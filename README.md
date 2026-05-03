@@ -172,6 +172,8 @@ python run_editor.py
 
 当前属于 Preview 分发阶段，未签名或未公证的包可能触发 macOS Gatekeeper、Windows SmartScreen 或杀毒软件提示。请只从本仓库 Release 页面下载，并优先校验 SHA-256。
 
+维护者发布预览版时，`prepare_preview_release.py` 会生成公开推荐附件的 `.sha256` 与 `.checksum.json` 清单；如果 Release 页面附带这些文件，下载者可以先核对哈希再解压。
+
 ### 游戏成品导出
 
 打开项目后，可在编辑器的 `预览导出` 页生成游戏成品包：
@@ -264,6 +266,9 @@ macOS / Linux：
 
 ```bash
 cd tony-na-engine
+node --check prototype_editor/modules/asset_catalog.js
+node --check prototype_editor/modules/editor_mode.js
+node --check prototype_editor/modules/release_version.js
 node --check prototype_editor/app.js
 node --check export_player_template/player.js
 python3 -m py_compile run_editor.py
@@ -273,6 +278,9 @@ Windows：
 
 ```bat
 cd tony-na-engine
+node --check prototype_editor/modules/asset_catalog.js
+node --check prototype_editor/modules/editor_mode.js
+node --check prototype_editor/modules/release_version.js
 node --check prototype_editor/app.js
 node --check export_player_template/player.js
 py -3 -m py_compile run_editor.py
@@ -312,6 +320,30 @@ cd tony-na-engine
 py -3 -m unittest discover -s tests -p "test_browser_playwright_smoke.py" -v
 ```
 
+发布工具与前端模块：
+
+macOS / Linux：
+
+```bash
+cd tony-na-engine
+python3 -m unittest discover -s tests -p 'test_prepare_preview_release.py' -v
+python3 -m unittest discover -s tests -p 'test_frontend_asset_catalog_module.py' -v
+python3 -m unittest discover -s tests -p 'test_frontend_entrypoint_modules.py' -v
+python3 -m unittest discover -s tests -p 'test_frontend_editor_mode_module.py' -v
+python3 -m unittest discover -s tests -p 'test_frontend_release_version_module.py' -v
+```
+
+Windows：
+
+```bat
+cd tony-na-engine
+py -3 -m unittest discover -s tests -p "test_prepare_preview_release.py" -v
+py -3 -m unittest discover -s tests -p "test_frontend_asset_catalog_module.py" -v
+py -3 -m unittest discover -s tests -p "test_frontend_entrypoint_modules.py" -v
+py -3 -m unittest discover -s tests -p "test_frontend_editor_mode_module.py" -v
+py -3 -m unittest discover -s tests -p "test_frontend_release_version_module.py" -v
+```
+
 原生 Runtime 渲染 smoke（会在仓库内创建隔离虚拟环境并安装 `pygame-ce`）：
 
 macOS / Linux：
@@ -340,6 +372,7 @@ run_native_runtime_smoke.cmd
 
 - Python 语法检查
 - 前端脚本语法检查
+- 发布工具与前端模块测试
 - 后端 smoke 测试
 - 原生 Runtime 渲染 smoke 测试
 - Playwright 浏览器烟测

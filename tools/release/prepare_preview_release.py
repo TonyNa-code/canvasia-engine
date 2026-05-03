@@ -531,7 +531,7 @@ def render_download_guide(report: dict[str, Any]) -> str:
         "",
     ]
     artifacts = report.get("artifacts") or []
-    public_artifacts = select_public_release_artifacts(artifacts)
+    public_artifacts = report.get("publicArtifacts") or select_public_release_artifacts(artifacts)
     if public_artifacts:
         lines.extend(["### Recommended Assets", "", "| File | Type | Size | Best for |", "| --- | --- | --- | --- |"])
         for artifact in public_artifacts:
@@ -579,6 +579,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     discovered_artifacts = discover_artifacts(args.max_artifacts)
     accepted_artifacts = [artifact for artifact in discovered_artifacts if not has_release_check_errors(artifact)]
     rejected_artifacts = [artifact for artifact in discovered_artifacts if has_release_check_errors(artifact)]
+    public_artifacts = select_public_release_artifacts(accepted_artifacts)
     release_skip_reason = ""
     if args.skip_network:
         release_skip_reason = "network skipped"
@@ -590,10 +591,11 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         "githubActions": github_ci_status(git, skip_network=args.skip_network),
         "privacy": scan_privacy(extra_sensitive),
         "artifacts": accepted_artifacts,
+        "publicArtifacts": public_artifacts,
         "rejectedArtifacts": rejected_artifacts,
         "githubRelease": github_release_status(
             git,
-            accepted_artifacts,
+            public_artifacts,
             release_tag=args.release_tag,
             skip_reason=release_skip_reason,
         ),
@@ -664,11 +666,24 @@ def render_upload_manifest(report: dict[str, Any]) -> str:
     lines.extend(["", "## Suggested Upload Artifacts", ""])
     if not report["artifacts"]:
         lines.append("- No local artifacts found. Generate fresh exports before publishing.")
+    public_artifact_names = {artifact["name"] for artifact in report.get("publicArtifacts") or []}
+    if public_artifact_names:
+        lines.extend(
+            [
+                "These are the public Release assets checked against GitHub:",
+                "",
+                *[f"- `{name}`" for name in sorted(public_artifact_names)],
+                "",
+                "All accepted local artifacts are listed below for maintenance and archival review:",
+                "",
+            ]
+        )
     for artifact in report["artifacts"]:
         summary = artifact.get("releaseCheckSummary") or {}
         release_note = ""
         if summary:
             release_note = f" release-check errors={summary.get('errors', 0)} warnings={summary.get('warnings', 0)}"
+        visibility_note = " public-release" if artifact["name"] in public_artifact_names else " local-only"
         lines.extend(
             [
                 f"### `{artifact['name']}`",
@@ -678,7 +693,7 @@ def render_upload_manifest(report: dict[str, Any]) -> str:
                 f"- Size: `{artifact['sizeLabel']}`",
                 f"- SHA256: `{artifact['sha256']}`",
                 f"- Modified: `{artifact['modifiedAt']}`",
-                f"- Notes:{release_note or ' n/a'}",
+                f"- Notes:{visibility_note}{release_note}",
                 "",
             ]
         )
@@ -717,7 +732,7 @@ def render_release_body(report: dict[str, Any]) -> str:
     lines.append(f"- Privacy scan findings: `{len(report['privacy']['sensitiveFindings'])}`")
     lines.append(f"- Working tree clean when prepared: `{report['git']['workingTreeClean']}`")
     lines.extend(["", "## Artifact Checksums", ""])
-    public_artifacts = select_public_release_artifacts(report["artifacts"])
+    public_artifacts = report.get("publicArtifacts") or select_public_release_artifacts(report["artifacts"])
     if not public_artifacts:
         lines.append("- Attach freshly generated artifacts and paste their hashes here.")
     for artifact in public_artifacts:
@@ -726,18 +741,58 @@ def render_release_body(report: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def render_public_checksums_text(report: dict[str, Any]) -> str:
+    public_artifacts = report.get("publicArtifacts") or select_public_release_artifacts(report.get("artifacts") or [])
+    lines = [
+        f"# Generated: {report['generatedAt']}",
+        f"# Commit: {report['git']['shortCommit']}",
+    ]
+    lines.extend(f"{artifact['sha256']}  {artifact['name']}" for artifact in public_artifacts)
+    return "\n".join(lines) + "\n"
+
+
+def public_checksums_payload(report: dict[str, Any]) -> dict[str, Any]:
+    public_artifacts = report.get("publicArtifacts") or select_public_release_artifacts(report.get("artifacts") or [])
+    return {
+        "generatedAt": report["generatedAt"],
+        "commit": report["git"]["commit"],
+        "shortCommit": report["git"]["shortCommit"],
+        "branch": report["git"]["branch"],
+        "artifacts": [
+            {
+                "name": artifact["name"],
+                "path": artifact["path"],
+                "kind": artifact["kind"],
+                "size": artifact["size"],
+                "sizeLabel": artifact["sizeLabel"],
+                "sha256": artifact["sha256"],
+            }
+            for artifact in public_artifacts
+        ],
+    }
+
+
 def write_outputs(report: dict[str, Any], output_dir: Path) -> dict[str, str]:
     output_dir.mkdir(parents=True, exist_ok=True)
     json_path = output_dir / "preview-release-readiness.json"
     manifest_path = output_dir / "preview-release-upload-manifest.md"
     body_path = output_dir / "preview-release-body.md"
+    sha256_path = output_dir / "preview-release-public-assets.sha256"
+    checksum_json_path = output_dir / "preview-release-public-assets.checksum.json"
     json_path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     manifest_path.write_text(render_upload_manifest(report), encoding="utf-8")
     body_path.write_text(render_release_body(report), encoding="utf-8")
+    sha256_path.write_text(render_public_checksums_text(report), encoding="utf-8")
+    checksum_json_path.write_text(
+        json.dumps(public_checksums_payload(report), ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
     return {
         "json": relative(json_path),
         "manifest": relative(manifest_path),
         "releaseBody": relative(body_path),
+        "sha256": relative(sha256_path),
+        "checksumJson": relative(checksum_json_path),
     }
 
 
@@ -756,7 +811,7 @@ def print_summary(report: dict[str, Any], outputs: dict[str, str]) -> None:
             print(
                 "- GitHub Release: "
                 f"{release.get('tag')} / matched {len(release.get('matchedAssets') or [])} "
-                f"of {len(report['artifacts'])} suggested assets"
+                f"of {len(report.get('publicArtifacts') or [])} public assets"
             )
         else:
             print(f"- GitHub Release: {release.get('tag')} not found")
@@ -764,6 +819,7 @@ def print_summary(report: dict[str, Any], outputs: dict[str, str]) -> None:
         print(f"- GitHub Release: not checked ({release.get('reason')})")
     print(f"- Privacy findings: {len(report['privacy']['sensitiveFindings'])}")
     print(f"- Artifacts listed: {len(report['artifacts'])}")
+    print(f"- Public release artifacts: {len(report.get('publicArtifacts') or [])}")
     print(f"- Rejected artifacts: {len(report.get('rejectedArtifacts') or [])}")
     print(f"- Ready for Preview tag: {report['readyForPreviewTag']}")
     if report["warnings"]:

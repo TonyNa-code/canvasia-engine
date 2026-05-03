@@ -65,7 +65,9 @@ const BLOCK_LABELS = {
   condition: "条件判断",
 };
 
-const ASSET_TYPE_LABELS = {
+const assetCatalogTools = window.TonyNaEditorAssetCatalog;
+
+const ASSET_TYPE_LABELS = assetCatalogTools?.ASSET_TYPE_LABELS ?? {
   background: "背景",
   sprite: "立绘",
   cg: "CG",
@@ -80,7 +82,7 @@ const ASSET_TYPE_LABELS = {
   scene3d: "3D 场景",
 };
 
-const ASSET_PRESET_TAGS = {
+const ASSET_PRESET_TAGS = assetCatalogTools?.ASSET_PRESET_TAGS ?? {
   background: ["校园", "教室", "走廊", "屋顶", "黄昏", "夜晚", "日常"],
   sprite: ["默认", "微笑", "害羞", "生气", "悲伤", "女主", "主角"],
   cg: ["主线", "回忆", "约会", "告白", "高潮", "甜蜜"],
@@ -95,14 +97,14 @@ const ASSET_PRESET_TAGS = {
   scene3d: ["场景", "地图", "房间", "GLB", "交互"],
 };
 
-const CHARACTER_PRESENTATION_MODE_LABELS = {
+const CHARACTER_PRESENTATION_MODE_LABELS = assetCatalogTools?.CHARACTER_PRESENTATION_MODE_LABELS ?? {
   sprite: "普通立绘",
   layered_sprite: "差分立绘",
   live2d: "Live2D",
   model3d: "3D 模型",
 };
 
-const ASSET_FILTER_MODE_LABELS = {
+const ASSET_FILTER_MODE_LABELS = assetCatalogTools?.ASSET_FILTER_MODE_LABELS ?? {
   all: "显示全部",
   unused: "仅看未使用",
   missing_file: "仅看待导入",
@@ -112,7 +114,7 @@ const ASSET_FILTER_MODE_LABELS = {
   media_budget: "仅看素材预算风险",
 };
 
-const ASSET_FILTER_MODE_STATUS_LABELS = {
+const ASSET_FILTER_MODE_STATUS_LABELS = assetCatalogTools?.ASSET_FILTER_MODE_STATUS_LABELS ?? {
   all: "全部素材",
   unused: "未使用素材",
   missing_file: "待导入素材",
@@ -122,7 +124,7 @@ const ASSET_FILTER_MODE_STATUS_LABELS = {
   media_budget: "体积偏大、建议发布前压缩的素材",
 };
 
-const ASSET_MEDIA_BUDGET_LIMITS = {
+const ASSET_MEDIA_BUDGET_LIMITS = assetCatalogTools?.ASSET_MEDIA_BUDGET_LIMITS ?? {
   background: { warnBytes: 8 * 1024 * 1024, blockerBytes: 24 * 1024 * 1024, label: "背景图" },
   sprite: { warnBytes: 6 * 1024 * 1024, blockerBytes: 18 * 1024 * 1024, label: "立绘" },
   cg: { warnBytes: 10 * 1024 * 1024, blockerBytes: 32 * 1024 * 1024, label: "CG" },
@@ -156,6 +158,9 @@ const CREATIVE_ASSISTANT_REMEMBER_KEY_STORAGE_KEY = "tony-na-engine:creative-ass
 const CREATIVE_ASSISTANT_HISTORY_STORAGE_KEY = "tony-na-engine:creative-assistant-history";
 const CREATIVE_ASSISTANT_DEFAULT_OPENAI_MODEL = "gpt-5.5";
 const CREATIVE_ASSISTANT_MAX_HISTORY = 8;
+const editorModeTools = window.TonyNaEditorMode;
+const releaseVersionTools = window.TonyNaEditorReleaseVersion;
+const DEFAULT_PROJECT_RELEASE_VERSION = releaseVersionTools?.DEFAULT_PROJECT_RELEASE_VERSION ?? "1.0.0-preview";
 
 const CREATIVE_ASSISTANT_PROMPT_SAMPLES = [
   "雨夜校园悬疑恋爱，女主知道一个不能说的秘密",
@@ -1898,60 +1903,14 @@ const SCENE_PRIORITY_LABELS = {
   parked: "先放一放",
 };
 
-const EDITOR_MODE_LABELS = {
+const EDITOR_MODE_LABELS = editorModeTools?.EDITOR_MODE_LABELS ?? {
   beginner: "新手模式",
   advanced: "高级模式",
 };
 
-const NAV_SCREEN_LABELS = {
-  dashboard: {
-    beginner: "开工首页",
-    advanced: "首页",
-  },
-  story: {
-    beginner: "写剧情",
-    advanced: "写剧情",
-  },
-  assets: {
-    beginner: "补素材",
-    advanced: "管素材",
-  },
-  characters: {
-    beginner: "看角色",
-    advanced: "管角色",
-  },
-  script: {
-    beginner: "台词台本",
-    advanced: "台词台本",
-  },
-  inspection: {
-    beginner: "查问题",
-    advanced: "项目巡检",
-  },
-  preview: {
-    beginner: "试玩收尾",
-    advanced: "预览导出",
-  },
-};
-
-const BEGINNER_STORY_TOOLBAR_ACTIONS = new Set([
-  "create-scene",
-  "create-chapter",
-  "rename-scene",
-  "add-dialogue",
-  "add-narration",
-  "add-choice",
-  "add-background",
-  "add-character-show",
-  "add-music-play",
-  "add-video-play",
-  "add-jump",
-]);
-
-const BEGINNER_ASSET_TOOLBAR_ACTIONS = new Set([
-  "pick-assets",
-  "replace-asset-file",
-]);
+const NAV_SCREEN_LABELS = editorModeTools?.NAV_SCREEN_LABELS ?? {};
+const BEGINNER_STORY_TOOLBAR_ACTIONS = editorModeTools?.BEGINNER_STORY_TOOLBAR_ACTIONS ?? new Set();
+const BEGINNER_ASSET_TOOLBAR_ACTIONS = editorModeTools?.BEGINNER_ASSET_TOOLBAR_ACTIONS ?? new Set();
 
 const STORY_BLOCK_TYPE_FILTER_LABELS = {
   all: "全部卡片",
@@ -10138,59 +10097,31 @@ function buildDialogBoxPresentation(theme, project = state.data?.project, assetM
 }
 
 function getProjectReleaseVersion(project = state.data?.project) {
-  const releaseVersion = String(
-    project?.releaseVersion ?? project?.buildVersion ?? project?.version ?? "1.0.0-preview"
-  ).trim();
-  return releaseVersion || "1.0.0-preview";
+  return releaseVersionTools?.getProjectReleaseVersion?.(project) ?? DEFAULT_PROJECT_RELEASE_VERSION;
 }
 
 function getSafeEditorMode(mode) {
-  return String(mode ?? "").trim().toLowerCase() === "advanced" ? "advanced" : "beginner";
+  return editorModeTools?.getSafeEditorMode?.(mode) ?? (String(mode ?? "").trim().toLowerCase() === "advanced" ? "advanced" : "beginner");
 }
 
 function getProjectEditorMode(project = state.data?.project) {
-  return getSafeEditorMode(project?.editorMode);
+  return editorModeTools?.getProjectEditorMode?.(project) ?? getSafeEditorMode(project?.editorMode);
 }
 
 function isAdvancedEditorMode(project = state.data?.project) {
-  return getProjectEditorMode(project) === "advanced";
+  return editorModeTools?.isAdvancedEditorMode?.(project) ?? (getProjectEditorMode(project) === "advanced");
 }
 
 function getEditorModeLabel(mode) {
-  return EDITOR_MODE_LABELS[getSafeEditorMode(mode)] ?? EDITOR_MODE_LABELS.beginner;
+  return editorModeTools?.getEditorModeLabel?.(mode) ?? EDITOR_MODE_LABELS[getSafeEditorMode(mode)] ?? EDITOR_MODE_LABELS.beginner;
 }
 
 function getNavScreenLabel(screenName, mode = getProjectEditorMode()) {
-  const safeMode = getSafeEditorMode(mode);
-  return NAV_SCREEN_LABELS[screenName]?.[safeMode] ?? NAV_SCREEN_LABELS[screenName]?.advanced ?? screenName;
+  return editorModeTools?.getNavScreenLabel?.(screenName, mode) ?? NAV_SCREEN_LABELS[screenName]?.[getSafeEditorMode(mode)] ?? screenName;
 }
 
 function getEditorModeDescription(mode, context = "dashboard") {
-  const safeMode = getSafeEditorMode(mode);
-
-  if (safeMode === "advanced") {
-  if (context === "preview") {
-    return "显示完整的发布检查、导出诊断和修复入口，适合收尾与发布前巡检。";
-  }
-  if (context === "inspection") {
-    return "显示完整的项目巡检、问题过滤、发布检查和修复入口，适合集中 QA 与收尾。";
-  }
-  if (context === "story") {
-    return "显示完整剧情工具栏，包括变量、条件、复杂演出和结构整理入口。";
-  }
-    return "显示完整编辑能力，适合处理分支逻辑和复杂演出。";
-  }
-
-  if (context === "preview") {
-    return "当前只保留导出阶段最常用的信息和按钮。";
-  }
-  if (context === "inspection") {
-    return "当前只显示关键错误、缺口和巡检入口。";
-  }
-  if (context === "story") {
-    return "当前只保留常用剧情骨架按钮，优先处理台词、旁白、选项、背景和音乐。";
-  }
-  return "当前优先保留常用入口，适合处理基础剧情流程。";
+  return editorModeTools?.getEditorModeDescription?.(mode, context) ?? "";
 }
 
 function renderEditorModeSwitchButtons(mode = getProjectEditorMode(), options = {}) {
@@ -10461,31 +10392,11 @@ function applyEditorModeUi() {
 }
 
 function getReleaseVersionBase(version = getProjectReleaseVersion()) {
-  const cleanVersion = String(version ?? "").trim();
-  const match = cleanVersion.match(/\d+\.\d+\.\d+/);
-  return match?.[0] ?? "1.0.0";
+  return releaseVersionTools?.getReleaseVersionBase?.(version) ?? "1.0.0";
 }
 
 function buildReleaseVersionFromPreset(preset, currentVersion = getProjectReleaseVersion()) {
-  const baseVersion = getReleaseVersionBase(currentVersion);
-
-  if (preset === "preview") {
-    return `${baseVersion}-preview`;
-  }
-
-  if (preset === "beta") {
-    return `${baseVersion}-beta`;
-  }
-
-  if (preset === "rc") {
-    return `${baseVersion}-rc1`;
-  }
-
-  if (preset === "release") {
-    return baseVersion;
-  }
-
-  return currentVersion;
+  return releaseVersionTools?.buildReleaseVersionFromPreset?.(preset, currentVersion) ?? currentVersion;
 }
 
 function getResolutionLabel(width, height) {
@@ -14156,7 +14067,9 @@ function renderAssetsScreen() {
 }
 
 function getSafeCharacterPresentationMode(mode) {
-  return Object.prototype.hasOwnProperty.call(CHARACTER_PRESENTATION_MODE_LABELS, mode) ? mode : "sprite";
+  return assetCatalogTools?.getSafeCharacterPresentationMode?.(mode) ?? (
+    Object.prototype.hasOwnProperty.call(CHARACTER_PRESENTATION_MODE_LABELS, mode) ? mode : "sprite"
+  );
 }
 
 function getCharacterPresentation(character) {
@@ -14184,7 +14097,9 @@ function getCharacterPresentation(character) {
 
 function getCharacterPresentationModeLabel(character) {
   const presentation = getCharacterPresentation(character);
-  return CHARACTER_PRESENTATION_MODE_LABELS[presentation.mode] ?? CHARACTER_PRESENTATION_MODE_LABELS.sprite;
+  return assetCatalogTools?.getCharacterPresentationModeLabel?.(presentation.mode) ?? (
+    CHARACTER_PRESENTATION_MODE_LABELS[presentation.mode] ?? CHARACTER_PRESENTATION_MODE_LABELS.sprite
+  );
 }
 
 function getCharacterPresentationPrimaryAssetId(character) {
@@ -38570,16 +38485,21 @@ function isAssetMissingFile(asset) {
 }
 
 function getSafeAssetFilterMode(filterMode) {
-  const safeMode = String(filterMode ?? "").trim();
-  return Object.prototype.hasOwnProperty.call(ASSET_FILTER_MODE_LABELS, safeMode) ? safeMode : "all";
+  return assetCatalogTools?.getSafeAssetFilterMode?.(filterMode) ?? (
+    Object.prototype.hasOwnProperty.call(ASSET_FILTER_MODE_LABELS, String(filterMode ?? "").trim())
+      ? String(filterMode ?? "").trim()
+      : "all"
+  );
 }
 
 function getAssetFilterModeLabel(filterMode) {
-  return ASSET_FILTER_MODE_LABELS[getSafeAssetFilterMode(filterMode)] ?? ASSET_FILTER_MODE_LABELS.all;
+  return assetCatalogTools?.getAssetFilterModeLabel?.(filterMode) ?? (
+    ASSET_FILTER_MODE_LABELS[getSafeAssetFilterMode(filterMode)] ?? ASSET_FILTER_MODE_LABELS.all
+  );
 }
 
 function getAssetFilterModeStatusLabel(filterMode) {
-  return (
+  return assetCatalogTools?.getAssetFilterModeStatusLabel?.(filterMode) ?? (
     ASSET_FILTER_MODE_STATUS_LABELS[getSafeAssetFilterMode(filterMode)] ??
     ASSET_FILTER_MODE_STATUS_LABELS.all
   );
@@ -38649,10 +38569,9 @@ function getNativeRuntime3dRiskForAsset(assetId) {
 }
 
 function getAssetMediaBudgetLimit(asset) {
-  if (!asset) {
-    return null;
-  }
-  return ASSET_MEDIA_BUDGET_LIMITS[asset.type] ?? null;
+  return assetCatalogTools?.getAssetMediaBudgetLimit?.(asset) ?? (
+    asset ? ASSET_MEDIA_BUDGET_LIMITS[asset.type] ?? null : null
+  );
 }
 
 function getAssetMediaBudgetSuggestion(asset, severity = "warn") {
@@ -39374,7 +39293,7 @@ function toggleAssetChecked(assetId, checked) {
 }
 
 function getAssetPresetTags(assetType) {
-  return ASSET_PRESET_TAGS[assetType] ?? [];
+  return assetCatalogTools?.getAssetPresetTags?.(assetType) ?? ASSET_PRESET_TAGS[assetType] ?? [];
 }
 
 function getSafeCharacterId(characterId) {
@@ -42732,7 +42651,7 @@ function getDefaultCharacterPosition(characterId) {
 }
 
 function getAssetTypeLabel(type) {
-  return ASSET_TYPE_LABELS[type] ?? type;
+  return assetCatalogTools?.getAssetTypeLabel?.(type) ?? ASSET_TYPE_LABELS[type] ?? type;
 }
 
 function getTemplateLabel(template) {

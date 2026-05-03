@@ -32,14 +32,30 @@ jobs:
             native_runtime/build_native_runtime_app.py \
             tools/release/check_editor_signing_readiness.py \
             tools/runtime/run_native_runtime_smoke.py \
+            tests/test_prepare_preview_release.py \
+            tests/test_frontend_asset_catalog_module.py \
+            tests/test_frontend_entrypoint_modules.py \
+            tests/test_frontend_editor_mode_module.py \
+            tests/test_frontend_release_version_module.py \
             tests/test_run_editor_smoke.py \
             tests/test_native_runtime_render_smoke.py \
             tests/test_browser_playwright_smoke.py
 
       - name: Frontend syntax check
         run: |
+          node --check prototype_editor/modules/asset_catalog.js
+          node --check prototype_editor/modules/editor_mode.js
+          node --check prototype_editor/modules/release_version.js
           node --check prototype_editor/app.js
           node --check export_player_template/player.js
+
+      - name: Release tooling tests
+        run: |
+          python -m unittest discover -s tests -p 'test_prepare_preview_release.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_asset_catalog_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_entrypoint_modules.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_editor_mode_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_release_version_module.py' -v
 
       - name: Backend smoke tests
         run: |

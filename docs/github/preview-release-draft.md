@@ -16,7 +16,7 @@ This release is intended for creators who want to try the editor, build a small 
 - Advanced particle presets and project-level particle preset library.
 - Project-level game UI skins, layout positioning, and visual novel text box styling.
 - Web runtime export and NW.js desktop package paths.
-- Native Runtime Preview with title screen, save/load, settings, archives, crash logs, PyInstaller packaging scripts, and system-player video bridge.
+- Native Runtime Preview with title screen, save/load, settings, archives, crash logs, PyInstaller packaging scripts, optional embedded video playback, and fallback system-player bridge.
 - Automated tests covering backend smoke paths and browser Playwright smoke paths.
 
 ## Downloads
