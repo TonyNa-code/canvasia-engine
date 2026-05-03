@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import urllib.error
 import urllib.parse
@@ -18,6 +19,9 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT_DIR = ROOT_DIR / "release_preview"
 RELEASE_DRAFT_PATH = ROOT_DIR / "docs" / "github" / "preview-release-draft.md"
 DOWNLOAD_GUIDE_MARKER = "<!-- TNE_GENERATED_DOWNLOAD_GUIDE -->"
+UPLOAD_ASSET_BUNDLE_DIRNAME = "preview-release-upload-assets"
+PUBLIC_ASSET_SHA256_NAME = "preview-release-public-assets.sha256"
+PUBLIC_ASSET_CHECKSUM_JSON_NAME = "preview-release-public-assets.checksum.json"
 
 EXCLUDED_PRIVACY_DIRS = {
     ".git",
@@ -731,8 +735,22 @@ def render_release_body(report: dict[str, Any]) -> str:
         lines.append(f"- GitHub Actions: not checked ({ci.get('reason')})")
     lines.append(f"- Privacy scan findings: `{len(report['privacy']['sensitiveFindings'])}`")
     lines.append(f"- Working tree clean when prepared: `{report['git']['workingTreeClean']}`")
-    lines.extend(["", "## Artifact Checksums", ""])
     public_artifacts = report.get("publicArtifacts") or select_public_release_artifacts(report["artifacts"])
+    if public_artifacts:
+        lines.extend(
+            [
+                "",
+                "### Download Verification",
+                "",
+                "If the Release includes the verification files, download them into the same folder as the package files before opening the packages.",
+                "",
+                "- macOS: run `verify_release_assets.command`, or run `sh verify_release_assets.sh` in Terminal.",
+                "- Linux: run `sh verify_release_assets.sh` in Terminal.",
+                "- Windows: run `verify_release_assets.cmd` from Command Prompt or PowerShell.",
+                "- Manual check: compare package hashes with `preview-release-public-assets.sha256` or `preview-release-public-assets.checksum.json`.",
+            ]
+        )
+    lines.extend(["", "## Artifact Checksums", ""])
     if not public_artifacts:
         lines.append("- Attach freshly generated artifacts and paste their hashes here.")
     for artifact in public_artifacts:
@@ -772,13 +790,182 @@ def public_checksums_payload(report: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def write_outputs(report: dict[str, Any], output_dir: Path) -> dict[str, str]:
+def render_release_verify_shell_script() -> str:
+    return f"""#!/bin/sh
+set -u
+
+cd "$(dirname "$0")" || exit 1
+CHECKSUM_FILE="{PUBLIC_ASSET_SHA256_NAME}"
+
+if [ ! -f "$CHECKSUM_FILE" ]; then
+  echo "Missing $CHECKSUM_FILE"
+  exit 2
+fi
+
+if command -v shasum >/dev/null 2>&1; then
+  HASH_COMMAND="shasum -a 256"
+elif command -v sha256sum >/dev/null 2>&1; then
+  HASH_COMMAND="sha256sum"
+else
+  echo "No SHA-256 tool found. Install shasum or sha256sum."
+  exit 2
+fi
+
+FAILED=0
+while IFS= read -r LINE || [ -n "$LINE" ]; do
+  case "$LINE" in
+    ""|"#"*) continue ;;
+  esac
+
+  EXPECTED=$(printf "%s" "$LINE" | awk '{{print $1}}')
+  FILE_NAME=${{LINE#*  }}
+
+  if [ "$FILE_NAME" = "$LINE" ] || [ -z "$EXPECTED" ] || [ -z "$FILE_NAME" ]; then
+    echo "SKIP invalid checksum line: $LINE"
+    FAILED=1
+    continue
+  fi
+
+  if [ ! -f "$FILE_NAME" ]; then
+    echo "MISSING $FILE_NAME"
+    FAILED=1
+    continue
+  fi
+
+  ACTUAL=$($HASH_COMMAND "$FILE_NAME" | awk '{{print $1}}')
+  if [ "$ACTUAL" = "$EXPECTED" ]; then
+    echo "OK $FILE_NAME"
+  else
+    echo "FAIL $FILE_NAME"
+    echo "  expected: $EXPECTED"
+    echo "  actual:   $ACTUAL"
+    FAILED=1
+  fi
+done < "$CHECKSUM_FILE"
+
+if [ "$FAILED" -eq 0 ]; then
+  echo "All release assets verified."
+fi
+
+exit "$FAILED"
+"""
+
+
+def render_release_verify_windows_script() -> str:
+    return f"""@echo off
+setlocal EnableExtensions EnableDelayedExpansion
+cd /d "%~dp0"
+set "CHECKSUM_FILE={PUBLIC_ASSET_SHA256_NAME}"
+set "FAILED=0"
+
+if not exist "%CHECKSUM_FILE%" (
+  echo Missing %CHECKSUM_FILE%
+  exit /b 2
+)
+
+for /f "usebackq tokens=1,* delims= " %%A in ("%CHECKSUM_FILE%") do (
+  set "EXPECTED=%%A"
+  set "FILE_NAME=%%B"
+  if not "!EXPECTED:~0,1!"=="#" (
+    if "!FILE_NAME!"=="" (
+      echo SKIP invalid checksum line: %%A %%B
+      set "FAILED=1"
+    ) else if not exist "!FILE_NAME!" (
+      echo MISSING !FILE_NAME!
+      set "FAILED=1"
+    ) else (
+      set "ACTUAL="
+      for /f "tokens=1" %%H in ('certutil -hashfile "!FILE_NAME!" SHA256 ^| findstr /R /V "hash CertUtil"') do if not defined ACTUAL set "ACTUAL=%%H"
+      if /I "!ACTUAL!"=="!EXPECTED!" (
+        echo OK !FILE_NAME!
+      ) else (
+        echo FAIL !FILE_NAME!
+        echo   expected: !EXPECTED!
+        echo   actual:   !ACTUAL!
+        set "FAILED=1"
+      )
+    )
+  )
+)
+
+if "%FAILED%"=="0" echo All release assets verified.
+exit /b %FAILED%
+"""
+
+
+def write_release_verifier_scripts(output_dir: Path) -> list[Path]:
+    shell_script = render_release_verify_shell_script()
+    scripts = [
+        (output_dir / "verify_release_assets.sh", shell_script, 0o755),
+        (output_dir / "verify_release_assets.command", shell_script, 0o755),
+        (output_dir / "verify_release_assets.cmd", render_release_verify_windows_script(), 0o644),
+    ]
+    written_paths: list[Path] = []
+    for path, content, mode in scripts:
+        path.write_text(content, encoding="utf-8", newline="\n")
+        path.chmod(mode)
+        written_paths.append(path)
+    return written_paths
+
+
+def copy_public_upload_assets(report: dict[str, Any], output_dir: Path, companion_paths: list[Path]) -> dict[str, Any]:
+    public_artifacts = report.get("publicArtifacts") or select_public_release_artifacts(report.get("artifacts") or [])
+    bundle_dir = output_dir / UPLOAD_ASSET_BUNDLE_DIRNAME
+    bundle_dir.mkdir(parents=True, exist_ok=True)
+    copied: list[dict[str, str]] = []
+    missing: list[dict[str, str]] = []
+
+    for artifact in public_artifacts:
+        source = ROOT_DIR / str(artifact.get("path") or "")
+        target = bundle_dir / str(artifact.get("name") or source.name)
+        if source.is_file():
+            shutil.copy2(source, target)
+            copied.append({"name": target.name, "source": relative(source), "path": relative(target)})
+        else:
+            missing.append({"name": str(artifact.get("name") or ""), "source": relative(source)})
+
+    for companion_path in companion_paths:
+        target = bundle_dir / companion_path.name
+        shutil.copy2(companion_path, target)
+        copied.append({"name": target.name, "source": relative(companion_path), "path": relative(target)})
+
+    manifest_path = bundle_dir / "UPLOAD_ASSETS.md"
+    manifest_lines = [
+        "# Preview Release Upload Assets",
+        "",
+        "Upload the ready files listed below to the GitHub Release assets area.",
+        "",
+        f"- Generated: `{report['generatedAt']}`",
+        f"- Commit: `{report['git']['shortCommit']}`",
+        f"- Files ready: `{len(copied)}`",
+        f"- Missing public artifacts: `{len(missing)}`",
+        "",
+        "## Ready Files",
+        "",
+    ]
+    manifest_lines.extend(f"- `{item['name']}`" for item in copied)
+    if missing:
+        manifest_lines.extend(["", "## Missing Files", ""])
+        manifest_lines.extend(f"- `{item['name']}` from `{item['source']}`" for item in missing)
+    manifest_lines.append("")
+    manifest_path.write_text("\n".join(manifest_lines), encoding="utf-8")
+    copied.append({"name": manifest_path.name, "source": relative(manifest_path), "path": relative(manifest_path)})
+
+    return {
+        "path": relative(bundle_dir),
+        "manifest": relative(manifest_path),
+        "copied": copied,
+        "missing": missing,
+    }
+
+
+def write_outputs(report: dict[str, Any], output_dir: Path, *, copy_public_assets: bool = False) -> dict[str, str]:
     output_dir.mkdir(parents=True, exist_ok=True)
     json_path = output_dir / "preview-release-readiness.json"
     manifest_path = output_dir / "preview-release-upload-manifest.md"
     body_path = output_dir / "preview-release-body.md"
-    sha256_path = output_dir / "preview-release-public-assets.sha256"
-    checksum_json_path = output_dir / "preview-release-public-assets.checksum.json"
+    sha256_path = output_dir / PUBLIC_ASSET_SHA256_NAME
+    checksum_json_path = output_dir / PUBLIC_ASSET_CHECKSUM_JSON_NAME
     json_path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     manifest_path.write_text(render_upload_manifest(report), encoding="utf-8")
     body_path.write_text(render_release_body(report), encoding="utf-8")
@@ -787,13 +974,22 @@ def write_outputs(report: dict[str, Any], output_dir: Path) -> dict[str, str]:
         json.dumps(public_checksums_payload(report), ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
-    return {
+    verifier_paths = write_release_verifier_scripts(output_dir)
+    outputs = {
         "json": relative(json_path),
         "manifest": relative(manifest_path),
         "releaseBody": relative(body_path),
         "sha256": relative(sha256_path),
         "checksumJson": relative(checksum_json_path),
+        "verifyShell": relative(verifier_paths[0]),
+        "verifyMac": relative(verifier_paths[1]),
+        "verifyWindows": relative(verifier_paths[2]),
     }
+    if copy_public_assets:
+        upload_bundle = copy_public_upload_assets(report, output_dir, [sha256_path, checksum_json_path, *verifier_paths])
+        outputs["uploadAssets"] = upload_bundle["path"]
+        outputs["uploadAssetsManifest"] = upload_bundle["manifest"]
+    return outputs
 
 
 def print_summary(report: dict[str, Any], outputs: dict[str, str]) -> None:
@@ -841,6 +1037,11 @@ def main() -> int:
     parser.add_argument("--release-tag", default="", help="GitHub Release tag to compare against; default uses a tag at HEAD")
     parser.add_argument("--skip-release-check", action="store_true", help="Do not compare GitHub Release assets")
     parser.add_argument(
+        "--copy-public-assets",
+        action="store_true",
+        help="Copy public artifacts and generated checksum files into a ready-to-upload folder",
+    )
+    parser.add_argument(
         "--extra-sensitive",
         action="append",
         default=[],
@@ -852,7 +1053,7 @@ def main() -> int:
 
     output_dir = args.output_dir or (DEFAULT_OUTPUT_DIR / current_timestamp())
     report = build_report(args)
-    outputs = write_outputs(report, output_dir)
+    outputs = write_outputs(report, output_dir, copy_public_assets=args.copy_public_assets)
     print_summary(report, outputs)
     return 0 if report["readyForPreviewTag"] else 1
 

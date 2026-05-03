@@ -172,7 +172,7 @@ python run_editor.py
 
 当前属于 Preview 分发阶段，未签名或未公证的包可能触发 macOS Gatekeeper、Windows SmartScreen 或杀毒软件提示。请只从本仓库 Release 页面下载，并优先校验 SHA-256。
 
-维护者发布预览版时，`prepare_preview_release.py` 会生成公开推荐附件的 `.sha256` 与 `.checksum.json` 清单；如果 Release 页面附带这些文件，下载者可以先核对哈希再解压。
+维护者发布预览版时，`prepare_preview_release.py` 会生成公开推荐附件的 `.sha256`、`.checksum.json` 和三系统校验脚本；加上 `--copy-public-assets` 后，还会把推荐附件、校验清单和校验脚本集中到一个可直接上传到 GitHub Release 的目录。如果 Release 页面附带这些文件，下载者可以先核对哈希再解压。
 
 ### 游戏成品导出
 

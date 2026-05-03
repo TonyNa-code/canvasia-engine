@@ -14,6 +14,12 @@
 python3 tools/release/prepare_preview_release.py
 ```
 
+如果希望把公开推荐附件和校验清单集中到一个可直接上传的目录：
+
+```bash
+python3 tools/release/prepare_preview_release.py --copy-public-assets
+```
+
 发布后复查 GitHub Release 页面真实附件是否和本地推荐清单一致：
 
 ```bash
@@ -24,7 +30,7 @@ python3 tools/release/prepare_preview_release.py --release-tag v0.1.0-preview
 
 `prepare_preview_release.py` 会把公开 Release 推荐附件和本地历史产物分开：公开页面只校验最新推荐下载项，旧导出包仍会留在 upload manifest 里作为维护者复查线索，不要求全部上传。
 
-脚本会额外生成 `preview-release-public-assets.sha256` 和 `preview-release-public-assets.checksum.json`，发布时建议和公开推荐附件一起上传，方便下载者校验压缩包未损坏、未被替换。
+脚本会额外生成 `preview-release-public-assets.sha256`、`preview-release-public-assets.checksum.json`、`verify_release_assets.sh`、`verify_release_assets.command` 和 `verify_release_assets.cmd`，发布时建议和公开推荐附件一起上传，方便下载者校验压缩包未损坏、未被替换。
 
 如果需要额外扫描旧用户名、真实姓名或其他私密字符串，不要把这些词写进仓库文件；用本地环境变量临时传入：
 
