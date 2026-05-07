@@ -33,10 +33,21 @@ jobs:
             tools/release/check_editor_signing_readiness.py \
             tools/runtime/run_native_runtime_smoke.py \
             tests/test_prepare_preview_release.py \
+            tests/test_frontend_action_handlers.py \
             tests/test_frontend_asset_catalog_module.py \
+            tests/test_frontend_editor_common_module.py \
+            tests/test_frontend_creative_assistant_module.py \
+            tests/test_frontend_editor_filters_module.py \
             tests/test_frontend_entrypoint_modules.py \
             tests/test_frontend_editor_mode_module.py \
+            tests/test_frontend_preview_save_module.py \
+            tests/test_frontend_project_history_module.py \
+            tests/test_frontend_project_settings_module.py \
+            tests/test_frontend_recent_workspace_module.py \
             tests/test_frontend_release_version_module.py \
+            tests/test_frontend_script_voice_module.py \
+            tests/test_frontend_system_dialog_module.py \
+            tests/test_frontend_ui_theme_module.py \
             tests/test_run_editor_smoke.py \
             tests/test_native_runtime_render_smoke.py \
             tests/test_browser_playwright_smoke.py
@@ -44,18 +55,39 @@ jobs:
       - name: Frontend syntax check
         run: |
           node --check prototype_editor/modules/asset_catalog.js
+          node --check prototype_editor/modules/editor_common.js
+          node --check prototype_editor/modules/creative_assistant.js
+          node --check prototype_editor/modules/editor_filters.js
           node --check prototype_editor/modules/editor_mode.js
+          node --check prototype_editor/modules/preview_save.js
+          node --check prototype_editor/modules/project_history.js
+          node --check prototype_editor/modules/project_settings.js
+          node --check prototype_editor/modules/recent_workspace.js
           node --check prototype_editor/modules/release_version.js
+          node --check prototype_editor/modules/script_voice.js
+          node --check prototype_editor/modules/system_dialog.js
+          node --check prototype_editor/modules/ui_theme.js
           node --check prototype_editor/app.js
           node --check export_player_template/player.js
 
       - name: Release tooling tests
         run: |
           python -m unittest discover -s tests -p 'test_prepare_preview_release.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_action_handlers.py' -v
           python -m unittest discover -s tests -p 'test_frontend_asset_catalog_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_editor_common_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_creative_assistant_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_editor_filters_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_entrypoint_modules.py' -v
           python -m unittest discover -s tests -p 'test_frontend_editor_mode_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_preview_save_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_project_history_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_project_settings_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_recent_workspace_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_release_version_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_script_voice_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_system_dialog_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_ui_theme_module.py' -v
 
       - name: Backend smoke tests
         run: |

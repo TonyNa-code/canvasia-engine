@@ -2447,6 +2447,26 @@ body[data-editor-mode="beginner"] #screen-preview #previewSceneFilterBar {
   width: auto;
 }
 
+.creative-openai-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(82, 101, 138, 0.1);
+}
+
+.creative-openai-actions > span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.creative-import-button {
+  position: relative;
+  user-select: none;
+}
+
 .creative-mode-button,
 .creative-sample-chip {
   border: 1px solid rgba(82, 101, 138, 0.14);
@@ -2634,9 +2654,57 @@ body[data-editor-mode="beginner"] #screen-preview #previewSceneFilterBar {
   justify-content: space-between;
 }
 
+.creative-history-head-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .creative-history-head > div {
   display: grid;
   gap: 3px;
+}
+
+.creative-history-head > div span:last-child {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.creative-history-tools {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto;
+  gap: 9px;
+  align-items: center;
+}
+
+.creative-history-search input {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(82, 101, 138, 0.14);
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--ink);
+}
+
+.creative-history-tools .toolbar-button.is-active {
+  background: linear-gradient(135deg, rgba(48, 91, 255, 0.94), rgba(136, 78, 255, 0.9));
+  color: white;
+  box-shadow: 0 10px 22px rgba(82, 101, 138, 0.18);
+}
+
+.creative-history-recovery {
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(74, 112, 255, 0.16);
+  background:
+    linear-gradient(135deg, rgba(246, 250, 255, 0.92), rgba(239, 244, 255, 0.72)),
+    radial-gradient(circle at top left, rgba(92, 122, 255, 0.12), transparent 34%);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
 }
 
 .creative-history-list {
@@ -2652,6 +2720,13 @@ body[data-editor-mode="beginner"] #screen-preview #previewSceneFilterBar {
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.72);
   border: 1px solid rgba(82, 101, 138, 0.1);
+}
+
+.creative-history-card.is-favorite {
+  border-color: rgba(74, 112, 255, 0.22);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.88), rgba(241, 247, 255, 0.78)),
+    radial-gradient(circle at top right, rgba(126, 92, 255, 0.16), transparent 36%);
 }
 
 .creative-history-card > div:first-child {
@@ -2682,9 +2757,35 @@ body[data-editor-mode="beginner"] #screen-preview #previewSceneFilterBar {
   font-size: 11px;
 }
 
+.creative-history-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.creative-history-meta span {
+  padding: 3px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(82, 101, 138, 0.1);
+  background: rgba(245, 249, 255, 0.76);
+  color: var(--muted);
+  font-size: 10px;
+}
+
 .creative-history-actions {
   justify-content: flex-end;
   flex-wrap: wrap;
+}
+
+.creative-history-empty {
+  grid-column: 1 / -1;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px dashed rgba(82, 101, 138, 0.18);
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.54);
+  font-size: 12px;
 }
 
 .creative-history-note {

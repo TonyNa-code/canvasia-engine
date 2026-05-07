@@ -640,6 +640,21 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
         panel.get_by_text("可插入").wait_for(timeout=15000)
         panel.get_by_text("剧情卡片预览").wait_for(timeout=10000)
         panel.locator(".creative-assistant-history").wait_for(timeout=10000)
+        panel.get_by_role("button", name="收藏", exact=True).first.click()
+        panel.get_by_role("button", name="已收藏", exact=True).first.wait_for(timeout=10000)
+        panel.locator("#creativeAssistantHistorySearchInput").fill("雨夜")
+        panel.locator(".creative-history-card").first.wait_for(timeout=10000)
+        panel.locator("#creativeAssistantHistorySearchInput").fill("找不到的灵感关键词")
+        panel.get_by_text("没有匹配的灵感").wait_for(timeout=10000)
+        panel.locator("#creativeAssistantHistorySearchInput").fill("")
+        panel.get_by_role("button", name="只看收藏").click()
+        panel.get_by_role("button", name="显示全部").wait_for(timeout=10000)
+        panel.locator(".creative-history-card").first.wait_for(timeout=10000)
+        history_meta = panel.locator(".creative-history-meta").first
+        history_meta.wait_for(timeout=10000)
+        self.assertRegex(history_meta.inner_text(), r"(张卡片|仅建议)")
+        self.assertIn("本地模板", history_meta.inner_text())
+        panel.get_by_role("button", name="显示全部").click()
 
         with self.page.expect_download() as download_info:
             panel.get_by_role("button", name="导出最新灵感").click()
@@ -649,7 +664,84 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
         self.assertTrue(download_path.exists())
         self.assertIn("creative_assistant_idea", download_path.read_text(encoding="utf-8"))
 
-        panel.get_by_role("button", name="恢复").first.click()
+        with self.page.expect_download() as archive_download_info:
+            panel.get_by_role("button", name="导出全部").click()
+        archive_download = archive_download_info.value
+        archive_path = self.repo_copy / archive_download.suggested_filename
+        archive_download.save_as(str(archive_path))
+        archive_payload = archive_path.read_text(encoding="utf-8")
+        self.assertIn("creative_assistant_history_archive", archive_payload)
+        self.assertIn('"containsApiKey": false', archive_payload)
+
+        with self.page.expect_download() as view_download_info:
+            panel.get_by_role("button", name="导出当前视图").click()
+        view_download = view_download_info.value
+        view_path = self.repo_copy / view_download.suggested_filename
+        view_download.save_as(str(view_path))
+        view_payload = view_path.read_text(encoding="utf-8")
+        self.assertIn("creative_assistant_history_archive", view_payload)
+
+        with self.page.expect_download() as markdown_download_info:
+            panel.get_by_role("button", name="导出 Markdown").click()
+        markdown_download = markdown_download_info.value
+        markdown_path = self.repo_copy / markdown_download.suggested_filename
+        markdown_download.save_as(str(markdown_path))
+        markdown_payload = markdown_path.read_text(encoding="utf-8")
+        self.assertIn("Tony Na Assistant 灵感档案", markdown_payload)
+        self.assertIn("隐私说明", markdown_payload)
+
+        panel.get_by_role("button", name="复制文档").first.click()
+        self.page.get_by_text("单条灵感 Markdown 已复制").wait_for(timeout=10000)
+
+        panel.get_by_role("button", name="OpenAI 真模型").click()
+        panel.locator("#creativeAssistantOpenAiKey").fill("sk-browser-smoke-test")
+        panel.locator("#creativeAssistantRememberKey").check()
+        self.assertEqual(
+            self.page.evaluate(
+                """() => localStorage.getItem("tony-na-engine:creative-assistant-openai-key")"""
+            ),
+            "sk-browser-smoke-test",
+        )
+        panel.get_by_role("button", name="忘记本机 Key").click()
+        self.assertEqual(panel.locator("#creativeAssistantOpenAiKey").input_value(), "")
+        self.assertTrue(panel.get_by_role("button", name="忘记本机 Key").is_disabled())
+        self.assertIsNone(
+            self.page.evaluate(
+                """() => localStorage.getItem("tony-na-engine:creative-assistant-openai-key")"""
+            )
+        )
+
+        panel.get_by_role("button", name="清空").click()
+        self.page.get_by_role("button", name="清空灵感盒").click()
+        self.page.wait_for_function(
+            """() => document.querySelectorAll("#creativeAssistantPanel .creative-history-card").length === 0""",
+            timeout=15000,
+        )
+        panel.get_by_role("button", name="恢复上次清理").click()
+        panel.locator(".creative-history-card").first.wait_for(timeout=10000)
+        panel.get_by_role("button", name="清空").click()
+        self.page.get_by_role("button", name="清空灵感盒").click()
+        self.page.wait_for_function(
+            """() => document.querySelectorAll("#creativeAssistantPanel .creative-history-card").length === 0""",
+            timeout=15000,
+        )
+        panel.locator("#creativeAssistantHistoryImportInput").set_input_files(str(archive_path))
+        panel.locator(".creative-assistant-history").wait_for(timeout=10000)
+        panel.get_by_role("button", name="已收藏", exact=True).first.wait_for(timeout=10000)
+        panel.locator('[data-action="set-creative-assistant-provider"][data-creative-provider="local"]').click()
+        panel.locator("#creativeAssistantPrompt").fill("黄昏天台，青梅竹马终于谈起三年前的误会")
+        panel.get_by_role("button", name="生成建议").click()
+        panel.locator(".creative-history-card").nth(1).wait_for(timeout=10000)
+        panel.get_by_role("button", name="清理未收藏").click()
+        self.page.get_by_role("button", name="确认清理").click()
+        self.page.get_by_text("未收藏灵感已清理").wait_for(timeout=10000)
+        self.assertEqual(panel.locator(".creative-history-card").count(), 1)
+        panel.get_by_role("button", name="恢复上次清理").click()
+        self.page.get_by_role("button", name="恢复灵感盒").click()
+        self.page.get_by_text("已恢复，当前灵感盒已转存为恢复点").wait_for(timeout=10000)
+        self.assertGreater(panel.locator(".creative-history-card").count(), 1)
+
+        panel.locator(".creative-history-card").first.get_by_role("button", name="恢复", exact=True).click()
         panel.get_by_role("button", name="插入到当前场景").click()
         self.page.wait_for_function(
             """([selector, expected]) => document.querySelectorAll(selector).length > expected""",

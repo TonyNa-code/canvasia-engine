@@ -48,7 +48,7 @@ Tony Na Engine 当前更适合这样理解：
 - 新手模式 / 高级模式分层
 - 角色、素材、台词台本、配音工作流
 - 项目巡检、一键发布前修复顺序、素材性能预算、发布总控 Markdown / JSON 报告、自动回归试玩路线测试
-- Tony Na Assistant 智能创作助手：支持零配置本地模板，也支持创作者自带 OpenAI API Key 调用真模型生成剧情、建议、素材提示和可导出的灵感包
+- Tony Na Assistant 智能创作助手：支持零配置本地模板，也支持创作者自带 OpenAI API Key 调用真模型生成剧情、建议、素材提示、灵感盒归档包和可插入剧情卡片
 - 正式存档 / 读档、系统菜单
 - 项目级成品 UI 皮肤、UI Kit 部件绑定、九宫格贴图、按钮多状态贴图、布局位置微调与视觉小说文本框设计
 - EXTRA 回想馆、图鉴馆、成就馆、章节回放、结局回放、语音回听
@@ -63,7 +63,7 @@ Tony Na Engine 当前更适合这样理解：
 | --- | --- | --- |
 | 剧情 / 分支编辑 | 可用 | 支持可视化卡片、选项跳转、条件与变量、场景树筛选。 |
 | 素材管理 | 可用 | 支持背景、角色、CG、BGM、音效、语音、字体等素材导入、替换、删除、使用保护与发布前体积预算提示。 |
-| 智能创作助手 | 可用 | 默认本地模板；可选自带 OpenAI API Key 的真模型模式；支持灵感盒、卡片预览、勾选插入与导出。 |
+| 智能创作助手 | 可用 | 默认本地模板；可选自带 OpenAI API Key 的真模型模式；支持灵感盒搜索、收藏保留、卡片预览、勾选插入、单条 / 全量 Markdown 创作档案、单条导出、全部归档、导入与本机 Key 遗忘。 |
 | 项目安全网 | 可用 | 支持自动快照、版本恢复、崩溃恢复、正式存档 / 读档、发布前检查与发布总控 Markdown / JSON 报告导出。 |
 | 成品 UI 自定义 | 可用 | 支持项目级 UI 皮肤、按钮多状态、九宫格贴图、布局位置与视觉小说文本框设计。 |
 | EXTRA / 回想系统 | 可用 | 支持图鉴馆、回想馆、成就馆、章节回放、结局回放与语音回听。 |
@@ -88,6 +88,9 @@ Tony Na Engine 当前更适合这样理解：
 - [`prototype_editor`](prototype_editor)  
   编辑器前端
 
+- [`prototype_editor/modules`](prototype_editor/modules)
+  前端纯逻辑模块，覆盖素材目录、创作助手、发布总控、变量、外观主题、项目历史等可单独测试的能力
+
 - [`export_player_template`](export_player_template)  
   导出后玩家端 Runtime 模板
 
@@ -103,9 +106,9 @@ Tony Na Engine 当前更适合这样理解：
 
 - 默认使用本地模板模式，不需要联网，不会上传项目内容，也不会产生 API 费用
 - 创作者可自带 OpenAI API Key，并在面板里切换到 `OpenAI 真模型`，用于生成更自由的剧情片段、创作建议、场景润色和素材概念提示
-- API Key 不会写入项目文件；只有勾选“只在本浏览器记住 Key”时，才会保存在当前浏览器的 localStorage
+- API Key 不会写入项目文件；只有勾选“只在本浏览器记住 Key”时，才会保存在当前浏览器的 localStorage，并可随时点击“忘记本机 Key”移除；助手结果进入界面和灵感盒前会按固定字段清洗，避免异常字段混入项目数据
 - 真模型不可用或未填写 Key 时，会自动回落到本地模板助手，避免创作流程被卡住
-- 生成结果会进入本地“灵感盒”，可恢复、删除或导出为 `.tn-idea.json`；灵感盒同样只保存在当前浏览器
+- 生成结果会进入本地“灵感盒”，可搜索、收藏、恢复、删除、清理未收藏、复制历史剧情卡片、复制单条 Markdown 文档、导出 Markdown 创作档案、单条导出为 `.tn-idea.json`，也可以导出当前视图或导入全部 `.tn-idea-vault.json`；容量到上限时会优先保留收藏灵感，清理类操作会先提醒备份并要求确认，最近一次清理前的灵感盒可一键恢复，恢复前会把当前灵感盒转存成新的恢复点
 - 插入前可以预览、勾选将要写入的剧情卡片，并复制成台本文本，方便创作者先审稿或发给协作者
 
 ## 快速开始
@@ -267,8 +270,18 @@ macOS / Linux：
 ```bash
 cd tony-na-engine
 node --check prototype_editor/modules/asset_catalog.js
+node --check prototype_editor/modules/editor_common.js
+node --check prototype_editor/modules/creative_assistant.js
+node --check prototype_editor/modules/editor_filters.js
 node --check prototype_editor/modules/editor_mode.js
+node --check prototype_editor/modules/preview_save.js
+node --check prototype_editor/modules/project_history.js
+node --check prototype_editor/modules/project_settings.js
+node --check prototype_editor/modules/recent_workspace.js
 node --check prototype_editor/modules/release_version.js
+node --check prototype_editor/modules/script_voice.js
+node --check prototype_editor/modules/system_dialog.js
+node --check prototype_editor/modules/ui_theme.js
 node --check prototype_editor/app.js
 node --check export_player_template/player.js
 python3 -m py_compile run_editor.py
@@ -279,8 +292,18 @@ Windows：
 ```bat
 cd tony-na-engine
 node --check prototype_editor/modules/asset_catalog.js
+node --check prototype_editor/modules/editor_common.js
+node --check prototype_editor/modules/creative_assistant.js
+node --check prototype_editor/modules/editor_filters.js
 node --check prototype_editor/modules/editor_mode.js
+node --check prototype_editor/modules/preview_save.js
+node --check prototype_editor/modules/project_history.js
+node --check prototype_editor/modules/project_settings.js
+node --check prototype_editor/modules/recent_workspace.js
 node --check prototype_editor/modules/release_version.js
+node --check prototype_editor/modules/script_voice.js
+node --check prototype_editor/modules/system_dialog.js
+node --check prototype_editor/modules/ui_theme.js
 node --check prototype_editor/app.js
 node --check export_player_template/player.js
 py -3 -m py_compile run_editor.py
@@ -327,10 +350,21 @@ macOS / Linux：
 ```bash
 cd tony-na-engine
 python3 -m unittest discover -s tests -p 'test_prepare_preview_release.py' -v
+python3 -m unittest discover -s tests -p 'test_frontend_action_handlers.py' -v
 python3 -m unittest discover -s tests -p 'test_frontend_asset_catalog_module.py' -v
+python3 -m unittest discover -s tests -p 'test_frontend_editor_common_module.py' -v
+python3 -m unittest discover -s tests -p 'test_frontend_creative_assistant_module.py' -v
+python3 -m unittest discover -s tests -p 'test_frontend_editor_filters_module.py' -v
 python3 -m unittest discover -s tests -p 'test_frontend_entrypoint_modules.py' -v
 python3 -m unittest discover -s tests -p 'test_frontend_editor_mode_module.py' -v
+python3 -m unittest discover -s tests -p 'test_frontend_preview_save_module.py' -v
+python3 -m unittest discover -s tests -p 'test_frontend_project_history_module.py' -v
+python3 -m unittest discover -s tests -p 'test_frontend_project_settings_module.py' -v
+python3 -m unittest discover -s tests -p 'test_frontend_recent_workspace_module.py' -v
 python3 -m unittest discover -s tests -p 'test_frontend_release_version_module.py' -v
+python3 -m unittest discover -s tests -p 'test_frontend_script_voice_module.py' -v
+python3 -m unittest discover -s tests -p 'test_frontend_system_dialog_module.py' -v
+python3 -m unittest discover -s tests -p 'test_frontend_ui_theme_module.py' -v
 ```
 
 Windows：
@@ -338,10 +372,21 @@ Windows：
 ```bat
 cd tony-na-engine
 py -3 -m unittest discover -s tests -p "test_prepare_preview_release.py" -v
+py -3 -m unittest discover -s tests -p "test_frontend_action_handlers.py" -v
 py -3 -m unittest discover -s tests -p "test_frontend_asset_catalog_module.py" -v
+py -3 -m unittest discover -s tests -p "test_frontend_editor_common_module.py" -v
+py -3 -m unittest discover -s tests -p "test_frontend_creative_assistant_module.py" -v
+py -3 -m unittest discover -s tests -p "test_frontend_editor_filters_module.py" -v
 py -3 -m unittest discover -s tests -p "test_frontend_entrypoint_modules.py" -v
 py -3 -m unittest discover -s tests -p "test_frontend_editor_mode_module.py" -v
+py -3 -m unittest discover -s tests -p "test_frontend_preview_save_module.py" -v
+py -3 -m unittest discover -s tests -p "test_frontend_project_history_module.py" -v
+py -3 -m unittest discover -s tests -p "test_frontend_project_settings_module.py" -v
+py -3 -m unittest discover -s tests -p "test_frontend_recent_workspace_module.py" -v
 py -3 -m unittest discover -s tests -p "test_frontend_release_version_module.py" -v
+py -3 -m unittest discover -s tests -p "test_frontend_script_voice_module.py" -v
+py -3 -m unittest discover -s tests -p "test_frontend_system_dialog_module.py" -v
+py -3 -m unittest discover -s tests -p "test_frontend_ui_theme_module.py" -v
 ```
 
 原生 Runtime 渲染 smoke（会在仓库内创建隔离虚拟环境并安装 `pygame-ce`）：

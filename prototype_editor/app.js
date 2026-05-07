@@ -65,6 +65,17 @@ const BLOCK_LABELS = {
   condition: "条件判断",
 };
 
+const editorCommonTools = window.TonyNaEditorCommon;
+const projectSettingsTools = window.TonyNaEditorProjectSettings;
+const systemDialogTools = window.TonyNaEditorSystemDialog;
+const uiThemeTools = window.TonyNaEditorUiTheme;
+const previewSaveTools = window.TonyNaEditorPreviewSave;
+const recentWorkspaceTools = window.TonyNaEditorRecentWorkspace;
+const editorFilterTools = window.TonyNaEditorFilters;
+const scriptVoiceTools = window.TonyNaEditorScriptVoice;
+const visualEffectTools = window.TonyNaEditorVisualEffects;
+const variableTools = window.TonyNaEditorVariables;
+const projectHistoryTools = window.TonyNaEditorProjectHistory;
 const assetCatalogTools = window.TonyNaEditorAssetCatalog;
 
 const ASSET_TYPE_LABELS = assetCatalogTools?.ASSET_TYPE_LABELS ?? {
@@ -139,30 +150,41 @@ const ASSET_MEDIA_BUDGET_LIMITS = assetCatalogTools?.ASSET_MEDIA_BUDGET_LIMITS ?
   scene3d: { warnBytes: 120 * 1024 * 1024, blockerBytes: 500 * 1024 * 1024, label: "3D 场景" },
 };
 
-const CREATIVE_ASSISTANT_MODES = {
+const creativeAssistantTools = window.TonyNaEditorCreativeAssistant;
+
+const CREATIVE_ASSISTANT_MODES = creativeAssistantTools?.CREATIVE_ASSISTANT_MODES ?? {
   starter_demo: "试玩 Demo",
   script: "剧情片段",
   advice: "创作建议",
   polish: "场景润色",
 };
 
-const CREATIVE_ASSISTANT_PROVIDERS = {
+const CREATIVE_ASSISTANT_PROVIDERS = creativeAssistantTools?.CREATIVE_ASSISTANT_PROVIDERS ?? {
   local: "本地模板",
   openai: "OpenAI 真模型",
 };
 
-const CREATIVE_ASSISTANT_PROVIDER_STORAGE_KEY = "tony-na-engine:creative-assistant-provider";
-const CREATIVE_ASSISTANT_OPENAI_KEY_STORAGE_KEY = "tony-na-engine:creative-assistant-openai-key";
-const CREATIVE_ASSISTANT_OPENAI_MODEL_STORAGE_KEY = "tony-na-engine:creative-assistant-openai-model";
-const CREATIVE_ASSISTANT_REMEMBER_KEY_STORAGE_KEY = "tony-na-engine:creative-assistant-remember-key";
-const CREATIVE_ASSISTANT_HISTORY_STORAGE_KEY = "tony-na-engine:creative-assistant-history";
-const CREATIVE_ASSISTANT_DEFAULT_OPENAI_MODEL = "gpt-5.5";
-const CREATIVE_ASSISTANT_MAX_HISTORY = 8;
+const CREATIVE_ASSISTANT_PROVIDER_STORAGE_KEY =
+  creativeAssistantTools?.CREATIVE_ASSISTANT_PROVIDER_STORAGE_KEY ?? "tony-na-engine:creative-assistant-provider";
+const CREATIVE_ASSISTANT_OPENAI_KEY_STORAGE_KEY =
+  creativeAssistantTools?.CREATIVE_ASSISTANT_OPENAI_KEY_STORAGE_KEY ?? "tony-na-engine:creative-assistant-openai-key";
+const CREATIVE_ASSISTANT_OPENAI_MODEL_STORAGE_KEY =
+  creativeAssistantTools?.CREATIVE_ASSISTANT_OPENAI_MODEL_STORAGE_KEY ?? "tony-na-engine:creative-assistant-openai-model";
+const CREATIVE_ASSISTANT_REMEMBER_KEY_STORAGE_KEY =
+  creativeAssistantTools?.CREATIVE_ASSISTANT_REMEMBER_KEY_STORAGE_KEY ?? "tony-na-engine:creative-assistant-remember-key";
+const CREATIVE_ASSISTANT_HISTORY_STORAGE_KEY =
+  creativeAssistantTools?.CREATIVE_ASSISTANT_HISTORY_STORAGE_KEY ?? "tony-na-engine:creative-assistant-history";
+const CREATIVE_ASSISTANT_HISTORY_RECOVERY_STORAGE_KEY =
+  creativeAssistantTools?.CREATIVE_ASSISTANT_HISTORY_RECOVERY_STORAGE_KEY ?? "tony-na-engine:creative-assistant-history-recovery";
+const CREATIVE_ASSISTANT_DEFAULT_OPENAI_MODEL =
+  creativeAssistantTools?.CREATIVE_ASSISTANT_DEFAULT_OPENAI_MODEL ?? "gpt-5.5";
+const CREATIVE_ASSISTANT_MAX_HISTORY = creativeAssistantTools?.CREATIVE_ASSISTANT_MAX_HISTORY ?? 8;
 const editorModeTools = window.TonyNaEditorMode;
 const releaseVersionTools = window.TonyNaEditorReleaseVersion;
+const releaseControlTools = window.TonyNaEditorReleaseControl;
 const DEFAULT_PROJECT_RELEASE_VERSION = releaseVersionTools?.DEFAULT_PROJECT_RELEASE_VERSION ?? "1.0.0-preview";
 
-const CREATIVE_ASSISTANT_PROMPT_SAMPLES = [
+const CREATIVE_ASSISTANT_PROMPT_SAMPLES = creativeAssistantTools?.CREATIVE_ASSISTANT_PROMPT_SAMPLES ?? [
   "雨夜校园悬疑恋爱，女主知道一个不能说的秘密",
   "近未来城市里，AI 少女第一次学会撒谎",
   "黄昏天台，青梅竹马终于谈起三年前的误会",
@@ -1261,114 +1283,114 @@ const PARTICLE_COMBO_PRESET_CONFIGS = {
 
 const PARTICLE_IMAGE_ASSET_TYPES = ["background", "sprite", "cg", "ui"];
 
-const SHAKE_INTENSITY_LABELS = {
+const SHAKE_INTENSITY_LABELS = visualEffectTools?.SHAKE_INTENSITY_LABELS ?? {
   light: "轻微",
   medium: "明显",
   heavy: "很强",
 };
 
-const EFFECT_DURATION_LABELS = {
+const EFFECT_DURATION_LABELS = visualEffectTools?.EFFECT_DURATION_LABELS ?? {
   short: "短一下",
   medium: "正常",
   long: "久一点",
 };
 
-const FLASH_COLOR_LABELS = {
+const FLASH_COLOR_LABELS = visualEffectTools?.FLASH_COLOR_LABELS ?? {
   white: "白闪",
   warm: "暖光",
   red: "红闪",
   black: "黑闪",
 };
 
-const FLASH_INTENSITY_LABELS = {
+const FLASH_INTENSITY_LABELS = visualEffectTools?.FLASH_INTENSITY_LABELS ?? {
   soft: "柔和",
   medium: "明显",
   strong: "很亮",
 };
 
-const FADE_ACTION_LABELS = {
+const FADE_ACTION_LABELS = visualEffectTools?.FADE_ACTION_LABELS ?? {
   fade_out: "慢慢淡出",
   fade_in: "慢慢亮起",
 };
 
-const FADE_COLOR_LABELS = {
+const FADE_COLOR_LABELS = visualEffectTools?.FADE_COLOR_LABELS ?? {
   black: "黑场",
   white: "白场",
 };
 
-const CAMERA_ZOOM_ACTION_LABELS = {
+const CAMERA_ZOOM_ACTION_LABELS = visualEffectTools?.CAMERA_ZOOM_ACTION_LABELS ?? {
   zoom_in: "推近镜头",
   zoom_out: "拉远镜头",
   reset: "恢复正常",
 };
 
-const CAMERA_ZOOM_STRENGTH_LABELS = {
+const CAMERA_ZOOM_STRENGTH_LABELS = visualEffectTools?.CAMERA_ZOOM_STRENGTH_LABELS ?? {
   light: "轻一点",
   medium: "明显",
   heavy: "更强",
 };
 
-const CAMERA_ZOOM_FOCUS_LABELS = {
+const CAMERA_ZOOM_FOCUS_LABELS = visualEffectTools?.CAMERA_ZOOM_FOCUS_LABELS ?? {
   left: "看左侧",
   center: "看中间",
   right: "看右侧",
 };
 
-const SCREEN_FILTER_ACTION_LABELS = {
+const SCREEN_FILTER_ACTION_LABELS = visualEffectTools?.SCREEN_FILTER_ACTION_LABELS ?? {
   apply: "开启滤镜",
   clear: "关闭滤镜",
 };
 
-const SCREEN_FILTER_PRESET_LABELS = {
+const SCREEN_FILTER_PRESET_LABELS = visualEffectTools?.SCREEN_FILTER_PRESET_LABELS ?? {
   memory: "暖色回忆",
   mono: "黑白回忆",
   dream: "梦境柔光",
   cold: "冷色回放",
 };
 
-const SCREEN_FILTER_STRENGTH_LABELS = {
+const SCREEN_FILTER_STRENGTH_LABELS = visualEffectTools?.SCREEN_FILTER_STRENGTH_LABELS ?? {
   soft: "轻一点",
   medium: "正常",
   strong: "更明显",
 };
 
-const CAMERA_PAN_TARGET_LABELS = {
+const CAMERA_PAN_TARGET_LABELS = visualEffectTools?.CAMERA_PAN_TARGET_LABELS ?? {
   left: "向左看",
   center: "回到中间",
   right: "向右看",
 };
 
-const CAMERA_PAN_STRENGTH_LABELS = {
+const CAMERA_PAN_STRENGTH_LABELS = visualEffectTools?.CAMERA_PAN_STRENGTH_LABELS ?? {
   light: "轻一点",
   medium: "明显",
   heavy: "更远",
 };
 
-const DEPTH_BLUR_ACTION_LABELS = {
+const DEPTH_BLUR_ACTION_LABELS = visualEffectTools?.DEPTH_BLUR_ACTION_LABELS ?? {
   apply: "开启景深",
   clear: "关闭景深",
 };
 
-const DEPTH_BLUR_FOCUS_LABELS = {
+const DEPTH_BLUR_FOCUS_LABELS = visualEffectTools?.DEPTH_BLUR_FOCUS_LABELS ?? {
   left: "左侧角色更清楚",
   center: "中间角色更清楚",
   right: "右侧角色更清楚",
   full: "只虚化背景",
 };
 
-const DEPTH_BLUR_STRENGTH_LABELS = {
+const DEPTH_BLUR_STRENGTH_LABELS = visualEffectTools?.DEPTH_BLUR_STRENGTH_LABELS ?? {
   soft: "轻一点",
   medium: "正常",
   strong: "更明显",
 };
 
-const VIDEO_FIT_LABELS = {
+const VIDEO_FIT_LABELS = visualEffectTools?.VIDEO_FIT_LABELS ?? {
   contain: "完整显示",
   cover: "铺满裁切",
   fill: "拉伸填满",
 };
 
-const VIDEO_VOLUME_LABELS = {
+const VIDEO_VOLUME_LABELS = visualEffectTools?.VIDEO_VOLUME_LABELS ?? {
   0: "静音",
   25: "25%",
   50: "50%",
@@ -1376,7 +1398,7 @@ const VIDEO_VOLUME_LABELS = {
   100: "100%",
 };
 
-const CREDITS_BACKGROUND_LABELS = {
+const CREDITS_BACKGROUND_LABELS = visualEffectTools?.CREDITS_BACKGROUND_LABELS ?? {
   dark: "深色电影片尾",
   light: "浅色清爽片尾",
   transparent: "叠在当前画面上",
@@ -1422,7 +1444,7 @@ const VN_TEXT_SPLIT_TARGET_LENGTH = 180;
 const VN_CHOICE_LONG_WARNING_LENGTH = 42;
 const VN_CHOICE_MANY_OPTIONS = 6;
 
-const STARTER_VARIABLE_PRESETS = [
+const STARTER_VARIABLE_PRESETS = variableTools?.STARTER_VARIABLE_PRESETS ?? [
   {
     id: "var_affection",
     name: "好感度",
@@ -1865,20 +1887,20 @@ const PROJECT_DIALOG_BOX_PRESETS = {
   },
 };
 
-const UI_THEME_MODE_LABELS = {
+const UI_THEME_MODE_LABELS = uiThemeTools?.UI_THEME_MODE_LABELS ?? {
   auto: "自动切换",
   light: "浅色模式",
   dark: "深色模式",
 };
 
-const DASHBOARD_SEARCH_MODE_LABELS = {
+const DASHBOARD_SEARCH_MODE_LABELS = editorFilterTools?.DASHBOARD_SEARCH_MODE_LABELS ?? {
   all: "全部结果",
   scenes: "场景",
   characters: "角色",
   lines: "台词和选项",
 };
 
-const ROUTE_MAP_FILTER_LABELS = {
+const ROUTE_MAP_FILTER_LABELS = editorFilterTools?.ROUTE_MAP_FILTER_LABELS ?? {
   all: "全部场景",
   issues: "有问题",
   missing_background: "缺背景",
@@ -1889,14 +1911,14 @@ const ROUTE_MAP_FILTER_LABELS = {
   ready: "完成度高",
 };
 
-const SCENE_STATUS_LABELS = {
+const SCENE_STATUS_LABELS = editorFilterTools?.SCENE_STATUS_LABELS ?? {
   outline: "待开写",
   drafting: "写作中",
   polishing: "润色中",
   ready: "可试玩",
 };
 
-const SCENE_PRIORITY_LABELS = {
+const SCENE_PRIORITY_LABELS = editorFilterTools?.SCENE_PRIORITY_LABELS ?? {
   normal: "正常",
   focus: "优先处理",
   rush: "马上处理",
@@ -1912,7 +1934,7 @@ const NAV_SCREEN_LABELS = editorModeTools?.NAV_SCREEN_LABELS ?? {};
 const BEGINNER_STORY_TOOLBAR_ACTIONS = editorModeTools?.BEGINNER_STORY_TOOLBAR_ACTIONS ?? new Set();
 const BEGINNER_ASSET_TOOLBAR_ACTIONS = editorModeTools?.BEGINNER_ASSET_TOOLBAR_ACTIONS ?? new Set();
 
-const STORY_BLOCK_TYPE_FILTER_LABELS = {
+const STORY_BLOCK_TYPE_FILTER_LABELS = editorFilterTools?.STORY_BLOCK_TYPE_FILTER_LABELS ?? {
   all: "全部卡片",
   story: "只看正文",
   effect: "只看演出",
@@ -1922,7 +1944,7 @@ const STORY_BLOCK_TYPE_FILTER_LABELS = {
   choice: "只看选项",
 };
 
-const STORY_BLOCK_ISSUE_FILTER_LABELS = {
+const STORY_BLOCK_ISSUE_FILTER_LABELS = editorFilterTools?.STORY_BLOCK_ISSUE_FILTER_LABELS ?? {
   all: "全部状态",
   any: "只看有问题",
   missing_voice: "待绑语音",
@@ -1950,7 +1972,7 @@ const STORY_TEMPLATE_PRESETS = {
   },
 };
 
-const STORY_SCENE_TREE_FILTER_LABELS = {
+const STORY_SCENE_TREE_FILTER_LABELS = editorFilterTools?.STORY_SCENE_TREE_FILTER_LABELS ?? {
   all: "全部场景",
   focus: "重点场景",
   ready: "可试玩",
@@ -1958,7 +1980,7 @@ const STORY_SCENE_TREE_FILTER_LABELS = {
   notes: "有便签",
 };
 
-const CHARACTER_FILTER_LABELS = {
+const CHARACTER_FILTER_LABELS = editorFilterTools?.CHARACTER_FILTER_LABELS ?? {
   all: "全部角色",
   missing_voice: "待配音",
   voiced: "语音已齐",
@@ -1966,7 +1988,7 @@ const CHARACTER_FILTER_LABELS = {
   silent: "暂无台词",
 };
 
-const PREVIEW_ISSUE_FILTER_LABELS = {
+const PREVIEW_ISSUE_FILTER_LABELS = editorFilterTools?.PREVIEW_ISSUE_FILTER_LABELS ?? {
   all: "全部检查",
   errors: "结构错误",
   warnings: "补充提醒",
@@ -1975,27 +1997,27 @@ const PREVIEW_ISSUE_FILTER_LABELS = {
   unused_assets: "未使用素材",
 };
 
-const PREVIEW_SCENE_FILTER_LABELS = {
+const PREVIEW_SCENE_FILTER_LABELS = editorFilterTools?.PREVIEW_SCENE_FILTER_LABELS ?? {
   all: "全部起点",
   focus: "重点场景",
   ready: "可试玩",
   issues: "有问题",
 };
 
-const SCRIPT_TYPE_LABELS = {
+const SCRIPT_TYPE_LABELS = editorFilterTools?.SCRIPT_TYPE_LABELS ?? {
   dialogue: "台词",
   narration: "旁白",
   choice: "选项",
 };
 
-const SCRIPT_VOICE_FILTER_LABELS = {
+const SCRIPT_VOICE_FILTER_LABELS = editorFilterTools?.SCRIPT_VOICE_FILTER_LABELS ?? {
   all: "全部状态",
   missing: "待绑语音",
   voiced: "已绑语音",
   not_required: "不需要语音",
 };
 
-const SCRIPT_ISSUE_FILTER_LABELS = {
+const SCRIPT_ISSUE_FILTER_LABELS = editorFilterTools?.SCRIPT_ISSUE_FILTER_LABELS ?? {
   all: "全部问题状态",
   any: "只看有问题",
   placeholder: "待补正文",
@@ -2016,20 +2038,23 @@ const PREVIEW_PLAYBACK_DEFAULTS = {
   voiceVolume: 92,
 };
 
-const PREVIEW_SAVE_SHORTCUT_COUNT = 3;
-const PREVIEW_SAVE_DIALOG_PAGE_SIZE = 6;
+const PREVIEW_SAVE_SHORTCUT_COUNT = previewSaveTools?.PREVIEW_SAVE_SHORTCUT_COUNT ?? 3;
+const PREVIEW_SAVE_DIALOG_PAGE_SIZE = previewSaveTools?.PREVIEW_SAVE_DIALOG_PAGE_SIZE ?? 6;
 const PREVIEW_REGRESSION_MAX_CASES = 12;
 const PREVIEW_REGRESSION_MAX_STEPS = 80;
 const PREVIEW_REGRESSION_MAX_REPEAT = 3;
 const PREVIEW_REGRESSION_BRANCHING_SEED_LIMIT = 4;
-const RECENT_WORKSPACE_LIMIT = 8;
-const EDITOR_UI_THEME_STORAGE_KEY = "tony-na-engine:editor-ui-theme-mode";
-const RECENT_WORKSPACE_TYPE_LABELS = {
+const RECENT_WORKSPACE_LIMIT = recentWorkspaceTools?.RECENT_WORKSPACE_LIMIT ?? 8;
+const EDITOR_UI_THEME_STORAGE_KEY =
+  uiThemeTools?.EDITOR_UI_THEME_STORAGE_KEY ?? "tony-na-engine:editor-ui-theme-mode";
+const RECENT_WORKSPACE_TYPE_LABELS = recentWorkspaceTools?.RECENT_WORKSPACE_TYPE_LABELS ?? {
   scene: "剧情场景",
   script: "台本入口",
   asset: "素材资料",
   character: "角色资料",
 };
+
+const initialCreativeAssistantSettings = loadStoredCreativeAssistantSettings();
 
 const state = {
   currentScreen: "dashboard",
@@ -2062,12 +2087,15 @@ const state = {
   creativeAssistantResult: null,
   creativeAssistantLoading: false,
   creativeAssistantError: "",
-  creativeAssistantProvider: loadStoredCreativeAssistantProvider(),
-  creativeAssistantOpenAiKey: loadStoredCreativeAssistantOpenAiKey(),
-  creativeAssistantRememberKey: loadStoredCreativeAssistantRememberKey(),
-  creativeAssistantModel: loadStoredCreativeAssistantModel(),
+  creativeAssistantProvider: initialCreativeAssistantSettings.provider,
+  creativeAssistantOpenAiKey: initialCreativeAssistantSettings.openAiKey,
+  creativeAssistantRememberKey: initialCreativeAssistantSettings.rememberKey,
+  creativeAssistantModel: initialCreativeAssistantSettings.model,
   creativeAssistantSelectedBlockIndexes: null,
   creativeAssistantHistory: loadStoredCreativeAssistantHistory(),
+  creativeAssistantHistoryRecovery: loadStoredCreativeAssistantHistoryRecovery(),
+  creativeAssistantHistoryQuery: "",
+  creativeAssistantHistoryFavoritesOnly: false,
   particlePresetSearchQuery: "",
   selectedParticleCustomPresetId: "",
   characterSearchQuery: "",
@@ -2135,21 +2163,28 @@ const state = {
 };
 
 function getSafeUiThemeMode(mode) {
-  return Object.hasOwn(UI_THEME_MODE_LABELS, mode) ? mode : "auto";
+  const safeMode = String(mode ?? "").trim();
+  return uiThemeTools?.getSafeUiThemeMode?.(mode)
+    ?? (Object.prototype.hasOwnProperty.call(UI_THEME_MODE_LABELS, safeMode) ? safeMode : "auto");
 }
 
 function getUiThemeModeLabel(mode) {
-  return UI_THEME_MODE_LABELS[getSafeUiThemeMode(mode)];
+  return uiThemeTools?.getUiThemeModeLabel?.(mode) ?? UI_THEME_MODE_LABELS[getSafeUiThemeMode(mode)];
 }
 
 function resolveUiTheme(mode = state.previewPlayback?.uiThemeMode ?? PREVIEW_PLAYBACK_DEFAULTS.uiThemeMode, now = new Date()) {
+  if (uiThemeTools?.resolveUiTheme) {
+    return uiThemeTools.resolveUiTheme(mode, now);
+  }
+
   const safeMode = getSafeUiThemeMode(mode);
 
   if (safeMode === "light" || safeMode === "dark") {
     return safeMode;
   }
 
-  const hour = now.getHours();
+  const timestamp = typeof now?.getTime === "function" ? now.getTime() : Number.NaN;
+  const hour = Number.isNaN(timestamp) ? new Date().getHours() : now.getHours();
   return hour >= 7 && hour < 19 ? "light" : "dark";
 }
 
@@ -2172,10 +2207,6 @@ function scheduleEditorUiThemeAutoRefresh() {
   }, 60 * 1000);
 }
 
-let toastTimer = null;
-let engineDialogRoot = null;
-let activeEngineDialog = null;
-let engineDialogQueue = [];
 const nativeWindowAlert = typeof window.alert === "function" ? window.alert.bind(window) : null;
 let autoSaveTimer = null;
 let autoSavePromise = null;
@@ -2338,6 +2369,14 @@ const refs = {
   projectNavButtons: Array.from(document.querySelectorAll(".nav-button[data-requires-project='true']")),
 };
 
+const systemDialogController = systemDialogTools?.createSystemDialogController?.({
+  window,
+  document,
+  toastElement: refs.interactionToast,
+  copyTextToClipboard: (text) => copyTextToClipboard(text),
+  fallbackAlert: nativeWindowAlert,
+}) ?? null;
+
 document.addEventListener("click", (event) => {
   void handleClick(event);
 });
@@ -2482,6 +2521,10 @@ function setProjectChromeEnabled(enabled) {
 }
 
 function getSafeProjectSessionRecovery(recovery = state.projectSessionRecovery) {
+  if (projectHistoryTools?.getSafeProjectSessionRecovery) {
+    return projectHistoryTools.getSafeProjectSessionRecovery(recovery);
+  }
+
   if (!recovery || typeof recovery !== "object") {
     return {
       noticeActive: false,
@@ -2502,6 +2545,10 @@ function getSafeProjectSessionRecovery(recovery = state.projectSessionRecovery) 
 }
 
 function getSafeProjectHistory(history = state.projectHistory) {
+  if (projectHistoryTools?.getSafeProjectHistory) {
+    return projectHistoryTools.getSafeProjectHistory(history);
+  }
+
   if (!history || typeof history !== "object") {
     return {
       totalSnapshots: 0,
@@ -2530,6 +2577,10 @@ function getSafeProjectHistory(history = state.projectHistory) {
 }
 
 function getHistorySnapshotByIndex(targetIndex, history = state.projectHistory) {
+  if (projectHistoryTools?.getHistorySnapshotByIndex) {
+    return projectHistoryTools.getHistorySnapshotByIndex(targetIndex, history);
+  }
+
   const safeHistory = getSafeProjectHistory(history);
   const numericIndex = Number(targetIndex);
   if (Number.isNaN(numericIndex)) {
@@ -2539,6 +2590,10 @@ function getHistorySnapshotByIndex(targetIndex, history = state.projectHistory) 
 }
 
 function getHistoryKindLabel(kind) {
+  if (projectHistoryTools?.getHistoryKindLabel) {
+    return projectHistoryTools.getHistoryKindLabel(kind);
+  }
+
   if (kind === "manual") {
     return "手动检查点";
   }
@@ -2549,6 +2604,10 @@ function getHistoryKindLabel(kind) {
 }
 
 function getHistoryKindTone(kind) {
+  if (projectHistoryTools?.getHistoryKindTone) {
+    return projectHistoryTools.getHistoryKindTone(kind);
+  }
+
   if (kind === "manual") {
     return "good";
   }
@@ -2559,10 +2618,18 @@ function getHistoryKindTone(kind) {
 }
 
 function getSafeHistoryFilterMode(value) {
+  if (projectHistoryTools?.getSafeHistoryFilterMode) {
+    return projectHistoryTools.getSafeHistoryFilterMode(value);
+  }
+
   return ["all", "manual", "auto", "baseline", "current"].includes(value) ? value : "all";
 }
 
 function getHistoryFilterLabel(value) {
+  if (projectHistoryTools?.getHistoryFilterLabel) {
+    return projectHistoryTools.getHistoryFilterLabel(value);
+  }
+
   const labels = {
     all: "全部版本",
     manual: "只看检查点",
@@ -2574,6 +2641,10 @@ function getHistoryFilterLabel(value) {
 }
 
 function getHistoryChangeKindLabel(kind) {
+  if (projectHistoryTools?.getHistoryChangeKindLabel) {
+    return projectHistoryTools.getHistoryChangeKindLabel(kind);
+  }
+
   if (kind === "created") {
     return "新增";
   }
@@ -2584,6 +2655,14 @@ function getHistoryChangeKindLabel(kind) {
 }
 
 function getFilteredHistorySnapshots(history = state.projectHistory) {
+  if (projectHistoryTools?.getFilteredHistorySnapshots) {
+    return projectHistoryTools.getFilteredHistorySnapshots(history, {
+      searchQuery: state.historySearchQuery,
+      filterMode: state.historyFilterMode,
+      formatDate,
+    });
+  }
+
   const safeHistory = getSafeProjectHistory(history);
   const query = String(state.historySearchQuery ?? "").trim().toLowerCase();
   const filterMode = getSafeHistoryFilterMode(state.historyFilterMode);
@@ -2682,6 +2761,10 @@ function renderHistoryTimeline(history = state.projectHistory, options = {}) {
 }
 
 function formatHistoryRestorePreview(preview) {
+  if (projectHistoryTools?.formatHistoryRestorePreview) {
+    return projectHistoryTools.formatHistoryRestorePreview(preview);
+  }
+
   if (!preview || typeof preview !== "object") {
     return "恢复后会把项目回到你选中的那个时间点。";
   }
@@ -2770,8 +2853,12 @@ async function maybePromptProjectRecovery(data = state.data) {
   const recovery = getSafeProjectSessionRecovery(data.sessionRecovery ?? state.projectSessionRecovery);
   const history = getSafeProjectHistory(data.history ?? state.projectHistory);
   const previousSnapshot =
-    history.previousSnapshot ?? getHistorySnapshotByIndex(Number(history.currentIndex) - 1, history);
-  const promptKey = `${data.project.projectId}:${recovery.lastUnexpectedExitAt || recovery.lastUnexpectedExitStartedAt || "none"}`;
+    projectHistoryTools?.getPreviousHistorySnapshot?.(history) ??
+    history.previousSnapshot ??
+    getHistorySnapshotByIndex(Number(history.currentIndex) - 1, history);
+  const promptKey =
+    projectHistoryTools?.buildProjectRecoveryPromptKey?.(data.project.projectId, recovery) ??
+    `${data.project.projectId}:${recovery.lastUnexpectedExitAt || recovery.lastUnexpectedExitStartedAt || "none"}`;
 
   if (!recovery.noticeActive || !previousSnapshot || state.historyRecoveryPromptKey === promptKey) {
     return;
@@ -5086,6 +5173,33 @@ async function handleClick(event) {
     return;
   }
 
+  if (action === "toggle-creative-assistant-history-favorites") {
+    state.creativeAssistantHistoryFavoritesOnly = !state.creativeAssistantHistoryFavoritesOnly;
+    renderStoryScreen();
+    setSaveStatus(state.creativeAssistantHistoryFavoritesOnly ? "灵感盒已切到只看收藏" : "灵感盒已显示全部记录");
+    return;
+  }
+
+  if (action === "toggle-creative-assistant-history-favorite") {
+    toggleCreativeAssistantHistoryFavorite(actionTarget.dataset.creativeHistoryId);
+    return;
+  }
+
+  if (action === "copy-creative-assistant-history-blocks") {
+    void copyCreativeAssistantHistoryBlocks(actionTarget.dataset.creativeHistoryId);
+    return;
+  }
+
+  if (action === "copy-creative-assistant-history-record-markdown") {
+    void copyCreativeAssistantHistoryRecordMarkdown(actionTarget.dataset.creativeHistoryId);
+    return;
+  }
+
+  if (action === "copy-creative-assistant-history-markdown") {
+    void copyCreativeAssistantHistoryMarkdown();
+    return;
+  }
+
   if (action === "restore-creative-assistant-history") {
     restoreCreativeAssistantHistoryRecord(actionTarget.dataset.creativeHistoryId);
     return;
@@ -5096,13 +5210,43 @@ async function handleClick(event) {
     return;
   }
 
+  if (action === "export-creative-assistant-history-archive") {
+    exportCreativeAssistantHistoryArchive();
+    return;
+  }
+
+  if (action === "export-creative-assistant-history-view") {
+    exportCreativeAssistantHistoryViewArchive();
+    return;
+  }
+
+  if (action === "export-creative-assistant-history-markdown") {
+    exportCreativeAssistantHistoryMarkdown();
+    return;
+  }
+
   if (action === "delete-creative-assistant-history") {
-    deleteCreativeAssistantHistoryRecord(actionTarget.dataset.creativeHistoryId);
+    void deleteCreativeAssistantHistoryRecord(actionTarget.dataset.creativeHistoryId);
     return;
   }
 
   if (action === "clear-creative-assistant-history") {
-    clearCreativeAssistantHistory();
+    void clearCreativeAssistantHistory();
+    return;
+  }
+
+  if (action === "clear-creative-assistant-nonfavorites") {
+    void clearCreativeAssistantNonFavoriteHistory();
+    return;
+  }
+
+  if (action === "restore-creative-assistant-history-recovery") {
+    void restoreCreativeAssistantHistoryRecovery();
+    return;
+  }
+
+  if (action === "forget-creative-assistant-key") {
+    forgetCreativeAssistantOpenAiKey();
     return;
   }
 
@@ -5698,6 +5842,12 @@ function handleChange(event) {
     return;
   }
 
+  if (target.id === "creativeAssistantHistoryImportInput") {
+    void importCreativeAssistantHistoryArchive(target.files?.[0] ?? null);
+    target.value = "";
+    return;
+  }
+
   if (target.id === "assetSmartImportInput") {
     void importAssets(Array.from(target.files ?? []), { smartImport: true });
     target.value = "";
@@ -5826,6 +5976,7 @@ function handleChange(event) {
   if (target.id === "creativeAssistantRememberKey") {
     state.creativeAssistantRememberKey = Boolean(target.checked);
     persistCreativeAssistantSettings();
+    syncCreativeAssistantPrivacyControls();
     setSaveStatus(
       state.creativeAssistantRememberKey
         ? "智能助手会把 Key 记在本浏览器 localStorage"
@@ -5933,12 +6084,26 @@ function handleInput(event) {
     return;
   }
 
+  if (event.target.id === "creativeAssistantHistorySearchInput") {
+    state.creativeAssistantHistoryQuery = event.target.value ?? "";
+    renderStoryScreen();
+    requestAnimationFrame(() => {
+      const searchInput = document.getElementById("creativeAssistantHistorySearchInput");
+      if (searchInput) {
+        searchInput.focus();
+        searchInput.setSelectionRange(state.creativeAssistantHistoryQuery.length, state.creativeAssistantHistoryQuery.length);
+      }
+    });
+    return;
+  }
+
   if (event.target.id === "creativeAssistantOpenAiKey") {
     state.creativeAssistantOpenAiKey = event.target.value ?? "";
     state.creativeAssistantResult = null;
     state.creativeAssistantSelectedBlockIndexes = null;
     state.creativeAssistantError = "";
     persistCreativeAssistantSettings();
+    syncCreativeAssistantPrivacyControls();
     return;
   }
 
@@ -6030,46 +6195,8 @@ function handleInput(event) {
 }
 
 function handleGlobalKeydown(event) {
-  if (activeEngineDialog) {
-    if (event.code === "Escape") {
-      event.preventDefault();
-      closeActiveEngineDialog(false);
-      return;
-    }
-
-    const engineDialogButton =
-      event.target instanceof Element ? event.target.closest(".system-dialog button") : null;
-    const engineDialogInput =
-      event.target instanceof HTMLInputElement && event.target.classList.contains("system-dialog-input")
-        ? event.target
-        : null;
-    if (event.code === "Enter" && !event.shiftKey && engineDialogInput) {
-      event.preventDefault();
-      if (activeEngineDialog?.options?.input?.required && !engineDialogInput.value.trim()) {
-        engineDialogInput.classList.add("is-invalid");
-        engineDialogInput
-          .closest(".system-dialog")
-          ?.querySelector(".system-dialog-input-hint")
-          ?.classList.add("is-visible");
-        return;
-      }
-      closeActiveEngineDialog(engineDialogInput.value);
-      return;
-    }
-
-    if (event.code === "Enter" && !event.shiftKey && !engineDialogButton && !isKeyboardTypingTarget(event.target)) {
-      event.preventDefault();
-      closeActiveEngineDialog(true);
-      return;
-    }
-
-    if (event.code === "Tab" || event.code === "Space") {
-      return;
-    }
-
-    if (!isKeyboardTypingTarget(event.target)) {
-      event.preventDefault();
-    }
+  if (systemDialogController?.hasActiveDialog?.()) {
+    systemDialogController.handleKeydown(event, { isKeyboardTypingTarget });
     return;
   }
 
@@ -6519,6 +6646,10 @@ async function replayPreviewHistoryVoice(rawIndex) {
 }
 
 function getSafePreviewSaveSlotIndex(rawIndex) {
+  if (previewSaveTools?.getSafePreviewSaveSlotIndex) {
+    return previewSaveTools.getSafePreviewSaveSlotIndex(rawIndex, getProjectFormalSaveSlotCount());
+  }
+
   const numeric = Number(rawIndex);
   const slotCount = getProjectFormalSaveSlotCount();
 
@@ -6531,10 +6662,25 @@ function getSafePreviewSaveSlotIndex(rawIndex) {
 }
 
 function getPreviewSaveDialogPageCount() {
+  if (previewSaveTools?.getPreviewSaveDialogPageCount) {
+    return previewSaveTools.getPreviewSaveDialogPageCount(
+      getProjectFormalSaveSlotCount(),
+      PREVIEW_SAVE_DIALOG_PAGE_SIZE
+    );
+  }
+
   return Math.max(1, Math.ceil(getProjectFormalSaveSlotCount() / PREVIEW_SAVE_DIALOG_PAGE_SIZE));
 }
 
 function getSafePreviewSaveDialogPage(rawPage) {
+  if (previewSaveTools?.getSafePreviewSaveDialogPage) {
+    return previewSaveTools.getSafePreviewSaveDialogPage(rawPage, {
+      currentPage: state.previewSaveDialogPage ?? 0,
+      slotCount: getProjectFormalSaveSlotCount(),
+      pageSize: PREVIEW_SAVE_DIALOG_PAGE_SIZE,
+    });
+  }
+
   const numeric = Number(rawPage);
   const maxPageIndex = getPreviewSaveDialogPageCount() - 1;
   if (!Number.isInteger(numeric)) {
@@ -7189,6 +7335,10 @@ function renderPreviewSaveConfirmDialog() {
 }
 
 function getSafePreviewSaveDialogMode(rawMode) {
+  if (previewSaveTools?.getSafePreviewSaveDialogMode) {
+    return previewSaveTools.getSafePreviewSaveDialogMode(rawMode);
+  }
+
   return rawMode === "load" ? "load" : "save";
 }
 
@@ -8232,6 +8382,10 @@ function getVoicePlaceholderTargetAssets(data = state.data) {
 }
 
 function buildVoiceFileMatchAlertMessage(result) {
+  if (scriptVoiceTools?.buildVoiceFileMatchAlertMessage) {
+    return scriptVoiceTools.buildVoiceFileMatchAlertMessage(result);
+  }
+
   const lines = [];
   const matchedCount = Number(result?.matchedCount ?? 0);
   const unmatchedFiles = result?.unmatchedFiles ?? [];
@@ -8271,6 +8425,10 @@ function buildVoiceFileMatchAlertMessage(result) {
 }
 
 function buildVoiceMatchReviewSession(uploadFiles, result) {
+  if (scriptVoiceTools?.buildVoiceMatchReviewSession) {
+    return scriptVoiceTools.buildVoiceMatchReviewSession(uploadFiles, result);
+  }
+
   const payloadBuckets = new Map();
   (uploadFiles ?? []).forEach((filePayload) => {
     const name = String(filePayload?.name ?? "").trim();
@@ -8326,10 +8484,18 @@ function buildVoiceMatchReviewSession(uploadFiles, result) {
 }
 
 function getVoiceMatchReviewSelectId(reviewKind, reviewIndex) {
+  if (scriptVoiceTools?.getVoiceMatchReviewSelectId) {
+    return scriptVoiceTools.getVoiceMatchReviewSelectId(reviewKind, reviewIndex);
+  }
+
   return `voiceMatchReview-${reviewKind}-${reviewIndex}`;
 }
 
 function getAvailableManualVoiceMatchTargets(data = state.data) {
+  if (scriptVoiceTools?.getAvailableManualVoiceMatchTargets) {
+    return scriptVoiceTools.getAvailableManualVoiceMatchTargets(data);
+  }
+
   if (!data) {
     return [];
   }
@@ -8337,6 +8503,10 @@ function getAvailableManualVoiceMatchTargets(data = state.data) {
 }
 
 function getDefaultVoiceMatchTargetId(item, availableTargets) {
+  if (scriptVoiceTools?.getDefaultVoiceMatchTargetId) {
+    return scriptVoiceTools.getDefaultVoiceMatchTargetId(item, availableTargets);
+  }
+
   const candidateIds = (item?.candidates ?? [])
     .map((candidate) => candidate.assetId)
     .filter((assetId) => availableTargets.some((asset) => asset.id === assetId));
@@ -8677,6 +8847,14 @@ function findScriptEntryByLocation(sceneId, blockId = null) {
 }
 
 function buildScriptEntryCopyText(entry) {
+  if (scriptVoiceTools?.buildScriptEntryCopyText) {
+    return scriptVoiceTools.buildScriptEntryCopyText(entry, {
+      projectTitle: state.data.project.title,
+      getScriptTypeLabel,
+      getScriptIssueFilterLabel,
+    });
+  }
+
   const lines = [
     `项目：${state.data.project.title}`,
     `章节：${entry.chapterName}`,
@@ -9117,335 +9295,31 @@ function setSaveStatus(message, isError = false) {
 }
 
 function showToast(message, tone = "soft") {
-  if (!refs.interactionToast || !message) {
-    return;
-  }
-
-  refs.interactionToast.textContent = message;
-  refs.interactionToast.className =
-    tone === "error" ? "interaction-toast is-visible is-error" : "interaction-toast is-visible";
-
-  if (toastTimer) {
-    clearTimeout(toastTimer);
-  }
-
-  toastTimer = setTimeout(() => {
-    refs.interactionToast.className = tone === "error" ? "interaction-toast is-error" : "interaction-toast";
-  }, 1800);
+  systemDialogController?.showToast(message, tone);
 }
 
 function installEngineDialogBridge() {
-  if (window.__tonyNaEngineDialogBridgeInstalled) {
-    return;
-  }
-
-  window.__tonyNaEngineDialogBridgeInstalled = true;
-  window.alert = (message) => {
-    void showEngineAlert(inferEngineAlertOptions(message));
-  };
-}
-
-function ensureEngineDialogRoot() {
-  if (engineDialogRoot?.isConnected) {
-    return engineDialogRoot;
-  }
-
-  engineDialogRoot = document.createElement("div");
-  engineDialogRoot.className = "system-dialog-backdrop";
-  engineDialogRoot.setAttribute("role", "presentation");
-  engineDialogRoot.hidden = true;
-  document.body.append(engineDialogRoot);
-  return engineDialogRoot;
-}
-
-function normalizeEngineDialogOptions(options = {}) {
-  const message = Array.isArray(options.message)
-    ? options.message.filter(Boolean).join("\n")
-    : String(options.message ?? "");
-  const input = options.input && typeof options.input === "object" ? options.input : null;
-  const copyText =
-    options.copyText === false
-      ? ""
-      : String(
-          options.copyText ??
-            (options.copyable || message.length > 90 || message.includes("\n") ? message : "")
-        );
-  return {
-    title: String(options.title ?? "提示"),
-    eyebrow: String(options.eyebrow ?? "Tony Na Engine"),
-    message,
-    tone: ["danger", "warning", "success", "info"].includes(options.tone) ? options.tone : "info",
-    confirmLabel: String(options.confirmLabel ?? "知道了"),
-    cancelLabel: String(options.cancelLabel ?? "取消"),
-    showCancel: Boolean(options.showCancel),
-    allowBackdropClose: options.allowBackdropClose !== false,
-    copyText,
-    copyLabel: String(options.copyLabel ?? "复制详情"),
-    copySuccessMessage: String(options.copySuccessMessage ?? "弹窗详情已复制"),
-    input: input
-      ? {
-          value: String(input.value ?? ""),
-          placeholder: String(input.placeholder ?? ""),
-          maxLength: Number.isFinite(Number(input.maxLength)) ? Number(input.maxLength) : 80,
-          required: input.required !== false,
-          requiredMessage: String(input.requiredMessage ?? "这里需要填写内容。"),
-        }
-      : null,
-  };
-}
-
-function inferEngineAlertOptions(message) {
-  const text = String(message ?? "");
-  const isFailure = /失败|没有成功|错误|异常|Error|Exception|Traceback/i.test(text);
-  const isWarning = /不能|无法|暂时|先选|先填|缺失|找不到/.test(text);
-  const tone = isFailure ? "danger" : isWarning ? "warning" : "info";
-  const title = isFailure ? "操作失败" : isWarning ? "需要处理" : "提示";
-  return {
-    title,
-    message: text,
-    tone,
-    copyable: isFailure || text.length > 90 || text.includes("\n"),
-  };
+  systemDialogController?.installAlertBridge();
 }
 
 function showEngineAlert(options = {}) {
-  if (!document.body) {
-    nativeWindowAlert?.(String(options?.message ?? options ?? ""));
-    return Promise.resolve(true);
+  if (systemDialogController?.showAlert) {
+    return systemDialogController.showAlert(options);
   }
-
-  const normalizedOptions =
-    typeof options === "object" && options !== null
-      ? options
-      : {
-          message: options,
-        };
-  return showEngineDialog({
-    title: "提示",
-    tone: "info",
-    confirmLabel: "知道了",
-    ...normalizedOptions,
-    showCancel: false,
-  });
+  nativeWindowAlert?.(String(options?.message ?? options ?? ""));
+  return Promise.resolve(true);
 }
 
 function showEngineConfirm(options = {}) {
-  return showEngineDialog({
-    title: "确认操作",
-    tone: "warning",
-    confirmLabel: "确认继续",
-    cancelLabel: "先不动",
-    ...options,
-    showCancel: true,
-  });
+  return systemDialogController?.showConfirm?.(options) ?? Promise.resolve(false);
 }
 
 async function showEnginePrompt(options = {}) {
-  const result = await showEngineDialog({
-    title: "输入内容",
-    tone: "info",
-    confirmLabel: "确认",
-    cancelLabel: "取消",
-    ...options,
-    showCancel: true,
-    input: {
-      value: options.defaultValue ?? options.value ?? "",
-      placeholder: options.placeholder ?? "",
-      maxLength: options.maxLength ?? 80,
-      required: options.required ?? true,
-      requiredMessage: options.requiredMessage ?? "先填一个名称，再继续。",
-      ...(options.input ?? {}),
-    },
-  });
-  return result === null || result === false ? null : String(result ?? "");
-}
-
-function showEngineDialog(options = {}) {
-  return new Promise((resolve) => {
-    engineDialogQueue.push({
-      options: normalizeEngineDialogOptions(options),
-      previousFocus: document.activeElement instanceof HTMLElement ? document.activeElement : null,
-      resolve,
-    });
-    renderNextEngineDialog();
-  });
-}
-
-function renderNextEngineDialog() {
-  if (activeEngineDialog || engineDialogQueue.length === 0) {
-    return;
-  }
-
-  const root = ensureEngineDialogRoot();
-  const request = engineDialogQueue.shift();
-  const close = (confirmed) => {
-    if (activeEngineDialog?.close !== close) {
-      return;
-    }
-
-    root.hidden = true;
-    root.replaceChildren();
-    activeEngineDialog = null;
-    if (request.previousFocus?.isConnected) {
-      request.previousFocus.focus({ preventScroll: true });
-    }
-    request.resolve(confirmed);
-    renderNextEngineDialog();
-  };
-
-  activeEngineDialog = {
-    close,
-    options: request.options,
-  };
-
-  renderEngineDialog(root, request.options, close);
-}
-
-function renderEngineDialog(root, options, close) {
-  root.hidden = false;
-  root.dataset.tone = options.tone;
-  root.replaceChildren();
-
-  const dialog = document.createElement("section");
-  dialog.className = "system-dialog";
-  dialog.setAttribute("role", "dialog");
-  dialog.setAttribute("aria-modal", "true");
-  dialog.setAttribute("aria-labelledby", "systemDialogTitle");
-  dialog.addEventListener("click", (event) => event.stopPropagation());
-
-  const halo = document.createElement("div");
-  halo.className = "system-dialog-halo";
-  halo.setAttribute("aria-hidden", "true");
-
-  const header = document.createElement("div");
-  header.className = "system-dialog-header";
-
-  const mark = document.createElement("div");
-  mark.className = "system-dialog-mark";
-  mark.setAttribute("aria-hidden", "true");
-  mark.textContent = getEngineDialogToneMark(options.tone);
-
-  const titleWrap = document.createElement("div");
-  const eyebrow = document.createElement("span");
-  eyebrow.className = "system-dialog-eyebrow";
-  eyebrow.textContent = options.eyebrow;
-  const title = document.createElement("h2");
-  title.id = "systemDialogTitle";
-  title.textContent = options.title;
-  titleWrap.append(eyebrow, title);
-
-  header.append(mark, titleWrap);
-
-  const message = document.createElement("p");
-  message.className = "system-dialog-message";
-  message.textContent = options.message || "操作已经完成。";
-
-  let input = null;
-  let inputHint = null;
-  if (options.input) {
-    input = document.createElement("input");
-    input.className = "system-dialog-input";
-    input.type = "text";
-    input.value = options.input.value;
-    input.placeholder = options.input.placeholder;
-    input.maxLength = options.input.maxLength;
-    input.autocomplete = "off";
-    input.spellcheck = false;
-    input.setAttribute("aria-label", options.title);
-
-    inputHint = document.createElement("div");
-    inputHint.className = "system-dialog-input-hint";
-    inputHint.textContent = options.input.requiredMessage;
-  }
-
-  const actions = document.createElement("div");
-  actions.className = "system-dialog-actions";
-
-  if (options.copyText) {
-    const copyButton = document.createElement("button");
-    copyButton.type = "button";
-    copyButton.className = "toolbar-button";
-    copyButton.textContent = options.copyLabel;
-    copyButton.addEventListener("click", async () => {
-      const copied = await copyTextToClipboard(options.copyText);
-      showToast(copied ? options.copySuccessMessage : "复制失败，请手动选择文本", copied ? "soft" : "error");
-    });
-    actions.append(copyButton);
-  }
-
-  if (options.showCancel) {
-    const cancelButton = document.createElement("button");
-    cancelButton.type = "button";
-    cancelButton.className = "toolbar-button";
-    cancelButton.textContent = options.cancelLabel;
-    cancelButton.addEventListener("click", () => close(options.input ? null : false));
-    actions.append(cancelButton);
-  }
-
-  const confirmButton = document.createElement("button");
-  confirmButton.type = "button";
-  confirmButton.className =
-    options.tone === "danger" ? "toolbar-button toolbar-button-danger" : "toolbar-button toolbar-button-primary";
-  confirmButton.textContent = options.confirmLabel;
-  confirmButton.addEventListener("click", () => {
-    if (options.input && options.input.required && !input.value.trim()) {
-      input.focus({ preventScroll: true });
-      inputHint.classList.add("is-visible");
-      return;
-    }
-    close(options.input ? input.value : true);
-  });
-  actions.append(confirmButton);
-
-  if (input) {
-    const syncInputState = () => {
-      const isInvalid = options.input.required && !input.value.trim();
-      input.classList.toggle("is-invalid", isInvalid);
-      inputHint.classList.toggle("is-visible", isInvalid);
-      confirmButton.disabled = isInvalid;
-    };
-    input.addEventListener("input", syncInputState);
-    syncInputState();
-  }
-
-  dialog.append(halo, header, message);
-  if (input) {
-    dialog.append(input);
-    dialog.append(inputHint);
-  }
-  dialog.append(actions);
-  root.append(dialog);
-
-  if (options.allowBackdropClose) {
-    root.onclick = () => close(options.input ? null : false);
-  } else {
-    root.onclick = null;
-  }
-
-  window.requestAnimationFrame(() => {
-    const focusTarget = input ?? confirmButton;
-    focusTarget.focus({ preventScroll: true });
-    if (input) {
-      input.select();
-    }
-  });
-}
-
-function getEngineDialogToneMark(tone) {
-  if (tone === "danger") {
-    return "!";
-  }
-  if (tone === "warning") {
-    return "?";
-  }
-  if (tone === "success") {
-    return "✓";
-  }
-  return "i";
+  return systemDialogController?.showPrompt?.(options) ?? null;
 }
 
 function closeActiveEngineDialog(result = false) {
-  activeEngineDialog?.close(result);
+  systemDialogController?.closeActive?.(result);
 }
 
 function shouldFlushPendingStoryChanges(action) {
@@ -9758,6 +9632,10 @@ async function toggleAssetAudioPreview(assetId) {
 }
 
 function getProjectResolution(project = state.data?.project) {
+  if (projectSettingsTools?.getProjectResolution) {
+    return projectSettingsTools.getProjectResolution(project);
+  }
+
   const width = Number.parseInt(project?.resolution?.width ?? 1280, 10);
   const height = Number.parseInt(project?.resolution?.height ?? 720, 10);
 
@@ -9767,7 +9645,39 @@ function getProjectResolution(project = state.data?.project) {
   };
 }
 
+function getProjectSettingsOptions() {
+  return {
+    saveSlotCountLimits: PROJECT_SAVE_SLOT_COUNT_LIMITS,
+    defaultRuntimeSettings: DEFAULT_PROJECT_RUNTIME_SETTINGS,
+    dialogBoxPresetLabels: PROJECT_DIALOG_BOX_PRESET_LABELS,
+    dialogBoxShapeLabels: PROJECT_DIALOG_BOX_SHAPE_LABELS,
+    dialogBoxAnchorLabels: PROJECT_DIALOG_BOX_ANCHOR_LABELS,
+    defaultDialogBoxConfig: DEFAULT_PROJECT_DIALOG_BOX_CONFIG,
+    dialogBoxPresets: PROJECT_DIALOG_BOX_PRESETS,
+    gameUiPresetLabels: PROJECT_GAME_UI_PRESET_LABELS,
+    gameUiLayoutLabels: PROJECT_GAME_UI_LAYOUT_LABELS,
+    gameUiTitleLayoutLabels: PROJECT_GAME_UI_TITLE_LAYOUT_LABELS,
+    gameUiFontLabels: PROJECT_GAME_UI_FONT_LABELS,
+    gameUiSurfaceLabels: PROJECT_GAME_UI_SURFACE_LABELS,
+    gameUiBrandLabels: PROJECT_GAME_UI_BRAND_LABELS,
+    gameUiSidePanelLabels: PROJECT_GAME_UI_SIDE_PANEL_LABELS,
+    gameUiSidePositionLabels: PROJECT_GAME_UI_SIDE_POSITION_LABELS,
+    gameUiTopbarPositionLabels: PROJECT_GAME_UI_TOPBAR_POSITION_LABELS,
+    gameUiHudPositionLabels: PROJECT_GAME_UI_HUD_POSITION_LABELS,
+    gameUiTitleCardAnchorLabels: PROJECT_GAME_UI_TITLE_CARD_ANCHOR_LABELS,
+    defaultGameUiConfig: DEFAULT_PROJECT_GAME_UI_CONFIG,
+    gameUiPresets: PROJECT_GAME_UI_PRESETS,
+    clamp,
+    getSafeNumber,
+    getSafeColor: getSafeParticleColor,
+  };
+}
+
 function getSafeProjectFormalSaveSlotCount(value) {
+  if (projectSettingsTools?.getSafeProjectFormalSaveSlotCount) {
+    return projectSettingsTools.getSafeProjectFormalSaveSlotCount(value, getProjectSettingsOptions());
+  }
+
   return clamp(
     Math.round(getSafeNumber(value, DEFAULT_PROJECT_RUNTIME_SETTINGS.formalSaveSlotCount)),
     PROJECT_SAVE_SLOT_COUNT_LIMITS.min,
@@ -9776,6 +9686,10 @@ function getSafeProjectFormalSaveSlotCount(value) {
 }
 
 function getProjectRuntimeSettings(project = state.data?.project) {
+  if (projectSettingsTools?.getProjectRuntimeSettings) {
+    return projectSettingsTools.getProjectRuntimeSettings(project, getProjectSettingsOptions());
+  }
+
   const runtimeSettings = project?.runtimeSettings ?? {};
   return {
     formalSaveSlotCount: getSafeProjectFormalSaveSlotCount(runtimeSettings.formalSaveSlotCount),
@@ -9783,22 +9697,42 @@ function getProjectRuntimeSettings(project = state.data?.project) {
 }
 
 function getProjectFormalSaveSlotCount(project = state.data?.project) {
+  if (projectSettingsTools?.getProjectFormalSaveSlotCount) {
+    return projectSettingsTools.getProjectFormalSaveSlotCount(project, getProjectSettingsOptions());
+  }
+
   return getProjectRuntimeSettings(project).formalSaveSlotCount;
 }
 
 function getSafeProjectDialogBoxPreset(value) {
+  if (projectSettingsTools?.getSafeProjectDialogBoxPreset) {
+    return projectSettingsTools.getSafeProjectDialogBoxPreset(value, getProjectSettingsOptions());
+  }
+
   return Object.hasOwn(PROJECT_DIALOG_BOX_PRESET_LABELS, value) ? value : DEFAULT_PROJECT_DIALOG_BOX_CONFIG.preset;
 }
 
 function getSafeProjectDialogBoxShape(value) {
+  if (projectSettingsTools?.getSafeProjectDialogBoxShape) {
+    return projectSettingsTools.getSafeProjectDialogBoxShape(value, getProjectSettingsOptions());
+  }
+
   return Object.hasOwn(PROJECT_DIALOG_BOX_SHAPE_LABELS, value) ? value : DEFAULT_PROJECT_DIALOG_BOX_CONFIG.shape;
 }
 
 function getSafeProjectDialogBoxAnchor(value) {
+  if (projectSettingsTools?.getSafeProjectDialogBoxAnchor) {
+    return projectSettingsTools.getSafeProjectDialogBoxAnchor(value, getProjectSettingsOptions());
+  }
+
   return Object.hasOwn(PROJECT_DIALOG_BOX_ANCHOR_LABELS, value) ? value : DEFAULT_PROJECT_DIALOG_BOX_CONFIG.anchor;
 }
 
 function getProjectDialogBoxPresetConfig(preset) {
+  if (projectSettingsTools?.getProjectDialogBoxPresetConfig) {
+    return projectSettingsTools.getProjectDialogBoxPresetConfig(preset, getProjectSettingsOptions());
+  }
+
   const safePreset = getSafeProjectDialogBoxPreset(preset);
   return {
     ...DEFAULT_PROJECT_DIALOG_BOX_CONFIG,
@@ -9808,6 +9742,10 @@ function getProjectDialogBoxPresetConfig(preset) {
 }
 
 function getProjectDialogBoxConfig(project = state.data?.project) {
+  if (projectSettingsTools?.getProjectDialogBoxConfig) {
+    return projectSettingsTools.getProjectDialogBoxConfig(project, getProjectSettingsOptions());
+  }
+
   const source = project?.dialogBoxConfig ?? {};
   const base = getProjectDialogBoxPresetConfig(source.preset);
   return {
@@ -9838,52 +9776,100 @@ function getProjectDialogBoxConfig(project = state.data?.project) {
 }
 
 function getSafeProjectGameUiPreset(value) {
+  if (projectSettingsTools?.getSafeProjectGameUiPreset) {
+    return projectSettingsTools.getSafeProjectGameUiPreset(value, getProjectSettingsOptions());
+  }
+
   return Object.hasOwn(PROJECT_GAME_UI_PRESET_LABELS, value) ? value : DEFAULT_PROJECT_GAME_UI_CONFIG.preset;
 }
 
 function getSafeProjectGameUiLayoutPreset(value) {
+  if (projectSettingsTools?.getSafeProjectGameUiLayoutPreset) {
+    return projectSettingsTools.getSafeProjectGameUiLayoutPreset(value, getProjectSettingsOptions());
+  }
+
   return Object.hasOwn(PROJECT_GAME_UI_LAYOUT_LABELS, value) ? value : DEFAULT_PROJECT_GAME_UI_CONFIG.layoutPreset;
 }
 
 function getSafeProjectGameUiTitleLayout(value) {
+  if (projectSettingsTools?.getSafeProjectGameUiTitleLayout) {
+    return projectSettingsTools.getSafeProjectGameUiTitleLayout(value, getProjectSettingsOptions());
+  }
+
   return Object.hasOwn(PROJECT_GAME_UI_TITLE_LAYOUT_LABELS, value) ? value : DEFAULT_PROJECT_GAME_UI_CONFIG.titleLayout;
 }
 
 function getSafeProjectGameUiFontStyle(value) {
+  if (projectSettingsTools?.getSafeProjectGameUiFontStyle) {
+    return projectSettingsTools.getSafeProjectGameUiFontStyle(value, getProjectSettingsOptions());
+  }
+
   return Object.hasOwn(PROJECT_GAME_UI_FONT_LABELS, value) ? value : DEFAULT_PROJECT_GAME_UI_CONFIG.fontStyle;
 }
 
 function getSafeProjectGameUiSurfaceStyle(value) {
+  if (projectSettingsTools?.getSafeProjectGameUiSurfaceStyle) {
+    return projectSettingsTools.getSafeProjectGameUiSurfaceStyle(value, getProjectSettingsOptions());
+  }
+
   return Object.hasOwn(PROJECT_GAME_UI_SURFACE_LABELS, value) ? value : DEFAULT_PROJECT_GAME_UI_CONFIG.surfaceStyle;
 }
 
 function getSafeProjectGameUiBrandMode(value) {
+  if (projectSettingsTools?.getSafeProjectGameUiBrandMode) {
+    return projectSettingsTools.getSafeProjectGameUiBrandMode(value, getProjectSettingsOptions());
+  }
+
   return Object.hasOwn(PROJECT_GAME_UI_BRAND_LABELS, value) ? value : DEFAULT_PROJECT_GAME_UI_CONFIG.brandMode;
 }
 
 function getSafeProjectGameUiSidePanelMode(value) {
+  if (projectSettingsTools?.getSafeProjectGameUiSidePanelMode) {
+    return projectSettingsTools.getSafeProjectGameUiSidePanelMode(value, getProjectSettingsOptions());
+  }
+
   return Object.hasOwn(PROJECT_GAME_UI_SIDE_PANEL_LABELS, value) ? value : DEFAULT_PROJECT_GAME_UI_CONFIG.sidePanelMode;
 }
 
 function getSafeProjectGameUiSidePanelPosition(value) {
+  if (projectSettingsTools?.getSafeProjectGameUiSidePanelPosition) {
+    return projectSettingsTools.getSafeProjectGameUiSidePanelPosition(value, getProjectSettingsOptions());
+  }
+
   return Object.hasOwn(PROJECT_GAME_UI_SIDE_POSITION_LABELS, value) ? value : DEFAULT_PROJECT_GAME_UI_CONFIG.sidePanelPosition;
 }
 
 function getSafeProjectGameUiTopbarPosition(value) {
+  if (projectSettingsTools?.getSafeProjectGameUiTopbarPosition) {
+    return projectSettingsTools.getSafeProjectGameUiTopbarPosition(value, getProjectSettingsOptions());
+  }
+
   return Object.hasOwn(PROJECT_GAME_UI_TOPBAR_POSITION_LABELS, value) ? value : DEFAULT_PROJECT_GAME_UI_CONFIG.topbarPosition;
 }
 
 function getSafeProjectGameUiHudPosition(value) {
+  if (projectSettingsTools?.getSafeProjectGameUiHudPosition) {
+    return projectSettingsTools.getSafeProjectGameUiHudPosition(value, getProjectSettingsOptions());
+  }
+
   return Object.hasOwn(PROJECT_GAME_UI_HUD_POSITION_LABELS, value) ? value : DEFAULT_PROJECT_GAME_UI_CONFIG.hudPosition;
 }
 
 function getSafeProjectGameUiTitleCardAnchor(value) {
+  if (projectSettingsTools?.getSafeProjectGameUiTitleCardAnchor) {
+    return projectSettingsTools.getSafeProjectGameUiTitleCardAnchor(value, getProjectSettingsOptions());
+  }
+
   return Object.hasOwn(PROJECT_GAME_UI_TITLE_CARD_ANCHOR_LABELS, value)
     ? value
     : DEFAULT_PROJECT_GAME_UI_CONFIG.titleCardAnchor;
 }
 
 function getSafeGameUiFrameSlice(value, fallback = { top: 18, right: 18, bottom: 18, left: 18 }) {
+  if (projectSettingsTools?.getSafeGameUiFrameSlice) {
+    return projectSettingsTools.getSafeGameUiFrameSlice(value, fallback, getProjectSettingsOptions());
+  }
+
   const source = value && typeof value === "object" ? value : {};
   return {
     top: clamp(getSafeNumber(source.top, fallback.top), 0, 96),
@@ -9894,6 +9880,10 @@ function getSafeGameUiFrameSlice(value, fallback = { top: 18, right: 18, bottom:
 }
 
 function getProjectGameUiPresetConfig(preset) {
+  if (projectSettingsTools?.getProjectGameUiPresetConfig) {
+    return projectSettingsTools.getProjectGameUiPresetConfig(preset, getProjectSettingsOptions());
+  }
+
   const safePreset = getSafeProjectGameUiPreset(preset);
   return {
     ...DEFAULT_PROJECT_GAME_UI_CONFIG,
@@ -9903,6 +9893,10 @@ function getProjectGameUiPresetConfig(preset) {
 }
 
 function getProjectGameUiConfig(project = state.data?.project) {
+  if (projectSettingsTools?.getProjectGameUiConfig) {
+    return projectSettingsTools.getProjectGameUiConfig(project, getProjectSettingsOptions());
+  }
+
   const source = project?.gameUiConfig ?? {};
   const base = getProjectGameUiPresetConfig(source.preset);
   return {
@@ -10005,6 +9999,10 @@ function getDialogThemeBaseColors(theme) {
 }
 
 function toRgbaString(hexColor, opacityPercent) {
+  if (projectSettingsTools?.toRgbaString) {
+    return projectSettingsTools.toRgbaString(hexColor, opacityPercent, getProjectSettingsOptions());
+  }
+
   const safeHex = getSafeParticleColor(hexColor, "#ffffff").slice(1);
   const red = Number.parseInt(safeHex.slice(0, 2), 16);
   const green = Number.parseInt(safeHex.slice(2, 4), 16);
@@ -10014,6 +10012,10 @@ function toRgbaString(hexColor, opacityPercent) {
 }
 
 function getDialogShapeRadius(shape, fallbackRadius = 18) {
+  if (projectSettingsTools?.getDialogShapeRadius) {
+    return projectSettingsTools.getDialogShapeRadius(shape, fallbackRadius, getProjectSettingsOptions());
+  }
+
   const safeShape = getSafeProjectDialogBoxShape(shape);
   if (safeShape === "square") {
     return 6;
@@ -10442,6 +10444,10 @@ function renderResolutionButtons() {
 }
 
 function getRecentWorkspaceTypeLabel(type) {
+  if (recentWorkspaceTools?.getRecentWorkspaceTypeLabel) {
+    return recentWorkspaceTools.getRecentWorkspaceTypeLabel(type);
+  }
+
   return RECENT_WORKSPACE_TYPE_LABELS[getSafeRecentWorkspaceType(type)] ?? RECENT_WORKSPACE_TYPE_LABELS.scene;
 }
 
@@ -12508,38 +12514,74 @@ function renderRouteAlerts(routeOverview) {
 }
 
 function getSafeDashboardSearchMode(mode) {
+  if (editorFilterTools?.getSafeDashboardSearchMode) {
+    return editorFilterTools.getSafeDashboardSearchMode(mode);
+  }
+
   return Object.prototype.hasOwnProperty.call(DASHBOARD_SEARCH_MODE_LABELS, mode) ? mode : "all";
 }
 
 function getDashboardSearchModeLabel(mode) {
+  if (editorFilterTools?.getDashboardSearchModeLabel) {
+    return editorFilterTools.getDashboardSearchModeLabel(mode);
+  }
+
   return DASHBOARD_SEARCH_MODE_LABELS[getSafeDashboardSearchMode(mode)] ?? DASHBOARD_SEARCH_MODE_LABELS.all;
 }
 
 function getSafeRouteMapFilter(mode) {
+  if (editorFilterTools?.getSafeRouteMapFilter) {
+    return editorFilterTools.getSafeRouteMapFilter(mode);
+  }
+
   return Object.prototype.hasOwnProperty.call(ROUTE_MAP_FILTER_LABELS, mode) ? mode : "all";
 }
 
 function getRouteMapFilterLabel(mode) {
+  if (editorFilterTools?.getRouteMapFilterLabel) {
+    return editorFilterTools.getRouteMapFilterLabel(mode);
+  }
+
   return ROUTE_MAP_FILTER_LABELS[getSafeRouteMapFilter(mode)] ?? ROUTE_MAP_FILTER_LABELS.all;
 }
 
 function getSafeSceneStatus(value) {
+  if (editorFilterTools?.getSafeSceneStatus) {
+    return editorFilterTools.getSafeSceneStatus(value);
+  }
+
   return Object.prototype.hasOwnProperty.call(SCENE_STATUS_LABELS, value) ? value : "drafting";
 }
 
 function getSceneStatusLabel(value) {
+  if (editorFilterTools?.getSceneStatusLabel) {
+    return editorFilterTools.getSceneStatusLabel(value);
+  }
+
   return SCENE_STATUS_LABELS[getSafeSceneStatus(value)] ?? SCENE_STATUS_LABELS.drafting;
 }
 
 function getSafeScenePriority(value) {
+  if (editorFilterTools?.getSafeScenePriority) {
+    return editorFilterTools.getSafeScenePriority(value);
+  }
+
   return Object.prototype.hasOwnProperty.call(SCENE_PRIORITY_LABELS, value) ? value : "normal";
 }
 
 function getScenePriorityLabel(value) {
+  if (editorFilterTools?.getScenePriorityLabel) {
+    return editorFilterTools.getScenePriorityLabel(value);
+  }
+
   return SCENE_PRIORITY_LABELS[getSafeScenePriority(value)] ?? SCENE_PRIORITY_LABELS.normal;
 }
 
 function getSceneStatusToneClass(status) {
+  if (editorFilterTools?.getSceneStatusToneClass) {
+    return editorFilterTools.getSceneStatusToneClass(status);
+  }
+
   const safeStatus = getSafeSceneStatus(status);
   if (safeStatus === "ready") {
     return "good-text";
@@ -12551,6 +12593,10 @@ function getSceneStatusToneClass(status) {
 }
 
 function getScenePriorityToneClass(priority) {
+  if (editorFilterTools?.getScenePriorityToneClass) {
+    return editorFilterTools.getScenePriorityToneClass(priority);
+  }
+
   const safePriority = getSafeScenePriority(priority);
   if (safePriority === "rush") {
     return "danger-text";
@@ -12562,6 +12608,10 @@ function getScenePriorityToneClass(priority) {
 }
 
 function getSceneQuickButtonToneClass(kind, value) {
+  if (editorFilterTools?.getSceneQuickButtonToneClass) {
+    return editorFilterTools.getSceneQuickButtonToneClass(kind, value);
+  }
+
   if (kind === "status") {
     return getSafeSceneStatus(value) === "ready" ? "is-good" : "is-soft";
   }
@@ -12658,6 +12708,10 @@ function renderScenePlanningQuickButtons(scene) {
 }
 
 function doesRouteNodeMatchFilter(node, filterMode = state.dashboardRouteFilter) {
+  if (editorFilterTools?.doesRouteNodeMatchFilter) {
+    return editorFilterTools.doesRouteNodeMatchFilter(node, filterMode);
+  }
+
   const safeFilter = getSafeRouteMapFilter(filterMode);
 
   if (safeFilter === "all") {
@@ -12696,6 +12750,10 @@ function doesRouteNodeMatchFilter(node, filterMode = state.dashboardRouteFilter)
 }
 
 function getRouteMapFilterCount(routeOverview, filterMode) {
+  if (editorFilterTools?.getRouteMapFilterCount) {
+    return editorFilterTools.getRouteMapFilterCount(routeOverview, filterMode);
+  }
+
   return (routeOverview.nodes ?? []).filter((node) => doesRouteNodeMatchFilter(node, filterMode)).length;
 }
 
@@ -12764,22 +12822,42 @@ function focusStoryBlockFilters({
 }
 
 function getSafeStoryBlockTypeFilter(value) {
+  if (editorFilterTools?.getSafeStoryBlockTypeFilter) {
+    return editorFilterTools.getSafeStoryBlockTypeFilter(value);
+  }
+
   return Object.prototype.hasOwnProperty.call(STORY_BLOCK_TYPE_FILTER_LABELS, value) ? value : "all";
 }
 
 function getStoryBlockTypeFilterLabel(value) {
+  if (editorFilterTools?.getStoryBlockTypeFilterLabel) {
+    return editorFilterTools.getStoryBlockTypeFilterLabel(value);
+  }
+
   return STORY_BLOCK_TYPE_FILTER_LABELS[getSafeStoryBlockTypeFilter(value)] ?? STORY_BLOCK_TYPE_FILTER_LABELS.all;
 }
 
 function getSafeStoryBlockIssueFilter(value) {
+  if (editorFilterTools?.getSafeStoryBlockIssueFilter) {
+    return editorFilterTools.getSafeStoryBlockIssueFilter(value);
+  }
+
   return Object.prototype.hasOwnProperty.call(STORY_BLOCK_ISSUE_FILTER_LABELS, value) ? value : "all";
 }
 
 function getStoryBlockIssueFilterLabel(value) {
+  if (editorFilterTools?.getStoryBlockIssueFilterLabel) {
+    return editorFilterTools.getStoryBlockIssueFilterLabel(value);
+  }
+
   return STORY_BLOCK_ISSUE_FILTER_LABELS[getSafeStoryBlockIssueFilter(value)] ?? STORY_BLOCK_ISSUE_FILTER_LABELS.all;
 }
 
 function getStoryBlockGroup(type) {
+  if (editorFilterTools?.getStoryBlockGroup) {
+    return editorFilterTools.getStoryBlockGroup(type);
+  }
+
   if (type === "dialogue" || type === "narration" || type === "choice") {
     return "story";
   }
@@ -12792,6 +12870,10 @@ function getStoryBlockGroup(type) {
 }
 
 function getStoryBlockGroupLabel(type) {
+  if (editorFilterTools?.getStoryBlockGroupLabel) {
+    return editorFilterTools.getStoryBlockGroupLabel(type);
+  }
+
   const group = getStoryBlockGroup(type);
   if (group === "story") {
     return "正文";
@@ -12990,34 +13072,66 @@ function getStoryBlockIssueItems(block) {
 }
 
 function getSafeStorySceneTreeFilter(value) {
+  if (editorFilterTools?.getSafeStorySceneTreeFilter) {
+    return editorFilterTools.getSafeStorySceneTreeFilter(value);
+  }
+
   return Object.prototype.hasOwnProperty.call(STORY_SCENE_TREE_FILTER_LABELS, value) ? value : "all";
 }
 
 function getStorySceneTreeFilterLabel(value) {
+  if (editorFilterTools?.getStorySceneTreeFilterLabel) {
+    return editorFilterTools.getStorySceneTreeFilterLabel(value);
+  }
+
   return STORY_SCENE_TREE_FILTER_LABELS[getSafeStorySceneTreeFilter(value)] ?? STORY_SCENE_TREE_FILTER_LABELS.all;
 }
 
 function getSafeCharacterFilterMode(value) {
+  if (editorFilterTools?.getSafeCharacterFilterMode) {
+    return editorFilterTools.getSafeCharacterFilterMode(value);
+  }
+
   return Object.prototype.hasOwnProperty.call(CHARACTER_FILTER_LABELS, value) ? value : "all";
 }
 
 function getCharacterFilterLabel(value) {
+  if (editorFilterTools?.getCharacterFilterLabel) {
+    return editorFilterTools.getCharacterFilterLabel(value);
+  }
+
   return CHARACTER_FILTER_LABELS[getSafeCharacterFilterMode(value)] ?? CHARACTER_FILTER_LABELS.all;
 }
 
 function getSafePreviewIssueFilterMode(value) {
+  if (editorFilterTools?.getSafePreviewIssueFilterMode) {
+    return editorFilterTools.getSafePreviewIssueFilterMode(value);
+  }
+
   return Object.prototype.hasOwnProperty.call(PREVIEW_ISSUE_FILTER_LABELS, value) ? value : "all";
 }
 
 function getPreviewIssueFilterLabel(value) {
+  if (editorFilterTools?.getPreviewIssueFilterLabel) {
+    return editorFilterTools.getPreviewIssueFilterLabel(value);
+  }
+
   return PREVIEW_ISSUE_FILTER_LABELS[getSafePreviewIssueFilterMode(value)] ?? PREVIEW_ISSUE_FILTER_LABELS.all;
 }
 
 function getSafePreviewSceneFilterMode(value) {
+  if (editorFilterTools?.getSafePreviewSceneFilterMode) {
+    return editorFilterTools.getSafePreviewSceneFilterMode(value);
+  }
+
   return Object.prototype.hasOwnProperty.call(PREVIEW_SCENE_FILTER_LABELS, value) ? value : "all";
 }
 
 function getPreviewSceneFilterLabel(value) {
+  if (editorFilterTools?.getPreviewSceneFilterLabel) {
+    return editorFilterTools.getPreviewSceneFilterLabel(value);
+  }
+
   return PREVIEW_SCENE_FILTER_LABELS[getSafePreviewSceneFilterMode(value)] ?? PREVIEW_SCENE_FILTER_LABELS.all;
 }
 
@@ -13093,7 +13207,7 @@ function buildStorySceneTreeOverview(routeOverview) {
   const chapters = (routeOverview.chapters ?? [])
     .map((chapter) => {
       const chapterSearchText = normalizeDashboardSearchQuery(chapter.name);
-      const chapterMatchesQuery = terms.length > 0 && terms.every((term) => chapterSearchText.includes(term));
+      const chapterMatchesQuery = terms.length > 0 && doesSearchTextMatchTerms(chapterSearchText, terms);
       const scenes = (chapter.scenes ?? []).filter((sceneNode) => {
         if (!matchesStorySceneTreeFilter(sceneNode, filterMode)) {
           return false;
@@ -13108,7 +13222,7 @@ function buildStorySceneTreeOverview(routeOverview) {
         }
 
         const searchText = buildStorySceneTreeSearchText(sceneNode);
-        return terms.every((term) => searchText.includes(term));
+        return doesSearchTextMatchTerms(searchText, terms);
       });
 
       return {
@@ -13305,7 +13419,7 @@ function getFilteredStoryBlocks(scene) {
     }
 
     const haystack = buildStoryBlockSearchText(block, scene);
-    return terms.every((term) => haystack.includes(term));
+    return doesSearchTextMatchTerms(haystack, terms);
   });
 }
 
@@ -13379,6 +13493,10 @@ function renderStoryBlockIssueBadges(block) {
 }
 
 function normalizeDashboardSearchQuery(value) {
+  if (editorFilterTools?.normalizeDashboardSearchQuery) {
+    return editorFilterTools.normalizeDashboardSearchQuery(value);
+  }
+
   return String(value ?? "")
     .trim()
     .toLowerCase()
@@ -13386,8 +13504,27 @@ function normalizeDashboardSearchQuery(value) {
 }
 
 function getDashboardSearchTerms(value) {
+  if (editorFilterTools?.getDashboardSearchTerms) {
+    return editorFilterTools.getDashboardSearchTerms(value);
+  }
+
   const query = normalizeDashboardSearchQuery(value);
   return query ? query.split(" ").filter(Boolean) : [];
+}
+
+function doesSearchTextMatchTerms(searchText, terms) {
+  if (editorFilterTools?.doesSearchTextMatchTerms) {
+    return editorFilterTools.doesSearchTextMatchTerms(searchText, terms);
+  }
+
+  const safeTerms = Array.isArray(terms)
+    ? terms.map((term) => normalizeDashboardSearchQuery(term)).filter(Boolean)
+    : getDashboardSearchTerms(terms);
+  if (!safeTerms.length) {
+    return true;
+  }
+  const haystack = normalizeDashboardSearchQuery(searchText);
+  return safeTerms.every((term) => haystack.includes(term));
 }
 
 function buildDashboardSearchOverview() {
@@ -13498,10 +13635,9 @@ function buildDashboardSearchOverview() {
     });
   });
 
-  const sortByScore = (left, right) => right.score - left.score || left.title.localeCompare(right.title, "zh-CN");
-  scenes.sort(sortByScore);
-  characters.sort(sortByScore);
-  lines.sort(sortByScore);
+  const sortedScenes = sortDashboardSearchResults(scenes);
+  const sortedCharacters = sortDashboardSearchResults(characters);
+  const sortedLines = sortDashboardSearchResults(lines);
   const hasQuery = terms.length > 0;
 
   return {
@@ -13509,24 +13645,28 @@ function buildDashboardSearchOverview() {
     normalizedQuery,
     mode: getSafeDashboardSearchMode(state.dashboardSearchMode),
     counts: {
-      scenes: hasQuery ? scenes.length : state.data.scenes.length,
-      characters: hasQuery ? characters.length : state.data.characters.length,
-      lines: hasQuery ? lines.length : countSearchableStoryBlocks(),
+      scenes: hasQuery ? sortedScenes.length : state.data.scenes.length,
+      characters: hasQuery ? sortedCharacters.length : state.data.characters.length,
+      lines: hasQuery ? sortedLines.length : countSearchableStoryBlocks(),
     },
-    scenes,
-    characters,
-    lines,
+    scenes: sortedScenes,
+    characters: sortedCharacters,
+    lines: sortedLines,
     suggestions: getDashboardSearchSuggestions(),
   };
 }
 
 function scoreDashboardSearchMatch(primaryText, searchFields, normalizedQuery, terms) {
+  if (editorFilterTools?.scoreDashboardSearchMatch) {
+    return editorFilterTools.scoreDashboardSearchMatch(primaryText, searchFields, normalizedQuery, terms);
+  }
+
   if (!terms.length) {
     return -1;
   }
 
   const haystack = normalizeDashboardSearchQuery(searchFields.filter(Boolean).join(" "));
-  if (!terms.every((term) => haystack.includes(term))) {
+  if (!doesSearchTextMatchTerms(haystack, terms)) {
     return -1;
   }
 
@@ -13547,6 +13687,18 @@ function scoreDashboardSearchMatch(primaryText, searchFields, normalizedQuery, t
   );
 
   return score;
+}
+
+function sortDashboardSearchResults(items) {
+  if (editorFilterTools?.sortDashboardSearchResults) {
+    return editorFilterTools.sortDashboardSearchResults(items);
+  }
+
+  return (Array.isArray(items) ? [...items] : []).sort(
+    (left, right) =>
+      (Number(right?.score) || 0) - (Number(left?.score) || 0) ||
+      String(left?.title ?? "").localeCompare(String(right?.title ?? ""), "zh-CN")
+  );
 }
 
 function getDashboardSearchSuggestions() {
@@ -14426,7 +14578,7 @@ function buildCharacterRosterOverview() {
         return true;
       }
 
-      return terms.every((term) => entry.searchText.includes(term));
+      return doesSearchTextMatchTerms(entry.searchText, terms);
     })
     .sort((left, right) => {
       const missingVoiceDiff = (right.stats.missingVoiceCount ?? 0) - (left.stats.missingVoiceCount ?? 0);
@@ -14766,6 +14918,10 @@ function createScriptEntryContextSummary(entry) {
 }
 
 function entryToVoicePlaceholderItem(entry) {
+  if (scriptVoiceTools?.entryToVoicePlaceholderItem) {
+    return scriptVoiceTools.entryToVoicePlaceholderItem(entry);
+  }
+
   if (!entry?.sceneId || !entry?.blockId) {
     return null;
   }
@@ -14885,7 +15041,7 @@ function getFilteredScriptEntries(allEntries) {
     const haystack = normalizeScriptSearchQuery(
       [entry.title, entry.text, entry.meta, entry.speakerName, entry.searchText].join(" ")
     );
-    return terms.every((term) => haystack.includes(term));
+    return doesSearchTextMatchTerms(haystack, terms);
   });
 }
 
@@ -15202,6 +15358,10 @@ function renderBeginnerScriptSummary(filteredEntries, allEntries) {
 }
 
 function getScriptVoiceWorkflowState(entry) {
+  if (scriptVoiceTools?.getScriptVoiceWorkflowState) {
+    return scriptVoiceTools.getScriptVoiceWorkflowState(entry);
+  }
+
   if (entry?.type !== "dialogue") {
     return "not_required";
   }
@@ -15215,6 +15375,10 @@ function getScriptVoiceWorkflowState(entry) {
 }
 
 function getScriptVoiceWorkflowLabel(entry) {
+  if (scriptVoiceTools?.getScriptVoiceWorkflowLabel) {
+    return scriptVoiceTools.getScriptVoiceWorkflowLabel(entry);
+  }
+
   const workflow = getScriptVoiceWorkflowState(entry);
   if (workflow === "missing_binding") {
     return "还没建语音条目";
@@ -15229,6 +15393,10 @@ function getScriptVoiceWorkflowLabel(entry) {
 }
 
 function buildSuggestedVoiceBaseName(entry) {
+  if (scriptVoiceTools?.buildSuggestedVoiceBaseName) {
+    return scriptVoiceTools.buildSuggestedVoiceBaseName(entry);
+  }
+
   if (entry.voiceName) {
     return entry.voiceName;
   }
@@ -15239,6 +15407,12 @@ function buildSuggestedVoiceBaseName(entry) {
 }
 
 function buildSuggestedVoiceFileName(entry) {
+  if (scriptVoiceTools?.buildSuggestedVoiceFileName) {
+    return scriptVoiceTools.buildSuggestedVoiceFileName(entry, {
+      sanitizeFileName,
+    });
+  }
+
   const existingPathName = entry.voiceAssetPath ? entry.voiceAssetPath.split("/").pop() ?? "" : "";
   if (existingPathName) {
     return existingPathName;
@@ -16973,6 +17147,16 @@ function exportProjectVoiceBrief() {
 }
 
 function buildScriptTxtContent(filteredEntries, totalEntryCount) {
+  if (scriptVoiceTools?.buildScriptTxtContent) {
+    return scriptVoiceTools.buildScriptTxtContent(filteredEntries, totalEntryCount, {
+      projectTitle: state.data.project.title,
+      filterSummaryText: getScriptFilterSummaryText(),
+      exportedAt: new Date().toISOString(),
+      formatDate,
+      getScriptIssueFilterLabel,
+    });
+  }
+
   const lines = [];
   const scopeText = getScriptFilterSummaryText();
   const groupedByChapter = new Map();
@@ -17030,6 +17214,18 @@ function buildScriptTxtContent(filteredEntries, totalEntryCount) {
 }
 
 function buildScriptCsvContent(filteredEntries, totalEntryCount) {
+  if (scriptVoiceTools?.buildScriptCsvContent) {
+    return scriptVoiceTools.buildScriptCsvContent(filteredEntries, totalEntryCount, {
+      projectTitle: state.data.project.title,
+      filterSummaryText: getScriptFilterSummaryText(),
+      exportedAt: new Date().toISOString(),
+      formatDate,
+      formatCsvCell,
+      getScriptTypeLabel,
+      getScriptIssueFilterLabel,
+    });
+  }
+
   const scopeText = getScriptFilterSummaryText();
   const rows = [
     ["项目名", state.data.project.title],
@@ -17058,6 +17254,13 @@ function buildScriptCsvContent(filteredEntries, totalEntryCount) {
 }
 
 function getVoiceSheetEntries(sourceEntries, filters = {}) {
+  if (scriptVoiceTools?.getVoiceSheetEntries) {
+    return scriptVoiceTools.getVoiceSheetEntries(sourceEntries, filters, {
+      getSafeScriptCharacterFilter,
+      getSafeScriptChapterFilter,
+    });
+  }
+
   const safeCharacterId = filters.characterId ? getSafeScriptCharacterFilter(filters.characterId) : "all";
   const safeChapterId = filters.chapterId ? getSafeScriptChapterFilter(filters.chapterId) : "all";
 
@@ -17076,6 +17279,19 @@ function getVoiceSheetEntries(sourceEntries, filters = {}) {
 }
 
 function buildScriptVoiceSheetContent(filteredEntries, totalEntryCount, filters = {}) {
+  if (scriptVoiceTools?.buildScriptVoiceSheetContent) {
+    return scriptVoiceTools.buildScriptVoiceSheetContent(filteredEntries, totalEntryCount, filters, {
+      projectTitle: state.data.project.title,
+      filterSummaryText: getScriptFilterSummaryText(),
+      exportedAt: new Date().toISOString(),
+      formatDate,
+      formatCsvCell,
+      sanitizeFileName,
+      getScriptCharacterFilterLabel,
+      getScriptChapterFilterLabel,
+    });
+  }
+
   const scopeText =
     filters.characterId || filters.chapterId
       ? [
@@ -17159,6 +17375,10 @@ function getScriptFilterSummaryText() {
 }
 
 function getScriptVoiceStatusText(status) {
+  if (scriptVoiceTools?.getScriptVoiceStatusText) {
+    return scriptVoiceTools.getScriptVoiceStatusText(status);
+  }
+
   if (status === "missing") {
     return "待绑语音";
   }
@@ -17171,14 +17391,30 @@ function getScriptVoiceStatusText(status) {
 }
 
 function getSafeScriptIssueFilter(value) {
+  if (editorFilterTools?.getSafeScriptIssueFilter) {
+    return editorFilterTools.getSafeScriptIssueFilter(value);
+  }
+
   return Object.prototype.hasOwnProperty.call(SCRIPT_ISSUE_FILTER_LABELS, value) ? value : "all";
 }
 
 function getScriptIssueFilterLabel(value) {
+  if (editorFilterTools?.getScriptIssueFilterLabel) {
+    return editorFilterTools.getScriptIssueFilterLabel(value);
+  }
+
   return SCRIPT_ISSUE_FILTER_LABELS[getSafeScriptIssueFilter(value)] ?? SCRIPT_ISSUE_FILTER_LABELS.all;
 }
 
 function buildScriptExportFileName(format) {
+  if (scriptVoiceTools?.buildScriptExportFileName) {
+    return scriptVoiceTools.buildScriptExportFileName(format, {
+      projectTitle: state.data.project.title || "tony-na-engine",
+      filterSummaryText: getScriptFilterSummaryText(),
+      sanitizeFileName,
+    });
+  }
+
   const extension = format === "csv" ? "csv" : "txt";
   const date = new Date();
   const dateStamp = [
@@ -17192,6 +17428,16 @@ function buildScriptExportFileName(format) {
 }
 
 function buildScriptVoiceSheetFileName(filters = {}) {
+  if (scriptVoiceTools?.buildScriptVoiceSheetFileName) {
+    return scriptVoiceTools.buildScriptVoiceSheetFileName(filters, {
+      projectTitle: state.data.project.title || "tony-na-engine",
+      filterSummaryText: getScriptFilterSummaryText(),
+      sanitizeFileName,
+      getScriptCharacterFilterLabel,
+      getScriptChapterFilterLabel,
+    });
+  }
+
   const date = new Date();
   const dateStamp = [
     date.getFullYear(),
@@ -17213,6 +17459,13 @@ function buildScriptVoiceSheetFileName(filters = {}) {
 }
 
 function buildCharacterVoiceBriefFileName(character) {
+  if (scriptVoiceTools?.buildCharacterVoiceBriefFileName) {
+    return scriptVoiceTools.buildCharacterVoiceBriefFileName(character, {
+      projectTitle: state.data.project.title || "tony-na-engine",
+      sanitizeFileName,
+    });
+  }
+
   const date = new Date();
   const dateStamp = [
     date.getFullYear(),
@@ -17225,6 +17478,13 @@ function buildCharacterVoiceBriefFileName(character) {
 }
 
 function buildChapterVoiceBriefFileName(chapter) {
+  if (scriptVoiceTools?.buildChapterVoiceBriefFileName) {
+    return scriptVoiceTools.buildChapterVoiceBriefFileName(chapter, {
+      projectTitle: state.data.project.title || "tony-na-engine",
+      sanitizeFileName,
+    });
+  }
+
   const date = new Date();
   const dateStamp = [
     date.getFullYear(),
@@ -17237,6 +17497,13 @@ function buildChapterVoiceBriefFileName(chapter) {
 }
 
 function buildProjectVoiceBriefFileName() {
+  if (scriptVoiceTools?.buildProjectVoiceBriefFileName) {
+    return scriptVoiceTools.buildProjectVoiceBriefFileName({
+      projectTitle: state.data.project.title || "tony-na-engine",
+      sanitizeFileName,
+    });
+  }
+
   const date = new Date();
   const dateStamp = [
     date.getFullYear(),
@@ -17419,6 +17686,10 @@ function buildChapterVoiceBriefContent(chapter, dialogueEntries, pendingEntries)
 }
 
 function sanitizeFileName(value) {
+  if (editorCommonTools?.sanitizeFileName) {
+    return editorCommonTools.sanitizeFileName(value);
+  }
+
   return String(value ?? "")
     .trim()
     .replace(/[\\/:*?"<>|]/g, "_")
@@ -17428,6 +17699,10 @@ function sanitizeFileName(value) {
 }
 
 function formatCsvCell(value) {
+  if (editorCommonTools?.formatCsvCell) {
+    return editorCommonTools.formatCsvCell(value);
+  }
+
   const text = String(value ?? "");
   return `"${text.replaceAll('"', '""')}"`;
 }
@@ -17463,6 +17738,10 @@ function getTopScriptSpeaker(entries) {
 }
 
 function normalizeScriptSearchQuery(value) {
+  if (editorFilterTools?.normalizeScriptSearchQuery) {
+    return editorFilterTools.normalizeScriptSearchQuery(value);
+  }
+
   return String(value ?? "")
     .trim()
     .toLowerCase()
@@ -17470,6 +17749,10 @@ function normalizeScriptSearchQuery(value) {
 }
 
 function getScriptSearchTerms(value) {
+  if (editorFilterTools?.getScriptSearchTerms) {
+    return editorFilterTools.getScriptSearchTerms(value);
+  }
+
   const query = normalizeScriptSearchQuery(value);
   return query ? query.split(" ").filter(Boolean) : [];
 }
@@ -17500,18 +17783,34 @@ function getSafeScriptCharacterFilter(characterId) {
 }
 
 function getSafeScriptTypeFilter(type) {
+  if (editorFilterTools?.getSafeScriptTypeFilter) {
+    return editorFilterTools.getSafeScriptTypeFilter(type);
+  }
+
   return Object.prototype.hasOwnProperty.call(SCRIPT_TYPE_LABELS, type) ? type : "all";
 }
 
 function getSafeScriptVoiceFilter(value) {
+  if (editorFilterTools?.getSafeScriptVoiceFilter) {
+    return editorFilterTools.getSafeScriptVoiceFilter(value);
+  }
+
   return Object.prototype.hasOwnProperty.call(SCRIPT_VOICE_FILTER_LABELS, value) ? value : "all";
 }
 
 function getScriptTypeLabel(type) {
+  if (editorFilterTools?.getScriptTypeLabel) {
+    return editorFilterTools.getScriptTypeLabel(type);
+  }
+
   return type === "all" ? "全部内容" : SCRIPT_TYPE_LABELS[getSafeScriptTypeFilter(type)] ?? "全部内容";
 }
 
 function getScriptVoiceFilterLabel(value) {
+  if (editorFilterTools?.getScriptVoiceFilterLabel) {
+    return editorFilterTools.getScriptVoiceFilterLabel(value);
+  }
+
   return SCRIPT_VOICE_FILTER_LABELS[getSafeScriptVoiceFilter(value)] ?? SCRIPT_VOICE_FILTER_LABELS.all;
 }
 
@@ -18707,7 +19006,7 @@ function buildPreviewScenePickerOverview(routeOverview) {
   const chapters = (routeOverview.chapters ?? [])
     .map((chapter) => {
       const chapterSearchText = normalizeDashboardSearchQuery(chapter.name);
-      const chapterMatchesQuery = terms.length > 0 && terms.every((term) => chapterSearchText.includes(term));
+      const chapterMatchesQuery = terms.length > 0 && doesSearchTextMatchTerms(chapterSearchText, terms);
       const scenes = (chapter.scenes ?? []).filter((sceneNode) => {
         if (!matchesPreviewSceneFilterMode(sceneNode, filterMode)) {
           return false;
@@ -18721,7 +19020,7 @@ function buildPreviewScenePickerOverview(routeOverview) {
           return true;
         }
 
-        return terms.every((term) => buildStorySceneTreeSearchText(sceneNode).includes(term));
+        return doesSearchTextMatchTerms(buildStorySceneTreeSearchText(sceneNode), terms);
       });
 
       return {
@@ -19431,6 +19730,10 @@ function getBrowserStorage() {
 function loadStoredEditorUiThemeMode() {
   const storage = getBrowserStorage();
 
+  if (uiThemeTools?.loadStoredEditorUiThemeMode) {
+    return uiThemeTools.loadStoredEditorUiThemeMode(storage, PREVIEW_PLAYBACK_DEFAULTS.uiThemeMode);
+  }
+
   if (!storage) {
     return PREVIEW_PLAYBACK_DEFAULTS.uiThemeMode;
   }
@@ -19444,6 +19747,11 @@ function loadStoredEditorUiThemeMode() {
 
 function persistStoredEditorUiThemeMode(mode) {
   const storage = getBrowserStorage();
+
+  if (uiThemeTools?.persistStoredEditorUiThemeMode) {
+    uiThemeTools.persistStoredEditorUiThemeMode(storage, mode);
+    return;
+  }
 
   if (!storage) {
     return;
@@ -19562,10 +19870,18 @@ function getPreviewQuickSaveStorageKey(project = state.data?.project) {
 }
 
 function createEmptyPreviewSaveSlots() {
+  if (previewSaveTools?.createEmptyPreviewSaveSlots) {
+    return previewSaveTools.createEmptyPreviewSaveSlots(getProjectFormalSaveSlotCount());
+  }
+
   return Array.from({ length: getProjectFormalSaveSlotCount() }, () => null);
 }
 
 function deepClonePreviewData(value) {
+  if (previewSaveTools?.deepClonePreviewData) {
+    return previewSaveTools.deepClonePreviewData(value);
+  }
+
   try {
     return JSON.parse(JSON.stringify(value ?? null));
   } catch (error) {
@@ -19574,6 +19890,14 @@ function deepClonePreviewData(value) {
 }
 
 function sanitizeStoredPreviewSnapshot(source) {
+  if (previewSaveTools?.sanitizeStoredPreviewSnapshot) {
+    return previewSaveTools.sanitizeStoredPreviewSnapshot(source, {
+      getSceneById: (sceneId) => state.data?.scenesById.get(sceneId) ?? null,
+      cloneVisualState: clonePreviewVisualState,
+      cloneVariables: clonePreviewVariables,
+    });
+  }
+
   if (!source || typeof source !== "object") {
     return null;
   }
@@ -19605,6 +19929,14 @@ function sanitizeStoredPreviewSnapshot(source) {
 }
 
 function sanitizeStoredPreviewSession(source) {
+  if (previewSaveTools?.sanitizeStoredPreviewSession) {
+    return previewSaveTools.sanitizeStoredPreviewSession(source, {
+      fallbackSceneId: state.data?.project?.entrySceneId ?? state.selectedSceneId,
+      getSafeSceneId: (sceneId) => getSafeSceneId(sceneId),
+      sanitizeSnapshot: (snapshot) => sanitizeStoredPreviewSnapshot(snapshot),
+    });
+  }
+
   if (!source || typeof source !== "object") {
     return null;
   }
@@ -19630,6 +19962,13 @@ function sanitizeStoredPreviewSession(source) {
 }
 
 function sanitizeStoredPreviewSaveSlot(source) {
+  if (previewSaveTools?.sanitizeStoredPreviewSaveSlot) {
+    return previewSaveTools.sanitizeStoredPreviewSaveSlot(source, {
+      sanitizeSession: (session) => sanitizeStoredPreviewSession(session),
+      nowIso: () => new Date().toISOString(),
+    });
+  }
+
   if (!source || typeof source !== "object") {
     return null;
   }
@@ -19865,19 +20204,35 @@ function persistPreviewReadHistory() {
 }
 
 function getRecentWorkspaceStorageKey(project = state.data?.project) {
+  if (recentWorkspaceTools?.getRecentWorkspaceStorageKey) {
+    return recentWorkspaceTools.getRecentWorkspaceStorageKey(getProjectStorageScope(project));
+  }
+
   return `tony-na-engine:editor-recent-work:${getProjectStorageScope(project)}`;
 }
 
 function getSafeRecentWorkspaceType(type) {
+  if (recentWorkspaceTools?.getSafeRecentWorkspaceType) {
+    return recentWorkspaceTools.getSafeRecentWorkspaceType(type);
+  }
+
   return Object.prototype.hasOwnProperty.call(RECENT_WORKSPACE_TYPE_LABELS, type) ? type : "scene";
 }
 
 function sanitizeRecentWorkspaceText(value, maxLength = 140) {
+  if (recentWorkspaceTools?.sanitizeRecentWorkspaceText) {
+    return recentWorkspaceTools.sanitizeRecentWorkspaceText(value, maxLength);
+  }
+
   const text = String(value ?? "").trim();
   return text ? text.slice(0, maxLength) : "";
 }
 
 function getRecentWorkspaceItemKey(entry) {
+  if (recentWorkspaceTools?.getRecentWorkspaceItemKey) {
+    return recentWorkspaceTools.getRecentWorkspaceItemKey(entry);
+  }
+
   if (!entry) {
     return "";
   }
@@ -19898,6 +20253,10 @@ function getRecentWorkspaceItemKey(entry) {
 }
 
 function sanitizeRecentWorkspaceEntry(source = {}) {
+  if (recentWorkspaceTools?.sanitizeRecentWorkspaceEntry) {
+    return recentWorkspaceTools.sanitizeRecentWorkspaceEntry(source);
+  }
+
   if (!source || typeof source !== "object") {
     return null;
   }
@@ -19935,6 +20294,14 @@ function sanitizeRecentWorkspaceEntry(source = {}) {
 function loadStoredRecentWorkspaceItems(project = state.data?.project) {
   const storage = getBrowserStorage();
 
+  if (recentWorkspaceTools?.loadStoredRecentWorkspaceItems) {
+    return recentWorkspaceTools.loadStoredRecentWorkspaceItems(
+      storage,
+      getRecentWorkspaceStorageKey(project),
+      { limit: RECENT_WORKSPACE_LIMIT }
+    );
+  }
+
   if (!storage) {
     return [];
   }
@@ -19960,6 +20327,16 @@ function loadStoredRecentWorkspaceItems(project = state.data?.project) {
 function persistRecentWorkspaceItems() {
   const storage = getBrowserStorage();
 
+  if (recentWorkspaceTools?.persistRecentWorkspaceItems) {
+    recentWorkspaceTools.persistRecentWorkspaceItems(
+      storage,
+      state.data?.project ? getRecentWorkspaceStorageKey(state.data.project) : "",
+      state.recentWorkspaceItems,
+      { limit: RECENT_WORKSPACE_LIMIT }
+    );
+    return;
+  }
+
   if (!storage || !state.data?.project) {
     return;
   }
@@ -19975,6 +20352,26 @@ function persistRecentWorkspaceItems() {
 }
 
 function recordRecentWorkspaceItem(source = {}) {
+  if (recentWorkspaceTools?.mergeRecentWorkspaceItem) {
+    const beforeItems = state.recentWorkspaceItems ?? [];
+    const nextItems = recentWorkspaceTools.mergeRecentWorkspaceItem(
+      beforeItems,
+      {
+        ...source,
+        updatedAt: new Date().toISOString(),
+      },
+      { limit: RECENT_WORKSPACE_LIMIT }
+    );
+
+    if (nextItems.length === beforeItems.length && nextItems.every((item, index) => item === beforeItems[index])) {
+      return;
+    }
+
+    state.recentWorkspaceItems = nextItems;
+    persistRecentWorkspaceItems();
+    return;
+  }
+
   const entry = sanitizeRecentWorkspaceEntry({
     ...source,
     updatedAt: new Date().toISOString(),
@@ -20068,7 +20465,12 @@ function clearRecentWorkspaceItems() {
   state.recentWorkspaceItems = [];
   const storage = getBrowserStorage();
 
-  if (storage && state.data?.project) {
+  if (recentWorkspaceTools?.clearStoredRecentWorkspaceItems) {
+    recentWorkspaceTools.clearStoredRecentWorkspaceItems(
+      storage,
+      state.data?.project ? getRecentWorkspaceStorageKey(state.data.project) : ""
+    );
+  } else if (storage && state.data?.project) {
     try {
       storage.removeItem(getRecentWorkspaceStorageKey(state.data.project));
     } catch (error) {
@@ -21137,6 +21539,10 @@ function getPreviewVariableValue(variables, variableId) {
 }
 
 function clampPreviewVariableNumber(variableId, value) {
+  if (variableTools?.clampVariableNumber) {
+    return variableTools.clampVariableNumber(variableId, value, getVariableToolOptions());
+  }
+
   const [minValue, maxValue] = getVariableNumberBounds(variableId);
   let nextValue = value;
 
@@ -22334,6 +22740,10 @@ function getAssetEmptyMessage(fallback = "这个分类里暂时没有素材。")
 }
 
 function parseAssetTagsInput(value) {
+  if (assetCatalogTools?.parseAssetTagsInput) {
+    return assetCatalogTools.parseAssetTagsInput(value);
+  }
+
   return Array.from(
     new Set(
       String(value ?? "")
@@ -22487,25 +22897,30 @@ async function saveCharacterPresentation(characterId) {
 
 async function applyBulkAssetTags(mode) {
   const checkedAssets = getCurrentCheckedAssetsOfSelectedType();
-  const assets = checkedAssets.length > 0 ? checkedAssets : getCurrentFilteredAssetsOfSelectedType();
+  const filteredAssets = getCurrentFilteredAssetsOfSelectedType();
+  const operation = assetCatalogTools?.buildBulkAssetTagOperation
+    ? assetCatalogTools.buildBulkAssetTagOperation(mode, refs.assetBulkTagsInput?.value ?? "", checkedAssets, filteredAssets)
+    : null;
+  const assets = operation?.assets ?? (checkedAssets.length > 0 ? checkedAssets : filteredAssets);
   if (!assets.length) {
     setSaveStatus("当前筛选结果里没有可批量处理的素材", true);
     return;
   }
 
-  const tags = parseAssetTagsInput(refs.assetBulkTagsInput?.value ?? "");
+  const tags = operation?.tags ?? parseAssetTagsInput(refs.assetBulkTagsInput?.value ?? "");
   if (!tags.length) {
     window.alert("先输入至少一个标签，再批量处理。");
     setSaveStatus("先输入至少一个标签", true);
     return;
   }
 
-  const actionLabel = mode === "remove" ? "移除" : "添加";
+  const actionLabel = operation?.actionLabel ?? (mode === "remove" ? "移除" : "添加");
   const targetLabel =
-    checkedAssets.length > 0 ? `当前勾选的 ${checkedAssets.length} 个素材` : `当前筛选结果里的 ${assets.length} 个素材`;
+    operation?.targetLabel ??
+    (checkedAssets.length > 0 ? `当前勾选的 ${checkedAssets.length} 个素材` : `当前筛选结果里的 ${assets.length} 个素材`);
   const confirmed = await showEngineConfirm({
     title: `批量${actionLabel}素材标签？`,
-    message: `确定要给${targetLabel}批量${actionLabel}标签吗？\n\n标签：${tags.join(" / ")}`,
+    message: operation?.confirmationMessage ?? `确定要给${targetLabel}批量${actionLabel}标签吗？\n\n标签：${tags.join(" / ")}`,
     tone: "warning",
     confirmLabel: `确认${actionLabel}`,
     cancelLabel: "先不处理",
@@ -22517,8 +22932,8 @@ async function applyBulkAssetTags(mode) {
   try {
     setSaveStatus(`正在批量${actionLabel}标签...`);
     const result = await postJson(API_BULK_UPDATE_ASSET_TAGS, {
-      assetIds: assets.map((asset) => asset.id),
-      mode,
+      assetIds: operation?.assetIds ?? assets.map((asset) => asset.id),
+      mode: operation?.mode ?? mode,
       tags,
     });
 
@@ -22540,14 +22955,17 @@ async function applyBulkAssetTags(mode) {
 }
 
 async function applyPresetTag(tag) {
-  const cleanTag = String(tag ?? "").trim();
+  const checkedAssets = getCurrentCheckedAssetsOfSelectedType();
+  const selectedAsset = getSelectedAsset();
+  const operation = assetCatalogTools?.buildPresetAssetTagOperation
+    ? assetCatalogTools.buildPresetAssetTagOperation(tag, checkedAssets, selectedAsset)
+    : null;
+  const cleanTag = operation?.tag ?? String(tag ?? "").trim();
   if (!cleanTag) {
     return;
   }
 
-  const checkedAssets = getCurrentCheckedAssetsOfSelectedType();
-  const selectedAsset = getSelectedAsset();
-  const targetAssets = checkedAssets.length > 0 ? checkedAssets : selectedAsset ? [selectedAsset] : [];
+  const targetAssets = operation?.targetAssets ?? (checkedAssets.length > 0 ? checkedAssets : selectedAsset ? [selectedAsset] : []);
 
   if (!targetAssets.length) {
     setSaveStatus("先选中或勾选至少一个素材", true);
@@ -22557,12 +22975,13 @@ async function applyPresetTag(tag) {
 
   try {
     const targetLabel =
-      checkedAssets.length > 0 ? `勾选的 ${checkedAssets.length} 个素材` : `当前素材：${selectedAsset?.name ?? ""}`;
+      operation?.targetLabel ??
+      (checkedAssets.length > 0 ? `勾选的 ${checkedAssets.length} 个素材` : `当前素材：${selectedAsset?.name ?? ""}`);
     setSaveStatus(`正在添加预设标签：${cleanTag}`);
     await postJson(API_BULK_UPDATE_ASSET_TAGS, {
-      assetIds: targetAssets.map((asset) => asset.id),
+      assetIds: operation?.assetIds ?? targetAssets.map((asset) => asset.id),
       mode: "add",
-      tags: [cleanTag],
+      tags: operation?.tags ?? [cleanTag],
     });
     await reloadProjectData({
       ...getCurrentUiState(),
@@ -24218,7 +24637,7 @@ function getFilteredPreviewIssueItems(items) {
       return true;
     }
 
-    return terms.every((term) => item.searchText.includes(term));
+    return doesSearchTextMatchTerms(item.searchText, terms);
   });
 }
 
@@ -24287,7 +24706,7 @@ function getFilteredInspectionIssueItems(items) {
       return true;
     }
 
-    return terms.every((term) => item.searchText.includes(term));
+    return doesSearchTextMatchTerms(item.searchText, terms);
   });
 }
 
@@ -24803,6 +25222,10 @@ function buildReleaseChecklistItems() {
 }
 
 function buildReleaseChecklistSummary(items = buildReleaseChecklistItems()) {
+  if (releaseControlTools?.buildReleaseChecklistSummary) {
+    return releaseControlTools.buildReleaseChecklistSummary(items);
+  }
+
   const blockerCount = items.filter((item) => item.severity === "blocker").length;
   const warnCount = items.filter((item) => item.severity === "warn").length;
   const readyCount = items.filter((item) => item.severity === "good").length;
@@ -27445,6 +27868,10 @@ function buildMarkdownTable(headers, rows) {
 }
 
 function getReleaseSeverityLabel(severity) {
+  if (releaseControlTools?.getReleaseSeverityLabel) {
+    return releaseControlTools.getReleaseSeverityLabel(severity);
+  }
+
   switch (severity) {
     case "blocker":
       return "阻塞";
@@ -27458,6 +27885,10 @@ function getReleaseSeverityLabel(severity) {
 }
 
 function getReleaseStepToneLabel(tone) {
+  if (releaseControlTools?.getReleaseStepToneLabel) {
+    return releaseControlTools.getReleaseStepToneLabel(tone);
+  }
+
   switch (tone) {
     case "danger":
       return "先修";
@@ -27471,6 +27902,10 @@ function getReleaseStepToneLabel(tone) {
 }
 
 function serializeReleaseReportAction(action) {
+  if (releaseControlTools?.serializeReleaseReportAction) {
+    return releaseControlTools.serializeReleaseReportAction(action);
+  }
+
   if (!action) {
     return null;
   }
@@ -28096,6 +28531,35 @@ function exportReleaseControlJsonReport() {
 }
 
 function buildReleaseFixOrder(routeOverview) {
+  if (releaseControlTools?.buildReleaseFixOrder) {
+    const project = state.data?.project ?? {};
+    const validationErrors = state.validation?.errors ?? [];
+    const validationWarnings = state.validation?.warnings ?? [];
+    const missingVoiceWarnings = validationWarnings.filter(
+      (issue) => issue.message === "这句台词还没有绑定语音。"
+    );
+    const nonVoiceWarnings = validationWarnings.filter(
+      (issue) => issue.message !== "这句台词还没有绑定语音。"
+    );
+
+    return releaseControlTools.buildReleaseFixOrder({
+      project,
+      resolution: getProjectResolution(project),
+      releaseVersion: getProjectReleaseVersion(project),
+      hasStoredReleaseVersion: Boolean(String(project.releaseVersion ?? "").trim()),
+      errorCount: validationErrors.length,
+      warningIssues: validationWarnings,
+      firstErrorAction: validationErrors[0] ? getValidationIssueAction(validationErrors[0]) : null,
+      firstVoiceAction: missingVoiceWarnings[0] ? getValidationIssueAction(missingVoiceWarnings[0]) : null,
+      firstWarningAction: nonVoiceWarnings[0] ? getValidationIssueAction(nonVoiceWarnings[0]) : null,
+      routeMetrics: routeOverview?.metrics ?? {},
+      urgentMissingAssetsCount: state.data.assetList.filter((asset) => isAssetUrgentMissing(asset)).length,
+      mediaBudgetReport: buildAssetMediaBudgetReport(),
+      unusedAssetCount: getUnusedAssets().length,
+      exportResult: state.lastExportResult,
+    });
+  }
+
   const project = state.data?.project ?? {};
   const resolution = getProjectResolution(project);
   const releaseVersion = getProjectReleaseVersion(project);
@@ -28598,6 +29062,10 @@ function renderEmpty(text) {
 }
 
 function truncateText(value, maxLength = 32) {
+  if (editorCommonTools?.truncateText) {
+    return editorCommonTools.truncateText(value, maxLength);
+  }
+
   const text = String(value ?? "").trim();
 
   if (text.length <= maxLength) {
@@ -28608,6 +29076,10 @@ function truncateText(value, maxLength = 32) {
 }
 
 function formatDate(value) {
+  if (editorCommonTools?.formatDate) {
+    return editorCommonTools.formatDate(value);
+  }
+
   if (!value) {
     return "未知";
   }
@@ -31362,53 +31834,70 @@ function renderChoiceOptionEditorRow(option, index, optionCount = 1) {
 }
 
 function getSafeCreativeAssistantMode(mode) {
-  const safeMode = String(mode ?? "").trim();
-  return Object.prototype.hasOwnProperty.call(CREATIVE_ASSISTANT_MODES, safeMode) ? safeMode : "starter_demo";
+  return creativeAssistantTools?.getSafeCreativeAssistantMode?.(mode) ?? (
+    Object.prototype.hasOwnProperty.call(CREATIVE_ASSISTANT_MODES, String(mode ?? "").trim())
+      ? String(mode ?? "").trim()
+      : "starter_demo"
+  );
 }
 
 function getSafeCreativeAssistantProvider(provider) {
-  const safeProvider = String(provider ?? "").trim();
-  return Object.prototype.hasOwnProperty.call(CREATIVE_ASSISTANT_PROVIDERS, safeProvider) ? safeProvider : "local";
+  return creativeAssistantTools?.getSafeCreativeAssistantProvider?.(provider) ?? (
+    Object.prototype.hasOwnProperty.call(CREATIVE_ASSISTANT_PROVIDERS, String(provider ?? "").trim())
+      ? String(provider ?? "").trim()
+      : "local"
+  );
 }
 
 function getSafeCreativeAssistantModel(model) {
-  const cleanModel = String(model ?? "").trim();
-  return cleanModel || CREATIVE_ASSISTANT_DEFAULT_OPENAI_MODEL;
+  return creativeAssistantTools?.getSafeCreativeAssistantModel?.(model) ?? (
+    String(model ?? "").trim() || CREATIVE_ASSISTANT_DEFAULT_OPENAI_MODEL
+  );
 }
 
-function loadStoredCreativeAssistantProvider() {
+function getDefaultCreativeAssistantSettings() {
+  return creativeAssistantTools?.getDefaultCreativeAssistantSettings?.() ?? {
+    provider: "local",
+    rememberKey: false,
+    openAiKey: "",
+    model: CREATIVE_ASSISTANT_DEFAULT_OPENAI_MODEL,
+  };
+}
+
+function loadStoredCreativeAssistantSettings() {
   try {
-    return getSafeCreativeAssistantProvider(localStorage.getItem(CREATIVE_ASSISTANT_PROVIDER_STORAGE_KEY));
+    if (creativeAssistantTools?.loadCreativeAssistantSettings) {
+      return creativeAssistantTools.loadCreativeAssistantSettings(localStorage);
+    }
   } catch (error) {
-    return "local";
+    return getDefaultCreativeAssistantSettings();
   }
-}
-
-function loadStoredCreativeAssistantRememberKey() {
   try {
-    return localStorage.getItem(CREATIVE_ASSISTANT_REMEMBER_KEY_STORAGE_KEY) === "true";
+    return {
+      provider: getSafeCreativeAssistantProvider(localStorage.getItem(CREATIVE_ASSISTANT_PROVIDER_STORAGE_KEY)),
+      rememberKey: localStorage.getItem(CREATIVE_ASSISTANT_REMEMBER_KEY_STORAGE_KEY) === "true",
+      openAiKey: localStorage.getItem(CREATIVE_ASSISTANT_OPENAI_KEY_STORAGE_KEY) ?? "",
+      model: getSafeCreativeAssistantModel(localStorage.getItem(CREATIVE_ASSISTANT_OPENAI_MODEL_STORAGE_KEY)),
+    };
   } catch (error) {
-    return false;
-  }
-}
-
-function loadStoredCreativeAssistantOpenAiKey() {
-  try {
-    return localStorage.getItem(CREATIVE_ASSISTANT_OPENAI_KEY_STORAGE_KEY) ?? "";
-  } catch (error) {
-    return "";
-  }
-}
-
-function loadStoredCreativeAssistantModel() {
-  try {
-    return getSafeCreativeAssistantModel(localStorage.getItem(CREATIVE_ASSISTANT_OPENAI_MODEL_STORAGE_KEY));
-  } catch (error) {
-    return CREATIVE_ASSISTANT_DEFAULT_OPENAI_MODEL;
+    return getDefaultCreativeAssistantSettings();
   }
 }
 
 function persistCreativeAssistantSettings() {
+  try {
+    if (creativeAssistantTools?.persistCreativeAssistantSettings) {
+      creativeAssistantTools.persistCreativeAssistantSettings(localStorage, {
+        provider: state.creativeAssistantProvider,
+        model: state.creativeAssistantModel,
+        rememberKey: state.creativeAssistantRememberKey,
+        openAiKey: state.creativeAssistantOpenAiKey,
+      });
+      return;
+    }
+  } catch (error) {
+    return;
+  }
   try {
     localStorage.setItem(CREATIVE_ASSISTANT_PROVIDER_STORAGE_KEY, getSafeCreativeAssistantProvider(state.creativeAssistantProvider));
     localStorage.setItem(CREATIVE_ASSISTANT_OPENAI_MODEL_STORAGE_KEY, getSafeCreativeAssistantModel(state.creativeAssistantModel));
@@ -31424,7 +31913,7 @@ function persistCreativeAssistantSettings() {
 }
 
 function trimCreativeAssistantText(value, maxLength = 600) {
-  return String(value ?? "").trim().slice(0, maxLength);
+  return creativeAssistantTools?.trimCreativeAssistantText?.(value, maxLength) ?? String(value ?? "").trim().slice(0, maxLength);
 }
 
 function createCreativeAssistantHistoryId() {
@@ -31432,6 +31921,9 @@ function createCreativeAssistantHistoryId() {
 }
 
 function cloneCreativeAssistantBlocksForHistory(blocks) {
+  if (creativeAssistantTools?.cloneCreativeAssistantBlocksForHistory) {
+    return creativeAssistantTools.cloneCreativeAssistantBlocksForHistory(blocks);
+  }
   if (!Array.isArray(blocks)) {
     return [];
   }
@@ -31460,6 +31952,9 @@ function cloneCreativeAssistantBlocksForHistory(blocks) {
 }
 
 function sanitizeCreativeAssistantHistoryResult(result) {
+  if (creativeAssistantTools?.sanitizeCreativeAssistantHistoryResult) {
+    return creativeAssistantTools.sanitizeCreativeAssistantHistoryResult(result);
+  }
   if (!result || typeof result !== "object") {
     return null;
   }
@@ -31500,7 +31995,24 @@ function sanitizeCreativeAssistantHistoryResult(result) {
   };
 }
 
+function sanitizeCreativeAssistantGenerationResponse(response) {
+  if (creativeAssistantTools?.sanitizeCreativeAssistantGenerationResponse) {
+    return creativeAssistantTools.sanitizeCreativeAssistantGenerationResponse(response);
+  }
+  const rawResult =
+    response && typeof response === "object" && Object.prototype.hasOwnProperty.call(response, "result")
+      ? response.result
+      : response;
+  return sanitizeCreativeAssistantHistoryResult(rawResult);
+}
+
 function sanitizeCreativeAssistantHistoryRecord(record) {
+  if (creativeAssistantTools?.sanitizeCreativeAssistantHistoryRecord) {
+    return creativeAssistantTools.sanitizeCreativeAssistantHistoryRecord(record, {
+      createId: createCreativeAssistantHistoryId,
+      nowIso: () => new Date().toISOString(),
+    });
+  }
   if (!record || typeof record !== "object") {
     return null;
   }
@@ -31514,17 +32026,78 @@ function sanitizeCreativeAssistantHistoryRecord(record) {
     prompt: trimCreativeAssistantText(record.prompt, 800),
     sceneId: trimCreativeAssistantText(record.sceneId, 160),
     sceneName: trimCreativeAssistantText(record.sceneName || "当前场景", 160),
+    favorite: Boolean(record.favorite),
     result,
   };
 }
 
+function capCreativeAssistantHistoryRecords(records, limit = CREATIVE_ASSISTANT_MAX_HISTORY) {
+  if (creativeAssistantTools?.capCreativeAssistantHistoryRecords) {
+    return creativeAssistantTools.capCreativeAssistantHistoryRecords(records, limit);
+  }
+  const numericLimit = Number(limit);
+  const safeLimit = Math.max(0, Number.isFinite(numericLimit) ? numericLimit : CREATIVE_ASSISTANT_MAX_HISTORY);
+  const sourceRecords = (Array.isArray(records) ? records : []).filter(Boolean);
+  if (safeLimit <= 0) {
+    return [];
+  }
+  if (sourceRecords.length <= safeLimit) {
+    return sourceRecords.slice(0, safeLimit);
+  }
+  const selected = [];
+  const selectedRecords = new Set();
+  sourceRecords.forEach((record, index) => {
+    if (record?.favorite && selected.length < safeLimit) {
+      selected.push({ index, record });
+      selectedRecords.add(record);
+    }
+  });
+  sourceRecords.forEach((record, index) => {
+    if (!selectedRecords.has(record) && selected.length < safeLimit) {
+      selected.push({ index, record });
+      selectedRecords.add(record);
+    }
+  });
+  return selected.sort((left, right) => left.index - right.index).map((item) => item.record);
+}
+
+function mergeCreativeAssistantHistoryRecord(records, record, limit = CREATIVE_ASSISTANT_MAX_HISTORY) {
+  if (creativeAssistantTools?.mergeCreativeAssistantHistoryRecord) {
+    return creativeAssistantTools.mergeCreativeAssistantHistoryRecord(records, record, limit);
+  }
+  const sourceRecords = Array.isArray(records) ? records : [];
+  if (!record) {
+    return capCreativeAssistantHistoryRecords(sourceRecords, limit);
+  }
+  const recordSignature = `${record.result?.title ?? ""}|${record.prompt ?? ""}`;
+  const duplicateRecord = sourceRecords.find(
+    (item) => item.id === record.id || `${item.result?.title ?? ""}|${item.prompt ?? ""}` === recordSignature
+  );
+  const mergedRecord = duplicateRecord?.favorite && !record.favorite ? { ...record, favorite: true } : record;
+  return capCreativeAssistantHistoryRecords([
+    mergedRecord,
+    ...sourceRecords.filter(
+      (item) => item.id !== record.id && `${item.result?.title ?? ""}|${item.prompt ?? ""}` !== recordSignature
+    ),
+  ], limit);
+}
+
 function loadStoredCreativeAssistantHistory() {
   try {
+    if (creativeAssistantTools?.loadCreativeAssistantHistory) {
+      return creativeAssistantTools.loadCreativeAssistantHistory(localStorage, {
+        createId: createCreativeAssistantHistoryId,
+        nowIso: () => new Date().toISOString(),
+      });
+    }
+  } catch (error) {
+    return [];
+  }
+  try {
     const parsed = JSON.parse(localStorage.getItem(CREATIVE_ASSISTANT_HISTORY_STORAGE_KEY) || "[]");
-    return (Array.isArray(parsed) ? parsed : [])
+    return capCreativeAssistantHistoryRecords((Array.isArray(parsed) ? parsed : [])
       .map((record) => sanitizeCreativeAssistantHistoryRecord(record))
-      .filter(Boolean)
-      .slice(0, CREATIVE_ASSISTANT_MAX_HISTORY);
+      .filter(Boolean), CREATIVE_ASSISTANT_MAX_HISTORY);
   } catch (error) {
     return [];
   }
@@ -31532,13 +32105,125 @@ function loadStoredCreativeAssistantHistory() {
 
 function persistCreativeAssistantHistory() {
   try {
+    if (creativeAssistantTools?.persistCreativeAssistantHistory) {
+      creativeAssistantTools.persistCreativeAssistantHistory(
+        localStorage,
+        state.creativeAssistantHistory,
+        CREATIVE_ASSISTANT_MAX_HISTORY
+      );
+      return;
+    }
+  } catch (error) {
+    return;
+  }
+  try {
     localStorage.setItem(
       CREATIVE_ASSISTANT_HISTORY_STORAGE_KEY,
-      JSON.stringify((state.creativeAssistantHistory ?? []).slice(0, CREATIVE_ASSISTANT_MAX_HISTORY))
+      JSON.stringify(capCreativeAssistantHistoryRecords(state.creativeAssistantHistory, CREATIVE_ASSISTANT_MAX_HISTORY))
     );
   } catch (error) {
     return;
   }
+}
+
+function buildCreativeAssistantHistoryRecoverySnapshot(reason) {
+  const records = capCreativeAssistantHistoryRecords(state.creativeAssistantHistory, CREATIVE_ASSISTANT_MAX_HISTORY);
+  if (!records.length) {
+    return null;
+  }
+  if (creativeAssistantTools?.buildCreativeAssistantHistoryRecoverySnapshot) {
+    return creativeAssistantTools.buildCreativeAssistantHistoryRecoverySnapshot(records, {
+      createdAt: new Date().toISOString(),
+      reason,
+      limit: CREATIVE_ASSISTANT_MAX_HISTORY,
+      createId: createCreativeAssistantHistoryId,
+      nowIso: () => new Date().toISOString(),
+    });
+  }
+  return {
+    engine: "Tony Na Engine",
+    kind: "creative_assistant_history_recovery",
+    formatVersion: 1,
+    createdAt: new Date().toISOString(),
+    reason,
+    recordCount: records.length,
+    records,
+    privacy: {
+      containsApiKey: false,
+      storage: "browser_localStorage",
+    },
+  };
+}
+
+function loadStoredCreativeAssistantHistoryRecovery() {
+  try {
+    if (creativeAssistantTools?.loadCreativeAssistantHistoryRecovery) {
+      return creativeAssistantTools.loadCreativeAssistantHistoryRecovery(localStorage, {
+        createId: createCreativeAssistantHistoryId,
+        nowIso: () => new Date().toISOString(),
+        limit: CREATIVE_ASSISTANT_MAX_HISTORY,
+      });
+    }
+  } catch (error) {
+    return null;
+  }
+  try {
+    const snapshot = JSON.parse(localStorage.getItem(CREATIVE_ASSISTANT_HISTORY_RECOVERY_STORAGE_KEY) || "null");
+    const records = capCreativeAssistantHistoryRecords((Array.isArray(snapshot?.records) ? snapshot.records : [])
+      .map((record) => sanitizeCreativeAssistantHistoryRecord(record))
+      .filter(Boolean), CREATIVE_ASSISTANT_MAX_HISTORY);
+    if (!records.length) {
+      return null;
+    }
+    return {
+      engine: "Tony Na Engine",
+      kind: "creative_assistant_history_recovery",
+      formatVersion: 1,
+      createdAt: trimCreativeAssistantText(snapshot.createdAt, 40) || new Date().toISOString(),
+      reason: trimCreativeAssistantText(snapshot.reason || "history_cleanup", 80),
+      recordCount: records.length,
+      records,
+      privacy: {
+        containsApiKey: false,
+        storage: "browser_localStorage",
+      },
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
+function persistCreativeAssistantHistoryRecovery(snapshot) {
+  state.creativeAssistantHistoryRecovery = snapshot ?? null;
+  try {
+    if (creativeAssistantTools?.persistCreativeAssistantHistoryRecovery) {
+      if (snapshot) {
+        creativeAssistantTools.persistCreativeAssistantHistoryRecovery(localStorage, snapshot);
+      } else {
+        creativeAssistantTools.clearCreativeAssistantHistoryRecovery?.(localStorage);
+      }
+      return;
+    }
+  } catch (error) {
+    return;
+  }
+  try {
+    if (snapshot) {
+      localStorage.setItem(CREATIVE_ASSISTANT_HISTORY_RECOVERY_STORAGE_KEY, JSON.stringify(snapshot));
+    } else {
+      localStorage.removeItem(CREATIVE_ASSISTANT_HISTORY_RECOVERY_STORAGE_KEY);
+    }
+  } catch (error) {
+    return;
+  }
+}
+
+function stashCreativeAssistantHistoryRecovery(reason) {
+  const snapshot = buildCreativeAssistantHistoryRecoverySnapshot(reason);
+  if (snapshot) {
+    persistCreativeAssistantHistoryRecovery(snapshot);
+  }
+  return snapshot;
 }
 
 function getCreativeAssistantHistoryRecord(recordId) {
@@ -31547,6 +32232,37 @@ function getCreativeAssistantHistoryRecord(recordId) {
     return null;
   }
   return (state.creativeAssistantHistory ?? []).find((record) => record.id === safeRecordId) ?? null;
+}
+
+function filterCreativeAssistantHistoryRecords(records = state.creativeAssistantHistory) {
+  const options = {
+    query: state.creativeAssistantHistoryQuery,
+    favoritesOnly: state.creativeAssistantHistoryFavoritesOnly,
+  };
+  if (creativeAssistantTools?.filterCreativeAssistantHistoryRecords) {
+    return creativeAssistantTools.filterCreativeAssistantHistoryRecords(records, options);
+  }
+  const query = trimCreativeAssistantText(options.query, 160).toLowerCase();
+  return (Array.isArray(records) ? records : []).filter((record) => {
+    if (options.favoritesOnly && !record?.favorite) {
+      return false;
+    }
+    if (!query) {
+      return true;
+    }
+    return [
+      record?.prompt,
+      record?.sceneName,
+      record?.result?.title,
+      record?.result?.summary,
+      ...(Array.isArray(record?.result?.guidance) ? record.result.guidance : []),
+      ...(Array.isArray(record?.result?.assetPrompts) ? record.result.assetPrompts : []),
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase()
+      .includes(query);
+  });
 }
 
 function rememberCreativeAssistantResult(result) {
@@ -31564,12 +32280,11 @@ function rememberCreativeAssistantResult(result) {
     return;
   }
 
-  state.creativeAssistantHistory = [
+  state.creativeAssistantHistory = mergeCreativeAssistantHistoryRecord(
+    state.creativeAssistantHistory,
     record,
-    ...(state.creativeAssistantHistory ?? []).filter(
-      (item) => item.id !== record.id && `${item.result?.title ?? ""}|${item.prompt ?? ""}` !== `${record.result.title}|${record.prompt}`
-    ),
-  ].slice(0, CREATIVE_ASSISTANT_MAX_HISTORY);
+    CREATIVE_ASSISTANT_MAX_HISTORY
+  );
   persistCreativeAssistantHistory();
 }
 
@@ -31588,40 +32303,97 @@ function formatCreativeAssistantHistoryTime(value) {
 
 function renderCreativeAssistantHistory() {
   const records = state.creativeAssistantHistory ?? [];
-  if (!records.length) {
+  const recovery = state.creativeAssistantHistoryRecovery;
+  const recoveryCount = recovery?.records?.length ?? 0;
+  if (!records.length && !recoveryCount) {
     return "";
   }
+  const visibleRecords = filterCreativeAssistantHistoryRecords(records).slice(0, CREATIVE_ASSISTANT_MAX_HISTORY);
+  const favoriteCount = records.filter((record) => record.favorite).length;
+  const query = state.creativeAssistantHistoryQuery ?? "";
+  const isFiltered = Boolean(query.trim() || state.creativeAssistantHistoryFavoritesOnly);
   return `
     <div class="creative-assistant-history">
       <div class="creative-history-head">
         <div>
           <span class="eyebrow">Idea Vault</span>
           <strong>灵感盒</strong>
+          <span>${visibleRecords.length}/${records.length} 条${favoriteCount ? ` · 收藏 ${favoriteCount}` : ""}</span>
         </div>
-        <button type="button" class="toolbar-button" data-action="clear-creative-assistant-history">清空</button>
+        <div class="creative-history-head-actions">
+          <button type="button" class="toolbar-button" data-action="copy-creative-assistant-history-markdown">复制档案</button>
+          <button type="button" class="toolbar-button" data-action="export-creative-assistant-history-markdown">导出 Markdown</button>
+          <button type="button" class="toolbar-button" data-action="export-creative-assistant-history-view" ${visibleRecords.length ? "" : "disabled"}>导出当前视图</button>
+          <button type="button" class="toolbar-button" data-action="export-creative-assistant-history-archive">导出全部</button>
+          <button type="button" class="toolbar-button" data-action="clear-creative-assistant-nonfavorites" ${favoriteCount && favoriteCount < records.length ? "" : "disabled"}>清理未收藏</button>
+          <button type="button" class="toolbar-button" data-action="clear-creative-assistant-history">清空</button>
+          ${
+            recoveryCount
+              ? `<button type="button" class="toolbar-button toolbar-button-primary" data-action="restore-creative-assistant-history-recovery">恢复上次清理</button>`
+              : ""
+          }
+        </div>
+      </div>
+      ${
+        recoveryCount
+          ? `<div class="creative-history-recovery">最近一次删除 / 清理前保留了 ${recoveryCount} 条可恢复灵感；恢复前会把当前灵感盒保存成新的恢复点。</div>`
+          : ""
+      }
+      <div class="creative-history-tools">
+        <label class="creative-history-search">
+          <span class="sr-only">搜索灵感盒</span>
+          <input
+            id="creativeAssistantHistorySearchInput"
+            type="search"
+            placeholder="搜索标题、场景、提示词、素材建议..."
+            value="${escapeHtml(query)}"
+          />
+        </label>
+        <button
+          type="button"
+          class="toolbar-button ${state.creativeAssistantHistoryFavoritesOnly ? "is-active" : ""}"
+          data-action="toggle-creative-assistant-history-favorites"
+        >
+          ${state.creativeAssistantHistoryFavoritesOnly ? "显示全部" : "只看收藏"}
+        </button>
       </div>
       <div class="creative-history-list">
-        ${records
-          .slice(0, CREATIVE_ASSISTANT_MAX_HISTORY)
-          .map(
-            (record) => `
-              <article class="creative-history-card">
+        ${
+          visibleRecords.length
+            ? visibleRecords
+              .map(
+                (record) => {
+                  const blockCount = getCreativeAssistantResultBlocks(record.result).length;
+                  const providerLabel = record.result?.provider?.label ?? CREATIVE_ASSISTANT_PROVIDERS[record.result?.provider?.mode] ?? "本地模板";
+                  return `
+              <article class="creative-history-card ${record.favorite ? "is-favorite" : ""}">
                 <div>
                   <strong>${escapeHtml(record.result.title)}</strong>
                   <p>${escapeHtml(record.prompt || record.result.summary || "未填写主题")}</p>
+                  <div class="creative-history-meta">
+                    <span>${escapeHtml(record.result.modeLabel ?? CREATIVE_ASSISTANT_MODES[record.result.mode] ?? "灵感")}</span>
+                    <span>${blockCount ? `${blockCount} 张卡片` : "仅建议"}</span>
+                    <span>${escapeHtml(providerLabel)}</span>
+                  </div>
                   <span>${escapeHtml(record.sceneName)} · ${escapeHtml(formatCreativeAssistantHistoryTime(record.createdAt))}</span>
                 </div>
                 <div class="creative-history-actions">
+                  <button type="button" class="toolbar-button" data-action="toggle-creative-assistant-history-favorite" data-creative-history-id="${escapeHtml(record.id)}">${record.favorite ? "已收藏" : "收藏"}</button>
+                  <button type="button" class="toolbar-button" data-action="copy-creative-assistant-history-blocks" data-creative-history-id="${escapeHtml(record.id)}" ${getCreativeAssistantResultBlocks(record.result).length ? "" : "disabled"}>复制卡片</button>
+                  <button type="button" class="toolbar-button" data-action="copy-creative-assistant-history-record-markdown" data-creative-history-id="${escapeHtml(record.id)}">复制文档</button>
                   <button type="button" class="toolbar-button" data-action="restore-creative-assistant-history" data-creative-history-id="${escapeHtml(record.id)}">恢复</button>
                   <button type="button" class="toolbar-button" data-action="export-creative-assistant-history" data-creative-history-id="${escapeHtml(record.id)}">导出</button>
                   <button type="button" class="toolbar-button danger" data-action="delete-creative-assistant-history" data-creative-history-id="${escapeHtml(record.id)}">删除</button>
                 </div>
               </article>
-            `
-          )
-          .join("")}
+            `;
+                }
+              )
+              .join("")
+            : `<div class="creative-history-empty">${isFiltered ? "没有匹配的灵感。换个关键词，或者先显示全部。" : "灵感盒暂时为空。"}</div>`
+        }
       </div>
-      <p class="creative-history-note">灵感盒只保存在当前浏览器 localStorage，不写入项目文件，也不会保存 API Key。</p>
+      <p class="creative-history-note">灵感盒最多保留 ${CREATIVE_ASSISTANT_MAX_HISTORY} 条，收藏会优先保留；内容只保存在当前浏览器 localStorage，不写入项目文件，也不会保存 API Key。</p>
     </div>
   `;
 }
@@ -31642,6 +32414,152 @@ function restoreCreativeAssistantHistoryRecord(recordId) {
   showToast("已恢复到助手结果区");
 }
 
+function toggleCreativeAssistantHistoryFavorite(recordId) {
+  const record = getCreativeAssistantHistoryRecord(recordId);
+  if (!record) {
+    showToast("没有找到这条助手灵感", "error");
+    return;
+  }
+  const nextFavorite = !record.favorite;
+  state.creativeAssistantHistory = (state.creativeAssistantHistory ?? []).map((item) =>
+    item.id === record.id ? { ...item, favorite: nextFavorite } : item
+  );
+  persistCreativeAssistantHistory();
+  renderStoryScreen();
+  setSaveStatus(nextFavorite ? `已收藏灵感：${record.result.title}` : `已取消收藏：${record.result.title}`);
+}
+
+function buildCreativeAssistantHistoryBlocksText(record) {
+  if (!record?.result) {
+    return "";
+  }
+  const indexes = getDefaultCreativeAssistantBlockSelection(record.result);
+  if (creativeAssistantTools?.buildCreativeAssistantBlocksText) {
+    return creativeAssistantTools.buildCreativeAssistantBlocksText(record.result, indexes);
+  }
+  const blocks = getCreativeAssistantResultBlocks(record.result);
+  if (!blocks.length) {
+    return "";
+  }
+  return [
+    record.result.title ? `《${record.result.title}》` : "Tony Na Assistant 剧情卡片",
+    record.result.summary ?? "",
+    "",
+    ...blocks.map((block, index) => getCreativeAssistantBlockPreviewText(block, index)),
+  ]
+    .filter((line) => line !== null && line !== undefined)
+    .join("\n\n");
+}
+
+async function copyCreativeAssistantHistoryBlocks(recordId) {
+  const record = getCreativeAssistantHistoryRecord(recordId);
+  if (!record) {
+    showToast("没有找到这条助手灵感", "error");
+    return;
+  }
+  const content = buildCreativeAssistantHistoryBlocksText(record);
+  if (!content) {
+    showToast("这条灵感没有可复制的剧情卡片", "error");
+    return;
+  }
+  const copied = await copyTextToClipboard(content);
+  if (copied) {
+    showToast("历史剧情卡片已复制");
+  } else {
+    window.alert(content);
+  }
+}
+
+function buildCreativeAssistantHistoryRecordMarkdown(record) {
+  if (creativeAssistantTools?.buildCreativeAssistantRecordMarkdown) {
+    return creativeAssistantTools.buildCreativeAssistantRecordMarkdown(record, 0);
+  }
+  if (!record?.result) {
+    return "";
+  }
+  return [
+    `## ${record.result.title}${record.favorite ? " ★" : ""}`,
+    "",
+    record.prompt ? `- 提示词：${record.prompt}` : "",
+    record.sceneName ? `- 场景：${record.sceneName}` : "",
+    record.result.summary ?? "",
+    buildCreativeAssistantHistoryBlocksText(record),
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+async function copyCreativeAssistantHistoryRecordMarkdown(recordId) {
+  const record = getCreativeAssistantHistoryRecord(recordId);
+  if (!record) {
+    showToast("没有找到这条助手灵感", "error");
+    return;
+  }
+  const content = buildCreativeAssistantHistoryRecordMarkdown(record);
+  const copied = await copyTextToClipboard(content);
+  if (copied) {
+    showToast("单条灵感 Markdown 已复制");
+  } else {
+    window.alert(content);
+  }
+}
+
+function buildCreativeAssistantHistoryMarkdown() {
+  const records = state.creativeAssistantHistory ?? [];
+  const options = {
+    projectTitle: state.data?.project?.title ?? "Tony Na Engine Project",
+    exportedAt: new Date().toISOString(),
+    query: state.creativeAssistantHistoryQuery,
+    favoritesOnly: state.creativeAssistantHistoryFavoritesOnly,
+    limit: CREATIVE_ASSISTANT_MAX_HISTORY,
+  };
+  if (creativeAssistantTools?.buildCreativeAssistantHistoryMarkdown) {
+    return creativeAssistantTools.buildCreativeAssistantHistoryMarkdown(records, options);
+  }
+  const visibleRecords = filterCreativeAssistantHistoryRecords(records).slice(0, CREATIVE_ASSISTANT_MAX_HISTORY);
+  return [
+    `# ${options.projectTitle} · Tony Na Assistant 灵感档案`,
+    "",
+    `- 导出时间：${options.exportedAt}`,
+    `- 记录数量：${visibleRecords.length}`,
+    "- 隐私说明：此 Markdown 不包含 API Key，仅包含提示词和生成内容。",
+    "",
+    visibleRecords.length
+      ? visibleRecords
+        .map((record, index) => [
+          `## ${index + 1}. ${record.result.title}${record.favorite ? " ★" : ""}`,
+          "",
+          record.prompt ? `- 提示词：${record.prompt}` : "",
+          record.result.summary ?? "",
+          buildCreativeAssistantHistoryBlocksText(record),
+        ].filter(Boolean).join("\n\n"))
+        .join("\n\n---\n\n")
+      : "_当前筛选下没有可导出的灵感。_",
+  ].join("\n");
+}
+
+async function copyCreativeAssistantHistoryMarkdown() {
+  const content = buildCreativeAssistantHistoryMarkdown();
+  const copied = await copyTextToClipboard(content);
+  if (copied) {
+    showToast("灵感盒 Markdown 档案已复制");
+  } else {
+    window.alert(content);
+  }
+}
+
+function exportCreativeAssistantHistoryMarkdown() {
+  const projectSlug = makeParticleCustomPresetId(state.data?.project?.title ?? "tony_na_project");
+  const scope = state.creativeAssistantHistoryFavoritesOnly ? "_favorites" : "";
+  downloadTextFile(
+    `${projectSlug}.tn-idea-vault${scope}.md`,
+    buildCreativeAssistantHistoryMarkdown(),
+    "text/markdown;charset=utf-8"
+  );
+  setSaveStatus("灵感盒 Markdown 档案已导出");
+  showToast("Markdown 创作档案已导出");
+}
+
 function exportCreativeAssistantHistoryRecord(recordId) {
   const record = getCreativeAssistantHistoryRecord(recordId);
   if (!record) {
@@ -31658,7 +32576,135 @@ function exportCreativeAssistantHistoryRecord(recordId) {
   showToast("助手灵感包已导出");
 }
 
-function deleteCreativeAssistantHistoryRecord(recordId) {
+function exportCreativeAssistantHistoryArchive() {
+  const records = capCreativeAssistantHistoryRecords(state.creativeAssistantHistory, CREATIVE_ASSISTANT_MAX_HISTORY);
+  if (!records.length) {
+    showToast("灵感盒还没有可导出的内容", "error");
+    return;
+  }
+  const archive = creativeAssistantTools?.buildCreativeAssistantHistoryArchive?.(records, {
+    projectTitle: state.data?.project?.title ?? "",
+    exportedAt: new Date().toISOString(),
+    limit: CREATIVE_ASSISTANT_MAX_HISTORY,
+  }) ?? {
+    engine: "Tony Na Engine",
+    kind: "creative_assistant_history_archive",
+    formatVersion: 1,
+    exportedAt: new Date().toISOString(),
+    projectTitle: state.data?.project?.title ?? "",
+    recordCount: records.length,
+    records,
+    privacy: {
+      containsApiKey: false,
+      storage: "browser_localStorage",
+      note: "Archive contains prompts and generated ideas only; API keys are never included.",
+    },
+  };
+  const projectSlug = makeParticleCustomPresetId(state.data?.project?.title ?? "tony_na_project");
+  downloadJsonFile(`${projectSlug}.tn-idea-vault.json`, archive);
+  setSaveStatus(`已归档灵感盒：${archive.recordCount ?? records.length} 条`);
+  showToast("灵感盒归档包已导出");
+}
+
+function exportCreativeAssistantHistoryViewArchive() {
+  const records = filterCreativeAssistantHistoryRecords(state.creativeAssistantHistory)
+    .slice(0, CREATIVE_ASSISTANT_MAX_HISTORY);
+  if (!records.length) {
+    showToast("当前视图没有可导出的灵感", "error");
+    return;
+  }
+  const archive = creativeAssistantTools?.buildCreativeAssistantHistoryArchive?.(records, {
+    projectTitle: state.data?.project?.title ?? "",
+    exportedAt: new Date().toISOString(),
+    limit: CREATIVE_ASSISTANT_MAX_HISTORY,
+  }) ?? {
+    engine: "Tony Na Engine",
+    kind: "creative_assistant_history_archive",
+    formatVersion: 1,
+    exportedAt: new Date().toISOString(),
+    projectTitle: state.data?.project?.title ?? "",
+    recordCount: records.length,
+    records,
+    privacy: {
+      containsApiKey: false,
+      storage: "browser_localStorage",
+      note: "Archive contains prompts and generated ideas only; API keys are never included.",
+    },
+  };
+  const projectSlug = makeParticleCustomPresetId(state.data?.project?.title ?? "tony_na_project");
+  const scope = state.creativeAssistantHistoryFavoritesOnly ? "_favorites" : state.creativeAssistantHistoryQuery.trim() ? "_filtered" : "_view";
+  downloadJsonFile(`${projectSlug}.tn-idea-vault${scope}.json`, archive);
+  setSaveStatus(`已导出当前灵感视图：${archive.recordCount ?? records.length} 条`);
+  showToast("当前视图灵感包已导出");
+}
+
+async function readFileAsText(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error(`读取文件失败：${file.name}`));
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.readAsText(file);
+  });
+}
+
+async function importCreativeAssistantHistoryArchive(file) {
+  if (!file) {
+    return;
+  }
+  try {
+    const payload = JSON.parse(await readFileAsText(file));
+    const importedRecords = creativeAssistantTools?.getCreativeAssistantHistoryArchiveRecords?.(payload, {
+      limit: CREATIVE_ASSISTANT_MAX_HISTORY,
+    }) ?? (
+      Array.isArray(payload?.records)
+        ? payload.records
+        : payload?.record
+          ? [payload.record]
+          : []
+    )
+      .map((record) => sanitizeCreativeAssistantHistoryRecord(record))
+      .filter(Boolean)
+      .slice(0, CREATIVE_ASSISTANT_MAX_HISTORY);
+
+    if (!importedRecords.length) {
+      throw new Error("这个文件里没有可识别的灵感记录");
+    }
+
+    [...importedRecords].reverse().forEach((record) => {
+      state.creativeAssistantHistory = mergeCreativeAssistantHistoryRecord(
+        state.creativeAssistantHistory,
+        record,
+        CREATIVE_ASSISTANT_MAX_HISTORY
+      );
+    });
+
+    persistCreativeAssistantHistory();
+    renderStoryScreen();
+    setSaveStatus(`已导入 ${importedRecords.length} 条助手灵感`);
+    showToast(`灵感盒已导入 ${importedRecords.length} 条`);
+  } catch (error) {
+    setSaveStatus("导入助手灵感失败", true);
+    showToast(error.message || "导入助手灵感失败", "error");
+  }
+}
+
+async function deleteCreativeAssistantHistoryRecord(recordId) {
+  const record = getCreativeAssistantHistoryRecord(recordId);
+  if (!record) {
+    showToast("没有找到这条助手灵感", "error");
+    return;
+  }
+  const confirmed = await showEngineConfirm({
+    title: "删除这条助手灵感？",
+    message: `将删除「${record.result.title}」。如果后面还可能用到，建议先导出单条灵感或复制文档。`,
+    tone: "danger",
+    confirmLabel: "删除灵感",
+    cancelLabel: "先保留",
+  });
+  if (!confirmed) {
+    return;
+  }
+  stashCreativeAssistantHistoryRecovery("delete_record");
   const beforeCount = state.creativeAssistantHistory?.length ?? 0;
   state.creativeAssistantHistory = (state.creativeAssistantHistory ?? []).filter((record) => record.id !== recordId);
   persistCreativeAssistantHistory();
@@ -31669,12 +32715,114 @@ function deleteCreativeAssistantHistoryRecord(recordId) {
   }
 }
 
-function clearCreativeAssistantHistory() {
+async function clearCreativeAssistantHistory() {
+  const beforeCount = state.creativeAssistantHistory?.length ?? 0;
+  if (!beforeCount) {
+    return;
+  }
+  const confirmed = await showEngineConfirm({
+    title: "清空整个灵感盒？",
+    message: `即将删除当前浏览器里的 ${beforeCount} 条助手灵感。这个操作不会写入项目文件，但清空后只能靠之前导出的 .tn-idea-vault.json 或 Markdown 档案恢复。`,
+    tone: "danger",
+    confirmLabel: "清空灵感盒",
+    cancelLabel: "先导出备份",
+  });
+  if (!confirmed) {
+    return;
+  }
+  stashCreativeAssistantHistoryRecovery("clear_all");
   state.creativeAssistantHistory = [];
   persistCreativeAssistantHistory();
   renderStoryScreen();
   setSaveStatus("智能助手灵感盒已清空");
   showToast("灵感盒已清空");
+}
+
+async function clearCreativeAssistantNonFavoriteHistory() {
+  const beforeCount = state.creativeAssistantHistory?.length ?? 0;
+  const favoriteRecords = (state.creativeAssistantHistory ?? []).filter((record) => record.favorite);
+  const removedCount = Math.max(0, beforeCount - favoriteRecords.length);
+  if (!removedCount) {
+    setSaveStatus("当前没有可清理的未收藏灵感");
+    return;
+  }
+  const confirmed = await showEngineConfirm({
+    title: "清理未收藏灵感？",
+    message: `将删除 ${removedCount} 条未收藏灵感，保留 ${favoriteRecords.length} 条收藏灵感。建议先导出当前视图或全部归档后再清理。`,
+    tone: "warning",
+    confirmLabel: "确认清理",
+    cancelLabel: "先不清理",
+  });
+  if (!confirmed) {
+    return;
+  }
+  stashCreativeAssistantHistoryRecovery("clear_nonfavorites");
+  state.creativeAssistantHistory = capCreativeAssistantHistoryRecords(favoriteRecords, CREATIVE_ASSISTANT_MAX_HISTORY);
+  persistCreativeAssistantHistory();
+  renderStoryScreen();
+  setSaveStatus(`已清理 ${removedCount} 条未收藏灵感，保留 ${state.creativeAssistantHistory.length} 条收藏`);
+  showToast("未收藏灵感已清理");
+}
+
+async function restoreCreativeAssistantHistoryRecovery() {
+  const snapshot = state.creativeAssistantHistoryRecovery;
+  const recoveryPlan = creativeAssistantTools?.buildCreativeAssistantHistoryRecoverySwap
+    ? creativeAssistantTools.buildCreativeAssistantHistoryRecoverySwap(
+        state.creativeAssistantHistory,
+        snapshot,
+        {
+          createdAt: new Date().toISOString(),
+          reason: "before_restore",
+          limit: CREATIVE_ASSISTANT_MAX_HISTORY,
+          createId: createCreativeAssistantHistoryId,
+          nowIso: () => new Date().toISOString(),
+        }
+      )
+    : {
+        canRestore: Boolean(capCreativeAssistantHistoryRecords(snapshot?.records, CREATIVE_ASSISTANT_MAX_HISTORY).length),
+        currentRecordCount: capCreativeAssistantHistoryRecords(state.creativeAssistantHistory, CREATIVE_ASSISTANT_MAX_HISTORY).length,
+        restoredRecords: capCreativeAssistantHistoryRecords(snapshot?.records, CREATIVE_ASSISTANT_MAX_HISTORY),
+        nextRecoverySnapshot: buildCreativeAssistantHistoryRecoverySnapshot("before_restore"),
+      };
+  const records = recoveryPlan.restoredRecords ?? [];
+  if (!recoveryPlan.canRestore || !records.length) {
+    showToast("没有可恢复的灵感备份", "error");
+    return;
+  }
+  if (recoveryPlan.currentRecordCount) {
+    const confirmed = await showEngineConfirm({
+      title: "恢复上次清理？",
+      message: `将用 ${records.length} 条备份灵感替换当前 ${recoveryPlan.currentRecordCount} 条灵感。当前灵感盒会先保存成新的恢复点，方便需要时再切回来。`,
+      tone: "warning",
+      confirmLabel: "恢复灵感盒",
+      cancelLabel: "先不恢复",
+    });
+    if (!confirmed) {
+      return;
+    }
+  }
+  state.creativeAssistantHistory = records;
+  persistCreativeAssistantHistory();
+  persistCreativeAssistantHistoryRecovery(recoveryPlan.nextRecoverySnapshot);
+  renderStoryScreen();
+  setSaveStatus(`已恢复上次灵感盒：${records.length} 条`);
+  showToast(recoveryPlan.nextRecoverySnapshot ? "已恢复，当前灵感盒已转存为恢复点" : "已恢复上次清理前的灵感盒");
+}
+
+function forgetCreativeAssistantOpenAiKey() {
+  state.creativeAssistantOpenAiKey = "";
+  state.creativeAssistantRememberKey = false;
+  persistCreativeAssistantSettings();
+  renderStoryScreen();
+  setSaveStatus("已从本浏览器移除智能助手 API Key");
+  showToast("已忘记本浏览器保存的 Key");
+}
+
+function syncCreativeAssistantPrivacyControls() {
+  const forgetKeyButton = document.querySelector('[data-action="forget-creative-assistant-key"]');
+  if (forgetKeyButton) {
+    forgetKeyButton.disabled = !(state.creativeAssistantOpenAiKey || state.creativeAssistantRememberKey);
+  }
 }
 
 function renderCreativeAssistantProviderButtons() {
@@ -31724,7 +32872,7 @@ function renderCreativeAssistantModeButtons() {
 }
 
 function getCreativeAssistantBlockTypeLabel(blockType) {
-  return (
+  return creativeAssistantTools?.getCreativeAssistantBlockTypeLabel?.(blockType) ?? (
     {
       dialogue: "台词",
       narration: "旁白",
@@ -31734,6 +32882,9 @@ function getCreativeAssistantBlockTypeLabel(blockType) {
 }
 
 function getCreativeAssistantBlockPreviewText(block, index) {
+  if (creativeAssistantTools?.getCreativeAssistantBlockPreviewText) {
+    return creativeAssistantTools.getCreativeAssistantBlockPreviewText(block, index);
+  }
   const blockType = ["dialogue", "narration", "choice"].includes(block?.type) ? block.type : "narration";
   if (blockType === "choice") {
     const options = Array.isArray(block.options) ? block.options : [];
@@ -31747,29 +32898,44 @@ function getCreativeAssistantBlockPreviewText(block, index) {
 }
 
 function buildCreativeAssistantBlocksText(result) {
-  const blocks = getSelectedCreativeAssistantBlocks(result);
-  if (!blocks.length) {
-    return "";
-  }
-  return [
+  return creativeAssistantTools?.buildCreativeAssistantBlocksText?.(
+    result,
+    state.creativeAssistantSelectedBlockIndexes
+  ) ?? (() => {
+    const blocks = getSelectedCreativeAssistantBlocks(result);
+    if (!blocks.length) {
+      return "";
+    }
+    return [
     result?.title ? `《${result.title}》` : "Tony Na Assistant 剧情卡片",
     result?.summary ?? "",
     "",
     ...blocks.map((block, index) => getCreativeAssistantBlockPreviewText(block, index)),
-  ]
-    .filter((line) => line !== null && line !== undefined)
-    .join("\n\n");
+    ]
+      .filter((line) => line !== null && line !== undefined)
+      .join("\n\n");
+  })();
 }
 
 function getCreativeAssistantResultBlocks(result = state.creativeAssistantResult) {
-  return Array.isArray(result?.blocks) ? result.blocks : [];
+  return creativeAssistantTools?.getCreativeAssistantResultBlocks?.(result) ?? (
+    Array.isArray(result?.blocks) ? result.blocks : []
+  );
 }
 
 function getDefaultCreativeAssistantBlockSelection(result = state.creativeAssistantResult) {
-  return getCreativeAssistantResultBlocks(result).map((_block, index) => index);
+  return creativeAssistantTools?.getDefaultCreativeAssistantBlockSelection?.(result) ?? (
+    getCreativeAssistantResultBlocks(result).map((_block, index) => index)
+  );
 }
 
 function getActiveCreativeAssistantBlockIndexes(result = state.creativeAssistantResult) {
+  if (creativeAssistantTools?.getActiveCreativeAssistantBlockIndexes) {
+    return creativeAssistantTools.getActiveCreativeAssistantBlockIndexes(
+      result,
+      state.creativeAssistantSelectedBlockIndexes
+    );
+  }
   const blocks = getCreativeAssistantResultBlocks(result);
   if (!blocks.length) {
     return [];
@@ -31783,6 +32949,12 @@ function getActiveCreativeAssistantBlockIndexes(result = state.creativeAssistant
 }
 
 function getSelectedCreativeAssistantBlocks(result = state.creativeAssistantResult) {
+  if (creativeAssistantTools?.getSelectedCreativeAssistantBlocks) {
+    return creativeAssistantTools.getSelectedCreativeAssistantBlocks(
+      result,
+      state.creativeAssistantSelectedBlockIndexes
+    );
+  }
   const blocks = getCreativeAssistantResultBlocks(result);
   const selectedIndexes = getActiveCreativeAssistantBlockIndexes(result);
   return selectedIndexes.map((index) => blocks[index]).filter(Boolean);
@@ -32001,6 +33173,17 @@ function renderCreativeAssistantPanel(scene, selectedBlock) {
                   />
                   <span>只在本浏览器记住 Key，不写入项目文件</span>
                 </label>
+                <div class="creative-openai-actions">
+                  <span>隐私安全</span>
+                  <button
+                    type="button"
+                    class="toolbar-button"
+                    data-action="forget-creative-assistant-key"
+                    ${state.creativeAssistantOpenAiKey || state.creativeAssistantRememberKey ? "" : "disabled"}
+                  >
+                    忘记本机 Key
+                  </button>
+                </div>
               </div>
             `
             : ""
@@ -32046,6 +33229,15 @@ function renderCreativeAssistantPanel(scene, selectedBlock) {
           >
             导出最新灵感
           </button>
+          <label class="toolbar-button creative-import-button">
+            导入灵感
+            <input
+              id="creativeAssistantHistoryImportInput"
+              class="sr-only"
+              type="file"
+              accept="application/json,.json,.tn-idea.json,.tn-idea-vault.json"
+            />
+          </label>
         </div>
       </div>
       ${renderCreativeAssistantResult()}
@@ -32129,7 +33321,7 @@ async function generateCreativeAssistant() {
       selectedBlockId: selectedBlock?.id ?? null,
       selectedBlockSummary: selectedBlock ? getBlockSummary(selectedBlock, scene).title : "",
     });
-    state.creativeAssistantResult = result.result ?? null;
+    state.creativeAssistantResult = sanitizeCreativeAssistantGenerationResponse(result);
     if (state.creativeAssistantResult) {
       state.creativeAssistantSelectedBlockIndexes = getDefaultCreativeAssistantBlockSelection(state.creativeAssistantResult);
       rememberCreativeAssistantResult(state.creativeAssistantResult);
@@ -38473,14 +39665,26 @@ function cloneScene(scene) {
 }
 
 function isAssetUnused(assetId, data = state.data) {
+  if (assetCatalogTools?.isAssetUnused) {
+    return assetCatalogTools.isAssetUnused(assetId, data);
+  }
+
   return (data.assetUsage.get(assetId) ?? []).length === 0;
 }
 
 function getUnusedAssets(data = state.data) {
+  if (assetCatalogTools?.getUnusedAssets) {
+    return assetCatalogTools.getUnusedAssets(data);
+  }
+
   return data.assetList.filter((asset) => isAssetUnused(asset.id, data));
 }
 
 function isAssetMissingFile(asset) {
+  if (assetCatalogTools?.isAssetMissingFile) {
+    return assetCatalogTools.isAssetMissingFile(asset);
+  }
+
   return !Boolean(asset?.fileExists);
 }
 
@@ -38575,6 +39779,10 @@ function getAssetMediaBudgetLimit(asset) {
 }
 
 function getAssetMediaBudgetSuggestion(asset, severity = "warn") {
+  if (assetCatalogTools?.getAssetMediaBudgetSuggestion) {
+    return assetCatalogTools.getAssetMediaBudgetSuggestion(asset, severity);
+  }
+
   switch (asset?.type) {
     case "background":
     case "sprite":
@@ -38603,6 +39811,10 @@ function getAssetMediaBudgetSuggestion(asset, severity = "warn") {
 }
 
 function getAssetMediaBudgetRisk(asset) {
+  if (assetCatalogTools?.getAssetMediaBudgetRisk) {
+    return assetCatalogTools.getAssetMediaBudgetRisk(asset);
+  }
+
   const limit = getAssetMediaBudgetLimit(asset);
   const size = Number(asset?.fileSizeBytes ?? 0);
   if (!limit || !asset?.fileExists || !Number.isFinite(size) || size <= limit.warnBytes) {
@@ -38631,6 +39843,10 @@ function getAssetMediaBudgetRisk(asset) {
 }
 
 function buildAssetMediaBudgetReport(data = state.data) {
+  if (assetCatalogTools?.buildAssetMediaBudgetReport) {
+    return assetCatalogTools.buildAssetMediaBudgetReport(data);
+  }
+
   const assets = data?.assetList ?? [];
   const items = assets
     .map((asset) => getAssetMediaBudgetRisk(asset))
@@ -38690,6 +39906,17 @@ function getVisibleAssets(
     favoriteOnly = state.assetFavoriteOnly,
   } = {}
 ) {
+  if (assetCatalogTools?.getVisibleAssets) {
+    return assetCatalogTools.getVisibleAssets(data, {
+      filterMode,
+      searchQuery,
+      tagFilter,
+      sortMode,
+      favoriteOnly,
+      nativeRuntime3dRiskAssetIds: getNativeRuntime3dRiskAssetIdSet(),
+    });
+  }
+
   const safeFilterMode = getSafeAssetFilterMode(filterMode);
   let assets = [];
 
@@ -38756,6 +39983,10 @@ function getVisibleAssets(
 }
 
 function sortAssets(assets, sortMode = state.assetSortMode) {
+  if (assetCatalogTools?.sortAssets) {
+    return assetCatalogTools.sortAssets(assets, sortMode, state.data);
+  }
+
   const list = [...assets];
 
   if (sortMode === "recent") {
@@ -38794,10 +40025,18 @@ function sortAssets(assets, sortMode = state.assetSortMode) {
 }
 
 function getAssetUsageCount(assetId, data = state.data) {
+  if (assetCatalogTools?.getAssetUsageCount) {
+    return assetCatalogTools.getAssetUsageCount(assetId, data);
+  }
+
   return data?.assetUsage?.get(assetId)?.length ?? 0;
 }
 
 function normalizeAssetDuplicateToken(value) {
+  if (assetCatalogTools?.normalizeAssetDuplicateToken) {
+    return assetCatalogTools.normalizeAssetDuplicateToken(value);
+  }
+
   return String(value ?? "")
     .trim()
     .toLowerCase()
@@ -38808,6 +40047,10 @@ function normalizeAssetDuplicateToken(value) {
 }
 
 function getAssetPathBasename(assetPath) {
+  if (assetCatalogTools?.getAssetPathBasename) {
+    return assetCatalogTools.getAssetPathBasename(assetPath);
+  }
+
   const path = String(assetPath ?? "").trim();
   if (!path) {
     return "";
@@ -38817,6 +40060,10 @@ function getAssetPathBasename(assetPath) {
 }
 
 function getAssetDuplicateReasonLabels(info, relatedAssetId = null) {
+  if (assetCatalogTools?.getAssetDuplicateReasonLabels) {
+    return assetCatalogTools.getAssetDuplicateReasonLabels(info, relatedAssetId);
+  }
+
   const labels = [];
   const matches = {
     exactPath: relatedAssetId ? info.pathMatchIds.has(relatedAssetId) : info.pathMatchIds.size > 0,
@@ -38838,6 +40085,10 @@ function getAssetDuplicateReasonLabels(info, relatedAssetId = null) {
 }
 
 function getAssetDuplicatePreferenceScore(asset, data = state.data) {
+  if (assetCatalogTools?.getAssetDuplicatePreferenceScore) {
+    return assetCatalogTools.getAssetDuplicatePreferenceScore(asset, data);
+  }
+
   if (!asset) {
     return -1;
   }
@@ -38852,6 +40103,10 @@ function getAssetDuplicatePreferenceScore(asset, data = state.data) {
 }
 
 function buildAssetDuplicatePreferenceNotes(asset, data = state.data) {
+  if (assetCatalogTools?.buildAssetDuplicatePreferenceNotes) {
+    return assetCatalogTools.buildAssetDuplicatePreferenceNotes(asset, data);
+  }
+
   if (!asset) {
     return [];
   }
@@ -38879,6 +40134,10 @@ function buildAssetDuplicatePreferenceNotes(asset, data = state.data) {
 }
 
 function buildAssetDuplicateOverview(data = state.data) {
+  if (assetCatalogTools?.buildAssetDuplicateOverview) {
+    return assetCatalogTools.buildAssetDuplicateOverview(data);
+  }
+
   const pathGroups = new Map();
   const nameGroups = new Map();
   const stemGroups = new Map();
@@ -39135,10 +40394,18 @@ function buildAssetDuplicateOverview(data = state.data) {
 }
 
 function isAssetUrgentMissing(asset, data = state.data) {
+  if (assetCatalogTools?.isAssetUrgentMissing) {
+    return assetCatalogTools.isAssetUrgentMissing(asset, data);
+  }
+
   return isAssetMissingFile(asset) && getAssetUsageCount(asset.id, data) > 0;
 }
 
 function buildAssetGapOverview(data = state.data, duplicateOverview = buildAssetDuplicateOverview(data)) {
+  if (assetCatalogTools?.buildAssetGapOverview) {
+    return assetCatalogTools.buildAssetGapOverview(data, duplicateOverview);
+  }
+
   const perType = Object.keys(ASSET_TYPE_LABELS).map((type) => {
     const assets = data.assetList.filter((asset) => asset.type === type);
     const missingCount = assets.filter((asset) => isAssetMissingFile(asset)).length;
@@ -39185,6 +40452,10 @@ function buildAssetGapOverview(data = state.data, duplicateOverview = buildAsset
 }
 
 function getAssetTypeGapSummaryText(assetType, assetPool = null, data = state.data, duplicateOverview = buildAssetDuplicateOverview(data)) {
+  if (assetCatalogTools?.getAssetTypeGapSummaryText) {
+    return assetCatalogTools.getAssetTypeGapSummaryText(assetType, assetPool, data, duplicateOverview);
+  }
+
   const assets =
     assetPool ?? data.assetList.filter((asset) => asset.type === assetType);
   const totalCount = assets.length;
@@ -39216,10 +40487,18 @@ function getAssetTypeGapSummaryText(assetType, assetPool = null, data = state.da
 }
 
 function normalizeAssetSearchQuery(value) {
+  if (assetCatalogTools?.normalizeAssetSearchQuery) {
+    return assetCatalogTools.normalizeAssetSearchQuery(value);
+  }
+
   return String(value ?? "").trim().toLowerCase();
 }
 
 function getAssetSortLabel(sortMode) {
+  if (assetCatalogTools?.getAssetSortLabel) {
+    return assetCatalogTools.getAssetSortLabel(sortMode);
+  }
+
   const labels = {
     default: "默认顺序",
     recent: "最近导入在前",
@@ -39231,10 +40510,25 @@ function getAssetSortLabel(sortMode) {
 }
 
 function getCurrentFilteredAssetsOfSelectedType(data = state.data) {
+  if (assetCatalogTools?.getCurrentFilteredAssetsOfSelectedType) {
+    return assetCatalogTools.getCurrentFilteredAssetsOfSelectedType(data, state.selectedAssetType, {
+      filterMode: state.assetFilterMode,
+      searchQuery: state.assetSearchQuery,
+      tagFilter: state.assetTagFilter,
+      sortMode: state.assetSortMode,
+      favoriteOnly: state.assetFavoriteOnly,
+      nativeRuntime3dRiskAssetIds: getNativeRuntime3dRiskAssetIdSet(),
+    });
+  }
+
   return getVisibleAssets(data).filter((asset) => asset.type === state.selectedAssetType);
 }
 
 function getCheckedAssetIds(data = state.data) {
+  if (assetCatalogTools?.getCheckedAssetIds) {
+    return assetCatalogTools.getCheckedAssetIds(state.assetCheckedIds, data);
+  }
+
   const validIds = new Set((data?.assetList ?? []).map((asset) => asset.id));
   const uniqueIds = [];
   const seenIds = new Set();
@@ -39252,6 +40546,10 @@ function getCheckedAssetIds(data = state.data) {
 }
 
 function pruneAssetCheckedIds(checkedIds = state.assetCheckedIds, data = state.data) {
+  if (assetCatalogTools?.pruneAssetCheckedIds) {
+    return assetCatalogTools.pruneAssetCheckedIds(checkedIds, data);
+  }
+
   const validIds = new Set((data?.assetList ?? []).map((asset) => asset.id));
   const nextIds = [];
   const seenIds = new Set();
@@ -39269,20 +40567,56 @@ function pruneAssetCheckedIds(checkedIds = state.assetCheckedIds, data = state.d
 }
 
 function getCurrentCheckedAssetIds(data = state.data) {
+  if (assetCatalogTools?.getCurrentCheckedAssetIds) {
+    return assetCatalogTools.getCurrentCheckedAssetIds(state.assetCheckedIds, data, state.selectedAssetType, {
+      filterMode: state.assetFilterMode,
+      searchQuery: state.assetSearchQuery,
+      tagFilter: state.assetTagFilter,
+      sortMode: state.assetSortMode,
+      favoriteOnly: state.assetFavoriteOnly,
+      nativeRuntime3dRiskAssetIds: getNativeRuntime3dRiskAssetIdSet(),
+    });
+  }
+
   const currentTypeIds = new Set(getCurrentFilteredAssetsOfSelectedType(data).map((asset) => asset.id));
   return getCheckedAssetIds(data).filter((assetId) => currentTypeIds.has(assetId));
 }
 
 function getCurrentCheckedAssetsOfSelectedType(data = state.data) {
+  if (assetCatalogTools?.getCurrentCheckedAssetsOfSelectedType) {
+    return assetCatalogTools.getCurrentCheckedAssetsOfSelectedType(
+      state.assetCheckedIds,
+      data,
+      state.selectedAssetType,
+      {
+        filterMode: state.assetFilterMode,
+        searchQuery: state.assetSearchQuery,
+        tagFilter: state.assetTagFilter,
+        sortMode: state.assetSortMode,
+        favoriteOnly: state.assetFavoriteOnly,
+        nativeRuntime3dRiskAssetIds: getNativeRuntime3dRiskAssetIdSet(),
+      }
+    );
+  }
+
   const checkedIds = new Set(getCurrentCheckedAssetIds(data));
   return getCurrentFilteredAssetsOfSelectedType(data).filter((asset) => checkedIds.has(asset.id));
 }
 
 function isAssetChecked(assetId, data = state.data) {
+  if (assetCatalogTools?.isAssetChecked) {
+    return assetCatalogTools.isAssetChecked(assetId, state.assetCheckedIds, data);
+  }
+
   return getCheckedAssetIds(data).includes(assetId);
 }
 
 function toggleAssetChecked(assetId, checked) {
+  if (assetCatalogTools?.toggleAssetChecked) {
+    state.assetCheckedIds = assetCatalogTools.toggleAssetChecked(state.assetCheckedIds, assetId, checked, state.data);
+    return;
+  }
+
   const nextCheckedIds = new Set(getCheckedAssetIds());
   if (checked) {
     nextCheckedIds.add(assetId);
@@ -39314,6 +40648,10 @@ function getSafeExpressionId(characterId, expressionId) {
 }
 
 function getSafeAssetIdByType(assetType, assetId = null) {
+  if (assetCatalogTools?.getSafeAssetIdByType) {
+    return assetCatalogTools.getSafeAssetIdByType(assetType, assetId, state.data);
+  }
+
   const assets = state.data.assetList.filter((asset) => asset.type === assetType);
   return assets.some((asset) => asset.id === assetId) ? assetId : assets[0]?.id ?? "";
 }
@@ -39340,11 +40678,19 @@ function getDefaultJumpTargetSceneId(currentSceneId) {
 }
 
 function getSafeNonNegativeNumber(value, fallback = 0) {
+  if (editorCommonTools?.getSafeNonNegativeNumber) {
+    return editorCommonTools.getSafeNonNegativeNumber(value, fallback);
+  }
+
   const parsed = Number.parseInt(value ?? "", 10);
   return Number.isFinite(parsed) ? Math.max(parsed, 0) : fallback;
 }
 
 function getSafeNumber(value, fallback = 0) {
+  if (editorCommonTools?.getSafeNumber) {
+    return editorCommonTools.getSafeNumber(value, fallback);
+  }
+
   const parsed = Number.parseFloat(value ?? "");
   return Number.isFinite(parsed) ? parsed : fallback;
 }
@@ -39359,7 +40705,20 @@ function getSafeScene3dPreviewConfig(source = {}) {
   };
 }
 
+function getVariableToolOptions(options = {}) {
+  return {
+    variables: state.data?.variables ?? [],
+    variablesById: state.data?.variablesById,
+    escapeHtml,
+    ...options,
+  };
+}
+
 function parseVariableNumberBound(value) {
+  if (variableTools?.parseVariableNumberBound) {
+    return variableTools.parseVariableNumberBound(value);
+  }
+
   if (value === null || value === undefined || typeof value === "boolean") {
     return null;
   }
@@ -39369,6 +40728,10 @@ function parseVariableNumberBound(value) {
 }
 
 function getVariableNumberBounds(variableOrId) {
+  if (variableTools?.getVariableNumberBounds) {
+    return variableTools.getVariableNumberBounds(variableOrId, getVariableToolOptions());
+  }
+
   const variable =
     typeof variableOrId === "string" ? state.data.variablesById.get(variableOrId) : variableOrId;
 
@@ -39383,14 +40746,26 @@ function getVariableNumberBounds(variableOrId) {
 }
 
 function getFilteredVariables(typeFilter = null) {
+  if (variableTools?.getFilteredVariables) {
+    return variableTools.getFilteredVariables(typeFilter, getVariableToolOptions());
+  }
+
   return state.data.variables.filter((variable) => !typeFilter || variable.type === typeFilter);
 }
 
 function hasUsableVariable(typeFilter = null) {
+  if (variableTools?.hasUsableVariable) {
+    return variableTools.hasUsableVariable(typeFilter, getVariableToolOptions());
+  }
+
   return getFilteredVariables(typeFilter).length > 0;
 }
 
 function createStarterVariableCopy(preset, existingIds) {
+  if (variableTools?.createStarterVariableCopy) {
+    return variableTools.createStarterVariableCopy(preset, existingIds);
+  }
+
   const nextVariable = JSON.parse(JSON.stringify(preset));
   const baseId = nextVariable.id;
   let candidateId = baseId;
@@ -39407,6 +40782,10 @@ function createStarterVariableCopy(preset, existingIds) {
 }
 
 function buildStarterVariableLibrary(existingVariables = state.data.variables, options = {}) {
+  if (variableTools?.buildStarterVariableLibrary) {
+    return variableTools.buildStarterVariableLibrary(existingVariables, options);
+  }
+
   const existing = Array.isArray(existingVariables)
     ? existingVariables.map((variable) => JSON.parse(JSON.stringify(variable)))
     : [];
@@ -39478,6 +40857,10 @@ async function ensureStarterVariables(options = {}) {
 }
 
 function getSafeVariableId(variableId, typeFilter = null) {
+  if (variableTools?.getSafeVariableId) {
+    return variableTools.getSafeVariableId(variableId, typeFilter, getVariableToolOptions());
+  }
+
   const variables = getFilteredVariables(typeFilter);
 
   if (variables.some((variable) => variable.id === variableId)) {
@@ -39492,16 +40875,28 @@ function getSafeVariableId(variableId, typeFilter = null) {
 }
 
 function getVariableType(variableId) {
+  if (variableTools?.getVariableType) {
+    return variableTools.getVariableType(variableId, getVariableToolOptions());
+  }
+
   return state.data.variablesById.get(variableId)?.type ?? "string";
 }
 
 function getVariableTypeLabel(type) {
+  if (variableTools?.getVariableTypeLabel) {
+    return variableTools.getVariableTypeLabel(type);
+  }
+
   if (type === "number") return "数字";
   if (type === "boolean") return "开关";
   return "文本";
 }
 
 function normalizeVariableValue(variableId, value) {
+  if (variableTools?.normalizeVariableValue) {
+    return variableTools.normalizeVariableValue(variableId, value, getVariableToolOptions());
+  }
+
   const variable = state.data.variablesById.get(variableId);
   const type = variable?.type ?? "string";
   const fallback = variable?.defaultValue;
@@ -39535,6 +40930,10 @@ function normalizeVariableValue(variableId, value) {
 }
 
 function formatVariableValue(variableId, value) {
+  if (variableTools?.formatVariableValue) {
+    return variableTools.formatVariableValue(variableId, value, getVariableToolOptions());
+  }
+
   const safeValue = normalizeVariableValue(variableId, value);
 
   if (typeof safeValue === "boolean") {
@@ -39545,12 +40944,20 @@ function formatVariableValue(variableId, value) {
 }
 
 function getVariableDefaultValue(variableId) {
+  if (variableTools?.getVariableDefaultValue) {
+    return variableTools.getVariableDefaultValue(variableId, getVariableToolOptions());
+  }
+
   const variable = state.data.variablesById.get(variableId);
   const value = normalizeVariableValue(variableId, variable?.defaultValue);
   return typeof value === "number" ? clampPreviewVariableNumber(variableId, value) : value;
 }
 
 function renderVariableOptions(selectedVariableId, typeFilter = null) {
+  if (variableTools?.renderVariableOptions) {
+    return variableTools.renderVariableOptions(selectedVariableId, typeFilter, getVariableToolOptions());
+  }
+
   const variables = getFilteredVariables(typeFilter);
 
   if (variables.length === 0) {
@@ -39569,6 +40976,10 @@ function renderVariableOptions(selectedVariableId, typeFilter = null) {
 }
 
 function renderVariableSetValueFields(variableId, value) {
+  if (variableTools?.renderVariableSetValueFields) {
+    return variableTools.renderVariableSetValueFields(variableId, value, getVariableToolOptions());
+  }
+
   const type = getVariableType(variableId);
   const safeValue = normalizeVariableValue(variableId, value);
 
@@ -39615,6 +41026,10 @@ function renderVariableSetValueFields(variableId, value) {
 }
 
 function renderConditionValueFields(variableId, value) {
+  if (variableTools?.renderConditionValueFields) {
+    return variableTools.renderConditionValueFields(variableId, value, getVariableToolOptions());
+  }
+
   const type = getVariableType(variableId);
   const safeValue = normalizeVariableValue(variableId, value);
 
@@ -39655,6 +41070,10 @@ function renderConditionValueFields(variableId, value) {
 }
 
 function getConditionOperators(variableId) {
+  if (variableTools?.getConditionOperators) {
+    return variableTools.getConditionOperators(variableId, getVariableToolOptions());
+  }
+
   if (getVariableType(variableId) === "number") {
     return [
       [">=", "大于等于"],
@@ -39673,11 +41092,23 @@ function getConditionOperators(variableId) {
 }
 
 function getSafeConditionOperator(variableId, operator) {
+  if (variableTools?.getSafeConditionOperator) {
+    return variableTools.getSafeConditionOperator(variableId, operator, getVariableToolOptions());
+  }
+
   const operators = getConditionOperators(variableId);
   return operators.some(([value]) => value === operator) ? operator : operators[0]?.[0] ?? "==";
 }
 
 function renderConditionOperatorOptions(variableId, selectedOperator) {
+  if (variableTools?.renderConditionOperatorOptions) {
+    return variableTools.renderConditionOperatorOptions(
+      variableId,
+      selectedOperator,
+      getVariableToolOptions()
+    );
+  }
+
   return getConditionOperators(variableId)
     .map(
       ([value, label]) => `
@@ -39690,24 +41121,44 @@ function renderConditionOperatorOptions(variableId, selectedOperator) {
 }
 
 function isEditableChoiceEffect(effect) {
+  if (variableTools?.isEditableChoiceEffect) {
+    return variableTools.isEditableChoiceEffect(effect);
+  }
+
   return effect?.type === "variable_set" || effect?.type === "variable_add";
 }
 
 function getEditableChoiceEffects(effects = []) {
+  if (variableTools?.getEditableChoiceEffects) {
+    return variableTools.getEditableChoiceEffects(effects);
+  }
+
   return (effects ?? []).filter((effect) => isEditableChoiceEffect(effect));
 }
 
 function getSafeChoiceEffectType(effectType) {
+  if (variableTools?.getSafeChoiceEffectType) {
+    return variableTools.getSafeChoiceEffectType(effectType);
+  }
+
   return effectType === "variable_add" ? "variable_add" : "variable_set";
 }
 
 function getChoiceEffectVariableId(effectType, variableId) {
+  if (variableTools?.getChoiceEffectVariableId) {
+    return variableTools.getChoiceEffectVariableId(effectType, variableId, getVariableToolOptions());
+  }
+
   return effectType === "variable_add"
     ? getSafeVariableId(variableId, "number")
     : getSafeVariableId(variableId);
 }
 
 function normalizeChoiceEffect(effect = {}) {
+  if (variableTools?.normalizeChoiceEffect) {
+    return variableTools.normalizeChoiceEffect(effect, getVariableToolOptions());
+  }
+
   const type = getSafeChoiceEffectType(effect.type);
   const variableId = getChoiceEffectVariableId(type, effect.variableId);
 
@@ -39727,6 +41178,10 @@ function normalizeChoiceEffect(effect = {}) {
 }
 
 function renderChoiceEffectTypeOptions(selectedType) {
+  if (variableTools?.renderChoiceEffectTypeOptions) {
+    return variableTools.renderChoiceEffectTypeOptions(selectedType, getVariableToolOptions());
+  }
+
   return [
     ["variable_add", "给数字变量加减数值"],
     ["variable_set", "把变量直接改成指定值"],
@@ -39742,6 +41197,10 @@ function renderChoiceEffectTypeOptions(selectedType) {
 }
 
 function renderChoiceEffectValueFields(effectType, variableId, value) {
+  if (variableTools?.renderChoiceEffectValueFields) {
+    return variableTools.renderChoiceEffectValueFields(effectType, variableId, value, getVariableToolOptions());
+  }
+
   if (effectType === "variable_add") {
     return `
       <div class="detail-row">
@@ -40888,22 +42347,30 @@ function buildParticleComboVariants(particleEffect) {
 }
 
 function getSafeShakeIntensity(intensity) {
-  return Object.hasOwn(SHAKE_INTENSITY_LABELS, intensity) ? intensity : "medium";
+  return visualEffectTools?.getSafeShakeIntensity?.(intensity) ?? (
+    Object.hasOwn(SHAKE_INTENSITY_LABELS, intensity) ? intensity : "medium"
+  );
 }
 
 function getShakeIntensityLabel(intensity) {
-  return SHAKE_INTENSITY_LABELS[getSafeShakeIntensity(intensity)];
+  return visualEffectTools?.getShakeIntensityLabel?.(intensity) ?? SHAKE_INTENSITY_LABELS[getSafeShakeIntensity(intensity)];
 }
 
 function getSafeEffectDuration(duration) {
-  return Object.hasOwn(EFFECT_DURATION_LABELS, duration) ? duration : "medium";
+  return visualEffectTools?.getSafeEffectDuration?.(duration) ?? (
+    Object.hasOwn(EFFECT_DURATION_LABELS, duration) ? duration : "medium"
+  );
 }
 
 function getEffectDurationLabel(duration) {
-  return EFFECT_DURATION_LABELS[getSafeEffectDuration(duration)];
+  return visualEffectTools?.getEffectDurationLabel?.(duration) ?? EFFECT_DURATION_LABELS[getSafeEffectDuration(duration)];
 }
 
 function getShakeDistance(intensity) {
+  if (visualEffectTools?.getShakeDistance) {
+    return visualEffectTools.getShakeDistance(intensity);
+  }
+
   return {
     light: 5,
     medium: 10,
@@ -40912,6 +42379,10 @@ function getShakeDistance(intensity) {
 }
 
 function getEffectDurationSeconds(duration) {
+  if (visualEffectTools?.getEffectDurationSeconds) {
+    return visualEffectTools.getEffectDurationSeconds(duration);
+  }
+
   return {
     short: 0.42,
     medium: 0.78,
@@ -40920,22 +42391,30 @@ function getEffectDurationSeconds(duration) {
 }
 
 function getSafeFlashColor(color) {
-  return Object.hasOwn(FLASH_COLOR_LABELS, color) ? color : "white";
+  return visualEffectTools?.getSafeFlashColor?.(color) ?? (
+    Object.hasOwn(FLASH_COLOR_LABELS, color) ? color : "white"
+  );
 }
 
 function getFlashColorLabel(color) {
-  return FLASH_COLOR_LABELS[getSafeFlashColor(color)];
+  return visualEffectTools?.getFlashColorLabel?.(color) ?? FLASH_COLOR_LABELS[getSafeFlashColor(color)];
 }
 
 function getSafeFlashIntensity(intensity) {
-  return Object.hasOwn(FLASH_INTENSITY_LABELS, intensity) ? intensity : "medium";
+  return visualEffectTools?.getSafeFlashIntensity?.(intensity) ?? (
+    Object.hasOwn(FLASH_INTENSITY_LABELS, intensity) ? intensity : "medium"
+  );
 }
 
 function getFlashIntensityLabel(intensity) {
-  return FLASH_INTENSITY_LABELS[getSafeFlashIntensity(intensity)];
+  return visualEffectTools?.getFlashIntensityLabel?.(intensity) ?? FLASH_INTENSITY_LABELS[getSafeFlashIntensity(intensity)];
 }
 
 function getFlashOpacity(intensity) {
+  if (visualEffectTools?.getFlashOpacity) {
+    return visualEffectTools.getFlashOpacity(intensity);
+  }
+
   return {
     soft: 0.36,
     medium: 0.54,
@@ -40944,6 +42423,10 @@ function getFlashOpacity(intensity) {
 }
 
 function getFlashColorRgb(color) {
+  if (visualEffectTools?.getFlashColorRgb) {
+    return visualEffectTools.getFlashColorRgb(color);
+  }
+
   return {
     white: "255, 255, 255",
     warm: "255, 236, 204",
@@ -40953,22 +42436,30 @@ function getFlashColorRgb(color) {
 }
 
 function getSafeFadeAction(action) {
-  return Object.hasOwn(FADE_ACTION_LABELS, action) ? action : "fade_out";
+  return visualEffectTools?.getSafeFadeAction?.(action) ?? (
+    Object.hasOwn(FADE_ACTION_LABELS, action) ? action : "fade_out"
+  );
 }
 
 function getFadeActionLabel(action) {
-  return FADE_ACTION_LABELS[getSafeFadeAction(action)];
+  return visualEffectTools?.getFadeActionLabel?.(action) ?? FADE_ACTION_LABELS[getSafeFadeAction(action)];
 }
 
 function getSafeFadeColor(color) {
-  return Object.hasOwn(FADE_COLOR_LABELS, color) ? color : "black";
+  return visualEffectTools?.getSafeFadeColor?.(color) ?? (
+    Object.hasOwn(FADE_COLOR_LABELS, color) ? color : "black"
+  );
 }
 
 function getFadeColorLabel(color) {
-  return FADE_COLOR_LABELS[getSafeFadeColor(color)];
+  return visualEffectTools?.getFadeColorLabel?.(color) ?? FADE_COLOR_LABELS[getSafeFadeColor(color)];
 }
 
 function getFadeColorRgb(color) {
+  if (visualEffectTools?.getFadeColorRgb) {
+    return visualEffectTools.getFadeColorRgb(color);
+  }
+
   return {
     black: "18, 14, 12",
     white: "255, 252, 247",
@@ -40976,30 +42467,40 @@ function getFadeColorRgb(color) {
 }
 
 function getSafeCameraZoomAction(action) {
-  return Object.hasOwn(CAMERA_ZOOM_ACTION_LABELS, action) ? action : "zoom_in";
+  return visualEffectTools?.getSafeCameraZoomAction?.(action) ?? (
+    Object.hasOwn(CAMERA_ZOOM_ACTION_LABELS, action) ? action : "zoom_in"
+  );
 }
 
 function getCameraZoomActionLabel(action) {
-  return CAMERA_ZOOM_ACTION_LABELS[getSafeCameraZoomAction(action)];
+  return visualEffectTools?.getCameraZoomActionLabel?.(action) ?? CAMERA_ZOOM_ACTION_LABELS[getSafeCameraZoomAction(action)];
 }
 
 function getSafeCameraZoomStrength(strength) {
-  return Object.hasOwn(CAMERA_ZOOM_STRENGTH_LABELS, strength) ? strength : "medium";
+  return visualEffectTools?.getSafeCameraZoomStrength?.(strength) ?? (
+    Object.hasOwn(CAMERA_ZOOM_STRENGTH_LABELS, strength) ? strength : "medium"
+  );
 }
 
 function getCameraZoomStrengthLabel(strength) {
-  return CAMERA_ZOOM_STRENGTH_LABELS[getSafeCameraZoomStrength(strength)];
+  return visualEffectTools?.getCameraZoomStrengthLabel?.(strength) ?? CAMERA_ZOOM_STRENGTH_LABELS[getSafeCameraZoomStrength(strength)];
 }
 
 function getSafeCameraZoomFocus(focus) {
-  return Object.hasOwn(CAMERA_ZOOM_FOCUS_LABELS, focus) ? focus : "center";
+  return visualEffectTools?.getSafeCameraZoomFocus?.(focus) ?? (
+    Object.hasOwn(CAMERA_ZOOM_FOCUS_LABELS, focus) ? focus : "center"
+  );
 }
 
 function getCameraZoomFocusLabel(focus) {
-  return CAMERA_ZOOM_FOCUS_LABELS[getSafeCameraZoomFocus(focus)];
+  return visualEffectTools?.getCameraZoomFocusLabel?.(focus) ?? CAMERA_ZOOM_FOCUS_LABELS[getSafeCameraZoomFocus(focus)];
 }
 
 function getCameraZoomScale(action, strength) {
+  if (visualEffectTools?.getCameraZoomScale) {
+    return visualEffectTools.getCameraZoomScale(action, strength);
+  }
+
   const safeAction = getSafeCameraZoomAction(action);
   const safeStrength = getSafeCameraZoomStrength(strength);
 
@@ -41023,6 +42524,10 @@ function getCameraZoomScale(action, strength) {
 }
 
 function getCameraZoomOrigin(focus) {
+  if (visualEffectTools?.getCameraZoomOrigin) {
+    return visualEffectTools.getCameraZoomOrigin(focus);
+  }
+
   return {
     left: "28% 52%",
     center: "50% 52%",
@@ -41031,22 +42536,30 @@ function getCameraZoomOrigin(focus) {
 }
 
 function getSafeCameraPanTarget(target) {
-  return Object.hasOwn(CAMERA_PAN_TARGET_LABELS, target) ? target : "center";
+  return visualEffectTools?.getSafeCameraPanTarget?.(target) ?? (
+    Object.hasOwn(CAMERA_PAN_TARGET_LABELS, target) ? target : "center"
+  );
 }
 
 function getCameraPanTargetLabel(target) {
-  return CAMERA_PAN_TARGET_LABELS[getSafeCameraPanTarget(target)];
+  return visualEffectTools?.getCameraPanTargetLabel?.(target) ?? CAMERA_PAN_TARGET_LABELS[getSafeCameraPanTarget(target)];
 }
 
 function getSafeCameraPanStrength(strength) {
-  return Object.hasOwn(CAMERA_PAN_STRENGTH_LABELS, strength) ? strength : "medium";
+  return visualEffectTools?.getSafeCameraPanStrength?.(strength) ?? (
+    Object.hasOwn(CAMERA_PAN_STRENGTH_LABELS, strength) ? strength : "medium"
+  );
 }
 
 function getCameraPanStrengthLabel(strength) {
-  return CAMERA_PAN_STRENGTH_LABELS[getSafeCameraPanStrength(strength)];
+  return visualEffectTools?.getCameraPanStrengthLabel?.(strength) ?? CAMERA_PAN_STRENGTH_LABELS[getSafeCameraPanStrength(strength)];
 }
 
 function getCameraPanOffset(target, strength) {
+  if (visualEffectTools?.getCameraPanOffset) {
+    return visualEffectTools.getCameraPanOffset(target, strength);
+  }
+
   const safeTarget = getSafeCameraPanTarget(target);
   if (safeTarget === "center") {
     return 0;
@@ -41062,30 +42575,40 @@ function getCameraPanOffset(target, strength) {
 }
 
 function getSafeScreenFilterAction(action) {
-  return Object.hasOwn(SCREEN_FILTER_ACTION_LABELS, action) ? action : "apply";
+  return visualEffectTools?.getSafeScreenFilterAction?.(action) ?? (
+    Object.hasOwn(SCREEN_FILTER_ACTION_LABELS, action) ? action : "apply"
+  );
 }
 
 function getScreenFilterActionLabel(action) {
-  return SCREEN_FILTER_ACTION_LABELS[getSafeScreenFilterAction(action)];
+  return visualEffectTools?.getScreenFilterActionLabel?.(action) ?? SCREEN_FILTER_ACTION_LABELS[getSafeScreenFilterAction(action)];
 }
 
 function getSafeScreenFilterPreset(preset) {
-  return Object.hasOwn(SCREEN_FILTER_PRESET_LABELS, preset) ? preset : "memory";
+  return visualEffectTools?.getSafeScreenFilterPreset?.(preset) ?? (
+    Object.hasOwn(SCREEN_FILTER_PRESET_LABELS, preset) ? preset : "memory"
+  );
 }
 
 function getScreenFilterPresetLabel(preset) {
-  return SCREEN_FILTER_PRESET_LABELS[getSafeScreenFilterPreset(preset)];
+  return visualEffectTools?.getScreenFilterPresetLabel?.(preset) ?? SCREEN_FILTER_PRESET_LABELS[getSafeScreenFilterPreset(preset)];
 }
 
 function getSafeScreenFilterStrength(strength) {
-  return Object.hasOwn(SCREEN_FILTER_STRENGTH_LABELS, strength) ? strength : "medium";
+  return visualEffectTools?.getSafeScreenFilterStrength?.(strength) ?? (
+    Object.hasOwn(SCREEN_FILTER_STRENGTH_LABELS, strength) ? strength : "medium"
+  );
 }
 
 function getScreenFilterStrengthLabel(strength) {
-  return SCREEN_FILTER_STRENGTH_LABELS[getSafeScreenFilterStrength(strength)];
+  return visualEffectTools?.getScreenFilterStrengthLabel?.(strength) ?? SCREEN_FILTER_STRENGTH_LABELS[getSafeScreenFilterStrength(strength)];
 }
 
 function getScreenFilterCss(screenFilter) {
+  if (visualEffectTools?.getScreenFilterCss) {
+    return visualEffectTools.getScreenFilterCss(screenFilter);
+  }
+
   if (!screenFilter) {
     return "";
   }
@@ -41120,6 +42643,10 @@ function getScreenFilterCss(screenFilter) {
 }
 
 function getScreenFilterWash(screenFilter) {
+  if (visualEffectTools?.getScreenFilterWash) {
+    return visualEffectTools.getScreenFilterWash(screenFilter);
+  }
+
   if (!screenFilter) {
     return {
       background: "transparent",
@@ -41149,30 +42676,40 @@ function getScreenFilterWash(screenFilter) {
 }
 
 function getSafeDepthBlurAction(action) {
-  return Object.hasOwn(DEPTH_BLUR_ACTION_LABELS, action) ? action : "apply";
+  return visualEffectTools?.getSafeDepthBlurAction?.(action) ?? (
+    Object.hasOwn(DEPTH_BLUR_ACTION_LABELS, action) ? action : "apply"
+  );
 }
 
 function getDepthBlurActionLabel(action) {
-  return DEPTH_BLUR_ACTION_LABELS[getSafeDepthBlurAction(action)];
+  return visualEffectTools?.getDepthBlurActionLabel?.(action) ?? DEPTH_BLUR_ACTION_LABELS[getSafeDepthBlurAction(action)];
 }
 
 function getSafeDepthBlurFocus(focus) {
-  return Object.hasOwn(DEPTH_BLUR_FOCUS_LABELS, focus) ? focus : "center";
+  return visualEffectTools?.getSafeDepthBlurFocus?.(focus) ?? (
+    Object.hasOwn(DEPTH_BLUR_FOCUS_LABELS, focus) ? focus : "center"
+  );
 }
 
 function getDepthBlurFocusLabel(focus) {
-  return DEPTH_BLUR_FOCUS_LABELS[getSafeDepthBlurFocus(focus)];
+  return visualEffectTools?.getDepthBlurFocusLabel?.(focus) ?? DEPTH_BLUR_FOCUS_LABELS[getSafeDepthBlurFocus(focus)];
 }
 
 function getSafeDepthBlurStrength(strength) {
-  return Object.hasOwn(DEPTH_BLUR_STRENGTH_LABELS, strength) ? strength : "medium";
+  return visualEffectTools?.getSafeDepthBlurStrength?.(strength) ?? (
+    Object.hasOwn(DEPTH_BLUR_STRENGTH_LABELS, strength) ? strength : "medium"
+  );
 }
 
 function getDepthBlurStrengthLabel(strength) {
-  return DEPTH_BLUR_STRENGTH_LABELS[getSafeDepthBlurStrength(strength)];
+  return visualEffectTools?.getDepthBlurStrengthLabel?.(strength) ?? DEPTH_BLUR_STRENGTH_LABELS[getSafeDepthBlurStrength(strength)];
 }
 
 function getDepthBlurBackdropPx(strength) {
+  if (visualEffectTools?.getDepthBlurBackdropPx) {
+    return visualEffectTools.getDepthBlurBackdropPx(strength);
+  }
+
   return {
     soft: 4,
     medium: 7,
@@ -41181,6 +42718,10 @@ function getDepthBlurBackdropPx(strength) {
 }
 
 function getDepthBlurParticlePx(strength) {
+  if (visualEffectTools?.getDepthBlurParticlePx) {
+    return visualEffectTools.getDepthBlurParticlePx(strength);
+  }
+
   return {
     soft: 1.5,
     medium: 2.4,
@@ -41189,6 +42730,10 @@ function getDepthBlurParticlePx(strength) {
 }
 
 function getDepthBlurSpritePx(strength) {
+  if (visualEffectTools?.getDepthBlurSpritePx) {
+    return visualEffectTools.getDepthBlurSpritePx(strength);
+  }
+
   return {
     soft: 1.8,
     medium: 2.8,
@@ -41197,6 +42742,10 @@ function getDepthBlurSpritePx(strength) {
 }
 
 function getDepthBlurSpriteOpacity(strength) {
+  if (visualEffectTools?.getDepthBlurSpriteOpacity) {
+    return visualEffectTools.getDepthBlurSpriteOpacity(strength);
+  }
+
   return {
     soft: 0.72,
     medium: 0.58,
@@ -42665,30 +44214,52 @@ function getTemplateLabel(template) {
 }
 
 function isImageAssetType(type) {
+  if (assetCatalogTools?.isImageAssetType) {
+    return assetCatalogTools.isImageAssetType(type);
+  }
+
   return ["background", "sprite", "cg", "ui"].includes(type);
 }
 
 function isAudioAssetType(type) {
+  if (assetCatalogTools?.isAudioAssetType) {
+    return assetCatalogTools.isAudioAssetType(type);
+  }
+
   return ["bgm", "sfx", "voice"].includes(type);
 }
 
 function isVideoAssetType(type) {
+  if (assetCatalogTools?.isVideoAssetType) {
+    return assetCatalogTools.isVideoAssetType(type);
+  }
+
   return type === "video";
 }
 
 function isScene3dAssetType(type) {
+  if (assetCatalogTools?.isScene3dAssetType) {
+    return assetCatalogTools.isScene3dAssetType(type);
+  }
+
   return type === "scene3d";
 }
 
 function getSafeVideoFit(value) {
-  return Object.prototype.hasOwnProperty.call(VIDEO_FIT_LABELS, value) ? value : "contain";
+  return visualEffectTools?.getSafeVideoFit?.(value) ?? (
+    Object.prototype.hasOwnProperty.call(VIDEO_FIT_LABELS, value) ? value : "contain"
+  );
 }
 
 function getVideoFitLabel(value) {
-  return VIDEO_FIT_LABELS[getSafeVideoFit(value)] ?? VIDEO_FIT_LABELS.contain;
+  return visualEffectTools?.getVideoFitLabel?.(value) ?? VIDEO_FIT_LABELS[getSafeVideoFit(value)] ?? VIDEO_FIT_LABELS.contain;
 }
 
 function getSafeVideoVolume(value) {
+  if (visualEffectTools?.getSafeVideoVolume) {
+    return visualEffectTools.getSafeVideoVolume(value);
+  }
+
   const number = Number(value);
   if (!Number.isFinite(number)) {
     return 100;
@@ -42697,6 +44268,10 @@ function getSafeVideoVolume(value) {
 }
 
 function getSafeCreditsDuration(value) {
+  if (visualEffectTools?.getSafeCreditsDuration) {
+    return visualEffectTools.getSafeCreditsDuration(value);
+  }
+
   const number = Number(value);
   if (!Number.isFinite(number)) {
     return 18;
@@ -42705,14 +44280,22 @@ function getSafeCreditsDuration(value) {
 }
 
 function getSafeCreditsBackground(value) {
-  return Object.prototype.hasOwnProperty.call(CREDITS_BACKGROUND_LABELS, value) ? value : "dark";
+  return visualEffectTools?.getSafeCreditsBackground?.(value) ?? (
+    Object.prototype.hasOwnProperty.call(CREDITS_BACKGROUND_LABELS, value) ? value : "dark"
+  );
 }
 
 function getCreditsBackgroundLabel(value) {
-  return CREDITS_BACKGROUND_LABELS[getSafeCreditsBackground(value)] ?? CREDITS_BACKGROUND_LABELS.dark;
+  return visualEffectTools?.getCreditsBackgroundLabel?.(value) ?? (
+    CREDITS_BACKGROUND_LABELS[getSafeCreditsBackground(value)] ?? CREDITS_BACKGROUND_LABELS.dark
+  );
 }
 
 function parseCreditsLines(value) {
+  if (visualEffectTools?.parseCreditsLines) {
+    return visualEffectTools.parseCreditsLines(value);
+  }
+
   return String(value ?? "")
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -42720,6 +44303,10 @@ function parseCreditsLines(value) {
 }
 
 function getCreditsLines(blockLines) {
+  if (visualEffectTools?.getCreditsLines) {
+    return visualEffectTools.getCreditsLines(blockLines);
+  }
+
   if (Array.isArray(blockLines)) {
     return blockLines.map((line) => String(line ?? "").trim()).filter(Boolean);
   }
@@ -42727,10 +44314,14 @@ function getCreditsLines(blockLines) {
 }
 
 function getCreditsLinesText(blockLines) {
-  return getCreditsLines(blockLines).join("\n");
+  return visualEffectTools?.getCreditsLinesText?.(blockLines) ?? getCreditsLines(blockLines).join("\n");
 }
 
 function buildTemplateAssetUrl(relativePath) {
+  if (editorCommonTools?.buildTemplateAssetUrl) {
+    return editorCommonTools.buildTemplateAssetUrl(relativePath, state.data?.currentProject?.publicRoot ?? "");
+  }
+
   const normalized = String(relativePath ?? "")
     .replaceAll("\\", "/")
     .replace(/^\/+/, "")
@@ -42750,6 +44341,10 @@ function getAssetPublicUrl(asset) {
 }
 
 function formatFileSize(bytes) {
+  if (editorCommonTools?.formatFileSize) {
+    return editorCommonTools.formatFileSize(bytes);
+  }
+
   const size = Number(bytes);
   if (!Number.isFinite(size) || size < 0) {
     return "未知";
@@ -42791,10 +44386,18 @@ function getBackdropStyle(backgroundAssetId, scene3dPreview = null) {
 }
 
 function clamp(value, min, max) {
+  if (editorCommonTools?.clamp) {
+    return editorCommonTools.clamp(value, min, max);
+  }
+
   return Math.min(Math.max(value, min), max);
 }
 
 function escapeHtml(value) {
+  if (editorCommonTools?.escapeHtml) {
+    return editorCommonTools.escapeHtml(value);
+  }
+
   return String(value)
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")

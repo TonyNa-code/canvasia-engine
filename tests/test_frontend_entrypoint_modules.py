@@ -17,9 +17,22 @@ class FrontendEntrypointModuleTests(unittest.TestCase):
         scripts = SCRIPT_SRC_PATTERN.findall(html)
 
         required_scripts = [
+            "./modules/editor_common.js",
+            "./modules/variables.js",
+            "./modules/project_settings.js",
+            "./modules/system_dialog.js",
+            "./modules/ui_theme.js",
+            "./modules/preview_save.js",
+            "./modules/recent_workspace.js",
+            "./modules/editor_filters.js",
+            "./modules/script_voice.js",
+            "./modules/visual_effects.js",
+            "./modules/project_history.js",
             "./modules/asset_catalog.js",
+            "./modules/creative_assistant.js",
             "./modules/editor_mode.js",
             "./modules/release_version.js",
+            "./modules/release_control.js",
             "./app.js",
         ]
         for script in required_scripts:
