@@ -32,6 +32,7 @@ jobs:
             native_runtime/build_native_runtime_app.py \
             tools/release/check_editor_signing_readiness.py \
             tools/runtime/run_native_runtime_smoke.py \
+            tests/test_ci_workflow_coverage.py \
             tests/test_prepare_preview_release.py \
             tests/test_frontend_action_handlers.py \
             tests/test_frontend_asset_catalog_module.py \
@@ -44,10 +45,13 @@ jobs:
             tests/test_frontend_project_history_module.py \
             tests/test_frontend_project_settings_module.py \
             tests/test_frontend_recent_workspace_module.py \
+            tests/test_frontend_release_control_module.py \
             tests/test_frontend_release_version_module.py \
             tests/test_frontend_script_voice_module.py \
             tests/test_frontend_system_dialog_module.py \
             tests/test_frontend_ui_theme_module.py \
+            tests/test_frontend_variables_module.py \
+            tests/test_frontend_visual_effects_module.py \
             tests/test_run_editor_smoke.py \
             tests/test_native_runtime_render_smoke.py \
             tests/test_browser_playwright_smoke.py
@@ -63,15 +67,19 @@ jobs:
           node --check prototype_editor/modules/project_history.js
           node --check prototype_editor/modules/project_settings.js
           node --check prototype_editor/modules/recent_workspace.js
+          node --check prototype_editor/modules/release_control.js
           node --check prototype_editor/modules/release_version.js
           node --check prototype_editor/modules/script_voice.js
           node --check prototype_editor/modules/system_dialog.js
           node --check prototype_editor/modules/ui_theme.js
+          node --check prototype_editor/modules/variables.js
+          node --check prototype_editor/modules/visual_effects.js
           node --check prototype_editor/app.js
           node --check export_player_template/player.js
 
       - name: Release tooling tests
         run: |
+          python -m unittest discover -s tests -p 'test_ci_workflow_coverage.py' -v
           python -m unittest discover -s tests -p 'test_prepare_preview_release.py' -v
           python -m unittest discover -s tests -p 'test_frontend_action_handlers.py' -v
           python -m unittest discover -s tests -p 'test_frontend_asset_catalog_module.py' -v
@@ -84,10 +92,13 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_project_history_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_project_settings_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_recent_workspace_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_release_control_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_release_version_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_script_voice_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_system_dialog_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_ui_theme_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_variables_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_visual_effects_module.py' -v
 
       - name: Backend smoke tests
         run: |

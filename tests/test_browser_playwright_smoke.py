@@ -26,12 +26,31 @@ def find_free_port() -> int:
         return int(sock.getsockname()[1])
 
 
-def wait_for_server_ready(url: str, process: subprocess.Popen[str], timeout_seconds: float = 20.0) -> None:
+def read_server_log_tail(process: subprocess.Popen[str], log_path: Path | None = None, limit: int = 4000) -> str:
+    if log_path and log_path.exists():
+        try:
+            return log_path.read_text(encoding="utf-8", errors="replace")[-limit:]
+        except Exception:
+            return ""
+    if process.stdout:
+        try:
+            return process.stdout.read()[-limit:]
+        except Exception:
+            return ""
+    return ""
+
+
+def wait_for_server_ready(
+    url: str,
+    process: subprocess.Popen[str],
+    timeout_seconds: float = 20.0,
+    log_path: Path | None = None,
+) -> None:
     deadline = time.time() + timeout_seconds
     last_error = ""
     while time.time() < deadline:
         if process.poll() is not None:
-            output = process.stdout.read() if process.stdout else ""
+            output = read_server_log_tail(process, log_path)
             raise RuntimeError(f"测试服务提前退出。\n{output}")
         try:
             with urlopen(url, timeout=1.5) as response:
@@ -40,7 +59,8 @@ def wait_for_server_ready(url: str, process: subprocess.Popen[str], timeout_seco
         except Exception as error:  # pragma: no cover - readiness polling
             last_error = str(error)
             time.sleep(0.25)
-    raise RuntimeError(f"测试服务没有在规定时间内启动：{last_error}")
+    output = read_server_log_tail(process, log_path)
+    raise RuntimeError(f"测试服务没有在规定时间内启动：{last_error}\n{output}")
 
 
 def create_fake_runtime_archive(archive_path: Path, platform_key: str) -> Path:
@@ -171,15 +191,17 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
                 "TONY_NA_EDITOR_WINDOWS_CERT_SUBJECT": "Tony Na Engine Project",
             }
         )
+        cls.server_log_path = cls.repo_copy / ".tmp_browser_smoke_server.log"
+        cls.server_log_file = cls.server_log_path.open("w", encoding="utf-8")
         cls.server_process = subprocess.Popen(
             [sys.executable, str(cls.repo_copy / "run_editor.py"), "--port", str(cls.port), "--no-open"],
             cwd=cls.repo_copy,
             env=server_env,
-            stdout=subprocess.PIPE,
+            stdout=cls.server_log_file,
             stderr=subprocess.STDOUT,
             text=True,
         )
-        wait_for_server_ready(cls.editor_url, cls.server_process)
+        wait_for_server_ready(cls.editor_url, cls.server_process, log_path=cls.server_log_path)
 
         cls.playwright = sync_playwright().start()
         cls.browser = cls.playwright.chromium.launch(headless=True)
@@ -203,8 +225,7 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
             except Exception:
                 pass
         try:
-            if cls.server_process.stdout:
-                cls.server_process.stdout.close()
+            cls.server_log_file.close()
         except Exception:
             pass
         cls.temp_dir.cleanup()
@@ -217,8 +238,28 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
         self.context.close()
 
     def open_editor(self) -> None:
-        self.page.goto(self.editor_url, wait_until="domcontentloaded")
-        self.page.get_by_text("先选项目，再进入编辑器").wait_for(timeout=15000)
+        last_error: Exception | None = None
+        for attempt in range(3):
+            try:
+                wait_for_server_ready(
+                    self.editor_url,
+                    self.server_process,
+                    timeout_seconds=8.0,
+                    log_path=self.server_log_path,
+                )
+                self.page.goto(self.editor_url, wait_until="domcontentloaded", timeout=45000)
+                self.page.get_by_text("先选项目，再进入编辑器").wait_for(timeout=15000)
+                return
+            except Exception as error:
+                last_error = error
+                if attempt >= 2:
+                    break
+                try:
+                    self.page.goto("about:blank", wait_until="domcontentloaded", timeout=5000)
+                except Exception:
+                    pass
+                time.sleep(0.5)
+        raise RuntimeError(f"编辑器页面没有稳定打开：{last_error}") from last_error
 
     def create_blank_project(self, name: str) -> None:
         self.open_editor()
