@@ -21,6 +21,26 @@ class CiWorkflowCoverageTests(unittest.TestCase):
             workflow,
         )
 
+    def test_local_verify_tool_is_run_in_ci(self) -> None:
+        workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("tools/ci/local_verify.py", workflow)
+        self.assertIn("tests/test_local_verify_tool.py", workflow)
+        self.assertIn(
+            "python -m unittest discover -s tests -p 'test_local_verify_tool.py' -v",
+            workflow,
+        )
+
+    def test_github_status_tool_is_run_in_ci(self) -> None:
+        workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("tools/ci/github_status.py", workflow)
+        self.assertIn("tests/test_github_status_tool.py", workflow)
+        self.assertIn(
+            "python -m unittest discover -s tests -p 'test_github_status_tool.py' -v",
+            workflow,
+        )
+
     def test_editor_entrypoint_modules_are_syntax_checked_in_ci(self) -> None:
         workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
         html = EDITOR_INDEX_PATH.read_text(encoding="utf-8")

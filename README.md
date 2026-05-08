@@ -55,7 +55,7 @@ Tony Na Engine 当前更适合这样理解：
 - 高级粒子系统、项目级粒子预设库
 - Live2D / 3D 角色模型与 3D 场景资产导入，原生 Runtime 可输出 glTF 结构、材质贴图槽、动画通道、依赖、引用位置和转换建议清单
 - 网页试玩包、Windows 桌面包、编辑器桌面包、三系统编辑器套装
-- 自动化测试体系（后端 smoke + Playwright 浏览器烟测）
+- 自动化测试体系（本地 CI 预检 + 后端 smoke + Playwright 浏览器烟测）
 
 ## 功能状态
 
@@ -263,53 +263,64 @@ py -3 -m playwright install chromium
 
 ### 本地检查
 
-前端脚本与关键 Python 文件语法检查：
+推荐先跑本地 CI 预检。它会自动读取 `prototype_editor/index.html` 中加载的前端模块和 `tests/test_frontend*.py` 测试文件，避免 README、CI 和实际模块清单互相漂移。
 
 macOS / Linux：
 
 ```bash
 cd tony-na-engine
-node --check prototype_editor/modules/asset_catalog.js
-node --check prototype_editor/modules/editor_common.js
-node --check prototype_editor/modules/creative_assistant.js
-node --check prototype_editor/modules/editor_filters.js
-node --check prototype_editor/modules/editor_mode.js
-node --check prototype_editor/modules/preview_save.js
-node --check prototype_editor/modules/project_history.js
-node --check prototype_editor/modules/project_settings.js
-node --check prototype_editor/modules/recent_workspace.js
-node --check prototype_editor/modules/release_version.js
-node --check prototype_editor/modules/script_voice.js
-node --check prototype_editor/modules/system_dialog.js
-node --check prototype_editor/modules/ui_theme.js
-node --check prototype_editor/app.js
-node --check export_player_template/player.js
-python3 -m py_compile run_editor.py
+./verify_before_push.sh
 ```
 
 Windows：
 
 ```bat
 cd tony-na-engine
-node --check prototype_editor/modules/asset_catalog.js
-node --check prototype_editor/modules/editor_common.js
-node --check prototype_editor/modules/creative_assistant.js
-node --check prototype_editor/modules/editor_filters.js
-node --check prototype_editor/modules/editor_mode.js
-node --check prototype_editor/modules/preview_save.js
-node --check prototype_editor/modules/project_history.js
-node --check prototype_editor/modules/project_settings.js
-node --check prototype_editor/modules/recent_workspace.js
-node --check prototype_editor/modules/release_version.js
-node --check prototype_editor/modules/script_voice.js
-node --check prototype_editor/modules/system_dialog.js
-node --check prototype_editor/modules/ui_theme.js
-node --check prototype_editor/app.js
-node --check export_player_template/player.js
-py -3 -m py_compile run_editor.py
+verify_before_push.cmd
+```
+
+也可以直接指定预检档位：
+
+- `syntax`：只跑 Python / 前端脚本语法检查。
+- `quick`：语法检查 + 发布工具 + 前端模块单元测试。
+- `standard`：`quick` + 后端 smoke，适合日常提交前使用。
+- `full`：`standard` + 原生 Runtime 渲染 smoke + Playwright 浏览器长流程，适合重要发布前使用。
+- `browser`：只跑 Playwright 浏览器 smoke，适合排查 UI / 导出流程。
+
+示例：
+
+```bash
+python3 tools/ci/local_verify.py --profile quick
+python3 tools/ci/local_verify.py --profile full --json-report local-verify.json --markdown-report local-verify.md
+```
+
+### GitHub 检查状态
+
+如果 GitHub 页面上出现红叉、黄点或绿色勾，可以直接运行状态检查脚本。它会读取当前仓库远程地址和当前提交，显示 GitHub Actions 是否通过、仍在运行或失败。
+
+macOS / Linux：
+
+```bash
+cd tony-na-engine
+./check_github_ci_status.sh
+```
+
+Windows：
+
+```bat
+cd tony-na-engine
+check_github_ci_status.cmd
+```
+
+如果刚刚推送，想等待 GitHub Actions 跑完：
+
+```bash
+python3 tools/ci/github_status.py --watch
 ```
 
 ### 自动化测试
+
+如果只想单独跑某一类测试，也可以继续使用下面这些命令。
 
 后端 smoke：
 
@@ -350,21 +361,7 @@ macOS / Linux：
 ```bash
 cd tony-na-engine
 python3 -m unittest discover -s tests -p 'test_prepare_preview_release.py' -v
-python3 -m unittest discover -s tests -p 'test_frontend_action_handlers.py' -v
-python3 -m unittest discover -s tests -p 'test_frontend_asset_catalog_module.py' -v
-python3 -m unittest discover -s tests -p 'test_frontend_editor_common_module.py' -v
-python3 -m unittest discover -s tests -p 'test_frontend_creative_assistant_module.py' -v
-python3 -m unittest discover -s tests -p 'test_frontend_editor_filters_module.py' -v
-python3 -m unittest discover -s tests -p 'test_frontend_entrypoint_modules.py' -v
-python3 -m unittest discover -s tests -p 'test_frontend_editor_mode_module.py' -v
-python3 -m unittest discover -s tests -p 'test_frontend_preview_save_module.py' -v
-python3 -m unittest discover -s tests -p 'test_frontend_project_history_module.py' -v
-python3 -m unittest discover -s tests -p 'test_frontend_project_settings_module.py' -v
-python3 -m unittest discover -s tests -p 'test_frontend_recent_workspace_module.py' -v
-python3 -m unittest discover -s tests -p 'test_frontend_release_version_module.py' -v
-python3 -m unittest discover -s tests -p 'test_frontend_script_voice_module.py' -v
-python3 -m unittest discover -s tests -p 'test_frontend_system_dialog_module.py' -v
-python3 -m unittest discover -s tests -p 'test_frontend_ui_theme_module.py' -v
+python3 -m unittest discover -s tests -p 'test_frontend*.py' -v
 ```
 
 Windows：
@@ -372,21 +369,7 @@ Windows：
 ```bat
 cd tony-na-engine
 py -3 -m unittest discover -s tests -p "test_prepare_preview_release.py" -v
-py -3 -m unittest discover -s tests -p "test_frontend_action_handlers.py" -v
-py -3 -m unittest discover -s tests -p "test_frontend_asset_catalog_module.py" -v
-py -3 -m unittest discover -s tests -p "test_frontend_editor_common_module.py" -v
-py -3 -m unittest discover -s tests -p "test_frontend_creative_assistant_module.py" -v
-py -3 -m unittest discover -s tests -p "test_frontend_editor_filters_module.py" -v
-py -3 -m unittest discover -s tests -p "test_frontend_entrypoint_modules.py" -v
-py -3 -m unittest discover -s tests -p "test_frontend_editor_mode_module.py" -v
-py -3 -m unittest discover -s tests -p "test_frontend_preview_save_module.py" -v
-py -3 -m unittest discover -s tests -p "test_frontend_project_history_module.py" -v
-py -3 -m unittest discover -s tests -p "test_frontend_project_settings_module.py" -v
-py -3 -m unittest discover -s tests -p "test_frontend_recent_workspace_module.py" -v
-py -3 -m unittest discover -s tests -p "test_frontend_release_version_module.py" -v
-py -3 -m unittest discover -s tests -p "test_frontend_script_voice_module.py" -v
-py -3 -m unittest discover -s tests -p "test_frontend_system_dialog_module.py" -v
-py -3 -m unittest discover -s tests -p "test_frontend_ui_theme_module.py" -v
+py -3 -m unittest discover -s tests -p "test_frontend*.py" -v
 ```
 
 原生 Runtime 渲染 smoke（会在仓库内创建隔离虚拟环境并安装 `pygame-ce`）：
@@ -407,9 +390,9 @@ run_native_runtime_smoke.cmd
 
 或者直接运行对应系统脚本：
 
-- macOS：[`run_tests.command`](run_tests.command) / [`run_browser_tests.command`](run_browser_tests.command) / [`run_native_runtime_smoke.command`](run_native_runtime_smoke.command)
-- Windows：[`run_tests.cmd`](run_tests.cmd) / [`run_browser_tests.cmd`](run_browser_tests.cmd) / [`run_native_runtime_smoke.cmd`](run_native_runtime_smoke.cmd)
-- Linux：[`run_tests.sh`](run_tests.sh) / [`run_browser_tests.sh`](run_browser_tests.sh) / [`run_native_runtime_smoke.sh`](run_native_runtime_smoke.sh)
+- macOS：[`verify_before_push.command`](verify_before_push.command) / [`check_github_ci_status.command`](check_github_ci_status.command) / [`run_tests.command`](run_tests.command) / [`run_browser_tests.command`](run_browser_tests.command) / [`run_native_runtime_smoke.command`](run_native_runtime_smoke.command)
+- Windows：[`verify_before_push.cmd`](verify_before_push.cmd) / [`check_github_ci_status.cmd`](check_github_ci_status.cmd) / [`run_tests.cmd`](run_tests.cmd) / [`run_browser_tests.cmd`](run_browser_tests.cmd) / [`run_native_runtime_smoke.cmd`](run_native_runtime_smoke.cmd)
+- Linux：[`verify_before_push.sh`](verify_before_push.sh) / [`check_github_ci_status.sh`](check_github_ci_status.sh) / [`run_tests.sh`](run_tests.sh) / [`run_browser_tests.sh`](run_browser_tests.sh) / [`run_native_runtime_smoke.sh`](run_native_runtime_smoke.sh)
 
 ### GitHub Actions
 
@@ -418,6 +401,8 @@ run_native_runtime_smoke.cmd
 - Python 语法检查
 - 前端脚本语法检查
 - 发布工具与前端模块测试
+- 本地 CI 预检工具覆盖自检
+- GitHub Actions 状态检查工具自检
 - 后端 smoke 测试
 - 原生 Runtime 渲染 smoke 测试
 - Playwright 浏览器烟测
