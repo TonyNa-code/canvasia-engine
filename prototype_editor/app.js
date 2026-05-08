@@ -4044,7 +4044,7 @@ async function handleClick(event) {
     } catch (error) {
       setSaveStatus("刷新项目列表失败", true);
       showToast("刷新项目列表失败", "error");
-      window.alert(`刷新项目列表失败：${error.message}`);
+      showEngineAlert(`刷新项目列表失败：${error.message}`);
     }
     return;
   }
@@ -4098,7 +4098,7 @@ async function handleClick(event) {
     const snapshot = getHistorySnapshotByIndex(targetIndex);
 
     if (!snapshot) {
-      window.alert("没有找到你想恢复的那份版本。");
+      showEngineAlert("没有找到你想恢复的那份版本。");
       return;
     }
 
@@ -4123,7 +4123,7 @@ async function handleClick(event) {
     const targetIndex = Number(actionTarget.dataset.historyIndex);
     const snapshot = getHistorySnapshotByIndex(targetIndex);
     if (!snapshot) {
-      window.alert("没有找到要改备注的那份版本。");
+      showEngineAlert("没有找到要改备注的那份版本。");
       return;
     }
     await renameProjectHistorySnapshot(snapshot);
@@ -4149,7 +4149,7 @@ async function handleClick(event) {
       showToast(`空白项目已创建：${name}`);
     } catch (error) {
       if (!handleProjectLoadFailure(error, "创建项目失败")) {
-        window.alert(`新建空白项目失败：${error.message}`);
+        showEngineAlert(`新建空白项目失败：${error.message}`);
       }
     }
     return;
@@ -4203,7 +4203,7 @@ async function handleClick(event) {
       showToast(`已打开项目：${result.project?.title ?? "未命名项目"}`);
     } catch (error) {
       if (!handleProjectLoadFailure(error, "打开项目失败")) {
-        window.alert(`打开项目失败：${error.message}`);
+        showEngineAlert(`打开项目失败：${error.message}`);
       }
     }
     return;
@@ -4243,7 +4243,7 @@ async function handleClick(event) {
     } catch (error) {
       setSaveStatus("修改项目名失败", true);
       showToast("修改项目名失败", "error");
-      window.alert(`修改项目名失败：${error.message}`);
+      showEngineAlert(`修改项目名失败：${error.message}`);
     }
     return;
   }
@@ -4274,7 +4274,7 @@ async function handleClick(event) {
       showToast(`复制完成：${nextName}`);
     } catch (error) {
       if (!handleProjectLoadFailure(error, "复制项目失败")) {
-        window.alert(`复制项目失败：${error.message}`);
+        showEngineAlert(`复制项目失败：${error.message}`);
       }
     }
     return;
@@ -4311,7 +4311,7 @@ async function handleClick(event) {
     } catch (error) {
       setSaveStatus("删除项目失败", true);
       showToast("删除项目失败", "error");
-      window.alert(`删除项目失败：${error.message}`);
+      showEngineAlert(`删除项目失败：${error.message}`);
     }
     return;
   }
@@ -4334,6 +4334,7 @@ async function handleClick(event) {
   }
 
   if (!state.data) {
+    handleMissingProjectAction(actionTarget);
     return;
   }
 
@@ -5821,6 +5822,8 @@ async function handleClick(event) {
     resetPreviewDebugDraftToDefaults();
     return;
   }
+
+  handleUnhandledEditorAction(action, actionTarget);
 }
 
 function handleChange(event) {
@@ -8296,7 +8299,7 @@ async function createVoicePlaceholderForLine(sceneId, blockId = null) {
   } catch (error) {
     setSaveStatus("生成语音条目失败", true);
     showToast("生成语音条目失败", "error");
-    window.alert(`生成语音条目没有成功：${error.message}`);
+    showEngineAlert(`生成语音条目没有成功：${error.message}`);
   }
 }
 
@@ -8350,7 +8353,7 @@ async function createVoicePlaceholdersForEntries(entries, options = {}) {
   } catch (error) {
     setSaveStatus("批量生成语音条目失败", true);
     showToast("批量生成语音条目失败", "error");
-    window.alert(`批量生成语音条目没有成功：${error.message}`);
+    showEngineAlert(`批量生成语音条目没有成功：${error.message}`);
   }
 }
 
@@ -8688,12 +8691,12 @@ async function matchVoiceFilesToPlaceholders(files) {
 
     const alertMessage = buildVoiceFileMatchAlertMessage(result);
     if (alertMessage && warningCount > 0) {
-      window.alert(alertMessage);
+      showEngineAlert(alertMessage);
     }
   } catch (error) {
     setSaveStatus("批量匹配语音文件失败", true);
     showToast("批量匹配语音文件失败", "error");
-    window.alert(`批量匹配语音文件没有成功：${error.message}`);
+    showEngineAlert(`批量匹配语音文件没有成功：${error.message}`);
   }
 }
 
@@ -8757,7 +8760,7 @@ async function bindVoiceMatchReviewFile(reviewKind, reviewIndex) {
   } catch (error) {
     setSaveStatus("手动绑定语音文件失败", true);
     showToast("手动绑定语音文件失败", "error");
-    window.alert(`手动绑定语音文件没有成功：${error.message}`);
+    showEngineAlert(`手动绑定语音文件没有成功：${error.message}`);
   }
 }
 
@@ -9316,6 +9319,33 @@ function showEngineConfirm(options = {}) {
 
 async function showEnginePrompt(options = {}) {
   return systemDialogController?.showPrompt?.(options) ?? null;
+}
+
+function getActionTargetLabel(actionTarget) {
+  return String(actionTarget?.textContent ?? "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 36);
+}
+
+function handleMissingProjectAction(actionTarget) {
+  const label = getActionTargetLabel(actionTarget);
+  const suffix = label ? `：${label}` : "";
+  setSaveStatus(`先打开一个项目，再使用这个按钮${suffix}`, true);
+  showToast("先新建或打开一个项目", "error");
+}
+
+function handleUnhandledEditorAction(action, actionTarget) {
+  const safeAction = String(action || "unknown");
+  const label = getActionTargetLabel(actionTarget);
+  const labelSuffix = label ? `（${label}）` : "";
+  setSaveStatus(`按钮暂未接线：${safeAction}${labelSuffix}`, true);
+  showToast("这个按钮暂时还没有接上功能", "error");
+  console.warn("[Tony Na Engine] Unhandled editor action", {
+    action: safeAction,
+    label,
+    dataset: { ...(actionTarget?.dataset ?? {}) },
+  });
 }
 
 function closeActiveEngineDialog(result = false) {
@@ -22785,7 +22815,7 @@ async function saveSelectedAssetMetadata() {
   const tags = parseAssetTagsInput(tagsInput?.value ?? "");
 
   if (!name) {
-    window.alert("素材名称不能为空。");
+    showEngineAlert("素材名称不能为空。");
     setSaveStatus("素材名称不能为空", true);
     return;
   }
@@ -22812,7 +22842,7 @@ async function saveSelectedAssetMetadata() {
   } catch (error) {
     setSaveStatus("保存素材信息失败", true);
     showToast("保存素材信息失败", "error");
-    window.alert(`保存素材信息没有成功：${error.message}`);
+    showEngineAlert(`保存素材信息没有成功：${error.message}`);
   }
 }
 
@@ -22839,7 +22869,7 @@ async function toggleAssetFavorite(assetId) {
   } catch (error) {
     setSaveStatus("切换收藏失败", true);
     showToast("切换收藏失败", "error");
-    window.alert(`切换收藏状态没有成功：${error.message}`);
+    showEngineAlert(`切换收藏状态没有成功：${error.message}`);
   }
 }
 
@@ -22891,7 +22921,7 @@ async function saveCharacterPresentation(characterId) {
   } catch (error) {
     setSaveStatus("保存角色表现失败", true);
     showToast("保存角色表现失败", "error");
-    window.alert(`保存角色表现没有成功：${error.message}`);
+    showEngineAlert(`保存角色表现没有成功：${error.message}`);
   }
 }
 
@@ -22909,7 +22939,7 @@ async function applyBulkAssetTags(mode) {
 
   const tags = operation?.tags ?? parseAssetTagsInput(refs.assetBulkTagsInput?.value ?? "");
   if (!tags.length) {
-    window.alert("先输入至少一个标签，再批量处理。");
+    showEngineAlert("先输入至少一个标签，再批量处理。");
     setSaveStatus("先输入至少一个标签", true);
     return;
   }
@@ -22950,7 +22980,7 @@ async function applyBulkAssetTags(mode) {
   } catch (error) {
     setSaveStatus("批量改标签失败", true);
     showToast("批量改标签失败", "error");
-    window.alert(`批量改标签没有成功：${error.message}`);
+    showEngineAlert(`批量改标签没有成功：${error.message}`);
   }
 }
 
@@ -22993,7 +23023,7 @@ async function applyPresetTag(tag) {
   } catch (error) {
     setSaveStatus("添加预设标签失败", true);
     showToast("添加预设标签失败", "error");
-    window.alert(`添加预设标签没有成功：${error.message}`);
+    showEngineAlert(`添加预设标签没有成功：${error.message}`);
   }
 }
 
@@ -32466,7 +32496,7 @@ async function copyCreativeAssistantHistoryBlocks(recordId) {
   if (copied) {
     showToast("历史剧情卡片已复制");
   } else {
-    window.alert(content);
+    showEngineAlert(content);
   }
 }
 
@@ -32500,7 +32530,7 @@ async function copyCreativeAssistantHistoryRecordMarkdown(recordId) {
   if (copied) {
     showToast("单条灵感 Markdown 已复制");
   } else {
-    window.alert(content);
+    showEngineAlert(content);
   }
 }
 
@@ -32544,7 +32574,7 @@ async function copyCreativeAssistantHistoryMarkdown() {
   if (copied) {
     showToast("灵感盒 Markdown 档案已复制");
   } else {
-    window.alert(content);
+    showEngineAlert(content);
   }
 }
 
@@ -33394,7 +33424,7 @@ async function copyCreativeAssistantSummary() {
   if (copied) {
     showToast("助手建议已复制");
   } else {
-    window.alert(lines.join("\n"));
+    showEngineAlert(lines.join("\n"));
   }
 }
 
@@ -33409,7 +33439,7 @@ async function copyCreativeAssistantBlocks() {
   if (copied) {
     showToast("剧情卡片已复制");
   } else {
-    window.alert(content);
+    showEngineAlert(content);
   }
 }
 
@@ -33578,7 +33608,7 @@ async function applyStoryTemplate(templateId) {
   const preset = getStoryTemplatePreset(templateId);
 
   if (!scene || !preset) {
-    window.alert("先选中一个场景，再插入剧情模板。");
+    showEngineAlert("先选中一个场景，再插入剧情模板。");
     return;
   }
 
@@ -33755,7 +33785,7 @@ async function createScene() {
   const chapter = getSelectedChapter();
 
   if (!chapter) {
-    window.alert("现在还没有可用章节。先点“新建章节”，再继续建场景。");
+    showEngineAlert("现在还没有可用章节。先点“新建章节”，再继续建场景。");
     return;
   }
 
@@ -33787,7 +33817,7 @@ async function createScene() {
     setSaveStatus(`已新建场景：${sceneName}`);
   } catch (error) {
     setSaveStatus("新建场景失败", true);
-    window.alert(`新建场景没有成功：${error.message}`);
+    showEngineAlert(`新建场景没有成功：${error.message}`);
   }
 }
 
@@ -33795,7 +33825,7 @@ async function duplicateScene() {
   const scene = getSelectedScene();
 
   if (!scene) {
-    window.alert("先选中一个场景，再复制它。");
+    showEngineAlert("先选中一个场景，再复制它。");
     return;
   }
 
@@ -33825,7 +33855,7 @@ async function duplicateScene() {
     setSaveStatus(`已复制场景：${nextName}`);
   } catch (error) {
     setSaveStatus("复制场景失败", true);
-    window.alert(`复制场景没有成功：${error.message}`);
+    showEngineAlert(`复制场景没有成功：${error.message}`);
   }
 }
 
@@ -33872,7 +33902,7 @@ async function createChapter(options = {}) {
     showToast(options.successMessage ?? `已新建章节：${chapterName}`);
   } catch (error) {
     setSaveStatus("新建章节失败", true);
-    window.alert(`新建章节没有成功：${error.message}`);
+    showEngineAlert(`新建章节没有成功：${error.message}`);
   }
 }
 
@@ -33929,7 +33959,7 @@ async function createStarterKit(options = {}) {
   } catch (error) {
     setSaveStatus("生成起步骨架失败", true);
     showToast("生成起步骨架失败", "error");
-    window.alert(`生成起步骨架没有成功：${error.message}`);
+    showEngineAlert(`生成起步骨架没有成功：${error.message}`);
   }
 }
 
@@ -33971,7 +34001,7 @@ async function createHistoryCheckpoint() {
 
     setSaveStatus("保存检查点失败", true);
     showToast("保存检查点失败", "error");
-    window.alert(`保存检查点没有成功：${error.message}`);
+    showEngineAlert(`保存检查点没有成功：${error.message}`);
   }
 }
 
@@ -34030,7 +34060,7 @@ async function renameProjectHistorySnapshot(snapshot) {
   } catch (error) {
     setSaveStatus("更新检查点备注失败", true);
     showToast("更新检查点备注失败", "error");
-    window.alert(`更新检查点备注没有成功：${error.message}`);
+    showEngineAlert(`更新检查点备注没有成功：${error.message}`);
   }
 }
 
@@ -34051,7 +34081,7 @@ async function acknowledgeProjectRecoveryNotice() {
   } catch (error) {
     setSaveStatus("收起提醒失败", true);
     showToast("收起提醒失败", "error");
-    window.alert(`收起提醒没有成功：${error.message}`);
+    showEngineAlert(`收起提醒没有成功：${error.message}`);
   }
 }
 
@@ -34127,7 +34157,7 @@ async function applyProjectHistoryAction(mode = "undo", options = {}) {
 
     setSaveStatus(`${actionLabel}失败`, true);
     showToast(`${actionLabel}失败`, "error");
-    window.alert(`${actionLabel}没有成功：${error.message}`);
+    showEngineAlert(`${actionLabel}没有成功：${error.message}`);
   }
 }
 
@@ -34135,7 +34165,7 @@ async function duplicateChapter() {
   const chapter = getSelectedChapter();
 
   if (!chapter) {
-    window.alert("先选中这个章节里的任意场景，再复制整章。");
+    showEngineAlert("先选中这个章节里的任意场景，再复制整章。");
     return;
   }
 
@@ -34164,7 +34194,7 @@ async function duplicateChapter() {
     setSaveStatus(`已复制章节：${nextName}`);
   } catch (error) {
     setSaveStatus("复制章节失败", true);
-    window.alert(`复制章节没有成功：${error.message}`);
+    showEngineAlert(`复制章节没有成功：${error.message}`);
   }
 }
 
@@ -34172,7 +34202,7 @@ async function moveScene(direction) {
   const { scene, chapter, sceneOrder, index } = getSelectedSceneOrderInfo();
 
   if (!scene || !chapter) {
-    window.alert("先选中一个场景，再调整它的位置。");
+    showEngineAlert("先选中一个场景，再调整它的位置。");
     return;
   }
 
@@ -34201,7 +34231,7 @@ async function moveScene(direction) {
     setSaveStatus(direction < 0 ? "场景已上移一位" : "场景已下移一位");
   } catch (error) {
     setSaveStatus("调整场景顺序失败", true);
-    window.alert(`调整场景顺序没有成功：${error.message}`);
+    showEngineAlert(`调整场景顺序没有成功：${error.message}`);
   }
 }
 
@@ -34209,7 +34239,7 @@ async function renameScene() {
   const scene = getSelectedScene();
 
   if (!scene) {
-    window.alert("先从左边选中一个场景，再修改它的名字。");
+    showEngineAlert("先从左边选中一个场景，再修改它的名字。");
     return;
   }
 
@@ -34237,7 +34267,7 @@ async function renameScene() {
     setSaveStatus(`场景已改名：${nextName}`);
   } catch (error) {
     setSaveStatus("修改场景名失败", true);
-    window.alert(`修改场景名没有成功：${error.message}`);
+    showEngineAlert(`修改场景名没有成功：${error.message}`);
   }
 }
 
@@ -34245,7 +34275,7 @@ async function renameChapter() {
   const chapter = getSelectedChapter();
 
   if (!chapter) {
-    window.alert("现在还没有可用章节。");
+    showEngineAlert("现在还没有可用章节。");
     return;
   }
 
@@ -34272,7 +34302,7 @@ async function renameChapter() {
     setSaveStatus(`章节已改名：${nextName}`);
   } catch (error) {
     setSaveStatus("修改章节名失败", true);
-    window.alert(`修改章节名没有成功：${error.message}`);
+    showEngineAlert(`修改章节名没有成功：${error.message}`);
   }
 }
 
@@ -34280,7 +34310,7 @@ async function moveChapter(direction) {
   const { chapter, chapterOrder, index } = getSelectedChapterOrderInfo();
 
   if (!chapter) {
-    window.alert("先选中一个章节里的场景，再调整章节顺序。");
+    showEngineAlert("先选中一个章节里的场景，再调整章节顺序。");
     return;
   }
 
@@ -34308,7 +34338,7 @@ async function moveChapter(direction) {
     setSaveStatus(direction < 0 ? "章节已上移一位" : "章节已下移一位");
   } catch (error) {
     setSaveStatus("调整章节顺序失败", true);
-    window.alert(`调整章节顺序没有成功：${error.message}`);
+    showEngineAlert(`调整章节顺序没有成功：${error.message}`);
   }
 }
 
@@ -34316,7 +34346,7 @@ async function deleteScene() {
   const scene = getSelectedScene();
 
   if (!scene) {
-    window.alert("先选中一个场景，才能删除它。");
+    showEngineAlert("先选中一个场景，才能删除它。");
     return;
   }
 
@@ -34351,7 +34381,7 @@ async function deleteScene() {
     setSaveStatus(`已删除场景：${scene.name}`);
   } catch (error) {
     setSaveStatus("删除场景失败", true);
-    window.alert(`删除场景没有成功：${error.message}`);
+    showEngineAlert(`删除场景没有成功：${error.message}`);
   }
 }
 
@@ -34359,7 +34389,7 @@ async function deleteChapter() {
   const { chapter } = getSelectedChapterOrderInfo();
 
   if (!chapter) {
-    window.alert("现在还没有可删除的章节。");
+    showEngineAlert("现在还没有可删除的章节。");
     return;
   }
 
@@ -34393,7 +34423,7 @@ async function deleteChapter() {
     setSaveStatus(`已删除章节：${chapter.name}`);
   } catch (error) {
     setSaveStatus("删除章节失败", true);
-    window.alert(`删除章节没有成功：${error.message}`);
+    showEngineAlert(`删除章节没有成功：${error.message}`);
   }
 }
 
@@ -34522,7 +34552,7 @@ async function saveProjectResolution(widthValue, heightValue) {
   } catch (error) {
     setSaveStatus("切换分辨率失败", true);
     showToast("切换分辨率失败", "error");
-    window.alert(`切换分辨率没有成功：${error.message}`);
+    showEngineAlert(`切换分辨率没有成功：${error.message}`);
   }
 }
 
@@ -34564,7 +34594,7 @@ async function saveProjectEditorMode(mode) {
   } catch (error) {
     setSaveStatus("切换编辑模式失败", true);
     showToast("切换编辑模式失败", "error");
-    window.alert(`切换编辑模式没有成功：${error.message}`);
+    showEngineAlert(`切换编辑模式没有成功：${error.message}`);
   }
 }
 
@@ -34596,7 +34626,7 @@ async function saveProjectReleaseVersion() {
   } catch (error) {
     setSaveStatus("保存发布版本失败", true);
     showToast("保存发布版本失败", "error");
-    window.alert(`保存发布版本没有成功：${error.message}`);
+    showEngineAlert(`保存发布版本没有成功：${error.message}`);
   }
 }
 
@@ -36273,7 +36303,7 @@ async function saveProjectFormalSaveSlotCount() {
   } catch (error) {
     setSaveStatus("保存正式存档位失败", true);
     showToast("保存正式存档位失败", "error");
-    window.alert(`保存正式存档位没有成功：${error.message}`);
+    showEngineAlert(`保存正式存档位没有成功：${error.message}`);
   }
 }
 
@@ -36437,7 +36467,7 @@ async function addProjectVariable(type = "number") {
   } catch (error) {
     setSaveStatus("新增变量失败", true);
     showToast("新增变量失败", "error");
-    window.alert(`新增变量没有成功：${error.message}`);
+    showEngineAlert(`新增变量没有成功：${error.message}`);
   }
 }
 
@@ -36512,7 +36542,7 @@ async function saveProjectVariable(variableId) {
   } catch (error) {
     setSaveStatus("保存变量失败", true);
     showToast("保存变量失败", "error");
-    window.alert(`保存变量没有成功：${error.message}`);
+    showEngineAlert(`保存变量没有成功：${error.message}`);
   }
 }
 
@@ -36567,7 +36597,7 @@ async function duplicateProjectVariable(variableId) {
   } catch (error) {
     setSaveStatus("复制变量失败", true);
     showToast("复制变量失败", "error");
-    window.alert(`复制变量没有成功：${error.message}`);
+    showEngineAlert(`复制变量没有成功：${error.message}`);
   }
 }
 
@@ -36606,7 +36636,7 @@ async function deleteProjectVariable(variableId) {
   } catch (error) {
     setSaveStatus("删除变量失败", true);
     showToast("删除变量失败", "error");
-    window.alert(`删除变量没有成功：${error.message}`);
+    showEngineAlert(`删除变量没有成功：${error.message}`);
   }
 }
 
@@ -36654,7 +36684,7 @@ async function deleteUnusedProjectVariables() {
   } catch (error) {
     setSaveStatus("清理未引用变量失败", true);
     showToast("清理未引用变量失败", "error");
-    window.alert(`清理未引用变量没有成功：${error.message}`);
+    showEngineAlert(`清理未引用变量没有成功：${error.message}`);
   }
 }
 
@@ -36718,7 +36748,7 @@ async function repairProjectVariableRanges() {
   } catch (error) {
     setSaveStatus("整理变量范围失败", true);
     showToast("整理变量范围失败", "error");
-    window.alert(`整理变量范围没有成功：${error.message}`);
+    showEngineAlert(`整理变量范围没有成功：${error.message}`);
   }
 }
 
@@ -36738,7 +36768,7 @@ async function saveProjectDialogBoxConfig() {
   } catch (error) {
     setSaveStatus("保存文本框样式失败", true);
     showToast("保存文本框样式失败", "error");
-    window.alert(`保存文本框样式没有成功：${error.message}`);
+    showEngineAlert(`保存文本框样式没有成功：${error.message}`);
   }
 }
 
@@ -36756,7 +36786,7 @@ async function saveProjectGameUiConfig() {
   } catch (error) {
     setSaveStatus("保存成品 UI 皮肤失败", true);
     showToast("保存成品 UI 皮肤失败", "error");
-    window.alert(`保存成品 UI 皮肤没有成功：${error.message}`);
+    showEngineAlert(`保存成品 UI 皮肤没有成功：${error.message}`);
   }
 }
 
@@ -36915,7 +36945,7 @@ async function importAssets(files, options = {}) {
   } catch (error) {
     setSaveStatus("导入素材失败", true);
     showToast("导入素材失败", "error");
-    window.alert(`导入素材没有成功：${error.message}`);
+    showEngineAlert(`导入素材没有成功：${error.message}`);
   }
 }
 
@@ -36950,7 +36980,7 @@ async function replaceSelectedAssetFile(file) {
   } catch (error) {
     setSaveStatus("替换素材失败", true);
     showToast("替换素材失败", "error");
-    window.alert(`替换素材没有成功：${error.message}`);
+    showEngineAlert(`替换素材没有成功：${error.message}`);
   }
 }
 
@@ -37010,7 +37040,7 @@ async function deleteSelectedAsset() {
   } catch (error) {
     setSaveStatus("删除素材失败", true);
     showToast("删除素材失败", "error");
-    window.alert(`删除素材没有成功：${error.message}`);
+    showEngineAlert(`删除素材没有成功：${error.message}`);
   }
 }
 
@@ -37106,7 +37136,7 @@ async function deleteSelectedUnusedAssets() {
   } catch (error) {
     setSaveStatus("批量删除素材失败", true);
     showToast("批量删除素材失败", "error");
-    window.alert(`批量删除素材没有成功：${error.message}`);
+    showEngineAlert(`批量删除素材没有成功：${error.message}`);
   }
 }
 
@@ -37192,7 +37222,7 @@ async function exportBuild(target = "web") {
   } catch (error) {
     setSaveStatus(`导出${targetLabel}失败`, true);
     showToast(`导出${targetLabel}失败`, "error");
-    window.alert(`导出${targetLabel}没有成功：${error.message}`);
+    showEngineAlert(`导出${targetLabel}没有成功：${error.message}`);
   }
 }
 
@@ -38281,7 +38311,7 @@ async function persistScene(updatedScene, options = {}) {
       return false;
     }
 
-    window.alert(`保存没有成功：${error.message}`);
+    showEngineAlert(`保存没有成功：${error.message}`);
     return false;
   }
 }
@@ -38931,7 +38961,7 @@ async function saveParticleCustomPreset() {
   } catch (error) {
     setSaveStatus("保存粒子预设失败", true);
     showToast("保存粒子预设失败", "error");
-    window.alert(`保存粒子预设没有成功：${error.message}`);
+    showEngineAlert(`保存粒子预设没有成功：${error.message}`);
   }
 }
 
@@ -39079,7 +39109,7 @@ async function importParticleCustomPresetPack(file) {
   } catch (error) {
     setSaveStatus("导入粒子预设失败", true);
     showToast("导入粒子预设失败", "error");
-    window.alert(`导入粒子预设没有成功：${error.message}`);
+    showEngineAlert(`导入粒子预设没有成功：${error.message}`);
   }
 }
 
@@ -39131,7 +39161,7 @@ async function deleteParticleCustomPreset() {
   } catch (error) {
     setSaveStatus("删除粒子预设失败", true);
     showToast("删除粒子预设失败", "error");
-    window.alert(`删除粒子预设没有成功：${error.message}`);
+    showEngineAlert(`删除粒子预设没有成功：${error.message}`);
   }
 }
 
@@ -40846,7 +40876,7 @@ async function ensureStarterVariables(options = {}) {
     } catch (error) {
       setSaveStatus("创建基础变量库失败", true);
       showToast("创建基础变量库失败", "error");
-      window.alert(`创建基础变量库没有成功：${error.message}`);
+      showEngineAlert(`创建基础变量库没有成功：${error.message}`);
       return false;
     } finally {
       state.starterVariablesPromise = null;

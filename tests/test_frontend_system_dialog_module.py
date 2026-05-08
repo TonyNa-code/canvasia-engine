@@ -9,6 +9,7 @@ from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "system_dialog.js"
+APP_PATH = ROOT_DIR / "prototype_editor" / "app.js"
 
 
 class FrontendSystemDialogModuleTests(unittest.TestCase):
@@ -38,6 +39,7 @@ class FrontendSystemDialogModuleTests(unittest.TestCase):
               keys: Object.keys(tools).sort(),
               normalized,
               failure: tools.inferSystemAlertOptions("导出失败：missing bg.png"),
+              softFailure: tools.inferSystemAlertOptions("保存没有成功：网络异常"),
               warning: tools.inferSystemAlertOptions("先选中一个场景"),
               info: tools.inferSystemAlertOptions("保存完成"),
               marks: [
@@ -72,11 +74,20 @@ class FrontendSystemDialogModuleTests(unittest.TestCase):
         self.assertEqual(payload["failure"]["title"], "操作失败")
         self.assertEqual(payload["failure"]["tone"], "danger")
         self.assertTrue(payload["failure"]["copyable"])
+        self.assertEqual(payload["softFailure"]["title"], "操作失败")
+        self.assertEqual(payload["softFailure"]["tone"], "danger")
         self.assertEqual(payload["warning"]["title"], "需要处理")
         self.assertEqual(payload["warning"]["tone"], "warning")
         self.assertEqual(payload["info"]["title"], "提示")
         self.assertEqual(payload["info"]["tone"], "info")
         self.assertEqual(payload["marks"], ["!", "?", "✓", "i"])
+
+    def test_app_uses_engine_alert_wrapper_for_user_messages(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("function showEngineAlert", source)
+        self.assertNotIn("window.alert(", source)
+        self.assertGreaterEqual(source.count("showEngineAlert("), 60)
 
 
 if __name__ == "__main__":

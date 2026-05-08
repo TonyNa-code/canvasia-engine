@@ -70,6 +70,105 @@ def detect_sha(revision: str = "HEAD") -> str:
     return run_git(["rev-parse", revision])
 
 
+def parse_porcelain_status(status_text: str) -> dict[str, int]:
+    counts = {"staged": 0, "unstaged": 0, "untracked": 0, "total": 0}
+    for line in str(status_text or "").splitlines():
+        if not line:
+            continue
+        if line.startswith("??"):
+            counts["untracked"] += 1
+            counts["total"] += 1
+            continue
+        index_status = line[0] if len(line) > 0 else " "
+        worktree_status = line[1] if len(line) > 1 else " "
+        if index_status != " ":
+            counts["staged"] += 1
+        if worktree_status != " ":
+            counts["unstaged"] += 1
+        if index_status != " " or worktree_status != " ":
+            counts["total"] += 1
+    return counts
+
+
+def classify_git_sync(git_snapshot: dict[str, Any]) -> str:
+    if not git_snapshot.get("hasRemoteBranch"):
+        return "no_remote"
+    dirty = git_snapshot.get("dirty") or {}
+    if dirty.get("total", 0) > 0:
+        return "dirty"
+    ahead = int(git_snapshot.get("ahead") or 0)
+    behind = int(git_snapshot.get("behind") or 0)
+    if ahead > 0 and behind > 0:
+        return "diverged"
+    if ahead > 0:
+        return "ahead"
+    if behind > 0:
+        return "behind"
+    return "synced"
+
+
+def get_git_sync_label(status: str) -> str:
+    return {
+        "synced": "已同步",
+        "dirty": "有未提交改动",
+        "ahead": "有未推送提交",
+        "behind": "落后远端",
+        "diverged": "本地和远端已分叉",
+        "no_remote": "未找到远端分支",
+    }.get(status, status)
+
+
+def refresh_remote_tracking_branch(remote_branch: str = "origin/main") -> bool:
+    remote, separator, branch = str(remote_branch or "").partition("/")
+    if not remote or not separator or not branch:
+        return False
+    try:
+        run_git(["fetch", "--quiet", remote, f"+{branch}:refs/remotes/{remote}/{branch}"])
+    except RuntimeError:
+        return False
+    return True
+
+
+def get_git_snapshot(remote_branch: str = "origin/main", fetch_remote: bool = False) -> dict[str, Any]:
+    remote_refreshed = refresh_remote_tracking_branch(remote_branch) if fetch_remote else False
+    status_text = run_git(["status", "--porcelain"])
+    dirty = parse_porcelain_status(status_text)
+    branch = run_git(["branch", "--show-current"]) or "(detached)"
+    local_sha = detect_sha()
+    has_remote_branch = True
+    remote_sha = ""
+    ahead = 0
+    behind = 0
+
+    try:
+        remote_sha = detect_sha(remote_branch)
+        ahead_behind = run_git(["rev-list", "--left-right", "--count", f"HEAD...{remote_branch}"])
+        ahead_text, behind_text = ahead_behind.split()
+        ahead = int(ahead_text)
+        behind = int(behind_text)
+    except (RuntimeError, ValueError):
+        has_remote_branch = False
+
+    snapshot: dict[str, Any] = {
+        "branch": branch,
+        "remoteBranch": remote_branch,
+        "remoteRefreshRequested": bool(fetch_remote),
+        "remoteRefreshed": remote_refreshed,
+        "localSha": local_sha,
+        "localShortSha": local_sha[:7],
+        "remoteSha": remote_sha,
+        "remoteShortSha": remote_sha[:7] if remote_sha else "",
+        "hasRemoteBranch": has_remote_branch,
+        "ahead": ahead,
+        "behind": behind,
+        "dirty": dirty,
+    }
+    sync_status = classify_git_sync(snapshot)
+    snapshot["syncStatus"] = sync_status
+    snapshot["syncLabel"] = get_git_sync_label(sync_status)
+    return snapshot
+
+
 def build_headers(token: str = "") -> dict[str, str]:
     headers = {
         "Accept": "application/vnd.github+json",
@@ -149,6 +248,7 @@ def build_status_payload(
     sha: str,
     check_runs: Sequence[dict[str, Any]],
     annotations_by_run: dict[str, list[dict[str, Any]]] | None = None,
+    git_snapshot: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     normalized_runs = [normalize_check_run(run) for run in check_runs]
     status = classify_check_runs(check_runs)
@@ -161,6 +261,7 @@ def build_status_payload(
         "totalCount": len(normalized_runs),
         "runs": normalized_runs,
         "annotations": annotations_by_run or {},
+        "git": git_snapshot or {},
     }
 
 
@@ -187,6 +288,29 @@ def format_status_text(payload: dict[str, Any]) -> str:
         f"提交：{payload['shortSha']}",
         f"检查数量：{payload['totalCount']}",
     ]
+    git = payload.get("git") or {}
+    if git:
+        dirty = git.get("dirty") or {}
+        dirty_total = int(dirty.get("total") or 0)
+        lines.extend(
+            [
+                f"本地同步：{git.get('syncLabel', '')}",
+                f"本地分支：{git.get('branch', '')} @ {git.get('localShortSha', '')}",
+                f"远端分支：{git.get('remoteBranch', '')}"
+                + (f" @ {git.get('remoteShortSha', '')}" if git.get("remoteShortSha") else ""),
+                *(
+                    [
+                        "远端刷新："
+                        + ("已刷新" if git.get("remoteRefreshed") else "刷新失败，使用本地缓存")
+                    ]
+                    if git.get("remoteRefreshRequested")
+                    else []
+                ),
+                f"未提交文件：{dirty_total}",
+                f"未推送提交：{git.get('ahead', 0)}",
+                f"落后远端提交：{git.get('behind', 0)}",
+            ]
+        )
     if not payload["runs"]:
         lines.append("还没有查到 GitHub Actions 检查。可能是刚推送，或者这个提交没有触发 workflow。")
     for run in payload["runs"]:
@@ -213,16 +337,26 @@ def write_json_report(path: Path, payload: dict[str, Any]) -> None:
 
 
 def write_markdown_report(path: Path, payload: dict[str, Any]) -> None:
+    git = payload.get("git") or {}
     lines = [
         "# Tony Na Engine GitHub CI Status",
         "",
         f"- Repository: `{payload['repo']}`",
         f"- Commit: `{payload['shortSha']}`",
         f"- Status: `{payload['status']}`",
-        "",
-        "| Check | Status | Conclusion | Link |",
-        "| --- | --- | --- | --- |",
     ]
+    if git:
+        dirty = git.get("dirty") or {}
+        lines.extend(
+            [
+                f"- Git sync: `{git.get('syncStatus', '')}`",
+                f"- Git branch: `{git.get('branch', '')}` -> `{git.get('remoteBranch', '')}`",
+                f"- Remote refresh: `{'updated' if git.get('remoteRefreshed') else 'not requested' if not git.get('remoteRefreshRequested') else 'failed'}`",
+                f"- Local changes: `{dirty.get('total', 0)}`",
+                f"- Ahead / behind: `{git.get('ahead', 0)} / {git.get('behind', 0)}`",
+            ]
+        )
+    lines.extend(["", "| Check | Status | Conclusion | Link |", "| --- | --- | --- | --- |"])
     for run in payload["runs"]:
         link = f"[open]({run['detailsUrl']})" if run["detailsUrl"] else ""
         lines.append(f"| {run['name']} | {run['status']} | {run['conclusion'] or 'pending'} | {link} |")
@@ -248,7 +382,10 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Check the GitHub Actions status for the current commit.")
     parser.add_argument("--repo", help="GitHub repository in owner/name form. Defaults to git remote origin.")
     parser.add_argument("--remote", default="origin", help="Git remote used to detect the repository.")
+    parser.add_argument("--remote-branch", default="origin/main", help="Remote branch used for ahead/behind checks.")
     parser.add_argument("--sha", help="Commit SHA to check. Defaults to HEAD.")
+    parser.add_argument("--fetch", action="store_true", help="Fetch the remote branch before local ahead/behind checks.")
+    parser.add_argument("--skip-git", action="store_true", help="Only check GitHub Actions, without local Git sync details.")
     parser.add_argument("--watch", action="store_true", help="Wait until GitHub Actions finishes.")
     parser.add_argument("--interval", type=float, default=10.0, help="Polling interval when --watch is used.")
     parser.add_argument("--timeout", type=float, default=900.0, help="Maximum seconds to wait when --watch is used.")
@@ -263,6 +400,7 @@ def load_status_payload(args: argparse.Namespace) -> dict[str, Any]:
     sha = args.sha or detect_sha()
     token = os.environ.get("GITHUB_TOKEN", "")
     deadline = time.time() + args.timeout
+    git_snapshot = None if args.skip_git else get_git_snapshot(args.remote_branch, args.fetch)
 
     while True:
         if args.input_json:
@@ -271,7 +409,7 @@ def load_status_payload(args: argparse.Namespace) -> dict[str, Any]:
             check_runs = fetch_check_runs(GitHubStatusRequest(repo=repo, sha=sha, token=token))
         status = classify_check_runs(check_runs)
         annotations = collect_annotations_for_failures(check_runs, token) if status == "failure" and not args.input_json else {}
-        payload = build_status_payload(repo, sha, check_runs, annotations)
+        payload = build_status_payload(repo, sha, check_runs, annotations, git_snapshot)
 
         if not args.watch or status not in {"in_progress", "missing"}:
             return payload

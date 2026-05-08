@@ -55,6 +55,36 @@ class GitHubStatusToolTests(unittest.TestCase):
             "in_progress",
         )
 
+    def test_git_sync_helpers_classify_local_states(self) -> None:
+        counts = self.github_status.parse_porcelain_status(" M README.md\nA  tools/example.py\n?? draft.txt\n")
+        self.assertEqual(counts, {"staged": 1, "unstaged": 1, "untracked": 1, "total": 3})
+
+        base = {"hasRemoteBranch": True, "dirty": {"total": 0}, "ahead": 0, "behind": 0}
+        self.assertEqual(self.github_status.classify_git_sync(base), "synced")
+        self.assertEqual(self.github_status.classify_git_sync({**base, "dirty": {"total": 1}}), "dirty")
+        self.assertEqual(self.github_status.classify_git_sync({**base, "ahead": 2}), "ahead")
+        self.assertEqual(self.github_status.classify_git_sync({**base, "behind": 1}), "behind")
+        self.assertEqual(self.github_status.classify_git_sync({**base, "ahead": 1, "behind": 1}), "diverged")
+        self.assertEqual(self.github_status.classify_git_sync({**base, "hasRemoteBranch": False}), "no_remote")
+        self.assertFalse(self.github_status.refresh_remote_tracking_branch(""))
+
+    def test_status_payload_can_include_git_snapshot(self) -> None:
+        payload = self.github_status.build_status_payload(
+            "TonyNa-code/tony-na-engine",
+            "d33586a51f417505471243629f2d530ef49b5e74",
+            [{"status": "completed", "conclusion": "success"}],
+            git_snapshot={
+                "syncStatus": "synced",
+                "syncLabel": "已同步",
+                "remoteRefreshRequested": True,
+                "remoteRefreshed": True,
+            },
+        )
+
+        self.assertEqual(payload["git"]["syncStatus"], "synced")
+        self.assertIn("本地同步：已同步", self.github_status.format_status_text(payload))
+        self.assertIn("远端刷新：已刷新", self.github_status.format_status_text(payload))
+
     def test_cli_can_render_saved_check_run_payload(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             payload_path = Path(tmp_dir) / "check-runs.json"
@@ -88,6 +118,7 @@ class GitHubStatusToolTests(unittest.TestCase):
                     str(payload_path),
                     "--json-report",
                     str(report_path),
+                    "--skip-git",
                 ],
                 cwd=ROOT_DIR,
                 capture_output=True,
@@ -100,6 +131,7 @@ class GitHubStatusToolTests(unittest.TestCase):
             report = json.loads(report_path.read_text(encoding="utf-8"))
             self.assertEqual(report["status"], "success")
             self.assertEqual(report["runs"][0]["name"], "verify")
+            self.assertEqual(report["git"], {})
 
 
 if __name__ == "__main__":

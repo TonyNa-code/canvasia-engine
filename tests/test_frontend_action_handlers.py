@@ -10,6 +10,9 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 EDITOR_DIR = ROOT_DIR / "prototype_editor"
 INDEX_PATH = EDITOR_DIR / "index.html"
 APP_PATH = EDITOR_DIR / "app.js"
+MODULE_PATHS = tuple(sorted((EDITOR_DIR / "modules").glob("*.js")))
+ACTION_ATTRIBUTE_PATHS = (INDEX_PATH, APP_PATH)
+ACTION_CONFIG_PATHS = (APP_PATH, *MODULE_PATHS)
 
 ACTION_ATTRIBUTE_PATTERN = re.compile(
     r"(?<!\[)\bdata-action\s*=\s*([\"'])([^\"'${}]+)\1"
@@ -34,6 +37,8 @@ DYNAMIC_DATA_ACTION_MARKERS = Counter(
 NON_CLICK_ACTION_VALUES = {
     "apply",
     "fade_out",
+    "start",
+    "stop",
     "zoom_in",
 }
 
@@ -44,21 +49,45 @@ def _line_number(source: str, offset: int) -> int:
 
 def _get_handled_actions() -> set[str]:
     app_source = APP_PATH.read_text(encoding="utf-8")
+    click_handler = _extract_function_source(app_source, "handleClick")
     handled_actions = {
         match.group(2)
-        for match in ACTION_HANDLER_PATTERN.finditer(app_source)
+        for match in ACTION_HANDLER_PATTERN.finditer(click_handler)
     }
     handled_actions.update(
         match.group(2)
-        for match in ACTION_CASE_HANDLER_PATTERN.finditer(app_source)
+        for match in ACTION_CASE_HANDLER_PATTERN.finditer(click_handler)
     )
     return handled_actions
+
+
+def _extract_function_source(source: str, function_name: str) -> str:
+    marker_match = re.search(
+        rf"(?:async\s+)?function\s+{re.escape(function_name)}\s*\(",
+        source,
+    )
+    if not marker_match:
+        raise AssertionError(f"Missing function {function_name}")
+    body_start = source.find("{", marker_match.end())
+    if body_start < 0:
+        raise AssertionError(f"Missing function body for {function_name}")
+
+    depth = 0
+    for index in range(body_start, len(source)):
+        char = source[index]
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return source[body_start : index + 1]
+    raise AssertionError(f"Unclosed function body for {function_name}")
 
 
 class FrontendActionHandlerTests(unittest.TestCase):
     def test_literal_data_actions_have_click_handlers(self) -> None:
         action_locations: dict[str, list[str]] = {}
-        for path in (INDEX_PATH, APP_PATH):
+        for path in ACTION_ATTRIBUTE_PATHS:
             source = path.read_text(encoding="utf-8")
             for match in ACTION_ATTRIBUTE_PATTERN.finditer(source):
                 action = match.group(2).strip()
@@ -104,16 +133,18 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertEqual(dynamic_markers, DYNAMIC_DATA_ACTION_MARKERS)
 
     def test_action_config_values_have_click_handlers(self) -> None:
-        app_source = APP_PATH.read_text(encoding="utf-8")
         handled_actions = _get_handled_actions()
         action_locations: dict[str, list[str]] = {}
-        for match in ACTION_CONFIG_VALUE_PATTERN.finditer(app_source):
-            action = match.group(2)
-            if action in NON_CLICK_ACTION_VALUES:
-                continue
-            action_locations.setdefault(action, []).append(
-                f"prototype_editor/app.js:{_line_number(app_source, match.start())}"
-            )
+        for path in ACTION_CONFIG_PATHS:
+            source = path.read_text(encoding="utf-8")
+            relative_path = path.relative_to(ROOT_DIR).as_posix()
+            for match in ACTION_CONFIG_VALUE_PATTERN.finditer(source):
+                action = match.group(2)
+                if action in NON_CLICK_ACTION_VALUES:
+                    continue
+                action_locations.setdefault(action, []).append(
+                    f"{relative_path}:{_line_number(source, match.start())}"
+                )
 
         missing_actions = {
             action: locations
@@ -121,7 +152,7 @@ class FrontendActionHandlerTests(unittest.TestCase):
             if action not in handled_actions
         }
 
-        self.assertGreaterEqual(len(action_locations), 40)
+        self.assertGreaterEqual(len(action_locations), 45)
         self.assertFalse(
             missing_actions,
             "Action config values without handleClick coverage:\n"
@@ -130,6 +161,20 @@ class FrontendActionHandlerTests(unittest.TestCase):
                 for action, locations in missing_actions.items()
             ),
         )
+
+    def test_handle_click_has_runtime_fallback_for_unwired_buttons(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        click_handler = _extract_function_source(source, "handleClick")
+
+        self.assertIn("function handleMissingProjectAction", source)
+        self.assertIn("function handleUnhandledEditorAction", source)
+        self.assertIn("handleMissingProjectAction(actionTarget);", click_handler)
+        self.assertIn("handleUnhandledEditorAction(action, actionTarget);", click_handler)
+        self.assertLess(
+            click_handler.rfind('action === "reset-preview-debug-defaults"'),
+            click_handler.rfind("handleUnhandledEditorAction(action, actionTarget);"),
+        )
+        self.assertIn("[Tony Na Engine] Unhandled editor action", source)
 
 
 if __name__ == "__main__":

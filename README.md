@@ -55,7 +55,7 @@ Tony Na Engine 当前更适合这样理解：
 - 高级粒子系统、项目级粒子预设库
 - Live2D / 3D 角色模型与 3D 场景资产导入，原生 Runtime 可输出 glTF 结构、材质贴图槽、动画通道、依赖、引用位置和转换建议清单
 - 网页试玩包、Windows 桌面包、编辑器桌面包、三系统编辑器套装
-- 自动化测试体系（本地 CI 预检 + 后端 smoke + Playwright 浏览器烟测）
+- 自动化测试体系（本地 CI 预检 + 按钮动作覆盖扫描 + 未接线按钮运行时兜底 + 后端 smoke + Playwright 浏览器烟测）
 
 ## 功能状态
 
@@ -296,7 +296,7 @@ python3 tools/ci/local_verify.py --profile full --json-report local-verify.json 
 
 ### GitHub 检查状态
 
-如果 GitHub 页面上出现红叉、黄点或绿色勾，可以直接运行状态检查脚本。它会读取当前仓库远程地址和当前提交，显示 GitHub Actions 是否通过、仍在运行或失败。
+如果 GitHub 页面上出现红叉、黄点或绿色勾，可以直接运行状态检查脚本。它会读取当前仓库远程地址、当前提交和本地 Git 状态，同时显示 GitHub Actions 是否通过、本地是否有未提交改动、是否有提交还没推送、是否落后远端。
 
 macOS / Linux：
 
@@ -315,7 +315,13 @@ check_github_ci_status.cmd
 如果刚刚推送，想等待 GitHub Actions 跑完：
 
 ```bash
-python3 tools/ci/github_status.py --watch
+./check_github_ci_status.sh --watch
+```
+
+如果想先刷新远端分支缓存，再判断本地是否还有没推送或落后远端：
+
+```bash
+./check_github_ci_status.sh --fetch
 ```
 
 ### 自动化测试
@@ -400,7 +406,7 @@ run_native_runtime_smoke.cmd
 
 - Python 语法检查
 - 前端脚本语法检查
-- 发布工具与前端模块测试
+- 发布工具、前端模块、按钮动作覆盖、未接线按钮兜底与统一弹窗回归测试
 - 本地 CI 预检工具覆盖自检
 - GitHub Actions 状态检查工具自检
 - 后端 smoke 测试

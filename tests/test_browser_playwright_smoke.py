@@ -303,6 +303,22 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
         dialog.get_by_role("button", name="知道了").click()
         self.page.locator(".system-dialog").wait_for(state="detached", timeout=15000)
 
+    def test_editor_unknown_action_shows_runtime_fallback(self) -> None:
+        self.create_blank_project("浏览器烟测项目_UnknownAction")
+        self.page.evaluate(
+            """() => {
+                const button = document.createElement("button");
+                button.type = "button";
+                button.dataset.action = "codex-unwired-action";
+                button.textContent = "未接线按钮";
+                document.body.append(button);
+                button.click();
+                button.remove();
+            }"""
+        )
+        self.page.get_by_text("这个按钮暂时还没有接上功能").wait_for(timeout=15000)
+        self.page.get_by_text("按钮暂未接线：codex-unwired-action").wait_for(timeout=15000)
+
     def open_project_by_title(self, title: str) -> None:
         self.open_editor()
         card = self.page.locator(".project-card").filter(has_text=title).first
