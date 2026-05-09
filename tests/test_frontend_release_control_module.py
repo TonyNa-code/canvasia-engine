@@ -9,9 +9,25 @@ from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "release_control.js"
+APP_PATH = ROOT_DIR / "prototype_editor" / "app.js"
 
 
 class FrontendReleaseControlModuleTests(unittest.TestCase):
+    def test_final_publish_gate_is_visible_before_release_checklist(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("function buildFinalPublishGate", source)
+        self.assertIn("function serializeFinalPublishGate", source)
+        self.assertIn("function renderFinalPublishGatePanel", source)
+        self.assertIn("最终发表门禁", source)
+        self.assertIn("finalPublishGate: serializeFinalPublishGate(finalPublishGate)", source)
+        self.assertIn("## 最终发表门禁", source)
+        self.assertIn("${renderFinalPublishGatePanel(routeOverview)}", source)
+        self.assertLess(
+            source.index("${renderFinalPublishGatePanel(routeOverview)}"),
+            source.index("${renderReleaseChecklistPanel()}"),
+        )
+
     def test_release_control_helpers_work_without_browser_dom(self) -> None:
         script = textwrap.dedent(
             f"""
@@ -66,6 +82,34 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
                 tools.isDesktopExportReady({{ target: "web", runtimeMode: "nwjs", missingAssets: 0 }}),
                 tools.isDesktopExportReady({{ target: "linux_nwjs", runtimeMode: "nwjs", missingAssets: 2 }}),
               ],
+              blockedGate: tools.buildFinalPublishGate({{
+                releaseChecklistItems: [
+                  {{ severity: "blocker", title: "结构错误", description: "还有坏链", action: {{ label: "只看结构错误", action: "set-preview-issue-filter" }} }},
+                  {{ severity: "warn", title: "语音覆盖", description: "还有待绑语音" }},
+                  {{ severity: "good", title: "发布版本" }},
+                ],
+                releaseFixOrder: {{ steps: [{{ title: "先清结构错误", actions: [{{ label: "一键生成修复顺序", action: "generate-release-fix-order" }}] }}] }},
+                regressionSummary: {{ failCount: 1, warnCount: 0 }},
+                hasRegressionRun: true,
+                exportResult: {{ targetLabel: "Windows 桌面包" }},
+              }}),
+              previewGate: tools.buildFinalPublishGate({{
+                releaseChecklistItems: [
+                  {{ severity: "warn", title: "语音覆盖", description: "还有待绑语音", action: {{ label: "只看待绑语音", action: "focus-script-missing-voice" }} }},
+                  {{ severity: "good", title: "发布版本" }},
+                ],
+                hasRegressionRun: false,
+                exportResult: {{ targetLabel: "网页包" }},
+              }}),
+              readyGate: tools.buildFinalPublishGate({{
+                releaseChecklistItems: [
+                  {{ severity: "good", title: "发布版本" }},
+                  {{ severity: "good", title: "结构错误" }},
+                ],
+                regressionSummary: {{ failCount: 0, warnCount: 0 }},
+                hasRegressionRun: true,
+                exportResult: {{ targetLabel: "macOS 桌面包" }},
+              }}),
             }};
             process.stdout.write(JSON.stringify(result));
             """
@@ -96,6 +140,18 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
         self.assertEqual(len(payload["splitWarnings"]["missingVoiceWarnings"]), 1)
         self.assertEqual(len(payload["splitWarnings"]["nonVoiceWarnings"]), 1)
         self.assertEqual(payload["desktopReady"], [True, False, False, False])
+        self.assertEqual(payload["blockedGate"]["status"], "blocked")
+        self.assertEqual(payload["blockedGate"]["badge"], "暂缓发布")
+        self.assertEqual(payload["blockedGate"]["primaryAction"]["action"], "set-preview-issue-filter")
+        self.assertEqual(payload["blockedGate"]["metrics"][0]["value"], "2 个")
+        self.assertEqual(payload["blockedGate"]["checklist"][0]["label"], "结构错误")
+        self.assertEqual(payload["previewGate"]["status"], "preview")
+        self.assertEqual(payload["previewGate"]["primaryAction"]["action"], "run-preview-regression")
+        self.assertEqual(payload["previewGate"]["metrics"][3]["value"], "网页包")
+        self.assertEqual(payload["readyGate"]["status"], "ready")
+        self.assertEqual(payload["readyGate"]["badge"], "可以公开发布")
+        self.assertEqual(payload["readyGate"]["primaryAction"]["action"], "export-release-control-report")
+        self.assertEqual(payload["readyGate"]["secondaryActions"][0]["dataset"], {"export-target": "web"})
 
     def test_release_fix_order_prioritizes_blockers_before_polish(self) -> None:
         script = textwrap.dedent(

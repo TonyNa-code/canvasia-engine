@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import json
 import re
+import subprocess
+import textwrap
 import unittest
 from collections import Counter
 from pathlib import Path
@@ -68,7 +71,17 @@ def _extract_function_source(source: str, function_name: str) -> str:
     )
     if not marker_match:
         raise AssertionError(f"Missing function {function_name}")
-    body_start = source.find("{", marker_match.end())
+    signature_depth = 0
+    body_start = -1
+    for index in range(marker_match.end() - 1, len(source)):
+        char = source[index]
+        if char == "(":
+            signature_depth += 1
+        elif char == ")":
+            signature_depth -= 1
+            if signature_depth == 0:
+                body_start = source.find("{", index)
+                break
     if body_start < 0:
         raise AssertionError(f"Missing function body for {function_name}")
 
@@ -166,6 +179,12 @@ class FrontendActionHandlerTests(unittest.TestCase):
         source = APP_PATH.read_text(encoding="utf-8")
         click_handler = _extract_function_source(source, "handleClick")
 
+        self.assertIn('actionTarget.matches(":disabled")', click_handler)
+        self.assertIn('actionTarget.getAttribute("aria-disabled") === "true"', click_handler)
+        self.assertLess(
+            click_handler.index('actionTarget.matches(":disabled")'),
+            click_handler.index("const { action } = actionTarget.dataset;"),
+        )
         self.assertIn("function handleMissingProjectAction", source)
         self.assertIn("function handleUnhandledEditorAction", source)
         self.assertIn("handleMissingProjectAction(actionTarget);", click_handler)
@@ -176,6 +195,53 @@ class FrontendActionHandlerTests(unittest.TestCase):
         )
         self.assertIn("[Tony Na Engine] Unhandled editor action", source)
 
+    def test_handle_click_ignores_disabled_actions_before_dispatch(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        click_handler = _extract_function_source(source, "handleClick")
+        script = textwrap.dedent(
+            f"""
+            const calls = [];
+            const state = {{ beginnerTutorialOpen: false }};
+            const event = {{
+              prevented: false,
+              preventDefault() {{ this.prevented = true; }},
+              target: {{
+                closest(selector) {{
+                  calls.push({{ type: "closest", selector }});
+                  return {{
+                    dataset: {{ action: "export-build" }},
+                    matches(selector) {{
+                      calls.push({{ type: "matches", selector }});
+                      return selector === ":disabled";
+                    }},
+                    getAttribute(name) {{
+                      calls.push({{ type: "getAttribute", name }});
+                      return null;
+                    }},
+                  }};
+                }},
+              }},
+            }};
+            async function exportBuild() {{ throw new Error("disabled action should not dispatch"); }}
+            async function handleClick(event) {click_handler}
+            await handleClick(event);
+            process.stdout.write(JSON.stringify({{ prevented: event.prevented, calls }}));
+            """
+        )
+        completed = subprocess.run(
+            ["node", "--input-type=module", "-e", script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        self.assertTrue(payload["prevented"])
+        self.assertEqual(payload["calls"][0], {"type": "closest", "selector": "[data-action]"})
+        self.assertEqual(payload["calls"][1], {"type": "matches", "selector": ":disabled"})
+
     def test_quick_switch_screen_actions_keep_dataset_screen(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
         quick_action_button = _extract_function_source(source, "renderQuickActionButton")
@@ -183,6 +249,201 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn('action.action === "switch-screen"', quick_action_button)
         self.assertIn('action.dataset?.screen', quick_action_button)
         self.assertIn('data-screen="${escapeHtml(screen)}"', quick_action_button)
+
+    def test_quick_action_button_renders_disabled_state(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        quick_action_button = _extract_function_source(source, "renderQuickActionButton")
+        escape_html = _extract_function_source(source, "escapeHtml")
+        script = textwrap.dedent(
+            f"""
+            const editorCommonTools = null;
+            function escapeHtml(value) {escape_html}
+            function renderQuickActionButton(action, emphasized = false) {quick_action_button}
+            const html = renderQuickActionButton({{
+              label: "确认 <执行>",
+              action: "repair-project-doctor",
+              disabled: true,
+              title: "先点“预览”再执行",
+              dataset: {{ "repair-codes": "entry_scene,scene_order" }},
+            }});
+            process.stdout.write(JSON.stringify({{ html }}));
+            """
+        )
+        completed = subprocess.run(
+            ["node", "-e", script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        html = json.loads(completed.stdout)["html"]
+        self.assertIn('data-action="repair-project-doctor"', html)
+        self.assertIn('data-repair-codes="entry_scene,scene_order"', html)
+        self.assertIn('disabled aria-disabled="true"', html)
+        self.assertIn('title="先点“预览”再执行"', html)
+        self.assertIn("确认 &lt;执行&gt;", html)
+
+    def test_project_doctor_report_labels_distinguish_preview_from_repair(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        report_labels = _extract_function_source(source, "getProjectDoctorRepairReceiptReportLabels")
+        script = textwrap.dedent(
+            f"""
+            function getProjectDoctorRepairReceiptReportLabels(receipt = {{}}) {report_labels}
+            const preview = getProjectDoctorRepairReceiptReportLabels({{ status: "preview", dryRun: true }});
+            const repaired = getProjectDoctorRepairReceiptReportLabels({{ status: "repaired" }});
+            const unknown = getProjectDoctorRepairReceiptReportLabels({{ status: "unknown" }});
+            process.stdout.write(JSON.stringify({{ preview, repaired, unknown }}));
+            """
+        )
+        completed = subprocess.run(
+            ["node", "-e", script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        self.assertEqual(payload["preview"]["heading"], "最近一次安全修复预览")
+        self.assertEqual(payload["preview"]["timeLabel"], "预览时间")
+        self.assertEqual(payload["preview"]["repairVerb"], "将修复")
+        self.assertEqual(payload["preview"]["skipVerb"], "将跳过")
+        self.assertEqual(payload["repaired"]["heading"], "最近一次安全修复")
+        self.assertEqual(payload["repaired"]["timeLabel"], "修复时间")
+        self.assertEqual(payload["repaired"]["repairVerb"], "已修复")
+        self.assertEqual(payload["unknown"]["heading"], "最近一次未识别修复请求")
+        self.assertIn("projectDoctorReceiptLabels", source)
+        self.assertIn("receiptLabels.countLabel", source)
+
+    def test_project_doctor_repair_requires_matching_preview(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        parse_codes = _extract_function_source(source, "parseProjectDoctorRepairCodes")
+        get_preview_codes = _extract_function_source(source, "getCurrentProjectDoctorPreviewRepairCodes")
+        repair_project_doctor = _extract_function_source(source, "repairProjectDoctor")
+        script = textwrap.dedent(
+            f"""
+            const API_REPAIR_PROJECT_DOCTOR = "/api/repair-project-doctor";
+            const calls = [];
+            const statuses = [];
+            const toasts = [];
+            const reloads = [];
+            const renders = [];
+            const state = {{
+              data: {{ project: {{ title: "测试项目" }} }},
+              projectDoctorRepairReceipt: null,
+              lastExportResult: {{ ok: true }},
+              currentScreen: "dashboard",
+            }};
+            function parseProjectDoctorRepairCodes(value) {parse_codes}
+            function getCurrentProjectDoctorPreviewRepairCodes() {get_preview_codes}
+            function buildProjectDoctorRepairReceipt(result) {{
+              return {{
+                ...result,
+                status: result.dryRun ? "preview" : "repaired",
+                requestedCodes: result.requestedCodes ?? result.repairs?.map((item) => item.code) ?? [],
+                wouldChange: Boolean(result.wouldChange) || Boolean(result.repairs?.length),
+              }};
+            }}
+            async function postJson(endpoint, payload) {{
+              calls.push({{ endpoint, payload }});
+              return {{
+                changed: !payload.dryRun,
+                dryRun: Boolean(payload.dryRun),
+                wouldChange: true,
+                requestedCodes: payload.repairCodes ?? [],
+                repairs: (payload.repairCodes ?? ["entry_scene"]).map((code) => ({{ code }})),
+                skipped: [],
+              }};
+            }}
+            function setSaveStatus(message, isError = false) {{ statuses.push({{ message, isError }}); }}
+            function showToast(message, tone = "soft") {{ toasts.push({{ message, tone }}); }}
+            function showEngineAlert(message) {{ throw new Error(message); }}
+            function getCurrentUiState() {{ return {{ selectedSceneId: "scene_01" }}; }}
+            async function reloadProjectData(preserved) {{ reloads.push(preserved); }}
+            function renderInspectionScreen() {{ throw new Error("inspection render should not run in this test"); }}
+            function renderPreviewScreen() {{ renders.push("preview"); }}
+            function renderDashboard() {{ renders.push("dashboard"); }}
+            async function repairProjectDoctor(repairCodesValue = "", options = {{}}) {repair_project_doctor}
+
+            await repairProjectDoctor("entry_scene");
+            const blockedWithoutPreview = {{
+              calls: calls.length,
+              status: statuses.at(-1),
+              toast: toasts.at(-1),
+            }};
+
+            state.projectDoctorRepairReceipt = {{
+              status: "preview",
+              wouldChange: true,
+              requestedCodes: ["scene_order"],
+            }};
+            await repairProjectDoctor("entry_scene");
+            const blockedMismatch = {{
+              calls: calls.length,
+              status: statuses.at(-1),
+              toast: toasts.at(-1),
+            }};
+
+            state.projectDoctorRepairReceipt = {{
+              status: "preview",
+              wouldChange: true,
+              requestedCodes: ["entry_scene", "scene_order"],
+            }};
+            await repairProjectDoctor("entry_scene");
+            const matchedSingle = calls.at(-1);
+
+            state.projectDoctorRepairReceipt = {{
+              status: "preview",
+              wouldChange: true,
+              requestedCodes: ["entry_scene", "scene_order"],
+            }};
+            await repairProjectDoctor("");
+            const matchedPreviewAll = calls.at(-1);
+
+            state.projectDoctorRepairReceipt = null;
+            await repairProjectDoctor("", {{ dryRun: true }});
+            const dryRunPreview = calls.at(-1);
+
+            process.stdout.write(JSON.stringify({{
+              blockedWithoutPreview,
+              blockedMismatch,
+              matchedSingle,
+              matchedPreviewAll,
+              dryRunPreview,
+              reloads,
+              renders,
+              lastReceipt: state.projectDoctorRepairReceipt,
+              lastExportResult: state.lastExportResult,
+            }}));
+            """
+        )
+        completed = subprocess.run(
+            ["node", "--input-type=module", "-e", script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        self.assertEqual(payload["blockedWithoutPreview"]["calls"], 0)
+        self.assertEqual(payload["blockedWithoutPreview"]["status"]["message"], "请先点“先预览安全修复”，确认后再执行")
+        self.assertTrue(payload["blockedWithoutPreview"]["status"]["isError"])
+        self.assertEqual(payload["blockedWithoutPreview"]["toast"]["tone"], "error")
+        self.assertEqual(payload["blockedMismatch"]["calls"], 0)
+        self.assertEqual(payload["blockedMismatch"]["status"]["message"], "项目医生预览已变化，请先重新预览安全修复")
+        self.assertEqual(payload["matchedSingle"]["payload"]["repairCodes"], ["entry_scene"])
+        self.assertEqual(payload["matchedPreviewAll"]["payload"]["repairCodes"], ["entry_scene", "scene_order"])
+        self.assertTrue(payload["dryRunPreview"]["payload"]["dryRun"])
+        self.assertNotIn("repairCodes", payload["dryRunPreview"]["payload"])
+        self.assertTrue(all(item["preserveProjectDoctorRepairReceipt"] for item in payload["reloads"]))
+        self.assertEqual(payload["renders"], ["dashboard", "dashboard", "dashboard"])
+        self.assertEqual(payload["lastReceipt"]["status"], "preview")
+        self.assertIsNone(payload["lastExportResult"])
 
     def test_preview_regression_action_refreshes_current_progress_surface(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")

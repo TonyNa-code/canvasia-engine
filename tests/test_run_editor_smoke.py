@@ -478,6 +478,32 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertIn("移除重复章节引用 1 个", repair_by_code["chapter_order"]["detail"])
         self.assertIn("移除重复场景引用 1 个", repair_by_code["scene_order"]["detail"])
 
+    def test_project_doctor_dry_run_previews_without_writing(self) -> None:
+        _, chapter_result = self.create_blank_project_with_chapter()
+        second_scene = run_editor.create_scene(chapter_result["chapterId"], "第二场")
+        chapter_path = run_editor.CHAPTERS_DIR / f"{chapter_result['chapterId']}.json"
+        chapter_doc = run_editor.read_json(chapter_path)
+        chapter_doc["sceneOrder"] = ["missing_scene", second_scene["sceneId"], second_scene["sceneId"]]
+        run_editor.write_json(chapter_path, chapter_doc)
+
+        project_doc = run_editor.read_json(run_editor.PROJECT_PATH)
+        project_doc["entrySceneId"] = "missing_entry"
+        project_doc["chapterOrder"] = ["ghost_chapter", chapter_result["chapterId"], chapter_result["chapterId"]]
+        run_editor.write_json(run_editor.PROJECT_PATH, project_doc)
+
+        result = run_editor.repair_project_doctor(dry_run=True)
+        previewed_project = run_editor.read_json(run_editor.PROJECT_PATH)
+        previewed_chapter = run_editor.read_json(chapter_path)
+        repair_codes = {item["code"] for item in result["repairs"]}
+
+        self.assertFalse(result["changed"])
+        self.assertTrue(result["wouldChange"])
+        self.assertTrue(result["dryRun"])
+        self.assertEqual(repair_codes, {"entry_scene", "chapter_order", "scene_order"})
+        self.assertEqual(previewed_project["entrySceneId"], "missing_entry")
+        self.assertEqual(previewed_project["chapterOrder"], ["ghost_chapter", chapter_result["chapterId"], chapter_result["chapterId"]])
+        self.assertEqual(previewed_chapter["sceneOrder"], ["missing_scene", second_scene["sceneId"], second_scene["sceneId"]])
+
     def test_project_doctor_clears_stale_chapter_order_when_no_chapters_exist(self) -> None:
         run_editor.create_blank_project("空章节修复测试")
         project_doc = run_editor.read_json(run_editor.PROJECT_PATH)
@@ -529,8 +555,21 @@ class RunEditorSmokeTests(unittest.TestCase):
         repaired_project = run_editor.read_json(run_editor.PROJECT_PATH)
 
         self.assertFalse(result["changed"])
+        self.assertFalse(result["wouldChange"])
+        self.assertEqual(result["requestedCodes"], [])
+        self.assertEqual(result["ignoredCodes"], ["unknown_code"])
         self.assertEqual(result["repairs"], [])
         self.assertEqual(repaired_project["entrySceneId"], "missing_entry")
+
+        mixed_result = run_editor.repair_project_doctor(["entry_scene", "unknown_code"], dry_run=True)
+        mixed_project = run_editor.read_json(run_editor.PROJECT_PATH)
+
+        self.assertFalse(mixed_result["changed"])
+        self.assertTrue(mixed_result["wouldChange"])
+        self.assertEqual(mixed_result["requestedCodes"], ["entry_scene"])
+        self.assertEqual(mixed_result["ignoredCodes"], ["unknown_code"])
+        self.assertEqual([repair["code"] for repair in mixed_result["repairs"]], ["entry_scene"])
+        self.assertEqual(mixed_project["entrySceneId"], "missing_entry")
 
     def test_character_presentation_can_bind_live2d_and_model3d_assets(self) -> None:
         self.create_blank_project_with_chapter()

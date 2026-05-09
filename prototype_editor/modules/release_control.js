@@ -109,6 +109,106 @@
     };
   }
 
+  function getReleaseChecklistCounts(items = []) {
+    const safeItems = Array.isArray(items) ? items : [];
+    return {
+      blockerCount: safeItems.filter((item) => item?.severity === "blocker").length,
+      warnCount: safeItems.filter((item) => item?.severity === "warn").length,
+      readyCount: safeItems.filter((item) => item?.severity === "good").length,
+      totalCount: safeItems.length,
+    };
+  }
+
+  function getFirstReleaseAction(items = [], severity = "blocker") {
+    const match = (Array.isArray(items) ? items : []).find((item) => item?.severity === severity && item?.action);
+    return match?.action ?? null;
+  }
+
+  function buildGateChecklistItems(items = [], releaseFixOrder = null, status = "blocked") {
+    const safeItems = Array.isArray(items) ? items : [];
+    const priorityItems =
+      status === "blocked"
+        ? safeItems.filter((item) => item?.severity === "blocker")
+        : safeItems.filter((item) => item?.severity === "warn");
+    if (priorityItems.length > 0) {
+      return priorityItems.slice(0, 3).map((item) => ({
+        label: item.title ?? "待处理项",
+        detail: item.description ?? item.status ?? "发布前建议处理。",
+        done: false,
+        action: serializeReleaseReportAction(item.action),
+      }));
+    }
+    const fixSteps = Array.isArray(releaseFixOrder?.steps) ? releaseFixOrder.steps : [];
+    return fixSteps.slice(0, 3).map((step) => ({
+      label: step.title ?? "发布前收尾",
+      detail: step.description ?? step.statusLabel ?? "继续完成这一步。",
+      done: step.tone === "good",
+      action: serializeReleaseReportAction(step.actions?.[0]),
+    }));
+  }
+
+  function buildFinalPublishGate(context = {}) {
+    const releaseChecklistItems = Array.isArray(context.releaseChecklistItems) ? context.releaseChecklistItems : [];
+    const releaseFixOrder = context.releaseFixOrder ?? null;
+    const exportResult = context.exportResult ?? null;
+    const regressionSummary = context.regressionResult?.summary ?? context.regressionSummary ?? null;
+    const hasRegressionRun = Boolean(context.regressionResult || context.hasRegressionRun);
+    const regressionFailCount = toCount(regressionSummary?.failCount);
+    const regressionWarnCount = toCount(regressionSummary?.warnCount);
+    const { blockerCount, warnCount, readyCount, totalCount } = getReleaseChecklistCounts(releaseChecklistItems);
+    const hasBlockers = blockerCount > 0 || regressionFailCount > 0;
+    const hasWarnings = warnCount > 0 || regressionWarnCount > 0 || !hasRegressionRun;
+    const status = hasBlockers ? "blocked" : hasWarnings ? "preview" : "ready";
+    const firstBlockerAction = getFirstReleaseAction(releaseChecklistItems, "blocker");
+    const firstWarnAction = getFirstReleaseAction(releaseChecklistItems, "warn");
+    const exportLabel = exportResult?.targetLabel || exportResult?.target || "尚未导出";
+    const primaryAction =
+      status === "blocked"
+        ? firstBlockerAction || releaseFixOrder?.steps?.[0]?.actions?.[0] || { label: "一键生成修复顺序", action: "generate-release-fix-order" }
+        : status === "preview"
+          ? (!hasRegressionRun
+              ? { label: "先跑自动回归试玩", action: "run-preview-regression" }
+              : firstWarnAction || { label: "导出发布总控报告", action: "export-release-control-report" })
+          : { label: "导出发布总控报告", action: "export-release-control-report" };
+    const secondaryActions =
+      status === "ready"
+        ? [
+            { label: "导出网页包", action: "export-build", dataset: { "export-target": "web" } },
+            { label: "导出原生 Runtime", action: "export-build", dataset: { "export-target": "native_runtime" } },
+          ]
+        : [
+            { label: "导出巡检报告", action: "export-inspection-report" },
+            { label: "导出发布总控 JSON", action: "export-release-control-json" },
+          ];
+
+    return {
+      status,
+      tone: status === "blocked" ? "danger" : status === "preview" ? "warn" : "good",
+      badge: status === "blocked" ? "暂缓发布" : status === "preview" ? "可发 Preview" : "可以公开发布",
+      title:
+        status === "blocked"
+          ? `暂缓公开发布：还有 ${blockerCount + regressionFailCount} 个阻塞项`
+          : status === "preview"
+            ? "可以发布 Preview，但建议先确认提醒项"
+            : "可以进入公开发布流程",
+      description:
+        status === "blocked"
+          ? "这些问题可能造成断线、缺素材、包体异常或回归失败。建议先按门禁里的主按钮处理，再重新导出。"
+          : status === "preview"
+            ? "当前没有硬阻塞，适合按 Preview / Early Access 口径发布；如果想更稳，先把提醒和回归试玩补齐。"
+            : "当前发布检查、回归和导出状态都比较干净，可以开始整理 GitHub Release 附件和发布说明。",
+      metrics: [
+        { label: "阻塞", value: `${blockerCount + regressionFailCount} 个`, hint: "公开发布前建议清零" },
+        { label: "提醒", value: `${warnCount + regressionWarnCount + (hasRegressionRun ? 0 : 1)} 个`, hint: "Preview 可带说明发布" },
+        { label: "通过", value: `${readyCount}/${totalCount}`, hint: "发布检查清单已就绪项" },
+        { label: "最近导出", value: exportLabel, hint: hasRegressionRun ? "已跑过自动回归" : "还没跑自动回归" },
+      ],
+      primaryAction: serializeReleaseReportAction(primaryAction),
+      secondaryActions: secondaryActions.map(serializeReleaseReportAction).filter(Boolean),
+      checklist: buildGateChecklistItems(releaseChecklistItems, releaseFixOrder, status),
+    };
+  }
+
   function splitReleaseWarnings(warningIssues = []) {
     const safeWarnings = Array.isArray(warningIssues) ? warningIssues : [];
     return {
@@ -343,6 +443,7 @@
     getReleaseStepToneLabel,
     serializeReleaseReportAction,
     buildReleaseChecklistSummary,
+    buildFinalPublishGate,
     splitReleaseWarnings,
     isDesktopExportReady,
     buildReleaseFixOrder,

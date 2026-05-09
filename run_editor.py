@@ -2146,21 +2146,32 @@ PROJECT_DOCTOR_REPAIR_CODES = {
 }
 
 
-def normalize_project_doctor_repair_codes(value: object = None) -> set[str]:
+def split_project_doctor_repair_code_tokens(value: object = None) -> list[str]:
     if value is None:
-        return set(PROJECT_DOCTOR_REPAIR_CODES)
+        return []
     if isinstance(value, str):
         raw_items = re.split(r"[\s,]+", value)
     elif isinstance(value, list):
         raw_items = value
     else:
-        return set()
+        return []
+    return [str(item or "").strip().lower() for item in raw_items if str(item or "").strip()]
 
-    return {
-        str(item or "").strip().lower()
-        for item in raw_items
-        if str(item or "").strip().lower() in PROJECT_DOCTOR_REPAIR_CODES
-    }
+
+def normalize_project_doctor_repair_codes(value: object = None) -> set[str]:
+    if value is None:
+        return set(PROJECT_DOCTOR_REPAIR_CODES)
+    return {code for code in split_project_doctor_repair_code_tokens(value) if code in PROJECT_DOCTOR_REPAIR_CODES}
+
+
+def get_unknown_project_doctor_repair_codes(value: object = None) -> list[str]:
+    if value is None:
+        return []
+    unknown_codes: list[str] = []
+    for code in split_project_doctor_repair_code_tokens(value):
+        if code not in PROJECT_DOCTOR_REPAIR_CODES and code not in unknown_codes:
+            unknown_codes.append(code)
+    return unknown_codes
 
 
 def dedupe_project_doctor_order(items: list[str]) -> tuple[list[str], int]:
@@ -2212,8 +2223,9 @@ def get_first_ordered_scene_id(project: dict, chapters: list[dict]) -> str:
     return ""
 
 
-def repair_project_doctor(repair_codes: object = None) -> dict:
+def repair_project_doctor(repair_codes: object = None, dry_run: bool = False) -> dict:
     selected_codes = normalize_project_doctor_repair_codes(repair_codes)
+    ignored_codes = get_unknown_project_doctor_repair_codes(repair_codes)
     project = read_json(PROJECT_PATH)
     chapter_entries = [(path, read_json(path)) for path in list_chapter_files()]
     chapters = [chapter for _, chapter in chapter_entries]
@@ -2265,7 +2277,8 @@ def repair_project_doctor(repair_codes: object = None) -> dict:
             if next_order != current_order:
                 chapter["sceneOrder"] = next_order
                 chapter["updatedAt"] = now_iso()
-                write_json(chapter_file, chapter)
+                if not dry_run:
+                    write_json(chapter_file, chapter)
                 repairs.append(
                     {
                         "code": "scene_order",
@@ -2312,12 +2325,16 @@ def repair_project_doctor(repair_codes: object = None) -> dict:
         else:
             skipped.append({"code": "entry_scene", "title": "入口场景无需修复"})
 
-    if project_changed:
+    if project_changed and not dry_run:
         project["updatedAt"] = now_iso()
         write_json(PROJECT_PATH, project)
 
     return {
-        "changed": bool(repairs),
+        "changed": bool(repairs) and not dry_run,
+        "wouldChange": bool(repairs),
+        "dryRun": bool(dry_run),
+        "requestedCodes": sorted(selected_codes),
+        "ignoredCodes": ignored_codes,
         "repairs": repairs,
         "skipped": skipped,
         "project": project,
@@ -11290,7 +11307,7 @@ class EditorRequestHandler(SimpleHTTPRequestHandler):
     def handle_repair_project_doctor(self) -> None:
         try:
             payload = self.read_json_body()
-            result = repair_project_doctor(payload.get("repairCodes"))
+            result = repair_project_doctor(payload.get("repairCodes"), dry_run=bool(payload.get("dryRun")))
             if result.get("changed"):
                 result = attach_history_to_result(result, "项目医生安全修复")
             else:

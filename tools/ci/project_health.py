@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shlex
 import sys
 from collections import Counter
 from dataclasses import dataclass
@@ -48,6 +49,7 @@ ASSET_REFERENCE_KEYS = {
     "modelAssetId",
 }
 SAFE_REPAIR_CODES = {"entry_scene", "chapter_order", "scene_order"}
+SAFE_REPAIR_CODE_LABEL = ", ".join(sorted(SAFE_REPAIR_CODES))
 
 
 @dataclass(frozen=True)
@@ -159,14 +161,17 @@ def dedupe_order_items(items: Sequence[str]) -> tuple[list[str], int]:
     return deduped, duplicate_count
 
 
+def split_safe_repair_code_tokens(value: str | Sequence[str]) -> list[str]:
+    raw_items = value.replace(",", " ").split() if isinstance(value, str) else value
+    return [str(item or "").strip().lower() for item in raw_items if str(item or "").strip()]
+
+
 def normalize_safe_repair_codes(value: str | Sequence[str] | None, report: dict[str, Any] | None = None) -> list[str]:
     if value is None:
         repair_counts = (report or {}).get("summary", {}).get("autoFixableByRepairCode", {})
         raw_items = repair_counts.keys() if isinstance(repair_counts, dict) else SAFE_REPAIR_CODES
-    elif isinstance(value, str):
-        raw_items = value.replace(",", " ").split()
     else:
-        raw_items = value
+        raw_items = split_safe_repair_code_tokens(value)
 
     codes: list[str] = []
     for item in raw_items:
@@ -174,6 +179,14 @@ def normalize_safe_repair_codes(value: str | Sequence[str] | None, report: dict[
         if code in SAFE_REPAIR_CODES and code not in codes:
             codes.append(code)
     return codes
+
+
+def get_unknown_safe_repair_codes(value: str | Sequence[str]) -> list[str]:
+    unknown_codes: list[str] = []
+    for code in split_safe_repair_code_tokens(value):
+        if code not in SAFE_REPAIR_CODES and code not in unknown_codes:
+            unknown_codes.append(code)
+    return unknown_codes
 
 
 def load_repair_chapter_entries(project_dir: Path) -> list[tuple[Path, dict[str, Any]]]:
@@ -214,6 +227,7 @@ def repair_safe_project_issues(
     project_dir: Path,
     repair_codes: str | Sequence[str] | None = None,
     report: dict[str, Any] | None = None,
+    dry_run: bool = False,
 ) -> dict[str, Any]:
     project_dir = project_dir.resolve()
     selected_codes = normalize_safe_repair_codes(repair_codes, report)
@@ -223,6 +237,8 @@ def repair_safe_project_issues(
     if project_error or not isinstance(project_payload, dict):
         return {
             "changed": False,
+            "wouldChange": False,
+            "dryRun": bool(dry_run),
             "requestedCodes": selected_codes,
             "repairs": repairs,
             "skipped": [{"code": "project_json", "title": "项目文件无法读取", "detail": project_error.detail if project_error else ""}],
@@ -271,7 +287,8 @@ def repair_safe_project_issues(
             removed_count = len([scene_id for scene_id in current_order if scene_id and scene_id not in scene_id_set])
             if next_order != current_order:
                 chapter["sceneOrder"] = next_order
-                write_json_file(chapter_file, chapter)
+                if not dry_run:
+                    write_json_file(chapter_file, chapter)
                 repairs.append(
                     {
                         "code": "scene_order",
@@ -319,15 +336,39 @@ def repair_safe_project_issues(
         else:
             skipped.append({"code": "entry_scene", "title": "入口场景无需修复", "detail": ""})
 
-    if project_changed:
+    if project_changed and not dry_run:
         write_json_file(project_dir / "project.json", project_payload)
 
     return {
-        "changed": bool(repairs),
+        "changed": bool(repairs) and not dry_run,
+        "wouldChange": bool(repairs),
+        "dryRun": bool(dry_run),
         "requestedCodes": selected_codes,
         "repairs": repairs,
         "skipped": skipped,
     }
+
+
+def build_safe_repair_command(report: dict[str, Any], dry_run: bool = False) -> str:
+    repair_codes = normalize_safe_repair_codes(None, report)
+    project_dir = str(report.get("projectDir") or "").strip()
+    if not repair_codes or not project_dir:
+        return ""
+    command = [
+        "python3",
+        "tools/ci/project_health.py",
+        project_dir,
+        "--repair-safe",
+    ]
+    if dry_run:
+        command.append("--repair-dry-run")
+    command.extend(
+        [
+            "--repair-codes",
+            ",".join(repair_codes),
+        ]
+    )
+    return " ".join(shlex.quote(part) for part in command)
 
 
 def build_summary(issues: Sequence[HealthIssue]) -> dict[str, Any]:
@@ -725,7 +766,17 @@ def build_next_actions(report: dict[str, Any]) -> list[str]:
     actions: list[str] = []
 
     if int(summary.get("autoFixableCount") or 0) > 0:
-        actions.append("先在编辑器的项目巡检页运行“项目医生一键安全修复”，处理入口场景、章节顺序和场景顺序。")
+        safe_repair_command = str(report.get("safeRepairCommand") or "").strip()
+        safe_repair_preview_command = str(report.get("safeRepairPreviewCommand") or "").strip()
+        command_hint = ""
+        if safe_repair_preview_command and safe_repair_command:
+            command_hint = f"；命令行可选：先预览 {safe_repair_preview_command}，确认后修复 {safe_repair_command}"
+        elif safe_repair_command:
+            command_hint = f"；命令行可选：{safe_repair_command}"
+        actions.append(
+            "先在编辑器的项目巡检页运行“项目医生一键安全修复”，处理入口场景、章节顺序和场景顺序。"
+            + command_hint
+        )
     if {"asset_file_missing", "asset_reference_missing"} & issue_codes:
         actions.append("回到素材页重新导入缺失素材，或把剧情/角色/UI 引用改成现有素材。")
     if {"scene_reference_missing", "character_reference_missing", "variable_reference_missing"} & issue_codes:
@@ -951,7 +1002,7 @@ def analyze_project(project_dir: Path) -> dict[str, Any]:
         chapters,
     )
 
-    return {
+    report = {
         "projectDir": display_path(project_dir),
         "summary": summary,
         "metrics": metrics,
@@ -963,6 +1014,13 @@ def analyze_project(project_dir: Path) -> dict[str, Any]:
         },
         "issues": [issue.as_dict() for issue in issues],
     }
+    safe_repair_command = build_safe_repair_command(report)
+    safe_repair_preview_command = build_safe_repair_command(report, dry_run=True)
+    if safe_repair_command:
+        report["safeRepairCommand"] = safe_repair_command
+    if safe_repair_preview_command:
+        report["safeRepairPreviewCommand"] = safe_repair_preview_command
+    return report
 
 
 def write_json_report(path: Path, report: dict[str, Any]) -> None:
@@ -987,6 +1045,8 @@ def write_markdown_report(path: Path, report: dict[str, Any]) -> None:
     next_actions = build_next_actions(report)
     code_summary = build_issue_code_summary(report)
     repair_result = report.get("repairResult") if isinstance(report.get("repairResult"), dict) else None
+    safe_repair_command = str(report.get("safeRepairCommand") or "").strip()
+    safe_repair_preview_command = str(report.get("safeRepairPreviewCommand") or "").strip()
     lines = [
         "# Tony Na Engine Project Health Report",
         "",
@@ -1003,6 +1063,10 @@ def write_markdown_report(path: Path, report: dict[str, Any]) -> None:
             "- Safe repair groups: "
             + ", ".join(f"{repair_code}={count}" for repair_code, count in sorted(repair_code_counts.items()))
         )
+    if safe_repair_preview_command:
+        lines.append(f"- Optional safe repair preview command: `{safe_repair_preview_command}`")
+    if safe_repair_command:
+        lines.append(f"- Optional safe repair command: `{safe_repair_command}`")
     lines.extend(
         [
             "",
@@ -1071,12 +1135,15 @@ def write_markdown_report(path: Path, report: dict[str, Any]) -> None:
     )
     lines.extend(f"- {action}" for action in next_actions)
     if repair_result:
+        is_dry_run = bool(repair_result.get("dryRun"))
         lines.extend(
             [
                 "",
-                "## Safe Repair Result",
+                "## Safe Repair Preview" if is_dry_run else "## Safe Repair Result",
                 "",
                 f"- Changed: {repair_result.get('changed', False)}",
+                f"- Would change: {repair_result.get('wouldChange', False)}",
+                f"- Dry run: {is_dry_run}",
                 f"- Repaired: {len(repair_result.get('repairs', []))}",
                 f"- Skipped: {len(repair_result.get('skipped', []))}",
             ]
@@ -1122,6 +1189,8 @@ def build_terminal_summary_lines(report: dict[str, Any], report_paths: Sequence[
     sorted_issues = get_sorted_issues(report)
     repair_code_counts = summary.get("autoFixableByRepairCode", {})
     repair_result = report.get("repairResult") if isinstance(report.get("repairResult"), dict) else None
+    safe_repair_command = str(report.get("safeRepairCommand") or "").strip()
+    safe_repair_preview_command = str(report.get("safeRepairPreviewCommand") or "").strip()
     lines = [
         "Tony Na Engine Project Health",
         f"Project: {report.get('projectDir', '')}",
@@ -1152,10 +1221,17 @@ def build_terminal_summary_lines(report: dict[str, Any], report_paths: Sequence[
             "Safe repair groups: "
             + ", ".join(f"{repair_code}={count}" for repair_code, count in sorted(repair_code_counts.items()))
         )
+    if safe_repair_preview_command:
+        lines.append(f"Safe repair preview command: {safe_repair_preview_command}")
+    if safe_repair_command:
+        lines.append(f"Safe repair command: {safe_repair_command}")
     if repair_result:
         repairs = repair_result.get("repairs", []) if isinstance(repair_result.get("repairs"), list) else []
         skipped = repair_result.get("skipped", []) if isinstance(repair_result.get("skipped"), list) else []
-        lines.append(f"Safe repair result: repaired {len(repairs)} / skipped {len(skipped)}")
+        if repair_result.get("dryRun"):
+            lines.append(f"Safe repair preview: would repair {len(repairs)} / skip {len(skipped)}")
+        else:
+            lines.append(f"Safe repair result: repaired {len(repairs)} / skipped {len(skipped)}")
         for repair in repairs[:5]:
             lines.append(f"  - {repair.get('title', '已安全修复')}")
     if sorted_issues:
@@ -1193,15 +1269,41 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
         "--repair-codes",
         help="Comma- or space-separated safe repair codes to apply with --repair-safe. Defaults to the current auto-fixable groups.",
     )
-    return parser.parse_args(argv)
+    parser.add_argument(
+        "--repair-dry-run",
+        action="store_true",
+        help="Preview the selected --repair-safe changes without writing project files.",
+    )
+    args = parser.parse_args(argv)
+    if args.repair_codes and not args.repair_safe:
+        parser.error("--repair-codes requires --repair-safe so the tool never writes files by accident.")
+    if args.repair_dry_run and not args.repair_safe:
+        parser.error("--repair-dry-run requires --repair-safe so the preview always uses explicit safe repair mode.")
+    if args.repair_safe and args.repair_codes:
+        unknown_codes = get_unknown_safe_repair_codes(args.repair_codes)
+        if unknown_codes:
+            parser.error(
+                "--repair-codes contains unknown code(s): "
+                + ", ".join(unknown_codes)
+                + f". Available: {SAFE_REPAIR_CODE_LABEL}."
+            )
+        if not normalize_safe_repair_codes(args.repair_codes):
+            parser.error(f"--repair-codes must include at least one of: {SAFE_REPAIR_CODE_LABEL}.")
+    return args
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv or sys.argv[1:])
     report = analyze_project(args.project_dir)
     if args.repair_safe:
-        repair_result = repair_safe_project_issues(args.project_dir, args.repair_codes, report)
-        report = analyze_project(args.project_dir)
+        repair_result = repair_safe_project_issues(
+            args.project_dir,
+            args.repair_codes,
+            report,
+            dry_run=args.repair_dry_run,
+        )
+        if not args.repair_dry_run:
+            report = analyze_project(args.project_dir)
         report["repairResult"] = repair_result
     if args.json_report:
         write_json_report(args.json_report, report)

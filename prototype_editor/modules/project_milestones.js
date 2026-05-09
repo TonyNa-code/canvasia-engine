@@ -404,7 +404,137 @@
     };
   }
 
+  function getActionKey(action = {}) {
+    return [
+      action.action ?? "",
+      action.screen ?? action.dataset?.screen ?? "",
+      action.sceneId ?? "",
+      action.blockId ?? "",
+      action.characterId ?? "",
+      action.chapterId ?? "",
+      action.assetId ?? "",
+      action.dataset?.["export-target"] ?? action.dataset?.exportTarget ?? "",
+    ].join(":");
+  }
+
+  function normalizeBriefAction(action, fallback = null) {
+    const base = action && typeof action === "object" ? action : fallback;
+    if (!base || typeof base !== "object") {
+      return null;
+    }
+    const normalized = {
+      label: String(base.label ?? "去处理"),
+      action: String(base.action ?? "switch-screen"),
+    };
+    ["href", "screen", "sceneId", "blockId", "characterId", "chapterId", "assetId"].forEach((key) => {
+      if (base[key]) {
+        normalized[key] = String(base[key]);
+      }
+    });
+    if (base.dataset && typeof base.dataset === "object") {
+      normalized.dataset = { ...base.dataset };
+    }
+    return normalized;
+  }
+
+  function dedupeBriefActions(actions = []) {
+    const seen = new Set();
+    const normalizedActions = [];
+    actions
+      .map((action) => normalizeBriefAction(action))
+      .filter(Boolean)
+      .forEach((action) => {
+        const key = getActionKey(action);
+        if (seen.has(key)) {
+          return;
+        }
+        seen.add(key);
+        normalizedActions.push(action);
+      });
+    return normalizedActions;
+  }
+
+  function buildProjectMilestoneActionBrief(plan = {}) {
+    const digest = buildProjectMilestoneGapDigest(plan);
+    const focusMilestone = plan.nextMilestone ?? (Array.isArray(plan.milestones) ? plan.milestones[0] : null);
+    const primaryGap = digest.primaryGap ?? null;
+    const isReady = digest.status === "ready";
+    const primaryAction = normalizeBriefAction(
+      isReady
+        ? { label: "去试玩验收", action: "switch-screen", screen: "preview" }
+        : digest.nextAction,
+      { label: "打开项目巡检", action: "switch-screen", screen: "inspection" }
+    );
+    const secondarySeedActions = isReady
+      ? [
+          { label: "重新导出网页包", action: "export-build", dataset: { "export-target": "web" } },
+          { label: "打开项目巡检", action: "switch-screen", screen: "inspection" },
+          { label: "查看成品路线", action: "switch-screen", screen: "dashboard" },
+        ]
+      : [
+          { label: "打开项目巡检", action: "switch-screen", screen: "inspection" },
+          { label: "查看成品路线", action: "switch-screen", screen: "dashboard" },
+          { label: "去试玩确认", action: "switch-screen", screen: "preview" },
+        ];
+    const secondaryActions = dedupeBriefActions([
+      primaryAction,
+      ...secondarySeedActions,
+    ]).filter((action) => getActionKey(action) !== getActionKey(primaryAction));
+
+    const checklist = isReady
+      ? [
+          {
+            label: "人工长流程试玩",
+            detail: "从头到尾跑一次主要路线，记录卡顿、错字和演出节奏问题。",
+            done: false,
+          },
+          {
+            label: "整理发布附件",
+            detail: "确认下载包、校验文件、说明文档和截图都已准备好。",
+            done: false,
+          },
+          {
+            label: "撰写 Release notes",
+            detail: "用玩家能看懂的话说明当前版本能做什么、已知限制是什么。",
+            done: false,
+          },
+        ]
+      : (digest.topGaps ?? []).slice(0, 3).map((gap) => ({
+          label: gap.label ?? "待处理项",
+          detail: gap.missing || gap.detail || "继续补齐这个条件。",
+          done: Boolean(gap.done),
+        }));
+
+    return {
+      status: digest.status,
+      tone: isReady ? "good" : digest.status === "close" ? "warn" : "danger",
+      eyebrow: isReady ? "今日工作台" : digest.eyebrow,
+      badge: isReady ? "准备验收" : digest.status === "close" ? "快到发布" : "优先推进",
+      title: isReady
+        ? "进入人工验收和发布附件整理"
+        : primaryGap
+          ? `先做：${primaryGap.missing || primaryGap.label}`
+          : digest.title,
+      description: isReady
+        ? "核心发布门槛已经达标，现在最值钱的是人工试玩、附件整理和版本说明。"
+        : `这是通往「${digest.nextMilestoneTitle || focusMilestone?.title || "当前阶段"}」的最短路径；做完后再跑一次巡检和试玩确认。`,
+      primaryAction,
+      secondaryActions: secondaryActions.slice(0, 2),
+      metrics: [
+        { label: "总进度", value: `${digest.overallScore}%`, hint: `${digest.completedCount}/${digest.totalCount} 个阶段达标` },
+        {
+          label: digest.gapMetricLabel ?? "阶段缺口",
+          value: `${digest.activeBlockerCount ?? digest.releaseBlockerCount ?? 0} 项`,
+          hint: digest.gapMetricHint ?? "先清掉这一阶段",
+        },
+        { label: "当前阶段", value: digest.nextMilestoneTitle, hint: focusMilestone?.label ?? "按按钮继续推进" },
+      ],
+      checklist,
+    };
+  }
+
   const projectMilestonesApi = Object.freeze({
+    buildProjectMilestoneActionBrief,
     buildProjectMilestonePlan,
     buildProjectMilestoneGapDigest,
     clampPercent,

@@ -206,6 +206,70 @@ class FrontendProjectMilestonesModuleTests(unittest.TestCase):
         self.assertEqual(payload["ready"]["title"], "发布候选核心条件已达标")
         self.assertEqual(payload["ready"]["topGaps"], [])
 
+    def test_project_milestone_action_brief_guides_the_next_click(self) -> None:
+        payload = self.run_module_script(
+            """
+            const earlyPlan = tools.buildProjectMilestonePlan({
+              totalChapters: 0,
+              totalScenes: 0,
+              scenesWithContent: 0,
+              scenesWithBackground: 0,
+              scenesWithMusic: 0,
+              scenesWithEffects: 0,
+              totalDialogueCount: 0,
+              voicedDialogueCount: 0,
+              readyAssetCount: 0,
+              totalAssetCount: 0,
+              validationErrorCount: 1,
+              validationWarningCount: 0,
+              brokenRoutes: 0,
+              orphanScenes: 0,
+              hasStarterKit: false,
+              hasExport: false,
+              regressionPass: false,
+            });
+            const readyPlan = tools.buildProjectMilestonePlan({
+              totalChapters: 3,
+              totalScenes: 6,
+              scenesWithContent: 6,
+              scenesWithBackground: 6,
+              scenesWithMusic: 5,
+              scenesWithEffects: 3,
+              totalDialogueCount: 30,
+              voicedDialogueCount: 22,
+              readyAssetCount: 29,
+              totalAssetCount: 30,
+              validationErrorCount: 0,
+              validationWarningCount: 0,
+              brokenRoutes: 0,
+              orphanScenes: 0,
+              hasStarterKit: true,
+              hasExport: true,
+              regressionPass: true,
+            });
+            process.stdout.write(JSON.stringify({
+              early: tools.buildProjectMilestoneActionBrief(earlyPlan),
+              ready: tools.buildProjectMilestoneActionBrief(readyPlan),
+            }));
+            """
+        )
+
+        self.assertEqual(payload["early"]["badge"], "优先推进")
+        self.assertIn("先做：先创建第一章和第一场", payload["early"]["title"])
+        self.assertEqual(payload["early"]["primaryAction"]["action"], "create-first-chapter")
+        self.assertEqual(payload["early"]["metrics"][0]["label"], "总进度")
+        self.assertEqual(payload["early"]["checklist"][0]["label"], "章节和场景骨架")
+        self.assertEqual(payload["ready"]["tone"], "good")
+        self.assertEqual(payload["ready"]["badge"], "准备验收")
+        self.assertEqual(payload["ready"]["primaryAction"]["action"], "switch-screen")
+        self.assertEqual(payload["ready"]["primaryAction"]["screen"], "preview")
+        self.assertEqual(payload["ready"]["secondaryActions"][0]["action"], "export-build")
+        self.assertEqual(payload["ready"]["secondaryActions"][0]["label"], "重新导出网页包")
+        self.assertEqual(payload["ready"]["secondaryActions"][0]["dataset"], {"export-target": "web"})
+        self.assertEqual(payload["ready"]["secondaryActions"][1]["action"], "switch-screen")
+        self.assertEqual(payload["ready"]["secondaryActions"][1]["screen"], "inspection")
+        self.assertEqual([item["label"] for item in payload["ready"]["checklist"]], ["人工长流程试玩", "整理发布附件", "撰写 Release notes"])
+
     def test_project_milestones_can_reach_all_done(self) -> None:
         payload = self.run_module_script(
             """
@@ -343,6 +407,14 @@ class FrontendProjectMilestonesModuleTests(unittest.TestCase):
     def test_project_milestones_are_visible_from_inspection_overview(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
 
+        self.assertIn("function renderDashboardActionBrief", source)
+        self.assertIn("${renderDashboardActionBrief(routeOverview)}", source)
+        self.assertIn("creator-focus-panel", source)
+        self.assertIn("今日工作台", source)
+        self.assertIn("function dedupeDashboardActionBriefActions", source)
+        self.assertIn('label: "重新导出网页包", action: "export-build", dataset: { "export-target": "web" }', source)
+        self.assertIn("secondaryActions: secondaryActions.slice(0, 2)", source)
+        self.assertIn("人工长流程试玩", source)
         self.assertIn("function renderCompactProjectMilestonePanel", source)
         self.assertIn("project-milestone-compact-panel", source)
         self.assertIn("function renderProjectMilestoneGapDigest", source)
@@ -355,13 +427,20 @@ class FrontendProjectMilestonesModuleTests(unittest.TestCase):
 
     def test_project_milestone_cards_follow_theme_surface_rules(self) -> None:
         source = STYLE_PATH.read_text(encoding="utf-8")
+        creator_focus_styles = source.split(".creator-focus-panel {", 1)[1].split(".recent-work-panel", 1)[0]
 
+        self.assertIn(".creator-focus-panel", source)
+        self.assertIn(".creator-focus-layout", source)
+        self.assertIn(".creator-focus-checklist", source)
         self.assertIn(".project-milestone-card,", source)
         self.assertIn(".project-milestone-gap-digest,", source)
         self.assertIn(".project-milestone-check,", source)
         self.assertIn(".project-milestone-gap-item,", source)
         self.assertIn(".project-milestone-card.is-good", source)
         self.assertIn(".project-milestone-gap-digest.is-ready", source)
+        self.assertNotIn("radial-gradient", creator_focus_styles)
+        self.assertNotIn("clamp(", creator_focus_styles)
+        self.assertIn("letter-spacing: 0;", creator_focus_styles)
         self.assertIn(".project-milestone-card.is-warn", source)
         self.assertIn(".project-milestone-gap-digest.is-close", source)
         self.assertIn(".project-milestone-card.is-danger", source)

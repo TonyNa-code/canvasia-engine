@@ -4046,6 +4046,10 @@ async function handleClick(event) {
   if (!actionTarget) {
     return;
   }
+  if (actionTarget.matches(":disabled") || actionTarget.getAttribute("aria-disabled") === "true") {
+    event.preventDefault();
+    return;
+  }
 
   const { action } = actionTarget.dataset;
 
@@ -4719,6 +4723,11 @@ async function handleClick(event) {
 
   if (action === "repair-project-doctor") {
     void repairProjectDoctor(actionTarget.dataset.repairCodes);
+    return;
+  }
+
+  if (action === "preview-project-doctor-repair") {
+    void repairProjectDoctor(actionTarget.dataset.repairCodes, { dryRun: true });
     return;
   }
 
@@ -11013,6 +11022,7 @@ function renderDashboard() {
       </section>
     </div>
 
+    ${renderDashboardActionBrief(routeOverview)}
     ${isBlankProject ? renderBlankProjectStarterPanel("dashboard") : starterKitPanel}
     ${!isAdvancedMode ? renderBeginnerDashboardWorkflow(routeOverview) : ""}
     ${renderDashboardProductionBoard(routeOverview)}
@@ -11273,6 +11283,138 @@ function buildProjectMilestoneGapDigest(plan) {
   };
 }
 
+function getDashboardActionBriefKey(action = {}) {
+  return [
+    action.action ?? "",
+    action.screen ?? action.dataset?.screen ?? "",
+    action.sceneId ?? "",
+    action.blockId ?? "",
+    action.characterId ?? "",
+    action.chapterId ?? "",
+    action.assetId ?? "",
+    action.dataset?.["export-target"] ?? action.dataset?.exportTarget ?? "",
+  ].join(":");
+}
+
+function normalizeDashboardActionBriefAction(action, fallback = null) {
+  const source = action && typeof action === "object" ? action : fallback;
+  if (!source || typeof source !== "object") {
+    return null;
+  }
+  const normalized = {
+    label: String(source.label ?? "去处理"),
+    action: String(source.action ?? "switch-screen"),
+  };
+  ["href", "screen", "sceneId", "blockId", "characterId", "chapterId", "assetId"].forEach((key) => {
+    if (source[key]) {
+      normalized[key] = String(source[key]);
+    }
+  });
+  if (source.dataset && typeof source.dataset === "object") {
+    normalized.dataset = { ...source.dataset };
+  }
+  return normalized;
+}
+
+function dedupeDashboardActionBriefActions(actions = []) {
+  const seen = new Set();
+  const normalizedActions = [];
+  actions
+    .map((action) => normalizeDashboardActionBriefAction(action))
+    .filter(Boolean)
+    .forEach((action) => {
+      const key = getDashboardActionBriefKey(action);
+      if (seen.has(key)) {
+        return;
+      }
+      seen.add(key);
+      normalizedActions.push(action);
+    });
+  return normalizedActions;
+}
+
+function buildProjectMilestoneActionBrief(plan) {
+  if (projectMilestoneTools?.buildProjectMilestoneActionBrief) {
+    return projectMilestoneTools.buildProjectMilestoneActionBrief(plan);
+  }
+
+  const digest = buildProjectMilestoneGapDigest(plan);
+  const focusMilestone = plan?.nextMilestone ?? (Array.isArray(plan?.milestones) ? plan.milestones[0] : null);
+  const primaryGap = digest.primaryGap ?? null;
+  const isReady = digest.status === "ready";
+  const primaryAction = normalizeDashboardActionBriefAction(
+    isReady
+      ? { label: "去试玩验收", action: "switch-screen", screen: "preview" }
+      : digest.nextAction,
+    { label: "打开项目巡检", action: "switch-screen", screen: "inspection" }
+  );
+  const secondarySeedActions = isReady
+    ? [
+        { label: "重新导出网页包", action: "export-build", dataset: { "export-target": "web" } },
+        { label: "打开项目巡检", action: "switch-screen", screen: "inspection" },
+        { label: "查看成品路线", action: "switch-screen", screen: "dashboard" },
+      ]
+    : [
+        { label: "打开项目巡检", action: "switch-screen", screen: "inspection" },
+        { label: "查看成品路线", action: "switch-screen", screen: "dashboard" },
+        { label: "去试玩确认", action: "switch-screen", screen: "preview" },
+      ];
+  const secondaryActions = dedupeDashboardActionBriefActions([
+    primaryAction,
+    ...secondarySeedActions,
+  ]).filter((action) => getDashboardActionBriefKey(action) !== getDashboardActionBriefKey(primaryAction));
+  const checklist = isReady
+    ? [
+        {
+          label: "人工长流程试玩",
+          detail: "从头到尾跑一次主要路线，记录卡顿、错字和演出节奏问题。",
+          done: false,
+        },
+        {
+          label: "整理发布附件",
+          detail: "确认下载包、校验文件、说明文档和截图都已准备好。",
+          done: false,
+        },
+        {
+          label: "撰写 Release notes",
+          detail: "用玩家能看懂的话说明当前版本能做什么、已知限制是什么。",
+          done: false,
+        },
+      ]
+    : (digest.topGaps ?? []).slice(0, 3).map((gap) => ({
+        label: gap.label ?? "待处理项",
+        detail: gap.missing || gap.detail || "继续补齐这个条件。",
+        done: Boolean(gap.done),
+      }));
+
+  return {
+    status: digest.status,
+    tone: isReady ? "good" : digest.status === "close" ? "warn" : "danger",
+    eyebrow: isReady ? "今日工作台" : digest.eyebrow,
+    badge: isReady ? "准备验收" : digest.status === "close" ? "快到发布" : "优先推进",
+    title: isReady
+      ? "进入人工验收和发布附件整理"
+      : primaryGap
+        ? `先做：${primaryGap.missing || primaryGap.label}`
+        : digest.title,
+    description: isReady
+      ? "核心发布门槛已经达标，现在最值钱的是人工试玩、附件整理和版本说明。"
+      : `这是通往「${digest.nextMilestoneTitle || focusMilestone?.title || "当前阶段"}」的最短路径；做完后再跑一次巡检和试玩确认。`,
+    primaryAction,
+    secondaryActions: secondaryActions.slice(0, 2),
+    metrics: [
+      { label: "总进度", value: `${digest.overallScore}%`, hint: `${digest.completedCount}/${digest.totalCount} 个阶段达标` },
+      {
+        label: digest.gapMetricLabel ?? "阶段缺口",
+        value: `${digest.activeBlockerCount ?? digest.releaseBlockerCount ?? 0} 项`,
+        hint: digest.gapMetricHint ?? "先清掉这一阶段",
+      },
+      { label: "当前阶段", value: digest.nextMilestoneTitle, hint: focusMilestone?.label ?? "按按钮继续推进" },
+    ],
+    checklist,
+  };
+}
+
 function getProjectMilestoneToneClass(tone) {
   if (tone === "danger") {
     return "danger-text";
@@ -11294,6 +11436,66 @@ function getProjectMilestoneGapToneClass(status) {
     return "warn-text";
   }
   return "danger-text";
+}
+
+function renderDashboardActionBriefChecklist(items = []) {
+  if (!items.length) {
+    return `
+      <div class="creator-focus-checklist">
+        <article class="creator-focus-check is-done">
+          <strong>当前没有明显缺口</strong>
+          <span>可以继续试玩、导出或进入人工验收。</span>
+        </article>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="creator-focus-checklist">
+      ${items
+        .map(
+          (item) => `
+            <article class="creator-focus-check ${item.done ? "is-done" : ""}">
+              <strong>${escapeHtml(item.label ?? "待处理项")}</strong>
+              <span>${escapeHtml(item.detail ?? "继续补齐这个条件。")}</span>
+            </article>
+          `
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function renderDashboardActionBrief(routeOverview) {
+  const overview = buildDashboardProductionOverview(routeOverview);
+  const plan = buildProjectMilestonePlan(routeOverview, overview);
+  const brief = buildProjectMilestoneActionBrief(plan);
+  const actions = [brief.primaryAction, ...(brief.secondaryActions ?? [])].filter(Boolean).slice(0, 3);
+  const metrics = Array.isArray(brief.metrics) ? brief.metrics : [];
+
+  return `
+    <section class="panel creator-focus-panel is-${escapeHtml(brief.tone ?? brief.status ?? "soft")}">
+      <div class="creator-focus-layout">
+        <article class="creator-focus-main">
+          <div class="creator-focus-head">
+            <span class="eyebrow">${escapeHtml(brief.eyebrow ?? "今日工作台")}</span>
+            <span class="badge badge-soft ${getProjectMilestoneToneClass(brief.tone)}">${escapeHtml(brief.badge ?? "下一步")}</span>
+          </div>
+          <h2>${escapeHtml(brief.title ?? "继续推进当前项目")}</h2>
+          <p>${escapeHtml(brief.description ?? "按当前项目状态选择最短路径，做完后再回到巡检和试玩确认。")}</p>
+          <div class="script-entry-actions">
+            ${renderProjectMilestoneActions(actions)}
+          </div>
+        </article>
+        <div class="creator-focus-side">
+          <div class="route-summary-strip creator-focus-metrics">
+            ${metrics.map((metric) => renderRouteMetricCard(metric.label, metric.value, metric.hint)).join("")}
+          </div>
+          ${renderDashboardActionBriefChecklist(brief.checklist)}
+        </div>
+      </div>
+    </section>
+  `;
 }
 
 function renderProjectMilestoneGapList(gaps = []) {
@@ -12239,6 +12441,8 @@ function renderDashboardTaskActions(actions = []) {
 function renderQuickActionButton(action, emphasized = false) {
   const className = `toolbar-button${emphasized ? " toolbar-button-primary" : ""}`;
   const label = escapeHtml(action.label ?? "去处理");
+  const disabledMarkup = action.disabled ? ' disabled aria-disabled="true"' : "";
+  const titleMarkup = action.title ? ` title="${escapeHtml(action.title)}"` : "";
   const datasetMarkup = Object.entries(action.dataset ?? {})
     .map(([key, value]) => ` data-${key}="${escapeHtml(String(value ?? ""))}"`)
     .join("");
@@ -12355,6 +12559,8 @@ function renderQuickActionButton(action, emphasized = false) {
       type="button"
       class="${className}"
       data-action="${escapeHtml(action.action ?? "")}"
+      ${titleMarkup}
+      ${disabledMarkup}
       ${datasetMarkup}
     >
       ${label}
@@ -25700,6 +25906,130 @@ function buildReleaseChecklistSummary(items = buildReleaseChecklistItems()) {
   };
 }
 
+function buildFinalPublishGate(items = buildReleaseChecklistItems(), releaseFixOrder = null) {
+  if (releaseControlTools?.buildFinalPublishGate) {
+    return releaseControlTools.buildFinalPublishGate({
+      releaseChecklistItems: items,
+      releaseFixOrder,
+      regressionResult: state.inspectionRegressionResult,
+      exportResult: state.lastExportResult,
+    });
+  }
+
+  const blockerItems = items.filter((item) => item.severity === "blocker");
+  const warnItems = items.filter((item) => item.severity === "warn");
+  const readyItems = items.filter((item) => item.severity === "good");
+  const regressionSummary = state.inspectionRegressionResult?.summary ?? null;
+  const regressionFailCount = Number(regressionSummary?.failCount ?? 0);
+  const regressionWarnCount = Number(regressionSummary?.warnCount ?? 0);
+  const hasRegressionRun = Boolean(state.inspectionRegressionResult);
+  const status = blockerItems.length || regressionFailCount > 0 ? "blocked" : warnItems.length || regressionWarnCount > 0 || !hasRegressionRun ? "preview" : "ready";
+  const primaryAction =
+    status === "blocked"
+      ? blockerItems.find((item) => item.action)?.action ?? releaseFixOrder?.steps?.[0]?.actions?.[0] ?? { label: "一键生成修复顺序", action: "generate-release-fix-order" }
+      : status === "preview"
+        ? !hasRegressionRun
+          ? { label: "先跑自动回归试玩", action: "run-preview-regression" }
+          : warnItems.find((item) => item.action)?.action ?? { label: "导出发布总控报告", action: "export-release-control-report" }
+        : { label: "导出发布总控报告", action: "export-release-control-report" };
+  return {
+    status,
+    tone: status === "blocked" ? "danger" : status === "preview" ? "warn" : "good",
+    badge: status === "blocked" ? "暂缓发布" : status === "preview" ? "可发 Preview" : "可以公开发布",
+    title:
+      status === "blocked"
+        ? `暂缓公开发布：还有 ${blockerItems.length + regressionFailCount} 个阻塞项`
+        : status === "preview"
+          ? "可以发布 Preview，但建议先确认提醒项"
+          : "可以进入公开发布流程",
+    description:
+      status === "blocked"
+        ? "这些问题可能造成断线、缺素材、包体异常或回归失败。建议先按门禁里的主按钮处理，再重新导出。"
+        : status === "preview"
+          ? "当前没有硬阻塞，适合按 Preview / Early Access 口径发布；如果想更稳，先把提醒和回归试玩补齐。"
+          : "当前发布检查、回归和导出状态都比较干净，可以开始整理 GitHub Release 附件和发布说明。",
+    metrics: [
+      { label: "阻塞", value: `${blockerItems.length + regressionFailCount} 个`, hint: "公开发布前建议清零" },
+      { label: "提醒", value: `${warnItems.length + regressionWarnCount + (hasRegressionRun ? 0 : 1)} 个`, hint: "Preview 可带说明发布" },
+      { label: "通过", value: `${readyItems.length}/${items.length}`, hint: "发布检查清单已就绪项" },
+      { label: "最近导出", value: state.lastExportResult?.targetLabel ?? state.lastExportResult?.target ?? "尚未导出", hint: hasRegressionRun ? "已跑过自动回归" : "还没跑自动回归" },
+    ],
+    primaryAction,
+    secondaryActions:
+      status === "ready"
+        ? [
+            { label: "导出网页包", action: "export-build", dataset: { "export-target": "web" } },
+            { label: "导出原生 Runtime", action: "export-build", dataset: { "export-target": "native_runtime" } },
+          ]
+        : [
+            { label: "导出巡检报告", action: "export-inspection-report" },
+            { label: "导出发布总控 JSON", action: "export-release-control-json" },
+          ],
+    checklist: (status === "blocked" ? blockerItems : warnItems).slice(0, 3).map((item) => ({
+      label: item.title,
+      detail: item.description,
+      done: false,
+      action: item.action,
+    })),
+  };
+}
+
+function renderFinalPublishGateChecklist(items = []) {
+  if (!items.length) {
+    return `
+      <div class="project-milestone-gap-list final-publish-gate-list">
+        <article class="project-milestone-gap-item is-done">
+          <strong>关键发布门槛已达标</strong>
+          <span>可以进入附件整理、发布说明和最后人工验收。</span>
+        </article>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="project-milestone-gap-list final-publish-gate-list">
+      ${items
+        .map(
+          (item) => `
+            <article class="project-milestone-gap-item ${item.done ? "is-done" : ""}">
+              <strong>${escapeHtml(item.label ?? "发布前待处理项")}</strong>
+              <span>${escapeHtml(item.detail ?? "继续补齐这个发布门槛。")}</span>
+            </article>
+          `
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function renderFinalPublishGatePanel(routeOverview) {
+  const releaseItems = buildReleaseChecklistItems();
+  const releaseFixOrder = buildReleaseFixOrder(routeOverview);
+  const gate = buildFinalPublishGate(releaseItems, releaseFixOrder);
+  const actions = [gate.primaryAction, ...(gate.secondaryActions ?? [])].filter(Boolean).slice(0, 3);
+  const toneClass = gate.tone === "danger" ? "danger-text" : gate.tone === "warn" ? "warn-text" : "good-text";
+
+  return `
+    <article class="detail-card preview-sprint-panel final-publish-gate is-${escapeHtml(gate.tone ?? "soft")}">
+      <div class="preview-sprint-head">
+        <div>
+          <span class="eyebrow">最终发表门禁</span>
+          <strong>${escapeHtml(gate.title ?? "发布前最终确认")}</strong>
+        </div>
+        <span class="issue-tag ${toneClass}">${escapeHtml(gate.badge ?? "待确认")}</span>
+      </div>
+      <p>${escapeHtml(gate.description ?? "按这里的结论完成最后发布前确认。")}</p>
+      <div class="preview-sprint-metrics">
+        ${(gate.metrics ?? []).map((metric) => renderRouteMetricCard(metric.label, metric.value, metric.hint)).join("")}
+      </div>
+      ${renderFinalPublishGateChecklist(gate.checklist)}
+      <div class="script-entry-actions">
+        ${renderProjectMilestoneActions(actions)}
+      </div>
+    </article>
+  `;
+}
+
 function renderReleaseChecklistCard(item) {
   return `
     <article class="issue-card">
@@ -26477,6 +26807,7 @@ function renderProjectValidationSummary() {
     ${renderEditorModeGuideCard("preview")}
     ${renderCompactProjectMilestonePanel(routeOverview)}
     ${renderReleaseSettingsPanel()}
+    ${renderFinalPublishGatePanel(routeOverview)}
     ${renderReleaseChecklistPanel()}
     ${renderPlayerProfileOverviewPanel()}
     ${renderVoiceReplayOverviewPanel()}
@@ -28423,6 +28754,29 @@ function serializeProjectMilestoneGapDigest(digest) {
   };
 }
 
+function serializeFinalPublishGate(gate) {
+  return {
+    status: gate?.status ?? "",
+    tone: gate?.tone ?? "",
+    badge: gate?.badge ?? "",
+    title: gate?.title ?? "",
+    description: gate?.description ?? "",
+    metrics: (gate?.metrics ?? []).map((metric) => ({
+      label: metric?.label ?? "",
+      value: metric?.value ?? "",
+      hint: metric?.hint ?? "",
+    })),
+    primaryAction: serializeReleaseReportAction(gate?.primaryAction),
+    secondaryActions: (gate?.secondaryActions ?? []).map(serializeReleaseReportAction).filter(Boolean),
+    checklist: (gate?.checklist ?? []).map((item) => ({
+      label: item?.label ?? "",
+      detail: item?.detail ?? "",
+      done: Boolean(item?.done),
+      action: serializeReleaseReportAction(item?.action),
+    })),
+  };
+}
+
 function formatProjectMilestonePrimaryBlocker(milestone) {
   const blocker = milestone?.blockers?.[0];
   if (!blocker) {
@@ -28496,6 +28850,7 @@ function buildReleaseControlReportPayload() {
   const releaseItems = buildReleaseChecklistItems();
   const releaseSummary = buildReleaseChecklistSummary(releaseItems);
   const releaseFixOrder = buildReleaseFixOrder(routeOverview);
+  const finalPublishGate = buildFinalPublishGate(releaseItems, releaseFixOrder);
   const projectDoctorQueue = buildProjectDoctorQueue(routeOverview, issueItems);
   const projectDoctorSummary = buildProjectDoctorSummary(projectDoctorQueue);
   const projectMilestonePlan = buildProjectMilestonePlan(routeOverview);
@@ -28530,6 +28885,7 @@ function buildReleaseControlReportPayload() {
       readyCount: releaseItems.filter((item) => item.severity === "good").length,
       metrics: releaseSummary.metrics.map(([label, value]) => ({ label, value })),
     },
+    finalPublishGate: serializeFinalPublishGate(finalPublishGate),
     validation: {
       errorCount: state.validation.errors.length,
       warningCount: state.validation.warnings.length,
@@ -28759,6 +29115,7 @@ function buildInspectionReportContent() {
   const releaseItems = buildReleaseChecklistItems();
   const releaseSummary = buildReleaseChecklistSummary(releaseItems);
   const releaseFixOrder = buildReleaseFixOrder(routeOverview);
+  const finalPublishGate = buildFinalPublishGate(releaseItems, releaseFixOrder);
   const projectDoctorQueue = buildProjectDoctorQueue(routeOverview, issueItems);
   const projectDoctorSummary = buildProjectDoctorSummary(projectDoctorQueue);
   const projectMilestonePlan = buildProjectMilestonePlan(routeOverview);
@@ -28789,6 +29146,10 @@ function buildInspectionReportContent() {
     "发布检查判断：",
     `- ${releaseSummary.title}`,
     `- ${releaseSummary.description}`,
+    "",
+    "最终发表门禁：",
+    `- ${finalPublishGate.badge}：${finalPublishGate.title}`,
+    `- ${finalPublishGate.description}`,
     "",
   ];
 
@@ -28844,12 +29205,13 @@ function buildInspectionReportContent() {
   lines.push("", "项目医生修复队列：");
   lines.push(`- ${projectDoctorSummary.badge}：${projectDoctorSummary.title}`);
   lines.push(`- ${projectDoctorSummary.description}`);
-  lines.push(`- ${projectDoctorSummary.autoRepairLabel ?? "暂无可一键修复项"}`);
+  lines.push(`- ${projectDoctorSummary.autoRepairLabel ?? "暂无可预览修复项"}`);
   if (state.projectDoctorRepairReceipt) {
+    const receiptLabels = getProjectDoctorRepairReceiptReportLabels(state.projectDoctorRepairReceipt);
     lines.push(
-      `- 最近一次安全修复：${state.projectDoctorRepairReceipt.title}`,
-      `- 修复时间：${formatDate(state.projectDoctorRepairReceipt.generatedAt)}`,
-      `- 已修复 / 已跳过：${state.projectDoctorRepairReceipt.repairCount ?? 0} / ${state.projectDoctorRepairReceipt.skippedCount ?? 0}`,
+      `- ${receiptLabels.heading}：${state.projectDoctorRepairReceipt.title}`,
+      `- ${receiptLabels.timeLabel}：${formatDate(state.projectDoctorRepairReceipt.generatedAt)}`,
+      `- ${receiptLabels.countLabel}：${state.projectDoctorRepairReceipt.repairCount ?? 0} / ${state.projectDoctorRepairReceipt.skippedCount ?? 0}`,
       ""
     );
   }
@@ -28969,6 +29331,7 @@ function buildReleaseControlReportContent() {
   const releaseItems = buildReleaseChecklistItems();
   const releaseSummary = buildReleaseChecklistSummary(releaseItems);
   const releaseFixOrder = buildReleaseFixOrder(routeOverview);
+  const finalPublishGate = buildFinalPublishGate(releaseItems, releaseFixOrder);
   const projectDoctorQueue = buildProjectDoctorQueue(routeOverview, issueItems);
   const projectDoctorSummary = buildProjectDoctorSummary(projectDoctorQueue);
   const projectMilestonePlan = buildProjectMilestonePlan(routeOverview);
@@ -28981,6 +29344,9 @@ function buildReleaseControlReportContent() {
   const exportResult = state.lastExportResult;
   const resolution = getProjectResolution();
   const generatedAt = new Date().toISOString();
+  const projectDoctorReceiptLabels = state.projectDoctorRepairReceipt
+    ? getProjectDoctorRepairReceiptReportLabels(state.projectDoctorRepairReceipt)
+    : null;
   const releaseChecklistTable = buildMarkdownTable(
     ["检查项", "状态", "级别", "说明"],
     releaseItems.map((item) => [
@@ -28988,6 +29354,26 @@ function buildReleaseControlReportContent() {
       item.status,
       getReleaseSeverityLabel(item.severity),
       item.description,
+    ])
+  );
+  const finalPublishGateTable = buildMarkdownTable(
+    ["项目", "结果", "说明"],
+    [
+      ["门禁状态", finalPublishGate.badge, finalPublishGate.title],
+      ["门禁结论", finalPublishGate.status, finalPublishGate.description],
+      ...(finalPublishGate.metrics ?? []).map((metric) => [
+        metric.label ?? "",
+        metric.value ?? "",
+        metric.hint ?? "",
+      ]),
+    ]
+  );
+  const finalPublishGateChecklistTable = buildMarkdownTable(
+    ["事项", "说明", "完成"],
+    (finalPublishGate.checklist ?? []).map((item) => [
+      item.label ?? "",
+      item.detail ?? "",
+      item.done ? "是" : "否",
     ])
   );
   const mediaBudgetTable = buildMarkdownTable(
@@ -29110,6 +29496,12 @@ function buildReleaseControlReportContent() {
       ]
     ),
     "",
+    "## 最终发表门禁",
+    "",
+    finalPublishGateTable || "当前没有可列出的最终发表门禁。",
+    "",
+    finalPublishGateChecklistTable || "当前关键发布门槛已达标，可以进入附件整理、发布说明和最后人工验收。",
+    "",
     "## 发布检查清单",
     "",
     releaseChecklistTable || "当前没有可列出的发布检查项。",
@@ -29141,9 +29533,9 @@ function buildReleaseControlReportContent() {
     "",
     `- ${projectDoctorSummary.badge}：${projectDoctorSummary.title}`,
     `- ${projectDoctorSummary.description}`,
-    `- ${projectDoctorSummary.autoRepairLabel ?? "暂无可一键修复项"}`,
-    state.projectDoctorRepairReceipt
-      ? `- 最近一次安全修复：${state.projectDoctorRepairReceipt.title}（已修复 ${state.projectDoctorRepairReceipt.repairCount ?? 0} 项，已跳过 ${state.projectDoctorRepairReceipt.skippedCount ?? 0} 项）`
+    `- ${projectDoctorSummary.autoRepairLabel ?? "暂无可预览修复项"}`,
+    state.projectDoctorRepairReceipt && projectDoctorReceiptLabels
+      ? `- ${projectDoctorReceiptLabels.compactPrefix}：${state.projectDoctorRepairReceipt.title}（${projectDoctorReceiptLabels.repairVerb} ${state.projectDoctorRepairReceipt.repairCount ?? 0} 项，${projectDoctorReceiptLabels.skipVerb} ${state.projectDoctorRepairReceipt.skippedCount ?? 0} 项）`
       : "",
     "",
     projectDoctorTable || "当前没有项目医生需要优先处理的事项。",
@@ -29592,15 +29984,61 @@ function formatProjectDoctorRepairCodes(codes = []) {
   if (!safeCodes.length) {
     return "需手动处理";
   }
-  return `可一键安全修复：${safeCodes.map(getProjectDoctorRepairCodeLabel).join(" / ")}`;
+  return `可先预览安全修复：${safeCodes.map(getProjectDoctorRepairCodeLabel).join(" / ")}`;
 }
 
-function buildProjectDoctorRepairNextActions(status = "clean") {
+function getProjectDoctorRepairReceiptReportLabels(receipt = {}) {
+  const isPreview = receipt?.status === "preview" || Boolean(receipt?.dryRun);
+  const isUnknown = receipt?.status === "unknown";
+  if (isPreview) {
+    return {
+      heading: "最近一次安全修复预览",
+      timeLabel: "预览时间",
+      countLabel: "将修复 / 将跳过",
+      compactPrefix: "最近一次安全修复预览",
+      repairVerb: "将修复",
+      skipVerb: "将跳过",
+    };
+  }
+  if (isUnknown) {
+    return {
+      heading: "最近一次未识别修复请求",
+      timeLabel: "请求时间",
+      countLabel: "可修复 / 已跳过",
+      compactPrefix: "最近一次未识别修复请求",
+      repairVerb: "可修复",
+      skipVerb: "已跳过",
+    };
+  }
+  return {
+    heading: "最近一次安全修复",
+    timeLabel: "修复时间",
+    countLabel: "已修复 / 已跳过",
+    compactPrefix: "最近一次安全修复",
+    repairVerb: "已修复",
+    skipVerb: "已跳过",
+  };
+}
+
+function buildProjectDoctorRepairNextActions(status = "clean", repairCodes = []) {
   if (projectDoctorTools?.buildProjectDoctorRepairNextActions) {
-    return projectDoctorTools.buildProjectDoctorRepairNextActions(status);
+    return projectDoctorTools.buildProjectDoctorRepairNextActions(status, repairCodes);
   }
 
   const repaired = status === "repaired";
+  const preview = status === "preview";
+  const repairCodeText = Array.isArray(repairCodes) ? repairCodes.filter(Boolean).join(",") : "";
+  if (preview) {
+    return [
+      {
+        label: "确认执行安全修复",
+        action: "repair-project-doctor",
+        dataset: repairCodeText ? { "repair-codes": repairCodeText } : {},
+      },
+      { label: "重新巡检确认", action: "run-project-inspection" },
+      { label: "导出巡检报告", action: "export-inspection-report" },
+    ];
+  }
   return [
     { label: "重新巡检确认", action: "run-project-inspection" },
     repaired
@@ -29616,36 +30054,78 @@ function buildProjectDoctorRepairReceipt(result) {
   }
 
   const repairs = Array.isArray(result?.repairs) ? result.repairs : [];
-  const skipped = Array.isArray(result?.skipped) ? result.skipped : [];
-  const changed = Boolean(result?.changed) || repairs.length > 0;
-  const status = changed ? "repaired" : "clean";
+  const dryRun = Boolean(result?.dryRun);
+  const changed = Boolean(result?.changed);
+  const wouldChange = Boolean(result?.wouldChange) || repairs.length > 0;
+  const requestedCodes = Array.isArray(result?.requestedCodes) ? result.requestedCodes.filter(Boolean) : [];
+  const ignoredCodes = Array.isArray(result?.ignoredCodes) ? result.ignoredCodes.filter(Boolean) : [];
+  const skipped = [
+    ...(Array.isArray(result?.skipped) ? result.skipped : []),
+    ...ignoredCodes.map((code) => ({
+      code: `ignored_${code}`,
+      title: `未识别修复码：${code}`,
+      detail: "这个修复码不属于当前安全修复范围，可能来自过期按钮或手动输入；请重新巡检后再点项目医生按钮。",
+    })),
+  ];
+  const status = ignoredCodes.length && !wouldChange && !changed
+    ? "unknown"
+    : dryRun && wouldChange ? "preview" : changed ? "repaired" : "clean";
+  const ignoredNote = ignoredCodes.length ? `；另有 ${ignoredCodes.length} 个未识别修复码已列在跳过区` : "";
   return {
     generatedAt: result?.savedAt ?? new Date().toISOString(),
     status,
-    badge: changed ? "已自动修复" : "无需自动修复",
-    title: changed ? `项目医生完成 ${repairs.length} 项安全修复` : "项目医生没有发现可自动修复的低风险结构问题",
-    description: changed ? "修复已写入项目并进入自动快照链。" : "入口、章节顺序和场景顺序当前无需自动处理。",
+    badge: status === "unknown" ? "未识别" : status === "preview" ? "预览未写入" : changed ? "已自动修复" : "无需自动修复",
+    title:
+      status === "preview"
+        ? `项目医生预览到 ${repairs.length} 项可安全修复`
+        : status === "unknown"
+        ? `项目医生未识别 ${ignoredCodes.length} 个修复码`
+        : changed
+        ? `项目医生完成 ${repairs.length} 项安全修复`
+        : "项目医生没有发现可自动修复的低风险结构问题",
+    description:
+      status === "preview"
+        ? `这只是预览，不会写入项目文件；确认列表无误后再执行安全修复${ignoredNote}。`
+        : status === "unknown"
+        ? `这些修复码不属于当前安全修复范围：${ignoredCodes.join(" / ")}。请重新巡检后再点项目医生按钮。`
+        : changed
+        ? `修复已写入项目并进入自动快照链${ignoredNote}。`
+        : `入口、章节顺序和场景顺序当前无需自动处理${ignoredNote}。`,
     repairCount: repairs.length,
     skippedCount: skipped.length,
+    dryRun,
+    wouldChange,
+    requestedCodes,
+    ignoredCodes,
     repairs,
     skipped,
-    nextActions: buildProjectDoctorRepairNextActions(status),
+    nextActions: buildProjectDoctorRepairNextActions(status, requestedCodes),
   };
 }
 
 function withProjectDoctorRepairActions(queue) {
+  const previewedRepairCodes = new Set(getCurrentProjectDoctorPreviewRepairCodes());
+
   return queue.map((step) => {
     const repairCodes = getProjectDoctorAutoRepairCodes(step);
     if (!repairCodes.length) {
       return step;
     }
+    const canConfirmStepRepair = repairCodes.every((code) => previewedRepairCodes.has(code));
 
     return {
       ...step,
       actions: [
         {
-          label: "一键安全修复",
+          label: "先预览这项修复",
+          action: "preview-project-doctor-repair",
+          dataset: { "repair-codes": repairCodes.join(",") },
+        },
+        {
+          label: canConfirmStepRepair ? "确认执行这项修复" : "预览后可执行这项",
           action: "repair-project-doctor",
+          disabled: !canConfirmStepRepair,
+          title: canConfirmStepRepair ? "" : "先点“先预览这项修复”，确认预览结果后再执行",
           dataset: { "repair-codes": repairCodes.join(",") },
         },
         ...(step.actions ?? []),
@@ -29702,8 +30182,8 @@ function buildProjectDoctorSummary(queue) {
     softCount: queue.filter((step) => step.tone === "soft").length,
     autoRepairableCount: queue.filter((step) => getProjectDoctorAutoRepairCodes(step).length > 0).length,
     autoRepairLabel: queue.some((step) => getProjectDoctorAutoRepairCodes(step).length > 0)
-      ? `可一键安全修复 ${queue.filter((step) => getProjectDoctorAutoRepairCodes(step).length > 0).length} 项`
-      : "暂无可一键修复项",
+      ? `可先预览安全修复 ${queue.filter((step) => getProjectDoctorAutoRepairCodes(step).length > 0).length} 项`
+      : "暂无可预览修复项",
     nextStepTitle: queue[0]?.title ?? "",
   };
 }
@@ -29761,7 +30241,8 @@ function renderProjectDoctorRepairReceiptPanel(receipt = state.projectDoctorRepa
     return "";
   }
 
-  const tone = receipt.status === "repaired" ? "good" : "soft";
+  const isPreview = receipt.status === "preview";
+  const tone = receipt.status === "repaired" ? "good" : isPreview ? "warn" : "soft";
   const nextActions = (Array.isArray(receipt.nextActions)
     ? receipt.nextActions
     : buildProjectDoctorRepairNextActions(receipt.status)
@@ -29776,22 +30257,22 @@ function renderProjectDoctorRepairReceiptPanel(receipt = state.projectDoctorRepa
       </div>
       <p>${escapeHtml(receipt.description)}</p>
       <div class="preview-sprint-metrics">
-        ${renderRouteMetricCard("已修复", `${receipt.repairCount ?? 0} 项`, "低风险结构项")}
-        ${renderRouteMetricCard("已跳过", `${receipt.skippedCount ?? 0} 项`, "当前无需处理")}
-        ${renderRouteMetricCard("修复时间", formatDate(receipt.generatedAt), "本次会话记录")}
-        ${renderRouteMetricCard("建议", "重新巡检", "确认问题已消失")}
+        ${renderRouteMetricCard(isPreview ? "将修复" : "已修复", `${receipt.repairCount ?? 0} 项`, "低风险结构项")}
+        ${renderRouteMetricCard(isPreview ? "将跳过" : "已跳过", `${receipt.skippedCount ?? 0} 项`, "当前无需处理")}
+        ${renderRouteMetricCard(isPreview ? "预览时间" : "修复时间", formatDate(receipt.generatedAt), "本次会话记录")}
+        ${renderRouteMetricCard("建议", isPreview ? "确认后修复" : "重新巡检", isPreview ? "不会写入文件" : "确认问题已消失")}
       </div>
       <div class="preview-sprint-actions project-doctor-receipt-actions">
         ${nextActions.map((action, index) => renderQuickActionButton(action, index === 0)).join("")}
       </div>
       <div class="project-doctor-receipt-columns">
         <div>
-          <strong class="project-doctor-receipt-heading">已自动处理</strong>
-          ${renderProjectDoctorReceiptList(receipt.repairs ?? [], "这次没有写入新的自动修复。")}
+          <strong class="project-doctor-receipt-heading">${isPreview ? "预览会处理" : "已自动处理"}</strong>
+          ${renderProjectDoctorReceiptList(receipt.repairs ?? [], isPreview ? "预览里没有发现可自动修复项。" : "这次没有写入新的自动修复。")}
         </div>
         <div>
-          <strong class="project-doctor-receipt-heading">无需处理 / 已跳过</strong>
-          ${renderProjectDoctorReceiptList(receipt.skipped ?? [], "这次没有跳过项。")}
+          <strong class="project-doctor-receipt-heading">${isPreview ? "预览会跳过" : "无需处理 / 已跳过"}</strong>
+          ${renderProjectDoctorReceiptList(receipt.skipped ?? [], isPreview ? "预览里没有需要跳过的项目。" : "这次没有跳过项。")}
         </div>
       </div>
     </article>
@@ -29805,37 +30286,84 @@ function parseProjectDoctorRepairCodes(value) {
     .filter(Boolean);
 }
 
-async function repairProjectDoctor(repairCodesValue = "") {
+function getCurrentProjectDoctorPreviewRepairCodes() {
+  const receipt = state.projectDoctorRepairReceipt;
+  if (receipt?.status !== "preview" || !receipt?.wouldChange || !Array.isArray(receipt.requestedCodes)) {
+    return [];
+  }
+  return receipt.requestedCodes.map((code) => String(code ?? "").trim()).filter(Boolean);
+}
+
+async function repairProjectDoctor(repairCodesValue = "", options = {}) {
   if (!state.data) {
     showToast("先打开一个项目，再使用项目医生修复");
     return;
   }
 
   const repairCodes = parseProjectDoctorRepairCodes(repairCodesValue);
-  const payload = repairCodes.length > 0 ? { repairCodes } : {};
+  const dryRun = Boolean(options.dryRun);
+  let confirmedRepairCodes = repairCodes;
+  if (!dryRun) {
+    const previewRepairCodes = getCurrentProjectDoctorPreviewRepairCodes();
+    const previewRepairCodeSet = new Set(previewRepairCodes);
+    confirmedRepairCodes = repairCodes.length ? repairCodes : previewRepairCodes;
+    const matchesPreview = confirmedRepairCodes.length > 0
+      && confirmedRepairCodes.every((code) => previewRepairCodeSet.has(code));
+    if (!matchesPreview) {
+      const message = previewRepairCodes.length
+        ? "项目医生预览已变化，请先重新预览安全修复"
+        : "请先点“先预览安全修复”，确认后再执行";
+      setSaveStatus(message, true);
+      showToast(message, "error");
+      return;
+    }
+  }
+  const payload = {
+    ...(confirmedRepairCodes.length > 0 ? { repairCodes: confirmedRepairCodes } : {}),
+    ...(dryRun ? { dryRun: true } : {}),
+  };
 
   try {
-    setSaveStatus("项目医生正在安全修复...");
+    setSaveStatus(dryRun ? "项目医生正在预览安全修复..." : "项目医生正在安全修复...");
     const result = await postJson(API_REPAIR_PROJECT_DOCTOR, payload);
-    state.lastExportResult = null;
+    if (!dryRun) {
+      state.lastExportResult = null;
+    }
     state.projectDoctorRepairReceipt = buildProjectDoctorRepairReceipt(result);
-    await reloadProjectData({ ...getCurrentUiState() });
+    if (!dryRun) {
+      await reloadProjectData({ ...getCurrentUiState(), preserveProjectDoctorRepairReceipt: true });
+    }
 
     if (state.currentScreen === "inspection") {
       renderInspectionScreen();
     }
+    if (state.currentScreen === "preview") {
+      renderPreviewScreen();
+    }
+    if (state.currentScreen === "dashboard") {
+      renderDashboard();
+    }
 
     const repairCount = Array.isArray(result.repairs) ? result.repairs.length : 0;
-    const message =
-      repairCount > 0
-        ? `项目医生已完成 ${repairCount} 项安全修复`
+    const ignoredCount = Array.isArray(result.ignoredCodes) ? result.ignoredCodes.length : 0;
+    const ignoredSuffix = ignoredCount > 0 ? `，另有 ${ignoredCount} 个未识别修复码` : "";
+    const message = dryRun
+      ? repairCount > 0
+        ? `项目医生预览到 ${repairCount} 项可安全修复，尚未写入${ignoredSuffix}`
+        : ignoredCount > 0
+        ? `项目医生发现 ${ignoredCount} 个未识别修复码，请重新巡检`
+        : "项目医生预览过了，暂无可自动修复的低风险结构问题"
+      : repairCount > 0
+        ? `项目医生已完成 ${repairCount} 项安全修复${ignoredSuffix}`
+        : ignoredCount > 0
+        ? `项目医生发现 ${ignoredCount} 个未识别修复码，请重新巡检`
         : "项目医生检查过了，暂无可自动修复的低风险结构问题";
     setSaveStatus(message);
     showToast(message, "soft");
   } catch (error) {
-    setSaveStatus("项目医生安全修复失败", true);
-    showToast("项目医生安全修复失败", "error");
-    showEngineAlert(`项目医生安全修复没有成功：${error.message}`);
+    setSaveStatus(dryRun ? "项目医生预览失败" : "项目医生安全修复失败", true);
+    showToast(dryRun ? "项目医生预览失败" : "项目医生安全修复失败", "error");
+    showEngineAlert(`项目医生${dryRun ? "预览" : "安全修复"}没有成功：${error.message}`);
   }
 }
 
@@ -29843,6 +30371,14 @@ function renderProjectDoctorPanel(routeOverview, issueItems) {
   const queue = buildProjectDoctorQueue(routeOverview, issueItems);
   const summary = buildProjectDoctorSummary(queue);
   const summaryTone = summary.status === "danger" ? "danger" : summary.status === "warn" ? "warn" : "soft";
+  const previewRepairCodes = getCurrentProjectDoctorPreviewRepairCodes();
+  const previewRepairDataset = previewRepairCodes.length
+    ? ` data-repair-codes="${escapeHtml(previewRepairCodes.join(","))}"`
+    : "";
+  const confirmRepairDisabled = previewRepairCodes.length
+    ? ""
+    : ` disabled aria-disabled="true" title="${escapeHtml("先点“先预览安全修复”，确认预览结果后再执行")}"`;
+  const confirmRepairLabel = previewRepairCodes.length ? "确认并执行预览的修复" : "预览后可执行修复";
 
   return `
     <article class="detail-card preview-sprint-panel project-doctor-panel">
@@ -29860,12 +30396,15 @@ function renderProjectDoctorPanel(routeOverview, issueItems) {
           ${renderRouteMetricCard("硬阻塞", `${summary.dangerCount ?? 0} 个`, "优先清掉")}
           ${renderRouteMetricCard("建议复看", `${summary.warnCount ?? 0} 个`, "发布前处理")}
           ${renderRouteMetricCard("整理项", `${summary.softCount ?? 0} 个`, "收尾时清理")}
-          ${renderRouteMetricCard("可一键修复", `${summary.autoRepairableCount ?? 0} 项`, "项目医生可自动处理")}
+          ${renderRouteMetricCard("可安全修复", `${summary.autoRepairableCount ?? 0} 项`, "先预览再确认")}
         </div>
       </article>
       <div class="detail-actions">
-        <button class="toolbar-button toolbar-button-primary" data-action="repair-project-doctor">
-          一键安全修复低风险结构问题
+        <button class="toolbar-button toolbar-button-primary" data-action="preview-project-doctor-repair">
+          先预览安全修复
+        </button>
+        <button class="toolbar-button" data-action="repair-project-doctor"${previewRepairDataset}${confirmRepairDisabled}>
+          ${escapeHtml(confirmRepairLabel)}
         </button>
         <button class="toolbar-button toolbar-button-primary" data-action="run-project-inspection">
           重新巡检并刷新队列
@@ -29946,6 +30485,7 @@ function renderInspectionOverviewPanel(routeOverview) {
       ${renderReleaseFixOrderPanel(routeOverview)}
       ${renderPreviewRegressionPanel(routeOverview)}
       ${renderPreviewRegressionFixQueuePanel()}
+      ${renderFinalPublishGatePanel(routeOverview)}
       ${renderReleaseChecklistPanel()}
       ${isAdvancedEditorMode() ? renderPreviewSprintPanel() : ""}
     </section>
@@ -30111,10 +30651,10 @@ function getValidationIssueRecovery(issue, level = "warning") {
     return "先把项目入口改成真实存在的场景，或者恢复被删掉的入口场景；修完后重新巡检。";
   }
   if (message.includes("章节排序") || message.includes("章节没有进入排序") || location.includes("chapterOrder")) {
-    return "项目医生的一键安全修复会清理无效或重复章节排序，并把遗漏章节补回排序表。";
+    return "先点项目医生的“先预览安全修复”，确认后再执行；系统会清理无效或重复章节排序，并把遗漏章节补回排序表。";
   }
   if (message.includes("场景排序") || message.includes("场景没有进入排序") || location.includes("sceneOrder")) {
-    return "项目医生的一键安全修复会清理无效或重复场景排序，并把遗漏场景补回本章顺序表。";
+    return "先点项目医生的“先预览安全修复”，确认后再执行；系统会清理无效或重复场景排序，并把遗漏场景补回本章顺序表。";
   }
   if (message.includes("引用的场景") || message.includes("不存在")) {
     return "打开对应卡片，把跳转、选项或条件分支指向真实存在的场景。";
@@ -39403,6 +39943,9 @@ async function reloadProjectData(preserved = {}) {
   state.projectHistory = data.history ?? null;
   state.projectSessionRecovery = data.sessionRecovery ?? null;
   state.validation = runValidation(data);
+  if (!preserved.preserveProjectDoctorRepairReceipt) {
+    state.projectDoctorRepairReceipt = null;
+  }
   updateErrorRecoveryState(null);
 
   const selectedScene =

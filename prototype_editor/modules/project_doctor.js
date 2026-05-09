@@ -101,10 +101,10 @@
       return cleanText(item.recovery);
     }
     if (searchText.includes("章节排序") || searchText.includes("章节没有进入排序") || searchText.includes("chapterOrder")) {
-      return "可以点项目医生的一键安全修复，系统会清理无效或重复章节排序，并把遗漏章节补回排序表。";
+      return "先点项目医生的“先预览安全修复”，确认后再执行；系统会清理无效或重复章节排序，并把遗漏章节补回排序表。";
     }
     if (searchText.includes("场景排序") || searchText.includes("场景没有进入排序") || searchText.includes("sceneOrder")) {
-      return "可以点项目医生的一键安全修复，系统会清理无效或重复场景排序，并把遗漏场景补回本章顺序表。";
+      return "先点项目医生的“先预览安全修复”，确认后再执行；系统会清理无效或重复场景排序，并把遗漏场景补回本章顺序表。";
     }
     if (kind === "errors") {
       if (title.includes("入口场景")) {
@@ -386,7 +386,7 @@
         warnCount,
         softCount,
         autoRepairableCount,
-        autoRepairLabel: "暂无可一键修复项",
+        autoRepairLabel: "暂无可预览修复项",
         nextStepTitle: "",
       };
     }
@@ -401,7 +401,7 @@
         warnCount,
         softCount,
         autoRepairableCount,
-        autoRepairLabel: autoRepairableCount ? `可一键安全修复 ${autoRepairableCount} 项` : "暂无可一键修复项",
+        autoRepairLabel: autoRepairableCount ? `可先预览安全修复 ${autoRepairableCount} 项` : "暂无可预览修复项",
         nextStepTitle: nextStep.title,
       };
     }
@@ -416,7 +416,7 @@
         warnCount,
         softCount,
         autoRepairableCount,
-        autoRepairLabel: autoRepairableCount ? `可一键安全修复 ${autoRepairableCount} 项` : "暂无可一键修复项",
+        autoRepairLabel: autoRepairableCount ? `可先预览安全修复 ${autoRepairableCount} 项` : "暂无可预览修复项",
         nextStepTitle: nextStep.title,
       };
     }
@@ -430,7 +430,7 @@
       warnCount,
       softCount,
       autoRepairableCount,
-      autoRepairLabel: autoRepairableCount ? `可一键安全修复 ${autoRepairableCount} 项` : "暂无可一键修复项",
+      autoRepairLabel: autoRepairableCount ? `可先预览安全修复 ${autoRepairableCount} 项` : "暂无可预览修复项",
       nextStepTitle: nextStep.title,
     };
   }
@@ -443,8 +443,21 @@
     };
   }
 
-  function buildProjectDoctorRepairNextActions(status = "clean") {
+  function buildProjectDoctorRepairNextActions(status = "clean", repairCodes = []) {
     const repaired = status === "repaired";
+    const preview = status === "preview";
+    const repairCodeText = Array.isArray(repairCodes) ? repairCodes.filter(Boolean).join(",") : "";
+    if (preview) {
+      return [
+        {
+          label: "确认执行安全修复",
+          action: "repair-project-doctor",
+          dataset: repairCodeText ? { "repair-codes": repairCodeText } : {},
+        },
+        { label: "重新巡检确认", action: "run-project-inspection" },
+        { label: "导出巡检报告", action: "export-inspection-report" },
+      ];
+    }
     return [
       { label: "重新巡检确认", action: "run-project-inspection" },
       repaired
@@ -462,29 +475,65 @@
     const repairs = Array.isArray(result.repairs)
       ? result.repairs.map((item, index) => normalizeRepairReceiptItem(item, index, "repair"))
       : [];
-    const skipped = Array.isArray(result.skipped)
-      ? result.skipped.map((item, index) => normalizeRepairReceiptItem(item, index, "skip"))
+    const dryRun = Boolean(result.dryRun);
+    const changed = Boolean(result.changed);
+    const requestedCodes = Array.isArray(result.requestedCodes)
+      ? result.requestedCodes.map((code) => cleanText(code)).filter(Boolean)
       : [];
+    const ignoredCodes = Array.isArray(result.ignoredCodes)
+      ? result.ignoredCodes.map((code) => cleanText(code)).filter(Boolean)
+      : [];
+    const skipped = [
+      ...(Array.isArray(result.skipped)
+        ? result.skipped.map((item, index) => normalizeRepairReceiptItem(item, index, "skip"))
+        : []),
+      ...ignoredCodes.map((code, index) =>
+        normalizeRepairReceiptItem(
+          {
+            code: `ignored_${code}`,
+            title: `未识别修复码：${code}`,
+            detail: "这个修复码不属于当前安全修复范围，可能来自过期按钮或手动输入；请重新巡检后再点项目医生按钮。",
+          },
+          index,
+          "skip"
+        )
+      ),
+    ];
     const repairCount = repairs.length;
     const skippedCount = skipped.length;
-    const changed = Boolean(result.changed) || repairCount > 0;
-    const status = changed ? "repaired" : "clean";
+    const wouldChange = Boolean(result.wouldChange) || repairCount > 0;
+    const status = ignoredCodes.length && !wouldChange && !changed
+      ? "unknown"
+      : dryRun && wouldChange ? "preview" : changed ? "repaired" : "clean";
+    const ignoredNote = ignoredCodes.length ? `；另有 ${ignoredCodes.length} 个未识别修复码已列在跳过区` : "";
 
     return {
       generatedAt: cleanText(result.savedAt || result.generatedAt || new Date().toISOString()),
       status,
-      badge: changed ? "已自动修复" : "无需自动修复",
-      title: changed
+      badge: status === "unknown" ? "未识别" : status === "preview" ? "预览未写入" : changed ? "已自动修复" : "无需自动修复",
+      title: status === "preview"
+        ? `项目医生预览到 ${repairCount} 项可安全修复`
+        : status === "unknown"
+        ? `项目医生未识别 ${ignoredCodes.length} 个修复码`
+        : changed
         ? `项目医生完成 ${repairCount} 项安全修复`
         : "项目医生没有发现可自动修复的低风险结构问题",
-      description: changed
-        ? "修复已写入项目并进入自动快照链；建议重新巡检或跑一次自动回归确认结果。"
-        : "这通常代表入口、章节顺序和场景顺序已经比较干净，剩余事项需要人工判断。",
+      description: status === "preview"
+        ? `这只是预览，不会写入项目文件；确认列表无误后再执行安全修复${ignoredNote}。`
+        : status === "unknown"
+        ? `这些修复码不属于当前安全修复范围：${ignoredCodes.join(" / ")}。请重新巡检后再点项目医生按钮。`
+        : changed
+        ? `修复已写入项目并进入自动快照链；建议重新巡检或跑一次自动回归确认结果${ignoredNote}。`
+        : `这通常代表入口、章节顺序和场景顺序已经比较干净，剩余事项需要人工判断${ignoredNote}。`,
       repairCount,
       skippedCount,
+      dryRun,
+      wouldChange,
+      requestedCodes,
+      ignoredCodes,
       repairs,
       skipped,
-      nextActions: buildProjectDoctorRepairNextActions(status),
+      nextActions: buildProjectDoctorRepairNextActions(status, requestedCodes),
     };
   }
 

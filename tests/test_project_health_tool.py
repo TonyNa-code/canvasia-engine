@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -166,6 +167,11 @@ class ProjectHealthToolTests(unittest.TestCase):
         self.assertEqual(report["roadmap"]["nextStage"]["id"], "first_playable")
         self.assertEqual(report["roadmap"]["nextStage"]["primaryGap"]["id"], "no_blocking_errors")
         self.assertEqual(report["roadmap"]["nextStage"]["primaryGap"]["action"]["label"], "打开项目巡检")
+        self.assertIn("--repair-safe", report["safeRepairCommand"])
+        self.assertIn("--repair-codes", report["safeRepairCommand"])
+        self.assertIn("chapter_order,entry_scene,scene_order", report["safeRepairCommand"])
+        self.assertIn("--repair-dry-run", report["safeRepairPreviewCommand"])
+        self.assertIn("chapter_order,entry_scene,scene_order", report["safeRepairPreviewCommand"])
         self.assertEqual(
             report["summary"]["autoFixableByRepairCode"],
             {"chapter_order": 1, "entry_scene": 1, "scene_order": 1},
@@ -185,6 +191,27 @@ class ProjectHealthToolTests(unittest.TestCase):
         self.assertEqual(repair_codes["entry_scene_missing"], "entry_scene")
         self.assertEqual(repair_codes["chapter_order_missing"], "chapter_order")
         self.assertEqual(repair_codes["scene_order_missing"], "scene_order")
+
+    def test_safe_repair_command_quotes_project_paths_with_spaces(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="project health ") as tmp_dir:
+            project_dir = Path(tmp_dir) / "project with spaces"
+            create_minimal_project(project_dir, broken=True)
+
+            report = self.project_health.analyze_project(project_dir)
+
+        command = report["safeRepairCommand"]
+        preview_command = report["safeRepairPreviewCommand"]
+        command_parts = shlex.split(command)
+        preview_command_parts = shlex.split(preview_command)
+        self.assertIn("'", command)
+        self.assertIn("'", preview_command)
+        self.assertEqual(command_parts[0:3], ["python3", "tools/ci/project_health.py", str(project_dir.resolve())])
+        self.assertEqual(command_parts[3:], ["--repair-safe", "--repair-codes", "chapter_order,entry_scene,scene_order"])
+        self.assertEqual(preview_command_parts[0:3], ["python3", "tools/ci/project_health.py", str(project_dir.resolve())])
+        self.assertEqual(
+            preview_command_parts[3:],
+            ["--repair-safe", "--repair-dry-run", "--repair-codes", "chapter_order,entry_scene,scene_order"],
+        )
 
     def test_duplicate_story_order_reports_safe_repair_codes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -254,6 +281,48 @@ class ProjectHealthToolTests(unittest.TestCase):
         self.assertEqual(after["summary"]["autoFixableCount"], 0)
         self.assertGreater(after["summary"]["errors"], 0)
 
+    def test_safe_repair_codes_can_limit_written_changes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            project_dir = Path(tmp_dir) / "project"
+            create_minimal_project(project_dir, broken=True)
+
+            result = self.project_health.repair_safe_project_issues(project_dir, repair_codes="entry_scene")
+            after = self.project_health.analyze_project(project_dir)
+            project_payload = json.loads((project_dir / "project.json").read_text(encoding="utf-8"))
+            chapter_payload = json.loads((project_dir / "data" / "chapters" / "chapter_01.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(result["requestedCodes"], ["entry_scene"])
+        self.assertEqual([repair["code"] for repair in result["repairs"]], ["entry_scene"])
+        self.assertEqual(project_payload["entrySceneId"], "scene_start")
+        self.assertEqual(project_payload["chapterOrder"], ["chapter_missing", "chapter_01"])
+        self.assertEqual(chapter_payload["sceneOrder"], ["scene_missing_order", "scene_start"])
+        self.assertEqual(
+            after["summary"]["autoFixableByRepairCode"],
+            {"chapter_order": 1, "scene_order": 1},
+        )
+
+    def test_safe_repair_dry_run_reports_plan_without_writing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            project_dir = Path(tmp_dir) / "project"
+            create_minimal_project(project_dir, broken=True)
+
+            result = self.project_health.repair_safe_project_issues(
+                project_dir,
+                repair_codes="entry_scene,scene_order",
+                dry_run=True,
+            )
+            after = self.project_health.analyze_project(project_dir)
+            project_payload = json.loads((project_dir / "project.json").read_text(encoding="utf-8"))
+            chapter_payload = json.loads((project_dir / "data" / "chapters" / "chapter_01.json").read_text(encoding="utf-8"))
+
+        self.assertTrue(result["dryRun"])
+        self.assertFalse(result["changed"])
+        self.assertTrue(result["wouldChange"])
+        self.assertEqual([repair["code"] for repair in result["repairs"]], ["scene_order", "entry_scene"])
+        self.assertEqual(project_payload["entrySceneId"], "scene_missing_entry")
+        self.assertEqual(chapter_payload["sceneOrder"], ["scene_missing_order", "scene_start"])
+        self.assertEqual(after["summary"]["autoFixableCount"], 3)
+
     def test_template_project_has_no_health_errors(self) -> None:
         report = self.project_health.analyze_project(ROOT_DIR / "template_project")
 
@@ -289,9 +358,124 @@ class ProjectHealthToolTests(unittest.TestCase):
             markdown = markdown_report.read_text(encoding="utf-8")
             self.assertEqual(payload["summary"]["autoFixableCount"], 0)
             self.assertTrue(payload["repairResult"]["changed"])
+            self.assertTrue(payload["repairResult"]["wouldChange"])
+            self.assertFalse(payload["repairResult"]["dryRun"])
             self.assertEqual(len(payload["repairResult"]["repairs"]), 3)
+            self.assertNotIn("safeRepairCommand", payload)
             self.assertIn("## Safe Repair Result", markdown)
             self.assertIn("已修复入口场景", markdown)
+
+    def test_cli_can_preview_safe_repairs_without_writing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            project_dir = Path(tmp_dir) / "project"
+            create_minimal_project(project_dir, broken=True)
+            json_report = Path(tmp_dir) / "project-health.json"
+            markdown_report = Path(tmp_dir) / "project-health.md"
+
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    str(MODULE_PATH),
+                    str(project_dir),
+                    "--repair-safe",
+                    "--repair-dry-run",
+                    "--repair-codes",
+                    "entry_scene,scene_order",
+                    "--json-report",
+                    str(json_report),
+                    "--markdown-report",
+                    str(markdown_report),
+                ],
+                cwd=ROOT_DIR,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            payload = json.loads(json_report.read_text(encoding="utf-8"))
+            markdown = markdown_report.read_text(encoding="utf-8")
+            project_payload = json.loads((project_dir / "project.json").read_text(encoding="utf-8"))
+            chapter_payload = json.loads((project_dir / "data" / "chapters" / "chapter_01.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(completed.returncode, 1)
+        self.assertIn("Safe repair preview: would repair 2 / skip 0", completed.stdout)
+        self.assertEqual(project_payload["entrySceneId"], "scene_missing_entry")
+        self.assertEqual(chapter_payload["sceneOrder"], ["scene_missing_order", "scene_start"])
+        self.assertEqual(payload["summary"]["autoFixableCount"], 3)
+        self.assertTrue(payload["repairResult"]["dryRun"])
+        self.assertFalse(payload["repairResult"]["changed"])
+        self.assertTrue(payload["repairResult"]["wouldChange"])
+        self.assertIn("safeRepairCommand", payload)
+        self.assertIn("safeRepairPreviewCommand", payload)
+        self.assertIn("## Safe Repair Preview", markdown)
+        self.assertIn("Dry run: True", markdown)
+
+    def test_repair_codes_require_explicit_repair_safe_flag(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            project_dir = Path(tmp_dir) / "project"
+            create_minimal_project(project_dir, broken=True)
+
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    str(MODULE_PATH),
+                    str(project_dir),
+                    "--repair-codes",
+                    "entry_scene",
+                ],
+                cwd=ROOT_DIR,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+        self.assertEqual(completed.returncode, 2)
+        self.assertIn("--repair-codes requires --repair-safe", completed.stderr)
+
+    def test_repair_dry_run_requires_explicit_repair_safe_flag(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            project_dir = Path(tmp_dir) / "project"
+            create_minimal_project(project_dir, broken=True)
+
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    str(MODULE_PATH),
+                    str(project_dir),
+                    "--repair-dry-run",
+                ],
+                cwd=ROOT_DIR,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+        self.assertEqual(completed.returncode, 2)
+        self.assertIn("--repair-dry-run requires --repair-safe", completed.stderr)
+
+    def test_cli_rejects_unknown_repair_codes_before_writing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            project_dir = Path(tmp_dir) / "project"
+            create_minimal_project(project_dir, broken=True)
+
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    str(MODULE_PATH),
+                    str(project_dir),
+                    "--repair-safe",
+                    "--repair-codes",
+                    "entry_scene,not_a_repair",
+                ],
+                cwd=ROOT_DIR,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            project_payload = json.loads((project_dir / "project.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(completed.returncode, 2)
+        self.assertIn("--repair-codes contains unknown code(s): not_a_repair", completed.stderr)
+        self.assertEqual(project_payload["entrySceneId"], "scene_missing_entry")
 
     def test_cli_writes_json_and_markdown_reports(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -320,6 +504,12 @@ class ProjectHealthToolTests(unittest.TestCase):
             self.assertIn("Tony Na Engine Project Health", completed.stdout)
             self.assertIn("Status: failed (需要先处理)", completed.stdout)
             self.assertIn("safe repairs 3", completed.stdout)
+            self.assertIn("Safe repair command:", completed.stdout)
+            self.assertIn("Safe repair preview command:", completed.stdout)
+            self.assertLess(
+                completed.stdout.index("Safe repair preview command:"),
+                completed.stdout.index("Safe repair command:"),
+            )
             self.assertIn("Roadmap:", completed.stdout)
             self.assertIn("First issues:", completed.stdout)
             self.assertIn("Next actions:", completed.stdout)
@@ -329,6 +519,10 @@ class ProjectHealthToolTests(unittest.TestCase):
             self.assertGreater(payload["summary"]["errors"], 0)
             self.assertIn("metrics", payload)
             self.assertIn("roadmap", payload)
+            self.assertIn("safeRepairCommand", payload)
+            self.assertIn("safeRepairPreviewCommand", payload)
+            self.assertIn("--repair-safe", payload["safeRepairCommand"])
+            self.assertIn("--repair-dry-run", payload["safeRepairPreviewCommand"])
             self.assertEqual(payload["roadmap"]["nextStage"]["id"], "first_playable")
             self.assertEqual(payload["metrics"]["chapterCount"], 1)
             self.assertEqual(payload["metrics"]["readyAssetCount"], 0)
@@ -352,6 +546,13 @@ class ProjectHealthToolTests(unittest.TestCase):
             self.assertIn("## Suggested Next Actions", markdown)
             self.assertIn("Safe repairs: 3", markdown)
             self.assertIn("Safe repair groups", markdown)
+            self.assertIn("Optional safe repair command", markdown)
+            self.assertIn("Optional safe repair preview command", markdown)
+            self.assertLess(
+                markdown.index("Optional safe repair preview command"),
+                markdown.index("Optional safe repair command"),
+            )
+            self.assertIn("命令行可选：先预览 python3 tools/ci/project_health.py", markdown)
             self.assertIn("引用的素材不存在", markdown)
             self.assertIn("Safe Repair", markdown)
             self.assertIn("entry_scene", markdown)
@@ -395,6 +596,7 @@ class ProjectHealthToolTests(unittest.TestCase):
         self.assertIn("| Asset references | 1 unique / 1 total |", markdown)
         self.assertIn("## Suggested Next Actions", markdown)
         self.assertIn("先在编辑器的项目巡检页运行", markdown)
+        self.assertIn("命令行可选：先预览 python3 tools/ci/project_health.py", markdown)
         self.assertIn("重新导入缺失素材", markdown)
 
 

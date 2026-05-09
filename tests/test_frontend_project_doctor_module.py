@@ -107,7 +107,7 @@ class FrontendProjectDoctorModuleTests(unittest.TestCase):
         self.assertEqual(payload["summary"]["dangerCount"], 3)
         self.assertEqual(payload["summary"]["warnCount"], 3)
         self.assertEqual(payload["summary"]["autoRepairableCount"], 1)
-        self.assertIn("可一键安全修复 1 项", payload["summary"]["autoRepairLabel"])
+        self.assertIn("可先预览安全修复 1 项", payload["summary"]["autoRepairLabel"])
         self.assertIn("硬阻塞", payload["summary"]["title"])
 
     def test_project_doctor_clean_summary_is_encouraging(self) -> None:
@@ -127,7 +127,7 @@ class FrontendProjectDoctorModuleTests(unittest.TestCase):
         self.assertEqual(payload["summary"]["status"], "clean")
         self.assertEqual(payload["summary"]["badge"], "很干净")
         self.assertEqual(payload["summary"]["autoRepairableCount"], 0)
-        self.assertEqual(payload["summary"]["autoRepairLabel"], "暂无可一键修复项")
+        self.assertEqual(payload["summary"]["autoRepairLabel"], "暂无可预览修复项")
         self.assertIn("继续试玩", payload["summary"]["description"])
 
     def test_project_doctor_respects_zero_limit(self) -> None:
@@ -203,8 +203,10 @@ class FrontendProjectDoctorModuleTests(unittest.TestCase):
         scene_step = by_title["场景排序重复。"]
         self.assertEqual(chapter_step["repairCodes"], ["chapter_order"])
         self.assertEqual(scene_step["repairCodes"], ["scene_order"])
+        self.assertIn("先预览安全修复", chapter_step["recovery"])
         self.assertIn("遗漏章节补回排序表", chapter_step["recovery"])
         self.assertIn("章节排序的重复", chapter_step["doneWhen"])
+        self.assertIn("先预览安全修复", scene_step["recovery"])
         self.assertIn("遗漏场景补回本章顺序表", scene_step["recovery"])
         self.assertIn("本章场景能按正确顺序浏览", scene_step["doneWhen"])
 
@@ -219,10 +221,34 @@ class FrontendProjectDoctorModuleTests(unittest.TestCase):
         self.assertIn('"场景没有进入排序。"', source)
         self.assertIn("data.project.chapterOrder ?? []", source)
         self.assertIn("localSceneIds.has(safeSceneId)", source)
-        self.assertIn("项目医生的一键安全修复会清理无效或重复章节排序", source)
-        self.assertIn("项目医生的一键安全修复会清理无效或重复场景排序", source)
+        self.assertIn("先点项目医生的“先预览安全修复”", source)
+        self.assertIn("系统会清理无效或重复章节排序", source)
+        self.assertIn("系统会清理无效或重复场景排序", source)
         self.assertIn("autoRepairableCount", source)
-        self.assertIn("可一键修复", source)
+        self.assertIn("可安全修复", source)
+        self.assertIn("先预览再确认", source)
+        self.assertIn('data-action="preview-project-doctor-repair"', source)
+        self.assertIn("确认执行这项修复", source)
+        self.assertIn("预览后可执行这项", source)
+        self.assertIn("canConfirmStepRepair", source)
+        self.assertIn("previewedRepairCodes.has", source)
+        self.assertIn("确认并执行预览的修复", source)
+        self.assertIn("预览后可执行修复", source)
+        self.assertIn("confirmRepairLabel", source)
+        self.assertIn("getCurrentProjectDoctorPreviewRepairCodes", source)
+        self.assertIn("matchesPreview", source)
+        self.assertIn("项目医生预览已变化，请先重新预览安全修复", source)
+        self.assertIn("请先点“先预览安全修复”，确认后再执行", source)
+        self.assertIn('disabled aria-disabled="true"', source)
+        self.assertIn("previewRepairCodes.join", source)
+        self.assertIn("项目医生正在预览安全修复", source)
+        self.assertIn("dryRun: true", source)
+        self.assertIn("if (!dryRun) {\n      state.lastExportResult = null;", source)
+        self.assertIn("preserveProjectDoctorRepairReceipt: true", source)
+        self.assertIn("if (!preserved.preserveProjectDoctorRepairReceipt) {", source)
+        self.assertIn("ignoredCount", source)
+        self.assertIn("另有 ${ignoredCount} 个未识别修复码", source)
+        self.assertIn("项目医生发现 ${ignoredCount} 个未识别修复码，请重新巡检", source)
 
     def test_project_doctor_builds_repair_receipt(self) -> None:
         payload = self.run_project_doctor_script(
@@ -243,7 +269,36 @@ class FrontendProjectDoctorModuleTests(unittest.TestCase):
               repairs: [],
               skipped: [{ code: "entry_scene", title: "入口场景无需修复" }],
             });
-            process.stdout.write(JSON.stringify({ repaired, clean }));
+            const preview = tools.buildProjectDoctorRepairReceipt({
+              dryRun: true,
+              changed: false,
+              wouldChange: true,
+              requestedCodes: ["entry_scene", "scene_order"],
+              repairs: [
+                { code: "entry_scene", title: "将修复入口场景", detail: "入口场景会改为 scene_001。" },
+              ],
+              skipped: [],
+            });
+            const previewMixed = tools.buildProjectDoctorRepairReceipt({
+              dryRun: true,
+              changed: false,
+              wouldChange: true,
+              requestedCodes: ["entry_scene"],
+              ignoredCodes: ["typo_code"],
+              repairs: [
+                { code: "entry_scene", title: "将修复入口场景", detail: "入口场景会改为 scene_001。" },
+              ],
+              skipped: [],
+            });
+            const unknown = tools.buildProjectDoctorRepairReceipt({
+              changed: false,
+              wouldChange: false,
+              requestedCodes: [],
+              ignoredCodes: ["unknown_code"],
+              repairs: [],
+              skipped: [],
+            });
+            process.stdout.write(JSON.stringify({ repaired, clean, preview, previewMixed, unknown }));
             """
         )
 
@@ -259,6 +314,26 @@ class FrontendProjectDoctorModuleTests(unittest.TestCase):
         self.assertEqual(payload["clean"]["nextActions"][1]["action"], "switch-screen")
         self.assertEqual(payload["clean"]["nextActions"][1]["screen"], "preview")
         self.assertIn("没有发现", payload["clean"]["title"])
+        self.assertEqual(payload["preview"]["status"], "preview")
+        self.assertEqual(payload["preview"]["badge"], "预览未写入")
+        self.assertTrue(payload["preview"]["dryRun"])
+        self.assertTrue(payload["preview"]["wouldChange"])
+        self.assertIn("不会写入", payload["preview"]["description"])
+        self.assertEqual(payload["preview"]["nextActions"][0]["action"], "repair-project-doctor")
+        self.assertEqual(payload["preview"]["nextActions"][0]["dataset"]["repair-codes"], "entry_scene,scene_order")
+        self.assertEqual(payload["preview"]["nextActions"][1]["action"], "run-project-inspection")
+        self.assertNotIn("run-preview-regression", [action["action"] for action in payload["preview"]["nextActions"]])
+        self.assertEqual(payload["previewMixed"]["status"], "preview")
+        self.assertEqual(payload["previewMixed"]["skippedCount"], 1)
+        self.assertEqual(payload["previewMixed"]["skipped"][0]["code"], "ignored_typo_code")
+        self.assertIn("未识别修复码", payload["previewMixed"]["skipped"][0]["title"])
+        self.assertIn("跳过区", payload["previewMixed"]["description"])
+        self.assertEqual(payload["previewMixed"]["nextActions"][0]["dataset"]["repair-codes"], "entry_scene")
+        self.assertEqual(payload["unknown"]["status"], "unknown")
+        self.assertEqual(payload["unknown"]["badge"], "未识别")
+        self.assertEqual(payload["unknown"]["ignoredCodes"], ["unknown_code"])
+        self.assertIn("重新巡检", payload["unknown"]["description"])
+        self.assertEqual(payload["unknown"]["nextActions"][0]["action"], "run-project-inspection")
 
 
 if __name__ == "__main__":
