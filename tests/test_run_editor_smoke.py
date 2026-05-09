@@ -448,6 +448,90 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(bundle["variables"]["variables"][0]["id"], "var_affection")
         self.assertEqual(bundle["variables"]["variables"][1]["defaultValue"], "common")
 
+    def test_project_doctor_repairs_safe_structure_issues(self) -> None:
+        _, chapter_result = self.create_blank_project_with_chapter()
+        second_scene = run_editor.create_scene(chapter_result["chapterId"], "第二场")
+        chapter_path = run_editor.CHAPTERS_DIR / f"{chapter_result['chapterId']}.json"
+        chapter_doc = run_editor.read_json(chapter_path)
+        chapter_doc["sceneOrder"] = ["missing_scene", second_scene["sceneId"], second_scene["sceneId"]]
+        run_editor.write_json(chapter_path, chapter_doc)
+
+        project_doc = run_editor.read_json(run_editor.PROJECT_PATH)
+        project_doc["entrySceneId"] = "missing_entry"
+        project_doc["chapterOrder"] = ["ghost_chapter", chapter_result["chapterId"], chapter_result["chapterId"]]
+        run_editor.write_json(run_editor.PROJECT_PATH, project_doc)
+
+        result = run_editor.repair_project_doctor()
+        repaired_project = run_editor.read_json(run_editor.PROJECT_PATH)
+        repaired_chapter = run_editor.read_json(chapter_path)
+        repair_codes = {item["code"] for item in result["repairs"]}
+        repair_by_code = {item["code"]: item for item in result["repairs"]}
+
+        self.assertTrue(result["changed"])
+        self.assertEqual(repair_codes, {"entry_scene", "chapter_order", "scene_order"})
+        self.assertEqual(repaired_project["entrySceneId"], second_scene["sceneId"])
+        self.assertEqual(repaired_project["chapterOrder"], [chapter_result["chapterId"]])
+        self.assertEqual(
+            repaired_chapter["sceneOrder"],
+            [second_scene["sceneId"], chapter_result["sceneId"]],
+        )
+        self.assertIn("移除重复章节引用 1 个", repair_by_code["chapter_order"]["detail"])
+        self.assertIn("移除重复场景引用 1 个", repair_by_code["scene_order"]["detail"])
+
+    def test_project_doctor_clears_stale_chapter_order_when_no_chapters_exist(self) -> None:
+        run_editor.create_blank_project("空章节修复测试")
+        project_doc = run_editor.read_json(run_editor.PROJECT_PATH)
+        project_doc["chapterOrder"] = ["deleted_chapter"]
+        run_editor.write_json(run_editor.PROJECT_PATH, project_doc)
+
+        result = run_editor.repair_project_doctor(["chapter_order"])
+        repaired_project = run_editor.read_json(run_editor.PROJECT_PATH)
+
+        self.assertTrue(result["changed"])
+        self.assertEqual(repaired_project["chapterOrder"], [])
+        self.assertEqual(result["repairs"][0]["code"], "chapter_order")
+        self.assertIn("移除无效章节引用 1 个", result["repairs"][0]["detail"])
+
+    def test_project_doctor_deduplicates_order_lists_without_other_damage(self) -> None:
+        _, chapter_result = self.create_blank_project_with_chapter()
+        second_scene = run_editor.create_scene(chapter_result["chapterId"], "第二场")
+        chapter_path = run_editor.CHAPTERS_DIR / f"{chapter_result['chapterId']}.json"
+        chapter_doc = run_editor.read_json(chapter_path)
+        chapter_doc["sceneOrder"] = [
+            chapter_result["sceneId"],
+            chapter_result["sceneId"],
+            second_scene["sceneId"],
+        ]
+        run_editor.write_json(chapter_path, chapter_doc)
+
+        project_doc = run_editor.read_json(run_editor.PROJECT_PATH)
+        project_doc["chapterOrder"] = [chapter_result["chapterId"], chapter_result["chapterId"]]
+        run_editor.write_json(run_editor.PROJECT_PATH, project_doc)
+
+        result = run_editor.repair_project_doctor(["chapter_order", "scene_order"])
+        repaired_project = run_editor.read_json(run_editor.PROJECT_PATH)
+        repaired_chapter = run_editor.read_json(chapter_path)
+        repair_by_code = {item["code"]: item for item in result["repairs"]}
+
+        self.assertTrue(result["changed"])
+        self.assertEqual(repaired_project["chapterOrder"], [chapter_result["chapterId"]])
+        self.assertEqual(repaired_chapter["sceneOrder"], [chapter_result["sceneId"], second_scene["sceneId"]])
+        self.assertIn("移除重复章节引用 1 个", repair_by_code["chapter_order"]["detail"])
+        self.assertIn("移除重复场景引用 1 个", repair_by_code["scene_order"]["detail"])
+
+    def test_project_doctor_ignores_unknown_repair_codes(self) -> None:
+        _, chapter_result = self.create_blank_project_with_chapter()
+        project_doc = run_editor.read_json(run_editor.PROJECT_PATH)
+        project_doc["entrySceneId"] = "missing_entry"
+        run_editor.write_json(run_editor.PROJECT_PATH, project_doc)
+
+        result = run_editor.repair_project_doctor(["unknown_code"])
+        repaired_project = run_editor.read_json(run_editor.PROJECT_PATH)
+
+        self.assertFalse(result["changed"])
+        self.assertEqual(result["repairs"], [])
+        self.assertEqual(repaired_project["entrySceneId"], "missing_entry")
+
     def test_character_presentation_can_bind_live2d_and_model3d_assets(self) -> None:
         self.create_blank_project_with_chapter()
         sprite_asset = run_editor.import_assets(

@@ -47,7 +47,7 @@ Tony Na Engine 当前更适合这样理解：
 - 项目中心与空白新建项目
 - 新手模式 / 高级模式分层
 - 角色、素材、台词台本、配音工作流
-- 项目巡检、一键发布前修复顺序、素材性能预算、发布总控 Markdown / JSON 报告、自动回归试玩路线测试
+- 项目巡检、项目医生小白修复向导、成品目标路线、一键安全修复低风险结构问题、一键发布前修复顺序、素材性能预算、发布总控 Markdown / JSON 报告、自动回归试玩路线测试
 - Tony Na Assistant 智能创作助手：支持零配置本地模板，也支持创作者自带 OpenAI API Key 调用真模型生成剧情、建议、素材提示、灵感盒归档包和可插入剧情卡片
 - 正式存档 / 读档、系统菜单
 - 项目级成品 UI 皮肤、UI Kit 部件绑定、九宫格贴图、按钮多状态贴图、布局位置微调与视觉小说文本框设计
@@ -64,7 +64,7 @@ Tony Na Engine 当前更适合这样理解：
 | 剧情 / 分支编辑 | 可用 | 支持可视化卡片、选项跳转、条件与变量、场景树筛选。 |
 | 素材管理 | 可用 | 支持背景、角色、CG、BGM、音效、语音、字体等素材导入、替换、删除、使用保护与发布前体积预算提示。 |
 | 智能创作助手 | 可用 | 默认本地模板；可选自带 OpenAI API Key 的真模型模式；支持灵感盒搜索、收藏保留、卡片预览、勾选插入、单条 / 全量 Markdown 创作档案、单条导出、全部归档、导入与本机 Key 遗忘。 |
-| 项目安全网 | 可用 | 支持自动快照、版本恢复、崩溃恢复、正式存档 / 读档、发布前检查与发布总控 Markdown / JSON 报告导出。 |
+| 项目安全网 | 可用 | 支持自动快照、版本恢复、崩溃恢复、正式存档 / 读档、项目医生修复队列、成品目标路线、入口场景 / 章节顺序 / 场景顺序的一键安全修复、发布前检查与发布总控 Markdown / JSON 报告导出。 |
 | 成品 UI 自定义 | 可用 | 支持项目级 UI 皮肤、按钮多状态、九宫格贴图、布局位置与视觉小说文本框设计。 |
 | EXTRA / 回想系统 | 可用 | 支持图鉴馆、回想馆、成就馆、章节回放、结局回放与语音回听。 |
 | 粒子与演出 | 可用 | 支持高级粒子预设、项目级自定义粒子、镜头、滤镜、闪屏、震动等演出配置。 |
@@ -89,7 +89,7 @@ Tony Na Engine 当前更适合这样理解：
   编辑器前端
 
 - [`prototype_editor/modules`](prototype_editor/modules)
-  前端纯逻辑模块，覆盖素材目录、创作助手、发布总控、变量、外观主题、项目历史等可单独测试的能力
+  前端纯逻辑模块，覆盖素材目录、创作助手、项目医生、成品目标路线、发布总控、变量、外观主题、项目历史等可单独测试的能力
 
 - [`export_player_template`](export_player_template)  
   导出后玩家端 Runtime 模板
@@ -292,7 +292,19 @@ verify_before_push.cmd
 ```bash
 python3 tools/ci/local_verify.py --profile quick
 python3 tools/ci/local_verify.py --profile full --json-report local-verify.json --markdown-report local-verify.md
+python3 tools/ci/local_verify.py --profile full --no-fail-fast --markdown-report local-verify.md
+python3 tools/ci/local_verify.py --profile full --no-fail-fast --report-dir verification_reports
+python3 tools/ci/local_verify.py --profile full --strict-clean --report-dir verification_reports
+python3 tools/ci/project_health.py template_project --markdown-report verification_reports/project-health-template.md
 ```
+
+终端输出会显示检查档位、当前分支、提交号、本地改动数量、逐项通过/失败状态、分类汇总和下一步提示。
+需要一次性看完整故障清单时，可以加 `--no-fail-fast`，报告会继续跑完后续检查并按类别汇总失败位置。
+如果本机缺少某个必需工具，报告会归类到 `environment`，并列出受影响的检查项。
+需要同时保存 JSON 和 Markdown 报告时，可以使用 `--report-dir verification_reports`；目录里会保留当前档位报告，也会生成 `local-verify-latest.md` 作为最新报告入口。
+报告会记录当前分支、短提交号和未提交改动数量，方便确认验证对应的是哪一版代码。
+正式发布前可以加 `--strict-clean`，让本地未提交改动也作为发布闸门失败项显示在报告里。
+需要检查某个游戏项目是否缺素材、坏跳转或引用不存在，可以运行 `tools/ci/project_health.py <项目目录>`；它会在终端里显示项目健康状态、首批问题、安全修复分组和下一步建议。
 
 ### GitHub 检查状态
 

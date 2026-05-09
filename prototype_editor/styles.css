@@ -656,6 +656,32 @@ textarea {
   margin-bottom: 18px;
 }
 
+.project-milestone-panel {
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 18px;
+  background:
+    radial-gradient(circle at 8% 0%, rgba(121, 220, 255, 0.14), transparent 32%),
+    radial-gradient(circle at 96% 12%, rgba(246, 185, 119, 0.18), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(248, 244, 238, 0.92));
+}
+
+.project-milestone-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(115, 86, 67, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(115, 86, 67, 0.035) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: linear-gradient(90deg, rgba(0, 0, 0, 0.58), transparent 72%);
+}
+
+.project-milestone-panel > * {
+  position: relative;
+}
+
 .scene-status-board-panel {
   margin-bottom: 18px;
 }
@@ -889,6 +915,302 @@ textarea {
   grid-template-columns: 1.15fr 0.85fr;
   gap: 14px;
   margin-top: 14px;
+}
+
+.project-milestone-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.12fr) minmax(320px, 0.88fr);
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.project-milestone-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.project-milestone-card {
+  position: relative;
+  display: grid;
+  gap: 12px;
+  overflow: hidden;
+  padding: 18px;
+  border-radius: 22px;
+  border: 1px solid rgba(115, 86, 67, 0.12);
+  background:
+    radial-gradient(circle at top right, rgba(255, 247, 233, 0.96), transparent 38%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 244, 238, 0.92));
+  box-shadow: 0 16px 36px rgba(57, 45, 35, 0.06);
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.project-milestone-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 5px;
+  background: linear-gradient(180deg, rgba(121, 220, 255, 0.84), rgba(110, 124, 255, 0.76));
+  opacity: 0.72;
+}
+
+.project-milestone-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 20px 44px rgba(57, 45, 35, 0.1);
+}
+
+.project-milestone-card.is-focus {
+  min-height: 100%;
+  background:
+    radial-gradient(circle at 88% 6%, rgba(126, 169, 255, 0.2), transparent 32%),
+    radial-gradient(circle at 10% 100%, rgba(246, 185, 119, 0.22), transparent 34%),
+    linear-gradient(135deg, rgba(255, 251, 245, 0.98), rgba(243, 248, 255, 0.94));
+}
+
+.project-milestone-card.is-focus::after {
+  content: "";
+  position: absolute;
+  right: -60px;
+  bottom: -70px;
+  width: 180px;
+  height: 180px;
+  border-radius: 999px;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(121, 220, 255, 0.18), transparent 68%);
+}
+
+.project-milestone-card.is-good {
+  border-color: rgba(79, 139, 88, 0.22);
+}
+
+.project-milestone-card.is-good::before {
+  background: linear-gradient(180deg, rgba(99, 185, 112, 0.88), rgba(121, 220, 255, 0.5));
+}
+
+.project-milestone-card.is-warn {
+  border-color: rgba(181, 113, 45, 0.24);
+}
+
+.project-milestone-card.is-warn::before {
+  background: linear-gradient(180deg, rgba(244, 180, 93, 0.88), rgba(121, 220, 255, 0.45));
+}
+
+.project-milestone-card.is-danger {
+  border-color: rgba(185, 75, 65, 0.24);
+}
+
+.project-milestone-card.is-danger::before {
+  background: linear-gradient(180deg, rgba(238, 103, 92, 0.92), rgba(244, 180, 93, 0.56));
+}
+
+.project-milestone-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.project-milestone-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.project-milestone-card-head strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 19px;
+  color: var(--ink);
+}
+
+.project-milestone-card-head small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+
+.project-milestone-phase {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 26px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(80, 123, 230, 0.18);
+  background: rgba(255, 255, 255, 0.72);
+  color: rgba(58, 85, 143, 0.92);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.project-milestone-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.project-milestone-progress-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.project-milestone-progress-head strong {
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.project-milestone-progress {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.66), rgba(115, 86, 67, 0.08)),
+    rgba(115, 86, 67, 0.1);
+  box-shadow: inset 0 1px 3px rgba(57, 45, 35, 0.08);
+}
+
+.project-milestone-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background:
+    linear-gradient(90deg, rgba(121, 220, 255, 0.96), rgba(80, 123, 230, 0.92), rgba(246, 185, 119, 0.92));
+  box-shadow: 0 0 18px rgba(80, 123, 230, 0.18);
+}
+
+.project-milestone-checklist {
+  display: grid;
+  gap: 9px;
+}
+
+.project-milestone-check {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid rgba(115, 86, 67, 0.09);
+}
+
+.project-milestone-check-dot {
+  width: 10px;
+  height: 10px;
+  margin-top: 6px;
+  border-radius: 999px;
+  background: var(--warn);
+  box-shadow: 0 0 0 4px rgba(230, 156, 71, 0.12);
+}
+
+.project-milestone-check.is-done .project-milestone-check-dot {
+  background: var(--good);
+  box-shadow: 0 0 0 4px rgba(79, 139, 88, 0.12);
+}
+
+.project-milestone-check strong,
+.project-milestone-check span {
+  display: block;
+}
+
+.project-milestone-check strong {
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.project-milestone-check span,
+.project-milestone-more {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.project-milestone-more {
+  padding: 2px 4px;
+}
+
+.project-milestone-gap-digest {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 20px;
+  border: 1px solid rgba(115, 86, 67, 0.1);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(121, 220, 255, 0.14), transparent 32%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.76), rgba(248, 244, 238, 0.7));
+}
+
+.project-milestone-gap-digest.is-ready {
+  border-color: rgba(79, 139, 88, 0.22);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(99, 185, 112, 0.16), transparent 32%),
+    linear-gradient(180deg, rgba(247, 255, 249, 0.88), rgba(255, 255, 255, 0.76));
+}
+
+.project-milestone-gap-digest.is-close {
+  border-color: rgba(181, 113, 45, 0.22);
+}
+
+.project-milestone-gap-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.project-milestone-gap-head strong {
+  display: block;
+  margin-top: 4px;
+  color: var(--ink);
+  font-size: 17px;
+}
+
+.project-milestone-gap-digest p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.project-milestone-gap-metrics {
+  margin-bottom: 0;
+}
+
+.project-milestone-gap-list {
+  display: grid;
+  gap: 8px;
+}
+
+.project-milestone-gap-item {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.64);
+  border: 1px solid rgba(115, 86, 67, 0.08);
+}
+
+.project-milestone-gap-item.is-done {
+  background: rgba(244, 255, 248, 0.72);
+  border-color: rgba(79, 139, 88, 0.16);
+}
+
+.project-milestone-gap-item strong {
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.project-milestone-gap-item span {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
 }
 
 .scene-status-board {
@@ -1839,6 +2161,26 @@ body[data-editor-mode="beginner"] #screen-preview #previewSceneFilterBar {
 .issue-card {
   display: grid;
   gap: 10px;
+}
+
+.issue-recovery,
+.project-doctor-recovery {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(248, 245, 240, 0.78);
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.project-doctor-recovery {
+  display: grid;
+  gap: 4px;
+}
+
+.project-doctor-recovery strong {
+  color: var(--text);
+  font-size: 0.86rem;
 }
 
 .editor-mode-card,
@@ -4952,6 +5294,71 @@ button.asset-gap-stat-card:hover {
   line-height: 1.7;
 }
 
+.project-doctor-recovery,
+.project-doctor-done {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(115, 86, 67, 0.1);
+  color: var(--muted);
+  line-height: 1.6;
+  font-size: 13px;
+}
+
+.project-doctor-done {
+  background: rgba(246, 255, 250, 0.72);
+}
+
+.project-doctor-recovery strong,
+.project-doctor-done strong {
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.project-doctor-receipt {
+  border-color: rgba(91, 168, 124, 0.2);
+}
+
+.project-doctor-receipt-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.project-doctor-receipt-heading {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.project-doctor-receipt-list {
+  display: grid;
+  gap: 8px;
+}
+
+.project-doctor-receipt-item {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(115, 86, 67, 0.1);
+}
+
+.project-doctor-receipt-item strong {
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.project-doctor-receipt-item span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
 .preview-sprint-metrics {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -5178,6 +5585,10 @@ button.asset-gap-stat-card:hover {
 
 .danger-text {
   color: var(--danger);
+}
+
+.soft-text {
+  color: var(--muted);
 }
 
 .empty-note {
@@ -5414,6 +5825,7 @@ button.asset-gap-stat-card:hover {
   .dashboard-grid,
   .recent-work-grid,
   .production-board-grid,
+  .project-milestone-grid,
   .production-scene-grid,
   .scene-status-board,
   .story-structure-grid,
@@ -5836,6 +6248,10 @@ select:focus {
     .rhythm-card,
     .voice-batch-card,
     .voice-recording-card,
+    .project-milestone-card,
+    .project-milestone-gap-digest,
+    .project-milestone-check,
+    .project-milestone-gap-item,
     .list-card,
     .scene-card,
     .block-card,
@@ -5958,6 +6374,9 @@ select:focus {
 .recent-work-card.is-good,
 .production-focus-card.is-good,
 .production-task-card.is-good,
+.project-milestone-card.is-good,
+.project-milestone-gap-digest.is-ready,
+.project-milestone-gap-item.is-done,
 .route-link-chip-fallback,
 .route-alert-card.is-warn {
   background:
@@ -5968,6 +6387,8 @@ select:focus {
 .recent-work-card.is-warn,
 .production-focus-card.is-warn,
 .production-task-card.is-warn,
+.project-milestone-card.is-warn,
+.project-milestone-gap-digest.is-close,
 .route-link-chip-choice {
   background:
     linear-gradient(180deg, rgba(28, 22, 12, 0.96), rgba(17, 14, 10, 0.94)),
@@ -5977,6 +6398,7 @@ select:focus {
 .recent-work-card.is-danger,
 .production-focus-card.is-danger,
 .production-task-card.is-danger,
+.project-milestone-card.is-danger,
 .route-alert-card.is-danger,
 .route-link-chip.is-broken,
 .route-link-chip-condition {
@@ -5992,6 +6414,7 @@ select:focus {
 }
 
 .story-template-button:hover,
+.project-milestone-card:hover,
 .scene-card:hover,
 .block-card:hover,
 .asset-card:hover,
@@ -8125,6 +8548,7 @@ html[data-ui-theme="light"] .ui-theme-mode-button {
 .recent-work-grid,
 .scene-status-board,
 .production-board-grid,
+.project-milestone-grid,
 .story-structure-grid,
 .story-optimizer-grid,
 .preview-sprint-grid,

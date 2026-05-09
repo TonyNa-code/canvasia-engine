@@ -8,6 +8,7 @@ __pycache__/
 .export_runtime_cache/
 .tmp_brand_preview/
 .native_runtime_smoke_venv/
+.local_private/
 
 exports/
 projects/
@@ -17,6 +18,7 @@ projects/
 playwright-report/
 test-results/
 release_preview/
+verification_reports/
 
 *.log
 *.tmp

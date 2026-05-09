@@ -176,6 +176,63 @@ class FrontendActionHandlerTests(unittest.TestCase):
         )
         self.assertIn("[Tony Na Engine] Unhandled editor action", source)
 
+    def test_quick_switch_screen_actions_keep_dataset_screen(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        quick_action_button = _extract_function_source(source, "renderQuickActionButton")
+
+        self.assertIn('action.action === "switch-screen"', quick_action_button)
+        self.assertIn('action.dataset?.screen', quick_action_button)
+        self.assertIn('data-screen="${escapeHtml(screen)}"', quick_action_button)
+
+    def test_preview_regression_action_refreshes_current_progress_surface(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        click_handler = _extract_function_source(source, "handleClick")
+        regression_block_start = click_handler.index('action === "run-preview-regression"')
+        regression_block_end = click_handler.index('action === "export-inspection-report"', regression_block_start)
+        regression_block = click_handler[regression_block_start:regression_block_end]
+
+        self.assertIn("state.inspectionRegressionResult = runPreviewRegressionSmokeTest", regression_block)
+        self.assertIn('state.currentScreen === "preview"', regression_block)
+        self.assertIn("renderPreviewScreen();", regression_block)
+        self.assertIn('state.currentScreen === "dashboard"', regression_block)
+        self.assertIn("renderDashboard();", regression_block)
+
+    def test_beginner_dashboard_export_step_requires_real_export_record(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        workflow = _extract_function_source(source, "buildBeginnerDashboardWorkflow")
+        renderer = _extract_function_source(source, "renderBeginnerDashboardWorkflow")
+
+        self.assertIn("const canPreviewAndExport =", workflow)
+        self.assertIn("const hasExportRecord = Boolean(state.lastExportResult);", workflow)
+        self.assertIn("const exportMissingAssetCount = Number(state.lastExportResult?.missingAssets ?? 0) || 0;", workflow)
+        self.assertIn("const hasCleanExportRecord = hasExportRecord && exportMissingAssetCount <= 0;", workflow)
+        self.assertIn("done: hasCleanExportRecord", workflow)
+        self.assertIn("已导出，缺 ${exportMissingAssetCount} 个素材", workflow)
+        self.assertIn("导出成功后这一步才算完成", workflow)
+        self.assertIn("补齐后再导出才更接近可交付", workflow)
+        self.assertIn('action: "export-build"', workflow)
+        self.assertIn('dataset: { "export-target": "web" }', workflow)
+        self.assertIn('action: "focus-asset-gap"', workflow)
+        self.assertIn('dataset: { "asset-filter-mode": "urgent_missing" }', workflow)
+        self.assertIn('dataset: { screen: "inspection" }', workflow)
+        self.assertIn("function getBeginnerWorkflowStepStatusLabel", source)
+        self.assertIn("function getBeginnerWorkflowStepToneClass", source)
+        self.assertIn("getBeginnerWorkflowStepStatusLabel(step)", renderer)
+        self.assertIn("getBeginnerWorkflowStepToneClass(step)", renderer)
+
+    def test_export_build_refreshes_current_progress_surface(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        export_build = _extract_function_source(source, "exportBuild")
+
+        self.assertIn("state.lastExportResult = result;", export_build)
+        self.assertIn("renderPreviewScreen();", export_build)
+        self.assertIn('state.currentScreen === "dashboard"', export_build)
+        self.assertIn("renderDashboard();", export_build)
+        self.assertIn('state.currentScreen === "inspection"', export_build)
+        self.assertIn("renderInspectionScreen();", export_build)
+        self.assertLess(export_build.index("state.lastExportResult = result;"), export_build.index("renderDashboard();"))
+        self.assertLess(export_build.index("state.lastExportResult = result;"), export_build.index("renderInspectionScreen();"))
+
 
 if __name__ == "__main__":
     unittest.main()

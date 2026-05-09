@@ -85,6 +85,90 @@ class GitHubStatusToolTests(unittest.TestCase):
         self.assertIn("本地同步：已同步", self.github_status.format_status_text(payload))
         self.assertIn("远端刷新：已刷新", self.github_status.format_status_text(payload))
 
+    def test_transient_github_network_errors_render_as_status(self) -> None:
+        self.assertTrue(
+            self.github_status.is_transient_github_error(
+                RuntimeError("无法连接 GitHub API：<urlopen error _ssl.c:1015: handshake operation timed out>")
+            )
+        )
+        payload = self.github_status.build_status_payload(
+            "TonyNa-code/tony-na-engine",
+            "d33586a51f417505471243629f2d530ef49b5e74",
+            [],
+            status_override="network_error",
+            error_message="无法连接 GitHub API：handshake operation timed out",
+        )
+
+        self.assertEqual(payload["status"], "network_error")
+        self.assertEqual(payload["statusLabel"], "网络暂时不可用")
+        status_text = self.github_status.format_status_text(payload)
+        self.assertIn("状态查询提示：无法连接 GitHub API", status_text)
+        self.assertIn("这是网络/API 查询问题，不代表 CI 已失败", status_text)
+        self.assertNotIn("还没有查到 GitHub Actions 检查", status_text)
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_path = Path(tmp_dir) / "network-status.md"
+            self.github_status.write_markdown_report(report_path, payload)
+            report = report_path.read_text(encoding="utf-8")
+            self.assertIn("- Query note: `无法连接 GitHub API：handshake operation timed out`", report)
+            self.assertIn("GitHub API was temporarily unreachable", report)
+            self.assertNotIn("| Check | Status | Conclusion | Link |", report)
+
+    def test_network_error_messages_are_report_safe(self) -> None:
+        noisy_message = "无法连接 GitHub API：\n`handshake` operation timed out\n请稍后重试"
+        payload = self.github_status.build_status_payload(
+            "TonyNa-code/tony-na-engine",
+            "d33586a51f417505471243629f2d530ef49b5e74",
+            [],
+            status_override="network_error",
+            error_message=noisy_message,
+        )
+
+        self.assertEqual(payload["error"], "无法连接 GitHub API： `handshake` operation timed out 请稍后重试")
+        self.assertIn("状态查询提示：无法连接 GitHub API： `handshake`", self.github_status.format_status_text(payload))
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_path = Path(tmp_dir) / "network-status.md"
+            self.github_status.write_markdown_report(report_path, payload)
+            report = report_path.read_text(encoding="utf-8")
+            self.assertIn("- Query note: `无法连接 GitHub API： 'handshake' operation timed out 请稍后重试`", report)
+
+    def test_markdown_report_escapes_dynamic_cells_and_compacts_annotations(self) -> None:
+        payload = self.github_status.build_status_payload(
+            "TonyNa-code/tony-na-engine",
+            "d33586a51f417505471243629f2d530ef49b5e74",
+            [
+                {
+                    "id": 7,
+                    "name": "verify | smoke\nphase",
+                    "status": "completed",
+                    "conclusion": "failure",
+                    "details_url": "https://github.com/example/actions/runs/7",
+                    "output": {"annotations_count": 1, "annotations_url": "https://api.github.com/example"},
+                }
+            ],
+            annotations_by_run={
+                "7": [
+                    {
+                        "path": "tests/test_status.py",
+                        "start_line": 12,
+                        "message": "first line\nsecond line",
+                    }
+                ]
+            },
+        )
+
+        status_text = self.github_status.format_status_text(payload)
+        self.assertIn("- tests/test_status.py:12 first line second line", status_text)
+        self.assertNotIn("first line\nsecond line", status_text)
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_path = Path(tmp_dir) / "status.md"
+            self.github_status.write_markdown_report(report_path, payload)
+            report = report_path.read_text(encoding="utf-8")
+            self.assertIn("| verify \\| smoke phase | completed | failure |", report)
+            self.assertIn("- `tests/test_status.py:12` first line second line", report)
+            self.assertNotIn("first line\nsecond line", report)
+
     def test_cli_can_render_saved_check_run_payload(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             payload_path = Path(tmp_dir) / "check-runs.json"

@@ -2139,6 +2139,191 @@ def save_project_settings(
     return {"project": project}
 
 
+PROJECT_DOCTOR_REPAIR_CODES = {
+    "entry_scene",
+    "chapter_order",
+    "scene_order",
+}
+
+
+def normalize_project_doctor_repair_codes(value: object = None) -> set[str]:
+    if value is None:
+        return set(PROJECT_DOCTOR_REPAIR_CODES)
+    if isinstance(value, str):
+        raw_items = re.split(r"[\s,]+", value)
+    elif isinstance(value, list):
+        raw_items = value
+    else:
+        return set()
+
+    return {
+        str(item or "").strip().lower()
+        for item in raw_items
+        if str(item or "").strip().lower() in PROJECT_DOCTOR_REPAIR_CODES
+    }
+
+
+def dedupe_project_doctor_order(items: list[str]) -> tuple[list[str], int]:
+    seen: set[str] = set()
+    deduped: list[str] = []
+    duplicate_count = 0
+    for item in items:
+        if item in seen:
+            duplicate_count += 1
+            continue
+        seen.add(item)
+        deduped.append(item)
+    return deduped, duplicate_count
+
+
+def normalize_project_doctor_order_items(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [text for item in value if (text := str(item or "").strip())]
+
+
+def get_first_ordered_scene_id(project: dict, chapters: list[dict]) -> str:
+    chapter_by_id = {chapter.get("chapterId"): chapter for chapter in chapters if chapter.get("chapterId")}
+    ordered_chapter_ids = [
+        chapter_id
+        for chapter_id in normalize_text_list(project.get("chapterOrder"))
+        if chapter_id in chapter_by_id
+    ]
+    ordered_chapter_ids.extend(
+        chapter.get("chapterId")
+        for chapter in chapters
+        if chapter.get("chapterId") and chapter.get("chapterId") not in ordered_chapter_ids
+    )
+
+    for chapter_id in ordered_chapter_ids:
+        chapter = chapter_by_id.get(chapter_id)
+        if not chapter:
+            continue
+        scenes = [scene for scene in chapter.get("scenes", []) if isinstance(scene, dict)]
+        scene_by_id = {scene.get("id"): scene for scene in scenes if scene.get("id")}
+        scene_order = [
+            scene_id
+            for scene_id in normalize_text_list(chapter.get("sceneOrder"))
+            if scene_id in scene_by_id
+        ]
+        scene_order.extend(scene.get("id") for scene in scenes if scene.get("id") not in scene_order)
+        if scene_order:
+            return str(scene_order[0])
+    return ""
+
+
+def repair_project_doctor(repair_codes: object = None) -> dict:
+    selected_codes = normalize_project_doctor_repair_codes(repair_codes)
+    project = read_json(PROJECT_PATH)
+    chapter_entries = [(path, read_json(path)) for path in list_chapter_files()]
+    chapters = [chapter for _, chapter in chapter_entries]
+    repairs: list[dict] = []
+    skipped: list[dict] = []
+    project_changed = False
+
+    if "chapter_order" in selected_codes:
+        chapter_ids = [
+            str(chapter.get("chapterId") or "").strip()
+            for chapter in chapters
+            if str(chapter.get("chapterId") or "").strip()
+        ]
+        chapter_id_set = set(chapter_ids)
+        current_order = normalize_project_doctor_order_items(project.get("chapterOrder"))
+        valid_order, duplicate_count = dedupe_project_doctor_order(
+            [chapter_id for chapter_id in current_order if chapter_id in chapter_id_set]
+        )
+        valid_order_set = set(valid_order)
+        next_order = [*valid_order, *[chapter_id for chapter_id in chapter_ids if chapter_id not in valid_order_set]]
+        removed_count = len([chapter_id for chapter_id in current_order if chapter_id and chapter_id not in chapter_id_set])
+        appended_count = len([chapter_id for chapter_id in chapter_ids if chapter_id not in valid_order_set])
+        if next_order != current_order:
+            project["chapterOrder"] = next_order
+            project_changed = True
+            repairs.append(
+                {
+                    "code": "chapter_order",
+                    "title": "已整理章节顺序",
+                    "detail": f"移除无效章节引用 {removed_count} 个，移除重复章节引用 {duplicate_count} 个，补回未进入排序的章节 {appended_count} 个。",
+                }
+            )
+        else:
+            skipped.append({"code": "chapter_order", "title": "章节顺序无需修复"})
+
+    if "scene_order" in selected_codes:
+        for chapter_file, chapter in chapter_entries:
+            scenes = [scene for scene in chapter.get("scenes", []) if isinstance(scene, dict)]
+            scene_ids = [str(scene.get("id") or "").strip() for scene in scenes if str(scene.get("id") or "").strip()]
+            scene_id_set = set(scene_ids)
+            current_order = normalize_project_doctor_order_items(chapter.get("sceneOrder"))
+            valid_order, duplicate_count = dedupe_project_doctor_order(
+                [scene_id for scene_id in current_order if scene_id in scene_id_set]
+            )
+            valid_order_set = set(valid_order)
+            missing_order = [scene_id for scene_id in scene_ids if scene_id not in valid_order_set]
+            next_order = [*valid_order, *missing_order]
+            removed_count = len([scene_id for scene_id in current_order if scene_id and scene_id not in scene_id_set])
+            if next_order != current_order:
+                chapter["sceneOrder"] = next_order
+                chapter["updatedAt"] = now_iso()
+                write_json(chapter_file, chapter)
+                repairs.append(
+                    {
+                        "code": "scene_order",
+                        "title": f"已整理场景顺序：{chapter.get('name') or chapter.get('chapterId') or chapter_file.stem}",
+                        "detail": f"移除无效场景引用 {removed_count} 个，移除重复场景引用 {duplicate_count} 个，补回未进入排序的场景 {len(missing_order)} 个。",
+                    }
+                )
+            else:
+                skipped.append(
+                    {
+                        "code": "scene_order",
+                        "title": f"场景顺序无需修复：{chapter.get('name') or chapter.get('chapterId') or chapter_file.stem}",
+                    }
+                )
+
+    all_scene_ids = {
+        str(scene.get("id") or "").strip()
+        for chapter in chapters
+        for scene in chapter.get("scenes", [])
+        if isinstance(scene, dict) and str(scene.get("id") or "").strip()
+    }
+    if "entry_scene" in selected_codes:
+        entry_scene_id = str(project.get("entrySceneId") or "").strip()
+        if entry_scene_id not in all_scene_ids:
+            fallback_scene_id = get_first_ordered_scene_id(project, chapters)
+            if fallback_scene_id:
+                project["entrySceneId"] = fallback_scene_id
+                project_changed = True
+                repairs.append(
+                    {
+                        "code": "entry_scene",
+                        "title": "已修复入口场景",
+                        "detail": f"入口场景已改为当前项目里的第一个可用场景：{fallback_scene_id}。",
+                    }
+                )
+            else:
+                skipped.append(
+                    {
+                        "code": "entry_scene",
+                        "title": "入口场景无法自动修复",
+                        "detail": "项目里还没有可用场景，请先新建章节和场景。",
+                    }
+                )
+        else:
+            skipped.append({"code": "entry_scene", "title": "入口场景无需修复"})
+
+    if project_changed:
+        project["updatedAt"] = now_iso()
+        write_json(PROJECT_PATH, project)
+
+    return {
+        "changed": bool(repairs),
+        "repairs": repairs,
+        "skipped": skipped,
+        "project": project,
+    }
+
+
 def validate_variable_id(value: object) -> str:
     variable_id = str(value or "").strip()
     if not variable_id:
@@ -10331,6 +10516,10 @@ class EditorRequestHandler(SimpleHTTPRequestHandler):
             self.handle_save_project_settings()
             return
 
+        if parsed.path == "/api/repair-project-doctor":
+            self.handle_repair_project_doctor()
+            return
+
         if parsed.path == "/api/rename-variable":
             self.handle_rename_variable()
             return
@@ -11095,6 +11284,31 @@ class EditorRequestHandler(SimpleHTTPRequestHandler):
         except Exception as error:  # pragma: no cover - defensive fallback
             self.send_json(
                 {"ok": False, "error": f"保存项目设置时出了意外问题：{error}"},
+                status=HTTPStatus.INTERNAL_SERVER_ERROR,
+            )
+
+    def handle_repair_project_doctor(self) -> None:
+        try:
+            payload = self.read_json_body()
+            result = repair_project_doctor(payload.get("repairCodes"))
+            if result.get("changed"):
+                result = attach_history_to_result(result, "项目医生安全修复")
+            else:
+                result["history"] = build_history_payload()
+            self.send_json(
+                {
+                    "ok": True,
+                    "savedAt": now_iso(),
+                    **result,
+                }
+            )
+        except json.JSONDecodeError:
+            self.send_json({"ok": False, "error": "请求体不是有效 JSON。"}, status=HTTPStatus.BAD_REQUEST)
+        except ValueError as error:
+            self.send_json({"ok": False, "error": str(error)}, status=HTTPStatus.BAD_REQUEST)
+        except Exception as error:  # pragma: no cover - defensive fallback
+            self.send_json(
+                {"ok": False, "error": f"项目医生安全修复时出了意外问题：{error}"},
                 status=HTTPStatus.INTERNAL_SERVER_ERROR,
             )
 

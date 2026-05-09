@@ -32,6 +32,8 @@ class FrontendEntrypointModuleTests(unittest.TestCase):
             "./modules/creative_assistant.js",
             "./modules/editor_mode.js",
             "./modules/release_version.js",
+            "./modules/project_doctor.js",
+            "./modules/project_milestones.js",
             "./modules/release_control.js",
             "./app.js",
         ]

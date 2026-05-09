@@ -20,6 +20,7 @@ const API_CREATE_VOICE_PLACEHOLDER = "/api/create-voice-placeholder";
 const API_CREATE_VOICE_PLACEHOLDERS = "/api/create-voice-placeholders";
 const API_MATCH_VOICE_FILES = "/api/match-voice-files";
 const API_SAVE_PROJECT_SETTINGS = "/api/save-project-settings";
+const API_REPAIR_PROJECT_DOCTOR = "/api/repair-project-doctor";
 const API_RENAME_VARIABLE = "/api/rename-variable";
 const API_CREATE_CHAPTER = "/api/create-chapter";
 const API_CREATE_STARTER_KIT = "/api/create-starter-kit";
@@ -77,6 +78,8 @@ const visualEffectTools = window.TonyNaEditorVisualEffects;
 const variableTools = window.TonyNaEditorVariables;
 const projectHistoryTools = window.TonyNaEditorProjectHistory;
 const assetCatalogTools = window.TonyNaEditorAssetCatalog;
+const projectDoctorTools = window.TonyNaEditorProjectDoctor;
+const projectMilestoneTools = window.TonyNaEditorProjectMilestones ?? window.TonyNaProjectMilestones;
 
 const ASSET_TYPE_LABELS = assetCatalogTools?.ASSET_TYPE_LABELS ?? {
   background: "背景",
@@ -2105,6 +2108,7 @@ const state = {
   inspectionIssueSearchQuery: "",
   inspectionIssueFilterMode: "all",
   inspectionRegressionResult: null,
+  projectDoctorRepairReceipt: null,
   projectVariableSearchQuery: "",
   projectVariableFilterMode: "all",
   projectVariableDrafts: {},
@@ -2910,6 +2914,7 @@ function resetProjectScopedUiState() {
   state.inspectionIssueSearchQuery = "";
   state.inspectionIssueFilterMode = "all";
   state.inspectionRegressionResult = null;
+  state.projectDoctorRepairReceipt = null;
   state.projectVariableSearchQuery = "";
   state.projectVariableFilterMode = "all";
   state.projectVariableDrafts = {};
@@ -3181,7 +3186,11 @@ function buildBeginnerDashboardWorkflow(routeOverview) {
   const hasStructure = state.data.chapters.length > 0 && state.data.scenes.length > 0;
   const hasStoryContent = productionOverview.scenesWithContent > 0;
   const hasStarterKit = !starterKitOverview.needsStarterKit;
-  const previewReady = state.data.scenes.length > 0 && state.validation.errors.length === 0;
+  const canPreviewAndExport = state.data.scenes.length > 0 && state.validation.errors.length === 0;
+  const hasExportRecord = Boolean(state.lastExportResult);
+  const exportMissingAssetCount = Number(state.lastExportResult?.missingAssets ?? 0) || 0;
+  const hasCleanExportRecord = hasExportRecord && exportMissingAssetCount <= 0;
+  const exportTargetLabel = state.lastExportResult?.targetLabel ?? state.lastExportResult?.target ?? "试玩包";
 
   const steps = [
     {
@@ -3233,14 +3242,41 @@ function buildBeginnerDashboardWorkflow(routeOverview) {
     {
       step: "第四步",
       title: "试玩与导出",
-      done: previewReady,
-      description: previewReady
-        ? "当前没有结构错误，可以进入试玩与导出阶段。"
-        : "清理结构错误后即可进入预览导出页。",
-      actions: [
-        { label: "去试玩这版", action: "switch-screen", dataset: { screen: "preview" } },
-        { label: "查看导出页", action: "switch-screen", dataset: { screen: "preview" } },
-      ],
+      done: hasCleanExportRecord,
+      statusLabel: hasCleanExportRecord
+        ? "已导出"
+        : hasExportRecord
+          ? `已导出，缺 ${exportMissingAssetCount} 个素材`
+          : canPreviewAndExport
+            ? "可试玩，待导出"
+            : "先修错误",
+      statusTone: hasCleanExportRecord ? "good" : hasExportRecord || canPreviewAndExport ? "warn" : "danger",
+      description: hasCleanExportRecord
+        ? `最近已经导出过一版 ${exportTargetLabel}，后续修改后建议再导一版确认。`
+        : hasExportRecord
+          ? `最近已经导出过一版 ${exportTargetLabel}，但还有 ${exportMissingAssetCount} 个素材没找到；补齐后再导出才更接近可交付。`
+        : canPreviewAndExport
+          ? "当前没有结构错误，可以先试玩并导出一版；导出成功后这一步才算完成。"
+          : "先清理结构错误后再进入试玩与导出，避免导出的包一打开就断线。",
+      actions: hasCleanExportRecord
+        ? [
+            { label: "导出新版本", action: "export-build", dataset: { "export-target": "web" } },
+            { label: "去试玩复查", action: "switch-screen", dataset: { screen: "preview" } },
+          ]
+        : hasExportRecord
+          ? [
+              { label: "去素材页补缺口", action: "focus-asset-gap", dataset: { "asset-filter-mode": "urgent_missing" } },
+              { label: "重新导出试玩包", action: "export-build", dataset: { "export-target": "web" } },
+            ]
+        : canPreviewAndExport
+          ? [
+              { label: "去试玩这版", action: "switch-screen", dataset: { screen: "preview" } },
+              { label: "导出试玩包", action: "export-build", dataset: { "export-target": "web" } },
+            ]
+          : [
+              { label: "打开项目巡检", action: "switch-screen", dataset: { screen: "inspection" } },
+              { label: "去剧情页修", action: "switch-screen", dataset: { screen: "story" } },
+            ],
     },
   ];
 
@@ -3248,6 +3284,26 @@ function buildBeginnerDashboardWorkflow(routeOverview) {
     steps,
     nextStep: steps.find((item) => !item.done) ?? steps[steps.length - 1],
   };
+}
+
+function getBeginnerWorkflowStepStatusLabel(step) {
+  if (step?.statusLabel) {
+    return step.statusLabel;
+  }
+  return step?.done ? "当前已完成" : "进行中";
+}
+
+function getBeginnerWorkflowStepToneClass(step) {
+  if (step?.done || step?.statusTone === "good") {
+    return "good-text";
+  }
+  if (step?.statusTone === "danger") {
+    return "danger-text";
+  }
+  if (step?.statusTone === "soft") {
+    return "soft-text";
+  }
+  return "warn-text";
 }
 
 function renderBeginnerDashboardWorkflow(routeOverview) {
@@ -3280,8 +3336,8 @@ function renderBeginnerDashboardWorkflow(routeOverview) {
                   <strong>${escapeHtml(step.title)}</strong>
                   <p>${escapeHtml(step.description)}</p>
                   <div class="story-filter-chip-row">
-          <span class="issue-tag ${step.done ? "good-text" : "warn-text"}">
-                      ${step.done ? "当前已完成" : "进行中"}
+                    <span class="issue-tag ${getBeginnerWorkflowStepToneClass(step)}">
+                      ${escapeHtml(getBeginnerWorkflowStepStatusLabel(step))}
                     </span>
                   </div>
                 </article>
@@ -4661,6 +4717,11 @@ async function handleClick(event) {
     return;
   }
 
+  if (action === "repair-project-doctor") {
+    void repairProjectDoctor(actionTarget.dataset.repairCodes);
+    return;
+  }
+
   if (action === "generate-release-fix-order") {
     state.validation = runValidation(state.data);
     updateTopbar();
@@ -4686,6 +4747,12 @@ async function handleClick(event) {
     updateTopbar();
     state.inspectionRegressionResult = runPreviewRegressionSmokeTest(buildSceneRouteOverview());
     renderInspectionScreen();
+    if (state.currentScreen === "preview") {
+      renderPreviewScreen();
+    }
+    if (state.currentScreen === "dashboard") {
+      renderDashboard();
+    }
     const summary = state.inspectionRegressionResult.summary;
     const statusMessage = `自动回归试玩完成：通过 ${summary.passCount} 条，提醒 ${summary.warnCount} 条，失败 ${summary.failCount} 条`;
     setSaveStatus(statusMessage, summary.failCount > 0);
@@ -10949,6 +11016,7 @@ function renderDashboard() {
     ${isBlankProject ? renderBlankProjectStarterPanel("dashboard") : starterKitPanel}
     ${!isAdvancedMode ? renderBeginnerDashboardWorkflow(routeOverview) : ""}
     ${renderDashboardProductionBoard(routeOverview)}
+    ${renderProjectMilestonePanel(routeOverview)}
     ${isAdvancedMode ? renderDashboardRecentWorkspacePanel() : renderBeginnerAdvancedToolsPanel()}
     ${isAdvancedMode ? `<div id="projectHistoryPanelHost">${renderProjectHistoryPanel()}</div>` : ""}
     ${isAdvancedMode ? renderDashboardSceneStatusBoard(routeOverview) : ""}
@@ -11116,6 +11184,331 @@ function renderDashboardProductionBoard(routeOverview) {
       </div>
       ${renderDashboardScenePlanningBoard(overview)}
     </section>
+  `;
+}
+
+function buildProjectMilestoneContext(routeOverview, overview = buildDashboardProductionOverview(routeOverview)) {
+  const starterKitOverview = getStarterKitOverview();
+  const regressionSummary = state.inspectionRegressionResult?.summary ?? null;
+
+  return {
+    totalChapters: state.data.chapters?.length ?? 0,
+    totalScenes: overview.totalScenes,
+    scenesWithContent: overview.scenesWithContent,
+    scenesWithBackground: overview.scenesWithBackground,
+    scenesWithMusic: overview.scenesWithMusic,
+    scenesWithEffects: overview.scenesWithEffects,
+    totalDialogueCount: overview.totalDialogueCount,
+    voicedDialogueCount: overview.voicedDialogueCount,
+    readyAssetCount: overview.readyAssetCount,
+    totalAssetCount: overview.totalAssetCount,
+    validationErrorCount: state.validation.errors.length,
+    validationWarningCount: state.validation.warnings.length,
+    brokenRoutes: routeOverview.metrics.brokenRoutes,
+    orphanScenes: routeOverview.metrics.orphanScenes,
+    hasStarterKit:
+      !starterKitOverview.missingCharacter &&
+      !starterKitOverview.missingBackground &&
+      !starterKitOverview.missingBgm,
+    hasExport: Boolean(state.lastExportResult),
+    regressionPass: Boolean(regressionSummary && (regressionSummary.failCount ?? 0) === 0),
+  };
+}
+
+function buildProjectMilestonePlan(routeOverview, overview = buildDashboardProductionOverview(routeOverview)) {
+  if (projectMilestoneTools?.buildProjectMilestonePlan) {
+    return projectMilestoneTools.buildProjectMilestonePlan(buildProjectMilestoneContext(routeOverview, overview));
+  }
+
+  return {
+    overallScore: overview.readinessScore,
+    completedCount: 0,
+    totalCount: 1,
+    headline: overview.summary,
+    nextMilestone: {
+      title: "继续推进当前项目",
+      percent: overview.readinessScore,
+    },
+    milestones: [],
+  };
+}
+
+function buildProjectMilestoneGapDigest(plan) {
+  if (projectMilestoneTools?.buildProjectMilestoneGapDigest) {
+    return projectMilestoneTools.buildProjectMilestoneGapDigest(plan);
+  }
+
+  const releaseMilestone = (plan?.milestones ?? []).find((milestone) => milestone.id === "release_candidate") ?? plan?.nextMilestone;
+  const nextMilestone = plan?.nextMilestone ?? releaseMilestone;
+  const isReleasePhase = nextMilestone?.id === "release_candidate" || Boolean(releaseMilestone?.done);
+  const releaseBlockers = releaseMilestone?.blockers ?? [];
+  const nextBlockers = nextMilestone?.blockers ?? [];
+  const activeBlockers = isReleasePhase ? releaseBlockers : nextBlockers;
+  const primaryGap = activeBlockers[0] ?? nextBlockers[0] ?? releaseBlockers[0] ?? null;
+  const activePercent = nextMilestone?.percent ?? releaseMilestone?.percent ?? 0;
+  return {
+    status: releaseMilestone?.done ? "ready" : activeBlockers.length <= 2 && (activePercent >= 70 || (plan?.overallScore ?? 0) >= 70) ? "close" : "open",
+    eyebrow: releaseMilestone?.done || isReleasePhase ? "发布候选差距" : "当前阶段缺口",
+    title: releaseMilestone?.done
+      ? "发布候选核心条件已达标"
+      : activeBlockers.length > 0
+        ? `${nextMilestone?.title ?? "当前阶段"}还差 ${activeBlockers.length} 项`
+        : `继续确认${nextMilestone?.title ?? "当前阶段"}状态`,
+    description: primaryGap
+      ? `先处理「${primaryGap.missing || primaryGap.label}」，然后重新跑一次巡检和试玩。`
+      : "继续按当前阶段推进，完成后再做发布候选确认。",
+    overallScore: plan?.overallScore ?? 0,
+    completedCount: plan?.completedCount ?? 0,
+    totalCount: plan?.totalCount ?? 0,
+    activePercent,
+    releasePercent: releaseMilestone?.percent ?? 0,
+    activeBlockerCount: activeBlockers.length,
+    releaseBlockerCount: releaseBlockers.length,
+    gapMetricLabel: releaseMilestone?.done || isReleasePhase ? "候选缺口" : "阶段缺口",
+    gapMetricHint: releaseMilestone?.done || isReleasePhase ? "发布前建议清零" : "先清掉这一阶段",
+    nextMilestoneTitle: nextMilestone?.title ?? "继续推进当前项目",
+    primaryGap,
+    topGaps: activeBlockers.slice(0, 4),
+    nextAction: nextMilestone?.actions?.[0] ?? releaseMilestone?.actions?.[0] ?? null,
+  };
+}
+
+function getProjectMilestoneToneClass(tone) {
+  if (tone === "danger") {
+    return "danger-text";
+  }
+  if (tone === "warn") {
+    return "warn-text";
+  }
+  if (tone === "good") {
+    return "good-text";
+  }
+  return "soft-text";
+}
+
+function getProjectMilestoneGapToneClass(status) {
+  if (status === "ready") {
+    return "good-text";
+  }
+  if (status === "close") {
+    return "warn-text";
+  }
+  return "danger-text";
+}
+
+function renderProjectMilestoneGapList(gaps = []) {
+  if (!gaps.length) {
+    return `
+      <div class="project-milestone-gap-list">
+        <article class="project-milestone-gap-item is-done">
+          <strong>核心发布门槛已达标</strong>
+          <span>可以进入人工长流程试玩、附件整理和 Release notes 准备。</span>
+        </article>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="project-milestone-gap-list">
+      ${gaps
+        .map(
+          (gap) => `
+            <article class="project-milestone-gap-item">
+              <strong>${escapeHtml(gap.label ?? "待处理项")}</strong>
+              <span>${escapeHtml(gap.missing || gap.detail || "继续补齐这个发布候选条件。")}</span>
+            </article>
+          `
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function renderProjectMilestoneChecklist(checks = []) {
+  const orderedChecks = [...checks.filter((check) => !check.done), ...checks.filter((check) => check.done)];
+  const visibleChecks = orderedChecks.slice(0, 5);
+  const hiddenCount = Math.max(orderedChecks.length - visibleChecks.length, 0);
+
+  return `
+    <div class="project-milestone-checklist">
+      ${visibleChecks
+        .map(
+          (check) => `
+            <div class="project-milestone-check ${check.done ? "is-done" : "is-open"}">
+              <span class="project-milestone-check-dot" aria-hidden="true"></span>
+              <div>
+                <strong>${escapeHtml(check.label)}</strong>
+                <span>${escapeHtml(check.done ? check.detail : check.missing)}</span>
+              </div>
+            </div>
+          `
+        )
+        .join("")}
+      ${
+        hiddenCount > 0
+          ? `<div class="project-milestone-more">还有 ${hiddenCount} 项细节已收起，进入项目巡检可继续查看。</div>`
+          : ""
+      }
+    </div>
+  `;
+}
+
+function renderProjectMilestoneActions(actions = []) {
+  if (actions.length === 0) {
+    return `
+      <button type="button" class="toolbar-button toolbar-button-primary" data-action="switch-screen" data-screen="preview">
+        去试玩确认
+      </button>
+    `;
+  }
+
+  return actions.map((action, index) => renderQuickActionButton(action, index === 0)).join("");
+}
+
+function renderProjectMilestoneGapDigest(digest) {
+  const action = digest.nextAction ?? { label: "去试玩确认", action: "switch-screen", screen: "preview" };
+  const actions = [
+    action,
+    { label: "打开项目巡检", action: "switch-screen", screen: "inspection" },
+  ];
+
+  return `
+    <article class="project-milestone-gap-digest is-${escapeHtml(digest.status)}">
+      <div class="project-milestone-gap-head">
+        <div>
+          <span class="eyebrow">${escapeHtml(digest.eyebrow ?? "发布候选差距")}</span>
+          <strong>${escapeHtml(digest.title)}</strong>
+        </div>
+        <span class="issue-tag ${getProjectMilestoneGapToneClass(digest.status)}">${
+          digest.status === "ready" ? "可人工验收" : `${digest.activePercent ?? digest.releasePercent}%`
+        }</span>
+      </div>
+      <p>${escapeHtml(digest.description)}</p>
+      <div class="route-summary-strip project-milestone-gap-metrics">
+        ${renderRouteMetricCard("总进度", `${digest.overallScore}%`, `${digest.completedCount}/${digest.totalCount} 个阶段达标`)}
+        ${renderRouteMetricCard(digest.gapMetricLabel ?? "候选缺口", `${digest.activeBlockerCount ?? digest.releaseBlockerCount} 项`, digest.gapMetricHint ?? "发布前建议清零")}
+        ${renderRouteMetricCard("当前阶段", digest.nextMilestoneTitle, "先做当前阶段的第一步")}
+      </div>
+      ${renderProjectMilestoneGapList(digest.topGaps)}
+      <div class="script-entry-actions">
+        ${renderProjectMilestoneActions(actions)}
+      </div>
+    </article>
+  `;
+}
+
+function renderProjectMilestoneCard(milestone, options = {}) {
+  const isFocus = options.focus === true;
+  const toneClass = getProjectMilestoneToneClass(milestone.tone);
+  const phaseLabel = options.index ? `阶段 ${options.index}` : milestone.label;
+
+  return `
+    <article class="project-milestone-card ${isFocus ? "is-focus" : ""} is-${escapeHtml(milestone.tone)}">
+      <div class="project-milestone-card-head">
+        <div>
+          <span class="project-milestone-phase">${escapeHtml(phaseLabel)}</span>
+          <strong>${escapeHtml(milestone.title)}</strong>
+          <small>${escapeHtml(milestone.label)}</small>
+        </div>
+        <span class="issue-tag ${toneClass}">${milestone.done ? "已达标" : `${milestone.percent}%`}</span>
+      </div>
+      <p>${escapeHtml(milestone.summary)}</p>
+      <div class="project-milestone-progress-head">
+        <span>目标完成度</span>
+        <strong>${milestone.percent}%</strong>
+      </div>
+      <div class="project-milestone-progress" aria-label="${escapeHtml(milestone.title)}完成度">
+        <span style="width:${milestone.percent}%;"></span>
+      </div>
+      ${renderProjectMilestoneChecklist(milestone.checks)}
+      <div class="script-entry-actions">
+        ${renderProjectMilestoneActions(milestone.actions)}
+      </div>
+    </article>
+  `;
+}
+
+function renderProjectMilestonePanel(routeOverview) {
+  const overview = buildDashboardProductionOverview(routeOverview);
+  const plan = buildProjectMilestonePlan(routeOverview, overview);
+  const focusMilestone = plan.nextMilestone ?? plan.milestones?.[0] ?? null;
+  const secondaryMilestones = (plan.milestones ?? []).filter((milestone) => milestone.id !== focusMilestone?.id);
+
+  if (!focusMilestone) {
+    return "";
+  }
+
+  return `
+    <section class="panel project-milestone-panel">
+      <div class="panel-heading">
+        <div>
+          <h2>成品目标路线</h2>
+          <span class="panel-note">把“下一步做什么”按 Demo、体验版、发布候选拆成可执行目标</span>
+        </div>
+        <span class="badge badge-soft">总进度 ${plan.overallScore}% · ${plan.completedCount}/${plan.totalCount}</span>
+      </div>
+      <div class="route-summary-strip">
+        ${renderRouteMetricCard("当前目标", focusMilestone.title, plan.headline)}
+        ${renderRouteMetricCard("下一步缺口", focusMilestone.blockers?.[0]?.missing ?? "进入试玩确认手感", focusMilestone.summary)}
+        ${renderRouteMetricCard("已完成目标", `${plan.completedCount}/${plan.totalCount}`, "完成的阶段越多，越接近可公开发布")}
+      </div>
+      <div class="project-milestone-grid">
+        ${renderProjectMilestoneCard(focusMilestone, { focus: true, index: (plan.milestones ?? []).findIndex((milestone) => milestone.id === focusMilestone.id) + 1 })}
+        <div class="project-milestone-stack">
+          ${secondaryMilestones
+            .map((milestone) =>
+              renderProjectMilestoneCard(milestone, {
+                index: (plan.milestones ?? []).findIndex((item) => item.id === milestone.id) + 1,
+              })
+            )
+            .join("")}
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function renderCompactProjectMilestonePanel(routeOverview) {
+  const overview = buildDashboardProductionOverview(routeOverview);
+  const plan = buildProjectMilestonePlan(routeOverview, overview);
+  const focusMilestone = plan.nextMilestone ?? plan.milestones?.[0] ?? null;
+  const gapDigest = buildProjectMilestoneGapDigest(plan);
+
+  if (!focusMilestone) {
+    return "";
+  }
+
+  const milestoneActions = (focusMilestone.actions ?? []).length
+    ? focusMilestone.actions
+    : [{ label: "去试玩确认", action: "switch-screen", screen: "preview" }];
+  const actions = [
+    ...milestoneActions,
+    { label: "回首页看完整路线", action: "switch-screen", screen: "dashboard" },
+  ].slice(0, 3);
+  const primaryBlocker = formatProjectMilestonePrimaryBlocker(focusMilestone);
+
+  return `
+    <article class="detail-card preview-sprint-panel project-milestone-compact-panel">
+      <div class="preview-sprint-head">
+        <div>
+          <span class="eyebrow">成品目标路线</span>
+          <strong>${escapeHtml(focusMilestone.title)}</strong>
+        </div>
+        <span class="issue-tag ${getProjectMilestoneToneClass(focusMilestone.tone)}">${
+          focusMilestone.done ? "已达标" : `${focusMilestone.percent}%`
+        }</span>
+      </div>
+      <p>${escapeHtml(plan.headline)}</p>
+      <div class="preview-sprint-metrics">
+        ${renderRouteMetricCard("下一步缺口", primaryBlocker, focusMilestone.summary)}
+        ${renderRouteMetricCard("总进度", `${plan.overallScore}%`, `${plan.completedCount}/${plan.totalCount} 个阶段已达标`)}
+        ${renderRouteMetricCard("当前阶段", focusMilestone.label, "按按钮继续推进，不需要手写配置")}
+      </div>
+      ${renderProjectMilestoneGapDigest(gapDigest)}
+      <div class="script-entry-actions">
+        ${renderProjectMilestoneActions(actions)}
+      </div>
+    </article>
   `;
 }
 
@@ -11944,12 +12337,13 @@ function renderQuickActionButton(action, emphasized = false) {
   }
 
   if (action.action === "switch-screen") {
+    const screen = action.screen ?? action.dataset?.screen ?? "dashboard";
     return `
       <button
         type="button"
         class="${className}"
         data-action="switch-screen"
-        data-screen="${escapeHtml(action.screen ?? "dashboard")}"
+        data-screen="${escapeHtml(screen)}"
       >
         ${label}
       </button>
@@ -24560,6 +24954,7 @@ function buildPreviewIssueItems() {
       label: "错误",
       title: issue.message,
       meta: issue.location,
+      recovery: getValidationIssueRecovery(issue, "error"),
       action: getValidationIssueAction(issue),
       searchText: normalizeDashboardSearchQuery(`${issue.message} ${issue.location}`),
     });
@@ -24572,6 +24967,7 @@ function buildPreviewIssueItems() {
       label: "提醒",
       title: issue.message,
       meta: issue.location,
+      recovery: getValidationIssueRecovery(issue, "warning"),
       action: getValidationIssueAction(issue),
       searchText: normalizeDashboardSearchQuery(`${issue.message} ${issue.location}`),
     });
@@ -24587,6 +24983,7 @@ function buildPreviewIssueItems() {
       meta: exportResult.missingAssetNames?.length
         ? exportResult.missingAssetNames.slice(0, 8).join(" / ")
         : "可以先去素材页确认文件有没有导入成功。",
+      recovery: "把缺失文件放回原位置，或在素材页用替换素材重新绑定真实存在的文件，然后重新导出确认。",
       action: {
         label: "去素材页定位",
         action: "switch-screen",
@@ -24613,6 +25010,7 @@ function buildPreviewIssueItems() {
         .slice(0, 6)
         .map((item) => `${item.name} · ${item.fileSizeLabel}`)
         .join(" / "),
+      recovery: "优先压缩最大的视频、音频和图片素材；保留源文件归档，项目里放发布用压缩版。",
       action: {
         label: "去素材页压缩清单",
         action: "focus-asset-gap",
@@ -24638,6 +25036,7 @@ function buildPreviewIssueItems() {
         .slice(0, 6)
         .map((asset) => `${asset.name} · ${getAssetTypeLabel(asset.type)}`)
         .join(" / "),
+      recovery: "确认这些素材是否只是备用；不需要的可以删除或移到项目外归档，让素材库更清爽。",
       action: {
         label: "去素材页定位",
         action: "focus-unused-assets",
@@ -26051,6 +26450,7 @@ function renderProjectValidationSummary() {
   const filteredIssueItems = getFilteredPreviewIssueItems(issueItems);
   const issueCards = filteredIssueItems.map((item) => renderPreviewIssueItemCard(item));
   const isAdvancedMode = isAdvancedEditorMode();
+  const routeOverview = buildSceneRouteOverview();
   const visibleIssueCards = isAdvancedMode
     ? issueCards
     : issueItems
@@ -26075,6 +26475,7 @@ function renderProjectValidationSummary() {
       ["当前导出判断", state.validation.errors.length === 0 ? "结构上可以继续做原型" : "先修错误"],
     ])}
     ${renderEditorModeGuideCard("preview")}
+    ${renderCompactProjectMilestonePanel(routeOverview)}
     ${renderReleaseSettingsPanel()}
     ${renderReleaseChecklistPanel()}
     ${renderPlayerProfileOverviewPanel()}
@@ -27953,6 +28354,141 @@ function serializeReleaseReportAction(action) {
   };
 }
 
+function serializeProjectMilestoneCheck(check) {
+  return {
+    id: check?.id ?? "",
+    label: check?.label ?? "",
+    done: Boolean(check?.done),
+    detail: check?.detail ?? "",
+    missing: check?.missing ?? "",
+    weight: check?.weight ?? 1,
+    action: serializeReleaseReportAction(check?.action),
+  };
+}
+
+function serializeOptionalProjectMilestoneCheck(check) {
+  return check ? serializeProjectMilestoneCheck(check) : null;
+}
+
+function serializeProjectMilestone(milestone) {
+  if (!milestone) {
+    return null;
+  }
+
+  return {
+    id: milestone.id ?? "",
+    title: milestone.title ?? "",
+    label: milestone.label ?? "",
+    percent: milestone.percent ?? 0,
+    done: Boolean(milestone.done),
+    tone: milestone.tone ?? "",
+    summary: milestone.summary ?? "",
+    blockers: (milestone.blockers ?? []).map(serializeProjectMilestoneCheck),
+    wins: (milestone.wins ?? []).map(serializeProjectMilestoneCheck),
+    checks: (milestone.checks ?? []).map(serializeProjectMilestoneCheck),
+    actions: (milestone.actions ?? []).map(serializeReleaseReportAction).filter(Boolean),
+  };
+}
+
+function serializeProjectMilestonePlan(plan) {
+  return {
+    overallScore: plan?.overallScore ?? 0,
+    completedCount: plan?.completedCount ?? 0,
+    totalCount: plan?.totalCount ?? 0,
+    headline: plan?.headline ?? "",
+    nextMilestone: serializeProjectMilestone(plan?.nextMilestone),
+    milestones: (plan?.milestones ?? []).map(serializeProjectMilestone).filter(Boolean),
+  };
+}
+
+function serializeProjectMilestoneGapDigest(digest) {
+  return {
+    status: digest?.status ?? "",
+    eyebrow: digest?.eyebrow ?? "",
+    title: digest?.title ?? "",
+    description: digest?.description ?? "",
+    overallScore: digest?.overallScore ?? 0,
+    completedCount: digest?.completedCount ?? 0,
+    totalCount: digest?.totalCount ?? 0,
+    activePercent: digest?.activePercent ?? 0,
+    releasePercent: digest?.releasePercent ?? 0,
+    activeBlockerCount: digest?.activeBlockerCount ?? 0,
+    releaseBlockerCount: digest?.releaseBlockerCount ?? 0,
+    gapMetricLabel: digest?.gapMetricLabel ?? "",
+    gapMetricHint: digest?.gapMetricHint ?? "",
+    nextMilestoneTitle: digest?.nextMilestoneTitle ?? "",
+    primaryGap: serializeOptionalProjectMilestoneCheck(digest?.primaryGap),
+    topGaps: (digest?.topGaps ?? []).map(serializeProjectMilestoneCheck),
+    nextAction: serializeReleaseReportAction(digest?.nextAction),
+  };
+}
+
+function formatProjectMilestonePrimaryBlocker(milestone) {
+  const blocker = milestone?.blockers?.[0];
+  if (!blocker) {
+    return milestone?.done ? "已达标" : "进入试玩确认手感";
+  }
+  return blocker.missing || blocker.label || "继续补齐当前阶段";
+}
+
+function formatProjectMilestoneActions(actions = []) {
+  const labels = (actions ?? []).map((action) => action?.label).filter(Boolean);
+  return labels.length > 0 ? labels.join(" / ") : "试玩确认";
+}
+
+function buildReleaseReportNextStep(releaseFixOrder, projectMilestoneGapDigest) {
+  const firstReleaseStep = releaseFixOrder?.steps?.[0];
+  if (firstReleaseStep) {
+    const action = firstReleaseStep.actions?.[0] ?? null;
+    return {
+      title: firstReleaseStep.title,
+      description: firstReleaseStep.description,
+      statusLabel: firstReleaseStep.statusLabel,
+      action: serializeReleaseReportAction(action),
+      source: "release_fix_order",
+    };
+  }
+
+  if (projectMilestoneGapDigest && projectMilestoneGapDigest.status !== "ready") {
+    const primaryGap = projectMilestoneGapDigest?.primaryGap;
+    const action = primaryGap?.action ?? projectMilestoneGapDigest?.nextAction ?? null;
+    return {
+      title: primaryGap?.label ?? projectMilestoneGapDigest?.title ?? "继续推进成品目标路线",
+      description:
+        primaryGap?.missing ??
+        projectMilestoneGapDigest?.description ??
+        "先按成品目标路线补齐当前阶段，再重新巡检和试玩。",
+      statusLabel: projectMilestoneGapDigest?.eyebrow ?? "当前阶段缺口",
+      action: serializeReleaseReportAction(action),
+      source: "project_milestone_gap",
+    };
+  }
+
+  return {
+    title: "最终试玩和正式导出",
+    description: "当前没有明显阻塞，可以直接做最终试玩和正式导出。",
+    statusLabel: "可以继续",
+    action: null,
+    source: "release_ready",
+  };
+}
+
+function formatReleaseReportNextStepActionHint(nextStep) {
+  const actionLabel = nextStep?.action?.label;
+  return actionLabel ? `建议按钮：${actionLabel}。` : "";
+}
+
+function formatReleaseReportNextStepAdvice(nextStep) {
+  const actionHint = formatReleaseReportNextStepActionHint(nextStep);
+  if (nextStep?.source === "release_fix_order") {
+    return `先处理「${nextStep.title}」，再重新导出一版原生 Runtime / 桌面包确认。${actionHint}`;
+  }
+  if (nextStep?.source === "project_milestone_gap") {
+    return `发布修复队列暂时没有硬阻塞；先补「${nextStep.title}」，再重新巡检和试玩。${actionHint}`;
+  }
+  return "当前没有明显阻塞，可以直接做最终试玩和正式导出。";
+}
+
 function buildReleaseControlReportPayload() {
   const generatedAt = new Date().toISOString();
   const routeOverview = buildSceneRouteOverview();
@@ -27960,6 +28496,10 @@ function buildReleaseControlReportPayload() {
   const releaseItems = buildReleaseChecklistItems();
   const releaseSummary = buildReleaseChecklistSummary(releaseItems);
   const releaseFixOrder = buildReleaseFixOrder(routeOverview);
+  const projectDoctorQueue = buildProjectDoctorQueue(routeOverview, issueItems);
+  const projectDoctorSummary = buildProjectDoctorSummary(projectDoctorQueue);
+  const projectMilestonePlan = buildProjectMilestonePlan(routeOverview);
+  const projectMilestoneGapDigest = buildProjectMilestoneGapDigest(projectMilestonePlan);
   const mediaBudgetReport = buildAssetMediaBudgetReport();
   const native3dDigest = getLatestNativeRuntime3dDigest();
   const regressionResult = state.inspectionRegressionResult;
@@ -27968,6 +28508,7 @@ function buildReleaseControlReportPayload() {
   const resolution = getProjectResolution();
   const urgentMissingAssets = state.data.assetList.filter((asset) => isAssetUrgentMissing(asset));
   const unusedAssets = getUnusedAssets();
+  const nextStep = buildReleaseReportNextStep(releaseFixOrder, projectMilestoneGapDigest);
 
   return {
     formatVersion: 1,
@@ -28013,6 +28554,10 @@ function buildReleaseControlReportPayload() {
       brokenRoutes: routeOverview.metrics.brokenRoutes,
       totalScenes: routeOverview.nodes.length,
     },
+    projectMilestones: {
+      ...serializeProjectMilestonePlan(projectMilestonePlan),
+      gapDigest: serializeProjectMilestoneGapDigest(projectMilestoneGapDigest),
+    },
     releaseChecklist: releaseItems.map((item) => ({
       title: item.title,
       status: item.status,
@@ -28031,6 +28576,33 @@ function buildReleaseControlReportPayload() {
         title: step.title,
         statusLabel: step.statusLabel,
         description: step.description,
+        actions: (step.actions ?? []).map(serializeReleaseReportAction).filter(Boolean),
+      })),
+    },
+    projectDoctor: {
+      badge: projectDoctorSummary.badge,
+      title: projectDoctorSummary.title,
+      description: projectDoctorSummary.description,
+      lastRepairReceipt: state.projectDoctorRepairReceipt,
+      dangerCount: projectDoctorSummary.dangerCount ?? 0,
+      warnCount: projectDoctorSummary.warnCount ?? 0,
+      softCount: projectDoctorSummary.softCount ?? 0,
+      autoRepairableCount: projectDoctorSummary.autoRepairableCount ?? 0,
+      autoRepairLabel: projectDoctorSummary.autoRepairLabel ?? "",
+      nextStepTitle: projectDoctorSummary.nextStepTitle ?? "",
+      steps: projectDoctorQueue.map((step) => ({
+        order: step.order,
+        kind: step.kind,
+        label: step.label,
+        badge: step.badge,
+        tone: step.tone,
+        title: step.title,
+        meta: step.meta,
+        why: step.why,
+        recovery: step.recovery,
+        doneWhen: step.doneWhen ?? "",
+        repairCodes: getProjectDoctorAutoRepairCodes(step),
+        repairLabel: formatProjectDoctorRepairCodes(getProjectDoctorAutoRepairCodes(step)),
         actions: (step.actions ?? []).map(serializeReleaseReportAction).filter(Boolean),
       })),
     },
@@ -28177,18 +28749,7 @@ function buildReleaseControlReportPayload() {
           })),
         }
       : null,
-    nextStep:
-      releaseFixOrder.steps.length > 0
-        ? {
-            title: releaseFixOrder.steps[0].title,
-            description: releaseFixOrder.steps[0].description,
-            statusLabel: releaseFixOrder.steps[0].statusLabel,
-          }
-        : {
-            title: "最终试玩和正式导出",
-            description: "当前没有明显阻塞，可以直接做最终试玩和正式导出。",
-            statusLabel: "可以继续",
-          },
+    nextStep,
   };
 }
 
@@ -28198,6 +28759,11 @@ function buildInspectionReportContent() {
   const releaseItems = buildReleaseChecklistItems();
   const releaseSummary = buildReleaseChecklistSummary(releaseItems);
   const releaseFixOrder = buildReleaseFixOrder(routeOverview);
+  const projectDoctorQueue = buildProjectDoctorQueue(routeOverview, issueItems);
+  const projectDoctorSummary = buildProjectDoctorSummary(projectDoctorQueue);
+  const projectMilestonePlan = buildProjectMilestonePlan(routeOverview);
+  const projectMilestoneGapDigest = buildProjectMilestoneGapDigest(projectMilestonePlan);
+  const nextStep = buildReleaseReportNextStep(releaseFixOrder, projectMilestoneGapDigest);
   const regressionResult = state.inspectionRegressionResult;
   const regressionFixQueue = buildPreviewRegressionFixQueue();
   const exportResult = state.lastExportResult;
@@ -28218,6 +28784,7 @@ function buildInspectionReportContent() {
     `- 收束场景：${routeOverview.metrics.endingScenes} 个`,
     `- 孤立场景：${routeOverview.metrics.orphanScenes} 个`,
     `- 坏链数量：${routeOverview.metrics.brokenRoutes} 条`,
+    `- 成品目标路线：${projectMilestonePlan.nextMilestone?.title ?? "继续推进当前项目"}（总进度 ${projectMilestonePlan.overallScore ?? 0}%）`,
     "",
     "发布检查判断：",
     `- ${releaseSummary.title}`,
@@ -28274,6 +28841,64 @@ function buildInspectionReportContent() {
     lines.push("- 当前巡检结果比较干净，可以继续做正式导出和最终试玩。");
   }
 
+  lines.push("", "项目医生修复队列：");
+  lines.push(`- ${projectDoctorSummary.badge}：${projectDoctorSummary.title}`);
+  lines.push(`- ${projectDoctorSummary.description}`);
+  lines.push(`- ${projectDoctorSummary.autoRepairLabel ?? "暂无可一键修复项"}`);
+  if (state.projectDoctorRepairReceipt) {
+    lines.push(
+      `- 最近一次安全修复：${state.projectDoctorRepairReceipt.title}`,
+      `- 修复时间：${formatDate(state.projectDoctorRepairReceipt.generatedAt)}`,
+      `- 已修复 / 已跳过：${state.projectDoctorRepairReceipt.repairCount ?? 0} / ${state.projectDoctorRepairReceipt.skippedCount ?? 0}`,
+      ""
+    );
+  }
+  if (projectDoctorQueue.length > 0) {
+    projectDoctorQueue.forEach((step) => {
+      lines.push(
+        `${step.order}. ${step.title}`,
+        `   类型：${step.label} / ${step.badge}`,
+        `   位置：${step.meta}`,
+        `   原因：${step.why}`,
+        `   建议：${step.recovery}`,
+        `   修完应该看到：${step.doneWhen ?? "重新巡检后，这条问题会消失或变成可确认的提醒。"}`,
+        `   安全修复：${formatProjectDoctorRepairCodes(getProjectDoctorAutoRepairCodes(step))}`,
+        ""
+      );
+    });
+  } else {
+    lines.push("1. 当前没有项目医生需要优先处理的事项。");
+  }
+
+  lines.push("", "成品目标路线：");
+  lines.push(
+    `- ${projectMilestonePlan.headline ?? "继续推进当前项目。"}`,
+    `- ${projectMilestoneGapDigest.eyebrow ?? "当前阶段缺口"}：${projectMilestoneGapDigest.title}`,
+    `- 建议：${projectMilestoneGapDigest.description}`,
+    `- 总进度：${projectMilestonePlan.overallScore ?? 0}%`,
+    `- 已完成阶段：${projectMilestonePlan.completedCount ?? 0}/${projectMilestonePlan.totalCount ?? 0}`,
+    `- 当前阶段：${projectMilestonePlan.nextMilestone?.title ?? "继续推进当前项目"}`,
+    `- 下一步缺口：${formatProjectMilestonePrimaryBlocker(projectMilestonePlan.nextMilestone)}`,
+    ""
+  );
+  if ((projectMilestoneGapDigest.topGaps ?? []).length > 0) {
+    lines.push("优先缺口：");
+    projectMilestoneGapDigest.topGaps.forEach((gap, index) => {
+      lines.push(`${index + 1}. ${gap.label ?? "待处理项"}：${gap.missing || gap.detail || "继续补齐这个条件。"}`);
+    });
+    lines.push("");
+  }
+  (projectMilestonePlan.milestones ?? []).forEach((milestone, index) => {
+    lines.push(
+      `${index + 1}. ${milestone.title}`,
+      `   状态：${milestone.done ? "已达标" : `${milestone.percent}%`}`,
+      `   说明：${milestone.summary}`,
+      `   下一步：${formatProjectMilestonePrimaryBlocker(milestone)}`,
+      `   按钮：${formatProjectMilestoneActions(milestone.actions)}`,
+      ""
+    );
+  });
+
   lines.push("", "发布前修复顺序：");
   if (releaseFixOrder.steps.length > 0) {
     releaseFixOrder.steps.forEach((step, index) => {
@@ -28285,7 +28910,7 @@ function buildInspectionReportContent() {
       );
     });
   } else {
-    lines.push("1. 当前没有明显阻塞，可以直接做最终试玩和正式导出。");
+    lines.push(`1. ${formatReleaseReportNextStepAdvice(nextStep)}`);
   }
 
   lines.push("", "自动回归试玩路线测试：");
@@ -28344,6 +28969,11 @@ function buildReleaseControlReportContent() {
   const releaseItems = buildReleaseChecklistItems();
   const releaseSummary = buildReleaseChecklistSummary(releaseItems);
   const releaseFixOrder = buildReleaseFixOrder(routeOverview);
+  const projectDoctorQueue = buildProjectDoctorQueue(routeOverview, issueItems);
+  const projectDoctorSummary = buildProjectDoctorSummary(projectDoctorQueue);
+  const projectMilestonePlan = buildProjectMilestonePlan(routeOverview);
+  const projectMilestoneGapDigest = buildProjectMilestoneGapDigest(projectMilestonePlan);
+  const nextStep = buildReleaseReportNextStep(releaseFixOrder, projectMilestoneGapDigest);
   const mediaBudgetReport = buildAssetMediaBudgetReport();
   const native3dDigest = getLatestNativeRuntime3dDigest();
   const regressionResult = state.inspectionRegressionResult;
@@ -28398,6 +29028,36 @@ function buildReleaseControlReportContent() {
     ["类型", "标题", "位置 / 摘要"],
     issueItems.slice(0, 30).map((item) => [item.label, item.title, item.meta])
   );
+  const projectDoctorTable = buildMarkdownTable(
+    ["顺序", "类型", "事项", "为什么", "建议怎么修", "修完应该看到", "安全修复"],
+    projectDoctorQueue.map((step) => [
+      `${step.order}`,
+      `${step.label} / ${step.badge}`,
+      `${step.title} / ${step.meta}`,
+      step.why,
+      step.recovery,
+      step.doneWhen ?? "重新巡检后，这条问题会消失或变成可确认的提醒。",
+      formatProjectDoctorRepairCodes(getProjectDoctorAutoRepairCodes(step)),
+    ])
+  );
+  const projectMilestoneTable = buildMarkdownTable(
+    ["阶段", "状态", "完成度", "当前缺口", "下一步按钮"],
+    (projectMilestonePlan.milestones ?? []).map((milestone) => [
+      milestone.title,
+      milestone.done ? "已达标" : "继续推进",
+      `${milestone.percent ?? 0}%`,
+      formatProjectMilestonePrimaryBlocker(milestone),
+      formatProjectMilestoneActions(milestone.actions),
+    ])
+  );
+  const projectMilestoneGapTable = buildMarkdownTable(
+    ["顺序", "缺口", "处理提示"],
+    (projectMilestoneGapDigest.topGaps ?? []).map((gap, index) => [
+      `${index + 1}`,
+      gap.label ?? "待处理项",
+      gap.missing || gap.detail || "继续补齐这个条件。",
+    ])
+  );
   const regressionTable = regressionResult
     ? buildMarkdownTable(
         ["路线", "状态", "来源", "细节", "步数"],
@@ -28445,6 +29105,8 @@ function buildReleaseControlReportContent() {
         ["入口场景", routeOverview.metrics.entrySceneName],
         ["分支 / 收束 / 孤立场景", `${routeOverview.metrics.branchingScenes} / ${routeOverview.metrics.endingScenes} / ${routeOverview.metrics.orphanScenes}`],
         ["坏链数量", `${routeOverview.metrics.brokenRoutes} 条`],
+        ["成品目标路线", `${projectMilestonePlan.nextMilestone?.title ?? "继续推进当前项目"}（${projectMilestonePlan.overallScore ?? 0}%）`],
+        [projectMilestoneGapDigest.eyebrow ?? "当前阶段缺口", projectMilestoneGapDigest.title],
       ]
     ),
     "",
@@ -28474,7 +29136,38 @@ function buildReleaseControlReportContent() {
     );
   }
 
-  lines.push("## 发布前修复顺序", "", fixOrderTable || "当前没有明显阻塞，可以直接做最终试玩和正式导出。", "");
+  lines.push(
+    "## 项目医生修复队列",
+    "",
+    `- ${projectDoctorSummary.badge}：${projectDoctorSummary.title}`,
+    `- ${projectDoctorSummary.description}`,
+    `- ${projectDoctorSummary.autoRepairLabel ?? "暂无可一键修复项"}`,
+    state.projectDoctorRepairReceipt
+      ? `- 最近一次安全修复：${state.projectDoctorRepairReceipt.title}（已修复 ${state.projectDoctorRepairReceipt.repairCount ?? 0} 项，已跳过 ${state.projectDoctorRepairReceipt.skippedCount ?? 0} 项）`
+      : "",
+    "",
+    projectDoctorTable || "当前没有项目医生需要优先处理的事项。",
+    ""
+  );
+
+  lines.push(
+    "## 成品目标路线",
+    "",
+    `- ${projectMilestonePlan.headline ?? "继续推进当前项目。"}`,
+    `- ${projectMilestoneGapDigest.eyebrow ?? "当前阶段缺口"}：${projectMilestoneGapDigest.title}`,
+    `- 建议：${projectMilestoneGapDigest.description}`,
+    `- 总进度：${projectMilestonePlan.overallScore ?? 0}%`,
+    `- 已完成阶段：${projectMilestonePlan.completedCount ?? 0}/${projectMilestonePlan.totalCount ?? 0}`,
+    `- 当前阶段：${projectMilestonePlan.nextMilestone?.title ?? "继续推进当前项目"}`,
+    `- 下一步缺口：${formatProjectMilestonePrimaryBlocker(projectMilestonePlan.nextMilestone)}`,
+    "",
+    projectMilestoneGapTable || "当前没有需要优先列出的阶段缺口。",
+    "",
+    projectMilestoneTable || "当前没有可列出的成品目标路线。",
+    ""
+  );
+
+  lines.push("## 发布前修复顺序", "", fixOrderTable || formatReleaseReportNextStepAdvice(nextStep), "");
 
   lines.push("## 素材性能预算", "");
   if (mediaBudgetReport.count > 0) {
@@ -28527,9 +29220,7 @@ function buildReleaseControlReportContent() {
   lines.push(
     "## 下一步建议",
     "",
-    releaseFixOrder.steps.length > 0
-      ? `先处理「${releaseFixOrder.steps[0].title}」，再重新导出一版原生 Runtime / 桌面包确认。`
-      : "当前没有明显阻塞，可以直接做最终试玩和正式导出。",
+    formatReleaseReportNextStepAdvice(nextStep),
     ""
   );
 
@@ -28853,12 +29544,356 @@ function renderReleaseFixOrderPanel(routeOverview) {
   `;
 }
 
+function getProjectDoctorAutoRepairCodes(step) {
+  if (Array.isArray(step?.repairCodes)) {
+    return step.repairCodes
+      .map((code) => String(code ?? "").trim())
+      .filter(Boolean);
+  }
+
+  const primaryText = `${step?.title ?? ""} ${step?.meta ?? ""}`;
+  const primaryCodes = inferProjectDoctorAutoRepairCodesFromText(primaryText);
+  if (primaryCodes.length) {
+    return primaryCodes;
+  }
+  return inferProjectDoctorAutoRepairCodesFromText(step?.recovery ?? "");
+}
+
+function inferProjectDoctorAutoRepairCodesFromText(value) {
+  const text = String(value ?? "");
+  const codes = [];
+
+  if (text.includes("入口场景")) {
+    codes.push("entry_scene");
+  }
+  if (text.includes("场景顺序") || text.includes("场景排序") || text.includes("sceneOrder")) {
+    codes.push("scene_order");
+  }
+  if (text.includes("章节排序") || text.includes("chapterOrder")) {
+    codes.push("chapter_order");
+  }
+
+  return [...new Set(codes)];
+}
+
+function getProjectDoctorRepairCodeLabel(code) {
+  const labels = {
+    entry_scene: "入口场景",
+    scene_order: "场景排序",
+    chapter_order: "章节排序",
+  };
+  return labels[code] ?? code;
+}
+
+function formatProjectDoctorRepairCodes(codes = []) {
+  const safeCodes = (codes ?? [])
+    .map((code) => String(code ?? "").trim())
+    .filter(Boolean);
+  if (!safeCodes.length) {
+    return "需手动处理";
+  }
+  return `可一键安全修复：${safeCodes.map(getProjectDoctorRepairCodeLabel).join(" / ")}`;
+}
+
+function buildProjectDoctorRepairNextActions(status = "clean") {
+  if (projectDoctorTools?.buildProjectDoctorRepairNextActions) {
+    return projectDoctorTools.buildProjectDoctorRepairNextActions(status);
+  }
+
+  const repaired = status === "repaired";
+  return [
+    { label: "重新巡检确认", action: "run-project-inspection" },
+    repaired
+      ? { label: "跑自动回归确认", action: "run-preview-regression" }
+      : { label: "去预览导出", action: "switch-screen", screen: "preview" },
+    { label: "导出巡检报告", action: "export-inspection-report" },
+  ];
+}
+
+function buildProjectDoctorRepairReceipt(result) {
+  if (projectDoctorTools?.buildProjectDoctorRepairReceipt) {
+    return projectDoctorTools.buildProjectDoctorRepairReceipt(result);
+  }
+
+  const repairs = Array.isArray(result?.repairs) ? result.repairs : [];
+  const skipped = Array.isArray(result?.skipped) ? result.skipped : [];
+  const changed = Boolean(result?.changed) || repairs.length > 0;
+  const status = changed ? "repaired" : "clean";
+  return {
+    generatedAt: result?.savedAt ?? new Date().toISOString(),
+    status,
+    badge: changed ? "已自动修复" : "无需自动修复",
+    title: changed ? `项目医生完成 ${repairs.length} 项安全修复` : "项目医生没有发现可自动修复的低风险结构问题",
+    description: changed ? "修复已写入项目并进入自动快照链。" : "入口、章节顺序和场景顺序当前无需自动处理。",
+    repairCount: repairs.length,
+    skippedCount: skipped.length,
+    repairs,
+    skipped,
+    nextActions: buildProjectDoctorRepairNextActions(status),
+  };
+}
+
+function withProjectDoctorRepairActions(queue) {
+  return queue.map((step) => {
+    const repairCodes = getProjectDoctorAutoRepairCodes(step);
+    if (!repairCodes.length) {
+      return step;
+    }
+
+    return {
+      ...step,
+      actions: [
+        {
+          label: "一键安全修复",
+          action: "repair-project-doctor",
+          dataset: { "repair-codes": repairCodes.join(",") },
+        },
+        ...(step.actions ?? []),
+      ],
+    };
+  });
+}
+
+function buildProjectDoctorQueue(routeOverview, issueItems) {
+  if (projectDoctorTools?.buildProjectDoctorQueue) {
+    return withProjectDoctorRepairActions(
+      projectDoctorTools.buildProjectDoctorQueue({
+        issueItems,
+        routeOverview,
+        regressionResult: state.inspectionRegressionResult,
+        limit: isAdvancedEditorMode() ? 10 : 6,
+      })
+    );
+  }
+
+  return withProjectDoctorRepairActions(
+    issueItems.slice(0, 6).map((item, index) => ({
+      id: `${item.kind}-${index}`,
+      order: index + 1,
+      kind: item.kind,
+      label: item.label,
+      badge: index === 0 ? "先处理" : "排队",
+      tone: item.kind === "errors" ? "danger" : item.kind === "unused_assets" ? "soft" : "warn",
+      title: item.title,
+      meta: item.meta,
+      why: "它会影响试玩、导出或后续排查效率。",
+      recovery: item.recovery ?? "点开对应位置，按提示补内容、补引用或调整设置。",
+      actions: [item.action].filter(Boolean),
+    }))
+  );
+}
+
+function buildProjectDoctorSummary(queue) {
+  if (projectDoctorTools?.buildProjectDoctorSummary) {
+    return projectDoctorTools.buildProjectDoctorSummary(queue);
+  }
+
+  const dangerCount = queue.filter((step) => step.tone === "danger").length;
+  const warnCount = queue.filter((step) => step.tone === "warn").length;
+  return {
+    status: dangerCount > 0 ? "danger" : warnCount > 0 ? "warn" : queue.length ? "soft" : "clean",
+    badge: dangerCount > 0 ? "先修硬阻塞" : warnCount > 0 ? "可边做边修" : queue.length ? "整理收尾" : "很干净",
+    title: queue.length ? `项目医生排出了 ${queue.length} 个优先步骤` : "项目医生没有发现需要优先处理的事项",
+    description: queue.length
+      ? "按这个顺序处理，通常比从长长的问题列表里随机点更省时间。"
+      : "当前可以继续试玩、补内容或导出一版做最终确认。",
+    dangerCount,
+    warnCount,
+    softCount: queue.filter((step) => step.tone === "soft").length,
+    autoRepairableCount: queue.filter((step) => getProjectDoctorAutoRepairCodes(step).length > 0).length,
+    autoRepairLabel: queue.some((step) => getProjectDoctorAutoRepairCodes(step).length > 0)
+      ? `可一键安全修复 ${queue.filter((step) => getProjectDoctorAutoRepairCodes(step).length > 0).length} 项`
+      : "暂无可一键修复项",
+    nextStepTitle: queue[0]?.title ?? "",
+  };
+}
+
+function renderProjectDoctorStepCard(step) {
+  const toneClass = getDashboardTaskToneClass(step.tone);
+  const actions = (step.actions ?? []).filter(Boolean).slice(0, 3);
+
+  return `
+    <article class="preview-sprint-card project-doctor-step is-${escapeHtml(step.tone ?? "soft")}">
+      <div class="preview-sprint-head">
+        <strong>第 ${Number(step.order ?? 0)} 步 · ${escapeHtml(step.title)}</strong>
+        <span class="issue-tag ${toneClass}">${escapeHtml(step.badge ?? step.label ?? "处理")}</span>
+      </div>
+      <div class="detail-meta">${escapeHtml(`${step.label ?? "待处理"} · ${step.meta ?? "未标注位置"}`)}</div>
+      <p>${escapeHtml(step.why ?? "这一步会影响试玩、导出或后续排查效率。")}</p>
+      <div class="project-doctor-recovery">
+        <strong>建议怎么修</strong>
+        <span>${escapeHtml(step.recovery ?? "点开对应位置，按提示补内容、补引用或调整设置。")}</span>
+      </div>
+      <div class="project-doctor-done">
+        <strong>修完应该看到</strong>
+        <span>${escapeHtml(step.doneWhen ?? "重新巡检后，这条问题会消失或变成可确认的提醒。")}</span>
+      </div>
+      <div class="preview-sprint-actions">
+        ${actions.map((action, index) => renderQuickActionButton(action, index === 0)).join("")}
+      </div>
+    </article>
+  `;
+}
+
+function renderProjectDoctorReceiptList(items = [], emptyText = "没有记录") {
+  if (!items.length) {
+    return `<div class="empty-note">${escapeHtml(emptyText)}</div>`;
+  }
+
+  return `
+    <div class="project-doctor-receipt-list">
+      ${items
+        .map(
+          (item) => `
+            <article class="project-doctor-receipt-item">
+              <strong>${escapeHtml(item.title ?? "项目医生记录")}</strong>
+              <span>${escapeHtml(item.detail ?? "没有更多细节。")}</span>
+            </article>
+          `
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function renderProjectDoctorRepairReceiptPanel(receipt = state.projectDoctorRepairReceipt) {
+  if (!receipt) {
+    return "";
+  }
+
+  const tone = receipt.status === "repaired" ? "good" : "soft";
+  const nextActions = (Array.isArray(receipt.nextActions)
+    ? receipt.nextActions
+    : buildProjectDoctorRepairNextActions(receipt.status)
+  )
+    .filter(Boolean)
+    .slice(0, 3);
+  return `
+    <article class="preview-sprint-card project-doctor-receipt is-${tone}">
+      <div class="preview-sprint-head">
+        <strong>${escapeHtml(receipt.title)}</strong>
+        <span class="issue-tag ${receipt.status === "repaired" ? "good-text" : ""}">${escapeHtml(receipt.badge)}</span>
+      </div>
+      <p>${escapeHtml(receipt.description)}</p>
+      <div class="preview-sprint-metrics">
+        ${renderRouteMetricCard("已修复", `${receipt.repairCount ?? 0} 项`, "低风险结构项")}
+        ${renderRouteMetricCard("已跳过", `${receipt.skippedCount ?? 0} 项`, "当前无需处理")}
+        ${renderRouteMetricCard("修复时间", formatDate(receipt.generatedAt), "本次会话记录")}
+        ${renderRouteMetricCard("建议", "重新巡检", "确认问题已消失")}
+      </div>
+      <div class="preview-sprint-actions project-doctor-receipt-actions">
+        ${nextActions.map((action, index) => renderQuickActionButton(action, index === 0)).join("")}
+      </div>
+      <div class="project-doctor-receipt-columns">
+        <div>
+          <strong class="project-doctor-receipt-heading">已自动处理</strong>
+          ${renderProjectDoctorReceiptList(receipt.repairs ?? [], "这次没有写入新的自动修复。")}
+        </div>
+        <div>
+          <strong class="project-doctor-receipt-heading">无需处理 / 已跳过</strong>
+          ${renderProjectDoctorReceiptList(receipt.skipped ?? [], "这次没有跳过项。")}
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+function parseProjectDoctorRepairCodes(value) {
+  return String(value ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+async function repairProjectDoctor(repairCodesValue = "") {
+  if (!state.data) {
+    showToast("先打开一个项目，再使用项目医生修复");
+    return;
+  }
+
+  const repairCodes = parseProjectDoctorRepairCodes(repairCodesValue);
+  const payload = repairCodes.length > 0 ? { repairCodes } : {};
+
+  try {
+    setSaveStatus("项目医生正在安全修复...");
+    const result = await postJson(API_REPAIR_PROJECT_DOCTOR, payload);
+    state.lastExportResult = null;
+    state.projectDoctorRepairReceipt = buildProjectDoctorRepairReceipt(result);
+    await reloadProjectData({ ...getCurrentUiState() });
+
+    if (state.currentScreen === "inspection") {
+      renderInspectionScreen();
+    }
+
+    const repairCount = Array.isArray(result.repairs) ? result.repairs.length : 0;
+    const message =
+      repairCount > 0
+        ? `项目医生已完成 ${repairCount} 项安全修复`
+        : "项目医生检查过了，暂无可自动修复的低风险结构问题";
+    setSaveStatus(message);
+    showToast(message, "soft");
+  } catch (error) {
+    setSaveStatus("项目医生安全修复失败", true);
+    showToast("项目医生安全修复失败", "error");
+    showEngineAlert(`项目医生安全修复没有成功：${error.message}`);
+  }
+}
+
+function renderProjectDoctorPanel(routeOverview, issueItems) {
+  const queue = buildProjectDoctorQueue(routeOverview, issueItems);
+  const summary = buildProjectDoctorSummary(queue);
+  const summaryTone = summary.status === "danger" ? "danger" : summary.status === "warn" ? "warn" : "soft";
+
+  return `
+    <article class="detail-card preview-sprint-panel project-doctor-panel">
+      <div class="panel-heading">
+        <h2>项目医生 / 小白修复向导</h2>
+        <span class="badge badge-soft">把巡检结果变成可执行步骤</span>
+      </div>
+      <article class="preview-sprint-card is-${summaryTone}">
+        <div class="preview-sprint-head">
+          <strong>${escapeHtml(summary.title)}</strong>
+          <span class="issue-tag ${getDashboardTaskToneClass(summaryTone)}">${escapeHtml(summary.badge)}</span>
+        </div>
+        <p>${escapeHtml(summary.description)}</p>
+        <div class="preview-sprint-metrics">
+          ${renderRouteMetricCard("硬阻塞", `${summary.dangerCount ?? 0} 个`, "优先清掉")}
+          ${renderRouteMetricCard("建议复看", `${summary.warnCount ?? 0} 个`, "发布前处理")}
+          ${renderRouteMetricCard("整理项", `${summary.softCount ?? 0} 个`, "收尾时清理")}
+          ${renderRouteMetricCard("可一键修复", `${summary.autoRepairableCount ?? 0} 项`, "项目医生可自动处理")}
+        </div>
+      </article>
+      <div class="detail-actions">
+        <button class="toolbar-button toolbar-button-primary" data-action="repair-project-doctor">
+          一键安全修复低风险结构问题
+        </button>
+        <button class="toolbar-button toolbar-button-primary" data-action="run-project-inspection">
+          重新巡检并刷新队列
+        </button>
+        <button class="toolbar-button" data-action="run-preview-regression">
+          跑自动回归后再排序
+        </button>
+        <button class="toolbar-button" data-action="export-inspection-report">
+          导出给测试人员
+        </button>
+      </div>
+      ${renderProjectDoctorRepairReceiptPanel()}
+      ${
+        queue.length > 0
+          ? `<div class="preview-sprint-grid">${queue.map((step) => renderProjectDoctorStepCard(step)).join("")}</div>`
+          : renderEmpty("项目医生暂时没有排出修复队列。可以继续写剧情、试玩，或导出一版做最终确认。")
+      }
+    </article>
+  `;
+}
+
 function renderInspectionOverviewPanel(routeOverview) {
   const urgentMissingAssets = state.data.assetList.filter((asset) => isAssetUrgentMissing(asset)).length;
   const missingVoiceWarnings = state.validation.warnings.filter(
     (issue) => issue.message === "这句台词还没有绑定语音。"
   ).length;
   const releaseSummary = buildReleaseChecklistSummary();
+  const issueItems = buildPreviewIssueItems();
 
   return `
     <section class="panel">
@@ -28906,6 +29941,8 @@ function renderInspectionOverviewPanel(routeOverview) {
         ${renderRouteMetricCard("孤立场景", routeOverview.metrics.orphanScenes, "待检查入口")}
         ${renderRouteMetricCard("坏链数量", routeOverview.metrics.brokenRoutes, "先清零会更稳")}
       </div>
+      ${renderCompactProjectMilestonePanel(routeOverview)}
+      ${renderProjectDoctorPanel(routeOverview, issueItems)}
       ${renderReleaseFixOrderPanel(routeOverview)}
       ${renderPreviewRegressionPanel(routeOverview)}
       ${renderPreviewRegressionFixQueuePanel()}
@@ -28971,6 +30008,7 @@ function renderPreviewIssueItemCard(item) {
       <span class="issue-tag ${item.toneClass}">${escapeHtml(item.label)}</span>
       <strong>${escapeHtml(item.title)}</strong>
       <div class="issue-meta">${escapeHtml(item.meta)}</div>
+      ${item.recovery ? `<p class="issue-recovery">${escapeHtml(item.recovery)}</p>` : ""}
       ${item.action ? `<div class="issue-card-footer">${renderQuickActionButton(item.action, true)}</div>` : ""}
     </article>
   `;
@@ -29063,6 +30101,43 @@ function getValidationIssueAction(issue) {
   }
 
   return null;
+}
+
+function getValidationIssueRecovery(issue, level = "warning") {
+  const message = String(issue?.message ?? "");
+  const location = String(issue?.location ?? "");
+
+  if (message.includes("入口场景")) {
+    return "先把项目入口改成真实存在的场景，或者恢复被删掉的入口场景；修完后重新巡检。";
+  }
+  if (message.includes("章节排序") || message.includes("章节没有进入排序") || location.includes("chapterOrder")) {
+    return "项目医生的一键安全修复会清理无效或重复章节排序，并把遗漏章节补回排序表。";
+  }
+  if (message.includes("场景排序") || message.includes("场景没有进入排序") || location.includes("sceneOrder")) {
+    return "项目医生的一键安全修复会清理无效或重复场景排序，并把遗漏场景补回本章顺序表。";
+  }
+  if (message.includes("引用的场景") || message.includes("不存在")) {
+    return "打开对应卡片，把跳转、选项或条件分支指向真实存在的场景。";
+  }
+  if (message.includes("素材") || message.includes("立绘") || message.includes("模型")) {
+    return "点开对应素材或角色，把引用换成现有素材；如果文件丢了，先在素材页重新导入。";
+  }
+  if (message.includes("角色") || message.includes("表情")) {
+    return "打开角色页检查默认立绘、表情和高级表现素材，优先补齐当前剧情正在引用的那一项。";
+  }
+  if (message.includes("变量")) {
+    return "打开变量库确认变量类型、默认值和范围；如果剧情卡引用了旧变量，请换成现有变量。";
+  }
+  if (message.includes("台词") && message.includes("语音")) {
+    return "如果计划全语音，先去台词台本导出配音表；如果暂时无语音，可以把它当作发布前提醒。";
+  }
+  if (message.includes("偏长") || location.includes("字")) {
+    return "建议把这段拆成两到三张卡片，试玩节奏会更像正式视觉小说。";
+  }
+  if (level === "error") {
+    return "先点定位按钮打开具体位置，把缺失引用或错误配置修好，再重新巡检确认。";
+  }
+  return "如果这是刻意设计可以暂时跳过；如果不是，按提示补内容、补引用或调整设置。";
 }
 
 function renderDetailRows(rows) {
@@ -37174,6 +38249,12 @@ async function exportBuild(target = "web") {
     const result = await postJson(API_EXPORT_BUILD, { target: exportTarget });
     state.lastExportResult = result;
     renderPreviewScreen();
+    if (state.currentScreen === "dashboard") {
+      renderDashboard();
+    }
+    if (state.currentScreen === "inspection") {
+      renderInspectionScreen();
+    }
 
     if (result.missingAssets > 0) {
       setSaveStatus(`${result.targetLabel ?? targetLabel}已导出，但还有 ${result.missingAssets} 个素材文件没找到`);
@@ -43670,6 +44751,37 @@ function runValidation(data) {
     data.scenesById.has(id) ? { type: "scene", sceneId: id } : { type: "screen", screen: "story" }
   );
 
+  const validChapterIds = new Set(data.chapters.map((chapter) => chapter.chapterId).filter(Boolean));
+  const seenChapterOrderIds = new Set();
+  (data.project.chapterOrder ?? []).forEach((chapterId, orderIndex) => {
+    const safeChapterId = String(chapterId ?? "").trim();
+    if (!safeChapterId) {
+      return;
+    }
+    if (seenChapterOrderIds.has(safeChapterId)) {
+      pushIssue("warning", "章节排序重复。", `project.json.chapterOrder[${orderIndex}] -> ${safeChapterId}`, {
+        type: "chapter",
+        chapterId: safeChapterId,
+      });
+      return;
+    }
+    seenChapterOrderIds.add(safeChapterId);
+    if (!validChapterIds.has(safeChapterId)) {
+      pushIssue("error", "章节排序里引用了不存在的章节。", `project.json.chapterOrder[${orderIndex}] -> ${safeChapterId}`, {
+        type: "screen",
+        screen: "story",
+      });
+    }
+  });
+  data.chapters.forEach((chapter) => {
+    if (chapter.chapterId && !seenChapterOrderIds.has(chapter.chapterId)) {
+      pushIssue("warning", "章节没有进入排序。", `project.json.chapterOrder -> 缺少 ${chapter.chapterId}`, {
+        type: "chapter",
+        chapterId: chapter.chapterId,
+      });
+    }
+  });
+
   if (data.scenes.length > 0 && !data.scenesById.has(data.project.entrySceneId)) {
     pushIssue("error", "入口场景不存在。", `project.json -> ${data.project.entrySceneId}`, {
       type: "screen",
@@ -43756,9 +44868,31 @@ function runValidation(data) {
   });
 
   data.chapters.forEach((chapter) => {
-    (chapter.sceneOrder ?? []).forEach((sceneId) => {
-      if (!data.scenesById.has(sceneId)) {
-        pushIssue("error", "章节顺序里引用了不存在的场景。", `章节 ${chapter.name}`, {
+    const localSceneIds = new Set((chapter.scenes ?? []).map((scene) => scene.id).filter(Boolean));
+    const seenSceneOrderIds = new Set();
+    (chapter.sceneOrder ?? []).forEach((sceneId, orderIndex) => {
+      const safeSceneId = String(sceneId ?? "").trim();
+      if (!safeSceneId) {
+        return;
+      }
+      if (seenSceneOrderIds.has(safeSceneId)) {
+        pushIssue("warning", "场景排序重复。", `章节 ${chapter.name} -> sceneOrder[${orderIndex}] -> ${safeSceneId}`, {
+          type: "chapter",
+          chapterId: chapter.chapterId,
+        });
+        return;
+      }
+      seenSceneOrderIds.add(safeSceneId);
+      if (!localSceneIds.has(safeSceneId)) {
+        pushIssue("error", "场景排序里引用了不存在的场景。", `章节 ${chapter.name} -> sceneOrder[${orderIndex}] -> ${safeSceneId}`, {
+          type: "chapter",
+          chapterId: chapter.chapterId,
+        });
+      }
+    });
+    (chapter.scenes ?? []).forEach((scene) => {
+      if (scene.id && !seenSceneOrderIds.has(scene.id)) {
+        pushIssue("warning", "场景没有进入排序。", `章节 ${chapter.name} -> sceneOrder 缺少 ${scene.id}`, {
           type: "chapter",
           chapterId: chapter.chapterId,
         });

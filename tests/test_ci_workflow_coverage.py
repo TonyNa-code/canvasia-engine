@@ -41,6 +41,20 @@ class CiWorkflowCoverageTests(unittest.TestCase):
             workflow,
         )
 
+    def test_project_health_tool_is_run_in_ci(self) -> None:
+        workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("tools/ci/project_health.py", workflow)
+        self.assertIn("tests/test_project_health_tool.py", workflow)
+        self.assertIn(
+            "python -m unittest discover -s tests -p 'test_project_health_tool.py' -v",
+            workflow,
+        )
+        self.assertIn(
+            "python tools/ci/project_health.py template_project --json-report verification_reports/project-health-template.json --markdown-report verification_reports/project-health-template.md",
+            workflow,
+        )
+
     def test_editor_entrypoint_modules_are_syntax_checked_in_ci(self) -> None:
         workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
         html = EDITOR_INDEX_PATH.read_text(encoding="utf-8")

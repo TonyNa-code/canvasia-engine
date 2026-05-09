@@ -19,6 +19,16 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 GITHUB_API_ROOT = "https://api.github.com"
 FINAL_FAILURE_CONCLUSIONS = {"action_required", "cancelled", "failure", "startup_failure", "timed_out"}
 FINAL_PASSING_CONCLUSIONS = {"success", "neutral", "skipped"}
+TRANSIENT_GITHUB_ERROR_PATTERNS = (
+    "timed out",
+    "temporary failure",
+    "temporarily unavailable",
+    "connection reset",
+    "connection aborted",
+    "network is unreachable",
+    "urlopen error",
+    "_ssl.c",
+)
 
 
 @dataclass(frozen=True)
@@ -205,6 +215,27 @@ def fetch_annotations(annotations_url: str, token: str = "") -> list[dict[str, A
     return list(payload or [])
 
 
+def is_transient_github_error(error: BaseException) -> bool:
+    message = str(error).lower()
+    return any(pattern in message for pattern in TRANSIENT_GITHUB_ERROR_PATTERNS)
+
+
+def compact_status_message(message: Any, limit: int = 500) -> str:
+    text = re.sub(r"\s+", " ", str(message or "")).strip()
+    safe_limit = max(int(limit or 0), 20)
+    if len(text) <= safe_limit:
+        return text
+    return f"{text[: safe_limit - 3].rstrip()}..."
+
+
+def format_markdown_inline_code(value: Any) -> str:
+    return compact_status_message(value).replace("`", "'")
+
+
+def format_markdown_table_cell(value: Any, limit: int = 160) -> str:
+    return compact_status_message(value, limit).replace("|", r"\|")
+
+
 def classify_check_runs(check_runs: Sequence[dict[str, Any]]) -> str:
     if not check_runs:
         return "missing"
@@ -224,6 +255,7 @@ def get_status_label(status: str) -> str:
         "failure": "失败",
         "in_progress": "运行中",
         "missing": "暂未找到检查",
+        "network_error": "网络暂时不可用",
         "unknown": "未知",
     }.get(status, status)
 
@@ -249,9 +281,11 @@ def build_status_payload(
     check_runs: Sequence[dict[str, Any]],
     annotations_by_run: dict[str, list[dict[str, Any]]] | None = None,
     git_snapshot: dict[str, Any] | None = None,
+    status_override: str = "",
+    error_message: str = "",
 ) -> dict[str, Any]:
     normalized_runs = [normalize_check_run(run) for run in check_runs]
-    status = classify_check_runs(check_runs)
+    status = status_override or classify_check_runs(check_runs)
     return {
         "repo": repo,
         "sha": sha,
@@ -262,6 +296,7 @@ def build_status_payload(
         "runs": normalized_runs,
         "annotations": annotations_by_run or {},
         "git": git_snapshot or {},
+        "error": compact_status_message(error_message),
     }
 
 
@@ -311,8 +346,12 @@ def format_status_text(payload: dict[str, Any]) -> str:
                 f"落后远端提交：{git.get('behind', 0)}",
             ]
         )
-    if not payload["runs"]:
+    if payload["status"] == "network_error":
+        lines.append("GitHub Actions 状态暂时查不到；这是网络/API 查询问题，不代表 CI 已失败。")
+    elif not payload["runs"]:
         lines.append("还没有查到 GitHub Actions 检查。可能是刚推送，或者这个提交没有触发 workflow。")
+    if payload.get("error"):
+        lines.append(f"状态查询提示：{payload['error']}")
     for run in payload["runs"]:
         conclusion = run["conclusion"] or "pending"
         lines.append(f"- {run['name']}: {run['status']} / {conclusion}")
@@ -323,7 +362,7 @@ def format_status_text(payload: dict[str, Any]) -> str:
         lines.append("失败提示：")
         for run_id, items in annotations.items():
             for item in items[:5]:
-                message = str(item.get("message") or "").strip()
+                message = compact_status_message(item.get("message") or "")
                 path = item.get("path") or ""
                 line = item.get("start_line") or ""
                 location = f"{path}:{line}" if path and line else path
@@ -345,6 +384,8 @@ def write_markdown_report(path: Path, payload: dict[str, Any]) -> None:
         f"- Commit: `{payload['shortSha']}`",
         f"- Status: `{payload['status']}`",
     ]
+    if payload.get("error"):
+        lines.append(f"- Query note: `{format_markdown_inline_code(payload['error'])}`")
     if git:
         dirty = git.get("dirty") or {}
         lines.extend(
@@ -356,17 +397,35 @@ def write_markdown_report(path: Path, payload: dict[str, Any]) -> None:
                 f"- Ahead / behind: `{git.get('ahead', 0)} / {git.get('behind', 0)}`",
             ]
         )
-    lines.extend(["", "| Check | Status | Conclusion | Link |", "| --- | --- | --- | --- |"])
-    for run in payload["runs"]:
-        link = f"[open]({run['detailsUrl']})" if run["detailsUrl"] else ""
-        lines.append(f"| {run['name']} | {run['status']} | {run['conclusion'] or 'pending'} | {link} |")
+    if payload["runs"]:
+        lines.extend(["", "| Check | Status | Conclusion | Link |", "| --- | --- | --- | --- |"])
+        for run in payload["runs"]:
+            link = f"[open]({run['detailsUrl']})" if run["detailsUrl"] else ""
+            lines.append(
+                "| "
+                + " | ".join(
+                    [
+                        format_markdown_table_cell(run["name"]),
+                        format_markdown_table_cell(run["status"]),
+                        format_markdown_table_cell(run["conclusion"] or "pending"),
+                        link,
+                    ]
+                )
+                + " |"
+            )
+    elif payload["status"] == "network_error":
+        lines.extend(["", "_GitHub Actions could not be queried because the GitHub API was temporarily unreachable._"])
+    else:
+        lines.extend(["", "_No GitHub Actions check runs were found for this commit._"])
     annotations = payload.get("annotations") or {}
     if annotations:
         lines.extend(["", "## Annotations"])
         for run_id, items in annotations.items():
             lines.append(f"### Check Run {run_id}")
             for item in items:
-                lines.append(f"- `{item.get('path', '')}:{item.get('start_line', '')}` {item.get('message', '')}")
+                location = format_markdown_inline_code(f"{item.get('path', '')}:{item.get('start_line', '')}")
+                message = compact_status_message(item.get("message") or "")
+                lines.append(f"- `{location}` {message}")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -406,7 +465,24 @@ def load_status_payload(args: argparse.Namespace) -> dict[str, Any]:
         if args.input_json:
             check_runs = read_check_runs_from_file(args.input_json)
         else:
-            check_runs = fetch_check_runs(GitHubStatusRequest(repo=repo, sha=sha, token=token))
+            try:
+                check_runs = fetch_check_runs(GitHubStatusRequest(repo=repo, sha=sha, token=token))
+            except RuntimeError as error:
+                if not is_transient_github_error(error):
+                    raise
+                if args.watch and time.time() < deadline:
+                    print(f"GitHub API 暂时连不上：{error}。{args.interval:.0f}s 后重试...")
+                    time.sleep(max(args.interval, 1.0))
+                    continue
+                return build_status_payload(
+                    repo,
+                    sha,
+                    [],
+                    {},
+                    git_snapshot,
+                    status_override="network_error",
+                    error_message=str(error),
+                )
         status = classify_check_runs(check_runs)
         annotations = collect_annotations_for_failures(check_runs, token) if status == "failure" and not args.input_json else {}
         payload = build_status_payload(repo, sha, check_runs, annotations, git_snapshot)

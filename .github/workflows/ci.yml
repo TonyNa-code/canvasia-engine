@@ -34,10 +34,12 @@ jobs:
             tools/release/prepare_preview_release.py \
             tools/ci/github_status.py \
             tools/ci/local_verify.py \
+            tools/ci/project_health.py \
             tools/runtime/run_native_runtime_smoke.py \
             tests/test_ci_workflow_coverage.py \
             tests/test_github_status_tool.py \
             tests/test_local_verify_tool.py \
+            tests/test_project_health_tool.py \
             tests/test_prepare_preview_release.py \
             tests/test_frontend_action_handlers.py \
             tests/test_frontend_asset_catalog_module.py \
@@ -47,6 +49,8 @@ jobs:
             tests/test_frontend_entrypoint_modules.py \
             tests/test_frontend_editor_mode_module.py \
             tests/test_frontend_preview_save_module.py \
+            tests/test_frontend_project_doctor_module.py \
+            tests/test_frontend_project_milestones_module.py \
             tests/test_frontend_project_history_module.py \
             tests/test_frontend_project_settings_module.py \
             tests/test_frontend_recent_workspace_module.py \
@@ -69,6 +73,8 @@ jobs:
           node --check prototype_editor/modules/editor_filters.js
           node --check prototype_editor/modules/editor_mode.js
           node --check prototype_editor/modules/preview_save.js
+          node --check prototype_editor/modules/project_doctor.js
+          node --check prototype_editor/modules/project_milestones.js
           node --check prototype_editor/modules/project_history.js
           node --check prototype_editor/modules/project_settings.js
           node --check prototype_editor/modules/recent_workspace.js
@@ -87,6 +93,8 @@ jobs:
           python -m unittest discover -s tests -p 'test_ci_workflow_coverage.py' -v
           python -m unittest discover -s tests -p 'test_github_status_tool.py' -v
           python -m unittest discover -s tests -p 'test_local_verify_tool.py' -v
+          python -m unittest discover -s tests -p 'test_project_health_tool.py' -v
+          python tools/ci/project_health.py template_project --json-report verification_reports/project-health-template.json --markdown-report verification_reports/project-health-template.md
           python -m unittest discover -s tests -p 'test_prepare_preview_release.py' -v
           python -m unittest discover -s tests -p 'test_frontend_action_handlers.py' -v
           python -m unittest discover -s tests -p 'test_frontend_asset_catalog_module.py' -v
@@ -96,6 +104,8 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_entrypoint_modules.py' -v
           python -m unittest discover -s tests -p 'test_frontend_editor_mode_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_preview_save_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_project_doctor_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_project_milestones_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_project_history_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_project_settings_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_recent_workspace_module.py' -v
