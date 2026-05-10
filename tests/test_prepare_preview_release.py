@@ -20,6 +20,29 @@ spec.loader.exec_module(prepare_preview_release)
 
 
 class PreviewReleaseBodyTests(unittest.TestCase):
+    def test_scan_privacy_ignores_known_sanitization_fixture_placeholders(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            fixture_path = Path(tmp_dir) / "creative_assistant_fixture.py"
+            synthetic_sensitive_line = "api" + 'Key: "fake-live-value-for-release-test",'
+            fixture_path.write_text(
+                "\n".join(
+                    [
+                        'apiKey: "should-not-survive",',
+                        'password = "should-not-survive"',
+                        synthetic_sensitive_line,
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            with patch.object(prepare_preview_release, "tracked_files", return_value=[fixture_path]):
+                result = prepare_preview_release.scan_privacy([])
+
+        self.assertFalse(result["passed"])
+        self.assertEqual(len(result["sensitiveFindings"]), 1)
+        self.assertEqual(result["sensitiveFindings"][0]["type"], "api_key_assignment")
+        self.assertEqual(result["sensitiveFindings"][0]["line"], 3)
+
     def test_release_body_includes_public_download_guide(self) -> None:
         report = {
             "githubActions": {"checked": True, "status": "completed", "conclusion": "success"},

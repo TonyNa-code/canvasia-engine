@@ -4731,6 +4731,16 @@ async function handleClick(event) {
     return;
   }
 
+  if (action === "export-project-doctor-receipt") {
+    exportProjectDoctorRepairReceipt();
+    return;
+  }
+
+  if (action === "copy-project-doctor-receipt-summary") {
+    void copyProjectDoctorRepairReceiptSummary();
+    return;
+  }
+
   if (action === "generate-release-fix-order") {
     state.validation = runValidation(state.data);
     updateTopbar();
@@ -28611,6 +28621,13 @@ function buildReleaseControlJsonReportFileName() {
   return `${title}_release_control_report_${dateStamp}.json`;
 }
 
+function buildProjectDoctorRepairReceiptFileName(receipt = state.projectDoctorRepairReceipt) {
+  const title = sanitizeFileName(state.data?.project?.title || "tony-na-engine");
+  const status = sanitizeFileName(receipt?.status || "receipt");
+  const receiptId = sanitizeFileName(getProjectDoctorRepairReceiptDisplayId(receipt));
+  return `${title}_project_doctor_${status || "receipt"}_${receiptId || "receipt"}.md`;
+}
+
 function escapeMarkdownTableCell(value) {
   return String(value ?? "")
     .replace(/\|/g, "\\|")
@@ -28864,6 +28881,7 @@ function buildReleaseControlReportPayload() {
   const urgentMissingAssets = state.data.assetList.filter((asset) => isAssetUrgentMissing(asset));
   const unusedAssets = getUnusedAssets();
   const nextStep = buildReleaseReportNextStep(releaseFixOrder, projectMilestoneGapDigest);
+  const projectDoctorRepairReceiptReport = buildProjectDoctorRepairReceiptReportSummary(state.projectDoctorRepairReceipt);
 
   return {
     formatVersion: 1,
@@ -28940,6 +28958,7 @@ function buildReleaseControlReportPayload() {
       title: projectDoctorSummary.title,
       description: projectDoctorSummary.description,
       lastRepairReceipt: state.projectDoctorRepairReceipt,
+      lastRepairReceiptReport: projectDoctorRepairReceiptReport,
       dangerCount: projectDoctorSummary.dangerCount ?? 0,
       warnCount: projectDoctorSummary.warnCount ?? 0,
       softCount: projectDoctorSummary.softCount ?? 0,
@@ -29208,10 +29227,16 @@ function buildInspectionReportContent() {
   lines.push(`- ${projectDoctorSummary.autoRepairLabel ?? "暂无可预览修复项"}`);
   if (state.projectDoctorRepairReceipt) {
     const receiptLabels = getProjectDoctorRepairReceiptReportLabels(state.projectDoctorRepairReceipt);
+    const receiptItems = buildProjectDoctorRepairReceiptReportItems(state.projectDoctorRepairReceipt, receiptLabels);
+    const receiptWriteStatus = getProjectDoctorRepairReceiptWriteStatus(state.projectDoctorRepairReceipt);
     lines.push(
       `- ${receiptLabels.heading}：${state.projectDoctorRepairReceipt.title}`,
+      `- 回执编号：${getProjectDoctorRepairReceiptDisplayId(state.projectDoctorRepairReceipt)}`,
       `- ${receiptLabels.timeLabel}：${formatDate(state.projectDoctorRepairReceipt.generatedAt)}`,
       `- ${receiptLabels.countLabel}：${state.projectDoctorRepairReceipt.repairCount ?? 0} / ${state.projectDoctorRepairReceipt.skippedCount ?? 0}`,
+      `- 写入状态：${receiptWriteStatus.label}（${receiptWriteStatus.detail}）`,
+      `- 修复范围：${formatProjectDoctorRepairReceiptScope(state.projectDoctorRepairReceipt)}`,
+      ...receiptItems.map((item) => `- ${item}`),
       ""
     );
   }
@@ -29346,6 +29371,12 @@ function buildReleaseControlReportContent() {
   const generatedAt = new Date().toISOString();
   const projectDoctorReceiptLabels = state.projectDoctorRepairReceipt
     ? getProjectDoctorRepairReceiptReportLabels(state.projectDoctorRepairReceipt)
+    : null;
+  const projectDoctorReceiptReportItems = state.projectDoctorRepairReceipt && projectDoctorReceiptLabels
+    ? buildProjectDoctorRepairReceiptReportItems(state.projectDoctorRepairReceipt, projectDoctorReceiptLabels)
+    : [];
+  const projectDoctorReceiptWriteStatus = state.projectDoctorRepairReceipt
+    ? getProjectDoctorRepairReceiptWriteStatus(state.projectDoctorRepairReceipt)
     : null;
   const releaseChecklistTable = buildMarkdownTable(
     ["检查项", "状态", "级别", "说明"],
@@ -29534,9 +29565,15 @@ function buildReleaseControlReportContent() {
     `- ${projectDoctorSummary.badge}：${projectDoctorSummary.title}`,
     `- ${projectDoctorSummary.description}`,
     `- ${projectDoctorSummary.autoRepairLabel ?? "暂无可预览修复项"}`,
-    state.projectDoctorRepairReceipt && projectDoctorReceiptLabels
-      ? `- ${projectDoctorReceiptLabels.compactPrefix}：${state.projectDoctorRepairReceipt.title}（${projectDoctorReceiptLabels.repairVerb} ${state.projectDoctorRepairReceipt.repairCount ?? 0} 项，${projectDoctorReceiptLabels.skipVerb} ${state.projectDoctorRepairReceipt.skippedCount ?? 0} 项）`
-      : "",
+    ...(state.projectDoctorRepairReceipt && projectDoctorReceiptLabels
+      ? [
+          `- ${projectDoctorReceiptLabels.compactPrefix}：${state.projectDoctorRepairReceipt.title}（${projectDoctorReceiptLabels.repairVerb} ${state.projectDoctorRepairReceipt.repairCount ?? 0} 项，${projectDoctorReceiptLabels.skipVerb} ${state.projectDoctorRepairReceipt.skippedCount ?? 0} 项）`,
+          `- 回执编号：${getProjectDoctorRepairReceiptDisplayId(state.projectDoctorRepairReceipt)}`,
+          `- 写入状态：${projectDoctorReceiptWriteStatus.label}（${projectDoctorReceiptWriteStatus.detail}）`,
+          `- 修复范围：${formatProjectDoctorRepairReceiptScope(state.projectDoctorRepairReceipt)}`,
+          ...projectDoctorReceiptReportItems.map((item) => `- ${item}`),
+        ]
+      : []),
     "",
     projectDoctorTable || "当前没有项目医生需要优先处理的事项。",
     ""
@@ -29977,6 +30014,20 @@ function getProjectDoctorRepairCodeLabel(code) {
   return labels[code] ?? code;
 }
 
+function getProjectDoctorRepairReceiptRequestedCodes(receipt = {}) {
+  return Array.isArray(receipt?.requestedCodes)
+    ? receipt.requestedCodes.map((code) => String(code ?? "").trim()).filter(Boolean)
+    : [];
+}
+
+function formatProjectDoctorRepairReceiptScope(receipt = {}) {
+  const requestedCodes = getProjectDoctorRepairReceiptRequestedCodes(receipt);
+  if (!requestedCodes.length) {
+    return receipt?.status === "unknown" ? "无可执行范围" : "全部安全项";
+  }
+  return requestedCodes.map(getProjectDoctorRepairCodeLabel).join(" / ");
+}
+
 function formatProjectDoctorRepairCodes(codes = []) {
   const safeCodes = (codes ?? [])
     .map((code) => String(code ?? "").trim())
@@ -30020,6 +30071,311 @@ function getProjectDoctorRepairReceiptReportLabels(receipt = {}) {
   };
 }
 
+function getProjectDoctorRepairReceiptWriteStatus(receipt = {}) {
+  const status = String(receipt?.status ?? "");
+  if (status === "preview" || receipt?.dryRun) {
+    return {
+      status: "preview",
+      label: "未写入项目文件",
+      detail: "这只是安全修复预览，确认执行前不会改动项目。",
+    };
+  }
+  if (status === "unknown") {
+    return {
+      status: "unknown",
+      label: "未执行",
+      detail: "修复码未识别，请重新巡检刷新后再预览。",
+    };
+  }
+  if (status === "repaired") {
+    return {
+      status: "written",
+      label: "已写入项目文件",
+      detail: "安全修复已执行，建议重新巡检确认结果。",
+    };
+  }
+  return {
+    status: "clean",
+    label: "无需写入",
+    detail: "项目医生没有发现需要自动写入的低风险结构问题。",
+  };
+}
+
+function formatProjectDoctorRepairReceiptIdStamp(value) {
+  const date = value ? new Date(value) : null;
+  if (!date || Number.isNaN(date.getTime())) {
+    return "undated";
+  }
+  return [
+    date.getUTCFullYear(),
+    String(date.getUTCMonth() + 1).padStart(2, "0"),
+    String(date.getUTCDate()).padStart(2, "0"),
+    String(date.getUTCHours()).padStart(2, "0"),
+    String(date.getUTCMinutes()).padStart(2, "0"),
+  ].join("");
+}
+
+function getProjectDoctorRepairReceiptId(receipt = {}) {
+  const status = sanitizeFileName(receipt?.status || "receipt").toLowerCase() || "receipt";
+  const stamp = formatProjectDoctorRepairReceiptIdStamp(receipt?.generatedAt);
+  const itemDigest = (items = []) => (Array.isArray(items) ? items : [])
+    .map((item) => [
+      item?.code,
+      item?.title,
+      item?.detail,
+    ].map((value) => String(value ?? "").trim()).join("~"))
+    .join("||");
+  const source = [
+    status,
+    receipt?.dryRun ? "dry-run" : "write",
+    receipt?.generatedAt ?? "",
+    receipt?.title ?? "",
+    getProjectDoctorRepairReceiptRequestedCodes(receipt).join(","),
+    receipt?.repairCount ?? 0,
+    receipt?.skippedCount ?? 0,
+    itemDigest(receipt?.repairs),
+    itemDigest(receipt?.skipped),
+  ].join("|");
+  let hash = 0;
+  for (let index = 0; index < source.length; index += 1) {
+    hash = (hash * 31 + source.charCodeAt(index)) >>> 0;
+  }
+  return `doctor-${status}-${stamp}-${hash.toString(36).padStart(6, "0").slice(-6)}`;
+}
+
+function normalizeProjectDoctorRepairReceiptId(value) {
+  const text = String(value ?? "")
+    .replace(/\s+/g, "-")
+    .trim();
+  if (!text) {
+    return "";
+  }
+  return text
+    .replace(/[\\/:*?"<>|]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 96);
+}
+
+function getProjectDoctorRepairReceiptDisplayId(receipt = {}) {
+  const explicitId = normalizeProjectDoctorRepairReceiptId(receipt?.receiptId);
+  return explicitId || getProjectDoctorRepairReceiptId(receipt);
+}
+
+function withProjectDoctorRepairReceiptId(receipt = null) {
+  if (!receipt) {
+    return receipt;
+  }
+  return {
+    ...receipt,
+    receiptId: getProjectDoctorRepairReceiptDisplayId(receipt),
+  };
+}
+
+function compactProjectDoctorRepairReceiptReportText(value, fallback = "", maxLength = 140) {
+  const text = String(value ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const safeText = text || fallback;
+  if (!safeText || safeText.length <= maxLength) {
+    return safeText;
+  }
+  return `${safeText.slice(0, Math.max(0, maxLength - 1)).trim()}…`;
+}
+
+function formatProjectDoctorRepairReceiptReportItem(item = {}, verb = "已处理") {
+  const title = compactProjectDoctorRepairReceiptReportText(item?.title, "项目医生记录", 72);
+  const detail = compactProjectDoctorRepairReceiptReportText(item?.detail, "", 120);
+  return detail ? `${verb}：${title}；${detail}` : `${verb}：${title}`;
+}
+
+function buildProjectDoctorRepairReceiptReportItems(receipt = {}, labels = getProjectDoctorRepairReceiptReportLabels(receipt)) {
+  const repairs = Array.isArray(receipt?.repairs) ? receipt.repairs : [];
+  const skipped = Array.isArray(receipt?.skipped) ? receipt.skipped : [];
+  const items = [
+    ...repairs.slice(0, 5).map((item) => formatProjectDoctorRepairReceiptReportItem(item, labels.repairVerb)),
+    ...skipped.slice(0, 5).map((item) => formatProjectDoctorRepairReceiptReportItem(item, labels.skipVerb)),
+  ];
+
+  if (repairs.length > 5) {
+    items.push(`${labels.repairVerb}：另有 ${repairs.length - 5} 项没有展开，完整记录在本次项目医生回执里。`);
+  }
+  if (skipped.length > 5) {
+    items.push(`${labels.skipVerb}：另有 ${skipped.length - 5} 项没有展开，完整记录在本次项目医生回执里。`);
+  }
+  return items;
+}
+
+function buildProjectDoctorRepairReceiptReportSummary(receipt = null) {
+  if (!receipt) {
+    return null;
+  }
+
+  const labels = getProjectDoctorRepairReceiptReportLabels(receipt);
+  const requestedRepairCodes = getProjectDoctorRepairReceiptRequestedCodes(receipt);
+  const writeStatus = getProjectDoctorRepairReceiptWriteStatus(receipt);
+  return {
+    receiptId: getProjectDoctorRepairReceiptDisplayId(receipt),
+    status: String(receipt.status ?? ""),
+    dryRun: Boolean(receipt.dryRun),
+    generatedAt: String(receipt.generatedAt ?? ""),
+    heading: labels.heading,
+    timeLabel: labels.timeLabel,
+    countLabel: labels.countLabel,
+    repairVerb: labels.repairVerb,
+    skipVerb: labels.skipVerb,
+    title: compactProjectDoctorRepairReceiptReportText(receipt.title, labels.heading, 120),
+    repairCount: Number(receipt.repairCount ?? 0) || 0,
+    skippedCount: Number(receipt.skippedCount ?? 0) || 0,
+    requestedRepairCodes,
+    requestedRepairLabels: requestedRepairCodes.map(getProjectDoctorRepairCodeLabel),
+    scopeLabel: formatProjectDoctorRepairReceiptScope(receipt),
+    writeStatus,
+    items: buildProjectDoctorRepairReceiptReportItems(receipt, labels),
+  };
+}
+
+function buildProjectDoctorRepairReceiptMarkdownContent(receipt = state.projectDoctorRepairReceipt) {
+  if (!receipt) {
+    return "";
+  }
+
+  const labels = getProjectDoctorRepairReceiptReportLabels(receipt);
+  const reportSummary = buildProjectDoctorRepairReceiptReportSummary(receipt);
+  const repairs = Array.isArray(receipt.repairs) ? receipt.repairs : [];
+  const skipped = Array.isArray(receipt.skipped) ? receipt.skipped : [];
+  const nextActions = (Array.isArray(receipt.nextActions)
+    ? receipt.nextActions
+    : buildProjectDoctorRepairNextActions(receipt.status, reportSummary?.requestedRepairCodes ?? [])
+  ).filter(Boolean);
+  const detailRows = [
+    ...repairs.map((item) => [
+      labels.repairVerb,
+      compactProjectDoctorRepairReceiptReportText(item?.title, "项目医生记录", 96),
+      compactProjectDoctorRepairReceiptReportText(item?.detail, "没有更多细节。", 180),
+    ]),
+    ...skipped.map((item) => [
+      labels.skipVerb,
+      compactProjectDoctorRepairReceiptReportText(item?.title, "项目医生记录", 96),
+      compactProjectDoctorRepairReceiptReportText(item?.detail, "没有更多细节。", 180),
+    ]),
+  ];
+  const summaryTable = buildMarkdownTable(
+    ["项目", "内容"],
+    [
+      ["回执编号", reportSummary?.receiptId ?? getProjectDoctorRepairReceiptDisplayId(receipt)],
+      ["回执类型", labels.heading],
+      ["标题", reportSummary?.title ?? labels.heading],
+      [labels.timeLabel, formatDate(receipt.generatedAt)],
+      ["写入状态", `${reportSummary?.writeStatus?.label ?? "未记录"}：${reportSummary?.writeStatus?.detail ?? "没有记录写入状态。"}`],
+      ["修复范围", reportSummary?.scopeLabel ?? formatProjectDoctorRepairReceiptScope(receipt)],
+      [labels.countLabel, `${reportSummary?.repairCount ?? 0} / ${reportSummary?.skippedCount ?? 0}`],
+    ]
+  );
+  const detailTable = buildMarkdownTable(["类型", "事项", "细节"], detailRows);
+  const nextActionLines = nextActions.length
+    ? nextActions.map((action, index) => `${index + 1}. ${action.label ?? "继续处理"}`)
+    : ["1. 重新巡检并导出发布总控报告。"];
+
+  return [
+    `# ${labels.heading}`,
+    "",
+    `- 回执编号：${reportSummary?.receiptId ?? getProjectDoctorRepairReceiptDisplayId(receipt)}`,
+    `- 项目：${state.data?.project?.title ?? "Tony Na Engine Project"}`,
+    `- 导出时间：${formatDate(new Date().toISOString())}`,
+    "",
+    "## 回执摘要",
+    "",
+    summaryTable,
+    "",
+    "## 明细",
+    "",
+    detailTable || "当前没有可展开的处理明细。",
+    "",
+    "## 后续建议",
+    "",
+    ...nextActionLines,
+    "",
+  ].join("\n");
+}
+
+function buildProjectDoctorRepairReceiptClipboardSummary(receipt = state.projectDoctorRepairReceipt) {
+  if (!receipt) {
+    return "";
+  }
+
+  const reportSummary = buildProjectDoctorRepairReceiptReportSummary(receipt);
+  const nextActions = (Array.isArray(receipt.nextActions)
+    ? receipt.nextActions
+    : buildProjectDoctorRepairNextActions(receipt.status, reportSummary?.requestedRepairCodes ?? [])
+  ).filter(Boolean);
+  const itemLines = (reportSummary?.items ?? []).slice(0, 3).map((item) => `- ${item}`);
+  const overflowCount = Math.max(0, (reportSummary?.items?.length ?? 0) - itemLines.length);
+  if (overflowCount > 0) {
+    itemLines.push(`- 另有 ${overflowCount} 条明细，请导出完整回执查看。`);
+  }
+  const generatedAtText = receipt.generatedAt ? formatDate(receipt.generatedAt) : "未记录";
+  const writeStatusLabel = reportSummary?.writeStatus?.label ?? "未记录";
+  const writeStatusDetail = reportSummary?.writeStatus?.detail;
+  const writeStatusText = writeStatusDetail
+    ? `${writeStatusLabel}（${writeStatusDetail}）`
+    : writeStatusLabel;
+
+  return [
+    `${reportSummary?.heading ?? "项目医生回执"}：${reportSummary?.title ?? "项目医生回执"}`,
+    `回执编号：${reportSummary?.receiptId ?? getProjectDoctorRepairReceiptDisplayId(receipt)}`,
+    `项目：${state.data?.project?.title ?? "Tony Na Engine Project"}`,
+    `${reportSummary?.timeLabel ?? "回执时间"}：${generatedAtText}`,
+    `写入状态：${writeStatusText}`,
+    `修复范围：${reportSummary?.scopeLabel ?? formatProjectDoctorRepairReceiptScope(receipt)}`,
+    `${reportSummary?.countLabel ?? "处理数量"}：${reportSummary?.repairCount ?? 0} / ${reportSummary?.skippedCount ?? 0}`,
+    ...itemLines,
+    nextActions[0]?.label ? `下一步：${nextActions[0].label}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function exportProjectDoctorRepairReceipt() {
+  if (!state.projectDoctorRepairReceipt) {
+    showToast("还没有项目医生回执可导出，请先预览或执行安全修复。", "error");
+    setSaveStatus("暂无项目医生回执可导出", true);
+    return false;
+  }
+
+  const fileName = buildProjectDoctorRepairReceiptFileName(state.projectDoctorRepairReceipt);
+  downloadTextFile(
+    fileName,
+    buildProjectDoctorRepairReceiptMarkdownContent(state.projectDoctorRepairReceipt),
+    "text/markdown;charset=utf-8"
+  );
+  setSaveStatus(`已导出项目医生回执：${fileName}`);
+  showToast("项目医生回执已导出");
+  return true;
+}
+
+async function copyProjectDoctorRepairReceiptSummary() {
+  if (!state.projectDoctorRepairReceipt) {
+    showToast("还没有项目医生回执可复制，请先预览或执行安全修复。", "error");
+    setSaveStatus("暂无项目医生回执可复制", true);
+    return false;
+  }
+
+  const receiptId = getProjectDoctorRepairReceiptDisplayId(state.projectDoctorRepairReceipt);
+  const copied = await copyTextToClipboard(
+    buildProjectDoctorRepairReceiptClipboardSummary(state.projectDoctorRepairReceipt)
+  );
+  if (!copied) {
+    showToast("复制失败，可以改用“导出这次回执”保存文件。", "error");
+    setSaveStatus("项目医生回执复制失败", true);
+    return false;
+  }
+
+  setSaveStatus(`已复制项目医生回执摘要：${receiptId}`);
+  showToast("项目医生回执摘要已复制");
+  return true;
+}
+
 function buildProjectDoctorRepairNextActions(status = "clean", repairCodes = []) {
   if (projectDoctorTools?.buildProjectDoctorRepairNextActions) {
     return projectDoctorTools.buildProjectDoctorRepairNextActions(status, repairCodes);
@@ -30027,6 +30383,7 @@ function buildProjectDoctorRepairNextActions(status = "clean", repairCodes = [])
 
   const repaired = status === "repaired";
   const preview = status === "preview";
+  const unknown = status === "unknown";
   const repairCodeText = Array.isArray(repairCodes) ? repairCodes.filter(Boolean).join(",") : "";
   if (preview) {
     return [
@@ -30036,6 +30393,13 @@ function buildProjectDoctorRepairNextActions(status = "clean", repairCodes = [])
         dataset: repairCodeText ? { "repair-codes": repairCodeText } : {},
       },
       { label: "重新巡检确认", action: "run-project-inspection" },
+      { label: "导出巡检报告", action: "export-inspection-report" },
+    ];
+  }
+  if (unknown) {
+    return [
+      { label: "重新巡检刷新修复码", action: "run-project-inspection" },
+      { label: "重新预览安全修复", action: "preview-project-doctor-repair" },
       { label: "导出巡检报告", action: "export-inspection-report" },
     ];
   }
@@ -30050,7 +30414,7 @@ function buildProjectDoctorRepairNextActions(status = "clean", repairCodes = [])
 
 function buildProjectDoctorRepairReceipt(result) {
   if (projectDoctorTools?.buildProjectDoctorRepairReceipt) {
-    return projectDoctorTools.buildProjectDoctorRepairReceipt(result);
+    return withProjectDoctorRepairReceiptId(projectDoctorTools.buildProjectDoctorRepairReceipt(result));
   }
 
   const repairs = Array.isArray(result?.repairs) ? result.repairs : [];
@@ -30071,7 +30435,7 @@ function buildProjectDoctorRepairReceipt(result) {
     ? "unknown"
     : dryRun && wouldChange ? "preview" : changed ? "repaired" : "clean";
   const ignoredNote = ignoredCodes.length ? `；另有 ${ignoredCodes.length} 个未识别修复码已列在跳过区` : "";
-  return {
+  return withProjectDoctorRepairReceiptId({
     generatedAt: result?.savedAt ?? new Date().toISOString(),
     status,
     badge: status === "unknown" ? "未识别" : status === "preview" ? "预览未写入" : changed ? "已自动修复" : "无需自动修复",
@@ -30100,7 +30464,7 @@ function buildProjectDoctorRepairReceipt(result) {
     repairs,
     skipped,
     nextActions: buildProjectDoctorRepairNextActions(status, requestedCodes),
-  };
+  });
 }
 
 function withProjectDoctorRepairActions(queue) {
@@ -30242,10 +30606,19 @@ function renderProjectDoctorRepairReceiptPanel(receipt = state.projectDoctorRepa
   }
 
   const isPreview = receipt.status === "preview";
-  const tone = receipt.status === "repaired" ? "good" : isPreview ? "warn" : "soft";
+  const isUnknown = receipt.status === "unknown";
+  const receiptLabels = getProjectDoctorRepairReceiptReportLabels(receipt);
+  const writeStatus = getProjectDoctorRepairReceiptWriteStatus(receipt);
+  const tone = receipt.status === "repaired" ? "good" : isPreview || isUnknown ? "warn" : "soft";
+  const scopeLabel = formatProjectDoctorRepairReceiptScope(receipt);
+  const scopeHint = isUnknown
+    ? "请重新巡检刷新修复码"
+    : isPreview
+    ? "确认按钮只执行这个范围"
+    : "本次自动修复范围";
   const nextActions = (Array.isArray(receipt.nextActions)
     ? receipt.nextActions
-    : buildProjectDoctorRepairNextActions(receipt.status)
+    : buildProjectDoctorRepairNextActions(receipt.status, getProjectDoctorRepairReceiptRequestedCodes(receipt))
   )
     .filter(Boolean)
     .slice(0, 3);
@@ -30257,22 +30630,30 @@ function renderProjectDoctorRepairReceiptPanel(receipt = state.projectDoctorRepa
       </div>
       <p>${escapeHtml(receipt.description)}</p>
       <div class="preview-sprint-metrics">
-        ${renderRouteMetricCard(isPreview ? "将修复" : "已修复", `${receipt.repairCount ?? 0} 项`, "低风险结构项")}
-        ${renderRouteMetricCard(isPreview ? "将跳过" : "已跳过", `${receipt.skippedCount ?? 0} 项`, "当前无需处理")}
-        ${renderRouteMetricCard(isPreview ? "预览时间" : "修复时间", formatDate(receipt.generatedAt), "本次会话记录")}
-        ${renderRouteMetricCard("建议", isPreview ? "确认后修复" : "重新巡检", isPreview ? "不会写入文件" : "确认问题已消失")}
+        ${renderRouteMetricCard(receiptLabels.repairVerb, `${receipt.repairCount ?? 0} 项`, "低风险结构项")}
+        ${renderRouteMetricCard(receiptLabels.skipVerb, `${receipt.skippedCount ?? 0} 项`, isUnknown ? "未执行的请求" : "当前无需处理")}
+        ${renderRouteMetricCard(receiptLabels.timeLabel, formatDate(receipt.generatedAt), "本次会话记录")}
+        ${renderRouteMetricCard("写入状态", writeStatus.label, writeStatus.detail)}
+        ${renderRouteMetricCard("修复范围", scopeLabel, scopeHint)}
+        ${renderRouteMetricCard("回执编号", getProjectDoctorRepairReceiptDisplayId(receipt), "发给测试人员时可用来对齐记录")}
       </div>
       <div class="preview-sprint-actions project-doctor-receipt-actions">
         ${nextActions.map((action, index) => renderQuickActionButton(action, index === 0)).join("")}
+        <button class="toolbar-button" data-action="copy-project-doctor-receipt-summary">
+          复制回执摘要
+        </button>
+        <button class="toolbar-button" data-action="export-project-doctor-receipt">
+          导出这次回执
+        </button>
       </div>
       <div class="project-doctor-receipt-columns">
         <div>
-          <strong class="project-doctor-receipt-heading">${isPreview ? "预览会处理" : "已自动处理"}</strong>
-          ${renderProjectDoctorReceiptList(receipt.repairs ?? [], isPreview ? "预览里没有发现可自动修复项。" : "这次没有写入新的自动修复。")}
+          <strong class="project-doctor-receipt-heading">${isPreview ? "预览会处理" : isUnknown ? "可自动处理" : "已自动处理"}</strong>
+          ${renderProjectDoctorReceiptList(receipt.repairs ?? [], isPreview ? "预览里没有发现可自动修复项。" : isUnknown ? "这次请求里没有可执行的安全修复项。" : "这次没有写入新的自动修复。")}
         </div>
         <div>
-          <strong class="project-doctor-receipt-heading">${isPreview ? "预览会跳过" : "无需处理 / 已跳过"}</strong>
-          ${renderProjectDoctorReceiptList(receipt.skipped ?? [], isPreview ? "预览里没有需要跳过的项目。" : "这次没有跳过项。")}
+          <strong class="project-doctor-receipt-heading">${isPreview ? "预览会跳过" : isUnknown ? "未识别 / 已跳过" : "无需处理 / 已跳过"}</strong>
+          ${renderProjectDoctorReceiptList(receipt.skipped ?? [], isPreview ? "预览里没有需要跳过的项目。" : isUnknown ? "这次没有可列出的未识别修复码。" : "这次没有跳过项。")}
         </div>
       </div>
     </article>
@@ -34341,7 +34722,7 @@ async function deleteCreativeAssistantHistoryRecord(recordId) {
   }
   const confirmed = await showEngineConfirm({
     title: "删除这条助手灵感？",
-    message: `将删除「${record.result.title}」。如果后面还可能用到，建议先导出单条灵感或复制文档。`,
+    message: `将删除「${record.result.title}」。若之后还可能用到，建议先导出单条灵感或复制文档。`,
     tone: "danger",
     confirmLabel: "删除灵感",
     cancelLabel: "先保留",

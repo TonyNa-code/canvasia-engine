@@ -468,6 +468,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         repair_by_code = {item["code"]: item for item in result["repairs"]}
 
         self.assertTrue(result["changed"])
+        self.assertEqual(result["requestedCodes"], ["entry_scene", "chapter_order", "scene_order"])
         self.assertEqual(repair_codes, {"entry_scene", "chapter_order", "scene_order"})
         self.assertEqual(repaired_project["entrySceneId"], second_scene["sceneId"])
         self.assertEqual(repaired_project["chapterOrder"], [chapter_result["chapterId"]])
@@ -499,6 +500,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertFalse(result["changed"])
         self.assertTrue(result["wouldChange"])
         self.assertTrue(result["dryRun"])
+        self.assertEqual(result["requestedCodes"], ["entry_scene", "chapter_order", "scene_order"])
         self.assertEqual(repair_codes, {"entry_scene", "chapter_order", "scene_order"})
         self.assertEqual(previewed_project["entrySceneId"], "missing_entry")
         self.assertEqual(previewed_project["chapterOrder"], ["ghost_chapter", chapter_result["chapterId"], chapter_result["chapterId"]])

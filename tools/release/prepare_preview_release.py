@@ -45,6 +45,13 @@ SENSITIVE_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("password_assignment", re.compile(r"password\s*[:=]\s*['\"][^'\"]+", re.IGNORECASE)),
     ("secret_assignment", re.compile(r"secret\s*[:=]\s*['\"][^'\"]+", re.IGNORECASE)),
 ]
+SENSITIVE_ASSIGNMENT_VALUE_RE = re.compile(
+    r"(?:api[_-]?key|password|secret)\s*[:=]\s*(['\"])(?P<value>[^'\"]+)\1",
+    re.IGNORECASE,
+)
+KNOWN_SAFE_PLACEHOLDER_SECRET_VALUES = {
+    "should-not-survive",
+}
 
 
 def run_command(args: list[str], *, cwd: Path = ROOT_DIR) -> tuple[int, str, str]:
@@ -272,6 +279,18 @@ def build_sensitive_patterns(extra_patterns: list[str]) -> list[tuple[str, re.Pa
     return patterns
 
 
+def is_known_placeholder_sensitive_assignment(label: str, line: str) -> bool:
+    if label not in {"api_key_assignment", "password_assignment", "secret_assignment"}:
+        return False
+    matches = list(SENSITIVE_ASSIGNMENT_VALUE_RE.finditer(line))
+    if not matches:
+        return False
+    return all(
+        match.group("value").strip().lower() in KNOWN_SAFE_PLACEHOLDER_SECRET_VALUES
+        for match in matches
+    )
+
+
 def scan_privacy(extra_patterns: list[str]) -> dict[str, Any]:
     findings: list[dict[str, Any]] = []
     large_files: list[dict[str, Any]] = []
@@ -292,6 +311,8 @@ def scan_privacy(extra_patterns: list[str]) -> dict[str, Any]:
             for label, pattern in patterns:
                 if pattern.search(line):
                     if relative(path) == "tools/release/prepare_preview_release.py" and "re.compile" in line:
+                        continue
+                    if is_known_placeholder_sensitive_assignment(label, line):
                         continue
                     findings.append(
                         {

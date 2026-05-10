@@ -446,6 +446,7 @@
   function buildProjectDoctorRepairNextActions(status = "clean", repairCodes = []) {
     const repaired = status === "repaired";
     const preview = status === "preview";
+    const unknown = status === "unknown";
     const repairCodeText = Array.isArray(repairCodes) ? repairCodes.filter(Boolean).join(",") : "";
     if (preview) {
       return [
@@ -455,6 +456,13 @@
           dataset: repairCodeText ? { "repair-codes": repairCodeText } : {},
         },
         { label: "重新巡检确认", action: "run-project-inspection" },
+        { label: "导出巡检报告", action: "export-inspection-report" },
+      ];
+    }
+    if (unknown) {
+      return [
+        { label: "重新巡检刷新修复码", action: "run-project-inspection" },
+        { label: "重新预览安全修复", action: "preview-project-doctor-repair" },
         { label: "导出巡检报告", action: "export-inspection-report" },
       ];
     }

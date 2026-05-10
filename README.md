@@ -156,13 +156,13 @@ python run_editor.py
 
 ### 编辑器 App
 
-编辑器预览包通过 GitHub Releases 分发。当前计划提供：
+编辑器预览包通过 GitHub Releases 分发。每个预览版会尽量提供下列三类附件，实际可下载文件以对应 Release 页面为准：
 
 - `macos.tar.gz`
 - `windows.zip`
 - `linux.tar.gz`
 
-预览包用于快速体验编辑器本体，不需要从源码启动。若某个平台包尚未出现在 Release 附件中，以该版本 Release notes 为准。
+预览包用于快速体验编辑器本体，不需要从源码启动。若某个平台包暂未出现在 Release 附件中，可先使用源码方式启动，或等待该平台附件补齐。
 
 ### 该下载哪个文件
 
@@ -175,7 +175,7 @@ python run_editor.py
 
 当前属于 Preview 分发阶段，未签名或未公证的包可能触发 macOS Gatekeeper、Windows SmartScreen 或杀毒软件提示。请只从本仓库 Release 页面下载，并优先校验 SHA-256。
 
-维护者发布预览版时，`prepare_preview_release.py` 会生成公开推荐附件的 `.sha256`、`.checksum.json` 和三系统校验脚本；加上 `--copy-public-assets` 后，还会把推荐附件、校验清单和校验脚本集中到一个可直接上传到 GitHub Release 的目录。如果 Release 页面附带这些文件，下载者可以先核对哈希再解压。
+发布预览版时，`prepare_preview_release.py` 会生成公开推荐附件的 `.sha256`、`.checksum.json` 和三系统校验脚本；加上 `--copy-public-assets` 后，还会把推荐附件、校验清单和校验脚本集中到一个可直接上传到 GitHub Release 的目录。如果 Release 页面附带这些文件，下载者可以先核对哈希再解压。
 
 ### 游戏成品导出
 

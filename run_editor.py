@@ -2139,11 +2139,13 @@ def save_project_settings(
     return {"project": project}
 
 
-PROJECT_DOCTOR_REPAIR_CODES = {
+PROJECT_DOCTOR_REPAIR_CODE_ORDER = (
     "entry_scene",
     "chapter_order",
     "scene_order",
-}
+)
+
+PROJECT_DOCTOR_REPAIR_CODES = set(PROJECT_DOCTOR_REPAIR_CODE_ORDER)
 
 
 def split_project_doctor_repair_code_tokens(value: object = None) -> list[str]:
@@ -2172,6 +2174,10 @@ def get_unknown_project_doctor_repair_codes(value: object = None) -> list[str]:
         if code not in PROJECT_DOCTOR_REPAIR_CODES and code not in unknown_codes:
             unknown_codes.append(code)
     return unknown_codes
+
+
+def sort_project_doctor_repair_codes(codes: set[str]) -> list[str]:
+    return [code for code in PROJECT_DOCTOR_REPAIR_CODE_ORDER if code in codes]
 
 
 def dedupe_project_doctor_order(items: list[str]) -> tuple[list[str], int]:
@@ -2333,7 +2339,7 @@ def repair_project_doctor(repair_codes: object = None, dry_run: bool = False) ->
         "changed": bool(repairs) and not dry_run,
         "wouldChange": bool(repairs),
         "dryRun": bool(dry_run),
-        "requestedCodes": sorted(selected_codes),
+        "requestedCodes": sort_project_doctor_repair_codes(selected_codes),
         "ignoredCodes": ignored_codes,
         "repairs": repairs,
         "skipped": skipped,
@@ -5774,7 +5780,7 @@ def build_editor_package_readme(target_label: str, runtime_info: dict | None = N
                 "",
                 "macOS 附加说明：",
                 f"- {EDITOR_MAC_APP_NAME} 已经会把编辑器资源一起打进去，双击即可直接启动。",
-                "- 如果后面补上开发者签名与公证，它就更接近真正可分发的正式安装版。",
+                "- 开发者签名与公证完成后，可作为更接近正式分发标准的安装包发布。",
             ]
         )
     return "\n".join(lines) + "\n"

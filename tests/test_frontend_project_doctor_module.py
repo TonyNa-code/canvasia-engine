@@ -334,6 +334,11 @@ class FrontendProjectDoctorModuleTests(unittest.TestCase):
         self.assertEqual(payload["unknown"]["ignoredCodes"], ["unknown_code"])
         self.assertIn("重新巡检", payload["unknown"]["description"])
         self.assertEqual(payload["unknown"]["nextActions"][0]["action"], "run-project-inspection")
+        self.assertEqual(payload["unknown"]["nextActions"][0]["label"], "重新巡检刷新修复码")
+        self.assertEqual(payload["unknown"]["nextActions"][1]["action"], "preview-project-doctor-repair")
+        self.assertEqual(payload["unknown"]["nextActions"][1]["label"], "重新预览安全修复")
+        self.assertEqual(payload["unknown"]["nextActions"][2]["action"], "export-inspection-report")
+        self.assertNotIn("switch-screen", [action["action"] for action in payload["unknown"]["nextActions"]])
 
 
 if __name__ == "__main__":
