@@ -448,6 +448,18 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(bundle["variables"]["variables"][0]["id"], "var_affection")
         self.assertEqual(bundle["variables"]["variables"][1]["defaultValue"], "common")
 
+    def test_project_center_hides_internal_packaging_smoke_projects_and_keeps_mode_choice(self) -> None:
+        hidden_result = run_editor.create_blank_project("原生 Runtime 打包烟测", editor_mode="advanced")
+        visible_result = run_editor.create_blank_project("公开测试项目", editor_mode="advanced")
+
+        project_center = run_editor.get_project_center_payload()
+        project_titles = [project["title"] for project in project_center["projects"]]
+
+        self.assertEqual(hidden_result["project"]["editorMode"], "advanced")
+        self.assertEqual(visible_result["project"]["editorMode"], "advanced")
+        self.assertNotIn("原生 Runtime 打包烟测", project_titles)
+        self.assertIn("公开测试项目", project_titles)
+
     def test_project_doctor_repairs_safe_structure_issues(self) -> None:
         _, chapter_result = self.create_blank_project_with_chapter()
         second_scene = run_editor.create_scene(chapter_result["chapterId"], "第二场")

@@ -1277,6 +1277,14 @@ def build_project_public_root(project_dir: Path) -> str:
     return f"/{encoded}" if encoded else ""
 
 
+INTERNAL_PROJECT_TITLE_MARKERS = ("打包烟测", "packaging smoke", "package smoke")
+
+
+def is_internal_project_summary(summary: dict) -> bool:
+    haystack = " ".join(str(summary.get(key) or "") for key in ("projectId", "title", "template")).lower()
+    return any(marker in haystack for marker in INTERNAL_PROJECT_TITLE_MARKERS)
+
+
 def build_project_summary(project_id: str, project_dir: Path, kind: str = "project") -> dict:
     project_path = project_dir / "project.json"
     if not project_path.is_file():
@@ -1318,7 +1326,10 @@ def list_local_projects() -> list[dict]:
             continue
 
         try:
-            projects.append(build_project_summary(project_dir.name, project_dir))
+            summary = build_project_summary(project_dir.name, project_dir)
+            if is_internal_project_summary(summary):
+                continue
+            projects.append(summary)
         except Exception:
             continue
 
@@ -2523,7 +2534,7 @@ def next_project_id(base_name: str) -> str:
     return candidate
 
 
-def create_blank_project(project_name: str) -> dict:
+def create_blank_project(project_name: str, editor_mode: str | None = None) -> dict:
     global HAS_SELECTED_PROJECT
     clean_name = str(project_name or "").strip()
     if not clean_name:
@@ -2536,6 +2547,10 @@ def create_blank_project(project_name: str) -> dict:
     chapters_dir = data_dir / "chapters"
     chapters_dir.mkdir(parents=True, exist_ok=True)
 
+    normalized_editor_mode = str(editor_mode or DEFAULT_EDITOR_MODE).strip().lower() or DEFAULT_EDITOR_MODE
+    if normalized_editor_mode not in {"beginner", "advanced"}:
+        normalized_editor_mode = DEFAULT_EDITOR_MODE
+
     timestamp = now_iso()
     project_doc = {
         "projectId": project_id,
@@ -2543,7 +2558,7 @@ def create_blank_project(project_name: str) -> dict:
         "template": "blank",
         "language": "zh-CN",
         "releaseVersion": DEFAULT_EXPORT_RELEASE_VERSION,
-        "editorMode": DEFAULT_EDITOR_MODE,
+        "editorMode": normalized_editor_mode,
         "resolution": {
             "width": 1920,
             "height": 1080,
@@ -10619,7 +10634,7 @@ class EditorRequestHandler(SimpleHTTPRequestHandler):
     def handle_create_project(self) -> None:
         try:
             payload = self.read_json_body()
-            result = create_blank_project(payload.get("name"))
+            result = create_blank_project(payload.get("name"), editor_mode=payload.get("editorMode"))
             self.send_json(
                 {
                     "ok": True,

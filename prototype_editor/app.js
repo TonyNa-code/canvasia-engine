@@ -2050,6 +2050,7 @@ const PREVIEW_REGRESSION_BRANCHING_SEED_LIMIT = 4;
 const RECENT_WORKSPACE_LIMIT = recentWorkspaceTools?.RECENT_WORKSPACE_LIMIT ?? 8;
 const EDITOR_UI_THEME_STORAGE_KEY =
   uiThemeTools?.EDITOR_UI_THEME_STORAGE_KEY ?? "tony-na-engine:editor-ui-theme-mode";
+const PROJECT_CENTER_EDITOR_MODE_STORAGE_KEY = "tony-na-engine:project-center-editor-mode";
 const RECENT_WORKSPACE_TYPE_LABELS = recentWorkspaceTools?.RECENT_WORKSPACE_TYPE_LABELS ?? {
   scene: "剧情场景",
   script: "台本入口",
@@ -2065,6 +2066,7 @@ const state = {
     activeProjectId: null,
     projects: [],
   },
+  projectCenterEditorMode: loadStoredProjectCenterEditorMode(),
   selectedSceneId: null,
   selectedBlockId: null,
   selectedAssetType: "background",
@@ -2520,7 +2522,13 @@ async function loadProjectData() {
 
 function setProjectChromeEnabled(enabled) {
   refs.projectNavButtons.forEach((button) => {
-    button.disabled = !enabled;
+    button.disabled = false;
+    button.classList.toggle("is-project-locked", !enabled);
+    if (!enabled) {
+      button.title = "先新建或打开一个项目后可用";
+    } else {
+      button.removeAttribute("title");
+    }
   });
 }
 
@@ -3825,6 +3833,8 @@ function renderProjectCenter() {
   const activeProjectId = state.projectCenter?.activeProjectId ?? null;
   const localProjects = projects.filter((project) => !project.isSample);
   const sampleProject = projects.find((project) => project.isSample) ?? null;
+  const projectCenterMode = getSafeEditorMode(state.projectCenterEditorMode);
+  const projectCenterModeLabel = getEditorModeLabel(projectCenterMode);
 
   refs.projectCenterContent.innerHTML = `
     <div class="project-center-shell">
@@ -3839,6 +3849,7 @@ function renderProjectCenter() {
             <div class="project-center-pill-row">
               <span class="project-center-pill">默认从空白项目开始</span>
               <span class="project-center-pill">默认分辨率 1920 × 1080</span>
+              <span class="project-center-pill">新建默认：${escapeHtml(projectCenterModeLabel)}</span>
               <span class="project-center-pill">示例项目会单独列在下方，不会默认打开</span>
             </div>
             <div class="project-center-actions">
@@ -3859,6 +3870,7 @@ function renderProjectCenter() {
           <p>空白项目初始不会自动加入章节、台词和角色，可按需要自行新建章节和场景。</p>
           <div class="project-meta-row">
             <span class="project-center-pill">已发现项目 ${localProjects.length} 个</span>
+            <span class="project-center-pill">顶部可切换新建默认模式</span>
             <span class="project-center-pill">${
               sampleProject ? "示例项目可选打开" : "当前没有示例项目"
             }</span>
@@ -4111,8 +4123,14 @@ async function handleClick(event) {
 
   if (action === "set-editor-mode") {
     if (!state.data) {
-      setSaveStatus("先打开一个项目，再切编辑模式");
-      showToast("先从项目中心打开一个项目");
+      const nextMode = getSafeEditorMode(actionTarget.dataset.editorMode);
+      state.projectCenterEditorMode = nextMode;
+      persistStoredProjectCenterEditorMode(nextMode);
+      renderProjectCenter();
+      updateTopbar();
+      applyEditorModeUi();
+      setSaveStatus(`新建项目默认使用${getEditorModeLabel(nextMode)}`);
+      showToast(`新建项目默认：${getEditorModeLabel(nextMode)}`);
       return;
     }
     await saveProjectEditorMode(actionTarget.dataset.editorMode);
@@ -4203,7 +4221,10 @@ async function handleClick(event) {
 
     try {
       setSaveStatus("正在创建空白项目...");
-      const result = await postJson(API_CREATE_PROJECT, { name });
+      const result = await postJson(API_CREATE_PROJECT, {
+        name,
+        editorMode: state.projectCenterEditorMode,
+      });
       state.projectCenter = result.projectCenter ?? (await loadProjectCenter());
       await enterActiveProjectEditor(`已打开空白项目：${name}`);
       showToast(`空白项目已创建：${name}`);
@@ -10455,17 +10476,21 @@ function renderStoryEditorModeBanner(scene = null) {
 
 function applyEditorModeUi() {
   const hasProject = Boolean(state.data?.project);
-  const mode = hasProject ? getProjectEditorMode() : "beginner";
+  const mode = hasProject ? getProjectEditorMode() : getSafeEditorMode(state.projectCenterEditorMode);
   document.body.dataset.editorMode = hasProject ? mode : "project-center";
 
   if (refs.editorModeBeginnerButton) {
-    refs.editorModeBeginnerButton.disabled = !hasProject;
-    refs.editorModeBeginnerButton.classList.toggle("is-active", hasProject && mode === "beginner");
+    refs.editorModeBeginnerButton.disabled = false;
+    refs.editorModeBeginnerButton.classList.toggle("is-active", mode === "beginner");
+    refs.editorModeBeginnerButton.classList.remove("is-project-locked");
+    refs.editorModeBeginnerButton.title = hasProject ? "" : "设为新建项目默认模式";
   }
 
   if (refs.editorModeAdvancedButton) {
-    refs.editorModeAdvancedButton.disabled = !hasProject;
-    refs.editorModeAdvancedButton.classList.toggle("is-active", hasProject && mode === "advanced");
+    refs.editorModeAdvancedButton.disabled = false;
+    refs.editorModeAdvancedButton.classList.toggle("is-active", mode === "advanced");
+    refs.editorModeAdvancedButton.classList.remove("is-project-locked");
+    refs.editorModeAdvancedButton.title = hasProject ? "" : "设为新建项目默认模式";
   }
 
   const storyButtons = Array.from(document.querySelectorAll("#storyPrimaryToolbar [data-action]"));
@@ -20382,6 +20407,32 @@ function loadStoredEditorUiThemeMode() {
     return getSafeUiThemeMode(storage.getItem(EDITOR_UI_THEME_STORAGE_KEY));
   } catch (error) {
     return PREVIEW_PLAYBACK_DEFAULTS.uiThemeMode;
+  }
+}
+
+function loadStoredProjectCenterEditorMode() {
+  const storage = getBrowserStorage();
+  if (!storage) {
+    return "beginner";
+  }
+
+  try {
+    return getSafeEditorMode(storage.getItem(PROJECT_CENTER_EDITOR_MODE_STORAGE_KEY));
+  } catch (error) {
+    return "beginner";
+  }
+}
+
+function persistStoredProjectCenterEditorMode(mode) {
+  const storage = getBrowserStorage();
+  if (!storage) {
+    return;
+  }
+
+  try {
+    storage.setItem(PROJECT_CENTER_EDITOR_MODE_STORAGE_KEY, getSafeEditorMode(mode));
+  } catch (error) {
+    // Keep the in-memory mode even if browser storage is unavailable.
   }
 }
 
