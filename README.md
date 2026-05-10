@@ -171,7 +171,7 @@ python run_editor.py
 | 只想体验编辑器 | 对应系统的编辑器预览包 | 如果 Release 里暂时没有你的系统包，可先用源码方式启动。 |
 | 想从源码运行 / 二次开发 | `Source code` | 需要本机安装 Python 3。 |
 | 想试玩导出的游戏 | 网页试玩包或原生 Runtime 包 | 网页包适合浏览器预览；原生 Runtime 包用于验证脱离 HTML 的桌面播放链。 |
-| 想确认下载没损坏 | `.sha256` / `.checksum.json` / `.verify.*` | 有这些附件时，建议先校验压缩包再解压。 |
+| 想确认下载没损坏 | `.sha256` / `.checksum.json` / `verify_release_assets.*` | 有这些附件时，建议先校验压缩包再解压。 |
 
 当前属于 Preview 分发阶段，未签名或未公证的包可能触发 macOS Gatekeeper、Windows SmartScreen 或杀毒软件提示。请只从本仓库 Release 页面下载，并优先校验 SHA-256。
 
@@ -473,4 +473,5 @@ Issue / PR 入口：
 
 - [Bug report](.github/ISSUE_TEMPLATE/bug_report.md)
 - [Feature request](.github/ISSUE_TEMPLATE/feature_request.md)
+- [Release / package problem](.github/ISSUE_TEMPLATE/release_package_problem.md)
 - [Pull request template](.github/pull_request_template.md)
