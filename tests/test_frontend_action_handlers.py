@@ -187,6 +187,7 @@ class FrontendActionHandlerTests(unittest.TestCase):
         )
         self.assertIn("function handleMissingProjectAction", source)
         self.assertIn("function handleUnhandledEditorAction", source)
+        self.assertIn("function handleEditorRuntimeError", source)
         self.assertIn("handleMissingProjectAction(actionTarget);", click_handler)
         self.assertIn("handleUnhandledEditorAction(action, actionTarget);", click_handler)
         self.assertLess(
@@ -194,6 +195,12 @@ class FrontendActionHandlerTests(unittest.TestCase):
             click_handler.rfind("handleUnhandledEditorAction(action, actionTarget);"),
         )
         self.assertIn("[Tony Na Engine] Unhandled editor action", source)
+        self.assertIn("handleClick(event).catch", source)
+        self.assertIn('handleEditorRuntimeError(error, "点击操作")', source)
+        self.assertIn("installEditorRuntimeErrorBoundary();", source)
+        self.assertIn('window.addEventListener("unhandledrejection"', source)
+        self.assertIn("lastEditorRuntimeErrorKey", source)
+        self.assertIn("[Tony Na Engine] Editor runtime error", source)
 
     def test_handle_click_ignores_disabled_actions_before_dispatch(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
@@ -241,6 +248,58 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertTrue(payload["prevented"])
         self.assertEqual(payload["calls"][0], {"type": "closest", "selector": "[data-action]"})
         self.assertEqual(payload["calls"][1], {"type": "matches", "selector": ":disabled"})
+
+    def test_runtime_error_handler_dedupes_user_notifications(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        runtime_error_handler = _extract_function_source(source, "handleEditorRuntimeError")
+        script = textwrap.dedent(
+            f"""
+            let lastEditorRuntimeErrorKey = "";
+            let lastEditorRuntimeErrorAt = 0;
+            let now = 1000;
+            Date.now = () => now;
+            const calls = [];
+            function setSaveStatus(message, isError = false) {{
+              calls.push({{ type: "status", message, isError }});
+            }}
+            function showToast(message, tone = "soft") {{
+              calls.push({{ type: "toast", message, tone }});
+            }}
+            console.error = (...args) => {{
+              calls.push({{
+                type: "console",
+                label: String(args[0]),
+                message: String(args[1]?.message ?? args[1] ?? ""),
+              }});
+            }};
+            function handleEditorRuntimeError(error, context = "操作") {runtime_error_handler}
+            handleEditorRuntimeError(new Error("按钮爆了"), "点击操作");
+            handleEditorRuntimeError(new Error("按钮爆了"), "点击操作");
+            now = 3001;
+            handleEditorRuntimeError(new Error("按钮爆了"), "点击操作");
+            process.stdout.write(JSON.stringify({{ calls }}));
+            """
+        )
+        completed = subprocess.run(
+            ["node", "-e", script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        calls = json.loads(completed.stdout)["calls"]
+        status_calls = [call for call in calls if call["type"] == "status"]
+        toast_calls = [call for call in calls if call["type"] == "toast"]
+        console_calls = [call for call in calls if call["type"] == "console"]
+
+        self.assertEqual(len(status_calls), 2)
+        self.assertEqual(len(toast_calls), 2)
+        self.assertEqual(len(console_calls), 3)
+        self.assertEqual(status_calls[0]["message"], "点击操作没有成功：按钮爆了")
+        self.assertTrue(status_calls[0]["isError"])
+        self.assertEqual(toast_calls[0], {"type": "toast", "message": "点击操作没有成功", "tone": "error"})
 
     def test_quick_switch_screen_actions_keep_dataset_screen(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")

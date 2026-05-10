@@ -362,6 +362,41 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
         self.page.get_by_role("button", name="试玩收尾").click()
         self.page.get_by_text("新手收尾顺序").wait_for(timeout=15000)
 
+    def test_dashboard_scene_preview_button_opens_preview_without_runtime_error(self) -> None:
+        page_errors: list[str] = []
+        console_errors: list[str] = []
+        self.page.on("pageerror", lambda error: page_errors.append(str(error)))
+        self.page.on(
+            "console",
+            lambda message: console_errors.append(message.text) if message.type == "error" else None,
+        )
+
+        self.open_project_by_title("心跳时差")
+        scene_preview_buttons = self.page.locator("button[data-action='preview-scene-from-map']:visible")
+        scene_preview_buttons.first.wait_for(timeout=15000)
+        self.assertGreater(scene_preview_buttons.count(), 0)
+
+        scene_preview_buttons.first.click()
+        self.page.wait_for_function(
+            """() => {
+                const previewScreen = document.querySelector("#screen-preview");
+                const previewMeta = document.querySelector("#previewMeta")?.textContent || "";
+                const previewStage = document.querySelector("#previewStage");
+                return Boolean(previewScreen?.classList.contains("is-active"))
+                  && Boolean(previewStage)
+                  && previewMeta.includes("起点")
+                  && previewMeta.includes("当前");
+            }""",
+            timeout=15000,
+        )
+
+        runtime_errors = [
+            message
+            for message in [*page_errors, *console_errors]
+            if "ReferenceError" in message or "getBlockLabel" in message
+        ]
+        self.assertFalse(runtime_errors, "\n".join(runtime_errors))
+
     def export_web_build(self) -> str:
         self.open_preview_screen()
         self.page.get_by_role("button", name="导出试玩包").first.click()

@@ -2248,6 +2248,8 @@ let previewAutoAdvanceKey = null;
 let previewMusicAudio = null;
 let previewCurrentMusicAssetId = null;
 let editorUiThemeAutoRefreshTimer = null;
+let lastEditorRuntimeErrorKey = "";
+let lastEditorRuntimeErrorAt = 0;
 const previewActiveSfxAudios = new Set();
 const assetPreviewAudio = new Audio();
 assetPreviewAudio.preload = "none";
@@ -2409,8 +2411,12 @@ const systemDialogController = systemDialogTools?.createSystemDialogController?.
   fallbackAlert: nativeWindowAlert,
 }) ?? null;
 
+installEditorRuntimeErrorBoundary();
+
 document.addEventListener("click", (event) => {
-  void handleClick(event);
+  void handleClick(event).catch((error) => {
+    handleEditorRuntimeError(error, "点击操作");
+  });
 });
 document.addEventListener("change", handleChange);
 document.addEventListener("input", handleInput);
@@ -2418,7 +2424,9 @@ document.addEventListener("keydown", handleGlobalKeydown);
 document.addEventListener("dragstart", handleGlobalDragStart);
 document.addEventListener("dragover", handleGlobalDragOver);
 document.addEventListener("drop", (event) => {
-  void handleGlobalDrop(event);
+  void handleGlobalDrop(event).catch((error) => {
+    handleEditorRuntimeError(error, "拖拽导入");
+  });
 });
 document.addEventListener("dragend", handleGlobalDragEnd);
 
@@ -9487,6 +9495,31 @@ function handleUnhandledEditorAction(action, actionTarget) {
     action: safeAction,
     label,
     dataset: { ...(actionTarget?.dataset ?? {}) },
+  });
+}
+
+function handleEditorRuntimeError(error, context = "操作") {
+  const message = error instanceof Error ? error.message : String(error ?? "未知错误");
+  const errorKey = `${context}:${message}`;
+  const now = Date.now();
+  const shouldNotify =
+    errorKey !== lastEditorRuntimeErrorKey || now - lastEditorRuntimeErrorAt > 1600;
+  lastEditorRuntimeErrorKey = errorKey;
+  lastEditorRuntimeErrorAt = now;
+
+  if (shouldNotify) {
+    setSaveStatus(`${context}没有成功：${message}`, true);
+    showToast(`${context}没有成功`, "error");
+  }
+  console.error("[Tony Na Engine] Editor runtime error", error);
+}
+
+function installEditorRuntimeErrorBoundary() {
+  window.addEventListener("error", (event) => {
+    handleEditorRuntimeError(event.error ?? event.message, "编辑器运行");
+  });
+  window.addEventListener("unhandledrejection", (event) => {
+    handleEditorRuntimeError(event.reason, "异步任务");
   });
 }
 
@@ -32000,8 +32033,8 @@ function renderReadonlyBlockPanel(block) {
   return `
     ${renderDetailRows(buildBlockDetails(block))}
     <article class="editor-card">
-      <h3>这张卡片暂时是只读的</h3>
-      <p>当前模板里常用的剧情卡片都已经接通真实编辑与保存。后面如果继续扩展，就会在这里追加更多高级系统。</p>
+      <h3>高级兼容卡片</h3>
+      <p>这张卡片会完整保留在项目数据和导出流程中。当前界面先显示结构详情，适合检查从旧版本或自定义扩展导入的高级内容。</p>
     </article>
   `;
 }
@@ -37917,7 +37950,7 @@ function renderProjectRuntimeSettingsPanel() {
               试玩里切到项目样式
             </button>
           </div>
-          <div class="detail-meta">当前支持预设、透明无框、自定义颜色/尺寸，以及叠加一张 UI 素材图层。后面还可以继续往更复杂的版式设计扩。</div>
+          <div class="detail-meta">当前支持预设、透明无框、自定义颜色/尺寸，以及叠加一张 UI 素材图层；复杂版式可以先通过 UI 素材图层完成。</div>
         </section>
         <section class="detail-card dialog-config-card">
           <strong>成品 UI 皮肤</strong>
