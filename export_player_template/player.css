@@ -728,13 +728,13 @@ button {
     opacity: 0;
   }
   to {
-    opacity: 1;
+    opacity: var(--sprite-opacity, 1);
   }
 }
 
 @keyframes player-sprite-fade-out {
   from {
-    opacity: 1;
+    opacity: var(--sprite-opacity, 1);
   }
   to {
     opacity: 0;
@@ -4747,4 +4747,227 @@ html[data-game-ui-title-anchor="bottom"] .start-overlay {
 html[data-game-ui-title-anchor="center"] .start-overlay,
 html[data-game-ui-title-anchor="free"] .start-overlay {
   place-items: center;
+}
+
+/* === Character Stage Direction Controls === */
+.sprite-card {
+  --sprite-base-y: 0px;
+  --sprite-offset-x: 0%;
+  --sprite-offset-y: 0%;
+  --sprite-scale: 1;
+  --sprite-opacity: 1;
+  position: relative;
+  opacity: var(--sprite-opacity);
+  transform:
+    translate(var(--sprite-offset-x), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
+    scale(var(--sprite-scale));
+  transform-origin: 50% 100%;
+}
+
+.sprite-card[data-position="left"] {
+  --sprite-base-y: 10px;
+}
+
+.sprite-card[data-position="center"] {
+  --sprite-base-y: -10px;
+}
+
+.sprite-card[data-position="right"] {
+  --sprite-base-y: 4px;
+}
+
+.sprite-card.is-entering[data-transition="fade"] {
+  animation: player-sprite-fade-in 320ms ease both;
+}
+
+.sprite-card.is-leaving[data-transition="fade"] {
+  animation: player-sprite-fade-out 320ms ease both;
+}
+
+.sprite-card.is-entering[data-transition="slide_left"] {
+  animation: player-sprite-slide-left-in 360ms cubic-bezier(0.19, 1, 0.22, 1) both;
+}
+
+.sprite-card.is-leaving[data-transition="slide_left"] {
+  animation: player-sprite-slide-left-out 300ms ease both;
+}
+
+.sprite-card.is-entering[data-transition="slide_right"] {
+  animation: player-sprite-slide-right-in 360ms cubic-bezier(0.19, 1, 0.22, 1) both;
+}
+
+.sprite-card.is-leaving[data-transition="slide_right"] {
+  animation: player-sprite-slide-right-out 300ms ease both;
+}
+
+.sprite-card.is-entering[data-transition="rise"] {
+  animation: player-sprite-rise-in 360ms cubic-bezier(0.19, 1, 0.22, 1) both;
+}
+
+.sprite-card.is-leaving[data-transition="rise"] {
+  animation: player-sprite-rise-out 300ms ease both;
+}
+
+.sprite-card.is-entering[data-transition="pop"] {
+  animation: player-sprite-pop-in 340ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.sprite-card.is-entering[data-transition="pop"] .sprite-card-inner {
+  animation: player-sprite-pop-inner 340ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.sprite-card.is-leaving[data-transition="pop"] {
+  animation: player-sprite-pop-out 260ms ease both;
+}
+
+@keyframes player-sprite-slide-left-in {
+  from {
+    opacity: 0;
+    transform:
+      translate(calc(var(--sprite-offset-x) - 34%), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
+      scale(var(--sprite-scale));
+  }
+  to {
+    opacity: var(--sprite-opacity);
+    transform:
+      translate(var(--sprite-offset-x), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
+      scale(var(--sprite-scale));
+  }
+}
+
+@keyframes player-sprite-slide-left-out {
+  from {
+    opacity: var(--sprite-opacity);
+    transform:
+      translate(var(--sprite-offset-x), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
+      scale(var(--sprite-scale));
+  }
+  to {
+    opacity: 0;
+    transform:
+      translate(calc(var(--sprite-offset-x) - 28%), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
+      scale(var(--sprite-scale));
+  }
+}
+
+@keyframes player-sprite-slide-right-in {
+  from {
+    opacity: 0;
+    transform:
+      translate(calc(var(--sprite-offset-x) + 34%), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
+      scale(var(--sprite-scale));
+  }
+  to {
+    opacity: var(--sprite-opacity);
+    transform:
+      translate(var(--sprite-offset-x), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
+      scale(var(--sprite-scale));
+  }
+}
+
+@keyframes player-sprite-slide-right-out {
+  from {
+    opacity: var(--sprite-opacity);
+    transform:
+      translate(var(--sprite-offset-x), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
+      scale(var(--sprite-scale));
+  }
+  to {
+    opacity: 0;
+    transform:
+      translate(calc(var(--sprite-offset-x) + 28%), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
+      scale(var(--sprite-scale));
+  }
+}
+
+@keyframes player-sprite-rise-in {
+  from {
+    opacity: 0;
+    transform:
+      translate(var(--sprite-offset-x), calc(var(--sprite-base-y) + var(--sprite-offset-y) + 22px))
+      scale(var(--sprite-scale));
+  }
+  to {
+    opacity: var(--sprite-opacity);
+    transform:
+      translate(var(--sprite-offset-x), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
+      scale(var(--sprite-scale));
+  }
+}
+
+@keyframes player-sprite-rise-out {
+  from {
+    opacity: var(--sprite-opacity);
+    transform:
+      translate(var(--sprite-offset-x), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
+      scale(var(--sprite-scale));
+  }
+  to {
+    opacity: 0;
+    transform:
+      translate(var(--sprite-offset-x), calc(var(--sprite-base-y) + var(--sprite-offset-y) + 18px))
+      scale(var(--sprite-scale));
+  }
+}
+
+@keyframes player-sprite-pop-in {
+  from {
+    opacity: 0;
+    transform:
+      translate(var(--sprite-offset-x), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
+      scale(var(--sprite-scale));
+  }
+  68% {
+    opacity: var(--sprite-opacity);
+    transform:
+      translate(var(--sprite-offset-x), calc(var(--sprite-base-y) + var(--sprite-offset-y) - 4px))
+      scale(var(--sprite-scale));
+  }
+  to {
+    opacity: var(--sprite-opacity);
+    transform:
+      translate(var(--sprite-offset-x), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
+      scale(var(--sprite-scale));
+  }
+}
+
+@keyframes player-sprite-pop-inner {
+  from {
+    transform: scale(0.82);
+  }
+  68% {
+    transform: scale(1.04);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+@keyframes player-sprite-pop-out {
+  from {
+    opacity: var(--sprite-opacity);
+    transform:
+      translate(var(--sprite-offset-x), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
+      scale(var(--sprite-scale));
+  }
+  to {
+    opacity: 0;
+    transform:
+      translate(var(--sprite-offset-x), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
+      scale(var(--sprite-scale));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sprite-card.is-entering,
+  .sprite-card.is-leaving,
+  .sprite-card.is-entering .sprite-card-inner {
+    animation: none !important;
+  }
+}
+
+html[data-game-ui-motion="low"] .sprite-card.is-entering,
+html[data-game-ui-motion="low"] .sprite-card.is-leaving,
+html[data-game-ui-motion="low"] .sprite-card.is-entering .sprite-card-inner {
+  animation: none !important;
 }

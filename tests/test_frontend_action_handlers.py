@@ -250,6 +250,14 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn('action.dataset?.screen', quick_action_button)
         self.assertIn('data-screen="${escapeHtml(screen)}"', quick_action_button)
 
+    def test_preview_thumbnail_block_label_helper_is_defined(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        preview_thumbnail = _extract_function_source(source, "buildPreviewThumbnailDataUrl")
+        get_block_label = _extract_function_source(source, "getBlockLabel")
+
+        self.assertIn("BLOCK_LABELS[type]", get_block_label)
+        self.assertIn("getBlockLabel(snapshot.blockType)", preview_thumbnail)
+
     def test_quick_action_button_renders_disabled_state(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
         quick_action_button = _extract_function_source(source, "renderQuickActionButton")

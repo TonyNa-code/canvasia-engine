@@ -66,6 +66,10 @@ const BLOCK_LABELS = {
   condition: "条件判断",
 };
 
+function getBlockLabel(type) {
+  return BLOCK_LABELS[type] ?? type ?? "步骤";
+}
+
 const editorCommonTools = window.TonyNaEditorCommon;
 const projectSettingsTools = window.TonyNaEditorProjectSettings;
 const systemDialogTools = window.TonyNaEditorSystemDialog;
@@ -1411,6 +1415,28 @@ const POSITION_LABELS = {
   left: "左侧",
   center: "中间",
   right: "右侧",
+};
+
+const CHARACTER_TRANSITION_LABELS = {
+  fade: "淡入淡出",
+  slide_left: "从左侧滑入 / 滑出",
+  slide_right: "从右侧滑入 / 滑出",
+  rise: "向上浮现",
+  pop: "轻微弹出",
+  none: "直接切换",
+};
+
+const BASIC_TRANSITION_LABELS = {
+  fade: "淡入淡出",
+  none: "直接切换",
+};
+
+const DEFAULT_CHARACTER_STAGE = {
+  offsetX: 0,
+  offsetY: 0,
+  scale: 100,
+  opacity: 100,
+  layer: 0,
 };
 
 const SUPPORTED_RESOLUTIONS = [
@@ -7942,6 +7968,13 @@ function clearPreviewSaveSlot(rawIndex) {
   return true;
 }
 
+function scrollEditorViewportToTop() {
+  window.requestAnimationFrame(() => {
+    refs.appMain?.scrollTo?.({ top: 0, behavior: "smooth" });
+    window.scrollTo?.({ top: 0, behavior: "smooth" });
+  });
+}
+
 function switchScreen(screenName) {
   state.currentScreen = screenName;
   refs.navButtons.forEach((button) => {
@@ -7971,6 +8004,8 @@ function switchScreen(screenName) {
     stopPreviewMusicPlayback();
     stopPreviewOneShotAudios();
   }
+
+  scrollEditorViewportToTop();
 }
 
 function selectScene(sceneId) {
@@ -22095,11 +22130,13 @@ function applyBlockToPreviewState(block, visualState, variables) {
         position: block.position ?? getDefaultCharacterPosition(block.characterId),
         expressionId: block.expressionId,
         expressionName: getExpressionName(block.characterId, block.expressionId),
+        stage: getCharacterStageFromBlock(block),
       });
-      if (getSafeTransition(block.transition) === "fade") {
+      if (getSafeTransition(block.transition) !== "none") {
         visualState.characterTransitionEvent = {
           mode: "show",
           characterId: block.characterId,
+          transition: getSafeTransition(block.transition),
         };
       }
       visualState.speakerName = "角色演出";
@@ -22112,10 +22149,11 @@ function applyBlockToPreviewState(block, visualState, variables) {
         getPreviewCharacterState(visualState, block.characterId) ??
         createFallbackPreviewCharacterState(block.characterId);
       removePreviewCharacter(visualState, block.characterId);
-      if (getSafeTransition(block.transition) === "fade") {
+      if (getSafeTransition(block.transition) !== "none") {
         visualState.characterTransitionEvent = {
           mode: "hide",
           characterState: previousState,
+          transition: getSafeTransition(block.transition),
         };
       }
       visualState.speakerName = "角色演出";
@@ -22141,6 +22179,9 @@ function applyBlockToPreviewState(block, visualState, variables) {
           getDefaultCharacterPosition(block.speakerId),
         expressionId: block.expressionId,
         expressionName: getExpressionName(block.speakerId, block.expressionId),
+        stage:
+          getPreviewCharacterState(visualState, block.speakerId)?.stage ??
+          getSafeCharacterStage(),
       });
       return null;
     }
@@ -22218,6 +22259,7 @@ function createFallbackPreviewCharacterState(characterId) {
     position: getDefaultCharacterPosition(characterId),
     expressionId: safeExpressionId,
     expressionName: getExpressionName(characterId, safeExpressionId),
+    stage: getSafeCharacterStage(),
   };
 }
 
@@ -23962,6 +24004,8 @@ function renderStageSpriteCard(
   const presentationLabel = character ? getCharacterPresentationModeLabel(character) : "普通立绘";
   const expression = (character?.expressions ?? []).find((item) => item.id === characterState.expressionId);
   const expressionBindingStatus = getCharacterExpressionBindingStatus(expression);
+  const transition = characterTransitionEvent ? getSafeTransition(characterTransitionEvent.transition) : "none";
+  const stageStyle = getCharacterStageStyle(characterState.stage);
 
   if (shouldBlurStageCharacter(characterState.position, depthBlur)) {
     classes.push("is-depth-muted");
@@ -23989,7 +24033,7 @@ function renderStageSpriteCard(
   }
 
   return `
-    <div class="${classes.join(" ")}" data-position="${characterState.position}" data-presentation="${escapeHtml(getCharacterPresentation(character).mode)}">
+    <div class="${classes.join(" ")}" data-position="${characterState.position}" data-transition="${transition}" data-presentation="${escapeHtml(getCharacterPresentation(character).mode)}" style="${stageStyle}">
       <div class="sprite-card-inner">
         <div class="sprite-name">${escapeHtml(character?.displayName ?? characterState.characterId)}</div>
         <div class="sprite-expression">${escapeHtml(characterState.expressionName)}</div>
@@ -32160,7 +32204,7 @@ function renderBackgroundEditor(block) {
       <div class="detail-row">
         <label for="editorTransition">切换方式</label>
         <select id="editorTransition">
-          ${renderTransitionOptions(transition)}
+          ${renderTransitionOptions(transition, { basic: true })}
         </select>
       </div>
       <div class="detail-row">
@@ -32197,11 +32241,12 @@ function renderCharacterShowEditor(block) {
   const expressionId = getSafeExpressionId(characterId, block.expressionId);
   const position = getSafePosition(block.position);
   const transition = getSafeTransition(block.transition);
+  const stage = getCharacterStageFromBlock(block);
 
   return `
     <article class="editor-card">
       <h3>编辑角色出场</h3>
-      <p>这里决定是谁出场、用什么表情、站在画面哪里，以及如何出现。</p>
+      <p>这里决定是谁出场、用什么表情、站在画面哪里，以及如何出现。需要更细的舞台调度时，可以继续微调立绘位置、大小和层级。</p>
     </article>
     <div class="field-grid">
       <div class="detail-row">
@@ -32228,6 +32273,7 @@ function renderCharacterShowEditor(block) {
           ${renderTransitionOptions(transition)}
         </select>
       </div>
+      ${renderCharacterStageControls(stage)}
     </div>
     <div class="detail-actions">
       <button class="toolbar-button toolbar-button-primary" data-action="save-block">保存这张卡片</button>
@@ -39856,6 +39902,7 @@ function collectEditedBlock(block) {
       ),
       position: getSafePosition(document.getElementById("editorCharacterPosition")?.value),
       transition: getSafeTransition(document.getElementById("editorTransition")?.value),
+      stage: readCharacterStageControls(),
     };
   }
 
@@ -41449,6 +41496,7 @@ function createDefaultBlock(scene, blockType) {
       expressionId: getSafeExpressionId(characterId, null),
       position: getDefaultCharacterPosition(characterId),
       transition: "fade",
+      stage: { ...DEFAULT_CHARACTER_STAGE },
     };
   }
 
@@ -43528,11 +43576,9 @@ function renderPositionOptions(selectedPosition) {
     .join("");
 }
 
-function renderTransitionOptions(selectedTransition) {
-  return [
-    ["fade", "淡入淡出"],
-    ["none", "直接切换"],
-  ]
+function renderTransitionOptions(selectedTransition, options = {}) {
+  const labels = options.basic ? BASIC_TRANSITION_LABELS : CHARACTER_TRANSITION_LABELS;
+  return Object.entries(labels)
     .map(
       ([value, label]) => `
         <option value="${value}" ${value === selectedTransition ? "selected" : ""}>
@@ -43548,11 +43594,85 @@ function getSafePosition(position) {
 }
 
 function getSafeTransition(transition) {
-  return transition === "none" ? "none" : "fade";
+  return Object.hasOwn(CHARACTER_TRANSITION_LABELS, transition) ? transition : "fade";
 }
 
 function getTransitionLabel(transition) {
-  return getSafeTransition(transition) === "none" ? "直接切换" : "淡入淡出";
+  return CHARACTER_TRANSITION_LABELS[getSafeTransition(transition)];
+}
+
+function getSafeCharacterStage(source = {}) {
+  const raw = source && typeof source === "object" ? source : {};
+  return {
+    offsetX: Math.round(clamp(getSafeNumber(raw.offsetX, DEFAULT_CHARACTER_STAGE.offsetX), -60, 60)),
+    offsetY: Math.round(clamp(getSafeNumber(raw.offsetY, DEFAULT_CHARACTER_STAGE.offsetY), -45, 45)),
+    scale: Math.round(clamp(getSafeNumber(raw.scale, DEFAULT_CHARACTER_STAGE.scale), 45, 220)),
+    opacity: Math.round(clamp(getSafeNumber(raw.opacity, DEFAULT_CHARACTER_STAGE.opacity), 0, 100)),
+    layer: Math.round(clamp(getSafeNumber(raw.layer, DEFAULT_CHARACTER_STAGE.layer), -10, 10)),
+  };
+}
+
+function getCharacterStageFromBlock(block = {}) {
+  return getSafeCharacterStage(block.stage ?? block.characterStage ?? {});
+}
+
+function readCharacterStageControls() {
+  return getSafeCharacterStage({
+    offsetX: document.getElementById("editorCharacterOffsetX")?.value,
+    offsetY: document.getElementById("editorCharacterOffsetY")?.value,
+    scale: document.getElementById("editorCharacterScale")?.value,
+    opacity: document.getElementById("editorCharacterOpacity")?.value,
+    layer: document.getElementById("editorCharacterLayer")?.value,
+  });
+}
+
+function getCharacterStageStyle(stageSource = {}) {
+  const stage = getSafeCharacterStage(stageSource);
+  return [
+    `--sprite-offset-x:${stage.offsetX}%;`,
+    `--sprite-offset-y:${stage.offsetY}%;`,
+    `--sprite-scale:${(stage.scale / 100).toFixed(3)};`,
+    `--sprite-opacity:${(stage.opacity / 100).toFixed(2)};`,
+    `--sprite-layer:${stage.layer};`,
+    `z-index:${20 + stage.layer};`,
+  ].join("");
+}
+
+function renderCharacterStageControls(stageSource = {}) {
+  const stage = getSafeCharacterStage(stageSource);
+  return `
+    <div class="detail-row character-stage-controls">
+      <label>立绘位置 / 大小 / 层级</label>
+      <div class="field-grid compact-grid">
+        <label>
+          <span>X 偏移 %</span>
+          <input id="editorCharacterOffsetX" type="number" min="-60" max="60" step="1" value="${stage.offsetX}" />
+        </label>
+        <label>
+          <span>Y 偏移 %</span>
+          <input id="editorCharacterOffsetY" type="number" min="-45" max="45" step="1" value="${stage.offsetY}" />
+        </label>
+        <label>
+          <span>缩放 %</span>
+          <input id="editorCharacterScale" type="number" min="45" max="220" step="1" value="${stage.scale}" />
+        </label>
+        <label>
+          <span>透明度 %</span>
+          <input id="editorCharacterOpacity" type="number" min="0" max="100" step="1" value="${stage.opacity}" />
+        </label>
+        <label>
+          <span>层级</span>
+          <input id="editorCharacterLayer" type="number" min="-10" max="10" step="1" value="${stage.layer}" />
+        </label>
+      </div>
+      <p class="helper-text">用于微调立绘站位：X 左右、Y 上下、缩放大小、透明度和前后层级。默认值不会影响旧项目。</p>
+    </div>
+  `;
+}
+
+function getCharacterStageSummary(stageSource = {}) {
+  const stage = getSafeCharacterStage(stageSource);
+  return `X ${stage.offsetX}% / Y ${stage.offsetY}% / ${stage.scale}% / 透明 ${stage.opacity}% / 层级 ${stage.layer}`;
 }
 
 function getSafeParticleAction(action) {
@@ -44894,6 +45014,7 @@ function buildBlockDetails(block) {
       ]);
       rows.push(["使用表情", getExpressionName(block.characterId, block.expressionId)]);
       rows.push(["显示位置", getPositionLabel(block.position)]);
+      rows.push(["舞台微调", getCharacterStageSummary(getCharacterStageFromBlock(block))]);
       rows.push(["转场效果", getTransitionLabel(block.transition)]);
       break;
     case "character_hide":
@@ -45451,11 +45572,13 @@ function computeVisualState(scene, blockIndex) {
           position: block.position ?? getDefaultCharacterPosition(block.characterId),
           expressionId: block.expressionId,
           expressionName: getExpressionName(block.characterId, block.expressionId),
+          stage: getCharacterStageFromBlock(block),
         });
-        if (getSafeTransition(block.transition) === "fade") {
+        if (getSafeTransition(block.transition) !== "none") {
           visual.characterTransitionEvent = {
             mode: "show",
             characterId: block.characterId,
+            transition: getSafeTransition(block.transition),
           };
         }
         break;
@@ -45463,10 +45586,11 @@ function computeVisualState(scene, blockIndex) {
         const previousState =
           visibleMap.get(block.characterId) ?? createFallbackPreviewCharacterState(block.characterId);
         visibleMap.delete(block.characterId);
-        if (getSafeTransition(block.transition) === "fade") {
+        if (getSafeTransition(block.transition) !== "none") {
           visual.characterTransitionEvent = {
             mode: "hide",
             characterState: previousState,
+            transition: getSafeTransition(block.transition),
           };
         }
         break;
@@ -45488,6 +45612,7 @@ function computeVisualState(scene, blockIndex) {
           position: existing?.position ?? getDefaultCharacterPosition(block.speakerId),
           expressionId: block.expressionId,
           expressionName: getExpressionName(block.speakerId, block.expressionId),
+          stage: existing?.stage ?? getSafeCharacterStage(),
         });
         break;
       }

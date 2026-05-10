@@ -6826,6 +6826,25 @@ def clamp(value: float, minimum: float, maximum: float) -> float:
     return max(minimum, min(maximum, value))
 
 
+def get_safe_character_stage(source: dict | None) -> dict:
+    raw = source if isinstance(source, dict) else {}
+
+    def read_number(key: str, fallback: float, minimum: float, maximum: float) -> float:
+        try:
+            value = float(raw.get(key, fallback))
+        except (TypeError, ValueError):
+            value = fallback
+        return clamp(value, minimum, maximum)
+
+    return {
+        "offsetX": round(read_number("offsetX", 0, -60, 60)),
+        "offsetY": round(read_number("offsetY", 0, -45, 45)),
+        "scale": round(read_number("scale", 100, 45, 220)),
+        "opacity": round(read_number("opacity", 100, 0, 100)),
+        "layer": round(read_number("layer", 0, -10, 10)),
+    }
+
+
 def get_block_label(block_type: str) -> str:
     return {
         "dialogue": "台词",
@@ -9152,6 +9171,7 @@ class NativeRuntimePlayer:
                     self.visible_characters[character_id] = {
                         "expressionId": block.get("expressionId"),
                         "position": block.get("position"),
+                        "stage": get_safe_character_stage(block.get("stage")),
                     }
                 self.current_block_index += 1
                 continue
@@ -9315,6 +9335,7 @@ class NativeRuntimePlayer:
         self.visible_characters[speaker_id] = {
             "expressionId": block.get("expressionId") or existing.get("expressionId") or "expr_default",
             "position": existing.get("position") or character.get("defaultPosition") or "center",
+            "stage": get_safe_character_stage(existing.get("stage")),
         }
 
     def play_bgm(self, asset_id: str | None, loop: bool = True) -> None:
@@ -10294,35 +10315,54 @@ class NativeRuntimePlayer:
             "center": int(self.width * 0.50),
             "right": int(self.width * 0.76),
         }
-        for character_id, state in sorted(self.visible_characters.items(), key=lambda item: position_x.get(item[1].get("position") or "center", 0)):
+        def character_sort_key(item):
+            character_state = item[1] if isinstance(item[1], dict) else {}
+            stage = get_safe_character_stage(character_state.get("stage"))
+            return (
+                stage["layer"],
+                position_x.get(character_state.get("position") or "center", 0),
+            )
+
+        for character_id, state in sorted(self.visible_characters.items(), key=character_sort_key):
+            stage = get_safe_character_stage(state.get("stage"))
             sprite_asset_id = self.get_character_sprite_asset_id(character_id, state.get("expressionId"))
             sprite = self._load_image(sprite_asset_id)
-            x = position_x.get(state.get("position") or "center", self.width // 2)
+            x = position_x.get(state.get("position") or "center", self.width // 2) + int(self.width * stage["offsetX"] / 100)
+            bottom_y = int(self.height * 0.88) + int(self.height * stage["offsetY"] / 100)
             if sprite:
                 sprite_width, sprite_height = sprite.get_size()
                 max_height = int(self.height * 0.74)
-                scale = min(max_height / max(sprite_height, 1), 1.6)
+                scale = min(max_height / max(sprite_height, 1), 1.6) * (stage["scale"] / 100)
                 scaled = self.pygame.transform.smoothscale(
                     sprite,
                     (max(1, int(sprite_width * scale)), max(1, int(sprite_height * scale))),
                 )
-                rect = scaled.get_rect(midbottom=(x, int(self.height * 0.88)))
+                if stage["opacity"] < 100:
+                    scaled = scaled.copy()
+                    scaled.set_alpha(int(255 * stage["opacity"] / 100))
+                rect = scaled.get_rect(midbottom=(x, bottom_y))
                 target.blit(scaled, rect)
                 character = self.characters_by_id.get(character_id) or {}
-                self.render_character_model_preview_card(target, rect, character, state.get("expressionId"))
+                if stage["opacity"] > 15:
+                    self.render_character_model_preview_card(target, rect, character, state.get("expressionId"))
             else:
                 placeholder_rect = self.pygame.Rect(0, 0, 220, 420)
-                placeholder_rect.midbottom = (x, int(self.height * 0.88))
-                self.pygame.draw.rect(target, palette["placeholder"], placeholder_rect, border_radius=28)
-                self.pygame.draw.rect(target, palette["panelBorder"], placeholder_rect, 2, border_radius=28)
+                placeholder_rect.width = max(1, int(placeholder_rect.width * stage["scale"] / 100))
+                placeholder_rect.height = max(1, int(placeholder_rect.height * stage["scale"] / 100))
+                placeholder_rect.midbottom = (x, bottom_y)
+                placeholder_surface = self.pygame.Surface(placeholder_rect.size, self.pygame.SRCALPHA)
+                self.pygame.draw.rect(placeholder_surface, with_alpha(palette["placeholder"], stage["opacity"]), placeholder_surface.get_rect(), border_radius=28)
+                self.pygame.draw.rect(placeholder_surface, with_alpha(palette["panelBorder"], stage["opacity"]), placeholder_surface.get_rect(), 2, border_radius=28)
+                target.blit(placeholder_surface, placeholder_rect)
                 character = self.characters_by_id.get(character_id) or {}
                 character_name = character.get("displayName") or character_id
                 presentation_label = self.get_character_presentation_mode_label(character)
                 model_asset_label = self.get_character_model_asset_label(character)
                 binding_label = self.get_character_expression_binding_label(character, state.get("expressionId"))
-                self.blit_text_center(self.font_body, character_name, placeholder_rect.centerx, placeholder_rect.centery - 16, palette["text"], target=target)
-                self.blit_text_center(self.font_ui, presentation_label, placeholder_rect.centerx, placeholder_rect.centery + 22, palette["accent"], target=target)
-                self.blit_text_center(self.font_ui, model_asset_label, placeholder_rect.centerx, placeholder_rect.centery + 52, palette["muted"], target=target)
+                if stage["opacity"] > 15:
+                    self.blit_text_center(self.font_body, character_name, placeholder_rect.centerx, placeholder_rect.centery - 16, palette["text"], target=target)
+                    self.blit_text_center(self.font_ui, presentation_label, placeholder_rect.centerx, placeholder_rect.centery + 22, palette["accent"], target=target)
+                    self.blit_text_center(self.font_ui, model_asset_label, placeholder_rect.centerx, placeholder_rect.centery + 52, palette["muted"], target=target)
                 self.blit_text_center(self.font_ui, binding_label[:32], placeholder_rect.centerx, placeholder_rect.centery + 80, palette["muted"], target=target)
                 self.render_character_model_preview_card(target, placeholder_rect, character, state.get("expressionId"))
 

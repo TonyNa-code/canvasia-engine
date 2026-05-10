@@ -9027,11 +9027,13 @@ function applyBlockToPreviewState(block, visualState, variables) {
         position: block.position ?? getDefaultCharacterPosition(block.characterId),
         expressionId: block.expressionId,
         expressionName: getExpressionName(block.characterId, block.expressionId),
+        stage: getCharacterStageFromBlock(block),
       });
-      if (getSafeTransition(block.transition) === "fade") {
+      if (getSafeTransition(block.transition) !== "none") {
         visualState.characterTransitionEvent = {
           mode: "show",
           characterId: block.characterId,
+          transition: getSafeTransition(block.transition),
         };
       }
       visualState.speakerName = "角色演出";
@@ -9042,10 +9044,11 @@ function applyBlockToPreviewState(block, visualState, variables) {
         getPreviewCharacterState(visualState, block.characterId) ??
         createFallbackPreviewCharacterState(block.characterId);
       removePreviewCharacter(visualState, block.characterId);
-      if (getSafeTransition(block.transition) === "fade") {
+      if (getSafeTransition(block.transition) !== "none") {
         visualState.characterTransitionEvent = {
           mode: "hide",
           characterState: previousState,
+          transition: getSafeTransition(block.transition),
         };
       }
       visualState.speakerName = "角色演出";
@@ -9067,6 +9070,9 @@ function applyBlockToPreviewState(block, visualState, variables) {
           getDefaultCharacterPosition(block.speakerId),
         expressionId: block.expressionId,
         expressionName: getExpressionName(block.speakerId, block.expressionId),
+        stage:
+          getPreviewCharacterState(visualState, block.speakerId)?.stage ??
+          getSafeCharacterStage(),
       });
       return null;
     case "narration":
@@ -9144,6 +9150,7 @@ function createFallbackPreviewCharacterState(characterId) {
     position: getDefaultCharacterPosition(characterId),
     expressionId,
     expressionName: getExpressionName(characterId, expressionId),
+    stage: getSafeCharacterStage(),
   };
 }
 
@@ -9412,6 +9419,8 @@ function renderSpriteCard(
   const spriteUrl = getAssetUrl(spriteAssetId);
   const classes = ["sprite-card"];
   const isGhostHide = characterState.__ghostMode === "hide";
+  const transition = characterTransitionEvent ? getSafeTransition(characterTransitionEvent.transition) : "none";
+  const stageStyle = getCharacterStageStyle(characterState.stage);
 
   if (shouldBlurPlayerCharacter(characterState.position, depthBlur)) {
     classes.push("is-depth-muted");
@@ -9447,7 +9456,7 @@ function renderSpriteCard(
       )}</div>`;
 
   return `
-    <article class="${classes.join(" ")}" data-position="${escapeHtml(characterState.position)}">
+    <article class="${classes.join(" ")}" data-position="${escapeHtml(characterState.position)}" data-transition="${escapeHtml(transition)}" style="${stageStyle}">
       <div class="sprite-card-inner">
         ${visual}
         <div class="sprite-name">${escapeHtml(character?.displayName ?? characterState.characterId)}</div>
@@ -9824,7 +9833,36 @@ function getDefaultCharacterPosition(characterId) {
 }
 
 function getSafeTransition(transition) {
-  return transition === "none" ? "none" : "fade";
+  return ["fade", "slide_left", "slide_right", "rise", "pop", "none"].includes(transition)
+    ? transition
+    : "fade";
+}
+
+function getSafeCharacterStage(source = {}) {
+  const raw = source && typeof source === "object" ? source : {};
+  return {
+    offsetX: Math.round(clamp(getSafeNumber(raw.offsetX, 0), -60, 60)),
+    offsetY: Math.round(clamp(getSafeNumber(raw.offsetY, 0), -45, 45)),
+    scale: Math.round(clamp(getSafeNumber(raw.scale, 100), 45, 220)),
+    opacity: Math.round(clamp(getSafeNumber(raw.opacity, 100), 0, 100)),
+    layer: Math.round(clamp(getSafeNumber(raw.layer, 0), -10, 10)),
+  };
+}
+
+function getCharacterStageFromBlock(block = {}) {
+  return getSafeCharacterStage(block.stage ?? block.characterStage ?? {});
+}
+
+function getCharacterStageStyle(stageSource = {}) {
+  const stage = getSafeCharacterStage(stageSource);
+  return [
+    `--sprite-offset-x:${stage.offsetX}%;`,
+    `--sprite-offset-y:${stage.offsetY}%;`,
+    `--sprite-scale:${(stage.scale / 100).toFixed(3)};`,
+    `--sprite-opacity:${(stage.opacity / 100).toFixed(2)};`,
+    `--sprite-layer:${stage.layer};`,
+    `z-index:${20 + stage.layer};`,
+  ].join("");
 }
 
 function getPositionOrder(position) {
