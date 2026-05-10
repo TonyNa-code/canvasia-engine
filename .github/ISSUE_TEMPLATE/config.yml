@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Quick start / 快速开始
+    url: https://github.com/TonyNa-code/tony-na-engine#快速开始
+    about: 第一次使用时，建议先看 README 的启动、下载和导出说明。
+  - name: Security / 隐私与安全问题
+    url: https://github.com/TonyNa-code/tony-na-engine/security/policy
+    about: 如果要报告 token、证书、隐私泄漏或安全问题，请优先使用安全政策入口。
+  - name: Releases / 下载预览包
+    url: https://github.com/TonyNa-code/tony-na-engine/releases
+    about: 下载编辑器预览包、源码包和发布附件校验文件。

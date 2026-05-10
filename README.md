@@ -472,6 +472,7 @@ run_native_runtime_smoke.cmd
 Issue / PR 入口：
 
 - [Bug report](.github/ISSUE_TEMPLATE/bug_report.md)
+- [Beginner help / usage question](.github/ISSUE_TEMPLATE/usage_help.md)
 - [Feature request](.github/ISSUE_TEMPLATE/feature_request.md)
 - [Release / package problem](.github/ISSUE_TEMPLATE/release_package_problem.md)
 - [Pull request template](.github/pull_request_template.md)
