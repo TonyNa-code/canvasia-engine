@@ -160,6 +160,36 @@ def github_ci_status(git: dict[str, Any], *, skip_network: bool = False) -> dict
     }
 
 
+def is_github_actions_green(ci: dict[str, Any]) -> bool:
+    return ci.get("checked") and ci.get("status") == "completed" and ci.get("conclusion") == "success"
+
+
+def format_github_actions_summary(ci: dict[str, Any]) -> str:
+    if not ci.get("checked"):
+        return f"not checked ({ci.get('reason')})"
+    if ci.get("status") == "not_found_for_commit":
+        latest = ci.get("latestRun") or {}
+        latest_label = str(latest.get("shortCommit") or "").strip()
+        latest_status = " / ".join(
+            item for item in [str(latest.get("status") or "").strip(), str(latest.get("conclusion") or "").strip()] if item
+        )
+        suffix = f"; latest branch run `{latest_label}` was {latest_status}" if latest_label and latest_status else ""
+        return f"not found for current commit; push this commit and wait for CI{suffix}"
+    status = str(ci.get("status") or "").strip() or "unknown"
+    conclusion = str(ci.get("conclusion") or "").strip()
+    return f"{status} / {conclusion}" if conclusion else status
+
+
+def build_github_actions_warning(ci: dict[str, Any]) -> str:
+    if not ci.get("checked"):
+        return f"GitHub Actions status was not checked: {ci.get('reason')}"
+    if ci.get("status") == "not_found_for_commit":
+        return "GitHub Actions has not run for the current commit yet; push this commit and wait for CI before tagging a release."
+    if not is_github_actions_green(ci):
+        return "GitHub Actions is not green for the current commit."
+    return ""
+
+
 def choose_release_tag(git: dict[str, Any], release_tag: str) -> str:
     explicit_tag = release_tag.strip()
     if explicit_tag:
@@ -511,10 +541,9 @@ def build_warnings(report: dict[str, Any]) -> list[str]:
     privacy = report["privacy"]
     if not git["workingTreeClean"]:
         warnings.append("Working tree is not clean; commit or discard local changes before tagging a release.")
-    if ci.get("checked") and not (ci.get("status") == "completed" and ci.get("conclusion") == "success"):
-        warnings.append("GitHub Actions is not green for the current commit.")
-    if not ci.get("checked"):
-        warnings.append(f"GitHub Actions status was not checked: {ci.get('reason')}")
+    ci_warning = build_github_actions_warning(ci)
+    if ci_warning:
+        warnings.append(ci_warning)
     if privacy["sensitiveFindings"]:
         warnings.append("Privacy scan found potential sensitive strings.")
     if privacy["largeTrackedFiles"]:
@@ -646,11 +675,19 @@ def render_upload_manifest(report: dict[str, Any]) -> str:
     if ci.get("checked"):
         lines.extend(
             [
-                f"- Status: `{ci.get('status', '')}`",
-                f"- Conclusion: `{ci.get('conclusion', '')}`",
+                f"- Status: `{format_github_actions_summary(ci)}`",
+                f"- Conclusion: `{ci.get('conclusion', '') or 'n/a'}`",
                 f"- URL: {ci.get('url', '') or 'n/a'}",
             ]
         )
+        latest_run = ci.get("latestRun") or {}
+        if latest_run:
+            lines.append(
+                f"- Latest branch run: `{latest_run.get('shortCommit', '')}` / "
+                f"`{latest_run.get('status', '')}` / `{latest_run.get('conclusion', '') or 'n/a'}`"
+            )
+            if latest_run.get("url"):
+                lines.append(f"- Latest branch run URL: {latest_run['url']}")
     else:
         lines.append(f"- Not checked: {ci.get('reason')}")
     lines.extend(["", "## GitHub Release Page", ""])
@@ -750,10 +787,7 @@ def render_release_body(report: dict[str, Any]) -> str:
     else:
         lines = [body, "", download_guide, "", "## Verification", ""]
     ci = report["githubActions"]
-    if ci.get("checked"):
-        lines.append(f"- GitHub Actions: `{ci.get('status')}` / `{ci.get('conclusion')}`")
-    else:
-        lines.append(f"- GitHub Actions: not checked ({ci.get('reason')})")
+    lines.append(f"- GitHub Actions: `{format_github_actions_summary(ci)}`")
     lines.append(f"- Privacy scan findings: `{len(report['privacy']['sensitiveFindings'])}`")
     lines.append(f"- Working tree clean when prepared: `{report['git']['workingTreeClean']}`")
     public_artifacts = report.get("publicArtifacts") or select_public_release_artifacts(report["artifacts"])
@@ -1018,10 +1052,7 @@ def print_summary(report: dict[str, Any], outputs: dict[str, str]) -> None:
     print(f"- Commit: {report['git']['shortCommit']}")
     print(f"- Working tree clean: {report['git']['workingTreeClean']}")
     ci = report["githubActions"]
-    if ci.get("checked"):
-        print(f"- GitHub Actions: {ci.get('status')} / {ci.get('conclusion')}")
-    else:
-        print(f"- GitHub Actions: not checked ({ci.get('reason')})")
+    print(f"- GitHub Actions: {format_github_actions_summary(ci)}")
     release = report.get("githubRelease") or {}
     if release.get("checked"):
         if release.get("exists"):

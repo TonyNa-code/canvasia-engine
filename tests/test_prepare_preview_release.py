@@ -43,6 +43,43 @@ class PreviewReleaseBodyTests(unittest.TestCase):
         self.assertEqual(result["sensitiveFindings"][0]["type"], "api_key_assignment")
         self.assertEqual(result["sensitiveFindings"][0]["line"], 3)
 
+    def test_github_actions_not_found_message_explains_push_then_wait(self) -> None:
+        report = {
+            "generatedAt": "2026-05-10T14:30:00+08:00",
+            "git": {
+                "branch": "main",
+                "shortCommit": "def5678",
+                "workingTreeClean": True,
+            },
+            "githubActions": {
+                "checked": True,
+                "status": "not_found_for_commit",
+                "conclusion": "",
+                "latestRun": {
+                    "shortCommit": "abc1234",
+                    "status": "completed",
+                    "conclusion": "success",
+                    "url": "https://github.com/example/actions/runs/1",
+                },
+            },
+            "privacy": {"passed": True, "sensitiveFindings": [], "largeTrackedFiles": []},
+            "artifacts": [],
+            "publicArtifacts": [],
+            "rejectedArtifacts": [],
+            "githubRelease": {"checked": False, "reason": "release check skipped"},
+        }
+        report["warnings"] = prepare_preview_release.build_warnings(report)
+
+        manifest = prepare_preview_release.render_upload_manifest(report)
+        body = prepare_preview_release.render_release_body(report)
+
+        self.assertTrue(
+            any("GitHub Actions has not run for the current commit yet" in warning for warning in report["warnings"])
+        )
+        self.assertIn("push this commit and wait for CI", manifest)
+        self.assertIn("Latest branch run: `abc1234` / `completed` / `success`", manifest)
+        self.assertIn("GitHub Actions: `not found for current commit; push this commit and wait for CI", body)
+
     def test_release_body_includes_public_download_guide(self) -> None:
         report = {
             "githubActions": {"checked": True, "status": "completed", "conclusion": "success"},
@@ -99,7 +136,7 @@ class PreviewReleaseBodyTests(unittest.TestCase):
 
         self.assertIn("No binary package is attached", body)
         self.assertIn("Source code archive", body)
-        self.assertIn("GitHub Actions: not checked", body)
+        self.assertIn("GitHub Actions: `not checked", body)
         self.assertNotIn("verify_release_assets.cmd", body)
 
     def test_release_comparison_uses_public_artifacts_only(self) -> None:
