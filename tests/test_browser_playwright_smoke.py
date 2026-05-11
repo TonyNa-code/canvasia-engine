@@ -727,15 +727,28 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
         panel = self.page.locator("#creativeAssistantPanel")
         block_cards = self.page.locator("#storyBlockList .block-card")
         initial_count = block_cards.count()
+        search_query = "浏览器烟测灵感"
 
+        panel.locator("#creativeAssistantPrompt").fill(f"雨夜校园悬疑恋爱，{search_query}")
         panel.get_by_role("button", name="生成建议").click()
         panel.get_by_text("可插入").wait_for(timeout=15000)
         panel.get_by_text("剧情卡片预览").wait_for(timeout=10000)
         panel.locator(".creative-assistant-history").wait_for(timeout=10000)
-        panel.get_by_role("button", name="收藏", exact=True).first.click()
-        panel.get_by_role("button", name="已收藏", exact=True).first.wait_for(timeout=10000)
-        panel.locator("#creativeAssistantHistorySearchInput").fill("雨夜")
-        panel.locator(".creative-history-card").first.wait_for(timeout=10000)
+        history_cards = panel.locator(".creative-history-card")
+        history_cards.first.wait_for(timeout=15000)
+        history_cards.first.get_by_role("button", name="收藏", exact=True).click()
+        history_cards.first.get_by_role("button", name="已收藏", exact=True).wait_for(timeout=10000)
+        panel.locator("#creativeAssistantHistorySearchInput").fill(search_query)
+        self.page.wait_for_function(
+            """(query) => {
+                const panel = document.querySelector("#creativeAssistantPanel");
+                const input = panel?.querySelector("#creativeAssistantHistorySearchInput");
+                const cards = Array.from(panel?.querySelectorAll(".creative-history-card") ?? []);
+                return input?.value === query && cards.some((card) => card.innerText.includes(query));
+            }""",
+            arg=search_query,
+            timeout=15000,
+        )
         panel.locator("#creativeAssistantHistorySearchInput").fill("找不到的灵感关键词")
         panel.get_by_text("没有匹配的灵感").wait_for(timeout=10000)
         panel.locator("#creativeAssistantHistorySearchInput").fill("")
