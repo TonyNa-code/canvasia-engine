@@ -1085,6 +1085,12 @@ const FADE_COLOR_LABELS = {
   white: "白场",
 };
 
+const MUSIC_END_MODE_LABELS = {
+  until_next_music: "播到下一首或停止卡",
+  scene_end: "播完整个场景",
+  after_block: "播到指定卡片后",
+};
+
 const CAMERA_ZOOM_ACTION_LABELS = {
   zoom_in: "推近镜头",
   zoom_out: "拉远镜头",
@@ -1120,6 +1126,24 @@ const SCREEN_FILTER_STRENGTH_LABELS = {
   medium: "正常",
   strong: "更明显",
 };
+
+const SCREEN_COLOR_GRADE_DEFAULTS = Object.freeze({
+  brightness: 100,
+  contrast: 100,
+  saturation: 100,
+  hue: 0,
+  temperature: 0,
+  vignette: 0,
+});
+
+const SCREEN_COLOR_GRADE_LIMITS = Object.freeze({
+  brightness: Object.freeze([40, 180]),
+  contrast: Object.freeze([40, 180]),
+  saturation: Object.freeze([0, 220]),
+  hue: Object.freeze([-180, 180]),
+  temperature: Object.freeze([-100, 100]),
+  vignette: Object.freeze([0, 100]),
+});
 
 const CAMERA_PAN_TARGET_LABELS = {
   left: "向左看",
@@ -6730,6 +6754,7 @@ function stopVoicePlayback({ resetStepKey = true } = {}) {
 
 function updateRuntimeAudioVolumes() {
   if (state.bgmAudio) {
+    cancelAudioFade(state.bgmAudio);
     state.bgmAudio.volume = getVolumeRatio(state.playback.bgmVolume, 72);
   }
 
@@ -8653,6 +8678,9 @@ function createInitialPreviewVisualState() {
     backgroundName: "未设置背景",
     musicName: "未播放",
     musicAssetId: null,
+    musicScope: null,
+    musicFadeOutMs: 0,
+    musicPreviousFadeOutMs: 0,
     particleEffect: null,
     screenShake: null,
     screenFlash: null,
@@ -8677,6 +8705,16 @@ function clonePreviewVisualState(visualState) {
     particleEffect: visualState?.particleEffect
       ? normalizeParticleEffectConfig(visualState.particleEffect)
       : null,
+    musicScope: visualState?.musicScope
+      ? {
+          sceneId: String(visualState.musicScope.sceneId ?? ""),
+          endMode: getSafeMusicEndMode(visualState.musicScope.endMode),
+          endBlockId: String(visualState.musicScope.endBlockId ?? ""),
+          fadeOutMs: getSafeAudioFadeMs(visualState.musicScope.fadeOutMs, 600),
+        }
+      : null,
+    musicFadeOutMs: getSafeAudioFadeMs(visualState?.musicFadeOutMs, 0),
+    musicPreviousFadeOutMs: getSafeAudioFadeMs(visualState?.musicPreviousFadeOutMs, 0),
     screenShake: visualState?.screenShake
       ? {
           intensity: getSafeShakeIntensity(visualState.screenShake.intensity),
@@ -8713,6 +8751,7 @@ function clonePreviewVisualState(visualState) {
       ? {
           preset: getSafeScreenFilterPreset(visualState.screenFilter.preset),
           strength: getSafeScreenFilterStrength(visualState.screenFilter.strength),
+          grade: getSafeScreenColorGrade(visualState.screenFilter.grade),
         }
       : null,
     depthBlur: visualState?.depthBlur
@@ -8744,6 +8783,62 @@ function clearTransientStageEffects(visualState) {
   visualState.activeCharacterId = null;
   visualState.characterTransitionEvent = null;
   visualState.characterEmphasisEvent = null;
+  visualState.musicFadeOutMs = 0;
+  visualState.musicPreviousFadeOutMs = 0;
+}
+
+function getSafeMusicEndMode(mode) {
+  return Object.hasOwn(MUSIC_END_MODE_LABELS, mode) ? mode : "until_next_music";
+}
+
+function getMusicScopeFromBlock(block = {}, sceneId = "") {
+  const endMode = getSafeMusicEndMode(block.endMode);
+  const endBlockId = endMode === "after_block" ? String(block.endBlockId ?? "").trim() : "";
+  return {
+    sceneId: String(sceneId ?? ""),
+    endMode: endBlockId ? endMode : endMode === "after_block" ? "until_next_music" : endMode,
+    endBlockId,
+    fadeOutMs: getSafeAudioFadeMs(block.fadeOutMs, 600),
+  };
+}
+
+function clearPreviewMusicForScopeEnd(visualState, fadeOutMs = 0) {
+  visualState.musicAssetId = null;
+  visualState.musicName = "未播放";
+  visualState.musicScope = null;
+  visualState.musicFadeOutMs = getSafeAudioFadeMs(fadeOutMs, 0);
+}
+
+function applyMusicScopeBeforeBlock(visualState, scene, blockIndex) {
+  const scope = visualState?.musicScope;
+  if (!scope || getSafeMusicEndMode(scope.endMode) === "until_next_music") {
+    return;
+  }
+
+  const sceneId = String(scene?.id ?? "");
+  const scopeSceneId = String(scope.sceneId ?? "");
+  if (scopeSceneId && sceneId && scopeSceneId !== sceneId) {
+    clearPreviewMusicForScopeEnd(visualState, scope.fadeOutMs);
+    return;
+  }
+
+  if (getSafeMusicEndMode(scope.endMode) !== "after_block") {
+    return;
+  }
+
+  const endBlockId = String(scope.endBlockId ?? "");
+  const endIndex = (scene?.blocks ?? []).findIndex((item) => item.id === endBlockId);
+  if (endIndex >= 0 && blockIndex > endIndex) {
+    clearPreviewMusicForScopeEnd(visualState, scope.fadeOutMs);
+  }
+}
+
+function applyMusicScopeForTerminal(visualState) {
+  const scope = visualState?.musicScope;
+  if (!scope || getSafeMusicEndMode(scope.endMode) === "until_next_music") {
+    return;
+  }
+  clearPreviewMusicForScopeEnd(visualState, scope.fadeOutMs);
 }
 
 function createInitialVariableState() {
@@ -8789,8 +8884,9 @@ function buildPreviewSnapshot(sceneId, blockIndex, previousVisualState, previous
 
   const nextVisualState = clonePreviewVisualState(baseVisualState);
   clearTransientStageEffects(nextVisualState);
+  applyMusicScopeBeforeBlock(nextVisualState, scene, blockIndex);
   const nextVariables = clonePreviewVariables(baseVariables);
-  const transitionTargetSceneId = applyBlockToPreviewState(block, nextVisualState, nextVariables);
+  const transitionTargetSceneId = applyBlockToPreviewState(block, nextVisualState, nextVariables, scene.id);
 
   return {
     sceneId: scene.id,
@@ -8810,6 +8906,7 @@ function buildPreviewSnapshot(sceneId, blockIndex, previousVisualState, previous
 function createPreviewTerminalSnapshot(scene, visualState, variables, message) {
   const nextVisualState = clonePreviewVisualState(visualState);
   clearTransientStageEffects(nextVisualState);
+  applyMusicScopeForTerminal(nextVisualState);
   nextVisualState.speakerName = "试玩结束";
   nextVisualState.dialogueText = message;
 
@@ -8858,7 +8955,7 @@ function createNextPreviewSnapshot(currentSnapshot) {
   );
 }
 
-function applyBlockToPreviewState(block, visualState, variables) {
+function applyBlockToPreviewState(block, visualState, variables, sceneId = "") {
   switch (block.type) {
     case "background": {
       const asset = data.assetsById.get(block.assetId);
@@ -8870,15 +8967,25 @@ function applyBlockToPreviewState(block, visualState, variables) {
     }
     case "music_play": {
       const asset = data.assetsById.get(block.assetId);
+      if (visualState.musicAssetId && visualState.musicAssetId !== block.assetId) {
+        visualState.musicPreviousFadeOutMs = getSafeAudioFadeMs(
+          visualState.musicScope?.fadeOutMs,
+          getSafeAudioFadeMs(block.fadeInMs, 0)
+        );
+      }
       visualState.musicAssetId = block.assetId;
       visualState.musicName = asset?.name ?? block.assetId;
+      visualState.musicScope = getMusicScopeFromBlock(block, sceneId);
+      visualState.musicFadeOutMs = 0;
       visualState.speakerName = "音乐";
       visualState.dialogueText = `开始播放：${asset?.name ?? block.assetId}`;
       return null;
     }
     case "music_stop":
+      visualState.musicFadeOutMs = getSafeAudioFadeMs(block.fadeOutMs, 600);
       visualState.musicAssetId = null;
       visualState.musicName = "未播放";
+      visualState.musicScope = null;
       visualState.speakerName = "音乐";
       visualState.dialogueText = "背景音乐停止了。";
       return null;
@@ -8993,6 +9100,7 @@ function applyBlockToPreviewState(block, visualState, variables) {
           : {
               preset: getSafeScreenFilterPreset(block.preset),
               strength: getSafeScreenFilterStrength(block.strength),
+              grade: getSafeScreenColorGrade(block.grade),
             };
       visualState.speakerName = "画面滤镜";
       visualState.dialogueText =
@@ -9470,7 +9578,9 @@ function syncAudio(snapshot) {
   const nextMusicAssetId = snapshot.visualState.musicAssetId ?? null;
 
   if (!nextMusicAssetId) {
-    stopMusic();
+    stopMusic({
+      fadeOutMs: getSafeAudioFadeMs(snapshot.visualState?.musicFadeOutMs ?? snapshot.block?.fadeOutMs),
+    });
     return;
   }
 
@@ -9478,7 +9588,9 @@ function syncAudio(snapshot) {
     return;
   }
 
-  stopMusic();
+  const fadeInMs = getSafeAudioFadeMs(snapshot.block?.fadeInMs);
+  const previousFadeOutMs = getSafeAudioFadeMs(snapshot.visualState?.musicPreviousFadeOutMs, fadeInMs);
+  fadeOutPreviousMusic(previousFadeOutMs);
   const musicUrl = getAssetUrl(nextMusicAssetId);
 
   if (!musicUrl) {
@@ -9488,10 +9600,19 @@ function syncAudio(snapshot) {
 
   const audio = new Audio(encodeURI(musicUrl));
   audio.loop = true;
-  audio.volume = getVolumeRatio(state.playback.bgmVolume, 72);
+  const targetVolume = getVolumeRatio(state.playback.bgmVolume, 72);
+  audio.volume = fadeInMs > 0 ? 0 : targetVolume;
   audio.play().catch(() => {});
   state.bgmAudio = audio;
   state.currentMusicAssetId = nextMusicAssetId;
+
+  if (fadeInMs > 0) {
+    fadeAudioVolume(audio, {
+      from: 0,
+      to: targetVolume,
+      durationMs: fadeInMs,
+    });
+  }
 }
 
 function syncOneShotAudio(snapshot) {
@@ -9713,12 +9834,89 @@ function finishCreditsPlayback({ skipped = false } = {}) {
   renderRuntime();
 }
 
-function stopMusic() {
-  if (state.bgmAudio) {
-    state.bgmAudio.pause();
-    state.bgmAudio.src = "";
-    state.bgmAudio = null;
+function getSafeAudioFadeMs(value, fallback = 0) {
+  return Math.round(clamp(getSafeNumber(value, fallback), 0, 30000));
+}
+
+function cancelAudioFade(audio) {
+  if (!audio?._tnEngineFadeFrame) {
+    return;
   }
+  window.cancelAnimationFrame(audio._tnEngineFadeFrame);
+  audio._tnEngineFadeFrame = null;
+}
+
+function disposeAudio(audio) {
+  if (!audio) {
+    return;
+  }
+  cancelAudioFade(audio);
+  audio.pause();
+  audio.src = "";
+}
+
+function fadeAudioVolume(audio, { from = audio?.volume ?? 0, to = 0, durationMs = 0, onComplete = null } = {}) {
+  if (!audio) {
+    return;
+  }
+
+  cancelAudioFade(audio);
+  const safeFrom = clamp(getSafeNumber(from, audio.volume || 0), 0, 1);
+  const safeTo = clamp(getSafeNumber(to, 0), 0, 1);
+  const safeDuration = getSafeAudioFadeMs(durationMs);
+
+  if (safeDuration <= 0) {
+    audio.volume = safeTo;
+    if (typeof onComplete === "function") {
+      onComplete();
+    }
+    return;
+  }
+
+  const startedAt = window.performance.now();
+  const tick = (now) => {
+    const progress = clamp((now - startedAt) / safeDuration, 0, 1);
+    const eased = progress * progress * (3 - 2 * progress);
+    audio.volume = safeFrom + (safeTo - safeFrom) * eased;
+    if (progress >= 1) {
+      audio._tnEngineFadeFrame = null;
+      if (typeof onComplete === "function") {
+        onComplete();
+      }
+      return;
+    }
+    audio._tnEngineFadeFrame = window.requestAnimationFrame(tick);
+  };
+
+  audio.volume = safeFrom;
+  audio._tnEngineFadeFrame = window.requestAnimationFrame(tick);
+}
+
+function fadeOutPreviousMusic(fadeOutMs = 0) {
+  const previousAudio = state.bgmAudio;
+  state.bgmAudio = null;
+  state.currentMusicAssetId = null;
+
+  if (!previousAudio) {
+    return;
+  }
+
+  const safeFadeOutMs = getSafeAudioFadeMs(fadeOutMs);
+  if (safeFadeOutMs <= 0) {
+    disposeAudio(previousAudio);
+    return;
+  }
+
+  fadeAudioVolume(previousAudio, {
+    from: previousAudio.volume,
+    to: 0,
+    durationMs: safeFadeOutMs,
+    onComplete: () => disposeAudio(previousAudio),
+  });
+}
+
+function stopMusic({ fadeOutMs = 0 } = {}) {
+  fadeOutPreviousMusic(fadeOutMs);
   state.currentMusicAssetId = null;
 }
 
@@ -10866,6 +11064,37 @@ function getScreenFilterStrengthLabel(strength) {
   return SCREEN_FILTER_STRENGTH_LABELS[getSafeScreenFilterStrength(strength)];
 }
 
+function getSafeScreenColorGrade(source) {
+  const grade = source && typeof source === "object" ? source : {};
+  return Object.fromEntries(
+    Object.entries(SCREEN_COLOR_GRADE_DEFAULTS).map(([key, fallback]) => {
+      const [minimum, maximum] = SCREEN_COLOR_GRADE_LIMITS[key];
+      const value = Number(grade[key]);
+      const safeValue = Number.isFinite(value) ? value : fallback;
+      return [key, Math.round(clamp(safeValue, minimum, maximum))];
+    })
+  );
+}
+
+function getScreenColorGradeCss(source) {
+  const grade = getSafeScreenColorGrade(source);
+  const hue = grade.hue - grade.temperature * 0.08;
+  return [
+    `brightness(${(grade.brightness / 100).toFixed(3)})`,
+    `contrast(${(grade.contrast / 100).toFixed(3)})`,
+    `saturate(${(grade.saturation / 100).toFixed(3)})`,
+    `hue-rotate(${hue.toFixed(2)}deg)`,
+  ].join(" ");
+}
+
+function getScreenFilterVignette(screenFilter) {
+  if (!screenFilter) {
+    return 0;
+  }
+  const grade = getSafeScreenColorGrade(screenFilter.grade);
+  return Number((grade.vignette / 100 * 0.68).toFixed(3));
+}
+
 function getScreenFilterCss(screenFilter) {
   if (!screenFilter) {
     return "";
@@ -10897,7 +11126,7 @@ function getScreenFilterCss(screenFilter) {
     },
   };
 
-  return recipes[preset][strength];
+  return combineFilterCss(recipes[preset][strength], getScreenColorGradeCss(screenFilter.grade));
 }
 
 function getScreenFilterWash(screenFilter) {
@@ -10910,7 +11139,8 @@ function getScreenFilterWash(screenFilter) {
 
   const preset = getSafeScreenFilterPreset(screenFilter.preset);
   const strength = getSafeScreenFilterStrength(screenFilter.strength);
-  const opacity = {
+  const grade = getSafeScreenColorGrade(screenFilter.grade);
+  const baseOpacity = {
     soft: 0.12,
     medium: 0.2,
     strong: 0.28,
@@ -10922,10 +11152,15 @@ function getScreenFilterWash(screenFilter) {
     dream: "linear-gradient(180deg, rgba(255, 241, 250, 0.82), rgba(214, 230, 255, 0.48))",
     cold: "linear-gradient(180deg, rgba(204, 232, 255, 0.72), rgba(136, 176, 222, 0.44))",
   };
+  const temperatureWash =
+    grade.temperature > 0
+      ? "linear-gradient(180deg, rgba(255, 220, 166, 0.76), rgba(255, 150, 92, 0.34))"
+      : "linear-gradient(180deg, rgba(178, 221, 255, 0.72), rgba(86, 126, 255, 0.3))";
+  const temperatureOpacity = Math.abs(grade.temperature) / 100 * 0.16;
 
   return {
-    background: backgrounds[preset],
-    opacity,
+    background: temperatureOpacity > 0.001 ? `${temperatureWash}, ${backgrounds[preset]}` : backgrounds[preset],
+    opacity: Number(clamp(baseOpacity + temperatureOpacity, 0, 0.46).toFixed(3)),
   };
 }
 
@@ -11256,6 +11491,7 @@ function applyStageWorldPresentation(visualState) {
 
   refs.filterLayer.style.setProperty("--filter-wash", wash.background);
   refs.filterLayer.style.setProperty("--filter-opacity", String(wash.opacity));
+  refs.filterLayer.style.setProperty("--filter-vignette-opacity", String(getScreenFilterVignette(visualState.screenFilter)));
 }
 
 function combineFilterCss(...parts) {

@@ -437,6 +437,22 @@ SCREEN_FILTER_WASH = {
     "cold": ((122, 184, 255), 42),
 }
 SCREEN_FILTER_STRENGTH_MULTIPLIER = {"soft": 0.62, "medium": 1.0, "strong": 1.38}
+SCREEN_COLOR_GRADE_DEFAULTS = {
+    "brightness": 100,
+    "contrast": 100,
+    "saturation": 100,
+    "hue": 0,
+    "temperature": 0,
+    "vignette": 0,
+}
+SCREEN_COLOR_GRADE_LIMITS = {
+    "brightness": (40, 180),
+    "contrast": (40, 180),
+    "saturation": (0, 220),
+    "hue": (-180, 180),
+    "temperature": (-100, 100),
+    "vignette": (0, 100),
+}
 DEPTH_BLUR_ALPHA = {"soft": 24, "medium": 42, "strong": 64}
 SUPPORTED_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp", ".webp"}
 SUPPORTED_AUDIO_EXTENSIONS = {".ogg", ".wav", ".mp3"}
@@ -5688,6 +5704,7 @@ def normalize_native_visual_effect_block(block: dict | None) -> dict:
             "action": get_safe_option(block.get("action"), {"apply", "clear"}, "apply"),
             "preset": get_safe_option(block.get("preset"), set(SCREEN_FILTER_WASH), "memory"),
             "strength": get_safe_option(block.get("strength"), {"soft", "medium", "strong"}, "medium"),
+            "grade": get_safe_screen_color_grade(block.get("grade")),
         }
     if block_type == "depth_blur":
         return {
@@ -6070,6 +6087,40 @@ def clamp_int(value, minimum: int, maximum: int, fallback: int) -> int:
     except Exception:
         numeric = fallback
     return max(minimum, min(maximum, numeric))
+
+
+def get_safe_audio_fade_ms(value, fallback: int = 0) -> int:
+    return clamp_int(value, 0, 30000, fallback)
+
+
+def get_safe_music_end_mode(value) -> str:
+    safe_value = str(value or "").strip()
+    if safe_value in {"until_next_music", "scene_end", "after_block"}:
+        return safe_value
+    return "until_next_music"
+
+
+def get_safe_screen_color_grade(source) -> dict:
+    grade = source if isinstance(source, dict) else {}
+    safe_grade = {}
+    for key, fallback in SCREEN_COLOR_GRADE_DEFAULTS.items():
+        minimum, maximum = SCREEN_COLOR_GRADE_LIMITS[key]
+        safe_grade[key] = clamp_int(grade.get(key), minimum, maximum, fallback)
+    return safe_grade
+
+
+def get_music_scope_from_block(block: dict | None, scene_id: str | None) -> dict:
+    source = block or {}
+    end_mode = get_safe_music_end_mode(source.get("endMode"))
+    end_block_id = str(source.get("endBlockId") or "").strip() if end_mode == "after_block" else ""
+    if end_mode == "after_block" and not end_block_id:
+        end_mode = "until_next_music"
+    return {
+        "sceneId": str(scene_id or ""),
+        "endMode": end_mode,
+        "endBlockId": end_block_id,
+        "fadeOutMs": get_safe_audio_fade_ms(source.get("fadeOutMs"), 600),
+    }
 
 
 def parse_hex_color(value, fallback):
@@ -6999,6 +7050,7 @@ class NativeRuntimePlayer:
         self.image_file_cache: dict[str, object] = {}
         self.sound_cache: dict[str, object] = {}
         self.current_bgm_asset_id: str | None = None
+        self.current_bgm_scope: dict | None = None
         self.current_voice_channel = None
         self.project_id = str(self.project.get("projectId") or "untitled_project")
         self.save_store = load_project_save_store(self.project_id, self.formal_save_slot_count)
@@ -8013,6 +8065,7 @@ class NativeRuntimePlayer:
                 self.auto_play_deadline_ms = 0
 
     def handle_scene_finished(self, scene: dict | None) -> None:
+        self.apply_bgm_scope_for_scene_finished(scene)
         self.unlock_relation_entries_for_scene(scene)
         scene_id = str((scene or {}).get("id") or "").strip()
         if self.is_ending_scene(scene_id):
@@ -8433,6 +8486,7 @@ class NativeRuntimePlayer:
         self.stage_background_asset_id = None
         self.visible_characters = {}
         self.current_bgm_asset_id = None
+        self.current_bgm_scope = None
         self.variable_state = self.build_initial_variable_state()
         self.current_scene_id = self.project.get("entrySceneId") or self.scene_order[0]
         if self.current_scene_id not in self.scenes_by_id:
@@ -8841,6 +8895,7 @@ class NativeRuntimePlayer:
             },
             "visibleCharacters": dict(self.visible_characters),
             "currentBgmAssetId": self.current_bgm_asset_id,
+            "currentBgmScope": dict(self.current_bgm_scope) if isinstance(self.current_bgm_scope, dict) else None,
             "finished": self.finished,
             "finishedMessage": self.finished_message,
             "summaryText": self.get_current_line_preview()[:96],
@@ -8913,6 +8968,7 @@ class NativeRuntimePlayer:
         self.apply_scene3d_preview_config(snapshot.get("scene3dPreview") if isinstance(snapshot.get("scene3dPreview"), dict) else None)
         self.visible_characters = dict(snapshot.get("visibleCharacters") or {})
         self.current_bgm_asset_id = None
+        self.current_bgm_scope = snapshot.get("currentBgmScope") if isinstance(snapshot.get("currentBgmScope"), dict) else None
         self.clear_particle_effect()
         self.clear_stage_visual_effects(include_persistent=True)
 
@@ -8951,6 +9007,39 @@ class NativeRuntimePlayer:
     def clear_particle_effect(self) -> None:
         self.active_particle_effect = None
         self.particle_items = []
+
+    def stop_bgm_for_scope_end(self, fade_out_ms: int = 0) -> None:
+        self.stop_bgm(fade_out_ms=fade_out_ms)
+        self.current_bgm_scope = None
+
+    def apply_bgm_scope_before_block(self, scene: dict | None, block_index: int) -> None:
+        scope = self.current_bgm_scope if isinstance(self.current_bgm_scope, dict) else None
+        if not scope:
+            return
+        end_mode = get_safe_music_end_mode(scope.get("endMode"))
+        if end_mode == "until_next_music":
+            return
+        scene_id = str((scene or {}).get("id") or "")
+        scope_scene_id = str(scope.get("sceneId") or "")
+        if scope_scene_id and scene_id and scope_scene_id != scene_id:
+            self.stop_bgm_for_scope_end(get_safe_audio_fade_ms(scope.get("fadeOutMs"), 600))
+            return
+        if end_mode != "after_block":
+            return
+        end_block_id = str(scope.get("endBlockId") or "")
+        blocks = (scene or {}).get("blocks", []) or []
+        end_index = next((index for index, item in enumerate(blocks) if item.get("id") == end_block_id), -1)
+        if end_index >= 0 and block_index > end_index:
+            self.stop_bgm_for_scope_end(get_safe_audio_fade_ms(scope.get("fadeOutMs"), 600))
+
+    def apply_bgm_scope_for_scene_finished(self, scene: dict | None) -> None:
+        scope = self.current_bgm_scope if isinstance(self.current_bgm_scope, dict) else None
+        if not scope or get_safe_music_end_mode(scope.get("endMode")) == "until_next_music":
+            return
+        scene_id = str((scene or {}).get("id") or "")
+        scope_scene_id = str(scope.get("sceneId") or "")
+        if not scope_scene_id or scope_scene_id == scene_id:
+            self.stop_bgm_for_scope_end(get_safe_audio_fade_ms(scope.get("fadeOutMs"), 600))
 
     def clear_stage_visual_effects(self, include_persistent: bool = False) -> None:
         self.screen_shake_effect = None
@@ -9149,6 +9238,8 @@ class NativeRuntimePlayer:
                 self.handle_scene_finished(scene)
                 return
 
+            self.apply_bgm_scope_before_block(scene, self.current_block_index)
+
             block = blocks[self.current_block_index]
             block_type = str(block.get("type") or "").strip()
 
@@ -9184,12 +9275,18 @@ class NativeRuntimePlayer:
                 continue
 
             if block_type == "music_play":
-                self.play_bgm(block.get("assetId"), loop=bool(block.get("loop", True)))
+                self.current_bgm_scope = get_music_scope_from_block(block, self.current_scene_id)
+                self.play_bgm(
+                    block.get("assetId"),
+                    loop=bool(block.get("loop", True)),
+                    fade_in_ms=get_safe_audio_fade_ms(block.get("fadeInMs"), 600),
+                )
                 self.current_block_index += 1
                 continue
 
             if block_type == "music_stop":
-                self.stop_bgm()
+                self.current_bgm_scope = None
+                self.stop_bgm(fade_out_ms=get_safe_audio_fade_ms(block.get("fadeOutMs"), 600))
                 self.current_block_index += 1
                 continue
 
@@ -9338,7 +9435,7 @@ class NativeRuntimePlayer:
             "stage": get_safe_character_stage(existing.get("stage")),
         }
 
-    def play_bgm(self, asset_id: str | None, loop: bool = True) -> None:
+    def play_bgm(self, asset_id: str | None, loop: bool = True, fade_in_ms: int = 0) -> None:
         if not self.pygame.mixer.get_init():
             return
         if asset_id == self.current_bgm_asset_id:
@@ -9347,21 +9444,32 @@ class NativeRuntimePlayer:
         asset_path = get_asset_runtime_path(self.bundle_dir, asset)
         if not asset_path:
             self.current_bgm_asset_id = None
+            self.current_bgm_scope = None
             return
         if asset and asset.get("type") == "bgm":
             self.unlock_archive_entry("bgmUnlocked", asset_id)
         try:
             self.pygame.mixer.music.load(str(asset_path))
             self.pygame.mixer.music.set_volume(self.get_effective_volume("bgmVolume"))
-            self.pygame.mixer.music.play(-1 if loop else 0)
+            safe_fade_in_ms = get_safe_audio_fade_ms(fade_in_ms)
+            try:
+                self.pygame.mixer.music.play(-1 if loop else 0, fade_ms=safe_fade_in_ms)
+            except TypeError:
+                self.pygame.mixer.music.play(-1 if loop else 0)
             self.current_bgm_asset_id = asset_id
         except Exception:
             self.current_bgm_asset_id = None
+            self.current_bgm_scope = None
 
-    def stop_bgm(self) -> None:
+    def stop_bgm(self, fade_out_ms: int = 0) -> None:
         if self.pygame.mixer.get_init():
-            self.pygame.mixer.music.stop()
+            safe_fade_out_ms = get_safe_audio_fade_ms(fade_out_ms)
+            if safe_fade_out_ms > 0:
+                self.pygame.mixer.music.fadeout(safe_fade_out_ms)
+            else:
+                self.pygame.mixer.music.stop()
         self.current_bgm_asset_id = None
+        self.current_bgm_scope = None
 
     def play_sfx(self, asset_id: str | None) -> None:
         sound = self._load_sound(asset_id)
@@ -10118,11 +10226,70 @@ class NativeRuntimePlayer:
         if self.screen_filter_effect:
             preset = str(self.screen_filter_effect.get("preset") or "memory")
             strength = str(self.screen_filter_effect.get("strength") or "medium")
+            grade = get_safe_screen_color_grade(self.screen_filter_effect.get("grade"))
             wash_color, base_alpha = SCREEN_FILTER_WASH.get(preset, SCREEN_FILTER_WASH["memory"])
             alpha = int(base_alpha * SCREEN_FILTER_STRENGTH_MULTIPLIER.get(strength, 1.0))
             wash = self.pygame.Surface((self.width, self.height), self.pygame.SRCALPHA)
             wash.fill((*wash_color, max(0, min(160, alpha))))
             self.screen.blit(wash, (0, 0))
+
+            temperature = int(grade.get("temperature") or 0)
+            if temperature:
+                temp_color = (255, 184, 102) if temperature > 0 else (108, 172, 255)
+                temp_alpha = int(min(54, abs(temperature) / 100 * 54))
+                temp_wash = self.pygame.Surface((self.width, self.height), self.pygame.SRCALPHA)
+                temp_wash.fill((*temp_color, temp_alpha))
+                self.screen.blit(temp_wash, (0, 0))
+
+            brightness_delta = int(grade.get("brightness") or 100) - 100
+            if brightness_delta:
+                tone = 255 if brightness_delta > 0 else 0
+                tone_alpha = int(min(72, abs(brightness_delta) / 80 * 72))
+                tone_wash = self.pygame.Surface((self.width, self.height), self.pygame.SRCALPHA)
+                tone_wash.fill((tone, tone, tone, tone_alpha))
+                self.screen.blit(tone_wash, (0, 0))
+
+            contrast_delta = int(grade.get("contrast") or 100) - 100
+            if contrast_delta > 0:
+                multiplier = 255 - int(min(42, contrast_delta / 80 * 42))
+                contrast_wash = self.pygame.Surface((self.width, self.height), self.pygame.SRCALPHA)
+                contrast_wash.fill((multiplier, multiplier, multiplier, 255))
+                self.screen.blit(contrast_wash, (0, 0), special_flags=self.pygame.BLEND_RGBA_MULT)
+            elif contrast_delta < 0:
+                flat_alpha = int(min(42, abs(contrast_delta) / 80 * 42))
+                flat_wash = self.pygame.Surface((self.width, self.height), self.pygame.SRCALPHA)
+                flat_wash.fill((140, 148, 160, flat_alpha))
+                self.screen.blit(flat_wash, (0, 0))
+
+            saturation_delta = int(grade.get("saturation") or 100) - 100
+            if saturation_delta < 0:
+                gray_alpha = int(min(58, abs(saturation_delta) / 100 * 58))
+                gray_wash = self.pygame.Surface((self.width, self.height), self.pygame.SRCALPHA)
+                gray_wash.fill((184, 192, 206, gray_alpha))
+                self.screen.blit(gray_wash, (0, 0))
+
+            hue_shift = int(grade.get("hue") or 0)
+            if hue_shift:
+                hue_color = (142, 106, 255) if hue_shift > 0 else (94, 222, 184)
+                hue_alpha = int(min(34, abs(hue_shift) / 180 * 34))
+                hue_wash = self.pygame.Surface((self.width, self.height), self.pygame.SRCALPHA)
+                hue_wash.fill((*hue_color, hue_alpha))
+                self.screen.blit(hue_wash, (0, 0))
+
+            vignette = int(grade.get("vignette") or 0)
+            if vignette > 0:
+                vignette_surface = self.pygame.Surface((self.width, self.height), self.pygame.SRCALPHA)
+                max_alpha = int(min(122, vignette / 100 * 122))
+                band = max(1, int(min(self.width, self.height) * 0.16))
+                for index in range(6):
+                    ratio = (index + 1) / 6
+                    alpha_step = int(max_alpha * ratio)
+                    inset = int(band * (1 - ratio))
+                    self.pygame.draw.rect(vignette_surface, (2, 6, 12, alpha_step), self.pygame.Rect(0, 0, self.width, max(1, band - inset)))
+                    self.pygame.draw.rect(vignette_surface, (2, 6, 12, alpha_step), self.pygame.Rect(0, self.height - max(1, band - inset), self.width, max(1, band - inset)))
+                    self.pygame.draw.rect(vignette_surface, (2, 6, 12, alpha_step), self.pygame.Rect(0, 0, max(1, band - inset), self.height))
+                    self.pygame.draw.rect(vignette_surface, (2, 6, 12, alpha_step), self.pygame.Rect(self.width - max(1, band - inset), 0, max(1, band - inset), self.height))
+                self.screen.blit(vignette_surface, (0, 0))
 
         if self.depth_blur_effect:
             strength = str(self.depth_blur_effect.get("strength") or "medium")

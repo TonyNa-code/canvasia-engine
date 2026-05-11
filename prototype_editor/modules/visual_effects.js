@@ -70,6 +70,24 @@
     strong: "更明显",
   });
 
+  const SCREEN_COLOR_GRADE_DEFAULTS = Object.freeze({
+    brightness: 100,
+    contrast: 100,
+    saturation: 100,
+    hue: 0,
+    temperature: 0,
+    vignette: 0,
+  });
+
+  const SCREEN_COLOR_GRADE_LIMITS = Object.freeze({
+    brightness: Object.freeze([40, 180]),
+    contrast: Object.freeze([40, 180]),
+    saturation: Object.freeze([0, 220]),
+    hue: Object.freeze([-180, 180]),
+    temperature: Object.freeze([-100, 100]),
+    vignette: Object.freeze([0, 100]),
+  });
+
   const CAMERA_PAN_TARGET_LABELS = Object.freeze({
     left: "向左看",
     center: "回到中间",
@@ -330,6 +348,61 @@
     return SCREEN_FILTER_STRENGTH_LABELS[getSafeScreenFilterStrength(strength)];
   }
 
+  function getSafeScreenColorGrade(source) {
+    const grade = source && typeof source === "object" ? source : {};
+    return Object.fromEntries(
+      Object.entries(SCREEN_COLOR_GRADE_DEFAULTS).map(([key, fallback]) => {
+        const [minimum, maximum] = SCREEN_COLOR_GRADE_LIMITS[key];
+        const value = Number(grade[key]);
+        const safeValue = Number.isFinite(value) ? value : fallback;
+        return [key, Math.round(clamp(safeValue, minimum, maximum))];
+      })
+    );
+  }
+
+  function getScreenColorGradeCss(source) {
+    const grade = getSafeScreenColorGrade(source);
+    const hue = grade.hue - grade.temperature * 0.08;
+    return [
+      `brightness(${(grade.brightness / 100).toFixed(3)})`,
+      `contrast(${(grade.contrast / 100).toFixed(3)})`,
+      `saturate(${(grade.saturation / 100).toFixed(3)})`,
+      `hue-rotate(${hue.toFixed(2)}deg)`,
+    ].join(" ");
+  }
+
+  function getScreenColorGradeSummary(source) {
+    const grade = getSafeScreenColorGrade(source);
+    const parts = [];
+    if (grade.brightness !== SCREEN_COLOR_GRADE_DEFAULTS.brightness) {
+      parts.push(`亮度 ${grade.brightness}`);
+    }
+    if (grade.contrast !== SCREEN_COLOR_GRADE_DEFAULTS.contrast) {
+      parts.push(`对比 ${grade.contrast}`);
+    }
+    if (grade.saturation !== SCREEN_COLOR_GRADE_DEFAULTS.saturation) {
+      parts.push(`饱和 ${grade.saturation}`);
+    }
+    if (grade.hue !== SCREEN_COLOR_GRADE_DEFAULTS.hue) {
+      parts.push(`色相 ${grade.hue}`);
+    }
+    if (grade.temperature !== SCREEN_COLOR_GRADE_DEFAULTS.temperature) {
+      parts.push(`冷暖 ${grade.temperature}`);
+    }
+    if (grade.vignette !== SCREEN_COLOR_GRADE_DEFAULTS.vignette) {
+      parts.push(`暗角 ${grade.vignette}`);
+    }
+    return parts.length ? parts.join(" / ") : "默认色彩";
+  }
+
+  function getScreenFilterVignette(screenFilter) {
+    if (!screenFilter) {
+      return 0;
+    }
+    const grade = getSafeScreenColorGrade(screenFilter.grade);
+    return Number((grade.vignette / 100 * 0.68).toFixed(3));
+  }
+
   function getScreenFilterCss(screenFilter) {
     if (!screenFilter) {
       return "";
@@ -360,7 +433,7 @@
       },
     };
 
-    return recipes[preset][strength];
+    return [recipes[preset][strength], getScreenColorGradeCss(screenFilter.grade)].filter(Boolean).join(" ");
   }
 
   function getScreenFilterWash(screenFilter) {
@@ -373,7 +446,8 @@
 
     const preset = getSafeScreenFilterPreset(screenFilter.preset);
     const strength = getSafeScreenFilterStrength(screenFilter.strength);
-    const opacity = {
+    const grade = getSafeScreenColorGrade(screenFilter.grade);
+    const baseOpacity = {
       soft: 0.12,
       medium: 0.2,
       strong: 0.28,
@@ -384,10 +458,16 @@
       dream: "linear-gradient(180deg, rgba(255, 241, 250, 0.82), rgba(214, 230, 255, 0.48))",
       cold: "linear-gradient(180deg, rgba(204, 232, 255, 0.72), rgba(136, 176, 222, 0.44))",
     };
+    const temperatureWash =
+      grade.temperature > 0
+        ? "linear-gradient(180deg, rgba(255, 220, 166, 0.76), rgba(255, 150, 92, 0.34))"
+        : "linear-gradient(180deg, rgba(178, 221, 255, 0.72), rgba(86, 126, 255, 0.3))";
+    const temperatureOpacity = Math.abs(grade.temperature) / 100 * 0.16;
 
     return {
-      background: backgrounds[preset],
-      opacity,
+      background:
+        temperatureOpacity > 0.001 ? `${temperatureWash}, ${backgrounds[preset]}` : backgrounds[preset],
+      opacity: Number(clamp(baseOpacity + temperatureOpacity, 0, 0.46).toFixed(3)),
     };
   }
 
@@ -510,6 +590,8 @@
     SCREEN_FILTER_ACTION_LABELS,
     SCREEN_FILTER_PRESET_LABELS,
     SCREEN_FILTER_STRENGTH_LABELS,
+    SCREEN_COLOR_GRADE_DEFAULTS,
+    SCREEN_COLOR_GRADE_LIMITS,
     CAMERA_PAN_TARGET_LABELS,
     CAMERA_PAN_STRENGTH_LABELS,
     DEPTH_BLUR_ACTION_LABELS,
@@ -554,8 +636,12 @@
     getScreenFilterPresetLabel,
     getSafeScreenFilterStrength,
     getScreenFilterStrengthLabel,
+    getSafeScreenColorGrade,
+    getScreenColorGradeCss,
+    getScreenColorGradeSummary,
     getScreenFilterCss,
     getScreenFilterWash,
+    getScreenFilterVignette,
     getSafeDepthBlurAction,
     getDepthBlurActionLabel,
     getSafeDepthBlurFocus,

@@ -13,6 +13,8 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 EDITOR_DIR = ROOT_DIR / "prototype_editor"
 INDEX_PATH = EDITOR_DIR / "index.html"
 APP_PATH = EDITOR_DIR / "app.js"
+PLAYER_PATH = ROOT_DIR / "export_player_template" / "player.js"
+NATIVE_RUNTIME_PATH = ROOT_DIR / "native_runtime" / "runtime_player.py"
 MODULE_PATHS = tuple(sorted((EDITOR_DIR / "modules").glob("*.js")))
 ACTION_ATTRIBUTE_PATHS = (INDEX_PATH, APP_PATH)
 ACTION_CONFIG_PATHS = (APP_PATH, *MODULE_PATHS)
@@ -351,6 +353,71 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn('disabled aria-disabled="true"', html)
         self.assertIn('title="先点“预览”再执行"', html)
         self.assertIn("确认 &lt;执行&gt;", html)
+
+    def test_exported_runtimes_honor_bgm_fade_controls(self) -> None:
+        app_source = APP_PATH.read_text(encoding="utf-8")
+        music_editor = _extract_function_source(app_source, "renderMusicPlayEditor")
+        collect_edited_block = _extract_function_source(app_source, "collectEditedBlock")
+        player_source = PLAYER_PATH.read_text(encoding="utf-8")
+        sync_audio = _extract_function_source(player_source, "syncAudio")
+        apply_block = _extract_function_source(player_source, "applyBlockToPreviewState")
+        fade_audio = _extract_function_source(player_source, "fadeAudioVolume")
+        stop_music = _extract_function_source(player_source, "stopMusic")
+
+        self.assertIn("editorMusicEndMode", music_editor)
+        self.assertIn("editorMusicEndBlockId", music_editor)
+        self.assertIn("editorMusicRangeFadeOutMs", music_editor)
+        self.assertIn("endMode", collect_edited_block)
+        self.assertIn("endBlockId", collect_edited_block)
+        self.assertIn("snapshot.block?.fadeInMs", sync_audio)
+        self.assertIn("snapshot.visualState?.musicFadeOutMs", sync_audio)
+        self.assertIn("snapshot.visualState?.musicPreviousFadeOutMs", sync_audio)
+        self.assertIn("getMusicScopeFromBlock(block, sceneId)", apply_block)
+        self.assertIn("applyMusicScopeBeforeBlock", player_source)
+        self.assertIn("window.requestAnimationFrame", fade_audio)
+        self.assertIn("fadeOutPreviousMusic(fadeOutMs)", stop_music)
+
+        native_source = NATIVE_RUNTIME_PATH.read_text(encoding="utf-8")
+        self.assertIn("def get_safe_audio_fade_ms", native_source)
+        self.assertIn("def get_music_scope_from_block", native_source)
+        self.assertIn("self.current_bgm_scope = get_music_scope_from_block(block, self.current_scene_id)", native_source)
+        self.assertIn("def apply_bgm_scope_before_block", native_source)
+        self.assertIn('fade_in_ms=get_safe_audio_fade_ms(block.get("fadeInMs"), 600)', native_source)
+        self.assertIn('self.stop_bgm(fade_out_ms=get_safe_audio_fade_ms(block.get("fadeOutMs"), 600))', native_source)
+        self.assertIn("self.pygame.mixer.music.fadeout(safe_fade_out_ms)", native_source)
+
+    def test_screen_filter_color_grade_controls_reach_exported_runtimes(self) -> None:
+        app_source = APP_PATH.read_text(encoding="utf-8")
+        filter_editor = _extract_function_source(app_source, "renderScreenFilterEditor")
+        collect_edited_block = _extract_function_source(app_source, "collectEditedBlock")
+        filter_layer = _extract_function_source(app_source, "renderStageFilterLayer")
+
+        self.assertIn("editorColorGradeBrightness", filter_editor)
+        self.assertIn("editorColorGradeContrast", filter_editor)
+        self.assertIn("editorColorGradeSaturation", filter_editor)
+        self.assertIn("editorColorGradeHue", filter_editor)
+        self.assertIn("editorColorGradeTemperature", filter_editor)
+        self.assertIn("editorColorGradeVignette", filter_editor)
+        self.assertIn("grade: readScreenColorGradeControls()", collect_edited_block)
+        self.assertIn("--filter-vignette-opacity", filter_layer)
+        self.assertIn("getScreenColorGradeSummary(block.grade)", app_source)
+
+        player_source = PLAYER_PATH.read_text(encoding="utf-8")
+        screen_css = _extract_function_source(player_source, "getScreenFilterCss")
+        apply_block = _extract_function_source(player_source, "applyBlockToPreviewState")
+        presentation = _extract_function_source(player_source, "applyStageWorldPresentation")
+
+        self.assertIn("getScreenColorGradeCss(screenFilter.grade)", screen_css)
+        self.assertIn("grade: getSafeScreenColorGrade(block.grade)", apply_block)
+        self.assertIn("getScreenFilterVignette(visualState.screenFilter)", presentation)
+        self.assertIn("--filter-vignette-opacity", (ROOT_DIR / "export_player_template" / "player.css").read_text(encoding="utf-8"))
+
+        native_source = NATIVE_RUNTIME_PATH.read_text(encoding="utf-8")
+        self.assertIn("SCREEN_COLOR_GRADE_DEFAULTS", native_source)
+        self.assertIn("def get_safe_screen_color_grade", native_source)
+        self.assertIn('"grade": get_safe_screen_color_grade(block.get("grade"))', native_source)
+        self.assertIn("temperature = int(grade.get(\"temperature\") or 0)", native_source)
+        self.assertIn("vignette = int(grade.get(\"vignette\") or 0)", native_source)
 
     def test_project_doctor_report_labels_distinguish_preview_from_repair(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")

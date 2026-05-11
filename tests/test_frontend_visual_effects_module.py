@@ -66,6 +66,11 @@ class FrontendVisualEffectsModuleTests(unittest.TestCase):
                 tools.getScreenFilterCss(null),
                 tools.getScreenFilterWash({{ preset: "dream", strength: "soft" }}),
                 tools.getScreenFilterWash(null),
+                tools.getSafeScreenColorGrade({{ brightness: "999", temperature: "-140", vignette: "bad" }}),
+                tools.getScreenColorGradeCss({{ brightness: 120, contrast: 80, saturation: 135, hue: 18, temperature: -30 }}),
+                tools.getScreenColorGradeSummary({{ brightness: 120, temperature: -30, vignette: 20 }}),
+                tools.getScreenFilterVignette({{ grade: {{ vignette: 50 }} }}),
+                tools.getScreenFilterWash({{ preset: "memory", strength: "medium", grade: {{ temperature: 80 }} }}),
               ],
               depth: [
                 tools.getDepthBlurBackdropPx("strong"),
@@ -117,6 +122,16 @@ class FrontendVisualEffectsModuleTests(unittest.TestCase):
         self.assertEqual(payload["screen"][2]["opacity"], 0.12)
         self.assertIn("rgba(255, 241, 250", payload["screen"][2]["background"])
         self.assertEqual(payload["screen"][3], {"background": "transparent", "opacity": 0})
+        self.assertEqual(
+            payload["screen"][4],
+            {"brightness": 180, "contrast": 100, "saturation": 100, "hue": 0, "temperature": -100, "vignette": 0},
+        )
+        self.assertIn("brightness(1.200)", payload["screen"][5])
+        self.assertIn("hue-rotate(20.40deg)", payload["screen"][5])
+        self.assertEqual(payload["screen"][6], "亮度 120 / 冷暖 -30 / 暗角 20")
+        self.assertAlmostEqual(payload["screen"][7], 0.34)
+        self.assertEqual(payload["screen"][8]["opacity"], 0.328)
+        self.assertIn("rgba(255, 220, 166", payload["screen"][8]["background"])
         self.assertEqual(payload["depth"], [10, 2.4, 1.8, 0.58])
         self.assertEqual(payload["videoAndCredits"][0:8], [0, 50, 100, 100, 4, 36, 180, 18])
         self.assertEqual(payload["videoAndCredits"][8], ["制作：Tony Na", "音乐：夜雨"])

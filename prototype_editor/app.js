@@ -70,6 +70,20 @@ function getBlockLabel(type) {
   return BLOCK_LABELS[type] ?? type ?? "步骤";
 }
 
+const MUSIC_END_MODE_LABELS = {
+  until_next_music: "播到下一首或停止卡",
+  scene_end: "播完整个场景",
+  after_block: "播到指定卡片后",
+};
+
+function getSafeMusicEndMode(mode) {
+  return Object.hasOwn(MUSIC_END_MODE_LABELS, mode) ? mode : "until_next_music";
+}
+
+function getMusicEndModeLabel(mode) {
+  return MUSIC_END_MODE_LABELS[getSafeMusicEndMode(mode)];
+}
+
 const editorCommonTools = window.TonyNaEditorCommon;
 const projectSettingsTools = window.TonyNaEditorProjectSettings;
 const systemDialogTools = window.TonyNaEditorSystemDialog;
@@ -1360,6 +1374,24 @@ const SCREEN_FILTER_STRENGTH_LABELS = visualEffectTools?.SCREEN_FILTER_STRENGTH_
   medium: "正常",
   strong: "更明显",
 };
+
+const SCREEN_COLOR_GRADE_DEFAULTS = visualEffectTools?.SCREEN_COLOR_GRADE_DEFAULTS ?? Object.freeze({
+  brightness: 100,
+  contrast: 100,
+  saturation: 100,
+  hue: 0,
+  temperature: 0,
+  vignette: 0,
+});
+
+const SCREEN_COLOR_GRADE_LIMITS = visualEffectTools?.SCREEN_COLOR_GRADE_LIMITS ?? Object.freeze({
+  brightness: Object.freeze([40, 180]),
+  contrast: Object.freeze([40, 180]),
+  saturation: Object.freeze([0, 220]),
+  hue: Object.freeze([-180, 180]),
+  temperature: Object.freeze([-100, 100]),
+  vignette: Object.freeze([0, 100]),
+});
 
 const CAMERA_PAN_TARGET_LABELS = visualEffectTools?.CAMERA_PAN_TARGET_LABELS ?? {
   left: "向左看",
@@ -21731,6 +21763,10 @@ function createInitialPreviewVisualState() {
     scene3dPreview: null,
     scene3dPreview: null,
     musicName: "未播放",
+    musicAssetId: null,
+    musicScope: null,
+    musicFadeOutMs: 0,
+    musicPreviousFadeOutMs: 0,
     particleEffect: null,
     screenShake: null,
     screenFlash: null,
@@ -21755,6 +21791,16 @@ function clonePreviewVisualState(visualState) {
     particleEffect: visualState?.particleEffect
       ? normalizeParticleEffectConfig(visualState.particleEffect)
       : null,
+    musicScope: visualState?.musicScope
+      ? {
+          sceneId: String(visualState.musicScope.sceneId ?? ""),
+          endMode: getSafeMusicEndMode(visualState.musicScope.endMode),
+          endBlockId: String(visualState.musicScope.endBlockId ?? ""),
+          fadeOutMs: getSafeNonNegativeNumber(visualState.musicScope.fadeOutMs, 600),
+        }
+      : null,
+    musicFadeOutMs: getSafeNonNegativeNumber(visualState?.musicFadeOutMs, 0),
+    musicPreviousFadeOutMs: getSafeNonNegativeNumber(visualState?.musicPreviousFadeOutMs, 0),
     scene3dPreview: visualState?.scene3dPreview ? getSafeScene3dPreviewConfig(visualState.scene3dPreview) : null,
     screenShake: visualState?.screenShake
       ? {
@@ -21792,6 +21838,7 @@ function clonePreviewVisualState(visualState) {
       ? {
           preset: getSafeScreenFilterPreset(visualState.screenFilter.preset),
           strength: getSafeScreenFilterStrength(visualState.screenFilter.strength),
+          grade: getSafeScreenColorGrade(visualState.screenFilter.grade),
         }
       : null,
     depthBlur: visualState?.depthBlur
@@ -21823,6 +21870,58 @@ function clearTransientStageEffects(visualState) {
   visualState.activeCharacterId = null;
   visualState.characterTransitionEvent = null;
   visualState.characterEmphasisEvent = null;
+  visualState.musicFadeOutMs = 0;
+  visualState.musicPreviousFadeOutMs = 0;
+}
+
+function getMusicScopeFromBlock(block = {}, sceneId = "") {
+  const endMode = getSafeMusicEndMode(block.endMode);
+  const endBlockId = endMode === "after_block" ? String(block.endBlockId ?? "").trim() : "";
+  return {
+    sceneId: String(sceneId ?? ""),
+    endMode: endBlockId ? endMode : endMode === "after_block" ? "until_next_music" : endMode,
+    endBlockId,
+    fadeOutMs: getSafeNonNegativeNumber(block.fadeOutMs, 600),
+  };
+}
+
+function clearPreviewMusicForScopeEnd(visualState, fadeOutMs = 0) {
+  visualState.musicAssetId = null;
+  visualState.musicName = "未播放";
+  visualState.musicScope = null;
+  visualState.musicFadeOutMs = getSafeNonNegativeNumber(fadeOutMs, 0);
+}
+
+function applyMusicScopeBeforeBlock(visualState, scene, blockIndex) {
+  const scope = visualState?.musicScope;
+  if (!scope || getSafeMusicEndMode(scope.endMode) === "until_next_music") {
+    return;
+  }
+
+  const sceneId = String(scene?.id ?? "");
+  const scopeSceneId = String(scope.sceneId ?? "");
+  if (scopeSceneId && sceneId && scopeSceneId !== sceneId) {
+    clearPreviewMusicForScopeEnd(visualState, scope.fadeOutMs);
+    return;
+  }
+
+  if (getSafeMusicEndMode(scope.endMode) !== "after_block") {
+    return;
+  }
+
+  const endBlockId = String(scope.endBlockId ?? "");
+  const endIndex = (scene?.blocks ?? []).findIndex((item) => item.id === endBlockId);
+  if (endIndex >= 0 && blockIndex > endIndex) {
+    clearPreviewMusicForScopeEnd(visualState, scope.fadeOutMs);
+  }
+}
+
+function applyMusicScopeForTerminal(visualState) {
+  const scope = visualState?.musicScope;
+  if (!scope || getSafeMusicEndMode(scope.endMode) === "until_next_music") {
+    return;
+  }
+  clearPreviewMusicForScopeEnd(visualState, scope.fadeOutMs);
 }
 
 function createInitialVariableState() {
@@ -21869,8 +21968,9 @@ function buildPreviewSnapshot(sceneId, blockIndex, previousVisualState, previous
 
   const nextVisualState = clonePreviewVisualState(baseVisualState);
   clearTransientStageEffects(nextVisualState);
+  applyMusicScopeBeforeBlock(nextVisualState, scene, blockIndex);
   const nextVariables = clonePreviewVariables(baseVariables);
-  const transitionTargetSceneId = applyBlockToPreviewState(block, nextVisualState, nextVariables);
+  const transitionTargetSceneId = applyBlockToPreviewState(block, nextVisualState, nextVariables, scene.id);
   const conditionResult =
     block.type === "condition" ? resolveConditionBranchResult(block, nextVariables) : null;
 
@@ -21894,6 +21994,7 @@ function buildPreviewSnapshot(sceneId, blockIndex, previousVisualState, previous
 function createPreviewTerminalSnapshot(scene, visualState, variables, message) {
   const nextVisualState = clonePreviewVisualState(visualState);
   clearTransientStageEffects(nextVisualState);
+  applyMusicScopeForTerminal(nextVisualState);
   nextVisualState.speakerName = "试玩结束";
   nextVisualState.dialogueText = message;
 
@@ -22007,7 +22108,7 @@ function choosePreviewRegressionOption(session, optionId) {
   return nextSnapshot;
 }
 
-function applyBlockToPreviewState(block, visualState, variables) {
+function applyBlockToPreviewState(block, visualState, variables, sceneId = "") {
   switch (block.type) {
     case "background": {
       const asset = state.data.assetsById.get(block.assetId);
@@ -22024,13 +22125,27 @@ function applyBlockToPreviewState(block, visualState, variables) {
     }
     case "music_play": {
       const asset = state.data.assetsById.get(block.assetId);
+      if (visualState.musicAssetId && visualState.musicAssetId !== block.assetId) {
+        visualState.musicPreviousFadeOutMs = getSafeNonNegativeNumber(
+          visualState.musicScope?.fadeOutMs,
+          getSafeNonNegativeNumber(block.fadeInMs, 0)
+        );
+      }
+      visualState.musicAssetId = block.assetId;
       visualState.musicName = asset?.name ?? block.assetId;
+      visualState.musicScope = getMusicScopeFromBlock(block, sceneId);
+      visualState.musicFadeOutMs = 0;
       visualState.speakerName = "音乐";
-      visualState.dialogueText = `开始播放：${asset?.name ?? block.assetId}`;
+      visualState.dialogueText = `开始播放：${asset?.name ?? block.assetId}。范围：${getMusicEndModeLabel(
+        visualState.musicScope.endMode
+      )}`;
       return null;
     }
     case "music_stop":
+      visualState.musicFadeOutMs = getSafeNonNegativeNumber(block.fadeOutMs, 600);
+      visualState.musicAssetId = null;
       visualState.musicName = "未播放";
+      visualState.musicScope = null;
       visualState.speakerName = "音乐";
       visualState.dialogueText = "背景音乐停止了。";
       return null;
@@ -22129,6 +22244,7 @@ function applyBlockToPreviewState(block, visualState, variables) {
           : {
               preset: getSafeScreenFilterPreset(block.preset),
               strength: getSafeScreenFilterStrength(block.strength),
+              grade: getSafeScreenColorGrade(block.grade),
             };
       visualState.speakerName = "画面滤镜";
       visualState.dialogueText =
@@ -22136,7 +22252,7 @@ function applyBlockToPreviewState(block, visualState, variables) {
           ? "当前画面的回忆滤镜会在这里关闭。"
           : `画面会套上${getScreenFilterPresetLabel(block.preset)}，强度 ${getScreenFilterStrengthLabel(
               block.strength
-            )}。`;
+            )}，调色 ${getScreenColorGradeSummary(block.grade)}。`;
       return null;
     }
     case "depth_blur": {
@@ -24333,12 +24449,14 @@ function renderStageFilterLayer(screenFilter) {
   }
 
   const wash = getScreenFilterWash(screenFilter);
+  const vignette = getScreenFilterVignette(screenFilter);
   return `
     <div
       class="stage-filter-layer"
       style="
         --filter-wash:${wash.background};
         --filter-opacity:${wash.opacity};
+        --filter-vignette-opacity:${vignette};
       "
       aria-hidden="true"
     ></div>
@@ -32343,14 +32461,65 @@ function renderCharacterHideEditor(block) {
   `;
 }
 
+function getMusicRangeCandidateBlocks(block = {}) {
+  const scene = getSelectedScene();
+  const blocks = scene?.blocks ?? [];
+  const currentIndex = blocks.findIndex((item) => item.id === block.id);
+  const candidateBlocks = blocks.filter((item, index) => item.id && (currentIndex < 0 || index > currentIndex));
+  if (block.endBlockId && !candidateBlocks.some((item) => item.id === block.endBlockId)) {
+    const preservedBlock = blocks.find((item) => item.id === block.endBlockId);
+    if (preservedBlock) {
+      candidateBlocks.unshift(preservedBlock);
+    }
+  }
+  return candidateBlocks;
+}
+
+function getMusicRangeBlockLabel(block, index) {
+  const label = getBlockLabel(block.type);
+  const text = block.text || block.title || block.name || block.assetId || "";
+  const suffix = text ? ` · ${truncateText(text, 28)}` : "";
+  return `${index + 1}. ${label}${suffix}`;
+}
+
+function renderMusicEndModeOptions(selectedMode) {
+  const safeMode = getSafeMusicEndMode(selectedMode);
+  return Object.entries(MUSIC_END_MODE_LABELS)
+    .map(
+      ([mode, label]) => `
+        <option value="${mode}" ${mode === safeMode ? "selected" : ""}>${escapeHtml(label)}</option>
+      `
+    )
+    .join("");
+}
+
+function renderMusicRangeEndBlockOptions(block) {
+  const candidates = getMusicRangeCandidateBlocks(block);
+  if (!candidates.length) {
+    return `<option value="">当前卡片后面还没有可选结束点</option>`;
+  }
+  const selectedId = String(block.endBlockId ?? "");
+  return candidates
+    .map(
+      (candidate, index) => `
+        <option value="${escapeHtml(candidate.id)}" ${candidate.id === selectedId ? "selected" : ""}>
+          ${escapeHtml(getMusicRangeBlockLabel(candidate, index))}
+        </option>
+      `
+    )
+    .join("");
+}
+
 function renderMusicPlayEditor(block) {
   const musicAssets = state.data.assetList.filter((asset) => asset.type === "bgm");
   const assetId = getSafeAssetIdByType("bgm", block.assetId);
+  const endMode = getSafeMusicEndMode(block.endMode);
+  const hasRangeCandidates = getMusicRangeCandidateBlocks(block).length > 0;
 
   return `
     <article class="editor-card">
       <h3>编辑背景音乐</h3>
-      <p>这里决定播哪首 BGM、是否循环，以及淡入多久。</p>
+      <p>这里决定播哪首 BGM、是否循环、淡入多久，以及这首歌覆盖哪一段剧情。</p>
     </article>
     <div class="field-grid">
       <div class="detail-row">
@@ -32375,9 +32544,29 @@ function renderMusicPlayEditor(block) {
         </select>
       </div>
       <div class="detail-row">
+        <label for="editorMusicEndMode">播放范围</label>
+        <select id="editorMusicEndMode">
+          ${renderMusicEndModeOptions(endMode)}
+        </select>
+        <p class="helper-text">可以让这首 BGM 自动覆盖一段文本，而不是只能机械地靠下一张音乐卡切换。</p>
+      </div>
+      <div class="detail-row">
+        <label for="editorMusicEndBlockId">范围结束卡片</label>
+        <select id="editorMusicEndBlockId" ${hasRangeCandidates ? "" : "disabled"}>
+          ${renderMusicRangeEndBlockOptions(block)}
+        </select>
+        <p class="helper-text">当播放范围选“播到指定卡片后”时，会在玩家看完这张卡片后自动淡出停止。</p>
+      </div>
+      <div class="detail-row">
         <label for="editorFadeInMs">淡入时间（毫秒）</label>
         <input id="editorFadeInMs" type="number" min="0" step="100" value="${escapeHtml(
           String(block.fadeInMs ?? 0)
+        )}" />
+      </div>
+      <div class="detail-row">
+        <label for="editorMusicRangeFadeOutMs">范围结束淡出（毫秒）</label>
+        <input id="editorMusicRangeFadeOutMs" type="number" min="0" step="100" value="${escapeHtml(
+          String(block.fadeOutMs ?? 600)
         )}" />
       </div>
     </div>
@@ -33534,15 +33723,38 @@ function renderCameraPanEditor(block) {
   `;
 }
 
+function renderColorGradeNumberInput(id, label, key, grade, hint = "") {
+  const [minimum, maximum] = SCREEN_COLOR_GRADE_LIMITS[key];
+  const defaultValue = SCREEN_COLOR_GRADE_DEFAULTS[key];
+  return `
+    <div class="detail-row">
+      <label for="${id}">${label}</label>
+      <input
+        id="${id}"
+        type="number"
+        min="${minimum}"
+        max="${maximum}"
+        step="1"
+        value="${grade[key]}"
+        aria-describedby="${id}Hint"
+      />
+      <div id="${id}Hint" class="helper-text">${escapeHtml(
+        hint || `范围 ${minimum} 到 ${maximum}，默认 ${defaultValue}`
+      )}</div>
+    </div>
+  `;
+}
+
 function renderScreenFilterEditor(block) {
   const action = getSafeScreenFilterAction(block.action);
   const preset = getSafeScreenFilterPreset(block.preset);
   const strength = getSafeScreenFilterStrength(block.strength);
+  const grade = getSafeScreenColorGrade(block.grade);
 
   return `
     <article class="editor-card">
-      <h3>编辑回忆滤镜</h3>
-      <p>适合回忆、梦境、冷静分析、旧照片感这类需要明显改变画面气氛的段落。</p>
+      <h3>编辑画面调色</h3>
+      <p>先选一个气氛预设，再像调色板一样微调亮度、对比度、色相、冷暖和暗角。</p>
     </article>
     <div class="field-grid">
       <div class="detail-row">
@@ -33588,6 +33800,18 @@ function renderScreenFilterEditor(block) {
         </select>
       </div>
       <div class="helper-text">滤镜会持续保留，直到后面插入一张“关闭滤镜”的卡片为止。</div>
+    </div>
+    <article class="editor-card">
+      <h3>基础调色板</h3>
+      <p>默认值不会改变画面。小白可以只改预设，高级用户可以用这些参数做统一色调。</p>
+    </article>
+    <div class="field-grid">
+      ${renderColorGradeNumberInput("editorColorGradeBrightness", "亮度", "brightness", grade)}
+      ${renderColorGradeNumberInput("editorColorGradeContrast", "对比度", "contrast", grade)}
+      ${renderColorGradeNumberInput("editorColorGradeSaturation", "饱和度", "saturation", grade)}
+      ${renderColorGradeNumberInput("editorColorGradeHue", "色相旋转", "hue", grade, "负数偏向前一段色相，正数偏向后一段色相，默认 0")}
+      ${renderColorGradeNumberInput("editorColorGradeTemperature", "冷暖色温", "temperature", grade, "负数更冷，正数更暖，默认 0")}
+      ${renderColorGradeNumberInput("editorColorGradeVignette", "暗角强度", "vignette", grade, "0 是关闭，100 是最明显")}
     </div>
     <div class="detail-actions">
       <button class="toolbar-button toolbar-button-primary" data-action="save-block">保存这张卡片</button>
@@ -39831,6 +40055,17 @@ async function splitSelectedReadableBlock() {
   return success;
 }
 
+function readScreenColorGradeControls() {
+  return getSafeScreenColorGrade({
+    brightness: document.getElementById("editorColorGradeBrightness")?.value,
+    contrast: document.getElementById("editorColorGradeContrast")?.value,
+    saturation: document.getElementById("editorColorGradeSaturation")?.value,
+    hue: document.getElementById("editorColorGradeHue")?.value,
+    temperature: document.getElementById("editorColorGradeTemperature")?.value,
+    vignette: document.getElementById("editorColorGradeVignette")?.value,
+  });
+}
+
 function collectEditedBlock(block) {
   if (block.type === "dialogue") {
     const speakerId = getSafeCharacterId(document.getElementById("editorSpeakerId")?.value);
@@ -39948,11 +40183,15 @@ function collectEditedBlock(block) {
   }
 
   if (block.type === "music_play") {
+    const endMode = getSafeMusicEndMode(document.getElementById("editorMusicEndMode")?.value);
     return {
       ...block,
       assetId: getSafeAssetIdByType("bgm", document.getElementById("editorMusicAssetId")?.value),
       loop: document.getElementById("editorMusicLoop")?.value !== "false",
       fadeInMs: getSafeNonNegativeNumber(document.getElementById("editorFadeInMs")?.value, 600),
+      fadeOutMs: getSafeNonNegativeNumber(document.getElementById("editorMusicRangeFadeOutMs")?.value, 600),
+      endMode,
+      endBlockId: endMode === "after_block" ? document.getElementById("editorMusicEndBlockId")?.value ?? "" : "",
     };
   }
 
@@ -40248,6 +40487,7 @@ function collectEditedBlock(block) {
       action: getSafeScreenFilterAction(document.getElementById("editorScreenFilterAction")?.value),
       preset: getSafeScreenFilterPreset(document.getElementById("editorScreenFilterPreset")?.value),
       strength: getSafeScreenFilterStrength(document.getElementById("editorScreenFilterStrength")?.value),
+      grade: readScreenColorGradeControls(),
     };
   }
 
@@ -41550,6 +41790,9 @@ function createDefaultBlock(scene, blockType) {
       assetId: getSafeAssetIdByType("bgm"),
       loop: true,
       fadeInMs: 600,
+      fadeOutMs: 600,
+      endMode: "until_next_music",
+      endBlockId: "",
     };
   }
 
@@ -41659,6 +41902,7 @@ function createDefaultBlock(scene, blockType) {
       action: "apply",
       preset: "memory",
       strength: "medium",
+      grade: getSafeScreenColorGrade(),
     };
   }
 
@@ -44843,6 +45087,77 @@ function getScreenFilterStrengthLabel(strength) {
   return visualEffectTools?.getScreenFilterStrengthLabel?.(strength) ?? SCREEN_FILTER_STRENGTH_LABELS[getSafeScreenFilterStrength(strength)];
 }
 
+function getSafeScreenColorGrade(source) {
+  if (visualEffectTools?.getSafeScreenColorGrade) {
+    return visualEffectTools.getSafeScreenColorGrade(source);
+  }
+
+  const grade = source && typeof source === "object" ? source : {};
+  return Object.fromEntries(
+    Object.entries(SCREEN_COLOR_GRADE_DEFAULTS).map(([key, fallback]) => {
+      const [minimum, maximum] = SCREEN_COLOR_GRADE_LIMITS[key];
+      const value = Number(grade[key]);
+      const safeValue = Number.isFinite(value) ? value : fallback;
+      return [key, Math.round(clamp(safeValue, minimum, maximum))];
+    })
+  );
+}
+
+function getScreenColorGradeCss(source) {
+  if (visualEffectTools?.getScreenColorGradeCss) {
+    return visualEffectTools.getScreenColorGradeCss(source);
+  }
+
+  const grade = getSafeScreenColorGrade(source);
+  const hue = grade.hue - grade.temperature * 0.08;
+  return [
+    `brightness(${(grade.brightness / 100).toFixed(3)})`,
+    `contrast(${(grade.contrast / 100).toFixed(3)})`,
+    `saturate(${(grade.saturation / 100).toFixed(3)})`,
+    `hue-rotate(${hue.toFixed(2)}deg)`,
+  ].join(" ");
+}
+
+function getScreenColorGradeSummary(source) {
+  if (visualEffectTools?.getScreenColorGradeSummary) {
+    return visualEffectTools.getScreenColorGradeSummary(source);
+  }
+
+  const grade = getSafeScreenColorGrade(source);
+  const parts = [];
+  if (grade.brightness !== SCREEN_COLOR_GRADE_DEFAULTS.brightness) {
+    parts.push(`亮度 ${grade.brightness}`);
+  }
+  if (grade.contrast !== SCREEN_COLOR_GRADE_DEFAULTS.contrast) {
+    parts.push(`对比 ${grade.contrast}`);
+  }
+  if (grade.saturation !== SCREEN_COLOR_GRADE_DEFAULTS.saturation) {
+    parts.push(`饱和 ${grade.saturation}`);
+  }
+  if (grade.hue !== SCREEN_COLOR_GRADE_DEFAULTS.hue) {
+    parts.push(`色相 ${grade.hue}`);
+  }
+  if (grade.temperature !== SCREEN_COLOR_GRADE_DEFAULTS.temperature) {
+    parts.push(`冷暖 ${grade.temperature}`);
+  }
+  if (grade.vignette !== SCREEN_COLOR_GRADE_DEFAULTS.vignette) {
+    parts.push(`暗角 ${grade.vignette}`);
+  }
+  return parts.length ? parts.join(" / ") : "默认色彩";
+}
+
+function getScreenFilterVignette(screenFilter) {
+  if (visualEffectTools?.getScreenFilterVignette) {
+    return visualEffectTools.getScreenFilterVignette(screenFilter);
+  }
+
+  if (!screenFilter) {
+    return 0;
+  }
+  const grade = getSafeScreenColorGrade(screenFilter.grade);
+  return Number((grade.vignette / 100 * 0.68).toFixed(3));
+}
+
 function getScreenFilterCss(screenFilter) {
   if (visualEffectTools?.getScreenFilterCss) {
     return visualEffectTools.getScreenFilterCss(screenFilter);
@@ -44878,7 +45193,7 @@ function getScreenFilterCss(screenFilter) {
     },
   };
 
-  return recipes[preset][strength];
+  return [recipes[preset][strength], getScreenColorGradeCss(screenFilter.grade)].filter(Boolean).join(" ");
 }
 
 function getScreenFilterWash(screenFilter) {
@@ -44895,7 +45210,8 @@ function getScreenFilterWash(screenFilter) {
 
   const preset = getSafeScreenFilterPreset(screenFilter.preset);
   const strength = getSafeScreenFilterStrength(screenFilter.strength);
-  const opacity = {
+  const grade = getSafeScreenColorGrade(screenFilter.grade);
+  const baseOpacity = {
     soft: 0.12,
     medium: 0.2,
     strong: 0.28,
@@ -44907,10 +45223,15 @@ function getScreenFilterWash(screenFilter) {
     dream: "linear-gradient(180deg, rgba(255, 241, 250, 0.82), rgba(214, 230, 255, 0.48))",
     cold: "linear-gradient(180deg, rgba(204, 232, 255, 0.72), rgba(136, 176, 222, 0.44))",
   };
+  const temperatureWash =
+    grade.temperature > 0
+      ? "linear-gradient(180deg, rgba(255, 220, 166, 0.76), rgba(255, 150, 92, 0.34))"
+      : "linear-gradient(180deg, rgba(178, 221, 255, 0.72), rgba(86, 126, 255, 0.3))";
+  const temperatureOpacity = Math.abs(grade.temperature) / 100 * 0.16;
 
   return {
-    background: backgrounds[preset],
-    opacity,
+    background: temperatureOpacity > 0.001 ? `${temperatureWash}, ${backgrounds[preset]}` : backgrounds[preset],
+    opacity: Number(clamp(baseOpacity + temperatureOpacity, 0, 0.46).toFixed(3)),
   };
 }
 
@@ -45063,7 +45384,12 @@ function buildBlockDetails(block) {
         state.data.assetsById.get(block.assetId)?.name ?? block.assetId,
       ]);
       rows.push(["循环播放", block.loop ? "是" : "否"]);
+      rows.push(["播放范围", getMusicEndModeLabel(block.endMode)]);
+      if (getSafeMusicEndMode(block.endMode) === "after_block") {
+        rows.push(["结束卡片", block.endBlockId || "未选择"]);
+      }
       rows.push(["淡入时间", `${block.fadeInMs ?? 0} ms`]);
+      rows.push(["范围淡出", `${block.fadeOutMs ?? 600} ms`]);
       break;
     case "music_stop":
       rows.push(["淡出时间", `${block.fadeOutMs ?? 0} ms`]);
@@ -45199,6 +45525,7 @@ function buildBlockDetails(block) {
       if (getSafeScreenFilterAction(block.action) !== "clear") {
         rows.push(["滤镜风格", getScreenFilterPresetLabel(block.preset)]);
         rows.push(["滤镜强度", getScreenFilterStrengthLabel(block.strength)]);
+        rows.push(["基础调色", getScreenColorGradeSummary(block.grade)]);
       }
       break;
     case "depth_blur":
@@ -45280,7 +45607,7 @@ function getBlockSummary(block, scene) {
     case "music_play":
       return {
         title: state.data.assetsById.get(block.assetId)?.name ?? block.assetId,
-        meta: "播放背景音乐",
+        meta: `${getMusicEndModeLabel(block.endMode)} / 淡入 ${block.fadeInMs ?? 0} ms`,
       };
     case "music_stop":
       return {
@@ -45376,7 +45703,7 @@ function getBlockSummary(block, scene) {
           }
         : {
             title: `${getScreenFilterPresetLabel(block.preset)} / ${getScreenFilterStrengthLabel(block.strength)}`,
-            meta: "让这一段画面带上特定情绪氛围",
+            meta: getScreenColorGradeSummary(block.grade),
           };
     case "depth_blur":
       return getSafeDepthBlurAction(block.action) === "clear"
@@ -45433,6 +45760,10 @@ function computeVisualState(scene, blockIndex) {
     backgroundAssetId: null,
     backgroundName: "未设置背景",
     musicName: "未播放",
+    musicAssetId: null,
+    musicScope: null,
+    musicFadeOutMs: 0,
+    musicPreviousFadeOutMs: 0,
     particleEffect: null,
     screenShake: null,
     screenFlash: null,
@@ -45450,8 +45781,9 @@ function computeVisualState(scene, blockIndex) {
   const visibleMap = new Map();
   const blocks = scene.blocks ?? [];
 
-  blocks.slice(0, blockIndex + 1).forEach((block) => {
+  blocks.slice(0, blockIndex + 1).forEach((block, index) => {
     clearTransientStageEffects(visual);
+    applyMusicScopeBeforeBlock(visual, scene, index);
     switch (block.type) {
       case "background": {
         const asset = state.data.assetsById.get(block.assetId);
@@ -45463,11 +45795,16 @@ function computeVisualState(scene, blockIndex) {
       }
       case "music_play": {
         const asset = state.data.assetsById.get(block.assetId);
+        visual.musicAssetId = block.assetId;
         visual.musicName = asset?.name ?? block.assetId;
+        visual.musicScope = getMusicScopeFromBlock(block, scene.id);
         break;
       }
       case "music_stop":
+        visual.musicFadeOutMs = getSafeNonNegativeNumber(block.fadeOutMs, 600);
+        visual.musicAssetId = null;
         visual.musicName = "未播放";
+        visual.musicScope = null;
         break;
       case "video_play": {
         const asset = state.data.assetsById.get(block.assetId);
@@ -45575,12 +45912,13 @@ function computeVisualState(scene, blockIndex) {
             : {
                 preset: getSafeScreenFilterPreset(block.preset),
                 strength: getSafeScreenFilterStrength(block.strength),
+                grade: getSafeScreenColorGrade(block.grade),
               };
         visual.speakerName = "画面滤镜";
         visual.dialogueText =
           filterAction === "clear"
             ? "这里会把滤镜关掉。"
-            : `这里会套上${getScreenFilterPresetLabel(block.preset)}。`;
+            : `这里会套上${getScreenFilterPresetLabel(block.preset)}，调色 ${getScreenColorGradeSummary(block.grade)}。`;
         break;
       }
       case "depth_blur": {
@@ -46363,6 +46701,16 @@ function validateBlock(block, scene, data, pushIssue) {
           if (getSafeScreenFilterStrength(block.strength) !== (block.strength ?? "medium")) {
             pushIssue("warning", "滤镜强度不认识，预览时会回退成正常。", location, blockContext);
           }
+          Object.entries(SCREEN_COLOR_GRADE_LIMITS).forEach(([key, [minimum, maximum]]) => {
+            const rawValue = block.grade?.[key];
+            if (rawValue === undefined || rawValue === null || rawValue === "") {
+              return;
+            }
+            const numericValue = Number(rawValue);
+            if (!Number.isFinite(numericValue) || numericValue < minimum || numericValue > maximum) {
+              pushIssue("warning", "画面调色参数超出范围，预览时会自动限制到安全值。", location, blockContext);
+            }
+          });
         }
         break;
       case "depth_blur":
