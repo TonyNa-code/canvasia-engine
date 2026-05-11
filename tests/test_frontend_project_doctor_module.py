@@ -22,7 +22,7 @@ class FrontendProjectDoctorModuleTests(unittest.TestCase):
             context.globalThis = context;
             vm.createContext(context);
             vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
-            const tools = context.window.TonyNaEditorProjectDoctor;
+            const tools = context.window.CanvasiaEditorProjectDoctor;
             {body}
             """
         )

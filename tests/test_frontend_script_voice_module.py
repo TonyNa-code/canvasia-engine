@@ -21,7 +21,7 @@ class FrontendScriptVoiceModuleTests(unittest.TestCase):
             context.globalThis = context;
             vm.createContext(context);
             vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
-            const tools = context.window.TonyNaEditorScriptVoice;
+            const tools = context.window.CanvasiaEditorScriptVoice;
             const entry = {{
               type: "dialogue",
               sceneId: "scene_a",
@@ -265,7 +265,7 @@ class FrontendScriptVoiceModuleTests(unittest.TestCase):
         self.assertIn("问题标签：待绑语音 / 问题:too_long", payload["copyText"])
         self.assertIn("上一句：旁白：雨声贴着窗沿落下。", payload["copyText"])
         self.assertIn("下一句：悠奈：不要回头。", payload["copyText"])
-        self.assertIn("雨夜样章 · Tony Na Engine 台本导出", payload["scriptTxt"])
+        self.assertIn("雨夜样章 · Canvasia Engine 台本导出", payload["scriptTxt"])
         self.assertIn("当前筛选：角色=悠奈 / 语音=待绑", payload["scriptTxt"])
         self.assertIn("【章节】序章", payload["scriptTxt"])
         self.assertIn("  - 悠奈：你真的听见了吗？ （待绑语音）", payload["scriptTxt"])

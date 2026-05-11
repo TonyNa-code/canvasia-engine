@@ -218,7 +218,7 @@ class NativeRuntimeRenderSmokeTests(unittest.TestCase):
 
     def test_text_wrapping_preserves_words_newlines_and_ellipsis(self) -> None:
         font = pygame.font.Font(None, 24)
-        lines = wrap_text(font, "Hello world from Tony Na Engine\n第二行中文EnglishMix测试", 128)
+        lines = wrap_text(font, "Hello world from Canvasia Engine\n第二行中文EnglishMix测试", 128)
 
         self.assertGreaterEqual(len(lines), 3)
         self.assertIn("Hello", lines[0])

@@ -400,7 +400,7 @@
     );
   }
 
-  global.TonyNaEditorFilters = Object.freeze({
+  global.CanvasiaEditorFilters = Object.freeze({
     DASHBOARD_SEARCH_MODE_LABELS,
     ROUTE_MAP_FILTER_LABELS,
     SCENE_STATUS_LABELS,

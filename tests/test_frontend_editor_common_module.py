@@ -21,7 +21,7 @@ class FrontendEditorCommonModuleTests(unittest.TestCase):
             context.globalThis = context;
             vm.createContext(context);
             vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
-            const tools = context.window.TonyNaEditorCommon;
+            const tools = context.window.CanvasiaEditorCommon;
             const result = {{
               keys: Object.keys(tools).sort(),
               fileNames: [

@@ -12,6 +12,7 @@ __pycache__/
 
 exports/
 projects/
+.canvasia_history/
 .tony_na_history/
 
 .pytest_cache/

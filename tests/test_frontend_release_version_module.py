@@ -21,7 +21,7 @@ class FrontendReleaseVersionModuleTests(unittest.TestCase):
             context.globalThis = context;
             vm.createContext(context);
             vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
-            const tools = context.window.TonyNaEditorReleaseVersion;
+            const tools = context.window.CanvasiaEditorReleaseVersion;
             const result = {{
               fallback: tools.getProjectReleaseVersion({{}}),
               releaseVersion: tools.getProjectReleaseVersion({{ releaseVersion: " 2.4.0-beta " }}),

@@ -1,6 +1,6 @@
 # Contributing
 
-感谢你愿意帮助 Tony Na Engine。
+感谢你愿意帮助 Canvasia Engine。
 
 ## 适合贡献的方向
 
@@ -21,14 +21,14 @@
 ## 本地运行
 
 ```bash
-cd tony-na-engine
+cd canvasia-engine
 python3 run_editor.py
 ```
 
 ## 测试
 
 ```bash
-cd tony-na-engine
+cd canvasia-engine
 python3 -m unittest discover -s tests -v
 ```
 

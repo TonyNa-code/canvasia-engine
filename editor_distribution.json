@@ -1,25 +1,25 @@
 {
-  "productName": "Tony Na Engine Editor",
-  "bundleIdentifier": "com.tonyna.engine.editor",
-  "publisherName": "Tony Na",
-  "companyName": "Tony Na Engine Project",
-  "website": "https://github.com/TonyNa-code/tony-na-engine",
-  "supportUrl": "https://github.com/TonyNa-code/tony-na-engine/issues",
+  "productName": "Canvasia Engine Editor",
+  "bundleIdentifier": "com.canvasia.engine.editor",
+  "publisherName": "Canvasia Engine Project",
+  "companyName": "Canvasia Engine Project",
+  "website": "https://github.com/TonyNa-code/canvasia-engine",
+  "supportUrl": "https://github.com/TonyNa-code/canvasia-engine/issues",
   "supportEmail": "",
-  "copyright": "Copyright (c) 2026 Tony Na Engine Contributors",
+  "copyright": "Copyright (c) 2026 Canvasia Engine Contributors",
   "macOS": {
     "minimumSystemVersion": "12.0",
     "category": "public.app-category.developer-tools"
   },
   "windows": {
-    "appId": "com.tonyna.engine.editor",
-    "publisher": "Tony Na Engine Project",
+    "appId": "com.canvasia.engine.editor",
+    "publisher": "Canvasia Engine Project",
     "installerCompilerPath": "",
     "installerCompilerRunner": ""
   },
   "linux": {
-    "desktopFileName": "Tony Na Engine Editor.desktop",
-    "maintainer": "Tony Na",
+    "desktopFileName": "Canvasia Engine Editor.desktop",
+    "maintainer": "Canvasia Maintainers",
     "categories": [
       "Development"
     ]

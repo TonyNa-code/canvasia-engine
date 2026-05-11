@@ -1,4 +1,4 @@
-# Tony Na Engine Preview P0 Release Gate
+# Canvasia Engine Preview P0 Release Gate
 
 This page is the final go / no-go checklist before publishing a GitHub Preview release.
 
@@ -23,7 +23,7 @@ This page is the final go / no-go checklist before publishing a GitHub Preview r
 Before publishing, scan staged files and the full tracked tree for:
 
 - Local absolute paths such as `/Users/...`
-- Real names beyond `Tony Na`
+- Real personal names beyond the public maintainer alias
 - Private keys, certificates, tokens, passwords, signing env files
 - Local project exports, generated app bundles, large runtime caches
 - Personal screenshots or temporary files
@@ -31,7 +31,7 @@ Before publishing, scan staged files and the full tracked tree for:
 Recommended scan:
 
 ```bash
-TNE_PRIVACY_EXTRA_PATTERNS="old-real-name,old-username" python3 tools/release/prepare_preview_release.py
+CANVASIA_PRIVACY_EXTRA_PATTERNS="old-real-name,old-username" python3 tools/release/prepare_preview_release.py
 rg -n --hidden --glob '!.git/**' --glob '!exports/**' --glob '!projects/**' --glob '!.export_runtime_cache/**' --glob '!__pycache__/**' --glob '!*.pyc' "BEGIN [A-Z ]*PRIVATE KEY|ghp_|github_pat_|password\\s*[:=]|secret\\s*[:=]|api[_-]?key\\s*[:=]" .
 find . -path './.git' -prune -o -path './exports' -prune -o -path './projects' -prune -o -path './.export_runtime_cache' -prune -o -type f -size +20M -print
 ```

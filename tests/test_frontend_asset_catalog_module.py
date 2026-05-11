@@ -21,7 +21,7 @@ class FrontendAssetCatalogModuleTests(unittest.TestCase):
             context.globalThis = context;
             vm.createContext(context);
             vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
-            const tools = context.window.TonyNaEditorAssetCatalog;
+            const tools = context.window.CanvasiaEditorAssetCatalog;
             const mb = 1024 * 1024;
             const assetList = [
               {{ id: "bg_large", type: "background", name: "巨幅背景", fileExists: true, fileSizeBytes: 30 * mb }},

@@ -37,7 +37,7 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
             context.globalThis = context;
             vm.createContext(context);
             vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
-            const tools = context.window.TonyNaEditorReleaseControl;
+            const tools = context.window.CanvasiaEditorReleaseControl;
             const action = {{
               label: "打开素材",
               action: "open-asset-from-issue",
@@ -162,7 +162,7 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
             context.globalThis = context;
             vm.createContext(context);
             vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
-            const tools = context.window.TonyNaEditorReleaseControl;
+            const tools = context.window.CanvasiaEditorReleaseControl;
             const plan = tools.buildReleaseFixOrder({{
               resolution: {{ width: 1280, height: 720 }},
               releaseVersion: "1.2.0-preview",

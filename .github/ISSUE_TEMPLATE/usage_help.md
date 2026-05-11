@@ -37,7 +37,7 @@ assignees: ''
 
 - 系统：
 - 使用方式：源码启动 / 编辑器预览包 / 导出的游戏包
-- 是否为第一次使用 Tony Na Engine：
+- 是否为第一次使用 Canvasia Engine：
 
 ## 隐私提醒
 

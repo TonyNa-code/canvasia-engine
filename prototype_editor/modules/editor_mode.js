@@ -100,7 +100,7 @@
     return "当前优先保留常用入口，适合处理基础剧情流程。";
   }
 
-  global.TonyNaEditorMode = Object.freeze({
+  global.CanvasiaEditorMode = Object.freeze({
     EDITOR_MODE_LABELS,
     NAV_SCREEN_LABELS,
     BEGINNER_STORY_TOOLBAR_ACTIONS,

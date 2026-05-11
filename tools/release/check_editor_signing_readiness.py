@@ -44,7 +44,7 @@ def build_report() -> dict:
 
     report = {
         "distributionConfigPath": str(config_path),
-        "productName": config.get("productName") or "Tony Na Engine Editor",
+        "productName": config.get("productName") or "Canvasia Engine Editor",
         "bundleIdentifier": config.get("bundleIdentifier") or "",
         "macOS": {
             "appIdentity": mac_settings.get("macAppIdentity") or "",
@@ -82,7 +82,7 @@ def build_report() -> dict:
 
 
 def print_human_report(report: dict) -> None:
-    print("Tony Na Engine 维护者签名准备检查")
+    print("Canvasia Engine 维护者签名准备检查")
     print("")
     print(f"发行配置：{report['distributionConfigPath']}")
     print(f"产品名：{report['productName']}")
@@ -121,7 +121,7 @@ def print_human_report(report: dict) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="检查 Tony Na Engine 编辑器维护者签名与公证准备状态")
+    parser = argparse.ArgumentParser(description="检查 Canvasia Engine 编辑器维护者签名与公证准备状态")
     parser.add_argument("--json", action="store_true", help="输出 JSON")
     args = parser.parse_args()
 

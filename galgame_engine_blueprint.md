@@ -12,7 +12,7 @@
 - 直接预览剧情效果
 - 一键导出成可玩的游戏
 
-这套引擎正式命名为 `Tony Na Engine`。
+这套引擎正式命名为 `Canvasia Engine`。
 
 第一版最重要的设计思路只有一句话：
 
@@ -57,7 +57,7 @@
 
 ## 1. Engine Positioning
 
-Working name: `Tony Na Engine`
+Working name: `Canvasia Engine`
 
 Target:
 

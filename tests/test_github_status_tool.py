@@ -29,11 +29,11 @@ class GitHubStatusToolTests(unittest.TestCase):
 
     def test_parse_github_repo_from_common_remote_urls(self) -> None:
         cases = {
-            "git@github.com:TonyNa-code/tony-na-engine.git": "TonyNa-code/tony-na-engine",
-            "ssh://git@ssh.github.com:443/TonyNa-code/tony-na-engine.git": "TonyNa-code/tony-na-engine",
-            "ssh://git@github.com/TonyNa-code/tony-na-engine.git": "TonyNa-code/tony-na-engine",
-            "https://github.com/TonyNa-code/tony-na-engine.git": "TonyNa-code/tony-na-engine",
-            "https://github.com/TonyNa-code/tony-na-engine": "TonyNa-code/tony-na-engine",
+            "git@github.com:TonyNa-code/canvasia-engine.git": "TonyNa-code/canvasia-engine",
+            "ssh://git@ssh.github.com:443/TonyNa-code/canvasia-engine.git": "TonyNa-code/canvasia-engine",
+            "ssh://git@github.com/TonyNa-code/canvasia-engine.git": "TonyNa-code/canvasia-engine",
+            "https://github.com/TonyNa-code/canvasia-engine.git": "TonyNa-code/canvasia-engine",
+            "https://github.com/TonyNa-code/canvasia-engine": "TonyNa-code/canvasia-engine",
         }
 
         for remote_url, expected in cases.items():
@@ -70,7 +70,7 @@ class GitHubStatusToolTests(unittest.TestCase):
 
     def test_status_payload_can_include_git_snapshot(self) -> None:
         payload = self.github_status.build_status_payload(
-            "TonyNa-code/tony-na-engine",
+            "TonyNa-code/canvasia-engine",
             "d33586a51f417505471243629f2d530ef49b5e74",
             [{"status": "completed", "conclusion": "success"}],
             git_snapshot={
@@ -92,7 +92,7 @@ class GitHubStatusToolTests(unittest.TestCase):
             )
         )
         payload = self.github_status.build_status_payload(
-            "TonyNa-code/tony-na-engine",
+            "TonyNa-code/canvasia-engine",
             "d33586a51f417505471243629f2d530ef49b5e74",
             [],
             status_override="network_error",
@@ -117,7 +117,7 @@ class GitHubStatusToolTests(unittest.TestCase):
     def test_network_error_messages_are_report_safe(self) -> None:
         noisy_message = "无法连接 GitHub API：\n`handshake` operation timed out\n请稍后重试"
         payload = self.github_status.build_status_payload(
-            "TonyNa-code/tony-na-engine",
+            "TonyNa-code/canvasia-engine",
             "d33586a51f417505471243629f2d530ef49b5e74",
             [],
             status_override="network_error",
@@ -134,7 +134,7 @@ class GitHubStatusToolTests(unittest.TestCase):
 
     def test_markdown_report_escapes_dynamic_cells_and_compacts_annotations(self) -> None:
         payload = self.github_status.build_status_payload(
-            "TonyNa-code/tony-na-engine",
+            "TonyNa-code/canvasia-engine",
             "d33586a51f417505471243629f2d530ef49b5e74",
             [
                 {
@@ -195,7 +195,7 @@ class GitHubStatusToolTests(unittest.TestCase):
                     sys.executable,
                     str(MODULE_PATH),
                     "--repo",
-                    "TonyNa-code/tony-na-engine",
+                    "TonyNa-code/canvasia-engine",
                     "--sha",
                     "d33586a51f417505471243629f2d530ef49b5e74",
                     "--input-json",

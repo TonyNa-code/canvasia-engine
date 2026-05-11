@@ -40,7 +40,7 @@ NATIVE_RUNTIME_TEMPLATE_DIR = ROOT_DIR / "native_runtime"
 EXPORT_RUNTIME_CACHE_DIR = ROOT_DIR / ".export_runtime_cache"
 SUPPORTED_RESOLUTIONS = {(1280, 720), (1920, 1080)}
 VARIABLE_ID_PATTERN = re.compile(r"^[0-9A-Za-z_\-\u4e00-\u9fff]{1,64}$")
-HISTORY_DIR_NAME = ".tony_na_history"
+HISTORY_DIR_NAME = ".canvasia_history"
 HISTORY_SNAPSHOTS_DIR_NAME = "snapshots"
 HISTORY_MANIFEST_FILE_NAME = "history_manifest.json"
 HISTORY_FORMAT_VERSION = 1
@@ -265,9 +265,9 @@ LOCAL_NWJS_RUNTIME_DIRS = [
 LOCAL_NWJS_RUNTIME_GUIDE_NAME = "README_把_NWJS_运行壳放这里.txt"
 EDITOR_PACKAGE_VERSION = "1.0.0-preview"
 EDITOR_BUNDLE_DIR_NAME = "editor_bundle"
-EDITOR_MAC_APP_NAME = "Tony Na Engine Editor.app"
-EDITOR_MAC_APP_EXECUTABLE = "TonyNaEngineEditor"
-EDITOR_MAC_INSTALLER_NAME = "Tony Na Engine Editor Installer.pkg"
+EDITOR_MAC_APP_NAME = "Canvasia Engine Editor.app"
+EDITOR_MAC_APP_EXECUTABLE = "CanvasiaEngineEditor"
+EDITOR_MAC_INSTALLER_NAME = "Canvasia Engine Editor Installer.pkg"
 EDITOR_EDITOR_README_NAME = "README_编辑器包先看这里.txt"
 EDITOR_COMMERCIAL_README_NAME = "README_编辑器发布维护先看这里.txt"
 EDITOR_SIGNING_GUIDE_NAME = "README_编辑器签名与公证维护说明.md"
@@ -318,10 +318,10 @@ NATIVE_RUNTIME_LINUX_APP_BUILDER_COMMAND_NAME = "build_native_runtime_app.sh"
 NATIVE_RUNTIME_WINDOWS_APP_BUILDER_COMMAND_NAME = "build_native_runtime_app.bat"
 EDITOR_DISTRIBUTION_CONFIG_NAME = "editor_distribution.json"
 EDITOR_DISTRIBUTION_SNAPSHOT_NAME = "editor_distribution.snapshot.json"
-EDITOR_WINDOWS_INSTALLER_SCRIPT_NAME = "Tony Na Engine Editor Installer.iss"
+EDITOR_WINDOWS_INSTALLER_SCRIPT_NAME = "Canvasia Engine Editor Installer.iss"
 EDITOR_LINUX_INSTALL_SCRIPT_NAME = "install_editor.sh"
-EDITOR_START_COMMAND_NAME = "启动 Tony Na Engine 编辑器.command"
-EDITOR_START_WINDOWS_NAME = "启动 Tony Na Engine 编辑器.cmd"
+EDITOR_START_COMMAND_NAME = "启动 Canvasia Engine 编辑器.command"
+EDITOR_START_WINDOWS_NAME = "启动 Canvasia Engine 编辑器.cmd"
 EDITOR_RUNTIME_DIR_NAME = "runtime"
 EDITOR_RUNTIME_CACHE_VERSION = 1
 EDITOR_RUNTIME_SOURCE_CONDA_PACK = "conda_pack"
@@ -329,7 +329,7 @@ EDITOR_RUNTIME_SOURCE_SYSTEM = "system_python"
 EDITOR_RUNTIME_SOURCE_PYTHON_BUILD_STANDALONE = "python_build_standalone"
 EDITOR_PORTABLE_PYTHON_RELEASE = "20260414"
 EDITOR_PORTABLE_PYTHON_VERSION = "3.13.13"
-EDITOR_LINUX_START_NAME = "启动 Tony Na Engine 编辑器.sh"
+EDITOR_LINUX_START_NAME = "启动 Canvasia Engine 编辑器.sh"
 EDITOR_PLATFORM_MACOS = "macos"
 EDITOR_PLATFORM_WINDOWS = "windows"
 EDITOR_PLATFORM_LINUX = "linux"
@@ -371,45 +371,45 @@ EDITOR_EXPORT_EMPTY_DIRECTORIES = [
     "exports",
 ]
 
-EDITOR_MAC_APP_IDENTITY_ENV = "TONY_NA_EDITOR_MAC_APP_IDENTITY"
-EDITOR_MAC_INSTALLER_IDENTITY_ENV = "TONY_NA_EDITOR_MAC_INSTALLER_IDENTITY"
-EDITOR_MAC_NOTARY_PROFILE_ENV = "TONY_NA_EDITOR_MAC_NOTARY_PROFILE"
-EDITOR_WINDOWS_ISCC_ENV = "TONY_NA_EDITOR_WINDOWS_ISCC"
-EDITOR_WINDOWS_ISCC_RUNNER_ENV = "TONY_NA_EDITOR_WINDOWS_ISCC_RUNNER"
-EDITOR_WINDOWS_SIGNTOOL_ENV = "TONY_NA_EDITOR_WINDOWS_SIGNTOOL"
-EDITOR_WINDOWS_SIGNTOOL_RUNNER_ENV = "TONY_NA_EDITOR_WINDOWS_SIGNTOOL_RUNNER"
-EDITOR_WINDOWS_CERT_SUBJECT_ENV = "TONY_NA_EDITOR_WINDOWS_CERT_SUBJECT"
-EDITOR_WINDOWS_CERT_THUMBPRINT_ENV = "TONY_NA_EDITOR_WINDOWS_CERT_THUMBPRINT"
-EDITOR_WINDOWS_PFX_PATH_ENV = "TONY_NA_EDITOR_WINDOWS_PFX_PATH"
-EDITOR_WINDOWS_PFX_PASSWORD_ENV = "TONY_NA_EDITOR_WINDOWS_PFX_PASSWORD"
-EDITOR_WINDOWS_TIMESTAMP_URL_ENV = "TONY_NA_EDITOR_WINDOWS_TIMESTAMP_URL"
+EDITOR_MAC_APP_IDENTITY_ENV = "CANVASIA_EDITOR_MAC_APP_IDENTITY"
+EDITOR_MAC_INSTALLER_IDENTITY_ENV = "CANVASIA_EDITOR_MAC_INSTALLER_IDENTITY"
+EDITOR_MAC_NOTARY_PROFILE_ENV = "CANVASIA_EDITOR_MAC_NOTARY_PROFILE"
+EDITOR_WINDOWS_ISCC_ENV = "CANVASIA_EDITOR_WINDOWS_ISCC"
+EDITOR_WINDOWS_ISCC_RUNNER_ENV = "CANVASIA_EDITOR_WINDOWS_ISCC_RUNNER"
+EDITOR_WINDOWS_SIGNTOOL_ENV = "CANVASIA_EDITOR_WINDOWS_SIGNTOOL"
+EDITOR_WINDOWS_SIGNTOOL_RUNNER_ENV = "CANVASIA_EDITOR_WINDOWS_SIGNTOOL_RUNNER"
+EDITOR_WINDOWS_CERT_SUBJECT_ENV = "CANVASIA_EDITOR_WINDOWS_CERT_SUBJECT"
+EDITOR_WINDOWS_CERT_THUMBPRINT_ENV = "CANVASIA_EDITOR_WINDOWS_CERT_THUMBPRINT"
+EDITOR_WINDOWS_PFX_PATH_ENV = "CANVASIA_EDITOR_WINDOWS_PFX_PATH"
+EDITOR_WINDOWS_PFX_PASSWORD_ENV = "CANVASIA_EDITOR_WINDOWS_PFX_PASSWORD"
+EDITOR_WINDOWS_TIMESTAMP_URL_ENV = "CANVASIA_EDITOR_WINDOWS_TIMESTAMP_URL"
 
 TEMPLATE_DIR = SAMPLE_PROJECT_DIR
 
 
 def build_default_editor_distribution_config() -> dict:
     return {
-        "productName": "Tony Na Engine Editor",
-        "bundleIdentifier": "com.tonyna.engine.editor",
-        "publisherName": "Tony Na",
-        "companyName": "Tony Na Engine Project",
-        "website": "https://github.com/TonyNa-code/tony-na-engine",
-        "supportUrl": "https://github.com/TonyNa-code/tony-na-engine/issues",
+        "productName": "Canvasia Engine Editor",
+        "bundleIdentifier": "com.canvasia.engine.editor",
+        "publisherName": "Canvasia Engine Project",
+        "companyName": "Canvasia Engine Project",
+        "website": "https://github.com/TonyNa-code/canvasia-engine",
+        "supportUrl": "https://github.com/TonyNa-code/canvasia-engine/issues",
         "supportEmail": "",
-        "copyright": "Copyright (c) 2026 Tony Na Engine Contributors",
+        "copyright": "Copyright (c) 2026 Canvasia Engine Contributors",
         "macOS": {
             "minimumSystemVersion": "12.0",
             "category": "public.app-category.developer-tools",
         },
         "windows": {
-            "appId": "com.tonyna.engine.editor",
-            "publisher": "Tony Na Engine Project",
+            "appId": "com.canvasia.engine.editor",
+            "publisher": "Canvasia Engine Project",
             "installerCompilerPath": "",
             "installerCompilerRunner": "",
         },
         "linux": {
-            "desktopFileName": "Tony Na Engine Editor.desktop",
-            "maintainer": "Tony Na",
+            "desktopFileName": "Canvasia Engine Editor.desktop",
+            "maintainer": "Canvasia Maintainers",
             "categories": ["Development"],
         },
         "signing": {
@@ -452,19 +452,19 @@ def sanitize_bundle_identifier(value: str, fallback: str) -> str:
 
 def normalize_editor_distribution_config(raw_config: dict | None = None) -> dict:
     merged = merge_nested_dict(build_default_editor_distribution_config(), raw_config or {})
-    merged["productName"] = str(merged.get("productName") or "Tony Na Engine Editor").strip() or "Tony Na Engine Editor"
+    merged["productName"] = str(merged.get("productName") or "Canvasia Engine Editor").strip() or "Canvasia Engine Editor"
     merged["bundleIdentifier"] = sanitize_bundle_identifier(
         str(merged.get("bundleIdentifier") or ""),
-        "com.tonyna.engine.editor",
+        "com.canvasia.engine.editor",
     )
-    merged["publisherName"] = str(merged.get("publisherName") or "Tony Na").strip() or "Tony Na"
+    merged["publisherName"] = str(merged.get("publisherName") or "Canvasia Engine Project").strip() or "Canvasia Engine Project"
     merged["companyName"] = str(merged.get("companyName") or merged["publisherName"]).strip() or merged["publisherName"]
     merged["website"] = str(merged.get("website") or "").strip()
-    default_support_url = "https://github.com/TonyNa-code/tony-na-engine/issues"
+    default_support_url = "https://github.com/TonyNa-code/canvasia-engine/issues"
     merged["supportUrl"] = str(merged.get("supportUrl") or merged["website"] or default_support_url).strip()
     merged["supportEmail"] = str(merged.get("supportEmail") or "").strip()
     merged["copyright"] = (
-        str(merged.get("copyright") or "").strip() or "Copyright (c) 2026 Tony Na Engine Contributors"
+        str(merged.get("copyright") or "").strip() or "Copyright (c) 2026 Canvasia Engine Contributors"
     )
     merged["macOS"]["minimumSystemVersion"] = (
         str(merged["macOS"].get("minimumSystemVersion") or "12.0").strip() or "12.0"
@@ -487,8 +487,8 @@ def normalize_editor_distribution_config(raw_config: dict | None = None) -> dict
         merged["windows"].get("installerCompilerRunner") or ""
     ).strip()
     merged["linux"]["desktopFileName"] = (
-        str(merged["linux"].get("desktopFileName") or "Tony Na Engine Editor.desktop").strip()
-        or "Tony Na Engine Editor.desktop"
+        str(merged["linux"].get("desktopFileName") or "Canvasia Engine Editor.desktop").strip()
+        or "Canvasia Engine Editor.desktop"
     )
     merged["linux"]["maintainer"] = (
         str(merged["linux"].get("maintainer") or merged["publisherName"]).strip() or merged["publisherName"]
@@ -1948,7 +1948,7 @@ def call_openai_creative_assistant(payload: dict, local_result: dict, api_key: s
     request_payload = {
         "model": model,
         "instructions": (
-            "你是 Tony Na Engine 内置的视觉小说创作助手。"
+            "你是 Canvasia Engine 内置的视觉小说创作助手。"
             "请根据用户主题和当前项目上下文，生成适合 galgame/视觉小说编辑器直接插入的内容。"
             "只生成原创内容；不要输出 Markdown；不要声称已经生成图片或音频。"
             "blocks 只能使用 narration、dialogue、choice 三类；dialogue 优先使用给定 characters 的 id。"
@@ -1969,7 +1969,7 @@ def call_openai_creative_assistant(payload: dict, local_result: dict, api_key: s
         "text": {
             "format": {
                 "type": "json_schema",
-                "name": "tony_na_creative_assistant_result",
+                "name": "canvasia_creative_assistant_result",
                 "schema": build_creative_assistant_response_schema(),
             }
         },
@@ -5116,7 +5116,7 @@ def build_export_manifest(
         "buildId": build_id,
         "builtAt": now_iso(),
         "engine": {
-            "name": "Tony Na Engine",
+            "name": "Canvasia Engine",
             "exportTarget": target,
             "exportTargetLabel": target_label,
             "releaseVersion": get_export_release_version(project),
@@ -5153,8 +5153,8 @@ def write_export_manifest(build_dir: Path, manifest: dict) -> Path:
 
 
 def build_export_splash_svg(project: dict, release_version: str, target_label: str) -> str:
-    title = (project.get("title") or "Tony Na Engine").strip() or "Tony Na Engine"
-    subtitle = target_label or "Tony Na Engine 导出试玩包"
+    title = (project.get("title") or "Canvasia Engine").strip() or "Canvasia Engine"
+    subtitle = target_label or "Canvasia Engine 导出试玩包"
     palette = build_export_icon_palette(project)
     background_top = f"rgb({palette['backgroundTop'][0]}, {palette['backgroundTop'][1]}, {palette['backgroundTop'][2]})"
     background_bottom = (
@@ -5260,7 +5260,7 @@ def build_export_splash_svg(project: dict, release_version: str, target_label: s
     <text x="160" y="642" fill="rgba(159,232,255,0.86)" font-size="20" font-weight="700" letter-spacing="10" font-family="'Avenir Next','PingFang SC','Microsoft YaHei','Noto Sans SC',sans-serif">MOON ARC VISUAL NARRATIVE SYSTEM</text>
     <text x="160" y="714" fill="white" font-size="78" font-weight="700" font-family="'Avenir Next','PingFang SC','Microsoft YaHei','Noto Sans SC',sans-serif">{safe_title}</text>
     <text x="160" y="776" fill="rgba(255,255,255,0.78)" font-size="28" font-weight="500" font-family="'PingFang SC','Microsoft YaHei','Noto Sans SC',sans-serif">{safe_subtitle}</text>
-    <text x="160" y="816" fill="rgba(255,255,255,0.58)" font-size="21" font-weight="500" font-family="'PingFang SC','Microsoft YaHei','Noto Sans SC',sans-serif">发布版本 {safe_version} · Tony Na Engine Moonlight Runtime</text>
+    <text x="160" y="816" fill="rgba(255,255,255,0.58)" font-size="21" font-weight="500" font-family="'PingFang SC','Microsoft YaHei','Noto Sans SC',sans-serif">发布版本 {safe_version} · Canvasia Engine Moonlight Runtime</text>
   </g>
 </svg>
 """
@@ -5290,8 +5290,8 @@ def should_build_editor_macos_app() -> bool:
 
 def get_editor_runtime_cache_root() -> Path:
     if sys.platform == "darwin":
-        return Path.home() / "Library" / "Caches" / "TonyNaEngine" / "editor_runtime"
-    return Path.home() / ".cache" / "TonyNaEngine" / "editor_runtime"
+        return Path.home() / "Library" / "Caches" / "CanvasiaEngine" / "editor_runtime"
+    return Path.home() / ".cache" / "CanvasiaEngine" / "editor_runtime"
 
 
 def get_editor_runtime_cache_dir() -> Path:
@@ -5494,7 +5494,7 @@ def build_portable_python_download_url(platform_key: str) -> str:
 
 
 def get_portable_runtime_override_env_var(platform_key: str) -> str:
-    return f"TONY_NA_EDITOR_RUNTIME_ARCHIVE_{platform_key.upper()}"
+    return f"CANVASIA_EDITOR_RUNTIME_ARCHIVE_{platform_key.upper()}"
 
 
 def resolve_portable_runtime_override_archive(platform_key: str) -> Path | None:
@@ -5618,10 +5618,10 @@ done
 if ! command -v python3 >/dev/null 2>&1; then
   if command -v osascript >/dev/null 2>&1; then
     /usr/bin/osascript <<'APPLESCRIPT'
-display alert "需要先安装 Python 3" message "Tony Na Engine 编辑器包第一阶段仍然依赖系统里的 Python 3。先安装 Python 3，再双击启动编辑器。" as critical
+display alert "需要先安装 Python 3" message "Canvasia Engine 编辑器包第一阶段仍然依赖系统里的 Python 3。先安装 Python 3，再双击启动编辑器。" as critical
 APPLESCRIPT
   else
-    echo "需要先安装 Python 3，才能启动 Tony Na Engine 编辑器包。"
+    echo "需要先安装 Python 3，才能启动 Canvasia Engine 编辑器包。"
   fi
   exit 1
 fi
@@ -5650,7 +5650,7 @@ do
 done
 
 if ! command -v python3 >/dev/null 2>&1; then
-  echo "需要先安装 Python 3，才能启动 Tony Na Engine 编辑器包。"
+  echo "需要先安装 Python 3，才能启动 Canvasia Engine 编辑器包。"
   exit 1
 fi
 
@@ -5707,7 +5707,7 @@ if %errorlevel%==0 (
   exit /b %errorlevel%
 )
 
-echo 需要先安装 Python 3，才能启动 Tony Na Engine 编辑器包。
+echo 需要先安装 Python 3，才能启动 Canvasia Engine 编辑器包。
 echo 安装 Python 3 后，请重新双击这个启动器。
 pause
 exit /b 1
@@ -5736,7 +5736,7 @@ def write_editor_root_launchers(build_dir: Path) -> dict:
 def build_editor_package_readme(target_label: str, runtime_info: dict | None = None) -> str:
     runtime_info = runtime_info or {}
     lines = [
-        "Tony Na Engine 编辑器本体正式打包（维护发布准备版）",
+        "Canvasia Engine 编辑器本体正式打包（维护发布准备版）",
         "",
         f"当前包类型：{target_label}",
         "这是一份可以直接分发的编辑器桌面包，里面已经带了编辑器前端、样板项目、导出模板和启动器。",
@@ -5921,19 +5921,19 @@ def build_windows_signing_status_label(result: dict) -> str:
 
 
 def build_editor_windows_installer_base_name(config: dict) -> str:
-    app_name = config.get("productName") or "Tony Na Engine Editor"
-    return sanitize_export_filename(app_name) or "TonyNaEngineEditorSetup"
+    app_name = config.get("productName") or "Canvasia Engine Editor"
+    return sanitize_export_filename(app_name) or "CanvasiaEngineEditorSetup"
 
 
 def build_editor_windows_installer_script(config: dict) -> str:
-    app_name = config.get("productName") or "Tony Na Engine Editor"
-    app_id = (config.get("windows") or {}).get("appId") or config.get("bundleIdentifier") or "com.tonyna.engine.editor"
-    publisher = (config.get("windows") or {}).get("publisher") or config.get("companyName") or "Tony Na Engine Project"
-    website = config.get("website") or config.get("supportUrl") or "https://github.com/TonyNa-code/tony-na-engine"
+    app_name = config.get("productName") or "Canvasia Engine Editor"
+    app_id = (config.get("windows") or {}).get("appId") or config.get("bundleIdentifier") or "com.canvasia.engine.editor"
+    publisher = (config.get("windows") or {}).get("publisher") or config.get("companyName") or "Canvasia Engine Project"
+    website = config.get("website") or config.get("supportUrl") or "https://github.com/TonyNa-code/canvasia-engine"
     support_url = config.get("supportUrl") or website
     support_contact = config.get("supportEmail") or support_url
     output_base_name = build_editor_windows_installer_base_name(config)
-    return f"""; Tony Na Engine Editor Windows 安装包脚本（Inno Setup）
+    return f"""; Canvasia Engine Editor Windows 安装包脚本（Inno Setup）
 ; 用法：在 Windows 上安装 Inno Setup 后，直接编译这份 .iss。
 [Setup]
 AppId={{{app_id}}}
@@ -6180,9 +6180,9 @@ def attempt_windows_editor_signing(installer_path: Path | None, config: dict) ->
 
 
 def build_editor_linux_install_script(config: dict) -> str:
-    app_name = config.get("productName") or "Tony Na Engine Editor"
-    slug = sanitize_export_filename(app_name) or "tony_na_engine_editor"
-    desktop_name = (config.get("linux") or {}).get("desktopFileName") or "Tony Na Engine Editor.desktop"
+    app_name = config.get("productName") or "Canvasia Engine Editor"
+    slug = sanitize_export_filename(app_name) or "canvasia_engine_editor"
+    desktop_name = (config.get("linux") or {}).get("desktopFileName") or "Canvasia Engine Editor.desktop"
     return f"""#!/usr/bin/env bash
 set -euo pipefail
 
@@ -6340,7 +6340,7 @@ def build_editor_commercial_readme(
     extra_notes: list[str] | None = None,
 ) -> str:
     lines = [
-        f"Tony Na Engine 编辑器发布维护说明（{platform_label}）",
+        f"Canvasia Engine 编辑器发布维护说明（{platform_label}）",
         "",
         f"发行配置文件：{config_path}",
         f"本次打包快照：{distribution_snapshot_path.name}",
@@ -6452,7 +6452,7 @@ def build_editor_package_manifest(
         "buildId": build_id,
         "builtAt": now_iso(),
         "engine": {
-            "name": "Tony Na Engine",
+            "name": "Canvasia Engine",
             "packageTarget": EXPORT_TARGET_EDITOR_DESKTOP,
             "packageTargetLabel": target_label,
             "releaseVersion": EDITOR_PACKAGE_VERSION,
@@ -6542,8 +6542,8 @@ def create_macos_editor_app_bundle(
         ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".DS_Store"),
     )
 
-    product_name = distribution_config.get("productName") or "Tony Na Engine Editor"
-    bundle_identifier = distribution_config.get("bundleIdentifier") or "com.tonyna.engine.editor"
+    product_name = distribution_config.get("productName") or "Canvasia Engine Editor"
+    bundle_identifier = distribution_config.get("bundleIdentifier") or "com.canvasia.engine.editor"
     minimum_system_version = (distribution_config.get("macOS") or {}).get("minimumSystemVersion") or "12.0"
     application_category = (distribution_config.get("macOS") or {}).get("category") or "public.app-category.developer-tools"
 
@@ -6636,7 +6636,7 @@ def build_macos_editor_installer(build_dir: Path, app_dir: Path, distribution_co
             "--root",
             str(installer_root),
             "--identifier",
-            f"{distribution_config.get('bundleIdentifier') or 'com.tonyna.engine.editor'}.installer",
+            f"{distribution_config.get('bundleIdentifier') or 'com.canvasia.engine.editor'}.installer",
             "--version",
             EDITOR_PACKAGE_VERSION,
             "--install-location",
@@ -6652,14 +6652,14 @@ def build_macos_editor_installer(build_dir: Path, app_dir: Path, distribution_co
 
 
 def build_editor_linux_desktop_entry(distribution_config: dict) -> str:
-    app_name = distribution_config.get("productName") or "Tony Na Engine Editor"
+    app_name = distribution_config.get("productName") or "Canvasia Engine Editor"
     categories = ";".join((distribution_config.get("linux") or {}).get("categories") or ["Development"])
     if not categories.endswith(";"):
         categories += ";"
     return f"""[Desktop Entry]
 Type=Application
 Name={app_name}
-Comment=Tony Na Engine 可视化编辑器
+Comment=Canvasia Engine 可视化编辑器
 Exec=./{EDITOR_LINUX_START_NAME}
 Terminal=true
 Icon=app_icon.png
@@ -6668,7 +6668,7 @@ Categories={categories}
 
 
 def write_editor_linux_desktop_entry(build_dir: Path, distribution_config: dict) -> Path:
-    desktop_file_name = (distribution_config.get("linux") or {}).get("desktopFileName") or "Tony Na Engine Editor.desktop"
+    desktop_file_name = (distribution_config.get("linux") or {}).get("desktopFileName") or "Canvasia Engine Editor.desktop"
     desktop_path = build_dir / desktop_file_name
     desktop_path.write_text(build_editor_linux_desktop_entry(distribution_config), encoding="utf-8")
     desktop_path.chmod(0o755)
@@ -6677,7 +6677,7 @@ def write_editor_linux_desktop_entry(build_dir: Path, distribution_config: dict)
 
 def build_editor_suite_readme(packages: list[dict], distribution_config_path: Path) -> str:
     lines = [
-        "Tony Na Engine 三系统编辑器套装",
+        "Canvasia Engine 三系统编辑器套装",
         "",
         "这份导出会把 macOS / Windows / Linux 三个平台的编辑器包一起整理出来。",
         "每个平台目录里都已经带了编辑器前端、样板项目、导出模板、启动器和内嵌 Python 运行时。",
@@ -6713,7 +6713,7 @@ def build_editor_suite_manifest(build_id: str, packages: list[dict], distributio
         "buildId": build_id,
         "builtAt": now_iso(),
         "engine": {
-            "name": "Tony Na Engine",
+            "name": "Canvasia Engine",
             "packageTarget": EXPORT_TARGET_EDITOR_DESKTOP_SUITE,
             "packageTargetLabel": "三系统编辑器套装",
             "releaseVersion": EDITOR_PACKAGE_VERSION,
@@ -6759,19 +6759,19 @@ def export_editor_suite_platform_package(
     distribution_snapshot_path = write_editor_distribution_snapshot(platform_dir, distribution_config)
     signing_support_files = copy_editor_signing_support_files(platform_dir)
 
-    icon_png_bytes = build_export_icon_png({"projectId": f"editor_{platform_key}", "title": distribution_config.get("productName") or "Tony Na Engine Editor"})
+    icon_png_bytes = build_export_icon_png({"projectId": f"editor_{platform_key}", "title": distribution_config.get("productName") or "Canvasia Engine Editor"})
     icon_ico_bytes = build_export_icon_ico(icon_png_bytes)
     root_icon_files = write_export_icon_files(platform_dir, icon_png_bytes, icon_ico_bytes)
     write_export_icon_files(bundle_dir, icon_png_bytes, icon_ico_bytes)
     splash_file = write_export_splash_asset(
         platform_dir,
-        {"title": distribution_config.get("productName") or "Tony Na Engine Editor", "projectId": f"editor_{platform_key}"},
+        {"title": distribution_config.get("productName") or "Canvasia Engine Editor", "projectId": f"editor_{platform_key}"},
         EDITOR_PACKAGE_VERSION,
         f"{target['label']} 编辑器包",
     )
     write_export_splash_asset(
         bundle_dir,
-        {"title": distribution_config.get("productName") or "Tony Na Engine Editor", "projectId": f"editor_{platform_key}"},
+        {"title": distribution_config.get("productName") or "Canvasia Engine Editor", "projectId": f"editor_{platform_key}"},
         EDITOR_PACKAGE_VERSION,
         f"{target['label']} 编辑器包",
     )
@@ -7233,7 +7233,7 @@ def build_native_runtime_release_control_payload(
         "formatVersion": 1,
         "generatedAt": now_iso(),
         "engine": {
-            "name": "Tony Na Engine",
+            "name": "Canvasia Engine",
             "target": EXPORT_TARGET_NATIVE_RUNTIME,
             "targetLabel": "原生 Runtime 包",
             "runtimeMode": build_info.get("runtimeMode") or "pygame_native",
@@ -8328,7 +8328,7 @@ def write_export_release_notes_draft(
     release_notes_path = archive_path.with_name(f"{archive_path.name}.release-notes.md")
     report_names = [str(report.get("name") or "") for report in internal_reports if report.get("name")]
     lines = [
-        "# Tony Na Engine 原生 Runtime Preview",
+        "# Canvasia Engine 原生 Runtime Preview",
         "",
         f"- 类型：{target_label}",
         "- 这是原生 Runtime Preview 包说明。发布时请按实际附件保留适用内容。",
@@ -8653,7 +8653,7 @@ def export_web_build() -> dict:
     export_assets_doc, copied_assets, missing_assets = copy_assets_for_export(bundle["assets"], build_dir)
     export_payload = build_export_payload(bundle, export_assets_doc, copied_assets, missing_assets)
     release_version = get_export_release_version(bundle["project"])
-    splash_file = write_export_splash_asset(build_dir, bundle["project"], release_version, "Tony Na Engine 网页试玩包")
+    splash_file = write_export_splash_asset(build_dir, bundle["project"], release_version, "Canvasia Engine 网页试玩包")
     export_payload["buildInfo"]["releaseVersion"] = release_version
     export_payload["buildInfo"]["exportTargetLabel"] = "网页试玩包"
     export_payload["buildInfo"]["splashImageUrl"] = splash_file["relativePath"]
@@ -8707,13 +8707,13 @@ def ensure_export_runtime_cache_dir() -> Path:
 
 
 def download_remote_file(url: str, target_path: Path) -> None:
-    request = Request(url, headers={"User-Agent": "Mozilla/5.0 TonyNaEngine/1.0"})
+    request = Request(url, headers={"User-Agent": "Mozilla/5.0 CanvasiaEngine/1.0"})
     with urlopen(request) as response, target_path.open("wb") as output:
         shutil.copyfileobj(response, output)
 
 
 def get_nwjs_macos_arch() -> str:
-    override = str(os.environ.get("TONY_NA_NWJS_MACOS_ARCH") or "").strip().lower()
+    override = str(os.environ.get("CANVASIA_NWJS_MACOS_ARCH") or "").strip().lower()
     if override in {"arm64", "x64"}:
         return override
     machine = platform.machine().lower()
@@ -8746,11 +8746,11 @@ def get_nwjs_runtime_cache_dir(platform_key: str) -> Path:
 
 
 def get_nwjs_runtime_dir_override_env_var(platform_key: str) -> str:
-    return f"TONY_NA_NWJS_RUNTIME_DIR_{platform_key.upper()}"
+    return f"CANVASIA_NWJS_RUNTIME_DIR_{platform_key.upper()}"
 
 
 def get_nwjs_runtime_archive_override_env_var(platform_key: str) -> str:
-    return f"TONY_NA_NWJS_RUNTIME_ARCHIVE_{platform_key.upper()}"
+    return f"CANVASIA_NWJS_RUNTIME_ARCHIVE_{platform_key.upper()}"
 
 
 def strip_archive_extensions(name: str) -> str:
@@ -8778,7 +8778,7 @@ def ensure_local_nwjs_runtime_dropin_guide() -> Path:
     guide_dir.mkdir(parents=True, exist_ok=True)
     guide_path = guide_dir / LOCAL_NWJS_RUNTIME_GUIDE_NAME
     lines = [
-        "Tony Na Engine · NW.js 本地运行壳投放说明",
+        "Canvasia Engine · NW.js 本地运行壳投放说明",
         "",
         "如果你想在外网受限的环境里导出真正的原生桌面包，可以把 NW.js 运行壳手动放到这里。",
         "",
@@ -8790,8 +8790,8 @@ def ensure_local_nwjs_runtime_dropin_guide() -> Path:
         "支持这几种放法：",
         "1. 直接把压缩包放进 desktop_runtime/ 或对应平台子目录（windows / macos / linux）",
         "2. 解压成目录后放进去",
-        "3. 或者用环境变量指定：TONY_NA_NWJS_RUNTIME_DIR_<PLATFORM> / TONY_NA_NWJS_RUNTIME_ARCHIVE_<PLATFORM>",
-        "   例如：TONY_NA_NWJS_RUNTIME_DIR_WINDOWS、TONY_NA_NWJS_RUNTIME_ARCHIVE_MACOS",
+        "3. 或者用环境变量指定：CANVASIA_NWJS_RUNTIME_DIR_<PLATFORM> / CANVASIA_NWJS_RUNTIME_ARCHIVE_<PLATFORM>",
+        "   例如：CANVASIA_NWJS_RUNTIME_DIR_WINDOWS、CANVASIA_NWJS_RUNTIME_ARCHIVE_MACOS",
         "",
         "编辑器下次导出桌面包时，会先找这里的本地运行壳，再尝试联网下载。",
     ]
@@ -8927,7 +8927,7 @@ def extract_nwjs_runtime_archive(platform_key: str, archive_path: Path, runtime_
 def resolve_nwjs_runtime_dir_override(platform_key: str) -> Path | None:
     env_var_names = [get_nwjs_runtime_dir_override_env_var(platform_key)]
     if platform_key == NWJS_GAME_PLATFORM_WINDOWS:
-        env_var_names.append("TONY_NA_NWJS_RUNTIME_DIR")
+        env_var_names.append("CANVASIA_NWJS_RUNTIME_DIR")
     for env_var_name in env_var_names:
         env_value = str(os.environ.get(env_var_name) or "").strip()
         if env_value:
@@ -8940,7 +8940,7 @@ def resolve_nwjs_runtime_dir_override(platform_key: str) -> Path | None:
 def resolve_nwjs_runtime_archive_override(platform_key: str) -> Path | None:
     env_var_names = [get_nwjs_runtime_archive_override_env_var(platform_key)]
     if platform_key == NWJS_GAME_PLATFORM_WINDOWS:
-        env_var_names.append("TONY_NA_NWJS_RUNTIME_ZIP")
+        env_var_names.append("CANVASIA_NWJS_RUNTIME_ZIP")
     for env_var_name in env_var_names:
         env_value = str(os.environ.get(env_var_name) or "").strip()
         if env_value:
@@ -9019,12 +9019,12 @@ def ensure_nwjs_runtime(platform_key: str) -> tuple[Path, bool, str, str]:
 def build_nwjs_package_json(project: dict, target_label: str, icon_path: str | None = None) -> dict:
     resolution = project.get("resolution") or {"width": 1280, "height": 720}
     return {
-        "name": sanitize_export_filename(project.get("projectId") or project.get("title") or "tony_na_game"),
+        "name": sanitize_export_filename(project.get("projectId") or project.get("title") or "canvasia_game"),
         "version": get_export_release_version(project),
-        "description": f"{project.get('title') or 'Tony Na Engine Game'} {target_label}",
+        "description": f"{project.get('title') or 'Canvasia Engine Game'} {target_label}",
         "main": "index.html",
         "window": {
-            "title": project.get("title") or "Tony Na Engine Game",
+            "title": project.get("title") or "Canvasia Engine Game",
             "width": int(resolution.get("width", 1280)),
             "height": int(resolution.get("height", 720)),
             "position": "center",
@@ -9061,16 +9061,16 @@ def sanitize_bundle_identifier_fragment(value: str) -> str:
 
 def build_game_bundle_identifier(project: dict) -> str:
     fragment = sanitize_bundle_identifier_fragment(project.get("projectId") or project.get("title") or "game")
-    return f"com.tonyna.engine.game.{fragment}"
+    return f"com.canvasia.engine.game.{fragment}"
 
 
 def build_macos_app_bundle_name(project: dict) -> str:
-    safe_name = re.sub(r'[\\/:*?"<>|]+', " ", str(project.get("title") or "Tony Na Engine Game")).strip()
-    return f"{safe_name or 'Tony Na Engine Game'}.app"
+    safe_name = re.sub(r'[\\/:*?"<>|]+', " ", str(project.get("title") or "Canvasia Engine Game")).strip()
+    return f"{safe_name or 'Canvasia Engine Game'}.app"
 
 
 def build_macos_executable_name(project: dict) -> str:
-    return sanitize_export_filename(project.get("projectId") or project.get("title") or "TonyNaGame")
+    return sanitize_export_filename(project.get("projectId") or project.get("title") or "CanvasiaGame")
 
 
 def customize_macos_nwjs_app_bundle(app_bundle_path: Path, project: dict, release_version: str) -> str:
@@ -9096,7 +9096,7 @@ def customize_macos_nwjs_app_bundle(app_bundle_path: Path, project: dict, releas
         raise ValueError("macOS 运行壳缺少可执行文件。")
     new_executable_path.chmod(0o755)
 
-    project_title = str(project.get("title") or "Tony Na Engine Game").strip() or "Tony Na Engine Game"
+    project_title = str(project.get("title") or "Canvasia Engine Game").strip() or "Canvasia Engine Game"
     info_plist["CFBundleDisplayName"] = project_title
     info_plist["CFBundleName"] = project_title
     info_plist["CFBundleExecutable"] = new_executable_name
@@ -9168,7 +9168,7 @@ def write_macos_package_readme(
 ) -> Path:
     readme_path = build_dir / "README_先看这里.txt"
     lines = [
-        "Tony Na Engine macOS 桌面发布包",
+        "Canvasia Engine macOS 桌面发布包",
         "",
         f"1. 优先双击 {start_helper_name}；也可以直接打开 {app_bundle_name}。",
         "2. 对外分发时，建议把整个文件夹一起打包，不要只拿出 .app 单独发。",
@@ -9197,7 +9197,7 @@ def write_linux_package_readme(
 ) -> Path:
     readme_path = build_dir / "README_先看这里.txt"
     lines = [
-        "Tony Na Engine Linux 桌面发布包",
+        "Canvasia Engine Linux 桌面发布包",
         "",
         f"1. 优先双击 {start_helper_name}；也可以直接运行 ./{executable_name}。",
         "2. 如果当前文件没有可执行权限，可以先执行：chmod +x 启动游戏.sh",
@@ -9227,7 +9227,7 @@ def write_windows_package_readme(
 ) -> Path:
     readme_path = build_dir / "README_先看这里.txt"
     lines = [
-        "Tony Na Engine Windows 桌面发布包",
+        "Canvasia Engine Windows 桌面发布包",
         "",
         f"1. 优先双击 启动游戏.cmd；也可以直接双击 {executable_name}。",
         "2. 对外分发时，建议把整个文件夹一起打包，不要只拿出 exe 单独发。",
@@ -9256,7 +9256,7 @@ def write_windows_package_readme(
 
 
 def build_windows_browser_launcher_script(project_title: str) -> str:
-    safe_title = project_title or "Tony Na Engine Game"
+    safe_title = project_title or "Canvasia Engine Game"
     return f"""@echo off
 setlocal
 set "GAME_DIR=%~dp0app"
@@ -9293,9 +9293,9 @@ exit /b 0
 def write_windows_browser_launcher(build_dir: Path, project: dict) -> Path:
     launcher_name = sanitize_export_filename(project.get("title") or "") or ""
     if launcher_name in {"", "asset"}:
-        launcher_name = sanitize_export_filename(project.get("projectId") or "") or "TonyNaGame"
+        launcher_name = sanitize_export_filename(project.get("projectId") or "") or "CanvasiaGame"
     launcher_path = build_dir / f"{launcher_name}.cmd"
-    launcher_path.write_text(build_windows_browser_launcher_script(project.get("title") or "Tony Na Engine Game"), encoding="utf-8")
+    launcher_path.write_text(build_windows_browser_launcher_script(project.get("title") or "Canvasia Engine Game"), encoding="utf-8")
     return launcher_path
 
 
@@ -9330,8 +9330,8 @@ def export_windows_nwjs_build() -> dict:
     export_assets_doc, copied_assets, missing_assets = copy_assets_for_export(bundle["assets"], app_dir)
     export_payload = build_export_payload(bundle, export_assets_doc, copied_assets, missing_assets)
     release_version = get_export_release_version(bundle["project"])
-    splash_file = write_export_splash_asset(app_dir, bundle["project"], release_version, "Tony Na Engine Windows 桌面发布包")
-    root_splash_file = write_export_splash_asset(build_dir, bundle["project"], release_version, "Tony Na Engine Windows 桌面发布包")
+    splash_file = write_export_splash_asset(app_dir, bundle["project"], release_version, "Canvasia Engine Windows 桌面发布包")
+    root_splash_file = write_export_splash_asset(build_dir, bundle["project"], release_version, "Canvasia Engine Windows 桌面发布包")
     export_payload["buildInfo"]["releaseVersion"] = release_version
     export_payload["buildInfo"]["exportTargetLabel"] = "Windows 桌面包"
     export_payload["buildInfo"]["splashImageUrl"] = splash_file["relativePath"]
@@ -9373,7 +9373,7 @@ def export_windows_nwjs_build() -> dict:
 
         executable_name = sanitize_export_filename(bundle["project"].get("title") or "") or ""
         if executable_name in {"", "asset"}:
-            executable_name = sanitize_export_filename(bundle["project"].get("projectId") or "") or "TonyNaGame"
+            executable_name = sanitize_export_filename(bundle["project"].get("projectId") or "") or "CanvasiaGame"
         executable_name = f"{executable_name}.exe"
 
         default_executable = build_dir / "nw.exe"
@@ -9484,8 +9484,8 @@ def export_macos_nwjs_build() -> dict:
     export_assets_doc, copied_assets, missing_assets = copy_assets_for_export(bundle["assets"], app_dir)
     export_payload = build_export_payload(bundle, export_assets_doc, copied_assets, missing_assets)
     release_version = get_export_release_version(bundle["project"])
-    splash_file = write_export_splash_asset(app_dir, bundle["project"], release_version, "Tony Na Engine macOS 桌面发布包")
-    root_splash_file = write_export_splash_asset(build_dir, bundle["project"], release_version, "Tony Na Engine macOS 桌面发布包")
+    splash_file = write_export_splash_asset(app_dir, bundle["project"], release_version, "Canvasia Engine macOS 桌面发布包")
+    root_splash_file = write_export_splash_asset(build_dir, bundle["project"], release_version, "Canvasia Engine macOS 桌面发布包")
     export_payload["buildInfo"]["releaseVersion"] = release_version
     export_payload["buildInfo"]["exportTargetLabel"] = "macOS 桌面包"
     export_payload["buildInfo"]["splashImageUrl"] = splash_file["relativePath"]
@@ -9613,8 +9613,8 @@ def export_linux_nwjs_build() -> dict:
     export_assets_doc, copied_assets, missing_assets = copy_assets_for_export(bundle["assets"], app_dir)
     export_payload = build_export_payload(bundle, export_assets_doc, copied_assets, missing_assets)
     release_version = get_export_release_version(bundle["project"])
-    splash_file = write_export_splash_asset(app_dir, bundle["project"], release_version, "Tony Na Engine Linux 桌面发布包")
-    root_splash_file = write_export_splash_asset(build_dir, bundle["project"], release_version, "Tony Na Engine Linux 桌面发布包")
+    splash_file = write_export_splash_asset(app_dir, bundle["project"], release_version, "Canvasia Engine Linux 桌面发布包")
+    root_splash_file = write_export_splash_asset(build_dir, bundle["project"], release_version, "Canvasia Engine Linux 桌面发布包")
     export_payload["buildInfo"]["releaseVersion"] = release_version
     export_payload["buildInfo"]["exportTargetLabel"] = "Linux 桌面包"
     export_payload["buildInfo"]["splashImageUrl"] = splash_file["relativePath"]
@@ -9645,7 +9645,7 @@ def export_linux_nwjs_build() -> dict:
 
     executable_name = sanitize_export_filename(bundle["project"].get("title") or "") or ""
     if executable_name in {"", "asset"}:
-        executable_name = sanitize_export_filename(bundle["project"].get("projectId") or "") or "TonyNaGame"
+        executable_name = sanitize_export_filename(bundle["project"].get("projectId") or "") or "CanvasiaGame"
 
     default_executable = build_dir / "nw"
     launcher_path = build_dir / executable_name
@@ -9744,20 +9744,20 @@ def export_editor_desktop_build() -> dict:
     signing_support_files = copy_editor_signing_support_files(build_dir)
 
     icon_png_bytes = build_export_icon_png(
-        {"projectId": "editor_package", "title": distribution_config.get("productName") or "Tony Na Engine Editor"}
+        {"projectId": "editor_package", "title": distribution_config.get("productName") or "Canvasia Engine Editor"}
     )
     icon_ico_bytes = build_export_icon_ico(icon_png_bytes)
     root_icon_files = write_export_icon_files(build_dir, icon_png_bytes, icon_ico_bytes)
     bundle_icon_files = write_export_icon_files(bundle_dir, icon_png_bytes, icon_ico_bytes)
     splash_file = write_export_splash_asset(
         build_dir,
-        {"title": distribution_config.get("productName") or "Tony Na Engine Editor", "projectId": "editor_package"},
+        {"title": distribution_config.get("productName") or "Canvasia Engine Editor", "projectId": "editor_package"},
         EDITOR_PACKAGE_VERSION,
         target_label,
     )
     bundle_splash_file = write_export_splash_asset(
         bundle_dir,
-        {"title": distribution_config.get("productName") or "Tony Na Engine Editor", "projectId": "editor_package"},
+        {"title": distribution_config.get("productName") or "Canvasia Engine Editor", "projectId": "editor_package"},
         EDITOR_PACKAGE_VERSION,
         target_label,
     )
@@ -11709,7 +11709,7 @@ class EditorRequestHandler(SimpleHTTPRequestHandler):
 def main() -> None:
     global HAS_SELECTED_PROJECT
     parser = argparse.ArgumentParser(
-        description="启动 Tony Na Engine 原型编辑器的本地预览服务。"
+        description="启动 Canvasia Engine 原型编辑器的本地预览服务。"
     )
     parser.add_argument(
         "--port",
@@ -11733,7 +11733,7 @@ def main() -> None:
     server = ThreadingHTTPServer(("127.0.0.1", port), EditorRequestHandler)
     url = build_url(port)
 
-    print("Tony Na Engine 原型编辑器已启动")
+    print("Canvasia Engine 原型编辑器已启动")
     print(f"本地地址: {url}")
     print("按 Ctrl+C 可以停止服务")
 

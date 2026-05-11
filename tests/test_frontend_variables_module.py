@@ -21,7 +21,7 @@ class FrontendVariablesModuleTests(unittest.TestCase):
             context.globalThis = context;
             vm.createContext(context);
             vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
-            const tools = context.window.TonyNaEditorVariables;
+            const tools = context.window.CanvasiaEditorVariables;
             const variables = [
               {{ id: "score", name: "分数<危险>", type: "number", defaultValue: 12, min: 0, max: 10 }},
               {{ id: "route", name: "路线", type: "string", defaultValue: "common" }},

@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="docs/github/tn-engine-hero.png" alt="Tony Na Engine hero" width="100%" />
+  <img src="docs/github/canvasia-engine-hero.png" alt="Canvasia Engine hero" width="100%" />
 </p>
 
-<h1 align="center">Tony Na Engine</h1>
+<h1 align="center">Canvasia Engine</h1>
 
 <p align="center">
   一套面向视觉小说 / Galgame 创作者的可视化引擎原型。<br />
@@ -29,7 +29,7 @@
 
 ## 项目定位
 
-Tony Na Engine 当前更适合这样理解：
+Canvasia Engine 当前更适合这样理解：
 
 - `源码可见创作者预览版`
 - `Early Access / Preview`
@@ -48,7 +48,7 @@ Tony Na Engine 当前更适合这样理解：
 - 新手模式 / 高级模式分层
 - 角色、素材、台词台本、配音工作流
 - 首页今日工作台、最终发表门禁、项目巡检、项目医生小白修复向导、项目医生回执导出 / 复制 / 编号、成品目标路线、一键安全修复低风险结构问题、一键发布前修复顺序、素材性能预算、发布总控 Markdown / JSON 报告、自动回归试玩路线测试
-- Tony Na Assistant 智能创作助手：支持零配置本地模板，也支持创作者自带 OpenAI API Key 调用真模型生成剧情、建议、素材提示、灵感盒归档包和可插入剧情卡片
+- Canvasia Assistant 智能创作助手：支持零配置本地模板，也支持创作者自带 OpenAI API Key 调用真模型生成剧情、建议、素材提示、灵感盒归档包和可插入剧情卡片
 - 正式存档 / 读档、系统菜单
 - 项目级成品 UI 皮肤、UI Kit 部件绑定、九宫格贴图、按钮多状态贴图、布局位置微调与视觉小说文本框设计
 - EXTRA 回想馆、图鉴馆、成就馆、章节回放、结局回放、语音回听
@@ -77,8 +77,8 @@ Tony Na Engine 当前更适合这样理解：
 
 | 剧情编辑与智能助手 | 试玩与导出 |
 | --- | --- |
-| ![Tony Na Engine story editor with assistant](docs/github/screenshot-story-assistant.png) | ![Tony Na Engine preview and export screen](docs/github/screenshot-preview-export.png) |
-| 剧情页支持可视化卡片、场景结构、Tony Na Assistant、灵感盒和勾选式插入。 | 试玩页集中处理预览、设置、发布前问题提示和多平台导出入口。 |
+| ![Canvasia Engine story editor with assistant](docs/github/screenshot-story-assistant.png) | ![Canvasia Engine preview and export screen](docs/github/screenshot-preview-export.png) |
+| 剧情页支持可视化卡片、场景结构、Canvasia Assistant、灵感盒和勾选式插入。 | 试玩页集中处理预览、设置、发布前问题提示和多平台导出入口。 |
 
 ## 仓库结构
 
@@ -102,13 +102,13 @@ Tony Na Engine 当前更适合这样理解：
 
 ## 智能创作助手
 
-剧情编辑页内置 `Tony Na Assistant`：
+剧情编辑页内置 `Canvasia Assistant`：
 
 - 默认使用本地模板模式，不需要联网，不会上传项目内容，也不会产生 API 费用
 - 创作者可自带 OpenAI API Key，并在面板里切换到 `OpenAI 真模型`，用于生成更自由的剧情片段、创作建议、场景润色和素材概念提示
 - API Key 不会写入项目文件；只有勾选“只在本浏览器记住 Key”时，才会保存在当前浏览器的 localStorage，并可随时点击“忘记本机 Key”移除；助手结果进入界面和灵感盒前会按固定字段清洗，避免异常字段混入项目数据
 - 真模型不可用或未填写 Key 时，会自动回落到本地模板助手，避免创作流程被卡住
-- 生成结果会进入本地“灵感盒”，可搜索、收藏、恢复、删除、清理未收藏、复制历史剧情卡片、复制单条 Markdown 文档、导出 Markdown 创作档案、单条导出为 `.tn-idea.json`，也可以导出当前视图或导入全部 `.tn-idea-vault.json`；容量到上限时会优先保留收藏灵感，清理类操作会先提醒备份并要求确认，最近一次清理前的灵感盒可一键恢复，恢复前会把当前灵感盒转存成新的恢复点
+- 生成结果会进入本地“灵感盒”，可搜索、收藏、恢复、删除、清理未收藏、复制历史剧情卡片、复制单条 Markdown 文档、导出 Markdown 创作档案、单条导出为 `.canvasia-idea.json`，也可以导出当前视图或导入全部 `.canvasia-idea-vault.json`；容量到上限时会优先保留收藏灵感，清理类操作会先提醒备份并要求确认，最近一次清理前的灵感盒可一键恢复，恢复前会把当前灵感盒转存成新的恢复点
 - 插入前可以预览、勾选将要写入的剧情卡片，并复制成台本文本，方便创作者先审稿或发给协作者
 
 ## 快速开始
@@ -133,16 +133,16 @@ Tony Na Engine 当前更适合这样理解：
 macOS / Linux：
 
 ```bash
-git clone https://github.com/TonyNa-code/tony-na-engine.git
-cd tony-na-engine
+git clone https://github.com/TonyNa-code/canvasia-engine.git
+cd canvasia-engine
 python3 run_editor.py
 ```
 
 Windows：
 
 ```bat
-git clone https://github.com/TonyNa-code/tony-na-engine.git
-cd tony-na-engine
+git clone https://github.com/TonyNa-code/canvasia-engine.git
+cd canvasia-engine
 py -3 run_editor.py
 ```
 
@@ -248,7 +248,7 @@ py -3 runtime_player.py --verify-file-integrity .
 macOS / Linux：
 
 ```bash
-cd tony-na-engine
+cd canvasia-engine
 python3 -m pip install -r requirements-dev.txt
 python3 -m playwright install chromium
 ```
@@ -256,7 +256,7 @@ python3 -m playwright install chromium
 Windows：
 
 ```bat
-cd tony-na-engine
+cd canvasia-engine
 py -3 -m pip install -r requirements-dev.txt
 py -3 -m playwright install chromium
 ```
@@ -268,14 +268,14 @@ py -3 -m playwright install chromium
 macOS / Linux：
 
 ```bash
-cd tony-na-engine
+cd canvasia-engine
 ./verify_before_push.sh
 ```
 
 Windows：
 
 ```bat
-cd tony-na-engine
+cd canvasia-engine
 verify_before_push.cmd
 ```
 
@@ -314,14 +314,14 @@ python3 tools/ci/project_health.py template_project --markdown-report verificati
 macOS / Linux：
 
 ```bash
-cd tony-na-engine
+cd canvasia-engine
 ./check_github_ci_status.sh
 ```
 
 Windows：
 
 ```bat
-cd tony-na-engine
+cd canvasia-engine
 check_github_ci_status.cmd
 ```
 
@@ -348,14 +348,14 @@ check_github_ci_status.cmd
 macOS / Linux：
 
 ```bash
-cd tony-na-engine
+cd canvasia-engine
 python3 -m unittest discover -s tests -p 'test_run_editor_smoke.py' -v
 ```
 
 Windows：
 
 ```bat
-cd tony-na-engine
+cd canvasia-engine
 py -3 -m unittest discover -s tests -p "test_run_editor_smoke.py" -v
 ```
 
@@ -364,14 +364,14 @@ py -3 -m unittest discover -s tests -p "test_run_editor_smoke.py" -v
 macOS / Linux：
 
 ```bash
-cd tony-na-engine
+cd canvasia-engine
 python3 -m unittest discover -s tests -p 'test_browser_playwright_smoke.py' -v
 ```
 
 Windows：
 
 ```bat
-cd tony-na-engine
+cd canvasia-engine
 py -3 -m unittest discover -s tests -p "test_browser_playwright_smoke.py" -v
 ```
 
@@ -380,7 +380,7 @@ py -3 -m unittest discover -s tests -p "test_browser_playwright_smoke.py" -v
 macOS / Linux：
 
 ```bash
-cd tony-na-engine
+cd canvasia-engine
 python3 -m unittest discover -s tests -p 'test_prepare_preview_release.py' -v
 python3 -m unittest discover -s tests -p 'test_frontend*.py' -v
 ```
@@ -388,7 +388,7 @@ python3 -m unittest discover -s tests -p 'test_frontend*.py' -v
 Windows：
 
 ```bat
-cd tony-na-engine
+cd canvasia-engine
 py -3 -m unittest discover -s tests -p "test_prepare_preview_release.py" -v
 py -3 -m unittest discover -s tests -p "test_frontend*.py" -v
 ```
@@ -398,14 +398,14 @@ py -3 -m unittest discover -s tests -p "test_frontend*.py" -v
 macOS / Linux：
 
 ```bash
-cd tony-na-engine
+cd canvasia-engine
 ./run_native_runtime_smoke.sh
 ```
 
 Windows：
 
 ```bat
-cd tony-na-engine
+cd canvasia-engine
 run_native_runtime_smoke.cmd
 ```
 
@@ -447,7 +447,7 @@ run_native_runtime_smoke.cmd
 
 ## 许可说明
 
-当前仓库采用 **Tony Na Engine Creator License 1.0**：
+当前仓库采用 **Canvasia Engine Creator License 1.0**：
 
 - [`LICENSE`](LICENSE)
 

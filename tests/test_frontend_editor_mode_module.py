@@ -21,7 +21,7 @@ class FrontendEditorModeModuleTests(unittest.TestCase):
             context.globalThis = context;
             vm.createContext(context);
             vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
-            const tools = context.window.TonyNaEditorMode;
+            const tools = context.window.CanvasiaEditorMode;
             const result = {{
               safeBeginner: tools.getSafeEditorMode("unknown"),
               safeAdvanced: tools.getSafeEditorMode(" Advanced "),

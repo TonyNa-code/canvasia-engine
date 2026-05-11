@@ -11,12 +11,12 @@
     openai: "OpenAI 真模型",
   });
 
-  const CREATIVE_ASSISTANT_PROVIDER_STORAGE_KEY = "tony-na-engine:creative-assistant-provider";
-  const CREATIVE_ASSISTANT_OPENAI_KEY_STORAGE_KEY = "tony-na-engine:creative-assistant-openai-key";
-  const CREATIVE_ASSISTANT_OPENAI_MODEL_STORAGE_KEY = "tony-na-engine:creative-assistant-openai-model";
-  const CREATIVE_ASSISTANT_REMEMBER_KEY_STORAGE_KEY = "tony-na-engine:creative-assistant-remember-key";
-  const CREATIVE_ASSISTANT_HISTORY_STORAGE_KEY = "tony-na-engine:creative-assistant-history";
-  const CREATIVE_ASSISTANT_HISTORY_RECOVERY_STORAGE_KEY = "tony-na-engine:creative-assistant-history-recovery";
+  const CREATIVE_ASSISTANT_PROVIDER_STORAGE_KEY = "canvasia-engine:creative-assistant-provider";
+  const CREATIVE_ASSISTANT_OPENAI_KEY_STORAGE_KEY = "canvasia-engine:creative-assistant-openai-key";
+  const CREATIVE_ASSISTANT_OPENAI_MODEL_STORAGE_KEY = "canvasia-engine:creative-assistant-openai-model";
+  const CREATIVE_ASSISTANT_REMEMBER_KEY_STORAGE_KEY = "canvasia-engine:creative-assistant-remember-key";
+  const CREATIVE_ASSISTANT_HISTORY_STORAGE_KEY = "canvasia-engine:creative-assistant-history";
+  const CREATIVE_ASSISTANT_HISTORY_RECOVERY_STORAGE_KEY = "canvasia-engine:creative-assistant-history-recovery";
   const CREATIVE_ASSISTANT_DEFAULT_OPENAI_MODEL = "gpt-5.5";
   const CREATIVE_ASSISTANT_MAX_HISTORY = 8;
 
@@ -288,7 +288,7 @@
       options.limit
     );
     return {
-      engine: "Tony Na Engine",
+      engine: "Canvasia Engine",
       kind: "creative_assistant_history_recovery",
       formatVersion: 1,
       createdAt: trimCreativeAssistantText(options.createdAt, 40) || new Date().toISOString(),
@@ -321,7 +321,7 @@
       return null;
     }
     return {
-      engine: "Tony Na Engine",
+      engine: "Canvasia Engine",
       kind: "creative_assistant_history_recovery",
       formatVersion: 1,
       createdAt: trimCreativeAssistantText(snapshot.createdAt, 40) || new Date().toISOString(),
@@ -426,7 +426,7 @@
       .filter(Boolean)
       .slice(0, safeLimit);
     return {
-      engine: "Tony Na Engine",
+      engine: "Canvasia Engine",
       kind: "creative_assistant_history_archive",
       formatVersion: 1,
       exportedAt: trimCreativeAssistantText(options.exportedAt, 40) || new Date().toISOString(),
@@ -540,14 +540,14 @@
       query: options.query,
       favoritesOnly: options.favoritesOnly,
     }).slice(0, Number.isFinite(Number(options.limit)) ? Math.max(0, Number(options.limit)) : CREATIVE_ASSISTANT_MAX_HISTORY);
-    const projectTitle = trimCreativeAssistantText(options.projectTitle, 160) || "Tony Na Engine Project";
+    const projectTitle = trimCreativeAssistantText(options.projectTitle, 160) || "Canvasia Engine Project";
     const exportedAt = trimCreativeAssistantText(options.exportedAt, 40) || new Date().toISOString();
     const filterNote = [
       trimCreativeAssistantText(options.query, 160) ? `关键词：${trimCreativeAssistantText(options.query, 160)}` : "",
       options.favoritesOnly ? "范围：仅收藏" : "",
     ].filter(Boolean).join("；") || "范围：全部灵感";
     return [
-      `# ${projectTitle} · Tony Na Assistant 灵感档案`,
+      `# ${projectTitle} · Canvasia Assistant 灵感档案`,
       "",
       `- 导出时间：${exportedAt}`,
       `- 记录数量：${sanitizedRecords.length}`,
@@ -617,7 +617,7 @@
       return "";
     }
     return [
-      result?.title ? `《${result.title}》` : "Tony Na Assistant 剧情卡片",
+      result?.title ? `《${result.title}》` : "Canvasia Assistant 剧情卡片",
       result?.summary ?? "",
       "",
       ...blocks.map((block, index) => getCreativeAssistantBlockPreviewText(block, index)),
@@ -626,7 +626,7 @@
       .join("\n\n");
   }
 
-  global.TonyNaEditorCreativeAssistant = Object.freeze({
+  global.CanvasiaEditorCreativeAssistant = Object.freeze({
     CREATIVE_ASSISTANT_MODES,
     CREATIVE_ASSISTANT_PROVIDERS,
     CREATIVE_ASSISTANT_PROVIDER_STORAGE_KEY,

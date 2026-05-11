@@ -501,7 +501,7 @@ class ProjectHealthToolTests(unittest.TestCase):
             )
 
             self.assertEqual(completed.returncode, 1)
-            self.assertIn("Tony Na Engine Project Health", completed.stdout)
+            self.assertIn("Canvasia Engine Project Health", completed.stdout)
             self.assertIn("Status: failed (需要先处理)", completed.stdout)
             self.assertIn("safe repairs 3", completed.stdout)
             self.assertIn("Safe repair command:", completed.stdout)
@@ -528,7 +528,7 @@ class ProjectHealthToolTests(unittest.TestCase):
             self.assertEqual(payload["metrics"]["readyAssetCount"], 0)
             self.assertEqual(payload["metrics"]["assetCount"], 1)
             self.assertEqual(payload["summary"]["autoFixableCount"], 3)
-            self.assertIn("# Tony Na Engine Project Health Report", markdown)
+            self.assertIn("# Canvasia Engine Project Health Report", markdown)
             self.assertIn("Status label: 需要先处理", markdown)
             self.assertIn("## Triage Summary", markdown)
             self.assertIn("First blocking issue", markdown)
@@ -569,7 +569,7 @@ class ProjectHealthToolTests(unittest.TestCase):
             report = self.project_health.analyze_project(project_dir)
             lines = self.project_health.build_terminal_summary_lines(report)
 
-        self.assertIn("Tony Na Engine Project Health", lines[0])
+        self.assertIn("Canvasia Engine Project Health", lines[0])
         self.assertTrue(any("Status: passed (基础健康)" in line for line in lines))
         self.assertIn("Project size: 1 chapters / 1 scenes / 3 blocks | assets 1/1 ready", lines)
         self.assertTrue(any("Roadmap: 2/3 stages" in line for line in lines))

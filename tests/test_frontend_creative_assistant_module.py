@@ -21,7 +21,7 @@ class FrontendCreativeAssistantModuleTests(unittest.TestCase):
             context.globalThis = context;
             vm.createContext(context);
             vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
-            const tools = context.window.TonyNaEditorCreativeAssistant;
+            const tools = context.window.CanvasiaEditorCreativeAssistant;
             const record = tools.sanitizeCreativeAssistantHistoryRecord({{
               id: "",
               createdAt: "",
@@ -194,7 +194,7 @@ class FrontendCreativeAssistantModuleTests(unittest.TestCase):
         self.assertIn("1. 追上去", payload["choicePreview"])
         self.assertIn("《雨夜秘密》", payload["selectedBlocksText"])
         self.assertIn("#2 旁白", payload["selectedBlocksText"])
-        self.assertEqual(payload["archive"]["engine"], "Tony Na Engine")
+        self.assertEqual(payload["archive"]["engine"], "Canvasia Engine")
         self.assertEqual(payload["archive"]["kind"], "creative_assistant_history_archive")
         self.assertEqual(payload["archive"]["formatVersion"], 1)
         self.assertEqual(payload["archive"]["exportedAt"], "2026-05-05T00:00:00.000Z")
@@ -237,7 +237,7 @@ class FrontendCreativeAssistantModuleTests(unittest.TestCase):
         self.assertIn("追上去", payload["searchText"])
         self.assertIn("## 1. 雨夜秘密", payload["recordMarkdown"])
         self.assertIn("★", payload["recordMarkdown"])
-        self.assertIn("# 星夜测试项目 · Tony Na Assistant 灵感档案", payload["historyMarkdown"])
+        self.assertIn("# 星夜测试项目 · Canvasia Assistant 灵感档案", payload["historyMarkdown"])
         self.assertIn("关键词：追上去", payload["historyMarkdown"])
         self.assertIn("隐私说明", payload["historyMarkdown"])
         self.assertIn("可插入剧情卡片", payload["historyMarkdown"])
@@ -272,7 +272,7 @@ class FrontendCreativeAssistantModuleTests(unittest.TestCase):
             context.globalThis = context;
             vm.createContext(context);
             vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
-            const tools = context.window.TonyNaEditorCreativeAssistant;
+            const tools = context.window.CanvasiaEditorCreativeAssistant;
             const storage = {{
               values: new Map(),
               getItem(key) {{

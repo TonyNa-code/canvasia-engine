@@ -21,7 +21,7 @@ class FrontendUiThemeModuleTests(unittest.TestCase):
             context.globalThis = context;
             vm.createContext(context);
             vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
-            const tools = context.window.TonyNaEditorUiTheme;
+            const tools = context.window.CanvasiaEditorUiTheme;
             const storage = {{
               values: new Map(),
               getItem(key) {{
@@ -89,7 +89,7 @@ class FrontendUiThemeModuleTests(unittest.TestCase):
         self.assertEqual(payload["safeModes"], ["dark", "light", "auto", "auto"])
         self.assertEqual(payload["resolved"][:4], ["light", "dark", "light", "dark"])
         self.assertIn(payload["resolved"][4], ["light", "dark"])
-        self.assertEqual(payload["storageKey"], "tony-na-engine:editor-ui-theme-mode")
+        self.assertEqual(payload["storageKey"], "canvasia-engine:editor-ui-theme-mode")
         self.assertTrue(payload["persisted"])
         self.assertEqual(payload["savedMode"], "dark")
         self.assertEqual(payload["loadedMode"], "dark")

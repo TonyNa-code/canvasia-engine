@@ -436,7 +436,7 @@
     };
   }
 
-  global.TonyNaEditorReleaseControl = Object.freeze({
+  global.CanvasiaEditorReleaseControl = Object.freeze({
     MISSING_VOICE_WARNING_MESSAGE,
     DESKTOP_EXPORT_TARGETS,
     getReleaseSeverityLabel,

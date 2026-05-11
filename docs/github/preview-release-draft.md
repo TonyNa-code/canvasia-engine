@@ -1,8 +1,8 @@
-# Tony Na Engine Preview Release Draft
+# Canvasia Engine Preview Release Draft
 
-## Tony Na Engine Preview
+## Canvasia Engine Preview
 
-Tony Na Engine is a source-available visual novel / galgame creation toolkit with a visual editor, runtime exports, archive systems, particle effects, project checks, and automated smoke tests.
+Canvasia Engine is a source-available visual novel / galgame creation toolkit with a visual editor, runtime exports, archive systems, particle effects, project checks, and automated smoke tests.
 
 This release is intended for creators who want to try the editor, build a small project, test the export flow, and report issues before a fully stable signed release.
 
@@ -23,7 +23,7 @@ This release is intended for creators who want to try the editor, build a small 
 
 Release assets appear below this text on GitHub. If a platform package is not attached, that platform is not included in this specific Preview upload. The source code archive remains available for users who want to run the editor with Python 3.
 
-<!-- TNE_GENERATED_DOWNLOAD_GUIDE -->
+<!-- CANVASIA_GENERATED_DOWNLOAD_GUIDE -->
 
 ## Important Notes
 

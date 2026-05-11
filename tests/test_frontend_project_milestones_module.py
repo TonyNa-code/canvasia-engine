@@ -23,8 +23,8 @@ class FrontendProjectMilestonesModuleTests(unittest.TestCase):
             context.globalThis = context;
             vm.createContext(context);
             vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
-            const tools = context.window.TonyNaProjectMilestones;
-            if (context.window.TonyNaEditorProjectMilestones !== tools) {{
+            const tools = context.window.CanvasiaProjectMilestones;
+            if (context.window.CanvasiaEditorProjectMilestones !== tools) {{
               throw new Error("Project milestone module alias was not attached.");
             }}
             {script_body}

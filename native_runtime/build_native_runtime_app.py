@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 
 
-DEFAULT_APP_NAME = "TonyNaNativeGame"
+DEFAULT_APP_NAME = "CanvasiaNativeGame"
 GAME_DATA_NAME = "game_data.json"
 RUNTIME_PLAYER_NAME = "runtime_player.py"
 PACKAGE_MANIFEST_NAME = "native_app_package_manifest.json"
@@ -96,7 +96,7 @@ def sanitize_bundle_identifier(value: str | None) -> str:
     suffix_parts = re.findall(r"[a-z0-9]+", raw_value)
     suffix = ".".join(suffix_parts).strip(".") or "game"
     suffix = suffix[:80].strip(".") or "game"
-    return f"com.tonyna.{suffix}"
+    return f"com.canvasia.{suffix}"
 
 
 def sanitize_archive_stem(value: str | None) -> str:
@@ -577,11 +577,11 @@ def run_build(bundle_dir: Path, args: argparse.Namespace) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="把 Tony Na Engine 原生 Runtime 导出包打成桌面应用")
+    parser = argparse.ArgumentParser(description="把 Canvasia Engine 原生 Runtime 导出包打成桌面应用")
     parser.add_argument("bundle_dir", nargs="?", default=".", help="原生 Runtime 导出包目录，默认当前目录")
     parser.add_argument("--mode", choices=("onedir", "onefile"), default="onedir", help="PyInstaller 输出模式")
     parser.add_argument("--app-name", dest="app_name", help="覆盖应用名称；默认使用项目名")
-    parser.add_argument("--bundle-id", dest="bundle_id", help="覆盖 macOS Bundle Identifier，默认自动生成 com.tonyna.*")
+    parser.add_argument("--bundle-id", dest="bundle_id", help="覆盖 macOS Bundle Identifier，默认自动生成 com.canvasia.*")
     parser.add_argument("--console", action="store_true", help="保留控制台窗口，便于排错")
     parser.add_argument("--icon", type=Path, help="可选应用图标路径")
     parser.add_argument("--allow-missing-assets", action="store_true", help="允许素材缺失时继续打包")

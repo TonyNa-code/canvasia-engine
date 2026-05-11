@@ -545,7 +545,7 @@
     };
   }
 
-  global.TonyNaEditorProjectDoctor = Object.freeze({
+  global.CanvasiaEditorProjectDoctor = Object.freeze({
     buildProjectDoctorRepairNextActions,
     buildProjectDoctorRepairReceipt,
     buildProjectDoctorQueue,

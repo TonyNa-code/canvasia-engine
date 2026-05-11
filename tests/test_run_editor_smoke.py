@@ -112,7 +112,7 @@ def create_fake_iscc_script(script_path: Path) -> Path:
         """#!/bin/sh
 set -eu
 output_dir=""
-output_base="TonyNaEngineEditorSetup"
+output_base="CanvasiaEngineEditorSetup"
 for arg in "$@"; do
   case "$arg" in
     /O*) output_dir="${arg#/O}" ;;
@@ -241,7 +241,7 @@ class RunEditorSmokeTests(unittest.TestCase):
             os.environ[run_editor.get_nwjs_runtime_dir_override_env_var(platform_key)] = str(runtime_dir)
         os.environ[run_editor.EDITOR_WINDOWS_ISCC_ENV] = str(self.fake_iscc)
         os.environ[run_editor.EDITOR_WINDOWS_SIGNTOOL_ENV] = str(self.fake_signtool)
-        os.environ[run_editor.EDITOR_WINDOWS_CERT_SUBJECT_ENV] = "Tony Na Engine Project"
+        os.environ[run_editor.EDITOR_WINDOWS_CERT_SUBJECT_ENV] = "Canvasia Engine Project"
 
     def tearDown(self) -> None:
         run_editor.PROJECTS_DIR = self.original_globals["PROJECTS_DIR"]
@@ -1389,7 +1389,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                     "type": "credits_roll",
                     "title": "STAFF",
                     "subtitle": "Thank you for playing",
-                    "lines": ["企划：Tony Na", "测试：Tony Na Engine"],
+                    "lines": ["企划：Creator", "测试：Canvasia Engine"],
                     "durationSeconds": 12,
                     "background": "dark",
                     "skippable": True,
@@ -1990,7 +1990,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertIn("运行 .verify.command / .verify.sh / .verify.bat", release_artifact_markdown)
         self.assertIn("Release Notes 摘要", release_artifact_markdown)
         release_notes_markdown = Path(export_result["releaseNotesPath"]).read_text(encoding="utf-8")
-        self.assertIn("# Tony Na Engine 原生 Runtime Preview", release_notes_markdown)
+        self.assertIn("# Canvasia Engine 原生 Runtime Preview", release_notes_markdown)
         self.assertIn("GitHub Release", release_notes_markdown)
         self.assertIn(export_result["archiveName"], release_notes_markdown)
         self.assertIn(archive_sha256, release_notes_markdown)
@@ -2244,7 +2244,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue(app_builder_payload["plannedArchiveName"].endswith("-preview.zip"))
         self.assertEqual(app_builder_payload["optionalVideoRequirements"], run_editor.NATIVE_RUNTIME_VIDEO_REQUIREMENTS_NAME)
         self.assertIn(app_builder_payload["platform"], {"macos", "windows", "linux", "unknown"})
-        self.assertTrue(app_builder_payload["bundleIdentifier"].startswith("com.tonyna."))
+        self.assertTrue(app_builder_payload["bundleIdentifier"].startswith("com.canvasia."))
         self.assertTrue(app_builder_payload["distributionNotes"])
         self.assertTrue(app_builder_payload["dataEntries"])
         self.assertFalse(app_builder_payload["missingAssetPaths"])

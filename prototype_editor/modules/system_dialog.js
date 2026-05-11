@@ -15,7 +15,7 @@
           );
     return {
       title: String(options.title ?? "提示"),
-      eyebrow: String(options.eyebrow ?? "Tony Na Engine"),
+      eyebrow: String(options.eyebrow ?? "Canvasia Engine"),
       message,
       tone: ["danger", "warning", "success", "info"].includes(options.tone) ? options.tone : "info",
       confirmLabel: String(options.confirmLabel ?? "知道了"),
@@ -438,7 +438,7 @@
     });
   }
 
-  global.TonyNaEditorSystemDialog = Object.freeze({
+  global.CanvasiaEditorSystemDialog = Object.freeze({
     DEFAULT_TOAST_HIDE_MS,
     normalizeSystemDialogOptions,
     inferSystemAlertOptions,

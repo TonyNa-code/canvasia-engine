@@ -486,7 +486,7 @@ def build_terminal_header_lines(
 ) -> list[str]:
     git = git_snapshot or {}
     lines = [
-        colorize_terminal("Tony Na Engine Verify", "bold", use_color),
+        colorize_terminal("Canvasia Engine Verify", "bold", use_color),
         f"Profile: {profile} | Checks: {len(steps)}",
     ]
     if git.get("available"):
@@ -631,7 +631,7 @@ def write_markdown_report(
     summary = summarize_results(results)
     git = git_snapshot if git_snapshot is not None else get_git_snapshot()
     lines = [
-        "# Tony Na Engine Local Verify Report",
+        "# Canvasia Engine Local Verify Report",
         "",
         f"- Profile: `{profile}`",
         f"- Generated: `{generated_at or get_report_timestamp()}`",
@@ -786,7 +786,7 @@ def run_verify_steps(
 
 
 def parse_args(argv: Sequence[str]) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run Tony Na Engine local CI-style verification.")
+    parser = argparse.ArgumentParser(description="Run Canvasia Engine local CI-style verification.")
     parser.add_argument(
         "--profile",
         choices=["syntax", "quick", "standard", "full", "browser", "github"],

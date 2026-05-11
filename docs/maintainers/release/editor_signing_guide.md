@@ -1,4 +1,4 @@
-# Tony Na Engine 编辑器维护者签名与公证操作指南
+# Canvasia Engine 编辑器维护者签名与公证操作指南
 
 本说明仅面向维护者，用于正式发布前的编辑器签名与公证操作。当前编辑器导出链已经接通：
 
@@ -31,9 +31,9 @@
 
 ### macOS 需要
 
-- `TONY_NA_EDITOR_MAC_APP_IDENTITY`
-- `TONY_NA_EDITOR_MAC_INSTALLER_IDENTITY`
-- `TONY_NA_EDITOR_MAC_NOTARY_PROFILE`
+- `CANVASIA_EDITOR_MAC_APP_IDENTITY`
+- `CANVASIA_EDITOR_MAC_INSTALLER_IDENTITY`
+- `CANVASIA_EDITOR_MAC_NOTARY_PROFILE`
 
 建议先在本机确认这些命令可用：
 
@@ -45,32 +45,32 @@ xcrun notarytool --help
 
 ### Windows 需要
 
-- `TONY_NA_EDITOR_WINDOWS_ISCC`
-- `TONY_NA_EDITOR_WINDOWS_SIGNTOOL`
+- `CANVASIA_EDITOR_WINDOWS_ISCC`
+- `CANVASIA_EDITOR_WINDOWS_SIGNTOOL`
 
 再从下面三种证书方式中任选一种：
 
 1. 证书主题名
-   - `TONY_NA_EDITOR_WINDOWS_CERT_SUBJECT`
+   - `CANVASIA_EDITOR_WINDOWS_CERT_SUBJECT`
 2. 证书指纹
-   - `TONY_NA_EDITOR_WINDOWS_CERT_THUMBPRINT`
+   - `CANVASIA_EDITOR_WINDOWS_CERT_THUMBPRINT`
 3. PFX 文件
-   - `TONY_NA_EDITOR_WINDOWS_PFX_PATH`
-   - `TONY_NA_EDITOR_WINDOWS_PFX_PASSWORD`
+   - `CANVASIA_EDITOR_WINDOWS_PFX_PATH`
+   - `CANVASIA_EDITOR_WINDOWS_PFX_PASSWORD`
 
 可选：
 
-- `TONY_NA_EDITOR_WINDOWS_TIMESTAMP_URL`
+- `CANVASIA_EDITOR_WINDOWS_TIMESTAMP_URL`
 
 如果需要在非 Windows 环境跨平台触发 Windows 编译/签名，还可以补：
 
-- `TONY_NA_EDITOR_WINDOWS_ISCC_RUNNER`
-- `TONY_NA_EDITOR_WINDOWS_SIGNTOOL_RUNNER`
+- `CANVASIA_EDITOR_WINDOWS_ISCC_RUNNER`
+- `CANVASIA_EDITOR_WINDOWS_SIGNTOOL_RUNNER`
 
 ## 3. macOS 真签名与公证流程建议
 
 1. 先准备好 Apple Developer 证书和 notary profile
-2. 确认上面的 3 个 `TONY_NA_EDITOR_MAC_*` 环境变量都能取到
+2. 确认上面的 3 个 `CANVASIA_EDITOR_MAC_*` 环境变量都能取到
 3. 在编辑器里执行：
    - `导出编辑器桌面包`
    - 或 `导出三系统编辑器套装`
@@ -88,8 +88,8 @@ xcrun notarytool --help
 2. 确认可用的 `signtool.exe`
 3. 准备好真实代码签名证书
 4. 配好：
-   - `TONY_NA_EDITOR_WINDOWS_ISCC`
-   - `TONY_NA_EDITOR_WINDOWS_SIGNTOOL`
+   - `CANVASIA_EDITOR_WINDOWS_ISCC`
+   - `CANVASIA_EDITOR_WINDOWS_SIGNTOOL`
    - 以及主题名 / 指纹 / PFX 三选一
 5. 在编辑器里执行：
    - `导出编辑器桌面包`

@@ -45,7 +45,7 @@
   }
 
   function getProjectTitle(options = {}) {
-    return String(options.projectTitle || "tony-na-engine");
+    return String(options.projectTitle || "canvasia-engine");
   }
 
   function getExportedAt(options = {}) {
@@ -293,7 +293,7 @@
   }
 
   function buildScriptEntryCopyText(entry, options = {}) {
-    const projectTitle = options.projectTitle ?? "Tony Na Engine Project";
+    const projectTitle = options.projectTitle ?? "Canvasia Engine Project";
     const lines = [
       `项目：${projectTitle}`,
       `章节：${entry.chapterName}`,
@@ -346,7 +346,7 @@
       groupedByChapter.set(entry.chapterName, chapterBucket);
     });
 
-    lines.push(`${getProjectTitle(options)} · Tony Na Engine 台本导出`);
+    lines.push(`${getProjectTitle(options)} · Canvasia Engine 台本导出`);
     lines.push(`导出时间：${formatDate(getExportedAt(options), options)}`);
     lines.push(`当前筛选：${scopeText}`);
     lines.push(`导出条数：${getArray(filteredEntries).length} / 全项目 ${totalEntryCount}`);
@@ -497,13 +497,13 @@
 
   function buildScriptExportFileName(format, options = {}) {
     const extension = format === "csv" ? "csv" : "txt";
-    const title = sanitizeFileName(getProjectTitle(options), options) || "tony-na-engine";
+    const title = sanitizeFileName(getProjectTitle(options), options) || "canvasia-engine";
     const scope = sanitizeFileName(getScriptFilterSummaryText(options), options).slice(0, 28) || "full-script";
     return `${title}_script_${scope}_${getDateStamp(options)}.${extension}`;
   }
 
   function buildScriptVoiceSheetFileName(filters = {}, options = {}) {
-    const title = sanitizeFileName(getProjectTitle(options), options) || "tony-na-engine";
+    const title = sanitizeFileName(getProjectTitle(options), options) || "canvasia-engine";
     const scopeText =
       filters.characterId || filters.chapterId
         ? [
@@ -518,23 +518,23 @@
   }
 
   function buildCharacterVoiceBriefFileName(character, options = {}) {
-    const title = sanitizeFileName(getProjectTitle(options), options) || "tony-na-engine";
+    const title = sanitizeFileName(getProjectTitle(options), options) || "canvasia-engine";
     const characterName = sanitizeFileName(character?.displayName || character?.id || "character", options);
     return `${title}_voice_delivery_${characterName}_${getDateStamp(options)}.txt`;
   }
 
   function buildChapterVoiceBriefFileName(chapter, options = {}) {
-    const title = sanitizeFileName(getProjectTitle(options), options) || "tony-na-engine";
+    const title = sanitizeFileName(getProjectTitle(options), options) || "canvasia-engine";
     const chapterName = sanitizeFileName(chapter?.name || chapter?.chapterId || "chapter", options);
     return `${title}_voice_delivery_${chapterName}_${getDateStamp(options)}.txt`;
   }
 
   function buildProjectVoiceBriefFileName(options = {}) {
-    const title = sanitizeFileName(getProjectTitle(options), options) || "tony-na-engine";
+    const title = sanitizeFileName(getProjectTitle(options), options) || "canvasia-engine";
     return `${title}_voice_delivery_project_${getDateStamp(options)}.txt`;
   }
 
-  global.TonyNaEditorScriptVoice = Object.freeze({
+  global.CanvasiaEditorScriptVoice = Object.freeze({
     entryToVoicePlaceholderItem,
     getScriptVoiceWorkflowState,
     getScriptVoiceWorkflowLabel,

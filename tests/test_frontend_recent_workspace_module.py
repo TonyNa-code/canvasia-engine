@@ -21,7 +21,7 @@ class FrontendRecentWorkspaceModuleTests(unittest.TestCase):
             context.globalThis = context;
             vm.createContext(context);
             vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
-            const tools = context.window.TonyNaEditorRecentWorkspace;
+            const tools = context.window.CanvasiaEditorRecentWorkspace;
             const storage = {{
               values: new Map(),
               getItem(key) {{
@@ -151,7 +151,7 @@ class FrontendRecentWorkspaceModuleTests(unittest.TestCase):
         self.assertEqual(payload["constants"], [8, "剧情场景"])
         self.assertEqual(payload["labels"], ["剧情场景", "台本入口", "剧情场景"])
         self.assertEqual(payload["safeTypes"], ["asset", "scene"])
-        self.assertEqual(payload["storageKey"], "tony-na-engine:editor-recent-work:project-alpha")
+        self.assertEqual(payload["storageKey"], "canvasia-engine:editor-recent-work:project-alpha")
         self.assertEqual(payload["sceneEntry"]["sceneId"], "scene_a")
         self.assertEqual(payload["sceneEntry"]["updatedAt"], "2026-05-07T00:00:00.000Z")
         self.assertEqual(len(payload["sceneEntry"]["title"]), 160)

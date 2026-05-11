@@ -577,7 +577,7 @@
     return getCreditsLines(blockLines).join("\n");
   }
 
-  global.TonyNaEditorVisualEffects = Object.freeze({
+  global.CanvasiaEditorVisualEffects = Object.freeze({
     SHAKE_INTENSITY_LABELS,
     EFFECT_DURATION_LABELS,
     FLASH_COLOR_LABELS,

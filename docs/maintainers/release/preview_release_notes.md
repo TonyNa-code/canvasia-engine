@@ -1,4 +1,4 @@
-# Tony Na Engine 维护者预览发布说明
+# Canvasia Engine 维护者预览发布说明
 
 本说明仅供维护者准备 GitHub Release 或测试分发时参考。
 

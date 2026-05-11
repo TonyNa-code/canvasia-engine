@@ -1048,7 +1048,7 @@ def write_markdown_report(path: Path, report: dict[str, Any]) -> None:
     safe_repair_command = str(report.get("safeRepairCommand") or "").strip()
     safe_repair_preview_command = str(report.get("safeRepairPreviewCommand") or "").strip()
     lines = [
-        "# Tony Na Engine Project Health Report",
+        "# Canvasia Engine Project Health Report",
         "",
         f"- Project: `{report.get('projectDir', '')}`",
         f"- Status: `{summary.get('status', 'unknown')}`",
@@ -1192,7 +1192,7 @@ def build_terminal_summary_lines(report: dict[str, Any], report_paths: Sequence[
     safe_repair_command = str(report.get("safeRepairCommand") or "").strip()
     safe_repair_preview_command = str(report.get("safeRepairPreviewCommand") or "").strip()
     lines = [
-        "Tony Na Engine Project Health",
+        "Canvasia Engine Project Health",
         f"Project: {report.get('projectDir', '')}",
         (
             f"Status: {status} ({get_status_label(status)}) | "
@@ -1256,7 +1256,7 @@ def print_terminal_summary(report: dict[str, Any], report_paths: Sequence[Path] 
 
 
 def parse_args(argv: Sequence[str]) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Check a Tony Na Engine project for beginner-facing health issues.")
+    parser = argparse.ArgumentParser(description="Check a Canvasia Engine project for beginner-facing health issues.")
     parser.add_argument("project_dir", type=Path, help="Project directory to check, for example template_project.")
     parser.add_argument("--json-report", type=Path, help="Write a machine-readable JSON report.")
     parser.add_argument("--markdown-report", type=Path, help="Write a human-readable Markdown report.")

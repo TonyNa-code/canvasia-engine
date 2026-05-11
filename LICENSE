@@ -1,8 +1,8 @@
-Tony Na Engine Creator License 1.0
+Canvasia Engine Creator License 1.0
 
-Copyright (c) 2026 Tony Na
+Copyright (c) 2026 Canvasia Engine Contributors
 
-This license governs the Tony Na Engine source code, editor, runtime templates,
+This license governs the Canvasia Engine source code, editor, runtime templates,
 packaging scripts, documentation, and bundled assets in this repository
 ("Engine").
 
@@ -55,14 +55,14 @@ license, you must keep:
 
 - this license text;
 - existing copyright notices;
-- reasonable credit to "Tony Na Engine" as the original engine project.
+- reasonable credit to "Canvasia Engine" as the original engine project.
 
 Created Works do not need to be open-sourced, and attribution inside the game
 is recommended but not mandatory.
 
 5. Trademarks and Branding
 
-"Tony Na", "Tony Na Engine", associated logos, and related branding are not
+"Canvasia Engine", associated logos, and related branding are not
 licensed as trademarks under this license. You may not market your own engine,
 fork, service, or toolkit using confusingly similar branding without prior
 written permission.

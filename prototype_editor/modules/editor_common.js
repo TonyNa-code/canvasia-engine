@@ -86,7 +86,7 @@
       .replaceAll("'", "&#39;");
   }
 
-  global.TonyNaEditorCommon = Object.freeze({
+  global.CanvasiaEditorCommon = Object.freeze({
     sanitizeFileName,
     formatCsvCell,
     truncateText,

@@ -22,7 +22,7 @@ class FrontendSystemDialogModuleTests(unittest.TestCase):
             context.globalThis = context;
             vm.createContext(context);
             vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
-            const tools = context.window.TonyNaEditorSystemDialog;
+            const tools = context.window.CanvasiaEditorSystemDialog;
             const normalized = tools.normalizeSystemDialogOptions({{
               title: " 删除项目？ ",
               message: ["第一行", "", "第二行"],

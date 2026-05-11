@@ -196,13 +196,13 @@ class FrontendActionHandlerTests(unittest.TestCase):
             click_handler.rfind('action === "reset-preview-debug-defaults"'),
             click_handler.rfind("handleUnhandledEditorAction(action, actionTarget);"),
         )
-        self.assertIn("[Tony Na Engine] Unhandled editor action", source)
+        self.assertIn("[Canvasia Engine] Unhandled editor action", source)
         self.assertIn("handleClick(event).catch", source)
         self.assertIn('handleEditorRuntimeError(error, "点击操作")', source)
         self.assertIn("installEditorRuntimeErrorBoundary();", source)
         self.assertIn('window.addEventListener("unhandledrejection"', source)
         self.assertIn("lastEditorRuntimeErrorKey", source)
-        self.assertIn("[Tony Na Engine] Editor runtime error", source)
+        self.assertIn("[Canvasia Engine] Editor runtime error", source)
 
     def test_handle_click_ignores_disabled_actions_before_dispatch(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")

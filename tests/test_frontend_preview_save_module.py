@@ -21,7 +21,7 @@ class FrontendPreviewSaveModuleTests(unittest.TestCase):
             context.globalThis = context;
             vm.createContext(context);
             vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
-            const tools = context.window.TonyNaEditorPreviewSave;
+            const tools = context.window.CanvasiaEditorPreviewSave;
             const sceneNames = new Map([["scene_a", {{ name: "序章教室" }}]]);
             const snapshotSource = {{
               sceneId: "scene_a",

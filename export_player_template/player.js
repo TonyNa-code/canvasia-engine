@@ -1532,7 +1532,7 @@ function init() {
   state.endingProgress = loadStoredEndingProgress();
   state.extraUnlocks = loadStoredExtraUnlocks();
   syncAchievementProgressFromState();
-  document.title = `${data.project.title ?? "Tony Na Engine"} · 网页试玩包`;
+  document.title = `${data.project.title ?? "Canvasia Engine"} · 网页试玩包`;
   refs.gameTitle.textContent = data.project.title ?? "未命名项目";
   refs.gameMeta.textContent = buildMetaSummary();
   renderStartArtwork();
@@ -2080,7 +2080,7 @@ function renderBeforeStart() {
   refs.sceneChip.textContent = "等待开始";
   refs.musicChip.textContent = "BGM：未播放";
   refs.backgroundLabel.textContent = "导出试玩包已就绪";
-  refs.speakerName.textContent = "Tony Na Engine";
+  refs.speakerName.textContent = "Canvasia Engine";
   refs.speakerName.style.color = "";
   refs.lineTypeTag.textContent = "准备";
   refs.messageText.textContent = "点击“开始试玩”后，运行时会按当前项目的分支、变量和跳转继续推进。";
@@ -3522,7 +3522,7 @@ function renderProfileDialog() {
 
   refs.profileDialogHero.innerHTML = `
     <div class="extra-hero-copy">
-      <strong>${escapeHtml(data.project.title ?? "Tony Na Engine")} · 玩家档案</strong>
+      <strong>${escapeHtml(data.project.title ?? "Canvasia Engine")} · 玩家档案</strong>
       <span>${escapeHtml(
         profile.firstPlayedAt
           ? `第一次开始：${formatDate(profile.firstPlayedAt)} · 最近一次开始：${profile.lastPlayedAt ? formatDate(profile.lastPlayedAt) : "未记录"}`
@@ -4972,7 +4972,7 @@ function applyProjectGameUiSkin(project = data.project) {
   root.style.setProperty("--game-ui-overlay-image", cssUrlFromAssetId(config.uiOverlayAssetId));
   root.style.setProperty("--game-ui-overlay-opacity", (config.uiOverlayOpacity / 100).toFixed(2));
 
-  const projectTitle = data.project?.title ?? "Tony Na Engine";
+  const projectTitle = data.project?.title ?? "Canvasia Engine";
   const topEyebrow = document.querySelector(".player-brand-copy .eyebrow");
   const startEyebrow = document.querySelector(".start-card > .eyebrow");
   const startBrandTitle = document.querySelector(".start-brand-copy strong");
@@ -5152,7 +5152,7 @@ function getBrowserStorage() {
 }
 
 function getProjectStorageScope() {
-  const title = String(data.project.title ?? "tony-na-project")
+  const title = String(data.project.title ?? "canvasia-project")
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9\u4e00-\u9fa5_-]+/g, "-")
@@ -5163,7 +5163,7 @@ function getProjectStorageScope() {
 }
 
 function getPlaybackStorageKey() {
-  return `tony-na-engine:player-preview:${getProjectStorageScope()}`;
+  return `canvasia-engine:player-preview:${getProjectStorageScope()}`;
 }
 
 function sanitizePlaybackSettings(source = {}) {
@@ -5215,47 +5215,47 @@ function persistPlaybackSettings() {
 }
 
 function getAutoResumeStorageKey() {
-  return `tony-na-engine:player-autoresume:${getProjectStorageScope()}`;
+  return `canvasia-engine:player-autoresume:${getProjectStorageScope()}`;
 }
 
 function getReadHistoryStorageKey() {
-  return `tony-na-engine:player-read:${getProjectStorageScope()}`;
+  return `canvasia-engine:player-read:${getProjectStorageScope()}`;
 }
 
 function getSaveSlotStorageKey() {
-  return `tony-na-engine:player-saves:${getProjectStorageScope()}`;
+  return `canvasia-engine:player-saves:${getProjectStorageScope()}`;
 }
 
 function getQuickSaveStorageKey() {
-  return `tony-na-engine:player-quicksave:${getProjectStorageScope()}`;
+  return `canvasia-engine:player-quicksave:${getProjectStorageScope()}`;
 }
 
 function getPlayerProfileStorageKey() {
-  return `tony-na-engine:player-profile:${getProjectStorageScope()}`;
+  return `canvasia-engine:player-profile:${getProjectStorageScope()}`;
 }
 
 function getAchievementProgressStorageKey() {
-  return `tony-na-engine:player-achievements:${getProjectStorageScope()}`;
+  return `canvasia-engine:player-achievements:${getProjectStorageScope()}`;
 }
 
 function getChapterReplayStorageKey() {
-  return `tony-na-engine:player-chapters:${getProjectStorageScope()}`;
+  return `canvasia-engine:player-chapters:${getProjectStorageScope()}`;
 }
 
 function getLocationArchiveStorageKey() {
-  return `tony-na-engine:player-locations:${getProjectStorageScope()}`;
+  return `canvasia-engine:player-locations:${getProjectStorageScope()}`;
 }
 
 function getNarrationArchiveStorageKey() {
-  return `tony-na-engine:player-narrations:${getProjectStorageScope()}`;
+  return `canvasia-engine:player-narrations:${getProjectStorageScope()}`;
 }
 
 function getRelationArchiveStorageKey() {
-  return `tony-na-engine:player-relations:${getProjectStorageScope()}`;
+  return `canvasia-engine:player-relations:${getProjectStorageScope()}`;
 }
 
 function getVoiceReplayStorageKey() {
-  return `tony-na-engine:player-voice-replay:${getProjectStorageScope()}`;
+  return `canvasia-engine:player-voice-replay:${getProjectStorageScope()}`;
 }
 
 function buildVoiceReplayEntryId(sceneId, blockId, blockIndex) {
@@ -6025,15 +6025,15 @@ function syncAchievementProgressFromState() {
 }
 
 function getCharacterArchiveStorageKey() {
-  return `tony-na-engine:player-characters:${getProjectStorageScope()}`;
+  return `canvasia-engine:player-characters:${getProjectStorageScope()}`;
 }
 
 function getExtraUnlockStorageKey() {
-  return `tony-na-engine:player-extra:${getProjectStorageScope()}`;
+  return `canvasia-engine:player-extra:${getProjectStorageScope()}`;
 }
 
 function getEndingProgressStorageKey() {
-  return `tony-na-engine:player-endings:${getProjectStorageScope()}`;
+  return `canvasia-engine:player-endings:${getProjectStorageScope()}`;
 }
 
 function getEndingScenes() {
@@ -7717,7 +7717,7 @@ function buildSaveThumbnailDataUrl(snapshot) {
     })
     .join("");
 
-  const speaker = escapeHtml(snapshot.visualState?.speakerName ?? snapshot.sceneName ?? "Tony Na Engine");
+  const speaker = escapeHtml(snapshot.visualState?.speakerName ?? snapshot.sceneName ?? "Canvasia Engine");
   const dialogue = escapeHtml(truncateText(snapshot.visualState?.dialogueText ?? "这个节点没有正文。", 34));
   const scene = escapeHtml(snapshot.visualState?.backgroundName ?? snapshot.sceneName ?? "未设置背景");
   const block = escapeHtml(snapshot.completed ? "路线结束" : getBlockLabel(snapshot.blockType));
@@ -7811,7 +7811,7 @@ function renderSaveVisualSummary(slot) {
   }
 
   const blockLabel = snapshot.completed ? "路线结束" : getBlockLabel(snapshot.blockType);
-  const stageTitle = snapshot.visualState?.speakerName || snapshot.sceneName || "Tony Na Engine";
+  const stageTitle = snapshot.visualState?.speakerName || snapshot.sceneName || "Canvasia Engine";
   const stageText = truncateText(snapshot.visualState?.dialogueText ?? "这个节点没有正文。", 38);
   const thumbnailUrl = slot?.thumbnailDataUrl || buildSaveThumbnailDataUrl(snapshot);
 
@@ -8693,7 +8693,7 @@ function createInitialPreviewVisualState() {
     characterTransitionEvent: null,
     characterEmphasisEvent: null,
     visibleCharacters: [],
-    speakerName: "Tony Na Engine",
+    speakerName: "Canvasia Engine",
     dialogueText: "点击“继续”后，这里会按导出时的剧情顺序推进。",
   };
 }
@@ -9782,7 +9782,7 @@ function syncCreditsPlayback(snapshot) {
   refs.creditsSkipButton.hidden = block.skippable === false;
   refs.creditsRoll.innerHTML = `
     <div class="credits-roll-inner">
-      <div class="credits-roll-kicker">Tony Na Engine</div>
+      <div class="credits-roll-kicker">Canvasia Engine</div>
       <h2>${escapeHtml(block.title || "STAFF")}</h2>
       ${block.subtitle ? `<p class="credits-roll-subtitle">${escapeHtml(block.subtitle)}</p>` : ""}
       <div class="credits-roll-lines">

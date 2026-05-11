@@ -183,7 +183,7 @@ def build_headers(token: str = "") -> dict[str, str]:
     headers = {
         "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
-        "User-Agent": "tony-na-engine-local-ci-status",
+        "User-Agent": "canvasia-engine-local-ci-status",
     }
     if token:
         headers["Authorization"] = f"Bearer {token}"
@@ -378,7 +378,7 @@ def write_json_report(path: Path, payload: dict[str, Any]) -> None:
 def write_markdown_report(path: Path, payload: dict[str, Any]) -> None:
     git = payload.get("git") or {}
     lines = [
-        "# Tony Na Engine GitHub CI Status",
+        "# Canvasia Engine GitHub CI Status",
         "",
         f"- Repository: `{payload['repo']}`",
         f"- Commit: `{payload['shortSha']}`",

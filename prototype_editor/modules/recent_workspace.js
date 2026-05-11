@@ -28,7 +28,7 @@
 
   function getRecentWorkspaceStorageKey(scope = "default") {
     const safeScope = sanitizeRecentWorkspaceText(scope, 180) || "default";
-    return `tony-na-engine:editor-recent-work:${safeScope}`;
+    return `canvasia-engine:editor-recent-work:${safeScope}`;
   }
 
   function getRecentWorkspaceItemKey(entry) {
@@ -163,7 +163,7 @@
     }
   }
 
-  global.TonyNaEditorRecentWorkspace = Object.freeze({
+  global.CanvasiaEditorRecentWorkspace = Object.freeze({
     RECENT_WORKSPACE_LIMIT,
     RECENT_WORKSPACE_TYPE_LABELS,
     getSafeRecentWorkspaceType,

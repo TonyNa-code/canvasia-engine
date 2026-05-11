@@ -87,7 +87,7 @@ class PreviewReleaseBodyTests(unittest.TestCase):
             "git": {"workingTreeClean": True},
             "artifacts": [
                 {
-                    "name": "TonyNaEngine-macos-preview.zip",
+                    "name": "CanvasiaEngine-macos-preview.zip",
                     "kind": "editor-package",
                     "sizeLabel": "42.0 MB",
                     "sha256": "a" * 64,
@@ -111,7 +111,7 @@ class PreviewReleaseBodyTests(unittest.TestCase):
 
         self.assertIn("## Download Guide", body)
         self.assertIn("### Recommended Assets", body)
-        self.assertIn("TonyNaEngine-macos-preview.zip", body)
+        self.assertIn("CanvasiaEngine-macos-preview.zip", body)
         self.assertIn("SampleGame-native_runtime-preview.zip", body)
         self.assertNotIn("SampleGame-old-native_runtime-preview.zip", body)
         self.assertIn("Try the editor without cloning source", body)

@@ -112,7 +112,7 @@ def create_fake_iscc_script(script_path: Path) -> Path:
         """#!/bin/sh
 set -eu
 output_dir=""
-output_base="TonyNaEngineEditorSetup"
+output_base="CanvasiaEngineEditorSetup"
 for arg in "$@"; do
   case "$arg" in
     /O*) output_dir="${arg#/O}" ;;
@@ -180,15 +180,15 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
         server_env = os.environ.copy()
         server_env.update(
             {
-                "TONY_NA_EDITOR_RUNTIME_ARCHIVE_MACOS": str(cls.fake_runtime_archives["macos"]),
-                "TONY_NA_EDITOR_RUNTIME_ARCHIVE_WINDOWS": str(cls.fake_runtime_archives["windows"]),
-                "TONY_NA_EDITOR_RUNTIME_ARCHIVE_LINUX": str(cls.fake_runtime_archives["linux"]),
-                "TONY_NA_NWJS_RUNTIME_DIR_MACOS": str(cls.fake_nwjs_runtime_dirs["macos"]),
-                "TONY_NA_NWJS_RUNTIME_DIR_WINDOWS": str(cls.fake_nwjs_runtime_dirs["windows"]),
-                "TONY_NA_NWJS_RUNTIME_DIR_LINUX": str(cls.fake_nwjs_runtime_dirs["linux"]),
-                "TONY_NA_EDITOR_WINDOWS_ISCC": str(cls.fake_iscc),
-                "TONY_NA_EDITOR_WINDOWS_SIGNTOOL": str(cls.fake_signtool),
-                "TONY_NA_EDITOR_WINDOWS_CERT_SUBJECT": "Tony Na Engine Project",
+                "CANVASIA_EDITOR_RUNTIME_ARCHIVE_MACOS": str(cls.fake_runtime_archives["macos"]),
+                "CANVASIA_EDITOR_RUNTIME_ARCHIVE_WINDOWS": str(cls.fake_runtime_archives["windows"]),
+                "CANVASIA_EDITOR_RUNTIME_ARCHIVE_LINUX": str(cls.fake_runtime_archives["linux"]),
+                "CANVASIA_NWJS_RUNTIME_DIR_MACOS": str(cls.fake_nwjs_runtime_dirs["macos"]),
+                "CANVASIA_NWJS_RUNTIME_DIR_WINDOWS": str(cls.fake_nwjs_runtime_dirs["windows"]),
+                "CANVASIA_NWJS_RUNTIME_DIR_LINUX": str(cls.fake_nwjs_runtime_dirs["linux"]),
+                "CANVASIA_EDITOR_WINDOWS_ISCC": str(cls.fake_iscc),
+                "CANVASIA_EDITOR_WINDOWS_SIGNTOOL": str(cls.fake_signtool),
+                "CANVASIA_EDITOR_WINDOWS_CERT_SUBJECT": "Canvasia Engine Project",
             }
         )
         cls.server_log_path = cls.repo_copy / ".tmp_browser_smoke_server.log"
@@ -419,11 +419,11 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
             """(options) => {
                 const now = new Date().toISOString();
                 window.localStorage.setItem(
-                    "tony-na-engine:player-chapters:心跳时差",
+                    "canvasia-engine:player-chapters:心跳时差",
                     JSON.stringify({ chapter_opening: now })
                 );
                 window.localStorage.setItem(
-                    "tony-na-engine:player-extra:心跳时差",
+                    "canvasia-engine:player-extra:心跳时差",
                     JSON.stringify({
                         cg: options?.includeGallery ? ["cg_twilight_memory"] : [],
                         bgm: ["bgm_after_school"],
@@ -431,7 +431,7 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
                 );
                 if (options?.includeVoiceReplay) {
                     window.localStorage.setItem(
-                        "tony-na-engine:player-voice-replay:心跳时差",
+                        "canvasia-engine:player-voice-replay:心跳时差",
                         JSON.stringify({
                             "scene_classroom_sunset:block_005:6": {
                                 unlockedAt: now,
@@ -454,7 +454,7 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
 
                 if (options?.includeEndings) {
                     window.localStorage.setItem(
-                        "tony-na-engine:player-endings:心跳时差",
+                        "canvasia-engine:player-endings:心跳时差",
                         JSON.stringify({
                             unlocked: {
                                 scene_normal_goodnight: now,
@@ -513,7 +513,7 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
             """() => {
                 const now = new Date().toISOString();
                 window.localStorage.setItem(
-                    "tony-na-engine:player-locations:心跳时差",
+                    "canvasia-engine:player-locations:心跳时差",
                     JSON.stringify({
                         bg_classroom_sunset: now,
                         bg_hallway_after_school: now,
@@ -521,20 +521,20 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
                     })
                 );
                 window.localStorage.setItem(
-                    "tony-na-engine:player-narrations:心跳时差",
+                    "canvasia-engine:player-narrations:心跳时差",
                     JSON.stringify({
                         "scene_rooftop_breeze:block_014:1": now,
                         "scene_normal_goodnight:block_023:1": now,
                     })
                 );
                 window.localStorage.setItem(
-                    "tony-na-engine:player-relations:心跳时差",
+                    "canvasia-engine:player-relations:心跳时差",
                     JSON.stringify({
                         "char_linruoxi__char_player": now,
                     })
                 );
                 window.localStorage.setItem(
-                    "tony-na-engine:player-characters:心跳时差",
+                    "canvasia-engine:player-characters:心跳时差",
                     JSON.stringify(["char_linruoxi", "char_player"])
                 );
             }"""
@@ -779,7 +779,7 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
         markdown_path = self.repo_copy / markdown_download.suggested_filename
         markdown_download.save_as(str(markdown_path))
         markdown_payload = markdown_path.read_text(encoding="utf-8")
-        self.assertIn("Tony Na Assistant 灵感档案", markdown_payload)
+        self.assertIn("Canvasia Assistant 灵感档案", markdown_payload)
         self.assertIn("隐私说明", markdown_payload)
 
         panel.get_by_role("button", name="复制文档").first.click()
@@ -790,7 +790,7 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
         panel.locator("#creativeAssistantRememberKey").check()
         self.assertEqual(
             self.page.evaluate(
-                """() => localStorage.getItem("tony-na-engine:creative-assistant-openai-key")"""
+                """() => localStorage.getItem("canvasia-engine:creative-assistant-openai-key")"""
             ),
             "sk-browser-smoke-test",
         )
@@ -799,7 +799,7 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
         self.assertTrue(panel.get_by_role("button", name="忘记本机 Key").is_disabled())
         self.assertIsNone(
             self.page.evaluate(
-                """() => localStorage.getItem("tony-na-engine:creative-assistant-openai-key")"""
+                """() => localStorage.getItem("canvasia-engine:creative-assistant-openai-key")"""
             )
         )
 
@@ -1026,7 +1026,7 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
         download_path = self.repo_copy / download.suggested_filename
         download.save_as(str(download_path))
         report_content = download_path.read_text(encoding="utf-8-sig")
-        self.assertIn("Tony Na Engine 变量治理报告", report_content)
+        self.assertIn("Canvasia Engine 变量治理报告", report_content)
         self.assertIn("被使用变量", report_content)
         self.assertIn("未使用变量", report_content)
         self.assertIn("预留变量", report_content)

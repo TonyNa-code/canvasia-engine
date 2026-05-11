@@ -540,6 +540,6 @@
     clampPercent,
     getPercent,
   });
-  global.TonyNaProjectMilestones = projectMilestonesApi;
-  global.TonyNaEditorProjectMilestones = projectMilestonesApi;
+  global.CanvasiaProjectMilestones = projectMilestonesApi;
+  global.CanvasiaEditorProjectMilestones = projectMilestonesApi;
 })(typeof window !== "undefined" ? window : globalThis);

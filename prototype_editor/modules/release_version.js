@@ -37,7 +37,7 @@
     return currentVersion;
   }
 
-  global.TonyNaEditorReleaseVersion = Object.freeze({
+  global.CanvasiaEditorReleaseVersion = Object.freeze({
     DEFAULT_PROJECT_RELEASE_VERSION,
     DEFAULT_RELEASE_VERSION_BASE,
     getProjectReleaseVersion,

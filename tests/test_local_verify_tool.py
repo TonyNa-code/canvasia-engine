@@ -127,12 +127,12 @@ class LocalVerifyToolTests(unittest.TestCase):
             self.assertEqual(payload["git"], latest_payload["git"])
             self.assertEqual(payload["summary"]["status"], "planned")
             markdown_text = markdown_report.read_text(encoding="utf-8")
-            self.assertIn("# Tony Na Engine Local Verify Report", markdown_text)
+            self.assertIn("# Canvasia Engine Local Verify Report", markdown_text)
             self.assertIn(f"- Generated: `{payload['generatedAt']}`", markdown_text)
             self.assertIn("## Git Snapshot", markdown_text)
             self.assertEqual(latest_payload["profile"], "syntax")
             self.assertIn(
-                "# Tony Na Engine Local Verify Report",
+                "# Canvasia Engine Local Verify Report",
                 latest_markdown_report.read_text(encoding="utf-8"),
             )
 
@@ -245,7 +245,7 @@ class LocalVerifyToolTests(unittest.TestCase):
 
         self.assertEqual(self.local_verify.format_terminal_step_header(1, 1, step), "[01/01] Frontend syntax (frontend-syntax)")
         self.assertIn("[PASS] passed in 0.25s", self.local_verify.format_terminal_step_result(result))
-        self.assertIn("Tony Na Engine Verify", header[0])
+        self.assertIn("Canvasia Engine Verify", header[0])
         self.assertIn("Profile: quick | Checks: 1", header[1])
         self.assertIn("Git: main @ abc1234 | local changes: 2", header[2])
         self.assertIn("Verification Summary", lines)
@@ -300,12 +300,12 @@ class LocalVerifyToolTests(unittest.TestCase):
             self.local_verify.VerifyStep(
                 name="Node syntax: prototype_editor/app.js",
                 category="frontend-syntax",
-                command=["definitely-missing-tony-na-tool", "--check", "prototype_editor/app.js"],
+                command=["definitely-missing-canvasia-tool", "--check", "prototype_editor/app.js"],
             )
         ]
 
         missing_tools = self.local_verify.check_required_tools(steps)
-        self.assertEqual(missing_tools, ["definitely-missing-tony-na-tool"])
+        self.assertEqual(missing_tools, ["definitely-missing-canvasia-tool"])
         results = self.local_verify.build_missing_tool_results(steps, missing_tools)
         summary = self.local_verify.summarize_results(results)
 
@@ -313,7 +313,7 @@ class LocalVerifyToolTests(unittest.TestCase):
         self.assertEqual(results[0].category, "environment")
         self.assertIn("Affected checks: Node syntax: prototype_editor/app.js", results[0].output_tail)
         self.assertEqual(summary["failedCategories"], ["environment"])
-        self.assertEqual(summary["firstFailedStep"]["name"], "Missing required tool: definitely-missing-tony-na-tool")
+        self.assertEqual(summary["firstFailedStep"]["name"], "Missing required tool: definitely-missing-canvasia-tool")
 
     def test_strict_git_clean_gate_reports_clean_and_dirty_states(self) -> None:
         clean_result = self.local_verify.build_git_clean_result(

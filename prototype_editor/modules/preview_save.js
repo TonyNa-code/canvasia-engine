@@ -137,7 +137,7 @@
     };
   }
 
-  global.TonyNaEditorPreviewSave = Object.freeze({
+  global.CanvasiaEditorPreviewSave = Object.freeze({
     PREVIEW_SAVE_SHORTCUT_COUNT,
     PREVIEW_SAVE_DIALOG_PAGE_SIZE,
     getSafePreviewSaveSlotIndex,

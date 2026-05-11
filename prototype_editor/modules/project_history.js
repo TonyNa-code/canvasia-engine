@@ -261,7 +261,7 @@
     }`;
   }
 
-  global.TonyNaEditorProjectHistory = Object.freeze({
+  global.CanvasiaEditorProjectHistory = Object.freeze({
     HISTORY_KIND_LABELS,
     HISTORY_KIND_TONES,
     HISTORY_FILTER_LABELS,

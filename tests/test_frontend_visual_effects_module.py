@@ -21,7 +21,7 @@ class FrontendVisualEffectsModuleTests(unittest.TestCase):
             context.globalThis = context;
             vm.createContext(context);
             vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
-            const tools = context.window.TonyNaEditorVisualEffects;
+            const tools = context.window.CanvasiaEditorVisualEffects;
             const result = {{
               keys: Object.keys(tools).sort(),
               labels: [
@@ -87,7 +87,7 @@ class FrontendVisualEffectsModuleTests(unittest.TestCase):
                 tools.getSafeCreditsDuration("35.6"),
                 tools.getSafeCreditsDuration("999"),
                 tools.getSafeCreditsDuration("bad"),
-                tools.parseCreditsLines("制作：Tony Na\\n\\n 音乐：夜雨 "),
+                tools.parseCreditsLines("制作：Creator\\n\\n 音乐：夜雨 "),
                 tools.getCreditsLines([" 导演 ", "", null, "脚本"]),
                 tools.getCreditsLinesText(["Staff", " Cast "]),
               ],
@@ -134,7 +134,7 @@ class FrontendVisualEffectsModuleTests(unittest.TestCase):
         self.assertIn("rgba(255, 220, 166", payload["screen"][8]["background"])
         self.assertEqual(payload["depth"], [10, 2.4, 1.8, 0.58])
         self.assertEqual(payload["videoAndCredits"][0:8], [0, 50, 100, 100, 4, 36, 180, 18])
-        self.assertEqual(payload["videoAndCredits"][8], ["制作：Tony Na", "音乐：夜雨"])
+        self.assertEqual(payload["videoAndCredits"][8], ["制作：Creator", "音乐：夜雨"])
         self.assertEqual(payload["videoAndCredits"][9], ["导演", "脚本"])
         self.assertEqual(payload["videoAndCredits"][10], "Staff\nCast")
 

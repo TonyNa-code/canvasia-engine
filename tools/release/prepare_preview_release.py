@@ -18,7 +18,7 @@ from typing import Any
 ROOT_DIR = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT_DIR = ROOT_DIR / "release_preview"
 RELEASE_DRAFT_PATH = ROOT_DIR / "docs" / "github" / "preview-release-draft.md"
-DOWNLOAD_GUIDE_MARKER = "<!-- TNE_GENERATED_DOWNLOAD_GUIDE -->"
+DOWNLOAD_GUIDE_MARKER = "<!-- CANVASIA_GENERATED_DOWNLOAD_GUIDE -->"
 UPLOAD_ASSET_BUNDLE_DIRNAME = "preview-release-upload-assets"
 PUBLIC_ASSET_SHA256_NAME = "preview-release-public-assets.sha256"
 PUBLIC_ASSET_CHECKSUM_JSON_NAME = "preview-release-public-assets.checksum.json"
@@ -778,7 +778,7 @@ def render_upload_manifest(report: dict[str, Any]) -> str:
 
 
 def render_release_body(report: dict[str, Any]) -> str:
-    body = RELEASE_DRAFT_PATH.read_text(encoding="utf-8") if RELEASE_DRAFT_PATH.exists() else "# Tony Na Engine Preview\n"
+    body = RELEASE_DRAFT_PATH.read_text(encoding="utf-8") if RELEASE_DRAFT_PATH.exists() else "# Canvasia Engine Preview\n"
     download_guide = render_download_guide(report).rstrip()
     body = body.rstrip()
     if DOWNLOAD_GUIDE_MARKER in body:
@@ -1048,7 +1048,7 @@ def write_outputs(report: dict[str, Any], output_dir: Path, *, copy_public_asset
 
 
 def print_summary(report: dict[str, Any], outputs: dict[str, str]) -> None:
-    print("Tony Na Engine Preview release prep")
+    print("Canvasia Engine Preview release prep")
     print(f"- Commit: {report['git']['shortCommit']}")
     print(f"- Working tree clean: {report['git']['workingTreeClean']}")
     ci = report["githubActions"]
@@ -1082,7 +1082,7 @@ def print_summary(report: dict[str, Any], outputs: dict[str, str]) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Prepare Tony Na Engine Preview release notes and upload manifest")
+    parser = argparse.ArgumentParser(description="Prepare Canvasia Engine Preview release notes and upload manifest")
     parser.add_argument("--output-dir", type=Path, default=None, help="Output directory, default release_preview/<timestamp>")
     parser.add_argument("--max-artifacts", type=int, default=12, help="Maximum local artifacts to list from exports/")
     parser.add_argument("--skip-network", action="store_true", help="Do not query GitHub Actions status")
@@ -1097,10 +1097,10 @@ def main() -> int:
         "--extra-sensitive",
         action="append",
         default=[],
-        help="Additional sensitive literal to scan for; repeat or pass via TNE_PRIVACY_EXTRA_PATTERNS",
+        help="Additional sensitive literal to scan for; repeat or pass via CANVASIA_PRIVACY_EXTRA_PATTERNS",
     )
     args = parser.parse_args()
-    env_patterns = [item.strip() for item in os.environ.get("TNE_PRIVACY_EXTRA_PATTERNS", "").split(",") if item.strip()]
+    env_patterns = [item.strip() for item in os.environ.get("CANVASIA_PRIVACY_EXTRA_PATTERNS", "").split(",") if item.strip()]
     args.extra_sensitive.extend(env_patterns)
 
     output_dir = args.output_dir or (DEFAULT_OUTPUT_DIR / current_timestamp())

@@ -5,7 +5,7 @@
     dark: "深色模式",
   });
 
-  const EDITOR_UI_THEME_STORAGE_KEY = "tony-na-engine:editor-ui-theme-mode";
+  const EDITOR_UI_THEME_STORAGE_KEY = "canvasia-engine:editor-ui-theme-mode";
 
   function hasOwn(source, key) {
     return Object.prototype.hasOwnProperty.call(source, key);
@@ -57,7 +57,7 @@
     }
   }
 
-  global.TonyNaEditorUiTheme = Object.freeze({
+  global.CanvasiaEditorUiTheme = Object.freeze({
     UI_THEME_MODE_LABELS,
     EDITOR_UI_THEME_STORAGE_KEY,
     getSafeUiThemeMode,

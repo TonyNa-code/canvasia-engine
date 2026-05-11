@@ -971,7 +971,7 @@
     return ASSET_TYPE_LABELS[type] ?? type;
   }
 
-  global.TonyNaEditorAssetCatalog = Object.freeze({
+  global.CanvasiaEditorAssetCatalog = Object.freeze({
     ASSET_TYPE_LABELS,
     ASSET_PRESET_TAGS,
     CHARACTER_PRESENTATION_MODE_LABELS,

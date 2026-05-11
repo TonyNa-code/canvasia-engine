@@ -496,7 +496,7 @@
   `;
   }
 
-  global.TonyNaEditorVariables = Object.freeze({
+  global.CanvasiaEditorVariables = Object.freeze({
     STARTER_VARIABLE_PRESETS,
     parseVariableNumberBound,
     getVariableNumberBounds,

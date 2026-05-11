@@ -84,20 +84,20 @@ function getMusicEndModeLabel(mode) {
   return MUSIC_END_MODE_LABELS[getSafeMusicEndMode(mode)];
 }
 
-const editorCommonTools = window.TonyNaEditorCommon;
-const projectSettingsTools = window.TonyNaEditorProjectSettings;
-const systemDialogTools = window.TonyNaEditorSystemDialog;
-const uiThemeTools = window.TonyNaEditorUiTheme;
-const previewSaveTools = window.TonyNaEditorPreviewSave;
-const recentWorkspaceTools = window.TonyNaEditorRecentWorkspace;
-const editorFilterTools = window.TonyNaEditorFilters;
-const scriptVoiceTools = window.TonyNaEditorScriptVoice;
-const visualEffectTools = window.TonyNaEditorVisualEffects;
-const variableTools = window.TonyNaEditorVariables;
-const projectHistoryTools = window.TonyNaEditorProjectHistory;
-const assetCatalogTools = window.TonyNaEditorAssetCatalog;
-const projectDoctorTools = window.TonyNaEditorProjectDoctor;
-const projectMilestoneTools = window.TonyNaEditorProjectMilestones ?? window.TonyNaProjectMilestones;
+const editorCommonTools = window.CanvasiaEditorCommon;
+const projectSettingsTools = window.CanvasiaEditorProjectSettings;
+const systemDialogTools = window.CanvasiaEditorSystemDialog;
+const uiThemeTools = window.CanvasiaEditorUiTheme;
+const previewSaveTools = window.CanvasiaEditorPreviewSave;
+const recentWorkspaceTools = window.CanvasiaEditorRecentWorkspace;
+const editorFilterTools = window.CanvasiaEditorFilters;
+const scriptVoiceTools = window.CanvasiaEditorScriptVoice;
+const visualEffectTools = window.CanvasiaEditorVisualEffects;
+const variableTools = window.CanvasiaEditorVariables;
+const projectHistoryTools = window.CanvasiaEditorProjectHistory;
+const assetCatalogTools = window.CanvasiaEditorAssetCatalog;
+const projectDoctorTools = window.CanvasiaEditorProjectDoctor;
+const projectMilestoneTools = window.CanvasiaEditorProjectMilestones ?? window.CanvasiaProjectMilestones;
 
 const ASSET_TYPE_LABELS = assetCatalogTools?.ASSET_TYPE_LABELS ?? {
   background: "背景",
@@ -171,7 +171,7 @@ const ASSET_MEDIA_BUDGET_LIMITS = assetCatalogTools?.ASSET_MEDIA_BUDGET_LIMITS ?
   scene3d: { warnBytes: 120 * 1024 * 1024, blockerBytes: 500 * 1024 * 1024, label: "3D 场景" },
 };
 
-const creativeAssistantTools = window.TonyNaEditorCreativeAssistant;
+const creativeAssistantTools = window.CanvasiaEditorCreativeAssistant;
 
 const CREATIVE_ASSISTANT_MODES = creativeAssistantTools?.CREATIVE_ASSISTANT_MODES ?? {
   starter_demo: "试玩 Demo",
@@ -186,23 +186,23 @@ const CREATIVE_ASSISTANT_PROVIDERS = creativeAssistantTools?.CREATIVE_ASSISTANT_
 };
 
 const CREATIVE_ASSISTANT_PROVIDER_STORAGE_KEY =
-  creativeAssistantTools?.CREATIVE_ASSISTANT_PROVIDER_STORAGE_KEY ?? "tony-na-engine:creative-assistant-provider";
+  creativeAssistantTools?.CREATIVE_ASSISTANT_PROVIDER_STORAGE_KEY ?? "canvasia-engine:creative-assistant-provider";
 const CREATIVE_ASSISTANT_OPENAI_KEY_STORAGE_KEY =
-  creativeAssistantTools?.CREATIVE_ASSISTANT_OPENAI_KEY_STORAGE_KEY ?? "tony-na-engine:creative-assistant-openai-key";
+  creativeAssistantTools?.CREATIVE_ASSISTANT_OPENAI_KEY_STORAGE_KEY ?? "canvasia-engine:creative-assistant-openai-key";
 const CREATIVE_ASSISTANT_OPENAI_MODEL_STORAGE_KEY =
-  creativeAssistantTools?.CREATIVE_ASSISTANT_OPENAI_MODEL_STORAGE_KEY ?? "tony-na-engine:creative-assistant-openai-model";
+  creativeAssistantTools?.CREATIVE_ASSISTANT_OPENAI_MODEL_STORAGE_KEY ?? "canvasia-engine:creative-assistant-openai-model";
 const CREATIVE_ASSISTANT_REMEMBER_KEY_STORAGE_KEY =
-  creativeAssistantTools?.CREATIVE_ASSISTANT_REMEMBER_KEY_STORAGE_KEY ?? "tony-na-engine:creative-assistant-remember-key";
+  creativeAssistantTools?.CREATIVE_ASSISTANT_REMEMBER_KEY_STORAGE_KEY ?? "canvasia-engine:creative-assistant-remember-key";
 const CREATIVE_ASSISTANT_HISTORY_STORAGE_KEY =
-  creativeAssistantTools?.CREATIVE_ASSISTANT_HISTORY_STORAGE_KEY ?? "tony-na-engine:creative-assistant-history";
+  creativeAssistantTools?.CREATIVE_ASSISTANT_HISTORY_STORAGE_KEY ?? "canvasia-engine:creative-assistant-history";
 const CREATIVE_ASSISTANT_HISTORY_RECOVERY_STORAGE_KEY =
-  creativeAssistantTools?.CREATIVE_ASSISTANT_HISTORY_RECOVERY_STORAGE_KEY ?? "tony-na-engine:creative-assistant-history-recovery";
+  creativeAssistantTools?.CREATIVE_ASSISTANT_HISTORY_RECOVERY_STORAGE_KEY ?? "canvasia-engine:creative-assistant-history-recovery";
 const CREATIVE_ASSISTANT_DEFAULT_OPENAI_MODEL =
   creativeAssistantTools?.CREATIVE_ASSISTANT_DEFAULT_OPENAI_MODEL ?? "gpt-5.5";
 const CREATIVE_ASSISTANT_MAX_HISTORY = creativeAssistantTools?.CREATIVE_ASSISTANT_MAX_HISTORY ?? 8;
-const editorModeTools = window.TonyNaEditorMode;
-const releaseVersionTools = window.TonyNaEditorReleaseVersion;
-const releaseControlTools = window.TonyNaEditorReleaseControl;
+const editorModeTools = window.CanvasiaEditorMode;
+const releaseVersionTools = window.CanvasiaEditorReleaseVersion;
+const releaseControlTools = window.CanvasiaEditorReleaseControl;
 const DEFAULT_PROJECT_RELEASE_VERSION = releaseVersionTools?.DEFAULT_PROJECT_RELEASE_VERSION ?? "1.0.0-preview";
 
 const CREATIVE_ASSISTANT_PROMPT_SAMPLES = creativeAssistantTools?.CREATIVE_ASSISTANT_PROMPT_SAMPLES ?? [
@@ -2107,8 +2107,8 @@ const PREVIEW_REGRESSION_MAX_REPEAT = 3;
 const PREVIEW_REGRESSION_BRANCHING_SEED_LIMIT = 4;
 const RECENT_WORKSPACE_LIMIT = recentWorkspaceTools?.RECENT_WORKSPACE_LIMIT ?? 8;
 const EDITOR_UI_THEME_STORAGE_KEY =
-  uiThemeTools?.EDITOR_UI_THEME_STORAGE_KEY ?? "tony-na-engine:editor-ui-theme-mode";
-const PROJECT_CENTER_EDITOR_MODE_STORAGE_KEY = "tony-na-engine:project-center-editor-mode";
+  uiThemeTools?.EDITOR_UI_THEME_STORAGE_KEY ?? "canvasia-engine:editor-ui-theme-mode";
+const PROJECT_CENTER_EDITOR_MODE_STORAGE_KEY = "canvasia-engine:project-center-editor-mode";
 const RECENT_WORKSPACE_TYPE_LABELS = recentWorkspaceTools?.RECENT_WORKSPACE_TYPE_LABELS ?? {
   scene: "剧情场景",
   script: "台本入口",
@@ -7010,7 +7010,7 @@ function buildPreviewThumbnailDataUrl(snapshot) {
     })
     .join("");
 
-  const speaker = escapeHtml(snapshot.visualState?.speakerName ?? snapshot.sceneName ?? "Tony Na Engine");
+  const speaker = escapeHtml(snapshot.visualState?.speakerName ?? snapshot.sceneName ?? "Canvasia Engine");
   const dialogue = escapeHtml(truncateText(snapshot.visualState?.dialogueText ?? "这个节点没有正文。", 34));
   const scene = escapeHtml(snapshot.visualState?.backgroundName ?? snapshot.sceneName ?? "未设置背景");
   const block = escapeHtml(snapshot.completed ? "路线结束" : getBlockLabel(snapshot.blockType));
@@ -7093,7 +7093,7 @@ function renderPreviewSaveVisualSummary(slot) {
   }
 
   const blockLabel = snapshot.completed ? "路线结束" : getBlockLabel(snapshot.blockType);
-  const stageTitle = snapshot.visualState?.speakerName || snapshot.sceneName || "Tony Na Engine";
+  const stageTitle = snapshot.visualState?.speakerName || snapshot.sceneName || "Canvasia Engine";
   const stageText = truncateText(snapshot.visualState?.dialogueText ?? "这个节点没有正文。", 38);
   const thumbnailUrl = slot?.thumbnailDataUrl || buildPreviewThumbnailDataUrl(snapshot);
 
@@ -9523,7 +9523,7 @@ function handleUnhandledEditorAction(action, actionTarget) {
   const labelSuffix = label ? `（${label}）` : "";
   setSaveStatus(`按钮暂未接线：${safeAction}${labelSuffix}`, true);
   showToast("这个按钮暂时还没有接上功能", "error");
-  console.warn("[Tony Na Engine] Unhandled editor action", {
+  console.warn("[Canvasia Engine] Unhandled editor action", {
     action: safeAction,
     label,
     dataset: { ...(actionTarget?.dataset ?? {}) },
@@ -9543,7 +9543,7 @@ function handleEditorRuntimeError(error, context = "操作") {
     setSaveStatus(`${context}没有成功：${message}`, true);
     showToast(`${context}没有成功`, "error");
   }
-  console.error("[Tony Na Engine] Editor runtime error", error);
+  console.error("[Canvasia Engine] Editor runtime error", error);
 }
 
 function installEditorRuntimeErrorBoundary() {
@@ -11208,7 +11208,7 @@ function renderDashboard() {
                 <input
                   id="dashboardSearchInput"
                   type="search"
-                  placeholder="比如：告白 / 天台 / Tony / 雪花 / 选项文案"
+                  placeholder="比如：告白 / 天台 / 角色名 / 雪花 / 选项文案"
                 />
               </label>
               <button class="toolbar-button" data-action="clear-dashboard-search">清空搜索</button>
@@ -17934,7 +17934,7 @@ function buildScriptTxtContent(filteredEntries, totalEntryCount) {
     groupedByChapter.set(entry.chapterName, chapterBucket);
   });
 
-  lines.push(`${state.data.project.title} · Tony Na Engine 台本导出`);
+  lines.push(`${state.data.project.title} · Canvasia Engine 台本导出`);
   lines.push(`导出时间：${formatDate(new Date().toISOString())}`);
   lines.push(`当前筛选：${scopeText}`);
   lines.push(`导出条数：${filteredEntries.length} / 全项目 ${totalEntryCount}`);
@@ -18174,7 +18174,7 @@ function getScriptIssueFilterLabel(value) {
 function buildScriptExportFileName(format) {
   if (scriptVoiceTools?.buildScriptExportFileName) {
     return scriptVoiceTools.buildScriptExportFileName(format, {
-      projectTitle: state.data.project.title || "tony-na-engine",
+      projectTitle: state.data.project.title || "canvasia-engine",
       filterSummaryText: getScriptFilterSummaryText(),
       sanitizeFileName,
     });
@@ -18187,7 +18187,7 @@ function buildScriptExportFileName(format) {
     String(date.getMonth() + 1).padStart(2, "0"),
     String(date.getDate()).padStart(2, "0"),
   ].join("");
-  const title = sanitizeFileName(state.data.project.title || "tony-na-engine");
+  const title = sanitizeFileName(state.data.project.title || "canvasia-engine");
   const scope = sanitizeFileName(getScriptFilterSummaryText()).slice(0, 28) || "full-script";
   return `${title}_script_${scope}_${dateStamp}.${extension}`;
 }
@@ -18195,7 +18195,7 @@ function buildScriptExportFileName(format) {
 function buildScriptVoiceSheetFileName(filters = {}) {
   if (scriptVoiceTools?.buildScriptVoiceSheetFileName) {
     return scriptVoiceTools.buildScriptVoiceSheetFileName(filters, {
-      projectTitle: state.data.project.title || "tony-na-engine",
+      projectTitle: state.data.project.title || "canvasia-engine",
       filterSummaryText: getScriptFilterSummaryText(),
       sanitizeFileName,
       getScriptCharacterFilterLabel,
@@ -18209,7 +18209,7 @@ function buildScriptVoiceSheetFileName(filters = {}) {
     String(date.getMonth() + 1).padStart(2, "0"),
     String(date.getDate()).padStart(2, "0"),
   ].join("");
-  const title = sanitizeFileName(state.data.project.title || "tony-na-engine");
+  const title = sanitizeFileName(state.data.project.title || "canvasia-engine");
   const scopeText =
     filters.characterId || filters.chapterId
       ? [
@@ -18226,7 +18226,7 @@ function buildScriptVoiceSheetFileName(filters = {}) {
 function buildCharacterVoiceBriefFileName(character) {
   if (scriptVoiceTools?.buildCharacterVoiceBriefFileName) {
     return scriptVoiceTools.buildCharacterVoiceBriefFileName(character, {
-      projectTitle: state.data.project.title || "tony-na-engine",
+      projectTitle: state.data.project.title || "canvasia-engine",
       sanitizeFileName,
     });
   }
@@ -18237,7 +18237,7 @@ function buildCharacterVoiceBriefFileName(character) {
     String(date.getMonth() + 1).padStart(2, "0"),
     String(date.getDate()).padStart(2, "0"),
   ].join("");
-  const title = sanitizeFileName(state.data.project.title || "tony-na-engine");
+  const title = sanitizeFileName(state.data.project.title || "canvasia-engine");
   const characterName = sanitizeFileName(character?.displayName || character?.id || "character");
   return `${title}_voice_delivery_${characterName}_${dateStamp}.txt`;
 }
@@ -18245,7 +18245,7 @@ function buildCharacterVoiceBriefFileName(character) {
 function buildChapterVoiceBriefFileName(chapter) {
   if (scriptVoiceTools?.buildChapterVoiceBriefFileName) {
     return scriptVoiceTools.buildChapterVoiceBriefFileName(chapter, {
-      projectTitle: state.data.project.title || "tony-na-engine",
+      projectTitle: state.data.project.title || "canvasia-engine",
       sanitizeFileName,
     });
   }
@@ -18256,7 +18256,7 @@ function buildChapterVoiceBriefFileName(chapter) {
     String(date.getMonth() + 1).padStart(2, "0"),
     String(date.getDate()).padStart(2, "0"),
   ].join("");
-  const title = sanitizeFileName(state.data.project.title || "tony-na-engine");
+  const title = sanitizeFileName(state.data.project.title || "canvasia-engine");
   const chapterName = sanitizeFileName(chapter?.name || chapter?.chapterId || "chapter");
   return `${title}_voice_delivery_${chapterName}_${dateStamp}.txt`;
 }
@@ -18264,7 +18264,7 @@ function buildChapterVoiceBriefFileName(chapter) {
 function buildProjectVoiceBriefFileName() {
   if (scriptVoiceTools?.buildProjectVoiceBriefFileName) {
     return scriptVoiceTools.buildProjectVoiceBriefFileName({
-      projectTitle: state.data.project.title || "tony-na-engine",
+      projectTitle: state.data.project.title || "canvasia-engine",
       sanitizeFileName,
     });
   }
@@ -18275,7 +18275,7 @@ function buildProjectVoiceBriefFileName() {
     String(date.getMonth() + 1).padStart(2, "0"),
     String(date.getDate()).padStart(2, "0"),
   ].join("");
-  const title = sanitizeFileName(state.data.project.title || "tony-na-engine");
+  const title = sanitizeFileName(state.data.project.title || "canvasia-engine");
   return `${title}_voice_delivery_project_${dateStamp}.txt`;
 }
 
@@ -18295,7 +18295,7 @@ function buildCharacterVoiceBriefContent(character, stats) {
     "交付方式：",
     "1. 先按下面的“目标录音文件名”录制并命名。",
     "2. 如果这句已经有语音占位条目，优先往对应条目上传真实文件。",
-    "3. 录完后回 Tony Na Engine 的语音素材页批量匹配，就能自动回绑大部分语音。",
+    "3. 录完后回 Canvasia Engine 的语音素材页批量匹配，就能自动回绑大部分语音。",
     "",
     "待录台词清单：",
   ];
@@ -18337,7 +18337,7 @@ function buildProjectVoiceBriefContent(allEntries) {
     "",
     "交付方式：",
     "1. 先看下面的“优先章节”和“优先角色批次”，从最卡进度的部分开始补。",
-    "2. 章节或角色范围需要更细台词清单时，回 Tony Na Engine 继续导出对应章节 / 角色的命名清单和交付说明。",
+    "2. 章节或角色范围需要更细台词清单时，回 Canvasia Engine 继续导出对应章节 / 角色的命名清单和交付说明。",
     "3. 录完后优先用语音素材页的“批量匹配语音文件”回绑真实文件。",
     "",
   ];
@@ -20556,7 +20556,7 @@ function persistStoredEditorUiThemeMode(mode) {
 }
 
 function getProjectStorageScope(project = state.data?.project) {
-  const rawKey = String(project?.projectId ?? project?.title ?? "tony-na-project")
+  const rawKey = String(project?.projectId ?? project?.title ?? "canvasia-project")
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9\u4e00-\u9fa5_-]+/g, "-")
@@ -20567,7 +20567,7 @@ function getProjectStorageScope(project = state.data?.project) {
 }
 
 function getPreviewPlaybackStorageKey(project = state.data?.project) {
-  return `tony-na-engine:editor-preview:${getProjectStorageScope(project)}`;
+  return `canvasia-engine:editor-preview:${getProjectStorageScope(project)}`;
 }
 
 function sanitizePreviewPlaybackSettings(source = {}) {
@@ -20645,19 +20645,19 @@ function syncEditorUiThemeControls() {
 }
 
 function getPreviewAutoResumeStorageKey(project = state.data?.project) {
-  return `tony-na-engine:editor-autoresume:${getProjectStorageScope(project)}`;
+  return `canvasia-engine:editor-autoresume:${getProjectStorageScope(project)}`;
 }
 
 function getPreviewReadHistoryStorageKey(project = state.data?.project) {
-  return `tony-na-engine:editor-read:${getProjectStorageScope(project)}`;
+  return `canvasia-engine:editor-read:${getProjectStorageScope(project)}`;
 }
 
 function getPreviewSaveSlotStorageKey(project = state.data?.project) {
-  return `tony-na-engine:editor-saves:${getProjectStorageScope(project)}`;
+  return `canvasia-engine:editor-saves:${getProjectStorageScope(project)}`;
 }
 
 function getPreviewQuickSaveStorageKey(project = state.data?.project) {
-  return `tony-na-engine:editor-quicksave:${getProjectStorageScope(project)}`;
+  return `canvasia-engine:editor-quicksave:${getProjectStorageScope(project)}`;
 }
 
 function createEmptyPreviewSaveSlots() {
@@ -20999,7 +20999,7 @@ function getRecentWorkspaceStorageKey(project = state.data?.project) {
     return recentWorkspaceTools.getRecentWorkspaceStorageKey(getProjectStorageScope(project));
   }
 
-  return `tony-na-engine:editor-recent-work:${getProjectStorageScope(project)}`;
+  return `canvasia-engine:editor-recent-work:${getProjectStorageScope(project)}`;
 }
 
 function getSafeRecentWorkspaceType(type) {
@@ -28841,7 +28841,7 @@ function buildInspectionReportFileName() {
     String(date.getMonth() + 1).padStart(2, "0"),
     String(date.getDate()).padStart(2, "0"),
   ].join("");
-  const title = sanitizeFileName(state.data?.project?.title || "tony-na-engine");
+  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
   return `${title}_inspection_report_${dateStamp}.txt`;
 }
 
@@ -28852,7 +28852,7 @@ function buildReleaseControlReportFileName() {
     String(date.getMonth() + 1).padStart(2, "0"),
     String(date.getDate()).padStart(2, "0"),
   ].join("");
-  const title = sanitizeFileName(state.data?.project?.title || "tony-na-engine");
+  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
   return `${title}_release_control_report_${dateStamp}.md`;
 }
 
@@ -28863,12 +28863,12 @@ function buildReleaseControlJsonReportFileName() {
     String(date.getMonth() + 1).padStart(2, "0"),
     String(date.getDate()).padStart(2, "0"),
   ].join("");
-  const title = sanitizeFileName(state.data?.project?.title || "tony-na-engine");
+  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
   return `${title}_release_control_report_${dateStamp}.json`;
 }
 
 function buildProjectDoctorRepairReceiptFileName(receipt = state.projectDoctorRepairReceipt) {
-  const title = sanitizeFileName(state.data?.project?.title || "tony-na-engine");
+  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
   const status = sanitizeFileName(receipt?.status || "receipt");
   const receiptId = sanitizeFileName(getProjectDoctorRepairReceiptDisplayId(receipt));
   return `${title}_project_doctor_${status || "receipt"}_${receiptId || "receipt"}.md`;
@@ -30527,7 +30527,7 @@ function buildProjectDoctorRepairReceiptMarkdownContent(receipt = state.projectD
     `# ${labels.heading}`,
     "",
     `- 回执编号：${reportSummary?.receiptId ?? getProjectDoctorRepairReceiptDisplayId(receipt)}`,
-    `- 项目：${state.data?.project?.title ?? "Tony Na Engine Project"}`,
+    `- 项目：${state.data?.project?.title ?? "Canvasia Engine Project"}`,
     `- 导出时间：${formatDate(new Date().toISOString())}`,
     "",
     "## 回执摘要",
@@ -30570,7 +30570,7 @@ function buildProjectDoctorRepairReceiptClipboardSummary(receipt = state.project
   return [
     `${reportSummary?.heading ?? "项目医生回执"}：${reportSummary?.title ?? "项目医生回执"}`,
     `回执编号：${reportSummary?.receiptId ?? getProjectDoctorRepairReceiptDisplayId(receipt)}`,
-    `项目：${state.data?.project?.title ?? "Tony Na Engine Project"}`,
+    `项目：${state.data?.project?.title ?? "Canvasia Engine Project"}`,
     `${reportSummary?.timeLabel ?? "回执时间"}：${generatedAtText}`,
     `写入状态：${writeStatusText}`,
     `修复范围：${reportSummary?.scopeLabel ?? formatProjectDoctorRepairReceiptScope(receipt)}`,
@@ -32750,7 +32750,7 @@ function renderCreditsRollEditor(block) {
       </div>
       <div class="detail-row">
         <label for="editorCreditsLines">字幕内容</label>
-        <textarea id="editorCreditsLines" placeholder="企划：Tony Na&#10;剧本：Tony Na&#10;美术：Your Artist&#10;音乐：Your Composer">${escapeHtml(lines)}</textarea>
+        <textarea id="editorCreditsLines" placeholder="企划：Creator&#10;剧本：Writer&#10;美术：Your Artist&#10;音乐：Your Composer">${escapeHtml(lines)}</textarea>
       </div>
       <div class="detail-row">
         <label for="editorCreditsDuration">滚动时长（秒）</label>
@@ -34521,7 +34521,7 @@ function buildCreativeAssistantHistoryRecoverySnapshot(reason) {
     });
   }
   return {
-    engine: "Tony Na Engine",
+    engine: "Canvasia Engine",
     kind: "creative_assistant_history_recovery",
     formatVersion: 1,
     createdAt: new Date().toISOString(),
@@ -34556,7 +34556,7 @@ function loadStoredCreativeAssistantHistoryRecovery() {
       return null;
     }
     return {
-      engine: "Tony Na Engine",
+      engine: "Canvasia Engine",
       kind: "creative_assistant_history_recovery",
       formatVersion: 1,
       createdAt: trimCreativeAssistantText(snapshot.createdAt, 40) || new Date().toISOString(),
@@ -34822,7 +34822,7 @@ function buildCreativeAssistantHistoryBlocksText(record) {
     return "";
   }
   return [
-    record.result.title ? `《${record.result.title}》` : "Tony Na Assistant 剧情卡片",
+    record.result.title ? `《${record.result.title}》` : "Canvasia Assistant 剧情卡片",
     record.result.summary ?? "",
     "",
     ...blocks.map((block, index) => getCreativeAssistantBlockPreviewText(block, index)),
@@ -34887,7 +34887,7 @@ async function copyCreativeAssistantHistoryRecordMarkdown(recordId) {
 function buildCreativeAssistantHistoryMarkdown() {
   const records = state.creativeAssistantHistory ?? [];
   const options = {
-    projectTitle: state.data?.project?.title ?? "Tony Na Engine Project",
+    projectTitle: state.data?.project?.title ?? "Canvasia Engine Project",
     exportedAt: new Date().toISOString(),
     query: state.creativeAssistantHistoryQuery,
     favoritesOnly: state.creativeAssistantHistoryFavoritesOnly,
@@ -34898,7 +34898,7 @@ function buildCreativeAssistantHistoryMarkdown() {
   }
   const visibleRecords = filterCreativeAssistantHistoryRecords(records).slice(0, CREATIVE_ASSISTANT_MAX_HISTORY);
   return [
-    `# ${options.projectTitle} · Tony Na Assistant 灵感档案`,
+    `# ${options.projectTitle} · Canvasia Assistant 灵感档案`,
     "",
     `- 导出时间：${options.exportedAt}`,
     `- 记录数量：${visibleRecords.length}`,
@@ -34929,10 +34929,10 @@ async function copyCreativeAssistantHistoryMarkdown() {
 }
 
 function exportCreativeAssistantHistoryMarkdown() {
-  const projectSlug = makeParticleCustomPresetId(state.data?.project?.title ?? "tony_na_project");
+  const projectSlug = makeParticleCustomPresetId(state.data?.project?.title ?? "canvasia_project");
   const scope = state.creativeAssistantHistoryFavoritesOnly ? "_favorites" : "";
   downloadTextFile(
-    `${projectSlug}.tn-idea-vault${scope}.md`,
+    `${projectSlug}.canvasia-idea-vault${scope}.md`,
     buildCreativeAssistantHistoryMarkdown(),
     "text/markdown;charset=utf-8"
   );
@@ -34946,8 +34946,8 @@ function exportCreativeAssistantHistoryRecord(recordId) {
     showToast("没有找到可导出的助手灵感", "error");
     return;
   }
-  downloadJsonFile(`${makeParticleCustomPresetId(record.result.title || "creative_assistant")}.tn-idea.json`, {
-    engine: "Tony Na Engine",
+  downloadJsonFile(`${makeParticleCustomPresetId(record.result.title || "creative_assistant")}.canvasia-idea.json`, {
+    engine: "Canvasia Engine",
     kind: "creative_assistant_idea",
     exportedAt: new Date().toISOString(),
     record,
@@ -34967,7 +34967,7 @@ function exportCreativeAssistantHistoryArchive() {
     exportedAt: new Date().toISOString(),
     limit: CREATIVE_ASSISTANT_MAX_HISTORY,
   }) ?? {
-    engine: "Tony Na Engine",
+    engine: "Canvasia Engine",
     kind: "creative_assistant_history_archive",
     formatVersion: 1,
     exportedAt: new Date().toISOString(),
@@ -34980,8 +34980,8 @@ function exportCreativeAssistantHistoryArchive() {
       note: "Archive contains prompts and generated ideas only; API keys are never included.",
     },
   };
-  const projectSlug = makeParticleCustomPresetId(state.data?.project?.title ?? "tony_na_project");
-  downloadJsonFile(`${projectSlug}.tn-idea-vault.json`, archive);
+  const projectSlug = makeParticleCustomPresetId(state.data?.project?.title ?? "canvasia_project");
+  downloadJsonFile(`${projectSlug}.canvasia-idea-vault.json`, archive);
   setSaveStatus(`已归档灵感盒：${archive.recordCount ?? records.length} 条`);
   showToast("灵感盒归档包已导出");
 }
@@ -34998,7 +34998,7 @@ function exportCreativeAssistantHistoryViewArchive() {
     exportedAt: new Date().toISOString(),
     limit: CREATIVE_ASSISTANT_MAX_HISTORY,
   }) ?? {
-    engine: "Tony Na Engine",
+    engine: "Canvasia Engine",
     kind: "creative_assistant_history_archive",
     formatVersion: 1,
     exportedAt: new Date().toISOString(),
@@ -35011,9 +35011,9 @@ function exportCreativeAssistantHistoryViewArchive() {
       note: "Archive contains prompts and generated ideas only; API keys are never included.",
     },
   };
-  const projectSlug = makeParticleCustomPresetId(state.data?.project?.title ?? "tony_na_project");
+  const projectSlug = makeParticleCustomPresetId(state.data?.project?.title ?? "canvasia_project");
   const scope = state.creativeAssistantHistoryFavoritesOnly ? "_favorites" : state.creativeAssistantHistoryQuery.trim() ? "_filtered" : "_view";
-  downloadJsonFile(`${projectSlug}.tn-idea-vault${scope}.json`, archive);
+  downloadJsonFile(`${projectSlug}.canvasia-idea-vault${scope}.json`, archive);
   setSaveStatus(`已导出当前灵感视图：${archive.recordCount ?? records.length} 条`);
   showToast("当前视图灵感包已导出");
 }
@@ -35102,7 +35102,7 @@ async function clearCreativeAssistantHistory() {
   }
   const confirmed = await showEngineConfirm({
     title: "清空整个灵感盒？",
-    message: `即将删除当前浏览器里的 ${beforeCount} 条助手灵感。这个操作不会写入项目文件，但清空后只能靠之前导出的 .tn-idea-vault.json 或 Markdown 档案恢复。`,
+    message: `即将删除当前浏览器里的 ${beforeCount} 条助手灵感。这个操作不会写入项目文件，但清空后只能靠之前导出的 .canvasia-idea-vault.json 或 Markdown 档案恢复。`,
     tone: "danger",
     confirmLabel: "清空灵感盒",
     cancelLabel: "先导出备份",
@@ -35226,7 +35226,7 @@ function renderCreativeAssistantBlankPanel() {
   return `
     <div class="creative-assistant-shell is-blank">
       <div class="creative-assistant-copy">
-        <span class="eyebrow">Tony Na Assistant</span>
+        <span class="eyebrow">Canvasia Assistant</span>
         <strong>先创建一个场景，智能创作助手就能帮你搭 Demo。</strong>
         <p>默认使用本地模板，不上传项目、不产生 API 费用；也可以在剧情编辑页切到自带 Key 的真模型模式。</p>
       </div>
@@ -35287,7 +35287,7 @@ function buildCreativeAssistantBlocksText(result) {
       return "";
     }
     return [
-    result?.title ? `《${result.title}》` : "Tony Na Assistant 剧情卡片",
+    result?.title ? `《${result.title}》` : "Canvasia Assistant 剧情卡片",
     result?.summary ?? "",
     "",
     ...blocks.map((block, index) => getCreativeAssistantBlockPreviewText(block, index)),
@@ -35507,7 +35507,7 @@ function renderCreativeAssistantPanel(scene, selectedBlock) {
   return `
     <div class="creative-assistant-shell">
       <div class="creative-assistant-copy">
-        <span class="eyebrow">Tony Na Assistant · 创作搭子</span>
+        <span class="eyebrow">Canvasia Assistant · 创作搭子</span>
         <div class="creative-assistant-title-row">
           <strong>智能创作助手</strong>
           <span class="badge badge-soft">${escapeHtml(scene?.name ?? "当前场景")}</span>
@@ -35615,7 +35615,7 @@ function renderCreativeAssistantPanel(scene, selectedBlock) {
               id="creativeAssistantHistoryImportInput"
               class="sr-only"
               type="file"
-              accept="application/json,.json,.tn-idea.json,.tn-idea-vault.json"
+              accept="application/json,.json,.canvasia-idea.json,.canvasia-idea-vault.json"
             />
           </label>
         </div>
@@ -37922,7 +37922,7 @@ function buildProjectVariableAuditReportContent(items) {
     .filter((item) => item.usage.total > 0)
     .sort((a, b) => b.usage.total - a.usage.total);
   const lines = [
-    "Tony Na Engine 变量治理报告",
+    "Canvasia Engine 变量治理报告",
     `项目：${projectTitle}`,
     `生成时间：${new Date().toLocaleString()}`,
     "",
@@ -41387,9 +41387,9 @@ function exportParticleCustomPreset() {
   }
 
   downloadJsonFile(
-    `${makeParticleCustomPresetId(preset.name)}.tn-particle-preset.json`,
+    `${makeParticleCustomPresetId(preset.name)}.canvasia-particle-preset.json`,
     {
-      engine: "Tony Na Engine",
+      engine: "Canvasia Engine",
       kind: "particle_preset",
       exportedAt: new Date().toISOString(),
       preset,
@@ -41407,11 +41407,11 @@ function exportParticleCustomPresetPack() {
     return;
   }
 
-  const projectName = state.data?.project?.title ?? "Tony Na Project";
+  const projectName = state.data?.project?.title ?? "Canvasia Project";
   downloadJsonFile(
-    `${makeParticleCustomPresetId(projectName)}.tn-particle-pack.json`,
+    `${makeParticleCustomPresetId(projectName)}.canvasia-particle-pack.json`,
     {
-      engine: "Tony Na Engine",
+      engine: "Canvasia Engine",
       kind: "particle_preset_pack",
       projectTitle: projectName,
       exportedAt: new Date().toISOString(),
@@ -41832,7 +41832,7 @@ function createDefaultBlock(scene, blockType) {
       type: "credits_roll",
       title: "STAFF",
       subtitle: "Thank you for playing",
-      lines: ["企划：Tony Na", "剧本：Tony Na", "美术：", "音乐：", "特别感谢：所有玩家"],
+      lines: ["企划：Creator", "剧本：Writer", "美术：", "音乐：", "特别感谢：所有玩家"],
       durationSeconds: 18,
       background: "dark",
       skippable: true,

@@ -311,7 +311,7 @@
     return clamp(getSafeNumber(fallbackRadius, 18, options), 8, 42, options);
   }
 
-  global.TonyNaEditorProjectSettings = Object.freeze({
+  global.CanvasiaEditorProjectSettings = Object.freeze({
     getProjectResolution,
     getSafeProjectFormalSaveSlotCount,
     getProjectRuntimeSettings,

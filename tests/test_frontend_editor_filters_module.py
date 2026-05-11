@@ -21,7 +21,7 @@ class FrontendEditorFiltersModuleTests(unittest.TestCase):
             context.globalThis = context;
             vm.createContext(context);
             vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
-            const tools = context.window.TonyNaEditorFilters;
+            const tools = context.window.CanvasiaEditorFilters;
             const routeNodes = [
               {{
                 hasStoryContent: true,

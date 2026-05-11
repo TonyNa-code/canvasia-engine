@@ -285,7 +285,7 @@ DIALOG_BOX_PRESETS = {
         "panelAssetFit": "cover",
     },
 }
-SAVE_ROOT_DIR_NAME = ".tony-na-engine"
+SAVE_ROOT_DIR_NAME = ".canvasia-engine"
 SAVE_SUBDIR_NAME = "native-runtime-saves"
 SETTINGS_SUBDIR_NAME = "native-runtime-settings"
 PROGRESS_SUBDIR_NAME = "native-runtime-progress"
@@ -4679,7 +4679,7 @@ def run_doctor_callable_check(check_id: str, label: str, callback, *args) -> dic
 def run_doctor_with_temporary_home(callback):
     original_home = os.environ.get("HOME")
     original_userprofile = os.environ.get("USERPROFILE")
-    with tempfile.TemporaryDirectory(prefix="tony-na-native-doctor-") as temp_dir:
+    with tempfile.TemporaryDirectory(prefix="canvasia-native-doctor-") as temp_dir:
         temp_home = Path(temp_dir) / "home"
         temp_home.mkdir(parents=True, exist_ok=True)
         os.environ["HOME"] = str(temp_home)
@@ -5361,7 +5361,7 @@ def build_native_runtime_release_control_payload(bundle_dir: Path) -> dict:
         "generatedAt": now_iso(),
         "bundleDir": str(bundle_dir),
         "engine": {
-            "name": "Tony Na Engine",
+            "name": "Canvasia Engine",
             "target": "native_runtime",
             "targetLabel": "原生 Runtime 包",
             "runtimeMode": "pygame_native",
@@ -5538,7 +5538,7 @@ def build_native_title_screen_report(bundle_dir: Path) -> dict:
         "status": "ready",
         "checkedAt": now_iso(),
         "bundleDir": str(bundle_dir),
-        "projectTitle": str(project.get("title") or project.get("name") or "Tony Na Engine"),
+        "projectTitle": str(project.get("title") or project.get("name") or "Canvasia Engine"),
         "titleLogoAssetId": title_logo_asset_id,
         "titleLogoExists": bool(title_logo_path and title_logo_path.is_file()),
         "engineBrandLogo": ENGINE_BRAND_LOGO_RELATIVE_PATH,
@@ -6370,7 +6370,7 @@ def write_runtime_crash_log(game_data_path: Path, error: BaseException, context:
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
     log_path = log_dir / f"runtime-crash-{timestamp}.log"
     lines = [
-        "Tony Na Engine Native Runtime Crash Log",
+        "Canvasia Engine Native Runtime Crash Log",
         f"Time: {now_iso()}",
         f"Context: {context}",
         f"Game data: {game_data_path}",
@@ -6406,7 +6406,7 @@ def show_runtime_error_screen(pygame, message: str, log_path: Path | None) -> No
         screen = pygame.display.get_surface()
         if screen is None:
             screen = pygame.display.set_mode((860, 360))
-        pygame.display.set_caption("Tony Na Engine Runtime Error")
+        pygame.display.set_caption("Canvasia Engine Runtime Error")
         font_title = pygame.font.SysFont("Arial", 26, bold=True)
         font_body = pygame.font.SysFont("Arial", 18)
         clock = pygame.time.Clock()
@@ -7038,7 +7038,7 @@ class NativeRuntimePlayer:
         self.clock = pygame.time.Clock()
         self.screen = pygame.display.set_mode((self.width, self.height))
         self.active_display_mode = "windowed"
-        pygame.display.set_caption(f"{self.project.get('title') or 'Tony Na Engine'} · 原生 Runtime")
+        pygame.display.set_caption(f"{self.project.get('title') or 'Canvasia Engine'} · 原生 Runtime")
 
         self.font_source_status = "系统字体"
         self.font_small = self._create_font(22)
@@ -10539,7 +10539,7 @@ class NativeRuntimePlayer:
         self.pygame.draw.rect(self.screen, (*palette["panel"], palette["panelAlpha"]), panel, border_radius=18)
         self.pygame.draw.rect(self.screen, palette["panelBorder"], panel, 1, border_radius=18)
         self.draw_game_ui_panel_frame(panel)
-        project_title = self.project.get("title") or "Tony Na Engine"
+        project_title = self.project.get("title") or "Canvasia Engine"
         target_label = self.build_info.get("exportTargetLabel") or "原生 Runtime"
         status_text = f"{project_title} · {target_label}"
         self.screen.blit(self.font_ui.render(status_text, True, palette["text"]), (36, 30))
@@ -10927,12 +10927,12 @@ class NativeRuntimePlayer:
             )
             self.screen.blit(scaled, scaled.get_rect(center=logo_rect.center))
         else:
-            self.blit_text_center(self.font_title, "TNE", logo_rect.centerx, logo_rect.centery - 18, palette["text"])
-            self.blit_text_center(self.font_ui, "Tony Na Engine", logo_rect.centerx, logo_rect.centery + 26, palette["muted"])
+            self.blit_text_center(self.font_title, "CE", logo_rect.centerx, logo_rect.centery - 18, palette["text"])
+            self.blit_text_center(self.font_ui, "Canvasia Engine", logo_rect.centerx, logo_rect.centery + 26, palette["muted"])
 
         title_left = logo_rect.right + 42
         title_top = panel.top + 78
-        project_title = str(self.project.get("title") or self.project.get("name") or "Tony Na Engine")
+        project_title = str(self.project.get("title") or self.project.get("name") or "Canvasia Engine")
         self.screen.blit(self.font_ui.render("NATIVE RUNTIME PREVIEW", True, palette["accent"]), (title_left, title_top))
         self.screen.blit(self.font_title.render(project_title[:28], True, palette["text"]), (title_left, title_top + 34))
         summary = f"{len(self.chapters)} 章 · {len(self.scenes_by_id)} 场景 · 正式存档 {self.formal_save_slot_count} 格"
@@ -12561,7 +12561,7 @@ def run_player(game_data_path: Path) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Tony Na Engine 原生 Runtime 播放器")
+    parser = argparse.ArgumentParser(description="Canvasia Engine 原生 Runtime 播放器")
     parser.add_argument("game_data", nargs="?", default=DEFAULT_GAME_DATA_NAME, help="导出的 game_data.json 路径")
     parser.add_argument("--validate-bundle", dest="validate_bundle", help="只检查导出包结构，不启动窗口")
     parser.add_argument("--release-check", dest="release_check", help="输出发布前自检报告 JSON，不启动窗口")

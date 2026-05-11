@@ -1,4 +1,4 @@
-# Tony Na Engine Preview Release Checklist
+# Canvasia Engine Preview Release Checklist
 
 This checklist is for publishing a source-available Preview / Early Access build. It is not a promise that the engine is already a fully signed commercial stable release.
 
@@ -43,7 +43,7 @@ Current Preview-ready criteria:
 - Save / load, quick save, player profile, and auto resume are present.
 - System menu, text speed, volume, theme, and fullscreen settings are present.
 - Archive/gallery/replay surfaces are functional enough for Preview.
-- Crash logs are written to `~/.tony-na-engine/native-runtime-logs/`.
+- Crash logs are written to `~/.canvasia-engine/native-runtime-logs/`.
 - Video cards can be inspected with `runtime_player.py --describe-video-bridge .`; in native Preview they use a system-player bridge rather than embedded decoding.
 - `build_native_runtime_app.py --describe .` returns a packaging plan.
 - PyInstaller packaging can produce a platform Preview zip on the target system.
@@ -96,7 +96,7 @@ Mobile:
 ## Suggested GitHub Release Body
 
 ```md
-## Tony Na Engine Preview
+## Canvasia Engine Preview
 
 This is a source-available Preview build for testing the editor, web export, and native Runtime packaging flow.
 
