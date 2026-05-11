@@ -78,7 +78,11 @@ class FrontendCreativeAssistantModuleTests(unittest.TestCase):
               scriptMode: tools.getSafeCreativeAssistantMode("script"),
               defaultProvider: tools.getSafeCreativeAssistantProvider("bad"),
               openaiProvider: tools.getSafeCreativeAssistantProvider("openai"),
+              deepseekProvider: tools.getSafeCreativeAssistantProvider("deepseek"),
+              providerConfig: tools.getCreativeAssistantProviderConfig("deepseek"),
               defaultModel: tools.getSafeCreativeAssistantModel("   "),
+              deepseekDefaultModel: tools.getSafeCreativeAssistantModel("   ", "deepseek"),
+              customBaseUrl: tools.getSafeCreativeAssistantBaseUrl("  http://127.0.0.1:11434/v1  "),
               defaultSettings: tools.getDefaultCreativeAssistantSettings(),
               activeIndexes: tools.getActiveCreativeAssistantBlockIndexes(record.result, [2, 0, 99, 0]),
               selectedTypes: tools.getSelectedCreativeAssistantBlocks(record.result, [1]).map((block) => block.type),
@@ -182,10 +186,15 @@ class FrontendCreativeAssistantModuleTests(unittest.TestCase):
         self.assertEqual(payload["scriptMode"], "script")
         self.assertEqual(payload["defaultProvider"], "local")
         self.assertEqual(payload["openaiProvider"], "openai")
+        self.assertEqual(payload["deepseekProvider"], "deepseek")
+        self.assertEqual(payload["providerConfig"]["defaultModel"], "deepseek-v4-flash")
         self.assertEqual(payload["defaultModel"], "gpt-5.5")
+        self.assertEqual(payload["deepseekDefaultModel"], "deepseek-v4-flash")
+        self.assertEqual(payload["customBaseUrl"], "http://127.0.0.1:11434/v1")
         self.assertEqual(payload["defaultSettings"]["provider"], "local")
         self.assertFalse(payload["defaultSettings"]["rememberKey"])
         self.assertEqual(payload["defaultSettings"]["openAiKey"], "")
+        self.assertEqual(payload["defaultSettings"]["apiKey"], "")
         self.assertEqual(payload["activeIndexes"], [0, 2])
         self.assertEqual(payload["selectedTypes"], ["choice"])
         self.assertIn("#1 台词", payload["dialoguePreview"])
@@ -286,18 +295,20 @@ class FrontendCreativeAssistantModuleTests(unittest.TestCase):
               }},
             }};
             tools.persistCreativeAssistantSettings(storage, {{
-              provider: "openai",
-              model: " gpt-custom ",
+              provider: "deepseek",
+              model: " deepseek-custom ",
+              baseUrl: " https://custom.example/v1 ",
               rememberKey: false,
-              openAiKey: "secret-key",
+              apiKey: "secret-key",
             }});
             const privateSettings = tools.loadCreativeAssistantSettings(storage);
-            const keyAfterPrivateSave = storage.getItem(tools.CREATIVE_ASSISTANT_OPENAI_KEY_STORAGE_KEY);
+            const keyAfterPrivateSave = storage.getItem(tools.CREATIVE_ASSISTANT_API_KEY_STORAGE_KEY);
             tools.persistCreativeAssistantSettings(storage, {{
-              provider: "openai",
-              model: "gpt-custom",
+              provider: "deepseek",
+              model: "deepseek-custom",
+              baseUrl: "https://custom.example/v1",
               rememberKey: true,
-              openAiKey: "secret-key",
+              apiKey: "secret-key",
             }});
             const rememberedSettings = tools.loadCreativeAssistantSettings(storage);
             tools.persistCreativeAssistantHistory(storage, [
@@ -325,13 +336,16 @@ class FrontendCreativeAssistantModuleTests(unittest.TestCase):
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
         payload = json.loads(completed.stdout)
-        self.assertEqual(payload["privateSettings"]["provider"], "openai")
-        self.assertEqual(payload["privateSettings"]["model"], "gpt-custom")
+        self.assertEqual(payload["privateSettings"]["provider"], "deepseek")
+        self.assertEqual(payload["privateSettings"]["model"], "deepseek-custom")
+        self.assertEqual(payload["privateSettings"]["baseUrl"], "https://custom.example/v1")
         self.assertFalse(payload["privateSettings"]["rememberKey"])
         self.assertEqual(payload["privateSettings"]["openAiKey"], "")
+        self.assertEqual(payload["privateSettings"]["apiKey"], "")
         self.assertIsNone(payload["keyAfterPrivateSave"])
         self.assertTrue(payload["rememberedSettings"]["rememberKey"])
         self.assertEqual(payload["rememberedSettings"]["openAiKey"], "secret-key")
+        self.assertEqual(payload["rememberedSettings"]["apiKey"], "secret-key")
         self.assertEqual(payload["savedHistoryLength"], 1)
         self.assertEqual(payload["savedHistoryFirstId"], "a")
 

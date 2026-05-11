@@ -1541,9 +1541,52 @@ def build_starter_scene(scene_id: str, scene_name: str) -> dict:
 CREATIVE_ASSISTANT_MAX_PROMPT_CHARS = 800
 CREATIVE_ASSISTANT_OPENAI_ENDPOINT = "https://api.openai.com/v1/responses"
 CREATIVE_ASSISTANT_DEFAULT_OPENAI_MODEL = "gpt-5.5"
+CREATIVE_ASSISTANT_PROVIDER_CONFIGS = {
+    "local": {
+        "label": "本地模板助手",
+        "default_model": "",
+        "kind": "local",
+        "endpoint": "",
+    },
+    "openai": {
+        "label": "OpenAI",
+        "default_model": CREATIVE_ASSISTANT_DEFAULT_OPENAI_MODEL,
+        "kind": "openai_responses",
+        "endpoint": CREATIVE_ASSISTANT_OPENAI_ENDPOINT,
+    },
+    "deepseek": {
+        "label": "DeepSeek",
+        "default_model": "deepseek-v4-flash",
+        "kind": "openai_compatible_chat",
+        "endpoint": "https://api.deepseek.com/chat/completions",
+    },
+    "qwen": {
+        "label": "通义千问",
+        "default_model": "qwen-plus",
+        "kind": "openai_compatible_chat",
+        "endpoint": "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
+    },
+    "kimi": {
+        "label": "Kimi",
+        "default_model": "kimi-k2.6",
+        "kind": "openai_compatible_chat",
+        "endpoint": "https://api.moonshot.cn/v1/chat/completions",
+    },
+    "zhipu": {
+        "label": "智谱 GLM",
+        "default_model": "glm-5.1",
+        "kind": "openai_compatible_chat",
+        "endpoint": "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+    },
+    "custom": {
+        "label": "自定义兼容接口",
+        "default_model": "gpt-compatible",
+        "kind": "openai_compatible_chat",
+        "endpoint": "",
+    },
+}
 CREATIVE_ASSISTANT_PROVIDER_LABELS = {
-    "local": "本地模板助手",
-    "openai": "OpenAI 真模型助手",
+    provider: config["label"] for provider, config in CREATIVE_ASSISTANT_PROVIDER_CONFIGS.items()
 }
 CREATIVE_ASSISTANT_MODE_LABELS = {
     "starter_demo": "试玩 Demo 生成",
@@ -1562,6 +1605,10 @@ def normalize_creative_assistant_provider(value: object) -> str:
     return provider if provider in CREATIVE_ASSISTANT_PROVIDER_LABELS else "local"
 
 
+def get_creative_assistant_provider_config(provider: object) -> dict:
+    return CREATIVE_ASSISTANT_PROVIDER_CONFIGS[normalize_creative_assistant_provider(provider)]
+
+
 def normalize_creative_assistant_mode(value: object) -> str:
     mode = str(value or "starter_demo").strip()
     return mode if mode in CREATIVE_ASSISTANT_MODE_LABELS else "starter_demo"
@@ -1573,13 +1620,43 @@ def clean_creative_prompt(value: object) -> str:
     return prompt[:CREATIVE_ASSISTANT_MAX_PROMPT_CHARS] or "雨夜校园里，一个秘密把两个人重新拉回彼此身边。"
 
 
-def clean_creative_assistant_model(value: object) -> str:
+def clean_creative_assistant_model(value: object, provider: object = "openai") -> str:
+    default_model = str(get_creative_assistant_provider_config(provider).get("default_model") or CREATIVE_ASSISTANT_DEFAULT_OPENAI_MODEL)
     model = str(value or "").strip()
     if not model:
-        return CREATIVE_ASSISTANT_DEFAULT_OPENAI_MODEL
+        return default_model
     if len(model) > 80 or not re.fullmatch(r"[A-Za-z0-9._:-]+", model):
-        return CREATIVE_ASSISTANT_DEFAULT_OPENAI_MODEL
+        return default_model
     return model
+
+
+def clean_creative_assistant_base_url(value: object) -> str:
+    base_url = str(value or "").strip().rstrip("/")
+    if not base_url or len(base_url) > 240:
+        return ""
+    parsed = urlparse(base_url)
+    if parsed.scheme == "https" and parsed.netloc:
+        return base_url
+    if parsed.scheme == "http" and parsed.hostname in {"localhost", "127.0.0.1", "::1"}:
+        return base_url
+    return ""
+
+
+def build_creative_assistant_chat_endpoint(provider: str, payload: dict) -> str:
+    provider_config = get_creative_assistant_provider_config(provider)
+    if provider == "custom":
+        endpoint = clean_creative_assistant_base_url(payload.get("baseUrl"))
+        if not endpoint:
+            raise CreativeAssistantModelError("自定义兼容接口需要填写有效 Base URL。")
+    else:
+        endpoint = str(provider_config.get("endpoint") or "").strip().rstrip("/")
+    if not endpoint:
+        raise CreativeAssistantModelError("当前模型服务没有配置可调用的接口地址。")
+    if endpoint.endswith("/chat/completions"):
+        return endpoint
+    if endpoint.endswith("/v1") or endpoint.endswith("/compatible-mode/v1") or endpoint.endswith("/paas/v4"):
+        return f"{endpoint}/chat/completions"
+    return f"{endpoint}/chat/completions"
 
 
 def pick_creative_assistant_flavor(prompt: str) -> dict:
@@ -1861,6 +1938,42 @@ def extract_openai_response_text(response_payload: dict) -> str:
     raise CreativeAssistantModelError("模型没有返回可读取的文本。")
 
 
+def extract_chat_completion_response_text(response_payload: dict) -> str:
+    choices = response_payload.get("choices")
+    if not isinstance(choices, list) or not choices:
+        raise CreativeAssistantModelError("模型没有返回可读取的 choices。")
+    message = choices[0].get("message") if isinstance(choices[0], dict) else {}
+    content = message.get("content") if isinstance(message, dict) else ""
+    if isinstance(content, list):
+        parts = []
+        for item in content:
+            if isinstance(item, dict):
+                parts.append(str(item.get("text") or item.get("content") or ""))
+            else:
+                parts.append(str(item))
+        content = "".join(parts)
+    if isinstance(content, str) and content.strip():
+        return content.strip()
+    raise CreativeAssistantModelError("模型没有返回可读取的文本。")
+
+
+def parse_creative_assistant_json_text(response_text: str) -> dict:
+    text = str(response_text or "").strip()
+    if text.startswith("```"):
+        text = re.sub(r"^```(?:json)?", "", text, flags=re.IGNORECASE).strip()
+        text = re.sub(r"```$", "", text).strip()
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError as error:
+        match = re.search(r"\{.*\}", text, flags=re.DOTALL)
+        if match:
+            try:
+                return json.loads(match.group(0))
+            except json.JSONDecodeError:
+                pass
+        raise CreativeAssistantModelError("模型返回的内容不是有效 JSON。") from error
+
+
 def sanitize_model_creative_blocks(raw_blocks: object, fallback_scene_id: str) -> list[dict]:
     if not isinstance(raw_blocks, list):
         return []
@@ -1903,9 +2016,11 @@ def sanitize_model_creative_blocks(raw_blocks: object, fallback_scene_id: str) -
     return blocks
 
 
-def sanitize_model_creative_result(raw_result: object, local_result: dict, model: str) -> dict:
+def sanitize_model_creative_result(raw_result: object, local_result: dict, model: str, provider: object = "openai") -> dict:
     if not isinstance(raw_result, dict):
         raise CreativeAssistantModelError("模型返回的 JSON 不是对象。")
+    provider = normalize_creative_assistant_provider(provider)
+    provider_label = CREATIVE_ASSISTANT_PROVIDER_LABELS[provider]
     fallback_scene_id = ""
     for block in local_result.get("blocks", []) or []:
         if isinstance(block, dict) and block.get("type") == "choice":
@@ -1925,16 +2040,16 @@ def sanitize_model_creative_result(raw_result: object, local_result: dict, model
         "insertable": len(blocks) > 0,
         "blockCount": len(blocks),
         "provider": {
-            "mode": "openai",
-            "label": CREATIVE_ASSISTANT_PROVIDER_LABELS["openai"],
+            "mode": provider,
+            "label": provider_label,
             "status": "model",
             "model": model,
             "fallback": False,
         },
         "privacy": {
-            "mode": "openai_byo_key",
+            "mode": f"{provider}_byo_key",
             "sentToExternalService": True,
-            "message": "已使用你提供的 OpenAI API Key 调用真模型；Key 不会写入项目文件。",
+            "message": f"已使用你提供的 {provider_label} API Key 调用真模型；Key 不会写入项目文件。",
         },
     }
     if not result["summary"]:
@@ -2000,27 +2115,83 @@ def call_openai_creative_assistant(payload: dict, local_result: dict, api_key: s
     except Exception as error:
         raise CreativeAssistantModelError(f"调用 OpenAI 失败：{error}") from error
     response_text = extract_openai_response_text(response_data)
+    raw_result = parse_creative_assistant_json_text(response_text)
+    return sanitize_model_creative_result(raw_result, local_result, model, "openai")
+
+
+def call_compatible_creative_assistant(payload: dict, local_result: dict, api_key: str, model: str, provider: str) -> dict:
+    prompt = clean_creative_prompt(payload.get("prompt"))
+    context = build_creative_assistant_model_context(payload, prompt)
+    provider_label = CREATIVE_ASSISTANT_PROVIDER_LABELS[provider]
+    endpoint = build_creative_assistant_chat_endpoint(provider, payload)
+    request_payload = {
+        "model": model,
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "你是 Canvasia Engine 内置的视觉小说创作助手。"
+                    "请根据用户主题和当前项目上下文，生成适合 galgame/视觉小说编辑器直接插入的内容。"
+                    "只生成原创内容；不要声称已经生成图片或音频。"
+                    "只输出 JSON 对象，不要输出 Markdown 代码块。"
+                    "JSON 必须包含 title、summary、guidance、assetPrompts、blocks。"
+                    "blocks 只能使用 narration、dialogue、choice 三类；dialogue 优先使用给定 characters 的 id。"
+                    "如果 mode 是 advice，可以让 blocks 为空；其他模式尽量提供 3 到 6 张可插入卡片。"
+                ),
+            },
+            {
+                "role": "user",
+                "content": json.dumps(context, ensure_ascii=False, indent=2),
+            },
+        ],
+        "temperature": 0.75,
+        "max_tokens": 1800,
+    }
+    request = Request(
+        endpoint,
+        data=json.dumps(request_payload).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
     try:
-        raw_result = json.loads(response_text)
-    except json.JSONDecodeError as error:
-        raise CreativeAssistantModelError("模型返回的内容不是有效 JSON。") from error
-    return sanitize_model_creative_result(raw_result, local_result, model)
+        with urlopen(request, timeout=45) as response:
+            response_data = json.loads(response.read().decode("utf-8"))
+    except HTTPError as error:
+        error_body = ""
+        try:
+            error_body = error.read().decode("utf-8")[:500]
+        except Exception:
+            error_body = ""
+        raise CreativeAssistantModelError(f"{provider_label} 返回错误 {error.code}：{error_body or error.reason}") from error
+    except URLError as error:
+        raise CreativeAssistantModelError(f"连接 {provider_label} 失败：{error.reason}") from error
+    except TimeoutError as error:
+        raise CreativeAssistantModelError(f"连接 {provider_label} 超时。") from error
+    except Exception as error:
+        raise CreativeAssistantModelError(f"调用 {provider_label} 失败：{error}") from error
+    response_text = extract_chat_completion_response_text(response_data)
+    raw_result = parse_creative_assistant_json_text(response_text)
+    return sanitize_model_creative_result(raw_result, local_result, model, provider)
 
 
 def build_creative_assistant_result(payload: dict | None) -> dict:
     payload = payload if isinstance(payload, dict) else {}
     local_result = build_local_creative_assistant_result(payload)
     provider = normalize_creative_assistant_provider(payload.get("provider"))
-    if provider != "openai":
+    if provider == "local":
         return local_result
+    provider_label = CREATIVE_ASSISTANT_PROVIDER_LABELS[provider]
     api_key = str(payload.get("apiKey") or "").strip()
-    model = clean_creative_assistant_model(payload.get("model"))
+    model = clean_creative_assistant_model(payload.get("model"), provider)
     if not api_key:
         return {
             **local_result,
             "provider": {
-                "mode": "openai",
-                "label": CREATIVE_ASSISTANT_PROVIDER_LABELS["openai"],
+                "mode": provider,
+                "label": provider_label,
                 "status": "missing_key",
                 "model": model,
                 "fallback": True,
@@ -2030,16 +2201,18 @@ def build_creative_assistant_result(payload: dict | None) -> dict:
                 "sentToExternalService": False,
                 "message": "未填写 API Key，已自动使用本地模板助手；不会上传项目内容。",
             },
-            "fallbackReason": "未填写 OpenAI API Key。",
+            "fallbackReason": f"未填写 {provider_label} API Key。",
         }
     try:
-        return call_openai_creative_assistant(payload, local_result, api_key, model)
+        if provider == "openai":
+            return call_openai_creative_assistant(payload, local_result, api_key, model)
+        return call_compatible_creative_assistant(payload, local_result, api_key, model, provider)
     except CreativeAssistantModelError as error:
         return {
             **local_result,
             "provider": {
-                "mode": "openai",
-                "label": CREATIVE_ASSISTANT_PROVIDER_LABELS["openai"],
+                "mode": provider,
+                "label": provider_label,
                 "status": "fallback",
                 "model": model,
                 "fallback": True,

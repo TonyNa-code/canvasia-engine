@@ -8,16 +8,75 @@
 
   const CREATIVE_ASSISTANT_PROVIDERS = Object.freeze({
     local: "本地模板",
-    openai: "OpenAI 真模型",
+    openai: "OpenAI",
+    deepseek: "DeepSeek",
+    qwen: "通义千问",
+    kimi: "Kimi",
+    zhipu: "智谱 GLM",
+    custom: "自定义兼容接口",
+  });
+
+  const CREATIVE_ASSISTANT_PROVIDER_CONFIGS = Object.freeze({
+    local: {
+      label: "本地模板",
+      defaultModel: "",
+      keyPlaceholder: "",
+      modelPlaceholder: "",
+      endpointNote: "零配置，不上传项目内容，也不会产生 API 费用。",
+    },
+    openai: {
+      label: "OpenAI",
+      defaultModel: "gpt-5.5",
+      keyPlaceholder: "sk-...",
+      modelPlaceholder: "gpt-5.5",
+      endpointNote: "使用 OpenAI Responses API。",
+    },
+    deepseek: {
+      label: "DeepSeek",
+      defaultModel: "deepseek-v4-flash",
+      keyPlaceholder: "sk-...",
+      modelPlaceholder: "deepseek-v4-flash",
+      endpointNote: "默认调用 https://api.deepseek.com/chat/completions。",
+    },
+    qwen: {
+      label: "通义千问",
+      defaultModel: "qwen-plus",
+      keyPlaceholder: "sk-...",
+      modelPlaceholder: "qwen-plus",
+      endpointNote: "默认调用阿里云百炼 OpenAI 兼容接口。",
+    },
+    kimi: {
+      label: "Kimi",
+      defaultModel: "kimi-k2.6",
+      keyPlaceholder: "sk-...",
+      modelPlaceholder: "kimi-k2.6",
+      endpointNote: "默认调用 Kimi / Moonshot OpenAI 兼容接口。",
+    },
+    zhipu: {
+      label: "智谱 GLM",
+      defaultModel: "glm-5.1",
+      keyPlaceholder: "",
+      modelPlaceholder: "glm-5.1",
+      endpointNote: "默认调用智谱 OpenAI 兼容接口。",
+    },
+    custom: {
+      label: "自定义兼容接口",
+      defaultModel: "gpt-compatible",
+      keyPlaceholder: "你的兼容服务 API Key",
+      modelPlaceholder: "例如 qwen-plus / deepseek-v4-flash / 自部署模型名",
+      endpointNote: "填入兼容 OpenAI Chat Completions 的 Base URL 或完整 /chat/completions 地址。",
+    },
   });
 
   const CREATIVE_ASSISTANT_PROVIDER_STORAGE_KEY = "canvasia-engine:creative-assistant-provider";
+  const CREATIVE_ASSISTANT_API_KEY_STORAGE_KEY = "canvasia-engine:creative-assistant-api-key";
   const CREATIVE_ASSISTANT_OPENAI_KEY_STORAGE_KEY = "canvasia-engine:creative-assistant-openai-key";
   const CREATIVE_ASSISTANT_OPENAI_MODEL_STORAGE_KEY = "canvasia-engine:creative-assistant-openai-model";
+  const CREATIVE_ASSISTANT_BASE_URL_STORAGE_KEY = "canvasia-engine:creative-assistant-base-url";
   const CREATIVE_ASSISTANT_REMEMBER_KEY_STORAGE_KEY = "canvasia-engine:creative-assistant-remember-key";
   const CREATIVE_ASSISTANT_HISTORY_STORAGE_KEY = "canvasia-engine:creative-assistant-history";
   const CREATIVE_ASSISTANT_HISTORY_RECOVERY_STORAGE_KEY = "canvasia-engine:creative-assistant-history-recovery";
-  const CREATIVE_ASSISTANT_DEFAULT_OPENAI_MODEL = "gpt-5.5";
+  const CREATIVE_ASSISTANT_DEFAULT_OPENAI_MODEL = CREATIVE_ASSISTANT_PROVIDER_CONFIGS.openai.defaultModel;
   const CREATIVE_ASSISTANT_MAX_HISTORY = 8;
 
   const CREATIVE_ASSISTANT_PROMPT_SAMPLES = Object.freeze([
@@ -40,17 +99,28 @@
     return hasOwn(CREATIVE_ASSISTANT_PROVIDERS, safeProvider) ? safeProvider : "local";
   }
 
-  function getSafeCreativeAssistantModel(model) {
+  function getCreativeAssistantProviderConfig(provider) {
+    const safeProvider = getSafeCreativeAssistantProvider(provider);
+    return CREATIVE_ASSISTANT_PROVIDER_CONFIGS[safeProvider] ?? CREATIVE_ASSISTANT_PROVIDER_CONFIGS.local;
+  }
+
+  function getSafeCreativeAssistantModel(model, provider = "openai") {
     const cleanModel = String(model ?? "").trim();
-    return cleanModel || CREATIVE_ASSISTANT_DEFAULT_OPENAI_MODEL;
+    return cleanModel || getCreativeAssistantProviderConfig(provider).defaultModel || CREATIVE_ASSISTANT_DEFAULT_OPENAI_MODEL;
+  }
+
+  function getSafeCreativeAssistantBaseUrl(value) {
+    return String(value ?? "").trim().slice(0, 240);
   }
 
   function getDefaultCreativeAssistantSettings() {
     return {
       provider: "local",
       rememberKey: false,
+      apiKey: "",
       openAiKey: "",
       model: CREATIVE_ASSISTANT_DEFAULT_OPENAI_MODEL,
+      baseUrl: "",
     };
   }
 
@@ -219,30 +289,44 @@
 
   function loadCreativeAssistantSettings(storage) {
     try {
+      const provider = getSafeCreativeAssistantProvider(storage.getItem(CREATIVE_ASSISTANT_PROVIDER_STORAGE_KEY));
+      const apiKey =
+        storage.getItem(CREATIVE_ASSISTANT_API_KEY_STORAGE_KEY) ??
+        storage.getItem(CREATIVE_ASSISTANT_OPENAI_KEY_STORAGE_KEY) ??
+        "";
       return {
-        provider: getSafeCreativeAssistantProvider(storage.getItem(CREATIVE_ASSISTANT_PROVIDER_STORAGE_KEY)),
+        provider,
         rememberKey: storage.getItem(CREATIVE_ASSISTANT_REMEMBER_KEY_STORAGE_KEY) === "true",
-        openAiKey: storage.getItem(CREATIVE_ASSISTANT_OPENAI_KEY_STORAGE_KEY) ?? "",
-        model: getSafeCreativeAssistantModel(storage.getItem(CREATIVE_ASSISTANT_OPENAI_MODEL_STORAGE_KEY)),
+        apiKey,
+        openAiKey: apiKey,
+        model: getSafeCreativeAssistantModel(storage.getItem(CREATIVE_ASSISTANT_OPENAI_MODEL_STORAGE_KEY), provider),
+        baseUrl: getSafeCreativeAssistantBaseUrl(storage.getItem(CREATIVE_ASSISTANT_BASE_URL_STORAGE_KEY)),
       };
     } catch (error) {
       return {
         provider: "local",
         rememberKey: false,
+        apiKey: "",
         openAiKey: "",
         model: CREATIVE_ASSISTANT_DEFAULT_OPENAI_MODEL,
+        baseUrl: "",
       };
     }
   }
 
   function persistCreativeAssistantSettings(storage, settings) {
     try {
-      storage.setItem(CREATIVE_ASSISTANT_PROVIDER_STORAGE_KEY, getSafeCreativeAssistantProvider(settings?.provider));
-      storage.setItem(CREATIVE_ASSISTANT_OPENAI_MODEL_STORAGE_KEY, getSafeCreativeAssistantModel(settings?.model));
+      const provider = getSafeCreativeAssistantProvider(settings?.provider);
+      const apiKey = settings?.apiKey ?? settings?.openAiKey ?? "";
+      storage.setItem(CREATIVE_ASSISTANT_PROVIDER_STORAGE_KEY, provider);
+      storage.setItem(CREATIVE_ASSISTANT_OPENAI_MODEL_STORAGE_KEY, getSafeCreativeAssistantModel(settings?.model, provider));
+      storage.setItem(CREATIVE_ASSISTANT_BASE_URL_STORAGE_KEY, getSafeCreativeAssistantBaseUrl(settings?.baseUrl));
       storage.setItem(CREATIVE_ASSISTANT_REMEMBER_KEY_STORAGE_KEY, settings?.rememberKey ? "true" : "false");
-      if (settings?.rememberKey && settings?.openAiKey) {
-        storage.setItem(CREATIVE_ASSISTANT_OPENAI_KEY_STORAGE_KEY, settings.openAiKey);
+      if (settings?.rememberKey && apiKey) {
+        storage.setItem(CREATIVE_ASSISTANT_API_KEY_STORAGE_KEY, apiKey);
+        storage.removeItem(CREATIVE_ASSISTANT_OPENAI_KEY_STORAGE_KEY);
       } else {
+        storage.removeItem(CREATIVE_ASSISTANT_API_KEY_STORAGE_KEY);
         storage.removeItem(CREATIVE_ASSISTANT_OPENAI_KEY_STORAGE_KEY);
       }
       return true;
@@ -629,9 +713,12 @@
   global.CanvasiaEditorCreativeAssistant = Object.freeze({
     CREATIVE_ASSISTANT_MODES,
     CREATIVE_ASSISTANT_PROVIDERS,
+    CREATIVE_ASSISTANT_PROVIDER_CONFIGS,
     CREATIVE_ASSISTANT_PROVIDER_STORAGE_KEY,
+    CREATIVE_ASSISTANT_API_KEY_STORAGE_KEY,
     CREATIVE_ASSISTANT_OPENAI_KEY_STORAGE_KEY,
     CREATIVE_ASSISTANT_OPENAI_MODEL_STORAGE_KEY,
+    CREATIVE_ASSISTANT_BASE_URL_STORAGE_KEY,
     CREATIVE_ASSISTANT_REMEMBER_KEY_STORAGE_KEY,
     CREATIVE_ASSISTANT_HISTORY_STORAGE_KEY,
     CREATIVE_ASSISTANT_HISTORY_RECOVERY_STORAGE_KEY,
@@ -640,7 +727,9 @@
     CREATIVE_ASSISTANT_PROMPT_SAMPLES,
     getSafeCreativeAssistantMode,
     getSafeCreativeAssistantProvider,
+    getCreativeAssistantProviderConfig,
     getSafeCreativeAssistantModel,
+    getSafeCreativeAssistantBaseUrl,
     getDefaultCreativeAssistantSettings,
     trimCreativeAssistantText,
     cloneCreativeAssistantBlocksForHistory,

@@ -798,12 +798,12 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
         panel.get_by_role("button", name="复制文档").first.click()
         self.page.get_by_text("单条灵感 Markdown 已复制").wait_for(timeout=10000)
 
-        panel.get_by_role("button", name="OpenAI 真模型").click()
+        panel.get_by_role("button", name="DeepSeek").click()
         panel.locator("#creativeAssistantOpenAiKey").fill("sk-browser-smoke-test")
         panel.locator("#creativeAssistantRememberKey").check()
         self.assertEqual(
             self.page.evaluate(
-                """() => localStorage.getItem("canvasia-engine:creative-assistant-openai-key")"""
+                """() => localStorage.getItem("canvasia-engine:creative-assistant-api-key")"""
             ),
             "sk-browser-smoke-test",
         )
@@ -812,7 +812,7 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
         self.assertTrue(panel.get_by_role("button", name="忘记本机 Key").is_disabled())
         self.assertIsNone(
             self.page.evaluate(
-                """() => localStorage.getItem("canvasia-engine:creative-assistant-openai-key")"""
+                """() => localStorage.getItem("canvasia-engine:creative-assistant-api-key")"""
             )
         )
 

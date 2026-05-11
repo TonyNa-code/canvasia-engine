@@ -2900,6 +2900,11 @@ body[data-editor-mode="beginner"] #screen-preview #previewSceneFilterBar {
   width: auto;
 }
 
+.creative-openai-config > .helper-text {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
 .creative-openai-actions {
   grid-column: 1 / -1;
   display: flex;

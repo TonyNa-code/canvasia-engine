@@ -1300,6 +1300,71 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(result["blocks"][1]["speakerId"], "heroine")
         self.assertEqual(result["blocks"][2]["options"][0]["gotoSceneId"], chapter_result["sceneId"])
 
+    def test_creative_assistant_compatible_provider_uses_chat_completions(self) -> None:
+        _, chapter_result = self.create_blank_project_with_chapter()
+        model_result = {
+            "title": "兼容模型标题",
+            "summary": "DeepSeek 兼容接口返回了可插入剧情。",
+            "guidance": ["先写误会，再给一次选择。"],
+            "assetPrompts": ["雨夜校园，蓝色背光，视觉小说背景"],
+            "blocks": [
+                {"type": "narration", "text": "窗外的雨把走廊灯切成一格一格的影子。"},
+                {"type": "choice", "options": [
+                    {"text": "追上去", "gotoSceneId": chapter_result["sceneId"]},
+                    {"text": "留在原地", "gotoSceneId": chapter_result["sceneId"]},
+                ]},
+            ],
+        }
+        response_payload = {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps(model_result, ensure_ascii=False),
+                    }
+                }
+            ]
+        }
+
+        class FakeResponse:
+            def __enter__(self) -> "FakeResponse":
+                return self
+
+            def __exit__(self, *_args: object) -> bool:
+                return False
+
+            def read(self) -> bytes:
+                return json.dumps(response_payload, ensure_ascii=False).encode("utf-8")
+
+        def fake_urlopen(request, timeout=0):
+            self.assertEqual(timeout, 45)
+            self.assertEqual(request.full_url, "https://api.deepseek.com/chat/completions")
+            self.assertEqual(request.get_header("Authorization"), "Bearer test-deepseek-key")
+            body = json.loads(request.data.decode("utf-8"))
+            self.assertEqual(body["model"], "deepseek-v4-flash")
+            self.assertEqual(body["messages"][0]["role"], "system")
+            self.assertIn("只输出 JSON 对象", body["messages"][0]["content"])
+            self.assertIn("雨夜校园误会", body["messages"][1]["content"])
+            return FakeResponse()
+
+        with mock.patch("run_editor.urlopen", fake_urlopen):
+            result = run_editor.build_creative_assistant_result(
+                {
+                    "provider": "deepseek",
+                    "apiKey": "test-deepseek-key",
+                    "mode": "script",
+                    "prompt": "雨夜校园误会",
+                    "sceneId": chapter_result["sceneId"],
+                }
+            )
+
+        self.assertEqual(result["provider"]["mode"], "deepseek")
+        self.assertEqual(result["provider"]["status"], "model")
+        self.assertEqual(result["provider"]["model"], "deepseek-v4-flash")
+        self.assertTrue(result["privacy"]["sentToExternalService"])
+        self.assertIn("DeepSeek API Key", result["privacy"]["message"])
+        self.assertEqual(result["title"], "兼容模型标题")
+        self.assertEqual(result["blockCount"], 2)
+
     def test_asset_import_replace_and_delete_with_usage_protection(self) -> None:
         _, chapter_result = self.create_blank_project_with_chapter()
 

@@ -182,15 +182,25 @@ const CREATIVE_ASSISTANT_MODES = creativeAssistantTools?.CREATIVE_ASSISTANT_MODE
 
 const CREATIVE_ASSISTANT_PROVIDERS = creativeAssistantTools?.CREATIVE_ASSISTANT_PROVIDERS ?? {
   local: "本地模板",
-  openai: "OpenAI 真模型",
+  openai: "OpenAI",
+  deepseek: "DeepSeek",
+  qwen: "通义千问",
+  kimi: "Kimi",
+  zhipu: "智谱 GLM",
+  custom: "自定义兼容接口",
 };
+const CREATIVE_ASSISTANT_PROVIDER_CONFIGS = creativeAssistantTools?.CREATIVE_ASSISTANT_PROVIDER_CONFIGS ?? {};
 
 const CREATIVE_ASSISTANT_PROVIDER_STORAGE_KEY =
   creativeAssistantTools?.CREATIVE_ASSISTANT_PROVIDER_STORAGE_KEY ?? "canvasia-engine:creative-assistant-provider";
+const CREATIVE_ASSISTANT_API_KEY_STORAGE_KEY =
+  creativeAssistantTools?.CREATIVE_ASSISTANT_API_KEY_STORAGE_KEY ?? "canvasia-engine:creative-assistant-api-key";
 const CREATIVE_ASSISTANT_OPENAI_KEY_STORAGE_KEY =
   creativeAssistantTools?.CREATIVE_ASSISTANT_OPENAI_KEY_STORAGE_KEY ?? "canvasia-engine:creative-assistant-openai-key";
 const CREATIVE_ASSISTANT_OPENAI_MODEL_STORAGE_KEY =
   creativeAssistantTools?.CREATIVE_ASSISTANT_OPENAI_MODEL_STORAGE_KEY ?? "canvasia-engine:creative-assistant-openai-model";
+const CREATIVE_ASSISTANT_BASE_URL_STORAGE_KEY =
+  creativeAssistantTools?.CREATIVE_ASSISTANT_BASE_URL_STORAGE_KEY ?? "canvasia-engine:creative-assistant-base-url";
 const CREATIVE_ASSISTANT_REMEMBER_KEY_STORAGE_KEY =
   creativeAssistantTools?.CREATIVE_ASSISTANT_REMEMBER_KEY_STORAGE_KEY ?? "canvasia-engine:creative-assistant-remember-key";
 const CREATIVE_ASSISTANT_HISTORY_STORAGE_KEY =
@@ -2154,6 +2164,7 @@ const state = {
   creativeAssistantOpenAiKey: initialCreativeAssistantSettings.openAiKey,
   creativeAssistantRememberKey: initialCreativeAssistantSettings.rememberKey,
   creativeAssistantModel: initialCreativeAssistantSettings.model,
+  creativeAssistantBaseUrl: initialCreativeAssistantSettings.baseUrl,
   creativeAssistantSelectedBlockIndexes: null,
   creativeAssistantHistory: loadStoredCreativeAssistantHistory(),
   creativeAssistantHistoryRecovery: loadStoredCreativeAssistantHistoryRecovery(),
@@ -5301,7 +5312,16 @@ async function handleClick(event) {
   }
 
   if (action === "set-creative-assistant-provider") {
+    const previousProvider = getSafeCreativeAssistantProvider(state.creativeAssistantProvider);
+    const previousDefaultModel = getCreativeAssistantProviderConfig(previousProvider).defaultModel;
     state.creativeAssistantProvider = getSafeCreativeAssistantProvider(actionTarget.dataset.creativeProvider);
+    const nextDefaultModel = getCreativeAssistantProviderConfig(state.creativeAssistantProvider).defaultModel;
+    if (!state.creativeAssistantModel || state.creativeAssistantModel === previousDefaultModel) {
+      state.creativeAssistantModel = nextDefaultModel || CREATIVE_ASSISTANT_DEFAULT_OPENAI_MODEL;
+    }
+    if (state.creativeAssistantProvider !== "custom") {
+      state.creativeAssistantBaseUrl = "";
+    }
     state.creativeAssistantResult = null;
     state.creativeAssistantSelectedBlockIndexes = null;
     state.creativeAssistantError = "";
@@ -6284,7 +6304,16 @@ function handleInput(event) {
   }
 
   if (event.target.id === "creativeAssistantModel") {
-    state.creativeAssistantModel = getSafeCreativeAssistantModel(event.target.value);
+    state.creativeAssistantModel = getSafeCreativeAssistantModel(event.target.value, state.creativeAssistantProvider);
+    state.creativeAssistantResult = null;
+    state.creativeAssistantSelectedBlockIndexes = null;
+    state.creativeAssistantError = "";
+    persistCreativeAssistantSettings();
+    return;
+  }
+
+  if (event.target.id === "creativeAssistantBaseUrl") {
+    state.creativeAssistantBaseUrl = getSafeCreativeAssistantBaseUrl(event.target.value);
     state.creativeAssistantResult = null;
     state.creativeAssistantSelectedBlockIndexes = null;
     state.creativeAssistantError = "";
@@ -34229,9 +34258,27 @@ function getSafeCreativeAssistantProvider(provider) {
   );
 }
 
-function getSafeCreativeAssistantModel(model) {
-  return creativeAssistantTools?.getSafeCreativeAssistantModel?.(model) ?? (
-    String(model ?? "").trim() || CREATIVE_ASSISTANT_DEFAULT_OPENAI_MODEL
+function getCreativeAssistantProviderConfig(provider) {
+  return creativeAssistantTools?.getCreativeAssistantProviderConfig?.(provider) ?? (
+    CREATIVE_ASSISTANT_PROVIDER_CONFIGS[getSafeCreativeAssistantProvider(provider)] ?? {
+      label: CREATIVE_ASSISTANT_PROVIDERS[getSafeCreativeAssistantProvider(provider)] ?? "兼容模型",
+      defaultModel: CREATIVE_ASSISTANT_DEFAULT_OPENAI_MODEL,
+      keyPlaceholder: "API Key",
+      modelPlaceholder: CREATIVE_ASSISTANT_DEFAULT_OPENAI_MODEL,
+      endpointNote: "使用兼容接口调用真模型。",
+    }
+  );
+}
+
+function getSafeCreativeAssistantModel(model, provider = "openai") {
+  return creativeAssistantTools?.getSafeCreativeAssistantModel?.(model, provider) ?? (
+    String(model ?? "").trim() || getCreativeAssistantProviderConfig(provider).defaultModel || CREATIVE_ASSISTANT_DEFAULT_OPENAI_MODEL
+  );
+}
+
+function getSafeCreativeAssistantBaseUrl(value) {
+  return creativeAssistantTools?.getSafeCreativeAssistantBaseUrl?.(value) ?? (
+    String(value ?? "").trim().slice(0, 240)
   );
 }
 
@@ -34239,8 +34286,10 @@ function getDefaultCreativeAssistantSettings() {
   return creativeAssistantTools?.getDefaultCreativeAssistantSettings?.() ?? {
     provider: "local",
     rememberKey: false,
+    apiKey: "",
     openAiKey: "",
     model: CREATIVE_ASSISTANT_DEFAULT_OPENAI_MODEL,
+    baseUrl: "",
   };
 }
 
@@ -34253,11 +34302,18 @@ function loadStoredCreativeAssistantSettings() {
     return getDefaultCreativeAssistantSettings();
   }
   try {
+    const provider = getSafeCreativeAssistantProvider(localStorage.getItem(CREATIVE_ASSISTANT_PROVIDER_STORAGE_KEY));
+    const apiKey =
+      localStorage.getItem(CREATIVE_ASSISTANT_API_KEY_STORAGE_KEY) ??
+      localStorage.getItem(CREATIVE_ASSISTANT_OPENAI_KEY_STORAGE_KEY) ??
+      "";
     return {
-      provider: getSafeCreativeAssistantProvider(localStorage.getItem(CREATIVE_ASSISTANT_PROVIDER_STORAGE_KEY)),
+      provider,
       rememberKey: localStorage.getItem(CREATIVE_ASSISTANT_REMEMBER_KEY_STORAGE_KEY) === "true",
-      openAiKey: localStorage.getItem(CREATIVE_ASSISTANT_OPENAI_KEY_STORAGE_KEY) ?? "",
-      model: getSafeCreativeAssistantModel(localStorage.getItem(CREATIVE_ASSISTANT_OPENAI_MODEL_STORAGE_KEY)),
+      apiKey,
+      openAiKey: apiKey,
+      model: getSafeCreativeAssistantModel(localStorage.getItem(CREATIVE_ASSISTANT_OPENAI_MODEL_STORAGE_KEY), provider),
+      baseUrl: getSafeCreativeAssistantBaseUrl(localStorage.getItem(CREATIVE_ASSISTANT_BASE_URL_STORAGE_KEY)),
     };
   } catch (error) {
     return getDefaultCreativeAssistantSettings();
@@ -34271,7 +34327,9 @@ function persistCreativeAssistantSettings() {
         provider: state.creativeAssistantProvider,
         model: state.creativeAssistantModel,
         rememberKey: state.creativeAssistantRememberKey,
+        apiKey: state.creativeAssistantOpenAiKey,
         openAiKey: state.creativeAssistantOpenAiKey,
+        baseUrl: state.creativeAssistantBaseUrl,
       });
       return;
     }
@@ -34279,12 +34337,16 @@ function persistCreativeAssistantSettings() {
     return;
   }
   try {
-    localStorage.setItem(CREATIVE_ASSISTANT_PROVIDER_STORAGE_KEY, getSafeCreativeAssistantProvider(state.creativeAssistantProvider));
-    localStorage.setItem(CREATIVE_ASSISTANT_OPENAI_MODEL_STORAGE_KEY, getSafeCreativeAssistantModel(state.creativeAssistantModel));
+    const provider = getSafeCreativeAssistantProvider(state.creativeAssistantProvider);
+    localStorage.setItem(CREATIVE_ASSISTANT_PROVIDER_STORAGE_KEY, provider);
+    localStorage.setItem(CREATIVE_ASSISTANT_OPENAI_MODEL_STORAGE_KEY, getSafeCreativeAssistantModel(state.creativeAssistantModel, provider));
+    localStorage.setItem(CREATIVE_ASSISTANT_BASE_URL_STORAGE_KEY, getSafeCreativeAssistantBaseUrl(state.creativeAssistantBaseUrl));
     localStorage.setItem(CREATIVE_ASSISTANT_REMEMBER_KEY_STORAGE_KEY, state.creativeAssistantRememberKey ? "true" : "false");
     if (state.creativeAssistantRememberKey && state.creativeAssistantOpenAiKey) {
-      localStorage.setItem(CREATIVE_ASSISTANT_OPENAI_KEY_STORAGE_KEY, state.creativeAssistantOpenAiKey);
+      localStorage.setItem(CREATIVE_ASSISTANT_API_KEY_STORAGE_KEY, state.creativeAssistantOpenAiKey);
+      localStorage.removeItem(CREATIVE_ASSISTANT_OPENAI_KEY_STORAGE_KEY);
     } else {
+      localStorage.removeItem(CREATIVE_ASSISTANT_API_KEY_STORAGE_KEY);
       localStorage.removeItem(CREATIVE_ASSISTANT_OPENAI_KEY_STORAGE_KEY);
     }
   } catch (error) {
@@ -35454,7 +35516,10 @@ function renderCreativeAssistantResult() {
   const assetPrompts = Array.isArray(result.assetPrompts) ? result.assetPrompts : [];
   const blockCount = Number(result.blockCount ?? result.blocks?.length ?? 0);
   const provider = result.provider ?? {};
-  const providerLabel = provider.label ?? (provider.mode === "openai" ? "OpenAI 真模型" : "本地模板");
+  const providerLabel =
+    provider.label ??
+    CREATIVE_ASSISTANT_PROVIDERS[getSafeCreativeAssistantProvider(provider.mode)] ??
+    "兼容模型";
   const providerMeta = provider.model ? `${providerLabel} · ${provider.model}` : providerLabel;
   return `
     <div class="creative-assistant-result">
@@ -35503,7 +35568,8 @@ function renderCreativeAssistantPanel(scene, selectedBlock) {
   const selectedAssistantBlockCount = getSelectedCreativeAssistantBlocks().length;
   const canInsert = Boolean(state.creativeAssistantResult?.insertable && selectedAssistantBlockCount > 0 && !state.creativeAssistantLoading);
   const provider = getSafeCreativeAssistantProvider(state.creativeAssistantProvider);
-  const isOpenAiProvider = provider === "openai";
+  const providerConfig = getCreativeAssistantProviderConfig(provider);
+  const isModelProvider = provider !== "local";
   return `
     <div class="creative-assistant-shell">
       <div class="creative-assistant-copy">
@@ -35512,7 +35578,7 @@ function renderCreativeAssistantPanel(scene, selectedBlock) {
           <strong>智能创作助手</strong>
           <span class="badge badge-soft">${escapeHtml(scene?.name ?? "当前场景")}</span>
         </div>
-        <p>本地模板适合零配置试玩；自带 OpenAI API Key 时可切到真模型生成，产出更自由的剧情、建议和素材提示。</p>
+        <p>本地模板适合零配置试玩；也可以使用 OpenAI、DeepSeek、通义千问、Kimi、智谱或自定义兼容 API Key 生成更自由的剧情、建议和素材提示。</p>
         <div class="creative-current-context">
           当前插入点：${escapeHtml(selectedBlock ? getBlockSummary(selectedBlock, scene).title : "场景末尾")}
         </div>
@@ -35523,16 +35589,16 @@ function renderCreativeAssistantPanel(scene, selectedBlock) {
           <div class="creative-mode-row">${renderCreativeAssistantProviderButtons()}</div>
         </div>
         ${
-          isOpenAiProvider
+          isModelProvider
             ? `
               <div class="creative-openai-config">
                 <label>
-                  <span>OpenAI API Key</span>
+                  <span>${escapeHtml(providerConfig.label ?? CREATIVE_ASSISTANT_PROVIDERS[provider] ?? "兼容模型")} API Key</span>
                   <input
                     id="creativeAssistantOpenAiKey"
                     type="password"
                     autocomplete="off"
-                    placeholder="sk-..."
+                    placeholder="${escapeHtml(providerConfig.keyPlaceholder ?? "API Key")}"
                     value="${escapeHtml(state.creativeAssistantOpenAiKey)}"
                   />
                 </label>
@@ -35542,9 +35608,27 @@ function renderCreativeAssistantPanel(scene, selectedBlock) {
                     id="creativeAssistantModel"
                     type="text"
                     spellcheck="false"
-                    value="${escapeHtml(getSafeCreativeAssistantModel(state.creativeAssistantModel))}"
+                    placeholder="${escapeHtml(providerConfig.modelPlaceholder ?? providerConfig.defaultModel ?? "")}"
+                    value="${escapeHtml(getSafeCreativeAssistantModel(state.creativeAssistantModel, provider))}"
                   />
                 </label>
+                ${
+                  provider === "custom"
+                    ? `
+                      <label>
+                        <span>Base URL</span>
+                        <input
+                          id="creativeAssistantBaseUrl"
+                          type="url"
+                          spellcheck="false"
+                          placeholder="https://example.com/v1 或 http://127.0.0.1:11434/v1"
+                          value="${escapeHtml(state.creativeAssistantBaseUrl ?? "")}"
+                        />
+                      </label>
+                    `
+                    : ""
+                }
+                <p class="helper-text">${escapeHtml(providerConfig.endpointNote ?? "Key 只用于本次生成，不会写入项目文件。")}</p>
                 <label class="creative-remember-key">
                   <input
                     id="creativeAssistantRememberKey"
@@ -35582,7 +35666,7 @@ function renderCreativeAssistantPanel(scene, selectedBlock) {
             data-action="generate-creative-assistant"
             ${state.creativeAssistantLoading ? "disabled" : ""}
           >
-            ${state.creativeAssistantLoading ? "生成中..." : isOpenAiProvider ? "用真模型生成" : "生成建议"}
+            ${state.creativeAssistantLoading ? "生成中..." : isModelProvider ? "用 API 生成" : "生成建议"}
           </button>
           <button
             type="button"
@@ -35684,6 +35768,8 @@ async function generateCreativeAssistant() {
     document.getElementById("creativeAssistantOpenAiKey")?.value?.trim() ?? state.creativeAssistantOpenAiKey;
   state.creativeAssistantModel =
     document.getElementById("creativeAssistantModel")?.value?.trim() || state.creativeAssistantModel;
+  state.creativeAssistantBaseUrl =
+    document.getElementById("creativeAssistantBaseUrl")?.value?.trim() ?? state.creativeAssistantBaseUrl;
   persistCreativeAssistantSettings();
   state.creativeAssistantLoading = true;
   state.creativeAssistantError = "";
@@ -35694,7 +35780,8 @@ async function generateCreativeAssistant() {
     const result = await postJson(API_CREATIVE_ASSISTANT, {
       provider: getSafeCreativeAssistantProvider(state.creativeAssistantProvider),
       apiKey: state.creativeAssistantOpenAiKey,
-      model: getSafeCreativeAssistantModel(state.creativeAssistantModel),
+      model: getSafeCreativeAssistantModel(state.creativeAssistantModel, state.creativeAssistantProvider),
+      baseUrl: getSafeCreativeAssistantBaseUrl(state.creativeAssistantBaseUrl),
       mode: getSafeCreativeAssistantMode(state.creativeAssistantMode),
       prompt: state.creativeAssistantPrompt,
       sceneId: scene.id,
