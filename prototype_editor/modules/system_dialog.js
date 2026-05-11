@@ -119,11 +119,11 @@
     }
 
     function installAlertBridge() {
-      if (!rootWindow || rootWindow.__tonyNaEngineDialogBridgeInstalled) {
+      if (!rootWindow || rootWindow.__canvasiaEngineDialogBridgeInstalled) {
         return;
       }
 
-      rootWindow.__tonyNaEngineDialogBridgeInstalled = true;
+      rootWindow.__canvasiaEngineDialogBridgeInstalled = true;
       rootWindow.alert = (message) => {
         void showAlert(inferSystemAlertOptions(message));
       };
