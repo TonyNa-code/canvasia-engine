@@ -24,7 +24,7 @@ from pathlib import Path
 ASSET_TYPE_IMAGE = {"background", "sprite", "cg", "ui"}
 ASSET_TYPE_FONT = {"font"}
 DEFAULT_GAME_DATA_NAME = "game_data.json"
-ENGINE_BRAND_LOGO_RELATIVE_PATH = "assets/brand-logo.png"
+ENGINE_BRAND_LOGO_RELATIVE_PATH = "assets/canvasia-brand-logo.png"
 NATIVE_VIDEO_OPTIONAL_REQUIREMENTS_NAME = "requirements-native-runtime-video.txt"
 NATIVE_VIDEO_OPTIONAL_REQUIREMENTS_CANDIDATES = (NATIVE_VIDEO_OPTIONAL_REQUIREMENTS_NAME, "requirements-video.txt")
 NATIVE_VIDEO_SYNC_BACKEND_ID = "pyav_audio_video_sync"
@@ -8130,7 +8130,7 @@ class NativeRuntimePlayer:
         candidates = [
             self.bundle_dir / ENGINE_BRAND_LOGO_RELATIVE_PATH,
             Path(__file__).resolve().parent / ENGINE_BRAND_LOGO_RELATIVE_PATH,
-            Path(__file__).resolve().parent.parent / "prototype_editor" / "assets" / "brand-logo.png",
+            Path(__file__).resolve().parent.parent / "prototype_editor" / "assets" / "canvasia-brand-logo.png",
         ]
         for candidate in candidates:
             if candidate.is_file():

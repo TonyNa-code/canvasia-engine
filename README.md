@@ -77,7 +77,7 @@ Canvasia Engine 当前更适合这样理解：
 
 | 剧情编辑与智能助手 | 试玩与导出 |
 | --- | --- |
-| ![Canvasia Engine story editor with assistant](docs/github/screenshot-story-assistant.png) | ![Canvasia Engine preview and export screen](docs/github/screenshot-preview-export.png) |
+| ![Canvasia Engine story editor with assistant](docs/github/canvasia-screenshot-story-assistant.png) | ![Canvasia Engine preview and export screen](docs/github/canvasia-screenshot-preview-export.png) |
 | 剧情页支持可视化卡片、场景结构、Canvasia Assistant、灵感盒和勾选式插入。 | 试玩页集中处理预览、设置、发布前问题提示和多平台导出入口。 |
 
 ## 仓库结构
