@@ -185,6 +185,20 @@ class FrontendProjectSettingsModuleTests(unittest.TestCase):
             const result = {{
               keys: Object.keys(tools).sort(),
               resolution: tools.getProjectResolution(project),
+              resolutionLabels: [
+                tools.getResolutionLabel(1280, 720),
+                tools.getResolutionLabel(1024, 768),
+              ],
+              screenLabels: [
+                tools.getScreenLabel("story"),
+                tools.getScreenLabel("custom_screen"),
+                tools.getScreenLabel(null),
+              ],
+              stageStyles: [
+                tools.getStageContainerStyle(project),
+                tools.getStageContainerStyle(project, {{ large: true }}),
+              ],
+              resolutionButtons: tools.renderResolutionButtons({{ resolution: {{ width: 1920, height: 1080 }} }}),
               slots: [
                 tools.getSafeProjectFormalSaveSlotCount(0, options),
                 tools.getSafeProjectFormalSaveSlotCount(2, options),
@@ -214,6 +228,29 @@ class FrontendProjectSettingsModuleTests(unittest.TestCase):
                 tools.getDialogShapeRadius("rounded", 99, options),
               ],
               frameFallback: tools.getSafeGameUiFrameSlice(null, {{ top: 8, right: 10, bottom: 12, left: 14 }}, options),
+              exportedDialogLabels: tools.PROJECT_DIALOG_BOX_PRESET_LABELS,
+              defaultDialogPreset: tools.getProjectDialogBoxPresetConfig("paper"),
+              defaultDialogConfig: tools.getProjectDialogBoxConfig({{
+                dialogBoxConfig: {{
+                  preset: "transparent",
+                  shape: "broken",
+                  widthPercent: 10,
+                  backgroundColor: "not-a-color",
+                  anchor: "free",
+                  offsetXPercent: 99,
+                }},
+              }}),
+              exportedGameUiLabels: tools.PROJECT_GAME_UI_PRESET_LABELS,
+              defaultGameUiPreset: tools.getProjectGameUiPresetConfig("warm"),
+              defaultGameUiConfig: tools.getProjectGameUiConfig({{
+                gameUiConfig: {{
+                  preset: "paper",
+                  layoutPreset: "broken",
+                  hudPosition: "bottom-left",
+                  sidePanelWidth: 999,
+                  panelFrameSlice: {{ top: -9, right: 12, bottom: 14, left: 16 }},
+                }},
+              }}),
             }};
             process.stdout.write(JSON.stringify(result));
             """
@@ -230,6 +267,12 @@ class FrontendProjectSettingsModuleTests(unittest.TestCase):
         payload = json.loads(completed.stdout)
         self.assertIn("getProjectGameUiConfig", payload["keys"])
         self.assertEqual(payload["resolution"], {"width": 1920, "height": 720})
+        self.assertEqual(payload["resolutionLabels"], ["HD 1280 × 720", "1024 × 768"])
+        self.assertEqual(payload["screenLabels"], ["写剧情", "custom_screen", "页面"])
+        self.assertEqual(payload["stageStyles"], ["--stage-ratio: 1920 / 720;", "--stage-ratio: 1920 / 720; max-width: 100%;"])
+        self.assertIn('data-action="set-resolution"', payload["resolutionButtons"])
+        self.assertIn('data-width="1920"', payload["resolutionButtons"])
+        self.assertIn("toolbar-button-primary", payload["resolutionButtons"])
         self.assertEqual(payload["slots"], [3, 3, 120, 120])
         self.assertEqual(payload["safeDialogValues"], ["moonlight", "square", "free"])
         self.assertEqual(payload["dialogConfig"]["preset"], "warm")
@@ -272,6 +315,25 @@ class FrontendProjectSettingsModuleTests(unittest.TestCase):
         self.assertEqual(payload["rgba"], ["rgba(171, 205, 239, 0.25)", "rgba(255, 255, 255, 1.00)"])
         self.assertEqual(payload["radii"], [6, 999, 42])
         self.assertEqual(payload["frameFallback"], {"top": 8, "right": 10, "bottom": 12, "left": 14})
+        self.assertEqual(payload["exportedDialogLabels"]["moonlight"], "夜色玻璃")
+        self.assertEqual(payload["exportedDialogLabels"]["custom"], "自定义样式")
+        self.assertEqual(payload["defaultDialogPreset"]["preset"], "paper")
+        self.assertEqual(payload["defaultDialogPreset"]["shape"], "square")
+        self.assertEqual(payload["defaultDialogConfig"]["preset"], "transparent")
+        self.assertEqual(payload["defaultDialogConfig"]["shape"], "rounded")
+        self.assertEqual(payload["defaultDialogConfig"]["widthPercent"], 55)
+        self.assertEqual(payload["defaultDialogConfig"]["backgroundColor"], "#08111b")
+        self.assertEqual(payload["defaultDialogConfig"]["anchor"], "free")
+        self.assertEqual(payload["defaultDialogConfig"]["offsetXPercent"], 35)
+        self.assertEqual(payload["exportedGameUiLabels"]["stellar"], "神秘科技")
+        self.assertEqual(payload["exportedGameUiLabels"]["custom"], "自定义皮肤")
+        self.assertEqual(payload["defaultGameUiPreset"]["preset"], "warm")
+        self.assertEqual(payload["defaultGameUiPreset"]["fontStyle"], "rounded")
+        self.assertEqual(payload["defaultGameUiConfig"]["preset"], "paper")
+        self.assertEqual(payload["defaultGameUiConfig"]["layoutPreset"], "balanced")
+        self.assertEqual(payload["defaultGameUiConfig"]["hudPosition"], "bottom-left")
+        self.assertEqual(payload["defaultGameUiConfig"]["sidePanelWidth"], 460)
+        self.assertEqual(payload["defaultGameUiConfig"]["panelFrameSlice"], {"top": 0, "right": 12, "bottom": 14, "left": 16})
 
 
 if __name__ == "__main__":

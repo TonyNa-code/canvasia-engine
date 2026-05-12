@@ -28,6 +28,11 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlparse
 from urllib.request import Request, urlopen
 
+from openai_asset_generation import (
+    call_openai_asset_generation_model,
+    normalize_openai_asset_generation_type,
+)
+
 
 ROOT_DIR = Path(__file__).resolve().parent
 PROJECTS_DIR = ROOT_DIR / "projects"
@@ -156,6 +161,20 @@ ASSET_ID_PREFIXES = {
     "live2d": "live2d",
     "model3d": "model3d",
     "scene3d": "scene3d",
+}
+ASSET_TYPE_LABELS = {
+    "background": "背景",
+    "sprite": "立绘",
+    "cg": "CG",
+    "bgm": "音乐",
+    "sfx": "音效",
+    "voice": "语音",
+    "video": "视频",
+    "ui": "界面素材",
+    "font": "字体",
+    "live2d": "Live2D",
+    "model3d": "3D 模型",
+    "scene3d": "3D 场景",
 }
 BLOCK_LABELS = {
     "background": "切换背景",
@@ -296,6 +315,8 @@ NATIVE_RUNTIME_RELEASE_CHECK_NAME = "native-runtime-release-check.json"
 NATIVE_RUNTIME_RC_REPORT_NAME = "native-runtime-release-candidate-report.json"
 NATIVE_RUNTIME_RELEASE_CONTROL_REPORT_NAME = "native-runtime-release-control-report.md"
 NATIVE_RUNTIME_RELEASE_CONTROL_JSON_NAME = "native-runtime-release-control-report.json"
+NATIVE_RUNTIME_ACCEPTANCE_REPORT_NAME = "native-runtime-release-acceptance.md"
+NATIVE_RUNTIME_ACCEPTANCE_JSON_NAME = "native-runtime-release-acceptance.json"
 NATIVE_RUNTIME_FILE_INTEGRITY_REPORT_NAME = "native-runtime-file-integrity.json"
 NATIVE_RUNTIME_FILE_INTEGRITY_MARKDOWN_NAME = "native-runtime-file-integrity.md"
 NATIVE_RUNTIME_3D_ASSET_REPORT_NAME = "native-runtime-3d-asset-report.json"
@@ -310,6 +331,9 @@ NATIVE_RUNTIME_WINDOWS_RC_COMMAND_NAME = "check_native_runtime_release_candidate
 NATIVE_RUNTIME_MAC_RELEASE_CONTROL_COMMAND_NAME = "生成原生Runtime发布总控报告.command"
 NATIVE_RUNTIME_LINUX_RELEASE_CONTROL_COMMAND_NAME = "generate_native_runtime_release_control.sh"
 NATIVE_RUNTIME_WINDOWS_RELEASE_CONTROL_COMMAND_NAME = "generate_native_runtime_release_control.bat"
+NATIVE_RUNTIME_MAC_ACCEPTANCE_COMMAND_NAME = "生成原生Runtime发布验收清单.command"
+NATIVE_RUNTIME_LINUX_ACCEPTANCE_COMMAND_NAME = "generate_native_runtime_acceptance_checklist.sh"
+NATIVE_RUNTIME_WINDOWS_ACCEPTANCE_COMMAND_NAME = "generate_native_runtime_acceptance_checklist.bat"
 NATIVE_RUNTIME_MAC_FILE_INTEGRITY_COMMAND_NAME = "校验原生Runtime文件完整性.command"
 NATIVE_RUNTIME_LINUX_FILE_INTEGRITY_COMMAND_NAME = "verify_native_runtime_file_integrity.sh"
 NATIVE_RUNTIME_WINDOWS_FILE_INTEGRITY_COMMAND_NAME = "verify_native_runtime_file_integrity.bat"
@@ -3805,6 +3829,73 @@ def import_assets(asset_type: str, files: list[dict], fallback_asset_type: str |
         "importedCount": len(imported_assets),
         "assets": imported_assets,
         "groupedCounts": grouped_counts,
+    }
+
+
+def generate_openai_asset(payload: dict) -> dict:
+    asset_type = normalize_openai_asset_generation_type(payload.get("assetType"))
+    image_bytes, generation_meta = call_openai_asset_generation_model(payload, asset_type)
+    output_format = generation_meta["outputFormat"]
+    extension = ".jpg" if output_format == "jpeg" else f".{output_format}"
+    asset_name = (
+        str(payload.get("assetName") or "").strip()[:80]
+        or f"AI 生成{ASSET_TYPE_LABELS.get(asset_type, '素材')}"
+    )
+
+    assets_path = DATA_DIR / "assets.json"
+    assets_doc = read_json(assets_path)
+    assets = assets_doc.setdefault("assets", [])
+    existing_ids = {asset.get("id") for asset in assets if asset.get("id")}
+    target_relative_dir = ASSET_DIRECTORIES[asset_type]
+    target_dir = TEMPLATE_DIR / target_relative_dir
+    target_dir.mkdir(parents=True, exist_ok=True)
+    existing_names = {path.name for path in target_dir.glob("*") if path.is_file()}
+    output_name = build_asset_file_name(f"{asset_name}{extension}", existing_names)
+    output_path = target_dir / output_name
+    output_path.write_bytes(image_bytes)
+
+    tags = normalize_asset_tags(
+        [
+            "AI生成",
+            "OpenAI",
+            ASSET_TYPE_LABELS.get(asset_type, asset_type),
+            generation_meta["model"],
+        ]
+    )
+    asset_record = {
+        "id": build_asset_id(asset_type, output_name, existing_ids),
+        "type": asset_type,
+        "name": asset_name,
+        "path": (target_relative_dir / output_name).as_posix(),
+        "tags": tags,
+        "favorite": False,
+        "source": {
+            "kind": "openai_image_generation",
+            "model": generation_meta["model"],
+            "size": generation_meta["size"],
+            "quality": generation_meta["quality"],
+            "background": generation_meta["background"],
+            "outputFormat": generation_meta["outputFormat"],
+            "promptPreview": generation_meta["prompt"][:220],
+        },
+    }
+    assets.append(asset_record)
+    write_json(assets_path, assets_doc)
+    touch_project()
+
+    return {
+        "assetType": asset_type,
+        "asset": enrich_asset_record(asset_record),
+        "model": generation_meta["model"],
+        "size": generation_meta["size"],
+        "quality": generation_meta["quality"],
+        "background": generation_meta["background"],
+        "outputFormat": generation_meta["outputFormat"],
+        "privacy": {
+            "sentToExternalService": True,
+            "apiKeyStored": False,
+            "message": "API Key 只随本次请求发送给 OpenAI，没有写入项目文件或素材元数据。",
+        },
     }
 
 
@@ -7548,6 +7639,9 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
     mac_release_control_path = build_dir / NATIVE_RUNTIME_MAC_RELEASE_CONTROL_COMMAND_NAME
     linux_release_control_path = build_dir / NATIVE_RUNTIME_LINUX_RELEASE_CONTROL_COMMAND_NAME
     windows_release_control_path = build_dir / NATIVE_RUNTIME_WINDOWS_RELEASE_CONTROL_COMMAND_NAME
+    mac_acceptance_path = build_dir / NATIVE_RUNTIME_MAC_ACCEPTANCE_COMMAND_NAME
+    linux_acceptance_path = build_dir / NATIVE_RUNTIME_LINUX_ACCEPTANCE_COMMAND_NAME
+    windows_acceptance_path = build_dir / NATIVE_RUNTIME_WINDOWS_ACCEPTANCE_COMMAND_NAME
     mac_file_integrity_path = build_dir / NATIVE_RUNTIME_MAC_FILE_INTEGRITY_COMMAND_NAME
     linux_file_integrity_path = build_dir / NATIVE_RUNTIME_LINUX_FILE_INTEGRITY_COMMAND_NAME
     windows_file_integrity_path = build_dir / NATIVE_RUNTIME_WINDOWS_FILE_INTEGRITY_COMMAND_NAME
@@ -7728,6 +7822,63 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
         ),
         encoding="utf-8",
     )
+    mac_acceptance_path.write_text(
+        "\n".join(
+            [
+                "#!/bin/bash",
+                "set -e",
+                'SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"',
+                'cd "$SCRIPT_DIR"',
+                'python3 runtime_player.py --write-acceptance-reports . || {',
+                '  echo ""',
+                '  echo "发布验收清单没有生成成功。请先运行发布总控报告和文件完整性校验。"',
+                '  echo "可手动执行：python3 runtime_player.py --write-acceptance-reports ."',
+                '  echo ""',
+                '  read -r -p "按回车关闭..." _',
+                '  exit 1',
+                '}',
+                'echo ""',
+                'echo "发布验收清单已生成：native-runtime-release-acceptance.md / .json"',
+                'read -r -p "按回车关闭..." _',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    linux_acceptance_path.write_text(
+        "\n".join(
+            [
+                "#!/bin/bash",
+                "set -e",
+                'SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"',
+                'cd "$SCRIPT_DIR"',
+                'python3 runtime_player.py --write-acceptance-reports .',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    windows_acceptance_path.write_text(
+        "\r\n".join(
+            [
+                "@echo off",
+                "cd /d %~dp0",
+                "python runtime_player.py --write-acceptance-reports .",
+                "if errorlevel 1 (",
+                "  echo.",
+                "  echo 发布验收清单没有生成成功，请先运行发布总控报告和文件完整性校验。",
+                "  echo 可手动执行：python runtime_player.py --write-acceptance-reports .",
+                "  pause",
+                "  exit /b 1",
+                ")",
+                "echo.",
+                "echo 发布验收清单已生成：native-runtime-release-acceptance.md / .json",
+                "pause",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
     mac_file_integrity_path.write_text(
         "\n".join(
             [
@@ -7851,6 +8002,8 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
     linux_rc_path.chmod(0o755)
     mac_release_control_path.chmod(0o755)
     linux_release_control_path.chmod(0o755)
+    mac_acceptance_path.chmod(0o755)
+    linux_acceptance_path.chmod(0o755)
     mac_file_integrity_path.chmod(0o755)
     linux_file_integrity_path.chmod(0o755)
     mac_app_builder_path.chmod(0o755)
@@ -8073,6 +8226,12 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
         "linuxReleaseControlReporterPath": str(linux_release_control_path),
         "windowsReleaseControlReporterName": windows_release_control_path.name,
         "windowsReleaseControlReporterPath": str(windows_release_control_path),
+        "macAcceptanceReporterName": mac_acceptance_path.name,
+        "macAcceptanceReporterPath": str(mac_acceptance_path),
+        "linuxAcceptanceReporterName": linux_acceptance_path.name,
+        "linuxAcceptanceReporterPath": str(linux_acceptance_path),
+        "windowsAcceptanceReporterName": windows_acceptance_path.name,
+        "windowsAcceptanceReporterPath": str(windows_acceptance_path),
         "macFileIntegrityCheckerName": mac_file_integrity_path.name,
         "macFileIntegrityCheckerPath": str(mac_file_integrity_path),
         "linuxFileIntegrityCheckerName": linux_file_integrity_path.name,
@@ -8148,6 +8307,69 @@ def write_native_runtime_file_integrity_reports(build_dir: Path) -> dict:
         "fileIntegrityReportPath": str(report_path),
         "fileIntegrityMarkdownName": markdown_path.name,
         "fileIntegrityMarkdownPath": str(markdown_path),
+    }
+
+
+def write_native_runtime_acceptance_reports(build_dir: Path) -> dict:
+    report_path = build_dir / NATIVE_RUNTIME_ACCEPTANCE_REPORT_NAME
+    json_path = build_dir / NATIVE_RUNTIME_ACCEPTANCE_JSON_NAME
+    acceptance_report = subprocess.run(
+        [
+            sys.executable,
+            str(build_dir / NATIVE_RUNTIME_PLAYER_NAME),
+            "--write-acceptance-reports",
+            str(build_dir),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    payload: dict | None = None
+    try:
+        payload = json.loads(json_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        payload = None
+
+    if payload is None:
+        message = acceptance_report.stderr.strip() or acceptance_report.stdout.strip() or "发布验收清单生成失败。"
+        payload = {
+            "formatVersion": 1,
+            "generatedAt": now_iso(),
+            "acceptanceGate": {
+                "status": "needs_manual_review",
+                "label": "需要人工复核",
+                "summary": message,
+            },
+            "automatedChecks": [],
+            "platformMatrix": [],
+            "manualCheckGroups": [],
+            "recommendedCommands": ["python3 runtime_player.py --write-acceptance-reports ."],
+            "includedReports": {},
+        }
+        json_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        report_path.write_text(
+            "\n".join(
+                [
+                    "# 原生 Runtime 发布验收清单",
+                    "",
+                    "发布验收清单暂不可用。",
+                    "",
+                    f"- 原因：{message}",
+                    "- 可手动运行 `python3 runtime_player.py --write-acceptance-reports .` 重新生成。",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+    gate = payload.get("acceptanceGate") if isinstance(payload.get("acceptanceGate"), dict) else {}
+    return {
+        "acceptanceStatus": str(gate.get("status") or "needs_manual_review"),
+        "acceptanceSummary": str(gate.get("summary") or ""),
+        "acceptanceReportName": report_path.name,
+        "acceptanceReportPath": str(report_path),
+        "acceptanceJsonName": json_path.name,
+        "acceptanceJsonPath": str(json_path),
     }
 
 
@@ -8533,6 +8755,7 @@ def write_export_release_notes_draft(
         "2. macOS 双击 `.verify.command`，Linux 运行 `.verify.sh`，Windows 双击 `.verify.bat`。",
         "3. 解压后运行 `python3 runtime_player.py --verify-file-integrity .` 校验包内核心文件。",
         "4. 打开 `native-runtime-release-control-report.md` 查看发布总控结论。",
+        "5. 打开 `native-runtime-release-acceptance.md` 按目标系统完成最终人工验收。",
         "",
         "## 包内重点报告",
         "",
@@ -8589,6 +8812,8 @@ def export_native_runtime_build() -> dict:
             "releaseCandidateReport": runtime_files["releaseCandidateReportName"],
             "releaseControlReport": runtime_files["releaseControlReportName"],
             "releaseControlJson": runtime_files["releaseControlJsonName"],
+            "acceptanceReport": NATIVE_RUNTIME_ACCEPTANCE_REPORT_NAME,
+            "acceptanceJson": NATIVE_RUNTIME_ACCEPTANCE_JSON_NAME,
             "fileIntegrityReport": NATIVE_RUNTIME_FILE_INTEGRITY_REPORT_NAME,
             "fileIntegrityMarkdown": NATIVE_RUNTIME_FILE_INTEGRITY_MARKDOWN_NAME,
             "asset3dReport": runtime_files["asset3dReportName"],
@@ -8603,6 +8828,9 @@ def export_native_runtime_build() -> dict:
             "macReleaseControlReporter": runtime_files["macReleaseControlReporterName"],
             "linuxReleaseControlReporter": runtime_files["linuxReleaseControlReporterName"],
             "windowsReleaseControlReporter": runtime_files["windowsReleaseControlReporterName"],
+            "macAcceptanceReporter": runtime_files["macAcceptanceReporterName"],
+            "linuxAcceptanceReporter": runtime_files["linuxAcceptanceReporterName"],
+            "windowsAcceptanceReporter": runtime_files["windowsAcceptanceReporterName"],
             "macFileIntegrityChecker": runtime_files["macFileIntegrityCheckerName"],
             "linuxFileIntegrityChecker": runtime_files["linuxFileIntegrityCheckerName"],
             "windowsFileIntegrityChecker": runtime_files["windowsFileIntegrityCheckerName"],
@@ -8629,6 +8857,13 @@ def export_native_runtime_build() -> dict:
                 "linux": runtime_files["linuxReleaseControlReporterName"],
                 "windows": runtime_files["windowsReleaseControlReporterName"],
             },
+            "acceptanceReport": NATIVE_RUNTIME_ACCEPTANCE_REPORT_NAME,
+            "acceptanceJson": NATIVE_RUNTIME_ACCEPTANCE_JSON_NAME,
+            "acceptanceReporter": {
+                "macos": runtime_files["macAcceptanceReporterName"],
+                "linux": runtime_files["linuxAcceptanceReporterName"],
+                "windows": runtime_files["windowsAcceptanceReporterName"],
+            },
             "fileIntegrityReport": NATIVE_RUNTIME_FILE_INTEGRITY_REPORT_NAME,
             "fileIntegrityMarkdown": NATIVE_RUNTIME_FILE_INTEGRITY_MARKDOWN_NAME,
             "fileIntegrityChecker": {
@@ -8645,6 +8880,7 @@ def export_native_runtime_build() -> dict:
     )
     manifest_path = write_export_manifest(build_dir, manifest)
     integrity_files = write_native_runtime_file_integrity_reports(build_dir)
+    acceptance_files = write_native_runtime_acceptance_reports(build_dir)
     archive_path = Path(shutil.make_archive(str(build_dir), "zip", root_dir=build_dir))
     archive_checksum = write_export_archive_checksum_files(archive_path, "原生 Runtime 包（可打包 App）")
     archive_verifiers = write_export_archive_verifier_scripts(archive_path, archive_checksum["archiveSha256"])
@@ -8656,6 +8892,8 @@ def export_native_runtime_build() -> dict:
         {"name": runtime_files["releaseControlJsonName"], "description": "机器可读发布总控 JSON。"},
         {"name": integrity_files["fileIntegrityMarkdownName"], "description": "包内核心文件完整性 Markdown。"},
         {"name": integrity_files["fileIntegrityReportName"], "description": "包内核心文件 SHA-256 JSON。"},
+        {"name": acceptance_files["acceptanceReportName"], "description": "三系统人工验收清单 Markdown。"},
+        {"name": acceptance_files["acceptanceJsonName"], "description": "机器可读发布验收清单 JSON。"},
         {"name": runtime_files["asset3dSummaryName"], "description": "3D 资产 Markdown 摘要。"},
         {"name": runtime_files["asset3dDigestName"], "description": "3D 风险精简摘要 JSON。"},
     ]
@@ -8760,6 +8998,14 @@ def export_native_runtime_build() -> dict:
         "fileIntegrityMarkdownPublicUrl": f"/exports/{build_dir.name}/{integrity_files['fileIntegrityMarkdownName']}",
         "fileIntegrityStatus": integrity_files["fileIntegrityStatus"],
         "fileIntegritySummary": integrity_files["fileIntegritySummary"],
+        "acceptanceReportName": acceptance_files["acceptanceReportName"],
+        "acceptanceReportPath": acceptance_files["acceptanceReportPath"],
+        "acceptanceReportPublicUrl": f"/exports/{build_dir.name}/{acceptance_files['acceptanceReportName']}",
+        "acceptanceJsonName": acceptance_files["acceptanceJsonName"],
+        "acceptanceJsonPath": acceptance_files["acceptanceJsonPath"],
+        "acceptanceJsonPublicUrl": f"/exports/{build_dir.name}/{acceptance_files['acceptanceJsonName']}",
+        "acceptanceStatus": acceptance_files["acceptanceStatus"],
+        "acceptanceSummary": acceptance_files["acceptanceSummary"],
         "asset3dReportName": runtime_files["asset3dReportName"],
         "asset3dReportPath": runtime_files["asset3dReportPath"],
         "asset3dReportPublicUrl": f"/exports/{build_dir.name}/{runtime_files['asset3dReportName']}",
@@ -8799,6 +9045,15 @@ def export_native_runtime_build() -> dict:
         "windowsReleaseControlReporterName": runtime_files["windowsReleaseControlReporterName"],
         "windowsReleaseControlReporterPath": runtime_files["windowsReleaseControlReporterPath"],
         "windowsReleaseControlReporterPublicUrl": f"/exports/{build_dir.name}/{runtime_files['windowsReleaseControlReporterName']}",
+        "macAcceptanceReporterName": runtime_files["macAcceptanceReporterName"],
+        "macAcceptanceReporterPath": runtime_files["macAcceptanceReporterPath"],
+        "macAcceptanceReporterPublicUrl": f"/exports/{build_dir.name}/{runtime_files['macAcceptanceReporterName']}",
+        "linuxAcceptanceReporterName": runtime_files["linuxAcceptanceReporterName"],
+        "linuxAcceptanceReporterPath": runtime_files["linuxAcceptanceReporterPath"],
+        "linuxAcceptanceReporterPublicUrl": f"/exports/{build_dir.name}/{runtime_files['linuxAcceptanceReporterName']}",
+        "windowsAcceptanceReporterName": runtime_files["windowsAcceptanceReporterName"],
+        "windowsAcceptanceReporterPath": runtime_files["windowsAcceptanceReporterPath"],
+        "windowsAcceptanceReporterPublicUrl": f"/exports/{build_dir.name}/{runtime_files['windowsAcceptanceReporterName']}",
         "macFileIntegrityCheckerName": runtime_files["macFileIntegrityCheckerName"],
         "macFileIntegrityCheckerPath": runtime_files["macFileIntegrityCheckerPath"],
         "macFileIntegrityCheckerPublicUrl": f"/exports/{build_dir.name}/{runtime_files['macFileIntegrityCheckerName']}",
@@ -10687,6 +10942,10 @@ class EditorRequestHandler(SimpleHTTPRequestHandler):
             self.handle_import_assets()
             return
 
+        if parsed.path == "/api/generate-openai-asset":
+            self.handle_generate_openai_asset()
+            return
+
         if parsed.path == "/api/create-voice-placeholder":
             self.handle_create_voice_placeholder()
             return
@@ -11218,6 +11477,31 @@ class EditorRequestHandler(SimpleHTTPRequestHandler):
         except Exception as error:  # pragma: no cover - defensive fallback
             self.send_json(
                 {"ok": False, "error": f"导入素材时出了意外问题：{error}"},
+                status=HTTPStatus.INTERNAL_SERVER_ERROR,
+            )
+
+    def handle_generate_openai_asset(self) -> None:
+        try:
+            payload = self.read_json_body()
+            result = generate_openai_asset(payload)
+            result = attach_history_to_result(
+                result,
+                f"AI 生成素材：{result.get('asset', {}).get('name') or '未命名素材'}",
+            )
+            self.send_json(
+                {
+                    "ok": True,
+                    "savedAt": now_iso(),
+                    **result,
+                }
+            )
+        except json.JSONDecodeError:
+            self.send_json({"ok": False, "error": "请求体不是有效 JSON。"}, status=HTTPStatus.BAD_REQUEST)
+        except ValueError as error:
+            self.send_json({"ok": False, "error": str(error)}, status=HTTPStatus.BAD_REQUEST)
+        except Exception as error:  # pragma: no cover - defensive fallback
+            self.send_json(
+                {"ok": False, "error": f"AI 生成素材时出了意外问题：{error}"},
                 status=HTTPStatus.INTERNAL_SERVER_ERROR,
             )
 

@@ -17,6 +17,8 @@ class FrontendEntrypointModuleTests(unittest.TestCase):
         scripts = SCRIPT_SRC_PATTERN.findall(html)
 
         required_scripts = [
+            "./modules/story_block_catalog.js",
+            "./modules/story_templates.js",
             "./modules/editor_common.js",
             "./modules/variables.js",
             "./modules/project_settings.js",
@@ -25,10 +27,14 @@ class FrontendEntrypointModuleTests(unittest.TestCase):
             "./modules/preview_save.js",
             "./modules/recent_workspace.js",
             "./modules/editor_filters.js",
+            "./modules/script_readability.js",
             "./modules/script_voice.js",
             "./modules/visual_effects.js",
+            "./modules/particle_effects.js",
             "./modules/project_history.js",
             "./modules/asset_catalog.js",
+            "./modules/openai_asset_generator.js",
+            "./modules/beginner_tutorial.js",
             "./modules/creative_assistant.js",
             "./modules/editor_mode.js",
             "./modules/release_version.js",

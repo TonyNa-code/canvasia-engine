@@ -16,6 +16,8 @@ const API_SAVE_SCENE = "/api/save-scene";
 const API_CREATE_SCENE = "/api/create-scene";
 const API_EXPORT_BUILD = "/api/export-build";
 const API_IMPORT_ASSETS = "/api/import-assets";
+const API_GENERATE_OPENAI_ASSET =
+  window.CanvasiaEditorOpenAiAssetGenerator?.API_GENERATE_OPENAI_ASSET ?? "/api/generate-openai-asset";
 const API_CREATE_VOICE_PLACEHOLDER = "/api/create-voice-placeholder";
 const API_CREATE_VOICE_PLACEHOLDERS = "/api/create-voice-placeholders";
 const API_MATCH_VOICE_FILES = "/api/match-voice-files";
@@ -40,64 +42,89 @@ const API_BULK_UPDATE_ASSET_TAGS = "/api/bulk-update-asset-tags";
 const API_BULK_DELETE_ASSETS = "/api/bulk-delete-assets";
 const API_CREATIVE_ASSISTANT = "/api/creative-assistant";
 
-const BLOCK_LABELS = {
-  background: "切换背景",
-  dialogue: "台词",
-  narration: "旁白",
-  character_show: "显示角色",
-  character_hide: "隐藏角色",
-  music_play: "播放音乐",
-  music_stop: "停止音乐",
-  sfx_play: "播放音效",
-  video_play: "播放视频",
-  credits_roll: "片尾字幕",
-  particle_effect: "粒子特效",
-  screen_shake: "屏幕震动",
-  screen_flash: "闪屏",
-  screen_fade: "黑场淡入淡出",
-  camera_zoom: "镜头推近拉远",
-  camera_pan: "镜头平移",
-  screen_filter: "回忆滤镜",
-  depth_blur: "景深模糊",
-  jump: "跳转",
-  variable_set: "设置变量",
-  variable_add: "修改变量",
-  choice: "选项",
-  condition: "条件判断",
-};
+const storyBlockCatalogTools = window.CanvasiaEditorStoryBlockCatalog;
+const { BLOCK_LABELS, MUSIC_END_MODE_LABELS } = storyBlockCatalogTools;
+const storyTemplateTools = window.CanvasiaEditorStoryTemplates;
+const { STORY_TEMPLATE_PRESETS } = storyTemplateTools;
 
 function getBlockLabel(type) {
-  return BLOCK_LABELS[type] ?? type ?? "步骤";
+  return storyBlockCatalogTools.getBlockLabel(type) ?? BLOCK_LABELS[type] ?? type ?? "步骤";
 }
 
-const MUSIC_END_MODE_LABELS = {
-  until_next_music: "播到下一首或停止卡",
-  scene_end: "播完整个场景",
-  after_block: "播到指定卡片后",
-};
-
 function getSafeMusicEndMode(mode) {
-  return Object.hasOwn(MUSIC_END_MODE_LABELS, mode) ? mode : "until_next_music";
+  return storyBlockCatalogTools.getSafeMusicEndMode(mode);
 }
 
 function getMusicEndModeLabel(mode) {
-  return MUSIC_END_MODE_LABELS[getSafeMusicEndMode(mode)];
+  return storyBlockCatalogTools.getMusicEndModeLabel(mode);
 }
 
 const editorCommonTools = window.CanvasiaEditorCommon;
 const projectSettingsTools = window.CanvasiaEditorProjectSettings;
+const {
+  PROJECT_DIALOG_BOX_PRESET_LABELS,
+  PROJECT_DIALOG_BOX_SHAPE_LABELS,
+  PROJECT_DIALOG_BOX_ANCHOR_LABELS,
+  DEFAULT_PROJECT_DIALOG_BOX_CONFIG,
+  PROJECT_DIALOG_BOX_PRESETS,
+  PROJECT_GAME_UI_PRESET_LABELS,
+  PROJECT_GAME_UI_LAYOUT_LABELS,
+  PROJECT_GAME_UI_TITLE_LAYOUT_LABELS,
+  PROJECT_GAME_UI_FONT_LABELS,
+  PROJECT_GAME_UI_SURFACE_LABELS,
+  PROJECT_GAME_UI_BRAND_LABELS,
+  PROJECT_GAME_UI_SIDE_PANEL_LABELS,
+  PROJECT_GAME_UI_SIDE_POSITION_LABELS,
+  PROJECT_GAME_UI_TOPBAR_POSITION_LABELS,
+  PROJECT_GAME_UI_HUD_POSITION_LABELS,
+  PROJECT_GAME_UI_TITLE_CARD_ANCHOR_LABELS,
+  DEFAULT_PROJECT_GAME_UI_CONFIG,
+  PROJECT_GAME_UI_PRESETS,
+} = projectSettingsTools;
 const systemDialogTools = window.CanvasiaEditorSystemDialog;
 const uiThemeTools = window.CanvasiaEditorUiTheme;
 const previewSaveTools = window.CanvasiaEditorPreviewSave;
 const recentWorkspaceTools = window.CanvasiaEditorRecentWorkspace;
 const editorFilterTools = window.CanvasiaEditorFilters;
+const scriptReadabilityTools = window.CanvasiaEditorScriptReadability;
+const {
+  VN_TEXT_LONG_WARNING_LENGTH,
+  VN_TEXT_LONG_WARNING_LINES,
+  VN_TEXT_SPLIT_TARGET_LENGTH,
+  VN_CHOICE_LONG_WARNING_LENGTH,
+  VN_CHOICE_MANY_OPTIONS,
+} = scriptReadabilityTools;
 const scriptVoiceTools = window.CanvasiaEditorScriptVoice;
 const visualEffectTools = window.CanvasiaEditorVisualEffects;
+const particleEffectTools = window.CanvasiaEditorParticleEffects;
+const {
+  PARTICLE_PRESET_LABELS,
+  PARTICLE_INTENSITY_LABELS,
+  PARTICLE_SPEED_LABELS,
+  PARTICLE_WIND_LABELS,
+  PARTICLE_AREA_LABELS,
+  PARTICLE_BLEND_LABELS,
+  PARTICLE_EMISSION_MODE_LABELS,
+  PARTICLE_EMITTER_SHAPE_LABELS,
+  PARTICLE_FOLLOW_LABELS,
+  PARTICLE_FOLLOW_ANCHOR_LABELS,
+  PARTICLE_SIZE_CURVE_LABELS,
+  PARTICLE_OPACITY_CURVE_LABELS,
+  PARTICLE_COLOR_CURVE_LABELS,
+  PARTICLE_FORCE_FIELD_LABELS,
+  PARTICLE_COMBO_PRESET_LABELS,
+  PARTICLE_SCENE_PRESET_LABELS,
+  PARTICLE_CUSTOM_COMBO_LAYER_LIMIT,
+  PARTICLE_CUSTOM_PRESET_LIMIT,
+  PARTICLE_IMAGE_ASSET_TYPES,
+} = particleEffectTools;
 const variableTools = window.CanvasiaEditorVariables;
 const projectHistoryTools = window.CanvasiaEditorProjectHistory;
 const assetCatalogTools = window.CanvasiaEditorAssetCatalog;
 const projectDoctorTools = window.CanvasiaEditorProjectDoctor;
 const projectMilestoneTools = window.CanvasiaEditorProjectMilestones ?? window.CanvasiaProjectMilestones;
+const openAiAssetTools = window.CanvasiaEditorOpenAiAssetGenerator;
+const beginnerTutorialTools = window.CanvasiaEditorBeginnerTutorial;
 
 const ASSET_TYPE_LABELS = assetCatalogTools?.ASSET_TYPE_LABELS ?? {
   background: "背景",
@@ -220,1099 +247,6 @@ const CREATIVE_ASSISTANT_PROMPT_SAMPLES = creativeAssistantTools?.CREATIVE_ASSIS
   "近未来城市里，AI 少女第一次学会撒谎",
   "黄昏天台，青梅竹马终于谈起三年前的误会",
 ];
-
-const PARTICLE_PRESET_LABELS = {
-  snow: "雪花",
-  rain: "雨丝",
-  petals: "樱花",
-  dust: "光尘",
-  embers: "火星",
-  sparkles: "闪光",
-  bubbles: "气泡",
-  confetti: "纸片",
-  smoke: "烟雾",
-  flame: "火焰",
-  stardust: "星尘",
-  glyphs: "法阵符纹",
-};
-
-const PARTICLE_INTENSITY_LABELS = {
-  light: "轻一点",
-  medium: "中等",
-  heavy: "浓一点",
-};
-
-const PARTICLE_SPEED_LABELS = {
-  slow: "慢一点",
-  medium: "正常",
-  fast: "快一点",
-};
-
-const PARTICLE_WIND_LABELS = {
-  left: "向左吹",
-  still: "几乎无风",
-  right: "向右吹",
-};
-
-const PARTICLE_AREA_LABELS = {
-  full: "铺满全屏",
-  left: "左半边",
-  center: "中间区域",
-  right: "右半边",
-};
-
-const PARTICLE_BLEND_LABELS = {
-  screen: "滤色发光",
-  add: "线性发光",
-  normal: "正常叠加",
-};
-
-const PARTICLE_EMISSION_MODE_LABELS = {
-  continuous: "持续发射",
-  burst: "爆发式发射",
-};
-
-const PARTICLE_EMITTER_SHAPE_LABELS = {
-  line: "线形发射器",
-  point: "点发射器",
-  box: "盒形发射器",
-  circle: "圆形发射器",
-};
-
-const PARTICLE_FOLLOW_LABELS = {
-  none: "固定在画面上",
-  character: "跟随当前说话角色",
-  camera: "跟随镜头中心",
-};
-
-const PARTICLE_FOLLOW_ANCHOR_LABELS = {
-  head: "头部附近",
-  torso: "身体中段",
-  feet: "脚边 / 地面",
-};
-
-const PARTICLE_SIZE_CURVE_LABELS = {
-  steady: "尺寸保持稳定",
-  bloom: "先小后大",
-  shrink: "慢慢缩小",
-  pulse: "中段放大",
-};
-
-const PARTICLE_OPACITY_CURVE_LABELS = {
-  fade: "正常淡出",
-  linger: "停留更久",
-  blink: "中段更亮",
-  pop: "先亮后淡",
-};
-
-const PARTICLE_COLOR_CURVE_LABELS = {
-  steady: "颜色保持稳定",
-  cool_shift: "慢慢偏冷",
-  warm_shift: "越烧越暖",
-  spectral: "光谱漂移",
-  pulse_glow: "中段爆亮",
-};
-
-const PARTICLE_FORCE_FIELD_LABELS = {
-  none: "无中心力场",
-  attract: "吸附中心",
-  repel: "排斥中心",
-  orbit: "环绕中心",
-};
-
-const PARTICLE_COMBO_PRESET_LABELS = {
-  none: "单层粒子",
-  blizzard_stack: "暴风雪叠层",
-  inferno_stack: "火焰仪式叠层",
-  arcane_stack: "魔法阵叠层",
-  celestial_stack: "星海梦境叠层",
-  celebration_stack: "礼花舞台叠层",
-};
-
-const PARTICLE_CUSTOM_COMBO_LAYER_LIMIT = 6;
-const PARTICLE_CUSTOM_PRESET_LIMIT = 24;
-
-const PARTICLE_SCENE_PRESET_LABELS = {
-  blizzard: "暴雪",
-  thunderstorm: "暴雨",
-  magic_burst: "魔法火花",
-  ember_field: "火焰余烬",
-  underwater: "水底气泡",
-  festival: "舞台礼花",
-  smoke_veil: "烟雾幕帘",
-  flame_aura: "火焰环流",
-  stardust_field: "星尘漂流",
-  magic_circle: "魔法阵环",
-};
-
-const PARTICLE_PRESET_DEFAULTS = {
-  snow: {
-    density: 40,
-    sizeMin: 6,
-    sizeMax: 18,
-    lifeMin: 6,
-    lifeMax: 11,
-    gravityX: 0,
-    gravityY: 70,
-    gravityZ: 16,
-    spreadX: 100,
-    spreadY: 22,
-    spreadZ: 36,
-    opacityMin: 0.38,
-    opacityMax: 0.95,
-    rotationMin: 0,
-    rotationMax: 180,
-    spin: 55,
-    turbulence: 22,
-    color: "#ffffff",
-    colorAccent: "#dff4ff",
-    blend: "screen",
-  },
-  rain: {
-    density: 56,
-    sizeMin: 2,
-    sizeMax: 4,
-    lifeMin: 1.2,
-    lifeMax: 2.5,
-    gravityX: 18,
-    gravityY: 190,
-    gravityZ: -8,
-    spreadX: 100,
-    spreadY: 14,
-    spreadZ: 20,
-    opacityMin: 0.26,
-    opacityMax: 0.82,
-    rotationMin: 8,
-    rotationMax: 14,
-    spin: 0,
-    turbulence: 10,
-    color: "#b7dcff",
-    colorAccent: "#f0fbff",
-    blend: "screen",
-  },
-  petals: {
-    density: 28,
-    sizeMin: 12,
-    sizeMax: 22,
-    lifeMin: 4.5,
-    lifeMax: 8.2,
-    gravityX: 0,
-    gravityY: 58,
-    gravityZ: 6,
-    spreadX: 100,
-    spreadY: 24,
-    spreadZ: 42,
-    opacityMin: 0.48,
-    opacityMax: 0.96,
-    rotationMin: -20,
-    rotationMax: 40,
-    spin: 120,
-    turbulence: 36,
-    color: "#ffd6ea",
-    colorAccent: "#fff3f8",
-    blend: "screen",
-  },
-  dust: {
-    density: 26,
-    sizeMin: 4,
-    sizeMax: 12,
-    lifeMin: 5.5,
-    lifeMax: 11,
-    gravityX: 0,
-    gravityY: 24,
-    gravityZ: 24,
-    spreadX: 100,
-    spreadY: 40,
-    spreadZ: 70,
-    opacityMin: 0.18,
-    opacityMax: 0.72,
-    rotationMin: 0,
-    rotationMax: 360,
-    spin: 40,
-    turbulence: 24,
-    color: "#c4f6ff",
-    colorAccent: "#f8fdff",
-    blend: "screen",
-  },
-  embers: {
-    density: 24,
-    sizeMin: 3,
-    sizeMax: 9,
-    lifeMin: 2.6,
-    lifeMax: 6.4,
-    gravityX: 6,
-    gravityY: -46,
-    gravityZ: 30,
-    spreadX: 100,
-    spreadY: 36,
-    spreadZ: 54,
-    opacityMin: 0.3,
-    opacityMax: 0.92,
-    rotationMin: 0,
-    rotationMax: 180,
-    spin: 80,
-    turbulence: 34,
-    color: "#ffb36b",
-    colorAccent: "#fff1b5",
-    blend: "add",
-  },
-  sparkles: {
-    density: 18,
-    sizeMin: 5,
-    sizeMax: 12,
-    lifeMin: 1.8,
-    lifeMax: 4.2,
-    gravityX: 0,
-    gravityY: 16,
-    gravityZ: 36,
-    spreadX: 100,
-    spreadY: 50,
-    spreadZ: 58,
-    opacityMin: 0.28,
-    opacityMax: 1,
-    rotationMin: 0,
-    rotationMax: 180,
-    spin: 180,
-    turbulence: 26,
-    color: "#dff8ff",
-    colorAccent: "#8fe8ff",
-    blend: "add",
-  },
-  bubbles: {
-    density: 20,
-    sizeMin: 10,
-    sizeMax: 26,
-    lifeMin: 3.8,
-    lifeMax: 8.6,
-    gravityX: 0,
-    gravityY: -72,
-    gravityZ: 28,
-    spreadX: 100,
-    spreadY: 44,
-    spreadZ: 64,
-    opacityMin: 0.18,
-    opacityMax: 0.62,
-    rotationMin: -16,
-    rotationMax: 16,
-    spin: 36,
-    turbulence: 18,
-    color: "#b6f3ff",
-    colorAccent: "#effcff",
-    blend: "normal",
-  },
-  confetti: {
-    density: 34,
-    sizeMin: 6,
-    sizeMax: 14,
-    lifeMin: 3.2,
-    lifeMax: 6.4,
-    gravityX: 0,
-    gravityY: 120,
-    gravityZ: 18,
-    spreadX: 100,
-    spreadY: 26,
-    spreadZ: 48,
-    opacityMin: 0.52,
-    opacityMax: 0.98,
-    rotationMin: 0,
-    rotationMax: 360,
-    spin: 240,
-    turbulence: 42,
-    color: "#7fe7ff",
-    colorAccent: "#ff8ee3",
-    blend: "normal",
-  },
-  smoke: {
-    density: 22,
-    sizeMin: 24,
-    sizeMax: 64,
-    lifeMin: 4.6,
-    lifeMax: 10.8,
-    gravityX: 0,
-    gravityY: -24,
-    gravityZ: 42,
-    spreadX: 72,
-    spreadY: 44,
-    spreadZ: 80,
-    opacityMin: 0.14,
-    opacityMax: 0.46,
-    rotationMin: -26,
-    rotationMax: 26,
-    spin: 18,
-    turbulence: 32,
-    color: "#aebed4",
-    colorAccent: "#f1f7ff",
-    blend: "normal",
-  },
-  flame: {
-    density: 26,
-    sizeMin: 14,
-    sizeMax: 34,
-    lifeMin: 1.4,
-    lifeMax: 3.8,
-    gravityX: 0,
-    gravityY: -82,
-    gravityZ: 24,
-    spreadX: 40,
-    spreadY: 36,
-    spreadZ: 44,
-    opacityMin: 0.34,
-    opacityMax: 0.92,
-    rotationMin: -18,
-    rotationMax: 18,
-    spin: 58,
-    turbulence: 44,
-    color: "#ff8b3d",
-    colorAccent: "#fff4a6",
-    blend: "add",
-  },
-  stardust: {
-    density: 30,
-    sizeMin: 3,
-    sizeMax: 10,
-    lifeMin: 5.4,
-    lifeMax: 12.6,
-    gravityX: 0,
-    gravityY: 8,
-    gravityZ: 54,
-    spreadX: 100,
-    spreadY: 60,
-    spreadZ: 90,
-    opacityMin: 0.18,
-    opacityMax: 0.86,
-    rotationMin: 0,
-    rotationMax: 240,
-    spin: 140,
-    turbulence: 28,
-    color: "#8edbff",
-    colorAccent: "#fff1ff",
-    blend: "screen",
-  },
-  glyphs: {
-    density: 14,
-    sizeMin: 18,
-    sizeMax: 36,
-    lifeMin: 2.6,
-    lifeMax: 5.8,
-    gravityX: 0,
-    gravityY: 0,
-    gravityZ: 18,
-    spreadX: 34,
-    spreadY: 18,
-    spreadZ: 26,
-    opacityMin: 0.34,
-    opacityMax: 0.92,
-    rotationMin: -12,
-    rotationMax: 12,
-    spin: 120,
-    turbulence: 14,
-    color: "#85d4ff",
-    colorAccent: "#f7dcff",
-    blend: "add",
-  },
-};
-
-const PARTICLE_PRESET_ADVANCED_DEFAULTS = {
-  snow: {
-    emissionMode: "continuous",
-    emitterShape: "line",
-    emitterX: 50,
-    emitterY: -6,
-    emitterZ: 0,
-    attractionX: 0,
-    attractionY: 0,
-    vortex: 12,
-    follow: "none",
-    sizeCurve: "steady",
-    opacityCurve: "linger",
-    forceField: "none",
-    fieldX: 50,
-    fieldY: 52,
-  },
-  rain: {
-    emissionMode: "continuous",
-    emitterShape: "line",
-    emitterX: 50,
-    emitterY: -8,
-    emitterZ: -8,
-    attractionX: 10,
-    attractionY: 0,
-    vortex: 6,
-    follow: "none",
-    sizeCurve: "steady",
-    opacityCurve: "fade",
-    forceField: "none",
-    fieldX: 50,
-    fieldY: 58,
-  },
-  petals: {
-    emissionMode: "continuous",
-    emitterShape: "line",
-    emitterX: 50,
-    emitterY: -4,
-    emitterZ: 10,
-    attractionX: 0,
-    attractionY: 4,
-    vortex: 48,
-    follow: "none",
-    sizeCurve: "pulse",
-    opacityCurve: "linger",
-    forceField: "orbit",
-    fieldX: 50,
-    fieldY: 56,
-  },
-  dust: {
-    emissionMode: "continuous",
-    emitterShape: "box",
-    emitterX: 50,
-    emitterY: 52,
-    emitterZ: 20,
-    attractionX: 0,
-    attractionY: -4,
-    vortex: 18,
-    follow: "none",
-    sizeCurve: "bloom",
-    opacityCurve: "linger",
-    forceField: "attract",
-    fieldX: 50,
-    fieldY: 54,
-  },
-  embers: {
-    emissionMode: "continuous",
-    emitterShape: "circle",
-    emitterX: 50,
-    emitterY: 104,
-    emitterZ: 24,
-    attractionX: 0,
-    attractionY: -14,
-    vortex: 65,
-    follow: "none",
-    sizeCurve: "shrink",
-    opacityCurve: "pop",
-    forceField: "orbit",
-    fieldX: 50,
-    fieldY: 84,
-  },
-  sparkles: {
-    emissionMode: "burst",
-    emitterShape: "point",
-    emitterX: 50,
-    emitterY: 48,
-    emitterZ: 0,
-    attractionX: 0,
-    attractionY: 0,
-    vortex: 95,
-    follow: "none",
-    sizeCurve: "pulse",
-    opacityCurve: "blink",
-    forceField: "orbit",
-    fieldX: 50,
-    fieldY: 50,
-  },
-  bubbles: {
-    emissionMode: "continuous",
-    emitterShape: "circle",
-    emitterX: 50,
-    emitterY: 106,
-    emitterZ: 26,
-    attractionX: 0,
-    attractionY: -18,
-    vortex: 24,
-    follow: "none",
-    sizeCurve: "bloom",
-    opacityCurve: "linger",
-    forceField: "attract",
-    fieldX: 50,
-    fieldY: 42,
-  },
-  confetti: {
-    emissionMode: "burst",
-    emitterShape: "line",
-    emitterX: 50,
-    emitterY: -6,
-    emitterZ: 6,
-    attractionX: 0,
-    attractionY: 16,
-    vortex: 110,
-    follow: "none",
-    sizeCurve: "pulse",
-    opacityCurve: "pop",
-    forceField: "repel",
-    fieldX: 50,
-    fieldY: 40,
-  },
-  smoke: {
-    emissionMode: "continuous",
-    emitterShape: "circle",
-    emitterX: 50,
-    emitterY: 94,
-    emitterZ: 22,
-    attractionX: 0,
-    attractionY: -10,
-    vortex: 36,
-    follow: "none",
-    sizeCurve: "bloom",
-    opacityCurve: "linger",
-    forceField: "attract",
-    fieldX: 50,
-    fieldY: 58,
-  },
-  flame: {
-    emissionMode: "continuous",
-    emitterShape: "point",
-    emitterX: 50,
-    emitterY: 94,
-    emitterZ: 12,
-    attractionX: 0,
-    attractionY: -22,
-    vortex: 84,
-    follow: "none",
-    sizeCurve: "shrink",
-    opacityCurve: "pop",
-    forceField: "orbit",
-    fieldX: 50,
-    fieldY: 76,
-  },
-  stardust: {
-    emissionMode: "continuous",
-    emitterShape: "box",
-    emitterX: 50,
-    emitterY: 48,
-    emitterZ: 36,
-    attractionX: 0,
-    attractionY: 0,
-    vortex: 72,
-    follow: "camera",
-    sizeCurve: "pulse",
-    opacityCurve: "blink",
-    forceField: "orbit",
-    fieldX: 50,
-    fieldY: 50,
-  },
-  glyphs: {
-    emissionMode: "burst",
-    emitterShape: "circle",
-    emitterX: 50,
-    emitterY: 56,
-    emitterZ: 10,
-    attractionX: 0,
-    attractionY: 0,
-    vortex: 150,
-    follow: "character",
-    sizeCurve: "pulse",
-    opacityCurve: "blink",
-    forceField: "orbit",
-    fieldX: 50,
-    fieldY: 56,
-  },
-};
-
-const PARTICLE_SCENE_PRESET_CONFIGS = {
-  blizzard: {
-    preset: "snow",
-    comboPreset: "blizzard_stack",
-    intensity: "heavy",
-    speed: "fast",
-    wind: "left",
-    area: "full",
-    density: 96,
-    sizeMin: 7,
-    sizeMax: 22,
-    lifeMin: 5.6,
-    lifeMax: 10.2,
-    gravityX: -38,
-    gravityY: 102,
-    gravityZ: 28,
-    spreadX: 100,
-    spreadY: 34,
-    spreadZ: 60,
-    turbulence: 46,
-    emissionMode: "continuous",
-    emitterShape: "line",
-    sizeCurve: "steady",
-    opacityCurve: "linger",
-    forceField: "attract",
-    fieldX: 42,
-    fieldY: 60,
-    color: "#f4fbff",
-    colorAccent: "#d8f4ff",
-    blend: "screen",
-  },
-  thunderstorm: {
-    preset: "rain",
-    intensity: "heavy",
-    speed: "fast",
-    wind: "right",
-    area: "full",
-    density: 110,
-    sizeMin: 2,
-    sizeMax: 5,
-    lifeMin: 0.9,
-    lifeMax: 1.8,
-    gravityX: 46,
-    gravityY: 230,
-    gravityZ: -18,
-    spreadX: 100,
-    spreadY: 18,
-    spreadZ: 30,
-    turbulence: 18,
-    emissionMode: "continuous",
-    emitterShape: "line",
-    sizeCurve: "steady",
-    opacityCurve: "fade",
-    forceField: "none",
-    color: "#9bd4ff",
-    colorAccent: "#f0fbff",
-    blend: "screen",
-  },
-  magic_burst: {
-    preset: "sparkles",
-    comboPreset: "arcane_stack",
-    intensity: "heavy",
-    speed: "medium",
-    wind: "still",
-    area: "center",
-    density: 42,
-    sizeMin: 6,
-    sizeMax: 18,
-    lifeMin: 1.4,
-    lifeMax: 3.4,
-    gravityX: 0,
-    gravityY: 16,
-    gravityZ: 42,
-    spreadX: 44,
-    spreadY: 44,
-    spreadZ: 72,
-    turbulence: 52,
-    emissionMode: "burst",
-    emitterShape: "circle",
-    emitterX: 50,
-    emitterY: 54,
-    vortex: 150,
-    sizeCurve: "pulse",
-    opacityCurve: "blink",
-    forceField: "orbit",
-    fieldX: 50,
-    fieldY: 52,
-    color: "#9de4ff",
-    colorAccent: "#fff0ff",
-    blend: "add",
-  },
-  ember_field: {
-    preset: "embers",
-    comboPreset: "inferno_stack",
-    intensity: "heavy",
-    speed: "slow",
-    wind: "left",
-    area: "full",
-    density: 54,
-    sizeMin: 4,
-    sizeMax: 12,
-    lifeMin: 3.2,
-    lifeMax: 7.2,
-    gravityX: -12,
-    gravityY: -52,
-    gravityZ: 38,
-    spreadX: 92,
-    spreadY: 44,
-    spreadZ: 68,
-    turbulence: 58,
-    emissionMode: "continuous",
-    emitterShape: "box",
-    emitterY: 94,
-    vortex: 120,
-    sizeCurve: "shrink",
-    opacityCurve: "pop",
-    forceField: "orbit",
-    fieldX: 54,
-    fieldY: 76,
-    color: "#ff9a57",
-    colorAccent: "#fff0b3",
-    blend: "add",
-  },
-  underwater: {
-    preset: "bubbles",
-    intensity: "medium",
-    speed: "slow",
-    wind: "still",
-    area: "center",
-    density: 34,
-    sizeMin: 10,
-    sizeMax: 30,
-    lifeMin: 4.5,
-    lifeMax: 9.6,
-    gravityX: 0,
-    gravityY: -80,
-    gravityZ: 38,
-    spreadX: 54,
-    spreadY: 58,
-    spreadZ: 82,
-    turbulence: 26,
-    emissionMode: "continuous",
-    emitterShape: "circle",
-    emitterX: 50,
-    emitterY: 106,
-    sizeCurve: "bloom",
-    opacityCurve: "linger",
-    forceField: "attract",
-    fieldX: 50,
-    fieldY: 36,
-    color: "#8de9ff",
-    colorAccent: "#f2ffff",
-    blend: "normal",
-  },
-  festival: {
-    preset: "confetti",
-    comboPreset: "celebration_stack",
-    intensity: "heavy",
-    speed: "medium",
-    wind: "still",
-    area: "full",
-    density: 56,
-    sizeMin: 7,
-    sizeMax: 16,
-    lifeMin: 2.4,
-    lifeMax: 4.8,
-    gravityX: 0,
-    gravityY: 144,
-    gravityZ: 24,
-    spreadX: 100,
-    spreadY: 32,
-    spreadZ: 56,
-    turbulence: 62,
-    emissionMode: "burst",
-    emitterShape: "line",
-    emitterY: -6,
-    vortex: 132,
-    sizeCurve: "pulse",
-    opacityCurve: "pop",
-    forceField: "repel",
-    fieldX: 50,
-    fieldY: 46,
-    color: "#8ce7ff",
-    colorAccent: "#ff8ada",
-    blend: "normal",
-  },
-  smoke_veil: {
-    preset: "smoke",
-    intensity: "medium",
-    speed: "slow",
-    wind: "left",
-    area: "full",
-    density: 30,
-    sizeMin: 28,
-    sizeMax: 72,
-    lifeMin: 5.4,
-    lifeMax: 12,
-    gravityX: -8,
-    gravityY: -18,
-    gravityZ: 52,
-    spreadX: 84,
-    spreadY: 56,
-    spreadZ: 90,
-    turbulence: 44,
-    emissionMode: "continuous",
-    emitterShape: "box",
-    emitterY: 86,
-    sizeCurve: "bloom",
-    opacityCurve: "linger",
-    forceField: "attract",
-    fieldX: 46,
-    fieldY: 50,
-    color: "#b1bfd3",
-    colorAccent: "#eef4ff",
-    blend: "normal",
-  },
-  flame_aura: {
-    preset: "flame",
-    comboPreset: "inferno_stack",
-    intensity: "heavy",
-    speed: "medium",
-    wind: "still",
-    area: "center",
-    density: 34,
-    sizeMin: 16,
-    sizeMax: 34,
-    lifeMin: 1.2,
-    lifeMax: 3.2,
-    gravityX: 0,
-    gravityY: -96,
-    gravityZ: 28,
-    spreadX: 36,
-    spreadY: 30,
-    spreadZ: 38,
-    turbulence: 56,
-    emissionMode: "continuous",
-    emitterShape: "circle",
-    emitterY: 92,
-    follow: "character",
-    sizeCurve: "shrink",
-    opacityCurve: "pop",
-    forceField: "orbit",
-    fieldX: 50,
-    fieldY: 74,
-    color: "#ff8d42",
-    colorAccent: "#fff0ab",
-    blend: "add",
-  },
-  stardust_field: {
-    preset: "stardust",
-    comboPreset: "celestial_stack",
-    intensity: "medium",
-    speed: "slow",
-    wind: "still",
-    area: "full",
-    density: 42,
-    sizeMin: 3,
-    sizeMax: 12,
-    lifeMin: 6.8,
-    lifeMax: 13.4,
-    gravityX: 0,
-    gravityY: 6,
-    gravityZ: 66,
-    spreadX: 100,
-    spreadY: 62,
-    spreadZ: 100,
-    turbulence: 32,
-    emissionMode: "continuous",
-    emitterShape: "box",
-    emitterY: 48,
-    follow: "camera",
-    sizeCurve: "pulse",
-    opacityCurve: "blink",
-    forceField: "orbit",
-    fieldX: 50,
-    fieldY: 50,
-    color: "#97ddff",
-    colorAccent: "#ffe5ff",
-    blend: "screen",
-  },
-  magic_circle: {
-    preset: "glyphs",
-    comboPreset: "arcane_stack",
-    intensity: "heavy",
-    speed: "slow",
-    wind: "still",
-    area: "center",
-    density: 18,
-    sizeMin: 20,
-    sizeMax: 38,
-    lifeMin: 2.8,
-    lifeMax: 6.4,
-    gravityX: 0,
-    gravityY: 0,
-    gravityZ: 14,
-    spreadX: 28,
-    spreadY: 12,
-    spreadZ: 32,
-    turbulence: 16,
-    emissionMode: "burst",
-    emitterShape: "circle",
-    emitterY: 56,
-    follow: "character",
-    sizeCurve: "pulse",
-    opacityCurve: "blink",
-    forceField: "orbit",
-    fieldX: 50,
-    fieldY: 56,
-    color: "#8fd8ff",
-    colorAccent: "#f5d8ff",
-    blend: "add",
-  },
-};
-
-const PARTICLE_COMBO_PRESET_CONFIGS = {
-  none: [],
-  blizzard_stack: [
-    {
-      preset: "snow",
-      densityMultiplier: 0.84,
-      layerCount: 2,
-      sizeScale: 1.08,
-      lifeScale: 1.12,
-      spreadYMultiplier: 1.18,
-      spreadZAdd: 18,
-      turbulenceAdd: 10,
-      opacityScale: 0.92,
-      follow: "camera",
-      followAnchor: "torso",
-      blend: "screen",
-      colorMix: 0.28,
-    },
-    {
-      preset: "dust",
-      densityMultiplier: 0.42,
-      sizeScale: 1.52,
-      lifeScale: 1.34,
-      spreadYMultiplier: 1.46,
-      spreadZAdd: 24,
-      gravityYAdd: -10,
-      turbulenceAdd: 18,
-      opacityScale: 0.46,
-      follow: "camera",
-      followAnchor: "torso",
-      forceField: "attract",
-      blend: "screen",
-      color: "#d9efff",
-      colorAccent: "#ffffff",
-      colorEnd: "#b8d8ff",
-    },
-  ],
-  inferno_stack: [
-    {
-      preset: "flame",
-      densityMultiplier: 0.88,
-      layerCount: 2,
-      sizeScale: 1.04,
-      opacityScale: 0.96,
-      follow: "character",
-      followAnchor: "feet",
-      emitterYOffset: 10,
-      blend: "add",
-      colorMix: 0.36,
-    },
-    {
-      preset: "smoke",
-      densityMultiplier: 0.44,
-      sizeScale: 1.62,
-      lifeScale: 1.26,
-      spreadYMultiplier: 1.38,
-      spreadZAdd: 28,
-      gravityYAdd: -14,
-      turbulenceAdd: 14,
-      opacityScale: 0.56,
-      follow: "character",
-      followAnchor: "torso",
-      emitterYOffset: 4,
-      blend: "normal",
-      color: "#9e95a6",
-      colorAccent: "#ddd8e8",
-      colorEnd: "#706978",
-    },
-    {
-      preset: "embers",
-      densityMultiplier: 0.48,
-      sizeScale: 0.92,
-      lifeScale: 0.92,
-      opacityScale: 0.78,
-      follow: "character",
-      followAnchor: "torso",
-      emitterYOffset: 8,
-      blend: "add",
-      colorMix: 0.22,
-    },
-  ],
-  arcane_stack: [
-    {
-      preset: "glyphs",
-      densityMultiplier: 0.9,
-      layerCount: 2,
-      sizeScale: 1.06,
-      opacityScale: 0.92,
-      follow: "character",
-      followAnchor: "feet",
-      forceField: "orbit",
-      blend: "add",
-      colorMix: 0.48,
-    },
-    {
-      preset: "stardust",
-      densityMultiplier: 0.54,
-      sizeScale: 0.92,
-      lifeScale: 1.12,
-      spreadZAdd: 34,
-      turbulenceAdd: 18,
-      opacityScale: 0.72,
-      follow: "camera",
-      followAnchor: "torso",
-      area: "center",
-      blend: "screen",
-      colorMix: 0.52,
-    },
-    {
-      preset: "sparkles",
-      densityMultiplier: 0.34,
-      sizeScale: 0.82,
-      opacityScale: 0.78,
-      emissionMode: "burst",
-      follow: "character",
-      followAnchor: "torso",
-      emitterShape: "circle",
-      blend: "add",
-      colorMix: 0.48,
-    },
-  ],
-  celestial_stack: [
-    {
-      preset: "stardust",
-      densityMultiplier: 0.88,
-      layerCount: 2,
-      opacityScale: 0.92,
-      follow: "camera",
-      followAnchor: "torso",
-      blend: "screen",
-      colorMix: 0.46,
-    },
-    {
-      preset: "dust",
-      densityMultiplier: 0.4,
-      sizeScale: 1.44,
-      lifeScale: 1.28,
-      spreadZAdd: 30,
-      opacityScale: 0.42,
-      turbulenceAdd: 18,
-      follow: "camera",
-      followAnchor: "torso",
-      blend: "screen",
-      colorMix: 0.44,
-    },
-    {
-      preset: "bubbles",
-      densityMultiplier: 0.24,
-      sizeScale: 0.74,
-      lifeScale: 1.12,
-      gravityYAdd: -22,
-      opacityScale: 0.36,
-      follow: "camera",
-      followAnchor: "torso",
-      area: "center",
-      blend: "normal",
-      colorMix: 0.34,
-    },
-  ],
-  celebration_stack: [
-    {
-      preset: "confetti",
-      densityMultiplier: 0.78,
-      layerCount: 2,
-      emissionMode: "burst",
-      opacityScale: 0.96,
-      blend: "normal",
-      colorMix: 0.3,
-    },
-    {
-      preset: "sparkles",
-      densityMultiplier: 0.4,
-      sizeScale: 0.82,
-      opacityScale: 0.82,
-      emissionMode: "burst",
-      blend: "add",
-      colorMix: 0.44,
-    },
-    {
-      preset: "stardust",
-      densityMultiplier: 0.26,
-      lifeScale: 0.92,
-      opacityScale: 0.46,
-      follow: "camera",
-      followAnchor: "torso",
-      blend: "screen",
-      colorMix: 0.38,
-    },
-  ],
-};
-
-const PARTICLE_IMAGE_ASSET_TYPES = ["background", "sprite", "cg", "ui"];
 
 const SHAKE_INTENSITY_LABELS = visualEffectTools?.SHAKE_INTENSITY_LABELS ?? {
   light: "轻微",
@@ -1481,11 +415,6 @@ const DEFAULT_CHARACTER_STAGE = {
   layer: 0,
 };
 
-const SUPPORTED_RESOLUTIONS = [
-  { width: 1280, height: 720, label: "HD 1280 × 720" },
-  { width: 1920, height: 1080, label: "Full HD 1920 × 1080" },
-];
-
 const TEXT_SPEED_LABELS = {
   slow: "慢一点",
   normal: "正常",
@@ -1500,20 +429,6 @@ const DIALOG_THEME_LABELS = {
   paper: "纸页回忆",
   transparent: "透明无框",
 };
-
-const PROJECT_DIALOG_BOX_PRESET_LABELS = {
-  moonlight: "夜色玻璃",
-  warm: "暖光标准",
-  paper: "纸页回忆",
-  transparent: "透明无框",
-  custom: "自定义样式",
-};
-
-const VN_TEXT_LONG_WARNING_LENGTH = 260;
-const VN_TEXT_LONG_WARNING_LINES = 5;
-const VN_TEXT_SPLIT_TARGET_LENGTH = 180;
-const VN_CHOICE_LONG_WARNING_LENGTH = 42;
-const VN_CHOICE_MANY_OPTIONS = 6;
 
 const STARTER_VARIABLE_PRESETS = variableTools?.STARTER_VARIABLE_PRESETS ?? [
   {
@@ -1538,94 +453,6 @@ const STARTER_VARIABLE_PRESETS = variableTools?.STARTER_VARIABLE_PRESETS ?? [
   },
 ];
 
-const PROJECT_DIALOG_BOX_SHAPE_LABELS = {
-  rounded: "圆角框",
-  square: "方角框",
-  capsule: "胶囊框",
-};
-
-const PROJECT_DIALOG_BOX_ANCHOR_LABELS = {
-  bottom: "底部对话框",
-  center: "居中对话框",
-  top: "顶部字幕框",
-  free: "自由偏移",
-};
-
-const PROJECT_GAME_UI_PRESET_LABELS = {
-  stellar: "神秘科技",
-  warm: "暖色轻小说",
-  paper: "纸页回忆",
-  minimal: "极简透明",
-  custom: "自定义皮肤",
-};
-
-const PROJECT_GAME_UI_LAYOUT_LABELS = {
-  balanced: "标准工作台",
-  cinematic: "电影标题页",
-  compact: "紧凑信息栏",
-  minimal: "沉浸无侧栏",
-  custom: "自定义布局",
-};
-
-const PROJECT_GAME_UI_TITLE_LAYOUT_LABELS = {
-  center: "居中标题",
-  left: "左侧标题",
-  poster: "海报标题",
-};
-
-const PROJECT_GAME_UI_FONT_LABELS = {
-  modern: "现代无衬线",
-  serif: "文学衬线",
-  rounded: "圆润轻快",
-};
-
-const PROJECT_GAME_UI_SURFACE_LABELS = {
-  glass: "玻璃面板",
-  solid: "实色面板",
-  minimal: "轻量线框",
-};
-
-const PROJECT_GAME_UI_BRAND_LABELS = {
-  project: "显示项目名",
-  engine: "显示引擎标识",
-  hidden: "隐藏品牌露出",
-};
-
-const PROJECT_GAME_UI_SIDE_PANEL_LABELS = {
-  full: "完整侧栏",
-  compact: "紧凑侧栏",
-  hidden: "隐藏侧栏",
-};
-
-const PROJECT_GAME_UI_SIDE_POSITION_LABELS = {
-  right: "侧栏在右",
-  left: "侧栏在左",
-};
-
-const PROJECT_GAME_UI_TOPBAR_POSITION_LABELS = {
-  top: "顶部栏在上",
-  bottom: "顶部栏在下",
-  hidden: "隐藏顶部栏",
-};
-
-const PROJECT_GAME_UI_HUD_POSITION_LABELS = {
-  top: "顶部两端",
-  "top-left": "左上角",
-  "top-right": "右上角",
-  "bottom-left": "左下角",
-  "bottom-right": "右下角",
-  hidden: "隐藏 HUD",
-};
-
-const PROJECT_GAME_UI_TITLE_CARD_ANCHOR_LABELS = {
-  center: "标题居中",
-  left: "标题靠左",
-  right: "标题靠右",
-  top: "标题靠上",
-  bottom: "标题靠下",
-  free: "自由偏移",
-};
-
 const PROJECT_SAVE_SLOT_COUNT_LIMITS = {
   min: 3,
   max: 120,
@@ -1633,329 +460,6 @@ const PROJECT_SAVE_SLOT_COUNT_LIMITS = {
 
 const DEFAULT_PROJECT_RUNTIME_SETTINGS = {
   formalSaveSlotCount: 24,
-};
-
-const DEFAULT_PROJECT_DIALOG_BOX_CONFIG = {
-  preset: "moonlight",
-  shape: "rounded",
-  widthPercent: 76,
-  minHeight: 148,
-  paddingX: 18,
-  paddingY: 14,
-  backgroundColor: "#0c1422",
-  backgroundOpacity: 92,
-  borderColor: "#79dcff",
-  borderOpacity: 18,
-  textColor: "#f3f6ff",
-  speakerColor: "#ffffff",
-  hintColor: "#c8d6ea",
-  blurStrength: 10,
-  borderWidth: 1,
-  shadowStrength: 30,
-  panelAssetId: "",
-  panelAssetOpacity: 0,
-  panelAssetFit: "cover",
-  anchor: "bottom",
-  offsetXPercent: 0,
-  offsetYPercent: 0,
-};
-
-const DEFAULT_PROJECT_GAME_UI_CONFIG = {
-  preset: "stellar",
-  layoutPreset: "balanced",
-  titleLayout: "center",
-  fontStyle: "modern",
-  fontFamily: "",
-  fontAssetId: "",
-  surfaceStyle: "glass",
-  brandMode: "project",
-  sidePanelMode: "full",
-  sidePanelPosition: "right",
-  topbarPosition: "top",
-  hudPosition: "top",
-  titleCardAnchor: "center",
-  titleCardOffsetXPercent: 0,
-  titleCardOffsetYPercent: 0,
-  layoutGap: 20,
-  sidePanelWidth: 320,
-  backgroundColor: "#071120",
-  backgroundAccentColor: "#6bd5ff",
-  panelColor: "#0c1422",
-  panelOpacity: 88,
-  textColor: "#f3f7ff",
-  mutedTextColor: "#bacce4",
-  accentColor: "#79dcff",
-  accentAltColor: "#7b7cff",
-  buttonTextColor: "#f8fcff",
-  borderColor: "#79dcff",
-  borderOpacity: 18,
-  cornerRadius: 22,
-  backdropBlur: 14,
-  stageVignette: 42,
-  motionIntensity: 70,
-  titleBackgroundAssetId: "",
-  titleBackgroundFit: "cover",
-  titleBackgroundOpacity: 42,
-  titleLogoAssetId: "",
-  panelFrameAssetId: "",
-  panelFrameOpacity: 18,
-  panelFrameSlice: { top: 24, right: 24, bottom: 24, left: 24 },
-  buttonFrameAssetId: "",
-  buttonHoverFrameAssetId: "",
-  buttonPressedFrameAssetId: "",
-  buttonDisabledFrameAssetId: "",
-  buttonFrameOpacity: 24,
-  buttonFrameSlice: { top: 18, right: 18, bottom: 18, left: 18 },
-  saveSlotFrameAssetId: "",
-  systemPanelFrameAssetId: "",
-  uiOverlayAssetId: "",
-  uiOverlayOpacity: 8,
-};
-
-const PROJECT_GAME_UI_PRESETS = {
-  stellar: {
-    preset: "stellar",
-    layoutPreset: "balanced",
-    titleLayout: "center",
-    fontStyle: "modern",
-    surfaceStyle: "glass",
-    brandMode: "project",
-    sidePanelMode: "full",
-    sidePanelPosition: "right",
-    topbarPosition: "top",
-    hudPosition: "top",
-    titleCardAnchor: "center",
-    titleCardOffsetXPercent: 0,
-    titleCardOffsetYPercent: 0,
-    layoutGap: 20,
-    sidePanelWidth: 320,
-    backgroundColor: "#071120",
-    backgroundAccentColor: "#6bd5ff",
-    panelColor: "#0c1422",
-    panelOpacity: 88,
-    textColor: "#f3f7ff",
-    mutedTextColor: "#bacce4",
-    accentColor: "#79dcff",
-    accentAltColor: "#7b7cff",
-    buttonTextColor: "#f8fcff",
-    borderColor: "#79dcff",
-    borderOpacity: 18,
-    cornerRadius: 22,
-    backdropBlur: 14,
-    stageVignette: 42,
-    motionIntensity: 70,
-    titleBackgroundOpacity: 42,
-    titleBackgroundFit: "cover",
-    panelFrameOpacity: 18,
-    buttonFrameOpacity: 24,
-    uiOverlayOpacity: 8,
-  },
-  warm: {
-    preset: "warm",
-    layoutPreset: "balanced",
-    titleLayout: "center",
-    fontStyle: "rounded",
-    surfaceStyle: "glass",
-    brandMode: "project",
-    sidePanelMode: "full",
-    sidePanelPosition: "right",
-    topbarPosition: "top",
-    hudPosition: "top",
-    titleCardAnchor: "center",
-    titleCardOffsetXPercent: 0,
-    titleCardOffsetYPercent: 0,
-    layoutGap: 20,
-    sidePanelWidth: 320,
-    backgroundColor: "#fff4e8",
-    backgroundAccentColor: "#f0a35f",
-    panelColor: "#fff8ef",
-    panelOpacity: 92,
-    textColor: "#3d2a1f",
-    mutedTextColor: "#7a6252",
-    accentColor: "#d67245",
-    accentAltColor: "#f0b35d",
-    buttonTextColor: "#fffaf4",
-    borderColor: "#d67245",
-    borderOpacity: 20,
-    cornerRadius: 24,
-    backdropBlur: 10,
-    stageVignette: 28,
-    motionIntensity: 45,
-    titleBackgroundOpacity: 36,
-    titleBackgroundFit: "cover",
-    panelFrameOpacity: 14,
-    buttonFrameOpacity: 18,
-    uiOverlayOpacity: 5,
-  },
-  paper: {
-    preset: "paper",
-    layoutPreset: "compact",
-    titleLayout: "left",
-    fontStyle: "serif",
-    surfaceStyle: "solid",
-    brandMode: "project",
-    sidePanelMode: "compact",
-    sidePanelPosition: "left",
-    topbarPosition: "top",
-    hudPosition: "bottom-left",
-    titleCardAnchor: "left",
-    titleCardOffsetXPercent: 0,
-    titleCardOffsetYPercent: 0,
-    layoutGap: 16,
-    sidePanelWidth: 280,
-    backgroundColor: "#f7efe0",
-    backgroundAccentColor: "#b98a5d",
-    panelColor: "#fff9ed",
-    panelOpacity: 96,
-    textColor: "#3d2a1d",
-    mutedTextColor: "#806b57",
-    accentColor: "#9a683d",
-    accentAltColor: "#c09a64",
-    buttonTextColor: "#fffaf1",
-    borderColor: "#a5794e",
-    borderOpacity: 28,
-    cornerRadius: 12,
-    backdropBlur: 4,
-    stageVignette: 35,
-    motionIntensity: 25,
-    titleBackgroundOpacity: 28,
-    titleBackgroundFit: "cover",
-    panelFrameOpacity: 22,
-    buttonFrameOpacity: 12,
-    uiOverlayOpacity: 10,
-  },
-  minimal: {
-    preset: "minimal",
-    layoutPreset: "minimal",
-    titleLayout: "poster",
-    fontStyle: "modern",
-    surfaceStyle: "minimal",
-    brandMode: "hidden",
-    sidePanelMode: "hidden",
-    sidePanelPosition: "right",
-    topbarPosition: "hidden",
-    hudPosition: "hidden",
-    titleCardAnchor: "bottom",
-    titleCardOffsetXPercent: 0,
-    titleCardOffsetYPercent: -6,
-    layoutGap: 14,
-    sidePanelWidth: 260,
-    backgroundColor: "#05070c",
-    backgroundAccentColor: "#ffffff",
-    panelColor: "#05070c",
-    panelOpacity: 48,
-    textColor: "#f7f7f7",
-    mutedTextColor: "#c6c8cf",
-    accentColor: "#ffffff",
-    accentAltColor: "#aeb5c6",
-    buttonTextColor: "#101216",
-    borderColor: "#ffffff",
-    borderOpacity: 16,
-    cornerRadius: 10,
-    backdropBlur: 2,
-    stageVignette: 20,
-    motionIntensity: 10,
-    titleBackgroundOpacity: 24,
-    titleBackgroundFit: "cover",
-    panelFrameOpacity: 0,
-    buttonFrameOpacity: 0,
-    uiOverlayOpacity: 0,
-  },
-};
-
-const PROJECT_DIALOG_BOX_PRESETS = {
-  moonlight: {
-    preset: "moonlight",
-    shape: "rounded",
-    widthPercent: 76,
-    minHeight: 148,
-    paddingX: 18,
-    paddingY: 14,
-    backgroundColor: "#0c1422",
-    backgroundOpacity: 92,
-    borderColor: "#79dcff",
-    borderOpacity: 18,
-    textColor: "#f3f6ff",
-    speakerColor: "#ffffff",
-    hintColor: "#c8d6ea",
-    blurStrength: 10,
-    borderWidth: 1,
-    shadowStrength: 30,
-    panelAssetOpacity: 0,
-    panelAssetFit: "cover",
-    anchor: "bottom",
-    offsetXPercent: 0,
-    offsetYPercent: 0,
-  },
-  warm: {
-    preset: "warm",
-    shape: "rounded",
-    widthPercent: 76,
-    minHeight: 148,
-    paddingX: 16,
-    paddingY: 14,
-    backgroundColor: "#fffaf5",
-    backgroundOpacity: 92,
-    borderColor: "#8f6548",
-    borderOpacity: 18,
-    textColor: "#332117",
-    speakerColor: "#7f5438",
-    hintColor: "#6d5b4f",
-    blurStrength: 8,
-    borderWidth: 1,
-    shadowStrength: 18,
-    panelAssetOpacity: 0,
-    panelAssetFit: "cover",
-    anchor: "bottom",
-    offsetXPercent: 0,
-    offsetYPercent: 0,
-  },
-  paper: {
-    preset: "paper",
-    shape: "square",
-    widthPercent: 76,
-    minHeight: 156,
-    paddingX: 18,
-    paddingY: 16,
-    backgroundColor: "#fff7e8",
-    backgroundOpacity: 95,
-    borderColor: "#b08659",
-    borderOpacity: 28,
-    textColor: "#4a2f1d",
-    speakerColor: "#7f5438",
-    hintColor: "#7f6a54",
-    blurStrength: 4,
-    borderWidth: 1,
-    shadowStrength: 16,
-    panelAssetOpacity: 0,
-    panelAssetFit: "cover",
-    anchor: "bottom",
-    offsetXPercent: 0,
-    offsetYPercent: 0,
-  },
-  transparent: {
-    preset: "transparent",
-    shape: "rounded",
-    widthPercent: 78,
-    minHeight: 132,
-    paddingX: 18,
-    paddingY: 12,
-    backgroundColor: "#08111b",
-    backgroundOpacity: 0,
-    borderColor: "#7fe6ff",
-    borderOpacity: 0,
-    textColor: "#f4f8ff",
-    speakerColor: "#ffffff",
-    hintColor: "#d0daf0",
-    blurStrength: 0,
-    borderWidth: 0,
-    shadowStrength: 0,
-    panelAssetOpacity: 0,
-    panelAssetFit: "cover",
-    anchor: "bottom",
-    offsetXPercent: 0,
-    offsetYPercent: 0,
-  },
 };
 
 const UI_THEME_MODE_LABELS = uiThemeTools?.UI_THEME_MODE_LABELS ?? {
@@ -2023,24 +527,6 @@ const STORY_BLOCK_ISSUE_FILTER_LABELS = editorFilterTools?.STORY_BLOCK_ISSUE_FIL
   broken_target: "跳转待修",
   variable_logic: "变量待修",
   too_long: "偏长文本",
-};
-
-const STORY_TEMPLATE_PRESETS = {
-  opening_intro: {
-    title: "开场铺垫",
-  },
-  memory_entry: {
-    title: "进入回忆",
-  },
-  emotion_burst: {
-    title: "情绪爆点",
-  },
-  branch_choice: {
-    title: "选项分支",
-  },
-  scene_outro: {
-    title: "场景收尾",
-  },
 };
 
 const STORY_SCENE_TREE_FILTER_LABELS = editorFilterTools?.STORY_SCENE_TREE_FILTER_LABELS ?? {
@@ -2127,6 +613,20 @@ const RECENT_WORKSPACE_TYPE_LABELS = recentWorkspaceTools?.RECENT_WORKSPACE_TYPE
 };
 
 const initialCreativeAssistantSettings = loadStoredCreativeAssistantSettings();
+const initialOpenAiAssetState = openAiAssetTools?.getDefaultOpenAiAssetGenerationState?.() ?? {
+  openAiAssetType: "background",
+  openAiAssetPrompt: "雨后黄昏的校园走廊，窗外有浅蓝色天光，适合作为视觉小说背景",
+  openAiAssetName: "",
+  openAiAssetApiKey: "",
+  openAiAssetModel: "gpt-image-1.5",
+  openAiAssetSize: "1536x1024",
+  openAiAssetQuality: "medium",
+  openAiAssetBackground: "auto",
+  openAiAssetOutputFormat: "png",
+  openAiAssetLoading: false,
+  openAiAssetError: "",
+  openAiAssetLastResult: null,
+};
 
 const state = {
   currentScreen: "dashboard",
@@ -2145,6 +645,7 @@ const state = {
   assetSortMode: "default",
   assetFavoriteOnly: false,
   assetCheckedIds: [],
+  ...initialOpenAiAssetState,
   dashboardSearchQuery: "",
   dashboardSearchMode: "all",
   dashboardRouteFilter: "all",
@@ -2982,6 +1483,7 @@ function resetProjectScopedUiState() {
   state.assetSortMode = "default";
   state.assetFavoriteOnly = false;
   state.assetCheckedIds = [];
+  Object.assign(state, openAiAssetTools?.getDefaultOpenAiAssetGenerationState?.() ?? initialOpenAiAssetState);
   state.dashboardSearchQuery = "";
   state.dashboardSearchMode = "all";
   state.dashboardRouteFilter = "all";
@@ -3467,6 +1969,31 @@ function renderBeginnerAdvancedToolsPanel() {
   `;
 }
 
+function getSafeOpenAiAssetGenerationType(type) {
+  return openAiAssetTools?.getSafeOpenAiAssetGenerationType?.(type) ?? (
+    ["background", "sprite", "cg", "ui"].includes(type) ? type : "background"
+  );
+}
+
+function getSafeOpenAiAssetGenerationOption(value, options, fallback) {
+  return openAiAssetTools?.getSafeOpenAiAssetGenerationOption?.(value, options, fallback) ?? (
+    options.includes(value) ? value : fallback
+  );
+}
+
+function getOpenAiAssetPromptSample(assetType) {
+  return openAiAssetTools?.getOpenAiAssetPromptSample?.(assetType) ?? "雨后黄昏的校园走廊，窗外有浅蓝色天光，适合作为视觉小说背景";
+}
+
+function renderOpenAiAssetGeneratorPanel() {
+  return openAiAssetTools?.renderOpenAiAssetGeneratorPanel?.({
+    state,
+    selectedAssetType: state.selectedAssetType,
+    escapeHtml,
+    getAssetTypeLabel,
+  }) ?? "";
+}
+
 function renderBeginnerAssetsGuide(selectedAsset, duplicateOverview = buildAssetDuplicateOverview()) {
   const overview = buildAssetGapOverview(state.data, duplicateOverview);
   const currentTypeSummary = overview.perTypeMap.get(state.selectedAssetType) ?? null;
@@ -3631,170 +2158,20 @@ function renderBeginnerCharacterGuide(character, stats) {
 }
 
 function hasBeginnerTutorialStoryContent(data = state.data) {
-  const scenes = data?.scenes ?? [];
-  return scenes.some((scene) =>
-    (scene.blocks ?? []).some((block) => ["dialogue", "narration", "choice"].includes(block.type))
-  );
+  return beginnerTutorialTools?.hasBeginnerTutorialStoryContent?.(data) ?? false;
 }
 
 function hasBeginnerTutorialPreviewProgress() {
-  const autoResume = sanitizeStoredPreviewSession(state.previewAutoResume?.session);
-  const quickSave = sanitizeStoredPreviewSession(state.previewQuickSave?.session);
-  const slotSession = state.previewSaveSlots.find((slot) => sanitizeStoredPreviewSession(slot?.session));
-  const sessionTimelineLength = state.previewSession?.timeline?.length ?? 0;
-  return Boolean(autoResume || quickSave || slotSession || sessionTimelineLength > 1);
-}
-
-function getRuntimeExportSupportSummary() {
-  return {
-    windows: "游戏成品现在支持网页试玩包和 Windows 桌面包，Windows 这边可以走可运行桌面包链路。",
-    macLinux: "macOS 和 Linux 现在也已经能导出原生桌面包，三端都走同一套 NW.js 原生桌面壳链路。",
-    editor:
-      "编辑器本体已经能导出三系统桌面套装，所以创作工具和游戏成品的支持范围现在不是完全一样的。",
-  };
+  return beginnerTutorialTools?.hasBeginnerTutorialPreviewProgress?.(state, sanitizeStoredPreviewSession) ?? false;
 }
 
 function getBeginnerTutorialSteps() {
-  const hasProject = Boolean(state.data?.project);
-  const isBlankProject = hasProject && isCurrentProjectBlank();
-  const hasScenes = (state.data?.scenes?.length ?? 0) > 0;
-  const hasStoryContent = hasProject && hasBeginnerTutorialStoryContent();
-  const starterKitOverview = hasProject ? getStarterKitOverview() : null;
-  const starterKitReady = hasProject && starterKitOverview ? !starterKitOverview.needsStarterKit : false;
-  const previewReady = hasProject && hasScenes;
-  const previewDone = previewReady && hasBeginnerTutorialPreviewProgress();
-  const exportDone = Boolean(state.lastExportResult);
-  const exportSupport = getRuntimeExportSupportSummary();
-
-  return [
-    {
-      id: "project",
-      step: "第 1 步",
-      title: hasProject ? "先确认当前项目入口" : "先创建或打开项目",
-      done: hasProject,
-      summary: hasProject
-        ? `当前已经打开《${state.data.project.title}》，后续步骤会按项目进度排列。`
-        : "从项目中心创建空白项目，或打开已有项目后再继续。",
-      notes: [
-        hasProject ? "页面切换和保存操作都会基于当前项目进行。" : "空白项目不会自动填入样板剧情。",
-        "示例项目会单独显示在项目中心下方。",
-      ],
-      actions: hasProject
-        ? [
-            { label: "回项目中心看看", action: "open-project-center" },
-            { label: "继续留在当前项目", action: "switch-screen", dataset: { screen: "dashboard" } },
-          ]
-        : [
-            { label: "新建空白项目", action: "create-project" },
-            { label: "刷新项目列表", action: "refresh-project-center" },
-          ],
-    },
-    {
-      id: "chapter",
-      step: "第 2 步",
-      title: hasScenes ? "第一章和第一场已经有了" : "先建第一章和第一场",
-      done: hasScenes,
-      summary: hasScenes
-        ? "剧情骨架已经建立，可直接继续写入正文。"
-        : "空白项目需要先创建第一章和第一场，后续内容才能挂载。",
-      notes: [
-        "没有场景时，剧情块和试玩入口都不会出现。",
-        "如需自定义命名，可使用“自定义名字再创建”。",
-      ],
-      actions: hasScenes
-        ? [
-            { label: "去剧情页继续写", action: "switch-screen", dataset: { screen: "story" } },
-            { label: "查看首页路线", action: "switch-screen", dataset: { screen: "dashboard" } },
-          ]
-        : [
-            { label: "一键创建第一章", action: "create-first-chapter" },
-            { label: "自定义名字再创建", action: "create-first-chapter-custom" },
-          ],
-    },
-    {
-      id: "story",
-      step: "第 3 步",
-      title: hasStoryContent ? "正文已经开始成形" : "先写第一段正文",
-      done: hasStoryContent,
-      summary: hasStoryContent
-        ? "当前项目里已经有正文卡片，后续可以继续补齐角色、背景、音乐和分支。"
-        : "先写一句台词或旁白，让项目从空场景进入可阅读状态。",
-      notes: [
-        "新手模式下，剧情页优先显示正文相关入口。",
-        "变量、条件和镜头演出可在后续切换到高级模式时再补充。",
-      ],
-      actions: [
-        { label: hasStoryContent ? "继续写剧情" : "打开剧情页", action: "switch-screen", dataset: { screen: "story" } },
-        { label: "看新手工作流", action: "switch-screen", dataset: { screen: "story" } },
-      ],
-    },
-    {
-      id: "starter-kit",
-      step: "第 4 步",
-      title: starterKitReady ? "角色和基础素材已经补上" : "再补角色、背景和 BGM",
-      done: starterKitReady,
-      summary: starterKitReady
-        ? "项目已经具备角色和基础素材骨架。"
-        : "补上第一个角色、一张背景和一首 BGM 后，预览会更完整。",
-      notes: [
-        starterKitOverview?.needsStarterKit
-          ? `当前还缺：${starterKitOverview.missingLabels.join("、")}。`
-          : "如已自行导入素材，可继续进入试玩与导出流程。",
-        "这里生成的是项目骨架条目，后续仍可在素材页替换成正式图片和音频文件。",
-      ],
-      actions: starterKitOverview?.needsStarterKit
-        ? [
-            { label: "一键生成起步骨架", action: "create-starter-kit" },
-            { label: "自定义名字再生成", action: "create-starter-kit-custom" },
-          ]
-        : [
-            { label: "打开角色页", action: "switch-screen", dataset: { screen: "characters" } },
-            { label: "去素材页继续补", action: "switch-screen", dataset: { screen: "assets" } },
-          ],
-    },
-    {
-      id: "preview",
-      step: "第 5 步",
-      title: previewDone ? "试玩链已经跑过" : "进入试玩流程",
-      done: previewDone,
-      summary: previewReady
-        ? previewDone
-          ? "当前版本已经完成试玩记录，可继续使用正式存档、快速存档和系统菜单做自测。"
-          : "当前已经有可运行场景，适合先到试玩页检查节奏和基础链路。"
-        : "当前还没有可试玩场景，需要先完成前面步骤。",
-      notes: [
-        "试玩页已经接通正式存档、快速存档、系统菜单和标题页读档等核心能力。",
-        "当前内容可先完成一轮试玩，再继续补充细节。",
-      ],
-      actions: previewReady
-        ? [
-            { label: "进入试玩收尾", action: "switch-screen", dataset: { screen: "preview" } },
-            { label: "回剧情页继续补", action: "switch-screen", dataset: { screen: "story" } },
-          ]
-        : [
-            { label: "创建第一章", action: "create-first-chapter" },
-            { label: "回首页看看进度", action: "switch-screen", dataset: { screen: "dashboard" } },
-          ],
-    },
-    {
-      id: "export",
-      step: "第 6 步",
-      title: exportDone ? "已经导出过一版" : "最后再看导出目标",
-      done: exportDone,
-      summary: exportDone
-        ? "导出链已经实际跑过了，后面就可以继续收尾、修问题、再导下一版。"
-        : "导出前可先确认平台支持范围：当前游戏成品的原生桌面端以 Windows 为主，mac 和 Linux 可先导网页试玩包。",
-      notes: [
-        exportSupport.windows,
-        exportSupport.macLinux,
-        exportSupport.editor,
-      ],
-      actions: [
-        { label: "打开预览导出页", action: "switch-screen", dataset: { screen: "preview" } },
-        { label: "打开项目巡检", action: "switch-screen", dataset: { screen: "inspection" } },
-      ],
-    },
-  ];
+  return beginnerTutorialTools?.buildBeginnerTutorialSteps?.({
+    data: state.data,
+    starterKitOverview: state.data?.project ? getStarterKitOverview() : null,
+    previewProgress: hasBeginnerTutorialPreviewProgress(),
+    lastExportResult: state.lastExportResult,
+  }) ?? [];
 }
 
 function renderBeginnerTutorialDialog() {
@@ -3803,64 +2180,23 @@ function renderBeginnerTutorialDialog() {
   }
 
   const steps = getBeginnerTutorialSteps();
-  const maxIndex = Math.max(steps.length - 1, 0);
-  const stepIndex = Math.min(Math.max(Number.parseInt(state.beginnerTutorialStep ?? 0, 10) || 0, 0), maxIndex);
+  const stepIndex = beginnerTutorialTools?.clampBeginnerTutorialStepIndex?.(state.beginnerTutorialStep, steps) ?? 0;
   const currentStep = steps[stepIndex] ?? steps[0];
   const activeProjectTitle = state.data?.project?.title ?? state.projectCenter?.projects?.find(
     (project) => project.projectId === state.projectCenter?.activeProjectId
   )?.title;
 
   if (refs.beginnerTutorialSummary) {
-    refs.beginnerTutorialSummary.textContent = state.data?.project
-      ? `当前项目：${activeProjectTitle}。教程会按这个项目的真实进度排列当前流程。`
-      : activeProjectTitle
-        ? `上次打开的项目是《${activeProjectTitle}》。如需继续处理，可先从项目中心打开。`
-        : "还没有打开项目也没关系。先从项目中心创建空白项目，再按下面 6 步往下走。";
+    refs.beginnerTutorialSummary.textContent = beginnerTutorialTools?.getBeginnerTutorialSummary?.({
+      data: state.data,
+      activeProjectTitle,
+    }) ?? "";
   }
 
-  refs.beginnerTutorialStepList.innerHTML = steps
-    .map(
-      (step, index) => `
-        <button
-          type="button"
-          class="beginner-tutorial-step-button ${index === stepIndex ? "is-active" : ""} ${step.done ? "is-done" : ""}"
-          data-action="set-beginner-tutorial-step"
-          data-step-index="${index}"
-        >
-          <span class="beginner-tutorial-step-meta">${escapeHtml(step.step)}</span>
-          <strong>${escapeHtml(step.title)}</strong>
-          <span class="beginner-tutorial-step-state">${step.done ? "当前已完成" : "进行中"}</span>
-        </button>
-      `
-    )
-    .join("");
-
-  refs.beginnerTutorialContent.innerHTML = `
-    <article class="beginner-tutorial-focus">
-      <span class="issue-tag ${currentStep.done ? "good-text" : "warn-text"}">${escapeHtml(currentStep.step)}</span>
-      <h3>${escapeHtml(currentStep.title)}</h3>
-      <p>${escapeHtml(currentStep.summary)}</p>
-      <div class="detail-actions">
-        ${currentStep.actions.map((action, index) => renderQuickActionButton(action, index === 0)).join("")}
-      </div>
-    </article>
-    <section class="beginner-tutorial-note-stack">
-      ${currentStep.notes
-        .map(
-          (note) => `
-            <article class="detail-card beginner-tutorial-note-card">
-              <strong>这一条为什么重要</strong>
-              <p>${escapeHtml(note)}</p>
-            </article>
-          `
-        )
-        .join("")}
-    </section>
-    <article class="detail-card beginner-tutorial-footer-card">
-      <strong>最简单的记忆方式</strong>
-      <p>先建项目和第一场，再写正文，补角色和素材，进入试玩，最后再看导出目标。先完成一段可运行内容，再继续扩展会更清晰。</p>
-    </article>
-  `;
+  refs.beginnerTutorialStepList.innerHTML =
+    beginnerTutorialTools?.renderBeginnerTutorialStepList?.(steps, stepIndex, escapeHtml) ?? "";
+  refs.beginnerTutorialContent.innerHTML =
+    beginnerTutorialTools?.renderBeginnerTutorialContent?.(currentStep, { escapeHtml, renderQuickActionButton }) ?? "";
 
   refs.beginnerTutorialDialog.hidden = !state.beginnerTutorialOpen;
   refs.beginnerTutorialDialog.classList.toggle("is-visible", state.beginnerTutorialOpen);
@@ -3869,12 +2205,9 @@ function renderBeginnerTutorialDialog() {
 function openBeginnerTutorial(options = {}) {
   const requestedStep = Number.parseInt(options.stepIndex ?? "", 10);
   const steps = getBeginnerTutorialSteps();
-  const fallbackIndex = Math.max(
-    steps.findIndex((step) => !step.done),
-    0
-  );
+  const fallbackIndex = beginnerTutorialTools?.getBeginnerTutorialDefaultStepIndex?.(steps) ?? 0;
   state.beginnerTutorialStep = Number.isInteger(requestedStep)
-    ? Math.min(Math.max(requestedStep, 0), Math.max(steps.length - 1, 0))
+    ? beginnerTutorialTools?.clampBeginnerTutorialStepIndex?.(requestedStep, steps) ?? 0
     : fallbackIndex;
   state.beginnerTutorialOpen = true;
   renderBeginnerTutorialDialog();
@@ -3896,8 +2229,7 @@ function closeBeginnerTutorial(options = {}) {
 
 function setBeginnerTutorialStep(stepIndex) {
   const steps = getBeginnerTutorialSteps();
-  const maxIndex = Math.max(steps.length - 1, 0);
-  state.beginnerTutorialStep = Math.min(Math.max(Number.parseInt(stepIndex ?? "0", 10) || 0, 0), maxIndex);
+  state.beginnerTutorialStep = beginnerTutorialTools?.clampBeginnerTutorialStepIndex?.(stepIndex, steps) ?? 0;
   renderBeginnerTutorialDialog();
 }
 
@@ -5444,6 +3776,22 @@ async function handleClick(event) {
     return;
   }
 
+  if (action === "apply-openai-asset-prompt-sample") {
+    const assetType = getSafeOpenAiAssetGenerationType(actionTarget.dataset.assetType);
+    state.openAiAssetType = assetType;
+    state.openAiAssetPrompt = getOpenAiAssetPromptSample(assetType);
+    state.openAiAssetError = "";
+    state.openAiAssetLastResult = null;
+    renderAssetsScreen();
+    setSaveStatus(`已填入 ${getAssetTypeLabel(assetType)} 生图提示词示例`);
+    return;
+  }
+
+  if (action === "generate-openai-asset") {
+    void generateOpenAiAsset();
+    return;
+  }
+
   if (action === "select-scene") {
     selectScene(actionTarget.dataset.sceneId);
     const scene = state.data.scenesById.get(actionTarget.dataset.sceneId);
@@ -5685,6 +4033,13 @@ async function handleClick(event) {
 
   if (action === "select-asset-type") {
     state.selectedAssetType = actionTarget.dataset.assetType;
+    if (getSafeOpenAiAssetGenerationType(state.selectedAssetType) === state.selectedAssetType) {
+      const previousSample = getOpenAiAssetPromptSample(state.openAiAssetType);
+      state.openAiAssetType = state.selectedAssetType;
+      if (!state.openAiAssetPrompt.trim() || state.openAiAssetPrompt === previousSample) {
+        state.openAiAssetPrompt = getOpenAiAssetPromptSample(state.openAiAssetType);
+      }
+    }
     const visibleAssets = getVisibleAssets();
     const firstAsset = visibleAssets.find(
       (asset) => asset.type === state.selectedAssetType
@@ -6069,6 +4424,57 @@ function handleChange(event) {
     return;
   }
 
+  if (target.id === "openAiAssetType") {
+    state.openAiAssetType = getSafeOpenAiAssetGenerationType(target.value);
+    if (!state.openAiAssetPrompt.trim()) {
+      state.openAiAssetPrompt = getOpenAiAssetPromptSample(state.openAiAssetType);
+    }
+    state.openAiAssetError = "";
+    renderAssetsScreen();
+    setSaveStatus(`AI 生图素材类型：${getAssetTypeLabel(state.openAiAssetType)}`);
+    return;
+  }
+
+  if (target.id === "openAiAssetSize") {
+    state.openAiAssetSize = getSafeOpenAiAssetGenerationOption(
+      target.value,
+      openAiAssetTools?.OPENAI_ASSET_GENERATION_SIZES ?? [],
+      "1536x1024"
+    );
+    setSaveStatus(`AI 生图尺寸：${state.openAiAssetSize}`);
+    return;
+  }
+
+  if (target.id === "openAiAssetQuality") {
+    state.openAiAssetQuality = getSafeOpenAiAssetGenerationOption(
+      target.value,
+      openAiAssetTools?.OPENAI_ASSET_GENERATION_QUALITIES ?? [],
+      "medium"
+    );
+    setSaveStatus(`AI 生图质量：${state.openAiAssetQuality}`);
+    return;
+  }
+
+  if (target.id === "openAiAssetBackground") {
+    state.openAiAssetBackground = getSafeOpenAiAssetGenerationOption(
+      target.value,
+      openAiAssetTools?.OPENAI_ASSET_GENERATION_BACKGROUNDS ?? [],
+      "auto"
+    );
+    setSaveStatus(`AI 生图背景：${state.openAiAssetBackground}`);
+    return;
+  }
+
+  if (target.id === "openAiAssetOutputFormat") {
+    state.openAiAssetOutputFormat = getSafeOpenAiAssetGenerationOption(
+      target.value,
+      openAiAssetTools?.OPENAI_ASSET_GENERATION_FORMATS ?? [],
+      "png"
+    );
+    setSaveStatus(`AI 生图格式：${state.openAiAssetOutputFormat}`);
+    return;
+  }
+
   if (target.id === "storyBlockTypeSelect") {
     state.storyBlockTypeFilter = getSafeStoryBlockTypeFilter(target.value);
     renderStoryScreen();
@@ -6277,6 +4683,31 @@ function handleInput(event) {
     state.creativeAssistantResult = null;
     state.creativeAssistantSelectedBlockIndexes = null;
     state.creativeAssistantError = "";
+    return;
+  }
+
+  if (event.target.id === "openAiAssetPrompt") {
+    state.openAiAssetPrompt = event.target.value ?? "";
+    state.openAiAssetError = "";
+    state.openAiAssetLastResult = null;
+    return;
+  }
+
+  if (event.target.id === "openAiAssetName") {
+    state.openAiAssetName = event.target.value ?? "";
+    state.openAiAssetError = "";
+    return;
+  }
+
+  if (event.target.id === "openAiAssetApiKey") {
+    state.openAiAssetApiKey = event.target.value ?? "";
+    state.openAiAssetError = "";
+    return;
+  }
+
+  if (event.target.id === "openAiAssetModel") {
+    state.openAiAssetModel = event.target.value ?? "";
+    state.openAiAssetError = "";
     return;
   }
 
@@ -9898,21 +8329,14 @@ async function toggleAssetAudioPreview(assetId) {
 }
 
 function getProjectResolution(project = state.data?.project) {
-  if (projectSettingsTools?.getProjectResolution) {
-    return projectSettingsTools.getProjectResolution(project);
-  }
-
-  const width = Number.parseInt(project?.resolution?.width ?? 1280, 10);
-  const height = Number.parseInt(project?.resolution?.height ?? 720, 10);
-
-  return {
-    width: Number.isFinite(width) ? width : 1280,
-    height: Number.isFinite(height) ? height : 720,
-  };
+  return projectSettingsTools.getProjectResolution(project);
 }
 
 function getProjectSettingsOptions() {
   return {
+    defaultResolution: projectSettingsTools.DEFAULT_RESOLUTION,
+    supportedResolutions: projectSettingsTools.SUPPORTED_RESOLUTIONS,
+    screenLabels: projectSettingsTools.SCREEN_LABELS,
     saveSlotCountLimits: PROJECT_SAVE_SLOT_COUNT_LIMITS,
     defaultRuntimeSettings: DEFAULT_PROJECT_RUNTIME_SETTINGS,
     dialogBoxPresetLabels: PROJECT_DIALOG_BOX_PRESET_LABELS,
@@ -9940,283 +8364,91 @@ function getProjectSettingsOptions() {
 }
 
 function getSafeProjectFormalSaveSlotCount(value) {
-  if (projectSettingsTools?.getSafeProjectFormalSaveSlotCount) {
-    return projectSettingsTools.getSafeProjectFormalSaveSlotCount(value, getProjectSettingsOptions());
-  }
-
-  return clamp(
-    Math.round(getSafeNumber(value, DEFAULT_PROJECT_RUNTIME_SETTINGS.formalSaveSlotCount)),
-    PROJECT_SAVE_SLOT_COUNT_LIMITS.min,
-    PROJECT_SAVE_SLOT_COUNT_LIMITS.max
-  );
+  return projectSettingsTools.getSafeProjectFormalSaveSlotCount(value, getProjectSettingsOptions());
 }
 
 function getProjectRuntimeSettings(project = state.data?.project) {
-  if (projectSettingsTools?.getProjectRuntimeSettings) {
-    return projectSettingsTools.getProjectRuntimeSettings(project, getProjectSettingsOptions());
-  }
-
-  const runtimeSettings = project?.runtimeSettings ?? {};
-  return {
-    formalSaveSlotCount: getSafeProjectFormalSaveSlotCount(runtimeSettings.formalSaveSlotCount),
-  };
+  return projectSettingsTools.getProjectRuntimeSettings(project, getProjectSettingsOptions());
 }
 
 function getProjectFormalSaveSlotCount(project = state.data?.project) {
-  if (projectSettingsTools?.getProjectFormalSaveSlotCount) {
-    return projectSettingsTools.getProjectFormalSaveSlotCount(project, getProjectSettingsOptions());
-  }
-
-  return getProjectRuntimeSettings(project).formalSaveSlotCount;
+  return projectSettingsTools.getProjectFormalSaveSlotCount(project, getProjectSettingsOptions());
 }
 
 function getSafeProjectDialogBoxPreset(value) {
-  if (projectSettingsTools?.getSafeProjectDialogBoxPreset) {
-    return projectSettingsTools.getSafeProjectDialogBoxPreset(value, getProjectSettingsOptions());
-  }
-
-  return Object.hasOwn(PROJECT_DIALOG_BOX_PRESET_LABELS, value) ? value : DEFAULT_PROJECT_DIALOG_BOX_CONFIG.preset;
+  return projectSettingsTools.getSafeProjectDialogBoxPreset(value, getProjectSettingsOptions());
 }
 
 function getSafeProjectDialogBoxShape(value) {
-  if (projectSettingsTools?.getSafeProjectDialogBoxShape) {
-    return projectSettingsTools.getSafeProjectDialogBoxShape(value, getProjectSettingsOptions());
-  }
-
-  return Object.hasOwn(PROJECT_DIALOG_BOX_SHAPE_LABELS, value) ? value : DEFAULT_PROJECT_DIALOG_BOX_CONFIG.shape;
+  return projectSettingsTools.getSafeProjectDialogBoxShape(value, getProjectSettingsOptions());
 }
 
 function getSafeProjectDialogBoxAnchor(value) {
-  if (projectSettingsTools?.getSafeProjectDialogBoxAnchor) {
-    return projectSettingsTools.getSafeProjectDialogBoxAnchor(value, getProjectSettingsOptions());
-  }
-
-  return Object.hasOwn(PROJECT_DIALOG_BOX_ANCHOR_LABELS, value) ? value : DEFAULT_PROJECT_DIALOG_BOX_CONFIG.anchor;
+  return projectSettingsTools.getSafeProjectDialogBoxAnchor(value, getProjectSettingsOptions());
 }
 
 function getProjectDialogBoxPresetConfig(preset) {
-  if (projectSettingsTools?.getProjectDialogBoxPresetConfig) {
-    return projectSettingsTools.getProjectDialogBoxPresetConfig(preset, getProjectSettingsOptions());
-  }
-
-  const safePreset = getSafeProjectDialogBoxPreset(preset);
-  return {
-    ...DEFAULT_PROJECT_DIALOG_BOX_CONFIG,
-    ...(PROJECT_DIALOG_BOX_PRESETS[safePreset] ?? {}),
-    preset: safePreset,
-  };
+  return projectSettingsTools.getProjectDialogBoxPresetConfig(preset, getProjectSettingsOptions());
 }
 
 function getProjectDialogBoxConfig(project = state.data?.project) {
-  if (projectSettingsTools?.getProjectDialogBoxConfig) {
-    return projectSettingsTools.getProjectDialogBoxConfig(project, getProjectSettingsOptions());
-  }
-
-  const source = project?.dialogBoxConfig ?? {};
-  const base = getProjectDialogBoxPresetConfig(source.preset);
-  return {
-    ...base,
-    preset: getSafeProjectDialogBoxPreset(source.preset ?? base.preset),
-    shape: getSafeProjectDialogBoxShape(source.shape ?? base.shape),
-    widthPercent: clamp(getSafeNumber(source.widthPercent, base.widthPercent), 55, 100),
-    minHeight: clamp(getSafeNumber(source.minHeight, base.minHeight), 96, 320),
-    paddingX: clamp(getSafeNumber(source.paddingX, base.paddingX), 8, 72),
-    paddingY: clamp(getSafeNumber(source.paddingY, base.paddingY), 6, 48),
-    backgroundColor: getSafeParticleColor(source.backgroundColor, base.backgroundColor),
-    backgroundOpacity: clamp(getSafeNumber(source.backgroundOpacity, base.backgroundOpacity), 0, 100),
-    borderColor: getSafeParticleColor(source.borderColor, base.borderColor),
-    borderOpacity: clamp(getSafeNumber(source.borderOpacity, base.borderOpacity), 0, 100),
-    textColor: getSafeParticleColor(source.textColor, base.textColor),
-    speakerColor: getSafeParticleColor(source.speakerColor, base.speakerColor),
-    hintColor: getSafeParticleColor(source.hintColor, base.hintColor),
-    blurStrength: clamp(getSafeNumber(source.blurStrength, base.blurStrength), 0, 24),
-    borderWidth: clamp(getSafeNumber(source.borderWidth, base.borderWidth), 0, 4),
-    shadowStrength: clamp(getSafeNumber(source.shadowStrength, base.shadowStrength), 0, 48),
-    panelAssetId: String(source.panelAssetId ?? "").trim(),
-    panelAssetOpacity: clamp(getSafeNumber(source.panelAssetOpacity, base.panelAssetOpacity), 0, 100),
-    panelAssetFit: source.panelAssetFit === "contain" ? "contain" : "cover",
-    anchor: getSafeProjectDialogBoxAnchor(source.anchor ?? base.anchor),
-    offsetXPercent: clamp(getSafeNumber(source.offsetXPercent, base.offsetXPercent), -35, 35),
-    offsetYPercent: clamp(getSafeNumber(source.offsetYPercent, base.offsetYPercent), -35, 35),
-  };
+  return projectSettingsTools.getProjectDialogBoxConfig(project, getProjectSettingsOptions());
 }
 
 function getSafeProjectGameUiPreset(value) {
-  if (projectSettingsTools?.getSafeProjectGameUiPreset) {
-    return projectSettingsTools.getSafeProjectGameUiPreset(value, getProjectSettingsOptions());
-  }
-
-  return Object.hasOwn(PROJECT_GAME_UI_PRESET_LABELS, value) ? value : DEFAULT_PROJECT_GAME_UI_CONFIG.preset;
+  return projectSettingsTools.getSafeProjectGameUiPreset(value, getProjectSettingsOptions());
 }
 
 function getSafeProjectGameUiLayoutPreset(value) {
-  if (projectSettingsTools?.getSafeProjectGameUiLayoutPreset) {
-    return projectSettingsTools.getSafeProjectGameUiLayoutPreset(value, getProjectSettingsOptions());
-  }
-
-  return Object.hasOwn(PROJECT_GAME_UI_LAYOUT_LABELS, value) ? value : DEFAULT_PROJECT_GAME_UI_CONFIG.layoutPreset;
+  return projectSettingsTools.getSafeProjectGameUiLayoutPreset(value, getProjectSettingsOptions());
 }
 
 function getSafeProjectGameUiTitleLayout(value) {
-  if (projectSettingsTools?.getSafeProjectGameUiTitleLayout) {
-    return projectSettingsTools.getSafeProjectGameUiTitleLayout(value, getProjectSettingsOptions());
-  }
-
-  return Object.hasOwn(PROJECT_GAME_UI_TITLE_LAYOUT_LABELS, value) ? value : DEFAULT_PROJECT_GAME_UI_CONFIG.titleLayout;
+  return projectSettingsTools.getSafeProjectGameUiTitleLayout(value, getProjectSettingsOptions());
 }
 
 function getSafeProjectGameUiFontStyle(value) {
-  if (projectSettingsTools?.getSafeProjectGameUiFontStyle) {
-    return projectSettingsTools.getSafeProjectGameUiFontStyle(value, getProjectSettingsOptions());
-  }
-
-  return Object.hasOwn(PROJECT_GAME_UI_FONT_LABELS, value) ? value : DEFAULT_PROJECT_GAME_UI_CONFIG.fontStyle;
+  return projectSettingsTools.getSafeProjectGameUiFontStyle(value, getProjectSettingsOptions());
 }
 
 function getSafeProjectGameUiSurfaceStyle(value) {
-  if (projectSettingsTools?.getSafeProjectGameUiSurfaceStyle) {
-    return projectSettingsTools.getSafeProjectGameUiSurfaceStyle(value, getProjectSettingsOptions());
-  }
-
-  return Object.hasOwn(PROJECT_GAME_UI_SURFACE_LABELS, value) ? value : DEFAULT_PROJECT_GAME_UI_CONFIG.surfaceStyle;
+  return projectSettingsTools.getSafeProjectGameUiSurfaceStyle(value, getProjectSettingsOptions());
 }
 
 function getSafeProjectGameUiBrandMode(value) {
-  if (projectSettingsTools?.getSafeProjectGameUiBrandMode) {
-    return projectSettingsTools.getSafeProjectGameUiBrandMode(value, getProjectSettingsOptions());
-  }
-
-  return Object.hasOwn(PROJECT_GAME_UI_BRAND_LABELS, value) ? value : DEFAULT_PROJECT_GAME_UI_CONFIG.brandMode;
+  return projectSettingsTools.getSafeProjectGameUiBrandMode(value, getProjectSettingsOptions());
 }
 
 function getSafeProjectGameUiSidePanelMode(value) {
-  if (projectSettingsTools?.getSafeProjectGameUiSidePanelMode) {
-    return projectSettingsTools.getSafeProjectGameUiSidePanelMode(value, getProjectSettingsOptions());
-  }
-
-  return Object.hasOwn(PROJECT_GAME_UI_SIDE_PANEL_LABELS, value) ? value : DEFAULT_PROJECT_GAME_UI_CONFIG.sidePanelMode;
+  return projectSettingsTools.getSafeProjectGameUiSidePanelMode(value, getProjectSettingsOptions());
 }
 
 function getSafeProjectGameUiSidePanelPosition(value) {
-  if (projectSettingsTools?.getSafeProjectGameUiSidePanelPosition) {
-    return projectSettingsTools.getSafeProjectGameUiSidePanelPosition(value, getProjectSettingsOptions());
-  }
-
-  return Object.hasOwn(PROJECT_GAME_UI_SIDE_POSITION_LABELS, value) ? value : DEFAULT_PROJECT_GAME_UI_CONFIG.sidePanelPosition;
+  return projectSettingsTools.getSafeProjectGameUiSidePanelPosition(value, getProjectSettingsOptions());
 }
 
 function getSafeProjectGameUiTopbarPosition(value) {
-  if (projectSettingsTools?.getSafeProjectGameUiTopbarPosition) {
-    return projectSettingsTools.getSafeProjectGameUiTopbarPosition(value, getProjectSettingsOptions());
-  }
-
-  return Object.hasOwn(PROJECT_GAME_UI_TOPBAR_POSITION_LABELS, value) ? value : DEFAULT_PROJECT_GAME_UI_CONFIG.topbarPosition;
+  return projectSettingsTools.getSafeProjectGameUiTopbarPosition(value, getProjectSettingsOptions());
 }
 
 function getSafeProjectGameUiHudPosition(value) {
-  if (projectSettingsTools?.getSafeProjectGameUiHudPosition) {
-    return projectSettingsTools.getSafeProjectGameUiHudPosition(value, getProjectSettingsOptions());
-  }
-
-  return Object.hasOwn(PROJECT_GAME_UI_HUD_POSITION_LABELS, value) ? value : DEFAULT_PROJECT_GAME_UI_CONFIG.hudPosition;
+  return projectSettingsTools.getSafeProjectGameUiHudPosition(value, getProjectSettingsOptions());
 }
 
 function getSafeProjectGameUiTitleCardAnchor(value) {
-  if (projectSettingsTools?.getSafeProjectGameUiTitleCardAnchor) {
-    return projectSettingsTools.getSafeProjectGameUiTitleCardAnchor(value, getProjectSettingsOptions());
-  }
-
-  return Object.hasOwn(PROJECT_GAME_UI_TITLE_CARD_ANCHOR_LABELS, value)
-    ? value
-    : DEFAULT_PROJECT_GAME_UI_CONFIG.titleCardAnchor;
+  return projectSettingsTools.getSafeProjectGameUiTitleCardAnchor(value, getProjectSettingsOptions());
 }
 
 function getSafeGameUiFrameSlice(value, fallback = { top: 18, right: 18, bottom: 18, left: 18 }) {
-  if (projectSettingsTools?.getSafeGameUiFrameSlice) {
-    return projectSettingsTools.getSafeGameUiFrameSlice(value, fallback, getProjectSettingsOptions());
-  }
-
-  const source = value && typeof value === "object" ? value : {};
-  return {
-    top: clamp(getSafeNumber(source.top, fallback.top), 0, 96),
-    right: clamp(getSafeNumber(source.right, fallback.right), 0, 96),
-    bottom: clamp(getSafeNumber(source.bottom, fallback.bottom), 0, 96),
-    left: clamp(getSafeNumber(source.left, fallback.left), 0, 96),
-  };
+  return projectSettingsTools.getSafeGameUiFrameSlice(value, fallback, getProjectSettingsOptions());
 }
 
 function getProjectGameUiPresetConfig(preset) {
-  if (projectSettingsTools?.getProjectGameUiPresetConfig) {
-    return projectSettingsTools.getProjectGameUiPresetConfig(preset, getProjectSettingsOptions());
-  }
-
-  const safePreset = getSafeProjectGameUiPreset(preset);
-  return {
-    ...DEFAULT_PROJECT_GAME_UI_CONFIG,
-    ...(PROJECT_GAME_UI_PRESETS[safePreset] ?? {}),
-    preset: safePreset,
-  };
+  return projectSettingsTools.getProjectGameUiPresetConfig(preset, getProjectSettingsOptions());
 }
 
 function getProjectGameUiConfig(project = state.data?.project) {
-  if (projectSettingsTools?.getProjectGameUiConfig) {
-    return projectSettingsTools.getProjectGameUiConfig(project, getProjectSettingsOptions());
-  }
-
-  const source = project?.gameUiConfig ?? {};
-  const base = getProjectGameUiPresetConfig(source.preset);
-  return {
-    ...base,
-    preset: getSafeProjectGameUiPreset(source.preset ?? base.preset),
-    layoutPreset: getSafeProjectGameUiLayoutPreset(source.layoutPreset ?? base.layoutPreset),
-    titleLayout: getSafeProjectGameUiTitleLayout(source.titleLayout ?? base.titleLayout),
-    fontStyle: getSafeProjectGameUiFontStyle(source.fontStyle ?? base.fontStyle),
-    fontFamily: String(source.fontFamily ?? base.fontFamily ?? "").trim().slice(0, 80),
-    fontAssetId: String(source.fontAssetId ?? base.fontAssetId ?? "").trim(),
-    surfaceStyle: getSafeProjectGameUiSurfaceStyle(source.surfaceStyle ?? base.surfaceStyle),
-    brandMode: getSafeProjectGameUiBrandMode(source.brandMode ?? base.brandMode),
-    sidePanelMode: getSafeProjectGameUiSidePanelMode(source.sidePanelMode ?? base.sidePanelMode),
-    sidePanelPosition: getSafeProjectGameUiSidePanelPosition(source.sidePanelPosition ?? base.sidePanelPosition),
-    topbarPosition: getSafeProjectGameUiTopbarPosition(source.topbarPosition ?? base.topbarPosition),
-    hudPosition: getSafeProjectGameUiHudPosition(source.hudPosition ?? base.hudPosition),
-    titleCardAnchor: getSafeProjectGameUiTitleCardAnchor(source.titleCardAnchor ?? base.titleCardAnchor),
-    titleCardOffsetXPercent: clamp(getSafeNumber(source.titleCardOffsetXPercent, base.titleCardOffsetXPercent), -35, 35),
-    titleCardOffsetYPercent: clamp(getSafeNumber(source.titleCardOffsetYPercent, base.titleCardOffsetYPercent), -35, 35),
-    layoutGap: clamp(getSafeNumber(source.layoutGap, base.layoutGap), 8, 48),
-    sidePanelWidth: clamp(getSafeNumber(source.sidePanelWidth, base.sidePanelWidth), 240, 460),
-    backgroundColor: getSafeParticleColor(source.backgroundColor, base.backgroundColor),
-    backgroundAccentColor: getSafeParticleColor(source.backgroundAccentColor, base.backgroundAccentColor),
-    panelColor: getSafeParticleColor(source.panelColor, base.panelColor),
-    panelOpacity: clamp(getSafeNumber(source.panelOpacity, base.panelOpacity), 35, 100),
-    textColor: getSafeParticleColor(source.textColor, base.textColor),
-    mutedTextColor: getSafeParticleColor(source.mutedTextColor, base.mutedTextColor),
-    accentColor: getSafeParticleColor(source.accentColor, base.accentColor),
-    accentAltColor: getSafeParticleColor(source.accentAltColor, base.accentAltColor),
-    buttonTextColor: getSafeParticleColor(source.buttonTextColor, base.buttonTextColor),
-    borderColor: getSafeParticleColor(source.borderColor, base.borderColor),
-    borderOpacity: clamp(getSafeNumber(source.borderOpacity, base.borderOpacity), 0, 100),
-    cornerRadius: clamp(getSafeNumber(source.cornerRadius, base.cornerRadius), 4, 42),
-    backdropBlur: clamp(getSafeNumber(source.backdropBlur, base.backdropBlur), 0, 28),
-    stageVignette: clamp(getSafeNumber(source.stageVignette, base.stageVignette), 0, 80),
-    motionIntensity: clamp(getSafeNumber(source.motionIntensity, base.motionIntensity), 0, 100),
-    titleBackgroundAssetId: String(source.titleBackgroundAssetId ?? "").trim(),
-    titleBackgroundFit: source.titleBackgroundFit === "contain" ? "contain" : "cover",
-    titleBackgroundOpacity: clamp(getSafeNumber(source.titleBackgroundOpacity, base.titleBackgroundOpacity), 0, 100),
-    titleLogoAssetId: String(source.titleLogoAssetId ?? "").trim(),
-    panelFrameAssetId: String(source.panelFrameAssetId ?? "").trim(),
-    panelFrameOpacity: clamp(getSafeNumber(source.panelFrameOpacity, base.panelFrameOpacity), 0, 100),
-    panelFrameSlice: getSafeGameUiFrameSlice(source.panelFrameSlice, base.panelFrameSlice),
-    buttonFrameAssetId: String(source.buttonFrameAssetId ?? "").trim(),
-    buttonHoverFrameAssetId: String(source.buttonHoverFrameAssetId ?? "").trim(),
-    buttonPressedFrameAssetId: String(source.buttonPressedFrameAssetId ?? "").trim(),
-    buttonDisabledFrameAssetId: String(source.buttonDisabledFrameAssetId ?? "").trim(),
-    buttonFrameOpacity: clamp(getSafeNumber(source.buttonFrameOpacity, base.buttonFrameOpacity), 0, 100),
-    buttonFrameSlice: getSafeGameUiFrameSlice(source.buttonFrameSlice, base.buttonFrameSlice),
-    saveSlotFrameAssetId: String(source.saveSlotFrameAssetId ?? "").trim(),
-    systemPanelFrameAssetId: String(source.systemPanelFrameAssetId ?? "").trim(),
-    uiOverlayAssetId: String(source.uiOverlayAssetId ?? "").trim(),
-    uiOverlayOpacity: clamp(getSafeNumber(source.uiOverlayOpacity, base.uiOverlayOpacity), 0, 100),
-  };
+  return projectSettingsTools.getProjectGameUiConfig(project, getProjectSettingsOptions());
 }
 
 function getDialogThemeBaseColors(theme) {
@@ -10265,31 +8497,11 @@ function getDialogThemeBaseColors(theme) {
 }
 
 function toRgbaString(hexColor, opacityPercent) {
-  if (projectSettingsTools?.toRgbaString) {
-    return projectSettingsTools.toRgbaString(hexColor, opacityPercent, getProjectSettingsOptions());
-  }
-
-  const safeHex = getSafeParticleColor(hexColor, "#ffffff").slice(1);
-  const red = Number.parseInt(safeHex.slice(0, 2), 16);
-  const green = Number.parseInt(safeHex.slice(2, 4), 16);
-  const blue = Number.parseInt(safeHex.slice(4, 6), 16);
-  const alpha = clamp(getSafeNumber(opacityPercent, 100), 0, 100) / 100;
-  return `rgba(${red}, ${green}, ${blue}, ${alpha.toFixed(2)})`;
+  return projectSettingsTools.toRgbaString(hexColor, opacityPercent, getProjectSettingsOptions());
 }
 
 function getDialogShapeRadius(shape, fallbackRadius = 18) {
-  if (projectSettingsTools?.getDialogShapeRadius) {
-    return projectSettingsTools.getDialogShapeRadius(shape, fallbackRadius, getProjectSettingsOptions());
-  }
-
-  const safeShape = getSafeProjectDialogBoxShape(shape);
-  if (safeShape === "square") {
-    return 6;
-  }
-  if (safeShape === "capsule") {
-    return 999;
-  }
-  return clamp(getSafeNumber(fallbackRadius, 18), 8, 42);
+  return projectSettingsTools.getDialogShapeRadius(shape, fallbackRadius, getProjectSettingsOptions());
 }
 
 function getDialogPanelAssetUrl(assetId, assetMap = state.data?.assetsById) {
@@ -10393,182 +8605,14 @@ function getEditorModeDescription(mode, context = "dashboard") {
 }
 
 function renderEditorModeSwitchButtons(mode = getProjectEditorMode(), options = {}) {
-  const safeMode = getSafeEditorMode(mode);
-  const compact = options.compact === true;
-  return ["beginner", "advanced"]
-    .map(
-      (itemMode) => `
-        <button
-          type="button"
-          class="toolbar-button editor-mode-chip ${safeMode === itemMode ? "is-active" : ""} ${compact ? "is-compact" : ""}"
-          data-action="set-editor-mode"
-          data-editor-mode="${itemMode}"
-        >
-          ${escapeHtml(getEditorModeLabel(itemMode))}
-        </button>
-      `
-    )
-    .join("");
+  return editorModeTools.renderEditorModeSwitchButtons(mode, { ...options, escapeHtml });
 }
 
 function renderEditorModeGuideCard(context = "dashboard") {
-  const mode = getProjectEditorMode();
-  const isAdvanced = mode === "advanced";
-  const title =
-    context === "preview"
-      ? "导出界面分层"
-      : context === "inspection"
-        ? "巡检界面分层"
-      : context === "story"
-        ? "剧情工具栏分层"
-        : "编辑器模式";
-  const description = getEditorModeDescription(mode, context);
-  const note = isAdvanced
-    ? "如需快速返回基础流程，可切回新手模式。"
-    : "需要处理变量、条件分支、镜头和复杂演出时，可切换到高级模式。";
-
-  return `
-    <article class="detail-card editor-mode-card">
-      <strong>${escapeHtml(title)}</strong>
-      <p>${escapeHtml(description)}</p>
-      <div class="detail-actions">
-        ${renderEditorModeSwitchButtons(mode)}
-        <button type="button" class="toolbar-button" data-action="open-beginner-tutorial">
-          打开新手教程
-        </button>
-      </div>
-      <div class="detail-meta">${escapeHtml(note)}</div>
-    </article>
-  `;
-}
-
-function buildBeginnerStoryWorkflow(scene) {
-  if (!scene) {
-    return null;
-  }
-
-  const blocks = Array.isArray(scene.blocks) ? scene.blocks : [];
-  const storyCount = blocks.filter((block) => ["dialogue", "narration"].includes(block.type)).length;
-  const hasBackground = blocks.some((block) => block.type === "background");
-  const hasCharacterShow = blocks.some((block) => block.type === "character_show");
-  const hasMusic = blocks.some((block) => block.type === "music_play");
-  const hasBranchOrJump = blocks.some((block) => ["choice", "jump"].includes(block.type));
-  const hasPolish = blocks.some((block) =>
-    ["particle_effect", "screen_shake", "screen_flash", "screen_fade", "camera_zoom", "camera_pan", "screen_filter", "depth_blur"].includes(
-      block.type
-    )
-  );
-
-  const steps = [
-    {
-      step: "第一步",
-      title: "写入这一场的基础正文",
-      done: storyCount > 0,
-      description:
-        storyCount > 0
-          ? `这一场已经有 ${storyCount} 张正文卡片了，可以继续往下补氛围和去向。`
-          : "先写一句台词或旁白，让这一场从空白状态进入可阅读状态。",
-      actions:
-        storyCount > 0
-          ? [
-              { label: "继续加台词", action: "add-dialogue" },
-              { label: "加一张旁白", action: "add-narration" },
-            ]
-          : [
-              { label: "一键开场铺垫", action: "apply-story-template", dataset: { "template-id": "opening_intro" } },
-              { label: "先加一句台词", action: "add-dialogue" },
-            ],
-    },
-    {
-      step: "第二步",
-      title: "补齐基础演出氛围",
-      done: hasBackground && (hasCharacterShow || hasMusic),
-      description:
-        hasBackground && (hasCharacterShow || hasMusic)
-          ? "这一场已经有基础空间感了，人物和音乐至少有一项进来了。"
-          : "背景、人物亮相和音乐至少补两项后，这一场的预览会更完整。",
-      actions: [
-        { label: hasBackground ? "再显一个角色" : "先切背景", action: hasBackground ? "add-character-show" : "add-background" },
-        { label: hasMusic ? "补人物亮相" : "播一首音乐", action: hasMusic ? "add-character-show" : "add-music-play" },
-      ],
-    },
-    {
-      step: "第三步",
-      title: "补齐这一场的去向",
-      done: hasBranchOrJump,
-      description:
-        hasBranchOrJump
-          ? "这场已经有下一步去向了，后面就可以开始试玩路线。"
-          : "补一个选项分支，或者至少连接到下一场，避免流程在这里中断。",
-      actions: [
-        { label: "加选项分支", action: "add-choice" },
-        { label: "直接跳下一场", action: "add-jump" },
-      ],
-    },
-    {
-      step: "第四步",
-      title: "补充强化演出",
-      done: hasPolish,
-      description:
-        hasPolish
-          ? "这一场已经有至少一种强化演出，记忆点开始出来了。"
-          : "剧情顺畅后，可再补粒子、镜头、闪屏等强化演出。",
-      actions: [
-        { label: "加粒子特效", action: "add-particle-effect" },
-        { label: "去试玩这场", action: "preview-scene-from-map", sceneId: scene.id },
-      ],
-    },
-  ];
-
-  const nextStep = steps.find((item) => !item.done) ?? steps[steps.length - 1];
-
-  return {
-    nextStep,
-    steps,
-  };
-}
-
-function renderBeginnerStoryWorkflow(scene) {
-  const workflow = buildBeginnerStoryWorkflow(scene);
-  if (!workflow) {
-    return "";
-  }
-
-  return `
-    <article class="detail-card beginner-workflow-panel">
-      <div class="panel-heading">
-        <div>
-          <h2>新手上手顺序</h2>
-          <span class="panel-note">按当前场景状态显示处理顺序</span>
-        </div>
-          <span class="issue-tag good-text">当前进行项：${escapeHtml(workflow.nextStep.step)}</span>
-      </div>
-      <article class="beginner-workflow-focus">
-        <span class="workflow-step-label">${escapeHtml(workflow.nextStep.step)}</span>
-        <strong>${escapeHtml(workflow.nextStep.title)}</strong>
-        <p>${escapeHtml(workflow.nextStep.description)}</p>
-        <div class="detail-actions">
-          ${workflow.nextStep.actions.map((action, index) => renderQuickActionButton(action, index === 0)).join("")}
-        </div>
-      </article>
-      <div class="beginner-workflow-grid">
-        ${workflow.steps
-          .map(
-            (step) => `
-              <article class="beginner-workflow-card ${step.done ? "is-done" : "is-current"}">
-                <span class="workflow-step-label">${escapeHtml(step.step)}</span>
-                <strong>${escapeHtml(step.title)}</strong>
-                <p>${escapeHtml(step.description)}</p>
-                <div class="story-filter-chip-row">
-                  <span class="issue-tag ${step.done ? "good-text" : "warn-text"}">${step.done ? "当前已完成" : "进行中"}</span>
-                </div>
-              </article>
-            `
-          )
-          .join("")}
-      </div>
-    </article>
-  `;
+  return editorModeTools.renderEditorModeGuideCard(context, {
+    mode: getProjectEditorMode(),
+    escapeHtml,
+  });
 }
 
 function renderStoryEditorModeBanner(scene = null) {
@@ -10580,27 +8624,12 @@ function renderStoryEditorModeBanner(scene = null) {
     0
   );
 
-  return `
-    <article class="detail-card editor-mode-banner-card">
-      <div class="story-mode-banner-head">
-        <div class="text-stack">
-          <strong>${escapeHtml(getEditorModeLabel(mode))}</strong>
-          <p>${escapeHtml(getEditorModeDescription(mode, "story"))}</p>
-        </div>
-        <div class="detail-actions">
-          ${renderEditorModeSwitchButtons(mode, { compact: true })}
-        </div>
-      </div>
-      <div class="story-filter-chip-row">
-        ${
-          mode === "advanced"
-            ? '<span class="issue-tag good-text">完整工具栏已展开</span><span class="issue-tag">适合处理变量、条件和复杂演出</span>'
-            : `<span class="issue-tag good-text">当前显示常用骨架按钮</span><span class="issue-tag">已收起 ${hiddenCount} 个高级按钮</span>`
-        }
-      </div>
-    </article>
-  ${mode === "beginner" ? renderBeginnerStoryWorkflow(scene) : ""}
-  `;
+  return editorModeTools.renderStoryEditorModeBanner(scene, {
+    mode,
+    hiddenCount,
+    escapeHtml,
+    renderQuickActionButton,
+  });
 }
 
 function applyEditorModeUi() {
@@ -10672,45 +8701,25 @@ function buildReleaseVersionFromPreset(preset, currentVersion = getProjectReleas
 }
 
 function getResolutionLabel(width, height) {
-  return (
-    SUPPORTED_RESOLUTIONS.find((item) => item.width === width && item.height === height)?.label ??
-    `${width} × ${height}`
-  );
+  return projectSettingsTools.getResolutionLabel(width, height, getProjectSettingsOptions());
 }
 
 function getScreenLabel(screenName) {
-  const labels = {
-    dashboard: "首页",
-    story: "写剧情",
-    assets: "管素材",
-    characters: "管角色",
-    script: "台词台本",
-    preview: "预览导出",
-  };
-
-  return labels[screenName] ?? screenName ?? "页面";
+  return projectSettingsTools.getScreenLabel(screenName, getProjectSettingsOptions());
 }
 
 function getStageContainerStyle(large = false) {
-  const resolution = getProjectResolution();
-  return `--stage-ratio: ${resolution.width} / ${resolution.height};${large ? " max-width: 100%;" : ""}`;
+  return projectSettingsTools.getStageContainerStyle(state.data?.project, {
+    ...getProjectSettingsOptions(),
+    large,
+  });
 }
 
 function renderResolutionButtons() {
-  const resolution = getProjectResolution();
-
-  return SUPPORTED_RESOLUTIONS.map(
-    (item) => `
-      <button
-        class="toolbar-button ${item.width === resolution.width && item.height === resolution.height ? "toolbar-button-primary" : ""}"
-        data-action="set-resolution"
-        data-width="${item.width}"
-        data-height="${item.height}"
-      >
-        ${escapeHtml(item.label)}
-      </button>
-    `
-  ).join("");
+  return projectSettingsTools.renderResolutionButtons(state.data?.project, {
+    ...getProjectSettingsOptions(),
+    escapeHtml,
+  });
 }
 
 function getRecentWorkspaceTypeLabel(type) {
@@ -14867,6 +12876,7 @@ function renderAssetsScreen() {
   const visibleAssets = getVisibleAssets();
   const duplicateOverview = buildAssetDuplicateOverview();
   const starterKitPanel = renderStarterKitPanel("assets");
+  const openAiAssetGeneratorPanel = renderOpenAiAssetGeneratorPanel();
   const isAdvancedMode = isAdvancedEditorMode();
   const voiceMatchTargets = getVoicePlaceholderTargetAssets();
   const shouldPreserveSelectedType =
@@ -14945,8 +12955,8 @@ function renderAssetsScreen() {
 
   if (refs.assetGapBoard) {
     refs.assetGapBoard.innerHTML = isAdvancedMode
-      ? `${starterKitPanel}${renderAssetGapBoard(duplicateOverview)}`
-      : `${starterKitPanel}${renderBeginnerAssetsGuide(selectedAsset, duplicateOverview)}`;
+      ? `${openAiAssetGeneratorPanel}${starterKitPanel}${renderAssetGapBoard(duplicateOverview)}`
+      : `${openAiAssetGeneratorPanel}${starterKitPanel}${renderBeginnerAssetsGuide(selectedAsset, duplicateOverview)}`;
   }
 
   if (refs.assetTagFilterBar) {
@@ -32512,14 +30522,7 @@ function getMusicRangeBlockLabel(block, index) {
 }
 
 function renderMusicEndModeOptions(selectedMode) {
-  const safeMode = getSafeMusicEndMode(selectedMode);
-  return Object.entries(MUSIC_END_MODE_LABELS)
-    .map(
-      ([mode, label]) => `
-        <option value="${mode}" ${mode === safeMode ? "selected" : ""}>${escapeHtml(label)}</option>
-      `
-    )
-    .join("");
+  return storyBlockCatalogTools.renderMusicEndModeOptions(selectedMode, { escapeHtml });
 }
 
 function renderMusicRangeEndBlockOptions(block) {
@@ -35903,7 +33906,7 @@ async function addBlock(blockType) {
 }
 
 function getStoryTemplatePreset(templateId) {
-  return STORY_TEMPLATE_PRESETS[templateId] ?? null;
+  return storyTemplateTools.getStoryTemplatePreset(templateId);
 }
 
 function createTemplateBlock(sceneDraft, blockType, configure = null) {
@@ -39350,6 +37353,93 @@ function formatGroupedAssetCounts(groupedCounts = {}) {
     .join(" / ");
 }
 
+async function generateOpenAiAsset() {
+  state.openAiAssetType = getSafeOpenAiAssetGenerationType(
+    document.getElementById("openAiAssetType")?.value ?? state.openAiAssetType
+  );
+  state.openAiAssetPrompt = document.getElementById("openAiAssetPrompt")?.value?.trim() ?? state.openAiAssetPrompt;
+  state.openAiAssetName = document.getElementById("openAiAssetName")?.value?.trim() ?? state.openAiAssetName;
+  state.openAiAssetApiKey = document.getElementById("openAiAssetApiKey")?.value?.trim() ?? state.openAiAssetApiKey;
+  state.openAiAssetModel = document.getElementById("openAiAssetModel")?.value?.trim() || state.openAiAssetModel;
+  state.openAiAssetSize = getSafeOpenAiAssetGenerationOption(
+    document.getElementById("openAiAssetSize")?.value ?? state.openAiAssetSize,
+    openAiAssetTools?.OPENAI_ASSET_GENERATION_SIZES ?? [],
+    "1536x1024"
+  );
+  state.openAiAssetQuality = getSafeOpenAiAssetGenerationOption(
+    document.getElementById("openAiAssetQuality")?.value ?? state.openAiAssetQuality,
+    openAiAssetTools?.OPENAI_ASSET_GENERATION_QUALITIES ?? [],
+    "medium"
+  );
+  state.openAiAssetBackground = getSafeOpenAiAssetGenerationOption(
+    document.getElementById("openAiAssetBackground")?.value ?? state.openAiAssetBackground,
+    openAiAssetTools?.OPENAI_ASSET_GENERATION_BACKGROUNDS ?? [],
+    "auto"
+  );
+  state.openAiAssetOutputFormat = getSafeOpenAiAssetGenerationOption(
+    document.getElementById("openAiAssetOutputFormat")?.value ?? state.openAiAssetOutputFormat,
+    openAiAssetTools?.OPENAI_ASSET_GENERATION_FORMATS ?? [],
+    "png"
+  );
+
+  if (!state.openAiAssetPrompt.trim()) {
+    state.openAiAssetError = "请先写一句要生成什么素材。";
+    renderAssetsScreen();
+    showToast("先写生图提示词", "error");
+    return;
+  }
+
+  if (!state.openAiAssetApiKey.trim()) {
+    state.openAiAssetError = "请先填写 OpenAI API Key。Key 不会写入项目文件。";
+    renderAssetsScreen();
+    showToast("先填写 OpenAI API Key", "error");
+    return;
+  }
+
+  try {
+    state.openAiAssetLoading = true;
+    state.openAiAssetError = "";
+    state.openAiAssetLastResult = null;
+    renderAssetsScreen();
+    setSaveStatus(`正在生成${getAssetTypeLabel(state.openAiAssetType)}素材...`);
+
+    const result = await postJson(
+      API_GENERATE_OPENAI_ASSET,
+      openAiAssetTools?.buildOpenAiAssetGenerationPayload?.(state) ?? {
+        assetType: state.openAiAssetType,
+        prompt: state.openAiAssetPrompt,
+        assetName: state.openAiAssetName,
+        apiKey: state.openAiAssetApiKey,
+        model: state.openAiAssetModel,
+        size: state.openAiAssetSize,
+        quality: state.openAiAssetQuality,
+        background: state.openAiAssetBackground,
+        outputFormat: state.openAiAssetOutputFormat,
+      }
+    );
+
+    state.lastExportResult = null;
+    state.openAiAssetLastResult = result;
+    state.openAiAssetName = "";
+    await reloadProjectData({
+      ...getCurrentUiState(),
+      selectedAssetType: result.assetType ?? state.openAiAssetType,
+      selectedAssetId: result.asset?.id ?? state.selectedAssetId,
+      assetFilterMode: "all",
+    });
+    state.openAiAssetLastResult = result;
+    setSaveStatus(`已生成并导入素材：${result.asset?.name ?? "新素材"}`);
+    showToast(`已生成：${result.asset?.name ?? "新素材"}`);
+  } catch (error) {
+    state.openAiAssetError = error.message;
+    setSaveStatus("AI 生成素材失败", true);
+    showToast("AI 生成素材失败", "error");
+  } finally {
+    state.openAiAssetLoading = false;
+    renderAssetsScreen();
+  }
+}
+
 async function importAssets(files, options = {}) {
   if (!files.length) {
     return;
@@ -39833,53 +37923,27 @@ async function saveSelectedBlock(options = {}) {
 }
 
 function getReadableTextMetrics(text) {
-  const safeText = String(text ?? "").trim();
-  return {
-    length: safeText.length,
-    lineCount: safeText ? safeText.split(/\r?\n/).length : 0,
-  };
+  return scriptReadabilityTools.getReadableTextMetrics(text);
 }
 
 function buildReadableTextSummary(metrics) {
-  const safeMetrics =
-    metrics && typeof metrics === "object"
-      ? metrics
-      : {
-          length: 0,
-          lineCount: 0,
-        };
-  return `当前 ${safeMetrics.length} 字 / ${safeMetrics.lineCount} 行，超过 ${VN_TEXT_SPLIT_TARGET_LENGTH} 字会启用拆分；超过 ${VN_TEXT_LONG_WARNING_LENGTH} 字或 ${VN_TEXT_LONG_WARNING_LINES} 行时建议拆卡。`;
+  return scriptReadabilityTools.buildReadableTextSummary(metrics);
 }
 
 function getChoiceTextQualityState(text) {
-  const length = String(text ?? "").trim().length;
-  const isLong = length > VN_CHOICE_LONG_WARNING_LENGTH;
-
-  return {
-    length,
-    isLong,
-    statusText: isLong ? "文案偏长" : "按钮舒适",
-    toneClass: isLong ? "warn-text" : "good-text",
-  };
+  return scriptReadabilityTools.getChoiceTextQualityState(text);
 }
 
 function buildChoiceTextSummary(length) {
-  return `当前 ${length} 字，建议不超过 ${VN_CHOICE_LONG_WARNING_LENGTH} 字；解释性内容最好放到前一句台词或旁白里。`;
+  return scriptReadabilityTools.buildChoiceTextSummary(length);
 }
 
 function renderChoiceTextQualityTools(text) {
-  const toolState = getChoiceTextQualityState(text);
-
-  return `
-    <div class="choice-text-tools ${toolState.isLong ? "is-warning" : ""}" data-choice-text-tools>
-      <span class="helper-text" data-choice-text-summary>${escapeHtml(buildChoiceTextSummary(toolState.length))}</span>
-      <span class="issue-tag ${toolState.toneClass}" data-choice-text-status>${toolState.statusText}</span>
-    </div>
-  `;
+  return scriptReadabilityTools.renderChoiceTextQualityTools(text, { escapeHtml });
 }
 
 function buildChoiceCountSummary(optionCount) {
-  return `当前 ${optionCount} 个选项，超过 ${VN_CHOICE_MANY_OPTIONS} 个时按钮区可能拥挤；复杂分支建议拆成二级选择。`;
+  return scriptReadabilityTools.buildChoiceCountSummary(optionCount);
 }
 
 function updateChoiceCountQualityTools(container = document.getElementById("choiceOptionsEditor")) {
@@ -39928,22 +37992,11 @@ function updateChoiceTextQualityToolsFromInput(input) {
 }
 
 function isReadableTextLong(text) {
-  const metrics = getReadableTextMetrics(text);
-  return metrics.length > VN_TEXT_LONG_WARNING_LENGTH || metrics.lineCount > VN_TEXT_LONG_WARNING_LINES;
+  return scriptReadabilityTools.isReadableTextLong(text);
 }
 
 function getReadableTextToolState(text) {
-  const metrics = getReadableTextMetrics(text);
-  const isLong = isReadableTextLong(text);
-  const canSplit = splitReadableTextIntoChunks(text).length > 1;
-
-  return {
-    metrics,
-    isLong,
-    canSplit,
-    statusText: isLong ? "建议拆卡" : canSplit ? "可拆卡" : "长度舒适",
-    toneClass: isLong ? "warn-text" : "good-text",
-  };
+  return scriptReadabilityTools.getReadableTextToolState(text);
 }
 
 function updateReadableTextQualityToolsFromInput(input) {
@@ -39975,96 +38028,19 @@ function updateReadableTextQualityToolsFromInput(input) {
 }
 
 function findReadableSplitIndex(text, limit) {
-  const safeLimit = Math.max(1, Number(limit) || VN_TEXT_SPLIT_TARGET_LENGTH);
-  const searchWindow = text.slice(0, safeLimit + 1);
-  const minUsefulIndex = Math.floor(safeLimit * 0.45);
-  const punctuationPattern = /[。！？!?；;，,、：:]/g;
-  let match = null;
-  let splitIndex = -1;
-
-  while ((match = punctuationPattern.exec(searchWindow)) !== null) {
-    const candidateIndex = match.index + 1;
-    if (candidateIndex >= minUsefulIndex) {
-      splitIndex = candidateIndex;
-    }
-  }
-
-  if (splitIndex > 0) {
-    return splitIndex;
-  }
-
-  const spaceIndex = searchWindow.lastIndexOf(" ");
-  if (spaceIndex >= minUsefulIndex) {
-    return spaceIndex + 1;
-  }
-
-  return safeLimit;
+  return scriptReadabilityTools.findReadableSplitIndex(text, limit);
 }
 
 function splitLongReadableSegment(segment, limit) {
-  const chunks = [];
-  let remaining = String(segment ?? "").trim();
-
-  while (remaining.length > limit) {
-    const splitIndex = findReadableSplitIndex(remaining, limit);
-    const head = remaining.slice(0, splitIndex).trim();
-    if (head) {
-      chunks.push(head);
-    }
-    remaining = remaining.slice(splitIndex).trim();
-  }
-
-  if (remaining) {
-    chunks.push(remaining);
-  }
-
-  return chunks;
+  return scriptReadabilityTools.splitLongReadableSegment(segment, limit);
 }
 
 function shouldJoinReadableSegmentsWithSpace(left, right) {
-  return /[A-Za-z0-9)]$/.test(left) && /^[A-Za-z0-9(]/.test(right);
+  return scriptReadabilityTools.shouldJoinReadableSegmentsWithSpace(left, right);
 }
 
 function splitReadableTextIntoChunks(text, limit = VN_TEXT_SPLIT_TARGET_LENGTH) {
-  const safeLimit = Math.max(20, Number(limit) || VN_TEXT_SPLIT_TARGET_LENGTH);
-  const normalizedText = String(text ?? "").replace(/\r\n/g, "\n").trim();
-  if (!normalizedText) {
-    return [];
-  }
-
-  const rawSegments = normalizedText
-    .split(/\n+/)
-    .flatMap((line) => line.match(/[^。！？!?；;…]+[。！？!?；;…]*/g) ?? [line])
-    .map((segment) => segment.trim())
-    .filter(Boolean);
-  const sentenceSegments = rawSegments.flatMap((segment) =>
-    segment.length > safeLimit ? splitLongReadableSegment(segment, safeLimit) : [segment]
-  );
-  const chunks = [];
-  let currentChunk = "";
-
-  sentenceSegments.forEach((segment) => {
-    if (!currentChunk) {
-      currentChunk = segment;
-      return;
-    }
-
-    const separator = shouldJoinReadableSegmentsWithSpace(currentChunk, segment) ? " " : "";
-    const merged = `${currentChunk}${separator}${segment}`;
-    if (merged.length <= safeLimit) {
-      currentChunk = merged;
-      return;
-    }
-
-    chunks.push(currentChunk);
-    currentChunk = segment;
-  });
-
-  if (currentChunk) {
-    chunks.push(currentChunk);
-  }
-
-  return chunks;
+  return scriptReadabilityTools.splitReadableTextIntoChunks(text, limit);
 }
 
 function createBlockIdAllocator(scene) {
@@ -44040,138 +42016,123 @@ function getCharacterStageSummary(stageSource = {}) {
 }
 
 function getSafeParticleAction(action) {
-  return action === "stop" ? "stop" : "start";
+  return particleEffectTools.getSafeParticleAction(action);
 }
 
 function getParticleActionLabel(action) {
-  return getSafeParticleAction(action) === "stop" ? "关闭当前粒子特效" : "开始粒子特效";
+  return particleEffectTools.getParticleActionLabel(action);
 }
 
 function getSafeParticlePreset(preset) {
-  return Object.hasOwn(PARTICLE_PRESET_LABELS, preset) ? preset : "snow";
+  return particleEffectTools.getSafeParticlePreset(preset);
 }
 
 function getParticlePresetLabel(preset) {
-  return PARTICLE_PRESET_LABELS[getSafeParticlePreset(preset)];
+  return particleEffectTools.getParticlePresetLabel(preset);
 }
 
 function getParticlePresetDefaults(preset) {
-  return PARTICLE_PRESET_DEFAULTS[getSafeParticlePreset(preset)] ?? PARTICLE_PRESET_DEFAULTS.snow;
+  return particleEffectTools.getParticlePresetDefaults(preset);
 }
 
 function getParticleAdvancedDefaults(preset) {
-  return (
-    PARTICLE_PRESET_ADVANCED_DEFAULTS[getSafeParticlePreset(preset)] ?? PARTICLE_PRESET_ADVANCED_DEFAULTS.snow
-  );
+  return particleEffectTools.getParticleAdvancedDefaults(preset);
 }
 
 function getSafeParticleIntensity(intensity) {
-  return Object.hasOwn(PARTICLE_INTENSITY_LABELS, intensity) ? intensity : "medium";
+  return particleEffectTools.getSafeParticleIntensity(intensity);
 }
 
 function getParticleIntensityLabel(intensity) {
-  return PARTICLE_INTENSITY_LABELS[getSafeParticleIntensity(intensity)];
+  return particleEffectTools.getParticleIntensityLabel(intensity);
 }
 
 function getSafeParticleBlendMode(blend) {
-  return Object.hasOwn(PARTICLE_BLEND_LABELS, blend) ? blend : "screen";
+  return particleEffectTools.getSafeParticleBlendMode(blend);
 }
 
 function getParticleBlendModeLabel(blend) {
-  return PARTICLE_BLEND_LABELS[getSafeParticleBlendMode(blend)];
+  return particleEffectTools.getParticleBlendModeLabel(blend);
 }
 
 function getParticleBlendCssValue(blend) {
-  return getSafeParticleBlendMode(blend) === "add" ? "plus-lighter" : getSafeParticleBlendMode(blend);
+  return particleEffectTools.getParticleBlendCssValue(blend);
 }
 
 function getSafeParticleEmissionMode(mode) {
-  return Object.hasOwn(PARTICLE_EMISSION_MODE_LABELS, mode) ? mode : "continuous";
+  return particleEffectTools.getSafeParticleEmissionMode(mode);
 }
 
 function getParticleEmissionModeLabel(mode) {
-  return PARTICLE_EMISSION_MODE_LABELS[getSafeParticleEmissionMode(mode)];
+  return particleEffectTools.getParticleEmissionModeLabel(mode);
 }
 
 function getSafeParticleEmitterShape(shape) {
-  return Object.hasOwn(PARTICLE_EMITTER_SHAPE_LABELS, shape) ? shape : "line";
+  return particleEffectTools.getSafeParticleEmitterShape(shape);
 }
 
 function getParticleEmitterShapeLabel(shape) {
-  return PARTICLE_EMITTER_SHAPE_LABELS[getSafeParticleEmitterShape(shape)];
+  return particleEffectTools.getParticleEmitterShapeLabel(shape);
 }
 
 function getSafeParticleFollowTarget(follow) {
-  return Object.hasOwn(PARTICLE_FOLLOW_LABELS, follow) ? follow : "none";
+  return particleEffectTools.getSafeParticleFollowTarget(follow);
 }
 
 function getParticleFollowTargetLabel(follow) {
-  return PARTICLE_FOLLOW_LABELS[getSafeParticleFollowTarget(follow)];
+  return particleEffectTools.getParticleFollowTargetLabel(follow);
 }
 
 function getSafeParticleFollowAnchor(anchor) {
-  return Object.hasOwn(PARTICLE_FOLLOW_ANCHOR_LABELS, anchor) ? anchor : "torso";
+  return particleEffectTools.getSafeParticleFollowAnchor(anchor);
 }
 
 function getParticleFollowAnchorLabel(anchor) {
-  return PARTICLE_FOLLOW_ANCHOR_LABELS[getSafeParticleFollowAnchor(anchor)];
+  return particleEffectTools.getParticleFollowAnchorLabel(anchor);
 }
 
 function getSafeParticleSizeCurve(curve) {
-  return Object.hasOwn(PARTICLE_SIZE_CURVE_LABELS, curve) ? curve : "steady";
+  return particleEffectTools.getSafeParticleSizeCurve(curve);
 }
 
 function getParticleSizeCurveLabel(curve) {
-  return PARTICLE_SIZE_CURVE_LABELS[getSafeParticleSizeCurve(curve)];
+  return particleEffectTools.getParticleSizeCurveLabel(curve);
 }
 
 function getSafeParticleOpacityCurve(curve) {
-  return Object.hasOwn(PARTICLE_OPACITY_CURVE_LABELS, curve) ? curve : "fade";
+  return particleEffectTools.getSafeParticleOpacityCurve(curve);
 }
 
 function getParticleOpacityCurveLabel(curve) {
-  return PARTICLE_OPACITY_CURVE_LABELS[getSafeParticleOpacityCurve(curve)];
+  return particleEffectTools.getParticleOpacityCurveLabel(curve);
 }
 
 function getSafeParticleForceField(mode) {
-  return Object.hasOwn(PARTICLE_FORCE_FIELD_LABELS, mode) ? mode : "none";
+  return particleEffectTools.getSafeParticleForceField(mode);
 }
 
 function getParticleForceFieldLabel(mode) {
-  return PARTICLE_FORCE_FIELD_LABELS[getSafeParticleForceField(mode)];
+  return particleEffectTools.getParticleForceFieldLabel(mode);
 }
 
 function getParticleScenePresetConfig(presetId) {
-  return PARTICLE_SCENE_PRESET_CONFIGS[presetId] ?? null;
+  return particleEffectTools.getParticleScenePresetConfig(presetId);
 }
 
 function getParticleDefaultColorCurve(preset) {
-  return {
-    snow: "cool_shift",
-    rain: "cool_shift",
-    petals: "steady",
-    dust: "steady",
-    embers: "warm_shift",
-    sparkles: "pulse_glow",
-    bubbles: "cool_shift",
-    confetti: "steady",
-    smoke: "cool_shift",
-    flame: "warm_shift",
-    stardust: "spectral",
-    glyphs: "spectral",
-  }[getSafeParticlePreset(preset)] ?? "steady";
+  return particleEffectTools.getParticleDefaultColorCurve(preset);
 }
 
 function getSafeParticleLayerCount(layerCount) {
-  return clamp(Math.round(getSafeNumber(layerCount, 1)), 1, 3);
+  return particleEffectTools.getSafeParticleLayerCount(layerCount);
 }
 
 function getSafeParticleComboPreset(comboPreset) {
-  return Object.hasOwn(PARTICLE_COMBO_PRESET_LABELS, comboPreset) ? comboPreset : "none";
+  return particleEffectTools.getSafeParticleComboPreset(comboPreset);
 }
 
 function getParticleComboPresetLabel(comboPreset) {
-  return PARTICLE_COMBO_PRESET_LABELS[getSafeParticleComboPreset(comboPreset)];
+  return particleEffectTools.getParticleComboPresetLabel(comboPreset);
 }
 
 function buildDefaultParticleCustomComboLayer(preset = "stardust") {
@@ -44251,19 +42212,7 @@ function getParticleCustomPresetById(presetId, project = state.data?.project) {
 }
 
 function makeParticleCustomPresetId(name, existingIds = []) {
-  const base = String(name ?? "")
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9\u4e00-\u9fff]+/g, "_")
-    .replace(/^_+|_+$/g, "") || "particle_preset";
-  let candidate = base;
-  let suffix = 2;
-  const used = new Set(existingIds);
-  while (used.has(candidate)) {
-    candidate = `${base}_${String(suffix).padStart(2, "0")}`;
-    suffix += 1;
-  }
-  return candidate;
+  return particleEffectTools.makeParticleCustomPresetId(name, existingIds);
 }
 
 function getParticleCustomPresetPrimaryPreset(config) {
@@ -44348,26 +42297,23 @@ function renderParticleCustomPresetQuickList() {
 }
 
 function getSafeParticleColorCurve(curve) {
-  return Object.hasOwn(PARTICLE_COLOR_CURVE_LABELS, curve) ? curve : "steady";
+  return particleEffectTools.getSafeParticleColorCurve(curve);
 }
 
 function getParticleColorCurveLabel(curve) {
-  return PARTICLE_COLOR_CURVE_LABELS[getSafeParticleColorCurve(curve)];
+  return particleEffectTools.getParticleColorCurveLabel(curve);
 }
 
 function isValidParticleColor(color) {
-  return /^#[0-9a-fA-F]{6}$/.test(String(color ?? "").trim());
+  return particleEffectTools.isValidParticleColor(color);
 }
 
 function getSafeParticleColor(color, fallback = "#ffffff") {
-  if (isValidParticleColor(color)) {
-    return String(color).trim().toLowerCase();
-  }
-  return String(fallback).trim().toLowerCase();
+  return particleEffectTools.getSafeParticleColor(color, fallback);
 }
 
 function getSafeParticleClampedNumber(value, fallback, min, max) {
-  return clamp(getSafeNumber(value, fallback), min, max);
+  return particleEffectTools.getSafeParticleClampedNumber(value, fallback, min, max);
 }
 
 function normalizeParticleRange(minValue, maxValue, fallbackMin, fallbackMax, clampMin, clampMax) {
@@ -44377,58 +42323,7 @@ function normalizeParticleRange(minValue, maxValue, fallbackMin, fallbackMax, cl
 }
 
 function buildDefaultParticleEffectConfig(preset = "snow") {
-  const safePreset = getSafeParticlePreset(preset);
-  const defaults = getParticlePresetDefaults(safePreset);
-  const advancedDefaults = getParticleAdvancedDefaults(safePreset);
-  return {
-    action: "start",
-    preset: safePreset,
-    assetId: "",
-    intensity: "medium",
-    speed: "medium",
-    wind: "still",
-    area: "full",
-    emissionMode: advancedDefaults.emissionMode,
-    emitterShape: advancedDefaults.emitterShape,
-    emitterX: advancedDefaults.emitterX,
-    emitterY: advancedDefaults.emitterY,
-    emitterZ: advancedDefaults.emitterZ,
-    attractionX: advancedDefaults.attractionX,
-    attractionY: advancedDefaults.attractionY,
-    vortex: advancedDefaults.vortex,
-    follow: advancedDefaults.follow,
-    followAnchor: "torso",
-    comboPreset: "none",
-    customComboLayers: [],
-    layerCount: 1,
-    sizeCurve: advancedDefaults.sizeCurve,
-    opacityCurve: advancedDefaults.opacityCurve,
-    colorCurve: getParticleDefaultColorCurve(safePreset),
-    forceField: advancedDefaults.forceField,
-    fieldX: advancedDefaults.fieldX,
-    fieldY: advancedDefaults.fieldY,
-    density: defaults.density,
-    sizeMin: defaults.sizeMin,
-    sizeMax: defaults.sizeMax,
-    lifeMin: defaults.lifeMin,
-    lifeMax: defaults.lifeMax,
-    gravityX: defaults.gravityX,
-    gravityY: defaults.gravityY,
-    gravityZ: defaults.gravityZ,
-    spreadX: defaults.spreadX,
-    spreadY: defaults.spreadY,
-    spreadZ: defaults.spreadZ,
-    opacityMin: defaults.opacityMin,
-    opacityMax: defaults.opacityMax,
-    rotationMin: defaults.rotationMin,
-    rotationMax: defaults.rotationMax,
-    spin: defaults.spin,
-    turbulence: defaults.turbulence,
-    color: defaults.color,
-    colorAccent: defaults.colorAccent,
-    colorEnd: defaults.colorAccent,
-    blend: defaults.blend,
-  };
+  return particleEffectTools.buildDefaultParticleEffectConfig(preset);
 }
 
 function normalizeParticleEffectConfig(particleEffect) {
@@ -44569,138 +42464,67 @@ function getParticleImageStyle(assetId) {
 }
 
 function getSafeParticleSpeed(speed) {
-  return Object.hasOwn(PARTICLE_SPEED_LABELS, speed) ? speed : "medium";
+  return particleEffectTools.getSafeParticleSpeed(speed);
 }
 
 function getParticleSpeedLabel(speed) {
-  return PARTICLE_SPEED_LABELS[getSafeParticleSpeed(speed)];
+  return particleEffectTools.getParticleSpeedLabel(speed);
 }
 
 function getSafeParticleWind(wind) {
-  return Object.hasOwn(PARTICLE_WIND_LABELS, wind) ? wind : "still";
+  return particleEffectTools.getSafeParticleWind(wind);
 }
 
 function getParticleWindLabel(wind) {
-  return PARTICLE_WIND_LABELS[getSafeParticleWind(wind)];
+  return particleEffectTools.getParticleWindLabel(wind);
 }
 
 function getSafeParticleArea(area) {
-  return Object.hasOwn(PARTICLE_AREA_LABELS, area) ? area : "full";
+  return particleEffectTools.getSafeParticleArea(area);
 }
 
 function getParticleAreaLabel(area) {
-  return PARTICLE_AREA_LABELS[getSafeParticleArea(area)];
+  return particleEffectTools.getParticleAreaLabel(area);
 }
 
 function getParticleSpeedMultiplier(speed) {
-  return {
-    slow: 1.28,
-    medium: 1,
-    fast: 0.78,
-  }[getSafeParticleSpeed(speed)];
+  return particleEffectTools.getParticleSpeedMultiplier(speed);
 }
 
 function getParticleWindBias(wind, preset) {
-  const base = {
-    left: -26,
-    still: 0,
-    right: 26,
-  }[getSafeParticleWind(wind)];
-
-  if (preset === "rain") {
-    return base * 0.85;
-  }
-
-  if (preset === "dust" || preset === "bubbles") {
-    return base * 0.5;
-  }
-
-  return base;
+  return particleEffectTools.getParticleWindBias(wind, preset);
 }
 
 function getParticleAreaLayout(area, spreadX = 100) {
-  const base = {
-    full: { start: 0, width: 100 },
-    left: { start: 0, width: 54 },
-    center: { start: 23, width: 54 },
-    right: { start: 46, width: 54 },
-  }[getSafeParticleArea(area)];
-  const normalizedWidth = Math.max(8, base.width * (clamp(spreadX, 4, 100) / 100));
-  return {
-    start: base.start + (base.width - normalizedWidth) * 0.5,
-    width: normalizedWidth,
-  };
+  return particleEffectTools.getParticleAreaLayout(area, spreadX);
 }
 
 function getParticlePresetDensityMultiplier(preset) {
-  return {
-    snow: 1,
-    rain: 1.15,
-    petals: 0.72,
-    dust: 0.56,
-    embers: 0.58,
-    sparkles: 0.42,
-    bubbles: 0.45,
-    confetti: 0.8,
-  }[getSafeParticlePreset(preset)];
+  return particleEffectTools.getParticlePresetDensityMultiplier(preset);
 }
 
 function getParticleMotionProfile(preset) {
-  return {
-    snow: { startBase: -18, endBase: 126, aspect: "round" },
-    rain: { startBase: -20, endBase: 136, aspect: "rain" },
-    petals: { startBase: -14, endBase: 126, aspect: "petal" },
-    dust: { startBase: -8, endBase: 112, aspect: "dust" },
-    embers: { startBase: 108, endBase: -18, aspect: "ember" },
-    sparkles: { startBase: -6, endBase: 118, aspect: "sparkle" },
-    bubbles: { startBase: 112, endBase: -22, aspect: "bubble" },
-    confetti: { startBase: -12, endBase: 126, aspect: "confetti" },
-  }[getSafeParticlePreset(preset)];
+  return particleEffectTools.getParticleMotionProfile(preset);
 }
 
 function getParticleRandom(index, salt = 1) {
-  const value = Math.sin((index + 1) * 12.9898 + salt * 78.233) * 43758.5453123;
-  return value - Math.floor(value);
-}
-
-function hexToRgb(color) {
-  const safeColor = getSafeParticleColor(color, "#ffffff");
-  return {
-    red: Number.parseInt(safeColor.slice(1, 3), 16),
-    green: Number.parseInt(safeColor.slice(3, 5), 16),
-    blue: Number.parseInt(safeColor.slice(5, 7), 16),
-  };
+  return particleEffectTools.getParticleRandom(index, salt);
 }
 
 function mixParticleColors(colorA, colorB, ratio) {
-  const first = hexToRgb(colorA);
-  const second = hexToRgb(colorB);
-  const mixChannel = (channel) =>
-    clamp(Math.round(first[channel] + (second[channel] - first[channel]) * ratio), 0, 255)
-      .toString(16)
-      .padStart(2, "0");
-
-  return `#${mixChannel("red")}${mixChannel("green")}${mixChannel("blue")}`;
+  return particleEffectTools.mixParticleColors(colorA, colorB, ratio);
 }
 
 function formatParticleNumber(value, fractionDigits = 0) {
-  return Number(value).toFixed(fractionDigits).replace(/\.0+$/, "").replace(/(\.\d*[1-9])0+$/, "$1");
+  return particleEffectTools.formatParticleNumber(value, fractionDigits);
 }
 
 function getParticleAnchorPercent(position) {
-  return {
-    left: 24,
-    center: 50,
-    right: 76,
-  }[position] ?? 50;
+  return particleEffectTools.getParticleAnchorPercent(position);
 }
 
 function getParticleCameraAnchorPercent(stageContext = null) {
-  const focus =
-    stageContext?.cameraPan?.target && stageContext.cameraPan.target !== "center"
-      ? stageContext.cameraPan.target
-      : stageContext?.cameraZoom?.focus ?? "center";
-  return getParticleAnchorPercent(focus);
+  return particleEffectTools.getParticleCameraAnchorPercent(stageContext);
 }
 
 function getParticleEmitterAnchor(particleEffect, stageContext = null) {
@@ -44832,7 +42656,7 @@ function buildParticleLayerVariants(particleEffect) {
 function buildParticleComboVariants(particleEffect) {
   const baseConfig = normalizeParticleEffectConfig(particleEffect);
   const comboPreset = getSafeParticleComboPreset(baseConfig.comboPreset);
-  const presetOverlays = PARTICLE_COMBO_PRESET_CONFIGS[comboPreset] ?? [];
+  const presetOverlays = particleEffectTools.getParticleComboPresetConfig(comboPreset);
   const customOverlays = getEnabledParticleCustomComboLayers(baseConfig.customComboLayers).map((layer) => ({
     preset: layer.preset,
     emissionMode: layer.emissionMode,
@@ -46936,13 +44760,7 @@ function getAssetTypeLabel(type) {
 }
 
 function getTemplateLabel(template) {
-  if (template === "blank") {
-    return "空白项目";
-  }
-  if (template === "campus_romance") {
-    return "校园恋爱模板";
-  }
-  return template;
+  return storyTemplateTools.getTemplateLabel(template);
 }
 
 function isImageAssetType(type) {

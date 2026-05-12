@@ -150,6 +150,34 @@ python3 runtime_player.py --release-control-report .
 - Linux：运行 `./generate_native_runtime_release_control.sh`
 - Windows：双击 `generate_native_runtime_release_control.bat`
 
+## 发布验收清单
+
+编辑器导出的完整原生 Runtime 包会额外附带：
+
+- `native-runtime-release-acceptance.md`：面向发布前人工点测的清单，包含自动检查结果、macOS / Windows / Linux 三系统验收项，以及启动、读档、音画、回想馆、成品分发等逐项确认框。
+- `native-runtime-release-acceptance.json`：同一份清单的机器可读版本，可供 CI、发布脚本或外部工具读取。
+
+这份清单会在导出包生成时自动写入。建议在正式分享或发布前打开 Markdown 版本，按目标系统完成最后一轮人工点测。
+
+重新生成验收清单：
+
+```bash
+python3 runtime_player.py --write-acceptance-reports .
+```
+
+或分别输出到终端：
+
+```bash
+python3 runtime_player.py --acceptance-check .
+python3 runtime_player.py --acceptance-report .
+```
+
+随包脚本：
+
+- macOS：双击 `生成原生Runtime发布验收清单.command`
+- Linux：运行 `./generate_native_runtime_acceptance_checklist.sh`
+- Windows：双击 `generate_native_runtime_acceptance_checklist.bat`
+
 ## 文件完整性校验
 
 编辑器导出的完整原生 Runtime 包会附带：

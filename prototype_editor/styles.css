@@ -2958,6 +2958,45 @@ body[data-editor-mode="beginner"] #screen-preview #previewSceneFilterBar {
   background: rgba(255, 255, 255, 0.86);
 }
 
+.openai-asset-generator-panel {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 14px;
+  background:
+    var(--panel-tint),
+    var(--panel-card);
+  border-color: var(--panel-border);
+}
+
+.openai-asset-generator-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.openai-asset-generator-grid label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.openai-asset-generator-grid input,
+.openai-asset-generator-grid select,
+.openai-asset-generator-grid textarea {
+  min-width: 0;
+  font-size: 13px;
+}
+
+.openai-asset-prompt-field {
+  grid-column: 1 / -1;
+}
+
+.openai-asset-prompt-field textarea {
+  min-height: 92px;
+}
+
 .creative-assistant-result {
   display: grid;
   gap: 10px;

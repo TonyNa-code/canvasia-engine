@@ -15,6 +15,7 @@ import unittest
 from unittest import mock
 from pathlib import Path
 
+import openai_asset_generation
 import run_editor
 
 
@@ -1365,6 +1366,77 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(result["title"], "兼容模型标题")
         self.assertEqual(result["blockCount"], 2)
 
+    def test_openai_asset_generation_saves_image_without_persisting_key(self) -> None:
+        self.create_blank_project_with_chapter()
+        response_payload = {
+            "data": [
+                {
+                    "b64_json": base64.b64encode(build_fake_png_bytes()).decode("utf-8"),
+                }
+            ]
+        }
+        captured = {}
+
+        class FakeResponse:
+            def __enter__(self) -> "FakeResponse":
+                return self
+
+            def __exit__(self, *_args: object) -> bool:
+                return False
+
+            def read(self, *_args: object) -> bytes:
+                return json.dumps(response_payload).encode("utf-8")
+
+        def fake_urlopen(request, timeout=0):
+            self.assertEqual(timeout, 90)
+            self.assertEqual(request.full_url, openai_asset_generation.OPENAI_ASSET_GENERATION_ENDPOINT)
+            self.assertEqual(request.get_header("Authorization"), "Bearer test-openai-image-key")
+            body = json.loads(request.data.decode("utf-8"))
+            captured["body"] = body
+            self.assertEqual(body["model"], "gpt-image-test")
+            self.assertEqual(body["size"], "1536x1024")
+            self.assertEqual(body["quality"], "high")
+            self.assertEqual(body["output_format"], "png")
+            self.assertIn("视觉小说背景", body["prompt"])
+            self.assertIn("visual novel background", body["prompt"])
+            return FakeResponse()
+
+        with mock.patch("openai_asset_generation.urlopen", fake_urlopen):
+            result = run_editor.generate_openai_asset(
+                {
+                    "assetType": "background",
+                    "prompt": "雨夜校园，视觉小说背景",
+                    "assetName": "雨夜校园背景",
+                    "apiKey": "test-openai-image-key",
+                    "model": "gpt-image-test",
+                    "size": "1536x1024",
+                    "quality": "high",
+                    "outputFormat": "png",
+                }
+            )
+
+        asset = result["asset"]
+        self.assertEqual(asset["type"], "background")
+        self.assertEqual(asset["name"], "雨夜校园背景")
+        self.assertTrue((run_editor.TEMPLATE_DIR / asset["path"]).is_file())
+        self.assertIn("AI生成", asset["tags"])
+        self.assertTrue(result["privacy"]["sentToExternalService"])
+        self.assertFalse(result["privacy"]["apiKeyStored"])
+        assets_doc = run_editor.read_json(run_editor.DATA_DIR / "assets.json")
+        self.assertNotIn("test-openai-image-key", json.dumps(assets_doc, ensure_ascii=False))
+        self.assertIn("visual novel background", captured["body"]["prompt"])
+
+    def test_openai_asset_generation_requires_api_key(self) -> None:
+        self.create_blank_project_with_chapter()
+        with self.assertRaisesRegex(ValueError, "API Key"):
+            run_editor.generate_openai_asset(
+                {
+                    "assetType": "sprite",
+                    "prompt": "原创女主角立绘，透明背景",
+                    "apiKey": "",
+                }
+            )
+
     def test_asset_import_replace_and_delete_with_usage_protection(self) -> None:
         _, chapter_result = self.create_blank_project_with_chapter()
 
@@ -2080,6 +2152,11 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["runtime"]["releaseControlReporter"]["macos"], run_editor.NATIVE_RUNTIME_MAC_RELEASE_CONTROL_COMMAND_NAME)
         self.assertEqual(manifest["runtime"]["releaseControlReporter"]["linux"], run_editor.NATIVE_RUNTIME_LINUX_RELEASE_CONTROL_COMMAND_NAME)
         self.assertEqual(manifest["runtime"]["releaseControlReporter"]["windows"], run_editor.NATIVE_RUNTIME_WINDOWS_RELEASE_CONTROL_COMMAND_NAME)
+        self.assertEqual(manifest["runtime"]["acceptanceReport"], run_editor.NATIVE_RUNTIME_ACCEPTANCE_REPORT_NAME)
+        self.assertEqual(manifest["runtime"]["acceptanceJson"], run_editor.NATIVE_RUNTIME_ACCEPTANCE_JSON_NAME)
+        self.assertEqual(manifest["runtime"]["acceptanceReporter"]["macos"], run_editor.NATIVE_RUNTIME_MAC_ACCEPTANCE_COMMAND_NAME)
+        self.assertEqual(manifest["runtime"]["acceptanceReporter"]["linux"], run_editor.NATIVE_RUNTIME_LINUX_ACCEPTANCE_COMMAND_NAME)
+        self.assertEqual(manifest["runtime"]["acceptanceReporter"]["windows"], run_editor.NATIVE_RUNTIME_WINDOWS_ACCEPTANCE_COMMAND_NAME)
         self.assertEqual(manifest["runtime"]["fileIntegrityReport"], run_editor.NATIVE_RUNTIME_FILE_INTEGRITY_REPORT_NAME)
         self.assertEqual(manifest["runtime"]["fileIntegrityMarkdown"], run_editor.NATIVE_RUNTIME_FILE_INTEGRITY_MARKDOWN_NAME)
         self.assertEqual(manifest["runtime"]["fileIntegrityChecker"]["macos"], run_editor.NATIVE_RUNTIME_MAC_FILE_INTEGRITY_COMMAND_NAME)
@@ -2094,6 +2171,11 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["macReleaseControlReporter"], run_editor.NATIVE_RUNTIME_MAC_RELEASE_CONTROL_COMMAND_NAME)
         self.assertEqual(manifest["files"]["linuxReleaseControlReporter"], run_editor.NATIVE_RUNTIME_LINUX_RELEASE_CONTROL_COMMAND_NAME)
         self.assertEqual(manifest["files"]["windowsReleaseControlReporter"], run_editor.NATIVE_RUNTIME_WINDOWS_RELEASE_CONTROL_COMMAND_NAME)
+        self.assertEqual(manifest["files"]["acceptanceReport"], run_editor.NATIVE_RUNTIME_ACCEPTANCE_REPORT_NAME)
+        self.assertEqual(manifest["files"]["acceptanceJson"], run_editor.NATIVE_RUNTIME_ACCEPTANCE_JSON_NAME)
+        self.assertEqual(manifest["files"]["macAcceptanceReporter"], run_editor.NATIVE_RUNTIME_MAC_ACCEPTANCE_COMMAND_NAME)
+        self.assertEqual(manifest["files"]["linuxAcceptanceReporter"], run_editor.NATIVE_RUNTIME_LINUX_ACCEPTANCE_COMMAND_NAME)
+        self.assertEqual(manifest["files"]["windowsAcceptanceReporter"], run_editor.NATIVE_RUNTIME_WINDOWS_ACCEPTANCE_COMMAND_NAME)
         self.assertEqual(manifest["files"]["fileIntegrityReport"], run_editor.NATIVE_RUNTIME_FILE_INTEGRITY_REPORT_NAME)
         self.assertEqual(manifest["files"]["fileIntegrityMarkdown"], run_editor.NATIVE_RUNTIME_FILE_INTEGRITY_MARKDOWN_NAME)
         self.assertEqual(manifest["files"]["macFileIntegrityChecker"], run_editor.NATIVE_RUNTIME_MAC_FILE_INTEGRITY_COMMAND_NAME)
@@ -2196,6 +2278,24 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue(export_result["linuxFileIntegrityCheckerPublicUrl"].endswith(run_editor.NATIVE_RUNTIME_LINUX_FILE_INTEGRITY_COMMAND_NAME))
         self.assertTrue(export_result["windowsFileIntegrityCheckerPublicUrl"].endswith(run_editor.NATIVE_RUNTIME_WINDOWS_FILE_INTEGRITY_COMMAND_NAME))
 
+        acceptance_payload = json.loads((build_dir / run_editor.NATIVE_RUNTIME_ACCEPTANCE_JSON_NAME).read_text(encoding="utf-8"))
+        self.assertEqual(acceptance_payload["formatVersion"], 1)
+        self.assertIn(acceptance_payload["acceptanceGate"]["status"], {"ready_for_manual_acceptance", "needs_manual_review"})
+        self.assertGreaterEqual(len(acceptance_payload["automatedChecks"]), 5)
+        self.assertTrue({"macos", "windows", "linux"} <= {entry["id"] for entry in acceptance_payload["platformMatrix"]})
+        self.assertTrue(acceptance_payload["manualCheckGroups"])
+        self.assertTrue(acceptance_payload["recommendedCommands"])
+        acceptance_markdown = (build_dir / run_editor.NATIVE_RUNTIME_ACCEPTANCE_REPORT_NAME).read_text(encoding="utf-8")
+        self.assertIn("# 原生 Runtime 发布验收清单", acceptance_markdown)
+        self.assertIn("## 人工逐项点测", acceptance_markdown)
+        self.assertIn("- [ ]", acceptance_markdown)
+        self.assertEqual(export_result["acceptanceStatus"], acceptance_payload["acceptanceGate"]["status"])
+        self.assertTrue(export_result["acceptanceReportPublicUrl"].endswith(run_editor.NATIVE_RUNTIME_ACCEPTANCE_REPORT_NAME))
+        self.assertTrue(export_result["acceptanceJsonPublicUrl"].endswith(run_editor.NATIVE_RUNTIME_ACCEPTANCE_JSON_NAME))
+        self.assertTrue(export_result["macAcceptanceReporterPublicUrl"].endswith(run_editor.NATIVE_RUNTIME_MAC_ACCEPTANCE_COMMAND_NAME))
+        self.assertTrue(export_result["linuxAcceptanceReporterPublicUrl"].endswith(run_editor.NATIVE_RUNTIME_LINUX_ACCEPTANCE_COMMAND_NAME))
+        self.assertTrue(export_result["windowsAcceptanceReporterPublicUrl"].endswith(run_editor.NATIVE_RUNTIME_WINDOWS_ACCEPTANCE_COMMAND_NAME))
+
         integrity_cli_verify = subprocess.run(
             [
                 sys.executable,
@@ -2212,6 +2312,56 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(integrity_verify_payload["status"], "pass")
         self.assertEqual(integrity_verify_payload["summary"]["missingCount"], 0)
         self.assertEqual(integrity_verify_payload["summary"]["changedCount"], 0)
+
+        acceptance_cli_json = subprocess.run(
+            [
+                sys.executable,
+                str(build_dir / run_editor.NATIVE_RUNTIME_PLAYER_NAME),
+                "--acceptance-check",
+                str(build_dir),
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(acceptance_cli_json.returncode, 0, acceptance_cli_json.stdout + acceptance_cli_json.stderr)
+        acceptance_cli_payload = json.loads(acceptance_cli_json.stdout)
+        self.assertEqual(acceptance_cli_payload["project"]["title"], "自动化测试项目")
+        self.assertIn(
+            acceptance_cli_payload["acceptanceGate"]["status"],
+            {"ready_for_manual_acceptance", "needs_manual_review"},
+        )
+
+        acceptance_cli_markdown = subprocess.run(
+            [
+                sys.executable,
+                str(build_dir / run_editor.NATIVE_RUNTIME_PLAYER_NAME),
+                "--acceptance-report",
+                str(build_dir),
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(
+            acceptance_cli_markdown.returncode,
+            0,
+            acceptance_cli_markdown.stdout + acceptance_cli_markdown.stderr,
+        )
+        self.assertIn("# 原生 Runtime 发布验收清单", acceptance_cli_markdown.stdout)
+
+        acceptance_cli_write = subprocess.run(
+            [
+                sys.executable,
+                str(build_dir / run_editor.NATIVE_RUNTIME_PLAYER_NAME),
+                "--write-acceptance-reports",
+                str(build_dir),
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(acceptance_cli_write.returncode, 0, acceptance_cli_write.stdout + acceptance_cli_write.stderr)
 
         doctor_description = subprocess.run(
             [

@@ -44,7 +44,10 @@ jobs:
             tests/test_frontend_action_handlers.py \
             tests/test_frontend_asset_catalog_module.py \
             tests/test_frontend_editor_common_module.py \
+            tests/test_frontend_beginner_tutorial_module.py \
             tests/test_frontend_creative_assistant_module.py \
+            tests/test_frontend_openai_asset_generator_module.py \
+            tests/test_frontend_particle_effects_module.py \
             tests/test_frontend_editor_filters_module.py \
             tests/test_frontend_entrypoint_modules.py \
             tests/test_frontend_editor_mode_module.py \
@@ -56,7 +59,10 @@ jobs:
             tests/test_frontend_recent_workspace_module.py \
             tests/test_frontend_release_control_module.py \
             tests/test_frontend_release_version_module.py \
+            tests/test_frontend_script_readability_module.py \
             tests/test_frontend_script_voice_module.py \
+            tests/test_frontend_story_block_catalog_module.py \
+            tests/test_frontend_story_templates_module.py \
             tests/test_frontend_system_dialog_module.py \
             tests/test_frontend_ui_theme_module.py \
             tests/test_frontend_variables_module.py \
@@ -68,6 +74,7 @@ jobs:
       - name: Frontend syntax check
         run: |
           node --check prototype_editor/modules/asset_catalog.js
+          node --check prototype_editor/modules/beginner_tutorial.js
           node --check prototype_editor/modules/editor_common.js
           node --check prototype_editor/modules/creative_assistant.js
           node --check prototype_editor/modules/editor_filters.js
@@ -77,10 +84,15 @@ jobs:
           node --check prototype_editor/modules/project_milestones.js
           node --check prototype_editor/modules/project_history.js
           node --check prototype_editor/modules/project_settings.js
+          node --check prototype_editor/modules/openai_asset_generator.js
+          node --check prototype_editor/modules/particle_effects.js
           node --check prototype_editor/modules/recent_workspace.js
           node --check prototype_editor/modules/release_control.js
           node --check prototype_editor/modules/release_version.js
+          node --check prototype_editor/modules/script_readability.js
           node --check prototype_editor/modules/script_voice.js
+          node --check prototype_editor/modules/story_block_catalog.js
+          node --check prototype_editor/modules/story_templates.js
           node --check prototype_editor/modules/system_dialog.js
           node --check prototype_editor/modules/ui_theme.js
           node --check prototype_editor/modules/variables.js
@@ -98,8 +110,11 @@ jobs:
           python -m unittest discover -s tests -p 'test_prepare_preview_release.py' -v
           python -m unittest discover -s tests -p 'test_frontend_action_handlers.py' -v
           python -m unittest discover -s tests -p 'test_frontend_asset_catalog_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_beginner_tutorial_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_editor_common_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_creative_assistant_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_openai_asset_generator_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_particle_effects_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_editor_filters_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_entrypoint_modules.py' -v
           python -m unittest discover -s tests -p 'test_frontend_editor_mode_module.py' -v
@@ -111,7 +126,10 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_recent_workspace_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_release_control_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_release_version_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_script_readability_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_script_voice_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_story_block_catalog_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_story_templates_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_system_dialog_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_ui_theme_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_variables_module.py' -v

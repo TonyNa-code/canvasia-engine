@@ -31,6 +31,8 @@ NATIVE_VIDEO_SYNC_BACKEND_ID = "pyav_audio_video_sync"
 NATIVE_VIDEO_EMBEDDED_BACKEND_ID = "opencv_embedded_playback"
 FILE_INTEGRITY_REPORT_NAME = "native-runtime-file-integrity.json"
 FILE_INTEGRITY_MARKDOWN_NAME = "native-runtime-file-integrity.md"
+ACCEPTANCE_REPORT_NAME = "native-runtime-release-acceptance.md"
+ACCEPTANCE_JSON_NAME = "native-runtime-release-acceptance.json"
 FILE_INTEGRITY_EXCLUDED_FILE_NAMES = {
     FILE_INTEGRITY_REPORT_NAME,
     FILE_INTEGRITY_MARKDOWN_NAME,
@@ -5403,6 +5405,8 @@ def build_native_runtime_release_control_payload(bundle_dir: Path) -> dict:
             "releaseControlJson": "native-runtime-release-control-report.json",
             "fileIntegrityReport": FILE_INTEGRITY_REPORT_NAME,
             "fileIntegrityMarkdown": FILE_INTEGRITY_MARKDOWN_NAME,
+            "acceptanceMarkdown": ACCEPTANCE_REPORT_NAME,
+            "acceptanceJson": ACCEPTANCE_JSON_NAME,
         },
     }
 
@@ -5498,6 +5502,321 @@ def print_native_runtime_release_control_json_report(bundle_dir: Path) -> dict:
 def print_native_runtime_release_control_markdown_report(bundle_dir: Path) -> dict:
     payload = build_native_runtime_release_control_payload(bundle_dir)
     print(render_native_runtime_release_control_markdown(payload), end="")
+    return payload
+
+
+def build_acceptance_automated_checks(release_control: dict, integrity_verification: dict) -> list[dict]:
+    release_check = release_control.get("releaseCheck") if isinstance(release_control.get("releaseCheck"), dict) else {}
+    release_candidate = (
+        release_control.get("releaseCandidate") if isinstance(release_control.get("releaseCandidate"), dict) else {}
+    )
+    asset3d = release_control.get("asset3d") if isinstance(release_control.get("asset3d"), dict) else {}
+    return [
+        {
+            "id": "release_check",
+            "label": "发布前自检",
+            "status": str(release_check.get("status") or "unavailable"),
+            "summary": release_check.get("summary") or {},
+            "command": "python3 runtime_player.py --release-check .",
+        },
+        {
+            "id": "release_candidate",
+            "label": "发布候选总报告",
+            "status": str(release_candidate.get("status") or "unavailable"),
+            "summary": release_candidate.get("summary") or {},
+            "command": "python3 runtime_player.py --release-candidate-report .",
+        },
+        {
+            "id": "release_control",
+            "label": "发布总控",
+            "status": str((release_control.get("qualityGate") or {}).get("status") or "unavailable"),
+            "summary": str((release_control.get("qualityGate") or {}).get("summary") or ""),
+            "command": "python3 runtime_player.py --release-control-report .",
+        },
+        {
+            "id": "file_integrity",
+            "label": "文件完整性",
+            "status": str(integrity_verification.get("status") or "unavailable"),
+            "summary": integrity_verification.get("summary") or {},
+            "command": "python3 runtime_player.py --verify-file-integrity .",
+        },
+        {
+            "id": "video_strategy",
+            "label": "视频后端策略",
+            "status": str((release_candidate.get("videoStrategy") or {}).get("previewProbeStatus") or "unavailable"),
+            "summary": str((release_candidate.get("videoStrategy") or {}).get("recommendation") or ""),
+            "command": "python3 runtime_player.py --probe-video-preview .",
+        },
+        {
+            "id": "asset3d",
+            "label": "3D 资产风险",
+            "status": str(asset3d.get("status") or "unavailable"),
+            "summary": str(asset3d.get("summaryLine") or ""),
+            "command": "python3 runtime_player.py --describe-3d-assets .",
+        },
+    ]
+
+
+def build_acceptance_platform_matrix(release_control: dict) -> list[dict]:
+    release_candidate = (
+        release_control.get("releaseCandidate") if isinstance(release_control.get("releaseCandidate"), dict) else {}
+    )
+    platform_matrix = release_candidate.get("platformMatrix") if isinstance(release_candidate.get("platformMatrix"), list) else []
+    source = platform_matrix or [
+        {"id": "macos", "label": "macOS", "buildScript": "打包原生Runtime应用.command"},
+        {"id": "windows", "label": "Windows", "buildScript": "build_native_runtime_app.bat"},
+        {"id": "linux", "label": "Linux", "buildScript": "build_native_runtime_app.sh"},
+    ]
+    rows = []
+    for entry in source:
+        if not isinstance(entry, dict):
+            continue
+        rows.append(
+            {
+                "id": str(entry.get("id") or ""),
+                "label": str(entry.get("label") or entry.get("id") or "目标系统"),
+                "buildScript": str(entry.get("buildScript") or ""),
+                "currentMachine": bool(entry.get("currentMachine")),
+                "status": "needs_target_test",
+                "requiredManualChecks": [
+                    "启动包或 App，确认标题页、开始游戏、读档、设置和退出都能响应。",
+                    "完成一轮正式存档、读档、快存、退出重开自动续玩。",
+                    "试玩至少一条包含选项、跳转、音频、资料馆入口和视频/3D 兜底提示的路线。",
+                    "记录系统安全提示、杀毒/SmartScreen/Gatekeeper 提示和玩家可理解程度。",
+                ],
+            }
+        )
+    return rows
+
+
+def build_acceptance_manual_check_groups() -> list[dict]:
+    return [
+        {
+            "id": "startup",
+            "label": "启动与主菜单",
+            "items": [
+                "首次启动不会闪退，标题页按钮能用。",
+                "新开游戏、继续游戏、读档、设置、资料馆、退出路径都可达。",
+                "未安装可选视频依赖时，提示清楚且不影响主线试玩。",
+            ],
+        },
+        {
+            "id": "reading_flow",
+            "label": "阅读主链",
+            "items": [
+                "台词、旁白、选项、跳转、条件分支和变量变化符合网页预览。",
+                "文字速度、自动播放、已读快进、清屏、历史文本和语音回听可用。",
+                "鼠标、键盘快捷键和右键菜单不会卡死在覆盖层。",
+            ],
+        },
+        {
+            "id": "state",
+            "label": "存档 / 设置 / 进度",
+            "items": [
+                "正式存档位数量符合项目设置，翻页和覆盖存档正常。",
+                "快存、正式读档、退出重开自动续玩可恢复到合理位置。",
+                "主题、显示模式、文字大小、文本框透明度和音量设置能持久保存。",
+            ],
+        },
+        {
+            "id": "extras",
+            "label": "资料馆与解锁",
+            "items": [
+                "章节回放、CG、音乐、地点、角色、结局、成就入口可打开。",
+                "详情页、内部选择和返回路径清晰。",
+                "未解锁内容不会暴露错误数据或空白死页。",
+            ],
+        },
+        {
+            "id": "media",
+            "label": "音视频 / 3D / 演出",
+            "items": [
+                "BGM、音效、语音音量独立可控，切换场景不残留异常声音。",
+                "OP/ED/PV 视频能按预期内嵌播放或桥接系统播放器，并能回到剧情链。",
+                "3D / Live2D 预览桥和兜底立绘提示清楚，不误导成完整实时渲染。",
+                "粒子、镜头、闪屏、淡入淡出、滤镜和景深不会挡住核心文本。",
+            ],
+        },
+        {
+            "id": "distribution",
+            "label": "分发与升级",
+            "items": [
+                "压缩包 SHA-256、包内完整性校验和验收报告都随包提供。",
+                "覆盖旧版本后，已有存档、设置和进度不会被误删。",
+                "崩溃日志位置可找到，错误信息能帮助用户反馈问题。",
+            ],
+        },
+    ]
+
+
+def get_acceptance_status(release_control: dict, integrity_verification: dict) -> dict:
+    quality_gate = release_control.get("qualityGate") if isinstance(release_control.get("qualityGate"), dict) else {}
+    quality_status = str(quality_gate.get("status") or "blocked")
+    integrity_status = str(integrity_verification.get("status") or "unavailable")
+    if quality_status == "blocked" or integrity_status == "fail":
+        return {
+            "status": "blocked",
+            "label": "暂不建议验收",
+            "summary": "自动检查存在阻塞项，应先修复后再做人工三系统验收。",
+        }
+    if quality_status == "needs_review" or integrity_status in {"warn", "unavailable"}:
+        return {
+            "status": "needs_manual_review",
+            "label": "可进入人工复核",
+            "summary": "主链没有自动阻塞，但仍需人工确认警告、目标系统表现和分发提示。",
+        }
+    return {
+        "status": "ready_for_manual_acceptance",
+        "label": "可进入三系统验收",
+        "summary": "自动检查没有发现阻塞项，可以按清单进行目标系统人工点测。",
+    }
+
+
+def build_native_runtime_acceptance_payload(bundle_dir: Path) -> dict:
+    release_control = build_native_runtime_release_control_payload(bundle_dir)
+    try:
+        integrity_verification = build_native_runtime_file_integrity_verification(bundle_dir)
+    except NativeRuntimeError as error:
+        integrity_verification = {
+            "status": "unavailable",
+            "checkedAt": now_iso(),
+            "summary": {"missingCount": 0, "changedCount": 0, "extraCount": 0},
+            "message": str(error),
+        }
+    acceptance_gate = get_acceptance_status(release_control, integrity_verification)
+    project = release_control.get("project") if isinstance(release_control.get("project"), dict) else {}
+    engine = release_control.get("engine") if isinstance(release_control.get("engine"), dict) else {}
+    manual_groups = build_acceptance_manual_check_groups()
+    platform_matrix = build_acceptance_platform_matrix(release_control)
+    return {
+        "formatVersion": 1,
+        "generatedAt": now_iso(),
+        "bundleDir": str(bundle_dir),
+        "project": project,
+        "engine": engine,
+        "acceptanceGate": acceptance_gate,
+        "automatedChecks": build_acceptance_automated_checks(release_control, integrity_verification),
+        "platformMatrix": platform_matrix,
+        "manualCheckGroups": manual_groups,
+        "summary": {
+            "manualGroupCount": len(manual_groups),
+            "manualItemCount": sum(len(group.get("items") or []) for group in manual_groups),
+            "targetPlatformCount": len(platform_matrix),
+            "releaseControlStatus": (release_control.get("qualityGate") or {}).get("status"),
+            "fileIntegrityStatus": integrity_verification.get("status"),
+        },
+        "recommendedCommands": [
+            "python3 runtime_player.py --doctor .",
+            "python3 runtime_player.py --verify-file-integrity .",
+            "python3 runtime_player.py --release-control-report .",
+            "python3 runtime_player.py --acceptance-report .",
+        ],
+        "includedReports": {
+            "acceptanceMarkdown": ACCEPTANCE_REPORT_NAME,
+            "acceptanceJson": ACCEPTANCE_JSON_NAME,
+            "releaseControlMarkdown": "native-runtime-release-control-report.md",
+            "releaseControlJson": "native-runtime-release-control-report.json",
+            "fileIntegrityJson": FILE_INTEGRITY_REPORT_NAME,
+            "fileIntegrityMarkdown": FILE_INTEGRITY_MARKDOWN_NAME,
+        },
+    }
+
+
+def render_native_runtime_acceptance_markdown(payload: dict) -> str:
+    project = payload.get("project") if isinstance(payload.get("project"), dict) else {}
+    engine = payload.get("engine") if isinstance(payload.get("engine"), dict) else {}
+    gate = payload.get("acceptanceGate") if isinstance(payload.get("acceptanceGate"), dict) else {}
+    summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
+    lines = [
+        "# 原生 Runtime 发布验收清单",
+        "",
+        f"- 项目：{format_markdown_value(project.get('title'), '未命名项目')}",
+        f"- 版本：{format_markdown_value(engine.get('releaseVersion'), '1.0.0-preview')}",
+        f"- 生成时间：{format_markdown_value(payload.get('generatedAt'))}",
+        f"- 验收状态：{format_markdown_value(gate.get('label'), '需要复核')}",
+        "",
+        "## 总结",
+        "",
+        format_markdown_value(gate.get("summary"), "请按下方清单完成目标系统点测。"),
+        "",
+        "## 自动检查",
+        "",
+        "| 检查 | 状态 | 命令 |",
+        "| --- | --- | --- |",
+    ]
+    for check in payload.get("automatedChecks") or []:
+        if isinstance(check, dict):
+            lines.append(
+                f"| {format_markdown_value(check.get('label'), '检查')} | "
+                f"{format_markdown_value(check.get('status'), 'unavailable')} | "
+                f"`{format_markdown_value(check.get('command'), '-')}` |"
+            )
+    lines.extend(
+        [
+            "",
+            "## 三系统验收",
+            "",
+            "| 系统 | 构建脚本 | 当前机器 | 验收状态 |",
+            "| --- | --- | --- | --- |",
+        ]
+    )
+    for platform_entry in payload.get("platformMatrix") or []:
+        if isinstance(platform_entry, dict):
+            lines.append(
+                f"| {format_markdown_value(platform_entry.get('label'), '目标系统')} | "
+                f"{format_markdown_value(platform_entry.get('buildScript'), '目标系统打包')} | "
+                f"{'是' if platform_entry.get('currentMachine') else '否'} | "
+                f"{format_markdown_value(platform_entry.get('status'), 'needs_target_test')} |"
+            )
+    lines.extend(["", "## 人工逐项点测", ""])
+    for group in payload.get("manualCheckGroups") or []:
+        if not isinstance(group, dict):
+            continue
+        lines.extend([f"### {format_markdown_value(group.get('label'), '验收项')}", ""])
+        for item in group.get("items") or []:
+            lines.append(f"- [ ] {format_markdown_value(item)}")
+        lines.append("")
+    lines.extend(
+        [
+            "## 建议命令",
+            "",
+            "```bash",
+            *[str(command) for command in payload.get("recommendedCommands") or []],
+            "```",
+            "",
+            "## 验收规模",
+            "",
+            f"- 人工分组：{int(summary.get('manualGroupCount') or 0)}",
+            f"- 人工检查项：{int(summary.get('manualItemCount') or 0)}",
+            f"- 目标系统：{int(summary.get('targetPlatformCount') or 0)}",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def write_native_runtime_acceptance_reports(bundle_dir: Path) -> dict:
+    payload = build_native_runtime_acceptance_payload(bundle_dir)
+    (bundle_dir / ACCEPTANCE_JSON_NAME).write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    (bundle_dir / ACCEPTANCE_REPORT_NAME).write_text(
+        render_native_runtime_acceptance_markdown(payload),
+        encoding="utf-8",
+    )
+    return payload
+
+
+def print_native_runtime_acceptance_json_report(bundle_dir: Path) -> dict:
+    payload = build_native_runtime_acceptance_payload(bundle_dir)
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    return payload
+
+
+def print_native_runtime_acceptance_markdown_report(bundle_dir: Path) -> dict:
+    payload = build_native_runtime_acceptance_payload(bundle_dir)
+    print(render_native_runtime_acceptance_markdown(payload), end="")
     return payload
 
 
@@ -12570,6 +12889,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--release-control-json", dest="release_control_json", help="输出原生 Runtime 发布总控报告 JSON，不启动窗口")
     parser.add_argument("--release-control-report", "--release-control-md", dest="release_control_report", help="输出原生 Runtime 发布总控 Markdown 报告，不启动窗口")
     parser.add_argument("--write-release-control-reports", dest="write_release_control_reports", help="写入原生 Runtime 发布总控 Markdown / JSON 报告，不启动窗口")
+    parser.add_argument("--acceptance-check", "--acceptance-json", dest="acceptance_check", help="输出原生 Runtime 发布验收清单 JSON，不启动窗口")
+    parser.add_argument("--acceptance-report", "--acceptance-md", dest="acceptance_report", help="输出原生 Runtime 发布验收清单 Markdown，不启动窗口")
+    parser.add_argument("--write-acceptance-reports", dest="write_acceptance_reports", help="写入原生 Runtime 发布验收清单 Markdown / JSON，不启动窗口")
     parser.add_argument("--file-integrity-report", dest="file_integrity_report", help="输出原生 Runtime 文件完整性清单 JSON，不启动窗口")
     parser.add_argument("--file-integrity-markdown", "--file-integrity-md", dest="file_integrity_markdown", help="输出原生 Runtime 文件完整性 Markdown 报告，不启动窗口")
     parser.add_argument("--write-file-integrity-reports", dest="write_file_integrity_reports", help="写入原生 Runtime 文件完整性 Markdown / JSON 报告，不启动窗口")
@@ -12655,6 +12977,42 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         except NativeRuntimeError as error:
             print(f"Native runtime release control report write failed: {error}")
+            return 1
+
+    if args.acceptance_check:
+        try:
+            report = print_native_runtime_acceptance_json_report(Path(args.acceptance_check).resolve())
+            return 1 if report.get("acceptanceGate", {}).get("status") == "blocked" else 0
+        except NativeRuntimeError as error:
+            print(f"Native runtime acceptance check failed: {error}")
+            return 1
+
+    if args.acceptance_report:
+        try:
+            report = print_native_runtime_acceptance_markdown_report(Path(args.acceptance_report).resolve())
+            return 1 if report.get("acceptanceGate", {}).get("status") == "blocked" else 0
+        except NativeRuntimeError as error:
+            print(f"Native runtime acceptance report failed: {error}")
+            return 1
+
+    if args.write_acceptance_reports:
+        try:
+            payload = write_native_runtime_acceptance_reports(Path(args.write_acceptance_reports).resolve())
+            print(
+                json.dumps(
+                    {
+                        "status": payload.get("acceptanceGate", {}).get("status"),
+                        "label": payload.get("acceptanceGate", {}).get("label"),
+                        "markdown": ACCEPTANCE_REPORT_NAME,
+                        "json": ACCEPTANCE_JSON_NAME,
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
+            return 1 if payload.get("acceptanceGate", {}).get("status") == "blocked" else 0
+        except NativeRuntimeError as error:
+            print(f"Native runtime acceptance report write failed: {error}")
             return 1
 
     if args.file_integrity_report:

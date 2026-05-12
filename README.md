@@ -17,6 +17,7 @@
 </p>
 
 <p align="center">
+  <a href="docs/creator_quick_start_zh-CN.md">小白使用教程</a> ·
   <a href="#快速开始">快速开始</a> ·
   <a href="#当前已经有的核心能力">核心能力</a> ·
   <a href="#功能状态">功能状态</a> ·
@@ -47,8 +48,9 @@ Canvasia Engine 当前更适合这样理解：
 - 项目中心与空白新建项目
 - 新手模式 / 高级模式分层
 - 角色、素材、台词台本、配音工作流
-- 首页今日工作台、最终发表门禁、项目巡检、项目医生小白修复向导、项目医生回执导出 / 复制 / 编号、成品目标路线、一键安全修复低风险结构问题、一键发布前修复顺序、素材性能预算、发布总控 Markdown / JSON 报告、自动回归试玩路线测试
+- 首页今日工作台、最终发表门禁、项目巡检、项目医生小白修复向导、项目医生回执导出 / 复制 / 编号、成品目标路线、一键安全修复低风险结构问题、一键发布前修复顺序、素材性能预算、发布总控 Markdown / JSON 报告、发布验收清单、自动回归试玩路线测试
 - Canvasia Assistant 智能创作助手：支持零配置本地模板，也支持创作者自带 OpenAI、DeepSeek、通义千问、Kimi、智谱 GLM 或自定义兼容 API Key 调用真模型生成剧情、建议、素材提示、灵感盒归档包和可插入剧情卡片
+- 素材页可选 OpenAI Image 生图：输入提示词即可生成背景、立绘、CG 或 UI 素材，并自动导入项目素材库；API Key 只用于本次请求，不写入项目文件
 - 正式存档 / 读档、系统菜单
 - 项目级成品 UI 皮肤、UI Kit 部件绑定、九宫格贴图、按钮多状态贴图、布局位置微调与视觉小说文本框设计
 - EXTRA 回想馆、图鉴馆、成就馆、章节回放、结局回放、语音回听
@@ -62,7 +64,7 @@ Canvasia Engine 当前更适合这样理解：
 | 模块 | 当前状态 | 说明 |
 | --- | --- | --- |
 | 剧情 / 分支编辑 | 可用 | 支持可视化卡片、选项跳转、条件与变量、场景树筛选。 |
-| 素材管理 | 可用 | 支持背景、角色、CG、BGM、音效、语音、字体等素材导入、替换、删除、使用保护与发布前体积预算提示。 |
+| 素材管理 | 可用 | 支持背景、角色、CG、BGM、音效、语音、字体等素材导入、替换、删除、使用保护与发布前体积预算提示；可选使用 OpenAI Image 直接生成背景、立绘、CG 和 UI 素材并入库。 |
 | 智能创作助手 | 可用 | 默认本地模板；可选自带 OpenAI、DeepSeek、通义千问、Kimi、智谱 GLM 或自定义兼容 API Key 的真模型模式；支持灵感盒搜索、收藏保留、卡片预览、勾选插入、单条 / 全量 Markdown 创作档案、单条导出、全部归档、导入与本机 Key 遗忘。 |
 | 项目安全网 | 可用 | 支持自动快照、版本恢复、崩溃恢复、正式存档 / 读档、首页今日工作台、最终发表门禁、项目医生修复队列、项目医生可追溯回执、成品目标路线、入口场景 / 章节顺序 / 场景顺序的一键安全修复、发布前检查与发布总控 Markdown / JSON 报告导出。 |
 | 成品 UI 自定义 | 可用 | 支持项目级 UI 皮肤、按钮多状态、九宫格贴图、布局位置与视觉小说文本框设计。 |
@@ -111,7 +113,19 @@ Canvasia Engine 当前更适合这样理解：
 - 生成结果会进入本地“灵感盒”，可搜索、收藏、恢复、删除、清理未收藏、复制历史剧情卡片、复制单条 Markdown 文档、导出 Markdown 创作档案、单条导出为 `.canvasia-idea.json`，也可以导出当前视图或导入全部 `.canvasia-idea-vault.json`；容量到上限时会优先保留收藏灵感，清理类操作会先提醒备份并要求确认，最近一次清理前的灵感盒可一键恢复，恢复前会把当前灵感盒转存成新的恢复点
 - 插入前可以预览、勾选将要写入的剧情卡片，并复制成台本文本，方便创作者先审稿或发给协作者
 
+## AI 素材生成
+
+素材页内置可选的 OpenAI Image 生图入口：
+
+- 支持生成 `背景`、`立绘`、`CG` 和 `界面素材`
+- 可设置素材名、提示词、模型、尺寸、质量、背景和输出格式
+- 生成成功后会自动写入当前项目素材库，不需要再手动下载再导入
+- API Key 只随本次生成请求发送，不会写入项目文件或素材元数据
+- 没有 OpenAI API Key 时，仍可继续使用普通上传素材和本地模板助手
+
 ## 快速开始
+
+第一次使用建议先看这份面向创作者的零代码教程：[`Canvasia Engine 群友小白使用教程`](docs/creator_quick_start_zh-CN.md)。它会从下载、启动、新建项目、导入素材、写第一段剧情、试玩到导出，按普通用户视角走一遍。
 
 ### 运行环境
 
@@ -191,7 +205,7 @@ python run_editor.py
 
 - `网页试玩包`：适合快速预览、网页分发和轻量测试。
 - `Windows / macOS / Linux 桌面包`：当前主要基于 NW.js 桌面 Runtime。
-- `原生 Runtime 包`：Preview 路线，已覆盖标题页主菜单、基础剧情主链、正式存档/读档、系统菜单设置项、文本历史、自动播放、已读快进、项目字体、玩家档案/自动续玩、基础粒子与镜头演出、3D 资产结构 / 依赖清单、可选 PyAV/FFmpeg 音画同步内嵌视频播放、OpenCV 画面兜底、系统播放器桥接兜底、第一批资料馆，以及随包生成的发布候选总报告与发布总控报告。
+- `原生 Runtime 包`：Preview 路线，已覆盖标题页主菜单、基础剧情主链、正式存档/读档、系统菜单设置项、文本历史、自动播放、已读快进、项目字体、玩家档案/自动续玩、基础粒子与镜头演出、3D 资产结构 / 依赖清单、可选 PyAV/FFmpeg 音画同步内嵌视频播放、OpenCV 画面兜底、系统播放器桥接兜底、第一批资料馆，以及随包生成的发布候选总报告、发布总控报告与三系统验收清单。
 - `手机端 Runtime`：实验规划阶段，当前重点是触控、音频策略和界面适配验证。
 
 ### 原生 Runtime 发布体检
@@ -206,6 +220,8 @@ python run_editor.py
 - `native-runtime-release-control-report.md`：面向人工验收的发布总控报告，汇总自检、RC、3D 风险、发布状态和下一步顺序。
 - `native-runtime-release-control-report.json`：同一份总控结论的机器可读版本，适合接 CI、发布脚本或自动化验收。
 - `生成原生Runtime发布总控报告.command` / `generate_native_runtime_release_control.sh` / `generate_native_runtime_release_control.bat`：三系统刷新脚本，可在不打开编辑器的情况下重新生成发布总控 Markdown / JSON。
+- `native-runtime-release-acceptance.md` / `native-runtime-release-acceptance.json`：发布前验收清单，汇总自动检查、三系统人工点测项、启动/读档/音画/资料馆/分发确认项。
+- `生成原生Runtime发布验收清单.command` / `generate_native_runtime_acceptance_checklist.sh` / `generate_native_runtime_acceptance_checklist.bat`：三系统验收清单刷新脚本。
 - `native-runtime-file-integrity.md` / `native-runtime-file-integrity.json`：导出包核心文件 SHA-256 完整性清单，用于确认脚本、素材、manifest 和游戏数据没有丢失或被改坏。
 - `校验原生Runtime文件完整性.command` / `verify_native_runtime_file_integrity.sh` / `verify_native_runtime_file_integrity.bat`：三系统完整性校验脚本。
 - `*.zip.sha256` / `*.zip.checksum.json`：导出压缩包的 SHA-256 校验文件，适合上传 GitHub Release 时一起附带，方便下载后先验证压缩包本身。
