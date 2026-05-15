@@ -18,8 +18,8 @@
 
 <p align="center">
   <strong>言語</strong>：
-  <a href="README.md">简体中文</a> ·
-  <a href="README.en-US.md">English</a> ·
+  <a href="README.zh-CN.md">简体中文</a> ·
+  <a href="README.md">English</a> ·
   日本語
 </p>
 
