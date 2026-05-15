@@ -3,6 +3,9 @@
   "projectId": "project_heart_delay",
   "title": "心跳时差",
   "language": "zh-CN",
+  "supportedLanguages": [
+    "zh-CN"
+  ],
   "releaseVersion": "1.0.2-rc1",
   "resolution": {
     "width": 1920,

@@ -2049,6 +2049,8 @@ class RunEditorSmokeTests(unittest.TestCase):
             ],
         )["assets"]
         run_editor.save_project_settings(
+            language="ja-JP",
+            supported_languages=["zh-CN", "ja-JP", "en-US"],
             runtime_settings={"formalSaveSlotCount": 60},
             game_ui_config={
                 "preset": "paper",
@@ -2161,6 +2163,11 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue(Path(export_result["releaseArtifactIndexJsonPath"]).is_file())
         self.assertTrue(Path(export_result["releaseNotesPath"]).is_file())
         self.assertTrue(manifest_path.is_file())
+        native_game_data = json.loads((build_dir / "game_data.json").read_text(encoding="utf-8"))
+        self.assertEqual(native_game_data["i18n"]["defaultLanguage"], "ja-JP")
+        self.assertEqual(native_game_data["i18n"]["supportedLanguages"], ["zh-CN", "ja-JP", "en-US"])
+        native_player_source = (build_dir / run_editor.NATIVE_RUNTIME_PLAYER_NAME).read_text(encoding="utf-8")
+        self.assertIn('("language", "语言")', native_player_source)
 
         archive_sha256 = hashlib.sha256(Path(export_result["archivePath"]).read_bytes()).hexdigest()
         self.assertEqual(export_result["archiveSha256"], archive_sha256)
@@ -2775,6 +2782,79 @@ class RunEditorSmokeTests(unittest.TestCase):
         )
         self.assertEqual(provenance["build"]["target"], run_editor.EXPORT_TARGET_MACOS_NWJS)
         self.assertEqual(manifest["runtime"]["version"], run_editor.NWJS_RUNTIME_VERSION)
+
+    def test_project_i18n_settings_export_to_web_runtime(self) -> None:
+        run_editor.create_blank_project("国际化测试")
+        run_editor.save_project_settings(
+            language="ja-JP",
+            supported_languages=["zh-CN", "ja-JP", "en-US"],
+        )
+        chapter_result = run_editor.create_chapter("第一章", "教室")
+        run_editor.write_json(
+            run_editor.DATA_DIR / "characters.json",
+            run_editor.normalize_characters_document(
+                {
+                    "characters": [
+                        {
+                            "id": "char_heroine",
+                            "displayName": "林若曦",
+                            "displayNameTranslations": {
+                                "ja-JP": "林ルオシー",
+                                "en-US": "Lin Ruoxi",
+                            },
+                        }
+                    ]
+                }
+            ),
+        )
+        scene = chapter_result["scene"]
+        scene["nameTranslations"] = {"ja-JP": "教室", "en-US": "Classroom"}
+        self.save_scene_with_blocks(
+            chapter_result["chapterId"],
+            scene,
+            [
+                {
+                    "id": "block_dialogue",
+                    "type": "dialogue",
+                    "speakerId": "char_heroine",
+                    "text": "今天的风，好像有点甜。",
+                    "textTranslations": {
+                        "ja-JP": "今日の風、少し甘い気がする。",
+                        "en-US": "The wind feels a little sweet today.",
+                    },
+                },
+                {
+                    "id": "block_choice",
+                    "type": "choice",
+                    "options": [
+                        {
+                            "id": "opt_home",
+                            "text": "一起回家吧",
+                            "textTranslations": {
+                                "ja-JP": "一緒に帰ろう",
+                                "en-US": "Let's go home together",
+                            },
+                            "gotoSceneId": scene["id"],
+                        }
+                    ],
+                },
+            ],
+        )
+
+        export_result = run_editor.export_web_build()
+        manifest = json.loads(Path(export_result["manifestPath"]).read_text(encoding="utf-8"))
+        self.assertEqual(manifest["project"]["language"], "ja-JP")
+        self.assertEqual(manifest["project"]["supportedLanguages"], ["zh-CN", "ja-JP", "en-US"])
+
+        index_html = Path(export_result["indexPath"]).read_text(encoding="utf-8")
+        self.assertIn('"defaultLanguage": "ja-JP"', index_html)
+        self.assertIn('"supportedLanguages": [', index_html)
+        self.assertIn('"今日の風、少し甘い気がする。"', index_html)
+        self.assertIn('"Let\\u0027s go home together"', index_html.replace("'", "\\u0027"))
+        self.assertIn("languageSelect", Path(export_result["buildPath"], "index.html").read_text(encoding="utf-8"))
+        player_js = Path(export_result["buildPath"], "player.js").read_text(encoding="utf-8")
+        self.assertIn("function handleLanguageChange", player_js)
+        self.assertIn("getLocalizedValue", player_js)
 
     def test_linux_nwjs_build_smoke(self) -> None:
         _, chapter_result = self.create_blank_project_with_chapter()

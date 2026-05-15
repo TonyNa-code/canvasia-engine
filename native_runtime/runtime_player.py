@@ -23,6 +23,7 @@ from pathlib import Path
 
 ASSET_TYPE_IMAGE = {"background", "sprite", "cg", "ui"}
 ASSET_TYPE_FONT = {"font"}
+DEFAULT_PROJECT_LANGUAGE = "zh-CN"
 DEFAULT_GAME_DATA_NAME = "game_data.json"
 ENGINE_BRAND_LOGO_RELATIVE_PATH = "assets/canvasia-brand-logo.png"
 NATIVE_VIDEO_OPTIONAL_REQUIREMENTS_NAME = "requirements-native-runtime-video.txt"
@@ -299,6 +300,7 @@ DEFAULT_RUNTIME_PLAYER_SETTINGS = {
     "themeMode": "auto",
     "displayMode": "windowed",
     "textSpeed": "normal",
+    "language": "",
     "textScalePercent": 100,
     "dialogBoxOpacityPercent": 100,
     "autoPlayDelayMs": 1800,
@@ -333,6 +335,11 @@ TEXT_SPEED_LABELS = {
     "fast": "快",
     "instant": "瞬时",
 }
+RUNTIME_LANGUAGE_LABELS = {
+    "zh-CN": "简体中文",
+    "ja-JP": "日本語",
+    "en-US": "English",
+}
 AUTO_PLAY_DELAY_PRESETS = (900, 1400, 1800, 2400, 3200)
 TEXT_SCALE_PRESETS = (90, 100, 110, 125)
 DIALOG_BOX_OPACITY_PRESETS = (0, 35, 60, 80, 100)
@@ -364,6 +371,7 @@ SETTINGS_MENU_ITEMS = [
     ("themeMode", "界面主题"),
     ("displayMode", "显示模式"),
     ("textSpeed", "文字速度"),
+    ("language", "语言"),
     ("textScalePercent", "文字大小"),
     ("dialogBoxOpacityPercent", "文本框透明度"),
     ("autoPlayDelayMs", "自动播放间隔"),
@@ -487,6 +495,28 @@ def load_game_data(game_data_path: Path) -> dict:
     if not game_data_path.is_file():
         raise NativeRuntimeError(f"没有找到游戏数据文件：{game_data_path}")
     return json.loads(game_data_path.read_text(encoding="utf-8"))
+
+
+def normalize_language_code(value: object, fallback: str = DEFAULT_PROJECT_LANGUAGE) -> str:
+    raw_value = str(value or "").strip()
+    if not raw_value or not re.fullmatch(r"[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8}){0,2}", raw_value):
+        return fallback
+    parts = raw_value.split("-")
+    normalized = [parts[0].lower()]
+    for index, part in enumerate(parts[1:], start=1):
+        normalized.append(part.upper() if index == 1 and len(part) in {2, 3} else part)
+    return "-".join(normalized)
+
+
+def normalize_supported_languages(value: object, default_language: str = DEFAULT_PROJECT_LANGUAGE) -> list[str]:
+    languages: list[str] = []
+    for raw_language in value if isinstance(value, list) else []:
+        language = normalize_language_code(raw_language, "")
+        if language and language not in languages:
+            languages.append(language)
+    if default_language and default_language not in languages:
+        languages.insert(0, default_language)
+    return languages or [DEFAULT_PROJECT_LANGUAGE]
 
 
 def looks_like_live2d_file_reference(value: object) -> bool:
@@ -5615,7 +5645,7 @@ def build_acceptance_manual_check_groups() -> list[dict]:
             "items": [
                 "正式存档位数量符合项目设置，翻页和覆盖存档正常。",
                 "快存、正式读档、退出重开自动续玩可恢复到合理位置。",
-                "主题、显示模式、文字大小、文本框透明度和音量设置能持久保存。",
+                "主题、显示模式、语言、文字大小、文本框透明度和音量设置能持久保存。",
             ],
         },
         {
@@ -6287,6 +6317,7 @@ def exercise_runtime_settings(bundle_dir: Path) -> None:
             "themeMode": "dark",
             "displayMode": "fullscreen",
             "textSpeed": "fast",
+            "language": "ja-JP",
             "textScalePercent": 110,
             "dialogBoxOpacityPercent": 60,
             "masterVolume": 78,
@@ -6299,6 +6330,8 @@ def exercise_runtime_settings(bundle_dir: Path) -> None:
     loaded = load_project_runtime_settings(project_id)
     if loaded["themeMode"] != "dark" or loaded["displayMode"] != "fullscreen" or loaded["textSpeed"] != "fast":
         raise NativeRuntimeError("原生 Runtime 设置写入后没有正确读回。")
+    if loaded["language"] != "ja-JP":
+        raise NativeRuntimeError("原生 Runtime 语言设置读回不正确。")
     if loaded["masterVolume"] != 78 or loaded["voiceVolume"] != 88:
         raise NativeRuntimeError("原生 Runtime 音量设置读回不正确。")
     if loaded["textScalePercent"] != 110 or loaded["dialogBoxOpacityPercent"] != 60:
@@ -6996,6 +7029,7 @@ def sanitize_runtime_player_settings(value: dict | None) -> dict:
     text_speed = str(source.get("textSpeed") or DEFAULT_RUNTIME_PLAYER_SETTINGS["textSpeed"]).strip().lower()
     if text_speed not in TEXT_SPEED_PRESETS:
         text_speed = DEFAULT_RUNTIME_PLAYER_SETTINGS["textSpeed"]
+    language = normalize_language_code(source.get("language"), "")
     auto_play_wait_for_voice = str(
         source.get("autoPlayWaitForVoice") or DEFAULT_RUNTIME_PLAYER_SETTINGS["autoPlayWaitForVoice"]
     ).strip().lower()
@@ -7005,6 +7039,7 @@ def sanitize_runtime_player_settings(value: dict | None) -> dict:
         "themeMode": theme_mode,
         "displayMode": display_mode,
         "textSpeed": text_speed,
+        "language": language,
         "textScalePercent": clamp_int(
             source.get("textScalePercent"),
             min(TEXT_SCALE_PRESETS),
@@ -7333,6 +7368,21 @@ class NativeRuntimePlayer:
         self.variables_by_id = {str(variable.get("id")): variable for variable in self.variables if variable.get("id")}
         self.chapters = self.data.get("chapters") or []
         self.build_info = self.data.get("buildInfo") or {}
+        self.i18n = self.data.get("i18n") if isinstance(self.data.get("i18n"), dict) else {}
+        self.default_language = normalize_language_code(
+            self.i18n.get("defaultLanguage") or self.project.get("language"),
+            DEFAULT_PROJECT_LANGUAGE,
+        )
+        self.fallback_language = normalize_language_code(self.i18n.get("fallbackLanguage"), self.default_language)
+        self.supported_languages = normalize_supported_languages(
+            self.i18n.get("supportedLanguages") or self.project.get("supportedLanguages"),
+            self.default_language,
+        )
+        self.language_labels = {
+            **RUNTIME_LANGUAGE_LABELS,
+            **(self.i18n.get("languageLabels") if isinstance(self.i18n.get("languageLabels"), dict) else {}),
+        }
+        self.current_language = self.default_language
         self.dialog_box_config = get_project_dialog_box_config(self.project)
         self.game_ui_config = get_project_game_ui_config(self.project)
 
@@ -7375,6 +7425,7 @@ class NativeRuntimePlayer:
         self.save_store = load_project_save_store(self.project_id, self.formal_save_slot_count)
         self.save_file_path = get_project_save_file_path(self.project_id)
         self.runtime_settings = load_project_runtime_settings(self.project_id)
+        self.apply_runtime_language_setting()
         self.settings_file_path = get_project_settings_file_path(self.project_id)
         self.archive_progress = load_project_archive_progress(self.project_id)
         self.progress_file_path = get_project_progress_file_path(self.project_id)
@@ -7528,6 +7579,38 @@ class NativeRuntimePlayer:
         master = clamp(float(self.runtime_settings.get("masterVolume", 100)) / 100, 0.0, 1.0)
         channel = clamp(float(self.runtime_settings.get(channel_key, 100)) / 100, 0.0, 1.0)
         return master * channel
+
+    def get_safe_runtime_language(self, language: object) -> str:
+        normalized = normalize_language_code(language, "")
+        if normalized and normalized in self.supported_languages:
+            return normalized
+        if self.default_language in self.supported_languages:
+            return self.default_language
+        return self.supported_languages[0] if self.supported_languages else DEFAULT_PROJECT_LANGUAGE
+
+    def get_runtime_language_label(self, language: object) -> str:
+        safe_language = self.get_safe_runtime_language(language)
+        return str(self.language_labels.get(safe_language) or safe_language)
+
+    def apply_runtime_language_setting(self) -> None:
+        self.current_language = self.get_safe_runtime_language(self.runtime_settings.get("language"))
+        self.runtime_settings["language"] = self.current_language
+
+    def localize_value(self, source: dict | None, key: str, fallback: str = "") -> str:
+        source = source if isinstance(source, dict) else {}
+        translations = source.get(f"{key}Translations") if isinstance(source.get(f"{key}Translations"), dict) else {}
+        candidates = [
+            self.current_language,
+            self.fallback_language,
+            self.default_language,
+            DEFAULT_PROJECT_LANGUAGE,
+        ]
+        for candidate in candidates:
+            language = normalize_language_code(candidate, "")
+            text = str(translations.get(language) or "").strip() if language else ""
+            if text:
+                return text
+        return str(source.get(key) or fallback or "").strip()
 
     def is_voice_playing(self) -> bool:
         if not self.current_voice_channel:
@@ -7750,11 +7833,11 @@ class NativeRuntimePlayer:
             if block_type == "background" and block.get("assetId"):
                 preview["backgroundAssetId"] = str(block.get("assetId") or "")
             elif block_type in {"dialogue", "narration"}:
-                preview["dialogueText"] = str(block.get("text") or "").strip()
+                preview["dialogueText"] = self.localize_value(block, "text")
                 speaker_id = str(block.get("speakerId") or "").strip()
                 if speaker_id:
                     speaker = self.characters_by_id.get(speaker_id) or {}
-                    preview["speakerName"] = str(speaker.get("displayName") or speaker_id)
+                    preview["speakerName"] = self.localize_value(speaker, "displayName", speaker_id)
                 elif block_type == "narration":
                     preview["speakerName"] = "旁白"
         return preview
@@ -7793,8 +7876,8 @@ class NativeRuntimePlayer:
             entries.append(
                 {
                     "id": chapter_id,
-                    "name": str(chapter.get("name") or f"第 {order} 章"),
-                    "subtitle": f"{len(scenes)} 个场景 · 开头：{first_scene.get('name') or '未命名场景'}",
+                    "name": self.localize_value(chapter, "name", f"第 {order} 章"),
+                    "subtitle": f"{len(scenes)} 个场景 · 开头：{self.localize_value(first_scene, 'name', '未命名场景')}",
                     "notes": str(chapter.get("summary") or chapter.get("notes") or ""),
                     "actionLabel": "重放这一章",
                     "actionEnabled": chapter_id in unlocked_ids and bool(first_scene.get("id")),
@@ -7856,7 +7939,7 @@ class NativeRuntimePlayer:
         seen_asset_ids: set[str] = set()
         entries = []
         for chapter in self.chapters:
-            chapter_name = str(chapter.get("name") or "未命名章节")
+            chapter_name = self.localize_value(chapter, "name", "未命名章节")
             for scene in chapter.get("scenes") or []:
                 for block in scene.get("blocks", []) or []:
                     if str(block.get("type") or "").strip() != "background":
@@ -7873,7 +7956,7 @@ class NativeRuntimePlayer:
                         {
                             "id": asset_id,
                             "name": str(asset.get("name") or asset_id),
-                            "subtitle": f"{chapter_name} · {scene.get('name') or '未命名场景'}",
+                            "subtitle": f"{chapter_name} · {self.localize_value(scene, 'name', '未命名场景')}",
                             "notes": tags or ("推进到这个 3D 场景第一次出现的位置后会自动收录。" if asset.get("type") == "scene3d" else "推进到这张背景第一次出现的位置后会自动收录。"),
                             "actionLabel": "查看地点",
                             "actionEnabled": asset_id in unlocked_ids,
@@ -7898,7 +7981,7 @@ class NativeRuntimePlayer:
             entries.append(
                 {
                     "id": character_id,
-                    "name": str(character.get("displayName") or character_id),
+                    "name": self.localize_value(character, "displayName", character_id),
                     "subtitle": f"{mode_label} · {character.get('defaultPosition') or 'center'} · {len(expressions)} 个表情",
                     "notes": str(character.get("bio") or "推进到角色出场或开口后自动收录。"),
                     "actionLabel": "查看角色",
@@ -7914,7 +7997,7 @@ class NativeRuntimePlayer:
         unlocked_ids = set(self.archive_progress.get("narrationUnlocked") or [])
         entries = []
         for chapter in self.chapters:
-            chapter_name = str(chapter.get("name") or "未命名章节")
+            chapter_name = self.localize_value(chapter, "name", "未命名章节")
             for scene in chapter.get("scenes") or []:
                 current_background_asset_id = ""
                 for block_index, block in enumerate(scene.get("blocks", []) or []):
@@ -7923,14 +8006,14 @@ class NativeRuntimePlayer:
                         current_background_asset_id = str(block.get("assetId") or "")
                     if block_type != "narration":
                         continue
-                    text = str(block.get("text") or "").strip()
+                    text = self.localize_value(block, "text")
                     if not text:
                         continue
                     entry_id = build_narration_archive_entry_id(scene.get("id"), block.get("id"), block_index)
                     entries.append(
                         {
                             "id": entry_id,
-                            "name": f"{chapter_name} · {scene.get('name') or '未命名场景'}",
+                            "name": f"{chapter_name} · {self.localize_value(scene, 'name', '未命名场景')}",
                             "subtitle": f"第 {block_index + 1} 条摘录",
                             "notes": text[:80],
                             "actionLabel": "查看摘录",
@@ -7948,7 +8031,7 @@ class NativeRuntimePlayer:
         entries = []
         seen_pair_ids: set[str] = set()
         for chapter in self.chapters:
-            chapter_name = str(chapter.get("name") or "未命名章节")
+            chapter_name = self.localize_value(chapter, "name", "未命名章节")
             for scene in chapter.get("scenes") or []:
                 scene_character_ids = self.collect_scene_encounter_character_ids(scene)
                 if len(scene_character_ids) < 2:
@@ -7962,11 +8045,13 @@ class NativeRuntimePlayer:
                         seen_pair_ids.add(pair_id)
                         left_character = self.characters_by_id.get(left_character_id) or {}
                         right_character = self.characters_by_id.get(right_character_id) or {}
+                        left_name = self.localize_value(left_character, "displayName", left_character_id)
+                        right_name = self.localize_value(right_character, "displayName", right_character_id)
                         entries.append(
                             {
                                 "id": pair_id,
-                                "name": f"{left_character.get('displayName') or left_character_id} × {right_character.get('displayName') or right_character_id}",
-                                "subtitle": f"{chapter_name} · {scene.get('name') or '未命名场景'}",
+                                "name": f"{left_name} × {right_name}",
+                                "subtitle": f"{chapter_name} · {self.localize_value(scene, 'name', '未命名场景')}",
                                 "notes": preview["dialogueText"] or "推进到这组角色真正同场后会自动收录。",
                                 "actionLabel": "查看关系",
                                 "actionEnabled": pair_id in unlocked_ids,
@@ -7982,8 +8067,9 @@ class NativeRuntimePlayer:
         unlocked_ids = set(self.archive_progress.get("voiceReplayUnlocked") or [])
         entries = []
         for chapter in self.chapters:
-            chapter_name = str(chapter.get("name") or "未命名章节")
+            chapter_name = self.localize_value(chapter, "name", "未命名章节")
             for scene in chapter.get("scenes") or []:
+                scene_name = self.localize_value(scene, "name", "未命名场景")
                 current_background_asset_id = ""
                 for block_index, block in enumerate(scene.get("blocks", []) or []):
                     block_type = str(block.get("type") or "").strip()
@@ -7991,19 +8077,19 @@ class NativeRuntimePlayer:
                         current_background_asset_id = str(block.get("assetId") or "")
                     if block_type not in {"dialogue", "narration"} or not block.get("voiceAssetId"):
                         continue
-                    text = str(block.get("text") or "").strip()
+                    text = self.localize_value(block, "text")
                     entry_id = build_voice_replay_entry_id(scene.get("id"), block.get("id"), block_index)
                     speaker_id = str(block.get("speakerId") or "").strip()
                     speaker_name = ""
                     if speaker_id:
-                        speaker_name = str((self.characters_by_id.get(speaker_id) or {}).get("displayName") or speaker_id)
+                        speaker_name = self.localize_value(self.characters_by_id.get(speaker_id), "displayName", speaker_id)
                     elif block_type == "narration":
                         speaker_name = "旁白"
                     entries.append(
                         {
                             "id": entry_id,
-                            "name": speaker_name or f"{chapter_name} · {scene.get('name') or '未命名场景'}",
-                            "subtitle": f"{chapter_name} · {scene.get('name') or '未命名场景'}",
+                            "name": speaker_name or f"{chapter_name} · {scene_name}",
+                            "subtitle": f"{chapter_name} · {scene_name}",
                             "notes": text[:80] or "这句带语音的台词会在推进后自动收录。",
                             "actionLabel": "回放语音",
                             "actionEnabled": entry_id in unlocked_ids,
@@ -8020,7 +8106,7 @@ class NativeRuntimePlayer:
         unlocked_ids = set(self.archive_progress.get("endingUnlocked") or [])
         entries = []
         for chapter in self.chapters:
-            chapter_name = str(chapter.get("name") or "未命名章节")
+            chapter_name = self.localize_value(chapter, "name", "未命名章节")
             for scene in chapter.get("scenes") or []:
                 scene_id = str(scene.get("id") or "").strip()
                 if not scene_id or collect_scene_outgoing_targets(scene):
@@ -8029,7 +8115,7 @@ class NativeRuntimePlayer:
                 entries.append(
                     {
                         "id": scene_id,
-                        "name": str(scene.get("name") or scene_id),
+                        "name": self.localize_value(scene, "name", scene_id),
                         "subtitle": chapter_name,
                         "notes": str(scene.get("notes") or "推进到这条路线收束位置后会自动回收到这里。"),
                         "actionLabel": "回放结局",
@@ -8242,7 +8328,7 @@ class NativeRuntimePlayer:
         speaker_id = line.get("speakerId")
         if line.get("type") == "dialogue":
             character = self.characters_by_id.get(speaker_id) or {}
-            return str(character.get("displayName") or speaker_id or "角色")
+            return self.localize_value(character, "displayName", str(speaker_id or "角色"))
         if line.get("speakerName"):
             return str(line.get("speakerName") or "")
         if line.get("blockLabel"):
@@ -8262,7 +8348,7 @@ class NativeRuntimePlayer:
         self.text_history.append(
             {
                 "key": history_key,
-                "sceneName": str((scene or {}).get("name") or self.get_current_scene_name()),
+                "sceneName": self.localize_value(scene, "name", self.get_current_scene_name()),
                 "speakerName": self.get_line_speaker_name(line),
                 "text": text,
                 "blockType": block_type,
@@ -8699,7 +8785,7 @@ class NativeRuntimePlayer:
     def get_dialogue_speaker_name(self, line: dict) -> str:
         if line.get("type") == "dialogue":
             character = self.characters_by_id.get(line.get("speakerId")) or {}
-            return str(character.get("displayName") or line.get("speakerId") or "")
+            return self.localize_value(character, "displayName", str(line.get("speakerId") or ""))
         if line.get("speakerName"):
             return str(line.get("speakerName") or "")
         if line.get("blockLabel"):
@@ -9028,6 +9114,11 @@ class NativeRuntimePlayer:
             self.runtime_settings["textSpeed"] = options[(current_index + direction) % len(options)]
             if self.current_line and not self.is_current_line_fully_visible():
                 self.start_current_line_display(self.current_line_full_text)
+        elif setting_key == "language":
+            options = self.supported_languages or [DEFAULT_PROJECT_LANGUAGE]
+            current = self.get_safe_runtime_language(self.runtime_settings.get("language"))
+            current_index = options.index(current) if current in options else 0
+            self.runtime_settings["language"] = options[(current_index + direction) % len(options)]
         elif setting_key == "textScalePercent":
             current = int(self.runtime_settings.get("textScalePercent") or DEFAULT_RUNTIME_PLAYER_SETTINGS["textScalePercent"])
             options = list(TEXT_SCALE_PRESETS)
@@ -9052,6 +9143,9 @@ class NativeRuntimePlayer:
             current_value = int(self.runtime_settings.get(setting_key) or DEFAULT_RUNTIME_PLAYER_SETTINGS[setting_key])
             self.runtime_settings[setting_key] = clamp_int(current_value + direction * 5, 0, 100, current_value)
         self.runtime_settings = sanitize_runtime_player_settings(self.runtime_settings)
+        self.apply_runtime_language_setting()
+        if setting_key == "language":
+            self.refresh_current_localized_pause()
         self.persist_runtime_settings()
         self.apply_runtime_settings()
         self.status_message = "体验设置已更新。"
@@ -9069,6 +9163,8 @@ class NativeRuntimePlayer:
         if setting_key == "textSpeed":
             speed_key = str(self.runtime_settings.get("textSpeed") or "normal")
             return TEXT_SPEED_LABELS.get(speed_key, speed_key)
+        if setting_key == "language":
+            return self.get_runtime_language_label(self.runtime_settings.get("language"))
         if setting_key == "textScalePercent":
             return f"{int(self.runtime_settings.get('textScalePercent') or DEFAULT_RUNTIME_PLAYER_SETTINGS['textScalePercent'])}%"
         if setting_key == "dialogBoxOpacityPercent":
@@ -9186,7 +9282,29 @@ class NativeRuntimePlayer:
         return self.scenes_by_id.get(self.current_scene_id)
 
     def get_current_scene_name(self) -> str:
-        return str((self.get_current_scene() or {}).get("name") or self.current_scene_id or "未命名场景")
+        return self.localize_value(self.get_current_scene(), "name", self.current_scene_id or "未命名场景")
+
+    def refresh_current_localized_pause(self) -> None:
+        scene = self.get_current_scene()
+        blocks = (scene or {}).get("blocks", []) or []
+        if self.current_block_index >= len(blocks):
+            return
+        block = blocks[self.current_block_index]
+        block_type = str(block.get("type") or "").strip()
+        if block_type not in {"dialogue", "narration"}:
+            return
+        was_fully_visible = self.is_current_line_fully_visible()
+        line_text = self.localize_value(block, "text")
+        self.current_line = {
+            "type": block_type,
+            "speakerId": block.get("speakerId"),
+            "text": line_text,
+            "voiceAssetId": block.get("voiceAssetId"),
+            "blockLabel": get_block_label(block_type),
+        }
+        self.start_current_line_display(line_text)
+        if was_fully_visible:
+            self.reveal_current_line_immediately()
 
     def get_current_line_preview(self) -> str:
         if self.current_line and self.current_line.get("text"):
@@ -9522,7 +9640,7 @@ class NativeRuntimePlayer:
             self.stop_flow_assist()
             return
         if block_type in {"dialogue", "narration"}:
-            line_text = str(block.get("text") or "")
+            line_text = self.localize_value(block, "text")
             self.current_line = {
                 "type": block_type,
                 "speakerId": block.get("speakerId"),
@@ -9718,7 +9836,7 @@ class NativeRuntimePlayer:
                 return
 
             if block_type in {"dialogue", "narration"}:
-                line_text = str(block.get("text") or "")
+                line_text = self.localize_value(block, "text")
                 self.current_line = {
                     "type": block_type,
                     "speakerId": block.get("speakerId"),
@@ -10841,7 +10959,7 @@ class NativeRuntimePlayer:
                 self.pygame.draw.rect(placeholder_surface, with_alpha(palette["panelBorder"], stage["opacity"]), placeholder_surface.get_rect(), 2, border_radius=28)
                 target.blit(placeholder_surface, placeholder_rect)
                 character = self.characters_by_id.get(character_id) or {}
-                character_name = character.get("displayName") or character_id
+                character_name = self.localize_value(character, "displayName", character_id)
                 presentation_label = self.get_character_presentation_mode_label(character)
                 model_asset_label = self.get_character_model_asset_label(character)
                 binding_label = self.get_character_expression_binding_label(character, state.get("expressionId"))
@@ -11175,6 +11293,7 @@ class NativeRuntimePlayer:
             self.pygame.draw.rect(self.screen, border, row_rect, 2, border_radius=16)
             self.draw_game_ui_button_frame(row_rect, self.get_game_ui_button_state(row_rect, active=is_active))
             label = str(option.get("text") or f"选项 {index + 1}")
+            label = self.localize_value(option, "text", label)
             self.screen.blit(
                 self.font_body.render(label, True, self.dialog_box_config.get("textColor", COLOR_TEXT)),
                 (row_rect.left + 18, row_rect.top + 5),
@@ -11573,7 +11692,7 @@ class NativeRuntimePlayer:
         if item_key == "load":
             return f"读取正式存档槽位；{self.build_save_summary_line()}。"
         if item_key == "settings":
-            return "调整主题、全屏、文字速度、文本框透明度和各类音量。"
+            return "调整主题、全屏、语言、文字速度、文本框透明度和各类音量。"
         if item_key == "quick-save":
             return "立即覆盖快速存档，适合临时保留当前进度。"
         if item_key == "quick-load":
@@ -11658,6 +11777,7 @@ class NativeRuntimePlayer:
         status_lines = [
             f"主题：{self.get_setting_value_label('themeMode')}",
             f"显示：{self.get_setting_value_label('displayMode')}",
+            f"语言：{self.get_setting_value_label('language')}",
             f"文本：{self.get_setting_value_label('textSpeed')} / {self.get_setting_value_label('textScalePercent')}",
         ]
         status_top = detail_rect.bottom - 94
@@ -11675,7 +11795,7 @@ class NativeRuntimePlayer:
 
     def get_help_overlay_sections(self) -> list[dict]:
         scene = self.scenes_by_id.get(str(self.current_scene_id or "")) or {}
-        scene_label = "标题页" if self.title_screen_active else str(scene.get("name") or self.current_scene_id or "未命名场景")
+        scene_label = "标题页" if self.title_screen_active else self.localize_value(scene, "name", self.current_scene_id or "未命名场景")
         if self.current_choices:
             reading_state = f"选项中：{self.current_choice_index + 1}/{len(self.current_choices)}"
         elif self.current_line:
@@ -11710,8 +11830,9 @@ class NativeRuntimePlayer:
                 "title": "体验设置",
                 "lines": [
                     f"主题：{self.get_setting_value_label('themeMode')} · 显示：{self.get_setting_value_label('displayMode')}",
-                    f"文字：{self.get_setting_value_label('textSpeed')} · 大小：{self.get_setting_value_label('textScalePercent')}",
-                    f"文本框：{self.get_setting_value_label('dialogBoxOpacityPercent')} · 自动：{self.get_setting_value_label('autoPlayDelayMs')}",
+                    f"语言：{self.get_setting_value_label('language')} · 文字：{self.get_setting_value_label('textSpeed')}",
+                    f"大小：{self.get_setting_value_label('textScalePercent')} · 自动：{self.get_setting_value_label('autoPlayDelayMs')}",
+                    f"文本框：{self.get_setting_value_label('dialogBoxOpacityPercent')} · 等语音：{self.get_setting_value_label('autoPlayWaitForVoice')}",
                     f"音量：总 {self.get_setting_value_label('masterVolume')} / BGM {self.get_setting_value_label('bgmVolume')} / 语音 {self.get_setting_value_label('voiceVolume')}",
                 ],
             },
@@ -11891,7 +12012,7 @@ class NativeRuntimePlayer:
         self.draw_game_ui_panel_frame(panel, "system")
         self.screen.blit(self.font_title.render("体验设置", True, palette["text"]), (panel.left + 28, panel.top + 24))
         self.screen.blit(
-            self.font_ui.render("主题 / 显示 / 阅读辅助 / 文本框 / 自动播放 / 四路音量", True, palette["muted"]),
+            self.font_ui.render("主题 / 显示 / 语言 / 阅读辅助 / 文本框 / 自动播放 / 四路音量", True, palette["muted"]),
             (panel.left + 28, panel.top + 58),
         )
 

@@ -1,3 +1,36 @@
+const DEFAULT_RUNTIME_LANGUAGE = "zh-CN";
+const RUNTIME_LANGUAGE_LABELS = {
+  "zh-CN": "简体中文",
+  "ja-JP": "日本語",
+  "en-US": "English",
+};
+
+function normalizeLanguageCode(value, fallback = DEFAULT_RUNTIME_LANGUAGE) {
+  const rawValue = String(value ?? "").trim();
+  if (!rawValue || !/^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8}){0,2}$/.test(rawValue)) {
+    return fallback;
+  }
+  const parts = rawValue.split("-");
+  return [
+    parts[0].toLowerCase(),
+    ...parts.slice(1).map((part, index) => (index === 0 && [2, 3].includes(part.length) ? part.toUpperCase() : part)),
+  ].join("-");
+}
+
+function normalizeSupportedLanguages(rawLanguages, defaultLanguage = DEFAULT_RUNTIME_LANGUAGE) {
+  const languages = [];
+  (Array.isArray(rawLanguages) ? rawLanguages : []).forEach((rawLanguage) => {
+    const language = normalizeLanguageCode(rawLanguage, "");
+    if (language && !languages.includes(language)) {
+      languages.push(language);
+    }
+  });
+  if (!languages.includes(defaultLanguage)) {
+    languages.unshift(defaultLanguage);
+  }
+  return languages.length ? languages : [DEFAULT_RUNTIME_LANGUAGE];
+}
+
 const rawData = window.LIGHTWHISPER_GAME_DATA ?? {};
 const data = normalizeGameData(rawData);
 
@@ -51,6 +84,7 @@ const refs = {
   startSummary: document.getElementById("startSummary"),
   startResumeSummary: document.getElementById("startResumeSummary"),
   textSpeedSelect: document.getElementById("textSpeedSelect"),
+  languageSelect: document.getElementById("languageSelect"),
   dialogThemeSelect: document.getElementById("dialogThemeSelect"),
   uiThemeSelect: document.getElementById("uiThemeSelect"),
   bgmVolumeRange: document.getElementById("bgmVolumeRange"),
@@ -97,6 +131,7 @@ const refs = {
   systemMenuQuickLoadButton: document.getElementById("systemMenuQuickLoadButton"),
   systemMenuReturnTitleButton: document.getElementById("systemMenuReturnTitleButton"),
   menuTextSpeedSelect: document.getElementById("menuTextSpeedSelect"),
+  menuLanguageSelect: document.getElementById("menuLanguageSelect"),
   menuDialogThemeSelect: document.getElementById("menuDialogThemeSelect"),
   menuUiThemeSelect: document.getElementById("menuUiThemeSelect"),
   menuBgmVolumeRange: document.getElementById("menuBgmVolumeRange"),
@@ -1210,6 +1245,7 @@ const UI_THEME_MODE_LABELS = {
 
 const PLAYBACK_DEFAULTS = {
   textSpeed: "normal",
+  language: "",
   dialogTheme: "project",
   uiThemeMode: "auto",
   autoPlay: false,
@@ -1560,6 +1596,7 @@ function init() {
     });
   });
   refs.textSpeedSelect?.addEventListener("change", handleTextSpeedChange);
+  refs.languageSelect?.addEventListener("change", handleLanguageChange);
   refs.dialogThemeSelect?.addEventListener("change", handleDialogThemeChange);
   refs.uiThemeSelect?.addEventListener("change", handleUiThemeModeChange);
   refs.bgmVolumeRange?.addEventListener("input", handleBgmVolumeChange);
@@ -1618,6 +1655,7 @@ function init() {
   refs.cancelSaveConfirmButton?.addEventListener("click", closeSaveConfirmDialog);
   refs.confirmSaveConfirmButton?.addEventListener("click", confirmSaveIntent);
   refs.menuTextSpeedSelect?.addEventListener("change", handleTextSpeedChange);
+  refs.menuLanguageSelect?.addEventListener("change", handleLanguageChange);
   refs.menuDialogThemeSelect?.addEventListener("change", handleDialogThemeChange);
   refs.menuUiThemeSelect?.addEventListener("change", handleUiThemeModeChange);
   refs.menuBgmVolumeRange?.addEventListener("input", handleBgmVolumeChange);
@@ -1640,6 +1678,23 @@ function init() {
 
 function normalizeGameData(source) {
   const project = source.project ?? {};
+  const defaultLanguage = normalizeLanguageCode(
+    source.i18n?.defaultLanguage ?? project.language,
+    DEFAULT_RUNTIME_LANGUAGE
+  );
+  const supportedLanguages = normalizeSupportedLanguages(
+    source.i18n?.supportedLanguages ?? project.supportedLanguages,
+    defaultLanguage
+  );
+  const i18n = {
+    defaultLanguage,
+    fallbackLanguage: normalizeLanguageCode(source.i18n?.fallbackLanguage, defaultLanguage),
+    supportedLanguages,
+    languageLabels: {
+      ...RUNTIME_LANGUAGE_LABELS,
+      ...(source.i18n?.languageLabels && typeof source.i18n.languageLabels === "object" ? source.i18n.languageLabels : {}),
+    },
+  };
   const assets = source.assets?.assets ?? [];
   const characters = source.characters?.characters ?? [];
   const variables = source.variables?.variables ?? [];
@@ -1676,6 +1731,7 @@ function normalizeGameData(source) {
     scenes,
     scenesById,
     endingScenes,
+    i18n,
     buildInfo: source.buildInfo ?? { copiedAssets: 0, missingAssets: [] },
   };
 }
@@ -1722,7 +1778,7 @@ function buildEndingScenePreview(scene) {
   (scene?.blocks ?? []).forEach((block) => {
     applyBlockToPreviewState(block, visualState, variables);
     if (block.type === "dialogue" || block.type === "narration") {
-      lastStoryText = String(block.text ?? "").trim();
+      lastStoryText = getBlockText(block).trim();
       lastStorySpeaker = visualState.speakerName ?? "";
     }
   });
@@ -1827,7 +1883,7 @@ function renderStartSummary() {
   refs.startSummary.innerHTML = [
     ["导出类型", data.buildInfo.exportTargetLabel ?? "网页试玩包"],
     ["发布版本", data.buildInfo.releaseVersion ?? "1.0.0-preview"],
-    ["入口场景", data.scenesById.get(getEntrySceneId())?.name ?? "未找到"],
+    ["入口场景", getSceneName(data.scenesById.get(getEntrySceneId()), "未找到")],
     ["输出分辨率", `${resolution.width} × ${resolution.height}`],
     ["章节数量", `${data.chapters.length} 个`],
     ["场景数量", `${data.scenes.length} 个`],
@@ -1942,7 +1998,7 @@ function renderBuildInfo() {
     ["导出类型", data.buildInfo.exportTargetLabel ?? "网页试玩包"],
     ["发布版本", data.buildInfo.releaseVersion ?? "1.0.0-preview"],
     ["输出分辨率", `${resolution.width} × ${resolution.height}`],
-    ["入口场景", data.scenesById.get(getEntrySceneId())?.name ?? getEntrySceneId()],
+    ["入口场景", getSceneName(data.scenesById.get(getEntrySceneId()), getEntrySceneId())],
     ["玩家档案", profile.sessionCount > 0 ? `${profile.sessionCount} 次 · ${formatPlayDuration(profile.totalPlayMs)}` : "未记录"],
     [
       "章节选集",
@@ -3993,17 +4049,18 @@ function renderCharacterDialog() {
     return;
   }
 
+  const selectedDisplayName = getCharacterName(selectedEntry.id);
   refs.characterDialogHero.innerHTML = selectedEntry.unlocked
     ? `
         <div class="extra-hero-image-wrap">
           ${
             selectedEntry.defaultSpriteUrl
-              ? `<img class="extra-hero-image" src="${escapeHtml(selectedEntry.defaultSpriteUrl)}" alt="${escapeHtml(selectedEntry.displayName)}" />`
+              ? `<img class="extra-hero-image" src="${escapeHtml(selectedEntry.defaultSpriteUrl)}" alt="${escapeHtml(selectedDisplayName)}" />`
               : `<div class="extra-hero-locked">这个角色当前没有可显示的立绘文件。</div>`
           }
         </div>
         <div class="extra-hero-copy">
-          <strong>${escapeHtml(selectedEntry.displayName)}</strong>
+          <strong>${escapeHtml(selectedDisplayName)}</strong>
           <span>${escapeHtml(selectedEntry.bio || "这个角色暂时还没有简介。")}</span>
           <span>${escapeHtml(`默认站位：${getPositionLabel(selectedEntry.defaultPosition ?? "center")} · 表情 ${selectedEntry.expressions.length} 种`)}</span>
           <div class="character-expression-strip">
@@ -4040,8 +4097,9 @@ function renderCharacterDialog() {
 
   refs.characterDialogList.innerHTML = entries.length
     ? entries
-        .map(
-          (entry) => `
+        .map((entry) => {
+          const displayName = getCharacterName(entry.id);
+          return `
             <button
               class="extra-gallery-card ${entry.id === selectedEntry.id ? "is-active" : ""} ${entry.unlocked ? "" : "is-locked"}"
               type="button"
@@ -4050,15 +4108,15 @@ function renderCharacterDialog() {
               <div class="extra-gallery-thumb">
                 ${
                   entry.unlocked && entry.defaultSpriteUrl
-                    ? `<img src="${escapeHtml(entry.defaultSpriteUrl)}" alt="${escapeHtml(entry.displayName)}" />`
+                    ? `<img src="${escapeHtml(entry.defaultSpriteUrl)}" alt="${escapeHtml(displayName)}" />`
                     : `<span>${entry.unlocked ? "待载入" : "未解锁"}</span>`
                 }
               </div>
-              <strong>${escapeHtml(entry.unlocked ? entry.displayName : "？？？")}</strong>
+              <strong>${escapeHtml(entry.unlocked ? displayName : "？？？")}</strong>
               <span>${escapeHtml(entry.unlocked ? (entry.bio || "已收录角色资料") : "推进剧情后解锁")}</span>
             </button>
-          `
-        )
+          `;
+        })
         .join("")
     : renderEmpty("这个项目当前还没有角色条目。");
 }
@@ -5169,6 +5227,7 @@ function getPlaybackStorageKey() {
 function sanitizePlaybackSettings(source = {}) {
   return {
     textSpeed: getSafeTextSpeed(source.textSpeed ?? PLAYBACK_DEFAULTS.textSpeed),
+    language: getSafeRuntimeLanguage(source.language ?? PLAYBACK_DEFAULTS.language),
     dialogTheme: getSafeDialogTheme(source.dialogTheme ?? PLAYBACK_DEFAULTS.dialogTheme),
     uiThemeMode: getSafeUiThemeMode(source.uiThemeMode ?? PLAYBACK_DEFAULTS.uiThemeMode),
     autoPlay: Boolean(source.autoPlay ?? PLAYBACK_DEFAULTS.autoPlay),
@@ -5178,6 +5237,70 @@ function sanitizePlaybackSettings(source = {}) {
     sfxVolume: getSafeVolumePercent(source.sfxVolume, PLAYBACK_DEFAULTS.sfxVolume),
     voiceVolume: getSafeVolumePercent(source.voiceVolume, PLAYBACK_DEFAULTS.voiceVolume),
   };
+}
+
+function getSupportedRuntimeLanguages() {
+  return data.i18n?.supportedLanguages?.length ? data.i18n.supportedLanguages : [DEFAULT_RUNTIME_LANGUAGE];
+}
+
+function getDefaultRuntimeLanguage() {
+  return getSafeRuntimeLanguage(data.i18n?.defaultLanguage ?? DEFAULT_RUNTIME_LANGUAGE);
+}
+
+function getSafeRuntimeLanguage(language) {
+  const supportedLanguages = getSupportedRuntimeLanguages();
+  const normalized = normalizeLanguageCode(language, "");
+  if (normalized && supportedLanguages.includes(normalized)) {
+    return normalized;
+  }
+  return supportedLanguages.includes(data.i18n?.defaultLanguage)
+    ? data.i18n.defaultLanguage
+    : supportedLanguages[0] ?? DEFAULT_RUNTIME_LANGUAGE;
+}
+
+function getRuntimeLanguageLabel(language) {
+  const safeLanguage = getSafeRuntimeLanguage(language);
+  return data.i18n?.languageLabels?.[safeLanguage] ?? RUNTIME_LANGUAGE_LABELS[safeLanguage] ?? safeLanguage;
+}
+
+function getCurrentRuntimeLanguage() {
+  return getSafeRuntimeLanguage(state.playback?.language || getDefaultRuntimeLanguage());
+}
+
+function getLocalizedValue(source, key, fallback = "") {
+  const safeSource = source && typeof source === "object" ? source : {};
+  const translations = safeSource[`${key}Translations`];
+  const language = getCurrentRuntimeLanguage();
+  if (translations && typeof translations === "object") {
+    for (const candidate of [language, data.i18n?.fallbackLanguage, data.i18n?.defaultLanguage, DEFAULT_RUNTIME_LANGUAGE]) {
+      const text = String(translations[candidate] ?? "").trim();
+      if (text) {
+        return text;
+      }
+    }
+  }
+  return String(safeSource[key] ?? fallback ?? "");
+}
+
+function getBlockText(block) {
+  return getLocalizedValue(block, "text");
+}
+
+function getChoiceText(option) {
+  return getLocalizedValue(option, "text", "未命名选项");
+}
+
+function getSceneName(scene, fallback = "") {
+  return getLocalizedValue(scene, "name", fallback || scene?.id || "未知场景");
+}
+
+function getChapterName(chapterId, fallback = "") {
+  const chapter = data.chapters.find((item) => item.chapterId === chapterId);
+  return getLocalizedValue(chapter, "name", fallback || chapterId || "未命名章节");
+}
+
+function getSceneChapterName(scene) {
+  return getChapterName(scene?.chapterId, scene?.chapterName || scene?.chapterId);
 }
 
 function loadStoredPlaybackSettings() {
@@ -5283,13 +5406,13 @@ function getVoiceReplayEntries() {
       entries.push({
         id: buildVoiceReplayEntryId(scene.id, block.id, blockIndex),
         sceneId: scene.id,
-        sceneName: scene.name,
+        sceneName: getSceneName(scene),
         chapterId: scene.chapterId,
-        chapterName: scene.chapterName,
+        chapterName: getSceneChapterName(scene),
         blockId: block.id ?? null,
         blockIndex,
         blockType: block.type,
-        text: String(block.text ?? "").trim(),
+        text: getBlockText(block).trim(),
         speakerName: block.type === "dialogue" ? getCharacterName(block.speakerId) : "旁白",
         voiceAssetId: block.voiceAssetId,
         voiceName: voiceAsset.name || block.voiceAssetId,
@@ -5487,18 +5610,19 @@ function getChapterReplayEntries() {
     const firstScene = (chapter.scenes ?? [])[0] ?? null;
     return {
       chapterId: chapter.chapterId,
-      name: chapter.name || `章节 ${index + 1}`,
+      name: getLocalizedValue(chapter, "name", chapter.name || `章节 ${index + 1}`),
       order: index + 1,
       firstSceneId: firstScene?.id ?? "",
-      firstSceneName: firstScene?.name ?? "未设置开场场景",
+      firstSceneName: firstScene ? getSceneName(firstScene, "未设置开场场景") : "未设置开场场景",
       notes: firstScene?.notes ?? "",
       sceneCount: (chapter.scenes ?? []).length,
       previewBackgroundAssetId:
         (firstScene?.blocks ?? []).find((block) => block.type === "background" && block.assetId)?.assetId ?? "",
       previewSpeakerId:
         (firstScene?.blocks ?? []).find((block) => block.type === "dialogue" && block.speakerId)?.speakerId ?? "",
-      previewText:
-        (firstScene?.blocks ?? []).find((block) => block.type === "dialogue" || block.type === "narration")?.text ?? "",
+      previewText: getBlockText(
+        (firstScene?.blocks ?? []).find((block) => block.type === "dialogue" || block.type === "narration")
+      ),
     };
   });
 }
@@ -5564,26 +5688,24 @@ function getRelationshipArchiveEntries() {
         }
 
         seenPairIds.add(pairId);
-        const leftCharacter = data.charactersById.get(leftCharacterId);
-        const rightCharacter = data.charactersById.get(rightCharacterId);
         const previewBackgroundAssetId =
           (scene.blocks ?? []).find((block) => block.type === "background" && block.assetId)?.assetId ?? "";
-        const previewText =
-          (scene.blocks ?? []).find((block) => block.type === "dialogue" || block.type === "narration")?.text ?? "";
 
         entries.push({
           id: pairId,
           leftCharacterId,
           rightCharacterId,
-          leftCharacterName: leftCharacter?.displayName ?? leftCharacterId,
-          rightCharacterName: rightCharacter?.displayName ?? rightCharacterId,
+          leftCharacterName: getCharacterName(leftCharacterId),
+          rightCharacterName: getCharacterName(rightCharacterId),
           chapterId: scene.chapterId,
-          chapterName: scene.chapterName,
+          chapterName: getSceneChapterName(scene),
           sceneId: scene.id,
-          sceneName: scene.name,
+          sceneName: getSceneName(scene),
           previewBackgroundAssetId,
           previewBackgroundUrl: getAssetUrl(previewBackgroundAssetId),
-          previewText,
+          previewText: getBlockText(
+            (scene.blocks ?? []).find((block) => block.type === "dialogue" || block.type === "narration")
+          ),
         });
       }
     }
@@ -5607,7 +5729,7 @@ function getNarrationArchiveEntries() {
         return;
       }
 
-      const text = String(block.text ?? "").trim();
+      const text = getBlockText(block).trim();
       if (!text) {
         return;
       }
@@ -5615,9 +5737,9 @@ function getNarrationArchiveEntries() {
       entries.push({
         id: buildNarrationArchiveEntryId(scene.id, block.id, blockIndex),
         sceneId: scene.id,
-        sceneName: scene.name,
+        sceneName: getSceneName(scene),
         chapterId: scene.chapterId,
-        chapterName: scene.chapterName,
+        chapterName: getSceneChapterName(scene),
         blockId: block.id ?? null,
         blockIndex,
         text,
@@ -5650,9 +5772,9 @@ function getLocationArchiveEntries() {
         id: asset.id,
         name: asset.name || asset.id,
         chapterId: scene.chapterId,
-        chapterName: scene.chapterName,
+        chapterName: getSceneChapterName(scene),
         sceneId: scene.id,
-        sceneName: scene.name,
+        sceneName: getSceneName(scene),
         firstBlockIndex: blockIndex,
         tags: Array.isArray(asset.tags) ? asset.tags : [],
         imageUrl: getAssetUrl(asset.id),
@@ -6277,6 +6399,32 @@ function sanitizeStoredSnapshot(source) {
       source.transitionTargetSceneId == null ? null : String(source.transitionTargetSceneId),
     completed: Boolean(source.completed),
   };
+}
+
+function relocalizeRuntimeSnapshot(snapshot) {
+  if (!snapshot || !snapshot.block) {
+    return snapshot;
+  }
+  const scene = data.scenesById.get(snapshot.sceneId);
+  snapshot.sceneName = getSceneName(scene, snapshot.sceneName);
+  if (snapshot.blockType === "dialogue") {
+    snapshot.visualState.speakerName = getCharacterName(snapshot.block.speakerId);
+    snapshot.visualState.dialogueText = getBlockText(snapshot.block);
+  } else if (snapshot.blockType === "narration") {
+    snapshot.visualState.speakerName = "旁白";
+    snapshot.visualState.dialogueText = getBlockText(snapshot.block);
+  } else if (snapshot.blockType === "choice") {
+    snapshot.visualState.speakerName = "选择分支";
+    snapshot.visualState.dialogueText = "请选择一个选项继续试玩。";
+  }
+  return snapshot;
+}
+
+function relocalizeRuntimeSession() {
+  if (!state.session?.timeline?.length) {
+    return;
+  }
+  state.session.timeline.forEach((snapshot) => relocalizeRuntimeSnapshot(snapshot));
 }
 
 function sanitizeStoredSession(source) {
@@ -6908,6 +7056,8 @@ function renderPlaybackControls(snapshot = getCurrentSnapshot()) {
     refs.textSpeedSelect.value = getSafeTextSpeed(state.playback.textSpeed);
   }
 
+  renderRuntimeLanguageSelect(refs.languageSelect);
+
   if (refs.dialogThemeSelect) {
     refs.dialogThemeSelect.value = getSafeDialogTheme(state.playback.dialogTheme);
   }
@@ -6919,6 +7069,8 @@ function renderPlaybackControls(snapshot = getCurrentSnapshot()) {
   if (refs.menuTextSpeedSelect) {
     refs.menuTextSpeedSelect.value = getSafeTextSpeed(state.playback.textSpeed);
   }
+
+  renderRuntimeLanguageSelect(refs.menuLanguageSelect);
 
   if (refs.menuDialogThemeSelect) {
     refs.menuDialogThemeSelect.value = getSafeDialogTheme(state.playback.dialogTheme);
@@ -7012,6 +7164,26 @@ function renderPlaybackControls(snapshot = getCurrentSnapshot()) {
   renderSaveDialog();
 }
 
+function renderRuntimeLanguageSelect(select) {
+  if (!select) {
+    return;
+  }
+  const currentLanguage = getCurrentRuntimeLanguage();
+  const options = getSupportedRuntimeLanguages()
+    .map(
+      (language) =>
+        `<option value="${escapeHtml(language)}" ${language === currentLanguage ? "selected" : ""}>${escapeHtml(
+          getRuntimeLanguageLabel(language)
+        )}</option>`
+    )
+    .join("");
+  if (select.innerHTML !== options) {
+    select.innerHTML = options;
+  }
+  select.value = currentLanguage;
+  select.disabled = getSupportedRuntimeLanguages().length <= 1;
+}
+
 function setRuntimeUiThemeMode(mode) {
   state.playback.uiThemeMode = getSafeUiThemeMode(mode);
   persistPlaybackSettings();
@@ -7025,6 +7197,21 @@ function handleTextSpeedChange(event) {
   stopRuntimeTypewriter();
   stopRuntimeAutoAdvance();
   renderRuntime();
+}
+
+function handleLanguageChange(event) {
+  state.playback.language = getSafeRuntimeLanguage(event.target.value);
+  persistPlaybackSettings();
+  stopRuntimeTypewriter();
+  stopRuntimeAutoAdvance();
+  relocalizeRuntimeSession();
+  renderStartSummary();
+  renderBuildInfo();
+  if (state.started && state.session) {
+    renderRuntime();
+  } else {
+    renderBeforeStart();
+  }
 }
 
 function handleDialogThemeChange(event) {
@@ -7136,10 +7323,12 @@ function replayCurrentVoice() {
 }
 
 function resetPlaybackSettings() {
-  state.playback = { ...PLAYBACK_DEFAULTS };
+  state.playback = sanitizePlaybackSettings({ ...PLAYBACK_DEFAULTS, language: getDefaultRuntimeLanguage() });
   persistPlaybackSettings();
   applyRuntimeUiTheme(state.playback.uiThemeMode);
   stopRuntimeAutoAdvance();
+  stopRuntimeTypewriter();
+  relocalizeRuntimeSession();
   updateRuntimeAudioVolumes();
 
   if (state.started && state.session) {
@@ -7684,7 +7873,6 @@ function buildSaveThumbnailDataUrl(snapshot) {
   };
   const spriteMarkup = visibleCharacters
     .map((characterState) => {
-      const character = data.charactersById.get(characterState.characterId);
       const spriteUrl = toAbsoluteThumbnailUrl(
         getAssetUrl(getSpriteAssetId(characterState.characterId, characterState.expressionId))
       );
@@ -7692,7 +7880,8 @@ function buildSaveThumbnailDataUrl(snapshot) {
       const x = centerX - 34;
       const y = 46;
       const labelY = 146;
-      const name = escapeHtml(character?.displayName ?? characterState.characterId ?? "");
+      const localizedName = getCharacterName(characterState.characterId);
+      const name = escapeHtml(localizedName);
       const isActive = snapshot.visualState?.activeCharacterId === characterState.characterId;
 
       if (spriteUrl) {
@@ -7705,7 +7894,7 @@ function buildSaveThumbnailDataUrl(snapshot) {
         `;
       }
 
-      const fallback = escapeHtml((character?.displayName ?? characterState.characterId ?? "?").slice(0, 1));
+      const fallback = escapeHtml((localizedName || "?").slice(0, 1));
       return `
         <g opacity="${isActive ? "1" : "0.88"}">
           <rect x="${x}" y="${y}" rx="14" ry="14" width="68" height="94" fill="rgba(255,248,242,0.24)" stroke="rgba(255,255,255,0.22)" />
@@ -7774,16 +7963,16 @@ function renderSaveCast(snapshot) {
 
   return visibleCharacters
     .map((characterState) => {
-      const character = data.charactersById.get(characterState.characterId);
       const spriteAssetId = getSpriteAssetId(characterState.characterId, characterState.expressionId);
       const spriteUrl = getAssetUrl(spriteAssetId);
       const isActive = snapshot?.visualState?.activeCharacterId === characterState.characterId;
+      const localizedName = getCharacterName(characterState.characterId);
       const artMarkup = spriteUrl
         ? `<div class="save-slot-character-art has-image" style="background-image:url('${escapeHtml(
             encodeURI(spriteUrl)
           )}')"></div>`
         : `<div class="save-slot-character-art">${escapeHtml(
-            (character?.displayName ?? characterState.characterId ?? "?").slice(0, 1)
+            (localizedName || "?").slice(0, 1)
           )}</div>`;
 
       return `
@@ -7791,7 +7980,7 @@ function renderSaveCast(snapshot) {
           characterState.position ?? "center"
         )}">
           ${artMarkup}
-          <span>${escapeHtml(character?.displayName ?? characterState.characterId)}</span>
+          <span>${escapeHtml(localizedName)}</span>
         </div>
       `;
     })
@@ -8874,7 +9063,7 @@ function buildPreviewSnapshot(sceneId, blockIndex, previousVisualState, previous
     return createPreviewTerminalSnapshot(
       {
         sceneId: scene.id,
-        sceneName: scene.name,
+        sceneName: getSceneName(scene),
       },
       baseVisualState,
       baseVariables,
@@ -8890,7 +9079,7 @@ function buildPreviewSnapshot(sceneId, blockIndex, previousVisualState, previous
 
   return {
     sceneId: scene.id,
-    sceneName: scene.name,
+    sceneName: getSceneName(scene),
     blockIndex,
     blockId: block.id,
     blockType: block.type,
@@ -9170,7 +9359,7 @@ function applyBlockToPreviewState(block, visualState, variables, sceneId = "") {
         characterId: block.speakerId,
       };
       visualState.speakerName = getCharacterName(block.speakerId);
-      visualState.dialogueText = block.text ?? "";
+      visualState.dialogueText = getBlockText(block);
       upsertPreviewCharacter(visualState, {
         characterId: block.speakerId,
         position:
@@ -9185,7 +9374,7 @@ function applyBlockToPreviewState(block, visualState, variables, sceneId = "") {
       return null;
     case "narration":
       visualState.speakerName = "旁白";
-      visualState.dialogueText = block.text ?? "";
+      visualState.dialogueText = getBlockText(block);
       return null;
     case "choice":
       visualState.speakerName = "选择分支";
@@ -9212,12 +9401,18 @@ function applyBlockToPreviewState(block, visualState, variables, sceneId = "") {
     case "condition": {
       const targetSceneId = resolveConditionTargetSceneId(block, variables);
       visualState.speakerName = "系统判断";
-      visualState.dialogueText = `判断完成，下一步会去：${data.scenesById.get(targetSceneId)?.name ?? targetSceneId}`;
+      visualState.dialogueText = `判断完成，下一步会去：${getSceneName(
+        data.scenesById.get(targetSceneId),
+        targetSceneId
+      )}`;
       return targetSceneId;
     }
     case "jump":
       visualState.speakerName = "场景跳转";
-      visualState.dialogueText = `下一步会跳到：${data.scenesById.get(block.targetSceneId)?.name ?? block.targetSceneId}`;
+      visualState.dialogueText = `下一步会跳到：${getSceneName(
+        data.scenesById.get(block.targetSceneId),
+        block.targetSceneId
+      )}`;
       return getSafeSceneId(block.targetSceneId, block.targetSceneId);
     case "sfx_play":
       visualState.speakerName = "音效";
@@ -9463,8 +9658,8 @@ function renderChoiceButtons(snapshot) {
     .map(
       (option) => `
         <button class="choice-button" type="button" data-option-id="${escapeHtml(option.id)}">
-          <strong>${escapeHtml(option.text)}</strong>
-          <span>进入 ${escapeHtml(data.scenesById.get(option.gotoSceneId)?.name ?? option.gotoSceneId)}</span>
+          <strong>${escapeHtml(getChoiceText(option))}</strong>
+          <span>进入 ${escapeHtml(getSceneName(data.scenesById.get(option.gotoSceneId), option.gotoSceneId))}</span>
         </button>
       `
     )
@@ -9521,10 +9716,9 @@ function renderSpriteCard(
   activeCharacterId = null,
   characterEmphasisEvent = null
 ) {
-  const character = data.charactersById.get(characterState.characterId);
   const spriteAssetId = getSpriteAssetId(characterState.characterId, characterState.expressionId);
-  const spriteAsset = data.assetsById.get(spriteAssetId);
   const spriteUrl = getAssetUrl(spriteAssetId);
+  const localizedName = getCharacterName(characterState.characterId);
   const classes = ["sprite-card"];
   const isGhostHide = characterState.__ghostMode === "hide";
   const transition = characterTransitionEvent ? getSafeTransition(characterTransitionEvent.transition) : "none";
@@ -9556,18 +9750,14 @@ function renderSpriteCard(
   }
 
   const visual = spriteUrl
-    ? `<img class="sprite-image" src="${escapeHtml(encodeURI(spriteUrl))}" alt="${escapeHtml(
-        character?.displayName ?? characterState.characterId
-      )}" />`
-    : `<div class="sprite-fallback">${escapeHtml(
-        (character?.displayName ?? characterState.characterId).slice(0, 1)
-      )}</div>`;
+    ? `<img class="sprite-image" src="${escapeHtml(encodeURI(spriteUrl))}" alt="${escapeHtml(localizedName)}" />`
+    : `<div class="sprite-fallback">${escapeHtml((localizedName || "?").slice(0, 1))}</div>`;
 
   return `
     <article class="${classes.join(" ")}" data-position="${escapeHtml(characterState.position)}" data-transition="${escapeHtml(transition)}" style="${stageStyle}">
       <div class="sprite-card-inner">
         ${visual}
-        <div class="sprite-name">${escapeHtml(character?.displayName ?? characterState.characterId)}</div>
+        <div class="sprite-name">${escapeHtml(localizedName)}</div>
         <div class="sprite-expression">${escapeHtml(characterState.expressionName ?? "默认")}</div>
       </div>
     </article>
@@ -9991,7 +10181,8 @@ function getSafeSceneId(sceneId, fallbackSceneId = null) {
 }
 
 function getCharacterName(characterId) {
-  return data.charactersById.get(characterId)?.displayName ?? characterId ?? "未命名角色";
+  const character = data.charactersById.get(characterId);
+  return getLocalizedValue(character, "displayName", characterId ?? "未命名角色");
 }
 
 function getPositionLabel(position) {

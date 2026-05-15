@@ -66,6 +66,12 @@ EXPORT_PROVENANCE_WINDOWS_VERIFIER_NAME = "verify_tony_na_provenance.bat"
 EXPORT_PROTECTION_PROFILE = "light-origin-integrity"
 PROJECT_FORMAT_VERSION = 3
 DEFAULT_EXPORT_RELEASE_VERSION = "1.0.0-preview"
+DEFAULT_PROJECT_LANGUAGE = "zh-CN"
+SUPPORTED_PROJECT_LANGUAGES = {
+    "zh-CN": "简体中文",
+    "ja-JP": "日本語",
+    "en-US": "English",
+}
 DEFAULT_EDITOR_MODE = "beginner"
 DEFAULT_FORMAL_SAVE_SLOT_COUNT = 24
 MIN_FORMAL_SAVE_SLOT_COUNT = 3
@@ -899,6 +905,45 @@ def normalize_particle_presets_for_migration(value: object) -> list[dict]:
         return []
 
 
+def normalize_language_code(value: object, fallback: str = DEFAULT_PROJECT_LANGUAGE) -> str:
+    raw_value = str(value or "").strip()
+    if not raw_value:
+        return fallback
+    if not re.fullmatch(r"[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8}){0,2}", raw_value):
+        return fallback
+    parts = raw_value.split("-")
+    normalized_parts = [parts[0].lower()]
+    for index, part in enumerate(parts[1:], start=1):
+        normalized_parts.append(part.upper() if index == 1 and len(part) in {2, 3} else part)
+    return "-".join(normalized_parts)
+
+
+def normalize_supported_languages(value: object, default_language: str = DEFAULT_PROJECT_LANGUAGE) -> list[str]:
+    raw_languages = value if isinstance(value, list) else []
+    languages: list[str] = []
+    for raw_language in raw_languages:
+        language = normalize_language_code(raw_language, "")
+        if language and language not in languages:
+            languages.append(language)
+    if default_language not in languages:
+        languages.insert(0, default_language)
+    if not languages:
+        languages.append(DEFAULT_PROJECT_LANGUAGE)
+    return languages[:8]
+
+
+def normalize_translation_map(value: object) -> dict:
+    if not isinstance(value, dict):
+        return {}
+    translations: dict[str, str] = {}
+    for raw_language, raw_text in value.items():
+        language = normalize_language_code(raw_language, "")
+        text = str(raw_text or "").strip()
+        if language and text:
+            translations[language] = text[:8000]
+    return translations
+
+
 def normalize_scene_block(block: object, index: int, existing_ids: set[str]) -> dict:
     normalized = dict(block) if isinstance(block, dict) else {}
     block_id = str(normalized.get("id") or "").strip()
@@ -914,10 +959,28 @@ def normalize_scene_block(block: object, index: int, existing_ids: set[str]) -> 
 
     if normalized["type"] == "choice":
         options = normalized.get("options")
-        normalized["options"] = options if isinstance(options, list) else []
+        normalized_options = []
+        if isinstance(options, list):
+            for option in options:
+                if not isinstance(option, dict):
+                    continue
+                normalized_option = dict(option)
+                normalized_option["textTranslations"] = normalize_translation_map(
+                    normalized_option.get("textTranslations")
+                )
+                if not normalized_option["textTranslations"]:
+                    normalized_option.pop("textTranslations", None)
+                normalized_options.append(normalized_option)
+        normalized["options"] = normalized_options
     if normalized["type"] == "condition":
         branches = normalized.get("branches")
         normalized["branches"] = branches if isinstance(branches, list) else []
+    for translation_key in ("textTranslations", "titleTranslations"):
+        translations = normalize_translation_map(normalized.get(translation_key))
+        if translations:
+            normalized[translation_key] = translations
+        else:
+            normalized.pop(translation_key, None)
     return normalized
 
 
@@ -930,6 +993,11 @@ def normalize_scene_document(scene: object, index: int, existing_scene_ids: set[
         existing_scene_ids.add(scene_id)
     normalized["id"] = scene_id
     normalized["name"] = str(normalized.get("name") or f"未命名场景 {index}").strip() or f"未命名场景 {index}"
+    scene_name_translations = normalize_translation_map(normalized.get("nameTranslations"))
+    if scene_name_translations:
+        normalized["nameTranslations"] = scene_name_translations
+    else:
+        normalized.pop("nameTranslations", None)
     normalized["notes"] = str(normalized.get("notes") or "").strip()
     normalized["status"] = str(normalized.get("status") or "drafting").strip() or "drafting"
     if normalized["status"] not in {"outline", "drafting", "polishing", "ready"}:
@@ -954,6 +1022,11 @@ def normalize_chapter_document(chapter: object, fallback_file_stem: str) -> dict
     normalized["chapterId"] = chapter_id
     normalized["formatVersion"] = PROJECT_FORMAT_VERSION
     normalized["name"] = str(normalized.get("name") or chapter_id).strip() or chapter_id
+    chapter_name_translations = normalize_translation_map(normalized.get("nameTranslations"))
+    if chapter_name_translations:
+        normalized["nameTranslations"] = chapter_name_translations
+    else:
+        normalized.pop("nameTranslations", None)
     normalized["notes"] = str(normalized.get("notes") or "").strip()
 
     raw_scenes = normalized.get("scenes")
@@ -1024,6 +1097,11 @@ def normalize_characters_document(payload: object) -> dict:
         character["id"] = character_id
         display_name = str(character.get("displayName") or character.get("name") or character_id).strip() or character_id
         character["displayName"] = display_name
+        display_name_translations = normalize_translation_map(character.get("displayNameTranslations"))
+        if display_name_translations:
+            character["displayNameTranslations"] = display_name_translations
+        else:
+            character.pop("displayNameTranslations", None)
         character["nameColor"] = str(character.get("nameColor") or "#E0E6FF").strip() or "#E0E6FF"
         default_position = str(character.get("defaultPosition") or "center").strip() or "center"
         character["defaultPosition"] = default_position if default_position in {"left", "center", "right"} else "center"
@@ -1161,7 +1239,11 @@ def normalize_project_document(
     normalized["projectId"] = str(normalized.get("projectId") or project_id).strip() or project_id
     normalized["title"] = str(normalized.get("title") or normalized["projectId"]).strip() or normalized["projectId"]
     normalized["template"] = str(normalized.get("template") or "blank").strip() or "blank"
-    normalized["language"] = str(normalized.get("language") or "zh-CN").strip() or "zh-CN"
+    normalized["language"] = normalize_language_code(normalized.get("language"), DEFAULT_PROJECT_LANGUAGE)
+    normalized["supportedLanguages"] = normalize_supported_languages(
+        normalized.get("supportedLanguages"),
+        normalized["language"],
+    )
     normalized["releaseVersion"] = sanitize_release_version_value(normalized.get("releaseVersion"))
     editor_mode = str(normalized.get("editorMode") or DEFAULT_EDITOR_MODE).strip().lower() or DEFAULT_EDITOR_MODE
     normalized["editorMode"] = editor_mode if editor_mode in {"beginner", "advanced"} else DEFAULT_EDITOR_MODE
@@ -1339,7 +1421,8 @@ def build_project_summary(project_id: str, project_dir: Path, kind: str = "proje
         "kind": kind,
         "title": project.get("title") or project_id,
         "template": project.get("template") or "blank",
-        "language": project.get("language") or "zh-CN",
+        "language": project.get("language") or DEFAULT_PROJECT_LANGUAGE,
+        "supportedLanguages": project.get("supportedLanguages") or [project.get("language") or DEFAULT_PROJECT_LANGUAGE],
         "editorMode": project.get("editorMode") or DEFAULT_EDITOR_MODE,
         "chapterCount": len(chapter_files),
         "sceneCount": scene_count,
@@ -2295,6 +2378,8 @@ def save_project_settings(
     *,
     resolution: dict | None = None,
     release_version: str | None = None,
+    language: str | None = None,
+    supported_languages: list | None = None,
     editor_mode: str | None = None,
     runtime_settings: dict | None = None,
     dialog_box_config: dict | None = None,
@@ -2327,6 +2412,15 @@ def save_project_settings(
             project["releaseVersion"] = clean_release_version
         else:
             project.pop("releaseVersion", None)
+
+    if language is not None:
+        project["language"] = normalize_language_code(language, DEFAULT_PROJECT_LANGUAGE)
+
+    if supported_languages is not None or language is not None:
+        project["supportedLanguages"] = normalize_supported_languages(
+            supported_languages if supported_languages is not None else project.get("supportedLanguages"),
+            normalize_language_code(project.get("language"), DEFAULT_PROJECT_LANGUAGE),
+        )
 
     if editor_mode is not None:
         normalized_editor_mode = str(editor_mode).strip().lower() or DEFAULT_EDITOR_MODE
@@ -2764,7 +2858,8 @@ def create_blank_project(project_name: str, editor_mode: str | None = None) -> d
         "projectId": project_id,
         "title": clean_name,
         "template": "blank",
-        "language": "zh-CN",
+        "language": DEFAULT_PROJECT_LANGUAGE,
+        "supportedLanguages": [DEFAULT_PROJECT_LANGUAGE],
         "releaseVersion": DEFAULT_EXPORT_RELEASE_VERSION,
         "editorMode": normalized_editor_mode,
         "resolution": {
@@ -4913,8 +5008,21 @@ def render_export_index(payload: dict) -> str:
 
 
 def build_export_payload(bundle: dict, assets_doc: dict, copied_assets: int, missing_assets: list[dict]) -> dict:
+    project = bundle["project"]
+    default_language = normalize_language_code(project.get("language"), DEFAULT_PROJECT_LANGUAGE)
+    supported_languages = normalize_supported_languages(project.get("supportedLanguages"), default_language)
     return {
-        "project": bundle["project"],
+        "project": project,
+        "i18n": {
+            "formatVersion": 1,
+            "defaultLanguage": default_language,
+            "fallbackLanguage": DEFAULT_PROJECT_LANGUAGE if DEFAULT_PROJECT_LANGUAGE in supported_languages else default_language,
+            "supportedLanguages": supported_languages,
+            "languageLabels": {
+                language: SUPPORTED_PROJECT_LANGUAGES.get(language, language)
+                for language in supported_languages
+            },
+        },
         "assets": assets_doc,
         "characters": bundle["characters"],
         "variables": bundle["variables"],
@@ -5407,7 +5515,10 @@ def build_export_manifest(
         "project": {
             "projectId": project.get("projectId"),
             "title": project.get("title"),
-            "language": project.get("language") or "zh-CN",
+            "language": project.get("language") or DEFAULT_PROJECT_LANGUAGE,
+            "supportedLanguages": project.get("supportedLanguages") or [
+                project.get("language") or DEFAULT_PROJECT_LANGUAGE
+            ],
             "resolution": {
                 "width": int(resolution.get("width", 1280)),
                 "height": int(resolution.get("height", 720)),
@@ -12233,6 +12344,8 @@ class EditorRequestHandler(SimpleHTTPRequestHandler):
                 save_project_settings(
                     resolution=payload.get("resolution"),
                     release_version=payload.get("releaseVersion"),
+                    language=payload.get("language"),
+                    supported_languages=payload.get("supportedLanguages"),
                     editor_mode=payload.get("editorMode"),
                     runtime_settings=payload.get("runtimeSettings"),
                     dialog_box_config=payload.get("dialogBoxConfig"),

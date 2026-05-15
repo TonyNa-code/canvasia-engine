@@ -505,6 +505,12 @@ const EDITOR_MODE_LABELS = editorModeTools?.EDITOR_MODE_LABELS ?? {
   advanced: "高级模式",
 };
 
+const PROJECT_LANGUAGE_LABELS = {
+  "zh-CN": "简体中文",
+  "ja-JP": "日本語",
+  "en-US": "English",
+};
+
 const NAV_SCREEN_LABELS = editorModeTools?.NAV_SCREEN_LABELS ?? {};
 const BEGINNER_STORY_TOOLBAR_ACTIONS = editorModeTools?.BEGINNER_STORY_TOOLBAR_ACTIONS ?? new Set();
 const BEGINNER_ASSET_TOOLBAR_ACTIONS = editorModeTools?.BEGINNER_ASSET_TOOLBAR_ACTIONS ?? new Set();
@@ -3410,6 +3416,11 @@ async function handleClick(event) {
 
   if (action === "save-project-save-slot-count") {
     void saveProjectFormalSaveSlotCount();
+    return;
+  }
+
+  if (action === "save-project-localization") {
+    void saveProjectLocalizationSettings();
     return;
   }
 
@@ -8373,6 +8384,22 @@ function getProjectRuntimeSettings(project = state.data?.project) {
 
 function getProjectFormalSaveSlotCount(project = state.data?.project) {
   return projectSettingsTools.getProjectFormalSaveSlotCount(project, getProjectSettingsOptions());
+}
+
+function getProjectLanguage(project = state.data?.project) {
+  return String(project?.language ?? "zh-CN").trim() || "zh-CN";
+}
+
+function getProjectSupportedLanguages(project = state.data?.project) {
+  const defaultLanguage = getProjectLanguage(project);
+  const languages = Array.isArray(project?.supportedLanguages) ? project.supportedLanguages : [];
+  const normalizedLanguages = languages
+    .map((language) => String(language ?? "").trim())
+    .filter(Boolean);
+  if (!normalizedLanguages.includes(defaultLanguage)) {
+    normalizedLanguages.unshift(defaultLanguage);
+  }
+  return normalizedLanguages.length ? normalizedLanguages : ["zh-CN"];
 }
 
 function getSafeProjectDialogBoxPreset(value) {
@@ -36099,11 +36126,58 @@ function renderProjectRuntimeSettingsPanel() {
   const runtimeSettings = getProjectRuntimeSettings();
   const dialogBoxConfig = getProjectDialogBoxConfig();
   const gameUiConfig = getProjectGameUiConfig();
+  const projectLanguage = getProjectLanguage();
+  const projectSupportedLanguages = getProjectSupportedLanguages();
   return `
     <article class="detail-card">
       <strong>成品体验设置</strong>
       <p class="helper-text">这里会直接写进项目文件，网页试玩包和桌面版都会吃这套配置。适合先把“存档规模”“对话框风格”和“成品 UI 皮肤”定下来。</p>
       <div class="detail-stack">
+        <section class="detail-card dialog-config-card">
+          <strong>多语言与国际化</strong>
+          <p class="helper-text">先选择默认语言，再勾选成品包里允许玩家切换的语言。剧情卡片可逐步补充 textTranslations / displayNameTranslations，缺失翻译会自动回退到默认文本。</p>
+          <div class="playback-setting-grid dialog-config-grid">
+            <label class="playback-setting">
+              <span>默认语言</span>
+              <select id="projectDefaultLanguageSelect">
+                ${Object.entries(PROJECT_LANGUAGE_LABELS)
+                  .map(
+                    ([language, label]) =>
+                      `<option value="${language}" ${projectLanguage === language ? "selected" : ""}>${escapeHtml(label)}</option>`
+                  )
+                  .join("")}
+              </select>
+            </label>
+            <div class="playback-setting">
+              <span>成品可切换语言</span>
+              <div class="detail-actions">
+                ${Object.entries(PROJECT_LANGUAGE_LABELS)
+                  .map(
+                    ([language, label]) => `
+                      <label class="toolbar-button">
+                        <input
+                          type="checkbox"
+                          data-project-supported-language
+                          value="${language}"
+                          ${projectSupportedLanguages.includes(language) ? "checked" : ""}
+                        />
+                        ${escapeHtml(label)}
+                      </label>
+                    `
+                  )
+                  .join("")}
+              </div>
+            </div>
+          </div>
+          <div class="detail-actions">
+            <button class="toolbar-button toolbar-button-primary" data-action="save-project-localization">
+              保存多语言设置
+            </button>
+          </div>
+          <div class="detail-meta">当前默认语言：${escapeHtml(
+            PROJECT_LANGUAGE_LABELS[projectLanguage] ?? projectLanguage
+          )}；导出 Runtime 会提供 ${projectSupportedLanguages.length} 种语言。</div>
+        </section>
         <section class="detail-card dialog-config-card">
           <strong>正式存档位数量</strong>
           <p class="helper-text">手动存档位不再固定。大项目可直接扩到 50、100 或更多，读档分页会自动跟着变化。</p>
@@ -36744,6 +36818,34 @@ async function saveProjectFormalSaveSlotCount() {
     setSaveStatus("保存正式存档位失败", true);
     showToast("保存正式存档位失败", "error");
     showEngineAlert(`保存正式存档位没有成功：${error.message}`);
+  }
+}
+
+async function saveProjectLocalizationSettings() {
+  const language = String(document.getElementById("projectDefaultLanguageSelect")?.value ?? "zh-CN").trim() || "zh-CN";
+  const supportedLanguages = Array.from(document.querySelectorAll("[data-project-supported-language]"))
+    .filter((input) => input.checked)
+    .map((input) => String(input.value ?? "").trim())
+    .filter(Boolean);
+  if (!supportedLanguages.includes(language)) {
+    supportedLanguages.unshift(language);
+  }
+
+  try {
+    setSaveStatus("正在保存多语言设置...");
+    const result = await postJson(API_SAVE_PROJECT_SETTINGS, {
+      language,
+      supportedLanguages,
+    });
+    await reloadProjectData({ ...getCurrentUiState() });
+    const savedLanguage = getProjectLanguage(result.project ?? state.data?.project);
+    const savedSupportedLanguages = getProjectSupportedLanguages(result.project ?? state.data?.project);
+    setSaveStatus(`多语言设置已保存：${savedSupportedLanguages.length} 种语言`);
+    showToast(`默认语言已设为 ${PROJECT_LANGUAGE_LABELS[savedLanguage] ?? savedLanguage}`);
+  } catch (error) {
+    setSaveStatus("保存多语言设置失败", true);
+    showToast("保存多语言设置失败", "error");
+    showEngineAlert(`保存多语言设置没有成功：${error.message}`);
   }
 }
 

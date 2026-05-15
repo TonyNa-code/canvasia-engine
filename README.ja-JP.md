@@ -1,0 +1,203 @@
+<p align="center">
+  <img src="docs/github/canvasia-engine-hero.png" alt="Canvasia Engine hero" width="100%" />
+</p>
+
+<h1 align="center">Canvasia Engine</h1>
+
+<p align="center">
+  ビジュアルノベル / Galgame 制作者向けのビジュアル制作エンジン・プロトタイプです。<br />
+  素材を追加し、台詞を書き、ボタンで確認しながら、コードを書かずにプレイ可能な作品を作ることを目指しています。
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/status-source--available%20preview-3fb7ff?style=for-the-badge" alt="Status: Source-Available Preview" />
+  <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-0e1628?style=for-the-badge" alt="Platforms" />
+  <img src="https://img.shields.io/badge/tests-smoke%20%2B%20playwright-1fc98b?style=for-the-badge" alt="Tests" />
+  <img src="https://img.shields.io/badge/license-Creator%20License%201.0-f5c451?style=for-the-badge" alt="Creator License 1.0" />
+</p>
+
+<p align="center">
+  <strong>言語</strong>：
+  <a href="README.md">简体中文</a> ·
+  <a href="README.en-US.md">English</a> ·
+  日本語
+</p>
+
+<p align="center">
+  <a href="#クイックスタート">クイックスタート</a> ·
+  <a href="#主な機能">主な機能</a> ·
+  <a href="#機能ステータス">機能ステータス</a> ·
+  <a href="#書き出し">書き出し</a> ·
+  <a href="#テスト">テスト</a> ·
+  <a href="CONTRIBUTING.md">Contributing</a>
+</p>
+
+---
+
+## プロジェクトの位置づけ
+
+Canvasia Engine は、ビジュアルノベル / Galgame 制作者のための source-available preview 版です。
+
+現在は次の用途に向いています。
+
+- 小規模なビジュアルノベルの試作
+- エディタと書き出しフローの検証
+- 個人制作や同人制作の初期プロトタイプ
+- 安定版リリース前の機能体験とフィードバック
+
+ビジュアルエディタ、書き出しパイプライン、ネイティブ Runtime preview、プロジェクト復旧機能、自動 smoke test はすでに含まれています。署名、公証、インストーラー、長時間の手動 QA はまだ強化中のため、現時点では **Preview / Early Access** として公開しています。
+
+## 主な機能
+
+- シーン、カード、台詞、ナレーション、選択肢、変数、条件分岐を扱えるビジュアルストーリーエディタ
+- 空白プロジェクト、新人向けモード、高度編集モードを備えたプロジェクトセンター
+- 背景、立ち絵、CG、BGM、効果音、ボイス、フォント、UI 素材、Live2D、3D モデル、3D シーン素材の管理
+- プロジェクトのデフォルト言語と、プレイヤーが切り替えられる言語設定
+- シーン名、章名、台詞、選択肢、キャラクター名の翻訳テキストを Runtime 側で読み取り、未翻訳部分は安全にフォールバック
+- Canvasia Assistant：ローカルテンプレートモードと、制作者自身の OpenAI、DeepSeek、Qwen、Kimi、Zhipu GLM、互換 API プロバイダーに対応
+- OpenAI Image を利用した背景、立ち絵、CG、UI 素材生成の任意機能
+- 通常セーブ / ロード、クイックセーブ / ロード、システムメニュー、テキスト履歴、自動再生、既読スキップ、ボイス回想
+- ゲーム UI スキン、UI Kit 素材バインド、9-slice テクスチャ、ボタン状態、レイアウト調整、ビジュアルノベル用テキストボックス設計
+- CG 回想、音楽鑑賞、キャラクター図鑑、場所図鑑、ナレーション図鑑、関係図鑑、実績、章回想、エンディング回想、ボイス回想
+- 高度なパーティクルプリセット、プロジェクト単位のパーティクルライブラリ、カメラ演出、フィルター、フラッシュ、画面揺れ、フェード
+- Live2D / 3D キャラクターと 3D シーン素材のインポート、ネイティブ Runtime での glTF / GLB / VRM 構造レポート
+- Web 試遊パッケージ、デスクトップ書き出し、エディタデスクトップビルド、ネイティブ Runtime preview パッケージ
+- ローカル CI precheck、backend smoke、Playwright browser smoke、ボタン配線チェック、release-control report、ファイル整合性検証
+
+## 機能ステータス
+
+| 領域 | 状態 | 説明 |
+| --- | --- | --- |
+| ストーリー / 分岐編集 | Available | カード、選択肢、ジャンプ、変数、条件分岐、シーングラフ確認に対応。 |
+| 素材管理 | Available | インポート、置き換え、削除、使用中保護、容量予算ヒント、任意の OpenAI Image 生成に対応。 |
+| 多言語 / i18n | Preview | プロジェクト言語設定、書き出しメタデータ、Web Runtime 言語切替、ネイティブ Runtime 言語切替、フォールバック動作に対応。 |
+| Canvasia Assistant | Available | ローカルテンプレートと、制作者自身の API Key を使う主要互換プロバイダーに対応。 |
+| プロジェクト安全網 | Available | スナップショット、復元、クラッシュ復旧、プロジェクト Doctor、修復キュー、公開前チェック、release-control report。 |
+| ゲーム UI カスタマイズ | Available | UI スキン、ボタン状態、9-slice 画像、レイアウト調整、テキストボックス設計。 |
+| EXTRA / 回想システム | Available | CG、音楽、キャラクター、場所、ナレーション、関係、実績、章、エンディング、ボイス回想。 |
+| パーティクル / 演出 | Available | パーティクル、カメラ、フィルター、フラッシュ、画面揺れ、フェード、キャラクター演出。 |
+| Live2D / 3D 素材 | Preview | Live2D、3D キャラクター、3D シーン素材をインポート可能。ネイティブ Runtime は 3D 構造とリスクレポートを出力。 |
+| Web / Desktop 書き出し | Preview | Web 試遊パッケージとデスクトップパッケージに対応。署名と公証は Release notes に従います。 |
+| ネイティブ Runtime | Preview | コア再生、設定、セーブ、履歴、自動再生、動画フォールバック、3D レポート、初期図鑑システムをカバー。 |
+| Mobile Runtime | Experimental planning | タッチ操作、音声ポリシー、レイアウト適応を検証中。 |
+
+## スクリーンショット
+
+| ストーリーエディタと Assistant | プレビューと書き出し |
+| --- | --- |
+| ![Canvasia Engine story editor with assistant](docs/github/canvasia-screenshot-story-assistant.png) | ![Canvasia Engine preview and export screen](docs/github/canvasia-screenshot-preview-export.png) |
+| ストーリーカード、シーン構造、Canvasia Assistant、アイデア保管庫、挿入可能な生成カード。 | プレビュー、Runtime 設定、公開前チェック、マルチプラットフォーム書き出し入口。 |
+
+## リポジトリ構成
+
+- [`run_editor.py`](run_editor.py): ローカルエディタサーバー、プロジェクト管理、書き出し、パッケージング入口
+- [`prototype_editor`](prototype_editor): エディタ frontend
+- [`prototype_editor/modules`](prototype_editor/modules): 単体テスト可能な frontend 純ロジックモジュール
+- [`export_player_template`](export_player_template): 書き出し後の Web Runtime テンプレート
+- [`native_runtime`](native_runtime): ネイティブ Runtime player と desktop runtime 関連ロジック
+- [`template_project`](template_project): 空白プロジェクトテンプレート
+- [`tests`](tests): 自動 smoke / regression tests
+
+## クイックスタート
+
+ソースから起動する場合、基本的には Python 3 が必要です。
+
+### 起動スクリプト
+
+- macOS: [`start_editor.command`](start_editor.command) をダブルクリック
+- Windows: [`start_editor.cmd`](start_editor.cmd) をダブルクリック
+- Linux: [`start_editor.sh`](start_editor.sh) を実行
+
+### コマンドライン
+
+macOS / Linux:
+
+```bash
+git clone https://github.com/TonyNa-code/canvasia-engine.git
+cd canvasia-engine
+python3 run_editor.py
+```
+
+Windows:
+
+```bat
+git clone https://github.com/TonyNa-code/canvasia-engine.git
+cd canvasia-engine
+py -3 run_editor.py
+```
+
+Windows の `py` launcher がない場合:
+
+```bat
+python run_editor.py
+```
+
+起動後、ブラウザでローカルの `127.0.0.1` アドレスが開きます。プロジェクトファイルは自分の PC 内に保存されます。
+
+## 最初の Demo 作成
+
+最初は小さく始めるのがおすすめです。
+
+- 背景 1 枚
+- キャラクター立ち絵 1 体
+- BGM 1 曲
+- 台詞 10 から 20 行
+- 選択肢 1 つ
+- 簡単なエンディング 1 つ
+
+まず一本のルートを最後まで通し、その後で分岐、演出、UI、図鑑、ボイスなどを追加すると進めやすくなります。
+
+## 多言語プロジェクト
+
+Canvasia は初期 i18n フローに対応しています。
+
+1. まずメイン言語でストーリーを完成させます。
+2. プロジェクトの Runtime 設定でデフォルト言語を選びます。
+3. `zh-CN`、`ja-JP`、`en-US` など、プレイヤーが切り替えられる言語を有効にします。
+4. キャラクター名、シーン名、章名、台詞、ナレーション、選択肢の翻訳を追加します。
+5. Web Runtime またはネイティブ Runtime の設定メニューで言語切替を確認します。
+
+翻訳が未入力の箇所はデフォルトテキストにフォールバックするため、一部の翻訳漏れでゲームが停止することはありません。
+
+## 書き出し
+
+プロジェクトを開き、プレビュー / 書き出し画面から次のパッケージを生成できます。
+
+- Web 試遊パッケージ
+- Windows desktop パッケージ
+- macOS desktop パッケージ
+- Linux desktop パッケージ
+- standalone app ビルド用 scaffold を含むネイティブ Runtime preview パッケージ
+
+気軽に共有するなら Web 試遊パッケージが最も簡単です。よりアプリに近いデスクトップ再生フローを検証する場合は、ネイティブ Runtime パッケージを使います。
+
+## Release パッケージ
+
+Preview 版のエディタビルドは、利用可能な場合 GitHub Releases で配布されます。
+
+- `macos.tar.gz`
+- `windows.zip`
+- `linux.tar.gz`
+
+未署名の preview build は macOS Gatekeeper、Windows SmartScreen、ウイルス対策ソフトの警告を出す場合があります。必ず公式リポジトリの Release ページからダウンロードし、SHA-256 ファイルがある場合は検証してください。
+
+## テスト
+
+代表的なローカルチェック:
+
+```bash
+python3 -m unittest tests.test_run_editor_smoke -v
+python3 -m unittest tests.test_frontend_particle_effects_module -v
+node --check prototype_editor/app.js
+node --check export_player_template/player.js
+```
+
+一部の browser / native rendering checks には追加のローカル依存関係が必要になる場合があります。
+
+## ライセンス
+
+このプロジェクトは [`LICENSE`](LICENSE) に含まれる Creator License 1.0 を使用します。このエンジンで制作したゲームの商用利用は可能ですが、改変したエンジン自体の再配布や商用化にはライセンス上の制限があります。
+
+## Contributing
+
+Issue や Pull Request を作成する前に、[`CONTRIBUTING.md`](CONTRIBUTING.md)、[`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md)、[`SECURITY.md`](SECURITY.md) を確認してください。
