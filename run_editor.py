@@ -53,6 +53,17 @@ MAX_HISTORY_SNAPSHOTS = 40
 SESSION_STATE_FILE_NAME = "session_state.json"
 SESSION_FORMAT_VERSION = 1
 EXPORT_MANIFEST_FORMAT_VERSION = 1
+EXPORT_ENGINE_SIGNATURE = {
+    "id": "tne",
+    "by": "Tony-Na",
+}
+EXPORT_PROVENANCE_FORMAT_VERSION = 1
+EXPORT_PROVENANCE_FILE_NAME = "tony-na-provenance.json"
+EXPORT_PROVENANCE_VERIFIER_SCRIPT_NAME = "verify_tony_na_provenance.py"
+EXPORT_PROVENANCE_MAC_VERIFIER_NAME = "verify_tony_na_provenance.command"
+EXPORT_PROVENANCE_LINUX_VERIFIER_NAME = "verify_tony_na_provenance.sh"
+EXPORT_PROVENANCE_WINDOWS_VERIFIER_NAME = "verify_tony_na_provenance.bat"
+EXPORT_PROTECTION_PROFILE = "light-origin-integrity"
 PROJECT_FORMAT_VERSION = 3
 DEFAULT_EXPORT_RELEASE_VERSION = "1.0.0-preview"
 DEFAULT_EDITOR_MODE = "beginner"
@@ -4912,6 +4923,13 @@ def build_export_payload(bundle: dict, assets_doc: dict, copied_assets: int, mis
             "builtAt": now_iso(),
             "copiedAssets": copied_assets,
             "missingAssets": missing_assets,
+            "engineSignature": dict(EXPORT_ENGINE_SIGNATURE),
+            "protection": {
+                "profile": EXPORT_PROTECTION_PROFILE,
+                "level": "light",
+                "provenanceFile": EXPORT_PROVENANCE_FILE_NAME,
+                "visibleWatermark": False,
+            },
         },
     }
 
@@ -5384,6 +5402,7 @@ def build_export_manifest(
             "exportTarget": target,
             "exportTargetLabel": target_label,
             "releaseVersion": get_export_release_version(project),
+            "signature": dict(EXPORT_ENGINE_SIGNATURE),
         },
         "project": {
             "projectId": project.get("projectId"),
@@ -5404,6 +5423,20 @@ def build_export_manifest(
             "missingCount": len(missing_assets),
             "missingAssetNames": missing_asset_names,
         },
+        "protection": {
+            "profile": EXPORT_PROTECTION_PROFILE,
+            "level": "light",
+            "algorithm": "sha256",
+            "provenanceFile": EXPORT_PROVENANCE_FILE_NAME,
+            "verifiers": {
+                "python": EXPORT_PROVENANCE_VERIFIER_SCRIPT_NAME,
+                "macos": EXPORT_PROVENANCE_MAC_VERIFIER_NAME,
+                "linux": EXPORT_PROVENANCE_LINUX_VERIFIER_NAME,
+                "windows": EXPORT_PROVENANCE_WINDOWS_VERIFIER_NAME,
+            },
+            "visibleWatermark": False,
+            "checks": ["engine_signature", "file_fingerprints", "build_seal"],
+        },
         "files": extra_files or {},
         "runtime": runtime_payload,
         "warnings": [runtime_payload.get("warning")] if runtime_payload.get("warning") else [],
@@ -5414,6 +5447,316 @@ def write_export_manifest(build_dir: Path, manifest: dict) -> Path:
     manifest_path = build_dir / "export_manifest.json"
     manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return manifest_path
+
+
+def should_include_export_provenance_file(path: Path) -> bool:
+    if not path.is_file():
+        return False
+    if path.name in {EXPORT_PROVENANCE_FILE_NAME, ".DS_Store"}:
+        return False
+    if "__pycache__" in path.parts:
+        return False
+    if path.name.endswith((".zip", ".tar", ".tar.gz", ".tgz")):
+        return False
+    return True
+
+
+def iter_export_provenance_files(build_dir: Path, roots: list[Path] | None = None) -> list[Path]:
+    scan_roots = roots or [build_dir]
+    files: list[Path] = []
+    for root in scan_roots:
+        if not root.exists():
+            continue
+        if root.is_file():
+            if should_include_export_provenance_file(root):
+                files.append(root)
+            continue
+        for path in root.rglob("*"):
+            if should_include_export_provenance_file(path):
+                files.append(path)
+    return sorted(set(files), key=lambda item: item.relative_to(build_dir).as_posix())
+
+
+def build_export_provenance_payload(
+    build_dir: Path,
+    bundle: dict,
+    manifest: dict,
+    *,
+    roots: list[Path] | None = None,
+) -> dict:
+    file_entries = []
+    total_bytes = 0
+    for path in iter_export_provenance_files(build_dir, roots):
+        size_bytes = path.stat().st_size
+        total_bytes += size_bytes
+        file_entries.append(
+            {
+                "path": path.relative_to(build_dir).as_posix(),
+                "sizeBytes": size_bytes,
+                "sha256": calculate_file_sha256(path),
+            }
+        )
+
+    seal_payload = {
+        "engine": manifest.get("engine") or {},
+        "project": manifest.get("project") or {},
+        "protection": manifest.get("protection") or {},
+        "files": file_entries,
+    }
+    seal_source = json.dumps(seal_payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    project = bundle.get("project") or {}
+    return {
+        "formatVersion": EXPORT_PROVENANCE_FORMAT_VERSION,
+        "profile": EXPORT_PROTECTION_PROFILE,
+        "createdAt": now_iso(),
+        "algorithm": "sha256",
+        "engine": {
+            "name": manifest.get("engine", {}).get("name") or "Canvasia Engine",
+            "releaseVersion": manifest.get("engine", {}).get("releaseVersion") or DEFAULT_EXPORT_RELEASE_VERSION,
+            "signature": dict(EXPORT_ENGINE_SIGNATURE),
+        },
+        "build": {
+            "buildId": manifest.get("buildId") or "",
+            "target": manifest.get("engine", {}).get("exportTarget") or "",
+            "targetLabel": manifest.get("engine", {}).get("exportTargetLabel") or "",
+            "projectId": project.get("projectId") or "",
+            "projectTitle": project.get("title") or "",
+        },
+        "protection": {
+            "level": "light",
+            "visibleWatermark": False,
+            "notEncryption": True,
+            "purpose": "origin marker and tamper evidence",
+        },
+        "summary": {
+            "fileCount": len(file_entries),
+            "totalBytes": total_bytes,
+            "seal": hashlib.sha256(seal_source).hexdigest(),
+        },
+        "files": file_entries,
+    }
+
+
+def write_export_provenance_file(
+    build_dir: Path,
+    bundle: dict,
+    manifest: dict,
+    *,
+    roots: list[Path] | None = None,
+) -> dict:
+    provenance_path = build_dir / EXPORT_PROVENANCE_FILE_NAME
+    payload = build_export_provenance_payload(build_dir, bundle, manifest, roots=roots)
+    provenance_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return {
+        "provenanceName": provenance_path.name,
+        "provenancePath": str(provenance_path),
+        "provenanceSeal": payload["summary"]["seal"],
+        "provenanceSummary": payload["summary"],
+    }
+
+
+def build_export_provenance_verifier_script() -> str:
+    expected_signature = json.dumps(EXPORT_ENGINE_SIGNATURE, ensure_ascii=False, sort_keys=True)
+    return f'''#!/usr/bin/env python3
+from __future__ import annotations
+
+import hashlib
+import json
+import sys
+from datetime import datetime
+from pathlib import Path
+
+PROVENANCE_FILE_NAME = "{EXPORT_PROVENANCE_FILE_NAME}"
+MANIFEST_FILE_NAME = "export_manifest.json"
+EXPECTED_PROFILE = "{EXPORT_PROTECTION_PROFILE}"
+EXPECTED_SIGNATURE = {expected_signature}
+
+
+def now_iso() -> str:
+    return datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as file_handle:
+        for chunk in iter(lambda: file_handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def load_json(path: Path) -> dict:
+    with path.open("r", encoding="utf-8") as file_handle:
+        payload = json.load(file_handle)
+    return payload if isinstance(payload, dict) else {{}}
+
+
+def compact_sha256(payload: dict) -> str:
+    raw = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()
+
+
+def verify_bundle(bundle_dir: Path) -> dict:
+    provenance_path = bundle_dir / PROVENANCE_FILE_NAME
+    manifest_path = bundle_dir / MANIFEST_FILE_NAME
+    missing_files = []
+    changed_files = []
+    errors = []
+
+    if not provenance_path.is_file():
+        return {{
+            "status": "fail",
+            "checkedAt": now_iso(),
+            "bundleDir": str(bundle_dir),
+            "errors": [f"Missing {{PROVENANCE_FILE_NAME}}"],
+            "summary": {{"missingCount": 1, "changedCount": 0, "sealMatched": False}},
+        }}
+
+    try:
+        provenance = load_json(provenance_path)
+    except Exception as error:
+        return {{
+            "status": "fail",
+            "checkedAt": now_iso(),
+            "bundleDir": str(bundle_dir),
+            "errors": [f"Cannot read {{PROVENANCE_FILE_NAME}}: {{error}}"],
+            "summary": {{"missingCount": 0, "changedCount": 0, "sealMatched": False}},
+        }}
+
+    manifest = {{}}
+    if manifest_path.is_file():
+        try:
+            manifest = load_json(manifest_path)
+        except Exception as error:
+            errors.append(f"Cannot read {{MANIFEST_FILE_NAME}}: {{error}}")
+    else:
+        errors.append(f"Missing {{MANIFEST_FILE_NAME}}")
+
+    for entry in provenance.get("files") or []:
+        if not isinstance(entry, dict):
+            continue
+        relative_path = str(entry.get("path") or "").strip()
+        if not relative_path:
+            continue
+        file_path = bundle_dir / relative_path
+        expected_size = int(entry.get("sizeBytes") or 0)
+        expected_sha256 = str(entry.get("sha256") or "")
+        if not file_path.is_file():
+            missing_files.append({{"path": relative_path, "expectedSha256": expected_sha256}})
+            continue
+        actual_size = file_path.stat().st_size
+        actual_sha256 = sha256_file(file_path)
+        if actual_size != expected_size or actual_sha256 != expected_sha256:
+            changed_files.append(
+                {{
+                    "path": relative_path,
+                    "expectedSizeBytes": expected_size,
+                    "actualSizeBytes": actual_size,
+                    "expectedSha256": expected_sha256,
+                    "actualSha256": actual_sha256,
+                }}
+            )
+
+    expected_seal = str((provenance.get("summary") or {{}}).get("seal") or "")
+    seal_payload = {{
+        "engine": manifest.get("engine") or {{}},
+        "project": manifest.get("project") or {{}},
+        "protection": manifest.get("protection") or {{}},
+        "files": provenance.get("files") or [],
+    }}
+    actual_seal = compact_sha256(seal_payload)
+    profile_matched = provenance.get("profile") == EXPECTED_PROFILE
+    signature_matched = (provenance.get("engine") or {{}}).get("signature") == EXPECTED_SIGNATURE
+    seal_matched = bool(expected_seal) and actual_seal == expected_seal
+    status = "pass" if not errors and not missing_files and not changed_files and profile_matched and signature_matched and seal_matched else "fail"
+    return {{
+        "status": status,
+        "checkedAt": now_iso(),
+        "bundleDir": str(bundle_dir),
+        "profileMatched": profile_matched,
+        "signatureMatched": signature_matched,
+        "sealMatched": seal_matched,
+        "expectedSeal": expected_seal,
+        "actualSeal": actual_seal,
+        "summary": {{
+            "checkedFileCount": len(provenance.get("files") or []),
+            "missingCount": len(missing_files),
+            "changedCount": len(changed_files),
+            "errorCount": len(errors),
+        }},
+        "missingFiles": missing_files[:50],
+        "changedFiles": changed_files[:50],
+        "errors": errors[:50],
+    }}
+
+
+def main() -> int:
+    bundle_dir = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path(__file__).resolve().parent
+    if bundle_dir.is_file():
+        bundle_dir = bundle_dir.parent
+    report = verify_bundle(bundle_dir)
+    print(json.dumps(report, ensure_ascii=False, indent=2))
+    return 0 if report.get("status") == "pass" else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+'''
+
+
+def build_export_provenance_shell_verifier(script_name: str) -> str:
+    return "\n".join(
+        [
+            "#!/bin/sh",
+            "set -eu",
+            'cd "$(dirname "$0")"',
+            "if command -v python3 >/dev/null 2>&1; then",
+            f'  python3 "{script_name}" .',
+            "else",
+            f'  python "{script_name}" .',
+            "fi",
+            "",
+        ]
+    )
+
+
+def build_export_provenance_windows_verifier(script_name: str) -> str:
+    return "\n".join(
+        [
+            "@echo off",
+            "setlocal",
+            'cd /d "%~dp0"',
+            f'py -3 "{script_name}" .',
+            "if %ERRORLEVEL% EQU 0 exit /b 0",
+            f'python "{script_name}" .',
+            "exit /b %ERRORLEVEL%",
+            "",
+        ]
+    )
+
+
+def write_export_provenance_verifier_files(build_dir: Path) -> dict:
+    script_path = build_dir / EXPORT_PROVENANCE_VERIFIER_SCRIPT_NAME
+    mac_path = build_dir / EXPORT_PROVENANCE_MAC_VERIFIER_NAME
+    linux_path = build_dir / EXPORT_PROVENANCE_LINUX_VERIFIER_NAME
+    windows_path = build_dir / EXPORT_PROVENANCE_WINDOWS_VERIFIER_NAME
+    script_path.write_text(build_export_provenance_verifier_script(), encoding="utf-8")
+    mac_path.write_text(build_export_provenance_shell_verifier(script_path.name), encoding="utf-8")
+    linux_path.write_text(build_export_provenance_shell_verifier(script_path.name), encoding="utf-8")
+    windows_path.write_text(build_export_provenance_windows_verifier(script_path.name), encoding="utf-8")
+    script_path.chmod(0o755)
+    mac_path.chmod(0o755)
+    linux_path.chmod(0o755)
+    return {
+        "provenanceVerifierName": script_path.name,
+        "provenanceVerifierPath": str(script_path),
+        "provenanceVerifierMacName": mac_path.name,
+        "provenanceVerifierMacPath": str(mac_path),
+        "provenanceVerifierLinuxName": linux_path.name,
+        "provenanceVerifierLinuxPath": str(linux_path),
+        "provenanceVerifierWindowsName": windows_path.name,
+        "provenanceVerifierWindowsPath": str(windows_path),
+        "paths": [script_path, mac_path, linux_path, windows_path],
+    }
 
 
 def build_export_splash_svg(project: dict, release_version: str, target_label: str) -> str:
@@ -8879,6 +9222,8 @@ def export_native_runtime_build() -> dict:
         },
     )
     manifest_path = write_export_manifest(build_dir, manifest)
+    provenance_verifiers = write_export_provenance_verifier_files(build_dir)
+    provenance_file = write_export_provenance_file(build_dir, bundle, manifest)
     integrity_files = write_native_runtime_file_integrity_reports(build_dir)
     acceptance_files = write_native_runtime_acceptance_reports(build_dir)
     archive_path = Path(shutil.make_archive(str(build_dir), "zip", root_dir=build_dir))
@@ -8892,6 +9237,8 @@ def export_native_runtime_build() -> dict:
         {"name": runtime_files["releaseControlJsonName"], "description": "机器可读发布总控 JSON。"},
         {"name": integrity_files["fileIntegrityMarkdownName"], "description": "包内核心文件完整性 Markdown。"},
         {"name": integrity_files["fileIntegrityReportName"], "description": "包内核心文件 SHA-256 JSON。"},
+        {"name": provenance_file["provenanceName"], "description": "低调来源标记与文件指纹清单。"},
+        {"name": provenance_verifiers["provenanceVerifierName"], "description": "低调来源与文件指纹校验脚本。"},
         {"name": acceptance_files["acceptanceReportName"], "description": "三系统人工验收清单 Markdown。"},
         {"name": acceptance_files["acceptanceJsonName"], "description": "机器可读发布验收清单 JSON。"},
         {"name": runtime_files["asset3dSummaryName"], "description": "3D 资产 Markdown 摘要。"},
@@ -8998,6 +9345,23 @@ def export_native_runtime_build() -> dict:
         "fileIntegrityMarkdownPublicUrl": f"/exports/{build_dir.name}/{integrity_files['fileIntegrityMarkdownName']}",
         "fileIntegrityStatus": integrity_files["fileIntegrityStatus"],
         "fileIntegritySummary": integrity_files["fileIntegritySummary"],
+        "provenanceName": provenance_file["provenanceName"],
+        "provenancePath": provenance_file["provenancePath"],
+        "provenancePublicUrl": f"/exports/{build_dir.name}/{provenance_file['provenanceName']}",
+        "provenanceSeal": provenance_file["provenanceSeal"],
+        "provenanceSummary": provenance_file["provenanceSummary"],
+        "provenanceVerifierName": provenance_verifiers["provenanceVerifierName"],
+        "provenanceVerifierPath": provenance_verifiers["provenanceVerifierPath"],
+        "provenanceVerifierPublicUrl": f"/exports/{build_dir.name}/{provenance_verifiers['provenanceVerifierName']}",
+        "provenanceVerifierMacName": provenance_verifiers["provenanceVerifierMacName"],
+        "provenanceVerifierMacPath": provenance_verifiers["provenanceVerifierMacPath"],
+        "provenanceVerifierMacPublicUrl": f"/exports/{build_dir.name}/{provenance_verifiers['provenanceVerifierMacName']}",
+        "provenanceVerifierLinuxName": provenance_verifiers["provenanceVerifierLinuxName"],
+        "provenanceVerifierLinuxPath": provenance_verifiers["provenanceVerifierLinuxPath"],
+        "provenanceVerifierLinuxPublicUrl": f"/exports/{build_dir.name}/{provenance_verifiers['provenanceVerifierLinuxName']}",
+        "provenanceVerifierWindowsName": provenance_verifiers["provenanceVerifierWindowsName"],
+        "provenanceVerifierWindowsPath": provenance_verifiers["provenanceVerifierWindowsPath"],
+        "provenanceVerifierWindowsPublicUrl": f"/exports/{build_dir.name}/{provenance_verifiers['provenanceVerifierWindowsName']}",
         "acceptanceReportName": acceptance_files["acceptanceReportName"],
         "acceptanceReportPath": acceptance_files["acceptanceReportPath"],
         "acceptanceReportPublicUrl": f"/exports/{build_dir.name}/{acceptance_files['acceptanceReportName']}",
@@ -9106,6 +9470,8 @@ def export_web_build() -> dict:
         },
     )
     manifest_path = write_export_manifest(build_dir, manifest)
+    provenance_verifiers = write_export_provenance_verifier_files(build_dir)
+    provenance_file = write_export_provenance_file(build_dir, bundle, manifest)
 
     return {
         "target": EXPORT_TARGET_WEB,
@@ -9116,6 +9482,23 @@ def export_web_build() -> dict:
         "publicIndexUrl": f"/exports/{build_dir.name}/index.html",
         "manifestPath": str(manifest_path),
         "manifestPublicUrl": f"/exports/{build_dir.name}/{manifest_path.name}",
+        "provenanceName": provenance_file["provenanceName"],
+        "provenancePath": provenance_file["provenancePath"],
+        "provenancePublicUrl": f"/exports/{build_dir.name}/{provenance_file['provenanceName']}",
+        "provenanceSeal": provenance_file["provenanceSeal"],
+        "provenanceSummary": provenance_file["provenanceSummary"],
+        "provenanceVerifierName": provenance_verifiers["provenanceVerifierName"],
+        "provenanceVerifierPath": provenance_verifiers["provenanceVerifierPath"],
+        "provenanceVerifierPublicUrl": f"/exports/{build_dir.name}/{provenance_verifiers['provenanceVerifierName']}",
+        "provenanceVerifierMacName": provenance_verifiers["provenanceVerifierMacName"],
+        "provenanceVerifierMacPath": provenance_verifiers["provenanceVerifierMacPath"],
+        "provenanceVerifierMacPublicUrl": f"/exports/{build_dir.name}/{provenance_verifiers['provenanceVerifierMacName']}",
+        "provenanceVerifierLinuxName": provenance_verifiers["provenanceVerifierLinuxName"],
+        "provenanceVerifierLinuxPath": provenance_verifiers["provenanceVerifierLinuxPath"],
+        "provenanceVerifierLinuxPublicUrl": f"/exports/{build_dir.name}/{provenance_verifiers['provenanceVerifierLinuxName']}",
+        "provenanceVerifierWindowsName": provenance_verifiers["provenanceVerifierWindowsName"],
+        "provenanceVerifierWindowsPath": provenance_verifiers["provenanceVerifierWindowsPath"],
+        "provenanceVerifierWindowsPublicUrl": f"/exports/{build_dir.name}/{provenance_verifiers['provenanceVerifierWindowsName']}",
         "releaseVersion": release_version,
         "iconPngPath": str(icon_files["pngPath"]),
         "iconIcoPath": str(icon_files["icoPath"]),
@@ -9864,6 +10247,20 @@ def export_windows_nwjs_build() -> dict:
         manifest_path.name,
         manifest["engine"]["releaseVersion"],
     )
+    provenance_verifiers = write_export_provenance_verifier_files(build_dir)
+    provenance_roots = [
+        app_dir,
+        manifest_path,
+        readme_path,
+        start_helper_path,
+        root_icon_files["pngPath"],
+        root_icon_files["icoPath"],
+        root_splash_file["path"],
+        *provenance_verifiers["paths"],
+    ]
+    if launcher_path.suffix.lower() in {".cmd", ".bat"}:
+        provenance_roots.append(launcher_path)
+    provenance_file = write_export_provenance_file(build_dir, bundle, manifest, roots=provenance_roots)
     archive_path = Path(shutil.make_archive(str(build_dir), "zip", root_dir=build_dir.parent, base_dir=build_dir.name))
 
     return {
@@ -9890,6 +10287,23 @@ def export_windows_nwjs_build() -> dict:
         "releaseVersion": release_version,
         "manifestPath": str(manifest_path),
         "manifestPublicUrl": f"/exports/{build_dir.name}/{manifest_path.name}",
+        "provenanceName": provenance_file["provenanceName"],
+        "provenancePath": provenance_file["provenancePath"],
+        "provenancePublicUrl": f"/exports/{build_dir.name}/{provenance_file['provenanceName']}",
+        "provenanceSeal": provenance_file["provenanceSeal"],
+        "provenanceSummary": provenance_file["provenanceSummary"],
+        "provenanceVerifierName": provenance_verifiers["provenanceVerifierName"],
+        "provenanceVerifierPath": provenance_verifiers["provenanceVerifierPath"],
+        "provenanceVerifierPublicUrl": f"/exports/{build_dir.name}/{provenance_verifiers['provenanceVerifierName']}",
+        "provenanceVerifierMacName": provenance_verifiers["provenanceVerifierMacName"],
+        "provenanceVerifierMacPath": provenance_verifiers["provenanceVerifierMacPath"],
+        "provenanceVerifierMacPublicUrl": f"/exports/{build_dir.name}/{provenance_verifiers['provenanceVerifierMacName']}",
+        "provenanceVerifierLinuxName": provenance_verifiers["provenanceVerifierLinuxName"],
+        "provenanceVerifierLinuxPath": provenance_verifiers["provenanceVerifierLinuxPath"],
+        "provenanceVerifierLinuxPublicUrl": f"/exports/{build_dir.name}/{provenance_verifiers['provenanceVerifierLinuxName']}",
+        "provenanceVerifierWindowsName": provenance_verifiers["provenanceVerifierWindowsName"],
+        "provenanceVerifierWindowsPath": provenance_verifiers["provenanceVerifierWindowsPath"],
+        "provenanceVerifierWindowsPublicUrl": f"/exports/{build_dir.name}/{provenance_verifiers['provenanceVerifierWindowsName']}",
         "iconPngPath": str(root_icon_files["pngPath"]),
         "iconIcoPath": str(root_icon_files["icoPath"]),
         "iconPngPublicUrl": f"/exports/{build_dir.name}/{root_icon_files['pngFileName']}",
@@ -9989,6 +10403,22 @@ def export_macos_nwjs_build() -> dict:
         manifest_path.name,
         release_version,
     )
+    provenance_verifiers = write_export_provenance_verifier_files(build_dir)
+    provenance_file = write_export_provenance_file(
+        build_dir,
+        bundle,
+        manifest,
+        roots=[
+            app_dir,
+            manifest_path,
+            readme_path,
+            start_helper_path,
+            root_icon_files["pngPath"],
+            root_icon_files["icoPath"],
+            root_splash_file["path"],
+            *provenance_verifiers["paths"],
+        ],
+    )
     archive_path = Path(shutil.make_archive(str(build_dir), "zip", root_dir=build_dir.parent, base_dir=build_dir.name))
 
     return {
@@ -10018,6 +10448,23 @@ def export_macos_nwjs_build() -> dict:
         "releaseVersion": release_version,
         "manifestPath": str(manifest_path),
         "manifestPublicUrl": f"/exports/{build_dir.name}/{manifest_path.name}",
+        "provenanceName": provenance_file["provenanceName"],
+        "provenancePath": provenance_file["provenancePath"],
+        "provenancePublicUrl": f"/exports/{build_dir.name}/{provenance_file['provenanceName']}",
+        "provenanceSeal": provenance_file["provenanceSeal"],
+        "provenanceSummary": provenance_file["provenanceSummary"],
+        "provenanceVerifierName": provenance_verifiers["provenanceVerifierName"],
+        "provenanceVerifierPath": provenance_verifiers["provenanceVerifierPath"],
+        "provenanceVerifierPublicUrl": f"/exports/{build_dir.name}/{provenance_verifiers['provenanceVerifierName']}",
+        "provenanceVerifierMacName": provenance_verifiers["provenanceVerifierMacName"],
+        "provenanceVerifierMacPath": provenance_verifiers["provenanceVerifierMacPath"],
+        "provenanceVerifierMacPublicUrl": f"/exports/{build_dir.name}/{provenance_verifiers['provenanceVerifierMacName']}",
+        "provenanceVerifierLinuxName": provenance_verifiers["provenanceVerifierLinuxName"],
+        "provenanceVerifierLinuxPath": provenance_verifiers["provenanceVerifierLinuxPath"],
+        "provenanceVerifierLinuxPublicUrl": f"/exports/{build_dir.name}/{provenance_verifiers['provenanceVerifierLinuxName']}",
+        "provenanceVerifierWindowsName": provenance_verifiers["provenanceVerifierWindowsName"],
+        "provenanceVerifierWindowsPath": provenance_verifiers["provenanceVerifierWindowsPath"],
+        "provenanceVerifierWindowsPublicUrl": f"/exports/{build_dir.name}/{provenance_verifiers['provenanceVerifierWindowsName']}",
         "iconPngPath": str(root_icon_files["pngPath"]),
         "iconIcoPath": str(root_icon_files["icoPath"]),
         "iconPngPublicUrl": f"/exports/{build_dir.name}/{root_icon_files['pngFileName']}",
@@ -10122,6 +10569,19 @@ def export_linux_nwjs_build() -> dict:
         manifest_path.name,
         release_version,
     )
+    provenance_verifiers = write_export_provenance_verifier_files(build_dir)
+    provenance_roots = [
+        app_dir,
+        package_path,
+        manifest_path,
+        readme_path,
+        start_helper_path,
+        root_icon_files["pngPath"],
+        root_icon_files["icoPath"],
+        root_splash_file["path"],
+        *provenance_verifiers["paths"],
+    ]
+    provenance_file = write_export_provenance_file(build_dir, bundle, manifest, roots=provenance_roots)
     archive_path = Path(shutil.make_archive(str(build_dir), "gztar", root_dir=build_dir.parent, base_dir=build_dir.name))
 
     return {
@@ -10148,6 +10608,23 @@ def export_linux_nwjs_build() -> dict:
         "releaseVersion": release_version,
         "manifestPath": str(manifest_path),
         "manifestPublicUrl": f"/exports/{build_dir.name}/{manifest_path.name}",
+        "provenanceName": provenance_file["provenanceName"],
+        "provenancePath": provenance_file["provenancePath"],
+        "provenancePublicUrl": f"/exports/{build_dir.name}/{provenance_file['provenanceName']}",
+        "provenanceSeal": provenance_file["provenanceSeal"],
+        "provenanceSummary": provenance_file["provenanceSummary"],
+        "provenanceVerifierName": provenance_verifiers["provenanceVerifierName"],
+        "provenanceVerifierPath": provenance_verifiers["provenanceVerifierPath"],
+        "provenanceVerifierPublicUrl": f"/exports/{build_dir.name}/{provenance_verifiers['provenanceVerifierName']}",
+        "provenanceVerifierMacName": provenance_verifiers["provenanceVerifierMacName"],
+        "provenanceVerifierMacPath": provenance_verifiers["provenanceVerifierMacPath"],
+        "provenanceVerifierMacPublicUrl": f"/exports/{build_dir.name}/{provenance_verifiers['provenanceVerifierMacName']}",
+        "provenanceVerifierLinuxName": provenance_verifiers["provenanceVerifierLinuxName"],
+        "provenanceVerifierLinuxPath": provenance_verifiers["provenanceVerifierLinuxPath"],
+        "provenanceVerifierLinuxPublicUrl": f"/exports/{build_dir.name}/{provenance_verifiers['provenanceVerifierLinuxName']}",
+        "provenanceVerifierWindowsName": provenance_verifiers["provenanceVerifierWindowsName"],
+        "provenanceVerifierWindowsPath": provenance_verifiers["provenanceVerifierWindowsPath"],
+        "provenanceVerifierWindowsPublicUrl": f"/exports/{build_dir.name}/{provenance_verifiers['provenanceVerifierWindowsName']}",
         "iconPngPath": str(root_icon_files["pngPath"]),
         "iconIcoPath": str(root_icon_files["icoPath"]),
         "iconPngPublicUrl": f"/exports/{build_dir.name}/{root_icon_files['pngFileName']}",

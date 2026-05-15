@@ -39354,49 +39354,46 @@ async function saveParticleCustomPreset() {
   const currentConfig = normalizeParticleEffectConfig(collectEditedBlock(block));
   const currentPresets = getProjectParticleCustomPresets();
   const selectedPresetId = String(select?.value ?? "").trim();
-  const existingPreset = getParticleCustomPresetById(selectedPresetId);
-  if (!existingPreset && currentPresets.length >= PARTICLE_CUSTOM_PRESET_LIMIT) {
+  const savePlan = particleEffectTools.buildParticleCustomPresetSavePlan({
+    name,
+    currentConfig,
+    currentPresets,
+    selectedPresetId,
+  });
+  if (!savePlan.ok && savePlan.reason === "limit_reached") {
     setSaveStatus(`这个项目最多保存 ${PARTICLE_CUSTOM_PRESET_LIMIT} 组粒子预设，请先删掉不用的预设`, true);
     showToast("项目粒子预设库已经满了", "error");
     return;
   }
-
-  const targetId =
-    existingPreset?.id ??
-    makeParticleCustomPresetId(
-      name,
-      currentPresets.map((preset) => preset.id)
-    );
-
-  const nextPresets = existingPreset
-    ? currentPresets.map((preset) =>
-        preset.id === existingPreset.id ? { ...preset, name, config: currentConfig } : preset
-      )
-    : [...currentPresets, { id: targetId, name, config: currentConfig }];
+  if (!savePlan.ok) {
+    setSaveStatus("粒子预设暂时不能保存，请检查预设名称和当前粒子配置", true);
+    showToast("粒子预设暂时不能保存", "error");
+    return;
+  }
 
   try {
-    setSaveStatus(existingPreset ? "正在更新粒子预设..." : "正在保存粒子预设...");
+    setSaveStatus(savePlan.isUpdate ? "正在更新粒子预设..." : "正在保存粒子预设...");
     await postJson(API_SAVE_PROJECT_SETTINGS, {
-      particleCustomPresets: nextPresets,
+      particleCustomPresets: savePlan.nextPresets,
     });
 
     await reloadProjectData({
       ...getCurrentUiState(),
     });
 
-    state.selectedParticleCustomPresetId = targetId;
+    state.selectedParticleCustomPresetId = savePlan.targetId;
     const nextSelect = document.getElementById("editorParticleCustomPresetSelect");
     const nextInput = document.getElementById("editorParticleCustomPresetName");
     if (nextSelect) {
-      nextSelect.value = targetId;
+      nextSelect.value = savePlan.targetId;
     }
     if (nextInput) {
-      nextInput.value = name;
+      nextInput.value = savePlan.name;
     }
     rerenderParticleCustomPresetQuickList();
 
-    setSaveStatus(existingPreset ? `粒子预设已更新：${name}` : `粒子预设已保存：${name}`);
-    showToast(existingPreset ? `已更新粒子预设：${name}` : `已保存粒子预设：${name}`);
+    setSaveStatus(savePlan.isUpdate ? `粒子预设已更新：${savePlan.name}` : `粒子预设已保存：${savePlan.name}`);
+    showToast(savePlan.isUpdate ? `已更新粒子预设：${savePlan.name}` : `已保存粒子预设：${savePlan.name}`);
   } catch (error) {
     setSaveStatus("保存粒子预设失败", true);
     showToast("保存粒子预设失败", "error");
@@ -39451,12 +39448,7 @@ function exportParticleCustomPreset() {
 
   downloadJsonFile(
     `${makeParticleCustomPresetId(preset.name)}.canvasia-particle-preset.json`,
-    {
-      engine: "Canvasia Engine",
-      kind: "particle_preset",
-      exportedAt: new Date().toISOString(),
-      preset,
-    }
+    particleEffectTools.buildParticleCustomPresetExportPayload(preset)
   );
   setSaveStatus(`粒子预设已导出：${preset.name}`);
   showToast(`已导出粒子预设：${preset.name}`);
@@ -39473,13 +39465,7 @@ function exportParticleCustomPresetPack() {
   const projectName = state.data?.project?.title ?? "Canvasia Project";
   downloadJsonFile(
     `${makeParticleCustomPresetId(projectName)}.canvasia-particle-pack.json`,
-    {
-      engine: "Canvasia Engine",
-      kind: "particle_preset_pack",
-      projectTitle: projectName,
-      exportedAt: new Date().toISOString(),
-      presets,
-    }
+    particleEffectTools.buildParticleCustomPresetPackExportPayload(presets, projectName)
   );
   setSaveStatus(`已导出整包粒子预设：共 ${presets.length} 组`);
   showToast(`已导出整包粒子预设：共 ${presets.length} 组`);
@@ -39494,57 +39480,22 @@ async function importParticleCustomPresetPack(file) {
     setSaveStatus("正在导入粒子预设包...");
     const rawText = await file.text();
     const parsed = JSON.parse(rawText);
-    const rawPresets = Array.isArray(parsed)
-      ? parsed
-      : Array.isArray(parsed?.presets)
-        ? parsed.presets
-        : parsed?.preset
-          ? [parsed.preset]
-          : [];
-
-    if (!rawPresets.length) {
-      throw new Error("这个文件里没有找到可导入的粒子预设。");
-    }
-
-    const existingPresets = getProjectParticleCustomPresets();
-    const remainingSlots = Math.max(0, PARTICLE_CUSTOM_PRESET_LIMIT - existingPresets.length);
-    if (!remainingSlots) {
-      throw new Error(`这个项目的粒子预设库已经达到上限 ${PARTICLE_CUSTOM_PRESET_LIMIT} 组，请先删掉一些旧预设再导入。`);
-    }
-
-    const importablePresets = rawPresets.slice(0, remainingSlots);
-    const skippedCount = Math.max(0, rawPresets.length - importablePresets.length);
-    const mergedPresets = [...existingPresets];
-    const usedIds = mergedPresets.map((preset) => preset.id);
-
-    importablePresets.forEach((rawPreset, index) => {
-      const name = String(rawPreset?.name ?? `导入预设 ${index + 1}`).trim() || `导入预设 ${index + 1}`;
-      const config = normalizeParticleEffectConfig(rawPreset?.config ?? rawPreset);
-      const nextId = makeParticleCustomPresetId(rawPreset?.id ?? name, usedIds);
-      usedIds.push(nextId);
-      mergedPresets.push({
-        id: nextId,
-        name,
-        config,
-      });
+    const importPlan = particleEffectTools.buildParticleCustomPresetImportPlan(parsed, getProjectParticleCustomPresets(), {
+      normalizeConfig: normalizeParticleEffectConfig,
     });
 
     await postJson(API_SAVE_PROJECT_SETTINGS, {
-      particleCustomPresets: mergedPresets,
+      particleCustomPresets: importPlan.mergedPresets,
     });
 
     await reloadProjectData({
       ...getCurrentUiState(),
     });
 
-    state.selectedParticleCustomPresetId = mergedPresets[mergedPresets.length - 1]?.id ?? "";
+    state.selectedParticleCustomPresetId = importPlan.selectedPresetId;
     rerenderParticleCustomPresetQuickList();
-    const importSummary =
-      skippedCount > 0
-        ? `已导入粒子预设：新增 ${importablePresets.length} 组，另有 ${skippedCount} 组因为项目上限被跳过`
-        : `已导入粒子预设：新增 ${importablePresets.length} 组`;
-    setSaveStatus(importSummary);
-    showToast(importSummary);
+    setSaveStatus(importPlan.summary);
+    showToast(importPlan.summary);
   } catch (error) {
     setSaveStatus("导入粒子预设失败", true);
     showToast("导入粒子预设失败", "error");
@@ -42136,67 +42087,23 @@ function getParticleComboPresetLabel(comboPreset) {
 }
 
 function buildDefaultParticleCustomComboLayer(preset = "stardust") {
-  const safePreset = getSafeParticlePreset(preset);
-  const defaults = getParticlePresetDefaults(safePreset);
-  const advancedDefaults = getParticleAdvancedDefaults(safePreset);
-  return {
-    enabled: false,
-    preset: safePreset,
-    emissionMode: advancedDefaults.emissionMode,
-    follow: advancedDefaults.follow,
-    followAnchor: "torso",
-    densityMultiplier: 1,
-    sizeScale: 1,
-    lifeScale: 1,
-    opacityScale: 1,
-    colorMix: 0.42,
-    blend: defaults.blend,
-  };
+  return particleEffectTools.buildDefaultParticleCustomComboLayer(preset);
 }
 
 function normalizeParticleCustomComboLayer(layer, fallbackPreset = "stardust") {
-  const base = buildDefaultParticleCustomComboLayer(layer?.preset ?? fallbackPreset);
-  return {
-    enabled: Boolean(layer?.enabled),
-    preset: getSafeParticlePreset(layer?.preset ?? base.preset),
-    emissionMode: getSafeParticleEmissionMode(layer?.emissionMode ?? base.emissionMode),
-    follow: getSafeParticleFollowTarget(layer?.follow ?? base.follow),
-    followAnchor: getSafeParticleFollowAnchor(layer?.followAnchor ?? base.followAnchor),
-    densityMultiplier: getSafeParticleClampedNumber(layer?.densityMultiplier, 1, 0.2, 4),
-    sizeScale: getSafeParticleClampedNumber(layer?.sizeScale, 1, 0.2, 4),
-    lifeScale: getSafeParticleClampedNumber(layer?.lifeScale, 1, 0.2, 4),
-    opacityScale: getSafeParticleClampedNumber(layer?.opacityScale, 1, 0.1, 2),
-    colorMix: getSafeParticleClampedNumber(layer?.colorMix, 0.42, 0, 1),
-    blend: getSafeParticleBlendMode(layer?.blend ?? base.blend),
-  };
+  return particleEffectTools.normalizeParticleCustomComboLayer(layer, fallbackPreset);
 }
 
 function normalizeParticleCustomComboLayers(layers) {
-  const source = Array.isArray(layers) ? layers.slice(0, PARTICLE_CUSTOM_COMBO_LAYER_LIMIT) : [];
-  return source.map((layer, index) =>
-    normalizeParticleCustomComboLayer(layer, index === 0 ? "stardust" : "smoke")
-  );
+  return particleEffectTools.normalizeParticleCustomComboLayers(layers);
 }
 
 function getEnabledParticleCustomComboLayers(layers) {
-  return normalizeParticleCustomComboLayers(layers).filter((layer) => layer.enabled);
+  return particleEffectTools.getEnabledParticleCustomComboLayers(layers);
 }
 
 function getParticleCustomComboLayerSummary(layers) {
-  const enabledLayers = getEnabledParticleCustomComboLayers(layers);
-  if (!enabledLayers.length) {
-    return "未额外叠层";
-  }
-
-  return enabledLayers
-    .map(
-      (layer, index) =>
-        `L${index + 2}:${getParticlePresetLabel(layer.preset)} / ×${formatParticleNumber(
-          layer.densityMultiplier,
-          1
-        )} / ${getParticleBlendModeLabel(layer.blend)}`
-    )
-    .join(" · ");
+  return particleEffectTools.getParticleCustomComboLayerSummary(layers);
 }
 
 function getProjectParticleCustomPresets(project = state.data?.project) {
@@ -42204,11 +42111,7 @@ function getProjectParticleCustomPresets(project = state.data?.project) {
 }
 
 function getParticleCustomPresetById(presetId, project = state.data?.project) {
-  const safePresetId = String(presetId ?? "").trim();
-  if (!safePresetId) {
-    return null;
-  }
-  return getProjectParticleCustomPresets(project).find((preset) => preset.id === safePresetId) ?? null;
+  return particleEffectTools.getParticleCustomPresetById(getProjectParticleCustomPresets(project), presetId);
 }
 
 function makeParticleCustomPresetId(name, existingIds = []) {
@@ -42216,43 +42119,19 @@ function makeParticleCustomPresetId(name, existingIds = []) {
 }
 
 function getParticleCustomPresetPrimaryPreset(config) {
-  return getSafeParticlePreset(config?.preset ?? "snow");
+  return particleEffectTools.getParticleCustomPresetPrimaryPreset(config);
 }
 
 function getParticleCustomPresetSearchTokens(preset) {
-  const config = normalizeParticleEffectConfig(preset?.config ?? {});
-  return [
-    preset?.name ?? "",
-    preset?.id ?? "",
-    getParticlePresetLabel(config.preset),
-    getParticleComboPresetLabel(config.comboPreset),
-    getParticleCustomComboLayerSummary(config.customComboLayers),
-  ]
-    .join(" ")
-    .toLowerCase();
+  return particleEffectTools.getParticleCustomPresetSearchTokens(preset);
 }
 
 function getFilteredParticleCustomPresets(query = state.particlePresetSearchQuery, project = state.data?.project) {
-  const normalizedQuery = String(query ?? "")
-    .trim()
-    .toLowerCase();
-  const presets = getProjectParticleCustomPresets(project);
-  if (!normalizedQuery) {
-    return presets;
-  }
-  return presets.filter((preset) => getParticleCustomPresetSearchTokens(preset).includes(normalizedQuery));
+  return particleEffectTools.getFilteredParticleCustomPresets(getProjectParticleCustomPresets(project), query);
 }
 
 function groupParticleCustomPresets(presets) {
-  const groups = new Map();
-  presets.forEach((preset) => {
-    const key = getParticleCustomPresetPrimaryPreset(preset.config);
-    if (!groups.has(key)) {
-      groups.set(key, []);
-    }
-    groups.get(key).push(preset);
-  });
-  return Array.from(groups.entries());
+  return particleEffectTools.groupParticleCustomPresets(presets);
 }
 
 function renderParticleCustomPresetQuickList() {
@@ -42528,216 +42407,25 @@ function getParticleCameraAnchorPercent(stageContext = null) {
 }
 
 function getParticleEmitterAnchor(particleEffect, stageContext = null) {
-  const config = normalizeParticleEffectConfig(particleEffect);
-  const areaLayout = getParticleAreaLayout(config.area, 100);
-  let anchorX = config.emitterX;
-  let anchorY = config.emitterY;
-  let anchorZ = config.emitterZ;
-  const follow = getSafeParticleFollowTarget(config.follow);
-
-  if (follow === "character" && stageContext?.activeCharacterId) {
-    const activeCharacter = (stageContext.visibleCharacters ?? []).find(
-      (item) => item.characterId === stageContext.activeCharacterId
-    );
-    if (activeCharacter) {
-      anchorX = getParticleAnchorPercent(activeCharacter.position);
-      const followAnchor = getSafeParticleFollowAnchor(config.followAnchor);
-      anchorY =
-        followAnchor === "head" ? 34 : followAnchor === "feet" ? 82 : 56;
-      anchorZ += 8;
-    }
-  } else if (follow === "camera") {
-    anchorX = getParticleCameraAnchorPercent(stageContext);
-    const followAnchor = getSafeParticleFollowAnchor(config.followAnchor);
-    anchorY =
-      followAnchor === "head" ? 30 : followAnchor === "feet" ? 72 : 48;
-  }
-
-  return {
-    x: clamp(anchorX, areaLayout.start, areaLayout.start + areaLayout.width),
-    y: clamp(anchorY, -20, 120),
-    z: clamp(anchorZ, -100, 100),
-  };
+  return particleEffectTools.getParticleEmitterAnchor(normalizeParticleEffectConfig(particleEffect), stageContext);
 }
 
 function getParticleCurveProfile(particleEffect) {
-  const config = normalizeParticleEffectConfig(particleEffect);
-  const sizeCurve = getSafeParticleSizeCurve(config.sizeCurve);
-  const opacityCurve = getSafeParticleOpacityCurve(config.opacityCurve);
-  const forceField = getSafeParticleForceField(config.forceField);
-
-  const sizeProfiles = {
-    steady: { start: 1, mid: 1.02, end: 1.04 },
-    bloom: { start: 0.48, mid: 0.92, end: 1.18 },
-    shrink: { start: 1.16, mid: 0.94, end: 0.66 },
-    pulse: { start: 0.68, mid: 1.28, end: 0.82 },
-  };
-
-  const opacityProfiles = {
-    fade: { start: 1, mid: 0.74, end: 0.12 },
-    linger: { start: 0.82, mid: 0.86, end: 0.26 },
-    blink: { start: 0.44, mid: 1, end: 0.14 },
-    pop: { start: 1, mid: 0.54, end: 0.08 },
-  };
-
-  const forceProfiles = {
-    none: { x: 0, y: 0, orbit: 0 },
-    attract: { x: 0.62, y: 0.62, orbit: 0.08 },
-    repel: { x: -0.68, y: -0.68, orbit: 0.06 },
-    orbit: { x: 0.22, y: 0.22, orbit: 0.78 },
-  };
-
-  return {
-    size: sizeProfiles[sizeCurve],
-    opacity: opacityProfiles[opacityCurve],
-    force: forceProfiles[forceField],
-  };
+  return particleEffectTools.getParticleCurveProfile(normalizeParticleEffectConfig(particleEffect));
 }
 
 function getParticleColorCurveProfile(particleEffect) {
-  const config = normalizeParticleEffectConfig(particleEffect);
-  const colorCurve = getSafeParticleColorCurve(config.colorCurve);
-
-  return {
-    steady: {
-      hue: { start: 0, mid: 0, end: 0 },
-      saturation: { start: 1, mid: 1, end: 1 },
-      brightness: { start: 1, mid: 1, end: 1 },
-    },
-    cool_shift: {
-      hue: { start: 0, mid: 10, end: 22 },
-      saturation: { start: 0.98, mid: 1.08, end: 1.14 },
-      brightness: { start: 0.98, mid: 1.04, end: 0.94 },
-    },
-    warm_shift: {
-      hue: { start: 0, mid: -10, end: -24 },
-      saturation: { start: 1, mid: 1.12, end: 1.18 },
-      brightness: { start: 0.96, mid: 1.08, end: 0.9 },
-    },
-    spectral: {
-      hue: { start: -10, mid: 18, end: 54 },
-      saturation: { start: 1.04, mid: 1.22, end: 1.12 },
-      brightness: { start: 0.94, mid: 1.12, end: 0.96 },
-    },
-    pulse_glow: {
-      hue: { start: 0, mid: 4, end: 0 },
-      saturation: { start: 1, mid: 1.28, end: 1.04 },
-      brightness: { start: 0.94, mid: 1.26, end: 0.9 },
-    },
-  }[colorCurve];
+  return particleEffectTools.getParticleColorCurveProfile(normalizeParticleEffectConfig(particleEffect));
 }
 
 function buildParticleLayerVariants(particleEffect) {
-  const config = normalizeParticleEffectConfig(particleEffect);
-  const layerCount = getSafeParticleLayerCount(config.layerCount);
-  return Array.from({ length: layerCount }, (_, layerIndex) => {
-    const depthFactor = layerCount === 1 ? 0 : layerIndex / (layerCount - 1);
-    const sizeFactor = layerCount === 1 ? 1 : 0.78 + depthFactor * 0.46;
-    const opacityFactor = layerCount === 1 ? 1 : 0.72 + depthFactor * 0.32;
-    const densityFactor = layerCount === 1 ? 1 : 0.74 + (1 - Math.abs(depthFactor - 0.5) * 2) * 0.42;
-    return {
-      ...config,
-      density: Math.max(6, Math.round((config.density / layerCount) * densityFactor)),
-      sizeMin: clamp(config.sizeMin * sizeFactor, 1, 160),
-      sizeMax: clamp(config.sizeMax * sizeFactor, 1, 160),
-      opacityMin: clamp(config.opacityMin * opacityFactor, 0.04, 1),
-      opacityMax: clamp(config.opacityMax * opacityFactor, 0.04, 1),
-      spreadZ: clamp(config.spreadZ + layerIndex * 12, 0, 100),
-      gravityZ: clamp(config.gravityZ + (depthFactor - 0.5) * 24, -120, 120),
-      emitterZ: clamp(config.emitterZ + (depthFactor - 0.5) * 22, -100, 100),
-      color: mixParticleColors(config.color, config.colorAccent, depthFactor * 0.35),
-      colorAccent: mixParticleColors(config.colorAccent, config.colorEnd, depthFactor * 0.35),
-      colorEnd: mixParticleColors(config.colorEnd, config.color, depthFactor * 0.18),
-      __layerIndex: layerIndex,
-    };
-  });
+  return particleEffectTools.buildParticleLayerVariants(normalizeParticleEffectConfig(particleEffect));
 }
 
 function buildParticleComboVariants(particleEffect) {
-  const baseConfig = normalizeParticleEffectConfig(particleEffect);
-  const comboPreset = getSafeParticleComboPreset(baseConfig.comboPreset);
-  const presetOverlays = particleEffectTools.getParticleComboPresetConfig(comboPreset);
-  const customOverlays = getEnabledParticleCustomComboLayers(baseConfig.customComboLayers).map((layer) => ({
-    preset: layer.preset,
-    emissionMode: layer.emissionMode,
-    follow: layer.follow,
-    followAnchor: layer.followAnchor,
-    densityMultiplier: layer.densityMultiplier,
-    sizeScale: layer.sizeScale,
-    lifeScale: layer.lifeScale,
-    opacityScale: layer.opacityScale,
-    colorMix: layer.colorMix,
-    blend: layer.blend,
-  }));
-  const overlays = [...presetOverlays, ...customOverlays];
-
-  if (!overlays.length) {
-    return [{ ...baseConfig, __comboIndex: 0 }];
-  }
-
-  return [
-    { ...baseConfig, __comboIndex: 0 },
-    ...overlays.map((overlay, comboIndex) => {
-      const overlayDefaults = normalizeParticleEffectConfig(buildDefaultParticleEffectConfig(overlay.preset));
-      const colorMix = clamp(getSafeNumber(overlay.colorMix, 0.42), 0, 1);
-      const follow = overlay.follow ?? overlayDefaults.follow;
-      const followAnchor =
-        overlay.followAnchor ?? (follow === "none" ? overlayDefaults.followAnchor : baseConfig.followAnchor);
-
-      return normalizeParticleEffectConfig({
-        ...overlayDefaults,
-        action: "start",
-        intensity: overlay.intensity ?? baseConfig.intensity,
-        speed: overlay.speed ?? baseConfig.speed,
-        wind: overlay.wind ?? baseConfig.wind,
-        area: overlay.area ?? baseConfig.area,
-        emissionMode: overlay.emissionMode ?? overlayDefaults.emissionMode,
-        emitterShape: overlay.emitterShape ?? overlayDefaults.emitterShape,
-        emitterX: (overlay.emitterX ?? baseConfig.emitterX) + getSafeNumber(overlay.emitterXOffset, 0),
-        emitterY: (overlay.emitterY ?? baseConfig.emitterY) + getSafeNumber(overlay.emitterYOffset, 0),
-        emitterZ: (overlay.emitterZ ?? baseConfig.emitterZ) + getSafeNumber(overlay.emitterZOffset, 0),
-        attractionX: overlay.attractionX ?? overlayDefaults.attractionX,
-        attractionY: overlay.attractionY ?? overlayDefaults.attractionY,
-        vortex: overlay.vortex ?? overlayDefaults.vortex,
-        follow,
-        followAnchor,
-        comboPreset: "none",
-        layerCount: overlay.layerCount ?? overlayDefaults.layerCount,
-        sizeCurve: overlay.sizeCurve ?? overlayDefaults.sizeCurve,
-        opacityCurve: overlay.opacityCurve ?? overlayDefaults.opacityCurve,
-        forceField: overlay.forceField ?? overlayDefaults.forceField,
-        fieldX: (overlay.fieldX ?? baseConfig.fieldX) + getSafeNumber(overlay.fieldXOffset, 0),
-        fieldY: (overlay.fieldY ?? baseConfig.fieldY) + getSafeNumber(overlay.fieldYOffset, 0),
-        density: Math.round(overlayDefaults.density * getSafeNumber(overlay.densityMultiplier, 1)),
-        sizeMin: overlayDefaults.sizeMin * getSafeNumber(overlay.sizeScale, 1),
-        sizeMax: overlayDefaults.sizeMax * getSafeNumber(overlay.sizeScale, 1),
-        lifeMin: overlayDefaults.lifeMin * getSafeNumber(overlay.lifeScale, 1),
-        lifeMax: overlayDefaults.lifeMax * getSafeNumber(overlay.lifeScale, 1),
-        gravityX: overlayDefaults.gravityX + getSafeNumber(overlay.gravityXAdd, 0),
-        gravityY: overlayDefaults.gravityY + getSafeNumber(overlay.gravityYAdd, 0),
-        gravityZ: overlayDefaults.gravityZ + getSafeNumber(overlay.gravityZAdd, 0),
-        spreadX: overlayDefaults.spreadX * getSafeNumber(overlay.spreadXMultiplier, 1),
-        spreadY: overlayDefaults.spreadY * getSafeNumber(overlay.spreadYMultiplier, 1),
-        spreadZ: overlayDefaults.spreadZ + getSafeNumber(overlay.spreadZAdd, 0),
-        opacityMin: overlayDefaults.opacityMin * getSafeNumber(overlay.opacityScale, 1),
-        opacityMax: overlayDefaults.opacityMax * getSafeNumber(overlay.opacityScale, 1),
-        rotationMin: overlayDefaults.rotationMin,
-        rotationMax: overlayDefaults.rotationMax,
-        spin: overlayDefaults.spin + getSafeNumber(overlay.spinAdd, 0),
-        turbulence: overlayDefaults.turbulence + getSafeNumber(overlay.turbulenceAdd, 0),
-        color: overlay.color ?? mixParticleColors(overlayDefaults.color, baseConfig.color, colorMix),
-        colorAccent:
-          overlay.colorAccent ??
-          mixParticleColors(overlayDefaults.colorAccent, baseConfig.colorAccent, Math.min(colorMix + 0.08, 1)),
-        colorEnd:
-          overlay.colorEnd ??
-          mixParticleColors(overlayDefaults.colorAccent, baseConfig.colorEnd, Math.min(colorMix + 0.04, 1)),
-        blend: overlay.blend ?? overlayDefaults.blend,
-        assetId: "",
-        __comboIndex: comboIndex + 1,
-      });
-    }),
-  ];
+  return particleEffectTools.buildParticleComboVariants(particleEffect, {
+    normalizeConfig: normalizeParticleEffectConfig,
+  });
 }
 
 function getSafeShakeIntensity(intensity) {
@@ -43225,23 +42913,10 @@ function getDepthBlurSpriteOpacity(strength) {
 }
 
 function describeParticleEffect(particleEffect) {
-  if (!particleEffect) {
-    return "已关闭";
-  }
-  const config = normalizeParticleEffectConfig(particleEffect);
-  return `${getParticlePresetLabel(config.preset)} · ${getParticleEmissionModeLabel(
-    config.emissionMode
-  )} · ${getParticleEmitterShapeLabel(config.emitterShape)} · ${getParticleComboPresetLabel(
-    config.comboPreset
-  )} · ${getParticleCustomComboLayerSummary(config.customComboLayers)} · ${getParticleSizeCurveLabel(
-    config.sizeCurve
-  )} · ${getParticleColorCurveLabel(config.colorCurve)} · ${config.layerCount} 层 · ${config.density} 颗 · ${formatParticleNumber(
-    config.sizeMin
-  )}-${formatParticleNumber(config.sizeMax)} px · G ${formatParticleNumber(config.gravityX)}/${formatParticleNumber(
-    config.gravityY
-  )}/${formatParticleNumber(config.gravityZ)} · ${getParticleBlendModeLabel(config.blend)}${
-    config.assetId ? ` · ${getParticleImageName(config.assetId)}` : ""
-  }`;
+  return particleEffectTools.describeParticleEffect(particleEffect, {
+    normalizeConfig: normalizeParticleEffectConfig,
+    getImageName: getParticleImageName,
+  });
 }
 
 function buildBlockDetails(block) {
@@ -43338,71 +43013,12 @@ function buildBlockDetails(block) {
       break;
     }
     case "particle_effect":
-      rows.push(["执行动作", getParticleActionLabel(block.action)]);
-      if (getSafeParticleAction(block.action) === "start") {
-        const particle = normalizeParticleEffectConfig(block);
-        rows.push(["粒子类型", getParticlePresetLabel(particle.preset)]);
-        rows.push(["自定义图片", getParticleImageName(particle.assetId)]);
-        rows.push(["特效强度", getParticleIntensityLabel(particle.intensity)]);
-        rows.push(["速度 / 风向", `${getParticleSpeedLabel(particle.speed)} / ${getParticleWindLabel(particle.wind)}`]);
-        rows.push(["出现区域", getParticleAreaLabel(particle.area)]);
-        rows.push(["发射模式", getParticleEmissionModeLabel(particle.emissionMode)]);
-        rows.push(["组合方案", getParticleComboPresetLabel(particle.comboPreset)]);
-        rows.push(["自定义叠层", getParticleCustomComboLayerSummary(particle.customComboLayers)]);
-        rows.push([
-          "发射器",
-          `${getParticleEmitterShapeLabel(particle.emitterShape)} / ${getParticleFollowTargetLabel(
-            particle.follow
-          )} / ${getParticleFollowAnchorLabel(particle.followAnchor)}`,
-        ]);
-        rows.push(["叠加层数", `${particle.layerCount} 层`]);
-        rows.push([
-          "时间曲线",
-          `${getParticleSizeCurveLabel(particle.sizeCurve)} / ${getParticleOpacityCurveLabel(
-            particle.opacityCurve
-          )} / ${getParticleColorCurveLabel(particle.colorCurve)}`,
-        ]);
-        rows.push(["中心力场", `${getParticleForceFieldLabel(particle.forceField)} / 中心 ${formatParticleNumber(particle.fieldX)} / ${formatParticleNumber(particle.fieldY)}`]);
-        rows.push([
-          "发射器 XYZ",
-          `${formatParticleNumber(particle.emitterX)} / ${formatParticleNumber(particle.emitterY)} / ${formatParticleNumber(
-            particle.emitterZ
-          )}`,
-        ]);
-        rows.push([
-          "吸引 / 旋涡",
-          `X ${formatParticleNumber(particle.attractionX)} / Y ${formatParticleNumber(
-            particle.attractionY
-          )} / 涡流 ${formatParticleNumber(particle.vortex)}`,
-        ]);
-        rows.push(["粒子数量", `${particle.density} 颗`]);
-        rows.push(["尺寸范围", `${formatParticleNumber(particle.sizeMin)} ~ ${formatParticleNumber(particle.sizeMax)} px`]);
-        rows.push(["寿命范围", `${formatParticleNumber(particle.lifeMin, 1)} ~ ${formatParticleNumber(particle.lifeMax, 1)} 秒`]);
-        rows.push([
-          "重力 XYZ",
-          `${formatParticleNumber(particle.gravityX)} / ${formatParticleNumber(particle.gravityY)} / ${formatParticleNumber(
-            particle.gravityZ
-          )}`,
-        ]);
-        rows.push([
-          "疏散 XYZ",
-          `${formatParticleNumber(particle.spreadX)} / ${formatParticleNumber(particle.spreadY)} / ${formatParticleNumber(
-            particle.spreadZ
-          )}`,
-        ]);
-        rows.push([
-          "透明度范围",
-          `${formatParticleNumber(particle.opacityMin, 2)} ~ ${formatParticleNumber(particle.opacityMax, 2)}`,
-        ]);
-        rows.push([
-          "旋转 / 扰动",
-          `${formatParticleNumber(particle.rotationMin)} ~ ${formatParticleNumber(
-            particle.rotationMax
-          )} deg / 自转 ${formatParticleNumber(particle.spin)} deg / 乱流 ${formatParticleNumber(particle.turbulence)}`,
-        ]);
-        rows.push(["颜色", `${particle.color} → ${particle.colorAccent} → ${particle.colorEnd}`]);
-        rows.push(["混合模式", getParticleBlendModeLabel(particle.blend)]);
-      }
+      rows.push(
+        ...particleEffectTools.buildParticleEffectDetailRows(block, {
+          normalizeConfig: normalizeParticleEffectConfig,
+          getImageName: getParticleImageName,
+        })
+      );
       break;
     case "screen_shake":
       rows.push(["震动强度", getShakeIntensityLabel(block.intensity)]);

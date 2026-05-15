@@ -263,6 +263,70 @@ class RunEditorSmokeTests(unittest.TestCase):
                 os.environ[env_key] = env_value
         self.temp_dir.cleanup()
 
+    def assert_export_manifest_has_subtle_engine_signature(self, manifest: dict) -> None:
+        self.assertEqual(manifest["engine"]["signature"], run_editor.EXPORT_ENGINE_SIGNATURE)
+        self.assertEqual(manifest["protection"]["profile"], run_editor.EXPORT_PROTECTION_PROFILE)
+        self.assertEqual(manifest["protection"]["provenanceFile"], run_editor.EXPORT_PROVENANCE_FILE_NAME)
+        self.assertFalse(manifest["protection"]["visibleWatermark"])
+        self.assertIn("file_fingerprints", manifest["protection"]["checks"])
+        self.assertEqual(
+            manifest["protection"]["verifiers"]["python"],
+            run_editor.EXPORT_PROVENANCE_VERIFIER_SCRIPT_NAME,
+        )
+        self.assertNotIn("Made with", json.dumps(manifest, ensure_ascii=False))
+
+    def assert_export_provenance_file(self, export_result: dict, expected_paths: set[str]) -> dict:
+        provenance_path = Path(export_result["provenancePath"])
+        self.assertTrue(provenance_path.is_file())
+        payload = json.loads(provenance_path.read_text(encoding="utf-8"))
+        self.assertEqual(payload["profile"], run_editor.EXPORT_PROTECTION_PROFILE)
+        self.assertEqual(payload["engine"]["signature"], run_editor.EXPORT_ENGINE_SIGNATURE)
+        self.assertFalse(payload["protection"]["visibleWatermark"])
+        self.assertTrue(payload["protection"]["notEncryption"])
+        self.assertRegex(payload["summary"]["seal"], r"^[0-9a-f]{64}$")
+        self.assertEqual(export_result["provenanceSeal"], payload["summary"]["seal"])
+        provenance_paths = {entry["path"] for entry in payload["files"]}
+        self.assertTrue(expected_paths.issubset(provenance_paths))
+        self.assertIn(run_editor.EXPORT_PROVENANCE_VERIFIER_SCRIPT_NAME, provenance_paths)
+        self.assertIn(run_editor.EXPORT_PROVENANCE_MAC_VERIFIER_NAME, provenance_paths)
+        self.assertIn(run_editor.EXPORT_PROVENANCE_LINUX_VERIFIER_NAME, provenance_paths)
+        self.assertIn(run_editor.EXPORT_PROVENANCE_WINDOWS_VERIFIER_NAME, provenance_paths)
+        manifest_entry = next(entry for entry in payload["files"] if entry["path"] == "export_manifest.json")
+        manifest_digest = hashlib.sha256((provenance_path.parent / "export_manifest.json").read_bytes()).hexdigest()
+        self.assertEqual(manifest_entry["sha256"], manifest_digest)
+        self.assertTrue(Path(export_result["provenanceVerifierPath"]).is_file())
+        self.assertTrue(Path(export_result["provenanceVerifierMacPath"]).is_file())
+        self.assertTrue(Path(export_result["provenanceVerifierLinuxPath"]).is_file())
+        self.assertTrue(Path(export_result["provenanceVerifierWindowsPath"]).is_file())
+        verifier_result = subprocess.run(
+            [sys.executable, str(Path(export_result["provenanceVerifierPath"])), str(provenance_path.parent)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(verifier_result.returncode, 0, verifier_result.stdout + verifier_result.stderr)
+        verifier_payload = json.loads(verifier_result.stdout)
+        self.assertEqual(verifier_payload["status"], "pass")
+        self.assertTrue(verifier_payload["sealMatched"])
+        self.assertNotIn("Made with", json.dumps(payload, ensure_ascii=False))
+        return payload
+
+    def assert_export_provenance_verifier_detects_tamper(self, export_result: dict, relative_path: str) -> None:
+        target_path = Path(export_result["buildPath"]) / relative_path
+        self.assertTrue(target_path.is_file())
+        with target_path.open("a", encoding="utf-8") as file_handle:
+            file_handle.write("\n/* tamper probe */\n")
+        verifier_result = subprocess.run(
+            [sys.executable, str(Path(export_result["provenanceVerifierPath"])), str(Path(export_result["buildPath"]))],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertNotEqual(verifier_result.returncode, 0)
+        verifier_payload = json.loads(verifier_result.stdout)
+        self.assertEqual(verifier_payload["status"], "fail")
+        self.assertIn(relative_path, {item["path"] for item in verifier_payload["changedFiles"]})
+
     def create_blank_project_with_chapter(self) -> tuple[dict, dict]:
         run_editor.create_blank_project("自动化测试项目")
         chapter_result = run_editor.create_chapter("第一章", "开场")
@@ -1843,10 +1907,17 @@ class RunEditorSmokeTests(unittest.TestCase):
 
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         self.assertEqual(manifest["engine"]["exportTarget"], run_editor.EXPORT_TARGET_WEB)
+        self.assert_export_manifest_has_subtle_engine_signature(manifest)
         self.assertEqual(
             manifest["engine"]["releaseVersion"],
             run_editor.DEFAULT_EXPORT_RELEASE_VERSION,
         )
+        provenance = self.assert_export_provenance_file(
+            export_result,
+            {"export_manifest.json", "index.html", "player.js", "player.css"},
+        )
+        self.assertEqual(provenance["build"]["target"], run_editor.EXPORT_TARGET_WEB)
+        self.assert_export_provenance_verifier_detects_tamper(export_result, "player.css")
 
     def test_native_runtime_release_check_flags_variable_logic_errors(self) -> None:
         _, chapter_result = self.create_blank_project_with_chapter()
@@ -2144,6 +2215,16 @@ class RunEditorSmokeTests(unittest.TestCase):
 
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         self.assertEqual(manifest["engine"]["exportTarget"], run_editor.EXPORT_TARGET_NATIVE_RUNTIME)
+        self.assert_export_manifest_has_subtle_engine_signature(manifest)
+        provenance = self.assert_export_provenance_file(
+            export_result,
+            {
+                "export_manifest.json",
+                run_editor.NATIVE_RUNTIME_PLAYER_NAME,
+                "game_data.json",
+            },
+        )
+        self.assertEqual(provenance["build"]["target"], run_editor.EXPORT_TARGET_NATIVE_RUNTIME)
         self.assertEqual(manifest["runtime"]["mode"], "pygame_native")
         self.assertTrue(manifest["runtime"]["canBuildStandaloneApp"])
         self.assertEqual(manifest["runtime"]["releaseCandidateReport"], run_editor.NATIVE_RUNTIME_RC_REPORT_NAME)
@@ -2269,6 +2350,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertIn("game_data.json", integrity_paths)
         self.assertIn(run_editor.NATIVE_RUNTIME_PLAYER_NAME, integrity_paths)
         self.assertIn("export_manifest.json", integrity_paths)
+        self.assertIn(run_editor.EXPORT_PROVENANCE_FILE_NAME, integrity_paths)
         self.assertNotIn(run_editor.NATIVE_RUNTIME_FILE_INTEGRITY_REPORT_NAME, integrity_paths)
         integrity_markdown = (build_dir / run_editor.NATIVE_RUNTIME_FILE_INTEGRITY_MARKDOWN_NAME).read_text(encoding="utf-8")
         self.assertIn("# 原生 Runtime 文件完整性报告", integrity_markdown)
@@ -2623,6 +2705,41 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(dialog_payload["page"], 1)
         self.assertEqual(dialog_payload["visibleSlots"][0]["slotIndex"], 6)
 
+    def test_windows_nwjs_build_smoke(self) -> None:
+        _, chapter_result = self.create_blank_project_with_chapter()
+
+        self.save_scene_with_blocks(
+            chapter_result["chapterId"],
+            chapter_result["scene"],
+            [
+                {
+                    "id": "block_001",
+                    "type": "dialogue",
+                    "speakerId": "heroine",
+                    "expressionId": "",
+                    "text": "这是 Windows 桌面导出烟测。",
+                }
+            ],
+        )
+
+        export_result = run_editor.export_windows_nwjs_build()
+
+        manifest_path = Path(export_result["manifestPath"])
+        self.assertEqual(export_result["target"], run_editor.EXPORT_TARGET_WINDOWS_NWJS)
+        self.assertTrue(Path(export_result["launcherPath"]).is_file())
+        self.assertTrue(Path(export_result["startHelperPath"]).is_file())
+        self.assertTrue(Path(export_result["archivePath"]).is_file())
+        self.assertTrue(manifest_path.is_file())
+
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        self.assertEqual(manifest["engine"]["exportTarget"], run_editor.EXPORT_TARGET_WINDOWS_NWJS)
+        self.assert_export_manifest_has_subtle_engine_signature(manifest)
+        provenance = self.assert_export_provenance_file(
+            export_result,
+            {"export_manifest.json", "app/index.html", "app/player.js", "app/player.css"},
+        )
+        self.assertEqual(provenance["build"]["target"], run_editor.EXPORT_TARGET_WINDOWS_NWJS)
+
     def test_macos_nwjs_build_smoke(self) -> None:
         _, chapter_result = self.create_blank_project_with_chapter()
 
@@ -2651,6 +2768,12 @@ class RunEditorSmokeTests(unittest.TestCase):
 
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         self.assertEqual(manifest["engine"]["exportTarget"], run_editor.EXPORT_TARGET_MACOS_NWJS)
+        self.assert_export_manifest_has_subtle_engine_signature(manifest)
+        provenance = self.assert_export_provenance_file(
+            export_result,
+            {"export_manifest.json", "app/index.html", "app/player.js", "app/player.css"},
+        )
+        self.assertEqual(provenance["build"]["target"], run_editor.EXPORT_TARGET_MACOS_NWJS)
         self.assertEqual(manifest["runtime"]["version"], run_editor.NWJS_RUNTIME_VERSION)
 
     def test_linux_nwjs_build_smoke(self) -> None:
@@ -2683,6 +2806,12 @@ class RunEditorSmokeTests(unittest.TestCase):
 
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         self.assertEqual(manifest["engine"]["exportTarget"], run_editor.EXPORT_TARGET_LINUX_NWJS)
+        self.assert_export_manifest_has_subtle_engine_signature(manifest)
+        provenance = self.assert_export_provenance_file(
+            export_result,
+            {"export_manifest.json", "app/index.html", "app/player.js", "app/player.css", "package.nw"},
+        )
+        self.assertEqual(provenance["build"]["target"], run_editor.EXPORT_TARGET_LINUX_NWJS)
         self.assertEqual(manifest["runtime"]["version"], run_editor.NWJS_RUNTIME_VERSION)
 
     def test_editor_desktop_build_smoke(self) -> None:
