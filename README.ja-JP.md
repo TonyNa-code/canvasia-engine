@@ -28,6 +28,7 @@
   <a href="#主な機能">主な機能</a> ·
   <a href="#機能ステータス">機能ステータス</a> ·
   <a href="#書き出し">書き出し</a> ·
+  <a href="#project-site-and-share-kit">Share Kit</a> ·
   <a href="#テスト">テスト</a> ·
   <a href="CONTRIBUTING.md">Contributing</a>
 </p>
@@ -87,6 +88,13 @@ Canvasia Engine は、ビジュアルノベル / Galgame 制作者のための s
 | --- | --- |
 | ![Canvasia Engine story editor with assistant](docs/github/canvasia-screenshot-story-assistant.png) | ![Canvasia Engine preview and export screen](docs/github/canvasia-screenshot-preview-export.png) |
 | ストーリーカード、シーン構造、Canvasia Assistant、アイデア保管庫、挿入可能な生成カード。 | プレビュー、Runtime 設定、公開前チェック、マルチプラットフォーム書き出し入口。 |
+
+## Project Site and Share Kit
+
+- Landing page source: [`docs/index.html`](docs/index.html)
+- Social preview image: [`docs/github/canvasia-social-preview.png`](docs/github/canvasia-social-preview.png)
+- Exposure kit: [`docs/marketing/exposure-kit.md`](docs/marketing/exposure-kit.md)
+- Expected GitHub Pages URL after enabling Pages from `/docs`: `https://tonyna-code.github.io/canvasia-engine/`
 
 ## リポジトリ構成
 

@@ -28,6 +28,7 @@
   <a href="#core-features">Core Features</a> ·
   <a href="#feature-status">Feature Status</a> ·
   <a href="#exports">Exports</a> ·
+  <a href="#project-site-and-share-kit">Share Kit</a> ·
   <a href="#testing">Testing</a> ·
   <a href="CONTRIBUTING.md">Contributing</a>
 </p>
@@ -87,6 +88,13 @@ The project already includes a visual editor, export pipeline, native runtime pr
 | --- | --- |
 | ![Canvasia Engine story editor with assistant](docs/github/canvasia-screenshot-story-assistant.png) | ![Canvasia Engine preview and export screen](docs/github/canvasia-screenshot-preview-export.png) |
 | Visual story cards, scene structure, Canvasia Assistant, idea vault, and insertable generated cards. | Preview, runtime settings, release checks, and multi-platform export entry points. |
+
+## Project Site and Share Kit
+
+- Landing page source: [`docs/index.html`](docs/index.html)
+- Social preview image: [`docs/github/canvasia-social-preview.png`](docs/github/canvasia-social-preview.png)
+- Exposure kit: [`docs/marketing/exposure-kit.md`](docs/marketing/exposure-kit.md)
+- Expected GitHub Pages URL after enabling Pages from `/docs`: `https://tonyna-code.github.io/canvasia-engine/`
 
 ## Repository Layout
 

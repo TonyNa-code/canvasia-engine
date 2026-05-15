@@ -29,6 +29,7 @@
   <a href="#当前已经有的核心能力">核心能力</a> ·
   <a href="#功能状态">功能状态</a> ·
   <a href="#界面预览">界面预览</a> ·
+  <a href="#项目主页与传播素材">传播素材</a> ·
   <a href="#发布状态">发布状态</a> ·
   <a href="CONTRIBUTING.md">参与贡献</a>
 </p>
@@ -90,6 +91,13 @@ Canvasia Engine 当前更适合这样理解：
 | --- | --- |
 | ![Canvasia Engine story editor with assistant](docs/github/canvasia-screenshot-story-assistant.png) | ![Canvasia Engine preview and export screen](docs/github/canvasia-screenshot-preview-export.png) |
 | 剧情页支持可视化卡片、场景结构、Canvasia Assistant、灵感盒和勾选式插入。 | 试玩页集中处理预览、设置、发布前问题提示和多平台导出入口。 |
+
+## 项目主页与传播素材
+
+- 项目主页源码：[`docs/index.html`](docs/index.html)
+- GitHub 社交预览图：[`docs/github/canvasia-social-preview.png`](docs/github/canvasia-social-preview.png)
+- 对外介绍与发布文案：[`docs/marketing/exposure-kit.md`](docs/marketing/exposure-kit.md)
+- 如果在 GitHub Pages 中把发布目录设为 `/docs`，预期主页地址是：`https://tonyna-code.github.io/canvasia-engine/`
 
 ## 仓库结构
 
