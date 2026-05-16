@@ -322,11 +322,16 @@ class FrontendActionHandlerTests(unittest.TestCase):
     def test_quick_action_button_renders_disabled_state(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
         quick_action_button = _extract_function_source(source, "renderQuickActionButton")
-        escape_html = _extract_function_source(source, "escapeHtml")
+        editor_common_path = EDITOR_DIR / "modules" / "editor_common.js"
         script = textwrap.dedent(
             f"""
-            const editorCommonTools = null;
-            function escapeHtml(value) {escape_html}
+            const fs = require("fs");
+            const vm = require("vm");
+            const moduleContext = {{ window: {{}} }};
+            moduleContext.globalThis = moduleContext;
+            vm.createContext(moduleContext);
+            vm.runInContext(fs.readFileSync({json.dumps(str(editor_common_path))}, "utf8"), moduleContext);
+            const escapeHtml = moduleContext.window.CanvasiaEditorCommon.escapeHtml;
             function renderQuickActionButton(action, emphasized = false) {quick_action_button}
             const html = renderQuickActionButton({{
               label: "确认 <执行>",

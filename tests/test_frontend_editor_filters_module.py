@@ -161,6 +161,33 @@ class FrontendEditorFiltersModuleTests(unittest.TestCase):
                 tools.getStoryBlockGroupLabel("condition"),
                 tools.getStoryBlockGroupLabel("particle_effect"),
               ],
+              issueItems: (() => {{
+                const issueOptions = {{
+                  assetsById: new Map([
+                    ["bg_ready", {{ fileExists: true }}],
+                    ["sprite_missing", {{ fileExists: false }}],
+                  ]),
+                  scenesById: new Map([["scene_a", {{ id: "scene_a" }}]]),
+                  getExpressionAssetId: (block) => block.expressionAssetId || "",
+                  getSafeParticleAction: (action) => action || "start",
+                  isReadableTextLong: (text) => String(text ?? "").length > 5,
+                  choiceManyOptions: 2,
+                  choiceLongWarningLength: 4,
+                  hasVariableLogicIssue: (block) => block.variableBroken === true,
+                }};
+                return [
+                  tools.getStoryBlockIssueItems({{ type: "dialogue", text: "很长很长的台词内容", expressionAssetId: "sprite_missing" }}, issueOptions)
+                    .map((item) => [item.key, item.label, item.toneClass]),
+                  tools.getStoryBlockIssueItems({{ type: "background", assetId: "" }}, issueOptions)
+                    .map((item) => [item.key, item.label, item.toneClass]),
+                  tools.getStoryBlockIssueItems({{ type: "choice", options: [{{ text: "很长很长选项", gotoSceneId: "missing_scene" }}] }}, issueOptions)
+                    .map((item) => [item.key, item.label, item.toneClass]),
+                  tools.getStoryBlockIssueItems({{ type: "condition", elseGotoSceneId: "scene_a", branches: [{{ gotoSceneId: "missing_scene" }}], variableBroken: true }}, issueOptions)
+                    .map((item) => [item.key, item.label, item.toneClass]),
+                  tools.getStoryBlockIssueItems({{ type: "particle_effect", action: "stop", assetId: "missing_particle" }}, issueOptions)
+                    .map((item) => [item.key, item.label, item.toneClass]),
+                ];
+              }})(),
               search: {{
                 normalized: tools.normalizeDashboardSearchQuery("  Heroine   雨夜  "),
                 terms: tools.getDashboardSearchTerms("  Heroine   雨夜  "),
@@ -210,6 +237,7 @@ class FrontendEditorFiltersModuleTests(unittest.TestCase):
         self.assertIn("getScriptIssueFilterLabel", payload["keys"])
         self.assertIn("doesRouteNodeMatchFilter", payload["keys"])
         self.assertIn("getStoryBlockGroup", payload["keys"])
+        self.assertIn("getStoryBlockIssueItems", payload["keys"])
         self.assertEqual(payload["labels"]["dashboard"], ["全部结果", "角色", "全部结果"])
         self.assertEqual(payload["labels"]["route"], ["缺 BGM", "全部场景"])
         self.assertEqual(payload["labels"]["scene"], ["可试玩", "写作中", "马上处理", "正常"])
@@ -292,6 +320,23 @@ class FrontendEditorFiltersModuleTests(unittest.TestCase):
             "正文",
             "逻辑",
             "演出",
+        ])
+        self.assertEqual(payload["issueItems"], [
+            [
+                ["missing_voice", "待绑语音", "warn-text"],
+                ["too_long", "偏长文本", "warn-text"],
+                ["missing_asset", "待补素材", "warn-text"],
+            ],
+            [["missing_asset", "待补素材", "warn-text"]],
+            [
+                ["too_long", "偏长文本", "warn-text"],
+                ["broken_target", "跳转待修", "danger-text"],
+            ],
+            [
+                ["broken_target", "跳转待修", "danger-text"],
+                ["variable_logic", "变量待修", "danger-text"],
+            ],
+            [],
         ])
         self.assertEqual(payload["search"], {
             "normalized": "heroine 雨夜",

@@ -44,6 +44,7 @@ const API_CREATIVE_ASSISTANT = "/api/creative-assistant";
 
 const storyBlockCatalogTools = window.CanvasiaEditorStoryBlockCatalog;
 const { BLOCK_LABELS, MUSIC_END_MODE_LABELS } = storyBlockCatalogTools;
+const storyBlockEditorTools = window.CanvasiaEditorStoryBlockEditors;
 const storyTemplateTools = window.CanvasiaEditorStoryTemplates;
 const { STORY_TEMPLATE_PRESETS } = storyTemplateTools;
 
@@ -60,6 +61,17 @@ function getMusicEndModeLabel(mode) {
 }
 
 const editorCommonTools = window.CanvasiaEditorCommon;
+const sanitizeFileName = editorCommonTools.sanitizeFileName;
+const formatCsvCell = editorCommonTools.formatCsvCell;
+const truncateText = editorCommonTools.truncateText;
+const formatDate = editorCommonTools.formatDate;
+const getSafeNonNegativeNumber = editorCommonTools.getSafeNonNegativeNumber;
+const getSafeNumber = editorCommonTools.getSafeNumber;
+const formatFileSize = editorCommonTools.formatFileSize;
+const clamp = editorCommonTools.clamp;
+const escapeHtml = editorCommonTools.escapeHtml;
+const buildTemplateAssetUrl = (relativePath) =>
+  editorCommonTools.buildTemplateAssetUrl(relativePath, state.data?.currentProject?.publicRoot ?? "");
 const projectSettingsTools = window.CanvasiaEditorProjectSettings;
 const {
   PROJECT_DIALOG_BOX_PRESET_LABELS,
@@ -387,13 +399,13 @@ const CREDITS_BACKGROUND_LABELS = visualEffectTools?.CREDITS_BACKGROUND_LABELS ?
   transparent: "叠在当前画面上",
 };
 
-const POSITION_LABELS = {
+const POSITION_LABELS = visualEffectTools?.POSITION_LABELS ?? {
   left: "左侧",
   center: "中间",
   right: "右侧",
 };
 
-const CHARACTER_TRANSITION_LABELS = {
+const CHARACTER_TRANSITION_LABELS = visualEffectTools?.CHARACTER_TRANSITION_LABELS ?? {
   fade: "淡入淡出",
   slide_left: "从左侧滑入 / 滑出",
   slide_right: "从右侧滑入 / 滑出",
@@ -402,12 +414,12 @@ const CHARACTER_TRANSITION_LABELS = {
   none: "直接切换",
 };
 
-const BASIC_TRANSITION_LABELS = {
+const BASIC_TRANSITION_LABELS = visualEffectTools?.BASIC_TRANSITION_LABELS ?? {
   fade: "淡入淡出",
   none: "直接切换",
 };
 
-const DEFAULT_CHARACTER_STAGE = {
+const DEFAULT_CHARACTER_STAGE = visualEffectTools?.DEFAULT_CHARACTER_STAGE ?? {
   offsetX: 0,
   offsetY: 0,
   scale: 100,
@@ -415,20 +427,31 @@ const DEFAULT_CHARACTER_STAGE = {
   layer: 0,
 };
 
-const TEXT_SPEED_LABELS = {
+const TEXT_SPEED_LABELS = visualEffectTools?.TEXT_SPEED_LABELS ?? {
   slow: "慢一点",
   normal: "正常",
   fast: "快一点",
   instant: "立刻显示",
 };
 
-const DIALOG_THEME_LABELS = {
+const DIALOG_THEME_LABELS = visualEffectTools?.DIALOG_THEME_LABELS ?? {
   project: "项目样式",
   warm: "暖光标准",
   moonlight: "夜色月光",
   paper: "纸页回忆",
   transparent: "透明无框",
 };
+
+const getSafePosition = visualEffectTools.getSafePosition;
+const getSafeTransition = visualEffectTools.getSafeTransition;
+const getTransitionLabel = visualEffectTools.getTransitionLabel;
+const getSafeCharacterStage = visualEffectTools.getSafeCharacterStage;
+const getCharacterStageStyle = visualEffectTools.getCharacterStageStyle;
+const getCharacterStageSummary = visualEffectTools.getCharacterStageSummary;
+const getSafeTextSpeed = visualEffectTools.getSafeTextSpeed;
+const getTextSpeedLabel = visualEffectTools.getTextSpeedLabel;
+const getSafeDialogTheme = visualEffectTools.getSafeDialogTheme;
+const getDialogThemeLabel = visualEffectTools.getDialogThemeLabel;
 
 const STARTER_VARIABLE_PRESETS = variableTools?.STARTER_VARIABLE_PRESETS ?? [
   {
@@ -11829,76 +11852,16 @@ function blockHasVariableLogicIssue(block) {
 }
 
 function getStoryBlockIssueItems(block) {
-  const items = [];
-  const pushIssue = (key, label, toneClass = "warn-text") => {
-    if (!items.some((item) => item.key === key)) {
-      items.push({ key, label, toneClass });
-    }
-  };
-
-  if (block.type === "dialogue" && !block.voiceAssetId) {
-    pushIssue("missing_voice", "待绑语音");
-  }
-
-  if (
-    ((block.type === "dialogue" || block.type === "narration") && isReadableTextLong(block.text)) ||
-    (block.type === "choice" &&
-      ((block.options ?? []).length > VN_CHOICE_MANY_OPTIONS ||
-        (block.options ?? []).some((option) => String(option.text ?? "").trim().length > VN_CHOICE_LONG_WARNING_LENGTH)))
-  ) {
-    pushIssue("too_long", "偏长文本");
-  }
-
-  const assetIdsToCheck = [];
-  if (["background", "music_play", "sfx_play", "video_play"].includes(block.type)) {
-    assetIdsToCheck.push(block.assetId);
-  }
-  if (block.type === "particle_effect" && getSafeParticleAction(block.action) !== "stop" && block.assetId) {
-    assetIdsToCheck.push(block.assetId);
-  }
-  const expressionAssetId = getBlockExpressionAssetId(block);
-  if (expressionAssetId) {
-    assetIdsToCheck.push(expressionAssetId);
-  }
-
-  if (
-    assetIdsToCheck.some((assetId) => {
-      if (!assetId) {
-        return true;
-      }
-      const asset = state.data.assetsById.get(assetId);
-      return !asset || !asset.fileExists;
-    })
-  ) {
-    pushIssue("missing_asset", "待补素材");
-  }
-
-  if (block.type === "jump" && !state.data.scenesById.has(block.targetSceneId)) {
-    pushIssue("broken_target", "跳转待修", "danger-text");
-  }
-
-  if (
-    block.type === "choice" &&
-    (block.options ?? []).some((option) => option.gotoSceneId && !state.data.scenesById.has(option.gotoSceneId))
-  ) {
-    pushIssue("broken_target", "跳转待修", "danger-text");
-  }
-
-  if (
-    block.type === "condition" &&
-    (
-      !state.data.scenesById.has(block.elseGotoSceneId) ||
-      (block.branches ?? []).some((branch) => branch.gotoSceneId && !state.data.scenesById.has(branch.gotoSceneId))
-    )
-  ) {
-    pushIssue("broken_target", "跳转待修", "danger-text");
-  }
-
-  if (blockHasVariableLogicIssue(block)) {
-    pushIssue("variable_logic", "变量待修", "danger-text");
-  }
-
-  return items;
+  return editorFilterTools.getStoryBlockIssueItems(block, {
+    assetsById: state.data.assetsById,
+    scenesById: state.data.scenesById,
+    getExpressionAssetId: getBlockExpressionAssetId,
+    getSafeParticleAction,
+    isReadableTextLong,
+    choiceManyOptions: VN_CHOICE_MANY_OPTIONS,
+    choiceLongWarningLength: VN_CHOICE_LONG_WARNING_LENGTH,
+    hasVariableLogicIssue: blockHasVariableLogicIssue,
+  });
 }
 
 function getSafeStorySceneTreeFilter(value) {
@@ -16516,28 +16479,6 @@ function buildChapterVoiceBriefContent(chapter, dialogueEntries, pendingEntries)
   return `\uFEFF${lines.join("\n")}`;
 }
 
-function sanitizeFileName(value) {
-  if (editorCommonTools?.sanitizeFileName) {
-    return editorCommonTools.sanitizeFileName(value);
-  }
-
-  return String(value ?? "")
-    .trim()
-    .replace(/[\\/:*?"<>|]/g, "_")
-    .replace(/\s+/g, "_")
-    .replace(/_+/g, "_")
-    .replace(/^_+|_+$/g, "");
-}
-
-function formatCsvCell(value) {
-  if (editorCommonTools?.formatCsvCell) {
-    return editorCommonTools.formatCsvCell(value);
-  }
-
-  const text = String(value ?? "");
-  return `"${text.replaceAll('"', '""')}"`;
-}
-
 function downloadTextFile(fileName, content, mimeType) {
   const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);
@@ -18532,22 +18473,6 @@ function getNextTypewriterIndex(text, currentIndex) {
   }
 
   return nextIndex;
-}
-
-function getSafeTextSpeed(speed) {
-  return Object.hasOwn(TEXT_SPEED_LABELS, speed) ? speed : "normal";
-}
-
-function getTextSpeedLabel(speed) {
-  return TEXT_SPEED_LABELS[getSafeTextSpeed(speed)];
-}
-
-function getSafeDialogTheme(theme) {
-  return Object.hasOwn(DIALOG_THEME_LABELS, theme) ? theme : "project";
-}
-
-function getDialogThemeLabel(theme) {
-  return DIALOG_THEME_LABELS[getSafeDialogTheme(theme)];
 }
 
 function getBrowserStorage() {
@@ -29399,33 +29324,6 @@ function renderEmpty(text) {
   return `<div class="empty-note">${escapeHtml(text)}</div>`;
 }
 
-function truncateText(value, maxLength = 32) {
-  if (editorCommonTools?.truncateText) {
-    return editorCommonTools.truncateText(value, maxLength);
-  }
-
-  const text = String(value ?? "").trim();
-
-  if (text.length <= maxLength) {
-    return text;
-  }
-
-  return `${text.slice(0, Math.max(maxLength - 1, 1))}…`;
-}
-
-function formatDate(value) {
-  if (editorCommonTools?.formatDate) {
-    return editorCommonTools.formatDate(value);
-  }
-
-  if (!value) {
-    return "未知";
-  }
-
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString("zh-CN");
-}
-
 function getSelectedScene() {
   return state.data.scenesById.get(state.selectedSceneId) ?? null;
 }
@@ -31940,43 +31838,14 @@ function renderDepthBlurEditor(block) {
 }
 
 function renderJumpEditor(block) {
-  const targetSceneId = getSafeSceneId(block.targetSceneId);
-
-  return `
-    <article class="editor-card">
-      <h3>编辑场景跳转</h3>
-      <p>这里决定这张卡片执行完以后，直接跳到哪个场景。</p>
-    </article>
-    <div class="field-grid">
-      <div class="detail-row">
-        <label for="editorJumpTargetSceneId">跳到哪个场景</label>
-        <select id="editorJumpTargetSceneId">
-          ${renderSceneOptions(targetSceneId)}
-        </select>
-      </div>
-    </div>
-    <div class="detail-actions">
-      <button class="toolbar-button toolbar-button-primary" data-action="save-block">保存这张卡片</button>
-    </div>
-  `;
+  return storyBlockEditorTools.renderJumpEditor(block, {
+    getSafeSceneId,
+    renderSceneOptions,
+  });
 }
 
 function renderVariableStarterPrompt(title, description) {
-  return `
-    <article class="editor-card">
-      <h3>${escapeHtml(title)}</h3>
-      <p>${escapeHtml(description)}</p>
-      <div class="detail-actions">
-        <button class="toolbar-button toolbar-button-primary" data-action="create-starter-variables">
-          一键创建基础变量库
-        </button>
-      </div>
-    </article>
-    <article class="editor-card">
-      <h3>会创建什么</h3>
-      <p>基础变量库会加入“好感度”（数字）、“路线标记”（文本）和“剧情开关”（是/否），足够支撑常见分支、数值变化和条件判断。</p>
-    </article>
-  `;
+  return storyBlockEditorTools.renderVariableStarterPrompt(title, description, { escapeHtml });
 }
 
 function renderVariableSetEditor(block) {
@@ -31989,32 +31858,14 @@ function renderVariableSetEditor(block) {
 
   const variableId = getSafeVariableId(block.variableId);
 
-  return `
-    <article class="editor-card">
-      <h3>编辑变量设置</h3>
-      <p>这里会把某个变量直接改成指定值，适合开关、路线名或固定状态。</p>
-    </article>
-    <div class="field-grid">
-      <div class="detail-row">
-        <label for="editorVariableId">要设置哪个变量</label>
-        <select id="editorVariableId">
-          ${renderVariableOptions(variableId)}
-        </select>
-      </div>
-      <div class="detail-row">
-        <label>变量类型</label>
-        <div id="editorVariableTypeValue" class="value">${escapeHtml(
-          getVariableTypeLabel(getVariableType(variableId))
-        )}</div>
-      </div>
-      <div id="editorVariableValueFields" class="field-grid">
-        ${renderVariableSetValueFields(variableId, block.value)}
-      </div>
-    </div>
-    <div class="detail-actions">
-      <button class="toolbar-button toolbar-button-primary" data-action="save-block">保存这张卡片</button>
-    </div>
-  `;
+  return storyBlockEditorTools.renderVariableSetEditor({ ...block, variableId }, {
+    escapeHtml,
+    getSafeVariableId,
+    getVariableType,
+    getVariableTypeLabel,
+    renderVariableOptions,
+    renderVariableSetValueFields,
+  });
 }
 
 function renderVariableAddEditor(block) {
@@ -32027,33 +31878,12 @@ function renderVariableAddEditor(block) {
 
   const variableId = getSafeVariableId(block.variableId, "number");
 
-  return `
-    <article class="editor-card">
-      <h3>编辑数字变量变化</h3>
-      <p>这里会给数字变量加减数值，最适合好感度、分数和进度条。</p>
-    </article>
-    <div class="field-grid">
-      <div class="detail-row">
-        <label for="editorVariableAddId">要修改哪个数字变量</label>
-        <select id="editorVariableAddId">
-          ${renderVariableOptions(variableId, "number")}
-        </select>
-      </div>
-      <div class="detail-row">
-        <label for="editorVariableAddValue">变化值</label>
-        <input
-          id="editorVariableAddValue"
-          type="number"
-          step="1"
-          value="${escapeHtml(String(getSafeNumber(block.value, 1)))}"
-        />
-      </div>
-      <div class="helper-text">正数表示增加，负数表示减少。这里只会列出数字类型的变量。</div>
-    </div>
-    <div class="detail-actions">
-      <button class="toolbar-button toolbar-button-primary" data-action="save-block">保存这张卡片</button>
-    </div>
-  `;
+  return storyBlockEditorTools.renderVariableAddEditor({ ...block, variableId }, {
+    escapeHtml,
+    getSafeVariableId,
+    getSafeNumber,
+    renderVariableOptions,
+  });
 }
 
 function renderConditionEditor(block) {
@@ -32096,180 +31926,50 @@ function renderConditionEditor(block) {
 }
 
 function renderConditionBranchEditorRow(branch, index, branchCount = 1) {
-  const branchId = branch.id ?? createConditionBranchId("condition", index);
-  const rules = branch.when?.length ? branch.when : [createDefaultConditionRule()];
-  const gotoSceneId = getSafeSceneId(
-    branch.gotoSceneId,
-    getDefaultJumpTargetSceneId(state.selectedSceneId)
-  );
-
-  return `
-    <div class="option-editor" data-condition-branch data-branch-id="${branchId}">
-      <strong data-condition-branch-title>条件分支 ${index + 1}</strong>
-      <div class="field-grid">
-        <div class="detail-row">
-          <label>满足这条分支后跳到哪里</label>
-          <select data-field="condition-goto">
-            ${renderSceneOptions(gotoSceneId)}
-          </select>
-        </div>
-      </div>
-      <div class="option-editor-list" data-condition-rules>
-        ${rules.map((rule, ruleIndex) => renderConditionRuleEditorRow(rule, ruleIndex, rules.length)).join("")}
-      </div>
-      <div class="detail-actions">
-        <button class="toolbar-button" data-action="move-condition-branch-up" ${index <= 0 ? "disabled" : ""}>上移分支</button>
-        <button class="toolbar-button" data-action="move-condition-branch-down" ${index >= branchCount - 1 ? "disabled" : ""}>下移分支</button>
-        <button class="toolbar-button" data-action="add-condition-rule" data-branch-id="${branchId}">再加一个判断</button>
-        <button class="toolbar-button" data-action="remove-condition-branch" data-branch-id="${branchId}">删除这条分支</button>
-      </div>
-    </div>
-  `;
+  return storyBlockEditorTools.renderConditionBranchEditorRow(branch, index, branchCount, {
+    selectedSceneId: state.selectedSceneId,
+    escapeHtml,
+    createConditionBranchId,
+    createDefaultConditionRule,
+    getSafeSceneId,
+    getDefaultJumpTargetSceneId,
+    renderSceneOptions,
+    renderConditionRuleEditorRow,
+  });
 }
 
 function renderConditionRuleEditorRow(rule, index, ruleCount = 1) {
-  const variableId = getSafeVariableId(rule.variableId);
-  const operator = getSafeConditionOperator(variableId, rule.operator);
-
-  return `
-    <div class="option-editor" data-condition-rule>
-      <strong data-condition-rule-title>判断 ${index + 1}</strong>
-      <div class="field-grid">
-        <div class="detail-row">
-          <label>检查哪个变量</label>
-          <select data-field="condition-variable">
-            ${renderVariableOptions(variableId)}
-          </select>
-        </div>
-        <div class="detail-row">
-          <label>比较方式</label>
-          <select data-field="condition-operator">
-            ${renderConditionOperatorOptions(variableId, operator)}
-          </select>
-        </div>
-        <div class="field-grid" data-condition-value-fields>
-          ${renderConditionValueFields(variableId, rule.value)}
-        </div>
-      </div>
-      <div class="detail-actions">
-        <button class="toolbar-button" data-action="move-condition-rule-up" ${index <= 0 ? "disabled" : ""}>上移判断</button>
-        <button class="toolbar-button" data-action="move-condition-rule-down" ${index >= ruleCount - 1 ? "disabled" : ""}>下移判断</button>
-        <button class="toolbar-button" data-action="remove-condition-rule">删除这个判断</button>
-      </div>
-    </div>
-  `;
+  return storyBlockEditorTools.renderConditionRuleEditorRow(rule, index, ruleCount, {
+    getSafeVariableId,
+    getSafeConditionOperator,
+    renderVariableOptions,
+    renderConditionOperatorOptions,
+    renderConditionValueFields,
+  });
 }
 
 function renderChoiceEffectEditorRow(effect, index, effectCount = 1) {
-  const safeEffect = normalizeChoiceEffect(effect);
-  const variableFilter = safeEffect.type === "variable_add" ? "number" : null;
-
-  return `
-    <div class="effect-editor" data-choice-effect>
-      <strong data-choice-effect-title>附加效果 ${index + 1}</strong>
-      <div class="field-grid">
-        <div class="detail-row">
-          <label>效果类型</label>
-          <select data-field="choice-effect-type">
-            ${renderChoiceEffectTypeOptions(safeEffect.type)}
-          </select>
-        </div>
-        <div class="detail-row">
-          <label>作用到哪个变量</label>
-          <select data-field="choice-effect-variable">
-            ${renderVariableOptions(safeEffect.variableId, variableFilter)}
-          </select>
-        </div>
-        <div class="field-grid" data-choice-effect-value-fields>
-          ${renderChoiceEffectValueFields(safeEffect.type, safeEffect.variableId, safeEffect.value)}
-        </div>
-      </div>
-      <div class="detail-actions">
-        <button class="toolbar-button" data-action="move-choice-effect-up" ${index <= 0 ? "disabled" : ""}>上移效果</button>
-        <button class="toolbar-button" data-action="move-choice-effect-down" ${index >= effectCount - 1 ? "disabled" : ""}>下移效果</button>
-        <button class="toolbar-button" data-action="remove-choice-effect">删除这条效果</button>
-      </div>
-    </div>
-  `;
+  return storyBlockEditorTools.renderChoiceEffectEditorRow(effect, index, effectCount, {
+    normalizeChoiceEffect,
+    renderChoiceEffectTypeOptions,
+    renderVariableOptions,
+    renderChoiceEffectValueFields,
+  });
 }
 
 function renderChoiceEffectEmptyState() {
-  return `<div class="helper-text" data-choice-effects-empty>这个选项暂时没有附加效果。需要的话，点下面按钮就能继续加。</div>`;
+  return storyBlockEditorTools.renderChoiceEffectEmptyState();
 }
 
 function renderChoiceOptionEditorRow(option, index, optionCount = 1) {
-  const editableEffects = getEditableChoiceEffects(option.effects);
-  const unsupportedEffectCount = Math.max((option.effects?.length ?? 0) - editableEffects.length, 0);
-
-  return `
-    <div class="option-editor" data-choice-option data-option-id="${option.id}">
-      <strong data-choice-option-title>选项 ${index + 1}</strong>
-      <div class="field-grid">
-        <div class="detail-row">
-          <label>选项文案</label>
-          <input
-            type="text"
-            data-field="choice-text"
-            value="${escapeHtml(option.text ?? "")}"
-            placeholder="例如：一起回家吧"
-          />
-          ${renderChoiceTextQualityTools(option.text)}
-        </div>
-        <div class="detail-row">
-          <label>跳转到哪个场景</label>
-          <select data-field="choice-goto">
-            ${state.data.scenes
-              .map(
-                (scene) => `
-                  <option value="${scene.id}" ${scene.id === option.gotoSceneId ? "selected" : ""}>
-                    ${escapeHtml(scene.name)}
-                  </option>
-                `
-              )
-              .join("")}
-          </select>
-        </div>
-        <div class="detail-row">
-          <label>这个选项触发时还要做什么</label>
-          <div class="value">当前共有 ${option.effects?.length ?? 0} 条附加效果</div>
-        </div>
-        <div class="effect-editor-list" data-choice-effects>
-          ${
-            editableEffects.length > 0
-              ? editableEffects
-                  .map((effect, effectIndex) => renderChoiceEffectEditorRow(effect, effectIndex, editableEffects.length))
-                  .join("")
-              : renderChoiceEffectEmptyState()
-          }
-        </div>
-        ${
-          unsupportedEffectCount > 0
-            ? `<div class="helper-text">这个选项里还有 ${unsupportedEffectCount} 条暂时不支持可视化编辑的旧效果，保存时会继续保留。</div>`
-            : ""
-        }
-        <div class="detail-actions">
-          <button
-            class="toolbar-button"
-            data-action="move-choice-option-up"
-            data-option-id="${option.id}"
-            ${index <= 0 ? "disabled" : ""}
-          >
-            上移选项
-          </button>
-          <button
-            class="toolbar-button"
-            data-action="move-choice-option-down"
-            data-option-id="${option.id}"
-            ${index >= optionCount - 1 ? "disabled" : ""}
-          >
-            下移选项
-          </button>
-          <button class="toolbar-button" data-action="add-choice-effect" data-option-id="${option.id}">给这个选项加效果</button>
-          <button class="toolbar-button" data-action="remove-choice-option" data-option-id="${option.id}">删除这个选项</button>
-        </div>
-      </div>
-    </div>
-  `;
+  return storyBlockEditorTools.renderChoiceOptionEditorRow(option, index, optionCount, {
+    scenes: state.data.scenes,
+    escapeHtml,
+    getEditableChoiceEffects,
+    renderChoiceTextQualityTools,
+    renderChoiceEffectEditorRow,
+    renderChoiceEffectEmptyState,
+  });
 }
 
 function getSafeCreativeAssistantMode(mode) {
@@ -40098,39 +39798,17 @@ function duplicateBlockForScene(scene, sourceBlock) {
 
 function createDefaultChoiceOptions(blockId, fallbackSceneId = null) {
   const targetSceneId = fallbackSceneId ?? state.selectedSceneId ?? state.data.scenes[0]?.id ?? "";
-  return [
-    {
-      id: createChoiceOptionId(blockId, 0),
-      text: "第一个选项",
-      gotoSceneId: targetSceneId,
-      effects: [],
-    },
-    {
-      id: createChoiceOptionId(blockId, 1),
-      text: "第二个选项",
-      gotoSceneId: targetSceneId,
-      effects: [],
-    },
-  ];
+  return storyBlockCatalogTools.createDefaultChoiceOptions(blockId, { targetSceneId });
 }
 
 function createDefaultChoiceEffect() {
   const numberVariableId = getSafeVariableId(null, "number");
-
-  if (numberVariableId) {
-    return {
-      type: "variable_add",
-      variableId: numberVariableId,
-      value: 1,
-    };
-  }
-
   const variableId = getSafeVariableId(state.data.variables[0]?.id);
-  return {
-    type: "variable_set",
+  return storyBlockCatalogTools.createDefaultChoiceEffect({
+    numberVariableId,
     variableId,
     value: getVariableDefaultValue(variableId),
-  };
+  });
 }
 
 function createBlockId(scene) {
@@ -40145,23 +39823,25 @@ function createBlockId(scene) {
 }
 
 function createChoiceOptionId(blockId, index) {
-  return `${blockId}_option_${index + 1}`;
+  return storyBlockCatalogTools.createChoiceOptionId(blockId, index);
 }
 
 function createConditionBranchId(blockId, index) {
-  return `${blockId}_branch_${index + 1}`;
+  return storyBlockCatalogTools.createConditionBranchId(blockId, index);
 }
 
 function createDefaultConditionBranches(blockId, currentSceneId = state.selectedSceneId) {
-  return [createDefaultConditionBranch(blockId, 0, currentSceneId)];
+  return storyBlockCatalogTools.createDefaultConditionBranches(blockId, {
+    rule: createDefaultConditionRule(),
+    targetSceneId: getDefaultJumpTargetSceneId(currentSceneId),
+  });
 }
 
 function createDefaultConditionBranch(blockId, index, currentSceneId = state.selectedSceneId) {
-  return {
-    id: createConditionBranchId(blockId, index),
-    when: [createDefaultConditionRule()],
-    gotoSceneId: getDefaultJumpTargetSceneId(currentSceneId),
-  };
+  return storyBlockCatalogTools.createDefaultConditionBranch(blockId, index, {
+    rule: createDefaultConditionRule(),
+    targetSceneId: getDefaultJumpTargetSceneId(currentSceneId),
+  });
 }
 
 function createDefaultConditionRule() {
@@ -40169,11 +39849,11 @@ function createDefaultConditionRule() {
     getSafeVariableId(null, "number") ||
     getSafeVariableId(state.data.variables[0]?.id);
 
-  return {
+  return storyBlockCatalogTools.createDefaultConditionRule({
     variableId,
     operator: getSafeConditionOperator(variableId, null),
     value: getVariableDefaultValue(variableId),
-  };
+  });
 }
 
 function stripSceneForSave(scene) {
@@ -41204,24 +40884,6 @@ function getDefaultJumpTargetSceneId(currentSceneId) {
   );
 }
 
-function getSafeNonNegativeNumber(value, fallback = 0) {
-  if (editorCommonTools?.getSafeNonNegativeNumber) {
-    return editorCommonTools.getSafeNonNegativeNumber(value, fallback);
-  }
-
-  const parsed = Number.parseInt(value ?? "", 10);
-  return Number.isFinite(parsed) ? Math.max(parsed, 0) : fallback;
-}
-
-function getSafeNumber(value, fallback = 0) {
-  if (editorCommonTools?.getSafeNumber) {
-    return editorCommonTools.getSafeNumber(value, fallback);
-  }
-
-  const parsed = Number.parseFloat(value ?? "");
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
 function getSafeScene3dPreviewConfig(source = {}) {
   const raw = source && typeof source === "object" ? source : {};
   return {
@@ -41982,29 +41644,6 @@ function renderTransitionOptions(selectedTransition, options = {}) {
     .join("");
 }
 
-function getSafePosition(position) {
-  return Object.hasOwn(POSITION_LABELS, position) ? position : "center";
-}
-
-function getSafeTransition(transition) {
-  return Object.hasOwn(CHARACTER_TRANSITION_LABELS, transition) ? transition : "fade";
-}
-
-function getTransitionLabel(transition) {
-  return CHARACTER_TRANSITION_LABELS[getSafeTransition(transition)];
-}
-
-function getSafeCharacterStage(source = {}) {
-  const raw = source && typeof source === "object" ? source : {};
-  return {
-    offsetX: Math.round(clamp(getSafeNumber(raw.offsetX, DEFAULT_CHARACTER_STAGE.offsetX), -60, 60)),
-    offsetY: Math.round(clamp(getSafeNumber(raw.offsetY, DEFAULT_CHARACTER_STAGE.offsetY), -45, 45)),
-    scale: Math.round(clamp(getSafeNumber(raw.scale, DEFAULT_CHARACTER_STAGE.scale), 45, 220)),
-    opacity: Math.round(clamp(getSafeNumber(raw.opacity, DEFAULT_CHARACTER_STAGE.opacity), 0, 100)),
-    layer: Math.round(clamp(getSafeNumber(raw.layer, DEFAULT_CHARACTER_STAGE.layer), -10, 10)),
-  };
-}
-
 function getCharacterStageFromBlock(block = {}) {
   return getSafeCharacterStage(block.stage ?? block.characterStage ?? {});
 }
@@ -42017,18 +41656,6 @@ function readCharacterStageControls() {
     opacity: document.getElementById("editorCharacterOpacity")?.value,
     layer: document.getElementById("editorCharacterLayer")?.value,
   });
-}
-
-function getCharacterStageStyle(stageSource = {}) {
-  const stage = getSafeCharacterStage(stageSource);
-  return [
-    `--sprite-offset-x:${stage.offsetX}%;`,
-    `--sprite-offset-y:${stage.offsetY}%;`,
-    `--sprite-scale:${(stage.scale / 100).toFixed(3)};`,
-    `--sprite-opacity:${(stage.opacity / 100).toFixed(2)};`,
-    `--sprite-layer:${stage.layer};`,
-    `z-index:${20 + stage.layer};`,
-  ].join("");
 }
 
 function renderCharacterStageControls(stageSource = {}) {
@@ -42061,11 +41688,6 @@ function renderCharacterStageControls(stageSource = {}) {
       <p class="helper-text">用于微调立绘站位：X 左右、Y 上下、缩放大小、透明度和前后层级。默认值不会影响旧项目。</p>
     </div>
   `;
-}
-
-function getCharacterStageSummary(stageSource = {}) {
-  const stage = getSafeCharacterStage(stageSource);
-  return `X ${stage.offsetX}% / Y ${stage.offsetY}% / ${stage.scale}% / 透明 ${stage.opacity}% / 层级 ${stage.layer}`;
 }
 
 function getSafeParticleAction(action) {
@@ -44585,45 +44207,11 @@ function getCreditsLinesText(blockLines) {
   return visualEffectTools?.getCreditsLinesText?.(blockLines) ?? getCreditsLines(blockLines).join("\n");
 }
 
-function buildTemplateAssetUrl(relativePath) {
-  if (editorCommonTools?.buildTemplateAssetUrl) {
-    return editorCommonTools.buildTemplateAssetUrl(relativePath, state.data?.currentProject?.publicRoot ?? "");
-  }
-
-  const normalized = String(relativePath ?? "")
-    .replaceAll("\\", "/")
-    .replace(/^\/+/, "")
-    .split("/")
-    .filter(Boolean)
-    .map((part) => encodeURIComponent(part))
-    .join("/");
-  const publicRoot = state.data?.currentProject?.publicRoot ?? "";
-  return normalized && publicRoot ? `${publicRoot}/${normalized}` : "";
-}
-
 function getAssetPublicUrl(asset) {
   if (!asset) {
     return "";
   }
   return asset.publicPath || buildTemplateAssetUrl(asset.path);
-}
-
-function formatFileSize(bytes) {
-  if (editorCommonTools?.formatFileSize) {
-    return editorCommonTools.formatFileSize(bytes);
-  }
-
-  const size = Number(bytes);
-  if (!Number.isFinite(size) || size < 0) {
-    return "未知";
-  }
-  if (size < 1024) {
-    return `${size} B`;
-  }
-  if (size < 1024 * 1024) {
-    return `${(size / 1024).toFixed(size < 10 * 1024 ? 1 : 0)} KB`;
-  }
-  return `${(size / (1024 * 1024)).toFixed(size < 10 * 1024 * 1024 ? 1 : 0)} MB`;
 }
 
 function getBackdropStyle(backgroundAssetId, scene3dPreview = null) {
@@ -44651,27 +44239,6 @@ function getBackdropStyle(backgroundAssetId, scene3dPreview = null) {
       "background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.18)), linear-gradient(180deg, #f7d7b0 0%, #d39a7a 40%, #70516f 100%);",
   };
   return gradients[backgroundAssetId] ?? gradients.bg_classroom_sunset;
-}
-
-function clamp(value, min, max) {
-  if (editorCommonTools?.clamp) {
-    return editorCommonTools.clamp(value, min, max);
-  }
-
-  return Math.min(Math.max(value, min), max);
-}
-
-function escapeHtml(value) {
-  if (editorCommonTools?.escapeHtml) {
-    return editorCommonTools.escapeHtml(value);
-  }
-
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
 }
 
 state.previewPlayback.uiThemeMode = loadStoredEditorUiThemeMode();

@@ -43,6 +43,24 @@ class FrontendStoryBlockCatalogModuleTests(unittest.TestCase):
               escapedMarkup: tools.renderMusicEndModeOptions("until_next_music", {{
                 escapeHtml: (value) => String(value).replace(/播/g, "&#25773;"),
               }}),
+              ids: [
+                tools.createChoiceOptionId("block_001", 0),
+                tools.createChoiceOptionId("block_001", 1),
+                tools.createConditionBranchId("block_001", 0),
+              ],
+              defaultChoiceOptions: tools.createDefaultChoiceOptions("block_001", {{ targetSceneId: "scene_a" }}),
+              defaultChoiceEffects: [
+                tools.createDefaultChoiceEffect({{ numberVariableId: "var_affection" }}),
+                tools.createDefaultChoiceEffect({{ variableId: "var_route", value: "common" }}),
+              ],
+              defaultCondition: {{
+                rule: tools.createDefaultConditionRule({{ variableId: "var_affection", operator: ">=", value: 3 }}),
+                branch: tools.createDefaultConditionBranch("block_001", 2, {{
+                  rule: tools.createDefaultConditionRule({{ variableId: "var_flag", operator: "==", value: true }}),
+                  targetSceneId: "scene_b",
+                }}),
+                branches: tools.createDefaultConditionBranches("block_002", {{ targetSceneId: "scene_c" }}),
+              }},
               exportedLabels: tools.BLOCK_LABELS,
               exportedMusicLabels: tools.MUSIC_END_MODE_LABELS,
             }};
@@ -67,6 +85,24 @@ class FrontendStoryBlockCatalogModuleTests(unittest.TestCase):
         self.assertIn('<option value="scene_end" selected>', payload["optionMarkup"])
         self.assertIn('<option value="until_next_music" ', payload["optionMarkup"])
         self.assertIn("&#25773;到下一首或停止卡", payload["escapedMarkup"])
+        self.assertEqual(payload["ids"], ["block_001_option_1", "block_001_option_2", "block_001_branch_1"])
+        self.assertEqual(payload["defaultChoiceOptions"], [
+            {"id": "block_001_option_1", "text": "第一个选项", "gotoSceneId": "scene_a", "effects": []},
+            {"id": "block_001_option_2", "text": "第二个选项", "gotoSceneId": "scene_a", "effects": []},
+        ])
+        self.assertEqual(payload["defaultChoiceEffects"], [
+            {"type": "variable_add", "variableId": "var_affection", "value": 1},
+            {"type": "variable_set", "variableId": "var_route", "value": "common"},
+        ])
+        self.assertEqual(payload["defaultCondition"]["rule"], {"variableId": "var_affection", "operator": ">=", "value": 3})
+        self.assertEqual(payload["defaultCondition"]["branch"], {
+            "id": "block_001_branch_3",
+            "when": [{"variableId": "var_flag", "operator": "==", "value": True}],
+            "gotoSceneId": "scene_b",
+        })
+        self.assertEqual(payload["defaultCondition"]["branches"], [
+            {"id": "block_002_branch_1", "when": [{"variableId": "", "operator": "=="}], "gotoSceneId": "scene_c"}
+        ])
         self.assertEqual(payload["exportedLabels"]["video_play"], "播放视频")
         self.assertEqual(payload["exportedMusicLabels"]["after_block"], "播到指定卡片后")
 

@@ -72,6 +72,68 @@
       .join("");
   }
 
+  function createChoiceOptionId(blockId, index) {
+    return `${blockId}_option_${Number(index) + 1}`;
+  }
+
+  function createConditionBranchId(blockId, index) {
+    return `${blockId}_branch_${Number(index) + 1}`;
+  }
+
+  function createDefaultChoiceOptions(blockId, options = {}) {
+    const targetSceneId = options.targetSceneId ?? "";
+    return [
+      {
+        id: createChoiceOptionId(blockId, 0),
+        text: "第一个选项",
+        gotoSceneId: targetSceneId,
+        effects: [],
+      },
+      {
+        id: createChoiceOptionId(blockId, 1),
+        text: "第二个选项",
+        gotoSceneId: targetSceneId,
+        effects: [],
+      },
+    ];
+  }
+
+  function createDefaultChoiceEffect(options = {}) {
+    if (options.numberVariableId) {
+      return {
+        type: "variable_add",
+        variableId: options.numberVariableId,
+        value: 1,
+      };
+    }
+
+    return {
+      type: "variable_set",
+      variableId: options.variableId ?? "",
+      value: options.value,
+    };
+  }
+
+  function createDefaultConditionRule(options = {}) {
+    return {
+      variableId: options.variableId ?? "",
+      operator: options.operator ?? "==",
+      value: options.value,
+    };
+  }
+
+  function createDefaultConditionBranch(blockId, index, options = {}) {
+    return {
+      id: createConditionBranchId(blockId, index),
+      when: [options.rule ?? createDefaultConditionRule()],
+      gotoSceneId: options.targetSceneId ?? "",
+    };
+  }
+
+  function createDefaultConditionBranches(blockId, options = {}) {
+    return [createDefaultConditionBranch(blockId, 0, options)];
+  }
+
   global.CanvasiaEditorStoryBlockCatalog = Object.freeze({
     BLOCK_LABELS,
     MUSIC_END_MODE_LABELS,
@@ -79,5 +141,12 @@
     getSafeMusicEndMode,
     getMusicEndModeLabel,
     renderMusicEndModeOptions,
+    createChoiceOptionId,
+    createConditionBranchId,
+    createDefaultChoiceOptions,
+    createDefaultChoiceEffect,
+    createDefaultConditionRule,
+    createDefaultConditionBranch,
+    createDefaultConditionBranches,
   });
 })(typeof window !== "undefined" ? window : globalThis);

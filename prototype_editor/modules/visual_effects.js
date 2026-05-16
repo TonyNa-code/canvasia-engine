@@ -138,6 +138,49 @@
     transparent: "叠在当前画面上",
   });
 
+  const POSITION_LABELS = Object.freeze({
+    left: "左侧",
+    center: "中间",
+    right: "右侧",
+  });
+
+  const CHARACTER_TRANSITION_LABELS = Object.freeze({
+    fade: "淡入淡出",
+    slide_left: "从左侧滑入 / 滑出",
+    slide_right: "从右侧滑入 / 滑出",
+    rise: "向上浮现",
+    pop: "轻微弹出",
+    none: "直接切换",
+  });
+
+  const BASIC_TRANSITION_LABELS = Object.freeze({
+    fade: "淡入淡出",
+    none: "直接切换",
+  });
+
+  const DEFAULT_CHARACTER_STAGE = Object.freeze({
+    offsetX: 0,
+    offsetY: 0,
+    scale: 100,
+    opacity: 100,
+    layer: 0,
+  });
+
+  const TEXT_SPEED_LABELS = Object.freeze({
+    slow: "慢一点",
+    normal: "正常",
+    fast: "快一点",
+    instant: "立刻显示",
+  });
+
+  const DIALOG_THEME_LABELS = Object.freeze({
+    project: "项目样式",
+    warm: "暖光标准",
+    moonlight: "夜色月光",
+    paper: "纸页回忆",
+    transparent: "透明无框",
+  });
+
   function hasOwn(source, key) {
     return Object.prototype.hasOwnProperty.call(source, key);
   }
@@ -577,6 +620,71 @@
     return getCreditsLines(blockLines).join("\n");
   }
 
+  function getSafePosition(position) {
+    return getSafeLabelKey(POSITION_LABELS, position, "center");
+  }
+
+  function getPositionLabel(position) {
+    return POSITION_LABELS[getSafePosition(position)];
+  }
+
+  function getSafeTransition(transition) {
+    return getSafeLabelKey(CHARACTER_TRANSITION_LABELS, transition, "fade");
+  }
+
+  function getTransitionLabel(transition) {
+    return CHARACTER_TRANSITION_LABELS[getSafeTransition(transition)];
+  }
+
+  function getSafeStageNumber(value, fallback, min, max) {
+    const number = Number.parseFloat(value ?? "");
+    return Number.isFinite(number) ? clamp(number, min, max) : fallback;
+  }
+
+  function getSafeCharacterStage(source = {}) {
+    const raw = source && typeof source === "object" ? source : {};
+    return {
+      offsetX: Math.round(getSafeStageNumber(raw.offsetX, DEFAULT_CHARACTER_STAGE.offsetX, -60, 60)),
+      offsetY: Math.round(getSafeStageNumber(raw.offsetY, DEFAULT_CHARACTER_STAGE.offsetY, -45, 45)),
+      scale: Math.round(getSafeStageNumber(raw.scale, DEFAULT_CHARACTER_STAGE.scale, 45, 220)),
+      opacity: Math.round(getSafeStageNumber(raw.opacity, DEFAULT_CHARACTER_STAGE.opacity, 0, 100)),
+      layer: Math.round(getSafeStageNumber(raw.layer, DEFAULT_CHARACTER_STAGE.layer, -10, 10)),
+    };
+  }
+
+  function getCharacterStageStyle(stageSource = {}) {
+    const stage = getSafeCharacterStage(stageSource);
+    return [
+      `--sprite-offset-x:${stage.offsetX}%;`,
+      `--sprite-offset-y:${stage.offsetY}%;`,
+      `--sprite-scale:${(stage.scale / 100).toFixed(3)};`,
+      `--sprite-opacity:${(stage.opacity / 100).toFixed(2)};`,
+      `--sprite-layer:${stage.layer};`,
+      `z-index:${20 + stage.layer};`,
+    ].join("");
+  }
+
+  function getCharacterStageSummary(stageSource = {}) {
+    const stage = getSafeCharacterStage(stageSource);
+    return `X ${stage.offsetX}% / Y ${stage.offsetY}% / ${stage.scale}% / 透明 ${stage.opacity}% / 层级 ${stage.layer}`;
+  }
+
+  function getSafeTextSpeed(speed) {
+    return getSafeLabelKey(TEXT_SPEED_LABELS, speed, "normal");
+  }
+
+  function getTextSpeedLabel(speed) {
+    return TEXT_SPEED_LABELS[getSafeTextSpeed(speed)];
+  }
+
+  function getSafeDialogTheme(theme) {
+    return getSafeLabelKey(DIALOG_THEME_LABELS, theme, "project");
+  }
+
+  function getDialogThemeLabel(theme) {
+    return DIALOG_THEME_LABELS[getSafeDialogTheme(theme)];
+  }
+
   global.CanvasiaEditorVisualEffects = Object.freeze({
     SHAKE_INTENSITY_LABELS,
     EFFECT_DURATION_LABELS,
@@ -600,6 +708,12 @@
     VIDEO_FIT_LABELS,
     VIDEO_VOLUME_LABELS,
     CREDITS_BACKGROUND_LABELS,
+    POSITION_LABELS,
+    CHARACTER_TRANSITION_LABELS,
+    BASIC_TRANSITION_LABELS,
+    DEFAULT_CHARACTER_STAGE,
+    TEXT_SPEED_LABELS,
+    DIALOG_THEME_LABELS,
     getSafeShakeIntensity,
     getShakeIntensityLabel,
     getSafeEffectDuration,
@@ -661,5 +775,16 @@
     parseCreditsLines,
     getCreditsLines,
     getCreditsLinesText,
+    getSafePosition,
+    getPositionLabel,
+    getSafeTransition,
+    getTransitionLabel,
+    getSafeCharacterStage,
+    getCharacterStageStyle,
+    getCharacterStageSummary,
+    getSafeTextSpeed,
+    getTextSpeedLabel,
+    getSafeDialogTheme,
+    getDialogThemeLabel,
   });
 })(typeof window !== "undefined" ? window : globalThis);

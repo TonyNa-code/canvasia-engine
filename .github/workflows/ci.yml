@@ -63,6 +63,7 @@ jobs:
             tests/test_frontend_script_readability_module.py \
             tests/test_frontend_script_voice_module.py \
             tests/test_frontend_story_block_catalog_module.py \
+            tests/test_frontend_story_block_editors_module.py \
             tests/test_frontend_story_templates_module.py \
             tests/test_frontend_system_dialog_module.py \
             tests/test_frontend_ui_theme_module.py \
@@ -93,6 +94,7 @@ jobs:
           node --check prototype_editor/modules/script_readability.js
           node --check prototype_editor/modules/script_voice.js
           node --check prototype_editor/modules/story_block_catalog.js
+          node --check prototype_editor/modules/story_block_editors.js
           node --check prototype_editor/modules/story_templates.js
           node --check prototype_editor/modules/system_dialog.js
           node --check prototype_editor/modules/ui_theme.js
@@ -130,6 +132,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_script_readability_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_script_voice_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_story_block_catalog_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_story_block_editors_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_story_templates_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_system_dialog_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_ui_theme_module.py' -v

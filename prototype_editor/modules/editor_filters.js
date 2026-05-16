@@ -109,6 +109,26 @@
     return Object.prototype.hasOwnProperty.call(source, key);
   }
 
+  function hasCollectionEntry(collection, key) {
+    if (!key || !collection) {
+      return false;
+    }
+    if (typeof collection.has === "function") {
+      return collection.has(key);
+    }
+    return hasOwn(collection, key);
+  }
+
+  function getCollectionEntry(collection, key) {
+    if (!key || !collection) {
+      return null;
+    }
+    if (typeof collection.get === "function") {
+      return collection.get(key) ?? null;
+    }
+    return hasOwn(collection, key) ? collection[key] ?? null : null;
+  }
+
   function getSafeValue(labels, value, fallback) {
     return hasOwn(labels, value) ? value : fallback;
   }
@@ -269,6 +289,89 @@
       return "逻辑";
     }
     return "演出";
+  }
+
+  function getStoryBlockIssueItems(block = {}, options = {}) {
+    const items = [];
+    const pushIssue = (key, label, toneClass = "warn-text") => {
+      if (!items.some((item) => item.key === key)) {
+        items.push({ key, label, toneClass });
+      }
+    };
+    const {
+      assetsById = null,
+      scenesById = null,
+      getExpressionAssetId = () => "",
+      getSafeParticleAction = (action) => action,
+      isReadableTextLong = () => false,
+      choiceManyOptions = 6,
+      choiceLongWarningLength = 42,
+      hasVariableLogicIssue = () => false,
+    } = options;
+
+    if (block.type === "dialogue" && !block.voiceAssetId) {
+      pushIssue("missing_voice", "待绑语音");
+    }
+
+    if (
+      ((block.type === "dialogue" || block.type === "narration") && isReadableTextLong(block.text)) ||
+      (block.type === "choice" &&
+        ((block.options ?? []).length > choiceManyOptions ||
+          (block.options ?? []).some((option) => String(option.text ?? "").trim().length > choiceLongWarningLength)))
+    ) {
+      pushIssue("too_long", "偏长文本");
+    }
+
+    const assetIdsToCheck = [];
+    if (["background", "music_play", "sfx_play", "video_play"].includes(block.type)) {
+      assetIdsToCheck.push(block.assetId);
+    }
+    if (block.type === "particle_effect" && getSafeParticleAction(block.action) !== "stop" && block.assetId) {
+      assetIdsToCheck.push(block.assetId);
+    }
+    const expressionAssetId = getExpressionAssetId(block);
+    if (expressionAssetId) {
+      assetIdsToCheck.push(expressionAssetId);
+    }
+
+    if (
+      assetIdsToCheck.some((assetId) => {
+        if (!assetId) {
+          return true;
+        }
+        const asset = getCollectionEntry(assetsById, assetId);
+        return !asset || !asset.fileExists;
+      })
+    ) {
+      pushIssue("missing_asset", "待补素材");
+    }
+
+    if (block.type === "jump" && !hasCollectionEntry(scenesById, block.targetSceneId)) {
+      pushIssue("broken_target", "跳转待修", "danger-text");
+    }
+
+    if (
+      block.type === "choice" &&
+      (block.options ?? []).some((option) => option.gotoSceneId && !hasCollectionEntry(scenesById, option.gotoSceneId))
+    ) {
+      pushIssue("broken_target", "跳转待修", "danger-text");
+    }
+
+    if (
+      block.type === "condition" &&
+      (
+        !hasCollectionEntry(scenesById, block.elseGotoSceneId) ||
+        (block.branches ?? []).some((branch) => branch.gotoSceneId && !hasCollectionEntry(scenesById, branch.gotoSceneId))
+      )
+    ) {
+      pushIssue("broken_target", "跳转待修", "danger-text");
+    }
+
+    if (hasVariableLogicIssue(block)) {
+      pushIssue("variable_logic", "变量待修", "danger-text");
+    }
+
+    return items;
   }
 
   function getSafeStorySceneTreeFilter(value) {
@@ -433,6 +536,7 @@
     getStoryBlockIssueFilterLabel,
     getStoryBlockGroup,
     getStoryBlockGroupLabel,
+    getStoryBlockIssueItems,
     getSafeStorySceneTreeFilter,
     getStorySceneTreeFilterLabel,
     getSafeCharacterFilterMode,
