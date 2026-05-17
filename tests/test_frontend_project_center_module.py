@@ -58,11 +58,35 @@ class FrontendProjectCenterModuleTests(unittest.TestCase):
               title: "无 helper",
               sceneCount: 0,
             }});
+            const heroHtml = tools.renderProjectCenterHero({{
+              localProjectCount: 2,
+              projectCenterModeLabel: "高级 <模式>",
+              hasSampleProject: true,
+              activeProjectId: "project-1",
+            }}, {{ escapeHtml }});
+            const emptyListHtml = tools.renderProjectCenterProjectList([], "", helpers);
+            const listHtml = tools.renderProjectCenterProjectList([
+              {{
+                projectId: "project-<1>",
+                title: "我的 <企划>",
+                template: "school",
+                sceneCount: 3,
+              }},
+              {{
+                projectId: "sample-1",
+                title: "示例项目",
+                isSample: true,
+                sceneCount: 6,
+              }},
+            ], "project-<1>", helpers);
             process.stdout.write(JSON.stringify({{
               keys: Object.keys(tools).sort(),
               formalHtml,
               sampleHtml,
               fallbackHtml,
+              heroHtml,
+              emptyListHtml,
+              listHtml,
             }}));
             """
         )
@@ -93,6 +117,19 @@ class FrontendProjectCenterModuleTests(unittest.TestCase):
         self.assertIn("复制成正式项目", payload["sampleHtml"])
         self.assertIn("真正的空白项目", payload["fallbackHtml"])
         self.assertIn("新手模式", payload["fallbackHtml"])
+        self.assertIn("renderProjectCenterHero", payload["keys"])
+        self.assertIn("renderProjectCenterProjectList", payload["keys"])
+        self.assertIn("新建默认：高级 &lt;模式&gt;", payload["heroHtml"])
+        self.assertIn("已发现项目 2 个", payload["heroHtml"])
+        self.assertIn("示例项目可选打开", payload["heroHtml"])
+        self.assertIn("已经记录过上次打开的项目", payload["heroHtml"])
+        self.assertIn('data-action="create-project"', payload["heroHtml"])
+        self.assertIn('data-action="refresh-project-center"', payload["heroHtml"])
+        self.assertIn("现在还是一张白纸", payload["emptyListHtml"])
+        self.assertIn("project-card-grid", payload["listHtml"])
+        self.assertEqual(payload["listHtml"].count("project-card "), 2)
+        self.assertIn("我的 &lt;企划&gt;", payload["listHtml"])
+        self.assertIn("复制成正式项目", payload["listHtml"])
 
 
 if __name__ == "__main__":

@@ -124,7 +124,85 @@
     `;
   }
 
+  function renderProjectCenterHero(summary = {}, helpers = {}) {
+    const escape = getEscapeHtml(helpers);
+    const localProjectCount = Math.max(Number.parseInt(summary.localProjectCount ?? 0, 10) || 0, 0);
+    const modeLabel = summary.projectCenterModeLabel ?? getFallbackEditorModeLabel(summary.projectCenterMode);
+    const hasSampleProject = Boolean(summary.hasSampleProject ?? summary.sampleProject);
+    const hasActiveProject = Boolean(summary.activeProjectId);
+
+    return `
+      <section class="project-center-hero">
+        <article class="project-center-banner">
+          <div class="project-center-copy">
+            <span class="eyebrow">像真正的游戏引擎一样开始</span>
+            <div>
+              <h2>先选项目，再进入编辑器</h2>
+              <p>这里不再默认打开测试样板。可先创建一个空白项目，或继续已有作品。</p>
+            </div>
+            <div class="project-center-pill-row">
+              <span class="project-center-pill">默认从空白项目开始</span>
+              <span class="project-center-pill">默认分辨率 1920 × 1080</span>
+              <span class="project-center-pill">新建默认：${escape(modeLabel)}</span>
+              <span class="project-center-pill">示例项目会单独列在下方，不会默认打开</span>
+            </div>
+            <div class="project-center-actions">
+              <button type="button" class="toolbar-button toolbar-button-primary" data-action="create-project">
+                新建空白项目
+              </button>
+              <button type="button" class="toolbar-button" data-action="open-beginner-tutorial">
+                打开新手教程
+              </button>
+              <button type="button" class="toolbar-button" data-action="refresh-project-center">
+                刷新项目列表
+              </button>
+            </div>
+          </div>
+        </article>
+        <aside class="project-center-sidecard">
+          <h3>当前入口说明</h3>
+          <p>空白项目初始不会自动加入章节、台词和角色，可按需要自行新建章节和场景。</p>
+          <div class="project-meta-row">
+            <span class="project-center-pill">已发现项目 ${localProjectCount} 个</span>
+            <span class="project-center-pill">顶部可切换新建默认模式</span>
+            <span class="project-center-pill">${hasSampleProject ? "示例项目可选打开" : "当前没有示例项目"}</span>
+            <span class="project-center-pill">${hasActiveProject ? "已经记录过上次打开的项目" : "还没有打开过项目"}</span>
+          </div>
+        </aside>
+      </section>
+    `;
+  }
+
+  function renderProjectCenterProjectList(projects = [], activeProjectId = "", helpers = {}) {
+    const projectList = Array.isArray(projects) ? projects : [];
+
+    return `
+      <section class="panel">
+        <div class="panel-heading">
+          <h2>项目列表</h2>
+          <span class="badge badge-soft">从这里打开</span>
+        </div>
+        ${
+          projectList.length === 0
+            ? `
+              <div class="project-card-empty">
+                <h3>现在还是一张白纸</h3>
+                <p>这正好。先点上面的“新建空白项目”，给作品起个名字，然后我们就从零开始把它搭起来。</p>
+              </div>
+            `
+            : `
+              <div class="project-card-grid">
+                ${projectList.map((project) => renderProjectCenterCard(project, activeProjectId, helpers)).join("")}
+              </div>
+            `
+        }
+      </section>
+    `;
+  }
+
   global.CanvasiaEditorProjectCenter = Object.freeze({
     renderProjectCenterCard,
+    renderProjectCenterHero,
+    renderProjectCenterProjectList,
   });
 })(typeof window !== "undefined" ? window : globalThis);
