@@ -137,6 +137,7 @@ const projectDoctorTools = window.CanvasiaEditorProjectDoctor;
 const projectMilestoneTools = window.CanvasiaEditorProjectMilestones ?? window.CanvasiaProjectMilestones;
 const openAiAssetTools = window.CanvasiaEditorOpenAiAssetGenerator;
 const beginnerTutorialTools = window.CanvasiaEditorBeginnerTutorial;
+const projectCenterTools = window.CanvasiaEditorProjectCenter;
 
 const ASSET_TYPE_LABELS = assetCatalogTools?.ASSET_TYPE_LABELS ?? {
   background: "背景",
@@ -1312,71 +1313,21 @@ function getFilteredHistorySnapshots(history = state.projectHistory) {
 }
 
 function renderHistorySnapshotCard(snapshot, options = {}) {
-  if (!snapshot) {
-    return "";
-  }
-
-  const isCompact = options.compact === true;
-  const isCurrent = Boolean(snapshot.isCurrent);
-  const canRestore = options.allowRestore !== false && !isCurrent;
-  const canRelabel = options.allowRelabel !== false;
-  const title = String(snapshot.label ?? "未命名快照").trim() || "未命名快照";
-  const metaLabel = `${getHistoryKindLabel(snapshot.kind)} · 第 ${Number(snapshot.index ?? 0) + 1} 份`;
-
-  return `
-    <article class="history-card ${isCurrent ? "is-current" : ""} ${snapshot.kind === "manual" ? "is-manual" : ""} ${
-      snapshot.kind === "baseline" ? "is-baseline" : ""
-    }">
-      <div class="history-card-top">
-        <div class="history-card-title">
-          <div class="pill-row">
-            <span class="issue-tag ${getDashboardTaskToneClass(getHistoryKindTone(snapshot.kind))}">${escapeHtml(
-              getHistoryKindLabel(snapshot.kind)
-            )}</span>
-            ${isCurrent ? '<span class="issue-tag is-good">当前版本</span>' : ""}
-          </div>
-          <strong>${escapeHtml(title)}</strong>
-        </div>
-        <span class="history-card-time">${escapeHtml(formatDate(snapshot.createdAt))}</span>
-      </div>
-      <div class="history-card-meta">${escapeHtml(metaLabel)}</div>
-      <div class="history-card-actions">
-        ${
-          canRestore
-            ? `<button class="toolbar-button ${isCompact ? "" : "toolbar-button-primary"}" data-action="restore-project-history" data-history-index="${Number(
-                snapshot.index ?? -1
-              )}">
-                恢复到这里
-              </button>`
-            : '<button class="toolbar-button" type="button" disabled>当前就在这里</button>'
-        }
-        ${
-          canRelabel
-            ? `<button class="toolbar-button" data-action="rename-project-history-snapshot" data-history-index="${Number(
-                snapshot.index ?? -1
-              )}">
-                改备注
-              </button>`
-            : ""
-        }
-      </div>
-    </article>
-  `;
+  return projectHistoryTools.renderHistorySnapshotCard(snapshot, {
+    ...options,
+    escapeHtml,
+    formatDate,
+    getDashboardTaskToneClass,
+  });
 }
 
 function renderHistoryTimeline(history = state.projectHistory, options = {}) {
-  const safeHistory = getSafeProjectHistory(history);
-  const snapshots = options.filteredSnapshots ?? getFilteredHistorySnapshots(history);
-
-  if (snapshots.length === 0) {
-    return safeHistory.totalSnapshots > 0
-      ? '<div class="history-empty">当前筛选下还没有命中的快照，可以换个关键词或切回“全部版本”。</div>'
-      : '<div class="history-empty">这个项目还没有可显示的快照时间线。</div>';
-  }
-
-  return snapshots
-    .map((snapshot) => renderHistorySnapshotCard(snapshot, options))
-    .join("");
+  return projectHistoryTools.renderHistoryTimeline(history, {
+    ...options,
+    escapeHtml,
+    formatDate,
+    getDashboardTaskToneClass,
+  });
 }
 
 function formatHistoryRestorePreview(preview) {
@@ -1667,133 +1618,17 @@ function getStarterKitOverview(data = state.data) {
 
 function renderStarterKitPanel(context = "dashboard") {
   const overview = getStarterKitOverview();
-  if (!overview.needsStarterKit) {
-    return "";
-  }
-
   const defaults = getStarterKitDefaults();
-  const contextCopy = {
-    dashboard: "当前项目已经有章节骨架，下一步适合补齐角色、背景和 BGM 的基础条目。",
-    story: "当前剧情已经可以继续写入，补齐角色、背景和 BGM 后，预览和演出会更完整。",
-    assets: "这里可以生成“背景 / 立绘 / BGM”的起步条目，后续再替换成正式素材文件。",
-    characters: "先补齐第一个角色骨架后，台词归属、立绘表情和语音整理会更完整。",
-  };
-
-  return `
-    <section class="detail-card starter-kit-panel">
-      <div class="panel-heading">
-        <h3>第二步起步骨架</h3>
-        <span class="badge badge-soft">补齐基础条目</span>
-      </div>
-      <div class="starter-kit-grid">
-        <article class="starter-kit-card is-primary">
-          <span class="eyebrow">当前进度</span>
-          <strong>补齐角色与基础素材</strong>
-          <p>${escapeHtml(contextCopy[context] ?? contextCopy.dashboard)}</p>
-          <div class="scene-card-tags">
-            ${overview.missingLabels
-              .map((label) => `<span class="issue-tag warn-text">待补：${escapeHtml(label)}</span>`)
-              .join("")}
-          </div>
-          <div class="pill-row">
-            ${overview.missingCharacter ? `<span class="pill">角色默认名：${escapeHtml(defaults.characterName)}</span>` : ""}
-            ${overview.missingBackground ? `<span class="pill">背景默认名：${escapeHtml(defaults.backgroundName)}</span>` : ""}
-            ${overview.missingBgm ? `<span class="pill">BGM 默认名：${escapeHtml(defaults.bgmName)}</span>` : ""}
-          </div>
-          <div class="action-row">
-            <button class="toolbar-button toolbar-button-primary" type="button" data-action="create-starter-kit">
-              一键生成起步骨架
-            </button>
-            <button class="toolbar-button" type="button" data-action="create-starter-kit-custom">
-              自定义名字再生成
-            </button>
-          </div>
-        </article>
-        <article class="starter-kit-card">
-          <span class="eyebrow">生成内容</span>
-          <ul class="blank-project-step-list">
-            ${overview.missingCharacter ? "<li>生成一个角色骨架，并自动带一张默认立绘条目。</li>" : ""}
-            ${overview.missingBackground ? "<li>生成第一张背景条目，方便你后面直接替换成真实图片。</li>" : ""}
-            ${overview.missingBgm ? "<li>生成第一首 BGM 条目，后面导入音乐时不用再从零建分类。</li>" : ""}
-          </ul>
-          <div class="detail-meta">此操作只会补齐条目骨架，不会改动现有剧情内容。</div>
-        </article>
-      </div>
-    </section>
-  `;
+  return beginnerTutorialTools.renderStarterKitPanel(overview, defaults, context, { escapeHtml });
 }
 
 function renderBlankProjectStarterPanel(context = "dashboard") {
   const defaults = getBlankProjectStarterDefaults();
-  const contextCopy =
-    context === "story"
-      ? "当前位于剧情页，先创建第一章和第一场景后，这里就会切换成可编辑的剧情工作台。"
-      : "当前项目还是空白状态，创建第一章和第一场景后即可继续填充台词、角色和素材。";
-
-  return `
-    <section class="panel blank-project-panel">
-      <div class="panel-heading">
-        <h2>空白项目首次引导</h2>
-        <span class="badge badge-soft">初始步骤</span>
-      </div>
-      <div class="blank-project-grid">
-        <article class="blank-project-card is-primary">
-          <span class="eyebrow">当前进度</span>
-          <h3>创建第一章和第一场景</h3>
-          <p>${escapeHtml(contextCopy)}</p>
-          <div class="pill-row">
-            <span class="pill">默认章节：${escapeHtml(defaults.chapterName)}</span>
-            <span class="pill">默认场景：${escapeHtml(defaults.firstSceneName)}</span>
-          </div>
-          <div class="action-row">
-            <button class="toolbar-button toolbar-button-primary" type="button" data-action="create-first-chapter">
-              一键创建第一章
-            </button>
-            <button class="toolbar-button" type="button" data-action="create-first-chapter-custom">
-              自定义名字再创建
-            </button>
-          </div>
-          <div class="detail-meta">章节名和场景名后续仍可修改。</div>
-        </article>
-        <article class="blank-project-card">
-          <span class="eyebrow">后续顺序</span>
-          <h3>开工顺序</h3>
-          <ol class="blank-project-step-list">
-            <li>先写出第一段旁白和第一句台词。</li>
-            <li>再去素材页导入第一张背景和一首 BGM。</li>
-            <li>然后回角色页补角色名、表情和立绘。</li>
-          </ol>
-          <div class="action-row">
-            <button class="toolbar-button" type="button" data-action="switch-screen" data-screen="assets">
-              打开素材页
-            </button>
-            <button class="toolbar-button" type="button" data-action="switch-screen" data-screen="characters">
-              打开角色页
-            </button>
-          </div>
-        </article>
-      </div>
-    </section>
-  `;
+  return beginnerTutorialTools.renderBlankProjectStarterPanel(defaults, context, { escapeHtml });
 }
 
 function renderBlankStoryWorkspacePanel() {
-  return `
-    <div class="blank-story-workspace">
-      <div class="blank-story-workspace-copy">
-        <strong>剧情工作台还没有章节和场景</strong>
-        <p>创建第一章和第一场景后，这里会切换成可编辑状态。</p>
-      </div>
-      <div class="action-row">
-        <button class="toolbar-button toolbar-button-primary" type="button" data-action="create-first-chapter">
-          一键创建第一章
-        </button>
-        <button class="toolbar-button" type="button" data-action="create-first-chapter-custom">
-          自定义名字再创建
-        </button>
-      </div>
-    </div>
-  `;
+  return beginnerTutorialTools.renderBlankStoryWorkspacePanel();
 }
 
 function buildBeginnerDashboardWorkflow(routeOverview) {
@@ -1903,99 +1738,20 @@ function buildBeginnerDashboardWorkflow(routeOverview) {
 }
 
 function getBeginnerWorkflowStepStatusLabel(step) {
-  if (step?.statusLabel) {
-    return step.statusLabel;
-  }
-  return step?.done ? "当前已完成" : "进行中";
+  return beginnerTutorialTools?.getBeginnerWorkflowStepStatusLabel?.(step) ?? (step?.done ? "当前已完成" : "进行中");
 }
 
 function getBeginnerWorkflowStepToneClass(step) {
-  if (step?.done || step?.statusTone === "good") {
-    return "good-text";
-  }
-  if (step?.statusTone === "danger") {
-    return "danger-text";
-  }
-  if (step?.statusTone === "soft") {
-    return "soft-text";
-  }
-  return "warn-text";
+  return beginnerTutorialTools?.getBeginnerWorkflowStepToneClass?.(step) ?? "warn-text";
 }
 
 function renderBeginnerDashboardWorkflow(routeOverview) {
   const workflow = buildBeginnerDashboardWorkflow(routeOverview);
-
-  return `
-    <section class="panel beginner-dashboard-panel">
-      <div class="panel-heading">
-        <div>
-          <h2>新手开工顺序</h2>
-          <span class="panel-note">按当前项目进度显示 4 个主要步骤</span>
-        </div>
-        <span class="badge badge-soft">当前进行项：${escapeHtml(workflow.nextStep.step)}</span>
-      </div>
-      <div class="beginner-dashboard-grid">
-        <article class="beginner-dashboard-card beginner-dashboard-focus-card">
-          <span class="eyebrow">${escapeHtml(workflow.nextStep.step)}</span>
-          <strong>${escapeHtml(workflow.nextStep.title)}</strong>
-          <p>${escapeHtml(workflow.nextStep.description)}</p>
-          <div class="detail-actions">
-            ${workflow.nextStep.actions.map((action, index) => renderQuickActionButton(action, index === 0)).join("")}
-          </div>
-        </article>
-        <div class="beginner-dashboard-step-stack">
-          ${workflow.steps
-            .map(
-              (step) => `
-                <article class="beginner-dashboard-card ${step.done ? "is-done" : ""}">
-                  <span class="workflow-step-label">${escapeHtml(step.step)}</span>
-                  <strong>${escapeHtml(step.title)}</strong>
-                  <p>${escapeHtml(step.description)}</p>
-                  <div class="story-filter-chip-row">
-                    <span class="issue-tag ${getBeginnerWorkflowStepToneClass(step)}">
-                      ${escapeHtml(getBeginnerWorkflowStepStatusLabel(step))}
-                    </span>
-                  </div>
-                </article>
-              `
-            )
-            .join("")}
-        </div>
-      </div>
-    </section>
-  `;
+  return beginnerTutorialTools.renderBeginnerDashboardWorkflow(workflow, { escapeHtml, renderQuickActionButton });
 }
 
 function renderBeginnerAdvancedToolsPanel() {
-  return `
-    <section class="panel beginner-advanced-tools-panel">
-      <div class="panel-heading">
-        <div>
-          <h2>更多高级工具</h2>
-          <span class="panel-note">需要分支、校对和发布收尾时可切换到高级模式</span>
-        </div>
-        <span class="badge badge-soft">新手模式默认收起</span>
-      </div>
-      <div class="story-filter-chip-row">
-        <span class="issue-tag">台词台本页</span>
-        <span class="issue-tag">全局检索台</span>
-        <span class="issue-tag">项目安全网时间线</span>
-        <span class="issue-tag">剧情路线图</span>
-        <span class="issue-tag">场景状态看板</span>
-      </div>
-      <article class="detail-card beginner-dashboard-card">
-        <strong>适用阶段</strong>
-        <p>完成基础剧情后，可切换到高级模式处理变量分支、系统校对、历史恢复和正式导出。</p>
-        <div class="detail-actions">
-          ${renderQuickActionButton(
-            { label: "切到高级模式", action: "set-editor-mode", dataset: { "editor-mode": "advanced" } },
-            true
-          )}
-          ${renderQuickActionButton({ label: "先继续写剧情", action: "switch-screen", dataset: { screen: "story" } })}
-        </div>
-      </article>
-    </section>
-  `;
+  return beginnerTutorialTools.renderBeginnerAdvancedToolsPanel({ renderQuickActionButton });
 }
 
 function getSafeOpenAiAssetGenerationType(type) {
@@ -2344,82 +2100,36 @@ function renderProjectCenter() {
 }
 
 function renderProjectCenterCard(project, activeProjectId) {
-  const isActive = project.projectId === activeProjectId;
-  const templateLabel = getTemplateLabel(project.template);
-  const resolution = project.resolution ?? {};
-  const updatedAt = project.updatedAt ? formatDate(project.updatedAt) : "刚创建";
-  const editorMode = getSafeEditorMode(project.editorMode);
+  const renderedCard = projectCenterTools?.renderProjectCenterCard?.(project, activeProjectId, {
+    escapeHtml,
+    formatDate,
+    getTemplateLabel,
+    getSafeEditorMode,
+    getEditorModeLabel,
+  });
+
+  if (renderedCard) {
+    return renderedCard;
+  }
+
+  const isActive = project?.projectId === activeProjectId;
   return `
-    <article class="project-card ${project.isSample ? "is-sample" : ""} ${isActive ? "is-active" : ""}">
+    <article class="project-card ${isActive ? "is-active" : ""}">
       <div class="project-card-head">
         <div class="text-stack">
-          <div class="project-meta-row">
-            <span class="issue-tag ${project.isSample ? "" : "good-text"}">${escapeHtml(
-              project.isSample ? "示例项目" : "空白项目 / 正式项目"
-            )}</span>
-            ${isActive ? '<span class="issue-tag good-text">上次打开</span>' : ""}
-          </div>
-          <h3>${escapeHtml(project.title ?? "未命名项目")}</h3>
-          <p>${escapeHtml(templateLabel)} / ${escapeHtml(project.language ?? "zh-CN")}</p>
+          <h3>${escapeHtml(project?.title ?? "未命名项目")}</h3>
+          <p>项目中心模块暂时不可用，但仍可尝试打开项目。</p>
         </div>
-      </div>
-      <div class="project-card-body">
-        <div class="project-meta-row">
-          <span class="project-center-pill">章节 ${project.chapterCount ?? 0}</span>
-          <span class="project-center-pill">场景 ${project.sceneCount ?? 0}</span>
-          <span class="project-center-pill">分辨率 ${resolution.width ?? 1920} × ${resolution.height ?? 1080}</span>
-          <span class="project-center-pill">${escapeHtml(getEditorModeLabel(editorMode))}</span>
-        </div>
-        <p class="project-card-meta">
-          ${escapeHtml(
-            project.isSample
-              ? "这是保留下来的示例项目，只在你需要参考时再打开。"
-              : (project.sceneCount ?? 0) === 0
-                ? `这是一个真正的空白项目，还没有章节和场景，当前默认用${getEditorModeLabel(editorMode)}开工。`
-                : `这个项目已经有基础内容，可继续写入；当前会按${getEditorModeLabel(editorMode)}打开。`
-          )}
-        </p>
-        <p class="project-card-meta">最近更新：${escapeHtml(updatedAt)}</p>
       </div>
       <div class="project-card-actions">
         <button
           type="button"
           class="toolbar-button toolbar-button-primary"
           data-action="open-project"
-          data-project-id="${escapeHtml(project.projectId ?? "")}"
+          data-project-id="${escapeHtml(project?.projectId ?? "")}"
         >
           ${isActive ? "继续编辑这个项目" : "打开这个项目"}
         </button>
-        <button
-          type="button"
-          class="toolbar-button"
-          data-action="${project.isSample ? "duplicate-project" : "rename-project"}"
-          data-project-id="${escapeHtml(project.projectId ?? "")}"
-        >
-          ${project.isSample ? "复制成正式项目" : "改项目名"}
-        </button>
-        ${
-          project.isSample
-            ? ""
-            : `
-              <button
-                type="button"
-                class="toolbar-button"
-                data-action="duplicate-project"
-                data-project-id="${escapeHtml(project.projectId ?? "")}"
-              >
-                复制项目
-              </button>
-              <button
-                type="button"
-                class="toolbar-button toolbar-button-danger"
-                data-action="delete-project"
-                data-project-id="${escapeHtml(project.projectId ?? "")}"
-              >
-                删除项目
-              </button>
-            `
-        }
       </div>
     </article>
   `;
@@ -8962,60 +8672,23 @@ function getResolvedRecentWorkspaceItems() {
 }
 
 function renderDashboardRecentWorkspaceCard(item) {
-  return `
-    <article class="detail-card recent-work-card is-${item.tone}">
-      <div class="recent-work-top">
-        <span class="issue-tag ${getDashboardTaskToneClass(item.tone)}">${escapeHtml(
-          getRecentWorkspaceTypeLabel(item.type)
-        )}</span>
-        <span class="recent-work-time">${escapeHtml(formatDate(item.updatedAt))}</span>
-      </div>
-      <strong>${escapeHtml(item.title)}</strong>
-      <p class="recent-work-summary">${escapeHtml(item.summary)}</p>
-      <div class="detail-meta">${escapeHtml(item.subtitle)}</div>
-      <div class="script-entry-actions">
-        ${renderDashboardTaskActions(item.actions)}
-      </div>
-    </article>
-  `;
+  return recentWorkspaceTools.renderDashboardRecentWorkspaceCard(item, {
+    escapeHtml,
+    formatDate,
+    getDashboardTaskToneClass,
+    renderDashboardTaskActions,
+  });
 }
 
 function renderDashboardRecentWorkspacePanel() {
-  const items = getResolvedRecentWorkspaceItems();
-  const sceneCount = items.filter((item) => item.type === "scene").length;
-  const scriptCount = items.filter((item) => item.type === "script").length;
-  const assetCount = items.filter((item) => item.type === "asset").length;
-  const characterCount = items.filter((item) => item.type === "character").length;
-
-  return `
-    <section class="panel recent-work-panel">
-      <div class="panel-heading recent-work-heading">
-        <div>
-          <h2>最近工作区</h2>
-          <span class="panel-note">最近使用过的场景、台本、素材和角色会记录在这里</span>
-        </div>
-        <button
-          class="toolbar-button"
-          type="button"
-          data-action="clear-recent-workspace"
-          ${items.length > 0 ? "" : "disabled"}
-        >
-          清空记录
-        </button>
-      </div>
-      <div class="route-summary-strip">
-        ${renderRouteMetricCard("场景", sceneCount, "最近切过或回去继续写的场景")}
-        ${renderRouteMetricCard("台本", scriptCount, "最近直接定位过的正文入口")}
-        ${renderRouteMetricCard("素材", assetCount, "最近查看或处理过的素材")}
-        ${renderRouteMetricCard("角色", characterCount, "最近回头确认过的角色资料")}
-      </div>
-      ${
-        items.length > 0
-          ? `<div class="recent-work-grid">${items.map((item) => renderDashboardRecentWorkspaceCard(item)).join("")}</div>`
-          : renderEmpty("开始写剧情、补素材、查看角色或定位台本后，这里会记录最近的工作位置。")
-      }
-    </section>
-  `;
+  return recentWorkspaceTools.renderDashboardRecentWorkspacePanel(getResolvedRecentWorkspaceItems(), {
+    escapeHtml,
+    formatDate,
+    getDashboardTaskToneClass,
+    renderDashboardTaskActions,
+    renderRouteMetricCard,
+    renderEmpty,
+  });
 }
 
 function renderProjectHistoryPanel() {
@@ -9722,72 +9395,15 @@ function renderDashboardActionBrief(routeOverview) {
 }
 
 function renderProjectMilestoneGapList(gaps = []) {
-  if (!gaps.length) {
-    return `
-      <div class="project-milestone-gap-list">
-        <article class="project-milestone-gap-item is-done">
-          <strong>核心发布门槛已达标</strong>
-          <span>可以进入人工长流程试玩、附件整理和 Release notes 准备。</span>
-        </article>
-      </div>
-    `;
-  }
-
-  return `
-    <div class="project-milestone-gap-list">
-      ${gaps
-        .map(
-          (gap) => `
-            <article class="project-milestone-gap-item">
-              <strong>${escapeHtml(gap.label ?? "待处理项")}</strong>
-              <span>${escapeHtml(gap.missing || gap.detail || "继续补齐这个发布候选条件。")}</span>
-            </article>
-          `
-        )
-        .join("")}
-    </div>
-  `;
+  return projectMilestoneTools.renderProjectMilestoneGapList(gaps, { escapeHtml });
 }
 
 function renderProjectMilestoneChecklist(checks = []) {
-  const orderedChecks = [...checks.filter((check) => !check.done), ...checks.filter((check) => check.done)];
-  const visibleChecks = orderedChecks.slice(0, 5);
-  const hiddenCount = Math.max(orderedChecks.length - visibleChecks.length, 0);
-
-  return `
-    <div class="project-milestone-checklist">
-      ${visibleChecks
-        .map(
-          (check) => `
-            <div class="project-milestone-check ${check.done ? "is-done" : "is-open"}">
-              <span class="project-milestone-check-dot" aria-hidden="true"></span>
-              <div>
-                <strong>${escapeHtml(check.label)}</strong>
-                <span>${escapeHtml(check.done ? check.detail : check.missing)}</span>
-              </div>
-            </div>
-          `
-        )
-        .join("")}
-      ${
-        hiddenCount > 0
-          ? `<div class="project-milestone-more">还有 ${hiddenCount} 项细节已收起，进入项目巡检可继续查看。</div>`
-          : ""
-      }
-    </div>
-  `;
+  return projectMilestoneTools.renderProjectMilestoneChecklist(checks, { escapeHtml });
 }
 
 function renderProjectMilestoneActions(actions = []) {
-  if (actions.length === 0) {
-    return `
-      <button type="button" class="toolbar-button toolbar-button-primary" data-action="switch-screen" data-screen="preview">
-        去试玩确认
-      </button>
-    `;
-  }
-
-  return actions.map((action, index) => renderQuickActionButton(action, index === 0)).join("");
+  return projectMilestoneTools.renderProjectMilestoneActions(actions, { escapeHtml, renderQuickActionButton });
 }
 
 function renderProjectMilestoneGapDigest(digest) {
@@ -10655,140 +10271,11 @@ function renderDashboardProductionTaskCard(task) {
 }
 
 function renderDashboardTaskActions(actions = []) {
-  return actions
-    .slice(0, 2)
-    .map((action, index) => renderQuickActionButton(action, index === 0))
-    .join("");
+  return editorCommonTools.renderDashboardTaskActions(actions);
 }
 
 function renderQuickActionButton(action, emphasized = false) {
-  const className = `toolbar-button${emphasized ? " toolbar-button-primary" : ""}`;
-  const label = escapeHtml(action.label ?? "去处理");
-  const disabledMarkup = action.disabled ? ' disabled aria-disabled="true"' : "";
-  const titleMarkup = action.title ? ` title="${escapeHtml(action.title)}"` : "";
-  const datasetMarkup = Object.entries(action.dataset ?? {})
-    .map(([key, value]) => ` data-${key}="${escapeHtml(String(value ?? ""))}"`)
-    .join("");
-
-  if (action.href) {
-    return `
-      <a
-        class="${className}"
-        href="${escapeHtml(action.href)}"
-        target="_blank"
-        rel="noreferrer"
-      >
-        ${label}
-      </a>
-    `;
-  }
-
-  if (action.action === "open-scene-from-map" || action.action === "preview-scene-from-map") {
-    return `
-      <button
-        type="button"
-        class="${className}"
-        data-action="${action.action}"
-        data-scene-id="${escapeHtml(action.sceneId ?? "")}"
-      >
-        ${label}
-      </button>
-    `;
-  }
-
-  if (action.action === "open-character-line") {
-    return `
-      <button
-        type="button"
-        class="${className}"
-        data-action="open-character-line"
-        data-scene-id="${escapeHtml(action.sceneId ?? "")}"
-        data-block-id="${escapeHtml(action.blockId ?? "")}"
-      >
-        ${label}
-      </button>
-    `;
-  }
-
-  if (action.action === "preview-story-location") {
-    return `
-      <button
-        type="button"
-        class="${className}"
-        data-action="preview-story-location"
-        data-scene-id="${escapeHtml(action.sceneId ?? "")}"
-        data-block-id="${escapeHtml(action.blockId ?? "")}"
-      >
-        ${label}
-      </button>
-    `;
-  }
-
-  if (action.action === "open-dashboard-character") {
-    return `
-      <button
-        type="button"
-        class="${className}"
-        data-action="open-dashboard-character"
-        data-character-id="${escapeHtml(action.characterId ?? "")}"
-      >
-        ${label}
-      </button>
-    `;
-  }
-
-  if (action.action === "open-script-chapter-scene") {
-    return `
-      <button
-        type="button"
-        class="${className}"
-        data-action="open-script-chapter-scene"
-        data-chapter-id="${escapeHtml(action.chapterId ?? "")}"
-      >
-        ${label}
-      </button>
-    `;
-  }
-
-  if (action.action === "open-asset-from-issue") {
-    return `
-      <button
-        type="button"
-        class="${className}"
-        data-action="open-asset-from-issue"
-        data-asset-id="${escapeHtml(action.assetId ?? "")}"
-      >
-        ${label}
-      </button>
-    `;
-  }
-
-  if (action.action === "switch-screen") {
-    const screen = action.screen ?? action.dataset?.screen ?? "dashboard";
-    return `
-      <button
-        type="button"
-        class="${className}"
-        data-action="switch-screen"
-        data-screen="${escapeHtml(screen)}"
-      >
-        ${label}
-      </button>
-    `;
-  }
-
-  return `
-    <button
-      type="button"
-      class="${className}"
-      data-action="${escapeHtml(action.action ?? "")}"
-      ${titleMarkup}
-      ${disabledMarkup}
-      ${datasetMarkup}
-    >
-      ${label}
-    </button>
-  `;
+  return editorCommonTools.renderQuickActionButton(action, emphasized);
 }
 
 function getDashboardTaskToneClass(tone) {
@@ -11165,13 +10652,7 @@ function getRouteAlertPriority(tone) {
 }
 
 function renderRouteMetricCard(label, value, hint) {
-  return `
-    <article class="route-metric-card">
-      <span>${escapeHtml(label)}</span>
-      <strong>${escapeHtml(String(value))}</strong>
-      <small>${escapeHtml(hint)}</small>
-    </article>
-  `;
+  return editorCommonTools.renderRouteMetricCard(label, value, hint);
 }
 
 function renderRouteMapBoard(routeOverview) {
@@ -18615,12 +18096,7 @@ function persistPreviewPlaybackSettings() {
 }
 
 function renderGlobalUiThemeSwitch() {
-  const activeMode = getSafeUiThemeMode(state.previewPlayback?.uiThemeMode);
-  refs.globalUiThemeButtons?.forEach((button) => {
-    const isActive = button.dataset.uiThemeMode === activeMode;
-    button.classList.toggle("is-active", isActive);
-    button.setAttribute("aria-pressed", isActive ? "true" : "false");
-  });
+  uiThemeTools.syncGlobalUiThemeButtons(refs.globalUiThemeButtons, state.previewPlayback?.uiThemeMode);
 }
 
 function syncEditorUiThemeControls() {
@@ -29299,29 +28775,15 @@ function getValidationIssueRecovery(issue, level = "warning") {
 }
 
 function renderDetailRows(rows) {
-  return rows
-    .map(
-      ([label, value]) => `
-        <div class="detail-row">
-          <label>${escapeHtml(label)}</label>
-          <div class="value">${escapeHtml(String(value))}</div>
-        </div>
-      `
-    )
-    .join("");
+  return editorCommonTools.renderDetailRows(rows);
 }
 
 function renderStatCard(label, value) {
-  return `
-    <article class="stat-card">
-      <h3>${escapeHtml(label)}</h3>
-      <strong>${value}</strong>
-    </article>
-  `;
+  return editorCommonTools.renderStatCard(label, value);
 }
 
 function renderEmpty(text) {
-  return `<div class="empty-note">${escapeHtml(text)}</div>`;
+  return editorCommonTools.renderEmpty(text);
 }
 
 function getSelectedScene() {
@@ -30083,346 +29545,92 @@ function renderStoryScenePlanner(scene, routeNode = null) {
 }
 
 function renderBlockManagementCard(scene, selectedIndex) {
-  const blockCount = scene?.blocks?.length ?? 0;
-
-  return `
-    <article class="editor-card">
-      <h3>管理这张卡片</h3>
-      <p>如果顺序不对，可以先上移、下移，确认无误后再继续编辑内容。</p>
-      ${renderDetailRows([
-        ["所在场景", scene?.name ?? "未选择"],
-        ["当前顺序", `第 ${selectedIndex + 1} 张 / 共 ${blockCount} 张`],
-      ])}
-      <div class="detail-actions">
-        <button class="toolbar-button" data-action="move-block-up" ${selectedIndex <= 0 ? "disabled" : ""}>
-          上移一格
-        </button>
-        <button class="toolbar-button" data-action="duplicate-block">复制这张卡片</button>
-        <button
-          class="toolbar-button"
-          data-action="move-block-down"
-          ${selectedIndex >= blockCount - 1 ? "disabled" : ""}
-        >
-          下移一格
-        </button>
-        <button class="toolbar-button toolbar-button-danger" data-action="delete-block">删除这张卡片</button>
-      </div>
-    </article>
-  `;
+  return storyBlockEditorTools.renderBlockManagementCard(scene, selectedIndex, { renderDetailRows });
 }
 
 function renderReadonlyBlockPanel(block) {
-  return `
-    ${renderDetailRows(buildBlockDetails(block))}
-    <article class="editor-card">
-      <h3>高级兼容卡片</h3>
-      <p>这张卡片会完整保留在项目数据和导出流程中。当前界面先显示结构详情，适合检查从旧版本或自定义扩展导入的高级内容。</p>
-    </article>
-  `;
+  return storyBlockEditorTools.renderReadonlyBlockPanel(block, { renderDetailRows, buildBlockDetails });
 }
 
 function renderReadableTextQualityTools(text, label) {
-  const toolState = getReadableTextToolState(text);
-
-  return `
-    <div class="readable-text-tools ${toolState.isLong ? "is-warning" : ""}" data-readable-text-tools>
-      <div>
-        <strong>${escapeHtml(label)}可读性</strong>
-        <p class="helper-text" data-readable-summary>
-          ${escapeHtml(buildReadableTextSummary(toolState.metrics))}
-        </p>
-      </div>
-      <span class="issue-tag ${toolState.toneClass}" data-readable-status>${toolState.statusText}</span>
-      <button
-        type="button"
-        class="toolbar-button"
-        data-action="split-readable-block"
-        data-readable-split-button
-        ${toolState.canSplit ? "" : "disabled"}
-      >
-        拆成长文本卡片
-      </button>
-    </div>
-  `;
+  return storyBlockEditorTools.renderReadableTextQualityTools(text, label, {
+    escapeHtml,
+    getReadableTextToolState,
+    buildReadableTextSummary,
+  });
 }
 
 function renderDialogueEditor(block) {
-  const speakerId = getSafeCharacterId(block.speakerId);
-  const expressionId = getSafeExpressionId(speakerId, block.expressionId);
-  const voiceAssets = state.data.assetList.filter((asset) => asset.type === "voice");
-  const boundVoiceAsset = block.voiceAssetId ? state.data.assetsById.get(block.voiceAssetId) : null;
-  const voiceHelperCard = block.voiceAssetId
-    ? `
-        <article class="editor-card">
-          <h3>这句已经绑好语音</h3>
-          <p>当前绑定的是“${escapeHtml(boundVoiceAsset?.name ?? block.voiceAssetId)}”。如果还没上传真实音频，后面去素材页替换这个语音条目就行。</p>
-        </article>
-      `
-    : `
-        <article class="editor-card">
-          <h3>这句还没有语音</h3>
-          <p>如需先搭起配音工作流，可直接生成一个语音占位条目；系统会自动绑定到这句台词，后续再上传真实文件即可。</p>
-          <div class="detail-actions">
-            <button
-              class="toolbar-button"
-              data-action="create-voice-placeholder"
-              data-scene-id="${state.selectedSceneId}"
-              data-block-id="${block.id}"
-            >
-              一键生成语音条目并绑定
-            </button>
-          </div>
-        </article>
-      `;
-
-  return `
-    <article class="editor-card">
-      <h3>编辑这句台词</h3>
-      <p>改完以后点“保存这张卡片”，内容就会写回示例项目 JSON。</p>
-    </article>
-    ${voiceHelperCard}
-    <div class="field-grid">
-      <div class="detail-row">
-        <label for="editorSpeakerId">说话角色</label>
-        <select id="editorSpeakerId">
-          ${state.data.characters
-            .map(
-              (character) => `
-                <option value="${character.id}" ${character.id === speakerId ? "selected" : ""}>
-                  ${escapeHtml(character.displayName)}
-                </option>
-              `
-            )
-            .join("")}
-        </select>
-      </div>
-      <div class="detail-row">
-        <label for="editorExpressionId">角色表情</label>
-        <select id="editorExpressionId">
-          ${renderExpressionOptions(speakerId, expressionId)}
-        </select>
-      </div>
-      <div class="detail-row">
-        <label for="editorVoiceAssetId">绑定语音</label>
-        <select id="editorVoiceAssetId">
-          <option value="">暂时不绑定语音</option>
-          ${voiceAssets
-            .map(
-              (asset) => `
-                <option value="${asset.id}" ${asset.id === (block.voiceAssetId ?? "") ? "selected" : ""}>
-                  ${escapeHtml(asset.name)}
-                </option>
-              `
-            )
-            .join("")}
-        </select>
-      </div>
-      <div class="detail-row">
-        <label for="editorDialogueText">台词内容</label>
-        <textarea id="editorDialogueText">${escapeHtml(block.text ?? "")}</textarea>
-        ${renderReadableTextQualityTools(block.text, "台词")}
-      </div>
-    </div>
-    <div class="detail-actions">
-      <button class="toolbar-button toolbar-button-primary" data-action="save-block">保存这张卡片</button>
-    </div>
-  `;
+  return storyBlockEditorTools.renderDialogueEditor(block, {
+    escapeHtml,
+    selectedSceneId: state.selectedSceneId,
+    characters: state.data.characters,
+    voiceAssets: state.data.assetList.filter((asset) => asset.type === "voice"),
+    assetsById: state.data.assetsById,
+    getSafeCharacterId,
+    getSafeExpressionId,
+    renderExpressionOptions,
+    renderReadableTextQualityTools,
+  });
 }
 
 function renderChoiceEditor(block) {
-  const choiceOptions = block.options?.length ? block.options : createDefaultChoiceOptions(block.id);
-  const options = choiceOptions.map(
-    (option, index) => renderChoiceOptionEditorRow(option, index, choiceOptions.length)
-  );
-
-  return `
-    <article class="editor-card">
-      <h3>编辑这个选项分支</h3>
-      <p>每个选项都能设置文案、跳转场景，还能追加好感度变化、开关变化和路线记录这类附加效果。</p>
-    </article>
-    ${renderDetailRows([
-      ["卡片类型", BLOCK_LABELS[block.type] ?? block.type],
-      ["当前选项数", choiceOptions.length],
-    ])}
-    ${renderChoiceCountQualityTools(choiceOptions.length)}
-    <div id="choiceOptionsEditor" class="option-editor-list">
-      ${options.join("")}
-    </div>
-    <div class="detail-actions">
-      <button class="toolbar-button" data-action="add-choice-option">再加一个选项</button>
-      <button class="toolbar-button toolbar-button-primary" data-action="save-block">保存这张卡片</button>
-    </div>
-  `;
+  return storyBlockEditorTools.renderChoiceEditor(block, {
+    blockLabels: BLOCK_LABELS,
+    createDefaultChoiceOptions,
+    renderDetailRows,
+    renderChoiceCountQualityTools,
+    renderChoiceOptionEditorRow,
+  });
 }
 
 function renderNarrationEditor(block) {
-  return `
-    <article class="editor-card">
-      <h3>编辑这段旁白</h3>
-      <p>旁白不会显示角色名，只负责推进气氛和叙述信息。</p>
-    </article>
-    <div class="field-grid">
-      <div class="detail-row">
-        <label for="editorNarrationText">旁白内容</label>
-        <textarea id="editorNarrationText">${escapeHtml(block.text ?? "")}</textarea>
-        ${renderReadableTextQualityTools(block.text, "旁白")}
-      </div>
-    </div>
-    <div class="detail-actions">
-      <button class="toolbar-button toolbar-button-primary" data-action="save-block">保存这张卡片</button>
-    </div>
-  `;
+  return storyBlockEditorTools.renderNarrationEditor(block, {
+    escapeHtml,
+    renderReadableTextQualityTools,
+  });
 }
 
 function renderChoiceCountQualityTools(optionCount) {
-  const safeCount = Math.max(Number(optionCount) || 0, 0);
-  const isCrowded = safeCount > VN_CHOICE_MANY_OPTIONS;
-
-  return `
-    <div class="choice-count-tools ${isCrowded ? "is-warning" : ""}" data-choice-count-tools>
-      <div>
-        <strong>选项按钮区</strong>
-        <p class="helper-text" data-choice-count-summary>${escapeHtml(buildChoiceCountSummary(safeCount))}</p>
-      </div>
-      <span class="issue-tag ${isCrowded ? "warn-text" : "good-text"}" data-choice-count-status>
-        ${isCrowded ? "按钮偏多" : "数量舒适"}
-      </span>
-    </div>
-  `;
+  return storyBlockEditorTools.renderChoiceCountQualityTools(optionCount, {
+    escapeHtml,
+    choiceManyOptionsThreshold: VN_CHOICE_MANY_OPTIONS,
+    buildChoiceCountSummary,
+  });
 }
 
 function renderBackgroundEditor(block) {
-  const backgroundAssets = state.data.assetList.filter((asset) => ["background", "scene3d"].includes(asset.type));
-  const transition = getSafeTransition(block.transition);
-  const scene3dPreview = getSafeScene3dPreviewConfig(block.scene3dPreview);
-
-  return `
-    <article class="editor-card">
-      <h3>编辑背景切换</h3>
-      <p>这里决定这一张卡片出现时，画面切到哪张背景；也可以选择 3D 场景资产，原生 Runtime 会进入交互预览桥。</p>
-    </article>
-    <div class="field-grid">
-      <div class="detail-row">
-        <label for="editorBackgroundAssetId">背景 / 3D 场景</label>
-        <select id="editorBackgroundAssetId">
-          ${backgroundAssets
-            .map(
-              (asset) => `
-                <option value="${asset.id}" ${asset.id === block.assetId ? "selected" : ""}>
-                  ${escapeHtml(asset.name)}${asset.type === "scene3d" ? " · 3D 场景" : ""}
-                </option>
-              `
-            )
-            .join("")}
-        </select>
-      </div>
-      <div class="detail-row">
-        <label for="editorTransition">切换方式</label>
-        <select id="editorTransition">
-          ${renderTransitionOptions(transition, { basic: true })}
-        </select>
-      </div>
-      <div class="detail-row">
-        <label>3D 场景默认视角</label>
-        <div class="field-grid compact-grid">
-          <label>
-            <span>Yaw 旋转</span>
-            <input id="editorScene3dYaw" type="number" min="0" max="359" step="1" value="${scene3dPreview.yaw}" />
-          </label>
-          <label>
-            <span>Pitch 俯仰</span>
-            <input id="editorScene3dPitch" type="number" min="12" max="72" step="1" value="${scene3dPreview.pitch}" />
-          </label>
-          <label>
-            <span>Zoom 缩放</span>
-            <input id="editorScene3dZoom" type="number" min="0.55" max="1.9" step="0.05" value="${scene3dPreview.zoom}" />
-          </label>
-        </div>
-        <p class="helper-text">当这里选择的是 3D 场景素材时，原生 Runtime 会用这组参数初始化空间预览桥。</p>
-      </div>
-      <label class="toggle-row">
-        <input id="editorScene3dInteractionEnabled" type="checkbox" ${scene3dPreview.interactionEnabled ? "checked" : ""} />
-        <span>允许玩家在原生 Runtime 中用方向键和 +/- 微调 3D 场景视角</span>
-      </label>
-    </div>
-    <div class="detail-actions">
-      <button class="toolbar-button toolbar-button-primary" data-action="save-block">保存这张卡片</button>
-    </div>
-  `;
+  return storyBlockEditorTools.renderBackgroundEditor(block, {
+    escapeHtml,
+    backgroundAssets: state.data.assetList.filter((asset) => ["background", "scene3d"].includes(asset.type)),
+    getSafeTransition,
+    getSafeScene3dPreviewConfig,
+    renderTransitionOptions,
+  });
 }
 
 function renderCharacterShowEditor(block) {
-  const characterId = getSafeCharacterId(block.characterId);
-  const expressionId = getSafeExpressionId(characterId, block.expressionId);
-  const position = getSafePosition(block.position);
-  const transition = getSafeTransition(block.transition);
-  const stage = getCharacterStageFromBlock(block);
-
-  return `
-    <article class="editor-card">
-      <h3>编辑角色出场</h3>
-      <p>这里决定是谁出场、用什么表情、站在画面哪里，以及如何出现。需要更细的舞台调度时，可以继续微调立绘位置、大小和层级。</p>
-    </article>
-    <div class="field-grid">
-      <div class="detail-row">
-        <label for="editorCharacterId">显示哪个角色</label>
-        <select id="editorCharacterId">
-          ${renderCharacterOptions(characterId)}
-        </select>
-      </div>
-      <div class="detail-row">
-        <label for="editorExpressionId">角色表情</label>
-        <select id="editorExpressionId">
-          ${renderExpressionOptions(characterId, expressionId)}
-        </select>
-      </div>
-      <div class="detail-row">
-        <label for="editorCharacterPosition">显示位置</label>
-        <select id="editorCharacterPosition">
-          ${renderPositionOptions(position)}
-        </select>
-      </div>
-      <div class="detail-row">
-        <label for="editorTransition">出场方式</label>
-        <select id="editorTransition">
-          ${renderTransitionOptions(transition)}
-        </select>
-      </div>
-      ${renderCharacterStageControls(stage)}
-    </div>
-    <div class="detail-actions">
-      <button class="toolbar-button toolbar-button-primary" data-action="save-block">保存这张卡片</button>
-    </div>
-  `;
+  return storyBlockEditorTools.renderCharacterShowEditor(block, {
+    getSafeCharacterId,
+    getSafeExpressionId,
+    getSafePosition,
+    getSafeTransition,
+    getCharacterStageFromBlock,
+    renderCharacterOptions,
+    renderExpressionOptions,
+    renderPositionOptions,
+    renderTransitionOptions,
+    renderCharacterStageControls,
+  });
 }
 
 function renderCharacterHideEditor(block) {
-  const characterId = getSafeCharacterId(block.characterId);
-  const transition = getSafeTransition(block.transition);
-
-  return `
-    <article class="editor-card">
-      <h3>编辑角色退场</h3>
-      <p>这里决定哪位角色离开画面，以及退场方式。</p>
-    </article>
-    <div class="field-grid">
-      <div class="detail-row">
-        <label for="editorCharacterId">隐藏哪个角色</label>
-        <select id="editorCharacterId">
-          ${renderCharacterOptions(characterId)}
-        </select>
-      </div>
-      <div class="detail-row">
-        <label for="editorTransition">退场方式</label>
-        <select id="editorTransition">
-          ${renderTransitionOptions(transition)}
-        </select>
-      </div>
-    </div>
-    <div class="detail-actions">
-      <button class="toolbar-button toolbar-button-primary" data-action="save-block">保存这张卡片</button>
-    </div>
-  `;
+  return storyBlockEditorTools.renderCharacterHideEditor(block, {
+    getSafeCharacterId,
+    getSafeTransition,
+    renderCharacterOptions,
+    renderTransitionOptions,
+  });
 }
 
 function getMusicRangeCandidateBlocks(block = {}) {
@@ -30468,1373 +29676,162 @@ function renderMusicRangeEndBlockOptions(block) {
 }
 
 function renderMusicPlayEditor(block) {
-  const musicAssets = state.data.assetList.filter((asset) => asset.type === "bgm");
-  const assetId = getSafeAssetIdByType("bgm", block.assetId);
-  const endMode = getSafeMusicEndMode(block.endMode);
-  const hasRangeCandidates = getMusicRangeCandidateBlocks(block).length > 0;
-
-  return `
-    <article class="editor-card">
-      <h3>编辑背景音乐</h3>
-      <p>这里决定播哪首 BGM、是否循环、淡入多久，以及这首歌覆盖哪一段剧情。</p>
-    </article>
-    <div class="field-grid">
-      <div class="detail-row">
-        <label for="editorMusicAssetId">音乐素材</label>
-        <select id="editorMusicAssetId">
-          ${musicAssets
-            .map(
-              (asset) => `
-                <option value="${asset.id}" ${asset.id === assetId ? "selected" : ""}>
-                  ${escapeHtml(asset.name)}
-                </option>
-              `
-            )
-            .join("")}
-        </select>
-      </div>
-      <div class="detail-row">
-        <label for="editorMusicLoop">是否循环</label>
-        <select id="editorMusicLoop">
-          <option value="true" ${block.loop !== false ? "selected" : ""}>循环播放</option>
-          <option value="false" ${block.loop === false ? "selected" : ""}>只播放一次</option>
-        </select>
-      </div>
-      <div class="detail-row">
-        <label for="editorMusicEndMode">播放范围</label>
-        <select id="editorMusicEndMode">
-          ${renderMusicEndModeOptions(endMode)}
-        </select>
-        <p class="helper-text">可以让这首 BGM 自动覆盖一段文本，而不是只能机械地靠下一张音乐卡切换。</p>
-      </div>
-      <div class="detail-row">
-        <label for="editorMusicEndBlockId">范围结束卡片</label>
-        <select id="editorMusicEndBlockId" ${hasRangeCandidates ? "" : "disabled"}>
-          ${renderMusicRangeEndBlockOptions(block)}
-        </select>
-        <p class="helper-text">当播放范围选“播到指定卡片后”时，会在玩家看完这张卡片后自动淡出停止。</p>
-      </div>
-      <div class="detail-row">
-        <label for="editorFadeInMs">淡入时间（毫秒）</label>
-        <input id="editorFadeInMs" type="number" min="0" step="100" value="${escapeHtml(
-          String(block.fadeInMs ?? 0)
-        )}" />
-      </div>
-      <div class="detail-row">
-        <label for="editorMusicRangeFadeOutMs">范围结束淡出（毫秒）</label>
-        <input id="editorMusicRangeFadeOutMs" type="number" min="0" step="100" value="${escapeHtml(
-          String(block.fadeOutMs ?? 600)
-        )}" />
-      </div>
-    </div>
-    <div class="detail-actions">
-      <button class="toolbar-button toolbar-button-primary" data-action="save-block">保存这张卡片</button>
-    </div>
-  `;
+  return storyBlockEditorTools.renderMusicPlayEditor(block, {
+    escapeHtml,
+    musicAssets: state.data.assetList.filter((asset) => asset.type === "bgm"),
+    hasRangeCandidates: getMusicRangeCandidateBlocks(block).length > 0,
+    getSafeAssetIdByType,
+    getSafeMusicEndMode,
+    renderMusicEndModeOptions,
+    renderMusicRangeEndBlockOptions,
+  });
 }
 
 function renderMusicStopEditor(block) {
-  return `
-    <article class="editor-card">
-      <h3>编辑停止音乐</h3>
-      <p>这里决定当前 BGM 什么时候停，以及淡出多久。</p>
-    </article>
-    <div class="field-grid">
-      <div class="detail-row">
-        <label for="editorFadeOutMs">淡出时间（毫秒）</label>
-        <input id="editorFadeOutMs" type="number" min="0" step="100" value="${escapeHtml(
-          String(block.fadeOutMs ?? 0)
-        )}" />
-      </div>
-    </div>
-    <div class="detail-actions">
-      <button class="toolbar-button toolbar-button-primary" data-action="save-block">保存这张卡片</button>
-    </div>
-  `;
+  return storyBlockEditorTools.renderMusicStopEditor(block, { escapeHtml });
 }
 
 function renderSfxPlayEditor(block) {
-  const sfxAssets = state.data.assetList.filter((asset) => asset.type === "sfx");
-  const assetId = getSafeAssetIdByType("sfx", block.assetId);
-
-  return `
-    <article class="editor-card">
-      <h3>编辑音效播放</h3>
-      <p>这里决定当前卡片触发时播放哪一个音效。</p>
-    </article>
-    <div class="field-grid">
-      <div class="detail-row">
-        <label for="editorSfxAssetId">音效素材</label>
-        <select id="editorSfxAssetId">
-          ${sfxAssets
-            .map(
-              (asset) => `
-                <option value="${asset.id}" ${asset.id === assetId ? "selected" : ""}>
-                  ${escapeHtml(asset.name)}
-                </option>
-              `
-            )
-            .join("")}
-        </select>
-      </div>
-    </div>
-    <div class="detail-actions">
-      <button class="toolbar-button toolbar-button-primary" data-action="save-block">保存这张卡片</button>
-    </div>
-  `;
+  return storyBlockEditorTools.renderSfxPlayEditor(block, {
+    escapeHtml,
+    sfxAssets: state.data.assetList.filter((asset) => asset.type === "sfx"),
+    getSafeAssetIdByType,
+  });
 }
 
 function renderVideoPlayEditor(block) {
-  const videoAssets = state.data.assetList.filter((asset) => asset.type === "video");
-  const assetId = getSafeAssetIdByType("video", block.assetId);
-  const startTimeSeconds = getSafeNonNegativeNumber(block.startTimeSeconds, 0);
-  const endTimeSeconds = getSafeNonNegativeNumber(block.endTimeSeconds, 0);
-  const volume = getSafeVideoVolume(block.volume);
-  const fit = getSafeVideoFit(block.fit);
-
-  return `
-    <article class="editor-card">
-      <h3>编辑视频播放</h3>
-      <p>适合 OP、ED、PV、过场动画。这里也提供最基础的裁段能力：设置开始秒数和结束秒数，就能只播放素材中的一小段。</p>
-    </article>
-    <div class="field-grid">
-      <div class="detail-row">
-        <label for="editorVideoAssetId">视频素材</label>
-        <select id="editorVideoAssetId">
-          <option value="">暂时不选择视频</option>
-          ${videoAssets
-            .map(
-              (asset) => `
-                <option value="${asset.id}" ${asset.id === assetId ? "selected" : ""}>
-                  ${escapeHtml(asset.name)}
-                </option>
-              `
-            )
-            .join("")}
-        </select>
-      </div>
-      <div class="detail-row">
-        <label for="editorVideoTitle">播放标题</label>
-        <input
-          id="editorVideoTitle"
-          type="text"
-          maxlength="48"
-          value="${escapeHtml(block.title ?? "")}"
-          placeholder="例如：Opening Movie / Ending Movie"
-        />
-      </div>
-      <div class="detail-row">
-        <label for="editorVideoFit">画面适配</label>
-        <select id="editorVideoFit">
-          ${Object.entries(VIDEO_FIT_LABELS)
-            .map(
-              ([value, label]) => `
-                <option value="${value}" ${value === fit ? "selected" : ""}>
-                  ${escapeHtml(label)}
-                </option>
-              `
-            )
-            .join("")}
-        </select>
-      </div>
-      <div class="detail-row">
-        <label for="editorVideoVolume">视频音量</label>
-        <select id="editorVideoVolume">
-          ${Object.entries(VIDEO_VOLUME_LABELS)
-            .map(
-              ([value, label]) => `
-                <option value="${value}" ${Number(value) === volume ? "selected" : ""}>
-                  ${escapeHtml(label)}
-                </option>
-              `
-            )
-            .join("")}
-        </select>
-      </div>
-      <div class="detail-row">
-        <label for="editorVideoStartTime">从第几秒开始</label>
-        <input id="editorVideoStartTime" type="number" min="0" step="0.1" value="${escapeHtml(String(startTimeSeconds))}" />
-      </div>
-      <div class="detail-row">
-        <label for="editorVideoEndTime">到第几秒结束</label>
-        <input id="editorVideoEndTime" type="number" min="0" step="0.1" value="${escapeHtml(String(endTimeSeconds))}" />
-      </div>
-      <div class="detail-row">
-        <label for="editorVideoSkippable">是否允许跳过</label>
-        <select id="editorVideoSkippable">
-          <option value="true" ${block.skippable !== false ? "selected" : ""}>允许玩家跳过</option>
-          <option value="false" ${block.skippable === false ? "selected" : ""}>必须播放完</option>
-        </select>
-      </div>
-      <div class="helper-text">结束秒数填 0 表示播放到视频文件自然结束。网页包和 NW.js 桌面包会直接播放视频；原生 Runtime Preview 会优先尝试窗口内 PyAV/FFmpeg 音画同步播放，失败时再回落到 OpenCV 画面兜底或系统播放器桥接。</div>
-    </div>
-    <div class="detail-actions">
-      <button class="toolbar-button toolbar-button-primary" data-action="save-block">保存这张卡片</button>
-      <button class="toolbar-button" data-action="focus-asset-gap" data-asset-filter-mode="all" data-asset-type="video">去视频素材库</button>
-    </div>
-  `;
+  return storyBlockEditorTools.renderVideoPlayEditor(block, {
+    escapeHtml,
+    videoAssets: state.data.assetList.filter((asset) => asset.type === "video"),
+    videoFitLabels: VIDEO_FIT_LABELS,
+    videoVolumeLabels: VIDEO_VOLUME_LABELS,
+    getSafeAssetIdByType,
+    getSafeNonNegativeNumber,
+    getSafeVideoVolume,
+    getSafeVideoFit,
+  });
 }
 
 function renderCreditsRollEditor(block) {
-  const lines = getCreditsLinesText(block.lines);
-  const durationSeconds = getSafeCreditsDuration(block.durationSeconds);
-  const background = getSafeCreditsBackground(block.background);
-
-  return `
-    <article class="editor-card">
-      <h3>编辑片尾演职人员表</h3>
-      <p>这是一张轻量“片尾字幕”卡片，不需要外部剪辑软件也能做基础滚动片尾。后面如果要做更复杂的片尾动画，可以再导出视频替换。</p>
-    </article>
-    <div class="field-grid">
-      <div class="detail-row">
-        <label for="editorCreditsTitle">片尾标题</label>
-        <input
-          id="editorCreditsTitle"
-          type="text"
-          maxlength="48"
-          value="${escapeHtml(block.title ?? "STAFF")}"
-        />
-      </div>
-      <div class="detail-row">
-        <label for="editorCreditsSubtitle">副标题</label>
-        <input
-          id="editorCreditsSubtitle"
-          type="text"
-          maxlength="72"
-          value="${escapeHtml(block.subtitle ?? "")}"
-          placeholder="例如：Thank you for playing"
-        />
-      </div>
-      <div class="detail-row">
-        <label for="editorCreditsLines">字幕内容</label>
-        <textarea id="editorCreditsLines" placeholder="企划：Creator&#10;剧本：Writer&#10;美术：Your Artist&#10;音乐：Your Composer">${escapeHtml(lines)}</textarea>
-      </div>
-      <div class="detail-row">
-        <label for="editorCreditsDuration">滚动时长（秒）</label>
-        <input id="editorCreditsDuration" type="number" min="4" max="180" step="1" value="${escapeHtml(String(durationSeconds))}" />
-      </div>
-      <div class="detail-row">
-        <label for="editorCreditsBackground">片尾背景</label>
-        <select id="editorCreditsBackground">
-          ${Object.entries(CREDITS_BACKGROUND_LABELS)
-            .map(
-              ([value, label]) => `
-                <option value="${value}" ${value === background ? "selected" : ""}>
-                  ${escapeHtml(label)}
-                </option>
-              `
-            )
-            .join("")}
-        </select>
-      </div>
-      <div class="detail-row">
-        <label for="editorCreditsSkippable">是否允许跳过</label>
-        <select id="editorCreditsSkippable">
-          <option value="true" ${block.skippable !== false ? "selected" : ""}>允许玩家跳过</option>
-          <option value="false" ${block.skippable === false ? "selected" : ""}>必须滚完</option>
-        </select>
-      </div>
-    </div>
-    <div class="detail-actions">
-      <button class="toolbar-button toolbar-button-primary" data-action="save-block">保存这张卡片</button>
-    </div>
-  `;
+  return storyBlockEditorTools.renderCreditsRollEditor(block, {
+    escapeHtml,
+    creditsBackgroundLabels: CREDITS_BACKGROUND_LABELS,
+    getCreditsLinesText,
+    getSafeCreditsDuration,
+    getSafeCreditsBackground,
+  });
 }
 
 function renderParticleCustomLayerEditor(index, layer) {
-  const slotNumber = index + 1;
-  const normalizedLayer = normalizeParticleCustomComboLayer(layer, index === 0 ? "stardust" : "smoke");
-
-  return `
-    <article class="editor-card particle-custom-layer-card" data-particle-custom-layer data-layer-index="${index}">
-      <div class="particle-custom-layer-head">
-        <h3>自定义叠层 ${slotNumber}</h3>
-        <button class="toolbar-button toolbar-button-danger" type="button" data-action="remove-particle-custom-layer" data-layer-index="${index}">
-          删除这层
-        </button>
-      </div>
-      <p>这一层是你额外加的附加发射器。它适合叠烟雾、星尘、法阵、火焰这种辅助层，不用再单独新开一张粒子卡片。</p>
-      <div class="particle-custom-layer-grid">
-        <div class="detail-row">
-          <label for="editorParticleCustomLayer${slotNumber}Enabled">是否启用</label>
-          <select id="editorParticleCustomLayer${slotNumber}Enabled">
-            <option value="false" ${normalizedLayer.enabled ? "" : "selected"}>先关闭这层</option>
-            <option value="true" ${normalizedLayer.enabled ? "selected" : ""}>启用这层附加粒子</option>
-          </select>
-        </div>
-        <div class="detail-row">
-          <label for="editorParticleCustomLayer${slotNumber}Preset">叠层粒子类型</label>
-          <select id="editorParticleCustomLayer${slotNumber}Preset">
-            ${Object.entries(PARTICLE_PRESET_LABELS)
-              .map(
-                ([value, label]) => `
-                  <option value="${value}" ${value === normalizedLayer.preset ? "selected" : ""}>
-                    ${escapeHtml(label)}
-                  </option>
-                `
-              )
-              .join("")}
-          </select>
-        </div>
-        <div class="detail-row">
-          <label for="editorParticleCustomLayer${slotNumber}EmissionMode">发射模式</label>
-          <select id="editorParticleCustomLayer${slotNumber}EmissionMode">
-            ${Object.entries(PARTICLE_EMISSION_MODE_LABELS)
-              .map(
-                ([value, label]) => `
-                  <option value="${value}" ${value === normalizedLayer.emissionMode ? "selected" : ""}>
-                    ${escapeHtml(label)}
-                  </option>
-                `
-              )
-              .join("")}
-          </select>
-        </div>
-        <div class="detail-row">
-          <label for="editorParticleCustomLayer${slotNumber}Follow">跟随目标</label>
-          <select id="editorParticleCustomLayer${slotNumber}Follow">
-            ${Object.entries(PARTICLE_FOLLOW_LABELS)
-              .map(
-                ([value, label]) => `
-                  <option value="${value}" ${value === normalizedLayer.follow ? "selected" : ""}>
-                    ${escapeHtml(label)}
-                  </option>
-                `
-              )
-              .join("")}
-          </select>
-        </div>
-        <div class="detail-row">
-          <label for="editorParticleCustomLayer${slotNumber}FollowAnchor">跟随锚点</label>
-          <select id="editorParticleCustomLayer${slotNumber}FollowAnchor">
-            ${Object.entries(PARTICLE_FOLLOW_ANCHOR_LABELS)
-              .map(
-                ([value, label]) => `
-                  <option value="${value}" ${value === normalizedLayer.followAnchor ? "selected" : ""}>
-                    ${escapeHtml(label)}
-                  </option>
-                `
-              )
-              .join("")}
-          </select>
-        </div>
-        <div class="detail-row">
-          <label for="editorParticleCustomLayer${slotNumber}DensityMultiplier">数量倍率</label>
-          <input id="editorParticleCustomLayer${slotNumber}DensityMultiplier" type="number" min="0.2" max="4" step="0.1" value="${formatParticleNumber(
-            normalizedLayer.densityMultiplier,
-            1
-          )}" />
-        </div>
-        <div class="detail-row">
-          <label for="editorParticleCustomLayer${slotNumber}SizeScale">尺寸倍率</label>
-          <input id="editorParticleCustomLayer${slotNumber}SizeScale" type="number" min="0.2" max="4" step="0.1" value="${formatParticleNumber(
-            normalizedLayer.sizeScale,
-            1
-          )}" />
-        </div>
-        <div class="detail-row">
-          <label for="editorParticleCustomLayer${slotNumber}LifeScale">寿命倍率</label>
-          <input id="editorParticleCustomLayer${slotNumber}LifeScale" type="number" min="0.2" max="4" step="0.1" value="${formatParticleNumber(
-            normalizedLayer.lifeScale,
-            1
-          )}" />
-        </div>
-        <div class="detail-row">
-          <label for="editorParticleCustomLayer${slotNumber}OpacityScale">透明度倍率</label>
-          <input id="editorParticleCustomLayer${slotNumber}OpacityScale" type="number" min="0.1" max="2" step="0.1" value="${formatParticleNumber(
-            normalizedLayer.opacityScale,
-            1
-          )}" />
-        </div>
-        <div class="detail-row">
-          <label for="editorParticleCustomLayer${slotNumber}ColorMix">颜色混合（0~1）</label>
-          <input id="editorParticleCustomLayer${slotNumber}ColorMix" type="number" min="0" max="1" step="0.05" value="${formatParticleNumber(
-            normalizedLayer.colorMix,
-            2
-          )}" />
-        </div>
-        <div class="detail-row">
-          <label for="editorParticleCustomLayer${slotNumber}Blend">混合模式</label>
-          <select id="editorParticleCustomLayer${slotNumber}Blend">
-            ${Object.entries(PARTICLE_BLEND_LABELS)
-              .map(
-                ([value, label]) => `
-                  <option value="${value}" ${value === normalizedLayer.blend ? "selected" : ""}>
-                    ${escapeHtml(label)}
-                  </option>
-                `
-              )
-              .join("")}
-          </select>
-        </div>
-      </div>
-    </article>
-  `;
+  return particleEffectTools.renderParticleCustomLayerEditor(index, layer, { escapeHtml });
 }
 
 function renderParticleEffectEditor(block) {
-  const particle = normalizeParticleEffectConfig(block);
-  const action = particle.action;
-  const preset = particle.preset;
-  const intensity = particle.intensity;
-  const speed = particle.speed;
-  const wind = particle.wind;
-  const area = particle.area;
-  const assetId = particle.assetId;
-  const customComboLayers = normalizeParticleCustomComboLayers(particle.customComboLayers);
-  const savedParticlePresets = getProjectParticleCustomPresets();
-
-  return `
-    <article class="editor-card">
-      <h3>编辑粒子特效</h3>
-      <p>这里已经升级成高级粒子模块了。除了雪、雨、樱花和光尘，现在还能做火星、闪光、气泡、纸片，并且把数量、尺寸、寿命、重力、XYZ 疏散、旋转、颜色、混合方式都像 AE 一样细调。</p>
-    </article>
-    <div class="field-grid">
-      <div class="detail-row">
-        <label for="editorParticleAction">这张卡片要做什么</label>
-        <select id="editorParticleAction">
-          <option value="start" ${action === "start" ? "selected" : ""}>开始粒子特效</option>
-          <option value="stop" ${action === "stop" ? "selected" : ""}>关闭当前粒子特效</option>
-        </select>
-      </div>
-      <div class="detail-row">
-        <label for="editorParticlePreset">粒子类型</label>
-        <select id="editorParticlePreset">
-          ${Object.entries(PARTICLE_PRESET_LABELS)
-            .map(
-              ([value, label]) => `
-                <option value="${value}" ${value === preset ? "selected" : ""}>
-                  ${escapeHtml(label)}
-                </option>
-              `
-            )
-            .join("")}
-        </select>
-      </div>
-      <div class="detail-row">
-        <label>快速套用</label>
-        <button class="toolbar-button" data-action="apply-particle-preset-defaults">套用这个预设的高级参数</button>
-      </div>
-      <div class="detail-row">
-        <label for="editorParticleScenePreset">演出级预设库</label>
-        <select id="editorParticleScenePreset">
-          ${Object.entries(PARTICLE_SCENE_PRESET_LABELS)
-            .map(
-              ([value, label]) => `
-                <option value="${value}">${escapeHtml(label)}</option>
-              `
-            )
-            .join("")}
-        </select>
-      </div>
-      <div class="detail-row">
-        <label>一键生成完整效果</label>
-        <button class="toolbar-button" data-action="apply-particle-scene-preset">套用这组演出级预设</button>
-      </div>
-      <article class="editor-card particle-preset-library-card">
-        <h3>项目粒子预设库</h3>
-        <p>把你调好的暴雪、火焰仪式、魔法阵、梦境星海存成这个项目自己的粒子预设，下次直接复用。当前已保存 ${savedParticlePresets.length} / ${PARTICLE_CUSTOM_PRESET_LIMIT} 组。</p>
-      </article>
-      <div class="detail-row">
-        <label for="editorParticleCustomPresetSearch">搜索项目预设</label>
-        <input
-          id="editorParticleCustomPresetSearch"
-          type="text"
-          placeholder="搜预设名、粒子类型、组合方案"
-          value="${escapeHtml(state.particlePresetSearchQuery)}"
-        />
-      </div>
-      <div class="detail-row">
-        <label for="editorParticleCustomPresetSelect">已保存的粒子预设</label>
-        <select id="editorParticleCustomPresetSelect">
-          <option value="">先选一个项目预设</option>
-          ${savedParticlePresets
-            .map(
-              (presetItem) => `
-                <option value="${escapeHtml(presetItem.id)}" ${presetItem.id === state.selectedParticleCustomPresetId ? "selected" : ""}>${escapeHtml(presetItem.name)}</option>
-              `
-            )
-            .join("")}
-        </select>
-      </div>
-      <div class="detail-row">
-        <label>快速调用</label>
-        <div class="detail-actions">
-          <button class="toolbar-button" type="button" data-action="apply-particle-custom-preset">套用这个项目预设</button>
-          <button class="toolbar-button toolbar-button-danger" type="button" data-action="delete-particle-custom-preset" ${
-            savedParticlePresets.length === 0 ? "disabled" : ""
-          }>删除这个项目预设</button>
-        </div>
-      </div>
-      <div class="detail-row">
-        <label for="editorParticleCustomPresetName">保存为项目预设</label>
-        <input
-          id="editorParticleCustomPresetName"
-          type="text"
-          maxlength="36"
-          placeholder="比如：暴雪神殿 / 紫焰法阵 / 星海梦境"
-          value=""
-        />
-      </div>
-      <div class="detail-row">
-        <label>写进当前项目</label>
-        <div class="detail-actions">
-          <button class="toolbar-button" type="button" data-action="save-particle-custom-preset">保存这组粒子为项目预设</button>
-          <button class="toolbar-button" type="button" data-action="export-particle-custom-preset" ${
-            savedParticlePresets.length === 0 ? "disabled" : ""
-          }>导出当前预设</button>
-          <button class="toolbar-button" type="button" data-action="export-particle-custom-preset-pack" ${
-            savedParticlePresets.length === 0 ? "disabled" : ""
-          }>导出整个预设包</button>
-          <button class="toolbar-button" type="button" data-action="import-particle-custom-preset-pack">导入预设包</button>
-        </div>
-      </div>
-      <article class="editor-card particle-preset-quick-library">
-        <h3>快速挑选</h3>
-        <p class="helper-text">搜索结果 ${getFilteredParticleCustomPresets().length} 组；每个项目最多保存 ${PARTICLE_CUSTOM_PRESET_LIMIT} 组粒子预设。</p>
-        <div id="particleCustomPresetQuickList">${renderParticleCustomPresetQuickList()}</div>
-      </article>
-      <div class="detail-row">
-        <label for="editorParticleIntensity">特效强度</label>
-        <select id="editorParticleIntensity">
-          ${Object.entries(PARTICLE_INTENSITY_LABELS)
-            .map(
-              ([value, label]) => `
-                <option value="${value}" ${value === intensity ? "selected" : ""}>
-                  ${escapeHtml(label)}
-                </option>
-              `
-            )
-            .join("")}
-        </select>
-      </div>
-      <div class="detail-row">
-        <label for="editorParticleDensity">粒子数量</label>
-        <input id="editorParticleDensity" type="number" min="4" max="240" step="1" value="${particle.density}" />
-      </div>
-      <div class="detail-row">
-        <label for="editorParticleAssetId">自定义粒子图片</label>
-        <select id="editorParticleAssetId">
-          <option value="">使用当前预设的默认外观</option>
-          ${renderParticleImageAssetOptions(assetId)}
-        </select>
-      </div>
-      <div class="detail-row">
-        <label for="editorParticleSpeed">下落速度</label>
-        <select id="editorParticleSpeed">
-          ${Object.entries(PARTICLE_SPEED_LABELS)
-            .map(
-              ([value, label]) => `
-                <option value="${value}" ${value === speed ? "selected" : ""}>
-                  ${escapeHtml(label)}
-                </option>
-              `
-            )
-            .join("")}
-        </select>
-      </div>
-      <div class="detail-row">
-        <label for="editorParticleWind">风向</label>
-        <select id="editorParticleWind">
-          ${Object.entries(PARTICLE_WIND_LABELS)
-            .map(
-              ([value, label]) => `
-                <option value="${value}" ${value === wind ? "selected" : ""}>
-                  ${escapeHtml(label)}
-                </option>
-              `
-            )
-            .join("")}
-        </select>
-      </div>
-      <div class="detail-row">
-        <label for="editorParticleArea">出现区域</label>
-        <select id="editorParticleArea">
-          ${Object.entries(PARTICLE_AREA_LABELS)
-            .map(
-              ([value, label]) => `
-                <option value="${value}" ${value === area ? "selected" : ""}>
-                  ${escapeHtml(label)}
-                </option>
-              `
-            )
-            .join("")}
-          </select>
-      </div>
-      <div class="detail-row">
-        <label for="editorParticleBlend">混合模式</label>
-        <select id="editorParticleBlend">
-          ${Object.entries(PARTICLE_BLEND_LABELS)
-            .map(
-              ([value, label]) => `
-                <option value="${value}" ${value === particle.blend ? "selected" : ""}>
-                  ${escapeHtml(label)}
-                </option>
-              `
-            )
-            .join("")}
-        </select>
-      </div>
-      <div class="detail-row">
-        <label for="editorParticleEmissionMode">发射模式</label>
-        <select id="editorParticleEmissionMode">
-          ${Object.entries(PARTICLE_EMISSION_MODE_LABELS)
-            .map(
-              ([value, label]) => `
-                <option value="${value}" ${value === particle.emissionMode ? "selected" : ""}>
-                  ${escapeHtml(label)}
-                </option>
-              `
-            )
-            .join("")}
-        </select>
-      </div>
-      <div class="detail-row">
-        <label for="editorParticleComboPreset">组合方案</label>
-        <select id="editorParticleComboPreset">
-          ${Object.entries(PARTICLE_COMBO_PRESET_LABELS)
-            .map(
-              ([value, label]) => `
-                <option value="${value}" ${value === particle.comboPreset ? "selected" : ""}>
-                  ${escapeHtml(label)}
-                </option>
-              `
-            )
-            .join("")}
-        </select>
-      </div>
-      <article class="editor-card particle-custom-layer-toolbar">
-        <h3>自定义多层组合</h3>
-        <p>如果现成的组合方案还不够，这里支持继续叠加更多发射器，并按需要新增或删除附加层。</p>
-        <div class="detail-actions">
-          <button class="toolbar-button" type="button" data-action="add-particle-custom-layer" ${
-            customComboLayers.length >= PARTICLE_CUSTOM_COMBO_LAYER_LIMIT ? "disabled" : ""
-          }>
-            新增一层附加粒子
-          </button>
-        </div>
-      </article>
-      ${
-        customComboLayers.length > 0
-          ? customComboLayers.map((layer, index) => renderParticleCustomLayerEditor(index, layer)).join("")
-          : `<article class="editor-card particle-custom-layer-empty"><p>当前还没有额外叠层。可使用上面的按钮继续叠加烟雾、星尘、法阵、火焰等辅助层。</p></article>`
-      }
-      <article class="editor-card">
-        <h3>发射器和外力</h3>
-        <p>这一组更像 AE 里的发射器：可以决定它是持续下雪、一次性爆发纸片，还是从某个点、某条线、某个圆形区域喷出来；现在还可以一键套“组合方案”，把烟雾、法阵、星尘、火焰这些多层发射器叠在同一张卡里。</p>
-      </article>
-      <div class="detail-row">
-        <label for="editorParticleEmitterShape">发射器形状</label>
-        <select id="editorParticleEmitterShape">
-          ${Object.entries(PARTICLE_EMITTER_SHAPE_LABELS)
-            .map(
-              ([value, label]) => `
-                <option value="${value}" ${value === particle.emitterShape ? "selected" : ""}>
-                  ${escapeHtml(label)}
-                </option>
-              `
-            )
-            .join("")}
-        </select>
-      </div>
-      <div class="detail-row">
-        <label for="editorParticleFollow">跟随目标</label>
-        <select id="editorParticleFollow">
-          ${Object.entries(PARTICLE_FOLLOW_LABELS)
-            .map(
-              ([value, label]) => `
-                <option value="${value}" ${value === particle.follow ? "selected" : ""}>
-                  ${escapeHtml(label)}
-                </option>
-              `
-            )
-            .join("")}
-        </select>
-      </div>
-      <div class="detail-row">
-        <label for="editorParticleFollowAnchor">跟随锚点</label>
-        <select id="editorParticleFollowAnchor">
-          ${Object.entries(PARTICLE_FOLLOW_ANCHOR_LABELS)
-            .map(
-              ([value, label]) => `
-                <option value="${value}" ${value === particle.followAnchor ? "selected" : ""}>
-                  ${escapeHtml(label)}
-                </option>
-              `
-            )
-            .join("")}
-        </select>
-      </div>
-      <div class="detail-row">
-        <label for="editorParticleLayerCount">叠加层数</label>
-        <input id="editorParticleLayerCount" type="number" min="1" max="3" step="1" value="${particle.layerCount}" />
-      </div>
-      <div class="detail-row">
-        <label for="editorParticleEmitterX">发射器 X（%）</label>
-        <input id="editorParticleEmitterX" type="number" min="0" max="100" step="1" value="${formatParticleNumber(
-          particle.emitterX
-        )}" />
-      </div>
-      <div class="detail-row">
-        <label for="editorParticleEmitterY">发射器 Y（%）</label>
-        <input id="editorParticleEmitterY" type="number" min="-20" max="120" step="1" value="${formatParticleNumber(
-          particle.emitterY
-        )}" />
-      </div>
-      <div class="detail-row">
-        <label for="editorParticleEmitterZ">发射器 Z</label>
-        <input id="editorParticleEmitterZ" type="number" min="-100" max="100" step="1" value="${formatParticleNumber(
-          particle.emitterZ
-        )}" />
-      </div>
-      <div class="detail-row">
-        <label for="editorParticleAttractionX">吸引 / 推离 X</label>
-        <input id="editorParticleAttractionX" type="number" min="-160" max="160" step="1" value="${formatParticleNumber(
-          particle.attractionX
-        )}" />
-      </div>
-      <div class="detail-row">
-        <label for="editorParticleAttractionY">吸引 / 推离 Y</label>
-        <input id="editorParticleAttractionY" type="number" min="-160" max="160" step="1" value="${formatParticleNumber(
-          particle.attractionY
-        )}" />
-      </div>
-      <div class="detail-row">
-        <label for="editorParticleVortex">旋涡 / 绕圈</label>
-        <input id="editorParticleVortex" type="number" min="-240" max="240" step="1" value="${formatParticleNumber(
-          particle.vortex
-        )}" />
-      </div>
-      <div class="detail-row">
-        <label for="editorParticleForceField">中心力场</label>
-        <select id="editorParticleForceField">
-          ${Object.entries(PARTICLE_FORCE_FIELD_LABELS)
-            .map(
-              ([value, label]) => `
-                <option value="${value}" ${value === particle.forceField ? "selected" : ""}>
-                  ${escapeHtml(label)}
-                </option>
-              `
-            )
-            .join("")}
-        </select>
-      </div>
-      <div class="detail-row">
-        <label for="editorParticleFieldX">力场中心 X（%）</label>
-        <input id="editorParticleFieldX" type="number" min="0" max="100" step="1" value="${formatParticleNumber(
-          particle.fieldX
-        )}" />
-      </div>
-      <div class="detail-row">
-        <label for="editorParticleFieldY">力场中心 Y（%）</label>
-        <input id="editorParticleFieldY" type="number" min="-20" max="120" step="1" value="${formatParticleNumber(
-          particle.fieldY
-        )}" />
-      </div>
-      <article class="editor-card">
-        <h3>外观和寿命</h3>
-        <p>这里决定粒子看起来有多大、活多久、透明度范围是多少。做大雪、细雨、轻尘和烟花碎片时会特别好用。</p>
-      </article>
-      <div class="detail-row">
-        <label for="editorParticleSizeMin">最小尺寸（px）</label>
-        <input id="editorParticleSizeMin" type="number" min="1" max="160" step="1" value="${formatParticleNumber(
-          particle.sizeMin
-        )}" />
-      </div>
-      <div class="detail-row">
-        <label for="editorParticleSizeMax">最大尺寸（px）</label>
-        <input id="editorParticleSizeMax" type="number" min="1" max="160" step="1" value="${formatParticleNumber(
-          particle.sizeMax
-        )}" />
-      </div>
-      <div class="detail-row">
-        <label for="editorParticleLifeMin">最短寿命（秒）</label>
-        <input id="editorParticleLifeMin" type="number" min="0.4" max="20" step="0.1" value="${formatParticleNumber(
-          particle.lifeMin,
-          1
-        )}" />
-      </div>
-      <div class="detail-row">
-        <label for="editorParticleLifeMax">最长寿命（秒）</label>
-        <input id="editorParticleLifeMax" type="number" min="0.4" max="20" step="0.1" value="${formatParticleNumber(
-          particle.lifeMax,
-          1
-        )}" />
-      </div>
-      <div class="detail-row">
-        <label for="editorParticleOpacityMin">最小透明度（0~1）</label>
-        <input id="editorParticleOpacityMin" type="number" min="0.04" max="1" step="0.01" value="${formatParticleNumber(
-          particle.opacityMin,
-          2
-        )}" />
-      </div>
-      <div class="detail-row">
-        <label for="editorParticleOpacityMax">最大透明度（0~1）</label>
-        <input id="editorParticleOpacityMax" type="number" min="0.04" max="1" step="0.01" value="${formatParticleNumber(
-          particle.opacityMax,
-          2
-        )}" />
-      </div>
-      <div class="detail-row">
-        <label for="editorParticleSizeCurve">尺寸时间曲线</label>
-        <select id="editorParticleSizeCurve">
-          ${Object.entries(PARTICLE_SIZE_CURVE_LABELS)
-            .map(
-              ([value, label]) => `
-                <option value="${value}" ${value === particle.sizeCurve ? "selected" : ""}>
-                  ${escapeHtml(label)}
-                </option>
-              `
-            )
-            .join("")}
-        </select>
-      </div>
-      <div class="detail-row">
-        <label for="editorParticleOpacityCurve">透明度时间曲线</label>
-        <select id="editorParticleOpacityCurve">
-          ${Object.entries(PARTICLE_OPACITY_CURVE_LABELS)
-            .map(
-              ([value, label]) => `
-                <option value="${value}" ${value === particle.opacityCurve ? "selected" : ""}>
-                  ${escapeHtml(label)}
-                </option>
-              `
-            )
-            .join("")}
-        </select>
-      </div>
-      <div class="detail-row">
-        <label for="editorParticleColorCurve">颜色时间曲线</label>
-        <select id="editorParticleColorCurve">
-          ${Object.entries(PARTICLE_COLOR_CURVE_LABELS)
-            .map(
-              ([value, label]) => `
-                <option value="${value}" ${value === particle.colorCurve ? "selected" : ""}>
-                  ${escapeHtml(label)}
-                </option>
-              `
-            )
-            .join("")}
-        </select>
-      </div>
-      <article class="editor-card">
-        <h3>XYZ 运动和疏散</h3>
-        <p>X / Y / Z 三个轴都可调。可将它理解为：X 是横向力，Y 是上下重力，Z 是远近层次；疏散越高，粒子越不整齐、越有空间感。</p>
-      </article>
-      <div class="detail-row">
-        <label for="editorParticleGravityX">重力 X</label>
-        <input id="editorParticleGravityX" type="number" min="-180" max="180" step="1" value="${formatParticleNumber(
-          particle.gravityX
-        )}" />
-      </div>
-      <div class="detail-row">
-        <label for="editorParticleGravityY">重力 Y</label>
-        <input id="editorParticleGravityY" type="number" min="-160" max="280" step="1" value="${formatParticleNumber(
-          particle.gravityY
-        )}" />
-      </div>
-      <div class="detail-row">
-        <label for="editorParticleGravityZ">重力 Z</label>
-        <input id="editorParticleGravityZ" type="number" min="-120" max="120" step="1" value="${formatParticleNumber(
-          particle.gravityZ
-        )}" />
-      </div>
-      <div class="detail-row">
-        <label for="editorParticleSpreadX">疏散 X（%）</label>
-        <input id="editorParticleSpreadX" type="number" min="4" max="100" step="1" value="${formatParticleNumber(
-          particle.spreadX
-        )}" />
-      </div>
-      <div class="detail-row">
-        <label for="editorParticleSpreadY">疏散 Y（%）</label>
-        <input id="editorParticleSpreadY" type="number" min="0" max="100" step="1" value="${formatParticleNumber(
-          particle.spreadY
-        )}" />
-      </div>
-      <div class="detail-row">
-        <label for="editorParticleSpreadZ">疏散 Z（%）</label>
-        <input id="editorParticleSpreadZ" type="number" min="0" max="100" step="1" value="${formatParticleNumber(
-          particle.spreadZ
-        )}" />
-      </div>
-      <div class="detail-row">
-        <label for="editorParticleTurbulence">乱流 / 扰动</label>
-        <input id="editorParticleTurbulence" type="number" min="0" max="120" step="1" value="${formatParticleNumber(
-          particle.turbulence
-        )}" />
-      </div>
-      <article class="editor-card">
-        <h3>旋转和颜色</h3>
-        <p>这里可以把粒子调成慢慢转、快速打转、偏冷、偏暖或者高亮发光。如果上传的是自定义雪花图片，这里的颜色会直接当作着色涂层来用。</p>
-      </article>
-      <div class="detail-row">
-        <label for="editorParticleRotationMin">初始旋转最小值（deg）</label>
-        <input id="editorParticleRotationMin" type="number" min="-360" max="360" step="1" value="${formatParticleNumber(
-          particle.rotationMin
-        )}" />
-      </div>
-      <div class="detail-row">
-        <label for="editorParticleRotationMax">初始旋转最大值（deg）</label>
-        <input id="editorParticleRotationMax" type="number" min="-360" max="360" step="1" value="${formatParticleNumber(
-          particle.rotationMax
-        )}" />
-      </div>
-      <div class="detail-row">
-        <label for="editorParticleSpin">自转速度 / 累积旋转（deg）</label>
-        <input id="editorParticleSpin" type="number" min="-1080" max="1080" step="1" value="${formatParticleNumber(
-          particle.spin
-        )}" />
-      </div>
-      <div class="detail-row">
-        <label for="editorParticleColor">主颜色</label>
-        <input id="editorParticleColor" type="color" value="${particle.color}" />
-      </div>
-      <div class="detail-row">
-        <label for="editorParticleColorAccent">高光 / 辅助颜色</label>
-        <input id="editorParticleColorAccent" type="color" value="${particle.colorAccent}" />
-      </div>
-      <div class="detail-row">
-        <label for="editorParticleColorEnd">结尾颜色</label>
-        <input id="editorParticleColorEnd" type="color" value="${particle.colorEnd}" />
-      </div>
-      <div class="helper-text">如果选择“关闭当前粒子特效”，下面这些高级设置会被忽略；如果选择“开始”，它会一直持续到遇到下一张关闭卡片为止。现在这套参数已经足够做大雪、暴雨、漂浮火星、梦境闪光、冒泡、庆祝纸片这些高级演出了。</div>
-    </div>
-    <div class="detail-actions">
-      <button class="toolbar-button toolbar-button-primary" data-action="save-block">保存这张卡片</button>
-    </div>
-  `;
+  return particleEffectTools.renderParticleEffectEditor(block, {
+    escapeHtml,
+    normalizeParticleEffectConfig,
+    savedParticlePresets: getProjectParticleCustomPresets(),
+    particlePresetSearchQuery: state.particlePresetSearchQuery,
+    selectedParticleCustomPresetId: state.selectedParticleCustomPresetId,
+    filteredParticleCustomPresetCount: getFilteredParticleCustomPresets().length,
+    customPresetLimit: PARTICLE_CUSTOM_PRESET_LIMIT,
+    particleImageAssets: getParticleImageAssets(),
+    getAssetTypeLabel,
+    renderParticleCustomPresetQuickList,
+    renderParticleCustomLayerEditor,
+  });
 }
 
 function renderScreenShakeEditor(block) {
-  const intensity = getSafeShakeIntensity(block.intensity);
-  const duration = getSafeEffectDuration(block.duration);
-
-  return `
-    <article class="editor-card">
-      <h3>编辑屏幕震动</h3>
-      <p>适合撞门、跌倒、心跳、爆点台词这类需要“震一下”来加强情绪的时刻。</p>
-    </article>
-    <div class="field-grid">
-      <div class="detail-row">
-        <label for="editorShakeIntensity">震动强度</label>
-        <select id="editorShakeIntensity">
-          ${Object.entries(SHAKE_INTENSITY_LABELS)
-            .map(
-              ([value, label]) => `
-                <option value="${value}" ${value === intensity ? "selected" : ""}>
-                  ${escapeHtml(label)}
-                </option>
-              `
-            )
-            .join("")}
-        </select>
-      </div>
-      <div class="detail-row">
-        <label for="editorShakeDuration">持续多久</label>
-        <select id="editorShakeDuration">
-          ${Object.entries(EFFECT_DURATION_LABELS)
-            .map(
-              ([value, label]) => `
-                <option value="${value}" ${value === duration ? "selected" : ""}>
-                  ${escapeHtml(label)}
-                </option>
-              `
-            )
-            .join("")}
-        </select>
-      </div>
-      <div class="helper-text">屏幕震动是一次性的演出卡片，只会影响当前这一步，不会一直抖下去。</div>
-    </div>
-    <div class="detail-actions">
-      <button class="toolbar-button toolbar-button-primary" data-action="save-block">保存这张卡片</button>
-    </div>
-  `;
+  return storyBlockEditorTools.renderScreenShakeEditor(block, {
+    escapeHtml,
+    shakeIntensityLabels: SHAKE_INTENSITY_LABELS,
+    effectDurationLabels: EFFECT_DURATION_LABELS,
+    getSafeShakeIntensity,
+    getSafeEffectDuration,
+  });
 }
 
 function renderScreenFlashEditor(block) {
-  const color = getSafeFlashColor(block.color);
-  const intensity = getSafeFlashIntensity(block.intensity);
-  const duration = getSafeEffectDuration(block.duration);
-
-  return `
-    <article class="editor-card">
-      <h3>编辑闪屏</h3>
-      <p>适合回忆切入、强光、冲击、情绪爆点这类需要画面瞬间闪一下的过场演出。</p>
-    </article>
-    <div class="field-grid">
-      <div class="detail-row">
-        <label for="editorFlashColor">闪屏颜色</label>
-        <select id="editorFlashColor">
-          ${Object.entries(FLASH_COLOR_LABELS)
-            .map(
-              ([value, label]) => `
-                <option value="${value}" ${value === color ? "selected" : ""}>
-                  ${escapeHtml(label)}
-                </option>
-              `
-            )
-            .join("")}
-        </select>
-      </div>
-      <div class="detail-row">
-        <label for="editorFlashIntensity">闪屏强度</label>
-        <select id="editorFlashIntensity">
-          ${Object.entries(FLASH_INTENSITY_LABELS)
-            .map(
-              ([value, label]) => `
-                <option value="${value}" ${value === intensity ? "selected" : ""}>
-                  ${escapeHtml(label)}
-                </option>
-              `
-            )
-            .join("")}
-        </select>
-      </div>
-      <div class="detail-row">
-        <label for="editorFlashDuration">持续多久</label>
-        <select id="editorFlashDuration">
-          ${Object.entries(EFFECT_DURATION_LABELS)
-            .map(
-              ([value, label]) => `
-                <option value="${value}" ${value === duration ? "selected" : ""}>
-                  ${escapeHtml(label)}
-                </option>
-              `
-            )
-            .join("")}
-        </select>
-      </div>
-      <div class="helper-text">闪屏也是一次性的演出卡片，适合穿插在关键台词和转场前后。</div>
-    </div>
-    <div class="detail-actions">
-      <button class="toolbar-button toolbar-button-primary" data-action="save-block">保存这张卡片</button>
-    </div>
-  `;
+  return storyBlockEditorTools.renderScreenFlashEditor(block, {
+    escapeHtml,
+    flashColorLabels: FLASH_COLOR_LABELS,
+    flashIntensityLabels: FLASH_INTENSITY_LABELS,
+    effectDurationLabels: EFFECT_DURATION_LABELS,
+    getSafeFlashColor,
+    getSafeFlashIntensity,
+    getSafeEffectDuration,
+  });
 }
 
 function renderScreenFadeEditor(block) {
-  const action = getSafeFadeAction(block.action);
-  const color = getSafeFadeColor(block.color);
-  const duration = getSafeEffectDuration(block.duration);
-
-  return `
-    <article class="editor-card">
-      <h3>编辑黑场淡入淡出</h3>
-      <p>适合章节切换、视角切换、告白前停顿、回忆开场这类需要慢慢暗下去或亮起来的过场。</p>
-    </article>
-    <div class="field-grid">
-      <div class="detail-row">
-        <label for="editorFadeAction">这张卡片要做什么</label>
-        <select id="editorFadeAction">
-          ${Object.entries(FADE_ACTION_LABELS)
-            .map(
-              ([value, label]) => `
-                <option value="${value}" ${value === action ? "selected" : ""}>
-                  ${escapeHtml(label)}
-                </option>
-              `
-            )
-            .join("")}
-        </select>
-      </div>
-      <div class="detail-row">
-        <label for="editorFadeColor">淡到什么颜色</label>
-        <select id="editorFadeColor">
-          ${Object.entries(FADE_COLOR_LABELS)
-            .map(
-              ([value, label]) => `
-                <option value="${value}" ${value === color ? "selected" : ""}>
-                  ${escapeHtml(label)}
-                </option>
-              `
-            )
-            .join("")}
-        </select>
-      </div>
-      <div class="detail-row">
-        <label for="editorFadeDuration">持续多久</label>
-        <select id="editorFadeDuration">
-          ${Object.entries(EFFECT_DURATION_LABELS)
-            .map(
-              ([value, label]) => `
-                <option value="${value}" ${value === duration ? "selected" : ""}>
-                  ${escapeHtml(label)}
-                </option>
-              `
-            )
-            .join("")}
-        </select>
-      </div>
-      <div class="helper-text">需要做“先黑场，再切背景，再亮起”时，通常会按“淡出 -> 切背景 -> 淡入”的顺序摆卡片。</div>
-    </div>
-    <div class="detail-actions">
-      <button class="toolbar-button toolbar-button-primary" data-action="save-block">保存这张卡片</button>
-    </div>
-  `;
+  return storyBlockEditorTools.renderScreenFadeEditor(block, {
+    escapeHtml,
+    fadeActionLabels: FADE_ACTION_LABELS,
+    fadeColorLabels: FADE_COLOR_LABELS,
+    effectDurationLabels: EFFECT_DURATION_LABELS,
+    getSafeFadeAction,
+    getSafeFadeColor,
+    getSafeEffectDuration,
+  });
 }
 
 function renderCameraZoomEditor(block) {
-  const action = getSafeCameraZoomAction(block.action);
-  const strength = getSafeCameraZoomStrength(block.strength);
-  const focus = getSafeCameraZoomFocus(block.focus);
-
-  return `
-    <article class="editor-card">
-      <h3>编辑镜头推近拉远</h3>
-      <p>适合心动特写、视线聚焦、危险逼近或突然拉远制造距离感的时刻。</p>
-    </article>
-    <div class="field-grid">
-      <div class="detail-row">
-        <label for="editorCameraZoomAction">镜头动作</label>
-        <select id="editorCameraZoomAction">
-          ${Object.entries(CAMERA_ZOOM_ACTION_LABELS)
-            .map(
-              ([value, label]) => `
-                <option value="${value}" ${value === action ? "selected" : ""}>
-                  ${escapeHtml(label)}
-                </option>
-              `
-            )
-            .join("")}
-        </select>
-      </div>
-      <div class="detail-row">
-        <label for="editorCameraZoomStrength">镜头强度</label>
-        <select id="editorCameraZoomStrength">
-          ${Object.entries(CAMERA_ZOOM_STRENGTH_LABELS)
-            .map(
-              ([value, label]) => `
-                <option value="${value}" ${value === strength ? "selected" : ""}>
-                  ${escapeHtml(label)}
-                </option>
-              `
-            )
-            .join("")}
-        </select>
-      </div>
-      <div class="detail-row">
-        <label for="editorCameraZoomFocus">重点看哪里</label>
-        <select id="editorCameraZoomFocus">
-          ${Object.entries(CAMERA_ZOOM_FOCUS_LABELS)
-            .map(
-              ([value, label]) => `
-                <option value="${value}" ${value === focus ? "selected" : ""}>
-                  ${escapeHtml(label)}
-                </option>
-              `
-            )
-            .join("")}
-        </select>
-      </div>
-      <div class="helper-text">镜头缩放会持续保留，直到后面再插一张新的镜头卡片，或者选“恢复正常”为止。</div>
-    </div>
-    <div class="detail-actions">
-      <button class="toolbar-button toolbar-button-primary" data-action="save-block">保存这张卡片</button>
-    </div>
-  `;
+  return storyBlockEditorTools.renderCameraZoomEditor(block, {
+    escapeHtml,
+    cameraZoomActionLabels: CAMERA_ZOOM_ACTION_LABELS,
+    cameraZoomStrengthLabels: CAMERA_ZOOM_STRENGTH_LABELS,
+    cameraZoomFocusLabels: CAMERA_ZOOM_FOCUS_LABELS,
+    getSafeCameraZoomAction,
+    getSafeCameraZoomStrength,
+    getSafeCameraZoomFocus,
+  });
 }
 
 function renderCameraPanEditor(block) {
-  const target = getSafeCameraPanTarget(block.target);
-  const strength = getSafeCameraPanStrength(block.strength);
-
-  return `
-    <article class="editor-card">
-      <h3>编辑镜头平移</h3>
-      <p>适合视线移动、角色从一侧出场、慢慢把注意力移到另一边，或者拉回画面中心。</p>
-    </article>
-    <div class="field-grid">
-      <div class="detail-row">
-        <label for="editorCameraPanTarget">镜头看向哪里</label>
-        <select id="editorCameraPanTarget">
-          ${Object.entries(CAMERA_PAN_TARGET_LABELS)
-            .map(
-              ([value, label]) => `
-                <option value="${value}" ${value === target ? "selected" : ""}>
-                  ${escapeHtml(label)}
-                </option>
-              `
-            )
-            .join("")}
-        </select>
-      </div>
-      <div class="detail-row">
-        <label for="editorCameraPanStrength">平移幅度</label>
-        <select id="editorCameraPanStrength">
-          ${Object.entries(CAMERA_PAN_STRENGTH_LABELS)
-            .map(
-              ([value, label]) => `
-                <option value="${value}" ${value === strength ? "selected" : ""}>
-                  ${escapeHtml(label)}
-                </option>
-              `
-            )
-            .join("")}
-        </select>
-      </div>
-      <div class="helper-text">镜头平移会持续保留，直到后面再插一张新的平移卡片，或者选“回到中间”为止。</div>
-    </div>
-    <div class="detail-actions">
-      <button class="toolbar-button toolbar-button-primary" data-action="save-block">保存这张卡片</button>
-    </div>
-  `;
+  return storyBlockEditorTools.renderCameraPanEditor(block, {
+    escapeHtml,
+    cameraPanTargetLabels: CAMERA_PAN_TARGET_LABELS,
+    cameraPanStrengthLabels: CAMERA_PAN_STRENGTH_LABELS,
+    getSafeCameraPanTarget,
+    getSafeCameraPanStrength,
+  });
 }
 
 function renderColorGradeNumberInput(id, label, key, grade, hint = "") {
-  const [minimum, maximum] = SCREEN_COLOR_GRADE_LIMITS[key];
-  const defaultValue = SCREEN_COLOR_GRADE_DEFAULTS[key];
-  return `
-    <div class="detail-row">
-      <label for="${id}">${label}</label>
-      <input
-        id="${id}"
-        type="number"
-        min="${minimum}"
-        max="${maximum}"
-        step="1"
-        value="${grade[key]}"
-        aria-describedby="${id}Hint"
-      />
-      <div id="${id}Hint" class="helper-text">${escapeHtml(
-        hint || `范围 ${minimum} 到 ${maximum}，默认 ${defaultValue}`
-      )}</div>
-    </div>
-  `;
+  return storyBlockEditorTools.renderColorGradeNumberInput(id, label, key, grade, {
+    escapeHtml,
+    hint,
+    screenColorGradeDefaults: SCREEN_COLOR_GRADE_DEFAULTS,
+    screenColorGradeLimits: SCREEN_COLOR_GRADE_LIMITS,
+  });
 }
 
 function renderScreenFilterEditor(block) {
-  const action = getSafeScreenFilterAction(block.action);
-  const preset = getSafeScreenFilterPreset(block.preset);
-  const strength = getSafeScreenFilterStrength(block.strength);
-  const grade = getSafeScreenColorGrade(block.grade);
-
-  return `
-    <article class="editor-card">
-      <h3>编辑画面调色</h3>
-      <p>先选一个气氛预设，再像调色板一样微调亮度、对比度、色相、冷暖和暗角。</p>
-    </article>
-    <div class="field-grid">
-      <div class="detail-row">
-        <label for="editorScreenFilterAction">这张卡片要做什么</label>
-        <select id="editorScreenFilterAction">
-          ${Object.entries(SCREEN_FILTER_ACTION_LABELS)
-            .map(
-              ([value, label]) => `
-                <option value="${value}" ${value === action ? "selected" : ""}>
-                  ${escapeHtml(label)}
-                </option>
-              `
-            )
-            .join("")}
-        </select>
-      </div>
-      <div class="detail-row">
-        <label for="editorScreenFilterPreset">滤镜风格</label>
-        <select id="editorScreenFilterPreset">
-          ${Object.entries(SCREEN_FILTER_PRESET_LABELS)
-            .map(
-              ([value, label]) => `
-                <option value="${value}" ${value === preset ? "selected" : ""}>
-                  ${escapeHtml(label)}
-                </option>
-              `
-            )
-            .join("")}
-        </select>
-      </div>
-      <div class="detail-row">
-        <label for="editorScreenFilterStrength">滤镜强度</label>
-        <select id="editorScreenFilterStrength">
-          ${Object.entries(SCREEN_FILTER_STRENGTH_LABELS)
-            .map(
-              ([value, label]) => `
-                <option value="${value}" ${value === strength ? "selected" : ""}>
-                  ${escapeHtml(label)}
-                </option>
-              `
-            )
-            .join("")}
-        </select>
-      </div>
-      <div class="helper-text">滤镜会持续保留，直到后面插入一张“关闭滤镜”的卡片为止。</div>
-    </div>
-    <article class="editor-card">
-      <h3>基础调色板</h3>
-      <p>默认值不会改变画面。小白可以只改预设，高级用户可以用这些参数做统一色调。</p>
-    </article>
-    <div class="field-grid">
-      ${renderColorGradeNumberInput("editorColorGradeBrightness", "亮度", "brightness", grade)}
-      ${renderColorGradeNumberInput("editorColorGradeContrast", "对比度", "contrast", grade)}
-      ${renderColorGradeNumberInput("editorColorGradeSaturation", "饱和度", "saturation", grade)}
-      ${renderColorGradeNumberInput("editorColorGradeHue", "色相旋转", "hue", grade, "负数偏向前一段色相，正数偏向后一段色相，默认 0")}
-      ${renderColorGradeNumberInput("editorColorGradeTemperature", "冷暖色温", "temperature", grade, "负数更冷，正数更暖，默认 0")}
-      ${renderColorGradeNumberInput("editorColorGradeVignette", "暗角强度", "vignette", grade, "0 是关闭，100 是最明显")}
-    </div>
-    <div class="detail-actions">
-      <button class="toolbar-button toolbar-button-primary" data-action="save-block">保存这张卡片</button>
-    </div>
-  `;
+  return storyBlockEditorTools.renderScreenFilterEditor(block, {
+    escapeHtml,
+    screenFilterActionLabels: SCREEN_FILTER_ACTION_LABELS,
+    screenFilterPresetLabels: SCREEN_FILTER_PRESET_LABELS,
+    screenFilterStrengthLabels: SCREEN_FILTER_STRENGTH_LABELS,
+    screenColorGradeDefaults: SCREEN_COLOR_GRADE_DEFAULTS,
+    screenColorGradeLimits: SCREEN_COLOR_GRADE_LIMITS,
+    getSafeScreenFilterAction,
+    getSafeScreenFilterPreset,
+    getSafeScreenFilterStrength,
+    getSafeScreenColorGrade,
+  });
 }
 
 function renderDepthBlurEditor(block) {
-  const action = getSafeDepthBlurAction(block.action);
-  const focus = getSafeDepthBlurFocus(block.focus);
-  const strength = getSafeDepthBlurStrength(block.strength);
-
-  return `
-    <article class="editor-card">
-      <h3>编辑景深模糊</h3>
-      <p>适合回忆、心动特写、旁人退到背景、镜头只想强调某一位角色的时候。</p>
-    </article>
-    <div class="field-grid">
-      <div class="detail-row">
-        <label for="editorDepthBlurAction">这张卡片要做什么</label>
-        <select id="editorDepthBlurAction">
-          ${Object.entries(DEPTH_BLUR_ACTION_LABELS)
-            .map(
-              ([value, label]) => `
-                <option value="${value}" ${value === action ? "selected" : ""}>
-                  ${escapeHtml(label)}
-                </option>
-              `
-            )
-            .join("")}
-        </select>
-      </div>
-      <div class="detail-row">
-        <label for="editorDepthBlurFocus">重点突出哪里</label>
-        <select id="editorDepthBlurFocus">
-          ${Object.entries(DEPTH_BLUR_FOCUS_LABELS)
-            .map(
-              ([value, label]) => `
-                <option value="${value}" ${value === focus ? "selected" : ""}>
-                  ${escapeHtml(label)}
-                </option>
-              `
-            )
-            .join("")}
-        </select>
-      </div>
-      <div class="detail-row">
-        <label for="editorDepthBlurStrength">模糊强度</label>
-        <select id="editorDepthBlurStrength">
-          ${Object.entries(DEPTH_BLUR_STRENGTH_LABELS)
-            .map(
-              ([value, label]) => `
-                <option value="${value}" ${value === strength ? "selected" : ""}>
-                  ${escapeHtml(label)}
-                </option>
-              `
-            )
-            .join("")}
-        </select>
-      </div>
-      <div class="helper-text">景深会持续保留，直到你再插一张“关闭景深”的卡片为止。</div>
-    </div>
-    <div class="detail-actions">
-      <button class="toolbar-button toolbar-button-primary" data-action="save-block">保存这张卡片</button>
-    </div>
-  `;
+  return storyBlockEditorTools.renderDepthBlurEditor(block, {
+    escapeHtml,
+    depthBlurActionLabels: DEPTH_BLUR_ACTION_LABELS,
+    depthBlurFocusLabels: DEPTH_BLUR_FOCUS_LABELS,
+    depthBlurStrengthLabels: DEPTH_BLUR_STRENGTH_LABELS,
+    getSafeDepthBlurAction,
+    getSafeDepthBlurFocus,
+    getSafeDepthBlurStrength,
+  });
 }
 
 function renderJumpEditor(block) {
@@ -31894,35 +29891,16 @@ function renderConditionEditor(block) {
     );
   }
 
-  const branches = block.branches?.length ? block.branches : createDefaultConditionBranches(block.id);
-  const elseGotoSceneId = getSafeSceneId(
-    block.elseGotoSceneId,
-    getDefaultJumpTargetSceneId(state.selectedSceneId)
-  );
-
-  return `
-    <article class="editor-card">
-      <h3>编辑条件判断</h3>
-      <p>这里会先检查变量，再根据结果跳到不同场景。每条分支都可以继续加判断。</p>
-    </article>
-    ${renderDetailRows([
-      ["当前分支数", branches.length],
-      ["没命中时去哪里", state.data.scenesById.get(elseGotoSceneId)?.name ?? elseGotoSceneId],
-    ])}
-    <div id="conditionBranchesEditor" class="option-editor-list">
-      ${branches.map((branch, index) => renderConditionBranchEditorRow(branch, index, branches.length)).join("")}
-    </div>
-    <div class="detail-row">
-      <label for="editorConditionElseSceneId">如果都不满足，跳到哪个场景</label>
-      <select id="editorConditionElseSceneId">
-        ${renderSceneOptions(elseGotoSceneId)}
-      </select>
-    </div>
-    <div class="detail-actions">
-      <button class="toolbar-button" data-action="add-condition-branch">再加一条分支</button>
-      <button class="toolbar-button toolbar-button-primary" data-action="save-block">保存这张卡片</button>
-    </div>
-  `;
+  return storyBlockEditorTools.renderConditionEditor(block, {
+    selectedSceneId: state.selectedSceneId,
+    createDefaultConditionBranches,
+    getSafeSceneId,
+    getDefaultJumpTargetSceneId,
+    getSceneLabelById: (sceneId) => state.data.scenesById.get(sceneId)?.name ?? sceneId,
+    renderDetailRows,
+    renderSceneOptions,
+    renderConditionBranchEditorRow,
+  });
 }
 
 function renderConditionBranchEditorRow(branch, index, branchCount = 1) {
@@ -41608,15 +39586,10 @@ function renderSceneOptions(selectedSceneId) {
 }
 
 function renderParticleImageAssetOptions(selectedAssetId) {
-  return getParticleImageAssets()
-    .map(
-      (asset) => `
-        <option value="${asset.id}" ${asset.id === selectedAssetId ? "selected" : ""}>
-          ${escapeHtml(asset.name)} · ${escapeHtml(getAssetTypeLabel(asset.type))}
-        </option>
-      `
-    )
-    .join("");
+  return particleEffectTools.renderParticleImageAssetOptions(getParticleImageAssets(), selectedAssetId, {
+    escapeHtml,
+    getAssetTypeLabel,
+  });
 }
 
 function renderPositionOptions(selectedPosition) {
@@ -41859,44 +39832,12 @@ function groupParticleCustomPresets(presets) {
 }
 
 function renderParticleCustomPresetQuickList() {
-  const selectedPresetId = state.selectedParticleCustomPresetId;
   const filteredPresets = getFilteredParticleCustomPresets();
-
-  if (!filteredPresets.length) {
-    return `<div class="helper-text">当前筛选下还没有命中的粒子预设。可换一个关键词，或先保存一组新的项目预设。</div>`;
-  }
-
-  return groupParticleCustomPresets(filteredPresets)
-    .map(
-      ([presetType, presets]) => `
-        <section class="particle-preset-group">
-          <div class="particle-preset-group-title">${escapeHtml(getParticlePresetLabel(presetType))}</div>
-          <div class="particle-preset-chip-list">
-            ${presets
-              .map((preset) => {
-                const config = normalizeParticleEffectConfig(preset.config);
-                return `
-                  <button
-                    class="particle-preset-chip ${preset.id === selectedPresetId ? "is-active" : ""}"
-                    type="button"
-                    data-action="select-particle-custom-preset"
-                    data-preset-id="${escapeHtml(preset.id)}"
-                  >
-                    <strong>${escapeHtml(preset.name)}</strong>
-                    <span>${escapeHtml(
-                      `${getParticleComboPresetLabel(config.comboPreset)} / ${getParticleCustomComboLayerSummary(
-                        config.customComboLayers
-                      )}`
-                    )}</span>
-                  </button>
-                `;
-              })
-              .join("")}
-          </div>
-        </section>
-      `
-    )
-    .join("");
+  return particleEffectTools.renderParticleCustomPresetQuickList(filteredPresets, {
+    escapeHtml,
+    selectedPresetId: state.selectedParticleCustomPresetId,
+    normalizeParticleEffectConfig,
+  });
 }
 
 function getSafeParticleColorCurve(curve) {

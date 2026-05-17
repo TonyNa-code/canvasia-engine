@@ -270,6 +270,59 @@ class FrontendProjectMilestonesModuleTests(unittest.TestCase):
         self.assertEqual(payload["ready"]["secondaryActions"][1]["screen"], "inspection")
         self.assertEqual([item["label"] for item in payload["ready"]["checklist"]], ["人工长流程试玩", "整理发布附件", "撰写 Release notes"])
 
+    def test_project_milestone_render_helpers_work_without_app_shell(self) -> None:
+        payload = self.run_module_script(
+            """
+            const checks = [
+              { label: "已完成 <项>", detail: "完成 & 可用", missing: "不用显示", done: true },
+              { label: "待处理", detail: "还没好", missing: "先补正文", done: false },
+              { label: "待处理 2", detail: "还没好", missing: "再补背景", done: false },
+              { label: "待处理 3", detail: "还没好", missing: "再补音乐", done: false },
+              { label: "待处理 4", detail: "还没好", missing: "再补演出", done: false },
+              { label: "已完成 2", detail: "已经导出", missing: "不用显示", done: true },
+            ];
+            const gaps = [
+              { label: "素材 <缺口>", missing: "补齐 & 重新巡检" },
+            ];
+            const renderedActions = [];
+            const actionsMarkup = tools.renderProjectMilestoneActions([
+              { label: "打开巡检", action: "switch-screen", screen: "inspection" },
+              { label: "导出网页包", action: "export-build", dataset: { "export-target": "web" } },
+            ], {
+              renderQuickActionButton: (action, emphasized) => {
+                renderedActions.push({ label: action.label, emphasized });
+                return `<button data-action="${action.action}" data-em="${emphasized ? "1" : "0"}">${action.label}</button>`;
+              },
+            });
+            process.stdout.write(JSON.stringify({
+              keys: Object.keys(tools).sort(),
+              gapMarkup: tools.renderProjectMilestoneGapList(gaps),
+              doneGapMarkup: tools.renderProjectMilestoneGapList([]),
+              checklistMarkup: tools.renderProjectMilestoneChecklist(checks),
+              actionsMarkup,
+              fallbackActionsMarkup: tools.renderProjectMilestoneActions([]),
+              renderedActions,
+            }));
+            """
+        )
+
+        self.assertIn("renderProjectMilestoneGapList", payload["keys"])
+        self.assertIn("renderProjectMilestoneChecklist", payload["keys"])
+        self.assertIn("renderProjectMilestoneActions", payload["keys"])
+        self.assertIn("素材 &lt;缺口&gt;", payload["gapMarkup"])
+        self.assertIn("补齐 &amp; 重新巡检", payload["gapMarkup"])
+        self.assertIn("核心发布门槛已达标", payload["doneGapMarkup"])
+        self.assertLess(payload["checklistMarkup"].index("待处理"), payload["checklistMarkup"].index("已完成 &lt;项&gt;"))
+        self.assertIn("还有 1 项细节已收起", payload["checklistMarkup"])
+        self.assertEqual(payload["renderedActions"], [
+            {"label": "打开巡检", "emphasized": True},
+            {"label": "导出网页包", "emphasized": False},
+        ])
+        self.assertIn('data-action="switch-screen"', payload["actionsMarkup"])
+        self.assertIn('data-em="1"', payload["actionsMarkup"])
+        self.assertIn('data-em="0"', payload["actionsMarkup"])
+        self.assertIn('data-screen="preview"', payload["fallbackActionsMarkup"])
+
     def test_project_milestones_can_reach_all_done(self) -> None:
         payload = self.run_module_script(
             """

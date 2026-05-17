@@ -533,12 +533,110 @@
     };
   }
 
+  function escapeHtml(value) {
+    return String(value)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
+  }
+
+  function renderProjectMilestoneGapList(gaps = [], options = {}) {
+    const escape = typeof options.escapeHtml === "function" ? options.escapeHtml : escapeHtml;
+    const safeGaps = Array.isArray(gaps) ? gaps : [];
+
+    if (!safeGaps.length) {
+      return `
+      <div class="project-milestone-gap-list">
+        <article class="project-milestone-gap-item is-done">
+          <strong>核心发布门槛已达标</strong>
+          <span>可以进入人工长流程试玩、附件整理和 Release notes 准备。</span>
+        </article>
+      </div>
+    `;
+    }
+
+    return `
+    <div class="project-milestone-gap-list">
+      ${safeGaps
+        .map(
+          (gap) => `
+            <article class="project-milestone-gap-item">
+              <strong>${escape(gap.label ?? "待处理项")}</strong>
+              <span>${escape(gap.missing || gap.detail || "继续补齐这个发布候选条件。")}</span>
+            </article>
+          `
+        )
+        .join("")}
+    </div>
+  `;
+  }
+
+  function renderProjectMilestoneChecklist(checks = [], options = {}) {
+    const escape = typeof options.escapeHtml === "function" ? options.escapeHtml : escapeHtml;
+    const safeChecks = Array.isArray(checks) ? checks : [];
+    const orderedChecks = [...safeChecks.filter((check) => !check.done), ...safeChecks.filter((check) => check.done)];
+    const visibleChecks = orderedChecks.slice(0, 5);
+    const hiddenCount = Math.max(orderedChecks.length - visibleChecks.length, 0);
+
+    return `
+    <div class="project-milestone-checklist">
+      ${visibleChecks
+        .map(
+          (check) => `
+            <div class="project-milestone-check ${check.done ? "is-done" : "is-open"}">
+              <span class="project-milestone-check-dot" aria-hidden="true"></span>
+              <div>
+                <strong>${escape(check.label)}</strong>
+                <span>${escape(check.done ? check.detail : check.missing)}</span>
+              </div>
+            </div>
+          `
+        )
+        .join("")}
+      ${
+        hiddenCount > 0
+          ? `<div class="project-milestone-more">还有 ${hiddenCount} 项细节已收起，进入项目巡检可继续查看。</div>`
+          : ""
+      }
+    </div>
+  `;
+  }
+
+  function renderProjectMilestoneActions(actions = [], options = {}) {
+    const safeActions = Array.isArray(actions) ? actions : [];
+    const renderQuickActionButton =
+      typeof options.renderQuickActionButton === "function"
+        ? options.renderQuickActionButton
+        : (action, emphasized = false) => {
+            const escape = typeof options.escapeHtml === "function" ? options.escapeHtml : escapeHtml;
+            const className = `toolbar-button${emphasized ? " toolbar-button-primary" : ""}`;
+            return `<button type="button" class="${className}" data-action="${escape(action.action ?? "")}">${escape(
+              action.label ?? "去处理"
+            )}</button>`;
+          };
+
+    if (safeActions.length === 0) {
+      return `
+      <button type="button" class="toolbar-button toolbar-button-primary" data-action="switch-screen" data-screen="preview">
+        去试玩确认
+      </button>
+    `;
+    }
+
+    return safeActions.map((action, index) => renderQuickActionButton(action, index === 0)).join("");
+  }
+
   const projectMilestonesApi = Object.freeze({
     buildProjectMilestoneActionBrief,
     buildProjectMilestonePlan,
     buildProjectMilestoneGapDigest,
     clampPercent,
     getPercent,
+    renderProjectMilestoneGapList,
+    renderProjectMilestoneChecklist,
+    renderProjectMilestoneActions,
   });
   global.CanvasiaProjectMilestones = projectMilestonesApi;
   global.CanvasiaEditorProjectMilestones = projectMilestonesApi;

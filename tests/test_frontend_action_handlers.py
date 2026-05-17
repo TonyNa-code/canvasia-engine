@@ -16,7 +16,7 @@ APP_PATH = EDITOR_DIR / "app.js"
 PLAYER_PATH = ROOT_DIR / "export_player_template" / "player.js"
 NATIVE_RUNTIME_PATH = ROOT_DIR / "native_runtime" / "runtime_player.py"
 MODULE_PATHS = tuple(sorted((EDITOR_DIR / "modules").glob("*.js")))
-ACTION_ATTRIBUTE_PATHS = (INDEX_PATH, APP_PATH)
+ACTION_ATTRIBUTE_PATHS = (INDEX_PATH, APP_PATH, *MODULE_PATHS)
 ACTION_CONFIG_PATHS = (APP_PATH, *MODULE_PATHS)
 
 ACTION_ATTRIBUTE_PATTERN = re.compile(
@@ -132,7 +132,12 @@ class FrontendActionHandlerTests(unittest.TestCase):
         )
 
     def test_dynamic_data_action_sites_are_audited(self) -> None:
-        source = APP_PATH.read_text(encoding="utf-8")
+        dynamic_action_paths = (
+            APP_PATH,
+            EDITOR_DIR / "modules" / "editor_common.js",
+            EDITOR_DIR / "modules" / "project_center.js",
+        )
+        source = "\n".join(path.read_text(encoding="utf-8") for path in dynamic_action_paths)
         dynamic_markers = Counter()
         for line in source.splitlines():
             if 'data-action="${' not in line:
@@ -304,8 +309,8 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertEqual(toast_calls[0], {"type": "toast", "message": "点击操作没有成功", "tone": "error"})
 
     def test_quick_switch_screen_actions_keep_dataset_screen(self) -> None:
-        source = APP_PATH.read_text(encoding="utf-8")
-        quick_action_button = _extract_function_source(source, "renderQuickActionButton")
+        editor_common_source = (EDITOR_DIR / "modules" / "editor_common.js").read_text(encoding="utf-8")
+        quick_action_button = _extract_function_source(editor_common_source, "renderQuickActionButton")
 
         self.assertIn('action.action === "switch-screen"', quick_action_button)
         self.assertIn('action.dataset?.screen', quick_action_button)
@@ -320,8 +325,6 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("getBlockLabel(snapshot.blockType)", preview_thumbnail)
 
     def test_quick_action_button_renders_disabled_state(self) -> None:
-        source = APP_PATH.read_text(encoding="utf-8")
-        quick_action_button = _extract_function_source(source, "renderQuickActionButton")
         editor_common_path = EDITOR_DIR / "modules" / "editor_common.js"
         script = textwrap.dedent(
             f"""
@@ -331,9 +334,8 @@ class FrontendActionHandlerTests(unittest.TestCase):
             moduleContext.globalThis = moduleContext;
             vm.createContext(moduleContext);
             vm.runInContext(fs.readFileSync({json.dumps(str(editor_common_path))}, "utf8"), moduleContext);
-            const escapeHtml = moduleContext.window.CanvasiaEditorCommon.escapeHtml;
-            function renderQuickActionButton(action, emphasized = false) {quick_action_button}
-            const html = renderQuickActionButton({{
+            const tools = moduleContext.window.CanvasiaEditorCommon;
+            const html = tools.renderQuickActionButton({{
               label: "确认 <执行>",
               action: "repair-project-doctor",
               disabled: true,
@@ -361,7 +363,9 @@ class FrontendActionHandlerTests(unittest.TestCase):
 
     def test_exported_runtimes_honor_bgm_fade_controls(self) -> None:
         app_source = APP_PATH.read_text(encoding="utf-8")
+        story_editor_source = (EDITOR_DIR / "modules" / "story_block_editors.js").read_text(encoding="utf-8")
         music_editor = _extract_function_source(app_source, "renderMusicPlayEditor")
+        music_editor_template = _extract_function_source(story_editor_source, "renderMusicPlayEditor")
         collect_edited_block = _extract_function_source(app_source, "collectEditedBlock")
         player_source = PLAYER_PATH.read_text(encoding="utf-8")
         sync_audio = _extract_function_source(player_source, "syncAudio")
@@ -369,9 +373,10 @@ class FrontendActionHandlerTests(unittest.TestCase):
         fade_audio = _extract_function_source(player_source, "fadeAudioVolume")
         stop_music = _extract_function_source(player_source, "stopMusic")
 
-        self.assertIn("editorMusicEndMode", music_editor)
-        self.assertIn("editorMusicEndBlockId", music_editor)
-        self.assertIn("editorMusicRangeFadeOutMs", music_editor)
+        self.assertIn("storyBlockEditorTools.renderMusicPlayEditor", music_editor)
+        self.assertIn("editorMusicEndMode", music_editor_template)
+        self.assertIn("editorMusicEndBlockId", music_editor_template)
+        self.assertIn("editorMusicRangeFadeOutMs", music_editor_template)
         self.assertIn("endMode", collect_edited_block)
         self.assertIn("endBlockId", collect_edited_block)
         self.assertIn("snapshot.block?.fadeInMs", sync_audio)
@@ -393,16 +398,19 @@ class FrontendActionHandlerTests(unittest.TestCase):
 
     def test_screen_filter_color_grade_controls_reach_exported_runtimes(self) -> None:
         app_source = APP_PATH.read_text(encoding="utf-8")
+        story_editor_source = (EDITOR_DIR / "modules" / "story_block_editors.js").read_text(encoding="utf-8")
         filter_editor = _extract_function_source(app_source, "renderScreenFilterEditor")
+        filter_editor_template = _extract_function_source(story_editor_source, "renderScreenFilterEditor")
         collect_edited_block = _extract_function_source(app_source, "collectEditedBlock")
         filter_layer = _extract_function_source(app_source, "renderStageFilterLayer")
 
-        self.assertIn("editorColorGradeBrightness", filter_editor)
-        self.assertIn("editorColorGradeContrast", filter_editor)
-        self.assertIn("editorColorGradeSaturation", filter_editor)
-        self.assertIn("editorColorGradeHue", filter_editor)
-        self.assertIn("editorColorGradeTemperature", filter_editor)
-        self.assertIn("editorColorGradeVignette", filter_editor)
+        self.assertIn("storyBlockEditorTools.renderScreenFilterEditor", filter_editor)
+        self.assertIn("editorColorGradeBrightness", filter_editor_template)
+        self.assertIn("editorColorGradeContrast", filter_editor_template)
+        self.assertIn("editorColorGradeSaturation", filter_editor_template)
+        self.assertIn("editorColorGradeHue", filter_editor_template)
+        self.assertIn("editorColorGradeTemperature", filter_editor_template)
+        self.assertIn("editorColorGradeVignette", filter_editor_template)
         self.assertIn("grade: readScreenColorGradeControls()", collect_edited_block)
         self.assertIn("--filter-vignette-opacity", filter_layer)
         self.assertIn("getScreenColorGradeSummary(block.grade)", app_source)
@@ -1103,6 +1111,7 @@ class FrontendActionHandlerTests(unittest.TestCase):
 
     def test_beginner_dashboard_export_step_requires_real_export_record(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
+        beginner_tutorial_source = (EDITOR_DIR / "modules" / "beginner_tutorial.js").read_text(encoding="utf-8")
         workflow = _extract_function_source(source, "buildBeginnerDashboardWorkflow")
         renderer = _extract_function_source(source, "renderBeginnerDashboardWorkflow")
 
@@ -1119,10 +1128,11 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn('action: "focus-asset-gap"', workflow)
         self.assertIn('dataset: { "asset-filter-mode": "urgent_missing" }', workflow)
         self.assertIn('dataset: { screen: "inspection" }', workflow)
-        self.assertIn("function getBeginnerWorkflowStepStatusLabel", source)
-        self.assertIn("function getBeginnerWorkflowStepToneClass", source)
-        self.assertIn("getBeginnerWorkflowStepStatusLabel(step)", renderer)
-        self.assertIn("getBeginnerWorkflowStepToneClass(step)", renderer)
+        self.assertIn("beginnerTutorialTools.renderBeginnerDashboardWorkflow", renderer)
+        self.assertIn("function getBeginnerWorkflowStepStatusLabel", beginner_tutorial_source)
+        self.assertIn("function getBeginnerWorkflowStepToneClass", beginner_tutorial_source)
+        self.assertIn("getBeginnerWorkflowStepStatusLabel(step)", beginner_tutorial_source)
+        self.assertIn("getBeginnerWorkflowStepToneClass(step)", beginner_tutorial_source)
 
     def test_export_build_refreshes_current_progress_surface(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")

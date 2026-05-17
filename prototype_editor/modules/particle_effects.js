@@ -1145,6 +1145,19 @@ const PARTICLE_COMBO_PRESET_CONFIGS = {
     return Object.prototype.hasOwnProperty.call(source, key);
   }
 
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  function getEscapeHtml(options = {}) {
+    return typeof options.escapeHtml === "function" ? options.escapeHtml : escapeHtml;
+  }
+
   function getSafeNumber(value, fallback) {
     const parsed = Number.parseFloat(value ?? "");
     return Number.isFinite(parsed) ? parsed : fallback;
@@ -1524,6 +1537,107 @@ const PARTICLE_COMBO_PRESET_CONFIGS = {
 
   function formatParticleNumber(value, fractionDigits = 0) {
     return Number(value).toFixed(fractionDigits).replace(/\.0+$/, "").replace(/(\.\d*[1-9])0+$/, "$1");
+  }
+
+  function renderParticleLabelOptions(labelMap, selectedValue, options = {}) {
+    const escape = getEscapeHtml(options);
+    return Object.entries(labelMap ?? {})
+      .map(
+        ([value, label]) => `
+                  <option value="${escape(value)}" ${value === selectedValue ? "selected" : ""}>
+                    ${escape(label)}
+                  </option>
+                `
+      )
+      .join("");
+  }
+
+  function renderParticleCustomLayerEditor(index, layer, options = {}) {
+    const escape = getEscapeHtml(options);
+    const safeIndex = Number.isFinite(Number(index)) ? Number(index) : 0;
+    const slotNumber = safeIndex + 1;
+    const normalizedLayer = normalizeParticleCustomComboLayer(layer, safeIndex === 0 ? "stardust" : "smoke");
+
+    return `
+    <article class="editor-card particle-custom-layer-card" data-particle-custom-layer data-layer-index="${safeIndex}">
+      <div class="particle-custom-layer-head">
+        <h3>自定义叠层 ${slotNumber}</h3>
+        <button class="toolbar-button toolbar-button-danger" type="button" data-action="remove-particle-custom-layer" data-layer-index="${safeIndex}">
+          删除这层
+        </button>
+      </div>
+      <p>这一层是你额外加的附加发射器。它适合叠烟雾、星尘、法阵、火焰这种辅助层，不用再单独新开一张粒子卡片。</p>
+      <div class="particle-custom-layer-grid">
+        <div class="detail-row">
+          <label for="editorParticleCustomLayer${slotNumber}Enabled">是否启用</label>
+          <select id="editorParticleCustomLayer${slotNumber}Enabled">
+            <option value="false" ${normalizedLayer.enabled ? "" : "selected"}>先关闭这层</option>
+            <option value="true" ${normalizedLayer.enabled ? "selected" : ""}>启用这层附加粒子</option>
+          </select>
+        </div>
+        <div class="detail-row">
+          <label for="editorParticleCustomLayer${slotNumber}Preset">叠层粒子类型</label>
+          <select id="editorParticleCustomLayer${slotNumber}Preset">
+            ${renderParticleLabelOptions(PARTICLE_PRESET_LABELS, normalizedLayer.preset, options)}
+          </select>
+        </div>
+        <div class="detail-row">
+          <label for="editorParticleCustomLayer${slotNumber}EmissionMode">发射模式</label>
+          <select id="editorParticleCustomLayer${slotNumber}EmissionMode">
+            ${renderParticleLabelOptions(PARTICLE_EMISSION_MODE_LABELS, normalizedLayer.emissionMode, options)}
+          </select>
+        </div>
+        <div class="detail-row">
+          <label for="editorParticleCustomLayer${slotNumber}Follow">跟随目标</label>
+          <select id="editorParticleCustomLayer${slotNumber}Follow">
+            ${renderParticleLabelOptions(PARTICLE_FOLLOW_LABELS, normalizedLayer.follow, options)}
+          </select>
+        </div>
+        <div class="detail-row">
+          <label for="editorParticleCustomLayer${slotNumber}FollowAnchor">跟随锚点</label>
+          <select id="editorParticleCustomLayer${slotNumber}FollowAnchor">
+            ${renderParticleLabelOptions(PARTICLE_FOLLOW_ANCHOR_LABELS, normalizedLayer.followAnchor, options)}
+          </select>
+        </div>
+        <div class="detail-row">
+          <label for="editorParticleCustomLayer${slotNumber}DensityMultiplier">数量倍率</label>
+          <input id="editorParticleCustomLayer${slotNumber}DensityMultiplier" type="number" min="0.2" max="4" step="0.1" value="${escape(
+            formatParticleNumber(normalizedLayer.densityMultiplier, 1)
+          )}" />
+        </div>
+        <div class="detail-row">
+          <label for="editorParticleCustomLayer${slotNumber}SizeScale">尺寸倍率</label>
+          <input id="editorParticleCustomLayer${slotNumber}SizeScale" type="number" min="0.2" max="4" step="0.1" value="${escape(
+            formatParticleNumber(normalizedLayer.sizeScale, 1)
+          )}" />
+        </div>
+        <div class="detail-row">
+          <label for="editorParticleCustomLayer${slotNumber}LifeScale">寿命倍率</label>
+          <input id="editorParticleCustomLayer${slotNumber}LifeScale" type="number" min="0.2" max="4" step="0.1" value="${escape(
+            formatParticleNumber(normalizedLayer.lifeScale, 1)
+          )}" />
+        </div>
+        <div class="detail-row">
+          <label for="editorParticleCustomLayer${slotNumber}OpacityScale">透明度倍率</label>
+          <input id="editorParticleCustomLayer${slotNumber}OpacityScale" type="number" min="0.1" max="2" step="0.1" value="${escape(
+            formatParticleNumber(normalizedLayer.opacityScale, 1)
+          )}" />
+        </div>
+        <div class="detail-row">
+          <label for="editorParticleCustomLayer${slotNumber}ColorMix">颜色混合（0~1）</label>
+          <input id="editorParticleCustomLayer${slotNumber}ColorMix" type="number" min="0" max="1" step="0.05" value="${escape(
+            formatParticleNumber(normalizedLayer.colorMix, 2)
+          )}" />
+        </div>
+        <div class="detail-row">
+          <label for="editorParticleCustomLayer${slotNumber}Blend">混合模式</label>
+          <select id="editorParticleCustomLayer${slotNumber}Blend">
+            ${renderParticleLabelOptions(PARTICLE_BLEND_LABELS, normalizedLayer.blend, options)}
+          </select>
+        </div>
+      </div>
+    </article>
+  `;
   }
 
   function getParticleAnchorPercent(position) {
@@ -1934,6 +2048,339 @@ const PARTICLE_COMBO_PRESET_CONFIGS = {
     return Array.from(groups.entries());
   }
 
+  function renderParticleEditorSelectRow(id, label, labelMap, selectedValue, options = {}) {
+    const escape = getEscapeHtml(options);
+    return `
+      <div class="detail-row">
+        <label for="${escape(id)}">${escape(label)}</label>
+        <select id="${escape(id)}">
+          ${renderParticleLabelOptions(labelMap, selectedValue, options)}
+        </select>
+      </div>
+    `;
+  }
+
+  function renderParticleEditorNumberRow(id, label, value, inputOptions = {}, options = {}) {
+    const escape = getEscapeHtml(options);
+    const {
+      min = 0,
+      max = 100,
+      step = 1,
+      fractionDigits = 0,
+    } = inputOptions;
+    return `
+      <div class="detail-row">
+        <label for="${escape(id)}">${escape(label)}</label>
+        <input id="${escape(id)}" type="number" min="${escape(min)}" max="${escape(max)}" step="${escape(step)}" value="${escape(
+          formatParticleNumber(value, fractionDigits)
+        )}" />
+      </div>
+    `;
+  }
+
+  function renderParticleEditorColorRow(id, label, value, options = {}) {
+    const escape = getEscapeHtml(options);
+    return `
+      <div class="detail-row">
+        <label for="${escape(id)}">${escape(label)}</label>
+        <input id="${escape(id)}" type="color" value="${escape(value)}" />
+      </div>
+    `;
+  }
+
+  function renderParticleImageAssetOptions(assets, selectedAssetId, options = {}) {
+    const escape = getEscapeHtml(options);
+    const getAssetTypeLabel =
+      typeof options.getAssetTypeLabel === "function" ? options.getAssetTypeLabel : (type) => type ?? "";
+
+    return (Array.isArray(assets) ? assets : [])
+      .map(
+        (asset) => `
+        <option value="${escape(asset?.id ?? "")}" ${asset?.id === selectedAssetId ? "selected" : ""}>
+          ${escape(asset?.name ?? "")} · ${escape(getAssetTypeLabel(asset?.type))}
+        </option>
+      `
+      )
+      .join("");
+  }
+
+  function renderParticleCustomPresetQuickList(presets = [], options = {}) {
+    const escape = getEscapeHtml(options);
+    const selectedPresetId = String(options.selectedPresetId ?? "");
+    const normalizeConfig =
+      typeof options.normalizeParticleEffectConfig === "function"
+        ? options.normalizeParticleEffectConfig
+        : buildDefaultParticleEffectConfig;
+    const filteredPresets = Array.isArray(presets) ? presets : [];
+
+    if (!filteredPresets.length) {
+      return `<div class="helper-text">当前筛选下还没有命中的粒子预设。可换一个关键词，或先保存一组新的项目预设。</div>`;
+    }
+
+    return groupParticleCustomPresets(filteredPresets)
+      .map(
+        ([presetType, presetItems]) => `
+        <section class="particle-preset-group">
+          <div class="particle-preset-group-title">${escape(getParticlePresetLabel(presetType))}</div>
+          <div class="particle-preset-chip-list">
+            ${presetItems
+              .map((preset) => {
+                const config = normalizeConfig(preset?.config);
+                return `
+                  <button
+                    class="particle-preset-chip ${preset?.id === selectedPresetId ? "is-active" : ""}"
+                    type="button"
+                    data-action="select-particle-custom-preset"
+                    data-preset-id="${escape(preset?.id ?? "")}"
+                  >
+                    <strong>${escape(preset?.name ?? "")}</strong>
+                    <span>${escape(
+                      `${getParticleComboPresetLabel(config.comboPreset)} / ${getParticleCustomComboLayerSummary(
+                        config.customComboLayers
+                      )}`
+                    )}</span>
+                  </button>
+                `;
+              })
+              .join("")}
+          </div>
+        </section>
+      `
+      )
+      .join("");
+  }
+
+  function renderParticleEffectEditor(block, options = {}) {
+    const escape = getEscapeHtml(options);
+    const normalizeConfig =
+      typeof options.normalizeParticleEffectConfig === "function"
+        ? options.normalizeParticleEffectConfig
+        : (config = {}) => ({
+            ...buildDefaultParticleEffectConfig(config?.preset),
+            ...(config && typeof config === "object" ? config : {}),
+          });
+    const renderImageOptions =
+      typeof options.renderParticleImageAssetOptions === "function"
+        ? options.renderParticleImageAssetOptions
+        : (selectedAssetId) => renderParticleImageAssetOptions(options.particleImageAssets, selectedAssetId, options);
+    const renderCustomLayer =
+      typeof options.renderParticleCustomLayerEditor === "function"
+        ? options.renderParticleCustomLayerEditor
+        : renderParticleCustomLayerEditor;
+    const particle = normalizeConfig(block);
+    const action = getSafeParticleAction(particle.action);
+    const preset = getSafeParticlePreset(particle.preset);
+    const intensity = getSafeParticleIntensity(particle.intensity);
+    const speed = getSafeParticleSpeed(particle.speed);
+    const wind = getSafeParticleWind(particle.wind);
+    const area = getSafeParticleArea(particle.area);
+    const assetId = String(particle.assetId ?? "");
+    const customComboLayers = normalizeParticleCustomComboLayers(particle.customComboLayers);
+    const savedParticlePresets = Array.isArray(options.savedParticlePresets) ? options.savedParticlePresets : [];
+    const particlePresetSearchQuery = String(options.particlePresetSearchQuery ?? "");
+    const selectedParticleCustomPresetId = String(options.selectedParticleCustomPresetId ?? "");
+    const filteredParticleCustomPresets = getFilteredParticleCustomPresets(
+      savedParticlePresets,
+      particlePresetSearchQuery
+    );
+    const filteredParticleCustomPresetCount = Number.isFinite(Number(options.filteredParticleCustomPresetCount))
+      ? Number(options.filteredParticleCustomPresetCount)
+      : filteredParticleCustomPresets.length;
+    const customPresetLimit = Number(options.customPresetLimit ?? PARTICLE_CUSTOM_PRESET_LIMIT);
+    const quickListMarkup =
+      typeof options.renderParticleCustomPresetQuickList === "function"
+        ? options.renderParticleCustomPresetQuickList()
+        : renderParticleCustomPresetQuickList(filteredParticleCustomPresets, {
+            ...options,
+            selectedPresetId: selectedParticleCustomPresetId,
+            normalizeParticleEffectConfig: normalizeConfig,
+          });
+
+    return `
+    <article class="editor-card">
+      <h3>编辑粒子特效</h3>
+      <p>这里已经升级成高级粒子模块了。除了雪、雨、樱花和光尘，现在还能做火星、闪光、气泡、纸片，并且把数量、尺寸、寿命、重力、XYZ 疏散、旋转、颜色、混合方式都像 AE 一样细调。</p>
+    </article>
+    <div class="field-grid">
+      <div class="detail-row">
+        <label for="editorParticleAction">这张卡片要做什么</label>
+        <select id="editorParticleAction">
+          <option value="start" ${action === "start" ? "selected" : ""}>开始粒子特效</option>
+          <option value="stop" ${action === "stop" ? "selected" : ""}>关闭当前粒子特效</option>
+        </select>
+      </div>
+      ${renderParticleEditorSelectRow("editorParticlePreset", "粒子类型", PARTICLE_PRESET_LABELS, preset, options)}
+      <div class="detail-row">
+        <label>快速套用</label>
+        <button class="toolbar-button" data-action="apply-particle-preset-defaults">套用这个预设的高级参数</button>
+      </div>
+      <div class="detail-row">
+        <label for="editorParticleScenePreset">演出级预设库</label>
+        <select id="editorParticleScenePreset">
+          ${Object.entries(PARTICLE_SCENE_PRESET_LABELS)
+            .map(([value, label]) => `<option value="${escape(value)}">${escape(label)}</option>`)
+            .join("")}
+        </select>
+      </div>
+      <div class="detail-row">
+        <label>一键生成完整效果</label>
+        <button class="toolbar-button" data-action="apply-particle-scene-preset">套用这组演出级预设</button>
+      </div>
+      <article class="editor-card particle-preset-library-card">
+        <h3>项目粒子预设库</h3>
+        <p>把你调好的暴雪、火焰仪式、魔法阵、梦境星海存成这个项目自己的粒子预设，下次直接复用。当前已保存 ${savedParticlePresets.length} / ${customPresetLimit} 组。</p>
+      </article>
+      <div class="detail-row">
+        <label for="editorParticleCustomPresetSearch">搜索项目预设</label>
+        <input
+          id="editorParticleCustomPresetSearch"
+          type="text"
+          placeholder="搜预设名、粒子类型、组合方案"
+          value="${escape(particlePresetSearchQuery)}"
+        />
+      </div>
+      <div class="detail-row">
+        <label for="editorParticleCustomPresetSelect">已保存的粒子预设</label>
+        <select id="editorParticleCustomPresetSelect">
+          <option value="">先选一个项目预设</option>
+          ${savedParticlePresets
+            .map(
+              (presetItem) => `
+                <option value="${escape(presetItem?.id ?? "")}" ${
+                  presetItem?.id === selectedParticleCustomPresetId ? "selected" : ""
+                }>${escape(presetItem?.name ?? "")}</option>
+              `
+            )
+            .join("")}
+        </select>
+      </div>
+      <div class="detail-row">
+        <label>快速调用</label>
+        <div class="detail-actions">
+          <button class="toolbar-button" type="button" data-action="apply-particle-custom-preset">套用这个项目预设</button>
+          <button class="toolbar-button toolbar-button-danger" type="button" data-action="delete-particle-custom-preset" ${
+            savedParticlePresets.length === 0 ? "disabled" : ""
+          }>删除这个项目预设</button>
+        </div>
+      </div>
+      <div class="detail-row">
+        <label for="editorParticleCustomPresetName">保存为项目预设</label>
+        <input
+          id="editorParticleCustomPresetName"
+          type="text"
+          maxlength="36"
+          placeholder="比如：暴雪神殿 / 紫焰法阵 / 星海梦境"
+          value=""
+        />
+      </div>
+      <div class="detail-row">
+        <label>写进当前项目</label>
+        <div class="detail-actions">
+          <button class="toolbar-button" type="button" data-action="save-particle-custom-preset">保存这组粒子为项目预设</button>
+          <button class="toolbar-button" type="button" data-action="export-particle-custom-preset" ${
+            savedParticlePresets.length === 0 ? "disabled" : ""
+          }>导出当前预设</button>
+          <button class="toolbar-button" type="button" data-action="export-particle-custom-preset-pack" ${
+            savedParticlePresets.length === 0 ? "disabled" : ""
+          }>导出整个预设包</button>
+          <button class="toolbar-button" type="button" data-action="import-particle-custom-preset-pack">导入预设包</button>
+        </div>
+      </div>
+      <article class="editor-card particle-preset-quick-library">
+        <h3>快速挑选</h3>
+        <p class="helper-text">搜索结果 ${filteredParticleCustomPresetCount} 组；每个项目最多保存 ${customPresetLimit} 组粒子预设。</p>
+        <div id="particleCustomPresetQuickList">${quickListMarkup}</div>
+      </article>
+      ${renderParticleEditorSelectRow("editorParticleIntensity", "特效强度", PARTICLE_INTENSITY_LABELS, intensity, options)}
+      ${renderParticleEditorNumberRow("editorParticleDensity", "粒子数量", particle.density, { min: 4, max: 240 }, options)}
+      <div class="detail-row">
+        <label for="editorParticleAssetId">自定义粒子图片</label>
+        <select id="editorParticleAssetId">
+          <option value="">使用当前预设的默认外观</option>
+          ${renderImageOptions(assetId)}
+        </select>
+      </div>
+      ${renderParticleEditorSelectRow("editorParticleSpeed", "下落速度", PARTICLE_SPEED_LABELS, speed, options)}
+      ${renderParticleEditorSelectRow("editorParticleWind", "风向", PARTICLE_WIND_LABELS, wind, options)}
+      ${renderParticleEditorSelectRow("editorParticleArea", "出现区域", PARTICLE_AREA_LABELS, area, options)}
+      ${renderParticleEditorSelectRow("editorParticleBlend", "混合模式", PARTICLE_BLEND_LABELS, particle.blend, options)}
+      ${renderParticleEditorSelectRow("editorParticleEmissionMode", "发射模式", PARTICLE_EMISSION_MODE_LABELS, particle.emissionMode, options)}
+      ${renderParticleEditorSelectRow("editorParticleComboPreset", "组合方案", PARTICLE_COMBO_PRESET_LABELS, particle.comboPreset, options)}
+      <article class="editor-card particle-custom-layer-toolbar">
+        <h3>自定义多层组合</h3>
+        <p>如果现成的组合方案还不够，这里支持继续叠加更多发射器，并按需要新增或删除附加层。</p>
+        <div class="detail-actions">
+          <button class="toolbar-button" type="button" data-action="add-particle-custom-layer" ${
+            customComboLayers.length >= PARTICLE_CUSTOM_COMBO_LAYER_LIMIT ? "disabled" : ""
+          }>
+            新增一层附加粒子
+          </button>
+        </div>
+      </article>
+      ${
+        customComboLayers.length > 0
+          ? customComboLayers.map((layer, index) => renderCustomLayer(index, layer)).join("")
+          : `<article class="editor-card particle-custom-layer-empty"><p>当前还没有额外叠层。可使用上面的按钮继续叠加烟雾、星尘、法阵、火焰等辅助层。</p></article>`
+      }
+      <article class="editor-card">
+        <h3>发射器和外力</h3>
+        <p>这一组更像 AE 里的发射器：可以决定它是持续下雪、一次性爆发纸片，还是从某个点、某条线、某个圆形区域喷出来；现在还可以一键套“组合方案”，把烟雾、法阵、星尘、火焰这些多层发射器叠在同一张卡里。</p>
+      </article>
+      ${renderParticleEditorSelectRow("editorParticleEmitterShape", "发射器形状", PARTICLE_EMITTER_SHAPE_LABELS, particle.emitterShape, options)}
+      ${renderParticleEditorSelectRow("editorParticleFollow", "跟随目标", PARTICLE_FOLLOW_LABELS, particle.follow, options)}
+      ${renderParticleEditorSelectRow("editorParticleFollowAnchor", "跟随锚点", PARTICLE_FOLLOW_ANCHOR_LABELS, particle.followAnchor, options)}
+      ${renderParticleEditorNumberRow("editorParticleLayerCount", "叠加层数", particle.layerCount, { min: 1, max: 3 }, options)}
+      ${renderParticleEditorNumberRow("editorParticleEmitterX", "发射器 X（%）", particle.emitterX, { min: 0, max: 100 }, options)}
+      ${renderParticleEditorNumberRow("editorParticleEmitterY", "发射器 Y（%）", particle.emitterY, { min: -20, max: 120 }, options)}
+      ${renderParticleEditorNumberRow("editorParticleEmitterZ", "发射器 Z", particle.emitterZ, { min: -100, max: 100 }, options)}
+      ${renderParticleEditorNumberRow("editorParticleAttractionX", "吸引 / 推离 X", particle.attractionX, { min: -160, max: 160 }, options)}
+      ${renderParticleEditorNumberRow("editorParticleAttractionY", "吸引 / 推离 Y", particle.attractionY, { min: -160, max: 160 }, options)}
+      ${renderParticleEditorNumberRow("editorParticleVortex", "旋涡 / 绕圈", particle.vortex, { min: -240, max: 240 }, options)}
+      ${renderParticleEditorSelectRow("editorParticleForceField", "中心力场", PARTICLE_FORCE_FIELD_LABELS, particle.forceField, options)}
+      ${renderParticleEditorNumberRow("editorParticleFieldX", "力场中心 X（%）", particle.fieldX, { min: 0, max: 100 }, options)}
+      ${renderParticleEditorNumberRow("editorParticleFieldY", "力场中心 Y（%）", particle.fieldY, { min: -20, max: 120 }, options)}
+      <article class="editor-card">
+        <h3>外观和寿命</h3>
+        <p>这里决定粒子看起来有多大、活多久、透明度范围是多少。做大雪、细雨、轻尘和烟花碎片时会特别好用。</p>
+      </article>
+      ${renderParticleEditorNumberRow("editorParticleSizeMin", "最小尺寸（px）", particle.sizeMin, { min: 1, max: 160 }, options)}
+      ${renderParticleEditorNumberRow("editorParticleSizeMax", "最大尺寸（px）", particle.sizeMax, { min: 1, max: 160 }, options)}
+      ${renderParticleEditorNumberRow("editorParticleLifeMin", "最短寿命（秒）", particle.lifeMin, { min: 0.4, max: 20, step: 0.1, fractionDigits: 1 }, options)}
+      ${renderParticleEditorNumberRow("editorParticleLifeMax", "最长寿命（秒）", particle.lifeMax, { min: 0.4, max: 20, step: 0.1, fractionDigits: 1 }, options)}
+      ${renderParticleEditorNumberRow("editorParticleOpacityMin", "最小透明度（0~1）", particle.opacityMin, { min: 0.04, max: 1, step: 0.01, fractionDigits: 2 }, options)}
+      ${renderParticleEditorNumberRow("editorParticleOpacityMax", "最大透明度（0~1）", particle.opacityMax, { min: 0.04, max: 1, step: 0.01, fractionDigits: 2 }, options)}
+      ${renderParticleEditorSelectRow("editorParticleSizeCurve", "尺寸时间曲线", PARTICLE_SIZE_CURVE_LABELS, particle.sizeCurve, options)}
+      ${renderParticleEditorSelectRow("editorParticleOpacityCurve", "透明度时间曲线", PARTICLE_OPACITY_CURVE_LABELS, particle.opacityCurve, options)}
+      ${renderParticleEditorSelectRow("editorParticleColorCurve", "颜色时间曲线", PARTICLE_COLOR_CURVE_LABELS, particle.colorCurve, options)}
+      <article class="editor-card">
+        <h3>XYZ 运动和疏散</h3>
+        <p>X / Y / Z 三个轴都可调。可将它理解为：X 是横向力，Y 是上下重力，Z 是远近层次；疏散越高，粒子越不整齐、越有空间感。</p>
+      </article>
+      ${renderParticleEditorNumberRow("editorParticleGravityX", "重力 X", particle.gravityX, { min: -180, max: 180 }, options)}
+      ${renderParticleEditorNumberRow("editorParticleGravityY", "重力 Y", particle.gravityY, { min: -160, max: 280 }, options)}
+      ${renderParticleEditorNumberRow("editorParticleGravityZ", "重力 Z", particle.gravityZ, { min: -120, max: 120 }, options)}
+      ${renderParticleEditorNumberRow("editorParticleSpreadX", "疏散 X（%）", particle.spreadX, { min: 4, max: 100 }, options)}
+      ${renderParticleEditorNumberRow("editorParticleSpreadY", "疏散 Y（%）", particle.spreadY, { min: 0, max: 100 }, options)}
+      ${renderParticleEditorNumberRow("editorParticleSpreadZ", "疏散 Z（%）", particle.spreadZ, { min: 0, max: 100 }, options)}
+      ${renderParticleEditorNumberRow("editorParticleTurbulence", "乱流 / 扰动", particle.turbulence, { min: 0, max: 120 }, options)}
+      <article class="editor-card">
+        <h3>旋转和颜色</h3>
+        <p>这里可以把粒子调成慢慢转、快速打转、偏冷、偏暖或者高亮发光。如果上传的是自定义雪花图片，这里的颜色会直接当作着色涂层来用。</p>
+      </article>
+      ${renderParticleEditorNumberRow("editorParticleRotationMin", "初始旋转最小值（deg）", particle.rotationMin, { min: -360, max: 360 }, options)}
+      ${renderParticleEditorNumberRow("editorParticleRotationMax", "初始旋转最大值（deg）", particle.rotationMax, { min: -360, max: 360 }, options)}
+      ${renderParticleEditorNumberRow("editorParticleSpin", "自转速度 / 累积旋转（deg）", particle.spin, { min: -1080, max: 1080 }, options)}
+      ${renderParticleEditorColorRow("editorParticleColor", "主颜色", particle.color, options)}
+      ${renderParticleEditorColorRow("editorParticleColorAccent", "高光 / 辅助颜色", particle.colorAccent, options)}
+      ${renderParticleEditorColorRow("editorParticleColorEnd", "结尾颜色", particle.colorEnd, options)}
+      <div class="helper-text">如果选择“关闭当前粒子特效”，下面这些高级设置会被忽略；如果选择“开始”，它会一直持续到遇到下一张关闭卡片为止。现在这套参数已经足够做大雪、暴雨、漂浮火星、梦境闪光、冒泡、庆祝纸片这些高级演出了。</div>
+    </div>
+    <div class="detail-actions">
+      <button class="toolbar-button toolbar-button-primary" data-action="save-block">保存这张卡片</button>
+    </div>
+  `;
+  }
+
   function getParticleCustomPresetById(presets = [], presetId = "") {
     const safePresetId = String(presetId ?? "").trim();
     if (!safePresetId || !Array.isArray(presets)) {
@@ -2142,6 +2589,7 @@ const PARTICLE_COMBO_PRESET_CONFIGS = {
     getParticleMotionProfile,
     getParticleRandom,
     formatParticleNumber,
+    renderParticleCustomLayerEditor,
     getParticleAnchorPercent,
     getParticleCameraAnchorPercent,
     getParticleEmitterAnchor,
@@ -2159,6 +2607,9 @@ const PARTICLE_COMBO_PRESET_CONFIGS = {
     getParticleCustomPresetSearchTokens,
     getFilteredParticleCustomPresets,
     groupParticleCustomPresets,
+    renderParticleCustomPresetQuickList,
+    renderParticleEffectEditor,
+    renderParticleImageAssetOptions,
     getParticleCustomPresetById,
     buildParticleCustomPresetSavePlan,
     buildParticleCustomPresetExportPayload,

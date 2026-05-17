@@ -133,6 +133,27 @@ class FrontendRecentWorkspaceModuleTests(unittest.TestCase):
                 tools.sanitizeRecentWorkspaceText("abcdef", 0),
                 tools.sanitizeRecentWorkspaceText("abcdef", "bad"),
               ],
+              cardMarkup: tools.renderDashboardRecentWorkspaceCard({{
+                type: "script",
+                tone: "warn",
+                title: "台词 <入口>",
+                summary: "继续 & 试听",
+                subtitle: "第一章 · 教室",
+                updatedAt: "2026-05-07T08:00:00.000Z",
+                actions: [{{ label: "试玩", action: "preview-story-location" }}],
+              }}, {{
+                formatDate: () => "2026/5/7 08:00",
+                renderDashboardTaskActions: (actions) => `<button data-count="${{actions.length}}">go</button>`,
+              }}),
+              panelMarkup: tools.renderDashboardRecentWorkspacePanel([
+                {{ type: "scene", tone: "good", title: "场景一", summary: "可继续", subtitle: "第一章", updatedAt: "2026-05-07T08:00:00.000Z", actions: [] }},
+                {{ type: "asset", tone: "soft", title: "背景", summary: "已查看", subtitle: "素材", updatedAt: "2026-05-07T08:01:00.000Z", actions: [] }},
+              ], {{
+                renderDashboardTaskActions: () => "",
+              }}),
+              emptyPanelMarkup: tools.renderDashboardRecentWorkspacePanel([], {{
+                renderEmpty: (text) => `<empty>${{text}}</empty>`,
+              }}),
             }};
             process.stdout.write(JSON.stringify(result));
             """
@@ -148,6 +169,8 @@ class FrontendRecentWorkspaceModuleTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 0, completed.stderr)
         payload = json.loads(completed.stdout)
         self.assertIn("mergeRecentWorkspaceItem", payload["keys"])
+        self.assertIn("renderDashboardRecentWorkspaceCard", payload["keys"])
+        self.assertIn("renderDashboardRecentWorkspacePanel", payload["keys"])
         self.assertEqual(payload["constants"], [8, "剧情场景"])
         self.assertEqual(payload["labels"], ["剧情场景", "台本入口", "剧情场景"])
         self.assertEqual(payload["safeTypes"], ["asset", "scene"])
@@ -178,6 +201,17 @@ class FrontendRecentWorkspaceModuleTests(unittest.TestCase):
         self.assertFalse(payload["failingPersist"])
         self.assertFalse(payload["failingClear"])
         self.assertEqual(payload["textLimits"], ["abc", "", "abcdef"])
+        self.assertIn("台本入口", payload["cardMarkup"])
+        self.assertIn("台词 &lt;入口&gt;", payload["cardMarkup"])
+        self.assertIn("继续 &amp; 试听", payload["cardMarkup"])
+        self.assertIn('data-count="1"', payload["cardMarkup"])
+        self.assertIn('data-action="clear-recent-workspace"', payload["panelMarkup"])
+        self.assertIn("最近工作区", payload["panelMarkup"])
+        self.assertIn("场景一", payload["panelMarkup"])
+        self.assertIn("背景", payload["panelMarkup"])
+        self.assertIn("<strong>1</strong>", payload["panelMarkup"])
+        self.assertIn("<empty>开始写剧情", payload["emptyPanelMarkup"])
+        self.assertIn("disabled", payload["emptyPanelMarkup"])
 
 
 if __name__ == "__main__":

@@ -163,6 +163,133 @@
     }
   }
 
+  function escapeHtml(value) {
+    return String(value)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
+  }
+
+  function formatDate(value, options = {}) {
+    if (!value) {
+      return "未知";
+    }
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return String(value);
+    }
+
+    return date.toLocaleString(options.locale || "zh-CN", options.formatOptions);
+  }
+
+  function getDashboardTaskToneClass(tone) {
+    if (tone === "danger") {
+      return "danger-text";
+    }
+    if (tone === "warn") {
+      return "warn-text";
+    }
+    if (tone === "good") {
+      return "good-text";
+    }
+    return "";
+  }
+
+  function renderEmpty(text, options = {}) {
+    const escape = typeof options.escapeHtml === "function" ? options.escapeHtml : escapeHtml;
+    return `<div class="empty-note">${escape(text)}</div>`;
+  }
+
+  function renderRouteMetricCard(label, value, hint, options = {}) {
+    if (typeof options.renderRouteMetricCard === "function") {
+      return options.renderRouteMetricCard(label, value, hint);
+    }
+
+    const escape = typeof options.escapeHtml === "function" ? options.escapeHtml : escapeHtml;
+    return `
+    <article class="route-metric-card">
+      <span>${escape(label)}</span>
+      <strong>${escape(String(value))}</strong>
+      <small>${escape(hint)}</small>
+    </article>
+  `;
+  }
+
+  function renderDashboardRecentWorkspaceCard(item, options = {}) {
+    const escape = typeof options.escapeHtml === "function" ? options.escapeHtml : escapeHtml;
+    const format = typeof options.formatDate === "function" ? options.formatDate : formatDate;
+    const getToneClass =
+      typeof options.getDashboardTaskToneClass === "function"
+        ? options.getDashboardTaskToneClass
+        : getDashboardTaskToneClass;
+    const renderActions =
+      typeof options.renderDashboardTaskActions === "function"
+        ? options.renderDashboardTaskActions
+        : () => "";
+
+    return `
+    <article class="detail-card recent-work-card is-${item.tone}">
+      <div class="recent-work-top">
+        <span class="issue-tag ${getToneClass(item.tone)}">${escape(
+          getRecentWorkspaceTypeLabel(item.type)
+        )}</span>
+        <span class="recent-work-time">${escape(format(item.updatedAt))}</span>
+      </div>
+      <strong>${escape(item.title)}</strong>
+      <p class="recent-work-summary">${escape(item.summary)}</p>
+      <div class="detail-meta">${escape(item.subtitle)}</div>
+      <div class="script-entry-actions">
+        ${renderActions(item.actions)}
+      </div>
+    </article>
+  `;
+  }
+
+  function renderDashboardRecentWorkspacePanel(items = [], options = {}) {
+    const safeItems = Array.isArray(items) ? items : [];
+    const sceneCount = safeItems.filter((item) => item.type === "scene").length;
+    const scriptCount = safeItems.filter((item) => item.type === "script").length;
+    const assetCount = safeItems.filter((item) => item.type === "asset").length;
+    const characterCount = safeItems.filter((item) => item.type === "character").length;
+    const renderBlank =
+      typeof options.renderEmpty === "function" ? options.renderEmpty : (text) => renderEmpty(text, options);
+
+    return `
+    <section class="panel recent-work-panel">
+      <div class="panel-heading recent-work-heading">
+        <div>
+          <h2>最近工作区</h2>
+          <span class="panel-note">最近使用过的场景、台本、素材和角色会记录在这里</span>
+        </div>
+        <button
+          class="toolbar-button"
+          type="button"
+          data-action="clear-recent-workspace"
+          ${safeItems.length > 0 ? "" : "disabled"}
+        >
+          清空记录
+        </button>
+      </div>
+      <div class="route-summary-strip">
+        ${renderRouteMetricCard("场景", sceneCount, "最近切过或回去继续写的场景", options)}
+        ${renderRouteMetricCard("台本", scriptCount, "最近直接定位过的正文入口", options)}
+        ${renderRouteMetricCard("素材", assetCount, "最近查看或处理过的素材", options)}
+        ${renderRouteMetricCard("角色", characterCount, "最近回头确认过的角色资料", options)}
+      </div>
+      ${
+        safeItems.length > 0
+          ? `<div class="recent-work-grid">${safeItems
+              .map((item) => renderDashboardRecentWorkspaceCard(item, options))
+              .join("")}</div>`
+          : renderBlank("开始写剧情、补素材、查看角色或定位台本后，这里会记录最近的工作位置。")
+      }
+    </section>
+  `;
+  }
+
   global.CanvasiaEditorRecentWorkspace = Object.freeze({
     RECENT_WORKSPACE_LIMIT,
     RECENT_WORKSPACE_TYPE_LABELS,
@@ -177,5 +304,7 @@
     loadStoredRecentWorkspaceItems,
     persistRecentWorkspaceItems,
     clearStoredRecentWorkspaceItems,
+    renderDashboardRecentWorkspaceCard,
+    renderDashboardRecentWorkspacePanel,
   });
 })(typeof window !== "undefined" ? window : globalThis);

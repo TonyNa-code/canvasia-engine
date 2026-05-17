@@ -261,6 +261,116 @@
     }`;
   }
 
+  function escapeHtml(value) {
+    return String(value)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
+  }
+
+  function formatDate(value) {
+    if (!value) {
+      return "未知";
+    }
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return String(value);
+    }
+
+    return date.toLocaleString("zh-CN");
+  }
+
+  function getDashboardTaskToneClass(tone) {
+    if (tone === "danger") {
+      return "danger-text";
+    }
+    if (tone === "warn") {
+      return "warn-text";
+    }
+    if (tone === "good") {
+      return "good-text";
+    }
+    return "";
+  }
+
+  function renderHistorySnapshotCard(snapshot, options = {}) {
+    const safeSnapshot = sanitizeHistorySnapshot(snapshot);
+    if (!safeSnapshot) {
+      return "";
+    }
+
+    const escape = typeof options.escapeHtml === "function" ? options.escapeHtml : escapeHtml;
+    const format = typeof options.formatDate === "function" ? options.formatDate : formatDate;
+    const getToneClass =
+      typeof options.getDashboardTaskToneClass === "function"
+        ? options.getDashboardTaskToneClass
+        : getDashboardTaskToneClass;
+    const isCompact = options.compact === true;
+    const isCurrent = Boolean(safeSnapshot.isCurrent);
+    const canRestore = options.allowRestore !== false && !isCurrent;
+    const canRelabel = options.allowRelabel !== false;
+    const title = safeSnapshot.label || "未命名快照";
+    const metaLabel = `${getHistoryKindLabel(safeSnapshot.kind)} · 第 ${Number(safeSnapshot.index ?? 0) + 1} 份`;
+
+    return `
+    <article class="history-card ${isCurrent ? "is-current" : ""} ${safeSnapshot.kind === "manual" ? "is-manual" : ""} ${
+      safeSnapshot.kind === "baseline" ? "is-baseline" : ""
+    }">
+      <div class="history-card-top">
+        <div class="history-card-title">
+          <div class="pill-row">
+            <span class="issue-tag ${getToneClass(getHistoryKindTone(safeSnapshot.kind))}">${escape(
+              getHistoryKindLabel(safeSnapshot.kind)
+            )}</span>
+            ${isCurrent ? '<span class="issue-tag is-good">当前版本</span>' : ""}
+          </div>
+          <strong>${escape(title)}</strong>
+        </div>
+        <span class="history-card-time">${escape(format(safeSnapshot.createdAt))}</span>
+      </div>
+      <div class="history-card-meta">${escape(metaLabel)}</div>
+      <div class="history-card-actions">
+        ${
+          canRestore
+            ? `<button class="toolbar-button ${isCompact ? "" : "toolbar-button-primary"}" data-action="restore-project-history" data-history-index="${Number(
+                safeSnapshot.index ?? -1
+              )}">
+                恢复到这里
+              </button>`
+            : '<button class="toolbar-button" type="button" disabled>当前就在这里</button>'
+        }
+        ${
+          canRelabel
+            ? `<button class="toolbar-button" data-action="rename-project-history-snapshot" data-history-index="${Number(
+                safeSnapshot.index ?? -1
+              )}">
+                改备注
+              </button>`
+            : ""
+        }
+      </div>
+    </article>
+  `;
+  }
+
+  function renderHistoryTimeline(history, options = {}) {
+    const safeHistory = getSafeProjectHistory(history);
+    const snapshots = Array.isArray(options.filteredSnapshots)
+      ? sanitizeHistorySnapshots(options.filteredSnapshots)
+      : getFilteredHistorySnapshots(safeHistory, options);
+
+    if (snapshots.length === 0) {
+      return safeHistory.totalSnapshots > 0
+        ? '<div class="history-empty">当前筛选下还没有命中的快照，可以换个关键词或切回“全部版本”。</div>'
+        : '<div class="history-empty">这个项目还没有可显示的快照时间线。</div>';
+    }
+
+    return snapshots.map((snapshot) => renderHistorySnapshotCard(snapshot, options)).join("");
+  }
+
   global.CanvasiaEditorProjectHistory = Object.freeze({
     HISTORY_KIND_LABELS,
     HISTORY_KIND_TONES,
@@ -286,5 +396,7 @@
     getFilteredHistorySnapshots,
     formatHistoryRestorePreview,
     buildProjectRecoveryPromptKey,
+    renderHistorySnapshotCard,
+    renderHistoryTimeline,
   });
 })(typeof window !== "undefined" ? window : globalThis);

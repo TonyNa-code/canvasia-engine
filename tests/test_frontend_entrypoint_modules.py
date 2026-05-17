@@ -36,6 +36,7 @@ class FrontendEntrypointModuleTests(unittest.TestCase):
             "./modules/asset_catalog.js",
             "./modules/openai_asset_generator.js",
             "./modules/beginner_tutorial.js",
+            "./modules/project_center.js",
             "./modules/creative_assistant.js",
             "./modules/editor_mode.js",
             "./modules/release_version.js",

@@ -237,6 +237,100 @@ class FrontendParticleEffectsModuleTests(unittest.TestCase):
                 enabledCount: tools.getEnabledParticleCustomComboLayers(comboTestLayers).length,
                 summary: tools.getParticleCustomComboLayerSummary(comboTestLayers),
               }},
+              customLayerMarkup: tools.renderParticleCustomLayerEditor(1, {{
+                enabled: true,
+                preset: "flame",
+                emissionMode: "burst",
+                follow: "character",
+                followAnchor: "feet",
+                densityMultiplier: 1.5,
+                sizeScale: 1.25,
+                lifeScale: 0.75,
+                opacityScale: 0.6,
+                colorMix: 0.35,
+                blend: "add",
+              }}),
+              customPresetQuickListMarkup: tools.renderParticleCustomPresetQuickList(
+                particlePresetLibrary.slice(0, 2),
+                {{
+                  selectedPresetId: "dream_fx",
+                  normalizeParticleEffectConfig: (config) => ({{
+                    comboPreset: config.comboPreset || "none",
+                    customComboLayers: config.customComboLayers || [],
+                  }}),
+                }}
+              ),
+              emptyCustomPresetQuickListMarkup: tools.renderParticleCustomPresetQuickList([]),
+              imageAssetOptionsMarkup: tools.renderParticleImageAssetOptions(
+                [
+                  {{ id: "bg_1", name: "背景 <雨天>", type: "background" }},
+                  {{ id: "spark_png", name: "自定义火花图", type: "ui" }},
+                ],
+                "spark_png",
+                {{ getAssetTypeLabel: (type) => ({{ background: "背景", ui: "UI 图层" }}[type] || type) }}
+              ),
+              particleEditorMarkup: tools.renderParticleEffectEditor(
+                {{
+                  action: "start",
+                  preset: "flame",
+                  intensity: "heavy",
+                  speed: "fast",
+                  wind: "right",
+                  area: "center",
+                  assetId: "spark_png",
+                  density: 88,
+                  customComboLayers: comboTestLayers,
+                  comboPreset: "arcane_stack",
+                  emitterShape: "circle",
+                  follow: "character",
+                  followAnchor: "feet",
+                  layerCount: 3,
+                  emitterX: 44,
+                  emitterY: 77,
+                  emitterZ: 8,
+                  attractionX: 10,
+                  attractionY: -20,
+                  vortex: 33,
+                  forceField: "orbit",
+                  fieldX: 55,
+                  fieldY: 66,
+                  sizeMin: 4,
+                  sizeMax: 16,
+                  lifeMin: 1.5,
+                  lifeMax: 4.5,
+                  opacityMin: 0.3,
+                  opacityMax: 0.9,
+                  sizeCurve: "pulse",
+                  opacityCurve: "blink",
+                  colorCurve: "spectral",
+                  gravityX: 0,
+                  gravityY: 30,
+                  gravityZ: -5,
+                  spreadX: 40,
+                  spreadY: 20,
+                  spreadZ: 10,
+                  turbulence: 12,
+                  rotationMin: -15,
+                  rotationMax: 45,
+                  spin: 30,
+                  color: "#111111",
+                  colorAccent: "#eeeeee",
+                  colorEnd: "#ff8844",
+                  blend: "add",
+                }},
+                {{
+                  savedParticlePresets: particlePresetLibrary.slice(0, 2),
+                  selectedParticleCustomPresetId: "snow_soft",
+                  particlePresetSearchQuery: "魔法",
+                  filteredParticleCustomPresetCount: 1,
+                  customPresetLimit: 24,
+                  particleImageAssets: [{{ id: "spark_png", name: "自定义火花图", type: "ui" }}],
+                  getAssetTypeLabel: (type) => ({{ ui: "UI 图层" }}[type] || type),
+                  normalizeParticleEffectConfig: (config) => config,
+                  renderParticleCustomPresetQuickList: () => `<div data-quick-list>quick preset list</div>`,
+                  renderParticleCustomLayerEditor: (index, layer) => `<section data-rendered-layer="${{index}}:${{layer.preset}}"></section>`,
+                }}
+              ),
               comboVariants: {{
                 none: tools
                   .buildParticleComboVariants({{ preset: "snow", comboPreset: "none", density: 12 }})
@@ -532,6 +626,10 @@ class FrontendParticleEffectsModuleTests(unittest.TestCase):
         self.assertIn("buildParticleCustomPresetSavePlan", payload["keys"])
         self.assertIn("getParticleEmitterAnchor", payload["keys"])
         self.assertIn("getParticleCurveProfile", payload["keys"])
+        self.assertIn("renderParticleCustomLayerEditor", payload["keys"])
+        self.assertIn("renderParticleCustomPresetQuickList", payload["keys"])
+        self.assertIn("renderParticleEffectEditor", payload["keys"])
+        self.assertIn("renderParticleImageAssetOptions", payload["keys"])
         self.assertEqual(
             payload["labels"],
             [
@@ -657,6 +755,56 @@ class FrontendParticleEffectsModuleTests(unittest.TestCase):
                 "summary": "L2:火焰 / ×1.5 / 线性发光 · L3:烟雾 / ×0.3 / 正常叠加",
             },
         )
+        self.assertIn("自定义叠层 2", payload["customLayerMarkup"])
+        self.assertIn('data-layer-index="1"', payload["customLayerMarkup"])
+        self.assertIn('id="editorParticleCustomLayer2Preset"', payload["customLayerMarkup"])
+        self.assertIn('value="flame" selected', payload["customLayerMarkup"])
+        self.assertIn('value="burst" selected', payload["customLayerMarkup"])
+        self.assertIn('value="character" selected', payload["customLayerMarkup"])
+        self.assertIn('value="feet" selected', payload["customLayerMarkup"])
+        self.assertIn('id="editorParticleCustomLayer2DensityMultiplier"', payload["customLayerMarkup"])
+        self.assertIn('value="1.5"', payload["customLayerMarkup"])
+        self.assertIn('id="editorParticleCustomLayer2ColorMix"', payload["customLayerMarkup"])
+        self.assertIn('value="0.35"', payload["customLayerMarkup"])
+        self.assertIn('value="add" selected', payload["customLayerMarkup"])
+        self.assertIn("particle-preset-group-title", payload["customPresetQuickListMarkup"])
+        self.assertIn("法阵符纹", payload["customPresetQuickListMarkup"])
+        self.assertIn("梦境光", payload["customPresetQuickListMarkup"])
+        self.assertIn("柔雪", payload["customPresetQuickListMarkup"])
+        self.assertIn("is-active", payload["customPresetQuickListMarkup"])
+        self.assertIn('data-preset-id="dream_fx"', payload["customPresetQuickListMarkup"])
+        self.assertIn("魔法阵叠层 / L2:火焰 / ×1.5 / 线性发光", payload["customPresetQuickListMarkup"])
+        self.assertIn("当前筛选下还没有命中的粒子预设", payload["emptyCustomPresetQuickListMarkup"])
+        self.assertIn("背景 &lt;雨天&gt; · 背景", payload["imageAssetOptionsMarkup"])
+        self.assertIn("自定义火花图 · UI 图层", payload["imageAssetOptionsMarkup"])
+        self.assertIn('value="spark_png" selected', payload["imageAssetOptionsMarkup"])
+        self.assertIn("编辑粒子特效", payload["particleEditorMarkup"])
+        self.assertIn('id="editorParticleAction"', payload["particleEditorMarkup"])
+        self.assertIn('value="start" selected', payload["particleEditorMarkup"])
+        self.assertIn('id="editorParticlePreset"', payload["particleEditorMarkup"])
+        self.assertIn('value="flame" selected', payload["particleEditorMarkup"])
+        self.assertIn('data-action="apply-particle-scene-preset"', payload["particleEditorMarkup"])
+        self.assertIn("当前已保存 2 / 24 组", payload["particleEditorMarkup"])
+        self.assertIn('id="editorParticleCustomPresetSearch"', payload["particleEditorMarkup"])
+        self.assertIn('value="魔法"', payload["particleEditorMarkup"])
+        self.assertIn('value="snow_soft" selected', payload["particleEditorMarkup"])
+        self.assertIn("搜索结果 1 组", payload["particleEditorMarkup"])
+        self.assertIn('data-quick-list', payload["particleEditorMarkup"])
+        self.assertIn("自定义火花图", payload["particleEditorMarkup"])
+        self.assertIn('id="editorParticleDensity"', payload["particleEditorMarkup"])
+        self.assertIn('value="88"', payload["particleEditorMarkup"])
+        self.assertIn('data-action="add-particle-custom-layer"', payload["particleEditorMarkup"])
+        self.assertIn('data-rendered-layer="0:flame"', payload["particleEditorMarkup"])
+        self.assertIn('data-rendered-layer="1:dust"', payload["particleEditorMarkup"])
+        self.assertIn('id="editorParticleEmitterShape"', payload["particleEditorMarkup"])
+        self.assertIn('value="circle" selected', payload["particleEditorMarkup"])
+        self.assertIn('id="editorParticleFollowAnchor"', payload["particleEditorMarkup"])
+        self.assertIn('value="feet" selected', payload["particleEditorMarkup"])
+        self.assertIn('id="editorParticleForceField"', payload["particleEditorMarkup"])
+        self.assertIn('value="orbit" selected', payload["particleEditorMarkup"])
+        self.assertIn('id="editorParticleColorEnd"', payload["particleEditorMarkup"])
+        self.assertIn('value="#ff8844"', payload["particleEditorMarkup"])
+        self.assertIn('data-action="save-block"', payload["particleEditorMarkup"])
         self.assertEqual(
             payload["comboVariants"],
             {

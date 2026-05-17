@@ -57,6 +57,19 @@
     }
   }
 
+  function syncGlobalUiThemeButtons(buttons, mode) {
+    const activeMode = getSafeUiThemeMode(mode);
+    const buttonList = Array.from(buttons ?? []);
+
+    buttonList.forEach((button) => {
+      const isActive = button?.dataset?.uiThemeMode === activeMode;
+      button?.classList?.toggle?.("is-active", isActive);
+      button?.setAttribute?.("aria-pressed", isActive ? "true" : "false");
+    });
+
+    return activeMode;
+  }
+
   global.CanvasiaEditorUiTheme = Object.freeze({
     UI_THEME_MODE_LABELS,
     EDITOR_UI_THEME_STORAGE_KEY,
@@ -65,5 +78,6 @@
     resolveUiTheme,
     loadStoredEditorUiThemeMode,
     persistStoredEditorUiThemeMode,
+    syncGlobalUiThemeButtons,
   });
 })(typeof window !== "undefined" ? window : globalThis);

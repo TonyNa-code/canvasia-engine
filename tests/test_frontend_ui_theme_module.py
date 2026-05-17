@@ -41,6 +41,27 @@ class FrontendUiThemeModuleTests(unittest.TestCase):
             }};
 
             const persisted = tools.persistStoredEditorUiThemeMode(storage, " dark ");
+            const buttons = ["auto", "light", "dark"].map((mode) => ({{
+              dataset: {{ uiThemeMode: mode }},
+              classes: new Set(),
+              attrs: {{}},
+              classList: {{
+                toggle(name, enabled) {{
+                  if (enabled) {{
+                    this.owner.classes.add(name);
+                  }} else {{
+                    this.owner.classes.delete(name);
+                  }}
+                }},
+              }},
+              setAttribute(name, value) {{
+                this.attrs[name] = value;
+              }},
+            }}));
+            buttons.forEach((button) => {{
+              button.classList.owner = button;
+            }});
+            const activeMode = tools.syncGlobalUiThemeButtons(buttons, " light ");
             const result = {{
               keys: Object.keys(tools).sort(),
               labels: [
@@ -69,6 +90,12 @@ class FrontendUiThemeModuleTests(unittest.TestCase):
               fallbackMode: tools.loadStoredEditorUiThemeMode(null, "dark"),
               failingLoad: tools.loadStoredEditorUiThemeMode(failingStorage, "light"),
               failingPersist: tools.persistStoredEditorUiThemeMode(failingStorage, "light"),
+              activeMode,
+              buttonStates: buttons.map((button) => ({{
+                mode: button.dataset.uiThemeMode,
+                active: button.classes.has("is-active"),
+                pressed: button.attrs["aria-pressed"],
+              }})),
             }};
             process.stdout.write(JSON.stringify(result));
             """
@@ -85,6 +112,7 @@ class FrontendUiThemeModuleTests(unittest.TestCase):
         payload = json.loads(completed.stdout)
         self.assertIn("resolveUiTheme", payload["keys"])
         self.assertIn("loadStoredEditorUiThemeMode", payload["keys"])
+        self.assertIn("syncGlobalUiThemeButtons", payload["keys"])
         self.assertEqual(payload["labels"], ["自动切换", "浅色模式", "深色模式", "自动切换"])
         self.assertEqual(payload["safeModes"], ["dark", "light", "auto", "auto"])
         self.assertEqual(payload["resolved"][:4], ["light", "dark", "light", "dark"])
@@ -96,6 +124,12 @@ class FrontendUiThemeModuleTests(unittest.TestCase):
         self.assertEqual(payload["fallbackMode"], "dark")
         self.assertEqual(payload["failingLoad"], "light")
         self.assertFalse(payload["failingPersist"])
+        self.assertEqual(payload["activeMode"], "light")
+        self.assertEqual(payload["buttonStates"], [
+            {"mode": "auto", "active": False, "pressed": "false"},
+            {"mode": "light", "active": True, "pressed": "true"},
+            {"mode": "dark", "active": False, "pressed": "false"},
+        ])
 
 
 if __name__ == "__main__":

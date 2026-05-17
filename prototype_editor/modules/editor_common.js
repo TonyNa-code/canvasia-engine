@@ -86,6 +86,179 @@
       .replaceAll("'", "&#39;");
   }
 
+  function renderDetailRows(rows) {
+    return (Array.isArray(rows) ? rows : [])
+      .map(
+        ([label, value]) => `
+        <div class="detail-row">
+          <label>${escapeHtml(label)}</label>
+          <div class="value">${escapeHtml(String(value))}</div>
+        </div>
+      `
+      )
+      .join("");
+  }
+
+  function renderStatCard(label, value) {
+    return `
+    <article class="stat-card">
+      <h3>${escapeHtml(label)}</h3>
+      <strong>${value}</strong>
+    </article>
+  `;
+  }
+
+  function renderEmpty(text) {
+    return `<div class="empty-note">${escapeHtml(text)}</div>`;
+  }
+
+  function renderQuickActionButton(action, emphasized = false) {
+    const className = `toolbar-button${emphasized ? " toolbar-button-primary" : ""}`;
+    const label = escapeHtml(action.label ?? "去处理");
+    const disabledMarkup = action.disabled ? ' disabled aria-disabled="true"' : "";
+    const titleMarkup = action.title ? ` title="${escapeHtml(action.title)}"` : "";
+    const datasetMarkup = Object.entries(action.dataset ?? {})
+      .map(([key, value]) => ` data-${key}="${escapeHtml(String(value ?? ""))}"`)
+      .join("");
+
+    if (action.href) {
+      return `
+      <a
+        class="${className}"
+        href="${escapeHtml(action.href)}"
+        target="_blank"
+        rel="noreferrer"
+      >
+        ${label}
+      </a>
+    `;
+    }
+
+    if (action.action === "open-scene-from-map" || action.action === "preview-scene-from-map") {
+      return `
+      <button
+        type="button"
+        class="${className}"
+        data-action="${action.action}"
+        data-scene-id="${escapeHtml(action.sceneId ?? "")}"
+      >
+        ${label}
+      </button>
+    `;
+    }
+
+    if (action.action === "open-character-line") {
+      return `
+      <button
+        type="button"
+        class="${className}"
+        data-action="open-character-line"
+        data-scene-id="${escapeHtml(action.sceneId ?? "")}"
+        data-block-id="${escapeHtml(action.blockId ?? "")}"
+      >
+        ${label}
+      </button>
+    `;
+    }
+
+    if (action.action === "preview-story-location") {
+      return `
+      <button
+        type="button"
+        class="${className}"
+        data-action="preview-story-location"
+        data-scene-id="${escapeHtml(action.sceneId ?? "")}"
+        data-block-id="${escapeHtml(action.blockId ?? "")}"
+      >
+        ${label}
+      </button>
+    `;
+    }
+
+    if (action.action === "open-dashboard-character") {
+      return `
+      <button
+        type="button"
+        class="${className}"
+        data-action="open-dashboard-character"
+        data-character-id="${escapeHtml(action.characterId ?? "")}"
+      >
+        ${label}
+      </button>
+    `;
+    }
+
+    if (action.action === "open-script-chapter-scene") {
+      return `
+      <button
+        type="button"
+        class="${className}"
+        data-action="open-script-chapter-scene"
+        data-chapter-id="${escapeHtml(action.chapterId ?? "")}"
+      >
+        ${label}
+      </button>
+    `;
+    }
+
+    if (action.action === "open-asset-from-issue") {
+      return `
+      <button
+        type="button"
+        class="${className}"
+        data-action="open-asset-from-issue"
+        data-asset-id="${escapeHtml(action.assetId ?? "")}"
+      >
+        ${label}
+      </button>
+    `;
+    }
+
+    if (action.action === "switch-screen") {
+      const screen = action.screen ?? action.dataset?.screen ?? "dashboard";
+      return `
+      <button
+        type="button"
+        class="${className}"
+        data-action="switch-screen"
+        data-screen="${escapeHtml(screen)}"
+      >
+        ${label}
+      </button>
+    `;
+    }
+
+    return `
+    <button
+      type="button"
+      class="${className}"
+      data-action="${escapeHtml(action.action ?? "")}"
+      ${titleMarkup}
+      ${disabledMarkup}
+      ${datasetMarkup}
+    >
+      ${label}
+    </button>
+  `;
+  }
+
+  function renderDashboardTaskActions(actions = []) {
+    return actions
+      .slice(0, 2)
+      .map((action, index) => renderQuickActionButton(action, index === 0))
+      .join("");
+  }
+
+  function renderRouteMetricCard(label, value, hint) {
+    return `
+    <article class="route-metric-card">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(String(value))}</strong>
+      <small>${escapeHtml(hint)}</small>
+    </article>
+  `;
+  }
+
   global.CanvasiaEditorCommon = Object.freeze({
     sanitizeFileName,
     formatCsvCell,
@@ -97,5 +270,11 @@
     formatFileSize,
     clamp,
     escapeHtml,
+    renderDetailRows,
+    renderStatCard,
+    renderEmpty,
+    renderQuickActionButton,
+    renderDashboardTaskActions,
+    renderRouteMetricCard,
   });
 })(typeof window !== "undefined" ? window : globalThis);

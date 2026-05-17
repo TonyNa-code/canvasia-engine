@@ -99,6 +99,24 @@ class FrontendProjectHistoryModuleTests(unittest.TestCase):
               promptKey: tools.buildProjectRecoveryPromptKey("project_a", {{
                 lastUnexpectedExitStartedAt: "2026-05-06T10:30:00Z",
               }}),
+              manualCardMarkup: tools.renderHistorySnapshotCard(history.timelineSnapshots[0], {{
+                formatDate: () => "2026/5/6 09:00",
+              }}),
+              currentCardMarkup: tools.renderHistorySnapshotCard(history.timelineSnapshots[1], {{
+                allowRelabel: false,
+              }}),
+              timelineMarkup: tools.renderHistoryTimeline(history, {{
+                filteredSnapshots: [history.timelineSnapshots[0], history.timelineSnapshots[1]],
+                compact: true,
+              }}),
+              filteredEmptyMarkup: tools.renderHistoryTimeline({{
+                totalSnapshots: 2,
+                timelineSnapshots: [],
+              }}, {{ filteredSnapshots: [] }}),
+              freshEmptyMarkup: tools.renderHistoryTimeline({{
+                totalSnapshots: 0,
+                timelineSnapshots: [],
+              }}),
             }};
             process.stdout.write(JSON.stringify(result));
             """
@@ -115,6 +133,8 @@ class FrontendProjectHistoryModuleTests(unittest.TestCase):
         payload = json.loads(completed.stdout)
         self.assertIn("getSafeProjectHistory", payload["keys"])
         self.assertIn("formatHistoryRestorePreview", payload["keys"])
+        self.assertIn("renderHistorySnapshotCard", payload["keys"])
+        self.assertIn("renderHistoryTimeline", payload["keys"])
         self.assertEqual(payload["defaults"]["history"]["totalSnapshots"], 0)
         self.assertFalse(payload["defaults"]["recovery"]["noticeActive"])
         self.assertEqual(payload["safeHistory"]["totalSnapshots"], 4)
@@ -147,6 +167,17 @@ class FrontendProjectHistoryModuleTests(unittest.TestCase):
         self.assertEqual(payload["previewNoDiff"], "当前版本和目标版本没有差异。")
         self.assertEqual(payload["previewFallback"], "恢复后会把项目回到你选中的那个时间点。")
         self.assertEqual(payload["promptKey"], "project_a:2026-05-06T10:30:00Z")
+        self.assertIn("手动检查点", payload["manualCardMarkup"])
+        self.assertIn("开工前检查点", payload["manualCardMarkup"])
+        self.assertIn("2026/5/6 09:00", payload["manualCardMarkup"])
+        self.assertIn('data-action="restore-project-history"', payload["manualCardMarkup"])
+        self.assertIn('data-action="rename-project-history-snapshot"', payload["manualCardMarkup"])
+        self.assertIn("当前版本", payload["currentCardMarkup"])
+        self.assertIn("当前就在这里", payload["currentCardMarkup"])
+        self.assertNotIn('data-action="rename-project-history-snapshot"', payload["currentCardMarkup"])
+        self.assertEqual(payload["timelineMarkup"].count('<article class="history-card'), 2)
+        self.assertIn("当前筛选下还没有命中的快照", payload["filteredEmptyMarkup"])
+        self.assertIn("这个项目还没有可显示的快照时间线", payload["freshEmptyMarkup"])
 
 
 if __name__ == "__main__":

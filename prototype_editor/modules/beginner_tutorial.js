@@ -238,6 +238,255 @@
     `;
   }
 
+  function getBeginnerWorkflowStepStatusLabel(step) {
+    if (step?.statusLabel) {
+      return step.statusLabel;
+    }
+    return step?.done ? "当前已完成" : "进行中";
+  }
+
+  function getBeginnerWorkflowStepToneClass(step) {
+    if (step?.done || step?.statusTone === "good") {
+      return "good-text";
+    }
+    if (step?.statusTone === "danger") {
+      return "danger-text";
+    }
+    if (step?.statusTone === "soft") {
+      return "soft-text";
+    }
+    return "warn-text";
+  }
+
+  function escapeHtml(value) {
+    return String(value)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
+  }
+
+  function renderBeginnerDashboardWorkflow(workflow, helpers = {}) {
+    const escape = helpers.escapeHtml ?? escapeHtml;
+    const renderQuickActionButton = helpers.renderQuickActionButton ?? (() => "");
+    const safeWorkflow = workflow && typeof workflow === "object" ? workflow : { steps: [], nextStep: null };
+    const steps = Array.isArray(safeWorkflow.steps) ? safeWorkflow.steps : [];
+    const nextStep = safeWorkflow.nextStep ?? steps.find((item) => !item.done) ?? steps[0] ?? {
+      step: "第 1 步",
+      title: "先创建或打开项目",
+      description: "从项目中心创建空白项目，或打开已有项目后再继续。",
+      actions: [{ label: "回项目中心", action: "open-project-center" }],
+    };
+
+    return `
+    <section class="panel beginner-dashboard-panel">
+      <div class="panel-heading">
+        <div>
+          <h2>新手开工顺序</h2>
+          <span class="panel-note">按当前项目进度显示 4 个主要步骤</span>
+        </div>
+        <span class="badge badge-soft">当前进行项：${escape(nextStep.step)}</span>
+      </div>
+      <div class="beginner-dashboard-grid">
+        <article class="beginner-dashboard-card beginner-dashboard-focus-card">
+          <span class="eyebrow">${escape(nextStep.step)}</span>
+          <strong>${escape(nextStep.title)}</strong>
+          <p>${escape(nextStep.description)}</p>
+          <div class="detail-actions">
+            ${(nextStep.actions ?? []).map((action, index) => renderQuickActionButton(action, index === 0)).join("")}
+          </div>
+        </article>
+        <div class="beginner-dashboard-step-stack">
+          ${steps
+            .map(
+              (step) => `
+                <article class="beginner-dashboard-card ${step.done ? "is-done" : ""}">
+                  <span class="workflow-step-label">${escape(step.step)}</span>
+                  <strong>${escape(step.title)}</strong>
+                  <p>${escape(step.description)}</p>
+                  <div class="story-filter-chip-row">
+                    <span class="issue-tag ${getBeginnerWorkflowStepToneClass(step)}">
+                      ${escape(getBeginnerWorkflowStepStatusLabel(step))}
+                    </span>
+                  </div>
+                </article>
+              `
+            )
+            .join("")}
+        </div>
+      </div>
+    </section>
+  `;
+  }
+
+  function renderBeginnerAdvancedToolsPanel(helpers = {}) {
+    const renderQuickActionButton = helpers.renderQuickActionButton ?? (() => "");
+
+    return `
+    <section class="panel beginner-advanced-tools-panel">
+      <div class="panel-heading">
+        <div>
+          <h2>更多高级工具</h2>
+          <span class="panel-note">需要分支、校对和发布收尾时可切换到高级模式</span>
+        </div>
+        <span class="badge badge-soft">新手模式默认收起</span>
+      </div>
+      <div class="story-filter-chip-row">
+        <span class="issue-tag">台词台本页</span>
+        <span class="issue-tag">全局检索台</span>
+        <span class="issue-tag">项目安全网时间线</span>
+        <span class="issue-tag">剧情路线图</span>
+        <span class="issue-tag">场景状态看板</span>
+      </div>
+      <article class="detail-card beginner-dashboard-card">
+        <strong>适用阶段</strong>
+        <p>完成基础剧情后，可切换到高级模式处理变量分支、系统校对、历史恢复和正式导出。</p>
+        <div class="detail-actions">
+          ${renderQuickActionButton(
+            { label: "切到高级模式", action: "set-editor-mode", dataset: { "editor-mode": "advanced" } },
+            true
+          )}
+          ${renderQuickActionButton({ label: "先继续写剧情", action: "switch-screen", dataset: { screen: "story" } })}
+        </div>
+      </article>
+    </section>
+  `;
+  }
+
+  function renderStarterKitPanel(overview, defaults, context = "dashboard", helpers = {}) {
+    const escape = helpers.escapeHtml ?? escapeHtml;
+    const safeOverview = overview && typeof overview === "object" ? overview : {};
+    if (!safeOverview.needsStarterKit) {
+      return "";
+    }
+
+    const safeDefaults = defaults && typeof defaults === "object" ? defaults : {};
+    const contextCopy = {
+      dashboard: "当前项目已经有章节骨架，下一步适合补齐角色、背景和 BGM 的基础条目。",
+      story: "当前剧情已经可以继续写入，补齐角色、背景和 BGM 后，预览和演出会更完整。",
+      assets: "这里可以生成“背景 / 立绘 / BGM”的起步条目，后续再替换成正式素材文件。",
+      characters: "先补齐第一个角色骨架后，台词归属、立绘表情和语音整理会更完整。",
+    };
+
+    return `
+    <section class="detail-card starter-kit-panel">
+      <div class="panel-heading">
+        <h3>第二步起步骨架</h3>
+        <span class="badge badge-soft">补齐基础条目</span>
+      </div>
+      <div class="starter-kit-grid">
+        <article class="starter-kit-card is-primary">
+          <span class="eyebrow">当前进度</span>
+          <strong>补齐角色与基础素材</strong>
+          <p>${escape(contextCopy[context] ?? contextCopy.dashboard)}</p>
+          <div class="scene-card-tags">
+            ${(safeOverview.missingLabels ?? [])
+              .map((label) => `<span class="issue-tag warn-text">待补：${escape(label)}</span>`)
+              .join("")}
+          </div>
+          <div class="pill-row">
+            ${safeOverview.missingCharacter ? `<span class="pill">角色默认名：${escape(safeDefaults.characterName ?? "女主角")}</span>` : ""}
+            ${safeOverview.missingBackground ? `<span class="pill">背景默认名：${escape(safeDefaults.backgroundName ?? "第一场背景")}</span>` : ""}
+            ${safeOverview.missingBgm ? `<span class="pill">BGM 默认名：${escape(safeDefaults.bgmName ?? "开场 BGM")}</span>` : ""}
+          </div>
+          <div class="action-row">
+            <button class="toolbar-button toolbar-button-primary" type="button" data-action="create-starter-kit">
+              一键生成起步骨架
+            </button>
+            <button class="toolbar-button" type="button" data-action="create-starter-kit-custom">
+              自定义名字再生成
+            </button>
+          </div>
+        </article>
+        <article class="starter-kit-card">
+          <span class="eyebrow">生成内容</span>
+          <ul class="blank-project-step-list">
+            ${safeOverview.missingCharacter ? "<li>生成一个角色骨架，并自动带一张默认立绘条目。</li>" : ""}
+            ${safeOverview.missingBackground ? "<li>生成第一张背景条目，方便你后面直接替换成真实图片。</li>" : ""}
+            ${safeOverview.missingBgm ? "<li>生成第一首 BGM 条目，后面导入音乐时不用再从零建分类。</li>" : ""}
+          </ul>
+          <div class="detail-meta">此操作只会补齐条目骨架，不会改动现有剧情内容。</div>
+        </article>
+      </div>
+    </section>
+  `;
+  }
+
+  function renderBlankProjectStarterPanel(defaults, context = "dashboard", helpers = {}) {
+    const escape = helpers.escapeHtml ?? escapeHtml;
+    const safeDefaults = defaults && typeof defaults === "object" ? defaults : {};
+    const contextCopy =
+      context === "story"
+        ? "当前位于剧情页，先创建第一章和第一场景后，这里就会切换成可编辑的剧情工作台。"
+        : "当前项目还是空白状态，创建第一章和第一场景后即可继续填充台词、角色和素材。";
+
+    return `
+    <section class="panel blank-project-panel">
+      <div class="panel-heading">
+        <h2>空白项目首次引导</h2>
+        <span class="badge badge-soft">初始步骤</span>
+      </div>
+      <div class="blank-project-grid">
+        <article class="blank-project-card is-primary">
+          <span class="eyebrow">当前进度</span>
+          <h3>创建第一章和第一场景</h3>
+          <p>${escape(contextCopy)}</p>
+          <div class="pill-row">
+            <span class="pill">默认章节：${escape(safeDefaults.chapterName ?? "第一章")}</span>
+            <span class="pill">默认场景：${escape(safeDefaults.firstSceneName ?? "开场")}</span>
+          </div>
+          <div class="action-row">
+            <button class="toolbar-button toolbar-button-primary" type="button" data-action="create-first-chapter">
+              一键创建第一章
+            </button>
+            <button class="toolbar-button" type="button" data-action="create-first-chapter-custom">
+              自定义名字再创建
+            </button>
+          </div>
+          <div class="detail-meta">章节名和场景名后续仍可修改。</div>
+        </article>
+        <article class="blank-project-card">
+          <span class="eyebrow">后续顺序</span>
+          <h3>开工顺序</h3>
+          <ol class="blank-project-step-list">
+            <li>先写出第一段旁白和第一句台词。</li>
+            <li>再去素材页导入第一张背景和一首 BGM。</li>
+            <li>然后回角色页补角色名、表情和立绘。</li>
+          </ol>
+          <div class="action-row">
+            <button class="toolbar-button" type="button" data-action="switch-screen" data-screen="assets">
+              打开素材页
+            </button>
+            <button class="toolbar-button" type="button" data-action="switch-screen" data-screen="characters">
+              打开角色页
+            </button>
+          </div>
+        </article>
+      </div>
+    </section>
+  `;
+  }
+
+  function renderBlankStoryWorkspacePanel() {
+    return `
+    <div class="blank-story-workspace">
+      <div class="blank-story-workspace-copy">
+        <strong>剧情工作台还没有章节和场景</strong>
+        <p>创建第一章和第一场景后，这里会切换成可编辑状态。</p>
+      </div>
+      <div class="action-row">
+        <button class="toolbar-button toolbar-button-primary" type="button" data-action="create-first-chapter">
+          一键创建第一章
+        </button>
+        <button class="toolbar-button" type="button" data-action="create-first-chapter-custom">
+          自定义名字再创建
+        </button>
+      </div>
+    </div>
+  `;
+  }
+
   global.CanvasiaEditorBeginnerTutorial = Object.freeze({
     hasBeginnerTutorialStoryContent,
     hasBeginnerTutorialPreviewProgress,
@@ -248,5 +497,12 @@
     getBeginnerTutorialSummary,
     renderBeginnerTutorialStepList,
     renderBeginnerTutorialContent,
+    getBeginnerWorkflowStepStatusLabel,
+    getBeginnerWorkflowStepToneClass,
+    renderBeginnerDashboardWorkflow,
+    renderBeginnerAdvancedToolsPanel,
+    renderStarterKitPanel,
+    renderBlankProjectStarterPanel,
+    renderBlankStoryWorkspacePanel,
   });
 })(typeof window !== "undefined" ? window : globalThis);

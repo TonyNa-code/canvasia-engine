@@ -53,6 +53,7 @@ jobs:
             tests/test_frontend_entrypoint_modules.py \
             tests/test_frontend_editor_mode_module.py \
             tests/test_frontend_preview_save_module.py \
+            tests/test_frontend_project_center_module.py \
             tests/test_frontend_project_doctor_module.py \
             tests/test_frontend_project_milestones_module.py \
             tests/test_frontend_project_history_module.py \
@@ -82,6 +83,7 @@ jobs:
           node --check prototype_editor/modules/editor_filters.js
           node --check prototype_editor/modules/editor_mode.js
           node --check prototype_editor/modules/preview_save.js
+          node --check prototype_editor/modules/project_center.js
           node --check prototype_editor/modules/project_doctor.js
           node --check prototype_editor/modules/project_milestones.js
           node --check prototype_editor/modules/project_history.js
@@ -122,6 +124,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_entrypoint_modules.py' -v
           python -m unittest discover -s tests -p 'test_frontend_editor_mode_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_preview_save_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_project_center_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_project_doctor_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_project_milestones_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_project_history_module.py' -v
