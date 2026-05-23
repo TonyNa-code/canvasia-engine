@@ -65,6 +65,17 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
         self.assertEqual(get_next_typewriter_index(flag_text, 1), flag_text.index("B"))
         self.assertEqual(get_next_typewriter_index(skin_tone_text, 1), skin_tone_text.index("B"))
         self.assertEqual(get_next_typewriter_index(accented_text, 0), accented_text.index("!"))
+        opening_sentence = "“再见。”"
+        self.assertEqual(get_next_typewriter_index(opening_sentence, 0), opening_sentence.index("见"))
+        opening_word = '"Hi" there'
+        self.assertEqual(get_next_typewriter_index(opening_word, 0), opening_word.index("i"))
+        quoted_sentence = "“再见。”下一句"
+        self.assertEqual(
+            get_next_typewriter_index(quoted_sentence, quoted_sentence.index("。")),
+            quoted_sentence.index("下"),
+        )
+        quoted_word = '"Hi" there'
+        self.assertEqual(get_next_typewriter_index(quoted_word, quoted_word.index("i")), quoted_word.index(" ") + 1)
         self.assertEqual(get_typewriter_punctuation_pause_ms("Hello,"), 140)
         self.assertEqual(get_typewriter_punctuation_pause_ms("世界！"), 260)
         self.assertEqual(get_typewriter_punctuation_pause_ms("“再见。”"), 260)
@@ -72,6 +83,13 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
         self.assertEqual(get_typewriter_punctuation_pause_ms("Hello."), 260)
         self.assertEqual(get_typewriter_punctuation_pause_ms("Wait..."), 220)
         self.assertEqual(get_typewriter_punctuation_pause_ms('"Wait..."'), 220)
+        self.assertEqual(get_typewriter_punctuation_pause_ms("3.", "3.14"), 0)
+        self.assertEqual(get_typewriter_punctuation_pause_ms("v1.", "v1.2"), 0)
+        self.assertEqual(get_typewriter_punctuation_pause_ms("example.", "example.com"), 0)
+        self.assertEqual(get_typewriter_punctuation_pause_ms("Chapter 1."), 260)
+        self.assertEqual(get_typewriter_punctuation_pause_ms("Mr.", "Mr. Smith"), 0)
+        self.assertEqual(get_typewriter_punctuation_pause_ms("e.g.", "e.g. this"), 0)
+        self.assertEqual(get_typewriter_punctuation_pause_ms("Dr."), 260)
         self.assertGreater(
             get_native_typewriter_step_delay_ms("normal", "Hello,"),
             get_native_typewriter_step_delay_ms("normal", "Hello"),

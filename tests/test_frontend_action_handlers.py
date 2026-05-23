@@ -1254,7 +1254,7 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn('getPreviewSnapshotTextSpeed(snapshot) === "instant"', preview_typewriter)
         self.assertIn("getPreviewSnapshotTextSpeed(snapshot)", preview_delay)
         self.assertIn("function getTypewriterPunctuationPause", app_source)
-        self.assertIn("getTypewriterPunctuationPause(visibleText)", app_source)
+        self.assertIn("getTypewriterPunctuationPause(visibleText, fullText)", app_source)
         self.assertIn("state.previewTyping.visibleText", preview_schedule_typewriter)
 
         story_editor_source = (EDITOR_DIR / "modules" / "story_block_editors.js").read_text(encoding="utf-8")
@@ -1271,7 +1271,7 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn('getSnapshotTextSpeed(snapshot) === "instant"', runtime_typewriter)
         self.assertIn("getSnapshotTextSpeed(snapshot)", runtime_delay)
         self.assertIn("function getTypewriterPunctuationPause", player_source)
-        self.assertIn("getTypewriterPunctuationPause(visibleText)", player_source)
+        self.assertIn("getTypewriterPunctuationPause(visibleText, fullText)", player_source)
         self.assertIn("state.typingVisibleText", runtime_schedule_typewriter)
 
         native_source = NATIVE_RUNTIME_PATH.read_text(encoding="utf-8")
@@ -1296,14 +1296,20 @@ class FrontendActionHandlerTests(unittest.TestCase):
                     f"function getNextTypewriterClusterIndex(text, index) {_extract_function_source(source, 'getNextTypewriterClusterIndex')}",
                     f"function getNextCodePointIndex(text, index) {_extract_function_source(source, 'getNextCodePointIndex')}",
                     f"function getCodePointAtIndex(text, index) {_extract_function_source(source, 'getCodePointAtIndex')}",
+                    "const TYPEWRITER_LEADING_OPENERS = '“‘\"\\'（([{【〔〈《「『';",
+                    f"function includeTypewriterTrailingClosers(text, index) {_extract_function_source(source, 'includeTypewriterTrailingClosers')}",
+                    f"function includeTypewriterLeadingFollower(text, currentIndex, index) {_extract_function_source(source, 'includeTypewriterLeadingFollower')}",
                     f"function getNextTypewriterIndex(text, currentIndex) {_extract_function_source(source, 'getNextTypewriterIndex')}",
                     "const TEXT_SPEED_LABELS = { slow: '慢速', normal: '标准', fast: '快速', instant: '立刻显示' };",
                     "const TYPEWRITER_TRAILING_CLOSERS = '”’\"\\')）]}】〕〉》」』';",
+                    "const TYPEWRITER_PERIOD_ABBREVIATIONS = new Set(['mr', 'mrs', 'ms', 'dr', 'prof', 'sr', 'jr', 'st', 'vs', 'etc', 'e.g', 'i.e', 'u.s', 'u.k', 'no', 'fig', 'vol', 'ch', 'dept', 'inc', 'ltd', 'co']);",
                     "function getSafeTextSpeed(speed) { return Object.hasOwn(TEXT_SPEED_LABELS, speed) ? speed : 'normal'; }",
                     f"function getTypewriterPauseAnchorText(text) {_extract_function_source(source, 'getTypewriterPauseAnchorText')}",
                     f"function getTypewriterPauseAnchorChar(text) {_extract_function_source(source, 'getTypewriterPauseAnchorChar')}",
-                    f"function getTypewriterPunctuationPause(text) {_extract_function_source(source, 'getTypewriterPunctuationPause')}",
-                    f"function getTypewriterStepDelay(speed, visibleText = '') {_extract_function_source(source, 'getTypewriterStepDelay')}",
+                    f"function isTypewriterInlinePeriod(anchorText, fullText = '') {_extract_function_source(source, 'isTypewriterInlinePeriod')}",
+                    f"function isTypewriterAbbreviationPeriod(anchorText, fullText = '') {_extract_function_source(source, 'isTypewriterAbbreviationPeriod')}",
+                    f"function getTypewriterPunctuationPause(text, fullText = '') {_extract_function_source(source, 'getTypewriterPunctuationPause')}",
+                    f"function getTypewriterStepDelay(speed, visibleText = '', fullText = '') {_extract_function_source(source, 'getTypewriterStepDelay')}",
                     """
                     const emojiText = "A💙B";
                     if (getNextTypewriterIndex(emojiText, 1) !== 3) {
@@ -1334,6 +1340,22 @@ class FrontendActionHandlerTests(unittest.TestCase):
                     if (getNextTypewriterIndex("abc def", 0) !== 4) {
                       throw new Error("latin grouping or whitespace folding regressed");
                     }
+                    const openingSentence = "“再见。”";
+                    if (getNextTypewriterIndex(openingSentence, 0) !== openingSentence.indexOf("见")) {
+                      throw new Error("opening quote should reveal with the first content character");
+                    }
+                    const openingWord = '"Hi" there';
+                    if (getNextTypewriterIndex(openingWord, 0) !== openingWord.indexOf("i")) {
+                      throw new Error("opening quote should not appear as a lonely first frame");
+                    }
+                    const quotedSentence = "“再见。”下一句";
+                    if (getNextTypewriterIndex(quotedSentence, quotedSentence.indexOf("。")) !== quotedSentence.indexOf("下")) {
+                      throw new Error("closing quote should reveal with the punctuation before the pause");
+                    }
+                    const quotedWord = '"Hi" there';
+                    if (getNextTypewriterIndex(quotedWord, quotedWord.indexOf("i")) !== quotedWord.indexOf(" ") + 1) {
+                      throw new Error("closing quote should reveal with the previous word");
+                    }
                     if (getTypewriterStepDelay("instant", "世界！") !== 0) {
                       throw new Error("instant typewriter speed should not inherit punctuation pauses");
                     }
@@ -1354,6 +1376,27 @@ class FrontendActionHandlerTests(unittest.TestCase):
                     }
                     if (getTypewriterPunctuationPause('"Wait..."') !== 220) {
                       throw new Error("quoted ascii ellipsis pause regressed");
+                    }
+                    if (getTypewriterPunctuationPause("3.", "3.14") !== 0) {
+                      throw new Error("decimal period should not pause like a sentence");
+                    }
+                    if (getTypewriterPunctuationPause("v1.", "v1.2") !== 0) {
+                      throw new Error("version period should not pause like a sentence");
+                    }
+                    if (getTypewriterPunctuationPause("example.", "example.com") !== 0) {
+                      throw new Error("domain period should not pause like a sentence");
+                    }
+                    if (getTypewriterPunctuationPause("Chapter 1.") !== 260) {
+                      throw new Error("terminal numeric sentence period should still pause");
+                    }
+                    if (getTypewriterPunctuationPause("Mr.", "Mr. Smith") !== 0) {
+                      throw new Error("english honorific abbreviation should not pause like a sentence");
+                    }
+                    if (getTypewriterPunctuationPause("e.g.", "e.g. this") !== 0) {
+                      throw new Error("latin abbreviation should not pause like a sentence");
+                    }
+                    if (getTypewriterPunctuationPause("Dr.") !== 260) {
+                      throw new Error("terminal abbreviation should still pause when no following text exists");
                     }
                     """,
                 ]

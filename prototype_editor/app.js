@@ -440,7 +440,32 @@ const typewriterGraphemeSegmenter =
   typeof Intl !== "undefined" && typeof Intl.Segmenter === "function"
     ? new Intl.Segmenter(undefined, { granularity: "grapheme" })
     : null;
+const TYPEWRITER_LEADING_OPENERS = "“‘\"'（([{【〔〈《「『";
 const TYPEWRITER_TRAILING_CLOSERS = "”’\"'）)]}】〕〉》」』";
+const TYPEWRITER_PERIOD_ABBREVIATIONS = new Set([
+  "mr",
+  "mrs",
+  "ms",
+  "dr",
+  "prof",
+  "sr",
+  "jr",
+  "st",
+  "vs",
+  "etc",
+  "e.g",
+  "i.e",
+  "u.s",
+  "u.k",
+  "no",
+  "fig",
+  "vol",
+  "ch",
+  "dept",
+  "inc",
+  "ltd",
+  "co",
+]);
 
 const DIALOG_THEME_LABELS = visualEffectTools?.DIALOG_THEME_LABELS ?? {
   project: "项目样式",
@@ -17920,7 +17945,11 @@ function schedulePreviewTypewriterTick(expectedKey) {
     }
 
     schedulePreviewTypewriterTick(expectedKey);
-  }, getTypewriterStepDelay(getPreviewSnapshotTextSpeed(getCurrentPreviewSnapshot()), state.previewTyping.visibleText));
+  }, getTypewriterStepDelay(
+    getPreviewSnapshotTextSpeed(getCurrentPreviewSnapshot()),
+    state.previewTyping.visibleText,
+    state.previewTyping.fullText
+  ));
 }
 
 function getNextTypewriterIndex(text, currentIndex) {
@@ -17933,6 +17962,7 @@ function getNextTypewriterIndex(text, currentIndex) {
 
   let nextIndex = getNextCodePointIndex(safeText, safeIndex);
   const currentChar = getCodePointAtIndex(safeText, safeIndex);
+  nextIndex = includeTypewriterLeadingFollower(safeText, safeIndex, nextIndex);
 
   if (/[A-Za-z0-9]/.test(currentChar)) {
     let grouped = 1;
@@ -17946,10 +17976,37 @@ function getNextTypewriterIndex(text, currentIndex) {
     }
   }
 
+  nextIndex = includeTypewriterTrailingClosers(safeText, nextIndex);
+
   while (nextIndex < safeText.length && /\s/.test(getCodePointAtIndex(safeText, nextIndex))) {
     nextIndex = getNextCodePointIndex(safeText, nextIndex);
   }
 
+  return nextIndex;
+}
+
+function includeTypewriterLeadingFollower(text, currentIndex, index) {
+  const safeText = String(text ?? "");
+  const currentChar = getCodePointAtIndex(safeText, currentIndex);
+  let nextIndex = Math.max(0, Math.min(Number(index) || 0, safeText.length));
+
+  if (!TYPEWRITER_LEADING_OPENERS.includes(currentChar)) {
+    return nextIndex;
+  }
+
+  while (nextIndex < safeText.length && TYPEWRITER_LEADING_OPENERS.includes(getCodePointAtIndex(safeText, nextIndex))) {
+    nextIndex = getNextCodePointIndex(safeText, nextIndex);
+  }
+
+  return nextIndex < safeText.length ? getNextCodePointIndex(safeText, nextIndex) : nextIndex;
+}
+
+function includeTypewriterTrailingClosers(text, index) {
+  const safeText = String(text ?? "");
+  let nextIndex = Math.max(0, Math.min(Number(index) || 0, safeText.length));
+  while (nextIndex < safeText.length && TYPEWRITER_TRAILING_CLOSERS.includes(getCodePointAtIndex(safeText, nextIndex))) {
+    nextIndex = getNextUnicodeScalarIndex(safeText, nextIndex);
+  }
   return nextIndex;
 }
 
@@ -18041,11 +18098,17 @@ function getNextTypewriterClusterIndex(text, index) {
   return nextIndex;
 }
 
-function getTypewriterPunctuationPause(text) {
+function getTypewriterPunctuationPause(text, fullText = "") {
   const anchorText = getTypewriterPauseAnchorText(text);
   const anchorChar = Array.from(anchorText).at(-1) ?? "";
   if (/(\.{3,}|…+)$/.test(anchorText)) {
     return 220;
+  }
+  if (anchorChar === "." && isTypewriterInlinePeriod(anchorText, fullText)) {
+    return 0;
+  }
+  if (anchorChar === "." && isTypewriterAbbreviationPeriod(anchorText, fullText)) {
+    return 0;
   }
   if (/[。！？!?.]/.test(anchorChar)) {
     return 260;
@@ -18069,6 +18132,22 @@ function getTypewriterPauseAnchorText(text) {
 
 function getTypewriterPauseAnchorChar(text) {
   return Array.from(getTypewriterPauseAnchorText(text)).at(-1) ?? "";
+}
+
+function isTypewriterInlinePeriod(anchorText, fullText = "") {
+  const safeAnchorText = String(anchorText ?? "");
+  const safeFullText = String(fullText ?? "");
+  const previousChar = Array.from(safeAnchorText).at(-2) ?? "";
+  const nextChar = safeFullText.slice(safeAnchorText.length, safeAnchorText.length + 1);
+  return /[A-Za-z0-9]/.test(previousChar) && /[A-Za-z0-9]/.test(nextChar);
+}
+
+function isTypewriterAbbreviationPeriod(anchorText, fullText = "") {
+  const safeAnchorText = String(anchorText ?? "");
+  const safeFullText = String(fullText ?? "");
+  const token = (safeAnchorText.match(/([A-Za-z](?:[A-Za-z]|\.)*)\.$/)?.[1] ?? "").toLowerCase();
+  const nextChar = safeFullText.slice(safeAnchorText.length, safeAnchorText.length + 1);
+  return TYPEWRITER_PERIOD_ABBREVIATIONS.has(token) && /\s/.test(nextChar);
 }
 
 function getBrowserStorage() {
@@ -18877,7 +18956,7 @@ function formatVolumePercent(value, fallback = 100) {
   return `${getSafeVolumePercent(value, fallback)}%`;
 }
 
-function getTypewriterStepDelay(speed, visibleText = "") {
+function getTypewriterStepDelay(speed, visibleText = "", fullText = "") {
   const safeSpeed = getSafeTextSpeed(speed);
   if (safeSpeed === "instant") {
     return 0;
@@ -18887,7 +18966,7 @@ function getTypewriterStepDelay(speed, visibleText = "") {
     normal: 28,
     fast: 18,
     instant: 0,
-  }[safeSpeed] + getTypewriterPunctuationPause(visibleText);
+  }[safeSpeed] + getTypewriterPunctuationPause(visibleText, fullText);
 }
 
 function getPreviewSnapshotStepKey(snapshot) {
