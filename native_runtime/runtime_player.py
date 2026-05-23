@@ -6445,6 +6445,10 @@ def get_safe_audio_fade_ms(value, fallback: int = 0) -> int:
     return clamp_int(value, 0, 30000, fallback)
 
 
+def get_safe_volume_percent(value, fallback: int = 100) -> int:
+    return clamp_int(value, 0, 100, fallback)
+
+
 def get_safe_music_end_mode(value) -> str:
     safe_value = str(value or "").strip()
     if safe_value in {"until_next_music", "scene_end", "after_block"}:
@@ -7026,9 +7030,7 @@ def sanitize_runtime_player_settings(value: dict | None) -> dict:
     display_mode = str(source.get("displayMode") or DEFAULT_RUNTIME_PLAYER_SETTINGS["displayMode"]).strip().lower()
     if display_mode not in RUNTIME_DISPLAY_MODES:
         display_mode = DEFAULT_RUNTIME_PLAYER_SETTINGS["displayMode"]
-    text_speed = str(source.get("textSpeed") or DEFAULT_RUNTIME_PLAYER_SETTINGS["textSpeed"]).strip().lower()
-    if text_speed not in TEXT_SPEED_PRESETS:
-        text_speed = DEFAULT_RUNTIME_PLAYER_SETTINGS["textSpeed"]
+    text_speed = get_safe_text_speed(source.get("textSpeed"), DEFAULT_RUNTIME_PLAYER_SETTINGS["textSpeed"])
     language = normalize_language_code(source.get("language"), "")
     auto_play_wait_for_voice = str(
         source.get("autoPlayWaitForVoice") or DEFAULT_RUNTIME_PLAYER_SETTINGS["autoPlayWaitForVoice"]
@@ -7064,6 +7066,12 @@ def sanitize_runtime_player_settings(value: dict | None) -> dict:
         "sfxVolume": clamp_int(source.get("sfxVolume"), 0, 100, DEFAULT_RUNTIME_PLAYER_SETTINGS["sfxVolume"]),
         "voiceVolume": clamp_int(source.get("voiceVolume"), 0, 100, DEFAULT_RUNTIME_PLAYER_SETTINGS["voiceVolume"]),
     }
+
+
+def get_safe_text_speed(value: object, fallback: str = "normal") -> str:
+    safe_fallback = fallback if fallback in TEXT_SPEED_PRESETS else DEFAULT_RUNTIME_PLAYER_SETTINGS["textSpeed"]
+    text_speed = str(value or safe_fallback).strip().lower()
+    return text_speed if text_speed in TEXT_SPEED_PRESETS else safe_fallback
 
 
 def load_project_runtime_settings(project_id: str) -> dict:
@@ -7241,12 +7249,25 @@ def get_safe_character_stage(source: dict | None) -> dict:
             value = fallback
         return clamp(value, minimum, maximum)
 
+    def read_bool(key: str, fallback: bool = False) -> bool:
+        value = raw.get(key, fallback)
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in {"true", "1", "yes", "on"}:
+                return True
+            if normalized in {"false", "0", "no", "off", ""}:
+                return False
+        return fallback
+
     return {
         "offsetX": round(read_number("offsetX", 0, -60, 60)),
         "offsetY": round(read_number("offsetY", 0, -45, 45)),
         "scale": round(read_number("scale", 100, 45, 220)),
         "opacity": round(read_number("opacity", 100, 0, 100)),
         "layer": round(read_number("layer", 0, -10, 10)),
+        "flipX": read_bool("flipX"),
     }
 
 
@@ -7419,8 +7440,10 @@ class NativeRuntimePlayer:
         self.image_file_cache: dict[str, object] = {}
         self.sound_cache: dict[str, object] = {}
         self.current_bgm_asset_id: str | None = None
+        self.current_bgm_volume_percent = 100
         self.current_bgm_scope: dict | None = None
         self.current_voice_channel = None
+        self.current_voice_volume_percent = 100
         self.project_id = str(self.project.get("projectId") or "untitled_project")
         self.save_store = load_project_save_store(self.project_id, self.formal_save_slot_count)
         self.save_file_path = get_project_save_file_path(self.project_id)
@@ -7580,6 +7603,22 @@ class NativeRuntimePlayer:
         channel = clamp(float(self.runtime_settings.get(channel_key, 100)) / 100, 0.0, 1.0)
         return master * channel
 
+    def get_effective_bgm_volume(self, volume_percent: object | None = None) -> float:
+        safe_volume_percent = (
+            self.current_bgm_volume_percent
+            if volume_percent is None
+            else get_safe_volume_percent(volume_percent, 100)
+        )
+        return self.get_effective_volume("bgmVolume") * (safe_volume_percent / 100)
+
+    def get_effective_voice_volume(self, volume_percent: object | None = None) -> float:
+        safe_volume_percent = (
+            self.current_voice_volume_percent
+            if volume_percent is None
+            else get_safe_volume_percent(volume_percent, 100)
+        )
+        return self.get_effective_volume("voiceVolume") * (safe_volume_percent / 100)
+
     def get_safe_runtime_language(self, language: object) -> str:
         normalized = normalize_language_code(language, "")
         if normalized and normalized in self.supported_languages:
@@ -7625,12 +7664,12 @@ class NativeRuntimePlayer:
         self.apply_display_mode()
         if self.pygame.mixer.get_init():
             try:
-                self.pygame.mixer.music.set_volume(self.get_effective_volume("bgmVolume"))
+                self.pygame.mixer.music.set_volume(self.get_effective_bgm_volume())
             except Exception:
                 pass
         if self.current_voice_channel:
             try:
-                self.current_voice_channel.set_volume(self.get_effective_volume("voiceVolume"))
+                self.current_voice_channel.set_volume(self.get_effective_voice_volume())
             except Exception:
                 pass
 
@@ -8094,6 +8133,7 @@ class NativeRuntimePlayer:
                             "actionLabel": "回放语音",
                             "actionEnabled": entry_id in unlocked_ids,
                             "voiceAssetId": str(block.get("voiceAssetId") or ""),
+                            "voiceVolume": get_safe_volume_percent(block.get("voiceVolume"), 100),
                             "previewAssetId": current_background_asset_id,
                             "previewSpeakerName": speaker_name,
                             "previewText": text,
@@ -8295,7 +8335,7 @@ class NativeRuntimePlayer:
         self.current_line_started_at_ms = self.pygame.time.get_ticks()
         self.auto_play_deadline_ms = 0
         self.skip_deadline_ms = 0
-        if self.runtime_settings.get("textSpeed") == "instant":
+        if self.get_current_line_text_speed() == "instant":
             self.reveal_current_line_immediately()
 
     def reveal_current_line_immediately(self) -> None:
@@ -8308,12 +8348,18 @@ class NativeRuntimePlayer:
         if not self.current_line or self.is_current_line_fully_visible():
             return
         chars_per_second = TEXT_SPEED_PRESETS.get(
-            str(self.runtime_settings.get("textSpeed") or "normal"),
+            self.get_current_line_text_speed(),
             TEXT_SPEED_PRESETS["normal"],
         )
         elapsed_ms = max(0, self.pygame.time.get_ticks() - self.current_line_started_at_ms)
         revealed = min(len(self.current_line_full_text), int(elapsed_ms / 1000 * chars_per_second))
         self.current_line_revealed_chars = max(self.current_line_revealed_chars, revealed)
+
+    def get_current_line_text_speed(self) -> str:
+        return get_safe_text_speed(
+            (self.current_line or {}).get("textSpeed"),
+            str(self.runtime_settings.get("textSpeed") or "normal"),
+        )
 
     def get_current_line_render_text(self) -> str:
         self.update_current_line_reveal()
@@ -8353,6 +8399,7 @@ class NativeRuntimePlayer:
                 "text": text,
                 "blockType": block_type,
                 "voiceAssetId": str(line.get("voiceAssetId") or "").strip(),
+                "voiceVolume": get_safe_volume_percent(line.get("voiceVolume"), 100),
             }
         )
         self.text_history = self.text_history[-120:]
@@ -8374,7 +8421,7 @@ class NativeRuntimePlayer:
         if not voice_asset_id:
             self.status_message = "这条历史文本没有绑定语音。"
             return True
-        if self.play_voice(voice_asset_id):
+        if self.play_voice(voice_asset_id, volume_percent=item.get("voiceVolume")):
             self.status_message = f"正在回听：{item.get('speakerName') or '历史语音'}"
         else:
             self.status_message = "这条历史文本的语音素材不可用。"
@@ -8891,6 +8938,7 @@ class NativeRuntimePlayer:
         self.stage_background_asset_id = None
         self.visible_characters = {}
         self.current_bgm_asset_id = None
+        self.current_bgm_volume_percent = 100
         self.current_bgm_scope = None
         self.variable_state = self.build_initial_variable_state()
         self.current_scene_id = self.project.get("entrySceneId") or self.scene_order[0]
@@ -9222,7 +9270,7 @@ class NativeRuntimePlayer:
         if self.current_archive_key == "voices":
             voice_asset_id = str(entry.get("voiceAssetId") or "")
             if voice_asset_id:
-                self.play_voice(voice_asset_id)
+                self.play_voice(voice_asset_id, volume_percent=entry.get("voiceVolume"))
                 self.status_message = f"正在回放语音：{entry.get('name') or '未命名条目'}"
             else:
                 self.status_message = "这个条目当前没有可回放语音。"
@@ -9299,7 +9347,9 @@ class NativeRuntimePlayer:
             "type": block_type,
             "speakerId": block.get("speakerId"),
             "text": line_text,
+            "textSpeed": block.get("textSpeed"),
             "voiceAssetId": block.get("voiceAssetId"),
+            "voiceVolume": block.get("voiceVolume"),
             "blockLabel": get_block_label(block_type),
         }
         self.start_current_line_display(line_text)
@@ -9332,6 +9382,7 @@ class NativeRuntimePlayer:
             },
             "visibleCharacters": dict(self.visible_characters),
             "currentBgmAssetId": self.current_bgm_asset_id,
+            "currentBgmVolume": self.current_bgm_volume_percent,
             "currentBgmScope": dict(self.current_bgm_scope) if isinstance(self.current_bgm_scope, dict) else None,
             "finished": self.finished,
             "finishedMessage": self.finished_message,
@@ -9405,13 +9456,14 @@ class NativeRuntimePlayer:
         self.apply_scene3d_preview_config(snapshot.get("scene3dPreview") if isinstance(snapshot.get("scene3dPreview"), dict) else None)
         self.visible_characters = dict(snapshot.get("visibleCharacters") or {})
         self.current_bgm_asset_id = None
+        self.current_bgm_volume_percent = get_safe_volume_percent(snapshot.get("currentBgmVolume"), 100)
         self.current_bgm_scope = snapshot.get("currentBgmScope") if isinstance(snapshot.get("currentBgmScope"), dict) else None
         self.clear_particle_effect()
         self.clear_stage_visual_effects(include_persistent=True)
 
         bgm_asset_id = snapshot.get("currentBgmAssetId")
         if bgm_asset_id:
-            self.play_bgm(bgm_asset_id, loop=True)
+            self.play_bgm(bgm_asset_id, loop=True, volume_percent=self.current_bgm_volume_percent)
         else:
             self.stop_bgm()
 
@@ -9645,7 +9697,9 @@ class NativeRuntimePlayer:
                 "type": block_type,
                 "speakerId": block.get("speakerId"),
                 "text": line_text,
+                "textSpeed": block.get("textSpeed"),
                 "voiceAssetId": block.get("voiceAssetId"),
+                "voiceVolume": block.get("voiceVolume"),
                 "blockLabel": get_block_label(block_type),
             }
             self.sync_archive_progress_for_pause(scene, block, self.current_block_index)
@@ -9653,7 +9707,8 @@ class NativeRuntimePlayer:
             self.start_current_line_display(line_text)
             if block_type == "dialogue":
                 self.sync_expression_for_dialogue(block)
-                self.play_voice(block.get("voiceAssetId"))
+            if block.get("voiceAssetId"):
+                self.play_voice(block.get("voiceAssetId"), volume_percent=block.get("voiceVolume"))
             else:
                 self.stop_voice()
             return
@@ -9717,6 +9772,7 @@ class NativeRuntimePlayer:
                     block.get("assetId"),
                     loop=bool(block.get("loop", True)),
                     fade_in_ms=get_safe_audio_fade_ms(block.get("fadeInMs"), 600),
+                    volume_percent=block.get("volume"),
                 )
                 self.current_block_index += 1
                 continue
@@ -9743,7 +9799,7 @@ class NativeRuntimePlayer:
                 continue
 
             if block_type == "sfx_play":
-                self.play_sfx(block.get("assetId"))
+                self.play_sfx(block.get("assetId"), volume_percent=block.get("volume"))
                 self.current_block_index += 1
                 continue
 
@@ -9841,7 +9897,9 @@ class NativeRuntimePlayer:
                     "type": block_type,
                     "speakerId": block.get("speakerId"),
                     "text": line_text,
+                    "textSpeed": block.get("textSpeed"),
                     "voiceAssetId": block.get("voiceAssetId"),
+                    "voiceVolume": block.get("voiceVolume"),
                     "blockLabel": get_block_label(block_type),
                 }
                 self.sync_archive_progress_for_pause(scene, block, self.current_block_index)
@@ -9849,7 +9907,8 @@ class NativeRuntimePlayer:
                 self.start_current_line_display(line_text)
                 if block_type == "dialogue":
                     self.sync_expression_for_dialogue(block)
-                    self.play_voice(block.get("voiceAssetId"))
+                if block.get("voiceAssetId"):
+                    self.play_voice(block.get("voiceAssetId"), volume_percent=block.get("voiceVolume"))
                 else:
                     self.stop_voice()
                 self.status_message = f"当前卡片：{get_block_label(block_type)}"
@@ -9872,22 +9931,33 @@ class NativeRuntimePlayer:
             "stage": get_safe_character_stage(existing.get("stage")),
         }
 
-    def play_bgm(self, asset_id: str | None, loop: bool = True, fade_in_ms: int = 0) -> None:
+    def play_bgm(
+        self,
+        asset_id: str | None,
+        loop: bool = True,
+        fade_in_ms: int = 0,
+        volume_percent: object | None = None,
+    ) -> None:
         if not self.pygame.mixer.get_init():
             return
+        safe_volume_percent = get_safe_volume_percent(volume_percent, 100)
         if asset_id == self.current_bgm_asset_id:
+            self.current_bgm_volume_percent = safe_volume_percent
+            self.pygame.mixer.music.set_volume(self.get_effective_bgm_volume())
             return
         asset = self.assets_by_id.get(asset_id)
         asset_path = get_asset_runtime_path(self.bundle_dir, asset)
         if not asset_path:
             self.current_bgm_asset_id = None
+            self.current_bgm_volume_percent = 100
             self.current_bgm_scope = None
             return
         if asset and asset.get("type") == "bgm":
             self.unlock_archive_entry("bgmUnlocked", asset_id)
         try:
             self.pygame.mixer.music.load(str(asset_path))
-            self.pygame.mixer.music.set_volume(self.get_effective_volume("bgmVolume"))
+            self.current_bgm_volume_percent = safe_volume_percent
+            self.pygame.mixer.music.set_volume(self.get_effective_bgm_volume())
             safe_fade_in_ms = get_safe_audio_fade_ms(fade_in_ms)
             try:
                 self.pygame.mixer.music.play(-1 if loop else 0, fade_ms=safe_fade_in_ms)
@@ -9896,6 +9966,7 @@ class NativeRuntimePlayer:
             self.current_bgm_asset_id = asset_id
         except Exception:
             self.current_bgm_asset_id = None
+            self.current_bgm_volume_percent = 100
             self.current_bgm_scope = None
 
     def stop_bgm(self, fade_out_ms: int = 0) -> None:
@@ -9906,28 +9977,32 @@ class NativeRuntimePlayer:
             else:
                 self.pygame.mixer.music.stop()
         self.current_bgm_asset_id = None
+        self.current_bgm_volume_percent = 100
         self.current_bgm_scope = None
 
-    def play_sfx(self, asset_id: str | None) -> None:
+    def play_sfx(self, asset_id: str | None, volume_percent: object | None = None) -> None:
         sound = self._load_sound(asset_id)
         if sound:
             try:
-                sound.set_volume(self.get_effective_volume("sfxVolume"))
+                sound_volume = get_safe_volume_percent(volume_percent, 100) / 100
+                sound.set_volume(self.get_effective_volume("sfxVolume") * sound_volume)
                 sound.play()
             except Exception:
                 return
 
-    def play_voice(self, asset_id: str | None) -> bool:
+    def play_voice(self, asset_id: str | None, volume_percent: object | None = None) -> bool:
         self.stop_voice()
         sound = self._load_sound(asset_id)
         if not sound:
             return False
         try:
-            sound.set_volume(self.get_effective_volume("voiceVolume"))
+            self.current_voice_volume_percent = get_safe_volume_percent(volume_percent, 100)
+            sound.set_volume(self.get_effective_voice_volume())
             self.current_voice_channel = sound.play()
             return True
         except Exception:
             self.current_voice_channel = None
+            self.current_voice_volume_percent = 100
             return False
 
     def stop_voice(self) -> None:
@@ -9937,6 +10012,7 @@ class NativeRuntimePlayer:
             except Exception:
                 pass
         self.current_voice_channel = None
+        self.current_voice_volume_percent = 100
 
     def stop_embedded_video_playback(self) -> None:
         if self.embedded_video_playback:
@@ -10941,6 +11017,8 @@ class NativeRuntimePlayer:
                     sprite,
                     (max(1, int(sprite_width * scale)), max(1, int(sprite_height * scale))),
                 )
+                if stage["flipX"]:
+                    scaled = self.pygame.transform.flip(scaled, True, False)
                 if stage["opacity"] < 100:
                     scaled = scaled.copy()
                     scaled.set_alpha(int(255 * stage["opacity"] / 100))

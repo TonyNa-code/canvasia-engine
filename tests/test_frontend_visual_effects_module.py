@@ -68,6 +68,10 @@ class FrontendVisualEffectsModuleTests(unittest.TestCase):
                 tools.getCameraPanOffset("left", "heavy"),
                 tools.getCameraPanOffset("right", "light"),
                 tools.getCameraPanOffset("center", "heavy"),
+                tools.getSafeTransitionDurationMs("1250"),
+                tools.getSafeTransitionDurationMs("-20"),
+                tools.getSafeTransitionDurationMs("9000"),
+                tools.getSafeTransitionDurationMs("bad"),
               ],
               screen: [
                 tools.getScreenFilterCss({{ preset: "cold", strength: "strong" }}),
@@ -100,11 +104,11 @@ class FrontendVisualEffectsModuleTests(unittest.TestCase):
                 tools.getCreditsLinesText(["Staff", " Cast "]),
               ],
               characterStage: [
-                tools.getSafeCharacterStage({{ offsetX: "90", offsetY: "-90", scale: "15", opacity: "0", layer: "20" }}),
-                tools.getSafeCharacterStage({{ offsetX: "", offsetY: "12px", scale: "", opacity: "", layer: "" }}),
+                tools.getSafeCharacterStage({{ offsetX: "90", offsetY: "-90", scale: "15", opacity: "0", layer: "20", flipX: "true" }}),
+                tools.getSafeCharacterStage({{ offsetX: "", offsetY: "12px", scale: "", opacity: "", layer: "", flipX: "off" }}),
                 tools.getSafeCharacterStage(null),
-                tools.getCharacterStageStyle({{ offsetX: 12, offsetY: -8, scale: 125, opacity: 70, layer: 3 }}),
-                tools.getCharacterStageSummary({{ offsetX: 12, offsetY: -8, scale: 125, opacity: 70, layer: 3 }}),
+                tools.getCharacterStageStyle({{ offsetX: 12, offsetY: -8, scale: 125, opacity: 70, layer: 3, flipX: true }}),
+                tools.getCharacterStageSummary({{ offsetX: 12, offsetY: -8, scale: 125, opacity: 70, layer: 3, flipX: true }}),
               ],
             }};
             process.stdout.write(JSON.stringify(result));
@@ -146,7 +150,8 @@ class FrontendVisualEffectsModuleTests(unittest.TestCase):
             ["medium", "long", "white", "strong", "white", "right", "medium", "clear", "medium", "fill", "center", "fade", "normal", "project"],
         )
         self.assertEqual(payload["metrics"][0:5], [16, 0.42, 0.36, "255, 120, 120", "255, 252, 247"])
-        self.assertEqual(payload["metrics"][5:], [0.88, 1, "28% 52%", 12, -4, 0])
+        self.assertEqual(payload["metrics"][5:11], [0.88, 1, "28% 52%", 12, -4, 0])
+        self.assertEqual(payload["metrics"][11:], [1250, 0, 5000, 360])
         self.assertIn("hue-rotate(192deg)", payload["screen"][0])
         self.assertEqual(payload["screen"][1], "")
         self.assertEqual(payload["screen"][2]["opacity"], 0.12)
@@ -169,21 +174,21 @@ class FrontendVisualEffectsModuleTests(unittest.TestCase):
         self.assertEqual(payload["videoAndCredits"][10], "Staff\nCast")
         self.assertEqual(
             payload["characterStage"][0],
-            {"offsetX": 60, "offsetY": -45, "scale": 45, "opacity": 0, "layer": 10},
+            {"offsetX": 60, "offsetY": -45, "scale": 45, "opacity": 0, "layer": 10, "flipX": True},
         )
         self.assertEqual(
             payload["characterStage"][1],
-            {"offsetX": 0, "offsetY": 12, "scale": 100, "opacity": 100, "layer": 0},
+            {"offsetX": 0, "offsetY": 12, "scale": 100, "opacity": 100, "layer": 0, "flipX": False},
         )
         self.assertEqual(
             payload["characterStage"][2],
-            {"offsetX": 0, "offsetY": 0, "scale": 100, "opacity": 100, "layer": 0},
+            {"offsetX": 0, "offsetY": 0, "scale": 100, "opacity": 100, "layer": 0, "flipX": False},
         )
         self.assertEqual(
             payload["characterStage"][3],
-            "--sprite-offset-x:12%;--sprite-offset-y:-8%;--sprite-scale:1.250;--sprite-opacity:0.70;--sprite-layer:3;z-index:23;",
+            "--sprite-offset-x:12%;--sprite-offset-y:-8%;--sprite-scale:1.250;--sprite-opacity:0.70;--sprite-layer:3;--sprite-flip-x:-1;z-index:23;",
         )
-        self.assertEqual(payload["characterStage"][4], "X 12% / Y -8% / 125% / 透明 70% / 层级 3")
+        self.assertEqual(payload["characterStage"][4], "X 12% / Y -8% / 125% / 透明 70% / 层级 3 / 镜像")
 
 
 if __name__ == "__main__":

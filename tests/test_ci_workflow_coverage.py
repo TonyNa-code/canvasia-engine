@@ -9,9 +9,64 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 WORKFLOW_PATH = ROOT_DIR / ".github" / "workflows" / "ci.yml"
 EDITOR_INDEX_PATH = ROOT_DIR / "prototype_editor" / "index.html"
 SCRIPT_SRC_PATTERN = re.compile(r"<script\b[^>]*\bsrc=[\"']([^\"']+)[\"'][^>]*>", re.IGNORECASE)
+TOP_LEVEL_KEY_PATTERN = re.compile(r"^([A-Za-z0-9_-]+):(?:\s|$)")
+
+
+def _get_workflow_top_level_blocks() -> dict[str, str]:
+    workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+    blocks: dict[str, list[str]] = {}
+    current_key: str | None = None
+
+    for line in workflow.splitlines():
+        match = TOP_LEVEL_KEY_PATTERN.match(line)
+        if match:
+            current_key = match.group(1)
+            if current_key in blocks:
+                raise AssertionError(f"Duplicate top-level workflow key: {current_key}")
+            blocks[current_key] = [line]
+            continue
+
+        if current_key is not None:
+            blocks[current_key].append(line)
+
+    return {key: "\n".join(lines) for key, lines in blocks.items()}
 
 
 class CiWorkflowCoverageTests(unittest.TestCase):
+    def test_ci_hardening_keys_are_top_level(self) -> None:
+        blocks = _get_workflow_top_level_blocks()
+
+        for key in ("on", "env", "permissions", "concurrency", "jobs"):
+            self.assertIn(key, blocks)
+
+    def test_ci_opts_into_node_24_actions_runtime(self) -> None:
+        blocks = _get_workflow_top_level_blocks()
+
+        self.assertIn("FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true", blocks["env"])
+
+    def test_ci_uses_least_privilege_permissions(self) -> None:
+        blocks = _get_workflow_top_level_blocks()
+
+        self.assertIn("contents: read", blocks["permissions"])
+        self.assertNotIn("contents: write", blocks["permissions"])
+
+    def test_ci_cancels_superseded_branch_runs(self) -> None:
+        blocks = _get_workflow_top_level_blocks()
+
+        self.assertIn("group: ${{ github.workflow }}-${{ github.ref }}", blocks["concurrency"])
+        self.assertIn("cancel-in-progress: true", blocks["concurrency"])
+
+    def test_ci_can_be_run_manually_before_release(self) -> None:
+        blocks = _get_workflow_top_level_blocks()
+
+        self.assertIn("workflow_dispatch:", blocks["on"])
+
+    def test_ci_verify_job_has_timeout(self) -> None:
+        blocks = _get_workflow_top_level_blocks()
+
+        self.assertIn("verify:", blocks["jobs"])
+        self.assertIn("timeout-minutes: 45", blocks["jobs"])
+
     def test_ci_workflow_coverage_test_is_run_in_ci(self) -> None:
         workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
 

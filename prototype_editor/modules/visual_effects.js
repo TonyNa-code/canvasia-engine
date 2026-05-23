@@ -158,12 +158,17 @@
     none: "直接切换",
   });
 
+  const TRANSITION_DURATION_DEFAULT_MS = 360;
+  const TRANSITION_DURATION_MIN_MS = 0;
+  const TRANSITION_DURATION_MAX_MS = 5000;
+
   const DEFAULT_CHARACTER_STAGE = Object.freeze({
     offsetX: 0,
     offsetY: 0,
     scale: 100,
     opacity: 100,
     layer: 0,
+    flipX: false,
   });
 
   const TEXT_SPEED_LABELS = Object.freeze({
@@ -636,9 +641,35 @@
     return CHARACTER_TRANSITION_LABELS[getSafeTransition(transition)];
   }
 
+  function getSafeTransitionDurationMs(value, fallback = TRANSITION_DURATION_DEFAULT_MS) {
+    const number = Number.parseFloat(value ?? "");
+    const safeFallback = Number.isFinite(Number(fallback))
+      ? clamp(Number(fallback), TRANSITION_DURATION_MIN_MS, TRANSITION_DURATION_MAX_MS)
+      : TRANSITION_DURATION_DEFAULT_MS;
+    return Math.round(clamp(Number.isFinite(number) ? number : safeFallback, TRANSITION_DURATION_MIN_MS, TRANSITION_DURATION_MAX_MS));
+  }
+
   function getSafeStageNumber(value, fallback, min, max) {
     const number = Number.parseFloat(value ?? "");
     return Number.isFinite(number) ? clamp(number, min, max) : fallback;
+  }
+
+  function getSafeStageBoolean(value, fallback = false) {
+    if (typeof value === "boolean") {
+      return value;
+    }
+
+    if (typeof value === "string") {
+      const normalized = value.trim().toLowerCase();
+      if (["true", "1", "yes", "on"].includes(normalized)) {
+        return true;
+      }
+      if (["false", "0", "no", "off", ""].includes(normalized)) {
+        return false;
+      }
+    }
+
+    return fallback;
   }
 
   function getSafeCharacterStage(source = {}) {
@@ -649,6 +680,7 @@
       scale: Math.round(getSafeStageNumber(raw.scale, DEFAULT_CHARACTER_STAGE.scale, 45, 220)),
       opacity: Math.round(getSafeStageNumber(raw.opacity, DEFAULT_CHARACTER_STAGE.opacity, 0, 100)),
       layer: Math.round(getSafeStageNumber(raw.layer, DEFAULT_CHARACTER_STAGE.layer, -10, 10)),
+      flipX: getSafeStageBoolean(raw.flipX, DEFAULT_CHARACTER_STAGE.flipX),
     };
   }
 
@@ -660,13 +692,16 @@
       `--sprite-scale:${(stage.scale / 100).toFixed(3)};`,
       `--sprite-opacity:${(stage.opacity / 100).toFixed(2)};`,
       `--sprite-layer:${stage.layer};`,
+      `--sprite-flip-x:${stage.flipX ? -1 : 1};`,
       `z-index:${20 + stage.layer};`,
     ].join("");
   }
 
   function getCharacterStageSummary(stageSource = {}) {
     const stage = getSafeCharacterStage(stageSource);
-    return `X ${stage.offsetX}% / Y ${stage.offsetY}% / ${stage.scale}% / 透明 ${stage.opacity}% / 层级 ${stage.layer}`;
+    return `X ${stage.offsetX}% / Y ${stage.offsetY}% / ${stage.scale}% / 透明 ${stage.opacity}% / 层级 ${stage.layer}${
+      stage.flipX ? " / 镜像" : ""
+    }`;
   }
 
   function getSafeTextSpeed(speed) {
@@ -711,6 +746,9 @@
     POSITION_LABELS,
     CHARACTER_TRANSITION_LABELS,
     BASIC_TRANSITION_LABELS,
+    TRANSITION_DURATION_DEFAULT_MS,
+    TRANSITION_DURATION_MIN_MS,
+    TRANSITION_DURATION_MAX_MS,
     DEFAULT_CHARACTER_STAGE,
     TEXT_SPEED_LABELS,
     DIALOG_THEME_LABELS,
@@ -779,6 +817,7 @@
     getPositionLabel,
     getSafeTransition,
     getTransitionLabel,
+    getSafeTransitionDurationMs,
     getSafeCharacterStage,
     getCharacterStageStyle,
     getCharacterStageSummary,

@@ -1097,6 +1097,10 @@ const EFFECT_DURATION_LABELS = {
   long: "久一点",
 };
 
+const TRANSITION_DURATION_DEFAULT_MS = 360;
+const TRANSITION_DURATION_MIN_MS = 0;
+const TRANSITION_DURATION_MAX_MS = 5000;
+
 const FLASH_COLOR_LABELS = {
   white: "白闪",
   warm: "暖光",
@@ -3801,7 +3805,7 @@ async function playVoiceReplayPreview(entryId) {
   stopVoiceReplayPreview({ rerender: false });
 
   const audio = new Audio(entry.voiceUrl);
-  audio.volume = getVolumeRatio(state.playback.voiceVolume, 92);
+  audio.volume = getVolumeRatio(state.playback.voiceVolume, 92) * getVolumeRatio(entry.voiceVolume, 100);
   audio.addEventListener("ended", () => {
     stopVoiceReplayPreview();
   });
@@ -4602,7 +4606,7 @@ function shouldUseRuntimeTypewriter(snapshot) {
     return false;
   }
 
-  if (state.playback.textSpeed === "instant") {
+  if (getSnapshotTextSpeed(snapshot) === "instant") {
     return false;
   }
 
@@ -4611,6 +4615,10 @@ function shouldUseRuntimeTypewriter(snapshot) {
   }
 
   return (snapshot.visualState?.dialogueText ?? "").trim().length > 0;
+}
+
+function getSnapshotTextSpeed(snapshot) {
+  return getSafeTextSpeed(snapshot?.block?.textSpeed ?? state.playback.textSpeed);
 }
 
 function isRuntimeTypewriterActive() {
@@ -4711,7 +4719,7 @@ function scheduleRuntimeTypewriterTick(expectedKey) {
     }
 
     scheduleRuntimeTypewriterTick(expectedKey);
-  }, getTypewriterStepDelay(state.playback.textSpeed));
+  }, getTypewriterStepDelay(getSnapshotTextSpeed(getCurrentSnapshot())));
 }
 
 function getNextTypewriterIndex(text, currentIndex) {
@@ -5415,6 +5423,7 @@ function getVoiceReplayEntries() {
         text: getBlockText(block).trim(),
         speakerName: block.type === "dialogue" ? getCharacterName(block.speakerId) : "旁白",
         voiceAssetId: block.voiceAssetId,
+        voiceVolume: getSafeVolumePercent(block.voiceVolume, 100),
         voiceName: voiceAsset.name || block.voiceAssetId,
         voiceUrl,
       });
@@ -6860,7 +6869,7 @@ function getAutoAdvanceDelay(snapshot) {
       normal: 72,
       fast: 58,
       instant: 42,
-    }[getSafeTextSpeed(state.playback.textSpeed)];
+    }[getSnapshotTextSpeed(snapshot)];
     return Math.min(6800, Math.max(1100, 520 + text.length * multiplier));
   }
 
@@ -6903,7 +6912,7 @@ function stopVoicePlayback({ resetStepKey = true } = {}) {
 function updateRuntimeAudioVolumes() {
   if (state.bgmAudio) {
     cancelAudioFade(state.bgmAudio);
-    state.bgmAudio.volume = getVolumeRatio(state.playback.bgmVolume, 72);
+    state.bgmAudio.volume = getRuntimeMusicTargetVolume(getCurrentSnapshot());
   }
 
   if (musicRoomAudio) {
@@ -6911,11 +6920,11 @@ function updateRuntimeAudioVolumes() {
   }
 
   if (state.voiceAudio) {
-    state.voiceAudio.volume = getVolumeRatio(state.playback.voiceVolume, 92);
+    state.voiceAudio.volume = getRuntimeVoiceTargetVolume(getCurrentSnapshot());
   }
 
   activeSfxAudios.forEach((audio) => {
-    audio.volume = getVolumeRatio(state.playback.sfxVolume, 85);
+    audio.volume = getRuntimeSfxTargetVolume(audio._canvasiaSfxVolumePercent);
   });
 }
 
@@ -7023,6 +7032,7 @@ function handleVoiceError() {
 function syncVoice(snapshot) {
   const voiceAssetId = getVoiceAssetId(snapshot);
   const stepKey = getCurrentStepKey(snapshot);
+  const targetVolume = getRuntimeVoiceTargetVolume(snapshot);
 
   if (!state.playback.voiceEnabled || !voiceAssetId) {
     stopVoicePlayback();
@@ -7030,6 +7040,7 @@ function syncVoice(snapshot) {
   }
 
   if (state.currentVoiceStepKey === stepKey && state.voiceAudio) {
+    state.voiceAudio.volume = targetVolume;
     return;
   }
 
@@ -7042,13 +7053,20 @@ function syncVoice(snapshot) {
   }
 
   const audio = new Audio(encodeURI(voiceUrl));
-  audio.volume = getVolumeRatio(state.playback.voiceVolume, 92);
+  audio.volume = targetVolume;
   audio.addEventListener("ended", handleVoiceEnded);
   audio.addEventListener("error", handleVoiceError);
   audio.play().catch(() => {
     scheduleRuntimeAutoAdvance(snapshot);
   });
   state.voiceAudio = audio;
+}
+
+function getRuntimeVoiceTargetVolume(snapshot) {
+  return (
+    getVolumeRatio(state.playback.voiceVolume, 92) *
+    getVolumeRatio(snapshot?.block?.voiceVolume, 100)
+  );
 }
 
 function renderPlaybackControls(snapshot = getCurrentSnapshot()) {
@@ -8865,8 +8883,10 @@ function createInitialPreviewVisualState() {
   return {
     backgroundAssetId: null,
     backgroundName: "未设置背景",
+    backgroundTransitionEvent: null,
     musicName: "未播放",
     musicAssetId: null,
+    musicVolume: 100,
     musicScope: null,
     musicFadeOutMs: 0,
     musicPreviousFadeOutMs: 0,
@@ -8902,8 +8922,15 @@ function clonePreviewVisualState(visualState) {
           fadeOutMs: getSafeAudioFadeMs(visualState.musicScope.fadeOutMs, 600),
         }
       : null,
+    musicVolume: getSafeVolumePercent(visualState?.musicVolume, 100),
     musicFadeOutMs: getSafeAudioFadeMs(visualState?.musicFadeOutMs, 0),
     musicPreviousFadeOutMs: getSafeAudioFadeMs(visualState?.musicPreviousFadeOutMs, 0),
+    backgroundTransitionEvent: visualState?.backgroundTransitionEvent
+      ? {
+          transition: getSafeTransition(visualState.backgroundTransitionEvent.transition),
+          durationMs: getSafeTransitionDurationMs(visualState.backgroundTransitionEvent.durationMs),
+        }
+      : null,
     screenShake: visualState?.screenShake
       ? {
           intensity: getSafeShakeIntensity(visualState.screenShake.intensity),
@@ -8969,6 +8996,7 @@ function clearTransientStageEffects(visualState) {
 
   visualState.screenShake = null;
   visualState.screenFlash = null;
+  visualState.backgroundTransitionEvent = null;
   visualState.activeCharacterId = null;
   visualState.characterTransitionEvent = null;
   visualState.characterEmphasisEvent = null;
@@ -8994,6 +9022,7 @@ function getMusicScopeFromBlock(block = {}, sceneId = "") {
 function clearPreviewMusicForScopeEnd(visualState, fadeOutMs = 0) {
   visualState.musicAssetId = null;
   visualState.musicName = "未播放";
+  visualState.musicVolume = 100;
   visualState.musicScope = null;
   visualState.musicFadeOutMs = getSafeAudioFadeMs(fadeOutMs, 0);
 }
@@ -9150,6 +9179,13 @@ function applyBlockToPreviewState(block, visualState, variables, sceneId = "") {
       const asset = data.assetsById.get(block.assetId);
       visualState.backgroundAssetId = block.assetId;
       visualState.backgroundName = asset?.name ?? block.assetId;
+      visualState.backgroundTransitionEvent =
+        getSafeTransition(block.transition) === "none"
+          ? null
+          : {
+              transition: getSafeTransition(block.transition),
+              durationMs: getSafeTransitionDurationMs(block.transitionDurationMs),
+            };
       visualState.speakerName = "画面";
       visualState.dialogueText = `背景切换到：${asset?.name ?? block.assetId}`;
       return null;
@@ -9164,6 +9200,7 @@ function applyBlockToPreviewState(block, visualState, variables, sceneId = "") {
       }
       visualState.musicAssetId = block.assetId;
       visualState.musicName = asset?.name ?? block.assetId;
+      visualState.musicVolume = getSafeVolumePercent(block.volume, 100);
       visualState.musicScope = getMusicScopeFromBlock(block, sceneId);
       visualState.musicFadeOutMs = 0;
       visualState.speakerName = "音乐";
@@ -9174,6 +9211,7 @@ function applyBlockToPreviewState(block, visualState, variables, sceneId = "") {
       visualState.musicFadeOutMs = getSafeAudioFadeMs(block.fadeOutMs, 600);
       visualState.musicAssetId = null;
       visualState.musicName = "未播放";
+      visualState.musicVolume = 100;
       visualState.musicScope = null;
       visualState.speakerName = "音乐";
       visualState.dialogueText = "背景音乐停止了。";
@@ -9331,6 +9369,7 @@ function applyBlockToPreviewState(block, visualState, variables, sceneId = "") {
           mode: "show",
           characterId: block.characterId,
           transition: getSafeTransition(block.transition),
+          durationMs: getSafeTransitionDurationMs(block.transitionDurationMs),
         };
       }
       visualState.speakerName = "角色演出";
@@ -9346,6 +9385,7 @@ function applyBlockToPreviewState(block, visualState, variables, sceneId = "") {
           mode: "hide",
           characterState: previousState,
           transition: getSafeTransition(block.transition),
+          durationMs: getSafeTransitionDurationMs(block.transitionDurationMs),
         };
       }
       visualState.speakerName = "角色演出";
@@ -9674,6 +9714,17 @@ function renderStageVisual(snapshot) {
   refs.backgroundLayer.style.backgroundImage = backgroundUrl
     ? `linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.18)), url("${encodeURI(backgroundUrl)}")`
     : getBackdropStyle(visualState.backgroundAssetId);
+  const backgroundTransition = visualState.backgroundTransitionEvent;
+  refs.backgroundLayer.style.setProperty(
+    "--background-transition-ms",
+    `${getSafeTransitionDurationMs(backgroundTransition?.durationMs)}ms`
+  );
+  refs.backgroundLayer.dataset.transition = getSafeTransition(backgroundTransition?.transition ?? "none");
+  refs.backgroundLayer.classList.remove("is-transitioning", "transition-fade");
+  void refs.backgroundLayer.offsetWidth;
+  if (backgroundTransition && getSafeTransition(backgroundTransition.transition) !== "none") {
+    refs.backgroundLayer.classList.add("is-transitioning", `transition-${getSafeTransition(backgroundTransition.transition)}`);
+  }
   refs.particleLayer.innerHTML = renderParticleEffectLayer(visualState.particleEffect, visualState);
   applyStageWorldPresentation(visualState);
   applyStageScreenEffects(visualState, snapshot.block);
@@ -9722,7 +9773,10 @@ function renderSpriteCard(
   const classes = ["sprite-card"];
   const isGhostHide = characterState.__ghostMode === "hide";
   const transition = characterTransitionEvent ? getSafeTransition(characterTransitionEvent.transition) : "none";
-  const stageStyle = getCharacterStageStyle(characterState.stage);
+  const transitionDurationMs = characterTransitionEvent
+    ? getSafeTransitionDurationMs(characterTransitionEvent.durationMs)
+    : getSafeTransitionDurationMs();
+  const stageStyle = `${getCharacterStageStyle(characterState.stage)}--sprite-transition-ms:${transitionDurationMs}ms;`;
 
   if (shouldBlurPlayerCharacter(characterState.position, depthBlur)) {
     classes.push("is-depth-muted");
@@ -9756,7 +9810,7 @@ function renderSpriteCard(
   return `
     <article class="${classes.join(" ")}" data-position="${escapeHtml(characterState.position)}" data-transition="${escapeHtml(transition)}" style="${stageStyle}">
       <div class="sprite-card-inner">
-        ${visual}
+        <div class="sprite-visual-frame">${visual}</div>
         <div class="sprite-name">${escapeHtml(localizedName)}</div>
         <div class="sprite-expression">${escapeHtml(characterState.expressionName ?? "默认")}</div>
       </div>
@@ -9766,6 +9820,7 @@ function renderSpriteCard(
 
 function syncAudio(snapshot) {
   const nextMusicAssetId = snapshot.visualState.musicAssetId ?? null;
+  const targetVolume = getRuntimeMusicTargetVolume(snapshot);
 
   if (!nextMusicAssetId) {
     stopMusic({
@@ -9775,6 +9830,7 @@ function syncAudio(snapshot) {
   }
 
   if (state.currentMusicAssetId === nextMusicAssetId && state.bgmAudio) {
+    state.bgmAudio.volume = targetVolume;
     return;
   }
 
@@ -9790,7 +9846,6 @@ function syncAudio(snapshot) {
 
   const audio = new Audio(encodeURI(musicUrl));
   audio.loop = true;
-  const targetVolume = getVolumeRatio(state.playback.bgmVolume, 72);
   audio.volume = fadeInMs > 0 ? 0 : targetVolume;
   audio.play().catch(() => {});
   state.bgmAudio = audio;
@@ -9803,6 +9858,17 @@ function syncAudio(snapshot) {
       durationMs: fadeInMs,
     });
   }
+}
+
+function getRuntimeMusicTargetVolume(snapshot) {
+  return (
+    getVolumeRatio(state.playback.bgmVolume, 72) *
+    getVolumeRatio(snapshot?.visualState?.musicVolume ?? snapshot?.block?.volume, 100)
+  );
+}
+
+function getRuntimeSfxTargetVolume(volumePercent = 100) {
+  return getVolumeRatio(state.playback.sfxVolume, 85) * getVolumeRatio(volumePercent, 100);
 }
 
 function syncOneShotAudio(snapshot) {
@@ -9824,7 +9890,8 @@ function syncOneShotAudio(snapshot) {
   }
 
   const audio = new Audio(encodeURI(soundUrl));
-  audio.volume = getVolumeRatio(state.playback.sfxVolume, 85);
+  audio._canvasiaSfxVolumePercent = getSafeVolumePercent(snapshot.block?.volume, 100);
+  audio.volume = getRuntimeSfxTargetVolume(audio._canvasiaSfxVolumePercent);
   activeSfxAudios.add(audio);
   const cleanup = () => {
     activeSfxAudios.delete(audio);
@@ -10227,6 +10294,16 @@ function getSafeTransition(transition) {
     : "fade";
 }
 
+function getSafeTransitionDurationMs(value, fallback = TRANSITION_DURATION_DEFAULT_MS) {
+  const number = Number.parseFloat(value ?? "");
+  const safeFallback = Number.isFinite(Number(fallback))
+    ? clamp(Number(fallback), TRANSITION_DURATION_MIN_MS, TRANSITION_DURATION_MAX_MS)
+    : TRANSITION_DURATION_DEFAULT_MS;
+  return Math.round(
+    clamp(Number.isFinite(number) ? number : safeFallback, TRANSITION_DURATION_MIN_MS, TRANSITION_DURATION_MAX_MS)
+  );
+}
+
 function getSafeCharacterStage(source = {}) {
   const raw = source && typeof source === "object" ? source : {};
   return {
@@ -10235,6 +10312,7 @@ function getSafeCharacterStage(source = {}) {
     scale: Math.round(clamp(getSafeNumber(raw.scale, 100), 45, 220)),
     opacity: Math.round(clamp(getSafeNumber(raw.opacity, 100), 0, 100)),
     layer: Math.round(clamp(getSafeNumber(raw.layer, 0), -10, 10)),
+    flipX: getSafeBoolean(raw.flipX, false),
   };
 }
 
@@ -10250,6 +10328,7 @@ function getCharacterStageStyle(stageSource = {}) {
     `--sprite-scale:${(stage.scale / 100).toFixed(3)};`,
     `--sprite-opacity:${(stage.opacity / 100).toFixed(2)};`,
     `--sprite-layer:${stage.layer};`,
+    `--sprite-flip-x:${stage.flipX ? -1 : 1};`,
     `z-index:${20 + stage.layer};`,
   ].join("");
 }
@@ -11805,6 +11884,24 @@ function formatVariableValue(variableId, value) {
 function getSafeNumber(value, fallback = 0) {
   const parsed = Number.parseFloat(value ?? "");
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function getSafeBoolean(value, fallback = false) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["true", "1", "yes", "on"].includes(normalized)) {
+      return true;
+    }
+    if (["false", "0", "no", "off", ""].includes(normalized)) {
+      return false;
+    }
+  }
+
+  return fallback;
 }
 
 function clamp(value, min, max) {

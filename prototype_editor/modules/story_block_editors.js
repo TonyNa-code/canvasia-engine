@@ -73,6 +73,52 @@
     `;
   }
 
+  function renderTransitionDurationInput(block, options = {}) {
+    const escape = getEscapeHtml(options);
+    const getSafeTransitionDurationMs = getRenderer(options, "getSafeTransitionDurationMs", (value, fallback = 360) => {
+      const number = Number.parseFloat(value ?? "");
+      const safeFallback = Number.isFinite(Number(fallback)) ? Math.min(Math.max(Number(fallback), 0), 5000) : 360;
+      return Math.round(Math.min(Math.max(Number.isFinite(number) ? number : safeFallback, 0), 5000));
+    });
+    const durationMs = getSafeTransitionDurationMs(block?.transitionDurationMs);
+
+    return `
+      <div class="detail-row">
+        <label for="editorTransitionDurationMs">转场时长（毫秒）</label>
+        <input
+          id="editorTransitionDurationMs"
+          type="number"
+          min="0"
+          max="5000"
+          step="50"
+          value="${escape(String(durationMs))}"
+        />
+        <p class="helper-text">0 是直接切换；数值越大，淡入、滑入或退场越慢。旧项目不填时会自动使用默认节奏。</p>
+      </div>
+    `;
+  }
+
+  function renderTextSpeedOverrideRow(block, options = {}) {
+    const escape = getEscapeHtml(options);
+    const labelMap = {
+      follow: "跟随全局文字速度",
+      ...(options.textSpeedLabels ?? {}),
+    };
+    const selectedValue = Object.hasOwn(options.textSpeedLabels ?? {}, block?.textSpeed)
+      ? block.textSpeed
+      : "follow";
+
+    return `
+      <div class="detail-row">
+        <label for="editorTextSpeed">这句文字速度</label>
+        <select id="editorTextSpeed">
+          ${renderLabelOptions(labelMap, selectedValue, options)}
+        </select>
+        <p class="helper-text">用于单独控制这一句的打字机节奏。默认跟随试玩 / 玩家设置。</p>
+      </div>
+    `;
+  }
+
   function renderSaveBlockActions() {
     return `
     <div class="detail-actions">
@@ -446,10 +492,18 @@
         </select>
       </div>
       <div class="detail-row">
+        <label for="editorVoiceVolume">这句语音音量（%）</label>
+        <input id="editorVoiceVolume" type="number" min="0" max="100" step="1" value="${escape(
+          String(block?.voiceVolume ?? 100)
+        )}" />
+        <p class="helper-text">用于单独控制这一句配音的强弱，会和玩家自己的语音音量设置叠加。</p>
+      </div>
+      <div class="detail-row">
         <label for="editorDialogueText">台词内容</label>
         <textarea id="editorDialogueText">${escape(block?.text ?? "")}</textarea>
         ${renderReadableTextTools(block?.text, "台词")}
       </div>
+      ${renderTextSpeedOverrideRow(block, options)}
     </div>
     ${renderSaveBlockActions()}
   `;
@@ -490,11 +544,14 @@
   function renderNarrationEditor(block, options = {}) {
     const escape = getEscapeHtml(options);
     const renderReadableTextTools = getRenderer(options, "renderReadableTextQualityTools", renderReadableTextQualityTools);
+    const voiceAssets = Array.isArray(options.voiceAssets) ? options.voiceAssets : [];
+    const voiceAssetId = String(block?.voiceAssetId ?? "");
+    const boundVoiceAsset = voiceAssetId ? getCollectionEntry(options.assetsById, voiceAssetId) : null;
 
     return `
     <article class="editor-card">
       <h3>编辑这段旁白</h3>
-      <p>旁白不会显示角色名，只负责推进气氛和叙述信息。</p>
+      <p>旁白不会显示角色名，适合推进气氛、内心独白或 VO 叙述；需要时也可以绑定语音。</p>
     </article>
     <div class="field-grid">
       <div class="detail-row">
@@ -502,6 +559,32 @@
         <textarea id="editorNarrationText">${escape(block?.text ?? "")}</textarea>
         ${renderReadableTextTools(block?.text, "旁白")}
       </div>
+      <div class="detail-row">
+        <label for="editorNarrationVoiceAssetId">旁白语音</label>
+        <select id="editorNarrationVoiceAssetId">
+          <option value="">暂时不绑定语音</option>
+          ${voiceAssets
+            .map(
+              (asset) => `
+                <option value="${escape(asset.id ?? "")}" ${asset.id === voiceAssetId ? "selected" : ""}>
+                  ${escape(asset.name ?? "")}
+                </option>
+              `
+            )
+            .join("")}
+        </select>
+        <p class="helper-text">
+          ${voiceAssetId ? `当前绑定的是“${escape(boundVoiceAsset?.name ?? voiceAssetId)}”。` : "如果想做旁白朗读、内心独白或剧情 VO，可以在这里绑定语音。"}
+        </p>
+      </div>
+      <div class="detail-row">
+        <label for="editorNarrationVoiceVolume">旁白语音音量（%）</label>
+        <input id="editorNarrationVoiceVolume" type="number" min="0" max="100" step="1" value="${escape(
+          String(block?.voiceVolume ?? 100)
+        )}" />
+        <p class="helper-text">用于单独控制这段旁白语音的强弱，会和玩家自己的语音音量设置叠加。</p>
+      </div>
+      ${renderTextSpeedOverrideRow(block, options)}
     </div>
     ${renderSaveBlockActions()}
   `;
@@ -570,6 +653,7 @@
           ${renderTransitionOptions(transition, { basic: true })}
         </select>
       </div>
+      ${renderTransitionDurationInput(block, options)}
       <div class="detail-row">
         <label>3D 场景默认视角</label>
         <div class="field-grid compact-grid">
@@ -644,6 +728,7 @@
           ${renderTransitionOptions(transition)}
         </select>
       </div>
+      ${renderTransitionDurationInput(block, options)}
       ${renderCharacterStageControls(stage)}
     </div>
     ${renderSaveBlockActions()}
@@ -676,6 +761,7 @@
           ${renderTransitionOptions(transition)}
         </select>
       </div>
+      ${renderTransitionDurationInput(block, options)}
     </div>
     ${renderSaveBlockActions()}
   `;
@@ -709,6 +795,13 @@
           <option value="true" ${block?.loop !== false ? "selected" : ""}>循环播放</option>
           <option value="false" ${block?.loop === false ? "selected" : ""}>只播放一次</option>
         </select>
+      </div>
+      <div class="detail-row">
+        <label for="editorMusicVolume">本段音量（%）</label>
+        <input id="editorMusicVolume" type="number" min="0" max="100" step="1" value="${escape(
+          String(block?.volume ?? 100)
+        )}" />
+        <p class="helper-text">这里只控制这张音乐卡的混音倍率，会和玩家自己的 BGM 音量设置叠加。</p>
       </div>
       <div class="detail-row">
         <label for="editorMusicEndMode">播放范围</label>
@@ -762,6 +855,7 @@
   }
 
   function renderSfxPlayEditor(block, options = {}) {
+    const escape = getEscapeHtml(options);
     const getSafeAssetIdByType = getRenderer(options, "getSafeAssetIdByType", (_type, assetId) => assetId ?? "");
     const assetId = getSafeAssetIdByType("sfx", block?.assetId);
 
@@ -776,6 +870,13 @@
         <select id="editorSfxAssetId">
           ${renderAssetOptions(options.sfxAssets, assetId, options)}
         </select>
+      </div>
+      <div class="detail-row">
+        <label for="editorSfxVolume">本次音效音量（%）</label>
+        <input id="editorSfxVolume" type="number" min="0" max="100" step="1" value="${escape(
+          String(block?.volume ?? 100)
+        )}" />
+        <p class="helper-text">用于调整这一声门铃、脚步、心跳或爆发音效的存在感，会和玩家音效音量叠加。</p>
       </div>
     </div>
     ${renderSaveBlockActions()}

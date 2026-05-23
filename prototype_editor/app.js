@@ -426,6 +426,7 @@ const DEFAULT_CHARACTER_STAGE = visualEffectTools?.DEFAULT_CHARACTER_STAGE ?? {
   scale: 100,
   opacity: 100,
   layer: 0,
+  flipX: false,
 };
 
 const TEXT_SPEED_LABELS = visualEffectTools?.TEXT_SPEED_LABELS ?? {
@@ -446,6 +447,7 @@ const DIALOG_THEME_LABELS = visualEffectTools?.DIALOG_THEME_LABELS ?? {
 const getSafePosition = visualEffectTools.getSafePosition;
 const getSafeTransition = visualEffectTools.getSafeTransition;
 const getTransitionLabel = visualEffectTools.getTransitionLabel;
+const getSafeTransitionDurationMs = visualEffectTools.getSafeTransitionDurationMs;
 const getSafeCharacterStage = visualEffectTools.getSafeCharacterStage;
 const getCharacterStageStyle = visualEffectTools.getCharacterStageStyle;
 const getCharacterStageSummary = visualEffectTools.getCharacterStageSummary;
@@ -17793,7 +17795,7 @@ function shouldUsePreviewTypewriter(snapshot) {
     return false;
   }
 
-  if (state.previewPlayback.textSpeed === "instant") {
+  if (getPreviewSnapshotTextSpeed(snapshot) === "instant") {
     return false;
   }
 
@@ -17802,6 +17804,10 @@ function shouldUsePreviewTypewriter(snapshot) {
   }
 
   return (snapshot.visualState?.dialogueText ?? "").trim().length > 0;
+}
+
+function getPreviewSnapshotTextSpeed(snapshot) {
+  return getSafeTextSpeed(snapshot?.block?.textSpeed ?? state.previewPlayback.textSpeed);
 }
 
 function isPreviewTypewriterActive() {
@@ -17908,7 +17914,7 @@ function schedulePreviewTypewriterTick(expectedKey) {
     }
 
     schedulePreviewTypewriterTick(expectedKey);
-  }, getTypewriterStepDelay(state.previewPlayback.textSpeed));
+  }, getTypewriterStepDelay(getPreviewSnapshotTextSpeed(getCurrentPreviewSnapshot())));
 }
 
 function getNextTypewriterIndex(text, currentIndex) {
@@ -18800,7 +18806,7 @@ function getPreviewAutoAdvanceDelay(snapshot) {
       normal: 72,
       fast: 58,
       instant: 42,
-    }[getSafeTextSpeed(state.previewPlayback.textSpeed)];
+    }[getPreviewSnapshotTextSpeed(snapshot)];
     return Math.min(6800, Math.max(1100, 520 + text.length * multiplier));
   }
 
@@ -18851,15 +18857,15 @@ function stopPreviewVoicePlayback({ resetStepKey = true } = {}) {
 
 function updatePreviewAudioVolumes() {
   if (previewMusicAudio) {
-    previewMusicAudio.volume = getVolumeRatio(state.previewPlayback.bgmVolume, 72);
+    previewMusicAudio.volume = getPreviewMusicTargetVolume(getCurrentPreviewSnapshot());
   }
 
   previewActiveSfxAudios.forEach((audio) => {
-    audio.volume = getVolumeRatio(state.previewPlayback.sfxVolume, 85);
+    audio.volume = getPreviewSfxTargetVolume(audio._canvasiaSfxVolumePercent);
   });
 
   if (previewVoiceAudio.currentSrc || previewVoiceAudio.src) {
-    previewVoiceAudio.volume = getVolumeRatio(state.previewPlayback.voiceVolume, 92);
+    previewVoiceAudio.volume = getPreviewVoiceTargetVolume(getCurrentPreviewSnapshot());
   }
 }
 
@@ -18894,6 +18900,7 @@ function updatePreviewVolumeControl(controlId, rawValue, announce = false) {
 
 function syncPreviewMusic(snapshot) {
   const nextMusicAssetId = snapshot?.visualState?.musicAssetId ?? null;
+  const targetVolume = getPreviewMusicTargetVolume(snapshot);
 
   if (!nextMusicAssetId) {
     stopPreviewMusicPlayback();
@@ -18901,7 +18908,7 @@ function syncPreviewMusic(snapshot) {
   }
 
   if (previewCurrentMusicAssetId === nextMusicAssetId && previewMusicAudio) {
-    previewMusicAudio.volume = getVolumeRatio(state.previewPlayback.bgmVolume, 72);
+    previewMusicAudio.volume = targetVolume;
     return;
   }
 
@@ -18917,14 +18924,26 @@ function syncPreviewMusic(snapshot) {
 
   const audio = new Audio(encodeURI(previewUrl));
   audio.loop = true;
-  audio.volume = getVolumeRatio(state.previewPlayback.bgmVolume, 72);
+  audio.volume = targetVolume;
   audio.play().catch(() => {});
   previewMusicAudio = audio;
 }
 
-function playPreviewOneShotAudio(previewUrl) {
+function getPreviewMusicTargetVolume(snapshot) {
+  return (
+    getVolumeRatio(state.previewPlayback.bgmVolume, 72) *
+    getVolumeRatio(snapshot?.visualState?.musicVolume ?? snapshot?.block?.volume, 100)
+  );
+}
+
+function getPreviewSfxTargetVolume(volumePercent = 100) {
+  return getVolumeRatio(state.previewPlayback.sfxVolume, 85) * getVolumeRatio(volumePercent, 100);
+}
+
+function playPreviewOneShotAudio(previewUrl, volumePercent = 100) {
   const audio = new Audio(encodeURI(previewUrl));
-  audio.volume = getVolumeRatio(state.previewPlayback.sfxVolume, 85);
+  audio._canvasiaSfxVolumePercent = getSafeVolumePercent(volumePercent, 100);
+  audio.volume = getPreviewSfxTargetVolume(audio._canvasiaSfxVolumePercent);
   previewActiveSfxAudios.add(audio);
   const cleanup = () => {
     previewActiveSfxAudios.delete(audio);
@@ -18958,7 +18977,7 @@ function syncPreviewOneShotAudio(snapshot) {
     return;
   }
 
-  playPreviewOneShotAudio(previewUrl);
+  playPreviewOneShotAudio(previewUrl, snapshot.block?.volume);
 }
 
 function handlePreviewVoiceEnded() {
@@ -18978,6 +18997,7 @@ function handlePreviewVoiceError() {
 function syncPreviewVoice(snapshot) {
   const voiceAssetId = getPreviewVoiceAssetId(snapshot);
   const snapshotKey = getPreviewSnapshotStepKey(snapshot);
+  const targetVolume = getPreviewVoiceTargetVolume(snapshot);
 
   if (!state.previewPlayback.voiceEnabled || !voiceAssetId) {
     stopPreviewVoicePlayback();
@@ -18985,6 +19005,7 @@ function syncPreviewVoice(snapshot) {
   }
 
   if (state.previewVoiceStepKey === snapshotKey && (previewVoiceAudio.currentSrc || previewVoiceAudio.src)) {
+    previewVoiceAudio.volume = targetVolume;
     return;
   }
 
@@ -19000,10 +19021,17 @@ function syncPreviewVoice(snapshot) {
 
   previewVoiceAudio.src = encodeURI(previewUrl);
   previewVoiceAudio.currentTime = 0;
-  previewVoiceAudio.volume = getVolumeRatio(state.previewPlayback.voiceVolume, 92);
+  previewVoiceAudio.volume = targetVolume;
   previewVoiceAudio.play().catch(() => {
     schedulePreviewAutoAdvance(snapshot);
   });
+}
+
+function getPreviewVoiceTargetVolume(snapshot) {
+  return (
+    getVolumeRatio(state.previewPlayback.voiceVolume, 92) *
+    getVolumeRatio(snapshot?.block?.voiceVolume, 100)
+  );
 }
 
 function schedulePreviewAutoAdvance(snapshot, options = {}) {
@@ -19203,10 +19231,11 @@ function createInitialPreviewVisualState() {
   return {
     backgroundAssetId: null,
     backgroundName: "未设置背景",
-    scene3dPreview: null,
+    backgroundTransitionEvent: null,
     scene3dPreview: null,
     musicName: "未播放",
     musicAssetId: null,
+    musicVolume: 100,
     musicScope: null,
     musicFadeOutMs: 0,
     musicPreviousFadeOutMs: 0,
@@ -19242,8 +19271,15 @@ function clonePreviewVisualState(visualState) {
           fadeOutMs: getSafeNonNegativeNumber(visualState.musicScope.fadeOutMs, 600),
         }
       : null,
+    musicVolume: getSafeVolumePercent(visualState?.musicVolume, 100),
     musicFadeOutMs: getSafeNonNegativeNumber(visualState?.musicFadeOutMs, 0),
     musicPreviousFadeOutMs: getSafeNonNegativeNumber(visualState?.musicPreviousFadeOutMs, 0),
+    backgroundTransitionEvent: visualState?.backgroundTransitionEvent
+      ? {
+          transition: getSafeTransition(visualState.backgroundTransitionEvent.transition),
+          durationMs: getSafeTransitionDurationMs(visualState.backgroundTransitionEvent.durationMs),
+        }
+      : null,
     scene3dPreview: visualState?.scene3dPreview ? getSafeScene3dPreviewConfig(visualState.scene3dPreview) : null,
     screenShake: visualState?.screenShake
       ? {
@@ -19310,6 +19346,7 @@ function clearTransientStageEffects(visualState) {
 
   visualState.screenShake = null;
   visualState.screenFlash = null;
+  visualState.backgroundTransitionEvent = null;
   visualState.activeCharacterId = null;
   visualState.characterTransitionEvent = null;
   visualState.characterEmphasisEvent = null;
@@ -19331,6 +19368,7 @@ function getMusicScopeFromBlock(block = {}, sceneId = "") {
 function clearPreviewMusicForScopeEnd(visualState, fadeOutMs = 0) {
   visualState.musicAssetId = null;
   visualState.musicName = "未播放";
+  visualState.musicVolume = 100;
   visualState.musicScope = null;
   visualState.musicFadeOutMs = getSafeNonNegativeNumber(fadeOutMs, 0);
 }
@@ -19557,6 +19595,13 @@ function applyBlockToPreviewState(block, visualState, variables, sceneId = "") {
       const asset = state.data.assetsById.get(block.assetId);
       visualState.backgroundAssetId = block.assetId;
       visualState.backgroundName = asset?.name ?? block.assetId;
+      visualState.backgroundTransitionEvent =
+        getSafeTransition(block.transition) === "none"
+          ? null
+          : {
+              transition: getSafeTransition(block.transition),
+              durationMs: getSafeTransitionDurationMs(block.transitionDurationMs),
+            };
       visualState.scene3dPreview =
         asset?.type === "scene3d" ? getSafeScene3dPreviewConfig(block.scene3dPreview) : null;
       visualState.speakerName = "画面";
@@ -19576,18 +19621,20 @@ function applyBlockToPreviewState(block, visualState, variables, sceneId = "") {
       }
       visualState.musicAssetId = block.assetId;
       visualState.musicName = asset?.name ?? block.assetId;
+      visualState.musicVolume = getSafeVolumePercent(block.volume, 100);
       visualState.musicScope = getMusicScopeFromBlock(block, sceneId);
       visualState.musicFadeOutMs = 0;
       visualState.speakerName = "音乐";
       visualState.dialogueText = `开始播放：${asset?.name ?? block.assetId}。范围：${getMusicEndModeLabel(
         visualState.musicScope.endMode
-      )}`;
+      )} / 音量：${formatVolumePercent(visualState.musicVolume)}`;
       return null;
     }
     case "music_stop":
       visualState.musicFadeOutMs = getSafeNonNegativeNumber(block.fadeOutMs, 600);
       visualState.musicAssetId = null;
       visualState.musicName = "未播放";
+      visualState.musicVolume = 100;
       visualState.musicScope = null;
       visualState.speakerName = "音乐";
       visualState.dialogueText = "背景音乐停止了。";
@@ -19729,6 +19776,7 @@ function applyBlockToPreviewState(block, visualState, variables, sceneId = "") {
           mode: "show",
           characterId: block.characterId,
           transition: getSafeTransition(block.transition),
+          durationMs: getSafeTransitionDurationMs(block.transitionDurationMs),
         };
       }
       visualState.speakerName = "角色演出";
@@ -19746,6 +19794,7 @@ function applyBlockToPreviewState(block, visualState, variables, sceneId = "") {
           mode: "hide",
           characterState: previousState,
           transition: getSafeTransition(block.transition),
+          durationMs: getSafeTransitionDurationMs(block.transitionDurationMs),
         };
       }
       visualState.speakerName = "角色演出";
@@ -21431,6 +21480,14 @@ function renderMiniStage(scene, blockIndex) {
 
 function renderStage(visualState, large, options = {}) {
   const backdrop = `${getBackdropStyle(visualState.backgroundAssetId, visualState.scene3dPreview)}; ${getDepthBlurBackdropStyle(visualState.depthBlur)}`;
+  const backgroundTransition = visualState.backgroundTransitionEvent;
+  const backgroundTransitionClass =
+    backgroundTransition && getSafeTransition(backgroundTransition.transition) !== "none"
+      ? ` is-transitioning transition-${getSafeTransition(backgroundTransition.transition)}`
+      : "";
+  const backgroundTransitionStyle = backgroundTransition
+    ? `--background-transition-ms:${getSafeTransitionDurationMs(backgroundTransition.durationMs)}ms;`
+    : "";
   const dialogPresentation = buildDialogBoxPresentation(options.dialogTheme, state.data?.project, state.data?.assetsById);
   const particleMarkup = renderParticleEffectLayer(
     visualState.particleEffect,
@@ -21512,7 +21569,11 @@ function renderStage(visualState, large, options = {}) {
   return `
     <div class="stage-scene ${shakePresentation.className}" ${shakePresentation.style ? `style="${shakePresentation.style}"` : ""}>
       <div class="stage-world" ${worldPresentation.style ? `style="${worldPresentation.style}"` : ""}>
-        <div class="stage-backdrop" style="${backdrop}"></div>
+        <div
+          class="stage-backdrop${backgroundTransitionClass}"
+          data-transition="${escapeHtml(getSafeTransition(backgroundTransition?.transition ?? "none"))}"
+          style="${backdrop}; ${backgroundTransitionStyle}"
+        ></div>
         ${particleMarkup}
         <div class="stage-cast stage-cast-world">${castMarkup}</div>
       </div>
@@ -21597,7 +21658,10 @@ function renderStageSpriteCard(
   const expression = (character?.expressions ?? []).find((item) => item.id === characterState.expressionId);
   const expressionBindingStatus = getCharacterExpressionBindingStatus(expression);
   const transition = characterTransitionEvent ? getSafeTransition(characterTransitionEvent.transition) : "none";
-  const stageStyle = getCharacterStageStyle(characterState.stage);
+  const transitionDurationMs = characterTransitionEvent
+    ? getSafeTransitionDurationMs(characterTransitionEvent.durationMs)
+    : getSafeTransitionDurationMs();
+  const stageStyle = `${getCharacterStageStyle(characterState.stage)}--sprite-transition-ms:${transitionDurationMs}ms;`;
 
   if (shouldBlurStageCharacter(characterState.position, depthBlur)) {
     classes.push("is-depth-muted");
@@ -29543,6 +29607,7 @@ function renderDialogueEditor(block) {
     characters: state.data.characters,
     voiceAssets: state.data.assetList.filter((asset) => asset.type === "voice"),
     assetsById: state.data.assetsById,
+    textSpeedLabels: TEXT_SPEED_LABELS,
     getSafeCharacterId,
     getSafeExpressionId,
     renderExpressionOptions,
@@ -29563,6 +29628,9 @@ function renderChoiceEditor(block) {
 function renderNarrationEditor(block) {
   return storyBlockEditorTools.renderNarrationEditor(block, {
     escapeHtml,
+    voiceAssets: state.data.assetList.filter((asset) => asset.type === "voice"),
+    assetsById: state.data.assetsById,
+    textSpeedLabels: TEXT_SPEED_LABELS,
     renderReadableTextQualityTools,
   });
 }
@@ -29580,6 +29648,7 @@ function renderBackgroundEditor(block) {
     escapeHtml,
     backgroundAssets: state.data.assetList.filter((asset) => ["background", "scene3d"].includes(asset.type)),
     getSafeTransition,
+    getSafeTransitionDurationMs,
     getSafeScene3dPreviewConfig,
     renderTransitionOptions,
   });
@@ -29591,6 +29660,7 @@ function renderCharacterShowEditor(block) {
     getSafeExpressionId,
     getSafePosition,
     getSafeTransition,
+    getSafeTransitionDurationMs,
     getCharacterStageFromBlock,
     renderCharacterOptions,
     renderExpressionOptions,
@@ -29604,6 +29674,7 @@ function renderCharacterHideEditor(block) {
   return storyBlockEditorTools.renderCharacterHideEditor(block, {
     getSafeCharacterId,
     getSafeTransition,
+    getSafeTransitionDurationMs,
     renderCharacterOptions,
     renderTransitionOptions,
   });
@@ -35851,6 +35922,7 @@ async function splitSelectedReadableBlock() {
 
     if (index > 0 && nextBlock.type === "dialogue") {
       delete nextBlock.voiceAssetId;
+      delete nextBlock.voiceVolume;
     }
 
     return nextBlock;
@@ -35886,6 +35958,16 @@ function readScreenColorGradeControls() {
 }
 
 function collectEditedBlock(block) {
+  const applyTextSpeedOverride = (nextBlock) => {
+    const rawTextSpeed = document.getElementById("editorTextSpeed")?.value ?? "follow";
+    if (Object.hasOwn(TEXT_SPEED_LABELS, rawTextSpeed)) {
+      nextBlock.textSpeed = getSafeTextSpeed(rawTextSpeed);
+    } else {
+      delete nextBlock.textSpeed;
+    }
+    return nextBlock;
+  };
+
   if (block.type === "dialogue") {
     const speakerId = getSafeCharacterId(document.getElementById("editorSpeakerId")?.value);
     const expressionId = getSafeExpressionId(
@@ -35903,18 +35985,31 @@ function collectEditedBlock(block) {
 
     if (voiceAssetId) {
       nextBlock.voiceAssetId = voiceAssetId;
+      nextBlock.voiceVolume = getSafeVolumePercent(document.getElementById("editorVoiceVolume")?.value, 100);
     } else {
       delete nextBlock.voiceAssetId;
+      delete nextBlock.voiceVolume;
     }
 
-    return nextBlock;
+    return applyTextSpeedOverride(nextBlock);
   }
 
   if (block.type === "narration") {
-    return {
+    const voiceAssetId = document.getElementById("editorNarrationVoiceAssetId")?.value ?? "";
+    const nextBlock = {
       ...block,
       text: document.getElementById("editorNarrationText")?.value ?? "",
     };
+
+    if (voiceAssetId) {
+      nextBlock.voiceAssetId = voiceAssetId;
+      nextBlock.voiceVolume = getSafeVolumePercent(document.getElementById("editorNarrationVoiceVolume")?.value, 100);
+    } else {
+      delete nextBlock.voiceAssetId;
+      delete nextBlock.voiceVolume;
+    }
+
+    return applyTextSpeedOverride(nextBlock);
   }
 
   if (block.type === "choice") {
@@ -35968,6 +36063,9 @@ function collectEditedBlock(block) {
         state.data.assetList.find((asset) => asset.type === "background" || asset.type === "scene3d")?.id ??
         "",
       transition: getSafeTransition(document.getElementById("editorTransition")?.value),
+      transitionDurationMs: getSafeTransitionDurationMs(
+        document.getElementById("editorTransitionDurationMs")?.value
+      ),
       scene3dPreview: getSafeScene3dPreviewConfig({
         yaw: document.getElementById("editorScene3dYaw")?.value,
         pitch: document.getElementById("editorScene3dPitch")?.value,
@@ -35989,6 +36087,9 @@ function collectEditedBlock(block) {
       ),
       position: getSafePosition(document.getElementById("editorCharacterPosition")?.value),
       transition: getSafeTransition(document.getElementById("editorTransition")?.value),
+      transitionDurationMs: getSafeTransitionDurationMs(
+        document.getElementById("editorTransitionDurationMs")?.value
+      ),
       stage: readCharacterStageControls(),
     };
   }
@@ -35998,6 +36099,9 @@ function collectEditedBlock(block) {
       ...block,
       characterId: getSafeCharacterId(document.getElementById("editorCharacterId")?.value),
       transition: getSafeTransition(document.getElementById("editorTransition")?.value),
+      transitionDurationMs: getSafeTransitionDurationMs(
+        document.getElementById("editorTransitionDurationMs")?.value
+      ),
     };
   }
 
@@ -36007,6 +36111,7 @@ function collectEditedBlock(block) {
       ...block,
       assetId: getSafeAssetIdByType("bgm", document.getElementById("editorMusicAssetId")?.value),
       loop: document.getElementById("editorMusicLoop")?.value !== "false",
+      volume: getSafeVolumePercent(document.getElementById("editorMusicVolume")?.value, 100),
       fadeInMs: getSafeNonNegativeNumber(document.getElementById("editorFadeInMs")?.value, 600),
       fadeOutMs: getSafeNonNegativeNumber(document.getElementById("editorMusicRangeFadeOutMs")?.value, 600),
       endMode,
@@ -36025,6 +36130,7 @@ function collectEditedBlock(block) {
     return {
       ...block,
       assetId: getSafeAssetIdByType("sfx", document.getElementById("editorSfxAssetId")?.value),
+      volume: getSafeVolumePercent(document.getElementById("editorSfxVolume")?.value, 100),
     };
   }
 
@@ -37559,6 +37665,7 @@ function createDefaultBlock(scene, blockType) {
       type: "music_play",
       assetId: getSafeAssetIdByType("bgm"),
       loop: true,
+      volume: 100,
       fadeInMs: 600,
       fadeOutMs: 600,
       endMode: "until_next_music",
@@ -37579,6 +37686,7 @@ function createDefaultBlock(scene, blockType) {
       id: blockId,
       type: "sfx_play",
       assetId: getSafeAssetIdByType("sfx"),
+      volume: 100,
     };
   }
 
@@ -39604,6 +39712,7 @@ function readCharacterStageControls() {
     scale: document.getElementById("editorCharacterScale")?.value,
     opacity: document.getElementById("editorCharacterOpacity")?.value,
     layer: document.getElementById("editorCharacterLayer")?.value,
+    flipX: document.getElementById("editorCharacterFlipX")?.checked,
   });
 }
 
@@ -39634,7 +39743,11 @@ function renderCharacterStageControls(stageSource = {}) {
           <input id="editorCharacterLayer" type="number" min="-10" max="10" step="1" value="${stage.layer}" />
         </label>
       </div>
-      <p class="helper-text">用于微调立绘站位：X 左右、Y 上下、缩放大小、透明度和前后层级。默认值不会影响旧项目。</p>
+      <label class="toggle-row compact-toggle">
+        <input id="editorCharacterFlipX" type="checkbox" ${stage.flipX ? "checked" : ""} />
+        <span>水平镜像这张立绘，用同一张素材做左右朝向调度</span>
+      </label>
+      <p class="helper-text">用于微调立绘站位：X 左右、Y 上下、缩放大小、透明度、前后层级和镜像朝向。默认值不会影响旧项目。</p>
     </div>
   `;
 }
@@ -40570,6 +40683,7 @@ function buildBlockDetails(block) {
         state.data.assetsById.get(block.assetId)?.name ?? block.assetId,
       ]);
       rows.push(["转场效果", getTransitionLabel(block.transition)]);
+      rows.push(["转场时长", `${getSafeTransitionDurationMs(block.transitionDurationMs)} ms`]);
       break;
     case "dialogue":
       rows.push([
@@ -40579,14 +40693,38 @@ function buildBlockDetails(block) {
       rows.push(["角色表情", getExpressionName(block.speakerId, block.expressionId)]);
       rows.push(["台词内容", block.text]);
       rows.push([
+        "文字速度",
+        Object.hasOwn(TEXT_SPEED_LABELS, block.textSpeed)
+          ? getTextSpeedLabel(block.textSpeed)
+          : "跟随全局设置",
+      ]);
+      rows.push([
         "绑定语音",
         block.voiceAssetId
           ? state.data.assetsById.get(block.voiceAssetId)?.name ?? block.voiceAssetId
           : "未绑定",
       ]);
+      if (block.voiceAssetId) {
+        rows.push(["语音音量", formatVolumePercent(block.voiceVolume, 100)]);
+      }
       break;
     case "narration":
       rows.push(["旁白内容", block.text]);
+      rows.push([
+        "旁白语音",
+        block.voiceAssetId
+          ? state.data.assetsById.get(block.voiceAssetId)?.name ?? block.voiceAssetId
+          : "未绑定",
+      ]);
+      if (block.voiceAssetId) {
+        rows.push(["语音音量", formatVolumePercent(block.voiceVolume, 100)]);
+      }
+      rows.push([
+        "文字速度",
+        Object.hasOwn(TEXT_SPEED_LABELS, block.textSpeed)
+          ? getTextSpeedLabel(block.textSpeed)
+          : "跟随全局设置",
+      ]);
       break;
     case "character_show":
       rows.push([
@@ -40597,6 +40735,7 @@ function buildBlockDetails(block) {
       rows.push(["显示位置", getPositionLabel(block.position)]);
       rows.push(["舞台微调", getCharacterStageSummary(getCharacterStageFromBlock(block))]);
       rows.push(["转场效果", getTransitionLabel(block.transition)]);
+      rows.push(["转场时长", `${getSafeTransitionDurationMs(block.transitionDurationMs)} ms`]);
       break;
     case "character_hide":
       rows.push([
@@ -40604,6 +40743,7 @@ function buildBlockDetails(block) {
         state.data.charactersById.get(block.characterId)?.displayName ?? block.characterId,
       ]);
       rows.push(["转场效果", getTransitionLabel(block.transition)]);
+      rows.push(["转场时长", `${getSafeTransitionDurationMs(block.transitionDurationMs)} ms`]);
       break;
     case "music_play":
       rows.push([
@@ -40611,6 +40751,7 @@ function buildBlockDetails(block) {
         state.data.assetsById.get(block.assetId)?.name ?? block.assetId,
       ]);
       rows.push(["循环播放", block.loop ? "是" : "否"]);
+      rows.push(["本段音量", formatVolumePercent(block.volume, 100)]);
       rows.push(["播放范围", getMusicEndModeLabel(block.endMode)]);
       if (getSafeMusicEndMode(block.endMode) === "after_block") {
         rows.push(["结束卡片", block.endBlockId || "未选择"]);
@@ -40626,6 +40767,7 @@ function buildBlockDetails(block) {
         "音效素材",
         state.data.assetsById.get(block.assetId)?.name ?? block.assetId,
       ]);
+      rows.push(["本次音量", formatVolumePercent(block.volume, 100)]);
       break;
     case "video_play":
       rows.push([
@@ -40739,12 +40881,16 @@ function buildBlockDetails(block) {
   return rows;
 }
 
+function getTransitionDurationSummary(block = {}) {
+  return `${getTransitionLabel(block.transition)} · ${getSafeTransitionDurationMs(block.transitionDurationMs)} ms`;
+}
+
 function getBlockSummary(block, scene) {
   switch (block.type) {
     case "background":
       return {
         title: state.data.assetsById.get(block.assetId)?.name ?? block.assetId,
-        meta: `切到新背景，场景「${scene.name}」的画面会变`,
+        meta: `切到新背景，${getTransitionDurationSummary(block)}`,
       };
     case "dialogue":
       return {
@@ -40756,7 +40902,7 @@ function getBlockSummary(block, scene) {
     case "narration":
       return {
         title: block.text,
-        meta: "这是旁白卡片，不会显示角色名",
+        meta: block.voiceAssetId ? "这段旁白已绑定语音" : "这是旁白卡片，不会显示角色名",
       };
     case "character_show":
       return {
@@ -40765,12 +40911,12 @@ function getBlockSummary(block, scene) {
         } / ${getExpressionName(block.characterId, block.expressionId)} / ${getPositionLabel(
           block.position
         )}`,
-        meta: "角色会出现在画面里",
+        meta: `角色会出现在画面里，${getTransitionDurationSummary(block)}`,
       };
     case "character_hide":
       return {
         title: `${state.data.charactersById.get(block.characterId)?.displayName ?? block.characterId} 离场`,
-        meta: "角色会从画面里消失",
+        meta: `角色会从画面里消失，${getTransitionDurationSummary(block)}`,
       };
     case "music_play":
       return {
@@ -40927,8 +41073,10 @@ function computeVisualState(scene, blockIndex) {
   const visual = {
     backgroundAssetId: null,
     backgroundName: "未设置背景",
+    backgroundTransitionEvent: null,
     musicName: "未播放",
     musicAssetId: null,
+    musicVolume: 100,
     musicScope: null,
     musicFadeOutMs: 0,
     musicPreviousFadeOutMs: 0,
@@ -40957,6 +41105,13 @@ function computeVisualState(scene, blockIndex) {
         const asset = state.data.assetsById.get(block.assetId);
         visual.backgroundAssetId = block.assetId;
         visual.backgroundName = asset?.name ?? block.assetId;
+        visual.backgroundTransitionEvent =
+          getSafeTransition(block.transition) === "none"
+            ? null
+            : {
+                transition: getSafeTransition(block.transition),
+                durationMs: getSafeTransitionDurationMs(block.transitionDurationMs),
+              };
         visual.scene3dPreview =
           asset?.type === "scene3d" ? getSafeScene3dPreviewConfig(block.scene3dPreview) : null;
         break;
@@ -40965,6 +41120,7 @@ function computeVisualState(scene, blockIndex) {
         const asset = state.data.assetsById.get(block.assetId);
         visual.musicAssetId = block.assetId;
         visual.musicName = asset?.name ?? block.assetId;
+        visual.musicVolume = getSafeVolumePercent(block.volume, 100);
         visual.musicScope = getMusicScopeFromBlock(block, scene.id);
         break;
       }
@@ -40972,6 +41128,7 @@ function computeVisualState(scene, blockIndex) {
         visual.musicFadeOutMs = getSafeNonNegativeNumber(block.fadeOutMs, 600);
         visual.musicAssetId = null;
         visual.musicName = "未播放";
+        visual.musicVolume = 100;
         visual.musicScope = null;
         break;
       case "video_play": {
@@ -41118,6 +41275,7 @@ function computeVisualState(scene, blockIndex) {
             mode: "show",
             characterId: block.characterId,
             transition: getSafeTransition(block.transition),
+            durationMs: getSafeTransitionDurationMs(block.transitionDurationMs),
           };
         }
         break;
@@ -41130,6 +41288,7 @@ function computeVisualState(scene, blockIndex) {
             mode: "hide",
             characterState: previousState,
             transition: getSafeTransition(block.transition),
+            durationMs: getSafeTransitionDurationMs(block.transitionDurationMs),
           };
         }
         break;
@@ -41276,7 +41435,7 @@ function buildAssetUsageMap({ chapters, characters, charactersById }) {
             kind: "story",
             sceneId: scene.id,
             blockId: block.id,
-            label: `场景：${scene.name} / 台词语音`,
+            label: `场景：${scene.name} / ${BLOCK_LABELS[block.type] ?? "正文"}语音`,
             meta: `${chapter.name} · 第 ${blockIndex + 1} 张卡片`,
           });
         }
@@ -41905,6 +42064,9 @@ function validateBlock(block, scene, data, pushIssue) {
         break;
       case "narration":
         validateReadableTextLength(block.text, "旁白", location, blockContext, pushIssue);
+        if (block.voiceAssetId) {
+          requireAsset(block.voiceAssetId);
+        }
         break;
       case "character_show":
         requireCharacterExpression(block.characterId, block.expressionId);

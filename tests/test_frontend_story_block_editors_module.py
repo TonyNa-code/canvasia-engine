@@ -242,7 +242,7 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
               }}
             );
             const dialogueMarkup = tools.renderDialogueEditor(
-              {{ id: "block_1", speakerId: "char_a", expressionId: "smile", text: "你好 <世界>" }},
+              {{ id: "block_1", speakerId: "char_a", expressionId: "smile", text: "你好 <世界>", textSpeed: "fast" }},
               {{
                 selectedSceneId: "scene_a",
                 characters: [
@@ -253,6 +253,7 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
                   {{ id: "voice_1", name: "第一句语音" }},
                 ],
                 assetsById: new Map(),
+                textSpeedLabels: {{ slow: "慢一点", normal: "正常", fast: "快一点", instant: "立刻显示" }},
                 getSafeCharacterId: (value) => value || "char_a",
                 getSafeExpressionId: (_characterId, value) => value || "default",
                 renderExpressionOptions: (characterId, expressionId) => `<option value="${{expressionId}}" selected>${{characterId}}:${{expressionId}}</option>`,
@@ -260,7 +261,7 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
               }}
             );
             const boundDialogueMarkup = tools.renderDialogueEditor(
-              {{ id: "block_2", speakerId: "char_a", expressionId: "smile", voiceAssetId: "voice_1", text: "有语音" }},
+              {{ id: "block_2", speakerId: "char_a", expressionId: "smile", voiceAssetId: "voice_1", voiceVolume: 66, text: "有语音" }},
               {{
                 selectedSceneId: "scene_a",
                 characters: [{{ id: "char_a", displayName: "女主" }}],
@@ -292,8 +293,11 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
               }}
             );
             const narrationMarkup = tools.renderNarrationEditor(
-              {{ text: "旁白 <内容>" }},
+              {{ text: "旁白 <内容>", textSpeed: "instant", voiceAssetId: "voice_narration", voiceVolume: 58 }},
               {{
+                voiceAssets: [{{ id: "voice_narration", name: "旁白朗读" }}],
+                assetsById: new Map([["voice_narration", {{ name: "旁白朗读" }}]]),
+                textSpeedLabels: {{ slow: "慢一点", normal: "正常", fast: "快一点", instant: "立刻显示" }},
                 renderReadableTextQualityTools: (text, label) => `<small data-readable>${{label}}:${{text}}</small>`,
               }}
             );
@@ -301,6 +305,7 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
               {{
                 assetId: "scene_3d",
                 transition: "crossfade",
+                transitionDurationMs: 850,
                 scene3dPreview: {{ yaw: 45, pitch: 38, zoom: 1.25, interactionEnabled: false }},
               }},
               {{
@@ -309,17 +314,19 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
                   {{ id: "scene_3d", name: "天台 3D", type: "scene3d" }},
                 ],
                 getSafeTransition: (value) => value || "fade",
+                getSafeTransitionDurationMs: (value) => Number(value ?? 360),
                 getSafeScene3dPreviewConfig: (preview) => preview,
                 renderTransitionOptions: (selected, optionBag) => `<option value="${{selected}}" data-basic="${{Boolean(optionBag?.basic)}}" selected>${{selected}}</option>`,
               }}
             );
             const characterShowMarkup = tools.renderCharacterShowEditor(
-              {{ characterId: "char_a", expressionId: "smile", position: "right", transition: "slide" }},
+              {{ characterId: "char_a", expressionId: "smile", position: "right", transition: "slide", transitionDurationMs: 720 }},
               {{
                 getSafeCharacterId: (value) => value || "char_a",
                 getSafeExpressionId: (_characterId, value) => value || "default",
                 getSafePosition: (value) => value || "center",
                 getSafeTransition: (value) => value || "fade",
+                getSafeTransitionDurationMs: (value) => Number(value ?? 360),
                 getCharacterStageFromBlock: () => ({{ x: 12, scale: 1.2 }}),
                 renderCharacterOptions: (selected) => `<option value="${{selected}}" selected>角色 ${{selected}}</option>`,
                 renderExpressionOptions: (characterId, expressionId) => `<option value="${{expressionId}}" selected>${{characterId}}:${{expressionId}}</option>`,
@@ -329,16 +336,17 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
               }}
             );
             const characterHideMarkup = tools.renderCharacterHideEditor(
-              {{ characterId: "char_a", transition: "fade" }},
+              {{ characterId: "char_a", transition: "fade", transitionDurationMs: 640 }},
               {{
                 getSafeCharacterId: (value) => value || "char_a",
                 getSafeTransition: (value) => value || "fade",
+                getSafeTransitionDurationMs: (value) => Number(value ?? 360),
                 renderCharacterOptions: (selected) => `<option value="${{selected}}" selected>角色 ${{selected}}</option>`,
                 renderTransitionOptions: (selected) => `<option value="${{selected}}" selected>${{selected}}</option>`,
               }}
             );
             const musicMarkup = tools.renderMusicPlayEditor(
-              {{ assetId: "bgm_1", loop: false, endMode: "after_block", endBlockId: "block_9", fadeInMs: 800, fadeOutMs: 1200 }},
+              {{ assetId: "bgm_1", loop: false, volume: 45, endMode: "after_block", endBlockId: "block_9", fadeInMs: 800, fadeOutMs: 1200 }},
               {{
                 musicAssets: [
                   {{ id: "bgm_1", name: "黄昏 BGM" }},
@@ -353,7 +361,7 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
             );
             const musicStopMarkup = tools.renderMusicStopEditor({{ fadeOutMs: 500 }});
             const sfxMarkup = tools.renderSfxPlayEditor(
-              {{ assetId: "sfx_1" }},
+              {{ assetId: "sfx_1", volume: 62 }},
               {{
                 sfxAssets: [{{ id: "sfx_1", name: "门铃" }}],
                 getSafeAssetIdByType: (_type, assetId) => assetId || "sfx_1",
@@ -503,8 +511,12 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
         self.assertIn('data-block-id="block_1"', payload["dialogueMarkup"])
         self.assertIn("你好 &lt;世界&gt;", payload["dialogueMarkup"])
         self.assertIn("女主 &amp; A", payload["dialogueMarkup"])
+        self.assertIn("这句文字速度", payload["dialogueMarkup"])
+        self.assertIn("editorVoiceVolume", payload["dialogueMarkup"])
+        self.assertIn('value="fast" selected', payload["dialogueMarkup"])
         self.assertIn("这句已经绑好语音", payload["boundDialogueMarkup"])
         self.assertIn("第一句语音", payload["boundDialogueMarkup"])
+        self.assertIn('value="66"', payload["boundDialogueMarkup"])
         self.assertIn("编辑这个选项分支", payload["choiceMarkup"])
         self.assertIn('data-choice-count="1"', payload["choiceMarkup"])
         self.assertIn('data-choice-row="0/1"', payload["choiceMarkup"])
@@ -514,6 +526,11 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
         self.assertIn("按钮偏多", payload["choiceCountMarkup"])
         self.assertIn("编辑这段旁白", payload["narrationMarkup"])
         self.assertIn("旁白 &lt;内容&gt;", payload["narrationMarkup"])
+        self.assertIn("editorNarrationVoiceAssetId", payload["narrationMarkup"])
+        self.assertIn("editorNarrationVoiceVolume", payload["narrationMarkup"])
+        self.assertIn("旁白朗读", payload["narrationMarkup"])
+        self.assertIn('value="58"', payload["narrationMarkup"])
+        self.assertIn('value="instant" selected', payload["narrationMarkup"])
         self.assertIn("编辑背景切换", payload["backgroundMarkup"])
         self.assertIn("教室 &lt;黄昏&gt;", payload["backgroundMarkup"])
         self.assertIn("天台 3D · 3D 场景", payload["backgroundMarkup"])
@@ -521,24 +538,32 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
         self.assertIn('data-basic="true"', payload["backgroundMarkup"])
         self.assertIn('id="editorScene3dYaw"', payload["backgroundMarkup"])
         self.assertIn('value="45"', payload["backgroundMarkup"])
+        self.assertIn("转场时长", payload["backgroundMarkup"])
+        self.assertIn('value="850"', payload["backgroundMarkup"])
         self.assertNotIn('id="editorScene3dInteractionEnabled" type="checkbox" checked', payload["backgroundMarkup"])
         self.assertIn("编辑角色出场", payload["characterShowMarkup"])
         self.assertIn('id="editorCharacterId"', payload["characterShowMarkup"])
         self.assertIn('id="editorExpressionId"', payload["characterShowMarkup"])
         self.assertIn('id="editorCharacterPosition"', payload["characterShowMarkup"])
+        self.assertIn('value="720"', payload["characterShowMarkup"])
         self.assertIn('data-stage-x="12"', payload["characterShowMarkup"])
         self.assertIn("编辑角色退场", payload["characterHideMarkup"])
         self.assertIn("隐藏哪个角色", payload["characterHideMarkup"])
         self.assertIn('value="fade" selected', payload["characterHideMarkup"])
+        self.assertIn('value="640"', payload["characterHideMarkup"])
         self.assertIn("编辑背景音乐", payload["musicMarkup"])
         self.assertIn('value="bgm_1" selected', payload["musicMarkup"])
         self.assertIn("editorMusicEndMode", payload["musicMarkup"])
         self.assertIn("editorMusicEndBlockId", payload["musicMarkup"])
+        self.assertIn("editorMusicVolume", payload["musicMarkup"])
+        self.assertIn('value="45"', payload["musicMarkup"])
         self.assertIn('value="1200"', payload["musicMarkup"])
         self.assertIn("编辑停止音乐", payload["musicStopMarkup"])
         self.assertIn('value="500"', payload["musicStopMarkup"])
         self.assertIn("编辑音效播放", payload["sfxMarkup"])
         self.assertIn("门铃", payload["sfxMarkup"])
+        self.assertIn("editorSfxVolume", payload["sfxMarkup"])
+        self.assertIn('value="62"', payload["sfxMarkup"])
         self.assertIn("编辑视频播放", payload["videoMarkup"])
         self.assertIn("OP &lt;Movie&gt;", payload["videoMarkup"])
         self.assertIn('value="cover" selected', payload["videoMarkup"])
