@@ -1214,6 +1214,7 @@ class FrontendActionHandlerTests(unittest.TestCase):
         runtime_apply_block = _extract_function_source(player_source, "applyBlockToPreviewState")
         runtime_stage_visual = _extract_function_source(player_source, "renderStageVisual")
         runtime_sprite = _extract_function_source(player_source, "renderSpriteCard")
+        native_source = NATIVE_RUNTIME_PATH.read_text(encoding="utf-8")
 
         self.assertIn("editorTransitionDurationMs", story_editor_source)
         self.assertIn("getSafeTransitionDurationMs", story_editor_source)
@@ -1232,6 +1233,12 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("player-background-fade-in var(--background-transition-ms", player_css)
         self.assertIn("var(--sprite-transition-ms", editor_css)
         self.assertIn("var(--sprite-transition-ms", player_css)
+        self.assertIn("def get_safe_transition_duration_ms", native_source)
+        self.assertIn("self.start_background_transition(previous_background_asset_id, block)", native_source)
+        self.assertIn('"transition": self.get_character_transition_state(block, "in")', native_source)
+        self.assertIn('transition = self.get_character_transition_state(block, "out")', native_source)
+        self.assertIn("self.background_transition", native_source)
+        self.assertIn("self.leaving_characters", native_source)
 
     def test_line_text_speed_override_reaches_preview_export_and_native_runtime(self) -> None:
         app_source = APP_PATH.read_text(encoding="utf-8")
@@ -1239,12 +1246,16 @@ class FrontendActionHandlerTests(unittest.TestCase):
         preview_speed = _extract_function_source(app_source, "getPreviewSnapshotTextSpeed")
         preview_typewriter = _extract_function_source(app_source, "shouldUsePreviewTypewriter")
         preview_delay = _extract_function_source(app_source, "getPreviewAutoAdvanceDelay")
+        preview_schedule_typewriter = _extract_function_source(app_source, "schedulePreviewTypewriterTick")
         self.assertIn("editorTextSpeed", collect_edited_block)
         self.assertIn("nextBlock.textSpeed = getSafeTextSpeed(rawTextSpeed);", collect_edited_block)
         self.assertIn("delete nextBlock.textSpeed;", collect_edited_block)
         self.assertIn("snapshot?.block?.textSpeed ?? state.previewPlayback.textSpeed", preview_speed)
         self.assertIn('getPreviewSnapshotTextSpeed(snapshot) === "instant"', preview_typewriter)
         self.assertIn("getPreviewSnapshotTextSpeed(snapshot)", preview_delay)
+        self.assertIn("function getTypewriterPunctuationPause", app_source)
+        self.assertIn("getTypewriterPunctuationPause(visibleText)", app_source)
+        self.assertIn("state.previewTyping.visibleText", preview_schedule_typewriter)
 
         story_editor_source = (EDITOR_DIR / "modules" / "story_block_editors.js").read_text(encoding="utf-8")
         self.assertIn("renderTextSpeedOverrideRow", story_editor_source)
@@ -1255,15 +1266,109 @@ class FrontendActionHandlerTests(unittest.TestCase):
         runtime_speed = _extract_function_source(player_source, "getSnapshotTextSpeed")
         runtime_typewriter = _extract_function_source(player_source, "shouldUseRuntimeTypewriter")
         runtime_delay = _extract_function_source(player_source, "getAutoAdvanceDelay")
+        runtime_schedule_typewriter = _extract_function_source(player_source, "scheduleRuntimeTypewriterTick")
         self.assertIn("snapshot?.block?.textSpeed ?? state.playback.textSpeed", runtime_speed)
         self.assertIn('getSnapshotTextSpeed(snapshot) === "instant"', runtime_typewriter)
         self.assertIn("getSnapshotTextSpeed(snapshot)", runtime_delay)
+        self.assertIn("function getTypewriterPunctuationPause", player_source)
+        self.assertIn("getTypewriterPunctuationPause(visibleText)", player_source)
+        self.assertIn("state.typingVisibleText", runtime_schedule_typewriter)
 
         native_source = NATIVE_RUNTIME_PATH.read_text(encoding="utf-8")
         self.assertIn("def get_safe_text_speed", native_source)
+        self.assertIn("def get_next_typewriter_index", native_source)
+        self.assertIn("def get_typewriter_punctuation_pause_ms", native_source)
         self.assertIn("def get_current_line_text_speed", native_source)
         self.assertIn('"textSpeed": block.get("textSpeed")', native_source)
         self.assertIn("self.get_current_line_text_speed() == \"instant\"", native_source)
+        self.assertIn("self.current_line_next_reveal_at_ms", native_source)
+
+    def test_typewriter_index_helpers_keep_unicode_characters_intact(self) -> None:
+        for path in (APP_PATH, PLAYER_PATH):
+            source = path.read_text(encoding="utf-8")
+            script = "\n".join(
+                [
+                    "const typewriterGraphemeSegmenter = null;",
+                    f"function getNextUnicodeScalarIndex(text, index) {_extract_function_source(source, 'getNextUnicodeScalarIndex')}",
+                    f"function getTypewriterCodePointAtIndex(text, index) {_extract_function_source(source, 'getTypewriterCodePointAtIndex')}",
+                    f"function isRegionalIndicatorSymbol(text, index) {_extract_function_source(source, 'isRegionalIndicatorSymbol')}",
+                    f"function isTypewriterGraphemeExtension(text, index) {_extract_function_source(source, 'isTypewriterGraphemeExtension')}",
+                    f"function getNextTypewriterClusterIndex(text, index) {_extract_function_source(source, 'getNextTypewriterClusterIndex')}",
+                    f"function getNextCodePointIndex(text, index) {_extract_function_source(source, 'getNextCodePointIndex')}",
+                    f"function getCodePointAtIndex(text, index) {_extract_function_source(source, 'getCodePointAtIndex')}",
+                    f"function getNextTypewriterIndex(text, currentIndex) {_extract_function_source(source, 'getNextTypewriterIndex')}",
+                    "const TEXT_SPEED_LABELS = { slow: '慢速', normal: '标准', fast: '快速', instant: '立刻显示' };",
+                    "const TYPEWRITER_TRAILING_CLOSERS = '”’\"\\')）]}】〕〉》」』';",
+                    "function getSafeTextSpeed(speed) { return Object.hasOwn(TEXT_SPEED_LABELS, speed) ? speed : 'normal'; }",
+                    f"function getTypewriterPauseAnchorText(text) {_extract_function_source(source, 'getTypewriterPauseAnchorText')}",
+                    f"function getTypewriterPauseAnchorChar(text) {_extract_function_source(source, 'getTypewriterPauseAnchorChar')}",
+                    f"function getTypewriterPunctuationPause(text) {_extract_function_source(source, 'getTypewriterPunctuationPause')}",
+                    f"function getTypewriterStepDelay(speed, visibleText = '') {_extract_function_source(source, 'getTypewriterStepDelay')}",
+                    """
+                    const emojiText = "A💙B";
+                    if (getNextTypewriterIndex(emojiText, 1) !== 3) {
+                      throw new Error("emoji step split a surrogate pair");
+                    }
+                    if (getNextTypewriterIndex(emojiText, 2) !== 3) {
+                      throw new Error("emoji recovery from a partial surrogate pair regressed");
+                    }
+                    if (emojiText.slice(0, getNextTypewriterIndex(emojiText, 1)) !== "A💙") {
+                      throw new Error("emoji reveal text is not intact");
+                    }
+                    const familyText = "A👨‍👩‍👧‍👦B";
+                    if (getNextTypewriterIndex(familyText, 1) !== familyText.indexOf("B")) {
+                      throw new Error("grapheme cluster emoji was split during reveal");
+                    }
+                    const flagText = "A🇯🇵B";
+                    if (getNextTypewriterIndex(flagText, 1) !== flagText.indexOf("B")) {
+                      throw new Error("flag emoji was split during reveal");
+                    }
+                    const skinToneText = "A👍🏽B";
+                    if (getNextTypewriterIndex(skinToneText, 1) !== skinToneText.indexOf("B")) {
+                      throw new Error("emoji modifier was split during fallback reveal");
+                    }
+                    const accentedText = "e\\u0301!";
+                    if (getNextTypewriterIndex(accentedText, 0) !== accentedText.indexOf("!")) {
+                      throw new Error("combining accent was split during fallback reveal");
+                    }
+                    if (getNextTypewriterIndex("abc def", 0) !== 4) {
+                      throw new Error("latin grouping or whitespace folding regressed");
+                    }
+                    if (getTypewriterStepDelay("instant", "世界！") !== 0) {
+                      throw new Error("instant typewriter speed should not inherit punctuation pauses");
+                    }
+                    if (getTypewriterStepDelay("normal", "世界！") <= getTypewriterStepDelay("normal", "世界")) {
+                      throw new Error("punctuation pause no longer extends natural reading delay");
+                    }
+                    if (getTypewriterPunctuationPause("“再见。”") !== 260) {
+                      throw new Error("closing quote swallowed the sentence punctuation pause");
+                    }
+                    if (getTypewriterPunctuationPause("嗯，") !== 140) {
+                      throw new Error("clause punctuation pause regressed");
+                    }
+                    if (getTypewriterPunctuationPause("Hello.") !== 260) {
+                      throw new Error("english sentence punctuation pause regressed");
+                    }
+                    if (getTypewriterPunctuationPause("Wait...") !== 220) {
+                      throw new Error("ascii ellipsis pause regressed");
+                    }
+                    if (getTypewriterPunctuationPause('"Wait..."') !== 220) {
+                      throw new Error("quoted ascii ellipsis pause regressed");
+                    }
+                    """,
+                ]
+            )
+            completed = subprocess.run(
+                ["node", "-e", script],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(
+                completed.returncode,
+                0,
+                f"{path.name} typewriter helper regression:\n{completed.stderr}",
+            )
 
     def test_voice_line_volume_reaches_preview_export_and_native_runtime(self) -> None:
         app_source = APP_PATH.read_text(encoding="utf-8")
@@ -1275,9 +1380,11 @@ class FrontendActionHandlerTests(unittest.TestCase):
         narration_editor_template = _extract_function_source(story_editor_source, "renderNarrationEditor")
         render_narration_editor = _extract_function_source(app_source, "renderNarrationEditor")
         collect_edited_block = _extract_function_source(app_source, "collectEditedBlock")
+        preview_voice_asset = _extract_function_source(app_source, "getPreviewVoiceAssetId")
         preview_voice = _extract_function_source(app_source, "syncPreviewVoice")
         preview_voice_volume = _extract_function_source(app_source, "getPreviewVoiceTargetVolume")
         runtime_voice = _extract_function_source(player_source, "syncVoice")
+        runtime_voice_asset = _extract_function_source(player_source, "getVoiceAssetId")
         runtime_voice_volume = _extract_function_source(player_source, "getRuntimeVoiceTargetVolume")
         runtime_audio_update = _extract_function_source(player_source, "updateRuntimeAudioVolumes")
 
@@ -1289,8 +1396,10 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("editorNarrationVoiceAssetId", collect_edited_block)
         self.assertIn("editorNarrationVoiceVolume", collect_edited_block)
         self.assertIn("delete nextBlock.voiceVolume", collect_edited_block)
+        self.assertIn('snapshot.blockType !== "dialogue" && snapshot.blockType !== "narration"', preview_voice_asset)
         self.assertIn("getPreviewVoiceTargetVolume(snapshot)", preview_voice)
         self.assertIn("snapshot?.block?.voiceVolume", preview_voice_volume)
+        self.assertIn('snapshot.blockType !== "dialogue" && snapshot.blockType !== "narration"', runtime_voice_asset)
         self.assertIn("getRuntimeVoiceTargetVolume(snapshot)", runtime_voice)
         self.assertIn("snapshot?.block?.voiceVolume", runtime_voice_volume)
         self.assertIn("state.voiceAudio.volume = getRuntimeVoiceTargetVolume(getCurrentSnapshot())", runtime_audio_update)

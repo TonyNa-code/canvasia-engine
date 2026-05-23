@@ -16,6 +16,7 @@ import subprocess
 import sys
 import tempfile
 import traceback
+import unicodedata
 from contextlib import redirect_stdout
 from datetime import datetime
 from pathlib import Path
@@ -30,6 +31,11 @@ NATIVE_VIDEO_OPTIONAL_REQUIREMENTS_NAME = "requirements-native-runtime-video.txt
 NATIVE_VIDEO_OPTIONAL_REQUIREMENTS_CANDIDATES = (NATIVE_VIDEO_OPTIONAL_REQUIREMENTS_NAME, "requirements-video.txt")
 NATIVE_VIDEO_SYNC_BACKEND_ID = "pyav_audio_video_sync"
 NATIVE_VIDEO_EMBEDDED_BACKEND_ID = "opencv_embedded_playback"
+TRANSITION_DURATION_DEFAULT_MS = 360
+TRANSITION_DURATION_MIN_MS = 0
+TRANSITION_DURATION_MAX_MS = 5000
+NATIVE_BASIC_TRANSITIONS = {"fade", "none"}
+NATIVE_CHARACTER_TRANSITIONS = {"fade", "slide_left", "slide_right", "rise", "pop", "none"}
 FILE_INTEGRITY_REPORT_NAME = "native-runtime-file-integrity.json"
 FILE_INTEGRITY_MARKDOWN_NAME = "native-runtime-file-integrity.md"
 ACCEPTANCE_REPORT_NAME = "native-runtime-release-acceptance.md"
@@ -335,6 +341,10 @@ TEXT_SPEED_LABELS = {
     "fast": "快",
     "instant": "瞬时",
 }
+TYPEWRITER_SENTENCE_PAUSE_MS = 260
+TYPEWRITER_CLAUSE_PAUSE_MS = 140
+TYPEWRITER_ELLIPSIS_PAUSE_MS = 220
+TYPEWRITER_TRAILING_CLOSERS = "”’\"'）)]}】〕〉》」』"
 RUNTIME_LANGUAGE_LABELS = {
     "zh-CN": "简体中文",
     "ja-JP": "日本語",
@@ -6449,6 +6459,52 @@ def get_safe_volume_percent(value, fallback: int = 100) -> int:
     return clamp_int(value, 0, 100, fallback)
 
 
+def get_safe_transition_duration_ms(value, fallback: int = TRANSITION_DURATION_DEFAULT_MS) -> int:
+    safe_fallback = clamp_int(
+        fallback,
+        TRANSITION_DURATION_MIN_MS,
+        TRANSITION_DURATION_MAX_MS,
+        TRANSITION_DURATION_DEFAULT_MS,
+    )
+    return clamp_int(value, TRANSITION_DURATION_MIN_MS, TRANSITION_DURATION_MAX_MS, safe_fallback)
+
+
+def get_safe_basic_transition(value) -> str:
+    safe_value = str(value or "fade").strip()
+    return safe_value if safe_value in NATIVE_BASIC_TRANSITIONS else "fade"
+
+
+def get_safe_character_transition(value) -> str:
+    safe_value = str(value or "fade").strip()
+    return safe_value if safe_value in NATIVE_CHARACTER_TRANSITIONS else "fade"
+
+
+def build_native_transition_state(value, duration_ms, started_at_ms: int, direction: str = "in") -> dict | None:
+    transition = get_safe_character_transition(value)
+    safe_duration_ms = get_safe_transition_duration_ms(duration_ms)
+    if transition == "none" or safe_duration_ms <= 0:
+        return None
+    return {
+        "transition": transition,
+        "durationMs": safe_duration_ms,
+        "startedAtMs": max(0, int(started_at_ms or 0)),
+        "direction": "out" if direction == "out" else "in",
+    }
+
+
+def get_native_transition_progress(state: dict | None, now_ms: int) -> float:
+    if not state:
+        return 1.0
+    duration_ms = max(1, get_safe_transition_duration_ms(state.get("durationMs")))
+    started_at_ms = clamp_int(state.get("startedAtMs"), 0, max(0, int(now_ms or 0)), 0)
+    return clamp((int(now_ms or 0) - started_at_ms) / duration_ms, 0.0, 1.0)
+
+
+def ease_out_cubic(progress: float) -> float:
+    safe_progress = clamp(progress, 0.0, 1.0)
+    return 1.0 - (1.0 - safe_progress) ** 3
+
+
 def get_safe_music_end_mode(value) -> str:
     safe_value = str(value or "").strip()
     if safe_value in {"until_next_music", "scene_end", "after_block"}:
@@ -7074,6 +7130,115 @@ def get_safe_text_speed(value: object, fallback: str = "normal") -> str:
     return text_speed if text_speed in TEXT_SPEED_PRESETS else safe_fallback
 
 
+def is_regional_indicator_symbol(char: str) -> bool:
+    if not char:
+        return False
+    return 0x1F1E6 <= ord(char[0]) <= 0x1F1FF
+
+
+def is_typewriter_grapheme_extension(char: str) -> bool:
+    if not char:
+        return False
+    code_point = ord(char[0])
+    return (
+        unicodedata.category(char[0]) in {"Mn", "Mc", "Me"}
+        or 0xFE00 <= code_point <= 0xFE0F
+        or 0xE0100 <= code_point <= 0xE01EF
+        or 0x1F3FB <= code_point <= 0x1F3FF
+    )
+
+
+def get_next_typewriter_cluster_index(text: str, current_index: int) -> int:
+    safe_text = str(text or "")
+    safe_index = max(0, min(len(safe_text), int(current_index or 0)))
+    if safe_index >= len(safe_text):
+        return len(safe_text)
+
+    next_index = safe_index + 1
+
+    if (
+        is_regional_indicator_symbol(safe_text[safe_index])
+        and next_index < len(safe_text)
+        and is_regional_indicator_symbol(safe_text[next_index])
+    ):
+        return next_index + 1
+
+    while next_index < len(safe_text):
+        current_char = safe_text[next_index]
+        previous_char = safe_text[next_index - 1] if next_index > 0 else ""
+
+        if is_typewriter_grapheme_extension(current_char):
+            next_index += 1
+            continue
+        if previous_char == "\u200d":
+            next_index += 1
+            continue
+        if current_char == "\u200d":
+            next_index = min(len(safe_text), next_index + 2)
+            continue
+        break
+
+    return next_index
+
+
+def get_next_typewriter_index(text: str, current_index: int) -> int:
+    safe_text = str(text or "")
+    safe_index = max(0, min(len(safe_text), int(current_index or 0)))
+    if safe_index >= len(safe_text):
+        return len(safe_text)
+
+    next_index = get_next_typewriter_cluster_index(safe_text, safe_index)
+    current_char = safe_text[safe_index]
+    if re.match(r"[A-Za-z0-9]", current_char):
+        grouped = 1
+        while (
+            next_index < len(safe_text)
+            and grouped < 3
+            and re.match(r"[A-Za-z0-9]", safe_text[next_index])
+        ):
+            next_index = get_next_typewriter_cluster_index(safe_text, next_index)
+            grouped += 1
+
+    while next_index < len(safe_text) and safe_text[next_index].isspace():
+        next_index = get_next_typewriter_cluster_index(safe_text, next_index)
+    return next_index
+
+
+def get_typewriter_punctuation_pause_ms(text: str) -> int:
+    anchor_text = get_typewriter_pause_anchor_text(text)
+    anchor_char = get_typewriter_pause_anchor_char(text)
+    if re.search(r"(?:\.{3,}|…+)$", anchor_text):
+        return TYPEWRITER_ELLIPSIS_PAUSE_MS
+    if anchor_char in "。！？!?.":
+        return TYPEWRITER_SENTENCE_PAUSE_MS
+    if anchor_char in "…—-":
+        return TYPEWRITER_ELLIPSIS_PAUSE_MS
+    if anchor_char in "，、；;：:,":
+        return TYPEWRITER_CLAUSE_PAUSE_MS
+    return 0
+
+
+def get_typewriter_pause_anchor_text(text: str) -> str:
+    chars = list(str(text or "").rstrip())
+    while len(chars) > 1 and chars[-1] in TYPEWRITER_TRAILING_CLOSERS:
+        chars.pop()
+    return "".join(chars)
+
+
+def get_typewriter_pause_anchor_char(text: str) -> str:
+    chars = list(get_typewriter_pause_anchor_text(text))
+    return chars[-1] if chars else ""
+
+
+def get_native_typewriter_step_delay_ms(speed: str, visible_text: str = "") -> int:
+    safe_speed = get_safe_text_speed(speed)
+    chars_per_second = TEXT_SPEED_PRESETS.get(safe_speed, TEXT_SPEED_PRESETS["normal"])
+    if chars_per_second >= TEXT_SPEED_PRESETS["instant"]:
+        return 0
+    base_delay = max(1, int(round(1000 / max(1, chars_per_second))))
+    return base_delay + get_typewriter_punctuation_pause_ms(visible_text)
+
+
 def load_project_runtime_settings(project_id: str) -> dict:
     settings_path = get_project_settings_file_path(project_id)
     if not settings_path.is_file():
@@ -7484,6 +7649,7 @@ class NativeRuntimePlayer:
         self.archive_detail_key: str | None = None
         self.archive_detail_entry: dict | None = None
         self.current_line_started_at_ms = 0
+        self.current_line_next_reveal_at_ms = 0
         self.current_line_full_text = ""
         self.current_line_revealed_chars = 0
         self.runtime_elapsed_seconds = 0.0
@@ -7504,6 +7670,8 @@ class NativeRuntimePlayer:
         self.variable_state = self.build_initial_variable_state()
         self.stage_background_asset_id: str | None = None
         self.visible_characters: dict[str, dict] = {}
+        self.background_transition: dict | None = None
+        self.leaving_characters: dict[str, dict] = {}
         self.current_scene_id = self.project.get("entrySceneId") or self.scene_order[0]
         if self.current_scene_id not in self.scenes_by_id:
             self.current_scene_id = self.scene_order[0]
@@ -8333,6 +8501,7 @@ class NativeRuntimePlayer:
         self.current_line_full_text = str(text or "")
         self.current_line_revealed_chars = 0
         self.current_line_started_at_ms = self.pygame.time.get_ticks()
+        self.current_line_next_reveal_at_ms = self.current_line_started_at_ms
         self.auto_play_deadline_ms = 0
         self.skip_deadline_ms = 0
         if self.get_current_line_text_speed() == "instant":
@@ -8340,6 +8509,7 @@ class NativeRuntimePlayer:
 
     def reveal_current_line_immediately(self) -> None:
         self.current_line_revealed_chars = len(self.current_line_full_text)
+        self.current_line_next_reveal_at_ms = 0
 
     def is_current_line_fully_visible(self) -> bool:
         return self.current_line_revealed_chars >= len(self.current_line_full_text)
@@ -8347,13 +8517,26 @@ class NativeRuntimePlayer:
     def update_current_line_reveal(self) -> None:
         if not self.current_line or self.is_current_line_fully_visible():
             return
-        chars_per_second = TEXT_SPEED_PRESETS.get(
-            self.get_current_line_text_speed(),
-            TEXT_SPEED_PRESETS["normal"],
-        )
-        elapsed_ms = max(0, self.pygame.time.get_ticks() - self.current_line_started_at_ms)
-        revealed = min(len(self.current_line_full_text), int(elapsed_ms / 1000 * chars_per_second))
-        self.current_line_revealed_chars = max(self.current_line_revealed_chars, revealed)
+        speed = self.get_current_line_text_speed()
+        if speed == "instant":
+            self.reveal_current_line_immediately()
+            return
+
+        now_ms = self.pygame.time.get_ticks()
+        if self.current_line_next_reveal_at_ms <= 0:
+            self.current_line_next_reveal_at_ms = now_ms
+
+        while not self.is_current_line_fully_visible() and now_ms >= self.current_line_next_reveal_at_ms:
+            next_index = get_next_typewriter_index(self.current_line_full_text, self.current_line_revealed_chars)
+            if next_index <= self.current_line_revealed_chars:
+                self.reveal_current_line_immediately()
+                return
+            self.current_line_revealed_chars = next_index
+            if self.is_current_line_fully_visible():
+                self.current_line_next_reveal_at_ms = 0
+                return
+            visible_text = self.current_line_full_text[: self.current_line_revealed_chars]
+            self.current_line_next_reveal_at_ms += get_native_typewriter_step_delay_ms(speed, visible_text)
 
     def get_current_line_text_speed(self) -> str:
         return get_safe_text_speed(
@@ -8918,6 +9101,8 @@ class NativeRuntimePlayer:
         self.finished = False
         self.finished_message = ""
         self.stage_background_asset_id = self.get_title_preview_background_asset_id() or None
+        self.background_transition = None
+        self.leaving_characters = {}
         self.status_message = "标题页：选择开始、续玩、读档或设置。"
 
     def start_story_from_title(self) -> None:
@@ -8937,6 +9122,8 @@ class NativeRuntimePlayer:
         self.finished_message = ""
         self.stage_background_asset_id = None
         self.visible_characters = {}
+        self.background_transition = None
+        self.leaving_characters = {}
         self.current_bgm_asset_id = None
         self.current_bgm_volume_percent = 100
         self.current_bgm_scope = None
@@ -9365,6 +9552,18 @@ class NativeRuntimePlayer:
             return self.finished_message or "剧情已经结束。"
         return ""
 
+    def get_snapshot_visible_characters(self, source: dict | None = None) -> dict:
+        characters = source if isinstance(source, dict) else self.visible_characters
+        snapshot_characters = {}
+        for character_id, state in characters.items():
+            if not isinstance(state, dict):
+                continue
+            safe_state = dict(state)
+            safe_state.pop("transition", None)
+            safe_state.pop("__leaving", None)
+            snapshot_characters[character_id] = safe_state
+        return snapshot_characters
+
     def build_save_snapshot(self, kind: str) -> dict:
         return {
             "kind": kind,
@@ -9380,7 +9579,7 @@ class NativeRuntimePlayer:
                 "zoom": round(float(self.scene3d_preview_zoom), 3),
                 "interactionEnabled": bool(self.scene3d_preview_interaction_enabled),
             },
-            "visibleCharacters": dict(self.visible_characters),
+            "visibleCharacters": self.get_snapshot_visible_characters(),
             "currentBgmAssetId": self.current_bgm_asset_id,
             "currentBgmVolume": self.current_bgm_volume_percent,
             "currentBgmScope": dict(self.current_bgm_scope) if isinstance(self.current_bgm_scope, dict) else None,
@@ -9454,7 +9653,9 @@ class NativeRuntimePlayer:
         self.variable_state = self.merge_variable_state(snapshot.get("variableState") or {})
         self.stage_background_asset_id = snapshot.get("stageBackgroundAssetId")
         self.apply_scene3d_preview_config(snapshot.get("scene3dPreview") if isinstance(snapshot.get("scene3dPreview"), dict) else None)
-        self.visible_characters = dict(snapshot.get("visibleCharacters") or {})
+        self.visible_characters = self.get_snapshot_visible_characters(snapshot.get("visibleCharacters") or {})
+        self.background_transition = None
+        self.leaving_characters = {}
         self.current_bgm_asset_id = None
         self.current_bgm_volume_percent = get_safe_volume_percent(snapshot.get("currentBgmVolume"), 100)
         self.current_bgm_scope = snapshot.get("currentBgmScope") if isinstance(snapshot.get("currentBgmScope"), dict) else None
@@ -9567,6 +9768,50 @@ class NativeRuntimePlayer:
             self.depth_blur_effect = None if config.get("action") == "clear" else config
         self.status_message = f"演出已应用：{get_block_label(str(block_type or ''))}"
 
+    def get_runtime_ticks_ms(self) -> int:
+        return int(self.pygame.time.get_ticks())
+
+    def start_background_transition(self, previous_asset_id: str | None, block: dict) -> None:
+        previous_id = str(previous_asset_id or "").strip()
+        next_id = str(self.stage_background_asset_id or "").strip()
+        transition = get_safe_basic_transition(block.get("transition"))
+        duration_ms = get_safe_transition_duration_ms(block.get("transitionDurationMs"))
+        if not previous_id or previous_id == next_id or transition == "none" or duration_ms <= 0:
+            self.background_transition = None
+            return
+        self.background_transition = {
+            "previousAssetId": previous_id,
+            "nextAssetId": next_id,
+            "transition": transition,
+            "durationMs": duration_ms,
+            "startedAtMs": self.get_runtime_ticks_ms(),
+        }
+
+    def get_character_transition_state(self, block: dict, direction: str = "in") -> dict | None:
+        return build_native_transition_state(
+            block.get("transition"),
+            block.get("transitionDurationMs"),
+            self.get_runtime_ticks_ms(),
+            direction,
+        )
+
+    def prune_finished_native_transitions(self) -> None:
+        now_ms = self.get_runtime_ticks_ms()
+        if self.background_transition and get_native_transition_progress(self.background_transition, now_ms) >= 1.0:
+            self.background_transition = None
+
+        for character_id in list(self.leaving_characters):
+            transition = (self.leaving_characters.get(character_id) or {}).get("transition")
+            if get_native_transition_progress(transition, now_ms) >= 1.0:
+                self.leaving_characters.pop(character_id, None)
+
+        for state in self.visible_characters.values():
+            if not isinstance(state, dict):
+                continue
+            transition = state.get("transition")
+            if transition and get_native_transition_progress(transition, now_ms) >= 1.0:
+                state.pop("transition", None)
+
     def set_particle_effect(self, effect: dict | None) -> None:
         config = normalize_native_particle_effect_config(effect)
         if config["action"] == "stop":
@@ -9611,6 +9856,7 @@ class NativeRuntimePlayer:
             effect["remaining"] = remaining
             if remaining <= 0:
                 setattr(self, attr_name, None)
+        self.prune_finished_native_transitions()
 
     def render_particle_shape(self, surface, shape: str, color: tuple[int, int, int], alpha: int, size: int) -> None:
         draw_color = (*color, max(0, min(255, alpha)))
@@ -9736,10 +9982,12 @@ class NativeRuntimePlayer:
             block_type = str(block.get("type") or "").strip()
 
             if block_type == "background":
+                previous_background_asset_id = self.stage_background_asset_id
                 self.stage_background_asset_id = block.get("assetId")
                 background_asset = self.assets_by_id.get(self.stage_background_asset_id) or {}
                 if background_asset.get("type") == "scene3d":
                     self.apply_scene3d_preview_config(block.get("scene3dPreview") if isinstance(block.get("scene3dPreview"), dict) else None)
+                self.start_background_transition(previous_background_asset_id, block)
                 if background_asset.get("type") == "cg":
                     self.unlock_archive_entry("cgUnlocked", self.stage_background_asset_id)
                 elif background_asset.get("type") in {"background", "scene3d"}:
@@ -9755,14 +10003,20 @@ class NativeRuntimePlayer:
                         "expressionId": block.get("expressionId"),
                         "position": block.get("position"),
                         "stage": get_safe_character_stage(block.get("stage")),
+                        "transition": self.get_character_transition_state(block, "in"),
                     }
+                    self.leaving_characters.pop(character_id, None)
                 self.current_block_index += 1
                 continue
 
             if block_type == "character_hide":
                 character_id = block.get("characterId")
                 if character_id:
-                    self.visible_characters.pop(character_id, None)
+                    previous_state = self.visible_characters.pop(character_id, None)
+                    transition = self.get_character_transition_state(block, "out")
+                    if previous_state and transition:
+                        previous_state["transition"] = transition
+                        self.leaving_characters[character_id] = previous_state
                 self.current_block_index += 1
                 continue
 
@@ -9929,6 +10183,7 @@ class NativeRuntimePlayer:
             "expressionId": block.get("expressionId") or existing.get("expressionId") or "expr_default",
             "position": existing.get("position") or character.get("defaultPosition") or "center",
             "stage": get_safe_character_stage(existing.get("stage")),
+            "transition": existing.get("transition"),
         }
 
     def play_bgm(
@@ -10915,14 +11170,23 @@ class NativeRuntimePlayer:
         self.render_overlay()
         pygame.display.flip()
 
-    def render_background(self, target=None) -> None:
+    def render_background_asset(self, target, asset_id: str | None, alpha: int = 255) -> None:
         target = target or self.screen
         palette = self.get_active_palette()
-        background_asset = self.assets_by_id.get(str(self.stage_background_asset_id or "")) or {}
+        safe_asset_id = str(asset_id or "").strip()
+        safe_alpha = clamp_int(alpha, 0, 255, 255)
+        render_target = target
+        if safe_alpha < 255:
+            render_target = self.pygame.Surface((self.width, self.height), self.pygame.SRCALPHA)
+
+        background_asset = self.assets_by_id.get(safe_asset_id) or {}
         if background_asset.get("type") == "scene3d":
-            self.render_scene3d_background_preview(target, background_asset)
+            self.render_scene3d_background_preview(render_target, background_asset)
+            if safe_alpha < 255:
+                render_target.set_alpha(safe_alpha)
+                target.blit(render_target, (0, 0))
             return
-        background = self._load_image(self.stage_background_asset_id)
+        background = self._load_image(safe_asset_id)
         if background:
             bg_width, bg_height = background.get_size()
             scale = max(self.width / bg_width, self.height / bg_height)
@@ -10931,16 +11195,35 @@ class NativeRuntimePlayer:
                 (max(1, int(bg_width * scale)), max(1, int(bg_height * scale))),
             )
             rect = scaled.get_rect(center=(self.width // 2, self.height // 2))
-            target.blit(scaled, rect)
+            render_target.blit(scaled, rect)
         else:
             top = self.pygame.Surface((self.width, self.height // 2))
             bottom = self.pygame.Surface((self.width, self.height - self.height // 2))
             top.fill(palette["bgTop"])
             bottom.fill(palette["bgBottom"])
-            target.blit(top, (0, 0))
-            target.blit(bottom, (0, self.height // 2))
-            label = "背景未加载" if self.stage_background_asset_id else "当前场景没有背景"
-            self.blit_text_center(self.font_title, label, self.width // 2, self.height // 2 - 20, palette["muted"], target=target)
+            render_target.blit(top, (0, 0))
+            render_target.blit(bottom, (0, self.height // 2))
+            label = "背景未加载" if safe_asset_id else "当前场景没有背景"
+            self.blit_text_center(self.font_title, label, self.width // 2, self.height // 2 - 20, palette["muted"], target=render_target)
+
+        if safe_alpha < 255 and background_asset.get("type") != "scene3d":
+            render_target.set_alpha(safe_alpha)
+            target.blit(render_target, (0, 0))
+
+    def render_background(self, target=None) -> None:
+        target = target or self.screen
+        self.render_background_asset(target, self.stage_background_asset_id)
+        transition = self.background_transition
+        if not transition:
+            return
+        now_ms = self.get_runtime_ticks_ms()
+        progress = get_native_transition_progress(transition, now_ms)
+        if progress >= 1.0:
+            self.background_transition = None
+            return
+        previous_alpha = int(round(255 * (1.0 - ease_out_cubic(progress))))
+        if previous_alpha > 0:
+            self.render_background_asset(target, transition.get("previousAssetId"), previous_alpha)
 
     def render_character_model_preview_card(self, target, anchor_rect, character: dict, expression_id: str | None) -> None:
         report = self.get_character_model_preview_report(character, expression_id)
@@ -10987,6 +11270,52 @@ class NativeRuntimePlayer:
             target.blit(self.font_ui.render(clipped, True, palette["muted"]), (card_rect.left + 16, y))
             y += 20
 
+    def get_character_render_transition_adjustment(
+        self,
+        state: dict,
+        width: int,
+        height: int,
+        is_leaving: bool,
+    ) -> dict:
+        transition = state.get("transition") if isinstance(state, dict) else None
+        if not transition:
+            return {"opacityMultiplier": 1.0, "offsetX": 0, "offsetY": 0, "scaleMultiplier": 1.0}
+
+        progress = get_native_transition_progress(transition, self.get_runtime_ticks_ms())
+        eased = ease_out_cubic(progress)
+        transition_name = get_safe_character_transition(transition.get("transition"))
+        visible_ratio = 1.0 - eased if is_leaving else eased
+        offset_ratio = eased if is_leaving else (1.0 - eased)
+        offset_x = 0
+        offset_y = 0
+        scale_multiplier = 1.0
+
+        if transition_name == "slide_left":
+            offset_x = -int(width * 0.18 * offset_ratio)
+        elif transition_name == "slide_right":
+            offset_x = int(width * 0.18 * offset_ratio)
+        elif transition_name == "rise":
+            offset_y = int(height * 0.10 * offset_ratio)
+        elif transition_name == "pop":
+            scale_multiplier = (1.0 - 0.06 * eased) if is_leaving else (0.92 + 0.08 * eased)
+
+        return {
+            "opacityMultiplier": clamp(visible_ratio, 0.0, 1.0),
+            "offsetX": offset_x,
+            "offsetY": offset_y,
+            "scaleMultiplier": clamp(scale_multiplier, 0.25, 2.0),
+        }
+
+    def get_renderable_character_items(self) -> list[tuple[str, dict]]:
+        items: list[tuple[str, dict]] = []
+        for character_id, state in self.visible_characters.items():
+            items.append((character_id, dict(state or {})))
+        for character_id, state in self.leaving_characters.items():
+            leaving_state = dict(state or {})
+            leaving_state["__leaving"] = True
+            items.append((character_id, leaving_state))
+        return items
+
     def render_characters(self, target=None) -> None:
         target = target or self.screen
         palette = self.get_active_palette()
@@ -11003,50 +11332,110 @@ class NativeRuntimePlayer:
                 position_x.get(character_state.get("position") or "center", 0),
             )
 
-        for character_id, state in sorted(self.visible_characters.items(), key=character_sort_key):
+        for character_id, state in sorted(self.get_renderable_character_items(), key=character_sort_key):
             stage = get_safe_character_stage(state.get("stage"))
             sprite_asset_id = self.get_character_sprite_asset_id(character_id, state.get("expressionId"))
             sprite = self._load_image(sprite_asset_id)
             x = position_x.get(state.get("position") or "center", self.width // 2) + int(self.width * stage["offsetX"] / 100)
             bottom_y = int(self.height * 0.88) + int(self.height * stage["offsetY"] / 100)
+            is_leaving = bool(state.get("__leaving"))
             if sprite:
                 sprite_width, sprite_height = sprite.get_size()
                 max_height = int(self.height * 0.74)
                 scale = min(max_height / max(sprite_height, 1), 1.6) * (stage["scale"] / 100)
+                transition_adjustment = self.get_character_render_transition_adjustment(
+                    state,
+                    max(1, int(sprite_width * scale)),
+                    max(1, int(sprite_height * scale)),
+                    is_leaving,
+                )
+                scale *= transition_adjustment["scaleMultiplier"]
                 scaled = self.pygame.transform.smoothscale(
                     sprite,
                     (max(1, int(sprite_width * scale)), max(1, int(sprite_height * scale))),
                 )
                 if stage["flipX"]:
                     scaled = self.pygame.transform.flip(scaled, True, False)
-                if stage["opacity"] < 100:
+                effective_opacity = clamp(stage["opacity"] * transition_adjustment["opacityMultiplier"], 0, 100)
+                if effective_opacity < 100:
                     scaled = scaled.copy()
-                    scaled.set_alpha(int(255 * stage["opacity"] / 100))
-                rect = scaled.get_rect(midbottom=(x, bottom_y))
+                    scaled.set_alpha(int(255 * effective_opacity / 100))
+                rect = scaled.get_rect(
+                    midbottom=(
+                        x + int(transition_adjustment["offsetX"]),
+                        bottom_y + int(transition_adjustment["offsetY"]),
+                    )
+                )
                 target.blit(scaled, rect)
                 character = self.characters_by_id.get(character_id) or {}
-                if stage["opacity"] > 15:
+                if effective_opacity > 15 and not is_leaving:
                     self.render_character_model_preview_card(target, rect, character, state.get("expressionId"))
             else:
+                transition_adjustment = self.get_character_render_transition_adjustment(state, 220, 420, is_leaving)
                 placeholder_rect = self.pygame.Rect(0, 0, 220, 420)
-                placeholder_rect.width = max(1, int(placeholder_rect.width * stage["scale"] / 100))
-                placeholder_rect.height = max(1, int(placeholder_rect.height * stage["scale"] / 100))
-                placeholder_rect.midbottom = (x, bottom_y)
+                placeholder_scale = stage["scale"] / 100 * transition_adjustment["scaleMultiplier"]
+                placeholder_rect.width = max(1, int(placeholder_rect.width * placeholder_scale))
+                placeholder_rect.height = max(1, int(placeholder_rect.height * placeholder_scale))
+                placeholder_rect.midbottom = (
+                    x + int(transition_adjustment["offsetX"]),
+                    bottom_y + int(transition_adjustment["offsetY"]),
+                )
+                effective_opacity = clamp(stage["opacity"] * transition_adjustment["opacityMultiplier"], 0, 100)
                 placeholder_surface = self.pygame.Surface(placeholder_rect.size, self.pygame.SRCALPHA)
-                self.pygame.draw.rect(placeholder_surface, with_alpha(palette["placeholder"], stage["opacity"]), placeholder_surface.get_rect(), border_radius=28)
-                self.pygame.draw.rect(placeholder_surface, with_alpha(palette["panelBorder"], stage["opacity"]), placeholder_surface.get_rect(), 2, border_radius=28)
+                self.pygame.draw.rect(
+                    placeholder_surface,
+                    with_alpha(palette["placeholder"], effective_opacity),
+                    placeholder_surface.get_rect(),
+                    border_radius=28,
+                )
+                self.pygame.draw.rect(
+                    placeholder_surface,
+                    with_alpha(palette["panelBorder"], effective_opacity),
+                    placeholder_surface.get_rect(),
+                    2,
+                    border_radius=28,
+                )
                 target.blit(placeholder_surface, placeholder_rect)
                 character = self.characters_by_id.get(character_id) or {}
                 character_name = self.localize_value(character, "displayName", character_id)
                 presentation_label = self.get_character_presentation_mode_label(character)
                 model_asset_label = self.get_character_model_asset_label(character)
                 binding_label = self.get_character_expression_binding_label(character, state.get("expressionId"))
-                if stage["opacity"] > 15:
-                    self.blit_text_center(self.font_body, character_name, placeholder_rect.centerx, placeholder_rect.centery - 16, palette["text"], target=target)
-                    self.blit_text_center(self.font_ui, presentation_label, placeholder_rect.centerx, placeholder_rect.centery + 22, palette["accent"], target=target)
-                    self.blit_text_center(self.font_ui, model_asset_label, placeholder_rect.centerx, placeholder_rect.centery + 52, palette["muted"], target=target)
-                self.blit_text_center(self.font_ui, binding_label[:32], placeholder_rect.centerx, placeholder_rect.centery + 80, palette["muted"], target=target)
-                self.render_character_model_preview_card(target, placeholder_rect, character, state.get("expressionId"))
+                if effective_opacity > 15:
+                    self.blit_text_center(
+                        self.font_body,
+                        character_name,
+                        placeholder_rect.centerx,
+                        placeholder_rect.centery - 16,
+                        palette["text"],
+                        target=target,
+                    )
+                    self.blit_text_center(
+                        self.font_ui,
+                        presentation_label,
+                        placeholder_rect.centerx,
+                        placeholder_rect.centery + 22,
+                        palette["accent"],
+                        target=target,
+                    )
+                    self.blit_text_center(
+                        self.font_ui,
+                        model_asset_label,
+                        placeholder_rect.centerx,
+                        placeholder_rect.centery + 52,
+                        palette["muted"],
+                        target=target,
+                    )
+                    self.blit_text_center(
+                        self.font_ui,
+                        binding_label[:32],
+                        placeholder_rect.centerx,
+                        placeholder_rect.centery + 80,
+                        palette["muted"],
+                        target=target,
+                    )
+                if not is_leaving:
+                    self.render_character_model_preview_card(target, placeholder_rect, character, state.get("expressionId"))
 
     def render_status_bar(self) -> None:
         palette = self.get_active_palette()

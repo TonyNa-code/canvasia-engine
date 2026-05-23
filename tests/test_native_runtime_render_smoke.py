@@ -26,7 +26,10 @@ from native_runtime.runtime_player import (
     build_save_dialog_page_data,
     build_native_video_preview_probe_report,
     ellipsize_text,
+    get_native_typewriter_step_delay_ms,
+    get_next_typewriter_index,
     get_runtime_screenshot_dir,
+    get_typewriter_punctuation_pause_ms,
     load_project_archive_progress,
     load_opencv_video_frame_surface,
     write_project_auto_resume,
@@ -46,6 +49,34 @@ UI_ASSET_IDS = [
     "system_panel_frame",
     "ui_overlay",
 ]
+
+
+class NativeRuntimeTextHelperTests(unittest.TestCase):
+    def test_typewriter_groups_latin_text_and_pauses_after_punctuation(self) -> None:
+        text = "Hello, 世界！"
+        family_text = "A👨‍👩‍👧‍👦B"
+        flag_text = "A🇯🇵B"
+        skin_tone_text = "A👍🏽B"
+        accented_text = "e\u0301!"
+
+        self.assertEqual(get_next_typewriter_index(text, 0), 3)
+        self.assertEqual(get_next_typewriter_index(text, 3), 5)
+        self.assertEqual(get_next_typewriter_index(family_text, 1), family_text.index("B"))
+        self.assertEqual(get_next_typewriter_index(flag_text, 1), flag_text.index("B"))
+        self.assertEqual(get_next_typewriter_index(skin_tone_text, 1), skin_tone_text.index("B"))
+        self.assertEqual(get_next_typewriter_index(accented_text, 0), accented_text.index("!"))
+        self.assertEqual(get_typewriter_punctuation_pause_ms("Hello,"), 140)
+        self.assertEqual(get_typewriter_punctuation_pause_ms("世界！"), 260)
+        self.assertEqual(get_typewriter_punctuation_pause_ms("“再见。”"), 260)
+        self.assertEqual(get_typewriter_punctuation_pause_ms("嗯，"), 140)
+        self.assertEqual(get_typewriter_punctuation_pause_ms("Hello."), 260)
+        self.assertEqual(get_typewriter_punctuation_pause_ms("Wait..."), 220)
+        self.assertEqual(get_typewriter_punctuation_pause_ms('"Wait..."'), 220)
+        self.assertGreater(
+            get_native_typewriter_step_delay_ms("normal", "Hello,"),
+            get_native_typewriter_step_delay_ms("normal", "Hello"),
+        )
+        self.assertEqual(get_native_typewriter_step_delay_ms("instant", "世界！"), 0)
 
 
 @unittest.skipIf(pygame is None, "pygame-ce is not installed")
@@ -831,6 +862,70 @@ class NativeRuntimeRenderSmokeTests(unittest.TestCase):
             player.open_archive_detail(selected_entry)
             player.render()
             self.assert_screen_has_pixels(player)
+
+    def test_native_runtime_applies_background_and_character_transitions(self) -> None:
+        data_path = self.write_game_data()
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="The system font .*", category=UserWarning)
+            player = NativeRuntimePlayer(pygame, data_path)
+
+        player.stage_background_asset_id = "title_logo"
+        player.start_background_transition(
+            "title_background",
+            {"transition": "fade", "transitionDurationMs": 420},
+        )
+        self.assertIsNotNone(player.background_transition)
+        self.assertEqual(player.background_transition["previousAssetId"], "title_background")
+        self.assertEqual(player.background_transition["nextAssetId"], "title_logo")
+        self.assertEqual(player.background_transition["durationMs"], 420)
+        player.render_background()
+        self.assert_screen_has_pixels(player)
+
+        show_transition = player.get_character_transition_state(
+            {"transition": "slide_left", "transitionDurationMs": 420},
+            "in",
+        )
+        self.assertIsNotNone(show_transition)
+        player.visible_characters["heroine"] = {
+            "expressionId": "expr_default",
+            "position": "center",
+            "stage": {"scale": 100, "opacity": 100},
+            "transition": show_transition,
+        }
+        player.render_characters()
+        self.assert_screen_has_pixels(player)
+
+        hide_transition = player.get_character_transition_state(
+            {"transition": "rise", "transitionDurationMs": 420},
+            "out",
+        )
+        self.assertIsNotNone(hide_transition)
+        player.leaving_characters["heroine"] = {
+            "expressionId": "expr_default",
+            "position": "center",
+            "stage": {"scale": 100, "opacity": 100},
+            "transition": hide_transition,
+        }
+        self.assertGreaterEqual(len(player.get_renderable_character_items()), 2)
+        player.render_characters()
+        self.assert_screen_has_pixels(player)
+
+        snapshot_visible = player.get_snapshot_visible_characters()
+        self.assertNotIn("transition", snapshot_visible["heroine"])
+        self.assertNotIn("__leaving", snapshot_visible["heroine"])
+
+        now_ms = player.get_runtime_ticks_ms()
+        player.background_transition["startedAtMs"] = now_ms - 1000
+        player.background_transition["durationMs"] = 1
+        player.leaving_characters["heroine"]["transition"]["startedAtMs"] = now_ms - 1000
+        player.leaving_characters["heroine"]["transition"]["durationMs"] = 1
+        player.visible_characters["heroine"]["transition"]["startedAtMs"] = now_ms - 1000
+        player.visible_characters["heroine"]["transition"]["durationMs"] = 1
+        player.prune_finished_native_transitions()
+
+        self.assertIsNone(player.background_transition)
+        self.assertEqual(player.leaving_characters, {})
+        self.assertNotIn("transition", player.visible_characters["heroine"])
 
     def test_long_dialogue_expands_panel_and_marks_overflow(self) -> None:
         data_path = self.write_game_data()
