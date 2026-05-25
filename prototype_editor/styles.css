@@ -4133,6 +4133,336 @@ button.asset-gap-stat-card:hover {
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
 }
 
+.stage-preset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  margin: 10px 0 12px;
+}
+
+.stage-preset-chip {
+  display: grid;
+  gap: 4px;
+  min-height: 72px;
+  padding: 10px 12px;
+  text-align: left;
+  border-radius: 14px;
+  border: 1px solid rgba(82, 142, 255, 0.2);
+  background:
+    linear-gradient(135deg, rgba(233, 248, 255, 0.96), rgba(247, 251, 255, 0.78)),
+    white;
+  color: var(--text);
+  box-shadow: 0 10px 24px rgba(36, 76, 128, 0.08);
+  cursor: pointer;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.stage-preset-chip:hover,
+.stage-preset-chip:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(82, 142, 255, 0.45);
+  box-shadow: 0 14px 32px rgba(36, 76, 128, 0.14);
+}
+
+.stage-preset-chip.is-active {
+  border-color: rgba(64, 122, 235, 0.62);
+  background:
+    linear-gradient(135deg, rgba(219, 241, 255, 0.98), rgba(238, 246, 255, 0.9)),
+    white;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.74),
+    0 14px 30px rgba(47, 104, 204, 0.16);
+}
+
+.stage-preset-chip strong {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.stage-preset-current {
+  display: none;
+  flex: 0 0 auto;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(71, 129, 235, 0.14);
+  color: rgb(42, 92, 178);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.stage-preset-chip.is-active .stage-preset-current {
+  display: inline-flex;
+}
+
+.stage-preset-chip span {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.stage-control-preview {
+  position: relative;
+  min-height: 168px;
+  margin: 0 0 12px;
+  overflow: hidden;
+  border-radius: 18px;
+  border: 1px solid rgba(83, 144, 255, 0.18);
+  background:
+    linear-gradient(180deg, rgba(11, 22, 40, 0.04), rgba(255, 255, 255, 0.72)),
+    radial-gradient(circle at 50% 20%, rgba(105, 190, 255, 0.2), transparent 42%),
+    linear-gradient(135deg, rgba(240, 249, 255, 0.96), rgba(255, 255, 255, 0.86));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.86);
+}
+
+.stage-control-preview:focus-visible,
+.stage-adjust-panel:focus-visible {
+  outline: 3px solid rgba(73, 132, 245, 0.28);
+  outline-offset: 3px;
+}
+
+.stage-control-preview-grid {
+  position: absolute;
+  inset: 12px;
+  opacity: 0.46;
+  background-image:
+    linear-gradient(rgba(62, 116, 190, 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(62, 116, 190, 0.12) 1px, transparent 1px);
+  background-size: 24px 24px;
+  mask-image: linear-gradient(180deg, transparent, black 18%, black 76%, transparent);
+}
+
+.stage-control-preview-floor {
+  position: absolute;
+  left: 9%;
+  right: 9%;
+  bottom: 32px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(46, 95, 160, 0.34), transparent);
+}
+
+.stage-control-preview-sprite {
+  --sprite-offset-x: 0%;
+  --sprite-offset-y: 0%;
+  --sprite-scale: 1;
+  --sprite-opacity: 1;
+  --sprite-flip-x: 1;
+  position: absolute;
+  left: 50%;
+  bottom: 34px;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  width: 72px;
+  opacity: var(--sprite-opacity);
+  transform:
+    translate(calc(-50% + var(--sprite-offset-x)), var(--sprite-offset-y))
+    scale(var(--sprite-scale));
+  transform-origin: 50% 100%;
+  transition: transform 0.18s ease, opacity 0.18s ease;
+}
+
+.stage-control-preview-sprite[data-position="left"] {
+  left: 27%;
+}
+
+.stage-control-preview-sprite[data-position="center"] {
+  left: 50%;
+}
+
+.stage-control-preview-sprite[data-position="right"] {
+  left: 73%;
+}
+
+.stage-control-preview-sprite::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -10px;
+  width: 74px;
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(28, 70, 130, 0.16);
+  filter: blur(5px);
+  transform: translateX(-50%) scaleX(var(--sprite-scale));
+  z-index: -1;
+}
+
+.stage-control-preview-head,
+.stage-control-preview-body {
+  display: block;
+  transform: scaleX(var(--sprite-flip-x));
+  transform-origin: 50% 100%;
+}
+
+.stage-control-preview-head {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.9), transparent 26%),
+    linear-gradient(135deg, rgba(50, 105, 194, 0.92), rgba(119, 104, 240, 0.9));
+  box-shadow: 0 8px 18px rgba(38, 82, 160, 0.18);
+}
+
+.stage-control-preview-body {
+  width: 54px;
+  height: 74px;
+  border-radius: 24px 24px 12px 12px;
+  background:
+    linear-gradient(135deg, rgba(83, 152, 242, 0.9), rgba(34, 61, 118, 0.92)),
+    rgba(38, 74, 140, 0.88);
+  clip-path: polygon(50% 0, 84% 15%, 96% 100%, 4% 100%, 16% 15%);
+  box-shadow: 0 16px 28px rgba(31, 74, 142, 0.2);
+}
+
+.stage-control-preview-summary {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.74);
+  color: var(--muted);
+  font-size: 11px;
+  backdrop-filter: blur(10px);
+}
+
+.stage-control-preview-summary strong {
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.stage-control-preview-summary span {
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stage-adjust-panel {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 10px;
+  border: 1px solid rgba(83, 144, 255, 0.16);
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, rgba(247, 251, 255, 0.88), rgba(236, 247, 255, 0.58)),
+    rgba(255, 255, 255, 0.72);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82);
+}
+
+.stage-adjust-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.stage-adjust-head strong {
+  color: var(--text);
+  font-size: 12px;
+}
+
+.stage-adjust-head span {
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stage-adjust-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(76px, 1fr));
+  gap: 6px;
+}
+
+.stage-adjust-button {
+  display: grid;
+  gap: 2px;
+  min-height: 48px;
+  padding: 8px 9px;
+  border: 1px solid rgba(71, 126, 220, 0.16);
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(235, 246, 255, 0.82)),
+    rgba(255, 255, 255, 0.88);
+  color: var(--text);
+  text-align: left;
+  box-shadow: 0 8px 18px rgba(35, 74, 126, 0.08);
+  cursor: pointer;
+  transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.stage-adjust-button:hover,
+.stage-adjust-button:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(76, 135, 234, 0.48);
+  box-shadow: 0 12px 24px rgba(35, 74, 126, 0.14);
+}
+
+.stage-adjust-button:active {
+  transform: translateY(0);
+  box-shadow: 0 5px 12px rgba(35, 74, 126, 0.12);
+}
+
+.stage-adjust-button strong {
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.stage-adjust-button span {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.25;
+}
+
+.stage-shortcut-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: -2px 0 12px;
+}
+
+.stage-shortcut-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 8px;
+  border: 1px solid rgba(74, 127, 219, 0.14);
+  border-radius: 999px;
+  background: rgba(246, 251, 255, 0.72);
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1;
+}
+
+.stage-shortcut-chip kbd {
+  min-width: 20px;
+  padding: 2px 5px;
+  border: 1px solid rgba(66, 111, 190, 0.2);
+  border-radius: 6px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(228, 240, 255, 0.84)),
+    white;
+  color: rgb(39, 76, 139);
+  font: 700 10px / 1.15 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  text-align: center;
+  box-shadow: inset 0 -1px 0 rgba(46, 83, 146, 0.08);
+}
+
 .character-stage-controls .compact-toggle {
   display: flex;
   gap: 10px;

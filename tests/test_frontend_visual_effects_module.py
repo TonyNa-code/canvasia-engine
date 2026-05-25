@@ -107,6 +107,20 @@ class FrontendVisualEffectsModuleTests(unittest.TestCase):
                 tools.getSafeCharacterStage({{ offsetX: "90", offsetY: "-90", scale: "15", opacity: "0", layer: "20", flipX: "true" }}),
                 tools.getSafeCharacterStage({{ offsetX: "", offsetY: "12px", scale: "", opacity: "", layer: "", flipX: "off" }}),
                 tools.getSafeCharacterStage(null),
+                tools.getCharacterStagePreset("foreground"),
+                tools.getCharacterStagePreset("missing").id,
+                tools.getCharacterStagePreset("right_focus").position,
+                tools.getCharacterStagePreset("right_focus").stage,
+                tools.getCharacterStagePresetEntries().map((preset) => preset.id),
+                tools.getMatchingCharacterStagePresetId(tools.getCharacterStagePreset("foreground").stage, "center"),
+                tools.getMatchingCharacterStagePresetId(tools.getCharacterStagePreset("right_focus").stage, "right"),
+                tools.getMatchingCharacterStagePresetId(tools.getCharacterStagePreset("right_focus").stage, "left"),
+                tools.applyCharacterStageDelta({{ offsetX: 59, offsetY: -44, scale: 219, layer: 9 }}, {{ offsetX: 8, offsetY: -8, scale: 8, layer: 4 }}),
+                tools.getCharacterStageAdjustment("move_left"),
+                tools.applyCharacterStageAdjustment({{ offsetX: 58, scale: 218, opacity: 5, layer: 9, flipX: false }}, "move_right"),
+                tools.applyCharacterStageAdjustment({{ flipX: false }}, "flip_toggle").flipX,
+                tools.applyCharacterStageAdjustment({{ offsetX: 12 }}, "reset"),
+                tools.getCharacterStageAdjustmentEntries().map((adjustment) => adjustment.id).slice(-2),
                 tools.getCharacterStageStyle({{ offsetX: 12, offsetY: -8, scale: 125, opacity: 70, layer: 3, flipX: true }}),
                 tools.getCharacterStageSummary({{ offsetX: 12, offsetY: -8, scale: 125, opacity: 70, layer: 3, flipX: true }}),
               ],
@@ -126,6 +140,7 @@ class FrontendVisualEffectsModuleTests(unittest.TestCase):
         payload = json.loads(completed.stdout)
         self.assertIn("getScreenFilterCss", payload["keys"])
         self.assertIn("getCreditsLinesText", payload["keys"])
+        self.assertIn("getMatchingCharacterStagePresetId", payload["keys"])
         self.assertEqual(
             payload["labels"],
             [
@@ -184,11 +199,43 @@ class FrontendVisualEffectsModuleTests(unittest.TestCase):
             payload["characterStage"][2],
             {"offsetX": 0, "offsetY": 0, "scale": 100, "opacity": 100, "layer": 0, "flipX": False},
         )
+        self.assertEqual(payload["characterStage"][3]["id"], "foreground")
+        self.assertEqual(payload["characterStage"][3]["stage"]["scale"], 152)
+        self.assertEqual(payload["characterStage"][3]["stage"]["layer"], 5)
+        self.assertEqual(payload["characterStage"][4], "default")
+        self.assertEqual(payload["characterStage"][5], "right")
         self.assertEqual(
-            payload["characterStage"][3],
+            payload["characterStage"][6],
+            {"offsetX": -4, "offsetY": 0, "scale": 106, "opacity": 100, "layer": 0, "flipX": True},
+        )
+        self.assertEqual(
+            payload["characterStage"][7],
+            ["default", "close", "distant", "foreground", "memory", "left_focus", "right_focus"],
+        )
+        self.assertEqual(payload["characterStage"][8], "foreground")
+        self.assertEqual(payload["characterStage"][9], "right_focus")
+        self.assertEqual(payload["characterStage"][10], "")
+        self.assertEqual(
+            payload["characterStage"][11],
+            {"offsetX": 60, "offsetY": -45, "scale": 220, "opacity": 100, "layer": 10, "flipX": False},
+        )
+        self.assertEqual(payload["characterStage"][12]["id"], "move_left")
+        self.assertEqual(payload["characterStage"][12]["delta"], {"offsetX": -4})
+        self.assertEqual(
+            payload["characterStage"][13],
+            {"offsetX": 60, "offsetY": 0, "scale": 218, "opacity": 5, "layer": 9, "flipX": False},
+        )
+        self.assertTrue(payload["characterStage"][14])
+        self.assertEqual(
+            payload["characterStage"][15],
+            {"offsetX": 0, "offsetY": 0, "scale": 100, "opacity": 100, "layer": 0, "flipX": False},
+        )
+        self.assertEqual(payload["characterStage"][16], ["flip_toggle", "reset"])
+        self.assertEqual(
+            payload["characterStage"][17],
             "--sprite-offset-x:12%;--sprite-offset-y:-8%;--sprite-scale:1.250;--sprite-opacity:0.70;--sprite-layer:3;--sprite-flip-x:-1;z-index:23;",
         )
-        self.assertEqual(payload["characterStage"][4], "X 12% / Y -8% / 125% / 透明 70% / 层级 3 / 镜像")
+        self.assertEqual(payload["characterStage"][18], "X 12% / Y -8% / 125% / 透明 70% / 层级 3 / 镜像")
 
 
 if __name__ == "__main__":

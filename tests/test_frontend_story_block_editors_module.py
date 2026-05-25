@@ -332,7 +332,7 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
                 renderExpressionOptions: (characterId, expressionId) => `<option value="${{expressionId}}" selected>${{characterId}}:${{expressionId}}</option>`,
                 renderPositionOptions: (selected) => `<option value="${{selected}}" selected>${{selected}}</option>`,
                 renderTransitionOptions: (selected) => `<option value="${{selected}}" selected>${{selected}}</option>`,
-                renderCharacterStageControls: (stage) => `<section data-stage-x="${{stage.x}}" data-stage-scale="${{stage.scale}}">stage controls</section>`,
+                renderCharacterStageControls: (stage, stageOptions) => `<section data-stage-x="${{stage.x}}" data-stage-scale="${{stage.scale}}" data-stage-position="${{stageOptions.position}}">stage controls</section>`,
               }}
             );
             const characterHideMarkup = tools.renderCharacterHideEditor(
@@ -547,6 +547,7 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
         self.assertIn('id="editorCharacterPosition"', payload["characterShowMarkup"])
         self.assertIn('value="720"', payload["characterShowMarkup"])
         self.assertIn('data-stage-x="12"', payload["characterShowMarkup"])
+        self.assertIn('data-stage-position="right"', payload["characterShowMarkup"])
         self.assertIn("编辑角色退场", payload["characterHideMarkup"])
         self.assertIn("隐藏哪个角色", payload["characterHideMarkup"])
         self.assertIn('value="fade" selected', payload["characterHideMarkup"])

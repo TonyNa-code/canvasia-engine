@@ -729,7 +729,7 @@
         </select>
       </div>
       ${renderTransitionDurationInput(block, options)}
-      ${renderCharacterStageControls(stage)}
+      ${renderCharacterStageControls(stage, { position })}
     </div>
     ${renderSaveBlockActions()}
   `;

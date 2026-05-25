@@ -480,6 +480,12 @@ const getSafeTransition = visualEffectTools.getSafeTransition;
 const getTransitionLabel = visualEffectTools.getTransitionLabel;
 const getSafeTransitionDurationMs = visualEffectTools.getSafeTransitionDurationMs;
 const getSafeCharacterStage = visualEffectTools.getSafeCharacterStage;
+const getCharacterStagePreset = visualEffectTools.getCharacterStagePreset;
+const getCharacterStagePresetEntries = visualEffectTools.getCharacterStagePresetEntries;
+const getMatchingCharacterStagePresetId = visualEffectTools.getMatchingCharacterStagePresetId;
+const getCharacterStageAdjustmentEntries = visualEffectTools.getCharacterStageAdjustmentEntries;
+const applyCharacterStageDelta = visualEffectTools.applyCharacterStageDelta;
+const applyCharacterStageAdjustment = visualEffectTools.applyCharacterStageAdjustment;
 const getCharacterStageStyle = visualEffectTools.getCharacterStageStyle;
 const getCharacterStageSummary = visualEffectTools.getCharacterStageSummary;
 const getSafeTextSpeed = visualEffectTools.getSafeTextSpeed;
@@ -3583,6 +3589,16 @@ async function handleClick(event) {
     return;
   }
 
+  if (action === "apply-character-stage-preset") {
+    applyCharacterStagePresetToEditor(actionTarget.dataset.characterStagePreset);
+    return;
+  }
+
+  if (action === "adjust-character-stage") {
+    adjustCharacterStageInEditor(actionTarget.dataset.characterStageAdjustment);
+    return;
+  }
+
   if (action === "split-readable-block") {
     void splitSelectedReadableBlock();
     return;
@@ -4371,6 +4387,12 @@ function handleChange(event) {
     return;
   }
 
+  if (target.id === "editorCharacterPosition") {
+    updateCharacterStagePreview();
+    scheduleAutoSave();
+    return;
+  }
+
   if (target.id === "editorVariableId") {
     updateVariableSetEditor(target.value);
     scheduleAutoSave();
@@ -4396,6 +4418,12 @@ function handleChange(event) {
 
   if (target.matches('[data-field="condition-variable"]')) {
     updateConditionRuleEditor(target.closest("[data-condition-rule]"), target.value);
+    scheduleAutoSave();
+    return;
+  }
+
+  if (target.closest(".character-stage-controls")) {
+    updateCharacterStagePreview();
     scheduleAutoSave();
     return;
   }
@@ -4578,6 +4606,12 @@ function handleInput(event) {
     return;
   }
 
+  if (event.target.closest(".character-stage-controls")) {
+    updateCharacterStagePreview();
+    scheduleAutoSave();
+    return;
+  }
+
   if (event.target.closest("#storyBlockDetails")) {
     scheduleAutoSave();
   }
@@ -4600,6 +4634,10 @@ function handleGlobalKeydown(event) {
       return;
     }
     event.preventDefault();
+    return;
+  }
+
+  if (handleCharacterStageKeyboardNudge(event)) {
     return;
   }
 
@@ -4711,6 +4749,64 @@ function handleGlobalKeydown(event) {
     event.preventDefault();
     triggerPreviewNext({ showToastMessage: false });
   }
+}
+
+function getCharacterStageKeyboardDelta(event) {
+  const moveStep = event.shiftKey ? 10 : 2;
+  const scaleStep = event.shiftKey ? 12 : 3;
+  const layerStep = event.shiftKey ? 2 : 1;
+
+  if (event.code === "ArrowLeft") {
+    return { offsetX: -moveStep };
+  }
+  if (event.code === "ArrowRight") {
+    return { offsetX: moveStep };
+  }
+  if (event.code === "ArrowUp") {
+    return { offsetY: -moveStep };
+  }
+  if (event.code === "ArrowDown") {
+    return { offsetY: moveStep };
+  }
+  if (event.code === "Equal" || event.code === "NumpadAdd") {
+    return { scale: scaleStep };
+  }
+  if (event.code === "Minus" || event.code === "NumpadSubtract") {
+    return { scale: -scaleStep };
+  }
+  if (event.code === "BracketRight") {
+    return { layer: layerStep };
+  }
+  if (event.code === "BracketLeft") {
+    return { layer: -layerStep };
+  }
+  return null;
+}
+
+function handleCharacterStageKeyboardNudge(event) {
+  if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) {
+    return false;
+  }
+  if (!(event.target instanceof HTMLElement)) {
+    return false;
+  }
+  const controls = event.target.closest(".character-stage-controls");
+  if (!controls || event.target.closest("input, textarea, select")) {
+    return false;
+  }
+
+  const delta = getCharacterStageKeyboardDelta(event);
+  if (!delta) {
+    return false;
+  }
+
+  event.preventDefault();
+  const nextStage = applyCharacterStageDelta(readCharacterStageControls(), delta);
+  setCharacterStageEditorValues(nextStage);
+  updateCharacterStagePreview(nextStage);
+  scheduleAutoSave(180);
+  setSaveStatus(`键盘微调：${getCharacterStagePreviewSummary(nextStage, getCharacterStageEditorPosition())}`);
+  return true;
 }
 
 function getSceneStatusDragCard(target) {
@@ -7775,6 +7871,8 @@ function closeActiveEngineDialog(result = false) {
 function shouldFlushPendingStoryChanges(action) {
   return ![
     "save-block",
+    "apply-character-stage-preset",
+    "adjust-character-stage",
     "add-choice-option",
     "remove-choice-option",
     "move-choice-option-up",
@@ -39932,11 +40030,191 @@ function readCharacterStageControls() {
   });
 }
 
-function renderCharacterStageControls(stageSource = {}) {
+function setCharacterStageEditorValues(stageSource = {}) {
   const stage = getSafeCharacterStage(stageSource);
+  const fieldMap = [
+    ["editorCharacterOffsetX", stage.offsetX],
+    ["editorCharacterOffsetY", stage.offsetY],
+    ["editorCharacterScale", stage.scale],
+    ["editorCharacterOpacity", stage.opacity],
+    ["editorCharacterLayer", stage.layer],
+  ];
+
+  fieldMap.forEach(([fieldId, value]) => {
+    const input = document.getElementById(fieldId);
+    if (input) {
+      input.value = String(value);
+    }
+  });
+
+  const flipInput = document.getElementById("editorCharacterFlipX");
+  if (flipInput) {
+    flipInput.checked = stage.flipX;
+  }
+}
+
+function getCharacterStageEditorPosition() {
+  return getSafePosition(document.getElementById("editorCharacterPosition")?.value);
+}
+
+function setCharacterStageEditorPosition(position) {
+  if (!position) {
+    return getCharacterStageEditorPosition();
+  }
+
+  const safePosition = getSafePosition(position);
+  const positionSelect = document.getElementById("editorCharacterPosition");
+  if (positionSelect) {
+    positionSelect.value = safePosition;
+  }
+  return safePosition;
+}
+
+function applyCharacterStagePresetToEditor(presetId) {
+  const preset = getCharacterStagePreset(presetId);
+  setCharacterStageEditorValues(preset.stage);
+  const position = preset.position
+    ? setCharacterStageEditorPosition(preset.position)
+    : getCharacterStageEditorPosition();
+  updateCharacterStagePreview(preset.stage, position);
+  scheduleAutoSave(300);
+  setSaveStatus(`已套用立绘预设：${preset.label}`);
+  showToast(`立绘预设：${preset.label}`);
+}
+
+function adjustCharacterStageInEditor(adjustmentId) {
+  const nextStage = applyCharacterStageAdjustment(readCharacterStageControls(), adjustmentId);
+  setCharacterStageEditorValues(nextStage);
+  updateCharacterStagePreview(nextStage);
+  scheduleAutoSave(240);
+  setSaveStatus(`立绘微调：${getCharacterStagePreviewSummary(nextStage, getCharacterStageEditorPosition())}`);
+}
+
+function getCharacterStagePreviewSummary(stageSource = {}, positionSource = "center") {
+  return `${getPositionLabel(positionSource)} · ${getCharacterStageSummary(stageSource)}`;
+}
+
+function renderCharacterStageLivePreview(stageSource = {}, positionSource = "center") {
+  const stage = getSafeCharacterStage(stageSource);
+  const position = getSafePosition(positionSource);
+  const summary = getCharacterStagePreviewSummary(stage, position);
+  return `
+    <div class="stage-control-preview" data-character-stage-preview tabindex="0" aria-label="立绘构图实时预览。聚焦后可用方向键微调位置，Shift 加速。">
+      <div class="stage-control-preview-grid" aria-hidden="true"></div>
+      <div class="stage-control-preview-floor" aria-hidden="true"></div>
+      <div class="stage-control-preview-sprite" data-character-stage-preview-sprite data-position="${escapeHtml(position)}" style="${getCharacterStageStyle(stage)}">
+        <span class="stage-control-preview-head"></span>
+        <span class="stage-control-preview-body"></span>
+      </div>
+      <div class="stage-control-preview-summary">
+        <strong>实时构图预览</strong>
+        <span data-character-stage-preview-summary>${escapeHtml(summary)}</span>
+      </div>
+    </div>
+  `;
+}
+
+function updateCharacterStagePresetState(stageSource = readCharacterStageControls(), positionSource = getCharacterStageEditorPosition()) {
+  const activePresetId = getMatchingCharacterStagePresetId(stageSource, positionSource);
+  document.querySelectorAll("[data-character-stage-preset]").forEach((button) => {
+    const isActive = button.getAttribute("data-character-stage-preset") === activePresetId;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-pressed", isActive ? "true" : "false");
+  });
+}
+
+function updateCharacterStagePreview(stageSource = readCharacterStageControls(), positionSource = getCharacterStageEditorPosition()) {
+  const stage = getSafeCharacterStage(stageSource);
+  const position = getSafePosition(positionSource);
+  const previewSprite = document.querySelector("[data-character-stage-preview-sprite]");
+  const previewSummary = document.querySelector("[data-character-stage-preview-summary]");
+
+  if (previewSprite) {
+    previewSprite.dataset.position = position;
+    previewSprite.setAttribute("style", getCharacterStageStyle(stage));
+  }
+  if (previewSummary) {
+    previewSummary.textContent = getCharacterStagePreviewSummary(stage, position);
+  }
+  updateCharacterStagePresetState(stage, position);
+}
+
+function renderCharacterStageControls(stageSource = {}, options = {}) {
+  const stage = getSafeCharacterStage(stageSource);
+  const position = getSafePosition(options.position);
+  const activePresetId = getMatchingCharacterStagePresetId(stage, position);
+  const presetCards = getCharacterStagePresetEntries()
+    .map((preset) => {
+      const summary = preset.position
+        ? `${getPositionLabel(preset.position)} · ${getCharacterStageSummary(preset.stage)}`
+        : getCharacterStageSummary(preset.stage);
+      const isActive = preset.id === activePresetId;
+      return `
+        <button
+          type="button"
+          class="stage-preset-chip ${isActive ? "is-active" : ""}"
+          data-action="apply-character-stage-preset"
+          data-character-stage-preset="${escapeHtml(preset.id)}"
+          aria-pressed="${isActive ? "true" : "false"}"
+          title="${escapeHtml(preset.description)}"
+        >
+          <strong>${escapeHtml(preset.label)}<em class="stage-preset-current">当前</em></strong>
+          <span>${escapeHtml(summary)}</span>
+        </button>
+      `;
+    })
+    .join("");
+  const adjustmentButtons = getCharacterStageAdjustmentEntries()
+    .map(
+      (adjustment) => `
+        <button
+          type="button"
+          class="stage-adjust-button"
+          data-action="adjust-character-stage"
+          data-character-stage-adjustment="${escapeHtml(adjustment.id)}"
+          title="${escapeHtml(adjustment.description)}"
+        >
+          <strong>${escapeHtml(adjustment.label)}</strong>
+          <span>${escapeHtml(adjustment.description)}</span>
+        </button>
+      `
+    )
+    .join("");
+  const shortcutHints = [
+    ["方向键", "移动"],
+    ["Shift", "加速"],
+    ["+ / -", "缩放"],
+    ["[ / ]", "层级"],
+  ]
+    .map(
+      ([key, label]) => `
+        <span class="stage-shortcut-chip">
+          <kbd>${escapeHtml(key)}</kbd>
+          <span>${escapeHtml(label)}</span>
+        </span>
+      `
+    )
+    .join("");
+
   return `
     <div class="detail-row character-stage-controls">
       <label>立绘位置 / 大小 / 层级</label>
+      <div class="stage-preset-grid" aria-label="立绘舞台预设">
+        ${presetCards}
+      </div>
+      ${renderCharacterStageLivePreview(stage, position)}
+      <div class="stage-adjust-panel" tabindex="0" aria-label="立绘微调。方向键移动，加减缩放，中括号调整层级。">
+        <div class="stage-adjust-head">
+          <strong>快速微调</strong>
+          <span>小步移动、缩放、透明度和层级</span>
+        </div>
+        <div class="stage-adjust-grid">
+          ${adjustmentButtons}
+        </div>
+      </div>
+      <div class="stage-shortcut-strip" aria-label="立绘键盘快捷键">
+        ${shortcutHints}
+      </div>
       <div class="field-grid compact-grid">
         <label>
           <span>X 偏移 %</span>
@@ -39963,7 +40241,7 @@ function renderCharacterStageControls(stageSource = {}) {
         <input id="editorCharacterFlipX" type="checkbox" ${stage.flipX ? "checked" : ""} />
         <span>水平镜像这张立绘，用同一张素材做左右朝向调度</span>
       </label>
-      <p class="helper-text">用于微调立绘站位：X 左右、Y 上下、缩放大小、透明度、前后层级和镜像朝向。默认值不会影响旧项目。</p>
+      <p class="helper-text">先点预设快速得到可用构图，再用数字或键盘微调：方向键移动，+ / - 缩放，[ / ] 调层级，按住 Shift 加速。默认值不会影响旧项目。</p>
     </div>
   `;
 }

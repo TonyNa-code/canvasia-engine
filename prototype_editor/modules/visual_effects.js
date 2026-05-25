@@ -171,6 +171,109 @@
     flipX: false,
   });
 
+  const CHARACTER_STAGE_PRESETS = Object.freeze({
+    default: Object.freeze({
+      label: "标准站位",
+      description: "回到默认全身立绘，适合大多数对话段落。",
+      stage: Object.freeze({ ...DEFAULT_CHARACTER_STAGE }),
+    }),
+    close: Object.freeze({
+      label: "近景强调",
+      description: "稍微推近角色，让情绪句或关键回应更有存在感。",
+      stage: Object.freeze({ ...DEFAULT_CHARACTER_STAGE, scale: 124, offsetY: 3, layer: 2 }),
+    }),
+    distant: Object.freeze({
+      label: "远景留白",
+      description: "角色略远，适合开场、环境铺陈或多人站位。",
+      stage: Object.freeze({ ...DEFAULT_CHARACTER_STAGE, scale: 84, offsetY: 8, opacity: 96, layer: -1 }),
+    }),
+    foreground: Object.freeze({
+      label: "前景特写",
+      description: "大幅推近并放到前层，适合告白、冲突或惊讶瞬间。",
+      stage: Object.freeze({ ...DEFAULT_CHARACTER_STAGE, scale: 152, offsetY: -5, layer: 5 }),
+    }),
+    memory: Object.freeze({
+      label: "回忆半透",
+      description: "降低透明度并稍微后置，适合回忆、梦境或插叙演出。",
+      stage: Object.freeze({ ...DEFAULT_CHARACTER_STAGE, scale: 104, opacity: 58, layer: -2 }),
+    }),
+    left_focus: Object.freeze({
+      label: "左侧构图",
+      description: "切到左侧站位，给右侧留出台词、CG 或另一位角色的位置。",
+      position: "left",
+      stage: Object.freeze({ ...DEFAULT_CHARACTER_STAGE, offsetX: 4, scale: 106 }),
+    }),
+    right_focus: Object.freeze({
+      label: "右侧镜像",
+      description: "切到右侧站位并镜像，适合做面对左侧角色的对话构图。",
+      position: "right",
+      stage: Object.freeze({ ...DEFAULT_CHARACTER_STAGE, offsetX: -4, scale: 106, flipX: true }),
+    }),
+  });
+
+  const CHARACTER_STAGE_ADJUSTMENTS = Object.freeze({
+    move_left: Object.freeze({
+      label: "左移",
+      description: "X -4%",
+      delta: Object.freeze({ offsetX: -4 }),
+    }),
+    move_right: Object.freeze({
+      label: "右移",
+      description: "X +4%",
+      delta: Object.freeze({ offsetX: 4 }),
+    }),
+    move_up: Object.freeze({
+      label: "上移",
+      description: "Y -4%",
+      delta: Object.freeze({ offsetY: -4 }),
+    }),
+    move_down: Object.freeze({
+      label: "下移",
+      description: "Y +4%",
+      delta: Object.freeze({ offsetY: 4 }),
+    }),
+    zoom_in: Object.freeze({
+      label: "放大",
+      description: "缩放 +6%",
+      delta: Object.freeze({ scale: 6 }),
+    }),
+    zoom_out: Object.freeze({
+      label: "缩小",
+      description: "缩放 -6%",
+      delta: Object.freeze({ scale: -6 }),
+    }),
+    opacity_up: Object.freeze({
+      label: "加实",
+      description: "透明度 +12%",
+      delta: Object.freeze({ opacity: 12 }),
+    }),
+    opacity_down: Object.freeze({
+      label: "半透",
+      description: "透明度 -12%",
+      delta: Object.freeze({ opacity: -12 }),
+    }),
+    layer_up: Object.freeze({
+      label: "前一层",
+      description: "层级 +1",
+      delta: Object.freeze({ layer: 1 }),
+    }),
+    layer_down: Object.freeze({
+      label: "后一层",
+      description: "层级 -1",
+      delta: Object.freeze({ layer: -1 }),
+    }),
+    flip_toggle: Object.freeze({
+      label: "镜像",
+      description: "切换朝向",
+      toggleFlipX: true,
+    }),
+    reset: Object.freeze({
+      label: "重置",
+      description: "恢复默认",
+      reset: true,
+    }),
+  });
+
   const TEXT_SPEED_LABELS = Object.freeze({
     slow: "慢一点",
     normal: "正常",
@@ -684,6 +787,103 @@
     };
   }
 
+  function getCharacterStagePreset(presetId) {
+    const safePresetId = hasOwn(CHARACTER_STAGE_PRESETS, presetId) ? presetId : "default";
+    const preset = CHARACTER_STAGE_PRESETS[safePresetId];
+    return {
+      id: safePresetId,
+      label: preset.label,
+      description: preset.description,
+      position: typeof preset.position === "string" ? getSafePosition(preset.position) : "",
+      stage: getSafeCharacterStage(preset.stage),
+    };
+  }
+
+  function getCharacterStagePresetEntries() {
+    return Object.keys(CHARACTER_STAGE_PRESETS).map((presetId) => getCharacterStagePreset(presetId));
+  }
+
+  function isSameCharacterStage(leftSource = {}, rightSource = {}) {
+    const left = getSafeCharacterStage(leftSource);
+    const right = getSafeCharacterStage(rightSource);
+    return (
+      left.offsetX === right.offsetX &&
+      left.offsetY === right.offsetY &&
+      left.scale === right.scale &&
+      left.opacity === right.opacity &&
+      left.layer === right.layer &&
+      left.flipX === right.flipX
+    );
+  }
+
+  function getMatchingCharacterStagePresetId(stageSource = {}, positionSource = "center") {
+    const stage = getSafeCharacterStage(stageSource);
+    const position = getSafePosition(positionSource);
+    const matchedPreset = getCharacterStagePresetEntries().find((preset) => {
+      if (preset.position && preset.position !== position) {
+        return false;
+      }
+      return isSameCharacterStage(stage, preset.stage);
+    });
+
+    return matchedPreset?.id ?? "";
+  }
+
+  function getCharacterStageAdjustment(adjustmentId) {
+    const safeAdjustmentId = hasOwn(CHARACTER_STAGE_ADJUSTMENTS, adjustmentId) ? adjustmentId : "reset";
+    const adjustment = CHARACTER_STAGE_ADJUSTMENTS[safeAdjustmentId];
+    return {
+      id: safeAdjustmentId,
+      label: adjustment.label,
+      description: adjustment.description,
+      delta: adjustment.delta ? { ...adjustment.delta } : {},
+      toggleFlipX: Boolean(adjustment.toggleFlipX),
+      reset: Boolean(adjustment.reset),
+    };
+  }
+
+  function getCharacterStageAdjustmentEntries() {
+    return Object.keys(CHARACTER_STAGE_ADJUSTMENTS).map((adjustmentId) =>
+      getCharacterStageAdjustment(adjustmentId)
+    );
+  }
+
+  function getStageDeltaNumber(value) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : 0;
+  }
+
+  function applyCharacterStageDelta(stageSource = {}, deltaSource = {}) {
+    const stage = getSafeCharacterStage(stageSource);
+    const delta = deltaSource && typeof deltaSource === "object" ? deltaSource : {};
+    return getSafeCharacterStage({
+      ...stage,
+      offsetX: stage.offsetX + getStageDeltaNumber(delta.offsetX),
+      offsetY: stage.offsetY + getStageDeltaNumber(delta.offsetY),
+      scale: stage.scale + getStageDeltaNumber(delta.scale),
+      opacity: stage.opacity + getStageDeltaNumber(delta.opacity),
+      layer: stage.layer + getStageDeltaNumber(delta.layer),
+    });
+  }
+
+  function applyCharacterStageAdjustment(stageSource = {}, adjustmentId) {
+    const stage = getSafeCharacterStage(stageSource);
+    const adjustment = getCharacterStageAdjustment(adjustmentId);
+
+    if (adjustment.reset) {
+      return getSafeCharacterStage(DEFAULT_CHARACTER_STAGE);
+    }
+
+    if (adjustment.toggleFlipX) {
+      return getSafeCharacterStage({
+        ...stage,
+        flipX: !stage.flipX,
+      });
+    }
+
+    return applyCharacterStageDelta(stage, adjustment.delta);
+  }
+
   function getCharacterStageStyle(stageSource = {}) {
     const stage = getSafeCharacterStage(stageSource);
     return [
@@ -750,6 +950,8 @@
     TRANSITION_DURATION_MIN_MS,
     TRANSITION_DURATION_MAX_MS,
     DEFAULT_CHARACTER_STAGE,
+    CHARACTER_STAGE_PRESETS,
+    CHARACTER_STAGE_ADJUSTMENTS,
     TEXT_SPEED_LABELS,
     DIALOG_THEME_LABELS,
     getSafeShakeIntensity,
@@ -819,6 +1021,13 @@
     getTransitionLabel,
     getSafeTransitionDurationMs,
     getSafeCharacterStage,
+    getCharacterStagePreset,
+    getCharacterStagePresetEntries,
+    getMatchingCharacterStagePresetId,
+    getCharacterStageAdjustment,
+    getCharacterStageAdjustmentEntries,
+    applyCharacterStageDelta,
+    applyCharacterStageAdjustment,
     getCharacterStageStyle,
     getCharacterStageSummary,
     getSafeTextSpeed,
