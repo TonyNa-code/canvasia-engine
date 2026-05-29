@@ -4393,6 +4393,12 @@ function handleChange(event) {
     return;
   }
 
+  if (target.id === "editorMusicEndMode" || target.id === "editorMusicEndBlockId") {
+    updateMusicRangePreviewFromControls();
+    scheduleAutoSave();
+    return;
+  }
+
   if (target.id === "editorVariableId") {
     updateVariableSetEditor(target.value);
     scheduleAutoSave();
@@ -30008,11 +30014,22 @@ function getMusicRangeCandidateBlocks(block = {}) {
   return candidateBlocks;
 }
 
-function getMusicRangeBlockLabel(block, index) {
+function getMusicRangeEffectiveEndBlockId(block = {}) {
+  const candidates = getMusicRangeCandidateBlocks(block);
+  const selectedId = String(block.endBlockId ?? "");
+  if (selectedId && candidates.some((item) => item.id === selectedId)) {
+    return selectedId;
+  }
+  return candidates[0]?.id ?? "";
+}
+
+function getMusicRangeBlockLabel(block, index, sceneBlocks = getSelectedScene()?.blocks ?? []) {
   const label = getBlockLabel(block.type);
   const text = block.text || block.title || block.name || block.assetId || "";
   const suffix = text ? ` · ${truncateText(text, 28)}` : "";
-  return `${index + 1}. ${label}${suffix}`;
+  const sceneIndex = sceneBlocks.findIndex((item) => item.id === block.id);
+  const displayIndex = sceneIndex >= 0 ? sceneIndex + 1 : index + 1;
+  return `第 ${displayIndex} 张 · ${label}${suffix}`;
 }
 
 function renderMusicEndModeOptions(selectedMode) {
@@ -30021,19 +30038,157 @@ function renderMusicEndModeOptions(selectedMode) {
 
 function renderMusicRangeEndBlockOptions(block) {
   const candidates = getMusicRangeCandidateBlocks(block);
+  const sceneBlocks = getSelectedScene()?.blocks ?? [];
   if (!candidates.length) {
     return `<option value="">当前卡片后面还没有可选结束点</option>`;
   }
-  const selectedId = String(block.endBlockId ?? "");
+  const selectedId = getMusicRangeEffectiveEndBlockId(block);
   return candidates
     .map(
       (candidate, index) => `
         <option value="${escapeHtml(candidate.id)}" ${candidate.id === selectedId ? "selected" : ""}>
-          ${escapeHtml(getMusicRangeBlockLabel(candidate, index))}
+          ${escapeHtml(getMusicRangeBlockLabel(candidate, index, sceneBlocks))}
         </option>
       `
     )
     .join("");
+}
+
+function getMusicRangeSummaryFromValues(endMode, endBlockId = "", options = {}) {
+  const safeEndMode = getSafeMusicEndMode(endMode);
+  const scene = getSelectedScene();
+  const sceneBlocks = scene?.blocks ?? [];
+  const currentBlockIndex = sceneBlocks.findIndex((item) => item.id === options.currentBlockId);
+  if (safeEndMode === "scene_end") {
+    if (currentBlockIndex >= 0) {
+      return `这首 BGM 会从第 ${currentBlockIndex + 1} 张开始覆盖当前场景，离开场景时自动结束。`;
+    }
+    return "这首 BGM 会覆盖当前场景，离开场景时自动结束。";
+  }
+  if (safeEndMode === "after_block") {
+    if (options.hasRangeCandidates === false) {
+      return "当前音乐卡后面还没有可选结束点，先在后面新增台词、旁白或演出卡片。";
+    }
+    const targetBlock = sceneBlocks.find((item) => item.id === endBlockId);
+    if (!targetBlock) {
+      return "先选择一张结束卡片，音乐会在玩家看完那张卡片后淡出。";
+    }
+    const blockIndex = sceneBlocks.findIndex((item) => item.id === targetBlock.id);
+    if (currentBlockIndex >= 0 && blockIndex >= currentBlockIndex) {
+      const spanCount = blockIndex - currentBlockIndex + 1;
+      return `这首 BGM 会从第 ${currentBlockIndex + 1} 张播放到第 ${blockIndex + 1} 张「${getBlockLabel(
+        targetBlock.type
+      )}」看完后淡出，共覆盖 ${spanCount} 张卡片。`;
+    }
+    return `这首 BGM 会播放到第 ${blockIndex + 1} 张「${getBlockLabel(targetBlock.type)}」看完后淡出。`;
+  }
+  return "这首 BGM 会一直播放，直到下一张音乐卡或停止音乐卡接管。";
+}
+
+function getMusicRangeTimelineFromValues(endMode, endBlockId = "", options = {}) {
+  const safeEndMode = getSafeMusicEndMode(endMode);
+  const scene = getSelectedScene();
+  const sceneBlocks = scene?.blocks ?? [];
+  const currentBlockIndex = sceneBlocks.findIndex((item) => item.id === options.currentBlockId);
+  const targetBlock = sceneBlocks.find((item) => item.id === endBlockId);
+  const targetBlockIndex = targetBlock ? sceneBlocks.findIndex((item) => item.id === targetBlock.id) : -1;
+  const startLabel = currentBlockIndex >= 0 ? `第 ${currentBlockIndex + 1} 张` : "当前音乐卡";
+
+  if (safeEndMode === "scene_end") {
+    return {
+      startLabel,
+      modeLabel: "覆盖当前场景",
+      endLabel: "场景结束",
+      countLabel: currentBlockIndex >= 0 ? "从这里开始" : "自动覆盖",
+    };
+  }
+
+  if (safeEndMode === "after_block") {
+    if (options.hasRangeCandidates === false) {
+      return {
+        startLabel,
+        modeLabel: "指定结束卡",
+        endLabel: "暂无后续卡",
+        countLabel: "先添加卡片",
+      };
+    }
+    if (!targetBlock) {
+      return {
+        startLabel,
+        modeLabel: "指定结束卡",
+        endLabel: "未选择",
+        countLabel: "等待选择",
+      };
+    }
+    const spanCount =
+      currentBlockIndex >= 0 && targetBlockIndex >= currentBlockIndex ? targetBlockIndex - currentBlockIndex + 1 : 1;
+    return {
+      startLabel,
+      modeLabel: "指定结束卡",
+      endLabel: targetBlockIndex >= 0 ? `第 ${targetBlockIndex + 1} 张` : "已选卡片",
+      countLabel: `覆盖 ${spanCount} 张`,
+    };
+  }
+
+  return {
+    startLabel,
+    modeLabel: "持续到接管",
+    endLabel: "下一张音乐/停止卡",
+    countLabel: "自动接管",
+  };
+}
+
+function getMusicRangeSummary(block = {}) {
+  return getMusicRangeSummaryFromValues(block.endMode, getMusicRangeEffectiveEndBlockId(block), {
+    hasRangeCandidates: getMusicRangeCandidateBlocks(block).length > 0,
+    currentBlockId: block.id,
+  });
+}
+
+function getMusicRangeTimeline(block = {}) {
+  return getMusicRangeTimelineFromValues(block.endMode, getMusicRangeEffectiveEndBlockId(block), {
+    hasRangeCandidates: getMusicRangeCandidateBlocks(block).length > 0,
+    currentBlockId: block.id,
+  });
+}
+
+function updateMusicRangePreviewFromControls() {
+  const modeSelect = document.getElementById("editorMusicEndMode");
+  const endBlockSelect = document.getElementById("editorMusicEndBlockId");
+  const previewText = document.querySelector("[data-music-range-preview] span");
+  const timelineStart = document.querySelector("[data-music-range-start]");
+  const timelineMode = document.querySelector("[data-music-range-mode]");
+  const timelineEnd = document.querySelector("[data-music-range-end]");
+  const timelineCount = document.querySelector("[data-music-range-count]");
+  if (!modeSelect || !endBlockSelect || !previewText) {
+    return;
+  }
+
+  const endMode = getSafeMusicEndMode(modeSelect.value);
+  const hasRangeCandidates = endBlockSelect.dataset.hasRangeCandidates === "true";
+  const selectedEndBlockId =
+    endBlockSelect.value || (hasRangeCandidates ? endBlockSelect.querySelector("option[value]")?.value ?? "" : "");
+  endBlockSelect.disabled = endMode !== "after_block" || !hasRangeCandidates;
+  previewText.textContent = getMusicRangeSummaryFromValues(endMode, selectedEndBlockId, {
+    hasRangeCandidates,
+    currentBlockId: state.selectedBlockId,
+  });
+  const timeline = getMusicRangeTimelineFromValues(endMode, selectedEndBlockId, {
+    hasRangeCandidates,
+    currentBlockId: state.selectedBlockId,
+  });
+  if (timelineStart) {
+    timelineStart.textContent = timeline.startLabel;
+  }
+  if (timelineMode) {
+    timelineMode.textContent = timeline.modeLabel;
+  }
+  if (timelineEnd) {
+    timelineEnd.textContent = timeline.endLabel;
+  }
+  if (timelineCount) {
+    timelineCount.textContent = timeline.countLabel;
+  }
 }
 
 function renderMusicPlayEditor(block) {
@@ -30043,6 +30198,8 @@ function renderMusicPlayEditor(block) {
     hasRangeCandidates: getMusicRangeCandidateBlocks(block).length > 0,
     getSafeAssetIdByType,
     getSafeMusicEndMode,
+    getMusicRangeSummary,
+    getMusicRangeTimeline,
     renderMusicEndModeOptions,
     renderMusicRangeEndBlockOptions,
   });

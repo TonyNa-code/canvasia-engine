@@ -355,6 +355,13 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
                 hasRangeCandidates: true,
                 getSafeAssetIdByType: (_type, assetId) => assetId || "bgm_1",
                 getSafeMusicEndMode: (mode) => mode || "until_next_music",
+                getMusicRangeSummary: (block) => `范围到：${{block.endBlockId}}`,
+                getMusicRangeTimeline: () => ({{
+                  startLabel: "第 2 张",
+                  modeLabel: "指定结束卡",
+                  endLabel: "第 9 张",
+                  countLabel: "覆盖 8 张",
+                }}),
                 renderMusicEndModeOptions: (selected) => `<option value="${{selected}}" selected>${{selected}}</option>`,
                 renderMusicRangeEndBlockOptions: (block) => `<option value="${{block.endBlockId}}" selected>结束卡片</option>`,
               }}
@@ -556,6 +563,14 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
         self.assertIn('value="bgm_1" selected', payload["musicMarkup"])
         self.assertIn("editorMusicEndMode", payload["musicMarkup"])
         self.assertIn("editorMusicEndBlockId", payload["musicMarkup"])
+        self.assertIn('data-has-range-candidates="true"', payload["musicMarkup"])
+        self.assertIn("music-range-preview", payload["musicMarkup"])
+        self.assertIn("当前覆盖范围", payload["musicMarkup"])
+        self.assertIn("music-range-timeline", payload["musicMarkup"])
+        self.assertIn("data-music-range-start", payload["musicMarkup"])
+        self.assertIn("第 2 张", payload["musicMarkup"])
+        self.assertIn("覆盖 8 张", payload["musicMarkup"])
+        self.assertIn("范围到：block_9", payload["musicMarkup"])
         self.assertIn("editorMusicVolume", payload["musicMarkup"])
         self.assertIn('value="45"', payload["musicMarkup"])
         self.assertIn('value="1200"', payload["musicMarkup"])

@@ -771,11 +771,24 @@
     const escape = getEscapeHtml(options);
     const getSafeAssetIdByType = getRenderer(options, "getSafeAssetIdByType", (_type, assetId) => assetId ?? "");
     const getSafeMusicEndMode = getRenderer(options, "getSafeMusicEndMode", (mode) => mode ?? "until_next_music");
+    const getMusicRangeSummary = getRenderer(
+      options,
+      "getMusicRangeSummary",
+      () => "这首 BGM 会按播放范围设置自动覆盖剧情。"
+    );
+    const getMusicRangeTimeline = getRenderer(options, "getMusicRangeTimeline", () => ({
+      startLabel: "当前音乐卡",
+      modeLabel: "自动范围",
+      endLabel: "后续剧情",
+      countLabel: "按设置覆盖",
+    }));
     const renderMusicEndModeOptions = getRenderer(options, "renderMusicEndModeOptions");
     const renderMusicRangeEndBlockOptions = getRenderer(options, "renderMusicRangeEndBlockOptions");
     const assetId = getSafeAssetIdByType("bgm", block?.assetId);
     const endMode = getSafeMusicEndMode(block?.endMode);
     const hasRangeCandidates = Boolean(options.hasRangeCandidates);
+    const isCustomRange = endMode === "after_block";
+    const rangeTimeline = getMusicRangeTimeline(block);
 
     return `
     <article class="editor-card">
@@ -812,10 +825,24 @@
       </div>
       <div class="detail-row">
         <label for="editorMusicEndBlockId">范围结束卡片</label>
-        <select id="editorMusicEndBlockId" ${hasRangeCandidates ? "" : "disabled"}>
+        <select id="editorMusicEndBlockId" data-has-range-candidates="${hasRangeCandidates ? "true" : "false"}" ${
+          hasRangeCandidates && isCustomRange ? "" : "disabled"
+        }>
           ${renderMusicRangeEndBlockOptions(block)}
         </select>
         <p class="helper-text">当播放范围选“播到指定卡片后”时，会在玩家看完这张卡片后自动淡出停止。</p>
+      </div>
+      <div class="music-range-preview" data-music-range-preview>
+        <strong>当前覆盖范围</strong>
+        <div class="music-range-timeline" aria-label="BGM 覆盖范围时间轴">
+          <span data-music-range-start>${escape(rangeTimeline.startLabel)}</span>
+          <i aria-hidden="true"></i>
+          <span data-music-range-mode>${escape(rangeTimeline.modeLabel)}</span>
+          <i aria-hidden="true"></i>
+          <span data-music-range-end>${escape(rangeTimeline.endLabel)}</span>
+          <em data-music-range-count>${escape(rangeTimeline.countLabel)}</em>
+        </div>
+        <span>${escape(getMusicRangeSummary(block))}</span>
       </div>
       <div class="detail-row">
         <label for="editorFadeInMs">淡入时间（毫秒）</label>
