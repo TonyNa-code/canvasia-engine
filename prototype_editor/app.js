@@ -1118,9 +1118,17 @@ async function init() {
     setSaveStatus("载入失败", true);
     refs.loadingState.classList.add("is-hidden");
     refs.errorState.classList.remove("is-hidden");
-    refs.errorMessage.textContent = error.message;
+    refs.errorMessage.textContent = getEditorStartupErrorMessage(error);
     console.error(error);
   }
+}
+
+function getEditorStartupErrorMessage(error) {
+  const detail = getErrorDetailMessage(
+    error,
+    "编辑器没有载入成功，请确认编辑器服务仍在运行，然后刷新重试。"
+  );
+  return `编辑器没有载入成功。\n\n${detail}\n\n可以确认启动窗口没有关闭，或重新运行启动脚本后刷新页面。`;
 }
 
 async function fetchEditorResource(url, options = {}, contextLabel = "请求") {
@@ -1473,7 +1481,7 @@ function showFatalProjectLoadError(error) {
   refs.projectCenterState.classList.add("is-hidden");
   refs.appMain.classList.add("is-hidden");
   refs.errorState.classList.remove("is-hidden");
-  refs.errorMessage.textContent = error?.message ?? "当前还没有可显示的错误信息。";
+  refs.errorMessage.textContent = getProjectLoadErrorMessage(error);
   state.data = null;
   state.validation = null;
   state.lastExportResult = null;
@@ -1485,16 +1493,60 @@ function showFatalProjectLoadError(error) {
   setSaveStatus("项目载入失败", true);
 }
 
-function handleProjectLoadFailure(error, fallbackMessage) {
+function getProjectLoadErrorMessage(error) {
+  const detail = getErrorDetailMessage(error, "项目没有载入成功，请稍后再试一次。");
+  return `项目没有载入成功。\n\n${detail}\n\n如果这里显示了自动快照，可以先尝试恢复到上一个版本。`;
+}
+
+async function copyCurrentLoadErrorMessage() {
+  const message = String(refs.errorMessage?.textContent ?? "").trim();
+  if (!message) {
+    setSaveStatus("当前没有可复制的错误信息", true);
+    showToast("当前没有可复制的错误信息", "error");
+    return false;
+  }
+
+  const copied = await copyTextToClipboard(message);
+  if (!copied) {
+    setSaveStatus("错误信息复制失败", true);
+    showToast("复制失败，可以手动选中错误信息", "error");
+    return false;
+  }
+
+  setSaveStatus("错误信息已复制，可直接粘贴到反馈里");
+  showToast("错误信息已复制");
+  return true;
+}
+
+function handleProjectLoadFailure(error) {
   if (error?.recovery) {
     showFatalProjectLoadError(error);
     showToast("项目打开失败，但已经找到可恢复的自动快照", "error");
     return true;
   }
 
-  setSaveStatus(fallbackMessage, true);
-  showToast(fallbackMessage, "error");
   return false;
+}
+
+async function showCopyableOperationFailure(error, title, detailPrefix) {
+  const detailMessage = getErrorDetailMessage(error);
+  setSaveStatus(getErrorSummaryLine(error, title), true);
+  showToast(`${title}，已列出原因`, "error");
+  await showEngineAlert({
+    title,
+    message: `${detailPrefix}：\n${detailMessage}`,
+    tone: "warning",
+    copyable: true,
+    confirmLabel: "我知道了",
+  });
+}
+
+async function showProjectCenterFailure(error, title, detailPrefix) {
+  await showCopyableOperationFailure(error, title, detailPrefix);
+}
+
+async function showEditorOperationFailure(error, title, detailPrefix) {
+  await showCopyableOperationFailure(error, title, detailPrefix);
 }
 
 async function maybePromptProjectRecovery(data = state.data) {
@@ -2313,6 +2365,11 @@ async function handleClick(event) {
     return;
   }
 
+  if (action === "copy-error-message") {
+    void copyCurrentLoadErrorMessage();
+    return;
+  }
+
   if (action === "refresh-project-center") {
     try {
       setSaveStatus("正在刷新项目列表...");
@@ -2320,9 +2377,7 @@ async function handleClick(event) {
       setSaveStatus("项目列表已刷新");
       showToast("项目列表已经刷新");
     } catch (error) {
-      setSaveStatus("刷新项目列表失败", true);
-      showToast("刷新项目列表失败", "error");
-      showEngineAlert(`刷新项目列表失败：${error.message}`);
+      await showProjectCenterFailure(error, "刷新项目列表失败", "项目列表没有刷新成功");
     }
     return;
   }
@@ -2435,8 +2490,8 @@ async function handleClick(event) {
       await enterActiveProjectEditor(`已打开空白项目：${name}`);
       showToast(`空白项目已创建：${name}`);
     } catch (error) {
-      if (!handleProjectLoadFailure(error, "创建项目失败")) {
-        showEngineAlert(`新建空白项目失败：${error.message}`);
+      if (!handleProjectLoadFailure(error)) {
+        await showProjectCenterFailure(error, "新建空白项目失败", "空白项目没有创建成功");
       }
     }
     return;
@@ -2489,8 +2544,8 @@ async function handleClick(event) {
       await enterActiveProjectEditor(`已打开项目：${result.project?.title ?? "未命名项目"}`);
       showToast(`已打开项目：${result.project?.title ?? "未命名项目"}`);
     } catch (error) {
-      if (!handleProjectLoadFailure(error, "打开项目失败")) {
-        showEngineAlert(`打开项目失败：${error.message}`);
+      if (!handleProjectLoadFailure(error)) {
+        await showProjectCenterFailure(error, "打开项目失败", "项目没有打开成功");
       }
     }
     return;
@@ -2528,9 +2583,7 @@ async function handleClick(event) {
       setSaveStatus(`项目名已更新：${nextName}`);
       showToast(`项目名已更新：${nextName}`);
     } catch (error) {
-      setSaveStatus("修改项目名失败", true);
-      showToast("修改项目名失败", "error");
-      showEngineAlert(`修改项目名失败：${error.message}`);
+      await showProjectCenterFailure(error, "修改项目名失败", "项目名没有修改成功");
     }
     return;
   }
@@ -2560,8 +2613,8 @@ async function handleClick(event) {
       await enterActiveProjectEditor(`已打开复制项目：${nextName}`);
       showToast(`复制完成：${nextName}`);
     } catch (error) {
-      if (!handleProjectLoadFailure(error, "复制项目失败")) {
-        showEngineAlert(`复制项目失败：${error.message}`);
+      if (!handleProjectLoadFailure(error)) {
+        await showProjectCenterFailure(error, "复制项目失败", "项目没有复制成功");
       }
     }
     return;
@@ -2596,9 +2649,7 @@ async function handleClick(event) {
       setSaveStatus(`项目已删除：${project.title}`);
       showToast(`项目已删除：${project.title}`);
     } catch (error) {
-      setSaveStatus("删除项目失败", true);
-      showToast("删除项目失败", "error");
-      showEngineAlert(`删除项目失败：${error.message}`);
+      await showProjectCenterFailure(error, "删除项目失败", `项目「${project.title}」没有删除成功`);
     }
     return;
   }
@@ -6837,9 +6888,7 @@ async function createVoicePlaceholderForLine(sceneId, blockId = null) {
     setSaveStatus(`已生成并绑定语音条目：${assetName}`);
     showToast(`已给这句绑上语音条目：${assetName}`);
   } catch (error) {
-    setSaveStatus("生成语音条目失败", true);
-    showToast("生成语音条目失败", "error");
-    showEngineAlert(`生成语音条目没有成功：${error.message}`);
+    await showEditorOperationFailure(error, "生成语音条目失败", "语音条目没有生成成功");
   }
 }
 
@@ -6891,9 +6940,7 @@ async function createVoicePlaceholdersForEntries(entries, options = {}) {
     setSaveStatus(message);
     showToast(message);
   } catch (error) {
-    setSaveStatus("批量生成语音条目失败", true);
-    showToast("批量生成语音条目失败", "error");
-    showEngineAlert(`批量生成语音条目没有成功：${error.message}`);
+    await showEditorOperationFailure(error, "批量生成语音条目失败", "语音条目没有批量生成成功");
   }
 }
 
@@ -7234,9 +7281,7 @@ async function matchVoiceFilesToPlaceholders(files) {
       showEngineAlert(alertMessage);
     }
   } catch (error) {
-    setSaveStatus("批量匹配语音文件失败", true);
-    showToast("批量匹配语音文件失败", "error");
-    showEngineAlert(`批量匹配语音文件没有成功：${error.message}`);
+    await showEditorOperationFailure(error, "批量匹配语音文件失败", "语音文件没有批量匹配成功");
   }
 }
 
@@ -7298,9 +7343,7 @@ async function bindVoiceMatchReviewFile(reviewKind, reviewIndex) {
     setSaveStatus(`已把 ${item.fileName} 绑到：${asset.name}`);
     showToast(`已手动绑定：${asset.name}`);
   } catch (error) {
-    setSaveStatus("手动绑定语音文件失败", true);
-    showToast("手动绑定语音文件失败", "error");
-    showEngineAlert(`手动绑定语音文件没有成功：${error.message}`);
+    await showEditorOperationFailure(error, "手动绑定语音文件失败", "语音文件没有手动绑定成功");
   }
 }
 
@@ -7889,8 +7932,8 @@ function handleUnhandledEditorAction(action, actionTarget) {
 }
 
 function handleEditorRuntimeError(error, context = "操作") {
-  const message = error instanceof Error ? error.message : String(error ?? "未知错误");
-  const errorKey = `${context}:${message}`;
+  const detailMessage = getErrorDetailMessage(error, "未知错误");
+  const errorKey = `${context}:${detailMessage}`;
   const now = Date.now();
   const shouldNotify =
     errorKey !== lastEditorRuntimeErrorKey || now - lastEditorRuntimeErrorAt > 1600;
@@ -7898,7 +7941,7 @@ function handleEditorRuntimeError(error, context = "操作") {
   lastEditorRuntimeErrorAt = now;
 
   if (shouldNotify) {
-    setSaveStatus(`${context}没有成功：${message}`, true);
+    setSaveStatus(`${context}没有成功，详细错误已记录在控制台`, true);
     showToast(`${context}没有成功`, "error");
   }
   console.error("[Canvasia Engine] Editor runtime error", error);
@@ -21632,9 +21675,7 @@ async function saveSelectedAssetMetadata() {
     setSaveStatus(`素材信息已保存：${name}`);
     showToast(`素材信息已保存：${name}`);
   } catch (error) {
-    setSaveStatus("保存素材信息失败", true);
-    showToast("保存素材信息失败", "error");
-    showEngineAlert(`保存素材信息没有成功：${error.message}`);
+    await showEditorOperationFailure(error, "保存素材信息失败", "素材信息没有保存成功");
   }
 }
 
@@ -21659,9 +21700,7 @@ async function toggleAssetFavorite(assetId) {
     setSaveStatus(`${nextFavorite ? "已收藏" : "已取消收藏"}：${asset.name}`);
     showToast(`${nextFavorite ? "已收藏" : "已取消收藏"}：${asset.name}`);
   } catch (error) {
-    setSaveStatus("切换收藏失败", true);
-    showToast("切换收藏失败", "error");
-    showEngineAlert(`切换收藏状态没有成功：${error.message}`);
+    await showEditorOperationFailure(error, "切换收藏失败", "素材收藏状态没有切换成功");
   }
 }
 
@@ -21711,9 +21750,7 @@ async function saveCharacterPresentation(characterId) {
     setSaveStatus(`角色表现已保存：${character.displayName}`);
     showToast(`角色表现已保存：${character.displayName}`);
   } catch (error) {
-    setSaveStatus("保存角色表现失败", true);
-    showToast("保存角色表现失败", "error");
-    showEngineAlert(`保存角色表现没有成功：${error.message}`);
+    await showEditorOperationFailure(error, "保存角色表现失败", "角色表现没有保存成功");
   }
 }
 
@@ -21770,9 +21807,7 @@ async function applyBulkAssetTags(mode) {
     setSaveStatus(`已批量${actionLabel}标签：${result.updatedCount} 个素材`);
     showToast(`已批量${actionLabel}标签：${result.updatedCount} 个素材`);
   } catch (error) {
-    setSaveStatus("批量改标签失败", true);
-    showToast("批量改标签失败", "error");
-    showEngineAlert(`批量改标签没有成功：${error.message}`);
+    await showEditorOperationFailure(error, "批量改标签失败", "素材标签没有批量更新成功");
   }
 }
 
@@ -21813,9 +21848,7 @@ async function applyPresetTag(tag) {
     setSaveStatus(`已给${targetLabel}加上标签：${cleanTag}`);
     showToast(`已加预设标签：${cleanTag}`);
   } catch (error) {
-    setSaveStatus("添加预设标签失败", true);
-    showToast("添加预设标签失败", "error");
-    showEngineAlert(`添加预设标签没有成功：${error.message}`);
+    await showEditorOperationFailure(error, "添加预设标签失败", "预设标签没有添加成功");
   }
 }
 
@@ -28943,9 +28976,8 @@ async function repairProjectDoctor(repairCodesValue = "", options = {}) {
     setSaveStatus(message);
     showToast(message, "soft");
   } catch (error) {
-    setSaveStatus(dryRun ? "项目医生预览失败" : "项目医生安全修复失败", true);
-    showToast(dryRun ? "项目医生预览失败" : "项目医生安全修复失败", "error");
-    showEngineAlert(`项目医生${dryRun ? "预览" : "安全修复"}没有成功：${error.message}`);
+    const actionLabel = dryRun ? "项目医生预览" : "项目医生安全修复";
+    await showEditorOperationFailure(error, `${actionLabel}失败`, `${actionLabel}没有执行成功`);
   }
 }
 
@@ -32179,9 +32211,11 @@ async function generateCreativeAssistant() {
         : state.creativeAssistantResult?.title ?? "智能助手已生成建议"
     );
   } catch (error) {
-    state.creativeAssistantError = error.message;
-    setSaveStatus("智能助手生成失败", true);
-    showToast("智能助手生成失败", "error");
+    state.creativeAssistantError = getErrorDetailMessage(
+      error,
+      "智能助手没有生成成功，请检查 API Key、模型、服务地址或网络连接。"
+    );
+    await showEditorOperationFailure(error, "智能助手生成失败", "智能助手没有生成成功");
   } finally {
     state.creativeAssistantLoading = false;
     renderStoryScreen();
@@ -32632,8 +32666,7 @@ async function createScene() {
 
     setSaveStatus(`已新建场景：${sceneName}`);
   } catch (error) {
-    setSaveStatus("新建场景失败", true);
-    showEngineAlert(`新建场景没有成功：${error.message}`);
+    await showEditorOperationFailure(error, "新建场景失败", "场景没有创建成功");
   }
 }
 
@@ -32670,8 +32703,7 @@ async function duplicateScene() {
 
     setSaveStatus(`已复制场景：${nextName}`);
   } catch (error) {
-    setSaveStatus("复制场景失败", true);
-    showEngineAlert(`复制场景没有成功：${error.message}`);
+    await showEditorOperationFailure(error, "复制场景失败", "场景没有复制成功");
   }
 }
 
@@ -32717,8 +32749,7 @@ async function createChapter(options = {}) {
     setSaveStatus(options.successMessage ?? `已新建章节：${chapterName}`);
     showToast(options.successMessage ?? `已新建章节：${chapterName}`);
   } catch (error) {
-    setSaveStatus("新建章节失败", true);
-    showEngineAlert(`新建章节没有成功：${error.message}`);
+    await showEditorOperationFailure(error, "新建章节失败", "章节没有创建成功");
   }
 }
 
@@ -32773,9 +32804,7 @@ async function createStarterKit(options = {}) {
     setSaveStatus(message);
     showToast(message);
   } catch (error) {
-    setSaveStatus("生成起步骨架失败", true);
-    showToast("生成起步骨架失败", "error");
-    showEngineAlert(`生成起步骨架没有成功：${error.message}`);
+    await showEditorOperationFailure(error, "生成起步骨架失败", "起步骨架没有生成成功");
   }
 }
 
@@ -32815,9 +32844,7 @@ async function createHistoryCheckpoint() {
       return;
     }
 
-    setSaveStatus("保存检查点失败", true);
-    showToast("保存检查点失败", "error");
-    showEngineAlert(`保存检查点没有成功：${error.message}`);
+    await showEditorOperationFailure(error, "保存检查点失败", "检查点没有保存成功");
   }
 }
 
@@ -32874,9 +32901,7 @@ async function renameProjectHistorySnapshot(snapshot) {
     setSaveStatus(`已更新备注：${nextLabel}`);
     showToast(`已更新备注：${nextLabel}`);
   } catch (error) {
-    setSaveStatus("更新检查点备注失败", true);
-    showToast("更新检查点备注失败", "error");
-    showEngineAlert(`更新检查点备注没有成功：${error.message}`);
+    await showEditorOperationFailure(error, "更新检查点备注失败", "检查点备注没有更新成功");
   }
 }
 
@@ -32895,9 +32920,7 @@ async function acknowledgeProjectRecoveryNotice() {
     setSaveStatus("已记录当前操作");
     showToast("已收起异常退出提醒");
   } catch (error) {
-    setSaveStatus("收起提醒失败", true);
-    showToast("收起提醒失败", "error");
-    showEngineAlert(`收起提醒没有成功：${error.message}`);
+    await showEditorOperationFailure(error, "收起异常提醒失败", "异常退出提醒没有收起成功");
   }
 }
 
@@ -32971,9 +32994,7 @@ async function applyProjectHistoryAction(mode = "undo", options = {}) {
       return;
     }
 
-    setSaveStatus(`${actionLabel}失败`, true);
-    showToast(`${actionLabel}失败`, "error");
-    showEngineAlert(`${actionLabel}没有成功：${error.message}`);
+    await showEditorOperationFailure(error, `${actionLabel}失败`, `${actionLabel}没有成功`);
   }
 }
 
@@ -33009,8 +33030,7 @@ async function duplicateChapter() {
 
     setSaveStatus(`已复制章节：${nextName}`);
   } catch (error) {
-    setSaveStatus("复制章节失败", true);
-    showEngineAlert(`复制章节没有成功：${error.message}`);
+    await showEditorOperationFailure(error, "复制章节失败", "章节没有复制成功");
   }
 }
 
@@ -33046,8 +33066,7 @@ async function moveScene(direction) {
 
     setSaveStatus(direction < 0 ? "场景已上移一位" : "场景已下移一位");
   } catch (error) {
-    setSaveStatus("调整场景顺序失败", true);
-    showEngineAlert(`调整场景顺序没有成功：${error.message}`);
+    await showEditorOperationFailure(error, "调整场景顺序失败", "场景顺序没有调整成功");
   }
 }
 
@@ -33082,8 +33101,7 @@ async function renameScene() {
 
     setSaveStatus(`场景已改名：${nextName}`);
   } catch (error) {
-    setSaveStatus("修改场景名失败", true);
-    showEngineAlert(`修改场景名没有成功：${error.message}`);
+    await showEditorOperationFailure(error, "修改场景名失败", "场景名没有修改成功");
   }
 }
 
@@ -33117,8 +33135,7 @@ async function renameChapter() {
 
     setSaveStatus(`章节已改名：${nextName}`);
   } catch (error) {
-    setSaveStatus("修改章节名失败", true);
-    showEngineAlert(`修改章节名没有成功：${error.message}`);
+    await showEditorOperationFailure(error, "修改章节名失败", "章节名没有修改成功");
   }
 }
 
@@ -33153,8 +33170,7 @@ async function moveChapter(direction) {
 
     setSaveStatus(direction < 0 ? "章节已上移一位" : "章节已下移一位");
   } catch (error) {
-    setSaveStatus("调整章节顺序失败", true);
-    showEngineAlert(`调整章节顺序没有成功：${error.message}`);
+    await showEditorOperationFailure(error, "调整章节顺序失败", "章节顺序没有调整成功");
   }
 }
 
@@ -33196,8 +33212,7 @@ async function deleteScene() {
 
     setSaveStatus(`已删除场景：${scene.name}`);
   } catch (error) {
-    setSaveStatus("删除场景失败", true);
-    showEngineAlert(`删除场景没有成功：${error.message}`);
+    await showEditorOperationFailure(error, "删除场景失败", `场景「${scene.name}」没有删除成功`);
   }
 }
 
@@ -33238,8 +33253,7 @@ async function deleteChapter() {
 
     setSaveStatus(`已删除章节：${chapter.name}`);
   } catch (error) {
-    setSaveStatus("删除章节失败", true);
-    showEngineAlert(`删除章节没有成功：${error.message}`);
+    await showEditorOperationFailure(error, "删除章节失败", `章节「${chapter.name}」没有删除成功`);
   }
 }
 
@@ -33366,9 +33380,7 @@ async function saveProjectResolution(widthValue, heightValue) {
     setSaveStatus(`项目分辨率已切到 ${resolution.width} × ${resolution.height}`);
     showToast(`分辨率已切到 ${getResolutionLabel(resolution.width, resolution.height)}`);
   } catch (error) {
-    setSaveStatus("切换分辨率失败", true);
-    showToast("切换分辨率失败", "error");
-    showEngineAlert(`切换分辨率没有成功：${error.message}`);
+    await showEditorOperationFailure(error, "切换分辨率失败", "项目分辨率没有切换成功");
   }
 }
 
@@ -33408,9 +33420,7 @@ async function saveProjectEditorMode(mode) {
           : "新手模式已开启，复杂入口已经收起"
     );
   } catch (error) {
-    setSaveStatus("切换编辑模式失败", true);
-    showToast("切换编辑模式失败", "error");
-    showEngineAlert(`切换编辑模式没有成功：${error.message}`);
+    await showEditorOperationFailure(error, "切换编辑模式失败", "编辑模式没有切换成功");
   }
 }
 
@@ -33440,9 +33450,7 @@ async function saveProjectReleaseVersion() {
     setSaveStatus(`发布版本已更新为 ${savedReleaseVersion}`);
     showToast(`发布版本已更新为 ${savedReleaseVersion}`);
   } catch (error) {
-    setSaveStatus("保存发布版本失败", true);
-    showToast("保存发布版本失败", "error");
-    showEngineAlert(`保存发布版本没有成功：${error.message}`);
+    await showEditorOperationFailure(error, "保存发布版本失败", "发布版本没有保存成功");
   }
 }
 
@@ -35164,9 +35172,7 @@ async function saveProjectFormalSaveSlotCount() {
     setSaveStatus(`正式存档位已更新为 ${getProjectFormalSaveSlotCount()} 个`);
     showToast(`正式存档位已更新为 ${getProjectFormalSaveSlotCount()} 个`);
   } catch (error) {
-    setSaveStatus("保存正式存档位失败", true);
-    showToast("保存正式存档位失败", "error");
-    showEngineAlert(`保存正式存档位没有成功：${error.message}`);
+    await showEditorOperationFailure(error, "保存正式存档位失败", "正式存档位没有保存成功");
   }
 }
 
@@ -35192,9 +35198,7 @@ async function saveProjectLocalizationSettings() {
     setSaveStatus(`多语言设置已保存：${savedSupportedLanguages.length} 种语言`);
     showToast(`默认语言已设为 ${PROJECT_LANGUAGE_LABELS[savedLanguage] ?? savedLanguage}`);
   } catch (error) {
-    setSaveStatus("保存多语言设置失败", true);
-    showToast("保存多语言设置失败", "error");
-    showEngineAlert(`保存多语言设置没有成功：${error.message}`);
+    await showEditorOperationFailure(error, "保存多语言设置失败", "多语言设置没有保存成功");
   }
 }
 
@@ -35356,9 +35360,7 @@ async function addProjectVariable(type = "number") {
       toastText: `已新增变量：${nextVariable.name}`,
     });
   } catch (error) {
-    setSaveStatus("新增变量失败", true);
-    showToast("新增变量失败", "error");
-    showEngineAlert(`新增变量没有成功：${error.message}`);
+    await showEditorOperationFailure(error, "新增变量失败", "变量没有新增成功");
   }
 }
 
@@ -35431,9 +35433,7 @@ async function saveProjectVariable(variableId) {
       }
     );
   } catch (error) {
-    setSaveStatus("保存变量失败", true);
-    showToast("保存变量失败", "error");
-    showEngineAlert(`保存变量没有成功：${error.message}`);
+    await showEditorOperationFailure(error, "保存变量失败", "变量没有保存成功");
   }
 }
 
@@ -35486,9 +35486,7 @@ async function duplicateProjectVariable(variableId) {
       toastText: `变量副本已创建：${nextVariable.name}`,
     });
   } catch (error) {
-    setSaveStatus("复制变量失败", true);
-    showToast("复制变量失败", "error");
-    showEngineAlert(`复制变量没有成功：${error.message}`);
+    await showEditorOperationFailure(error, "复制变量失败", "变量没有复制成功");
   }
 }
 
@@ -35525,9 +35523,7 @@ async function deleteProjectVariable(variableId) {
       }
     );
   } catch (error) {
-    setSaveStatus("删除变量失败", true);
-    showToast("删除变量失败", "error");
-    showEngineAlert(`删除变量没有成功：${error.message}`);
+    await showEditorOperationFailure(error, "删除变量失败", `变量「${variable.name}」没有删除成功`);
   }
 }
 
@@ -35573,9 +35569,7 @@ async function deleteUnusedProjectVariables() {
       }
     );
   } catch (error) {
-    setSaveStatus("清理未引用变量失败", true);
-    showToast("清理未引用变量失败", "error");
-    showEngineAlert(`清理未引用变量没有成功：${error.message}`);
+    await showEditorOperationFailure(error, "清理未引用变量失败", "未引用变量没有清理成功");
   }
 }
 
@@ -35637,9 +35631,7 @@ async function repairProjectVariableRanges() {
       clearAllDrafts: true,
     });
   } catch (error) {
-    setSaveStatus("整理变量范围失败", true);
-    showToast("整理变量范围失败", "error");
-    showEngineAlert(`整理变量范围没有成功：${error.message}`);
+    await showEditorOperationFailure(error, "整理变量范围失败", "变量范围没有整理成功");
   }
 }
 
@@ -35657,9 +35649,7 @@ async function saveProjectDialogBoxConfig() {
     setSaveStatus("项目文本框样式已保存");
     showToast("项目文本框样式已保存");
   } catch (error) {
-    setSaveStatus("保存文本框样式失败", true);
-    showToast("保存文本框样式失败", "error");
-    showEngineAlert(`保存文本框样式没有成功：${error.message}`);
+    await showEditorOperationFailure(error, "保存文本框样式失败", "项目文本框样式没有保存成功");
   }
 }
 
@@ -35675,9 +35665,7 @@ async function saveProjectGameUiConfig() {
     setSaveStatus("成品 UI 皮肤已保存");
     showToast("成品 UI 皮肤已保存");
   } catch (error) {
-    setSaveStatus("保存成品 UI 皮肤失败", true);
-    showToast("保存成品 UI 皮肤失败", "error");
-    showEngineAlert(`保存成品 UI 皮肤没有成功：${error.message}`);
+    await showEditorOperationFailure(error, "保存成品 UI 皮肤失败", "成品 UI 皮肤没有保存成功");
   }
 }
 
@@ -35882,9 +35870,11 @@ async function generateOpenAiAsset() {
     setSaveStatus(`已生成并导入素材：${result.asset?.name ?? "新素材"}`);
     showToast(`已生成：${result.asset?.name ?? "新素材"}`);
   } catch (error) {
-    state.openAiAssetError = error.message;
-    setSaveStatus("AI 生成素材失败", true);
-    showToast("AI 生成素材失败", "error");
+    state.openAiAssetError = getErrorDetailMessage(
+      error,
+      "AI 素材没有生成成功，请检查 API Key、模型、额度、服务地址或网络连接。"
+    );
+    await showEditorOperationFailure(error, "AI 生成素材失败", "素材没有生成成功");
   } finally {
     state.openAiAssetLoading = false;
     renderAssetsScreen();
@@ -37490,7 +37480,7 @@ async function persistScene(updatedScene, options = {}) {
       return false;
     }
 
-    showEngineAlert(`保存没有成功：${error.message}`);
+    await showEditorOperationFailure(error, "保存失败", "当前内容没有保存成功");
     return false;
   }
 }
@@ -38138,9 +38128,7 @@ async function saveParticleCustomPreset() {
     setSaveStatus(savePlan.isUpdate ? `粒子预设已更新：${savePlan.name}` : `粒子预设已保存：${savePlan.name}`);
     showToast(savePlan.isUpdate ? `已更新粒子预设：${savePlan.name}` : `已保存粒子预设：${savePlan.name}`);
   } catch (error) {
-    setSaveStatus("保存粒子预设失败", true);
-    showToast("保存粒子预设失败", "error");
-    showEngineAlert(`保存粒子预设没有成功：${error.message}`);
+    await showEditorOperationFailure(error, "保存粒子预设失败", "粒子预设没有保存成功");
   }
 }
 
@@ -38298,9 +38286,7 @@ async function deleteParticleCustomPreset() {
     setSaveStatus(`粒子预设已删除：${preset.name}`);
     showToast(`粒子预设已删除：${preset.name}`);
   } catch (error) {
-    setSaveStatus("删除粒子预设失败", true);
-    showToast("删除粒子预设失败", "error");
-    showEngineAlert(`删除粒子预设没有成功：${error.message}`);
+    await showEditorOperationFailure(error, "删除粒子预设失败", `粒子预设「${preset.name}」没有删除成功`);
   }
 }
 
@@ -39982,9 +39968,7 @@ async function ensureStarterVariables(options = {}) {
       showToast("基础变量库已创建");
       return true;
     } catch (error) {
-      setSaveStatus("创建基础变量库失败", true);
-      showToast("创建基础变量库失败", "error");
-      showEngineAlert(`创建基础变量库没有成功：${error.message}`);
+      await showEditorOperationFailure(error, "创建基础变量库失败", "基础变量库没有创建成功");
       return false;
     } finally {
       state.starterVariablesPromise = null;

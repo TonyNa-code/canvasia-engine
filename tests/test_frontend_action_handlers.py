@@ -221,6 +221,223 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertNotIn("response.json()", load_project_center)
         self.assertNotIn("response.json()", load_project_data)
 
+    def test_startup_and_fatal_errors_use_readable_messages(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        index_source = INDEX_PATH.read_text(encoding="utf-8")
+        click_handler = _extract_function_source(source, "handleClick")
+        init_source = _extract_function_source(source, "init")
+        startup_message = _extract_function_source(source, "getEditorStartupErrorMessage")
+        fatal_project_load = _extract_function_source(source, "showFatalProjectLoadError")
+        project_load_message = _extract_function_source(source, "getProjectLoadErrorMessage")
+        copy_load_error_message = _extract_function_source(source, "copyCurrentLoadErrorMessage")
+        runtime_error_handler = _extract_function_source(source, "handleEditorRuntimeError")
+
+        self.assertIn('data-action="copy-error-message"', index_source)
+        self.assertIn('action === "copy-error-message"', click_handler)
+        self.assertIn("void copyCurrentLoadErrorMessage();", click_handler)
+        self.assertIn("getEditorStartupErrorMessage(error)", init_source)
+        self.assertNotIn("refs.errorMessage.textContent = error.message", init_source)
+        self.assertIn("编辑器没有载入成功", startup_message)
+        self.assertIn("重新运行启动脚本后刷新页面", startup_message)
+        self.assertIn("getErrorDetailMessage(", startup_message)
+
+        self.assertIn("getProjectLoadErrorMessage(error)", fatal_project_load)
+        self.assertIn("项目没有载入成功", project_load_message)
+        self.assertIn("自动快照", project_load_message)
+        self.assertNotIn("error?.message", fatal_project_load)
+
+        self.assertIn("refs.errorMessage?.textContent", copy_load_error_message)
+        self.assertIn("copyTextToClipboard(message)", copy_load_error_message)
+        self.assertIn("错误信息已复制，可直接粘贴到反馈里", copy_load_error_message)
+        self.assertIn("当前没有可复制的错误信息", copy_load_error_message)
+        self.assertIn("复制失败，可以手动选中错误信息", copy_load_error_message)
+
+        self.assertIn('getErrorDetailMessage(error, "未知错误")', runtime_error_handler)
+        self.assertIn("详细错误已记录在控制台", runtime_error_handler)
+        self.assertNotIn("error.message", runtime_error_handler)
+
+    def test_project_center_failures_use_copyable_detail_dialogs(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        handle_click = _extract_function_source(source, "handleClick")
+        handle_project_load_failure = _extract_function_source(source, "handleProjectLoadFailure")
+        show_copyable_operation_failure = _extract_function_source(source, "showCopyableOperationFailure")
+        show_project_center_failure = _extract_function_source(source, "showProjectCenterFailure")
+
+        self.assertIn("getErrorDetailMessage(error)", show_copyable_operation_failure)
+        self.assertIn("getErrorSummaryLine(error, title)", show_copyable_operation_failure)
+        self.assertIn("copyable: true", show_copyable_operation_failure)
+        self.assertIn("`${title}，已列出原因`", show_copyable_operation_failure)
+        self.assertIn("await showCopyableOperationFailure(error, title, detailPrefix)", show_project_center_failure)
+        self.assertIn("error?.recovery", handle_project_load_failure)
+        self.assertNotIn("fallbackMessage", handle_project_load_failure)
+        self.assertNotIn("setSaveStatus(fallbackMessage", handle_project_load_failure)
+
+        expected_calls = [
+            'await showProjectCenterFailure(error, "刷新项目列表失败", "项目列表没有刷新成功")',
+            'await showProjectCenterFailure(error, "新建空白项目失败", "空白项目没有创建成功")',
+            'await showProjectCenterFailure(error, "打开项目失败", "项目没有打开成功")',
+            'await showProjectCenterFailure(error, "修改项目名失败", "项目名没有修改成功")',
+            'await showProjectCenterFailure(error, "复制项目失败", "项目没有复制成功")',
+            'await showProjectCenterFailure(error, "删除项目失败", `项目「${project.title}」没有删除成功`)',
+        ]
+        for expected_call in expected_calls:
+            self.assertIn(expected_call, handle_click)
+
+        old_alerts = [
+            "刷新项目列表失败：${error.message}",
+            "新建空白项目失败：${error.message}",
+            "打开项目失败：${error.message}",
+            "修改项目名失败：${error.message}",
+            "复制项目失败：${error.message}",
+            "删除项目失败：${error.message}",
+        ]
+        for old_alert in old_alerts:
+            self.assertNotIn(old_alert, handle_click)
+
+    def test_story_structure_failures_use_copyable_detail_dialogs(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        show_editor_operation_failure = _extract_function_source(source, "showEditorOperationFailure")
+        operation_sources = "\n".join(
+            _extract_function_source(source, function_name)
+            for function_name in (
+                "createScene",
+                "duplicateScene",
+                "createChapter",
+                "createStarterKit",
+                "createHistoryCheckpoint",
+                "renameProjectHistorySnapshot",
+                "acknowledgeProjectRecoveryNotice",
+                "applyProjectHistoryAction",
+                "duplicateChapter",
+                "moveScene",
+                "renameScene",
+                "renameChapter",
+                "moveChapter",
+                "deleteScene",
+                "deleteChapter",
+            )
+        )
+
+        self.assertIn("await showCopyableOperationFailure(error, title, detailPrefix)", show_editor_operation_failure)
+        expected_calls = [
+            'await showEditorOperationFailure(error, "新建场景失败", "场景没有创建成功")',
+            'await showEditorOperationFailure(error, "复制场景失败", "场景没有复制成功")',
+            'await showEditorOperationFailure(error, "新建章节失败", "章节没有创建成功")',
+            'await showEditorOperationFailure(error, "生成起步骨架失败", "起步骨架没有生成成功")',
+            'await showEditorOperationFailure(error, "保存检查点失败", "检查点没有保存成功")',
+            'await showEditorOperationFailure(error, "更新检查点备注失败", "检查点备注没有更新成功")',
+            'await showEditorOperationFailure(error, "收起异常提醒失败", "异常退出提醒没有收起成功")',
+            "await showEditorOperationFailure(error, `${actionLabel}失败`, `${actionLabel}没有成功`)",
+            'await showEditorOperationFailure(error, "复制章节失败", "章节没有复制成功")',
+            'await showEditorOperationFailure(error, "调整场景顺序失败", "场景顺序没有调整成功")',
+            'await showEditorOperationFailure(error, "修改场景名失败", "场景名没有修改成功")',
+            'await showEditorOperationFailure(error, "修改章节名失败", "章节名没有修改成功")',
+            'await showEditorOperationFailure(error, "调整章节顺序失败", "章节顺序没有调整成功")',
+            'await showEditorOperationFailure(error, "删除场景失败", `场景「${scene.name}」没有删除成功`)',
+            'await showEditorOperationFailure(error, "删除章节失败", `章节「${chapter.name}」没有删除成功`)',
+        ]
+        for expected_call in expected_calls:
+            self.assertIn(expected_call, operation_sources)
+
+        old_alerts = [
+            "新建场景没有成功：${error.message}",
+            "复制场景没有成功：${error.message}",
+            "新建章节没有成功：${error.message}",
+            "生成起步骨架没有成功：${error.message}",
+            "保存检查点没有成功：${error.message}",
+            "更新检查点备注没有成功：${error.message}",
+            "收起提醒没有成功：${error.message}",
+            "${actionLabel}没有成功：${error.message}",
+            "复制章节没有成功：${error.message}",
+            "调整场景顺序没有成功：${error.message}",
+            "修改场景名没有成功：${error.message}",
+            "修改章节名没有成功：${error.message}",
+            "调整章节顺序没有成功：${error.message}",
+            "删除场景没有成功：${error.message}",
+            "删除章节没有成功：${error.message}",
+        ]
+        for old_alert in old_alerts:
+            self.assertNotIn(old_alert, operation_sources)
+
+    def test_foundation_operation_failures_use_copyable_detail_dialogs(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        operation_sources = "\n".join(
+            _extract_function_source(source, function_name)
+            for function_name in (
+                "createVoicePlaceholderForLine",
+                "createVoicePlaceholdersForEntries",
+                "matchVoiceFilesToPlaceholders",
+                "bindVoiceMatchReviewFile",
+                "saveSelectedAssetMetadata",
+                "toggleAssetFavorite",
+                "saveCharacterPresentation",
+                "applyBulkAssetTags",
+                "applyPresetTag",
+                "repairProjectDoctor",
+                "generateCreativeAssistant",
+                "saveProjectResolution",
+                "saveProjectEditorMode",
+                "saveProjectReleaseVersion",
+                "saveProjectFormalSaveSlotCount",
+                "saveProjectLocalizationSettings",
+                "addProjectVariable",
+                "saveProjectVariable",
+                "duplicateProjectVariable",
+                "deleteProjectVariable",
+                "deleteUnusedProjectVariables",
+                "repairProjectVariableRanges",
+                "saveProjectDialogBoxConfig",
+                "saveProjectGameUiConfig",
+                "generateOpenAiAsset",
+                "persistScene",
+                "saveParticleCustomPreset",
+                "deleteParticleCustomPreset",
+                "ensureStarterVariables",
+            )
+        )
+
+        expected_calls = [
+            'await showEditorOperationFailure(error, "生成语音条目失败", "语音条目没有生成成功")',
+            'await showEditorOperationFailure(error, "批量生成语音条目失败", "语音条目没有批量生成成功")',
+            'await showEditorOperationFailure(error, "批量匹配语音文件失败", "语音文件没有批量匹配成功")',
+            'await showEditorOperationFailure(error, "手动绑定语音文件失败", "语音文件没有手动绑定成功")',
+            'await showEditorOperationFailure(error, "保存素材信息失败", "素材信息没有保存成功")',
+            'await showEditorOperationFailure(error, "切换收藏失败", "素材收藏状态没有切换成功")',
+            'await showEditorOperationFailure(error, "保存角色表现失败", "角色表现没有保存成功")',
+            'await showEditorOperationFailure(error, "批量改标签失败", "素材标签没有批量更新成功")',
+            'await showEditorOperationFailure(error, "添加预设标签失败", "预设标签没有添加成功")',
+            "await showEditorOperationFailure(error, `${actionLabel}失败`, `${actionLabel}没有执行成功`)",
+            'await showEditorOperationFailure(error, "智能助手生成失败", "智能助手没有生成成功")',
+            'await showEditorOperationFailure(error, "切换分辨率失败", "项目分辨率没有切换成功")',
+            'await showEditorOperationFailure(error, "切换编辑模式失败", "编辑模式没有切换成功")',
+            'await showEditorOperationFailure(error, "保存发布版本失败", "发布版本没有保存成功")',
+            'await showEditorOperationFailure(error, "保存正式存档位失败", "正式存档位没有保存成功")',
+            'await showEditorOperationFailure(error, "保存多语言设置失败", "多语言设置没有保存成功")',
+            'await showEditorOperationFailure(error, "新增变量失败", "变量没有新增成功")',
+            'await showEditorOperationFailure(error, "保存变量失败", "变量没有保存成功")',
+            'await showEditorOperationFailure(error, "复制变量失败", "变量没有复制成功")',
+            'await showEditorOperationFailure(error, "删除变量失败", `变量「${variable.name}」没有删除成功`)',
+            'await showEditorOperationFailure(error, "清理未引用变量失败", "未引用变量没有清理成功")',
+            'await showEditorOperationFailure(error, "整理变量范围失败", "变量范围没有整理成功")',
+            'await showEditorOperationFailure(error, "保存文本框样式失败", "项目文本框样式没有保存成功")',
+            'await showEditorOperationFailure(error, "保存成品 UI 皮肤失败", "成品 UI 皮肤没有保存成功")',
+            'await showEditorOperationFailure(error, "AI 生成素材失败", "素材没有生成成功")',
+            'await showEditorOperationFailure(error, "保存失败", "当前内容没有保存成功")',
+            'await showEditorOperationFailure(error, "保存粒子预设失败", "粒子预设没有保存成功")',
+            'await showEditorOperationFailure(error, "删除粒子预设失败", `粒子预设「${preset.name}」没有删除成功`)',
+            'await showEditorOperationFailure(error, "创建基础变量库失败", "基础变量库没有创建成功")',
+        ]
+        for expected_call in expected_calls:
+            self.assertIn(expected_call, operation_sources)
+
+        self.assertIn("state.creativeAssistantError = getErrorDetailMessage(", operation_sources)
+        self.assertIn("请检查 API Key、模型、服务地址或网络连接", operation_sources)
+        self.assertIn("state.openAiAssetError = getErrorDetailMessage(", operation_sources)
+        self.assertIn("请检查 API Key、模型、额度、服务地址或网络连接", operation_sources)
+        self.assertNotIn("state.creativeAssistantError = error.message", operation_sources)
+        self.assertNotIn("state.openAiAssetError = error.message", operation_sources)
+        self.assertNotRegex(source, r"showEngineAlert\(`[^`]*\$\{error\.message\}")
+
     def test_batch_file_read_reports_all_failed_local_files(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
         read_file = _extract_function_source(source, "readFileAsBase64Payload")
@@ -488,6 +705,7 @@ class FrontendActionHandlerTests(unittest.TestCase):
 
     def test_runtime_error_handler_dedupes_user_notifications(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
+        get_error_detail_message = _extract_function_source(source, "getErrorDetailMessage")
         runtime_error_handler = _extract_function_source(source, "handleEditorRuntimeError")
         script = textwrap.dedent(
             f"""
@@ -509,6 +727,7 @@ class FrontendActionHandlerTests(unittest.TestCase):
                 message: String(args[1]?.message ?? args[1] ?? ""),
               }});
             }};
+            function getErrorDetailMessage(error, fallbackMessage = "请求没有成功，请稍后再试一次。") {get_error_detail_message}
             function handleEditorRuntimeError(error, context = "操作") {runtime_error_handler}
             handleEditorRuntimeError(new Error("按钮爆了"), "点击操作");
             handleEditorRuntimeError(new Error("按钮爆了"), "点击操作");
@@ -534,7 +753,7 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertEqual(len(status_calls), 2)
         self.assertEqual(len(toast_calls), 2)
         self.assertEqual(len(console_calls), 3)
-        self.assertEqual(status_calls[0]["message"], "点击操作没有成功：按钮爆了")
+        self.assertEqual(status_calls[0]["message"], "点击操作没有成功，详细错误已记录在控制台")
         self.assertTrue(status_calls[0]["isError"])
         self.assertEqual(toast_calls[0], {"type": "toast", "message": "点击操作没有成功", "tone": "error"})
 
