@@ -100,6 +100,236 @@ def _extract_function_source(source: str, function_name: str) -> str:
 
 
 class FrontendActionHandlerTests(unittest.TestCase):
+    def test_post_json_reports_readable_response_errors(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        fetch_editor_resource = _extract_function_source(source, "fetchEditorResource")
+        read_json_response = _extract_function_source(source, "readJsonResponse")
+        post_json = _extract_function_source(source, "postJson")
+        script = textwrap.dedent(
+            f"""
+            async function fetchEditorResource(url, options = {{}}, contextLabel = "请求") {fetch_editor_resource}
+            async function readJsonResponse(response, options = {{}}) {read_json_response}
+            async function postJson(url, payload) {post_json}
+
+            const calls = [];
+            globalThis.fetch = async (url, options) => {{
+              calls.push({{ url, options }});
+              return {{
+                ok: false,
+                status: 502,
+                async text() {{ return "<html>Bad gateway</html>"; }},
+              }};
+            }};
+            let htmlMessage = "";
+            try {{
+              await postJson("/api/test", {{ hello: "world" }});
+            }} catch (error) {{
+              htmlMessage = error.message;
+            }}
+
+            globalThis.fetch = async () => ({{
+              ok: false,
+              status: 500,
+              async text() {{ return ""; }},
+            }});
+            let emptyMessage = "";
+            try {{
+              await postJson("/api/test", {{}});
+            }} catch (error) {{
+              emptyMessage = error.message;
+            }}
+
+            globalThis.fetch = async () => ({{
+              ok: false,
+              status: 418,
+              async text() {{
+                return JSON.stringify({{
+                  ok: false,
+                  error: "茶壶坏了",
+                  recovery: {{ mode: "snapshot" }},
+                  history: ["safe-point"],
+                }});
+              }},
+            }});
+            let jsonError = null;
+            try {{
+              await postJson("/api/test", {{}});
+            }} catch (error) {{
+              jsonError = {{ message: error.message, recovery: error.recovery, history: error.history }};
+            }}
+
+            globalThis.fetch = async () => ({{
+              ok: true,
+              status: 200,
+              async text() {{ return JSON.stringify({{ ok: true, value: 7 }}); }},
+            }});
+            const okResult = await postJson("/api/test", {{ ok: true }});
+
+            globalThis.fetch = async () => {{
+              throw new TypeError("Failed to fetch");
+            }};
+            let networkMessage = "";
+            try {{
+              await postJson("/api/test", {{}});
+            }} catch (error) {{
+              networkMessage = error.message;
+            }}
+
+            console.log(JSON.stringify({{
+              htmlMessage,
+              emptyMessage,
+              jsonError,
+              okResult,
+              networkMessage,
+              firstCall: calls[0],
+            }}));
+            """
+        )
+        result = subprocess.run(
+            ["node", "--input-type=module", "-e", script],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        payload = json.loads(result.stdout)
+
+        self.assertIn("无法识别的内容", payload["htmlMessage"])
+        self.assertIn("HTTP 502", payload["htmlMessage"])
+        self.assertEqual(payload["emptyMessage"], "请求失败，状态码 500")
+        self.assertEqual(payload["jsonError"]["message"], "茶壶坏了")
+        self.assertEqual(payload["jsonError"]["recovery"], {"mode": "snapshot"})
+        self.assertEqual(payload["jsonError"]["history"], ["safe-point"])
+        self.assertEqual(payload["okResult"]["value"], 7)
+        self.assertIn("无法连接到编辑器后端", payload["networkMessage"])
+        self.assertNotIn("Failed to fetch", payload["networkMessage"])
+        self.assertEqual(payload["firstCall"]["url"], "/api/test")
+        self.assertEqual(payload["firstCall"]["options"]["method"], "POST")
+
+    def test_project_bootstrap_fetches_use_readable_response_errors(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        fetch_editor_resource = _extract_function_source(source, "fetchEditorResource")
+        load_project_center = _extract_function_source(source, "loadProjectCenter")
+        load_project_data = _extract_function_source(source, "loadProjectData")
+
+        self.assertIn("无法连接到编辑器后端", fetch_editor_resource)
+        self.assertIn('fetchEditorResource(API_PROJECT_CENTER, {}, "读取项目列表")', load_project_center)
+        self.assertIn('fetchEditorResource(API_PROJECT_DATA, {}, "读取项目数据")', load_project_data)
+        self.assertIn('readJsonResponse(response, { contextLabel: "读取项目列表" })', load_project_center)
+        self.assertIn('readJsonResponse(response, { contextLabel: "读取项目数据" })', load_project_data)
+        self.assertIn("resultObject.error", load_project_center)
+        self.assertIn("loadError.recovery = bundle.recovery ?? null", load_project_data)
+        self.assertNotIn("response.json()", load_project_center)
+        self.assertNotIn("response.json()", load_project_data)
+
+    def test_batch_file_read_reports_all_failed_local_files(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        read_file = _extract_function_source(source, "readFileAsBase64Payload")
+        read_files = _extract_function_source(source, "readFilesAsBase64Payloads")
+        read_text = _extract_function_source(source, "readFileAsText")
+        parse_json_import = _extract_function_source(source, "parseJsonImportText")
+        script = textwrap.dedent(
+            f"""
+            class MockFileReader {{
+              readAsDataURL(file) {{
+                if (file.fail) {{
+                  this.onerror?.(new Error("simulated read error"));
+                  return;
+                }}
+                if (file.abort) {{
+                  this.onabort?.();
+                  return;
+                }}
+                this.result = `data:${{file.type || ""}};base64,${{file.payload || ""}}`;
+                this.onload?.();
+              }}
+              readAsText(file) {{
+                if (file.fail) {{
+                  this.onerror?.(new Error("simulated read error"));
+                  return;
+                }}
+                if (file.abort) {{
+                  this.onabort?.();
+                  return;
+                }}
+                this.result = file.text ?? "";
+                this.onload?.();
+              }}
+            }}
+            globalThis.FileReader = MockFileReader;
+
+            async function readFileAsBase64Payload(file) {read_file}
+            async function readFilesAsBase64Payloads(files, options = {{}}) {read_files}
+            async function readFileAsText(file) {read_text}
+            function parseJsonImportText(rawText, contextLabel = "导入文件") {parse_json_import}
+
+            const successPayload = await readFilesAsBase64Payloads([
+              {{ name: "ok.png", type: "image/png", payload: "ZmFrZQ==" }},
+            ], {{ actionLabel: "导入" }});
+            const textPayload = await readFileAsText({{ name: "ideas.json", text: "{{\\"records\\":[]}}" }});
+            const parsedPayload = parseJsonImportText(textPayload, "助手灵感包");
+
+            let batchMessage = "";
+            try {{
+              await readFilesAsBase64Payloads([
+                {{ name: "ok.png", type: "image/png", payload: "ZmFrZQ==" }},
+                {{ name: "lost.mp3", fail: true }},
+                {{ name: "busy.wav", abort: true }},
+              ], {{ actionLabel: "导入" }});
+            }} catch (error) {{
+              batchMessage = error.message;
+            }}
+
+            let missingFileMessage = "";
+            try {{
+              await readFileAsBase64Payload(null);
+            }} catch (error) {{
+              missingFileMessage = error.message;
+            }}
+
+            let textReadMessage = "";
+            try {{
+              await readFileAsText({{ name: "presets.json", abort: true }});
+            }} catch (error) {{
+              textReadMessage = error.message;
+            }}
+
+            let jsonMessage = "";
+            try {{
+              parseJsonImportText("not json", "粒子预设包");
+            }} catch (error) {{
+              jsonMessage = error.message;
+            }}
+
+            console.log(JSON.stringify({{
+              successPayload,
+              parsedPayload,
+              batchMessage,
+              missingFileMessage,
+              textReadMessage,
+              jsonMessage,
+            }}));
+            """
+        )
+        result = subprocess.run(
+            ["node", "--input-type=module", "-e", script],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        payload = json.loads(result.stdout)
+
+        self.assertEqual(payload["successPayload"], [{"name": "ok.png", "dataBase64": "ZmFrZQ=="}])
+        self.assertEqual(payload["parsedPayload"], {"records": []})
+        self.assertIn("导入失败", payload["batchMessage"])
+        self.assertIn("lost.mp3", payload["batchMessage"])
+        self.assertIn("busy.wav", payload["batchMessage"])
+        self.assertIn("重新选择", payload["batchMessage"])
+        self.assertEqual(payload["missingFileMessage"], "没有收到要读取的文件。")
+        self.assertIn("presets.json", payload["textReadMessage"])
+        self.assertIn("没有读到这个文件", payload["textReadMessage"])
+        self.assertIn("粒子预设包不是可识别的 JSON 文件", payload["jsonMessage"])
+        self.assertIn("Canvasia 导出的 .json 文件", payload["jsonMessage"])
+
     def test_literal_data_actions_have_click_handlers(self) -> None:
         action_locations: dict[str, list[str]] = {}
         for path in ACTION_ATTRIBUTE_PATHS:
@@ -1216,6 +1446,9 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("renderInspectionScreen();", export_build)
         self.assertLess(export_build.index("state.lastExportResult = result;"), export_build.index("renderDashboard();"))
         self.assertLess(export_build.index("state.lastExportResult = result;"), export_build.index("renderInspectionScreen();"))
+        self.assertIn("导出${targetLabel}失败，已列出原因", export_build)
+        self.assertIn("${targetLabel}没有导出成功", export_build)
+        self.assertIn("copyable: true", export_build)
 
     def test_asset_delete_confirmations_preview_exact_targets(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
@@ -1223,6 +1456,7 @@ class FrontendActionHandlerTests(unittest.TestCase):
         render_asset_details = _extract_function_source(source, "renderAssetDetails")
         import_accept = _extract_function_source(source, "getAssetImportAccept")
         import_assets = _extract_function_source(source, "importAssets")
+        read_files = _extract_function_source(source, "readFilesAsBase64Payloads")
         replace_accept = _extract_function_source(source, "getAssetReplaceAccept")
         replace_format_label = _extract_function_source(source, "getAssetReplaceFormatLabel")
         replace_button_label = _extract_function_source(source, "getAssetReplaceButtonLabel")
@@ -1255,6 +1489,12 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("const rejectedFiles = getRejectedAssetFilesByAccept(files, accept)", import_assets)
         self.assertIn("导入素材失败：文件格式不匹配", import_assets)
         self.assertIn("如果这一批文件本来就混着多种素材，请改用“智能导入”。", import_assets)
+        self.assertIn("导入素材失败，已列出问题文件", import_assets)
+        self.assertIn("这批素材没有导入成功", import_assets)
+        self.assertIn("copyable: true", import_assets)
+        self.assertIn("readFilesAsBase64Payloads(files", import_assets)
+        self.assertIn("Promise.allSettled", read_files)
+        self.assertIn("还有 ${failedMessages.length - 6} 个文件未展开", read_files)
         self.assertIn("ASSET_REPLACE_ACCEPTS[asset.type]", replace_accept)
         self.assertIn("ASSET_REPLACE_FORMAT_LABELS[asset.type]", replace_format_label)
         self.assertIn('["可补/替换格式", getAssetReplaceFormatLabel(asset)]', render_asset_details)
@@ -1268,6 +1508,10 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("if (!isFileAcceptedByAccept(file, accept))", replace_asset)
         self.assertIn("替换素材失败：文件格式不匹配", replace_asset)
         self.assertIn("如果这个文件其实属于别的素材分类", replace_asset)
+        self.assertIn("替换素材失败，已列出原因", replace_asset)
+        self.assertIn("这个素材文件没有替换成功", replace_asset)
+        self.assertIn("copyable: true", replace_asset)
+        self.assertIn("await showEngineAlert", replace_asset)
         self.assertIn("? getNextAssetSelectionAfterDelete(asset.id)", replace_asset)
         self.assertIn("selectedAssetId: selectedAssetIdAfterReplace", replace_asset)
         self.assertIn("当前筛选下的缺文件素材已经补完", replace_asset)
@@ -1280,6 +1524,9 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertNotIn(".slice(0, 6)\n        .join(\"\\n\")", delete_single)
         self.assertIn("将删除：\\n${deletePreview}", delete_single)
         self.assertIn("如仅需更换或补上传文件，优先使用“补/替换文件”", delete_single)
+        self.assertIn("删除素材失败，已列出原因", delete_single)
+        self.assertIn("素材「${asset.name}」没有删除成功", delete_single)
+        self.assertIn("copyable: true", delete_single)
         self.assertIn("const nextSelectedAssetId = getNextAssetSelectionAfterDelete(asset.id)", delete_single)
         self.assertIn("selectedAssetId: nextSelectedAssetId", delete_single)
         self.assertNotIn('assetFilterMode: "all"', delete_single)
@@ -1292,6 +1539,9 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("const deletePreview = formatAssetDeletionPreview(unusedAssets)", delete_bulk)
         self.assertIn("const skipPreview = formatAssetDeletionPreview(usedAssets", delete_bulk)
         self.assertIn("formatAssetUsagePreview(state.data.assetUsage.get(asset.id) ?? []", delete_bulk)
+        self.assertIn("批量删除素材失败，已列出原因", delete_bulk)
+        self.assertIn("这批素材没有批量删除成功", delete_bulk)
+        self.assertIn("copyable: true", delete_bulk)
         self.assertIn("会自动跳过：${usedAssets.length} 个仍在使用的素材\\n${skipPreview}", delete_bulk)
         self.assertIn("const nextSelectedAssetId = deletedIds.has(state.selectedAssetId)", delete_bulk)
         self.assertIn("? getNextAssetSelectionAfterDelete(deletedIds)", delete_bulk)

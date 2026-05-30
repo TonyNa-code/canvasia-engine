@@ -3964,6 +3964,7 @@ def import_assets(asset_type: str, files: list[dict], fallback_asset_type: str |
     imported_assets = []
     grouped_counts: dict[str, int] = {}
     pending_files: list[tuple[str, bytes, str]] = []
+    invalid_files: list[tuple[str, str, str]] = []
     written_paths: list[Path] = []
 
     for file_item in files:
@@ -3976,10 +3977,20 @@ def import_assets(asset_type: str, files: list[dict], fallback_asset_type: str |
         if asset_type != "auto" and not is_replace_file_allowed_for_asset_type(resolved_asset_type, file_name):
             type_label = ASSET_TYPE_LABELS.get(str(resolved_asset_type or ""), str(resolved_asset_type or "素材"))
             extension_hint = get_asset_replace_extension_hint(resolved_asset_type)
-            raise ValueError(
-                f"不能将“{file_name}”作为{type_label}素材导入。请上传 {extension_hint}，或使用智能导入自动分类。"
-            )
+            invalid_files.append((file_name, type_label, extension_hint))
+            continue
         pending_files.append((file_name, raw, resolved_asset_type))
+
+    if invalid_files:
+        _, type_label, extension_hint = invalid_files[0]
+        preview_names = [file_name for file_name, _, _ in invalid_files[:8]]
+        preview = "\n".join(f"- {file_name}" for file_name in preview_names)
+        hidden_count = len(invalid_files) - len(preview_names)
+        hidden_text = f"\n- 还有 {hidden_count} 个文件未展开" if hidden_count > 0 else ""
+        raise ValueError(
+            f"不能将以下文件作为{type_label}素材导入：\n{preview}{hidden_text}\n"
+            f"请上传 {extension_hint}，或使用智能导入自动分类。"
+        )
 
     try:
         for file_name, raw, resolved_asset_type in pending_files:

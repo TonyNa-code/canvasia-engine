@@ -1123,32 +1123,37 @@ async function init() {
   }
 }
 
+async function fetchEditorResource(url, options = {}, contextLabel = "请求") {
+  try {
+    return await fetch(url, options);
+  } catch (error) {
+    throw new Error(`${contextLabel}无法连接到编辑器后端，请确认编辑器服务仍在运行，然后刷新重试。`);
+  }
+}
+
 async function loadProjectCenter() {
-  const response = await fetch(API_PROJECT_CENTER);
+  const response = await fetchEditorResource(API_PROJECT_CENTER, {}, "读取项目列表");
+  const result = await readJsonResponse(response, { contextLabel: "读取项目列表" });
+  const resultObject = result && typeof result === "object" ? result : {};
 
   if (!response.ok) {
-    throw new Error(`读取项目列表失败，状态码 ${response.status}`);
+    throw new Error(resultObject.error ?? `读取项目列表失败，状态码 ${response.status}`);
   }
 
-  const result = await response.json();
   return {
-    activeProjectId: result.activeProjectId ?? null,
-    projects: Array.isArray(result.projects) ? result.projects : [],
+    activeProjectId: resultObject.activeProjectId ?? null,
+    projects: Array.isArray(resultObject.projects) ? resultObject.projects : [],
   };
 }
 
 async function loadProjectData() {
-  const response = await fetch(API_PROJECT_DATA);
-  let bundle = null;
-  try {
-    bundle = await response.json();
-  } catch (error) {
-    bundle = null;
-  }
+  const response = await fetchEditorResource(API_PROJECT_DATA, {}, "读取项目数据");
+  const result = await readJsonResponse(response, { contextLabel: "读取项目数据" });
+  const bundle = result && typeof result === "object" ? result : {};
 
-  if (!response.ok || bundle?.ok === false) {
-    const loadError = new Error(bundle?.error ?? `读取项目数据失败，状态码 ${response.status}`);
-    loadError.recovery = bundle?.recovery ?? null;
+  if (!response.ok || bundle.ok === false) {
+    const loadError = new Error(bundle.error ?? `读取项目数据失败，状态码 ${response.status}`);
+    loadError.recovery = bundle.recovery ?? null;
     throw loadError;
   }
 
@@ -7186,7 +7191,7 @@ async function matchVoiceFilesToPlaceholders(files) {
 
   try {
     setSaveStatus(`正在批量匹配 ${files.length} 个语音文件...`);
-    const payloadFiles = await Promise.all(files.map(readFileAsBase64Payload));
+    const payloadFiles = await readFilesAsBase64Payloads(files, { actionLabel: "批量匹配语音文件" });
     const result = await postJson(API_MATCH_VOICE_FILES, {
       files: payloadFiles,
       assetIds: targetAssets.map((asset) => asset.id),
@@ -31430,12 +31435,29 @@ function exportCreativeAssistantHistoryViewArchive() {
 }
 
 async function readFileAsText(file) {
+  if (!file) {
+    throw new Error("没有收到要读取的文件。");
+  }
+
+  const fileName = String(file.name || "未命名文件");
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onerror = () => reject(new Error(`读取文件失败：${file.name}`));
+    const rejectRead = () => {
+      reject(new Error(`${fileName}：浏览器没有读到这个文件，请确认文件没有被移动、删除或被系统占用。`));
+    };
+    reader.onerror = rejectRead;
+    reader.onabort = rejectRead;
     reader.onload = () => resolve(String(reader.result ?? ""));
     reader.readAsText(file);
   });
+}
+
+function parseJsonImportText(rawText, contextLabel = "导入文件") {
+  try {
+    return JSON.parse(String(rawText ?? ""));
+  } catch (error) {
+    throw new Error(`${contextLabel}不是可识别的 JSON 文件，请确认选择的是 Canvasia 导出的 .json 文件。`);
+  }
 }
 
 async function importCreativeAssistantHistoryArchive(file) {
@@ -31443,7 +31465,7 @@ async function importCreativeAssistantHistoryArchive(file) {
     return;
   }
   try {
-    const payload = JSON.parse(await readFileAsText(file));
+    const payload = parseJsonImportText(await readFileAsText(file), "助手灵感包");
     const importedRecords = creativeAssistantTools?.getCreativeAssistantHistoryArchiveRecords?.(payload, {
       limit: CREATIVE_ASSISTANT_MAX_HISTORY,
     }) ?? (
@@ -31474,8 +31496,16 @@ async function importCreativeAssistantHistoryArchive(file) {
     setSaveStatus(`已导入 ${importedRecords.length} 条助手灵感`);
     showToast(`灵感盒已导入 ${importedRecords.length} 条`);
   } catch (error) {
-    setSaveStatus("导入助手灵感失败", true);
-    showToast(error.message || "导入助手灵感失败", "error");
+    const message = getErrorDetailMessage(error, "导入助手灵感失败");
+    setSaveStatus(message, true);
+    showToast("导入助手灵感失败", "error");
+    await showEngineAlert({
+      title: "导入助手灵感失败",
+      message,
+      tone: "warning",
+      copyable: true,
+      confirmLabel: "我知道了",
+    });
   }
 }
 
@@ -35889,7 +35919,7 @@ async function importAssets(files, options = {}) {
   try {
     const modeLabel = options.smartImport ? "智能导入" : "导入";
     setSaveStatus(`正在${modeLabel} ${files.length} 个素材...`);
-    const payloadFiles = await Promise.all(files.map(readFileAsBase64Payload));
+    const payloadFiles = await readFilesAsBase64Payloads(files, { actionLabel: modeLabel });
     const result = await postJson(API_IMPORT_ASSETS, {
       assetType: options.smartImport ? "auto" : state.selectedAssetType,
       fallbackAssetType: state.selectedAssetType,
@@ -35911,9 +35941,16 @@ async function importAssets(files, options = {}) {
     setSaveStatus(message);
     showToast(message);
   } catch (error) {
-    setSaveStatus("导入素材失败", true);
-    showToast("导入素材失败", "error");
-    showEngineAlert(`导入素材没有成功：${error.message}`);
+    const detailMessage = getErrorDetailMessage(error);
+    setSaveStatus(getErrorSummaryLine(error, "导入素材失败"), true);
+    showToast("导入素材失败，已列出问题文件", "error");
+    await showEngineAlert({
+      title: "导入素材失败",
+      message: `这批素材没有导入成功：\n${detailMessage}`,
+      tone: "warning",
+      copyable: true,
+      confirmLabel: "我知道了",
+    });
   }
 }
 
@@ -35971,9 +36008,16 @@ async function replaceSelectedAssetFile(file) {
     setSaveStatus(`已替换素材文件：${nextAsset.name}${advanceMessage}`);
     showToast(`已替换素材文件：${nextAsset.name}${advanceMessage}`);
   } catch (error) {
-    setSaveStatus("替换素材失败", true);
-    showToast("替换素材失败", "error");
-    showEngineAlert(`替换素材没有成功：${error.message}`);
+    const detailMessage = getErrorDetailMessage(error);
+    setSaveStatus(getErrorSummaryLine(error, "替换素材失败"), true);
+    showToast("替换素材失败，已列出原因", "error");
+    await showEngineAlert({
+      title: "替换素材失败",
+      message: `这个素材文件没有替换成功：\n${detailMessage}`,
+      tone: "warning",
+      copyable: true,
+      confirmLabel: "我知道了",
+    });
   }
 }
 
@@ -36084,9 +36128,16 @@ async function deleteSelectedAsset() {
     setSaveStatus(`已删除素材：${asset.name}`);
     showToast(`已删除素材：${asset.name}`);
   } catch (error) {
-    setSaveStatus("删除素材失败", true);
-    showToast("删除素材失败", "error");
-    showEngineAlert(`删除素材没有成功：${error.message}`);
+    const detailMessage = getErrorDetailMessage(error);
+    setSaveStatus(getErrorSummaryLine(error, "删除素材失败"), true);
+    showToast("删除素材失败，已列出原因", "error");
+    await showEngineAlert({
+      title: "删除素材失败",
+      message: `素材「${asset.name}」没有删除成功：\n${detailMessage}`,
+      tone: "warning",
+      copyable: true,
+      confirmLabel: "我知道了",
+    });
   }
 }
 
@@ -36239,9 +36290,16 @@ async function deleteSelectedUnusedAssets() {
     setSaveStatus(message, result.deletedCount === 0);
     showToast(message, result.deletedCount === 0 ? "error" : "soft");
   } catch (error) {
-    setSaveStatus("批量删除素材失败", true);
-    showToast("批量删除素材失败", "error");
-    showEngineAlert(`批量删除素材没有成功：${error.message}`);
+    const detailMessage = getErrorDetailMessage(error);
+    setSaveStatus(getErrorSummaryLine(error, "批量删除素材失败"), true);
+    showToast("批量删除素材失败，已列出原因", "error");
+    await showEngineAlert({
+      title: "批量删除素材失败",
+      message: `这批素材没有批量删除成功：\n${detailMessage}`,
+      tone: "warning",
+      copyable: true,
+      confirmLabel: "我知道了",
+    });
   }
 }
 
@@ -36331,26 +36389,62 @@ async function exportBuild(target = "web") {
     setSaveStatus("试玩包已经导出，可以直接打开");
     showToast("试玩包已经导出，可以直接打开");
   } catch (error) {
-    setSaveStatus(`导出${targetLabel}失败`, true);
-    showToast(`导出${targetLabel}失败`, "error");
-    showEngineAlert(`导出${targetLabel}没有成功：${error.message}`);
+    const detailMessage = getErrorDetailMessage(error);
+    setSaveStatus(getErrorSummaryLine(error, `导出${targetLabel}失败`), true);
+    showToast(`导出${targetLabel}失败，已列出原因`, "error");
+    await showEngineAlert({
+      title: `导出${targetLabel}失败`,
+      message: `${targetLabel}没有导出成功：\n${detailMessage}`,
+      tone: "warning",
+      copyable: true,
+      confirmLabel: "我知道了",
+    });
   }
 }
 
 async function readFileAsBase64Payload(file) {
+  if (!file) {
+    throw new Error("没有收到要读取的文件。");
+  }
+
+  const fileName = String(file.name || "未命名文件");
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onerror = () => reject(new Error(`读取文件失败：${file.name}`));
+    const rejectRead = () => {
+      reject(new Error(`${fileName}：浏览器没有读到这个文件，请确认文件没有被移动、删除或被系统占用。`));
+    };
+    reader.onerror = rejectRead;
+    reader.onabort = rejectRead;
     reader.onload = () => {
       const result = String(reader.result ?? "");
       const dataBase64 = result.includes(",") ? result.split(",").pop() : result;
       resolve({
-        name: file.name,
+        name: fileName,
         dataBase64,
       });
     };
     reader.readAsDataURL(file);
   });
+}
+
+async function readFilesAsBase64Payloads(files, options = {}) {
+  const fileList = Array.from(files ?? []);
+  const settledResults = await Promise.allSettled(fileList.map(readFileAsBase64Payload));
+  const failedMessages = settledResults
+    .filter((result) => result.status === "rejected")
+    .map((result) => result.reason?.message || "未知文件读取失败");
+
+  if (failedMessages.length > 0) {
+    const preview = failedMessages.slice(0, 6).map((message) => `- ${message}`);
+    if (failedMessages.length > 6) {
+      preview.push(`- 还有 ${failedMessages.length - 6} 个文件未展开`);
+    }
+    throw new Error(
+      `${options.actionLabel || "读取本地文件"}失败：\n${preview.join("\n")}\n请确认这些文件仍在原位置，然后重新选择。`
+    );
+  }
+
+  return settledResults.map((result) => result.value);
 }
 
 async function saveSelectedScenePlanner() {
@@ -37308,24 +37402,60 @@ async function promptForText(message, defaultValue) {
   return cleanValue || null;
 }
 
-async function postJson(url, payload) {
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
-  const result = await response.json();
+function getErrorDetailMessage(error, fallbackMessage = "请求没有成功，请稍后再试一次。") {
+  return String(error?.message || fallbackMessage);
+}
 
-  if (!response.ok || !result.ok) {
-    const requestError = new Error(result.error ?? "请求失败");
-    requestError.recovery = result.recovery ?? null;
-    requestError.history = result.history ?? null;
+function getErrorSummaryLine(error, fallbackMessage) {
+  return getErrorDetailMessage(error, fallbackMessage).split(/\r?\n/)[0] || fallbackMessage;
+}
+
+async function readJsonResponse(response, options = {}) {
+  let responseText = "";
+  try {
+    responseText = await response.text();
+  } catch (error) {
+    throw new Error(`${options.contextLabel ?? "请求"}没有收到可读取的响应，请稍后重试。`);
+  }
+
+  if (!responseText.trim()) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(responseText);
+  } catch (error) {
+    const statusLabel = response.status ? `（HTTP ${response.status}）` : "";
+    throw new Error(
+      `${options.contextLabel ?? "请求"}返回了无法识别的内容${statusLabel}，请稍后重试或查看终端日志。`
+    );
+  }
+}
+
+async function postJson(url, payload) {
+  const response = await fetchEditorResource(
+    url,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    },
+    "请求"
+  );
+  const result = await readJsonResponse(response, { contextLabel: "请求" });
+  const resultObject = result && typeof result === "object" ? result : {};
+
+  if (!response.ok || !resultObject.ok) {
+    const statusLabel = response.status ? `，状态码 ${response.status}` : "";
+    const requestError = new Error(resultObject.error ?? `请求失败${statusLabel}`);
+    requestError.recovery = resultObject.recovery ?? null;
+    requestError.history = resultObject.history ?? null;
     throw requestError;
   }
 
-  return result;
+  return resultObject;
 }
 
 async function persistScene(updatedScene, options = {}) {
@@ -38091,8 +38221,7 @@ async function importParticleCustomPresetPack(file) {
 
   try {
     setSaveStatus("正在导入粒子预设包...");
-    const rawText = await file.text();
-    const parsed = JSON.parse(rawText);
+    const parsed = parseJsonImportText(await readFileAsText(file), "粒子预设包");
     const importPlan = particleEffectTools.buildParticleCustomPresetImportPlan(parsed, getProjectParticleCustomPresets(), {
       normalizeConfig: normalizeParticleEffectConfig,
     });
@@ -38110,9 +38239,16 @@ async function importParticleCustomPresetPack(file) {
     setSaveStatus(importPlan.summary);
     showToast(importPlan.summary);
   } catch (error) {
+    const message = getErrorDetailMessage(error, "导入粒子预设失败");
     setSaveStatus("导入粒子预设失败", true);
     showToast("导入粒子预设失败", "error");
-    showEngineAlert(`导入粒子预设没有成功：${error.message}`);
+    await showEngineAlert({
+      title: "导入粒子预设失败",
+      message,
+      tone: "warning",
+      copyable: true,
+      confirmLabel: "我知道了",
+    });
   }
 }
 

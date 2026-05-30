@@ -1515,20 +1515,27 @@ class RunEditorSmokeTests(unittest.TestCase):
     def test_asset_import_replace_and_delete_with_usage_protection(self) -> None:
         _, chapter_result = self.create_blank_project_with_chapter()
 
-        with self.assertRaisesRegex(ValueError, "不能将.*作为背景素材导入|智能导入"):
+        with self.assertRaises(ValueError) as single_context:
             run_editor.import_assets(
                 "background",
                 [build_upload_payload("wrong_bgm.mp3", b"fake-audio")],
             )
+        self.assertIn("wrong_bgm.mp3", str(single_context.exception))
+        self.assertIn("智能导入", str(single_context.exception))
         self.assertFalse((run_editor.TEMPLATE_DIR / "assets/backgrounds/wrong_bgm.mp3").exists())
-        with self.assertRaisesRegex(ValueError, "不能将.*作为背景素材导入|智能导入"):
+        with self.assertRaises(ValueError) as mixed_context:
             run_editor.import_assets(
                 "background",
                 [
                     build_upload_payload("atomic_ok.png", b"fake-image-before-error"),
                     build_upload_payload("atomic_bad.mp3", b"fake-audio-before-error"),
+                    build_upload_payload("atomic_bad.wav", b"fake-voice-before-error"),
                 ],
             )
+        mixed_message = str(mixed_context.exception)
+        self.assertIn("atomic_bad.mp3", mixed_message)
+        self.assertIn("atomic_bad.wav", mixed_message)
+        self.assertIn("智能导入", mixed_message)
         self.assertFalse((run_editor.TEMPLATE_DIR / "assets/backgrounds/atomic_ok.png").exists())
         original_write_bytes = Path.write_bytes
 
