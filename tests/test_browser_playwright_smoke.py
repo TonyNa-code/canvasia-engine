@@ -1058,6 +1058,158 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
             timeout=15000,
         )
 
+    def test_assets_bulk_delete_reports_deletable_and_protected_items(self) -> None:
+        project_title = "浏览器烟测项目_AssetCleanup"
+        self.create_blank_project(project_title)
+        self.create_first_chapter()
+        asset_payload = self.page.evaluate(
+            """async () => {
+                const importResponse = await fetch('/api/import-assets', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        assetType: 'background',
+                        files: [
+                            { name: 'used_cleanup_bg.png', dataBase64: btoa('used-background') },
+                            { name: 'unused_cleanup_bg.png', dataBase64: btoa('unused-background') },
+                        ],
+                    }),
+                });
+                const importResult = await importResponse.json();
+                if (!importResult.ok) {
+                    throw new Error(importResult.error || 'import failed');
+                }
+
+                const bundleResponse = await fetch('/api/project-data');
+                const bundle = await bundleResponse.json();
+                const chapter = bundle.chapters[0];
+                const scene = chapter.scenes[0];
+                const usedAsset = importResult.assets[0];
+                const unusedAsset = importResult.assets[1];
+                const saveResponse = await fetch('/api/save-scene', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chapterId: chapter.chapterId,
+                        sceneId: scene.id,
+                        scene: {
+                            ...scene,
+                            blocks: [
+                                { id: 'block_used_cleanup_bg', type: 'background', assetId: usedAsset.id, transition: 'fade' },
+                            ],
+                        },
+                    }),
+                });
+                const saveResult = await saveResponse.json();
+                if (!saveResult.ok) {
+                    throw new Error(saveResult.error || 'save scene failed');
+                }
+                return { usedId: usedAsset.id, unusedId: unusedAsset.id };
+            }"""
+        )
+        self.open_project_by_title(project_title)
+        advanced_button = self.page.get_by_role("button", name="打开高级工具").first
+        if advanced_button.is_visible():
+            advanced_button.click()
+        self.page.locator('[data-action="switch-screen"][data-screen="assets"]').first.click()
+        self.page.wait_for_function(
+            """() => document.querySelector('#screen-assets')?.classList.contains('is-active')""",
+            timeout=15000,
+        )
+
+        self.page.locator(f'input[data-action="toggle-asset-bulk"][data-asset-id="{asset_payload["usedId"]}"]').check()
+        self.page.locator(f'input[data-action="toggle-asset-bulk"][data-asset-id="{asset_payload["unusedId"]}"]').check()
+        bulk_delete_button = self.page.locator("#assetBulkDeleteButton")
+        self.assertIn("删未使用 1/2", bulk_delete_button.inner_text())
+        self.assertIn("跳过 1 个正在使用的素材", bulk_delete_button.get_attribute("title") or "")
+
+        bulk_delete_button.click()
+        dialog = self.page.locator(".system-dialog").filter(has_text="批量删除未使用素材").first
+        dialog.wait_for(timeout=15000)
+        dialog.get_by_text("可删除：1 个").wait_for(timeout=15000)
+        dialog.get_by_text("会自动跳过：1 个仍在使用的素材").wait_for(timeout=15000)
+        dialog.get_by_role("button", name="批量删除").click()
+        self.page.wait_for_function(
+            """async ({ usedId, unusedId }) => {
+                const response = await fetch('/api/project-data');
+                const bundle = await response.json();
+                const assetIds = bundle.assets.assets.map((asset) => asset.id);
+                return assetIds.includes(usedId) && !assetIds.includes(unusedId);
+            }""",
+            arg=asset_payload,
+            timeout=15000,
+        )
+        self.page.locator(f'input[data-action="toggle-asset-bulk"][data-asset-id="{asset_payload["usedId"]}"]').wait_for(
+            timeout=15000
+        )
+        self.assertIn("无可删未使用", bulk_delete_button.inner_text())
+
+    def test_asset_replace_button_contextualizes_missing_file_placeholders(self) -> None:
+        project_title = "浏览器烟测项目_AssetReplaceHint"
+        self.create_blank_project(project_title)
+        self.create_first_chapter()
+        asset_payload = self.page.evaluate(
+            """async () => {
+                const bundleResponse = await fetch('/api/project-data');
+                const bundle = await bundleResponse.json();
+                const chapter = bundle.chapters[0];
+                const scene = chapter.scenes[0];
+                const block = {
+                    id: 'block_missing_voice_hint',
+                    type: 'dialogue',
+                    speakerId: '',
+                    text: '这句台词用来确认补文件按钮会按素材类型提示。',
+                };
+                const saveResponse = await fetch('/api/save-scene', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chapterId: chapter.chapterId,
+                        sceneId: scene.id,
+                        scene: { ...scene, blocks: [block] },
+                    }),
+                });
+                const saveResult = await saveResponse.json();
+                if (!saveResult.ok) {
+                    throw new Error(saveResult.error || 'save scene failed');
+                }
+                const voiceResponse = await fetch('/api/create-voice-placeholder', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sceneId: scene.id,
+                        blockId: block.id,
+                        preferredName: 'missing_voice_hint',
+                    }),
+                });
+                const voiceResult = await voiceResponse.json();
+                if (!voiceResult.ok) {
+                    throw new Error(voiceResult.error || 'voice placeholder failed');
+                }
+                return { assetId: voiceResult.assetId };
+            }"""
+        )
+
+        self.open_project_by_title(project_title)
+        self.page.locator('[data-action="switch-screen"][data-screen="assets"]').first.click()
+        self.page.wait_for_function(
+            """() => document.querySelector('#screen-assets')?.classList.contains('is-active')""",
+            timeout=15000,
+        )
+        self.page.locator('[data-action="select-asset-type"][data-asset-type="voice"]').click()
+        self.page.locator(f'[data-action="select-asset"][data-asset-id="{asset_payload["assetId"]}"]').wait_for(
+            timeout=15000
+        )
+
+        replace_button = self.page.locator("#replaceAssetButton")
+        self.assertEqual(replace_button.inner_text().strip(), "补这个文件")
+        self.assertIn("补完后会自动跳到下一个缺文件素材", replace_button.get_attribute("title") or "")
+        self.assertIn("audio/*", self.page.locator("#assetImportInput").get_attribute("accept") or "")
+        self.assertIn("audio/*", self.page.locator("#assetReplaceInput").get_attribute("accept") or "")
+        self.assertIn(".flac", self.page.locator("#assetReplaceInput").get_attribute("accept") or "")
+        self.assertIn("video/*", self.page.locator("#assetSmartImportInput").get_attribute("accept") or "")
+        self.assertIn(".model3.json", self.page.locator("#assetSmartImportInput").get_attribute("accept") or "")
+
     def test_inspection_flow_can_run_regression_and_export_report(self) -> None:
         self.create_blank_project("浏览器烟测项目_C")
         self.create_first_chapter()

@@ -169,6 +169,44 @@ const ASSET_PRESET_TAGS = assetCatalogTools?.ASSET_PRESET_TAGS ?? {
   scene3d: ["场景", "地图", "房间", "GLB", "交互"],
 };
 
+const ASSET_REPLACE_ACCEPTS = {
+  background: "image/*,.png,.jpg,.jpeg,.webp,.gif,.avif",
+  sprite: "image/*,.png,.jpg,.jpeg,.webp,.gif,.avif",
+  cg: "image/*,.png,.jpg,.jpeg,.webp,.gif,.avif",
+  ui: "image/*,.png,.jpg,.jpeg,.webp,.gif,.avif",
+  bgm: "audio/*,.mp3,.ogg,.wav,.m4a,.aac,.flac",
+  sfx: "audio/*,.mp3,.ogg,.wav,.m4a,.aac,.flac",
+  voice: "audio/*,.mp3,.ogg,.wav,.m4a,.aac,.flac",
+  video: "video/*,.mp4,.webm,.mov,.m4v",
+  font: ".ttf,.otf,.ttc",
+  live2d: "application/json,.model3.json,.moc3,.motion3.json,.physics3.json,.cdi3.json,.pose3.json,.exp3.json,.userdata3.json",
+  model3d: ".glb,.gltf,.vrm,.fbx,.obj",
+  scene3d: ".glb,.gltf,.vrm,.fbx,.obj",
+};
+const ASSET_SMART_IMPORT_ACCEPT = Array.from(
+  new Set(
+    Object.values(ASSET_REPLACE_ACCEPTS)
+      .flatMap((accept) => accept.split(","))
+      .map((item) => item.trim())
+      .filter(Boolean)
+  )
+).join(",");
+
+const ASSET_REPLACE_FORMAT_LABELS = {
+  background: "PNG / JPG / WebP / GIF / AVIF",
+  sprite: "PNG / JPG / WebP / GIF / AVIF",
+  cg: "PNG / JPG / WebP / GIF / AVIF",
+  ui: "PNG / JPG / WebP / GIF / AVIF",
+  bgm: "MP3 / OGG / WAV / M4A / AAC / FLAC",
+  sfx: "MP3 / OGG / WAV / M4A / AAC / FLAC",
+  voice: "MP3 / OGG / WAV / M4A / AAC / FLAC",
+  video: "MP4 / WebM / MOV / M4V",
+  font: "TTF / OTF / TTC",
+  live2d: "model3.json / moc3 / motion3.json / physics3.json / exp3.json",
+  model3d: "GLB / GLTF / VRM / FBX / OBJ",
+  scene3d: "GLB / GLTF / VRM / FBX / OBJ",
+};
+
 const CHARACTER_PRESENTATION_MODE_LABELS = assetCatalogTools?.CHARACTER_PRESENTATION_MODE_LABELS ?? {
   sprite: "普通立绘",
   layered_sprite: "差分立绘",
@@ -1843,7 +1881,7 @@ function renderBeginnerAssetsGuide(selectedAsset, duplicateOverview = buildAsset
     title = `补齐“${selectedAssetName}”的真实文件`;
     description = `当前选中的${selectedTypeLabel}条目还没有真实文件，补齐后预览和导出才会生效。`;
     actions = [
-      { label: "替换当前文件", action: "replace-asset-file" },
+      { label: "补/替换文件", action: "replace-asset-file" },
       { label: "只看这类待导入", action: "focus-asset-gap", dataset: { "asset-filter-mode": "missing_file", "asset-type": state.selectedAssetType } },
     ];
   } else if (overview.urgentMissingCount > 0) {
@@ -12482,6 +12520,9 @@ function renderAssetsScreen() {
   const fullSelectedTypeAssets = state.data.assetList.filter((asset) => asset.type === state.selectedAssetType);
   const selectedTypeAssets = visibleAssets.filter((asset) => asset.type === state.selectedAssetType);
   const currentCheckedIds = getCurrentCheckedAssetIds();
+  const currentCheckedAssets = getCurrentCheckedAssetsOfSelectedType();
+  const currentDeletableCheckedCount = currentCheckedAssets.filter((asset) => isAssetUnused(asset.id)).length;
+  const currentProtectedCheckedCount = Math.max(currentCheckedAssets.length - currentDeletableCheckedCount, 0);
   const totalCheckedCount = getCheckedAssetIds().length;
   const hiddenCheckedCount = Math.max(totalCheckedCount - currentCheckedIds.length, 0);
   const searchSummary = getAssetFilterSummary();
@@ -12567,11 +12608,20 @@ function renderAssetsScreen() {
   }
 
   if (refs.assetBulkDeleteButton) {
-    refs.assetBulkDeleteButton.disabled = currentCheckedIds.length === 0;
-    refs.assetBulkDeleteButton.textContent =
-      currentCheckedIds.length > 0
-        ? `删掉勾选未使用 (${currentCheckedIds.length})`
-        : "删掉勾选未使用";
+    refs.assetBulkDeleteButton.disabled = currentCheckedIds.length === 0 || currentDeletableCheckedCount === 0;
+    if (currentCheckedIds.length === 0) {
+      refs.assetBulkDeleteButton.textContent = "删掉勾选未使用";
+      refs.assetBulkDeleteButton.title = "先勾选当前列表里想清理的素材。";
+    } else if (currentDeletableCheckedCount === 0) {
+      refs.assetBulkDeleteButton.textContent = `无可删未使用 (${currentCheckedIds.length})`;
+      refs.assetBulkDeleteButton.title = "当前勾选项都还在被引用保护，先解除引用后再删除。";
+    } else {
+      refs.assetBulkDeleteButton.textContent = `删未使用 ${currentDeletableCheckedCount}/${currentCheckedIds.length}`;
+      refs.assetBulkDeleteButton.title =
+        currentProtectedCheckedCount > 0
+          ? `会删除 ${currentDeletableCheckedCount} 个未使用素材，并跳过 ${currentProtectedCheckedCount} 个正在使用的素材。`
+          : `会删除当前勾选的 ${currentDeletableCheckedCount} 个未使用素材。`;
+    }
   }
 
   if (refs.matchVoiceFilesButton) {
@@ -12586,7 +12636,23 @@ function renderAssetsScreen() {
   }
 
   if (refs.replaceAssetButton) {
+    const replaceLabel = getAssetReplaceButtonLabel(selectedAsset);
     refs.replaceAssetButton.disabled = !selectedAsset;
+    refs.replaceAssetButton.textContent = replaceLabel;
+    refs.replaceAssetButton.title = getAssetReplaceButtonTitle(selectedAsset);
+    refs.replaceAssetButton.classList.toggle("toolbar-button-primary", Boolean(selectedAsset && !selectedAsset.fileExists));
+  }
+
+  if (refs.assetImportInput) {
+    refs.assetImportInput.accept = getAssetImportAccept(state.selectedAssetType);
+  }
+
+  if (refs.assetSmartImportInput) {
+    refs.assetSmartImportInput.accept = ASSET_SMART_IMPORT_ACCEPT;
+  }
+
+  if (refs.assetReplaceInput) {
+    refs.assetReplaceInput.accept = getAssetReplaceAccept(selectedAsset);
   }
 
   if (refs.deleteAssetButton) {
@@ -20914,6 +20980,40 @@ function renderAssetCard(asset, isSelected, duplicateInfo = null) {
   `;
 }
 
+function getAssetReplaceAccept(asset) {
+  return asset ? ASSET_REPLACE_ACCEPTS[asset.type] ?? "" : "";
+}
+
+function getAssetImportAccept(assetType = state.selectedAssetType) {
+  return ASSET_REPLACE_ACCEPTS[assetType] ?? "";
+}
+
+function getAssetReplaceFormatLabel(asset) {
+  return asset ? ASSET_REPLACE_FORMAT_LABELS[asset.type] ?? "与素材类型匹配的文件" : "先选中一个素材";
+}
+
+function getAssetReplaceButtonLabel(asset) {
+  if (!asset) {
+    return "先选中素材";
+  }
+
+  return asset.fileExists ? "替换当前文件" : "补这个文件";
+}
+
+function getAssetReplaceButtonTitle(asset) {
+  if (!asset) {
+    return "先从素材列表里选中一个条目。";
+  }
+
+  const typeLabel = getAssetTypeLabel(asset.type);
+  const acceptHint = getAssetReplaceAccept(asset) ? "文件选择器会优先限制为这一类格式。" : "请选择和这个素材类型匹配的文件。";
+  if (!asset.fileExists) {
+    return `为这个${typeLabel}补上传真实文件。若正在筛“待导入”，补完后会自动跳到下一个缺文件素材；${acceptHint}`;
+  }
+
+  return `替换这个${typeLabel}的真实文件，素材引用关系会保留；${acceptHint}`;
+}
+
 function renderCharacterCard(character, isSelected, stats = null) {
   const safeStats = stats ?? buildCharacterDialogueStats(character.id);
   return `
@@ -20940,7 +21040,7 @@ function renderAssetDetails(asset, duplicateOverview = buildAssetDuplicateOvervi
   const usages = state.data.assetUsage.get(asset.id) ?? [];
   const duplicateInfo = duplicateOverview.infoByAssetId.get(asset.id) ?? null;
   const assetTypeLabel = getAssetTypeLabel(asset.type);
-  const usagePreview = usages.slice(0, 4).join(" / ");
+  const usagePreview = formatAssetUsagePreview(usages, { limit: 4, separator: " / " });
   return `
     ${renderAssetPreviewCard(asset)}
     <article class="detail-card">
@@ -20981,6 +21081,7 @@ function renderAssetDetails(asset, duplicateOverview = buildAssetDuplicateOvervi
       ["文件路径", asset.path],
       ["文件状态", asset.fileExists ? "已导入，可直接预览" : "还没找到真实文件"],
       ["文件大小", asset.fileExists ? formatFileSize(asset.fileSizeBytes) : "暂时未知"],
+      ["可补/替换格式", getAssetReplaceFormatLabel(asset)],
       ["标签", asset.tags?.join(" / ") || "未填写"],
       ["使用状态", usages.length > 0 ? `已使用 ${usages.length} 处` : "暂时未使用"],
       ["重复检查", duplicateInfo ? duplicateInfo.summary : "当前没有明显重复信号"],
@@ -21000,7 +21101,7 @@ function renderAssetDetails(asset, duplicateOverview = buildAssetDuplicateOvervi
         ${
           usages.length > 0
             ? `先把剧情、角色或其他位置里对这个${assetTypeLabel}的引用解除，再回来删除。${usagePreview ? `当前最前面的引用有：${escapeHtml(usagePreview)}` : ""}`
-            : `这里删掉的是当前这个${assetTypeLabel}条目。这个动作不能撤回；如仅需更换文件，优先使用上面的“替换当前文件”。`
+            : `这里删掉的是当前这个${assetTypeLabel}条目。这个动作不能撤回；如仅需更换或补上传文件，优先使用上面的“补/替换文件”。`
         }
       </p>
       <div class="detail-actions">
@@ -21211,6 +21312,28 @@ function renderAssetDuplicateList(asset, duplicateOverview = buildAssetDuplicate
       </div>
     </div>
   `;
+}
+
+function formatAssetUsageEntry(usage, fallback = "使用位置") {
+  if (usage && typeof usage === "object") {
+    const label = usage.label || fallback;
+    return usage.meta ? `${label}（${usage.meta}）` : label;
+  }
+
+  return String(usage || fallback);
+}
+
+function formatAssetUsagePreview(usages, options = {}) {
+  const limit = Math.max(1, Math.floor(Number(options.limit ?? 4)) || 4);
+  const separator = options.separator ?? " / ";
+  const list = Array.isArray(usages) ? usages : [];
+  const lines = list.slice(0, limit).map((usage) => formatAssetUsageEntry(usage));
+
+  if (list.length > limit) {
+    lines.push(`还有 ${list.length - limit} 处未展开`);
+  }
+
+  return lines.join(separator);
 }
 
 function renderAssetUsageList(usages) {
@@ -35743,6 +35866,26 @@ async function importAssets(files, options = {}) {
     return;
   }
 
+  if (!options.smartImport) {
+    const accept = getAssetImportAccept(state.selectedAssetType);
+    const rejectedFiles = getRejectedAssetFilesByAccept(files, accept);
+    if (rejectedFiles.length > 0) {
+      const message = getFileAcceptMismatchMessage(rejectedFiles, {
+        expectedLabel: getAssetReplaceFormatLabel({ type: state.selectedAssetType }),
+        actionLabel: `导入${getAssetTypeLabel(state.selectedAssetType)}`,
+        fallbackHint: "如果这一批文件本来就混着多种素材，请改用“智能导入”。",
+      });
+      setSaveStatus("导入素材失败：文件格式不匹配", true);
+      showToast("文件格式不匹配", "error");
+      await showEngineAlert({
+        title: "文件格式不匹配",
+        message,
+        tone: "warning",
+      });
+      return;
+    }
+  }
+
   try {
     const modeLabel = options.smartImport ? "智能导入" : "导入";
     setSaveStatus(`正在${modeLabel} ${files.length} 个素材...`);
@@ -35780,12 +35923,33 @@ async function replaceSelectedAssetFile(file) {
     return;
   }
 
+  const accept = getAssetReplaceAccept(asset);
+  if (!isFileAcceptedByAccept(file, accept)) {
+    const message = getFileAcceptMismatchMessage([file], {
+      expectedLabel: getAssetReplaceFormatLabel(asset),
+      actionLabel: `补/替换${getAssetTypeLabel(asset.type)}`,
+      fallbackHint: "如果这个文件其实属于别的素材分类，请先切到对应分类上传，或使用“智能导入”。",
+    });
+    setSaveStatus("替换素材失败：文件格式不匹配", true);
+    showToast("文件格式不匹配", "error");
+    await showEngineAlert({
+      title: "文件格式不匹配",
+      message,
+      tone: "warning",
+    });
+    return;
+  }
+
   try {
     setSaveStatus(`正在替换素材文件：${asset.name}`);
     if (state.activeAssetAudioId === asset.id) {
       stopAssetAudioPreview({ rerender: false });
     }
 
+    const shouldAdvanceAfterReplace = shouldAdvanceAssetSelectionAfterReplace(asset);
+    const selectedAssetIdAfterReplace = shouldAdvanceAfterReplace
+      ? getNextAssetSelectionAfterDelete(asset.id)
+      : asset.id;
     const result = await postJson(API_REPLACE_ASSET, {
       assetId: asset.id,
       file: await readFileAsBase64Payload(file),
@@ -35795,18 +35959,75 @@ async function replaceSelectedAssetFile(file) {
     await reloadProjectData({
       ...getCurrentUiState(),
       selectedAssetType: asset.type,
-      selectedAssetId: asset.id,
-      assetFilterMode: "all",
+      selectedAssetId: selectedAssetIdAfterReplace,
     });
 
     const nextAsset = result.asset ?? asset;
-    setSaveStatus(`已替换素材文件：${nextAsset.name}`);
-    showToast(`已替换素材文件：${nextAsset.name}`);
+    const advanceMessage = shouldAdvanceAfterReplace
+      ? selectedAssetIdAfterReplace
+        ? "，已跳到下一个待补素材"
+        : "，当前筛选下的缺文件素材已经补完"
+      : "";
+    setSaveStatus(`已替换素材文件：${nextAsset.name}${advanceMessage}`);
+    showToast(`已替换素材文件：${nextAsset.name}${advanceMessage}`);
   } catch (error) {
     setSaveStatus("替换素材失败", true);
     showToast("替换素材失败", "error");
     showEngineAlert(`替换素材没有成功：${error.message}`);
   }
+}
+
+function getRejectedAssetFilesByAccept(files, accept) {
+  return Array.from(files ?? []).filter((file) => !isFileAcceptedByAccept(file, accept));
+}
+
+function isFileAcceptedByAccept(file, accept) {
+  const tokens = String(accept || "")
+    .split(",")
+    .map((token) => token.trim().toLowerCase())
+    .filter(Boolean);
+
+  if (!tokens.length) {
+    return true;
+  }
+
+  const fileName = String(file?.name || "").toLowerCase();
+  const fileType = String(file?.type || "").toLowerCase();
+  return tokens.some((token) => {
+    if (token.endsWith("/*")) {
+      return fileType.startsWith(token.slice(0, -1));
+    }
+    if (token.startsWith(".")) {
+      return fileName.endsWith(token);
+    }
+    return Boolean(fileType) && fileType === token;
+  });
+}
+
+function getFileAcceptMismatchMessage(files, options = {}) {
+  const names = Array.from(files ?? [])
+    .slice(0, 6)
+    .map((file) => `- ${file?.name || "未命名文件"}`);
+  if ((files?.length ?? 0) > 6) {
+    names.push(`- 还有 ${(files?.length ?? 0) - 6} 个文件未展开`);
+  }
+
+  return [
+    `${options.actionLabel || "处理素材"}前发现有文件格式不匹配。`,
+    names.join("\n"),
+    `需要的格式：${options.expectedLabel || "与素材类型匹配的文件"}`,
+    options.fallbackHint || "",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+function shouldAdvanceAssetSelectionAfterReplace(asset) {
+  if (!asset || asset.fileExists) {
+    return false;
+  }
+
+  return state.assetFilterMode === "missing_file" || state.assetFilterMode === "urgent_missing";
 }
 
 async function deleteSelectedAsset() {
@@ -35819,11 +36040,10 @@ async function deleteSelectedAsset() {
   const usageCount = getAssetUsageCount(asset.id);
   if (usageCount > 0) {
     const usages = state.data.assetUsage.get(asset.id) ?? [];
+    const usagePreview = formatAssetUsagePreview(usages, { limit: 6, separator: "\n" });
     await showEngineAlert({
       title: "素材仍在使用",
-      message: `这个素材还在被 ${usageCount} 个位置使用，暂时不能删除。\n\n先解除这些引用后再删：\n${usages
-        .slice(0, 6)
-        .join("\n")}`,
+      message: `这个素材还在被 ${usageCount} 个位置使用，暂时不能删除。\n\n先解除这些引用后再删：\n${usagePreview}`,
       tone: "warning",
     });
     setSaveStatus("这个素材还在被使用，不能直接删除", true);
@@ -35831,9 +36051,10 @@ async function deleteSelectedAsset() {
     return;
   }
 
+  const deletePreview = formatAssetDeletionPreview([asset], { includeFileSize: true });
   const confirmed = await showEngineConfirm({
     title: "删除这个素材？",
-    message: `确定要删掉素材「${asset.name}」吗？这个动作不能撤回。`,
+    message: `确定要删掉素材「${asset.name}」吗？\n\n将删除：\n${deletePreview}\n\n这个动作不能撤回；如仅需更换或补上传文件，优先使用“补/替换文件”。`,
     tone: "danger",
     confirmLabel: "删除素材",
     cancelLabel: "保留素材",
@@ -35848,6 +36069,7 @@ async function deleteSelectedAsset() {
       stopAssetAudioPreview({ rerender: false });
     }
 
+    const nextSelectedAssetId = getNextAssetSelectionAfterDelete(asset.id);
     await postJson(API_DELETE_ASSET, {
       assetId: asset.id,
     });
@@ -35856,8 +36078,7 @@ async function deleteSelectedAsset() {
     await reloadProjectData({
       ...getCurrentUiState(),
       selectedAssetType: asset.type,
-      selectedAssetId: null,
-      assetFilterMode: "all",
+      selectedAssetId: nextSelectedAssetId,
     });
 
     setSaveStatus(`已删除素材：${asset.name}`);
@@ -35867,6 +36088,27 @@ async function deleteSelectedAsset() {
     showToast("删除素材失败", "error");
     showEngineAlert(`删除素材没有成功：${error.message}`);
   }
+}
+
+function getNextAssetSelectionAfterDelete(deletedAssetIds) {
+  const deletedIdSet = new Set(
+    Array.isArray(deletedAssetIds) || deletedAssetIds instanceof Set ? [...deletedAssetIds] : [deletedAssetIds]
+  );
+  const currentAssets = getCurrentFilteredAssetsOfSelectedType();
+  const selectedIndex = currentAssets.findIndex((asset) => asset.id === state.selectedAssetId);
+  const firstDeletedIndex = currentAssets.findIndex((asset) => deletedIdSet.has(asset.id));
+  const anchorIndex = selectedIndex >= 0 ? selectedIndex : firstDeletedIndex;
+  const remainingAssets = currentAssets.filter((asset) => !deletedIdSet.has(asset.id));
+
+  if (!remainingAssets.length) {
+    return null;
+  }
+
+  if (anchorIndex < 0) {
+    return remainingAssets[0].id;
+  }
+
+  return remainingAssets[Math.min(anchorIndex, remainingAssets.length - 1)]?.id ?? null;
 }
 
 function selectAllVisibleAssets() {
@@ -35882,6 +36124,27 @@ function selectAllVisibleAssets() {
   renderAssetsScreen();
   setSaveStatus(`已勾选当前列表 ${visibleAssets.length} 个素材`);
   showToast(`已勾选当前列表 ${visibleAssets.length} 个素材`);
+}
+
+function formatAssetDeletionPreview(assets, options = {}) {
+  const limit = Math.max(1, Math.floor(Number(options.limit ?? 6)) || 6);
+  const includeUsage = Boolean(options.includeUsage);
+  const includeFileSize = options.includeFileSize !== false;
+  const lines = assets.slice(0, limit).map((asset, index) => {
+    const detailParts = [
+      getAssetTypeLabel(asset.type),
+      asset.path || "",
+      includeFileSize && asset.fileExists ? formatFileSize(asset.fileSizeBytes) : "",
+      includeUsage ? `已使用 ${getAssetUsageCount(asset.id)} 处` : "",
+    ].filter(Boolean);
+    return `${index + 1}. ${truncateText(asset.name || asset.id, 40)} · ${detailParts.join(" · ")}`;
+  });
+
+  if (assets.length > limit) {
+    lines.push(`…还有 ${assets.length - limit} 个未展开`);
+  }
+
+  return lines.join("\n");
 }
 
 function clearAssetSelection() {
@@ -35907,7 +36170,15 @@ async function deleteSelectedUnusedAssets() {
   if (!unusedAssets.length) {
     const usageLines = usedAssets
       .slice(0, 6)
-      .map((asset) => `${asset.name} · 已使用 ${getAssetUsageCount(asset.id)} 处`)
+      .map((asset) => {
+        const usagePreview = formatAssetUsagePreview(state.data.assetUsage.get(asset.id) ?? [], {
+          limit: 2,
+          separator: " / ",
+        });
+        return `${asset.name} · 已使用 ${getAssetUsageCount(asset.id)} 处${
+          usagePreview ? ` · ${usagePreview}` : ""
+        }`;
+      })
       .join("\n");
     await showEngineAlert({
       title: "没有可批量删除的素材",
@@ -35919,11 +36190,17 @@ async function deleteSelectedUnusedAssets() {
     return;
   }
 
+  const deletePreview = formatAssetDeletionPreview(unusedAssets);
+  const skipPreview = formatAssetDeletionPreview(usedAssets, { includeUsage: true, includeFileSize: false });
   const confirmed = await showEngineConfirm({
     title: "批量删除未使用素材？",
-    message: `确定要批量删除当前勾选里的未使用素材吗？\n\n可删除：${unusedAssets.length} 个\n${
-      usedAssets.length > 0 ? `会自动跳过：${usedAssets.length} 个仍在使用的素材` : "没有检测到正在使用的勾选项"
-    }`,
+    message: [
+      `确定要批量删除当前勾选里的未使用素材吗？`,
+      `可删除：${unusedAssets.length} 个\n将删除：\n${deletePreview}`,
+      usedAssets.length > 0
+        ? `会自动跳过：${usedAssets.length} 个仍在使用的素材\n${skipPreview}`
+        : "没有检测到正在使用的勾选项",
+    ].join("\n\n"),
     tone: "danger",
     confirmLabel: "批量删除",
     cancelLabel: "先不删除",
@@ -35943,11 +36220,14 @@ async function deleteSelectedUnusedAssets() {
       stopAssetAudioPreview({ rerender: false });
     }
 
+    const nextSelectedAssetId = deletedIds.has(state.selectedAssetId)
+      ? getNextAssetSelectionAfterDelete(deletedIds)
+      : state.selectedAssetId;
     state.lastExportResult = null;
     await reloadProjectData({
       ...getCurrentUiState(),
       selectedAssetType: state.selectedAssetType,
-      selectedAssetId: deletedIds.has(state.selectedAssetId) ? null : state.selectedAssetId,
+      selectedAssetId: nextSelectedAssetId,
     });
 
     const message =

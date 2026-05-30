@@ -1504,6 +1504,13 @@ class RunEditorSmokeTests(unittest.TestCase):
     def test_asset_import_replace_and_delete_with_usage_protection(self) -> None:
         _, chapter_result = self.create_blank_project_with_chapter()
 
+        with self.assertRaisesRegex(ValueError, "不能将.*作为背景素材导入|智能导入"):
+            run_editor.import_assets(
+                "background",
+                [build_upload_payload("wrong_bgm.mp3", b"fake-audio")],
+            )
+        self.assertFalse((run_editor.TEMPLATE_DIR / "assets/backgrounds/wrong_bgm.mp3").exists())
+
         import_result = run_editor.import_assets(
             "background",
             [build_upload_payload("bg_classroom.png", b"fake-image-1")],
@@ -1548,6 +1555,13 @@ class RunEditorSmokeTests(unittest.TestCase):
                 }
             ],
         )
+
+        with self.assertRaisesRegex(ValueError, "不能用.*替换背景素材|请上传"):
+            run_editor.replace_asset_file(
+                asset["id"],
+                build_upload_payload("wrong_bgm.mp3", b"fake-audio"),
+            )
+        self.assertTrue((run_editor.TEMPLATE_DIR / asset["path"]).is_file())
 
         replace_result = run_editor.replace_asset_file(
             asset["id"],

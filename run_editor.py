@@ -233,6 +233,33 @@ LIVE2D_EXTENSION_SUFFIXES = (
     ".exp3.json",
     ".userdata3.json",
 )
+ASSET_REPLACE_EXTENSION_GROUPS = {
+    "background": IMAGE_EXTENSIONS,
+    "sprite": IMAGE_EXTENSIONS,
+    "cg": IMAGE_EXTENSIONS,
+    "ui": IMAGE_EXTENSIONS,
+    "bgm": AUDIO_EXTENSIONS,
+    "sfx": AUDIO_EXTENSIONS,
+    "voice": AUDIO_EXTENSIONS,
+    "video": VIDEO_EXTENSIONS,
+    "font": FONT_EXTENSIONS,
+    "model3d": MODEL3D_EXTENSIONS,
+    "scene3d": MODEL3D_EXTENSIONS,
+}
+ASSET_REPLACE_EXTENSION_HINTS = {
+    "background": "png、jpg、webp、gif 或 avif",
+    "sprite": "png、jpg、webp、gif 或 avif",
+    "cg": "png、jpg、webp、gif 或 avif",
+    "ui": "png、jpg、webp、gif 或 avif",
+    "bgm": "mp3、ogg、wav、m4a、aac 或 flac",
+    "sfx": "mp3、ogg、wav、m4a、aac 或 flac",
+    "voice": "mp3、ogg、wav、m4a、aac 或 flac",
+    "video": "mp4、webm、mov 或 m4v",
+    "font": "ttf、otf 或 ttc",
+    "live2d": "model3.json、moc3、motion3.json、physics3.json、pose3.json、exp3.json 等 Live2D 文件",
+    "model3d": "glb、gltf、vrm、fbx 或 obj",
+    "scene3d": "glb、gltf、vrm、fbx 或 obj",
+}
 EXPORT_TARGET_WEB = "web"
 EXPORT_TARGET_NATIVE_RUNTIME = "native_runtime"
 EXPORT_TARGET_WINDOWS_NWJS = "windows_nwjs"
@@ -3792,6 +3819,25 @@ def choose_smart_asset_type(file_name: str, fallback_asset_type: str | None = No
     raise ValueError(f"文件“{file_name}”目前还无法自动判断素材类型。")
 
 
+def is_replace_file_allowed_for_asset_type(asset_type: str, file_name: str) -> bool:
+    clean_asset_type = str(asset_type or "").strip()
+    lower_file_name = str(file_name or "").lower()
+    ext = Path(lower_file_name).suffix.lower()
+
+    if clean_asset_type == "live2d":
+        return any(lower_file_name.endswith(suffix) for suffix in LIVE2D_EXTENSION_SUFFIXES)
+
+    allowed_extensions = ASSET_REPLACE_EXTENSION_GROUPS.get(clean_asset_type)
+    if allowed_extensions is None:
+        return clean_asset_type in ASSET_DIRECTORIES
+
+    return ext in allowed_extensions
+
+
+def get_asset_replace_extension_hint(asset_type: str) -> str:
+    return ASSET_REPLACE_EXTENSION_HINTS.get(str(asset_type or "").strip(), "与素材类型匹配的文件")
+
+
 def normalize_asset_tags(tags: list[str] | str | None) -> list[str]:
     if isinstance(tags, str):
         raw_items = re.split(r"[\n,，、;；]+", tags)
@@ -3905,6 +3951,12 @@ def import_assets(asset_type: str, files: list[dict], fallback_asset_type: str |
             if asset_type == "auto"
             else asset_type
         )
+        if asset_type != "auto" and not is_replace_file_allowed_for_asset_type(resolved_asset_type, file_name):
+            type_label = ASSET_TYPE_LABELS.get(str(resolved_asset_type or ""), str(resolved_asset_type or "素材"))
+            extension_hint = get_asset_replace_extension_hint(resolved_asset_type)
+            raise ValueError(
+                f"不能将“{file_name}”作为{type_label}素材导入。请上传 {extension_hint}，或使用智能导入自动分类。"
+            )
         target_relative_dir = ASSET_DIRECTORIES[resolved_asset_type]
         target_dir = TEMPLATE_DIR / target_relative_dir
         target_dir.mkdir(parents=True, exist_ok=True)
@@ -4021,6 +4073,12 @@ def replace_asset_file(asset_id: str, file_item: dict) -> dict:
     target_relative_dir = ASSET_DIRECTORIES.get(asset_type)
     if not target_relative_dir:
         raise ValueError("这个素材类型暂时不支持替换文件。")
+    if not is_replace_file_allowed_for_asset_type(asset_type, file_name):
+        type_label = ASSET_TYPE_LABELS.get(str(asset_type or ""), str(asset_type or "素材"))
+        extension_hint = get_asset_replace_extension_hint(asset_type)
+        raise ValueError(
+            f"不能用“{file_name}”替换{type_label}素材。请上传 {extension_hint}。"
+        )
 
     target_dir = TEMPLATE_DIR / target_relative_dir
     target_dir.mkdir(parents=True, exist_ok=True)
