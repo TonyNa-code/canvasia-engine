@@ -263,6 +263,17 @@ class RunEditorSmokeTests(unittest.TestCase):
                 os.environ[env_key] = env_value
         self.temp_dir.cleanup()
 
+    def test_write_json_keeps_original_file_when_dump_fails(self) -> None:
+        target_path = self.test_root / "atomic_write.json"
+        target_path.write_text('{"ok": true}\n', encoding="utf-8")
+
+        with mock.patch.object(run_editor.json, "dump", side_effect=RuntimeError("simulated json failure")):
+            with self.assertRaisesRegex(RuntimeError, "simulated json failure"):
+                run_editor.write_json(target_path, {"ok": False})
+
+        self.assertEqual(target_path.read_text(encoding="utf-8"), '{"ok": true}\n')
+        self.assertFalse(list(self.test_root.glob(".atomic_write.json.*.tmp")))
+
     def assert_export_manifest_has_subtle_engine_signature(self, manifest: dict) -> None:
         self.assertEqual(manifest["engine"]["signature"], run_editor.EXPORT_ENGINE_SIGNATURE)
         self.assertEqual(manifest["protection"]["profile"], run_editor.EXPORT_PROTECTION_PROFILE)
@@ -1510,6 +1521,35 @@ class RunEditorSmokeTests(unittest.TestCase):
                 [build_upload_payload("wrong_bgm.mp3", b"fake-audio")],
             )
         self.assertFalse((run_editor.TEMPLATE_DIR / "assets/backgrounds/wrong_bgm.mp3").exists())
+        with self.assertRaisesRegex(ValueError, "不能将.*作为背景素材导入|智能导入"):
+            run_editor.import_assets(
+                "background",
+                [
+                    build_upload_payload("atomic_ok.png", b"fake-image-before-error"),
+                    build_upload_payload("atomic_bad.mp3", b"fake-audio-before-error"),
+                ],
+            )
+        self.assertFalse((run_editor.TEMPLATE_DIR / "assets/backgrounds/atomic_ok.png").exists())
+        original_write_bytes = Path.write_bytes
+
+        def fail_second_asset_write(path: Path, data: bytes) -> int:
+            if path.name == "rollback_bad.png":
+                raise OSError("simulated disk write failure")
+            return original_write_bytes(path, data)
+
+        with mock.patch.object(Path, "write_bytes", fail_second_asset_write):
+            with self.assertRaisesRegex(OSError, "simulated disk write failure"):
+                run_editor.import_assets(
+                    "background",
+                    [
+                        build_upload_payload("rollback_ok.png", b"fake-image-before-disk-error"),
+                        build_upload_payload("rollback_bad.png", b"fake-image-disk-error"),
+                    ],
+                )
+        self.assertFalse((run_editor.TEMPLATE_DIR / "assets/backgrounds/rollback_ok.png").exists())
+        self.assertFalse((run_editor.TEMPLATE_DIR / "assets/backgrounds/rollback_bad.png").exists())
+        assets_after_rollback = run_editor.read_json(run_editor.DATA_DIR / "assets.json").get("assets", [])
+        self.assertFalse(any(asset.get("path", "").endswith("rollback_ok.png") for asset in assets_after_rollback))
 
         import_result = run_editor.import_assets(
             "background",

@@ -637,9 +637,29 @@ def read_json(path: Path) -> dict:
 
 
 def write_json(path: Path, payload: dict) -> None:
-    with path.open("w", encoding="utf-8") as file:
-        json.dump(payload, file, ensure_ascii=False, indent=2)
-        file.write("\n")
+    temp_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            "w",
+            encoding="utf-8",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as file:
+            temp_path = Path(file.name)
+            json.dump(payload, file, ensure_ascii=False, indent=2)
+            file.write("\n")
+            file.flush()
+            os.fsync(file.fileno())
+        os.replace(temp_path, path)
+    except Exception:
+        if temp_path is not None:
+            try:
+                temp_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+        raise
 
 
 def normalize_text_list(value: object) -> list[str]:
@@ -3943,6 +3963,8 @@ def import_assets(asset_type: str, files: list[dict], fallback_asset_type: str |
     existing_names_by_type: dict[str, set[str]] = {}
     imported_assets = []
     grouped_counts: dict[str, int] = {}
+    pending_files: list[tuple[str, bytes, str]] = []
+    written_paths: list[Path] = []
 
     for file_item in files:
         file_name, raw = decode_uploaded_file(file_item)
@@ -3957,30 +3979,43 @@ def import_assets(asset_type: str, files: list[dict], fallback_asset_type: str |
             raise ValueError(
                 f"不能将“{file_name}”作为{type_label}素材导入。请上传 {extension_hint}，或使用智能导入自动分类。"
             )
-        target_relative_dir = ASSET_DIRECTORIES[resolved_asset_type]
-        target_dir = TEMPLATE_DIR / target_relative_dir
-        target_dir.mkdir(parents=True, exist_ok=True)
-        existing_names = existing_names_by_type.setdefault(
-            resolved_asset_type,
-            {path.name for path in target_dir.glob("*") if path.is_file()},
-        )
-        output_name = build_asset_file_name(file_name, existing_names)
-        output_path = target_dir / output_name
-        output_path.write_bytes(raw)
-        asset_id = build_asset_id(resolved_asset_type, file_name, existing_ids)
-        asset_record = {
-            "id": asset_id,
-            "type": resolved_asset_type,
-            "name": display_asset_name(file_name),
-            "path": (target_relative_dir / output_name).as_posix(),
-            "tags": [],
-            "favorite": False,
-        }
-        assets.append(asset_record)
-        imported_assets.append(enrich_asset_record(asset_record))
-        grouped_counts[resolved_asset_type] = grouped_counts.get(resolved_asset_type, 0) + 1
+        pending_files.append((file_name, raw, resolved_asset_type))
 
-    write_json(assets_path, assets_doc)
+    try:
+        for file_name, raw, resolved_asset_type in pending_files:
+            target_relative_dir = ASSET_DIRECTORIES[resolved_asset_type]
+            target_dir = TEMPLATE_DIR / target_relative_dir
+            target_dir.mkdir(parents=True, exist_ok=True)
+            existing_names = existing_names_by_type.setdefault(
+                resolved_asset_type,
+                {path.name for path in target_dir.glob("*") if path.is_file()},
+            )
+            output_name = build_asset_file_name(file_name, existing_names)
+            output_path = target_dir / output_name
+            written_paths.append(output_path)
+            output_path.write_bytes(raw)
+            asset_id = build_asset_id(resolved_asset_type, file_name, existing_ids)
+            asset_record = {
+                "id": asset_id,
+                "type": resolved_asset_type,
+                "name": display_asset_name(file_name),
+                "path": (target_relative_dir / output_name).as_posix(),
+                "tags": [],
+                "favorite": False,
+            }
+            assets.append(asset_record)
+            imported_assets.append(enrich_asset_record(asset_record))
+            grouped_counts[resolved_asset_type] = grouped_counts.get(resolved_asset_type, 0) + 1
+
+        write_json(assets_path, assets_doc)
+    except Exception:
+        for written_path in reversed(written_paths):
+            try:
+                written_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+        raise
+
     touch_project()
     return {
         "assetType": imported_assets[0]["type"] if imported_assets else fallback_asset_type or asset_type,
