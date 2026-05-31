@@ -369,6 +369,12 @@ textarea {
   color: var(--muted);
 }
 
+.state-card .error-message-copy {
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+
 .project-center-state {
   padding: 28px;
 }

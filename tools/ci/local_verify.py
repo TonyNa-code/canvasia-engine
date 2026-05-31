@@ -31,6 +31,7 @@ PYTHON_SYNTAX_FILES = [
     "tools/ci/project_health.py",
     "tests/test_ci_workflow_coverage.py",
     "tests/test_prepare_preview_release.py",
+    "tests/test_release_public_surface.py",
     "tests/test_frontend_action_handlers.py",
     "tests/test_run_editor_smoke.py",
     "tests/test_native_runtime_render_smoke.py",
@@ -157,6 +158,7 @@ def build_release_tooling_steps(python_executable: str) -> list[VerifyStep]:
             ],
         ),
         build_unittest_step("Preview release tooling", "test_prepare_preview_release.py", "release-tests", python_executable),
+        build_unittest_step("Public release surface guard", "test_release_public_surface.py", "release-tests", python_executable),
     ]
 
 

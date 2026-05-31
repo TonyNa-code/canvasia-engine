@@ -110,6 +110,15 @@ class CiWorkflowCoverageTests(unittest.TestCase):
             workflow,
         )
 
+    def test_public_release_surface_guard_is_run_in_ci(self) -> None:
+        workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("tests/test_release_public_surface.py", workflow)
+        self.assertIn(
+            "python -m unittest discover -s tests -p 'test_release_public_surface.py' -v",
+            workflow,
+        )
+
     def test_editor_entrypoint_modules_are_syntax_checked_in_ci(self) -> None:
         workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
         html = EDITOR_INDEX_PATH.read_text(encoding="utf-8")

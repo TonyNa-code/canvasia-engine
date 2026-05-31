@@ -86,8 +86,11 @@ class FrontendSystemDialogModuleTests(unittest.TestCase):
         source = APP_PATH.read_text(encoding="utf-8")
 
         self.assertIn("function showEngineAlert", source)
+        self.assertIn("function showEngineConfirm", source)
         self.assertNotIn("window.alert(", source)
-        self.assertGreaterEqual(source.count("showEngineAlert("), 60)
+        self.assertNotIn("window.confirm(", source)
+        self.assertGreaterEqual(source.count("showEngineAlert("), 30)
+        self.assertGreaterEqual(source.count("showEngineConfirm("), 10)
 
 
 if __name__ == "__main__":

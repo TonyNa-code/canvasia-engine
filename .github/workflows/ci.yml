@@ -53,6 +53,7 @@ jobs:
             tests/test_local_verify_tool.py \
             tests/test_project_health_tool.py \
             tests/test_prepare_preview_release.py \
+            tests/test_release_public_surface.py \
             tests/test_frontend_action_handlers.py \
             tests/test_frontend_asset_catalog_module.py \
             tests/test_frontend_editor_common_module.py \
@@ -124,6 +125,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_project_health_tool.py' -v
           python tools/ci/project_health.py template_project --json-report verification_reports/project-health-template.json --markdown-report verification_reports/project-health-template.md
           python -m unittest discover -s tests -p 'test_prepare_preview_release.py' -v
+          python -m unittest discover -s tests -p 'test_release_public_surface.py' -v
           python -m unittest discover -s tests -p 'test_frontend_action_handlers.py' -v
           python -m unittest discover -s tests -p 'test_frontend_asset_catalog_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_beginner_tutorial_module.py' -v

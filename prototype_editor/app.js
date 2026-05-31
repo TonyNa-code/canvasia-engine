@@ -838,6 +838,7 @@ const state = {
   projectHistory: null,
   projectSessionRecovery: null,
   historyRecoveryPromptKey: "",
+  loadErrorStage: "",
   sceneStatusDrag: null,
   storyBlockDrag: null,
   starterVariablesPromise: null,
@@ -1115,10 +1116,12 @@ async function init() {
     refs.errorState.classList.add("is-hidden");
     openProjectCenter({ keepStatus: true });
   } catch (error) {
+    state.loadErrorStage = "editor_startup";
     setSaveStatus("载入失败", true);
     refs.loadingState.classList.add("is-hidden");
     refs.errorState.classList.remove("is-hidden");
     refs.errorMessage.textContent = getEditorStartupErrorMessage(error);
+    focusErrorStatePrimaryAction();
     console.error(error);
   }
 }
@@ -1477,6 +1480,7 @@ function updateErrorRecoveryState(history = state.projectHistory) {
 }
 
 function showFatalProjectLoadError(error) {
+  state.loadErrorStage = "project_load";
   refs.loadingState.classList.add("is-hidden");
   refs.projectCenterState.classList.add("is-hidden");
   refs.appMain.classList.add("is-hidden");
@@ -1491,11 +1495,116 @@ function showFatalProjectLoadError(error) {
   updateErrorRecoveryState();
   updateTopbar();
   setSaveStatus("项目载入失败", true);
+  focusErrorStatePrimaryAction();
 }
 
 function getProjectLoadErrorMessage(error) {
   const detail = getErrorDetailMessage(error, "项目没有载入成功，请稍后再试一次。");
   return `项目没有载入成功。\n\n${detail}\n\n如果这里显示了自动快照，可以先尝试恢复到上一个版本。`;
+}
+
+function getLoadErrorProjectTitle(options = {}) {
+  const explicitTitle = String(options.projectTitle ?? "").trim();
+  if (explicitTitle) {
+    return explicitTitle;
+  }
+
+  const currentProjectTitle = String(state.data?.project?.title ?? "").trim();
+  if (currentProjectTitle) {
+    return currentProjectTitle;
+  }
+
+  const activeProjectId = state.data?.project?.projectId ?? state.projectCenter?.activeProjectId ?? null;
+  const projectCenterTitle = String(
+    (state.projectCenter?.projects ?? []).find((project) => project?.projectId === activeProjectId)?.title ?? ""
+  ).trim();
+
+  return projectCenterTitle || "未打开项目";
+}
+
+function getLoadErrorStageLabel(options = {}) {
+  const explicitLabel = String(options.stageLabel ?? "").trim();
+  if (explicitLabel) {
+    return explicitLabel;
+  }
+
+  const stage = String(options.stage ?? state.loadErrorStage ?? "").trim();
+  if (stage === "editor_startup") {
+    return "编辑器启动";
+  }
+  if (stage === "project_load") {
+    return "项目载入";
+  }
+
+  return "未标记";
+}
+
+function getLoadErrorRecoverySummary(options = {}) {
+  const explicitSummary = String(options.recoverySummary ?? "").trim();
+  if (explicitSummary) {
+    return explicitSummary;
+  }
+
+  const history = getSafeProjectHistory(options.history ?? state.projectHistory);
+  if (history.totalSnapshots <= 0) {
+    return "";
+  }
+
+  if (!history.canUndo) {
+    return `${history.totalSnapshots} 份，当前已是最早版本`;
+  }
+
+  const previousLabel = String(history.previousSnapshot?.label ?? "").trim();
+  return previousLabel
+    ? `${history.totalSnapshots} 份，可恢复到「${previousLabel}」`
+    : `${history.totalSnapshots} 份，可恢复到上个版本`;
+}
+
+function buildLoadErrorFeedbackText(message, options = {}) {
+  const cleanMessage = String(message ?? "").trim();
+  if (!cleanMessage) {
+    return "";
+  }
+
+  const capturedAt = options.capturedAt ?? new Date().toISOString();
+  const pageUrl = options.pageUrl ?? globalThis.location?.href ?? "未知页面";
+  const stageLabel = getLoadErrorStageLabel(options);
+  const projectTitle = getLoadErrorProjectTitle(options);
+  const releaseVersion = options.releaseVersion ?? (state.data ? getProjectReleaseVersion() : "");
+  const recoverySummary = getLoadErrorRecoverySummary(options);
+  const lines = [
+    "# Canvasia Engine 错误反馈",
+    "",
+    `时间：${capturedAt}`,
+    `页面：${pageUrl}`,
+    `阶段：${stageLabel}`,
+    `项目：${projectTitle}`,
+  ];
+
+  if (releaseVersion) {
+    lines.push(`项目版本：${releaseVersion}`);
+  }
+
+  if (recoverySummary) {
+    lines.push(`自动快照：${recoverySummary}`);
+  }
+
+  lines.push("", "错误信息：", cleanMessage);
+  return lines.join("\n");
+}
+
+function focusErrorStatePrimaryAction() {
+  const focusTarget = refs.errorState?.querySelector?.('[data-action="reload-editor-page"]');
+  if (typeof focusTarget?.focus !== "function") {
+    return false;
+  }
+
+  focusTarget.focus({ preventScroll: true });
+  return true;
+}
+
+function isErrorStateVisible() {
+  return Boolean(refs.errorState && !refs.errorState.classList.contains("is-hidden"));
 }
 
 async function copyCurrentLoadErrorMessage() {
@@ -1506,7 +1615,7 @@ async function copyCurrentLoadErrorMessage() {
     return false;
   }
 
-  const copied = await copyTextToClipboard(message);
+  const copied = await copyTextToClipboard(buildLoadErrorFeedbackText(message));
   if (!copied) {
     setSaveStatus("错误信息复制失败", true);
     showToast("复制失败，可以手动选中错误信息", "error");
@@ -1516,6 +1625,24 @@ async function copyCurrentLoadErrorMessage() {
   setSaveStatus("错误信息已复制，可直接粘贴到反馈里");
   showToast("错误信息已复制");
   return true;
+}
+
+function reloadEditorPage() {
+  setSaveStatus("正在重新载入编辑器...");
+  showToast("正在重新载入编辑器");
+
+  try {
+    if (typeof globalThis.location?.reload === "function") {
+      globalThis.location.reload();
+      return true;
+    }
+  } catch (error) {
+    console.warn("[Canvasia Engine] Reload from error state failed", error);
+  }
+
+  setSaveStatus("浏览器没有允许自动刷新，请手动刷新页面", true);
+  showToast("请手动刷新页面", "error");
+  return false;
 }
 
 function handleProjectLoadFailure(error) {
@@ -2228,7 +2355,7 @@ function renderProjectCenterCard(project, activeProjectId) {
       <div class="project-card-head">
         <div class="text-stack">
           <h3>${escapeHtml(project?.title ?? "未命名项目")}</h3>
-          <p>项目中心模块暂时不可用，但仍可尝试打开项目。</p>
+          <p>正在使用项目中心简化视图，仍可打开项目继续编辑。</p>
         </div>
       </div>
       <div class="project-card-actions">
@@ -2247,6 +2374,7 @@ function renderProjectCenterCard(project, activeProjectId) {
 
 function openProjectCenter(options = {}) {
   renderProjectCenter();
+  state.loadErrorStage = "";
   refs.loadingState.classList.add("is-hidden");
   refs.errorState.classList.add("is-hidden");
   refs.appMain.classList.add("is-hidden");
@@ -2263,6 +2391,7 @@ function openProjectCenter(options = {}) {
 }
 
 function showEditorShell() {
+  state.loadErrorStage = "";
   refs.loadingState.classList.add("is-hidden");
   refs.errorState.classList.add("is-hidden");
   refs.projectCenterState.classList.add("is-hidden");
@@ -2289,6 +2418,33 @@ async function refreshProjectCenterState() {
   state.projectCenter = await loadProjectCenter();
   renderProjectCenter();
   updateTopbar();
+}
+
+async function openProjectCenterFromErrorState() {
+  setSaveStatus("正在重新读取项目列表...");
+
+  try {
+    await refreshProjectCenterState();
+    openProjectCenter({ keepStatus: true });
+    setSaveStatus("项目列表已刷新");
+    showToast("已回到项目中心");
+    return true;
+  } catch (error) {
+    console.warn("[Canvasia Engine] Project center refresh from error state failed", error);
+    const hasCachedProjects = (state.projectCenter?.projects ?? []).length > 0;
+    if (hasCachedProjects) {
+      openProjectCenter({ keepStatus: true });
+      setSaveStatus("项目列表暂时无法刷新，已显示上次读取结果", true);
+      showToast("已显示上次读取的项目列表", "error");
+      return true;
+    }
+
+    refs.errorMessage.textContent = getEditorStartupErrorMessage(error);
+    setSaveStatus("项目列表仍然无法读取", true);
+    showToast("项目列表仍然无法读取", "error");
+    focusErrorStatePrimaryAction();
+    return false;
+  }
 }
 
 function getProjectCenterProject(projectId) {
@@ -2360,6 +2516,10 @@ async function handleClick(event) {
     if (state.currentScreen === "story" && state.data) {
       await flushPendingStoryChanges();
     }
+    if (isErrorStateVisible()) {
+      await openProjectCenterFromErrorState();
+      return;
+    }
     openProjectCenter();
     showToast("已回到项目中心");
     return;
@@ -2367,6 +2527,11 @@ async function handleClick(event) {
 
   if (action === "copy-error-message") {
     void copyCurrentLoadErrorMessage();
+    return;
+  }
+
+  if (action === "reload-editor-page") {
+    reloadEditorPage();
     return;
   }
 
@@ -7922,8 +8087,8 @@ function handleUnhandledEditorAction(action, actionTarget) {
   const safeAction = String(action || "unknown");
   const label = getActionTargetLabel(actionTarget);
   const labelSuffix = label ? `（${label}）` : "";
-  setSaveStatus(`按钮暂未接线：${safeAction}${labelSuffix}`, true);
-  showToast("这个按钮暂时还没有接上功能", "error");
+  setSaveStatus(`这个入口当前无法执行：${safeAction}${labelSuffix}`, true);
+  showToast("这个入口当前无法执行，已记录排查信息", "error");
   console.warn("[Canvasia Engine] Unhandled editor action", {
     action: safeAction,
     label,
@@ -38000,7 +38165,8 @@ function applyParticleScenePresetToEditor() {
   const scenePreset = getParticleScenePresetConfig(presetId);
 
   if (!scenePreset) {
-    showToast("这组演出级预设暂时不可用");
+    setSaveStatus("没有找到这组演出预设，请重新选择一个预设", true);
+    showToast("没有找到这组演出预设", "error");
     return;
   }
 

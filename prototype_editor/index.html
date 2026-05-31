@@ -159,11 +159,17 @@
         <p>正在载入项目入口与编辑器界面。</p>
       </div>
 
-      <div id="errorState" class="state-card is-hidden">
+      <div id="errorState" class="state-card is-hidden" role="alert" aria-live="assertive" aria-atomic="true">
         <h2>载入失败</h2>
-        <p id="errorMessage">当前还没有可显示的错误信息。</p>
+        <p id="errorMessage" class="error-message-copy">当前还没有可显示的错误信息。</p>
         <div class="action-row">
-          <button class="toolbar-button" data-action="copy-error-message">
+          <button class="toolbar-button toolbar-button-primary" data-action="reload-editor-page" aria-label="重新载入编辑器页面">
+            重新载入编辑器
+          </button>
+          <button class="toolbar-button" data-action="open-project-center" aria-label="返回项目中心重新选择项目">
+            回到项目中心
+          </button>
+          <button class="toolbar-button" data-action="copy-error-message" aria-label="复制当前载入失败的反馈信息">
             复制错误信息
           </button>
         </div>
@@ -173,9 +179,6 @@
           <div class="action-row">
             <button id="errorRecoverButton" class="toolbar-button toolbar-button-primary" data-action="restore-previous-version">
               尝试恢复上个版本
-            </button>
-            <button class="toolbar-button" data-action="open-project-center">
-              回到项目中心
             </button>
           </div>
         </div>

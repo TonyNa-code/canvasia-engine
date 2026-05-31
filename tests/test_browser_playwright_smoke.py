@@ -316,8 +316,8 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
                 button.remove();
             }"""
         )
-        self.page.get_by_text("这个按钮暂时还没有接上功能").wait_for(timeout=15000)
-        self.page.get_by_text("按钮暂未接线：codex-unwired-action").wait_for(timeout=15000)
+        self.page.get_by_text("这个入口当前无法执行，已记录排查信息").wait_for(timeout=15000)
+        self.page.get_by_text("这个入口当前无法执行：codex-unwired-action").wait_for(timeout=15000)
 
     def open_project_by_title(self, title: str) -> None:
         self.open_editor()

@@ -224,37 +224,293 @@ class FrontendActionHandlerTests(unittest.TestCase):
     def test_startup_and_fatal_errors_use_readable_messages(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
         index_source = INDEX_PATH.read_text(encoding="utf-8")
+        style_source = (EDITOR_DIR / "styles.css").read_text(encoding="utf-8")
         click_handler = _extract_function_source(source, "handleClick")
         init_source = _extract_function_source(source, "init")
         startup_message = _extract_function_source(source, "getEditorStartupErrorMessage")
         fatal_project_load = _extract_function_source(source, "showFatalProjectLoadError")
         project_load_message = _extract_function_source(source, "getProjectLoadErrorMessage")
+        load_error_stage_label = _extract_function_source(source, "getLoadErrorStageLabel")
+        load_error_project_title = _extract_function_source(source, "getLoadErrorProjectTitle")
+        load_error_recovery_summary = _extract_function_source(source, "getLoadErrorRecoverySummary")
+        feedback_text = _extract_function_source(source, "buildLoadErrorFeedbackText")
+        focus_error_state = _extract_function_source(source, "focusErrorStatePrimaryAction")
+        is_error_state_visible = _extract_function_source(source, "isErrorStateVisible")
         copy_load_error_message = _extract_function_source(source, "copyCurrentLoadErrorMessage")
+        reload_editor_page = _extract_function_source(source, "reloadEditorPage")
+        project_center_from_error = _extract_function_source(source, "openProjectCenterFromErrorState")
         runtime_error_handler = _extract_function_source(source, "handleEditorRuntimeError")
+        open_project_center = _extract_function_source(source, "openProjectCenter")
+        show_editor_shell = _extract_function_source(source, "showEditorShell")
 
+        self.assertIn('data-action="reload-editor-page"', index_source)
+        self.assertIn('aria-label="重新载入编辑器页面"', index_source)
+        self.assertIn('data-action="open-project-center"', index_source)
+        self.assertIn('aria-label="返回项目中心重新选择项目"', index_source)
         self.assertIn('data-action="copy-error-message"', index_source)
+        self.assertIn('role="alert"', index_source)
+        self.assertIn('aria-live="assertive"', index_source)
+        self.assertIn('aria-atomic="true"', index_source)
+        self.assertIn('class="error-message-copy"', index_source)
+        self.assertIn('aria-label="复制当前载入失败的反馈信息"', index_source)
+        self.assertIn(".state-card .error-message-copy", style_source)
+        self.assertIn("line-height: 1.65", style_source)
+        self.assertIn("overflow-wrap: anywhere", style_source)
+        self.assertIn("white-space: pre-line", style_source)
+        self.assertIn('action === "reload-editor-page"', click_handler)
+        self.assertIn("reloadEditorPage();", click_handler)
         self.assertIn('action === "copy-error-message"', click_handler)
         self.assertIn("void copyCurrentLoadErrorMessage();", click_handler)
+        self.assertIn("isErrorStateVisible()", click_handler)
+        self.assertIn("await openProjectCenterFromErrorState();", click_handler)
+        self.assertIn('state.loadErrorStage = ""', open_project_center)
+        self.assertIn('state.loadErrorStage = ""', show_editor_shell)
+        self.assertLess(
+            click_handler.index('action === "open-project-center"'),
+            click_handler.index("if (!state.data) {"),
+        )
+        self.assertLess(
+            click_handler.index('action === "reload-editor-page"'),
+            click_handler.index("if (!state.data) {"),
+        )
+        self.assertIn('loadErrorStage: ""', source)
         self.assertIn("getEditorStartupErrorMessage(error)", init_source)
+        self.assertIn('state.loadErrorStage = "editor_startup"', init_source)
+        self.assertIn("focusErrorStatePrimaryAction();", init_source)
         self.assertNotIn("refs.errorMessage.textContent = error.message", init_source)
         self.assertIn("编辑器没有载入成功", startup_message)
         self.assertIn("重新运行启动脚本后刷新页面", startup_message)
         self.assertIn("getErrorDetailMessage(", startup_message)
 
         self.assertIn("getProjectLoadErrorMessage(error)", fatal_project_load)
+        self.assertIn('state.loadErrorStage = "project_load"', fatal_project_load)
+        self.assertIn("focusErrorStatePrimaryAction();", fatal_project_load)
         self.assertIn("项目没有载入成功", project_load_message)
         self.assertIn("自动快照", project_load_message)
         self.assertNotIn("error?.message", fatal_project_load)
 
+        self.assertIn("options.stageLabel", load_error_stage_label)
+        self.assertIn("editor_startup", load_error_stage_label)
+        self.assertIn("编辑器启动", load_error_stage_label)
+        self.assertIn("project_load", load_error_stage_label)
+        self.assertIn("项目载入", load_error_stage_label)
+        self.assertIn("state.projectCenter?.activeProjectId", load_error_project_title)
+        self.assertIn("project?.projectId === activeProjectId", load_error_project_title)
+        self.assertIn("未打开项目", load_error_project_title)
+        self.assertIn("getSafeProjectHistory", load_error_recovery_summary)
+        self.assertIn("history.totalSnapshots", load_error_recovery_summary)
+        self.assertIn("history.canUndo", load_error_recovery_summary)
+        self.assertIn("previousSnapshot?.label", load_error_recovery_summary)
+        self.assertIn("# Canvasia Engine 错误反馈", feedback_text)
+        self.assertIn("页面：${pageUrl}", feedback_text)
+        self.assertIn("阶段：${stageLabel}", feedback_text)
+        self.assertIn("项目：${projectTitle}", feedback_text)
+        self.assertIn("项目版本：${releaseVersion}", feedback_text)
+        self.assertIn("自动快照：${recoverySummary}", feedback_text)
+        self.assertIn("错误信息：", feedback_text)
+        self.assertIn('[data-action="reload-editor-page"]', focus_error_state)
+        self.assertIn("preventScroll: true", focus_error_state)
+        self.assertIn("return false", focus_error_state)
+        self.assertIn('classList.contains("is-hidden")', is_error_state_visible)
         self.assertIn("refs.errorMessage?.textContent", copy_load_error_message)
-        self.assertIn("copyTextToClipboard(message)", copy_load_error_message)
+        self.assertIn("copyTextToClipboard(buildLoadErrorFeedbackText(message))", copy_load_error_message)
         self.assertIn("错误信息已复制，可直接粘贴到反馈里", copy_load_error_message)
         self.assertIn("当前没有可复制的错误信息", copy_load_error_message)
         self.assertIn("复制失败，可以手动选中错误信息", copy_load_error_message)
+        self.assertIn("globalThis.location?.reload", reload_editor_page)
+        self.assertIn("浏览器没有允许自动刷新，请手动刷新页面", reload_editor_page)
+        self.assertIn("refreshProjectCenterState()", project_center_from_error)
+        self.assertIn("openProjectCenter({ keepStatus: true })", project_center_from_error)
+        self.assertIn("项目列表暂时无法刷新，已显示上次读取结果", project_center_from_error)
+        self.assertIn("getEditorStartupErrorMessage(error)", project_center_from_error)
+        self.assertIn("项目列表仍然无法读取", project_center_from_error)
+        self.assertIn("focusErrorStatePrimaryAction()", project_center_from_error)
 
         self.assertIn('getErrorDetailMessage(error, "未知错误")', runtime_error_handler)
         self.assertIn("详细错误已记录在控制台", runtime_error_handler)
         self.assertNotIn("error.message", runtime_error_handler)
+
+        script = textwrap.dedent(
+            f"""
+            let state = {{
+              data: null,
+              loadErrorStage: "project_load",
+              projectCenter: {{
+                activeProjectId: "broken-project",
+                projects: [{{ projectId: "broken-project", title: "破损测试工程" }}],
+              }},
+              projectHistory: {{
+                totalSnapshots: 3,
+                canUndo: true,
+                previousSnapshot: {{ label: "自动保存 2" }},
+              }},
+            }};
+            function getLoadErrorStageLabel(options = {{}}) {load_error_stage_label}
+            function getLoadErrorProjectTitle(options = {{}}) {load_error_project_title}
+            function getSafeProjectHistory(history = state.projectHistory) {{
+              return history ?? {{ totalSnapshots: 0, canUndo: false, previousSnapshot: null }};
+            }}
+            function getLoadErrorRecoverySummary(options = {{}}) {load_error_recovery_summary}
+            function buildLoadErrorFeedbackText(message, options = {{}}) {feedback_text}
+            const payload = buildLoadErrorFeedbackText("启动服务断开", {{
+              capturedAt: "2026-05-31T12:00:00.000Z",
+              pageUrl: "http://127.0.0.1:8765/prototype_editor/index.html",
+              stageLabel: "编辑器启动",
+              projectTitle: "心跳时差",
+              releaseVersion: "1.2.3-preview",
+              recoverySummary: "无可用快照",
+            }});
+            const fallbackPayload = buildLoadErrorFeedbackText("项目数据损坏", {{
+              capturedAt: "2026-05-31T12:05:00.000Z",
+              pageUrl: "http://127.0.0.1:8765/prototype_editor/index.html",
+            }});
+            const lockedPayload = buildLoadErrorFeedbackText("已经无法继续回退", {{
+              capturedAt: "2026-05-31T12:10:00.000Z",
+              pageUrl: "http://127.0.0.1:8765/prototype_editor/index.html",
+              history: {{
+                totalSnapshots: 2,
+                canUndo: false,
+                previousSnapshot: null,
+              }},
+              stage: "editor_startup",
+            }});
+            process.stdout.write(JSON.stringify({{ payload, fallbackPayload, lockedPayload }}));
+            """
+        )
+        completed = subprocess.run(
+            ["node", "-e", script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)["payload"]
+        self.assertIn("# Canvasia Engine 错误反馈", payload)
+        self.assertIn("时间：2026-05-31T12:00:00.000Z", payload)
+        self.assertIn("页面：http://127.0.0.1:8765/prototype_editor/index.html", payload)
+        self.assertIn("阶段：编辑器启动", payload)
+        self.assertIn("项目：心跳时差", payload)
+        self.assertIn("项目版本：1.2.3-preview", payload)
+        self.assertIn("自动快照：无可用快照", payload)
+        self.assertIn("启动服务断开", payload)
+        fallback_payload = json.loads(completed.stdout)["fallbackPayload"]
+        self.assertIn("阶段：项目载入", fallback_payload)
+        self.assertIn("项目：破损测试工程", fallback_payload)
+        self.assertIn("自动快照：3 份，可恢复到「自动保存 2」", fallback_payload)
+        self.assertIn("项目数据损坏", fallback_payload)
+        locked_payload = json.loads(completed.stdout)["lockedPayload"]
+        self.assertIn("阶段：编辑器启动", locked_payload)
+        self.assertIn("自动快照：2 份，当前已是最早版本", locked_payload)
+
+        reload_script = textwrap.dedent(
+            f"""
+            const calls = [];
+            function setSaveStatus(message, isError = false) {{
+              calls.push({{ type: "status", message, isError }});
+            }}
+            function showToast(message, tone = "soft") {{
+              calls.push({{ type: "toast", message, tone }});
+            }}
+            console.warn = (...args) => calls.push({{ type: "warn", message: String(args[0]) }});
+            globalThis.location = {{
+              reload() {{
+                calls.push({{ type: "reload" }});
+              }},
+            }};
+            function reloadEditorPage() {reload_editor_page}
+            const succeeded = reloadEditorPage();
+            delete globalThis.location;
+            const failed = reloadEditorPage();
+            process.stdout.write(JSON.stringify({{ succeeded, failed, calls }}));
+            """
+        )
+        reload_completed = subprocess.run(
+            ["node", "-e", reload_script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(reload_completed.returncode, 0, reload_completed.stderr)
+        reload_payload = json.loads(reload_completed.stdout)
+        self.assertTrue(reload_payload["succeeded"])
+        self.assertFalse(reload_payload["failed"])
+        self.assertIn({"type": "reload"}, reload_payload["calls"])
+        self.assertIn(
+            {"type": "status", "message": "浏览器没有允许自动刷新，请手动刷新页面", "isError": True},
+            reload_payload["calls"],
+        )
+
+        project_center_script = textwrap.dedent(
+            f"""
+            const calls = [];
+            const state = {{ projectCenter: {{ projects: [] }} }};
+            const refs = {{ errorMessage: {{ textContent: "" }} }};
+            let refreshMode = "success";
+            function setSaveStatus(message, isError = false) {{
+              calls.push({{ type: "status", message, isError }});
+            }}
+            async function refreshProjectCenterState() {{
+              calls.push({{ type: "refresh" }});
+              if (refreshMode !== "success") {{
+                throw new Error("后端暂时不可用");
+              }}
+              state.projectCenter = {{ projects: [{{ projectId: "demo" }}] }};
+            }}
+            function openProjectCenter(options = {{}}) {{
+              calls.push({{ type: "open", options }});
+            }}
+            function showToast(message, tone = "soft") {{
+              calls.push({{ type: "toast", message, tone }});
+            }}
+            function getEditorStartupErrorMessage(error) {{
+              return `startup:${{error.message}}`;
+            }}
+            function focusErrorStatePrimaryAction() {{
+              calls.push({{ type: "focus" }});
+              return true;
+            }}
+            console.warn = (...args) => calls.push({{ type: "warn", message: String(args[0]) }});
+            async function run() {{
+              async function openProjectCenterFromErrorState() {project_center_from_error}
+              const success = await openProjectCenterFromErrorState();
+              refreshMode = "fail-with-cache";
+              const cached = await openProjectCenterFromErrorState();
+              state.projectCenter = {{ projects: [] }};
+              refs.errorMessage.textContent = "";
+              refreshMode = "fail-empty";
+              const empty = await openProjectCenterFromErrorState();
+              process.stdout.write(JSON.stringify({{ success, cached, empty, errorMessage: refs.errorMessage.textContent, calls }}));
+            }}
+            run().catch((error) => {{
+              console.error(error);
+              process.exit(1);
+            }});
+            """
+        )
+        project_center_completed = subprocess.run(
+            ["node", "-e", project_center_script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(project_center_completed.returncode, 0, project_center_completed.stderr)
+        project_center_payload = json.loads(project_center_completed.stdout)
+        self.assertTrue(project_center_payload["success"])
+        self.assertTrue(project_center_payload["cached"])
+        self.assertFalse(project_center_payload["empty"])
+        self.assertEqual(project_center_payload["errorMessage"], "startup:后端暂时不可用")
+        self.assertIn(
+            {"type": "status", "message": "项目列表暂时无法刷新，已显示上次读取结果", "isError": True},
+            project_center_payload["calls"],
+        )
+        self.assertIn(
+            {"type": "status", "message": "项目列表仍然无法读取", "isError": True},
+            project_center_payload["calls"],
+        )
+        self.assertIn({"type": "focus"}, project_center_payload["calls"])
 
     def test_project_center_failures_use_copyable_detail_dialogs(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
@@ -644,6 +900,9 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("function handleEditorRuntimeError", source)
         self.assertIn("handleMissingProjectAction(actionTarget);", click_handler)
         self.assertIn("handleUnhandledEditorAction(action, actionTarget);", click_handler)
+        self.assertIn("这个入口当前无法执行", source)
+        self.assertNotIn("按钮暂未接线", source)
+        self.assertNotIn("这个按钮暂时还没有接上功能", source)
         self.assertLess(
             click_handler.rfind('action === "reset-preview-debug-defaults"'),
             click_handler.rfind("handleUnhandledEditorAction(action, actionTarget);"),
