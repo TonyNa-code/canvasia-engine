@@ -60,6 +60,7 @@ class FrontendProjectCenterModuleTests(unittest.TestCase):
             }});
             const heroHtml = tools.renderProjectCenterHero({{
               localProjectCount: 2,
+              projectCenterMode: "advanced",
               projectCenterModeLabel: "高级 <模式>",
               hasSampleProject: true,
               activeProjectId: "project-1",
@@ -120,6 +121,17 @@ class FrontendProjectCenterModuleTests(unittest.TestCase):
         self.assertIn("renderProjectCenterHero", payload["keys"])
         self.assertIn("renderProjectCenterProjectList", payload["keys"])
         self.assertIn("新建默认：高级 &lt;模式&gt;", payload["heroHtml"])
+        self.assertIn("新建项目默认模式", payload["heroHtml"])
+        self.assertIn("只影响之后创建的空白项目", payload["heroHtml"])
+        self.assertIn('data-action="set-editor-mode"', payload["heroHtml"])
+        self.assertIn('data-editor-mode="beginner"', payload["heroHtml"])
+        self.assertIn('data-editor-mode="advanced"', payload["heroHtml"])
+        self.assertIn("设为新手模式", payload["heroHtml"])
+        self.assertIn('aria-label="项目中心主卡片：设为新建项目默认新手模式"', payload["heroHtml"])
+        self.assertIn("默认：高级模式", payload["heroHtml"])
+        self.assertIn('title="新建项目已经默认使用高级模式"', payload["heroHtml"])
+        self.assertIn('aria-pressed="true"', payload["heroHtml"])
+        self.assertIn("默认模式可在主卡片或顶部切换", payload["heroHtml"])
         self.assertIn("已发现项目 2 个", payload["heroHtml"])
         self.assertIn("示例项目可选打开", payload["heroHtml"])
         self.assertIn("已经记录过上次打开的项目", payload["heroHtml"])

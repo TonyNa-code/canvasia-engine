@@ -842,6 +842,7 @@ const state = {
   sceneStatusDrag: null,
   storyBlockDrag: null,
   starterVariablesPromise: null,
+  chapterCreateInFlight: false,
   beginnerTutorialOpen: false,
   beginnerTutorialStep: 0,
 };
@@ -2248,6 +2249,32 @@ function renderBeginnerTutorialDialog() {
   refs.beginnerTutorialDialog.classList.toggle("is-visible", state.beginnerTutorialOpen);
 }
 
+function focusBeginnerTutorialDialog() {
+  if (!state.beginnerTutorialOpen || !refs.beginnerTutorialDialog) {
+    return;
+  }
+
+  const focusTarget =
+    refs.beginnerTutorialStepList?.querySelector(".beginner-tutorial-step-button.is-active") ??
+    refs.beginnerTutorialDialog.querySelector('[data-action="close-beginner-tutorial"]') ??
+    refs.beginnerTutorialDialog.querySelector('[role="dialog"]');
+
+  if (!focusTarget?.focus) {
+    return;
+  }
+
+  const runFocus = () => {
+    if (state.beginnerTutorialOpen) {
+      focusTarget.focus({ preventScroll: true });
+    }
+  };
+
+  runFocus();
+  if (typeof requestAnimationFrame === "function") {
+    requestAnimationFrame(runFocus);
+  }
+}
+
 function openBeginnerTutorial(options = {}) {
   const requestedStep = Number.parseInt(options.stepIndex ?? "", 10);
   const steps = getBeginnerTutorialSteps();
@@ -2257,6 +2284,7 @@ function openBeginnerTutorial(options = {}) {
     : fallbackIndex;
   state.beginnerTutorialOpen = true;
   renderBeginnerTutorialDialog();
+  focusBeginnerTutorialDialog();
   setSaveStatus("已打开新手教程");
 }
 
@@ -2277,6 +2305,107 @@ function setBeginnerTutorialStep(stepIndex) {
   const steps = getBeginnerTutorialSteps();
   state.beginnerTutorialStep = beginnerTutorialTools?.clampBeginnerTutorialStepIndex?.(stepIndex, steps) ?? 0;
   renderBeginnerTutorialDialog();
+  focusBeginnerTutorialDialog();
+}
+
+function handleBeginnerTutorialStepKeyboardNavigation(event) {
+  if (!state.beginnerTutorialOpen || !refs.beginnerTutorialStepList || !(event.target instanceof HTMLElement)) {
+    return false;
+  }
+
+  if (!["ArrowUp", "ArrowDown", "Home", "End"].includes(event.code)) {
+    return false;
+  }
+
+  const stepButton = event.target.closest(".beginner-tutorial-step-button");
+  if (!stepButton || !refs.beginnerTutorialStepList.contains(stepButton)) {
+    return false;
+  }
+
+  const steps = getBeginnerTutorialSteps();
+  if (steps.length <= 0) {
+    return false;
+  }
+
+  const currentIndex = beginnerTutorialTools?.clampBeginnerTutorialStepIndex?.(
+    stepButton.dataset.stepIndex,
+    steps
+  ) ?? 0;
+  let nextIndex = currentIndex;
+  if (event.code === "ArrowUp") {
+    nextIndex = Math.max(currentIndex - 1, 0);
+  } else if (event.code === "ArrowDown") {
+    nextIndex = Math.min(currentIndex + 1, steps.length - 1);
+  } else if (event.code === "Home") {
+    nextIndex = 0;
+  } else if (event.code === "End") {
+    nextIndex = steps.length - 1;
+  }
+
+  event.preventDefault();
+  setBeginnerTutorialStep(nextIndex);
+  return true;
+}
+
+function getBeginnerTutorialFocusableElements() {
+  const dialogElement =
+    refs.beginnerTutorialDialog?.querySelector?.(".beginner-tutorial-dialog") ?? refs.beginnerTutorialDialog;
+  if (!dialogElement?.querySelectorAll) {
+    return [];
+  }
+
+  return Array.from(
+    dialogElement.querySelectorAll(
+      [
+        "button:not(:disabled)",
+        "a[href]",
+        "input:not(:disabled)",
+        "textarea:not(:disabled)",
+        "select:not(:disabled)",
+        "[tabindex]:not([tabindex='-1'])",
+      ].join(", ")
+    )
+  ).filter(
+    (element) =>
+      element instanceof HTMLElement &&
+      element.hidden !== true &&
+      element.disabled !== true &&
+      element.getAttribute("aria-hidden") !== "true" &&
+      element.tabIndex >= 0
+  );
+}
+
+function handleBeginnerTutorialDialogTab(event) {
+  if (!state.beginnerTutorialOpen || event.code !== "Tab") {
+    return false;
+  }
+
+  const focusableElements = getBeginnerTutorialFocusableElements();
+  const dialogElement =
+    refs.beginnerTutorialDialog?.querySelector?.(".beginner-tutorial-dialog") ?? refs.beginnerTutorialDialog;
+  if (focusableElements.length <= 0) {
+    event.preventDefault();
+    dialogElement?.focus?.({ preventScroll: true });
+    return true;
+  }
+
+  const activeElement = document.activeElement;
+  const activeIndex = focusableElements.indexOf(activeElement);
+  if (activeIndex === -1) {
+    event.preventDefault();
+    focusableElements[0].focus({ preventScroll: true });
+    return true;
+  }
+
+  const isFirst = activeIndex === 0;
+  const isLast = activeIndex === focusableElements.length - 1;
+  if ((event.shiftKey && isFirst) || (!event.shiftKey && isLast)) {
+    event.preventDefault();
+    focusableElements[event.shiftKey ? focusableElements.length - 1 : 0].focus({ preventScroll: true });
+    return true;
+  }
+
+  return false;
 }
 
 function renderProjectCenter() {
@@ -2549,14 +2678,21 @@ async function handleClick(event) {
 
   if (action === "set-editor-mode") {
     if (!state.data) {
+      const currentMode = getSafeEditorMode(state.projectCenterEditorMode);
       const nextMode = getSafeEditorMode(actionTarget.dataset.editorMode);
+      const modeLabel = getEditorModeLabel(nextMode);
       state.projectCenterEditorMode = nextMode;
       persistStoredProjectCenterEditorMode(nextMode);
       renderProjectCenter();
       updateTopbar();
       applyEditorModeUi();
-      setSaveStatus(`新建项目默认使用${getEditorModeLabel(nextMode)}`);
-      showToast(`新建项目默认：${getEditorModeLabel(nextMode)}`);
+      if (currentMode === nextMode) {
+        setSaveStatus(`新建项目已经默认使用${modeLabel}`);
+        showToast(`已经默认使用${modeLabel}`);
+        return;
+      }
+      setSaveStatus(`新建项目默认使用${modeLabel}`);
+      showToast(`新建项目默认：${modeLabel}`);
       return;
     }
     await saveProjectEditorMode(actionTarget.dataset.editorMode);
@@ -2640,20 +2776,33 @@ async function handleClick(event) {
   }
 
   if (action === "create-project") {
-    const name = await promptForText("给这个新项目起个名字：", "未命名新作");
+    const projectMode = getSafeEditorMode(state.projectCenterEditorMode);
+    const projectModeLabel = getEditorModeLabel(projectMode);
+    const name = await promptForText(
+      [
+        "给这个新项目起个名字：",
+        `将以${projectModeLabel}创建一个真正的空白项目；已有项目不会被改变。`,
+      ],
+      "未命名新作",
+      {
+        title: "新建空白项目",
+        confirmLabel: `创建${projectModeLabel}项目`,
+        placeholder: "例如：雨夜校园序章",
+      }
+    );
     if (!name) {
       return;
     }
 
     try {
-      setSaveStatus("正在创建空白项目...");
+      setSaveStatus(`正在创建${projectModeLabel}空白项目...`);
       const result = await postJson(API_CREATE_PROJECT, {
         name,
-        editorMode: state.projectCenterEditorMode,
+        editorMode: projectMode,
       });
       state.projectCenter = result.projectCenter ?? (await loadProjectCenter());
-      await enterActiveProjectEditor(`已打开空白项目：${name}`);
-      showToast(`空白项目已创建：${name}`);
+      await enterActiveProjectEditor(`已打开${projectModeLabel}空白项目：${name}`);
+      showToast(`空白项目已创建：${name}（${projectModeLabel}）`);
     } catch (error) {
       if (!handleProjectLoadFailure(error)) {
         await showProjectCenterFailure(error, "新建空白项目失败", "空白项目没有创建成功");
@@ -4895,6 +5044,15 @@ function handleGlobalKeydown(event) {
   }
 
   if (state.beginnerTutorialOpen) {
+    if (handleBeginnerTutorialStepKeyboardNavigation(event)) {
+      return;
+    }
+    if (handleBeginnerTutorialDialogTab(event)) {
+      return;
+    }
+    if (event.code === "Tab") {
+      return;
+    }
     if (isKeyboardTypingTarget(event.target)) {
       return;
     }
@@ -8761,19 +8919,8 @@ function applyEditorModeUi() {
   const mode = hasProject ? getProjectEditorMode() : getSafeEditorMode(state.projectCenterEditorMode);
   document.body.dataset.editorMode = hasProject ? mode : "project-center";
 
-  if (refs.editorModeBeginnerButton) {
-    refs.editorModeBeginnerButton.disabled = false;
-    refs.editorModeBeginnerButton.classList.toggle("is-active", mode === "beginner");
-    refs.editorModeBeginnerButton.classList.remove("is-project-locked");
-    refs.editorModeBeginnerButton.title = hasProject ? "" : "设为新建项目默认模式";
-  }
-
-  if (refs.editorModeAdvancedButton) {
-    refs.editorModeAdvancedButton.disabled = false;
-    refs.editorModeAdvancedButton.classList.toggle("is-active", mode === "advanced");
-    refs.editorModeAdvancedButton.classList.remove("is-project-locked");
-    refs.editorModeAdvancedButton.title = hasProject ? "" : "设为新建项目默认模式";
-  }
+  syncEditorModeButton(refs.editorModeBeginnerButton, "beginner", mode, hasProject);
+  syncEditorModeButton(refs.editorModeAdvancedButton, "advanced", mode, hasProject);
 
   const storyButtons = Array.from(document.querySelectorAll("#storyPrimaryToolbar [data-action]"));
   storyButtons.forEach((button) => {
@@ -8814,6 +8961,31 @@ function applyEditorModeUi() {
         : "当前显示常用入口"
       : "常用入口";
   }
+}
+
+function syncEditorModeButton(button, targetMode, activeMode, hasProject) {
+  if (!button) {
+    return;
+  }
+
+  const safeMode = getSafeEditorMode(targetMode);
+  const modeLabel = getEditorModeLabel(safeMode);
+  const isActive = activeMode === safeMode;
+  button.disabled = false;
+  button.classList.toggle("is-active", isActive);
+  button.classList.remove("is-project-locked");
+  button.setAttribute("aria-pressed", isActive ? "true" : "false");
+
+  if (hasProject) {
+    button.textContent = modeLabel;
+    button.title = isActive ? `当前项目正在使用${modeLabel}` : `切换当前项目到${modeLabel}`;
+    button.setAttribute("aria-label", button.title);
+    return;
+  }
+
+  button.textContent = isActive ? `默认：${modeLabel}` : `设为${modeLabel}`;
+  button.title = isActive ? `新建项目将默认使用${modeLabel}` : `设为新建项目默认${modeLabel}`;
+  button.setAttribute("aria-label", button.title);
 }
 
 function getReleaseVersionBase(version = getProjectReleaseVersion()) {
@@ -9177,6 +9349,37 @@ function rerenderProjectHistoryPanel(options = {}) {
   }
 }
 
+function renderDashboardPrimaryActions(isBlankProject) {
+  if (isBlankProject) {
+    return `
+      <button class="toolbar-button toolbar-button-primary" data-action="create-first-chapter">
+        创建第一章和第一场
+      </button>
+      <button class="toolbar-button" data-action="create-first-chapter-custom">
+        自定义名字再创建
+      </button>
+      <button class="toolbar-button" data-action="open-beginner-tutorial" data-step-index="1">
+        看 6 步教程
+      </button>
+    `;
+  }
+
+  return `
+    <button class="toolbar-button toolbar-button-primary" data-action="switch-screen" data-screen="story">
+      进入剧情编辑
+    </button>
+    <button class="toolbar-button" data-action="switch-screen" data-screen="preview">
+      查看试玩页
+    </button>
+    <button class="toolbar-button" data-action="switch-screen" data-screen="assets">
+      打开素材页
+    </button>
+    <button class="toolbar-button" data-action="open-beginner-tutorial">
+      打开新手教程
+    </button>
+  `;
+}
+
 function renderDashboard() {
   const { project, scenes, characters, assetList, chapters } = state.data;
   const routeOverview = buildSceneRouteOverview();
@@ -9220,18 +9423,7 @@ function renderDashboard() {
             <span class="pill">格式版本：V${project.formatVersion}</span>
           </div>
           <div class="action-row">
-            <button class="toolbar-button toolbar-button-primary" data-action="switch-screen" data-screen="story">
-              进入剧情编辑
-            </button>
-            <button class="toolbar-button" data-action="switch-screen" data-screen="preview">
-              查看试玩页
-            </button>
-            <button class="toolbar-button" data-action="switch-screen" data-screen="assets">
-              打开素材页
-            </button>
-            <button class="toolbar-button" data-action="open-beginner-tutorial">
-              打开新手教程
-            </button>
+            ${renderDashboardPrimaryActions(isBlankProject)}
           </div>
           <article class="detail-card">
             <strong>项目分辨率</strong>
@@ -32873,25 +33065,38 @@ async function duplicateScene() {
 }
 
 async function createChapter(options = {}) {
+  if (!state.data) {
+    setSaveStatus("先新建或打开一个项目", true);
+    return;
+  }
+
+  if (state.chapterCreateInFlight) {
+    setSaveStatus("正在创建章节，请稍等...");
+    showToast("正在创建章节，请稍等...");
+    return;
+  }
+
+  state.chapterCreateInFlight = true;
   const defaultChapterName = options.defaultChapterName ?? `新章节 ${state.data.chapters.length + 1}`;
   const suggestedSceneName = options.defaultSceneName ?? `${defaultChapterName} 开场`;
-  const chapterName = options.skipPrompts
-    ? defaultChapterName
-    : await promptForText("请输入新章节的名字。", defaultChapterName);
-
-  if (chapterName === null) {
-    return;
-  }
-
-  const firstSceneName = options.skipPrompts
-    ? suggestedSceneName
-    : await promptForText("再给这个章节的第一个场景起个名字。", suggestedSceneName);
-
-  if (firstSceneName === null) {
-    return;
-  }
 
   try {
+    const chapterName = options.skipPrompts
+      ? defaultChapterName
+      : await promptForText("请输入新章节的名字。", defaultChapterName);
+
+    if (chapterName === null) {
+      return;
+    }
+
+    const firstSceneName = options.skipPrompts
+      ? suggestedSceneName
+      : await promptForText("再给这个章节的第一个场景起个名字。", suggestedSceneName);
+
+    if (firstSceneName === null) {
+      return;
+    }
+
     setSaveStatus("正在新建章节...");
     const result = await postJson(API_CREATE_CHAPTER, {
       chapterName,
@@ -32915,6 +33120,8 @@ async function createChapter(options = {}) {
     showToast(options.successMessage ?? `已新建章节：${chapterName}`);
   } catch (error) {
     await showEditorOperationFailure(error, "新建章节失败", "章节没有创建成功");
+  } finally {
+    state.chapterCreateInFlight = false;
   }
 }
 
@@ -37539,14 +37746,17 @@ function getCurrentUiState() {
   };
 }
 
-async function promptForText(message, defaultValue) {
+async function promptForText(message, defaultValue, options = {}) {
   const promptValue = await showEnginePrompt({
-    title: "填写名称",
+    title: options.title ?? "填写名称",
     message,
     defaultValue,
-    placeholder: defaultValue,
-    confirmLabel: "确认",
-    cancelLabel: "取消",
+    placeholder: options.placeholder ?? defaultValue,
+    confirmLabel: options.confirmLabel ?? "确认",
+    cancelLabel: options.cancelLabel ?? "取消",
+    requiredMessage: options.requiredMessage ?? "先填一个名称，再继续。",
+    maxLength: options.maxLength ?? 80,
+    copyText: options.copyText ?? false,
   });
 
   if (promptValue === null) {

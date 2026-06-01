@@ -10,6 +10,7 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "system_dialog.js"
 APP_PATH = ROOT_DIR / "prototype_editor" / "app.js"
+STYLE_PATH = ROOT_DIR / "prototype_editor" / "styles.css"
 
 
 class FrontendSystemDialogModuleTests(unittest.TestCase):
@@ -91,6 +92,20 @@ class FrontendSystemDialogModuleTests(unittest.TestCase):
         self.assertNotIn("window.confirm(", source)
         self.assertGreaterEqual(source.count("showEngineAlert("), 30)
         self.assertGreaterEqual(source.count("showEngineConfirm("), 10)
+
+    def test_system_dialog_keeps_contrast_inside_dark_editor_theme(self) -> None:
+        style_source = STYLE_PATH.read_text(encoding="utf-8")
+
+        self.assertIn(".system-dialog h2", style_source)
+        self.assertIn("color: #173352", style_source)
+        self.assertIn(".system-dialog-message", style_source)
+        self.assertIn("color: #526c91", style_source)
+        self.assertIn(".system-dialog-input::placeholder", style_source)
+        self.assertIn("color: #8aa0bc", style_source)
+        self.assertIn(".system-dialog-input::selection", style_source)
+        self.assertIn("background: rgba(121, 220, 255, 0.32)", style_source)
+        self.assertIn(".system-dialog-actions .toolbar-button-primary", style_source)
+        self.assertIn("background: linear-gradient(135deg, #28a8ff, #4169ff)", style_source)
 
 
 if __name__ == "__main__":

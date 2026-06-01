@@ -221,6 +221,94 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertNotIn("response.json()", load_project_center)
         self.assertNotIn("response.json()", load_project_data)
 
+    def test_editor_mode_switch_explains_project_center_default_scope(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        apply_editor_mode_ui = _extract_function_source(source, "applyEditorModeUi")
+        sync_editor_mode_button = _extract_function_source(source, "syncEditorModeButton")
+        handle_click = _extract_function_source(source, "handleClick")
+
+        self.assertIn("syncEditorModeButton(refs.editorModeBeginnerButton", apply_editor_mode_ui)
+        self.assertIn("syncEditorModeButton(refs.editorModeAdvancedButton", apply_editor_mode_ui)
+        self.assertIn("aria-pressed", sync_editor_mode_button)
+        self.assertIn("默认：${modeLabel}", sync_editor_mode_button)
+        self.assertIn("设为${modeLabel}", sync_editor_mode_button)
+        self.assertIn("当前项目正在使用${modeLabel}", sync_editor_mode_button)
+        self.assertIn("新建项目将默认使用${modeLabel}", sync_editor_mode_button)
+        self.assertIn("const currentMode = getSafeEditorMode(state.projectCenterEditorMode)", handle_click)
+        self.assertIn("新建项目已经默认使用${modeLabel}", handle_click)
+        self.assertIn("已经默认使用${modeLabel}", handle_click)
+        self.assertIn("showToast(`新建项目默认：${modeLabel}`)", handle_click)
+
+        script = textwrap.dedent(
+            f"""
+            function getSafeEditorMode(mode) {{
+              return String(mode).trim() === "advanced" ? "advanced" : "beginner";
+            }}
+            function getEditorModeLabel(mode) {{
+              return getSafeEditorMode(mode) === "advanced" ? "高级模式" : "新手模式";
+            }}
+            function createButton() {{
+              const classes = new Set();
+              return {{
+                disabled: true,
+                textContent: "",
+                title: "",
+                attrs: {{}},
+                classList: {{
+                  toggle(name, enabled) {{
+                    enabled ? classes.add(name) : classes.delete(name);
+                  }},
+                  remove(name) {{
+                    classes.delete(name);
+                  }},
+                }},
+                setAttribute(name, value) {{
+                  this.attrs[name] = value;
+                }},
+                get classes() {{
+                  return Array.from(classes).sort();
+                }},
+              }};
+            }}
+            function syncEditorModeButton(button, targetMode, activeMode, hasProject) {sync_editor_mode_button}
+            const projectCenterActive = createButton();
+            const projectCenterInactive = createButton();
+            const projectActive = createButton();
+            const projectInactive = createButton();
+            syncEditorModeButton(projectCenterActive, "beginner", "beginner", false);
+            syncEditorModeButton(projectCenterInactive, "advanced", "beginner", false);
+            syncEditorModeButton(projectActive, "advanced", "advanced", true);
+            syncEditorModeButton(projectInactive, "beginner", "advanced", true);
+            process.stdout.write(JSON.stringify({{
+              projectCenterActive,
+              projectCenterInactive,
+              projectActive,
+              projectInactive,
+            }}));
+            """
+        )
+        completed = subprocess.run(
+            ["node", "-e", script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        self.assertEqual(payload["projectCenterActive"]["textContent"], "默认：新手模式")
+        self.assertEqual(payload["projectCenterActive"]["attrs"]["aria-pressed"], "true")
+        self.assertIn("新建项目将默认使用新手模式", payload["projectCenterActive"]["attrs"]["aria-label"])
+        self.assertEqual(payload["projectCenterInactive"]["textContent"], "设为高级模式")
+        self.assertEqual(payload["projectCenterInactive"]["attrs"]["aria-pressed"], "false")
+        self.assertIn("设为新建项目默认高级模式", payload["projectCenterInactive"]["title"])
+        self.assertEqual(payload["projectActive"]["textContent"], "高级模式")
+        self.assertEqual(payload["projectActive"]["attrs"]["aria-pressed"], "true")
+        self.assertIn("当前项目正在使用高级模式", payload["projectActive"]["title"])
+        self.assertEqual(payload["projectInactive"]["textContent"], "新手模式")
+        self.assertEqual(payload["projectInactive"]["attrs"]["aria-pressed"], "false")
+        self.assertIn("切换当前项目到新手模式", payload["projectInactive"]["attrs"]["aria-label"])
+
     def test_startup_and_fatal_errors_use_readable_messages(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
         index_source = INDEX_PATH.read_text(encoding="utf-8")
@@ -549,6 +637,208 @@ class FrontendActionHandlerTests(unittest.TestCase):
         ]
         for old_alert in old_alerts:
             self.assertNotIn(old_alert, handle_click)
+
+    def test_create_project_prompt_confirms_default_editor_mode(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        handle_click = _extract_function_source(source, "handleClick")
+        prompt_for_text = _extract_function_source(source, "promptForText")
+
+        self.assertIn('action === "create-project"', handle_click)
+        self.assertIn("const projectMode = getSafeEditorMode(state.projectCenterEditorMode)", handle_click)
+        self.assertIn("const projectModeLabel = getEditorModeLabel(projectMode)", handle_click)
+        self.assertIn("将以${projectModeLabel}创建一个真正的空白项目", handle_click)
+        self.assertIn('title: "新建空白项目"', handle_click)
+        self.assertIn("confirmLabel: `创建${projectModeLabel}项目`", handle_click)
+        self.assertIn('placeholder: "例如：雨夜校园序章"', handle_click)
+        self.assertIn("setSaveStatus(`正在创建${projectModeLabel}空白项目...`)", handle_click)
+        self.assertIn("editorMode: projectMode", handle_click)
+        self.assertIn("`已打开${projectModeLabel}空白项目：${name}`", handle_click)
+        self.assertIn("`空白项目已创建：${name}（${projectModeLabel}）`", handle_click)
+        self.assertNotIn("editorMode: state.projectCenterEditorMode", handle_click)
+        self.assertIn("options.title", prompt_for_text)
+        self.assertIn("options.placeholder", prompt_for_text)
+        self.assertIn("options.confirmLabel", prompt_for_text)
+        self.assertIn("options.requiredMessage", prompt_for_text)
+        self.assertIn("options.maxLength", prompt_for_text)
+        self.assertIn("options.copyText ?? false", prompt_for_text)
+
+        script = textwrap.dedent(
+            f"""
+            const calls = [];
+            async function showEnginePrompt(options) {{
+              calls.push(options);
+              return "  心跳练习曲  ";
+            }}
+            async function promptForText(message, defaultValue, options = {{}}) {prompt_for_text}
+            async function run() {{
+              const value = await promptForText(["起名", "模式说明"], "未命名新作", {{
+                title: "新建空白项目",
+                confirmLabel: "创建新手模式项目",
+                placeholder: "例如：雨夜校园序章",
+                requiredMessage: "先填项目名。",
+                maxLength: 40,
+              }});
+              const empty = await (async () => {{
+                showEnginePrompt = async (options) => {{
+                  calls.push(options);
+                  return "   ";
+                }};
+                return promptForText("空白测试", "默认名");
+              }})();
+              process.stdout.write(JSON.stringify({{ value, empty, calls }}));
+            }}
+            run().catch((error) => {{
+              console.error(error);
+              process.exit(1);
+            }});
+            """
+        )
+        completed = subprocess.run(
+            ["node", "-e", script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        self.assertEqual(payload["value"], "心跳练习曲")
+        self.assertIsNone(payload["empty"])
+        self.assertEqual(payload["calls"][0]["title"], "新建空白项目")
+        self.assertEqual(payload["calls"][0]["message"], ["起名", "模式说明"])
+        self.assertEqual(payload["calls"][0]["confirmLabel"], "创建新手模式项目")
+        self.assertEqual(payload["calls"][0]["placeholder"], "例如：雨夜校园序章")
+        self.assertEqual(payload["calls"][0]["requiredMessage"], "先填项目名。")
+        self.assertEqual(payload["calls"][0]["maxLength"], 40)
+        self.assertIs(payload["calls"][0]["copyText"], False)
+        self.assertEqual(payload["calls"][1]["title"], "填写名称")
+        self.assertEqual(payload["calls"][1]["confirmLabel"], "确认")
+        self.assertEqual(payload["calls"][1]["placeholder"], "默认名")
+        self.assertIs(payload["calls"][1]["copyText"], False)
+
+    def test_blank_project_dashboard_promotes_first_chapter_action(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        render_dashboard = _extract_function_source(source, "renderDashboard")
+        render_dashboard_actions = _extract_function_source(source, "renderDashboardPrimaryActions")
+
+        self.assertIn("renderDashboardPrimaryActions(isBlankProject)", render_dashboard)
+        self.assertIn('data-action="create-first-chapter"', render_dashboard_actions)
+        self.assertIn('data-action="create-first-chapter-custom"', render_dashboard_actions)
+        self.assertIn('data-step-index="1"', render_dashboard_actions)
+        self.assertIn('data-action="switch-screen" data-screen="story"', render_dashboard_actions)
+
+        script = textwrap.dedent(
+            f"""
+            function renderDashboardPrimaryActions(isBlankProject) {render_dashboard_actions}
+            const blankMarkup = renderDashboardPrimaryActions(true);
+            const activeMarkup = renderDashboardPrimaryActions(false);
+            process.stdout.write(JSON.stringify({{ blankMarkup, activeMarkup }}));
+            """
+        )
+        completed = subprocess.run(
+            ["node", "-e", script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        self.assertIn("创建第一章和第一场", payload["blankMarkup"])
+        self.assertIn('data-action="create-first-chapter"', payload["blankMarkup"])
+        self.assertIn('data-action="create-first-chapter-custom"', payload["blankMarkup"])
+        self.assertIn('data-action="open-beginner-tutorial"', payload["blankMarkup"])
+        self.assertIn('data-step-index="1"', payload["blankMarkup"])
+        self.assertNotIn('data-screen="story"', payload["blankMarkup"])
+        self.assertIn("进入剧情编辑", payload["activeMarkup"])
+        self.assertIn('data-action="switch-screen" data-screen="story"', payload["activeMarkup"])
+        self.assertIn("查看试玩页", payload["activeMarkup"])
+        self.assertIn("打开素材页", payload["activeMarkup"])
+        self.assertNotIn('data-action="create-first-chapter"', payload["activeMarkup"])
+
+    def test_create_chapter_ignores_duplicate_clicks_while_pending(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        create_chapter = _extract_function_source(source, "createChapter")
+
+        self.assertIn("state.chapterCreateInFlight", source)
+        self.assertIn("正在创建章节，请稍等", create_chapter)
+        self.assertIn("state.chapterCreateInFlight = true", create_chapter)
+        self.assertIn("state.chapterCreateInFlight = false", create_chapter)
+        self.assertIn("finally", create_chapter)
+
+        script = textwrap.dedent(
+            f"""
+            const API_CREATE_CHAPTER = "/api/create-chapter";
+            const state = {{
+              data: {{ chapters: [], scenes: [] }},
+              chapterCreateInFlight: false,
+            }};
+            const statuses = [];
+            const toasts = [];
+            const reloads = [];
+            let postCount = 0;
+            function setSaveStatus(message, isError = false) {{
+              statuses.push({{ message, isError }});
+            }}
+            function showToast(message) {{
+              toasts.push(message);
+            }}
+            function getCurrentUiState() {{
+              return {{ selectedSceneId: null, selectedBlockId: null }};
+            }}
+            async function reloadProjectData(payload) {{
+              reloads.push(payload);
+            }}
+            function switchScreen(screen) {{
+              statuses.push({{ message: `screen:${{screen}}`, isError: false }});
+            }}
+            async function showEditorOperationFailure(error) {{
+              throw error;
+            }}
+            async function promptForText() {{
+              throw new Error("skipPrompts should avoid prompts");
+            }}
+            async function postJson(url, payload) {{
+              postCount += 1;
+              await new Promise((resolve) => setTimeout(resolve, 20));
+              return {{
+                sceneId: "scene-1",
+                scene: {{ blocks: [{{ id: "block-1" }}] }},
+                payload,
+              }};
+            }}
+            async function createChapter(options = {{}}) {create_chapter}
+            Promise.all([
+              createChapter({{ skipPrompts: true, defaultChapterName: "第一章 开场", defaultSceneName: "第一场 相遇", afterCreateScreen: "story" }}),
+              createChapter({{ skipPrompts: true, defaultChapterName: "第一章 开场", defaultSceneName: "第一场 相遇", afterCreateScreen: "story" }}),
+            ]).then(() => {{
+              process.stdout.write(JSON.stringify({{
+                postCount,
+                statuses,
+                toasts,
+                reloads,
+                inFlight: state.chapterCreateInFlight,
+              }}));
+            }}).catch((error) => {{
+              console.error(error);
+              process.exit(1);
+            }});
+            """
+        )
+        completed = subprocess.run(
+            ["node", "-e", script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        self.assertEqual(payload["postCount"], 1)
+        self.assertFalse(payload["inFlight"])
+        self.assertEqual(len(payload["reloads"]), 1)
+        self.assertIn("正在创建章节，请稍等...", [status["message"] for status in payload["statuses"]])
+        self.assertIn("正在创建章节，请稍等...", payload["toasts"])
 
     def test_story_structure_failures_use_copyable_detail_dialogs(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
@@ -961,6 +1251,315 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertTrue(payload["prevented"])
         self.assertEqual(payload["calls"][0], {"type": "closest", "selector": "[data-action]"})
         self.assertEqual(payload["calls"][1], {"type": "matches", "selector": ":disabled"})
+
+    def test_beginner_tutorial_dialog_keeps_keyboard_navigation(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        index_source = INDEX_PATH.read_text(encoding="utf-8")
+        style_source = (EDITOR_DIR / "styles.css").read_text(encoding="utf-8")
+        open_tutorial = _extract_function_source(source, "openBeginnerTutorial")
+        set_step = _extract_function_source(source, "setBeginnerTutorialStep")
+        focus_tutorial = _extract_function_source(source, "focusBeginnerTutorialDialog")
+        step_keyboard = _extract_function_source(source, "handleBeginnerTutorialStepKeyboardNavigation")
+        focusable_elements = _extract_function_source(source, "getBeginnerTutorialFocusableElements")
+        dialog_tab = _extract_function_source(source, "handleBeginnerTutorialDialogTab")
+        keydown_handler = _extract_function_source(source, "handleGlobalKeydown")
+
+        self.assertIn('aria-labelledby="beginnerTutorialTitle"', index_source)
+        self.assertIn('tabindex="-1"', index_source)
+        self.assertIn("focusBeginnerTutorialDialog()", open_tutorial)
+        self.assertIn("focusBeginnerTutorialDialog()", set_step)
+        self.assertIn(".beginner-tutorial-step-button.is-active", focus_tutorial)
+        self.assertIn('[data-action="close-beginner-tutorial"]', focus_tutorial)
+        self.assertIn('[role="dialog"]', focus_tutorial)
+        self.assertIn("preventScroll: true", focus_tutorial)
+        self.assertIn("requestAnimationFrame", focus_tutorial)
+        self.assertIn('"ArrowUp"', step_keyboard)
+        self.assertIn('"ArrowDown"', step_keyboard)
+        self.assertIn('"Home"', step_keyboard)
+        self.assertIn('"End"', step_keyboard)
+        self.assertIn("setBeginnerTutorialStep(nextIndex)", step_keyboard)
+        self.assertIn("button:not(:disabled)", focusable_elements)
+        self.assertIn("focusableElements.length <= 0", dialog_tab)
+        self.assertIn("focusableElements.indexOf(activeElement)", dialog_tab)
+        self.assertIn("preventScroll: true", dialog_tab)
+        self.assertIn("handleBeginnerTutorialStepKeyboardNavigation(event)", keydown_handler)
+        self.assertIn("handleBeginnerTutorialDialogTab(event)", keydown_handler)
+        self.assertIn('event.code === "Tab"', keydown_handler)
+        self.assertIn(".beginner-tutorial-step-button:focus-visible", style_source)
+
+        script = textwrap.dedent(
+            f"""
+            const state = {{ beginnerTutorialOpen: true }};
+            const systemDialogController = null;
+            const calls = [];
+            const navCalls = [];
+            const tabCalls = [];
+            function closeBeginnerTutorial() {{
+              calls.push("close");
+            }}
+            function handleBeginnerTutorialStepKeyboardNavigation(event) {{
+              navCalls.push(event.code);
+              if (event.code === "ArrowDown") {{
+                event.preventDefault();
+                return true;
+              }}
+              return false;
+            }}
+            function handleBeginnerTutorialDialogTab(event) {{
+              tabCalls.push(event.code);
+              return false;
+            }}
+            function isKeyboardTypingTarget(target) {{
+              return Boolean(target?.isTypingTarget);
+            }}
+            function handleCharacterStageKeyboardNudge() {{
+              throw new Error("tutorial keyboard guard should stop before stage shortcuts");
+            }}
+            function handleGlobalKeydown(event) {keydown_handler}
+            const makeEvent = (code, target = {{}}) => ({{
+              code,
+              target,
+              prevented: false,
+              preventDefault() {{
+                this.prevented = true;
+              }},
+            }});
+            const tabEvent = makeEvent("Tab");
+            const letterEvent = makeEvent("KeyA");
+            const arrowEvent = makeEvent("ArrowDown");
+            const escapeEvent = makeEvent("Escape");
+            handleGlobalKeydown(tabEvent);
+            handleGlobalKeydown(letterEvent);
+            handleGlobalKeydown(arrowEvent);
+            handleGlobalKeydown(escapeEvent);
+            process.stdout.write(JSON.stringify({{
+              tabPrevented: tabEvent.prevented,
+              letterPrevented: letterEvent.prevented,
+              arrowPrevented: arrowEvent.prevented,
+              escapePrevented: escapeEvent.prevented,
+              calls,
+              navCalls,
+              tabCalls,
+            }}));
+            """
+        )
+        completed = subprocess.run(
+            ["node", "-e", script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        self.assertFalse(payload["tabPrevented"])
+        self.assertTrue(payload["letterPrevented"])
+        self.assertTrue(payload["arrowPrevented"])
+        self.assertTrue(payload["escapePrevented"])
+        self.assertEqual(payload["calls"], ["close"])
+        self.assertEqual(payload["navCalls"], ["Tab", "KeyA", "ArrowDown"])
+        self.assertEqual(payload["tabCalls"], ["Tab", "KeyA"])
+
+        script = textwrap.dedent(
+            f"""
+            class HTMLElement {{}}
+            const calls = [];
+            const state = {{ beginnerTutorialOpen: true }};
+            const steps = [{{}}, {{}}, {{}}];
+            const refs = {{
+              beginnerTutorialStepList: {{
+                contains(node) {{
+                  return Boolean(node?.inStepList);
+                }},
+              }},
+            }};
+            const beginnerTutorialTools = {{
+              clampBeginnerTutorialStepIndex(value, items) {{
+                return Math.min(Math.max(Number.parseInt(value ?? "0", 10) || 0, 0), items.length - 1);
+              }},
+            }};
+            function getBeginnerTutorialSteps() {{
+              return steps;
+            }}
+            function setBeginnerTutorialStep(index) {{
+              calls.push({{ type: "set", index }});
+            }}
+            class StepButton extends HTMLElement {{
+              constructor(index) {{
+                super();
+                this.dataset = {{ stepIndex: String(index) }};
+                this.inStepList = true;
+              }}
+              closest(selector) {{
+                return selector === ".beginner-tutorial-step-button" ? this : null;
+              }}
+            }}
+            function makeEvent(code, index = 1) {{
+              return {{
+                code,
+                target: new StepButton(index),
+                prevented: false,
+                preventDefault() {{
+                  this.prevented = true;
+                }},
+              }};
+            }}
+            function handleBeginnerTutorialStepKeyboardNavigation(event) {step_keyboard}
+            const down = makeEvent("ArrowDown", 1);
+            const up = makeEvent("ArrowUp", 1);
+            const home = makeEvent("Home", 2);
+            const end = makeEvent("End", 0);
+            const enter = makeEvent("Enter", 1);
+            const results = [down, up, home, end, enter].map((event) => ({{
+              code: event.code,
+              handled: handleBeginnerTutorialStepKeyboardNavigation(event),
+              prevented: event.prevented,
+            }}));
+            process.stdout.write(JSON.stringify({{ results, calls }}));
+            """
+        )
+        completed = subprocess.run(
+            ["node", "-e", script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        self.assertEqual(
+            payload["results"],
+            [
+                {"code": "ArrowDown", "handled": True, "prevented": True},
+                {"code": "ArrowUp", "handled": True, "prevented": True},
+                {"code": "Home", "handled": True, "prevented": True},
+                {"code": "End", "handled": True, "prevented": True},
+                {"code": "Enter", "handled": False, "prevented": False},
+            ],
+        )
+        self.assertEqual(
+            payload["calls"],
+            [
+                {"type": "set", "index": 2},
+                {"type": "set", "index": 0},
+                {"type": "set", "index": 0},
+                {"type": "set", "index": 2},
+            ],
+        )
+
+        script = textwrap.dedent(
+            f"""
+            class HTMLElement {{}}
+            const state = {{ beginnerTutorialOpen: true }};
+            const focusCalls = [];
+            const root = {{
+              focus(options) {{
+                focusCalls.push({{ type: "root", options }});
+              }},
+              querySelectorAll() {{
+                return elements;
+              }},
+            }};
+            const refs = {{
+              beginnerTutorialDialog: {{
+                querySelector(selector) {{
+                  return selector === ".beginner-tutorial-dialog" ? root : null;
+                }},
+              }},
+            }};
+            class FocusableElement extends HTMLElement {{
+              constructor(id, options = {{}}) {{
+                super();
+                this.id = id;
+                this.hidden = Boolean(options.hidden);
+                this.disabled = Boolean(options.disabled);
+                this.tabIndex = options.tabIndex ?? 0;
+                this.ariaHidden = options.ariaHidden ?? "false";
+              }}
+              getAttribute(name) {{
+                return name === "aria-hidden" ? this.ariaHidden : null;
+              }}
+              focus(options) {{
+                document.activeElement = this;
+                focusCalls.push({{ type: "focus", id: this.id, options }});
+              }}
+            }}
+            const first = new FocusableElement("first");
+            const middle = new FocusableElement("middle");
+            const last = new FocusableElement("last");
+            const hidden = new FocusableElement("hidden", {{ hidden: true }});
+            const disabled = new FocusableElement("disabled", {{ disabled: true }});
+            const elements = [first, hidden, middle, disabled, last];
+            const document = {{ activeElement: first }};
+            function getBeginnerTutorialFocusableElements() {focusable_elements}
+            function handleBeginnerTutorialDialogTab(event) {dialog_tab}
+            function makeTabEvent(options = {{}}) {{
+              return {{
+                code: "Tab",
+                shiftKey: Boolean(options.shiftKey),
+                prevented: false,
+                preventDefault() {{
+                  this.prevented = true;
+                }},
+              }};
+            }}
+            const shiftFromFirst = makeTabEvent({{ shiftKey: true }});
+            const handledShiftFromFirst = handleBeginnerTutorialDialogTab(shiftFromFirst);
+            const shiftFromFirstResult = {{
+              handled: handledShiftFromFirst,
+              prevented: shiftFromFirst.prevented,
+              active: document.activeElement.id,
+            }};
+            document.activeElement = last;
+            const tabFromLast = makeTabEvent();
+            const handledTabFromLast = handleBeginnerTutorialDialogTab(tabFromLast);
+            const tabFromLastResult = {{
+              handled: handledTabFromLast,
+              prevented: tabFromLast.prevented,
+              active: document.activeElement.id,
+            }};
+            document.activeElement = middle;
+            const tabFromMiddle = makeTabEvent();
+            const handledTabFromMiddle = handleBeginnerTutorialDialogTab(tabFromMiddle);
+            const tabFromMiddleResult = {{
+              handled: handledTabFromMiddle,
+              prevented: tabFromMiddle.prevented,
+              active: document.activeElement.id,
+            }};
+            document.activeElement = new FocusableElement("outside");
+            const tabFromOutside = makeTabEvent();
+            const handledTabFromOutside = handleBeginnerTutorialDialogTab(tabFromOutside);
+            const tabFromOutsideResult = {{
+              handled: handledTabFromOutside,
+              prevented: tabFromOutside.prevented,
+              active: document.activeElement.id,
+            }};
+            process.stdout.write(JSON.stringify({{
+              focusableIds: getBeginnerTutorialFocusableElements().map((element) => element.id),
+              results: [shiftFromFirstResult, tabFromLastResult, tabFromMiddleResult, tabFromOutsideResult],
+              focusCalls,
+            }}));
+            """
+        )
+        completed = subprocess.run(
+            ["node", "-e", script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        self.assertEqual(payload["focusableIds"], ["first", "middle", "last"])
+        self.assertEqual(
+            payload["results"],
+            [
+                {"handled": True, "prevented": True, "active": "last"},
+                {"handled": True, "prevented": True, "active": "first"},
+                {"handled": False, "prevented": False, "active": "middle"},
+                {"handled": True, "prevented": True, "active": "first"},
+            ],
+        )
 
     def test_runtime_error_handler_dedupes_user_notifications(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")

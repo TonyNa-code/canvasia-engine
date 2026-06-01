@@ -127,9 +127,31 @@
   function renderProjectCenterHero(summary = {}, helpers = {}) {
     const escape = getEscapeHtml(helpers);
     const localProjectCount = Math.max(Number.parseInt(summary.localProjectCount ?? 0, 10) || 0, 0);
+    const projectCenterMode = getFallbackEditorMode(summary.projectCenterMode);
     const modeLabel = summary.projectCenterModeLabel ?? getFallbackEditorModeLabel(summary.projectCenterMode);
     const hasSampleProject = Boolean(summary.hasSampleProject ?? summary.sampleProject);
     const hasActiveProject = Boolean(summary.activeProjectId);
+    const renderModeOption = (mode) => {
+      const safeMode = getFallbackEditorMode(mode);
+      const isActive = projectCenterMode === safeMode;
+      const label = getFallbackEditorModeLabel(safeMode);
+      const buttonLabel = isActive ? `默认：${label}` : `设为${label}`;
+      const actionLabel = isActive ? `新建项目已经默认使用${label}` : `设为新建项目默认${label}`;
+      const ariaLabel = `项目中心主卡片：${actionLabel}`;
+      return `
+        <button
+          type="button"
+          class="toolbar-button project-center-mode-option ${isActive ? "is-active" : ""}"
+          data-action="set-editor-mode"
+          data-editor-mode="${safeMode}"
+          aria-pressed="${isActive ? "true" : "false"}"
+          aria-label="${escape(ariaLabel)}"
+          title="${escape(actionLabel)}"
+        >
+          ${escape(buttonLabel)}
+        </button>
+      `;
+    };
 
     return `
       <section class="project-center-hero">
@@ -145,6 +167,16 @@
               <span class="project-center-pill">默认分辨率 1920 × 1080</span>
               <span class="project-center-pill">新建默认：${escape(modeLabel)}</span>
               <span class="project-center-pill">示例项目会单独列在下方，不会默认打开</span>
+            </div>
+            <div class="project-center-mode-panel">
+              <div>
+                <strong>新建项目默认模式</strong>
+                <span>只影响之后创建的空白项目；已有项目会保留自己的模式。</span>
+              </div>
+              <div class="project-center-mode-options" role="group" aria-label="新建项目默认编辑模式">
+                ${renderModeOption("beginner")}
+                ${renderModeOption("advanced")}
+              </div>
             </div>
             <div class="project-center-actions">
               <button type="button" class="toolbar-button toolbar-button-primary" data-action="create-project">
@@ -164,7 +196,7 @@
           <p>空白项目初始不会自动加入章节、台词和角色，可按需要自行新建章节和场景。</p>
           <div class="project-meta-row">
             <span class="project-center-pill">已发现项目 ${localProjectCount} 个</span>
-            <span class="project-center-pill">顶部可切换新建默认模式</span>
+            <span class="project-center-pill">默认模式可在主卡片或顶部切换</span>
             <span class="project-center-pill">${hasSampleProject ? "示例项目可选打开" : "当前没有示例项目"}</span>
             <span class="project-center-pill">${hasActiveProject ? "已经记录过上次打开的项目" : "还没有打开过项目"}</span>
           </div>

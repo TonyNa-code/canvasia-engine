@@ -448,6 +448,51 @@ textarea {
   font-size: 13px;
 }
 
+.project-center-mode-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px;
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(74, 156, 255, 0.14), transparent 36%),
+    linear-gradient(135deg, rgba(16, 34, 58, 0.94), rgba(10, 22, 39, 0.86));
+  border: 1px solid rgba(121, 220, 255, 0.18);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 14px 24px rgba(0, 0, 0, 0.14);
+}
+
+.project-center-mode-panel strong,
+.project-center-mode-panel span {
+  display: block;
+}
+
+.project-center-mode-panel strong {
+  color: rgba(239, 249, 255, 0.96);
+}
+
+.project-center-mode-panel span {
+  margin-top: 4px;
+  color: rgba(174, 200, 228, 0.86);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.project-center-mode-options {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.project-center-mode-option.is-active {
+  color: #fff;
+  background: linear-gradient(135deg, var(--brand), var(--brand-deep));
+  border-color: transparent;
+}
+
 .project-center-sidecard {
   padding: 22px;
   display: grid;
@@ -525,6 +570,15 @@ textarea {
 @media (max-width: 980px) {
   .project-center-hero {
     grid-template-columns: 1fr;
+  }
+
+  .project-center-mode-panel {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .project-center-mode-options {
+    justify-content: flex-start;
   }
 
   .story-mode-banner-head {
@@ -6368,7 +6422,7 @@ html[data-ui-theme="light"] .music-range-timeline em {
 .system-dialog-eyebrow {
   display: block;
   margin-bottom: 4px;
-  color: var(--muted);
+  color: #5f7a9d;
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.14em;
@@ -6379,12 +6433,14 @@ html[data-ui-theme="light"] .music-range-timeline em {
   margin: 0;
   font-family: "Georgia", "Times New Roman", serif;
   font-size: clamp(22px, 4vw, 30px);
+  color: #173352;
+  text-shadow: none;
 }
 
 .system-dialog-message {
   position: relative;
   margin: 0;
-  color: var(--muted);
+  color: #526c91;
   line-height: 1.75;
   white-space: pre-line;
 }
@@ -6395,7 +6451,7 @@ html[data-ui-theme="light"] .music-range-timeline em {
   padding: 14px 15px;
   border-radius: 16px;
   border: 1px solid color-mix(in srgb, var(--brand) 30%, transparent);
-  color: var(--ink);
+  color: #173352;
   background: rgba(255, 255, 255, 0.78);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
 }
@@ -6403,6 +6459,16 @@ html[data-ui-theme="light"] .music-range-timeline em {
 .system-dialog-input:focus {
   outline: 2px solid color-mix(in srgb, var(--brand) 36%, transparent);
   outline-offset: 2px;
+}
+
+.system-dialog-input::placeholder {
+  color: #8aa0bc;
+  opacity: 1;
+}
+
+.system-dialog-input::selection {
+  color: #173352;
+  background: rgba(121, 220, 255, 0.32);
 }
 
 .system-dialog-input.is-invalid {
@@ -6430,6 +6496,25 @@ html[data-ui-theme="light"] .music-range-timeline em {
 
 .system-dialog-actions .toolbar-button {
   min-width: 120px;
+  color: #274767;
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(112, 151, 205, 0.24);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.86),
+    0 8px 18px rgba(42, 83, 140, 0.1);
+}
+
+.system-dialog-actions .toolbar-button:hover {
+  color: #102a4d;
+  background: #ffffff;
+  border-color: rgba(55, 130, 255, 0.34);
+}
+
+.system-dialog-actions .toolbar-button-primary {
+  color: #ffffff;
+  background: linear-gradient(135deg, #28a8ff, #4169ff);
+  border-color: rgba(39, 133, 255, 0.4);
+  box-shadow: 0 12px 24px rgba(38, 106, 230, 0.22);
 }
 
 @keyframes system-dialog-enter {
@@ -8792,6 +8877,13 @@ textarea::placeholder {
   box-shadow: 0 16px 28px rgba(7, 11, 22, 0.24);
 }
 
+.beginner-tutorial-step-button:focus-visible {
+  outline: 3px solid rgba(121, 220, 255, 0.48);
+  outline-offset: 3px;
+  border-color: rgba(121, 220, 255, 0.62);
+  box-shadow: 0 0 0 6px rgba(121, 220, 255, 0.12), 0 18px 34px rgba(5, 10, 22, 0.28);
+}
+
 .beginner-tutorial-step-button.is-active {
   border-color: rgba(125, 188, 255, 0.48);
   background:
@@ -9628,6 +9720,24 @@ html[data-ui-theme="light"] .beginner-guide-focus-card {
   background:
     radial-gradient(circle at 88% 10%, rgba(81, 162, 255, 0.14), transparent 32%),
     linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(235, 245, 255, 0.96)) !important;
+}
+
+html[data-ui-theme="light"] .project-center-mode-panel {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(68, 153, 255, 0.12), transparent 36%),
+    linear-gradient(135deg, rgba(244, 250, 255, 0.96), rgba(232, 243, 255, 0.9));
+  border-color: rgba(112, 151, 205, 0.24);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.82),
+    0 12px 24px rgba(42, 83, 140, 0.1);
+}
+
+html[data-ui-theme="light"] .project-center-mode-panel strong {
+  color: #173352;
+}
+
+html[data-ui-theme="light"] .project-center-mode-panel span {
+  color: #5b7494;
 }
 
 html[data-ui-theme="light"] .project-card.is-sample {
