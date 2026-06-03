@@ -48,7 +48,24 @@
     const editorMode = getSafeEditorMode(project.editorMode);
     const editorModeLabel = getEditorModeLabel(editorMode);
     const projectId = project.projectId ?? "";
+    const isOpening = Boolean(helpers.projectOpenInFlightId) && helpers.projectOpenInFlightId === projectId;
+    const isRenaming = Boolean(helpers.projectRenameInFlightId) && helpers.projectRenameInFlightId === projectId;
+    const isDuplicating = Boolean(helpers.projectDuplicateInFlightId) && helpers.projectDuplicateInFlightId === projectId;
+    const isDeleting = Boolean(helpers.projectDeleteInFlightId) && helpers.projectDeleteInFlightId === projectId;
+    const operationInFlightMessage = String(helpers.projectCenterOperationInFlightMessage ?? "").trim();
+    const isProjectActionLocked = Boolean(operationInFlightMessage);
     const sceneCount = project.sceneCount ?? 0;
+    const getActionButtonClass = (isBusy) =>
+      `${isBusy ? "is-busy" : ""} ${!isBusy && isProjectActionLocked ? "is-locked" : ""}`.trim();
+    const getActionButtonAttrs = (isBusy) => {
+      if (isBusy) {
+        return 'disabled aria-disabled="true" aria-busy="true"';
+      }
+      if (isProjectActionLocked) {
+        return `disabled aria-disabled="true" title="${escape(operationInFlightMessage)}"`;
+      }
+      return "";
+    };
 
     const description = project.isSample
       ? "这是保留下来的示例项目，只在你需要参考时再打开。"
@@ -83,19 +100,21 @@
         <div class="project-card-actions">
           <button
             type="button"
-            class="toolbar-button toolbar-button-primary"
+            class="toolbar-button toolbar-button-primary ${getActionButtonClass(isOpening)}"
             data-action="open-project"
             data-project-id="${escape(projectId)}"
+            ${getActionButtonAttrs(isOpening)}
           >
-            ${isActive ? "继续编辑这个项目" : "打开这个项目"}
+            ${isOpening ? "打开中..." : isActive ? "继续编辑这个项目" : "打开这个项目"}
           </button>
           <button
             type="button"
-            class="toolbar-button"
+            class="toolbar-button ${getActionButtonClass(project.isSample ? isDuplicating : isRenaming)}"
             data-action="${project.isSample ? "duplicate-project" : "rename-project"}"
             data-project-id="${escape(projectId)}"
+            ${getActionButtonAttrs(project.isSample ? isDuplicating : isRenaming)}
           >
-            ${project.isSample ? "复制成正式项目" : "改项目名"}
+            ${project.isSample ? (isDuplicating ? "复制中..." : "复制成正式项目") : isRenaming ? "改名中..." : "改项目名"}
           </button>
           ${
             project.isSample
@@ -103,19 +122,21 @@
               : `
                 <button
                   type="button"
-                  class="toolbar-button"
+                  class="toolbar-button ${getActionButtonClass(isDuplicating)}"
                   data-action="duplicate-project"
                   data-project-id="${escape(projectId)}"
+                  ${getActionButtonAttrs(isDuplicating)}
                 >
-                  复制项目
+                  ${isDuplicating ? "复制中..." : "复制项目"}
                 </button>
                 <button
                   type="button"
-                  class="toolbar-button toolbar-button-danger"
+                  class="toolbar-button toolbar-button-danger ${getActionButtonClass(isDeleting)}"
                   data-action="delete-project"
                   data-project-id="${escape(projectId)}"
+                  ${getActionButtonAttrs(isDeleting)}
                 >
-                  删除项目
+                  ${isDeleting ? "删除中..." : "删除项目"}
                 </button>
               `
           }
@@ -131,6 +152,21 @@
     const modeLabel = summary.projectCenterModeLabel ?? getFallbackEditorModeLabel(summary.projectCenterMode);
     const hasSampleProject = Boolean(summary.hasSampleProject ?? summary.sampleProject);
     const hasActiveProject = Boolean(summary.activeProjectId);
+    const isCreatingProject = Boolean(helpers.projectCreateInFlight);
+    const isRefreshingProjects = Boolean(helpers.projectCenterRefreshInFlight);
+    const operationInFlightMessage = String(helpers.projectCenterOperationInFlightMessage ?? "").trim();
+    const isProjectCenterLocked = Boolean(operationInFlightMessage);
+    const getHeroButtonClass = (isBusy) =>
+      `${isBusy ? "is-busy" : ""} ${!isBusy && isProjectCenterLocked ? "is-locked" : ""}`.trim();
+    const getHeroButtonAttrs = (isBusy) => {
+      if (isBusy) {
+        return 'disabled aria-disabled="true" aria-busy="true"';
+      }
+      if (isProjectCenterLocked) {
+        return 'disabled aria-disabled="true"';
+      }
+      return "";
+    };
     const renderModeOption = (mode) => {
       const safeMode = getFallbackEditorMode(mode);
       const isActive = projectCenterMode === safeMode;
@@ -141,12 +177,13 @@
       return `
         <button
           type="button"
-          class="toolbar-button project-center-mode-option ${isActive ? "is-active" : ""}"
+          class="toolbar-button project-center-mode-option ${isActive ? "is-active" : ""} ${getHeroButtonClass(false)}"
           data-action="set-editor-mode"
           data-editor-mode="${safeMode}"
           aria-pressed="${isActive ? "true" : "false"}"
           aria-label="${escape(ariaLabel)}"
-          title="${escape(actionLabel)}"
+          title="${escape(isProjectCenterLocked ? operationInFlightMessage : actionLabel)}"
+          ${getHeroButtonAttrs(false)}
         >
           ${escape(buttonLabel)}
         </button>
@@ -179,14 +216,32 @@
               </div>
             </div>
             <div class="project-center-actions">
-              <button type="button" class="toolbar-button toolbar-button-primary" data-action="create-project">
-                新建空白项目
+              <button
+                type="button"
+                class="toolbar-button toolbar-button-primary ${getHeroButtonClass(isCreatingProject)}"
+                data-action="create-project"
+                ${getHeroButtonAttrs(isCreatingProject)}
+                ${isProjectCenterLocked && !isCreatingProject ? `title="${escape(operationInFlightMessage)}"` : ""}
+              >
+                ${isCreatingProject ? "准备中..." : "新建空白项目"}
               </button>
-              <button type="button" class="toolbar-button" data-action="open-beginner-tutorial">
+              <button
+                type="button"
+                class="toolbar-button ${getHeroButtonClass(false)}"
+                data-action="open-beginner-tutorial"
+                ${getHeroButtonAttrs(false)}
+                ${isProjectCenterLocked ? `title="${escape(operationInFlightMessage)}"` : ""}
+              >
                 打开新手教程
               </button>
-              <button type="button" class="toolbar-button" data-action="refresh-project-center">
-                刷新项目列表
+              <button
+                type="button"
+                class="toolbar-button ${getHeroButtonClass(isRefreshingProjects)}"
+                data-action="refresh-project-center"
+                ${getHeroButtonAttrs(isRefreshingProjects)}
+                ${isProjectCenterLocked && !isRefreshingProjects ? `title="${escape(operationInFlightMessage)}"` : ""}
+              >
+                ${isRefreshingProjects ? "刷新中..." : "刷新项目列表"}
               </button>
             </div>
           </div>

@@ -644,6 +644,12 @@ class FrontendActionHandlerTests(unittest.TestCase):
         prompt_for_text = _extract_function_source(source, "promptForText")
 
         self.assertIn('action === "create-project"', handle_click)
+        self.assertIn("state.projectCreateInFlight", source)
+        self.assertIn("正在准备新项目，请稍等", source)
+        self.assertIn("blockProjectCenterOperationIfInFlight()", handle_click)
+        self.assertIn("setProjectCreateInFlight(true)", handle_click)
+        self.assertIn("setProjectCreateInFlight(false)", handle_click)
+        self.assertIn("finally", handle_click)
         self.assertIn("const projectMode = getSafeEditorMode(state.projectCenterEditorMode)", handle_click)
         self.assertIn("const projectModeLabel = getEditorModeLabel(projectMode)", handle_click)
         self.assertIn("将以${projectModeLabel}创建一个真正的空白项目", handle_click)
@@ -716,6 +722,733 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertEqual(payload["calls"][1]["placeholder"], "默认名")
         self.assertIs(payload["calls"][1]["copyText"], False)
 
+    def test_project_center_operations_share_busy_gate(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        handle_click = _extract_function_source(source, "handleClick")
+        get_in_flight_message = _extract_function_source(source, "getProjectCenterOperationInFlightMessage")
+        block_operation = _extract_function_source(source, "blockProjectCenterOperationIfInFlight")
+
+        self.assertGreaterEqual(handle_click.count("blockProjectCenterOperationIfInFlight()"), 7)
+        self.assertIn('action === "set-editor-mode"', handle_click)
+        self.assertIn("setSaveStatus(message)", block_operation)
+        self.assertIn("showToast(message)", block_operation)
+        expected_pairs = [
+            ("state.projectCreateInFlight", "正在准备新项目，请稍等..."),
+            ("state.projectCenterRefreshInFlight", "正在刷新项目列表，请稍等..."),
+            ("state.projectOpenInFlightId", "正在打开项目，请稍等..."),
+            ("state.projectRenameInFlightId", "正在修改项目名，请稍等..."),
+            ("state.projectDuplicateInFlightId", "正在复制项目，请稍等..."),
+            ("state.projectDeleteInFlightId", "正在删除项目，请稍等..."),
+        ]
+        for state_key, message in expected_pairs:
+            self.assertIn(state_key, get_in_flight_message)
+            self.assertIn(message, get_in_flight_message)
+
+        script = textwrap.dedent(
+            f"""
+            const state = {{
+              projectCreateInFlight: false,
+              projectCenterRefreshInFlight: false,
+              projectOpenInFlightId: "",
+              projectRenameInFlightId: "",
+              projectDuplicateInFlightId: "",
+              projectDeleteInFlightId: "",
+            }};
+            const statusMessages = [];
+            const toastMessages = [];
+            function setSaveStatus(message) {{
+              statusMessages.push(message);
+            }}
+            function showToast(message) {{
+              toastMessages.push(message);
+            }}
+            function getProjectCenterOperationInFlightMessage() {get_in_flight_message}
+            function blockProjectCenterOperationIfInFlight() {block_operation}
+            function reset(overrides = {{}}) {{
+              Object.assign(state, {{
+                projectCreateInFlight: false,
+                projectCenterRefreshInFlight: false,
+                projectOpenInFlightId: "",
+                projectRenameInFlightId: "",
+                projectDuplicateInFlightId: "",
+                projectDeleteInFlightId: "",
+              }}, overrides);
+              statusMessages.length = 0;
+              toastMessages.length = 0;
+              const message = getProjectCenterOperationInFlightMessage();
+              const blocked = blockProjectCenterOperationIfInFlight();
+              return {{
+                message,
+                blocked,
+                statusMessages: [...statusMessages],
+                toastMessages: [...toastMessages],
+              }};
+            }}
+            process.stdout.write(JSON.stringify({{
+              idle: reset(),
+              create: reset({{ projectCreateInFlight: true }}),
+              refresh: reset({{ projectCenterRefreshInFlight: true }}),
+              open: reset({{ projectOpenInFlightId: "project-a" }}),
+              rename: reset({{ projectRenameInFlightId: "project-a" }}),
+              duplicate: reset({{ projectDuplicateInFlightId: "project-a" }}),
+              delete: reset({{ projectDeleteInFlightId: "project-a" }}),
+              priority: reset({{
+                projectCreateInFlight: true,
+                projectDeleteInFlightId: "project-a",
+              }}),
+            }}));
+            """
+        )
+        completed = subprocess.run(
+            ["node", "-e", script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        self.assertFalse(payload["idle"]["blocked"])
+        self.assertEqual(payload["idle"]["message"], "")
+        self.assertEqual(payload["idle"]["statusMessages"], [])
+        self.assertTrue(payload["create"]["blocked"])
+        self.assertEqual(payload["create"]["message"], "正在准备新项目，请稍等...")
+        self.assertEqual(payload["create"]["statusMessages"], ["正在准备新项目，请稍等..."])
+        self.assertEqual(payload["refresh"]["message"], "正在刷新项目列表，请稍等...")
+        self.assertEqual(payload["open"]["message"], "正在打开项目，请稍等...")
+        self.assertEqual(payload["rename"]["message"], "正在修改项目名，请稍等...")
+        self.assertEqual(payload["duplicate"]["message"], "正在复制项目，请稍等...")
+        self.assertEqual(payload["delete"]["message"], "正在删除项目，请稍等...")
+        self.assertEqual(payload["priority"]["message"], "正在准备新项目，请稍等...")
+        self.assertEqual(payload["priority"]["toastMessages"], ["正在准备新项目，请稍等..."])
+
+    def test_project_create_busy_state_disables_project_center_entry(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        set_action_button_busy_state = _extract_function_source(source, "setActionButtonBusyState")
+        set_project_create_in_flight = _extract_function_source(source, "setProjectCreateInFlight")
+        style_source = (EDITOR_DIR / "styles.css").read_text(encoding="utf-8")
+
+        self.assertIn(".toolbar-button.is-busy", style_source)
+        self.assertIn("button.textContent = busyLabel", set_action_button_busy_state)
+        self.assertIn("button.dataset[idleLabelKey]", set_action_button_busy_state)
+        self.assertIn('button.setAttribute("aria-busy", "true")', set_action_button_busy_state)
+        self.assertIn("state.projectCreateInFlight = Boolean(isInFlight)", set_project_create_in_flight)
+        self.assertIn('data-action="create-project"', set_project_create_in_flight)
+        self.assertIn('busyLabel: "准备中..."', set_project_create_in_flight)
+        self.assertIn("projectCreateIdleLabel", set_project_create_in_flight)
+
+        script = textwrap.dedent(
+            f"""
+            class HTMLButtonElement {{
+              constructor(label) {{
+                this.dataset = {{}};
+                this.textContent = label;
+                this.disabled = false;
+                this.attrs = {{}};
+                this.classes = new Set();
+                this.classList = {{
+                  add: (name) => this.classes.add(name),
+                  remove: (name) => this.classes.delete(name),
+                }};
+              }}
+              setAttribute(name, value) {{
+                this.attrs[name] = value;
+              }}
+              removeAttribute(name) {{
+                delete this.attrs[name];
+              }}
+            }}
+            const state = {{ projectCreateInFlight: false }};
+            const createButton = new HTMLButtonElement("新建空白项目");
+            const document = {{
+              querySelectorAll(selector) {{
+                return selector === '[data-action="create-project"]' ? [createButton] : [];
+              }},
+            }};
+            function setActionButtonBusyState(options = {{}}) {set_action_button_busy_state}
+            function setProjectCreateInFlight(isInFlight) {set_project_create_in_flight}
+            setProjectCreateInFlight(true);
+            const busy = {{
+              inFlight: state.projectCreateInFlight,
+              disabled: createButton.disabled,
+              text: createButton.textContent,
+              busy: createButton.attrs["aria-busy"],
+              ariaDisabled: createButton.attrs["aria-disabled"],
+              classes: Array.from(createButton.classes),
+            }};
+            setProjectCreateInFlight(false);
+            const idle = {{
+              inFlight: state.projectCreateInFlight,
+              disabled: createButton.disabled,
+              text: createButton.textContent,
+              busy: createButton.attrs["aria-busy"] ?? null,
+              ariaDisabled: createButton.attrs["aria-disabled"] ?? null,
+              classes: Array.from(createButton.classes),
+            }};
+            process.stdout.write(JSON.stringify({{ busy, idle }}));
+            """
+        )
+        completed = subprocess.run(
+            ["node", "-e", script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        self.assertTrue(payload["busy"]["inFlight"])
+        self.assertTrue(payload["busy"]["disabled"])
+        self.assertEqual(payload["busy"]["text"], "准备中...")
+        self.assertEqual(payload["busy"]["busy"], "true")
+        self.assertEqual(payload["busy"]["ariaDisabled"], "true")
+        self.assertIn("is-busy", payload["busy"]["classes"])
+        self.assertFalse(payload["idle"]["inFlight"])
+        self.assertFalse(payload["idle"]["disabled"])
+        self.assertEqual(payload["idle"]["text"], "新建空白项目")
+        self.assertIsNone(payload["idle"]["busy"])
+        self.assertIsNone(payload["idle"]["ariaDisabled"])
+        self.assertNotIn("is-busy", payload["idle"]["classes"])
+
+    def test_project_center_refresh_busy_state_disables_refresh_entry(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        handle_click = _extract_function_source(source, "handleClick")
+        set_action_button_busy_state = _extract_function_source(source, "setActionButtonBusyState")
+        set_refresh_in_flight = _extract_function_source(source, "setProjectCenterRefreshInFlight")
+        style_source = (EDITOR_DIR / "styles.css").read_text(encoding="utf-8")
+
+        self.assertIn(".toolbar-button.is-busy", style_source)
+        self.assertIn("button.textContent = busyLabel", set_action_button_busy_state)
+        self.assertIn("state.projectCenterRefreshInFlight", source)
+        self.assertIn("正在刷新项目列表，请稍等", source)
+        self.assertIn("blockProjectCenterOperationIfInFlight()", handle_click)
+        self.assertIn("setProjectCenterRefreshInFlight(true)", handle_click)
+        self.assertIn("setProjectCenterRefreshInFlight(false)", handle_click)
+        self.assertIn("finally", handle_click)
+        self.assertIn("state.projectCenterRefreshInFlight = Boolean(isInFlight)", set_refresh_in_flight)
+        self.assertIn('data-action="refresh-project-center"', set_refresh_in_flight)
+        self.assertIn('busyLabel: "刷新中..."', set_refresh_in_flight)
+        self.assertIn("projectCenterRefreshIdleLabel", set_refresh_in_flight)
+
+        script = textwrap.dedent(
+            f"""
+            class HTMLButtonElement {{
+              constructor(label) {{
+                this.dataset = {{}};
+                this.textContent = label;
+                this.disabled = false;
+                this.attrs = {{}};
+                this.classes = new Set();
+                this.classList = {{
+                  add: (name) => this.classes.add(name),
+                  remove: (name) => this.classes.delete(name),
+                }};
+              }}
+              setAttribute(name, value) {{
+                this.attrs[name] = value;
+              }}
+              removeAttribute(name) {{
+                delete this.attrs[name];
+              }}
+            }}
+            const state = {{ projectCenterRefreshInFlight: false }};
+            const refreshButton = new HTMLButtonElement("刷新项目列表");
+            const document = {{
+              querySelectorAll(selector) {{
+                return selector === '[data-action="refresh-project-center"]' ? [refreshButton] : [];
+              }},
+            }};
+            function setActionButtonBusyState(options = {{}}) {set_action_button_busy_state}
+            function setProjectCenterRefreshInFlight(isInFlight) {set_refresh_in_flight}
+            setProjectCenterRefreshInFlight(true);
+            const busy = {{
+              inFlight: state.projectCenterRefreshInFlight,
+              disabled: refreshButton.disabled,
+              text: refreshButton.textContent,
+              busy: refreshButton.attrs["aria-busy"],
+              ariaDisabled: refreshButton.attrs["aria-disabled"],
+              classes: Array.from(refreshButton.classes),
+            }};
+            setProjectCenterRefreshInFlight(false);
+            const idle = {{
+              inFlight: state.projectCenterRefreshInFlight,
+              disabled: refreshButton.disabled,
+              text: refreshButton.textContent,
+              busy: refreshButton.attrs["aria-busy"] ?? null,
+              ariaDisabled: refreshButton.attrs["aria-disabled"] ?? null,
+              classes: Array.from(refreshButton.classes),
+            }};
+            process.stdout.write(JSON.stringify({{ busy, idle }}));
+            """
+        )
+        completed = subprocess.run(
+            ["node", "-e", script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        self.assertTrue(payload["busy"]["inFlight"])
+        self.assertTrue(payload["busy"]["disabled"])
+        self.assertEqual(payload["busy"]["text"], "刷新中...")
+        self.assertEqual(payload["busy"]["busy"], "true")
+        self.assertEqual(payload["busy"]["ariaDisabled"], "true")
+        self.assertIn("is-busy", payload["busy"]["classes"])
+        self.assertFalse(payload["idle"]["inFlight"])
+        self.assertFalse(payload["idle"]["disabled"])
+        self.assertEqual(payload["idle"]["text"], "刷新项目列表")
+        self.assertIsNone(payload["idle"]["busy"])
+        self.assertIsNone(payload["idle"]["ariaDisabled"])
+        self.assertNotIn("is-busy", payload["idle"]["classes"])
+
+    def test_project_open_busy_state_disables_only_target_project(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        handle_click = _extract_function_source(source, "handleClick")
+        set_action_button_busy_state = _extract_function_source(source, "setActionButtonBusyState")
+        set_project_open_in_flight = _extract_function_source(source, "setProjectOpenInFlight")
+        style_source = (EDITOR_DIR / "styles.css").read_text(encoding="utf-8")
+
+        self.assertIn(".toolbar-button.is-busy", style_source)
+        self.assertIn("const isTarget = typeof options.isTarget", set_action_button_busy_state)
+        self.assertIn("state.projectOpenInFlightId", source)
+        self.assertIn("正在打开项目，请稍等", source)
+        self.assertIn("blockProjectCenterOperationIfInFlight()", handle_click)
+        self.assertIn("setProjectOpenInFlight(projectId)", handle_click)
+        self.assertIn('setProjectOpenInFlight("")', handle_click)
+        self.assertIn("finally", handle_click)
+        self.assertIn("state.projectOpenInFlightId = String(projectId ?? \"\").trim()", set_project_open_in_flight)
+        self.assertIn('data-action="open-project"', set_project_open_in_flight)
+        self.assertIn('busyLabel: "打开中..."', set_project_open_in_flight)
+        self.assertIn("projectOpenIdleLabel", set_project_open_in_flight)
+        self.assertIn("isTarget: (button) => button.dataset.projectId === state.projectOpenInFlightId", set_project_open_in_flight)
+
+        script = textwrap.dedent(
+            f"""
+            class HTMLButtonElement {{
+              constructor(projectId, label) {{
+                this.dataset = {{ projectId }};
+                this.textContent = label;
+                this.disabled = false;
+                this.attrs = {{}};
+                this.classes = new Set();
+                this.classList = {{
+                  add: (name) => this.classes.add(name),
+                  remove: (name) => this.classes.delete(name),
+                }};
+              }}
+              setAttribute(name, value) {{
+                this.attrs[name] = value;
+              }}
+              removeAttribute(name) {{
+                delete this.attrs[name];
+              }}
+            }}
+            const state = {{ projectOpenInFlightId: "" }};
+            const target = new HTMLButtonElement("project-a", "打开这个项目");
+            const other = new HTMLButtonElement("project-b", "继续编辑这个项目");
+            const document = {{
+              querySelectorAll(selector) {{
+                return selector === '[data-action="open-project"]' ? [target, other] : [];
+              }},
+            }};
+            function setActionButtonBusyState(options = {{}}) {set_action_button_busy_state}
+            function setProjectOpenInFlight(projectId) {set_project_open_in_flight}
+            setProjectOpenInFlight("project-a");
+            const busy = {{
+              inFlight: state.projectOpenInFlightId,
+              targetDisabled: target.disabled,
+              targetText: target.textContent,
+              targetBusy: target.attrs["aria-busy"],
+              targetAriaDisabled: target.attrs["aria-disabled"],
+              targetClasses: Array.from(target.classes),
+              otherDisabled: other.disabled,
+              otherText: other.textContent,
+              otherBusy: other.attrs["aria-busy"] ?? null,
+            }};
+            setProjectOpenInFlight("");
+            const idle = {{
+              inFlight: state.projectOpenInFlightId,
+              targetDisabled: target.disabled,
+              targetText: target.textContent,
+              targetBusy: target.attrs["aria-busy"] ?? null,
+              targetAriaDisabled: target.attrs["aria-disabled"] ?? null,
+              targetClasses: Array.from(target.classes),
+              otherDisabled: other.disabled,
+              otherText: other.textContent,
+              otherBusy: other.attrs["aria-busy"] ?? null,
+            }};
+            process.stdout.write(JSON.stringify({{ busy, idle }}));
+            """
+        )
+        completed = subprocess.run(
+            ["node", "-e", script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        self.assertEqual(payload["busy"]["inFlight"], "project-a")
+        self.assertTrue(payload["busy"]["targetDisabled"])
+        self.assertEqual(payload["busy"]["targetText"], "打开中...")
+        self.assertEqual(payload["busy"]["targetBusy"], "true")
+        self.assertEqual(payload["busy"]["targetAriaDisabled"], "true")
+        self.assertIn("is-busy", payload["busy"]["targetClasses"])
+        self.assertFalse(payload["busy"]["otherDisabled"])
+        self.assertEqual(payload["busy"]["otherText"], "继续编辑这个项目")
+        self.assertIsNone(payload["busy"]["otherBusy"])
+        self.assertEqual(payload["idle"]["inFlight"], "")
+        self.assertFalse(payload["idle"]["targetDisabled"])
+        self.assertEqual(payload["idle"]["targetText"], "打开这个项目")
+        self.assertIsNone(payload["idle"]["targetBusy"])
+        self.assertIsNone(payload["idle"]["targetAriaDisabled"])
+        self.assertNotIn("is-busy", payload["idle"]["targetClasses"])
+        self.assertFalse(payload["idle"]["otherDisabled"])
+        self.assertEqual(payload["idle"]["otherText"], "继续编辑这个项目")
+        self.assertIsNone(payload["idle"]["otherBusy"])
+
+    def test_project_rename_busy_state_disables_only_target_project(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        handle_click = _extract_function_source(source, "handleClick")
+        set_action_button_busy_state = _extract_function_source(source, "setActionButtonBusyState")
+        set_project_rename_in_flight = _extract_function_source(source, "setProjectRenameInFlight")
+        style_source = (EDITOR_DIR / "styles.css").read_text(encoding="utf-8")
+
+        self.assertIn(".toolbar-button.is-busy", style_source)
+        self.assertIn("state.projectRenameInFlightId", source)
+        self.assertIn("正在修改项目名，请稍等", source)
+        self.assertIn("blockProjectCenterOperationIfInFlight()", handle_click)
+        self.assertIn("setProjectRenameInFlight(projectId)", handle_click)
+        self.assertIn('setProjectRenameInFlight("")', handle_click)
+        self.assertIn("finally", handle_click)
+        self.assertIn(
+            "state.projectRenameInFlightId = String(projectId ?? \"\").trim()",
+            set_project_rename_in_flight,
+        )
+        self.assertIn('data-action="rename-project"', set_project_rename_in_flight)
+        self.assertIn('busyLabel: "改名中..."', set_project_rename_in_flight)
+        self.assertIn("projectRenameIdleLabel", set_project_rename_in_flight)
+        self.assertIn(
+            "isTarget: (button) => button.dataset.projectId === state.projectRenameInFlightId",
+            set_project_rename_in_flight,
+        )
+        self.assertIn("button.textContent = busyLabel", set_action_button_busy_state)
+
+        script = textwrap.dedent(
+            f"""
+            class HTMLButtonElement {{
+              constructor(projectId, label) {{
+                this.dataset = {{ projectId }};
+                this.textContent = label;
+                this.disabled = false;
+                this.attrs = {{}};
+                this.classes = new Set();
+                this.classList = {{
+                  add: (name) => this.classes.add(name),
+                  remove: (name) => this.classes.delete(name),
+                }};
+              }}
+              setAttribute(name, value) {{
+                this.attrs[name] = value;
+              }}
+              removeAttribute(name) {{
+                delete this.attrs[name];
+              }}
+            }}
+            const state = {{ projectRenameInFlightId: "" }};
+            const target = new HTMLButtonElement("project-a", "改项目名");
+            const other = new HTMLButtonElement("project-b", "改项目名");
+            const document = {{
+              querySelectorAll(selector) {{
+                return selector === '[data-action="rename-project"]' ? [target, other] : [];
+              }},
+            }};
+            function setActionButtonBusyState(options = {{}}) {set_action_button_busy_state}
+            function setProjectRenameInFlight(projectId) {set_project_rename_in_flight}
+            setProjectRenameInFlight("project-a");
+            const busy = {{
+              inFlight: state.projectRenameInFlightId,
+              targetDisabled: target.disabled,
+              targetText: target.textContent,
+              targetBusy: target.attrs["aria-busy"],
+              targetAriaDisabled: target.attrs["aria-disabled"],
+              targetClasses: Array.from(target.classes),
+              otherDisabled: other.disabled,
+              otherText: other.textContent,
+              otherBusy: other.attrs["aria-busy"] ?? null,
+            }};
+            setProjectRenameInFlight("");
+            const idle = {{
+              inFlight: state.projectRenameInFlightId,
+              targetDisabled: target.disabled,
+              targetText: target.textContent,
+              targetBusy: target.attrs["aria-busy"] ?? null,
+              targetAriaDisabled: target.attrs["aria-disabled"] ?? null,
+              targetClasses: Array.from(target.classes),
+              otherDisabled: other.disabled,
+              otherText: other.textContent,
+              otherBusy: other.attrs["aria-busy"] ?? null,
+            }};
+            process.stdout.write(JSON.stringify({{ busy, idle }}));
+            """
+        )
+        completed = subprocess.run(
+            ["node", "-e", script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        self.assertEqual(payload["busy"]["inFlight"], "project-a")
+        self.assertTrue(payload["busy"]["targetDisabled"])
+        self.assertEqual(payload["busy"]["targetText"], "改名中...")
+        self.assertEqual(payload["busy"]["targetBusy"], "true")
+        self.assertEqual(payload["busy"]["targetAriaDisabled"], "true")
+        self.assertIn("is-busy", payload["busy"]["targetClasses"])
+        self.assertFalse(payload["busy"]["otherDisabled"])
+        self.assertEqual(payload["busy"]["otherText"], "改项目名")
+        self.assertIsNone(payload["busy"]["otherBusy"])
+        self.assertEqual(payload["idle"]["inFlight"], "")
+        self.assertFalse(payload["idle"]["targetDisabled"])
+        self.assertEqual(payload["idle"]["targetText"], "改项目名")
+        self.assertIsNone(payload["idle"]["targetBusy"])
+        self.assertIsNone(payload["idle"]["targetAriaDisabled"])
+        self.assertNotIn("is-busy", payload["idle"]["targetClasses"])
+        self.assertFalse(payload["idle"]["otherDisabled"])
+        self.assertEqual(payload["idle"]["otherText"], "改项目名")
+        self.assertIsNone(payload["idle"]["otherBusy"])
+
+    def test_project_duplicate_busy_state_disables_only_target_project(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        handle_click = _extract_function_source(source, "handleClick")
+        set_action_button_busy_state = _extract_function_source(source, "setActionButtonBusyState")
+        set_project_duplicate_in_flight = _extract_function_source(source, "setProjectDuplicateInFlight")
+        style_source = (EDITOR_DIR / "styles.css").read_text(encoding="utf-8")
+
+        self.assertIn(".toolbar-button.is-busy", style_source)
+        self.assertIn("state.projectDuplicateInFlightId", source)
+        self.assertIn("正在复制项目，请稍等", source)
+        self.assertIn("blockProjectCenterOperationIfInFlight()", handle_click)
+        self.assertIn("setProjectDuplicateInFlight(projectId)", handle_click)
+        self.assertIn('setProjectDuplicateInFlight("")', handle_click)
+        self.assertIn("finally", handle_click)
+        self.assertIn(
+            "state.projectDuplicateInFlightId = String(projectId ?? \"\").trim()",
+            set_project_duplicate_in_flight,
+        )
+        self.assertIn('data-action="duplicate-project"', set_project_duplicate_in_flight)
+        self.assertIn('busyLabel: "复制中..."', set_project_duplicate_in_flight)
+        self.assertIn("projectDuplicateIdleLabel", set_project_duplicate_in_flight)
+        self.assertIn(
+            "isTarget: (button) => button.dataset.projectId === state.projectDuplicateInFlightId",
+            set_project_duplicate_in_flight,
+        )
+        self.assertIn("button.textContent = busyLabel", set_action_button_busy_state)
+
+        script = textwrap.dedent(
+            f"""
+            class HTMLButtonElement {{
+              constructor(projectId, label) {{
+                this.dataset = {{ projectId }};
+                this.textContent = label;
+                this.disabled = false;
+                this.attrs = {{}};
+                this.classes = new Set();
+                this.classList = {{
+                  add: (name) => this.classes.add(name),
+                  remove: (name) => this.classes.delete(name),
+                }};
+              }}
+              setAttribute(name, value) {{
+                this.attrs[name] = value;
+              }}
+              removeAttribute(name) {{
+                delete this.attrs[name];
+              }}
+            }}
+            const state = {{ projectDuplicateInFlightId: "" }};
+            const target = new HTMLButtonElement("project-a", "复制项目");
+            const other = new HTMLButtonElement("project-b", "复制成正式项目");
+            const document = {{
+              querySelectorAll(selector) {{
+                return selector === '[data-action="duplicate-project"]' ? [target, other] : [];
+              }},
+            }};
+            function setActionButtonBusyState(options = {{}}) {set_action_button_busy_state}
+            function setProjectDuplicateInFlight(projectId) {set_project_duplicate_in_flight}
+            setProjectDuplicateInFlight("project-a");
+            const busy = {{
+              inFlight: state.projectDuplicateInFlightId,
+              targetDisabled: target.disabled,
+              targetText: target.textContent,
+              targetBusy: target.attrs["aria-busy"],
+              targetAriaDisabled: target.attrs["aria-disabled"],
+              targetClasses: Array.from(target.classes),
+              otherDisabled: other.disabled,
+              otherText: other.textContent,
+              otherBusy: other.attrs["aria-busy"] ?? null,
+            }};
+            setProjectDuplicateInFlight("");
+            const idle = {{
+              inFlight: state.projectDuplicateInFlightId,
+              targetDisabled: target.disabled,
+              targetText: target.textContent,
+              targetBusy: target.attrs["aria-busy"] ?? null,
+              targetAriaDisabled: target.attrs["aria-disabled"] ?? null,
+              targetClasses: Array.from(target.classes),
+              otherDisabled: other.disabled,
+              otherText: other.textContent,
+              otherBusy: other.attrs["aria-busy"] ?? null,
+            }};
+            process.stdout.write(JSON.stringify({{ busy, idle }}));
+            """
+        )
+        completed = subprocess.run(
+            ["node", "-e", script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        self.assertEqual(payload["busy"]["inFlight"], "project-a")
+        self.assertTrue(payload["busy"]["targetDisabled"])
+        self.assertEqual(payload["busy"]["targetText"], "复制中...")
+        self.assertEqual(payload["busy"]["targetBusy"], "true")
+        self.assertEqual(payload["busy"]["targetAriaDisabled"], "true")
+        self.assertIn("is-busy", payload["busy"]["targetClasses"])
+        self.assertFalse(payload["busy"]["otherDisabled"])
+        self.assertEqual(payload["busy"]["otherText"], "复制成正式项目")
+        self.assertIsNone(payload["busy"]["otherBusy"])
+        self.assertEqual(payload["idle"]["inFlight"], "")
+        self.assertFalse(payload["idle"]["targetDisabled"])
+        self.assertEqual(payload["idle"]["targetText"], "复制项目")
+        self.assertIsNone(payload["idle"]["targetBusy"])
+        self.assertIsNone(payload["idle"]["targetAriaDisabled"])
+        self.assertNotIn("is-busy", payload["idle"]["targetClasses"])
+        self.assertFalse(payload["idle"]["otherDisabled"])
+        self.assertEqual(payload["idle"]["otherText"], "复制成正式项目")
+        self.assertIsNone(payload["idle"]["otherBusy"])
+
+    def test_project_delete_busy_state_disables_only_target_project(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        handle_click = _extract_function_source(source, "handleClick")
+        set_action_button_busy_state = _extract_function_source(source, "setActionButtonBusyState")
+        set_project_delete_in_flight = _extract_function_source(source, "setProjectDeleteInFlight")
+        style_source = (EDITOR_DIR / "styles.css").read_text(encoding="utf-8")
+
+        self.assertIn(".toolbar-button.is-busy", style_source)
+        self.assertIn("state.projectDeleteInFlightId", source)
+        self.assertIn("正在删除项目，请稍等", source)
+        self.assertIn("blockProjectCenterOperationIfInFlight()", handle_click)
+        self.assertIn("setProjectDeleteInFlight(projectId)", handle_click)
+        self.assertIn('setProjectDeleteInFlight("")', handle_click)
+        self.assertIn("finally", handle_click)
+        self.assertIn(
+            "state.projectDeleteInFlightId = String(projectId ?? \"\").trim()",
+            set_project_delete_in_flight,
+        )
+        self.assertIn('data-action="delete-project"', set_project_delete_in_flight)
+        self.assertIn('busyLabel: "删除中..."', set_project_delete_in_flight)
+        self.assertIn("projectDeleteIdleLabel", set_project_delete_in_flight)
+        self.assertIn(
+            "isTarget: (button) => button.dataset.projectId === state.projectDeleteInFlightId",
+            set_project_delete_in_flight,
+        )
+        self.assertIn("button.textContent = busyLabel", set_action_button_busy_state)
+
+        script = textwrap.dedent(
+            f"""
+            class HTMLButtonElement {{
+              constructor(projectId, label) {{
+                this.dataset = {{ projectId }};
+                this.textContent = label;
+                this.disabled = false;
+                this.attrs = {{}};
+                this.classes = new Set();
+                this.classList = {{
+                  add: (name) => this.classes.add(name),
+                  remove: (name) => this.classes.delete(name),
+                }};
+              }}
+              setAttribute(name, value) {{
+                this.attrs[name] = value;
+              }}
+              removeAttribute(name) {{
+                delete this.attrs[name];
+              }}
+            }}
+            const state = {{ projectDeleteInFlightId: "" }};
+            const target = new HTMLButtonElement("project-a", "删除项目");
+            const other = new HTMLButtonElement("project-b", "删除项目");
+            const document = {{
+              querySelectorAll(selector) {{
+                return selector === '[data-action="delete-project"]' ? [target, other] : [];
+              }},
+            }};
+            function setActionButtonBusyState(options = {{}}) {set_action_button_busy_state}
+            function setProjectDeleteInFlight(projectId) {set_project_delete_in_flight}
+            setProjectDeleteInFlight("project-a");
+            const busy = {{
+              inFlight: state.projectDeleteInFlightId,
+              targetDisabled: target.disabled,
+              targetText: target.textContent,
+              targetBusy: target.attrs["aria-busy"],
+              targetAriaDisabled: target.attrs["aria-disabled"],
+              targetClasses: Array.from(target.classes),
+              otherDisabled: other.disabled,
+              otherText: other.textContent,
+              otherBusy: other.attrs["aria-busy"] ?? null,
+            }};
+            setProjectDeleteInFlight("");
+            const idle = {{
+              inFlight: state.projectDeleteInFlightId,
+              targetDisabled: target.disabled,
+              targetText: target.textContent,
+              targetBusy: target.attrs["aria-busy"] ?? null,
+              targetAriaDisabled: target.attrs["aria-disabled"] ?? null,
+              targetClasses: Array.from(target.classes),
+              otherDisabled: other.disabled,
+              otherText: other.textContent,
+              otherBusy: other.attrs["aria-busy"] ?? null,
+            }};
+            process.stdout.write(JSON.stringify({{ busy, idle }}));
+            """
+        )
+        completed = subprocess.run(
+            ["node", "-e", script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        self.assertEqual(payload["busy"]["inFlight"], "project-a")
+        self.assertTrue(payload["busy"]["targetDisabled"])
+        self.assertEqual(payload["busy"]["targetText"], "删除中...")
+        self.assertEqual(payload["busy"]["targetBusy"], "true")
+        self.assertEqual(payload["busy"]["targetAriaDisabled"], "true")
+        self.assertIn("is-busy", payload["busy"]["targetClasses"])
+        self.assertFalse(payload["busy"]["otherDisabled"])
+        self.assertEqual(payload["busy"]["otherText"], "删除项目")
+        self.assertIsNone(payload["busy"]["otherBusy"])
+        self.assertEqual(payload["idle"]["inFlight"], "")
+        self.assertFalse(payload["idle"]["targetDisabled"])
+        self.assertEqual(payload["idle"]["targetText"], "删除项目")
+        self.assertIsNone(payload["idle"]["targetBusy"])
+        self.assertIsNone(payload["idle"]["targetAriaDisabled"])
+        self.assertNotIn("is-busy", payload["idle"]["targetClasses"])
+        self.assertFalse(payload["idle"]["otherDisabled"])
+        self.assertEqual(payload["idle"]["otherText"], "删除项目")
+        self.assertIsNone(payload["idle"]["otherBusy"])
+
     def test_blank_project_dashboard_promotes_first_chapter_action(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
         render_dashboard = _extract_function_source(source, "renderDashboard")
@@ -729,10 +1462,13 @@ class FrontendActionHandlerTests(unittest.TestCase):
 
         script = textwrap.dedent(
             f"""
+            const state = {{ chapterCreateInFlight: false }};
             function renderDashboardPrimaryActions(isBlankProject) {render_dashboard_actions}
             const blankMarkup = renderDashboardPrimaryActions(true);
             const activeMarkup = renderDashboardPrimaryActions(false);
-            process.stdout.write(JSON.stringify({{ blankMarkup, activeMarkup }}));
+            state.chapterCreateInFlight = true;
+            const busyBlankMarkup = renderDashboardPrimaryActions(true);
+            process.stdout.write(JSON.stringify({{ blankMarkup, activeMarkup, busyBlankMarkup }}));
             """
         )
         completed = subprocess.run(
@@ -750,6 +1486,9 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn('data-action="open-beginner-tutorial"', payload["blankMarkup"])
         self.assertIn('data-step-index="1"', payload["blankMarkup"])
         self.assertNotIn('data-screen="story"', payload["blankMarkup"])
+        self.assertNotIn('aria-busy="true"', payload["blankMarkup"])
+        self.assertIn('aria-busy="true"', payload["busyBlankMarkup"])
+        self.assertIn('disabled aria-disabled="true"', payload["busyBlankMarkup"])
         self.assertIn("进入剧情编辑", payload["activeMarkup"])
         self.assertIn('data-action="switch-screen" data-screen="story"', payload["activeMarkup"])
         self.assertIn("查看试玩页", payload["activeMarkup"])
@@ -759,11 +1498,16 @@ class FrontendActionHandlerTests(unittest.TestCase):
     def test_create_chapter_ignores_duplicate_clicks_while_pending(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
         create_chapter = _extract_function_source(source, "createChapter")
+        set_action_button_busy_state = _extract_function_source(source, "setActionButtonBusyState")
+        set_chapter_create_in_flight = _extract_function_source(source, "setChapterCreateInFlight")
 
         self.assertIn("state.chapterCreateInFlight", source)
         self.assertIn("正在创建章节，请稍等", create_chapter)
-        self.assertIn("state.chapterCreateInFlight = true", create_chapter)
-        self.assertIn("state.chapterCreateInFlight = false", create_chapter)
+        self.assertIn("setChapterCreateInFlight(true)", create_chapter)
+        self.assertIn("setChapterCreateInFlight(false)", create_chapter)
+        self.assertIn("state.chapterCreateInFlight = Boolean(isInFlight)", set_chapter_create_in_flight)
+        self.assertIn('busyLabel: "创建中..."', set_chapter_create_in_flight)
+        self.assertIn('button.setAttribute("aria-busy", "true")', set_action_button_busy_state)
         self.assertIn("finally", create_chapter)
 
         script = textwrap.dedent(
@@ -807,6 +1551,8 @@ class FrontendActionHandlerTests(unittest.TestCase):
                 payload,
               }};
             }}
+            function setActionButtonBusyState(options = {{}}) {set_action_button_busy_state}
+            function setChapterCreateInFlight(isInFlight) {set_chapter_create_in_flight}
             async function createChapter(options = {{}}) {create_chapter}
             Promise.all([
               createChapter({{ skipPrompts: true, defaultChapterName: "第一章 开场", defaultSceneName: "第一场 相遇", afterCreateScreen: "story" }}),
@@ -839,6 +1585,93 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertEqual(len(payload["reloads"]), 1)
         self.assertIn("正在创建章节，请稍等...", [status["message"] for status in payload["statuses"]])
         self.assertIn("正在创建章节，请稍等...", payload["toasts"])
+
+    def test_chapter_create_busy_state_disables_visible_buttons(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        set_action_button_busy_state = _extract_function_source(source, "setActionButtonBusyState")
+        set_chapter_create_in_flight = _extract_function_source(source, "setChapterCreateInFlight")
+        style_source = (EDITOR_DIR / "styles.css").read_text(encoding="utf-8")
+
+        self.assertIn(".toolbar-button.is-busy", style_source)
+        self.assertIn("querySelectorAll", set_action_button_busy_state)
+        self.assertIn('data-action="create-first-chapter"', set_chapter_create_in_flight)
+        self.assertIn("chapterCreateIdleLabel", set_chapter_create_in_flight)
+        self.assertIn("classList.add(\"is-busy\")", set_action_button_busy_state)
+        self.assertIn("classList.remove(\"is-busy\")", set_action_button_busy_state)
+
+        script = textwrap.dedent(
+            f"""
+            class HTMLButtonElement {{
+              constructor(action, label) {{
+                this.dataset = {{ action }};
+                this.textContent = label;
+                this.disabled = false;
+                this.attrs = {{}};
+                this.classes = new Set();
+                this.classList = {{
+                  add: (name) => this.classes.add(name),
+                  remove: (name) => this.classes.delete(name),
+                }};
+              }}
+              setAttribute(name, value) {{
+                this.attrs[name] = value;
+              }}
+              removeAttribute(name) {{
+                delete this.attrs[name];
+              }}
+            }}
+            const state = {{ chapterCreateInFlight: false }};
+            const direct = new HTMLButtonElement("create-first-chapter", "创建第一章和第一场");
+            const custom = new HTMLButtonElement("create-first-chapter-custom", "自定义名字再创建");
+            const document = {{
+              querySelectorAll(selector) {{
+                return [direct, custom];
+              }},
+            }};
+            function setActionButtonBusyState(options = {{}}) {set_action_button_busy_state}
+            function setChapterCreateInFlight(isInFlight) {set_chapter_create_in_flight}
+            setChapterCreateInFlight(true);
+            const busy = {{
+              inFlight: state.chapterCreateInFlight,
+              directDisabled: direct.disabled,
+              directText: direct.textContent,
+              customText: custom.textContent,
+              directBusy: direct.attrs["aria-busy"],
+              directClass: Array.from(direct.classes),
+            }};
+            setChapterCreateInFlight(false);
+            const idle = {{
+              inFlight: state.chapterCreateInFlight,
+              directDisabled: direct.disabled,
+              directText: direct.textContent,
+              customText: custom.textContent,
+              directBusy: direct.attrs["aria-busy"] ?? null,
+              directClass: Array.from(direct.classes),
+            }};
+            process.stdout.write(JSON.stringify({{ busy, idle }}));
+            """
+        )
+        completed = subprocess.run(
+            ["node", "-e", script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        self.assertTrue(payload["busy"]["inFlight"])
+        self.assertTrue(payload["busy"]["directDisabled"])
+        self.assertEqual(payload["busy"]["directText"], "创建中...")
+        self.assertEqual(payload["busy"]["customText"], "创建中...")
+        self.assertEqual(payload["busy"]["directBusy"], "true")
+        self.assertIn("is-busy", payload["busy"]["directClass"])
+        self.assertFalse(payload["idle"]["inFlight"])
+        self.assertFalse(payload["idle"]["directDisabled"])
+        self.assertEqual(payload["idle"]["directText"], "创建第一章和第一场")
+        self.assertEqual(payload["idle"]["customText"], "自定义名字再创建")
+        self.assertIsNone(payload["idle"]["directBusy"])
+        self.assertNotIn("is-busy", payload["idle"]["directClass"])
 
     def test_story_structure_failures_use_copyable_detail_dialogs(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")

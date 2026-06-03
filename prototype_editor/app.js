@@ -842,6 +842,12 @@ const state = {
   sceneStatusDrag: null,
   storyBlockDrag: null,
   starterVariablesPromise: null,
+  projectCenterRefreshInFlight: false,
+  projectCreateInFlight: false,
+  projectOpenInFlightId: "",
+  projectRenameInFlightId: "",
+  projectDuplicateInFlightId: "",
+  projectDeleteInFlightId: "",
   chapterCreateInFlight: false,
   beginnerTutorialOpen: false,
   beginnerTutorialStep: 0,
@@ -2436,7 +2442,12 @@ function renderProjectCenter() {
 }
 
 function renderProjectCenterHero(summary = {}) {
-  return projectCenterTools?.renderProjectCenterHero?.(summary, { escapeHtml }) ?? "";
+  return projectCenterTools?.renderProjectCenterHero?.(summary, {
+    escapeHtml,
+    projectCreateInFlight: state.projectCreateInFlight,
+    projectCenterRefreshInFlight: state.projectCenterRefreshInFlight,
+    projectCenterOperationInFlightMessage: getProjectCenterOperationInFlightMessage(),
+  }) ?? "";
 }
 
 function renderProjectCenterProjectList(projects, activeProjectId) {
@@ -2446,6 +2457,11 @@ function renderProjectCenterProjectList(projects, activeProjectId) {
     getTemplateLabel,
     getSafeEditorMode,
     getEditorModeLabel,
+    projectOpenInFlightId: state.projectOpenInFlightId,
+    projectRenameInFlightId: state.projectRenameInFlightId,
+    projectDuplicateInFlightId: state.projectDuplicateInFlightId,
+    projectDeleteInFlightId: state.projectDeleteInFlightId,
+    projectCenterOperationInFlightMessage: getProjectCenterOperationInFlightMessage(),
   });
 
   if (renderedList) {
@@ -2472,6 +2488,11 @@ function renderProjectCenterCard(project, activeProjectId) {
     getTemplateLabel,
     getSafeEditorMode,
     getEditorModeLabel,
+    projectOpenInFlightId: state.projectOpenInFlightId,
+    projectRenameInFlightId: state.projectRenameInFlightId,
+    projectDuplicateInFlightId: state.projectDuplicateInFlightId,
+    projectDeleteInFlightId: state.projectDeleteInFlightId,
+    projectCenterOperationInFlightMessage: getProjectCenterOperationInFlightMessage(),
   });
 
   if (renderedCard) {
@@ -2493,8 +2514,13 @@ function renderProjectCenterCard(project, activeProjectId) {
           class="toolbar-button toolbar-button-primary"
           data-action="open-project"
           data-project-id="${escapeHtml(project?.projectId ?? "")}"
+          ${
+            state.projectOpenInFlightId === project?.projectId
+              ? 'disabled aria-disabled="true" aria-busy="true"'
+              : ""
+          }
         >
-          ${isActive ? "继续编辑这个项目" : "打开这个项目"}
+          ${state.projectOpenInFlightId === project?.projectId ? "打开中..." : isActive ? "继续编辑这个项目" : "打开这个项目"}
         </button>
       </div>
     </article>
@@ -2578,6 +2604,38 @@ async function openProjectCenterFromErrorState() {
 
 function getProjectCenterProject(projectId) {
   return (state.projectCenter?.projects ?? []).find((project) => project.projectId === projectId) ?? null;
+}
+
+function getProjectCenterOperationInFlightMessage() {
+  if (state.projectCreateInFlight) {
+    return "正在准备新项目，请稍等...";
+  }
+  if (state.projectCenterRefreshInFlight) {
+    return "正在刷新项目列表，请稍等...";
+  }
+  if (state.projectOpenInFlightId) {
+    return "正在打开项目，请稍等...";
+  }
+  if (state.projectRenameInFlightId) {
+    return "正在修改项目名，请稍等...";
+  }
+  if (state.projectDuplicateInFlightId) {
+    return "正在复制项目，请稍等...";
+  }
+  if (state.projectDeleteInFlightId) {
+    return "正在删除项目，请稍等...";
+  }
+  return "";
+}
+
+function blockProjectCenterOperationIfInFlight() {
+  const message = getProjectCenterOperationInFlightMessage();
+  if (!message) {
+    return false;
+  }
+  setSaveStatus(message);
+  showToast(message);
+  return true;
 }
 
 function initializeSelection(data) {
@@ -2665,6 +2723,11 @@ async function handleClick(event) {
   }
 
   if (action === "refresh-project-center") {
+    if (blockProjectCenterOperationIfInFlight()) {
+      return;
+    }
+
+    setProjectCenterRefreshInFlight(true);
     try {
       setSaveStatus("正在刷新项目列表...");
       await refreshProjectCenterState();
@@ -2672,12 +2735,17 @@ async function handleClick(event) {
       showToast("项目列表已经刷新");
     } catch (error) {
       await showProjectCenterFailure(error, "刷新项目列表失败", "项目列表没有刷新成功");
+    } finally {
+      setProjectCenterRefreshInFlight(false);
     }
     return;
   }
 
   if (action === "set-editor-mode") {
     if (!state.data) {
+      if (blockProjectCenterOperationIfInFlight()) {
+        return;
+      }
       const currentMode = getSafeEditorMode(state.projectCenterEditorMode);
       const nextMode = getSafeEditorMode(actionTarget.dataset.editorMode);
       const modeLabel = getEditorModeLabel(nextMode);
@@ -2776,25 +2844,30 @@ async function handleClick(event) {
   }
 
   if (action === "create-project") {
-    const projectMode = getSafeEditorMode(state.projectCenterEditorMode);
-    const projectModeLabel = getEditorModeLabel(projectMode);
-    const name = await promptForText(
-      [
-        "给这个新项目起个名字：",
-        `将以${projectModeLabel}创建一个真正的空白项目；已有项目不会被改变。`,
-      ],
-      "未命名新作",
-      {
-        title: "新建空白项目",
-        confirmLabel: `创建${projectModeLabel}项目`,
-        placeholder: "例如：雨夜校园序章",
-      }
-    );
-    if (!name) {
+    if (blockProjectCenterOperationIfInFlight()) {
       return;
     }
 
+    const projectMode = getSafeEditorMode(state.projectCenterEditorMode);
+    const projectModeLabel = getEditorModeLabel(projectMode);
+    setProjectCreateInFlight(true);
     try {
+      const name = await promptForText(
+        [
+          "给这个新项目起个名字：",
+          `将以${projectModeLabel}创建一个真正的空白项目；已有项目不会被改变。`,
+        ],
+        "未命名新作",
+        {
+          title: "新建空白项目",
+          confirmLabel: `创建${projectModeLabel}项目`,
+          placeholder: "例如：雨夜校园序章",
+        }
+      );
+      if (!name) {
+        return;
+      }
+
       setSaveStatus(`正在创建${projectModeLabel}空白项目...`);
       const result = await postJson(API_CREATE_PROJECT, {
         name,
@@ -2807,6 +2880,8 @@ async function handleClick(event) {
       if (!handleProjectLoadFailure(error)) {
         await showProjectCenterFailure(error, "新建空白项目失败", "空白项目没有创建成功");
       }
+    } finally {
+      setProjectCreateInFlight(false);
     }
     return;
   }
@@ -2851,6 +2926,11 @@ async function handleClick(event) {
       return;
     }
 
+    if (blockProjectCenterOperationIfInFlight()) {
+      return;
+    }
+
+    setProjectOpenInFlight(projectId);
     try {
       setSaveStatus("正在打开项目...");
       const result = await postJson(API_OPEN_PROJECT, { projectId });
@@ -2861,6 +2941,8 @@ async function handleClick(event) {
       if (!handleProjectLoadFailure(error)) {
         await showProjectCenterFailure(error, "打开项目失败", "项目没有打开成功");
       }
+    } finally {
+      setProjectOpenInFlight("");
     }
     return;
   }
@@ -2872,12 +2954,17 @@ async function handleClick(event) {
       return;
     }
 
-    const nextName = await promptForText("把这个项目改成什么名字？", project.title ?? "未命名项目");
-    if (!nextName || nextName === project.title) {
+    if (blockProjectCenterOperationIfInFlight()) {
       return;
     }
 
+    setProjectRenameInFlight(projectId);
     try {
+      const nextName = await promptForText("把这个项目改成什么名字？", project.title ?? "未命名项目");
+      if (!nextName || nextName === project.title) {
+        return;
+      }
+
       setSaveStatus("正在修改项目名...");
       const result = await postJson(API_RENAME_PROJECT, {
         projectId,
@@ -2898,6 +2985,8 @@ async function handleClick(event) {
       showToast(`项目名已更新：${nextName}`);
     } catch (error) {
       await showProjectCenterFailure(error, "修改项目名失败", "项目名没有修改成功");
+    } finally {
+      setProjectRenameInFlight("");
     }
     return;
   }
@@ -2909,15 +2998,20 @@ async function handleClick(event) {
       return;
     }
 
-    const suggestedName = project.isSample
-      ? `${project.title} 正式项目`
-      : `${project.title} 副本`;
-    const nextName = await promptForText("给复制出来的新项目起个名字：", suggestedName);
-    if (!nextName) {
+    if (blockProjectCenterOperationIfInFlight()) {
       return;
     }
 
+    setProjectDuplicateInFlight(projectId);
     try {
+      const suggestedName = project.isSample
+        ? `${project.title} 正式项目`
+        : `${project.title} 副本`;
+      const nextName = await promptForText("给复制出来的新项目起个名字：", suggestedName);
+      if (!nextName) {
+        return;
+      }
+
       setSaveStatus("正在复制项目...");
       const result = await postJson(API_DUPLICATE_PROJECT, {
         projectId,
@@ -2930,6 +3024,8 @@ async function handleClick(event) {
       if (!handleProjectLoadFailure(error)) {
         await showProjectCenterFailure(error, "复制项目失败", "项目没有复制成功");
       }
+    } finally {
+      setProjectDuplicateInFlight("");
     }
     return;
   }
@@ -2938,6 +3034,10 @@ async function handleClick(event) {
     const projectId = String(actionTarget.dataset.projectId ?? "").trim();
     const project = getProjectCenterProject(projectId);
     if (!projectId || !project) {
+      return;
+    }
+
+    if (blockProjectCenterOperationIfInFlight()) {
       return;
     }
 
@@ -2952,6 +3052,7 @@ async function handleClick(event) {
       return;
     }
 
+    setProjectDeleteInFlight(projectId);
     try {
       setSaveStatus("正在删除项目...");
       const result = await postJson(API_DELETE_PROJECT, { projectId });
@@ -2964,6 +3065,8 @@ async function handleClick(event) {
       showToast(`项目已删除：${project.title}`);
     } catch (error) {
       await showProjectCenterFailure(error, "删除项目失败", `项目「${project.title}」没有删除成功`);
+    } finally {
+      setProjectDeleteInFlight("");
     }
     return;
   }
@@ -9352,10 +9455,14 @@ function rerenderProjectHistoryPanel(options = {}) {
 function renderDashboardPrimaryActions(isBlankProject) {
   if (isBlankProject) {
     return `
-      <button class="toolbar-button toolbar-button-primary" data-action="create-first-chapter">
+      <button class="toolbar-button toolbar-button-primary" data-action="create-first-chapter" ${
+        state.chapterCreateInFlight ? 'disabled aria-disabled="true" aria-busy="true"' : ""
+      }>
         创建第一章和第一场
       </button>
-      <button class="toolbar-button" data-action="create-first-chapter-custom">
+      <button class="toolbar-button" data-action="create-first-chapter-custom" ${
+        state.chapterCreateInFlight ? 'disabled aria-disabled="true" aria-busy="true"' : ""
+      }>
         自定义名字再创建
       </button>
       <button class="toolbar-button" data-action="open-beginner-tutorial" data-step-index="1">
@@ -9378,6 +9485,120 @@ function renderDashboardPrimaryActions(isBlankProject) {
       打开新手教程
     </button>
   `;
+}
+
+function setActionButtonBusyState(options = {}) {
+  if (typeof document === "undefined" || typeof document.querySelectorAll !== "function") {
+    return;
+  }
+
+  const selector = options.selector ?? "";
+  const idleLabelKey = options.idleLabelKey ?? "busyIdleLabel";
+  const busyLabel = options.busyLabel ?? "处理中...";
+  const isBusy = Boolean(options.isBusy);
+  const isTarget = typeof options.isTarget === "function" ? options.isTarget : () => true;
+  const buttons = Array.from(document.querySelectorAll(selector));
+
+  buttons.forEach((button) => {
+    if (!(button instanceof HTMLButtonElement)) {
+      return;
+    }
+
+    if (isBusy && isTarget(button)) {
+      if (!button.dataset[idleLabelKey]) {
+        button.dataset[idleLabelKey] = button.textContent.trim();
+      }
+      button.disabled = true;
+      button.classList.add("is-busy");
+      button.setAttribute("aria-disabled", "true");
+      button.setAttribute("aria-busy", "true");
+      button.textContent = busyLabel;
+      return;
+    }
+
+    button.disabled = false;
+    button.classList.remove("is-busy");
+    button.removeAttribute("aria-disabled");
+    button.removeAttribute("aria-busy");
+    if (button.dataset[idleLabelKey]) {
+      button.textContent = button.dataset[idleLabelKey];
+      delete button.dataset[idleLabelKey];
+    }
+  });
+}
+
+function setProjectCenterRefreshInFlight(isInFlight) {
+  state.projectCenterRefreshInFlight = Boolean(isInFlight);
+  setActionButtonBusyState({
+    selector: '[data-action="refresh-project-center"]',
+    isBusy: state.projectCenterRefreshInFlight,
+    busyLabel: "刷新中...",
+    idleLabelKey: "projectCenterRefreshIdleLabel",
+  });
+}
+
+function setProjectCreateInFlight(isInFlight) {
+  state.projectCreateInFlight = Boolean(isInFlight);
+  setActionButtonBusyState({
+    selector: '[data-action="create-project"]',
+    isBusy: state.projectCreateInFlight,
+    busyLabel: "准备中...",
+    idleLabelKey: "projectCreateIdleLabel",
+  });
+}
+
+function setProjectOpenInFlight(projectId) {
+  state.projectOpenInFlightId = String(projectId ?? "").trim();
+  setActionButtonBusyState({
+    selector: '[data-action="open-project"]',
+    isBusy: Boolean(state.projectOpenInFlightId),
+    busyLabel: "打开中...",
+    idleLabelKey: "projectOpenIdleLabel",
+    isTarget: (button) => button.dataset.projectId === state.projectOpenInFlightId,
+  });
+}
+
+function setProjectRenameInFlight(projectId) {
+  state.projectRenameInFlightId = String(projectId ?? "").trim();
+  setActionButtonBusyState({
+    selector: '[data-action="rename-project"]',
+    isBusy: Boolean(state.projectRenameInFlightId),
+    busyLabel: "改名中...",
+    idleLabelKey: "projectRenameIdleLabel",
+    isTarget: (button) => button.dataset.projectId === state.projectRenameInFlightId,
+  });
+}
+
+function setProjectDuplicateInFlight(projectId) {
+  state.projectDuplicateInFlightId = String(projectId ?? "").trim();
+  setActionButtonBusyState({
+    selector: '[data-action="duplicate-project"]',
+    isBusy: Boolean(state.projectDuplicateInFlightId),
+    busyLabel: "复制中...",
+    idleLabelKey: "projectDuplicateIdleLabel",
+    isTarget: (button) => button.dataset.projectId === state.projectDuplicateInFlightId,
+  });
+}
+
+function setProjectDeleteInFlight(projectId) {
+  state.projectDeleteInFlightId = String(projectId ?? "").trim();
+  setActionButtonBusyState({
+    selector: '[data-action="delete-project"]',
+    isBusy: Boolean(state.projectDeleteInFlightId),
+    busyLabel: "删除中...",
+    idleLabelKey: "projectDeleteIdleLabel",
+    isTarget: (button) => button.dataset.projectId === state.projectDeleteInFlightId,
+  });
+}
+
+function setChapterCreateInFlight(isInFlight) {
+  state.chapterCreateInFlight = Boolean(isInFlight);
+  setActionButtonBusyState({
+    selector: '[data-action="create-first-chapter"], [data-action="create-first-chapter-custom"]',
+    isBusy: state.chapterCreateInFlight,
+    busyLabel: "创建中...",
+    idleLabelKey: "chapterCreateIdleLabel",
+  });
 }
 
 function renderDashboard() {
@@ -33076,7 +33297,7 @@ async function createChapter(options = {}) {
     return;
   }
 
-  state.chapterCreateInFlight = true;
+  setChapterCreateInFlight(true);
   const defaultChapterName = options.defaultChapterName ?? `新章节 ${state.data.chapters.length + 1}`;
   const suggestedSceneName = options.defaultSceneName ?? `${defaultChapterName} 开场`;
 
@@ -33121,7 +33342,7 @@ async function createChapter(options = {}) {
   } catch (error) {
     await showEditorOperationFailure(error, "新建章节失败", "章节没有创建成功");
   } finally {
-    state.chapterCreateInFlight = false;
+    setChapterCreateInFlight(false);
   }
 }
 

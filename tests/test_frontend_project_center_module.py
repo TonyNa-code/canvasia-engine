@@ -54,6 +54,46 @@ class FrontendProjectCenterModuleTests(unittest.TestCase):
               chapterCount: 1,
               sceneCount: 6,
             }}, "", helpers);
+            const openingHtml = tools.renderProjectCenterCard({{
+              projectId: "project-opening",
+              title: "正在打开的企划",
+              template: "school",
+              sceneCount: 1,
+            }}, "", {{ ...helpers, projectOpenInFlightId: "project-opening" }});
+            const renamingHtml = tools.renderProjectCenterCard({{
+              projectId: "project-renaming",
+              title: "正在改名的企划",
+              template: "school",
+              sceneCount: 1,
+            }}, "", {{ ...helpers, projectRenameInFlightId: "project-renaming" }});
+            const duplicatingFormalHtml = tools.renderProjectCenterCard({{
+              projectId: "project-duplicating",
+              title: "正在复制的企划",
+              template: "school",
+              sceneCount: 1,
+            }}, "", {{ ...helpers, projectDuplicateInFlightId: "project-duplicating" }});
+            const duplicatingSampleHtml = tools.renderProjectCenterCard({{
+              projectId: "sample-duplicating",
+              title: "正在复制的示例",
+              template: "sample",
+              isSample: true,
+              sceneCount: 1,
+            }}, "", {{ ...helpers, projectDuplicateInFlightId: "sample-duplicating" }});
+            const deletingHtml = tools.renderProjectCenterCard({{
+              projectId: "project-deleting",
+              title: "正在删除的企划",
+              template: "school",
+              sceneCount: 1,
+            }}, "", {{ ...helpers, projectDeleteInFlightId: "project-deleting" }});
+            const lockedCardHtml = tools.renderProjectCenterCard({{
+              projectId: "project-locked",
+              title: "被其它操作锁住的企划",
+              template: "school",
+              sceneCount: 2,
+            }}, "", {{
+              ...helpers,
+              projectCenterOperationInFlightMessage: "正在打开项目，请稍等...",
+            }});
             const fallbackHtml = tools.renderProjectCenterCard({{
               title: "无 helper",
               sceneCount: 0,
@@ -65,6 +105,23 @@ class FrontendProjectCenterModuleTests(unittest.TestCase):
               hasSampleProject: true,
               activeProjectId: "project-1",
             }}, {{ escapeHtml }});
+            const busyHeroHtml = tools.renderProjectCenterHero({{
+              localProjectCount: 2,
+              projectCenterMode: "beginner",
+              projectCenterModeLabel: "新手模式",
+            }}, {{
+              escapeHtml,
+              projectCreateInFlight: true,
+              projectCenterRefreshInFlight: true,
+            }});
+            const lockedHeroHtml = tools.renderProjectCenterHero({{
+              localProjectCount: 2,
+              projectCenterMode: "advanced",
+              projectCenterModeLabel: "高级模式",
+            }}, {{
+              escapeHtml,
+              projectCenterOperationInFlightMessage: "正在打开项目，请稍等...",
+            }});
             const emptyListHtml = tools.renderProjectCenterProjectList([], "", helpers);
             const listHtml = tools.renderProjectCenterProjectList([
               {{
@@ -84,8 +141,16 @@ class FrontendProjectCenterModuleTests(unittest.TestCase):
               keys: Object.keys(tools).sort(),
               formalHtml,
               sampleHtml,
+              openingHtml,
+              renamingHtml,
+              duplicatingFormalHtml,
+              duplicatingSampleHtml,
+              deletingHtml,
+              lockedCardHtml,
               fallbackHtml,
               heroHtml,
+              busyHeroHtml,
+              lockedHeroHtml,
               emptyListHtml,
               listHtml,
             }}));
@@ -113,6 +178,30 @@ class FrontendProjectCenterModuleTests(unittest.TestCase):
         self.assertIn("日期:2026-05-18", payload["formalHtml"])
         self.assertIn("分辨率 2560 × 1440", payload["formalHtml"])
         self.assertIn("高级模式", payload["formalHtml"])
+        self.assertIn("打开中...", payload["openingHtml"])
+        self.assertIn('aria-busy="true"', payload["openingHtml"])
+        self.assertIn('disabled aria-disabled="true"', payload["openingHtml"])
+        self.assertIn("is-busy", payload["openingHtml"])
+        self.assertIn("改名中...", payload["renamingHtml"])
+        self.assertIn('aria-busy="true"', payload["renamingHtml"])
+        self.assertIn('disabled aria-disabled="true"', payload["renamingHtml"])
+        self.assertIn("is-busy", payload["renamingHtml"])
+        self.assertIn("复制中...", payload["duplicatingFormalHtml"])
+        self.assertIn('aria-busy="true"', payload["duplicatingFormalHtml"])
+        self.assertIn('data-action="duplicate-project"', payload["duplicatingFormalHtml"])
+        self.assertIn("复制中...", payload["duplicatingSampleHtml"])
+        self.assertIn('aria-busy="true"', payload["duplicatingSampleHtml"])
+        self.assertIn("is-busy", payload["duplicatingSampleHtml"])
+        self.assertIn("删除中...", payload["deletingHtml"])
+        self.assertIn('aria-busy="true"', payload["deletingHtml"])
+        self.assertIn('disabled aria-disabled="true"', payload["deletingHtml"])
+        self.assertIn("is-busy", payload["deletingHtml"])
+        self.assertIn("被其它操作锁住的企划", payload["lockedCardHtml"])
+        self.assertIn("is-locked", payload["lockedCardHtml"])
+        self.assertIn('disabled aria-disabled="true"', payload["lockedCardHtml"])
+        self.assertIn('title="正在打开项目，请稍等..."', payload["lockedCardHtml"])
+        self.assertNotIn('aria-busy="true"', payload["lockedCardHtml"])
+        self.assertNotIn("打开中...", payload["lockedCardHtml"])
         self.assertIn("data-action=\"duplicate-project\"", payload["sampleHtml"])
         self.assertNotIn("data-action=\"delete-project\"", payload["sampleHtml"])
         self.assertIn("复制成正式项目", payload["sampleHtml"])
@@ -137,6 +226,20 @@ class FrontendProjectCenterModuleTests(unittest.TestCase):
         self.assertIn("已经记录过上次打开的项目", payload["heroHtml"])
         self.assertIn('data-action="create-project"', payload["heroHtml"])
         self.assertIn('data-action="refresh-project-center"', payload["heroHtml"])
+        self.assertIn("准备中...", payload["busyHeroHtml"])
+        self.assertIn("刷新中...", payload["busyHeroHtml"])
+        self.assertIn('data-action="create-project"', payload["busyHeroHtml"])
+        self.assertIn('data-action="refresh-project-center"', payload["busyHeroHtml"])
+        self.assertIn('aria-busy="true"', payload["busyHeroHtml"])
+        self.assertIn('disabled aria-disabled="true"', payload["busyHeroHtml"])
+        self.assertIn("is-busy", payload["busyHeroHtml"])
+        self.assertIn("is-locked", payload["lockedHeroHtml"])
+        self.assertIn('disabled aria-disabled="true"', payload["lockedHeroHtml"])
+        self.assertIn('title="正在打开项目，请稍等..."', payload["lockedHeroHtml"])
+        self.assertIn('data-action="open-beginner-tutorial"', payload["lockedHeroHtml"])
+        self.assertNotIn('aria-busy="true"', payload["lockedHeroHtml"])
+        self.assertNotIn("准备中...", payload["lockedHeroHtml"])
+        self.assertNotIn("刷新中...", payload["lockedHeroHtml"])
         self.assertIn("现在还是一张白纸", payload["emptyListHtml"])
         self.assertIn("project-card-grid", payload["listHtml"])
         self.assertEqual(payload["listHtml"].count("project-card "), 2)
