@@ -1512,6 +1512,115 @@ class RunEditorSmokeTests(unittest.TestCase):
                 }
             )
 
+    def test_openai_asset_generation_rejects_transparent_jpeg(self) -> None:
+        self.create_blank_project_with_chapter()
+        with self.assertRaisesRegex(ValueError, "JPEG 不支持透明背景"):
+            run_editor.generate_openai_asset(
+                {
+                    "assetType": "sprite",
+                    "prompt": "原创女主角立绘，透明背景",
+                    "apiKey": "test-openai-image-key",
+                    "background": "transparent",
+                    "outputFormat": "jpeg",
+                }
+            )
+
+    def test_openai_asset_generation_rejects_overlong_prompt(self) -> None:
+        self.create_blank_project_with_chapter()
+        with self.assertRaisesRegex(ValueError, "提示词超过 1400 字"):
+            run_editor.generate_openai_asset(
+                {
+                    "assetType": "background",
+                    "prompt": "长" * 1401,
+                    "apiKey": "test-openai-image-key",
+                }
+            )
+
+    def test_openai_asset_generation_rejects_invalid_model_name(self) -> None:
+        self.create_blank_project_with_chapter()
+        with self.assertRaisesRegex(ValueError, "模型名只能包含英文字母"):
+            run_editor.generate_openai_asset(
+                {
+                    "assetType": "background",
+                    "prompt": "雨夜校园，视觉小说背景",
+                    "apiKey": "test-openai-image-key",
+                    "model": "坏 model",
+                }
+            )
+
+    def test_openai_asset_generation_empty_model_uses_default(self) -> None:
+        self.create_blank_project_with_chapter()
+        image_payload = {
+            "data": [
+                {
+                    "b64_json": base64.b64encode(build_fake_png_bytes()).decode("utf-8"),
+                }
+            ]
+        }
+        captured = {}
+
+        class FakeResponse:
+            def __enter__(self) -> "FakeResponse":
+                return self
+
+            def __exit__(self, *_args: object) -> bool:
+                return False
+
+            def read(self, *_args: object) -> bytes:
+                return json.dumps(image_payload).encode("utf-8")
+
+        def fake_urlopen(request, timeout=0):
+            body = json.loads(request.data.decode("utf-8"))
+            captured["model"] = body["model"]
+            return FakeResponse()
+
+        with mock.patch("openai_asset_generation.urlopen", fake_urlopen):
+            run_editor.generate_openai_asset(
+                {
+                    "assetType": "background",
+                    "prompt": "雨夜校园，视觉小说背景",
+                    "apiKey": "test-openai-image-key",
+                    "model": "",
+                }
+            )
+
+        self.assertEqual(captured["model"], openai_asset_generation.OPENAI_ASSET_GENERATION_DEFAULT_MODEL)
+
+    def test_openai_asset_generation_rejects_invalid_image_bytes(self) -> None:
+        self.create_blank_project_with_chapter()
+        response_payload = {
+            "data": [
+                {
+                    "b64_json": base64.b64encode(b"not-a-real-image").decode("utf-8"),
+                }
+            ]
+        }
+
+        class FakeResponse:
+            def __enter__(self) -> "FakeResponse":
+                return self
+
+            def __exit__(self, *_args: object) -> bool:
+                return False
+
+            def read(self, *_args: object) -> bytes:
+                return json.dumps(response_payload).encode("utf-8")
+
+        with mock.patch("openai_asset_generation.urlopen", lambda *_args, **_kwargs: FakeResponse()):
+            with self.assertRaisesRegex(openai_asset_generation.OpenAiAssetGenerationError, "不是可保存的 PNG"):
+                run_editor.generate_openai_asset(
+                    {
+                        "assetType": "background",
+                        "prompt": "雨夜校园，视觉小说背景",
+                        "assetName": "坏图片",
+                        "apiKey": "test-openai-image-key",
+                        "outputFormat": "png",
+                    }
+                )
+
+        assets_doc = run_editor.read_json(run_editor.DATA_DIR / "assets.json")
+        self.assertNotIn("坏图片", json.dumps(assets_doc, ensure_ascii=False))
+
     def test_asset_import_replace_and_delete_with_usage_protection(self) -> None:
         _, chapter_result = self.create_blank_project_with_chapter()
 

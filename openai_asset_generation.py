@@ -47,12 +47,27 @@ def normalize_openai_asset_generation_format(value: object) -> str:
     return output_format if output_format in OPENAI_ASSET_GENERATION_FORMATS else "png"
 
 
+def validate_openai_asset_generation_format_background(output_format: str, background: str) -> None:
+    if output_format == "jpeg" and background == "transparent":
+        raise ValueError("JPEG 不支持透明背景。请改用 PNG / WebP，或把背景改为自动 / 不透明。")
+
+
+def validate_openai_generated_image_bytes(image_bytes: bytes, output_format: str) -> None:
+    if output_format == "png" and image_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
+        return
+    if output_format == "jpeg" and image_bytes.startswith(b"\xff\xd8\xff"):
+        return
+    if output_format == "webp" and image_bytes.startswith(b"RIFF") and image_bytes[8:12] == b"WEBP":
+        return
+    raise OpenAiAssetGenerationError(f"OpenAI 返回的图片不是可保存的 {output_format.upper()} 文件。")
+
+
 def clean_openai_asset_generation_model(value: object) -> str:
     model = str(value or "").strip()
     if not model:
         return OPENAI_ASSET_GENERATION_DEFAULT_MODEL
     if len(model) > 80 or not re.fullmatch(r"[A-Za-z0-9._:-]+", model):
-        return OPENAI_ASSET_GENERATION_DEFAULT_MODEL
+        raise ValueError("模型名只能包含英文字母、数字、点、下划线、冒号或短横线，且不超过 80 个字符。")
     return model
 
 
@@ -61,7 +76,9 @@ def clean_openai_asset_generation_prompt(value: object) -> str:
     prompt = re.sub(r"\s+", " ", prompt)
     if not prompt:
         raise ValueError("请先写一句要生成什么素材。")
-    return prompt[:OPENAI_ASSET_GENERATION_MAX_PROMPT_CHARS]
+    if len(prompt) > OPENAI_ASSET_GENERATION_MAX_PROMPT_CHARS:
+        raise ValueError(f"提示词超过 {OPENAI_ASSET_GENERATION_MAX_PROMPT_CHARS} 字，请缩短后再生成。")
+    return prompt
 
 
 def build_openai_asset_generation_prompt(payload: dict, asset_type: str) -> str:
@@ -133,6 +150,7 @@ def call_openai_asset_generation_model(payload: dict, asset_type: str) -> tuple[
     quality = normalize_openai_asset_generation_quality(payload.get("quality"))
     background = normalize_openai_asset_generation_background(payload.get("background"))
     output_format = normalize_openai_asset_generation_format(payload.get("outputFormat"))
+    validate_openai_asset_generation_format_background(output_format, background)
     prompt = build_openai_asset_generation_prompt(payload, asset_type)
 
     request_payload = {
@@ -170,7 +188,10 @@ def call_openai_asset_generation_model(payload: dict, asset_type: str) -> tuple[
     except json.JSONDecodeError as error:
         raise OpenAiAssetGenerationError("OpenAI 生图接口返回了无法解析的内容。") from error
 
-    return extract_openai_generated_image_bytes(response_payload), {
+    image_bytes = extract_openai_generated_image_bytes(response_payload)
+    validate_openai_generated_image_bytes(image_bytes, output_format)
+
+    return image_bytes, {
         "model": model,
         "size": size,
         "quality": quality,

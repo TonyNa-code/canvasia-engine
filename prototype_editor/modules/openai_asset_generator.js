@@ -11,6 +11,7 @@
   const OPENAI_ASSET_GENERATION_QUALITIES = Object.freeze(["medium", "high", "low", "auto"]);
   const OPENAI_ASSET_GENERATION_BACKGROUNDS = Object.freeze(["auto", "transparent", "opaque"]);
   const OPENAI_ASSET_GENERATION_FORMATS = Object.freeze(["png", "webp", "jpeg"]);
+  const OPENAI_ASSET_GENERATION_MAX_PROMPT_CHARS = 1400;
 
   function getSafeOpenAiAssetGenerationType(type) {
     return OPENAI_ASSET_GENERATION_TYPES.includes(type) ? type : "background";
@@ -22,6 +23,54 @@
 
   function getOpenAiAssetPromptSample(assetType) {
     return OPENAI_ASSET_GENERATION_TYPE_PROMPTS[getSafeOpenAiAssetGenerationType(assetType)];
+  }
+
+  function getOpenAiAssetPromptLengthInfo(prompt) {
+    const length = Array.from(String(prompt ?? "")).length;
+    return {
+      length,
+      max: OPENAI_ASSET_GENERATION_MAX_PROMPT_CHARS,
+      remaining: Math.max(0, OPENAI_ASSET_GENERATION_MAX_PROMPT_CHARS - length),
+      overLimit: length > OPENAI_ASSET_GENERATION_MAX_PROMPT_CHARS,
+    };
+  }
+
+  function getOpenAiAssetPromptLengthLabel(prompt) {
+    const info = getOpenAiAssetPromptLengthInfo(prompt);
+    return `提示词 ${info.length} / ${info.max} 字`;
+  }
+
+  function getOpenAiAssetPromptLengthWarning(prompt) {
+    const info = getOpenAiAssetPromptLengthInfo(prompt);
+    return info.overLimit ? `提示词超过 ${info.max} 字，请缩短后再生成。` : "";
+  }
+
+  function getOpenAiAssetModelWarning(model) {
+    const value = String(model ?? "").trim();
+    if (!value) {
+      return "";
+    }
+    if (value.length > 80 || !/^[A-Za-z0-9._:-]+$/.test(value)) {
+      return "模型名只能包含英文字母、数字、点、下划线、冒号或短横线，且不超过 80 个字符。";
+    }
+    return "";
+  }
+
+  function getOpenAiAssetGenerationCompatibilityWarning(state = {}) {
+    const background = getSafeOpenAiAssetGenerationOption(
+      state.openAiAssetBackground,
+      OPENAI_ASSET_GENERATION_BACKGROUNDS,
+      "auto"
+    );
+    const outputFormat = getSafeOpenAiAssetGenerationOption(
+      state.openAiAssetOutputFormat,
+      OPENAI_ASSET_GENERATION_FORMATS,
+      "png"
+    );
+    if (background === "transparent" && outputFormat === "jpeg") {
+      return "JPEG 不支持透明背景。请改用 PNG / WebP，或把背景改为自动 / 不透明。";
+    }
+    return "";
   }
 
   function getDefaultOpenAiAssetGenerationState() {
@@ -83,6 +132,20 @@
       jpeg: "JPEG",
     };
     const samplePrompt = getOpenAiAssetPromptSample(assetType);
+    const isLoading = Boolean(state.openAiAssetLoading);
+    const fieldLockAttrs = isLoading ? 'disabled aria-disabled="true" title="AI 素材正在生成，请稍等..."' : "";
+    const modelWarning = getOpenAiAssetModelWarning(state.openAiAssetModel);
+    const promptLengthWarning = getOpenAiAssetPromptLengthWarning(state.openAiAssetPrompt);
+    const lastResult = state.openAiAssetLastResult ?? {};
+    const lastAsset = lastResult.asset ?? null;
+    const lastAssetPath = typeof lastAsset?.path === "string" ? lastAsset.path : "";
+    const lastPrivacyMessage =
+      typeof lastResult.privacy?.message === "string"
+        ? lastResult.privacy.message
+        : lastResult.privacy?.apiKeyStored === false
+          ? "API Key 未写入项目文件或素材元数据。"
+          : "";
+    const compatibilityWarning = getOpenAiAssetGenerationCompatibilityWarning(state);
 
     return `
       <section class="detail-card openai-asset-generator-panel">
@@ -96,70 +159,121 @@
         <div class="openai-asset-generator-grid">
           <label>
             <span>素材类型</span>
-            <select id="openAiAssetType">
+            <select id="openAiAssetType" ${fieldLockAttrs}>
               ${renderOpenAiAssetSelectOptions(OPENAI_ASSET_GENERATION_TYPES, assetType, typeLabels, escapeHtml)}
             </select>
           </label>
           <label>
             <span>素材名称</span>
-            <input id="openAiAssetName" type="text" maxlength="80" placeholder="比如：雨夜教室背景" value="${escapeHtml(state.openAiAssetName)}" />
+            <input id="openAiAssetName" type="text" maxlength="80" placeholder="比如：雨夜教室背景" value="${escapeHtml(state.openAiAssetName)}" ${fieldLockAttrs} />
           </label>
           <label>
             <span>OpenAI API Key</span>
-            <input id="openAiAssetApiKey" type="password" autocomplete="off" placeholder="sk-..." value="${escapeHtml(state.openAiAssetApiKey)}" />
+            <input id="openAiAssetApiKey" type="password" autocomplete="off" placeholder="sk-..." value="${escapeHtml(state.openAiAssetApiKey)}" ${fieldLockAttrs} />
           </label>
           <label>
             <span>模型</span>
-            <input id="openAiAssetModel" type="text" spellcheck="false" value="${escapeHtml(state.openAiAssetModel)}" placeholder="gpt-image-1.5" />
+            <input id="openAiAssetModel" type="text" spellcheck="false" value="${escapeHtml(state.openAiAssetModel)}" placeholder="gpt-image-1.5" ${fieldLockAttrs} />
+            ${
+              modelWarning
+                ? `<span class="helper-text danger-text" role="alert">${escapeHtml(modelWarning)}</span>`
+                : '<span class="helper-text">留空会使用默认模型；自定义模型名不要包含空格。</span>'
+            }
           </label>
           <label>
             <span>尺寸</span>
-            <select id="openAiAssetSize">
+            <select id="openAiAssetSize" ${fieldLockAttrs}>
               ${renderOpenAiAssetSelectOptions(OPENAI_ASSET_GENERATION_SIZES, state.openAiAssetSize, sizeLabels, escapeHtml)}
             </select>
           </label>
           <label>
             <span>质量</span>
-            <select id="openAiAssetQuality">
+            <select id="openAiAssetQuality" ${fieldLockAttrs}>
               ${renderOpenAiAssetSelectOptions(OPENAI_ASSET_GENERATION_QUALITIES, state.openAiAssetQuality, qualityLabels, escapeHtml)}
             </select>
           </label>
           <label>
             <span>背景</span>
-            <select id="openAiAssetBackground">
+            <select id="openAiAssetBackground" ${fieldLockAttrs}>
               ${renderOpenAiAssetSelectOptions(OPENAI_ASSET_GENERATION_BACKGROUNDS, state.openAiAssetBackground, backgroundLabels, escapeHtml)}
             </select>
           </label>
           <label>
             <span>格式</span>
-            <select id="openAiAssetOutputFormat">
+            <select id="openAiAssetOutputFormat" ${fieldLockAttrs}>
               ${renderOpenAiAssetSelectOptions(OPENAI_ASSET_GENERATION_FORMATS, state.openAiAssetOutputFormat, formatLabels, escapeHtml)}
             </select>
           </label>
           <label class="openai-asset-prompt-field">
             <span>提示词</span>
-            <textarea id="openAiAssetPrompt" placeholder="${escapeHtml(samplePrompt)}">${escapeHtml(state.openAiAssetPrompt)}</textarea>
+            <textarea id="openAiAssetPrompt" maxlength="${OPENAI_ASSET_GENERATION_MAX_PROMPT_CHARS}" placeholder="${escapeHtml(samplePrompt)}" ${fieldLockAttrs}>${escapeHtml(state.openAiAssetPrompt)}</textarea>
+            <span
+              id="openAiAssetPromptLengthStatus"
+              class="helper-text ${promptLengthWarning ? "danger-text" : ""}"
+              role="status"
+              aria-live="polite"
+            >${escapeHtml(promptLengthWarning || getOpenAiAssetPromptLengthLabel(state.openAiAssetPrompt))}</span>
           </label>
         </div>
         <div class="creative-current-context">
           Key 只随本次请求发送，不会写入项目文件；生成出来的图片会保存到 ${escapeHtml(getAssetTypeLabel(assetType))} 素材库。
         </div>
         ${
-          state.openAiAssetError
-            ? `<p class="helper-text danger-text">${escapeHtml(state.openAiAssetError)}</p>`
+          compatibilityWarning
+            ? `<p class="helper-text warn-text" role="note">${escapeHtml(compatibilityWarning)}</p>`
             : ""
         }
         ${
-          state.openAiAssetLastResult?.asset
-            ? `<p class="helper-text good-text">刚刚已生成：${escapeHtml(state.openAiAssetLastResult.asset.name)} · ${escapeHtml(getAssetTypeLabel(state.openAiAssetLastResult.asset.type))}</p>`
+          isLoading
+            ? '<p class="helper-text" role="status" aria-live="polite">正在生成素材，完成后会自动导入素材库，请暂时不要关闭页面。</p>'
+            : ""
+        }
+        ${
+          state.openAiAssetError
+            ? `<p class="helper-text danger-text" role="alert">${escapeHtml(state.openAiAssetError)}</p>`
+            : ""
+        }
+        ${
+          lastAsset
+            ? `<p class="helper-text good-text" role="status" aria-live="polite">刚刚已生成：${escapeHtml(lastAsset.name)} · ${escapeHtml(getAssetTypeLabel(lastAsset.type))}</p>`
+            : ""
+        }
+        ${
+          lastAsset && (lastAssetPath || lastPrivacyMessage)
+            ? `
+              <div class="creative-current-context" role="note">
+                ${lastAssetPath ? `<span>保存位置：${escapeHtml(lastAssetPath)}</span>` : ""}
+                ${lastPrivacyMessage ? `<span>隐私确认：${escapeHtml(lastPrivacyMessage)}</span>` : ""}
+              </div>
+            `
             : ""
         }
         <div class="creative-action-row">
-          <button type="button" class="toolbar-button toolbar-button-primary" data-action="generate-openai-asset" ${state.openAiAssetLoading ? "disabled" : ""}>
-            ${state.openAiAssetLoading ? "正在生成..." : "生成并导入素材库"}
+          <button
+            type="button"
+            class="toolbar-button toolbar-button-primary ${isLoading ? "is-busy" : ""}"
+            data-action="generate-openai-asset"
+            ${isLoading ? 'disabled aria-disabled="true" aria-busy="true"' : ""}
+          >
+            ${isLoading ? "正在生成..." : "生成并导入素材库"}
           </button>
-          <button type="button" class="toolbar-button" data-action="apply-openai-asset-prompt-sample" data-asset-type="${escapeHtml(assetType)}">
+          <button
+            type="button"
+            class="toolbar-button ${isLoading ? "is-locked" : ""}"
+            data-action="apply-openai-asset-prompt-sample"
+            data-asset-type="${escapeHtml(assetType)}"
+            ${isLoading ? 'disabled aria-disabled="true" title="AI 素材正在生成，请稍等..."' : ""}
+          >
             填入示例提示词
+          </button>
+          <button
+            type="button"
+            class="toolbar-button ${isLoading ? "is-locked" : ""}"
+            data-action="forget-openai-asset-key"
+            ${isLoading || !state.openAiAssetApiKey ? 'disabled aria-disabled="true"' : ""}
+            title="只清空当前页面里的生图 Key，不影响项目文件"
+          >
+            清空本次 Key
           </button>
         </div>
       </section>
@@ -188,9 +302,15 @@
     OPENAI_ASSET_GENERATION_QUALITIES,
     OPENAI_ASSET_GENERATION_BACKGROUNDS,
     OPENAI_ASSET_GENERATION_FORMATS,
+    OPENAI_ASSET_GENERATION_MAX_PROMPT_CHARS,
     getSafeOpenAiAssetGenerationType,
     getSafeOpenAiAssetGenerationOption,
     getOpenAiAssetPromptSample,
+    getOpenAiAssetPromptLengthInfo,
+    getOpenAiAssetPromptLengthLabel,
+    getOpenAiAssetPromptLengthWarning,
+    getOpenAiAssetModelWarning,
+    getOpenAiAssetGenerationCompatibilityWarning,
     getDefaultOpenAiAssetGenerationState,
     renderOpenAiAssetGeneratorPanel,
     buildOpenAiAssetGenerationPayload,

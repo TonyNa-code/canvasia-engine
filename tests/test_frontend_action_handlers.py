@@ -1817,6 +1817,109 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertNotIn("state.openAiAssetError = error.message", operation_sources)
         self.assertNotRegex(source, r"showEngineAlert\(`[^`]*\$\{error\.message\}")
 
+    def test_openai_asset_generation_has_busy_guard(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        handle_click = _extract_function_source(source, "handleClick")
+        handle_change = _extract_function_source(source, "handleChange")
+        handle_input = _extract_function_source(source, "handleInput")
+        is_openai_asset_generation_field_id = _extract_function_source(
+            source,
+            "isOpenAiAssetGenerationFieldId",
+        )
+        compatibility_warning = _extract_function_source(
+            source,
+            "getOpenAiAssetGenerationCompatibilityWarning",
+        )
+        prompt_length_warning = _extract_function_source(
+            source,
+            "getOpenAiAssetPromptLengthWarning",
+        )
+        model_warning = _extract_function_source(
+            source,
+            "getOpenAiAssetModelWarning",
+        )
+        sync_prompt_length_status = _extract_function_source(
+            source,
+            "syncOpenAiAssetPromptLengthStatus",
+        )
+        generate_openai_asset = _extract_function_source(source, "generateOpenAiAsset")
+        forget_openai_asset_key = _extract_function_source(source, "forgetOpenAiAssetKey")
+
+        self.assertIn('"openAiAssetPrompt"', is_openai_asset_generation_field_id)
+        self.assertIn('"openAiAssetApiKey"', is_openai_asset_generation_field_id)
+        self.assertIn('"openAiAssetOutputFormat"', is_openai_asset_generation_field_id)
+        self.assertIn("提示词超过 ${info.max} 字，请缩短后再生成。", prompt_length_warning)
+        self.assertIn("模型名只能包含英文字母、数字、点、下划线、冒号或短横线", model_warning)
+        self.assertIn("/^[A-Za-z0-9._:-]+$/.test(value)", model_warning)
+        self.assertIn('document.getElementById("openAiAssetPromptLengthStatus")', sync_prompt_length_status)
+        self.assertIn("status.classList.toggle", sync_prompt_length_status)
+        self.assertIn("openAiAssetBackground === \"transparent\"", compatibility_warning)
+        self.assertIn("openAiAssetOutputFormat === \"jpeg\"", compatibility_warning)
+        self.assertIn("if (state.openAiAssetLoading)", generate_openai_asset)
+        self.assertIn('setSaveStatus("AI 素材正在生成，请稍等...")', generate_openai_asset)
+        self.assertIn('showToast("AI 素材正在生成，请稍等...")', generate_openai_asset)
+        self.assertLess(
+            generate_openai_asset.index("if (state.openAiAssetLoading)"),
+            generate_openai_asset.index('document.getElementById("openAiAssetType")'),
+        )
+        self.assertIn("const compatibilityWarning = getOpenAiAssetGenerationCompatibilityWarning()", generate_openai_asset)
+        self.assertIn('showToast("生图格式和背景不兼容", "error")', generate_openai_asset)
+        self.assertLess(
+            generate_openai_asset.index("const compatibilityWarning = getOpenAiAssetGenerationCompatibilityWarning()"),
+            generate_openai_asset.index("if (!state.openAiAssetPrompt.trim())"),
+        )
+        self.assertLess(
+            generate_openai_asset.index("const compatibilityWarning = getOpenAiAssetGenerationCompatibilityWarning()"),
+            generate_openai_asset.index("postJson("),
+        )
+        self.assertIn("const modelWarning = getOpenAiAssetModelWarning(state.openAiAssetModel)", generate_openai_asset)
+        self.assertIn('showToast("生图模型名不合法", "error")', generate_openai_asset)
+        self.assertLess(
+            generate_openai_asset.index("const modelWarning = getOpenAiAssetModelWarning(state.openAiAssetModel)"),
+            generate_openai_asset.index("const promptLengthWarning = getOpenAiAssetPromptLengthWarning(state.openAiAssetPrompt)"),
+        )
+        self.assertLess(
+            generate_openai_asset.index("const modelWarning = getOpenAiAssetModelWarning(state.openAiAssetModel)"),
+            generate_openai_asset.index("postJson("),
+        )
+        self.assertIn("const promptLengthWarning = getOpenAiAssetPromptLengthWarning(state.openAiAssetPrompt)", generate_openai_asset)
+        self.assertIn('showToast("生图提示词太长", "error")', generate_openai_asset)
+        self.assertLess(
+            generate_openai_asset.index("const promptLengthWarning = getOpenAiAssetPromptLengthWarning(state.openAiAssetPrompt)"),
+            generate_openai_asset.index("if (!state.openAiAssetApiKey.trim())"),
+        )
+        self.assertLess(
+            generate_openai_asset.index("const promptLengthWarning = getOpenAiAssetPromptLengthWarning(state.openAiAssetPrompt)"),
+            generate_openai_asset.index("postJson("),
+        )
+        self.assertIn('action === "apply-openai-asset-prompt-sample"', handle_click)
+        self.assertIn("if (state.openAiAssetLoading)", handle_click)
+        self.assertLess(
+            handle_click.index('action === "apply-openai-asset-prompt-sample"'),
+            handle_click.index('action === "generate-openai-asset"'),
+        )
+        self.assertIn('action === "forget-openai-asset-key"', handle_click)
+        self.assertIn("forgetOpenAiAssetKey()", handle_click)
+        self.assertLess(
+            handle_click.index('action === "forget-openai-asset-key"'),
+            handle_click.index('action === "generate-openai-asset"'),
+        )
+        self.assertIn("if (state.openAiAssetLoading)", forget_openai_asset_key)
+        self.assertIn('state.openAiAssetApiKey = ""', forget_openai_asset_key)
+        self.assertIn('state.openAiAssetError = ""', forget_openai_asset_key)
+        self.assertIn('setSaveStatus("已清空本次 AI 生图 Key")', forget_openai_asset_key)
+        self.assertIn("state.openAiAssetLoading && isOpenAiAssetGenerationFieldId(target.id)", handle_change)
+        self.assertIn("state.openAiAssetLoading && isOpenAiAssetGenerationFieldId(event.target.id)", handle_input)
+        self.assertIn("syncOpenAiAssetPromptLengthStatus()", handle_input)
+        self.assertLess(
+            handle_change.index("state.openAiAssetLoading && isOpenAiAssetGenerationFieldId(target.id)"),
+            handle_change.index('target.id === "openAiAssetType"'),
+        )
+        self.assertLess(
+            handle_input.index("state.openAiAssetLoading && isOpenAiAssetGenerationFieldId(event.target.id)"),
+            handle_input.index('event.target.id === "openAiAssetPrompt"'),
+        )
+
     def test_batch_file_read_reports_all_failed_local_files(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
         read_file = _extract_function_source(source, "readFileAsBase64Payload")

@@ -2038,6 +2038,76 @@ function getOpenAiAssetPromptSample(assetType) {
   return openAiAssetTools?.getOpenAiAssetPromptSample?.(assetType) ?? "雨后黄昏的校园走廊，窗外有浅蓝色天光，适合作为视觉小说背景";
 }
 
+function getOpenAiAssetPromptLengthInfo(prompt = state.openAiAssetPrompt) {
+  return openAiAssetTools?.getOpenAiAssetPromptLengthInfo?.(prompt) ?? (() => {
+    const length = Array.from(String(prompt ?? "")).length;
+    return {
+      length,
+      max: 1400,
+      remaining: Math.max(0, 1400 - length),
+      overLimit: length > 1400,
+    };
+  })();
+}
+
+function getOpenAiAssetPromptLengthLabel(prompt = state.openAiAssetPrompt) {
+  return openAiAssetTools?.getOpenAiAssetPromptLengthLabel?.(prompt) ?? (() => {
+    const info = getOpenAiAssetPromptLengthInfo(prompt);
+    return `提示词 ${info.length} / ${info.max} 字`;
+  })();
+}
+
+function getOpenAiAssetPromptLengthWarning(prompt = state.openAiAssetPrompt) {
+  return openAiAssetTools?.getOpenAiAssetPromptLengthWarning?.(prompt) ?? (() => {
+    const info = getOpenAiAssetPromptLengthInfo(prompt);
+    return info.overLimit ? `提示词超过 ${info.max} 字，请缩短后再生成。` : "";
+  })();
+}
+
+function getOpenAiAssetModelWarning(model = state.openAiAssetModel) {
+  return openAiAssetTools?.getOpenAiAssetModelWarning?.(model) ?? (() => {
+    const value = String(model ?? "").trim();
+    if (!value) {
+      return "";
+    }
+    return value.length > 80 || !/^[A-Za-z0-9._:-]+$/.test(value)
+      ? "模型名只能包含英文字母、数字、点、下划线、冒号或短横线，且不超过 80 个字符。"
+      : "";
+  })();
+}
+
+function syncOpenAiAssetPromptLengthStatus() {
+  const status = document.getElementById("openAiAssetPromptLengthStatus");
+  if (!status) {
+    return;
+  }
+  const warning = getOpenAiAssetPromptLengthWarning();
+  status.textContent = warning || getOpenAiAssetPromptLengthLabel();
+  status.classList.toggle("danger-text", Boolean(warning));
+}
+
+function getOpenAiAssetGenerationCompatibilityWarning() {
+  return openAiAssetTools?.getOpenAiAssetGenerationCompatibilityWarning?.(state) ?? (
+    state.openAiAssetBackground === "transparent" && state.openAiAssetOutputFormat === "jpeg"
+      ? "JPEG 不支持透明背景。请改用 PNG / WebP，或把背景改为自动 / 不透明。"
+      : ""
+  );
+}
+
+function isOpenAiAssetGenerationFieldId(fieldId) {
+  return [
+    "openAiAssetType",
+    "openAiAssetName",
+    "openAiAssetApiKey",
+    "openAiAssetModel",
+    "openAiAssetSize",
+    "openAiAssetQuality",
+    "openAiAssetBackground",
+    "openAiAssetOutputFormat",
+    "openAiAssetPrompt",
+  ].includes(fieldId);
+}
+
 function renderOpenAiAssetGeneratorPanel() {
   return openAiAssetTools?.renderOpenAiAssetGeneratorPanel?.({
     state,
@@ -4047,6 +4117,11 @@ async function handleClick(event) {
   }
 
   if (action === "apply-openai-asset-prompt-sample") {
+    if (state.openAiAssetLoading) {
+      setSaveStatus("AI 素材正在生成，请稍等...");
+      showToast("AI 素材正在生成，请稍等...");
+      return;
+    }
     const assetType = getSafeOpenAiAssetGenerationType(actionTarget.dataset.assetType);
     state.openAiAssetType = assetType;
     state.openAiAssetPrompt = getOpenAiAssetPromptSample(assetType);
@@ -4054,6 +4129,11 @@ async function handleClick(event) {
     state.openAiAssetLastResult = null;
     renderAssetsScreen();
     setSaveStatus(`已填入 ${getAssetTypeLabel(assetType)} 生图提示词示例`);
+    return;
+  }
+
+  if (action === "forget-openai-asset-key") {
+    forgetOpenAiAssetKey();
     return;
   }
 
@@ -4661,6 +4741,11 @@ function handleChange(event) {
 
   const target = event.target;
 
+  if (state.openAiAssetLoading && isOpenAiAssetGenerationFieldId(target.id)) {
+    setSaveStatus("AI 素材正在生成，请稍等...");
+    return;
+  }
+
   if (target.id === "assetImportInput") {
     void importAssets(Array.from(target.files ?? []));
     target.value = "";
@@ -4741,6 +4826,14 @@ function handleChange(event) {
       openAiAssetTools?.OPENAI_ASSET_GENERATION_BACKGROUNDS ?? [],
       "auto"
     );
+    state.openAiAssetError = "";
+    const warning = getOpenAiAssetGenerationCompatibilityWarning();
+    if (warning) {
+      renderAssetsScreen();
+      setSaveStatus(warning);
+      return;
+    }
+    renderAssetsScreen();
     setSaveStatus(`AI 生图背景：${state.openAiAssetBackground}`);
     return;
   }
@@ -4751,6 +4844,14 @@ function handleChange(event) {
       openAiAssetTools?.OPENAI_ASSET_GENERATION_FORMATS ?? [],
       "png"
     );
+    state.openAiAssetError = "";
+    const warning = getOpenAiAssetGenerationCompatibilityWarning();
+    if (warning) {
+      renderAssetsScreen();
+      setSaveStatus(warning);
+      return;
+    }
+    renderAssetsScreen();
     setSaveStatus(`AI 生图格式：${state.openAiAssetOutputFormat}`);
     return;
   }
@@ -4955,6 +5056,11 @@ function handleInput(event) {
     return;
   }
 
+  if (state.openAiAssetLoading && isOpenAiAssetGenerationFieldId(event.target.id)) {
+    setSaveStatus("AI 素材正在生成，请稍等...");
+    return;
+  }
+
   if (updatePreviewVolumeControl(event.target.id, event.target.value, false)) {
     return;
   }
@@ -4988,6 +5094,7 @@ function handleInput(event) {
     state.openAiAssetPrompt = event.target.value ?? "";
     state.openAiAssetError = "";
     state.openAiAssetLastResult = null;
+    syncOpenAiAssetPromptLengthStatus();
     return;
   }
 
@@ -36386,6 +36493,12 @@ function formatGroupedAssetCounts(groupedCounts = {}) {
 }
 
 async function generateOpenAiAsset() {
+  if (state.openAiAssetLoading) {
+    setSaveStatus("AI 素材正在生成，请稍等...");
+    showToast("AI 素材正在生成，请稍等...");
+    return;
+  }
+
   state.openAiAssetType = getSafeOpenAiAssetGenerationType(
     document.getElementById("openAiAssetType")?.value ?? state.openAiAssetType
   );
@@ -36414,10 +36527,34 @@ async function generateOpenAiAsset() {
     "png"
   );
 
+  const compatibilityWarning = getOpenAiAssetGenerationCompatibilityWarning();
+  if (compatibilityWarning) {
+    state.openAiAssetError = "";
+    renderAssetsScreen();
+    showToast("生图格式和背景不兼容", "error");
+    return;
+  }
+
   if (!state.openAiAssetPrompt.trim()) {
     state.openAiAssetError = "请先写一句要生成什么素材。";
     renderAssetsScreen();
     showToast("先写生图提示词", "error");
+    return;
+  }
+
+  const modelWarning = getOpenAiAssetModelWarning(state.openAiAssetModel);
+  if (modelWarning) {
+    state.openAiAssetError = modelWarning;
+    renderAssetsScreen();
+    showToast("生图模型名不合法", "error");
+    return;
+  }
+
+  const promptLengthWarning = getOpenAiAssetPromptLengthWarning(state.openAiAssetPrompt);
+  if (promptLengthWarning) {
+    state.openAiAssetError = promptLengthWarning;
+    renderAssetsScreen();
+    showToast("生图提示词太长", "error");
     return;
   }
 
@@ -36472,6 +36609,19 @@ async function generateOpenAiAsset() {
     state.openAiAssetLoading = false;
     renderAssetsScreen();
   }
+}
+
+function forgetOpenAiAssetKey() {
+  if (state.openAiAssetLoading) {
+    setSaveStatus("AI 素材正在生成，请稍等...");
+    showToast("AI 素材正在生成，请稍等...");
+    return;
+  }
+  state.openAiAssetApiKey = "";
+  state.openAiAssetError = "";
+  renderAssetsScreen();
+  setSaveStatus("已清空本次 AI 生图 Key");
+  showToast("已清空本次生图 Key");
 }
 
 async function importAssets(files, options = {}) {
