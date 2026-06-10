@@ -29,6 +29,11 @@ class FrontendOpenAiAssetGeneratorModuleTests(unittest.TestCase):
               openAiAssetName: "女主默认",
               openAiAssetApiKey: "sk-test",
               openAiAssetModel: "gpt-image-test",
+              openAiAssetStyleHint: "清透蓝白、柔和光线、校园恋爱氛围",
+              openAiAssetBindCharacterId: "char_hero",
+              openAiAssetBindExpressionId: "expr_smile",
+              openAiAssetBindExpressionName: "微笑",
+              openAiAssetBindAsDefaultSprite: true,
               openAiAssetSize: "1536x1024",
               openAiAssetQuality: "high",
               openAiAssetBackground: "transparent",
@@ -44,37 +49,54 @@ class FrontendOpenAiAssetGeneratorModuleTests(unittest.TestCase):
             const html = tools.renderOpenAiAssetGeneratorPanel({{
               state,
               selectedAssetType: "background",
+              characters: [
+                {{ id: "char_hero", displayName: "女主角" }},
+                {{ id: "char_friend", displayName: "好友" }},
+              ],
               escapeHtml: (value) => String(value).replaceAll("<", "&lt;").replaceAll(">", "&gt;"),
               getAssetTypeLabel: (type) => ({{ background: "背景", sprite: "立绘", cg: "CG", ui: "界面素材" }}[type] || type),
             }});
             const loadingHtml = tools.renderOpenAiAssetGeneratorPanel({{
               state: {{ ...state, openAiAssetLoading: true }},
               selectedAssetType: "sprite",
+              characters: [{{ id: "char_hero", displayName: "女主角" }}],
               escapeHtml: (value) => String(value).replaceAll("<", "&lt;").replaceAll(">", "&gt;"),
               getAssetTypeLabel: (type) => ({{ background: "背景", sprite: "立绘", cg: "CG", ui: "界面素材" }}[type] || type),
             }});
             const errorHtml = tools.renderOpenAiAssetGeneratorPanel({{
               state: {{ ...state, openAiAssetError: "生成失败：额度不足", openAiAssetLastResult: null }},
               selectedAssetType: "sprite",
+              characters: [{{ id: "char_hero", displayName: "女主角" }}],
               escapeHtml: (value) => String(value).replaceAll("<", "&lt;").replaceAll(">", "&gt;"),
               getAssetTypeLabel: (type) => ({{ background: "背景", sprite: "立绘", cg: "CG", ui: "界面素材" }}[type] || type),
             }});
             const emptyKeyHtml = tools.renderOpenAiAssetGeneratorPanel({{
               state: {{ ...state, openAiAssetApiKey: "" }},
               selectedAssetType: "sprite",
+              characters: [{{ id: "char_hero", displayName: "女主角" }}],
               escapeHtml: (value) => String(value).replaceAll("<", "&lt;").replaceAll(">", "&gt;"),
               getAssetTypeLabel: (type) => ({{ background: "背景", sprite: "立绘", cg: "CG", ui: "界面素材" }}[type] || type),
             }});
             const overlongPrompt = "长".repeat(tools.OPENAI_ASSET_GENERATION_MAX_PROMPT_CHARS + 1);
+            const overlongStyleHint = "清".repeat(tools.OPENAI_ASSET_GENERATION_MAX_STYLE_HINT_CHARS + 1);
             const overlongHtml = tools.renderOpenAiAssetGeneratorPanel({{
               state: {{ ...state, openAiAssetPrompt: overlongPrompt, openAiAssetLastResult: null }},
               selectedAssetType: "sprite",
+              characters: [{{ id: "char_hero", displayName: "女主角" }}],
+              escapeHtml: (value) => String(value).replaceAll("<", "&lt;").replaceAll(">", "&gt;"),
+              getAssetTypeLabel: (type) => ({{ background: "背景", sprite: "立绘", cg: "CG", ui: "界面素材" }}[type] || type),
+            }});
+            const overlongStyleHintHtml = tools.renderOpenAiAssetGeneratorPanel({{
+              state: {{ ...state, openAiAssetStyleHint: overlongStyleHint, openAiAssetLastResult: null }},
+              selectedAssetType: "sprite",
+              characters: [{{ id: "char_hero", displayName: "女主角" }}],
               escapeHtml: (value) => String(value).replaceAll("<", "&lt;").replaceAll(">", "&gt;"),
               getAssetTypeLabel: (type) => ({{ background: "背景", sprite: "立绘", cg: "CG", ui: "界面素材" }}[type] || type),
             }});
             const invalidModelHtml = tools.renderOpenAiAssetGeneratorPanel({{
               state: {{ ...state, openAiAssetModel: "坏 model", openAiAssetLastResult: null }},
               selectedAssetType: "sprite",
+              characters: [{{ id: "char_hero", displayName: "女主角" }}],
               escapeHtml: (value) => String(value).replaceAll("<", "&lt;").replaceAll(">", "&gt;"),
               getAssetTypeLabel: (type) => ({{ background: "背景", sprite: "立绘", cg: "CG", ui: "界面素材" }}[type] || type),
             }});
@@ -87,6 +109,7 @@ class FrontendOpenAiAssetGeneratorModuleTests(unittest.TestCase):
             const incompatibleHtml = tools.renderOpenAiAssetGeneratorPanel({{
               state: incompatibleState,
               selectedAssetType: "sprite",
+              characters: [{{ id: "char_hero", displayName: "女主角" }}],
               escapeHtml: (value) => String(value).replaceAll("<", "&lt;").replaceAll(">", "&gt;"),
               getAssetTypeLabel: (type) => ({{ background: "背景", sprite: "立绘", cg: "CG", ui: "界面素材" }}[type] || type),
             }});
@@ -105,9 +128,18 @@ class FrontendOpenAiAssetGeneratorModuleTests(unittest.TestCase):
               safeOption: tools.getSafeOpenAiAssetGenerationOption("bad", tools.OPENAI_ASSET_GENERATION_SIZES, "1024x1024"),
               spritePrompt: tools.getOpenAiAssetPromptSample("sprite"),
               maxPromptChars: tools.OPENAI_ASSET_GENERATION_MAX_PROMPT_CHARS,
+              maxStyleHintChars: tools.OPENAI_ASSET_GENERATION_MAX_STYLE_HINT_CHARS,
+              stylePresetCount: tools.OPENAI_ASSET_GENERATION_STYLE_HINT_PRESETS.length,
+              firstStylePreset: tools.getOpenAiAssetStyleHintPreset("clear-school"),
+              missingStylePreset: tools.getOpenAiAssetStyleHintPreset("missing"),
+              expressionPresetCount: tools.OPENAI_ASSET_EXPRESSION_BIND_PRESETS.length,
+              smileExpressionPreset: tools.getOpenAiAssetExpressionBindPreset("expr_smile"),
+              missingExpressionPreset: tools.getOpenAiAssetExpressionBindPreset("missing"),
               promptLength: tools.getOpenAiAssetPromptLengthInfo(state.openAiAssetPrompt).length,
               promptLengthLabel: tools.getOpenAiAssetPromptLengthLabel(state.openAiAssetPrompt),
               overlongPromptWarning: tools.getOpenAiAssetPromptLengthWarning(overlongPrompt),
+              styleHintLengthLabel: tools.getOpenAiAssetStyleHintLengthLabel(state.openAiAssetStyleHint),
+              overlongStyleHintWarning: tools.getOpenAiAssetStyleHintLengthWarning(overlongStyleHint),
               hasPromptMaxLength: html.includes('id="openAiAssetPrompt" maxlength="1400"'),
               hasPromptLengthStatus: html.includes('id="openAiAssetPromptLengthStatus"') && html.includes("提示词 7 / 1400 字"),
               hasOverlongPromptWarning: overlongHtml.includes("提示词超过 1400 字，请缩短后再生成。"),
@@ -115,6 +147,17 @@ class FrontendOpenAiAssetGeneratorModuleTests(unittest.TestCase):
               emptyModelWarning: tools.getOpenAiAssetModelWarning(""),
               hasModelHelper: html.includes("留空会使用默认模型；自定义模型名不要包含空格。"),
               hasInvalidModelWarning: invalidModelHtml.includes("模型名只能包含英文字母、数字、点、下划线、冒号或短横线"),
+              hasStyleHintField: html.includes('id="openAiAssetStyleHint"') && html.includes('maxlength="260"'),
+              hasStyleHintLengthStatus: html.includes('id="openAiAssetStyleHintLengthStatus"') && html.includes("画风补充 16 / 260 字"),
+              hasOverlongStyleHintWarning: overlongStyleHintHtml.includes("画风补充超过 260 字，请缩短后再生成。"),
+              hasStylePresetButtons: html.includes('data-action="apply-openai-asset-style-preset"') && html.includes("清透校园"),
+              hasActiveStylePreset: html.includes('openai-asset-style-preset is-active'),
+              hasLockedStylePreset: loadingHtml.includes('data-action="apply-openai-asset-style-preset"') && loadingHtml.includes('title="AI 素材正在生成，请稍等..."'),
+              hasCharacterBindPanel: html.includes("生成后绑定角色") && html.includes('id="openAiAssetBindCharacterId"'),
+              hasCharacterOption: html.includes("女主角") && html.includes("好友"),
+              hasExpressionPreset: html.includes('data-action="apply-openai-asset-expression-preset"') && html.includes("微笑"),
+              hasDefaultSpriteToggle: html.includes('id="openAiAssetBindAsDefaultSprite"') && html.includes("同时设为角色默认立绘"),
+              hasLockedCharacterBind: loadingHtml.includes('id="openAiAssetBindCharacterId"') && loadingHtml.includes('title="AI 素材正在生成，请稍等..."'),
               compatibilityWarning: tools.getOpenAiAssetGenerationCompatibilityWarning(incompatibleState),
               noCompatibilityWarning: tools.getOpenAiAssetGenerationCompatibilityWarning(state),
               payload: tools.buildOpenAiAssetGenerationPayload(state),
@@ -142,6 +185,7 @@ class FrontendOpenAiAssetGeneratorModuleTests(unittest.TestCase):
               lockedFieldCount: loadingHtml.split('disabled aria-disabled="true" title="AI 素材正在生成，请稍等..."').length - 1,
               hasLockedPrompt: loadingHtml.includes('id="openAiAssetPrompt"') && loadingHtml.includes('title="AI 素材正在生成，请稍等..."'),
               hasLockedApiKey: loadingHtml.includes('id="openAiAssetApiKey"') && loadingHtml.includes('title="AI 素材正在生成，请稍等..."'),
+              hasLockedStyleHint: loadingHtml.includes('id="openAiAssetStyleHint"') && loadingHtml.includes('title="AI 素材正在生成，请稍等..."'),
               hasErrorAlert: errorHtml.includes('class="helper-text danger-text" role="alert"') && errorHtml.includes("生成失败：额度不足"),
             }};
             console.log(JSON.stringify(result));
@@ -156,9 +200,18 @@ class FrontendOpenAiAssetGeneratorModuleTests(unittest.TestCase):
         self.assertEqual(result["safeOption"], "1024x1024")
         self.assertIn("立绘", result["spritePrompt"])
         self.assertEqual(result["maxPromptChars"], 1400)
+        self.assertEqual(result["maxStyleHintChars"], 260)
+        self.assertGreaterEqual(result["stylePresetCount"], 4)
+        self.assertEqual(result["firstStylePreset"]["label"], "清透校园")
+        self.assertIsNone(result["missingStylePreset"])
+        self.assertGreaterEqual(result["expressionPresetCount"], 3)
+        self.assertEqual(result["smileExpressionPreset"]["name"], "微笑")
+        self.assertIsNone(result["missingExpressionPreset"])
         self.assertEqual(result["promptLength"], 7)
         self.assertEqual(result["promptLengthLabel"], "提示词 7 / 1400 字")
         self.assertIn("提示词超过 1400 字", result["overlongPromptWarning"])
+        self.assertEqual(result["styleHintLengthLabel"], "画风补充 16 / 260 字")
+        self.assertIn("画风补充超过 260 字", result["overlongStyleHintWarning"])
         self.assertTrue(result["hasPromptMaxLength"])
         self.assertTrue(result["hasPromptLengthStatus"])
         self.assertTrue(result["hasOverlongPromptWarning"])
@@ -166,10 +219,26 @@ class FrontendOpenAiAssetGeneratorModuleTests(unittest.TestCase):
         self.assertEqual(result["emptyModelWarning"], "")
         self.assertTrue(result["hasModelHelper"])
         self.assertTrue(result["hasInvalidModelWarning"])
+        self.assertTrue(result["hasStyleHintField"])
+        self.assertTrue(result["hasStyleHintLengthStatus"])
+        self.assertTrue(result["hasOverlongStyleHintWarning"])
+        self.assertTrue(result["hasStylePresetButtons"])
+        self.assertTrue(result["hasActiveStylePreset"])
+        self.assertTrue(result["hasLockedStylePreset"])
+        self.assertTrue(result["hasCharacterBindPanel"])
+        self.assertTrue(result["hasCharacterOption"])
+        self.assertTrue(result["hasExpressionPreset"])
+        self.assertTrue(result["hasDefaultSpriteToggle"])
+        self.assertTrue(result["hasLockedCharacterBind"])
         self.assertIn("JPEG 不支持透明背景", result["compatibilityWarning"])
         self.assertEqual(result["noCompatibilityWarning"], "")
         self.assertEqual(result["payload"]["assetType"], "sprite")
         self.assertEqual(result["payload"]["apiKey"], "sk-test")
+        self.assertEqual(result["payload"]["styleHint"], "清透蓝白、柔和光线、校园恋爱氛围")
+        self.assertEqual(result["payload"]["characterBinding"]["characterId"], "char_hero")
+        self.assertEqual(result["payload"]["characterBinding"]["expressionId"], "expr_smile")
+        self.assertEqual(result["payload"]["characterBinding"]["expressionName"], "微笑")
+        self.assertTrue(result["payload"]["characterBinding"]["setAsDefaultSprite"])
         self.assertEqual(result["payload"]["outputFormat"], "webp")
         self.assertTrue(result["hasButton"])
         self.assertTrue(result["hasPrivacyCopy"])
@@ -192,9 +261,10 @@ class FrontendOpenAiAssetGeneratorModuleTests(unittest.TestCase):
         self.assertTrue(result["hasForgetKeyTitle"])
         self.assertTrue(result["emptyKeyButtonDisabled"])
         self.assertTrue(result["loadingForgetKeyButtonLocked"])
-        self.assertGreaterEqual(result["lockedFieldCount"], 9)
+        self.assertGreaterEqual(result["lockedFieldCount"], 13)
         self.assertTrue(result["hasLockedPrompt"])
         self.assertTrue(result["hasLockedApiKey"])
+        self.assertTrue(result["hasLockedStyleHint"])
         self.assertTrue(result["hasErrorAlert"])
 
 

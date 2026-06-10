@@ -3532,6 +3532,165 @@ def build_starter_asset_record(
     }
 
 
+def find_first_scene_reference() -> tuple[Path, dict, dict] | None:
+    project = read_json(PROJECT_PATH)
+    chapter_files = list_chapter_files()
+    if not chapter_files:
+        return None
+
+    chapter_by_id: dict[str, tuple[Path, dict]] = {}
+    remaining: list[tuple[Path, dict]] = []
+    for chapter_path in chapter_files:
+        chapter = read_json(chapter_path)
+        chapter_id = str(chapter.get("chapterId") or "").strip()
+        if chapter_id:
+            chapter_by_id[chapter_id] = (chapter_path, chapter)
+        remaining.append((chapter_path, chapter))
+
+    ordered_refs: list[tuple[Path, dict]] = []
+    for chapter_id in normalize_text_list(project.get("chapterOrder")):
+        ref = chapter_by_id.get(chapter_id)
+        if ref and ref not in ordered_refs:
+            ordered_refs.append(ref)
+    ordered_refs.extend(ref for ref in remaining if ref not in ordered_refs)
+
+    for chapter_path, chapter in ordered_refs:
+        scenes = chapter.get("scenes", [])
+        if not isinstance(scenes, list) or not scenes:
+            continue
+        scene_by_id = {
+            str(scene.get("id") or ""): scene
+            for scene in scenes
+            if isinstance(scene, dict) and str(scene.get("id") or "").strip()
+        }
+        ordered_scenes = [
+            scene_by_id[scene_id]
+            for scene_id in normalize_text_list(chapter.get("sceneOrder"))
+            if scene_id in scene_by_id
+        ]
+        ordered_scenes.extend(scene for scene in scenes if isinstance(scene, dict) and scene not in ordered_scenes)
+        if ordered_scenes:
+            return chapter_path, chapter, ordered_scenes[0]
+    return None
+
+
+def find_first_asset_record(assets: list[dict], asset_type: str) -> dict | None:
+    return next((asset for asset in assets if asset.get("type") == asset_type), None)
+
+
+def find_starter_character_expression(character: dict | None) -> str:
+    if not isinstance(character, dict):
+        return "expr_default"
+    for expression in character.get("expressions", []) or []:
+        expression_id = str(expression.get("id") or "").strip()
+        if expression_id:
+            return expression_id
+    return "expr_default"
+
+
+def bootstrap_starter_kit_first_scene(
+    *,
+    assets: list[dict],
+    characters: list[dict],
+    created_character: dict | None,
+) -> dict:
+    scene_ref = find_first_scene_reference()
+    if not scene_ref:
+        return {
+            "applied": False,
+            "insertedLabels": [],
+            "insertedBlockIds": [],
+            "reason": "项目还没有章节和场景，先创建第一章后会更适合接入起步骨架。",
+        }
+
+    chapter_path, chapter, scene = scene_ref
+    blocks = scene.setdefault("blocks", [])
+    if not isinstance(blocks, list):
+        blocks = []
+        scene["blocks"] = blocks
+
+    background_asset = find_first_asset_record(assets, "background")
+    bgm_asset = find_first_asset_record(assets, "bgm")
+    starter_character = created_character or next((character for character in characters if isinstance(character, dict)), None)
+    existing_block_ids = {
+        str(block.get("id") or "").strip()
+        for block in blocks
+        if isinstance(block, dict) and str(block.get("id") or "").strip()
+    }
+    inserted_blocks: list[dict] = []
+    inserted_labels: list[str] = []
+
+    if bgm_asset and not any(isinstance(block, dict) and block.get("type") == "music_play" for block in blocks):
+        inserted_blocks.append(
+            {
+                "id": build_unique_slug_id(existing_block_ids, "block", "starter_bgm"),
+                "type": "music_play",
+                "assetId": bgm_asset["id"],
+                "loop": True,
+                "fadeInMs": 600,
+            }
+        )
+        inserted_labels.append("BGM 卡片")
+
+    if background_asset and not any(isinstance(block, dict) and block.get("type") == "background" for block in blocks):
+        inserted_blocks.append(
+            {
+                "id": build_unique_slug_id(existing_block_ids, "block", "starter_background"),
+                "type": "background",
+                "assetId": background_asset["id"],
+                "transition": "fade",
+            }
+        )
+        inserted_labels.append("背景卡片")
+
+    if starter_character and not any(isinstance(block, dict) and block.get("type") == "character_show" for block in blocks):
+        inserted_blocks.append(
+            {
+                "id": build_unique_slug_id(existing_block_ids, "block", "starter_character"),
+                "type": "character_show",
+                "characterId": starter_character["id"],
+                "expressionId": find_starter_character_expression(starter_character),
+                "position": starter_character.get("defaultPosition") or "left",
+                "transition": "fade",
+            }
+        )
+        inserted_labels.append("角色出场卡片")
+
+    if starter_character and not any(isinstance(block, dict) and block.get("type") == "dialogue" for block in blocks):
+        inserted_blocks.append(
+            {
+                "id": build_unique_slug_id(existing_block_ids, "block", "starter_dialogue"),
+                "type": "dialogue",
+                "speakerId": starter_character["id"],
+                "expressionId": find_starter_character_expression(starter_character),
+                "text": "今天，就从这里开始吧。",
+            }
+        )
+        inserted_labels.append("第一句角色台词")
+
+    if not inserted_blocks:
+        return {
+            "applied": False,
+            "chapterId": chapter.get("chapterId", ""),
+            "sceneId": scene.get("id", ""),
+            "sceneName": scene.get("name", ""),
+            "insertedLabels": [],
+            "insertedBlockIds": [],
+            "reason": "首场景已经有基础演出卡片，没有重复插入。",
+        }
+
+    scene["blocks"] = inserted_blocks + blocks
+    write_json(chapter_path, chapter)
+    return {
+        "applied": True,
+        "chapterId": chapter.get("chapterId", ""),
+        "sceneId": scene.get("id", ""),
+        "sceneName": scene.get("name", ""),
+        "insertedLabels": inserted_labels,
+        "insertedBlockIds": [block["id"] for block in inserted_blocks],
+    }
+
+
 def create_starter_kit(
     character_name: str | None = None,
     background_name: str | None = None,
@@ -3620,12 +3779,18 @@ def create_starter_kit(
 
     write_json(assets_path, assets_doc)
     write_json(characters_path, characters_doc)
+    scene_bootstrap = bootstrap_starter_kit_first_scene(
+        assets=assets,
+        characters=characters,
+        created_character=created_character,
+    )
     touch_project()
 
     return {
         "createdLabels": created_labels,
         "createdCharacter": created_character,
         "createdAssets": created_assets,
+        "sceneBootstrap": scene_bootstrap,
         "starterOverview": build_starter_kit_overview(assets, characters),
     }
 
@@ -4038,6 +4203,7 @@ def import_assets(asset_type: str, files: list[dict], fallback_asset_type: str |
 
 def generate_openai_asset(payload: dict) -> dict:
     asset_type = normalize_openai_asset_generation_type(payload.get("assetType"))
+    character_binding = normalize_openai_asset_character_binding(payload.get("characterBinding"), asset_type)
     image_bytes, generation_meta = call_openai_asset_generation_model(payload, asset_type)
     output_format = generation_meta["outputFormat"]
     extension = ".jpg" if output_format == "jpeg" else f".{output_format}"
@@ -4047,7 +4213,10 @@ def generate_openai_asset(payload: dict) -> dict:
     )
 
     assets_path = DATA_DIR / "assets.json"
+    characters_path = DATA_DIR / "characters.json"
     assets_doc = read_json(assets_path)
+    assets_doc_before = json.loads(json.dumps(assets_doc, ensure_ascii=False))
+    characters_doc_before = read_json(characters_path) if character_binding else None
     assets = assets_doc.setdefault("assets", [])
     existing_ids = {asset.get("id") for asset in assets if asset.get("id")}
     target_relative_dir = ASSET_DIRECTORIES[asset_type]
@@ -4083,11 +4252,31 @@ def generate_openai_asset(payload: dict) -> dict:
             "promptPreview": generation_meta["prompt"][:220],
         },
     }
-    assets.append(asset_record)
-    write_json(assets_path, assets_doc)
-    touch_project()
 
-    return {
+    binding_result = None
+    try:
+        assets.append(asset_record)
+        write_json(assets_path, assets_doc)
+        if character_binding:
+            binding_result = bind_sprite_asset_to_character(asset_record["id"], character_binding)
+        touch_project()
+    except Exception:
+        try:
+            output_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+        try:
+            write_json(assets_path, assets_doc_before)
+        except Exception:
+            pass
+        if characters_doc_before is not None:
+            try:
+                write_json(characters_path, characters_doc_before)
+            except Exception:
+                pass
+        raise
+
+    result = {
         "assetType": asset_type,
         "asset": enrich_asset_record(asset_record),
         "model": generation_meta["model"],
@@ -4100,6 +4289,105 @@ def generate_openai_asset(payload: dict) -> dict:
             "apiKeyStored": False,
             "message": "API Key 只随本次请求发送给 OpenAI，没有写入项目文件或素材元数据。",
         },
+    }
+    if binding_result:
+        result["characterBinding"] = binding_result
+    return result
+
+
+def normalize_openai_asset_character_binding(payload: object, asset_type: str) -> dict | None:
+    if not isinstance(payload, dict):
+        return None
+
+    character_id = str(payload.get("characterId") or "").strip()
+    if not character_id:
+        return None
+    if asset_type != "sprite":
+        raise ValueError("只有立绘素材可以在生成后绑定到角色表情。")
+
+    characters_doc = normalize_characters_document(read_json(DATA_DIR / "characters.json"))
+    characters = characters_doc.get("characters", [])
+    character = next((item for item in characters if item.get("id") == character_id), None)
+    if not character:
+        raise ValueError("没有找到要绑定立绘的角色。")
+
+    expression_name = str(payload.get("expressionName") or "").strip()[:40] or "默认"
+    expression_id = str(payload.get("expressionId") or "").strip()
+    existing_expression_ids = {
+        str(expression.get("id") or "").strip()
+        for expression in character.get("expressions", []) or []
+        if str(expression.get("id") or "").strip()
+    }
+    if not expression_id:
+        expression_id = build_unique_slug_id(existing_expression_ids, "expr", expression_name)
+
+    return {
+        "characterId": character_id,
+        "expressionId": expression_id[:80],
+        "expressionName": expression_name,
+        "setAsDefaultSprite": bool(payload.get("setAsDefaultSprite", True)),
+    }
+
+
+def bind_sprite_asset_to_character(asset_id: str, binding: dict) -> dict:
+    clean_asset_id = str(asset_id or "").strip()
+    if not clean_asset_id:
+        raise ValueError("绑定角色表情时缺少 sprite 素材。")
+
+    assets_doc = normalize_assets_document(read_json(DATA_DIR / "assets.json"))
+    asset = next((item for item in assets_doc.get("assets", []) if item.get("id") == clean_asset_id), None)
+    if not asset or asset.get("type") != "sprite":
+        raise ValueError("只能把立绘素材绑定到角色表情。")
+
+    characters_path = DATA_DIR / "characters.json"
+    characters_doc = normalize_characters_document(read_json(characters_path))
+    characters = characters_doc.setdefault("characters", [])
+    character = next((item for item in characters if item.get("id") == binding.get("characterId")), None)
+    if not character:
+        raise ValueError("没有找到要绑定立绘的角色。")
+
+    expressions = character.setdefault("expressions", [])
+    expression_id = str(binding.get("expressionId") or "").strip()
+    expression_name = str(binding.get("expressionName") or "").strip() or expression_id or "默认"
+    expression = next((item for item in expressions if item.get("id") == expression_id), None)
+    if not expression:
+        existing_expression_ids = {
+            str(item.get("id") or "").strip()
+            for item in expressions
+            if str(item.get("id") or "").strip()
+        }
+        if not expression_id or expression_id in existing_expression_ids:
+            expression_id = build_unique_slug_id(existing_expression_ids, "expr", expression_name)
+        expression = {
+            "id": expression_id,
+            "name": expression_name,
+            "spriteAssetId": clean_asset_id,
+            "layerAssetIds": [],
+            "live2dExpression": "",
+            "live2dMotion": "",
+            "model3dExpression": "",
+            "model3dAnimation": "",
+        }
+        expressions.append(expression)
+    else:
+        expression["name"] = expression_name
+        expression["spriteAssetId"] = clean_asset_id
+
+    set_as_default = bool(binding.get("setAsDefaultSprite")) or not str(character.get("defaultSpriteId") or "").strip()
+    if set_as_default:
+        character["defaultSpriteId"] = clean_asset_id
+        presentation = normalize_character_presentation(character.get("presentation"), clean_asset_id)
+        presentation["fallbackSpriteAssetId"] = clean_asset_id
+        character["presentation"] = presentation
+
+    write_json(characters_path, characters_doc)
+    return {
+        "characterId": character["id"],
+        "characterName": character.get("displayName") or character["id"],
+        "expressionId": expression["id"],
+        "expressionName": expression.get("name") or expression["id"],
+        "assetId": clean_asset_id,
+        "setAsDefaultSprite": set_as_default,
     }
 
 

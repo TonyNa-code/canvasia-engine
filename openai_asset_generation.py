@@ -11,6 +11,7 @@ from urllib.request import Request, urlopen
 OPENAI_ASSET_GENERATION_ENDPOINT = "https://api.openai.com/v1/images/generations"
 OPENAI_ASSET_GENERATION_DEFAULT_MODEL = "gpt-image-1.5"
 OPENAI_ASSET_GENERATION_MAX_PROMPT_CHARS = 1400
+OPENAI_ASSET_GENERATION_MAX_STYLE_HINT_CHARS = 260
 OPENAI_ASSET_GENERATION_IMAGE_TYPES = {"background", "sprite", "cg", "ui"}
 OPENAI_ASSET_GENERATION_SIZES = {"1024x1024", "1024x1536", "1536x1024", "auto"}
 OPENAI_ASSET_GENERATION_QUALITIES = {"low", "medium", "high", "auto"}
@@ -81,9 +82,17 @@ def clean_openai_asset_generation_prompt(value: object) -> str:
     return prompt
 
 
+def clean_openai_asset_generation_style_hint(value: object) -> str:
+    style_hint = str(value or "").strip()
+    style_hint = re.sub(r"\s+", " ", style_hint)
+    if len(style_hint) > OPENAI_ASSET_GENERATION_MAX_STYLE_HINT_CHARS:
+        raise ValueError(f"画风补充超过 {OPENAI_ASSET_GENERATION_MAX_STYLE_HINT_CHARS} 字，请缩短后再生成。")
+    return style_hint
+
+
 def build_openai_asset_generation_prompt(payload: dict, asset_type: str) -> str:
     user_prompt = clean_openai_asset_generation_prompt(payload.get("prompt"))
-    style_hint = str(payload.get("styleHint") or "").strip()
+    style_hint = clean_openai_asset_generation_style_hint(payload.get("styleHint"))
     asset_hints = {
         "background": (
             "Create an original visual novel background. No characters, no text, no watermark. "
@@ -108,7 +117,7 @@ def build_openai_asset_generation_prompt(payload: dict, asset_type: str) -> str:
         "Use an anime-inspired but original art direction. Do not copy copyrighted characters, studio logos, or existing IP.",
     ]
     if style_hint:
-        parts.append(f"Additional art direction: {style_hint[:260]}")
+        parts.append(f"Additional art direction: {style_hint}")
     return "\n".join(parts)
 
 

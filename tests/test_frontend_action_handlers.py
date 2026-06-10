@@ -1738,6 +1738,20 @@ class FrontendActionHandlerTests(unittest.TestCase):
         for old_alert in old_alerts:
             self.assertNotIn(old_alert, operation_sources)
 
+    def test_starter_kit_success_message_mentions_first_scene_bootstrap(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        create_starter_kit = _extract_function_source(source, "createStarterKit")
+
+        self.assertIn("const bootstrap = result.sceneBootstrap ?? {}", create_starter_kit)
+        self.assertIn("const insertedBlockIds = Array.isArray(bootstrap.insertedBlockIds)", create_starter_kit)
+        self.assertIn("selectedSceneId: bootstrap.sceneId ?? state.selectedSceneId", create_starter_kit)
+        self.assertIn("selectedBlockId: insertedBlockIds[0] ?? state.selectedBlockId", create_starter_kit)
+        self.assertIn("previewStartSceneId: bootstrap.sceneId ?? state.previewStartSceneId", create_starter_kit)
+        self.assertIn("const insertedLabels = Array.isArray(bootstrap.insertedLabels)", create_starter_kit)
+        self.assertIn("bootstrap.applied && insertedLabels.length > 0", create_starter_kit)
+        self.assertIn("并已接入${sceneLabel}", create_starter_kit)
+        self.assertIn("insertedLabels.join", create_starter_kit)
+
     def test_foundation_operation_failures_use_copyable_detail_dialogs(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
         operation_sources = "\n".join(
@@ -1834,6 +1848,10 @@ class FrontendActionHandlerTests(unittest.TestCase):
             source,
             "getOpenAiAssetPromptLengthWarning",
         )
+        built_in_prompt_sample = _extract_function_source(
+            source,
+            "isOpenAiAssetBuiltInPromptSample",
+        )
         model_warning = _extract_function_source(
             source,
             "getOpenAiAssetModelWarning",
@@ -1842,17 +1860,31 @@ class FrontendActionHandlerTests(unittest.TestCase):
             source,
             "syncOpenAiAssetPromptLengthStatus",
         )
+        sync_style_hint_length_status = _extract_function_source(
+            source,
+            "syncOpenAiAssetStyleHintLengthStatus",
+        )
         generate_openai_asset = _extract_function_source(source, "generateOpenAiAsset")
         forget_openai_asset_key = _extract_function_source(source, "forgetOpenAiAssetKey")
 
         self.assertIn('"openAiAssetPrompt"', is_openai_asset_generation_field_id)
         self.assertIn('"openAiAssetApiKey"', is_openai_asset_generation_field_id)
+        self.assertIn('"openAiAssetStyleHint"', is_openai_asset_generation_field_id)
+        self.assertIn('"openAiAssetBindCharacterId"', is_openai_asset_generation_field_id)
+        self.assertIn('"openAiAssetBindExpressionId"', is_openai_asset_generation_field_id)
+        self.assertIn('"openAiAssetBindExpressionName"', is_openai_asset_generation_field_id)
+        self.assertIn('"openAiAssetBindAsDefaultSprite"', is_openai_asset_generation_field_id)
         self.assertIn('"openAiAssetOutputFormat"', is_openai_asset_generation_field_id)
+        self.assertIn("OPENAI_ASSET_GENERATION_TYPES", built_in_prompt_sample)
+        self.assertIn("getOpenAiAssetPromptSample(assetType)", built_in_prompt_sample)
         self.assertIn("提示词超过 ${info.max} 字，请缩短后再生成。", prompt_length_warning)
         self.assertIn("模型名只能包含英文字母、数字、点、下划线、冒号或短横线", model_warning)
         self.assertIn("/^[A-Za-z0-9._:-]+$/.test(value)", model_warning)
         self.assertIn('document.getElementById("openAiAssetPromptLengthStatus")', sync_prompt_length_status)
         self.assertIn("status.classList.toggle", sync_prompt_length_status)
+        self.assertIn('document.getElementById("openAiAssetStyleHintLengthStatus")', sync_style_hint_length_status)
+        self.assertIn("getOpenAiAssetStyleHintLengthWarning()", sync_style_hint_length_status)
+        self.assertIn("status.classList.toggle", sync_style_hint_length_status)
         self.assertIn("openAiAssetBackground === \"transparent\"", compatibility_warning)
         self.assertIn("openAiAssetOutputFormat === \"jpeg\"", compatibility_warning)
         self.assertIn("if (state.openAiAssetLoading)", generate_openai_asset)
@@ -1884,18 +1916,53 @@ class FrontendActionHandlerTests(unittest.TestCase):
         )
         self.assertIn("const promptLengthWarning = getOpenAiAssetPromptLengthWarning(state.openAiAssetPrompt)", generate_openai_asset)
         self.assertIn('showToast("生图提示词太长", "error")', generate_openai_asset)
+        self.assertIn('document.getElementById("openAiAssetStyleHint")', generate_openai_asset)
+        self.assertIn("styleHint: state.openAiAssetStyleHint", generate_openai_asset)
+        self.assertIn('document.getElementById("openAiAssetBindCharacterId")', generate_openai_asset)
+        self.assertIn('document.getElementById("openAiAssetBindExpressionId")', generate_openai_asset)
+        self.assertIn('document.getElementById("openAiAssetBindExpressionName")', generate_openai_asset)
+        self.assertIn('document.getElementById("openAiAssetBindAsDefaultSprite")', generate_openai_asset)
+        self.assertIn("const styleHintLengthWarning = getOpenAiAssetStyleHintLengthWarning(state.openAiAssetStyleHint)", generate_openai_asset)
+        self.assertIn('showToast("生图画风补充太长", "error")', generate_openai_asset)
         self.assertLess(
             generate_openai_asset.index("const promptLengthWarning = getOpenAiAssetPromptLengthWarning(state.openAiAssetPrompt)"),
+            generate_openai_asset.index("const styleHintLengthWarning = getOpenAiAssetStyleHintLengthWarning(state.openAiAssetStyleHint)"),
+        )
+        self.assertLess(
+            generate_openai_asset.index("const styleHintLengthWarning = getOpenAiAssetStyleHintLengthWarning(state.openAiAssetStyleHint)"),
             generate_openai_asset.index("if (!state.openAiAssetApiKey.trim())"),
         )
         self.assertLess(
-            generate_openai_asset.index("const promptLengthWarning = getOpenAiAssetPromptLengthWarning(state.openAiAssetPrompt)"),
+            generate_openai_asset.index("const styleHintLengthWarning = getOpenAiAssetStyleHintLengthWarning(state.openAiAssetStyleHint)"),
             generate_openai_asset.index("postJson("),
         )
+        self.assertIn("characterBinding:", generate_openai_asset)
+        self.assertIn("state.openAiAssetType === \"sprite\" && state.openAiAssetBindCharacterId", generate_openai_asset)
+        self.assertIn("expressionId: state.openAiAssetBindExpressionId", generate_openai_asset)
+        self.assertIn("setAsDefaultSprite: state.openAiAssetBindAsDefaultSprite", generate_openai_asset)
+        self.assertIn("const binding = result.characterBinding", generate_openai_asset)
+        self.assertIn("已生成并绑定角色", generate_openai_asset)
         self.assertIn('action === "apply-openai-asset-prompt-sample"', handle_click)
+        self.assertIn('action === "apply-openai-asset-style-preset"', handle_click)
+        self.assertIn("getOpenAiAssetStyleHintPreset", handle_click)
+        self.assertIn("state.openAiAssetStyleHint = preset.value", handle_click)
+        self.assertIn("已套用 AI 生图画风", handle_click)
+        self.assertIn('action === "apply-openai-asset-expression-preset"', handle_click)
+        self.assertIn("getOpenAiAssetExpressionBindPreset", handle_click)
+        self.assertIn("state.openAiAssetBindExpressionId = preset.id", handle_click)
+        self.assertIn("state.openAiAssetBindExpressionName = preset.name", handle_click)
+        self.assertIn("已套用绑定表情", handle_click)
         self.assertIn("if (state.openAiAssetLoading)", handle_click)
         self.assertLess(
             handle_click.index('action === "apply-openai-asset-prompt-sample"'),
+            handle_click.index('action === "apply-openai-asset-style-preset"'),
+        )
+        self.assertLess(
+            handle_click.index('action === "apply-openai-asset-style-preset"'),
+            handle_click.index('action === "apply-openai-asset-expression-preset"'),
+        )
+        self.assertLess(
+            handle_click.index('action === "apply-openai-asset-expression-preset"'),
             handle_click.index('action === "generate-openai-asset"'),
         )
         self.assertIn('action === "forget-openai-asset-key"', handle_click)
@@ -1911,6 +1978,15 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("state.openAiAssetLoading && isOpenAiAssetGenerationFieldId(target.id)", handle_change)
         self.assertIn("state.openAiAssetLoading && isOpenAiAssetGenerationFieldId(event.target.id)", handle_input)
         self.assertIn("syncOpenAiAssetPromptLengthStatus()", handle_input)
+        self.assertIn('event.target.id === "openAiAssetStyleHint"', handle_input)
+        self.assertIn('state.openAiAssetStyleHint = event.target.value ?? ""', handle_input)
+        self.assertIn("syncOpenAiAssetStyleHintLengthStatus()", handle_input)
+        self.assertIn('event.target.id === "openAiAssetBindExpressionId"', handle_input)
+        self.assertIn('event.target.id === "openAiAssetBindExpressionName"', handle_input)
+        self.assertIn('target.id === "openAiAssetBindCharacterId"', handle_change)
+        self.assertIn('target.id === "openAiAssetBindAsDefaultSprite"', handle_change)
+        self.assertIn("const shouldRefreshPromptSample = isOpenAiAssetBuiltInPromptSample(state.openAiAssetPrompt)", handle_change)
+        self.assertIn("if (shouldRefreshPromptSample)", handle_change)
         self.assertLess(
             handle_change.index("state.openAiAssetLoading && isOpenAiAssetGenerationFieldId(target.id)"),
             handle_change.index('target.id === "openAiAssetType"'),

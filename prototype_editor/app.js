@@ -726,6 +726,11 @@ const initialOpenAiAssetState = openAiAssetTools?.getDefaultOpenAiAssetGeneratio
   openAiAssetName: "",
   openAiAssetApiKey: "",
   openAiAssetModel: "gpt-image-1.5",
+  openAiAssetStyleHint: "",
+  openAiAssetBindCharacterId: "",
+  openAiAssetBindExpressionId: "expr_default",
+  openAiAssetBindExpressionName: "默认",
+  openAiAssetBindAsDefaultSprite: true,
   openAiAssetSize: "1536x1024",
   openAiAssetQuality: "medium",
   openAiAssetBackground: "auto",
@@ -2038,6 +2043,15 @@ function getOpenAiAssetPromptSample(assetType) {
   return openAiAssetTools?.getOpenAiAssetPromptSample?.(assetType) ?? "雨后黄昏的校园走廊，窗外有浅蓝色天光，适合作为视觉小说背景";
 }
 
+function isOpenAiAssetBuiltInPromptSample(prompt) {
+  const normalizedPrompt = String(prompt ?? "").trim();
+  if (!normalizedPrompt) {
+    return true;
+  }
+  const assetTypes = openAiAssetTools?.OPENAI_ASSET_GENERATION_TYPES ?? ["background", "sprite", "cg", "ui"];
+  return assetTypes.some((assetType) => normalizedPrompt === getOpenAiAssetPromptSample(assetType));
+}
+
 function getOpenAiAssetPromptLengthInfo(prompt = state.openAiAssetPrompt) {
   return openAiAssetTools?.getOpenAiAssetPromptLengthInfo?.(prompt) ?? (() => {
     const length = Array.from(String(prompt ?? "")).length;
@@ -2064,6 +2078,32 @@ function getOpenAiAssetPromptLengthWarning(prompt = state.openAiAssetPrompt) {
   })();
 }
 
+function getOpenAiAssetStyleHintLengthInfo(styleHint = state.openAiAssetStyleHint) {
+  return openAiAssetTools?.getOpenAiAssetStyleHintLengthInfo?.(styleHint) ?? (() => {
+    const length = Array.from(String(styleHint ?? "")).length;
+    return {
+      length,
+      max: openAiAssetTools?.OPENAI_ASSET_GENERATION_MAX_STYLE_HINT_CHARS ?? 260,
+      remaining: Math.max(0, (openAiAssetTools?.OPENAI_ASSET_GENERATION_MAX_STYLE_HINT_CHARS ?? 260) - length),
+      overLimit: length > (openAiAssetTools?.OPENAI_ASSET_GENERATION_MAX_STYLE_HINT_CHARS ?? 260),
+    };
+  })();
+}
+
+function getOpenAiAssetStyleHintLengthLabel(styleHint = state.openAiAssetStyleHint) {
+  return openAiAssetTools?.getOpenAiAssetStyleHintLengthLabel?.(styleHint) ?? (() => {
+    const info = getOpenAiAssetStyleHintLengthInfo(styleHint);
+    return `画风补充 ${info.length} / ${info.max} 字`;
+  })();
+}
+
+function getOpenAiAssetStyleHintLengthWarning(styleHint = state.openAiAssetStyleHint) {
+  return openAiAssetTools?.getOpenAiAssetStyleHintLengthWarning?.(styleHint) ?? (() => {
+    const info = getOpenAiAssetStyleHintLengthInfo(styleHint);
+    return info.overLimit ? `画风补充超过 ${info.max} 字，请缩短后再生成。` : "";
+  })();
+}
+
 function getOpenAiAssetModelWarning(model = state.openAiAssetModel) {
   return openAiAssetTools?.getOpenAiAssetModelWarning?.(model) ?? (() => {
     const value = String(model ?? "").trim();
@@ -2086,6 +2126,16 @@ function syncOpenAiAssetPromptLengthStatus() {
   status.classList.toggle("danger-text", Boolean(warning));
 }
 
+function syncOpenAiAssetStyleHintLengthStatus() {
+  const status = document.getElementById("openAiAssetStyleHintLengthStatus");
+  if (!status) {
+    return;
+  }
+  const warning = getOpenAiAssetStyleHintLengthWarning();
+  status.textContent = warning || getOpenAiAssetStyleHintLengthLabel();
+  status.classList.toggle("danger-text", Boolean(warning));
+}
+
 function getOpenAiAssetGenerationCompatibilityWarning() {
   return openAiAssetTools?.getOpenAiAssetGenerationCompatibilityWarning?.(state) ?? (
     state.openAiAssetBackground === "transparent" && state.openAiAssetOutputFormat === "jpeg"
@@ -2100,6 +2150,11 @@ function isOpenAiAssetGenerationFieldId(fieldId) {
     "openAiAssetName",
     "openAiAssetApiKey",
     "openAiAssetModel",
+    "openAiAssetStyleHint",
+    "openAiAssetBindCharacterId",
+    "openAiAssetBindExpressionId",
+    "openAiAssetBindExpressionName",
+    "openAiAssetBindAsDefaultSprite",
     "openAiAssetSize",
     "openAiAssetQuality",
     "openAiAssetBackground",
@@ -2112,6 +2167,7 @@ function renderOpenAiAssetGeneratorPanel() {
   return openAiAssetTools?.renderOpenAiAssetGeneratorPanel?.({
     state,
     selectedAssetType: state.selectedAssetType,
+    characters: state.data?.characters ?? [],
     escapeHtml,
     getAssetTypeLabel,
   }) ?? "";
@@ -4132,6 +4188,47 @@ async function handleClick(event) {
     return;
   }
 
+  if (action === "apply-openai-asset-style-preset") {
+    if (state.openAiAssetLoading) {
+      setSaveStatus("AI 素材正在生成，请稍等...");
+      showToast("AI 素材正在生成，请稍等...");
+      return;
+    }
+    const preset = openAiAssetTools?.getOpenAiAssetStyleHintPreset?.(actionTarget.dataset.stylePreset);
+    if (!preset) {
+      setSaveStatus("没有找到这组 AI 生图画风预设", true);
+      showToast("画风预设不可用", "error");
+      return;
+    }
+    state.openAiAssetStyleHint = preset.value;
+    state.openAiAssetError = "";
+    state.openAiAssetLastResult = null;
+    renderAssetsScreen();
+    setSaveStatus(`已套用 AI 生图画风：${preset.label}`);
+    return;
+  }
+
+  if (action === "apply-openai-asset-expression-preset") {
+    if (state.openAiAssetLoading) {
+      setSaveStatus("AI 素材正在生成，请稍等...");
+      showToast("AI 素材正在生成，请稍等...");
+      return;
+    }
+    const preset = openAiAssetTools?.getOpenAiAssetExpressionBindPreset?.(actionTarget.dataset.expressionPreset);
+    if (!preset) {
+      setSaveStatus("没有找到这组角色表情预设", true);
+      showToast("角色表情预设不可用", "error");
+      return;
+    }
+    state.openAiAssetBindExpressionId = preset.id;
+    state.openAiAssetBindExpressionName = preset.name;
+    state.openAiAssetError = "";
+    state.openAiAssetLastResult = null;
+    renderAssetsScreen();
+    setSaveStatus(`已套用绑定表情：${preset.label}`);
+    return;
+  }
+
   if (action === "forget-openai-asset-key") {
     forgetOpenAiAssetKey();
     return;
@@ -4790,8 +4887,9 @@ function handleChange(event) {
   }
 
   if (target.id === "openAiAssetType") {
+    const shouldRefreshPromptSample = isOpenAiAssetBuiltInPromptSample(state.openAiAssetPrompt);
     state.openAiAssetType = getSafeOpenAiAssetGenerationType(target.value);
-    if (!state.openAiAssetPrompt.trim()) {
+    if (shouldRefreshPromptSample) {
       state.openAiAssetPrompt = getOpenAiAssetPromptSample(state.openAiAssetType);
     }
     state.openAiAssetError = "";
@@ -4853,6 +4951,33 @@ function handleChange(event) {
     }
     renderAssetsScreen();
     setSaveStatus(`AI 生图格式：${state.openAiAssetOutputFormat}`);
+    return;
+  }
+
+  if (target.id === "openAiAssetBindCharacterId") {
+    state.openAiAssetBindCharacterId = target.value ?? "";
+    state.openAiAssetError = "";
+    state.openAiAssetLastResult = null;
+    setSaveStatus(
+      state.openAiAssetBindCharacterId
+        ? `AI 立绘生成后会绑定到：${
+            state.data?.charactersById?.get(state.openAiAssetBindCharacterId)?.displayName ??
+            state.openAiAssetBindCharacterId
+          }`
+        : "AI 立绘生成后只加入素材库"
+    );
+    return;
+  }
+
+  if (target.id === "openAiAssetBindAsDefaultSprite") {
+    state.openAiAssetBindAsDefaultSprite = Boolean(target.checked);
+    state.openAiAssetError = "";
+    state.openAiAssetLastResult = null;
+    setSaveStatus(
+      state.openAiAssetBindAsDefaultSprite
+        ? "生成后会同步设为角色默认立绘"
+        : "生成后只绑定到指定表情，不改默认立绘"
+    );
     return;
   }
 
@@ -5113,6 +5238,28 @@ function handleInput(event) {
   if (event.target.id === "openAiAssetModel") {
     state.openAiAssetModel = event.target.value ?? "";
     state.openAiAssetError = "";
+    return;
+  }
+
+  if (event.target.id === "openAiAssetStyleHint") {
+    state.openAiAssetStyleHint = event.target.value ?? "";
+    state.openAiAssetError = "";
+    state.openAiAssetLastResult = null;
+    syncOpenAiAssetStyleHintLengthStatus();
+    return;
+  }
+
+  if (event.target.id === "openAiAssetBindExpressionId") {
+    state.openAiAssetBindExpressionId = event.target.value ?? "";
+    state.openAiAssetError = "";
+    state.openAiAssetLastResult = null;
+    return;
+  }
+
+  if (event.target.id === "openAiAssetBindExpressionName") {
+    state.openAiAssetBindExpressionName = event.target.value ?? "";
+    state.openAiAssetError = "";
+    state.openAiAssetLastResult = null;
     return;
   }
 
@@ -33494,15 +33641,28 @@ async function createStarterKit(options = {}) {
   try {
     setSaveStatus("正在生成起步骨架...");
     const result = await postJson(API_CREATE_STARTER_KIT, payload);
+    const bootstrap = result.sceneBootstrap ?? {};
+    const insertedBlockIds = Array.isArray(bootstrap.insertedBlockIds) ? bootstrap.insertedBlockIds : [];
     await reloadProjectData({
       ...getCurrentUiState(),
+      selectedSceneId: bootstrap.sceneId ?? state.selectedSceneId,
+      selectedBlockId: insertedBlockIds[0] ?? state.selectedBlockId,
+      previewSceneId: bootstrap.sceneId ?? state.previewSceneId,
+      previewStartSceneId: bootstrap.sceneId ?? state.previewStartSceneId,
+      previewBlockIndex: 0,
       selectedCharacterId: result.createdCharacter?.id ?? state.selectedCharacterId,
     });
     const createdLabels = Array.isArray(result.createdLabels) ? result.createdLabels : [];
+    const insertedLabels = Array.isArray(bootstrap.insertedLabels) ? bootstrap.insertedLabels : [];
+    const sceneLabel = bootstrap.sceneName || bootstrap.sceneId || "首场景";
     const message =
       createdLabels.length > 0 ? `已补好：${createdLabels.join("、")}` : "起步骨架已经补好了";
-    setSaveStatus(message);
-    showToast(message);
+    const bootstrapMessage =
+      bootstrap.applied && insertedLabels.length > 0
+        ? `${message}，并已接入${sceneLabel}：${insertedLabels.join("、")}`
+        : message;
+    setSaveStatus(bootstrapMessage);
+    showToast(bootstrapMessage);
   } catch (error) {
     await showEditorOperationFailure(error, "生成起步骨架失败", "起步骨架没有生成成功");
   }
@@ -36506,6 +36666,23 @@ async function generateOpenAiAsset() {
   state.openAiAssetName = document.getElementById("openAiAssetName")?.value?.trim() ?? state.openAiAssetName;
   state.openAiAssetApiKey = document.getElementById("openAiAssetApiKey")?.value?.trim() ?? state.openAiAssetApiKey;
   state.openAiAssetModel = document.getElementById("openAiAssetModel")?.value?.trim() || state.openAiAssetModel;
+  state.openAiAssetStyleHint =
+    document.getElementById("openAiAssetStyleHint")?.value?.trim() ?? state.openAiAssetStyleHint;
+  const bindCharacterField = document.getElementById("openAiAssetBindCharacterId");
+  state.openAiAssetBindCharacterId =
+    state.openAiAssetType === "sprite" && bindCharacterField ? bindCharacterField.value.trim() : "";
+  const bindExpressionIdField = document.getElementById("openAiAssetBindExpressionId");
+  if (bindExpressionIdField) {
+    state.openAiAssetBindExpressionId = bindExpressionIdField.value.trim();
+  }
+  const bindExpressionNameField = document.getElementById("openAiAssetBindExpressionName");
+  if (bindExpressionNameField) {
+    state.openAiAssetBindExpressionName = bindExpressionNameField.value.trim();
+  }
+  const bindDefaultField = document.getElementById("openAiAssetBindAsDefaultSprite");
+  if (bindDefaultField) {
+    state.openAiAssetBindAsDefaultSprite = Boolean(bindDefaultField.checked);
+  }
   state.openAiAssetSize = getSafeOpenAiAssetGenerationOption(
     document.getElementById("openAiAssetSize")?.value ?? state.openAiAssetSize,
     openAiAssetTools?.OPENAI_ASSET_GENERATION_SIZES ?? [],
@@ -36558,6 +36735,14 @@ async function generateOpenAiAsset() {
     return;
   }
 
+  const styleHintLengthWarning = getOpenAiAssetStyleHintLengthWarning(state.openAiAssetStyleHint);
+  if (styleHintLengthWarning) {
+    state.openAiAssetError = styleHintLengthWarning;
+    renderAssetsScreen();
+    showToast("生图画风补充太长", "error");
+    return;
+  }
+
   if (!state.openAiAssetApiKey.trim()) {
     state.openAiAssetError = "请先填写 OpenAI API Key。Key 不会写入项目文件。";
     renderAssetsScreen();
@@ -36580,6 +36765,16 @@ async function generateOpenAiAsset() {
         assetName: state.openAiAssetName,
         apiKey: state.openAiAssetApiKey,
         model: state.openAiAssetModel,
+        styleHint: state.openAiAssetStyleHint,
+        characterBinding:
+          state.openAiAssetType === "sprite" && state.openAiAssetBindCharacterId
+            ? {
+                characterId: state.openAiAssetBindCharacterId,
+                expressionId: state.openAiAssetBindExpressionId,
+                expressionName: state.openAiAssetBindExpressionName,
+                setAsDefaultSprite: state.openAiAssetBindAsDefaultSprite,
+              }
+            : null,
         size: state.openAiAssetSize,
         quality: state.openAiAssetQuality,
         background: state.openAiAssetBackground,
@@ -36594,11 +36789,16 @@ async function generateOpenAiAsset() {
       ...getCurrentUiState(),
       selectedAssetType: result.assetType ?? state.openAiAssetType,
       selectedAssetId: result.asset?.id ?? state.selectedAssetId,
+      selectedCharacterId: result.characterBinding?.characterId ?? state.selectedCharacterId,
       assetFilterMode: "all",
     });
     state.openAiAssetLastResult = result;
-    setSaveStatus(`已生成并导入素材：${result.asset?.name ?? "新素材"}`);
-    showToast(`已生成：${result.asset?.name ?? "新素材"}`);
+    const binding = result.characterBinding;
+    const bindingText = binding
+      ? `，并绑定到 ${binding.characterName ?? binding.characterId} / ${binding.expressionName ?? binding.expressionId}`
+      : "";
+    setSaveStatus(`已生成并导入素材：${result.asset?.name ?? "新素材"}${bindingText}`);
+    showToast(binding ? `已生成并绑定角色：${binding.characterName ?? "角色"}` : `已生成：${result.asset?.name ?? "新素材"}`);
   } catch (error) {
     state.openAiAssetError = getErrorDetailMessage(
       error,

@@ -56,7 +56,7 @@ The project already includes a visual editor, export pipeline, native runtime pr
 - Multi-language project settings for default language and player-selectable languages
 - Localized runtime text for scene names, chapter names, dialogue, choices, and character names, with safe fallback when a translation is missing
 - Canvasia Assistant with local template mode and optional creator-provided OpenAI, DeepSeek, Qwen, Kimi, Zhipu GLM, or compatible API providers
-- Optional OpenAI Image asset generation for backgrounds, sprites, CGs, and UI materials, with prompt/model validation and local-only API key handling
+- Optional OpenAI Image asset generation for backgrounds, sprites, CGs, and UI materials, with style-hint presets, sprite-to-character expression binding, prompt/model validation, and local-only API key handling
 - Formal save/load, quick save/load, system menu, text history, autoplay, skip-read, and voice replay
 - Custom game UI skins, UI Kit binding, nine-slice textures, button states, layout controls, and visual novel textbox design
 - Extra galleries: CG replay, music room, character archive, location archive, narration archive, relationship archive, achievements, chapter replay, ending replay, and voice replay
@@ -70,7 +70,7 @@ The project already includes a visual editor, export pipeline, native runtime pr
 | Area | Status | Notes |
 | --- | --- | --- |
 | Story and Branch Editing | Available | Visual cards, choices, jumps, variables, conditions, and scene graph inspection. |
-| Asset Management | Available | Import, replace, delete, usage protection, file-size budget hints, and optional OpenAI Image generation with prompt, model, format, and returned-file validation. |
+| Asset Management | Available | Import, replace, delete, usage protection, file-size budget hints, and optional OpenAI Image generation with style presets, sprite expression binding, prompt, model, format, and returned-file validation. |
 | Multi-language / i18n | Preview | Project language settings, export metadata, Web Runtime language switching, native Runtime language switching, and fallback behavior. |
 | Canvasia Assistant | Available | Local template mode plus optional creator-owned API keys for major compatible providers. |
 | Project Safety Net | Available | Snapshots, restore, crash recovery, project doctor, repair queue, release gates, and release-control reports. |
@@ -109,6 +109,14 @@ The project already includes a visual editor, export pipeline, native runtime pr
 ## Quick Start
 
 The editor only requires Python 3 for the source-based path.
+
+If this is your first time opening Canvasia, follow the short route below:
+
+1. Launch the editor.
+2. Create or open a project.
+3. Use the one-click starter kit to add the first character, background, and BGM.
+4. Let the starter kit wire those basics into the first scene, then replace the placeholder assets when ready.
+5. Write 10 to 20 lines, run preview, then export a Web or desktop demo.
 
 ### One-click scripts
 
@@ -154,6 +162,7 @@ For a first five-minute demo, start small:
 - 1 simple ending
 
 Build one complete path first, then add branches, effects, UI skins, galleries, voice, and extra polish.
+The starter kit can create the first character/background/BGM records and connect them to the first scene, so you can begin from a playable skeleton instead of wiring every card by hand.
 
 ## Multi-language Projects
 

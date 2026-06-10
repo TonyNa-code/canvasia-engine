@@ -103,13 +103,13 @@
         title: starterKitReady ? "角色和基础素材已经补上" : "再补角色、背景和 BGM",
         done: starterKitReady,
         summary: starterKitReady
-          ? "项目已经具备角色和基础素材骨架。"
-          : "补上第一个角色、一张背景和一首 BGM 后，预览会更完整。",
+          ? "项目已经具备角色、基础素材和首场景演出骨架。"
+          : "补上第一个角色、一张背景和一首 BGM 后，会自动尝试接入首场景，让预览更快跑起来。",
         notes: [
           starterKitOverview?.needsStarterKit
             ? `当前还缺：${starterKitOverview.missingLabels.join("、")}。`
             : "如已自行导入素材，可继续进入试玩与导出流程。",
-          "这里生成的是项目骨架条目，后续仍可在素材页替换成正式图片和音频文件。",
+          "这里生成的是项目骨架条目和首场景基础演出，后续仍可在素材页替换成正式图片和音频文件。",
         ],
         actions: starterKitOverview?.needsStarterKit
           ? [
@@ -152,7 +152,7 @@
         done: exportDone,
         summary: exportDone
           ? "导出链已经实际跑过了，后面就可以继续收尾、修问题、再导下一版。"
-          : "导出前可先确认平台支持范围：当前游戏成品的原生桌面端以 Windows 为主，mac 和 Linux 可先导网页试玩包。",
+          : "导出前可先确认平台支持范围：当前游戏成品可导出网页试玩包，也可走 Windows / macOS / Linux 原生桌面包链路。",
         notes: [
           exportSupport.windows,
           exportSupport.macLinux,

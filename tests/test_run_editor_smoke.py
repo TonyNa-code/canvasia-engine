@@ -349,6 +349,42 @@ class RunEditorSmokeTests(unittest.TestCase):
         run_editor.save_scene(chapter_id, updated_scene["id"], updated_scene)
         return updated_scene
 
+    def test_starter_kit_bootstraps_first_scene_for_playable_demo(self) -> None:
+        self.create_blank_project_with_chapter()
+
+        result = run_editor.create_starter_kit(
+            character_name="小葵",
+            background_name="放学后的教室",
+            bgm_name="第一天的风",
+        )
+
+        self.assertEqual(result["createdLabels"], ["第一个角色", "第一张背景", "第一首 BGM"])
+        self.assertFalse(any(result["starterOverview"].values()))
+        self.assertTrue(result["sceneBootstrap"]["applied"])
+        self.assertEqual(
+            result["sceneBootstrap"]["insertedLabels"],
+            ["BGM 卡片", "背景卡片", "角色出场卡片", "第一句角色台词"],
+        )
+        self.assertEqual(len(result["sceneBootstrap"]["insertedBlockIds"]), 4)
+
+        bundle = run_editor.load_project_bundle()
+        first_scene = bundle["chapters"][0]["scenes"][0]
+        first_blocks = first_scene["blocks"][:4]
+        self.assertEqual([block["type"] for block in first_blocks], ["music_play", "background", "character_show", "dialogue"])
+        self.assertEqual(result["sceneBootstrap"]["insertedBlockIds"], [block["id"] for block in first_blocks])
+
+        created_assets_by_type = {asset["type"]: asset for asset in result["createdAssets"]}
+        created_character = result["createdCharacter"]
+        self.assertEqual(first_blocks[0]["assetId"], created_assets_by_type["bgm"]["id"])
+        self.assertEqual(first_blocks[0]["fadeInMs"], 600)
+        self.assertEqual(first_blocks[1]["assetId"], created_assets_by_type["background"]["id"])
+        self.assertEqual(first_blocks[1]["transition"], "fade")
+        self.assertEqual(first_blocks[2]["characterId"], created_character["id"])
+        self.assertEqual(first_blocks[2]["expressionId"], "expr_default")
+        self.assertEqual(first_blocks[3]["speakerId"], created_character["id"])
+        self.assertIn("开始", first_blocks[3]["text"])
+        self.assertEqual(first_scene["blocks"][4]["type"], "narration")
+
     def test_project_creation_scene_save_and_settings(self) -> None:
         project_summary, chapter_result = self.create_blank_project_with_chapter()
 
@@ -1474,6 +1510,7 @@ class RunEditorSmokeTests(unittest.TestCase):
             self.assertEqual(body["output_format"], "png")
             self.assertIn("视觉小说背景", body["prompt"])
             self.assertIn("visual novel background", body["prompt"])
+            self.assertIn("soft blue lighting", body["prompt"])
             return FakeResponse()
 
         with mock.patch("openai_asset_generation.urlopen", fake_urlopen):
@@ -1481,6 +1518,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 {
                     "assetType": "background",
                     "prompt": "雨夜校园，视觉小说背景",
+                    "styleHint": "soft blue lighting",
                     "assetName": "雨夜校园背景",
                     "apiKey": "test-openai-image-key",
                     "model": "gpt-image-test",
@@ -1500,6 +1538,188 @@ class RunEditorSmokeTests(unittest.TestCase):
         assets_doc = run_editor.read_json(run_editor.DATA_DIR / "assets.json")
         self.assertNotIn("test-openai-image-key", json.dumps(assets_doc, ensure_ascii=False))
         self.assertIn("visual novel background", captured["body"]["prompt"])
+        self.assertIn("soft blue lighting", captured["body"]["prompt"])
+
+    def test_openai_asset_generation_binds_sprite_to_character_expression(self) -> None:
+        self.create_blank_project_with_chapter()
+        run_editor.write_json(
+            run_editor.DATA_DIR / "characters.json",
+            {
+                "characters": [
+                    {
+                        "id": "char_hero",
+                        "displayName": "蓝白女主",
+                        "defaultSpriteId": "",
+                        "expressions": [],
+                    }
+                ]
+            },
+        )
+        response_payload = {
+            "data": [
+                {
+                    "b64_json": base64.b64encode(build_fake_png_bytes()).decode("utf-8"),
+                }
+            ]
+        }
+        captured = {}
+
+        class FakeResponse:
+            def __enter__(self) -> "FakeResponse":
+                return self
+
+            def __exit__(self, *_args: object) -> bool:
+                return False
+
+            def read(self, *_args: object) -> bytes:
+                return json.dumps(response_payload).encode("utf-8")
+
+        def fake_urlopen(request, timeout=0):
+            body = json.loads(request.data.decode("utf-8"))
+            captured["body"] = body
+            self.assertEqual(body["model"], "gpt-image-test")
+            self.assertEqual(body["size"], "1024x1536")
+            self.assertEqual(body["background"], "transparent")
+            self.assertIn("清透蓝白", body["prompt"])
+            return FakeResponse()
+
+        with mock.patch("openai_asset_generation.urlopen", fake_urlopen):
+            result = run_editor.generate_openai_asset(
+                {
+                    "assetType": "sprite",
+                    "prompt": "原创女主角半身立绘，校服，透明背景",
+                    "styleHint": "清透蓝白",
+                    "assetName": "女主微笑立绘",
+                    "apiKey": "test-openai-image-key",
+                    "model": "gpt-image-test",
+                    "size": "1024x1536",
+                    "quality": "high",
+                    "background": "transparent",
+                    "outputFormat": "png",
+                    "characterBinding": {
+                        "characterId": "char_hero",
+                        "expressionId": "expr_smile",
+                        "expressionName": "微笑",
+                        "setAsDefaultSprite": True,
+                    },
+                }
+            )
+
+        asset = result["asset"]
+        binding = result["characterBinding"]
+        self.assertEqual(asset["type"], "sprite")
+        self.assertEqual(binding["characterId"], "char_hero")
+        self.assertEqual(binding["characterName"], "蓝白女主")
+        self.assertEqual(binding["expressionId"], "expr_smile")
+        self.assertEqual(binding["expressionName"], "微笑")
+        self.assertTrue(binding["setAsDefaultSprite"])
+        self.assertEqual(binding["assetId"], asset["id"])
+        self.assertIn("清透蓝白", captured["body"]["prompt"])
+
+        characters_doc = run_editor.read_json(run_editor.DATA_DIR / "characters.json")
+        character = characters_doc["characters"][0]
+        self.assertEqual(character["defaultSpriteId"], asset["id"])
+        self.assertEqual(character["presentation"]["fallbackSpriteAssetId"], asset["id"])
+        self.assertEqual(character["expressions"][0]["id"], "expr_smile")
+        self.assertEqual(character["expressions"][0]["name"], "微笑")
+        self.assertEqual(character["expressions"][0]["spriteAssetId"], asset["id"])
+        self.assertNotIn("test-openai-image-key", json.dumps(characters_doc, ensure_ascii=False))
+
+    def test_openai_asset_generation_rolls_back_when_character_binding_fails(self) -> None:
+        self.create_blank_project_with_chapter()
+        characters_path = run_editor.DATA_DIR / "characters.json"
+        run_editor.write_json(
+            characters_path,
+            {
+                "characters": [
+                    {
+                        "id": "char_hero",
+                        "displayName": "蓝白女主",
+                        "defaultSpriteId": "",
+                        "expressions": [],
+                    }
+                ]
+            },
+        )
+        assets_path = run_editor.DATA_DIR / "assets.json"
+        before_assets = run_editor.read_json(assets_path)
+        before_characters = run_editor.read_json(characters_path)
+        sprite_dir = run_editor.TEMPLATE_DIR / run_editor.ASSET_DIRECTORIES["sprite"]
+        before_sprite_files = {path.name for path in sprite_dir.glob("*") if path.is_file()} if sprite_dir.is_dir() else set()
+        generation_meta = {
+            "model": "gpt-image-test",
+            "size": "1024x1536",
+            "quality": "high",
+            "background": "transparent",
+            "outputFormat": "png",
+            "prompt": "原创女主角半身立绘，校服，透明背景",
+        }
+
+        with (
+            mock.patch.object(
+                run_editor,
+                "call_openai_asset_generation_model",
+                return_value=(build_fake_png_bytes(), generation_meta),
+            ),
+            mock.patch.object(
+                run_editor,
+                "bind_sprite_asset_to_character",
+                side_effect=RuntimeError("simulated binding failure"),
+            ),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "simulated binding failure"):
+                run_editor.generate_openai_asset(
+                    {
+                        "assetType": "sprite",
+                        "prompt": "原创女主角半身立绘，校服，透明背景",
+                        "assetName": "失败回滚立绘",
+                        "apiKey": "test-openai-image-key",
+                        "model": "gpt-image-test",
+                        "size": "1024x1536",
+                        "quality": "high",
+                        "background": "transparent",
+                        "outputFormat": "png",
+                        "characterBinding": {
+                            "characterId": "char_hero",
+                            "expressionId": "expr_smile",
+                            "expressionName": "微笑",
+                            "setAsDefaultSprite": True,
+                        },
+                    }
+                )
+
+        after_sprite_files = {path.name for path in sprite_dir.glob("*") if path.is_file()} if sprite_dir.is_dir() else set()
+        self.assertEqual(run_editor.read_json(assets_path), before_assets)
+        self.assertEqual(run_editor.read_json(characters_path), before_characters)
+        self.assertEqual(after_sprite_files, before_sprite_files)
+
+    def test_openai_asset_generation_rejects_non_sprite_character_binding(self) -> None:
+        self.create_blank_project_with_chapter()
+        run_editor.write_json(
+            run_editor.DATA_DIR / "characters.json",
+            {
+                "characters": [
+                    {
+                        "id": "char_hero",
+                        "displayName": "蓝白女主",
+                        "defaultSpriteId": "",
+                        "expressions": [],
+                    }
+                ]
+            },
+        )
+        with self.assertRaisesRegex(ValueError, "只有立绘素材可以在生成后绑定到角色表情"):
+            run_editor.generate_openai_asset(
+                {
+                    "assetType": "background",
+                    "prompt": "雨夜校园，视觉小说背景",
+                    "apiKey": "test-openai-image-key",
+                    "characterBinding": {
+                        "characterId": "char_hero",
+                        "expressionName": "默认",
+                    },
+                }
+            )
 
     def test_openai_asset_generation_requires_api_key(self) -> None:
         self.create_blank_project_with_chapter()
@@ -1532,6 +1752,18 @@ class RunEditorSmokeTests(unittest.TestCase):
                 {
                     "assetType": "background",
                     "prompt": "长" * 1401,
+                    "apiKey": "test-openai-image-key",
+                }
+            )
+
+    def test_openai_asset_generation_rejects_overlong_style_hint(self) -> None:
+        self.create_blank_project_with_chapter()
+        with self.assertRaisesRegex(ValueError, "画风补充超过 260 字"):
+            run_editor.generate_openai_asset(
+                {
+                    "assetType": "background",
+                    "prompt": "雨夜校园，视觉小说背景",
+                    "styleHint": "清" * 261,
                     "apiKey": "test-openai-image-key",
                 }
             )
