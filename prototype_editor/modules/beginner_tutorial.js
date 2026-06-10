@@ -109,7 +109,7 @@
           starterKitOverview?.needsStarterKit
             ? `当前还缺：${starterKitOverview.missingLabels.join("、")}。`
             : "如已自行导入素材，可继续进入试玩与导出流程。",
-          "这里生成的是项目骨架条目和首场景基础演出，后续仍可在素材页替换成正式图片和音频文件。",
+          "这里会生成可试玩的占位素材和首场景基础演出，后续仍可在素材页替换成正式图片和音频文件。",
         ],
         actions: starterKitOverview?.needsStarterKit
           ? [
@@ -403,8 +403,8 @@
           <span class="eyebrow">生成内容</span>
           <ul class="blank-project-step-list">
             ${safeOverview.missingCharacter ? "<li>生成一个角色骨架，并自动带一张默认立绘条目。</li>" : ""}
-            ${safeOverview.missingBackground ? "<li>生成第一张背景条目，方便你后面直接替换成真实图片。</li>" : ""}
-            ${safeOverview.missingBgm ? "<li>生成第一首 BGM 条目，后面导入音乐时不用再从零建分类。</li>" : ""}
+            ${safeOverview.missingBackground ? "<li>生成第一张可替换背景占位图，方便你先试玩再换正式图片。</li>" : ""}
+            ${safeOverview.missingBgm ? "<li>生成第一首可替换静音 BGM，占住演出位置，后面可直接替换。</li>" : ""}
           </ul>
           <div class="detail-meta">此操作只会补齐条目骨架，不会改动现有剧情内容。</div>
         </article>

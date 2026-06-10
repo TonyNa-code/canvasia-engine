@@ -3510,6 +3510,117 @@ def next_named_asset_path(
     return str(candidate).replace("\\", "/")
 
 
+def build_png_chunk(chunk_type: bytes, data: bytes) -> bytes:
+    checksum = zlib.crc32(chunk_type + data) & 0xFFFFFFFF
+    return struct.pack("!I", len(data)) + chunk_type + data + struct.pack("!I", checksum)
+
+
+def build_rgba_png_bytes(width: int, height: int, pixel_builder) -> bytes:
+    rows = bytearray()
+    for y in range(height):
+        rows.append(0)
+        for x in range(width):
+            rows.extend(pixel_builder(x, y))
+    return b"".join(
+        [
+            b"\x89PNG\r\n\x1a\n",
+            build_png_chunk(b"IHDR", struct.pack("!IIBBBBB", width, height, 8, 6, 0, 0, 0)),
+            build_png_chunk(b"IDAT", zlib.compress(bytes(rows), 9)),
+            build_png_chunk(b"IEND", b""),
+        ]
+    )
+
+
+def build_starter_background_placeholder_png_bytes() -> bytes:
+    width = 320
+    height = 180
+
+    def pixel(x: int, y: int) -> tuple[int, int, int, int]:
+        sky = int(28 + 48 * (1 - y / max(height - 1, 1)))
+        glow = int(38 * (x / max(width - 1, 1)))
+        return (18 + glow, sky, 82 + glow, 255)
+
+    return build_rgba_png_bytes(width, height, pixel)
+
+
+def build_starter_sprite_placeholder_png_bytes() -> bytes:
+    width = 160
+    height = 240
+    center_x = width // 2
+
+    def pixel(x: int, y: int) -> tuple[int, int, int, int]:
+        head = (x - center_x) ** 2 + (y - 60) ** 2 <= 28 ** 2
+        body = abs(x - center_x) <= max(12, 34 - abs(y - 142) // 3) and 88 <= y <= 210
+        hair = (x - center_x) ** 2 + (y - 72) ** 2 <= 42 ** 2 and y > 42
+        if hair and not head:
+            return (44, 70, 122, 215)
+        if head:
+            return (244, 210, 188, 235)
+        if body:
+            return (78, 135, 210, 230)
+        return (0, 0, 0, 0)
+
+    return build_rgba_png_bytes(width, height, pixel)
+
+
+def build_starter_silent_wav_bytes(duration_seconds: float = 1.2, sample_rate: int = 22050) -> bytes:
+    frame_count = max(1, int(sample_rate * duration_seconds))
+    channel_count = 1
+    bits_per_sample = 16
+    block_align = channel_count * bits_per_sample // 8
+    byte_rate = sample_rate * block_align
+    data = b"\x00" * frame_count * block_align
+    return b"".join(
+        [
+            b"RIFF",
+            struct.pack("<I", 36 + len(data)),
+            b"WAVEfmt ",
+            struct.pack("<IHHIIHH", 16, 1, channel_count, sample_rate, byte_rate, block_align, bits_per_sample),
+            b"data",
+            struct.pack("<I", len(data)),
+            data,
+        ]
+    )
+
+
+def write_starter_placeholder_asset_file(asset_record: dict) -> Path | None:
+    asset_path = str(asset_record.get("path") or "").strip()
+    asset_type = str(asset_record.get("type") or "").strip()
+    if not asset_path:
+        return None
+
+    target_path = TEMPLATE_DIR / asset_path
+    if target_path.exists():
+        return None
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if asset_type == "background":
+        target_path.write_bytes(build_starter_background_placeholder_png_bytes())
+    elif asset_type == "sprite":
+        target_path.write_bytes(build_starter_sprite_placeholder_png_bytes())
+    elif asset_type == "bgm":
+        target_path.write_bytes(build_starter_silent_wav_bytes())
+    else:
+        return None
+    return target_path
+
+
+def capture_file_snapshots(paths: list[Path]) -> dict[Path, bytes | None]:
+    return {path: path.read_bytes() if path.exists() else None for path in paths}
+
+
+def restore_file_snapshots(snapshots: dict[Path, bytes | None]) -> None:
+    for path, content in snapshots.items():
+        if content is None:
+            try:
+                path.unlink(missing_ok=True)
+            except OSError:
+                pass
+            continue
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content)
+
+
 def build_starter_asset_record(
     asset_type: str,
     asset_name: str,
@@ -3517,7 +3628,7 @@ def build_starter_asset_record(
     existing_paths: set[str],
     tags: list[str],
 ) -> dict:
-    suffix = ".mp3" if asset_type == "bgm" else ".png"
+    suffix = ".wav" if asset_type == "bgm" else ".png"
     asset_id = next_named_id(existing_ids, ASSET_ID_PREFIXES.get(asset_type, asset_type), asset_name)
     asset_path = next_named_asset_path(existing_paths, asset_type, asset_name, suffix)
     existing_ids.add(asset_id)
@@ -3714,8 +3825,10 @@ def create_starter_kit(
     existing_asset_paths = {str(asset.get("path") or "").replace("\\", "/") for asset in assets if asset.get("path")}
     existing_character_ids = {character.get("id") for character in characters if character.get("id")}
     created_labels: list[str] = []
-    created_assets: list[dict] = []
+    created_asset_records: list[dict] = []
     created_character = None
+    file_snapshots = capture_file_snapshots([assets_path, characters_path, PROJECT_PATH, *list_chapter_files()])
+    created_placeholder_paths: list[Path] = []
 
     if starter_overview["missingCharacter"]:
         sprite_name = f"{clean_character_name} 默认立绘"
@@ -3724,10 +3837,10 @@ def create_starter_kit(
             sprite_name,
             existing_asset_ids,
             existing_asset_paths,
-            ["起步骨架", clean_character_name, "默认", "待导入"],
+            ["起步骨架", clean_character_name, "默认", "占位素材", "可替换"],
         )
         assets.append(sprite_record)
-        created_assets.append(enrich_asset_record(sprite_record))
+        created_asset_records.append(sprite_record)
 
         character_id = next_named_id(existing_character_ids, "char", clean_character_name)
         existing_character_ids.add(character_id)
@@ -3759,10 +3872,10 @@ def create_starter_kit(
             clean_background_name,
             existing_asset_ids,
             existing_asset_paths,
-            ["起步骨架", "背景", "待导入"],
+            ["起步骨架", "背景", "占位素材", "可替换"],
         )
         assets.append(background_record)
-        created_assets.append(enrich_asset_record(background_record))
+        created_asset_records.append(background_record)
         created_labels.append("第一张背景")
 
     if starter_overview["missingBgm"]:
@@ -3771,25 +3884,39 @@ def create_starter_kit(
             clean_bgm_name,
             existing_asset_ids,
             existing_asset_paths,
-            ["起步骨架", "音乐", "待导入"],
+            ["起步骨架", "音乐", "占位素材", "可替换"],
         )
         assets.append(bgm_record)
-        created_assets.append(enrich_asset_record(bgm_record))
+        created_asset_records.append(bgm_record)
         created_labels.append("第一首 BGM")
 
-    write_json(assets_path, assets_doc)
-    write_json(characters_path, characters_doc)
-    scene_bootstrap = bootstrap_starter_kit_first_scene(
-        assets=assets,
-        characters=characters,
-        created_character=created_character,
-    )
-    touch_project()
+    try:
+        for asset_record in created_asset_records:
+            written_path = write_starter_placeholder_asset_file(asset_record)
+            if written_path:
+                created_placeholder_paths.append(written_path)
+
+        write_json(assets_path, assets_doc)
+        write_json(characters_path, characters_doc)
+        scene_bootstrap = bootstrap_starter_kit_first_scene(
+            assets=assets,
+            characters=characters,
+            created_character=created_character,
+        )
+        touch_project()
+    except Exception:
+        for placeholder_path in reversed(created_placeholder_paths):
+            try:
+                placeholder_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+        restore_file_snapshots(file_snapshots)
+        raise
 
     return {
         "createdLabels": created_labels,
         "createdCharacter": created_character,
-        "createdAssets": created_assets,
+        "createdAssets": [enrich_asset_record(asset_record) for asset_record in created_asset_records],
         "sceneBootstrap": scene_bootstrap,
         "starterOverview": build_starter_kit_overview(assets, characters),
     }

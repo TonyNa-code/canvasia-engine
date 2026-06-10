@@ -16,7 +16,7 @@ from pathlib import Path
 from urllib.parse import urljoin
 from urllib.request import urlopen
 
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import Error as PlaywrightError, sync_playwright
 
 
 def find_free_port() -> int:
@@ -146,6 +146,26 @@ exit 0
 class BrowserPlaywrightSmokeTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
+        cls.temp_dir = None
+        cls.server_process = None
+        cls.server_log_file = None
+        cls.playwright = None
+        cls.browser = None
+
+        try:
+            cls.playwright = sync_playwright().start()
+            cls.browser = cls.playwright.chromium.launch(headless=True)
+        except PlaywrightError as error:
+            try:
+                if cls.playwright:
+                    cls.playwright.stop()
+            except Exception:
+                pass
+            message = str(error)
+            if "Executable doesn't exist" in message or "playwright install" in message:
+                raise unittest.SkipTest("Playwright Chromium is not installed; run `python -m playwright install chromium`.")
+            raise
+
         cls.temp_dir = tempfile.TemporaryDirectory()
         cls.repo_source = Path(__file__).resolve().parents[1]
         cls.repo_copy = Path(cls.temp_dir.name) / "browser_test_repo"
@@ -156,6 +176,8 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
                 "__pycache__",
                 "*.pyc",
                 ".DS_Store",
+                ".git",
+                "fsmonitor--daemon.ipc",
                 "exports",
                 ".export_runtime_cache",
                 ".tmp_brand_preview",
@@ -203,32 +225,35 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
         )
         wait_for_server_ready(cls.editor_url, cls.server_process, log_path=cls.server_log_path)
 
-        cls.playwright = sync_playwright().start()
-        cls.browser = cls.playwright.chromium.launch(headless=True)
-
     @classmethod
     def tearDownClass(cls) -> None:
         try:
-            cls.browser.close()
+            if cls.browser:
+                cls.browser.close()
         except Exception:
             pass
         try:
-            cls.playwright.stop()
+            if cls.playwright:
+                cls.playwright.stop()
         except Exception:
             pass
         try:
-            cls.server_process.terminate()
-            cls.server_process.wait(timeout=5)
+            if cls.server_process:
+                cls.server_process.terminate()
+                cls.server_process.wait(timeout=5)
         except Exception:
             try:
-                cls.server_process.kill()
+                if cls.server_process:
+                    cls.server_process.kill()
             except Exception:
                 pass
         try:
-            cls.server_log_file.close()
+            if cls.server_log_file:
+                cls.server_log_file.close()
         except Exception:
             pass
-        cls.temp_dir.cleanup()
+        if cls.temp_dir:
+            cls.temp_dir.cleanup()
 
     def setUp(self) -> None:
         self.context = self.browser.new_context(viewport={"width": 1600, "height": 1000}, accept_downloads=True)
@@ -261,13 +286,16 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
                 time.sleep(0.5)
         raise RuntimeError(f"编辑器页面没有稳定打开：{last_error}") from last_error
 
+    def get_create_project_confirm_button(self, dialog):
+        return dialog.get_by_role("button", name=re.compile(r"^(确认|创建.*项目)$"))
+
     def create_blank_project(self, name: str) -> None:
         self.open_editor()
         self.page.get_by_role("button", name="新建空白项目").click()
         dialog = self.page.locator(".system-dialog").filter(has_text="给这个新项目起个名字").first
         dialog.wait_for(timeout=15000)
         dialog.locator(".system-dialog-input").fill(name)
-        dialog.get_by_role("button", name="确认").click()
+        self.get_create_project_confirm_button(dialog).click()
         self.page.get_by_role("button", name="一键创建第一章").first.wait_for(timeout=15000)
 
     def test_editor_system_prompt_requires_text(self) -> None:
@@ -276,9 +304,10 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
         dialog = self.page.locator(".system-dialog").filter(has_text="给这个新项目起个名字").first
         dialog.wait_for(timeout=15000)
         dialog.locator(".system-dialog-input").fill("")
-        self.assertTrue(dialog.get_by_role("button", name="确认").is_disabled())
+        confirm_button = self.get_create_project_confirm_button(dialog)
+        self.assertTrue(confirm_button.is_disabled())
         dialog.locator(".system-dialog-input").fill("浏览器烟测项目_PromptRequired")
-        dialog.get_by_role("button", name="确认").click()
+        confirm_button.click()
         self.page.get_by_role("button", name="一键创建第一章").first.wait_for(timeout=15000)
 
     def create_first_chapter(self) -> None:

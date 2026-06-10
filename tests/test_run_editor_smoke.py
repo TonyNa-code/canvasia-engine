@@ -12,6 +12,7 @@ import sys
 import tempfile
 import tarfile
 import unittest
+import wave
 from unittest import mock
 from pathlib import Path
 
@@ -374,6 +375,23 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(result["sceneBootstrap"]["insertedBlockIds"], [block["id"] for block in first_blocks])
 
         created_assets_by_type = {asset["type"]: asset for asset in result["createdAssets"]}
+        self.assertEqual(set(created_assets_by_type), {"sprite", "background", "bgm"})
+        for asset in result["createdAssets"]:
+            self.assertTrue(asset["fileExists"], asset)
+            self.assertIn("占位素材", asset["tags"])
+            asset_path = run_editor.TEMPLATE_DIR / asset["path"]
+            self.assertTrue(asset_path.is_file())
+            if asset["type"] in {"sprite", "background"}:
+                asset_bytes = asset_path.read_bytes()
+                self.assertTrue(asset_bytes.startswith(b"\x89PNG\r\n\x1a\n"))
+                self.assertIn(b"IHDR", asset_bytes[:32])
+                self.assertIn(b"IEND", asset_bytes[-16:])
+            if asset["type"] == "bgm":
+                with wave.open(str(asset_path), "rb") as wav_file:
+                    self.assertEqual(wav_file.getnchannels(), 1)
+                    self.assertEqual(wav_file.getsampwidth(), 2)
+                    self.assertEqual(wav_file.getframerate(), 22050)
+                    self.assertGreater(wav_file.getnframes(), 0)
         created_character = result["createdCharacter"]
         self.assertEqual(first_blocks[0]["assetId"], created_assets_by_type["bgm"]["id"])
         self.assertEqual(first_blocks[0]["fadeInMs"], 600)
@@ -384,6 +402,62 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(first_blocks[3]["speakerId"], created_character["id"])
         self.assertIn("开始", first_blocks[3]["text"])
         self.assertEqual(first_scene["blocks"][4]["type"], "narration")
+
+        health_result = subprocess.run(
+            [sys.executable, str(run_editor.ROOT_DIR / "tools/ci/project_health.py"), str(run_editor.TEMPLATE_DIR)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(health_result.returncode, 0, health_result.stdout + health_result.stderr)
+
+        export_result = run_editor.export_web_build()
+        self.assertEqual(export_result["missingAssets"], 0)
+
+    def test_starter_kit_rolls_back_when_first_scene_bootstrap_fails(self) -> None:
+        self.create_blank_project_with_chapter()
+        snapshot_paths = [
+            run_editor.DATA_DIR / "assets.json",
+            run_editor.DATA_DIR / "characters.json",
+            run_editor.PROJECT_PATH,
+            *run_editor.list_chapter_files(),
+        ]
+        before_snapshots = {path: path.read_bytes() for path in snapshot_paths}
+        asset_roots = [
+            run_editor.TEMPLATE_DIR / "assets" / "backgrounds",
+            run_editor.TEMPLATE_DIR / "assets" / "sprites",
+            run_editor.TEMPLATE_DIR / "assets" / "bgm",
+        ]
+        before_asset_files = {
+            path.relative_to(run_editor.TEMPLATE_DIR).as_posix()
+            for root in asset_roots
+            if root.exists()
+            for path in root.glob("*")
+            if path.is_file()
+        }
+
+        with mock.patch.object(
+            run_editor,
+            "bootstrap_starter_kit_first_scene",
+            side_effect=RuntimeError("simulated bootstrap failure"),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "simulated bootstrap failure"):
+                run_editor.create_starter_kit(
+                    character_name="回滚角色",
+                    background_name="回滚背景",
+                    bgm_name="回滚 BGM",
+                )
+
+        after_asset_files = {
+            path.relative_to(run_editor.TEMPLATE_DIR).as_posix()
+            for root in asset_roots
+            if root.exists()
+            for path in root.glob("*")
+            if path.is_file()
+        }
+        self.assertEqual(after_asset_files, before_asset_files)
+        for path, before_content in before_snapshots.items():
+            self.assertEqual(path.read_bytes(), before_content, path)
 
     def test_project_creation_scene_save_and_settings(self) -> None:
         project_summary, chapter_result = self.create_blank_project_with_chapter()
