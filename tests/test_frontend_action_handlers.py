@@ -606,6 +606,8 @@ class FrontendActionHandlerTests(unittest.TestCase):
         handle_project_load_failure = _extract_function_source(source, "handleProjectLoadFailure")
         show_copyable_operation_failure = _extract_function_source(source, "showCopyableOperationFailure")
         show_project_center_failure = _extract_function_source(source, "showProjectCenterFailure")
+        create_playable_demo_project = _extract_function_source(source, "createPlayableDemoProject")
+        project_center_operation_sources = "\n".join([handle_click, create_playable_demo_project])
 
         self.assertIn("getErrorDetailMessage(error)", show_copyable_operation_failure)
         self.assertIn("getErrorSummaryLine(error, title)", show_copyable_operation_failure)
@@ -619,24 +621,26 @@ class FrontendActionHandlerTests(unittest.TestCase):
         expected_calls = [
             'await showProjectCenterFailure(error, "刷新项目列表失败", "项目列表没有刷新成功")',
             'await showProjectCenterFailure(error, "新建空白项目失败", "空白项目没有创建成功")',
+            'await showProjectCenterFailure(error, "新建可试玩 Demo 失败", "可试玩 Demo 没有创建成功")',
             'await showProjectCenterFailure(error, "打开项目失败", "项目没有打开成功")',
             'await showProjectCenterFailure(error, "修改项目名失败", "项目名没有修改成功")',
             'await showProjectCenterFailure(error, "复制项目失败", "项目没有复制成功")',
             'await showProjectCenterFailure(error, "删除项目失败", `项目「${project.title}」没有删除成功`)',
         ]
         for expected_call in expected_calls:
-            self.assertIn(expected_call, handle_click)
+            self.assertIn(expected_call, project_center_operation_sources)
 
         old_alerts = [
             "刷新项目列表失败：${error.message}",
             "新建空白项目失败：${error.message}",
+            "新建可试玩 Demo 失败：${error.message}",
             "打开项目失败：${error.message}",
             "修改项目名失败：${error.message}",
             "复制项目失败：${error.message}",
             "删除项目失败：${error.message}",
         ]
         for old_alert in old_alerts:
-            self.assertNotIn(old_alert, handle_click)
+            self.assertNotIn(old_alert, project_center_operation_sources)
 
     def test_create_project_prompt_confirms_default_editor_mode(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
@@ -667,6 +671,15 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("options.requiredMessage", prompt_for_text)
         self.assertIn("options.maxLength", prompt_for_text)
         self.assertIn("options.copyText ?? false", prompt_for_text)
+        self.assertIn('action === "create-playable-demo-project"', handle_click)
+        self.assertIn("await createPlayableDemoProject()", handle_click)
+        self.assertIn("async function createPlayableDemoProject", source)
+        self.assertIn("新建可试玩 Demo", source)
+        self.assertIn("生成 Demo 项目", source)
+        self.assertIn("await postJson(API_CREATE_PROJECT", source)
+        self.assertIn("await postJson(API_CREATE_CHAPTER", source)
+        self.assertIn("rethrowErrors: true", source)
+        self.assertIn('switchScreen("preview")', source)
 
         script = textwrap.dedent(
             f"""
@@ -833,7 +846,7 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("button.dataset[idleLabelKey]", set_action_button_busy_state)
         self.assertIn('button.setAttribute("aria-busy", "true")', set_action_button_busy_state)
         self.assertIn("state.projectCreateInFlight = Boolean(isInFlight)", set_project_create_in_flight)
-        self.assertIn('data-action="create-project"', set_project_create_in_flight)
+        self.assertIn('[data-action="create-project"], [data-action="create-playable-demo-project"]', set_project_create_in_flight)
         self.assertIn('busyLabel: "准备中..."', set_project_create_in_flight)
         self.assertIn("projectCreateIdleLabel", set_project_create_in_flight)
 
@@ -860,9 +873,12 @@ class FrontendActionHandlerTests(unittest.TestCase):
             }}
             const state = {{ projectCreateInFlight: false }};
             const createButton = new HTMLButtonElement("新建空白项目");
+            const demoButton = new HTMLButtonElement("新建可试玩 Demo");
             const document = {{
               querySelectorAll(selector) {{
-                return selector === '[data-action="create-project"]' ? [createButton] : [];
+                return selector === '[data-action="create-project"], [data-action="create-playable-demo-project"]'
+                  ? [createButton, demoButton]
+                  : [];
               }},
             }};
             function setActionButtonBusyState(options = {{}}) {set_action_button_busy_state}
@@ -874,6 +890,8 @@ class FrontendActionHandlerTests(unittest.TestCase):
               text: createButton.textContent,
               busy: createButton.attrs["aria-busy"],
               ariaDisabled: createButton.attrs["aria-disabled"],
+              demoText: demoButton.textContent,
+              demoBusy: demoButton.attrs["aria-busy"],
               classes: Array.from(createButton.classes),
             }};
             setProjectCreateInFlight(false);
@@ -883,6 +901,8 @@ class FrontendActionHandlerTests(unittest.TestCase):
               text: createButton.textContent,
               busy: createButton.attrs["aria-busy"] ?? null,
               ariaDisabled: createButton.attrs["aria-disabled"] ?? null,
+              demoText: demoButton.textContent,
+              demoBusy: demoButton.attrs["aria-busy"] ?? null,
               classes: Array.from(createButton.classes),
             }};
             process.stdout.write(JSON.stringify({{ busy, idle }}));
@@ -900,13 +920,17 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertTrue(payload["busy"]["inFlight"])
         self.assertTrue(payload["busy"]["disabled"])
         self.assertEqual(payload["busy"]["text"], "准备中...")
+        self.assertEqual(payload["busy"]["demoText"], "准备中...")
         self.assertEqual(payload["busy"]["busy"], "true")
+        self.assertEqual(payload["busy"]["demoBusy"], "true")
         self.assertEqual(payload["busy"]["ariaDisabled"], "true")
         self.assertIn("is-busy", payload["busy"]["classes"])
         self.assertFalse(payload["idle"]["inFlight"])
         self.assertFalse(payload["idle"]["disabled"])
         self.assertEqual(payload["idle"]["text"], "新建空白项目")
+        self.assertEqual(payload["idle"]["demoText"], "新建可试玩 Demo")
         self.assertIsNone(payload["idle"]["busy"])
+        self.assertIsNone(payload["idle"]["demoBusy"])
         self.assertIsNone(payload["idle"]["ariaDisabled"])
         self.assertNotIn("is-busy", payload["idle"]["classes"])
 
@@ -1748,9 +1772,135 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("selectedBlockId: insertedBlockIds[0] ?? state.selectedBlockId", create_starter_kit)
         self.assertIn("previewStartSceneId: bootstrap.sceneId ?? state.previewStartSceneId", create_starter_kit)
         self.assertIn("const insertedLabels = Array.isArray(bootstrap.insertedLabels)", create_starter_kit)
+        self.assertIn("const createdAssets = Array.isArray(result.createdAssets)", create_starter_kit)
+        self.assertIn("readyPlaceholderAssets.length", create_starter_kit)
+        self.assertIn("可替换占位素材已生成，可直接试玩和导出", create_starter_kit)
         self.assertIn("bootstrap.applied && insertedLabels.length > 0", create_starter_kit)
         self.assertIn("并已接入${sceneLabel}", create_starter_kit)
         self.assertIn("insertedLabels.join", create_starter_kit)
+
+    def test_starter_kit_success_message_only_promises_ready_placeholder_assets(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        create_starter_kit = _extract_function_source(source, "createStarterKit")
+        script = textwrap.dedent(
+            f"""
+            const createStarterKit = eval(
+              "(async function createStarterKit(options = {{}}) " + {json.dumps(create_starter_kit)} + ")"
+            );
+
+            const saveStatuses = [];
+            const toasts = [];
+            const reloads = [];
+            let backendResult = null;
+
+            const API_CREATE_STARTER_KIT = "/api/create-starter-kit";
+            const state = {{
+              selectedSceneId: "old_scene",
+              selectedBlockId: "old_block",
+              previewSceneId: "old_preview",
+              previewStartSceneId: "old_start",
+              selectedCharacterId: "old_character",
+            }};
+
+            function getStarterKitOverview() {{
+              return {{ needsStarterKit: true, missingCharacter: false, missingBackground: false, missingBgm: false }};
+            }}
+
+            function getStarterKitDefaults() {{
+              return {{ characterName: "女主角", backgroundName: "第一场背景", bgmName: "开场 BGM" }};
+            }}
+
+            async function promptForText() {{
+              throw new Error("prompt should be skipped");
+            }}
+
+            async function postJson(url, payload) {{
+              if (url !== API_CREATE_STARTER_KIT) {{
+                throw new Error(`unexpected url ${{url}}`);
+              }}
+              return backendResult;
+            }}
+
+            function getCurrentUiState() {{
+              return {{ keep: "ui" }};
+            }}
+
+            async function reloadProjectData(nextState) {{
+              reloads.push(nextState);
+            }}
+
+            function setSaveStatus(message) {{
+              saveStatuses.push(message);
+            }}
+
+            function showToast(message, type) {{
+              toasts.push({{ message, type: type ?? null }});
+            }}
+
+            async function showEditorOperationFailure(error) {{
+              throw error;
+            }}
+
+            async function runCase(createdAssets) {{
+              saveStatuses.length = 0;
+              toasts.length = 0;
+              reloads.length = 0;
+              backendResult = {{
+                createdLabels: ["第一个角色", "第一张背景"],
+                createdAssets,
+                createdCharacter: {{ id: "char_hero" }},
+                sceneBootstrap: {{
+                  applied: true,
+                  sceneId: "scene_intro",
+                  sceneName: "开场",
+                  insertedBlockIds: ["block_bgm"],
+                  insertedLabels: ["BGM 卡片"],
+                }},
+              }};
+              await createStarterKit({{ skipPrompts: true }});
+              return {{
+                finalStatus: saveStatuses.at(-1),
+                toast: toasts.at(-1)?.message,
+                reload: reloads.at(-1),
+              }};
+            }}
+
+            (async () => {{
+              const ready = await runCase([
+                {{ fileExists: true, tags: ["占位素材", "可替换"] }},
+                {{ fileExists: true, tags: ["占位素材"] }},
+                {{ fileExists: false, tags: ["占位素材"] }},
+                {{ fileExists: true, tags: ["正式素材"] }},
+              ]);
+              if (!ready.finalStatus.includes("2 个可替换占位素材已生成，可直接试玩和导出")) {{
+                throw new Error(`ready placeholder summary missing: ${{ready.finalStatus}}`);
+              }}
+              if (ready.toast !== ready.finalStatus) {{
+                throw new Error("toast and save status should match");
+              }}
+              if (ready.reload.selectedSceneId !== "scene_intro" || ready.reload.selectedBlockId !== "block_bgm") {{
+                throw new Error("starter kit should focus the bootstrapped scene and first inserted block");
+              }}
+
+              const notReady = await runCase([
+                {{ fileExists: false, tags: ["占位素材"] }},
+                {{ fileExists: true, tags: ["正式素材"] }},
+              ]);
+              if (notReady.finalStatus.includes("可直接试玩和导出")) {{
+                throw new Error(`non-ready assets should not be promised as playable: ${{notReady.finalStatus}}`);
+              }}
+              console.log(JSON.stringify({{ ready: ready.finalStatus, notReady: notReady.finalStatus }}));
+            }})().catch((error) => {{
+              console.error(error.stack || error.message);
+              process.exit(1);
+            }});
+            """
+        )
+        completed = subprocess.run(["node", "-e", script], text=True, capture_output=True, check=False)
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        self.assertIn("可直接试玩和导出", payload["ready"])
+        self.assertNotIn("可直接试玩和导出", payload["notReady"])
 
     def test_foundation_operation_failures_use_copyable_detail_dialogs(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")

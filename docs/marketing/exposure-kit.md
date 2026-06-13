@@ -62,7 +62,7 @@ Repo: https://github.com/TonyNa-code/canvasia-engine
 Chinese:
 
 ```text
-我做了一个开源可见的视觉小说 / galgame 制作引擎 Canvasia Engine。
+我做了一个源码可见的视觉小说 / galgame 制作引擎 Canvasia Engine。
 
 它偏小白友好：可视化写剧情、导入素材、调 UI、做回想馆/图鉴馆、粒子和演出、导出网页/桌面/原生 Runtime，还带发布前检查。
 

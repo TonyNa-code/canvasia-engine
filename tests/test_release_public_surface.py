@@ -59,6 +59,7 @@ PUBLIC_RELEASE_PATTERN_BLOCKLIST = (
     ("github_classic_token", re.compile(r"ghp_[A-Za-z0-9]{20,}")),
     ("github_fine_grained_token", re.compile(r"github_pat_[A-Za-z0-9_]{20,}")),
     ("private_key", re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----")),
+    ("license_claim_open_source_visible", re.compile(r"开源可见")),
     ("mac_or_linux_home_path", re.compile(r"/(?:Users|home)/[A-Za-z0-9._-]+(?:/|$)")),
     ("windows_user_path", re.compile(r"[A-Za-z]:\\Users\\[A-Za-z0-9._-]+\\")),
 )
@@ -121,6 +122,7 @@ class ReleasePublicSurfaceTests(unittest.TestCase):
                 "github ghp_" + "b" * 24,
                 "fine github_pat_" + "c" * 32,
                 "-----BEGIN PRIVATE KEY-----",
+                "license drift 开源可见",
             ]
         )
 
@@ -135,6 +137,7 @@ class ReleasePublicSurfaceTests(unittest.TestCase):
         self.assertIn("docs/synthetic.md: github_classic_token", findings)
         self.assertIn("docs/synthetic.md: github_fine_grained_token", findings)
         self.assertIn("docs/synthetic.md: private_key", findings)
+        self.assertIn("docs/synthetic.md: license_claim_open_source_visible", findings)
 
 
 if __name__ == "__main__":

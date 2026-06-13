@@ -3012,6 +3012,11 @@ async function handleClick(event) {
     return;
   }
 
+  if (action === "create-playable-demo-project") {
+    await createPlayableDemoProject();
+    return;
+  }
+
   if (action === "create-first-chapter") {
     await createChapter({
       defaultChapterName: getBlankProjectStarterDefaults().chapterName,
@@ -9794,7 +9799,7 @@ function setProjectCenterRefreshInFlight(isInFlight) {
 function setProjectCreateInFlight(isInFlight) {
   state.projectCreateInFlight = Boolean(isInFlight);
   setActionButtonBusyState({
-    selector: '[data-action="create-project"]',
+    selector: '[data-action="create-project"], [data-action="create-playable-demo-project"]',
     isBusy: state.projectCreateInFlight,
     busyLabel: "准备中...",
     idleLabelKey: "projectCreateIdleLabel",
@@ -33600,6 +33605,71 @@ async function createChapter(options = {}) {
   }
 }
 
+async function createPlayableDemoProject() {
+  if (blockProjectCenterOperationIfInFlight()) {
+    return;
+  }
+
+  const projectMode = getSafeEditorMode(state.projectCenterEditorMode);
+  const projectModeLabel = getEditorModeLabel(projectMode);
+  const defaults = getBlankProjectStarterDefaults();
+  setProjectCreateInFlight(true);
+  try {
+    const name = await promptForText(
+      [
+        "给这个可试玩 Demo 起个名字：",
+        `系统会以${projectModeLabel}创建项目、补第一章和占位素材，并直接切到试玩页。`,
+      ],
+      "我的第一个 Demo",
+      {
+        title: "新建可试玩 Demo",
+        confirmLabel: "生成 Demo 项目",
+        placeholder: "例如：雨夜校园试玩版",
+      }
+    );
+    if (!name) {
+      return;
+    }
+
+    setSaveStatus(`正在创建${projectModeLabel}可试玩 Demo...`);
+    const projectResult = await postJson(API_CREATE_PROJECT, {
+      name,
+      editorMode: projectMode,
+    });
+    state.projectCenter = projectResult.projectCenter ?? (await loadProjectCenter());
+    await enterActiveProjectEditor(`已打开${projectModeLabel}Demo 项目：${name}`);
+
+    setSaveStatus("正在创建第一章和第一场景...");
+    const chapterResult = await postJson(API_CREATE_CHAPTER, {
+      chapterName: defaults.chapterName,
+      firstSceneName: defaults.firstSceneName,
+    });
+    await reloadProjectData({
+      ...getCurrentUiState(),
+      selectedSceneId: chapterResult.sceneId,
+      selectedBlockId: chapterResult.scene?.blocks?.[0]?.id ?? null,
+      previewSceneId: chapterResult.sceneId,
+      previewStartSceneId: chapterResult.sceneId,
+      previewBlockIndex: 0,
+    });
+
+    await createStarterKit({
+      skipPrompts: true,
+      rethrowErrors: true,
+    });
+    switchScreen("preview");
+    const successMessage = `可试玩 Demo 已生成：${name}`;
+    setSaveStatus(successMessage);
+    showToast(successMessage);
+  } catch (error) {
+    if (!handleProjectLoadFailure(error)) {
+      await showProjectCenterFailure(error, "新建可试玩 Demo 失败", "可试玩 Demo 没有创建成功");
+    }
+  } finally {
+    setProjectCreateInFlight(false);
+  }
+}
+
 async function createStarterKit(options = {}) {
   const overview = getStarterKitOverview();
   if (!overview.needsStarterKit) {
@@ -33654,16 +33724,30 @@ async function createStarterKit(options = {}) {
     });
     const createdLabels = Array.isArray(result.createdLabels) ? result.createdLabels : [];
     const insertedLabels = Array.isArray(bootstrap.insertedLabels) ? bootstrap.insertedLabels : [];
+    const createdAssets = Array.isArray(result.createdAssets) ? result.createdAssets : [];
+    const readyPlaceholderAssets = createdAssets.filter(
+      (asset) =>
+        asset?.fileExists &&
+        Array.isArray(asset.tags) &&
+        asset.tags.includes("占位素材")
+    );
     const sceneLabel = bootstrap.sceneName || bootstrap.sceneId || "首场景";
     const message =
       createdLabels.length > 0 ? `已补好：${createdLabels.join("、")}` : "起步骨架已经补好了";
+    const assetMessage =
+      readyPlaceholderAssets.length > 0
+        ? `，${readyPlaceholderAssets.length} 个可替换占位素材已生成，可直接试玩和导出`
+        : "";
     const bootstrapMessage =
       bootstrap.applied && insertedLabels.length > 0
-        ? `${message}，并已接入${sceneLabel}：${insertedLabels.join("、")}`
-        : message;
+        ? `${message}${assetMessage}，并已接入${sceneLabel}：${insertedLabels.join("、")}`
+        : `${message}${assetMessage}`;
     setSaveStatus(bootstrapMessage);
     showToast(bootstrapMessage);
   } catch (error) {
+    if (options.rethrowErrors) {
+      throw error;
+    }
     await showEditorOperationFailure(error, "生成起步骨架失败", "起步骨架没有生成成功");
   }
 }

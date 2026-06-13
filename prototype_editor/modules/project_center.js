@@ -219,6 +219,15 @@
               <button
                 type="button"
                 class="toolbar-button toolbar-button-primary ${getHeroButtonClass(isCreatingProject)}"
+                data-action="create-playable-demo-project"
+                ${getHeroButtonAttrs(isCreatingProject)}
+                ${isProjectCenterLocked && !isCreatingProject ? `title="${escape(operationInFlightMessage)}"` : ""}
+              >
+                ${isCreatingProject ? "准备中..." : "新建可试玩 Demo"}
+              </button>
+              <button
+                type="button"
+                class="toolbar-button ${getHeroButtonClass(isCreatingProject)}"
                 data-action="create-project"
                 ${getHeroButtonAttrs(isCreatingProject)}
                 ${isProjectCenterLocked && !isCreatingProject ? `title="${escape(operationInFlightMessage)}"` : ""}
@@ -248,7 +257,7 @@
         </article>
         <aside class="project-center-sidecard">
           <h3>当前入口说明</h3>
-          <p>空白项目初始不会自动加入章节、台词和角色，可按需要自行新建章节和场景。</p>
+          <p>想马上试玩就选 Demo 项目；想完全从零搭建，就选空白项目后自行新建章节和场景。</p>
           <div class="project-meta-row">
             <span class="project-center-pill">已发现项目 ${localProjectCount} 个</span>
             <span class="project-center-pill">默认模式可在主卡片或顶部切换</span>
