@@ -835,6 +835,152 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertEqual(payload["priority"]["message"], "正在准备新项目，请稍等...")
         self.assertEqual(payload["priority"]["toastMessages"], ["正在准备新项目，请稍等..."])
 
+    def test_playable_demo_starter_kit_failure_surfaces_and_restores_busy_state(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        create_playable_demo_project = _extract_function_source(source, "createPlayableDemoProject")
+        create_starter_kit = _extract_function_source(source, "createStarterKit")
+
+        script = textwrap.dedent(
+            f"""
+            const calls = [];
+            const statuses = [];
+            const toasts = [];
+            const failures = [];
+            const switches = [];
+            const reloads = [];
+            const API_CREATE_PROJECT = "/api/create-project";
+            const API_CREATE_CHAPTER = "/api/create-chapter";
+            const API_CREATE_STARTER_KIT = "/api/create-starter-kit";
+            const state = {{
+              projectCenterEditorMode: "beginner",
+              projectCreateInFlight: false,
+              selectedSceneId: "old-scene",
+              selectedBlockId: "old-block",
+              previewSceneId: "old-preview",
+              previewStartSceneId: "old-preview",
+              selectedCharacterId: "old-character",
+            }};
+            function blockProjectCenterOperationIfInFlight() {{
+              return false;
+            }}
+            function getSafeEditorMode(mode) {{
+              return mode === "advanced" ? "advanced" : "beginner";
+            }}
+            function getEditorModeLabel(mode) {{
+              return getSafeEditorMode(mode) === "advanced" ? "高级模式" : "新手模式";
+            }}
+            function getBlankProjectStarterDefaults() {{
+              return {{ chapterName: "第一章 开场", firstSceneName: "第一场 相遇" }};
+            }}
+            function setProjectCreateInFlight(value) {{
+              state.projectCreateInFlight = Boolean(value);
+              calls.push(["busy", state.projectCreateInFlight]);
+            }}
+            async function promptForText() {{
+              return "失败回归 Demo";
+            }}
+            async function postJson(url, payload) {{
+              calls.push(["post", url, payload]);
+              if (url === API_CREATE_PROJECT) {{
+                return {{ projectCenter: {{ projects: [] }} }};
+              }}
+              if (url === API_CREATE_CHAPTER) {{
+                return {{ sceneId: "scene_intro", scene: {{ blocks: [{{ id: "block_start" }}] }} }};
+              }}
+              if (url === API_CREATE_STARTER_KIT) {{
+                throw new Error("starter kit boom");
+              }}
+              throw new Error(`unexpected url ${{url}}`);
+            }}
+            async function loadProjectCenter() {{
+              return {{ projects: [] }};
+            }}
+            async function enterActiveProjectEditor(message) {{
+              calls.push(["enter", message]);
+              state.data = {{ project: {{ title: "失败回归 Demo" }}, chapters: [], scenes: [] }};
+            }}
+            function getCurrentUiState() {{
+              return {{}};
+            }}
+            async function reloadProjectData(payload) {{
+              reloads.push(payload);
+              state.selectedSceneId = payload.selectedSceneId;
+              state.selectedBlockId = payload.selectedBlockId;
+              state.previewSceneId = payload.previewSceneId;
+              state.previewStartSceneId = payload.previewStartSceneId;
+            }}
+            function getStarterKitOverview() {{
+              return {{
+                needsStarterKit: true,
+                missingLabels: ["角色", "背景", "BGM"],
+                missingCharacter: true,
+                missingBackground: true,
+                missingBgm: true,
+              }};
+            }}
+            function getStarterKitDefaults() {{
+              return {{ characterName: "女主角", backgroundName: "第一场背景", bgmName: "开场 BGM" }};
+            }}
+            async function showEditorOperationFailure(error) {{
+              calls.push(["editorFailure", error.message]);
+            }}
+            function handleProjectLoadFailure() {{
+              return false;
+            }}
+            async function showProjectCenterFailure(error, title, detail) {{
+              failures.push({{ message: error.message, title, detail }});
+            }}
+            function setSaveStatus(message, isError = false) {{
+              statuses.push({{ message, isError }});
+            }}
+            function showToast(message, type = null) {{
+              toasts.push({{ message, type }});
+            }}
+            function switchScreen(screen) {{
+              switches.push(screen);
+            }}
+            async function createStarterKit(options = {{}}) {create_starter_kit}
+            async function createPlayableDemoProject() {create_playable_demo_project}
+            createPlayableDemoProject().then(() => {{
+              process.stdout.write(JSON.stringify({{
+                calls,
+                statuses,
+                toasts,
+                failures,
+                switches,
+                reloads,
+                busy: state.projectCreateInFlight,
+              }}));
+            }}).catch((error) => {{
+              console.error(error);
+              process.exit(1);
+            }});
+            """
+        )
+        completed = subprocess.run(
+            ["node", "-e", script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        post_urls = [call[1] for call in payload["calls"] if call[0] == "post"]
+
+        self.assertEqual(post_urls, ["/api/create-project", "/api/create-chapter", "/api/create-starter-kit"])
+        self.assertEqual(payload["calls"][0], ["busy", True])
+        self.assertEqual(payload["calls"][-1], ["busy", False])
+        self.assertFalse(payload["busy"])
+        self.assertEqual(payload["failures"][0]["message"], "starter kit boom")
+        self.assertEqual(payload["failures"][0]["title"], "新建可试玩 Demo 失败")
+        self.assertEqual(payload["failures"][0]["detail"], "可试玩 Demo 没有创建成功")
+        self.assertEqual(payload["reloads"][0]["selectedSceneId"], "scene_intro")
+        self.assertEqual(payload["reloads"][0]["selectedBlockId"], "block_start")
+        self.assertNotIn("preview", payload["switches"])
+        self.assertFalse(any("可试玩 Demo 已生成" in status["message"] for status in payload["statuses"]))
+        self.assertEqual(payload["toasts"], [])
+
     def test_project_create_busy_state_disables_project_center_entry(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
         set_action_button_busy_state = _extract_function_source(source, "setActionButtonBusyState")

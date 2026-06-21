@@ -123,6 +123,14 @@ class FrontendProjectCenterModuleTests(unittest.TestCase):
               projectCenterOperationInFlightMessage: "正在打开项目，请稍等...",
             }});
             const emptyListHtml = tools.renderProjectCenterProjectList([], "", helpers);
+            const busyEmptyListHtml = tools.renderProjectCenterProjectList([], "", {{
+              ...helpers,
+              projectCreateInFlight: true,
+            }});
+            const lockedEmptyListHtml = tools.renderProjectCenterProjectList([], "", {{
+              ...helpers,
+              projectCenterOperationInFlightMessage: "正在打开项目，请稍等...",
+            }});
             const listHtml = tools.renderProjectCenterProjectList([
               {{
                 projectId: "project-<1>",
@@ -152,6 +160,8 @@ class FrontendProjectCenterModuleTests(unittest.TestCase):
               busyHeroHtml,
               lockedHeroHtml,
               emptyListHtml,
+              busyEmptyListHtml,
+              lockedEmptyListHtml,
               listHtml,
             }}));
             """
@@ -212,6 +222,8 @@ class FrontendProjectCenterModuleTests(unittest.TestCase):
         self.assertIn("新建默认：高级 &lt;模式&gt;", payload["heroHtml"])
         self.assertIn("新建项目默认模式", payload["heroHtml"])
         self.assertIn("只影响之后创建的空白项目", payload["heroHtml"])
+        self.assertIn("第一次建议先生成可试玩 Demo", payload["heroHtml"])
+        self.assertIn("推荐从可试玩 Demo 开始", payload["heroHtml"])
         self.assertIn('data-action="set-editor-mode"', payload["heroHtml"])
         self.assertIn('data-editor-mode="beginner"', payload["heroHtml"])
         self.assertIn('data-editor-mode="advanced"', payload["heroHtml"])
@@ -245,6 +257,18 @@ class FrontendProjectCenterModuleTests(unittest.TestCase):
         self.assertNotIn("准备中...", payload["lockedHeroHtml"])
         self.assertNotIn("刷新中...", payload["lockedHeroHtml"])
         self.assertIn("现在还是一张白纸", payload["emptyListHtml"])
+        self.assertIn("第一次建议先生成一个可试玩 Demo", payload["emptyListHtml"])
+        self.assertIn('data-action="create-playable-demo-project"', payload["emptyListHtml"])
+        self.assertIn('data-action="create-project"', payload["emptyListHtml"])
+        self.assertIn("新建可试玩 Demo", payload["emptyListHtml"])
+        self.assertIn("准备中...", payload["busyEmptyListHtml"])
+        self.assertIn('aria-busy="true"', payload["busyEmptyListHtml"])
+        self.assertIn('disabled aria-disabled="true"', payload["busyEmptyListHtml"])
+        self.assertIn("is-busy", payload["busyEmptyListHtml"])
+        self.assertIn("is-locked", payload["lockedEmptyListHtml"])
+        self.assertIn('disabled aria-disabled="true"', payload["lockedEmptyListHtml"])
+        self.assertIn('title="正在打开项目，请稍等..."', payload["lockedEmptyListHtml"])
+        self.assertNotIn('aria-busy="true"', payload["lockedEmptyListHtml"])
         self.assertIn("project-card-grid", payload["listHtml"])
         self.assertEqual(payload["listHtml"].count("project-card "), 2)
         self.assertIn("我的 &lt;企划&gt;", payload["listHtml"])

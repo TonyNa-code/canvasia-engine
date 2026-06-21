@@ -43,9 +43,10 @@
         done: hasProject,
         summary: hasProject
           ? `当前已经打开《${data.project.title}》，后续步骤会按项目进度排列。`
-          : "从项目中心创建空白项目，或打开已有项目后再继续。",
+          : "第一次建议先生成可试玩 Demo；想完全从零搭建时，再新建空白项目。",
         notes: [
-          hasProject ? "页面切换和保存操作都会基于当前项目进行。" : "空白项目不会自动填入样板剧情。",
+          hasProject ? "页面切换和保存操作都会基于当前项目进行。" : "Demo 会自动创建项目、第一章、基础素材和可预览入口。",
+          hasProject ? "可随时回项目中心切换作品或复制示例项目。" : "空白项目仍然保留，适合已经想好结构的作品。",
           "示例项目会单独显示在项目中心下方。",
         ],
         actions: hasProject
@@ -54,8 +55,8 @@
               { label: "继续留在当前项目", action: "switch-screen", dataset: { screen: "dashboard" } },
             ]
           : [
+              { label: "新建可试玩 Demo", action: "create-playable-demo-project" },
               { label: "新建空白项目", action: "create-project" },
-              { label: "刷新项目列表", action: "refresh-project-center" },
             ],
       },
       {
@@ -185,7 +186,7 @@
     if (context.activeProjectTitle) {
       return `上次打开的项目是《${context.activeProjectTitle}》。如需继续处理，可先从项目中心打开。`;
     }
-    return "还没有打开项目也没关系。先从项目中心创建空白项目，再按下面 6 步往下走。";
+    return "还没有打开项目也没关系。第一次建议先新建可试玩 Demo，再按下面 6 步往下走。";
   }
 
   function renderBeginnerTutorialStepList(steps, stepIndex, escapeHtml = String) {
@@ -275,7 +276,7 @@
     const nextStep = safeWorkflow.nextStep ?? steps.find((item) => !item.done) ?? steps[0] ?? {
       step: "第 1 步",
       title: "先创建或打开项目",
-      description: "从项目中心创建空白项目，或打开已有项目后再继续。",
+      description: "第一次建议从项目中心新建可试玩 Demo；想从零开始时，再新建空白项目。",
       actions: [{ label: "回项目中心", action: "open-project-center" }],
     };
 

@@ -197,10 +197,10 @@
             <span class="eyebrow">像真正的游戏引擎一样开始</span>
             <div>
               <h2>先选项目，再进入编辑器</h2>
-              <p>这里不再默认打开测试样板。可先创建一个空白项目，或继续已有作品。</p>
+              <p>这里不再默认打开测试样板。第一次建议先生成可试玩 Demo；想从零开始时，也可以创建空白项目。</p>
             </div>
             <div class="project-center-pill-row">
-              <span class="project-center-pill">默认从空白项目开始</span>
+              <span class="project-center-pill">推荐从可试玩 Demo 开始</span>
               <span class="project-center-pill">默认分辨率 1920 × 1080</span>
               <span class="project-center-pill">新建默认：${escape(modeLabel)}</span>
               <span class="project-center-pill">示例项目会单独列在下方，不会默认打开</span>
@@ -270,7 +270,22 @@
   }
 
   function renderProjectCenterProjectList(projects = [], activeProjectId = "", helpers = {}) {
+    const escape = getEscapeHtml(helpers);
     const projectList = Array.isArray(projects) ? projects : [];
+    const operationInFlightMessage = String(helpers.projectCenterOperationInFlightMessage ?? "").trim();
+    const isProjectCenterLocked = Boolean(operationInFlightMessage);
+    const isCreatingProject = Boolean(helpers.projectCreateInFlight);
+    const getEmptyCreateButtonClass = () =>
+      `${isCreatingProject ? "is-busy" : ""} ${!isCreatingProject && isProjectCenterLocked ? "is-locked" : ""}`.trim();
+    const getEmptyCreateButtonAttrs = () => {
+      if (isCreatingProject) {
+        return 'disabled aria-disabled="true" aria-busy="true"';
+      }
+      if (isProjectCenterLocked) {
+        return `disabled aria-disabled="true" title="${escape(operationInFlightMessage)}"`;
+      }
+      return "";
+    };
 
     return `
       <section class="panel">
@@ -283,7 +298,25 @@
             ? `
               <div class="project-card-empty">
                 <h3>现在还是一张白纸</h3>
-                <p>这正好。先点上面的“新建空白项目”，给作品起个名字，然后我们就从零开始把它搭起来。</p>
+                <p>第一次建议先生成一个可试玩 Demo，确认项目、章节、素材和试玩链路都能跑通；想完全从零搭建时，再选择空白项目。</p>
+                <div class="project-card-empty-actions">
+                  <button
+                    type="button"
+                    class="toolbar-button toolbar-button-primary ${getEmptyCreateButtonClass()}"
+                    data-action="create-playable-demo-project"
+                    ${getEmptyCreateButtonAttrs()}
+                  >
+                    ${isCreatingProject ? "准备中..." : "新建可试玩 Demo"}
+                  </button>
+                  <button
+                    type="button"
+                    class="toolbar-button ${getEmptyCreateButtonClass()}"
+                    data-action="create-project"
+                    ${getEmptyCreateButtonAttrs()}
+                  >
+                    ${isCreatingProject ? "准备中..." : "新建空白项目"}
+                  </button>
+                </div>
               </div>
             `
             : `

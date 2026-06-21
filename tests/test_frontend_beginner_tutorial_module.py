@@ -34,6 +34,11 @@ class FrontendBeginnerTutorialModuleTests(unittest.TestCase):
               previewProgress: true,
               lastExportResult: null,
             }});
+            const noProjectSteps = tools.buildBeginnerTutorialSteps({{}});
+            const noProjectContent = tools.renderBeginnerTutorialContent(noProjectSteps[0], {{
+              escapeHtml: (value) => String(value),
+              renderQuickActionButton: (action) => `<button data-action="${{action.action}}">${{action.label}}</button>`,
+            }});
             const content = tools.renderBeginnerTutorialContent(steps[0], {{
               escapeHtml: (value) => String(value).replaceAll("<", "&lt;").replaceAll(">", "&gt;"),
               renderQuickActionButton: (action) => `<button data-action="${{action.action}}">${{action.label}}</button>`,
@@ -66,6 +71,9 @@ class FrontendBeginnerTutorialModuleTests(unittest.TestCase):
             const workflowMarkup = tools.renderBeginnerDashboardWorkflow(workflow, {{
               renderQuickActionButton: quickRenderer,
             }});
+            const fallbackWorkflowMarkup = tools.renderBeginnerDashboardWorkflow(null, {{
+              renderQuickActionButton: quickRenderer,
+            }});
             const advancedMarkup = tools.renderBeginnerAdvancedToolsPanel({{
               renderQuickActionButton: quickRenderer,
             }});
@@ -96,6 +104,9 @@ class FrontendBeginnerTutorialModuleTests(unittest.TestCase):
               }}, (session) => session),
               stepCount: steps.length,
               firstDone: steps[0].done,
+              noProjectFirstDone: noProjectSteps[0].done,
+              noProjectSummary: tools.getBeginnerTutorialSummary({{}}),
+              noProjectContent,
               starterTitle: steps[3].title,
               defaultStep: tools.getBeginnerTutorialDefaultStepIndex(steps),
               clampedHigh: tools.clampBeginnerTutorialStepIndex(99, steps),
@@ -111,6 +122,7 @@ class FrontendBeginnerTutorialModuleTests(unittest.TestCase):
                 tools.getBeginnerWorkflowStepToneClass(workflow.steps[1]),
               ],
               workflowMarkup,
+              fallbackWorkflowMarkup,
               advancedMarkup,
               starterKitMarkup,
               starterKitHiddenMarkup,
@@ -133,6 +145,11 @@ class FrontendBeginnerTutorialModuleTests(unittest.TestCase):
         self.assertTrue(result["previewProgress"])
         self.assertEqual(result["stepCount"], 6)
         self.assertTrue(result["firstDone"])
+        self.assertFalse(result["noProjectFirstDone"])
+        self.assertIn("新建可试玩 Demo", result["noProjectSummary"])
+        self.assertIn("第一次建议先生成可试玩 Demo", result["noProjectContent"])
+        self.assertIn('data-action="create-playable-demo-project"', result["noProjectContent"])
+        self.assertIn('data-action="create-project"', result["noProjectContent"])
         self.assertIn("角色", result["starterTitle"])
         self.assertEqual(result["defaultStep"], 3)
         self.assertEqual(result["clampedHigh"], 5)
@@ -146,6 +163,7 @@ class FrontendBeginnerTutorialModuleTests(unittest.TestCase):
         self.assertIn("先写一句 &amp; 试玩", result["workflowMarkup"])
         self.assertIn('data-action="switch-screen"', result["workflowMarkup"])
         self.assertIn('data-em="1"', result["workflowMarkup"])
+        self.assertIn("第一次建议从项目中心新建可试玩 Demo", result["fallbackWorkflowMarkup"])
         self.assertIn("更多高级工具", result["advancedMarkup"])
         self.assertIn('data-action="set-editor-mode"', result["advancedMarkup"])
         self.assertIn("第二步起步骨架", result["starterKitMarkup"])

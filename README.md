@@ -51,7 +51,7 @@ The project already includes a visual editor, export pipeline, native runtime pr
 ## Core Features
 
 - Visual story editor with scenes, cards, dialogue, narration, choices, variables, and conditional branches
-- Project center with blank projects, beginner mode, and advanced mode
+- Project center with playable Demo projects, blank projects, beginner mode, and advanced mode
 - Asset management for backgrounds, character sprites, CGs, BGM, SFX, voice, fonts, UI assets, Live2D files, 3D models, and 3D scenes
 - Multi-language project settings for default language and player-selectable languages
 - Localized runtime text for scene names, chapter names, dialogue, choices, and character names, with safe fallback when a translation is missing
@@ -113,10 +113,10 @@ The editor only requires Python 3 for the source-based path.
 If this is your first time opening Canvasia, follow the short route below:
 
 1. Launch the editor.
-2. Create or open a project.
-3. Use the one-click starter kit to add the first character, background, and BGM.
-4. Let the starter kit wire those basics into the first scene, then replace the placeholder assets when ready.
-5. Write 10 to 20 lines, run preview, then export a Web or desktop demo.
+2. In Project Center, create a playable Demo project.
+3. Click through preview once to confirm the first scene, character, BGM, and dialogue all run.
+4. Replace the placeholder assets and lines with your own story.
+5. If you prefer a completely clean workspace, create a blank project and use the starter kit when you are ready.
 
 ### One-click scripts
 
@@ -162,7 +162,7 @@ For a first five-minute demo, start small:
 - 1 simple ending
 
 Build one complete path first, then add branches, effects, UI skins, galleries, voice, and extra polish.
-The starter kit can create the first character/background/BGM records and connect them to the first scene, so you can begin from a playable skeleton instead of wiring every card by hand.
+The playable Demo project gives you that skeleton immediately. If you start from a blank project instead, the starter kit can create the first character/background/BGM records and connect them to the first scene, so you do not have to wire every card by hand.
 
 ## Multi-language Projects
 
