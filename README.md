@@ -63,7 +63,7 @@ The project already includes a visual editor, export pipeline, native runtime pr
 - Advanced particle presets, project particle libraries, camera effects, screen filters, flashes, shakes, and fade transitions
 - Live2D / 3D character and 3D scene asset import, plus native-runtime 3D inspection reports for glTF / GLB / VRM assets
 - Web playable export, desktop exports, editor desktop builds, and native Runtime preview packages
-- Automated checks: local CI precheck, backend smoke tests, Playwright browser smoke tests, action wiring scans, release-control reports, and package integrity verification
+- Automated checks: local CI precheck, backend smoke tests, Playwright browser smoke tests, action wiring scans, release-control reports, VN baseline quality audits, and package integrity verification
 
 ## Feature Status
 
@@ -73,7 +73,7 @@ The project already includes a visual editor, export pipeline, native runtime pr
 | Asset Management | Available | Import, replace, delete, usage protection, file-size budget hints, and optional OpenAI Image generation with style presets, sprite expression binding, prompt, model, format, and returned-file validation. |
 | Multi-language / i18n | Preview | Project language settings, export metadata, Web Runtime language switching, native Runtime language switching, and fallback behavior. |
 | Canvasia Assistant | Available | Local template mode plus optional creator-owned API keys for major compatible providers. |
-| Project Safety Net | Available | Snapshots, restore, crash recovery, project doctor, repair queue, release gates, and release-control reports. |
+| Project Safety Net | Available | Snapshots, restore, crash recovery, project doctor, repair queue, release gates, release-control reports, and VN baseline quality checks for placeholder content, character sprites, backgrounds, BGM, choices, text density, and presentation polish. |
 | Game UI Customization | Available | Project UI skins, button states, nine-slice images, layout tuning, and textbox styling. |
 | Extras / Replay Systems | Available | CG, music, character, location, narration, relationship, achievement, chapter, ending, and voice replay systems. |
 | Particles and Presentation | Available | Particle presets, custom particle settings, camera, filters, flashes, shakes, fades, and character presentation effects. |

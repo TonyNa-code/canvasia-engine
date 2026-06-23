@@ -120,6 +120,59 @@ class FrontendProjectMilestonesModuleTests(unittest.TestCase):
         self.assertEqual(payload["releaseActions"], ["run-preview-regression", "export-build"])
         self.assertEqual(payload["exportDataset"], {"export-target": "web"})
 
+    def test_project_milestones_block_demo_placeholders_before_public_release(self) -> None:
+        payload = self.run_module_script(
+            """
+            const plan = tools.buildProjectMilestonePlan({
+              totalChapters: 3,
+              totalScenes: 5,
+              scenesWithContent: 5,
+              scenesWithBackground: 5,
+              scenesWithMusic: 4,
+              scenesWithEffects: 2,
+              totalDialogueCount: 20,
+              voicedDialogueCount: 14,
+              readyAssetCount: 20,
+              totalAssetCount: 20,
+              placeholderAssetCount: 2,
+              placeholderScriptCount: 3,
+              validationErrorCount: 0,
+              validationWarningCount: 0,
+              brokenRoutes: 0,
+              orphanScenes: 0,
+              hasStarterKit: true,
+              hasExport: true,
+              regressionPass: true,
+            });
+            const vertical = plan.milestones.find((milestone) => milestone.id === "vertical_slice");
+            const release = plan.milestones.find((milestone) => milestone.id === "release_candidate");
+            const verticalGap = vertical.blockers.find((check) => check.id === "demo_placeholders_replaced");
+            const releaseGap = release.blockers.find((check) => check.id === "no_demo_placeholders");
+            process.stdout.write(JSON.stringify({
+              nextTitle: plan.nextMilestone.title,
+              completedCount: plan.completedCount,
+              verticalDone: vertical.done,
+              releaseDone: release.done,
+              verticalGap,
+              releaseGap,
+              releaseAction: releaseGap.action,
+            }));
+            """
+        )
+
+        self.assertEqual(payload["nextTitle"], "体验版打磨")
+        self.assertEqual(payload["completedCount"], 1)
+        self.assertFalse(payload["verticalDone"])
+        self.assertFalse(payload["releaseDone"])
+        self.assertEqual(payload["verticalGap"]["label"], "Demo 占位内容已替换")
+        self.assertIn("待补正文 3 条", payload["verticalGap"]["detail"])
+        self.assertEqual(payload["verticalGap"]["missing"], "先把待补正文替换成正式台词。")
+        self.assertEqual(payload["verticalGap"]["action"]["action"], "switch-screen")
+        self.assertEqual(payload["verticalGap"]["action"]["screen"], "story")
+        self.assertEqual(payload["releaseGap"]["label"], "无明显 Demo 占位内容")
+        self.assertEqual(payload["releaseGap"]["missing"], "发布前把 Demo 占位素材和待补正文替换掉。")
+        self.assertEqual(payload["releaseAction"]["screen"], "story")
+
     def test_project_milestone_gap_digest_uses_current_phase_before_release(self) -> None:
         payload = self.run_module_script(
             """
@@ -440,6 +493,10 @@ class FrontendProjectMilestonesModuleTests(unittest.TestCase):
         source = APP_PATH.read_text(encoding="utf-8")
 
         self.assertIn("function serializeProjectMilestonePlan", source)
+        self.assertIn("placeholderAssetCount: overview.placeholderAssetCount", source)
+        self.assertIn("placeholderScriptCount: overview.placeholderScriptCount", source)
+        self.assertIn('asset.tags.includes("占位素材")', source)
+        self.assertIn('entry.issues ?? []).includes("placeholder")', source)
         self.assertIn("function serializeProjectMilestoneGapDigest", source)
         self.assertIn("function buildReleaseReportNextStep", source)
         self.assertIn("function formatReleaseReportNextStepActionHint", source)

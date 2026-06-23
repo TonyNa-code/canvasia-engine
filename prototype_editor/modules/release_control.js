@@ -225,6 +225,149 @@
     );
   }
 
+  function buildCreativeQualityAudit(context = {}) {
+    const quality = context.creativeQuality ?? {};
+    const storySceneCount = toCount(quality.storySceneCount);
+    const dialogueCount = toCount(quality.dialogueCount);
+    const narrationCount = toCount(quality.narrationCount);
+    const choiceCount = toCount(quality.choiceCount);
+    const characterCount = toCount(quality.characterCount);
+    const charactersWithSpriteCount = toCount(quality.charactersWithSpriteCount);
+    const characterShowCount = toCount(quality.characterShowCount);
+    const characterHideCount = toCount(quality.characterHideCount);
+    const scenesWithBackground = toCount(quality.scenesWithBackground);
+    const scenesWithMusic = toCount(quality.scenesWithMusic);
+    const scenesWithEffects = toCount(quality.scenesWithEffects);
+    const placeholderAssetCount = toCount(quality.placeholderAssetCount);
+    const placeholderScriptCount = toCount(quality.placeholderScriptCount);
+    const placeholderContentCount = placeholderAssetCount + placeholderScriptCount;
+    const textBlockCount = dialogueCount + narrationCount + choiceCount;
+    const textDensity = storySceneCount > 0 ? textBlockCount / storySceneCount : 0;
+    const steps = [];
+
+    if (placeholderContentCount > 0) {
+      steps.push({
+        tone: "warn",
+        title: "替换 Demo 占位内容",
+        statusLabel: `占位素材 ${placeholderAssetCount} 个 / 待补正文 ${placeholderScriptCount} 条`,
+        description: "这些内容最容易让玩家觉得还停在样板阶段；发布前先换成自己的正式素材和正式台词。",
+        actions: [
+          placeholderScriptCount > 0
+            ? { label: "去替换待补正文", action: "switch-screen", screen: "story" }
+            : { label: "去替换占位素材", action: "switch-screen", screen: "assets" },
+          {
+            label: "重新巡检确认",
+            action: "run-project-inspection",
+          },
+        ],
+      });
+    }
+
+    if (characterCount > 0 && charactersWithSpriteCount < characterCount) {
+      steps.push({
+        tone: "warn",
+        title: "补齐角色兜底立绘",
+        statusLabel: `已配置 ${charactersWithSpriteCount}/${characterCount} 个角色`,
+        description: "即使以后接 Live2D 或 3D，兜底立绘也能保证截图、存档、低配回退和导出包不空屏。",
+        actions: [
+          { label: "去角色页补立绘", action: "switch-screen", screen: "characters" },
+          { label: "去素材页导入立绘", action: "switch-screen", screen: "assets" },
+        ],
+      });
+    }
+
+    if (dialogueCount >= 3 && characterShowCount === 0) {
+      steps.push({
+        tone: "warn",
+        title: "补角色显示/隐藏演出",
+        statusLabel: "还没有角色出场卡",
+        description: "角色只在台词里说话但没有立绘入场，会让视觉小说的第一眼完成度偏低；先给主要角色补显示卡和位置。",
+        actions: [
+          { label: "去剧情页补角色显示", action: "switch-screen", screen: "story" },
+          { label: "检查角色立绘", action: "switch-screen", screen: "characters" },
+        ],
+      });
+    } else if (characterShowCount > 0 && characterHideCount === 0 && storySceneCount >= 2) {
+      steps.push({
+        tone: "soft",
+        title: "补角色退场节奏",
+        statusLabel: `已有 ${characterShowCount} 次出场 / 0 次隐藏`,
+        description: "角色入场后适当退场，能减少后面场景立绘状态混乱，也方便做切场和分支。",
+        actions: [
+          { label: "去剧情页补隐藏卡", action: "switch-screen", screen: "story" },
+          { label: "打开试玩确认", action: "switch-screen", screen: "preview" },
+        ],
+      });
+    }
+
+    if (storySceneCount > 0 && scenesWithBackground < storySceneCount) {
+      steps.push({
+        tone: "warn",
+        title: "补齐场景背景覆盖",
+        statusLabel: `已有背景 ${scenesWithBackground}/${storySceneCount} 场`,
+        description: "有正文却没有背景的场景会显得像未完成草稿；发布前至少给每个有内容的场景一张背景。",
+        actions: [
+          { label: "只看缺背景场景", action: "set-route-map-filter", dataset: { "route-filter": "missing_background" } },
+          { label: "去素材页补背景", action: "switch-screen", screen: "assets" },
+        ],
+      });
+    }
+
+    if (storySceneCount > 0 && scenesWithMusic < Math.max(1, Math.ceil(storySceneCount * 0.6))) {
+      steps.push({
+        tone: "soft",
+        title: "补关键场景 BGM 规划",
+        statusLabel: `已有 BGM ${scenesWithMusic}/${storySceneCount} 场`,
+        description: "不一定每一场都要换曲，但至少开场、情绪转折和结尾最好有明确 BGM 范围，避免音乐机械地一首接一首。",
+        actions: [
+          { label: "只看缺 BGM 场景", action: "set-route-map-filter", dataset: { "route-filter": "missing_music" } },
+          { label: "去剧情页补音乐卡", action: "switch-screen", screen: "story" },
+        ],
+      });
+    }
+
+    if (storySceneCount >= 2 && choiceCount === 0) {
+      steps.push({
+        tone: "soft",
+        title: "补一个玩家选择节点",
+        statusLabel: "还没有选项分支",
+        description: "如果作品不是纯线性短篇，至少给 Demo 放一个选择节点，会更像可玩的视觉小说而不是只读脚本。",
+        actions: [
+          { label: "去剧情页加选项", action: "switch-screen", screen: "story" },
+          { label: "查看路线图", action: "switch-screen", screen: "dashboard" },
+        ],
+      });
+    }
+
+    if (storySceneCount >= 2 && textDensity < 2) {
+      steps.push({
+        tone: "soft",
+        title: "补一点正文密度",
+        statusLabel: `平均每场 ${textDensity.toFixed(1)} 张正文卡`,
+        description: "场景已经搭起来但正文偏少时，玩家会很快跑完；发布前可以先补每场开场句、角色反应和收束句。",
+        actions: [
+          { label: "去剧情页补正文", action: "switch-screen", screen: "story" },
+          { label: "打开台本总览", action: "switch-screen", screen: "script" },
+        ],
+      });
+    }
+
+    if (storySceneCount >= 3 && scenesWithEffects === 0) {
+      steps.push({
+        tone: "soft",
+        title: "补基础演出点缀",
+        statusLabel: "还没有镜头/滤镜/粒子演出",
+        description: "哪怕只在关键句加一次淡入、镜头推近、粒子或滤镜，也会明显提升 Demo 的第一眼完成度。",
+        actions: [
+          { label: "去剧情页加演出卡", action: "switch-screen", screen: "story" },
+          { label: "打开台本演出灵感", action: "switch-screen", screen: "script" },
+        ],
+      });
+    }
+
+    return steps;
+  }
+
   function buildReleaseFixOrder(context = {}) {
     const routeMetrics = context.routeMetrics ?? context.routeOverview?.metrics ?? {};
     const resolution = normalizeResolution(context.resolution);
@@ -297,6 +440,8 @@
         ],
       });
     }
+
+    steps.push(...buildCreativeQualityAudit(context));
 
     if (mediaBudgetCount > 0) {
       const largest = mediaBudgetReport.largest ?? null;
@@ -446,6 +591,7 @@
     buildFinalPublishGate,
     splitReleaseWarnings,
     isDesktopExportReady,
+    buildCreativeQualityAudit,
     buildReleaseFixOrder,
   });
 })(typeof window !== "undefined" ? window : globalThis);

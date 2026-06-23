@@ -126,6 +126,9 @@
     const validationWarningCount = toCount(context.validationWarningCount);
     const brokenRoutes = toCount(context.brokenRoutes);
     const orphanScenes = toCount(context.orphanScenes);
+    const placeholderAssetCount = toCount(context.placeholderAssetCount);
+    const placeholderScriptCount = toCount(context.placeholderScriptCount);
+    const placeholderContentCount = placeholderAssetCount + placeholderScriptCount;
     const hasStarterKit = context.hasStarterKit === true;
     const hasExport = context.hasExport === true;
     const regressionPass = context.regressionPass === true;
@@ -141,6 +144,11 @@
       writeStory: createAction("去写正文", "switch-screen", { screen: "story" }),
       assets: createAction("打开素材页", "switch-screen", { screen: "assets" }),
       starterKit: createAction("生成起步骨架", "create-starter-kit"),
+      replacePlaceholders: createAction(
+        placeholderScriptCount > 0 ? "替换待补正文" : "替换占位素材",
+        "switch-screen",
+        { screen: placeholderScriptCount > 0 ? "story" : "assets" }
+      ),
       inspection: createAction("打开项目巡检", "switch-screen", { screen: "inspection" }),
       preview: createAction("去试玩导出", "switch-screen", { screen: "preview" }),
       regression: createAction("运行回归试玩", "run-preview-regression"),
@@ -252,6 +260,21 @@
             action: actions.assets,
           }),
           createCheck({
+            id: "demo_placeholders_replaced",
+            label: "Demo 占位内容已替换",
+            done: placeholderContentCount === 0,
+            detail:
+              placeholderContentCount === 0
+                ? "没有明显占位素材或待补正文"
+                : `占位素材 ${placeholderAssetCount} 个 / 待补正文 ${placeholderScriptCount} 条`,
+            missing:
+              placeholderScriptCount > 0
+                ? "先把待补正文替换成正式台词。"
+                : "先把可试玩 Demo 的占位素材换成正式素材。",
+            weight: 2,
+            action: actions.replacePlaceholders,
+          }),
+          createCheck({
             id: "warning_budget",
             label: "提醒项可控",
             done: validationWarningCount <= 5,
@@ -303,6 +326,18 @@
             missing: "把素材真实文件补到 90% 以上。",
             weight: 2,
             action: actions.assets,
+          }),
+          createCheck({
+            id: "no_demo_placeholders",
+            label: "无明显 Demo 占位内容",
+            done: placeholderContentCount === 0,
+            detail:
+              placeholderContentCount === 0
+                ? "没有明显占位内容"
+                : `占位素材 ${placeholderAssetCount} 个 / 待补正文 ${placeholderScriptCount} 条`,
+            missing: "发布前把 Demo 占位素材和待补正文替换掉。",
+            weight: 2,
+            action: actions.replacePlaceholders,
           }),
           createCheck({
             id: "voice_optional_polish",

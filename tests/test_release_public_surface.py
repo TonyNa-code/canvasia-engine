@@ -96,6 +96,51 @@ def collect_public_surface_findings(path: Path, text: str) -> list[str]:
 
 
 class ReleasePublicSurfaceTests(unittest.TestCase):
+    def test_public_onboarding_copy_stays_demo_first(self) -> None:
+        surfaces = {
+            "README.md": (ROOT_DIR / "README.md").read_text(encoding="utf-8"),
+            "README.zh-CN.md": (ROOT_DIR / "README.zh-CN.md").read_text(encoding="utf-8"),
+            "README.ja-JP.md": (ROOT_DIR / "README.ja-JP.md").read_text(encoding="utf-8"),
+            "docs/creator_quick_start_zh-CN.md": (ROOT_DIR / "docs" / "creator_quick_start_zh-CN.md").read_text(
+                encoding="utf-8"
+            ),
+            "docs/index.html": (ROOT_DIR / "docs" / "index.html").read_text(encoding="utf-8"),
+            "prototype_editor/modules/project_center.js": (
+                ROOT_DIR / "prototype_editor" / "modules" / "project_center.js"
+            ).read_text(encoding="utf-8"),
+            "prototype_editor/modules/beginner_tutorial.js": (
+                ROOT_DIR / "prototype_editor" / "modules" / "beginner_tutorial.js"
+            ).read_text(encoding="utf-8"),
+        }
+
+        expected_snippets = {
+            "README.md": ["create a playable Demo project", "create a blank project"],
+            "README.zh-CN.md": ["新建“可试玩 Demo”", "新建空白项目"],
+            "README.ja-JP.md": ["プレイ可能な Demo プロジェクト", "空白プロジェクト"],
+            "docs/creator_quick_start_zh-CN.md": ["新建可试玩 Demo", "替换或上传背景、人物、音乐"],
+            "docs/index.html": ["View Preview Releases"],
+            "prototype_editor/modules/project_center.js": ["推荐从可试玩 Demo 开始", "新建空白项目"],
+            "prototype_editor/modules/beginner_tutorial.js": ["第一次建议先生成可试玩 Demo", "新建空白项目"],
+        }
+        stale_first_run_copy = (
+            "Create or open a project.",
+            "从“项目中心”新建空白项目。",
+            "点“新建空白项目”。",
+            "默认从空白项目开始",
+            "可先创建一个空白项目，或继续已有作品。",
+            "空のプロジェクトでは、まず starter kit",
+            "Download Preview",
+        )
+
+        for relative_path, snippets in expected_snippets.items():
+            text = surfaces[relative_path]
+            for snippet in snippets:
+                self.assertIn(snippet, text, f"{relative_path} should keep Demo-first onboarding copy aligned")
+
+        joined_surface = "\n".join(surfaces.values())
+        for stale_copy in stale_first_run_copy:
+            self.assertNotIn(stale_copy, joined_surface)
+
     def test_public_release_surface_has_no_draft_or_internal_copy(self) -> None:
         findings: list[str] = []
         for path in iter_public_text_files():

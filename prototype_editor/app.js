@@ -10144,6 +10144,8 @@ function buildProjectMilestoneContext(routeOverview, overview = buildDashboardPr
     voicedDialogueCount: overview.voicedDialogueCount,
     readyAssetCount: overview.readyAssetCount,
     totalAssetCount: overview.totalAssetCount,
+    placeholderAssetCount: overview.placeholderAssetCount,
+    placeholderScriptCount: overview.placeholderScriptCount,
     validationErrorCount: state.validation.errors.length,
     validationWarningCount: state.validation.warnings.length,
     brokenRoutes: routeOverview.metrics.brokenRoutes,
@@ -10624,6 +10626,10 @@ function buildDashboardProductionOverview(routeOverview) {
   const flatScenes = scenes.filter((scene) => hasStoryContent(scene) && !hasEffects(scene));
   const voicedDialogueCount = dialogueEntries.filter((entry) => entry.voiceStatus === "voiced").length;
   const readyAssetCount = assetList.filter((asset) => asset.fileExists).length;
+  const placeholderAssetCount = assetList.filter(
+    (asset) => Array.isArray(asset.tags) && asset.tags.includes("占位素材")
+  ).length;
+  const placeholderScriptCount = issueEntries.filter((entry) => (entry.issues ?? []).includes("placeholder")).length;
   const unusedAssets = getUnusedAssets();
   const directionIdeaCount = buildScriptDirectionIdeas(scriptEntries).length;
   const storyProgress = getDashboardProgressPercent(scenesWithContent.length, scenes.length);
@@ -10646,6 +10652,8 @@ function buildDashboardProductionOverview(routeOverview) {
     totalScenes: scenes.length,
     totalDialogueCount: dialogueEntries.length,
     totalAssetCount: assetList.length,
+    placeholderAssetCount,
+    placeholderScriptCount,
     scenesWithContent: scenesWithContent.length,
     scenesWithBackground: scenesWithBackground.length,
     scenesWithMusic: scenesWithMusic.length,
@@ -28751,6 +28759,64 @@ function exportReleaseControlJsonReport() {
   showToast(`发布总控 JSON 已导出：${fileName}`);
 }
 
+function getCharacterPrimarySpriteAssetId(character) {
+  const presentation = character?.presentation ?? {};
+  const expressionSpriteId = (character?.expressions ?? []).find((expression) => expression?.spriteAssetId)?.spriteAssetId ?? "";
+  return presentation.fallbackSpriteAssetId || character?.defaultSpriteId || expressionSpriteId || "";
+}
+
+function buildReleaseCreativeQualityContext() {
+  const data = state.data ?? {};
+  const chapters = data.chapters ?? [];
+  const scenes = chapters.flatMap((chapter) => chapter.scenes ?? []);
+  const characters = data.characters ?? [];
+  const assetsById = data.assetsById ?? new Map();
+  const assetList = data.assetList ?? [];
+  const scriptEntries = analyzeScriptEntries(buildScriptEntries());
+  const effectBlockTypes = new Set([
+    "particle_effect",
+    "screen_shake",
+    "screen_flash",
+    "screen_fade",
+    "camera_zoom",
+    "camera_pan",
+    "screen_filter",
+    "depth_blur",
+  ]);
+  const storyScenes = scenes.filter((scene) =>
+    (scene.blocks ?? []).some((block) => ["dialogue", "narration", "choice"].includes(block.type))
+  );
+  const storySceneBlocks = storyScenes.flatMap((scene) => scene.blocks ?? []);
+
+  return {
+    storySceneCount: storyScenes.length,
+    dialogueCount: scriptEntries.filter((entry) => entry.type === "dialogue").length,
+    narrationCount: scriptEntries.filter((entry) => entry.type === "narration").length,
+    choiceCount: scriptEntries.filter((entry) => entry.type === "choice").length,
+    characterCount: characters.length,
+    charactersWithSpriteCount: characters.filter((character) => {
+      const assetId = getCharacterPrimarySpriteAssetId(character);
+      const asset = assetId ? assetsById.get(assetId) : null;
+      return Boolean(assetId && (!asset || asset.fileExists));
+    }).length,
+    characterShowCount: storySceneBlocks.filter((block) => block.type === "character_show" && block.characterId).length,
+    characterHideCount: storySceneBlocks.filter((block) => block.type === "character_hide" && block.characterId).length,
+    scenesWithBackground: storyScenes.filter((scene) =>
+      (scene.blocks ?? []).some((block) => block.type === "background" && block.assetId)
+    ).length,
+    scenesWithMusic: storyScenes.filter((scene) =>
+      (scene.blocks ?? []).some((block) => block.type === "music_play" && block.assetId)
+    ).length,
+    scenesWithEffects: storyScenes.filter((scene) =>
+      (scene.blocks ?? []).some((block) => effectBlockTypes.has(block.type))
+    ).length,
+    placeholderAssetCount: assetList.filter(
+      (asset) => Array.isArray(asset.tags) && asset.tags.includes("占位素材")
+    ).length,
+    placeholderScriptCount: scriptEntries.filter((entry) => (entry.issues ?? []).includes("placeholder")).length,
+  };
+}
+
 function buildReleaseFixOrder(routeOverview) {
   if (releaseControlTools?.buildReleaseFixOrder) {
     const project = state.data?.project ?? {};
@@ -28778,6 +28844,7 @@ function buildReleaseFixOrder(routeOverview) {
       mediaBudgetReport: buildAssetMediaBudgetReport(),
       unusedAssetCount: getUnusedAssets().length,
       exportResult: state.lastExportResult,
+      creativeQuality: buildReleaseCreativeQualityContext(),
     });
   }
 
