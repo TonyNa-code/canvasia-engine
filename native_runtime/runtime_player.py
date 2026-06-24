@@ -5439,6 +5439,21 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
         for asset in assets
         if isinstance(asset, dict) and asset.get("type") == "cg" and str(asset.get("id") or "").strip()
     }
+    bgm_asset_ids = {
+        str(asset.get("id"))
+        for asset in assets
+        if isinstance(asset, dict) and asset.get("type") in {"bgm", "audio"} and str(asset.get("id") or "").strip()
+    }
+    sfx_asset_ids = {
+        str(asset.get("id"))
+        for asset in assets
+        if isinstance(asset, dict) and asset.get("type") == "sfx" and str(asset.get("id") or "").strip()
+    }
+    voice_asset_ids = {
+        str(asset.get("id"))
+        for asset in assets
+        if isinstance(asset, dict) and asset.get("type") == "voice" and str(asset.get("id") or "").strip()
+    }
     variables, variables_by_id, duplicate_variable_ids = get_export_variable_map(payload)
     characters_doc = payload.get("characters") if isinstance(payload.get("characters"), dict) else {}
     characters = characters_doc.get("characters") if isinstance(characters_doc.get("characters"), list) else []
@@ -5520,10 +5535,15 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
     music_scoped_count = 0
     music_fade_in_count = 0
     music_fade_out_count = 0
+    music_used_asset_ids: set[str] = set()
+    missing_music_asset_count = 0
+    missing_music_asset_names: list[str] = []
     dialogue_voice_count = 0
     narration_voice_count = 0
+    voice_used_asset_ids: set[str] = set()
     missing_voice_asset_count = 0
     missing_voice_asset_names: list[str] = []
+    sfx_used_asset_ids: set[str] = set()
     text_block_count = 0
     total_text_chars = 0
     long_text_block_count = 0
@@ -5552,6 +5572,7 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
                 voice_asset_id = str(block.get("voiceAssetId") or "").strip()
                 if voice_asset_id:
                     dialogue_voice_count += 1
+                    voice_used_asset_ids.add(voice_asset_id)
                     voice_asset = assets_by_id.get(voice_asset_id)
                     if not voice_asset or not get_asset_runtime_path(bundle_dir, voice_asset):
                         missing_voice_asset_count += 1
@@ -5561,6 +5582,7 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
                 voice_asset_id = str(block.get("voiceAssetId") or "").strip()
                 if voice_asset_id:
                     narration_voice_count += 1
+                    voice_used_asset_ids.add(voice_asset_id)
                     voice_asset = assets_by_id.get(voice_asset_id)
                     if not voice_asset or not get_asset_runtime_path(bundle_dir, voice_asset):
                         missing_voice_asset_count += 1
@@ -5696,6 +5718,13 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             elif block_type == "music_play":
                 scene_has_music = True
                 music_play_count += 1
+                music_asset_id = str(block.get("assetId") or "").strip()
+                if music_asset_id:
+                    music_used_asset_ids.add(music_asset_id)
+                music_asset = assets_by_id.get(music_asset_id) if music_asset_id else None
+                if not music_asset or not get_asset_runtime_path(bundle_dir, music_asset):
+                    missing_music_asset_count += 1
+                    missing_music_asset_names.append(str(block.get("id") or music_asset_id or "未命名音乐卡"))
                 if get_safe_audio_fade_ms(block.get("fadeInMs"), 0) > 0:
                     music_fade_in_count += 1
                 if get_safe_audio_fade_ms(block.get("fadeOutMs"), 0) > 0:
@@ -5709,6 +5738,8 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             elif block_type == "sfx_play":
                 sfx_play_count += 1
                 sfx_asset_id = str(block.get("assetId") or "").strip()
+                if sfx_asset_id:
+                    sfx_used_asset_ids.add(sfx_asset_id)
                 sfx_asset = assets_by_id.get(sfx_asset_id) if sfx_asset_id else None
                 if not sfx_asset or not get_asset_runtime_path(bundle_dir, sfx_asset):
                     missing_sfx_asset_count += 1
@@ -5776,6 +5807,21 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
     unused_cg_asset_names = [
         str((assets_by_id.get(asset_id) or {}).get("name") or asset_id)
         for asset_id in unused_cg_asset_ids
+    ]
+    unused_bgm_asset_ids = sorted(bgm_asset_ids - music_used_asset_ids)
+    unused_bgm_asset_names = [
+        str((assets_by_id.get(asset_id) or {}).get("name") or asset_id)
+        for asset_id in unused_bgm_asset_ids
+    ]
+    unused_sfx_asset_ids = sorted(sfx_asset_ids - sfx_used_asset_ids)
+    unused_sfx_asset_names = [
+        str((assets_by_id.get(asset_id) or {}).get("name") or asset_id)
+        for asset_id in unused_sfx_asset_ids
+    ]
+    unused_voice_asset_ids = sorted(voice_asset_ids - voice_used_asset_ids)
+    unused_voice_asset_names = [
+        str((assets_by_id.get(asset_id) or {}).get("name") or asset_id)
+        for asset_id in unused_voice_asset_ids
     ]
     scene_count = len(scenes)
     text_density = round(text_block_count / scene_count, 2) if scene_count else 0.0
@@ -5891,6 +5937,15 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             "存在已绑定但缺失的语音文件",
             f"检测到 {missing_voice_asset_count} 条台词/旁白绑定了语音，但文件没有进入原生包：{', '.join(missing_voice_asset_names[:3])}",
             "重新导入或替换缺失语音素材，再导出原生 Runtime，避免玩家点开后听不到应有配音。",
+        )
+    if missing_music_asset_count:
+        add_vn_baseline_issue(
+            issues,
+            "warn",
+            "bgm_asset_missing",
+            "存在缺失的 BGM 文件",
+            f"检测到 {missing_music_asset_count} 张 BGM 播放卡片没有可用文件：{', '.join(missing_music_asset_names[:3])}",
+            "重新导入或替换缺失 BGM 素材，再导出原生 Runtime，避免章节开头、情绪段落或切歌点静默失效。",
         )
     if missing_background_asset_count:
         add_vn_baseline_issue(
@@ -6154,6 +6209,33 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             f"检测到 {len(unused_cg_asset_ids)} 张 CG 素材没有被背景/CG 卡引用：{', '.join(unused_cg_asset_names[:3])}",
             "把正式 CG 放进对应场景，或先移出发布包；否则 CG 回想馆会缺少可解锁内容，看起来像功能没有做完。",
         )
+    if unused_bgm_asset_ids:
+        add_vn_baseline_issue(
+            issues,
+            "soft",
+            "bgm_asset_unused",
+            "部分 BGM 素材还没有进入剧情",
+            f"检测到 {len(unused_bgm_asset_ids)} 首 BGM 没有被播放卡引用：{', '.join(unused_bgm_asset_names[:3])}",
+            "把正式曲目放进对应章节或先移出发布包；否则音乐鉴赏和发布包体都会显得没有整理干净。",
+        )
+    if unused_sfx_asset_ids:
+        add_vn_baseline_issue(
+            issues,
+            "soft",
+            "sfx_asset_unused",
+            "部分音效素材还没有进入剧情",
+            f"检测到 {len(unused_sfx_asset_ids)} 个音效没有被播放卡引用：{', '.join(unused_sfx_asset_names[:3])}",
+            "把正式音效放到点击、脚步、门铃或关键演出点；如果只是临时素材，发布前建议移出包体。",
+        )
+    if unused_voice_asset_ids:
+        add_vn_baseline_issue(
+            issues,
+            "soft",
+            "voice_asset_unused",
+            "部分语音素材还没有绑定台词",
+            f"检测到 {len(unused_voice_asset_ids)} 条语音没有被台词/旁白引用：{', '.join(unused_voice_asset_names[:3])}",
+            "把语音绑定到对应台词或先移出发布包；否则语音回听馆会缺内容，玩家也可能以为配音漏接。",
+        )
     if scene_count >= 2 and ending_scene_count and credits_roll_count == 0:
         add_vn_baseline_issue(
             issues,
@@ -6324,12 +6406,22 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             "musicScopedCount": music_scoped_count,
             "musicFadeInCount": music_fade_in_count,
             "musicFadeOutCount": music_fade_out_count,
+            "bgmAssetCount": len(bgm_asset_ids),
+            "bgmUsedAssetCount": len(music_used_asset_ids & bgm_asset_ids),
+            "unusedBgmAssetCount": len(unused_bgm_asset_ids),
+            "missingMusicAssetCount": missing_music_asset_count,
             "voiceEligibleLineCount": voice_eligible_line_count,
             "voiceBoundLineCount": voice_bound_line_count,
             "dialogueVoiceCount": dialogue_voice_count,
             "narrationVoiceCount": narration_voice_count,
             "voiceCoveragePercent": voice_coverage_percent,
             "missingVoiceAssetCount": missing_voice_asset_count,
+            "voiceAssetCount": len(voice_asset_ids),
+            "voiceUsedAssetCount": len(voice_used_asset_ids & voice_asset_ids),
+            "unusedVoiceAssetCount": len(unused_voice_asset_ids),
+            "sfxAssetCount": len(sfx_asset_ids),
+            "sfxUsedAssetCount": len(sfx_used_asset_ids & sfx_asset_ids),
+            "unusedSfxAssetCount": len(unused_sfx_asset_ids),
             "entrySceneExists": entry_scene_id in valid_scene_ids,
             "routeTargetMissingCount": len(missing_route_targets),
             "unreachableSceneCount": len(unreachable_scene_ids),
@@ -6361,6 +6453,7 @@ def render_native_runtime_vn_baseline_quality_markdown(report: dict) -> str:
         ("无动作选项", metrics.get("noActionChoiceOptionCount")),
         ("拥挤选项卡", metrics.get("crowdedChoiceBlockCount")),
         ("音效点 / 缺失音效", f"{int(metrics.get('sfxPlayCount') or 0)} / {int(metrics.get('missingSfxAssetCount') or 0)}"),
+        ("音效素材 / 已入剧情 / 未使用", f"{int(metrics.get('sfxAssetCount') or 0)} / {int(metrics.get('sfxUsedAssetCount') or 0)} / {int(metrics.get('unusedSfxAssetCount') or 0)}"),
         ("视频素材 / 播放卡 / 缺失视频", f"{int(metrics.get('videoAssetCount') or 0)} / {int(metrics.get('videoPlayCount') or 0)} / {int(metrics.get('missingVideoAssetCount') or 0)}"),
         ("结局 / 片尾字幕 / 字幕行", f"{int(metrics.get('endingSceneCount') or 0)} / {int(metrics.get('creditsRollCount') or 0)} / {int(metrics.get('creditsLineCount') or 0)}"),
         ("空片尾 / 过短片尾", f"{int(metrics.get('emptyCreditsRollCount') or 0)} / {int(metrics.get('shortCreditsRollCount') or 0)}"),
@@ -6378,9 +6471,11 @@ def render_native_runtime_vn_baseline_quality_markdown(report: dict) -> str:
         ("BGM 播放 / 停止", f"{int(metrics.get('musicPlayCount') or 0)} / {int(metrics.get('musicStopCount') or 0)}"),
         ("BGM 淡入 / 淡出", f"{int(metrics.get('musicFadeInCount') or 0)} / {int(metrics.get('musicFadeOutCount') or 0)}"),
         ("BGM 明确范围", metrics.get("musicScopedCount")),
+        ("BGM 素材 / 已入剧情 / 未使用 / 缺失", f"{int(metrics.get('bgmAssetCount') or 0)} / {int(metrics.get('bgmUsedAssetCount') or 0)} / {int(metrics.get('unusedBgmAssetCount') or 0)} / {int(metrics.get('missingMusicAssetCount') or 0)}"),
         ("语音覆盖", f"{format_markdown_value(metrics.get('voiceCoveragePercent'), '0')}%"),
         ("语音绑定 / 可配音文本", f"{int(metrics.get('voiceBoundLineCount') or 0)} / {int(metrics.get('voiceEligibleLineCount') or 0)}"),
         ("缺失语音文件", metrics.get("missingVoiceAssetCount")),
+        ("语音素材 / 已入剧情 / 未使用", f"{int(metrics.get('voiceAssetCount') or 0)} / {int(metrics.get('voiceUsedAssetCount') or 0)} / {int(metrics.get('unusedVoiceAssetCount') or 0)}"),
         ("入口场景有效", "是" if metrics.get("entrySceneExists") else "否"),
         ("路线缺失目标", metrics.get("routeTargetMissingCount")),
         ("入口不可达场景", metrics.get("unreachableSceneCount")),
@@ -6672,6 +6767,7 @@ def render_native_runtime_release_control_markdown(payload: dict) -> str:
             ("无动作选项", vn_metrics.get("noActionChoiceOptionCount")),
             ("拥挤选项卡", vn_metrics.get("crowdedChoiceBlockCount")),
             ("音效点 / 缺失音效", f"{int(vn_metrics.get('sfxPlayCount') or 0)} / {int(vn_metrics.get('missingSfxAssetCount') or 0)}"),
+            ("音效素材 / 已入剧情 / 未使用", f"{int(vn_metrics.get('sfxAssetCount') or 0)} / {int(vn_metrics.get('sfxUsedAssetCount') or 0)} / {int(vn_metrics.get('unusedSfxAssetCount') or 0)}"),
             ("视频素材 / 播放卡 / 缺失视频", f"{int(vn_metrics.get('videoAssetCount') or 0)} / {int(vn_metrics.get('videoPlayCount') or 0)} / {int(vn_metrics.get('missingVideoAssetCount') or 0)}"),
             ("结局 / 片尾字幕 / 字幕行", f"{int(vn_metrics.get('endingSceneCount') or 0)} / {int(vn_metrics.get('creditsRollCount') or 0)} / {int(vn_metrics.get('creditsLineCount') or 0)}"),
             ("空片尾 / 过短片尾", f"{int(vn_metrics.get('emptyCreditsRollCount') or 0)} / {int(vn_metrics.get('shortCreditsRollCount') or 0)}"),
@@ -6689,9 +6785,11 @@ def render_native_runtime_release_control_markdown(payload: dict) -> str:
             ("BGM 播放 / 停止", f"{int(vn_metrics.get('musicPlayCount') or 0)} / {int(vn_metrics.get('musicStopCount') or 0)}"),
             ("BGM 淡入 / 淡出", f"{int(vn_metrics.get('musicFadeInCount') or 0)} / {int(vn_metrics.get('musicFadeOutCount') or 0)}"),
             ("BGM 明确范围", vn_metrics.get("musicScopedCount")),
+            ("BGM 素材 / 已入剧情 / 未使用 / 缺失", f"{int(vn_metrics.get('bgmAssetCount') or 0)} / {int(vn_metrics.get('bgmUsedAssetCount') or 0)} / {int(vn_metrics.get('unusedBgmAssetCount') or 0)} / {int(vn_metrics.get('missingMusicAssetCount') or 0)}"),
             ("语音覆盖", f"{format_markdown_value(vn_metrics.get('voiceCoveragePercent'), '0')}%"),
             ("语音绑定 / 可配音文本", f"{int(vn_metrics.get('voiceBoundLineCount') or 0)} / {int(vn_metrics.get('voiceEligibleLineCount') or 0)}"),
             ("缺失语音文件", vn_metrics.get("missingVoiceAssetCount")),
+            ("语音素材 / 已入剧情 / 未使用", f"{int(vn_metrics.get('voiceAssetCount') or 0)} / {int(vn_metrics.get('voiceUsedAssetCount') or 0)} / {int(vn_metrics.get('unusedVoiceAssetCount') or 0)}"),
             ("入口场景有效", "是" if vn_metrics.get("entrySceneExists") else "否"),
             ("路线缺失目标", vn_metrics.get("routeTargetMissingCount")),
             ("入口不可达场景", vn_metrics.get("unreachableSceneCount")),

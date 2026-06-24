@@ -297,6 +297,80 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             self.assertIn("多首 BGM 缺少明确范围", markdown)
             self.assertIn("BGM 播放 / 停止", markdown)
 
+    def test_vn_baseline_quality_report_flags_audio_asset_usage_gaps(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_dir = Path(temp_dir) / "bundle"
+            bundle_dir.mkdir(parents=True)
+            bgm_path = bundle_dir / "assets" / "bgm" / "main.ogg"
+            unused_bgm_path = bundle_dir / "assets" / "bgm" / "unused.ogg"
+            sfx_path = bundle_dir / "assets" / "sfx" / "door.ogg"
+            unused_sfx_path = bundle_dir / "assets" / "sfx" / "unused.ogg"
+            voice_path = bundle_dir / "assets" / "voices" / "line.ogg"
+            unused_voice_path = bundle_dir / "assets" / "voices" / "unused.ogg"
+            for path in [bgm_path, unused_bgm_path, sfx_path, unused_sfx_path, voice_path, unused_voice_path]:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(b"fake-audio")
+            game_data = {
+                "project": {
+                    "projectId": "native_audio_usage_quality_smoke",
+                    "title": "Native Audio Usage Quality Smoke",
+                    "entrySceneId": "scene_audio",
+                },
+                "assets": {
+                    "assets": [
+                        {"id": "bgm_used", "type": "bgm", "name": "Main Theme", "exportUrl": bgm_path.relative_to(bundle_dir).as_posix()},
+                        {"id": "bgm_unused", "type": "bgm", "name": "Unused Theme", "exportUrl": unused_bgm_path.relative_to(bundle_dir).as_posix()},
+                        {"id": "sfx_used", "type": "sfx", "name": "Door", "exportUrl": sfx_path.relative_to(bundle_dir).as_posix()},
+                        {"id": "sfx_unused", "type": "sfx", "name": "Unused SFX", "exportUrl": unused_sfx_path.relative_to(bundle_dir).as_posix()},
+                        {"id": "voice_used", "type": "voice", "name": "Line Voice", "exportUrl": voice_path.relative_to(bundle_dir).as_posix()},
+                        {"id": "voice_unused", "type": "voice", "name": "Unused Voice", "exportUrl": unused_voice_path.relative_to(bundle_dir).as_posix()},
+                    ]
+                },
+                "characters": {"characters": []},
+                "chapters": [
+                    {
+                        "id": "chapter_1",
+                        "name": "Chapter 1",
+                        "scenes": [
+                            {
+                                "id": "scene_audio",
+                                "name": "Audio",
+                                "blocks": [
+                                    {"id": "music_ok", "type": "music_play", "assetId": "bgm_used", "fadeInMs": 600},
+                                    {"id": "music_missing", "type": "music_play", "assetId": "bgm_missing"},
+                                    {"id": "sfx_ok", "type": "sfx_play", "assetId": "sfx_used"},
+                                    {"id": "line_1", "type": "dialogue", "text": "Audio check.", "voiceAssetId": "voice_used"},
+                                ],
+                            }
+                        ],
+                    }
+                ],
+            }
+            (bundle_dir / "game_data.json").write_text(json.dumps(game_data, ensure_ascii=False), encoding="utf-8")
+
+            report = build_native_runtime_vn_baseline_quality_report(bundle_dir)
+
+            self.assertEqual(report["metrics"]["bgmAssetCount"], 2)
+            self.assertEqual(report["metrics"]["bgmUsedAssetCount"], 1)
+            self.assertEqual(report["metrics"]["unusedBgmAssetCount"], 1)
+            self.assertEqual(report["metrics"]["missingMusicAssetCount"], 1)
+            self.assertEqual(report["metrics"]["sfxAssetCount"], 2)
+            self.assertEqual(report["metrics"]["sfxUsedAssetCount"], 1)
+            self.assertEqual(report["metrics"]["unusedSfxAssetCount"], 1)
+            self.assertEqual(report["metrics"]["voiceAssetCount"], 2)
+            self.assertEqual(report["metrics"]["voiceUsedAssetCount"], 1)
+            self.assertEqual(report["metrics"]["unusedVoiceAssetCount"], 1)
+            issue_codes = {issue["code"] for issue in report["issues"]}
+            self.assertIn("bgm_asset_missing", issue_codes)
+            self.assertIn("bgm_asset_unused", issue_codes)
+            self.assertIn("sfx_asset_unused", issue_codes)
+            self.assertIn("voice_asset_unused", issue_codes)
+
+            markdown = render_native_runtime_vn_baseline_quality_markdown(report)
+            self.assertIn("BGM 素材 / 已入剧情 / 未使用 / 缺失", markdown)
+            self.assertIn("音效素材 / 已入剧情 / 未使用", markdown)
+            self.assertIn("语音素材 / 已入剧情 / 未使用", markdown)
+
     def test_vn_baseline_quality_report_flags_voice_binding_gaps(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             bundle_dir = Path(temp_dir) / "bundle"
