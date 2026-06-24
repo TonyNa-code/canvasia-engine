@@ -5433,6 +5433,7 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
     assets_doc = payload.get("assets") if isinstance(payload.get("assets"), dict) else {}
     assets = assets_doc.get("assets") if isinstance(assets_doc.get("assets"), list) else []
     assets_by_id = {str(asset.get("id")): asset for asset in assets if isinstance(asset, dict) and asset.get("id")}
+    video_asset_count = sum(1 for asset in assets if isinstance(asset, dict) and asset.get("type") == "video")
     characters_doc = payload.get("characters") if isinstance(payload.get("characters"), dict) else {}
     characters = characters_doc.get("characters") if isinstance(characters_doc.get("characters"), list) else []
     chapters = payload.get("chapters") if isinstance(payload.get("chapters"), list) else []
@@ -5466,6 +5467,9 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
     sfx_play_count = 0
     missing_sfx_asset_count = 0
     missing_sfx_asset_names: list[str] = []
+    video_play_count = 0
+    missing_video_asset_count = 0
+    missing_video_asset_names: list[str] = []
     music_play_count = 0
     music_stop_count = 0
     music_scoped_count = 0
@@ -5576,6 +5580,13 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
                 if not sfx_asset or not get_asset_runtime_path(bundle_dir, sfx_asset):
                     missing_sfx_asset_count += 1
                     missing_sfx_asset_names.append(str(block.get("id") or sfx_asset_id or "未命名音效卡"))
+            elif block_type == "video_play":
+                video_play_count += 1
+                video_asset_id = str(block.get("assetId") or "").strip()
+                video_asset = assets_by_id.get(video_asset_id) if video_asset_id else None
+                if not video_asset or not get_asset_runtime_path(bundle_dir, video_asset):
+                    missing_video_asset_count += 1
+                    missing_video_asset_names.append(str(block.get("id") or video_asset_id or "未命名视频卡"))
             elif block_type in VN_BASELINE_EFFECT_BLOCK_TYPES:
                 scene_has_effect = True
             text = get_vn_baseline_block_text(block)
@@ -5722,6 +5733,15 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             f"检测到 {missing_sfx_asset_count} 张音效卡片没有可用文件：{', '.join(missing_sfx_asset_names[:3])}",
             "重新导入或替换缺失音效素材，再导出原生 Runtime，避免点击、脚步或演出音效静默失效。",
         )
+    if missing_video_asset_count:
+        add_vn_baseline_issue(
+            issues,
+            "warn",
+            "video_asset_missing",
+            "存在缺失的视频文件",
+            f"检测到 {missing_video_asset_count} 张视频播放卡片没有可用文件：{', '.join(missing_video_asset_names[:3])}",
+            "重新导入或替换缺失 OP、ED、PV 或过场视频素材，再导出原生 Runtime，避免玩家点击播放后只看到占位提示。",
+        )
     if empty_choice_option_count:
         add_vn_baseline_issue(
             issues,
@@ -5849,6 +5869,15 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             "多场景项目没有检测到播放音效卡片。",
             "为门铃、脚步、点击、心跳、短信提示或关键演出补少量音效点，能显著提升试玩完成度。",
         )
+    if video_asset_count and video_play_count == 0:
+        add_vn_baseline_issue(
+            issues,
+            "soft",
+            "video_asset_unused",
+            "视频素材还没有进入剧情",
+            f"检测到 {video_asset_count} 个视频素材，但没有播放视频卡片。",
+            "如果这些是 OP、ED、PV 或过场动画，建议放入对应章节并跑一次原生 Runtime 视频桥接检查。",
+        )
     if dialogue_count >= 3 and character_show_count == 0:
         add_vn_baseline_issue(
             issues,
@@ -5959,6 +5988,9 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             "crowdedChoiceBlockCount": crowded_choice_block_count,
             "sfxPlayCount": sfx_play_count,
             "missingSfxAssetCount": missing_sfx_asset_count,
+            "videoAssetCount": video_asset_count,
+            "videoPlayCount": video_play_count,
+            "missingVideoAssetCount": missing_video_asset_count,
             "musicPlayCount": music_play_count,
             "musicStopCount": music_stop_count,
             "musicScopedCount": music_scoped_count,
@@ -5995,6 +6027,7 @@ def render_native_runtime_vn_baseline_quality_markdown(report: dict) -> str:
         ("空白 / 超长 / 重复选项", f"{int(metrics.get('emptyChoiceOptionCount') or 0)} / {int(metrics.get('longChoiceOptionCount') or 0)} / {int(metrics.get('duplicateChoiceOptionCount') or 0)}"),
         ("拥挤选项卡", metrics.get("crowdedChoiceBlockCount")),
         ("音效点 / 缺失音效", f"{int(metrics.get('sfxPlayCount') or 0)} / {int(metrics.get('missingSfxAssetCount') or 0)}"),
+        ("视频素材 / 播放卡 / 缺失视频", f"{int(metrics.get('videoAssetCount') or 0)} / {int(metrics.get('videoPlayCount') or 0)} / {int(metrics.get('missingVideoAssetCount') or 0)}"),
         ("角色立绘覆盖", f"{int(metrics.get('charactersWithSpriteCount') or 0)} / {int(metrics.get('characterCount') or 0)}"),
         ("人物转场 / 登场", f"{int(metrics.get('characterTransitionCount') or 0)} / {int(metrics.get('characterShowCount') or 0)}"),
         ("人物站位变化", metrics.get("characterPositionVariantCount")),
@@ -6296,6 +6329,7 @@ def render_native_runtime_release_control_markdown(payload: dict) -> str:
             ("空白 / 超长 / 重复选项", f"{int(vn_metrics.get('emptyChoiceOptionCount') or 0)} / {int(vn_metrics.get('longChoiceOptionCount') or 0)} / {int(vn_metrics.get('duplicateChoiceOptionCount') or 0)}"),
             ("拥挤选项卡", vn_metrics.get("crowdedChoiceBlockCount")),
             ("音效点 / 缺失音效", f"{int(vn_metrics.get('sfxPlayCount') or 0)} / {int(vn_metrics.get('missingSfxAssetCount') or 0)}"),
+            ("视频素材 / 播放卡 / 缺失视频", f"{int(vn_metrics.get('videoAssetCount') or 0)} / {int(vn_metrics.get('videoPlayCount') or 0)} / {int(vn_metrics.get('missingVideoAssetCount') or 0)}"),
             ("角色立绘覆盖", f"{int(vn_metrics.get('charactersWithSpriteCount') or 0)} / {int(vn_metrics.get('characterCount') or 0)}"),
             ("人物转场 / 登场", f"{int(vn_metrics.get('characterTransitionCount') or 0)} / {int(vn_metrics.get('characterShowCount') or 0)}"),
             ("人物站位变化", vn_metrics.get("characterPositionVariantCount")),

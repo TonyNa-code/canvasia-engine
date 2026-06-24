@@ -188,6 +188,9 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             self.assertEqual(report["metrics"]["missingBackgroundAssetCount"], 0)
             self.assertEqual(report["metrics"]["sfxPlayCount"], 0)
             self.assertEqual(report["metrics"]["missingSfxAssetCount"], 0)
+            self.assertEqual(report["metrics"]["videoAssetCount"], 0)
+            self.assertEqual(report["metrics"]["videoPlayCount"], 0)
+            self.assertEqual(report["metrics"]["missingVideoAssetCount"], 0)
             self.assertEqual(report["metrics"]["musicPlayCount"], 0)
             self.assertEqual(report["metrics"]["musicFadeInCount"], 0)
             self.assertEqual(report["metrics"]["voiceBoundLineCount"], 0)
@@ -203,6 +206,7 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             self.assertIn("角色立绘覆盖", markdown)
             self.assertIn("空白 / 超长 / 重复选项", markdown)
             self.assertIn("音效点 / 缺失音效", markdown)
+            self.assertIn("视频素材 / 播放卡 / 缺失视频", markdown)
             self.assertIn("BGM 淡入 / 淡出", markdown)
             self.assertIn("背景转场 / 背景卡", markdown)
             self.assertIn("语音覆盖", markdown)
@@ -682,6 +686,116 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
 
             markdown = render_native_runtime_vn_baseline_quality_markdown(report)
             self.assertIn("缺少基础音效点", markdown)
+
+    def test_vn_baseline_quality_report_flags_video_asset_gaps(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_dir = Path(temp_dir) / "bundle"
+            bundle_dir.mkdir(parents=True)
+            video_path = bundle_dir / "assets" / "video" / "opening.mp4"
+            video_path.parent.mkdir(parents=True, exist_ok=True)
+            video_path.write_bytes(b"fake-video")
+            game_data = {
+                "project": {
+                    "projectId": "native_video_quality_smoke",
+                    "title": "Native Video Quality Smoke",
+                    "entrySceneId": "scene_video",
+                },
+                "assets": {
+                    "assets": [
+                        {
+                            "id": "video_ok",
+                            "type": "video",
+                            "name": "Opening",
+                            "exportUrl": video_path.relative_to(bundle_dir).as_posix(),
+                        }
+                    ]
+                },
+                "characters": {"characters": []},
+                "chapters": [
+                    {
+                        "id": "chapter_1",
+                        "name": "Chapter 1",
+                        "scenes": [
+                            {
+                                "id": "scene_video",
+                                "name": "Video",
+                                "blocks": [
+                                    {"id": "video_1", "type": "video_play", "assetId": "video_ok"},
+                                    {"id": "video_2", "type": "video_play", "assetId": "video_missing"},
+                                    {"id": "line_1", "type": "narration", "text": "Video check."},
+                                ],
+                            }
+                        ],
+                    }
+                ],
+            }
+            (bundle_dir / "game_data.json").write_text(json.dumps(game_data, ensure_ascii=False), encoding="utf-8")
+
+            report = build_native_runtime_vn_baseline_quality_report(bundle_dir)
+
+            self.assertEqual(report["status"], "needs_fix")
+            self.assertEqual(report["metrics"]["videoAssetCount"], 1)
+            self.assertEqual(report["metrics"]["videoPlayCount"], 2)
+            self.assertEqual(report["metrics"]["missingVideoAssetCount"], 1)
+            issue_codes = {issue["code"] for issue in report["issues"]}
+            self.assertIn("video_asset_missing", issue_codes)
+            self.assertNotIn("video_asset_unused", issue_codes)
+
+            markdown = render_native_runtime_vn_baseline_quality_markdown(report)
+            self.assertIn("存在缺失的视频文件", markdown)
+            self.assertIn("视频素材 / 播放卡 / 缺失视频", markdown)
+
+    def test_vn_baseline_quality_report_flags_unused_video_assets_as_polish(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_dir = Path(temp_dir) / "bundle"
+            bundle_dir.mkdir(parents=True)
+            video_path = bundle_dir / "assets" / "video" / "pv.mp4"
+            video_path.parent.mkdir(parents=True, exist_ok=True)
+            video_path.write_bytes(b"fake-video")
+            game_data = {
+                "project": {
+                    "projectId": "native_unused_video_quality_smoke",
+                    "title": "Native Unused Video Quality Smoke",
+                    "entrySceneId": "scene_video",
+                },
+                "assets": {
+                    "assets": [
+                        {
+                            "id": "video_unused",
+                            "type": "video",
+                            "name": "PV",
+                            "exportUrl": video_path.relative_to(bundle_dir).as_posix(),
+                        }
+                    ]
+                },
+                "characters": {"characters": []},
+                "chapters": [
+                    {
+                        "id": "chapter_1",
+                        "name": "Chapter 1",
+                        "scenes": [
+                            {
+                                "id": "scene_video",
+                                "name": "Video",
+                                "blocks": [{"id": "line_1", "type": "narration", "text": "Unused video."}],
+                            }
+                        ],
+                    }
+                ],
+            }
+            (bundle_dir / "game_data.json").write_text(json.dumps(game_data, ensure_ascii=False), encoding="utf-8")
+
+            report = build_native_runtime_vn_baseline_quality_report(bundle_dir)
+
+            self.assertEqual(report["metrics"]["videoAssetCount"], 1)
+            self.assertEqual(report["metrics"]["videoPlayCount"], 0)
+            self.assertEqual(report["metrics"]["missingVideoAssetCount"], 0)
+            issue_codes = {issue["code"] for issue in report["issues"]}
+            self.assertIn("video_asset_unused", issue_codes)
+            self.assertNotIn("video_asset_missing", issue_codes)
+
+            markdown = render_native_runtime_vn_baseline_quality_markdown(report)
+            self.assertIn("视频素材还没有进入剧情", markdown)
 
 
 @unittest.skipIf(pygame is None, "pygame-ce is not installed")
