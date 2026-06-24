@@ -5398,6 +5398,17 @@ def is_vn_baseline_placeholder_asset(asset: dict) -> bool:
     return "占位素材" in text or "placeholder" in text
 
 
+def count_i18n_translations(source: dict | None, key: str, target_languages: list[str]) -> tuple[int, int]:
+    if not isinstance(source, dict) or not target_languages:
+        return (0, 0)
+    base_text = str(source.get(key) or "").strip()
+    translations = source.get(f"{key}Translations") if isinstance(source.get(f"{key}Translations"), dict) else {}
+    if not base_text and not translations:
+        return (0, 0)
+    translated_count = sum(1 for language in target_languages if str(translations.get(language) or "").strip())
+    return (len(target_languages), translated_count)
+
+
 def get_vn_baseline_block_text(block: dict) -> str:
     block_type = str(block.get("type") or "").strip()
     if block_type in {"dialogue", "narration"}:
@@ -5430,6 +5441,14 @@ def add_vn_baseline_issue(
 def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
     payload = load_game_data(bundle_dir / DEFAULT_GAME_DATA_NAME)
     project = payload.get("project") if isinstance(payload.get("project"), dict) else {}
+    i18n_doc = payload.get("i18n") if isinstance(payload.get("i18n"), dict) else {}
+    default_language = normalize_language_code(i18n_doc.get("defaultLanguage") or project.get("language"), DEFAULT_PROJECT_LANGUAGE)
+    fallback_language = normalize_language_code(i18n_doc.get("fallbackLanguage"), default_language)
+    supported_languages = normalize_supported_languages(
+        i18n_doc.get("supportedLanguages") or project.get("supportedLanguages"),
+        default_language,
+    )
+    target_i18n_languages = [language for language in supported_languages if language != default_language]
     runtime_settings = project.get("runtimeSettings") if isinstance(project.get("runtimeSettings"), dict) else {}
     formal_save_slot_count = get_project_formal_save_slot_count(project)
     raw_formal_save_slot_count = runtime_settings.get("formalSaveSlotCount", DEFAULT_FORMAL_SAVE_SLOT_COUNT)
@@ -5462,6 +5481,9 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
         for asset in assets
         if isinstance(asset, dict) and asset.get("type") == "voice" and str(asset.get("id") or "").strip()
     }
+    i18n_translatable_entry_count = 0
+    i18n_expected_translation_count = 0
+    i18n_present_translation_count = 0
     variables, variables_by_id, duplicate_variable_ids = get_export_variable_map(payload)
     characters_doc = payload.get("characters") if isinstance(payload.get("characters"), dict) else {}
     characters = characters_doc.get("characters") if isinstance(characters_doc.get("characters"), list) else []
@@ -5472,6 +5494,13 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
     }
     character_expression_ids_by_id: dict[str, set[str]] = {}
     for character_id, character in characters_by_id.items():
+        expected, present = count_i18n_translations(character, "displayName", target_i18n_languages)
+        if expected == 0:
+            expected, present = count_i18n_translations(character, "name", target_i18n_languages)
+        if expected:
+            i18n_translatable_entry_count += 1
+            i18n_expected_translation_count += expected
+            i18n_present_translation_count += present
         expressions = character.get("expressions") if isinstance(character.get("expressions"), list) else []
         character_expression_ids_by_id[character_id] = {
             str(expression.get("id")).strip()
@@ -5560,7 +5589,21 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
     multiline_text_block_count = 0
     long_text_block_names: list[str] = []
 
+    for chapter in chapters:
+        if not isinstance(chapter, dict):
+            continue
+        expected, present = count_i18n_translations(chapter, "name", target_i18n_languages)
+        if expected:
+            i18n_translatable_entry_count += 1
+            i18n_expected_translation_count += expected
+            i18n_present_translation_count += present
+
     for scene in scenes:
+        expected, present = count_i18n_translations(scene, "name", target_i18n_languages)
+        if expected:
+            i18n_translatable_entry_count += 1
+            i18n_expected_translation_count += expected
+            i18n_present_translation_count += present
         blocks = scene.get("blocks") if isinstance(scene.get("blocks"), list) else []
         scene_has_background = False
         scene_has_music = False
@@ -5571,6 +5614,11 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             block_type = str(block.get("type") or "").strip()
             if block_type == "dialogue":
                 dialogue_count += 1
+                expected, present = count_i18n_translations(block, "text", target_i18n_languages)
+                if expected:
+                    i18n_translatable_entry_count += 1
+                    i18n_expected_translation_count += expected
+                    i18n_present_translation_count += present
                 speaker_id = str(block.get("speakerId") or "").strip()
                 expression_id = str(block.get("expressionId") or "").strip()
                 if speaker_id and speaker_id not in characters_by_id:
@@ -5589,6 +5637,11 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
                         missing_voice_asset_names.append(str(block.get("id") or voice_asset_id))
             elif block_type == "narration":
                 narration_count += 1
+                expected, present = count_i18n_translations(block, "text", target_i18n_languages)
+                if expected:
+                    i18n_translatable_entry_count += 1
+                    i18n_expected_translation_count += expected
+                    i18n_present_translation_count += present
                 voice_asset_id = str(block.get("voiceAssetId") or "").strip()
                 if voice_asset_id:
                     narration_voice_count += 1
@@ -5608,6 +5661,11 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
                 for option in options:
                     if not isinstance(option, dict):
                         continue
+                    expected, present = count_i18n_translations(option, "text", target_i18n_languages)
+                    if expected:
+                        i18n_translatable_entry_count += 1
+                        i18n_expected_translation_count += expected
+                        i18n_present_translation_count += present
                     option_text = str(option.get("text") or "").strip()
                     normalized_option_text = option_text.lower()
                     if not option_text:
@@ -5845,6 +5903,11 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
     voice_eligible_line_count = dialogue_count + narration_count
     voice_bound_line_count = dialogue_voice_count + narration_voice_count
     voice_coverage_percent = round(voice_bound_line_count / voice_eligible_line_count * 100, 1) if voice_eligible_line_count else 0.0
+    i18n_translation_coverage_percent = (
+        round(i18n_present_translation_count / i18n_expected_translation_count * 100, 1)
+        if i18n_expected_translation_count
+        else (100.0 if not target_i18n_languages else 0.0)
+    )
     missing_route_targets: list[str] = []
     scene_outgoing_targets: dict[str, list[str]] = {}
     for scene in scenes:
@@ -6034,6 +6097,33 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             "部分选项分支结果完全相同",
             f"检测到 {same_target_choice_count} 个选项卡的多个按钮都跳到同一个场景且没有变量效果：{', '.join(same_target_choice_names[:3])}",
             "如果这是有意设计，建议至少加变量记录、好感度变化或后续差分；否则请拆出不同目标，避免玩家觉得选项只是装饰。",
+        )
+    if target_i18n_languages and fallback_language not in supported_languages:
+        add_vn_baseline_issue(
+            issues,
+            "warn",
+            "i18n_fallback_not_supported",
+            "多语言 fallback 不在支持语言列表中",
+            f"fallbackLanguage={fallback_language}，但 supportedLanguages={', '.join(supported_languages)}。",
+            "把 fallbackLanguage 加入支持语言列表，或改成默认语言；否则 Runtime 切换语言时可能只能退回原文。",
+        )
+    if target_i18n_languages and i18n_expected_translation_count == 0:
+        add_vn_baseline_issue(
+            issues,
+            "soft",
+            "i18n_enabled_without_translations",
+            "已开启多语言但没有检测到剧情翻译",
+            f"当前支持 {len(supported_languages)} 种语言：{', '.join(supported_languages)}，但章节、场景、角色、台词和选项没有目标语言翻译。",
+            "如果要对外宣传多语言，建议先补主线文本和选项翻译；如果只是预留功能，可以暂时只保留默认语言。",
+        )
+    elif target_i18n_languages and i18n_translation_coverage_percent < 60:
+        add_vn_baseline_issue(
+            issues,
+            "soft",
+            "i18n_translation_sparse",
+            "多语言翻译覆盖偏低",
+            f"目标语言翻译覆盖约 {i18n_translation_coverage_percent}%（{i18n_present_translation_count}/{i18n_expected_translation_count}）。",
+            "优先补齐章节名、场景名、选项和主线对白；否则玩家切换语言后会频繁看到默认语言文本。",
         )
     if duplicate_variable_ids:
         add_vn_baseline_issue(
@@ -6466,6 +6556,13 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             "sfxAssetCount": len(sfx_asset_ids),
             "sfxUsedAssetCount": len(sfx_used_asset_ids & sfx_asset_ids),
             "unusedSfxAssetCount": len(unused_sfx_asset_ids),
+            "supportedLanguageCount": len(supported_languages),
+            "targetI18nLanguageCount": len(target_i18n_languages),
+            "i18nTranslatableEntryCount": i18n_translatable_entry_count,
+            "i18nExpectedTranslationCount": i18n_expected_translation_count,
+            "i18nPresentTranslationCount": i18n_present_translation_count,
+            "i18nTranslationCoveragePercent": i18n_translation_coverage_percent,
+            "i18nFallbackSupported": fallback_language in supported_languages,
             "formalSaveSlotCount": formal_save_slot_count,
             "configuredFormalSaveSlotCount": configured_formal_save_slot_count,
             "saveDialogPageCount": save_dialog_page_count,
@@ -6525,6 +6622,7 @@ def render_native_runtime_vn_baseline_quality_markdown(report: dict) -> str:
         ("语音绑定 / 可配音文本", f"{int(metrics.get('voiceBoundLineCount') or 0)} / {int(metrics.get('voiceEligibleLineCount') or 0)}"),
         ("缺失语音文件", metrics.get("missingVoiceAssetCount")),
         ("语音素材 / 已入剧情 / 未使用", f"{int(metrics.get('voiceAssetCount') or 0)} / {int(metrics.get('voiceUsedAssetCount') or 0)} / {int(metrics.get('unusedVoiceAssetCount') or 0)}"),
+        ("语言 / 目标语言 / 翻译覆盖", f"{int(metrics.get('supportedLanguageCount') or 0)} / {int(metrics.get('targetI18nLanguageCount') or 0)} / {format_markdown_value(metrics.get('i18nTranslationCoveragePercent'), '0')}%"),
         ("正式存档位 / 读档页数", f"{int(metrics.get('formalSaveSlotCount') or 0)} / {int(metrics.get('saveDialogPageCount') or 0)}"),
         ("入口场景有效", "是" if metrics.get("entrySceneExists") else "否"),
         ("路线缺失目标", metrics.get("routeTargetMissingCount")),
@@ -6841,6 +6939,7 @@ def render_native_runtime_release_control_markdown(payload: dict) -> str:
             ("语音绑定 / 可配音文本", f"{int(vn_metrics.get('voiceBoundLineCount') or 0)} / {int(vn_metrics.get('voiceEligibleLineCount') or 0)}"),
             ("缺失语音文件", vn_metrics.get("missingVoiceAssetCount")),
             ("语音素材 / 已入剧情 / 未使用", f"{int(vn_metrics.get('voiceAssetCount') or 0)} / {int(vn_metrics.get('voiceUsedAssetCount') or 0)} / {int(vn_metrics.get('unusedVoiceAssetCount') or 0)}"),
+            ("语言 / 目标语言 / 翻译覆盖", f"{int(vn_metrics.get('supportedLanguageCount') or 0)} / {int(vn_metrics.get('targetI18nLanguageCount') or 0)} / {format_markdown_value(vn_metrics.get('i18nTranslationCoveragePercent'), '0')}%"),
             ("正式存档位 / 读档页数", f"{int(vn_metrics.get('formalSaveSlotCount') or 0)} / {int(vn_metrics.get('saveDialogPageCount') or 0)}"),
             ("入口场景有效", "是" if vn_metrics.get("entrySceneExists") else "否"),
             ("路线缺失目标", vn_metrics.get("routeTargetMissingCount")),

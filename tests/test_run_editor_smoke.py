@@ -2583,6 +2583,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                     {
                         "id": "heroine",
                         "displayName": "Heroine",
+                        "displayNameTranslations": {"zh-CN": "女主角", "en-US": "Heroine"},
                         "nameColor": "#E6876A",
                         "defaultPosition": "left",
                         "bio": "Native runtime smoke test character.",
@@ -2602,10 +2603,16 @@ class RunEditorSmokeTests(unittest.TestCase):
                 ],
             },
         )
+        chapter_path = run_editor.CHAPTERS_DIR / f"{chapter_result['chapterId']}.json"
+        chapter_doc = run_editor.read_json(chapter_path)
+        chapter_doc["nameTranslations"] = {"zh-CN": "第一章", "en-US": "Chapter One"}
+        run_editor.write_json(chapter_path, chapter_doc)
+        translated_scene = copy.deepcopy(chapter_result["scene"])
+        translated_scene["nameTranslations"] = {"zh-CN": "开场", "en-US": "Opening"}
 
         self.save_scene_with_blocks(
             chapter_result["chapterId"],
-            chapter_result["scene"],
+            translated_scene,
             [
                 {"id": "block_000", "type": "music_play", "assetId": bgm_asset["id"], "fadeInMs": 600},
                 {"id": "block_001", "type": "background", "assetId": background_asset["id"]},
@@ -2628,6 +2635,10 @@ class RunEditorSmokeTests(unittest.TestCase):
                     "speakerId": "heroine",
                     "expressionId": "",
                     "text": "这是原生 Runtime 包烟测。",
+                    "textTranslations": {
+                        "zh-CN": "这是原生 Runtime 包烟测。",
+                        "en-US": "This is a native Runtime package smoke test.",
+                    },
                 },
             ],
         )

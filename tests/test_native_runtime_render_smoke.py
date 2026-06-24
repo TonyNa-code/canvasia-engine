@@ -410,6 +410,81 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             self.assertIn("正式存档位 / 读档页数", markdown)
             self.assertIn("正式存档位配置超出安全范围", markdown)
 
+    def test_vn_baseline_quality_report_flags_i18n_translation_gaps(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_dir = Path(temp_dir) / "bundle"
+            bundle_dir.mkdir(parents=True)
+            game_data = {
+                "project": {
+                    "projectId": "native_i18n_quality_smoke",
+                    "title": "Native I18n Quality Smoke",
+                    "language": "zh-CN",
+                    "entrySceneId": "scene_i18n",
+                },
+                "i18n": {
+                    "defaultLanguage": "zh-CN",
+                    "fallbackLanguage": "ja-JP",
+                    "supportedLanguages": ["zh-CN", "en-US"],
+                },
+                "assets": {"assets": []},
+                "characters": {
+                    "characters": [
+                        {
+                            "id": "heroine",
+                            "displayName": "女主角",
+                            "displayNameTranslations": {"en-US": "Heroine"},
+                            "expressions": [],
+                        }
+                    ]
+                },
+                "chapters": [
+                    {
+                        "id": "chapter_1",
+                        "name": "第一章",
+                        "scenes": [
+                            {
+                                "id": "scene_i18n",
+                                "name": "教室",
+                                "blocks": [
+                                    {
+                                        "id": "line_1",
+                                        "type": "dialogue",
+                                        "speakerId": "heroine",
+                                        "text": "你好。",
+                                        "textTranslations": {"en-US": "Hello."},
+                                    },
+                                    {
+                                        "id": "choice_i18n",
+                                        "type": "choice",
+                                        "options": [
+                                            {"id": "choice_a", "text": "留下", "gotoSceneId": "scene_i18n"},
+                                            {"id": "choice_b", "text": "离开", "gotoSceneId": "scene_i18n"},
+                                        ],
+                                    },
+                                ],
+                            }
+                        ],
+                    }
+                ],
+            }
+            (bundle_dir / "game_data.json").write_text(json.dumps(game_data, ensure_ascii=False), encoding="utf-8")
+
+            report = build_native_runtime_vn_baseline_quality_report(bundle_dir)
+
+            self.assertEqual(report["metrics"]["supportedLanguageCount"], 2)
+            self.assertEqual(report["metrics"]["targetI18nLanguageCount"], 1)
+            self.assertEqual(report["metrics"]["i18nExpectedTranslationCount"], 6)
+            self.assertEqual(report["metrics"]["i18nPresentTranslationCount"], 2)
+            self.assertEqual(report["metrics"]["i18nTranslationCoveragePercent"], 33.3)
+            self.assertFalse(report["metrics"]["i18nFallbackSupported"])
+            issue_codes = {issue["code"] for issue in report["issues"]}
+            self.assertIn("i18n_fallback_not_supported", issue_codes)
+            self.assertIn("i18n_translation_sparse", issue_codes)
+
+            markdown = render_native_runtime_vn_baseline_quality_markdown(report)
+            self.assertIn("语言 / 目标语言 / 翻译覆盖", markdown)
+            self.assertIn("多语言翻译覆盖偏低", markdown)
+
     def test_vn_baseline_quality_report_flags_voice_binding_gaps(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             bundle_dir = Path(temp_dir) / "bundle"
