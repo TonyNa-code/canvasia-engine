@@ -535,6 +535,67 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             self.assertIn("多首 BGM 缺少明确范围", markdown)
             self.assertIn("BGM 播放 / 停止", markdown)
 
+    def test_vn_baseline_quality_report_flags_bgm_after_block_target_gaps(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_dir = Path(temp_dir) / "bundle"
+            bundle_dir.mkdir(parents=True)
+            game_data = {
+                "project": {
+                    "projectId": "native_bgm_after_block_quality_smoke",
+                    "title": "Native BGM After Block Quality Smoke",
+                    "entrySceneId": "scene_bgm_scope",
+                },
+                "assets": {"assets": []},
+                "characters": {"characters": []},
+                "chapters": [
+                    {
+                        "id": "chapter_1",
+                        "name": "Chapter 1",
+                        "scenes": [
+                            {
+                                "id": "scene_bgm_scope",
+                                "name": "BGM Scope",
+                                "blocks": [
+                                    {"id": "line_before", "type": "narration", "text": "Before music."},
+                                    {
+                                        "id": "music_missing_end",
+                                        "type": "music_play",
+                                        "assetId": "bgm_a",
+                                        "endMode": "after_block",
+                                        "endBlockId": "line_missing",
+                                    },
+                                    {
+                                        "id": "music_backward_end",
+                                        "type": "music_play",
+                                        "assetId": "bgm_b",
+                                        "endMode": "after_block",
+                                        "endBlockId": "line_before",
+                                    },
+                                    {"id": "line_after", "type": "narration", "text": "After music."},
+                                ],
+                            }
+                        ],
+                    }
+                ],
+            }
+            (bundle_dir / "game_data.json").write_text(json.dumps(game_data, ensure_ascii=False), encoding="utf-8")
+
+            report = build_native_runtime_vn_baseline_quality_report(bundle_dir)
+
+            self.assertEqual(report["metrics"]["musicPlayCount"], 2)
+            self.assertEqual(report["metrics"]["musicScopedCount"], 2)
+            self.assertEqual(report["metrics"]["musicAfterBlockScopeCount"], 2)
+            self.assertEqual(report["metrics"]["missingMusicEndBlockCount"], 1)
+            self.assertEqual(report["metrics"]["backwardMusicEndBlockCount"], 1)
+            issue_codes = {issue["code"] for issue in report["issues"]}
+            self.assertIn("bgm_after_block_target_missing", issue_codes)
+            self.assertIn("bgm_after_block_target_before_play", issue_codes)
+
+            markdown = render_native_runtime_vn_baseline_quality_markdown(report)
+            self.assertIn("BGM after_block / 缺失结束 / 倒挂结束", markdown)
+            self.assertIn("BGM after_block 结束卡片不可用", markdown)
+            self.assertIn("BGM after_block 结束点早于播放点", markdown)
+
     def test_vn_baseline_quality_report_flags_audio_asset_usage_gaps(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             bundle_dir = Path(temp_dir) / "bundle"

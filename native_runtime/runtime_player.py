@@ -5702,6 +5702,11 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
     music_scoped_count = 0
     music_fade_in_count = 0
     music_fade_out_count = 0
+    music_after_block_scope_count = 0
+    missing_music_end_block_count = 0
+    missing_music_end_block_names: list[str] = []
+    backward_music_end_block_count = 0
+    backward_music_end_block_names: list[str] = []
     music_used_asset_ids: set[str] = set()
     missing_music_asset_count = 0
     missing_music_asset_names: list[str] = []
@@ -5738,12 +5743,14 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             i18n_present_translation_count += present
         blocks = scene.get("blocks") if isinstance(scene.get("blocks"), list) else []
         block_id_counts: dict[str, int] = {}
+        block_id_first_indexes: dict[str, int] = {}
         for block_index, block in enumerate(blocks):
             if not isinstance(block, dict):
                 continue
             block_id = str(block.get("id") or "").strip()
             if block_id:
                 block_id_counts[block_id] = block_id_counts.get(block_id, 0) + 1
+                block_id_first_indexes.setdefault(block_id, block_index)
             else:
                 missing_block_id_count += 1
                 scene_label = str(scene.get("name") or scene.get("id") or "未命名场景")
@@ -5757,7 +5764,7 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
         scene_has_background = False
         scene_has_music = False
         scene_has_effect = False
-        for block in blocks:
+        for block_index, block in enumerate(blocks):
             if not isinstance(block, dict):
                 continue
             block_type = str(block.get("type") or "").strip()
@@ -5973,6 +5980,17 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
                     music_fade_out_count += 1
                 if get_safe_music_end_mode(block.get("endMode")) != "until_next_music":
                     music_scoped_count += 1
+                if get_safe_music_end_mode(block.get("endMode")) == "after_block":
+                    music_after_block_scope_count += 1
+                    end_block_id = str(block.get("endBlockId") or "").strip()
+                    block_label = str(block.get("id") or music_asset_id or "未命名音乐卡")
+                    scene_label = str(scene.get("name") or scene.get("id") or "未命名场景")
+                    if not end_block_id or end_block_id not in block_id_first_indexes:
+                        missing_music_end_block_count += 1
+                        missing_music_end_block_names.append(f"{scene_label}:{block_label}->{end_block_id or '未设置'}")
+                    elif block_id_first_indexes[end_block_id] <= block_index:
+                        backward_music_end_block_count += 1
+                        backward_music_end_block_names.append(f"{scene_label}:{block_label}->{end_block_id}")
             elif block_type == "music_stop":
                 music_stop_count += 1
                 if get_safe_audio_fade_ms(block.get("fadeOutMs"), 0) > 0:
@@ -6580,6 +6598,24 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             f"检测到 {music_play_count} 个 BGM 播放点，但没有 scene_end / after_block 范围或停止音乐卡片。",
             "给关键曲目设置结束范围，或在段落末尾补停止音乐卡片，避免音乐覆盖到不该出现的场景。",
         )
+    if missing_music_end_block_count:
+        add_vn_baseline_issue(
+            issues,
+            "warn",
+            "bgm_after_block_target_missing",
+            "BGM after_block 结束卡片不可用",
+            f"检测到 {missing_music_end_block_count} 个 BGM 范围指向不存在的结束卡片：{', '.join(missing_music_end_block_names[:3])}",
+            "重新选择同一场景内存在的结束卡片；否则这段 BGM 的自定义范围不会按预期停止。",
+        )
+    if backward_music_end_block_count:
+        add_vn_baseline_issue(
+            issues,
+            "warn",
+            "bgm_after_block_target_before_play",
+            "BGM after_block 结束点早于播放点",
+            f"检测到 {backward_music_end_block_count} 个 BGM 范围结束点位于播放卡片之前：{', '.join(backward_music_end_block_names[:3])}",
+            "把结束卡片放到音乐播放卡片之后，或改用 scene_end / until_next_music；否则音乐可能刚播放就结束。",
+        )
     if music_play_count and music_fade_in_count < music_play_count:
         add_vn_baseline_issue(
             issues,
@@ -6917,6 +6953,9 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             "musicPlayCount": music_play_count,
             "musicStopCount": music_stop_count,
             "musicScopedCount": music_scoped_count,
+            "musicAfterBlockScopeCount": music_after_block_scope_count,
+            "missingMusicEndBlockCount": missing_music_end_block_count,
+            "backwardMusicEndBlockCount": backward_music_end_block_count,
             "musicFadeInCount": music_fade_in_count,
             "musicFadeOutCount": music_fade_out_count,
             "bgmAssetCount": len(bgm_asset_ids),
@@ -7024,6 +7063,7 @@ def render_native_runtime_vn_baseline_quality_markdown(report: dict) -> str:
         ("BGM 播放 / 停止", f"{int(metrics.get('musicPlayCount') or 0)} / {int(metrics.get('musicStopCount') or 0)}"),
         ("BGM 淡入 / 淡出", f"{int(metrics.get('musicFadeInCount') or 0)} / {int(metrics.get('musicFadeOutCount') or 0)}"),
         ("BGM 明确范围", metrics.get("musicScopedCount")),
+        ("BGM after_block / 缺失结束 / 倒挂结束", f"{int(metrics.get('musicAfterBlockScopeCount') or 0)} / {int(metrics.get('missingMusicEndBlockCount') or 0)} / {int(metrics.get('backwardMusicEndBlockCount') or 0)}"),
         ("BGM 素材 / 已入剧情 / 未使用 / 缺失", f"{int(metrics.get('bgmAssetCount') or 0)} / {int(metrics.get('bgmUsedAssetCount') or 0)} / {int(metrics.get('unusedBgmAssetCount') or 0)} / {int(metrics.get('missingMusicAssetCount') or 0)}"),
         ("语音覆盖", f"{format_markdown_value(metrics.get('voiceCoveragePercent'), '0')}%"),
         ("语音绑定 / 可配音文本", f"{int(metrics.get('voiceBoundLineCount') or 0)} / {int(metrics.get('voiceEligibleLineCount') or 0)}"),
@@ -7355,6 +7395,7 @@ def render_native_runtime_release_control_markdown(payload: dict) -> str:
             ("BGM 播放 / 停止", f"{int(vn_metrics.get('musicPlayCount') or 0)} / {int(vn_metrics.get('musicStopCount') or 0)}"),
             ("BGM 淡入 / 淡出", f"{int(vn_metrics.get('musicFadeInCount') or 0)} / {int(vn_metrics.get('musicFadeOutCount') or 0)}"),
             ("BGM 明确范围", vn_metrics.get("musicScopedCount")),
+            ("BGM after_block / 缺失结束 / 倒挂结束", f"{int(vn_metrics.get('musicAfterBlockScopeCount') or 0)} / {int(vn_metrics.get('missingMusicEndBlockCount') or 0)} / {int(vn_metrics.get('backwardMusicEndBlockCount') or 0)}"),
             ("BGM 素材 / 已入剧情 / 未使用 / 缺失", f"{int(vn_metrics.get('bgmAssetCount') or 0)} / {int(vn_metrics.get('bgmUsedAssetCount') or 0)} / {int(vn_metrics.get('unusedBgmAssetCount') or 0)} / {int(vn_metrics.get('missingMusicAssetCount') or 0)}"),
             ("语音覆盖", f"{format_markdown_value(vn_metrics.get('voiceCoveragePercent'), '0')}%"),
             ("语音绑定 / 可配音文本", f"{int(vn_metrics.get('voiceBoundLineCount') or 0)} / {int(vn_metrics.get('voiceEligibleLineCount') or 0)}"),
