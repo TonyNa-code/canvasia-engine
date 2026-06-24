@@ -422,6 +422,94 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             self.assertIn("路线跳转目标缺失", markdown)
             self.assertIn("入口不可达场景", markdown)
 
+    def test_vn_baseline_quality_report_flags_logic_variable_gaps(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_dir = Path(temp_dir) / "bundle"
+            bundle_dir.mkdir(parents=True)
+            game_data = {
+                "project": {
+                    "projectId": "native_logic_quality_smoke",
+                    "title": "Native Logic Quality Smoke",
+                    "entrySceneId": "scene_logic",
+                },
+                "assets": {"assets": []},
+                "characters": {"characters": []},
+                "variables": {
+                    "variables": [
+                        {"id": "var_score", "name": "Score", "type": "number", "defaultValue": 0},
+                        {"id": "var_route", "name": "Route", "type": "string", "defaultValue": "a"},
+                    ]
+                },
+                "chapters": [
+                    {
+                        "id": "chapter_1",
+                        "name": "Chapter 1",
+                        "scenes": [
+                            {
+                                "id": "scene_logic",
+                                "name": "Logic",
+                                "blocks": [
+                                    {"id": "set_missing", "type": "variable_set", "variableId": "var_missing", "value": 1},
+                                    {"id": "add_string", "type": "variable_add", "variableId": "var_route", "value": 2},
+                                    {
+                                        "id": "choice_logic",
+                                        "type": "choice",
+                                        "options": [
+                                            {
+                                                "text": "Gain",
+                                                "gotoSceneId": "scene_logic",
+                                                "effects": [
+                                                    {"type": "variable_add", "variableId": "var_route", "value": 1},
+                                                    {"type": "variable_set", "variableId": "var_missing_effect", "value": True},
+                                                ],
+                                            }
+                                        ],
+                                    },
+                                    {
+                                        "id": "condition_logic",
+                                        "type": "condition",
+                                        "branches": [
+                                            {
+                                                "id": "branch_1",
+                                                "gotoSceneId": "scene_logic",
+                                                "when": [{"variableId": "var_route", "operator": ">", "value": "b"}],
+                                            },
+                                            {"id": "branch_2", "gotoSceneId": "scene_logic", "when": []},
+                                        ],
+                                    },
+                                    {"id": "condition_empty", "type": "condition", "branches": []},
+                                ],
+                            }
+                        ],
+                    }
+                ],
+            }
+            (bundle_dir / "game_data.json").write_text(json.dumps(game_data, ensure_ascii=False), encoding="utf-8")
+
+            report = build_native_runtime_vn_baseline_quality_report(bundle_dir)
+
+            self.assertEqual(report["status"], "needs_fix")
+            self.assertEqual(report["metrics"]["variableCount"], 2)
+            self.assertEqual(report["metrics"]["variableSetCount"], 1)
+            self.assertEqual(report["metrics"]["variableAddCount"], 1)
+            self.assertEqual(report["metrics"]["conditionCount"], 2)
+            self.assertEqual(report["metrics"]["conditionBranchCount"], 2)
+            self.assertEqual(report["metrics"]["conditionRuleCount"], 1)
+            self.assertEqual(report["metrics"]["choiceEffectCount"], 2)
+            self.assertEqual(report["metrics"]["logicMissingVariableCount"], 2)
+            self.assertEqual(report["metrics"]["logicNonNumberAddCount"], 2)
+            self.assertEqual(report["metrics"]["logicOperatorMismatchCount"], 1)
+            self.assertEqual(report["metrics"]["conditionEmptyBranchCount"], 2)
+            issue_codes = {issue["code"] for issue in report["issues"]}
+            self.assertIn("logic_variable_missing", issue_codes)
+            self.assertIn("logic_variable_add_type", issue_codes)
+            self.assertIn("logic_condition_operator", issue_codes)
+            self.assertIn("logic_condition_empty", issue_codes)
+
+            markdown = render_native_runtime_vn_baseline_quality_markdown(report)
+            self.assertIn("变量 / 条件 / 选项效果", markdown)
+            self.assertIn("逻辑缺失变量 / 非数字加减 / 条件符号不匹配", markdown)
+
     def test_vn_baseline_quality_report_flags_static_character_staging(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             bundle_dir = Path(temp_dir) / "bundle"

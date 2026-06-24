@@ -5434,6 +5434,7 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
     assets = assets_doc.get("assets") if isinstance(assets_doc.get("assets"), list) else []
     assets_by_id = {str(asset.get("id")): asset for asset in assets if isinstance(asset, dict) and asset.get("id")}
     video_asset_count = sum(1 for asset in assets if isinstance(asset, dict) and asset.get("type") == "video")
+    variables, variables_by_id, duplicate_variable_ids = get_export_variable_map(payload)
     characters_doc = payload.get("characters") if isinstance(payload.get("characters"), dict) else {}
     characters = characters_doc.get("characters") if isinstance(characters_doc.get("characters"), list) else []
     chapters = payload.get("chapters") if isinstance(payload.get("chapters"), list) else []
@@ -5446,6 +5447,16 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
     narration_count = 0
     choice_count = 0
     empty_text_count = 0
+    condition_count = 0
+    condition_branch_count = 0
+    condition_rule_count = 0
+    condition_empty_branch_count = 0
+    choice_effect_count = 0
+    variable_set_count = 0
+    variable_add_count = 0
+    logic_missing_variable_count = 0
+    logic_non_number_add_count = 0
+    logic_operator_mismatch_count = 0
     character_show_count = 0
     character_hide_count = 0
     character_transition_count = 0
@@ -5534,6 +5545,55 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
                         if normalized_option_text in seen_choice_texts:
                             duplicate_choice_option_count += 1
                         seen_choice_texts.add(normalized_option_text)
+                    effects = option.get("effects") if isinstance(option.get("effects"), list) else []
+                    for effect in effects:
+                        if not isinstance(effect, dict):
+                            continue
+                        effect_type = str(effect.get("type") or "").strip()
+                        if effect_type not in {"variable_set", "variable_add"}:
+                            continue
+                        choice_effect_count += 1
+                        variable_id = str(effect.get("variableId") or "").strip()
+                        variable = variables_by_id.get(variable_id)
+                        if not variable:
+                            logic_missing_variable_count += 1
+                        elif effect_type == "variable_add" and normalize_variable_type(variable.get("type")) != "number":
+                            logic_non_number_add_count += 1
+            elif block_type == "variable_set":
+                variable_set_count += 1
+                variable_id = str(block.get("variableId") or "").strip()
+                if variable_id not in variables_by_id:
+                    logic_missing_variable_count += 1
+            elif block_type == "variable_add":
+                variable_add_count += 1
+                variable_id = str(block.get("variableId") or "").strip()
+                variable = variables_by_id.get(variable_id)
+                if not variable:
+                    logic_missing_variable_count += 1
+                elif normalize_variable_type(variable.get("type")) != "number":
+                    logic_non_number_add_count += 1
+            elif block_type == "condition":
+                condition_count += 1
+                branches = block.get("branches") if isinstance(block.get("branches"), list) else []
+                condition_branch_count += len(branches)
+                if not branches:
+                    condition_empty_branch_count += 1
+                for branch in branches:
+                    if not isinstance(branch, dict):
+                        continue
+                    rules = branch.get("when") if isinstance(branch.get("when"), list) else []
+                    condition_rule_count += len(rules)
+                    if not rules:
+                        condition_empty_branch_count += 1
+                    for rule in rules:
+                        if not isinstance(rule, dict):
+                            continue
+                        variable_id = str(rule.get("variableId") or "").strip()
+                        variable = variables_by_id.get(variable_id)
+                        if not variable:
+                            logic_missing_variable_count += 1
+                        elif not condition_operator_matches_variable_type(normalize_variable_type(variable.get("type")), rule.get("operator")):
+                            logic_operator_mismatch_count += 1
             elif block_type == "character_show":
                 character_show_count += 1
                 character_position_values.add(str(block.get("position") or "center").strip() or "center")
@@ -5789,6 +5849,42 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             f"检测到 {empty_choice_option_count} 个选项按钮没有文案。",
             "补齐选项文案或删除空选项，避免玩家在原生 Runtime 里看到空白按钮。",
         )
+    if duplicate_variable_ids:
+        add_vn_baseline_issue(
+            issues,
+            "warn",
+            "logic_variable_duplicate_id",
+            "变量 ID 存在重复",
+            f"检测到 {len(duplicate_variable_ids)} 个重复变量 ID：{', '.join(sorted(duplicate_variable_ids)[:3])}",
+            "回到变量库合并或重命名重复变量，避免条件分支、选项效果和存档摘要读到不可预测的值。",
+        )
+    if logic_missing_variable_count:
+        add_vn_baseline_issue(
+            issues,
+            "warn",
+            "logic_variable_missing",
+            "逻辑卡片引用了不存在的变量",
+            f"检测到 {logic_missing_variable_count} 处变量设置、条件判断或选项效果引用了缺失变量。",
+            "重新选择变量或先在变量库创建对应变量；否则原生 Runtime 会跳过这些逻辑，分支状态可能失效。",
+        )
+    if logic_non_number_add_count:
+        add_vn_baseline_issue(
+            issues,
+            "warn",
+            "logic_variable_add_type",
+            "数字加减绑定了非数字变量",
+            f"检测到 {logic_non_number_add_count} 处变量加减或选项加减效果没有绑定数字变量。",
+            "把变量加减改绑到 number 类型变量，或改用变量设置效果；否则 Runtime 会忽略这类变化。",
+        )
+    if logic_operator_mismatch_count:
+        add_vn_baseline_issue(
+            issues,
+            "warn",
+            "logic_condition_operator",
+            "条件比较方式和变量类型不匹配",
+            f"检测到 {logic_operator_mismatch_count} 条条件规则使用了不适合当前变量类型的比较符。",
+            "文本和开关变量只用等于/不等于；大于、小于这类比较请改用数字变量。",
+        )
     if characters and characters_with_sprite < len(characters):
         add_vn_baseline_issue(
             issues,
@@ -5897,6 +5993,15 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             "选项按钮数量偏多",
             f"检测到 {crowded_choice_block_count} 个选项卡片超过 4 个按钮。",
             "如果不是菜单式选择，建议拆成两层选择或减少同屏按钮数量，提升手柄/键盘选择体验。",
+        )
+    if condition_empty_branch_count:
+        add_vn_baseline_issue(
+            issues,
+            "soft",
+            "logic_condition_empty",
+            "条件分支规则不完整",
+            f"检测到 {condition_empty_branch_count} 个条件分支没有分支或没有规则。",
+            "补齐条件规则，或确认这些分支就是默认兜底逻辑；发布前最好避免看起来像半成品的空条件。",
         )
     if scene_count >= 3 and sfx_play_count == 0:
         add_vn_baseline_issue(
@@ -6014,6 +6119,18 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             "dialogueCount": dialogue_count,
             "narrationCount": narration_count,
             "choiceCount": choice_count,
+            "variableCount": len(variables_by_id),
+            "duplicateVariableIdCount": len(duplicate_variable_ids),
+            "variableSetCount": variable_set_count,
+            "variableAddCount": variable_add_count,
+            "conditionCount": condition_count,
+            "conditionBranchCount": condition_branch_count,
+            "conditionRuleCount": condition_rule_count,
+            "conditionEmptyBranchCount": condition_empty_branch_count,
+            "choiceEffectCount": choice_effect_count,
+            "logicMissingVariableCount": logic_missing_variable_count,
+            "logicNonNumberAddCount": logic_non_number_add_count,
+            "logicOperatorMismatchCount": logic_operator_mismatch_count,
             "characterCount": len(characters),
             "charactersWithSpriteCount": characters_with_sprite,
             "characterShowCount": character_show_count,
@@ -6075,6 +6192,8 @@ def render_native_runtime_vn_baseline_quality_markdown(report: dict) -> str:
     metric_rows = [
         ("场景数", metrics.get("storySceneCount")),
         ("台词 / 旁白 / 选项", f"{int(metrics.get('dialogueCount') or 0)} / {int(metrics.get('narrationCount') or 0)} / {int(metrics.get('choiceCount') or 0)}"),
+        ("变量 / 条件 / 选项效果", f"{int(metrics.get('variableCount') or 0)} / {int(metrics.get('conditionCount') or 0)} / {int(metrics.get('choiceEffectCount') or 0)}"),
+        ("逻辑缺失变量 / 非数字加减 / 条件符号不匹配", f"{int(metrics.get('logicMissingVariableCount') or 0)} / {int(metrics.get('logicNonNumberAddCount') or 0)} / {int(metrics.get('logicOperatorMismatchCount') or 0)}"),
         ("选项按钮总数", metrics.get("choiceOptionCount")),
         ("空白 / 超长 / 重复选项", f"{int(metrics.get('emptyChoiceOptionCount') or 0)} / {int(metrics.get('longChoiceOptionCount') or 0)} / {int(metrics.get('duplicateChoiceOptionCount') or 0)}"),
         ("拥挤选项卡", metrics.get("crowdedChoiceBlockCount")),
@@ -6379,6 +6498,8 @@ def render_native_runtime_release_control_markdown(payload: dict) -> str:
         for label, value in [
             ("场景数", vn_metrics.get("storySceneCount")),
             ("台词 / 旁白 / 选项", f"{int(vn_metrics.get('dialogueCount') or 0)} / {int(vn_metrics.get('narrationCount') or 0)} / {int(vn_metrics.get('choiceCount') or 0)}"),
+            ("变量 / 条件 / 选项效果", f"{int(vn_metrics.get('variableCount') or 0)} / {int(vn_metrics.get('conditionCount') or 0)} / {int(vn_metrics.get('choiceEffectCount') or 0)}"),
+            ("逻辑缺失变量 / 非数字加减 / 条件符号不匹配", f"{int(vn_metrics.get('logicMissingVariableCount') or 0)} / {int(vn_metrics.get('logicNonNumberAddCount') or 0)} / {int(vn_metrics.get('logicOperatorMismatchCount') or 0)}"),
             ("选项按钮总数", vn_metrics.get("choiceOptionCount")),
             ("空白 / 超长 / 重复选项", f"{int(vn_metrics.get('emptyChoiceOptionCount') or 0)} / {int(vn_metrics.get('longChoiceOptionCount') or 0)} / {int(vn_metrics.get('duplicateChoiceOptionCount') or 0)}"),
             ("拥挤选项卡", vn_metrics.get("crowdedChoiceBlockCount")),
