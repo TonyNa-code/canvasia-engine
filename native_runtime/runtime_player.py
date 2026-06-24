@@ -5447,6 +5447,9 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
     empty_text_count = 0
     character_show_count = 0
     character_hide_count = 0
+    character_transition_count = 0
+    character_position_values: set[str] = set()
+    character_stage_adjustment_count = 0
     scenes_with_background = 0
     scenes_with_music = 0
     scenes_with_effects = 0
@@ -5493,8 +5496,23 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
                 choice_count += 1
             elif block_type == "character_show":
                 character_show_count += 1
+                character_position_values.add(str(block.get("position") or "center").strip() or "center")
+                if get_safe_character_transition(block.get("transition")) != "none" and get_safe_transition_duration_ms(block.get("transitionDurationMs"), 600) > 0:
+                    character_transition_count += 1
+                stage = get_safe_character_stage(block.get("stage") if isinstance(block.get("stage"), dict) else None)
+                if (
+                    stage.get("offsetX") != 0
+                    or stage.get("offsetY") != 0
+                    or stage.get("scale") != 100
+                    or stage.get("opacity") != 100
+                    or stage.get("layer") != 0
+                    or stage.get("flipX")
+                ):
+                    character_stage_adjustment_count += 1
             elif block_type == "character_hide":
                 character_hide_count += 1
+                if get_safe_character_transition(block.get("transition")) != "none" and get_safe_transition_duration_ms(block.get("transitionDurationMs"), 600) > 0:
+                    character_transition_count += 1
             elif block_type == "background":
                 scene_has_background = True
             elif block_type == "music_play":
@@ -5729,6 +5747,33 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             "检测到角色登场，但没有隐藏角色卡片。",
             "章节切换或角色离场时补一个隐藏卡片，避免立绘残留。",
         )
+    if character_show_count >= 3 and character_transition_count == 0:
+        add_vn_baseline_issue(
+            issues,
+            "soft",
+            "character_transition_missing",
+            "人物登场缺少基础转场",
+            f"检测到 {character_show_count} 次角色登场，但没有淡入、滑入、上浮或弹出转场。",
+            "给主要角色登场/退场设置轻量转场，不需要每张卡都动，但关键情绪点应避免硬切。",
+        )
+    if character_show_count >= 3 and len(character_position_values) <= 1:
+        add_vn_baseline_issue(
+            issues,
+            "soft",
+            "character_position_static",
+            "人物站位过于固定",
+            f"检测到 {character_show_count} 次角色登场，但只使用了 {len(character_position_values)} 种站位。",
+            "为对话双方或重点角色使用 left / center / right 等站位变化，减少所有立绘都堆在同一位置的观感。",
+        )
+    if character_show_count >= 4 and character_stage_adjustment_count == 0:
+        add_vn_baseline_issue(
+            issues,
+            "soft",
+            "character_stage_static",
+            "人物舞台参数没有变化",
+            "多次角色登场没有检测到缩放、透明度、偏移、翻转或层级调整。",
+            "在近景、回忆、压迫感或角色切换时适当使用缩放/透明度/偏移，让立绘调度更接近正式 VN。",
+        )
     if scene_count >= 2 and text_density < 2:
         add_vn_baseline_issue(
             issues,
@@ -5777,6 +5822,9 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             "charactersWithSpriteCount": characters_with_sprite,
             "characterShowCount": character_show_count,
             "characterHideCount": character_hide_count,
+            "characterTransitionCount": character_transition_count,
+            "characterPositionVariantCount": len(character_position_values),
+            "characterStageAdjustmentCount": character_stage_adjustment_count,
             "scenesWithBackground": scenes_with_background,
             "scenesWithMusic": scenes_with_music,
             "scenesWithEffects": scenes_with_effects,
@@ -5813,6 +5861,9 @@ def render_native_runtime_vn_baseline_quality_markdown(report: dict) -> str:
         ("场景数", metrics.get("storySceneCount")),
         ("台词 / 旁白 / 选项", f"{int(metrics.get('dialogueCount') or 0)} / {int(metrics.get('narrationCount') or 0)} / {int(metrics.get('choiceCount') or 0)}"),
         ("角色立绘覆盖", f"{int(metrics.get('charactersWithSpriteCount') or 0)} / {int(metrics.get('characterCount') or 0)}"),
+        ("人物转场 / 登场", f"{int(metrics.get('characterTransitionCount') or 0)} / {int(metrics.get('characterShowCount') or 0)}"),
+        ("人物站位变化", metrics.get("characterPositionVariantCount")),
+        ("人物舞台调整", metrics.get("characterStageAdjustmentCount")),
         ("背景覆盖", f"{int(metrics.get('scenesWithBackground') or 0)} / {int(metrics.get('storySceneCount') or 0)}"),
         ("BGM 进入点", metrics.get("scenesWithMusic")),
         ("BGM 播放 / 停止", f"{int(metrics.get('musicPlayCount') or 0)} / {int(metrics.get('musicStopCount') or 0)}"),
@@ -6104,6 +6155,9 @@ def render_native_runtime_release_control_markdown(payload: dict) -> str:
             ("场景数", vn_metrics.get("storySceneCount")),
             ("台词 / 旁白 / 选项", f"{int(vn_metrics.get('dialogueCount') or 0)} / {int(vn_metrics.get('narrationCount') or 0)} / {int(vn_metrics.get('choiceCount') or 0)}"),
             ("角色立绘覆盖", f"{int(vn_metrics.get('charactersWithSpriteCount') or 0)} / {int(vn_metrics.get('characterCount') or 0)}"),
+            ("人物转场 / 登场", f"{int(vn_metrics.get('characterTransitionCount') or 0)} / {int(vn_metrics.get('characterShowCount') or 0)}"),
+            ("人物站位变化", vn_metrics.get("characterPositionVariantCount")),
+            ("人物舞台调整", vn_metrics.get("characterStageAdjustmentCount")),
             ("背景覆盖", f"{int(vn_metrics.get('scenesWithBackground') or 0)} / {int(vn_metrics.get('storySceneCount') or 0)}"),
             ("BGM 进入点", vn_metrics.get("scenesWithMusic")),
             ("BGM 播放 / 停止", f"{int(vn_metrics.get('musicPlayCount') or 0)} / {int(vn_metrics.get('musicStopCount') or 0)}"),

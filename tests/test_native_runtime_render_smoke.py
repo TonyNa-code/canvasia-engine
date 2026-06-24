@@ -404,6 +404,57 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             self.assertIn("路线跳转目标缺失", markdown)
             self.assertIn("入口不可达场景", markdown)
 
+    def test_vn_baseline_quality_report_flags_static_character_staging(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_dir = Path(temp_dir) / "bundle"
+            bundle_dir.mkdir(parents=True)
+            game_data = {
+                "project": {
+                    "projectId": "native_character_stage_quality_smoke",
+                    "title": "Native Character Stage Quality Smoke",
+                    "entrySceneId": "scene_stage",
+                },
+                "assets": {"assets": []},
+                "characters": {"characters": []},
+                "chapters": [
+                    {
+                        "id": "chapter_1",
+                        "name": "Chapter 1",
+                        "scenes": [
+                            {
+                                "id": "scene_stage",
+                                "name": "Stage",
+                                "blocks": [
+                                    {"id": "show_1", "type": "character_show", "characterId": "heroine", "position": "center", "transition": "none"},
+                                    {"id": "show_2", "type": "character_show", "characterId": "heroine", "position": "center", "transition": "none"},
+                                    {"id": "show_3", "type": "character_show", "characterId": "heroine", "position": "center", "transition": "none"},
+                                    {"id": "show_4", "type": "character_show", "characterId": "heroine", "position": "center", "transition": "none"},
+                                    {"id": "line_1", "type": "dialogue", "speakerId": "heroine", "text": "Static staging 1."},
+                                    {"id": "line_2", "type": "dialogue", "speakerId": "heroine", "text": "Static staging 2."},
+                                    {"id": "line_3", "type": "dialogue", "speakerId": "heroine", "text": "Static staging 3."},
+                                ],
+                            }
+                        ],
+                    }
+                ],
+            }
+            (bundle_dir / "game_data.json").write_text(json.dumps(game_data, ensure_ascii=False), encoding="utf-8")
+
+            report = build_native_runtime_vn_baseline_quality_report(bundle_dir)
+
+            self.assertEqual(report["metrics"]["characterShowCount"], 4)
+            self.assertEqual(report["metrics"]["characterTransitionCount"], 0)
+            self.assertEqual(report["metrics"]["characterPositionVariantCount"], 1)
+            self.assertEqual(report["metrics"]["characterStageAdjustmentCount"], 0)
+            issue_codes = {issue["code"] for issue in report["issues"]}
+            self.assertIn("character_transition_missing", issue_codes)
+            self.assertIn("character_position_static", issue_codes)
+            self.assertIn("character_stage_static", issue_codes)
+
+            markdown = render_native_runtime_vn_baseline_quality_markdown(report)
+            self.assertIn("人物转场 / 登场", markdown)
+            self.assertIn("人物舞台参数没有变化", markdown)
+
 
 @unittest.skipIf(pygame is None, "pygame-ce is not installed")
 class NativeRuntimeRenderSmokeTests(unittest.TestCase):
