@@ -191,6 +191,10 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             self.assertEqual(report["metrics"]["videoAssetCount"], 0)
             self.assertEqual(report["metrics"]["videoPlayCount"], 0)
             self.assertEqual(report["metrics"]["missingVideoAssetCount"], 0)
+            self.assertEqual(report["metrics"]["creditsRollCount"], 0)
+            self.assertEqual(report["metrics"]["creditsLineCount"], 0)
+            self.assertEqual(report["metrics"]["emptyCreditsRollCount"], 0)
+            self.assertEqual(report["metrics"]["shortCreditsRollCount"], 0)
             self.assertEqual(report["metrics"]["musicPlayCount"], 0)
             self.assertEqual(report["metrics"]["musicFadeInCount"], 0)
             self.assertEqual(report["metrics"]["voiceBoundLineCount"], 0)
@@ -207,6 +211,7 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             self.assertIn("空白 / 超长 / 重复选项", markdown)
             self.assertIn("音效点 / 缺失音效", markdown)
             self.assertIn("视频素材 / 播放卡 / 缺失视频", markdown)
+            self.assertIn("结局 / 片尾字幕 / 字幕行", markdown)
             self.assertIn("BGM 淡入 / 淡出", markdown)
             self.assertIn("背景转场 / 背景卡", markdown)
             self.assertIn("语音覆盖", markdown)
@@ -796,6 +801,115 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
 
             markdown = render_native_runtime_vn_baseline_quality_markdown(report)
             self.assertIn("视频素材还没有进入剧情", markdown)
+
+    def test_vn_baseline_quality_report_flags_credits_roll_content_gaps(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_dir = Path(temp_dir) / "bundle"
+            bundle_dir.mkdir(parents=True)
+            game_data = {
+                "project": {
+                    "projectId": "native_credits_quality_smoke",
+                    "title": "Native Credits Quality Smoke",
+                    "entrySceneId": "scene_credits",
+                },
+                "assets": {"assets": []},
+                "characters": {"characters": []},
+                "chapters": [
+                    {
+                        "id": "chapter_1",
+                        "name": "Chapter 1",
+                        "scenes": [
+                            {
+                                "id": "scene_credits",
+                                "name": "Credits",
+                                "blocks": [
+                                    {
+                                        "id": "credits_empty",
+                                        "type": "credits_roll",
+                                        "title": "",
+                                        "subtitle": "",
+                                        "lines": [],
+                                        "durationSeconds": 0,
+                                    },
+                                    {
+                                        "id": "credits_short",
+                                        "type": "credits_roll",
+                                        "title": "STAFF",
+                                        "lines": ["企划：A", "美术：B"],
+                                        "durationSeconds": 3,
+                                    },
+                                    {"id": "line_1", "type": "narration", "text": "Credits check."},
+                                ],
+                            }
+                        ],
+                    }
+                ],
+            }
+            (bundle_dir / "game_data.json").write_text(json.dumps(game_data, ensure_ascii=False), encoding="utf-8")
+
+            report = build_native_runtime_vn_baseline_quality_report(bundle_dir)
+
+            self.assertEqual(report["status"], "needs_fix")
+            self.assertEqual(report["metrics"]["creditsRollCount"], 2)
+            self.assertEqual(report["metrics"]["creditsLineCount"], 2)
+            self.assertEqual(report["metrics"]["emptyCreditsRollCount"], 1)
+            self.assertEqual(report["metrics"]["shortCreditsRollCount"], 2)
+            issue_codes = {issue["code"] for issue in report["issues"]}
+            self.assertIn("credits_empty", issue_codes)
+            self.assertIn("credits_duration_short", issue_codes)
+
+            markdown = render_native_runtime_vn_baseline_quality_markdown(report)
+            self.assertIn("片尾字幕内容为空", markdown)
+            self.assertIn("空片尾 / 过短片尾", markdown)
+
+    def test_vn_baseline_quality_report_flags_missing_credits_for_ending_scene(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_dir = Path(temp_dir) / "bundle"
+            bundle_dir.mkdir(parents=True)
+            game_data = {
+                "project": {
+                    "projectId": "native_missing_credits_quality_smoke",
+                    "title": "Native Missing Credits Quality Smoke",
+                    "entrySceneId": "scene_start",
+                },
+                "assets": {"assets": []},
+                "characters": {"characters": []},
+                "chapters": [
+                    {
+                        "id": "chapter_1",
+                        "name": "Chapter 1",
+                        "scenes": [
+                            {
+                                "id": "scene_start",
+                                "name": "Start",
+                                "blocks": [
+                                    {
+                                        "id": "choice_1",
+                                        "type": "choice",
+                                        "options": [{"text": "End", "gotoSceneId": "scene_end"}],
+                                    }
+                                ],
+                            },
+                            {
+                                "id": "scene_end",
+                                "name": "End",
+                                "blocks": [{"id": "line_end", "type": "narration", "text": "The end."}],
+                            },
+                        ],
+                    }
+                ],
+            }
+            (bundle_dir / "game_data.json").write_text(json.dumps(game_data, ensure_ascii=False), encoding="utf-8")
+
+            report = build_native_runtime_vn_baseline_quality_report(bundle_dir)
+
+            self.assertEqual(report["metrics"]["endingSceneCount"], 1)
+            self.assertEqual(report["metrics"]["creditsRollCount"], 0)
+            issue_codes = {issue["code"] for issue in report["issues"]}
+            self.assertIn("credits_missing", issue_codes)
+
+            markdown = render_native_runtime_vn_baseline_quality_markdown(report)
+            self.assertIn("结局缺少片尾收束", markdown)
 
 
 @unittest.skipIf(pygame is None, "pygame-ce is not installed")

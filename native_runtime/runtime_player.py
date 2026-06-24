@@ -5470,6 +5470,11 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
     video_play_count = 0
     missing_video_asset_count = 0
     missing_video_asset_names: list[str] = []
+    credits_roll_count = 0
+    credits_line_count = 0
+    empty_credits_roll_count = 0
+    short_credits_roll_count = 0
+    short_credits_roll_names: list[str] = []
     music_play_count = 0
     music_stop_count = 0
     music_scoped_count = 0
@@ -5587,6 +5592,20 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
                 if not video_asset or not get_asset_runtime_path(bundle_dir, video_asset):
                     missing_video_asset_count += 1
                     missing_video_asset_names.append(str(block.get("id") or video_asset_id or "未命名视频卡"))
+            elif block_type == "credits_roll":
+                credits_roll_count += 1
+                lines = block.get("lines") if isinstance(block.get("lines"), list) else []
+                non_empty_lines = [str(line).strip() for line in lines if str(line).strip()]
+                credits_line_count += len(non_empty_lines)
+                if not str(block.get("title") or "").strip() and not str(block.get("subtitle") or "").strip() and not non_empty_lines:
+                    empty_credits_roll_count += 1
+                try:
+                    credits_duration_seconds = float(block.get("durationSeconds") or 0)
+                except (TypeError, ValueError):
+                    credits_duration_seconds = 0.0
+                if credits_duration_seconds < 4:
+                    short_credits_roll_count += 1
+                    short_credits_roll_names.append(str(block.get("id") or block.get("title") or "未命名片尾字幕"))
             elif block_type in VN_BASELINE_EFFECT_BLOCK_TYPES:
                 scene_has_effect = True
             text = get_vn_baseline_block_text(block)
@@ -5650,6 +5669,7 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
                 if target in valid_scene_ids and target not in reachable_scene_ids:
                     pending_scene_ids.append(target)
     unreachable_scene_ids = sorted(valid_scene_ids - reachable_scene_ids) if reachable_scene_ids else []
+    ending_scene_count = len(build_ending_scene_ids(chapters))
     issues: list[dict] = []
 
     if not scenes:
@@ -5741,6 +5761,24 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             "存在缺失的视频文件",
             f"检测到 {missing_video_asset_count} 张视频播放卡片没有可用文件：{', '.join(missing_video_asset_names[:3])}",
             "重新导入或替换缺失 OP、ED、PV 或过场视频素材，再导出原生 Runtime，避免玩家点击播放后只看到占位提示。",
+        )
+    if empty_credits_roll_count:
+        add_vn_baseline_issue(
+            issues,
+            "warn",
+            "credits_empty",
+            "片尾字幕内容为空",
+            f"检测到 {empty_credits_roll_count} 张片尾字幕卡片没有标题、副标题或字幕行。",
+            "补齐 STAFF、感谢名单或制作信息；如果暂时不需要片尾，请删除空片尾字幕卡片，避免玩家看到空白收尾。",
+        )
+    if short_credits_roll_count:
+        add_vn_baseline_issue(
+            issues,
+            "warn",
+            "credits_duration_short",
+            "片尾字幕时长过短",
+            f"检测到 {short_credits_roll_count} 张片尾字幕低于 4 秒：{', '.join(short_credits_roll_names[:3])}",
+            "将片尾字幕时长调到 8-30 秒，确保 STAFF 和感谢信息能被正常读完。",
         )
     if empty_choice_option_count:
         add_vn_baseline_issue(
@@ -5878,6 +5916,15 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             f"检测到 {video_asset_count} 个视频素材，但没有播放视频卡片。",
             "如果这些是 OP、ED、PV 或过场动画，建议放入对应章节并跑一次原生 Runtime 视频桥接检查。",
         )
+    if scene_count >= 2 and ending_scene_count and credits_roll_count == 0:
+        add_vn_baseline_issue(
+            issues,
+            "soft",
+            "credits_missing",
+            "结局缺少片尾收束",
+            f"检测到 {ending_scene_count} 个收束场景，但没有片尾字幕卡片。",
+            "为正式版结局或试玩 Demo 补一个简短 STAFF / Thank You 片尾，能让作品结束感更完整。",
+        )
     if dialogue_count >= 3 and character_show_count == 0:
         add_vn_baseline_issue(
             issues,
@@ -5991,6 +6038,11 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             "videoAssetCount": video_asset_count,
             "videoPlayCount": video_play_count,
             "missingVideoAssetCount": missing_video_asset_count,
+            "endingSceneCount": ending_scene_count,
+            "creditsRollCount": credits_roll_count,
+            "creditsLineCount": credits_line_count,
+            "emptyCreditsRollCount": empty_credits_roll_count,
+            "shortCreditsRollCount": short_credits_roll_count,
             "musicPlayCount": music_play_count,
             "musicStopCount": music_stop_count,
             "musicScopedCount": music_scoped_count,
@@ -6028,6 +6080,8 @@ def render_native_runtime_vn_baseline_quality_markdown(report: dict) -> str:
         ("拥挤选项卡", metrics.get("crowdedChoiceBlockCount")),
         ("音效点 / 缺失音效", f"{int(metrics.get('sfxPlayCount') or 0)} / {int(metrics.get('missingSfxAssetCount') or 0)}"),
         ("视频素材 / 播放卡 / 缺失视频", f"{int(metrics.get('videoAssetCount') or 0)} / {int(metrics.get('videoPlayCount') or 0)} / {int(metrics.get('missingVideoAssetCount') or 0)}"),
+        ("结局 / 片尾字幕 / 字幕行", f"{int(metrics.get('endingSceneCount') or 0)} / {int(metrics.get('creditsRollCount') or 0)} / {int(metrics.get('creditsLineCount') or 0)}"),
+        ("空片尾 / 过短片尾", f"{int(metrics.get('emptyCreditsRollCount') or 0)} / {int(metrics.get('shortCreditsRollCount') or 0)}"),
         ("角色立绘覆盖", f"{int(metrics.get('charactersWithSpriteCount') or 0)} / {int(metrics.get('characterCount') or 0)}"),
         ("人物转场 / 登场", f"{int(metrics.get('characterTransitionCount') or 0)} / {int(metrics.get('characterShowCount') or 0)}"),
         ("人物站位变化", metrics.get("characterPositionVariantCount")),
@@ -6330,6 +6384,8 @@ def render_native_runtime_release_control_markdown(payload: dict) -> str:
             ("拥挤选项卡", vn_metrics.get("crowdedChoiceBlockCount")),
             ("音效点 / 缺失音效", f"{int(vn_metrics.get('sfxPlayCount') or 0)} / {int(vn_metrics.get('missingSfxAssetCount') or 0)}"),
             ("视频素材 / 播放卡 / 缺失视频", f"{int(vn_metrics.get('videoAssetCount') or 0)} / {int(vn_metrics.get('videoPlayCount') or 0)} / {int(vn_metrics.get('missingVideoAssetCount') or 0)}"),
+            ("结局 / 片尾字幕 / 字幕行", f"{int(vn_metrics.get('endingSceneCount') or 0)} / {int(vn_metrics.get('creditsRollCount') or 0)} / {int(vn_metrics.get('creditsLineCount') or 0)}"),
+            ("空片尾 / 过短片尾", f"{int(vn_metrics.get('emptyCreditsRollCount') or 0)} / {int(vn_metrics.get('shortCreditsRollCount') or 0)}"),
             ("角色立绘覆盖", f"{int(vn_metrics.get('charactersWithSpriteCount') or 0)} / {int(vn_metrics.get('characterCount') or 0)}"),
             ("人物转场 / 登场", f"{int(vn_metrics.get('characterTransitionCount') or 0)} / {int(vn_metrics.get('characterShowCount') or 0)}"),
             ("人物站位变化", vn_metrics.get("characterPositionVariantCount")),
