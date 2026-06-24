@@ -5625,6 +5625,8 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
     no_action_choice_option_names: list[str] = []
     same_target_choice_count = 0
     same_target_choice_names: list[str] = []
+    same_target_condition_count = 0
+    same_target_condition_names: list[str] = []
     sfx_play_count = 0
     missing_sfx_asset_count = 0
     missing_sfx_asset_names: list[str] = []
@@ -5815,6 +5817,17 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
                             condition_read_variable_ids.add(variable_id)
                             if not condition_operator_matches_variable_type(normalize_variable_type(variable.get("type")), rule.get("operator")):
                                 logic_operator_mismatch_count += 1
+                conditional_targets = [
+                    str(branch.get("gotoSceneId") or "").strip()
+                    for branch in branches
+                    if isinstance(branch, dict)
+                    and str(branch.get("gotoSceneId") or "").strip()
+                    and isinstance(branch.get("when"), list)
+                    and branch.get("when")
+                ]
+                if len(conditional_targets) >= 2 and len(set(conditional_targets)) == 1:
+                    same_target_condition_count += 1
+                    same_target_condition_names.append(str(block.get("id") or "condition"))
             elif block_type == "character_show":
                 character_show_count += 1
                 character_id = str(block.get("characterId") or "").strip()
@@ -6233,6 +6246,15 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             "部分选项分支结果完全相同",
             f"检测到 {same_target_choice_count} 个选项卡的多个按钮都跳到同一个场景且没有变量效果：{', '.join(same_target_choice_names[:3])}",
             "如果这是有意设计，建议至少加变量记录、好感度变化或后续差分；否则请拆出不同目标，避免玩家觉得选项只是装饰。",
+        )
+    if same_target_condition_count:
+        add_vn_baseline_issue(
+            issues,
+            "soft",
+            "condition_same_target",
+            "部分条件分支结果完全相同",
+            f"检测到 {same_target_condition_count} 个条件卡的多个有效分支都跳到同一个场景：{', '.join(same_target_condition_names[:3])}",
+            "如果这是共通收束，请确认变量变化会在后续产生差分；否则建议把不同条件接到不同场景，避免条件分支看起来只是装饰。",
         )
     if target_i18n_languages and fallback_language not in supported_languages:
         add_vn_baseline_issue(
@@ -6710,6 +6732,7 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             "crowdedChoiceBlockCount": crowded_choice_block_count,
             "noActionChoiceOptionCount": no_action_choice_option_count,
             "sameTargetChoiceCount": same_target_choice_count,
+            "sameTargetConditionCount": same_target_condition_count,
             "sfxPlayCount": sfx_play_count,
             "missingSfxAssetCount": missing_sfx_asset_count,
             "videoAssetCount": video_asset_count,
@@ -6803,6 +6826,7 @@ def render_native_runtime_vn_baseline_quality_markdown(report: dict) -> str:
         ("空白 / 超长 / 重复选项", f"{int(metrics.get('emptyChoiceOptionCount') or 0)} / {int(metrics.get('longChoiceOptionCount') or 0)} / {int(metrics.get('duplicateChoiceOptionCount') or 0)}"),
         ("无动作选项", metrics.get("noActionChoiceOptionCount")),
         ("同目标假分支", metrics.get("sameTargetChoiceCount")),
+        ("同目标条件分支", metrics.get("sameTargetConditionCount")),
         ("拥挤选项卡", metrics.get("crowdedChoiceBlockCount")),
         ("音效点 / 缺失音效", f"{int(metrics.get('sfxPlayCount') or 0)} / {int(metrics.get('missingSfxAssetCount') or 0)}"),
         ("音效素材 / 已入剧情 / 未使用", f"{int(metrics.get('sfxAssetCount') or 0)} / {int(metrics.get('sfxUsedAssetCount') or 0)} / {int(metrics.get('unusedSfxAssetCount') or 0)}"),
@@ -7127,6 +7151,7 @@ def render_native_runtime_release_control_markdown(payload: dict) -> str:
             ("空白 / 超长 / 重复选项", f"{int(vn_metrics.get('emptyChoiceOptionCount') or 0)} / {int(vn_metrics.get('longChoiceOptionCount') or 0)} / {int(vn_metrics.get('duplicateChoiceOptionCount') or 0)}"),
             ("无动作选项", vn_metrics.get("noActionChoiceOptionCount")),
             ("同目标假分支", vn_metrics.get("sameTargetChoiceCount")),
+            ("同目标条件分支", vn_metrics.get("sameTargetConditionCount")),
             ("拥挤选项卡", vn_metrics.get("crowdedChoiceBlockCount")),
             ("音效点 / 缺失音效", f"{int(vn_metrics.get('sfxPlayCount') or 0)} / {int(vn_metrics.get('missingSfxAssetCount') or 0)}"),
             ("音效素材 / 已入剧情 / 未使用", f"{int(vn_metrics.get('sfxAssetCount') or 0)} / {int(vn_metrics.get('sfxUsedAssetCount') or 0)} / {int(vn_metrics.get('unusedSfxAssetCount') or 0)}"),

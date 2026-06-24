@@ -832,6 +832,78 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             self.assertIn("变量 / 条件 / 选项效果", markdown)
             self.assertIn("逻辑缺失变量 / 非数字加减 / 条件符号不匹配", markdown)
 
+    def test_vn_baseline_quality_report_flags_same_target_condition_branches(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_dir = Path(temp_dir) / "bundle"
+            bundle_dir.mkdir(parents=True)
+            game_data = {
+                "project": {
+                    "projectId": "native_condition_same_target_quality_smoke",
+                    "title": "Native Condition Same Target Quality Smoke",
+                    "entrySceneId": "scene_start",
+                },
+                "assets": {"assets": []},
+                "characters": {"characters": []},
+                "variables": {
+                    "variables": [
+                        {"id": "route_a", "name": "Route A", "type": "boolean", "defaultValue": False},
+                        {"id": "route_b", "name": "Route B", "type": "boolean", "defaultValue": False},
+                    ]
+                },
+                "chapters": [
+                    {
+                        "id": "chapter_1",
+                        "name": "Chapter 1",
+                        "scenes": [
+                            {
+                                "id": "scene_start",
+                                "name": "Start",
+                                "blocks": [
+                                    {
+                                        "id": "condition_same_target",
+                                        "type": "condition",
+                                        "elseGotoSceneId": "scene_else",
+                                        "branches": [
+                                            {
+                                                "id": "branch_a",
+                                                "gotoSceneId": "scene_merge",
+                                                "when": [{"variableId": "route_a", "operator": "==", "value": True}],
+                                            },
+                                            {
+                                                "id": "branch_b",
+                                                "gotoSceneId": "scene_merge",
+                                                "when": [{"variableId": "route_b", "operator": "==", "value": True}],
+                                            },
+                                        ],
+                                    }
+                                ],
+                            },
+                            {
+                                "id": "scene_merge",
+                                "name": "Merge",
+                                "blocks": [{"id": "line_merge", "type": "narration", "text": "Both branches arrive here."}],
+                            },
+                            {
+                                "id": "scene_else",
+                                "name": "Else",
+                                "blocks": [{"id": "line_else", "type": "narration", "text": "Fallback route."}],
+                            },
+                        ],
+                    }
+                ],
+            }
+            (bundle_dir / "game_data.json").write_text(json.dumps(game_data, ensure_ascii=False), encoding="utf-8")
+
+            report = build_native_runtime_vn_baseline_quality_report(bundle_dir)
+
+            self.assertEqual(report["metrics"]["sameTargetConditionCount"], 1)
+            issue_codes = {issue["code"] for issue in report["issues"]}
+            self.assertIn("condition_same_target", issue_codes)
+
+            markdown = render_native_runtime_vn_baseline_quality_markdown(report)
+            self.assertIn("同目标条件分支", markdown)
+            self.assertIn("部分条件分支结果完全相同", markdown)
+
     def test_vn_baseline_quality_report_flags_unconsumed_variable_writes(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             bundle_dir = Path(temp_dir) / "bundle"
