@@ -5437,6 +5437,19 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
     variables, variables_by_id, duplicate_variable_ids = get_export_variable_map(payload)
     characters_doc = payload.get("characters") if isinstance(payload.get("characters"), dict) else {}
     characters = characters_doc.get("characters") if isinstance(characters_doc.get("characters"), list) else []
+    characters_by_id = {
+        str(character.get("id")): character
+        for character in characters
+        if isinstance(character, dict) and str(character.get("id") or "").strip()
+    }
+    character_expression_ids_by_id: dict[str, set[str]] = {}
+    for character_id, character in characters_by_id.items():
+        expressions = character.get("expressions") if isinstance(character.get("expressions"), list) else []
+        character_expression_ids_by_id[character_id] = {
+            str(expression.get("id")).strip()
+            for expression in expressions
+            if isinstance(expression, dict) and str(expression.get("id") or "").strip()
+        }
     chapters = payload.get("chapters") if isinstance(payload.get("chapters"), list) else []
     scenes = iter_export_scenes(chapters)
     scene_ids = [str(scene.get("id") or "").strip() for scene in scenes if isinstance(scene, dict)]
@@ -5462,6 +5475,10 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
     character_transition_count = 0
     character_position_values: set[str] = set()
     character_stage_adjustment_count = 0
+    missing_character_ref_count = 0
+    missing_character_ref_names: list[str] = []
+    missing_expression_ref_count = 0
+    missing_expression_ref_names: list[str] = []
     scenes_with_background = 0
     background_block_count = 0
     background_transition_count = 0
@@ -5512,6 +5529,14 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             block_type = str(block.get("type") or "").strip()
             if block_type == "dialogue":
                 dialogue_count += 1
+                speaker_id = str(block.get("speakerId") or "").strip()
+                expression_id = str(block.get("expressionId") or "").strip()
+                if speaker_id and speaker_id not in characters_by_id:
+                    missing_character_ref_count += 1
+                    missing_character_ref_names.append(str(block.get("id") or speaker_id))
+                elif speaker_id and expression_id and expression_id not in character_expression_ids_by_id.get(speaker_id, set()):
+                    missing_expression_ref_count += 1
+                    missing_expression_ref_names.append(str(block.get("id") or f"{speaker_id}:{expression_id}"))
                 voice_asset_id = str(block.get("voiceAssetId") or "").strip()
                 if voice_asset_id:
                     dialogue_voice_count += 1
@@ -5599,6 +5624,14 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
                             logic_operator_mismatch_count += 1
             elif block_type == "character_show":
                 character_show_count += 1
+                character_id = str(block.get("characterId") or "").strip()
+                expression_id = str(block.get("expressionId") or "").strip()
+                if character_id and character_id not in characters_by_id:
+                    missing_character_ref_count += 1
+                    missing_character_ref_names.append(str(block.get("id") or character_id))
+                elif character_id and expression_id and expression_id not in character_expression_ids_by_id.get(character_id, set()):
+                    missing_expression_ref_count += 1
+                    missing_expression_ref_names.append(str(block.get("id") or f"{character_id}:{expression_id}"))
                 character_position_values.add(str(block.get("position") or "center").strip() or "center")
                 if get_safe_character_transition(block.get("transition")) != "none" and get_safe_transition_duration_ms(block.get("transitionDurationMs"), 600) > 0:
                     character_transition_count += 1
@@ -5614,6 +5647,10 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
                     character_stage_adjustment_count += 1
             elif block_type == "character_hide":
                 character_hide_count += 1
+                character_id = str(block.get("characterId") or "").strip()
+                if character_id and character_id not in characters_by_id:
+                    missing_character_ref_count += 1
+                    missing_character_ref_names.append(str(block.get("id") or character_id))
                 if get_safe_character_transition(block.get("transition")) != "none" and get_safe_transition_duration_ms(block.get("transitionDurationMs"), 600) > 0:
                     character_transition_count += 1
             elif block_type == "background":
@@ -5903,6 +5940,24 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             f"{len(characters) - characters_with_sprite} 个角色没有可用立绘文件：{', '.join(characters_missing_sprite[:3])}",
             "即使使用 Live2D / 3D，也建议给每个角色绑定一张兜底立绘，降低目标机器不支持模型时的翻车风险。",
         )
+    if missing_character_ref_count:
+        add_vn_baseline_issue(
+            issues,
+            "warn",
+            "character_reference_missing",
+            "剧情卡片引用了不存在的角色",
+            f"检测到 {missing_character_ref_count} 处台词、角色出场或退场引用了缺失角色：{', '.join(missing_character_ref_names[:3])}",
+            "回到剧情编辑器重新选择说话人或出场角色；删除角色后尤其要跑一次发布检查，避免原生 Runtime 只显示空名或占位人物。",
+        )
+    if missing_expression_ref_count:
+        add_vn_baseline_issue(
+            issues,
+            "warn",
+            "character_expression_missing",
+            "剧情卡片引用了不存在的表情",
+            f"检测到 {missing_expression_ref_count} 处台词或角色出场引用了缺失表情：{', '.join(missing_expression_ref_names[:3])}",
+            "重新选择角色表情，或在角色资料里补回对应表情；否则 Runtime 会回退默认外观，关键表情差分会丢失。",
+        )
     if scene_count and scenes_with_background < scene_count:
         add_vn_baseline_issue(
             issues,
@@ -6165,6 +6220,8 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             "characterTransitionCount": character_transition_count,
             "characterPositionVariantCount": len(character_position_values),
             "characterStageAdjustmentCount": character_stage_adjustment_count,
+            "missingCharacterReferenceCount": missing_character_ref_count,
+            "missingExpressionReferenceCount": missing_expression_ref_count,
             "scenesWithBackground": scenes_with_background,
             "backgroundBlockCount": background_block_count,
             "backgroundTransitionCount": background_transition_count,
@@ -6231,6 +6288,7 @@ def render_native_runtime_vn_baseline_quality_markdown(report: dict) -> str:
         ("结局 / 片尾字幕 / 字幕行", f"{int(metrics.get('endingSceneCount') or 0)} / {int(metrics.get('creditsRollCount') or 0)} / {int(metrics.get('creditsLineCount') or 0)}"),
         ("空片尾 / 过短片尾", f"{int(metrics.get('emptyCreditsRollCount') or 0)} / {int(metrics.get('shortCreditsRollCount') or 0)}"),
         ("角色立绘覆盖", f"{int(metrics.get('charactersWithSpriteCount') or 0)} / {int(metrics.get('characterCount') or 0)}"),
+        ("缺失角色 / 表情引用", f"{int(metrics.get('missingCharacterReferenceCount') or 0)} / {int(metrics.get('missingExpressionReferenceCount') or 0)}"),
         ("人物转场 / 登场", f"{int(metrics.get('characterTransitionCount') or 0)} / {int(metrics.get('characterShowCount') or 0)}"),
         ("人物站位变化", metrics.get("characterPositionVariantCount")),
         ("人物舞台调整", metrics.get("characterStageAdjustmentCount")),
@@ -6538,6 +6596,7 @@ def render_native_runtime_release_control_markdown(payload: dict) -> str:
             ("结局 / 片尾字幕 / 字幕行", f"{int(vn_metrics.get('endingSceneCount') or 0)} / {int(vn_metrics.get('creditsRollCount') or 0)} / {int(vn_metrics.get('creditsLineCount') or 0)}"),
             ("空片尾 / 过短片尾", f"{int(vn_metrics.get('emptyCreditsRollCount') or 0)} / {int(vn_metrics.get('shortCreditsRollCount') or 0)}"),
             ("角色立绘覆盖", f"{int(vn_metrics.get('charactersWithSpriteCount') or 0)} / {int(vn_metrics.get('characterCount') or 0)}"),
+            ("缺失角色 / 表情引用", f"{int(vn_metrics.get('missingCharacterReferenceCount') or 0)} / {int(vn_metrics.get('missingExpressionReferenceCount') or 0)}"),
             ("人物转场 / 登场", f"{int(vn_metrics.get('characterTransitionCount') or 0)} / {int(vn_metrics.get('characterShowCount') or 0)}"),
             ("人物站位变化", vn_metrics.get("characterPositionVariantCount")),
             ("人物舞台调整", vn_metrics.get("characterStageAdjustmentCount")),

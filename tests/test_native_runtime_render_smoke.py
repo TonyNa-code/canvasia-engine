@@ -555,6 +555,60 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             self.assertIn("过长文本 / 多换行文本", markdown)
             self.assertIn("部分文本卡片过长", markdown)
 
+    def test_vn_baseline_quality_report_flags_missing_character_references(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_dir = Path(temp_dir) / "bundle"
+            bundle_dir.mkdir(parents=True)
+            game_data = {
+                "project": {
+                    "projectId": "native_character_reference_quality_smoke",
+                    "title": "Native Character Reference Quality Smoke",
+                    "entrySceneId": "scene_character_refs",
+                },
+                "assets": {"assets": []},
+                "characters": {
+                    "characters": [
+                        {
+                            "id": "heroine",
+                            "displayName": "Heroine",
+                            "expressions": [{"id": "default", "spriteAssetId": ""}],
+                        }
+                    ]
+                },
+                "chapters": [
+                    {
+                        "id": "chapter_1",
+                        "name": "Chapter 1",
+                        "scenes": [
+                            {
+                                "id": "scene_character_refs",
+                                "name": "Character Refs",
+                                "blocks": [
+                                    {"id": "line_missing_speaker", "type": "dialogue", "speakerId": "ghost", "text": "Missing speaker."},
+                                    {"id": "line_missing_expression", "type": "dialogue", "speakerId": "heroine", "expressionId": "smile", "text": "Missing expression."},
+                                    {"id": "show_missing_character", "type": "character_show", "characterId": "ghost", "expressionId": "default"},
+                                    {"id": "show_missing_expression", "type": "character_show", "characterId": "heroine", "expressionId": "angry"},
+                                    {"id": "hide_missing_character", "type": "character_hide", "characterId": "ghost"},
+                                ],
+                            }
+                        ],
+                    }
+                ],
+            }
+            (bundle_dir / "game_data.json").write_text(json.dumps(game_data, ensure_ascii=False), encoding="utf-8")
+
+            report = build_native_runtime_vn_baseline_quality_report(bundle_dir)
+
+            self.assertEqual(report["metrics"]["missingCharacterReferenceCount"], 3)
+            self.assertEqual(report["metrics"]["missingExpressionReferenceCount"], 2)
+            issue_codes = {issue["code"] for issue in report["issues"]}
+            self.assertIn("character_reference_missing", issue_codes)
+            self.assertIn("character_expression_missing", issue_codes)
+
+            markdown = render_native_runtime_vn_baseline_quality_markdown(report)
+            self.assertIn("缺失角色 / 表情引用", markdown)
+            self.assertIn("剧情卡片引用了不存在的角色", markdown)
+
     def test_vn_baseline_quality_report_flags_static_character_staging(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             bundle_dir = Path(temp_dir) / "bundle"

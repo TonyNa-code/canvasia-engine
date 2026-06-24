@@ -2517,6 +2517,10 @@ class RunEditorSmokeTests(unittest.TestCase):
             "bgm",
             [build_upload_payload("native_smoke_theme.wav", build_fake_wav_bytes())],
         )["assets"][0]
+        sprite_asset = run_editor.import_assets(
+            "sprite",
+            [build_upload_payload("native_smoke_heroine.png", build_fake_png_bytes())],
+        )["assets"][0]
         ui_assets = run_editor.import_assets(
             "ui",
             [
@@ -2569,6 +2573,33 @@ class RunEditorSmokeTests(unittest.TestCase):
                 "systemPanelFrameAssetId": ui_assets[8]["id"],
                 "uiOverlayAssetId": ui_assets[9]["id"],
                 "uiOverlayOpacity": 5,
+            },
+        )
+        run_editor.write_json(
+            run_editor.DATA_DIR / "characters.json",
+            {
+                "formatVersion": run_editor.PROJECT_FORMAT_VERSION,
+                "characters": [
+                    {
+                        "id": "heroine",
+                        "displayName": "Heroine",
+                        "nameColor": "#E6876A",
+                        "defaultPosition": "left",
+                        "bio": "Native runtime smoke test character.",
+                        "defaultSpriteId": sprite_asset["id"],
+                        "presentation": {
+                            "mode": "sprite",
+                            "fallbackSpriteAssetId": sprite_asset["id"],
+                        },
+                        "expressions": [
+                            {
+                                "id": "expr_default",
+                                "name": "Default",
+                                "spriteAssetId": sprite_asset["id"],
+                            }
+                        ],
+                    }
+                ],
             },
         )
 
