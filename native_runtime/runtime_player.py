@@ -5604,6 +5604,20 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             if isinstance(expression, dict) and str(expression.get("id") or "").strip()
         }
     chapters = payload.get("chapters") if isinstance(payload.get("chapters"), list) else []
+    chapter_id_counts: dict[str, int] = {}
+    empty_chapter_count = 0
+    empty_chapter_names: list[str] = []
+    for chapter in chapters:
+        if not isinstance(chapter, dict):
+            continue
+        chapter_id = str(chapter.get("id") or chapter.get("chapterId") or "").strip()
+        if chapter_id:
+            chapter_id_counts[chapter_id] = chapter_id_counts.get(chapter_id, 0) + 1
+        chapter_scenes = chapter.get("scenes") if isinstance(chapter.get("scenes"), list) else []
+        if not chapter_scenes:
+            empty_chapter_count += 1
+            empty_chapter_names.append(str(chapter.get("name") or chapter_id or "未命名章节"))
+    duplicate_chapter_ids = sorted(chapter_id for chapter_id, count in chapter_id_counts.items() if count > 1)
     scenes = iter_export_scenes(chapters)
     scene_ids = [str(scene.get("id") or "").strip() for scene in scenes if isinstance(scene, dict)]
     scene_id_counts: dict[str, int] = {}
@@ -6135,7 +6149,25 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             "导出包里没有检测到章节场景。",
             "至少创建一个章节和入口场景，再重新导出原生 Runtime 包。",
         )
-    elif entry_scene_id not in valid_scene_ids:
+    if duplicate_chapter_ids:
+        add_vn_baseline_issue(
+            issues,
+            "warn",
+            "duplicate_chapter_id",
+            "章节 ID 存在重复",
+            f"检测到 {len(duplicate_chapter_ids)} 个重复章节 ID：{', '.join(duplicate_chapter_ids[:3])}",
+            "复制章节后请重新生成或修改章节 ID；重复 ID 会影响章节回放、发布报告和后续迁移工具识别章节。",
+        )
+    if empty_chapter_count:
+        add_vn_baseline_issue(
+            issues,
+            "soft",
+            "empty_chapter",
+            "存在没有场景的空章节",
+            f"检测到 {empty_chapter_count} 个空章节：{', '.join(empty_chapter_names[:3])}",
+            "如果只是草稿章节，建议发布前隐藏、补场景或移出发布包；否则章节回放里会像半成品入口。",
+        )
+    if scenes and entry_scene_id not in valid_scene_ids:
         add_vn_baseline_issue(
             issues,
             "warn",
@@ -6779,6 +6811,9 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             "recommendation": issues[0]["suggestion"] if issues else "基础视觉小说体验未发现明显缺口，可继续做目标系统实机点测。",
         },
         "metrics": {
+            "chapterCount": len(chapters),
+            "duplicateChapterIdCount": len(duplicate_chapter_ids),
+            "emptyChapterCount": empty_chapter_count,
             "storySceneCount": scene_count,
             "duplicateSceneIdCount": len(duplicate_scene_ids),
             "duplicateBlockIdCount": duplicate_block_id_count,
@@ -6915,6 +6950,8 @@ def render_native_runtime_vn_baseline_quality_markdown(report: dict) -> str:
     metrics = report.get("metrics") if isinstance(report.get("metrics"), dict) else {}
     issues = report.get("issues") if isinstance(report.get("issues"), list) else []
     metric_rows = [
+        ("章节数 / 空章节", f"{int(metrics.get('chapterCount') or 0)} / {int(metrics.get('emptyChapterCount') or 0)}"),
+        ("重复章节 ID", metrics.get("duplicateChapterIdCount")),
         ("场景数", metrics.get("storySceneCount")),
         ("重复场景 / 重复卡片 ID", f"{int(metrics.get('duplicateSceneIdCount') or 0)} / {int(metrics.get('duplicateBlockIdCount') or 0)}"),
         ("重复素材 / 角色 / 表情 ID", f"{int(metrics.get('duplicateAssetIdCount') or 0)} / {int(metrics.get('duplicateCharacterIdCount') or 0)} / {int(metrics.get('duplicateExpressionIdCount') or 0)}"),
@@ -7242,6 +7279,8 @@ def render_native_runtime_release_control_markdown(payload: dict) -> str:
     if vn_baseline:
         lines.extend(["## VN 基础质感", "", "| 指标 | 值 |", "| --- | --- |"])
         for label, value in [
+            ("章节数 / 空章节", f"{int(vn_metrics.get('chapterCount') or 0)} / {int(vn_metrics.get('emptyChapterCount') or 0)}"),
+            ("重复章节 ID", vn_metrics.get("duplicateChapterIdCount")),
             ("场景数", vn_metrics.get("storySceneCount")),
             ("重复场景 / 重复卡片 ID", f"{int(vn_metrics.get('duplicateSceneIdCount') or 0)} / {int(vn_metrics.get('duplicateBlockIdCount') or 0)}"),
             ("重复素材 / 角色 / 表情 ID", f"{int(vn_metrics.get('duplicateAssetIdCount') or 0)} / {int(vn_metrics.get('duplicateCharacterIdCount') or 0)} / {int(vn_metrics.get('duplicateExpressionIdCount') or 0)}"),

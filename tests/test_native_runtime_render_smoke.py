@@ -297,6 +297,52 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             self.assertIn("场景 ID 存在重复", markdown)
             self.assertIn("同一场景内存在重复卡片 ID", markdown)
 
+    def test_vn_baseline_quality_report_flags_chapter_structure_gaps(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_dir = Path(temp_dir) / "bundle"
+            bundle_dir.mkdir(parents=True)
+            game_data = {
+                "project": {
+                    "projectId": "native_chapter_structure_quality_smoke",
+                    "title": "Native Chapter Structure Quality Smoke",
+                    "entrySceneId": "missing_entry",
+                },
+                "assets": {"assets": []},
+                "characters": {"characters": []},
+                "chapters": [
+                    {
+                        "id": "chapter_dup",
+                        "name": "Chapter A",
+                        "scenes": [
+                            {
+                                "id": "scene_a",
+                                "name": "Scene A",
+                                "blocks": [{"id": "line_a", "type": "narration", "text": "A."}],
+                            }
+                        ],
+                    },
+                    {"id": "chapter_dup", "name": "Empty Copy", "scenes": []},
+                ],
+            }
+            (bundle_dir / "game_data.json").write_text(json.dumps(game_data, ensure_ascii=False), encoding="utf-8")
+
+            report = build_native_runtime_vn_baseline_quality_report(bundle_dir)
+
+            self.assertEqual(report["status"], "needs_fix")
+            self.assertEqual(report["metrics"]["chapterCount"], 2)
+            self.assertEqual(report["metrics"]["duplicateChapterIdCount"], 1)
+            self.assertEqual(report["metrics"]["emptyChapterCount"], 1)
+            issue_codes = {issue["code"] for issue in report["issues"]}
+            self.assertIn("duplicate_chapter_id", issue_codes)
+            self.assertIn("empty_chapter", issue_codes)
+            self.assertIn("entry_scene_missing", issue_codes)
+
+            markdown = render_native_runtime_vn_baseline_quality_markdown(report)
+            self.assertIn("章节数 / 空章节", markdown)
+            self.assertIn("重复章节 ID", markdown)
+            self.assertIn("章节 ID 存在重复", markdown)
+            self.assertIn("存在没有场景的空章节", markdown)
+
     def test_vn_baseline_quality_report_flags_duplicate_resource_ids(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             bundle_dir = Path(temp_dir) / "bundle"
