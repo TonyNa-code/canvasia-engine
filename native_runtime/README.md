@@ -127,7 +127,8 @@ python3 runtime_player.py --rc-report .
 编辑器导出的完整原生 Runtime 包会额外附带：
 
 - `native-runtime-release-control-report.md`：给人工验收看的总控报告，汇总发布自检、RC 状态、3D 风险摘要、发布门禁和下一步处理顺序。
-- `native-runtime-release-control-report.json`：给自动化脚本或 CI 读取的同一份结论，字段包含 `qualityGate`、`releaseCheck`、`releaseCandidate`、`asset3d` 和 `nextSteps`。
+- `native-runtime-release-control-report.json`：给自动化脚本或 CI 读取的同一份结论，字段包含 `qualityGate`、`releaseCheck`、`releaseCandidate`、`asset3d`、`vnBaselineQuality` 和 `nextSteps`。
+- `native-runtime-vn-baseline-quality.md` / `native-runtime-vn-baseline-quality.json`：检查视觉小说基础体验是否像完整作品，覆盖立绘兜底、背景覆盖、BGM 进入点、选项、空文本、占位素材和轻量演出润色。
 
 这两份文件会在导出包生成时自动写入。若需要重新计算底层检查，可以先运行 `--release-check`、`--doctor`、`--release-candidate-report` 和 `--describe-3d-assets`，再重新从编辑器导出一版包。
 
@@ -142,6 +143,7 @@ python3 runtime_player.py --write-release-control-reports .
 ```bash
 python3 runtime_player.py --release-control-json .
 python3 runtime_player.py --release-control-report .
+python3 runtime_player.py --vn-baseline-quality-report .
 ```
 
 随包脚本会自动调用同一条刷新命令：

@@ -20,9 +20,12 @@ except ModuleNotFoundError:  # pragma: no cover - CI installs pygame-ce for this
 from native_runtime.runtime_player import (
     NATIVE_VIDEO_EMBEDDED_BACKEND_ID,
     NATIVE_VIDEO_SYNC_BACKEND_ID,
+    VN_BASELINE_QUALITY_MARKDOWN_NAME,
+    VN_BASELINE_QUALITY_REPORT_NAME,
     NativeRuntimePlayer,
     OpenCvEmbeddedVideoPlayback,
     PyAvSynchronizedVideoPlayback,
+    build_native_runtime_vn_baseline_quality_report,
     build_save_dialog_page_data,
     build_native_video_preview_probe_report,
     ellipsize_text,
@@ -32,6 +35,8 @@ from native_runtime.runtime_player import (
     get_typewriter_punctuation_pause_ms,
     load_project_archive_progress,
     load_opencv_video_frame_surface,
+    render_native_runtime_vn_baseline_quality_markdown,
+    write_native_runtime_vn_baseline_quality_reports,
     write_project_auto_resume,
     wrap_text,
 )
@@ -95,6 +100,98 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             get_native_typewriter_step_delay_ms("normal", "Hello"),
         )
         self.assertEqual(get_native_typewriter_step_delay_ms("instant", "世界！"), 0)
+
+    def test_vn_baseline_quality_report_flags_native_release_polish_gaps(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_dir = Path(temp_dir) / "bundle"
+            bundle_dir.mkdir(parents=True)
+            background_path = bundle_dir / "assets" / "backgrounds" / "classroom.png"
+            background_path.parent.mkdir(parents=True, exist_ok=True)
+            background_path.write_bytes(b"fake-background")
+            model_path = bundle_dir / "assets" / "models" / "heroine.glb"
+            model_path.parent.mkdir(parents=True, exist_ok=True)
+            model_path.write_bytes(b"fake-model")
+            game_data = {
+                "project": {
+                    "projectId": "native_vn_quality_smoke",
+                    "title": "Native VN Quality Smoke",
+                    "entrySceneId": "scene_start",
+                    "resolution": {"width": 1280, "height": 720},
+                },
+                "assets": {
+                    "assets": [
+                        {
+                            "id": "classroom_bg",
+                            "type": "background",
+                            "name": "Classroom",
+                            "exportUrl": background_path.relative_to(bundle_dir).as_posix(),
+                            "tags": [],
+                        },
+                        {
+                            "id": "heroine_model",
+                            "type": "model3d",
+                            "name": "Heroine 3D Model",
+                            "exportUrl": model_path.relative_to(bundle_dir).as_posix(),
+                            "tags": ["3D"],
+                        },
+                    ]
+                },
+                "characters": {
+                    "characters": [
+                        {
+                            "id": "heroine",
+                            "displayName": "Heroine",
+                            "presentation": {
+                                "mode": "model3d",
+                                "fallbackSpriteAssetId": "",
+                                "model3d": {"modelAssetId": "heroine_model"},
+                            },
+                            "expressions": [{"id": "default", "spriteAssetId": ""}],
+                        }
+                    ]
+                },
+                "chapters": [
+                    {
+                        "id": "chapter_1",
+                        "name": "Chapter 1",
+                        "scenes": [
+                            {
+                                "id": "scene_start",
+                                "name": "Opening",
+                                "blocks": [
+                                    {"id": "bg", "type": "background", "assetId": "classroom_bg"},
+                                    {"id": "line", "type": "dialogue", "speakerId": "heroine", "text": "Welcome."},
+                                    {
+                                        "id": "choice",
+                                        "type": "choice",
+                                        "options": [{"text": "Continue", "gotoSceneId": ""}],
+                                    },
+                                ],
+                            }
+                        ],
+                    }
+                ],
+            }
+            (bundle_dir / "game_data.json").write_text(json.dumps(game_data, ensure_ascii=False), encoding="utf-8")
+
+            report = build_native_runtime_vn_baseline_quality_report(bundle_dir)
+
+            self.assertEqual(report["status"], "needs_fix")
+            self.assertEqual(report["metrics"]["storySceneCount"], 1)
+            self.assertEqual(report["metrics"]["choiceCount"], 1)
+            self.assertEqual(report["metrics"]["scenesWithBackground"], 1)
+            issue_codes = {issue["code"] for issue in report["issues"]}
+            self.assertIn("character_fallback_sprite", issue_codes)
+            self.assertIn("bgm_plan", issue_codes)
+
+            markdown = render_native_runtime_vn_baseline_quality_markdown(report)
+            self.assertIn("原生 Runtime VN 基础质感报告", markdown)
+            self.assertIn("角色立绘覆盖", markdown)
+
+            written = write_native_runtime_vn_baseline_quality_reports(bundle_dir)
+            self.assertEqual(written["status"], "needs_fix")
+            self.assertTrue((bundle_dir / VN_BASELINE_QUALITY_REPORT_NAME).is_file())
+            self.assertTrue((bundle_dir / VN_BASELINE_QUALITY_MARKDOWN_NAME).is_file())
 
 
 @unittest.skipIf(pygame is None, "pygame-ce is not installed")

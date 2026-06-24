@@ -40,10 +40,14 @@ FILE_INTEGRITY_REPORT_NAME = "native-runtime-file-integrity.json"
 FILE_INTEGRITY_MARKDOWN_NAME = "native-runtime-file-integrity.md"
 ACCEPTANCE_REPORT_NAME = "native-runtime-release-acceptance.md"
 ACCEPTANCE_JSON_NAME = "native-runtime-release-acceptance.json"
+VN_BASELINE_QUALITY_REPORT_NAME = "native-runtime-vn-baseline-quality.json"
+VN_BASELINE_QUALITY_MARKDOWN_NAME = "native-runtime-vn-baseline-quality.md"
 FILE_INTEGRITY_EXCLUDED_FILE_NAMES = {
     FILE_INTEGRITY_REPORT_NAME,
     FILE_INTEGRITY_MARKDOWN_NAME,
     "native_app_package_manifest.json",
+    VN_BASELINE_QUALITY_REPORT_NAME,
+    VN_BASELINE_QUALITY_MARKDOWN_NAME,
 }
 FILE_INTEGRITY_EXCLUDED_PREFIXES = {
     "__pycache__",
@@ -5344,34 +5348,412 @@ def build_native_runtime_3d_risk_digest(report: dict | None) -> dict:
     }
 
 
+VN_BASELINE_EFFECT_BLOCK_TYPES = {
+    "particle_effect",
+    "screen_shake",
+    "screen_flash",
+    "screen_fade",
+    "camera_zoom",
+    "camera_pan",
+    "screen_filter",
+    "depth_blur",
+}
+
+
+def get_vn_baseline_character_sprite_asset_id(character: dict) -> str:
+    presentation = character.get("presentation") if isinstance(character.get("presentation"), dict) else {}
+    for key in ("fallbackSpriteAssetId", "defaultSpriteId", "spriteAssetId"):
+        asset_id = str(presentation.get(key) or character.get(key) or "").strip()
+        if asset_id:
+            return asset_id
+    expressions = character.get("expressions") if isinstance(character.get("expressions"), list) else []
+    for expression in expressions:
+        if isinstance(expression, dict):
+            asset_id = str(expression.get("spriteAssetId") or "").strip()
+            if asset_id:
+                return asset_id
+    return ""
+
+
+def is_vn_baseline_placeholder_asset(asset: dict) -> bool:
+    tags = asset.get("tags") if isinstance(asset.get("tags"), list) else []
+    text = " ".join(str(value or "") for value in [asset.get("name"), asset.get("description"), *tags]).lower()
+    return "占位素材" in text or "placeholder" in text
+
+
+def get_vn_baseline_block_text(block: dict) -> str:
+    block_type = str(block.get("type") or "").strip()
+    if block_type in {"dialogue", "narration"}:
+        return str(block.get("text") or "").strip()
+    if block_type == "choice":
+        options = block.get("options") if isinstance(block.get("options"), list) else []
+        return " ".join(str(option.get("text") or "").strip() for option in options if isinstance(option, dict)).strip()
+    return ""
+
+
+def add_vn_baseline_issue(
+    issues: list[dict],
+    severity: str,
+    code: str,
+    title: str,
+    detail: str,
+    suggestion: str,
+) -> None:
+    issues.append(
+        {
+            "severity": severity,
+            "code": code,
+            "title": title,
+            "detail": detail,
+            "suggestion": suggestion,
+        }
+    )
+
+
+def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
+    payload = load_game_data(bundle_dir / DEFAULT_GAME_DATA_NAME)
+    project = payload.get("project") if isinstance(payload.get("project"), dict) else {}
+    assets_doc = payload.get("assets") if isinstance(payload.get("assets"), dict) else {}
+    assets = assets_doc.get("assets") if isinstance(assets_doc.get("assets"), list) else []
+    assets_by_id = {str(asset.get("id")): asset for asset in assets if isinstance(asset, dict) and asset.get("id")}
+    characters_doc = payload.get("characters") if isinstance(payload.get("characters"), dict) else {}
+    characters = characters_doc.get("characters") if isinstance(characters_doc.get("characters"), list) else []
+    chapters = payload.get("chapters") if isinstance(payload.get("chapters"), list) else []
+    scenes = iter_export_scenes(chapters)
+
+    dialogue_count = 0
+    narration_count = 0
+    choice_count = 0
+    empty_text_count = 0
+    character_show_count = 0
+    character_hide_count = 0
+    scenes_with_background = 0
+    scenes_with_music = 0
+    scenes_with_effects = 0
+    text_block_count = 0
+    total_text_chars = 0
+
+    for scene in scenes:
+        blocks = scene.get("blocks") if isinstance(scene.get("blocks"), list) else []
+        scene_has_background = False
+        scene_has_music = False
+        scene_has_effect = False
+        for block in blocks:
+            if not isinstance(block, dict):
+                continue
+            block_type = str(block.get("type") or "").strip()
+            if block_type == "dialogue":
+                dialogue_count += 1
+            elif block_type == "narration":
+                narration_count += 1
+            elif block_type == "choice":
+                choice_count += 1
+            elif block_type == "character_show":
+                character_show_count += 1
+            elif block_type == "character_hide":
+                character_hide_count += 1
+            elif block_type == "background":
+                scene_has_background = True
+            elif block_type == "music_play":
+                scene_has_music = True
+            elif block_type in VN_BASELINE_EFFECT_BLOCK_TYPES:
+                scene_has_effect = True
+            text = get_vn_baseline_block_text(block)
+            if block_type in {"dialogue", "narration", "choice"}:
+                text_block_count += 1
+                total_text_chars += len(text)
+                if not text:
+                    empty_text_count += 1
+        if scene_has_background:
+            scenes_with_background += 1
+        if scene_has_music:
+            scenes_with_music += 1
+        if scene_has_effect:
+            scenes_with_effects += 1
+
+    characters_with_sprite = 0
+    characters_missing_sprite = []
+    for character in characters:
+        if not isinstance(character, dict):
+            continue
+        asset_id = get_vn_baseline_character_sprite_asset_id(character)
+        asset = assets_by_id.get(asset_id) if asset_id else None
+        if asset_id and asset and get_asset_runtime_path(bundle_dir, asset):
+            characters_with_sprite += 1
+        else:
+            characters_missing_sprite.append(str(character.get("displayName") or character.get("name") or character.get("id") or "未命名角色"))
+
+    placeholder_assets = [
+        str(asset.get("name") or asset.get("id") or "未命名素材")
+        for asset in assets
+        if isinstance(asset, dict) and is_vn_baseline_placeholder_asset(asset)
+    ]
+    scene_count = len(scenes)
+    text_density = round(text_block_count / scene_count, 2) if scene_count else 0.0
+    average_text_length = round(total_text_chars / text_block_count, 1) if text_block_count else 0.0
+    issues: list[dict] = []
+
+    if not scenes:
+        add_vn_baseline_issue(
+            issues,
+            "warn",
+            "no_story_scene",
+            "没有可试玩场景",
+            "导出包里没有检测到章节场景。",
+            "至少创建一个章节和入口场景，再重新导出原生 Runtime 包。",
+        )
+    if placeholder_assets:
+        add_vn_baseline_issue(
+            issues,
+            "warn",
+            "placeholder_assets",
+            "仍有占位素材",
+            f"检测到 {len(placeholder_assets)} 个疑似占位素材：{', '.join(placeholder_assets[:3])}",
+            "发布前替换占位图、占位音频或临时 UI，避免玩家打开后误以为是半成品。",
+        )
+    if empty_text_count:
+        add_vn_baseline_issue(
+            issues,
+            "warn",
+            "empty_story_text",
+            "存在空白剧情文本",
+            f"检测到 {empty_text_count} 个台词、旁白或选项没有正文。",
+            "回到剧情编辑器补齐文本，或删除不再需要的空卡片。",
+        )
+    if characters and characters_with_sprite < len(characters):
+        add_vn_baseline_issue(
+            issues,
+            "warn",
+            "character_fallback_sprite",
+            "角色缺少可用立绘兜底",
+            f"{len(characters) - characters_with_sprite} 个角色没有可用立绘文件：{', '.join(characters_missing_sprite[:3])}",
+            "即使使用 Live2D / 3D，也建议给每个角色绑定一张兜底立绘，降低目标机器不支持模型时的翻车风险。",
+        )
+    if scene_count and scenes_with_background < scene_count:
+        add_vn_baseline_issue(
+            issues,
+            "warn",
+            "background_coverage",
+            "背景覆盖不完整",
+            f"{scene_count - scenes_with_background} 个场景没有背景卡片。",
+            "给每个可试玩场景至少放一张背景、CG 或 3D 场景，避免黑屏式试玩体验。",
+        )
+    expected_music_scenes = max(1, math.ceil(scene_count * 0.6)) if scene_count else 0
+    if scene_count and scenes_with_music < expected_music_scenes:
+        add_vn_baseline_issue(
+            issues,
+            "soft",
+            "bgm_plan",
+            "BGM 规划偏少",
+            f"当前 {scene_count} 个场景里只有 {scenes_with_music} 个场景主动播放 BGM。",
+            "为章节开头、转场或情绪段落设置 BGM 范围；短篇也建议至少有一条明确的音乐进入点。",
+        )
+    if scene_count >= 2 and choice_count == 0:
+        add_vn_baseline_issue(
+            issues,
+            "soft",
+            "choice_node",
+            "缺少可交互选项",
+            "多场景项目没有检测到选项节点。",
+            "如果目标是视觉小说而非纯电子书，建议至少加入一个选项、分支或可回收差分。",
+        )
+    if dialogue_count >= 3 and character_show_count == 0:
+        add_vn_baseline_issue(
+            issues,
+            "soft",
+            "character_stage",
+            "人物登场演出偏弱",
+            "台词数量已经成段，但没有检测到显示角色卡片。",
+            "为主要角色补显示/隐藏、位置、缩放和淡入淡出，让原生试玩更像正式 VN。",
+        )
+    elif scene_count >= 2 and character_show_count and character_hide_count == 0:
+        add_vn_baseline_issue(
+            issues,
+            "soft",
+            "character_hide_missing",
+            "角色退场节奏未标记",
+            "检测到角色登场，但没有隐藏角色卡片。",
+            "章节切换或角色离场时补一个隐藏卡片，避免立绘残留。",
+        )
+    if scene_count >= 2 and text_density < 2:
+        add_vn_baseline_issue(
+            issues,
+            "soft",
+            "text_density",
+            "剧情密度偏低",
+            f"平均每个场景只有 {text_density} 个台词/旁白/选项块。",
+            "若不是纯演出 Demo，建议补足关键对白、旁白和过渡说明。",
+        )
+    if scene_count >= 3 and scenes_with_effects == 0:
+        add_vn_baseline_issue(
+            issues,
+            "soft",
+            "presentation_polish",
+            "缺少基础演出润色",
+            "多场景项目没有检测到粒子、镜头或屏幕效果。",
+            "为关键情绪点补轻量镜头、闪白、滤镜或粒子，不需要堆特效，但要有记忆点。",
+        )
+
+    warn_count = sum(1 for issue in issues if issue.get("severity") == "warn")
+    soft_count = sum(1 for issue in issues if issue.get("severity") == "soft")
+    status = "ready" if not issues else ("needs_fix" if warn_count else "needs_polish")
+    return {
+        "formatVersion": 1,
+        "generatedAt": now_iso(),
+        "bundleDir": str(bundle_dir),
+        "status": status,
+        "project": {
+            "projectId": project.get("projectId"),
+            "title": project.get("title") or project.get("name") or "未命名项目",
+            "language": project.get("language") or DEFAULT_PROJECT_LANGUAGE,
+        },
+        "summary": {
+            "statusLabel": {"ready": "基础完整", "needs_fix": "需要修复", "needs_polish": "建议润色"}.get(status, status),
+            "warnCount": warn_count,
+            "softCount": soft_count,
+            "issueCount": len(issues),
+            "recommendation": issues[0]["suggestion"] if issues else "基础视觉小说体验未发现明显缺口，可继续做目标系统实机点测。",
+        },
+        "metrics": {
+            "storySceneCount": scene_count,
+            "dialogueCount": dialogue_count,
+            "narrationCount": narration_count,
+            "choiceCount": choice_count,
+            "characterCount": len(characters),
+            "charactersWithSpriteCount": characters_with_sprite,
+            "characterShowCount": character_show_count,
+            "characterHideCount": character_hide_count,
+            "scenesWithBackground": scenes_with_background,
+            "scenesWithMusic": scenes_with_music,
+            "scenesWithEffects": scenes_with_effects,
+            "placeholderAssetCount": len(placeholder_assets),
+            "emptyTextBlockCount": empty_text_count,
+            "textDensity": text_density,
+            "averageTextLength": average_text_length,
+        },
+        "issues": issues,
+    }
+
+
+def render_native_runtime_vn_baseline_quality_markdown(report: dict) -> str:
+    project = report.get("project") if isinstance(report.get("project"), dict) else {}
+    summary = report.get("summary") if isinstance(report.get("summary"), dict) else {}
+    metrics = report.get("metrics") if isinstance(report.get("metrics"), dict) else {}
+    issues = report.get("issues") if isinstance(report.get("issues"), list) else []
+    metric_rows = [
+        ("场景数", metrics.get("storySceneCount")),
+        ("台词 / 旁白 / 选项", f"{int(metrics.get('dialogueCount') or 0)} / {int(metrics.get('narrationCount') or 0)} / {int(metrics.get('choiceCount') or 0)}"),
+        ("角色立绘覆盖", f"{int(metrics.get('charactersWithSpriteCount') or 0)} / {int(metrics.get('characterCount') or 0)}"),
+        ("背景覆盖", f"{int(metrics.get('scenesWithBackground') or 0)} / {int(metrics.get('storySceneCount') or 0)}"),
+        ("BGM 进入点", metrics.get("scenesWithMusic")),
+        ("演出效果场景", metrics.get("scenesWithEffects")),
+        ("占位素材", metrics.get("placeholderAssetCount")),
+        ("空文本块", metrics.get("emptyTextBlockCount")),
+        ("平均剧情块密度", metrics.get("textDensity")),
+    ]
+    lines = [
+        "# 原生 Runtime VN 基础质感报告",
+        "",
+        f"- 项目：{format_markdown_value(project.get('title'), '未命名项目')}",
+        f"- 生成时间：{format_markdown_value(report.get('generatedAt'))}",
+        f"- 状态：{format_markdown_value(summary.get('statusLabel'), report.get('status') or 'unknown')}",
+        f"- 建议：{format_markdown_value(summary.get('recommendation'))}",
+        "",
+        "## 基础指标",
+        "",
+        "| 项目 | 值 |",
+        "| --- | --- |",
+    ]
+    for label, value in metric_rows:
+        lines.append(f"| {label} | {format_markdown_value(value, '0')} |")
+    lines.append("")
+    if issues:
+        lines.extend(["## 待处理项", "", "| 严重度 | 项目 | 说明 | 建议 |", "| --- | --- | --- | --- |"])
+        for issue in issues:
+            if isinstance(issue, dict):
+                lines.append(
+                    f"| {format_markdown_value(issue.get('severity'), 'soft')} | "
+                    f"{format_markdown_value(issue.get('title'), '待处理')} | "
+                    f"{format_markdown_value(issue.get('detail'), '-')} | "
+                    f"{format_markdown_value(issue.get('suggestion'), '-')} |"
+                )
+        lines.append("")
+    else:
+        lines.extend(["## 待处理项", "", "没有发现明显基础质感缺口。", ""])
+    lines.extend(
+        [
+            "## 重新生成",
+            "",
+            "```bash",
+            "python3 runtime_player.py --write-vn-baseline-quality-reports .",
+            "```",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def write_native_runtime_vn_baseline_quality_reports(bundle_dir: Path) -> dict:
+    report = build_native_runtime_vn_baseline_quality_report(bundle_dir)
+    (bundle_dir / VN_BASELINE_QUALITY_REPORT_NAME).write_text(
+        json.dumps(report, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    (bundle_dir / VN_BASELINE_QUALITY_MARKDOWN_NAME).write_text(
+        render_native_runtime_vn_baseline_quality_markdown(report),
+        encoding="utf-8",
+    )
+    return report
+
+
+def print_native_runtime_vn_baseline_quality_json_report(bundle_dir: Path) -> dict:
+    report = build_native_runtime_vn_baseline_quality_report(bundle_dir)
+    print(json.dumps(report, ensure_ascii=False, indent=2))
+    return report
+
+
+def print_native_runtime_vn_baseline_quality_markdown_report(bundle_dir: Path) -> dict:
+    report = build_native_runtime_vn_baseline_quality_report(bundle_dir)
+    print(render_native_runtime_vn_baseline_quality_markdown(report), end="")
+    return report
+
+
 def get_native_runtime_release_control_status(
     release_check: dict,
     release_candidate: dict,
     asset3d_digest: dict,
+    vn_baseline_quality: dict | None = None,
 ) -> dict:
     release_summary = release_check.get("summary") if isinstance(release_check.get("summary"), dict) else {}
     rc_summary = release_candidate.get("summary") if isinstance(release_candidate.get("summary"), dict) else {}
+    vn_summary = (
+        vn_baseline_quality.get("summary")
+        if isinstance(vn_baseline_quality, dict) and isinstance(vn_baseline_quality.get("summary"), dict)
+        else {}
+    )
     if (
         release_check.get("status") == "fail"
         or release_candidate.get("status") == "blocked"
         or int(release_summary.get("errors") or 0)
         or int(rc_summary.get("blockers") or 0)
+        or int(vn_summary.get("warnCount") or 0)
     ):
         return {
             "status": "blocked",
             "label": "阻塞发布",
-            "summary": "存在发布阻塞项，应先修复再进入三系统打包或分发。",
+            "summary": "存在发布阻塞项或 VN 基础体验缺口，应先修复再进入三系统打包或分发。",
         }
     if (
         release_candidate.get("status") != "preview_ready"
         or int(rc_summary.get("optionalFailures") or 0)
         or int(rc_summary.get("warnings") or 0)
         or bool(asset3d_digest.get("topIssues"))
+        or int(vn_summary.get("softCount") or 0)
     ):
         return {
             "status": "needs_review",
             "label": "需要复核",
-            "summary": "主链没有阻塞项，但仍有警告、可选能力失败或资产风险需要发布前确认。",
+            "summary": "主链没有阻塞项，但仍有警告、可选能力失败、资产风险或 VN 润色项需要发布前确认。",
         }
     return {
         "status": "ready",
@@ -5384,6 +5766,7 @@ def build_native_runtime_release_control_next_steps(
     release_check: dict,
     release_candidate: dict,
     asset3d_digest: dict,
+    vn_baseline_quality: dict,
     quality_gate: dict,
 ) -> list[str]:
     steps: list[str] = []
@@ -5411,6 +5794,11 @@ def build_native_runtime_release_control_next_steps(
             add_step(f"复核 3D 资产「{name}」：{action}")
     for recommendation in asset3d_digest.get("recommendations") or []:
         add_step(recommendation)
+    for issue in (vn_baseline_quality.get("issues") if isinstance(vn_baseline_quality.get("issues"), list) else [])[:5]:
+        if isinstance(issue, dict):
+            title = issue.get("title") or issue.get("code") or "VN 基础质感"
+            suggestion = issue.get("suggestion") or issue.get("detail") or "复核基础视觉小说体验。"
+            add_step(f"处理 VN 基础质感「{title}」：{suggestion}")
     return steps[:10]
 
 
@@ -5422,7 +5810,13 @@ def build_native_runtime_release_control_payload(bundle_dir: Path) -> dict:
     release_candidate = build_native_runtime_release_candidate_report(bundle_dir)
     asset3d_report = build_native_3d_asset_report(bundle_dir)
     asset3d_digest = build_native_runtime_3d_risk_digest(asset3d_report)
-    quality_gate = get_native_runtime_release_control_status(release_check, release_candidate, asset3d_digest)
+    vn_baseline_quality = build_native_runtime_vn_baseline_quality_report(bundle_dir)
+    quality_gate = get_native_runtime_release_control_status(
+        release_check,
+        release_candidate,
+        asset3d_digest,
+        vn_baseline_quality,
+    )
     return {
         "formatVersion": 1,
         "generatedAt": now_iso(),
@@ -5456,10 +5850,19 @@ def build_native_runtime_release_control_payload(bundle_dir: Path) -> dict:
             "commercialReleaseGaps": release_candidate.get("commercialReleaseGaps") or [],
         },
         "asset3d": asset3d_digest,
+        "vnBaselineQuality": {
+            "status": vn_baseline_quality.get("status"),
+            "summary": vn_baseline_quality.get("summary") or {},
+            "metrics": vn_baseline_quality.get("metrics") or {},
+            "topIssues": (vn_baseline_quality.get("issues") or [])[:8],
+            "markdown": VN_BASELINE_QUALITY_MARKDOWN_NAME,
+            "json": VN_BASELINE_QUALITY_REPORT_NAME,
+        },
         "nextSteps": build_native_runtime_release_control_next_steps(
             release_check,
             release_candidate,
             asset3d_digest,
+            vn_baseline_quality,
             quality_gate,
         ),
         "includedReports": {
@@ -5472,6 +5875,8 @@ def build_native_runtime_release_control_payload(bundle_dir: Path) -> dict:
             "fileIntegrityMarkdown": FILE_INTEGRITY_MARKDOWN_NAME,
             "acceptanceMarkdown": ACCEPTANCE_REPORT_NAME,
             "acceptanceJson": ACCEPTANCE_JSON_NAME,
+            "vnBaselineQualityMarkdown": VN_BASELINE_QUALITY_MARKDOWN_NAME,
+            "vnBaselineQualityJson": VN_BASELINE_QUALITY_REPORT_NAME,
         },
     }
 
@@ -5483,9 +5888,12 @@ def render_native_runtime_release_control_markdown(payload: dict) -> str:
     release_check = payload.get("releaseCheck") if isinstance(payload.get("releaseCheck"), dict) else {}
     release_candidate = payload.get("releaseCandidate") if isinstance(payload.get("releaseCandidate"), dict) else {}
     asset3d = payload.get("asset3d") if isinstance(payload.get("asset3d"), dict) else {}
+    vn_baseline = payload.get("vnBaselineQuality") if isinstance(payload.get("vnBaselineQuality"), dict) else {}
     release_summary = release_check.get("summary") if isinstance(release_check.get("summary"), dict) else {}
     rc_summary = release_candidate.get("summary") if isinstance(release_candidate.get("summary"), dict) else {}
     readiness = release_candidate.get("readinessEstimate") if isinstance(release_candidate.get("readinessEstimate"), dict) else {}
+    vn_summary = vn_baseline.get("summary") if isinstance(vn_baseline.get("summary"), dict) else {}
+    vn_metrics = vn_baseline.get("metrics") if isinstance(vn_baseline.get("metrics"), dict) else {}
     lines = [
         "# 原生 Runtime 发布总控报告",
         "",
@@ -5509,8 +5917,30 @@ def render_native_runtime_release_control_markdown(payload: dict) -> str:
         f"| 桌面 Preview 估算 | {format_markdown_value(readiness.get('desktopPreviewPercent'), 'n/a')}% |",
         f"| 商业桌面估算 | {format_markdown_value(readiness.get('commercialDesktopPercent'), 'n/a')}% |",
         f"| 3D 摘要 | {format_markdown_value(asset3d.get('summaryLine'), '未生成')} |",
+        f"| VN 基础质感 | {format_markdown_value(vn_summary.get('statusLabel'), vn_baseline.get('status') or '未生成')} |",
         "",
     ]
+    if vn_baseline:
+        lines.extend(["## VN 基础质感", "", "| 指标 | 值 |", "| --- | --- |"])
+        for label, value in [
+            ("场景数", vn_metrics.get("storySceneCount")),
+            ("台词 / 旁白 / 选项", f"{int(vn_metrics.get('dialogueCount') or 0)} / {int(vn_metrics.get('narrationCount') or 0)} / {int(vn_metrics.get('choiceCount') or 0)}"),
+            ("角色立绘覆盖", f"{int(vn_metrics.get('charactersWithSpriteCount') or 0)} / {int(vn_metrics.get('characterCount') or 0)}"),
+            ("背景覆盖", f"{int(vn_metrics.get('scenesWithBackground') or 0)} / {int(vn_metrics.get('storySceneCount') or 0)}"),
+            ("BGM 进入点", vn_metrics.get("scenesWithMusic")),
+            ("缺口 / 润色项", f"{int(vn_summary.get('warnCount') or 0)} / {int(vn_summary.get('softCount') or 0)}"),
+        ]:
+            lines.append(f"| {label} | {format_markdown_value(value, '0')} |")
+        top_vn_issues = vn_baseline.get("topIssues") if isinstance(vn_baseline.get("topIssues"), list) else []
+        if top_vn_issues:
+            lines.extend(["", "优先处理："])
+            for issue in top_vn_issues[:5]:
+                if isinstance(issue, dict):
+                    lines.append(
+                        f"- {format_markdown_value(issue.get('title'), 'VN 基础质感')}："
+                        f"{format_markdown_value(issue.get('suggestion') or issue.get('detail'), '需要复核')}"
+                    )
+        lines.append("")
     metrics = asset3d.get("metrics") if isinstance(asset3d.get("metrics"), list) else []
     if metrics:
         lines.extend(["## 3D 风险快照", "", "| 指标 | 值 |", "| --- | --- |"])
@@ -5547,6 +5977,7 @@ def render_native_runtime_release_control_markdown(payload: dict) -> str:
 
 def write_native_runtime_release_control_reports(bundle_dir: Path) -> dict:
     payload = build_native_runtime_release_control_payload(bundle_dir)
+    write_native_runtime_vn_baseline_quality_reports(bundle_dir)
     (bundle_dir / "native-runtime-release-control-report.json").write_text(
         json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
@@ -13552,6 +13983,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--release-control-json", dest="release_control_json", help="输出原生 Runtime 发布总控报告 JSON，不启动窗口")
     parser.add_argument("--release-control-report", "--release-control-md", dest="release_control_report", help="输出原生 Runtime 发布总控 Markdown 报告，不启动窗口")
     parser.add_argument("--write-release-control-reports", dest="write_release_control_reports", help="写入原生 Runtime 发布总控 Markdown / JSON 报告，不启动窗口")
+    parser.add_argument("--vn-baseline-quality-json", "--vn-quality-json", dest="vn_baseline_quality_json", help="输出原生 Runtime VN 基础质感报告 JSON，不启动窗口")
+    parser.add_argument("--vn-baseline-quality-report", "--vn-quality-report", "--vn-quality-md", dest="vn_baseline_quality_report", help="输出原生 Runtime VN 基础质感 Markdown 报告，不启动窗口")
+    parser.add_argument("--write-vn-baseline-quality-reports", "--write-vn-quality-reports", dest="write_vn_baseline_quality_reports", help="写入原生 Runtime VN 基础质感 Markdown / JSON 报告，不启动窗口")
     parser.add_argument("--acceptance-check", "--acceptance-json", dest="acceptance_check", help="输出原生 Runtime 发布验收清单 JSON，不启动窗口")
     parser.add_argument("--acceptance-report", "--acceptance-md", dest="acceptance_report", help="输出原生 Runtime 发布验收清单 Markdown，不启动窗口")
     parser.add_argument("--write-acceptance-reports", dest="write_acceptance_reports", help="写入原生 Runtime 发布验收清单 Markdown / JSON，不启动窗口")
@@ -13640,6 +14074,42 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         except NativeRuntimeError as error:
             print(f"Native runtime release control report write failed: {error}")
+            return 1
+
+    if args.vn_baseline_quality_json:
+        try:
+            report = print_native_runtime_vn_baseline_quality_json_report(Path(args.vn_baseline_quality_json).resolve())
+            return 1 if report.get("status") == "needs_fix" else 0
+        except NativeRuntimeError as error:
+            print(f"Native runtime VN baseline quality JSON failed: {error}")
+            return 1
+
+    if args.vn_baseline_quality_report:
+        try:
+            report = print_native_runtime_vn_baseline_quality_markdown_report(Path(args.vn_baseline_quality_report).resolve())
+            return 1 if report.get("status") == "needs_fix" else 0
+        except NativeRuntimeError as error:
+            print(f"Native runtime VN baseline quality report failed: {error}")
+            return 1
+
+    if args.write_vn_baseline_quality_reports:
+        try:
+            report = write_native_runtime_vn_baseline_quality_reports(Path(args.write_vn_baseline_quality_reports).resolve())
+            print(
+                json.dumps(
+                    {
+                        "status": report.get("status"),
+                        "label": report.get("summary", {}).get("statusLabel"),
+                        "markdown": VN_BASELINE_QUALITY_MARKDOWN_NAME,
+                        "json": VN_BASELINE_QUALITY_REPORT_NAME,
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
+            return 1 if report.get("status") == "needs_fix" else 0
+        except NativeRuntimeError as error:
+            print(f"Native runtime VN baseline quality report write failed: {error}")
             return 1
 
     if args.acceptance_check:
