@@ -186,6 +186,8 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             self.assertEqual(report["metrics"]["scenesWithBackground"], 1)
             self.assertEqual(report["metrics"]["backgroundBlockCount"], 1)
             self.assertEqual(report["metrics"]["missingBackgroundAssetCount"], 0)
+            self.assertEqual(report["metrics"]["sfxPlayCount"], 0)
+            self.assertEqual(report["metrics"]["missingSfxAssetCount"], 0)
             self.assertEqual(report["metrics"]["musicPlayCount"], 0)
             self.assertEqual(report["metrics"]["musicFadeInCount"], 0)
             self.assertEqual(report["metrics"]["voiceBoundLineCount"], 0)
@@ -200,6 +202,7 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             self.assertIn("原生 Runtime VN 基础质感报告", markdown)
             self.assertIn("角色立绘覆盖", markdown)
             self.assertIn("空白 / 超长 / 重复选项", markdown)
+            self.assertIn("音效点 / 缺失音效", markdown)
             self.assertIn("BGM 淡入 / 淡出", markdown)
             self.assertIn("背景转场 / 背景卡", markdown)
             self.assertIn("语音覆盖", markdown)
@@ -586,6 +589,99 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             markdown = render_native_runtime_vn_baseline_quality_markdown(report)
             self.assertIn("存在空白选项按钮", markdown)
             self.assertIn("空白 / 超长 / 重复选项", markdown)
+
+    def test_vn_baseline_quality_report_flags_sfx_asset_gaps(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_dir = Path(temp_dir) / "bundle"
+            bundle_dir.mkdir(parents=True)
+            sfx_path = bundle_dir / "assets" / "sfx" / "door.ogg"
+            sfx_path.parent.mkdir(parents=True, exist_ok=True)
+            sfx_path.write_bytes(b"fake-sfx")
+            game_data = {
+                "project": {
+                    "projectId": "native_sfx_quality_smoke",
+                    "title": "Native SFX Quality Smoke",
+                    "entrySceneId": "scene_sfx",
+                },
+                "assets": {
+                    "assets": [
+                        {
+                            "id": "sfx_ok",
+                            "type": "sfx",
+                            "name": "Door",
+                            "exportUrl": sfx_path.relative_to(bundle_dir).as_posix(),
+                        }
+                    ]
+                },
+                "characters": {"characters": []},
+                "chapters": [
+                    {
+                        "id": "chapter_1",
+                        "name": "Chapter 1",
+                        "scenes": [
+                            {
+                                "id": "scene_sfx",
+                                "name": "SFX",
+                                "blocks": [
+                                    {"id": "sfx_1", "type": "sfx_play", "assetId": "sfx_ok"},
+                                    {"id": "sfx_2", "type": "sfx_play", "assetId": "sfx_missing"},
+                                    {"id": "line_1", "type": "narration", "text": "SFX check."},
+                                ],
+                            }
+                        ],
+                    }
+                ],
+            }
+            (bundle_dir / "game_data.json").write_text(json.dumps(game_data, ensure_ascii=False), encoding="utf-8")
+
+            report = build_native_runtime_vn_baseline_quality_report(bundle_dir)
+
+            self.assertEqual(report["status"], "needs_fix")
+            self.assertEqual(report["metrics"]["sfxPlayCount"], 2)
+            self.assertEqual(report["metrics"]["missingSfxAssetCount"], 1)
+            issue_codes = {issue["code"] for issue in report["issues"]}
+            self.assertIn("sfx_asset_missing", issue_codes)
+            self.assertNotIn("sfx_plan", issue_codes)
+
+            markdown = render_native_runtime_vn_baseline_quality_markdown(report)
+            self.assertIn("存在缺失的音效文件", markdown)
+            self.assertIn("音效点 / 缺失音效", markdown)
+
+    def test_vn_baseline_quality_report_flags_missing_sfx_plan_for_multi_scene_projects(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_dir = Path(temp_dir) / "bundle"
+            bundle_dir.mkdir(parents=True)
+            game_data = {
+                "project": {
+                    "projectId": "native_sfx_plan_quality_smoke",
+                    "title": "Native SFX Plan Quality Smoke",
+                    "entrySceneId": "scene_a",
+                },
+                "assets": {"assets": []},
+                "characters": {"characters": []},
+                "chapters": [
+                    {
+                        "id": "chapter_1",
+                        "name": "Chapter 1",
+                        "scenes": [
+                            {"id": "scene_a", "name": "A", "blocks": [{"id": "line_a", "type": "narration", "text": "A."}]},
+                            {"id": "scene_b", "name": "B", "blocks": [{"id": "line_b", "type": "narration", "text": "B."}]},
+                            {"id": "scene_c", "name": "C", "blocks": [{"id": "line_c", "type": "narration", "text": "C."}]},
+                        ],
+                    }
+                ],
+            }
+            (bundle_dir / "game_data.json").write_text(json.dumps(game_data, ensure_ascii=False), encoding="utf-8")
+
+            report = build_native_runtime_vn_baseline_quality_report(bundle_dir)
+
+            self.assertEqual(report["metrics"]["sfxPlayCount"], 0)
+            self.assertEqual(report["metrics"]["missingSfxAssetCount"], 0)
+            issue_codes = {issue["code"] for issue in report["issues"]}
+            self.assertIn("sfx_plan", issue_codes)
+
+            markdown = render_native_runtime_vn_baseline_quality_markdown(report)
+            self.assertIn("缺少基础音效点", markdown)
 
 
 @unittest.skipIf(pygame is None, "pygame-ce is not installed")

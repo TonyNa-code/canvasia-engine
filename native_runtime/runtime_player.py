@@ -5463,6 +5463,9 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
     long_choice_option_count = 0
     duplicate_choice_option_count = 0
     crowded_choice_block_count = 0
+    sfx_play_count = 0
+    missing_sfx_asset_count = 0
+    missing_sfx_asset_names: list[str] = []
     music_play_count = 0
     music_stop_count = 0
     music_scoped_count = 0
@@ -5566,6 +5569,13 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
                 music_stop_count += 1
                 if get_safe_audio_fade_ms(block.get("fadeOutMs"), 0) > 0:
                     music_fade_out_count += 1
+            elif block_type == "sfx_play":
+                sfx_play_count += 1
+                sfx_asset_id = str(block.get("assetId") or "").strip()
+                sfx_asset = assets_by_id.get(sfx_asset_id) if sfx_asset_id else None
+                if not sfx_asset or not get_asset_runtime_path(bundle_dir, sfx_asset):
+                    missing_sfx_asset_count += 1
+                    missing_sfx_asset_names.append(str(block.get("id") or sfx_asset_id or "未命名音效卡"))
             elif block_type in VN_BASELINE_EFFECT_BLOCK_TYPES:
                 scene_has_effect = True
             text = get_vn_baseline_block_text(block)
@@ -5703,6 +5713,15 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             f"检测到 {missing_background_asset_count} 张背景卡片没有可用文件：{', '.join(missing_background_asset_names[:3])}",
             "重新导入或替换缺失背景、CG 或 3D 场景素材，再导出原生 Runtime，避免试玩中出现黑屏或占位背景。",
         )
+    if missing_sfx_asset_count:
+        add_vn_baseline_issue(
+            issues,
+            "warn",
+            "sfx_asset_missing",
+            "存在缺失的音效文件",
+            f"检测到 {missing_sfx_asset_count} 张音效卡片没有可用文件：{', '.join(missing_sfx_asset_names[:3])}",
+            "重新导入或替换缺失音效素材，再导出原生 Runtime，避免点击、脚步或演出音效静默失效。",
+        )
     if empty_choice_option_count:
         add_vn_baseline_issue(
             issues,
@@ -5821,6 +5840,15 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             f"检测到 {crowded_choice_block_count} 个选项卡片超过 4 个按钮。",
             "如果不是菜单式选择，建议拆成两层选择或减少同屏按钮数量，提升手柄/键盘选择体验。",
         )
+    if scene_count >= 3 and sfx_play_count == 0:
+        add_vn_baseline_issue(
+            issues,
+            "soft",
+            "sfx_plan",
+            "缺少基础音效点",
+            "多场景项目没有检测到播放音效卡片。",
+            "为门铃、脚步、点击、心跳、短信提示或关键演出补少量音效点，能显著提升试玩完成度。",
+        )
     if dialogue_count >= 3 and character_show_count == 0:
         add_vn_baseline_issue(
             issues,
@@ -5929,6 +5957,8 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             "longChoiceOptionCount": long_choice_option_count,
             "duplicateChoiceOptionCount": duplicate_choice_option_count,
             "crowdedChoiceBlockCount": crowded_choice_block_count,
+            "sfxPlayCount": sfx_play_count,
+            "missingSfxAssetCount": missing_sfx_asset_count,
             "musicPlayCount": music_play_count,
             "musicStopCount": music_stop_count,
             "musicScopedCount": music_scoped_count,
@@ -5964,6 +5994,7 @@ def render_native_runtime_vn_baseline_quality_markdown(report: dict) -> str:
         ("选项按钮总数", metrics.get("choiceOptionCount")),
         ("空白 / 超长 / 重复选项", f"{int(metrics.get('emptyChoiceOptionCount') or 0)} / {int(metrics.get('longChoiceOptionCount') or 0)} / {int(metrics.get('duplicateChoiceOptionCount') or 0)}"),
         ("拥挤选项卡", metrics.get("crowdedChoiceBlockCount")),
+        ("音效点 / 缺失音效", f"{int(metrics.get('sfxPlayCount') or 0)} / {int(metrics.get('missingSfxAssetCount') or 0)}"),
         ("角色立绘覆盖", f"{int(metrics.get('charactersWithSpriteCount') or 0)} / {int(metrics.get('characterCount') or 0)}"),
         ("人物转场 / 登场", f"{int(metrics.get('characterTransitionCount') or 0)} / {int(metrics.get('characterShowCount') or 0)}"),
         ("人物站位变化", metrics.get("characterPositionVariantCount")),
@@ -6264,6 +6295,7 @@ def render_native_runtime_release_control_markdown(payload: dict) -> str:
             ("选项按钮总数", vn_metrics.get("choiceOptionCount")),
             ("空白 / 超长 / 重复选项", f"{int(vn_metrics.get('emptyChoiceOptionCount') or 0)} / {int(vn_metrics.get('longChoiceOptionCount') or 0)} / {int(vn_metrics.get('duplicateChoiceOptionCount') or 0)}"),
             ("拥挤选项卡", vn_metrics.get("crowdedChoiceBlockCount")),
+            ("音效点 / 缺失音效", f"{int(vn_metrics.get('sfxPlayCount') or 0)} / {int(vn_metrics.get('missingSfxAssetCount') or 0)}"),
             ("角色立绘覆盖", f"{int(vn_metrics.get('charactersWithSpriteCount') or 0)} / {int(vn_metrics.get('characterCount') or 0)}"),
             ("人物转场 / 登场", f"{int(vn_metrics.get('characterTransitionCount') or 0)} / {int(vn_metrics.get('characterShowCount') or 0)}"),
             ("人物站位变化", vn_metrics.get("characterPositionVariantCount")),
