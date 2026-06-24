@@ -25,7 +25,9 @@ from native_runtime.runtime_player import (
     NativeRuntimePlayer,
     OpenCvEmbeddedVideoPlayback,
     PyAvSynchronizedVideoPlayback,
+    build_acceptance_automated_checks,
     build_native_runtime_vn_baseline_quality_report,
+    build_vn_baseline_quality_doctor_check,
     build_save_dialog_page_data,
     build_native_video_preview_probe_report,
     ellipsize_text,
@@ -192,6 +194,29 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             self.assertEqual(written["status"], "needs_fix")
             self.assertTrue((bundle_dir / VN_BASELINE_QUALITY_REPORT_NAME).is_file())
             self.assertTrue((bundle_dir / VN_BASELINE_QUALITY_MARKDOWN_NAME).is_file())
+
+            doctor_check = build_vn_baseline_quality_doctor_check(bundle_dir)
+            self.assertEqual(doctor_check["id"], "vn_baseline_quality")
+            self.assertEqual(doctor_check["status"], "fail")
+            self.assertIn("视觉小说基础质感", doctor_check["message"])
+
+            acceptance_checks = build_acceptance_automated_checks(
+                {
+                    "releaseCheck": {"status": "pass", "summary": {}},
+                    "releaseCandidate": {"status": "preview_ready", "summary": {}, "videoStrategy": {}},
+                    "qualityGate": {"status": "blocked", "summary": "VN baseline has fix items."},
+                    "asset3d": {"status": "no_3d_assets", "summaryLine": "none"},
+                    "vnBaselineQuality": {
+                        "status": report["status"],
+                        "summary": report["summary"],
+                    },
+                },
+                {"status": "pass", "summary": {}},
+            )
+            vn_check = next((check for check in acceptance_checks if check["id"] == "vn_baseline_quality"), None)
+            self.assertIsNotNone(vn_check)
+            self.assertEqual(vn_check["status"], "needs_fix")
+            self.assertEqual(vn_check["command"], "python3 runtime_player.py --vn-baseline-quality-report .")
 
 
 @unittest.skipIf(pygame is None, "pygame-ce is not installed")

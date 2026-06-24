@@ -87,7 +87,7 @@ python3 runtime_player.py --validate-bundle .
 
 ## 一键发布体检
 
-不启动窗口，集中运行导出包结构、发布前自检、标题页、正式存档面板、存档/设置/资料馆/玩家档案、粒子、演出、视频桥接和视频内嵌画面探针：
+不启动窗口，集中运行导出包结构、发布前自检、VN 基础质感、标题页、正式存档面板、存档/设置/资料馆/玩家档案、粒子、演出、视频桥接和视频内嵌画面探针：
 
 ```bash
 python3 runtime_player.py --doctor .
@@ -156,7 +156,7 @@ python3 runtime_player.py --vn-baseline-quality-report .
 
 编辑器导出的完整原生 Runtime 包会额外附带：
 
-- `native-runtime-release-acceptance.md`：面向发布前人工点测的清单，包含自动检查结果、macOS / Windows / Linux 三系统验收项，以及启动、读档、音画、回想馆、成品分发等逐项确认框。
+- `native-runtime-release-acceptance.md`：面向发布前人工点测的清单，包含自动检查结果、VN 基础质感、macOS / Windows / Linux 三系统验收项，以及启动、读档、音画、回想馆、成品分发等逐项确认框。
 - `native-runtime-release-acceptance.json`：同一份清单的机器可读版本，可供 CI、发布脚本或外部工具读取。
 
 这份清单会在导出包生成时自动写入。建议在正式分享或发布前打开 Markdown 版本，按目标系统完成最后一轮人工点测。

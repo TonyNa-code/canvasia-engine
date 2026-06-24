@@ -4784,6 +4784,22 @@ def build_release_check_doctor_check(bundle_dir: Path) -> dict:
     return build_doctor_check("release_check", "发布前自检", status, message, details=report)
 
 
+def build_vn_baseline_quality_doctor_check(bundle_dir: Path) -> dict:
+    report = build_native_runtime_vn_baseline_quality_report(bundle_dir)
+    report_status = str(report.get("status") or "needs_fix")
+    summary = report.get("summary") if isinstance(report.get("summary"), dict) else {}
+    if report_status == "ready":
+        status = "pass"
+        message = "视觉小说基础质感通过。"
+    elif report_status == "needs_polish":
+        status = "warn"
+        message = f"视觉小说基础质感还有 {summary.get('softCount', 0)} 个润色项。"
+    else:
+        status = "fail"
+        message = f"视觉小说基础质感还有 {summary.get('warnCount', 0)} 个需要修复的问题。"
+    return build_doctor_check("vn_baseline_quality", "VN 基础质感", status, message, details=report)
+
+
 def build_report_doctor_check(check_id: str, label: str, report_builder, bundle_dir: Path) -> dict:
     try:
         report = report_builder(bundle_dir)
@@ -4926,6 +4942,7 @@ def build_native_runtime_doctor_report(bundle_dir: Path) -> dict:
     checks: list[dict] = []
     checks.append(run_doctor_callable_check("bundle_structure", "导出包结构", validate_bundle, bundle_dir))
     checks.append(build_release_check_doctor_check(bundle_dir))
+    checks.append(build_vn_baseline_quality_doctor_check(bundle_dir))
     checks.append(
         run_doctor_with_temporary_home(
             lambda: build_report_doctor_check("title_screen", "标题页摘要", build_native_title_screen_report, bundle_dir)
@@ -6007,6 +6024,9 @@ def build_acceptance_automated_checks(release_control: dict, integrity_verificat
         release_control.get("releaseCandidate") if isinstance(release_control.get("releaseCandidate"), dict) else {}
     )
     asset3d = release_control.get("asset3d") if isinstance(release_control.get("asset3d"), dict) else {}
+    vn_baseline = (
+        release_control.get("vnBaselineQuality") if isinstance(release_control.get("vnBaselineQuality"), dict) else {}
+    )
     return [
         {
             "id": "release_check",
@@ -6028,6 +6048,13 @@ def build_acceptance_automated_checks(release_control: dict, integrity_verificat
             "status": str((release_control.get("qualityGate") or {}).get("status") or "unavailable"),
             "summary": str((release_control.get("qualityGate") or {}).get("summary") or ""),
             "command": "python3 runtime_player.py --release-control-report .",
+        },
+        {
+            "id": "vn_baseline_quality",
+            "label": "VN 基础质感",
+            "status": str(vn_baseline.get("status") or "unavailable"),
+            "summary": vn_baseline.get("summary") or {},
+            "command": "python3 runtime_player.py --vn-baseline-quality-report .",
         },
         {
             "id": "file_integrity",
