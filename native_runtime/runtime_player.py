@@ -5433,6 +5433,43 @@ def get_vn_baseline_color_contrast_ratio(
     return round((light + 0.05) / (dark + 0.05), 2)
 
 
+def get_vn_baseline_font_asset_status(bundle_dir: Path, game_ui_config: dict, assets_by_id: dict[str, dict]) -> dict:
+    font_asset_id = str((game_ui_config or {}).get("fontAssetId") or "").strip()
+    font_family = str((game_ui_config or {}).get("fontFamily") or "").strip()
+    status = {
+        "fontFamilyConfigured": bool(font_family),
+        "customFontAssetBound": bool(font_asset_id),
+        "fontAssetId": font_asset_id,
+        "fontAssetUsable": False,
+        "fontAssetMissingCount": 0,
+        "fontAssetTypeRiskCount": 0,
+        "fontExtensionRiskCount": 0,
+        "fontIssueNotes": [],
+    }
+    if not font_asset_id:
+        return status
+    font_asset = assets_by_id.get(font_asset_id)
+    if not isinstance(font_asset, dict):
+        status["fontAssetMissingCount"] = 1
+        status["fontIssueNotes"].append(f"字体素材引用不存在：{font_asset_id}")
+        return status
+    font_name = str(font_asset.get("name") or font_asset_id)
+    if str(font_asset.get("type") or "") != "font":
+        status["fontAssetTypeRiskCount"] = 1
+        status["fontIssueNotes"].append(f"字体素材类型不是 font：{font_name}")
+    font_path = get_asset_runtime_path(bundle_dir, font_asset)
+    if not font_path:
+        status["fontAssetMissingCount"] = 1
+        status["fontIssueNotes"].append(f"字体文件没有进入原生包：{font_name}")
+        return status
+    if font_path.suffix.lower() not in SUPPORTED_FONT_EXTENSIONS:
+        status["fontExtensionRiskCount"] = 1
+        status["fontIssueNotes"].append(f"字体扩展名不推荐：{font_path.suffix or '无扩展名'}")
+        return status
+    status["fontAssetUsable"] = status["fontAssetTypeRiskCount"] == 0
+    return status
+
+
 def get_vn_baseline_block_text(block: dict) -> str:
     block_type = str(block.get("type") or "").strip()
     if block_type in {"dialogue", "narration"}:
@@ -5485,6 +5522,9 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
     assets_doc = payload.get("assets") if isinstance(payload.get("assets"), dict) else {}
     assets = assets_doc.get("assets") if isinstance(assets_doc.get("assets"), list) else []
     assets_by_id = {str(asset.get("id")): asset for asset in assets if isinstance(asset, dict) and asset.get("id")}
+    game_ui_config = get_project_game_ui_config(project)
+    font_asset_count = sum(1 for asset in assets if isinstance(asset, dict) and asset.get("type") == "font")
+    font_status = get_vn_baseline_font_asset_status(bundle_dir, game_ui_config, assets_by_id)
     video_asset_count = sum(1 for asset in assets if isinstance(asset, dict) and asset.get("type") == "video")
     cg_asset_ids = {
         str(asset.get("id"))
@@ -6181,6 +6221,33 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             f"检测到 {len(duplicate_variable_ids)} 个重复变量 ID：{', '.join(sorted(duplicate_variable_ids)[:3])}",
             "回到变量库合并或重命名重复变量，避免条件分支、选项效果和存档摘要读到不可预测的值。",
         )
+    if font_status["fontAssetMissingCount"]:
+        add_vn_baseline_issue(
+            issues,
+            "warn",
+            "font_asset_missing",
+            "项目字体素材不可用",
+            "；".join(font_status["fontIssueNotes"][:3]) + "。",
+            "重新导入字体文件、重新选择字体素材，或清空字体绑定改用系统字体；否则玩家机器上可能回退到默认字体。",
+        )
+    elif font_status["fontAssetTypeRiskCount"]:
+        add_vn_baseline_issue(
+            issues,
+            "soft",
+            "font_asset_type_risk",
+            "项目字体素材类型不匹配",
+            "；".join(font_status["fontIssueNotes"][:3]) + "。",
+            "字体素材建议通过 font 类型导入，避免素材库整理、导出筛选和授权检查时被当作普通文件。",
+        )
+    elif font_status["fontExtensionRiskCount"]:
+        add_vn_baseline_issue(
+            issues,
+            "soft",
+            "font_extension_risk",
+            "项目字体格式可能不稳定",
+            "；".join(font_status["fontIssueNotes"][:3]) + "。",
+            "建议使用 ttf、otf 或 ttc，并确认字体授权允许随游戏分发；不推荐格式可能在部分平台无法加载。",
+        )
     if logic_missing_variable_count:
         add_vn_baseline_issue(
             issues,
@@ -6619,6 +6686,13 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             "i18nPresentTranslationCount": i18n_present_translation_count,
             "i18nTranslationCoveragePercent": i18n_translation_coverage_percent,
             "i18nFallbackSupported": fallback_language in supported_languages,
+            "fontAssetCount": font_asset_count,
+            "fontFamilyConfigured": font_status["fontFamilyConfigured"],
+            "customFontAssetBound": font_status["customFontAssetBound"],
+            "fontAssetUsable": font_status["fontAssetUsable"],
+            "fontAssetMissingCount": font_status["fontAssetMissingCount"],
+            "fontAssetTypeRiskCount": font_status["fontAssetTypeRiskCount"],
+            "fontExtensionRiskCount": font_status["fontExtensionRiskCount"],
             "formalSaveSlotCount": formal_save_slot_count,
             "configuredFormalSaveSlotCount": configured_formal_save_slot_count,
             "saveDialogPageCount": save_dialog_page_count,
@@ -6688,6 +6762,8 @@ def render_native_runtime_vn_baseline_quality_markdown(report: dict) -> str:
         ("缺失语音文件", metrics.get("missingVoiceAssetCount")),
         ("语音素材 / 已入剧情 / 未使用", f"{int(metrics.get('voiceAssetCount') or 0)} / {int(metrics.get('voiceUsedAssetCount') or 0)} / {int(metrics.get('unusedVoiceAssetCount') or 0)}"),
         ("语言 / 目标语言 / 翻译覆盖", f"{int(metrics.get('supportedLanguageCount') or 0)} / {int(metrics.get('targetI18nLanguageCount') or 0)} / {format_markdown_value(metrics.get('i18nTranslationCoveragePercent'), '0')}%"),
+        ("字体素材 / 已绑定 / 可用", f"{int(metrics.get('fontAssetCount') or 0)} / {'是' if metrics.get('customFontAssetBound') else '否'} / {'是' if metrics.get('fontAssetUsable') else '否'}"),
+        ("字体缺失 / 类型风险 / 格式风险", f"{int(metrics.get('fontAssetMissingCount') or 0)} / {int(metrics.get('fontAssetTypeRiskCount') or 0)} / {int(metrics.get('fontExtensionRiskCount') or 0)}"),
         ("正式存档位 / 读档页数", f"{int(metrics.get('formalSaveSlotCount') or 0)} / {int(metrics.get('saveDialogPageCount') or 0)}"),
         ("入口场景有效", "是" if metrics.get("entrySceneExists") else "否"),
         ("路线缺失目标", metrics.get("routeTargetMissingCount")),
@@ -7007,6 +7083,8 @@ def render_native_runtime_release_control_markdown(payload: dict) -> str:
             ("缺失语音文件", vn_metrics.get("missingVoiceAssetCount")),
             ("语音素材 / 已入剧情 / 未使用", f"{int(vn_metrics.get('voiceAssetCount') or 0)} / {int(vn_metrics.get('voiceUsedAssetCount') or 0)} / {int(vn_metrics.get('unusedVoiceAssetCount') or 0)}"),
             ("语言 / 目标语言 / 翻译覆盖", f"{int(vn_metrics.get('supportedLanguageCount') or 0)} / {int(vn_metrics.get('targetI18nLanguageCount') or 0)} / {format_markdown_value(vn_metrics.get('i18nTranslationCoveragePercent'), '0')}%"),
+            ("字体素材 / 已绑定 / 可用", f"{int(vn_metrics.get('fontAssetCount') or 0)} / {'是' if vn_metrics.get('customFontAssetBound') else '否'} / {'是' if vn_metrics.get('fontAssetUsable') else '否'}"),
+            ("字体缺失 / 类型风险 / 格式风险", f"{int(vn_metrics.get('fontAssetMissingCount') or 0)} / {int(vn_metrics.get('fontAssetTypeRiskCount') or 0)} / {int(vn_metrics.get('fontExtensionRiskCount') or 0)}"),
             ("正式存档位 / 读档页数", f"{int(vn_metrics.get('formalSaveSlotCount') or 0)} / {int(vn_metrics.get('saveDialogPageCount') or 0)}"),
             ("入口场景有效", "是" if vn_metrics.get("entrySceneExists") else "否"),
             ("路线缺失目标", vn_metrics.get("routeTargetMissingCount")),

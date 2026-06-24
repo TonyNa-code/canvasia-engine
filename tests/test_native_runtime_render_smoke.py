@@ -485,6 +485,67 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             self.assertIn("语言 / 目标语言 / 翻译覆盖", markdown)
             self.assertIn("多语言翻译覆盖偏低", markdown)
 
+    def test_vn_baseline_quality_report_flags_font_asset_gaps(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_dir = Path(temp_dir) / "bundle"
+            font_path = bundle_dir / "assets" / "fonts" / "story.woff"
+            font_path.parent.mkdir(parents=True)
+            font_path.write_bytes(b"fake-woff-font")
+            game_data = {
+                "project": {
+                    "projectId": "native_font_quality_smoke",
+                    "title": "Native Font Quality Smoke",
+                    "entrySceneId": "scene_font",
+                    "gameUiConfig": {
+                        "fontStyle": "serif",
+                        "fontFamily": "Story Serif",
+                        "fontAssetId": "font_story",
+                    },
+                },
+                "assets": {
+                    "assets": [
+                        {
+                            "id": "font_story",
+                            "type": "font",
+                            "name": "Story Font",
+                            "exportUrl": "assets/fonts/story.woff",
+                        }
+                    ]
+                },
+                "characters": {"characters": []},
+                "chapters": [
+                    {
+                        "id": "chapter_1",
+                        "name": "Chapter 1",
+                        "scenes": [
+                            {
+                                "id": "scene_font",
+                                "name": "Font",
+                                "blocks": [
+                                    {"id": "line_1", "type": "narration", "text": "字体巡检应该提前发现不推荐格式。"},
+                                ],
+                            }
+                        ],
+                    }
+                ],
+            }
+            (bundle_dir / "game_data.json").write_text(json.dumps(game_data, ensure_ascii=False), encoding="utf-8")
+
+            report = build_native_runtime_vn_baseline_quality_report(bundle_dir)
+
+            self.assertEqual(report["metrics"]["fontAssetCount"], 1)
+            self.assertTrue(report["metrics"]["fontFamilyConfigured"])
+            self.assertTrue(report["metrics"]["customFontAssetBound"])
+            self.assertFalse(report["metrics"]["fontAssetUsable"])
+            self.assertEqual(report["metrics"]["fontExtensionRiskCount"], 1)
+            issue_codes = {issue["code"] for issue in report["issues"]}
+            self.assertIn("font_extension_risk", issue_codes)
+
+            markdown = render_native_runtime_vn_baseline_quality_markdown(report)
+            self.assertIn("字体素材 / 已绑定 / 可用", markdown)
+            self.assertIn("字体缺失 / 类型风险 / 格式风险", markdown)
+            self.assertIn("项目字体格式可能不稳定", markdown)
+
     def test_vn_baseline_quality_report_flags_voice_binding_gaps(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             bundle_dir = Path(temp_dir) / "bundle"
