@@ -5619,6 +5619,15 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             empty_chapter_names.append(str(chapter.get("name") or chapter_id or "未命名章节"))
     duplicate_chapter_ids = sorted(chapter_id for chapter_id, count in chapter_id_counts.items() if count > 1)
     scenes = iter_export_scenes(chapters)
+    missing_scene_id_count = 0
+    missing_scene_id_names: list[str] = []
+    for scene in scenes:
+        if not isinstance(scene, dict):
+            continue
+        scene_id = str(scene.get("id") or "").strip()
+        if not scene_id:
+            missing_scene_id_count += 1
+            missing_scene_id_names.append(str(scene.get("name") or "未命名场景"))
     scene_ids = [str(scene.get("id") or "").strip() for scene in scenes if isinstance(scene, dict)]
     scene_id_counts: dict[str, int] = {}
     for scene_id in scene_ids:
@@ -5709,6 +5718,8 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
     long_text_block_names: list[str] = []
     duplicate_block_id_count = 0
     duplicate_block_id_names: list[str] = []
+    missing_block_id_count = 0
+    missing_block_id_names: list[str] = []
 
     for chapter in chapters:
         if not isinstance(chapter, dict):
@@ -5727,12 +5738,17 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             i18n_present_translation_count += present
         blocks = scene.get("blocks") if isinstance(scene.get("blocks"), list) else []
         block_id_counts: dict[str, int] = {}
-        for block in blocks:
+        for block_index, block in enumerate(blocks):
             if not isinstance(block, dict):
                 continue
             block_id = str(block.get("id") or "").strip()
             if block_id:
                 block_id_counts[block_id] = block_id_counts.get(block_id, 0) + 1
+            else:
+                missing_block_id_count += 1
+                scene_label = str(scene.get("name") or scene.get("id") or "未命名场景")
+                block_type = str(block.get("type") or "unknown").strip() or "unknown"
+                missing_block_id_names.append(f"{scene_label}:{block_type}#{block_index + 1}")
         duplicate_block_ids = sorted(block_id for block_id, count in block_id_counts.items() if count > 1)
         duplicate_block_id_count += len(duplicate_block_ids)
         if duplicate_block_ids:
@@ -6157,6 +6173,24 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             "章节 ID 存在重复",
             f"检测到 {len(duplicate_chapter_ids)} 个重复章节 ID：{', '.join(duplicate_chapter_ids[:3])}",
             "复制章节后请重新生成或修改章节 ID；重复 ID 会影响章节回放、发布报告和后续迁移工具识别章节。",
+        )
+    if missing_scene_id_count:
+        add_vn_baseline_issue(
+            issues,
+            "warn",
+            "missing_scene_id",
+            "存在没有 ID 的场景",
+            f"检测到 {missing_scene_id_count} 个场景没有 ID：{', '.join(missing_scene_id_names[:3])}",
+            "为每个场景生成稳定 ID；缺失场景 ID 会影响入口、跳转、存档、章节回放和结局解锁定位。",
+        )
+    if missing_block_id_count:
+        add_vn_baseline_issue(
+            issues,
+            "warn",
+            "missing_block_id",
+            "存在没有 ID 的剧情卡片",
+            f"检测到 {missing_block_id_count} 张剧情卡片没有 ID：{', '.join(missing_block_id_names[:3])}",
+            "为每张卡片生成稳定 ID；缺失卡片 ID 会影响文本历史、语音回听、BGM after_block 范围和后续自动化迁移。",
         )
     if empty_chapter_count:
         add_vn_baseline_issue(
@@ -6815,7 +6849,9 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             "duplicateChapterIdCount": len(duplicate_chapter_ids),
             "emptyChapterCount": empty_chapter_count,
             "storySceneCount": scene_count,
+            "missingSceneIdCount": missing_scene_id_count,
             "duplicateSceneIdCount": len(duplicate_scene_ids),
+            "missingBlockIdCount": missing_block_id_count,
             "duplicateBlockIdCount": duplicate_block_id_count,
             "duplicateAssetIdCount": len(duplicate_asset_ids),
             "duplicateCharacterIdCount": len(duplicate_character_ids),
@@ -6953,7 +6989,9 @@ def render_native_runtime_vn_baseline_quality_markdown(report: dict) -> str:
         ("章节数 / 空章节", f"{int(metrics.get('chapterCount') or 0)} / {int(metrics.get('emptyChapterCount') or 0)}"),
         ("重复章节 ID", metrics.get("duplicateChapterIdCount")),
         ("场景数", metrics.get("storySceneCount")),
+        ("缺失场景 ID", metrics.get("missingSceneIdCount")),
         ("重复场景 / 重复卡片 ID", f"{int(metrics.get('duplicateSceneIdCount') or 0)} / {int(metrics.get('duplicateBlockIdCount') or 0)}"),
+        ("缺失卡片 ID", metrics.get("missingBlockIdCount")),
         ("重复素材 / 角色 / 表情 ID", f"{int(metrics.get('duplicateAssetIdCount') or 0)} / {int(metrics.get('duplicateCharacterIdCount') or 0)} / {int(metrics.get('duplicateExpressionIdCount') or 0)}"),
         ("台词 / 旁白 / 选项", f"{int(metrics.get('dialogueCount') or 0)} / {int(metrics.get('narrationCount') or 0)} / {int(metrics.get('choiceCount') or 0)}"),
         ("变量 / 条件 / 选项效果", f"{int(metrics.get('variableCount') or 0)} / {int(metrics.get('conditionCount') or 0)} / {int(metrics.get('choiceEffectCount') or 0)}"),
@@ -7282,7 +7320,9 @@ def render_native_runtime_release_control_markdown(payload: dict) -> str:
             ("章节数 / 空章节", f"{int(vn_metrics.get('chapterCount') or 0)} / {int(vn_metrics.get('emptyChapterCount') or 0)}"),
             ("重复章节 ID", vn_metrics.get("duplicateChapterIdCount")),
             ("场景数", vn_metrics.get("storySceneCount")),
+            ("缺失场景 ID", vn_metrics.get("missingSceneIdCount")),
             ("重复场景 / 重复卡片 ID", f"{int(vn_metrics.get('duplicateSceneIdCount') or 0)} / {int(vn_metrics.get('duplicateBlockIdCount') or 0)}"),
+            ("缺失卡片 ID", vn_metrics.get("missingBlockIdCount")),
             ("重复素材 / 角色 / 表情 ID", f"{int(vn_metrics.get('duplicateAssetIdCount') or 0)} / {int(vn_metrics.get('duplicateCharacterIdCount') or 0)} / {int(vn_metrics.get('duplicateExpressionIdCount') or 0)}"),
             ("台词 / 旁白 / 选项", f"{int(vn_metrics.get('dialogueCount') or 0)} / {int(vn_metrics.get('narrationCount') or 0)} / {int(vn_metrics.get('choiceCount') or 0)}"),
             ("变量 / 条件 / 选项效果", f"{int(vn_metrics.get('variableCount') or 0)} / {int(vn_metrics.get('conditionCount') or 0)} / {int(vn_metrics.get('choiceEffectCount') or 0)}"),

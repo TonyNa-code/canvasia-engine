@@ -343,6 +343,57 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             self.assertIn("章节 ID 存在重复", markdown)
             self.assertIn("存在没有场景的空章节", markdown)
 
+    def test_vn_baseline_quality_report_flags_missing_scene_and_block_ids(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_dir = Path(temp_dir) / "bundle"
+            bundle_dir.mkdir(parents=True)
+            game_data = {
+                "project": {
+                    "projectId": "native_missing_id_quality_smoke",
+                    "title": "Native Missing ID Quality Smoke",
+                    "entrySceneId": "scene_ok",
+                },
+                "assets": {"assets": []},
+                "characters": {"characters": []},
+                "chapters": [
+                    {
+                        "id": "chapter_1",
+                        "name": "Chapter 1",
+                        "scenes": [
+                            {
+                                "id": "",
+                                "name": "Anonymous Scene",
+                                "blocks": [{"type": "narration", "text": "Anonymous."}],
+                            },
+                            {
+                                "id": "scene_ok",
+                                "name": "Stable Scene",
+                                "blocks": [
+                                    {"id": "line_ok", "type": "narration", "text": "Stable."},
+                                    {"type": "dialogue", "speakerId": "", "text": "Missing card id."},
+                                ],
+                            },
+                        ],
+                    }
+                ],
+            }
+            (bundle_dir / "game_data.json").write_text(json.dumps(game_data, ensure_ascii=False), encoding="utf-8")
+
+            report = build_native_runtime_vn_baseline_quality_report(bundle_dir)
+
+            self.assertEqual(report["status"], "needs_fix")
+            self.assertEqual(report["metrics"]["missingSceneIdCount"], 1)
+            self.assertEqual(report["metrics"]["missingBlockIdCount"], 2)
+            issue_codes = {issue["code"] for issue in report["issues"]}
+            self.assertIn("missing_scene_id", issue_codes)
+            self.assertIn("missing_block_id", issue_codes)
+
+            markdown = render_native_runtime_vn_baseline_quality_markdown(report)
+            self.assertIn("缺失场景 ID", markdown)
+            self.assertIn("缺失卡片 ID", markdown)
+            self.assertIn("存在没有 ID 的场景", markdown)
+            self.assertIn("存在没有 ID 的剧情卡片", markdown)
+
     def test_vn_baseline_quality_report_flags_duplicate_resource_ids(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             bundle_dir = Path(temp_dir) / "bundle"
