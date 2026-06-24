@@ -5575,6 +5575,11 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
     chapters = payload.get("chapters") if isinstance(payload.get("chapters"), list) else []
     scenes = iter_export_scenes(chapters)
     scene_ids = [str(scene.get("id") or "").strip() for scene in scenes if isinstance(scene, dict)]
+    scene_id_counts: dict[str, int] = {}
+    for scene_id in scene_ids:
+        if scene_id:
+            scene_id_counts[scene_id] = scene_id_counts.get(scene_id, 0) + 1
+    duplicate_scene_ids = sorted(scene_id for scene_id, count in scene_id_counts.items() if count > 1)
     valid_scene_ids = {scene_id for scene_id in scene_ids if scene_id}
     entry_scene_id = str(project.get("entrySceneId") or "").strip()
 
@@ -5657,6 +5662,8 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
     long_text_block_count = 0
     multiline_text_block_count = 0
     long_text_block_names: list[str] = []
+    duplicate_block_id_count = 0
+    duplicate_block_id_names: list[str] = []
 
     for chapter in chapters:
         if not isinstance(chapter, dict):
@@ -5674,6 +5681,18 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             i18n_expected_translation_count += expected
             i18n_present_translation_count += present
         blocks = scene.get("blocks") if isinstance(scene.get("blocks"), list) else []
+        block_id_counts: dict[str, int] = {}
+        for block in blocks:
+            if not isinstance(block, dict):
+                continue
+            block_id = str(block.get("id") or "").strip()
+            if block_id:
+                block_id_counts[block_id] = block_id_counts.get(block_id, 0) + 1
+        duplicate_block_ids = sorted(block_id for block_id, count in block_id_counts.items() if count > 1)
+        duplicate_block_id_count += len(duplicate_block_ids)
+        if duplicate_block_ids:
+            scene_label = str(scene.get("name") or scene.get("id") or "未命名场景")
+            duplicate_block_id_names.extend(f"{scene_label}:{block_id}" for block_id in duplicate_block_ids)
         scene_has_background = False
         scene_has_music = False
         scene_has_effect = False
@@ -6292,6 +6311,24 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             f"检测到 {len(duplicate_variable_ids)} 个重复变量 ID：{', '.join(sorted(duplicate_variable_ids)[:3])}",
             "回到变量库合并或重命名重复变量，避免条件分支、选项效果和存档摘要读到不可预测的值。",
         )
+    if duplicate_scene_ids:
+        add_vn_baseline_issue(
+            issues,
+            "warn",
+            "duplicate_scene_id",
+            "场景 ID 存在重复",
+            f"检测到 {len(duplicate_scene_ids)} 个重复场景 ID：{', '.join(duplicate_scene_ids[:3])}",
+            "复制场景后请重新生成或修改场景 ID；重复 ID 会让跳转、可达性分析和存档定位变得不可预测。",
+        )
+    if duplicate_block_id_count:
+        add_vn_baseline_issue(
+            issues,
+            "warn",
+            "duplicate_block_id",
+            "同一场景内存在重复卡片 ID",
+            f"检测到 {duplicate_block_id_count} 个重复卡片 ID：{', '.join(duplicate_block_id_names[:3])}",
+            "复制卡片后请重新生成或修改卡片 ID；重复 ID 会影响 BGM 结束范围、文本历史、语音回听和自动化发布检查。",
+        )
     if font_status["fontAssetMissingCount"]:
         add_vn_baseline_issue(
             issues,
@@ -6685,6 +6722,8 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
         },
         "metrics": {
             "storySceneCount": scene_count,
+            "duplicateSceneIdCount": len(duplicate_scene_ids),
+            "duplicateBlockIdCount": duplicate_block_id_count,
             "dialogueCount": dialogue_count,
             "narrationCount": narration_count,
             "choiceCount": choice_count,
@@ -6816,6 +6855,7 @@ def render_native_runtime_vn_baseline_quality_markdown(report: dict) -> str:
     issues = report.get("issues") if isinstance(report.get("issues"), list) else []
     metric_rows = [
         ("场景数", metrics.get("storySceneCount")),
+        ("重复场景 / 重复卡片 ID", f"{int(metrics.get('duplicateSceneIdCount') or 0)} / {int(metrics.get('duplicateBlockIdCount') or 0)}"),
         ("台词 / 旁白 / 选项", f"{int(metrics.get('dialogueCount') or 0)} / {int(metrics.get('narrationCount') or 0)} / {int(metrics.get('choiceCount') or 0)}"),
         ("变量 / 条件 / 选项效果", f"{int(metrics.get('variableCount') or 0)} / {int(metrics.get('conditionCount') or 0)} / {int(metrics.get('choiceEffectCount') or 0)}"),
         ("写入变量 / 条件读取 / 影响路线", f"{int(metrics.get('variableWrittenCount') or 0)} / {int(metrics.get('conditionReadVariableCount') or 0)} / {int(metrics.get('routeInfluencingVariableCount') or 0)}"),
@@ -7141,6 +7181,7 @@ def render_native_runtime_release_control_markdown(payload: dict) -> str:
         lines.extend(["## VN 基础质感", "", "| 指标 | 值 |", "| --- | --- |"])
         for label, value in [
             ("场景数", vn_metrics.get("storySceneCount")),
+            ("重复场景 / 重复卡片 ID", f"{int(vn_metrics.get('duplicateSceneIdCount') or 0)} / {int(vn_metrics.get('duplicateBlockIdCount') or 0)}"),
             ("台词 / 旁白 / 选项", f"{int(vn_metrics.get('dialogueCount') or 0)} / {int(vn_metrics.get('narrationCount') or 0)} / {int(vn_metrics.get('choiceCount') or 0)}"),
             ("变量 / 条件 / 选项效果", f"{int(vn_metrics.get('variableCount') or 0)} / {int(vn_metrics.get('conditionCount') or 0)} / {int(vn_metrics.get('choiceEffectCount') or 0)}"),
             ("写入变量 / 条件读取 / 影响路线", f"{int(vn_metrics.get('variableWrittenCount') or 0)} / {int(vn_metrics.get('conditionReadVariableCount') or 0)} / {int(vn_metrics.get('routeInfluencingVariableCount') or 0)}"),

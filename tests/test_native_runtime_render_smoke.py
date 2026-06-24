@@ -245,6 +245,58 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             self.assertEqual(vn_check["status"], "needs_fix")
             self.assertEqual(vn_check["command"], "python3 runtime_player.py --vn-baseline-quality-report .")
 
+    def test_vn_baseline_quality_report_flags_duplicate_scene_and_block_ids(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_dir = Path(temp_dir) / "bundle"
+            bundle_dir.mkdir(parents=True)
+            game_data = {
+                "project": {
+                    "projectId": "native_duplicate_id_quality_smoke",
+                    "title": "Native Duplicate ID Quality Smoke",
+                    "entrySceneId": "scene_dup",
+                },
+                "assets": {"assets": []},
+                "characters": {"characters": []},
+                "chapters": [
+                    {
+                        "id": "chapter_1",
+                        "name": "Chapter 1",
+                        "scenes": [
+                            {
+                                "id": "scene_dup",
+                                "name": "Opening",
+                                "blocks": [
+                                    {"id": "line_dup", "type": "narration", "text": "First line."},
+                                    {"id": "line_dup", "type": "narration", "text": "Second line."},
+                                ],
+                            },
+                            {
+                                "id": "scene_dup",
+                                "name": "Copied Opening",
+                                "blocks": [
+                                    {"id": "line_other", "type": "narration", "text": "Copied scene."},
+                                ],
+                            },
+                        ],
+                    }
+                ],
+            }
+            (bundle_dir / "game_data.json").write_text(json.dumps(game_data, ensure_ascii=False), encoding="utf-8")
+
+            report = build_native_runtime_vn_baseline_quality_report(bundle_dir)
+
+            self.assertEqual(report["status"], "needs_fix")
+            self.assertEqual(report["metrics"]["duplicateSceneIdCount"], 1)
+            self.assertEqual(report["metrics"]["duplicateBlockIdCount"], 1)
+            issue_codes = {issue["code"] for issue in report["issues"]}
+            self.assertIn("duplicate_scene_id", issue_codes)
+            self.assertIn("duplicate_block_id", issue_codes)
+
+            markdown = render_native_runtime_vn_baseline_quality_markdown(report)
+            self.assertIn("重复场景 / 重复卡片 ID", markdown)
+            self.assertIn("场景 ID 存在重复", markdown)
+            self.assertIn("同一场景内存在重复卡片 ID", markdown)
+
     def test_vn_baseline_quality_report_flags_bgm_continuity_gaps(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             bundle_dir = Path(temp_dir) / "bundle"
