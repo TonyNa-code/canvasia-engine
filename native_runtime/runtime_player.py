@@ -6021,6 +6021,30 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
                     pending_scene_ids.append(target)
     unreachable_scene_ids = sorted(valid_scene_ids - reachable_scene_ids) if reachable_scene_ids else []
     ending_scene_count = len(build_ending_scene_ids(chapters))
+    reachable_terminal_scene_names: list[str] = []
+    reachable_plain_terminal_scene_names: list[str] = []
+    reachable_terminal_scene_count = 0
+    reachable_credits_terminal_scene_count = 0
+    for scene in scenes:
+        if not isinstance(scene, dict):
+            continue
+        scene_id = str(scene.get("id") or "").strip()
+        if not scene_id or (reachable_scene_ids and scene_id not in reachable_scene_ids):
+            continue
+        if scene_outgoing_targets.get(scene_id):
+            continue
+        reachable_terminal_scene_count += 1
+        scene_name = str(scene.get("name") or scene_id)
+        reachable_terminal_scene_names.append(scene_name)
+        blocks = scene.get("blocks") if isinstance(scene.get("blocks"), list) else []
+        has_credits_roll = any(
+            isinstance(block, dict) and str(block.get("type") or "").strip() == "credits_roll"
+            for block in blocks
+        )
+        if has_credits_roll:
+            reachable_credits_terminal_scene_count += 1
+        else:
+            reachable_plain_terminal_scene_names.append(scene_name)
     issues: list[dict] = []
 
     if not scenes:
@@ -6076,6 +6100,15 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             "存在入口无法到达的场景",
             f"从入口场景出发，有 {len(unreachable_scene_ids)} 个场景没有被路线连接：{', '.join(unreachable_scene_ids[:3])}",
             "如果这些是正式内容，请用选项、跳转或条件分支接入；如果只是素材草稿，建议标记或移出发布章节。",
+        )
+    if scene_count >= 2 and reachable_plain_terminal_scene_names:
+        add_vn_baseline_issue(
+            issues,
+            "soft",
+            "plain_terminal_scene",
+            "部分可达路线缺少明确收束",
+            f"检测到 {len(reachable_plain_terminal_scene_names)} 个入口可到达的终点场景没有片尾字幕卡片：{', '.join(reachable_plain_terminal_scene_names[:3])}",
+            "如果这是正式结局，建议补片尾字幕、结局说明或明确的收束场景；如果只是中途断点，请接回后续场景，避免玩家以为流程坏了。",
         )
     if placeholder_assets:
         add_vn_baseline_issue(
@@ -6701,6 +6734,9 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             "routeTargetMissingCount": len(missing_route_targets),
             "unreachableSceneCount": len(unreachable_scene_ids),
             "linkedSceneCount": len(reachable_scene_ids),
+            "reachableTerminalSceneCount": reachable_terminal_scene_count,
+            "reachableCreditsTerminalSceneCount": reachable_credits_terminal_scene_count,
+            "reachablePlainTerminalSceneCount": len(reachable_plain_terminal_scene_names),
             "placeholderAssetCount": len(placeholder_assets),
             "emptyTextBlockCount": empty_text_count,
             "longTextBlockCount": long_text_block_count,
@@ -6768,6 +6804,7 @@ def render_native_runtime_vn_baseline_quality_markdown(report: dict) -> str:
         ("入口场景有效", "是" if metrics.get("entrySceneExists") else "否"),
         ("路线缺失目标", metrics.get("routeTargetMissingCount")),
         ("入口不可达场景", metrics.get("unreachableSceneCount")),
+        ("可达终点 / 片尾收束 / 普通断点", f"{int(metrics.get('reachableTerminalSceneCount') or 0)} / {int(metrics.get('reachableCreditsTerminalSceneCount') or 0)} / {int(metrics.get('reachablePlainTerminalSceneCount') or 0)}"),
         ("演出效果场景", metrics.get("scenesWithEffects")),
         ("占位素材", metrics.get("placeholderAssetCount")),
         ("空文本块", metrics.get("emptyTextBlockCount")),
@@ -7089,6 +7126,7 @@ def render_native_runtime_release_control_markdown(payload: dict) -> str:
             ("入口场景有效", "是" if vn_metrics.get("entrySceneExists") else "否"),
             ("路线缺失目标", vn_metrics.get("routeTargetMissingCount")),
             ("入口不可达场景", vn_metrics.get("unreachableSceneCount")),
+            ("可达终点 / 片尾收束 / 普通断点", f"{int(vn_metrics.get('reachableTerminalSceneCount') or 0)} / {int(vn_metrics.get('reachableCreditsTerminalSceneCount') or 0)} / {int(vn_metrics.get('reachablePlainTerminalSceneCount') or 0)}"),
             ("过长文本 / 多换行文本", f"{int(vn_metrics.get('longTextBlockCount') or 0)} / {int(vn_metrics.get('multilineTextBlockCount') or 0)}"),
             ("文本框可读性风险", vn_metrics.get("dialogBoxReadabilityRiskCount")),
             ("文本框透明度 / 色差", f"{int(vn_metrics.get('dialogBoxBackgroundOpacity') or 0)}% / {format_markdown_value(vn_metrics.get('dialogBoxTextContrastRatio'), '0')}:1"),

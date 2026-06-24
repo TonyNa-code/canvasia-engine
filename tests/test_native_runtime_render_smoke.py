@@ -663,13 +663,18 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             self.assertEqual(report["metrics"]["routeTargetMissingCount"], 1)
             self.assertEqual(report["metrics"]["unreachableSceneCount"], 1)
             self.assertEqual(report["metrics"]["linkedSceneCount"], 2)
+            self.assertEqual(report["metrics"]["reachableTerminalSceneCount"], 1)
+            self.assertEqual(report["metrics"]["reachableCreditsTerminalSceneCount"], 0)
+            self.assertEqual(report["metrics"]["reachablePlainTerminalSceneCount"], 1)
             issue_codes = {issue["code"] for issue in report["issues"]}
             self.assertIn("route_target_missing", issue_codes)
             self.assertIn("unreachable_scene", issue_codes)
+            self.assertIn("plain_terminal_scene", issue_codes)
 
             markdown = render_native_runtime_vn_baseline_quality_markdown(report)
             self.assertIn("路线跳转目标缺失", markdown)
             self.assertIn("入口不可达场景", markdown)
+            self.assertIn("可达终点 / 片尾收束 / 普通断点", markdown)
 
     def test_vn_baseline_quality_report_flags_empty_navigation_targets(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
