@@ -2509,6 +2509,14 @@ class RunEditorSmokeTests(unittest.TestCase):
 
     def test_native_runtime_export_build_smoke(self) -> None:
         _, chapter_result = self.create_blank_project_with_chapter()
+        background_asset = run_editor.import_assets(
+            "background",
+            [build_upload_payload("native_smoke_background.png", build_fake_png_bytes())],
+        )["assets"][0]
+        bgm_asset = run_editor.import_assets(
+            "bgm",
+            [build_upload_payload("native_smoke_theme.wav", build_fake_wav_bytes())],
+        )["assets"][0]
         ui_assets = run_editor.import_assets(
             "ui",
             [
@@ -2568,7 +2576,8 @@ class RunEditorSmokeTests(unittest.TestCase):
             chapter_result["chapterId"],
             chapter_result["scene"],
             [
-                {"id": "block_001", "type": "background", "assetId": ""},
+                {"id": "block_000", "type": "music_play", "assetId": bgm_asset["id"], "fadeInMs": 600},
+                {"id": "block_001", "type": "background", "assetId": background_asset["id"]},
                 {
                     "id": "block_001b",
                     "type": "particle_effect",
@@ -2609,6 +2618,8 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_RC_REPORT_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_RELEASE_CONTROL_REPORT_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_RELEASE_CONTROL_JSON_NAME).is_file())
+        self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_VN_BASELINE_QUALITY_REPORT_NAME).is_file())
+        self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_VN_BASELINE_QUALITY_MARKDOWN_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_FILE_INTEGRITY_REPORT_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_FILE_INTEGRITY_MARKDOWN_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_3D_ASSET_REPORT_NAME).is_file())
@@ -2713,6 +2724,8 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["runtime"]["releaseCandidateReport"], run_editor.NATIVE_RUNTIME_RC_REPORT_NAME)
         self.assertEqual(manifest["runtime"]["releaseControlReport"], run_editor.NATIVE_RUNTIME_RELEASE_CONTROL_REPORT_NAME)
         self.assertEqual(manifest["runtime"]["releaseControlJson"], run_editor.NATIVE_RUNTIME_RELEASE_CONTROL_JSON_NAME)
+        self.assertEqual(manifest["runtime"]["vnBaselineQualityReport"], run_editor.NATIVE_RUNTIME_VN_BASELINE_QUALITY_REPORT_NAME)
+        self.assertEqual(manifest["runtime"]["vnBaselineQualityMarkdown"], run_editor.NATIVE_RUNTIME_VN_BASELINE_QUALITY_MARKDOWN_NAME)
         self.assertEqual(manifest["runtime"]["releaseControlReporter"]["macos"], run_editor.NATIVE_RUNTIME_MAC_RELEASE_CONTROL_COMMAND_NAME)
         self.assertEqual(manifest["runtime"]["releaseControlReporter"]["linux"], run_editor.NATIVE_RUNTIME_LINUX_RELEASE_CONTROL_COMMAND_NAME)
         self.assertEqual(manifest["runtime"]["releaseControlReporter"]["windows"], run_editor.NATIVE_RUNTIME_WINDOWS_RELEASE_CONTROL_COMMAND_NAME)
@@ -2732,6 +2745,8 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["releaseCandidateReport"], run_editor.NATIVE_RUNTIME_RC_REPORT_NAME)
         self.assertEqual(manifest["files"]["releaseControlReport"], run_editor.NATIVE_RUNTIME_RELEASE_CONTROL_REPORT_NAME)
         self.assertEqual(manifest["files"]["releaseControlJson"], run_editor.NATIVE_RUNTIME_RELEASE_CONTROL_JSON_NAME)
+        self.assertEqual(manifest["files"]["vnBaselineQualityReport"], run_editor.NATIVE_RUNTIME_VN_BASELINE_QUALITY_REPORT_NAME)
+        self.assertEqual(manifest["files"]["vnBaselineQualityMarkdown"], run_editor.NATIVE_RUNTIME_VN_BASELINE_QUALITY_MARKDOWN_NAME)
         self.assertEqual(manifest["files"]["macReleaseControlReporter"], run_editor.NATIVE_RUNTIME_MAC_RELEASE_CONTROL_COMMAND_NAME)
         self.assertEqual(manifest["files"]["linuxReleaseControlReporter"], run_editor.NATIVE_RUNTIME_LINUX_RELEASE_CONTROL_COMMAND_NAME)
         self.assertEqual(manifest["files"]["windowsReleaseControlReporter"], run_editor.NATIVE_RUNTIME_WINDOWS_RELEASE_CONTROL_COMMAND_NAME)
@@ -2769,6 +2784,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(release_control_payload["formatVersion"], 1)
         self.assertEqual(release_control_payload["project"]["title"], "自动化测试项目")
         self.assertIn(release_control_payload["qualityGate"]["status"], {"ready", "needs_review"})
+        self.assertEqual(release_control_payload["vnBaselineQuality"]["status"], "ready")
         self.assertEqual(release_control_payload["releaseCheck"]["status"], "pass")
         self.assertIn(release_control_payload["releaseCandidate"]["status"], {"preview_ready", "preview_ready_with_warnings"})
         self.assertEqual(release_control_payload["asset3d"]["status"], export_result["asset3dReportDigest"]["status"])
@@ -2778,6 +2794,9 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertIn("## 核心指标", release_control_markdown)
         self.assertTrue(export_result["releaseControlReportPublicUrl"].endswith(run_editor.NATIVE_RUNTIME_RELEASE_CONTROL_REPORT_NAME))
         self.assertTrue(export_result["releaseControlJsonPublicUrl"].endswith(run_editor.NATIVE_RUNTIME_RELEASE_CONTROL_JSON_NAME))
+        self.assertEqual(export_result["vnBaselineQualityStatus"], "ready")
+        self.assertTrue(export_result["vnBaselineQualityReportPublicUrl"].endswith(run_editor.NATIVE_RUNTIME_VN_BASELINE_QUALITY_REPORT_NAME))
+        self.assertTrue(export_result["vnBaselineQualityMarkdownPublicUrl"].endswith(run_editor.NATIVE_RUNTIME_VN_BASELINE_QUALITY_MARKDOWN_NAME))
         self.assertTrue(export_result["macReleaseControlReporterPublicUrl"].endswith(run_editor.NATIVE_RUNTIME_MAC_RELEASE_CONTROL_COMMAND_NAME))
         self.assertTrue(export_result["linuxReleaseControlReporterPublicUrl"].endswith(run_editor.NATIVE_RUNTIME_LINUX_RELEASE_CONTROL_COMMAND_NAME))
         self.assertTrue(export_result["windowsReleaseControlReporterPublicUrl"].endswith(run_editor.NATIVE_RUNTIME_WINDOWS_RELEASE_CONTROL_COMMAND_NAME))
@@ -2850,6 +2869,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue({"macos", "windows", "linux"} <= {entry["id"] for entry in acceptance_payload["platformMatrix"]})
         self.assertTrue(acceptance_payload["manualCheckGroups"])
         self.assertTrue(acceptance_payload["recommendedCommands"])
+        self.assertIn("vn_baseline_quality", {check["id"] for check in acceptance_payload["automatedChecks"]})
         acceptance_markdown = (build_dir / run_editor.NATIVE_RUNTIME_ACCEPTANCE_REPORT_NAME).read_text(encoding="utf-8")
         self.assertIn("# 原生 Runtime 发布验收清单", acceptance_markdown)
         self.assertIn("## 人工逐项点测", acceptance_markdown)
@@ -2947,6 +2967,7 @@ class RunEditorSmokeTests(unittest.TestCase):
             {
                 "bundle_structure",
                 "release_check",
+                "vn_baseline_quality",
                 "save_load",
                 "settings",
                 "asset3d_report",

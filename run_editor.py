@@ -361,6 +361,8 @@ NATIVE_RUNTIME_RELEASE_CONTROL_REPORT_NAME = "native-runtime-release-control-rep
 NATIVE_RUNTIME_RELEASE_CONTROL_JSON_NAME = "native-runtime-release-control-report.json"
 NATIVE_RUNTIME_ACCEPTANCE_REPORT_NAME = "native-runtime-release-acceptance.md"
 NATIVE_RUNTIME_ACCEPTANCE_JSON_NAME = "native-runtime-release-acceptance.json"
+NATIVE_RUNTIME_VN_BASELINE_QUALITY_REPORT_NAME = "native-runtime-vn-baseline-quality.json"
+NATIVE_RUNTIME_VN_BASELINE_QUALITY_MARKDOWN_NAME = "native-runtime-vn-baseline-quality.md"
 NATIVE_RUNTIME_FILE_INTEGRITY_REPORT_NAME = "native-runtime-file-integrity.json"
 NATIVE_RUNTIME_FILE_INTEGRITY_MARKDOWN_NAME = "native-runtime-file-integrity.md"
 NATIVE_RUNTIME_3D_ASSET_REPORT_NAME = "native-runtime-3d-asset-report.json"
@@ -8625,6 +8627,8 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
     rc_report_path = build_dir / NATIVE_RUNTIME_RC_REPORT_NAME
     release_control_report_path = build_dir / NATIVE_RUNTIME_RELEASE_CONTROL_REPORT_NAME
     release_control_json_path = build_dir / NATIVE_RUNTIME_RELEASE_CONTROL_JSON_NAME
+    vn_baseline_report_path = build_dir / NATIVE_RUNTIME_VN_BASELINE_QUALITY_REPORT_NAME
+    vn_baseline_markdown_path = build_dir / NATIVE_RUNTIME_VN_BASELINE_QUALITY_MARKDOWN_NAME
     asset3d_report_path = build_dir / NATIVE_RUNTIME_3D_ASSET_REPORT_NAME
     asset3d_summary_path = build_dir / NATIVE_RUNTIME_3D_ASSET_SUMMARY_NAME
     asset3d_digest_path = build_dir / NATIVE_RUNTIME_3D_ASSET_DIGEST_NAME
@@ -9127,20 +9131,77 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
         json.dumps(asset3d_report_digest, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
-    release_control_payload = build_native_runtime_release_control_payload(
-        export_payload,
-        release_check_payload if isinstance(release_check_payload, dict) else None,
-        rc_report_payload if isinstance(rc_report_payload, dict) else None,
-        asset3d_report_digest,
+    release_control_payload = None
+    release_control_writer = subprocess.run(
+        [
+            sys.executable,
+            str(build_dir / NATIVE_RUNTIME_PLAYER_NAME),
+            "--write-release-control-reports",
+            str(build_dir),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
     )
-    release_control_json_path.write_text(
-        json.dumps(release_control_payload, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
-    release_control_report_path.write_text(
-        build_native_runtime_release_control_markdown(release_control_payload),
-        encoding="utf-8",
-    )
+    if release_control_writer.returncode == 0 and release_control_json_path.is_file():
+        try:
+            release_control_payload = json.loads(release_control_json_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            release_control_payload = None
+    if not isinstance(release_control_payload, dict):
+        release_control_payload = build_native_runtime_release_control_payload(
+            export_payload,
+            release_check_payload if isinstance(release_check_payload, dict) else None,
+            rc_report_payload if isinstance(rc_report_payload, dict) else None,
+            asset3d_report_digest,
+        )
+        release_control_json_path.write_text(
+            json.dumps(release_control_payload, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        release_control_report_path.write_text(
+            build_native_runtime_release_control_markdown(release_control_payload),
+            encoding="utf-8",
+        )
+        if not vn_baseline_report_path.is_file():
+            vn_baseline_report_path.write_text(
+                json.dumps(
+                    {
+                        "formatVersion": 1,
+                        "status": "unavailable",
+                        "generatedAt": now_iso(),
+                        "summary": {
+                            "statusLabel": "未生成",
+                            "issueCount": 1,
+                            "warnCount": 1,
+                            "softCount": 0,
+                            "recommendation": release_control_writer.stderr.strip()
+                            or release_control_writer.stdout.strip()
+                            or "可手动运行 python runtime_player.py --write-release-control-reports . 重新生成。",
+                        },
+                        "metrics": {},
+                        "issues": [],
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+        if not vn_baseline_markdown_path.is_file():
+            vn_baseline_markdown_path.write_text(
+                "\n".join(
+                    [
+                        "# 原生 Runtime VN 基础质感报告",
+                        "",
+                        "报告暂未生成。",
+                        "",
+                        "- 可手动运行 `python runtime_player.py --write-release-control-reports .` 重新生成。",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
 
     return {
         "gameDataName": game_data_path.name,
@@ -9169,6 +9230,11 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
         "releaseControlJsonPath": str(release_control_json_path),
         "releaseControlStatus": release_control_payload["qualityGate"]["status"],
         "releaseControlSummary": release_control_payload["qualityGate"]["summary"],
+        "vnBaselineQualityReportName": vn_baseline_report_path.name,
+        "vnBaselineQualityReportPath": str(vn_baseline_report_path),
+        "vnBaselineQualityMarkdownName": vn_baseline_markdown_path.name,
+        "vnBaselineQualityMarkdownPath": str(vn_baseline_markdown_path),
+        "vnBaselineQualityStatus": str((release_control_payload.get("vnBaselineQuality") or {}).get("status") or "unavailable"),
         "asset3dReportName": asset3d_report_path.name,
         "asset3dReportPath": str(asset3d_report_path),
         "asset3dSummaryName": asset3d_summary_path.name,
@@ -9785,6 +9851,8 @@ def export_native_runtime_build() -> dict:
             "releaseCandidateReport": runtime_files["releaseCandidateReportName"],
             "releaseControlReport": runtime_files["releaseControlReportName"],
             "releaseControlJson": runtime_files["releaseControlJsonName"],
+            "vnBaselineQualityReport": runtime_files["vnBaselineQualityReportName"],
+            "vnBaselineQualityMarkdown": runtime_files["vnBaselineQualityMarkdownName"],
             "acceptanceReport": NATIVE_RUNTIME_ACCEPTANCE_REPORT_NAME,
             "acceptanceJson": NATIVE_RUNTIME_ACCEPTANCE_JSON_NAME,
             "fileIntegrityReport": NATIVE_RUNTIME_FILE_INTEGRITY_REPORT_NAME,
@@ -9825,6 +9893,9 @@ def export_native_runtime_build() -> dict:
             "releaseControlReport": runtime_files["releaseControlReportName"],
             "releaseControlJson": runtime_files["releaseControlJsonName"],
             "releaseControlStatus": runtime_files["releaseControlStatus"],
+            "vnBaselineQualityReport": runtime_files["vnBaselineQualityReportName"],
+            "vnBaselineQualityMarkdown": runtime_files["vnBaselineQualityMarkdownName"],
+            "vnBaselineQualityStatus": runtime_files["vnBaselineQualityStatus"],
             "releaseControlReporter": {
                 "macos": runtime_files["macReleaseControlReporterName"],
                 "linux": runtime_files["linuxReleaseControlReporterName"],
@@ -9865,6 +9936,8 @@ def export_native_runtime_build() -> dict:
         {"name": runtime_files["releaseCandidateReportName"], "description": "原生 Runtime 发布候选总报告。"},
         {"name": runtime_files["releaseControlReportName"], "description": "人工验收用发布总控 Markdown。"},
         {"name": runtime_files["releaseControlJsonName"], "description": "机器可读发布总控 JSON。"},
+        {"name": runtime_files["vnBaselineQualityMarkdownName"], "description": "视觉小说基础质感 Markdown 报告。"},
+        {"name": runtime_files["vnBaselineQualityReportName"], "description": "机器可读 VN 基础质感 JSON。"},
         {"name": integrity_files["fileIntegrityMarkdownName"], "description": "包内核心文件完整性 Markdown。"},
         {"name": integrity_files["fileIntegrityReportName"], "description": "包内核心文件 SHA-256 JSON。"},
         {"name": provenance_file["provenanceName"], "description": "低调来源标记与文件指纹清单。"},
@@ -9967,6 +10040,13 @@ def export_native_runtime_build() -> dict:
         "releaseControlJsonPublicUrl": f"/exports/{build_dir.name}/{runtime_files['releaseControlJsonName']}",
         "releaseControlStatus": runtime_files["releaseControlStatus"],
         "releaseControlSummary": runtime_files["releaseControlSummary"],
+        "vnBaselineQualityReportName": runtime_files["vnBaselineQualityReportName"],
+        "vnBaselineQualityReportPath": runtime_files["vnBaselineQualityReportPath"],
+        "vnBaselineQualityReportPublicUrl": f"/exports/{build_dir.name}/{runtime_files['vnBaselineQualityReportName']}",
+        "vnBaselineQualityMarkdownName": runtime_files["vnBaselineQualityMarkdownName"],
+        "vnBaselineQualityMarkdownPath": runtime_files["vnBaselineQualityMarkdownPath"],
+        "vnBaselineQualityMarkdownPublicUrl": f"/exports/{build_dir.name}/{runtime_files['vnBaselineQualityMarkdownName']}",
+        "vnBaselineQualityStatus": runtime_files["vnBaselineQualityStatus"],
         "fileIntegrityReportName": integrity_files["fileIntegrityReportName"],
         "fileIntegrityReportPath": integrity_files["fileIntegrityReportPath"],
         "fileIntegrityReportPublicUrl": f"/exports/{build_dir.name}/{integrity_files['fileIntegrityReportName']}",
