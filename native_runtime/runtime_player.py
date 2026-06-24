@@ -5527,6 +5527,8 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
     crowded_choice_block_count = 0
     no_action_choice_option_count = 0
     no_action_choice_option_names: list[str] = []
+    same_target_choice_count = 0
+    same_target_choice_names: list[str] = []
     sfx_play_count = 0
     missing_sfx_asset_count = 0
     missing_sfx_asset_names: list[str] = []
@@ -5602,6 +5604,7 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
                 if len(options) > 4:
                     crowded_choice_block_count += 1
                 seen_choice_texts: set[str] = set()
+                plain_target_options: list[str] = []
                 for option in options:
                     if not isinstance(option, dict):
                         continue
@@ -5620,6 +5623,8 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
                     if option_text and not option_target and not effects:
                         no_action_choice_option_count += 1
                         no_action_choice_option_names.append(str(option.get("id") or option_text))
+                    if option_text and option_target and not effects:
+                        plain_target_options.append(option_target)
                     for effect in effects:
                         if not isinstance(effect, dict):
                             continue
@@ -5633,6 +5638,9 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
                             logic_missing_variable_count += 1
                         elif effect_type == "variable_add" and normalize_variable_type(variable.get("type")) != "number":
                             logic_non_number_add_count += 1
+                if len(plain_target_options) >= 2 and len(set(plain_target_options)) == 1:
+                    same_target_choice_count += 1
+                    same_target_choice_names.append(str(block.get("id") or "choice"))
             elif block_type == "variable_set":
                 variable_set_count += 1
                 variable_id = str(block.get("variableId") or "").strip()
@@ -6017,6 +6025,15 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             "部分选项没有明确动作",
             f"检测到 {no_action_choice_option_count} 个选项既没有跳转目标，也没有变量效果：{', '.join(no_action_choice_option_names[:3])}",
             "如果这是“继续当前剧情”的设计，建议至少加一个变量记录或后续差分；否则请补跳转目标，避免玩家以为选项是假按钮。",
+        )
+    if same_target_choice_count:
+        add_vn_baseline_issue(
+            issues,
+            "soft",
+            "choice_same_target",
+            "部分选项分支结果完全相同",
+            f"检测到 {same_target_choice_count} 个选项卡的多个按钮都跳到同一个场景且没有变量效果：{', '.join(same_target_choice_names[:3])}",
+            "如果这是有意设计，建议至少加变量记录、好感度变化或后续差分；否则请拆出不同目标，避免玩家觉得选项只是装饰。",
         )
     if duplicate_variable_ids:
         add_vn_baseline_issue(
@@ -6417,6 +6434,7 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             "duplicateChoiceOptionCount": duplicate_choice_option_count,
             "crowdedChoiceBlockCount": crowded_choice_block_count,
             "noActionChoiceOptionCount": no_action_choice_option_count,
+            "sameTargetChoiceCount": same_target_choice_count,
             "sfxPlayCount": sfx_play_count,
             "missingSfxAssetCount": missing_sfx_asset_count,
             "videoAssetCount": video_asset_count,
@@ -6481,6 +6499,7 @@ def render_native_runtime_vn_baseline_quality_markdown(report: dict) -> str:
         ("选项按钮总数", metrics.get("choiceOptionCount")),
         ("空白 / 超长 / 重复选项", f"{int(metrics.get('emptyChoiceOptionCount') or 0)} / {int(metrics.get('longChoiceOptionCount') or 0)} / {int(metrics.get('duplicateChoiceOptionCount') or 0)}"),
         ("无动作选项", metrics.get("noActionChoiceOptionCount")),
+        ("同目标假分支", metrics.get("sameTargetChoiceCount")),
         ("拥挤选项卡", metrics.get("crowdedChoiceBlockCount")),
         ("音效点 / 缺失音效", f"{int(metrics.get('sfxPlayCount') or 0)} / {int(metrics.get('missingSfxAssetCount') or 0)}"),
         ("音效素材 / 已入剧情 / 未使用", f"{int(metrics.get('sfxAssetCount') or 0)} / {int(metrics.get('sfxUsedAssetCount') or 0)} / {int(metrics.get('unusedSfxAssetCount') or 0)}"),
@@ -6796,6 +6815,7 @@ def render_native_runtime_release_control_markdown(payload: dict) -> str:
             ("选项按钮总数", vn_metrics.get("choiceOptionCount")),
             ("空白 / 超长 / 重复选项", f"{int(vn_metrics.get('emptyChoiceOptionCount') or 0)} / {int(vn_metrics.get('longChoiceOptionCount') or 0)} / {int(vn_metrics.get('duplicateChoiceOptionCount') or 0)}"),
             ("无动作选项", vn_metrics.get("noActionChoiceOptionCount")),
+            ("同目标假分支", vn_metrics.get("sameTargetChoiceCount")),
             ("拥挤选项卡", vn_metrics.get("crowdedChoiceBlockCount")),
             ("音效点 / 缺失音效", f"{int(vn_metrics.get('sfxPlayCount') or 0)} / {int(vn_metrics.get('missingSfxAssetCount') or 0)}"),
             ("音效素材 / 已入剧情 / 未使用", f"{int(vn_metrics.get('sfxAssetCount') or 0)} / {int(vn_metrics.get('sfxUsedAssetCount') or 0)} / {int(vn_metrics.get('unusedSfxAssetCount') or 0)}"),

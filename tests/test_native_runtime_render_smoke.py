@@ -1027,6 +1027,73 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             self.assertIn("无动作选项", markdown)
             self.assertIn("部分选项没有明确动作", markdown)
 
+    def test_vn_baseline_quality_report_flags_same_target_choice_options(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_dir = Path(temp_dir) / "bundle"
+            bundle_dir.mkdir(parents=True)
+            game_data = {
+                "project": {
+                    "projectId": "native_choice_same_target_quality_smoke",
+                    "title": "Native Choice Same Target Quality Smoke",
+                    "entrySceneId": "scene_choice",
+                },
+                "assets": {"assets": []},
+                "characters": {"characters": []},
+                "variables": {
+                    "variables": [
+                        {"id": "route_hint", "name": "Route Hint", "type": "text", "defaultValue": ""}
+                    ]
+                },
+                "chapters": [
+                    {
+                        "id": "chapter_1",
+                        "name": "Chapter 1",
+                        "scenes": [
+                            {
+                                "id": "scene_choice",
+                                "name": "Choice",
+                                "blocks": [
+                                    {
+                                        "id": "same_target_choice",
+                                        "type": "choice",
+                                        "options": [
+                                            {"id": "ask", "text": "Ask softly", "gotoSceneId": "scene_after"},
+                                            {"id": "push", "text": "Push harder", "gotoSceneId": "scene_after"},
+                                            {
+                                                "id": "record",
+                                                "text": "Remember this",
+                                                "gotoSceneId": "scene_after",
+                                                "effects": [
+                                                    {"type": "variable_set", "variableId": "route_hint", "value": "remembered"}
+                                                ],
+                                            },
+                                        ],
+                                    }
+                                ],
+                            },
+                            {
+                                "id": "scene_after",
+                                "name": "After",
+                                "blocks": [{"id": "line_after", "type": "narration", "text": "After choice."}],
+                            },
+                        ],
+                    }
+                ],
+            }
+            (bundle_dir / "game_data.json").write_text(json.dumps(game_data, ensure_ascii=False), encoding="utf-8")
+
+            report = build_native_runtime_vn_baseline_quality_report(bundle_dir)
+
+            self.assertEqual(report["metrics"]["sameTargetChoiceCount"], 1)
+            self.assertEqual(report["metrics"]["choiceEffectCount"], 1)
+            issue_codes = {issue["code"] for issue in report["issues"]}
+            self.assertIn("choice_same_target", issue_codes)
+            self.assertNotIn("choice_option_no_action", issue_codes)
+
+            markdown = render_native_runtime_vn_baseline_quality_markdown(report)
+            self.assertIn("同目标假分支", markdown)
+            self.assertIn("部分选项分支结果完全相同", markdown)
+
     def test_vn_baseline_quality_report_flags_sfx_asset_gaps(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             bundle_dir = Path(temp_dir) / "bundle"
