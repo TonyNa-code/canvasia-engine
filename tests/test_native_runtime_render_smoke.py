@@ -777,6 +777,16 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
                     "projectId": "native_text_quality_smoke",
                     "title": "Native Text Quality Smoke",
                     "entrySceneId": "scene_text",
+                    "dialogBoxConfig": {
+                        "preset": "custom",
+                        "widthPercent": 58,
+                        "minHeight": 100,
+                        "paddingX": 8,
+                        "paddingY": 6,
+                        "backgroundColor": "#f8fbff",
+                        "backgroundOpacity": 32,
+                        "textColor": "#ffffff",
+                    },
                 },
                 "assets": {"assets": []},
                 "characters": {"characters": []},
@@ -791,6 +801,7 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
                                 "blocks": [
                                     {"id": "long_line", "type": "dialogue", "text": long_text},
                                     {"id": "multi_line", "type": "narration", "text": multiline_text},
+                                    {"id": "short_line", "type": "dialogue", "text": "第三句用于触发文本框可读性巡检。"},
                                 ],
                             }
                         ],
@@ -803,12 +814,17 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
 
             self.assertEqual(report["metrics"]["longTextBlockCount"], 1)
             self.assertEqual(report["metrics"]["multilineTextBlockCount"], 1)
+            self.assertGreaterEqual(report["metrics"]["dialogBoxReadabilityRiskCount"], 1)
+            self.assertEqual(report["metrics"]["dialogBoxBackgroundOpacity"], 32)
+            self.assertEqual(report["metrics"]["dialogBoxWidthPercent"], 58)
             issue_codes = {issue["code"] for issue in report["issues"]}
             self.assertIn("long_story_text", issue_codes)
             self.assertIn("multiline_story_text", issue_codes)
+            self.assertIn("dialog_box_readability_risk", issue_codes)
 
             markdown = render_native_runtime_vn_baseline_quality_markdown(report)
             self.assertIn("过长文本 / 多换行文本", markdown)
+            self.assertIn("文本框可读性风险", markdown)
             self.assertIn("部分文本卡片过长", markdown)
 
     def test_vn_baseline_quality_report_flags_missing_character_references(self) -> None:

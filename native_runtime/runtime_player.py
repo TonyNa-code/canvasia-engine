@@ -5409,6 +5409,30 @@ def count_i18n_translations(source: dict | None, key: str, target_languages: lis
     return (len(target_languages), translated_count)
 
 
+def get_vn_baseline_color_luminance(color: tuple[int, int, int] | None) -> float:
+    channels = []
+    for channel in (color or (0, 0, 0))[:3]:
+        normalized = max(0.0, min(1.0, float(channel) / 255.0))
+        if normalized <= 0.03928:
+            channels.append(normalized / 12.92)
+        else:
+            channels.append(((normalized + 0.055) / 1.055) ** 2.4)
+    while len(channels) < 3:
+        channels.append(0.0)
+    return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2]
+
+
+def get_vn_baseline_color_contrast_ratio(
+    foreground: tuple[int, int, int] | None,
+    background: tuple[int, int, int] | None,
+) -> float:
+    foreground_luminance = get_vn_baseline_color_luminance(foreground)
+    background_luminance = get_vn_baseline_color_luminance(background)
+    light = max(foreground_luminance, background_luminance)
+    dark = min(foreground_luminance, background_luminance)
+    return round((light + 0.05) / (dark + 0.05), 2)
+
+
 def get_vn_baseline_block_text(block: dict) -> str:
     block_type = str(block.get("type") or "").strip()
     if block_type in {"dialogue", "narration"}:
@@ -5441,6 +5465,7 @@ def add_vn_baseline_issue(
 def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
     payload = load_game_data(bundle_dir / DEFAULT_GAME_DATA_NAME)
     project = payload.get("project") if isinstance(payload.get("project"), dict) else {}
+    dialog_box_config = get_project_dialog_box_config(project)
     i18n_doc = payload.get("i18n") if isinstance(payload.get("i18n"), dict) else {}
     default_language = normalize_language_code(i18n_doc.get("defaultLanguage") or project.get("language"), DEFAULT_PROJECT_LANGUAGE)
     fallback_language = normalize_language_code(i18n_doc.get("fallbackLanguage"), default_language)
@@ -5900,6 +5925,28 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
     scene_count = len(scenes)
     text_density = round(text_block_count / scene_count, 2) if scene_count else 0.0
     average_text_length = round(total_text_chars / text_block_count, 1) if text_block_count else 0.0
+    dialog_box_background_opacity = int(dialog_box_config.get("backgroundOpacity") or 0)
+    dialog_box_panel_asset_opacity = int(dialog_box_config.get("panelAssetOpacity") or 0)
+    dialog_box_has_panel_art = bool(str(dialog_box_config.get("panelAssetId") or "").strip() and dialog_box_panel_asset_opacity >= 35)
+    dialog_box_text_contrast_ratio = get_vn_baseline_color_contrast_ratio(
+        dialog_box_config.get("textColor"),
+        dialog_box_config.get("backgroundColor"),
+    )
+    dialog_box_readability_notes: list[str] = []
+    if text_block_count >= 3:
+        if dialog_box_background_opacity < 45 and not dialog_box_has_panel_art:
+            dialog_box_readability_notes.append(f"背景不透明度仅 {dialog_box_background_opacity}% 且没有高透明度面板图")
+        if dialog_box_text_contrast_ratio < 4.5 and (dialog_box_background_opacity >= 45 or dialog_box_has_panel_art):
+            dialog_box_readability_notes.append(f"正文与文本框底色对比约 {dialog_box_text_contrast_ratio}:1")
+        if int(dialog_box_config.get("widthPercent") or 0) < 64:
+            dialog_box_readability_notes.append(f"文本框宽度仅 {int(dialog_box_config.get('widthPercent') or 0)}%")
+        if int(dialog_box_config.get("minHeight") or 0) < 118 and (average_text_length >= 32 or long_text_block_count or multiline_text_block_count):
+            dialog_box_readability_notes.append(f"文本框最小高度仅 {int(dialog_box_config.get('minHeight') or 0)}px")
+        if int(dialog_box_config.get("paddingX") or 0) < 12 or int(dialog_box_config.get("paddingY") or 0) < 8:
+            dialog_box_readability_notes.append(
+                f"文本内边距偏小（{int(dialog_box_config.get('paddingX') or 0)} / {int(dialog_box_config.get('paddingY') or 0)}）"
+            )
+    dialog_box_readability_risk_count = len(dialog_box_readability_notes)
     voice_eligible_line_count = dialogue_count + narration_count
     voice_bound_line_count = dialogue_voice_count + narration_voice_count
     voice_coverage_percent = round(voice_bound_line_count / voice_eligible_line_count * 100, 1) if voice_eligible_line_count else 0.0
@@ -6450,6 +6497,15 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             f"检测到 {multiline_text_block_count} 张台词/旁白包含过多手动换行。",
             "手动换行过多会压缩可读区域；建议交给 Runtime 自动换行，或拆成更短的连续卡片。",
         )
+    if dialog_box_readability_risk_count:
+        add_vn_baseline_issue(
+            issues,
+            "soft",
+            "dialog_box_readability_risk",
+            "文本框可读性可能偏弱",
+            "；".join(dialog_box_readability_notes[:4]) + "。",
+            "提高文本框不透明度、扩大宽高和内边距，或使用对比更强的正文/底色组合；如果作品刻意透明，也建议跑一次浅色/复杂背景实机截图。",
+        )
     if scene_count >= 3 and scenes_with_effects == 0:
         add_vn_baseline_issue(
             issues,
@@ -6575,6 +6631,15 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             "emptyTextBlockCount": empty_text_count,
             "longTextBlockCount": long_text_block_count,
             "multilineTextBlockCount": multiline_text_block_count,
+            "dialogBoxReadabilityRiskCount": dialog_box_readability_risk_count,
+            "dialogBoxBackgroundOpacity": dialog_box_background_opacity,
+            "dialogBoxPanelAssetOpacity": dialog_box_panel_asset_opacity,
+            "dialogBoxHasPanelArt": dialog_box_has_panel_art,
+            "dialogBoxTextContrastRatio": dialog_box_text_contrast_ratio,
+            "dialogBoxWidthPercent": int(dialog_box_config.get("widthPercent") or 0),
+            "dialogBoxMinHeight": int(dialog_box_config.get("minHeight") or 0),
+            "dialogBoxPaddingX": int(dialog_box_config.get("paddingX") or 0),
+            "dialogBoxPaddingY": int(dialog_box_config.get("paddingY") or 0),
             "textDensity": text_density,
             "averageTextLength": average_text_length,
         },
@@ -6631,6 +6696,8 @@ def render_native_runtime_vn_baseline_quality_markdown(report: dict) -> str:
         ("占位素材", metrics.get("placeholderAssetCount")),
         ("空文本块", metrics.get("emptyTextBlockCount")),
         ("过长文本 / 多换行文本", f"{int(metrics.get('longTextBlockCount') or 0)} / {int(metrics.get('multilineTextBlockCount') or 0)}"),
+        ("文本框可读性风险", metrics.get("dialogBoxReadabilityRiskCount")),
+        ("文本框透明度 / 色差", f"{int(metrics.get('dialogBoxBackgroundOpacity') or 0)}% / {format_markdown_value(metrics.get('dialogBoxTextContrastRatio'), '0')}:1"),
         ("平均剧情块密度", metrics.get("textDensity")),
     ]
     lines = [
@@ -6945,6 +7012,8 @@ def render_native_runtime_release_control_markdown(payload: dict) -> str:
             ("路线缺失目标", vn_metrics.get("routeTargetMissingCount")),
             ("入口不可达场景", vn_metrics.get("unreachableSceneCount")),
             ("过长文本 / 多换行文本", f"{int(vn_metrics.get('longTextBlockCount') or 0)} / {int(vn_metrics.get('multilineTextBlockCount') or 0)}"),
+            ("文本框可读性风险", vn_metrics.get("dialogBoxReadabilityRiskCount")),
+            ("文本框透明度 / 色差", f"{int(vn_metrics.get('dialogBoxBackgroundOpacity') or 0)}% / {format_markdown_value(vn_metrics.get('dialogBoxTextContrastRatio'), '0')}:1"),
             ("缺口 / 润色项", f"{int(vn_summary.get('warnCount') or 0)} / {int(vn_summary.get('softCount') or 0)}"),
         ]:
             lines.append(f"| {label} | {format_markdown_value(value, '0')} |")
