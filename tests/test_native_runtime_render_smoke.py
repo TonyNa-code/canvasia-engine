@@ -297,6 +297,95 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             self.assertIn("场景 ID 存在重复", markdown)
             self.assertIn("同一场景内存在重复卡片 ID", markdown)
 
+    def test_vn_baseline_quality_report_flags_duplicate_resource_ids(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_dir = Path(temp_dir) / "bundle"
+            bundle_dir.mkdir(parents=True)
+            sprite_path = bundle_dir / "assets" / "characters" / "heroine.png"
+            sprite_path.parent.mkdir(parents=True, exist_ok=True)
+            sprite_path.write_bytes(b"fake-sprite")
+            game_data = {
+                "project": {
+                    "projectId": "native_duplicate_resource_quality_smoke",
+                    "title": "Native Duplicate Resource Quality Smoke",
+                    "entrySceneId": "scene_start",
+                },
+                "assets": {
+                    "assets": [
+                        {
+                            "id": "sprite_dup",
+                            "type": "character",
+                            "name": "Heroine A",
+                            "exportUrl": sprite_path.relative_to(bundle_dir).as_posix(),
+                        },
+                        {
+                            "id": "sprite_dup",
+                            "type": "character",
+                            "name": "Heroine B",
+                            "exportUrl": sprite_path.relative_to(bundle_dir).as_posix(),
+                        },
+                    ]
+                },
+                "characters": {
+                    "characters": [
+                        {
+                            "id": "heroine",
+                            "displayName": "Heroine A",
+                            "defaultSpriteAssetId": "sprite_dup",
+                            "expressions": [
+                                {"id": "smile", "spriteAssetId": "sprite_dup"},
+                                {"id": "smile", "spriteAssetId": "sprite_dup"},
+                            ],
+                        },
+                        {
+                            "id": "heroine",
+                            "displayName": "Heroine B",
+                            "defaultSpriteAssetId": "sprite_dup",
+                            "expressions": [{"id": "default", "spriteAssetId": "sprite_dup"}],
+                        },
+                    ]
+                },
+                "chapters": [
+                    {
+                        "id": "chapter_1",
+                        "name": "Chapter 1",
+                        "scenes": [
+                            {
+                                "id": "scene_start",
+                                "name": "Opening",
+                                "blocks": [
+                                    {
+                                        "id": "line_start",
+                                        "type": "dialogue",
+                                        "speakerId": "heroine",
+                                        "expressionId": "smile",
+                                        "text": "Hello.",
+                                    }
+                                ],
+                            }
+                        ],
+                    }
+                ],
+            }
+            (bundle_dir / "game_data.json").write_text(json.dumps(game_data, ensure_ascii=False), encoding="utf-8")
+
+            report = build_native_runtime_vn_baseline_quality_report(bundle_dir)
+
+            self.assertEqual(report["status"], "needs_fix")
+            self.assertEqual(report["metrics"]["duplicateAssetIdCount"], 1)
+            self.assertEqual(report["metrics"]["duplicateCharacterIdCount"], 1)
+            self.assertEqual(report["metrics"]["duplicateExpressionIdCount"], 1)
+            issue_codes = {issue["code"] for issue in report["issues"]}
+            self.assertIn("duplicate_asset_id", issue_codes)
+            self.assertIn("duplicate_character_id", issue_codes)
+            self.assertIn("duplicate_expression_id", issue_codes)
+
+            markdown = render_native_runtime_vn_baseline_quality_markdown(report)
+            self.assertIn("重复素材 / 角色 / 表情 ID", markdown)
+            self.assertIn("素材 ID 存在重复", markdown)
+            self.assertIn("角色 ID 存在重复", markdown)
+            self.assertIn("同一角色内存在重复表情 ID", markdown)
+
     def test_vn_baseline_quality_report_flags_bgm_continuity_gaps(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             bundle_dir = Path(temp_dir) / "bundle"

@@ -5521,6 +5521,14 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
     save_dialog_page_count = max(1, math.ceil(formal_save_slot_count / SAVE_DIALOG_PAGE_SIZE))
     assets_doc = payload.get("assets") if isinstance(payload.get("assets"), dict) else {}
     assets = assets_doc.get("assets") if isinstance(assets_doc.get("assets"), list) else []
+    asset_id_counts: dict[str, int] = {}
+    for asset in assets:
+        if not isinstance(asset, dict):
+            continue
+        asset_id = str(asset.get("id") or "").strip()
+        if asset_id:
+            asset_id_counts[asset_id] = asset_id_counts.get(asset_id, 0) + 1
+    duplicate_asset_ids = sorted(asset_id for asset_id, count in asset_id_counts.items() if count > 1)
     assets_by_id = {str(asset.get("id")): asset for asset in assets if isinstance(asset, dict) and asset.get("id")}
     game_ui_config = get_project_game_ui_config(project)
     font_asset_count = sum(1 for asset in assets if isinstance(asset, dict) and asset.get("type") == "font")
@@ -5552,6 +5560,29 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
     variables, variables_by_id, duplicate_variable_ids = get_export_variable_map(payload)
     characters_doc = payload.get("characters") if isinstance(payload.get("characters"), dict) else {}
     characters = characters_doc.get("characters") if isinstance(characters_doc.get("characters"), list) else []
+    character_id_counts: dict[str, int] = {}
+    duplicate_expression_id_count = 0
+    duplicate_expression_id_names: list[str] = []
+    for character in characters:
+        if not isinstance(character, dict):
+            continue
+        character_id = str(character.get("id") or "").strip()
+        if character_id:
+            character_id_counts[character_id] = character_id_counts.get(character_id, 0) + 1
+        expressions = character.get("expressions") if isinstance(character.get("expressions"), list) else []
+        expression_id_counts: dict[str, int] = {}
+        for expression in expressions:
+            if not isinstance(expression, dict):
+                continue
+            expression_id = str(expression.get("id") or "").strip()
+            if expression_id:
+                expression_id_counts[expression_id] = expression_id_counts.get(expression_id, 0) + 1
+        duplicate_expression_ids = sorted(expression_id for expression_id, count in expression_id_counts.items() if count > 1)
+        duplicate_expression_id_count += len(duplicate_expression_ids)
+        if duplicate_expression_ids:
+            character_label = str(character.get("displayName") or character.get("name") or character_id or "未命名角色")
+            duplicate_expression_id_names.extend(f"{character_label}:{expression_id}" for expression_id in duplicate_expression_ids)
+    duplicate_character_ids = sorted(character_id for character_id, count in character_id_counts.items() if count > 1)
     characters_by_id = {
         str(character.get("id")): character
         for character in characters
@@ -6329,6 +6360,33 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             f"检测到 {duplicate_block_id_count} 个重复卡片 ID：{', '.join(duplicate_block_id_names[:3])}",
             "复制卡片后请重新生成或修改卡片 ID；重复 ID 会影响 BGM 结束范围、文本历史、语音回听和自动化发布检查。",
         )
+    if duplicate_asset_ids:
+        add_vn_baseline_issue(
+            issues,
+            "warn",
+            "duplicate_asset_id",
+            "素材 ID 存在重复",
+            f"检测到 {len(duplicate_asset_ids)} 个重复素材 ID：{', '.join(duplicate_asset_ids[:3])}",
+            "重新导入或重命名重复素材；重复 ID 会让背景、BGM、语音、字体、3D 模型等引用指向不可预测的文件。",
+        )
+    if duplicate_character_ids:
+        add_vn_baseline_issue(
+            issues,
+            "warn",
+            "duplicate_character_id",
+            "角色 ID 存在重复",
+            f"检测到 {len(duplicate_character_ids)} 个重复角色 ID：{', '.join(duplicate_character_ids[:3])}",
+            "合并或重命名重复角色；重复 ID 会让说话人、立绘登场、回想馆和角色资料索引互相覆盖。",
+        )
+    if duplicate_expression_id_count:
+        add_vn_baseline_issue(
+            issues,
+            "warn",
+            "duplicate_expression_id",
+            "同一角色内存在重复表情 ID",
+            f"检测到 {duplicate_expression_id_count} 个重复表情 ID：{', '.join(duplicate_expression_id_names[:3])}",
+            "为同一角色的每个表情使用唯一 ID；重复 ID 会让表情差分和 Live2D / 3D 兜底映射显示错表情。",
+        )
     if font_status["fontAssetMissingCount"]:
         add_vn_baseline_issue(
             issues,
@@ -6724,6 +6782,9 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             "storySceneCount": scene_count,
             "duplicateSceneIdCount": len(duplicate_scene_ids),
             "duplicateBlockIdCount": duplicate_block_id_count,
+            "duplicateAssetIdCount": len(duplicate_asset_ids),
+            "duplicateCharacterIdCount": len(duplicate_character_ids),
+            "duplicateExpressionIdCount": duplicate_expression_id_count,
             "dialogueCount": dialogue_count,
             "narrationCount": narration_count,
             "choiceCount": choice_count,
@@ -6856,6 +6917,7 @@ def render_native_runtime_vn_baseline_quality_markdown(report: dict) -> str:
     metric_rows = [
         ("场景数", metrics.get("storySceneCount")),
         ("重复场景 / 重复卡片 ID", f"{int(metrics.get('duplicateSceneIdCount') or 0)} / {int(metrics.get('duplicateBlockIdCount') or 0)}"),
+        ("重复素材 / 角色 / 表情 ID", f"{int(metrics.get('duplicateAssetIdCount') or 0)} / {int(metrics.get('duplicateCharacterIdCount') or 0)} / {int(metrics.get('duplicateExpressionIdCount') or 0)}"),
         ("台词 / 旁白 / 选项", f"{int(metrics.get('dialogueCount') or 0)} / {int(metrics.get('narrationCount') or 0)} / {int(metrics.get('choiceCount') or 0)}"),
         ("变量 / 条件 / 选项效果", f"{int(metrics.get('variableCount') or 0)} / {int(metrics.get('conditionCount') or 0)} / {int(metrics.get('choiceEffectCount') or 0)}"),
         ("写入变量 / 条件读取 / 影响路线", f"{int(metrics.get('variableWrittenCount') or 0)} / {int(metrics.get('conditionReadVariableCount') or 0)} / {int(metrics.get('routeInfluencingVariableCount') or 0)}"),
@@ -7182,6 +7244,7 @@ def render_native_runtime_release_control_markdown(payload: dict) -> str:
         for label, value in [
             ("场景数", vn_metrics.get("storySceneCount")),
             ("重复场景 / 重复卡片 ID", f"{int(vn_metrics.get('duplicateSceneIdCount') or 0)} / {int(vn_metrics.get('duplicateBlockIdCount') or 0)}"),
+            ("重复素材 / 角色 / 表情 ID", f"{int(vn_metrics.get('duplicateAssetIdCount') or 0)} / {int(vn_metrics.get('duplicateCharacterIdCount') or 0)} / {int(vn_metrics.get('duplicateExpressionIdCount') or 0)}"),
             ("台词 / 旁白 / 选项", f"{int(vn_metrics.get('dialogueCount') or 0)} / {int(vn_metrics.get('narrationCount') or 0)} / {int(vn_metrics.get('choiceCount') or 0)}"),
             ("变量 / 条件 / 选项效果", f"{int(vn_metrics.get('variableCount') or 0)} / {int(vn_metrics.get('conditionCount') or 0)} / {int(vn_metrics.get('choiceEffectCount') or 0)}"),
             ("写入变量 / 条件读取 / 影响路线", f"{int(vn_metrics.get('variableWrittenCount') or 0)} / {int(vn_metrics.get('conditionReadVariableCount') or 0)} / {int(vn_metrics.get('routeInfluencingVariableCount') or 0)}"),
