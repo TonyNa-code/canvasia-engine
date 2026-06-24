@@ -510,6 +510,51 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             self.assertIn("变量 / 条件 / 选项效果", markdown)
             self.assertIn("逻辑缺失变量 / 非数字加减 / 条件符号不匹配", markdown)
 
+    def test_vn_baseline_quality_report_flags_text_readability_gaps(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_dir = Path(temp_dir) / "bundle"
+            bundle_dir.mkdir(parents=True)
+            long_text = "这一句会被故意写得很长，" * 32
+            multiline_text = "\n".join(["第一行", "第二行", "第三行", "第四行", "第五行", "第六行"])
+            game_data = {
+                "project": {
+                    "projectId": "native_text_quality_smoke",
+                    "title": "Native Text Quality Smoke",
+                    "entrySceneId": "scene_text",
+                },
+                "assets": {"assets": []},
+                "characters": {"characters": []},
+                "chapters": [
+                    {
+                        "id": "chapter_1",
+                        "name": "Chapter 1",
+                        "scenes": [
+                            {
+                                "id": "scene_text",
+                                "name": "Text",
+                                "blocks": [
+                                    {"id": "long_line", "type": "dialogue", "text": long_text},
+                                    {"id": "multi_line", "type": "narration", "text": multiline_text},
+                                ],
+                            }
+                        ],
+                    }
+                ],
+            }
+            (bundle_dir / "game_data.json").write_text(json.dumps(game_data, ensure_ascii=False), encoding="utf-8")
+
+            report = build_native_runtime_vn_baseline_quality_report(bundle_dir)
+
+            self.assertEqual(report["metrics"]["longTextBlockCount"], 1)
+            self.assertEqual(report["metrics"]["multilineTextBlockCount"], 1)
+            issue_codes = {issue["code"] for issue in report["issues"]}
+            self.assertIn("long_story_text", issue_codes)
+            self.assertIn("multiline_story_text", issue_codes)
+
+            markdown = render_native_runtime_vn_baseline_quality_markdown(report)
+            self.assertIn("过长文本 / 多换行文本", markdown)
+            self.assertIn("部分文本卡片过长", markdown)
+
     def test_vn_baseline_quality_report_flags_static_character_staging(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             bundle_dir = Path(temp_dir) / "bundle"

@@ -5497,6 +5497,9 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
     missing_voice_asset_names: list[str] = []
     text_block_count = 0
     total_text_chars = 0
+    long_text_block_count = 0
+    multiline_text_block_count = 0
+    long_text_block_names: list[str] = []
 
     for scene in scenes:
         blocks = scene.get("blocks") if isinstance(scene.get("blocks"), list) else []
@@ -5674,6 +5677,12 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
                 total_text_chars += len(text)
                 if not text:
                     empty_text_count += 1
+                if block_type in {"dialogue", "narration"}:
+                    if len(text) > VN_TEXT_LONG_WARNING_LENGTH:
+                        long_text_block_count += 1
+                        long_text_block_names.append(str(block.get("id") or block_type))
+                    if text.count("\n") >= VN_TEXT_LONG_WARNING_LINES:
+                        multiline_text_block_count += 1
         if scene_has_background:
             scenes_with_background += 1
         if scene_has_music:
@@ -6084,6 +6093,24 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             f"平均每个场景只有 {text_density} 个台词/旁白/选项块。",
             "若不是纯演出 Demo，建议补足关键对白、旁白和过渡说明。",
         )
+    if long_text_block_count:
+        add_vn_baseline_issue(
+            issues,
+            "soft",
+            "long_story_text",
+            "部分文本卡片过长",
+            f"检测到 {long_text_block_count} 张台词/旁白超过 {VN_TEXT_LONG_WARNING_LENGTH} 字：{', '.join(long_text_block_names[:3])}",
+            "把长段落拆成多张台词或旁白卡，保留打字机节奏，也避免小屏幕文本框溢出。",
+        )
+    if multiline_text_block_count:
+        add_vn_baseline_issue(
+            issues,
+            "soft",
+            "multiline_story_text",
+            "部分文本换行过多",
+            f"检测到 {multiline_text_block_count} 张台词/旁白包含过多手动换行。",
+            "手动换行过多会压缩可读区域；建议交给 Runtime 自动换行，或拆成更短的连续卡片。",
+        )
     if scene_count >= 3 and scenes_with_effects == 0:
         add_vn_baseline_issue(
             issues,
@@ -6177,6 +6204,8 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             "linkedSceneCount": len(reachable_scene_ids),
             "placeholderAssetCount": len(placeholder_assets),
             "emptyTextBlockCount": empty_text_count,
+            "longTextBlockCount": long_text_block_count,
+            "multilineTextBlockCount": multiline_text_block_count,
             "textDensity": text_density,
             "averageTextLength": average_text_length,
         },
@@ -6222,6 +6251,7 @@ def render_native_runtime_vn_baseline_quality_markdown(report: dict) -> str:
         ("演出效果场景", metrics.get("scenesWithEffects")),
         ("占位素材", metrics.get("placeholderAssetCount")),
         ("空文本块", metrics.get("emptyTextBlockCount")),
+        ("过长文本 / 多换行文本", f"{int(metrics.get('longTextBlockCount') or 0)} / {int(metrics.get('multilineTextBlockCount') or 0)}"),
         ("平均剧情块密度", metrics.get("textDensity")),
     ]
     lines = [
@@ -6525,6 +6555,7 @@ def render_native_runtime_release_control_markdown(payload: dict) -> str:
             ("入口场景有效", "是" if vn_metrics.get("entrySceneExists") else "否"),
             ("路线缺失目标", vn_metrics.get("routeTargetMissingCount")),
             ("入口不可达场景", vn_metrics.get("unreachableSceneCount")),
+            ("过长文本 / 多换行文本", f"{int(vn_metrics.get('longTextBlockCount') or 0)} / {int(vn_metrics.get('multilineTextBlockCount') or 0)}"),
             ("缺口 / 润色项", f"{int(vn_summary.get('warnCount') or 0)} / {int(vn_summary.get('softCount') or 0)}"),
         ]:
             lines.append(f"| {label} | {format_markdown_value(value, '0')} |")
