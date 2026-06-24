@@ -3835,6 +3835,17 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("${targetLabel}没有导出成功", export_build)
         self.assertIn("copyable: true", export_build)
 
+    def test_native_export_surface_links_vn_baseline_quality_reports(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("vnBaselineQualityMarkdownPublicUrl", source)
+        self.assertIn("打开 VN 基础质感报告", source)
+        self.assertIn("vnBaselineQualityReportPublicUrl", source)
+        self.assertIn("打开 VN 质感 JSON", source)
+        self.assertIn("VN 基础质感报告：", source)
+        self.assertIn("VN 基础质感 JSON：", source)
+        self.assertIn("VN 基础质感状态：", source)
+
     def test_asset_delete_confirmations_preview_exact_targets(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
         render_assets = _extract_function_source(source, "renderAssetsScreen")

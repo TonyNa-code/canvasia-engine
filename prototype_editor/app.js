@@ -26306,6 +26306,34 @@ function renderProjectValidationSummary() {
             : ""
         }
         ${
+          exportResult?.target === "native_runtime" && exportResult?.vnBaselineQualityMarkdownPublicUrl
+            ? `
+              <a
+                class="toolbar-button toolbar-button-primary"
+                href="${escapeHtml(exportResult.vnBaselineQualityMarkdownPublicUrl)}"
+                target="_blank"
+                rel="noreferrer"
+              >
+                打开 VN 基础质感报告
+              </a>
+            `
+            : ""
+        }
+        ${
+          exportResult?.target === "native_runtime" && exportResult?.vnBaselineQualityReportPublicUrl
+            ? `
+              <a
+                class="toolbar-button"
+                href="${escapeHtml(exportResult.vnBaselineQualityReportPublicUrl)}"
+                target="_blank"
+                rel="noreferrer"
+              >
+                打开 VN 质感 JSON
+              </a>
+            `
+            : ""
+        }
+        ${
           exportResult?.target === "native_runtime" && exportResult?.macReleaseControlReporterPublicUrl
             ? `
               <a
@@ -26542,6 +26570,12 @@ function renderProjectValidationSummary() {
                   exportResult.releaseControlJsonPath ?? "未生成"
                 )}<br />发布总控状态：${escapeHtml(
                   exportResult.releaseControlSummary ?? exportResult.releaseControlStatus ?? "未生成"
+                )}<br />VN 基础质感报告：${escapeHtml(
+                  exportResult.vnBaselineQualityMarkdownPath ?? "未生成"
+                )}<br />VN 基础质感 JSON：${escapeHtml(
+                  exportResult.vnBaselineQualityReportPath ?? "未生成"
+                )}<br />VN 基础质感状态：${escapeHtml(
+                  exportResult.vnBaselineQualityStatus ?? "未生成"
                 )}<br />发布总控刷新脚本：${escapeHtml(
                   [
                     exportResult.macReleaseControlReporterName,
