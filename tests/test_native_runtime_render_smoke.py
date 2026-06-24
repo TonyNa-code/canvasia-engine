@@ -371,6 +371,45 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             self.assertIn("音效素材 / 已入剧情 / 未使用", markdown)
             self.assertIn("语音素材 / 已入剧情 / 未使用", markdown)
 
+    def test_vn_baseline_quality_report_flags_save_slot_configuration_gaps(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_dir = Path(temp_dir) / "bundle"
+            bundle_dir.mkdir(parents=True)
+            scenes = [
+                {
+                    "id": f"scene_{index}",
+                    "name": f"Scene {index}",
+                    "blocks": [{"id": f"line_{index}", "type": "narration", "text": f"Scene {index}."}],
+                }
+                for index in range(6)
+            ]
+            game_data = {
+                "project": {
+                    "projectId": "native_save_slot_quality_smoke",
+                    "title": "Native Save Slot Quality Smoke",
+                    "entrySceneId": "scene_0",
+                    "runtimeSettings": {"formalSaveSlotCount": 2},
+                },
+                "assets": {"assets": []},
+                "characters": {"characters": []},
+                "chapters": [{"id": "chapter_1", "name": "Chapter 1", "scenes": scenes}],
+            }
+            (bundle_dir / "game_data.json").write_text(json.dumps(game_data, ensure_ascii=False), encoding="utf-8")
+
+            report = build_native_runtime_vn_baseline_quality_report(bundle_dir)
+
+            self.assertEqual(report["metrics"]["configuredFormalSaveSlotCount"], 2)
+            self.assertEqual(report["metrics"]["formalSaveSlotCount"], 3)
+            self.assertEqual(report["metrics"]["saveDialogPageCount"], 1)
+            self.assertTrue(report["metrics"]["saveSlotCountClamped"])
+            issue_codes = {issue["code"] for issue in report["issues"]}
+            self.assertIn("save_slot_count_clamped", issue_codes)
+            self.assertIn("save_slot_count_low", issue_codes)
+
+            markdown = render_native_runtime_vn_baseline_quality_markdown(report)
+            self.assertIn("正式存档位 / 读档页数", markdown)
+            self.assertIn("正式存档位配置超出安全范围", markdown)
+
     def test_vn_baseline_quality_report_flags_voice_binding_gaps(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             bundle_dir = Path(temp_dir) / "bundle"

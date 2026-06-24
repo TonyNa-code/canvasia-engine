@@ -5430,6 +5430,14 @@ def add_vn_baseline_issue(
 def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
     payload = load_game_data(bundle_dir / DEFAULT_GAME_DATA_NAME)
     project = payload.get("project") if isinstance(payload.get("project"), dict) else {}
+    runtime_settings = project.get("runtimeSettings") if isinstance(project.get("runtimeSettings"), dict) else {}
+    formal_save_slot_count = get_project_formal_save_slot_count(project)
+    raw_formal_save_slot_count = runtime_settings.get("formalSaveSlotCount", DEFAULT_FORMAL_SAVE_SLOT_COUNT)
+    try:
+        configured_formal_save_slot_count = int(raw_formal_save_slot_count)
+    except Exception:
+        configured_formal_save_slot_count = DEFAULT_FORMAL_SAVE_SLOT_COUNT
+    save_dialog_page_count = max(1, math.ceil(formal_save_slot_count / SAVE_DIALOG_PAGE_SIZE))
     assets_doc = payload.get("assets") if isinstance(payload.get("assets"), dict) else {}
     assets = assets_doc.get("assets") if isinstance(assets_doc.get("assets"), list) else []
     assets_by_id = {str(asset.get("id")): asset for asset in assets if isinstance(asset, dict) and asset.get("id")}
@@ -6236,6 +6244,24 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             f"检测到 {len(unused_voice_asset_ids)} 条语音没有被台词/旁白引用：{', '.join(unused_voice_asset_names[:3])}",
             "把语音绑定到对应台词或先移出发布包；否则语音回听馆会缺内容，玩家也可能以为配音漏接。",
         )
+    if configured_formal_save_slot_count != formal_save_slot_count:
+        add_vn_baseline_issue(
+            issues,
+            "warn",
+            "save_slot_count_clamped",
+            "正式存档位配置超出安全范围",
+            f"项目配置为 {raw_formal_save_slot_count} 个正式存档位，原生 Runtime 实际会使用 {formal_save_slot_count} 个。",
+            f"把正式存档位调整到 {MIN_FORMAL_SAVE_SLOT_COUNT}-{MAX_FORMAL_SAVE_SLOT_COUNT} 之间，避免编辑器、导出包和玩家看到的槽位数量不一致。",
+        )
+    if scene_count >= 6 and formal_save_slot_count < 12:
+        add_vn_baseline_issue(
+            issues,
+            "soft",
+            "save_slot_count_low",
+            "正式存档位可能偏少",
+            f"当前 {scene_count} 个场景只配置了 {formal_save_slot_count} 个正式存档位。",
+            "中长篇 Demo 建议至少保留 12-24 个正式存档位；如果作品有多路线或高密度选择，建议提高到 50 个以上。",
+        )
     if scene_count >= 2 and ending_scene_count and credits_roll_count == 0:
         add_vn_baseline_issue(
             issues,
@@ -6422,6 +6448,10 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             "sfxAssetCount": len(sfx_asset_ids),
             "sfxUsedAssetCount": len(sfx_used_asset_ids & sfx_asset_ids),
             "unusedSfxAssetCount": len(unused_sfx_asset_ids),
+            "formalSaveSlotCount": formal_save_slot_count,
+            "configuredFormalSaveSlotCount": configured_formal_save_slot_count,
+            "saveDialogPageCount": save_dialog_page_count,
+            "saveSlotCountClamped": configured_formal_save_slot_count != formal_save_slot_count,
             "entrySceneExists": entry_scene_id in valid_scene_ids,
             "routeTargetMissingCount": len(missing_route_targets),
             "unreachableSceneCount": len(unreachable_scene_ids),
@@ -6476,6 +6506,7 @@ def render_native_runtime_vn_baseline_quality_markdown(report: dict) -> str:
         ("语音绑定 / 可配音文本", f"{int(metrics.get('voiceBoundLineCount') or 0)} / {int(metrics.get('voiceEligibleLineCount') or 0)}"),
         ("缺失语音文件", metrics.get("missingVoiceAssetCount")),
         ("语音素材 / 已入剧情 / 未使用", f"{int(metrics.get('voiceAssetCount') or 0)} / {int(metrics.get('voiceUsedAssetCount') or 0)} / {int(metrics.get('unusedVoiceAssetCount') or 0)}"),
+        ("正式存档位 / 读档页数", f"{int(metrics.get('formalSaveSlotCount') or 0)} / {int(metrics.get('saveDialogPageCount') or 0)}"),
         ("入口场景有效", "是" if metrics.get("entrySceneExists") else "否"),
         ("路线缺失目标", metrics.get("routeTargetMissingCount")),
         ("入口不可达场景", metrics.get("unreachableSceneCount")),
@@ -6790,6 +6821,7 @@ def render_native_runtime_release_control_markdown(payload: dict) -> str:
             ("语音绑定 / 可配音文本", f"{int(vn_metrics.get('voiceBoundLineCount') or 0)} / {int(vn_metrics.get('voiceEligibleLineCount') or 0)}"),
             ("缺失语音文件", vn_metrics.get("missingVoiceAssetCount")),
             ("语音素材 / 已入剧情 / 未使用", f"{int(vn_metrics.get('voiceAssetCount') or 0)} / {int(vn_metrics.get('voiceUsedAssetCount') or 0)} / {int(vn_metrics.get('unusedVoiceAssetCount') or 0)}"),
+            ("正式存档位 / 读档页数", f"{int(vn_metrics.get('formalSaveSlotCount') or 0)} / {int(vn_metrics.get('saveDialogPageCount') or 0)}"),
             ("入口场景有效", "是" if vn_metrics.get("entrySceneExists") else "否"),
             ("路线缺失目标", vn_metrics.get("routeTargetMissingCount")),
             ("入口不可达场景", vn_metrics.get("unreachableSceneCount")),
