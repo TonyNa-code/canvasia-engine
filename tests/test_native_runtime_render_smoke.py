@@ -184,6 +184,8 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             self.assertEqual(report["metrics"]["scenesWithBackground"], 1)
             self.assertEqual(report["metrics"]["musicPlayCount"], 0)
             self.assertEqual(report["metrics"]["musicFadeInCount"], 0)
+            self.assertEqual(report["metrics"]["voiceBoundLineCount"], 0)
+            self.assertEqual(report["metrics"]["missingVoiceAssetCount"], 0)
             issue_codes = {issue["code"] for issue in report["issues"]}
             self.assertIn("character_fallback_sprite", issue_codes)
             self.assertIn("bgm_plan", issue_codes)
@@ -192,6 +194,7 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             self.assertIn("原生 Runtime VN 基础质感报告", markdown)
             self.assertIn("角色立绘覆盖", markdown)
             self.assertIn("BGM 淡入 / 淡出", markdown)
+            self.assertIn("语音覆盖", markdown)
 
             written = write_native_runtime_vn_baseline_quality_reports(bundle_dir)
             self.assertEqual(written["status"], "needs_fix")
@@ -272,6 +275,69 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             markdown = render_native_runtime_vn_baseline_quality_markdown(report)
             self.assertIn("多首 BGM 缺少明确范围", markdown)
             self.assertIn("BGM 播放 / 停止", markdown)
+
+    def test_vn_baseline_quality_report_flags_voice_binding_gaps(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_dir = Path(temp_dir) / "bundle"
+            bundle_dir.mkdir(parents=True)
+            voice_path = bundle_dir / "assets" / "voices" / "line_1.ogg"
+            voice_path.parent.mkdir(parents=True, exist_ok=True)
+            voice_path.write_bytes(b"fake-voice")
+            game_data = {
+                "project": {
+                    "projectId": "native_voice_quality_smoke",
+                    "title": "Native Voice Quality Smoke",
+                    "entrySceneId": "scene_voice",
+                },
+                "assets": {
+                    "assets": [
+                        {
+                            "id": "voice_ok",
+                            "type": "voice",
+                            "name": "Line 1 Voice",
+                            "exportUrl": voice_path.relative_to(bundle_dir).as_posix(),
+                            "tags": [],
+                        }
+                    ]
+                },
+                "characters": {"characters": []},
+                "chapters": [
+                    {
+                        "id": "chapter_1",
+                        "name": "Chapter 1",
+                        "scenes": [
+                            {
+                                "id": "scene_voice",
+                                "name": "Voice",
+                                "blocks": [
+                                    {"id": "line_1", "type": "dialogue", "text": "Voiced line.", "voiceAssetId": "voice_ok"},
+                                    {"id": "line_2", "type": "dialogue", "text": "Missing voice.", "voiceAssetId": "voice_missing"},
+                                    {"id": "line_3", "type": "dialogue", "text": "No voice 1."},
+                                    {"id": "line_4", "type": "dialogue", "text": "No voice 2."},
+                                    {"id": "line_5", "type": "dialogue", "text": "No voice 3."},
+                                ],
+                            }
+                        ],
+                    }
+                ],
+            }
+            (bundle_dir / "game_data.json").write_text(json.dumps(game_data, ensure_ascii=False), encoding="utf-8")
+
+            report = build_native_runtime_vn_baseline_quality_report(bundle_dir)
+
+            self.assertEqual(report["status"], "needs_fix")
+            self.assertEqual(report["metrics"]["voiceEligibleLineCount"], 5)
+            self.assertEqual(report["metrics"]["voiceBoundLineCount"], 2)
+            self.assertEqual(report["metrics"]["dialogueVoiceCount"], 2)
+            self.assertEqual(report["metrics"]["voiceCoveragePercent"], 40.0)
+            self.assertEqual(report["metrics"]["missingVoiceAssetCount"], 1)
+            issue_codes = {issue["code"] for issue in report["issues"]}
+            self.assertIn("voice_asset_missing", issue_codes)
+            self.assertIn("voice_coverage_gap", issue_codes)
+
+            markdown = render_native_runtime_vn_baseline_quality_markdown(report)
+            self.assertIn("存在已绑定但缺失的语音文件", markdown)
+            self.assertIn("语音绑定 / 可配音文本", markdown)
 
 
 @unittest.skipIf(pygame is None, "pygame-ce is not installed")

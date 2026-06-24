@@ -5452,6 +5452,10 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
     music_scoped_count = 0
     music_fade_in_count = 0
     music_fade_out_count = 0
+    dialogue_voice_count = 0
+    narration_voice_count = 0
+    missing_voice_asset_count = 0
+    missing_voice_asset_names: list[str] = []
     text_block_count = 0
     total_text_chars = 0
 
@@ -5466,8 +5470,22 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             block_type = str(block.get("type") or "").strip()
             if block_type == "dialogue":
                 dialogue_count += 1
+                voice_asset_id = str(block.get("voiceAssetId") or "").strip()
+                if voice_asset_id:
+                    dialogue_voice_count += 1
+                    voice_asset = assets_by_id.get(voice_asset_id)
+                    if not voice_asset or not get_asset_runtime_path(bundle_dir, voice_asset):
+                        missing_voice_asset_count += 1
+                        missing_voice_asset_names.append(str(block.get("id") or voice_asset_id))
             elif block_type == "narration":
                 narration_count += 1
+                voice_asset_id = str(block.get("voiceAssetId") or "").strip()
+                if voice_asset_id:
+                    narration_voice_count += 1
+                    voice_asset = assets_by_id.get(voice_asset_id)
+                    if not voice_asset or not get_asset_runtime_path(bundle_dir, voice_asset):
+                        missing_voice_asset_count += 1
+                        missing_voice_asset_names.append(str(block.get("id") or voice_asset_id))
             elif block_type == "choice":
                 choice_count += 1
             elif block_type == "character_show":
@@ -5524,6 +5542,9 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
     scene_count = len(scenes)
     text_density = round(text_block_count / scene_count, 2) if scene_count else 0.0
     average_text_length = round(total_text_chars / text_block_count, 1) if text_block_count else 0.0
+    voice_eligible_line_count = dialogue_count + narration_count
+    voice_bound_line_count = dialogue_voice_count + narration_voice_count
+    voice_coverage_percent = round(voice_bound_line_count / voice_eligible_line_count * 100, 1) if voice_eligible_line_count else 0.0
     issues: list[dict] = []
 
     if not scenes:
@@ -5552,6 +5573,15 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             "存在空白剧情文本",
             f"检测到 {empty_text_count} 个台词、旁白或选项没有正文。",
             "回到剧情编辑器补齐文本，或删除不再需要的空卡片。",
+        )
+    if missing_voice_asset_count:
+        add_vn_baseline_issue(
+            issues,
+            "warn",
+            "voice_asset_missing",
+            "存在已绑定但缺失的语音文件",
+            f"检测到 {missing_voice_asset_count} 条台词/旁白绑定了语音，但文件没有进入原生包：{', '.join(missing_voice_asset_names[:3])}",
+            "重新导入或替换缺失语音素材，再导出原生 Runtime，避免玩家点开后听不到应有配音。",
         )
     if characters and characters_with_sprite < len(characters):
         add_vn_baseline_issue(
@@ -5607,6 +5637,15 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             "部分 BGM 没有淡出",
             f"{music_stop_count - music_fade_out_count} 个停止音乐卡片没有设置淡出时间。",
             "给停止音乐卡片设置淡出，让场景切换和静音段落更自然。",
+        )
+    if voice_bound_line_count and voice_eligible_line_count >= 5 and voice_coverage_percent < 70:
+        add_vn_baseline_issue(
+            issues,
+            "soft",
+            "voice_coverage_gap",
+            "语音覆盖存在明显断层",
+            f"当前 {voice_eligible_line_count} 条台词/旁白里有 {voice_bound_line_count} 条绑定语音，覆盖约 {voice_coverage_percent}%。",
+            "如果这是配音试玩版，建议集中补齐主线关键句，或暂时移除零散语音，避免玩家误以为漏配。",
         )
     if scene_count >= 2 and choice_count == 0:
         add_vn_baseline_issue(
@@ -5691,6 +5730,12 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             "musicScopedCount": music_scoped_count,
             "musicFadeInCount": music_fade_in_count,
             "musicFadeOutCount": music_fade_out_count,
+            "voiceEligibleLineCount": voice_eligible_line_count,
+            "voiceBoundLineCount": voice_bound_line_count,
+            "dialogueVoiceCount": dialogue_voice_count,
+            "narrationVoiceCount": narration_voice_count,
+            "voiceCoveragePercent": voice_coverage_percent,
+            "missingVoiceAssetCount": missing_voice_asset_count,
             "placeholderAssetCount": len(placeholder_assets),
             "emptyTextBlockCount": empty_text_count,
             "textDensity": text_density,
@@ -5714,6 +5759,9 @@ def render_native_runtime_vn_baseline_quality_markdown(report: dict) -> str:
         ("BGM 播放 / 停止", f"{int(metrics.get('musicPlayCount') or 0)} / {int(metrics.get('musicStopCount') or 0)}"),
         ("BGM 淡入 / 淡出", f"{int(metrics.get('musicFadeInCount') or 0)} / {int(metrics.get('musicFadeOutCount') or 0)}"),
         ("BGM 明确范围", metrics.get("musicScopedCount")),
+        ("语音覆盖", f"{format_markdown_value(metrics.get('voiceCoveragePercent'), '0')}%"),
+        ("语音绑定 / 可配音文本", f"{int(metrics.get('voiceBoundLineCount') or 0)} / {int(metrics.get('voiceEligibleLineCount') or 0)}"),
+        ("缺失语音文件", metrics.get("missingVoiceAssetCount")),
         ("演出效果场景", metrics.get("scenesWithEffects")),
         ("占位素材", metrics.get("placeholderAssetCount")),
         ("空文本块", metrics.get("emptyTextBlockCount")),
@@ -5999,6 +6047,9 @@ def render_native_runtime_release_control_markdown(payload: dict) -> str:
             ("BGM 播放 / 停止", f"{int(vn_metrics.get('musicPlayCount') or 0)} / {int(vn_metrics.get('musicStopCount') or 0)}"),
             ("BGM 淡入 / 淡出", f"{int(vn_metrics.get('musicFadeInCount') or 0)} / {int(vn_metrics.get('musicFadeOutCount') or 0)}"),
             ("BGM 明确范围", vn_metrics.get("musicScopedCount")),
+            ("语音覆盖", f"{format_markdown_value(vn_metrics.get('voiceCoveragePercent'), '0')}%"),
+            ("语音绑定 / 可配音文本", f"{int(vn_metrics.get('voiceBoundLineCount') or 0)} / {int(vn_metrics.get('voiceEligibleLineCount') or 0)}"),
+            ("缺失语音文件", vn_metrics.get("missingVoiceAssetCount")),
             ("缺口 / 润色项", f"{int(vn_summary.get('warnCount') or 0)} / {int(vn_summary.get('softCount') or 0)}"),
         ]:
             lines.append(f"| {label} | {format_markdown_value(value, '0')} |")
