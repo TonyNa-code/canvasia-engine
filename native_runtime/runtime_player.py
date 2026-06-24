@@ -5593,6 +5593,8 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
     choice_effect_count = 0
     variable_set_count = 0
     variable_add_count = 0
+    variable_written_ids: set[str] = set()
+    condition_read_variable_ids: set[str] = set()
     logic_missing_variable_count = 0
     logic_non_number_add_count = 0
     logic_operator_mismatch_count = 0
@@ -5759,8 +5761,10 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
                         variable = variables_by_id.get(variable_id)
                         if not variable:
                             logic_missing_variable_count += 1
-                        elif effect_type == "variable_add" and normalize_variable_type(variable.get("type")) != "number":
-                            logic_non_number_add_count += 1
+                        else:
+                            variable_written_ids.add(variable_id)
+                            if effect_type == "variable_add" and normalize_variable_type(variable.get("type")) != "number":
+                                logic_non_number_add_count += 1
                 if len(plain_target_options) >= 2 and len(set(plain_target_options)) == 1:
                     same_target_choice_count += 1
                     same_target_choice_names.append(str(block.get("id") or "choice"))
@@ -5769,14 +5773,18 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
                 variable_id = str(block.get("variableId") or "").strip()
                 if variable_id not in variables_by_id:
                     logic_missing_variable_count += 1
+                else:
+                    variable_written_ids.add(variable_id)
             elif block_type == "variable_add":
                 variable_add_count += 1
                 variable_id = str(block.get("variableId") or "").strip()
                 variable = variables_by_id.get(variable_id)
                 if not variable:
                     logic_missing_variable_count += 1
-                elif normalize_variable_type(variable.get("type")) != "number":
-                    logic_non_number_add_count += 1
+                else:
+                    variable_written_ids.add(variable_id)
+                    if normalize_variable_type(variable.get("type")) != "number":
+                        logic_non_number_add_count += 1
             elif block_type == "condition":
                 condition_count += 1
                 branches = block.get("branches") if isinstance(block.get("branches"), list) else []
@@ -5803,8 +5811,10 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
                         variable = variables_by_id.get(variable_id)
                         if not variable:
                             logic_missing_variable_count += 1
-                        elif not condition_operator_matches_variable_type(normalize_variable_type(variable.get("type")), rule.get("operator")):
-                            logic_operator_mismatch_count += 1
+                        else:
+                            condition_read_variable_ids.add(variable_id)
+                            if not condition_operator_matches_variable_type(normalize_variable_type(variable.get("type")), rule.get("operator")):
+                                logic_operator_mismatch_count += 1
             elif block_type == "character_show":
                 character_show_count += 1
                 character_id = str(block.get("characterId") or "").strip()
@@ -5961,6 +5971,12 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
     unused_voice_asset_names = [
         str((assets_by_id.get(asset_id) or {}).get("name") or asset_id)
         for asset_id in unused_voice_asset_ids
+    ]
+    route_influencing_variable_ids = sorted(variable_written_ids & condition_read_variable_ids)
+    unconsumed_variable_write_ids = sorted(variable_written_ids - condition_read_variable_ids)
+    unconsumed_variable_write_names = [
+        str((variables_by_id.get(variable_id) or {}).get("name") or variable_id)
+        for variable_id in unconsumed_variable_write_ids
     ]
     scene_count = len(scenes)
     text_density = round(text_block_count / scene_count, 2) if scene_count else 0.0
@@ -6308,6 +6324,15 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             f"检测到 {logic_operator_mismatch_count} 条条件规则使用了不适合当前变量类型的比较符。",
             "文本和开关变量只用等于/不等于；大于、小于这类比较请改用数字变量。",
         )
+    if unconsumed_variable_write_ids and (condition_count or choice_effect_count or variable_set_count or variable_add_count):
+        add_vn_baseline_issue(
+            issues,
+            "soft",
+            "logic_variable_unconsumed_write",
+            "部分变量变化没有进入路线判断",
+            f"检测到 {len(unconsumed_variable_write_ids)} 个被写入但没有被条件分支读取的变量：{', '.join(unconsumed_variable_write_names[:3])}",
+            "如果这些变量代表好感度、路线旗标或状态差分，建议补条件分支读取它们；如果只是成就、统计或存档展示变量，可以在发布说明里明确用途。",
+        )
     if characters and characters_with_sprite < len(characters):
         add_vn_baseline_issue(
             issues,
@@ -6645,6 +6670,10 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             "duplicateVariableIdCount": len(duplicate_variable_ids),
             "variableSetCount": variable_set_count,
             "variableAddCount": variable_add_count,
+            "variableWrittenCount": len(variable_written_ids),
+            "conditionReadVariableCount": len(condition_read_variable_ids),
+            "routeInfluencingVariableCount": len(route_influencing_variable_ids),
+            "unconsumedVariableWriteCount": len(unconsumed_variable_write_ids),
             "conditionCount": condition_count,
             "conditionBranchCount": condition_branch_count,
             "conditionRuleCount": condition_rule_count,
@@ -6766,6 +6795,8 @@ def render_native_runtime_vn_baseline_quality_markdown(report: dict) -> str:
         ("场景数", metrics.get("storySceneCount")),
         ("台词 / 旁白 / 选项", f"{int(metrics.get('dialogueCount') or 0)} / {int(metrics.get('narrationCount') or 0)} / {int(metrics.get('choiceCount') or 0)}"),
         ("变量 / 条件 / 选项效果", f"{int(metrics.get('variableCount') or 0)} / {int(metrics.get('conditionCount') or 0)} / {int(metrics.get('choiceEffectCount') or 0)}"),
+        ("写入变量 / 条件读取 / 影响路线", f"{int(metrics.get('variableWrittenCount') or 0)} / {int(metrics.get('conditionReadVariableCount') or 0)} / {int(metrics.get('routeInfluencingVariableCount') or 0)}"),
+        ("未被条件读取的变量写入", metrics.get("unconsumedVariableWriteCount")),
         ("逻辑缺失变量 / 非数字加减 / 条件符号不匹配", f"{int(metrics.get('logicMissingVariableCount') or 0)} / {int(metrics.get('logicNonNumberAddCount') or 0)} / {int(metrics.get('logicOperatorMismatchCount') or 0)}"),
         ("空路线目标 / 条件隐式结束", f"{int(metrics.get('missingNavigationTargetCount') or 0)} / {int(metrics.get('implicitConditionFallbackEndCount') or 0)}"),
         ("选项按钮总数", metrics.get("choiceOptionCount")),
@@ -7088,6 +7119,8 @@ def render_native_runtime_release_control_markdown(payload: dict) -> str:
             ("场景数", vn_metrics.get("storySceneCount")),
             ("台词 / 旁白 / 选项", f"{int(vn_metrics.get('dialogueCount') or 0)} / {int(vn_metrics.get('narrationCount') or 0)} / {int(vn_metrics.get('choiceCount') or 0)}"),
             ("变量 / 条件 / 选项效果", f"{int(vn_metrics.get('variableCount') or 0)} / {int(vn_metrics.get('conditionCount') or 0)} / {int(vn_metrics.get('choiceEffectCount') or 0)}"),
+            ("写入变量 / 条件读取 / 影响路线", f"{int(vn_metrics.get('variableWrittenCount') or 0)} / {int(vn_metrics.get('conditionReadVariableCount') or 0)} / {int(vn_metrics.get('routeInfluencingVariableCount') or 0)}"),
+            ("未被条件读取的变量写入", vn_metrics.get("unconsumedVariableWriteCount")),
             ("逻辑缺失变量 / 非数字加减 / 条件符号不匹配", f"{int(vn_metrics.get('logicMissingVariableCount') or 0)} / {int(vn_metrics.get('logicNonNumberAddCount') or 0)} / {int(vn_metrics.get('logicOperatorMismatchCount') or 0)}"),
             ("空路线目标 / 条件隐式结束", f"{int(vn_metrics.get('missingNavigationTargetCount') or 0)} / {int(vn_metrics.get('implicitConditionFallbackEndCount') or 0)}"),
             ("选项按钮总数", vn_metrics.get("choiceOptionCount")),

@@ -832,6 +832,72 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             self.assertIn("变量 / 条件 / 选项效果", markdown)
             self.assertIn("逻辑缺失变量 / 非数字加减 / 条件符号不匹配", markdown)
 
+    def test_vn_baseline_quality_report_flags_unconsumed_variable_writes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_dir = Path(temp_dir) / "bundle"
+            bundle_dir.mkdir(parents=True)
+            game_data = {
+                "project": {
+                    "projectId": "native_unconsumed_variable_quality_smoke",
+                    "title": "Native Unconsumed Variable Quality Smoke",
+                    "entrySceneId": "scene_start",
+                },
+                "assets": {"assets": []},
+                "characters": {"characters": []},
+                "variables": {
+                    "variables": [
+                        {"id": "affection", "name": "Affection", "type": "number", "defaultValue": 0},
+                    ]
+                },
+                "chapters": [
+                    {
+                        "id": "chapter_1",
+                        "name": "Chapter 1",
+                        "scenes": [
+                            {
+                                "id": "scene_start",
+                                "name": "Start",
+                                "blocks": [
+                                    {
+                                        "id": "choice_affection",
+                                        "type": "choice",
+                                        "options": [
+                                            {
+                                                "text": "Be kind",
+                                                "gotoSceneId": "scene_end",
+                                                "effects": [
+                                                    {"type": "variable_add", "variableId": "affection", "value": 1},
+                                                ],
+                                            }
+                                        ],
+                                    }
+                                ],
+                            },
+                            {
+                                "id": "scene_end",
+                                "name": "End",
+                                "blocks": [{"id": "line_end", "type": "narration", "text": "The route ends without reading affection."}],
+                            },
+                        ],
+                    }
+                ],
+            }
+            (bundle_dir / "game_data.json").write_text(json.dumps(game_data, ensure_ascii=False), encoding="utf-8")
+
+            report = build_native_runtime_vn_baseline_quality_report(bundle_dir)
+
+            self.assertEqual(report["metrics"]["variableWrittenCount"], 1)
+            self.assertEqual(report["metrics"]["conditionReadVariableCount"], 0)
+            self.assertEqual(report["metrics"]["routeInfluencingVariableCount"], 0)
+            self.assertEqual(report["metrics"]["unconsumedVariableWriteCount"], 1)
+            issue_codes = {issue["code"] for issue in report["issues"]}
+            self.assertIn("logic_variable_unconsumed_write", issue_codes)
+
+            markdown = render_native_runtime_vn_baseline_quality_markdown(report)
+            self.assertIn("写入变量 / 条件读取 / 影响路线", markdown)
+            self.assertIn("未被条件读取的变量写入", markdown)
+            self.assertIn("部分变量变化没有进入路线判断", markdown)
+
     def test_vn_baseline_quality_report_flags_text_readability_gaps(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             bundle_dir = Path(temp_dir) / "bundle"
