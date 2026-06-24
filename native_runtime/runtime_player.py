@@ -5492,6 +5492,8 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
     long_choice_option_count = 0
     duplicate_choice_option_count = 0
     crowded_choice_block_count = 0
+    no_action_choice_option_count = 0
+    no_action_choice_option_names: list[str] = []
     sfx_play_count = 0
     missing_sfx_asset_count = 0
     missing_sfx_asset_names: list[str] = []
@@ -5574,6 +5576,10 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
                             duplicate_choice_option_count += 1
                         seen_choice_texts.add(normalized_option_text)
                     effects = option.get("effects") if isinstance(option.get("effects"), list) else []
+                    option_target = str(option.get("gotoSceneId") or option.get("targetSceneId") or "").strip()
+                    if option_text and not option_target and not effects:
+                        no_action_choice_option_count += 1
+                        no_action_choice_option_names.append(str(option.get("id") or option_text))
                     for effect in effects:
                         if not isinstance(effect, dict):
                             continue
@@ -5894,6 +5900,15 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             "存在空白选项按钮",
             f"检测到 {empty_choice_option_count} 个选项按钮没有文案。",
             "补齐选项文案或删除空选项，避免玩家在原生 Runtime 里看到空白按钮。",
+        )
+    if no_action_choice_option_count:
+        add_vn_baseline_issue(
+            issues,
+            "soft",
+            "choice_option_no_action",
+            "部分选项没有明确动作",
+            f"检测到 {no_action_choice_option_count} 个选项既没有跳转目标，也没有变量效果：{', '.join(no_action_choice_option_names[:3])}",
+            "如果这是“继续当前剧情”的设计，建议至少加一个变量记录或后续差分；否则请补跳转目标，避免玩家以为选项是假按钮。",
         )
     if duplicate_variable_ids:
         add_vn_baseline_issue(
@@ -6234,6 +6249,7 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             "longChoiceOptionCount": long_choice_option_count,
             "duplicateChoiceOptionCount": duplicate_choice_option_count,
             "crowdedChoiceBlockCount": crowded_choice_block_count,
+            "noActionChoiceOptionCount": no_action_choice_option_count,
             "sfxPlayCount": sfx_play_count,
             "missingSfxAssetCount": missing_sfx_asset_count,
             "videoAssetCount": video_asset_count,
@@ -6282,6 +6298,7 @@ def render_native_runtime_vn_baseline_quality_markdown(report: dict) -> str:
         ("逻辑缺失变量 / 非数字加减 / 条件符号不匹配", f"{int(metrics.get('logicMissingVariableCount') or 0)} / {int(metrics.get('logicNonNumberAddCount') or 0)} / {int(metrics.get('logicOperatorMismatchCount') or 0)}"),
         ("选项按钮总数", metrics.get("choiceOptionCount")),
         ("空白 / 超长 / 重复选项", f"{int(metrics.get('emptyChoiceOptionCount') or 0)} / {int(metrics.get('longChoiceOptionCount') or 0)} / {int(metrics.get('duplicateChoiceOptionCount') or 0)}"),
+        ("无动作选项", metrics.get("noActionChoiceOptionCount")),
         ("拥挤选项卡", metrics.get("crowdedChoiceBlockCount")),
         ("音效点 / 缺失音效", f"{int(metrics.get('sfxPlayCount') or 0)} / {int(metrics.get('missingSfxAssetCount') or 0)}"),
         ("视频素材 / 播放卡 / 缺失视频", f"{int(metrics.get('videoAssetCount') or 0)} / {int(metrics.get('videoPlayCount') or 0)} / {int(metrics.get('missingVideoAssetCount') or 0)}"),
@@ -6590,6 +6607,7 @@ def render_native_runtime_release_control_markdown(payload: dict) -> str:
             ("逻辑缺失变量 / 非数字加减 / 条件符号不匹配", f"{int(vn_metrics.get('logicMissingVariableCount') or 0)} / {int(vn_metrics.get('logicNonNumberAddCount') or 0)} / {int(vn_metrics.get('logicOperatorMismatchCount') or 0)}"),
             ("选项按钮总数", vn_metrics.get("choiceOptionCount")),
             ("空白 / 超长 / 重复选项", f"{int(vn_metrics.get('emptyChoiceOptionCount') or 0)} / {int(vn_metrics.get('longChoiceOptionCount') or 0)} / {int(vn_metrics.get('duplicateChoiceOptionCount') or 0)}"),
+            ("无动作选项", vn_metrics.get("noActionChoiceOptionCount")),
             ("拥挤选项卡", vn_metrics.get("crowdedChoiceBlockCount")),
             ("音效点 / 缺失音效", f"{int(vn_metrics.get('sfxPlayCount') or 0)} / {int(vn_metrics.get('missingSfxAssetCount') or 0)}"),
             ("视频素材 / 播放卡 / 缺失视频", f"{int(vn_metrics.get('videoAssetCount') or 0)} / {int(vn_metrics.get('videoPlayCount') or 0)} / {int(vn_metrics.get('missingVideoAssetCount') or 0)}"),

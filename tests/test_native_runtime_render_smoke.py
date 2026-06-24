@@ -786,6 +786,66 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             self.assertIn("存在空白选项按钮", markdown)
             self.assertIn("空白 / 超长 / 重复选项", markdown)
 
+    def test_vn_baseline_quality_report_flags_no_action_choice_options(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_dir = Path(temp_dir) / "bundle"
+            bundle_dir.mkdir(parents=True)
+            game_data = {
+                "project": {
+                    "projectId": "native_choice_action_quality_smoke",
+                    "title": "Native Choice Action Quality Smoke",
+                    "entrySceneId": "scene_choice_action",
+                },
+                "assets": {"assets": []},
+                "characters": {"characters": []},
+                "variables": {
+                    "variables": [
+                        {"id": "route_hint", "name": "Route Hint", "type": "text", "defaultValue": ""}
+                    ]
+                },
+                "chapters": [
+                    {
+                        "id": "chapter_1",
+                        "name": "Chapter 1",
+                        "scenes": [
+                            {
+                                "id": "scene_choice_action",
+                                "name": "Choice Action",
+                                "blocks": [
+                                    {
+                                        "id": "choice_action",
+                                        "type": "choice",
+                                        "options": [
+                                            {"id": "noop_choice", "text": "Do nothing"},
+                                            {
+                                                "id": "effect_choice",
+                                                "text": "Record and continue",
+                                                "effects": [
+                                                    {"type": "variable_set", "variableId": "route_hint", "value": "recorded"}
+                                                ],
+                                            },
+                                            {"id": "jump_choice", "text": "Jump", "gotoSceneId": "scene_choice_action"},
+                                        ],
+                                    }
+                                ],
+                            }
+                        ],
+                    }
+                ],
+            }
+            (bundle_dir / "game_data.json").write_text(json.dumps(game_data, ensure_ascii=False), encoding="utf-8")
+
+            report = build_native_runtime_vn_baseline_quality_report(bundle_dir)
+
+            self.assertEqual(report["metrics"]["choiceOptionCount"], 3)
+            self.assertEqual(report["metrics"]["noActionChoiceOptionCount"], 1)
+            issue_codes = {issue["code"] for issue in report["issues"]}
+            self.assertIn("choice_option_no_action", issue_codes)
+
+            markdown = render_native_runtime_vn_baseline_quality_markdown(report)
+            self.assertIn("无动作选项", markdown)
+            self.assertIn("部分选项没有明确动作", markdown)
+
     def test_vn_baseline_quality_report_flags_sfx_asset_gaps(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             bundle_dir = Path(temp_dir) / "bundle"
