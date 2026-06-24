@@ -5451,6 +5451,11 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
     character_position_values: set[str] = set()
     character_stage_adjustment_count = 0
     scenes_with_background = 0
+    background_block_count = 0
+    background_transition_count = 0
+    background_asset_ids: set[str] = set()
+    missing_background_asset_count = 0
+    missing_background_asset_names: list[str] = []
     scenes_with_music = 0
     scenes_with_effects = 0
     music_play_count = 0
@@ -5515,6 +5520,16 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
                     character_transition_count += 1
             elif block_type == "background":
                 scene_has_background = True
+                background_block_count += 1
+                background_asset_id = str(block.get("assetId") or "").strip()
+                if background_asset_id:
+                    background_asset_ids.add(background_asset_id)
+                background_asset = assets_by_id.get(background_asset_id) if background_asset_id else None
+                if not background_asset or not get_asset_runtime_path(bundle_dir, background_asset):
+                    missing_background_asset_count += 1
+                    missing_background_asset_names.append(str(block.get("id") or background_asset_id or "未命名背景卡"))
+                if get_safe_basic_transition(block.get("transition")) != "none" and get_safe_transition_duration_ms(block.get("transitionDurationMs"), 600) > 0:
+                    background_transition_count += 1
             elif block_type == "music_play":
                 scene_has_music = True
                 music_play_count += 1
@@ -5656,6 +5671,15 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             f"检测到 {missing_voice_asset_count} 条台词/旁白绑定了语音，但文件没有进入原生包：{', '.join(missing_voice_asset_names[:3])}",
             "重新导入或替换缺失语音素材，再导出原生 Runtime，避免玩家点开后听不到应有配音。",
         )
+    if missing_background_asset_count:
+        add_vn_baseline_issue(
+            issues,
+            "warn",
+            "background_asset_missing",
+            "存在缺失的背景/CG 文件",
+            f"检测到 {missing_background_asset_count} 张背景卡片没有可用文件：{', '.join(missing_background_asset_names[:3])}",
+            "重新导入或替换缺失背景、CG 或 3D 场景素材，再导出原生 Runtime，避免试玩中出现黑屏或占位背景。",
+        )
     if characters and characters_with_sprite < len(characters):
         add_vn_baseline_issue(
             issues,
@@ -5673,6 +5697,15 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             "背景覆盖不完整",
             f"{scene_count - scenes_with_background} 个场景没有背景卡片。",
             "给每个可试玩场景至少放一张背景、CG 或 3D 场景，避免黑屏式试玩体验。",
+        )
+    if background_block_count >= 2 and len(background_asset_ids) >= 2 and background_transition_count == 0:
+        add_vn_baseline_issue(
+            issues,
+            "soft",
+            "background_transition_missing",
+            "背景切换缺少基础转场",
+            f"检测到 {background_block_count} 张背景卡片、{len(background_asset_ids)} 个背景素材，但没有淡入淡出转场。",
+            "给章节开头或场景切换设置 400-1000ms 的淡入淡出，避免背景硬切影响沉浸感。",
         )
     expected_music_scenes = max(1, math.ceil(scene_count * 0.6)) if scene_count else 0
     if scene_count and scenes_with_music < expected_music_scenes:
@@ -5826,6 +5859,10 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             "characterPositionVariantCount": len(character_position_values),
             "characterStageAdjustmentCount": character_stage_adjustment_count,
             "scenesWithBackground": scenes_with_background,
+            "backgroundBlockCount": background_block_count,
+            "backgroundTransitionCount": background_transition_count,
+            "backgroundAssetVariantCount": len(background_asset_ids),
+            "missingBackgroundAssetCount": missing_background_asset_count,
             "scenesWithMusic": scenes_with_music,
             "scenesWithEffects": scenes_with_effects,
             "musicPlayCount": music_play_count,
@@ -5865,6 +5902,9 @@ def render_native_runtime_vn_baseline_quality_markdown(report: dict) -> str:
         ("人物站位变化", metrics.get("characterPositionVariantCount")),
         ("人物舞台调整", metrics.get("characterStageAdjustmentCount")),
         ("背景覆盖", f"{int(metrics.get('scenesWithBackground') or 0)} / {int(metrics.get('storySceneCount') or 0)}"),
+        ("背景转场 / 背景卡", f"{int(metrics.get('backgroundTransitionCount') or 0)} / {int(metrics.get('backgroundBlockCount') or 0)}"),
+        ("背景素材变化", metrics.get("backgroundAssetVariantCount")),
+        ("缺失背景文件", metrics.get("missingBackgroundAssetCount")),
         ("BGM 进入点", metrics.get("scenesWithMusic")),
         ("BGM 播放 / 停止", f"{int(metrics.get('musicPlayCount') or 0)} / {int(metrics.get('musicStopCount') or 0)}"),
         ("BGM 淡入 / 淡出", f"{int(metrics.get('musicFadeInCount') or 0)} / {int(metrics.get('musicFadeOutCount') or 0)}"),
@@ -6159,6 +6199,9 @@ def render_native_runtime_release_control_markdown(payload: dict) -> str:
             ("人物站位变化", vn_metrics.get("characterPositionVariantCount")),
             ("人物舞台调整", vn_metrics.get("characterStageAdjustmentCount")),
             ("背景覆盖", f"{int(vn_metrics.get('scenesWithBackground') or 0)} / {int(vn_metrics.get('storySceneCount') or 0)}"),
+            ("背景转场 / 背景卡", f"{int(vn_metrics.get('backgroundTransitionCount') or 0)} / {int(vn_metrics.get('backgroundBlockCount') or 0)}"),
+            ("背景素材变化", vn_metrics.get("backgroundAssetVariantCount")),
+            ("缺失背景文件", vn_metrics.get("missingBackgroundAssetCount")),
             ("BGM 进入点", vn_metrics.get("scenesWithMusic")),
             ("BGM 播放 / 停止", f"{int(vn_metrics.get('musicPlayCount') or 0)} / {int(vn_metrics.get('musicStopCount') or 0)}"),
             ("BGM 淡入 / 淡出", f"{int(vn_metrics.get('musicFadeInCount') or 0)} / {int(vn_metrics.get('musicFadeOutCount') or 0)}"),

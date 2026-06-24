@@ -182,6 +182,8 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             self.assertEqual(report["metrics"]["storySceneCount"], 1)
             self.assertEqual(report["metrics"]["choiceCount"], 1)
             self.assertEqual(report["metrics"]["scenesWithBackground"], 1)
+            self.assertEqual(report["metrics"]["backgroundBlockCount"], 1)
+            self.assertEqual(report["metrics"]["missingBackgroundAssetCount"], 0)
             self.assertEqual(report["metrics"]["musicPlayCount"], 0)
             self.assertEqual(report["metrics"]["musicFadeInCount"], 0)
             self.assertEqual(report["metrics"]["voiceBoundLineCount"], 0)
@@ -196,6 +198,7 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             self.assertIn("原生 Runtime VN 基础质感报告", markdown)
             self.assertIn("角色立绘覆盖", markdown)
             self.assertIn("BGM 淡入 / 淡出", markdown)
+            self.assertIn("背景转场 / 背景卡", markdown)
             self.assertIn("语音覆盖", markdown)
             self.assertIn("入口场景有效", markdown)
 
@@ -454,6 +457,74 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             markdown = render_native_runtime_vn_baseline_quality_markdown(report)
             self.assertIn("人物转场 / 登场", markdown)
             self.assertIn("人物舞台参数没有变化", markdown)
+
+    def test_vn_baseline_quality_report_flags_background_asset_and_transition_gaps(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_dir = Path(temp_dir) / "bundle"
+            bundle_dir.mkdir(parents=True)
+            bg_a = bundle_dir / "assets" / "backgrounds" / "classroom.png"
+            bg_b = bundle_dir / "assets" / "backgrounds" / "rooftop.png"
+            bg_a.parent.mkdir(parents=True, exist_ok=True)
+            bg_a.write_bytes(b"fake-bg-a")
+            bg_b.write_bytes(b"fake-bg-b")
+            game_data = {
+                "project": {
+                    "projectId": "native_background_quality_smoke",
+                    "title": "Native Background Quality Smoke",
+                    "entrySceneId": "scene_background",
+                },
+                "assets": {
+                    "assets": [
+                        {
+                            "id": "bg_a",
+                            "type": "background",
+                            "name": "Classroom",
+                            "exportUrl": bg_a.relative_to(bundle_dir).as_posix(),
+                        },
+                        {
+                            "id": "bg_b",
+                            "type": "background",
+                            "name": "Rooftop",
+                            "exportUrl": bg_b.relative_to(bundle_dir).as_posix(),
+                        },
+                    ]
+                },
+                "characters": {"characters": []},
+                "chapters": [
+                    {
+                        "id": "chapter_1",
+                        "name": "Chapter 1",
+                        "scenes": [
+                            {
+                                "id": "scene_background",
+                                "name": "Background",
+                                "blocks": [
+                                    {"id": "bg_1", "type": "background", "assetId": "bg_a", "transition": "none"},
+                                    {"id": "bg_2", "type": "background", "assetId": "bg_b", "transition": "none"},
+                                    {"id": "bg_3", "type": "background", "assetId": "bg_missing", "transition": "none"},
+                                    {"id": "line_1", "type": "narration", "text": "Background check."},
+                                ],
+                            }
+                        ],
+                    }
+                ],
+            }
+            (bundle_dir / "game_data.json").write_text(json.dumps(game_data, ensure_ascii=False), encoding="utf-8")
+
+            report = build_native_runtime_vn_baseline_quality_report(bundle_dir)
+
+            self.assertEqual(report["status"], "needs_fix")
+            self.assertEqual(report["metrics"]["backgroundBlockCount"], 3)
+            self.assertEqual(report["metrics"]["backgroundTransitionCount"], 0)
+            self.assertEqual(report["metrics"]["backgroundAssetVariantCount"], 3)
+            self.assertEqual(report["metrics"]["missingBackgroundAssetCount"], 1)
+            issue_codes = {issue["code"] for issue in report["issues"]}
+            self.assertIn("background_asset_missing", issue_codes)
+            self.assertIn("background_transition_missing", issue_codes)
+
+            markdown = render_native_runtime_vn_baseline_quality_markdown(report)
+            self.assertIn("存在缺失的背景/CG 文件", markdown)
+            self.assertIn("背景转场 / 背景卡", markdown)
 
 
 @unittest.skipIf(pygame is None, "pygame-ce is not installed")
