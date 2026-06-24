@@ -5458,6 +5458,11 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
     missing_background_asset_names: list[str] = []
     scenes_with_music = 0
     scenes_with_effects = 0
+    choice_option_count = 0
+    empty_choice_option_count = 0
+    long_choice_option_count = 0
+    duplicate_choice_option_count = 0
+    crowded_choice_block_count = 0
     music_play_count = 0
     music_stop_count = 0
     music_scoped_count = 0
@@ -5499,6 +5504,24 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
                         missing_voice_asset_names.append(str(block.get("id") or voice_asset_id))
             elif block_type == "choice":
                 choice_count += 1
+                options = block.get("options") if isinstance(block.get("options"), list) else []
+                choice_option_count += len(options)
+                if len(options) > 4:
+                    crowded_choice_block_count += 1
+                seen_choice_texts: set[str] = set()
+                for option in options:
+                    if not isinstance(option, dict):
+                        continue
+                    option_text = str(option.get("text") or "").strip()
+                    normalized_option_text = option_text.lower()
+                    if not option_text:
+                        empty_choice_option_count += 1
+                    elif len(option_text) > 42:
+                        long_choice_option_count += 1
+                    if normalized_option_text:
+                        if normalized_option_text in seen_choice_texts:
+                            duplicate_choice_option_count += 1
+                        seen_choice_texts.add(normalized_option_text)
             elif block_type == "character_show":
                 character_show_count += 1
                 character_position_values.add(str(block.get("position") or "center").strip() or "center")
@@ -5680,6 +5703,15 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             f"检测到 {missing_background_asset_count} 张背景卡片没有可用文件：{', '.join(missing_background_asset_names[:3])}",
             "重新导入或替换缺失背景、CG 或 3D 场景素材，再导出原生 Runtime，避免试玩中出现黑屏或占位背景。",
         )
+    if empty_choice_option_count:
+        add_vn_baseline_issue(
+            issues,
+            "warn",
+            "empty_choice_option",
+            "存在空白选项按钮",
+            f"检测到 {empty_choice_option_count} 个选项按钮没有文案。",
+            "补齐选项文案或删除空选项，避免玩家在原生 Runtime 里看到空白按钮。",
+        )
     if characters and characters_with_sprite < len(characters):
         add_vn_baseline_issue(
             issues,
@@ -5761,6 +5793,33 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             "缺少可交互选项",
             "多场景项目没有检测到选项节点。",
             "如果目标是视觉小说而非纯电子书，建议至少加入一个选项、分支或可回收差分。",
+        )
+    if long_choice_option_count:
+        add_vn_baseline_issue(
+            issues,
+            "soft",
+            "long_choice_option",
+            "部分选项文案偏长",
+            f"检测到 {long_choice_option_count} 个选项超过 42 字。",
+            "把选项按钮压缩成玩家一眼能读完的行动意图，详细心理活动可以放进下一句旁白。",
+        )
+    if duplicate_choice_option_count:
+        add_vn_baseline_issue(
+            issues,
+            "soft",
+            "duplicate_choice_option",
+            "同组选项存在重复文案",
+            f"检测到 {duplicate_choice_option_count} 个重复选项文案。",
+            "给每个选项写出明确差异，避免玩家以为分支无效或按钮重复。",
+        )
+    if crowded_choice_block_count:
+        add_vn_baseline_issue(
+            issues,
+            "soft",
+            "crowded_choice_block",
+            "选项按钮数量偏多",
+            f"检测到 {crowded_choice_block_count} 个选项卡片超过 4 个按钮。",
+            "如果不是菜单式选择，建议拆成两层选择或减少同屏按钮数量，提升手柄/键盘选择体验。",
         )
     if dialogue_count >= 3 and character_show_count == 0:
         add_vn_baseline_issue(
@@ -5865,6 +5924,11 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             "missingBackgroundAssetCount": missing_background_asset_count,
             "scenesWithMusic": scenes_with_music,
             "scenesWithEffects": scenes_with_effects,
+            "choiceOptionCount": choice_option_count,
+            "emptyChoiceOptionCount": empty_choice_option_count,
+            "longChoiceOptionCount": long_choice_option_count,
+            "duplicateChoiceOptionCount": duplicate_choice_option_count,
+            "crowdedChoiceBlockCount": crowded_choice_block_count,
             "musicPlayCount": music_play_count,
             "musicStopCount": music_stop_count,
             "musicScopedCount": music_scoped_count,
@@ -5897,6 +5961,9 @@ def render_native_runtime_vn_baseline_quality_markdown(report: dict) -> str:
     metric_rows = [
         ("场景数", metrics.get("storySceneCount")),
         ("台词 / 旁白 / 选项", f"{int(metrics.get('dialogueCount') or 0)} / {int(metrics.get('narrationCount') or 0)} / {int(metrics.get('choiceCount') or 0)}"),
+        ("选项按钮总数", metrics.get("choiceOptionCount")),
+        ("空白 / 超长 / 重复选项", f"{int(metrics.get('emptyChoiceOptionCount') or 0)} / {int(metrics.get('longChoiceOptionCount') or 0)} / {int(metrics.get('duplicateChoiceOptionCount') or 0)}"),
+        ("拥挤选项卡", metrics.get("crowdedChoiceBlockCount")),
         ("角色立绘覆盖", f"{int(metrics.get('charactersWithSpriteCount') or 0)} / {int(metrics.get('characterCount') or 0)}"),
         ("人物转场 / 登场", f"{int(metrics.get('characterTransitionCount') or 0)} / {int(metrics.get('characterShowCount') or 0)}"),
         ("人物站位变化", metrics.get("characterPositionVariantCount")),
@@ -6194,6 +6261,9 @@ def render_native_runtime_release_control_markdown(payload: dict) -> str:
         for label, value in [
             ("场景数", vn_metrics.get("storySceneCount")),
             ("台词 / 旁白 / 选项", f"{int(vn_metrics.get('dialogueCount') or 0)} / {int(vn_metrics.get('narrationCount') or 0)} / {int(vn_metrics.get('choiceCount') or 0)}"),
+            ("选项按钮总数", vn_metrics.get("choiceOptionCount")),
+            ("空白 / 超长 / 重复选项", f"{int(vn_metrics.get('emptyChoiceOptionCount') or 0)} / {int(vn_metrics.get('longChoiceOptionCount') or 0)} / {int(vn_metrics.get('duplicateChoiceOptionCount') or 0)}"),
+            ("拥挤选项卡", vn_metrics.get("crowdedChoiceBlockCount")),
             ("角色立绘覆盖", f"{int(vn_metrics.get('charactersWithSpriteCount') or 0)} / {int(vn_metrics.get('characterCount') or 0)}"),
             ("人物转场 / 登场", f"{int(vn_metrics.get('characterTransitionCount') or 0)} / {int(vn_metrics.get('characterShowCount') or 0)}"),
             ("人物站位变化", vn_metrics.get("characterPositionVariantCount")),

@@ -181,6 +181,8 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             self.assertEqual(report["status"], "needs_fix")
             self.assertEqual(report["metrics"]["storySceneCount"], 1)
             self.assertEqual(report["metrics"]["choiceCount"], 1)
+            self.assertEqual(report["metrics"]["choiceOptionCount"], 1)
+            self.assertEqual(report["metrics"]["emptyChoiceOptionCount"], 0)
             self.assertEqual(report["metrics"]["scenesWithBackground"], 1)
             self.assertEqual(report["metrics"]["backgroundBlockCount"], 1)
             self.assertEqual(report["metrics"]["missingBackgroundAssetCount"], 0)
@@ -197,6 +199,7 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             markdown = render_native_runtime_vn_baseline_quality_markdown(report)
             self.assertIn("原生 Runtime VN 基础质感报告", markdown)
             self.assertIn("角色立绘覆盖", markdown)
+            self.assertIn("空白 / 超长 / 重复选项", markdown)
             self.assertIn("BGM 淡入 / 淡出", markdown)
             self.assertIn("背景转场 / 背景卡", markdown)
             self.assertIn("语音覆盖", markdown)
@@ -525,6 +528,64 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             markdown = render_native_runtime_vn_baseline_quality_markdown(report)
             self.assertIn("存在缺失的背景/CG 文件", markdown)
             self.assertIn("背景转场 / 背景卡", markdown)
+
+    def test_vn_baseline_quality_report_flags_choice_text_gaps(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_dir = Path(temp_dir) / "bundle"
+            bundle_dir.mkdir(parents=True)
+            game_data = {
+                "project": {
+                    "projectId": "native_choice_quality_smoke",
+                    "title": "Native Choice Quality Smoke",
+                    "entrySceneId": "scene_choice",
+                },
+                "assets": {"assets": []},
+                "characters": {"characters": []},
+                "chapters": [
+                    {
+                        "id": "chapter_1",
+                        "name": "Chapter 1",
+                        "scenes": [
+                            {
+                                "id": "scene_choice",
+                                "name": "Choice",
+                                "blocks": [
+                                    {
+                                        "id": "choice_1",
+                                        "type": "choice",
+                                        "options": [
+                                            {"text": "", "gotoSceneId": "scene_choice"},
+                                            {"text": "Ask again", "gotoSceneId": "scene_choice"},
+                                            {"text": "Ask again", "gotoSceneId": "scene_choice"},
+                                            {"text": "This option is deliberately too long for a compact visual novel choice button", "gotoSceneId": "scene_choice"},
+                                            {"text": "Leave", "gotoSceneId": "scene_choice"},
+                                        ],
+                                    }
+                                ],
+                            }
+                        ],
+                    }
+                ],
+            }
+            (bundle_dir / "game_data.json").write_text(json.dumps(game_data, ensure_ascii=False), encoding="utf-8")
+
+            report = build_native_runtime_vn_baseline_quality_report(bundle_dir)
+
+            self.assertEqual(report["status"], "needs_fix")
+            self.assertEqual(report["metrics"]["choiceOptionCount"], 5)
+            self.assertEqual(report["metrics"]["emptyChoiceOptionCount"], 1)
+            self.assertEqual(report["metrics"]["longChoiceOptionCount"], 1)
+            self.assertEqual(report["metrics"]["duplicateChoiceOptionCount"], 1)
+            self.assertEqual(report["metrics"]["crowdedChoiceBlockCount"], 1)
+            issue_codes = {issue["code"] for issue in report["issues"]}
+            self.assertIn("empty_choice_option", issue_codes)
+            self.assertIn("long_choice_option", issue_codes)
+            self.assertIn("duplicate_choice_option", issue_codes)
+            self.assertIn("crowded_choice_block", issue_codes)
+
+            markdown = render_native_runtime_vn_baseline_quality_markdown(report)
+            self.assertIn("存在空白选项按钮", markdown)
+            self.assertIn("空白 / 超长 / 重复选项", markdown)
 
 
 @unittest.skipIf(pygame is None, "pygame-ce is not installed")
