@@ -5434,6 +5434,11 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
     assets = assets_doc.get("assets") if isinstance(assets_doc.get("assets"), list) else []
     assets_by_id = {str(asset.get("id")): asset for asset in assets if isinstance(asset, dict) and asset.get("id")}
     video_asset_count = sum(1 for asset in assets if isinstance(asset, dict) and asset.get("type") == "video")
+    cg_asset_ids = {
+        str(asset.get("id"))
+        for asset in assets
+        if isinstance(asset, dict) and asset.get("type") == "cg" and str(asset.get("id") or "").strip()
+    }
     variables, variables_by_id, duplicate_variable_ids = get_export_variable_map(payload)
     characters_doc = payload.get("characters") if isinstance(payload.get("characters"), dict) else {}
     characters = characters_doc.get("characters") if isinstance(characters_doc.get("characters"), list) else []
@@ -5487,6 +5492,7 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
     background_block_count = 0
     background_transition_count = 0
     background_asset_ids: set[str] = set()
+    cg_used_asset_ids: set[str] = set()
     missing_background_asset_count = 0
     missing_background_asset_names: list[str] = []
     scenes_with_music = 0
@@ -5683,6 +5689,8 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
                 if not background_asset or not get_asset_runtime_path(bundle_dir, background_asset):
                     missing_background_asset_count += 1
                     missing_background_asset_names.append(str(block.get("id") or background_asset_id or "未命名背景卡"))
+                elif background_asset.get("type") == "cg":
+                    cg_used_asset_ids.add(background_asset_id)
                 if get_safe_basic_transition(block.get("transition")) != "none" and get_safe_transition_duration_ms(block.get("transitionDurationMs"), 600) > 0:
                     background_transition_count += 1
             elif block_type == "music_play":
@@ -5763,6 +5771,11 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
         str(asset.get("name") or asset.get("id") or "未命名素材")
         for asset in assets
         if isinstance(asset, dict) and is_vn_baseline_placeholder_asset(asset)
+    ]
+    unused_cg_asset_ids = sorted(cg_asset_ids - cg_used_asset_ids)
+    unused_cg_asset_names = [
+        str((assets_by_id.get(asset_id) or {}).get("name") or asset_id)
+        for asset_id in unused_cg_asset_ids
     ]
     scene_count = len(scenes)
     text_density = round(text_block_count / scene_count, 2) if scene_count else 0.0
@@ -6132,6 +6145,15 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             f"检测到 {video_asset_count} 个视频素材，但没有播放视频卡片。",
             "如果这些是 OP、ED、PV 或过场动画，建议放入对应章节并跑一次原生 Runtime 视频桥接检查。",
         )
+    if unused_cg_asset_ids:
+        add_vn_baseline_issue(
+            issues,
+            "soft",
+            "cg_asset_unused",
+            "部分 CG 素材还没有进入剧情",
+            f"检测到 {len(unused_cg_asset_ids)} 张 CG 素材没有被背景/CG 卡引用：{', '.join(unused_cg_asset_names[:3])}",
+            "把正式 CG 放进对应场景，或先移出发布包；否则 CG 回想馆会缺少可解锁内容，看起来像功能没有做完。",
+        )
     if scene_count >= 2 and ending_scene_count and credits_roll_count == 0:
         add_vn_baseline_issue(
             issues,
@@ -6276,6 +6298,9 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             "backgroundTransitionCount": background_transition_count,
             "backgroundAssetVariantCount": len(background_asset_ids),
             "missingBackgroundAssetCount": missing_background_asset_count,
+            "cgAssetCount": len(cg_asset_ids),
+            "cgUsedAssetCount": len(cg_used_asset_ids),
+            "unusedCgAssetCount": len(unused_cg_asset_ids),
             "scenesWithMusic": scenes_with_music,
             "scenesWithEffects": scenes_with_effects,
             "choiceOptionCount": choice_option_count,
@@ -6348,6 +6373,7 @@ def render_native_runtime_vn_baseline_quality_markdown(report: dict) -> str:
         ("背景转场 / 背景卡", f"{int(metrics.get('backgroundTransitionCount') or 0)} / {int(metrics.get('backgroundBlockCount') or 0)}"),
         ("背景素材变化", metrics.get("backgroundAssetVariantCount")),
         ("缺失背景文件", metrics.get("missingBackgroundAssetCount")),
+        ("CG 素材 / 已入剧情 / 未使用", f"{int(metrics.get('cgAssetCount') or 0)} / {int(metrics.get('cgUsedAssetCount') or 0)} / {int(metrics.get('unusedCgAssetCount') or 0)}"),
         ("BGM 进入点", metrics.get("scenesWithMusic")),
         ("BGM 播放 / 停止", f"{int(metrics.get('musicPlayCount') or 0)} / {int(metrics.get('musicStopCount') or 0)}"),
         ("BGM 淡入 / 淡出", f"{int(metrics.get('musicFadeInCount') or 0)} / {int(metrics.get('musicFadeOutCount') or 0)}"),
@@ -6658,6 +6684,7 @@ def render_native_runtime_release_control_markdown(payload: dict) -> str:
             ("背景转场 / 背景卡", f"{int(vn_metrics.get('backgroundTransitionCount') or 0)} / {int(vn_metrics.get('backgroundBlockCount') or 0)}"),
             ("背景素材变化", vn_metrics.get("backgroundAssetVariantCount")),
             ("缺失背景文件", vn_metrics.get("missingBackgroundAssetCount")),
+            ("CG 素材 / 已入剧情 / 未使用", f"{int(vn_metrics.get('cgAssetCount') or 0)} / {int(vn_metrics.get('cgUsedAssetCount') or 0)} / {int(vn_metrics.get('unusedCgAssetCount') or 0)}"),
             ("BGM 进入点", vn_metrics.get("scenesWithMusic")),
             ("BGM 播放 / 停止", f"{int(vn_metrics.get('musicPlayCount') or 0)} / {int(vn_metrics.get('musicStopCount') or 0)}"),
             ("BGM 淡入 / 淡出", f"{int(vn_metrics.get('musicFadeInCount') or 0)} / {int(vn_metrics.get('musicFadeOutCount') or 0)}"),

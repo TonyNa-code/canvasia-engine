@@ -1117,6 +1117,69 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             markdown = render_native_runtime_vn_baseline_quality_markdown(report)
             self.assertIn("视频素材还没有进入剧情", markdown)
 
+    def test_vn_baseline_quality_report_flags_unused_cg_assets(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_dir = Path(temp_dir) / "bundle"
+            bundle_dir.mkdir(parents=True)
+            used_cg_path = bundle_dir / "assets" / "cg" / "first_cg.png"
+            unused_cg_path = bundle_dir / "assets" / "cg" / "secret_cg.png"
+            used_cg_path.parent.mkdir(parents=True, exist_ok=True)
+            used_cg_path.write_bytes(b"fake-used-cg")
+            unused_cg_path.write_bytes(b"fake-unused-cg")
+            game_data = {
+                "project": {
+                    "projectId": "native_cg_quality_smoke",
+                    "title": "Native CG Quality Smoke",
+                    "entrySceneId": "scene_cg",
+                },
+                "assets": {
+                    "assets": [
+                        {
+                            "id": "cg_used",
+                            "type": "cg",
+                            "name": "First CG",
+                            "exportUrl": used_cg_path.relative_to(bundle_dir).as_posix(),
+                        },
+                        {
+                            "id": "cg_unused",
+                            "type": "cg",
+                            "name": "Secret CG",
+                            "exportUrl": unused_cg_path.relative_to(bundle_dir).as_posix(),
+                        },
+                    ]
+                },
+                "characters": {"characters": []},
+                "chapters": [
+                    {
+                        "id": "chapter_1",
+                        "name": "Chapter 1",
+                        "scenes": [
+                            {
+                                "id": "scene_cg",
+                                "name": "CG",
+                                "blocks": [
+                                    {"id": "cg_block", "type": "background", "assetId": "cg_used", "transition": "fade"},
+                                    {"id": "line_1", "type": "narration", "text": "CG unlocked."},
+                                ],
+                            }
+                        ],
+                    }
+                ],
+            }
+            (bundle_dir / "game_data.json").write_text(json.dumps(game_data, ensure_ascii=False), encoding="utf-8")
+
+            report = build_native_runtime_vn_baseline_quality_report(bundle_dir)
+
+            self.assertEqual(report["metrics"]["cgAssetCount"], 2)
+            self.assertEqual(report["metrics"]["cgUsedAssetCount"], 1)
+            self.assertEqual(report["metrics"]["unusedCgAssetCount"], 1)
+            issue_codes = {issue["code"] for issue in report["issues"]}
+            self.assertIn("cg_asset_unused", issue_codes)
+
+            markdown = render_native_runtime_vn_baseline_quality_markdown(report)
+            self.assertIn("CG 素材 / 已入剧情 / 未使用", markdown)
+            self.assertIn("部分 CG 素材还没有进入剧情", markdown)
+
     def test_vn_baseline_quality_report_flags_credits_roll_content_gaps(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             bundle_dir = Path(temp_dir) / "bundle"
