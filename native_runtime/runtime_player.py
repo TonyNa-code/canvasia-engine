@@ -5464,6 +5464,10 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
     condition_branch_count = 0
     condition_rule_count = 0
     condition_empty_branch_count = 0
+    missing_navigation_target_count = 0
+    missing_navigation_target_names: list[str] = []
+    implicit_condition_fallback_end_count = 0
+    implicit_condition_fallback_names: list[str] = []
     choice_effect_count = 0
     variable_set_count = 0
     variable_add_count = 0
@@ -5612,9 +5616,15 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
                 condition_branch_count += len(branches)
                 if not branches:
                     condition_empty_branch_count += 1
+                elif not str(block.get("elseGotoSceneId") or "").strip():
+                    implicit_condition_fallback_end_count += 1
+                    implicit_condition_fallback_names.append(str(block.get("id") or "condition"))
                 for branch in branches:
                     if not isinstance(branch, dict):
                         continue
+                    if not str(branch.get("gotoSceneId") or "").strip():
+                        missing_navigation_target_count += 1
+                        missing_navigation_target_names.append(str(branch.get("id") or block.get("id") or "condition_branch"))
                     rules = branch.get("when") if isinstance(branch.get("when"), list) else []
                     condition_rule_count += len(rules)
                     if not rules:
@@ -5659,6 +5669,10 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
                     missing_character_ref_names.append(str(block.get("id") or character_id))
                 if get_safe_character_transition(block.get("transition")) != "none" and get_safe_transition_duration_ms(block.get("transitionDurationMs"), 600) > 0:
                     character_transition_count += 1
+            elif block_type == "jump":
+                if not str(block.get("targetSceneId") or "").strip():
+                    missing_navigation_target_count += 1
+                    missing_navigation_target_names.append(str(block.get("id") or "jump"))
             elif block_type == "background":
                 scene_has_background = True
                 background_block_count += 1
@@ -5810,6 +5824,24 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             "路线跳转目标缺失",
             f"检测到 {len(missing_route_targets)} 个跳转目标不存在：{', '.join(missing_route_targets[:3])}",
             "检查选项、条件分支和跳转卡片，确保每个目标场景都存在；删除场景后尤其要重新巡检路线。",
+        )
+    if missing_navigation_target_count:
+        add_vn_baseline_issue(
+            issues,
+            "warn",
+            "navigation_target_empty",
+            "路线控制卡片缺少跳转目标",
+            f"检测到 {missing_navigation_target_count} 个跳转或条件分支没有目标场景：{', '.join(missing_navigation_target_names[:3])}",
+            "补齐目标场景，或改成明确的结局/片尾卡片；否则原生 Runtime 会把空目标视为剧情结束，玩家可能以为流程断了。",
+        )
+    if implicit_condition_fallback_end_count:
+        add_vn_baseline_issue(
+            issues,
+            "soft",
+            "condition_fallback_implicit_end",
+            "条件未命中时会隐式结束",
+            f"检测到 {implicit_condition_fallback_end_count} 个条件卡片没有设置未命中目标：{', '.join(implicit_condition_fallback_names[:3])}",
+            "如果未命中条件就是结局，建议接到明确的结局或片尾场景；如果只是兜底分支遗漏，请补 else 目标场景。",
         )
     if unreachable_scene_ids:
         add_vn_baseline_issue(
@@ -6224,6 +6256,8 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             "conditionBranchCount": condition_branch_count,
             "conditionRuleCount": condition_rule_count,
             "conditionEmptyBranchCount": condition_empty_branch_count,
+            "missingNavigationTargetCount": missing_navigation_target_count,
+            "implicitConditionFallbackEndCount": implicit_condition_fallback_end_count,
             "choiceEffectCount": choice_effect_count,
             "logicMissingVariableCount": logic_missing_variable_count,
             "logicNonNumberAddCount": logic_non_number_add_count,
@@ -6296,6 +6330,7 @@ def render_native_runtime_vn_baseline_quality_markdown(report: dict) -> str:
         ("台词 / 旁白 / 选项", f"{int(metrics.get('dialogueCount') or 0)} / {int(metrics.get('narrationCount') or 0)} / {int(metrics.get('choiceCount') or 0)}"),
         ("变量 / 条件 / 选项效果", f"{int(metrics.get('variableCount') or 0)} / {int(metrics.get('conditionCount') or 0)} / {int(metrics.get('choiceEffectCount') or 0)}"),
         ("逻辑缺失变量 / 非数字加减 / 条件符号不匹配", f"{int(metrics.get('logicMissingVariableCount') or 0)} / {int(metrics.get('logicNonNumberAddCount') or 0)} / {int(metrics.get('logicOperatorMismatchCount') or 0)}"),
+        ("空路线目标 / 条件隐式结束", f"{int(metrics.get('missingNavigationTargetCount') or 0)} / {int(metrics.get('implicitConditionFallbackEndCount') or 0)}"),
         ("选项按钮总数", metrics.get("choiceOptionCount")),
         ("空白 / 超长 / 重复选项", f"{int(metrics.get('emptyChoiceOptionCount') or 0)} / {int(metrics.get('longChoiceOptionCount') or 0)} / {int(metrics.get('duplicateChoiceOptionCount') or 0)}"),
         ("无动作选项", metrics.get("noActionChoiceOptionCount")),
@@ -6605,6 +6640,7 @@ def render_native_runtime_release_control_markdown(payload: dict) -> str:
             ("台词 / 旁白 / 选项", f"{int(vn_metrics.get('dialogueCount') or 0)} / {int(vn_metrics.get('narrationCount') or 0)} / {int(vn_metrics.get('choiceCount') or 0)}"),
             ("变量 / 条件 / 选项效果", f"{int(vn_metrics.get('variableCount') or 0)} / {int(vn_metrics.get('conditionCount') or 0)} / {int(vn_metrics.get('choiceEffectCount') or 0)}"),
             ("逻辑缺失变量 / 非数字加减 / 条件符号不匹配", f"{int(vn_metrics.get('logicMissingVariableCount') or 0)} / {int(vn_metrics.get('logicNonNumberAddCount') or 0)} / {int(vn_metrics.get('logicOperatorMismatchCount') or 0)}"),
+            ("空路线目标 / 条件隐式结束", f"{int(vn_metrics.get('missingNavigationTargetCount') or 0)} / {int(vn_metrics.get('implicitConditionFallbackEndCount') or 0)}"),
             ("选项按钮总数", vn_metrics.get("choiceOptionCount")),
             ("空白 / 超长 / 重复选项", f"{int(vn_metrics.get('emptyChoiceOptionCount') or 0)} / {int(vn_metrics.get('longChoiceOptionCount') or 0)} / {int(vn_metrics.get('duplicateChoiceOptionCount') or 0)}"),
             ("无动作选项", vn_metrics.get("noActionChoiceOptionCount")),

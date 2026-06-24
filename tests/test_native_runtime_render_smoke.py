@@ -422,6 +422,74 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             self.assertIn("路线跳转目标缺失", markdown)
             self.assertIn("入口不可达场景", markdown)
 
+    def test_vn_baseline_quality_report_flags_empty_navigation_targets(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_dir = Path(temp_dir) / "bundle"
+            bundle_dir.mkdir(parents=True)
+            game_data = {
+                "project": {
+                    "projectId": "native_empty_navigation_quality_smoke",
+                    "title": "Native Empty Navigation Quality Smoke",
+                    "entrySceneId": "scene_start",
+                },
+                "assets": {"assets": []},
+                "characters": {"characters": []},
+                "variables": {
+                    "variables": [
+                        {"id": "flag_seen", "name": "Seen", "type": "boolean", "defaultValue": False}
+                    ]
+                },
+                "chapters": [
+                    {
+                        "id": "chapter_1",
+                        "name": "Chapter 1",
+                        "scenes": [
+                            {
+                                "id": "scene_start",
+                                "name": "Start",
+                                "blocks": [
+                                    {"id": "jump_empty", "type": "jump", "targetSceneId": ""},
+                                    {
+                                        "id": "condition_empty_targets",
+                                        "type": "condition",
+                                        "branches": [
+                                            {
+                                                "id": "branch_empty",
+                                                "gotoSceneId": "",
+                                                "when": [{"variableId": "flag_seen", "operator": "==", "value": True}],
+                                            },
+                                            {
+                                                "id": "branch_valid",
+                                                "gotoSceneId": "scene_end",
+                                                "when": [{"variableId": "flag_seen", "operator": "==", "value": False}],
+                                            },
+                                        ],
+                                    },
+                                ],
+                            },
+                            {
+                                "id": "scene_end",
+                                "name": "End",
+                                "blocks": [{"id": "line_end", "type": "narration", "text": "Reached."}],
+                            },
+                        ],
+                    }
+                ],
+            }
+            (bundle_dir / "game_data.json").write_text(json.dumps(game_data, ensure_ascii=False), encoding="utf-8")
+
+            report = build_native_runtime_vn_baseline_quality_report(bundle_dir)
+
+            self.assertEqual(report["metrics"]["missingNavigationTargetCount"], 2)
+            self.assertEqual(report["metrics"]["implicitConditionFallbackEndCount"], 1)
+            issue_codes = {issue["code"] for issue in report["issues"]}
+            self.assertIn("navigation_target_empty", issue_codes)
+            self.assertIn("condition_fallback_implicit_end", issue_codes)
+
+            markdown = render_native_runtime_vn_baseline_quality_markdown(report)
+            self.assertIn("空路线目标 / 条件隐式结束", markdown)
+            self.assertIn("路线控制卡片缺少跳转目标", markdown)
+
     def test_vn_baseline_quality_report_flags_logic_variable_gaps(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             bundle_dir = Path(temp_dir) / "bundle"
