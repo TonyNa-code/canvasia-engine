@@ -5437,6 +5437,9 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
     characters = characters_doc.get("characters") if isinstance(characters_doc.get("characters"), list) else []
     chapters = payload.get("chapters") if isinstance(payload.get("chapters"), list) else []
     scenes = iter_export_scenes(chapters)
+    scene_ids = [str(scene.get("id") or "").strip() for scene in scenes if isinstance(scene, dict)]
+    valid_scene_ids = {scene_id for scene_id in scene_ids if scene_id}
+    entry_scene_id = str(project.get("entrySceneId") or "").strip()
 
     dialogue_count = 0
     narration_count = 0
@@ -5545,6 +5548,31 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
     voice_eligible_line_count = dialogue_count + narration_count
     voice_bound_line_count = dialogue_voice_count + narration_voice_count
     voice_coverage_percent = round(voice_bound_line_count / voice_eligible_line_count * 100, 1) if voice_eligible_line_count else 0.0
+    missing_route_targets: list[str] = []
+    scene_outgoing_targets: dict[str, list[str]] = {}
+    for scene in scenes:
+        if not isinstance(scene, dict):
+            continue
+        scene_id = str(scene.get("id") or "").strip()
+        if not scene_id:
+            continue
+        targets = collect_scene_outgoing_targets(scene)
+        scene_outgoing_targets[scene_id] = targets
+        for target in targets:
+            if target not in valid_scene_ids:
+                missing_route_targets.append(f"{scene_id}->{target}")
+    reachable_scene_ids: set[str] = set()
+    if entry_scene_id in valid_scene_ids:
+        pending_scene_ids = [entry_scene_id]
+        while pending_scene_ids:
+            scene_id = pending_scene_ids.pop(0)
+            if scene_id in reachable_scene_ids:
+                continue
+            reachable_scene_ids.add(scene_id)
+            for target in scene_outgoing_targets.get(scene_id, []):
+                if target in valid_scene_ids and target not in reachable_scene_ids:
+                    pending_scene_ids.append(target)
+    unreachable_scene_ids = sorted(valid_scene_ids - reachable_scene_ids) if reachable_scene_ids else []
     issues: list[dict] = []
 
     if not scenes:
@@ -5555,6 +5583,33 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             "没有可试玩场景",
             "导出包里没有检测到章节场景。",
             "至少创建一个章节和入口场景，再重新导出原生 Runtime 包。",
+        )
+    elif entry_scene_id not in valid_scene_ids:
+        add_vn_baseline_issue(
+            issues,
+            "warn",
+            "entry_scene_missing",
+            "入口场景不可用",
+            f"项目入口场景指向 {entry_scene_id or '空值'}，但导出包里没有这个场景。",
+            "在项目设置里重新指定存在的入口场景，避免玩家启动原生 Runtime 后直接掉到异常或错误章节。",
+        )
+    if missing_route_targets:
+        add_vn_baseline_issue(
+            issues,
+            "warn",
+            "route_target_missing",
+            "路线跳转目标缺失",
+            f"检测到 {len(missing_route_targets)} 个跳转目标不存在：{', '.join(missing_route_targets[:3])}",
+            "检查选项、条件分支和跳转卡片，确保每个目标场景都存在；删除场景后尤其要重新巡检路线。",
+        )
+    if unreachable_scene_ids:
+        add_vn_baseline_issue(
+            issues,
+            "soft",
+            "unreachable_scene",
+            "存在入口无法到达的场景",
+            f"从入口场景出发，有 {len(unreachable_scene_ids)} 个场景没有被路线连接：{', '.join(unreachable_scene_ids[:3])}",
+            "如果这些是正式内容，请用选项、跳转或条件分支接入；如果只是素材草稿，建议标记或移出发布章节。",
         )
     if placeholder_assets:
         add_vn_baseline_issue(
@@ -5736,6 +5791,10 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             "narrationVoiceCount": narration_voice_count,
             "voiceCoveragePercent": voice_coverage_percent,
             "missingVoiceAssetCount": missing_voice_asset_count,
+            "entrySceneExists": entry_scene_id in valid_scene_ids,
+            "routeTargetMissingCount": len(missing_route_targets),
+            "unreachableSceneCount": len(unreachable_scene_ids),
+            "linkedSceneCount": len(reachable_scene_ids),
             "placeholderAssetCount": len(placeholder_assets),
             "emptyTextBlockCount": empty_text_count,
             "textDensity": text_density,
@@ -5762,6 +5821,9 @@ def render_native_runtime_vn_baseline_quality_markdown(report: dict) -> str:
         ("语音覆盖", f"{format_markdown_value(metrics.get('voiceCoveragePercent'), '0')}%"),
         ("语音绑定 / 可配音文本", f"{int(metrics.get('voiceBoundLineCount') or 0)} / {int(metrics.get('voiceEligibleLineCount') or 0)}"),
         ("缺失语音文件", metrics.get("missingVoiceAssetCount")),
+        ("入口场景有效", "是" if metrics.get("entrySceneExists") else "否"),
+        ("路线缺失目标", metrics.get("routeTargetMissingCount")),
+        ("入口不可达场景", metrics.get("unreachableSceneCount")),
         ("演出效果场景", metrics.get("scenesWithEffects")),
         ("占位素材", metrics.get("placeholderAssetCount")),
         ("空文本块", metrics.get("emptyTextBlockCount")),
@@ -6050,6 +6112,9 @@ def render_native_runtime_release_control_markdown(payload: dict) -> str:
             ("语音覆盖", f"{format_markdown_value(vn_metrics.get('voiceCoveragePercent'), '0')}%"),
             ("语音绑定 / 可配音文本", f"{int(vn_metrics.get('voiceBoundLineCount') or 0)} / {int(vn_metrics.get('voiceEligibleLineCount') or 0)}"),
             ("缺失语音文件", vn_metrics.get("missingVoiceAssetCount")),
+            ("入口场景有效", "是" if vn_metrics.get("entrySceneExists") else "否"),
+            ("路线缺失目标", vn_metrics.get("routeTargetMissingCount")),
+            ("入口不可达场景", vn_metrics.get("unreachableSceneCount")),
             ("缺口 / 润色项", f"{int(vn_summary.get('warnCount') or 0)} / {int(vn_summary.get('softCount') or 0)}"),
         ]:
             lines.append(f"| {label} | {format_markdown_value(value, '0')} |")

@@ -186,6 +186,8 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             self.assertEqual(report["metrics"]["musicFadeInCount"], 0)
             self.assertEqual(report["metrics"]["voiceBoundLineCount"], 0)
             self.assertEqual(report["metrics"]["missingVoiceAssetCount"], 0)
+            self.assertTrue(report["metrics"]["entrySceneExists"])
+            self.assertEqual(report["metrics"]["routeTargetMissingCount"], 0)
             issue_codes = {issue["code"] for issue in report["issues"]}
             self.assertIn("character_fallback_sprite", issue_codes)
             self.assertIn("bgm_plan", issue_codes)
@@ -195,6 +197,7 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             self.assertIn("角色立绘覆盖", markdown)
             self.assertIn("BGM 淡入 / 淡出", markdown)
             self.assertIn("语音覆盖", markdown)
+            self.assertIn("入口场景有效", markdown)
 
             written = write_native_runtime_vn_baseline_quality_reports(bundle_dir)
             self.assertEqual(written["status"], "needs_fix")
@@ -338,6 +341,68 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             markdown = render_native_runtime_vn_baseline_quality_markdown(report)
             self.assertIn("存在已绑定但缺失的语音文件", markdown)
             self.assertIn("语音绑定 / 可配音文本", markdown)
+
+    def test_vn_baseline_quality_report_flags_route_integrity_gaps(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_dir = Path(temp_dir) / "bundle"
+            bundle_dir.mkdir(parents=True)
+            game_data = {
+                "project": {
+                    "projectId": "native_route_quality_smoke",
+                    "title": "Native Route Quality Smoke",
+                    "entrySceneId": "scene_start",
+                },
+                "assets": {"assets": []},
+                "characters": {"characters": []},
+                "chapters": [
+                    {
+                        "id": "chapter_1",
+                        "name": "Chapter 1",
+                        "scenes": [
+                            {
+                                "id": "scene_start",
+                                "name": "Start",
+                                "blocks": [
+                                    {
+                                        "id": "choice_1",
+                                        "type": "choice",
+                                        "options": [
+                                            {"text": "Go missing", "gotoSceneId": "scene_missing"},
+                                            {"text": "Go good", "gotoSceneId": "scene_good"},
+                                        ],
+                                    }
+                                ],
+                            },
+                            {
+                                "id": "scene_good",
+                                "name": "Good",
+                                "blocks": [{"id": "line_good", "type": "narration", "text": "Reached."}],
+                            },
+                            {
+                                "id": "scene_island",
+                                "name": "Island",
+                                "blocks": [{"id": "line_island", "type": "narration", "text": "Hidden."}],
+                            },
+                        ],
+                    }
+                ],
+            }
+            (bundle_dir / "game_data.json").write_text(json.dumps(game_data, ensure_ascii=False), encoding="utf-8")
+
+            report = build_native_runtime_vn_baseline_quality_report(bundle_dir)
+
+            self.assertEqual(report["status"], "needs_fix")
+            self.assertTrue(report["metrics"]["entrySceneExists"])
+            self.assertEqual(report["metrics"]["routeTargetMissingCount"], 1)
+            self.assertEqual(report["metrics"]["unreachableSceneCount"], 1)
+            self.assertEqual(report["metrics"]["linkedSceneCount"], 2)
+            issue_codes = {issue["code"] for issue in report["issues"]}
+            self.assertIn("route_target_missing", issue_codes)
+            self.assertIn("unreachable_scene", issue_codes)
+
+            markdown = render_native_runtime_vn_baseline_quality_markdown(report)
+            self.assertIn("路线跳转目标缺失", markdown)
+            self.assertIn("入口不可达场景", markdown)
 
 
 @unittest.skipIf(pygame is None, "pygame-ce is not installed")
