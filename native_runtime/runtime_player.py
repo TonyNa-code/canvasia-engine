@@ -5447,6 +5447,11 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
     scenes_with_background = 0
     scenes_with_music = 0
     scenes_with_effects = 0
+    music_play_count = 0
+    music_stop_count = 0
+    music_scoped_count = 0
+    music_fade_in_count = 0
+    music_fade_out_count = 0
     text_block_count = 0
     total_text_chars = 0
 
@@ -5473,6 +5478,17 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
                 scene_has_background = True
             elif block_type == "music_play":
                 scene_has_music = True
+                music_play_count += 1
+                if get_safe_audio_fade_ms(block.get("fadeInMs"), 0) > 0:
+                    music_fade_in_count += 1
+                if get_safe_audio_fade_ms(block.get("fadeOutMs"), 0) > 0:
+                    music_fade_out_count += 1
+                if get_safe_music_end_mode(block.get("endMode")) != "until_next_music":
+                    music_scoped_count += 1
+            elif block_type == "music_stop":
+                music_stop_count += 1
+                if get_safe_audio_fade_ms(block.get("fadeOutMs"), 0) > 0:
+                    music_fade_out_count += 1
             elif block_type in VN_BASELINE_EFFECT_BLOCK_TYPES:
                 scene_has_effect = True
             text = get_vn_baseline_block_text(block)
@@ -5565,6 +5581,33 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             f"当前 {scene_count} 个场景里只有 {scenes_with_music} 个场景主动播放 BGM。",
             "为章节开头、转场或情绪段落设置 BGM 范围；短篇也建议至少有一条明确的音乐进入点。",
         )
+    if music_play_count >= 2 and music_scoped_count == 0 and music_stop_count == 0:
+        add_vn_baseline_issue(
+            issues,
+            "soft",
+            "bgm_scope",
+            "多首 BGM 缺少明确范围",
+            f"检测到 {music_play_count} 个 BGM 播放点，但没有 scene_end / after_block 范围或停止音乐卡片。",
+            "给关键曲目设置结束范围，或在段落末尾补停止音乐卡片，避免音乐覆盖到不该出现的场景。",
+        )
+    if music_play_count and music_fade_in_count < music_play_count:
+        add_vn_baseline_issue(
+            issues,
+            "soft",
+            "bgm_fade_in",
+            "部分 BGM 没有淡入",
+            f"{music_play_count - music_fade_in_count} 个 BGM 播放点没有设置淡入时间。",
+            "给 BGM 播放卡片设置 400-1000ms 的淡入，减少切歌突兀感。",
+        )
+    if music_stop_count and music_fade_out_count < music_stop_count:
+        add_vn_baseline_issue(
+            issues,
+            "soft",
+            "bgm_fade_out",
+            "部分 BGM 没有淡出",
+            f"{music_stop_count - music_fade_out_count} 个停止音乐卡片没有设置淡出时间。",
+            "给停止音乐卡片设置淡出，让场景切换和静音段落更自然。",
+        )
     if scene_count >= 2 and choice_count == 0:
         add_vn_baseline_issue(
             issues,
@@ -5643,6 +5686,11 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path) -> dict:
             "scenesWithBackground": scenes_with_background,
             "scenesWithMusic": scenes_with_music,
             "scenesWithEffects": scenes_with_effects,
+            "musicPlayCount": music_play_count,
+            "musicStopCount": music_stop_count,
+            "musicScopedCount": music_scoped_count,
+            "musicFadeInCount": music_fade_in_count,
+            "musicFadeOutCount": music_fade_out_count,
             "placeholderAssetCount": len(placeholder_assets),
             "emptyTextBlockCount": empty_text_count,
             "textDensity": text_density,
@@ -5663,6 +5711,9 @@ def render_native_runtime_vn_baseline_quality_markdown(report: dict) -> str:
         ("角色立绘覆盖", f"{int(metrics.get('charactersWithSpriteCount') or 0)} / {int(metrics.get('characterCount') or 0)}"),
         ("背景覆盖", f"{int(metrics.get('scenesWithBackground') or 0)} / {int(metrics.get('storySceneCount') or 0)}"),
         ("BGM 进入点", metrics.get("scenesWithMusic")),
+        ("BGM 播放 / 停止", f"{int(metrics.get('musicPlayCount') or 0)} / {int(metrics.get('musicStopCount') or 0)}"),
+        ("BGM 淡入 / 淡出", f"{int(metrics.get('musicFadeInCount') or 0)} / {int(metrics.get('musicFadeOutCount') or 0)}"),
+        ("BGM 明确范围", metrics.get("musicScopedCount")),
         ("演出效果场景", metrics.get("scenesWithEffects")),
         ("占位素材", metrics.get("placeholderAssetCount")),
         ("空文本块", metrics.get("emptyTextBlockCount")),
@@ -5945,6 +5996,9 @@ def render_native_runtime_release_control_markdown(payload: dict) -> str:
             ("角色立绘覆盖", f"{int(vn_metrics.get('charactersWithSpriteCount') or 0)} / {int(vn_metrics.get('characterCount') or 0)}"),
             ("背景覆盖", f"{int(vn_metrics.get('scenesWithBackground') or 0)} / {int(vn_metrics.get('storySceneCount') or 0)}"),
             ("BGM 进入点", vn_metrics.get("scenesWithMusic")),
+            ("BGM 播放 / 停止", f"{int(vn_metrics.get('musicPlayCount') or 0)} / {int(vn_metrics.get('musicStopCount') or 0)}"),
+            ("BGM 淡入 / 淡出", f"{int(vn_metrics.get('musicFadeInCount') or 0)} / {int(vn_metrics.get('musicFadeOutCount') or 0)}"),
+            ("BGM 明确范围", vn_metrics.get("musicScopedCount")),
             ("缺口 / 润色项", f"{int(vn_summary.get('warnCount') or 0)} / {int(vn_summary.get('softCount') or 0)}"),
         ]:
             lines.append(f"| {label} | {format_markdown_value(value, '0')} |")

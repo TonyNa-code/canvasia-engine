@@ -182,6 +182,8 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             self.assertEqual(report["metrics"]["storySceneCount"], 1)
             self.assertEqual(report["metrics"]["choiceCount"], 1)
             self.assertEqual(report["metrics"]["scenesWithBackground"], 1)
+            self.assertEqual(report["metrics"]["musicPlayCount"], 0)
+            self.assertEqual(report["metrics"]["musicFadeInCount"], 0)
             issue_codes = {issue["code"] for issue in report["issues"]}
             self.assertIn("character_fallback_sprite", issue_codes)
             self.assertIn("bgm_plan", issue_codes)
@@ -189,6 +191,7 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             markdown = render_native_runtime_vn_baseline_quality_markdown(report)
             self.assertIn("原生 Runtime VN 基础质感报告", markdown)
             self.assertIn("角色立绘覆盖", markdown)
+            self.assertIn("BGM 淡入 / 淡出", markdown)
 
             written = write_native_runtime_vn_baseline_quality_reports(bundle_dir)
             self.assertEqual(written["status"], "needs_fix")
@@ -217,6 +220,58 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             self.assertIsNotNone(vn_check)
             self.assertEqual(vn_check["status"], "needs_fix")
             self.assertEqual(vn_check["command"], "python3 runtime_player.py --vn-baseline-quality-report .")
+
+    def test_vn_baseline_quality_report_flags_bgm_continuity_gaps(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_dir = Path(temp_dir) / "bundle"
+            bundle_dir.mkdir(parents=True)
+            game_data = {
+                "project": {
+                    "projectId": "native_bgm_quality_smoke",
+                    "title": "Native BGM Quality Smoke",
+                    "entrySceneId": "scene_a",
+                },
+                "assets": {"assets": []},
+                "characters": {"characters": []},
+                "chapters": [
+                    {
+                        "id": "chapter_1",
+                        "name": "Chapter 1",
+                        "scenes": [
+                            {
+                                "id": "scene_a",
+                                "name": "A",
+                                "blocks": [
+                                    {"id": "music_a", "type": "music_play", "assetId": "bgm_a"},
+                                    {"id": "line_a", "type": "narration", "text": "First cue."},
+                                ],
+                            },
+                            {
+                                "id": "scene_b",
+                                "name": "B",
+                                "blocks": [
+                                    {"id": "music_b", "type": "music_play", "assetId": "bgm_b"},
+                                    {"id": "line_b", "type": "narration", "text": "Second cue."},
+                                ],
+                            },
+                        ],
+                    }
+                ],
+            }
+            (bundle_dir / "game_data.json").write_text(json.dumps(game_data, ensure_ascii=False), encoding="utf-8")
+
+            report = build_native_runtime_vn_baseline_quality_report(bundle_dir)
+
+            self.assertEqual(report["metrics"]["musicPlayCount"], 2)
+            self.assertEqual(report["metrics"]["musicScopedCount"], 0)
+            self.assertEqual(report["metrics"]["musicFadeInCount"], 0)
+            issue_codes = {issue["code"] for issue in report["issues"]}
+            self.assertIn("bgm_scope", issue_codes)
+            self.assertIn("bgm_fade_in", issue_codes)
+
+            markdown = render_native_runtime_vn_baseline_quality_markdown(report)
+            self.assertIn("多首 BGM 缺少明确范围", markdown)
+            self.assertIn("BGM 播放 / 停止", markdown)
 
 
 @unittest.skipIf(pygame is None, "pygame-ce is not installed")
