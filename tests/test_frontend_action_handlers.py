@@ -4114,6 +4114,27 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("localizationCoverageTools.getLocalizationCoverageStatusDigest", source)
         self.assertIn("localizationCoverageTools.buildLocalizationImportPlan", source)
 
+    def test_production_backlog_export_actions_are_wired(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        click_handler = _extract_function_source(source, "handleClick")
+        markdown_block_start = click_handler.index('action === "export-production-backlog-markdown"')
+        csv_block_start = click_handler.index('action === "export-production-backlog-csv"')
+        csv_block_end = click_handler.index('action === "export-release-control-report"', csv_block_start)
+        markdown_block = click_handler[markdown_block_start:csv_block_start]
+        csv_block = click_handler[csv_block_start:csv_block_end]
+
+        self.assertIn("const productionBacklogTools = window.CanvasiaEditorProductionBacklog", source)
+        self.assertIn('data-action="export-production-backlog-markdown"', source)
+        self.assertIn('data-action="export-production-backlog-csv"', source)
+        self.assertIn("exportProductionBacklogMarkdown();", markdown_block)
+        self.assertIn("exportProductionBacklogCsv();", csv_block)
+        self.assertIn("function buildProductionBacklog(", source)
+        self.assertIn("function renderProductionBacklogPanel(", source)
+        self.assertIn("function exportProductionBacklogMarkdown()", source)
+        self.assertIn("function exportProductionBacklogCsv()", source)
+        self.assertIn("productionBacklogTools.buildProductionBacklog", source)
+        self.assertIn("productionBacklogTools.getProductionBacklogStatusDigest", source)
+
     def test_scene_save_payload_preserves_scene_name_translations(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
         strip_scene_for_save = _extract_function_source(source, "stripSceneForSave")

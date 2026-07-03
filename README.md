@@ -67,7 +67,7 @@ The project already includes a visual editor, export pipeline, native runtime pr
 - Advanced particle presets, project particle libraries, camera effects, screen filters, flashes, shakes, and fade transitions
 - Live2D / 3D character and 3D scene asset import, plus native-runtime 3D inspection reports for glTF / GLB / VRM assets
 - Web playable export, desktop exports, editor desktop builds, and native Runtime preview packages
-- Automated checks: local CI precheck, backend smoke tests, Playwright browser smoke tests, action wiring scans, branch-aware preview regression with condition / fallback variable presets, release-control reports, scene production boards, voice production sheets, choice consequence audits, variable influence audits, asset dependency audits, BGM cue-sheet audits, character stage-direction audits, presentation timeline audits, tester handoff work orders, playtest feedback templates and feedback intake summaries, VN baseline quality audits, and package integrity verification
+- Automated checks: local CI precheck, backend smoke tests, Playwright browser smoke tests, action wiring scans, branch-aware preview regression with condition / fallback variable presets, release-control reports, production backlog queues, scene production boards, voice production sheets, choice consequence audits, variable influence audits, asset dependency audits, BGM cue-sheet audits, character stage-direction audits, presentation timeline audits, tester handoff work orders, playtest feedback templates and feedback intake summaries, VN baseline quality audits, and package integrity verification
 
 ## Feature Status
 
@@ -77,7 +77,7 @@ The project already includes a visual editor, export pipeline, native runtime pr
 | Asset Management | Available | Import, replace, delete, usage protection, dependency reports, file-size budget hints, and optional OpenAI Image generation with style presets, sprite expression binding, prompt, model, format, and returned-file validation. |
 | Multi-language / i18n | Preview | Project language settings, localization coverage reports, safe CSV re-import for character, chapter, scene, and story-card translations, export metadata, Web Runtime language switching, native Runtime language switching, and fallback behavior. |
 | Canvasia Assistant | Available | Local template mode plus optional creator-owned API keys for major compatible providers. |
-| Project Safety Net | Available | Snapshots, restore, crash recovery, project doctor, repair queue, release gates, release-control reports, and VN baseline quality checks for placeholder content, character sprites, backgrounds, BGM, choices, text density, and presentation polish. |
+| Project Safety Net | Available | Snapshots, restore, crash recovery, project doctor, repair queue, cross-module production backlog queues, release gates, release-control reports, and VN baseline quality checks for placeholder content, character sprites, backgrounds, BGM, choices, text density, and presentation polish. |
 | Game UI Customization | Available | Project UI skins, button states, nine-slice images, layout tuning, and textbox styling. |
 | Extras / Replay Systems | Available | CG, music, character, location, narration, relationship, achievement, chapter, ending, and voice replay systems. |
 | Particles and Presentation | Available | Particle presets, custom particle settings, camera, filters, flashes, shakes, fades, and character presentation effects. |

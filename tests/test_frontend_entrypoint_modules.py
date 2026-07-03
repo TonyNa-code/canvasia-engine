@@ -43,6 +43,7 @@ class FrontendEntrypointModuleTests(unittest.TestCase):
             "./modules/stage_direction_sheet.js",
             "./modules/presentation_timeline.js",
             "./modules/localization_coverage.js",
+            "./modules/production_backlog.js",
             "./modules/visual_effects.js",
             "./modules/particle_effects.js",
             "./modules/project_history.js",

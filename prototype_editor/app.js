@@ -62,6 +62,7 @@ const audioCueSheetTools = window.CanvasiaEditorAudioCueSheet;
 const stageDirectionSheetTools = window.CanvasiaEditorStageDirectionSheet;
 const presentationTimelineTools = window.CanvasiaEditorPresentationTimeline;
 const localizationCoverageTools = window.CanvasiaEditorLocalizationCoverage;
+const productionBacklogTools = window.CanvasiaEditorProductionBacklog;
 
 function getBlockLabel(type) {
   return storyBlockCatalogTools.getBlockLabel(type) ?? BLOCK_LABELS[type] ?? type ?? "步骤";
@@ -3920,6 +3921,16 @@ async function handleClick(event) {
 
   if (action === "import-localization-coverage-csv") {
     document.getElementById("localizationCoverageImportInput")?.click();
+    return;
+  }
+
+  if (action === "export-production-backlog-markdown") {
+    exportProductionBacklogMarkdown();
+    return;
+  }
+
+  if (action === "export-production-backlog-csv") {
+    exportProductionBacklogCsv();
     return;
   }
 
@@ -28572,6 +28583,17 @@ function buildLocalizationCoverageFileName(extension = "md") {
   return `${title}_localization_coverage_${dateStamp}.${extension}`;
 }
 
+function buildProductionBacklogFileName(extension = "md") {
+  const date = new Date();
+  const dateStamp = [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("");
+  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
+  return `${title}_production_backlog_${dateStamp}.${extension}`;
+}
+
 function buildPlaytestHandoffFileName(extension = "md") {
   const date = new Date();
   const dateStamp = [
@@ -30023,6 +30045,43 @@ async function importLocalizationCoverageCsv(file) {
   }
 }
 
+function buildProductionBacklog(routeOverview = null) {
+  const currentRouteOverview = routeOverview ?? buildSceneRouteOverview();
+  return productionBacklogTools.buildProductionBacklog({
+    projectTitle: state.data?.project?.title || "Canvasia Project",
+    routeOverview: currentRouteOverview,
+    sceneBoard: buildSceneProductionBoard(),
+    voiceSheet: buildVoiceProductionSheet(),
+    choiceConsequenceSheet: buildChoiceConsequenceSheet(),
+    variableInfluenceSheet: buildVariableInfluenceSheet(),
+    assetDependencySheet: buildAssetDependencySheet(),
+    audioCueSheet: buildAudioCueSheet(),
+    stageDirectionSheet: buildStageDirectionSheet(),
+    presentationTimeline: buildPresentationTimeline(),
+    localizationCoverage: buildLocalizationCoverage(),
+  });
+}
+
+function exportProductionBacklogMarkdown() {
+  const fileName = buildProductionBacklogFileName("md");
+  const backlog = buildProductionBacklog();
+  const content = productionBacklogTools.buildProductionBacklogMarkdown(backlog, {
+    projectTitle: state.data?.project?.title || "Canvasia Project",
+    generatedAt: formatDate(new Date().toISOString()),
+  });
+  downloadTextFile(fileName, content, "text/markdown;charset=utf-8");
+  setSaveStatus(`已导出生产待办队列：${fileName}`);
+  showToast(`生产待办队列已导出：${fileName}`);
+}
+
+function exportProductionBacklogCsv() {
+  const fileName = buildProductionBacklogFileName("csv");
+  const content = productionBacklogTools.buildProductionBacklogCsv(buildProductionBacklog());
+  downloadTextFile(fileName, content, "text/csv;charset=utf-8");
+  setSaveStatus(`已导出生产待办 CSV：${fileName}`);
+  showToast(`生产待办 CSV 已导出：${fileName}`);
+}
+
 function buildPlaytestHandoffContext() {
   const routeOverview = buildSceneRouteOverview();
   return {
@@ -31356,6 +31415,116 @@ function getVoiceProductionToneClass(status) {
   return "";
 }
 
+function getProductionBacklogToneClass(status) {
+  if (status === "blocked") {
+    return "danger-text";
+  }
+  if (status === "warn") {
+    return "warn-text";
+  }
+  if (status === "ready") {
+    return "good-text";
+  }
+  return "";
+}
+
+function renderProductionTaskAction(task) {
+  const action = task?.action ?? {};
+  const screenAttribute = action.screen ? ` data-screen="${escapeHtml(action.screen)}"` : "";
+  if (action.action === "run-project-inspection") {
+    return `
+      <button class="toolbar-button" data-action="run-project-inspection">
+        ${escapeHtml(action.label || "重新巡检")}
+      </button>
+    `;
+  }
+  return `
+    <button class="toolbar-button" data-action="switch-screen"${screenAttribute}>
+      ${escapeHtml(action.label || "去处理")}
+    </button>
+  `;
+}
+
+function renderProductionBacklogPanel(routeOverview) {
+  const backlog = buildProductionBacklog(routeOverview);
+  const digest = productionBacklogTools.getProductionBacklogStatusDigest(backlog);
+  const summary = backlog.summary ?? {};
+  const topTasks = (backlog.tasks ?? []).slice(0, 6);
+  const areaSummaries = (backlog.areaSummaries ?? []).slice(0, 4);
+
+  return `
+    <article class="detail-card preview-sprint-panel">
+      <div class="panel-heading">
+        <h2>生产待办队列</h2>
+        <span class="badge badge-soft ${getProductionBacklogToneClass(digest.status)}">${escapeHtml(digest.title)}</span>
+      </div>
+      <p class="helper-text">${escapeHtml(digest.detail)} 它会把路线、场景、语音、选项、变量、素材、BGM、角色演出、时间轴和多语言问题合并成一条可执行队列，适合每天开工先看。</p>
+      <div class="preview-sprint-metrics">
+        ${renderRouteMetricCard("总任务", `${summary.taskCount ?? 0} 项`, "跨模块自动汇总")}
+        ${renderRouteMetricCard("先修 / 优先", `${summary.blockerCount ?? 0} / ${summary.warningCount ?? 0}`, "先处理会阻塞试玩或发布的项")}
+        ${renderRouteMetricCard("覆盖模块", `${summary.areaCount ?? 0} 个`, "路线、素材、音频、翻译等")}
+        ${renderRouteMetricCard("生产就绪度", `${summary.readinessPercent ?? 0}%`, `${summary.topAreaLabel ?? "无"} ${summary.topAreaTaskCount ?? 0} 项`)}
+      </div>
+      <div class="detail-actions">
+        <button class="toolbar-button toolbar-button-primary" data-action="export-production-backlog-markdown">
+          导出生产待办
+        </button>
+        <button class="toolbar-button" data-action="export-production-backlog-csv">
+          导出待办 CSV
+        </button>
+        <button class="toolbar-button" data-action="run-project-inspection">
+          重新巡检刷新队列
+        </button>
+      </div>
+      ${
+        topTasks.length > 0
+          ? `
+            <div class="preview-sprint-grid">
+              ${topTasks
+                .map(
+                  (task) => `
+                    <article class="preview-sprint-card is-${task.severity === "blocker" ? "danger" : task.severity === "warn" ? "warn" : "soft"}">
+                      <div class="preview-sprint-head">
+                        <strong>${escapeHtml(task.title)}</strong>
+                        <span class="issue-tag ${task.severity === "blocker" ? "danger-text" : task.severity === "warn" ? "warn-text" : ""}">
+                          ${escapeHtml(`${task.severityLabel} · ${task.areaLabel}`)}
+                        </span>
+                      </div>
+                      <p>${escapeHtml(task.source)}</p>
+                      <div class="helper-text">${escapeHtml(task.detail)}</div>
+                      <div class="detail-actions compact-actions">
+                        ${renderProductionTaskAction(task)}
+                      </div>
+                    </article>
+                  `
+                )
+                .join("")}
+            </div>
+          `
+          : areaSummaries.length > 0
+            ? `
+              <div class="list-stack compact-stack">
+                ${areaSummaries
+                  .map(
+                    (area) => `
+                      <div class="route-testing-item">
+                        <div>
+                          <b>${escapeHtml(area.areaLabel)}</b>
+                          <span>${escapeHtml(`先修 ${area.blockerCount} · 优先 ${area.warningCount} · 润色 ${area.tipCount}`)}</span>
+                        </div>
+                        <span>${escapeHtml(`${area.taskCount} 项`)}</span>
+                      </div>
+                    `
+                  )
+                  .join("")}
+              </div>
+            `
+            : renderEmpty("跨模块生产队列暂时没有待办。可以继续写新剧情，或导出一版给测试人员试玩。")
+      }
+    </article>
+  `;
+}
+
 function renderSceneProductionBoardPanel() {
   const board = buildSceneProductionBoard();
   const digest = sceneProductionBoardTools.getSceneProductionBoardStatusDigest(board);
@@ -32173,6 +32342,7 @@ function renderInspectionOverviewPanel(routeOverview) {
       </div>
       ${renderCompactProjectMilestonePanel(routeOverview)}
       ${renderProjectDoctorPanel(routeOverview, issueItems)}
+      ${renderProductionBacklogPanel(routeOverview)}
       ${renderSceneProductionBoardPanel()}
       ${renderVoiceProductionPanel()}
       ${renderChoiceConsequencePanel()}
