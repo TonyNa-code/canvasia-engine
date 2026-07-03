@@ -2452,9 +2452,12 @@ function setBeginnerTutorialStep(stepIndex) {
 function getCommandPaletteContext() {
   const starterOverview = state.data ? getStarterKitOverview() : {};
   const validation = state.data ? state.validation ?? runValidation(state.data) : { errors: [], warnings: [] };
+  const selectedScene = state.data ? getSelectedScene() : null;
   return {
     hasProject: Boolean(state.data),
+    hasSelectedScene: Boolean(selectedScene),
     projectTitle: state.data?.project?.title ?? getProjectCenterActiveTitle(),
+    selectedSceneTitle: selectedScene?.name ?? "",
     currentScreen: state.currentScreen,
     chapterCount: state.data?.chapters?.length ?? 0,
     sceneCount: state.data?.scenes?.length ?? 0,
@@ -33441,13 +33444,17 @@ async function addBlock(blockType) {
 
   updatedScene.blocks.splice(insertIndex, 0, newBlock);
 
-  await persistScene(updatedScene, {
+  const success = await persistScene(updatedScene, {
     selectedSceneId: updatedScene.id,
     selectedBlockId: newBlock.id,
     previewSceneId: updatedScene.id,
     previewBlockIndex: insertIndex,
     successMessage: `已新增${BLOCK_LABELS[blockType] ?? blockType}`,
   });
+
+  if (success && state.currentScreen !== "story") {
+    switchScreen("story");
+  }
 }
 
 function getStoryTemplatePreset(templateId) {
@@ -33618,6 +33625,9 @@ async function applyStoryTemplate(templateId) {
   });
 
   if (success) {
+    if (state.currentScreen !== "story") {
+      switchScreen("story");
+    }
     showToast(`已插入模板：${preset.title}`);
   }
 }

@@ -41,15 +41,35 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
               needsStarterKit: true,
               errorCount: 0,
             }});
+            const projectWithScene = tools.buildCommandPaletteCommands({{
+              hasProject: true,
+              hasSelectedScene: true,
+              selectedSceneTitle: "雨夜教室",
+              chapterCount: 1,
+              sceneCount: 1,
+              needsStarterKit: false,
+              errorCount: 0,
+            }});
             const storySearch = tools.filterCommandPaletteCommands(project, "剧情");
+            const dialogueSearch = tools.filterCommandPaletteCommands(projectWithScene, "台词");
             const exportCommand = project.find((command) => command.id === "export-web");
             const firstChapterCommand = project.find((command) => command.id === "create-first-chapter");
+            const disabledDialogueCommand = project.find((command) => command.id === "insert-dialogue");
+            const enabledDialogueCommand = projectWithScene.find((command) => command.id === "insert-dialogue");
+            const templateCommand = projectWithScene.find((command) => command.id === "template-opening-intro");
             process.stdout.write(JSON.stringify({{
               noProjectStoryDisabled: noProject.find((command) => command.id === "screen-story").disabled,
               noProjectDemoDisabled: noProject.find((command) => command.id === "create-playable-demo").disabled,
               exportDisabled: exportCommand.disabled,
               firstChapterDisabled: firstChapterCommand.disabled,
               firstChapterAction: firstChapterCommand.action,
+              disabledDialogueReason: disabledDialogueCommand.disabledReason,
+              enabledDialogueDisabled: enabledDialogueCommand.disabled,
+              enabledDialogueSubtitle: enabledDialogueCommand.subtitle,
+              enabledDialogueAction: enabledDialogueCommand.action,
+              dialogueSearchIds: dialogueSearch.map((command) => command.id),
+              templateAction: templateCommand.action,
+              templateId: templateCommand.dataset["template-id"],
               storySearchIds: storySearch.map((command) => command.id),
               clamped: tools.clampCommandPaletteIndex(99, project),
             }}));
@@ -62,6 +82,13 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
         self.assertFalse(payload["exportDisabled"])
         self.assertFalse(payload["firstChapterDisabled"])
         self.assertEqual(payload["firstChapterAction"], "create-first-chapter")
+        self.assertIn("先创建或选择一个场景", payload["disabledDialogueReason"])
+        self.assertFalse(payload["enabledDialogueDisabled"])
+        self.assertEqual(payload["enabledDialogueAction"], "add-dialogue")
+        self.assertIn("雨夜教室", payload["enabledDialogueSubtitle"])
+        self.assertIn("insert-dialogue", payload["dialogueSearchIds"])
+        self.assertEqual(payload["templateAction"], "apply-story-template")
+        self.assertEqual(payload["templateId"], "opening_intro")
         self.assertIn("screen-story", payload["storySearchIds"])
         self.assertGreater(payload["clamped"], 0)
 
