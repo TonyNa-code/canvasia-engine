@@ -23,7 +23,12 @@ class FrontendEditorModeModuleTests(unittest.TestCase):
             vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
             const tools = context.window.CanvasiaEditorMode;
             const quickRenderer = (action, primary) =>
-              `<button data-action="${{action.action}}" data-primary="${{primary}}">${{action.label}}</button>`;
+              `<button data-action="${{action.action}}" data-primary="${{primary}}" data-template-id="${{action.dataset?.["template-id"] ?? ""}}">${{action.label}}</button>`;
+            const playableTemplateSummary = {{
+              title: "第一段可试玩",
+              blockCount: 10,
+              labels: ["切换背景", "播放音乐", "显示角色", "台词 x 3", "选项"],
+            }};
             const result = {{
               safeBeginner: tools.getSafeEditorMode("unknown"),
               safeAdvanced: tools.getSafeEditorMode(" Advanced "),
@@ -41,6 +46,10 @@ class FrontendEditorModeModuleTests(unittest.TestCase):
               assetToolbarHasPick: tools.BEGINNER_ASSET_TOOLBAR_ACTIONS.has("pick-assets"),
               emptyWorkflow: tools.buildBeginnerStoryWorkflow(null),
               blankWorkflow: tools.buildBeginnerStoryWorkflow({{ id: "scene_1", blocks: [] }}),
+              blankWorkflowWithSummary: tools.buildBeginnerStoryWorkflow({{ id: "scene_1", blocks: [] }}, {{
+                playableTemplateSummary,
+              }}),
+              normalizedSummary: tools.normalizeWorkflowTemplateSummary(playableTemplateSummary),
               storyWorkflow: tools.buildBeginnerStoryWorkflow({{
                 id: "scene_2",
                 blocks: [
@@ -62,11 +71,13 @@ class FrontendEditorModeModuleTests(unittest.TestCase):
               switchMarkup: tools.renderEditorModeSwitchButtons("advanced", {{ compact: true }}),
               guideMarkup: tools.renderEditorModeGuideCard("story", {{ mode: "beginner" }}),
               workflowMarkup: tools.renderBeginnerStoryWorkflow({{ id: "scene_4", blocks: [] }}, {{
+                playableTemplateSummary,
                 renderQuickActionButton: quickRenderer,
               }}),
               beginnerBannerMarkup: tools.renderStoryEditorModeBanner({{ id: "scene_5", blocks: [] }}, {{
                 mode: "beginner",
                 hiddenCount: 3,
+                playableTemplateSummary,
                 renderQuickActionButton: quickRenderer,
               }}),
               advancedBannerMarkup: tools.renderStoryEditorModeBanner({{ id: "scene_6", blocks: [] }}, {{
@@ -105,7 +116,12 @@ class FrontendEditorModeModuleTests(unittest.TestCase):
         self.assertIsNone(payload["emptyWorkflow"])
         self.assertEqual(payload["blankWorkflow"]["nextStep"]["step"], "第一步")
         self.assertEqual(payload["blankWorkflow"]["nextStep"]["actions"][0]["action"], "apply-story-template")
+        self.assertEqual(payload["blankWorkflow"]["nextStep"]["actions"][0]["dataset"]["template-id"], "playable_scene")
+        self.assertEqual(payload["blankWorkflow"]["nextStep"]["actions"][0]["label"], "生成可试玩段落")
         self.assertEqual(payload["blankWorkflow"]["steps"][0]["done"], False)
+        self.assertEqual(payload["blankWorkflowWithSummary"]["nextStep"]["templateSummary"]["title"], "第一段可试玩")
+        self.assertEqual(payload["blankWorkflowWithSummary"]["nextStep"]["templateSummary"]["blockCount"], 10)
+        self.assertIn("台词 x 3", payload["normalizedSummary"]["labels"])
         self.assertEqual(payload["storyWorkflow"]["steps"], [
             {
                 "step": "第一步",
@@ -158,6 +174,9 @@ class FrontendEditorModeModuleTests(unittest.TestCase):
         self.assertIn("打开新手教程", payload["guideMarkup"])
         self.assertIn("新手上手顺序", payload["workflowMarkup"])
         self.assertIn('data-action="apply-story-template"', payload["workflowMarkup"])
+        self.assertIn('data-template-id="playable_scene"', payload["workflowMarkup"])
+        self.assertIn("第一段可试玩 · 将插入 10 张卡片", payload["workflowMarkup"])
+        self.assertIn("台词 x 3", payload["workflowMarkup"])
         self.assertIn("已收起 3 个高级按钮", payload["beginnerBannerMarkup"])
         self.assertIn("新手上手顺序", payload["beginnerBannerMarkup"])
         self.assertIn("完整工具栏已展开", payload["advancedBannerMarkup"])

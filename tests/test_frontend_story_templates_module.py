@@ -34,6 +34,10 @@ class FrontendStoryTemplatesModuleTests(unittest.TestCase):
               ],
               playableRecipeTypes: tools.getStoryTemplateBlockRecipes("playable_scene").map((recipe) => recipe.type),
               playableChoiceTexts: tools.getStoryTemplateBlockRecipes("playable_scene").find((recipe) => recipe.type === "choice")?.choiceTexts,
+              playableTypeCounts: tools.getStoryTemplateBlockTypeCounts("playable_scene"),
+              playableSummary: tools.getStoryTemplateSummary("playable_scene", {{
+                getBlockLabel: (type) => type === "dialogue" ? "台词" : `label:${{type}}`,
+              }}),
               openingRecipeCount: tools.getStoryTemplateBlockRecipes("opening_intro").length,
               missingRecipes: tools.getStoryTemplateBlockRecipes("missing"),
               missingPreset: tools.getStoryTemplatePreset("missing"),
@@ -61,6 +65,7 @@ class FrontendStoryTemplatesModuleTests(unittest.TestCase):
         payload = json.loads(completed.stdout)
         self.assertIn("getStoryTemplatePreset", payload["keys"])
         self.assertIn("getStoryTemplateBlockRecipes", payload["keys"])
+        self.assertIn("getStoryTemplateSummary", payload["keys"])
         self.assertEqual(payload["presetTitles"], ["第一段可试玩", "开场铺垫", "进入回忆", "情绪爆点", "选项分支", "场景收尾"])
         self.assertEqual(
             payload["playableRecipeTypes"],
@@ -78,6 +83,11 @@ class FrontendStoryTemplatesModuleTests(unittest.TestCase):
             ],
         )
         self.assertEqual(payload["playableChoiceTexts"], ["认真回应她", "先转移话题"])
+        self.assertEqual(payload["playableTypeCounts"]["dialogue"], 3)
+        self.assertEqual(payload["playableTypeCounts"]["choice"], 1)
+        self.assertEqual(payload["playableSummary"]["title"], "第一段可试玩")
+        self.assertEqual(payload["playableSummary"]["blockCount"], 10)
+        self.assertIn("台词 x 3", payload["playableSummary"]["labels"])
         self.assertEqual(payload["openingRecipeCount"], 5)
         self.assertEqual(payload["missingRecipes"], [])
         self.assertIsNone(payload["missingPreset"])

@@ -251,6 +251,47 @@
     return STORY_TEMPLATE_BLOCK_RECIPES[templateId] ?? [];
   }
 
+  function getStoryTemplateBlockTypeCounts(templateId) {
+    return getStoryTemplateBlockRecipes(templateId).reduce((counts, recipe) => {
+      if (recipe?.type) {
+        counts[recipe.type] = (counts[recipe.type] ?? 0) + 1;
+      }
+      return counts;
+    }, {});
+  }
+
+  function getStoryTemplateSummary(templateId, options = {}) {
+    const recipes = getStoryTemplateBlockRecipes(templateId);
+    const getBlockLabel =
+      typeof options.getBlockLabel === "function" ? options.getBlockLabel : (type) => type;
+    const orderedTypes = [];
+    const counts = {};
+
+    recipes.forEach((recipe) => {
+      if (!recipe?.type) {
+        return;
+      }
+      if (!orderedTypes.includes(recipe.type)) {
+        orderedTypes.push(recipe.type);
+      }
+      counts[recipe.type] = (counts[recipe.type] ?? 0) + 1;
+    });
+
+    const labels = orderedTypes.map((type) => {
+      const count = counts[type] ?? 0;
+      const label = getBlockLabel(type);
+      return count > 1 ? `${label} x ${count}` : label;
+    });
+
+    return Object.freeze({
+      templateId,
+      title: getStoryTemplatePreset(templateId)?.title ?? templateId,
+      blockCount: recipes.length,
+      labels: Object.freeze(labels),
+      typeCounts: Object.freeze({ ...counts }),
+    });
+  }
+
   function getTemplateLabel(template) {
     return PROJECT_TEMPLATE_LABELS[template] ?? template;
   }
@@ -261,6 +302,8 @@
     PROJECT_TEMPLATE_LABELS,
     getStoryTemplatePreset,
     getStoryTemplateBlockRecipes,
+    getStoryTemplateBlockTypeCounts,
+    getStoryTemplateSummary,
     getTemplateLabel,
   });
 })(typeof window !== "undefined" ? window : globalThis);

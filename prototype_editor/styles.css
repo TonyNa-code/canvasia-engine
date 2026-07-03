@@ -2418,6 +2418,22 @@ body[data-editor-mode="beginner"] #screen-preview #previewSceneFilterBar {
   border-color: rgba(79, 139, 88, 0.22);
 }
 
+.workflow-template-summary {
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(79, 139, 88, 0.2);
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
+  display: grid;
+  gap: 8px;
+}
+
+.workflow-template-summary-title {
+  color: var(--text);
+  font-size: 0.83rem;
+  font-weight: 800;
+}
+
 .workflow-step-label {
   color: var(--brand-deep);
   font-size: 12px;

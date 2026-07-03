@@ -150,6 +150,43 @@
       : (action, primary = false) => renderFallbackQuickActionButton(action, primary, options);
   }
 
+  function normalizeWorkflowTemplateSummary(summary) {
+    if (!summary || typeof summary !== "object") {
+      return null;
+    }
+
+    const blockCount = Math.max(Number.parseInt(summary.blockCount ?? 0, 10) || 0, 0);
+    const labels = Array.isArray(summary.labels)
+      ? summary.labels.map((label) => String(label ?? "").trim()).filter(Boolean)
+      : [];
+    if (blockCount <= 0 || !labels.length) {
+      return null;
+    }
+
+    return {
+      title: String(summary.title ?? "剧情模板").trim() || "剧情模板",
+      blockCount,
+      labels: labels.slice(0, 8),
+    };
+  }
+
+  function renderWorkflowTemplateSummary(summary, options = {}) {
+    const safeSummary = normalizeWorkflowTemplateSummary(summary);
+    if (!safeSummary) {
+      return "";
+    }
+
+    const escape = getEscapeHtml(options);
+    return `
+      <div class="workflow-template-summary" aria-label="${escape(safeSummary.title)}模板预览">
+        <span class="workflow-template-summary-title">${escape(safeSummary.title)} · 将插入 ${safeSummary.blockCount} 张卡片</span>
+        <div class="story-filter-chip-row">
+          ${safeSummary.labels.map((label) => `<span class="issue-tag">${escape(label)}</span>`).join("")}
+        </div>
+      </div>
+    `;
+  }
+
   function renderEditorModeSwitchButtons(mode = "beginner", options = {}) {
     const escape = getEscapeHtml(options);
     const safeMode = getSafeEditorMode(mode);
@@ -211,7 +248,7 @@
     `;
   }
 
-  function buildBeginnerStoryWorkflow(scene) {
+  function buildBeginnerStoryWorkflow(scene, options = {}) {
     if (!scene) {
       return null;
     }
@@ -223,16 +260,18 @@
     const hasMusic = blocks.some((block) => block.type === "music_play");
     const hasBranchOrJump = blocks.some((block) => STORY_ROUTE_BLOCK_TYPES.includes(block.type));
     const hasPolish = blocks.some((block) => STORY_POLISH_BLOCK_TYPES.includes(block.type));
+    const playableTemplateSummary = normalizeWorkflowTemplateSummary(options.playableTemplateSummary);
 
     const steps = [
       {
         step: "第一步",
-        title: "写入这一场的基础正文",
+        title: storyCount > 0 ? "写入这一场的基础正文" : "先生成一段可试玩剧情",
         done: storyCount > 0,
         description:
           storyCount > 0
             ? `这一场已经有 ${storyCount} 张正文卡片了，可以继续往下补氛围和去向。`
-            : "先写一句台词或旁白，让这一场从空白状态进入可阅读状态。",
+            : "一键放入背景、音乐、角色登场、对白、选择项和淡出收束，先让这一场跑起来。",
+        ...(storyCount <= 0 && playableTemplateSummary ? { templateSummary: playableTemplateSummary } : {}),
         actions:
           storyCount > 0
             ? [
@@ -240,7 +279,7 @@
                 { label: "加一张旁白", action: "add-narration" },
               ]
             : [
-                { label: "一键开场铺垫", action: "apply-story-template", dataset: { "template-id": "opening_intro" } },
+                { label: "生成可试玩段落", action: "apply-story-template", dataset: { "template-id": "playable_scene" } },
                 { label: "先加一句台词", action: "add-dialogue" },
               ],
       },
@@ -292,7 +331,7 @@
   function renderBeginnerStoryWorkflow(scene, options = {}) {
     const escape = getEscapeHtml(options);
     const renderQuickActionButton = getQuickActionRenderer(options);
-    const workflow = buildBeginnerStoryWorkflow(scene);
+    const workflow = buildBeginnerStoryWorkflow(scene, options);
     if (!workflow) {
       return "";
     }
@@ -310,6 +349,7 @@
           <span class="workflow-step-label">${escape(workflow.nextStep.step)}</span>
           <strong>${escape(workflow.nextStep.title)}</strong>
           <p>${escape(workflow.nextStep.description)}</p>
+          ${renderWorkflowTemplateSummary(workflow.nextStep.templateSummary, options)}
           <div class="detail-actions">
             ${workflow.nextStep.actions.map((action, index) => renderQuickActionButton(action, index === 0)).join("")}
           </div>
@@ -322,6 +362,7 @@
                   <span class="workflow-step-label">${escape(step.step)}</span>
                   <strong>${escape(step.title)}</strong>
                   <p>${escape(step.description)}</p>
+                  ${renderWorkflowTemplateSummary(step.templateSummary, options)}
                   <div class="story-filter-chip-row">
                     <span class="issue-tag ${step.done ? "good-text" : "warn-text"}">${step.done ? "当前已完成" : "进行中"}</span>
                   </div>
@@ -380,6 +421,8 @@
     getEditorModeGuideTitle,
     getEditorModeGuideNote,
     renderEditorModeGuideCard,
+    normalizeWorkflowTemplateSummary,
+    renderWorkflowTemplateSummary,
     buildBeginnerStoryWorkflow,
     renderBeginnerStoryWorkflow,
     renderStoryEditorModeBanner,
