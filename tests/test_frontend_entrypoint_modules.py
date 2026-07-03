@@ -43,6 +43,7 @@ class FrontendEntrypointModuleTests(unittest.TestCase):
             "./modules/project_doctor.js",
             "./modules/project_milestones.js",
             "./modules/release_control.js",
+            "./modules/command_palette.js",
             "./app.js",
         ]
         for script in required_scripts:

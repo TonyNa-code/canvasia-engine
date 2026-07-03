@@ -275,6 +275,57 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(target_path.read_text(encoding="utf-8"), '{"ok": true}\n')
         self.assertFalse(list(self.test_root.glob(".atomic_write.json.*.tmp")))
 
+    def test_local_editor_api_origin_guard_accepts_only_local_hosts(self) -> None:
+        accepted_hosts = [
+            "127.0.0.1",
+            "127.0.0.1:8765",
+            "localhost",
+            "localhost:8765",
+            "[::1]:8765",
+        ]
+        rejected_hosts = [
+            "",
+            "example.com",
+            "example.com:8765",
+            "127.0.0.1.example.com",
+            "192.168.1.20:8765",
+        ]
+
+        for host in accepted_hosts:
+            self.assertTrue(run_editor.is_local_editor_host(host), host)
+        for host in rejected_hosts:
+            self.assertFalse(run_editor.is_local_editor_host(host), host)
+
+        self.assertTrue(run_editor.is_local_editor_origin(""))
+        self.assertTrue(run_editor.is_local_editor_origin("http://127.0.0.1:8765/prototype_editor/index.html"))
+        self.assertTrue(run_editor.is_local_editor_origin("http://localhost:8765/prototype_editor/index.html"))
+        self.assertTrue(run_editor.is_local_editor_origin("http://[::1]:8765/prototype_editor/index.html"))
+        self.assertFalse(run_editor.is_local_editor_origin("null"))
+        self.assertFalse(run_editor.is_local_editor_origin("https://evil.example/probe"))
+        self.assertFalse(run_editor.is_local_editor_origin("http://127.0.0.1.example.com/probe"))
+
+    def test_project_bundle_cache_reuses_unchanged_bundle_and_invalidates_on_write(self) -> None:
+        self.create_blank_project_with_chapter()
+
+        first_bundle = run_editor.load_project_bundle()
+        first_bundle["project"]["title"] = "被调用方误改的标题"
+
+        with mock.patch.object(
+            run_editor,
+            "build_project_bundle_uncached",
+            side_effect=AssertionError("unchanged project-data should be served from cache"),
+        ):
+            cached_bundle = run_editor.load_project_bundle()
+
+        self.assertEqual(cached_bundle["project"]["title"], "自动化测试项目")
+
+        project_doc = run_editor.read_json(run_editor.PROJECT_PATH)
+        project_doc["title"] = "缓存失效后的更长项目标题"
+        run_editor.write_json(run_editor.PROJECT_PATH, project_doc)
+
+        refreshed_bundle = run_editor.load_project_bundle()
+        self.assertEqual(refreshed_bundle["project"]["title"], "缓存失效后的更长项目标题")
+
     def assert_export_manifest_has_subtle_engine_signature(self, manifest: dict) -> None:
         self.assertEqual(manifest["engine"]["signature"], run_editor.EXPORT_ENGINE_SIGNATURE)
         self.assertEqual(manifest["protection"]["profile"], run_editor.EXPORT_PROTECTION_PROFILE)

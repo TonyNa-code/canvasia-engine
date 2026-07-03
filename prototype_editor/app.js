@@ -138,6 +138,7 @@ const projectMilestoneTools = window.CanvasiaEditorProjectMilestones ?? window.C
 const openAiAssetTools = window.CanvasiaEditorOpenAiAssetGenerator;
 const beginnerTutorialTools = window.CanvasiaEditorBeginnerTutorial;
 const projectCenterTools = window.CanvasiaEditorProjectCenter;
+const commandPaletteTools = window.CanvasiaEditorCommandPalette;
 
 const ASSET_TYPE_LABELS = assetCatalogTools?.ASSET_TYPE_LABELS ?? {
   background: "背景",
@@ -856,6 +857,9 @@ const state = {
   chapterCreateInFlight: false,
   beginnerTutorialOpen: false,
   beginnerTutorialStep: 0,
+  commandPaletteOpen: false,
+  commandPaletteQuery: "",
+  commandPaletteSelectedIndex: 0,
 };
 
 function getSafeUiThemeMode(mode) {
@@ -936,6 +940,11 @@ const refs = {
   editorModeBeginnerButton: document.getElementById("editorModeBeginnerButton"),
   editorModeAdvancedButton: document.getElementById("editorModeAdvancedButton"),
   beginnerTutorialButton: document.getElementById("beginnerTutorialButton"),
+  commandPaletteButton: document.getElementById("commandPaletteButton"),
+  commandPaletteDialog: document.getElementById("commandPaletteDialog"),
+  commandPaletteSearchInput: document.getElementById("commandPaletteSearchInput"),
+  commandPaletteMeta: document.getElementById("commandPaletteMeta"),
+  commandPaletteList: document.getElementById("commandPaletteList"),
   globalUiThemeButtons: Array.from(document.querySelectorAll(".ui-theme-mode-button")),
   projectTitleBadge: document.getElementById("projectTitleBadge"),
   saveStatusBadge: document.getElementById("saveStatusBadge"),
@@ -2440,6 +2449,162 @@ function setBeginnerTutorialStep(stepIndex) {
   focusBeginnerTutorialDialog();
 }
 
+function getCommandPaletteContext() {
+  const starterOverview = state.data ? getStarterKitOverview() : {};
+  const validation = state.data ? state.validation ?? runValidation(state.data) : { errors: [], warnings: [] };
+  return {
+    hasProject: Boolean(state.data),
+    projectTitle: state.data?.project?.title ?? getProjectCenterActiveTitle(),
+    currentScreen: state.currentScreen,
+    chapterCount: state.data?.chapters?.length ?? 0,
+    sceneCount: state.data?.scenes?.length ?? 0,
+    needsStarterKit: Boolean(starterOverview.needsStarterKit),
+    errorCount: validation?.errors?.length ?? 0,
+  };
+}
+
+function getCommandPaletteCommands() {
+  return commandPaletteTools?.buildCommandPaletteCommands?.(getCommandPaletteContext()) ?? [];
+}
+
+function getFilteredCommandPaletteCommands() {
+  const commands = getCommandPaletteCommands();
+  return commandPaletteTools?.filterCommandPaletteCommands?.(commands, state.commandPaletteQuery) ?? commands;
+}
+
+function renderCommandPalette() {
+  if (!refs.commandPaletteDialog || !refs.commandPaletteList) {
+    return;
+  }
+  refs.commandPaletteDialog.hidden = !state.commandPaletteOpen;
+  refs.commandPaletteDialog.classList.toggle("is-open", state.commandPaletteOpen);
+  if (!state.commandPaletteOpen) {
+    return;
+  }
+
+  const commands = getFilteredCommandPaletteCommands();
+  state.commandPaletteSelectedIndex =
+    commandPaletteTools?.clampCommandPaletteIndex?.(state.commandPaletteSelectedIndex, commands) ?? 0;
+  refs.commandPaletteList.innerHTML =
+    commandPaletteTools?.renderCommandPaletteList?.(commands, state.commandPaletteSelectedIndex, { escapeHtml }) ?? "";
+  if (refs.commandPaletteMeta) {
+    refs.commandPaletteMeta.textContent = state.data
+      ? `当前项目：${state.data.project?.title ?? "未命名项目"} · ${commands.length} 条可搜指令`
+      : `未打开项目 · ${commands.length} 条入口`;
+  }
+  if (refs.commandPaletteSearchInput && refs.commandPaletteSearchInput.value !== state.commandPaletteQuery) {
+    refs.commandPaletteSearchInput.value = state.commandPaletteQuery;
+  }
+}
+
+function openCommandPalette() {
+  state.commandPaletteOpen = true;
+  state.commandPaletteQuery = "";
+  state.commandPaletteSelectedIndex = 0;
+  renderCommandPalette();
+  window.requestAnimationFrame(() => {
+    refs.commandPaletteSearchInput?.focus();
+    refs.commandPaletteSearchInput?.select?.();
+  });
+}
+
+function closeCommandPalette({ silent = false } = {}) {
+  state.commandPaletteOpen = false;
+  state.commandPaletteQuery = "";
+  state.commandPaletteSelectedIndex = 0;
+  renderCommandPalette();
+  if (!silent) {
+    refs.commandPaletteButton?.focus?.();
+  }
+}
+
+function buildVirtualActionTarget(command) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.textContent = command.title ?? "";
+  button.dataset.action = command.action ?? "";
+  Object.entries(command.dataset ?? {}).forEach(([key, value]) => {
+    button.setAttribute(`data-${key}`, String(value ?? ""));
+  });
+  return button;
+}
+
+async function runCommandPaletteCommand(commandId) {
+  const command = getCommandPaletteCommands().find((item) => item.id === commandId);
+  if (!command) {
+    showToast("没有找到这条指令", "error");
+    return;
+  }
+  if (command.disabled) {
+    showToast(command.disabledReason || "这条指令当前不可用", "error");
+    return;
+  }
+
+  closeCommandPalette({ silent: true });
+  const virtualTarget = buildVirtualActionTarget(command);
+  await handleClick({
+    target: virtualTarget,
+    preventDefault() {},
+  });
+}
+
+async function runSelectedCommandPaletteCommand() {
+  const commands = getFilteredCommandPaletteCommands();
+  const index = commandPaletteTools?.clampCommandPaletteIndex?.(state.commandPaletteSelectedIndex, commands) ?? 0;
+  const command = commands[index];
+  if (!command) {
+    showToast("没有可执行的指令", "error");
+    return;
+  }
+  await runCommandPaletteCommand(command.id);
+}
+
+function handleCommandPaletteKeydown(event) {
+  if (!state.commandPaletteOpen) {
+    return false;
+  }
+  const commands = getFilteredCommandPaletteCommands();
+
+  if (event.code === "Escape") {
+    event.preventDefault();
+    closeCommandPalette();
+    return true;
+  }
+  if (event.code === "ArrowDown") {
+    event.preventDefault();
+    state.commandPaletteSelectedIndex =
+      commands.length > 0 ? (state.commandPaletteSelectedIndex + 1) % commands.length : 0;
+    renderCommandPalette();
+    return true;
+  }
+  if (event.code === "ArrowUp") {
+    event.preventDefault();
+    state.commandPaletteSelectedIndex =
+      commands.length > 0 ? (state.commandPaletteSelectedIndex - 1 + commands.length) % commands.length : 0;
+    renderCommandPalette();
+    return true;
+  }
+  if (event.code === "Home") {
+    event.preventDefault();
+    state.commandPaletteSelectedIndex = 0;
+    renderCommandPalette();
+    return true;
+  }
+  if (event.code === "End") {
+    event.preventDefault();
+    state.commandPaletteSelectedIndex = Math.max(commands.length - 1, 0);
+    renderCommandPalette();
+    return true;
+  }
+  if (event.code === "Enter") {
+    event.preventDefault();
+    void runSelectedCommandPaletteCommand();
+    return true;
+  }
+
+  return false;
+}
+
 function handleBeginnerTutorialStepKeyboardNavigation(event) {
   if (!state.beginnerTutorialOpen || !refs.beginnerTutorialStepList || !(event.target instanceof HTMLElement)) {
     return false;
@@ -2794,6 +2959,21 @@ async function handleClick(event) {
 
   if (action === "open-beginner-tutorial") {
     openBeginnerTutorial({ stepIndex: actionTarget.dataset.stepIndex });
+    return;
+  }
+
+  if (action === "open-command-palette") {
+    openCommandPalette();
+    return;
+  }
+
+  if (action === "close-command-palette") {
+    closeCommandPalette();
+    return;
+  }
+
+  if (action === "run-command-palette-command") {
+    await runCommandPaletteCommand(actionTarget.dataset.commandId);
     return;
   }
 
@@ -5357,6 +5537,13 @@ function handleInput(event) {
     return;
   }
 
+  if (event.target.id === "commandPaletteSearchInput") {
+    state.commandPaletteQuery = event.target.value ?? "";
+    state.commandPaletteSelectedIndex = 0;
+    renderCommandPalette();
+    return;
+  }
+
   if (event.target.id === "historySearchInput") {
     state.historySearchQuery = event.target.value ?? "";
     if (state.currentScreen === "dashboard") {
@@ -5396,6 +5583,16 @@ function handleInput(event) {
 function handleGlobalKeydown(event) {
   if (systemDialogController?.hasActiveDialog?.()) {
     systemDialogController.handleKeydown(event, { isKeyboardTypingTarget });
+    return;
+  }
+
+  if ((event.metaKey || event.ctrlKey) && event.code === "KeyK") {
+    event.preventDefault();
+    state.commandPaletteOpen ? closeCommandPalette() : openCommandPalette();
+    return;
+  }
+
+  if (handleCommandPaletteKeydown(event)) {
     return;
   }
 

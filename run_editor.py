@@ -28,6 +28,8 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlparse
 from urllib.request import Request, urlopen
 
+from editor_local_security import is_local_editor_host, is_local_editor_origin
+from editor_snapshot_cache import SnapshotCache, build_file_cache_signature
 from openai_asset_generation import (
     call_openai_asset_generation_model,
     normalize_openai_asset_generation_type,
@@ -614,6 +616,7 @@ CURRENT_PROJECT_INFO = {
 }
 HAS_SELECTED_PROJECT = False
 CURRENT_SERVER_SESSION_ID = f"server_session_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{os.getpid()}"
+PROJECT_BUNDLE_CACHE = SnapshotCache()
 
 
 def find_available_port(start_port: int) -> int:
@@ -1424,6 +1427,7 @@ def set_active_project_paths(project_id: str, project_dir: Path, kind: str = "pr
         "kind": kind,
         "projectDir": str(project_dir),
     }
+    clear_project_bundle_cache()
     migrate_project_directory(project_dir, project_id)
     ensure_project_history_initialized(project_dir)
     mark_project_session_running(project_id, project_dir, kind=kind)
@@ -1563,6 +1567,47 @@ def list_chapter_files() -> list[Path]:
     return sorted(CHAPTERS_DIR.glob("chapter_*.json"))
 
 
+def clear_project_bundle_cache() -> None:
+    PROJECT_BUNDLE_CACHE.clear()
+
+
+def build_project_bundle_cache_signature() -> tuple:
+    project_dir = Path(CURRENT_PROJECT_INFO.get("projectDir") or SAMPLE_PROJECT_DIR)
+    history_root = get_history_root(project_dir)
+    watched_files = [
+        PROJECT_PATH,
+        DATA_DIR / "assets.json",
+        DATA_DIR / "characters.json",
+        DATA_DIR / "variables.json",
+        get_history_manifest_path(project_dir),
+        get_session_state_path(project_dir),
+        *list_chapter_files(),
+    ]
+    watched_signatures = [build_file_cache_signature(path) for path in watched_files]
+
+    asset_file_signatures: list[tuple] = []
+    try:
+        assets_doc = read_json(DATA_DIR / "assets.json")
+    except Exception:
+        assets_doc = {}
+    for asset in assets_doc.get("assets", []) if isinstance(assets_doc, dict) else []:
+        if not isinstance(asset, dict):
+            continue
+        relative_path = str(asset.get("path") or "").strip()
+        if not relative_path:
+            continue
+        asset_file_signatures.append(build_file_cache_signature(TEMPLATE_DIR / relative_path))
+
+    return (
+        str(CURRENT_PROJECT_INFO.get("projectId") or SAMPLE_PROJECT_ID),
+        str(CURRENT_PROJECT_INFO.get("kind") or "project"),
+        project_dir.as_posix(),
+        history_root.as_posix(),
+        tuple(watched_signatures),
+        tuple(asset_file_signatures),
+    )
+
+
 def build_public_asset_path(relative_path: str) -> str:
     normalized = str(relative_path or "").replace("\\", "/").strip("/")
     encoded = "/".join(quote(part) for part in normalized.split("/") if part)
@@ -1591,7 +1636,30 @@ def load_assets_document() -> dict:
     return assets_doc
 
 
-def load_project_bundle() -> dict:
+def build_current_project_summary_from_loaded(project: dict, chapter_docs: list[dict]) -> dict:
+    project_dir = Path(CURRENT_PROJECT_INFO.get("projectDir") or SAMPLE_PROJECT_DIR)
+    project_id = str(CURRENT_PROJECT_INFO.get("projectId") or SAMPLE_PROJECT_ID)
+    kind = str(CURRENT_PROJECT_INFO.get("kind") or "project")
+    resolution = project.get("resolution") or {"width": 1920, "height": 1080}
+    return {
+        "projectId": project_id,
+        "kind": kind,
+        "title": project.get("title") or project_id,
+        "template": project.get("template") or "blank",
+        "language": project.get("language") or DEFAULT_PROJECT_LANGUAGE,
+        "supportedLanguages": project.get("supportedLanguages") or [project.get("language") or DEFAULT_PROJECT_LANGUAGE],
+        "editorMode": project.get("editorMode") or DEFAULT_EDITOR_MODE,
+        "chapterCount": len(chapter_docs),
+        "sceneCount": sum(len(chapter.get("scenes", [])) for chapter in chapter_docs),
+        "updatedAt": project.get("updatedAt") or project.get("createdAt") or "",
+        "createdAt": project.get("createdAt") or project.get("updatedAt") or "",
+        "resolution": resolution,
+        "publicRoot": build_project_public_root(project_dir),
+        "isSample": kind == "sample",
+    }
+
+
+def build_project_bundle_uncached() -> dict:
     migration_result = migrate_project_directory(
         Path(CURRENT_PROJECT_INFO.get("projectDir") or SAMPLE_PROJECT_DIR),
         str(CURRENT_PROJECT_INFO.get("projectId") or SAMPLE_PROJECT_ID),
@@ -1612,7 +1680,7 @@ def load_project_bundle() -> dict:
 
     return {
         "project": project,
-        "currentProject": get_current_project_summary(),
+        "currentProject": build_current_project_summary_from_loaded(project, chapter_docs),
         "history": build_history_payload(),
         "sessionRecovery": build_session_recovery_payload(),
         "assets": load_assets_document(),
@@ -1620,6 +1688,13 @@ def load_project_bundle() -> dict:
         "variables": read_json(DATA_DIR / "variables.json"),
         "chapters": chapter_docs,
     }
+
+
+def load_project_bundle() -> dict:
+    return PROJECT_BUNDLE_CACHE.get_or_build(
+        build_project_bundle_cache_signature,
+        build_project_bundle_uncached,
+    )
 
 
 def now_iso() -> str:
@@ -12049,8 +12124,36 @@ class EditorRequestHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(ROOT_DIR), **kwargs)
 
+    def is_allowed_api_request(self, *, require_origin: bool = False) -> bool:
+        host = self.headers.get("Host", "")
+        if host and not is_local_editor_host(host):
+            return False
+
+        if require_origin:
+            origin = self.headers.get("Origin", "")
+            referer = self.headers.get("Referer", "")
+            if origin and not is_local_editor_origin(origin):
+                return False
+            if not origin and referer and not is_local_editor_origin(referer):
+                return False
+
+        return True
+
+    def reject_non_local_api_request(self) -> None:
+        self.send_json(
+            {
+                "ok": False,
+                "error": "为了保护本地项目，编辑器 API 只接受来自本机编辑器页面的请求。",
+            },
+            status=HTTPStatus.FORBIDDEN,
+        )
+
     def do_GET(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
+
+        if parsed.path.startswith("/api/") and not self.is_allowed_api_request():
+            self.reject_non_local_api_request()
+            return
 
         if parsed.path == "/api/project-center":
             self.handle_project_center()
@@ -12068,6 +12171,10 @@ class EditorRequestHandler(SimpleHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
+
+        if parsed.path.startswith("/api/") and not self.is_allowed_api_request(require_origin=True):
+            self.reject_non_local_api_request()
+            return
 
         if parsed.path == "/api/create-project":
             self.handle_create_project()

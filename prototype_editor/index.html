@@ -102,6 +102,14 @@
           >
             新手教程
           </button>
+          <button
+            id="commandPaletteButton"
+            class="toolbar-button toolbar-button-primary command-palette-open-button"
+            data-action="open-command-palette"
+            aria-keyshortcuts="Meta+K Control+K"
+          >
+            指挥面板
+          </button>
           <div class="ui-theme-switch-wrap" aria-label="界面外观">
             <span class="ui-theme-switch-label">外观</span>
             <div id="globalUiThemeSwitch" class="ui-theme-switch" role="group" aria-label="界面主题切换">
@@ -935,6 +943,38 @@
       </section>
     </div>
 
+    <div id="commandPaletteDialog" class="command-palette-backdrop" hidden>
+      <section
+        class="command-palette-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="commandPaletteTitle"
+        aria-describedby="commandPaletteSummary"
+      >
+        <header class="command-palette-head">
+          <div>
+            <div class="eyebrow">Canvasia Command Deck</div>
+            <h2 id="commandPaletteTitle">想做什么，直接搜</h2>
+            <p id="commandPaletteSummary">按 <kbd>⌘K</kbd> / <kbd>Ctrl K</kbd> 随时打开。回车执行，方向键选择。</p>
+          </div>
+          <button class="toolbar-button" type="button" data-action="close-command-palette" aria-label="关闭指挥面板">
+            关闭
+          </button>
+        </header>
+        <label class="command-palette-search">
+          <span>搜索指令</span>
+          <input
+            id="commandPaletteSearchInput"
+            type="search"
+            placeholder="例如：剧情、导出、素材、新手、深色"
+            autocomplete="off"
+          />
+        </label>
+        <div id="commandPaletteMeta" class="command-palette-meta">准备中</div>
+        <div id="commandPaletteList" class="command-palette-list" role="listbox" aria-label="可执行指令"></div>
+      </section>
+    </div>
+
     <script src="./modules/story_block_catalog.js"></script>
     <script src="./modules/story_block_editors.js"></script>
     <script src="./modules/story_templates.js"></script>
@@ -961,6 +1001,7 @@
     <script src="./modules/project_doctor.js"></script>
     <script src="./modules/project_milestones.js"></script>
     <script src="./modules/release_control.js"></script>
+    <script src="./modules/command_palette.js"></script>
     <script type="module" src="./app.js"></script>
   </body>
 </html>

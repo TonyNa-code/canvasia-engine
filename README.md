@@ -52,6 +52,7 @@ The project already includes a visual editor, export pipeline, native runtime pr
 
 - Visual story editor with scenes, cards, dialogue, narration, choices, variables, and conditional branches
 - Project center with playable Demo projects, blank projects, beginner mode, and advanced mode
+- Command Palette with Cmd/Ctrl+K quick actions for project setup, navigation, themes, tutorial access, and export flow
 - Asset management for backgrounds, character sprites, CGs, BGM, SFX, voice, fonts, UI assets, Live2D files, 3D models, and 3D scenes
 - Multi-language project settings for default language and player-selectable languages
 - Localized runtime text for scene names, chapter names, dialogue, choices, and character names, with safe fallback when a translation is missing
@@ -99,12 +100,15 @@ The project already includes a visual editor, export pipeline, native runtime pr
 ## Repository Layout
 
 - [`run_editor.py`](run_editor.py): local editor server, project management, export pipeline, and packaging entry point
+- [`editor_local_security.py`](editor_local_security.py): loopback-only API request guard helpers
+- [`editor_snapshot_cache.py`](editor_snapshot_cache.py): reusable file-signature snapshot cache for read-heavy editor payloads
 - [`prototype_editor`](prototype_editor): visual editor frontend
 - [`prototype_editor/modules`](prototype_editor/modules): frontend pure-logic modules with standalone test coverage
 - [`export_player_template`](export_player_template): exported Web Runtime template
 - [`native_runtime`](native_runtime): native Runtime player and related desktop runtime logic
 - [`template_project`](template_project): blank starter project template
 - [`tests`](tests): automated smoke and regression tests
+- [`docs/maintainer-guide.md`](docs/maintainer-guide.md): maintenance boundaries, safe extension pattern, and recommended checks
 
 ## Quick Start
 

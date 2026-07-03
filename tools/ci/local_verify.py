@@ -21,6 +21,8 @@ EDITOR_INDEX_PATH = ROOT_DIR / "prototype_editor" / "index.html"
 SCRIPT_SRC_PATTERN = re.compile(r"<script\b[^>]*\bsrc=[\"']([^\"']+)[\"'][^>]*>", re.IGNORECASE)
 
 PYTHON_SYNTAX_FILES = [
+    "editor_local_security.py",
+    "editor_snapshot_cache.py",
     "run_editor.py",
     "native_runtime/runtime_player.py",
     "native_runtime/build_native_runtime_app.py",
@@ -30,6 +32,7 @@ PYTHON_SYNTAX_FILES = [
     "tools/ci/local_verify.py",
     "tools/ci/project_health.py",
     "tests/test_ci_workflow_coverage.py",
+    "tests/test_editor_infrastructure.py",
     "tests/test_prepare_preview_release.py",
     "tests/test_release_public_surface.py",
     "tests/test_frontend_action_handlers.py",

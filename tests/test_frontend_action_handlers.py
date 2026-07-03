@@ -13,6 +13,7 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 EDITOR_DIR = ROOT_DIR / "prototype_editor"
 INDEX_PATH = EDITOR_DIR / "index.html"
 APP_PATH = EDITOR_DIR / "app.js"
+STYLES_PATH = EDITOR_DIR / "styles.css"
 PLAYER_PATH = ROOT_DIR / "export_player_template" / "player.js"
 NATIVE_RUNTIME_PATH = ROOT_DIR / "native_runtime" / "runtime_player.py"
 MODULE_PATHS = tuple(sorted((EDITOR_DIR / "modules").glob("*.js")))
@@ -220,6 +221,30 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("loadError.recovery = bundle.recovery ?? null", load_project_data)
         self.assertNotIn("response.json()", load_project_center)
         self.assertNotIn("response.json()", load_project_data)
+
+    def test_command_palette_wiring_stays_integrated_with_editor_actions(self) -> None:
+        html = INDEX_PATH.read_text(encoding="utf-8")
+        app_source = APP_PATH.read_text(encoding="utf-8")
+        styles = STYLES_PATH.read_text(encoding="utf-8")
+        handle_click = _extract_function_source(app_source, "handleClick")
+        handle_global_keydown = _extract_function_source(app_source, "handleGlobalKeydown")
+        get_context = _extract_function_source(app_source, "getCommandPaletteContext")
+        run_command = _extract_function_source(app_source, "runCommandPaletteCommand")
+
+        self.assertIn("./modules/command_palette.js", html)
+        self.assertIn('id="commandPaletteDialog"', html)
+        self.assertIn('aria-keyshortcuts="Meta+K Control+K"', html)
+        self.assertIn('action === "open-command-palette"', handle_click)
+        self.assertIn('action === "close-command-palette"', handle_click)
+        self.assertIn('action === "run-command-palette-command"', handle_click)
+        self.assertIn('event.code === "KeyK"', handle_global_keydown)
+        self.assertIn("handleCommandPaletteKeydown(event)", handle_global_keydown)
+        self.assertIn("state.data ? state.validation ?? runValidation(state.data) : { errors: [], warnings: [] }", get_context)
+        self.assertNotIn("validateProject()", get_context)
+        self.assertIn("buildVirtualActionTarget(command)", run_command)
+        self.assertIn("await handleClick({", run_command)
+        self.assertIn(".command-palette-item.is-selected", styles)
+        self.assertIn('html[data-ui-theme="light"] .command-palette-item.is-selected', styles)
 
     def test_editor_mode_switch_explains_project_center_default_scope(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
@@ -2615,6 +2640,9 @@ class FrontendActionHandlerTests(unittest.TestCase):
             }}
             function handleBeginnerTutorialDialogTab(event) {{
               tabCalls.push(event.code);
+              return false;
+            }}
+            function handleCommandPaletteKeydown() {{
               return false;
             }}
             function isKeyboardTypingTarget(target) {{
