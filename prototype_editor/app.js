@@ -51,6 +51,7 @@ const scriptImporterTools = window.CanvasiaEditorScriptImporter;
 const routeAnalyzerTools = window.CanvasiaEditorRouteAnalyzer;
 const routeTestingReportTools = window.CanvasiaEditorRouteTestingReport;
 const playtestHandoffReportTools = window.CanvasiaEditorPlaytestHandoffReport;
+const audioCueSheetTools = window.CanvasiaEditorAudioCueSheet;
 
 function getBlockLabel(type) {
   return storyBlockCatalogTools.getBlockLabel(type) ?? BLOCK_LABELS[type] ?? type ?? "步骤";
@@ -3814,6 +3815,16 @@ async function handleClick(event) {
 
   if (action === "export-inspection-report") {
     exportInspectionReport();
+    return;
+  }
+
+  if (action === "export-audio-cue-sheet-markdown") {
+    exportAudioCueSheetMarkdown();
+    return;
+  }
+
+  if (action === "export-audio-cue-sheet-csv") {
+    exportAudioCueSheetCsv();
     return;
   }
 
@@ -28408,6 +28419,17 @@ function buildRouteTestingPlanFileName(extension = "md") {
   return `${title}_route_testing_plan_${dateStamp}.${extension}`;
 }
 
+function buildAudioCueSheetFileName(extension = "md") {
+  const date = new Date();
+  const dateStamp = [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("");
+  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
+  return `${title}_audio_cue_sheet_${dateStamp}.${extension}`;
+}
+
 function buildPlaytestHandoffFileName(extension = "md") {
   const date = new Date();
   const dateStamp = [
@@ -29589,6 +29611,30 @@ function exportRouteTestingPlanCsv() {
   downloadTextFile(fileName, content, "text/csv;charset=utf-8");
   setSaveStatus(`已导出路线试玩 CSV：${fileName}`);
   showToast(`路线试玩 CSV 已导出：${fileName}`);
+}
+
+function buildAudioCueSheet() {
+  return audioCueSheetTools.buildAudioCueSheet(state.data ?? {});
+}
+
+function exportAudioCueSheetMarkdown() {
+  const fileName = buildAudioCueSheetFileName("md");
+  const sheet = buildAudioCueSheet();
+  const content = audioCueSheetTools.buildAudioCueSheetMarkdown(sheet, {
+    projectTitle: state.data?.project?.title || "Canvasia Project",
+    generatedAt: formatDate(new Date().toISOString()),
+  });
+  downloadTextFile(fileName, content, "text/markdown;charset=utf-8");
+  setSaveStatus(`已导出 BGM 调度表：${fileName}`);
+  showToast(`BGM 调度表已导出：${fileName}`);
+}
+
+function exportAudioCueSheetCsv() {
+  const fileName = buildAudioCueSheetFileName("csv");
+  const content = audioCueSheetTools.buildAudioCueSheetCsv(buildAudioCueSheet());
+  downloadTextFile(fileName, content, "text/csv;charset=utf-8");
+  setSaveStatus(`已导出 BGM 调度 CSV：${fileName}`);
+  showToast(`BGM 调度 CSV 已导出：${fileName}`);
 }
 
 function buildPlaytestHandoffContext() {
@@ -30885,6 +30931,96 @@ function renderProjectDoctorPanel(routeOverview, issueItems) {
   `;
 }
 
+function getAudioCueSheetToneClass(status) {
+  if (status === "blocked") {
+    return "danger-text";
+  }
+  if (status === "warn") {
+    return "warn-text";
+  }
+  if (status === "ready") {
+    return "good-text";
+  }
+  return "";
+}
+
+function renderAudioCueSheetPanel() {
+  const sheet = buildAudioCueSheet();
+  const digest = audioCueSheetTools.getAudioCueSheetStatusDigest(sheet);
+  const summary = sheet.summary ?? {};
+  const topIssues = (sheet.issues ?? []).slice(0, 4);
+  const cuePreview = (sheet.cues ?? []).slice(0, 4);
+
+  return `
+    <article class="detail-card preview-sprint-panel">
+      <div class="panel-heading">
+        <h2>BGM 调度表</h2>
+        <span class="badge badge-soft ${getAudioCueSheetToneClass(digest.status)}">${escapeHtml(digest.title)}</span>
+      </div>
+      <p class="helper-text">${escapeHtml(digest.detail)} 适合发布前把“哪首歌覆盖哪段剧情、在哪里淡入淡出、哪里需要试听”一次看清。</p>
+      <div class="preview-sprint-metrics">
+        ${renderRouteMetricCard("BGM 卡", `${summary.cueCount ?? 0} 张`, "项目中所有播放音乐卡")}
+        ${renderRouteMetricCard("指定范围", `${summary.explicitRangeCount ?? 0} 段`, "从某段文本播到另一段文本")}
+        ${renderRouteMetricCard("阻塞 / 提醒", `${summary.blockerCount ?? 0} / ${summary.warningCount ?? 0}`, "缺素材、坏范围或提前接管")}
+        ${renderRouteMetricCard("无 BGM 场景", `${summary.scenesWithoutMusicCount ?? 0} 个`, "有内容但没有播放音乐卡")}
+      </div>
+      <div class="detail-actions">
+        <button class="toolbar-button toolbar-button-primary" data-action="export-audio-cue-sheet-markdown">
+          导出 BGM 调度表
+        </button>
+        <button class="toolbar-button" data-action="export-audio-cue-sheet-csv">
+          导出 BGM CSV
+        </button>
+        <button class="toolbar-button" data-action="switch-screen" data-screen="story">
+          去剧情页调整音乐
+        </button>
+      </div>
+      ${
+        topIssues.length > 0
+          ? `
+            <div class="preview-sprint-grid">
+              ${topIssues
+                .map(
+                  (issue) => `
+                    <article class="preview-sprint-card is-${issue.severity === "blocker" ? "danger" : issue.severity === "warn" ? "warn" : "soft"}">
+                      <div class="preview-sprint-head">
+                        <strong>${escapeHtml(issue.title)}</strong>
+                        <span class="issue-tag ${issue.severity === "blocker" ? "danger-text" : issue.severity === "warn" ? "warn-text" : ""}">
+                          ${escapeHtml(issue.severity === "blocker" ? "先修" : issue.severity === "warn" ? "复查" : "润色")}
+                        </span>
+                      </div>
+                      <p>${escapeHtml(`${issue.chapterName} · ${issue.sceneName} · ${issue.assetName}`)}</p>
+                      <div class="helper-text">${escapeHtml(issue.detail)}</div>
+                    </article>
+                  `
+                )
+                .join("")}
+            </div>
+          `
+          : cuePreview.length > 0
+            ? `
+              <div class="list-stack compact-stack">
+                ${cuePreview
+                  .map(
+                    (cue) => `
+                      <div class="route-testing-item">
+                        <div>
+                          <b>${escapeHtml(cue.assetName)}</b>
+                          <span>${escapeHtml(`${cue.chapterName} · ${cue.sceneName} · ${cue.endModeLabel}`)}</span>
+                        </div>
+                        <span>${escapeHtml(`${cue.startLabel} -> ${cue.endLabel}`)}</span>
+                      </div>
+                    `
+                  )
+                  .join("")}
+              </div>
+            `
+            : renderEmpty("当前项目还没有播放音乐卡。可以先在剧情页给入口场景加一首 BGM。")
+      }
+    </article>
+  `;
+}
+
 function renderInspectionOverviewPanel(routeOverview) {
   const urgentMissingAssets = state.data.assetList.filter((asset) => isAssetUrgentMissing(asset)).length;
   const missingVoiceWarnings = state.validation.warnings.filter(
@@ -30944,6 +31080,7 @@ function renderInspectionOverviewPanel(routeOverview) {
       </div>
       ${renderCompactProjectMilestonePanel(routeOverview)}
       ${renderProjectDoctorPanel(routeOverview, issueItems)}
+      ${renderAudioCueSheetPanel()}
       ${renderReleaseFixOrderPanel(routeOverview)}
       ${renderPreviewRegressionPanel(routeOverview)}
       ${renderPreviewRegressionFixQueuePanel()}
