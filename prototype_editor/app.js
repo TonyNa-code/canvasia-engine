@@ -51,6 +51,7 @@ const { STORY_TEMPLATE_PRESETS } = storyTemplateTools;
 const scriptImporterTools = window.CanvasiaEditorScriptImporter;
 const routeAnalyzerTools = window.CanvasiaEditorRouteAnalyzer;
 const routeTestingReportTools = window.CanvasiaEditorRouteTestingReport;
+const previewRegressionTools = window.CanvasiaEditorPreviewRegression;
 const playtestHandoffReportTools = window.CanvasiaEditorPlaytestHandoffReport;
 const audioCueSheetTools = window.CanvasiaEditorAudioCueSheet;
 const stageDirectionSheetTools = window.CanvasiaEditorStageDirectionSheet;
@@ -25906,107 +25907,14 @@ function renderReleaseChecklistPanel() {
 }
 
 function buildPreviewRegressionSeeds(routeOverview) {
-  const seeds = [];
-  const seenSceneIds = new Set();
-
-  function appendSeed(sceneId, sourceLabel, reason, score = 0) {
-    const safeSceneId = getSafeSceneId(sceneId);
-    const scene = state.data?.scenesById.get(safeSceneId);
-
-    if (!scene || seenSceneIds.has(scene.id)) {
-      return;
-    }
-
-    seenSceneIds.add(scene.id);
-    seeds.push({
-      sceneId: scene.id,
-      sceneName: scene.name,
-      chapterName: scene.chapterName ?? "未分章",
-      sourceLabel,
-      reason,
-      score,
-    });
-  }
-
-  appendSeed(
-    state.data?.project?.entrySceneId,
-    "项目入口",
-    "从游戏真正开始的位置先跑一遍，是最基础也最关键的一条烟测路线。",
-    100
-  );
-
-  routeOverview.chapters.forEach((chapter) => {
-    const firstScene = chapter.scenes?.[0];
-    if (!firstScene) {
-      return;
-    }
-    appendSeed(
-      firstScene.id,
-      `章节起点 · ${chapter.name}`,
-      "把每一章的第一场先跑通，最容易提前发现章节切换和起手坏链。",
-      90
-    );
+  return previewRegressionTools.buildPreviewRegressionSeeds(routeOverview, {
+    entrySceneId: state.data?.project?.entrySceneId,
+    fallbackSceneId: state.data?.scenes?.[0]?.id,
+    scenesById: state.data?.scenesById,
+    getSafeSceneId,
+    maxCases: PREVIEW_REGRESSION_MAX_CASES,
+    branchingSeedLimit: PREVIEW_REGRESSION_BRANCHING_SEED_LIMIT,
   });
-
-  routeOverview.nodes
-    .filter((node) => node.branchTargetCount > 1)
-    .sort((left, right) => {
-      if (right.branchTargetCount !== left.branchTargetCount) {
-        return right.branchTargetCount - left.branchTargetCount;
-      }
-      return (right.errorCount ?? 0) - (left.errorCount ?? 0);
-    })
-    .slice(0, PREVIEW_REGRESSION_BRANCHING_SEED_LIMIT)
-    .forEach((node) => {
-      appendSeed(
-        node.id,
-        "分支场景",
-        `这里有 ${node.branchTargetCount} 条去向，先按默认选项烟测一遍，最容易提前发现跳转断裂。`,
-        80
-      );
-    });
-
-  routeOverview.nodes
-    .filter((node) => (node.errorCount ?? 0) > 0 || node.brokenRouteCount > 0 || node.isOrphan || node.isUnreachable)
-    .sort((left, right) => {
-      const leftScore =
-        (left.errorCount ?? 0) * 10 +
-        left.brokenRouteCount * 6 +
-        (left.isOrphan ? 4 : 0) +
-        (left.isUnreachable ? 4 : 0);
-      const rightScore =
-        (right.errorCount ?? 0) * 10 +
-        right.brokenRouteCount * 6 +
-        (right.isOrphan ? 4 : 0) +
-        (right.isUnreachable ? 4 : 0);
-      return rightScore - leftScore;
-    })
-    .forEach((node) => {
-      appendSeed(
-        node.id,
-        "问题高发场景",
-        "这段本身已经带问题信号，适合在正式导出前顺手做一次重点回归。",
-        70
-      );
-    });
-
-  if (!seeds.length && state.data?.scenes?.[0]?.id) {
-    appendSeed(
-      state.data.scenes[0].id,
-      "默认起点",
-      "项目里暂时没有更明显的关键节点，就先从第一场开始回归。",
-      60
-    );
-  }
-
-  return seeds
-    .sort((left, right) => {
-      if (right.score !== left.score) {
-        return right.score - left.score;
-      }
-      return left.sceneName.localeCompare(right.sceneName, "zh-CN");
-    })
-    .slice(0, PREVIEW_REGRESSION_MAX_CASES);
 }
 
 function getPreviewRegressionTerminalMeta(snapshot, previousSnapshot, steps) {
@@ -26090,9 +25998,30 @@ function runPreviewRegressionCase(seed) {
   const visitedStepCounts = new Map();
   const visitedSceneIds = new Set();
   const selectedOptionTexts = [];
+  const expectedTargetSceneId = String(seed.targetSceneId ?? "").trim();
+  let expectedTargetReached = !expectedTargetSceneId;
   let previousSnapshot = null;
   let steps = 0;
   let choiceCount = 0;
+
+  function finalizeResult(result) {
+    if (
+      seed.seedKind === "route_case" &&
+      expectedTargetSceneId &&
+      !expectedTargetReached &&
+      result.status === "pass"
+    ) {
+      result.status = "warn";
+      result.statusLabel = "目标分支未跑到";
+      result.reason = "这条分支没有按预期命中目标场景";
+      result.detail = `自动试玩从分支场景开始推进，但没有进入「${seed.targetSceneName || expectedTargetSceneId}」。如果这是条件分支，需要先补变量预设或手动确认触发条件。`;
+    }
+    result.targetSceneId = expectedTargetSceneId;
+    result.targetSceneName = seed.targetSceneName ?? "";
+    result.expectedTargetReached = expectedTargetReached;
+    result.actions = buildPreviewRegressionCaseActions(result);
+    return result;
+  }
 
   while (steps < PREVIEW_REGRESSION_MAX_STEPS) {
     const snapshot = getCurrentPreviewRegressionSnapshot(session);
@@ -26103,6 +26032,9 @@ function runPreviewRegressionCase(seed) {
 
     if (snapshot.sceneId) {
       visitedSceneIds.add(snapshot.sceneId);
+      if (expectedTargetSceneId && String(snapshot.sceneId) === expectedTargetSceneId) {
+        expectedTargetReached = true;
+      }
     }
 
     const stateKey = [
@@ -26134,8 +26066,7 @@ function runPreviewRegressionCase(seed) {
         anchorSceneId: anchorSnapshot?.sceneId ?? seed.sceneId,
         anchorBlockId: anchorSnapshot?.blockId ?? null,
       };
-      result.actions = buildPreviewRegressionCaseActions(result);
-      return result;
+      return finalizeResult(result);
     }
 
     if (snapshot.completed) {
@@ -26162,8 +26093,7 @@ function runPreviewRegressionCase(seed) {
         anchorSceneId: terminalMeta.anchorSnapshot?.sceneId ?? seed.sceneId,
         anchorBlockId: terminalMeta.anchorSnapshot?.blockId ?? null,
       };
-      result.actions = buildPreviewRegressionCaseActions(result);
-      return result;
+      return finalizeResult(result);
     }
 
     if (snapshot.blockType === "choice") {
@@ -26185,11 +26115,13 @@ function runPreviewRegressionCase(seed) {
           anchorSceneId: snapshot.sceneId ?? seed.sceneId,
           anchorBlockId: snapshot.blockId ?? null,
         };
-        result.actions = buildPreviewRegressionCaseActions(result);
-        return result;
+        return finalizeResult(result);
       }
 
-      const selectedOption = snapshot.choiceOptions[0];
+      const selectedOption = previewRegressionTools.chooseRegressionOption(snapshot.choiceOptions, seed, {
+        sceneId: snapshot.sceneId,
+        blockIndex: snapshot.blockIndex,
+      });
       choiceCount += 1;
       selectedOptionTexts.push(truncateText(selectedOption.text || `选项 ${choiceCount}`, 18));
       previousSnapshot = snapshot;
@@ -26219,8 +26151,7 @@ function runPreviewRegressionCase(seed) {
         anchorSceneId: snapshot.sceneId ?? seed.sceneId,
         anchorBlockId: snapshot.blockId ?? null,
       };
-      result.actions = buildPreviewRegressionCaseActions(result);
-      return result;
+      return finalizeResult(result);
     }
 
     steps += 1;
@@ -26243,8 +26174,7 @@ function runPreviewRegressionCase(seed) {
     anchorSceneId: previousSnapshot?.sceneId ?? seed.sceneId,
     anchorBlockId: previousSnapshot?.blockId ?? null,
   };
-  result.actions = buildPreviewRegressionCaseActions(result);
-  return result;
+  return finalizeResult(result);
 }
 
 function runPreviewRegressionSmokeTest(routeOverview = buildSceneRouteOverview()) {
@@ -26304,7 +26234,7 @@ function renderPreviewRegressionCaseCard(caseResult) {
         <span class="issue-tag">选择 ${caseResult.choiceCount} 次</span>
         ${
           caseResult.selectedOptionTexts.length > 0
-            ? `<span class="issue-tag">${escapeHtml(`默认选项：${caseResult.selectedOptionTexts.slice(0, 2).join(" / ")}`)}${
+            ? `<span class="issue-tag">${escapeHtml(`选择路线：${caseResult.selectedOptionTexts.slice(0, 2).join(" / ")}`)}${
                 caseResult.selectedOptionTexts.length > 2 ? "…" : ""
               }</span>`
             : ""
@@ -29269,7 +29199,7 @@ function buildInspectionReportContent() {
         `   细节：${caseResult.detail}`,
         `   步数：${caseResult.steps} / 访问场景：${caseResult.visitedSceneCount} / 选择次数：${caseResult.choiceCount}`,
         caseResult.selectedOptionTexts.length > 0
-          ? `   默认选项：${caseResult.selectedOptionTexts.join(" / ")}`
+          ? `   选择路线：${caseResult.selectedOptionTexts.join(" / ")}`
           : "",
         ""
       );

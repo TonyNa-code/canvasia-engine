@@ -155,6 +155,9 @@
       targetSceneName: targetScene?.name ?? (config.targetSceneId || missingTargetLabel),
       targetExists: Boolean(targetScene),
       routeKind: config.routeKind,
+      blockIndex: Number.isInteger(config.blockIndex) ? config.blockIndex : null,
+      optionIndex: Number.isInteger(config.optionIndex) ? config.optionIndex : null,
+      branchIndex: Number.isInteger(config.branchIndex) ? config.branchIndex : null,
       label: config.label,
       shortLabel: config.shortLabel,
       meta: config.meta,
@@ -189,6 +192,7 @@
             createSceneRoute(scene, {
               blockIndex,
               routeKind: "choice",
+              optionIndex,
               targetSceneId: option.gotoSceneId,
               label: safeTruncate(option.text || `选项 ${optionIndex + 1}`, 20),
               shortLabel: "选项",
@@ -204,6 +208,7 @@
             createSceneRoute(scene, {
               blockIndex,
               routeKind: "condition",
+              branchIndex,
               targetSceneId: branch.gotoSceneId,
               label: summarizeConditionBranch(branch),
               shortLabel: "条件",
@@ -216,6 +221,7 @@
           createSceneRoute(scene, {
             blockIndex,
             routeKind: "fallback",
+            branchIndex: -1,
             targetSceneId: block.elseGotoSceneId,
             label: "都不满足时",
             shortLabel: "否则",
@@ -314,6 +320,9 @@
             order: routeIndex + 1,
             routeId: route.id,
             routeKind: route.routeKind,
+            blockIndex: route.blockIndex,
+            optionIndex: route.optionIndex,
+            branchIndex: route.branchIndex,
             label: getRoutePathStepLabel(route),
             sourceSceneId: node.id,
             sourceSceneName: node.name,

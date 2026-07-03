@@ -3903,6 +3903,9 @@ class FrontendActionHandlerTests(unittest.TestCase):
         regression_block_end = click_handler.index('action === "export-inspection-report"', regression_block_start)
         regression_block = click_handler[regression_block_start:regression_block_end]
 
+        self.assertIn("const previewRegressionTools = window.CanvasiaEditorPreviewRegression", source)
+        self.assertIn("previewRegressionTools.buildPreviewRegressionSeeds", source)
+        self.assertIn("previewRegressionTools.chooseRegressionOption", source)
         self.assertIn("state.inspectionRegressionResult = runPreviewRegressionSmokeTest", regression_block)
         self.assertIn('state.currentScreen === "preview"', regression_block)
         self.assertIn("renderPreviewScreen();", regression_block)
