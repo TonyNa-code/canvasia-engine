@@ -42,6 +42,45 @@
   const TEXT_LONG_WARNING_LINES = 5;
   const CHOICE_LONG_WARNING_LENGTH = 42;
   const CHOICE_MANY_OPTIONS = 6;
+  const CHOICE_CONTINUE_TARGET = "__continue__";
+
+  const SCENE_RECIPE_SUGGESTIONS = Object.freeze({
+    playable_scene: Object.freeze({
+      templateId: "playable_scene",
+      title: "先生成可试玩骨架",
+      actionLabel: "插入可试玩段落",
+      detail: "这个场景还没站起来，先用可试玩段落把背景、角色、台词、选项和收尾串成一段。",
+      priority: 95,
+    }),
+    daily_conversation: Object.freeze({
+      templateId: "daily_conversation",
+      title: "补日常对话节奏",
+      actionLabel: "插入日常节奏",
+      detail: "这个场景已经有内容，但基础画面或 BGM 氛围不够完整，适合补一组日常对话节奏。",
+      priority: 72,
+    }),
+    affection_choice: Object.freeze({
+      templateId: "affection_choice",
+      title: "加一个有后果的选项",
+      actionLabel: "插入好感选项",
+      detail: "正文已经能读了，可以加一组带变量后果的选项，让玩家感觉选择真的有意义。",
+      priority: 64,
+    }),
+    climax_sequence: Object.freeze({
+      templateId: "climax_sequence",
+      title: "补高潮演出段",
+      actionLabel: "插入高潮演出",
+      detail: "这个场景演出变化偏少，适合用镜头、闪屏、震动和景深把关键句抬起来。",
+      priority: 58,
+    }),
+    scene_outro: Object.freeze({
+      templateId: "scene_outro",
+      title: "补场景收尾",
+      actionLabel: "插入场景收尾",
+      detail: "这段已经比较完整，接下来可以补一个收束和转场，让试玩段落更像正式作品。",
+      priority: 42,
+    }),
+  });
 
   function toArray(value) {
     return Array.isArray(value) ? value : [];
@@ -50,6 +89,10 @@
   function cleanText(value, fallback = "") {
     const text = String(value ?? "").replace(/\s+/g, " ").trim();
     return text || fallback;
+  }
+
+  function isChoiceContinueTarget(value) {
+    return cleanText(value) === CHOICE_CONTINUE_TARGET;
   }
 
   function clamp(value, min, max) {
@@ -264,10 +307,37 @@
     return "继续打磨";
   }
 
+  function getSceneRecipeSuggestion(report = {}) {
+    const issues = toArray(report.issues);
+    const hasBlockingRoute = issues.some((issue) => issue.code === "scene_bad_route_target");
+    if (hasBlockingRoute) {
+      return null;
+    }
+    if (!report.hasStoryContent || (report.blockCount ?? 0) === 0) {
+      return SCENE_RECIPE_SUGGESTIONS.playable_scene;
+    }
+    if (!report.hasBackground || !report.hasMusic) {
+      return SCENE_RECIPE_SUGGESTIONS.daily_conversation;
+    }
+    if ((report.choiceCount ?? 0) === 0 && ((report.dialogueCount ?? 0) + (report.narrationCount ?? 0)) >= 2) {
+      return SCENE_RECIPE_SUGGESTIONS.affection_choice;
+    }
+    if (!report.hasEffects) {
+      return SCENE_RECIPE_SUGGESTIONS.climax_sequence;
+    }
+    if (report.status === "ready" && (report.choiceCount ?? 0) > 0) {
+      return SCENE_RECIPE_SUGGESTIONS.scene_outro;
+    }
+    return null;
+  }
+
   function getRouteTargetIssues(scene, blocks = [], sceneMap = new Map(), baseContext = {}) {
     const issues = [];
     function inspectTarget(targetSceneId, context) {
       const cleanTarget = cleanText(targetSceneId);
+      if (isChoiceContinueTarget(cleanTarget)) {
+        return;
+      }
       if (!cleanTarget || !sceneMap.has(cleanTarget)) {
         pushIssue(
           issues,
@@ -445,8 +515,10 @@
       ...metrics,
       ...issueCounts,
       nextAction: "",
+      recipeSuggestion: null,
     };
     report.nextAction = getSceneNextAction(report);
+    report.recipeSuggestion = getSceneRecipeSuggestion(report);
     return report;
   }
 
@@ -477,6 +549,7 @@
       blockerCount: issues.filter((issue) => issue.severity === "blocker").length,
       warningCount: issues.filter((issue) => issue.severity === "warn").length,
       tipCount: issues.filter((issue) => issue.severity === "tip").length,
+      recipeSuggestionCount: scenes.filter((scene) => Boolean(scene.recipeSuggestion)).length,
       averageCompletion: scenes.length
         ? Math.round(scenes.reduce((total, scene) => total + scene.completionScore, 0) / scenes.length)
         : 0,
@@ -578,6 +651,7 @@
       scene.hasBackground ? "有" : "缺",
       scene.hasMusic ? "有" : "缺",
       scene.hasEffects ? "有" : "少",
+      scene.recipeSuggestion?.title ?? "",
     ]);
     const issueRows = toArray(board.issues).slice(0, 40).map((issue, index) => [
       index + 1,
@@ -618,7 +692,7 @@
       "",
       "## 场景任务",
       "",
-      buildMarkdownTable(["状态", "章节", "场景", "完成度", "下一步", "卡片", "台词", "待绑语音", "背景", "BGM", "演出"], sceneRows) || "当前没有可列出的场景。",
+      buildMarkdownTable(["状态", "章节", "场景", "完成度", "下一步", "卡片", "台词", "待绑语音", "背景", "BGM", "演出", "推荐配方"], sceneRows) || "当前没有可列出的场景。",
       "",
       "## 优先问题",
       "",
@@ -645,10 +719,12 @@
       scene.hasBackground ? "有" : "缺",
       scene.hasMusic ? "有" : "缺",
       scene.hasEffects ? "有" : "少",
+      scene.recipeSuggestion?.title ?? "",
+      scene.recipeSuggestion?.templateId ?? "",
       scene.issues.map((issue) => issue.title).join(" / "),
     ]);
     return `\uFEFF${buildCsv(
-      ["序号", "状态", "章节", "场景", "完成度", "下一步", "卡片", "台词", "旁白", "选项", "条件", "待绑语音", "语音完成度", "背景", "BGM", "演出", "问题"],
+      ["序号", "状态", "章节", "场景", "完成度", "下一步", "卡片", "台词", "旁白", "选项", "条件", "待绑语音", "语音完成度", "背景", "BGM", "演出", "推荐配方", "配方 ID", "问题"],
       rows
     )}\n`;
   }
@@ -660,5 +736,6 @@
     buildSceneProductionBoardCsv,
     getSceneStatusLabel,
     getSceneNextAction,
+    getSceneRecipeSuggestion,
   });
 })(typeof window !== "undefined" ? window : globalThis);

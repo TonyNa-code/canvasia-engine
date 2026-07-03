@@ -45,6 +45,7 @@ class FrontendSceneProductionBoardModuleTests(unittest.TestCase):
                           options: [
                             {{ id: "a", text: "去屋顶", gotoSceneId: "scene_roof" }},
                             {{ id: "b", text: "这是一个非常非常非常非常非常非常非常长的选项文案，长到按钮区会明显拥挤，甚至需要玩家停下来读完才能理解", gotoSceneId: "scene_missing" }},
+                            {{ id: "c", text: "继续听她说", gotoSceneId: "__continue__" }},
                           ],
                         }},
                       ],
@@ -104,10 +105,12 @@ class FrontendSceneProductionBoardModuleTests(unittest.TestCase):
         self.assertIn("buildSceneProductionBoard", payload["keys"])
         self.assertIn("buildSceneProductionBoardMarkdown", payload["keys"])
         self.assertIn("buildSceneProductionBoardCsv", payload["keys"])
+        self.assertIn("getSceneRecipeSuggestion", payload["keys"])
         self.assertEqual(payload["board"]["summary"]["sceneCount"], 3)
         self.assertGreater(payload["board"]["summary"]["blockedSceneCount"], 0)
         self.assertGreater(payload["board"]["summary"]["warningSceneCount"], 0)
         self.assertEqual(payload["board"]["summary"]["emptySceneCount"], 1)
+        self.assertEqual(payload["board"]["summary"]["recipeSuggestionCount"], 2)
         self.assertGreater(payload["board"]["summary"]["missingBackgroundSceneCount"], 0)
         self.assertGreater(payload["board"]["summary"]["missingMusicSceneCount"], 0)
         self.assertEqual(payload["board"]["summary"]["missingVoiceLineCount"], 1)
@@ -122,9 +125,16 @@ class FrontendSceneProductionBoardModuleTests(unittest.TestCase):
         self.assertIn("scene_long_text", issue_codes)
         self.assertIn("scene_many_choices", issue_codes)
         self.assertIn("scene_long_choice_text", issue_codes)
+        self.assertNotIn("__continue__", json.dumps(payload["board"]["issues"], ensure_ascii=False))
+        scenes_by_id = {scene["sceneId"]: scene for scene in payload["board"]["scenes"]}
+        self.assertIsNone(scenes_by_id["scene_start"]["recipeSuggestion"])
+        self.assertEqual(scenes_by_id["scene_roof"]["recipeSuggestion"]["templateId"], "daily_conversation")
+        self.assertEqual(scenes_by_id["scene_empty"]["recipeSuggestion"]["templateId"], "playable_scene")
         self.assertIn("# Demo Project 场景生产看板", payload["markdown"])
         self.assertIn("教室黄昏", payload["markdown"])
+        self.assertIn("补日常对话节奏", payload["markdown"])
         self.assertIn('"屋顶"', payload["csv"])
+        self.assertIn('"daily_conversation"', payload["csv"])
         self.assertEqual(payload["readyLabel"], "可试玩")
 
 

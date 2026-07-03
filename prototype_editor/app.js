@@ -4469,6 +4469,11 @@ async function handleClick(event) {
     return;
   }
 
+  if (action === "apply-story-template-to-scene") {
+    void applyStoryTemplateToScene(actionTarget.dataset.sceneId, actionTarget.dataset.templateId);
+    return;
+  }
+
   if (action === "apply-script-import-sample") {
     applyScriptImportSample();
     return;
@@ -31726,6 +31731,7 @@ function renderSceneProductionBoardPanel() {
         ${renderRouteMetricCard("可试玩 / 先修", `${summary.readySceneCount ?? 0} / ${summary.blockedSceneCount ?? 0}`, "能跑起来与需要先处理的场景")}
         ${renderRouteMetricCard("缺背景 / 缺 BGM", `${summary.missingBackgroundSceneCount ?? 0} / ${summary.missingMusicSceneCount ?? 0}`, "最基础的画面和氛围缺口")}
         ${renderRouteMetricCard("待绑语音", `${summary.missingVoiceLineCount ?? 0} 句`, "台词语音覆盖缺口")}
+        ${renderRouteMetricCard("推荐配方", `${summary.recipeSuggestionCount ?? 0} 个`, "可以一键补齐场景骨架")}
       </div>
       <div class="detail-actions">
         <button class="toolbar-button toolbar-button-primary" data-action="export-scene-production-board-markdown">
@@ -31756,6 +31762,27 @@ function renderSceneProductionBoardPanel() {
                       <div class="helper-text">
                         ${escapeHtml(`卡片 ${scene.blockCount} · 台词 ${scene.dialogueCount} · 待绑语音 ${scene.missingVoiceCount} · 背景 ${scene.hasBackground ? "有" : "缺"} · BGM ${scene.hasMusic ? "有" : "缺"}`)}
                       </div>
+                      ${
+                        scene.recipeSuggestion
+                          ? `
+                            <div class="route-testing-item">
+                              <div>
+                                <b>${escapeHtml(scene.recipeSuggestion.title)}</b>
+                                <span>${escapeHtml(scene.recipeSuggestion.detail)}</span>
+                              </div>
+                              <button
+                                type="button"
+                                class="toolbar-button toolbar-button-primary"
+                                data-action="apply-story-template-to-scene"
+                                data-scene-id="${escapeHtml(scene.sceneId)}"
+                                data-template-id="${escapeHtml(scene.recipeSuggestion.templateId)}"
+                              >
+                                ${escapeHtml(scene.recipeSuggestion.actionLabel)}
+                              </button>
+                            </div>
+                          `
+                          : ""
+                      }
                     </article>
                   `
                 )
@@ -36028,6 +36055,21 @@ async function applyStoryTemplate(templateId) {
     }
     showToast(`已插入模板：${preset.title}`);
   }
+}
+
+async function applyStoryTemplateToScene(sceneId, templateId) {
+  const safeSceneId = getSafeSceneId(sceneId);
+  const scene = state.data?.scenesById?.get(safeSceneId);
+  if (!scene) {
+    setSaveStatus("推荐配方对应的场景不存在", true);
+    showToast("找不到要插入配方的场景", "error");
+    return;
+  }
+
+  selectScene(safeSceneId);
+  rememberRecentScene(safeSceneId);
+  switchScreen("story");
+  await applyStoryTemplate(templateId);
 }
 
 async function duplicateSelectedBlock() {
