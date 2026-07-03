@@ -67,6 +67,14 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
               particle snow heavy fast
               particle stop
             `);
+            const textSpeedBlocks = tools.parseScriptDraftToBlocks(`
+              speed fast
+              悠奈：快跑！
+              旁白：时间像被拉长。 speed slow
+              voice yuina_002
+              text speed instant
+              yuina "别眨眼。"
+            `);
             process.stdout.write(JSON.stringify({{
               keys: Object.keys(tools).sort(),
               normalizedLines: tools.normalizeScriptImportText(" a\\r\\n\\n b ").join("|"),
@@ -74,7 +82,11 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
               choiceOptionLine: tools.parseChoiceOptionLine("- 去天台 -> scene_roof"),
               dialogueLine: tools.parseDialogueLine("悠奈：你终于来了。"),
               quotedDialogueLine: tools.parseQuotedDialogueLine('悠奈 "你终于来了。"'),
+              dialogueSpeedLine: tools.parseDialogueLine("悠奈：快跑！ speed fast"),
+              quotedDialogueSpeedLine: tools.parseQuotedDialogueLine('悠奈 "别眨眼。" speed instant'),
+              narrationSpeedLine: tools.parseDialogueLine("旁白：时间像被拉长。 speed slow"),
               narrationLine: tools.parseDialogueLine("旁白：雨声变大了。"),
+              speedLine: tools.parseTextSpeedLine("speed instant"),
               stageLine: tools.parseStageDirectionLine("show yuina smile at right with dissolve"),
               stageLineWithStage: tools.parseStageDirectionLine("show yuina smile at right with dissolve scale 118 x -8 y 3 opacity 90 layer 2 flip"),
               sfxLine: tools.parseStageDirectionLine("play sound door_knock"),
@@ -106,6 +118,8 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
               atmosphereBlocks,
               atmosphereSummary: tools.summarizeScriptDraftBlocks(atmosphereBlocks),
               atmospherePreview: tools.buildScriptDraftPreviewLines(atmosphereBlocks, 6),
+              textSpeedBlocks,
+              textSpeedPreview: tools.buildScriptDraftPreviewLines(textSpeedBlocks, 4),
             }}));
             """
         )
@@ -135,7 +149,25 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
             "speakerName": "悠奈",
             "text": "你终于来了。",
         })
+        self.assertEqual(payload["dialogueSpeedLine"], {
+            "type": "dialogue",
+            "speakerName": "悠奈",
+            "text": "快跑！",
+            "textSpeed": "fast",
+        })
+        self.assertEqual(payload["quotedDialogueSpeedLine"], {
+            "type": "dialogue",
+            "speakerName": "悠奈",
+            "text": "别眨眼。",
+            "textSpeed": "instant",
+        })
+        self.assertEqual(payload["narrationSpeedLine"], {
+            "type": "narration",
+            "text": "时间像被拉长。",
+            "textSpeed": "slow",
+        })
         self.assertEqual(payload["narrationLine"], {"type": "narration", "text": "雨声变大了。"})
+        self.assertEqual(payload["speedLine"], {"textSpeed": "instant"})
         self.assertEqual(payload["stageLine"], {
             "type": "character_show",
             "characterHint": "yuina",
@@ -336,6 +368,18 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
         self.assertIn("演出：关闭滤镜", payload["atmospherePreview"][1])
         self.assertIn("演出：景深：right / strong", payload["atmospherePreview"][2])
         self.assertIn("演出：停止粒子", payload["atmospherePreview"][5])
+        self.assertEqual([block["type"] for block in payload["textSpeedBlocks"]], [
+            "dialogue",
+            "narration",
+            "dialogue",
+        ])
+        self.assertEqual(payload["textSpeedBlocks"][0]["textSpeed"], "fast")
+        self.assertEqual(payload["textSpeedBlocks"][1]["textSpeed"], "slow")
+        self.assertEqual(payload["textSpeedBlocks"][2]["textSpeed"], "instant")
+        self.assertEqual(payload["textSpeedBlocks"][2]["voiceHint"], "yuina_002")
+        self.assertIn("speed: fast", payload["textSpeedPreview"][0])
+        self.assertIn("voice: yuina_002", payload["textSpeedPreview"][2])
+        self.assertIn("speed: instant", payload["textSpeedPreview"][2])
 
 
 if __name__ == "__main__":

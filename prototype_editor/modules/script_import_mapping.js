@@ -132,6 +132,7 @@
       callScriptImportResolver(resolvers, "getSafeNonNegativeNumber", [value, fallback], fallback ?? 0);
     const getVolumePercent = (value, fallback) =>
       callScriptImportResolver(resolvers, "getSafeVolumePercent", [value, fallback], fallback ?? 100);
+    const getTextSpeed = (value) => callScriptImportResolver(resolvers, "getSafeTextSpeed", [value], value || "normal");
     const getVideoFit = (value) => callScriptImportResolver(resolvers, "getSafeVideoFit", [value], value || "contain");
     const getVideoVolume = (value) => callScriptImportResolver(resolvers, "getSafeVideoVolume", [value], 100);
     const getShakeIntensity = (value) =>
@@ -199,19 +200,23 @@
 
     if (draftBlock.type === "dialogue") {
       const voiceAssetId = getAssetId(draftBlock.voiceHint, ["voice"]);
+      const textSpeed = draftBlock.textSpeed ? getTextSpeed(draftBlock.textSpeed) : "";
       return {
         type: "dialogue",
         speakerId: callScriptImportResolver(resolvers, "getSpeakerCharacterId", [draftBlock.speakerName], ""),
         text: String(draftBlock.text ?? "").trim(),
+        ...(textSpeed ? { textSpeed } : {}),
         ...(voiceAssetId ? { voiceAssetId, voiceVolume: 100 } : {}),
       };
     }
 
     if (draftBlock.type === "narration") {
       const voiceAssetId = getAssetId(draftBlock.voiceHint, ["voice"]);
+      const textSpeed = draftBlock.textSpeed ? getTextSpeed(draftBlock.textSpeed) : "";
       return {
         type: "narration",
         text: String(draftBlock.text ?? "").trim(),
+        ...(textSpeed ? { textSpeed } : {}),
         ...(voiceAssetId ? { voiceAssetId, voiceVolume: 100 } : {}),
       };
     }

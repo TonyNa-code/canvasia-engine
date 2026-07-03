@@ -21,6 +21,31 @@
     "particle_effect",
   ]);
   const ROUTE_DRAFT_TYPES = Object.freeze(["jump"]);
+  const TEXT_SPEED_ALIASES = Object.freeze({
+    slow: "slow",
+    slower: "slow",
+    low: "slow",
+    normal: "normal",
+    standard: "normal",
+    default: "normal",
+    fast: "fast",
+    quick: "fast",
+    rapid: "fast",
+    instant: "instant",
+    immediate: "instant",
+    instantly: "instant",
+    now: "instant",
+    慢: "slow",
+    慢速: "slow",
+    正常: "normal",
+    标准: "normal",
+    默认: "normal",
+    快: "fast",
+    快速: "fast",
+    立刻: "instant",
+    立即: "instant",
+    瞬间: "instant",
+  });
   const TRANSITION_ALIASES = Object.freeze({
     dissolve: "fade",
     fade: "fade",
@@ -68,6 +93,31 @@
     const text = trimImportedText(value, 800);
     const match = text.match(/^["“”'‘’](.+?)["“”'‘’]$/u);
     return trimImportedText(match ? match[1] : text, 800);
+  }
+
+  function getSafeImportedTextSpeed(value) {
+    const token = normalizeDirectiveToken(value).replace(/^text_speed_?/u, "");
+    return TEXT_SPEED_ALIASES[token] ?? "";
+  }
+
+  function parseTextSpeedLine(line) {
+    const match = String(line ?? "").trim().match(/^(?:text\s+speed|text_speed|speed|文字速度|文本速度|速度)\s*[:=]?\s*(\S+)$/iu);
+    const textSpeed = getSafeImportedTextSpeed(match?.[1] ?? "");
+    return textSpeed ? { textSpeed } : null;
+  }
+
+  function extractInlineTextSpeed(value) {
+    let text = trimImportedText(value, 800);
+    const speedPattern =
+      /(?:\s*(?:[\[（(]\s*(?:text\s+speed|text_speed|speed|文字速度|文本速度|速度)\s*[:=]?\s*(\S+?)\s*[\]）)]|(?:text\s+speed|text_speed|speed|文字速度|文本速度|速度)\s*[:=]?\s*(\S+)))\s*$/iu;
+    const match = text.match(speedPattern);
+    const textSpeed = getSafeImportedTextSpeed(match?.[1] ?? match?.[2] ?? "");
+    if (!textSpeed) {
+      return { text, textSpeed: "" };
+    }
+
+    text = trimImportedText(text.replace(speedPattern, ""), 800);
+    return { text, textSpeed };
   }
 
   function readLeadingArgument(value) {
@@ -392,31 +442,50 @@
     }
 
     const speakerName = trimImportedText(match[1], 80);
-    const text = trimImportedText(match[2], 800);
+    const inlineOptions = extractInlineTextSpeed(match[2]);
+    const text = inlineOptions.text;
     if (!speakerName || !text || ["旁白", "narration", "旁述"].includes(speakerName.toLowerCase())) {
-      return text ? { type: "narration", text } : null;
+      return text ? { type: "narration", text, ...(inlineOptions.textSpeed ? { textSpeed: inlineOptions.textSpeed } : {}) } : null;
     }
 
     return {
       type: "dialogue",
       speakerName,
       text,
+      ...(inlineOptions.textSpeed ? { textSpeed: inlineOptions.textSpeed } : {}),
     };
   }
 
   function parseQuotedDialogueLine(line) {
     const text = String(line ?? "").trim();
-    const dialogue = text.match(/^([^"“”]{1,32})\s+["“](.+?)["”]\s*$/u);
+    const dialogue = text.match(/^([^"“”]{1,32})\s+["“](.+?)["”](.*)$/u);
     if (dialogue) {
+      const trailingOptions = extractInlineTextSpeed(dialogue[3]);
+      const inlineOptions = extractInlineTextSpeed(dialogue[2]);
       return {
         type: "dialogue",
         speakerName: trimImportedText(dialogue[1], 80),
-        text: trimImportedText(dialogue[2], 800),
+        text: inlineOptions.text,
+        ...(trailingOptions.textSpeed || inlineOptions.textSpeed
+          ? { textSpeed: trailingOptions.textSpeed || inlineOptions.textSpeed }
+          : {}),
       };
     }
 
-    const narration = text.match(/^["“](.+?)["”]\s*$/u);
-    return narration ? { type: "narration", text: trimImportedText(narration[1], 800) } : null;
+    const narration = text.match(/^["“](.+?)["”](.*)$/u);
+    if (!narration) {
+      return null;
+    }
+
+    const trailingOptions = extractInlineTextSpeed(narration[2]);
+    const inlineOptions = extractInlineTextSpeed(narration[1]);
+    return {
+      type: "narration",
+      text: inlineOptions.text,
+      ...(trailingOptions.textSpeed || inlineOptions.textSpeed
+        ? { textSpeed: trailingOptions.textSpeed || inlineOptions.textSpeed }
+        : {}),
+    };
   }
 
   function parseStageDirectionLine(line) {
@@ -728,11 +797,16 @@
     const blocks = [];
     const choiceOptions = [];
     let pendingVoiceHint = "";
+    let pendingTextSpeed = "";
 
-    function attachPendingVoice(block) {
+    function attachPendingLineOptions(block) {
       if (pendingVoiceHint && (block?.type === "dialogue" || block?.type === "narration")) {
         block.voiceHint = pendingVoiceHint;
         pendingVoiceHint = "";
+      }
+      if (pendingTextSpeed && (block?.type === "dialogue" || block?.type === "narration") && !block.textSpeed) {
+        block.textSpeed = pendingTextSpeed;
+        pendingTextSpeed = "";
       }
       return block;
     }
@@ -749,6 +823,12 @@
       const voiceLine = parseVoiceLine(line);
       if (voiceLine) {
         pendingVoiceHint = voiceLine.voiceHint;
+        return;
+      }
+
+      const textSpeedLine = parseTextSpeedLine(line);
+      if (textSpeedLine) {
+        pendingTextSpeed = textSpeedLine.textSpeed;
         return;
       }
 
@@ -784,21 +864,23 @@
 
       const dialogue = parseDialogueLine(line);
       if (dialogue) {
-        blocks.push(attachPendingVoice(dialogue));
+        blocks.push(attachPendingLineOptions(dialogue));
         return;
       }
 
       const quotedDialogue = parseQuotedDialogueLine(line);
       if (quotedDialogue) {
-        blocks.push(attachPendingVoice(quotedDialogue));
+        blocks.push(attachPendingLineOptions(quotedDialogue));
         return;
       }
 
       const narration = trimImportedText(line);
       if (narration) {
-        blocks.push(attachPendingVoice({
+        const inlineOptions = extractInlineTextSpeed(narration);
+        blocks.push(attachPendingLineOptions({
           type: "narration",
-          text: narration,
+          text: inlineOptions.text,
+          ...(inlineOptions.textSpeed ? { textSpeed: inlineOptions.textSpeed } : {}),
         }));
       }
     });
@@ -905,7 +987,8 @@
       .map((block, index) => {
         if (block?.type === "dialogue") {
           const voiceSuffix = block.voiceHint ? `（voice: ${block.voiceHint}）` : "";
-          return `${index + 1}. ${block.speakerName || "角色"}：${block.text || ""}${voiceSuffix}`;
+          const speedSuffix = block.textSpeed ? `（speed: ${block.textSpeed}）` : "";
+          return `${index + 1}. ${block.speakerName || "角色"}：${block.text || ""}${voiceSuffix}${speedSuffix}`;
         }
         if (block?.type === "choice") {
           return `${index + 1}. 选项：${(block.options ?? [])
@@ -918,7 +1001,9 @@
         if (ROUTE_DRAFT_TYPES.includes(block?.type)) {
           return `${index + 1}. 路线：${buildRoutePreviewLine(block)}`;
         }
-        return `${index + 1}. 旁白：${block?.text || ""}${block?.voiceHint ? `（voice: ${block.voiceHint}）` : ""}`;
+        const voiceSuffix = block?.voiceHint ? `（voice: ${block.voiceHint}）` : "";
+        const speedSuffix = block?.textSpeed ? `（speed: ${block.textSpeed}）` : "";
+        return `${index + 1}. 旁白：${block?.text || ""}${voiceSuffix}${speedSuffix}`;
       });
   }
 
@@ -935,6 +1020,7 @@
     parseQuotedDialogueLine,
     parseStageDirectionLine,
     parseVoiceLine,
+    parseTextSpeedLine,
     parseJumpLine,
     parseScriptDraftToBlocks,
     summarizeScriptDraftBlocks,

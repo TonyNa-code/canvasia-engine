@@ -59,6 +59,7 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
               getSafeTransitionDurationMs: (value, fallback = 600) => Number.parseInt(value, 10) || fallback,
               getSafeNonNegativeNumber: (value, fallback = 0) => Math.max(0, Number.parseFloat(value) || fallback),
               getSafeVolumePercent: (value, fallback = 100) => Math.max(0, Math.min(100, Number.parseInt(value, 10) || fallback)),
+              getSafeTextSpeed: (value) => ["slow", "normal", "fast", "instant"].includes(value) ? value : "normal",
               getSafeVideoFit: (value) => ["contain", "cover", "fill"].includes(value) ? value : "contain",
               getSafeVideoVolume: (value) => Math.max(0, Math.min(100, Number.parseInt(value, 10) || 100)),
               getSafeShakeIntensity: (value) => ["light", "medium", "heavy"].includes(value) ? value : "medium",
@@ -109,7 +110,12 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
               mediumDuration: tools.getImportedEffectDuration(700),
               longDuration: tools.getImportedEffectDuration(1200),
               normalizedDialogue: tools.normalizeImportedDraftBlockForScene(
-                {{ type: "dialogue", speakerName: "Yuina", text: " hi ", voiceHint: "yuina_001" }},
+                {{ type: "dialogue", speakerName: "Yuina", text: " hi ", voiceHint: "yuina_001", textSpeed: "fast" }},
+                null,
+                resolvers
+              ),
+              normalizedNarration: tools.normalizeImportedDraftBlockForScene(
+                {{ type: "narration", text: " wait ", textSpeed: "instant" }},
                 null,
                 resolvers
               ),
@@ -229,10 +235,16 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
                 "type": "dialogue",
                 "speakerId": "char_yuina",
                 "text": "hi",
+                "textSpeed": "fast",
                 "voiceAssetId": "voice_yuina_001",
                 "voiceVolume": 100,
             },
         )
+        self.assertEqual(payload["normalizedNarration"], {
+            "type": "narration",
+            "text": "wait",
+            "textSpeed": "instant",
+        })
         self.assertEqual(
             payload["normalizedChoice"],
             {
