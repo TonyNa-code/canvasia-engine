@@ -73,6 +73,19 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
               getSafeCreditsDuration: (value) => Math.max(4, Math.min(180, Number.parseInt(value, 10) || 18)),
               getSafeCreditsBackground: (value) => ["dark", "light", "transparent"].includes(value) ? value : "dark",
               getSafeFadeAction: (value) => value === "fade_in" ? "fade_in" : "fade_out",
+              getSafeScreenFilterAction: (value) => ["apply", "clear"].includes(value) ? value : "apply",
+              getSafeScreenFilterPreset: (value) => ["memory", "mono", "dream", "cold"].includes(value) ? value : "memory",
+              getSafeScreenFilterStrength: (value) => ["soft", "medium", "strong"].includes(value) ? value : "medium",
+              getSafeScreenColorGrade: (value) => value && typeof value === "object" ? {{ ...value, safe: true }} : {{ safe: true }},
+              getSafeDepthBlurAction: (value) => ["apply", "clear"].includes(value) ? value : "apply",
+              getSafeDepthBlurFocus: (value) => ["left", "center", "right", "full"].includes(value) ? value : "center",
+              getSafeDepthBlurStrength: (value) => ["soft", "medium", "strong"].includes(value) ? value : "medium",
+              getSafeParticleAction: (value) => ["start", "stop"].includes(value) ? value : "start",
+              getSafeParticlePreset: (value) => ["snow", "rain", "petals", "dust", "embers", "sparkles", "bubbles", "confetti", "smoke", "flame", "stardust", "glyphs"].includes(value) ? value : "snow",
+              getSafeParticleIntensity: (value) => ["light", "medium", "heavy"].includes(value) ? value : "medium",
+              getSafeParticleSpeed: (value) => ["slow", "medium", "fast"].includes(value) ? value : "medium",
+              buildDefaultParticleEffectConfig: (preset) => ({{ type: "particle_effect", action: "start", preset, intensity: "medium", speed: "medium", density: 40 }}),
+              normalizeParticleEffectConfig: (config) => ({{ ...config, normalized: true }}),
               getEffectDuration: (value) => tools.getImportedEffectDuration(value),
               getDefaultJumpTargetSceneId: () => "scene_end",
               defaultCharacterStage: {{ scale: 1, opacity: 1 }},
@@ -142,6 +155,31 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
               ),
               normalizedPan: tools.normalizeImportedDraftBlockForScene(
                 {{ type: "camera_pan", target: "left", strength: "light" }},
+                null,
+                resolvers
+              ),
+              normalizedFilter: tools.normalizeImportedDraftBlockForScene(
+                {{ type: "screen_filter", action: "apply", preset: "memory", strength: "soft" }},
+                null,
+                resolvers
+              ),
+              normalizedFilterClear: tools.normalizeImportedDraftBlockForScene(
+                {{ type: "screen_filter", action: "clear", preset: "mono", strength: "strong" }},
+                null,
+                resolvers
+              ),
+              normalizedBlur: tools.normalizeImportedDraftBlockForScene(
+                {{ type: "depth_blur", action: "apply", focus: "right", strength: "strong" }},
+                null,
+                resolvers
+              ),
+              normalizedParticle: tools.normalizeImportedDraftBlockForScene(
+                {{ type: "particle_effect", action: "start", preset: "snow", intensity: "heavy", speed: "fast" }},
+                null,
+                resolvers
+              ),
+              normalizedParticleStop: tools.normalizeImportedDraftBlockForScene(
+                {{ type: "particle_effect", action: "stop", preset: "rain", intensity: "light", speed: "slow" }},
                 null,
                 resolvers
               ),
@@ -243,6 +281,44 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
             "focus": "right",
         })
         self.assertEqual(payload["normalizedPan"], {"type": "camera_pan", "target": "left", "strength": "light"})
+        self.assertEqual(payload["normalizedFilter"], {
+            "type": "screen_filter",
+            "action": "apply",
+            "preset": "memory",
+            "strength": "soft",
+            "grade": {"safe": True},
+        })
+        self.assertEqual(payload["normalizedFilterClear"], {
+            "type": "screen_filter",
+            "action": "clear",
+            "preset": "mono",
+            "strength": "strong",
+            "grade": {"safe": True},
+        })
+        self.assertEqual(payload["normalizedBlur"], {
+            "type": "depth_blur",
+            "action": "apply",
+            "focus": "right",
+            "strength": "strong",
+        })
+        self.assertEqual(payload["normalizedParticle"], {
+            "type": "particle_effect",
+            "action": "start",
+            "preset": "snow",
+            "intensity": "heavy",
+            "speed": "fast",
+            "density": 40,
+            "normalized": True,
+        })
+        self.assertEqual(payload["normalizedParticleStop"], {
+            "type": "particle_effect",
+            "action": "stop",
+            "preset": "rain",
+            "intensity": "light",
+            "speed": "slow",
+            "density": 40,
+            "normalized": True,
+        })
         self.assertEqual(payload["normalizedJumpFallback"], {"type": "jump", "targetSceneId": "scene_end"})
 
 

@@ -157,6 +157,37 @@
     const getFadeAction = (value) => callScriptImportResolver(resolvers, "getSafeFadeAction", [value], value || "fade_out");
     const getEffectDuration = (value) =>
       callScriptImportResolver(resolvers, "getEffectDuration", [value], getImportedEffectDuration(value));
+    const getScreenFilterAction = (value) =>
+      callScriptImportResolver(resolvers, "getSafeScreenFilterAction", [value], value || "apply");
+    const getScreenFilterPreset = (value) =>
+      callScriptImportResolver(resolvers, "getSafeScreenFilterPreset", [value], value || "memory");
+    const getScreenFilterStrength = (value) =>
+      callScriptImportResolver(resolvers, "getSafeScreenFilterStrength", [value], value || "medium");
+    const getScreenColorGrade = (value) => callScriptImportResolver(resolvers, "getSafeScreenColorGrade", [value], {});
+    const getDepthBlurAction = (value) =>
+      callScriptImportResolver(resolvers, "getSafeDepthBlurAction", [value], value || "apply");
+    const getDepthBlurFocus = (value) =>
+      callScriptImportResolver(resolvers, "getSafeDepthBlurFocus", [value], value || "center");
+    const getDepthBlurStrength = (value) =>
+      callScriptImportResolver(resolvers, "getSafeDepthBlurStrength", [value], value || "medium");
+    const getParticleAction = (value) =>
+      callScriptImportResolver(resolvers, "getSafeParticleAction", [value], value || "start");
+    const getParticlePreset = (value) =>
+      callScriptImportResolver(resolvers, "getSafeParticlePreset", [value], value || "snow");
+    const getParticleIntensity = (value) =>
+      callScriptImportResolver(resolvers, "getSafeParticleIntensity", [value], value || "medium");
+    const getParticleSpeed = (value) =>
+      callScriptImportResolver(resolvers, "getSafeParticleSpeed", [value], value || "medium");
+    const buildParticleDefaults = (preset) =>
+      callScriptImportResolver(resolvers, "buildDefaultParticleEffectConfig", [preset], {
+        type: "particle_effect",
+        action: "start",
+        preset,
+        intensity: "medium",
+        speed: "medium",
+      });
+    const normalizeParticleConfig = (config) =>
+      callScriptImportResolver(resolvers, "normalizeParticleEffectConfig", [config], config);
     const getChoiceContinueTarget = () => resolvers?.choiceContinueTarget ?? "__continue__";
 
     if (draftBlock.type === "dialogue") {
@@ -336,6 +367,38 @@
         color: "black",
         duration: getEffectDuration(draftBlock.durationMs),
       };
+    }
+
+    if (draftBlock.type === "screen_filter") {
+      const action = getScreenFilterAction(draftBlock.action);
+      return {
+        type: "screen_filter",
+        action,
+        preset: getScreenFilterPreset(draftBlock.preset),
+        strength: getScreenFilterStrength(draftBlock.strength),
+        grade: getScreenColorGrade(draftBlock.grade),
+      };
+    }
+
+    if (draftBlock.type === "depth_blur") {
+      return {
+        type: "depth_blur",
+        action: getDepthBlurAction(draftBlock.action),
+        focus: getDepthBlurFocus(draftBlock.focus),
+        strength: getDepthBlurStrength(draftBlock.strength),
+      };
+    }
+
+    if (draftBlock.type === "particle_effect") {
+      const preset = getParticlePreset(draftBlock.preset);
+      return normalizeParticleConfig({
+        ...buildParticleDefaults(preset),
+        type: "particle_effect",
+        action: getParticleAction(draftBlock.action),
+        preset,
+        intensity: getParticleIntensity(draftBlock.intensity),
+        speed: getParticleSpeed(draftBlock.speed),
+      });
     }
 
     if (draftBlock.type === "jump") {

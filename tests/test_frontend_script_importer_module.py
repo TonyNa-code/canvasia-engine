@@ -59,6 +59,14 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
               pan left light
               credits title "STAFF" subtitle "Thanks for playing" duration 24 light no-skip lines "企划：Tony|剧本：Tony"
             `);
+            const atmosphereBlocks = tools.parseScriptDraftToBlocks(`
+              filter memory soft
+              clear filter
+              blur right strong
+              clear blur
+              particle snow heavy fast
+              particle stop
+            `);
             process.stdout.write(JSON.stringify({{
               keys: Object.keys(tools).sort(),
               normalizedLines: tools.normalizeScriptImportText(" a\\r\\n\\n b ").join("|"),
@@ -74,6 +82,12 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
               flashLine: tools.parseStageDirectionLine("flash red strong long"),
               zoomLine: tools.parseStageDirectionLine("zoom out heavy right"),
               panLine: tools.parseStageDirectionLine("pan left light"),
+              filterLine: tools.parseStageDirectionLine("filter memory soft"),
+              clearFilterLine: tools.parseStageDirectionLine("clear filter"),
+              blurLine: tools.parseStageDirectionLine("blur right strong"),
+              clearBlurLine: tools.parseStageDirectionLine("clear blur"),
+              particleLine: tools.parseStageDirectionLine("particle snow heavy fast"),
+              particleStopLine: tools.parseStageDirectionLine("particle stop"),
               creditsLine: tools.parseStageDirectionLine('credits title "STAFF" subtitle "Thanks for playing" duration 24 light no-skip lines "企划：Tony|剧本：Tony"'),
               voiceLine: tools.parseVoiceLine("voice yuina_001"),
               jumpLine: tools.parseJumpLine("jump scene_end"),
@@ -88,6 +102,9 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
               directorBlocks,
               directorSummary: tools.summarizeScriptDraftBlocks(directorBlocks),
               directorPreview: tools.buildScriptDraftPreviewLines(directorBlocks, 5),
+              atmosphereBlocks,
+              atmosphereSummary: tools.summarizeScriptDraftBlocks(atmosphereBlocks),
+              atmospherePreview: tools.buildScriptDraftPreviewLines(atmosphereBlocks, 6),
             }}));
             """
         )
@@ -151,6 +168,44 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
             "focus": "right",
         })
         self.assertEqual(payload["panLine"], {"type": "camera_pan", "target": "left", "strength": "light"})
+        self.assertEqual(payload["filterLine"], {
+            "type": "screen_filter",
+            "action": "apply",
+            "preset": "memory",
+            "strength": "soft",
+        })
+        self.assertEqual(payload["clearFilterLine"], {
+            "type": "screen_filter",
+            "action": "clear",
+            "preset": "memory",
+            "strength": "medium",
+        })
+        self.assertEqual(payload["blurLine"], {
+            "type": "depth_blur",
+            "action": "apply",
+            "focus": "right",
+            "strength": "strong",
+        })
+        self.assertEqual(payload["clearBlurLine"], {
+            "type": "depth_blur",
+            "action": "clear",
+            "focus": "center",
+            "strength": "medium",
+        })
+        self.assertEqual(payload["particleLine"], {
+            "type": "particle_effect",
+            "action": "start",
+            "preset": "snow",
+            "intensity": "heavy",
+            "speed": "fast",
+        })
+        self.assertEqual(payload["particleStopLine"], {
+            "type": "particle_effect",
+            "action": "stop",
+            "preset": "snow",
+            "intensity": "medium",
+            "speed": "medium",
+        })
         self.assertEqual(payload["creditsLine"], {
             "type": "credits_roll",
             "title": "STAFF",
@@ -244,6 +299,26 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
         })
         self.assertIn("演出：震屏：heavy / short", payload["directorPreview"][0])
         self.assertIn("演出：片尾字幕：STAFF", payload["directorPreview"][4])
+        self.assertEqual([block["type"] for block in payload["atmosphereBlocks"]], [
+            "screen_filter",
+            "screen_filter",
+            "depth_blur",
+            "depth_blur",
+            "particle_effect",
+            "particle_effect",
+        ])
+        self.assertEqual(payload["atmosphereSummary"], {
+            "dialogue": 0,
+            "narration": 0,
+            "choice": 0,
+            "stage": 6,
+            "route": 0,
+            "total": 6,
+        })
+        self.assertIn("演出：滤镜：memory / soft", payload["atmospherePreview"][0])
+        self.assertIn("演出：关闭滤镜", payload["atmospherePreview"][1])
+        self.assertIn("演出：景深：right / strong", payload["atmospherePreview"][2])
+        self.assertIn("演出：停止粒子", payload["atmospherePreview"][5])
 
 
 if __name__ == "__main__":

@@ -16,6 +16,9 @@
     "screen_fade",
     "camera_zoom",
     "camera_pan",
+    "screen_filter",
+    "depth_blur",
+    "particle_effect",
   ]);
   const ROUTE_DRAFT_TYPES = Object.freeze(["jump"]);
   const TRANSITION_ALIASES = Object.freeze({
@@ -197,6 +200,81 @@
     return parseInlineEnumToken(text, ["dark", "light", "transparent"], fallback, {
       clear: "transparent",
       overlay: "transparent",
+    });
+  }
+
+  function parseInlineScreenFilterPreset(text, fallback = "memory") {
+    return parseInlineEnumToken(text, ["memory", "mono", "dream", "cold"], fallback, {
+      sepia: "memory",
+      nostalgic: "memory",
+      warm: "memory",
+      monochrome: "mono",
+      blackwhite: "mono",
+      grayscale: "mono",
+      bw: "mono",
+      dreamy: "dream",
+      softlight: "dream",
+      cool: "cold",
+      blue: "cold",
+    });
+  }
+
+  function parseInlineScreenFilterStrength(text, fallback = "medium") {
+    return parseInlineEnumToken(text, ["soft", "medium", "strong"], fallback, {
+      light: "soft",
+      weak: "soft",
+      normal: "medium",
+      heavy: "strong",
+      hard: "strong",
+    });
+  }
+
+  function parseInlineDepthBlurFocus(text, fallback = "center") {
+    return parseInlineEnumToken(text, ["left", "center", "right", "full"], fallback, {
+      middle: "center",
+      bg: "full",
+      background: "full",
+      all: "full",
+    });
+  }
+
+  function parseInlineParticlePreset(text, fallback = "snow") {
+    return parseInlineEnumToken(
+      text,
+      ["snow", "rain", "petals", "dust", "embers", "sparkles", "bubbles", "confetti", "smoke", "flame", "stardust", "glyphs"],
+      fallback,
+      {
+        snowfall: "snow",
+        sakura: "petals",
+        flower: "petals",
+        flowers: "petals",
+        sparkle: "sparkles",
+        sparks: "embers",
+        fire: "flame",
+        star: "stardust",
+        stars: "stardust",
+        magic: "glyphs",
+        rune: "glyphs",
+        runes: "glyphs",
+      }
+    );
+  }
+
+  function parseInlineParticleIntensity(text, fallback = "medium") {
+    return parseInlineEnumToken(text, ["light", "medium", "heavy"], fallback, {
+      soft: "light",
+      weak: "light",
+      normal: "medium",
+      strong: "heavy",
+      dense: "heavy",
+    });
+  }
+
+  function parseInlineParticleSpeed(text, fallback = "medium") {
+    return parseInlineEnumToken(text, ["slow", "medium", "fast"], fallback, {
+      normal: "medium",
+      quick: "fast",
+      rapid: "fast",
     });
   }
 
@@ -463,6 +541,77 @@
       };
     }
 
+    const clearFilterMatch =
+      text.match(/^(?:clear|remove|stop)\s+(?:screen\s+)?filter\b(.*)$/i) ??
+      text.match(/^(?:screen\s+)?filter\s+(?:clear|off|stop)\b(.*)$/i);
+    if (clearFilterMatch) {
+      return {
+        type: "screen_filter",
+        action: "clear",
+        preset: "memory",
+        strength: "medium",
+      };
+    }
+
+    const filterMatch = text.match(/^(?:screen\s+)?filter\b(.*)$/i);
+    if (filterMatch) {
+      const filterText = filterMatch[1] ?? "";
+      return {
+        type: "screen_filter",
+        action: "apply",
+        preset: parseInlineScreenFilterPreset(filterText, "memory"),
+        strength: parseInlineScreenFilterStrength(filterText, "medium"),
+      };
+    }
+
+    const clearDepthBlurMatch =
+      text.match(/^(?:clear|remove|stop)\s+(?:depth\s+)?blur\b(.*)$/i) ??
+      text.match(/^(?:depth\s+)?blur\s+(?:clear|off|stop)\b(.*)$/i);
+    if (clearDepthBlurMatch) {
+      return {
+        type: "depth_blur",
+        action: "clear",
+        focus: "center",
+        strength: "medium",
+      };
+    }
+
+    const depthBlurMatch = text.match(/^(?:depth\s+)?blur\b(.*)$/i);
+    if (depthBlurMatch) {
+      const blurText = depthBlurMatch[1] ?? "";
+      return {
+        type: "depth_blur",
+        action: "apply",
+        focus: parseInlineDepthBlurFocus(blurText, "center"),
+        strength: parseInlineScreenFilterStrength(blurText, "medium"),
+      };
+    }
+
+    const stopParticleMatch =
+      text.match(/^(?:particle|particles|fx)\s+(?:stop|off|clear)\b(.*)$/i) ??
+      text.match(/^(?:stop|clear|remove)\s+(?:particle|particles|fx)\b(.*)$/i);
+    if (stopParticleMatch) {
+      return {
+        type: "particle_effect",
+        action: "stop",
+        preset: "snow",
+        intensity: "medium",
+        speed: "medium",
+      };
+    }
+
+    const particleMatch = text.match(/^(?:particle|particles|fx)\b(.*)$/i);
+    if (particleMatch) {
+      const particleText = particleMatch[1] ?? "";
+      return {
+        type: "particle_effect",
+        action: "start",
+        preset: parseInlineParticlePreset(particleText, "snow"),
+        intensity: parseInlineParticleIntensity(particleText, "medium"),
+        speed: parseInlineParticleSpeed(particleText, "medium"),
+      };
+    }
+
     const stopMusicMatch = text.match(/^stop\s+(?:music|bgm)\b(.*)$/i) ?? text.match(/^(?:music|bgm)\s+stop\b(.*)$/i);
     if (stopMusicMatch) {
       return {
@@ -662,6 +811,21 @@
     }
     if (block?.type === "camera_pan") {
       return `镜头平移：${block.target || "center"} / ${block.strength || "medium"}`;
+    }
+    if (block?.type === "screen_filter") {
+      return block.action === "clear"
+        ? "关闭滤镜"
+        : `滤镜：${block.preset || "memory"} / ${block.strength || "medium"}`;
+    }
+    if (block?.type === "depth_blur") {
+      return block.action === "clear"
+        ? "关闭景深"
+        : `景深：${block.focus || "center"} / ${block.strength || "medium"}`;
+    }
+    if (block?.type === "particle_effect") {
+      return block.action === "stop"
+        ? "停止粒子"
+        : `粒子：${block.preset || "snow"} / ${block.intensity || "medium"} / ${block.speed || "medium"}`;
     }
     if (block?.type === "music_stop") {
       return "停止 BGM";
