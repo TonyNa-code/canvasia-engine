@@ -200,6 +200,13 @@
 
   const STORY_TEMPLATE_COMMANDS = [
     {
+      id: "template-playable-scene",
+      title: "套用：第一段可试玩",
+      subtitle: "背景、BGM、角色登场、对白、选择项和收束淡出",
+      templateId: "playable_scene",
+      keywords: ["模板", "可试玩", "闭环", "demo", "playable", "第一段"],
+    },
+    {
       id: "template-opening-intro",
       title: "套用：开场铺垫",
       subtitle: "背景、BGM、旁白、角色登场和第一句对白",
@@ -345,7 +352,7 @@
     }
 
     if (blockCount <= 0) {
-      return ["template-opening-intro", "insert-background", "insert-music-play", "insert-character-show", "insert-dialogue"];
+      return ["template-playable-scene", "template-opening-intro", "insert-background", "insert-music-play", "insert-character-show"];
     }
 
     if (selectedBlockType === "background") {

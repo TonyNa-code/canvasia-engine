@@ -65,11 +65,13 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
             }});
             const storySearch = tools.filterCommandPaletteCommands(project, "剧情");
             const dialogueSearch = tools.filterCommandPaletteCommands(projectWithScene, "台词");
+            const playableSearch = tools.filterCommandPaletteCommands(projectWithScene, "可试玩");
             const exportCommand = project.find((command) => command.id === "export-web");
             const firstChapterCommand = project.find((command) => command.id === "create-first-chapter");
             const disabledDialogueCommand = project.find((command) => command.id === "insert-dialogue");
             const enabledDialogueCommand = projectWithScene.find((command) => command.id === "insert-dialogue");
             const templateCommand = projectWithScene.find((command) => command.id === "template-opening-intro");
+            const playableTemplateCommand = projectWithScene.find((command) => command.id === "template-playable-scene");
             process.stdout.write(JSON.stringify({{
               noProjectStoryDisabled: noProject.find((command) => command.id === "screen-story").disabled,
               noProjectDemoDisabled: noProject.find((command) => command.id === "create-playable-demo").disabled,
@@ -83,12 +85,15 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
               dialogueSearchIds: dialogueSearch.map((command) => command.id),
               templateAction: templateCommand.action,
               templateId: templateCommand.dataset["template-id"],
+              playableTemplateAction: playableTemplateCommand.action,
+              playableTemplateId: playableTemplateCommand.dataset["template-id"],
               emptySceneRecommendedIds: projectWithScene.slice(0, 4).map((command) => command.id),
               emptySceneRecommendedSections: projectWithScene.slice(0, 2).map((command) => command.section),
               dialogueRecommendedIds: projectAfterDialogue.slice(0, 4).map((command) => command.id),
               dialogueRecentIds: projectAfterDialogue.slice(4, 6).map((command) => command.id),
               dialogueRecentSections: projectAfterDialogue.slice(4, 6).map((command) => command.section),
               directRecommendedIds: tools.getRecommendedCommandIds({{ hasProject: true, hasSelectedScene: true, selectedBlockType: "dialogue", selectedSceneBlockCount: 2 }}),
+              playableSearchIds: playableSearch.map((command) => command.id),
               storySearchIds: storySearch.map((command) => command.id),
               clamped: tools.clampCommandPaletteIndex(99, project),
             }}));
@@ -108,12 +113,15 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
         self.assertIn("insert-dialogue", payload["dialogueSearchIds"])
         self.assertEqual(payload["templateAction"], "apply-story-template")
         self.assertEqual(payload["templateId"], "opening_intro")
-        self.assertEqual(payload["emptySceneRecommendedIds"][:3], ["template-opening-intro", "insert-background", "insert-music-play"])
+        self.assertEqual(payload["playableTemplateAction"], "apply-story-template")
+        self.assertEqual(payload["playableTemplateId"], "playable_scene")
+        self.assertEqual(payload["emptySceneRecommendedIds"][:3], ["template-playable-scene", "template-opening-intro", "insert-background"])
         self.assertEqual(payload["emptySceneRecommendedSections"], ["推荐", "推荐"])
         self.assertEqual(payload["dialogueRecommendedIds"][:3], ["insert-dialogue", "insert-choice", "template-emotion-burst"])
         self.assertEqual(payload["dialogueRecentIds"], ["insert-video", "screen-preview"])
         self.assertEqual(payload["dialogueRecentSections"], ["最近", "最近"])
         self.assertEqual(payload["directRecommendedIds"][:2], ["insert-dialogue", "insert-choice"])
+        self.assertIn("template-playable-scene", payload["playableSearchIds"])
         self.assertIn("screen-story", payload["storySearchIds"])
         self.assertGreater(payload["clamped"], 0)
 

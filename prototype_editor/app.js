@@ -33544,13 +33544,71 @@ function getStoryTemplatePreset(templateId) {
   return storyTemplateTools.getStoryTemplatePreset(templateId);
 }
 
-function createTemplateBlock(sceneDraft, blockType, configure = null) {
-  const block = createDefaultBlock(sceneDraft, blockType);
+function getStoryTemplateBlockRecipes(templateId) {
+  return storyTemplateTools.getStoryTemplateBlockRecipes(templateId);
+}
 
-  if (typeof configure === "function") {
-    configure(block);
+function cloneStoryTemplateFields(fields) {
+  if (!fields || typeof fields !== "object") {
+    return {};
   }
 
+  return JSON.parse(JSON.stringify(fields));
+}
+
+function applyStoryTemplateSpeaker(block, speakerId) {
+  if (!block || !speakerId) {
+    return;
+  }
+
+  if (block.type === "dialogue") {
+    block.speakerId = speakerId;
+    block.expressionId = getSafeExpressionId(speakerId, null);
+  }
+
+  if (block.type === "character_show") {
+    block.characterId = speakerId;
+    block.expressionId = getSafeExpressionId(speakerId, null);
+    block.position = getDefaultCharacterPosition(speakerId);
+  }
+
+  if (block.type === "character_hide") {
+    block.characterId = speakerId;
+  }
+}
+
+function applyStoryTemplateChoiceTexts(block, choiceTexts) {
+  if (!Array.isArray(choiceTexts) || !Array.isArray(block?.options)) {
+    return;
+  }
+
+  block.options = block.options.map((option, index) => ({
+    ...option,
+    text: choiceTexts[index] ?? option.text,
+  }));
+}
+
+function applyStoryTemplateRecipe(block, recipe, context) {
+  Object.assign(block, cloneStoryTemplateFields(recipe.fields));
+
+  if (recipe.speaker) {
+    applyStoryTemplateSpeaker(block, context.speakerId);
+  }
+
+  applyStoryTemplateChoiceTexts(block, recipe.choiceTexts);
+
+  if (recipe.defaultJumpTarget && block.type === "jump") {
+    block.targetSceneId = getDefaultJumpTargetSceneId(context.scene?.id);
+  }
+}
+
+function createTemplateBlock(sceneDraft, recipe, context) {
+  if (!recipe?.type) {
+    return null;
+  }
+
+  const block = createDefaultBlock(sceneDraft, recipe.type);
+  applyStoryTemplateRecipe(block, recipe, context);
   sceneDraft.blocks.push(block);
   return block;
 }
@@ -33562,118 +33620,26 @@ function buildStoryTemplateBlocks(scene, templateId) {
     return [];
   }
 
+  const recipes = getStoryTemplateBlockRecipes(templateId);
+  if (!recipes.length) {
+    return [];
+  }
+
   const sceneDraft = cloneScene(scene);
   sceneDraft.blocks = [...(scene.blocks ?? [])];
   const blocks = [];
   const speakerId = getSafeCharacterId(state.selectedCharacterId ?? state.data.characters[0]?.id);
+  const context = {
+    scene,
+    speakerId,
+  };
 
-  function push(blockType, configure = null) {
-    const block = createTemplateBlock(sceneDraft, blockType, configure);
-    blocks.push(block);
-    return block;
-  }
-
-  if (templateId === "opening_intro") {
-    push("background", (block) => {
-      block.transition = "fade";
-    });
-    push("music_play", (block) => {
-      block.loop = true;
-      block.fadeInMs = 900;
-    });
-    push("narration", (block) => {
-      block.text = "空气轻轻沉下来，故事就在这一刻真正开始。";
-    });
-    push("character_show", (block) => {
-      block.characterId = speakerId;
-      block.expressionId = getSafeExpressionId(speakerId, null);
-      block.position = getDefaultCharacterPosition(speakerId);
-      block.transition = "fade";
-    });
-    push("dialogue", (block) => {
-      block.speakerId = speakerId;
-      block.expressionId = getSafeExpressionId(speakerId, null);
-      block.text = "今天，会发生什么呢？";
-    });
-    return blocks;
-  }
-
-  if (templateId === "memory_entry") {
-    push("screen_fade", (block) => {
-      block.action = "fade_out";
-      block.color = "black";
-      block.duration = "medium";
-    });
-    push("screen_filter", (block) => {
-      block.action = "apply";
-      block.preset = "memory";
-      block.strength = "medium";
-    });
-    push("narration", (block) => {
-      block.text = "记忆像潮水一样慢慢涌了上来。";
-    });
-    push("screen_fade", (block) => {
-      block.action = "fade_in";
-      block.color = "black";
-      block.duration = "medium";
-    });
-    return blocks;
-  }
-
-  if (templateId === "emotion_burst") {
-    push("camera_zoom", (block) => {
-      block.action = "zoom_in";
-      block.strength = "medium";
-      block.focus = "center";
-    });
-    push("screen_flash", (block) => {
-      block.color = "white";
-      block.intensity = "medium";
-      block.duration = "short";
-    });
-    push("screen_shake", (block) => {
-      block.intensity = "light";
-      block.duration = "short";
-    });
-    push("dialogue", (block) => {
-      block.speakerId = speakerId;
-      block.expressionId = getSafeExpressionId(speakerId, null);
-      block.text = "那句话像被重重敲进心口一样。";
-    });
-    return blocks;
-  }
-
-  if (templateId === "branch_choice") {
-    push("dialogue", (block) => {
-      block.speakerId = speakerId;
-      block.expressionId = getSafeExpressionId(speakerId, null);
-      block.text = "接下来，你想怎么做？";
-    });
-    push("choice", (block) => {
-      block.options = (block.options ?? []).map((option, index) => ({
-        ...option,
-        text: index === 0 ? "立刻回应她" : "先把情绪藏起来",
-      }));
-    });
-    return blocks;
-  }
-
-  if (templateId === "scene_outro") {
-    push("narration", (block) => {
-      block.text = "这一段暂时落下帷幕，情绪却还没有真正散去。";
-    });
-    push("music_stop", (block) => {
-      block.fadeOutMs = 900;
-    });
-    push("character_hide", (block) => {
-      block.characterId = speakerId;
-      block.transition = "fade";
-    });
-    push("jump", (block) => {
-      block.targetSceneId = getDefaultJumpTargetSceneId(scene.id);
-    });
-    return blocks;
-  }
+  recipes.forEach((recipe) => {
+    const block = createTemplateBlock(sceneDraft, recipe, context);
+    if (block) {
+      blocks.push(block);
+    }
+  });
 
   return blocks;
 }

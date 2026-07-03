@@ -1,5 +1,8 @@
 (function attachStoryTemplateTools(global) {
   const STORY_TEMPLATE_PRESETS = Object.freeze({
+    playable_scene: Object.freeze({
+      title: "第一段可试玩",
+    }),
     opening_intro: Object.freeze({
       title: "开场铺垫",
     }),
@@ -17,13 +20,235 @@
     }),
   });
 
+  const STORY_TEMPLATE_BLOCK_RECIPES = deepFreeze({
+    playable_scene: [
+      {
+        type: "background",
+        fields: {
+          transition: "fade",
+        },
+      },
+      {
+        type: "music_play",
+        fields: {
+          loop: true,
+          fadeInMs: 900,
+          fadeOutMs: 900,
+        },
+      },
+      {
+        type: "character_show",
+        speaker: true,
+        fields: {
+          transition: "fade",
+        },
+      },
+      {
+        type: "narration",
+        fields: {
+          text: "傍晚的空气安静得像在等一个答案。",
+        },
+      },
+      {
+        type: "dialogue",
+        speaker: true,
+        fields: {
+          text: "你终于来了。",
+        },
+      },
+      {
+        type: "dialogue",
+        speaker: true,
+        fields: {
+          text: "我还以为你不会再回到这里。",
+        },
+      },
+      {
+        type: "choice",
+        choiceTexts: ["认真回应她", "先转移话题"],
+      },
+      {
+        type: "dialogue",
+        speaker: true,
+        fields: {
+          text: "不管怎样，故事已经从这里开始了。",
+        },
+      },
+      {
+        type: "music_stop",
+        fields: {
+          fadeOutMs: 900,
+        },
+      },
+      {
+        type: "screen_fade",
+        fields: {
+          "action": "fade_out",
+          color: "black",
+          duration: "medium",
+        },
+      },
+    ],
+    opening_intro: [
+      {
+        type: "background",
+        fields: {
+          transition: "fade",
+        },
+      },
+      {
+        type: "music_play",
+        fields: {
+          loop: true,
+          fadeInMs: 900,
+        },
+      },
+      {
+        type: "narration",
+        fields: {
+          text: "空气轻轻沉下来，故事就在这一刻真正开始。",
+        },
+      },
+      {
+        type: "character_show",
+        speaker: true,
+        fields: {
+          transition: "fade",
+        },
+      },
+      {
+        type: "dialogue",
+        speaker: true,
+        fields: {
+          text: "今天，会发生什么呢？",
+        },
+      },
+    ],
+    memory_entry: [
+      {
+        type: "screen_fade",
+        fields: {
+          "action": "fade_out",
+          color: "black",
+          duration: "medium",
+        },
+      },
+      {
+        type: "screen_filter",
+        fields: {
+          "action": "apply",
+          preset: "memory",
+          strength: "medium",
+        },
+      },
+      {
+        type: "narration",
+        fields: {
+          text: "记忆像潮水一样慢慢涌了上来。",
+        },
+      },
+      {
+        type: "screen_fade",
+        fields: {
+          "action": "fade_in",
+          color: "black",
+          duration: "medium",
+        },
+      },
+    ],
+    emotion_burst: [
+      {
+        type: "camera_zoom",
+        fields: {
+          "action": "zoom_in",
+          strength: "medium",
+          focus: "center",
+        },
+      },
+      {
+        type: "screen_flash",
+        fields: {
+          color: "white",
+          intensity: "medium",
+          duration: "short",
+        },
+      },
+      {
+        type: "screen_shake",
+        fields: {
+          intensity: "light",
+          duration: "short",
+        },
+      },
+      {
+        type: "dialogue",
+        speaker: true,
+        fields: {
+          text: "那句话像被重重敲进心口一样。",
+        },
+      },
+    ],
+    branch_choice: [
+      {
+        type: "dialogue",
+        speaker: true,
+        fields: {
+          text: "接下来，你想怎么做？",
+        },
+      },
+      {
+        type: "choice",
+        choiceTexts: ["立刻回应她", "先把情绪藏起来"],
+      },
+    ],
+    scene_outro: [
+      {
+        type: "narration",
+        fields: {
+          text: "这一段暂时落下帷幕，情绪却还没有真正散去。",
+        },
+      },
+      {
+        type: "music_stop",
+        fields: {
+          fadeOutMs: 900,
+        },
+      },
+      {
+        type: "character_hide",
+        speaker: true,
+        fields: {
+          transition: "fade",
+        },
+      },
+      {
+        type: "jump",
+        defaultJumpTarget: true,
+      },
+    ],
+  });
+
   const PROJECT_TEMPLATE_LABELS = Object.freeze({
     blank: "空白项目",
     campus_romance: "校园恋爱模板",
   });
 
+  function deepFreeze(source) {
+    if (!source || typeof source !== "object" || Object.isFrozen(source)) {
+      return source;
+    }
+
+    Object.freeze(source);
+    Object.values(source).forEach((value) => deepFreeze(value));
+    return source;
+  }
+
   function getStoryTemplatePreset(templateId) {
     return STORY_TEMPLATE_PRESETS[templateId] ?? null;
+  }
+
+  function getStoryTemplateBlockRecipes(templateId) {
+    return STORY_TEMPLATE_BLOCK_RECIPES[templateId] ?? [];
   }
 
   function getTemplateLabel(template) {
@@ -32,8 +257,10 @@
 
   global.CanvasiaEditorStoryTemplates = Object.freeze({
     STORY_TEMPLATE_PRESETS,
+    STORY_TEMPLATE_BLOCK_RECIPES,
     PROJECT_TEMPLATE_LABELS,
     getStoryTemplatePreset,
+    getStoryTemplateBlockRecipes,
     getTemplateLabel,
   });
 })(typeof window !== "undefined" ? window : globalThis);

@@ -25,12 +25,17 @@ class FrontendStoryTemplatesModuleTests(unittest.TestCase):
             const result = {{
               keys: Object.keys(tools).sort(),
               presetTitles: [
+                tools.getStoryTemplatePreset("playable_scene")?.title,
                 tools.getStoryTemplatePreset("opening_intro")?.title,
                 tools.getStoryTemplatePreset("memory_entry")?.title,
                 tools.getStoryTemplatePreset("emotion_burst")?.title,
                 tools.getStoryTemplatePreset("branch_choice")?.title,
                 tools.getStoryTemplatePreset("scene_outro")?.title,
               ],
+              playableRecipeTypes: tools.getStoryTemplateBlockRecipes("playable_scene").map((recipe) => recipe.type),
+              playableChoiceTexts: tools.getStoryTemplateBlockRecipes("playable_scene").find((recipe) => recipe.type === "choice")?.choiceTexts,
+              openingRecipeCount: tools.getStoryTemplateBlockRecipes("opening_intro").length,
+              missingRecipes: tools.getStoryTemplateBlockRecipes("missing"),
               missingPreset: tools.getStoryTemplatePreset("missing"),
               templateLabels: [
                 tools.getTemplateLabel("blank"),
@@ -55,10 +60,29 @@ class FrontendStoryTemplatesModuleTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 0, completed.stderr)
         payload = json.loads(completed.stdout)
         self.assertIn("getStoryTemplatePreset", payload["keys"])
-        self.assertEqual(payload["presetTitles"], ["开场铺垫", "进入回忆", "情绪爆点", "选项分支", "场景收尾"])
+        self.assertIn("getStoryTemplateBlockRecipes", payload["keys"])
+        self.assertEqual(payload["presetTitles"], ["第一段可试玩", "开场铺垫", "进入回忆", "情绪爆点", "选项分支", "场景收尾"])
+        self.assertEqual(
+            payload["playableRecipeTypes"],
+            [
+                "background",
+                "music_play",
+                "character_show",
+                "narration",
+                "dialogue",
+                "dialogue",
+                "choice",
+                "dialogue",
+                "music_stop",
+                "screen_fade",
+            ],
+        )
+        self.assertEqual(payload["playableChoiceTexts"], ["认真回应她", "先转移话题"])
+        self.assertEqual(payload["openingRecipeCount"], 5)
+        self.assertEqual(payload["missingRecipes"], [])
         self.assertIsNone(payload["missingPreset"])
         self.assertEqual(payload["templateLabels"], ["空白项目", "校园恋爱模板", "custom_template", None])
-        self.assertEqual(payload["exportedPresetCount"], 5)
+        self.assertEqual(payload["exportedPresetCount"], 6)
         self.assertEqual(payload["exportedBlankLabel"], "空白项目")
 
 
