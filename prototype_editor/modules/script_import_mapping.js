@@ -294,6 +294,31 @@
       };
     }
 
+    if (draftBlock.type === "variable_set") {
+      const variableId = getVariableId(draftBlock.variableHint ?? draftBlock.variableId);
+      if (!variableId) {
+        return null;
+      }
+      return {
+        type: "variable_set",
+        variableId,
+        value: normalizeImportedVariableValue(variableId, draftBlock.value),
+      };
+    }
+
+    if (draftBlock.type === "variable_add") {
+      const variableId = getVariableId(draftBlock.variableHint ?? draftBlock.variableId, "number");
+      const value = Number.parseFloat(draftBlock.value ?? "");
+      if (!variableId || !Number.isFinite(value)) {
+        return null;
+      }
+      return {
+        type: "variable_add",
+        variableId,
+        value: normalizeImportedVariableValue(variableId, value),
+      };
+    }
+
     if (draftBlock.type === "background") {
       return {
         type: "background",

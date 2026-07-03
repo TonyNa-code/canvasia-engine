@@ -83,6 +83,12 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
               if affection >= 2 -> good_ending else -> normal_ending
               if met == true and route = "good" -> true_end
             `);
+            const variableBlocks = tools.parseScriptDraftToBlocks(`
+              set route = common
+              add affection +1
+              affection += 2
+              设置 好感 为 3
+            `);
             process.stdout.write(JSON.stringify({{
               keys: Object.keys(tools).sort(),
               normalizedLines: tools.normalizeScriptImportText(" a\\r\\n\\n b ").join("|"),
@@ -91,6 +97,10 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
               choiceEffectAdd: tools.parseChoiceEffectClause("affection +1"),
               choiceEffectSet: tools.parseChoiceEffectClause("met=true"),
               choiceOptionEffectLine: tools.parseChoiceOptionLine('- 拉住她 -> rooftop [affection +1; met=true; route="good"]'),
+              variableSetLine: tools.parseVariableActionLine("set route = common"),
+              variableAddLine: tools.parseVariableActionLine("add affection +1"),
+              variableInlineAddLine: tools.parseVariableActionLine("affection += 2"),
+              variableChineseSetLine: tools.parseVariableActionLine("设置 好感 为 3"),
               conditionRule: tools.parseConditionRuleClause("affection >= 2"),
               conditionLine: tools.parseConditionLine("if affection >= 2 -> good_ending else -> normal_ending"),
               dialogueLine: tools.parseDialogueLine("悠奈：你终于来了。"),
@@ -138,6 +148,9 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
               conditionBlocks,
               conditionSummary: tools.summarizeScriptDraftBlocks(conditionBlocks),
               conditionPreview: tools.buildScriptDraftPreviewLines(conditionBlocks, 2),
+              variableBlocks,
+              variableSummary: tools.summarizeScriptDraftBlocks(variableBlocks),
+              variablePreview: tools.buildScriptDraftPreviewLines(variableBlocks, 4),
             }}));
             """
         )
@@ -175,6 +188,26 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
                 {"type": "variable_set", "variableHint": "met", "value": True},
                 {"type": "variable_set", "variableHint": "route", "value": "good"},
             ],
+        })
+        self.assertEqual(payload["variableSetLine"], {
+            "type": "variable_set",
+            "variableHint": "route",
+            "value": "common",
+        })
+        self.assertEqual(payload["variableAddLine"], {
+            "type": "variable_add",
+            "variableHint": "affection",
+            "value": 1,
+        })
+        self.assertEqual(payload["variableInlineAddLine"], {
+            "type": "variable_add",
+            "variableHint": "affection",
+            "value": 2,
+        })
+        self.assertEqual(payload["variableChineseSetLine"], {
+            "type": "variable_set",
+            "variableHint": "好感",
+            "value": 3,
         })
         self.assertEqual(payload["conditionRule"], {
             "variableHint": "affection",
@@ -331,7 +364,15 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
             {"text": "追上去"},
             {"text": "留在原地"},
         ])
-        self.assertEqual(payload["summary"], {"dialogue": 2, "narration": 2, "choice": 1, "stage": 0, "route": 0, "total": 5})
+        self.assertEqual(payload["summary"], {
+            "dialogue": 2,
+            "narration": 2,
+            "choice": 1,
+            "stage": 0,
+            "route": 0,
+            "logic": 0,
+            "total": 5,
+        })
         self.assertIn("悠奈：你终于来了。", payload["preview"][1])
         self.assertEqual(payload["limitedCount"], 2)
         self.assertEqual([block["type"] for block in payload["vnBlocks"]], [
@@ -378,6 +419,7 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
             "choice": 1,
             "stage": 8,
             "route": 1,
+            "logic": 0,
             "total": 12,
         })
         self.assertIn("演出：切背景：classroom", payload["vnPreview"][0])
@@ -396,6 +438,7 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
             "choice": 0,
             "stage": 5,
             "route": 0,
+            "logic": 0,
             "total": 5,
         })
         self.assertIn("演出：震屏：heavy / short", payload["directorPreview"][0])
@@ -414,6 +457,7 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
             "choice": 0,
             "stage": 6,
             "route": 0,
+            "logic": 0,
             "total": 6,
         })
         self.assertIn("演出：滤镜：memory / soft", payload["atmospherePreview"][0])
@@ -466,10 +510,28 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
             "choice": 0,
             "stage": 0,
             "route": 2,
+            "logic": 0,
             "total": 2,
         })
         self.assertIn("条件：affection >= 2 -> good_ending", payload["conditionPreview"][0])
         self.assertIn("否则：normal_ending", payload["conditionPreview"][0])
+        self.assertEqual(payload["variableBlocks"], [
+            {"type": "variable_set", "variableHint": "route", "value": "common"},
+            {"type": "variable_add", "variableHint": "affection", "value": 1},
+            {"type": "variable_add", "variableHint": "affection", "value": 2},
+            {"type": "variable_set", "variableHint": "好感", "value": 3},
+        ])
+        self.assertEqual(payload["variableSummary"], {
+            "dialogue": 0,
+            "narration": 0,
+            "choice": 0,
+            "stage": 0,
+            "route": 0,
+            "logic": 4,
+            "total": 4,
+        })
+        self.assertIn("逻辑：变量赋值：route = common", payload["variablePreview"][0])
+        self.assertIn("逻辑：变量变化：affection +1", payload["variablePreview"][1])
 
 
 if __name__ == "__main__":

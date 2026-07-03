@@ -21,6 +21,7 @@
     "particle_effect",
   ]);
   const ROUTE_DRAFT_TYPES = Object.freeze(["jump", "condition"]);
+  const VARIABLE_DRAFT_TYPES = Object.freeze(["variable_set", "variable_add"]);
   const TEXT_SPEED_ALIASES = Object.freeze({
     slow: "slow",
     slower: "slow",
@@ -465,13 +466,45 @@
         : null;
     }
 
-    const setMatch = text.match(/^([0-9A-Za-z_\-\u4e00-\u9fff]{1,64})\s*(?:=|:|is|to)\s*(.+)$/iu);
+    const setMatch = text.match(/^([0-9A-Za-z_\-\u4e00-\u9fff]{1,64})\s*(?:=|:|is|to|为)\s*(.+)$/iu);
     if (setMatch) {
       return {
         type: "variable_set",
         variableHint: setMatch[1],
         value: parseChoiceEffectValue(setMatch[2]),
       };
+    }
+
+    return null;
+  }
+
+  function parseVariableActionLine(line) {
+    const text = trimImportedText(line, 220);
+    if (!text) {
+      return null;
+    }
+
+    const addKeywordMatch = text.match(
+      /^(?:add|increase|inc|增加|加)\s+([0-9A-Za-z_\-\u4e00-\u9fff]{1,64})(?:\s+(?:by|为|=))?\s*([+-]?[0-9.]+)$/iu
+    );
+    if (addKeywordMatch) {
+      const value = Number.parseFloat(addKeywordMatch[2]);
+      return Number.isFinite(value)
+        ? {
+            type: "variable_add",
+            variableHint: addKeywordMatch[1],
+            value,
+          }
+        : null;
+    }
+
+    const setKeywordMatch = text.match(/^(?:set|let|var|variable|设置|设定|变量)\s+(.+)$/iu);
+    if (setKeywordMatch) {
+      return parseChoiceEffectClause(setKeywordMatch[1]);
+    }
+
+    if (/^[0-9A-Za-z_\-\u4e00-\u9fff]{1,64}\s*(?:\+=|-=|=)\s*.+$/u.test(text)) {
+      return parseChoiceEffectClause(text);
     }
 
     return null;
@@ -988,6 +1021,12 @@
         return;
       }
 
+      const variableAction = parseVariableActionLine(line);
+      if (variableAction) {
+        blocks.push(variableAction);
+        return;
+      }
+
       const stageDirection = parseStageDirectionLine(line);
       if (stageDirection) {
         blocks.push(stageDirection);
@@ -1034,15 +1073,17 @@
           summary.stage += 1;
         } else if (ROUTE_DRAFT_TYPES.includes(block?.type)) {
           summary.route += 1;
+        } else if (VARIABLE_DRAFT_TYPES.includes(block?.type)) {
+          summary.logic += 1;
         }
         return summary;
       },
-      { dialogue: 0, narration: 0, choice: 0, stage: 0, route: 0 }
+      { dialogue: 0, narration: 0, choice: 0, stage: 0, route: 0, logic: 0 }
     );
 
     return {
       ...counts,
-      total: counts.dialogue + counts.narration + counts.choice + counts.stage + counts.route,
+      total: counts.dialogue + counts.narration + counts.choice + counts.stage + counts.route + counts.logic,
     };
   }
 
@@ -1121,6 +1162,16 @@
     return "路线卡片";
   }
 
+  function buildVariablePreviewLine(block) {
+    const variableHint = trimImportedText(block?.variableHint ?? block?.variableId ?? "", 64) || "变量";
+    if (block?.type === "variable_add") {
+      const value = Number(block.value);
+      const amount = Number.isFinite(value) ? value : 0;
+      return `变量变化：${variableHint} ${amount >= 0 ? "+" : ""}${amount}`;
+    }
+    return `变量赋值：${variableHint} = ${String(block?.value ?? "")}`;
+  }
+
   function buildChoiceEffectPreview(effect) {
     const variableHint = trimImportedText(effect?.variableHint ?? effect?.variableId ?? "", 64);
     if (!variableHint) {
@@ -1158,6 +1209,9 @@
         if (ROUTE_DRAFT_TYPES.includes(block?.type)) {
           return `${index + 1}. 路线：${buildRoutePreviewLine(block)}`;
         }
+        if (VARIABLE_DRAFT_TYPES.includes(block?.type)) {
+          return `${index + 1}. 逻辑：${buildVariablePreviewLine(block)}`;
+        }
         const voiceSuffix = block?.voiceHint ? `（voice: ${block.voiceHint}）` : "";
         const speedSuffix = block?.textSpeed ? `（speed: ${block.textSpeed}）` : "";
         return `${index + 1}. 旁白：${block?.text || ""}${voiceSuffix}${speedSuffix}`;
@@ -1170,10 +1224,12 @@
     SCRIPT_IMPORT_MAX_OPTIONS,
     STAGE_DRAFT_TYPES,
     ROUTE_DRAFT_TYPES,
+    VARIABLE_DRAFT_TYPES,
     normalizeScriptImportText,
     parseChoiceLine,
     parseChoiceEffectClause,
     parseChoiceOptionLine,
+    parseVariableActionLine,
     parseDialogueLine,
     parseQuotedDialogueLine,
     parseStageDirectionLine,

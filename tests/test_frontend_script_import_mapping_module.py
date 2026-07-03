@@ -155,6 +155,21 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
                 null,
                 resolvers
               ),
+              normalizedVariableSet: tools.normalizeImportedDraftBlockForScene(
+                {{ type: "variable_set", variableHint: "route", value: "common" }},
+                null,
+                resolvers
+              ),
+              normalizedVariableAdd: tools.normalizeImportedDraftBlockForScene(
+                {{ type: "variable_add", variableHint: "affection", value: "2" }},
+                null,
+                resolvers
+              ),
+              normalizedVariableAddRejectsNonNumber: tools.normalizeImportedDraftBlockForScene(
+                {{ type: "variable_add", variableHint: "route", value: "1" }},
+                null,
+                resolvers
+              ),
               normalizedCharacterShow: tools.normalizeImportedDraftBlockForScene(
                 {{ type: "character_show", characterHint: "Yuina", expressionHint: "微笑", position: "right", transition: "dissolve", transitionDurationMs: "720" }},
                 null,
@@ -320,6 +335,17 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
                 },
             ],
         })
+        self.assertEqual(payload["normalizedVariableSet"], {
+            "type": "variable_set",
+            "variableId": "route",
+            "value": "common",
+        })
+        self.assertEqual(payload["normalizedVariableAdd"], {
+            "type": "variable_add",
+            "variableId": "affection",
+            "value": 2,
+        })
+        self.assertIsNone(payload["normalizedVariableAddRejectsNonNumber"])
         self.assertEqual(payload["normalizedCharacterShow"]["characterId"], "char_yuina")
         self.assertEqual(payload["normalizedCharacterShow"]["expressionId"], "expr_smile")
         self.assertEqual(payload["normalizedCharacterShow"]["position"], "right")

@@ -9827,6 +9827,8 @@ function getScriptImporterSampleDraft() {
     "voice yuina_001",
     `${characterName} "你终于来了。"`,
     "旁白：雨声贴着窗沿落下。",
+    "set route = common",
+    "add affection +1",
     "我把伞往她那边递过去。",
     "- 问她为什么在这里",
     "- 先沉默陪她一会儿",
@@ -9930,7 +9932,7 @@ function normalizeScriptImportBlockForScene(draftBlock, scene = getSelectedScene
 function parseCurrentScriptImportDraft() {
   state.scriptImporterDraft = getScriptImporterDraftFromDom();
   state.scriptImporterBlocks = scriptImporterTools.parseScriptDraftToBlocks(state.scriptImporterDraft);
-  state.scriptImporterError = state.scriptImporterBlocks.length ? "" : "没有识别到可插入的台词、旁白、选项或演出指令。";
+  state.scriptImporterError = state.scriptImporterBlocks.length ? "" : "没有识别到可插入的台词、旁白、选项、逻辑或演出指令。";
   return state.scriptImporterBlocks;
 }
 
@@ -9941,8 +9943,9 @@ function getScriptImportSummaryText(blocks = state.scriptImporterBlocks) {
   }
 
   const stagePart = summary.stage ? ` / 演出 ${summary.stage}` : "";
+  const logicPart = summary.logic ? ` / 逻辑 ${summary.logic}` : "";
   const routePart = summary.route ? ` / 跳转 ${summary.route}` : "";
-  return `将插入 ${summary.total} 张卡片：台词 ${summary.dialogue} / 旁白 ${summary.narration} / 选项 ${summary.choice}${stagePart}${routePart}`;
+  return `将插入 ${summary.total} 张卡片：台词 ${summary.dialogue} / 旁白 ${summary.narration} / 选项 ${summary.choice}${stagePart}${logicPart}${routePart}`;
 }
 
 function renderScriptImporterPanel(scene, selectedBlock) {
@@ -9961,7 +9964,7 @@ function renderScriptImporterPanel(scene, selectedBlock) {
       <div class="script-importer-copy">
         <span class="eyebrow">Text To Cards</span>
         <strong>手写剧本转剧情卡片</strong>
-        <p>从文档或备忘录粘贴文本：<code>角色：台词</code>、<code>角色 "台词"</code>、普通旁白、连续 <code>- 选项 [变量 +1]</code>，以及 <code>scene / show / hide / play music / play sound / play video / speed / if / shake / flash / zoom / pan / filter / blur / particle / credits / voice / jump</code> 演出、文字速度、变量后果、条件分支、音频、视频、镜头、氛围和路线指令都会先预览成可编辑卡片。</p>
+        <p>从文档或备忘录粘贴文本：<code>角色：台词</code>、<code>角色 "台词"</code>、普通旁白、连续 <code>- 选项 [变量 +1]</code>，以及 <code>scene / show / hide / play music / play sound / play video / speed / set / add / if / shake / flash / zoom / pan / filter / blur / particle / credits / voice / jump</code> 演出、文字速度、变量后果、变量卡、条件分支、音频、视频、镜头、氛围和路线指令都会先预览成可编辑卡片。</p>
         <span class="helper-text">${escapeHtml(insertionTarget)}</span>
       </div>
       <div class="script-importer-workbench">
@@ -9969,7 +9972,7 @@ function renderScriptImporterPanel(scene, selectedBlock) {
           id="scriptImporterDraft"
           class="script-importer-textarea"
           spellcheck="false"
-          placeholder="scene classroom with fade\nplay video opening_movie title &quot;Opening&quot; volume 80 from 0 to 18 cover\nplay music school_theme fadein 1.2\nshow 悠奈 smile at center with dissolve\nfilter memory soft\nblur right strong\nparticle snow heavy fast\nshake heavy short\nflash white soft short\nzoom in medium center\nplay sound door_knock\nvoice yuina_001\nspeed fast\n悠奈 &quot;你终于来了。&quot;\n- 问她为什么在这里 -> rooftop [affection +1]\n- 先沉默陪她一会儿 [affection -1]\nif affection >= 2 -> rooftop else -> ending\njump ending"
+          placeholder="scene classroom with fade\nplay video opening_movie title &quot;Opening&quot; volume 80 from 0 to 18 cover\nplay music school_theme fadein 1.2\nshow 悠奈 smile at center with dissolve\nfilter memory soft\nblur right strong\nparticle snow heavy fast\nshake heavy short\nflash white soft short\nzoom in medium center\nplay sound door_knock\nvoice yuina_001\nspeed fast\n悠奈 &quot;你终于来了。&quot;\nset route = common\nadd affection +1\n- 问她为什么在这里 -> rooftop [affection +1]\n- 先沉默陪她一会儿 [affection -1]\nif affection >= 2 -> rooftop else -> ending\njump ending"
         >${escapeHtml(draft)}</textarea>
         <div class="script-importer-actions">
           <button type="button" class="toolbar-button" data-action="apply-script-import-sample">填入示例</button>
@@ -35675,6 +35678,8 @@ function normalizeAssistantDraftBlockForScene(sceneDraft, draftBlock) {
     "screen_filter",
     "depth_blur",
     "particle_effect",
+    "variable_set",
+    "variable_add",
     "condition",
     "jump",
   ].includes(draftBlock.type)
@@ -35825,6 +35830,20 @@ function normalizeAssistantDraftBlockForScene(sceneDraft, draftBlock) {
         speed: getSafeParticleSpeed(block.speed),
       })
     );
+  } else if (blockType === "variable_set") {
+    const variableId = getSafeVariableId(block.variableId);
+    if (!variableId) {
+      return null;
+    }
+    block.variableId = variableId;
+    block.value = normalizeVariableValue(variableId, block.value);
+  } else if (blockType === "variable_add") {
+    const variableId = getSafeVariableId(block.variableId, "number");
+    if (!variableId) {
+      return null;
+    }
+    block.variableId = variableId;
+    block.value = getSafeNumber(block.value, 1);
   } else if (blockType === "condition") {
     const rawBranches = Array.isArray(block.branches) ? block.branches : [];
     block.branches = rawBranches
