@@ -39,6 +39,10 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
                 {{ id: "bgm_school", type: "bgm", name: "School Theme", fileName: "school_theme.ogg" }},
                 {{ id: "cg_school", type: "cg", name: "school_theme_cg.png" }},
               ],
+              scenes: [
+                {{ id: "scene_roof", name: "Rooftop", tags: ["天台"] }},
+                {{ id: "scene_end", name: "Ending" }},
+              ],
             }};
             process.stdout.write(JSON.stringify({{
               keys: Object.keys(tools).sort(),
@@ -49,6 +53,8 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
               backgroundByFile: tools.findImportedAssetIdByHint(data, "classroom", ["background"]),
               bgmByName: tools.findImportedAssetIdByHint(data, "school_theme", ["bgm"]),
               typedLookupDoesNotCrossAssetTypes: tools.findImportedAssetIdByHint(data, "school_theme", ["background"]),
+              sceneByName: tools.findImportedSceneIdByHint(data, "rooftop"),
+              sceneByTag: tools.findImportedSceneIdByHint(data, "天台"),
               shortDuration: tools.getImportedEffectDuration(300),
               mediumDuration: tools.getImportedEffectDuration(700),
               longDuration: tools.getImportedEffectDuration(1200),
@@ -73,6 +79,8 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
         self.assertEqual(payload["backgroundByFile"], "bg_classroom")
         self.assertEqual(payload["bgmByName"], "bgm_school")
         self.assertEqual(payload["typedLookupDoesNotCrossAssetTypes"], "")
+        self.assertEqual(payload["sceneByName"], "scene_roof")
+        self.assertEqual(payload["sceneByTag"], "scene_roof")
         self.assertEqual(payload["shortDuration"], "short")
         self.assertEqual(payload["mediumDuration"], "medium")
         self.assertEqual(payload["longDuration"], "long")

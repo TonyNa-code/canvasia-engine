@@ -10,6 +10,7 @@
     "music_stop",
     "screen_fade",
   ]);
+  const ROUTE_DRAFT_TYPES = Object.freeze(["jump"]);
   const TRANSITION_ALIASES = Object.freeze({
     dissolve: "fade",
     fade: "fade",
@@ -115,7 +116,7 @@
   }
 
   function isIgnoredScriptLine(line) {
-    return /^(?:#|\/\/|label\s+\S+\s*:|menu\s*:|return\b|jump\s+\S+|call\s+\S+|pause\b)/i.test(String(line ?? "").trim());
+    return /^(?:#|\/\/|label\s+\S+\s*:|menu\s*:|return\b|call\s+\S+|pause\b)/i.test(String(line ?? "").trim());
   }
 
   function parseChoiceLine(line) {
@@ -126,6 +127,19 @@
 
     const match = String(line ?? "").match(/^(?:[-*•]|[0-9]+[.)、])\s*(.+)$/u);
     return match ? trimImportedText(match[1], 160) : "";
+  }
+
+  function parseChoiceOptionLine(line) {
+    const text = parseChoiceLine(line);
+    if (!text) {
+      return null;
+    }
+
+    const targetMatch = text.match(/^(.+?)\s*(?:->|=>)\s*(\S.+)$/u);
+    return {
+      text: trimImportedText(targetMatch?.[1] ?? text, 160),
+      targetHint: trimImportedText(targetMatch?.[2] ?? "", 120),
+    };
   }
 
   function parseDialogueLine(line) {
@@ -246,6 +260,12 @@
     return null;
   }
 
+  function parseJumpLine(line) {
+    const match = String(line ?? "").trim().match(/^(?:jump|goto)\s+(.+)$/i);
+    const targetHint = trimImportedText(match?.[1] ?? "", 120);
+    return targetHint ? { type: "jump", targetHint } : null;
+  }
+
   function flushChoiceOptions(blocks, choiceOptions) {
     if (!choiceOptions.length) {
       return;
@@ -253,7 +273,16 @@
 
     blocks.push({
       type: "choice",
-      options: choiceOptions.slice(0, SCRIPT_IMPORT_MAX_OPTIONS).map((text) => ({ text })),
+      options: choiceOptions.slice(0, SCRIPT_IMPORT_MAX_OPTIONS).map((option) => {
+        const targetHint = trimImportedText(option?.targetHint ?? "", 120);
+        const normalizedOption = {
+          text: trimImportedText(option?.text ?? option, 160),
+        };
+        if (targetHint) {
+          normalizedOption.targetHint = targetHint;
+        }
+        return normalizedOption;
+      }),
     });
     choiceOptions.length = 0;
   }
@@ -274,12 +303,25 @@
         return;
       }
 
-      const choiceText = parseChoiceLine(line);
-      if (choiceText) {
-        choiceOptions.push(choiceText);
+      const choiceOption = parseChoiceOptionLine(line);
+      if (choiceOption?.text) {
+        choiceOptions.push(choiceOption);
         if (choiceOptions.length >= SCRIPT_IMPORT_MAX_OPTIONS) {
           flushChoiceOptions(blocks, choiceOptions);
         }
+        return;
+      }
+
+      const jump = parseJumpLine(line);
+      if (jump) {
+        if (choiceOptions.length) {
+          const latestOption = choiceOptions[choiceOptions.length - 1];
+          latestOption.targetHint = latestOption.targetHint || jump.targetHint;
+          return;
+        }
+
+        flushChoiceOptions(blocks, choiceOptions);
+        blocks.push(jump);
         return;
       }
 
@@ -327,15 +369,17 @@
           summary.narration += 1;
         } else if (STAGE_DRAFT_TYPES.includes(block?.type)) {
           summary.stage += 1;
+        } else if (ROUTE_DRAFT_TYPES.includes(block?.type)) {
+          summary.route += 1;
         }
         return summary;
       },
-      { dialogue: 0, narration: 0, choice: 0, stage: 0 }
+      { dialogue: 0, narration: 0, choice: 0, stage: 0, route: 0 }
     );
 
     return {
       ...counts,
-      total: counts.dialogue + counts.narration + counts.choice + counts.stage,
+      total: counts.dialogue + counts.narration + counts.choice + counts.stage + counts.route,
     };
   }
 
@@ -363,6 +407,13 @@
     return "演出卡片";
   }
 
+  function buildRoutePreviewLine(block) {
+    if (block?.type === "jump") {
+      return `跳转：${block.targetHint || "待选择场景"}`;
+    }
+    return "路线卡片";
+  }
+
   function buildScriptDraftPreviewLines(blocks = [], limit = 6) {
     return (Array.isArray(blocks) ? blocks : [])
       .slice(0, Math.max(0, Number.parseInt(limit, 10) || 0))
@@ -371,10 +422,15 @@
           return `${index + 1}. ${block.speakerName || "角色"}：${block.text || ""}`;
         }
         if (block?.type === "choice") {
-          return `${index + 1}. 选项：${(block.options ?? []).map((option) => option.text).join(" / ")}`;
+          return `${index + 1}. 选项：${(block.options ?? [])
+            .map((option) => (option.targetHint ? `${option.text} -> ${option.targetHint}` : option.text))
+            .join(" / ")}`;
         }
         if (STAGE_DRAFT_TYPES.includes(block?.type)) {
           return `${index + 1}. 演出：${buildStagePreviewLine(block)}`;
+        }
+        if (ROUTE_DRAFT_TYPES.includes(block?.type)) {
+          return `${index + 1}. 路线：${buildRoutePreviewLine(block)}`;
         }
         return `${index + 1}. 旁白：${block?.text || ""}`;
       });
@@ -385,11 +441,14 @@
     SCRIPT_IMPORT_MAX_BLOCKS,
     SCRIPT_IMPORT_MAX_OPTIONS,
     STAGE_DRAFT_TYPES,
+    ROUTE_DRAFT_TYPES,
     normalizeScriptImportText,
     parseChoiceLine,
+    parseChoiceOptionLine,
     parseDialogueLine,
     parseQuotedDialogueLine,
     parseStageDirectionLine,
+    parseJumpLine,
     parseScriptDraftToBlocks,
     summarizeScriptDraftBlocks,
     buildScriptDraftPreviewLines,

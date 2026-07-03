@@ -81,6 +81,20 @@
     return partial?.id ?? "";
   }
 
+  function findImportedSceneByHint(data, sceneHint) {
+    const scenes = Array.isArray(data?.scenes) ? data.scenes : [];
+    const exact = scenes.find((scene) => matchesImportedLookupHint(sceneHint, getImportedLookupValues(scene)));
+    return (
+      exact ??
+      scenes.find((scene) => matchesImportedLookupHint(sceneHint, getImportedLookupValues(scene), { partial: true })) ??
+      null
+    );
+  }
+
+  function findImportedSceneIdByHint(data, sceneHint) {
+    return findImportedSceneByHint(data, sceneHint)?.id ?? "";
+  }
+
   function getImportedEffectDuration(durationMs) {
     const ms = Number.parseFloat(durationMs ?? "");
     if (!Number.isFinite(ms)) {
@@ -102,6 +116,8 @@
     findImportedCharacterByHint,
     findImportedExpressionIdByHint,
     findImportedAssetIdByHint,
+    findImportedSceneByHint,
+    findImportedSceneIdByHint,
     getImportedEffectDuration,
   });
 })(typeof window !== "undefined" ? window : globalThis);

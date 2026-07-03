@@ -9860,11 +9860,15 @@ function findImportedAssetIdByHint(assetHint, assetTypes = []) {
   return scriptImportMappingTools.findImportedAssetIdByHint(state.data, assetHint, assetTypes);
 }
 
+function findImportedSceneIdByHint(sceneHint) {
+  return scriptImportMappingTools.findImportedSceneIdByHint(state.data, sceneHint);
+}
+
 function getImportedEffectDuration(durationMs) {
   return scriptImportMappingTools.getImportedEffectDuration(durationMs);
 }
 
-function normalizeScriptImportBlockForScene(draftBlock) {
+function normalizeScriptImportBlockForScene(draftBlock, scene = getSelectedScene()) {
   if (!draftBlock || typeof draftBlock !== "object") {
     return null;
   }
@@ -9881,7 +9885,13 @@ function normalizeScriptImportBlockForScene(draftBlock) {
     return {
       type: "choice",
       options: (Array.isArray(draftBlock.options) ? draftBlock.options : [])
-        .map((option) => ({ text: String(option?.text ?? "").trim() }))
+        .map((option) => {
+          const targetSceneId = findImportedSceneIdByHint(option?.targetHint);
+          return {
+            text: String(option?.text ?? "").trim(),
+            gotoSceneId: targetSceneId || CHOICE_CONTINUE_TARGET,
+          };
+        })
         .filter((option) => option.text),
     };
   }
@@ -9946,6 +9956,13 @@ function normalizeScriptImportBlockForScene(draftBlock) {
     };
   }
 
+  if (draftBlock.type === "jump") {
+    return {
+      type: "jump",
+      targetSceneId: findImportedSceneIdByHint(draftBlock.targetHint) || getDefaultJumpTargetSceneId(scene?.id),
+    };
+  }
+
   return {
     type: "narration",
     text: String(draftBlock.text ?? "").trim(),
@@ -9966,7 +9983,8 @@ function getScriptImportSummaryText(blocks = state.scriptImporterBlocks) {
   }
 
   const stagePart = summary.stage ? ` / 演出 ${summary.stage}` : "";
-  return `将插入 ${summary.total} 张卡片：台词 ${summary.dialogue} / 旁白 ${summary.narration} / 选项 ${summary.choice}${stagePart}`;
+  const routePart = summary.route ? ` / 跳转 ${summary.route}` : "";
+  return `将插入 ${summary.total} 张卡片：台词 ${summary.dialogue} / 旁白 ${summary.narration} / 选项 ${summary.choice}${stagePart}${routePart}`;
 }
 
 function renderScriptImporterPanel(scene, selectedBlock) {
@@ -9985,7 +10003,7 @@ function renderScriptImporterPanel(scene, selectedBlock) {
       <div class="script-importer-copy">
         <span class="eyebrow">Text To Cards</span>
         <strong>手写剧本转剧情卡片</strong>
-        <p>从文档或备忘录粘贴文本：<code>角色：台词</code>、<code>角色 "台词"</code>、普通旁白、连续 <code>- 选项</code>，以及 <code>scene / show / hide / play music</code> 演出指令都会先预览成可编辑卡片。</p>
+        <p>从文档或备忘录粘贴文本：<code>角色：台词</code>、<code>角色 "台词"</code>、普通旁白、连续 <code>- 选项</code>，以及 <code>scene / show / hide / play music / jump</code> 演出和路线指令都会先预览成可编辑卡片。</p>
         <span class="helper-text">${escapeHtml(insertionTarget)}</span>
       </div>
       <div class="script-importer-workbench">
@@ -9993,7 +10011,7 @@ function renderScriptImporterPanel(scene, selectedBlock) {
           id="scriptImporterDraft"
           class="script-importer-textarea"
           spellcheck="false"
-          placeholder="scene classroom with fade\nplay music school_theme fadein 1.2\nshow 悠奈 smile at center with dissolve\n悠奈 &quot;你终于来了。&quot;\n- 问她为什么在这里\n- 先沉默陪她一会儿"
+          placeholder="scene classroom with fade\nplay music school_theme fadein 1.2\nshow 悠奈 smile at center with dissolve\n悠奈 &quot;你终于来了。&quot;\n- 问她为什么在这里 -> rooftop\n- 先沉默陪她一会儿\njump ending"
         >${escapeHtml(draft)}</textarea>
         <div class="script-importer-actions">
           <button type="button" class="toolbar-button" data-action="apply-script-import-sample">填入示例</button>
@@ -10038,7 +10056,7 @@ async function insertScriptImportBlocks() {
   }
 
   const draftBlocks = parseCurrentScriptImportDraft()
-    .map((block) => normalizeScriptImportBlockForScene(block))
+    .map((block) => normalizeScriptImportBlockForScene(block, scene))
     .filter(Boolean);
   if (!draftBlocks.length) {
     renderStoryScreen();
@@ -35679,7 +35697,20 @@ function normalizeAssistantDraftBlockForScene(sceneDraft, draftBlock) {
     return null;
   }
 
-  const blockType = ["dialogue", "narration", "choice"].includes(draftBlock.type) ? draftBlock.type : "narration";
+  const blockType = [
+    "background",
+    "dialogue",
+    "narration",
+    "choice",
+    "character_show",
+    "character_hide",
+    "music_play",
+    "music_stop",
+    "screen_fade",
+    "jump",
+  ].includes(draftBlock.type)
+    ? draftBlock.type
+    : "narration";
   const blockId = createBlockId(sceneDraft);
   const block = { ...draftBlock, id: blockId, type: blockType };
 
@@ -35694,12 +35725,51 @@ function normalizeAssistantDraftBlockForScene(sceneDraft, draftBlock) {
     block.options = rawOptions.slice(0, 4).map((option, index) => ({
       id: createChoiceOptionId(blockId, index),
       text: String(option?.text ?? `选项 ${index + 1}`).trim() || `选项 ${index + 1}`,
-      gotoSceneId: getSafeSceneId(option?.gotoSceneId ?? sceneDraft.id, sceneDraft.id),
+      gotoSceneId: isChoiceContinueTarget(option?.gotoSceneId)
+        ? CHOICE_CONTINUE_TARGET
+        : getSafeSceneId(option?.gotoSceneId ?? sceneDraft.id, sceneDraft.id),
       effects: Array.isArray(option?.effects) ? option.effects : [],
     }));
     if (block.options.length === 0) {
       block.options = createDefaultChoiceOptions(blockId, sceneDraft.id);
     }
+  } else if (blockType === "background") {
+    block.assetId = getSafeAssetIdByType("background", block.assetId);
+    block.transition = getSafeTransition(block.transition);
+    block.transitionDurationMs = getSafeTransitionDurationMs(block.transitionDurationMs, 600);
+    delete block.assetHint;
+  } else if (blockType === "character_show") {
+    block.characterId = getSafeCharacterId(block.characterId ?? state.selectedCharacterId ?? state.data.characters[0]?.id);
+    block.expressionId = getSafeExpressionId(block.characterId, block.expressionId);
+    block.position = getSafePosition(block.position ?? getDefaultCharacterPosition(block.characterId));
+    block.transition = getSafeTransition(block.transition);
+    block.transitionDurationMs = getSafeTransitionDurationMs(block.transitionDurationMs, 600);
+    block.stage = { ...DEFAULT_CHARACTER_STAGE, ...(block.stage && typeof block.stage === "object" ? block.stage : {}) };
+    delete block.characterHint;
+    delete block.expressionHint;
+  } else if (blockType === "character_hide") {
+    block.characterId = getSafeCharacterId(block.characterId ?? state.selectedCharacterId ?? state.data.characters[0]?.id);
+    block.transition = getSafeTransition(block.transition);
+    block.transitionDurationMs = getSafeTransitionDurationMs(block.transitionDurationMs, 600);
+    delete block.characterHint;
+  } else if (blockType === "music_play") {
+    block.assetId = getSafeAssetIdByType("bgm", block.assetId);
+    block.loop = block.loop !== false;
+    block.volume = getSafeNonNegativeNumber(block.volume, 100);
+    block.fadeInMs = getSafeNonNegativeNumber(block.fadeInMs, 600);
+    block.fadeOutMs = getSafeNonNegativeNumber(block.fadeOutMs, 600);
+    block.endMode = getSafeMusicEndMode(block.endMode);
+    block.endBlockId = String(block.endBlockId ?? "").trim();
+    delete block.assetHint;
+  } else if (blockType === "music_stop") {
+    block.fadeOutMs = getSafeNonNegativeNumber(block.fadeOutMs, 600);
+  } else if (blockType === "screen_fade") {
+    block.action = getSafeFadeAction(block.action);
+    block.color = getSafeFadeColor(block.color);
+    block.duration = getSafeEffectDuration(block.duration);
+  } else if (blockType === "jump") {
+    block.targetSceneId = getSafeSceneId(block.targetSceneId, getDefaultJumpTargetSceneId(sceneDraft.id));
+    delete block.targetHint;
   } else {
     block.text = String(block.text ?? "新旁白").trim() || "新旁白";
     delete block.speakerName;
