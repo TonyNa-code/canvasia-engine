@@ -55,6 +55,7 @@ const previewRegressionTools = window.CanvasiaEditorPreviewRegression;
 const playtestHandoffReportTools = window.CanvasiaEditorPlaytestHandoffReport;
 const choiceConsequenceSheetTools = window.CanvasiaEditorChoiceConsequenceSheet;
 const variableInfluenceSheetTools = window.CanvasiaEditorVariableInfluenceSheet;
+const assetDependencySheetTools = window.CanvasiaEditorAssetDependencySheet;
 const audioCueSheetTools = window.CanvasiaEditorAudioCueSheet;
 const stageDirectionSheetTools = window.CanvasiaEditorStageDirectionSheet;
 const presentationTimelineTools = window.CanvasiaEditorPresentationTimeline;
@@ -3842,6 +3843,16 @@ async function handleClick(event) {
 
   if (action === "export-variable-influence-csv") {
     exportVariableInfluenceCsv();
+    return;
+  }
+
+  if (action === "export-asset-dependency-markdown") {
+    exportAssetDependencyMarkdown();
+    return;
+  }
+
+  if (action === "export-asset-dependency-csv") {
+    exportAssetDependencyCsv();
     return;
   }
 
@@ -28462,6 +28473,17 @@ function buildVariableInfluenceFileName(extension = "md") {
   return `${title}_variable_influence_sheet_${dateStamp}.${extension}`;
 }
 
+function buildAssetDependencyFileName(extension = "md") {
+  const date = new Date();
+  const dateStamp = [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("");
+  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
+  return `${title}_asset_dependency_sheet_${dateStamp}.${extension}`;
+}
+
 function buildAudioCueSheetFileName(extension = "md") {
   const date = new Date();
   const dateStamp = [
@@ -29738,6 +29760,30 @@ function exportVariableInfluenceCsv() {
   downloadTextFile(fileName, content, "text/csv;charset=utf-8");
   setSaveStatus(`已导出变量影响 CSV：${fileName}`);
   showToast(`变量影响 CSV 已导出：${fileName}`);
+}
+
+function buildAssetDependencySheet() {
+  return assetDependencySheetTools.buildAssetDependencySheet(state.data ?? {});
+}
+
+function exportAssetDependencyMarkdown() {
+  const fileName = buildAssetDependencyFileName("md");
+  const sheet = buildAssetDependencySheet();
+  const content = assetDependencySheetTools.buildAssetDependencyMarkdown(sheet, {
+    projectTitle: state.data?.project?.title || "Canvasia Project",
+    generatedAt: formatDate(new Date().toISOString()),
+  });
+  downloadTextFile(fileName, content, "text/markdown;charset=utf-8");
+  setSaveStatus(`已导出素材依赖表：${fileName}`);
+  showToast(`素材依赖表已导出：${fileName}`);
+}
+
+function exportAssetDependencyCsv() {
+  const fileName = buildAssetDependencyFileName("csv");
+  const content = assetDependencySheetTools.buildAssetDependencyCsv(buildAssetDependencySheet());
+  downloadTextFile(fileName, content, "text/csv;charset=utf-8");
+  setSaveStatus(`已导出素材依赖 CSV：${fileName}`);
+  showToast(`素材依赖 CSV 已导出：${fileName}`);
 }
 
 function buildAudioCueSheet() {
@@ -31361,6 +31407,98 @@ function renderVariableInfluencePanel() {
   `;
 }
 
+function getAssetDependencyToneClass(status) {
+  if (status === "blocked") {
+    return "danger-text";
+  }
+  if (status === "warn") {
+    return "warn-text";
+  }
+  if (status === "ready") {
+    return "good-text";
+  }
+  return "";
+}
+
+function renderAssetDependencyPanel() {
+  const sheet = buildAssetDependencySheet();
+  const digest = assetDependencySheetTools.getAssetDependencyStatusDigest(sheet);
+  const summary = sheet.summary ?? {};
+  const topIssues = (sheet.issues ?? []).slice(0, 4);
+  const assetPreview = (sheet.assets ?? [])
+    .filter((record) => record.referenceCount > 0 || record.issues.length > 0)
+    .slice(0, 4);
+
+  return `
+    <article class="detail-card preview-sprint-panel">
+      <div class="panel-heading">
+        <h2>素材依赖表</h2>
+        <span class="badge badge-soft ${getAssetDependencyToneClass(digest.status)}">${escapeHtml(digest.title)}</span>
+      </div>
+      <p class="helper-text">${escapeHtml(digest.detail)} 它会把剧情卡、角色资料和成品 UI 皮肤里用到的背景、立绘、音乐、语音、字体和 UI 图层集中列出，发布前能快速判断哪些素材不能删。</p>
+      <div class="preview-sprint-metrics">
+        ${renderRouteMetricCard("素材库", `${summary.assetCount ?? 0} 个`, "项目登记的全部素材")}
+        ${renderRouteMetricCard("已引用 / 未使用", `${summary.referencedAssetCount ?? 0} / ${summary.unusedAssetCount ?? 0}`, "能看出哪些素材真正参与作品")}
+        ${renderRouteMetricCard("已引用缺文件", `${summary.urgentMissingCount ?? 0} 个`, "发布前必须补齐")}
+        ${renderRouteMetricCard("剧情 / 角色 / UI", `${summary.storyReferenceCount ?? 0} / ${summary.characterReferenceCount ?? 0} / ${summary.uiReferenceCount ?? 0}`, "素材被用在什么层级")}
+      </div>
+      <div class="detail-actions">
+        <button class="toolbar-button toolbar-button-primary" data-action="export-asset-dependency-markdown">
+          导出素材依赖表
+        </button>
+        <button class="toolbar-button" data-action="export-asset-dependency-csv">
+          导出素材 CSV
+        </button>
+        <button class="toolbar-button" data-action="switch-screen" data-screen="assets">
+          去素材库整理
+        </button>
+      </div>
+      ${
+        topIssues.length > 0
+          ? `
+            <div class="preview-sprint-grid">
+              ${topIssues
+                .map(
+                  (issue) => `
+                    <article class="preview-sprint-card is-${issue.severity === "blocker" ? "danger" : issue.severity === "warn" ? "warn" : "soft"}">
+                      <div class="preview-sprint-head">
+                        <strong>${escapeHtml(issue.title)}</strong>
+                        <span class="issue-tag ${issue.severity === "blocker" ? "danger-text" : issue.severity === "warn" ? "warn-text" : ""}">
+                          ${escapeHtml(issue.severity === "blocker" ? "先修" : issue.severity === "warn" ? "复查" : "整理")}
+                        </span>
+                      </div>
+                      <p>${escapeHtml([issue.assetName, issue.scopeLabel, issue.location].filter(Boolean).join(" · "))}</p>
+                      <div class="helper-text">${escapeHtml(issue.detail)}</div>
+                    </article>
+                  `
+                )
+                .join("")}
+            </div>
+          `
+          : assetPreview.length > 0
+            ? `
+              <div class="list-stack compact-stack">
+                ${assetPreview
+                  .map(
+                    (record) => `
+                      <div class="route-testing-item">
+                        <div>
+                          <b>${escapeHtml(record.assetName)}</b>
+                          <span>${escapeHtml(`${record.typeLabel} · ${record.statusLabel} · ${record.fileExists ? "已导入" : "缺文件"}`)}</span>
+                        </div>
+                        <span>${escapeHtml(`引用 ${record.referenceCount} · 剧情 ${record.storyReferenceCount} / 角色 ${record.characterReferenceCount} / UI ${record.uiReferenceCount}`)}</span>
+                      </div>
+                    `
+                  )
+                  .join("")}
+              </div>
+            `
+            : renderEmpty("当前项目还没有素材依赖。先导入背景、立绘、音乐或 UI 素材后，这里会自动生成依赖清单。")
+      }
+    </article>
+  `;
+}
+
 function getAudioCueSheetToneClass(status) {
   if (status === "blocked") {
     return "danger-text";
@@ -31782,6 +31920,7 @@ function renderInspectionOverviewPanel(routeOverview) {
       ${renderProjectDoctorPanel(routeOverview, issueItems)}
       ${renderChoiceConsequencePanel()}
       ${renderVariableInfluencePanel()}
+      ${renderAssetDependencyPanel()}
       ${renderAudioCueSheetPanel()}
       ${renderStageDirectionSheetPanel()}
       ${renderPresentationTimelinePanel()}

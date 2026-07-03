@@ -3962,7 +3962,7 @@ class FrontendActionHandlerTests(unittest.TestCase):
         click_handler = _extract_function_source(source, "handleClick")
         markdown_block_start = click_handler.index('action === "export-variable-influence-markdown"')
         csv_block_start = click_handler.index('action === "export-variable-influence-csv"')
-        csv_block_end = click_handler.index('action === "export-audio-cue-sheet-markdown"', csv_block_start)
+        csv_block_end = click_handler.index('action === "export-asset-dependency-markdown"', csv_block_start)
         markdown_block = click_handler[markdown_block_start:csv_block_start]
         csv_block = click_handler[csv_block_start:csv_block_end]
 
@@ -3977,6 +3977,27 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("function exportVariableInfluenceCsv()", source)
         self.assertIn("variableInfluenceSheetTools.buildVariableInfluenceSheet", source)
         self.assertIn("variableInfluenceSheetTools.getVariableInfluenceStatusDigest", source)
+
+    def test_asset_dependency_sheet_export_actions_are_wired(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        click_handler = _extract_function_source(source, "handleClick")
+        markdown_block_start = click_handler.index('action === "export-asset-dependency-markdown"')
+        csv_block_start = click_handler.index('action === "export-asset-dependency-csv"')
+        csv_block_end = click_handler.index('action === "export-audio-cue-sheet-markdown"', csv_block_start)
+        markdown_block = click_handler[markdown_block_start:csv_block_start]
+        csv_block = click_handler[csv_block_start:csv_block_end]
+
+        self.assertIn("const assetDependencySheetTools = window.CanvasiaEditorAssetDependencySheet", source)
+        self.assertIn('data-action="export-asset-dependency-markdown"', source)
+        self.assertIn('data-action="export-asset-dependency-csv"', source)
+        self.assertIn("exportAssetDependencyMarkdown();", markdown_block)
+        self.assertIn("exportAssetDependencyCsv();", csv_block)
+        self.assertIn("function buildAssetDependencySheet()", source)
+        self.assertIn("function renderAssetDependencyPanel()", source)
+        self.assertIn("function exportAssetDependencyMarkdown()", source)
+        self.assertIn("function exportAssetDependencyCsv()", source)
+        self.assertIn("assetDependencySheetTools.buildAssetDependencySheet", source)
+        self.assertIn("assetDependencySheetTools.getAssetDependencyStatusDigest", source)
 
     def test_stage_direction_sheet_export_actions_are_wired(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")

@@ -67,14 +67,14 @@ Canvasia Engine は、ビジュアルノベル / Galgame 制作者のための s
 - 高度なパーティクルプリセット、プロジェクト単位のパーティクルライブラリ、カメラ演出、フィルター、フラッシュ、画面揺れ、フェード
 - Live2D / 3D キャラクターと 3D シーン素材のインポート、ネイティブ Runtime での glTF / GLB / VRM 構造レポート
 - Web 試遊パッケージ、デスクトップ書き出し、エディタデスクトップビルド、ネイティブ Runtime preview パッケージ
-- ローカル CI precheck、backend smoke、Playwright browser smoke、ボタン配線チェック、条件 / fallback 変数プリセット付き分岐対応 preview regression、release-control report、choice consequence audit、variable influence audit、BGM cue sheet audit、character stage-direction audit、presentation timeline audit、テスター引き継ぎワークオーダー、プレイテストフィードバックテンプレートと取り込みサマリー、VN baseline quality audit、ファイル整合性検証
+- ローカル CI precheck、backend smoke、Playwright browser smoke、ボタン配線チェック、条件 / fallback 変数プリセット付き分岐対応 preview regression、release-control report、choice consequence audit、variable influence audit、asset dependency audit、BGM cue sheet audit、character stage-direction audit、presentation timeline audit、テスター引き継ぎワークオーダー、プレイテストフィードバックテンプレートと取り込みサマリー、VN baseline quality audit、ファイル整合性検証
 
 ## 機能ステータス
 
 | 領域 | 状態 | 説明 |
 | --- | --- | --- |
 | ストーリー / 分岐編集 | Available | カード、選択肢、ジャンプ、変数、条件分岐、入口到達可能性チェック、シーングラフ確認、台本テキストからカードへのインポートに対応。 |
-| 素材管理 | Available | インポート、置き換え、削除、使用中保護、容量予算ヒント、画風プリセット / 立ち絵表情紐付け / プロンプト / モデル / 形式検証付きの任意 OpenAI Image 生成に対応。 |
+| 素材管理 | Available | インポート、置き換え、削除、使用中保護、依存関係レポート、容量予算ヒント、画風プリセット / 立ち絵表情紐付け / プロンプト / モデル / 形式検証付きの任意 OpenAI Image 生成に対応。 |
 | 多言語 / i18n | Preview | プロジェクト言語設定、多言語カバレッジレポート、キャラクター / 章 / シーン / ストーリーカード翻訳の安全な CSV 再インポート、書き出しメタデータ、Web Runtime 言語切替、ネイティブ Runtime 言語切替、フォールバック動作に対応。 |
 | Canvasia Assistant | Available | ローカルテンプレートと、制作者自身の API Key を使う主要互換プロバイダーに対応。 |
 | プロジェクト安全網 | Available | スナップショット、復元、クラッシュ復旧、プロジェクト Doctor、修復キュー、公開前チェック、release-control report、プレースホルダー、立ち絵、背景、BGM、選択肢、テキスト密度、演出の基礎品質チェック。 |
