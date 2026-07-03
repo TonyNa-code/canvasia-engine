@@ -1,4 +1,6 @@
 (function attachCommandPaletteTools(global) {
+  const COMMAND_PALETTE_RECENT_LIMIT = 6;
+
   const SCREEN_COMMANDS = [
     { id: "screen-dashboard", title: "回到制作首页", screen: "dashboard", section: "导航", keywords: ["首页", "路线", "dashboard"] },
     { id: "screen-story", title: "写剧情 / 编排场景", screen: "story", section: "导航", keywords: ["剧情", "台词", "场景", "story"] },
@@ -250,6 +252,84 @@
       .join(" ");
   }
 
+  function getSafeRecentLimit(limit = COMMAND_PALETTE_RECENT_LIMIT) {
+    const numericLimit = Number.parseInt(limit ?? COMMAND_PALETTE_RECENT_LIMIT, 10);
+    return Number.isFinite(numericLimit) && numericLimit >= 0 ? numericLimit : COMMAND_PALETTE_RECENT_LIMIT;
+  }
+
+  function sanitizeCommandPaletteCommandId(commandId) {
+    const safeId = String(commandId ?? "").trim();
+    return /^[a-z0-9][a-z0-9_-]{0,96}$/i.test(safeId) ? safeId : "";
+  }
+
+  function sanitizeCommandPaletteRecentIds(source = [], options = {}) {
+    const limit = getSafeRecentLimit(options.limit);
+    const availableIds = Array.isArray(options.availableIds) ? new Set(options.availableIds) : null;
+    const rawItems = Array.isArray(source) ? source : Array.isArray(source?.items) ? source.items : [];
+    const seen = new Set();
+    const result = [];
+
+    rawItems.forEach((item) => {
+      const id = sanitizeCommandPaletteCommandId(item);
+      if (!id || seen.has(id) || (availableIds && !availableIds.has(id))) {
+        return;
+      }
+      seen.add(id);
+      result.push(id);
+    });
+
+    return result.slice(0, limit);
+  }
+
+  function mergeCommandPaletteRecentId(recentIds = [], commandId = "", options = {}) {
+    const id = sanitizeCommandPaletteCommandId(commandId);
+    const limit = getSafeRecentLimit(options.limit);
+    const existing = sanitizeCommandPaletteRecentIds(recentIds, { ...options, limit: Math.max(limit, recentIds.length) });
+    if (!id || (Array.isArray(options.availableIds) && !options.availableIds.includes(id))) {
+      return existing.slice(0, limit);
+    }
+    return [id, ...existing.filter((item) => item !== id)].slice(0, limit);
+  }
+
+  function getCommandPaletteRecentStorageKey(scope = "global") {
+    const safeScope = String(scope ?? "global")
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9\u4e00-\u9fa5_-]+/g, "-")
+      .replace(/-+/g, "-")
+      .slice(0, 72) || "global";
+    return `canvasia-engine:editor-command-recent:${safeScope}`;
+  }
+
+  function loadStoredCommandPaletteRecentIds(storage, key, options = {}) {
+    if (!storage || !key) {
+      return [];
+    }
+
+    try {
+      const raw = storage.getItem(key);
+      if (!raw) {
+        return [];
+      }
+      return sanitizeCommandPaletteRecentIds(JSON.parse(raw), options);
+    } catch (error) {
+      return [];
+    }
+  }
+
+  function persistStoredCommandPaletteRecentIds(storage, key, recentIds = [], options = {}) {
+    if (!storage || !key) {
+      return false;
+    }
+
+    try {
+      storage.setItem(key, JSON.stringify(sanitizeCommandPaletteRecentIds(recentIds, options)));
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
   function getRecommendedCommandIds(context = {}) {
     const hasProject = Boolean(context.hasProject);
     const hasSelectedScene = Boolean(context.hasSelectedScene);
@@ -327,6 +407,45 @@
       ...recommendedCommands,
       ...commands.filter((command) => !recommendedIdSet.has(command.id)),
     ];
+  }
+
+  function prioritizeRecentCommands(commands = [], context = {}) {
+    const availableIds = commands.map((command) => command.id);
+    const recentIds = sanitizeCommandPaletteRecentIds(context.recentCommandIds, {
+      availableIds,
+      limit: context.recentLimit ?? COMMAND_PALETTE_RECENT_LIMIT,
+    });
+    if (!recentIds.length || !commands.length) {
+      return commands;
+    }
+
+    const commandById = new Map(commands.map((command) => [command.id, command]));
+    const recommendedIds = new Set(commands.filter((command) => command.recommended).map((command) => command.id));
+    const recentCommands = recentIds
+      .map((id) => commandById.get(id))
+      .filter((command) => command && !command.disabled && !recommendedIds.has(command.id))
+      .map((command) => ({
+        ...command,
+        originalSection: command.originalSection ?? command.section,
+        section: "最近",
+        recent: true,
+      }));
+    if (!recentCommands.length) {
+      return commands;
+    }
+
+    const recentIdSet = new Set(recentCommands.map((command) => command.id));
+    const recommendedCommands = commands.filter((command) => command.recommended);
+    const remainingCommands = commands.filter((command) => !command.recommended && !recentIdSet.has(command.id));
+    return [
+      ...recommendedCommands,
+      ...recentCommands,
+      ...remainingCommands,
+    ];
+  }
+
+  function prioritizeCommandPaletteCommands(commands = [], context = {}) {
+    return prioritizeRecentCommands(prioritizeRecommendedCommands(commands, context), context);
   }
 
   function buildCommandPaletteCommands(context = {}) {
@@ -469,7 +588,7 @@
       },
     ];
 
-    return prioritizeRecommendedCommands(commands, context);
+    return prioritizeCommandPaletteCommands(commands, context);
   }
 
   function filterCommandPaletteCommands(commands = [], query = "") {
@@ -511,14 +630,15 @@
         const selectedClass = index === selectedIndex ? " is-selected" : "";
         const disabledClass = disabled ? " is-disabled" : "";
         const recommendedClass = command.recommended ? " is-recommended" : "";
+        const recentClass = command.recent ? " is-recent" : "";
         const reason = disabled && command.disabledReason ? ` · ${command.disabledReason}` : "";
-        const sectionLabel = command.recommended && command.originalSection
+        const sectionLabel = (command.recommended || command.recent) && command.originalSection
           ? `${command.section} · ${command.originalSection}`
           : command.section ?? "指令";
         return `
           <button
             type="button"
-            class="command-palette-item${selectedClass}${disabledClass}${recommendedClass}"
+            class="command-palette-item${selectedClass}${disabledClass}${recommendedClass}${recentClass}"
             data-action="run-command-palette-command"
             data-command-id="${escapeHtml(command.id)}"
             role="option"
@@ -535,11 +655,19 @@
   }
 
   global.CanvasiaEditorCommandPalette = {
+    COMMAND_PALETTE_RECENT_LIMIT,
     buildCommandPaletteCommands,
     filterCommandPaletteCommands,
     clampCommandPaletteIndex,
     renderCommandPaletteList,
     getRecommendedCommandIds,
     prioritizeRecommendedCommands,
+    prioritizeRecentCommands,
+    prioritizeCommandPaletteCommands,
+    sanitizeCommandPaletteRecentIds,
+    mergeCommandPaletteRecentId,
+    getCommandPaletteRecentStorageKey,
+    loadStoredCommandPaletteRecentIds,
+    persistStoredCommandPaletteRecentIds,
   };
 })(window);

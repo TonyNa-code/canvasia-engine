@@ -9195,6 +9195,13 @@ textarea::placeholder {
     rgba(255, 255, 255, 0.04);
 }
 
+.command-palette-item.is-recent {
+  border-color: rgba(137, 234, 194, 0.2);
+  background:
+    linear-gradient(135deg, rgba(83, 220, 174, 0.1), rgba(84, 144, 255, 0.08)),
+    rgba(255, 255, 255, 0.036);
+}
+
 .command-palette-item.is-disabled {
   cursor: not-allowed;
   opacity: 0.48;
@@ -10095,6 +10102,13 @@ html[data-ui-theme="light"] .command-palette-item.is-recommended {
   background:
     linear-gradient(135deg, rgba(71, 178, 255, 0.16), rgba(108, 126, 255, 0.08)),
     rgba(255, 255, 255, 0.84);
+}
+
+html[data-ui-theme="light"] .command-palette-item.is-recent {
+  border-color: rgba(30, 162, 124, 0.24);
+  background:
+    linear-gradient(135deg, rgba(50, 205, 155, 0.14), rgba(65, 135, 240, 0.08)),
+    rgba(255, 255, 255, 0.82);
 }
 
 html[data-ui-theme="light"] .command-palette-section {

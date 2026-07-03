@@ -710,6 +710,7 @@ const PREVIEW_REGRESSION_MAX_STEPS = 80;
 const PREVIEW_REGRESSION_MAX_REPEAT = 3;
 const PREVIEW_REGRESSION_BRANCHING_SEED_LIMIT = 4;
 const RECENT_WORKSPACE_LIMIT = recentWorkspaceTools?.RECENT_WORKSPACE_LIMIT ?? 8;
+const COMMAND_PALETTE_RECENT_LIMIT = commandPaletteTools?.COMMAND_PALETTE_RECENT_LIMIT ?? 6;
 const EDITOR_UI_THEME_STORAGE_KEY =
   uiThemeTools?.EDITOR_UI_THEME_STORAGE_KEY ?? "canvasia-engine:editor-ui-theme-mode";
 const PROJECT_CENTER_EDITOR_MODE_STORAGE_KEY = "canvasia-engine:project-center-editor-mode";
@@ -860,6 +861,7 @@ const state = {
   commandPaletteOpen: false,
   commandPaletteQuery: "",
   commandPaletteSelectedIndex: 0,
+  commandPaletteRecentIds: loadStoredCommandPaletteRecentIds(null),
 };
 
 function getSafeUiThemeMode(mode) {
@@ -1806,6 +1808,7 @@ function resetProjectScopedUiState() {
   state.storyBlockDrag = null;
   state.beginnerTutorialOpen = false;
   state.beginnerTutorialStep = 0;
+  state.commandPaletteRecentIds = [];
   stopPreviewTypewriter();
   stopPreviewAutoAdvance();
   stopPreviewMusicPlayback();
@@ -1830,6 +1833,7 @@ function hydrateProjectRuntime(data) {
   state.previewSaveSlots = loadStoredPreviewSaveSlots(data.project);
   state.previewQuickSave = loadStoredPreviewQuickSave(data.project);
   state.recentWorkspaceItems = loadStoredRecentWorkspaceItems(data.project);
+  state.commandPaletteRecentIds = loadStoredCommandPaletteRecentIds(data.project);
   state.validation = runValidation(data);
   updateErrorRecoveryState(null);
   initializeSelection(data);
@@ -1844,6 +1848,7 @@ function clearLoadedProjectState() {
   state.lastExportResult = null;
   state.projectHistory = null;
   state.projectSessionRecovery = null;
+  state.commandPaletteRecentIds = loadStoredCommandPaletteRecentIds(null);
   updateErrorRecoveryState(null);
 }
 
@@ -2461,6 +2466,8 @@ function getCommandPaletteContext() {
     selectedSceneTitle: selectedScene?.name ?? "",
     selectedSceneBlockCount: selectedScene?.blocks?.length ?? 0,
     selectedBlockType: selectedBlock?.type ?? "",
+    recentCommandIds: state.commandPaletteRecentIds,
+    recentLimit: COMMAND_PALETTE_RECENT_LIMIT,
     currentScreen: state.currentScreen,
     chapterCount: state.data?.chapters?.length ?? 0,
     sceneCount: state.data?.scenes?.length ?? 0,
@@ -2552,6 +2559,7 @@ async function runCommandPaletteCommand(commandId) {
     target: virtualTarget,
     preventDefault() {},
   });
+  recordCommandPaletteCommand(command.id);
 }
 
 async function runSelectedCommandPaletteCommand() {
@@ -19496,6 +19504,78 @@ function getProjectStorageScope(project = state.data?.project) {
     .slice(0, 72);
 
   return rawKey || "project";
+}
+
+function getCommandPaletteRecentStorageKey(project = null) {
+  const scope = project ? getProjectStorageScope(project) : "global";
+  if (commandPaletteTools?.getCommandPaletteRecentStorageKey) {
+    return commandPaletteTools.getCommandPaletteRecentStorageKey(scope);
+  }
+  return `canvasia-engine:editor-command-recent:${scope}`;
+}
+
+function loadStoredCommandPaletteRecentIds(project = null) {
+  const storage = getBrowserStorage();
+  const key = getCommandPaletteRecentStorageKey(project);
+
+  if (commandPaletteTools?.loadStoredCommandPaletteRecentIds) {
+    return commandPaletteTools.loadStoredCommandPaletteRecentIds(storage, key, {
+      limit: COMMAND_PALETTE_RECENT_LIMIT,
+    });
+  }
+
+  if (!storage) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(storage.getItem(key) || "[]");
+    return Array.isArray(parsed) ? parsed.slice(0, COMMAND_PALETTE_RECENT_LIMIT) : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+function persistCommandPaletteRecentIds(project = state.data?.project ?? null) {
+  const storage = getBrowserStorage();
+  const key = getCommandPaletteRecentStorageKey(project);
+
+  if (commandPaletteTools?.persistStoredCommandPaletteRecentIds) {
+    commandPaletteTools.persistStoredCommandPaletteRecentIds(storage, key, state.commandPaletteRecentIds, {
+      limit: COMMAND_PALETTE_RECENT_LIMIT,
+    });
+    return;
+  }
+
+  if (!storage) {
+    return;
+  }
+
+  try {
+    storage.setItem(key, JSON.stringify(state.commandPaletteRecentIds.slice(0, COMMAND_PALETTE_RECENT_LIMIT)));
+  } catch (error) {
+    // Recent commands are a convenience only; failing storage must not block editing.
+  }
+}
+
+function recordCommandPaletteCommand(commandId) {
+  const nextIds = commandPaletteTools?.mergeCommandPaletteRecentId
+    ? commandPaletteTools.mergeCommandPaletteRecentId(state.commandPaletteRecentIds, commandId, {
+        limit: COMMAND_PALETTE_RECENT_LIMIT,
+      })
+    : [String(commandId ?? "").trim(), ...state.commandPaletteRecentIds.filter((id) => id !== commandId)]
+        .filter(Boolean)
+        .slice(0, COMMAND_PALETTE_RECENT_LIMIT);
+
+  if (
+    nextIds.length === state.commandPaletteRecentIds.length &&
+    nextIds.every((id, index) => id === state.commandPaletteRecentIds[index])
+  ) {
+    return;
+  }
+
+  state.commandPaletteRecentIds = nextIds;
+  persistCommandPaletteRecentIds();
 }
 
 function getPreviewPlaybackStorageKey(project = state.data?.project) {

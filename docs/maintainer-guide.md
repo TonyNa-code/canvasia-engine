@@ -9,7 +9,7 @@ This guide explains the current maintenance boundaries for contributors who want
 - `editor_snapshot_cache.py` owns small immutable-snapshot cache behavior. Reuse `SnapshotCache` for expensive read-mostly payloads that can be invalidated by a file signature.
 - `openai_asset_generation.py` owns image-generation API calls and returned-file validation.
 - `prototype_editor/modules/` owns browser-side editor logic that can be tested without a browser DOM.
-- `prototype_editor/modules/command_palette.js` owns Cmd/Ctrl+K command metadata, filtering, and list rendering. Keep command definitions there and route execution through existing editor actions.
+- `prototype_editor/modules/command_palette.js` owns Cmd/Ctrl+K command metadata, filtering, recommendations, recent-command helpers, and list rendering. Keep command definitions there and route execution through existing editor actions.
 - `native_runtime/runtime_player.py` owns native playback, native release checks, and runtime reports.
 
 ## Safe Extension Pattern

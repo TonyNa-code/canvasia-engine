@@ -57,6 +57,7 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
               selectedSceneTitle: "雨夜教室",
               selectedSceneBlockCount: 4,
               selectedBlockType: "dialogue",
+              recentCommandIds: ["insert-video", "screen-preview", "insert-choice", "bad id"],
               chapterCount: 1,
               sceneCount: 1,
               needsStarterKit: false,
@@ -85,6 +86,8 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
               emptySceneRecommendedIds: projectWithScene.slice(0, 4).map((command) => command.id),
               emptySceneRecommendedSections: projectWithScene.slice(0, 2).map((command) => command.section),
               dialogueRecommendedIds: projectAfterDialogue.slice(0, 4).map((command) => command.id),
+              dialogueRecentIds: projectAfterDialogue.slice(4, 6).map((command) => command.id),
+              dialogueRecentSections: projectAfterDialogue.slice(4, 6).map((command) => command.section),
               directRecommendedIds: tools.getRecommendedCommandIds({{ hasProject: true, hasSelectedScene: true, selectedBlockType: "dialogue", selectedSceneBlockCount: 2 }}),
               storySearchIds: storySearch.map((command) => command.id),
               clamped: tools.clampCommandPaletteIndex(99, project),
@@ -108,9 +111,63 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
         self.assertEqual(payload["emptySceneRecommendedIds"][:3], ["template-opening-intro", "insert-background", "insert-music-play"])
         self.assertEqual(payload["emptySceneRecommendedSections"], ["推荐", "推荐"])
         self.assertEqual(payload["dialogueRecommendedIds"][:3], ["insert-dialogue", "insert-choice", "template-emotion-burst"])
+        self.assertEqual(payload["dialogueRecentIds"], ["insert-video", "screen-preview"])
+        self.assertEqual(payload["dialogueRecentSections"], ["最近", "最近"])
         self.assertEqual(payload["directRecommendedIds"][:2], ["insert-dialogue", "insert-choice"])
         self.assertIn("screen-story", payload["storySearchIds"])
         self.assertGreater(payload["clamped"], 0)
+
+    def test_command_palette_recent_ids_are_sanitized_merged_and_persisted(self) -> None:
+        script = textwrap.dedent(
+            f"""
+            const fs = require("fs");
+            const vm = require("vm");
+            const context = {{ window: {{}} }};
+            context.globalThis = context;
+            vm.createContext(context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
+            const tools = context.window.CanvasiaEditorCommandPalette;
+            const storage = {{
+              value: "",
+              getItem(key) {{ return this.value; }},
+              setItem(key, value) {{ this.key = key; this.value = value; }},
+            }};
+            const key = tools.getCommandPaletteRecentStorageKey("Project Alpha!");
+            const sanitized = tools.sanitizeCommandPaletteRecentIds(
+              ["insert-dialogue", "bad id", "insert-dialogue", "screen-preview", "unknown"],
+              {{ availableIds: ["insert-dialogue", "screen-preview"], limit: 6 }}
+            );
+            const merged = tools.mergeCommandPaletteRecentId(
+              ["insert-dialogue", "screen-preview"],
+              "insert-video",
+              {{ limit: 3 }}
+            );
+            const moved = tools.mergeCommandPaletteRecentId(
+              merged,
+              "insert-dialogue",
+              {{ limit: 3 }}
+            );
+            const persisted = tools.persistStoredCommandPaletteRecentIds(storage, key, ["insert-dialogue", "bad id", "screen-preview"], {{
+              availableIds: ["insert-dialogue", "screen-preview"],
+              limit: 3,
+            }});
+            const stored = JSON.parse(storage.value || "[]");
+            const loaded = tools.loadStoredCommandPaletteRecentIds(storage, key, {{ limit: 3 }});
+            storage.value = "{{bad json";
+            const broken = tools.loadStoredCommandPaletteRecentIds(storage, key, {{ limit: 3 }});
+            process.stdout.write(JSON.stringify({{ key, sanitized, merged, moved, persisted, stored, loaded, broken }}));
+            """
+        )
+        payload = self.run_node(script)
+
+        self.assertEqual(payload["key"], "canvasia-engine:editor-command-recent:project-alpha-")
+        self.assertEqual(payload["sanitized"], ["insert-dialogue", "screen-preview"])
+        self.assertEqual(payload["merged"], ["insert-video", "insert-dialogue", "screen-preview"])
+        self.assertEqual(payload["moved"], ["insert-dialogue", "insert-video", "screen-preview"])
+        self.assertTrue(payload["persisted"])
+        self.assertEqual(payload["stored"], ["insert-dialogue", "screen-preview"])
+        self.assertEqual(payload["loaded"], ["insert-dialogue", "screen-preview"])
+        self.assertEqual(payload["broken"], [])
 
     def test_command_palette_renderer_marks_selected_and_disabled_commands(self) -> None:
         script = textwrap.dedent(
@@ -124,6 +181,7 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
             const tools = context.window.CanvasiaEditorCommandPalette;
             const html = tools.renderCommandPaletteList([
               {{ id: "a", title: "打开 <剧情>", section: "推荐", originalSection: "导航", subtitle: "去写", action: "switch-screen", recommended: true }},
+              {{ id: "c", title: "插入台词", section: "最近", originalSection: "插卡", subtitle: "继续写", action: "add-dialogue", recent: true }},
               {{ id: "b", title: "导出", section: "发布", subtitle: "先修错误", disabled: true, disabledReason: "不可用" }},
             ], 1, {{
               escapeHtml(value) {{
@@ -139,6 +197,8 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
         self.assertIn("打开 &lt;剧情&gt;", html)
         self.assertIn("推荐 · 导航", html)
         self.assertIn("is-recommended", html)
+        self.assertIn("最近 · 插卡", html)
+        self.assertIn("is-recent", html)
         self.assertIn("is-selected", html)
         self.assertIn("is-disabled", html)
         self.assertIn('aria-disabled="true"', html)
