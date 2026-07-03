@@ -3887,6 +3887,32 @@ async function handleClick(event) {
     return;
   }
 
+  if (action === "export-playtest-feedback-template-markdown") {
+    state.validation = runValidation(state.data);
+    updateTopbar();
+    exportPlaytestFeedbackTemplateMarkdown();
+    if (state.currentScreen === "inspection") {
+      renderInspectionScreen();
+    }
+    if (state.currentScreen === "preview") {
+      renderPreviewScreen();
+    }
+    return;
+  }
+
+  if (action === "export-playtest-feedback-template-csv") {
+    state.validation = runValidation(state.data);
+    updateTopbar();
+    exportPlaytestFeedbackTemplateCsv();
+    if (state.currentScreen === "inspection") {
+      renderInspectionScreen();
+    }
+    if (state.currentScreen === "preview") {
+      renderPreviewScreen();
+    }
+    return;
+  }
+
   if (action === "clear-inspection-filters") {
     state.inspectionIssueSearchQuery = "";
     state.inspectionIssueFilterMode = "all";
@@ -26250,6 +26276,12 @@ function renderPreviewRegressionPanel(routeOverview) {
         <button class="toolbar-button" data-action="export-playtest-handoff-csv">
           导出工单 CSV
         </button>
+        <button class="toolbar-button" data-action="export-playtest-feedback-template-markdown">
+          导出反馈模板
+        </button>
+        <button class="toolbar-button" data-action="export-playtest-feedback-template-csv">
+          导出反馈 CSV
+        </button>
       </div>
       ${
         result
@@ -28296,6 +28328,17 @@ function buildPlaytestHandoffFileName(extension = "md") {
   return `${title}_playtest_handoff_${dateStamp}.${extension}`;
 }
 
+function buildPlaytestFeedbackTemplateFileName(extension = "md") {
+  const date = new Date();
+  const dateStamp = [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("");
+  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
+  return `${title}_playtest_feedback_template_${dateStamp}.${extension}`;
+}
+
 function buildProjectDoctorRepairReceiptFileName(receipt = state.projectDoctorRepairReceipt) {
   const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
   const status = sanitizeFileName(receipt?.status || "receipt");
@@ -29471,6 +29514,22 @@ function exportPlaytestHandoffCsv() {
   downloadTextFile(fileName, content, "text/csv;charset=utf-8");
   setSaveStatus(`已导出测试员工单 CSV：${fileName}`);
   showToast(`测试员工单 CSV 已导出：${fileName}`);
+}
+
+function exportPlaytestFeedbackTemplateMarkdown() {
+  const fileName = buildPlaytestFeedbackTemplateFileName("md");
+  const content = playtestHandoffReportTools.buildPlaytestFeedbackTemplateMarkdown(buildPlaytestHandoffContext());
+  downloadTextFile(fileName, content, "text/markdown;charset=utf-8");
+  setSaveStatus(`已导出测试反馈模板：${fileName}`);
+  showToast(`测试反馈模板已导出：${fileName}`);
+}
+
+function exportPlaytestFeedbackTemplateCsv() {
+  const fileName = buildPlaytestFeedbackTemplateFileName("csv");
+  const content = playtestHandoffReportTools.buildPlaytestFeedbackTemplateCsv(buildPlaytestHandoffContext());
+  downloadTextFile(fileName, content, "text/csv;charset=utf-8");
+  setSaveStatus(`已导出测试反馈 CSV：${fileName}`);
+  showToast(`测试反馈 CSV 已导出：${fileName}`);
 }
 
 function getCharacterPrimarySpriteAssetId(character) {

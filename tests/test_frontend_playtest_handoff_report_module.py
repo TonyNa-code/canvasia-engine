@@ -113,6 +113,9 @@ class FrontendPlaytestHandoffReportModuleTests(unittest.TestCase):
             }};
             const markdown = tools.buildPlaytestHandoffMarkdown(contextData);
             const csv = tools.buildPlaytestHandoffCsv(contextData);
+            const feedbackRows = tools.buildPlaytestFeedbackRows(contextData);
+            const feedbackMarkdown = tools.buildPlaytestFeedbackTemplateMarkdown(contextData);
+            const feedbackCsv = tools.buildPlaytestFeedbackTemplateCsv(contextData);
             process.stdout.write(JSON.stringify({{
               keys: Object.keys(tools).sort(),
               flattened: tools.flattenRouteTestingCases(routeTestingPlan),
@@ -121,6 +124,9 @@ class FrontendPlaytestHandoffReportModuleTests(unittest.TestCase):
               regression: tools.serializeRegressionResult(regressionResult, regressionFixQueue),
               markdown,
               csv,
+              feedbackRows,
+              feedbackMarkdown,
+              feedbackCsv,
             }}));
             """
         )
@@ -136,7 +142,10 @@ class FrontendPlaytestHandoffReportModuleTests(unittest.TestCase):
         payload = json.loads(completed.stdout)
         self.assertIn("buildPlaytestHandoffMarkdown", payload["keys"])
         self.assertIn("buildPlaytestHandoffCsv", payload["keys"])
+        self.assertIn("buildPlaytestFeedbackTemplateMarkdown", payload["keys"])
+        self.assertIn("buildPlaytestFeedbackTemplateCsv", payload["keys"])
         self.assertEqual(len(payload["flattened"]), 3)
+        self.assertEqual(len(payload["feedbackRows"]), 5)
         self.assertEqual(payload["summary"]["blockedRouteCaseCount"], 1)
         self.assertEqual(payload["digest"]["status"], "blocked")
         self.assertEqual(payload["regression"]["summary"]["failCount"], 1)
@@ -146,6 +155,10 @@ class FrontendPlaytestHandoffReportModuleTests(unittest.TestCase):
         self.assertIn('"优先复看"', payload["csv"])
         self.assertIn('"分支路线"', payload["csv"])
         self.assertIn('"结局路径"', payload["csv"])
+        self.assertIn("# Demo 测试反馈模板", payload["feedbackMarkdown"])
+        self.assertIn("复现步骤", payload["feedbackMarkdown"])
+        self.assertIn("截图/录屏", payload["feedbackCsv"])
+        self.assertIn('"自由反馈"', payload["feedbackCsv"])
 
 
 if __name__ == "__main__":

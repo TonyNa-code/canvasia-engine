@@ -280,6 +280,101 @@
     return `\uFEFF${buildCsv(["类型", "序号", "章节", "场景", "入口/路径", "路线/目标", "状态", "测试提示"], rows)}\n`;
   }
 
+  function buildPlaytestFeedbackRows(context = {}) {
+    const routeRows = flattenRouteTestingCases(context.routeTestingPlan);
+    const regression = serializeRegressionResult(context.regressionResult, context.regressionFixQueue);
+    const focusRows = toArray(regression?.fixQueue).map((caseResult, index) => ({
+      type: "优先复看",
+      order: `${index + 1}`,
+      chapterName: caseResult.chapterName,
+      sceneName: caseResult.sceneName,
+      pathLabel: caseResult.sourceLabel,
+      targetLabel: caseResult.reason,
+      suggestedCategory: caseResult.status === "fail" ? "卡死/断线" : "体验复看",
+    }));
+    const plannedRows = routeRows.map((row) => ({
+      type: row.type,
+      order: row.order,
+      chapterName: row.chapterName,
+      sceneName: row.sceneName,
+      pathLabel: row.pathLabel,
+      targetLabel: row.targetLabel,
+      suggestedCategory: row.type === "结局路径" ? "结局/回想" : "分支/剧情",
+    }));
+
+    return [...focusRows, ...plannedRows, {
+      type: "自由反馈",
+      order: "",
+      chapterName: "",
+      sceneName: "",
+      pathLabel: "",
+      targetLabel: "",
+      suggestedCategory: "其他",
+    }];
+  }
+
+  function buildPlaytestFeedbackTemplateMarkdown(context = {}) {
+    const projectTitle = context.projectTitle || "Canvasia Project";
+    const generatedAt = context.generatedAt || new Date().toISOString();
+    const rows = buildPlaytestFeedbackRows(context);
+    const table = buildMarkdownTable(
+      ["类型", "章节", "场景", "路线/目标", "严重程度", "问题分类", "复现步骤", "期望表现", "实际表现", "截图/录屏", "备注"],
+      rows.slice(0, 100).map((row) => [
+        row.type,
+        row.chapterName,
+        row.sceneName,
+        row.targetLabel || row.pathLabel,
+        "",
+        row.suggestedCategory,
+        "",
+        "",
+        "",
+        "",
+        "",
+      ])
+    );
+
+    return `\uFEFF${[
+      `# ${projectTitle} 测试反馈模板`,
+      "",
+      `导出时间：${generatedAt}`,
+      "",
+      "## 填写说明",
+      "",
+      "- 严重程度建议写：阻塞 / 明显问题 / 轻微问题 / 建议。",
+      "- 问题分类建议写：卡死/断线、文本、演出、音频、UI、存档、性能、错别字、其他。",
+      "- 复现步骤请尽量写成“从哪个场景开始，点了哪些选项，发生了什么”。",
+      "- 如果有截图或录屏，把文件名或链接填在“截图/录屏”列。",
+      "",
+      "## 反馈表",
+      "",
+      table || "当前没有路线用例。可以直接在下面新增自由反馈。",
+      "",
+    ].join("\n")}`;
+  }
+
+  function buildPlaytestFeedbackTemplateCsv(context = {}) {
+    const projectTitle = context.projectTitle || "Canvasia Project";
+    const rows = [
+      ["项目", projectTitle, "", "", "", "", "", "", "", "", ""],
+      ...buildPlaytestFeedbackRows(context).map((row) => [
+        row.type,
+        row.chapterName,
+        row.sceneName,
+        row.targetLabel || row.pathLabel,
+        "",
+        row.suggestedCategory,
+        "",
+        "",
+        "",
+        "",
+        "",
+      ]),
+    ];
+
+    return `\uFEFF${buildCsv(["类型", "章节", "场景", "路线/目标", "严重程度", "问题分类", "复现步骤", "期望表现", "实际表现", "截图/录屏", "备注"], rows)}\n`;
+  }
+
   global.CanvasiaEditorPlaytestHandoffReport = Object.freeze({
     serializeRegressionResult,
     flattenRouteTestingCases,
@@ -287,5 +382,8 @@
     buildPlaytestHandoffDigest,
     buildPlaytestHandoffMarkdown,
     buildPlaytestHandoffCsv,
+    buildPlaytestFeedbackRows,
+    buildPlaytestFeedbackTemplateMarkdown,
+    buildPlaytestFeedbackTemplateCsv,
   });
 })(typeof window !== "undefined" ? window : globalThis);

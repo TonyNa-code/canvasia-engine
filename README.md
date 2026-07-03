@@ -66,7 +66,7 @@ The project already includes a visual editor, export pipeline, native runtime pr
 - Advanced particle presets, project particle libraries, camera effects, screen filters, flashes, shakes, and fade transitions
 - Live2D / 3D character and 3D scene asset import, plus native-runtime 3D inspection reports for glTF / GLB / VRM assets
 - Web playable export, desktop exports, editor desktop builds, and native Runtime preview packages
-- Automated checks: local CI precheck, backend smoke tests, Playwright browser smoke tests, action wiring scans, release-control reports, tester handoff work orders, VN baseline quality audits, and package integrity verification
+- Automated checks: local CI precheck, backend smoke tests, Playwright browser smoke tests, action wiring scans, release-control reports, tester handoff work orders, playtest feedback templates, VN baseline quality audits, and package integrity verification
 
 ## Feature Status
 

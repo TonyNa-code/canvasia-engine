@@ -3914,22 +3914,36 @@ class FrontendActionHandlerTests(unittest.TestCase):
         click_handler = _extract_function_source(source, "handleClick")
         markdown_block_start = click_handler.index('action === "export-playtest-handoff-markdown"')
         csv_block_start = click_handler.index('action === "export-playtest-handoff-csv"')
-        csv_block_end = click_handler.index('action === "clear-inspection-filters"', csv_block_start)
+        feedback_markdown_block_start = click_handler.index('action === "export-playtest-feedback-template-markdown"')
+        feedback_csv_block_start = click_handler.index('action === "export-playtest-feedback-template-csv"')
+        feedback_csv_block_end = click_handler.index('action === "clear-inspection-filters"', feedback_csv_block_start)
         markdown_block = click_handler[markdown_block_start:csv_block_start]
-        csv_block = click_handler[csv_block_start:csv_block_end]
+        csv_block = click_handler[csv_block_start:feedback_markdown_block_start]
+        feedback_markdown_block = click_handler[feedback_markdown_block_start:feedback_csv_block_start]
+        feedback_csv_block = click_handler[feedback_csv_block_start:feedback_csv_block_end]
 
         self.assertIn("const playtestHandoffReportTools = window.CanvasiaEditorPlaytestHandoffReport", source)
         self.assertIn('data-action="export-playtest-handoff-markdown"', source)
         self.assertIn('data-action="export-playtest-handoff-csv"', source)
+        self.assertIn('data-action="export-playtest-feedback-template-markdown"', source)
+        self.assertIn('data-action="export-playtest-feedback-template-csv"', source)
         self.assertIn("exportPlaytestHandoffMarkdown();", markdown_block)
         self.assertIn("exportPlaytestHandoffCsv();", csv_block)
+        self.assertIn("exportPlaytestFeedbackTemplateMarkdown();", feedback_markdown_block)
+        self.assertIn("exportPlaytestFeedbackTemplateCsv();", feedback_csv_block)
         self.assertIn('state.currentScreen === "inspection"', markdown_block)
         self.assertIn('state.currentScreen === "preview"', markdown_block)
         self.assertIn('state.currentScreen === "inspection"', csv_block)
         self.assertIn('state.currentScreen === "preview"', csv_block)
+        self.assertIn('state.currentScreen === "inspection"', feedback_markdown_block)
+        self.assertIn('state.currentScreen === "preview"', feedback_markdown_block)
+        self.assertIn('state.currentScreen === "inspection"', feedback_csv_block)
+        self.assertIn('state.currentScreen === "preview"', feedback_csv_block)
         self.assertIn("function buildPlaytestHandoffContext()", source)
         self.assertIn("function exportPlaytestHandoffMarkdown()", source)
         self.assertIn("function exportPlaytestHandoffCsv()", source)
+        self.assertIn("function exportPlaytestFeedbackTemplateMarkdown()", source)
+        self.assertIn("function exportPlaytestFeedbackTemplateCsv()", source)
 
     def test_beginner_dashboard_export_step_requires_real_export_record(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
