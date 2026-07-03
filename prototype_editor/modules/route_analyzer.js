@@ -238,6 +238,43 @@
     return 2;
   }
 
+  function buildRouteReachability(nodes = [], entrySceneId = "") {
+    const nodeById = new Map(nodes.map((node) => [node.id, node]));
+    const reachableSceneIds = new Set();
+    const routeDepthBySceneId = new Map();
+    const queue = [];
+
+    if (nodeById.has(entrySceneId)) {
+      reachableSceneIds.add(entrySceneId);
+      routeDepthBySceneId.set(entrySceneId, 0);
+      queue.push(entrySceneId);
+    }
+
+    while (queue.length > 0) {
+      const sceneId = queue.shift();
+      const node = nodeById.get(sceneId);
+      const currentDepth = routeDepthBySceneId.get(sceneId) ?? 0;
+      const nextSceneIds = [
+        ...new Set((node?.routes ?? []).filter((route) => route.targetExists).map((route) => route.targetSceneId)),
+      ];
+
+      nextSceneIds.forEach((targetSceneId) => {
+        if (!targetSceneId || reachableSceneIds.has(targetSceneId) || !nodeById.has(targetSceneId)) {
+          return;
+        }
+        reachableSceneIds.add(targetSceneId);
+        routeDepthBySceneId.set(targetSceneId, currentDepth + 1);
+        queue.push(targetSceneId);
+      });
+    }
+
+    return {
+      reachableSceneIds,
+      routeDepthBySceneId,
+      maxRouteDepth: routeDepthBySceneId.size ? Math.max(...routeDepthBySceneId.values()) : 0,
+    };
+  }
+
   function buildSceneRouteOverview(data = {}, validation = {}, options = {}) {
     const entrySceneId = data.project?.entrySceneId;
     const incomingCounts = new Map();
@@ -298,6 +335,8 @@
       });
     });
 
+    const reachability = buildRouteReachability(nodes, entrySceneId);
+
     nodes.forEach((node) => {
       const validRoutes = node.routes.filter((route) => route.targetExists);
       node.incomingCount = incomingCounts.get(node.id) ?? 0;
@@ -305,6 +344,11 @@
       node.brokenRouteCount = node.routes.length - validRoutes.length;
       node.isOrphan = !node.isEntry && node.incomingCount === 0;
       node.isEnding = validRoutes.length === 0;
+      node.isReachableFromEntry = reachability.reachableSceneIds.has(node.id);
+      node.isUnreachable = !node.isReachableFromEntry;
+      node.routeDepth = reachability.routeDepthBySceneId.has(node.id)
+        ? reachability.routeDepthBySceneId.get(node.id)
+        : null;
     });
 
     const alerts = [
@@ -327,6 +371,16 @@
           meta: "如果这不是隐藏路线，可从别的场景补一条入口。",
         })),
       ...nodes
+        .filter((node) => node.isUnreachable && !node.isOrphan)
+        .map((node) => ({
+          sceneId: node.id,
+          sceneName: node.name,
+          label: "不可达",
+          tone: "warn",
+          message: "这个场景虽然有入口线，但入口线本身不在玩家主路线里。",
+          meta: "从项目入口试玩时暂时走不到这里，建议检查前置场景是否也未接通。",
+        })),
+      ...nodes
         .filter((node) => node.isEnding && !node.isEntry)
         .map((node) => ({
           sceneId: node.id,
@@ -347,6 +401,9 @@
         branchingScenes: nodes.filter((node) => node.branchTargetCount > 1).length,
         endingScenes: nodes.filter((node) => node.isEnding).length,
         orphanScenes: nodes.filter((node) => node.isOrphan).length,
+        reachableScenes: reachability.reachableSceneIds.size,
+        unreachableScenes: nodes.filter((node) => node.isUnreachable).length,
+        maxRouteDepth: reachability.maxRouteDepth,
         brokenRoutes: brokenRoutes.length,
       },
     };
@@ -360,6 +417,7 @@
     createSceneRoute,
     collectSceneRoutes,
     getRouteAlertPriority,
+    buildRouteReachability,
     buildSceneRouteOverview,
   });
 })(typeof window !== "undefined" ? window : globalThis);

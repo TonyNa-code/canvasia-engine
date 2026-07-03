@@ -60,18 +60,27 @@ class FrontendRouteAnalyzerModuleTests(unittest.TestCase):
             const orphan = {{
               id: "scene_orphan",
               name: "Orphan",
-              blocks: [{{ id: "n", type: "narration", text: "Nobody reaches this." }}]
+              blocks: [
+                {{ id: "n", type: "narration", text: "Nobody reaches this." }},
+                {{ id: "jump", type: "jump", targetSceneId: "scene_hidden_chain" }}
+              ]
+            }};
+            const hiddenChain = {{
+              id: "scene_hidden_chain",
+              name: "Hidden Chain",
+              blocks: [{{ id: "n", type: "narration", text: "Has an incoming line, but the chain is unreachable." }}]
             }};
             const data = {{
               project: {{ entrySceneId: "scene_start" }},
               chapters: [
-                {{ chapterId: "ch1", name: "Chapter", sceneOrder: ["scene_start", "scene_end", "scene_secret", "scene_orphan"] }}
+                {{ chapterId: "ch1", name: "Chapter", sceneOrder: ["scene_start", "scene_end", "scene_secret", "scene_orphan", "scene_hidden_chain"] }}
               ],
               scenesById: new Map([
                 ["scene_start", start],
                 ["scene_end", end],
                 ["scene_secret", secret],
-                ["scene_orphan", orphan]
+                ["scene_orphan", orphan],
+                ["scene_hidden_chain", hiddenChain]
               ])
             }};
             const validation = {{
@@ -89,6 +98,7 @@ class FrontendRouteAnalyzerModuleTests(unittest.TestCase):
               startNode: overview.nodes.find((node) => node.id === "scene_start"),
               endNode: overview.nodes.find((node) => node.id === "scene_end"),
               orphanNode: overview.nodes.find((node) => node.id === "scene_orphan"),
+              hiddenChainNode: overview.nodes.find((node) => node.id === "scene_hidden_chain"),
               chapterProduction: overview.chapters[0].production,
               routeKinds,
             }}));
@@ -110,10 +120,20 @@ class FrontendRouteAnalyzerModuleTests(unittest.TestCase):
         self.assertEqual(payload["metrics"]["branchingScenes"], 1)
         self.assertEqual(payload["metrics"]["endingScenes"], 3)
         self.assertEqual(payload["metrics"]["orphanScenes"], 1)
+        self.assertEqual(payload["metrics"]["reachableScenes"], 3)
+        self.assertEqual(payload["metrics"]["unreachableScenes"], 2)
+        self.assertEqual(payload["metrics"]["maxRouteDepth"], 1)
         self.assertEqual(payload["routeKinds"], ["choice", "choice", "condition", "fallback"])
         self.assertEqual(payload["alertLabels"][:2], ["坏链", "坏链"])
+        self.assertIn("不可达", payload["alertLabels"])
+        self.assertTrue(payload["startNode"]["isReachableFromEntry"])
         self.assertTrue(payload["orphanNode"]["isOrphan"])
+        self.assertTrue(payload["orphanNode"]["isUnreachable"])
+        self.assertFalse(payload["hiddenChainNode"]["isOrphan"])
+        self.assertTrue(payload["hiddenChainNode"]["isUnreachable"])
+        self.assertIsNone(payload["hiddenChainNode"]["routeDepth"])
         self.assertTrue(payload["endNode"]["isEnding"])
+        self.assertEqual(payload["endNode"]["routeDepth"], 1)
         self.assertEqual(payload["startNode"]["missingVoiceCount"], 1)
         self.assertEqual(payload["startNode"]["errorCount"], 1)
         self.assertEqual(payload["endNode"]["warningCount"], 1)

@@ -60,6 +60,7 @@ The project already includes a visual editor, export pipeline, native runtime pr
 - Canvasia Assistant with local template mode and optional creator-provided OpenAI, DeepSeek, Qwen, Kimi, Zhipu GLM, or compatible API providers
 - Optional OpenAI Image asset generation for backgrounds, sprites, CGs, and UI materials, with style-hint presets, sprite-to-character expression binding, prompt/model validation, and local-only API key handling
 - Formal save/load, quick save/load, system menu, text history, autoplay, skip-read, and voice replay
+- Entry reachability route analysis for broken links, orphan scenes, unreachable scenes, branch depth, and ending candidates
 - Custom game UI skins, UI Kit binding, nine-slice textures, button states, layout controls, and visual novel textbox design
 - Extra galleries: CG replay, music room, character archive, location archive, narration archive, relationship archive, achievements, chapter replay, ending replay, and voice replay
 - Advanced particle presets, project particle libraries, camera effects, screen filters, flashes, shakes, and fade transitions
@@ -71,7 +72,7 @@ The project already includes a visual editor, export pipeline, native runtime pr
 
 | Area | Status | Notes |
 | --- | --- | --- |
-| Story and Branch Editing | Available | Visual cards, choices, jumps, variables, conditions, scene graph inspection, and plain-text script-to-card import. |
+| Story and Branch Editing | Available | Visual cards, choices, jumps, variables, conditions, entry reachability route checks, scene graph inspection, and plain-text script-to-card import. |
 | Asset Management | Available | Import, replace, delete, usage protection, file-size budget hints, and optional OpenAI Image generation with style presets, sprite expression binding, prompt, model, format, and returned-file validation. |
 | Multi-language / i18n | Preview | Project language settings, export metadata, Web Runtime language switching, native Runtime language switching, and fallback behavior. |
 | Canvasia Assistant | Available | Local template mode plus optional creator-owned API keys for major compatible providers. |

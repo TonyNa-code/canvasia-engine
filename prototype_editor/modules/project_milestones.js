@@ -126,6 +126,7 @@
     const validationWarningCount = toCount(context.validationWarningCount);
     const brokenRoutes = toCount(context.brokenRoutes);
     const orphanScenes = toCount(context.orphanScenes);
+    const unreachableScenes = toCount(context.unreachableScenes);
     const placeholderAssetCount = toCount(context.placeholderAssetCount);
     const placeholderScriptCount = toCount(context.placeholderScriptCount);
     const placeholderContentCount = placeholderAssetCount + placeholderScriptCount;
@@ -185,7 +186,12 @@
             id: "route",
             label: "试玩路线不断线",
             done: brokenRoutes === 0,
-            detail: brokenRoutes === 0 ? "未发现坏链" : `${brokenRoutes} 条坏链`,
+            detail:
+              brokenRoutes > 0
+                ? `${brokenRoutes} 条坏链`
+                : unreachableScenes > 0
+                  ? `未发现坏链；${unreachableScenes} 个不可达场景待发布前接通`
+                  : "未发现坏链或不可达场景",
             missing: "先清掉跳转坏链。",
             weight: 2,
             action: actions.inspection,
@@ -313,9 +319,12 @@
           createCheck({
             id: "reachable_scenes",
             label: "重要场景可抵达",
-            done: totalScenes <= 1 || orphanScenes === 0,
-            detail: `${orphanScenes} 个孤立场景`,
-            missing: "检查孤立场景是否需要接回主线。",
+            done: totalScenes <= 1 || (orphanScenes === 0 && unreachableScenes === 0),
+            detail:
+              unreachableScenes > 0
+                ? `${orphanScenes} 个孤立场景 / ${unreachableScenes} 个不可达场景`
+                : `${orphanScenes} 个孤立场景`,
+            missing: "检查孤立或入口不可达场景是否需要接回主线。",
             action: actions.inspection,
           }),
           createCheck({

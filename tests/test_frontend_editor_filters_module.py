@@ -33,6 +33,7 @@ class FrontendEditorFiltersModuleTests(unittest.TestCase):
                 errorCount: 0,
                 warningCount: 0,
                 brokenRouteCount: 0,
+                isUnreachable: false,
               }},
               {{
                 hasStoryContent: true,
@@ -44,6 +45,7 @@ class FrontendEditorFiltersModuleTests(unittest.TestCase):
                 errorCount: 1,
                 warningCount: 0,
                 brokenRouteCount: 0,
+                isUnreachable: false,
               }},
               {{
                 hasStoryContent: false,
@@ -55,6 +57,7 @@ class FrontendEditorFiltersModuleTests(unittest.TestCase):
                 errorCount: 0,
                 warningCount: 0,
                 brokenRouteCount: 0,
+                isUnreachable: true,
               }},
             ];
             const result = {{
@@ -67,6 +70,7 @@ class FrontendEditorFiltersModuleTests(unittest.TestCase):
                 ],
                 route: [
                   tools.getRouteMapFilterLabel("missing_music"),
+                  tools.getRouteMapFilterLabel("unreachable"),
                   tools.getRouteMapFilterLabel("broken"),
                 ],
                 scene: [
@@ -105,6 +109,7 @@ class FrontendEditorFiltersModuleTests(unittest.TestCase):
                 tools.getSafeDashboardSearchMode("lines"),
                 tools.getSafeDashboardSearchMode(" lines "),
                 tools.getSafeRouteMapFilter("ready"),
+                tools.getSafeRouteMapFilter("unreachable"),
                 tools.getSafeSceneStatus("polishing"),
                 tools.getSafeSceneStatus(null),
                 tools.getSafeScenePriority("parked"),
@@ -140,6 +145,7 @@ class FrontendEditorFiltersModuleTests(unittest.TestCase):
                 missingBackground: routeNodes.map((node) => tools.doesRouteNodeMatchFilter(node, "missing_background")),
                 missingMusic: routeNodes.map((node) => tools.doesRouteNodeMatchFilter(node, "missing_music")),
                 missingVoice: routeNodes.map((node) => tools.doesRouteNodeMatchFilter(node, "missing_voice")),
+                unreachable: routeNodes.map((node) => tools.doesRouteNodeMatchFilter(node, "unreachable")),
                 flat: routeNodes.map((node) => tools.doesRouteNodeMatchFilter(node, "flat")),
                 empty: routeNodes.map((node) => tools.doesRouteNodeMatchFilter(node, "empty")),
                 ready: routeNodes.map((node) => tools.doesRouteNodeMatchFilter(node, "ready")),
@@ -239,7 +245,7 @@ class FrontendEditorFiltersModuleTests(unittest.TestCase):
         self.assertIn("getStoryBlockGroup", payload["keys"])
         self.assertIn("getStoryBlockIssueItems", payload["keys"])
         self.assertEqual(payload["labels"]["dashboard"], ["全部结果", "角色", "全部结果"])
-        self.assertEqual(payload["labels"]["route"], ["缺 BGM", "全部场景"])
+        self.assertEqual(payload["labels"]["route"], ["缺 BGM", "不可达", "全部场景"])
         self.assertEqual(payload["labels"]["scene"], ["可试玩", "写作中", "马上处理", "正常"])
         self.assertEqual(payload["labels"]["story"], [
             "只看逻辑",
@@ -270,6 +276,7 @@ class FrontendEditorFiltersModuleTests(unittest.TestCase):
             "lines",
             "all",
             "ready",
+            "unreachable",
             "polishing",
             "drafting",
             "parked",
@@ -301,16 +308,17 @@ class FrontendEditorFiltersModuleTests(unittest.TestCase):
         ])
         self.assertEqual(payload["routeMatches"], {
             "all": [True, True, True],
-            "issues": [False, True, False],
+            "issues": [False, True, True],
             "missingBackground": [True, False, False],
             "missingMusic": [False, True, False],
             "missingVoice": [False, True, False],
+            "unreachable": [False, False, True],
             "flat": [True, False, False],
             "empty": [False, False, True],
             "ready": [False, True, False],
             "fallback": [True, True, True],
         })
-        self.assertEqual(payload["routeCounts"], [3, 1, 1, 0])
+        self.assertEqual(payload["routeCounts"], [3, 2, 1, 0])
         self.assertEqual(payload["storyGroups"], [
             "story",
             "story",

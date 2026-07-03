@@ -177,7 +177,7 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
               firstErrorAction: {{ action: "switch-screen", screen: "story", sceneId: "scene_1" }},
               firstVoiceAction: {{ action: "preview-story-location", sceneId: "scene_1", blockId: "line_1" }},
               firstWarningAction: {{ action: "preview-story-location", sceneId: "scene_2", blockId: "line_9" }},
-              routeMetrics: {{ orphanScenes: 1 }},
+              routeMetrics: {{ orphanScenes: 1, unreachableScenes: 2 }},
               urgentMissingAssetsCount: 3,
               mediaBudgetReport: {{
                 count: 2,
@@ -194,7 +194,7 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
               hasStoredReleaseVersion: true,
               errorCount: 0,
               warningIssues: [],
-              routeMetrics: {{ orphanScenes: 0 }},
+              routeMetrics: {{ orphanScenes: 0, unreachableScenes: 0 }},
               urgentMissingAssetsCount: 0,
               mediaBudgetReport: {{ count: 0, blockerCount: 0 }},
               unusedAssetCount: 0,
@@ -235,6 +235,7 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
         self.assertEqual(blocker_plan["blockerCount"], 1)
         self.assertEqual(blocker_plan["urgentCount"], 5)
         self.assertEqual(blocker_plan["steps"][0]["actions"][1]["label"], "打开第一条错误")
+        self.assertEqual(blocker_plan["steps"][1]["statusLabel"], "还有 1 个孤立场景 / 2 个不可达场景")
         self.assertEqual(blocker_plan["steps"][3]["actions"][1]["assetId"], "video_op")
         self.assertEqual(blocker_plan["steps"][5]["actions"][0]["action"], "save-release-version")
 
@@ -278,7 +279,7 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
               hasStoredReleaseVersion: true,
               errorCount: 0,
               warningIssues: [],
-              routeMetrics: {{ orphanScenes: 0 }},
+              routeMetrics: {{ orphanScenes: 0, unreachableScenes: 0 }},
               urgentMissingAssetsCount: 0,
               mediaBudgetReport: {{ count: 0, blockerCount: 0 }},
               unusedAssetCount: 0,

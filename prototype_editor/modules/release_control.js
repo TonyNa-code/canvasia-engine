@@ -407,12 +407,19 @@
       });
     }
 
-    if (toCount(routeMetrics.orphanScenes) > 0) {
+    const orphanSceneCount = toCount(routeMetrics.orphanScenes);
+    const unreachableSceneCount = toCount(routeMetrics.unreachableScenes);
+    if (orphanSceneCount > 0 || unreachableSceneCount > 0) {
       steps.push({
         tone: "warn",
         title: "检查孤立场景和路线入口",
-        statusLabel: `还有 ${toCount(routeMetrics.orphanScenes)} 个孤立场景`,
-        description: "这些场景暂时没有任何入口，就算内容写好了，玩家也可能永远走不到。",
+        statusLabel:
+          orphanSceneCount > 0 && unreachableSceneCount > 0
+            ? `还有 ${orphanSceneCount} 个孤立场景 / ${unreachableSceneCount} 个不可达场景`
+            : orphanSceneCount > 0
+              ? `还有 ${orphanSceneCount} 个孤立场景`
+              : `还有 ${unreachableSceneCount} 个入口不可达场景`,
+        description: "这些场景可能没有入口，或者虽然有入口线、但从项目入口试玩时仍然走不到。",
         actions: [
           { label: "回首页看路线图", action: "switch-screen", screen: "dashboard" },
           { label: "去剧情页补跳转", action: "switch-screen", screen: "story" },

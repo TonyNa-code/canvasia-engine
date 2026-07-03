@@ -12,6 +12,7 @@
     missing_background: "缺背景",
     missing_music: "缺 BGM",
     missing_voice: "缺语音",
+    unreachable: "不可达",
     flat: "演出偏素",
     empty: "正文未开始",
     ready: "完成度高",
@@ -161,7 +162,12 @@
     }
 
     if (safeFilter === "issues") {
-      return (node.errorCount ?? 0) > 0 || (node.warningCount ?? 0) > 0 || (node.brokenRouteCount ?? 0) > 0;
+      return (
+        (node.errorCount ?? 0) > 0 ||
+        (node.warningCount ?? 0) > 0 ||
+        (node.brokenRouteCount ?? 0) > 0 ||
+        node.isUnreachable === true
+      );
     }
 
     if (safeFilter === "missing_background") {
@@ -174,6 +180,10 @@
 
     if (safeFilter === "missing_voice") {
       return (node.missingVoiceCount ?? 0) > 0;
+    }
+
+    if (safeFilter === "unreachable") {
+      return node.isUnreachable === true;
     }
 
     if (safeFilter === "flat") {

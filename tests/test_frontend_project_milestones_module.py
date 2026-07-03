@@ -429,16 +429,20 @@ class FrontendProjectMilestonesModuleTests(unittest.TestCase):
               validationWarningCount: 1,
               brokenRoutes: 0,
               orphanScenes: 1,
+              unreachableScenes: 2,
               hasStarterKit: true,
               hasExport: false,
               regressionPass: false,
             });
+            const release = plan.milestones.find((milestone) => milestone.id === "release_candidate");
+            const reachabilityGap = release.blockers.find((gap) => gap.id === "reachable_scenes");
             const digest = tools.buildProjectMilestoneGapDigest(plan);
             process.stdout.write(JSON.stringify({
               status: digest.status,
               title: digest.title,
               releaseBlockerCount: digest.releaseBlockerCount,
               topGapIds: digest.topGaps.map((gap) => gap.id),
+              reachabilityGap,
               nextAction: digest.nextAction.action,
               nextMilestoneTitle: digest.nextMilestoneTitle,
             }));
@@ -449,6 +453,8 @@ class FrontendProjectMilestonesModuleTests(unittest.TestCase):
         self.assertEqual(payload["title"], "发布候选版还差 4 项")
         self.assertEqual(payload["releaseBlockerCount"], 4)
         self.assertEqual(payload["topGapIds"], ["reachable_scenes", "release_assets", "regression", "exported"])
+        self.assertIn("2 个不可达场景", payload["reachabilityGap"]["detail"])
+        self.assertEqual(payload["reachabilityGap"]["missing"], "检查孤立或入口不可达场景是否需要接回主线。")
         self.assertEqual(payload["nextAction"], "switch-screen")
         self.assertEqual(payload["nextMilestoneTitle"], "发布候选版")
 

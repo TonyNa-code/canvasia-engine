@@ -585,6 +585,7 @@ const ROUTE_MAP_FILTER_LABELS = editorFilterTools?.ROUTE_MAP_FILTER_LABELS ?? {
   missing_background: "缺背景",
   missing_music: "缺 BGM",
   missing_voice: "缺语音",
+  unreachable: "不可达",
   flat: "演出偏素",
   empty: "正文未开始",
   ready: "完成度高",
@@ -10383,7 +10384,7 @@ function renderDashboard() {
           </article>
           <article class="detail-card">
             <strong>剧情路线图已经接通</strong>
-            <p>首页可直接查看分支、死路、孤立场景和坏链，并从对应位置进入编辑或试玩。</p>
+            <p>首页可直接查看分支、死路、孤立场景、入口不可达场景和坏链，并从对应位置进入编辑或试玩。</p>
           </article>
         </div>
       </section>
@@ -10437,15 +10438,20 @@ function renderDashboard() {
             </div>
             <div class="route-summary-strip">
               ${renderRouteMetricCard("入口", routeOverview.metrics.entrySceneName, "入口场景")}
+              ${renderRouteMetricCard(
+                "可达场景",
+                `${routeOverview.metrics.reachableScenes}/${routeOverview.nodes.length}`,
+                `最长 ${routeOverview.metrics.maxRouteDepth} 步`
+              )}
               ${renderRouteMetricCard("分叉场景", routeOverview.metrics.branchingScenes, "有多个目标路线")}
               ${renderRouteMetricCard("收束场景", routeOverview.metrics.endingScenes, "没有继续跳出的场景")}
-              ${renderRouteMetricCard("孤立场景", routeOverview.metrics.orphanScenes, "几乎没人能走到这里")}
+              ${renderRouteMetricCard("不可达场景", routeOverview.metrics.unreachableScenes, "从入口暂时走不到")}
               ${renderRouteMetricCard("坏链数量", routeOverview.metrics.brokenRoutes, "引用了不存在的目标")}
             </div>
             <div class="route-legend">
               <span class="pill">橙色标签：当前正在编辑</span>
               <span class="pill">红色标签：坏链</span>
-              <span class="pill">黄色标签：孤立或收束</span>
+              <span class="pill">黄色标签：孤立、不可达或收束</span>
               <span class="pill">绿色标签：分叉点</span>
             </div>
             ${renderRouteMapFilterBar(routeOverview)}
@@ -10518,7 +10524,7 @@ function renderDashboard() {
       ${renderStatCard("场景数", scenes.length)}
       ${renderStatCard("分叉场景", routeOverview.metrics.branchingScenes)}
       ${renderStatCard("收束场景", routeOverview.metrics.endingScenes)}
-      ${renderStatCard("孤立场景", routeOverview.metrics.orphanScenes)}
+      ${renderStatCard("不可达场景", routeOverview.metrics.unreachableScenes)}
       ${renderStatCard("角色数", characters.length)}
       ${renderStatCard("素材数", assetList.length)}
     </div>
@@ -10614,6 +10620,9 @@ function buildProjectMilestoneContext(routeOverview, overview = buildDashboardPr
     validationWarningCount: state.validation.warnings.length,
     brokenRoutes: routeOverview.metrics.brokenRoutes,
     orphanScenes: routeOverview.metrics.orphanScenes,
+    reachableScenes: routeOverview.metrics.reachableScenes,
+    unreachableScenes: routeOverview.metrics.unreachableScenes,
+    maxRouteDepth: routeOverview.metrics.maxRouteDepth,
     hasStarterKit:
       !starterKitOverview.missingCharacter &&
       !starterKitOverview.missingBackground &&
@@ -11165,6 +11174,10 @@ function buildDashboardProductionSummary({
     return "目前最先该修的是路线断线，不然试玩时很容易直接卡住。";
   }
 
+  if ((routeOverview.metrics.unreachableScenes ?? 0) > 0) {
+    return `有 ${routeOverview.metrics.unreachableScenes} 个场景从入口暂时走不到，先接通主路线会更稳。`;
+  }
+
   if (issueEntryCount > 0) {
     return `台本里还有 ${issueEntryCount} 条需要体检的正文，先补这些会让后面统稿轻松很多。`;
   }
@@ -11306,6 +11319,7 @@ function buildDashboardProductionTasks(routeOverview, overview) {
   const tasks = [];
   const pushTask = (task) => tasks.push(task);
   const primaryDangerAlert = routeOverview.alerts.find((alert) => alert.tone === "danger");
+  const primaryReachabilityAlert = routeOverview.alerts.find((alert) => alert.label === "不可达");
   const structuralError = state.validation.errors.find(
     (issue) => !/目标场景不存在|章节顺序里引用了不存在的场景/.test(issue.message)
   );
@@ -11349,6 +11363,29 @@ function buildDashboardProductionTasks(routeOverview, overview) {
           label: "去预览导出页看检查",
           action: "switch-screen",
           screen: "preview",
+        },
+      ],
+    });
+  }
+
+  if (primaryReachabilityAlert) {
+    pushTask({
+      priority: 108,
+      tone: "warn",
+      badge: `不可达 ${routeOverview.metrics.unreachableScenes} 个`,
+      title: "接通入口走不到的场景",
+      description: `${primaryReachabilityAlert.sceneName} 已经有内容或入口线，但从项目入口试玩时暂时走不到。`,
+      meta: primaryReachabilityAlert.meta,
+      actions: [
+        {
+          label: "打开场景",
+          action: "open-scene-from-map",
+          sceneId: primaryReachabilityAlert.sceneId,
+        },
+        {
+          label: "只看不可达",
+          action: "set-route-map-filter",
+          dataset: { "route-filter": "unreachable" },
         },
       ],
     });
@@ -11982,6 +12019,10 @@ function renderRouteSceneCard(node) {
     badges.push('<span class="issue-tag warn-text">孤立</span>');
   }
 
+  if (node.isUnreachable) {
+    badges.push('<span class="issue-tag warn-text">不可达</span>');
+  }
+
   if (node.isEnding) {
     badges.push('<span class="issue-tag">收束</span>');
   }
@@ -12027,7 +12068,9 @@ function renderRouteSceneCard(node) {
       </div>
       <div class="route-scene-meta">
         ${node.blockCount} 张卡片 · ${node.dialogueCount} 句台词 · ${node.choiceCount} 个选项 ·
-        ${node.conditionCount} 次判断 · 来路 ${node.incomingCount} 条
+        ${node.conditionCount} 次判断 · 来路 ${node.incomingCount} 条 · ${
+          node.routeDepth === null ? "入口未连通" : `入口第 ${node.routeDepth} 步`
+        }
       </div>
       <div class="route-scene-progress">
         <div class="route-scene-progress-head">
@@ -12297,7 +12340,12 @@ function doesRouteNodeMatchFilter(node, filterMode = state.dashboardRouteFilter)
   }
 
   if (safeFilter === "issues") {
-    return (node.errorCount ?? 0) > 0 || (node.warningCount ?? 0) > 0 || (node.brokenRouteCount ?? 0) > 0;
+    return (
+      (node.errorCount ?? 0) > 0 ||
+      (node.warningCount ?? 0) > 0 ||
+      (node.brokenRouteCount ?? 0) > 0 ||
+      node.isUnreachable === true
+    );
   }
 
   if (safeFilter === "missing_background") {
@@ -12310,6 +12358,10 @@ function doesRouteNodeMatchFilter(node, filterMode = state.dashboardRouteFilter)
 
   if (safeFilter === "missing_voice") {
     return (node.missingVoiceCount ?? 0) > 0;
+  }
+
+  if (safeFilter === "unreachable") {
+    return node.isUnreachable === true;
   }
 
   if (safeFilter === "flat") {
@@ -12343,6 +12395,7 @@ function renderRouteMapFilterBar(routeOverview) {
     ["missing_background", "缺背景", getRouteMapFilterCount(routeOverview, "missing_background")],
     ["missing_music", "缺 BGM", getRouteMapFilterCount(routeOverview, "missing_music")],
     ["missing_voice", "缺语音", getRouteMapFilterCount(routeOverview, "missing_voice")],
+    ["unreachable", "不可达", getRouteMapFilterCount(routeOverview, "unreachable")],
     ["flat", "演出偏素", getRouteMapFilterCount(routeOverview, "flat")],
     ["empty", "未开写", getRouteMapFilterCount(routeOverview, "empty")],
     ["ready", "完成度高", getRouteMapFilterCount(routeOverview, "ready")],
@@ -12683,6 +12736,7 @@ function buildStorySceneTreeSearchText(sceneNode) {
     buildRouteSceneProductionNotes(sceneNode).join(" "),
     sceneNode.isEntry ? "入口场景" : "",
     sceneNode.isOrphan ? "孤立场景" : "",
+    sceneNode.isUnreachable ? "不可达场景" : "",
     sceneNode.isEnding ? "收束场景" : "",
     sceneNode.brokenRouteCount > 0 ? `坏链 ${sceneNode.brokenRouteCount}` : "",
   ];
@@ -12711,6 +12765,7 @@ function matchesStorySceneTreeFilter(sceneNode, filterMode) {
       (sceneNode.errorCount ?? 0) > 0 ||
       (sceneNode.warningCount ?? 0) > 0 ||
       sceneNode.isOrphan ||
+      sceneNode.isUnreachable ||
       buildRouteSceneProductionNotes(sceneNode).some((note) => note !== "可以继续抛光")
     );
   }
@@ -18531,6 +18586,7 @@ function matchesPreviewSceneFilterMode(sceneNode, filterMode) {
       (sceneNode.errorCount ?? 0) > 0 ||
       (sceneNode.warningCount ?? 0) > 0 ||
       sceneNode.isOrphan ||
+      sceneNode.isUnreachable ||
       buildRouteSceneProductionNotes(sceneNode).some((note) => note !== "可以继续抛光")
     );
   }
@@ -25637,11 +25693,18 @@ function buildPreviewRegressionSeeds(routeOverview) {
     });
 
   routeOverview.nodes
-    .filter((node) => (node.errorCount ?? 0) > 0 || node.brokenRouteCount > 0 || node.isOrphan)
+    .filter((node) => (node.errorCount ?? 0) > 0 || node.brokenRouteCount > 0 || node.isOrphan || node.isUnreachable)
     .sort((left, right) => {
-      const leftScore = (left.errorCount ?? 0) * 10 + left.brokenRouteCount * 6 + (left.isOrphan ? 4 : 0);
+      const leftScore =
+        (left.errorCount ?? 0) * 10 +
+        left.brokenRouteCount * 6 +
+        (left.isOrphan ? 4 : 0) +
+        (left.isUnreachable ? 4 : 0);
       const rightScore =
-        (right.errorCount ?? 0) * 10 + right.brokenRouteCount * 6 + (right.isOrphan ? 4 : 0);
+        (right.errorCount ?? 0) * 10 +
+        right.brokenRouteCount * 6 +
+        (right.isOrphan ? 4 : 0) +
+        (right.isUnreachable ? 4 : 0);
       return rightScore - leftScore;
     })
     .forEach((node) => {
@@ -28323,6 +28386,9 @@ function buildReleaseControlReportPayload() {
       branchingScenes: routeOverview.metrics.branchingScenes,
       endingScenes: routeOverview.metrics.endingScenes,
       orphanScenes: routeOverview.metrics.orphanScenes,
+      reachableScenes: routeOverview.metrics.reachableScenes,
+      unreachableScenes: routeOverview.metrics.unreachableScenes,
+      maxRouteDepth: routeOverview.metrics.maxRouteDepth,
       brokenRoutes: routeOverview.metrics.brokenRoutes,
       totalScenes: routeOverview.nodes.length,
     },
@@ -28557,6 +28623,9 @@ function buildInspectionReportContent() {
     `- 分支场景：${routeOverview.metrics.branchingScenes} 个`,
     `- 收束场景：${routeOverview.metrics.endingScenes} 个`,
     `- 孤立场景：${routeOverview.metrics.orphanScenes} 个`,
+    `- 可达场景：${routeOverview.metrics.reachableScenes}/${routeOverview.nodes.length} 个`,
+    `- 不可达场景：${routeOverview.metrics.unreachableScenes} 个`,
+    `- 最长路线深度：${routeOverview.metrics.maxRouteDepth} 步`,
     `- 坏链数量：${routeOverview.metrics.brokenRoutes} 条`,
     `- 成品目标路线：${projectMilestonePlan.nextMilestone?.title ?? "继续推进当前项目"}（总进度 ${projectMilestonePlan.overallScore ?? 0}%）`,
     "",
@@ -28919,6 +28988,7 @@ function buildReleaseControlReportContent() {
         ["闲置素材", `${getUnusedAssets().length} 个`],
         ["入口场景", routeOverview.metrics.entrySceneName],
         ["分支 / 收束 / 孤立场景", `${routeOverview.metrics.branchingScenes} / ${routeOverview.metrics.endingScenes} / ${routeOverview.metrics.orphanScenes}`],
+        ["可达 / 不可达 / 最长深度", `${routeOverview.metrics.reachableScenes} / ${routeOverview.metrics.unreachableScenes} / ${routeOverview.metrics.maxRouteDepth} 步`],
         ["坏链数量", `${routeOverview.metrics.brokenRoutes} 条`],
         ["成品目标路线", `${projectMilestonePlan.nextMilestone?.title ?? "继续推进当前项目"}（${projectMilestonePlan.overallScore ?? 0}%）`],
         [projectMilestoneGapDigest.eyebrow ?? "当前阶段缺口", projectMilestoneGapDigest.title],
@@ -29203,12 +29273,19 @@ function buildReleaseFixOrder(routeOverview) {
     });
   }
 
-  if (routeOverview.metrics.orphanScenes > 0) {
+  const orphanSceneCount = routeOverview.metrics.orphanScenes ?? 0;
+  const unreachableSceneCount = routeOverview.metrics.unreachableScenes ?? 0;
+  if (orphanSceneCount > 0 || unreachableSceneCount > 0) {
     steps.push({
       tone: "warn",
       title: "检查孤立场景和路线入口",
-      statusLabel: `还有 ${routeOverview.metrics.orphanScenes} 个孤立场景`,
-      description: "这些场景暂时没有任何入口，就算内容写好了，玩家也可能永远走不到。",
+      statusLabel:
+        orphanSceneCount > 0 && unreachableSceneCount > 0
+          ? `还有 ${orphanSceneCount} 个孤立场景 / ${unreachableSceneCount} 个不可达场景`
+          : orphanSceneCount > 0
+            ? `还有 ${orphanSceneCount} 个孤立场景`
+            : `还有 ${unreachableSceneCount} 个入口不可达场景`,
+      description: "这些场景可能没有入口，或者虽然有入口线、但从项目入口试玩时仍然走不到。",
       actions: [
         { label: "回首页看路线图", action: "switch-screen", screen: "dashboard" },
         { label: "去剧情页补跳转", action: "switch-screen", screen: "story" },
@@ -30314,7 +30391,7 @@ function renderInspectionOverviewPanel(routeOverview) {
       <div class="preview-sprint-metrics">
         ${renderRouteMetricCard("入口场景", routeOverview.metrics.entrySceneName, "当前项目从这里开始")}
         ${renderRouteMetricCard("分支场景", routeOverview.metrics.branchingScenes, "可继续扩路线")}
-        ${renderRouteMetricCard("孤立场景", routeOverview.metrics.orphanScenes, "待检查入口")}
+        ${renderRouteMetricCard("不可达场景", routeOverview.metrics.unreachableScenes, "入口实际走不到")}
         ${renderRouteMetricCard("坏链数量", routeOverview.metrics.brokenRoutes, "先清零会更稳")}
       </div>
       ${renderCompactProjectMilestonePanel(routeOverview)}
