@@ -3957,6 +3957,27 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("stageDirectionSheetTools.buildStageDirectionSheet", source)
         self.assertIn("stageDirectionSheetTools.getStageDirectionStatusDigest", source)
 
+    def test_presentation_timeline_export_actions_are_wired(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        click_handler = _extract_function_source(source, "handleClick")
+        markdown_block_start = click_handler.index('action === "export-presentation-timeline-markdown"')
+        csv_block_start = click_handler.index('action === "export-presentation-timeline-csv"')
+        csv_block_end = click_handler.index('action === "export-localization-coverage-markdown"', csv_block_start)
+        markdown_block = click_handler[markdown_block_start:csv_block_start]
+        csv_block = click_handler[csv_block_start:csv_block_end]
+
+        self.assertIn("const presentationTimelineTools = window.CanvasiaEditorPresentationTimeline", source)
+        self.assertIn('data-action="export-presentation-timeline-markdown"', source)
+        self.assertIn('data-action="export-presentation-timeline-csv"', source)
+        self.assertIn("exportPresentationTimelineMarkdown();", markdown_block)
+        self.assertIn("exportPresentationTimelineCsv();", csv_block)
+        self.assertIn("function buildPresentationTimeline()", source)
+        self.assertIn("function renderPresentationTimelinePanel()", source)
+        self.assertIn("function exportPresentationTimelineMarkdown()", source)
+        self.assertIn("function exportPresentationTimelineCsv()", source)
+        self.assertIn("presentationTimelineTools.buildPresentationTimeline", source)
+        self.assertIn("presentationTimelineTools.getPresentationTimelineStatusDigest", source)
+
     def test_localization_coverage_export_actions_are_wired(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
         click_handler = _extract_function_source(source, "handleClick")
