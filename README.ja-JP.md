@@ -66,7 +66,7 @@ Canvasia Engine は、ビジュアルノベル / Galgame 制作者のための s
 - 高度なパーティクルプリセット、プロジェクト単位のパーティクルライブラリ、カメラ演出、フィルター、フラッシュ、画面揺れ、フェード
 - Live2D / 3D キャラクターと 3D シーン素材のインポート、ネイティブ Runtime での glTF / GLB / VRM 構造レポート
 - Web 試遊パッケージ、デスクトップ書き出し、エディタデスクトップビルド、ネイティブ Runtime preview パッケージ
-- ローカル CI precheck、backend smoke、Playwright browser smoke、ボタン配線チェック、release-control report、VN baseline quality audit、ファイル整合性検証
+- ローカル CI precheck、backend smoke、Playwright browser smoke、ボタン配線チェック、release-control report、テスター引き継ぎワークオーダー、VN baseline quality audit、ファイル整合性検証
 
 ## 機能ステータス
 

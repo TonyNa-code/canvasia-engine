@@ -50,6 +50,7 @@ const { STORY_TEMPLATE_PRESETS } = storyTemplateTools;
 const scriptImporterTools = window.CanvasiaEditorScriptImporter;
 const routeAnalyzerTools = window.CanvasiaEditorRouteAnalyzer;
 const routeTestingReportTools = window.CanvasiaEditorRouteTestingReport;
+const playtestHandoffReportTools = window.CanvasiaEditorPlaytestHandoffReport;
 
 function getBlockLabel(type) {
   return storyBlockCatalogTools.getBlockLabel(type) ?? BLOCK_LABELS[type] ?? type ?? "步骤";
@@ -3856,6 +3857,32 @@ async function handleClick(event) {
     exportRouteTestingPlanCsv();
     if (state.currentScreen === "dashboard") {
       renderDashboard();
+    }
+    return;
+  }
+
+  if (action === "export-playtest-handoff-markdown") {
+    state.validation = runValidation(state.data);
+    updateTopbar();
+    exportPlaytestHandoffMarkdown();
+    if (state.currentScreen === "inspection") {
+      renderInspectionScreen();
+    }
+    if (state.currentScreen === "preview") {
+      renderPreviewScreen();
+    }
+    return;
+  }
+
+  if (action === "export-playtest-handoff-csv") {
+    state.validation = runValidation(state.data);
+    updateTopbar();
+    exportPlaytestHandoffCsv();
+    if (state.currentScreen === "inspection") {
+      renderInspectionScreen();
+    }
+    if (state.currentScreen === "preview") {
+      renderPreviewScreen();
     }
     return;
   }
@@ -26217,6 +26244,12 @@ function renderPreviewRegressionPanel(routeOverview) {
         <button class="toolbar-button" data-action="export-inspection-report">
           导出带回归结果的巡检报告
         </button>
+        <button class="toolbar-button" data-action="export-playtest-handoff-markdown">
+          导出测试员工单
+        </button>
+        <button class="toolbar-button" data-action="export-playtest-handoff-csv">
+          导出工单 CSV
+        </button>
       </div>
       ${
         result
@@ -28252,6 +28285,17 @@ function buildRouteTestingPlanFileName(extension = "md") {
   return `${title}_route_testing_plan_${dateStamp}.${extension}`;
 }
 
+function buildPlaytestHandoffFileName(extension = "md") {
+  const date = new Date();
+  const dateStamp = [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("");
+  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
+  return `${title}_playtest_handoff_${dateStamp}.${extension}`;
+}
+
 function buildProjectDoctorRepairReceiptFileName(receipt = state.projectDoctorRepairReceipt) {
   const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
   const status = sanitizeFileName(receipt?.status || "receipt");
@@ -29400,6 +29444,33 @@ function exportRouteTestingPlanCsv() {
   downloadTextFile(fileName, content, "text/csv;charset=utf-8");
   setSaveStatus(`已导出路线试玩 CSV：${fileName}`);
   showToast(`路线试玩 CSV 已导出：${fileName}`);
+}
+
+function buildPlaytestHandoffContext() {
+  const routeOverview = buildSceneRouteOverview();
+  return {
+    projectTitle: state.data?.project?.title || "Canvasia Project",
+    generatedAt: formatDate(new Date().toISOString()),
+    routeTestingPlan: routeOverview.routeTestingPlan,
+    regressionResult: state.inspectionRegressionResult,
+    regressionFixQueue: buildPreviewRegressionFixQueue(),
+  };
+}
+
+function exportPlaytestHandoffMarkdown() {
+  const fileName = buildPlaytestHandoffFileName("md");
+  const content = playtestHandoffReportTools.buildPlaytestHandoffMarkdown(buildPlaytestHandoffContext());
+  downloadTextFile(fileName, content, "text/markdown;charset=utf-8");
+  setSaveStatus(`已导出测试员工单：${fileName}`);
+  showToast(`测试员工单已导出：${fileName}`);
+}
+
+function exportPlaytestHandoffCsv() {
+  const fileName = buildPlaytestHandoffFileName("csv");
+  const content = playtestHandoffReportTools.buildPlaytestHandoffCsv(buildPlaytestHandoffContext());
+  downloadTextFile(fileName, content, "text/csv;charset=utf-8");
+  setSaveStatus(`已导出测试员工单 CSV：${fileName}`);
+  showToast(`测试员工单 CSV 已导出：${fileName}`);
 }
 
 function getCharacterPrimarySpriteAssetId(character) {
@@ -30624,6 +30695,9 @@ function renderInspectionOverviewPanel(routeOverview) {
           </button>
           <button class="toolbar-button" data-action="export-inspection-report">
             导出巡检报告
+          </button>
+          <button class="toolbar-button" data-action="export-playtest-handoff-markdown">
+            导出测试员工单
           </button>
           <button class="toolbar-button toolbar-button-primary" data-action="export-release-control-report">
             导出发布总控报告

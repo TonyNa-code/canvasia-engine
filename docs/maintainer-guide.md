@@ -14,6 +14,7 @@ This guide explains the current maintenance boundaries for contributors who want
 - `prototype_editor/modules/script_importer.js` owns plain-text script parsing for the story page. Keep line-format recognition, choice grouping, preview summaries, and import limits there; `app.js` should only connect parsed draft blocks to the selected scene and persistence flow.
 - `prototype_editor/modules/route_analyzer.js` owns pure scene-route analysis: route extraction, entry reachability, shortest entry paths, route QA case generation, broken-link detection, orphan / unreachable / ending metrics, route depth, validation issue counts, and per-scene production readiness. Keep future branch simulation or route scoring there so dashboard, project doctor, release gates, and tests share one route model.
 - `prototype_editor/modules/route_testing_report.js` owns route QA report serialization, Markdown tables, standalone Markdown export content, and CSV rows. Keep route report formatting there instead of adding more report-specific table logic to `app.js`.
+- `prototype_editor/modules/playtest_handoff_report.js` owns tester-facing playtest handoff exports: route cases, regression smoke results, fix queues, Markdown work orders, and CSV rows. Keep tester handoff wording and table formats there so `app.js` only wires buttons and downloads.
 - `native_runtime/runtime_player.py` owns native playback, native release checks, and runtime reports.
 
 ## Safe Extension Pattern

@@ -3909,6 +3909,28 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn('state.currentScreen === "dashboard"', regression_block)
         self.assertIn("renderDashboard();", regression_block)
 
+    def test_playtest_handoff_export_actions_are_wired(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        click_handler = _extract_function_source(source, "handleClick")
+        markdown_block_start = click_handler.index('action === "export-playtest-handoff-markdown"')
+        csv_block_start = click_handler.index('action === "export-playtest-handoff-csv"')
+        csv_block_end = click_handler.index('action === "clear-inspection-filters"', csv_block_start)
+        markdown_block = click_handler[markdown_block_start:csv_block_start]
+        csv_block = click_handler[csv_block_start:csv_block_end]
+
+        self.assertIn("const playtestHandoffReportTools = window.CanvasiaEditorPlaytestHandoffReport", source)
+        self.assertIn('data-action="export-playtest-handoff-markdown"', source)
+        self.assertIn('data-action="export-playtest-handoff-csv"', source)
+        self.assertIn("exportPlaytestHandoffMarkdown();", markdown_block)
+        self.assertIn("exportPlaytestHandoffCsv();", csv_block)
+        self.assertIn('state.currentScreen === "inspection"', markdown_block)
+        self.assertIn('state.currentScreen === "preview"', markdown_block)
+        self.assertIn('state.currentScreen === "inspection"', csv_block)
+        self.assertIn('state.currentScreen === "preview"', csv_block)
+        self.assertIn("function buildPlaytestHandoffContext()", source)
+        self.assertIn("function exportPlaytestHandoffMarkdown()", source)
+        self.assertIn("function exportPlaytestHandoffCsv()", source)
+
     def test_beginner_dashboard_export_step_requires_real_export_record(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
         beginner_tutorial_source = (EDITOR_DIR / "modules" / "beginner_tutorial.js").read_text(encoding="utf-8")
