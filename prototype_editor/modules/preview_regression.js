@@ -53,6 +53,112 @@
     return 86;
   }
 
+  function getVariableType(variableId, options = {}) {
+    if (typeof options.getVariableType === "function") {
+      return options.getVariableType(variableId);
+    }
+    const variable = getVariableById(variableId, options);
+    return variable?.type ?? "string";
+  }
+
+  function getVariableById(variableId, options = {}) {
+    const safeVariableId = cleanText(variableId);
+    const variablesById = options.variablesById;
+    if (!safeVariableId || !variablesById) {
+      return null;
+    }
+    if (typeof variablesById.get === "function") {
+      return variablesById.get(safeVariableId) ?? null;
+    }
+    if (typeof variablesById === "object") {
+      return variablesById[safeVariableId] ?? null;
+    }
+    return null;
+  }
+
+  function normalizeVariableValue(variableId, value, options = {}) {
+    if (typeof options.normalizeVariableValue === "function") {
+      return options.normalizeVariableValue(variableId, value);
+    }
+    const type = getVariableType(variableId, options);
+    if (type === "number") {
+      const numberValue = Number(value);
+      return Number.isFinite(numberValue) ? numberValue : 0;
+    }
+    if (type === "boolean") {
+      return value === true || value === "true";
+    }
+    return String(value ?? "");
+  }
+
+  function getVariableDefaultValue(variableId, options = {}) {
+    if (typeof options.getVariableDefaultValue === "function") {
+      return options.getVariableDefaultValue(variableId);
+    }
+    const variable = getVariableById(variableId, options);
+    return normalizeVariableValue(variableId, variable?.defaultValue, options);
+  }
+
+  function getNumberConditionNudge(operator) {
+    return operator === ">" || operator === "!=" ? 1 : operator === "<" ? -1 : 0;
+  }
+
+  function getSatisfiedConditionValue(rule = {}, options = {}) {
+    const variableId = cleanText(rule.variableId);
+    if (!variableId) {
+      return undefined;
+    }
+    const operator = cleanText(rule.operator, "==");
+    const type = getVariableType(variableId, options);
+    const right = normalizeVariableValue(variableId, rule.value, options);
+
+    if (type === "number") {
+      const numberValue = Number(right);
+      if (!Number.isFinite(numberValue)) {
+        return undefined;
+      }
+      if ([">", ">=", "<", "<=", "==", "!="].includes(operator)) {
+        return numberValue + getNumberConditionNudge(operator);
+      }
+      return numberValue;
+    }
+
+    if (type === "boolean") {
+      return operator === "!=" ? !Boolean(right) : Boolean(right);
+    }
+
+    if (operator === "!=") {
+      const text = String(right ?? "");
+      return text === "__canvasia_route_test__" ? "__canvasia_route_test_alt__" : "__canvasia_route_test__";
+    }
+    return String(right ?? "");
+  }
+
+  function buildConditionVariableOverrides(seed = {}, options = {}) {
+    if (seed.routeKind !== "condition" || !Number.isInteger(seed.blockIndex) || !Number.isInteger(seed.branchIndex)) {
+      return {};
+    }
+    const scene = getSceneById(seed.sourceSceneId || seed.sceneId, options);
+    const block = toArray(scene?.blocks)[seed.blockIndex];
+    if (block?.type !== "condition") {
+      return {};
+    }
+    const branch = toArray(block.branches)[seed.branchIndex];
+    if (!branch) {
+      return {};
+    }
+
+    return toArray(branch.when).reduce((overrides, rule) => {
+      const variableId = cleanText(rule?.variableId);
+      const value = getSatisfiedConditionValue(rule, options);
+      if (!variableId || value === undefined) {
+        return overrides;
+      }
+      overrides[variableId] = normalizeVariableValue(variableId, value, options);
+      return overrides;
+    }, {});
+  }
+
   function buildRouteCaseSeed(point = {}, routeCase = {}) {
     const routeLabel = cleanText(routeCase.label, `路线 ${routeCase.order ?? ""}`.trim());
     return {
@@ -278,6 +384,7 @@
   global.CanvasiaEditorPreviewRegression = Object.freeze({
     buildRouteCaseSeeds,
     buildPreviewRegressionSeeds,
+    buildConditionVariableOverrides,
     chooseRegressionOption,
   });
 })(typeof window !== "undefined" ? window : globalThis);

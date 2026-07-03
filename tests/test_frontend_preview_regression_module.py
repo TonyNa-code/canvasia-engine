@@ -23,9 +23,35 @@ class FrontendPreviewRegressionModuleTests(unittest.TestCase):
             vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
             const tools = context.window.CanvasiaEditorPreviewRegression;
             const scenesById = new Map([
-              ["scene_start", {{ id: "scene_start", name: "Start", chapterName: "Chapter" }}],
+              ["scene_start", {{
+                id: "scene_start",
+                name: "Start",
+                chapterName: "Chapter",
+                blocks: [
+                  {{ id: "line", type: "narration", text: "Start" }},
+                  {{
+                    id: "condition",
+                    type: "condition",
+                    branches: [
+                      {{
+                        gotoSceneId: "scene_good",
+                        when: [{{ variableId: "score", operator: ">=", value: 5 }}],
+                      }},
+                      {{
+                        gotoSceneId: "scene_bad",
+                        when: [{{ variableId: "flag", operator: "==", value: true }}],
+                      }},
+                    ],
+                    elseGotoSceneId: "scene_bad",
+                  }},
+                ],
+              }}],
               ["scene_good", {{ id: "scene_good", name: "Good", chapterName: "Chapter" }}],
               ["scene_bad", {{ id: "scene_bad", name: "Bad", chapterName: "Chapter" }}],
+            ]);
+            const variablesById = new Map([
+              ["score", {{ id: "score", type: "number", defaultValue: 0 }}],
+              ["flag", {{ id: "flag", type: "boolean", defaultValue: false }}],
             ]);
             const routeOverview = {{
               chapters: [
@@ -92,12 +118,40 @@ class FrontendPreviewRegressionModuleTests(unittest.TestCase):
               seeds.find((seed) => seed.routeCaseId === "route_good"),
               {{ sceneId: "scene_start", blockIndex: 1 }}
             );
+            const conditionOverrides = tools.buildConditionVariableOverrides(
+              {{
+                routeKind: "condition",
+                sourceSceneId: "scene_start",
+                blockIndex: 1,
+                branchIndex: 0,
+              }},
+              {{
+                scenesById,
+                variablesById,
+                getVariableType: (variableId) => variablesById.get(variableId)?.type ?? "string",
+              }}
+            );
+            const booleanOverrides = tools.buildConditionVariableOverrides(
+              {{
+                routeKind: "condition",
+                sourceSceneId: "scene_start",
+                blockIndex: 1,
+                branchIndex: 1,
+              }},
+              {{
+                scenesById,
+                variablesById,
+                getVariableType: (variableId) => variablesById.get(variableId)?.type ?? "string",
+              }}
+            );
             process.stdout.write(JSON.stringify({{
               keys: Object.keys(tools).sort(),
               seedIds: seeds.map((seed) => seed.seedId),
               routeSeeds: seeds.filter((seed) => seed.seedKind === "route_case"),
               selected,
               defaultWhenContextDoesNotMatch,
+              conditionOverrides,
+              booleanOverrides,
             }}));
             """
         )
@@ -112,6 +166,7 @@ class FrontendPreviewRegressionModuleTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 0, completed.stderr)
         payload = json.loads(completed.stdout)
         self.assertIn("buildPreviewRegressionSeeds", payload["keys"])
+        self.assertIn("buildConditionVariableOverrides", payload["keys"])
         self.assertIn("chooseRegressionOption", payload["keys"])
         self.assertEqual(payload["seedIds"][0], "entry")
         self.assertIn("route:route_good", payload["seedIds"])
@@ -121,6 +176,8 @@ class FrontendPreviewRegressionModuleTests(unittest.TestCase):
         self.assertEqual(payload["routeSeeds"][0]["optionIndex"], 2)
         self.assertEqual(payload["selected"]["id"], "opt_b")
         self.assertEqual(payload["defaultWhenContextDoesNotMatch"]["id"], "early_a")
+        self.assertEqual(payload["conditionOverrides"], {"score": 5})
+        self.assertEqual(payload["booleanOverrides"], {"flag": True})
 
 
 if __name__ == "__main__":

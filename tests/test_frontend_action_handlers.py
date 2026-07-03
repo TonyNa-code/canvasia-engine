@@ -3905,7 +3905,10 @@ class FrontendActionHandlerTests(unittest.TestCase):
 
         self.assertIn("const previewRegressionTools = window.CanvasiaEditorPreviewRegression", source)
         self.assertIn("previewRegressionTools.buildPreviewRegressionSeeds", source)
+        self.assertIn("previewRegressionTools.buildConditionVariableOverrides", source)
         self.assertIn("previewRegressionTools.chooseRegressionOption", source)
+        self.assertIn("createPreviewRegressionSession(seed.sceneId, variableOverrides)", source)
+        self.assertIn("variableOverrideSummary", source)
         self.assertIn("state.inspectionRegressionResult = runPreviewRegressionSmokeTest", regression_block)
         self.assertIn('state.currentScreen === "preview"', regression_block)
         self.assertIn("renderPreviewScreen();", regression_block)

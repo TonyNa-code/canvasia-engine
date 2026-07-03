@@ -21421,10 +21421,13 @@ function createNextPreviewSnapshot(currentSnapshot) {
   );
 }
 
-function createPreviewRegressionSession(startSceneId) {
+function createPreviewRegressionSession(startSceneId, variableOverrides = {}) {
   const safeStartSceneId = getSafeSceneId(startSceneId ?? state.selectedSceneId);
   const initialVisualState = createInitialPreviewVisualState();
-  const initialVariables = createInitialVariableState();
+  const initialVariables = {
+    ...createInitialVariableState(),
+    ...variableOverrides,
+  };
   const firstSnapshot = buildPreviewSnapshot(
     safeStartSceneId,
     0,
@@ -21437,6 +21440,22 @@ function createPreviewRegressionSession(startSceneId) {
     timeline: [firstSnapshot],
     position: 0,
   };
+}
+
+function getPreviewRegressionVariableOverrides(seed) {
+  return previewRegressionTools.buildConditionVariableOverrides(seed, {
+    scenesById: state.data?.scenesById,
+    variablesById: state.data?.variablesById,
+    getVariableType,
+    getVariableDefaultValue,
+    normalizeVariableValue,
+  });
+}
+
+function formatPreviewRegressionVariableOverrides(overrides = {}) {
+  return Object.entries(overrides)
+    .map(([variableId, value]) => `${state.data?.variablesById.get(variableId)?.name ?? variableId}=${formatVariableValue(variableId, value)}`)
+    .join(" / ");
 }
 
 function getCurrentPreviewRegressionSnapshot(session) {
@@ -25994,10 +26013,12 @@ function buildPreviewRegressionCaseActions(caseResult) {
 }
 
 function runPreviewRegressionCase(seed) {
-  const session = createPreviewRegressionSession(seed.sceneId);
+  const variableOverrides = getPreviewRegressionVariableOverrides(seed);
+  const session = createPreviewRegressionSession(seed.sceneId, variableOverrides);
   const visitedStepCounts = new Map();
   const visitedSceneIds = new Set();
   const selectedOptionTexts = [];
+  const variableOverrideSummary = formatPreviewRegressionVariableOverrides(variableOverrides);
   const expectedTargetSceneId = String(seed.targetSceneId ?? "").trim();
   let expectedTargetReached = !expectedTargetSceneId;
   let previousSnapshot = null;
@@ -26019,6 +26040,8 @@ function runPreviewRegressionCase(seed) {
     result.targetSceneId = expectedTargetSceneId;
     result.targetSceneName = seed.targetSceneName ?? "";
     result.expectedTargetReached = expectedTargetReached;
+    result.variableOverrides = variableOverrides;
+    result.variableOverrideSummary = variableOverrideSummary;
     result.actions = buildPreviewRegressionCaseActions(result);
     return result;
   }
@@ -26239,6 +26262,7 @@ function renderPreviewRegressionCaseCard(caseResult) {
               }</span>`
             : ""
         }
+        ${caseResult.variableOverrideSummary ? `<span class="issue-tag">${escapeHtml(`测试预设：${caseResult.variableOverrideSummary}`)}</span>` : ""}
       </div>
       <div class="preview-sprint-actions">
         ${(caseResult.actions ?? []).map((action, index) => renderQuickActionButton(action, index === 0)).join("")}
@@ -28958,6 +28982,8 @@ function buildReleaseControlReportPayload() {
             steps: caseResult.steps,
             visitedSceneCount: caseResult.visitedSceneCount,
             choiceCount: caseResult.choiceCount,
+            variableOverrideSummary: caseResult.variableOverrideSummary ?? "",
+            expectedTargetReached: Boolean(caseResult.expectedTargetReached),
             selectedOptionTexts: caseResult.selectedOptionTexts ?? [],
           })),
           fixQueue: regressionFixQueue.map((caseResult, index) => ({
@@ -29198,6 +29224,7 @@ function buildInspectionReportContent() {
         `   说明：${caseResult.reason}`,
         `   细节：${caseResult.detail}`,
         `   步数：${caseResult.steps} / 访问场景：${caseResult.visitedSceneCount} / 选择次数：${caseResult.choiceCount}`,
+        caseResult.variableOverrideSummary ? `   测试预设：${caseResult.variableOverrideSummary}` : "",
         caseResult.selectedOptionTexts.length > 0
           ? `   选择路线：${caseResult.selectedOptionTexts.join(" / ")}`
           : "",
