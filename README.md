@@ -53,6 +53,7 @@ The project already includes a visual editor, export pipeline, native runtime pr
 - Visual story editor with scenes, cards, dialogue, narration, choices, variables, and conditional branches
 - Project center with playable Demo projects, blank projects, beginner mode, and advanced mode
 - Context-aware Command Palette with Cmd/Ctrl+K quick actions for project setup, navigation, recommended next steps, recent commands, story card insertion, a previewed first-playable-scene template, themes, tutorial access, and export flow
+- Plain-text script import that previews and turns `Character: line`, narration lines, and consecutive choice lines into editable story cards
 - Asset management for backgrounds, character sprites, CGs, BGM, SFX, voice, fonts, UI assets, Live2D files, 3D models, and 3D scenes
 - Multi-language project settings for default language and player-selectable languages
 - Localized runtime text for scene names, chapter names, dialogue, choices, and character names, with safe fallback when a translation is missing
@@ -70,7 +71,7 @@ The project already includes a visual editor, export pipeline, native runtime pr
 
 | Area | Status | Notes |
 | --- | --- | --- |
-| Story and Branch Editing | Available | Visual cards, choices, jumps, variables, conditions, and scene graph inspection. |
+| Story and Branch Editing | Available | Visual cards, choices, jumps, variables, conditions, scene graph inspection, and plain-text script-to-card import. |
 | Asset Management | Available | Import, replace, delete, usage protection, file-size budget hints, and optional OpenAI Image generation with style presets, sprite expression binding, prompt, model, format, and returned-file validation. |
 | Multi-language / i18n | Preview | Project language settings, export metadata, Web Runtime language switching, native Runtime language switching, and fallback behavior. |
 | Canvasia Assistant | Available | Local template mode plus optional creator-owned API keys for major compatible providers. |
@@ -167,6 +168,8 @@ For a first five-minute demo, start small:
 
 Build one complete path first, then add branches, effects, UI skins, galleries, voice, and extra polish.
 The playable Demo project gives you that skeleton immediately. If you start from a blank project instead, the starter kit can create the first character/background/BGM records and connect them to the first scene, so you do not have to wire every card by hand.
+
+If your draft already lives in a document or notes app, paste a short section into the story page's script import panel. `Character: dialogue` becomes dialogue, plain lines become narration, and consecutive `- choice` lines become one choice card after preview.
 
 ## Multi-language Projects
 

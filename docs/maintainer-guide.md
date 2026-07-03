@@ -11,6 +11,7 @@ This guide explains the current maintenance boundaries for contributors who want
 - `prototype_editor/modules/` owns browser-side editor logic that can be tested without a browser DOM.
 - `prototype_editor/modules/command_palette.js` owns Cmd/Ctrl+K command metadata, filtering, recommendations, recent-command helpers, and list rendering. Keep command definitions there and route execution through existing editor actions.
 - `prototype_editor/modules/story_templates.js` owns reusable story template presets, block recipes, template summaries, and the story-page template panel order. Add or tune scene templates there, while `app.js` should only translate recipes into real scene blocks and render summaries into UI surfaces.
+- `prototype_editor/modules/script_importer.js` owns plain-text script parsing for the story page. Keep line-format recognition, choice grouping, preview summaries, and import limits there; `app.js` should only connect parsed draft blocks to the selected scene and persistence flow.
 - `native_runtime/runtime_player.py` owns native playback, native release checks, and runtime reports.
 
 ## Safe Extension Pattern

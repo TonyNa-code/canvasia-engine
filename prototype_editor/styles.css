@@ -2904,6 +2904,82 @@ body[data-editor-mode="beginner"] #screen-preview #previewSceneFilterBar {
   margin-bottom: 14px;
 }
 
+.script-importer-panel {
+  margin-bottom: 14px;
+}
+
+.script-importer-shell {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.8fr) minmax(320px, 1.35fr) minmax(240px, 0.9fr);
+  gap: 14px;
+  align-items: stretch;
+  padding: 16px;
+  border-radius: 20px;
+  border: 1px solid rgba(73, 116, 216, 0.14);
+  background:
+    radial-gradient(circle at 10% 18%, rgba(107, 161, 255, 0.14), transparent 34%),
+    linear-gradient(135deg, rgba(247, 250, 255, 0.95), rgba(255, 252, 247, 0.92));
+}
+
+.script-importer-copy,
+.script-importer-workbench,
+.script-importer-preview {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.script-importer-copy strong {
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.script-importer-copy p {
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.script-importer-textarea {
+  min-height: 132px;
+  width: 100%;
+  resize: vertical;
+  border-radius: 16px;
+  border: 1px solid rgba(73, 116, 216, 0.16);
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--text);
+  padding: 12px 14px;
+  font: inherit;
+  line-height: 1.65;
+}
+
+.script-importer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.script-importer-preview {
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid rgba(73, 116, 216, 0.12);
+}
+
+.script-importer-preview-lines {
+  display: grid;
+  gap: 6px;
+}
+
+.script-importer-preview-lines code {
+  display: block;
+  white-space: normal;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.76);
+  border: 1px solid rgba(73, 116, 216, 0.1);
+  border-radius: 10px;
+  padding: 6px 8px;
+}
+
 .creative-assistant-shell {
   display: grid;
   grid-template-columns: minmax(220px, 0.9fr) minmax(300px, 1.1fr) minmax(260px, 0.9fr);
@@ -6706,6 +6782,7 @@ html[data-ui-theme="light"] .music-range-timeline em {
   .story-structure-grid,
   .story-optimizer-grid,
   .preview-sprint-grid,
+  .script-importer-shell,
   .creative-assistant-shell,
   .story-template-grid,
   .asset-gap-stat-grid,
@@ -7136,6 +7213,8 @@ select:focus {
     .issue-card,
     .story-template-panel,
     .story-template-button,
+    .script-importer-shell,
+    .script-importer-preview,
     .story-structure-card,
     .story-structure-highlight-card,
     .story-structure-next-card,
@@ -7286,6 +7365,13 @@ select:focus {
   justify-items: start;
   text-align: left;
   border-color: rgba(121, 220, 255, 0.14) !important;
+}
+
+html:not([data-ui-theme="light"]) .script-importer-textarea,
+html:not([data-ui-theme="light"]) .script-importer-preview-lines code {
+  color: var(--ink);
+  background: rgba(7, 14, 26, 0.72);
+  border-color: rgba(121, 220, 255, 0.14);
 }
 
 .story-template-button:hover,

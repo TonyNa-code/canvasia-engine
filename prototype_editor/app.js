@@ -47,6 +47,7 @@ const { BLOCK_LABELS, MUSIC_END_MODE_LABELS } = storyBlockCatalogTools;
 const storyBlockEditorTools = window.CanvasiaEditorStoryBlockEditors;
 const storyTemplateTools = window.CanvasiaEditorStoryTemplates;
 const { STORY_TEMPLATE_PRESETS } = storyTemplateTools;
+const scriptImporterTools = window.CanvasiaEditorScriptImporter;
 
 function getBlockLabel(type) {
   return storyBlockCatalogTools.getBlockLabel(type) ?? BLOCK_LABELS[type] ?? type ?? "步骤";
@@ -770,6 +771,9 @@ const state = {
   storyBlockIssueFilter: "all",
   storySceneTreeSearchQuery: "",
   storySceneTreeFilter: "all",
+  scriptImporterDraft: "",
+  scriptImporterBlocks: [],
+  scriptImporterError: "",
   creativeAssistantMode: "starter_demo",
   creativeAssistantPrompt: CREATIVE_ASSISTANT_PROMPT_SAMPLES[0],
   creativeAssistantResult: null,
@@ -969,6 +973,7 @@ const refs = {
   storyEditorModeHint: document.getElementById("storyEditorModeHint"),
   storyTemplatePanel: document.getElementById("storyTemplatePanel"),
   storyTemplateGrid: document.getElementById("storyTemplateGrid"),
+  scriptImporterPanel: document.getElementById("scriptImporterPanel"),
   creativeAssistantPanel: document.getElementById("creativeAssistantPanel"),
   assetTypeList: document.getElementById("assetTypeList"),
   assetGrid: document.getElementById("assetGrid"),
@@ -4227,6 +4232,21 @@ async function handleClick(event) {
 
   if (action === "apply-story-template") {
     void applyStoryTemplate(actionTarget.dataset.templateId);
+    return;
+  }
+
+  if (action === "apply-script-import-sample") {
+    applyScriptImportSample();
+    return;
+  }
+
+  if (action === "preview-script-import") {
+    previewScriptImportDraft();
+    return;
+  }
+
+  if (action === "insert-script-import-blocks") {
+    void insertScriptImportBlocks();
     return;
   }
 
@@ -9538,6 +9558,187 @@ function renderStoryTemplateGrid() {
   return getStoryTemplatePanelItems().map((item) => renderStoryTemplateButton(item)).join("");
 }
 
+function getScriptImporterDraftFromDom() {
+  return document.getElementById("scriptImporterDraft")?.value ?? state.scriptImporterDraft ?? "";
+}
+
+function getScriptImporterSampleDraft() {
+  const characterName =
+    state.data?.charactersById?.get(state.selectedCharacterId)?.displayName ??
+    state.data?.characters?.[0]?.displayName ??
+    "女主角";
+  return [
+    "旁白：雨声贴着窗沿落下。",
+    `${characterName}：你终于来了。`,
+    "我把伞往她那边递过去。",
+    "- 问她为什么在这里",
+    "- 先沉默陪她一会儿",
+  ].join("\n");
+}
+
+function getImportedSpeakerCharacterId(speakerName) {
+  const characters = Array.isArray(state.data?.characters) ? state.data.characters : [];
+  const normalized = String(speakerName ?? "").trim().toLowerCase();
+  const matchedCharacter = normalized
+    ? characters.find((character) =>
+        [character.id, character.displayName, character.name]
+          .filter(Boolean)
+          .some((value) => String(value).trim().toLowerCase() === normalized)
+      )
+    : null;
+
+  return getSafeCharacterId(matchedCharacter?.id ?? state.selectedCharacterId ?? characters[0]?.id);
+}
+
+function normalizeScriptImportBlockForScene(draftBlock) {
+  if (!draftBlock || typeof draftBlock !== "object") {
+    return null;
+  }
+
+  if (draftBlock.type === "dialogue") {
+    return {
+      type: "dialogue",
+      speakerId: getImportedSpeakerCharacterId(draftBlock.speakerName),
+      text: String(draftBlock.text ?? "").trim(),
+    };
+  }
+
+  if (draftBlock.type === "choice") {
+    return {
+      type: "choice",
+      options: (Array.isArray(draftBlock.options) ? draftBlock.options : [])
+        .map((option) => ({ text: String(option?.text ?? "").trim() }))
+        .filter((option) => option.text),
+    };
+  }
+
+  return {
+    type: "narration",
+    text: String(draftBlock.text ?? "").trim(),
+  };
+}
+
+function parseCurrentScriptImportDraft() {
+  state.scriptImporterDraft = getScriptImporterDraftFromDom();
+  state.scriptImporterBlocks = scriptImporterTools.parseScriptDraftToBlocks(state.scriptImporterDraft);
+  state.scriptImporterError = state.scriptImporterBlocks.length ? "" : "没有识别到可插入的台词、旁白或选项。";
+  return state.scriptImporterBlocks;
+}
+
+function getScriptImportSummaryText(blocks = state.scriptImporterBlocks) {
+  const summary = scriptImporterTools.summarizeScriptDraftBlocks(blocks);
+  if (!summary.total) {
+    return "还没有预览结果";
+  }
+
+  return `将插入 ${summary.total} 张卡片：台词 ${summary.dialogue} / 旁白 ${summary.narration} / 选项 ${summary.choice}`;
+}
+
+function renderScriptImporterPanel(scene, selectedBlock) {
+  if (!scene) {
+    return "";
+  }
+
+  const draft = state.scriptImporterDraft ?? "";
+  const blocks = state.scriptImporterBlocks ?? [];
+  const previewLines = scriptImporterTools.buildScriptDraftPreviewLines(blocks, 5);
+  const hasBlocks = blocks.length > 0;
+  const insertionTarget = selectedBlock ? `当前会插入到「${getBlockSummary(selectedBlock, scene).title}」后面` : "当前会插入到场景末尾";
+
+  return `
+    <div class="script-importer-shell">
+      <div class="script-importer-copy">
+        <span class="eyebrow">Text To Cards</span>
+        <strong>手写剧本转剧情卡片</strong>
+        <p>从文档或备忘录粘贴文本：<code>角色：台词</code> 会变成台词，普通行会变旁白，连续 <code>- 选项</code> 会合并成选项卡。</p>
+        <span class="helper-text">${escapeHtml(insertionTarget)}</span>
+      </div>
+      <div class="script-importer-workbench">
+        <textarea
+          id="scriptImporterDraft"
+          class="script-importer-textarea"
+          spellcheck="false"
+          placeholder="旁白：雨声贴着窗沿落下。\n悠奈：你终于来了。\n- 问她为什么在这里\n- 先沉默陪她一会儿"
+        >${escapeHtml(draft)}</textarea>
+        <div class="script-importer-actions">
+          <button type="button" class="toolbar-button" data-action="apply-script-import-sample">填入示例</button>
+          <button type="button" class="toolbar-button" data-action="preview-script-import">预览识别</button>
+          <button type="button" class="toolbar-button toolbar-button-primary" data-action="insert-script-import-blocks" ${hasBlocks ? "" : "disabled"}>
+            插入识别结果
+          </button>
+        </div>
+      </div>
+      <div class="script-importer-preview">
+        <span class="issue-tag ${hasBlocks ? "good-text" : "warn-text"}">${escapeHtml(getScriptImportSummaryText(blocks))}</span>
+        ${state.scriptImporterError ? `<p class="helper-text warn-text">${escapeHtml(state.scriptImporterError)}</p>` : ""}
+        ${
+          previewLines.length
+            ? `<div class="script-importer-preview-lines">${previewLines.map((line) => `<code>${escapeHtml(line)}</code>`).join("")}</div>`
+            : `<p class="helper-text">先粘贴一小段文本并点击“预览识别”。</p>`
+        }
+      </div>
+    </div>
+  `;
+}
+
+function applyScriptImportSample() {
+  state.scriptImporterDraft = getScriptImporterSampleDraft();
+  state.scriptImporterBlocks = scriptImporterTools.parseScriptDraftToBlocks(state.scriptImporterDraft);
+  state.scriptImporterError = "";
+  renderStoryScreen();
+  setSaveStatus("已填入一段可识别的手写剧本示例");
+}
+
+function previewScriptImportDraft() {
+  const blocks = parseCurrentScriptImportDraft();
+  renderStoryScreen();
+  setSaveStatus(blocks.length ? getScriptImportSummaryText(blocks) : state.scriptImporterError, !blocks.length);
+}
+
+async function insertScriptImportBlocks() {
+  const scene = getSelectedScene();
+  if (!scene) {
+    showToast("先选中一个场景", "error");
+    return;
+  }
+
+  const draftBlocks = parseCurrentScriptImportDraft()
+    .map((block) => normalizeScriptImportBlockForScene(block))
+    .filter(Boolean);
+  if (!draftBlocks.length) {
+    renderStoryScreen();
+    showToast(state.scriptImporterError || "没有可插入的文本卡片", "error");
+    return;
+  }
+
+  const updatedScene = cloneScene(scene);
+  const selectedIndex = updatedScene.blocks.findIndex((block) => block.id === state.selectedBlockId);
+  const insertIndex = selectedIndex >= 0 ? selectedIndex + 1 : updatedScene.blocks.length;
+  const newBlocks = buildAssistantBlocksForInsertion(scene, draftBlocks);
+  if (!newBlocks.length) {
+    state.scriptImporterError = "识别成功，但没有生成可保存的剧情卡片。";
+    renderStoryScreen();
+    showToast(state.scriptImporterError, "error");
+    return;
+  }
+
+  updatedScene.blocks.splice(insertIndex, 0, ...newBlocks);
+  const success = await persistScene(updatedScene, {
+    selectedSceneId: updatedScene.id,
+    selectedBlockId: newBlocks[0]?.id ?? null,
+    previewSceneId: updatedScene.id,
+    previewBlockIndex: insertIndex,
+    successMessage: `已从手写文本插入 ${newBlocks.length} 张剧情卡片`,
+  });
+
+  if (success) {
+    state.scriptImporterBlocks = [];
+    state.scriptImporterError = "";
+    renderStoryScreen();
+    showToast(`已插入 ${newBlocks.length} 张文本卡片`);
+  }
+}
+
 function applyEditorModeUi() {
   const hasProject = Boolean(state.data?.project);
   const mode = hasProject ? getProjectEditorMode() : getSafeEditorMode(state.projectCenterEditorMode);
@@ -13579,6 +13780,11 @@ function renderStoryScreen() {
 
   if (refs.storyTemplateGrid) {
     refs.storyTemplateGrid.innerHTML = isBlankProject || !scene ? "" : renderStoryTemplateGrid();
+  }
+
+  if (refs.scriptImporterPanel) {
+    refs.scriptImporterPanel.innerHTML = isBlankProject ? "" : renderScriptImporterPanel(scene, selectedBlock);
+    refs.scriptImporterPanel.classList.toggle("is-hidden", isBlankProject || !scene);
   }
 
   if (refs.creativeAssistantPanel) {
@@ -33414,6 +33620,7 @@ function normalizeAssistantDraftBlockForScene(sceneDraft, draftBlock) {
     block.speakerId = getSafeCharacterId(block.speakerId ?? state.selectedCharacterId ?? state.data.characters[0]?.id);
     block.expressionId = getSafeExpressionId(block.speakerId, block.expressionId);
     block.text = String(block.text ?? "新台词").trim() || "新台词";
+    delete block.speakerName;
     delete block.options;
   } else if (blockType === "choice") {
     const rawOptions = Array.isArray(block.options) ? block.options : [];
@@ -33428,6 +33635,7 @@ function normalizeAssistantDraftBlockForScene(sceneDraft, draftBlock) {
     }
   } else {
     block.text = String(block.text ?? "新旁白").trim() || "新旁白";
+    delete block.speakerName;
     delete block.speakerId;
     delete block.expressionId;
     delete block.options;
