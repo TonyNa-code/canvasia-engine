@@ -62,6 +62,7 @@ const audioCueSheetTools = window.CanvasiaEditorAudioCueSheet;
 const stageDirectionSheetTools = window.CanvasiaEditorStageDirectionSheet;
 const presentationTimelineTools = window.CanvasiaEditorPresentationTimeline;
 const localizationCoverageTools = window.CanvasiaEditorLocalizationCoverage;
+const runtimeCapabilityMatrixTools = window.CanvasiaEditorRuntimeCapabilityMatrix;
 const productionBacklogTools = window.CanvasiaEditorProductionBacklog;
 
 function getBlockLabel(type) {
@@ -3921,6 +3922,16 @@ async function handleClick(event) {
 
   if (action === "import-localization-coverage-csv") {
     document.getElementById("localizationCoverageImportInput")?.click();
+    return;
+  }
+
+  if (action === "export-runtime-capability-markdown") {
+    exportRuntimeCapabilityMarkdown();
+    return;
+  }
+
+  if (action === "export-runtime-capability-csv") {
+    exportRuntimeCapabilityCsv();
     return;
   }
 
@@ -28583,6 +28594,17 @@ function buildLocalizationCoverageFileName(extension = "md") {
   return `${title}_localization_coverage_${dateStamp}.${extension}`;
 }
 
+function buildRuntimeCapabilityFileName(extension = "md") {
+  const date = new Date();
+  const dateStamp = [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("");
+  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
+  return `${title}_runtime_capability_matrix_${dateStamp}.${extension}`;
+}
+
 function buildProductionBacklogFileName(extension = "md") {
   const date = new Date();
   const dateStamp = [
@@ -30045,6 +30067,30 @@ async function importLocalizationCoverageCsv(file) {
   }
 }
 
+function buildRuntimeCapabilityMatrix() {
+  return runtimeCapabilityMatrixTools.buildRuntimeCapabilityMatrix(state.data ?? {});
+}
+
+function exportRuntimeCapabilityMarkdown() {
+  const fileName = buildRuntimeCapabilityFileName("md");
+  const matrix = buildRuntimeCapabilityMatrix();
+  const content = runtimeCapabilityMatrixTools.buildRuntimeCapabilityMarkdown(matrix, {
+    projectTitle: state.data?.project?.title || "Canvasia Project",
+    generatedAt: formatDate(new Date().toISOString()),
+  });
+  downloadTextFile(fileName, content, "text/markdown;charset=utf-8");
+  setSaveStatus(`已导出 Runtime 覆盖矩阵：${fileName}`);
+  showToast(`Runtime 覆盖矩阵已导出：${fileName}`);
+}
+
+function exportRuntimeCapabilityCsv() {
+  const fileName = buildRuntimeCapabilityFileName("csv");
+  const content = runtimeCapabilityMatrixTools.buildRuntimeCapabilityCsv(buildRuntimeCapabilityMatrix());
+  downloadTextFile(fileName, content, "text/csv;charset=utf-8");
+  setSaveStatus(`已导出 Runtime 覆盖 CSV：${fileName}`);
+  showToast(`Runtime 覆盖 CSV 已导出：${fileName}`);
+}
+
 function buildProductionBacklog(routeOverview = null) {
   const currentRouteOverview = routeOverview ?? buildSceneRouteOverview();
   return productionBacklogTools.buildProductionBacklog({
@@ -30059,6 +30105,7 @@ function buildProductionBacklog(routeOverview = null) {
     stageDirectionSheet: buildStageDirectionSheet(),
     presentationTimeline: buildPresentationTimeline(),
     localizationCoverage: buildLocalizationCoverage(),
+    runtimeCapabilityMatrix: buildRuntimeCapabilityMatrix(),
   });
 }
 
@@ -31415,6 +31462,19 @@ function getVoiceProductionToneClass(status) {
   return "";
 }
 
+function getRuntimeCapabilityToneClass(status) {
+  if (status === "blocked") {
+    return "danger-text";
+  }
+  if (status === "warn") {
+    return "warn-text";
+  }
+  if (status === "ready") {
+    return "good-text";
+  }
+  return "";
+}
+
 function getProductionBacklogToneClass(status) {
   if (status === "blocked") {
     return "danger-text";
@@ -31520,6 +31580,83 @@ function renderProductionBacklogPanel(routeOverview) {
               </div>
             `
             : renderEmpty("跨模块生产队列暂时没有待办。可以继续写新剧情，或导出一版给测试人员试玩。")
+      }
+    </article>
+  `;
+}
+
+function renderRuntimeCapabilityMatrixPanel() {
+  const matrix = buildRuntimeCapabilityMatrix();
+  const digest = runtimeCapabilityMatrixTools.getRuntimeCapabilityStatusDigest(matrix);
+  const summary = matrix.summary ?? {};
+  const issueRows = (matrix.issues ?? []).slice(0, 4);
+  const usedRows = (matrix.usedRows ?? []).slice(0, 6);
+
+  return `
+    <article class="detail-card preview-sprint-panel">
+      <div class="panel-heading">
+        <h2>Runtime 覆盖矩阵</h2>
+        <span class="badge badge-soft ${getRuntimeCapabilityToneClass(digest.status)}">${escapeHtml(digest.title)}</span>
+      </div>
+      <p class="helper-text">${escapeHtml(digest.detail)} 它会扫描当前项目实际使用的剧情卡片，确认 Web Runtime 和原生 Runtime 是否都有对应播放能力，避免“编辑器里能配，导出后只剩兜底”。</p>
+      <div class="preview-sprint-metrics">
+        ${renderRouteMetricCard("剧情卡片", `${summary.totalBlockCount ?? 0} 张`, "当前项目实际扫描")}
+        ${renderRouteMetricCard("已用类型 / 完整", `${summary.usedTypeCount ?? 0} / ${summary.fullUsedTypeCount ?? 0}`, "卡片类型覆盖情况")}
+        ${renderRouteMetricCard("需验收 / 未知", `${summary.partialUsedTypeCount ?? 0} / ${summary.unknownUsedTypeCount ?? 0}`, "发布前重点确认")}
+        ${renderRouteMetricCard("Web / 原生风险", `${summary.webPartialCount ?? 0} / ${summary.nativePartialCount ?? 0}`, "不同 Runtime 覆盖差异")}
+      </div>
+      <div class="detail-actions">
+        <button class="toolbar-button toolbar-button-primary" data-action="export-runtime-capability-markdown">
+          导出 Runtime 覆盖矩阵
+        </button>
+        <button class="toolbar-button" data-action="export-runtime-capability-csv">
+          导出 Runtime CSV
+        </button>
+        <button class="toolbar-button" data-action="switch-screen" data-screen="preview">
+          去导出试玩验证
+        </button>
+      </div>
+      ${
+        issueRows.length > 0
+          ? `
+            <div class="preview-sprint-grid">
+              ${issueRows
+                .map(
+                  (issue) => `
+                    <article class="preview-sprint-card is-${issue.severity === "blocker" ? "danger" : "warn"}">
+                      <div class="preview-sprint-head">
+                        <strong>${escapeHtml(issue.title)}</strong>
+                        <span class="issue-tag ${issue.severity === "blocker" ? "danger-text" : "warn-text"}">
+                          ${escapeHtml(issue.severity === "blocker" ? "先补支持" : "重点验收")}
+                        </span>
+                      </div>
+                      <p>${escapeHtml((issue.sceneNames ?? []).join(" / ") || issue.group || "全项目")}</p>
+                      <div class="helper-text">${escapeHtml(issue.detail)}</div>
+                    </article>
+                  `
+                )
+                .join("")}
+            </div>
+          `
+          : usedRows.length > 0
+            ? `
+              <div class="list-stack compact-stack">
+                ${usedRows
+                  .map(
+                    (row) => `
+                      <div class="route-testing-item">
+                        <div>
+                          <b>${escapeHtml(`${row.group} · ${row.type}`)}</b>
+                          <span>${escapeHtml(`Web ${row.webStatusLabel} · 原生 ${row.nativeStatusLabel}`)}</span>
+                        </div>
+                        <span>${escapeHtml(`${row.usedCount} 次`)}</span>
+                      </div>
+                    `
+                  )
+                  .join("")}
+              </div>
+            `
+            : renderEmpty("当前项目还没有剧情卡片。写完第一场后，这里会检查导出 Runtime 的覆盖状态。")
       }
     </article>
   `;
@@ -32343,6 +32480,7 @@ function renderInspectionOverviewPanel(routeOverview) {
       ${renderCompactProjectMilestonePanel(routeOverview)}
       ${renderProjectDoctorPanel(routeOverview, issueItems)}
       ${renderProductionBacklogPanel(routeOverview)}
+      ${renderRuntimeCapabilityMatrixPanel()}
       ${renderSceneProductionBoardPanel()}
       ${renderVoiceProductionPanel()}
       ${renderChoiceConsequencePanel()}

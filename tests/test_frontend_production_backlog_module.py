@@ -68,6 +68,11 @@ class FrontendProductionBacklogModuleTests(unittest.TestCase):
                   {{ severity: "warn", title: "缺少日文翻译", detail: "这句还没翻译。", languageLabel: "日本語", sceneName: "教室黄昏" }},
                 ],
               }},
+              runtimeCapabilityMatrix: {{
+                issues: [
+                  {{ severity: "warn", title: "video_play：需要验收", detail: "原生 Runtime 视频依赖目标平台兜底。", blockType: "video_play", group: "视频", usedCount: 1, sceneNames: ["OP"] }},
+                ],
+              }},
             }});
             const digest = tools.getProductionBacklogStatusDigest(backlog);
             const markdown = tools.buildProductionBacklogMarkdown(backlog, {{
@@ -103,15 +108,16 @@ class FrontendProductionBacklogModuleTests(unittest.TestCase):
         self.assertIn("buildProductionBacklogMarkdown", payload["keys"])
         self.assertIn("buildProductionBacklogCsv", payload["keys"])
         self.assertEqual(payload["backlog"]["projectTitle"], "Backlog Demo")
-        self.assertEqual(payload["backlog"]["summary"]["taskCount"], 12)
+        self.assertEqual(payload["backlog"]["summary"]["taskCount"], 13)
         self.assertEqual(payload["backlog"]["summary"]["blockerCount"], 3)
-        self.assertEqual(payload["backlog"]["summary"]["warningCount"], 6)
+        self.assertEqual(payload["backlog"]["summary"]["warningCount"], 7)
         self.assertEqual(payload["backlog"]["summary"]["tipCount"], 3)
-        self.assertGreaterEqual(payload["backlog"]["summary"]["areaCount"], 8)
+        self.assertGreaterEqual(payload["backlog"]["summary"]["areaCount"], 9)
         self.assertEqual(payload["digest"]["status"], "blocked")
         self.assertEqual(payload["backlog"]["tasks"][0]["severity"], "blocker")
         self.assertIn("生产待办队列", payload["markdown"])
         self.assertIn("语音文件缺失", payload["markdown"])
+        self.assertIn("Runtime 覆盖", payload["markdown"])
         self.assertIn('"素材依赖"', payload["csv"])
         self.assertEqual(payload["labels"], ["先修", "优先", "整理"])
 

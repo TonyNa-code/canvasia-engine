@@ -10,6 +10,7 @@
     stage: "角色调度",
     presentation: "演出节奏",
     localization: "多语言",
+    runtime: "Runtime 覆盖",
   });
 
   const AREA_ACTIONS = Object.freeze({
@@ -23,6 +24,7 @@
     stage: Object.freeze({ label: "补角色演出", action: "switch-screen", screen: "story" }),
     presentation: Object.freeze({ label: "补演出卡", action: "switch-screen", screen: "story" }),
     localization: Object.freeze({ label: "看翻译报告", action: "switch-screen", screen: "inspection" }),
+    runtime: Object.freeze({ label: "看 Runtime 覆盖", action: "switch-screen", screen: "inspection" }),
   });
 
   function toArray(value) {
@@ -262,6 +264,7 @@
     addIssueTasks(tasks, "stage", context.stageDirectionSheet?.issues, { fallbackTitle: "处理角色调度问题", fallbackSource: "角色舞台调度表" });
     addIssueTasks(tasks, "presentation", context.presentationTimeline?.issues, { fallbackTitle: "处理演出节奏问题", fallbackSource: "演出时间轴" });
     addIssueTasks(tasks, "localization", context.localizationCoverage?.issues, { fallbackTitle: "处理翻译覆盖问题", fallbackSource: "多语言覆盖报告", maxItems: 8 });
+    addIssueTasks(tasks, "runtime", context.runtimeCapabilityMatrix?.issues, { fallbackTitle: "处理 Runtime 覆盖风险", fallbackSource: "Runtime 覆盖矩阵", maxItems: 8, priorityBoost: 16 });
 
     tasks.sort((left, right) => {
       if (right.priority !== left.priority) {

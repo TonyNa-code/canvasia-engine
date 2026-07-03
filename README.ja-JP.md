@@ -67,7 +67,7 @@ Canvasia Engine は、ビジュアルノベル / Galgame 制作者のための s
 - 高度なパーティクルプリセット、プロジェクト単位のパーティクルライブラリ、カメラ演出、フィルター、フラッシュ、画面揺れ、フェード
 - Live2D / 3D キャラクターと 3D シーン素材のインポート、ネイティブ Runtime での glTF / GLB / VRM 構造レポート
 - Web 試遊パッケージ、デスクトップ書き出し、エディタデスクトップビルド、ネイティブ Runtime preview パッケージ
-- ローカル CI precheck、backend smoke、Playwright browser smoke、ボタン配線チェック、条件 / fallback 変数プリセット付き分岐対応 preview regression、release-control report、production backlog queue、scene production board、voice production sheet、choice consequence audit、variable influence audit、asset dependency audit、BGM cue sheet audit、character stage-direction audit、presentation timeline audit、テスター引き継ぎワークオーダー、プレイテストフィードバックテンプレートと取り込みサマリー、VN baseline quality audit、ファイル整合性検証
+- ローカル CI precheck、backend smoke、Playwright browser smoke、ボタン配線チェック、条件 / fallback 変数プリセット付き分岐対応 preview regression、release-control report、production backlog queue、Runtime capability matrix、scene production board、voice production sheet、choice consequence audit、variable influence audit、asset dependency audit、BGM cue sheet audit、character stage-direction audit、presentation timeline audit、テスター引き継ぎワークオーダー、プレイテストフィードバックテンプレートと取り込みサマリー、VN baseline quality audit、ファイル整合性検証
 
 ## 機能ステータス
 
@@ -83,7 +83,7 @@ Canvasia Engine は、ビジュアルノベル / Galgame 制作者のための s
 | パーティクル / 演出 | Available | パーティクル、カメラ、フィルター、フラッシュ、画面揺れ、フェード、キャラクター演出。 |
 | Live2D / 3D 素材 | Preview | Live2D、3D キャラクター、3D シーン素材をインポート可能。ネイティブ Runtime は 3D 構造とリスクレポートを出力。 |
 | Web / Desktop 書き出し | Preview | Web 試遊パッケージとデスクトップパッケージに対応。署名と公証は Release notes に従います。 |
-| ネイティブ Runtime | Preview | コア再生、設定、セーブ、履歴、自動再生、動画フォールバック、3D レポート、初期図鑑システムをカバー。 |
+| ネイティブ Runtime | Preview | コア再生、設定、セーブ、履歴、自動再生、動画フォールバック、3D レポート、初期図鑑システム、Web / native Runtime coverage checks をカバー。 |
 | Mobile Runtime | Experimental planning | タッチ操作、音声ポリシー、レイアウト適応を検証中。 |
 
 ## スクリーンショット

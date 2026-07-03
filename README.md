@@ -67,7 +67,7 @@ The project already includes a visual editor, export pipeline, native runtime pr
 - Advanced particle presets, project particle libraries, camera effects, screen filters, flashes, shakes, and fade transitions
 - Live2D / 3D character and 3D scene asset import, plus native-runtime 3D inspection reports for glTF / GLB / VRM assets
 - Web playable export, desktop exports, editor desktop builds, and native Runtime preview packages
-- Automated checks: local CI precheck, backend smoke tests, Playwright browser smoke tests, action wiring scans, branch-aware preview regression with condition / fallback variable presets, release-control reports, production backlog queues, scene production boards, voice production sheets, choice consequence audits, variable influence audits, asset dependency audits, BGM cue-sheet audits, character stage-direction audits, presentation timeline audits, tester handoff work orders, playtest feedback templates and feedback intake summaries, VN baseline quality audits, and package integrity verification
+- Automated checks: local CI precheck, backend smoke tests, Playwright browser smoke tests, action wiring scans, branch-aware preview regression with condition / fallback variable presets, release-control reports, production backlog queues, Runtime capability matrices, scene production boards, voice production sheets, choice consequence audits, variable influence audits, asset dependency audits, BGM cue-sheet audits, character stage-direction audits, presentation timeline audits, tester handoff work orders, playtest feedback templates and feedback intake summaries, VN baseline quality audits, and package integrity verification
 
 ## Feature Status
 
@@ -83,7 +83,7 @@ The project already includes a visual editor, export pipeline, native runtime pr
 | Particles and Presentation | Available | Particle presets, custom particle settings, camera, filters, flashes, shakes, fades, and character presentation effects. |
 | Live2D / 3D Assets | Preview | Live2D, 3D character models, and 3D scene assets can be imported; native Runtime exports 3D structure and risk reports. |
 | Web / Desktop Exports | Preview | Web playable packages and desktop packages are available; signing and notarization depend on release notes. |
-| Native Runtime | Preview | Covers the core playback path, settings, saves, history, autoplay, video fallback, 3D reports, and first archive systems. |
+| Native Runtime | Preview | Covers the core playback path, settings, saves, history, autoplay, video fallback, 3D reports, first archive systems, and editor-side Runtime capability matrices for Web / native coverage checks. |
 | Mobile Runtime | Experimental planning | Touch, audio policy, and layout adaptation are still being explored. |
 
 ## Screenshots

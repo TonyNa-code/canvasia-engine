@@ -4114,6 +4114,27 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("localizationCoverageTools.getLocalizationCoverageStatusDigest", source)
         self.assertIn("localizationCoverageTools.buildLocalizationImportPlan", source)
 
+    def test_runtime_capability_matrix_export_actions_are_wired(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        click_handler = _extract_function_source(source, "handleClick")
+        markdown_block_start = click_handler.index('action === "export-runtime-capability-markdown"')
+        csv_block_start = click_handler.index('action === "export-runtime-capability-csv"')
+        csv_block_end = click_handler.index('action === "export-production-backlog-markdown"', csv_block_start)
+        markdown_block = click_handler[markdown_block_start:csv_block_start]
+        csv_block = click_handler[csv_block_start:csv_block_end]
+
+        self.assertIn("const runtimeCapabilityMatrixTools = window.CanvasiaEditorRuntimeCapabilityMatrix", source)
+        self.assertIn('data-action="export-runtime-capability-markdown"', source)
+        self.assertIn('data-action="export-runtime-capability-csv"', source)
+        self.assertIn("exportRuntimeCapabilityMarkdown();", markdown_block)
+        self.assertIn("exportRuntimeCapabilityCsv();", csv_block)
+        self.assertIn("function buildRuntimeCapabilityMatrix()", source)
+        self.assertIn("function renderRuntimeCapabilityMatrixPanel()", source)
+        self.assertIn("function exportRuntimeCapabilityMarkdown()", source)
+        self.assertIn("function exportRuntimeCapabilityCsv()", source)
+        self.assertIn("runtimeCapabilityMatrixTools.buildRuntimeCapabilityMatrix", source)
+        self.assertIn("runtimeCapabilityMatrixTools.getRuntimeCapabilityStatusDigest", source)
+
     def test_production_backlog_export_actions_are_wired(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
         click_handler = _extract_function_source(source, "handleClick")
