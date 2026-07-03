@@ -30,6 +30,20 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
             source.index("${renderReleaseChecklistPanel()}"),
         )
 
+    def test_release_report_includes_route_testing_plan_context(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        report_start = source.index("function buildReleaseControlReportContent()")
+        report_end = source.index("function exportReleaseControlReport()")
+        report_body = source[report_start:report_end]
+
+        self.assertIn("const routeTestingPlan = routeOverview.routeTestingPlan ?? {}", report_body)
+        self.assertIn("const routeTestingSummary = routeTestingPlan.summary ?? {}", report_body)
+        self.assertIn("const routeTestingSummaryTable = buildMarkdownTable", report_body)
+        self.assertIn("const routeTestingDecisionTable = buildMarkdownTable", report_body)
+        self.assertIn("const routeEndingTestTable = buildMarkdownTable", report_body)
+        self.assertIn("## 路线试玩手册", report_body)
+        self.assertLess(report_body.index("const routeTestingPlan"), report_body.index("const routeTestingSummaryTable"))
+
     def test_release_control_helpers_work_without_browser_dom(self) -> None:
         script = textwrap.dedent(
             f"""

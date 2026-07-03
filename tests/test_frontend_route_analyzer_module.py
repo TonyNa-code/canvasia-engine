@@ -100,6 +100,7 @@ class FrontendRouteAnalyzerModuleTests(unittest.TestCase):
               orphanNode: overview.nodes.find((node) => node.id === "scene_orphan"),
               hiddenChainNode: overview.nodes.find((node) => node.id === "scene_hidden_chain"),
               endingPaths: overview.endingPaths,
+              routeTestingPlan: overview.routeTestingPlan,
               chapterProduction: overview.chapters[0].production,
               routeKinds,
             }}));
@@ -126,10 +127,14 @@ class FrontendRouteAnalyzerModuleTests(unittest.TestCase):
         self.assertEqual(payload["metrics"]["maxRouteDepth"], 1)
         self.assertEqual(payload["metrics"]["reachableEndingScenes"], 2)
         self.assertEqual(payload["metrics"]["unreachableEndingScenes"], 1)
+        self.assertEqual(payload["metrics"]["decisionPointScenes"], 1)
+        self.assertEqual(payload["metrics"]["routeTestCases"], 4)
+        self.assertEqual(payload["metrics"]["blockedRouteTestCases"], 2)
         self.assertEqual(payload["routeKinds"], ["choice", "choice", "condition", "fallback"])
         self.assertEqual(payload["alertLabels"][:2], ["坏链", "坏链"])
         self.assertIn("不可达", payload["alertLabels"])
         self.assertIn("buildRoutePathFromPredecessors", payload["keys"])
+        self.assertIn("buildRouteTestingPlan", payload["keys"])
         self.assertTrue(payload["startNode"]["isReachableFromEntry"])
         self.assertEqual(payload["startNode"]["entryPathLabel"], "Start")
         self.assertTrue(payload["orphanNode"]["isOrphan"])
@@ -146,6 +151,11 @@ class FrontendRouteAnalyzerModuleTests(unittest.TestCase):
         self.assertEqual(payload["endingPaths"][0]["pathRouteLabels"], ["选项：Go end"])
         self.assertEqual(payload["endingPaths"][-1]["sceneName"], "Hidden Chain")
         self.assertFalse(payload["endingPaths"][-1]["isReachable"])
+        self.assertEqual(payload["routeTestingPlan"]["summary"]["decisionPointCount"], 1)
+        self.assertEqual(payload["routeTestingPlan"]["summary"]["brokenRouteCaseCount"], 2)
+        self.assertEqual(payload["routeTestingPlan"]["summary"]["endingTestCaseCount"], 3)
+        self.assertEqual(payload["routeTestingPlan"]["decisionPoints"][0]["routeCases"][1]["status"], "broken")
+        self.assertEqual(payload["routeTestingPlan"]["endingTestCases"][0]["statusLabel"], "可打到")
         self.assertEqual(payload["startNode"]["missingVoiceCount"], 1)
         self.assertEqual(payload["startNode"]["errorCount"], 1)
         self.assertEqual(payload["endNode"]["warningCount"], 1)

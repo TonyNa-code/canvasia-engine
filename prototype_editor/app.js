@@ -10456,6 +10456,7 @@ function renderDashboard() {
             </div>
             ${renderRouteMapFilterBar(routeOverview)}
             ${renderRouteMapBoard(routeOverview)}
+            ${renderRouteTestingPlanPanel(routeOverview)}
           </section>
         `
         : ""
@@ -11989,6 +11990,110 @@ function renderRouteMapBoard(routeOverview) {
           `
         )
         .join("")}
+    </div>
+  `;
+}
+
+function getRouteCaseStatusToneClass(status) {
+  if (status === "broken") {
+    return "danger-text";
+  }
+  if (status === "unreachable") {
+    return "warn-text";
+  }
+  return "good-text";
+}
+
+function renderRouteTestingPlanPanel(routeOverview) {
+  const plan = routeOverview.routeTestingPlan ?? {};
+  const summary = plan.summary ?? {};
+  const decisionPoints = (plan.decisionPoints ?? []).slice(0, 4);
+  const endingTestCases = (plan.endingTestCases ?? []).slice(0, 4);
+  const blockedCases = (summary.brokenRouteCaseCount ?? 0) + (summary.unreachableRouteCaseCount ?? 0);
+
+  if ((summary.decisionPointCount ?? 0) === 0 && (summary.endingTestCaseCount ?? 0) === 0) {
+    return "";
+  }
+
+  return `
+    <div class="route-testing-plan">
+      <div class="panel-heading">
+        <h3>路线试玩手册</h3>
+        <span class="panel-note">按分支点和结局路径整理成发布前可执行清单</span>
+      </div>
+      <div class="route-summary-strip">
+        ${renderRouteMetricCard("分支检查点", summary.decisionPointCount ?? 0, `${summary.reachableDecisionPointCount ?? 0} 个从入口可到`)}
+        ${renderRouteMetricCard("路线用例", summary.routeCaseCount ?? 0, blockedCases > 0 ? `${blockedCases} 条需要先接通` : "当前用例都可进入测试")}
+        ${renderRouteMetricCard("结局用例", summary.endingTestCaseCount ?? 0, `${summary.reachableEndingTestCaseCount ?? 0} 个可打到`)}
+      </div>
+      <div class="route-testing-grid">
+        <article class="route-testing-card">
+          <strong>优先分支点</strong>
+          <div class="list-stack compact-stack">
+            ${
+              decisionPoints.length > 0
+                ? decisionPoints
+                    .map(
+                      (point) => `
+                        <div class="route-testing-item">
+                          <div>
+                            <b>${escapeHtml(point.sceneName)}</b>
+                            <span>${escapeHtml(point.chapterName)} · ${
+                              point.isReachable ? escapeHtml(point.entryPathLabel || "项目入口") : "入口未接通"
+                            }</span>
+                          </div>
+                          <div class="route-testing-chip-row">
+                            ${point.routeCases
+                              .slice(0, 4)
+                              .map(
+                                (routeCase) => `
+                                  <span class="issue-tag ${getRouteCaseStatusToneClass(routeCase.status)}">
+                                    ${escapeHtml(routeCase.label)} -> ${escapeHtml(routeCase.targetSceneName)}
+                                  </span>
+                                `
+                              )
+                              .join("")}
+                          </div>
+                          <button class="toolbar-button" data-action="open-scene-from-map" data-scene-id="${escapeHtml(point.sceneId)}">
+                            打开这个分支点
+                          </button>
+                        </div>
+                      `
+                    )
+                    .join("")
+                : renderEmpty("当前还没有需要单独覆盖的分支点。")
+            }
+          </div>
+        </article>
+        <article class="route-testing-card">
+          <strong>结局试玩路径</strong>
+          <div class="list-stack compact-stack">
+            ${
+              endingTestCases.length > 0
+                ? endingTestCases
+                    .map(
+                      (testCase) => `
+                        <div class="route-testing-item">
+                          <div>
+                            <b>${escapeHtml(testCase.sceneName)}</b>
+                            <span>${escapeHtml(testCase.pathLabel || "暂未接通")}</span>
+                          </div>
+                          <div class="route-testing-chip-row">
+                            <span class="issue-tag ${getRouteCaseStatusToneClass(testCase.status)}">${escapeHtml(testCase.statusLabel)}</span>
+                            <span class="issue-tag">${escapeHtml(testCase.testingHint)}</span>
+                          </div>
+                          <button class="toolbar-button" data-action="preview-scene-from-map" data-scene-id="${escapeHtml(testCase.sceneId)}">
+                            试玩这个结局点
+                          </button>
+                        </div>
+                      `
+                    )
+                    .join("")
+                : renderEmpty("还没有结局候选，先做一个不再跳走的收束场景。")
+            }
+          </div>
+        </article>
+      </div>
     </div>
   `;
 }
@@ -28278,6 +28383,40 @@ function serializeFinalPublishGate(gate) {
   };
 }
 
+function serializeRouteTestingPlan(plan = {}) {
+  return {
+    summary: plan.summary ?? {},
+    decisionPoints: (plan.decisionPoints ?? []).map((point) => ({
+      sceneId: point.sceneId,
+      sceneName: point.sceneName,
+      chapterName: point.chapterName,
+      routeDepth: point.routeDepth,
+      entryPathLabel: point.entryPathLabel,
+      isReachable: point.isReachable,
+      routeCount: point.routeCount,
+      brokenRouteCount: point.brokenRouteCount,
+      unreachableTargetCount: point.unreachableTargetCount,
+      routeCases: (point.routeCases ?? []).map((routeCase) => ({
+        label: routeCase.label,
+        targetSceneName: routeCase.targetSceneName,
+        targetExists: routeCase.targetExists,
+        status: routeCase.status,
+        statusLabel: routeCase.statusLabel,
+      })),
+    })),
+    endingTestCases: (plan.endingTestCases ?? []).map((testCase) => ({
+      sceneId: testCase.sceneId,
+      sceneName: testCase.sceneName,
+      chapterName: testCase.chapterName,
+      routeDepth: testCase.routeDepth,
+      pathLabel: testCase.pathLabel,
+      status: testCase.status,
+      statusLabel: testCase.statusLabel,
+      testingHint: testCase.testingHint,
+    })),
+  };
+}
+
 function formatProjectMilestonePrimaryBlocker(milestone) {
   const blocker = milestone?.blockers?.[0];
   if (!blocker) {
@@ -28361,6 +28500,8 @@ function buildReleaseControlReportPayload() {
   const regressionResult = state.inspectionRegressionResult;
   const regressionFixQueue = buildPreviewRegressionFixQueue();
   const exportResult = state.lastExportResult;
+  const routeTestingPlan = routeOverview.routeTestingPlan ?? {};
+  const routeTestingSummary = routeTestingPlan.summary ?? {};
   const resolution = getProjectResolution();
   const urgentMissingAssets = state.data.assetList.filter((asset) => isAssetUrgentMissing(asset));
   const unusedAssets = getUnusedAssets();
@@ -28415,6 +28556,9 @@ function buildReleaseControlReportPayload() {
       unreachableScenes: routeOverview.metrics.unreachableScenes,
       maxRouteDepth: routeOverview.metrics.maxRouteDepth,
       brokenRoutes: routeOverview.metrics.brokenRoutes,
+      decisionPointScenes: routeOverview.metrics.decisionPointScenes,
+      routeTestCases: routeOverview.metrics.routeTestCases,
+      blockedRouteTestCases: routeOverview.metrics.blockedRouteTestCases,
       totalScenes: routeOverview.nodes.length,
       endingPaths: (routeOverview.endingPaths ?? []).map((path) => ({
         sceneName: path.sceneName,
@@ -28423,6 +28567,7 @@ function buildReleaseControlReportPayload() {
         routeDepth: path.routeDepth,
         pathLabel: path.pathLabel,
       })),
+      testingPlan: serializeRouteTestingPlan(routeOverview.routeTestingPlan),
     },
     projectMilestones: {
       ...serializeProjectMilestonePlan(projectMilestonePlan),
@@ -28639,6 +28784,8 @@ function buildInspectionReportContent() {
   const regressionResult = state.inspectionRegressionResult;
   const regressionFixQueue = buildPreviewRegressionFixQueue();
   const exportResult = state.lastExportResult;
+  const routeTestingPlan = routeOverview.routeTestingPlan ?? {};
+  const routeTestingSummary = routeTestingPlan.summary ?? {};
   const lines = [
     `${state.data.project.title} · 项目巡检报告`,
     `导出时间：${formatDate(new Date().toISOString())}`,
@@ -28660,6 +28807,7 @@ function buildInspectionReportContent() {
     `- 不可达场景：${routeOverview.metrics.unreachableScenes} 个`,
     `- 最长路线深度：${routeOverview.metrics.maxRouteDepth} 步`,
     `- 坏链数量：${routeOverview.metrics.brokenRoutes} 条`,
+    `- 路线试玩手册：${routeTestingSummary.decisionPointCount ?? 0} 个分支检查点 / ${routeTestingSummary.routeCaseCount ?? 0} 条路线用例 / ${routeTestingSummary.endingTestCaseCount ?? 0} 个结局用例`,
     `- 成品目标路线：${projectMilestonePlan.nextMilestone?.title ?? "继续推进当前项目"}（总进度 ${projectMilestonePlan.overallScore ?? 0}%）`,
     "",
     "发布检查判断：",
@@ -28683,6 +28831,30 @@ function buildInspectionReportContent() {
       ""
     );
   }
+
+  lines.push("路线试玩手册：");
+  (routeTestingPlan.decisionPoints ?? []).slice(0, 6).forEach((point, index) => {
+    const routeCaseSummary = (point.routeCases ?? [])
+      .slice(0, 4)
+      .map((routeCase) => `${routeCase.label} -> ${routeCase.targetSceneName}（${routeCase.statusLabel}）`)
+      .join(" / ");
+    lines.push(
+      `${index + 1}. ${point.sceneName}`,
+      `   路径：${point.entryPathLabel || "入口未接通"}`,
+      `   分支：${routeCaseSummary || "暂无可列出的分支用例"}`
+    );
+  });
+  if ((routeTestingPlan.decisionPoints ?? []).length === 0) {
+    lines.push("1. 当前还没有需要单独覆盖的分支点。");
+  }
+  (routeTestingPlan.endingTestCases ?? []).slice(0, 4).forEach((testCase, index) => {
+    lines.push(
+      `结局 ${index + 1}. ${testCase.sceneName} / ${testCase.statusLabel}`,
+      `   路径：${testCase.pathLabel || "暂未接通"}`,
+      `   提示：${testCase.testingHint}`
+    );
+  });
+  lines.push("");
 
   if (state.validation.errors.length > 0) {
     lines.push("结构错误：");
@@ -28867,6 +29039,8 @@ function buildReleaseControlReportContent() {
   const regressionResult = state.inspectionRegressionResult;
   const regressionFixQueue = buildPreviewRegressionFixQueue();
   const exportResult = state.lastExportResult;
+  const routeTestingPlan = routeOverview.routeTestingPlan ?? {};
+  const routeTestingSummary = routeTestingPlan.summary ?? {};
   const resolution = getProjectResolution();
   const generatedAt = new Date().toISOString();
   const projectDoctorReceiptLabels = state.projectDoctorRepairReceipt
@@ -28997,6 +29171,38 @@ function buildReleaseControlReportContent() {
       caseResult.recommendation,
     ])
   );
+  const routeTestingSummaryTable = buildMarkdownTable(
+    ["项目", "数量"],
+    [
+      ["分支检查点", `${routeTestingSummary.decisionPointCount ?? 0}`],
+      ["从入口可到的分支点", `${routeTestingSummary.reachableDecisionPointCount ?? 0}`],
+      ["路线用例", `${routeTestingSummary.routeCaseCount ?? 0}`],
+      ["阻塞路线用例", `${(routeTestingSummary.brokenRouteCaseCount ?? 0) + (routeTestingSummary.unreachableRouteCaseCount ?? 0)}`],
+      ["结局用例", `${routeTestingSummary.endingTestCaseCount ?? 0}`],
+      ["可打到结局用例", `${routeTestingSummary.reachableEndingTestCaseCount ?? 0}`],
+    ]
+  );
+  const routeTestingDecisionTable = buildMarkdownTable(
+    ["分支点", "入口路径", "路线用例", "阻塞"],
+    (routeTestingPlan.decisionPoints ?? []).slice(0, 20).map((point) => [
+      `${point.chapterName} · ${point.sceneName}`,
+      point.entryPathLabel || "入口未接通",
+      (point.routeCases ?? [])
+        .slice(0, 5)
+        .map((routeCase) => `${routeCase.label} -> ${routeCase.targetSceneName}（${routeCase.statusLabel}）`)
+        .join(" / "),
+      `${(point.brokenRouteCount ?? 0) + (point.unreachableTargetCount ?? 0)}`,
+    ])
+  );
+  const routeEndingTestTable = buildMarkdownTable(
+    ["结局", "状态", "路径", "测试提示"],
+    (routeTestingPlan.endingTestCases ?? []).slice(0, 20).map((testCase) => [
+      `${testCase.chapterName} · ${testCase.sceneName}`,
+      testCase.statusLabel,
+      testCase.pathLabel || "暂未接通",
+      testCase.testingHint,
+    ])
+  );
 
   const lines = [
     `# ${state.data.project.title} 发布前总控报告`,
@@ -29024,11 +29230,20 @@ function buildReleaseControlReportContent() {
         ["可打到结局", `${routeOverview.metrics.reachableEndingScenes} / ${routeOverview.metrics.endingScenes}`],
         ["第一条结局路径", routeOverview.endingPaths?.find((path) => path.isReachable)?.pathLabel ?? "暂未接通"],
         ["可达 / 不可达 / 最长深度", `${routeOverview.metrics.reachableScenes} / ${routeOverview.metrics.unreachableScenes} / ${routeOverview.metrics.maxRouteDepth} 步`],
+        ["路线试玩手册", `${routeTestingSummary.decisionPointCount ?? 0} 个分支点 / ${routeTestingSummary.routeCaseCount ?? 0} 条路线用例 / ${routeTestingSummary.endingTestCaseCount ?? 0} 个结局用例`],
         ["坏链数量", `${routeOverview.metrics.brokenRoutes} 条`],
         ["成品目标路线", `${projectMilestonePlan.nextMilestone?.title ?? "继续推进当前项目"}（${projectMilestonePlan.overallScore ?? 0}%）`],
         [projectMilestoneGapDigest.eyebrow ?? "当前阶段缺口", projectMilestoneGapDigest.title],
       ]
     ),
+    "",
+    "## 路线试玩手册",
+    "",
+    routeTestingSummaryTable || "当前没有可列出的路线试玩手册摘要。",
+    "",
+    routeTestingDecisionTable || "当前没有需要单独覆盖的分支点。",
+    "",
+    routeEndingTestTable || "当前没有可列出的结局试玩路径。",
     "",
     "## 最终发表门禁",
     "",

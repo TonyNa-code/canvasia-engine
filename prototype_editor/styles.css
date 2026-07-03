@@ -1809,6 +1809,75 @@ textarea {
   margin-top: 12px;
 }
 
+.route-testing-plan {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+  padding: 16px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(115, 86, 67, 0.12);
+}
+
+.route-testing-plan h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.route-testing-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.route-testing-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(115, 86, 67, 0.1);
+}
+
+.route-testing-card > strong {
+  font-size: 15px;
+}
+
+.route-testing-item {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(244, 248, 255, 0.72);
+  border: 1px solid rgba(76, 130, 216, 0.12);
+}
+
+.route-testing-item b,
+.route-testing-item span {
+  display: block;
+}
+
+.route-testing-item b {
+  color: var(--text);
+  font-size: 14px;
+}
+
+.route-testing-item span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.route-testing-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.route-testing-chip-row .issue-tag {
+  margin-bottom: 0;
+}
+
 .route-link-chip {
   display: flex;
   flex-direction: column;

@@ -282,6 +282,104 @@
     };
   }
 
+  function getRouteCaseStatus(route = {}, targetNode = null) {
+    if (!route.targetExists) {
+      return "broken";
+    }
+    if (!targetNode?.isReachableFromEntry) {
+      return "unreachable";
+    }
+    return "ready";
+  }
+
+  function getRouteCaseStatusLabel(status) {
+    if (status === "broken") {
+      return "坏链";
+    }
+    if (status === "unreachable") {
+      return "目标不可达";
+    }
+    return "可试玩";
+  }
+
+  function buildRouteTestingPlan(nodes = [], endingPaths = []) {
+    const nodeById = new Map(nodes.map((node) => [node.id, node]));
+    const decisionPoints = nodes
+      .filter((node) => (node.routes?.length ?? 0) > 1 || node.choiceCount > 0 || node.conditionCount > 0)
+      .map((node) => {
+        const routeCases = (node.routes ?? []).map((route, routeIndex) => {
+          const targetNode = route.targetExists ? nodeById.get(route.targetSceneId) ?? null : null;
+          const status = getRouteCaseStatus(route, targetNode);
+          return {
+            order: routeIndex + 1,
+            routeId: route.id,
+            routeKind: route.routeKind,
+            label: getRoutePathStepLabel(route),
+            sourceSceneId: node.id,
+            sourceSceneName: node.name,
+            targetSceneId: route.targetSceneId,
+            targetSceneName: route.targetSceneName,
+            targetExists: route.targetExists,
+            targetPathLabel: targetNode?.entryPathLabel ?? "",
+            status,
+            statusLabel: getRouteCaseStatusLabel(status),
+          };
+        });
+
+        return {
+          sceneId: node.id,
+          sceneName: node.name,
+          chapterId: node.chapterId,
+          chapterName: node.chapterName,
+          routeDepth: node.routeDepth,
+          entryPathLabel: node.entryPathLabel,
+          isReachable: node.isReachableFromEntry,
+          routeCount: routeCases.length,
+          brokenRouteCount: routeCases.filter((item) => item.status === "broken").length,
+          unreachableTargetCount: routeCases.filter((item) => item.status === "unreachable").length,
+          routeCases,
+        };
+      })
+      .sort((left, right) => {
+        const leftRisk = left.brokenRouteCount * 4 + left.unreachableTargetCount * 2 + (left.isReachable ? 0 : 1);
+        const rightRisk = right.brokenRouteCount * 4 + right.unreachableTargetCount * 2 + (right.isReachable ? 0 : 1);
+        if (rightRisk !== leftRisk) {
+          return rightRisk - leftRisk;
+        }
+        return (left.routeDepth ?? Number.POSITIVE_INFINITY) - (right.routeDepth ?? Number.POSITIVE_INFINITY);
+      });
+
+    const endingTestCases = endingPaths.map((path, index) => ({
+      order: index + 1,
+      sceneId: path.sceneId,
+      sceneName: path.sceneName,
+      chapterId: path.chapterId,
+      chapterName: path.chapterName,
+      routeDepth: path.routeDepth,
+      pathLabel: path.pathLabel,
+      pathRouteLabels: path.pathRouteLabels,
+      status: path.isReachable ? "ready" : "unreachable",
+      statusLabel: path.isReachable ? "可打到" : "未接通",
+      testingHint: path.isReachable
+        ? "按这条路径完整试玩一次，确认文本、演出、存档和回收点都正常。"
+        : "先把它接回主入口，否则玩家不会自然打到这个结局。",
+    }));
+
+    return {
+      decisionPoints,
+      endingTestCases,
+      summary: {
+        decisionPointCount: decisionPoints.length,
+        reachableDecisionPointCount: decisionPoints.filter((point) => point.isReachable).length,
+        routeCaseCount: decisionPoints.reduce((sum, point) => sum + point.routeCases.length, 0),
+        brokenRouteCaseCount: decisionPoints.reduce((sum, point) => sum + point.brokenRouteCount, 0),
+        unreachableRouteCaseCount: decisionPoints.reduce((sum, point) => sum + point.unreachableTargetCount, 0),
+        endingTestCaseCount: endingTestCases.length,
+        reachableEndingTestCaseCount: endingTestCases.filter((item) => item.status === "ready").length,
+      },
+    };
+  }
+
   function buildRouteReachability(nodes = [], entrySceneId = "") {
     const nodeById = new Map(nodes.map((node) => [node.id, node]));
     const reachableSceneIds = new Set();
@@ -431,6 +529,8 @@
         return (left.routeDepth ?? Number.POSITIVE_INFINITY) - (right.routeDepth ?? Number.POSITIVE_INFINITY);
       });
 
+    const routeTestingPlan = buildRouteTestingPlan(nodes, endingPaths);
+
     const alerts = [
       ...brokenRoutes.map((route) => ({
         sceneId: route.sourceSceneId,
@@ -477,6 +577,7 @@
       nodes,
       alerts,
       endingPaths,
+      routeTestingPlan,
       metrics: {
         entrySceneName: getSceneById(data, entrySceneId, options)?.name ?? "未设置",
         branchingScenes: nodes.filter((node) => node.branchTargetCount > 1).length,
@@ -488,6 +589,10 @@
         unreachableScenes: nodes.filter((node) => node.isUnreachable).length,
         maxRouteDepth: reachability.maxRouteDepth,
         brokenRoutes: brokenRoutes.length,
+        decisionPointScenes: routeTestingPlan.summary.decisionPointCount,
+        routeTestCases: routeTestingPlan.summary.routeCaseCount,
+        blockedRouteTestCases:
+          routeTestingPlan.summary.brokenRouteCaseCount + routeTestingPlan.summary.unreachableRouteCaseCount,
       },
     };
   }
@@ -501,7 +606,10 @@
     collectSceneRoutes,
     getRouteAlertPriority,
     getRoutePathStepLabel,
+    getRouteCaseStatus,
+    getRouteCaseStatusLabel,
     buildRoutePathFromPredecessors,
+    buildRouteTestingPlan,
     buildRouteReachability,
     buildSceneRouteOverview,
   });
