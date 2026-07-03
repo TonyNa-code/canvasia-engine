@@ -94,6 +94,15 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
               buildDefaultParticleEffectConfig: (preset) => ({{ type: "particle_effect", action: "start", preset, intensity: "medium", speed: "medium", density: 40 }}),
               normalizeParticleEffectConfig: (config) => ({{ ...config, normalized: true }}),
               normalizeChoiceEffect: (effect) => ({{ ...effect, normalized: true }}),
+              getSafeConditionOperator: (variableId, value) => {{
+                const allowed = variableId === "affection" ? [">=", ">", "<=", "<", "==", "!="] : ["==", "!="];
+                return allowed.includes(value) ? value : allowed[0];
+              }},
+              normalizeVariableValue: (variableId, value) => {{
+                if (variableId === "affection") return Number(value) || 0;
+                if (variableId === "met") return value === true || value === "true";
+                return String(value ?? "");
+              }},
               getEffectDuration: (value) => tools.getImportedEffectDuration(value),
               getDefaultJumpTargetSceneId: () => "scene_end",
               defaultCharacterStage: {{ scale: 1, opacity: 1 }},
@@ -218,6 +227,23 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
               ),
               normalizedJumpFallback: tools.normalizeImportedDraftBlockForScene(
                 {{ type: "jump", targetHint: "unknown" }},
+                {{ id: "scene_start" }},
+                resolvers
+              ),
+              normalizedCondition: tools.normalizeImportedDraftBlockForScene(
+                {{ type: "condition", branches: [
+                  {{ when: [
+                    {{ variableHint: "affection", operator: ">=", value: "2" }},
+                    {{ variableHint: "met", operator: "==", value: true }}
+                  ], targetHint: "rooftop" }}
+                ], elseTargetHint: "ending" }},
+                {{ id: "scene_start" }},
+                resolvers
+              ),
+              normalizedConditionDropsUnknownVariable: tools.normalizeImportedDraftBlockForScene(
+                {{ type: "condition", branches: [
+                  {{ when: [{{ variableHint: "ghost", operator: "==", value: 1 }}], targetHint: "rooftop" }}
+                ] }},
                 {{ id: "scene_start" }},
                 resolvers
               ),
@@ -384,6 +410,20 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
             "normalized": True,
         })
         self.assertEqual(payload["normalizedJumpFallback"], {"type": "jump", "targetSceneId": "scene_end"})
+        self.assertEqual(payload["normalizedCondition"], {
+            "type": "condition",
+            "branches": [
+                {
+                    "when": [
+                        {"variableId": "affection", "operator": ">=", "value": 2},
+                        {"variableId": "met", "operator": "==", "value": True},
+                    ],
+                    "gotoSceneId": "scene_roof",
+                },
+            ],
+            "elseGotoSceneId": "scene_end",
+        })
+        self.assertIsNone(payload["normalizedConditionDropsUnknownVariable"])
 
 
 if __name__ == "__main__":

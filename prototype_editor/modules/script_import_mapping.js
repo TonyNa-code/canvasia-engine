@@ -184,6 +184,10 @@
     const getFadeAction = (value) => callScriptImportResolver(resolvers, "getSafeFadeAction", [value], value || "fade_out");
     const getEffectDuration = (value) =>
       callScriptImportResolver(resolvers, "getEffectDuration", [value], getImportedEffectDuration(value));
+    const getConditionOperator = (variableId, value) =>
+      callScriptImportResolver(resolvers, "getSafeConditionOperator", [variableId, value], value || "==");
+    const normalizeImportedVariableValue = (variableId, value) =>
+      callScriptImportResolver(resolvers, "normalizeVariableValue", [variableId, value], value);
     const getScreenFilterAction = (value) =>
       callScriptImportResolver(resolvers, "getSafeScreenFilterAction", [value], value || "apply");
     const getScreenFilterPreset = (value) =>
@@ -234,6 +238,25 @@
           });
         })
         .filter(Boolean);
+    const normalizeConditionRules = (rules = []) =>
+      (Array.isArray(rules) ? rules : [])
+        .map((rule) => {
+          const rawOperator = rule?.operator === "=" ? "==" : String(rule?.operator ?? "==").trim();
+          const numericOperator = [">", ">=", "<", "<="].includes(rawOperator);
+          const variableId = getVariableId(rule?.variableHint ?? rule?.variableId, numericOperator ? "number" : "");
+          if (!variableId) {
+            return null;
+          }
+          const operator = getConditionOperator(variableId, rawOperator);
+          return {
+            variableId,
+            operator,
+            value: normalizeImportedVariableValue(variableId, rule?.value),
+          };
+        })
+        .filter(Boolean);
+    const getDefaultConditionTarget = () =>
+      callScriptImportResolver(resolvers, "getDefaultJumpTargetSceneId", [scene?.id], "");
 
     if (draftBlock.type === "dialogue") {
       const voiceAssetId = getAssetId(draftBlock.voiceHint, ["voice"]);
@@ -416,6 +439,29 @@
         action: getFadeAction(draftBlock.action ?? "fade_out"),
         color: "black",
         duration: getEffectDuration(draftBlock.durationMs),
+      };
+    }
+
+    if (draftBlock.type === "condition") {
+      const branches = (Array.isArray(draftBlock.branches) ? draftBlock.branches : [])
+        .map((branch) => {
+          const when = normalizeConditionRules(branch?.when);
+          if (!when.length) {
+            return null;
+          }
+          return {
+            when,
+            gotoSceneId: getSceneId(branch?.targetHint ?? branch?.gotoSceneId) || getDefaultConditionTarget(),
+          };
+        })
+        .filter(Boolean);
+      if (!branches.length) {
+        return null;
+      }
+      return {
+        type: "condition",
+        branches,
+        elseGotoSceneId: getSceneId(draftBlock.elseTargetHint) || getDefaultConditionTarget(),
       };
     }
 

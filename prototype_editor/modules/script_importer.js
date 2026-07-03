@@ -20,7 +20,7 @@
     "depth_blur",
     "particle_effect",
   ]);
-  const ROUTE_DRAFT_TYPES = Object.freeze(["jump"]);
+  const ROUTE_DRAFT_TYPES = Object.freeze(["jump", "condition"]);
   const TEXT_SPEED_ALIASES = Object.freeze({
     slow: "slow",
     slower: "slow",
@@ -475,6 +475,51 @@
     }
 
     return null;
+  }
+
+  function parseConditionRuleClause(clause) {
+    const text = trimImportedText(clause, 180);
+    const match = text.match(/^([0-9A-Za-z_\-\u4e00-\u9fff]{1,64})\s*(>=|<=|==|!=|>|<|=)\s*(.+)$/u);
+    if (!match) {
+      return null;
+    }
+    return {
+      variableHint: match[1],
+      operator: match[2] === "=" ? "==" : match[2],
+      value: parseChoiceEffectValue(match[3]),
+    };
+  }
+
+  function parseConditionLine(line) {
+    const text = trimImportedText(line, 320);
+    const match = text.match(/^(?:if|when|如果)\s+(.+?)\s*(?:->|=>)\s*(.+)$/iu);
+    if (!match) {
+      return null;
+    }
+
+    const targetParts = match[2].match(/^(.*?)(?:\s+(?:else|otherwise|否则)\s*(?:->|=>)?\s*(.+))?$/iu);
+    const ruleText = trimImportedText(match[1], 180);
+    const rules = ruleText
+      .split(/\s*(?:&&|\band\b|且|并且)\s*/iu)
+      .map(parseConditionRuleClause)
+      .filter(Boolean);
+    const targetHint = trimImportedText(targetParts?.[1] ?? "", 120);
+    const elseTargetHint = trimImportedText(targetParts?.[2] ?? "", 120);
+
+    if (!rules.length || !targetHint) {
+      return null;
+    }
+
+    return {
+      type: "condition",
+      branches: [
+        {
+          when: rules,
+          targetHint,
+        },
+      ],
+      ...(elseTargetHint ? { elseTargetHint } : {}),
+    };
   }
 
   function extractChoiceEffects(text) {
@@ -937,6 +982,12 @@
 
       flushChoiceOptions(blocks, choiceOptions);
 
+      const condition = parseConditionLine(line);
+      if (condition) {
+        blocks.push(condition);
+        return;
+      }
+
       const stageDirection = parseStageDirectionLine(line);
       if (stageDirection) {
         blocks.push(stageDirection);
@@ -1059,6 +1110,14 @@
     if (block?.type === "jump") {
       return `跳转：${block.targetHint || "待选择场景"}`;
     }
+    if (block?.type === "condition") {
+      const firstBranch = block.branches?.[0] ?? {};
+      const whenText = (firstBranch.when ?? [])
+        .map((rule) => `${rule.variableHint || rule.variableId} ${rule.operator || "=="} ${String(rule.value ?? "")}`)
+        .join(" 且 ");
+      const elseText = block.elseTargetHint ? ` / 否则：${block.elseTargetHint}` : "";
+      return `条件：${whenText || "变量条件"} -> ${firstBranch.targetHint || "待选择场景"}${elseText}`;
+    }
     return "路线卡片";
   }
 
@@ -1120,6 +1179,8 @@
     parseStageDirectionLine,
     parseVoiceLine,
     parseTextSpeedLine,
+    parseConditionRuleClause,
+    parseConditionLine,
     parseJumpLine,
     parseScriptDraftToBlocks,
     summarizeScriptDraftBlocks,

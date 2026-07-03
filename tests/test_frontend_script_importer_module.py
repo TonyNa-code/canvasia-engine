@@ -79,6 +79,10 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
               - 拉住她 -> rooftop [affection +1; courage +2; met=true]
               - 先道歉 [affection -1; route="apology"]
             `);
+            const conditionBlocks = tools.parseScriptDraftToBlocks(`
+              if affection >= 2 -> good_ending else -> normal_ending
+              if met == true and route = "good" -> true_end
+            `);
             process.stdout.write(JSON.stringify({{
               keys: Object.keys(tools).sort(),
               normalizedLines: tools.normalizeScriptImportText(" a\\r\\n\\n b ").join("|"),
@@ -87,6 +91,8 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
               choiceEffectAdd: tools.parseChoiceEffectClause("affection +1"),
               choiceEffectSet: tools.parseChoiceEffectClause("met=true"),
               choiceOptionEffectLine: tools.parseChoiceOptionLine('- 拉住她 -> rooftop [affection +1; met=true; route="good"]'),
+              conditionRule: tools.parseConditionRuleClause("affection >= 2"),
+              conditionLine: tools.parseConditionLine("if affection >= 2 -> good_ending else -> normal_ending"),
               dialogueLine: tools.parseDialogueLine("悠奈：你终于来了。"),
               quotedDialogueLine: tools.parseQuotedDialogueLine('悠奈 "你终于来了。"'),
               dialogueSpeedLine: tools.parseDialogueLine("悠奈：快跑！ speed fast"),
@@ -129,6 +135,9 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
               textSpeedPreview: tools.buildScriptDraftPreviewLines(textSpeedBlocks, 4),
               choiceEffectBlocks,
               choiceEffectPreview: tools.buildScriptDraftPreviewLines(choiceEffectBlocks, 2),
+              conditionBlocks,
+              conditionSummary: tools.summarizeScriptDraftBlocks(conditionBlocks),
+              conditionPreview: tools.buildScriptDraftPreviewLines(conditionBlocks, 2),
             }}));
             """
         )
@@ -166,6 +175,21 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
                 {"type": "variable_set", "variableHint": "met", "value": True},
                 {"type": "variable_set", "variableHint": "route", "value": "good"},
             ],
+        })
+        self.assertEqual(payload["conditionRule"], {
+            "variableHint": "affection",
+            "operator": ">=",
+            "value": 2,
+        })
+        self.assertEqual(payload["conditionLine"], {
+            "type": "condition",
+            "branches": [
+                {
+                    "when": [{"variableHint": "affection", "operator": ">=", "value": 2}],
+                    "targetHint": "good_ending",
+                },
+            ],
+            "elseTargetHint": "normal_ending",
         })
         self.assertEqual(payload["dialogueLine"], {
             "type": "dialogue",
@@ -431,6 +455,21 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
         }])
         self.assertIn("affection +1", payload["choiceEffectPreview"][0])
         self.assertIn("met=true", payload["choiceEffectPreview"][0])
+        self.assertEqual([block["type"] for block in payload["conditionBlocks"]], ["condition", "condition"])
+        self.assertEqual(payload["conditionBlocks"][1]["branches"][0]["when"], [
+            {"variableHint": "met", "operator": "==", "value": True},
+            {"variableHint": "route", "operator": "==", "value": "good"},
+        ])
+        self.assertEqual(payload["conditionSummary"], {
+            "dialogue": 0,
+            "narration": 0,
+            "choice": 0,
+            "stage": 0,
+            "route": 2,
+            "total": 2,
+        })
+        self.assertIn("条件：affection >= 2 -> good_ending", payload["conditionPreview"][0])
+        self.assertIn("否则：normal_ending", payload["conditionPreview"][0])
 
 
 if __name__ == "__main__":
