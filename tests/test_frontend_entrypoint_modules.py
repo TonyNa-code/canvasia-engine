@@ -36,6 +36,7 @@ class FrontendEntrypointModuleTests(unittest.TestCase):
             "./modules/playtest_handoff_report.js",
             "./modules/audio_cue_sheet.js",
             "./modules/stage_direction_sheet.js",
+            "./modules/localization_coverage.js",
             "./modules/visual_effects.js",
             "./modules/particle_effects.js",
             "./modules/project_history.js",

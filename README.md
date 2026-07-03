@@ -57,6 +57,7 @@ The project already includes a visual editor, export pipeline, native runtime pr
 - Asset management for backgrounds, character sprites, CGs, BGM, SFX, voice, fonts, UI assets, Live2D files, 3D models, and 3D scenes
 - Multi-language project settings for default language and player-selectable languages
 - Localized runtime text for scene names, chapter names, dialogue, choices, and character names, with safe fallback when a translation is missing
+- Localization coverage checks with Markdown and CSV exports for missing or placeholder translations
 - Canvasia Assistant with local template mode and optional creator-provided OpenAI, DeepSeek, Qwen, Kimi, Zhipu GLM, or compatible API providers
 - Optional OpenAI Image asset generation for backgrounds, sprites, CGs, and UI materials, with style-hint presets, sprite-to-character expression binding, prompt/model validation, and local-only API key handling
 - Formal save/load, quick save/load, system menu, text history, autoplay, skip-read, and voice replay
@@ -74,7 +75,7 @@ The project already includes a visual editor, export pipeline, native runtime pr
 | --- | --- | --- |
 | Story and Branch Editing | Available | Visual cards, choices, jumps, variables, conditions, entry reachability route checks, scene graph inspection, and plain-text script-to-card import. |
 | Asset Management | Available | Import, replace, delete, usage protection, file-size budget hints, and optional OpenAI Image generation with style presets, sprite expression binding, prompt, model, format, and returned-file validation. |
-| Multi-language / i18n | Preview | Project language settings, export metadata, Web Runtime language switching, native Runtime language switching, and fallback behavior. |
+| Multi-language / i18n | Preview | Project language settings, localization coverage reports, export metadata, Web Runtime language switching, native Runtime language switching, and fallback behavior. |
 | Canvasia Assistant | Available | Local template mode plus optional creator-owned API keys for major compatible providers. |
 | Project Safety Net | Available | Snapshots, restore, crash recovery, project doctor, repair queue, release gates, release-control reports, and VN baseline quality checks for placeholder content, character sprites, backgrounds, BGM, choices, text density, and presentation polish. |
 | Game UI Customization | Available | Project UI skins, button states, nine-slice images, layout tuning, and textbox styling. |
@@ -180,7 +181,8 @@ Canvasia supports a first i18n workflow:
 2. Open project runtime settings and choose the default language.
 3. Enable player-selectable languages such as `zh-CN`, `ja-JP`, or `en-US`.
 4. Add translations for character names, scene names, chapter names, dialogue, narration, and choices.
-5. Export and switch language in the Web Runtime or native Runtime settings menu.
+5. Open the inspection center and export a localization coverage report or CSV if you want a translator-friendly checklist.
+6. Export and switch language in the Web Runtime or native Runtime settings menu.
 
 If a translation is missing, the runtime falls back to the default text instead of breaking the game.
 
