@@ -3941,7 +3941,7 @@ class FrontendActionHandlerTests(unittest.TestCase):
         click_handler = _extract_function_source(source, "handleClick")
         markdown_block_start = click_handler.index('action === "export-choice-consequence-markdown"')
         csv_block_start = click_handler.index('action === "export-choice-consequence-csv"')
-        csv_block_end = click_handler.index('action === "export-audio-cue-sheet-markdown"', csv_block_start)
+        csv_block_end = click_handler.index('action === "export-variable-influence-markdown"', csv_block_start)
         markdown_block = click_handler[markdown_block_start:csv_block_start]
         csv_block = click_handler[csv_block_start:csv_block_end]
 
@@ -3956,6 +3956,27 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("function exportChoiceConsequenceCsv()", source)
         self.assertIn("choiceConsequenceSheetTools.buildChoiceConsequenceSheet", source)
         self.assertIn("choiceConsequenceSheetTools.getChoiceConsequenceStatusDigest", source)
+
+    def test_variable_influence_sheet_export_actions_are_wired(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        click_handler = _extract_function_source(source, "handleClick")
+        markdown_block_start = click_handler.index('action === "export-variable-influence-markdown"')
+        csv_block_start = click_handler.index('action === "export-variable-influence-csv"')
+        csv_block_end = click_handler.index('action === "export-audio-cue-sheet-markdown"', csv_block_start)
+        markdown_block = click_handler[markdown_block_start:csv_block_start]
+        csv_block = click_handler[csv_block_start:csv_block_end]
+
+        self.assertIn("const variableInfluenceSheetTools = window.CanvasiaEditorVariableInfluenceSheet", source)
+        self.assertIn('data-action="export-variable-influence-markdown"', source)
+        self.assertIn('data-action="export-variable-influence-csv"', source)
+        self.assertIn("exportVariableInfluenceMarkdown();", markdown_block)
+        self.assertIn("exportVariableInfluenceCsv();", csv_block)
+        self.assertIn("function buildVariableInfluenceSheet()", source)
+        self.assertIn("function renderVariableInfluencePanel()", source)
+        self.assertIn("function exportVariableInfluenceMarkdown()", source)
+        self.assertIn("function exportVariableInfluenceCsv()", source)
+        self.assertIn("variableInfluenceSheetTools.buildVariableInfluenceSheet", source)
+        self.assertIn("variableInfluenceSheetTools.getVariableInfluenceStatusDigest", source)
 
     def test_stage_direction_sheet_export_actions_are_wired(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")

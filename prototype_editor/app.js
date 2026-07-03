@@ -54,6 +54,7 @@ const routeTestingReportTools = window.CanvasiaEditorRouteTestingReport;
 const previewRegressionTools = window.CanvasiaEditorPreviewRegression;
 const playtestHandoffReportTools = window.CanvasiaEditorPlaytestHandoffReport;
 const choiceConsequenceSheetTools = window.CanvasiaEditorChoiceConsequenceSheet;
+const variableInfluenceSheetTools = window.CanvasiaEditorVariableInfluenceSheet;
 const audioCueSheetTools = window.CanvasiaEditorAudioCueSheet;
 const stageDirectionSheetTools = window.CanvasiaEditorStageDirectionSheet;
 const presentationTimelineTools = window.CanvasiaEditorPresentationTimeline;
@@ -3831,6 +3832,16 @@ async function handleClick(event) {
 
   if (action === "export-choice-consequence-csv") {
     exportChoiceConsequenceCsv();
+    return;
+  }
+
+  if (action === "export-variable-influence-markdown") {
+    exportVariableInfluenceMarkdown();
+    return;
+  }
+
+  if (action === "export-variable-influence-csv") {
+    exportVariableInfluenceCsv();
     return;
   }
 
@@ -28440,6 +28451,17 @@ function buildChoiceConsequenceFileName(extension = "md") {
   return `${title}_choice_consequence_sheet_${dateStamp}.${extension}`;
 }
 
+function buildVariableInfluenceFileName(extension = "md") {
+  const date = new Date();
+  const dateStamp = [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("");
+  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
+  return `${title}_variable_influence_sheet_${dateStamp}.${extension}`;
+}
+
 function buildAudioCueSheetFileName(extension = "md") {
   const date = new Date();
   const dateStamp = [
@@ -29692,6 +29714,30 @@ function exportChoiceConsequenceCsv() {
   downloadTextFile(fileName, content, "text/csv;charset=utf-8");
   setSaveStatus(`已导出选项后果 CSV：${fileName}`);
   showToast(`选项后果 CSV 已导出：${fileName}`);
+}
+
+function buildVariableInfluenceSheet() {
+  return variableInfluenceSheetTools.buildVariableInfluenceSheet(state.data ?? {});
+}
+
+function exportVariableInfluenceMarkdown() {
+  const fileName = buildVariableInfluenceFileName("md");
+  const sheet = buildVariableInfluenceSheet();
+  const content = variableInfluenceSheetTools.buildVariableInfluenceMarkdown(sheet, {
+    projectTitle: state.data?.project?.title || "Canvasia Project",
+    generatedAt: formatDate(new Date().toISOString()),
+  });
+  downloadTextFile(fileName, content, "text/markdown;charset=utf-8");
+  setSaveStatus(`已导出变量影响表：${fileName}`);
+  showToast(`变量影响表已导出：${fileName}`);
+}
+
+function exportVariableInfluenceCsv() {
+  const fileName = buildVariableInfluenceFileName("csv");
+  const content = variableInfluenceSheetTools.buildVariableInfluenceCsv(buildVariableInfluenceSheet());
+  downloadTextFile(fileName, content, "text/csv;charset=utf-8");
+  setSaveStatus(`已导出变量影响 CSV：${fileName}`);
+  showToast(`变量影响 CSV 已导出：${fileName}`);
 }
 
 function buildAudioCueSheet() {
@@ -31223,6 +31269,98 @@ function renderChoiceConsequencePanel() {
   `;
 }
 
+function getVariableInfluenceToneClass(status) {
+  if (status === "blocked") {
+    return "danger-text";
+  }
+  if (status === "warn") {
+    return "warn-text";
+  }
+  if (status === "ready") {
+    return "good-text";
+  }
+  return "";
+}
+
+function renderVariableInfluencePanel() {
+  const sheet = buildVariableInfluenceSheet();
+  const digest = variableInfluenceSheetTools.getVariableInfluenceStatusDigest(sheet);
+  const summary = sheet.summary ?? {};
+  const topIssues = (sheet.issues ?? []).slice(0, 4);
+  const variablePreview = (sheet.variables ?? [])
+    .filter((record) => record.references.length > 0 || record.issues.length > 0)
+    .slice(0, 4);
+
+  return `
+    <article class="detail-card preview-sprint-panel">
+      <div class="panel-heading">
+        <h2>变量影响表</h2>
+        <span class="badge badge-soft ${getVariableInfluenceToneClass(digest.status)}">${escapeHtml(digest.title)}</span>
+      </div>
+      <p class="helper-text">${escapeHtml(digest.detail)} 它会把好感度、路线旗标、开关变量的“哪里写入、哪里读取、哪里坏引用”集中列出，方便排查分支逻辑。</p>
+      <div class="preview-sprint-metrics">
+        ${renderRouteMetricCard("变量库", `${summary.variableCount ?? 0} 个`, "项目里声明的变量")}
+        ${renderRouteMetricCard("写入 / 读取", `${summary.writeCount ?? 0} / ${summary.readCount ?? 0}`, "剧情卡、选项后果和条件判断")}
+        ${renderRouteMetricCard("未知引用", `${summary.unknownReferenceCount ?? 0} 个`, "引用了不存在或未选择的变量")}
+        ${renderRouteMetricCard("写入未读取", `${summary.writtenNeverReadCount ?? 0} 个`, "变化了但暂时不会影响分支")}
+      </div>
+      <div class="detail-actions">
+        <button class="toolbar-button toolbar-button-primary" data-action="export-variable-influence-markdown">
+          导出变量影响表
+        </button>
+        <button class="toolbar-button" data-action="export-variable-influence-csv">
+          导出变量 CSV
+        </button>
+        <button class="toolbar-button" data-action="switch-screen" data-screen="story">
+          去剧情页调整变量
+        </button>
+      </div>
+      ${
+        topIssues.length > 0
+          ? `
+            <div class="preview-sprint-grid">
+              ${topIssues
+                .map(
+                  (issue) => `
+                    <article class="preview-sprint-card is-${issue.severity === "blocker" ? "danger" : issue.severity === "warn" ? "warn" : "soft"}">
+                      <div class="preview-sprint-head">
+                        <strong>${escapeHtml(issue.title)}</strong>
+                        <span class="issue-tag ${issue.severity === "blocker" ? "danger-text" : issue.severity === "warn" ? "warn-text" : ""}">
+                          ${escapeHtml(issue.severity === "blocker" ? "先修" : issue.severity === "warn" ? "复查" : "整理")}
+                        </span>
+                      </div>
+                      <p>${escapeHtml([issue.variableName, issue.chapterName, issue.sceneName].filter(Boolean).join(" · "))}</p>
+                      <div class="helper-text">${escapeHtml(issue.detail)}</div>
+                    </article>
+                  `
+                )
+                .join("")}
+            </div>
+          `
+          : variablePreview.length > 0
+            ? `
+              <div class="list-stack compact-stack">
+                ${variablePreview
+                  .map(
+                    (record) => `
+                      <div class="route-testing-item">
+                        <div>
+                          <b>${escapeHtml(record.variableName)}</b>
+                          <span>${escapeHtml(`${record.typeLabel} · ${record.statusLabel}`)}</span>
+                        </div>
+                        <span>${escapeHtml(`写入 ${record.writeCount} / 读取 ${record.readCount}`)}</span>
+                      </div>
+                    `
+                  )
+                  .join("")}
+              </div>
+            `
+            : renderEmpty("当前项目还没有变量引用。需要好感度、路线旗标或开关判断时，可以先在变量库里添加基础变量。")
+      }
+    </article>
+  `;
+}
+
 function getAudioCueSheetToneClass(status) {
   if (status === "blocked") {
     return "danger-text";
@@ -31643,6 +31781,7 @@ function renderInspectionOverviewPanel(routeOverview) {
       ${renderCompactProjectMilestonePanel(routeOverview)}
       ${renderProjectDoctorPanel(routeOverview, issueItems)}
       ${renderChoiceConsequencePanel()}
+      ${renderVariableInfluencePanel()}
       ${renderAudioCueSheetPanel()}
       ${renderStageDirectionSheetPanel()}
       ${renderPresentationTimelinePanel()}
