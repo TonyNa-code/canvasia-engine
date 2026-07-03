@@ -46,6 +46,24 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
                 {{ id: "scene_end", name: "Ending" }},
               ],
             }};
+            const resolvers = {{
+              getSpeakerCharacterId: (hint) => tools.findImportedCharacterByHint(data, hint)?.id ?? "char_fallback",
+              findCharacterIdByHint: (hint) => tools.findImportedCharacterByHint(data, hint)?.id ?? "char_fallback",
+              findExpressionIdByHint: (characterId, hint) => tools.findImportedExpressionIdByHint(data, characterId, hint),
+              findAssetIdByHint: (hint, types) => tools.findImportedAssetIdByHint(data, hint, types),
+              findSceneIdByHint: (hint) => tools.findImportedSceneIdByHint(data, hint),
+              getDefaultCharacterPosition: () => "center",
+              getSafePosition: (value) => ["left", "center", "right"].includes(value) ? value : "center",
+              getSafeTransition: (value) => ["fade", "dissolve", "none"].includes(value) ? value : "fade",
+              getSafeTransitionDurationMs: (value, fallback = 600) => Number.parseInt(value, 10) || fallback,
+              getSafeNonNegativeNumber: (value, fallback = 0) => Math.max(0, Number.parseFloat(value) || fallback),
+              getSafeVolumePercent: (value, fallback = 100) => Math.max(0, Math.min(100, Number.parseInt(value, 10) || fallback)),
+              getSafeFadeAction: (value) => value === "fade_in" ? "fade_in" : "fade_out",
+              getEffectDuration: (value) => tools.getImportedEffectDuration(value),
+              getDefaultJumpTargetSceneId: () => "scene_end",
+              defaultCharacterStage: {{ scale: 1, opacity: 1 }},
+              choiceContinueTarget: "__continue__",
+            }};
             process.stdout.write(JSON.stringify({{
               keys: Object.keys(tools).sort(),
               normalized: tools.normalizeImportedLookupText("School Theme.ogg"),
@@ -62,6 +80,31 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
               shortDuration: tools.getImportedEffectDuration(300),
               mediumDuration: tools.getImportedEffectDuration(700),
               longDuration: tools.getImportedEffectDuration(1200),
+              normalizedDialogue: tools.normalizeImportedDraftBlockForScene(
+                {{ type: "dialogue", speakerName: "Yuina", text: " hi ", voiceHint: "yuina_001" }},
+                null,
+                resolvers
+              ),
+              normalizedChoice: tools.normalizeImportedDraftBlockForScene(
+                {{ type: "choice", options: [{{ text: " roof ", targetHint: "rooftop" }}, {{ text: "stay" }}] }},
+                null,
+                resolvers
+              ),
+              normalizedCharacterShow: tools.normalizeImportedDraftBlockForScene(
+                {{ type: "character_show", characterHint: "Yuina", expressionHint: "微笑", position: "right", transition: "dissolve", transitionDurationMs: "720" }},
+                null,
+                resolvers
+              ),
+              normalizedSfx: tools.normalizeImportedDraftBlockForScene(
+                {{ type: "sfx_play", assetHint: "door_knock", volume: "80" }},
+                null,
+                resolvers
+              ),
+              normalizedJumpFallback: tools.normalizeImportedDraftBlockForScene(
+                {{ type: "jump", targetHint: "unknown" }},
+                {{ id: "scene_start" }},
+                resolvers
+              ),
             }}));
             """
         )
@@ -90,6 +133,35 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
         self.assertEqual(payload["shortDuration"], "short")
         self.assertEqual(payload["mediumDuration"], "medium")
         self.assertEqual(payload["longDuration"], "long")
+        self.assertIn("normalizeImportedDraftBlockForScene", payload["keys"])
+        self.assertEqual(
+            payload["normalizedDialogue"],
+            {
+                "type": "dialogue",
+                "speakerId": "char_yuina",
+                "text": "hi",
+                "voiceAssetId": "voice_yuina_001",
+                "voiceVolume": 100,
+            },
+        )
+        self.assertEqual(
+            payload["normalizedChoice"],
+            {
+                "type": "choice",
+                "options": [
+                    {"text": "roof", "gotoSceneId": "scene_roof"},
+                    {"text": "stay", "gotoSceneId": "__continue__"},
+                ],
+            },
+        )
+        self.assertEqual(payload["normalizedCharacterShow"]["characterId"], "char_yuina")
+        self.assertEqual(payload["normalizedCharacterShow"]["expressionId"], "expr_smile")
+        self.assertEqual(payload["normalizedCharacterShow"]["position"], "right")
+        self.assertEqual(payload["normalizedCharacterShow"]["transition"], "dissolve")
+        self.assertEqual(payload["normalizedCharacterShow"]["transitionDurationMs"], 720)
+        self.assertEqual(payload["normalizedCharacterShow"]["stage"], {"scale": 1, "opacity": 1})
+        self.assertEqual(payload["normalizedSfx"], {"type": "sfx_play", "assetId": "sfx_door", "volume": 80})
+        self.assertEqual(payload["normalizedJumpFallback"], {"type": "jump", "targetSceneId": "scene_end"})
 
 
 if __name__ == "__main__":

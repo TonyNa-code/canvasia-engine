@@ -109,6 +109,164 @@
     return "medium";
   }
 
+  function callScriptImportResolver(resolvers, name, args = [], fallback = "") {
+    const resolver = resolvers?.[name];
+    return typeof resolver === "function" ? resolver(...args) : fallback;
+  }
+
+  function cloneScriptImportStageDefaults(value) {
+    return value && typeof value === "object" && !Array.isArray(value) ? { ...value } : {};
+  }
+
+  function normalizeImportedDraftBlockForScene(draftBlock, scene = null, resolvers = {}) {
+    if (!draftBlock || typeof draftBlock !== "object") {
+      return null;
+    }
+
+    const getAssetId = (hint, types) => callScriptImportResolver(resolvers, "findAssetIdByHint", [hint, types], "");
+    const getSceneId = (hint) => callScriptImportResolver(resolvers, "findSceneIdByHint", [hint], "");
+    const getTransition = (value) => callScriptImportResolver(resolvers, "getSafeTransition", [value], value || "fade");
+    const getTransitionDurationMs = (value, fallback) =>
+      callScriptImportResolver(resolvers, "getSafeTransitionDurationMs", [value, fallback], fallback ?? 600);
+    const getNonNegativeNumber = (value, fallback) =>
+      callScriptImportResolver(resolvers, "getSafeNonNegativeNumber", [value, fallback], fallback ?? 0);
+    const getVolumePercent = (value, fallback) =>
+      callScriptImportResolver(resolvers, "getSafeVolumePercent", [value, fallback], fallback ?? 100);
+    const getFadeAction = (value) => callScriptImportResolver(resolvers, "getSafeFadeAction", [value], value || "fade_out");
+    const getEffectDuration = (value) =>
+      callScriptImportResolver(resolvers, "getEffectDuration", [value], getImportedEffectDuration(value));
+    const getChoiceContinueTarget = () => resolvers?.choiceContinueTarget ?? "__continue__";
+
+    if (draftBlock.type === "dialogue") {
+      const voiceAssetId = getAssetId(draftBlock.voiceHint, ["voice"]);
+      return {
+        type: "dialogue",
+        speakerId: callScriptImportResolver(resolvers, "getSpeakerCharacterId", [draftBlock.speakerName], ""),
+        text: String(draftBlock.text ?? "").trim(),
+        ...(voiceAssetId ? { voiceAssetId, voiceVolume: 100 } : {}),
+      };
+    }
+
+    if (draftBlock.type === "narration") {
+      const voiceAssetId = getAssetId(draftBlock.voiceHint, ["voice"]);
+      return {
+        type: "narration",
+        text: String(draftBlock.text ?? "").trim(),
+        ...(voiceAssetId ? { voiceAssetId, voiceVolume: 100 } : {}),
+      };
+    }
+
+    if (draftBlock.type === "choice") {
+      return {
+        type: "choice",
+        options: (Array.isArray(draftBlock.options) ? draftBlock.options : [])
+          .map((option) => ({
+            text: String(option?.text ?? "").trim(),
+            gotoSceneId: getSceneId(option?.targetHint) || getChoiceContinueTarget(),
+          }))
+          .filter((option) => option.text),
+      };
+    }
+
+    if (draftBlock.type === "background") {
+      return {
+        type: "background",
+        assetId: getAssetId(draftBlock.assetHint, ["background", "cg"]),
+        transition: getTransition(draftBlock.transition ?? "fade"),
+        transitionDurationMs: getTransitionDurationMs(draftBlock.transitionDurationMs, 600),
+      };
+    }
+
+    if (draftBlock.type === "character_show") {
+      const characterId = callScriptImportResolver(resolvers, "findCharacterIdByHint", [draftBlock.characterHint], "");
+      const defaultPosition = callScriptImportResolver(
+        resolvers,
+        "getDefaultCharacterPosition",
+        [characterId],
+        "center"
+      );
+      return {
+        type: "character_show",
+        characterId,
+        expressionId: callScriptImportResolver(
+          resolvers,
+          "findExpressionIdByHint",
+          [characterId, draftBlock.expressionHint],
+          ""
+        ),
+        position: callScriptImportResolver(
+          resolvers,
+          "getSafePosition",
+          [draftBlock.position ?? defaultPosition],
+          draftBlock.position ?? defaultPosition
+        ),
+        transition: getTransition(draftBlock.transition ?? "fade"),
+        transitionDurationMs: getTransitionDurationMs(draftBlock.transitionDurationMs, 600),
+        stage: cloneScriptImportStageDefaults(resolvers?.defaultCharacterStage),
+      };
+    }
+
+    if (draftBlock.type === "character_hide") {
+      return {
+        type: "character_hide",
+        characterId: callScriptImportResolver(resolvers, "findCharacterIdByHint", [draftBlock.characterHint], ""),
+        transition: getTransition(draftBlock.transition ?? "fade"),
+        transitionDurationMs: getTransitionDurationMs(draftBlock.transitionDurationMs, 600),
+      };
+    }
+
+    if (draftBlock.type === "music_play") {
+      return {
+        type: "music_play",
+        assetId: getAssetId(draftBlock.assetHint, ["bgm"]),
+        loop: true,
+        volume: 100,
+        fadeInMs: getNonNegativeNumber(draftBlock.fadeInMs, 600),
+        fadeOutMs: getNonNegativeNumber(draftBlock.fadeOutMs, 600),
+        endMode: "until_next_music",
+        endBlockId: "",
+      };
+    }
+
+    if (draftBlock.type === "music_stop") {
+      return {
+        type: "music_stop",
+        fadeOutMs: getNonNegativeNumber(draftBlock.fadeOutMs, 600),
+      };
+    }
+
+    if (draftBlock.type === "sfx_play") {
+      return {
+        type: "sfx_play",
+        assetId: getAssetId(draftBlock.assetHint, ["sfx"]),
+        volume: getVolumePercent(draftBlock.volume, 100),
+      };
+    }
+
+    if (draftBlock.type === "screen_fade") {
+      return {
+        type: "screen_fade",
+        action: getFadeAction(draftBlock.action ?? "fade_out"),
+        color: "black",
+        duration: getEffectDuration(draftBlock.durationMs),
+      };
+    }
+
+    if (draftBlock.type === "jump") {
+      return {
+        type: "jump",
+        targetSceneId:
+          getSceneId(draftBlock.targetHint) ||
+          callScriptImportResolver(resolvers, "getDefaultJumpTargetSceneId", [scene?.id], ""),
+      };
+    }
+
+    return {
+      type: "narration",
+      text: String(draftBlock.text ?? "").trim(),
+    };
+  }
+
   global.CanvasiaEditorScriptImportMapping = Object.freeze({
     normalizeImportedLookupText,
     getImportedLookupValues,
@@ -119,5 +277,6 @@
     findImportedSceneByHint,
     findImportedSceneIdByHint,
     getImportedEffectDuration,
+    normalizeImportedDraftBlockForScene,
   });
 })(typeof window !== "undefined" ? window : globalThis);

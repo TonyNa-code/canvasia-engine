@@ -9871,123 +9871,24 @@ function getImportedEffectDuration(durationMs) {
 }
 
 function normalizeScriptImportBlockForScene(draftBlock, scene = getSelectedScene()) {
-  if (!draftBlock || typeof draftBlock !== "object") {
-    return null;
-  }
-
-  if (draftBlock.type === "dialogue") {
-    const voiceAssetId = findImportedAssetIdByHint(draftBlock.voiceHint, ["voice"]);
-    return {
-      type: "dialogue",
-      speakerId: getImportedSpeakerCharacterId(draftBlock.speakerName),
-      text: String(draftBlock.text ?? "").trim(),
-      ...(voiceAssetId ? { voiceAssetId, voiceVolume: 100 } : {}),
-    };
-  }
-
-  if (draftBlock.type === "narration") {
-    const voiceAssetId = findImportedAssetIdByHint(draftBlock.voiceHint, ["voice"]);
-    return {
-      type: "narration",
-      text: String(draftBlock.text ?? "").trim(),
-      ...(voiceAssetId ? { voiceAssetId, voiceVolume: 100 } : {}),
-    };
-  }
-
-  if (draftBlock.type === "choice") {
-    return {
-      type: "choice",
-      options: (Array.isArray(draftBlock.options) ? draftBlock.options : [])
-        .map((option) => {
-          const targetSceneId = findImportedSceneIdByHint(option?.targetHint);
-          return {
-            text: String(option?.text ?? "").trim(),
-            gotoSceneId: targetSceneId || CHOICE_CONTINUE_TARGET,
-          };
-        })
-        .filter((option) => option.text),
-    };
-  }
-
-  if (draftBlock.type === "background") {
-    return {
-      type: "background",
-      assetId: findImportedAssetIdByHint(draftBlock.assetHint, ["background", "cg"]),
-      transition: getSafeTransition(draftBlock.transition ?? "fade"),
-      transitionDurationMs: getSafeTransitionDurationMs(draftBlock.transitionDurationMs, 600),
-    };
-  }
-
-  if (draftBlock.type === "character_show") {
-    const characterId = findImportedCharacterIdByHint(draftBlock.characterHint);
-    return {
-      type: "character_show",
-      characterId,
-      expressionId: findImportedExpressionIdByHint(characterId, draftBlock.expressionHint),
-      position: getSafePosition(draftBlock.position ?? getDefaultCharacterPosition(characterId)),
-      transition: getSafeTransition(draftBlock.transition ?? "fade"),
-      transitionDurationMs: getSafeTransitionDurationMs(draftBlock.transitionDurationMs, 600),
-      stage: { ...DEFAULT_CHARACTER_STAGE },
-    };
-  }
-
-  if (draftBlock.type === "character_hide") {
-    return {
-      type: "character_hide",
-      characterId: findImportedCharacterIdByHint(draftBlock.characterHint),
-      transition: getSafeTransition(draftBlock.transition ?? "fade"),
-      transitionDurationMs: getSafeTransitionDurationMs(draftBlock.transitionDurationMs, 600),
-    };
-  }
-
-  if (draftBlock.type === "music_play") {
-    return {
-      type: "music_play",
-      assetId: findImportedAssetIdByHint(draftBlock.assetHint, ["bgm"]),
-      loop: true,
-      volume: 100,
-      fadeInMs: getSafeNonNegativeNumber(draftBlock.fadeInMs, 600),
-      fadeOutMs: getSafeNonNegativeNumber(draftBlock.fadeOutMs, 600),
-      endMode: "until_next_music",
-      endBlockId: "",
-    };
-  }
-
-  if (draftBlock.type === "music_stop") {
-    return {
-      type: "music_stop",
-      fadeOutMs: getSafeNonNegativeNumber(draftBlock.fadeOutMs, 600),
-    };
-  }
-
-  if (draftBlock.type === "sfx_play") {
-    return {
-      type: "sfx_play",
-      assetId: findImportedAssetIdByHint(draftBlock.assetHint, ["sfx"]),
-      volume: getSafeVolumePercent(draftBlock.volume, 100),
-    };
-  }
-
-  if (draftBlock.type === "screen_fade") {
-    return {
-      type: "screen_fade",
-      action: getSafeFadeAction(draftBlock.action ?? "fade_out"),
-      color: "black",
-      duration: getImportedEffectDuration(draftBlock.durationMs),
-    };
-  }
-
-  if (draftBlock.type === "jump") {
-    return {
-      type: "jump",
-      targetSceneId: findImportedSceneIdByHint(draftBlock.targetHint) || getDefaultJumpTargetSceneId(scene?.id),
-    };
-  }
-
-  return {
-    type: "narration",
-    text: String(draftBlock.text ?? "").trim(),
-  };
+  return scriptImportMappingTools.normalizeImportedDraftBlockForScene(draftBlock, scene, {
+    getSpeakerCharacterId: getImportedSpeakerCharacterId,
+    findCharacterIdByHint: (characterHint) => findImportedCharacterIdByHint(characterHint),
+    findExpressionIdByHint: findImportedExpressionIdByHint,
+    findAssetIdByHint: findImportedAssetIdByHint,
+    findSceneIdByHint: findImportedSceneIdByHint,
+    getDefaultCharacterPosition,
+    getSafePosition,
+    getSafeTransition,
+    getSafeTransitionDurationMs,
+    getSafeNonNegativeNumber,
+    getSafeVolumePercent,
+    getSafeFadeAction,
+    getEffectDuration: getImportedEffectDuration,
+    getDefaultJumpTargetSceneId,
+    defaultCharacterStage: DEFAULT_CHARACTER_STAGE,
+    choiceContinueTarget: CHOICE_CONTINUE_TARGET,
+  });
 }
 
 function parseCurrentScriptImportDraft() {
