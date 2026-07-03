@@ -45,6 +45,18 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
               hasProject: true,
               hasSelectedScene: true,
               selectedSceneTitle: "雨夜教室",
+              selectedSceneBlockCount: 0,
+              chapterCount: 1,
+              sceneCount: 1,
+              needsStarterKit: false,
+              errorCount: 0,
+            }});
+            const projectAfterDialogue = tools.buildCommandPaletteCommands({{
+              hasProject: true,
+              hasSelectedScene: true,
+              selectedSceneTitle: "雨夜教室",
+              selectedSceneBlockCount: 4,
+              selectedBlockType: "dialogue",
               chapterCount: 1,
               sceneCount: 1,
               needsStarterKit: false,
@@ -70,6 +82,10 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
               dialogueSearchIds: dialogueSearch.map((command) => command.id),
               templateAction: templateCommand.action,
               templateId: templateCommand.dataset["template-id"],
+              emptySceneRecommendedIds: projectWithScene.slice(0, 4).map((command) => command.id),
+              emptySceneRecommendedSections: projectWithScene.slice(0, 2).map((command) => command.section),
+              dialogueRecommendedIds: projectAfterDialogue.slice(0, 4).map((command) => command.id),
+              directRecommendedIds: tools.getRecommendedCommandIds({{ hasProject: true, hasSelectedScene: true, selectedBlockType: "dialogue", selectedSceneBlockCount: 2 }}),
               storySearchIds: storySearch.map((command) => command.id),
               clamped: tools.clampCommandPaletteIndex(99, project),
             }}));
@@ -89,6 +105,10 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
         self.assertIn("insert-dialogue", payload["dialogueSearchIds"])
         self.assertEqual(payload["templateAction"], "apply-story-template")
         self.assertEqual(payload["templateId"], "opening_intro")
+        self.assertEqual(payload["emptySceneRecommendedIds"][:3], ["template-opening-intro", "insert-background", "insert-music-play"])
+        self.assertEqual(payload["emptySceneRecommendedSections"], ["推荐", "推荐"])
+        self.assertEqual(payload["dialogueRecommendedIds"][:3], ["insert-dialogue", "insert-choice", "template-emotion-burst"])
+        self.assertEqual(payload["directRecommendedIds"][:2], ["insert-dialogue", "insert-choice"])
         self.assertIn("screen-story", payload["storySearchIds"])
         self.assertGreater(payload["clamped"], 0)
 
@@ -103,7 +123,7 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
             vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
             const tools = context.window.CanvasiaEditorCommandPalette;
             const html = tools.renderCommandPaletteList([
-              {{ id: "a", title: "打开 <剧情>", section: "导航", subtitle: "去写", action: "switch-screen" }},
+              {{ id: "a", title: "打开 <剧情>", section: "推荐", originalSection: "导航", subtitle: "去写", action: "switch-screen", recommended: true }},
               {{ id: "b", title: "导出", section: "发布", subtitle: "先修错误", disabled: true, disabledReason: "不可用" }},
             ], 1, {{
               escapeHtml(value) {{
@@ -117,6 +137,8 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
 
         self.assertIn('data-command-id="a"', html)
         self.assertIn("打开 &lt;剧情&gt;", html)
+        self.assertIn("推荐 · 导航", html)
+        self.assertIn("is-recommended", html)
         self.assertIn("is-selected", html)
         self.assertIn("is-disabled", html)
         self.assertIn('aria-disabled="true"', html)

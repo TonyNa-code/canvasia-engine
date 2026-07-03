@@ -250,6 +250,85 @@
       .join(" ");
   }
 
+  function getRecommendedCommandIds(context = {}) {
+    const hasProject = Boolean(context.hasProject);
+    const hasSelectedScene = Boolean(context.hasSelectedScene);
+    const blockCount = Number(context.selectedSceneBlockCount ?? 0);
+    const selectedBlockType = normalizeSearchText(context.selectedBlockType);
+
+    if (!hasProject) {
+      return ["create-playable-demo", "open-project-center", "open-beginner-tutorial"];
+    }
+
+    if (!hasSelectedScene) {
+      return ["create-first-chapter", "create-starter-kit", "screen-story", "open-beginner-tutorial"];
+    }
+
+    if (blockCount <= 0) {
+      return ["template-opening-intro", "insert-background", "insert-music-play", "insert-character-show", "insert-dialogue"];
+    }
+
+    if (selectedBlockType === "background") {
+      return ["insert-character-show", "insert-music-play", "insert-narration", "insert-dialogue"];
+    }
+    if (selectedBlockType === "music_play") {
+      return ["insert-character-show", "insert-narration", "insert-dialogue", "insert-choice"];
+    }
+    if (selectedBlockType === "character_show") {
+      return ["insert-dialogue", "insert-camera-zoom", "template-emotion-burst", "insert-choice"];
+    }
+    if (selectedBlockType === "dialogue") {
+      return ["insert-dialogue", "insert-choice", "template-emotion-burst", "insert-narration"];
+    }
+    if (selectedBlockType === "narration") {
+      return ["insert-dialogue", "insert-background", "insert-fade", "template-memory-entry"];
+    }
+    if (selectedBlockType === "choice") {
+      return ["insert-jump", "insert-condition", "insert-dialogue", "template-branch-choice"];
+    }
+    if (selectedBlockType === "condition") {
+      return ["insert-dialogue", "insert-jump", "insert-variable-set", "screen-preview"];
+    }
+    if (selectedBlockType === "video_play" || selectedBlockType === "credits_roll") {
+      return ["insert-narration", "insert-music-stop", "screen-preview", "export-web"];
+    }
+    if (selectedBlockType === "screen_fade" || selectedBlockType === "screen_filter" || selectedBlockType === "depth_blur") {
+      return ["insert-narration", "insert-dialogue", "insert-character-show", "insert-fade"];
+    }
+    if (selectedBlockType === "music_stop" || selectedBlockType === "character_hide" || selectedBlockType === "jump") {
+      return ["template-scene-outro", "screen-preview", "insert-narration", "insert-dialogue"];
+    }
+
+    return ["insert-dialogue", "insert-narration", "insert-choice", "screen-preview"];
+  }
+
+  function prioritizeRecommendedCommands(commands = [], context = {}) {
+    const recommendedIds = getRecommendedCommandIds(context);
+    if (!recommendedIds.length || !commands.length) {
+      return commands;
+    }
+
+    const commandById = new Map(commands.map((command) => [command.id, command]));
+    const recommendedCommands = recommendedIds
+      .map((id) => commandById.get(id))
+      .filter((command) => command && !command.disabled)
+      .map((command) => ({
+        ...command,
+        originalSection: command.originalSection ?? command.section,
+        section: "推荐",
+        recommended: true,
+      }));
+    if (!recommendedCommands.length) {
+      return commands;
+    }
+
+    const recommendedIdSet = new Set(recommendedCommands.map((command) => command.id));
+    return [
+      ...recommendedCommands,
+      ...commands.filter((command) => !recommendedIdSet.has(command.id)),
+    ];
+  }
+
   function buildCommandPaletteCommands(context = {}) {
     const hasProject = Boolean(context.hasProject);
     const hasSelectedScene = Boolean(context.hasSelectedScene);
@@ -390,7 +469,7 @@
       },
     ];
 
-    return commands;
+    return prioritizeRecommendedCommands(commands, context);
   }
 
   function filterCommandPaletteCommands(commands = [], query = "") {
@@ -431,18 +510,22 @@
         const disabled = Boolean(command.disabled);
         const selectedClass = index === selectedIndex ? " is-selected" : "";
         const disabledClass = disabled ? " is-disabled" : "";
+        const recommendedClass = command.recommended ? " is-recommended" : "";
         const reason = disabled && command.disabledReason ? ` · ${command.disabledReason}` : "";
+        const sectionLabel = command.recommended && command.originalSection
+          ? `${command.section} · ${command.originalSection}`
+          : command.section ?? "指令";
         return `
           <button
             type="button"
-            class="command-palette-item${selectedClass}${disabledClass}"
+            class="command-palette-item${selectedClass}${disabledClass}${recommendedClass}"
             data-action="run-command-palette-command"
             data-command-id="${escapeHtml(command.id)}"
             role="option"
             aria-selected="${index === selectedIndex ? "true" : "false"}"
             ${disabled ? 'aria-disabled="true"' : ""}
           >
-            <span class="command-palette-section">${escapeHtml(command.section ?? "指令")}</span>
+            <span class="command-palette-section">${escapeHtml(sectionLabel)}</span>
             <strong>${escapeHtml(command.title)}</strong>
             <small>${escapeHtml(`${command.subtitle ?? ""}${reason}`)}</small>
           </button>
@@ -456,5 +539,7 @@
     filterCommandPaletteCommands,
     clampCommandPaletteIndex,
     renderCommandPaletteList,
+    getRecommendedCommandIds,
+    prioritizeRecommendedCommands,
   };
 })(window);
