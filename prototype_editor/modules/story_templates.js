@@ -228,6 +228,39 @@
     ],
   });
 
+  const STORY_TEMPLATE_PANEL_ITEMS = deepFreeze([
+    {
+      templateId: "playable_scene",
+      tone: "hero",
+      description: "先生成一段能直接试玩的完整小场景",
+    },
+    {
+      templateId: "opening_intro",
+      tone: "good",
+      description: "背景、BGM、角色亮相和第一轮对白",
+    },
+    {
+      templateId: "memory_entry",
+      tone: "",
+      description: "黑场转入、回忆滤镜和回忆旁白",
+    },
+    {
+      templateId: "emotion_burst",
+      tone: "warn",
+      description: "镜头推近、闪屏、震动和冲击台词",
+    },
+    {
+      templateId: "branch_choice",
+      tone: "",
+      description: "一句提问加一组选项，适合做分线入口",
+    },
+    {
+      templateId: "scene_outro",
+      tone: "",
+      description: "收尾旁白、停音乐、退场和跳下一场",
+    },
+  ]);
+
   const PROJECT_TEMPLATE_LABELS = Object.freeze({
     blank: "空白项目",
     campus_romance: "校园恋爱模板",
@@ -292,6 +325,10 @@
     });
   }
 
+  function getStoryTemplatePanelItems() {
+    return STORY_TEMPLATE_PANEL_ITEMS;
+  }
+
   function getTemplateLabel(template) {
     return PROJECT_TEMPLATE_LABELS[template] ?? template;
   }
@@ -299,11 +336,13 @@
   global.CanvasiaEditorStoryTemplates = Object.freeze({
     STORY_TEMPLATE_PRESETS,
     STORY_TEMPLATE_BLOCK_RECIPES,
+    STORY_TEMPLATE_PANEL_ITEMS,
     PROJECT_TEMPLATE_LABELS,
     getStoryTemplatePreset,
     getStoryTemplateBlockRecipes,
     getStoryTemplateBlockTypeCounts,
     getStoryTemplateSummary,
+    getStoryTemplatePanelItems,
     getTemplateLabel,
   });
 })(typeof window !== "undefined" ? window : globalThis);

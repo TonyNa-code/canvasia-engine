@@ -241,33 +241,12 @@
             <button class="toolbar-button" data-action="add-variable-add">改数值</button>
             <button class="toolbar-button" data-action="add-condition">条件判断</button>
           </div>
-          <section class="story-template-panel">
+          <section id="storyTemplatePanel" class="story-template-panel">
             <div class="story-template-heading">
               <strong>一键剧情模板</strong>
               <span>会从当前选中的卡片后面连续插入一组常用卡片，适合快速搭骨架。</span>
             </div>
-            <div class="story-template-grid">
-              <button class="story-template-button is-good" type="button" data-action="apply-story-template" data-template-id="opening_intro">
-                <strong>开场铺垫</strong>
-                <span>背景 + BGM + 角色亮相 + 第一轮对白</span>
-              </button>
-              <button class="story-template-button" type="button" data-action="apply-story-template" data-template-id="memory_entry">
-                <strong>进入回忆</strong>
-                <span>黑场转入 + 回忆滤镜 + 一句回忆旁白</span>
-              </button>
-              <button class="story-template-button is-warn" type="button" data-action="apply-story-template" data-template-id="emotion_burst">
-                <strong>情绪爆点</strong>
-                <span>镜头推近 + 闪屏 + 震动 + 冲击台词</span>
-              </button>
-              <button class="story-template-button" type="button" data-action="apply-story-template" data-template-id="branch_choice">
-                <strong>选项分支</strong>
-                <span>一句提问 + 一组选项，适合做分线入口</span>
-              </button>
-              <button class="story-template-button" type="button" data-action="apply-story-template" data-template-id="scene_outro">
-                <strong>场景收尾</strong>
-                <span>收尾旁白 + 停音乐 + 退场 + 跳下一场</span>
-              </button>
-            </div>
+            <div id="storyTemplateGrid" class="story-template-grid" aria-live="polite"></div>
           </section>
           <section id="creativeAssistantPanel" class="creative-assistant-panel"></section>
           <div class="asset-search-row story-filter-row">

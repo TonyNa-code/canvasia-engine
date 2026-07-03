@@ -967,6 +967,8 @@ const refs = {
   storyBlockClearButton: document.getElementById("storyBlockClearButton"),
   storyBlockFilterSummary: document.getElementById("storyBlockFilterSummary"),
   storyEditorModeHint: document.getElementById("storyEditorModeHint"),
+  storyTemplatePanel: document.getElementById("storyTemplatePanel"),
+  storyTemplateGrid: document.getElementById("storyTemplateGrid"),
   creativeAssistantPanel: document.getElementById("creativeAssistantPanel"),
   assetTypeList: document.getElementById("assetTypeList"),
   assetGrid: document.getElementById("assetGrid"),
@@ -9488,6 +9490,54 @@ function renderStoryEditorModeBanner(scene = null) {
   });
 }
 
+function getStoryTemplatePanelItems() {
+  return typeof storyTemplateTools.getStoryTemplatePanelItems === "function"
+    ? storyTemplateTools.getStoryTemplatePanelItems()
+    : Object.keys(STORY_TEMPLATE_PRESETS).map((templateId) => ({ templateId }));
+}
+
+function getStoryTemplateButtonDescription(item, summary) {
+  const description = String(item?.description ?? "").trim();
+  if (description) {
+    return description;
+  }
+
+  return summary.labels.slice(0, 4).join(" + ") || "插入一组剧情卡片";
+}
+
+function renderStoryTemplateButton(item = {}) {
+  const templateId = String(item.templateId ?? "").trim();
+  const preset = getStoryTemplatePreset(templateId);
+  if (!templateId || !preset) {
+    return "";
+  }
+
+  const summary = storyTemplateTools.getStoryTemplateSummary(templateId, { getBlockLabel });
+  const tone = String(item.tone ?? "").trim();
+  const toneClass = tone ? ` is-${escapeHtml(tone)}` : "";
+  const labels = summary.labels.slice(0, 3);
+
+  return `
+    <button
+      class="story-template-button${toneClass}"
+      type="button"
+      data-action="apply-story-template"
+      data-template-id="${escapeHtml(templateId)}"
+    >
+      <strong>${escapeHtml(summary.title || preset.title)}</strong>
+      <span>${escapeHtml(getStoryTemplateButtonDescription(item, summary))}</span>
+      <div class="story-template-button-meta">
+        <span>${summary.blockCount} 张卡片</span>
+        ${labels.map((label) => `<span>${escapeHtml(label)}</span>`).join("")}
+      </div>
+    </button>
+  `;
+}
+
+function renderStoryTemplateGrid() {
+  return getStoryTemplatePanelItems().map((item) => renderStoryTemplateButton(item)).join("");
+}
+
 function applyEditorModeUi() {
   const hasProject = Boolean(state.data?.project);
   const mode = hasProject ? getProjectEditorMode() : getSafeEditorMode(state.projectCenterEditorMode);
@@ -13521,6 +13571,14 @@ function renderStoryScreen() {
   if (refs.storyEditorModeHint) {
     refs.storyEditorModeHint.innerHTML = isBlankProject ? "" : renderStoryEditorModeBanner(scene);
     refs.storyEditorModeHint.classList.toggle("is-hidden", isBlankProject);
+  }
+
+  if (refs.storyTemplatePanel) {
+    refs.storyTemplatePanel.classList.toggle("is-hidden", isBlankProject || !scene);
+  }
+
+  if (refs.storyTemplateGrid) {
+    refs.storyTemplateGrid.innerHTML = isBlankProject || !scene ? "" : renderStoryTemplateGrid();
   }
 
   if (refs.creativeAssistantPanel) {

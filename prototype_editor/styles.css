@@ -2826,7 +2826,7 @@ body[data-editor-mode="beginner"] #screen-preview #previewSceneFilterBar {
 
 .story-template-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
   gap: 10px;
 }
 
@@ -2848,6 +2848,14 @@ body[data-editor-mode="beginner"] #screen-preview #previewSceneFilterBar {
   background: linear-gradient(180deg, rgba(244, 255, 248, 0.98), rgba(236, 249, 241, 0.95));
 }
 
+.story-template-button.is-hero {
+  grid-column: span 2;
+  border-color: rgba(59, 111, 232, 0.24);
+  background:
+    radial-gradient(circle at 16% 18%, rgba(107, 161, 255, 0.24), transparent 32%),
+    linear-gradient(135deg, rgba(242, 247, 255, 0.99), rgba(245, 252, 248, 0.96));
+}
+
 .story-template-button.is-warn {
   background: linear-gradient(180deg, rgba(255, 249, 239, 0.98), rgba(255, 244, 227, 0.95));
 }
@@ -2866,6 +2874,30 @@ body[data-editor-mode="beginner"] #screen-preview #previewSceneFilterBar {
   color: var(--muted);
   font-size: 12px;
   line-height: 1.6;
+}
+
+.story-template-button-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.story-template-button-meta span {
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(73, 116, 216, 0.12);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+@media (max-width: 720px) {
+  .story-template-button.is-hero {
+    grid-column: span 1;
+  }
 }
 
 .creative-assistant-panel {

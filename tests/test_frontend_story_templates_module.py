@@ -38,6 +38,7 @@ class FrontendStoryTemplatesModuleTests(unittest.TestCase):
               playableSummary: tools.getStoryTemplateSummary("playable_scene", {{
                 getBlockLabel: (type) => type === "dialogue" ? "台词" : `label:${{type}}`,
               }}),
+              panelItems: tools.getStoryTemplatePanelItems(),
               openingRecipeCount: tools.getStoryTemplateBlockRecipes("opening_intro").length,
               missingRecipes: tools.getStoryTemplateBlockRecipes("missing"),
               missingPreset: tools.getStoryTemplatePreset("missing"),
@@ -66,6 +67,7 @@ class FrontendStoryTemplatesModuleTests(unittest.TestCase):
         self.assertIn("getStoryTemplatePreset", payload["keys"])
         self.assertIn("getStoryTemplateBlockRecipes", payload["keys"])
         self.assertIn("getStoryTemplateSummary", payload["keys"])
+        self.assertIn("getStoryTemplatePanelItems", payload["keys"])
         self.assertEqual(payload["presetTitles"], ["第一段可试玩", "开场铺垫", "进入回忆", "情绪爆点", "选项分支", "场景收尾"])
         self.assertEqual(
             payload["playableRecipeTypes"],
@@ -88,6 +90,16 @@ class FrontendStoryTemplatesModuleTests(unittest.TestCase):
         self.assertEqual(payload["playableSummary"]["title"], "第一段可试玩")
         self.assertEqual(payload["playableSummary"]["blockCount"], 10)
         self.assertIn("台词 x 3", payload["playableSummary"]["labels"])
+        self.assertEqual(payload["panelItems"][0]["templateId"], "playable_scene")
+        self.assertEqual(payload["panelItems"][0]["tone"], "hero")
+        self.assertEqual([item["templateId"] for item in payload["panelItems"]], [
+            "playable_scene",
+            "opening_intro",
+            "memory_entry",
+            "emotion_burst",
+            "branch_choice",
+            "scene_outro",
+        ])
         self.assertEqual(payload["openingRecipeCount"], 5)
         self.assertEqual(payload["missingRecipes"], [])
         self.assertIsNone(payload["missingPreset"])
