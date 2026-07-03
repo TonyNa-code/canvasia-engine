@@ -52,6 +52,13 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
               fade in 0.5
               jump scene_end
             `);
+            const directorBlocks = tools.parseScriptDraftToBlocks(`
+              shake heavy short
+              flash red strong long
+              zoom out heavy right
+              pan left light
+              credits title "STAFF" subtitle "Thanks for playing" duration 24 light no-skip lines "企划：Tony|剧本：Tony"
+            `);
             process.stdout.write(JSON.stringify({{
               keys: Object.keys(tools).sort(),
               normalizedLines: tools.normalizeScriptImportText(" a\\r\\n\\n b ").join("|"),
@@ -63,6 +70,11 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
               stageLine: tools.parseStageDirectionLine("show yuina smile at right with dissolve"),
               sfxLine: tools.parseStageDirectionLine("play sound door_knock"),
               videoLine: tools.parseStageDirectionLine('play video opening_movie title "Opening Movie" volume 80 from 2 to 12 cover no-skip'),
+              shakeLine: tools.parseStageDirectionLine("shake heavy short"),
+              flashLine: tools.parseStageDirectionLine("flash red strong long"),
+              zoomLine: tools.parseStageDirectionLine("zoom out heavy right"),
+              panLine: tools.parseStageDirectionLine("pan left light"),
+              creditsLine: tools.parseStageDirectionLine('credits title "STAFF" subtitle "Thanks for playing" duration 24 light no-skip lines "企划：Tony|剧本：Tony"'),
               voiceLine: tools.parseVoiceLine("voice yuina_001"),
               jumpLine: tools.parseJumpLine("jump scene_end"),
               blocks,
@@ -73,6 +85,9 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
               vnSummary: tools.summarizeScriptDraftBlocks(vnBlocks),
               vnPreview: tools.buildScriptDraftPreviewLines(vnBlocks, 4),
               vnVoicePreview: tools.buildScriptDraftPreviewLines(vnBlocks, 6),
+              directorBlocks,
+              directorSummary: tools.summarizeScriptDraftBlocks(directorBlocks),
+              directorPreview: tools.buildScriptDraftPreviewLines(directorBlocks, 5),
             }}));
             """
         )
@@ -120,6 +135,29 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
             "volume": 80,
             "startTimeSeconds": 2,
             "endTimeSeconds": 12,
+            "skippable": False,
+        })
+        self.assertEqual(payload["shakeLine"], {"type": "screen_shake", "intensity": "heavy", "duration": "short"})
+        self.assertEqual(payload["flashLine"], {
+            "type": "screen_flash",
+            "color": "red",
+            "intensity": "strong",
+            "duration": "long",
+        })
+        self.assertEqual(payload["zoomLine"], {
+            "type": "camera_zoom",
+            "action": "zoom_out",
+            "strength": "heavy",
+            "focus": "right",
+        })
+        self.assertEqual(payload["panLine"], {"type": "camera_pan", "target": "left", "strength": "light"})
+        self.assertEqual(payload["creditsLine"], {
+            "type": "credits_roll",
+            "title": "STAFF",
+            "subtitle": "Thanks for playing",
+            "lines": ["企划：Tony", "剧本：Tony"],
+            "durationSeconds": 24,
+            "background": "light",
             "skippable": False,
         })
         self.assertEqual(payload["voiceLine"], {"voiceHint": "yuina_001"})
@@ -189,6 +227,23 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
         self.assertIn("演出：切背景：classroom", payload["vnPreview"][0])
         self.assertIn("演出：播放视频：Opening Movie", payload["vnPreview"][1])
         self.assertIn("voice: yuina_001", payload["vnVoicePreview"][5])
+        self.assertEqual([block["type"] for block in payload["directorBlocks"]], [
+            "screen_shake",
+            "screen_flash",
+            "camera_zoom",
+            "camera_pan",
+            "credits_roll",
+        ])
+        self.assertEqual(payload["directorSummary"], {
+            "dialogue": 0,
+            "narration": 0,
+            "choice": 0,
+            "stage": 5,
+            "route": 0,
+            "total": 5,
+        })
+        self.assertIn("演出：震屏：heavy / short", payload["directorPreview"][0])
+        self.assertIn("演出：片尾字幕：STAFF", payload["directorPreview"][4])
 
 
 if __name__ == "__main__":

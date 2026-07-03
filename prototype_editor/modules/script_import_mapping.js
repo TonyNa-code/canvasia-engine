@@ -134,6 +134,26 @@
       callScriptImportResolver(resolvers, "getSafeVolumePercent", [value, fallback], fallback ?? 100);
     const getVideoFit = (value) => callScriptImportResolver(resolvers, "getSafeVideoFit", [value], value || "contain");
     const getVideoVolume = (value) => callScriptImportResolver(resolvers, "getSafeVideoVolume", [value], 100);
+    const getShakeIntensity = (value) =>
+      callScriptImportResolver(resolvers, "getSafeShakeIntensity", [value], value || "medium");
+    const getEffectDurationLabel = (value) =>
+      callScriptImportResolver(resolvers, "getSafeEffectDuration", [value], value || "medium");
+    const getFlashColor = (value) => callScriptImportResolver(resolvers, "getSafeFlashColor", [value], value || "white");
+    const getFlashIntensity = (value) =>
+      callScriptImportResolver(resolvers, "getSafeFlashIntensity", [value], value || "medium");
+    const getCameraZoomAction = (value) =>
+      callScriptImportResolver(resolvers, "getSafeCameraZoomAction", [value], value || "zoom_in");
+    const getCameraZoomStrength = (value) =>
+      callScriptImportResolver(resolvers, "getSafeCameraZoomStrength", [value], value || "medium");
+    const getCameraZoomFocus = (value) =>
+      callScriptImportResolver(resolvers, "getSafeCameraZoomFocus", [value], value || "center");
+    const getCameraPanTarget = (value) =>
+      callScriptImportResolver(resolvers, "getSafeCameraPanTarget", [value], value || "center");
+    const getCameraPanStrength = (value) =>
+      callScriptImportResolver(resolvers, "getSafeCameraPanStrength", [value], value || "medium");
+    const getCreditsDuration = (value) => callScriptImportResolver(resolvers, "getSafeCreditsDuration", [value], 18);
+    const getCreditsBackground = (value) =>
+      callScriptImportResolver(resolvers, "getSafeCreditsBackground", [value], value || "dark");
     const getFadeAction = (value) => callScriptImportResolver(resolvers, "getSafeFadeAction", [value], value || "fade_out");
     const getEffectDuration = (value) =>
       callScriptImportResolver(resolvers, "getEffectDuration", [value], getImportedEffectDuration(value));
@@ -257,6 +277,55 @@
         startTimeSeconds,
         endTimeSeconds: endTimeSeconds > startTimeSeconds ? endTimeSeconds : 0,
         skippable: draftBlock.skippable !== false,
+      };
+    }
+
+    if (draftBlock.type === "credits_roll") {
+      const lines = Array.isArray(draftBlock.lines)
+        ? draftBlock.lines.map((line) => String(line ?? "").trim()).filter(Boolean)
+        : [];
+      return {
+        type: "credits_roll",
+        title: String(draftBlock.title || "STAFF").trim().slice(0, 80) || "STAFF",
+        subtitle: String(draftBlock.subtitle ?? "").trim().slice(0, 120),
+        lines: lines.length ? lines : ["企划：Creator", "剧本：Writer", "美术：", "音乐：", "特别感谢：所有玩家"],
+        durationSeconds: getCreditsDuration(draftBlock.durationSeconds),
+        background: getCreditsBackground(draftBlock.background),
+        skippable: draftBlock.skippable !== false,
+      };
+    }
+
+    if (draftBlock.type === "screen_shake") {
+      return {
+        type: "screen_shake",
+        intensity: getShakeIntensity(draftBlock.intensity),
+        duration: getEffectDurationLabel(draftBlock.duration),
+      };
+    }
+
+    if (draftBlock.type === "screen_flash") {
+      return {
+        type: "screen_flash",
+        color: getFlashColor(draftBlock.color),
+        intensity: getFlashIntensity(draftBlock.intensity),
+        duration: getEffectDurationLabel(draftBlock.duration),
+      };
+    }
+
+    if (draftBlock.type === "camera_zoom") {
+      return {
+        type: "camera_zoom",
+        action: getCameraZoomAction(draftBlock.action),
+        strength: getCameraZoomStrength(draftBlock.strength),
+        focus: getCameraZoomFocus(draftBlock.focus),
+      };
+    }
+
+    if (draftBlock.type === "camera_pan") {
+      return {
+        type: "camera_pan",
+        target: getCameraPanTarget(draftBlock.target),
+        strength: getCameraPanStrength(draftBlock.strength),
       };
     }
 

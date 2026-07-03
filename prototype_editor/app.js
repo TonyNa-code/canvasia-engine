@@ -9885,6 +9885,17 @@ function normalizeScriptImportBlockForScene(draftBlock, scene = getSelectedScene
     getSafeVolumePercent,
     getSafeVideoFit,
     getSafeVideoVolume,
+    getSafeShakeIntensity,
+    getSafeEffectDuration,
+    getSafeFlashColor,
+    getSafeFlashIntensity,
+    getSafeCameraZoomAction,
+    getSafeCameraZoomStrength,
+    getSafeCameraZoomFocus,
+    getSafeCameraPanTarget,
+    getSafeCameraPanStrength,
+    getSafeCreditsDuration,
+    getSafeCreditsBackground,
     getSafeFadeAction,
     getEffectDuration: getImportedEffectDuration,
     getDefaultJumpTargetSceneId,
@@ -9927,7 +9938,7 @@ function renderScriptImporterPanel(scene, selectedBlock) {
       <div class="script-importer-copy">
         <span class="eyebrow">Text To Cards</span>
         <strong>手写剧本转剧情卡片</strong>
-        <p>从文档或备忘录粘贴文本：<code>角色：台词</code>、<code>角色 "台词"</code>、普通旁白、连续 <code>- 选项</code>，以及 <code>scene / show / hide / play music / play sound / play video / voice / jump</code> 演出、音频、视频和路线指令都会先预览成可编辑卡片。</p>
+        <p>从文档或备忘录粘贴文本：<code>角色：台词</code>、<code>角色 "台词"</code>、普通旁白、连续 <code>- 选项</code>，以及 <code>scene / show / hide / play music / play sound / play video / shake / flash / zoom / pan / credits / voice / jump</code> 演出、音频、视频、镜头和路线指令都会先预览成可编辑卡片。</p>
         <span class="helper-text">${escapeHtml(insertionTarget)}</span>
       </div>
       <div class="script-importer-workbench">
@@ -9935,7 +9946,7 @@ function renderScriptImporterPanel(scene, selectedBlock) {
           id="scriptImporterDraft"
           class="script-importer-textarea"
           spellcheck="false"
-          placeholder="scene classroom with fade\nplay video opening_movie title &quot;Opening&quot; volume 80 from 0 to 18 cover\nplay music school_theme fadein 1.2\nshow 悠奈 smile at center with dissolve\nplay sound door_knock\nvoice yuina_001\n悠奈 &quot;你终于来了。&quot;\n- 问她为什么在这里 -> rooftop\n- 先沉默陪她一会儿\njump ending"
+          placeholder="scene classroom with fade\nplay video opening_movie title &quot;Opening&quot; volume 80 from 0 to 18 cover\nplay music school_theme fadein 1.2\nshow 悠奈 smile at center with dissolve\nshake heavy short\nflash white soft short\nzoom in medium center\nplay sound door_knock\nvoice yuina_001\n悠奈 &quot;你终于来了。&quot;\n- 问她为什么在这里 -> rooftop\n- 先沉默陪她一会儿\njump ending"
         >${escapeHtml(draft)}</textarea>
         <div class="script-importer-actions">
           <button type="button" class="toolbar-button" data-action="apply-script-import-sample">填入示例</button>
@@ -35632,7 +35643,12 @@ function normalizeAssistantDraftBlockForScene(sceneDraft, draftBlock) {
     "music_stop",
     "sfx_play",
     "video_play",
+    "credits_roll",
+    "screen_shake",
+    "screen_flash",
     "screen_fade",
+    "camera_zoom",
+    "camera_pan",
     "jump",
   ].includes(draftBlock.type)
     ? draftBlock.type
@@ -35704,10 +35720,34 @@ function normalizeAssistantDraftBlockForScene(sceneDraft, draftBlock) {
     block.endTimeSeconds = endTimeSeconds > startTimeSeconds ? endTimeSeconds : 0;
     block.skippable = block.skippable !== false;
     delete block.assetHint;
+  } else if (blockType === "credits_roll") {
+    block.title = String(block.title ?? "STAFF").trim().slice(0, 80) || "STAFF";
+    block.subtitle = String(block.subtitle ?? "").trim().slice(0, 120);
+    block.lines = getCreditsLines(block.lines);
+    if (!block.lines.length) {
+      block.lines = ["企划：Creator", "剧本：Writer", "美术：", "音乐：", "特别感谢：所有玩家"];
+    }
+    block.durationSeconds = getSafeCreditsDuration(block.durationSeconds);
+    block.background = getSafeCreditsBackground(block.background);
+    block.skippable = block.skippable !== false;
+  } else if (blockType === "screen_shake") {
+    block.intensity = getSafeShakeIntensity(block.intensity);
+    block.duration = getSafeEffectDuration(block.duration);
+  } else if (blockType === "screen_flash") {
+    block.color = getSafeFlashColor(block.color);
+    block.intensity = getSafeFlashIntensity(block.intensity);
+    block.duration = getSafeEffectDuration(block.duration);
   } else if (blockType === "screen_fade") {
     block.action = getSafeFadeAction(block.action);
     block.color = getSafeFadeColor(block.color);
     block.duration = getSafeEffectDuration(block.duration);
+  } else if (blockType === "camera_zoom") {
+    block.action = getSafeCameraZoomAction(block.action);
+    block.strength = getSafeCameraZoomStrength(block.strength);
+    block.focus = getSafeCameraZoomFocus(block.focus);
+  } else if (blockType === "camera_pan") {
+    block.target = getSafeCameraPanTarget(block.target);
+    block.strength = getSafeCameraPanStrength(block.strength);
   } else if (blockType === "jump") {
     block.targetSceneId = getSafeSceneId(block.targetSceneId, getDefaultJumpTargetSceneId(sceneDraft.id));
     delete block.targetHint;

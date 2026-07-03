@@ -10,7 +10,12 @@
     "music_stop",
     "sfx_play",
     "video_play",
+    "credits_roll",
+    "screen_shake",
+    "screen_flash",
     "screen_fade",
+    "camera_zoom",
+    "camera_pan",
   ]);
   const ROUTE_DRAFT_TYPES = Object.freeze(["jump"]);
   const TRANSITION_ALIASES = Object.freeze({
@@ -118,17 +123,33 @@
     return Number.isFinite(number) ? Math.round(Math.max(0, Math.min(number, 100))) : fallback;
   }
 
-  function parseInlineVideoTitle(text, fallback = "") {
+  function parseInlineTitle(text, fallback = "") {
     const quoted = String(text ?? "").match(/\b(?:title|name|as)\s+["“'‘](.+?)["”'’]/iu);
     if (quoted) {
       return trimImportedText(quoted[1], 80);
     }
 
-    const titleStopWords = "volume|vol|from|start|to|end|contain|cover|fill|skip|skippable|no-?skip|unskippable";
+    const titleStopWords =
+      "volume|vol|from|start|to|end|duration|subtitle|sub|lines|staff|dark|light|transparent|contain|cover|fill|skip|skippable|no-?skip|unskippable";
     const plain = String(text ?? "").match(
       new RegExp(`\\b(?:title|name|as)\\s+([^,;]+?)(?=\\s+\\b(?:${titleStopWords})\\b|$)`, "iu")
     );
     return trimImportedText(plain?.[1] ?? fallback, 80);
+  }
+
+  function parseInlineSubtitle(text, fallback = "") {
+    const quoted = String(text ?? "").match(/\b(?:subtitle|sub)\s+["“'‘](.+?)["”'’]/iu);
+    return trimImportedText(quoted?.[1] ?? fallback, 120);
+  }
+
+  function parseInlineCreditsLines(text) {
+    const quoted = String(text ?? "").match(/\b(?:lines|staff)\s+["“'‘](.+?)["”'’]/iu);
+    return quoted
+      ? quoted[1]
+          .split(/\s*(?:\||\/|；|;)\s*/u)
+          .map((line) => trimImportedText(line, 80))
+          .filter(Boolean)
+      : [];
   }
 
   function parseInlineVideoFit(text, fallback = "contain") {
@@ -145,6 +166,38 @@
       return true;
     }
     return fallback;
+  }
+
+  function parseInlineEnumToken(text, allowedValues, fallback, aliases = {}) {
+    const tokens = String(text ?? "")
+      .toLowerCase()
+      .match(/[a-z_][a-z0-9_-]*/g) ?? [];
+    const allowedSet = new Set(allowedValues);
+    for (const token of tokens) {
+      const normalized = aliases[token] ?? token;
+      if (allowedSet.has(normalized)) {
+        return normalized;
+      }
+    }
+    return fallback;
+  }
+
+  function parseInlineEffectDurationToken(text, fallback = "medium") {
+    return parseInlineEnumToken(text, ["short", "medium", "long"], fallback, {
+      fast: "short",
+      quick: "short",
+      brief: "short",
+      normal: "medium",
+      slow: "long",
+      linger: "long",
+    });
+  }
+
+  function parseInlineCreditsBackground(text, fallback = "dark") {
+    return parseInlineEnumToken(text, ["dark", "light", "transparent"], fallback, {
+      clear: "transparent",
+      overlay: "transparent",
+    });
   }
 
   function parseDirectiveTransition(text, fallback = "fade") {
@@ -322,7 +375,7 @@
         ? {
             type: "video_play",
             assetHint: leading.argument,
-            title: parseInlineVideoTitle(leading.rest),
+            title: parseInlineTitle(leading.rest),
             fit: parseInlineVideoFit(videoText),
             volume: parseInlineVolumePercent(videoText, 100),
             startTimeSeconds,
@@ -330,6 +383,84 @@
             skippable: parseInlineVideoSkippable(videoText, true),
           }
         : null;
+    }
+
+    const creditsMatch = text.match(/^(?:credits|staff|roll\s+credits)\b(.*)$/i);
+    if (creditsMatch) {
+      const creditsText = creditsMatch[1] ?? "";
+      return {
+        type: "credits_roll",
+        title: parseInlineTitle(creditsText, "STAFF") || "STAFF",
+        subtitle: parseInlineSubtitle(creditsText),
+        lines: parseInlineCreditsLines(creditsText),
+        durationSeconds: parseInlineTimeSeconds(creditsText, ["duration"], 18),
+        background: parseInlineCreditsBackground(creditsText, "dark"),
+        skippable: parseInlineVideoSkippable(creditsText, true),
+      };
+    }
+
+    const shakeMatch = text.match(/^(?:screen\s+)?shake\b(.*)$/i);
+    if (shakeMatch) {
+      const shakeText = shakeMatch[1] ?? "";
+      return {
+        type: "screen_shake",
+        intensity: parseInlineEnumToken(shakeText, ["light", "medium", "heavy"], "medium", {
+          soft: "light",
+          weak: "light",
+          strong: "heavy",
+        }),
+        duration: parseInlineEffectDurationToken(shakeText, "short"),
+      };
+    }
+
+    const flashMatch = text.match(/^(?:screen\s+)?flash\b(.*)$/i);
+    if (flashMatch) {
+      const flashText = flashMatch[1] ?? "";
+      return {
+        type: "screen_flash",
+        color: parseInlineEnumToken(flashText, ["white", "warm", "red", "black"], "white"),
+        intensity: parseInlineEnumToken(flashText, ["soft", "medium", "strong"], "medium", {
+          light: "soft",
+          heavy: "strong",
+        }),
+        duration: parseInlineEffectDurationToken(flashText, "short"),
+      };
+    }
+
+    const zoomMatch = text.match(/^(?:camera\s+)?zoom\b(.*)$/i);
+    if (zoomMatch) {
+      const zoomText = zoomMatch[1] ?? "";
+      return {
+        type: "camera_zoom",
+        action: parseInlineEnumToken(zoomText, ["zoom_in", "zoom_out", "reset"], "zoom_in", {
+          in: "zoom_in",
+          out: "zoom_out",
+          normal: "reset",
+        }),
+        strength: parseInlineEnumToken(zoomText, ["light", "medium", "heavy"], "medium", {
+          soft: "light",
+          strong: "heavy",
+        }),
+        focus: parseInlineEnumToken(zoomText, ["left", "center", "right"], "center", {
+          middle: "center",
+        }),
+      };
+    }
+
+    const panMatch = text.match(/^(?:camera\s+)?pan\b(.*)$/i);
+    if (panMatch) {
+      const panText = panMatch[1] ?? "";
+      return {
+        type: "camera_pan",
+        target: parseInlineEnumToken(panText, ["left", "center", "right"], "center", {
+          middle: "center",
+          reset: "center",
+        }),
+        strength: parseInlineEnumToken(panText, ["light", "medium", "heavy"], "medium", {
+          soft: "light",
+          strong: "heavy",
+        }),
+      };
     }
 
     const stopMusicMatch = text.match(/^stop\s+(?:music|bgm)\b(.*)$/i) ?? text.match(/^(?:music|bgm)\s+stop\b(.*)$/i);
@@ -516,6 +647,21 @@
     }
     if (block?.type === "video_play") {
       return `播放视频：${block.title || block.assetHint || "待选择视频"}`;
+    }
+    if (block?.type === "credits_roll") {
+      return `片尾字幕：${block.title || "STAFF"}`;
+    }
+    if (block?.type === "screen_shake") {
+      return `震屏：${block.intensity || "medium"} / ${block.duration || "short"}`;
+    }
+    if (block?.type === "screen_flash") {
+      return `闪屏：${block.color || "white"} / ${block.intensity || "medium"}`;
+    }
+    if (block?.type === "camera_zoom") {
+      return `镜头缩放：${block.action || "zoom_in"} / ${block.focus || "center"}`;
+    }
+    if (block?.type === "camera_pan") {
+      return `镜头平移：${block.target || "center"} / ${block.strength || "medium"}`;
     }
     if (block?.type === "music_stop") {
       return "停止 BGM";

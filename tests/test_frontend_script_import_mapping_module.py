@@ -61,6 +61,17 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
               getSafeVolumePercent: (value, fallback = 100) => Math.max(0, Math.min(100, Number.parseInt(value, 10) || fallback)),
               getSafeVideoFit: (value) => ["contain", "cover", "fill"].includes(value) ? value : "contain",
               getSafeVideoVolume: (value) => Math.max(0, Math.min(100, Number.parseInt(value, 10) || 100)),
+              getSafeShakeIntensity: (value) => ["light", "medium", "heavy"].includes(value) ? value : "medium",
+              getSafeEffectDuration: (value) => ["short", "medium", "long"].includes(value) ? value : "medium",
+              getSafeFlashColor: (value) => ["white", "warm", "red", "black"].includes(value) ? value : "white",
+              getSafeFlashIntensity: (value) => ["soft", "medium", "strong"].includes(value) ? value : "medium",
+              getSafeCameraZoomAction: (value) => ["zoom_in", "zoom_out", "reset"].includes(value) ? value : "zoom_in",
+              getSafeCameraZoomStrength: (value) => ["light", "medium", "heavy"].includes(value) ? value : "medium",
+              getSafeCameraZoomFocus: (value) => ["left", "center", "right"].includes(value) ? value : "center",
+              getSafeCameraPanTarget: (value) => ["left", "center", "right"].includes(value) ? value : "center",
+              getSafeCameraPanStrength: (value) => ["light", "medium", "heavy"].includes(value) ? value : "medium",
+              getSafeCreditsDuration: (value) => Math.max(4, Math.min(180, Number.parseInt(value, 10) || 18)),
+              getSafeCreditsBackground: (value) => ["dark", "light", "transparent"].includes(value) ? value : "dark",
               getSafeFadeAction: (value) => value === "fade_in" ? "fade_in" : "fade_out",
               getEffectDuration: (value) => tools.getImportedEffectDuration(value),
               getDefaultJumpTargetSceneId: () => "scene_end",
@@ -106,6 +117,31 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
               ),
               normalizedVideo: tools.normalizeImportedDraftBlockForScene(
                 {{ type: "video_play", assetHint: "opening_movie", title: "Opening Movie", fit: "cover", volume: "75", startTimeSeconds: "2", endTimeSeconds: "12", skippable: false }},
+                null,
+                resolvers
+              ),
+              normalizedCredits: tools.normalizeImportedDraftBlockForScene(
+                {{ type: "credits_roll", title: "STAFF", subtitle: "Thanks", lines: ["企划：Tony"], durationSeconds: "24", background: "light", skippable: false }},
+                null,
+                resolvers
+              ),
+              normalizedShake: tools.normalizeImportedDraftBlockForScene(
+                {{ type: "screen_shake", intensity: "heavy", duration: "short" }},
+                null,
+                resolvers
+              ),
+              normalizedFlash: tools.normalizeImportedDraftBlockForScene(
+                {{ type: "screen_flash", color: "red", intensity: "strong", duration: "long" }},
+                null,
+                resolvers
+              ),
+              normalizedZoom: tools.normalizeImportedDraftBlockForScene(
+                {{ type: "camera_zoom", action: "zoom_out", strength: "heavy", focus: "right" }},
+                null,
+                resolvers
+              ),
+              normalizedPan: tools.normalizeImportedDraftBlockForScene(
+                {{ type: "camera_pan", target: "left", strength: "light" }},
                 null,
                 resolvers
               ),
@@ -184,6 +220,29 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
                 "skippable": False,
             },
         )
+        self.assertEqual(payload["normalizedCredits"], {
+            "type": "credits_roll",
+            "title": "STAFF",
+            "subtitle": "Thanks",
+            "lines": ["企划：Tony"],
+            "durationSeconds": 24,
+            "background": "light",
+            "skippable": False,
+        })
+        self.assertEqual(payload["normalizedShake"], {"type": "screen_shake", "intensity": "heavy", "duration": "short"})
+        self.assertEqual(payload["normalizedFlash"], {
+            "type": "screen_flash",
+            "color": "red",
+            "intensity": "strong",
+            "duration": "long",
+        })
+        self.assertEqual(payload["normalizedZoom"], {
+            "type": "camera_zoom",
+            "action": "zoom_out",
+            "strength": "heavy",
+            "focus": "right",
+        })
+        self.assertEqual(payload["normalizedPan"], {"type": "camera_pan", "target": "left", "strength": "light"})
         self.assertEqual(payload["normalizedJumpFallback"], {"type": "jump", "targetSceneId": "scene_end"})
 
 
