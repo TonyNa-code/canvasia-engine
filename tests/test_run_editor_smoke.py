@@ -685,6 +685,97 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(bundle["variables"]["variables"][0]["id"], "var_affection")
         self.assertEqual(bundle["variables"]["variables"][1]["defaultValue"], "common")
 
+    def test_import_localization_patches_updates_character_chapter_scene_and_blocks(self) -> None:
+        _, chapter_result = self.create_blank_project_with_chapter()
+        chapter_id = chapter_result["chapterId"]
+        scene = self.save_scene_with_blocks(
+            chapter_id,
+            chapter_result["scene"],
+            [
+                {
+                    "id": "line_001",
+                    "type": "dialogue",
+                    "speakerId": "hero",
+                    "text": "今天也留下来吗？",
+                },
+                {
+                    "id": "choice_001",
+                    "type": "choice",
+                    "options": [
+                        {"text": "留下来", "targetSceneId": ""},
+                        {"text": "先回家", "targetSceneId": ""},
+                    ],
+                },
+            ],
+        )
+        run_editor.write_json(
+            run_editor.DATA_DIR / "characters.json",
+            {
+                "formatVersion": run_editor.PROJECT_FORMAT_VERSION,
+                "characters": [
+                    {
+                        "id": "hero",
+                        "displayName": "蓝白女主",
+                        "nameColor": "#E0E6FF",
+                        "defaultPosition": "center",
+                        "expressions": [],
+                    }
+                ],
+            },
+        )
+
+        result = run_editor.import_localization_patches(
+            [
+                {"kind": "character", "targetId": "hero", "key": "displayName", "language": "en-US", "text": "Heroine"},
+                {"kind": "chapter", "targetId": chapter_id, "key": "name", "language": "en-US", "text": "Chapter One"},
+                {
+                    "kind": "scene",
+                    "targetId": scene["id"],
+                    "sceneId": scene["id"],
+                    "chapterId": chapter_id,
+                    "key": "name",
+                    "language": "en-US",
+                    "text": "Opening",
+                },
+                {
+                    "kind": "block",
+                    "targetId": "line_001",
+                    "sceneId": scene["id"],
+                    "chapterId": chapter_id,
+                    "key": "text",
+                    "language": "en-US",
+                    "text": "Will you stay today too?",
+                },
+                {
+                    "kind": "choice_option",
+                    "targetId": "choice_001",
+                    "sceneId": scene["id"],
+                    "chapterId": chapter_id,
+                    "key": "text",
+                    "optionIndex": 1,
+                    "language": "en-US",
+                    "text": "Go home first",
+                },
+                {"kind": "block", "targetId": "missing", "sceneId": scene["id"], "key": "text", "language": "en-US", "text": "Skip"},
+            ]
+        )
+
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["summary"]["appliedCount"], 5)
+        self.assertEqual(result["summary"]["skippedCount"], 1)
+        self.assertTrue(result["summary"]["characterChanged"])
+        self.assertEqual(result["summary"]["changedChapterFileCount"], 1)
+
+        bundle = run_editor.load_project_bundle()
+        character = bundle["characters"]["characters"][0]
+        chapter = bundle["chapters"][0]
+        saved_scene = chapter["scenes"][0]
+        self.assertEqual(character["displayNameTranslations"]["en-US"], "Heroine")
+        self.assertEqual(chapter["nameTranslations"]["en-US"], "Chapter One")
+        self.assertEqual(saved_scene["nameTranslations"]["en-US"], "Opening")
+        self.assertEqual(saved_scene["blocks"][0]["textTranslations"]["en-US"], "Will you stay today too?")
+        self.assertEqual(saved_scene["blocks"][1]["options"][1]["textTranslations"]["en-US"], "Go home first")
+
     def test_project_center_hides_internal_packaging_smoke_projects_and_keeps_mode_choice(self) -> None:
         hidden_result = run_editor.create_blank_project("原生 Runtime 打包烟测", editor_mode="advanced")
         visible_result = run_editor.create_blank_project("公开测试项目", editor_mode="advanced")

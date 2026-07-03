@@ -85,6 +85,7 @@ class FrontendLocalizationCoverageModuleTests(unittest.TestCase):
               '"序号","状态","语言","语言代码","类型","目标ID","字段键","选项序号","章节","场景","位置","字段","原文","译文"',
               '"1","缺翻译","日本語","ja-JP","block","line_1","text","","第一章","开场","第 1 张 · 蓝白女主台词","正文","今天也留下来吗？","今日も残る？"',
               '"2","缺翻译","日本語","ja-JP","character","hero","displayName","","","","蓝白女主","角色名","蓝白女主","ヒロイン"',
+              '"3","缺翻译","日本語","ja-JP","chapter","chapter_1","name","","第一章","","第一章","章节名","第一章","第一章 JP"',
             ].join("\\n");
             const importPlan = tools.buildLocalizationImportPlan(data, importCsv);
             process.stdout.write(JSON.stringify({{
@@ -124,8 +125,8 @@ class FrontendLocalizationCoverageModuleTests(unittest.TestCase):
         self.assertIn('"目标ID"', payload["csv"])
         self.assertIn('"Will you stay today too?"', payload["csv"])
         self.assertGreater(payload["importPlan"]["summary"]["rowCount"], 0)
-        self.assertGreaterEqual(payload["importPlan"]["summary"]["patchCount"], 1)
-        self.assertGreaterEqual(payload["importPlan"]["summary"]["skippedCount"], 1)
+        self.assertEqual(payload["importPlan"]["summary"]["patchCount"], 3)
+        self.assertEqual(payload["importPlan"]["summary"]["skippedCount"], 0)
 
 
 if __name__ == "__main__":

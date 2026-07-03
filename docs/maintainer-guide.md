@@ -5,6 +5,7 @@ This guide explains the current maintenance boundaries for contributors who want
 ## Core Boundaries
 
 - `run_editor.py` remains the source editor entry point. It owns the local HTTP server, project mutation commands, export commands, and packaging commands.
+- `run_editor.py` also owns final writes for localization imports through `/api/import-localization-patches`; keep filesystem mutation for translated character / chapter / scene / block data there, while the frontend module prepares import plans.
 - `editor_local_security.py` owns loopback-only editor API checks. Keep Host, Origin, and Referer policy changes there instead of spreading request-safety rules through handlers.
 - `editor_snapshot_cache.py` owns small immutable-snapshot cache behavior. Reuse `SnapshotCache` for expensive read-mostly payloads that can be invalidated by a file signature.
 - `openai_asset_generation.py` owns image-generation API calls and returned-file validation.

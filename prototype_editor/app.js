@@ -22,6 +22,7 @@ const API_CREATE_VOICE_PLACEHOLDER = "/api/create-voice-placeholder";
 const API_CREATE_VOICE_PLACEHOLDERS = "/api/create-voice-placeholders";
 const API_MATCH_VOICE_FILES = "/api/match-voice-files";
 const API_SAVE_PROJECT_SETTINGS = "/api/save-project-settings";
+const API_IMPORT_LOCALIZATION_PATCHES = "/api/import-localization-patches";
 const API_REPAIR_PROJECT_DOCTOR = "/api/repair-project-doctor";
 const API_RENAME_VARIABLE = "/api/rename-variable";
 const API_CREATE_CHAPTER = "/api/create-chapter";
@@ -29740,42 +29741,6 @@ function exportLocalizationCoverageCsv() {
   showToast(`多语言覆盖 CSV 已导出：${fileName}`);
 }
 
-function ensureTranslationMap(target, key) {
-  const mapKey = `${key}Translations`;
-  if (!target[mapKey] || typeof target[mapKey] !== "object" || Array.isArray(target[mapKey])) {
-    target[mapKey] = {};
-  }
-  return target[mapKey];
-}
-
-function applyLocalizationPatchToScene(scene, patch) {
-  if (patch.kind === "scene") {
-    ensureTranslationMap(scene, patch.key)[patch.language] = patch.text;
-    return true;
-  }
-
-  const block = (scene.blocks ?? []).find((candidate) => candidate.id === patch.targetId);
-  if (!block) {
-    return false;
-  }
-
-  if (patch.kind === "block") {
-    ensureTranslationMap(block, patch.key)[patch.language] = patch.text;
-    return true;
-  }
-
-  if (patch.kind === "choice_option") {
-    const option = Array.isArray(block.options) ? block.options[patch.optionIndex] : null;
-    if (!option) {
-      return false;
-    }
-    ensureTranslationMap(option, patch.key)[patch.language] = patch.text;
-    return true;
-  }
-
-  return false;
-}
-
 async function importLocalizationCoverageCsv(file) {
   if (!file) {
     return false;
@@ -29792,36 +29757,11 @@ async function importLocalizationCoverageCsv(file) {
       return false;
     }
 
-    const scenesById = new Map((state.data?.scenes ?? []).map((scene) => [scene.id, scene]));
-    const updatedScenes = new Map();
-    let appliedCount = 0;
-    patches.forEach((patch) => {
-      const sourceScene = scenesById.get(patch.sceneId);
-      if (!sourceScene) {
-        return;
-      }
-      const updatedScene = updatedScenes.get(patch.sceneId) ?? cloneScene(sourceScene);
-      if (applyLocalizationPatchToScene(updatedScene, patch)) {
-        appliedCount += 1;
-        updatedScenes.set(patch.sceneId, updatedScene);
-      }
-    });
-
-    if (!appliedCount) {
-      const message = "翻译 CSV 解析成功，但没有匹配到可写入的场景内容";
-      setSaveStatus(message, true);
-      showToast(message, "error");
-      return false;
-    }
-
-    setSaveStatus(`正在导入翻译：${appliedCount} 条 / ${updatedScenes.size} 个场景...`);
-    for (const scene of updatedScenes.values()) {
-      await postJson(API_SAVE_SCENE, {
-        chapterId: scene.chapterId,
-        sceneId: scene.id,
-        scene: stripSceneForSave(scene),
-      });
-    }
+    setSaveStatus(`正在导入翻译：${patches.length} 条...`);
+    const result = await postJson(API_IMPORT_LOCALIZATION_PATCHES, { patches });
+    const summary = result.summary ?? {};
+    const appliedCount = summary.appliedCount ?? (result.applied ?? []).length;
+    const skippedCount = (plan.summary?.skippedCount ?? 0) + (summary.skippedCount ?? 0);
 
     await reloadProjectData({
       ...getCurrentUiState(),
@@ -29833,12 +29773,14 @@ async function importLocalizationCoverageCsv(file) {
     });
     state.validation = runValidation(state.data);
     updateTopbar();
-    if (state.currentScreen === "inspection") {
-      renderInspectionScreen();
-    }
 
-    const skippedSuffix = plan.summary?.skippedCount ? `，跳过 ${plan.summary.skippedCount} 条` : "";
-    const message = `已导入翻译 ${appliedCount} 条，写入 ${updatedScenes.size} 个场景${skippedSuffix}`;
+    const changedTargets = [
+      summary.characterChanged ? "角色" : "",
+      summary.changedChapterFileCount ? `${summary.changedChapterFileCount} 个章节文件` : "",
+    ].filter(Boolean);
+    const changedSuffix = changedTargets.length ? `，更新 ${changedTargets.join("、")}` : "";
+    const skippedSuffix = skippedCount ? `，跳过 ${skippedCount} 条` : "";
+    const message = `已导入翻译 ${appliedCount} 条${changedSuffix}${skippedSuffix}`;
     setSaveStatus(message);
     showToast(message, "soft");
     return true;

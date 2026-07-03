@@ -2498,6 +2498,234 @@ def save_scene(chapter_id: str, scene_id: str, scene_payload: dict) -> None:
     raise ValueError("没有找到对应的章节文件。")
 
 
+def get_patch_text(value: object, limit: int = 8000) -> str:
+    return str(value or "").strip()[:limit]
+
+
+def get_patch_language(value: object) -> str:
+    return normalize_language_code(value, "")
+
+
+def ensure_translation_map(target: dict, key: str) -> dict:
+    map_key = f"{key}Translations"
+    translations = target.get(map_key)
+    if not isinstance(translations, dict):
+        translations = {}
+        target[map_key] = translations
+    return translations
+
+
+def build_localization_chapter_context() -> tuple[list[tuple[Path, dict]], dict[str, dict], dict[str, tuple[Path, dict, dict]]]:
+    chapter_entries = [(path, read_json(path)) for path in list_chapter_files()]
+    chapter_by_id = {
+        str(chapter.get("chapterId") or "").strip(): {"path": path, "chapter": chapter}
+        for path, chapter in chapter_entries
+        if str(chapter.get("chapterId") or "").strip()
+    }
+    scene_lookup: dict[str, tuple[Path, dict, dict]] = {}
+    for path, chapter in chapter_entries:
+        for scene in chapter.get("scenes", []) if isinstance(chapter.get("scenes"), list) else []:
+            scene_id = str(scene.get("id") or "").strip()
+            if scene_id:
+                scene_lookup[scene_id] = (path, chapter, scene)
+    return chapter_entries, chapter_by_id, scene_lookup
+
+
+def find_localization_scene_context(
+    patch: dict,
+    chapter_entries: list[tuple[Path, dict]],
+    chapter_by_id: dict[str, dict],
+    scene_lookup: dict[str, tuple[Path, dict, dict]],
+) -> tuple[Path, dict, dict] | None:
+    scene_id = str(patch.get("sceneId") or patch.get("targetId") or "").strip()
+    chapter_id = str(patch.get("chapterId") or "").strip()
+    if scene_id and chapter_id:
+        chapter_entry = chapter_by_id.get(chapter_id)
+        chapter = chapter_entry.get("chapter") if chapter_entry else None
+        if chapter:
+            for scene in chapter.get("scenes", []) if isinstance(chapter.get("scenes"), list) else []:
+                if str(scene.get("id") or "").strip() == scene_id:
+                    return (chapter_entry["path"], chapter, scene)
+    if scene_id in scene_lookup:
+        return scene_lookup[scene_id]
+    for path, chapter in chapter_entries:
+        for scene in chapter.get("scenes", []) if isinstance(chapter.get("scenes"), list) else []:
+            if str(scene.get("id") or "").strip() == scene_id:
+                return (path, chapter, scene)
+    return None
+
+
+def add_localization_skip(skipped: list[dict], patch: object, reason: str, index: int) -> None:
+    source = patch if isinstance(patch, dict) else {}
+    skipped.append(
+        {
+            "index": index,
+            "rowNumber": source.get("rowNumber"),
+            "kind": source.get("kind"),
+            "targetId": source.get("targetId"),
+            "language": source.get("language"),
+            "reason": reason,
+        }
+    )
+
+
+def apply_localization_translation(
+    target: dict,
+    key: str,
+    language: str,
+    text: str,
+    skipped: list[dict],
+    patch: dict,
+    index: int,
+) -> bool:
+    translations = ensure_translation_map(target, key)
+    if str(translations.get(language) or "").strip() == text:
+        add_localization_skip(skipped, patch, "译文与项目内现有内容相同。", index)
+        return False
+    translations[language] = text
+    return True
+
+
+def import_localization_patches(patches: object) -> dict:
+    if not isinstance(patches, list):
+        raise ValueError("翻译导入内容必须是补丁列表。")
+    if len(patches) > 2000:
+        raise ValueError("一次最多导入 2000 条翻译补丁，请分批处理。")
+
+    characters_path = DATA_DIR / "characters.json"
+    characters_doc = normalize_characters_document(read_json(characters_path))
+    characters = characters_doc.setdefault("characters", [])
+    characters_by_id = {str(character.get("id") or "").strip(): character for character in characters}
+    chapter_entries, chapter_by_id, scene_lookup = build_localization_chapter_context()
+    dirty_chapter_paths: set[Path] = set()
+    dirty_characters = False
+    applied: list[dict] = []
+    skipped: list[dict] = []
+
+    for index, raw_patch in enumerate(patches, start=1):
+        if not isinstance(raw_patch, dict):
+            add_localization_skip(skipped, raw_patch, "补丁不是有效对象。", index)
+            continue
+
+        kind = str(raw_patch.get("kind") or "").strip()
+        target_id = str(raw_patch.get("targetId") or "").strip()
+        key = str(raw_patch.get("key") or "").strip()
+        language = get_patch_language(raw_patch.get("language"))
+        text = get_patch_text(raw_patch.get("text"))
+
+        if not kind or not target_id or not key:
+            add_localization_skip(skipped, raw_patch, "缺少类型、目标ID或字段键。", index)
+            continue
+        if not language:
+            add_localization_skip(skipped, raw_patch, "语言代码为空。", index)
+            continue
+        if not text:
+            add_localization_skip(skipped, raw_patch, "译文为空。", index)
+            continue
+
+        if kind == "character":
+            if key not in {"displayName", "name"}:
+                add_localization_skip(skipped, raw_patch, "角色翻译只支持 displayName 或 name 字段。", index)
+                continue
+            character = characters_by_id.get(target_id)
+            if not character:
+                add_localization_skip(skipped, raw_patch, "找不到目标角色。", index)
+                continue
+            if apply_localization_translation(character, key, language, text, skipped, raw_patch, index):
+                dirty_characters = True
+                applied.append({"kind": kind, "targetId": target_id, "key": key, "language": language})
+            continue
+
+        if kind == "chapter":
+            if key != "name":
+                add_localization_skip(skipped, raw_patch, "章节翻译只支持 name 字段。", index)
+                continue
+            chapter_entry = chapter_by_id.get(target_id)
+            if not chapter_entry:
+                add_localization_skip(skipped, raw_patch, "找不到目标章节。", index)
+                continue
+            chapter = chapter_entry["chapter"]
+            if apply_localization_translation(chapter, key, language, text, skipped, raw_patch, index):
+                dirty_chapter_paths.add(chapter_entry["path"])
+                applied.append({"kind": kind, "targetId": target_id, "key": key, "language": language})
+            continue
+
+        scene_context = find_localization_scene_context(raw_patch, chapter_entries, chapter_by_id, scene_lookup)
+        if not scene_context:
+            add_localization_skip(skipped, raw_patch, "找不到目标场景。", index)
+            continue
+        chapter_path, chapter, scene = scene_context
+
+        if kind == "scene":
+            if key != "name":
+                add_localization_skip(skipped, raw_patch, "场景翻译只支持 name 字段。", index)
+                continue
+            if apply_localization_translation(scene, key, language, text, skipped, raw_patch, index):
+                dirty_chapter_paths.add(chapter_path)
+                applied.append({"kind": kind, "targetId": str(scene.get("id") or target_id), "key": key, "language": language})
+            continue
+
+        blocks = scene.get("blocks") if isinstance(scene.get("blocks"), list) else []
+        block = next((candidate for candidate in blocks if str(candidate.get("id") or "").strip() == target_id), None)
+        if not block:
+            add_localization_skip(skipped, raw_patch, "找不到目标卡片。", index)
+            continue
+
+        if kind == "block":
+            if key not in {"text", "title"}:
+                add_localization_skip(skipped, raw_patch, "卡片翻译只支持 text 或 title 字段。", index)
+                continue
+            if apply_localization_translation(block, key, language, text, skipped, raw_patch, index):
+                dirty_chapter_paths.add(chapter_path)
+                applied.append({"kind": kind, "targetId": target_id, "key": key, "language": language})
+            continue
+
+        if kind == "choice_option":
+            if key != "text":
+                add_localization_skip(skipped, raw_patch, "选项翻译只支持 text 字段。", index)
+                continue
+            option_index = raw_patch.get("optionIndex")
+            if not isinstance(option_index, int):
+                try:
+                    option_index = int(option_index)
+                except (TypeError, ValueError):
+                    option_index = -1
+            options = block.get("options") if isinstance(block.get("options"), list) else []
+            if option_index < 0 or option_index >= len(options):
+                add_localization_skip(skipped, raw_patch, "找不到目标选项。", index)
+                continue
+            if apply_localization_translation(options[option_index], key, language, text, skipped, raw_patch, index):
+                dirty_chapter_paths.add(chapter_path)
+                applied.append({"kind": kind, "targetId": target_id, "key": key, "language": language})
+            continue
+
+        add_localization_skip(skipped, raw_patch, "不支持的翻译补丁类型。", index)
+
+    if dirty_characters:
+        write_json(characters_path, normalize_characters_document(characters_doc))
+    for chapter_path, chapter in chapter_entries:
+        if chapter_path in dirty_chapter_paths:
+            write_json(chapter_path, normalize_chapter_document(chapter, chapter_path.stem))
+
+    changed = dirty_characters or bool(dirty_chapter_paths)
+    if changed:
+        touch_project()
+
+    return {
+        "changed": changed,
+        "applied": applied,
+        "skipped": skipped,
+        "summary": {
+            "patchCount": len(patches),
+            "appliedCount": len(applied),
+            "skippedCount": len(skipped),
+            "characterChanged": dirty_characters,
+            "changedChapterFileCount": len(dirty_chapter_paths),
+            "languageCount": len({item["language"] for item in applied}),
+        },
+    }
+
+
 def save_project_settings(
     *,
     resolution: dict | None = None,
@@ -12280,6 +12508,10 @@ class EditorRequestHandler(SimpleHTTPRequestHandler):
             self.handle_save_project_settings()
             return
 
+        if parsed.path == "/api/import-localization-patches":
+            self.handle_import_localization_patches()
+            return
+
         if parsed.path == "/api/repair-project-doctor":
             self.handle_repair_project_doctor()
             return
@@ -13075,6 +13307,30 @@ class EditorRequestHandler(SimpleHTTPRequestHandler):
         except Exception as error:  # pragma: no cover - defensive fallback
             self.send_json(
                 {"ok": False, "error": f"保存项目设置时出了意外问题：{error}"},
+                status=HTTPStatus.INTERNAL_SERVER_ERROR,
+            )
+
+    def handle_import_localization_patches(self) -> None:
+        try:
+            payload = self.read_json_body()
+            result = attach_history_to_result(
+                import_localization_patches(payload.get("patches")),
+                "导入多语言翻译",
+            )
+            self.send_json(
+                {
+                    "ok": True,
+                    "savedAt": now_iso(),
+                    **result,
+                }
+            )
+        except json.JSONDecodeError:
+            self.send_json({"ok": False, "error": "请求体不是有效 JSON。"}, status=HTTPStatus.BAD_REQUEST)
+        except ValueError as error:
+            self.send_json({"ok": False, "error": str(error)}, status=HTTPStatus.BAD_REQUEST)
+        except Exception as error:  # pragma: no cover - defensive fallback
+            self.send_json(
+                {"ok": False, "error": f"导入多语言翻译时出了意外问题：{error}"},
                 status=HTTPStatus.INTERNAL_SERVER_ERROR,
             )
 

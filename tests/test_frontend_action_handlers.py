@@ -3976,6 +3976,8 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("function exportLocalizationCoverageMarkdown()", source)
         self.assertIn("function exportLocalizationCoverageCsv()", source)
         self.assertIn("function importLocalizationCoverageCsv(file)", source)
+        self.assertIn('const API_IMPORT_LOCALIZATION_PATCHES = "/api/import-localization-patches"', source)
+        self.assertIn("postJson(API_IMPORT_LOCALIZATION_PATCHES", source)
         self.assertIn("localizationCoverageTools.buildLocalizationCoverage", source)
         self.assertIn("localizationCoverageTools.getLocalizationCoverageStatusDigest", source)
         self.assertIn("localizationCoverageTools.buildLocalizationImportPlan", source)

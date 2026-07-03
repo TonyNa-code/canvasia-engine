@@ -94,9 +94,9 @@
   function buildChapterMap(data = {}) {
     return new Map(
       toArray(data.chapters).map((chapter, index) => [
-        cleanText(chapter?.id),
+        getChapterId(chapter),
         {
-          id: cleanText(chapter?.id),
+          id: getChapterId(chapter),
           name: cleanText(chapter?.name ?? chapter?.title, `章节 ${index + 1}`),
           order: index,
         },
@@ -112,7 +112,7 @@
     }
     return toArray(data.chapters).flatMap((chapter, chapterIndex) =>
       toArray(chapter?.scenes).map((scene, sceneIndex) => ({
-        scene: { ...scene, chapterId: scene?.chapterId ?? chapter?.id },
+        scene: { ...scene, chapterId: scene?.chapterId ?? getChapterId(chapter) },
         index: chapterIndex * 10000 + sceneIndex,
       }))
     ).sort((left, right) => {
@@ -141,6 +141,10 @@
 
   function buildCharacterMap(data = {}) {
     return new Map(toArray(data.characters).map((character) => [cleanText(character?.id), character]));
+  }
+
+  function getChapterId(chapter = {}) {
+    return cleanText(chapter?.chapterId ?? chapter?.id);
   }
 
   function getCharacterName(character, fallback = "未命名角色") {
@@ -302,12 +306,14 @@
     });
 
     toArray(data.chapters).forEach((chapter, index) => {
+      const chapterId = getChapterId(chapter) || `chapter_${index + 1}`;
       const chapterName = cleanText(chapter?.name ?? chapter?.title, `章节 ${index + 1}`);
       addCoverageEntries(
         entries,
         chapter,
         {
-          id: cleanText(chapter?.id, `chapter_${index + 1}`),
+          id: chapterId,
+          targetId: chapterId,
           kind: "chapter",
           key: "name",
           chapterName,
@@ -669,6 +675,20 @@
     return null;
   }
 
+  function findCharacterById(data = {}, characterId = "") {
+    const cleanCharacterId = cleanText(characterId);
+    return cleanCharacterId
+      ? toArray(data.characters).find((character) => cleanText(character?.id) === cleanCharacterId) ?? null
+      : null;
+  }
+
+  function findChapterById(data = {}, chapterId = "") {
+    const cleanChapterId = cleanText(chapterId);
+    return cleanChapterId
+      ? toArray(data.chapters).find((chapter) => getChapterId(chapter) === cleanChapterId) ?? null
+      : null;
+  }
+
   function getCurrentTranslation(source = {}, key = "", language = "") {
     return cleanText(getTranslationMap(source, key)[language]);
   }
@@ -689,7 +709,7 @@
     const rows = parseLocalizationCoverageCsv(csvText);
     const patches = [];
     const skipped = [];
-    const supportedKinds = new Set(["scene", "block", "choice_option"]);
+    const supportedKinds = new Set(["character", "chapter", "scene", "block", "choice_option"]);
     const seenPatchKeys = new Set();
 
     rows.forEach((row) => {
@@ -713,6 +733,54 @@
       }
       if (!targetId || !key) {
         pushImportSkip(skipped, row, "缺少目标ID或字段键，请使用编辑器导出的新版 CSV。");
+        return;
+      }
+
+      if (kind === "character") {
+        const character = findCharacterById(data, targetId);
+        if (!character) {
+          pushImportSkip(skipped, row, "找不到目标角色。");
+          return;
+        }
+        if (!["displayName", "name"].includes(key)) {
+          pushImportSkip(skipped, row, "角色翻译只支持 displayName 或 name 字段。");
+          return;
+        }
+        if (getCurrentTranslation(character, key, language) === text) {
+          pushImportSkip(skipped, row, "译文与项目内现有内容相同。");
+          return;
+        }
+        const patchKey = `character:${targetId}:${key}:${language}`;
+        if (seenPatchKeys.has(patchKey)) {
+          pushImportSkip(skipped, row, "同一个目标在 CSV 中重复出现，已保留第一条。");
+          return;
+        }
+        seenPatchKeys.add(patchKey);
+        patches.push({ rowNumber: row.rowNumber, kind, targetId, key, language, text });
+        return;
+      }
+
+      if (kind === "chapter") {
+        const chapter = findChapterById(data, targetId);
+        if (!chapter) {
+          pushImportSkip(skipped, row, "找不到目标章节。");
+          return;
+        }
+        if (key !== "name") {
+          pushImportSkip(skipped, row, "章节翻译只支持 name 字段。");
+          return;
+        }
+        if (getCurrentTranslation(chapter, key, language) === text) {
+          pushImportSkip(skipped, row, "译文与项目内现有内容相同。");
+          return;
+        }
+        const patchKey = `chapter:${targetId}:${key}:${language}`;
+        if (seenPatchKeys.has(patchKey)) {
+          pushImportSkip(skipped, row, "同一个目标在 CSV 中重复出现，已保留第一条。");
+          return;
+        }
+        seenPatchKeys.add(patchKey);
+        patches.push({ rowNumber: row.rowNumber, kind, targetId, key, language, text });
         return;
       }
 
