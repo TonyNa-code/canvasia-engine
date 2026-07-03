@@ -67,13 +67,13 @@ The project already includes a visual editor, export pipeline, native runtime pr
 - Advanced particle presets, project particle libraries, camera effects, screen filters, flashes, shakes, and fade transitions
 - Live2D / 3D character and 3D scene asset import, plus native-runtime 3D inspection reports for glTF / GLB / VRM assets
 - Web playable export, desktop exports, editor desktop builds, and native Runtime preview packages
-- Automated checks: local CI precheck, backend smoke tests, Playwright browser smoke tests, action wiring scans, branch-aware preview regression with condition / fallback variable presets, release-control reports, choice consequence audits, variable influence audits, asset dependency audits, BGM cue-sheet audits, character stage-direction audits, presentation timeline audits, tester handoff work orders, playtest feedback templates and feedback intake summaries, VN baseline quality audits, and package integrity verification
+- Automated checks: local CI precheck, backend smoke tests, Playwright browser smoke tests, action wiring scans, branch-aware preview regression with condition / fallback variable presets, release-control reports, scene production boards, choice consequence audits, variable influence audits, asset dependency audits, BGM cue-sheet audits, character stage-direction audits, presentation timeline audits, tester handoff work orders, playtest feedback templates and feedback intake summaries, VN baseline quality audits, and package integrity verification
 
 ## Feature Status
 
 | Area | Status | Notes |
 | --- | --- | --- |
-| Story and Branch Editing | Available | Visual cards, choices, jumps, variables, conditions, entry reachability route checks, variable influence reports, scene graph inspection, and plain-text script-to-card import. |
+| Story and Branch Editing | Available | Visual cards, choices, jumps, variables, conditions, entry reachability route checks, scene production boards, variable influence reports, scene graph inspection, and plain-text script-to-card import. |
 | Asset Management | Available | Import, replace, delete, usage protection, dependency reports, file-size budget hints, and optional OpenAI Image generation with style presets, sprite expression binding, prompt, model, format, and returned-file validation. |
 | Multi-language / i18n | Preview | Project language settings, localization coverage reports, safe CSV re-import for character, chapter, scene, and story-card translations, export metadata, Web Runtime language switching, native Runtime language switching, and fallback behavior. |
 | Canvasia Assistant | Available | Local template mode plus optional creator-owned API keys for major compatible providers. |

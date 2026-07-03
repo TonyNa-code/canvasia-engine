@@ -51,6 +51,7 @@ const { STORY_TEMPLATE_PRESETS } = storyTemplateTools;
 const scriptImporterTools = window.CanvasiaEditorScriptImporter;
 const routeAnalyzerTools = window.CanvasiaEditorRouteAnalyzer;
 const routeTestingReportTools = window.CanvasiaEditorRouteTestingReport;
+const sceneProductionBoardTools = window.CanvasiaEditorSceneProductionBoard;
 const previewRegressionTools = window.CanvasiaEditorPreviewRegression;
 const playtestHandoffReportTools = window.CanvasiaEditorPlaytestHandoffReport;
 const choiceConsequenceSheetTools = window.CanvasiaEditorChoiceConsequenceSheet;
@@ -3823,6 +3824,16 @@ async function handleClick(event) {
 
   if (action === "export-inspection-report") {
     exportInspectionReport();
+    return;
+  }
+
+  if (action === "export-scene-production-board-markdown") {
+    exportSceneProductionBoardMarkdown();
+    return;
+  }
+
+  if (action === "export-scene-production-board-csv") {
+    exportSceneProductionBoardCsv();
     return;
   }
 
@@ -28451,6 +28462,17 @@ function buildRouteTestingPlanFileName(extension = "md") {
   return `${title}_route_testing_plan_${dateStamp}.${extension}`;
 }
 
+function buildSceneProductionBoardFileName(extension = "md") {
+  const date = new Date();
+  const dateStamp = [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("");
+  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
+  return `${title}_scene_production_board_${dateStamp}.${extension}`;
+}
+
 function buildChoiceConsequenceFileName(extension = "md") {
   const date = new Date();
   const dateStamp = [
@@ -29712,6 +29734,30 @@ function exportRouteTestingPlanCsv() {
   downloadTextFile(fileName, content, "text/csv;charset=utf-8");
   setSaveStatus(`已导出路线试玩 CSV：${fileName}`);
   showToast(`路线试玩 CSV 已导出：${fileName}`);
+}
+
+function buildSceneProductionBoard() {
+  return sceneProductionBoardTools.buildSceneProductionBoard(state.data ?? {});
+}
+
+function exportSceneProductionBoardMarkdown() {
+  const fileName = buildSceneProductionBoardFileName("md");
+  const board = buildSceneProductionBoard();
+  const content = sceneProductionBoardTools.buildSceneProductionBoardMarkdown(board, {
+    projectTitle: state.data?.project?.title || "Canvasia Project",
+    generatedAt: formatDate(new Date().toISOString()),
+  });
+  downloadTextFile(fileName, content, "text/markdown;charset=utf-8");
+  setSaveStatus(`已导出场景生产看板：${fileName}`);
+  showToast(`场景生产看板已导出：${fileName}`);
+}
+
+function exportSceneProductionBoardCsv() {
+  const fileName = buildSceneProductionBoardFileName("csv");
+  const content = sceneProductionBoardTools.buildSceneProductionBoardCsv(buildSceneProductionBoard());
+  downloadTextFile(fileName, content, "text/csv;charset=utf-8");
+  setSaveStatus(`已导出场景生产 CSV：${fileName}`);
+  showToast(`场景生产 CSV 已导出：${fileName}`);
 }
 
 function buildChoiceConsequenceSheet() {
@@ -31238,6 +31284,79 @@ function getChoiceConsequenceToneClass(status) {
   return "";
 }
 
+function getSceneProductionBoardToneClass(status) {
+  if (status === "blocked") {
+    return "danger-text";
+  }
+  if (status === "warn") {
+    return "warn-text";
+  }
+  if (status === "ready") {
+    return "good-text";
+  }
+  return "";
+}
+
+function renderSceneProductionBoardPanel() {
+  const board = buildSceneProductionBoard();
+  const digest = sceneProductionBoardTools.getSceneProductionBoardStatusDigest(board);
+  const summary = board.summary ?? {};
+  const priorityScenes = (board.scenes ?? []).slice(0, 4);
+
+  return `
+    <article class="detail-card preview-sprint-panel">
+      <div class="panel-heading">
+        <h2>场景生产看板</h2>
+        <span class="badge badge-soft ${getSceneProductionBoardToneClass(digest.status)}">${escapeHtml(digest.title)}</span>
+      </div>
+      <p class="helper-text">${escapeHtml(digest.detail)} 它会按场景整理缺背景、缺 BGM、待绑语音、长文本、坏跳转和演出不足，把“下一步该做什么”变成制作任务。</p>
+      <div class="preview-sprint-metrics">
+        ${renderRouteMetricCard("平均完成度", `${summary.averageCompletion ?? 0}%`, "所有场景的制作健康度")}
+        ${renderRouteMetricCard("可试玩 / 先修", `${summary.readySceneCount ?? 0} / ${summary.blockedSceneCount ?? 0}`, "能跑起来与需要先处理的场景")}
+        ${renderRouteMetricCard("缺背景 / 缺 BGM", `${summary.missingBackgroundSceneCount ?? 0} / ${summary.missingMusicSceneCount ?? 0}`, "最基础的画面和氛围缺口")}
+        ${renderRouteMetricCard("待绑语音", `${summary.missingVoiceLineCount ?? 0} 句`, "台词语音覆盖缺口")}
+      </div>
+      <div class="detail-actions">
+        <button class="toolbar-button toolbar-button-primary" data-action="export-scene-production-board-markdown">
+          导出场景生产看板
+        </button>
+        <button class="toolbar-button" data-action="export-scene-production-board-csv">
+          导出场景 CSV
+        </button>
+        <button class="toolbar-button" data-action="switch-screen" data-screen="story">
+          去剧情页处理
+        </button>
+      </div>
+      ${
+        priorityScenes.length > 0
+          ? `
+            <div class="preview-sprint-grid">
+              ${priorityScenes
+                .map(
+                  (scene) => `
+                    <article class="preview-sprint-card is-${scene.status === "blocked" ? "danger" : scene.status === "warn" ? "warn" : "soft"}">
+                      <div class="preview-sprint-head">
+                        <strong>${escapeHtml(scene.sceneName)}</strong>
+                        <span class="issue-tag ${getSceneProductionBoardToneClass(scene.status)}">
+                          ${escapeHtml(`${scene.statusLabel} · ${scene.completionScore}%`)}
+                        </span>
+                      </div>
+                      <p>${escapeHtml(`${scene.chapterName} · 下一步：${scene.nextAction}`)}</p>
+                      <div class="helper-text">
+                        ${escapeHtml(`卡片 ${scene.blockCount} · 台词 ${scene.dialogueCount} · 待绑语音 ${scene.missingVoiceCount} · 背景 ${scene.hasBackground ? "有" : "缺"} · BGM ${scene.hasMusic ? "有" : "缺"}`)}
+                      </div>
+                    </article>
+                  `
+                )
+                .join("")}
+            </div>
+          `
+          : renderEmpty("当前项目还没有场景。可以先在项目中心创建 Demo 或空白项目，再进入剧情页添加第一场。")
+      }
+    </article>
+  `;
+}
+
 function renderChoiceConsequencePanel() {
   const sheet = buildChoiceConsequenceSheet();
   const digest = choiceConsequenceSheetTools.getChoiceConsequenceStatusDigest(sheet);
@@ -31918,6 +32037,7 @@ function renderInspectionOverviewPanel(routeOverview) {
       </div>
       ${renderCompactProjectMilestonePanel(routeOverview)}
       ${renderProjectDoctorPanel(routeOverview, issueItems)}
+      ${renderSceneProductionBoardPanel()}
       ${renderChoiceConsequencePanel()}
       ${renderVariableInfluencePanel()}
       ${renderAssetDependencyPanel()}

@@ -3936,6 +3936,27 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("audioCueSheetTools.buildAudioCueSheet", source)
         self.assertIn("audioCueSheetTools.getAudioCueSheetStatusDigest", source)
 
+    def test_scene_production_board_export_actions_are_wired(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        click_handler = _extract_function_source(source, "handleClick")
+        markdown_block_start = click_handler.index('action === "export-scene-production-board-markdown"')
+        csv_block_start = click_handler.index('action === "export-scene-production-board-csv"')
+        csv_block_end = click_handler.index('action === "export-choice-consequence-markdown"', csv_block_start)
+        markdown_block = click_handler[markdown_block_start:csv_block_start]
+        csv_block = click_handler[csv_block_start:csv_block_end]
+
+        self.assertIn("const sceneProductionBoardTools = window.CanvasiaEditorSceneProductionBoard", source)
+        self.assertIn('data-action="export-scene-production-board-markdown"', source)
+        self.assertIn('data-action="export-scene-production-board-csv"', source)
+        self.assertIn("exportSceneProductionBoardMarkdown();", markdown_block)
+        self.assertIn("exportSceneProductionBoardCsv();", csv_block)
+        self.assertIn("function buildSceneProductionBoard()", source)
+        self.assertIn("function renderSceneProductionBoardPanel()", source)
+        self.assertIn("function exportSceneProductionBoardMarkdown()", source)
+        self.assertIn("function exportSceneProductionBoardCsv()", source)
+        self.assertIn("sceneProductionBoardTools.buildSceneProductionBoard", source)
+        self.assertIn("sceneProductionBoardTools.getSceneProductionBoardStatusDigest", source)
+
     def test_choice_consequence_sheet_export_actions_are_wired(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
         click_handler = _extract_function_source(source, "handleClick")
