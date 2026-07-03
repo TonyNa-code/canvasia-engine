@@ -8,6 +8,7 @@
     "character_hide",
     "music_play",
     "music_stop",
+    "sfx_play",
     "screen_fade",
   ]);
   const ROUTE_DRAFT_TYPES = Object.freeze(["jump"]);
@@ -240,6 +241,19 @@
         : null;
     }
 
+    const playSfxMatch = text.match(/^(?:play\s+)?(?:sound|sfx|se)\s+(.+)$/i);
+    if (playSfxMatch) {
+      const sfxText = playSfxMatch[1];
+      const leading = readLeadingArgument(sfxText);
+      return leading.argument
+        ? {
+            type: "sfx_play",
+            assetHint: leading.argument,
+            volume: 100,
+          }
+        : null;
+    }
+
     const stopMusicMatch = text.match(/^stop\s+(?:music|bgm)\b(.*)$/i) ?? text.match(/^(?:music|bgm)\s+stop\b(.*)$/i);
     if (stopMusicMatch) {
       return {
@@ -258,6 +272,12 @@
     }
 
     return null;
+  }
+
+  function parseVoiceLine(line) {
+    const match = String(line ?? "").trim().match(/^voice\s+(.+)$/i);
+    const voiceHint = stripWrappingQuotes(trimImportedText(match?.[1] ?? "", 160));
+    return voiceHint ? { voiceHint } : null;
   }
 
   function parseJumpLine(line) {
@@ -293,6 +313,15 @@
     const lines = normalizeScriptImportText(text).slice(0, maxLines);
     const blocks = [];
     const choiceOptions = [];
+    let pendingVoiceHint = "";
+
+    function attachPendingVoice(block) {
+      if (pendingVoiceHint && (block?.type === "dialogue" || block?.type === "narration")) {
+        block.voiceHint = pendingVoiceHint;
+        pendingVoiceHint = "";
+      }
+      return block;
+    }
 
     lines.forEach((line) => {
       if (blocks.length >= maxBlocks) {
@@ -300,6 +329,12 @@
       }
 
       if (isIgnoredScriptLine(line)) {
+        return;
+      }
+
+      const voiceLine = parseVoiceLine(line);
+      if (voiceLine) {
+        pendingVoiceHint = voiceLine.voiceHint;
         return;
       }
 
@@ -335,22 +370,22 @@
 
       const dialogue = parseDialogueLine(line);
       if (dialogue) {
-        blocks.push(dialogue);
+        blocks.push(attachPendingVoice(dialogue));
         return;
       }
 
       const quotedDialogue = parseQuotedDialogueLine(line);
       if (quotedDialogue) {
-        blocks.push(quotedDialogue);
+        blocks.push(attachPendingVoice(quotedDialogue));
         return;
       }
 
       const narration = trimImportedText(line);
       if (narration) {
-        blocks.push({
+        blocks.push(attachPendingVoice({
           type: "narration",
           text: narration,
-        });
+        }));
       }
     });
 
@@ -398,6 +433,9 @@
     if (block?.type === "music_play") {
       return `播放 BGM：${block.assetHint || "待选择音乐"}`;
     }
+    if (block?.type === "sfx_play") {
+      return `播放音效：${block.assetHint || "待选择音效"}`;
+    }
     if (block?.type === "music_stop") {
       return "停止 BGM";
     }
@@ -419,7 +457,8 @@
       .slice(0, Math.max(0, Number.parseInt(limit, 10) || 0))
       .map((block, index) => {
         if (block?.type === "dialogue") {
-          return `${index + 1}. ${block.speakerName || "角色"}：${block.text || ""}`;
+          const voiceSuffix = block.voiceHint ? `（voice: ${block.voiceHint}）` : "";
+          return `${index + 1}. ${block.speakerName || "角色"}：${block.text || ""}${voiceSuffix}`;
         }
         if (block?.type === "choice") {
           return `${index + 1}. 选项：${(block.options ?? [])
@@ -432,7 +471,7 @@
         if (ROUTE_DRAFT_TYPES.includes(block?.type)) {
           return `${index + 1}. 路线：${buildRoutePreviewLine(block)}`;
         }
-        return `${index + 1}. 旁白：${block?.text || ""}`;
+        return `${index + 1}. 旁白：${block?.text || ""}${block?.voiceHint ? `（voice: ${block.voiceHint}）` : ""}`;
       });
   }
 
@@ -448,6 +487,7 @@
     parseDialogueLine,
     parseQuotedDialogueLine,
     parseStageDirectionLine,
+    parseVoiceLine,
     parseJumpLine,
     parseScriptDraftToBlocks,
     summarizeScriptDraftBlocks,

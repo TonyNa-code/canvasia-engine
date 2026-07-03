@@ -38,6 +38,8 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
               scene classroom with fade duration 800ms
               play music school_theme fadein 1.2 fadeout 0.8
               show yuina smile at right with dissolve duration 700ms
+              play sound door_knock
+              voice yuina_001
               yuina "你终于来了。"
               "雨声没有停。"
               menu:
@@ -58,6 +60,8 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
               quotedDialogueLine: tools.parseQuotedDialogueLine('悠奈 "你终于来了。"'),
               narrationLine: tools.parseDialogueLine("旁白：雨声变大了。"),
               stageLine: tools.parseStageDirectionLine("show yuina smile at right with dissolve"),
+              sfxLine: tools.parseStageDirectionLine("play sound door_knock"),
+              voiceLine: tools.parseVoiceLine("voice yuina_001"),
               jumpLine: tools.parseJumpLine("jump scene_end"),
               blocks,
               summary: tools.summarizeScriptDraftBlocks(blocks),
@@ -66,6 +70,7 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
               vnBlocks,
               vnSummary: tools.summarizeScriptDraftBlocks(vnBlocks),
               vnPreview: tools.buildScriptDraftPreviewLines(vnBlocks, 4),
+              vnVoicePreview: tools.buildScriptDraftPreviewLines(vnBlocks, 5),
             }}));
             """
         )
@@ -104,6 +109,8 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
             "transition": "fade",
             "transitionDurationMs": 600,
         })
+        self.assertEqual(payload["sfxLine"], {"type": "sfx_play", "assetHint": "door_knock", "volume": 100})
+        self.assertEqual(payload["voiceLine"], {"voiceHint": "yuina_001"})
         self.assertEqual(payload["jumpLine"], {"type": "jump", "targetHint": "scene_end"})
         self.assertEqual([block["type"] for block in payload["blocks"]], [
             "narration",
@@ -125,6 +132,7 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
             "background",
             "music_play",
             "character_show",
+            "sfx_play",
             "dialogue",
             "narration",
             "choice",
@@ -141,22 +149,25 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
         self.assertEqual(payload["vnBlocks"][2]["position"], "right")
         self.assertEqual(payload["vnBlocks"][2]["transition"], "fade")
         self.assertEqual(payload["vnBlocks"][2]["transitionDurationMs"], 700)
-        self.assertEqual(payload["vnBlocks"][5]["options"], [
+        self.assertEqual(payload["vnBlocks"][3], {"type": "sfx_play", "assetHint": "door_knock", "volume": 100})
+        self.assertEqual(payload["vnBlocks"][4]["voiceHint"], "yuina_001")
+        self.assertEqual(payload["vnBlocks"][6]["options"], [
             {"text": "问她原因", "targetHint": "scene_roof"},
             {"text": "先沉默"},
         ])
-        self.assertEqual(payload["vnBlocks"][8]["action"], "fade_in")
-        self.assertEqual(payload["vnBlocks"][8]["durationMs"], 500)
-        self.assertEqual(payload["vnBlocks"][9], {"type": "jump", "targetHint": "scene_end"})
+        self.assertEqual(payload["vnBlocks"][9]["action"], "fade_in")
+        self.assertEqual(payload["vnBlocks"][9]["durationMs"], 500)
+        self.assertEqual(payload["vnBlocks"][10], {"type": "jump", "targetHint": "scene_end"})
         self.assertEqual(payload["vnSummary"], {
             "dialogue": 1,
             "narration": 1,
             "choice": 1,
-            "stage": 6,
+            "stage": 7,
             "route": 1,
-            "total": 10,
+            "total": 11,
         })
         self.assertIn("演出：切背景：classroom", payload["vnPreview"][0])
+        self.assertIn("voice: yuina_001", payload["vnVoicePreview"][4])
 
 
 if __name__ == "__main__":

@@ -37,6 +37,8 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
               assetList: [
                 {{ id: "bg_classroom", type: "background", name: "Classroom", fileName: "classroom.png", tags: ["教室"] }},
                 {{ id: "bgm_school", type: "bgm", name: "School Theme", fileName: "school_theme.ogg" }},
+                {{ id: "sfx_door", type: "sfx", name: "Door Knock", fileName: "door_knock.wav" }},
+                {{ id: "voice_yuina_001", type: "voice", name: "Yuina 001", fileName: "yuina_001.ogg" }},
                 {{ id: "cg_school", type: "cg", name: "school_theme_cg.png" }},
               ],
               scenes: [
@@ -52,6 +54,8 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
               expressionByTag: tools.findImportedExpressionIdByHint(data, "char_yuina", "微笑"),
               backgroundByFile: tools.findImportedAssetIdByHint(data, "classroom", ["background"]),
               bgmByName: tools.findImportedAssetIdByHint(data, "school_theme", ["bgm"]),
+              sfxByFile: tools.findImportedAssetIdByHint(data, "door_knock", ["sfx"]),
+              voiceByFile: tools.findImportedAssetIdByHint(data, "yuina_001", ["voice"]),
               typedLookupDoesNotCrossAssetTypes: tools.findImportedAssetIdByHint(data, "school_theme", ["background"]),
               sceneByName: tools.findImportedSceneIdByHint(data, "rooftop"),
               sceneByTag: tools.findImportedSceneIdByHint(data, "天台"),
@@ -78,6 +82,8 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
         self.assertEqual(payload["expressionByTag"], "expr_smile")
         self.assertEqual(payload["backgroundByFile"], "bg_classroom")
         self.assertEqual(payload["bgmByName"], "bgm_school")
+        self.assertEqual(payload["sfxByFile"], "sfx_door")
+        self.assertEqual(payload["voiceByFile"], "voice_yuina_001")
         self.assertEqual(payload["typedLookupDoesNotCrossAssetTypes"], "")
         self.assertEqual(payload["sceneByName"], "scene_roof")
         self.assertEqual(payload["sceneByTag"], "scene_roof")

@@ -9823,6 +9823,8 @@ function getScriptImporterSampleDraft() {
     "scene classroom with fade",
     "play music school_theme fadein 1.2",
     `show ${characterName} smile at center with dissolve`,
+    "play sound door_knock",
+    "voice yuina_001",
     `${characterName} "你终于来了。"`,
     "旁白：雨声贴着窗沿落下。",
     "我把伞往她那边递过去。",
@@ -9874,10 +9876,21 @@ function normalizeScriptImportBlockForScene(draftBlock, scene = getSelectedScene
   }
 
   if (draftBlock.type === "dialogue") {
+    const voiceAssetId = findImportedAssetIdByHint(draftBlock.voiceHint, ["voice"]);
     return {
       type: "dialogue",
       speakerId: getImportedSpeakerCharacterId(draftBlock.speakerName),
       text: String(draftBlock.text ?? "").trim(),
+      ...(voiceAssetId ? { voiceAssetId, voiceVolume: 100 } : {}),
+    };
+  }
+
+  if (draftBlock.type === "narration") {
+    const voiceAssetId = findImportedAssetIdByHint(draftBlock.voiceHint, ["voice"]);
+    return {
+      type: "narration",
+      text: String(draftBlock.text ?? "").trim(),
+      ...(voiceAssetId ? { voiceAssetId, voiceVolume: 100 } : {}),
     };
   }
 
@@ -9947,6 +9960,14 @@ function normalizeScriptImportBlockForScene(draftBlock, scene = getSelectedScene
     };
   }
 
+  if (draftBlock.type === "sfx_play") {
+    return {
+      type: "sfx_play",
+      assetId: findImportedAssetIdByHint(draftBlock.assetHint, ["sfx"]),
+      volume: getSafeVolumePercent(draftBlock.volume, 100),
+    };
+  }
+
   if (draftBlock.type === "screen_fade") {
     return {
       type: "screen_fade",
@@ -10003,7 +10024,7 @@ function renderScriptImporterPanel(scene, selectedBlock) {
       <div class="script-importer-copy">
         <span class="eyebrow">Text To Cards</span>
         <strong>手写剧本转剧情卡片</strong>
-        <p>从文档或备忘录粘贴文本：<code>角色：台词</code>、<code>角色 "台词"</code>、普通旁白、连续 <code>- 选项</code>，以及 <code>scene / show / hide / play music / jump</code> 演出和路线指令都会先预览成可编辑卡片。</p>
+        <p>从文档或备忘录粘贴文本：<code>角色：台词</code>、<code>角色 "台词"</code>、普通旁白、连续 <code>- 选项</code>，以及 <code>scene / show / hide / play music / play sound / voice / jump</code> 演出、音频和路线指令都会先预览成可编辑卡片。</p>
         <span class="helper-text">${escapeHtml(insertionTarget)}</span>
       </div>
       <div class="script-importer-workbench">
@@ -10011,7 +10032,7 @@ function renderScriptImporterPanel(scene, selectedBlock) {
           id="scriptImporterDraft"
           class="script-importer-textarea"
           spellcheck="false"
-          placeholder="scene classroom with fade\nplay music school_theme fadein 1.2\nshow 悠奈 smile at center with dissolve\n悠奈 &quot;你终于来了。&quot;\n- 问她为什么在这里 -> rooftop\n- 先沉默陪她一会儿\njump ending"
+          placeholder="scene classroom with fade\nplay music school_theme fadein 1.2\nshow 悠奈 smile at center with dissolve\nplay sound door_knock\nvoice yuina_001\n悠奈 &quot;你终于来了。&quot;\n- 问她为什么在这里 -> rooftop\n- 先沉默陪她一会儿\njump ending"
         >${escapeHtml(draft)}</textarea>
         <div class="script-importer-actions">
           <button type="button" class="toolbar-button" data-action="apply-script-import-sample">填入示例</button>
@@ -35706,6 +35727,7 @@ function normalizeAssistantDraftBlockForScene(sceneDraft, draftBlock) {
     "character_hide",
     "music_play",
     "music_stop",
+    "sfx_play",
     "screen_fade",
     "jump",
   ].includes(draftBlock.type)
@@ -35763,6 +35785,10 @@ function normalizeAssistantDraftBlockForScene(sceneDraft, draftBlock) {
     delete block.assetHint;
   } else if (blockType === "music_stop") {
     block.fadeOutMs = getSafeNonNegativeNumber(block.fadeOutMs, 600);
+  } else if (blockType === "sfx_play") {
+    block.assetId = getSafeAssetIdByType("sfx", block.assetId);
+    block.volume = getSafeVolumePercent(block.volume, 100);
+    delete block.assetHint;
   } else if (blockType === "screen_fade") {
     block.action = getSafeFadeAction(block.action);
     block.color = getSafeFadeColor(block.color);
