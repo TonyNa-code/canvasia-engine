@@ -42,6 +42,11 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
                 {{ id: "video_opening", type: "video", name: "Opening Movie", fileName: "opening_movie.mp4" }},
                 {{ id: "cg_school", type: "cg", name: "school_theme_cg.png" }},
               ],
+              variables: [
+                {{ id: "affection", type: "number", name: "Affection", displayName: "好感度", tags: ["好感"] }},
+                {{ id: "met", type: "boolean", name: "Met Heroine", displayName: "是否见过" }},
+                {{ id: "route", type: "string", name: "Route", displayName: "路线" }},
+              ],
               scenes: [
                 {{ id: "scene_roof", name: "Rooftop", tags: ["天台"] }},
                 {{ id: "scene_end", name: "Ending" }},
@@ -53,6 +58,7 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
               findExpressionIdByHint: (characterId, hint) => tools.findImportedExpressionIdByHint(data, characterId, hint),
               findAssetIdByHint: (hint, types) => tools.findImportedAssetIdByHint(data, hint, types),
               findSceneIdByHint: (hint) => tools.findImportedSceneIdByHint(data, hint),
+              findVariableIdByHint: (hint, typeFilter = "") => tools.findImportedVariableIdByHint(data, hint, typeFilter),
               getDefaultCharacterPosition: () => "center",
               getSafePosition: (value) => ["left", "center", "right"].includes(value) ? value : "center",
               getSafeTransition: (value) => ["fade", "dissolve", "none"].includes(value) ? value : "fade",
@@ -87,6 +93,7 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
               getSafeParticleSpeed: (value) => ["slow", "medium", "fast"].includes(value) ? value : "medium",
               buildDefaultParticleEffectConfig: (preset) => ({{ type: "particle_effect", action: "start", preset, intensity: "medium", speed: "medium", density: 40 }}),
               normalizeParticleEffectConfig: (config) => ({{ ...config, normalized: true }}),
+              normalizeChoiceEffect: (effect) => ({{ ...effect, normalized: true }}),
               getEffectDuration: (value) => tools.getImportedEffectDuration(value),
               getDefaultJumpTargetSceneId: () => "scene_end",
               defaultCharacterStage: {{ scale: 1, opacity: 1 }},
@@ -104,6 +111,9 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
               voiceByFile: tools.findImportedAssetIdByHint(data, "yuina_001", ["voice"]),
               videoByFile: tools.findImportedAssetIdByHint(data, "opening_movie", ["video"]),
               typedLookupDoesNotCrossAssetTypes: tools.findImportedAssetIdByHint(data, "school_theme", ["background"]),
+              variableById: tools.findImportedVariableIdByHint(data, "affection", "number"),
+              variableByDisplayName: tools.findImportedVariableIdByHint(data, "好感度", "number"),
+              variableTypeFilterPreventsWrongType: tools.findImportedVariableIdByHint(data, "route", "number"),
               sceneByName: tools.findImportedSceneIdByHint(data, "rooftop"),
               sceneByTag: tools.findImportedSceneIdByHint(data, "天台"),
               shortDuration: tools.getImportedEffectDuration(300),
@@ -121,6 +131,18 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
               ),
               normalizedChoice: tools.normalizeImportedDraftBlockForScene(
                 {{ type: "choice", options: [{{ text: " roof ", targetHint: "rooftop" }}, {{ text: "stay" }}] }},
+                null,
+                resolvers
+              ),
+              normalizedChoiceEffects: tools.normalizeImportedDraftBlockForScene(
+                {{ type: "choice", options: [
+                  {{ text: "拉住她", targetHint: "rooftop", effects: [
+                    {{ type: "variable_add", variableHint: "affection", value: 1 }},
+                    {{ type: "variable_set", variableHint: "met", value: true }},
+                    {{ type: "variable_set", variableHint: "route", value: "good" }},
+                    {{ type: "variable_add", variableHint: "route", value: 1 }}
+                  ] }}
+                ] }},
                 null,
                 resolvers
               ),
@@ -223,6 +245,9 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
         self.assertEqual(payload["voiceByFile"], "voice_yuina_001")
         self.assertEqual(payload["videoByFile"], "video_opening")
         self.assertEqual(payload["typedLookupDoesNotCrossAssetTypes"], "")
+        self.assertEqual(payload["variableById"], "affection")
+        self.assertEqual(payload["variableByDisplayName"], "affection")
+        self.assertEqual(payload["variableTypeFilterPreventsWrongType"], "")
         self.assertEqual(payload["sceneByName"], "scene_roof")
         self.assertEqual(payload["sceneByTag"], "scene_roof")
         self.assertEqual(payload["shortDuration"], "short")
@@ -250,11 +275,25 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
             {
                 "type": "choice",
                 "options": [
-                    {"text": "roof", "gotoSceneId": "scene_roof"},
-                    {"text": "stay", "gotoSceneId": "__continue__"},
+                    {"text": "roof", "gotoSceneId": "scene_roof", "effects": []},
+                    {"text": "stay", "gotoSceneId": "__continue__", "effects": []},
                 ],
             },
         )
+        self.assertEqual(payload["normalizedChoiceEffects"], {
+            "type": "choice",
+            "options": [
+                {
+                    "text": "拉住她",
+                    "gotoSceneId": "scene_roof",
+                    "effects": [
+                        {"type": "variable_add", "variableId": "affection", "value": 1, "normalized": True},
+                        {"type": "variable_set", "variableId": "met", "value": True, "normalized": True},
+                        {"type": "variable_set", "variableId": "route", "value": "good", "normalized": True},
+                    ],
+                },
+            ],
+        })
         self.assertEqual(payload["normalizedCharacterShow"]["characterId"], "char_yuina")
         self.assertEqual(payload["normalizedCharacterShow"]["expressionId"], "expr_smile")
         self.assertEqual(payload["normalizedCharacterShow"]["position"], "right")

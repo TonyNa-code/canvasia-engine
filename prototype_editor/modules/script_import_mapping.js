@@ -95,6 +95,23 @@
     return findImportedSceneByHint(data, sceneHint)?.id ?? "";
   }
 
+  function findImportedVariableByHint(data, variableHint, typeFilter = "") {
+    const variables = Array.isArray(data?.variables) ? data.variables : [];
+    const candidates = typeFilter ? variables.filter((variable) => variable?.type === typeFilter) : variables;
+    const exact = candidates.find((variable) => matchesImportedLookupHint(variableHint, getImportedLookupValues(variable)));
+    return (
+      exact ??
+      candidates.find((variable) =>
+        matchesImportedLookupHint(variableHint, getImportedLookupValues(variable), { partial: true })
+      ) ??
+      null
+    );
+  }
+
+  function findImportedVariableIdByHint(data, variableHint, typeFilter = "") {
+    return findImportedVariableByHint(data, variableHint, typeFilter)?.id ?? "";
+  }
+
   function getImportedEffectDuration(durationMs) {
     const ms = Number.parseFloat(durationMs ?? "");
     if (!Number.isFinite(ms)) {
@@ -125,6 +142,8 @@
 
     const getAssetId = (hint, types) => callScriptImportResolver(resolvers, "findAssetIdByHint", [hint, types], "");
     const getSceneId = (hint) => callScriptImportResolver(resolvers, "findSceneIdByHint", [hint], "");
+    const getVariableId = (hint, typeFilter = "") =>
+      callScriptImportResolver(resolvers, "findVariableIdByHint", [hint, typeFilter], "");
     const getTransition = (value) => callScriptImportResolver(resolvers, "getSafeTransition", [value], value || "fade");
     const getTransitionDurationMs = (value, fallback) =>
       callScriptImportResolver(resolvers, "getSafeTransitionDurationMs", [value, fallback], fallback ?? 600);
@@ -196,7 +215,25 @@
       });
     const normalizeParticleConfig = (config) =>
       callScriptImportResolver(resolvers, "normalizeParticleEffectConfig", [config], config);
+    const normalizeChoiceEffectConfig = (effect) =>
+      callScriptImportResolver(resolvers, "normalizeChoiceEffect", [effect], effect);
     const getChoiceContinueTarget = () => resolvers?.choiceContinueTarget ?? "__continue__";
+
+    const normalizeChoiceEffects = (effects = []) =>
+      (Array.isArray(effects) ? effects : [])
+        .map((effect) => {
+          const type = effect?.type === "variable_add" ? "variable_add" : "variable_set";
+          const variableId = getVariableId(effect?.variableHint ?? effect?.variableId, type === "variable_add" ? "number" : "");
+          if (!variableId) {
+            return null;
+          }
+          return normalizeChoiceEffectConfig({
+            type,
+            variableId,
+            value: effect?.value,
+          });
+        })
+        .filter(Boolean);
 
     if (draftBlock.type === "dialogue") {
       const voiceAssetId = getAssetId(draftBlock.voiceHint, ["voice"]);
@@ -228,6 +265,7 @@
           .map((option) => ({
             text: String(option?.text ?? "").trim(),
             gotoSceneId: getSceneId(option?.targetHint) || getChoiceContinueTarget(),
+            effects: normalizeChoiceEffects(option?.effects),
           }))
           .filter((option) => option.text),
       };
@@ -437,6 +475,8 @@
     findImportedAssetIdByHint,
     findImportedSceneByHint,
     findImportedSceneIdByHint,
+    findImportedVariableByHint,
+    findImportedVariableIdByHint,
     getImportedEffectDuration,
     normalizeImportedDraftBlockForScene,
   });

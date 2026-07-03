@@ -75,11 +75,18 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
               text speed instant
               yuina "别眨眼。"
             `);
+            const choiceEffectBlocks = tools.parseScriptDraftToBlocks(`
+              - 拉住她 -> rooftop [affection +1; courage +2; met=true]
+              - 先道歉 [affection -1; route="apology"]
+            `);
             process.stdout.write(JSON.stringify({{
               keys: Object.keys(tools).sort(),
               normalizedLines: tools.normalizeScriptImportText(" a\\r\\n\\n b ").join("|"),
               choiceLine: tools.parseChoiceLine("2. 追上去"),
               choiceOptionLine: tools.parseChoiceOptionLine("- 去天台 -> scene_roof"),
+              choiceEffectAdd: tools.parseChoiceEffectClause("affection +1"),
+              choiceEffectSet: tools.parseChoiceEffectClause("met=true"),
+              choiceOptionEffectLine: tools.parseChoiceOptionLine('- 拉住她 -> rooftop [affection +1; met=true; route="good"]'),
               dialogueLine: tools.parseDialogueLine("悠奈：你终于来了。"),
               quotedDialogueLine: tools.parseQuotedDialogueLine('悠奈 "你终于来了。"'),
               dialogueSpeedLine: tools.parseDialogueLine("悠奈：快跑！ speed fast"),
@@ -120,6 +127,8 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
               atmospherePreview: tools.buildScriptDraftPreviewLines(atmosphereBlocks, 6),
               textSpeedBlocks,
               textSpeedPreview: tools.buildScriptDraftPreviewLines(textSpeedBlocks, 4),
+              choiceEffectBlocks,
+              choiceEffectPreview: tools.buildScriptDraftPreviewLines(choiceEffectBlocks, 2),
             }}));
             """
         )
@@ -139,6 +148,25 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
         self.assertEqual(payload["normalizedLines"], "a|b")
         self.assertEqual(payload["choiceLine"], "追上去")
         self.assertEqual(payload["choiceOptionLine"], {"text": "去天台", "targetHint": "scene_roof"})
+        self.assertEqual(payload["choiceEffectAdd"], {
+            "type": "variable_add",
+            "variableHint": "affection",
+            "value": 1,
+        })
+        self.assertEqual(payload["choiceEffectSet"], {
+            "type": "variable_set",
+            "variableHint": "met",
+            "value": True,
+        })
+        self.assertEqual(payload["choiceOptionEffectLine"], {
+            "text": "拉住她",
+            "targetHint": "rooftop",
+            "effects": [
+                {"type": "variable_add", "variableHint": "affection", "value": 1},
+                {"type": "variable_set", "variableHint": "met", "value": True},
+                {"type": "variable_set", "variableHint": "route", "value": "good"},
+            ],
+        })
         self.assertEqual(payload["dialogueLine"], {
             "type": "dialogue",
             "speakerName": "悠奈",
@@ -380,6 +408,29 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
         self.assertIn("speed: fast", payload["textSpeedPreview"][0])
         self.assertIn("voice: yuina_002", payload["textSpeedPreview"][2])
         self.assertIn("speed: instant", payload["textSpeedPreview"][2])
+        self.assertEqual(payload["choiceEffectBlocks"], [{
+            "type": "choice",
+            "options": [
+                {
+                    "text": "拉住她",
+                    "targetHint": "rooftop",
+                    "effects": [
+                        {"type": "variable_add", "variableHint": "affection", "value": 1},
+                        {"type": "variable_add", "variableHint": "courage", "value": 2},
+                        {"type": "variable_set", "variableHint": "met", "value": True},
+                    ],
+                },
+                {
+                    "text": "先道歉",
+                    "effects": [
+                        {"type": "variable_add", "variableHint": "affection", "value": -1},
+                        {"type": "variable_set", "variableHint": "route", "value": "apology"},
+                    ],
+                },
+            ],
+        }])
+        self.assertIn("affection +1", payload["choiceEffectPreview"][0])
+        self.assertIn("met=true", payload["choiceEffectPreview"][0])
 
 
 if __name__ == "__main__":

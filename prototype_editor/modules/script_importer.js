@@ -422,16 +422,94 @@
     return match ? trimImportedText(match[1], 160) : "";
   }
 
-  function parseChoiceOptionLine(line) {
-    const text = parseChoiceLine(line);
+  function parseChoiceEffectValue(value) {
+    const text = stripWrappingQuotes(value);
+    const normalized = normalizeDirectiveToken(text);
+    if (["true", "yes", "on", "是", "开启"].includes(normalized)) {
+      return true;
+    }
+    if (["false", "no", "off", "否", "关闭"].includes(normalized)) {
+      return false;
+    }
+    const number = Number.parseFloat(text);
+    if (Number.isFinite(number) && String(text).match(/^[+-]?[0-9.]+$/u)) {
+      return number;
+    }
+    return trimImportedText(text, 120);
+  }
+
+  function parseChoiceEffectClause(clause) {
+    const text = trimImportedText(clause, 180);
     if (!text) {
       return null;
     }
 
-    const targetMatch = text.match(/^(.+?)\s*(?:->|=>)\s*(\S.+)$/u);
+    const addMatch = text.match(/^([0-9A-Za-z_\-\u4e00-\u9fff]{1,64})\s*(\+=|-=|\+|-)\s*([+-]?[0-9.]+)$/u);
+    if (addMatch) {
+      const operator = addMatch[2];
+      const amount = Number.parseFloat(addMatch[3]);
+      const delta =
+        operator === "+="
+          ? amount
+          : operator === "-="
+            ? -amount
+            : operator === "-"
+              ? -Math.abs(amount)
+              : Math.abs(amount);
+      return Number.isFinite(amount)
+        ? {
+            type: "variable_add",
+            variableHint: addMatch[1],
+            value: delta,
+          }
+        : null;
+    }
+
+    const setMatch = text.match(/^([0-9A-Za-z_\-\u4e00-\u9fff]{1,64})\s*(?:=|:|is|to)\s*(.+)$/iu);
+    if (setMatch) {
+      return {
+        type: "variable_set",
+        variableHint: setMatch[1],
+        value: parseChoiceEffectValue(setMatch[2]),
+      };
+    }
+
+    return null;
+  }
+
+  function extractChoiceEffects(text) {
+    const source = trimImportedText(text, 260);
+    const match = source.match(/^(.*?)\s*[\[【(（]\s*(.+?)\s*[\]】)）]\s*$/u);
+    if (!match) {
+      return { text: source, effects: [] };
+    }
+
+    const effects = match[2]
+      .split(/\s*(?:;|；|,|，)\s*/u)
+      .map(parseChoiceEffectClause)
+      .filter(Boolean);
+    if (!effects.length) {
+      return { text: source, effects: [] };
+    }
+
     return {
-      text: trimImportedText(targetMatch?.[1] ?? text, 160),
+      text: trimImportedText(match[1], 220),
+      effects,
+    };
+  }
+
+  function parseChoiceOptionLine(line) {
+    const choiceText = parseChoiceLine(line);
+    if (!choiceText) {
+      return null;
+    }
+
+    const extracted = extractChoiceEffects(choiceText);
+    const targetMatch = extracted.text.match(/^(.+?)\s*(?:->|=>)\s*(\S.+)$/u);
+    return {
+      text: trimImportedText(targetMatch?.[1] ?? extracted.text, 160),
       targetHint: trimImportedText(targetMatch?.[2] ?? "", 120),
+      ...(extracted.effects.length ? { effects: extracted.effects } : {}),
     };
   }
 
@@ -784,6 +862,9 @@
         if (targetHint) {
           normalizedOption.targetHint = targetHint;
         }
+        if (Array.isArray(option?.effects) && option.effects.length) {
+          normalizedOption.effects = option.effects.map((effect) => ({ ...effect }));
+        }
         return normalizedOption;
       }),
     });
@@ -981,6 +1062,19 @@
     return "路线卡片";
   }
 
+  function buildChoiceEffectPreview(effect) {
+    const variableHint = trimImportedText(effect?.variableHint ?? effect?.variableId ?? "", 64);
+    if (!variableHint) {
+      return "";
+    }
+    if (effect?.type === "variable_add") {
+      const value = Number(effect.value);
+      const amount = Number.isFinite(value) ? value : 0;
+      return `${variableHint} ${amount >= 0 ? "+" : ""}${amount}`;
+    }
+    return `${variableHint}=${String(effect?.value ?? "")}`;
+  }
+
   function buildScriptDraftPreviewLines(blocks = [], limit = 6) {
     return (Array.isArray(blocks) ? blocks : [])
       .slice(0, Math.max(0, Number.parseInt(limit, 10) || 0))
@@ -992,7 +1086,11 @@
         }
         if (block?.type === "choice") {
           return `${index + 1}. 选项：${(block.options ?? [])
-            .map((option) => (option.targetHint ? `${option.text} -> ${option.targetHint}` : option.text))
+            .map((option) => {
+              const routePart = option.targetHint ? `${option.text} -> ${option.targetHint}` : option.text;
+              const effectText = (option.effects ?? []).map(buildChoiceEffectPreview).filter(Boolean).join("; ");
+              return effectText ? `${routePart} [${effectText}]` : routePart;
+            })
             .join(" / ")}`;
         }
         if (STAGE_DRAFT_TYPES.includes(block?.type)) {
@@ -1015,6 +1113,7 @@
     ROUTE_DRAFT_TYPES,
     normalizeScriptImportText,
     parseChoiceLine,
+    parseChoiceEffectClause,
     parseChoiceOptionLine,
     parseDialogueLine,
     parseQuotedDialogueLine,
