@@ -52,6 +52,7 @@ const routeAnalyzerTools = window.CanvasiaEditorRouteAnalyzer;
 const routeTestingReportTools = window.CanvasiaEditorRouteTestingReport;
 const playtestHandoffReportTools = window.CanvasiaEditorPlaytestHandoffReport;
 const audioCueSheetTools = window.CanvasiaEditorAudioCueSheet;
+const stageDirectionSheetTools = window.CanvasiaEditorStageDirectionSheet;
 
 function getBlockLabel(type) {
   return storyBlockCatalogTools.getBlockLabel(type) ?? BLOCK_LABELS[type] ?? type ?? "步骤";
@@ -3825,6 +3826,16 @@ async function handleClick(event) {
 
   if (action === "export-audio-cue-sheet-csv") {
     exportAudioCueSheetCsv();
+    return;
+  }
+
+  if (action === "export-stage-direction-sheet-markdown") {
+    exportStageDirectionSheetMarkdown();
+    return;
+  }
+
+  if (action === "export-stage-direction-sheet-csv") {
+    exportStageDirectionSheetCsv();
     return;
   }
 
@@ -28430,6 +28441,17 @@ function buildAudioCueSheetFileName(extension = "md") {
   return `${title}_audio_cue_sheet_${dateStamp}.${extension}`;
 }
 
+function buildStageDirectionSheetFileName(extension = "md") {
+  const date = new Date();
+  const dateStamp = [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("");
+  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
+  return `${title}_stage_direction_sheet_${dateStamp}.${extension}`;
+}
+
 function buildPlaytestHandoffFileName(extension = "md") {
   const date = new Date();
   const dateStamp = [
@@ -29635,6 +29657,30 @@ function exportAudioCueSheetCsv() {
   downloadTextFile(fileName, content, "text/csv;charset=utf-8");
   setSaveStatus(`已导出 BGM 调度 CSV：${fileName}`);
   showToast(`BGM 调度 CSV 已导出：${fileName}`);
+}
+
+function buildStageDirectionSheet() {
+  return stageDirectionSheetTools.buildStageDirectionSheet(state.data ?? {});
+}
+
+function exportStageDirectionSheetMarkdown() {
+  const fileName = buildStageDirectionSheetFileName("md");
+  const sheet = buildStageDirectionSheet();
+  const content = stageDirectionSheetTools.buildStageDirectionSheetMarkdown(sheet, {
+    projectTitle: state.data?.project?.title || "Canvasia Project",
+    generatedAt: formatDate(new Date().toISOString()),
+  });
+  downloadTextFile(fileName, content, "text/markdown;charset=utf-8");
+  setSaveStatus(`已导出角色舞台调度表：${fileName}`);
+  showToast(`角色舞台调度表已导出：${fileName}`);
+}
+
+function exportStageDirectionSheetCsv() {
+  const fileName = buildStageDirectionSheetFileName("csv");
+  const content = stageDirectionSheetTools.buildStageDirectionSheetCsv(buildStageDirectionSheet());
+  downloadTextFile(fileName, content, "text/csv;charset=utf-8");
+  setSaveStatus(`已导出角色舞台调度 CSV：${fileName}`);
+  showToast(`角色舞台调度 CSV 已导出：${fileName}`);
 }
 
 function buildPlaytestHandoffContext() {
@@ -31021,6 +31067,96 @@ function renderAudioCueSheetPanel() {
   `;
 }
 
+function getStageDirectionSheetToneClass(status) {
+  if (status === "blocked") {
+    return "danger-text";
+  }
+  if (status === "warn") {
+    return "warn-text";
+  }
+  if (status === "ready") {
+    return "good-text";
+  }
+  return "";
+}
+
+function renderStageDirectionSheetPanel() {
+  const sheet = buildStageDirectionSheet();
+  const digest = stageDirectionSheetTools.getStageDirectionStatusDigest(sheet);
+  const summary = sheet.summary ?? {};
+  const topIssues = (sheet.issues ?? []).slice(0, 4);
+  const eventPreview = (sheet.events ?? []).slice(0, 4);
+
+  return `
+    <article class="detail-card preview-sprint-panel">
+      <div class="panel-heading">
+        <h2>角色舞台调度表</h2>
+        <span class="badge badge-soft ${getStageDirectionSheetToneClass(digest.status)}">${escapeHtml(digest.title)}</span>
+      </div>
+      <p class="helper-text">${escapeHtml(digest.detail)} 它会检查背景、角色登场 / 退场、说话人是否提前上场、表情和立绘是否可用。</p>
+      <div class="preview-sprint-metrics">
+        ${renderRouteMetricCard("舞台事件", `${summary.eventCount ?? 0} 个`, "背景、登场、退场和说话")}
+        ${renderRouteMetricCard("自动补位", `${summary.speakerAutoPlaceCount ?? 0} 句`, "说话人未提前登场")}
+        ${renderRouteMetricCard("立绘 / 表情缺口", `${summary.missingVisualCount ?? 0} 个`, "缺立绘、缺文件或坏表情")}
+        ${renderRouteMetricCard("无背景场景", `${summary.missingBackgroundSceneCount ?? 0} 个`, "有内容但没有明确背景")}
+      </div>
+      <div class="detail-actions">
+        <button class="toolbar-button toolbar-button-primary" data-action="export-stage-direction-sheet-markdown">
+          导出角色舞台调度表
+        </button>
+        <button class="toolbar-button" data-action="export-stage-direction-sheet-csv">
+          导出舞台调度 CSV
+        </button>
+        <button class="toolbar-button" data-action="switch-screen" data-screen="story">
+          去剧情页调整登场
+        </button>
+      </div>
+      ${
+        topIssues.length > 0
+          ? `
+            <div class="preview-sprint-grid">
+              ${topIssues
+                .map(
+                  (issue) => `
+                    <article class="preview-sprint-card is-${issue.severity === "blocker" ? "danger" : issue.severity === "warn" ? "warn" : "soft"}">
+                      <div class="preview-sprint-head">
+                        <strong>${escapeHtml(issue.title)}</strong>
+                        <span class="issue-tag ${issue.severity === "blocker" ? "danger-text" : issue.severity === "warn" ? "warn-text" : ""}">
+                          ${escapeHtml(issue.severity === "blocker" ? "先修" : issue.severity === "warn" ? "复查" : "润色")}
+                        </span>
+                      </div>
+                      <p>${escapeHtml(`${issue.chapterName} · ${issue.sceneName}`)}</p>
+                      <div class="helper-text">${escapeHtml(issue.detail)}</div>
+                    </article>
+                  `
+                )
+                .join("")}
+            </div>
+          `
+          : eventPreview.length > 0
+            ? `
+              <div class="list-stack compact-stack">
+                ${eventPreview
+                  .map(
+                    (event) => `
+                      <div class="route-testing-item">
+                        <div>
+                          <b>${escapeHtml(`${event.typeLabel}${event.characterName ? ` · ${event.characterName}` : ""}`)}</b>
+                          <span>${escapeHtml(`${event.chapterName} · ${event.sceneName} · ${event.positionLabel || event.assetStatusLabel}`)}</span>
+                        </div>
+                        <span>${escapeHtml(event.cue)}</span>
+                      </div>
+                    `
+                  )
+                  .join("")}
+              </div>
+            `
+            : renderEmpty("当前项目还没有可列出的角色舞台事件。可以先在剧情页添加背景、角色登场和台词。")
+      }
+    </article>
+  `;
+}
+
 function renderInspectionOverviewPanel(routeOverview) {
   const urgentMissingAssets = state.data.assetList.filter((asset) => isAssetUrgentMissing(asset)).length;
   const missingVoiceWarnings = state.validation.warnings.filter(
@@ -31081,6 +31217,7 @@ function renderInspectionOverviewPanel(routeOverview) {
       ${renderCompactProjectMilestonePanel(routeOverview)}
       ${renderProjectDoctorPanel(routeOverview, issueItems)}
       ${renderAudioCueSheetPanel()}
+      ${renderStageDirectionSheetPanel()}
       ${renderReleaseFixOrderPanel(routeOverview)}
       ${renderPreviewRegressionPanel(routeOverview)}
       ${renderPreviewRegressionFixQueuePanel()}

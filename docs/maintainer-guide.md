@@ -16,6 +16,7 @@ This guide explains the current maintenance boundaries for contributors who want
 - `prototype_editor/modules/route_testing_report.js` owns route QA report serialization, Markdown tables, standalone Markdown export content, and CSV rows. Keep route report formatting there instead of adding more report-specific table logic to `app.js`.
 - `prototype_editor/modules/playtest_handoff_report.js` owns tester-facing playtest handoff exports and intake: route cases, regression smoke results, fix queues, Markdown work orders, feedback templates, feedback CSV parsing, intake summaries, and CSV rows. Keep tester handoff wording and table formats there so `app.js` only wires buttons, downloads, and local file selection.
 - `prototype_editor/modules/audio_cue_sheet.js` owns BGM cue-sheet analysis and export formatting: music range summaries, missing BGM asset checks, invalid range targets, takeover warnings, fade suggestions, Markdown, and CSV. Keep future audio scheduling checks there so `app.js` remains a thin inspection/export surface.
+- `prototype_editor/modules/stage_direction_sheet.js` owns character stage-direction analysis and export formatting: background coverage, character show / hide continuity, speaker auto-placement warnings, expression and visual asset readiness, Markdown, and CSV. Keep future staging continuity checks there instead of adding more production-audit logic to `app.js`.
 - `native_runtime/runtime_player.py` owns native playback, native release checks, and runtime reports.
 
 ## Safe Extension Pattern

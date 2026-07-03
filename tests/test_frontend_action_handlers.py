@@ -3930,6 +3930,27 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("audioCueSheetTools.buildAudioCueSheet", source)
         self.assertIn("audioCueSheetTools.getAudioCueSheetStatusDigest", source)
 
+    def test_stage_direction_sheet_export_actions_are_wired(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        click_handler = _extract_function_source(source, "handleClick")
+        markdown_block_start = click_handler.index('action === "export-stage-direction-sheet-markdown"')
+        csv_block_start = click_handler.index('action === "export-stage-direction-sheet-csv"')
+        csv_block_end = click_handler.index('action === "export-release-control-report"', csv_block_start)
+        markdown_block = click_handler[markdown_block_start:csv_block_start]
+        csv_block = click_handler[csv_block_start:csv_block_end]
+
+        self.assertIn("const stageDirectionSheetTools = window.CanvasiaEditorStageDirectionSheet", source)
+        self.assertIn('data-action="export-stage-direction-sheet-markdown"', source)
+        self.assertIn('data-action="export-stage-direction-sheet-csv"', source)
+        self.assertIn("exportStageDirectionSheetMarkdown();", markdown_block)
+        self.assertIn("exportStageDirectionSheetCsv();", csv_block)
+        self.assertIn("function buildStageDirectionSheet()", source)
+        self.assertIn("function renderStageDirectionSheetPanel()", source)
+        self.assertIn("function exportStageDirectionSheetMarkdown()", source)
+        self.assertIn("function exportStageDirectionSheetCsv()", source)
+        self.assertIn("stageDirectionSheetTools.buildStageDirectionSheet", source)
+        self.assertIn("stageDirectionSheetTools.getStageDirectionStatusDigest", source)
+
     def test_playtest_handoff_export_actions_are_wired(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
         click_handler = _extract_function_source(source, "handleClick")
