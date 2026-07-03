@@ -15,6 +15,7 @@
     ["sfx_play", "音频", "full", "full", "支持音效播放与音量控制。"],
     ["video_play", "视频", "full", "partial", "Web Runtime 支持内嵌播放；原生 Runtime 支持 PyAV / OpenCV / 系统播放器兜底，需按目标平台验收。"],
     ["credits_roll", "结尾", "full", "full", "支持片尾字幕与回想 / 发布检查。"],
+    ["wait", "演出", "full", "full", "支持等待 / 停顿节奏卡；自动播放会按设定时长等待。"],
     ["particle_effect", "演出", "full", "full", "支持项目粒子预设、图片粒子、密度、速度、重力和颜色等参数。"],
     ["screen_shake", "演出", "full", "full", "支持屏幕震动。"],
     ["screen_flash", "演出", "full", "full", "支持闪屏。"],
@@ -56,6 +57,7 @@
   });
 
   const VISUAL_EFFECT_TYPES = new Set([
+    "wait",
     "screen_shake",
     "screen_flash",
     "screen_fade",

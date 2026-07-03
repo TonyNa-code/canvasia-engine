@@ -237,6 +237,37 @@
   `;
   }
 
+  function renderWaitEditor(block, options = {}) {
+    const escape = getEscapeHtml(options);
+    const getSafeWaitDurationSeconds = getRenderer(options, "getSafeWaitDurationSeconds", (value) => {
+      const parsed = Number.parseFloat(value ?? "");
+      return Number.isFinite(parsed) ? Math.min(Math.max(parsed, 0.1), 30) : 1;
+    });
+    const durationSeconds = getSafeWaitDurationSeconds(block?.durationSeconds);
+
+    return `
+    <article class="editor-card">
+      <h3>编辑等待停顿</h3>
+      <p>适合角色登场、黑场、OP 前后、告白前留白这类需要“让画面停一下”的节奏点。</p>
+    </article>
+    <div class="field-grid">
+      <div class="detail-row">
+        <label for="editorWaitDurationSeconds">等待多久（秒）</label>
+        <input
+          id="editorWaitDurationSeconds"
+          type="number"
+          min="0.1"
+          max="30"
+          step="0.1"
+          value="${escape(String(durationSeconds))}"
+        />
+        <p class="helper-text">建议常用 0.5 到 2 秒；太长会让玩家误以为卡住。运行时会按这个时长等待，也允许玩家提前点击继续。</p>
+      </div>
+    </div>
+    ${renderSaveBlockActions()}
+  `;
+  }
+
   function renderCameraZoomEditor(block, options = {}) {
     const getSafeCameraZoomAction = getRenderer(options, "getSafeCameraZoomAction", (value) => value ?? "zoom_in");
     const getSafeCameraZoomStrength = getRenderer(options, "getSafeCameraZoomStrength", (value) => value ?? "medium");
@@ -1433,6 +1464,7 @@
     renderScreenShakeEditor,
     renderScreenFlashEditor,
     renderScreenFadeEditor,
+    renderWaitEditor,
     renderCameraZoomEditor,
     renderCameraPanEditor,
     renderColorGradeNumberInput,

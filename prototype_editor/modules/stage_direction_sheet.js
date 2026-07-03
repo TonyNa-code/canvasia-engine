@@ -11,6 +11,9 @@
     narration: "旁白",
     character_show: "角色登场",
     character_hide: "角色退场",
+    video_play: "视频",
+    credits_roll: "片尾字幕",
+    wait: "等待停顿",
     choice: "选项",
     jump: "跳转",
   });
@@ -181,7 +184,7 @@
   }
 
   function isStoryContentBlock(block = {}) {
-    return ["background", "dialogue", "narration", "character_show", "choice", "video_play", "credits_roll"].includes(
+    return ["background", "dialogue", "narration", "character_show", "choice", "video_play", "credits_roll", "wait"].includes(
       block.type
     );
   }

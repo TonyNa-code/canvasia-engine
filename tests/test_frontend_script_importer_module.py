@@ -57,6 +57,7 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
               flash red strong long
               zoom out heavy right
               pan left light
+              pause 800ms
               credits title "STAFF" subtitle "Thanks for playing" duration 24 light no-skip lines "企划：Tony|剧本：Tony"
             `);
             const atmosphereBlocks = tools.parseScriptDraftToBlocks(`
@@ -125,6 +126,8 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
               particleLine: tools.parseStageDirectionLine("particle snow heavy fast"),
               particleStopLine: tools.parseStageDirectionLine("particle stop"),
               creditsLine: tools.parseStageDirectionLine('credits title "STAFF" subtitle "Thanks for playing" duration 24 light no-skip lines "企划：Tony|剧本：Tony"'),
+              waitLine: tools.parseWaitLine("pause 800ms"),
+              chineseWaitLine: tools.parseWaitLine("等待 1.5秒"),
               voiceLine: tools.parseVoiceLine("voice yuina_001"),
               jumpLine: tools.parseJumpLine("jump scene_end"),
               blocks,
@@ -349,6 +352,8 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
             "background": "light",
             "skippable": False,
         })
+        self.assertEqual(payload["waitLine"], {"type": "wait", "durationSeconds": 0.8})
+        self.assertEqual(payload["chineseWaitLine"], {"type": "wait", "durationSeconds": 1.5})
         self.assertEqual(payload["voiceLine"], {"voiceHint": "yuina_001"})
         self.assertEqual(payload["jumpLine"], {"type": "jump", "targetHint": "scene_end"})
         self.assertEqual([block["type"] for block in payload["blocks"]], [
@@ -430,19 +435,20 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
             "screen_flash",
             "camera_zoom",
             "camera_pan",
+            "wait",
             "credits_roll",
         ])
         self.assertEqual(payload["directorSummary"], {
             "dialogue": 0,
             "narration": 0,
             "choice": 0,
-            "stage": 5,
+            "stage": 6,
             "route": 0,
             "logic": 0,
-            "total": 5,
+            "total": 6,
         })
         self.assertIn("演出：震屏：heavy / short", payload["directorPreview"][0])
-        self.assertIn("演出：片尾字幕：STAFF", payload["directorPreview"][4])
+        self.assertIn("演出：等待：0.8s", payload["directorPreview"][4])
         self.assertEqual([block["type"] for block in payload["atmosphereBlocks"]], [
             "screen_filter",
             "screen_filter",

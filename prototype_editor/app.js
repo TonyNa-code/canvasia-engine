@@ -4399,6 +4399,11 @@ async function handleClick(event) {
     return;
   }
 
+  if (action === "add-wait") {
+    void addBlock("wait");
+    return;
+  }
+
   if (action === "add-particle-effect") {
     void addBlock("particle_effect");
     return;
@@ -9825,6 +9830,7 @@ function getScriptImporterSampleDraft() {
     `show ${characterName} smile at center with dissolve`,
     "play sound door_knock",
     "voice yuina_001",
+    "wait 0.8",
     `${characterName} "你终于来了。"`,
     "旁白：雨声贴着窗沿落下。",
     "set route = common",
@@ -9905,6 +9911,7 @@ function normalizeScriptImportBlockForScene(draftBlock, scene = getSelectedScene
     getSafeCameraPanStrength,
     getSafeCreditsDuration,
     getSafeCreditsBackground,
+    getSafeWaitDurationSeconds,
     getSafeFadeAction,
     getSafeConditionOperator,
     normalizeVariableValue,
@@ -9964,7 +9971,7 @@ function renderScriptImporterPanel(scene, selectedBlock) {
       <div class="script-importer-copy">
         <span class="eyebrow">Text To Cards</span>
         <strong>手写剧本转剧情卡片</strong>
-        <p>从文档或备忘录粘贴文本：<code>角色：台词</code>、<code>角色 "台词"</code>、普通旁白、连续 <code>- 选项 [变量 +1]</code>，以及 <code>scene / show / hide / play music / play sound / play video / speed / set / add / if / shake / flash / zoom / pan / filter / blur / particle / credits / voice / jump</code> 演出、文字速度、变量后果、变量卡、条件分支、音频、视频、镜头、氛围和路线指令都会先预览成可编辑卡片。</p>
+        <p>从文档或备忘录粘贴文本：<code>角色：台词</code>、<code>角色 "台词"</code>、普通旁白、连续 <code>- 选项 [变量 +1]</code>，以及 <code>scene / show / hide / play music / play sound / play video / speed / set / add / if / wait / pause / shake / flash / zoom / pan / filter / blur / particle / credits / voice / jump</code> 演出、文字速度、变量后果、变量卡、条件分支、音频、视频、镜头、氛围和路线指令都会先预览成可编辑卡片。</p>
         <span class="helper-text">${escapeHtml(insertionTarget)}</span>
       </div>
       <div class="script-importer-workbench">
@@ -9972,7 +9979,7 @@ function renderScriptImporterPanel(scene, selectedBlock) {
           id="scriptImporterDraft"
           class="script-importer-textarea"
           spellcheck="false"
-          placeholder="scene classroom with fade\nplay video opening_movie title &quot;Opening&quot; volume 80 from 0 to 18 cover\nplay music school_theme fadein 1.2\nshow 悠奈 smile at center with dissolve\nfilter memory soft\nblur right strong\nparticle snow heavy fast\nshake heavy short\nflash white soft short\nzoom in medium center\nplay sound door_knock\nvoice yuina_001\nspeed fast\n悠奈 &quot;你终于来了。&quot;\nset route = common\nadd affection +1\n- 问她为什么在这里 -> rooftop [affection +1]\n- 先沉默陪她一会儿 [affection -1]\nif affection >= 2 -> rooftop else -> ending\njump ending"
+          placeholder="scene classroom with fade\nplay video opening_movie title &quot;Opening&quot; volume 80 from 0 to 18 cover\nplay music school_theme fadein 1.2\nshow 悠奈 smile at center with dissolve\nfilter memory soft\nblur right strong\nparticle snow heavy fast\nshake heavy short\nflash white soft short\nzoom in medium center\nplay sound door_knock\nvoice yuina_001\nspeed fast\nwait 0.8\n悠奈 &quot;你终于来了。&quot;\nset route = common\nadd affection +1\n- 问她为什么在这里 -> rooftop [affection +1]\n- 先沉默陪她一会儿 [affection -1]\nif affection >= 2 -> rooftop else -> ending\njump ending"
         >${escapeHtml(draft)}</textarea>
         <div class="script-importer-actions">
           <button type="button" class="toolbar-button" data-action="apply-script-import-sample">填入示例</button>
@@ -10191,7 +10198,7 @@ function buildRecentSceneSummary(scene) {
   const hasMusic = blocks.some((block) => block.type === "music_play" && block.assetId);
   const missingVoiceCount = blocks.filter((block) => block.type === "dialogue" && !block.voiceAssetId).length;
   const hasEffects = blocks.some((block) =>
-    ["particle_effect", "screen_shake", "screen_flash", "screen_fade", "camera_zoom", "camera_pan", "screen_filter", "depth_blur"].includes(block.type)
+    ["particle_effect", "wait", "screen_shake", "screen_flash", "screen_fade", "camera_zoom", "camera_pan", "screen_filter", "depth_blur"].includes(block.type)
   );
 
   if (!hasStoryContent) {
@@ -11385,6 +11392,7 @@ function buildDashboardProductionOverview(routeOverview) {
   const issueEntries = scriptEntries.filter((entry) => (entry.issues?.length ?? 0) > 0);
   const effectBlockTypes = new Set([
     "particle_effect",
+    "wait",
     "screen_shake",
     "screen_flash",
     "screen_fade",
@@ -21774,9 +21782,13 @@ function applyBlockToPreviewState(block, visualState, variables, sceneId = "") {
       visualState.dialogueText =
         fadeAction === "fade_out"
           ? `画面会慢慢淡到${getFadeColorLabel(block.color)}，持续 ${getEffectDurationLabel(block.duration)}。`
-          : `画面会从${getFadeColorLabel(block.color)}慢慢亮起，持续 ${getEffectDurationLabel(block.duration)}。`;
+            : `画面会从${getFadeColorLabel(block.color)}慢慢亮起，持续 ${getEffectDurationLabel(block.duration)}。`;
       return null;
     }
+    case "wait":
+      visualState.speakerName = "节奏停顿";
+      visualState.dialogueText = `画面会停顿 ${getSafeWaitDurationSeconds(block.durationSeconds)} 秒。`;
+      return null;
     case "camera_zoom": {
       const zoomAction = getSafeCameraZoomAction(block.action);
       visualState.cameraZoom =
@@ -30331,6 +30343,7 @@ function buildReleaseCreativeQualityContext() {
   const scriptEntries = analyzeScriptEntries(buildScriptEntries());
   const effectBlockTypes = new Set([
     "particle_effect",
+    "wait",
     "screen_shake",
     "screen_flash",
     "screen_fade",
@@ -32922,6 +32935,8 @@ function renderBlockPanel(block, scene, selectedIndex) {
     editorMarkup = renderScreenFlashEditor(block);
   } else if (block.type === "screen_fade") {
     editorMarkup = renderScreenFadeEditor(block);
+  } else if (block.type === "wait") {
+    editorMarkup = renderWaitEditor(block);
   } else if (block.type === "camera_zoom") {
     editorMarkup = renderCameraZoomEditor(block);
   } else if (block.type === "camera_pan") {
@@ -32953,6 +32968,7 @@ function buildStorySceneStructureFallbackNode(scene) {
   const issueCounts = buildRouteValidationSceneIndex().get(scene.id);
   const effectBlockTypes = new Set([
     "particle_effect",
+    "wait",
     "screen_shake",
     "screen_flash",
     "screen_fade",
@@ -33028,6 +33044,8 @@ function getStorySceneHighlightCandidate(block, scene, index, blocks) {
     pushReason("这里会播放 OP、ED 或过场视频", 18);
   } else if (block.type === "credits_roll") {
     pushReason("这里会进入片尾演职人员表", 16);
+  } else if (block.type === "wait") {
+    pushReason("这里会控制试玩节奏和情绪留白", 12);
   } else if (block.type === "background") {
     pushReason("这里会切换画面空间", 11);
   } else if (["music_play", "music_stop", "sfx_play"].includes(block.type)) {
@@ -33981,6 +33999,13 @@ function renderScreenFadeEditor(block) {
     getSafeFadeAction,
     getSafeFadeColor,
     getSafeEffectDuration,
+  });
+}
+
+function renderWaitEditor(block) {
+  return storyBlockEditorTools.renderWaitEditor(block, {
+    escapeHtml,
+    getSafeWaitDurationSeconds,
   });
 }
 
@@ -35670,6 +35695,7 @@ function normalizeAssistantDraftBlockForScene(sceneDraft, draftBlock) {
     "sfx_play",
     "video_play",
     "credits_roll",
+    "wait",
     "screen_shake",
     "screen_flash",
     "screen_fade",
@@ -35789,6 +35815,8 @@ function normalizeAssistantDraftBlockForScene(sceneDraft, draftBlock) {
     block.durationSeconds = getSafeCreditsDuration(block.durationSeconds);
     block.background = getSafeCreditsBackground(block.background);
     block.skippable = block.skippable !== false;
+  } else if (blockType === "wait") {
+    block.durationSeconds = getSafeWaitDurationSeconds(block.durationSeconds);
   } else if (blockType === "screen_shake") {
     block.intensity = getSafeShakeIntensity(block.intensity);
     block.duration = getSafeEffectDuration(block.duration);
@@ -41263,6 +41291,13 @@ function collectEditedBlock(block) {
     };
   }
 
+  if (block.type === "wait") {
+    return {
+      ...block,
+      durationSeconds: getSafeWaitDurationSeconds(document.getElementById("editorWaitDurationSeconds")?.value),
+    };
+  }
+
   if (block.type === "camera_zoom") {
     return {
       ...block,
@@ -42630,6 +42665,14 @@ function createDefaultBlock(scene, blockType) {
       durationSeconds: 18,
       background: "dark",
       skippable: true,
+    };
+  }
+
+  if (blockType === "wait") {
+    return {
+      id: blockId,
+      type: "wait",
+      durationSeconds: 1,
     };
   }
 
@@ -45293,6 +45336,14 @@ function getSafeEffectDuration(duration) {
   );
 }
 
+function getSafeWaitDurationSeconds(value) {
+  const parsed = Number.parseFloat(value ?? "");
+  if (!Number.isFinite(parsed)) {
+    return 1;
+  }
+  return Math.round(Math.min(Math.max(parsed, 0.1), 30) * 10) / 10;
+}
+
 function getEffectDurationLabel(duration) {
   return visualEffectTools?.getEffectDurationLabel?.(duration) ?? EFFECT_DURATION_LABELS[getSafeEffectDuration(duration)];
 }
@@ -45890,6 +45941,10 @@ function buildBlockDetails(block) {
       rows.push(["允许跳过", block.skippable === false ? "否" : "是"]);
       break;
     }
+    case "wait":
+      rows.push(["等待时长", `${getSafeWaitDurationSeconds(block.durationSeconds)} 秒`]);
+      rows.push(["用途", "控制转场、登场或关键台词前后的节奏留白"]);
+      break;
     case "particle_effect":
       rows.push(
         ...particleEffectTools.buildParticleEffectDetailRows(block, {
@@ -46041,6 +46096,11 @@ function getBlockSummary(block, scene) {
         meta: `${getCreditsLines(block.lines).length} 行字幕 / ${getSafeCreditsDuration(
           block.durationSeconds
         )} 秒 / ${getCreditsBackgroundLabel(block.background)}`,
+      };
+    case "wait":
+      return {
+        title: `等待 ${getSafeWaitDurationSeconds(block.durationSeconds)} 秒`,
+        meta: "节奏停顿 / 运行时会按时长等待",
       };
     case "particle_effect":
       return getSafeParticleAction(block.action) === "stop"
@@ -46239,6 +46299,10 @@ function computeVisualState(scene, blockIndex) {
         visual.dialogueText = `${block.title || "STAFF"} / ${getCreditsLines(block.lines).length} 行 / ${getSafeCreditsDuration(
           block.durationSeconds
         )} 秒。`;
+        break;
+      case "wait":
+        visual.speakerName = "节奏停顿";
+        visual.dialogueText = `等待 ${getSafeWaitDurationSeconds(block.durationSeconds)} 秒。`;
         break;
       case "particle_effect":
         if (getSafeParticleAction(block.action) === "stop") {
@@ -46933,6 +46997,11 @@ function validateBlock(block, scene, data, pushIssue) {
         }
         if (getSafeCreditsBackground(block.background) !== (block.background ?? "dark")) {
           pushIssue("warning", "片尾背景样式不认识，预览时会回退成深色电影片尾。", location, blockContext);
+        }
+        break;
+      case "wait":
+        if (getSafeWaitDurationSeconds(block.durationSeconds) >= 8) {
+          pushIssue("warning", "等待停顿偏长，玩家可能误以为卡住。", location, blockContext);
         }
         break;
       case "particle_effect":

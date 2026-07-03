@@ -10,6 +10,7 @@
     sfx_play: "音效",
     video_play: "视频",
     credits_roll: "片尾字幕",
+    wait: "等待停顿",
     choice: "选项",
     jump: "跳转",
     condition: "条件",
@@ -120,7 +121,7 @@
   }
 
   function isStoryContentBlock(block = {}) {
-    return ["background", "dialogue", "narration", "character_show", "choice", "video_play", "credits_roll"].includes(
+    return ["background", "dialogue", "narration", "character_show", "choice", "video_play", "credits_roll", "wait"].includes(
       block.type
     );
   }

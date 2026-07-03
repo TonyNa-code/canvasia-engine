@@ -202,6 +202,12 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
                 getSafeEffectDuration: (value) => value || "medium",
               }}
             );
+            const waitMarkup = tools.renderWaitEditor(
+              {{ durationSeconds: "1.5" }},
+              {{
+                getSafeWaitDurationSeconds: (value) => Number.parseFloat(value || "1"),
+              }}
+            );
             const zoomMarkup = tools.renderCameraZoomEditor(
               {{ action: "zoom_out", strength: "heavy", focus: "right" }},
               {{
@@ -434,6 +440,7 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
               shakeMarkup,
               flashMarkup,
               fadeMarkup,
+              waitMarkup,
               zoomMarkup,
               panMarkup,
               filterMarkup,
@@ -499,6 +506,7 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
             "renderVariableSetEditor",
             "renderVariableStarterPrompt",
             "renderVideoPlayEditor",
+            "renderWaitEditor",
         ])
         self.assertIn("管理这张卡片", payload["blockManagementMarkup"])
         self.assertIn("<dt>所在场景</dt><dd>第一场 <黄昏></dd>", payload["blockManagementMarkup"])
@@ -520,6 +528,9 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
         self.assertIn('value="red" selected', payload["flashMarkup"])
         self.assertIn("编辑黑场淡入淡出", payload["fadeMarkup"])
         self.assertIn('value="fade_in" selected', payload["fadeMarkup"])
+        self.assertIn("编辑等待停顿", payload["waitMarkup"])
+        self.assertIn('id="editorWaitDurationSeconds"', payload["waitMarkup"])
+        self.assertIn('value="1.5"', payload["waitMarkup"])
         self.assertIn("编辑镜头推近拉远", payload["zoomMarkup"])
         self.assertIn('value="zoom_out" selected', payload["zoomMarkup"])
         self.assertIn("编辑镜头平移", payload["panMarkup"])

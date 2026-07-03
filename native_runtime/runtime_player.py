@@ -5370,6 +5370,7 @@ def build_native_runtime_3d_risk_digest(report: dict | None) -> dict:
 
 VN_BASELINE_EFFECT_BLOCK_TYPES = {
     "particle_effect",
+    "wait",
     "screen_shake",
     "screen_flash",
     "screen_fade",
@@ -7974,6 +7975,20 @@ def get_effect_duration_seconds(value) -> float:
     return EFFECT_DURATION_SECONDS.get(get_safe_option(value, set(EFFECT_DURATION_SECONDS), "medium"), EFFECT_DURATION_SECONDS["medium"])
 
 
+def get_safe_wait_duration_seconds(value) -> float:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return 1.0
+    if not math.isfinite(number):
+        return 1.0
+    return round(min(max(number, 0.1), 30.0), 1)
+
+
+def get_safe_wait_duration_ms(value) -> int:
+    return int(round(get_safe_wait_duration_seconds(value) * 1000))
+
+
 def normalize_native_visual_effect_block(block: dict | None) -> dict:
     block = block or {}
     block_type = str(block.get("type") or "").strip()
@@ -9450,6 +9465,7 @@ def get_block_label(block_type: str) -> str:
         "sfx_play": "播放音效",
         "video_play": "播放视频",
         "credits_roll": "片尾字幕",
+        "wait": "等待停顿",
         "particle_effect": "粒子特效",
         "screen_shake": "屏幕震动",
         "screen_flash": "闪屏",
@@ -10676,6 +10692,16 @@ class NativeRuntimePlayer:
             return
         now_ms = self.pygame.time.get_ticks()
         if self.skip_read_enabled:
+            if self.current_line.get("type") == "wait":
+                if not self.is_current_line_fully_visible():
+                    self.reveal_current_line_immediately()
+                if self.skip_deadline_ms <= 0:
+                    self.skip_deadline_ms = now_ms + 90
+                    return
+                if now_ms >= self.skip_deadline_ms:
+                    self.advance_current_line_if_allowed()
+                    self.skip_deadline_ms = 0
+                return
             history_key = str(self.current_line.get("historyKey") or "")
             if history_key not in self.read_text_keys:
                 self.skip_read_enabled = False
@@ -10690,13 +10716,19 @@ class NativeRuntimePlayer:
                 self.advance_current_line_if_allowed()
                 self.skip_deadline_ms = 0
             return
-        if self.auto_play_enabled and self.is_current_line_fully_visible():
+        timed_wait_active = self.current_line.get("type") == "wait"
+        if (self.auto_play_enabled or timed_wait_active) and self.is_current_line_fully_visible():
             if self.runtime_settings.get("autoPlayWaitForVoice") == "on" and self.is_voice_playing():
                 self.auto_play_deadline_ms = 0
                 return
             if self.auto_play_deadline_ms <= 0:
-                delay_ms = int(self.runtime_settings.get("autoPlayDelayMs") or DEFAULT_RUNTIME_PLAYER_SETTINGS["autoPlayDelayMs"])
-                self.auto_play_deadline_ms = now_ms + max(400, delay_ms)
+                delay_ms = int(
+                    self.current_line.get("waitDurationMs")
+                    or self.runtime_settings.get("autoPlayDelayMs")
+                    or DEFAULT_RUNTIME_PLAYER_SETTINGS["autoPlayDelayMs"]
+                )
+                minimum_delay_ms = 100 if self.current_line.get("type") == "wait" else 400
+                self.auto_play_deadline_ms = now_ms + max(minimum_delay_ms, delay_ms)
                 return
             if now_ms >= self.auto_play_deadline_ms:
                 self.advance_current_line_if_allowed()
@@ -11926,6 +11958,24 @@ class NativeRuntimePlayer:
             rect = image.get_rect(center=(int(item.get("x") or 0), int(item.get("y") or 0)))
             target.blit(image, rect)
 
+    def pause_on_wait_block(self, block: dict, scene: dict | None) -> None:
+        duration_seconds = get_safe_wait_duration_seconds(block.get("durationSeconds"))
+        duration_label = f"{duration_seconds:g}"
+        text = f"等待 {duration_label} 秒。"
+        self.current_line = {
+            "type": "wait",
+            "speakerId": None,
+            "speakerName": "节奏停顿",
+            "text": text,
+            "voiceAssetId": None,
+            "waitDurationMs": get_safe_wait_duration_ms(block.get("durationSeconds")),
+            "blockLabel": get_block_label("wait"),
+        }
+        self.stop_voice()
+        self.start_current_line_display(text)
+        self.reveal_current_line_immediately()
+        self.status_message = f"等待停顿：{duration_label} 秒"
+
     def hydrate_pause_from_current_block(self) -> None:
         scene = self.get_current_scene()
         blocks = (scene or {}).get("blocks", []) or []
@@ -11939,6 +11989,9 @@ class NativeRuntimePlayer:
             self.current_choices = block.get("options", []) or []
             self.current_choice_index = 0
             self.stop_flow_assist()
+            return
+        if block_type == "wait":
+            self.pause_on_wait_block(block, scene)
             return
         if block_type in {"dialogue", "narration"}:
             line_text = self.localize_value(block, "text")
@@ -12059,6 +12112,10 @@ class NativeRuntimePlayer:
                 self.play_sfx(block.get("assetId"), volume_percent=block.get("volume"))
                 self.current_block_index += 1
                 continue
+
+            if block_type == "wait":
+                self.pause_on_wait_block(block, scene)
+                return
 
             if block_type == "video_play":
                 self.stop_embedded_video_playback()

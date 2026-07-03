@@ -79,6 +79,7 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
               getSafeCameraPanStrength: (value) => ["light", "medium", "heavy"].includes(value) ? value : "medium",
               getSafeCreditsDuration: (value) => Math.max(4, Math.min(180, Number.parseInt(value, 10) || 18)),
               getSafeCreditsBackground: (value) => ["dark", "light", "transparent"].includes(value) ? value : "dark",
+              getSafeWaitDurationSeconds: (value) => Math.round(Math.max(0.1, Math.min(30, Number.parseFloat(value) || 1)) * 10) / 10,
               getSafeFadeAction: (value) => value === "fade_in" ? "fade_in" : "fade_out",
               getSafeScreenFilterAction: (value) => ["apply", "clear"].includes(value) ? value : "apply",
               getSafeScreenFilterPreset: (value) => ["memory", "mono", "dream", "cold"].includes(value) ? value : "memory",
@@ -192,6 +193,11 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
               ),
               normalizedCredits: tools.normalizeImportedDraftBlockForScene(
                 {{ type: "credits_roll", title: "STAFF", subtitle: "Thanks", lines: ["企划：Tony"], durationSeconds: "24", background: "light", skippable: false }},
+                null,
+                resolvers
+              ),
+              normalizedWait: tools.normalizeImportedDraftBlockForScene(
+                {{ type: "wait", durationSeconds: "1.2" }},
                 null,
                 resolvers
               ),
@@ -383,6 +389,7 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
             "background": "light",
             "skippable": False,
         })
+        self.assertEqual(payload["normalizedWait"], {"type": "wait", "durationSeconds": 1.2})
         self.assertEqual(payload["normalizedShake"], {"type": "screen_shake", "intensity": "heavy", "duration": "short"})
         self.assertEqual(payload["normalizedFlash"], {
             "type": "screen_flash",

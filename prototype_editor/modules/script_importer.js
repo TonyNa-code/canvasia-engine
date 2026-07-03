@@ -11,6 +11,7 @@
     "sfx_play",
     "video_play",
     "credits_roll",
+    "wait",
     "screen_shake",
     "screen_flash",
     "screen_fade",
@@ -158,6 +159,23 @@
 
     const seconds = raw.endsWith("ms") ? number / 1000 : number;
     return Math.round(Math.max(0, Math.min(seconds, 21600)) * 10) / 10;
+  }
+
+  function parseWaitDurationSeconds(value, fallbackSeconds = 1) {
+    const raw = String(value ?? "").trim().toLowerCase();
+    const match = raw.match(/^([0-9.]+)\s*(ms|毫秒|s|sec|secs|second|seconds|秒)?$/iu);
+    if (!match) {
+      return fallbackSeconds;
+    }
+
+    const number = Number.parseFloat(match[1]);
+    if (!Number.isFinite(number)) {
+      return fallbackSeconds;
+    }
+
+    const unit = normalizeDirectiveToken(match[2] ?? "s");
+    const seconds = unit === "ms" || unit === "毫秒" ? number / 1000 : number;
+    return Math.round(Math.min(Math.max(seconds, 0.1), 30) * 10) / 10;
   }
 
   function parseInlineTimeMs(text, keyword, fallbackMs = 600) {
@@ -410,7 +428,7 @@
   }
 
   function isIgnoredScriptLine(line) {
-    return /^(?:#|\/\/|label\s+\S+\s*:|menu\s*:|return\b|call\s+\S+|pause\b)/i.test(String(line ?? "").trim());
+    return /^(?:#|\/\/|label\s+\S+\s*:|menu\s*:|return\b|call\s+\S+)/i.test(String(line ?? "").trim());
   }
 
   function parseChoiceLine(line) {
@@ -913,6 +931,19 @@
     return null;
   }
 
+  function parseWaitLine(line) {
+    const text = trimImportedText(line, 120);
+    const match = text.match(/^(?:wait|pause|等待|停顿)(?:\s+(.+?))?$/iu);
+    if (!match) {
+      return null;
+    }
+
+    return {
+      type: "wait",
+      durationSeconds: parseWaitDurationSeconds(match[1] ?? "1", 1),
+    };
+  }
+
   function parseVoiceLine(line) {
     const match = String(line ?? "").trim().match(/^voice\s+(.+)$/i);
     const voiceHint = stripWrappingQuotes(trimImportedText(match?.[1] ?? "", 160));
@@ -1027,6 +1058,12 @@
         return;
       }
 
+      const wait = parseWaitLine(line);
+      if (wait) {
+        blocks.push(wait);
+        return;
+      }
+
       const stageDirection = parseStageDirectionLine(line);
       if (stageDirection) {
         blocks.push(stageDirection);
@@ -1110,6 +1147,9 @@
     }
     if (block?.type === "credits_roll") {
       return `片尾字幕：${block.title || "STAFF"}`;
+    }
+    if (block?.type === "wait") {
+      return `等待：${parseWaitDurationSeconds(block.durationSeconds, 1)}s`;
     }
     if (block?.type === "screen_shake") {
       return `震屏：${block.intensity || "medium"} / ${block.duration || "short"}`;
@@ -1233,6 +1273,7 @@
     parseDialogueLine,
     parseQuotedDialogueLine,
     parseStageDirectionLine,
+    parseWaitLine,
     parseVoiceLine,
     parseTextSpeedLine,
     parseConditionRuleClause,

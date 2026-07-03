@@ -41,6 +41,7 @@ class FrontendRuntimeCapabilityMatrixModuleTests(unittest.TestCase):
                         {{ id: "bg", type: "background", assetId: "bg_room" }},
                         {{ id: "line", type: "dialogue", speakerId: "char_a", text: "你好。" }},
                         {{ id: "scene3d", type: "background", assetId: "scene_3d" }},
+                        {{ id: "wait", type: "wait", durationSeconds: 1.2 }},
                         {{ id: "op", type: "video_play", assetId: "op_video" }},
                         {{ id: "future", type: "live2d_pose", characterId: "char_a" }},
                       ],
@@ -85,9 +86,9 @@ class FrontendRuntimeCapabilityMatrixModuleTests(unittest.TestCase):
         self.assertIn("buildRuntimeCapabilityMarkdown", payload["keys"])
         self.assertIn("buildRuntimeCapabilityCsv", payload["keys"])
         summary = payload["matrix"]["summary"]
-        self.assertEqual(summary["totalBlockCount"], 5)
-        self.assertEqual(summary["usedTypeCount"], 4)
-        self.assertEqual(summary["fullUsedTypeCount"], 1)
+        self.assertEqual(summary["totalBlockCount"], 6)
+        self.assertEqual(summary["usedTypeCount"], 5)
+        self.assertEqual(summary["fullUsedTypeCount"], 2)
         self.assertEqual(summary["partialUsedTypeCount"], 2)
         self.assertEqual(summary["unknownUsedTypeCount"], 1)
         self.assertEqual(summary["scene3dBackgroundCount"], 1)

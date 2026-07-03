@@ -1,6 +1,7 @@
 (function attachSceneProductionBoardTools(global) {
   const EFFECT_BLOCK_TYPES = Object.freeze([
     "particle_effect",
+    "wait",
     "screen_shake",
     "screen_flash",
     "screen_fade",
@@ -23,6 +24,7 @@
     sfx_play: "播放音效",
     video_play: "播放视频",
     credits_roll: "片尾字幕",
+    wait: "等待停顿",
     particle_effect: "粒子特效",
     screen_shake: "屏幕震动",
     screen_flash: "闪屏",

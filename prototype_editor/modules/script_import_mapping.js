@@ -181,6 +181,8 @@
     const getCreditsDuration = (value) => callScriptImportResolver(resolvers, "getSafeCreditsDuration", [value], 18);
     const getCreditsBackground = (value) =>
       callScriptImportResolver(resolvers, "getSafeCreditsBackground", [value], value || "dark");
+    const getWaitDurationSeconds = (value) =>
+      callScriptImportResolver(resolvers, "getSafeWaitDurationSeconds", [value], value || 1);
     const getFadeAction = (value) => callScriptImportResolver(resolvers, "getSafeFadeAction", [value], value || "fade_out");
     const getEffectDuration = (value) =>
       callScriptImportResolver(resolvers, "getEffectDuration", [value], getImportedEffectDuration(value));
@@ -421,6 +423,13 @@
         durationSeconds: getCreditsDuration(draftBlock.durationSeconds),
         background: getCreditsBackground(draftBlock.background),
         skippable: draftBlock.skippable !== false,
+      };
+    }
+
+    if (draftBlock.type === "wait") {
+      return {
+        type: "wait",
+        durationSeconds: getWaitDurationSeconds(draftBlock.durationSeconds),
       };
     }
 

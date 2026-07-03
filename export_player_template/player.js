@@ -7106,6 +7106,10 @@ function getAutoAdvanceDelay(snapshot) {
     return 520;
   }
 
+  if (snapshot.blockType === "wait") {
+    return getSafeWaitDurationMs(snapshot.block?.durationSeconds);
+  }
+
   return 820;
 }
 
@@ -7190,9 +7194,10 @@ function scheduleRuntimeAutoAdvance(snapshot, options = {}) {
 
   const skipActive = state.playback.skipRead;
   const autoPlayActive = state.playback.autoPlay;
+  const timedWaitActive = snapshot?.blockType === "wait";
 
   if (
-    (!autoPlayActive && !skipActive) ||
+    (!autoPlayActive && !skipActive && !timedWaitActive) ||
     !snapshot ||
     snapshot.completed ||
     isBlockingMediaSnapshot(snapshot) ||
@@ -7201,7 +7206,7 @@ function scheduleRuntimeAutoAdvance(snapshot, options = {}) {
     return;
   }
 
-  if (skipActive && !isSnapshotRead(snapshot)) {
+  if (skipActive && !timedWaitActive && !isSnapshotRead(snapshot)) {
     state.playback.skipRead = false;
     persistPlaybackSettings();
     renderPlaybackControls(snapshot);
@@ -7230,11 +7235,14 @@ function scheduleRuntimeAutoAdvance(snapshot, options = {}) {
 
   state.autoAdvanceStepKey = stepKey;
   state.autoAdvanceTimer = window.setTimeout(() => {
-    if ((!state.playback.autoPlay && !state.playback.skipRead) || state.autoAdvanceStepKey !== stepKey) {
+    const current = getCurrentSnapshot();
+    if (
+      (!state.playback.autoPlay && !state.playback.skipRead && current?.blockType !== "wait") ||
+      state.autoAdvanceStepKey !== stepKey
+    ) {
       return;
     }
 
-    const current = getCurrentSnapshot();
     if (!current || getCurrentStepKey(current) !== stepKey) {
       return;
     }
@@ -9459,6 +9467,10 @@ function applyBlockToPreviewState(block, visualState, variables, sceneId = "") {
         block.durationSeconds
       )} 秒。`;
       return null;
+    case "wait":
+      visualState.speakerName = "节奏停顿";
+      visualState.dialogueText = `等待 ${getSafeWaitDurationSeconds(block.durationSeconds)} 秒。`;
+      return null;
     case "particle_effect": {
       const action = getSafeParticleAction(block.action);
       if (action === "stop") {
@@ -10435,6 +10447,10 @@ function getPreviewHint(snapshot) {
     return snapshot.block?.skippable === false ? "片尾字幕滚完后会自动继续。" : "片尾字幕滚完会自动继续，也可以跳过片尾。";
   }
 
+  if (snapshot.blockType === "wait") {
+    return `这里会停顿 ${getSafeWaitDurationSeconds(snapshot.block?.durationSeconds)} 秒；也可以点击或按空格提前继续。`;
+  }
+
   if (snapshot.completed) {
     return "这条试玩路线已经结束了。";
   }
@@ -10601,6 +10617,7 @@ function getBlockLabel(type) {
     sfx_play: "播放音效",
     video_play: "播放视频",
     credits_roll: "片尾字幕",
+    wait: "等待停顿",
     particle_effect: "粒子特效",
     screen_shake: "屏幕震动",
     screen_flash: "闪屏",
@@ -10650,6 +10667,18 @@ function getSafeCreditsDuration(value) {
     return 18;
   }
   return Math.round(clamp(number, 4, 180));
+}
+
+function getSafeWaitDurationSeconds(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) {
+    return 1;
+  }
+  return Math.round(clamp(number, 0.1, 30) * 10) / 10;
+}
+
+function getSafeWaitDurationMs(value) {
+  return Math.round(getSafeWaitDurationSeconds(value) * 1000);
 }
 
 function getSafeCreditsBackground(value) {

@@ -46,6 +46,7 @@
     "add-character-show",
     "add-music-play",
     "add-video-play",
+    "add-wait",
     "add-jump",
   ]);
 
@@ -54,6 +55,7 @@
   const STORY_ROUTE_BLOCK_TYPES = Object.freeze(["choice", "jump"]);
   const STORY_POLISH_BLOCK_TYPES = Object.freeze([
     "particle_effect",
+    "wait",
     "screen_shake",
     "screen_flash",
     "screen_fade",

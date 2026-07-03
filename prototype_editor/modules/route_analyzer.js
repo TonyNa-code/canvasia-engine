@@ -3,6 +3,7 @@
 
   const DEFAULT_EFFECT_BLOCK_TYPES = Object.freeze([
     "particle_effect",
+    "wait",
     "screen_shake",
     "screen_flash",
     "screen_fade",

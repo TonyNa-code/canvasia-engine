@@ -411,7 +411,7 @@
     if (selectedBlockType === "condition") {
       return ["insert-dialogue", "insert-jump", "insert-variable-set", "screen-preview"];
     }
-    if (selectedBlockType === "video_play" || selectedBlockType === "credits_roll") {
+    if (selectedBlockType === "video_play" || selectedBlockType === "credits_roll" || selectedBlockType === "wait") {
       return ["insert-narration", "insert-music-stop", "screen-preview", "export-web"];
     }
     if (selectedBlockType === "screen_fade" || selectedBlockType === "screen_filter" || selectedBlockType === "depth_blur") {

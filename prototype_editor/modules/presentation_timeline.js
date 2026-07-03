@@ -10,6 +10,7 @@
     sfx_play: "音效",
     video_play: "视频",
     credits_roll: "片尾字幕",
+    wait: "等待停顿",
     particle_effect: "粒子",
     screen_shake: "震动",
     screen_flash: "闪屏",
@@ -36,6 +37,7 @@
     "character_show",
     "character_hide",
     "particle_effect",
+    "wait",
     "screen_shake",
     "screen_flash",
     "screen_fade",
@@ -219,6 +221,9 @@
     if (block.type === "credits_roll") {
       return Math.round(clampNumber(block.durationSeconds, 4, 180, 18) * 1000);
     }
+    if (block.type === "wait") {
+      return Math.round(clampNumber(block.durationSeconds, 0.1, 30, 1) * 1000);
+    }
     if (block.type === "video_play") {
       return Math.round(clampNumber(block.durationSeconds, 1, 600, 12) * 1000);
     }
@@ -389,6 +394,10 @@
 
     if (type === "credits_roll" && !toArray(block.lines).some((line) => cleanText(line))) {
       pushIssue(issues, "warn", "credits_without_lines", "片尾字幕为空", "片尾卡已经存在，但还没有演职人员文本。", baseContext);
+    }
+
+    if (type === "wait" && clampNumber(block.durationSeconds, 0.1, 30, 1) >= 8) {
+      pushIssue(issues, "warn", "long_wait_block", "等待停顿偏长", "超过 8 秒的停顿可能会让玩家误以为卡住，建议只在强演出时使用。", baseContext);
     }
 
     const status = getStatusFromIssues(issues);
