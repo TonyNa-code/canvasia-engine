@@ -54,7 +54,7 @@ The project already includes a visual editor, export pipeline, native runtime pr
 - Project center with playable Demo projects, blank projects, beginner mode, and advanced mode
 - Context-aware Command Palette with Cmd/Ctrl+K quick actions for project setup, navigation, recommended next steps, recent commands, story card insertion, a previewed first-playable-scene template, themes, tutorial access, and export flow
 - Production-ready scene recipes for OP hooks, daily dialogue rhythm, affection choices, climax direction, ED / credits, BGM range scoping, and variable-backed branch consequences
-- Plain-text script import that previews and turns `Character: line`, narration lines, and consecutive choice lines into editable story cards
+- Plain-text and Ren'Py-style script import that previews `Character: line`, quoted dialogue, narration, choices, `scene`, `show`, `hide`, and `play / stop music` cues as editable story cards
 - Asset management for backgrounds, character sprites, CGs, BGM, SFX, voice, fonts, UI assets, Live2D files, 3D models, and 3D scenes, with dependency reports that show where each asset is used
 - Multi-language project settings for default language and player-selectable languages
 - Localized runtime text for scene names, chapter names, dialogue, choices, and character names, with safe fallback when a translation is missing
@@ -172,7 +172,7 @@ For a first five-minute demo, start small:
 Build one complete path first, then add branches, effects, UI skins, galleries, voice, and extra polish.
 The playable Demo project gives you that skeleton immediately. If you start from a blank project instead, the starter kit can create the first character/background/BGM records and connect them to the first scene, so you do not have to wire every card by hand.
 
-If your draft already lives in a document or notes app, paste a short section into the story page's script import panel. `Character: dialogue` becomes dialogue, plain lines become narration, and consecutive `- choice` lines become one choice card after preview.
+If your draft already lives in a document or notes app, paste a short section into the story page's script import panel. `Character: dialogue` or `character "dialogue"` becomes dialogue, plain lines become narration, consecutive `- choice` or `"choice":` lines become one choice card, and lightweight cues such as `scene classroom with fade`, `show heroine smile at right with dissolve`, `hide heroine with fade`, and `play music school_theme fadein 1.2` become editable staging / audio cards after preview.
 
 ## Multi-language Projects
 

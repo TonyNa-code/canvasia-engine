@@ -49,6 +49,7 @@ const storyBlockEditorTools = window.CanvasiaEditorStoryBlockEditors;
 const storyTemplateTools = window.CanvasiaEditorStoryTemplates;
 const { STORY_TEMPLATE_PRESETS } = storyTemplateTools;
 const scriptImporterTools = window.CanvasiaEditorScriptImporter;
+const scriptImportMappingTools = window.CanvasiaEditorScriptImportMapping;
 const routeAnalyzerTools = window.CanvasiaEditorRouteAnalyzer;
 const routeTestingReportTools = window.CanvasiaEditorRouteTestingReport;
 const sceneProductionBoardTools = window.CanvasiaEditorSceneProductionBoard;
@@ -9819,26 +9820,48 @@ function getScriptImporterSampleDraft() {
     state.data?.characters?.[0]?.displayName ??
     "女主角";
   return [
+    "scene classroom with fade",
+    "play music school_theme fadein 1.2",
+    `show ${characterName} smile at center with dissolve`,
+    `${characterName} "你终于来了。"`,
     "旁白：雨声贴着窗沿落下。",
-    `${characterName}：你终于来了。`,
     "我把伞往她那边递过去。",
     "- 问她为什么在这里",
     "- 先沉默陪她一会儿",
+    "hide " + characterName + " with fade",
   ].join("\n");
 }
 
 function getImportedSpeakerCharacterId(speakerName) {
   const characters = Array.isArray(state.data?.characters) ? state.data.characters : [];
-  const normalized = String(speakerName ?? "").trim().toLowerCase();
-  const matchedCharacter = normalized
-    ? characters.find((character) =>
-        [character.id, character.displayName, character.name]
-          .filter(Boolean)
-          .some((value) => String(value).trim().toLowerCase() === normalized)
-      )
-    : null;
+  const matchedCharacter = scriptImportMappingTools.findImportedCharacterByHint(state.data, speakerName);
 
   return getSafeCharacterId(matchedCharacter?.id ?? state.selectedCharacterId ?? characters[0]?.id);
+}
+
+function findImportedCharacterIdByHint(characterHint, { fallbackToSelected = true } = {}) {
+  const characters = Array.isArray(state.data?.characters) ? state.data.characters : [];
+  const matchedCharacter = scriptImportMappingTools.findImportedCharacterByHint(state.data, characterHint);
+  if (matchedCharacter?.id) {
+    return getSafeCharacterId(matchedCharacter.id);
+  }
+
+  return fallbackToSelected ? getSafeCharacterId(state.selectedCharacterId ?? characters[0]?.id) : "";
+}
+
+function findImportedExpressionIdByHint(characterId, expressionHint) {
+  return getSafeExpressionId(
+    characterId,
+    scriptImportMappingTools.findImportedExpressionIdByHint(state.data, characterId, expressionHint)
+  );
+}
+
+function findImportedAssetIdByHint(assetHint, assetTypes = []) {
+  return scriptImportMappingTools.findImportedAssetIdByHint(state.data, assetHint, assetTypes);
+}
+
+function getImportedEffectDuration(durationMs) {
+  return scriptImportMappingTools.getImportedEffectDuration(durationMs);
 }
 
 function normalizeScriptImportBlockForScene(draftBlock) {
@@ -9863,6 +9886,66 @@ function normalizeScriptImportBlockForScene(draftBlock) {
     };
   }
 
+  if (draftBlock.type === "background") {
+    return {
+      type: "background",
+      assetId: findImportedAssetIdByHint(draftBlock.assetHint, ["background", "cg"]),
+      transition: getSafeTransition(draftBlock.transition ?? "fade"),
+      transitionDurationMs: getSafeTransitionDurationMs(draftBlock.transitionDurationMs, 600),
+    };
+  }
+
+  if (draftBlock.type === "character_show") {
+    const characterId = findImportedCharacterIdByHint(draftBlock.characterHint);
+    return {
+      type: "character_show",
+      characterId,
+      expressionId: findImportedExpressionIdByHint(characterId, draftBlock.expressionHint),
+      position: getSafePosition(draftBlock.position ?? getDefaultCharacterPosition(characterId)),
+      transition: getSafeTransition(draftBlock.transition ?? "fade"),
+      transitionDurationMs: getSafeTransitionDurationMs(draftBlock.transitionDurationMs, 600),
+      stage: { ...DEFAULT_CHARACTER_STAGE },
+    };
+  }
+
+  if (draftBlock.type === "character_hide") {
+    return {
+      type: "character_hide",
+      characterId: findImportedCharacterIdByHint(draftBlock.characterHint),
+      transition: getSafeTransition(draftBlock.transition ?? "fade"),
+      transitionDurationMs: getSafeTransitionDurationMs(draftBlock.transitionDurationMs, 600),
+    };
+  }
+
+  if (draftBlock.type === "music_play") {
+    return {
+      type: "music_play",
+      assetId: findImportedAssetIdByHint(draftBlock.assetHint, ["bgm"]),
+      loop: true,
+      volume: 100,
+      fadeInMs: getSafeNonNegativeNumber(draftBlock.fadeInMs, 600),
+      fadeOutMs: getSafeNonNegativeNumber(draftBlock.fadeOutMs, 600),
+      endMode: "until_next_music",
+      endBlockId: "",
+    };
+  }
+
+  if (draftBlock.type === "music_stop") {
+    return {
+      type: "music_stop",
+      fadeOutMs: getSafeNonNegativeNumber(draftBlock.fadeOutMs, 600),
+    };
+  }
+
+  if (draftBlock.type === "screen_fade") {
+    return {
+      type: "screen_fade",
+      action: getSafeFadeAction(draftBlock.action ?? "fade_out"),
+      color: "black",
+      duration: getImportedEffectDuration(draftBlock.durationMs),
+    };
+  }
+
   return {
     type: "narration",
     text: String(draftBlock.text ?? "").trim(),
@@ -9872,7 +9955,7 @@ function normalizeScriptImportBlockForScene(draftBlock) {
 function parseCurrentScriptImportDraft() {
   state.scriptImporterDraft = getScriptImporterDraftFromDom();
   state.scriptImporterBlocks = scriptImporterTools.parseScriptDraftToBlocks(state.scriptImporterDraft);
-  state.scriptImporterError = state.scriptImporterBlocks.length ? "" : "没有识别到可插入的台词、旁白或选项。";
+  state.scriptImporterError = state.scriptImporterBlocks.length ? "" : "没有识别到可插入的台词、旁白、选项或演出指令。";
   return state.scriptImporterBlocks;
 }
 
@@ -9882,7 +9965,8 @@ function getScriptImportSummaryText(blocks = state.scriptImporterBlocks) {
     return "还没有预览结果";
   }
 
-  return `将插入 ${summary.total} 张卡片：台词 ${summary.dialogue} / 旁白 ${summary.narration} / 选项 ${summary.choice}`;
+  const stagePart = summary.stage ? ` / 演出 ${summary.stage}` : "";
+  return `将插入 ${summary.total} 张卡片：台词 ${summary.dialogue} / 旁白 ${summary.narration} / 选项 ${summary.choice}${stagePart}`;
 }
 
 function renderScriptImporterPanel(scene, selectedBlock) {
@@ -9901,7 +9985,7 @@ function renderScriptImporterPanel(scene, selectedBlock) {
       <div class="script-importer-copy">
         <span class="eyebrow">Text To Cards</span>
         <strong>手写剧本转剧情卡片</strong>
-        <p>从文档或备忘录粘贴文本：<code>角色：台词</code> 会变成台词，普通行会变旁白，连续 <code>- 选项</code> 会合并成选项卡。</p>
+        <p>从文档或备忘录粘贴文本：<code>角色：台词</code>、<code>角色 "台词"</code>、普通旁白、连续 <code>- 选项</code>，以及 <code>scene / show / hide / play music</code> 演出指令都会先预览成可编辑卡片。</p>
         <span class="helper-text">${escapeHtml(insertionTarget)}</span>
       </div>
       <div class="script-importer-workbench">
@@ -9909,7 +9993,7 @@ function renderScriptImporterPanel(scene, selectedBlock) {
           id="scriptImporterDraft"
           class="script-importer-textarea"
           spellcheck="false"
-          placeholder="旁白：雨声贴着窗沿落下。\n悠奈：你终于来了。\n- 问她为什么在这里\n- 先沉默陪她一会儿"
+          placeholder="scene classroom with fade\nplay music school_theme fadein 1.2\nshow 悠奈 smile at center with dissolve\n悠奈 &quot;你终于来了。&quot;\n- 问她为什么在这里\n- 先沉默陪她一会儿"
         >${escapeHtml(draft)}</textarea>
         <div class="script-importer-actions">
           <button type="button" class="toolbar-button" data-action="apply-script-import-sample">填入示例</button>
