@@ -161,6 +161,17 @@ class FrontendRouteAnalyzerModuleTests(unittest.TestCase):
         self.assertEqual(payload["endNode"]["warningCount"], 1)
         self.assertGreater(payload["chapterProduction"]["averageCompletion"], 0)
 
+    def test_route_testing_plan_export_actions_are_wired_in_app(self) -> None:
+        source = (ROOT_DIR / "prototype_editor" / "app.js").read_text(encoding="utf-8")
+
+        self.assertIn("const routeTestingReportTools = window.CanvasiaEditorRouteTestingReport", source)
+        self.assertIn('data-action="export-route-testing-plan-markdown"', source)
+        self.assertIn('data-action="export-route-testing-plan-csv"', source)
+        self.assertIn('if (action === "export-route-testing-plan-markdown")', source)
+        self.assertIn('if (action === "export-route-testing-plan-csv")', source)
+        self.assertIn("function exportRouteTestingPlanMarkdown()", source)
+        self.assertIn("function exportRouteTestingPlanCsv()", source)
+
 
 if __name__ == "__main__":
     unittest.main()

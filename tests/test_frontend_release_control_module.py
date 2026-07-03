@@ -38,11 +38,15 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
 
         self.assertIn("const routeTestingPlan = routeOverview.routeTestingPlan ?? {}", report_body)
         self.assertIn("const routeTestingSummary = routeTestingPlan.summary ?? {}", report_body)
-        self.assertIn("const routeTestingSummaryTable = buildMarkdownTable", report_body)
-        self.assertIn("const routeTestingDecisionTable = buildMarkdownTable", report_body)
-        self.assertIn("const routeEndingTestTable = buildMarkdownTable", report_body)
+        self.assertIn(
+            "const routeTestingTables = routeTestingReportTools.buildRouteTestingReportTables(routeTestingPlan)",
+            report_body,
+        )
+        self.assertIn("routeTestingTables.summaryTable", report_body)
+        self.assertIn("routeTestingTables.decisionTable", report_body)
+        self.assertIn("routeTestingTables.endingTable", report_body)
         self.assertIn("## 路线试玩手册", report_body)
-        self.assertLess(report_body.index("const routeTestingPlan"), report_body.index("const routeTestingSummaryTable"))
+        self.assertLess(report_body.index("const routeTestingPlan"), report_body.index("const routeTestingTables"))
 
     def test_release_control_helpers_work_without_browser_dom(self) -> None:
         script = textwrap.dedent(

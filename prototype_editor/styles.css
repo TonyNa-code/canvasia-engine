@@ -1824,6 +1824,13 @@ textarea {
   font-size: 18px;
 }
 
+.route-testing-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
 .route-testing-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -49,6 +49,7 @@ const storyTemplateTools = window.CanvasiaEditorStoryTemplates;
 const { STORY_TEMPLATE_PRESETS } = storyTemplateTools;
 const scriptImporterTools = window.CanvasiaEditorScriptImporter;
 const routeAnalyzerTools = window.CanvasiaEditorRouteAnalyzer;
+const routeTestingReportTools = window.CanvasiaEditorRouteTestingReport;
 
 function getBlockLabel(type) {
   return storyBlockCatalogTools.getBlockLabel(type) ?? BLOCK_LABELS[type] ?? type ?? "步骤";
@@ -3835,6 +3836,26 @@ async function handleClick(event) {
     }
     if (state.currentScreen === "preview") {
       renderPreviewScreen();
+    }
+    return;
+  }
+
+  if (action === "export-route-testing-plan-markdown") {
+    state.validation = runValidation(state.data);
+    updateTopbar();
+    exportRouteTestingPlanMarkdown();
+    if (state.currentScreen === "dashboard") {
+      renderDashboard();
+    }
+    return;
+  }
+
+  if (action === "export-route-testing-plan-csv") {
+    state.validation = runValidation(state.data);
+    updateTopbar();
+    exportRouteTestingPlanCsv();
+    if (state.currentScreen === "dashboard") {
+      renderDashboard();
     }
     return;
   }
@@ -12018,8 +12039,18 @@ function renderRouteTestingPlanPanel(routeOverview) {
   return `
     <div class="route-testing-plan">
       <div class="panel-heading">
-        <h3>路线试玩手册</h3>
-        <span class="panel-note">按分支点和结局路径整理成发布前可执行清单</span>
+        <div>
+          <h3>路线试玩手册</h3>
+          <span class="panel-note">按分支点和结局路径整理成发布前可执行清单</span>
+        </div>
+        <div class="route-testing-actions">
+          <button type="button" class="toolbar-button" data-action="export-route-testing-plan-markdown">
+            导出手册
+          </button>
+          <button type="button" class="toolbar-button" data-action="export-route-testing-plan-csv">
+            导出 CSV
+          </button>
+        </div>
       </div>
       <div class="route-summary-strip">
         ${renderRouteMetricCard("分支检查点", summary.decisionPointCount ?? 0, `${summary.reachableDecisionPointCount ?? 0} 个从入口可到`)}
@@ -28210,6 +28241,17 @@ function buildReleaseControlJsonReportFileName() {
   return `${title}_release_control_report_${dateStamp}.json`;
 }
 
+function buildRouteTestingPlanFileName(extension = "md") {
+  const date = new Date();
+  const dateStamp = [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("");
+  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
+  return `${title}_route_testing_plan_${dateStamp}.${extension}`;
+}
+
 function buildProjectDoctorRepairReceiptFileName(receipt = state.projectDoctorRepairReceipt) {
   const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
   const status = sanitizeFileName(receipt?.status || "receipt");
@@ -28384,37 +28426,7 @@ function serializeFinalPublishGate(gate) {
 }
 
 function serializeRouteTestingPlan(plan = {}) {
-  return {
-    summary: plan.summary ?? {},
-    decisionPoints: (plan.decisionPoints ?? []).map((point) => ({
-      sceneId: point.sceneId,
-      sceneName: point.sceneName,
-      chapterName: point.chapterName,
-      routeDepth: point.routeDepth,
-      entryPathLabel: point.entryPathLabel,
-      isReachable: point.isReachable,
-      routeCount: point.routeCount,
-      brokenRouteCount: point.brokenRouteCount,
-      unreachableTargetCount: point.unreachableTargetCount,
-      routeCases: (point.routeCases ?? []).map((routeCase) => ({
-        label: routeCase.label,
-        targetSceneName: routeCase.targetSceneName,
-        targetExists: routeCase.targetExists,
-        status: routeCase.status,
-        statusLabel: routeCase.statusLabel,
-      })),
-    })),
-    endingTestCases: (plan.endingTestCases ?? []).map((testCase) => ({
-      sceneId: testCase.sceneId,
-      sceneName: testCase.sceneName,
-      chapterName: testCase.chapterName,
-      routeDepth: testCase.routeDepth,
-      pathLabel: testCase.pathLabel,
-      status: testCase.status,
-      statusLabel: testCase.statusLabel,
-      testingHint: testCase.testingHint,
-    })),
-  };
+  return routeTestingReportTools.serializeRouteTestingPlan(plan);
 }
 
 function formatProjectMilestonePrimaryBlocker(milestone) {
@@ -29171,38 +29183,7 @@ function buildReleaseControlReportContent() {
       caseResult.recommendation,
     ])
   );
-  const routeTestingSummaryTable = buildMarkdownTable(
-    ["项目", "数量"],
-    [
-      ["分支检查点", `${routeTestingSummary.decisionPointCount ?? 0}`],
-      ["从入口可到的分支点", `${routeTestingSummary.reachableDecisionPointCount ?? 0}`],
-      ["路线用例", `${routeTestingSummary.routeCaseCount ?? 0}`],
-      ["阻塞路线用例", `${(routeTestingSummary.brokenRouteCaseCount ?? 0) + (routeTestingSummary.unreachableRouteCaseCount ?? 0)}`],
-      ["结局用例", `${routeTestingSummary.endingTestCaseCount ?? 0}`],
-      ["可打到结局用例", `${routeTestingSummary.reachableEndingTestCaseCount ?? 0}`],
-    ]
-  );
-  const routeTestingDecisionTable = buildMarkdownTable(
-    ["分支点", "入口路径", "路线用例", "阻塞"],
-    (routeTestingPlan.decisionPoints ?? []).slice(0, 20).map((point) => [
-      `${point.chapterName} · ${point.sceneName}`,
-      point.entryPathLabel || "入口未接通",
-      (point.routeCases ?? [])
-        .slice(0, 5)
-        .map((routeCase) => `${routeCase.label} -> ${routeCase.targetSceneName}（${routeCase.statusLabel}）`)
-        .join(" / "),
-      `${(point.brokenRouteCount ?? 0) + (point.unreachableTargetCount ?? 0)}`,
-    ])
-  );
-  const routeEndingTestTable = buildMarkdownTable(
-    ["结局", "状态", "路径", "测试提示"],
-    (routeTestingPlan.endingTestCases ?? []).slice(0, 20).map((testCase) => [
-      `${testCase.chapterName} · ${testCase.sceneName}`,
-      testCase.statusLabel,
-      testCase.pathLabel || "暂未接通",
-      testCase.testingHint,
-    ])
-  );
+  const routeTestingTables = routeTestingReportTools.buildRouteTestingReportTables(routeTestingPlan);
 
   const lines = [
     `# ${state.data.project.title} 发布前总控报告`,
@@ -29239,11 +29220,11 @@ function buildReleaseControlReportContent() {
     "",
     "## 路线试玩手册",
     "",
-    routeTestingSummaryTable || "当前没有可列出的路线试玩手册摘要。",
+    routeTestingTables.summaryTable || "当前没有可列出的路线试玩手册摘要。",
     "",
-    routeTestingDecisionTable || "当前没有需要单独覆盖的分支点。",
+    routeTestingTables.decisionTable || "当前没有需要单独覆盖的分支点。",
     "",
-    routeEndingTestTable || "当前没有可列出的结局试玩路径。",
+    routeTestingTables.endingTable || "当前没有可列出的结局试玩路径。",
     "",
     "## 最终发表门禁",
     "",
@@ -29396,6 +29377,29 @@ function exportReleaseControlJsonReport() {
   downloadTextFile(fileName, content, "application/json;charset=utf-8");
   setSaveStatus(`已导出发布总控 JSON：${fileName}`);
   showToast(`发布总控 JSON 已导出：${fileName}`);
+}
+
+function exportRouteTestingPlanMarkdown() {
+  const fileName = buildRouteTestingPlanFileName("md");
+  const routeOverview = buildSceneRouteOverview();
+  const content = routeTestingReportTools.buildRouteTestingPlanMarkdown(routeOverview.routeTestingPlan, {
+    projectTitle: state.data?.project?.title || "Canvasia Project",
+    generatedAt: formatDate(new Date().toISOString()),
+  });
+  downloadTextFile(fileName, content, "text/markdown;charset=utf-8");
+  setSaveStatus(`已导出路线试玩手册：${fileName}`);
+  showToast(`路线试玩手册已导出：${fileName}`);
+}
+
+function exportRouteTestingPlanCsv() {
+  const fileName = buildRouteTestingPlanFileName("csv");
+  const routeOverview = buildSceneRouteOverview();
+  const content = routeTestingReportTools.buildRouteTestingPlanCsv(routeOverview.routeTestingPlan, {
+    projectTitle: state.data?.project?.title || "Canvasia Project",
+  });
+  downloadTextFile(fileName, content, "text/csv;charset=utf-8");
+  setSaveStatus(`已导出路线试玩 CSV：${fileName}`);
+  showToast(`路线试玩 CSV 已导出：${fileName}`);
 }
 
 function getCharacterPrimarySpriteAssetId(character) {
