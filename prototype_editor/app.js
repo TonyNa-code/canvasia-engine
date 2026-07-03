@@ -9879,6 +9879,7 @@ function normalizeScriptImportBlockForScene(draftBlock, scene = getSelectedScene
     findSceneIdByHint: findImportedSceneIdByHint,
     getDefaultCharacterPosition,
     getSafePosition,
+    getSafeCharacterStage,
     getSafeTransition,
     getSafeTransitionDurationMs,
     getSafeNonNegativeNumber,
@@ -35702,7 +35703,10 @@ function normalizeAssistantDraftBlockForScene(sceneDraft, draftBlock) {
     block.position = getSafePosition(block.position ?? getDefaultCharacterPosition(block.characterId));
     block.transition = getSafeTransition(block.transition);
     block.transitionDurationMs = getSafeTransitionDurationMs(block.transitionDurationMs, 600);
-    block.stage = { ...DEFAULT_CHARACTER_STAGE, ...(block.stage && typeof block.stage === "object" ? block.stage : {}) };
+    block.stage = getSafeCharacterStage({
+      ...DEFAULT_CHARACTER_STAGE,
+      ...(block.stage && typeof block.stage === "object" ? block.stage : {}),
+    });
     delete block.characterHint;
     delete block.expressionHint;
   } else if (blockType === "character_hide") {

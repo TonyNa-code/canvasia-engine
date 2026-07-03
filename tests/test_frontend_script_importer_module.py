@@ -76,6 +76,7 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
               quotedDialogueLine: tools.parseQuotedDialogueLine('悠奈 "你终于来了。"'),
               narrationLine: tools.parseDialogueLine("旁白：雨声变大了。"),
               stageLine: tools.parseStageDirectionLine("show yuina smile at right with dissolve"),
+              stageLineWithStage: tools.parseStageDirectionLine("show yuina smile at right with dissolve scale 118 x -8 y 3 opacity 90 layer 2 flip"),
               sfxLine: tools.parseStageDirectionLine("play sound door_knock"),
               videoLine: tools.parseStageDirectionLine('play video opening_movie title "Opening Movie" volume 80 from 2 to 12 cover no-skip'),
               shakeLine: tools.parseStageDirectionLine("shake heavy short"),
@@ -142,6 +143,22 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
             "position": "right",
             "transition": "fade",
             "transitionDurationMs": 600,
+        })
+        self.assertEqual(payload["stageLineWithStage"], {
+            "type": "character_show",
+            "characterHint": "yuina",
+            "expressionHint": "smile",
+            "position": "right",
+            "transition": "fade",
+            "transitionDurationMs": 600,
+            "stage": {
+                "offsetX": -8,
+                "offsetY": 3,
+                "scale": 118,
+                "opacity": 90,
+                "layer": 2,
+                "flipX": True,
+            },
         })
         self.assertEqual(payload["sfxLine"], {"type": "sfx_play", "assetHint": "door_knock", "volume": 100})
         self.assertEqual(payload["videoLine"], {

@@ -151,6 +151,13 @@
       callScriptImportResolver(resolvers, "getSafeCameraPanTarget", [value], value || "center");
     const getCameraPanStrength = (value) =>
       callScriptImportResolver(resolvers, "getSafeCameraPanStrength", [value], value || "medium");
+    const getCharacterStage = (value) => {
+      const mergedStage = {
+        ...cloneScriptImportStageDefaults(resolvers?.defaultCharacterStage),
+        ...cloneScriptImportStageDefaults(value),
+      };
+      return callScriptImportResolver(resolvers, "getSafeCharacterStage", [mergedStage], mergedStage);
+    };
     const getCreditsDuration = (value) => callScriptImportResolver(resolvers, "getSafeCreditsDuration", [value], 18);
     const getCreditsBackground = (value) =>
       callScriptImportResolver(resolvers, "getSafeCreditsBackground", [value], value || "dark");
@@ -255,7 +262,7 @@
         ),
         transition: getTransition(draftBlock.transition ?? "fade"),
         transitionDurationMs: getTransitionDurationMs(draftBlock.transitionDurationMs, 600),
-        stage: cloneScriptImportStageDefaults(resolvers?.defaultCharacterStage),
+        stage: getCharacterStage(draftBlock.stage),
       };
     }
 

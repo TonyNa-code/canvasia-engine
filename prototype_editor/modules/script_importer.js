@@ -60,6 +60,10 @@
       .replace(/[-\s]+/g, "_");
   }
 
+  function escapeRegExp(value) {
+    return String(value ?? "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
   function stripWrappingQuotes(value) {
     const text = trimImportedText(value, 800);
     const match = text.match(/^["“”'‘’](.+?)["“”'‘’]$/u);
@@ -278,6 +282,45 @@
     });
   }
 
+  function parseInlineStageNumber(text, keywords) {
+    const keywordPattern = (Array.isArray(keywords) ? keywords : [keywords]).map(escapeRegExp).join("|");
+    const match = String(text ?? "").match(
+      new RegExp(`(?:^|\\s)(?:${keywordPattern})\\s*[:=]?\\s*(-?[0-9.]+)\\s*%?`, "iu")
+    );
+    if (!match) {
+      return null;
+    }
+    const value = Number.parseFloat(match[1]);
+    return Number.isFinite(value) ? value : null;
+  }
+
+  function parseInlineCharacterStage(text) {
+    const source = String(text ?? "");
+    const stage = {};
+    const stageEntries = [
+      ["offsetX", ["x", "offsetx", "offset_x", "offset-x", "dx", "横向", "水平"]],
+      ["offsetY", ["y", "offsety", "offset_y", "offset-y", "dy", "纵向", "垂直"]],
+      ["scale", ["scale", "size", "zoom", "大小", "缩放"]],
+      ["opacity", ["opacity", "alpha", "透明", "透明度"]],
+      ["layer", ["layer", "z", "zindex", "z_index", "层级"]],
+    ];
+
+    stageEntries.forEach(([key, keywords]) => {
+      const value = parseInlineStageNumber(source, keywords);
+      if (value !== null) {
+        stage[key] = value;
+      }
+    });
+
+    if (/\b(?:no[-_\s]?flip|flipx?\s*(?:false|off|no|0))\b/iu.test(source)) {
+      stage.flipX = false;
+    } else if (/(?:镜像|反向)|\b(?:flip|flipx|mirror|mirrored)\b/iu.test(source)) {
+      stage.flipX = true;
+    }
+
+    return Object.keys(stage).length ? stage : null;
+  }
+
   function parseDirectiveTransition(text, fallback = "fade") {
     const match = String(text ?? "").match(/\bwith\s+([a-zA-Z_-]+)/u);
     const raw = normalizeDirectiveToken(match?.[1] ?? fallback).replace(/_+$/g, "");
@@ -294,14 +337,25 @@
   }
 
   function removeDirectiveClauses(text) {
-    return trimImportedText(
+    let cleaned = trimImportedText(
       String(text ?? "")
-        .replace(/\bwith\s+[a-zA-Z_-]+(?:\s+duration\s+[0-9.]+\s*(?:ms|s)?)?/iu, "")
-        .replace(/\bduration\s+[0-9.]+\s*(?:ms|s)?/iu, "")
-        .replace(/\bat\s+(left|center|right|truecenter|middle)\b/iu, "")
-        .replace(/\bfade(?:in|out)?\s+[0-9.]+\s*(?:ms|s)?/giu, ""),
+        .replace(/\bwith\s+[a-zA-Z_-]+(?:\s+duration\s+[0-9.]+\s*(?:ms|s)?)?/iu, " ")
+        .replace(/\bduration\s+[0-9.]+\s*(?:ms|s)?/iu, " ")
+        .replace(/\bat\s+(left|center|right|truecenter|middle)\b/iu, " ")
+        .replace(/\bfade(?:in|out)?\s+[0-9.]+\s*(?:ms|s)?/giu, " "),
       240
     );
+
+    for (let index = 0; index < 3; index += 1) {
+      cleaned = cleaned
+        .replace(
+        /(?:^|\s)(?:x|offsetx|offset_x|offset-x|dx|横向|水平|y|offsety|offset_y|offset-y|dy|纵向|垂直|scale|size|zoom|大小|缩放|opacity|alpha|透明|透明度|layer|z|zindex|z_index|层级)\s*[:=]?\s*-?[0-9.]+\s*%?/giu,
+        " "
+      )
+        .replace(/(?:^|\s)(?:no[-_\s]?flip|flipx?\s*(?:false|off|no|0)|flipx?|mirror|mirrored|镜像|反向)\b/giu, " ");
+    }
+
+    return trimImportedText(cleaned.replace(/\s+/g, " "), 240);
   }
 
   function isIgnoredScriptLine(line) {
@@ -389,6 +443,7 @@
       const showText = showMatch[1];
       const leading = readLeadingArgument(showText);
       const expressionHint = stripWrappingQuotes(removeDirectiveClauses(leading.rest));
+      const stage = parseInlineCharacterStage(showText);
       return leading.argument
         ? {
             type: "character_show",
@@ -397,6 +452,7 @@
             position: parseDirectivePosition(showText, "center"),
             transition: parseDirectiveTransition(showText, "fade"),
             transitionDurationMs: parseInlineTimeMs(showText, "duration", 600),
+            ...(stage ? { stage } : {}),
           }
         : null;
     }

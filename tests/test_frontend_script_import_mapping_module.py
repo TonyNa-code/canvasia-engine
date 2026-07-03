@@ -123,6 +123,11 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
                 null,
                 resolvers
               ),
+              normalizedCharacterShowWithStage: tools.normalizeImportedDraftBlockForScene(
+                {{ type: "character_show", characterHint: "Yuina", expressionHint: "微笑", position: "right", stage: {{ offsetX: -8, offsetY: 3, scale: 118, opacity: 90, layer: 2, flipX: true }} }},
+                null,
+                resolvers
+              ),
               normalizedSfx: tools.normalizeImportedDraftBlockForScene(
                 {{ type: "sfx_play", assetHint: "door_knock", volume: "80" }},
                 null,
@@ -244,6 +249,14 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
         self.assertEqual(payload["normalizedCharacterShow"]["transition"], "dissolve")
         self.assertEqual(payload["normalizedCharacterShow"]["transitionDurationMs"], 720)
         self.assertEqual(payload["normalizedCharacterShow"]["stage"], {"scale": 1, "opacity": 1})
+        self.assertEqual(payload["normalizedCharacterShowWithStage"]["stage"], {
+            "scale": 118,
+            "opacity": 90,
+            "offsetX": -8,
+            "offsetY": 3,
+            "layer": 2,
+            "flipX": True,
+        })
         self.assertEqual(payload["normalizedSfx"], {"type": "sfx_play", "assetId": "sfx_door", "volume": 80})
         self.assertEqual(
             payload["normalizedVideo"],
