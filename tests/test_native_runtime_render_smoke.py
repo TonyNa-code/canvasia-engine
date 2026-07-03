@@ -2649,6 +2649,47 @@ class NativeRuntimeRenderSmokeTests(unittest.TestCase):
         self.assertEqual(player.variable_state["var_route"], "404")
         self.assertNotIn("ghost", player.variable_state)
 
+    def test_choice_continue_target_stays_in_scene_and_applies_effects(self) -> None:
+        data_path = self.write_game_data()
+        payload = json.loads(data_path.read_text(encoding="utf-8"))
+        payload["variables"] = {
+            "variables": [
+                {"id": "var_score", "name": "Score", "type": "number", "defaultValue": 0},
+            ]
+        }
+        payload["chapters"][0]["scenes"][0]["blocks"] = [
+            {
+                "id": "choice_continue",
+                "type": "choice",
+                "options": [
+                    {
+                        "id": "stay_here",
+                        "text": "继续听她说",
+                        "gotoSceneId": "__continue__",
+                        "effects": [{"type": "variable_add", "variableId": "var_score", "value": 2}],
+                    }
+                ],
+            },
+            {"id": "line_after_choice", "type": "narration", "text": "选择后的下一句。"},
+        ]
+        data_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="The system font .*", category=UserWarning)
+            player = NativeRuntimePlayer(pygame, data_path)
+
+        self.assertEqual(player.get_current_scene()["id"], "scene_start")
+        self.assertEqual(player.current_block_index, 0)
+        self.assertEqual(player.current_choices[0]["gotoSceneId"], "__continue__")
+
+        player.choose_current_option(0)
+
+        self.assertEqual(player.get_current_scene()["id"], "scene_start")
+        self.assertEqual(player.current_block_index, 1)
+        self.assertIsNone(player.current_choices)
+        self.assertEqual(player.variable_state["var_score"], 2)
+        self.assertEqual(player.current_line["text"], "选择后的下一句。")
+
     def test_native_runtime_renders_ui_skin_overlays_headlessly(self) -> None:
         data_path = self.write_game_data()
         with warnings.catch_warnings():

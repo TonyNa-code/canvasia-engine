@@ -241,6 +241,41 @@
       templateId: "scene_outro",
       keywords: ["模板", "收尾", "outro", "结尾"],
     },
+    {
+      id: "template-op-movie-hook",
+      title: "套用：OP 前导",
+      subtitle: "OP 视频、黑场过渡和正式开场衔接",
+      templateId: "op_movie_hook",
+      keywords: ["模板", "op", "opening", "视频", "片头"],
+    },
+    {
+      id: "template-daily-conversation",
+      title: "套用：日常对话节奏",
+      subtitle: "带 BGM 范围、立绘登场和日常对白节奏",
+      templateId: "daily_conversation",
+      keywords: ["模板", "日常", "对话", "节奏", "bgm"],
+    },
+    {
+      id: "template-affection-choice",
+      title: "套用：好感度选项",
+      subtitle: "带变量变化和条件判断的分支段落",
+      templateId: "affection_choice",
+      keywords: ["模板", "好感度", "变量", "选项", "condition"],
+    },
+    {
+      id: "template-climax-sequence",
+      title: "套用：高潮演出段",
+      subtitle: "音乐、镜头、闪屏、震动和景深组合演出",
+      templateId: "climax_sequence",
+      keywords: ["模板", "高潮", "演出", "镜头", "shake", "flash"],
+    },
+    {
+      id: "template-ending-credits",
+      title: "套用：ED 与片尾",
+      subtitle: "ED 黑场、收束旁白、片尾字幕和停音乐",
+      templateId: "ending_credits",
+      keywords: ["模板", "ed", "ending", "片尾", "credits"],
+    },
   ];
 
   function normalizeSearchText(value) {

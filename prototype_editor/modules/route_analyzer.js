@@ -11,6 +11,11 @@
     "screen_filter",
     "depth_blur",
   ]);
+  const CHOICE_CONTINUE_TARGET = "__continue__";
+
+  function isChoiceContinueTarget(value) {
+    return String(value ?? "").trim() === CHOICE_CONTINUE_TARGET;
+  }
 
   function clamp(value, min, max) {
     return Math.min(Math.max(Number(value) || 0, min), max);
@@ -188,6 +193,9 @@
 
       if (block.type === "choice") {
         (block.options ?? []).forEach((option, optionIndex) => {
+          if (isChoiceContinueTarget(option.gotoSceneId)) {
+            return;
+          }
           routes.push(
             createSceneRoute(scene, {
               blockIndex,

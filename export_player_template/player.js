@@ -1,4 +1,5 @@
 const DEFAULT_RUNTIME_LANGUAGE = "zh-CN";
+const CHOICE_CONTINUE_TARGET = "__continue__";
 const RUNTIME_LANGUAGE_LABELS = {
   "zh-CN": "简体中文",
   "ja-JP": "日本語",
@@ -33,6 +34,10 @@ function normalizeSupportedLanguages(rawLanguages, defaultLanguage = DEFAULT_RUN
 
 const rawData = window.LIGHTWHISPER_GAME_DATA ?? {};
 const data = normalizeGameData(rawData);
+
+function isChoiceContinueTarget(value) {
+  return String(value ?? "").trim() === CHOICE_CONTINUE_TARGET;
+}
 
 const refs = {
   stageFrame: document.getElementById("stageFrame"),
@@ -1782,7 +1787,7 @@ function collectSceneOutgoingTargets(scene) {
 
     if (block.type === "choice") {
       (block.options ?? []).forEach((option) => {
-        if (option.gotoSceneId) {
+        if (option.gotoSceneId && !isChoiceContinueTarget(option.gotoSceneId)) {
           targets.push(option.gotoSceneId);
         }
       });
@@ -4593,6 +4598,14 @@ function movePreviewForward() {
   persistAutoResume();
 }
 
+function buildChoiceOptionNextSnapshot(current, option, nextVariables) {
+  const targetSceneId = option?.gotoSceneId ?? option?.targetSceneId ?? "";
+  if (isChoiceContinueTarget(targetSceneId)) {
+    return buildPreviewSnapshot(current.sceneId, current.blockIndex + 1, current.visualState, nextVariables);
+  }
+  return buildPreviewSnapshot(targetSceneId, 0, current.visualState, nextVariables);
+}
+
 function choosePreviewOption(optionId) {
   const session = state.session;
   const current = getCurrentSnapshot();
@@ -4609,7 +4622,7 @@ function choosePreviewOption(optionId) {
   unlockAchievement("first_choice");
   const nextVariables = clonePreviewVariables(current.variables);
   applyChoiceEffectsToPreviewVariables(nextVariables, option.effects ?? []);
-  const nextSnapshot = buildPreviewSnapshot(option.gotoSceneId, 0, current.visualState, nextVariables);
+  const nextSnapshot = buildChoiceOptionNextSnapshot(current, option, nextVariables);
   stopRuntimeAutoAdvance();
   session.timeline = session.timeline.slice(0, session.position + 1);
   session.timeline.push(nextSnapshot);
@@ -9915,7 +9928,7 @@ function renderChoiceButtons(snapshot) {
       (option) => `
         <button class="choice-button" type="button" data-option-id="${escapeHtml(option.id)}">
           <strong>${escapeHtml(getChoiceText(option))}</strong>
-          <span>进入 ${escapeHtml(getSceneName(data.scenesById.get(option.gotoSceneId), option.gotoSceneId))}</span>
+          <span>${escapeHtml(isChoiceContinueTarget(option.gotoSceneId) ? "继续下一张卡" : `进入 ${getSceneName(data.scenesById.get(option.gotoSceneId), option.gotoSceneId)}`)}</span>
         </button>
       `
     )

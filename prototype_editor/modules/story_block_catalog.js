@@ -31,6 +31,8 @@
     after_block: "播到指定卡片后",
   });
 
+  const CHOICE_CONTINUE_TARGET = "__continue__";
+
   function escapeHtml(value) {
     return String(value ?? "")
       .replace(/&/g, "&amp;")
@@ -58,6 +60,10 @@
 
   function getMusicEndModeLabel(mode) {
     return MUSIC_END_MODE_LABELS[getSafeMusicEndMode(mode)];
+  }
+
+  function isChoiceContinueTarget(value) {
+    return String(value ?? "").trim() === CHOICE_CONTINUE_TARGET;
   }
 
   function renderMusicEndModeOptions(selectedMode, options = {}) {
@@ -137,9 +143,11 @@
   global.CanvasiaEditorStoryBlockCatalog = Object.freeze({
     BLOCK_LABELS,
     MUSIC_END_MODE_LABELS,
+    CHOICE_CONTINUE_TARGET,
     getBlockLabel,
     getSafeMusicEndMode,
     getMusicEndModeLabel,
+    isChoiceContinueTarget,
     renderMusicEndModeOptions,
     createChoiceOptionId,
     createConditionBranchId,

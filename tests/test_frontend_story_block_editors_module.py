@@ -76,6 +76,26 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
                 renderChoiceEffectEditorRow: (effect, index, count) => `<div data-rendered-effect="${{index}}/${{count}}">${{effect.variableId}}</div>`,
               }}
             );
+            const continueOptionMarkup = tools.renderChoiceOptionEditorRow(
+              {{
+                id: "opt_continue",
+                text: "继续当前场景",
+                gotoSceneId: "__continue__",
+                effects: [],
+              }},
+              1,
+              2,
+              {{
+                scenes: [
+                  {{ id: "scene_a", name: "开头" }},
+                ],
+                choiceContinueTarget: "__continue__",
+                choiceContinueLabel: "继续当前场景下一张卡",
+                getEditableChoiceEffects: (effects) => effects,
+                renderChoiceTextQualityTools: () => "",
+                renderChoiceEffectEditorRow: () => "",
+              }}
+            );
             const ruleMarkup = tools.renderConditionRuleEditorRow(
               {{ variableId: "score", operator: ">=", value: 5 }},
               1,
@@ -403,6 +423,7 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
               effectMarkup,
               emptyMarkup: tools.renderChoiceEffectEmptyState(),
               optionMarkup,
+              continueOptionMarkup,
               ruleMarkup,
               branchMarkup,
               conditionMarkup,
@@ -627,6 +648,8 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
         self.assertIn('value="scene_b" selected', payload["optionMarkup"])
         self.assertIn('data-rendered-effect="0/1"', payload["optionMarkup"])
         self.assertIn("还有 1 条暂时不支持可视化编辑的旧效果", payload["optionMarkup"])
+        self.assertIn('value="__continue__" selected', payload["continueOptionMarkup"])
+        self.assertIn("继续当前场景下一张卡", payload["continueOptionMarkup"])
 
 
 if __name__ == "__main__":

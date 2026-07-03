@@ -51,6 +51,12 @@ class FrontendChoiceConsequenceSheetModuleTests(unittest.TestCase):
                           gotoSceneId: "scene_missing",
                           effects: [{{ type: "variable_set", variableId: "route", value: "classroom" }}],
                         }},
+                        {{
+                          id: "continue_reading",
+                          text: "先点头",
+                          gotoSceneId: "__continue__",
+                          effects: [{{ type: "variable_add", variableId: "affection", value: 1 }}],
+                        }},
                         {{ id: "noop", text: "沉默" }},
                       ],
                     }},
@@ -107,8 +113,8 @@ class FrontendChoiceConsequenceSheetModuleTests(unittest.TestCase):
         self.assertIn("buildChoiceConsequenceMarkdown", payload["keys"])
         self.assertIn("buildChoiceConsequenceCsv", payload["keys"])
         self.assertEqual(payload["sheet"]["summary"]["choiceBlockCount"], 3)
-        self.assertEqual(payload["sheet"]["summary"]["optionCount"], 7)
-        self.assertEqual(payload["sheet"]["summary"]["variableEffectCount"], 4)
+        self.assertEqual(payload["sheet"]["summary"]["optionCount"], 8)
+        self.assertEqual(payload["sheet"]["summary"]["variableEffectCount"], 5)
         self.assertEqual(payload["sheet"]["summary"]["noConsequenceCount"], 1)
         self.assertEqual(payload["sheet"]["summary"]["sameConsequenceCount"], 2)
         self.assertEqual(payload["sheet"]["summary"]["brokenTargetCount"], 1)
@@ -122,8 +128,19 @@ class FrontendChoiceConsequenceSheetModuleTests(unittest.TestCase):
         self.assertIn("choice_effect_add_non_number", issue_codes)
         self.assertIn("choice_effect_unknown_variable", issue_codes)
         self.assertIn("choice_option_empty_text", issue_codes)
+        continue_options = [
+            option
+            for block in payload["sheet"]["choiceBlocks"]
+            for option in block["options"]
+            if option["optionId"] == "continue_reading"
+        ]
+        self.assertEqual(len(continue_options), 1)
+        self.assertTrue(continue_options[0]["continuesCurrentScene"])
+        self.assertEqual(continue_options[0]["targetSceneName"], "继续下一张卡")
         self.assertIn("# Demo Project 选项后果表", payload["markdown"])
+        self.assertIn("继续下一张卡", payload["markdown"])
         self.assertIn("留在教室", payload["markdown"])
+        self.assertIn('"继续下一张卡"', payload["csv"])
         self.assertIn('"好感度 + 1"', payload["csv"])
         self.assertEqual(payload["effectLabel"], "变量增加")
         self.assertEqual(payload["effectSummary"], "路线 = good")

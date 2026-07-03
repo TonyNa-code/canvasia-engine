@@ -61,6 +61,11 @@ class FrontendStoryBlockCatalogModuleTests(unittest.TestCase):
                 }}),
                 branches: tools.createDefaultConditionBranches("block_002", {{ targetSceneId: "scene_c" }}),
               }},
+              choiceContinueTarget: tools.CHOICE_CONTINUE_TARGET,
+              continueChecks: [
+                tools.isChoiceContinueTarget("__continue__"),
+                tools.isChoiceContinueTarget("scene_a"),
+              ],
               exportedLabels: tools.BLOCK_LABELS,
               exportedMusicLabels: tools.MUSIC_END_MODE_LABELS,
             }};
@@ -78,6 +83,7 @@ class FrontendStoryBlockCatalogModuleTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 0, completed.stderr)
         payload = json.loads(completed.stdout)
         self.assertIn("getBlockLabel", payload["keys"])
+        self.assertIn("isChoiceContinueTarget", payload["keys"])
         self.assertIn("renderMusicEndModeOptions", payload["keys"])
         self.assertEqual(payload["labels"], ["台词", "粒子特效", "custom_block", "步骤"])
         self.assertEqual(payload["safeModes"], ["scene_end", "until_next_music", "until_next_music"])
@@ -103,6 +109,8 @@ class FrontendStoryBlockCatalogModuleTests(unittest.TestCase):
         self.assertEqual(payload["defaultCondition"]["branches"], [
             {"id": "block_002_branch_1", "when": [{"variableId": "", "operator": "=="}], "gotoSceneId": "scene_c"}
         ])
+        self.assertEqual(payload["choiceContinueTarget"], "__continue__")
+        self.assertEqual(payload["continueChecks"], [True, False])
         self.assertEqual(payload["exportedLabels"]["video_play"], "播放视频")
         self.assertEqual(payload["exportedMusicLabels"]["after_block"], "播到指定卡片后")
 

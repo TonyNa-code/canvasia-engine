@@ -66,6 +66,8 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
             const storySearch = tools.filterCommandPaletteCommands(project, "剧情");
             const dialogueSearch = tools.filterCommandPaletteCommands(projectWithScene, "台词");
             const playableSearch = tools.filterCommandPaletteCommands(projectWithScene, "可试玩");
+            const affectionSearch = tools.filterCommandPaletteCommands(projectWithScene, "好感度");
+            const creditsSearch = tools.filterCommandPaletteCommands(projectWithScene, "片尾");
             const exportCommand = project.find((command) => command.id === "export-web");
             const firstChapterCommand = project.find((command) => command.id === "create-first-chapter");
             const disabledDialogueCommand = project.find((command) => command.id === "insert-dialogue");
@@ -94,6 +96,8 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
               dialogueRecentSections: projectAfterDialogue.slice(4, 6).map((command) => command.section),
               directRecommendedIds: tools.getRecommendedCommandIds({{ hasProject: true, hasSelectedScene: true, selectedBlockType: "dialogue", selectedSceneBlockCount: 2 }}),
               playableSearchIds: playableSearch.map((command) => command.id),
+              affectionSearchIds: affectionSearch.map((command) => command.id),
+              creditsSearchIds: creditsSearch.map((command) => command.id),
               storySearchIds: storySearch.map((command) => command.id),
               clamped: tools.clampCommandPaletteIndex(99, project),
             }}));
@@ -122,6 +126,8 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
         self.assertEqual(payload["dialogueRecentSections"], ["最近", "最近"])
         self.assertEqual(payload["directRecommendedIds"][:2], ["insert-dialogue", "insert-choice"])
         self.assertIn("template-playable-scene", payload["playableSearchIds"])
+        self.assertIn("template-affection-choice", payload["affectionSearchIds"])
+        self.assertIn("template-ending-credits", payload["creditsSearchIds"])
         self.assertIn("screen-story", payload["storySearchIds"])
         self.assertGreater(payload["clamped"], 0)
 

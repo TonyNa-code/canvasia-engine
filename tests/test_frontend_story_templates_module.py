@@ -31,6 +31,11 @@ class FrontendStoryTemplatesModuleTests(unittest.TestCase):
                 tools.getStoryTemplatePreset("emotion_burst")?.title,
                 tools.getStoryTemplatePreset("branch_choice")?.title,
                 tools.getStoryTemplatePreset("scene_outro")?.title,
+                tools.getStoryTemplatePreset("op_movie_hook")?.title,
+                tools.getStoryTemplatePreset("daily_conversation")?.title,
+                tools.getStoryTemplatePreset("affection_choice")?.title,
+                tools.getStoryTemplatePreset("climax_sequence")?.title,
+                tools.getStoryTemplatePreset("ending_credits")?.title,
               ],
               playableRecipeTypes: tools.getStoryTemplateBlockRecipes("playable_scene").map((recipe) => recipe.type),
               playableChoiceTexts: tools.getStoryTemplateBlockRecipes("playable_scene").find((recipe) => recipe.type === "choice")?.choiceTexts,
@@ -39,6 +44,16 @@ class FrontendStoryTemplatesModuleTests(unittest.TestCase):
                 getBlockLabel: (type) => type === "dialogue" ? "台词" : `label:${{type}}`,
               }}),
               panelItems: tools.getStoryTemplatePanelItems(),
+              dailyRecipe: tools.getStoryTemplateBlockRecipes("daily_conversation"),
+              affectionRecipe: tools.getStoryTemplateBlockRecipes("affection_choice"),
+              climaxSummary: tools.getStoryTemplateSummary("climax_sequence", {{
+                getBlockLabel: (type) => type,
+              }}),
+              variableRequirements: {{
+                playable: tools.getStoryTemplateVariableRequirement("playable_scene"),
+                affection: tools.getStoryTemplateVariableRequirement("affection_choice"),
+                daily: tools.getStoryTemplateVariableRequirement("daily_conversation"),
+              }},
               openingRecipeCount: tools.getStoryTemplateBlockRecipes("opening_intro").length,
               missingRecipes: tools.getStoryTemplateBlockRecipes("missing"),
               missingPreset: tools.getStoryTemplatePreset("missing"),
@@ -68,7 +83,19 @@ class FrontendStoryTemplatesModuleTests(unittest.TestCase):
         self.assertIn("getStoryTemplateBlockRecipes", payload["keys"])
         self.assertIn("getStoryTemplateSummary", payload["keys"])
         self.assertIn("getStoryTemplatePanelItems", payload["keys"])
-        self.assertEqual(payload["presetTitles"], ["第一段可试玩", "开场铺垫", "进入回忆", "情绪爆点", "选项分支", "场景收尾"])
+        self.assertEqual(payload["presetTitles"], [
+            "第一段可试玩",
+            "开场铺垫",
+            "进入回忆",
+            "情绪爆点",
+            "选项分支",
+            "场景收尾",
+            "OP 前导",
+            "日常对话节奏",
+            "好感度选项",
+            "高潮演出段",
+            "ED 与片尾",
+        ])
         self.assertEqual(
             payload["playableRecipeTypes"],
             [
@@ -99,12 +126,29 @@ class FrontendStoryTemplatesModuleTests(unittest.TestCase):
             "emotion_burst",
             "branch_choice",
             "scene_outro",
+            "op_movie_hook",
+            "daily_conversation",
+            "affection_choice",
+            "climax_sequence",
+            "ending_credits",
         ])
+        daily_music = next(recipe for recipe in payload["dailyRecipe"] if recipe["type"] == "music_play")
+        self.assertEqual(daily_music["endAfterRecipeIndex"], 6)
+        affection_choice = next(recipe for recipe in payload["affectionRecipe"] if recipe["type"] == "choice")
+        self.assertEqual(affection_choice["choiceOptions"][0]["gotoSceneId"], "__continue__")
+        self.assertEqual(affection_choice["choiceOptions"][0]["effects"][0]["type"], "variable_add")
+        self.assertEqual(affection_choice["choiceOptions"][0]["effects"][0]["value"], 2)
+        self.assertEqual(payload["climaxSummary"]["blockCount"], 8)
+        self.assertIn("depth_blur x 2", payload["climaxSummary"]["labels"])
+        self.assertFalse(payload["variableRequirements"]["playable"]["requiresAny"])
+        self.assertTrue(payload["variableRequirements"]["affection"]["requiresAny"])
+        self.assertTrue(payload["variableRequirements"]["affection"]["requiresNumber"])
+        self.assertFalse(payload["variableRequirements"]["daily"]["requiresAny"])
         self.assertEqual(payload["openingRecipeCount"], 5)
         self.assertEqual(payload["missingRecipes"], [])
         self.assertIsNone(payload["missingPreset"])
         self.assertEqual(payload["templateLabels"], ["空白项目", "校园恋爱模板", "custom_template", None])
-        self.assertEqual(payload["exportedPresetCount"], 6)
+        self.assertEqual(payload["exportedPresetCount"], 11)
         self.assertEqual(payload["exportedBlankLabel"], "空白项目")
 
 

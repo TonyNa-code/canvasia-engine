@@ -3,6 +3,7 @@
     variable_add: "变量增加",
     variable_set: "变量设为",
   });
+  const CHOICE_CONTINUE_TARGET = "__continue__";
 
   function toArray(value) {
     return Array.isArray(value) ? value : [];
@@ -11,6 +12,10 @@
   function cleanText(value, fallback = "") {
     const text = String(value ?? "").replace(/\s+/g, " ").trim();
     return text || fallback;
+  }
+
+  function isChoiceContinueTarget(value) {
+    return cleanText(value) === CHOICE_CONTINUE_TARGET;
   }
 
   function buildSceneMap(data = {}) {
@@ -98,6 +103,9 @@
 
   function getSceneName(sceneMap, sceneId = "") {
     const id = cleanText(sceneId);
+    if (isChoiceContinueTarget(id)) {
+      return "继续下一张卡";
+    }
     const scene = sceneMap.get(id);
     return cleanText(scene?.name ?? scene?.title, id || "继续当前场景");
   }
@@ -232,6 +240,7 @@
   function buildChoiceOptionEntry(option = {}, context = {}) {
     const optionText = cleanText(option.text);
     const targetSceneId = cleanText(option.gotoSceneId);
+    const continuesCurrentScene = isChoiceContinueTarget(targetSceneId);
     const effects = toArray(option.effects);
     const baseContext = {
       chapterName: context.chapterName,
@@ -247,7 +256,7 @@
     if (!optionText) {
       pushIssue(issues, "blocker", "choice_option_empty_text", "选项文案为空", "玩家会看到空按钮或难以理解的选项。", baseContext);
     }
-    if (targetSceneId && !context.sceneMap.has(targetSceneId)) {
+    if (targetSceneId && !continuesCurrentScene && !context.sceneMap.has(targetSceneId)) {
       pushIssue(issues, "blocker", "choice_option_unknown_target", "选项目标场景不存在", `目标场景 ${targetSceneId} 已经找不到。`, baseContext);
     }
     if (!targetSceneId && effects.length === 0) {
@@ -272,6 +281,7 @@
       targetSceneId,
       targetSceneName: getSceneName(context.sceneMap, targetSceneId),
       hasTarget: Boolean(targetSceneId),
+      continuesCurrentScene,
       effectCount: effects.length,
       effectSummary: effects.length
         ? effects.map((effect) => summarizeChoiceEffect(effect, context.variableMap)).join(" / ")

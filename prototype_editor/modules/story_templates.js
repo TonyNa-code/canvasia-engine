@@ -18,6 +18,21 @@
     scene_outro: Object.freeze({
       title: "场景收尾",
     }),
+    op_movie_hook: Object.freeze({
+      title: "OP 前导",
+    }),
+    daily_conversation: Object.freeze({
+      title: "日常对话节奏",
+    }),
+    affection_choice: Object.freeze({
+      title: "好感度选项",
+    }),
+    climax_sequence: Object.freeze({
+      title: "高潮演出段",
+    }),
+    ending_credits: Object.freeze({
+      title: "ED 与片尾",
+    }),
   });
 
   const STORY_TEMPLATE_BLOCK_RECIPES = deepFreeze({
@@ -226,6 +241,241 @@
         defaultJumpTarget: true,
       },
     ],
+    op_movie_hook: [
+      {
+        type: "screen_fade",
+        fields: {
+          action: "fade_out",
+          color: "black",
+          duration: "short",
+        },
+      },
+      {
+        type: "video_play",
+        fields: {
+          title: "Opening Movie",
+          fit: "contain",
+          volume: 100,
+          skippable: true,
+        },
+      },
+      {
+        type: "screen_fade",
+        fields: {
+          action: "fade_in",
+          color: "black",
+          duration: "medium",
+        },
+      },
+      {
+        type: "background",
+        fields: {
+          transition: "fade",
+        },
+      },
+      {
+        type: "narration",
+        fields: {
+          text: "片头的余音散去，新的日常从这一刻接上。",
+        },
+      },
+    ],
+    daily_conversation: [
+      {
+        type: "background",
+        fields: {
+          transition: "fade",
+        },
+      },
+      {
+        type: "music_play",
+        endAfterRecipeIndex: 6,
+        fields: {
+          loop: true,
+          volume: 82,
+          fadeInMs: 800,
+          fadeOutMs: 700,
+        },
+      },
+      {
+        type: "character_show",
+        speaker: true,
+        fields: {
+          transition: "rise",
+          stage: {
+            offsetX: 0,
+            offsetY: 4,
+            scale: 104,
+            opacity: 100,
+            layer: 1,
+            flipX: false,
+          },
+        },
+      },
+      {
+        type: "narration",
+        fields: {
+          text: "她把书包往桌上一放，像是终于松了一口气。",
+        },
+      },
+      {
+        type: "dialogue",
+        speaker: true,
+        fields: {
+          text: "今天也辛苦啦。",
+        },
+      },
+      {
+        type: "dialogue",
+        speaker: true,
+        fields: {
+          text: "不过，真正麻烦的事情好像才刚刚开始。",
+        },
+      },
+      {
+        type: "narration",
+        fields: {
+          text: "窗外的光线慢慢偏暗，教室里只剩下两个人的呼吸声。",
+        },
+      },
+    ],
+    affection_choice: [
+      {
+        type: "dialogue",
+        speaker: true,
+        fields: {
+          text: "如果是你的话，会怎么回答我？",
+        },
+      },
+      {
+        type: "choice",
+        choiceOptions: [
+          {
+            text: "坦率地说出心意",
+            gotoSceneId: "__continue__",
+            effects: [{ type: "variable_add", value: 2 }],
+          },
+          {
+            text: "先观察她的反应",
+            gotoSceneId: "__continue__",
+            effects: [{ type: "variable_add", value: 1 }],
+          },
+        ],
+      },
+      {
+        type: "condition",
+        numberVariableCondition: {
+          operator: ">=",
+          value: 2,
+        },
+      },
+    ],
+    climax_sequence: [
+      {
+        type: "music_play",
+        endAfterRecipeIndex: 7,
+        fields: {
+          loop: true,
+          volume: 92,
+          fadeInMs: 400,
+          fadeOutMs: 900,
+        },
+      },
+      {
+        type: "screen_fade",
+        fields: {
+          action: "fade_in",
+          color: "black",
+          duration: "short",
+        },
+      },
+      {
+        type: "camera_zoom",
+        fields: {
+          action: "zoom_in",
+          strength: "strong",
+          focus: "center",
+        },
+      },
+      {
+        type: "screen_flash",
+        fields: {
+          color: "white",
+          intensity: "strong",
+          duration: "short",
+        },
+      },
+      {
+        type: "screen_shake",
+        fields: {
+          intensity: "medium",
+          duration: "short",
+        },
+      },
+      {
+        type: "depth_blur",
+        fields: {
+          action: "apply",
+          focus: "center",
+          strength: "medium",
+        },
+      },
+      {
+        type: "dialogue",
+        speaker: true,
+        fields: {
+          text: "这一刻，我终于明白自己真正想守住的是什么。",
+        },
+      },
+      {
+        type: "depth_blur",
+        fields: {
+          action: "clear",
+        },
+      },
+    ],
+    ending_credits: [
+      {
+        type: "screen_fade",
+        fields: {
+          action: "fade_out",
+          color: "black",
+          duration: "medium",
+        },
+      },
+      {
+        type: "music_play",
+        endAfterRecipeIndex: 3,
+        fields: {
+          loop: false,
+          volume: 88,
+          fadeInMs: 1200,
+          fadeOutMs: 1200,
+        },
+      },
+      {
+        type: "narration",
+        fields: {
+          text: "故事到这里暂时告一段落，但她留下的声音还在心里回响。",
+        },
+      },
+      {
+        type: "credits_roll",
+        fields: {
+          title: "STAFF",
+          subtitle: "Thank you for playing",
+          durationSeconds: 22,
+          background: "dark",
+          skippable: true,
+        },
+      },
+      {
+        type: "music_stop",
+        fields: {
+          fadeOutMs: 1200,
+        },
+      },
+    ],
   });
 
   const STORY_TEMPLATE_PANEL_ITEMS = deepFreeze([
@@ -259,6 +509,31 @@
       tone: "",
       description: "收尾旁白、停音乐、退场和跳下一场",
     },
+    {
+      templateId: "op_movie_hook",
+      tone: "hero",
+      description: "OP 视频、黑场过渡和正式开场衔接",
+    },
+    {
+      templateId: "daily_conversation",
+      tone: "good",
+      description: "带 BGM 范围、立绘登场和日常对话节奏",
+    },
+    {
+      templateId: "affection_choice",
+      tone: "warn",
+      description: "带好感度变化和条件判断的选项段落",
+    },
+    {
+      templateId: "climax_sequence",
+      tone: "warn",
+      description: "音乐、镜头、闪屏、震动和景深组合演出",
+    },
+    {
+      templateId: "ending_credits",
+      tone: "",
+      description: "ED 黑场、收束旁白、片尾字幕和停音乐",
+    },
   ]);
 
   const PROJECT_TEMPLATE_LABELS = Object.freeze({
@@ -274,6 +549,10 @@
     Object.freeze(source);
     Object.values(source).forEach((value) => deepFreeze(value));
     return source;
+  }
+
+  function toArray(value) {
+    return Array.isArray(value) ? value : [];
   }
 
   function getStoryTemplatePreset(templateId) {
@@ -325,6 +604,35 @@
     });
   }
 
+  function getStoryTemplateVariableRequirement(templateId) {
+    return getStoryTemplateBlockRecipes(templateId).reduce(
+      (requirement, recipe) => {
+        if (!recipe?.type) {
+          return requirement;
+        }
+        if (recipe.type === "variable_set" || recipe.type === "condition") {
+          requirement.requiresAny = true;
+        }
+        if (recipe.type === "variable_add" || recipe.numberVariableCondition) {
+          requirement.requiresAny = true;
+          requirement.requiresNumber = true;
+        }
+        toArray(recipe.choiceOptions).forEach((option) => {
+          toArray(option?.effects).forEach((effect) => {
+            if (effect?.type === "variable_add") {
+              requirement.requiresAny = true;
+              requirement.requiresNumber = true;
+            } else if (effect?.type === "variable_set") {
+              requirement.requiresAny = true;
+            }
+          });
+        });
+        return requirement;
+      },
+      { requiresAny: false, requiresNumber: false }
+    );
+  }
+
   function getStoryTemplatePanelItems() {
     return STORY_TEMPLATE_PANEL_ITEMS;
   }
@@ -342,6 +650,7 @@
     getStoryTemplateBlockRecipes,
     getStoryTemplateBlockTypeCounts,
     getStoryTemplateSummary,
+    getStoryTemplateVariableRequirement,
     getStoryTemplatePanelItems,
     getTemplateLabel,
   });

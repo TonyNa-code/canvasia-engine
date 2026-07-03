@@ -44,7 +44,7 @@ const API_BULK_DELETE_ASSETS = "/api/bulk-delete-assets";
 const API_CREATIVE_ASSISTANT = "/api/creative-assistant";
 
 const storyBlockCatalogTools = window.CanvasiaEditorStoryBlockCatalog;
-const { BLOCK_LABELS, MUSIC_END_MODE_LABELS } = storyBlockCatalogTools;
+const { BLOCK_LABELS, MUSIC_END_MODE_LABELS, CHOICE_CONTINUE_TARGET } = storyBlockCatalogTools;
 const storyBlockEditorTools = window.CanvasiaEditorStoryBlockEditors;
 const storyTemplateTools = window.CanvasiaEditorStoryTemplates;
 const { STORY_TEMPLATE_PRESETS } = storyTemplateTools;
@@ -71,6 +71,19 @@ function getBlockLabel(type) {
 
 function getSafeMusicEndMode(mode) {
   return storyBlockCatalogTools.getSafeMusicEndMode(mode);
+}
+
+function isChoiceContinueTarget(value) {
+  return typeof storyBlockCatalogTools.isChoiceContinueTarget === "function"
+    ? storyBlockCatalogTools.isChoiceContinueTarget(value)
+    : String(value ?? "").trim() === CHOICE_CONTINUE_TARGET;
+}
+
+function getChoiceTargetLabel(targetSceneId) {
+  if (isChoiceContinueTarget(targetSceneId)) {
+    return "继续下一张卡";
+  }
+  return state.data?.scenesById?.get(targetSceneId)?.name ?? targetSceneId ?? "";
 }
 
 function getMusicEndModeLabel(mode) {
@@ -13268,7 +13281,7 @@ function buildStoryBlockSearchText(block, scene) {
     parts.push((block.options ?? []).map((option) => option.text).join(" "));
     parts.push(
       (block.options ?? [])
-        .map((option) => state.data.scenesById.get(option.gotoSceneId)?.name ?? option.gotoSceneId)
+        .map((option) => getChoiceTargetLabel(option.gotoSceneId))
         .join(" ")
     );
   }
@@ -19344,12 +19357,7 @@ function choosePreviewOption(optionId) {
   const nextVariables = clonePreviewVariables(current.variables);
   applyChoiceEffectsToPreviewVariables(nextVariables, option.effects ?? []);
   current.selectedOptionId = option.id;
-  const nextSnapshot = buildPreviewSnapshot(
-    option.gotoSceneId,
-    0,
-    current.visualState,
-    nextVariables
-  );
+  const nextSnapshot = buildChoiceOptionNextSnapshot(current, option, nextVariables);
 
   stopPreviewAutoAdvance();
   session.timeline = session.timeline.slice(0, session.position + 1);
@@ -21563,6 +21571,19 @@ function movePreviewRegressionForward(session) {
   return nextSnapshot;
 }
 
+function buildChoiceOptionNextSnapshot(current, option, nextVariables) {
+  const targetSceneId = option?.gotoSceneId ?? option?.targetSceneId ?? "";
+  if (isChoiceContinueTarget(targetSceneId)) {
+    return buildPreviewSnapshot(
+      current.sceneId,
+      current.blockIndex + 1,
+      current.visualState,
+      nextVariables
+    );
+  }
+  return buildPreviewSnapshot(targetSceneId, 0, current.visualState, nextVariables);
+}
+
 function choosePreviewRegressionOption(session, optionId) {
   const current = getCurrentPreviewRegressionSnapshot(session);
 
@@ -21579,12 +21600,7 @@ function choosePreviewRegressionOption(session, optionId) {
   const nextVariables = clonePreviewVariables(current.variables);
   applyChoiceEffectsToPreviewVariables(nextVariables, option.effects ?? []);
   current.selectedOptionId = option.id;
-  const nextSnapshot = buildPreviewSnapshot(
-    option.gotoSceneId,
-    0,
-    current.visualState,
-    nextVariables
-  );
+  const nextSnapshot = buildChoiceOptionNextSnapshot(current, option, nextVariables);
 
   session.timeline.push(nextSnapshot);
   session.position = session.timeline.length - 1;
@@ -23571,7 +23587,7 @@ function renderStage(visualState, large, options = {}) {
                 <button class="preview-choice-button" data-action="preview-choice" data-option-id="${option.id}">
                   <strong>${escapeHtml(option.text)}</strong>
                   <span>进入 ${escapeHtml(
-                    state.data.scenesById.get(option.gotoSceneId)?.name ?? option.gotoSceneId
+                    getChoiceTargetLabel(option.gotoSceneId)
                   )}</span>
                 </button>
               `
@@ -24106,7 +24122,7 @@ function getPreviewChoiceDecision(snapshot) {
 
   const effectsCount = selectedOption.effects?.length ?? 0;
   const targetSceneName =
-    state.data.scenesById.get(selectedOption.gotoSceneId)?.name ?? selectedOption.gotoSceneId ?? "未设置目标";
+    getChoiceTargetLabel(selectedOption.gotoSceneId) || "未设置目标";
 
   return {
     title: `已选：${selectedOption.text?.trim() || "未命名选项"}`,
@@ -24635,7 +24651,7 @@ function buildPreviewBranchCoverage(session) {
             const outcomeKey = `${pointKey}:${optionKey}`;
             const effectsCount = option.effects?.length ?? 0;
             const targetSceneName =
-              state.data.scenesById.get(option.gotoSceneId)?.name ?? option.gotoSceneId ?? "未设置目标";
+              getChoiceTargetLabel(option.gotoSceneId) || "未设置目标";
 
             return {
               key: outcomeKey,
@@ -34044,6 +34060,8 @@ function renderChoiceEffectEmptyState() {
 function renderChoiceOptionEditorRow(option, index, optionCount = 1) {
   return storyBlockEditorTools.renderChoiceOptionEditorRow(option, index, optionCount, {
     scenes: state.data.scenes,
+    choiceContinueTarget: CHOICE_CONTINUE_TARGET,
+    choiceContinueLabel: "继续当前场景下一张卡",
     escapeHtml,
     getEditableChoiceEffects,
     renderChoiceTextQualityTools,
@@ -35753,12 +35771,51 @@ function getStoryTemplateBlockRecipes(templateId) {
   return storyTemplateTools.getStoryTemplateBlockRecipes(templateId);
 }
 
+function getStoryTemplateVariableRequirement(templateId) {
+  return typeof storyTemplateTools.getStoryTemplateVariableRequirement === "function"
+    ? storyTemplateTools.getStoryTemplateVariableRequirement(templateId)
+    : { requiresAny: false, requiresNumber: false };
+}
+
 function cloneStoryTemplateFields(fields) {
   if (!fields || typeof fields !== "object") {
     return {};
   }
 
   return JSON.parse(JSON.stringify(fields));
+}
+
+function buildStoryTemplateChoiceEffect(effectPlan = {}) {
+  const type = String(effectPlan.type ?? "").trim();
+  if (type === "variable_add") {
+    const variableId = getSafeVariableId(effectPlan.variableId, "number");
+    if (!variableId) {
+      return null;
+    }
+    const value = Number(effectPlan.value ?? 1);
+    return {
+      type: "variable_add",
+      variableId,
+      value: Number.isFinite(value) ? value : 1,
+    };
+  }
+
+  if (type === "variable_set") {
+    const variableId = getSafeVariableId(effectPlan.variableId);
+    if (!variableId) {
+      return null;
+    }
+    const value = Object.prototype.hasOwnProperty.call(effectPlan, "value")
+      ? effectPlan.value
+      : getVariableDefaultValue(variableId);
+    return {
+      type: "variable_set",
+      variableId,
+      value: normalizeVariableValue(variableId, value),
+    };
+  }
+
+  return null;
 }
 
 function applyStoryTemplateSpeaker(block, speakerId) {
@@ -35793,6 +35850,54 @@ function applyStoryTemplateChoiceTexts(block, choiceTexts) {
   }));
 }
 
+function applyStoryTemplateChoiceOptions(block, recipe, context) {
+  const optionPlans = Array.isArray(recipe.choiceOptions) ? recipe.choiceOptions : [];
+  if (!optionPlans.length || !Array.isArray(block?.options)) {
+    applyStoryTemplateChoiceTexts(block, recipe.choiceTexts);
+    return;
+  }
+
+  block.options = optionPlans.map((optionPlan, index) => {
+    const baseOption = block.options[index] ?? {};
+    const text = String(optionPlan?.text ?? recipe.choiceTexts?.[index] ?? baseOption.text ?? `选项 ${index + 1}`).trim();
+    const effects = (Array.isArray(optionPlan?.effects) ? optionPlan.effects : [])
+      .map((effectPlan) => buildStoryTemplateChoiceEffect(effectPlan))
+      .filter(Boolean);
+    return {
+      id: baseOption.id ?? createChoiceOptionId(block.id, index),
+      text: text || `选项 ${index + 1}`,
+      gotoSceneId: String(optionPlan?.gotoSceneId ?? baseOption.gotoSceneId ?? context.scene?.id ?? ""),
+      effects,
+    };
+  });
+}
+
+function applyStoryTemplateNumberCondition(block, recipe, context) {
+  if (block?.type !== "condition" || !recipe.numberVariableCondition) {
+    return;
+  }
+
+  const variableId = getSafeVariableId(recipe.numberVariableCondition.variableId, "number");
+  if (!variableId) {
+    return;
+  }
+
+  const value = Number(recipe.numberVariableCondition.value ?? 1);
+  const rule = {
+    variableId,
+    operator: recipe.numberVariableCondition.operator ?? ">=",
+    value: Number.isFinite(value) ? value : 1,
+  };
+  block.branches =
+    Array.isArray(block.branches) && block.branches.length
+      ? block.branches
+      : createDefaultConditionBranches(block.id, context.scene?.id);
+  block.branches[0] = {
+    ...block.branches[0],
+    when: [rule],
+  };
+}
+
 function applyStoryTemplateRecipe(block, recipe, context) {
   Object.assign(block, cloneStoryTemplateFields(recipe.fields));
 
@@ -35800,11 +35905,27 @@ function applyStoryTemplateRecipe(block, recipe, context) {
     applyStoryTemplateSpeaker(block, context.speakerId);
   }
 
-  applyStoryTemplateChoiceTexts(block, recipe.choiceTexts);
+  applyStoryTemplateChoiceOptions(block, recipe, context);
+  applyStoryTemplateNumberCondition(block, recipe, context);
 
   if (recipe.defaultJumpTarget && block.type === "jump") {
     block.targetSceneId = getDefaultJumpTargetSceneId(context.scene?.id);
   }
+}
+
+function finalizeStoryTemplateBlocks(blocks, recipes) {
+  blocks.forEach((block, index) => {
+    const recipe = recipes[index];
+    if (block?.type !== "music_play" || !Number.isInteger(recipe?.endAfterRecipeIndex)) {
+      return;
+    }
+    const endBlock = blocks[recipe.endAfterRecipeIndex];
+    if (!endBlock?.id) {
+      return;
+    }
+    block.endMode = "after_block";
+    block.endBlockId = endBlock.id;
+  });
 }
 
 function createTemplateBlock(sceneDraft, recipe, context) {
@@ -35846,14 +35967,37 @@ function buildStoryTemplateBlocks(scene, templateId) {
     }
   });
 
+  finalizeStoryTemplateBlocks(blocks, recipes);
   return blocks;
 }
 
 async function applyStoryTemplate(templateId) {
-  const scene = getSelectedScene();
   const preset = getStoryTemplatePreset(templateId);
 
-  if (!scene || !preset) {
+  if (!preset) {
+    showEngineAlert("没有找到这个剧情模板。");
+    return;
+  }
+
+  const initialScene = getSelectedScene();
+  if (!initialScene) {
+    showEngineAlert("先选中一个场景，再插入剧情模板。");
+    return;
+  }
+
+  const variableRequirement = getStoryTemplateVariableRequirement(templateId);
+  if (
+    variableRequirement.requiresAny &&
+    !(await ensureStarterVariables({
+      requireNumber: variableRequirement.requiresNumber,
+      reason: "这个模板会写入分支后果，正在创建基础变量库...",
+    }))
+  ) {
+    return;
+  }
+
+  const scene = getSelectedScene() ?? initialScene;
+  if (!scene) {
     showEngineAlert("先选中一个场景，再插入剧情模板。");
     return;
   }
@@ -45507,7 +45651,7 @@ function buildBlockDetails(block) {
         rows.push([
           `选项 ${index + 1}`,
           `${option.text} -> ${
-            state.data.scenesById.get(option.gotoSceneId)?.name ?? option.gotoSceneId
+            getChoiceTargetLabel(option.gotoSceneId)
           }${(option.effects?.length ?? 0) > 0 ? ` / ${option.effects.length} 条效果` : ""}`,
         ]);
       });
@@ -46416,6 +46560,9 @@ function validateBlock(block, scene, data, pushIssue) {
   };
 
   const requireScene = (sceneId, prefix) => {
+    if (isChoiceContinueTarget(sceneId)) {
+      return;
+    }
     if (sceneId && !data.scenesById.has(sceneId)) {
       pushIssue("error", `${prefix}不存在。`, `${location} -> ${sceneId}`, blockContext);
     }

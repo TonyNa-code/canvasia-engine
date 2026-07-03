@@ -26,6 +26,7 @@ ASSET_TYPE_IMAGE = {"background", "sprite", "cg", "ui"}
 ASSET_TYPE_FONT = {"font"}
 DEFAULT_PROJECT_LANGUAGE = "zh-CN"
 DEFAULT_GAME_DATA_NAME = "game_data.json"
+CHOICE_CONTINUE_TARGET = "__continue__"
 ENGINE_BRAND_LOGO_RELATIVE_PATH = "assets/canvasia-brand-logo.png"
 NATIVE_VIDEO_OPTIONAL_REQUIREMENTS_NAME = "requirements-native-runtime-video.txt"
 NATIVE_VIDEO_OPTIONAL_REQUIREMENTS_CANDIDATES = (NATIVE_VIDEO_OPTIONAL_REQUIREMENTS_NAME, "requirements-video.txt")
@@ -2935,6 +2936,8 @@ def build_release_check_report(bundle_dir: Path) -> dict:
 
     def check_scene_target(scene_id: object, label: str, path: str) -> None:
         target_scene_id = str(scene_id or "").strip()
+        if target_scene_id == CHOICE_CONTINUE_TARGET:
+            return
         if target_scene_id and target_scene_id in scene_ids:
             return
         add_release_check_issue(
@@ -7888,7 +7891,7 @@ def collect_scene_outgoing_targets(scene: dict | None) -> list[str]:
         elif block_type == "choice":
             for option in block.get("options", []) or []:
                 target = str(option.get("gotoSceneId") or "").strip()
-                if target:
+                if target and target != CHOICE_CONTINUE_TARGET:
                     targets.append(target)
         elif block_type == "condition":
             for branch in block.get("branches", []) or []:
@@ -12604,7 +12607,7 @@ class NativeRuntimePlayer:
         self.current_block_index += 1
         target_scene_id = option.get("gotoSceneId") or option.get("targetSceneId")
         self.current_choices = None
-        if target_scene_id:
+        if target_scene_id and str(target_scene_id).strip() != CHOICE_CONTINUE_TARGET:
             self.set_scene(target_scene_id)
         self.advance_until_pause()
         self.auto_resume_write_enabled = True

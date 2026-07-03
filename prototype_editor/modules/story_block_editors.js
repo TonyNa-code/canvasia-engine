@@ -1341,6 +1341,8 @@
     const escape = getEscapeHtml(options);
     const safeOption = option ?? {};
     const scenes = Array.isArray(options.scenes) ? options.scenes : [];
+    const choiceContinueTarget = String(options.choiceContinueTarget ?? "__continue__");
+    const choiceContinueLabel = String(options.choiceContinueLabel ?? "继续当前场景下一张卡");
     const renderChoiceTextQualityTools = getRenderer(options, "renderChoiceTextQualityTools");
     const renderEffectRow = getRenderer(options, "renderChoiceEffectEditorRow", renderChoiceEffectEditorRow);
     const renderEmptyState = getRenderer(options, "renderChoiceEffectEmptyState", renderChoiceEffectEmptyState);
@@ -1368,6 +1370,9 @@
         <div class="detail-row">
           <label>跳转到哪个场景</label>
           <select data-field="choice-goto">
+            <option value="${escape(choiceContinueTarget)}" ${safeOption.gotoSceneId === choiceContinueTarget ? "selected" : ""}>
+              ${escape(choiceContinueLabel)}
+            </option>
             ${scenes
               .map(
                 (scene) => `

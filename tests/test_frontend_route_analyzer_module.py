@@ -36,7 +36,8 @@ class FrontendRouteAnalyzerModuleTests(unittest.TestCase):
                   type: "choice",
                   options: [
                     {{ text: "Go end", gotoSceneId: "scene_end" }},
-                    {{ text: "Missing", gotoSceneId: "scene_missing" }}
+                    {{ text: "Missing", gotoSceneId: "scene_missing" }},
+                    {{ text: "Keep reading", gotoSceneId: "__continue__" }}
                   ]
                 }},
                 {{
@@ -131,6 +132,7 @@ class FrontendRouteAnalyzerModuleTests(unittest.TestCase):
         self.assertEqual(payload["metrics"]["routeTestCases"], 4)
         self.assertEqual(payload["metrics"]["blockedRouteTestCases"], 2)
         self.assertEqual(payload["routeKinds"], ["choice", "choice", "condition", "fallback"])
+        self.assertNotIn("__continue__", json.dumps(payload["startNode"]["routes"]))
         self.assertEqual(payload["alertLabels"][:2], ["坏链", "坏链"])
         self.assertIn("不可达", payload["alertLabels"])
         self.assertIn("buildRoutePathFromPredecessors", payload["keys"])
