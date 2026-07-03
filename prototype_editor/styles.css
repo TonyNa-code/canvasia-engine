@@ -2602,6 +2602,29 @@ body[data-editor-mode="beginner"] #screen-preview #previewSceneFilterBar {
   line-height: 1.6;
 }
 
+.route-scene-path {
+  display: grid;
+  gap: 4px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(76, 130, 216, 0.08);
+  border: 1px solid rgba(76, 130, 216, 0.16);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.route-scene-path strong {
+  color: var(--text);
+  font-size: 12px;
+}
+
+.route-scene-path.is-warning {
+  background: rgba(217, 111, 67, 0.1);
+  border-color: rgba(217, 111, 67, 0.18);
+}
+
 .issue-card-footer {
   display: flex;
   align-items: center;

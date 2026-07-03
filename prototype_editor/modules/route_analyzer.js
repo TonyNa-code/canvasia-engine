@@ -238,10 +238,55 @@
     return 2;
   }
 
+  function getRoutePathStepLabel(route = {}) {
+    const routeLabel = String(route.label ?? "").trim();
+    const shortLabel = String(route.shortLabel ?? route.routeKind ?? "路线").trim();
+    return routeLabel ? `${shortLabel}：${routeLabel}` : shortLabel;
+  }
+
+  function buildRoutePathFromPredecessors(nodeById, predecessorBySceneId, targetSceneId) {
+    if (!targetSceneId || !nodeById.has(targetSceneId)) {
+      return {
+        sceneIds: [],
+        sceneNames: [],
+        routeLabels: [],
+        label: "",
+        stepCount: 0,
+      };
+    }
+
+    const sceneIds = [targetSceneId];
+    const routeLabels = [];
+    const visitedSceneIds = new Set([targetSceneId]);
+    let cursorSceneId = targetSceneId;
+
+    while (predecessorBySceneId.has(cursorSceneId)) {
+      const predecessor = predecessorBySceneId.get(cursorSceneId);
+      if (!predecessor?.sourceSceneId || visitedSceneIds.has(predecessor.sourceSceneId)) {
+        break;
+      }
+      routeLabels.unshift(getRoutePathStepLabel(predecessor.route));
+      sceneIds.unshift(predecessor.sourceSceneId);
+      visitedSceneIds.add(predecessor.sourceSceneId);
+      cursorSceneId = predecessor.sourceSceneId;
+    }
+
+    const sceneNames = sceneIds.map((sceneId) => nodeById.get(sceneId)?.name ?? sceneId);
+
+    return {
+      sceneIds,
+      sceneNames,
+      routeLabels,
+      label: sceneNames.join(" -> "),
+      stepCount: Math.max(sceneIds.length - 1, 0),
+    };
+  }
+
   function buildRouteReachability(nodes = [], entrySceneId = "") {
     const nodeById = new Map(nodes.map((node) => [node.id, node]));
     const reachableSceneIds = new Set();
     const routeDepthBySceneId = new Map();
+    const predecessorBySceneId = new Map();
     const queue = [];
 
     if (nodeById.has(entrySceneId)) {
@@ -254,23 +299,29 @@
       const sceneId = queue.shift();
       const node = nodeById.get(sceneId);
       const currentDepth = routeDepthBySceneId.get(sceneId) ?? 0;
-      const nextSceneIds = [
-        ...new Set((node?.routes ?? []).filter((route) => route.targetExists).map((route) => route.targetSceneId)),
-      ];
+      const routeByTargetSceneId = new Map();
+      (node?.routes ?? []).forEach((route) => {
+        if (route.targetExists && route.targetSceneId && !routeByTargetSceneId.has(route.targetSceneId)) {
+          routeByTargetSceneId.set(route.targetSceneId, route);
+        }
+      });
 
-      nextSceneIds.forEach((targetSceneId) => {
+      routeByTargetSceneId.forEach((route, targetSceneId) => {
         if (!targetSceneId || reachableSceneIds.has(targetSceneId) || !nodeById.has(targetSceneId)) {
           return;
         }
         reachableSceneIds.add(targetSceneId);
         routeDepthBySceneId.set(targetSceneId, currentDepth + 1);
+        predecessorBySceneId.set(targetSceneId, { sourceSceneId: sceneId, route });
         queue.push(targetSceneId);
       });
     }
 
     return {
+      nodeById,
       reachableSceneIds,
       routeDepthBySceneId,
+      predecessorBySceneId,
       maxRouteDepth: routeDepthBySceneId.size ? Math.max(...routeDepthBySceneId.values()) : 0,
     };
   }
@@ -339,6 +390,9 @@
 
     nodes.forEach((node) => {
       const validRoutes = node.routes.filter((route) => route.targetExists);
+      const entryPath = reachability.reachableSceneIds.has(node.id)
+        ? buildRoutePathFromPredecessors(reachability.nodeById, reachability.predecessorBySceneId, node.id)
+        : buildRoutePathFromPredecessors(reachability.nodeById, new Map(), "");
       node.incomingCount = incomingCounts.get(node.id) ?? 0;
       node.branchTargetCount = new Set(validRoutes.map((route) => route.targetSceneId)).size;
       node.brokenRouteCount = node.routes.length - validRoutes.length;
@@ -349,7 +403,33 @@
       node.routeDepth = reachability.routeDepthBySceneId.has(node.id)
         ? reachability.routeDepthBySceneId.get(node.id)
         : null;
+      node.entryPathSceneIds = entryPath.sceneIds;
+      node.entryPathSceneNames = entryPath.sceneNames;
+      node.entryPathRouteLabels = entryPath.routeLabels;
+      node.entryPathLabel = entryPath.label;
+      node.entryPathStepCount = entryPath.stepCount;
     });
+
+    const endingPaths = nodes
+      .filter((node) => node.isEnding && !node.isEntry)
+      .map((node) => ({
+        sceneId: node.id,
+        sceneName: node.name,
+        chapterId: node.chapterId,
+        chapterName: node.chapterName,
+        routeDepth: node.routeDepth,
+        isReachable: node.isReachableFromEntry,
+        pathSceneIds: node.entryPathSceneIds,
+        pathSceneNames: node.entryPathSceneNames,
+        pathRouteLabels: node.entryPathRouteLabels,
+        pathLabel: node.entryPathLabel,
+      }))
+      .sort((left, right) => {
+        if (left.isReachable !== right.isReachable) {
+          return left.isReachable ? -1 : 1;
+        }
+        return (left.routeDepth ?? Number.POSITIVE_INFINITY) - (right.routeDepth ?? Number.POSITIVE_INFINITY);
+      });
 
     const alerts = [
       ...brokenRoutes.map((route) => ({
@@ -396,10 +476,13 @@
       chapters,
       nodes,
       alerts,
+      endingPaths,
       metrics: {
         entrySceneName: getSceneById(data, entrySceneId, options)?.name ?? "未设置",
         branchingScenes: nodes.filter((node) => node.branchTargetCount > 1).length,
         endingScenes: nodes.filter((node) => node.isEnding).length,
+        reachableEndingScenes: endingPaths.filter((path) => path.isReachable).length,
+        unreachableEndingScenes: endingPaths.filter((path) => !path.isReachable).length,
         orphanScenes: nodes.filter((node) => node.isOrphan).length,
         reachableScenes: reachability.reachableSceneIds.size,
         unreachableScenes: nodes.filter((node) => node.isUnreachable).length,
@@ -417,6 +500,8 @@
     createSceneRoute,
     collectSceneRoutes,
     getRouteAlertPriority,
+    getRoutePathStepLabel,
+    buildRoutePathFromPredecessors,
     buildRouteReachability,
     buildSceneRouteOverview,
   });

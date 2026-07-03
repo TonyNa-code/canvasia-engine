@@ -60,7 +60,7 @@ The project already includes a visual editor, export pipeline, native runtime pr
 - Canvasia Assistant with local template mode and optional creator-provided OpenAI, DeepSeek, Qwen, Kimi, Zhipu GLM, or compatible API providers
 - Optional OpenAI Image asset generation for backgrounds, sprites, CGs, and UI materials, with style-hint presets, sprite-to-character expression binding, prompt/model validation, and local-only API key handling
 - Formal save/load, quick save/load, system menu, text history, autoplay, skip-read, and voice replay
-- Entry reachability route analysis for broken links, orphan scenes, unreachable scenes, branch depth, and ending candidates
+- Entry reachability route analysis for broken links, orphan scenes, unreachable scenes, branch depth, ending candidates, and playable ending path previews
 - Custom game UI skins, UI Kit binding, nine-slice textures, button states, layout controls, and visual novel textbox design
 - Extra galleries: CG replay, music room, character archive, location archive, narration archive, relationship archive, achievements, chapter replay, ending replay, and voice replay
 - Advanced particle presets, project particle libraries, camera effects, screen filters, flashes, shakes, and fade transitions

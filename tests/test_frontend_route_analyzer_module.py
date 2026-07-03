@@ -99,6 +99,7 @@ class FrontendRouteAnalyzerModuleTests(unittest.TestCase):
               endNode: overview.nodes.find((node) => node.id === "scene_end"),
               orphanNode: overview.nodes.find((node) => node.id === "scene_orphan"),
               hiddenChainNode: overview.nodes.find((node) => node.id === "scene_hidden_chain"),
+              endingPaths: overview.endingPaths,
               chapterProduction: overview.chapters[0].production,
               routeKinds,
             }}));
@@ -123,17 +124,28 @@ class FrontendRouteAnalyzerModuleTests(unittest.TestCase):
         self.assertEqual(payload["metrics"]["reachableScenes"], 3)
         self.assertEqual(payload["metrics"]["unreachableScenes"], 2)
         self.assertEqual(payload["metrics"]["maxRouteDepth"], 1)
+        self.assertEqual(payload["metrics"]["reachableEndingScenes"], 2)
+        self.assertEqual(payload["metrics"]["unreachableEndingScenes"], 1)
         self.assertEqual(payload["routeKinds"], ["choice", "choice", "condition", "fallback"])
         self.assertEqual(payload["alertLabels"][:2], ["坏链", "坏链"])
         self.assertIn("不可达", payload["alertLabels"])
+        self.assertIn("buildRoutePathFromPredecessors", payload["keys"])
         self.assertTrue(payload["startNode"]["isReachableFromEntry"])
+        self.assertEqual(payload["startNode"]["entryPathLabel"], "Start")
         self.assertTrue(payload["orphanNode"]["isOrphan"])
         self.assertTrue(payload["orphanNode"]["isUnreachable"])
         self.assertFalse(payload["hiddenChainNode"]["isOrphan"])
         self.assertTrue(payload["hiddenChainNode"]["isUnreachable"])
         self.assertIsNone(payload["hiddenChainNode"]["routeDepth"])
+        self.assertEqual(payload["hiddenChainNode"]["entryPathLabel"], "")
         self.assertTrue(payload["endNode"]["isEnding"])
         self.assertEqual(payload["endNode"]["routeDepth"], 1)
+        self.assertEqual(payload["endNode"]["entryPathLabel"], "Start -> End")
+        self.assertEqual(payload["endNode"]["entryPathRouteLabels"], ["选项：Go end"])
+        self.assertEqual(payload["endingPaths"][0]["pathLabel"], "Start -> End")
+        self.assertEqual(payload["endingPaths"][0]["pathRouteLabels"], ["选项：Go end"])
+        self.assertEqual(payload["endingPaths"][-1]["sceneName"], "Hidden Chain")
+        self.assertFalse(payload["endingPaths"][-1]["isReachable"])
         self.assertEqual(payload["startNode"]["missingVoiceCount"], 1)
         self.assertEqual(payload["startNode"]["errorCount"], 1)
         self.assertEqual(payload["endNode"]["warningCount"], 1)

@@ -11998,6 +11998,22 @@ function renderRouteSceneCard(node) {
   const productionNotes = buildRouteSceneProductionNotes(node);
   const planningBadges = renderScenePlanningBadges(node);
   const quickButtons = renderScenePlanningQuickButtons(node);
+  const entryPathLabel = node.isEntry ? "项目入口" : node.entryPathLabel;
+  const entryPathMarkup = node.isUnreachable
+    ? `
+      <div class="route-scene-path is-warning">
+        <strong>入口路径</strong>
+        <span>从项目入口暂时走不到这里，建议检查上游场景是否也未接通。</span>
+      </div>
+    `
+    : entryPathLabel
+      ? `
+        <div class="route-scene-path">
+          <strong>${node.isEntry ? "入口路径" : "最短入口路径"}</strong>
+          <span>${escapeHtml(truncateText(entryPathLabel, 96))}</span>
+        </div>
+      `
+      : "";
 
   if (node.isEntry) {
     badges.push('<span class="issue-tag good-text">入口</span>');
@@ -12089,6 +12105,7 @@ function renderRouteSceneCard(node) {
       </div>
       ${quickButtons}
       ${node.notes ? `<div class="route-scene-note">${escapeHtml(truncateText(node.notes, 84))}</div>` : ""}
+      ${entryPathMarkup}
       ${routeListMarkup}
       <div class="route-scene-actions">
         <button type="button" class="toolbar-button toolbar-button-primary" data-action="open-scene-from-map" data-scene-id="${node.id}">
@@ -27995,31 +28012,43 @@ function renderCharacterArchiveOverviewPanel() {
 }
 
 function renderEndingCollectionOverviewPanel(routeOverview = buildSceneRouteOverview()) {
-  const endingNodes = routeOverview.nodes.filter((node) => node.isEnding);
-  const namedEndingPreview = endingNodes
+  const endingPaths = routeOverview.endingPaths ?? [];
+  const reachableEndingPaths = endingPaths.filter((path) => path.isReachable);
+  const unreachableEndingPaths = endingPaths.filter((path) => !path.isReachable);
+  const endingPreviewSource = reachableEndingPaths.length > 0 ? reachableEndingPaths : endingPaths;
+  const namedEndingPreview = endingPreviewSource
     .slice(0, 5)
-    .map((node) => `${node.chapterName} · ${node.name}`)
+    .map((path) => `${path.chapterName} · ${path.sceneName}`)
     .join(" / ");
+  const firstEndingPathLabel = reachableEndingPaths[0]?.pathLabel ?? "";
+  const endingMetaText =
+    endingPaths.length > 0
+      ? reachableEndingPaths.length > 0
+        ? `当前可打到的结局：${namedEndingPreview}${
+            reachableEndingPaths.length > 5 ? ` 等 ${reachableEndingPaths.length} 个` : ""
+          }${firstEndingPathLabel ? `。第一条路径：${firstEndingPathLabel}` : ""}`
+        : `当前有 ${endingPaths.length} 个收束场景，但都还没有从项目入口接通。`
+      : "现在还没有被识别成“收束场景”的内容，所以标题页不会出现结局回收入口。";
 
   return `
     <article class="detail-card">
       <strong>结局回收馆 / 通关记录</strong>
-      <p class="helper-text">导出后的标题页会把“没有继续跳往别处的收束场景”识别为可回收结局。玩家真正打到这条路线收尾后，该结局会在本机回收馆中点亮，并可从标题页直接回放。</p>
+      <p class="helper-text">导出后的标题页会把“从项目入口能实际打到的收束场景”识别为可回收结局。玩家真正打到这条路线收尾后，该结局会在本机回收馆中点亮，并可从标题页直接回放。</p>
       <div class="preview-sprint-metrics">
         ${renderRouteMetricCard(
           "可回收结局",
-          endingNodes.length > 0 ? `${endingNodes.length} 个` : "暂时没有",
-          endingNodes.length > 0 ? "这些收束场景会自动成为标题页的结局回收条目" : "至少先做一个不再跳走的收束场景"
+          reachableEndingPaths.length > 0 ? `${reachableEndingPaths.length} 个` : "暂时没有",
+          reachableEndingPaths.length > 0 ? "这些结局从项目入口可以实际打到" : "至少先做一个可从入口走到的收束场景"
         )}
         ${renderRouteMetricCard(
-          "入口规则",
-          endingNodes.length > 0 ? "标题页自动显示" : "暂不显示",
-          endingNodes.length > 0 ? "只要项目里存在可回收结局，标题页就会出现“结局回收”按钮" : "当前没有收束场景，所以标题页不会出现结局回收按钮"
+          "未接通结局",
+          unreachableEndingPaths.length > 0 ? `${unreachableEndingPaths.length} 个` : "没有",
+          unreachableEndingPaths.length > 0 ? "这些收束场景暂时从入口走不到，建议先补路线" : "当前结局候选都能从入口抵达"
         )}
         ${renderRouteMetricCard(
-          "回放方式",
-          "从结局场景开头重放",
-          "标题页回放不会重跑整条路线，而是直接从那个结局场景开头开始"
+          "示例路线",
+          firstEndingPathLabel ? "已识别" : "待接通",
+          firstEndingPathLabel ? truncateText(firstEndingPathLabel, 44) : "接通入口后会显示第一条结局路径"
         )}
         ${renderRouteMetricCard(
           "通关记录",
@@ -28038,13 +28067,7 @@ function renderEndingCollectionOverviewPanel(routeOverview = buildSceneRouteOver
           导一版试玩包确认
         </button>
       </div>
-      <div class="detail-meta">${
-        endingNodes.length > 0
-          ? `当前会被识别成结局的场景：${escapeHtml(namedEndingPreview)}${
-              endingNodes.length > 5 ? ` 等 ${endingNodes.length} 个` : ""
-            }`
-          : "现在还没有被识别成“收束场景”的内容，所以标题页不会出现结局回收入口。"
-      }</div>
+      <div class="detail-meta">${escapeHtml(endingMetaText)}</div>
     </article>
   `;
 }
@@ -28385,12 +28408,21 @@ function buildReleaseControlReportPayload() {
       entrySceneName: routeOverview.metrics.entrySceneName,
       branchingScenes: routeOverview.metrics.branchingScenes,
       endingScenes: routeOverview.metrics.endingScenes,
+      reachableEndingScenes: routeOverview.metrics.reachableEndingScenes,
+      unreachableEndingScenes: routeOverview.metrics.unreachableEndingScenes,
       orphanScenes: routeOverview.metrics.orphanScenes,
       reachableScenes: routeOverview.metrics.reachableScenes,
       unreachableScenes: routeOverview.metrics.unreachableScenes,
       maxRouteDepth: routeOverview.metrics.maxRouteDepth,
       brokenRoutes: routeOverview.metrics.brokenRoutes,
       totalScenes: routeOverview.nodes.length,
+      endingPaths: (routeOverview.endingPaths ?? []).map((path) => ({
+        sceneName: path.sceneName,
+        chapterName: path.chapterName,
+        isReachable: path.isReachable,
+        routeDepth: path.routeDepth,
+        pathLabel: path.pathLabel,
+      })),
     },
     projectMilestones: {
       ...serializeProjectMilestonePlan(projectMilestonePlan),
@@ -28622,6 +28654,7 @@ function buildInspectionReportContent() {
     `- 入口场景：${routeOverview.metrics.entrySceneName}`,
     `- 分支场景：${routeOverview.metrics.branchingScenes} 个`,
     `- 收束场景：${routeOverview.metrics.endingScenes} 个`,
+    `- 可打到结局：${routeOverview.metrics.reachableEndingScenes}/${routeOverview.metrics.endingScenes} 个`,
     `- 孤立场景：${routeOverview.metrics.orphanScenes} 个`,
     `- 可达场景：${routeOverview.metrics.reachableScenes}/${routeOverview.nodes.length} 个`,
     `- 不可达场景：${routeOverview.metrics.unreachableScenes} 个`,
@@ -28988,6 +29021,8 @@ function buildReleaseControlReportContent() {
         ["闲置素材", `${getUnusedAssets().length} 个`],
         ["入口场景", routeOverview.metrics.entrySceneName],
         ["分支 / 收束 / 孤立场景", `${routeOverview.metrics.branchingScenes} / ${routeOverview.metrics.endingScenes} / ${routeOverview.metrics.orphanScenes}`],
+        ["可打到结局", `${routeOverview.metrics.reachableEndingScenes} / ${routeOverview.metrics.endingScenes}`],
+        ["第一条结局路径", routeOverview.endingPaths?.find((path) => path.isReachable)?.pathLabel ?? "暂未接通"],
         ["可达 / 不可达 / 最长深度", `${routeOverview.metrics.reachableScenes} / ${routeOverview.metrics.unreachableScenes} / ${routeOverview.metrics.maxRouteDepth} 步`],
         ["坏链数量", `${routeOverview.metrics.brokenRoutes} 条`],
         ["成品目标路线", `${projectMilestonePlan.nextMilestone?.title ?? "继续推进当前项目"}（${projectMilestonePlan.overallScore ?? 0}%）`],
