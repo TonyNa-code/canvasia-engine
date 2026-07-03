@@ -3957,6 +3957,27 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("sceneProductionBoardTools.buildSceneProductionBoard", source)
         self.assertIn("sceneProductionBoardTools.getSceneProductionBoardStatusDigest", source)
 
+    def test_voice_production_sheet_export_actions_are_wired(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        click_handler = _extract_function_source(source, "handleClick")
+        markdown_block_start = click_handler.index('action === "export-voice-production-markdown"')
+        csv_block_start = click_handler.index('action === "export-voice-production-csv"')
+        csv_block_end = click_handler.index('action === "export-choice-consequence-markdown"', csv_block_start)
+        markdown_block = click_handler[markdown_block_start:csv_block_start]
+        csv_block = click_handler[csv_block_start:csv_block_end]
+
+        self.assertIn("const voiceProductionSheetTools = window.CanvasiaEditorVoiceProductionSheet", source)
+        self.assertIn('data-action="export-voice-production-markdown"', source)
+        self.assertIn('data-action="export-voice-production-csv"', source)
+        self.assertIn("exportVoiceProductionMarkdown();", markdown_block)
+        self.assertIn("exportVoiceProductionCsv();", csv_block)
+        self.assertIn("function buildVoiceProductionSheet()", source)
+        self.assertIn("function renderVoiceProductionPanel()", source)
+        self.assertIn("function exportVoiceProductionMarkdown()", source)
+        self.assertIn("function exportVoiceProductionCsv()", source)
+        self.assertIn("voiceProductionSheetTools.buildVoiceProductionSheet", source)
+        self.assertIn("voiceProductionSheetTools.getVoiceProductionStatusDigest", source)
+
     def test_choice_consequence_sheet_export_actions_are_wired(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
         click_handler = _extract_function_source(source, "handleClick")

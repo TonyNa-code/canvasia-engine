@@ -52,6 +52,7 @@ const scriptImporterTools = window.CanvasiaEditorScriptImporter;
 const routeAnalyzerTools = window.CanvasiaEditorRouteAnalyzer;
 const routeTestingReportTools = window.CanvasiaEditorRouteTestingReport;
 const sceneProductionBoardTools = window.CanvasiaEditorSceneProductionBoard;
+const voiceProductionSheetTools = window.CanvasiaEditorVoiceProductionSheet;
 const previewRegressionTools = window.CanvasiaEditorPreviewRegression;
 const playtestHandoffReportTools = window.CanvasiaEditorPlaytestHandoffReport;
 const choiceConsequenceSheetTools = window.CanvasiaEditorChoiceConsequenceSheet;
@@ -3834,6 +3835,16 @@ async function handleClick(event) {
 
   if (action === "export-scene-production-board-csv") {
     exportSceneProductionBoardCsv();
+    return;
+  }
+
+  if (action === "export-voice-production-markdown") {
+    exportVoiceProductionMarkdown();
+    return;
+  }
+
+  if (action === "export-voice-production-csv") {
+    exportVoiceProductionCsv();
     return;
   }
 
@@ -28473,6 +28484,17 @@ function buildSceneProductionBoardFileName(extension = "md") {
   return `${title}_scene_production_board_${dateStamp}.${extension}`;
 }
 
+function buildVoiceProductionFileName(extension = "md") {
+  const date = new Date();
+  const dateStamp = [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("");
+  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
+  return `${title}_voice_production_sheet_${dateStamp}.${extension}`;
+}
+
 function buildChoiceConsequenceFileName(extension = "md") {
   const date = new Date();
   const dateStamp = [
@@ -29758,6 +29780,30 @@ function exportSceneProductionBoardCsv() {
   downloadTextFile(fileName, content, "text/csv;charset=utf-8");
   setSaveStatus(`已导出场景生产 CSV：${fileName}`);
   showToast(`场景生产 CSV 已导出：${fileName}`);
+}
+
+function buildVoiceProductionSheet() {
+  return voiceProductionSheetTools.buildVoiceProductionSheet(state.data ?? {});
+}
+
+function exportVoiceProductionMarkdown() {
+  const fileName = buildVoiceProductionFileName("md");
+  const sheet = buildVoiceProductionSheet();
+  const content = voiceProductionSheetTools.buildVoiceProductionMarkdown(sheet, {
+    projectTitle: state.data?.project?.title || "Canvasia Project",
+    generatedAt: formatDate(new Date().toISOString()),
+  });
+  downloadTextFile(fileName, content, "text/markdown;charset=utf-8");
+  setSaveStatus(`已导出语音制作清单：${fileName}`);
+  showToast(`语音制作清单已导出：${fileName}`);
+}
+
+function exportVoiceProductionCsv() {
+  const fileName = buildVoiceProductionFileName("csv");
+  const content = voiceProductionSheetTools.buildVoiceProductionCsv(buildVoiceProductionSheet());
+  downloadTextFile(fileName, content, "text/csv;charset=utf-8");
+  setSaveStatus(`已导出语音制作 CSV：${fileName}`);
+  showToast(`语音制作 CSV 已导出：${fileName}`);
 }
 
 function buildChoiceConsequenceSheet() {
@@ -31297,6 +31343,19 @@ function getSceneProductionBoardToneClass(status) {
   return "";
 }
 
+function getVoiceProductionToneClass(status) {
+  if (status === "blocked") {
+    return "danger-text";
+  }
+  if (status === "warn") {
+    return "warn-text";
+  }
+  if (status === "ready") {
+    return "good-text";
+  }
+  return "";
+}
+
 function renderSceneProductionBoardPanel() {
   const board = buildSceneProductionBoard();
   const digest = sceneProductionBoardTools.getSceneProductionBoardStatusDigest(board);
@@ -31352,6 +31411,83 @@ function renderSceneProductionBoardPanel() {
             </div>
           `
           : renderEmpty("当前项目还没有场景。可以先在项目中心创建 Demo 或空白项目，再进入剧情页添加第一场。")
+      }
+    </article>
+  `;
+}
+
+function renderVoiceProductionPanel() {
+  const sheet = buildVoiceProductionSheet();
+  const digest = voiceProductionSheetTools.getVoiceProductionStatusDigest(sheet);
+  const summary = sheet.summary ?? {};
+  const topIssues = (sheet.issues ?? []).slice(0, 4);
+  const speakerPreview = (sheet.speakers ?? []).slice(0, 4);
+
+  return `
+    <article class="detail-card preview-sprint-panel">
+      <div class="panel-heading">
+        <h2>语音制作清单</h2>
+        <span class="badge badge-soft ${getVoiceProductionToneClass(digest.status)}">${escapeHtml(digest.title)}</span>
+      </div>
+      <p class="helper-text">${escapeHtml(digest.detail)} 它会按角色和台词检查待配音、缺语音条目、缺真实文件、说话人异常和长句，适合给声优、校对和发布前收尾使用。</p>
+      <div class="preview-sprint-metrics">
+        ${renderRouteMetricCard("台词 / 已配", `${summary.lineCount ?? 0} / ${summary.readyLineCount ?? 0}`, "所有需要配音的角色台词")}
+        ${renderRouteMetricCard("待配 / 缺条目", `${summary.missingVoiceCount ?? 0} / ${summary.missingAssetCount ?? 0}`, "还没绑定或绑定坏了的语音")}
+        ${renderRouteMetricCard("缺文件 / 类型错", `${summary.missingFileCount ?? 0} / ${summary.wrongTypeCount ?? 0}`, "导出后最容易无声的阻塞项")}
+        ${renderRouteMetricCard("角色 / 长句", `${summary.speakerCount ?? 0} / ${summary.longLineCount ?? 0}`, "分配声优和拆句参考")}
+      </div>
+      <div class="detail-actions">
+        <button class="toolbar-button toolbar-button-primary" data-action="export-voice-production-markdown">
+          导出语音制作清单
+        </button>
+        <button class="toolbar-button" data-action="export-voice-production-csv">
+          导出语音 CSV
+        </button>
+        <button class="toolbar-button" data-action="switch-screen" data-screen="script">
+          去台词台本处理
+        </button>
+      </div>
+      ${
+        topIssues.length > 0
+          ? `
+            <div class="preview-sprint-grid">
+              ${topIssues
+                .map(
+                  (issue) => `
+                    <article class="preview-sprint-card is-${issue.severity === "blocker" ? "danger" : issue.severity === "warn" ? "warn" : "soft"}">
+                      <div class="preview-sprint-head">
+                        <strong>${escapeHtml(issue.title)}</strong>
+                        <span class="issue-tag ${issue.severity === "blocker" ? "danger-text" : issue.severity === "warn" ? "warn-text" : ""}">
+                          ${escapeHtml(issue.severity === "blocker" ? "先修" : issue.severity === "warn" ? "复查" : "润色")}
+                        </span>
+                      </div>
+                      <p>${escapeHtml([issue.chapterName, issue.sceneName, issue.speakerName].filter(Boolean).join(" · "))}</p>
+                      <div class="helper-text">${escapeHtml(issue.detail)}</div>
+                    </article>
+                  `
+                )
+                .join("")}
+            </div>
+          `
+          : speakerPreview.length > 0
+            ? `
+              <div class="list-stack compact-stack">
+                ${speakerPreview
+                  .map(
+                    (speaker) => `
+                      <div class="route-testing-item">
+                        <div>
+                          <b>${escapeHtml(speaker.speakerName)}</b>
+                          <span>${escapeHtml(`台词 ${speaker.totalLines} · 已就绪 ${speaker.readyLines} · 待处理 ${speaker.missingLines}`)}</span>
+                        </div>
+                        <span>${escapeHtml(`${speaker.readyPercent}%`)}</span>
+                      </div>
+                    `
+                  )
+                  .join("")}
+              </div>
+            `
+            : renderEmpty("当前项目还没有角色台词。先在剧情页添加台词，再来这里生成配音制作清单。")
       }
     </article>
   `;
@@ -32038,6 +32174,7 @@ function renderInspectionOverviewPanel(routeOverview) {
       ${renderCompactProjectMilestonePanel(routeOverview)}
       ${renderProjectDoctorPanel(routeOverview, issueItems)}
       ${renderSceneProductionBoardPanel()}
+      ${renderVoiceProductionPanel()}
       ${renderChoiceConsequencePanel()}
       ${renderVariableInfluencePanel()}
       ${renderAssetDependencyPanel()}
