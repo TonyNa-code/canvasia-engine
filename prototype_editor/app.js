@@ -30079,8 +30079,8 @@ function exportRuntimeCapabilityMarkdown() {
     generatedAt: formatDate(new Date().toISOString()),
   });
   downloadTextFile(fileName, content, "text/markdown;charset=utf-8");
-  setSaveStatus(`已导出 Runtime 覆盖矩阵：${fileName}`);
-  showToast(`Runtime 覆盖矩阵已导出：${fileName}`);
+  setSaveStatus(`已导出 Runtime 矩阵与验收清单：${fileName}`);
+  showToast(`Runtime 矩阵与验收清单已导出：${fileName}`);
 }
 
 function exportRuntimeCapabilityCsv() {
@@ -31589,8 +31589,10 @@ function renderRuntimeCapabilityMatrixPanel() {
   const matrix = buildRuntimeCapabilityMatrix();
   const digest = runtimeCapabilityMatrixTools.getRuntimeCapabilityStatusDigest(matrix);
   const summary = matrix.summary ?? {};
+  const acceptanceSummary = matrix.acceptance?.summary ?? {};
   const issueRows = (matrix.issues ?? []).slice(0, 4);
   const usedRows = (matrix.usedRows ?? []).slice(0, 6);
+  const acceptanceItems = Array.isArray(matrix.acceptance?.items) ? matrix.acceptance.items.slice(0, 4) : [];
 
   return `
     <article class="detail-card preview-sprint-panel">
@@ -31603,11 +31605,11 @@ function renderRuntimeCapabilityMatrixPanel() {
         ${renderRouteMetricCard("剧情卡片", `${summary.totalBlockCount ?? 0} 张`, "当前项目实际扫描")}
         ${renderRouteMetricCard("已用类型 / 完整", `${summary.usedTypeCount ?? 0} / ${summary.fullUsedTypeCount ?? 0}`, "卡片类型覆盖情况")}
         ${renderRouteMetricCard("需验收 / 未知", `${summary.partialUsedTypeCount ?? 0} / ${summary.unknownUsedTypeCount ?? 0}`, "发布前重点确认")}
-        ${renderRouteMetricCard("Web / 原生风险", `${summary.webPartialCount ?? 0} / ${summary.nativePartialCount ?? 0}`, "不同 Runtime 覆盖差异")}
+        ${renderRouteMetricCard("Runtime 验收", `${acceptanceSummary.itemCount ?? 0} 项`, `Web ${acceptanceSummary.webItemCount ?? 0} · 原生 ${acceptanceSummary.nativeItemCount ?? 0}`)}
       </div>
       <div class="detail-actions">
         <button class="toolbar-button toolbar-button-primary" data-action="export-runtime-capability-markdown">
-          导出 Runtime 覆盖矩阵
+          导出 Runtime 矩阵与验收清单
         </button>
         <button class="toolbar-button" data-action="export-runtime-capability-csv">
           导出 Runtime CSV
@@ -31657,6 +31659,34 @@ function renderRuntimeCapabilityMatrixPanel() {
               </div>
             `
             : renderEmpty("当前项目还没有剧情卡片。写完第一场后，这里会检查导出 Runtime 的覆盖状态。")
+      }
+      ${
+        acceptanceItems.length > 0
+          ? `
+            <div class="section-subhead">
+              <div>
+                <h3>Runtime 验收清单</h3>
+                <p>把矩阵风险翻译成真实导出包需要点测的步骤。</p>
+              </div>
+              <span class="issue-tag">${escapeHtml(`先修 ${acceptanceSummary.blockerCount ?? 0} · 重点 ${acceptanceSummary.warningCount ?? 0}`)}</span>
+            </div>
+            <div class="list-stack compact-stack">
+              ${acceptanceItems
+                .map(
+                  (item) => `
+                    <div class="route-testing-item">
+                      <div>
+                        <b>${escapeHtml(item.title)}</b>
+                        <span>${escapeHtml(`${item.targetLabel} · ${item.detail}`)}</span>
+                      </div>
+                      <span>${escapeHtml(item.severityLabel)}</span>
+                    </div>
+                  `
+                )
+                .join("")}
+            </div>
+          `
+          : ""
       }
     </article>
   `;

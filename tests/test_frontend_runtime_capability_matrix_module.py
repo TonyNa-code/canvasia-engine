@@ -81,6 +81,7 @@ class FrontendRuntimeCapabilityMatrixModuleTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 0, completed.stderr)
         payload = json.loads(completed.stdout)
         self.assertIn("buildRuntimeCapabilityMatrix", payload["keys"])
+        self.assertIn("buildRuntimeAcceptanceChecklist", payload["keys"])
         self.assertIn("buildRuntimeCapabilityMarkdown", payload["keys"])
         self.assertIn("buildRuntimeCapabilityCsv", payload["keys"])
         summary = payload["matrix"]["summary"]
@@ -91,11 +92,21 @@ class FrontendRuntimeCapabilityMatrixModuleTests(unittest.TestCase):
         self.assertEqual(summary["unknownUsedTypeCount"], 1)
         self.assertEqual(summary["scene3dBackgroundCount"], 1)
         self.assertEqual(summary["issueCount"], 3)
+        acceptance_summary = payload["matrix"]["acceptance"]["summary"]
+        self.assertGreaterEqual(acceptance_summary["itemCount"], 7)
+        self.assertGreaterEqual(acceptance_summary["blockerCount"], 1)
+        self.assertGreaterEqual(acceptance_summary["nativeItemCount"], 2)
+        acceptance_titles = [item["title"] for item in payload["matrix"]["acceptance"]["items"]]
+        self.assertTrue(any("视频播放" in title for title in acceptance_titles))
+        self.assertTrue(any("3D 场景背景" in title for title in acceptance_titles))
+        self.assertTrue(any("live2d_pose" in title for title in acceptance_titles))
         self.assertEqual(payload["digest"]["status"], "blocked")
         issue_titles = [issue["title"] for issue in payload["matrix"]["issues"]]
         self.assertTrue(any("live2d_pose" in title for title in issue_titles))
         self.assertTrue(any("video_play" in title for title in issue_titles))
         self.assertIn("# Runtime Demo Runtime 覆盖矩阵", payload["markdown"])
+        self.assertIn("## Runtime 验收清单", payload["markdown"])
+        self.assertIn("原生 Runtime", payload["markdown"])
         self.assertIn("3D 场景背景", payload["markdown"])
         self.assertIn('"live2d_pose"', payload["csv"])
         self.assertEqual(payload["labels"], ["完整支持", "需要验收", "未知卡片"])

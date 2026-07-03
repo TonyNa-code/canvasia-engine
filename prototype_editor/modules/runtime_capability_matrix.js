@@ -43,6 +43,28 @@
     unknown: 4,
   });
 
+  const ACCEPTANCE_TARGET_LABELS = Object.freeze({
+    web: "Web Runtime",
+    native: "原生 Runtime",
+    cross: "Web / 原生",
+  });
+
+  const ACCEPTANCE_SEVERITY_LABELS = Object.freeze({
+    blocker: "先修",
+    warn: "重点验收",
+    check: "点测",
+  });
+
+  const VISUAL_EFFECT_TYPES = new Set([
+    "screen_shake",
+    "screen_flash",
+    "screen_fade",
+    "camera_zoom",
+    "camera_pan",
+    "screen_filter",
+    "depth_blur",
+  ]);
+
   function toArray(value) {
     return Array.isArray(value) ? value : [];
   }
@@ -179,6 +201,10 @@
     return STATUS_LABELS[status] ?? cleanText(status, "未知");
   }
 
+  function getRuntimeAcceptanceTargetLabel(target = "") {
+    return ACCEPTANCE_TARGET_LABELS[target] ?? cleanText(target, "全 Runtime");
+  }
+
   function getWorstStatus(...statuses) {
     return statuses.reduce((worst, status) => {
       const safeStatus = status || "unknown";
@@ -188,6 +214,242 @@
 
   function getCapabilityMap() {
     return new Map(CAPABILITY_ROWS.map((row) => [row.type, row]));
+  }
+
+  function getRowSceneLabel(row = {}) {
+    return toArray(row.usedSceneNames).join(" / ") || "当前项目";
+  }
+
+  function hasUsedType(typeSet, type) {
+    return Boolean(typeSet.get(type)?.usedCount);
+  }
+
+  function buildRuntimeAcceptanceChecklist(rows = [], summary = {}) {
+    const usedRows = toArray(rows).filter((row) => (row.usedCount ?? 0) > 0);
+    const usedTypeMap = new Map(usedRows.map((row) => [row.type, row]));
+    const items = [];
+    const seenIds = new Set();
+
+    const addItem = (item) => {
+      const id = cleanText(item.id);
+      if (!id || seenIds.has(id)) {
+        return;
+      }
+      seenIds.add(id);
+      items.push({
+        id,
+        target: item.target ?? "cross",
+        targetLabel: getRuntimeAcceptanceTargetLabel(item.target ?? "cross"),
+        severity: item.severity ?? "check",
+        severityLabel: ACCEPTANCE_SEVERITY_LABELS[item.severity ?? "check"] ?? "点测",
+        title: cleanText(item.title, "Runtime 验收项"),
+        detail: cleanText(item.detail, "导出后按目标平台实际跑一遍。"),
+        relatedBlockTypes: toArray(item.relatedBlockTypes).map((type) => cleanText(type)).filter(Boolean),
+        source: cleanText(item.source, "Runtime 覆盖矩阵"),
+        done: false,
+      });
+    };
+
+    if (!usedRows.length) {
+      return {
+        items: [],
+        summary: {
+          itemCount: 0,
+          blockerCount: 0,
+          warningCount: 0,
+          checkCount: 0,
+          webItemCount: 0,
+          nativeItemCount: 0,
+          crossRuntimeItemCount: 0,
+        },
+      };
+    }
+
+    addItem({
+      id: "web-runtime-first-run",
+      target: "web",
+      severity: "check",
+      title: "Web 试玩包从入口跑到第一处分支",
+      detail: "导出 Web 试玩包后，确认开场背景、第一条台词、菜单、存档和至少一个选项都能正常响应。",
+      relatedBlockTypes: usedRows.slice(0, 8).map((row) => row.type),
+      source: "基础播放链",
+    });
+    addItem({
+      id: "native-runtime-first-run",
+      target: "native",
+      severity: (summary.nativePartialCount ?? 0) > 0 ? "warn" : "check",
+      title: "原生 Runtime 在目标平台启动并完成一轮读档",
+      detail: "至少在准备发布的平台跑一次原生包，确认启动、继续游戏、正式存档、读档、系统菜单、历史文本和退出流程。",
+      relatedBlockTypes: usedRows.slice(0, 8).map((row) => row.type),
+      source: "基础播放链",
+    });
+
+    usedRows.forEach((row) => {
+      if (row.overallStatus === "unknown" || row.overallStatus === "unsupported") {
+        addItem({
+          id: `runtime-support-${row.type}`,
+          target: "cross",
+          severity: "blocker",
+          title: `${row.type} 需要先补 Runtime 支持声明`,
+          detail: `${row.type} 已在 ${getRowSceneLabel(row)} 使用，但还没有明确 Web / 原生播放策略。发布前应补矩阵、播放器处理或移除该卡片。`,
+          relatedBlockTypes: [row.type],
+          source: "未登记卡片",
+        });
+      } else if (row.overallStatus === "planned") {
+        addItem({
+          id: `runtime-planned-${row.type}`,
+          target: "cross",
+          severity: "blocker",
+          title: `${row.type} 仍处于规划中`,
+          detail: `${row.type} 已进入项目内容，但 Runtime 还没有正式可用路径。建议先改用已支持卡片或补完整播放器能力。`,
+          relatedBlockTypes: [row.type],
+          source: "规划中卡片",
+        });
+      }
+
+      if (row.webStatus !== "full" && row.webStatus !== "unknown") {
+        addItem({
+          id: `web-runtime-${row.type}`,
+          target: "web",
+          severity: "warn",
+          title: `Web Runtime 重点验收 ${row.type}`,
+          detail: `${row.type} 在 Web Runtime 不是完整覆盖；导出试玩包后需要确认 ${getRowSceneLabel(row)} 的表现和回退逻辑。`,
+          relatedBlockTypes: [row.type],
+          source: "Web 覆盖差异",
+        });
+      }
+      if (row.nativeStatus !== "full" && row.nativeStatus !== "unknown") {
+        addItem({
+          id: `native-runtime-${row.type}`,
+          target: "native",
+          severity: "warn",
+          title: `原生 Runtime 重点验收 ${row.type}`,
+          detail: `${row.type} 在原生 Runtime 依赖平台兜底或特殊环境；需要在目标系统确认 ${getRowSceneLabel(row)} 能完整播放。`,
+          relatedBlockTypes: [row.type],
+          source: "原生覆盖差异",
+        });
+      }
+    });
+
+    if (hasUsedType(usedTypeMap, "video_play")) {
+      addItem({
+        id: "runtime-video-sync",
+        target: "native",
+        severity: "warn",
+        title: "视频播放要验音画同步、跳过和结束回到剧情",
+        detail: "带 OP / ED / 插入视频的项目，要检查视频开始、播放中跳过、播放结束、失败兜底，以及回到下一张剧情卡片是否稳定。",
+        relatedBlockTypes: ["video_play"],
+        source: "视频链路",
+      });
+    }
+
+    if (["music_play", "music_stop", "sfx_play"].some((type) => hasUsedType(usedTypeMap, type))) {
+      addItem({
+        id: "runtime-audio-cues",
+        target: "cross",
+        severity: "check",
+        title: "音频调度要验淡入淡出、循环、音量和范围",
+        detail: "确认 BGM 不只是机械连播，而是能按指定剧情范围切换；音效不抢占 BGM，停止和淡出不会残留。",
+        relatedBlockTypes: ["music_play", "music_stop", "sfx_play"],
+        source: "音频链路",
+      });
+    }
+
+    if (["character_show", "character_hide"].some((type) => hasUsedType(usedTypeMap, type))) {
+      addItem({
+        id: "runtime-character-stage",
+        target: "cross",
+        severity: "check",
+        title: "立绘登退场要验位置、大小、透明度和转场",
+        detail: "确认角色自定义位置、缩放、淡入淡出、隐藏和多角色同屏不会被不同 Runtime 解释成错位或残影。",
+        relatedBlockTypes: ["character_show", "character_hide"],
+        source: "角色舞台",
+      });
+    }
+
+    if (["dialogue", "narration"].some((type) => hasUsedType(usedTypeMap, type))) {
+      addItem({
+        id: "runtime-textbox-reading",
+        target: "cross",
+        severity: "check",
+        title: "文字体验要验打字机、文本框、历史和语音回听",
+        detail: "确认长文本不溢出，打字机速度、点击快进、历史文本、自动播放和项目级文本框皮肤在导出包里一致。",
+        relatedBlockTypes: ["dialogue", "narration"],
+        source: "文本链路",
+      });
+    }
+
+    if (["choice", "condition", "jump", "variable_set", "variable_add"].some((type) => hasUsedType(usedTypeMap, type))) {
+      addItem({
+        id: "runtime-branch-variables",
+        target: "cross",
+        severity: "check",
+        title: "分支变量要验每条可达路线和坏链兜底",
+        detail: "至少跑一条主线、一条分支和一个返回路径，确认变量条件、否则分支、跳转目标和结局候选不会卡死。",
+        relatedBlockTypes: ["choice", "condition", "jump", "variable_set", "variable_add"],
+        source: "分支链路",
+      });
+    }
+
+    if (usedRows.some((row) => VISUAL_EFFECT_TYPES.has(row.type))) {
+      addItem({
+        id: "runtime-visual-effects-reset",
+        target: "cross",
+        severity: "check",
+        title: "镜头与滤镜演出要验播放结束后的复位",
+        detail: "震动、闪屏、淡入淡出、镜头移动、滤镜和景深要确认不会遮住 UI，也不会在下一场景残留状态。",
+        relatedBlockTypes: Array.from(VISUAL_EFFECT_TYPES),
+        source: "演出链路",
+      });
+    }
+
+    if (hasUsedType(usedTypeMap, "particle_effect")) {
+      addItem({
+        id: "runtime-particle-budget",
+        target: "cross",
+        severity: "check",
+        title: "粒子效果要验密度、图片粒子和帧率",
+        detail: "下雨、下雪、花瓣等粒子要确认密度、速度、重力、颜色和自定义贴图都能播放，并且低配设备不明显掉帧。",
+        relatedBlockTypes: ["particle_effect"],
+        source: "粒子链路",
+      });
+    }
+
+    if (hasUsedType(usedTypeMap, "credits_roll")) {
+      addItem({
+        id: "runtime-credits-ending",
+        target: "cross",
+        severity: "check",
+        title: "片尾字幕要验滚动、跳过和结束归档",
+        detail: "确认片尾演职员表滚动速度、跳过、结束后回到标题或回想馆登记都符合项目预期。",
+        relatedBlockTypes: ["credits_roll"],
+        source: "结尾链路",
+      });
+    }
+
+    if ((summary.scene3dBackgroundCount ?? 0) > 0) {
+      addItem({
+        id: "native-runtime-scene3d",
+        target: "native",
+        severity: "warn",
+        title: "3D 场景背景要验资产依赖和原生兜底",
+        detail: "检查 glTF / GLB / VRM 依赖、贴图路径、材质槽、动画通道和原生 Runtime 报告，避免导出包缺贴图或只显示空场景。",
+        relatedBlockTypes: ["background"],
+        source: "3D 资产链路",
+      });
+    }
+
+    const checklistSummary = {
+      itemCount: items.length,
+      blockerCount: items.filter((item) => item.severity === "blocker").length,
+      warningCount: items.filter((item) => item.severity === "warn").length,
+      checkCount: items.filter((item) => item.severity === "check").length,
+      webItemCount: items.filter((item) => item.target === "web").length,
+      nativeItemCount: items.filter((item) => item.target === "native").length,
+      crossRuntimeItemCount: items.filter((item) => item.target === "cross").length,
+    };
+
+    return { items, summary: checklistSummary };
   }
 
   function addUsage(usageMap, block, record, assetMap) {
@@ -302,12 +564,15 @@
       issueCount: issues.length,
     };
 
+    const acceptance = buildRuntimeAcceptanceChecklist(allRows, summary);
+
     return {
       projectTitle: cleanText(data.project?.title, "Canvasia Project"),
       rows: allRows,
       usedRows,
       issues,
       summary,
+      acceptance,
     };
   }
 
@@ -391,6 +656,14 @@
       issue.sceneNames.join(" / "),
       issue.detail,
     ]);
+    const acceptanceRows = toArray(matrix.acceptance?.items).map((item, index) => [
+      index + 1,
+      item.targetLabel,
+      item.severityLabel,
+      item.title,
+      item.relatedBlockTypes.join(" / "),
+      item.detail,
+    ]);
 
     return [
       `# ${projectTitle} Runtime 覆盖矩阵`,
@@ -428,6 +701,11 @@
       "",
       buildMarkdownTable(["序号", "级别", "卡片类型", "使用次数", "场景", "说明"], issueRows) || "当前没有 Runtime 覆盖风险。",
       "",
+      "## Runtime 验收清单",
+      "",
+      buildMarkdownTable(["序号", "目标", "级别", "验收项", "相关卡片", "说明"], acceptanceRows) ||
+        "当前项目还没有可生成验收清单的剧情卡片。",
+      "",
     ].join("\n");
   }
 
@@ -448,9 +726,11 @@
   global.CanvasiaEditorRuntimeCapabilityMatrix = Object.freeze({
     CAPABILITY_ROWS,
     buildRuntimeCapabilityMatrix,
+    buildRuntimeAcceptanceChecklist,
     getRuntimeCapabilityStatusDigest,
     buildRuntimeCapabilityMarkdown,
     buildRuntimeCapabilityCsv,
     getRuntimeStatusLabel,
+    getRuntimeAcceptanceTargetLabel,
   });
 })(typeof window !== "undefined" ? window : globalThis);

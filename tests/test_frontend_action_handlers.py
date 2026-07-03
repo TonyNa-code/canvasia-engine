@@ -4134,6 +4134,8 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("function exportRuntimeCapabilityCsv()", source)
         self.assertIn("runtimeCapabilityMatrixTools.buildRuntimeCapabilityMatrix", source)
         self.assertIn("runtimeCapabilityMatrixTools.getRuntimeCapabilityStatusDigest", source)
+        self.assertIn("matrix.acceptance?.summary", source)
+        self.assertIn("Runtime 验收清单", source)
 
     def test_production_backlog_export_actions_are_wired(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
