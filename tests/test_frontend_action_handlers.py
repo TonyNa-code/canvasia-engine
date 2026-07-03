@@ -3956,21 +3956,36 @@ class FrontendActionHandlerTests(unittest.TestCase):
         click_handler = _extract_function_source(source, "handleClick")
         markdown_block_start = click_handler.index('action === "export-localization-coverage-markdown"')
         csv_block_start = click_handler.index('action === "export-localization-coverage-csv"')
-        csv_block_end = click_handler.index('action === "export-release-control-report"', csv_block_start)
+        import_block_start = click_handler.index('action === "import-localization-coverage-csv"')
+        csv_block_end = import_block_start
+        import_block_end = click_handler.index('action === "export-release-control-report"', import_block_start)
         markdown_block = click_handler[markdown_block_start:csv_block_start]
         csv_block = click_handler[csv_block_start:csv_block_end]
+        import_block = click_handler[import_block_start:import_block_end]
 
         self.assertIn("const localizationCoverageTools = window.CanvasiaEditorLocalizationCoverage", source)
         self.assertIn('data-action="export-localization-coverage-markdown"', source)
         self.assertIn('data-action="export-localization-coverage-csv"', source)
+        self.assertIn('data-action="import-localization-coverage-csv"', source)
+        self.assertIn('id="localizationCoverageImportInput"', INDEX_PATH.read_text(encoding="utf-8"))
         self.assertIn("exportLocalizationCoverageMarkdown();", markdown_block)
         self.assertIn("exportLocalizationCoverageCsv();", csv_block)
+        self.assertIn('document.getElementById("localizationCoverageImportInput")?.click();', import_block)
         self.assertIn("function buildLocalizationCoverage()", source)
         self.assertIn("function renderLocalizationCoveragePanel()", source)
         self.assertIn("function exportLocalizationCoverageMarkdown()", source)
         self.assertIn("function exportLocalizationCoverageCsv()", source)
+        self.assertIn("function importLocalizationCoverageCsv(file)", source)
         self.assertIn("localizationCoverageTools.buildLocalizationCoverage", source)
         self.assertIn("localizationCoverageTools.getLocalizationCoverageStatusDigest", source)
+        self.assertIn("localizationCoverageTools.buildLocalizationImportPlan", source)
+
+    def test_scene_save_payload_preserves_scene_name_translations(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        strip_scene_for_save = _extract_function_source(source, "stripSceneForSave")
+
+        self.assertIn("nameTranslations", strip_scene_for_save)
+        self.assertIn("scene.nameTranslations", strip_scene_for_save)
 
     def test_playtest_handoff_export_actions_are_wired(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")

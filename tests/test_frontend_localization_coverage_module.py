@@ -81,12 +81,19 @@ class FrontendLocalizationCoverageModuleTests(unittest.TestCase):
               generatedAt: "2026-07-03 12:00:00",
             }});
             const csv = tools.buildLocalizationCoverageCsv(coverage);
+            const importCsv = [
+              '"序号","状态","语言","语言代码","类型","目标ID","字段键","选项序号","章节","场景","位置","字段","原文","译文"',
+              '"1","缺翻译","日本語","ja-JP","block","line_1","text","","第一章","开场","第 1 张 · 蓝白女主台词","正文","今天也留下来吗？","今日も残る？"',
+              '"2","缺翻译","日本語","ja-JP","character","hero","displayName","","","","蓝白女主","角色名","蓝白女主","ヒロイン"',
+            ].join("\\n");
+            const importPlan = tools.buildLocalizationImportPlan(data, importCsv);
             process.stdout.write(JSON.stringify({{
               keys: Object.keys(tools).sort(),
               coverage,
               digest,
               markdown,
               csv,
+              importPlan,
             }}));
             """
         )
@@ -103,6 +110,7 @@ class FrontendLocalizationCoverageModuleTests(unittest.TestCase):
         self.assertIn("buildLocalizationCoverage", payload["keys"])
         self.assertIn("buildLocalizationCoverageMarkdown", payload["keys"])
         self.assertIn("buildLocalizationCoverageCsv", payload["keys"])
+        self.assertIn("buildLocalizationImportPlan", payload["keys"])
         self.assertEqual(payload["coverage"]["defaultLanguage"], "zh-CN")
         self.assertEqual(payload["coverage"]["summary"]["targetLanguageCount"], 2)
         self.assertEqual(payload["coverage"]["summary"]["sourceTextCount"], 7)
@@ -113,7 +121,11 @@ class FrontendLocalizationCoverageModuleTests(unittest.TestCase):
         self.assertIn("多语言覆盖报告", payload["markdown"])
         self.assertIn("疑似未翻译", payload["markdown"])
         self.assertIn('"语言代码"', payload["csv"])
+        self.assertIn('"目标ID"', payload["csv"])
         self.assertIn('"Will you stay today too?"', payload["csv"])
+        self.assertGreater(payload["importPlan"]["summary"]["rowCount"], 0)
+        self.assertGreaterEqual(payload["importPlan"]["summary"]["patchCount"], 1)
+        self.assertGreaterEqual(payload["importPlan"]["summary"]["skippedCount"], 1)
 
 
 if __name__ == "__main__":

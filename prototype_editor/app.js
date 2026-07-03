@@ -3850,6 +3850,11 @@ async function handleClick(event) {
     return;
   }
 
+  if (action === "import-localization-coverage-csv") {
+    document.getElementById("localizationCoverageImportInput")?.click();
+    return;
+  }
+
   if (action === "export-release-control-report") {
     state.validation = runValidation(state.data);
     updateTopbar();
@@ -5210,6 +5215,12 @@ function handleChange(event) {
 
   if (target.id === "playtestFeedbackImportInput") {
     void importPlaytestFeedbackCsv(target.files?.[0] ?? null);
+    target.value = "";
+    return;
+  }
+
+  if (target.id === "localizationCoverageImportInput") {
+    void importLocalizationCoverageCsv(target.files?.[0] ?? null);
     target.value = "";
     return;
   }
@@ -29729,6 +29740,114 @@ function exportLocalizationCoverageCsv() {
   showToast(`多语言覆盖 CSV 已导出：${fileName}`);
 }
 
+function ensureTranslationMap(target, key) {
+  const mapKey = `${key}Translations`;
+  if (!target[mapKey] || typeof target[mapKey] !== "object" || Array.isArray(target[mapKey])) {
+    target[mapKey] = {};
+  }
+  return target[mapKey];
+}
+
+function applyLocalizationPatchToScene(scene, patch) {
+  if (patch.kind === "scene") {
+    ensureTranslationMap(scene, patch.key)[patch.language] = patch.text;
+    return true;
+  }
+
+  const block = (scene.blocks ?? []).find((candidate) => candidate.id === patch.targetId);
+  if (!block) {
+    return false;
+  }
+
+  if (patch.kind === "block") {
+    ensureTranslationMap(block, patch.key)[patch.language] = patch.text;
+    return true;
+  }
+
+  if (patch.kind === "choice_option") {
+    const option = Array.isArray(block.options) ? block.options[patch.optionIndex] : null;
+    if (!option) {
+      return false;
+    }
+    ensureTranslationMap(option, patch.key)[patch.language] = patch.text;
+    return true;
+  }
+
+  return false;
+}
+
+async function importLocalizationCoverageCsv(file) {
+  if (!file) {
+    return false;
+  }
+
+  try {
+    setSaveStatus("正在读取多语言翻译 CSV...");
+    const plan = localizationCoverageTools.buildLocalizationImportPlan(state.data ?? {}, await readFileAsText(file));
+    const patches = plan.patches ?? [];
+    if (!patches.length) {
+      const message = `翻译 CSV 没有可写入内容：跳过 ${plan.summary?.skippedCount ?? 0} 条`;
+      setSaveStatus(message, true);
+      showToast(message, "error");
+      return false;
+    }
+
+    const scenesById = new Map((state.data?.scenes ?? []).map((scene) => [scene.id, scene]));
+    const updatedScenes = new Map();
+    let appliedCount = 0;
+    patches.forEach((patch) => {
+      const sourceScene = scenesById.get(patch.sceneId);
+      if (!sourceScene) {
+        return;
+      }
+      const updatedScene = updatedScenes.get(patch.sceneId) ?? cloneScene(sourceScene);
+      if (applyLocalizationPatchToScene(updatedScene, patch)) {
+        appliedCount += 1;
+        updatedScenes.set(patch.sceneId, updatedScene);
+      }
+    });
+
+    if (!appliedCount) {
+      const message = "翻译 CSV 解析成功，但没有匹配到可写入的场景内容";
+      setSaveStatus(message, true);
+      showToast(message, "error");
+      return false;
+    }
+
+    setSaveStatus(`正在导入翻译：${appliedCount} 条 / ${updatedScenes.size} 个场景...`);
+    for (const scene of updatedScenes.values()) {
+      await postJson(API_SAVE_SCENE, {
+        chapterId: scene.chapterId,
+        sceneId: scene.id,
+        scene: stripSceneForSave(scene),
+      });
+    }
+
+    await reloadProjectData({
+      ...getCurrentUiState(),
+      selectedSceneId: state.selectedSceneId,
+      selectedBlockId: state.selectedBlockId,
+      previewSceneId: state.previewSceneId,
+      previewStartSceneId: state.previewStartSceneId,
+      previewBlockIndex: state.previewBlockIndex,
+    });
+    state.validation = runValidation(state.data);
+    updateTopbar();
+    if (state.currentScreen === "inspection") {
+      renderInspectionScreen();
+    }
+
+    const skippedSuffix = plan.summary?.skippedCount ? `，跳过 ${plan.summary.skippedCount} 条` : "";
+    const message = `已导入翻译 ${appliedCount} 条，写入 ${updatedScenes.size} 个场景${skippedSuffix}`;
+    setSaveStatus(message);
+    showToast(message, "soft");
+    return true;
+  } catch (error) {
+    await showEditorOperationFailure(error, "导入多语言 CSV 失败", "翻译 CSV 没有导入成功");
+    return false;
+  }
+}
+
 function buildPlaytestHandoffContext() {
   const routeOverview = buildSceneRouteOverview();
   return {
@@ -31239,6 +31358,9 @@ function renderLocalizationCoveragePanel() {
         </button>
         <button class="toolbar-button" data-action="export-localization-coverage-csv">
           导出翻译 CSV
+        </button>
+        <button class="toolbar-button" data-action="import-localization-coverage-csv">
+          导入翻译 CSV
         </button>
         <button class="toolbar-button" data-action="switch-screen" data-screen="preview">
           去预览切语言
@@ -41220,6 +41342,7 @@ function stripSceneForSave(scene) {
   return {
     id: scene.id,
     name: scene.name,
+    ...(scene.nameTranslations && typeof scene.nameTranslations === "object" ? { nameTranslations: scene.nameTranslations } : {}),
     notes: scene.notes ?? "",
     status: getSafeSceneStatus(scene.status),
     priority: getSafeScenePriority(scene.priority),

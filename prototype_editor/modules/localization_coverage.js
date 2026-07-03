@@ -217,10 +217,12 @@
       entries.push({
         id: `${descriptor.id}:${descriptor.key}:${language}`,
         sourceId: descriptor.id,
+        targetId: descriptor.targetId ?? descriptor.id,
         kind: descriptor.kind,
         language,
         languageLabel: getLanguageLabel(language),
         key: descriptor.key,
+        optionIndex: descriptor.optionIndex ?? null,
         fieldLabel: getFieldLabel(descriptor.kind, descriptor.key, descriptor.optionIndex),
         chapterName: descriptor.chapterName ?? "",
         sceneName: descriptor.sceneName ?? "",
@@ -259,6 +261,7 @@
           option,
           {
             id: `${baseDescriptor.id}:option_${optionIndex + 1}`,
+            targetId: baseDescriptor.id,
             kind: "choice_option",
             key: "text",
             optionIndex,
@@ -541,6 +544,10 @@
       entry.statusLabel,
       entry.languageLabel,
       entry.language,
+      entry.kind,
+      entry.targetId,
+      entry.key,
+      entry.optionIndex === null || entry.optionIndex === undefined ? "" : entry.optionIndex + 1,
       entry.chapterName,
       entry.sceneName,
       entry.locationLabel,
@@ -549,9 +556,269 @@
       entry.localizedText,
     ]);
     return `\uFEFF${buildCsv(
-      ["序号", "状态", "语言", "语言代码", "章节", "场景", "位置", "字段", "原文", "译文"],
+      ["序号", "状态", "语言", "语言代码", "类型", "目标ID", "字段键", "选项序号", "章节", "场景", "位置", "字段", "原文", "译文"],
       rows
     )}\n`;
+  }
+
+  function parseCsv(text = "") {
+    const source = String(text ?? "").replace(/^\uFEFF/, "");
+    const rows = [];
+    let row = [];
+    let cell = "";
+    let inQuotes = false;
+
+    for (let index = 0; index < source.length; index += 1) {
+      const char = source[index];
+      const nextChar = source[index + 1];
+      if (inQuotes) {
+        if (char === '"' && nextChar === '"') {
+          cell += '"';
+          index += 1;
+        } else if (char === '"') {
+          inQuotes = false;
+        } else {
+          cell += char;
+        }
+        continue;
+      }
+      if (char === '"') {
+        inQuotes = true;
+        continue;
+      }
+      if (char === ",") {
+        row.push(cell);
+        cell = "";
+        continue;
+      }
+      if (char === "\n") {
+        row.push(cell);
+        rows.push(row);
+        row = [];
+        cell = "";
+        continue;
+      }
+      if (char === "\r") {
+        continue;
+      }
+      cell += char;
+    }
+    row.push(cell);
+    rows.push(row);
+    return rows.filter((candidate) => candidate.some((value) => cleanText(value)));
+  }
+
+  function getCsvValue(row = {}, ...headers) {
+    for (const header of headers) {
+      if (Object.hasOwn(row, header)) {
+        return row[header];
+      }
+    }
+    return "";
+  }
+
+  function parseLocalizationCoverageCsv(text = "") {
+    const rows = parseCsv(text);
+    const headers = toArray(rows[0]).map((header) => cleanText(header));
+    return rows.slice(1).map((row, rowIndex) => {
+      const mapped = {};
+      headers.forEach((header, index) => {
+        if (header) {
+          mapped[header] = row[index] ?? "";
+        }
+      });
+      return {
+        rowNumber: rowIndex + 2,
+        statusLabel: cleanText(getCsvValue(mapped, "状态", "Status")),
+        languageLabel: cleanText(getCsvValue(mapped, "语言", "Language")),
+        language: cleanText(getCsvValue(mapped, "语言代码", "Language Code", "language")),
+        kind: cleanText(getCsvValue(mapped, "类型", "Kind", "kind")),
+        targetId: cleanText(getCsvValue(mapped, "目标ID", "Target ID", "targetId")),
+        key: cleanText(getCsvValue(mapped, "字段键", "Key", "key")),
+        optionNumber: cleanText(getCsvValue(mapped, "选项序号", "Option", "optionNumber")),
+        chapterName: cleanText(getCsvValue(mapped, "章节", "Chapter")),
+        sceneName: cleanText(getCsvValue(mapped, "场景", "Scene")),
+        locationLabel: cleanText(getCsvValue(mapped, "位置", "Location")),
+        fieldLabel: cleanText(getCsvValue(mapped, "字段", "Field")),
+        sourceText: cleanText(getCsvValue(mapped, "原文", "Source")),
+        localizedText: cleanText(getCsvValue(mapped, "译文", "Translation", "localizedText")),
+      };
+    });
+  }
+
+  function findSceneById(data = {}, sceneId = "") {
+    const cleanSceneId = cleanText(sceneId);
+    if (!cleanSceneId) {
+      return null;
+    }
+    const sceneEntry = getOrderedScenes(data).find(({ scene }) => cleanText(scene?.id) === cleanSceneId);
+    return sceneEntry?.scene ?? null;
+  }
+
+  function findBlockInScenes(data = {}, blockId = "") {
+    const cleanBlockId = cleanText(blockId);
+    if (!cleanBlockId) {
+      return null;
+    }
+    for (const { scene } of getOrderedScenes(data)) {
+      const block = toArray(scene?.blocks).find((candidate) => cleanText(candidate?.id) === cleanBlockId);
+      if (block) {
+        return { scene, block };
+      }
+    }
+    return null;
+  }
+
+  function getCurrentTranslation(source = {}, key = "", language = "") {
+    return cleanText(getTranslationMap(source, key)[language]);
+  }
+
+  function pushImportSkip(skipped, row, reason) {
+    skipped.push({
+      rowNumber: row.rowNumber,
+      reason,
+      kind: row.kind,
+      targetId: row.targetId,
+      language: row.language,
+      fieldLabel: row.fieldLabel,
+      locationLabel: row.locationLabel,
+    });
+  }
+
+  function buildLocalizationImportPlan(data = {}, csvText = "") {
+    const rows = parseLocalizationCoverageCsv(csvText);
+    const patches = [];
+    const skipped = [];
+    const supportedKinds = new Set(["scene", "block", "choice_option"]);
+    const seenPatchKeys = new Set();
+
+    rows.forEach((row) => {
+      const language = normalizeLanguageCode(row.language);
+      const key = cleanText(row.key);
+      const text = cleanText(row.localizedText);
+      const kind = cleanText(row.kind);
+      const targetId = cleanText(row.targetId);
+
+      if (!text) {
+        pushImportSkip(skipped, row, "译文为空，已跳过。");
+        return;
+      }
+      if (!language) {
+        pushImportSkip(skipped, row, "语言代码为空，已跳过。");
+        return;
+      }
+      if (!supportedKinds.has(kind)) {
+        pushImportSkip(skipped, row, "当前安全导入只自动写入场景名、场景卡片和选项翻译。");
+        return;
+      }
+      if (!targetId || !key) {
+        pushImportSkip(skipped, row, "缺少目标ID或字段键，请使用编辑器导出的新版 CSV。");
+        return;
+      }
+
+      if (kind === "scene") {
+        const scene = findSceneById(data, targetId);
+        if (!scene) {
+          pushImportSkip(skipped, row, "找不到目标场景。");
+          return;
+        }
+        if (key !== "name") {
+          pushImportSkip(skipped, row, "场景翻译只支持 name 字段。");
+          return;
+        }
+        if (getCurrentTranslation(scene, key, language) === text) {
+          pushImportSkip(skipped, row, "译文与项目内现有内容相同。");
+          return;
+        }
+        const patchKey = `scene:${targetId}:${key}:${language}`;
+        if (seenPatchKeys.has(patchKey)) {
+          pushImportSkip(skipped, row, "同一个目标在 CSV 中重复出现，已保留第一条。");
+          return;
+        }
+        seenPatchKeys.add(patchKey);
+        patches.push({ rowNumber: row.rowNumber, kind, sceneId: scene.id, chapterId: scene.chapterId, targetId, key, language, text });
+        return;
+      }
+
+      const match = findBlockInScenes(data, targetId);
+      if (!match) {
+        pushImportSkip(skipped, row, "找不到目标卡片。");
+        return;
+      }
+
+      if (kind === "block") {
+        if (!["text", "title"].includes(key)) {
+          pushImportSkip(skipped, row, "卡片翻译只支持 text 或 title 字段。");
+          return;
+        }
+        if (getCurrentTranslation(match.block, key, language) === text) {
+          pushImportSkip(skipped, row, "译文与项目内现有内容相同。");
+          return;
+        }
+        const patchKey = `block:${targetId}:${key}:${language}`;
+        if (seenPatchKeys.has(patchKey)) {
+          pushImportSkip(skipped, row, "同一个目标在 CSV 中重复出现，已保留第一条。");
+          return;
+        }
+        seenPatchKeys.add(patchKey);
+        patches.push({
+          rowNumber: row.rowNumber,
+          kind,
+          sceneId: match.scene.id,
+          chapterId: match.scene.chapterId,
+          targetId,
+          key,
+          language,
+          text,
+        });
+        return;
+      }
+
+      const optionIndex = Number.parseInt(row.optionNumber, 10) - 1;
+      const option = Number.isInteger(optionIndex) ? toArray(match.block?.options)[optionIndex] : null;
+      if (!option) {
+        pushImportSkip(skipped, row, "找不到目标选项。");
+        return;
+      }
+      if (key !== "text") {
+        pushImportSkip(skipped, row, "选项翻译只支持 text 字段。");
+        return;
+      }
+      if (getCurrentTranslation(option, key, language) === text) {
+        pushImportSkip(skipped, row, "译文与项目内现有内容相同。");
+        return;
+      }
+      const patchKey = `choice_option:${targetId}:${optionIndex}:${key}:${language}`;
+      if (seenPatchKeys.has(patchKey)) {
+        pushImportSkip(skipped, row, "同一个目标在 CSV 中重复出现，已保留第一条。");
+        return;
+      }
+      seenPatchKeys.add(patchKey);
+      patches.push({
+        rowNumber: row.rowNumber,
+        kind,
+        sceneId: match.scene.id,
+        chapterId: match.scene.chapterId,
+        targetId,
+        key,
+        optionIndex,
+        language,
+        text,
+      });
+    });
+
+    return {
+      rows,
+      patches,
+      skipped,
+      summary: {
+        rowCount: rows.length,
+        patchCount: patches.length,
+        skippedCount: skipped.length,
+        sceneCount: new Set(patches.map((patch) => patch.sceneId)).size,
+        languageCount: new Set(patches.map((patch) => patch.language)).size,
+      },
+    };
   }
 
   global.CanvasiaEditorLocalizationCoverage = Object.freeze({
@@ -561,5 +828,7 @@
     getLocalizationCoverageStatusDigest,
     buildLocalizationCoverageMarkdown,
     buildLocalizationCoverageCsv,
+    parseLocalizationCoverageCsv,
+    buildLocalizationImportPlan,
   });
 })(typeof window !== "undefined" ? window : globalThis);
