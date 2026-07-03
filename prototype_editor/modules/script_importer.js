@@ -9,6 +9,7 @@
     "music_play",
     "music_stop",
     "sfx_play",
+    "video_play",
     "screen_fade",
   ]);
   const ROUTE_DRAFT_TYPES = Object.freeze(["jump"]);
@@ -85,9 +86,65 @@
     return Math.round(Math.max(0, Math.min(ms, 30000)));
   }
 
+  function parseTimeSeconds(value, fallbackSeconds = 0) {
+    const raw = String(value ?? "").trim().toLowerCase();
+    const number = Number.parseFloat(raw);
+    if (!Number.isFinite(number)) {
+      return fallbackSeconds;
+    }
+
+    const seconds = raw.endsWith("ms") ? number / 1000 : number;
+    return Math.round(Math.max(0, Math.min(seconds, 21600)) * 10) / 10;
+  }
+
   function parseInlineTimeMs(text, keyword, fallbackMs = 600) {
     const match = String(text ?? "").match(new RegExp(`\\b${keyword}\\s+([0-9.]+\\s*(?:ms|s)?)`, "i"));
     return match ? parseTimeMs(match[1], fallbackMs) : fallbackMs;
+  }
+
+  function parseInlineTimeSeconds(text, keywords, fallbackSeconds = 0) {
+    const keywordPattern = Array.isArray(keywords) ? keywords.join("|") : keywords;
+    const match = String(text ?? "").match(new RegExp(`\\b(?:${keywordPattern})\\s+([0-9.]+\\s*(?:ms|s)?)`, "i"));
+    return match ? parseTimeSeconds(match[1], fallbackSeconds) : fallbackSeconds;
+  }
+
+  function parseInlineVolumePercent(text, fallback = 100) {
+    const match = String(text ?? "").match(/\b(?:volume|vol)\s+([0-9.]+)%?/i);
+    if (!match) {
+      return fallback;
+    }
+
+    const number = Number.parseFloat(match[1]);
+    return Number.isFinite(number) ? Math.round(Math.max(0, Math.min(number, 100))) : fallback;
+  }
+
+  function parseInlineVideoTitle(text, fallback = "") {
+    const quoted = String(text ?? "").match(/\b(?:title|name|as)\s+["“'‘](.+?)["”'’]/iu);
+    if (quoted) {
+      return trimImportedText(quoted[1], 80);
+    }
+
+    const titleStopWords = "volume|vol|from|start|to|end|contain|cover|fill|skip|skippable|no-?skip|unskippable";
+    const plain = String(text ?? "").match(
+      new RegExp(`\\b(?:title|name|as)\\s+([^,;]+?)(?=\\s+\\b(?:${titleStopWords})\\b|$)`, "iu")
+    );
+    return trimImportedText(plain?.[1] ?? fallback, 80);
+  }
+
+  function parseInlineVideoFit(text, fallback = "contain") {
+    const token = String(text ?? "").match(/\b(contain|cover|fill)\b/i)?.[1]?.toLowerCase();
+    return ["contain", "cover", "fill"].includes(token) ? token : fallback;
+  }
+
+  function parseInlineVideoSkippable(text, fallback = true) {
+    const source = String(text ?? "");
+    if (/(?:不可跳过|不能跳过|强制播放)|\b(?:no-?skip|unskippable|required|must\s+watch)\b/i.test(source)) {
+      return false;
+    }
+    if (/(?:可跳过)|\b(?:skip|skippable|can\s+skip)\b/i.test(source)) {
+      return true;
+    }
+    return fallback;
   }
 
   function parseDirectiveTransition(text, fallback = "fade") {
@@ -250,6 +307,27 @@
             type: "sfx_play",
             assetHint: leading.argument,
             volume: 100,
+          }
+        : null;
+    }
+
+    const playVideoMatch = text.match(/^(?:play\s+)?(?:video|movie|op|ed|pv)\s+(.+)$/i);
+    if (playVideoMatch) {
+      const videoText = playVideoMatch[1];
+      const leading = readLeadingArgument(videoText);
+      const startTimeSeconds = parseInlineTimeSeconds(videoText, ["from", "start"], 0);
+      const rawEndTimeSeconds = parseInlineTimeSeconds(videoText, ["to", "end"], 0);
+      const endTimeSeconds = rawEndTimeSeconds > startTimeSeconds ? rawEndTimeSeconds : 0;
+      return leading.argument
+        ? {
+            type: "video_play",
+            assetHint: leading.argument,
+            title: parseInlineVideoTitle(leading.rest),
+            fit: parseInlineVideoFit(videoText),
+            volume: parseInlineVolumePercent(videoText, 100),
+            startTimeSeconds,
+            endTimeSeconds,
+            skippable: parseInlineVideoSkippable(videoText, true),
           }
         : null;
     }
@@ -435,6 +513,9 @@
     }
     if (block?.type === "sfx_play") {
       return `播放音效：${block.assetHint || "待选择音效"}`;
+    }
+    if (block?.type === "video_play") {
+      return `播放视频：${block.title || block.assetHint || "待选择视频"}`;
     }
     if (block?.type === "music_stop") {
       return "停止 BGM";

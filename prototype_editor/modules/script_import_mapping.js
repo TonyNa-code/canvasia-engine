@@ -132,6 +132,8 @@
       callScriptImportResolver(resolvers, "getSafeNonNegativeNumber", [value, fallback], fallback ?? 0);
     const getVolumePercent = (value, fallback) =>
       callScriptImportResolver(resolvers, "getSafeVolumePercent", [value, fallback], fallback ?? 100);
+    const getVideoFit = (value) => callScriptImportResolver(resolvers, "getSafeVideoFit", [value], value || "contain");
+    const getVideoVolume = (value) => callScriptImportResolver(resolvers, "getSafeVideoVolume", [value], 100);
     const getFadeAction = (value) => callScriptImportResolver(resolvers, "getSafeFadeAction", [value], value || "fade_out");
     const getEffectDuration = (value) =>
       callScriptImportResolver(resolvers, "getEffectDuration", [value], getImportedEffectDuration(value));
@@ -240,6 +242,21 @@
         type: "sfx_play",
         assetId: getAssetId(draftBlock.assetHint, ["sfx"]),
         volume: getVolumePercent(draftBlock.volume, 100),
+      };
+    }
+
+    if (draftBlock.type === "video_play") {
+      const startTimeSeconds = getNonNegativeNumber(draftBlock.startTimeSeconds, 0);
+      const endTimeSeconds = getNonNegativeNumber(draftBlock.endTimeSeconds, 0);
+      return {
+        type: "video_play",
+        assetId: getAssetId(draftBlock.assetHint, ["video"]),
+        title: String(draftBlock.title || draftBlock.assetHint || "").trim().slice(0, 80),
+        fit: getVideoFit(draftBlock.fit),
+        volume: getVideoVolume(draftBlock.volume),
+        startTimeSeconds,
+        endTimeSeconds: endTimeSeconds > startTimeSeconds ? endTimeSeconds : 0,
+        skippable: draftBlock.skippable !== false,
       };
     }
 

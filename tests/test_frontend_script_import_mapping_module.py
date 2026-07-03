@@ -39,6 +39,7 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
                 {{ id: "bgm_school", type: "bgm", name: "School Theme", fileName: "school_theme.ogg" }},
                 {{ id: "sfx_door", type: "sfx", name: "Door Knock", fileName: "door_knock.wav" }},
                 {{ id: "voice_yuina_001", type: "voice", name: "Yuina 001", fileName: "yuina_001.ogg" }},
+                {{ id: "video_opening", type: "video", name: "Opening Movie", fileName: "opening_movie.mp4" }},
                 {{ id: "cg_school", type: "cg", name: "school_theme_cg.png" }},
               ],
               scenes: [
@@ -58,6 +59,8 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
               getSafeTransitionDurationMs: (value, fallback = 600) => Number.parseInt(value, 10) || fallback,
               getSafeNonNegativeNumber: (value, fallback = 0) => Math.max(0, Number.parseFloat(value) || fallback),
               getSafeVolumePercent: (value, fallback = 100) => Math.max(0, Math.min(100, Number.parseInt(value, 10) || fallback)),
+              getSafeVideoFit: (value) => ["contain", "cover", "fill"].includes(value) ? value : "contain",
+              getSafeVideoVolume: (value) => Math.max(0, Math.min(100, Number.parseInt(value, 10) || 100)),
               getSafeFadeAction: (value) => value === "fade_in" ? "fade_in" : "fade_out",
               getEffectDuration: (value) => tools.getImportedEffectDuration(value),
               getDefaultJumpTargetSceneId: () => "scene_end",
@@ -74,6 +77,7 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
               bgmByName: tools.findImportedAssetIdByHint(data, "school_theme", ["bgm"]),
               sfxByFile: tools.findImportedAssetIdByHint(data, "door_knock", ["sfx"]),
               voiceByFile: tools.findImportedAssetIdByHint(data, "yuina_001", ["voice"]),
+              videoByFile: tools.findImportedAssetIdByHint(data, "opening_movie", ["video"]),
               typedLookupDoesNotCrossAssetTypes: tools.findImportedAssetIdByHint(data, "school_theme", ["background"]),
               sceneByName: tools.findImportedSceneIdByHint(data, "rooftop"),
               sceneByTag: tools.findImportedSceneIdByHint(data, "天台"),
@@ -97,6 +101,11 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
               ),
               normalizedSfx: tools.normalizeImportedDraftBlockForScene(
                 {{ type: "sfx_play", assetHint: "door_knock", volume: "80" }},
+                null,
+                resolvers
+              ),
+              normalizedVideo: tools.normalizeImportedDraftBlockForScene(
+                {{ type: "video_play", assetHint: "opening_movie", title: "Opening Movie", fit: "cover", volume: "75", startTimeSeconds: "2", endTimeSeconds: "12", skippable: false }},
                 null,
                 resolvers
               ),
@@ -127,6 +136,7 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
         self.assertEqual(payload["bgmByName"], "bgm_school")
         self.assertEqual(payload["sfxByFile"], "sfx_door")
         self.assertEqual(payload["voiceByFile"], "voice_yuina_001")
+        self.assertEqual(payload["videoByFile"], "video_opening")
         self.assertEqual(payload["typedLookupDoesNotCrossAssetTypes"], "")
         self.assertEqual(payload["sceneByName"], "scene_roof")
         self.assertEqual(payload["sceneByTag"], "scene_roof")
@@ -161,6 +171,19 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
         self.assertEqual(payload["normalizedCharacterShow"]["transitionDurationMs"], 720)
         self.assertEqual(payload["normalizedCharacterShow"]["stage"], {"scale": 1, "opacity": 1})
         self.assertEqual(payload["normalizedSfx"], {"type": "sfx_play", "assetId": "sfx_door", "volume": 80})
+        self.assertEqual(
+            payload["normalizedVideo"],
+            {
+                "type": "video_play",
+                "assetId": "video_opening",
+                "title": "Opening Movie",
+                "fit": "cover",
+                "volume": 75,
+                "startTimeSeconds": 2,
+                "endTimeSeconds": 12,
+                "skippable": False,
+            },
+        )
         self.assertEqual(payload["normalizedJumpFallback"], {"type": "jump", "targetSceneId": "scene_end"})
 
 
