@@ -3936,6 +3936,27 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("audioCueSheetTools.buildAudioCueSheet", source)
         self.assertIn("audioCueSheetTools.getAudioCueSheetStatusDigest", source)
 
+    def test_choice_consequence_sheet_export_actions_are_wired(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        click_handler = _extract_function_source(source, "handleClick")
+        markdown_block_start = click_handler.index('action === "export-choice-consequence-markdown"')
+        csv_block_start = click_handler.index('action === "export-choice-consequence-csv"')
+        csv_block_end = click_handler.index('action === "export-audio-cue-sheet-markdown"', csv_block_start)
+        markdown_block = click_handler[markdown_block_start:csv_block_start]
+        csv_block = click_handler[csv_block_start:csv_block_end]
+
+        self.assertIn("const choiceConsequenceSheetTools = window.CanvasiaEditorChoiceConsequenceSheet", source)
+        self.assertIn('data-action="export-choice-consequence-markdown"', source)
+        self.assertIn('data-action="export-choice-consequence-csv"', source)
+        self.assertIn("exportChoiceConsequenceMarkdown();", markdown_block)
+        self.assertIn("exportChoiceConsequenceCsv();", csv_block)
+        self.assertIn("function buildChoiceConsequenceSheet()", source)
+        self.assertIn("function renderChoiceConsequencePanel()", source)
+        self.assertIn("function exportChoiceConsequenceMarkdown()", source)
+        self.assertIn("function exportChoiceConsequenceCsv()", source)
+        self.assertIn("choiceConsequenceSheetTools.buildChoiceConsequenceSheet", source)
+        self.assertIn("choiceConsequenceSheetTools.getChoiceConsequenceStatusDigest", source)
+
     def test_stage_direction_sheet_export_actions_are_wired(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
         click_handler = _extract_function_source(source, "handleClick")

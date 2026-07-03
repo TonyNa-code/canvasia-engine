@@ -53,6 +53,7 @@ const routeAnalyzerTools = window.CanvasiaEditorRouteAnalyzer;
 const routeTestingReportTools = window.CanvasiaEditorRouteTestingReport;
 const previewRegressionTools = window.CanvasiaEditorPreviewRegression;
 const playtestHandoffReportTools = window.CanvasiaEditorPlaytestHandoffReport;
+const choiceConsequenceSheetTools = window.CanvasiaEditorChoiceConsequenceSheet;
 const audioCueSheetTools = window.CanvasiaEditorAudioCueSheet;
 const stageDirectionSheetTools = window.CanvasiaEditorStageDirectionSheet;
 const presentationTimelineTools = window.CanvasiaEditorPresentationTimeline;
@@ -3820,6 +3821,16 @@ async function handleClick(event) {
 
   if (action === "export-inspection-report") {
     exportInspectionReport();
+    return;
+  }
+
+  if (action === "export-choice-consequence-markdown") {
+    exportChoiceConsequenceMarkdown();
+    return;
+  }
+
+  if (action === "export-choice-consequence-csv") {
+    exportChoiceConsequenceCsv();
     return;
   }
 
@@ -28418,6 +28429,17 @@ function buildRouteTestingPlanFileName(extension = "md") {
   return `${title}_route_testing_plan_${dateStamp}.${extension}`;
 }
 
+function buildChoiceConsequenceFileName(extension = "md") {
+  const date = new Date();
+  const dateStamp = [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("");
+  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
+  return `${title}_choice_consequence_sheet_${dateStamp}.${extension}`;
+}
+
 function buildAudioCueSheetFileName(extension = "md") {
   const date = new Date();
   const dateStamp = [
@@ -29646,6 +29668,30 @@ function exportRouteTestingPlanCsv() {
   downloadTextFile(fileName, content, "text/csv;charset=utf-8");
   setSaveStatus(`已导出路线试玩 CSV：${fileName}`);
   showToast(`路线试玩 CSV 已导出：${fileName}`);
+}
+
+function buildChoiceConsequenceSheet() {
+  return choiceConsequenceSheetTools.buildChoiceConsequenceSheet(state.data ?? {});
+}
+
+function exportChoiceConsequenceMarkdown() {
+  const fileName = buildChoiceConsequenceFileName("md");
+  const sheet = buildChoiceConsequenceSheet();
+  const content = choiceConsequenceSheetTools.buildChoiceConsequenceMarkdown(sheet, {
+    projectTitle: state.data?.project?.title || "Canvasia Project",
+    generatedAt: formatDate(new Date().toISOString()),
+  });
+  downloadTextFile(fileName, content, "text/markdown;charset=utf-8");
+  setSaveStatus(`已导出选项后果表：${fileName}`);
+  showToast(`选项后果表已导出：${fileName}`);
+}
+
+function exportChoiceConsequenceCsv() {
+  const fileName = buildChoiceConsequenceFileName("csv");
+  const content = choiceConsequenceSheetTools.buildChoiceConsequenceCsv(buildChoiceConsequenceSheet());
+  downloadTextFile(fileName, content, "text/csv;charset=utf-8");
+  setSaveStatus(`已导出选项后果 CSV：${fileName}`);
+  showToast(`选项后果 CSV 已导出：${fileName}`);
 }
 
 function buildAudioCueSheet() {
@@ -31087,6 +31133,96 @@ function renderProjectDoctorPanel(routeOverview, issueItems) {
   `;
 }
 
+function getChoiceConsequenceToneClass(status) {
+  if (status === "blocked") {
+    return "danger-text";
+  }
+  if (status === "warn") {
+    return "warn-text";
+  }
+  if (status === "ready") {
+    return "good-text";
+  }
+  return "";
+}
+
+function renderChoiceConsequencePanel() {
+  const sheet = buildChoiceConsequenceSheet();
+  const digest = choiceConsequenceSheetTools.getChoiceConsequenceStatusDigest(sheet);
+  const summary = sheet.summary ?? {};
+  const topIssues = (sheet.issues ?? []).slice(0, 4);
+  const optionPreview = (sheet.options ?? []).slice(0, 4);
+
+  return `
+    <article class="detail-card preview-sprint-panel">
+      <div class="panel-heading">
+        <h2>选项后果表</h2>
+        <span class="badge badge-soft ${getChoiceConsequenceToneClass(digest.status)}">${escapeHtml(digest.title)}</span>
+      </div>
+      <p class="helper-text">${escapeHtml(digest.detail)} 它会把每个选项的跳转目标和变量效果列出来，专门排查空选项、坏跳转、坏变量和容易被玩家吐槽的“假选项”。</p>
+      <div class="preview-sprint-metrics">
+        ${renderRouteMetricCard("选项卡", `${summary.choiceBlockCount ?? 0} 张`, "项目中的分支选择点")}
+        ${renderRouteMetricCard("选项按钮", `${summary.optionCount ?? 0} 个`, "玩家实际会点击的按钮")}
+        ${renderRouteMetricCard("变量效果", `${summary.variableEffectCount ?? 0} 个`, "好感度、路线旗标等后果")}
+        ${renderRouteMetricCard("无后果 / 同后果", `${summary.noConsequenceCount ?? 0} / ${summary.sameConsequenceCount ?? 0}`, "最容易显得像假按钮")}
+      </div>
+      <div class="detail-actions">
+        <button class="toolbar-button toolbar-button-primary" data-action="export-choice-consequence-markdown">
+          导出选项后果表
+        </button>
+        <button class="toolbar-button" data-action="export-choice-consequence-csv">
+          导出选项 CSV
+        </button>
+        <button class="toolbar-button" data-action="switch-screen" data-screen="story">
+          去剧情页调整选项
+        </button>
+      </div>
+      ${
+        topIssues.length > 0
+          ? `
+            <div class="preview-sprint-grid">
+              ${topIssues
+                .map(
+                  (issue) => `
+                    <article class="preview-sprint-card is-${issue.severity === "blocker" ? "danger" : issue.severity === "warn" ? "warn" : "soft"}">
+                      <div class="preview-sprint-head">
+                        <strong>${escapeHtml(issue.title)}</strong>
+                        <span class="issue-tag ${issue.severity === "blocker" ? "danger-text" : issue.severity === "warn" ? "warn-text" : ""}">
+                          ${escapeHtml(issue.severity === "blocker" ? "先修" : issue.severity === "warn" ? "复查" : "润色")}
+                        </span>
+                      </div>
+                      <p>${escapeHtml([issue.chapterName, issue.sceneName, issue.optionText].filter(Boolean).join(" · "))}</p>
+                      <div class="helper-text">${escapeHtml(issue.detail)}</div>
+                    </article>
+                  `
+                )
+                .join("")}
+            </div>
+          `
+          : optionPreview.length > 0
+            ? `
+              <div class="list-stack compact-stack">
+                ${optionPreview
+                  .map(
+                    (option) => `
+                      <div class="route-testing-item">
+                        <div>
+                          <b>${escapeHtml(option.optionText)}</b>
+                          <span>${escapeHtml(`${option.chapterName} · ${option.sceneName} -> ${option.targetSceneName}`)}</span>
+                        </div>
+                        <span>${escapeHtml(option.effectSummary)}</span>
+                      </div>
+                    `
+                  )
+                  .join("")}
+              </div>
+            `
+            : renderEmpty("当前项目还没有选项卡。可以先在剧情页添加选项，再为每个选项设置目标场景或变量后果。")
+      }
+    </article>
+  `;
+}
+
 function getAudioCueSheetToneClass(status) {
   if (status === "blocked") {
     return "danger-text";
@@ -31506,6 +31642,7 @@ function renderInspectionOverviewPanel(routeOverview) {
       </div>
       ${renderCompactProjectMilestonePanel(routeOverview)}
       ${renderProjectDoctorPanel(routeOverview, issueItems)}
+      ${renderChoiceConsequencePanel()}
       ${renderAudioCueSheetPanel()}
       ${renderStageDirectionSheetPanel()}
       ${renderPresentationTimelinePanel()}

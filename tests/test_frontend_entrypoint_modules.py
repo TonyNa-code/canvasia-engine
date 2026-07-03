@@ -35,6 +35,7 @@ class FrontendEntrypointModuleTests(unittest.TestCase):
             "./modules/route_testing_report.js",
             "./modules/preview_regression.js",
             "./modules/playtest_handoff_report.js",
+            "./modules/choice_consequence_sheet.js",
             "./modules/audio_cue_sheet.js",
             "./modules/stage_direction_sheet.js",
             "./modules/presentation_timeline.js",
