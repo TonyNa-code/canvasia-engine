@@ -39,6 +39,279 @@
     ].join("\n");
   }
 
+  function parseCsvRows(text = "") {
+    const rows = [];
+    let row = [];
+    let cell = "";
+    let inQuotes = false;
+    const source = String(text ?? "").replace(/^\uFEFF/, "");
+
+    for (let index = 0; index < source.length; index += 1) {
+      const char = source[index];
+      const nextChar = source[index + 1];
+      if (char === '"' && inQuotes && nextChar === '"') {
+        cell += '"';
+        index += 1;
+        continue;
+      }
+      if (char === '"') {
+        inQuotes = !inQuotes;
+        continue;
+      }
+      if (char === "," && !inQuotes) {
+        row.push(cell);
+        cell = "";
+        continue;
+      }
+      if ((char === "\n" || char === "\r") && !inQuotes) {
+        if (char === "\r" && nextChar === "\n") {
+          index += 1;
+        }
+        row.push(cell);
+        if (row.some((item) => String(item ?? "").trim())) {
+          rows.push(row);
+        }
+        row = [];
+        cell = "";
+        continue;
+      }
+      cell += char;
+    }
+
+    row.push(cell);
+    if (row.some((item) => String(item ?? "").trim())) {
+      rows.push(row);
+    }
+    return rows;
+  }
+
+  function normalizeHeader(value) {
+    return String(value ?? "").trim().toLowerCase().replace(/\s+/g, "");
+  }
+
+  function getCsvCell(row = [], headerIndex = {}, names = []) {
+    for (const name of names) {
+      const index = headerIndex.get(normalizeHeader(name));
+      if (Number.isInteger(index)) {
+        return String(row[index] ?? "").trim();
+      }
+    }
+    return "";
+  }
+
+  function getPlaytestFeedbackSeverityWeight(severity = "") {
+    const value = String(severity ?? "").toLowerCase();
+    if (/阻塞|blocker|critical|fatal|卡死|无法继续/.test(value)) {
+      return 100;
+    }
+    if (/明显|严重|major|high|important/.test(value)) {
+      return 70;
+    }
+    if (/轻微|minor|low|small/.test(value)) {
+      return 35;
+    }
+    if (/建议|suggest|idea|优化/.test(value)) {
+      return 15;
+    }
+    return value.trim() ? 30 : 20;
+  }
+
+  function getPlaytestFeedbackSeverityLabel(severity = "") {
+    const value = String(severity ?? "").trim();
+    if (!value) {
+      return "未分级";
+    }
+    if (getPlaytestFeedbackSeverityWeight(value) >= 100) {
+      return "阻塞";
+    }
+    if (getPlaytestFeedbackSeverityWeight(value) >= 70) {
+      return "明显问题";
+    }
+    if (getPlaytestFeedbackSeverityWeight(value) >= 35) {
+      return "轻微问题";
+    }
+    return "建议";
+  }
+
+  function normalizePlaytestFeedbackIssue(row = [], headerIndex = {}, index = 0) {
+    const type = getCsvCell(row, headerIndex, ["类型", "type"]);
+    const chapterName = getCsvCell(row, headerIndex, ["章节", "chapter"]);
+    const sceneName = getCsvCell(row, headerIndex, ["场景", "scene"]);
+    const routeTarget = getCsvCell(row, headerIndex, ["路线/目标", "路线", "目标", "route/target", "target"]);
+    const severity = getCsvCell(row, headerIndex, ["严重程度", "severity"]);
+    const category = getCsvCell(row, headerIndex, ["问题分类", "分类", "category"]);
+    const steps = getCsvCell(row, headerIndex, ["复现步骤", "steps"]);
+    const expected = getCsvCell(row, headerIndex, ["期望表现", "expected"]);
+    const actual = getCsvCell(row, headerIndex, ["实际表现", "actual"]);
+    const evidence = getCsvCell(row, headerIndex, ["截图/录屏", "截图", "录屏", "evidence"]);
+    const note = getCsvCell(row, headerIndex, ["备注", "note"]);
+    const hasIssueText = [severity, category, steps, expected, actual, evidence, note].some(Boolean);
+
+    if (!hasIssueText || type === "项目") {
+      return null;
+    }
+
+    const severityWeight = getPlaytestFeedbackSeverityWeight(severity || category || actual);
+    return {
+      id: `feedback-${index + 1}`,
+      order: index + 1,
+      type,
+      chapterName,
+      sceneName,
+      routeTarget,
+      severity,
+      severityLabel: getPlaytestFeedbackSeverityLabel(severity || category || actual),
+      severityWeight,
+      category: category || "未分类",
+      steps,
+      expected,
+      actual,
+      evidence,
+      note,
+      summary: actual || note || steps || routeTarget || sceneName || "测试反馈",
+    };
+  }
+
+  function parsePlaytestFeedbackCsv(text = "") {
+    const rows = parseCsvRows(text);
+    if (rows.length < 2) {
+      return {
+        issues: [],
+        skippedRows: rows.length,
+        headers: rows[0] ?? [],
+      };
+    }
+    const headers = rows[0].map((item) => String(item ?? "").trim());
+    const headerIndex = new Map(headers.map((header, index) => [normalizeHeader(header), index]));
+    const issues = [];
+    let skippedRows = 0;
+
+    rows.slice(1).forEach((row, index) => {
+      const issue = normalizePlaytestFeedbackIssue(row, headerIndex, index);
+      if (issue) {
+        issues.push(issue);
+      } else {
+        skippedRows += 1;
+      }
+    });
+
+    issues.sort((left, right) => {
+      if (right.severityWeight !== left.severityWeight) {
+        return right.severityWeight - left.severityWeight;
+      }
+      return left.order - right.order;
+    });
+
+    return {
+      issues,
+      skippedRows,
+      headers,
+    };
+  }
+
+  function buildPlaytestFeedbackIntake(text = "", context = {}) {
+    const parsed = parsePlaytestFeedbackCsv(text);
+    const categoryCounts = new Map();
+    parsed.issues.forEach((issue) => {
+      categoryCounts.set(issue.category, (categoryCounts.get(issue.category) ?? 0) + 1);
+    });
+    const blockerCount = parsed.issues.filter((issue) => issue.severityWeight >= 100).length;
+    const majorCount = parsed.issues.filter((issue) => issue.severityWeight >= 70 && issue.severityWeight < 100).length;
+    const minorCount = parsed.issues.filter((issue) => issue.severityWeight >= 35 && issue.severityWeight < 70).length;
+    const suggestionCount = Math.max(0, parsed.issues.length - blockerCount - majorCount - minorCount);
+
+    return {
+      projectTitle: context.projectTitle || "Canvasia Project",
+      importedAt: context.importedAt || new Date().toISOString(),
+      sourceName: context.sourceName || "",
+      skippedRows: parsed.skippedRows,
+      issues: parsed.issues,
+      summary: {
+        totalCount: parsed.issues.length,
+        blockerCount,
+        majorCount,
+        minorCount,
+        suggestionCount,
+        categoryCounts: Array.from(categoryCounts.entries())
+          .map(([category, count]) => ({ category, count }))
+          .sort((left, right) => right.count - left.count || left.category.localeCompare(right.category, "zh-CN")),
+      },
+    };
+  }
+
+  function buildPlaytestFeedbackIntakeMarkdown(intake = {}) {
+    const summary = intake.summary ?? {};
+    const issues = toArray(intake.issues);
+    const categoryTable = buildMarkdownTable(
+      ["问题分类", "数量"],
+      toArray(summary.categoryCounts).map((item) => [item.category, `${item.count}`])
+    );
+    const issueTable = buildMarkdownTable(
+      ["优先级", "严重程度", "分类", "章节", "场景", "路线/目标", "实际表现", "复现步骤", "截图/录屏"],
+      issues.slice(0, 80).map((issue, index) => [
+        `${index + 1}`,
+        issue.severityLabel,
+        issue.category,
+        issue.chapterName,
+        issue.sceneName,
+        issue.routeTarget,
+        issue.actual || issue.summary,
+        issue.steps,
+        issue.evidence,
+      ])
+    );
+
+    return `\uFEFF${[
+      `# ${intake.projectTitle || "Canvasia Project"} 测试反馈回收摘要`,
+      "",
+      `导入时间：${intake.importedAt || ""}`,
+      intake.sourceName ? `来源文件：${intake.sourceName}` : "",
+      "",
+      "## 总览",
+      "",
+      buildMarkdownTable(
+        ["项目", "数量"],
+        [
+          ["反馈总数", `${summary.totalCount ?? 0}`],
+          ["阻塞", `${summary.blockerCount ?? 0}`],
+          ["明显问题", `${summary.majorCount ?? 0}`],
+          ["轻微问题", `${summary.minorCount ?? 0}`],
+          ["建议", `${summary.suggestionCount ?? 0}`],
+          ["未采用空行", `${intake.skippedRows ?? 0}`],
+        ]
+      ),
+      "",
+      "## 分类统计",
+      "",
+      categoryTable || "暂时没有可统计的问题分类。",
+      "",
+      "## 优先修复列表",
+      "",
+      issueTable || "暂时没有可列出的测试反馈。",
+      "",
+    ].filter(Boolean).join("\n")}`;
+  }
+
+  function buildPlaytestFeedbackIntakeCsv(intake = {}) {
+    const issues = toArray(intake.issues);
+    return `\uFEFF${buildCsv(
+      ["优先级", "严重程度", "问题分类", "章节", "场景", "路线/目标", "实际表现", "复现步骤", "期望表现", "截图/录屏", "备注"],
+      issues.map((issue, index) => [
+        `${index + 1}`,
+        issue.severityLabel,
+        issue.category,
+        issue.chapterName,
+        issue.sceneName,
+        issue.routeTarget,
+        issue.actual || issue.summary,
+        issue.steps,
+        issue.expected,
+        issue.evidence,
+        issue.note,
+      ])
+    )}\n`;
+  }
+
   function serializeRegressionCase(caseResult = {}, index = 0) {
     return {
       order: index + 1,
@@ -385,5 +658,10 @@
     buildPlaytestFeedbackRows,
     buildPlaytestFeedbackTemplateMarkdown,
     buildPlaytestFeedbackTemplateCsv,
+    parseCsvRows,
+    parsePlaytestFeedbackCsv,
+    buildPlaytestFeedbackIntake,
+    buildPlaytestFeedbackIntakeMarkdown,
+    buildPlaytestFeedbackIntakeCsv,
   });
 })(typeof window !== "undefined" ? window : globalThis);

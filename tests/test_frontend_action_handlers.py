@@ -3916,21 +3916,37 @@ class FrontendActionHandlerTests(unittest.TestCase):
         csv_block_start = click_handler.index('action === "export-playtest-handoff-csv"')
         feedback_markdown_block_start = click_handler.index('action === "export-playtest-feedback-template-markdown"')
         feedback_csv_block_start = click_handler.index('action === "export-playtest-feedback-template-csv"')
-        feedback_csv_block_end = click_handler.index('action === "clear-inspection-filters"', feedback_csv_block_start)
+        import_feedback_block_start = click_handler.index('action === "import-playtest-feedback-csv"')
+        feedback_intake_markdown_block_start = click_handler.index('action === "export-playtest-feedback-intake-markdown"')
+        feedback_intake_csv_block_start = click_handler.index('action === "export-playtest-feedback-intake-csv"')
+        feedback_intake_csv_block_end = click_handler.index('action === "clear-inspection-filters"', feedback_intake_csv_block_start)
         markdown_block = click_handler[markdown_block_start:csv_block_start]
         csv_block = click_handler[csv_block_start:feedback_markdown_block_start]
         feedback_markdown_block = click_handler[feedback_markdown_block_start:feedback_csv_block_start]
-        feedback_csv_block = click_handler[feedback_csv_block_start:feedback_csv_block_end]
+        feedback_csv_block = click_handler[feedback_csv_block_start:import_feedback_block_start]
+        import_feedback_block = click_handler[import_feedback_block_start:feedback_intake_markdown_block_start]
+        feedback_intake_markdown_block = click_handler[feedback_intake_markdown_block_start:feedback_intake_csv_block_start]
+        feedback_intake_csv_block = click_handler[feedback_intake_csv_block_start:feedback_intake_csv_block_end]
+        handle_change = _extract_function_source(source, "handleChange")
 
         self.assertIn("const playtestHandoffReportTools = window.CanvasiaEditorPlaytestHandoffReport", source)
+        self.assertIn('id="playtestFeedbackImportInput"', (EDITOR_DIR / "index.html").read_text(encoding="utf-8"))
         self.assertIn('data-action="export-playtest-handoff-markdown"', source)
         self.assertIn('data-action="export-playtest-handoff-csv"', source)
         self.assertIn('data-action="export-playtest-feedback-template-markdown"', source)
         self.assertIn('data-action="export-playtest-feedback-template-csv"', source)
+        self.assertIn('data-action="import-playtest-feedback-csv"', source)
+        self.assertIn('data-action="export-playtest-feedback-intake-markdown"', source)
+        self.assertIn('data-action="export-playtest-feedback-intake-csv"', source)
         self.assertIn("exportPlaytestHandoffMarkdown();", markdown_block)
         self.assertIn("exportPlaytestHandoffCsv();", csv_block)
         self.assertIn("exportPlaytestFeedbackTemplateMarkdown();", feedback_markdown_block)
         self.assertIn("exportPlaytestFeedbackTemplateCsv();", feedback_csv_block)
+        self.assertIn('document.getElementById("playtestFeedbackImportInput")?.click();', import_feedback_block)
+        self.assertIn("exportPlaytestFeedbackIntakeMarkdown();", feedback_intake_markdown_block)
+        self.assertIn("exportPlaytestFeedbackIntakeCsv();", feedback_intake_csv_block)
+        self.assertIn('target.id === "playtestFeedbackImportInput"', handle_change)
+        self.assertIn("importPlaytestFeedbackCsv", handle_change)
         self.assertIn('state.currentScreen === "inspection"', markdown_block)
         self.assertIn('state.currentScreen === "preview"', markdown_block)
         self.assertIn('state.currentScreen === "inspection"', csv_block)
@@ -3944,6 +3960,9 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("function exportPlaytestHandoffCsv()", source)
         self.assertIn("function exportPlaytestFeedbackTemplateMarkdown()", source)
         self.assertIn("function exportPlaytestFeedbackTemplateCsv()", source)
+        self.assertIn("function importPlaytestFeedbackCsv(file)", source)
+        self.assertIn("function exportPlaytestFeedbackIntakeMarkdown()", source)
+        self.assertIn("function exportPlaytestFeedbackIntakeCsv()", source)
 
     def test_beginner_dashboard_export_step_requires_real_export_record(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")

@@ -802,6 +802,7 @@ const state = {
   inspectionIssueSearchQuery: "",
   inspectionIssueFilterMode: "all",
   inspectionRegressionResult: null,
+  playtestFeedbackIntake: null,
   projectDoctorRepairReceipt: null,
   projectVariableSearchQuery: "",
   projectVariableFilterMode: "all",
@@ -1776,6 +1777,7 @@ function resetProjectScopedUiState() {
   state.inspectionIssueSearchQuery = "";
   state.inspectionIssueFilterMode = "all";
   state.inspectionRegressionResult = null;
+  state.playtestFeedbackIntake = null;
   state.projectDoctorRepairReceipt = null;
   state.projectVariableSearchQuery = "";
   state.projectVariableFilterMode = "all";
@@ -3913,6 +3915,21 @@ async function handleClick(event) {
     return;
   }
 
+  if (action === "import-playtest-feedback-csv") {
+    document.getElementById("playtestFeedbackImportInput")?.click();
+    return;
+  }
+
+  if (action === "export-playtest-feedback-intake-markdown") {
+    exportPlaytestFeedbackIntakeMarkdown();
+    return;
+  }
+
+  if (action === "export-playtest-feedback-intake-csv") {
+    exportPlaytestFeedbackIntakeCsv();
+    return;
+  }
+
   if (action === "clear-inspection-filters") {
     state.inspectionIssueSearchQuery = "";
     state.inspectionIssueFilterMode = "all";
@@ -5154,6 +5171,12 @@ function handleChange(event) {
 
   if (target.id === "creativeAssistantHistoryImportInput") {
     void importCreativeAssistantHistoryArchive(target.files?.[0] ?? null);
+    target.value = "";
+    return;
+  }
+
+  if (target.id === "playtestFeedbackImportInput") {
+    void importPlaytestFeedbackCsv(target.files?.[0] ?? null);
     target.value = "";
     return;
   }
@@ -26282,6 +26305,9 @@ function renderPreviewRegressionPanel(routeOverview) {
         <button class="toolbar-button" data-action="export-playtest-feedback-template-csv">
           导出反馈 CSV
         </button>
+        <button class="toolbar-button toolbar-button-primary" data-action="import-playtest-feedback-csv">
+          导入反馈 CSV
+        </button>
       </div>
       ${
         result
@@ -26300,6 +26326,71 @@ function renderPreviewRegressionPanel(routeOverview) {
               </div>
             `
           : renderEmpty("还没有跑过自动回归试玩路线测试。点上面的按钮后，这里会列出关键路线的通过、提醒和失败结果。")
+      }
+      ${renderPlaytestFeedbackIntakePanel()}
+    </article>
+  `;
+}
+
+function renderPlaytestFeedbackIntakePanel() {
+  const intake = state.playtestFeedbackIntake;
+  if (!intake) {
+    return `
+      <article class="preview-sprint-card is-soft">
+        <div class="preview-sprint-head">
+          <strong>测试反馈回收</strong>
+          <span class="issue-tag">等待导入</span>
+        </div>
+        <p>测试员填完反馈 CSV 后，可以点“导入反馈 CSV”，这里会自动整理阻塞项、问题分类和优先修复顺序。</p>
+      </article>
+    `;
+  }
+
+  const summary = intake.summary ?? {};
+  const topIssues = (intake.issues ?? []).slice(0, 4);
+  return `
+    <article class="preview-sprint-card is-${(summary.blockerCount ?? 0) > 0 ? "danger" : (summary.majorCount ?? 0) > 0 ? "warn" : "good"}">
+      <div class="preview-sprint-head">
+        <strong>测试反馈回收摘要</strong>
+        <span class="issue-tag ${(summary.blockerCount ?? 0) > 0 ? "danger-text" : ""}">
+          ${escapeHtml(`共 ${summary.totalCount ?? 0} 条`)}
+        </span>
+      </div>
+      <p>${escapeHtml(intake.sourceName ? `来源：${intake.sourceName}` : "已导入测试反馈 CSV。")}</p>
+      <div class="preview-sprint-metrics">
+        ${renderRouteMetricCard("阻塞", `${summary.blockerCount ?? 0} 条`, "先修")}
+        ${renderRouteMetricCard("明显问题", `${summary.majorCount ?? 0} 条`, "优先")}
+        ${renderRouteMetricCard("轻微问题", `${summary.minorCount ?? 0} 条`, "收尾")}
+        ${renderRouteMetricCard("建议", `${summary.suggestionCount ?? 0} 条`, "可选")}
+      </div>
+      <div class="preview-sprint-actions">
+        <button class="toolbar-button toolbar-button-primary" data-action="export-playtest-feedback-intake-markdown">
+          导出反馈摘要
+        </button>
+        <button class="toolbar-button" data-action="export-playtest-feedback-intake-csv">
+          导出反馈排序 CSV
+        </button>
+      </div>
+      ${
+        topIssues.length > 0
+          ? `
+            <div class="list-stack compact-stack">
+              ${topIssues
+                .map(
+                  (issue, index) => `
+                    <div class="route-testing-item">
+                      <div>
+                        <b>${escapeHtml(`${index + 1}. ${issue.sceneName || issue.routeTarget || "未标注位置"}`)}</b>
+                        <span>${escapeHtml(`${issue.severityLabel} · ${issue.category} · ${issue.chapterName || "未标注章节"}`)}</span>
+                      </div>
+                      <span>${escapeHtml(issue.summary || issue.actual || issue.steps || "没有填写详细说明")}</span>
+                    </div>
+                  `
+                )
+                .join("")}
+            </div>
+          `
+          : renderEmpty("这份反馈表里没有填写具体问题。")
       }
     </article>
   `;
@@ -28339,6 +28430,17 @@ function buildPlaytestFeedbackTemplateFileName(extension = "md") {
   return `${title}_playtest_feedback_template_${dateStamp}.${extension}`;
 }
 
+function buildPlaytestFeedbackIntakeFileName(extension = "md") {
+  const date = new Date();
+  const dateStamp = [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("");
+  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
+  return `${title}_playtest_feedback_intake_${dateStamp}.${extension}`;
+}
+
 function buildProjectDoctorRepairReceiptFileName(receipt = state.projectDoctorRepairReceipt) {
   const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
   const status = sanitizeFileName(receipt?.status || "receipt");
@@ -29530,6 +29632,65 @@ function exportPlaytestFeedbackTemplateCsv() {
   downloadTextFile(fileName, content, "text/csv;charset=utf-8");
   setSaveStatus(`已导出测试反馈 CSV：${fileName}`);
   showToast(`测试反馈 CSV 已导出：${fileName}`);
+}
+
+async function importPlaytestFeedbackCsv(file) {
+  if (!file) {
+    return false;
+  }
+
+  try {
+    const intake = playtestHandoffReportTools.buildPlaytestFeedbackIntake(await readFileAsText(file), {
+      projectTitle: state.data?.project?.title || "Canvasia Project",
+      importedAt: formatDate(new Date().toISOString()),
+      sourceName: file.name || "",
+    });
+    state.playtestFeedbackIntake = intake;
+    if (state.currentScreen === "inspection") {
+      renderInspectionScreen();
+    }
+    if (state.currentScreen === "preview") {
+      renderPreviewScreen();
+    }
+    const totalCount = intake.summary?.totalCount ?? 0;
+    const blockerCount = intake.summary?.blockerCount ?? 0;
+    setSaveStatus(`已导入测试反馈：${totalCount} 条，其中阻塞 ${blockerCount} 条`);
+    showToast(totalCount > 0 ? `测试反馈已整理：${totalCount} 条` : "反馈表已导入，但没有填写的问题");
+    return true;
+  } catch (error) {
+    await showEditorOperationFailure(error, "导入测试反馈失败", "测试反馈 CSV 没有导入成功");
+    return false;
+  }
+}
+
+function exportPlaytestFeedbackIntakeMarkdown() {
+  if (!state.playtestFeedbackIntake) {
+    showToast("还没有导入测试反馈 CSV", "error");
+    setSaveStatus("暂无测试反馈摘要可导出", true);
+    return false;
+  }
+
+  const fileName = buildPlaytestFeedbackIntakeFileName("md");
+  const content = playtestHandoffReportTools.buildPlaytestFeedbackIntakeMarkdown(state.playtestFeedbackIntake);
+  downloadTextFile(fileName, content, "text/markdown;charset=utf-8");
+  setSaveStatus(`已导出测试反馈摘要：${fileName}`);
+  showToast(`测试反馈摘要已导出：${fileName}`);
+  return true;
+}
+
+function exportPlaytestFeedbackIntakeCsv() {
+  if (!state.playtestFeedbackIntake) {
+    showToast("还没有导入测试反馈 CSV", "error");
+    setSaveStatus("暂无测试反馈 CSV 摘要可导出", true);
+    return false;
+  }
+
+  const fileName = buildPlaytestFeedbackIntakeFileName("csv");
+  const content = playtestHandoffReportTools.buildPlaytestFeedbackIntakeCsv(state.playtestFeedbackIntake);
+  downloadTextFile(fileName, content, "text/csv;charset=utf-8");
+  setSaveStatus(`已导出测试反馈 CSV 摘要：${fileName}`);
+  showToast(`测试反馈 CSV 摘要已导出：${fileName}`);
+  return true;
 }
 
 function getCharacterPrimarySpriteAssetId(character) {

@@ -116,6 +116,19 @@ class FrontendPlaytestHandoffReportModuleTests(unittest.TestCase):
             const feedbackRows = tools.buildPlaytestFeedbackRows(contextData);
             const feedbackMarkdown = tools.buildPlaytestFeedbackTemplateMarkdown(contextData);
             const feedbackCsv = tools.buildPlaytestFeedbackTemplateCsv(contextData);
+            const filledFeedbackCsv = [
+              '"类型","章节","场景","路线/目标","严重程度","问题分类","复现步骤","期望表现","实际表现","截图/录屏","备注"',
+              '"优先复看","第1章","坏链落点","跳到了不存在的场景","阻塞","卡死/断线","选择离开","进入下一场","黑屏无法继续","bug01.png",""',
+              '"分支路线","第1章","开场分歧","选项：留下 -> 教室","轻微问题","文本","第一句台词","无错字","有错别字","",""',
+              '"自由反馈","","标题菜单","","建议","UI","","按钮更明显","开始按钮略暗","","可优化"',
+            ].join("\\n");
+            const feedbackIntake = tools.buildPlaytestFeedbackIntake(filledFeedbackCsv, {{
+              projectTitle: "Demo",
+              importedAt: "2026-05-10 21:00:00",
+              sourceName: "feedback.csv",
+            }});
+            const feedbackIntakeMarkdown = tools.buildPlaytestFeedbackIntakeMarkdown(feedbackIntake);
+            const feedbackIntakeCsv = tools.buildPlaytestFeedbackIntakeCsv(feedbackIntake);
             process.stdout.write(JSON.stringify({{
               keys: Object.keys(tools).sort(),
               flattened: tools.flattenRouteTestingCases(routeTestingPlan),
@@ -127,6 +140,9 @@ class FrontendPlaytestHandoffReportModuleTests(unittest.TestCase):
               feedbackRows,
               feedbackMarkdown,
               feedbackCsv,
+              feedbackIntake,
+              feedbackIntakeMarkdown,
+              feedbackIntakeCsv,
             }}));
             """
         )
@@ -144,6 +160,8 @@ class FrontendPlaytestHandoffReportModuleTests(unittest.TestCase):
         self.assertIn("buildPlaytestHandoffCsv", payload["keys"])
         self.assertIn("buildPlaytestFeedbackTemplateMarkdown", payload["keys"])
         self.assertIn("buildPlaytestFeedbackTemplateCsv", payload["keys"])
+        self.assertIn("buildPlaytestFeedbackIntake", payload["keys"])
+        self.assertIn("buildPlaytestFeedbackIntakeMarkdown", payload["keys"])
         self.assertEqual(len(payload["flattened"]), 3)
         self.assertEqual(len(payload["feedbackRows"]), 5)
         self.assertEqual(payload["summary"]["blockedRouteCaseCount"], 1)
@@ -159,6 +177,13 @@ class FrontendPlaytestHandoffReportModuleTests(unittest.TestCase):
         self.assertIn("复现步骤", payload["feedbackMarkdown"])
         self.assertIn("截图/录屏", payload["feedbackCsv"])
         self.assertIn('"自由反馈"', payload["feedbackCsv"])
+        self.assertEqual(payload["feedbackIntake"]["summary"]["totalCount"], 3)
+        self.assertEqual(payload["feedbackIntake"]["summary"]["blockerCount"], 1)
+        self.assertEqual(payload["feedbackIntake"]["issues"][0]["severityLabel"], "阻塞")
+        self.assertEqual(payload["feedbackIntake"]["issues"][0]["sceneName"], "坏链落点")
+        self.assertIn("# Demo 测试反馈回收摘要", payload["feedbackIntakeMarkdown"])
+        self.assertIn("卡死/断线", payload["feedbackIntakeMarkdown"])
+        self.assertIn('"优先级"', payload["feedbackIntakeCsv"])
 
 
 if __name__ == "__main__":
