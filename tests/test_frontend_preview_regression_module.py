@@ -50,8 +50,8 @@ class FrontendPreviewRegressionModuleTests(unittest.TestCase):
               ["scene_bad", {{ id: "scene_bad", name: "Bad", chapterName: "Chapter" }}],
             ]);
             const variablesById = new Map([
-              ["score", {{ id: "score", type: "number", defaultValue: 0 }}],
-              ["flag", {{ id: "flag", type: "boolean", defaultValue: false }}],
+              ["score", {{ id: "score", type: "number", defaultValue: 7 }}],
+              ["flag", {{ id: "flag", type: "boolean", defaultValue: true }}],
             ]);
             const routeOverview = {{
               chapters: [
@@ -144,6 +144,19 @@ class FrontendPreviewRegressionModuleTests(unittest.TestCase):
                 getVariableType: (variableId) => variablesById.get(variableId)?.type ?? "string",
               }}
             );
+            const fallbackOverrides = tools.buildConditionVariableOverrides(
+              {{
+                routeKind: "fallback",
+                sourceSceneId: "scene_start",
+                blockIndex: 1,
+                branchIndex: -1,
+              }},
+              {{
+                scenesById,
+                variablesById,
+                getVariableType: (variableId) => variablesById.get(variableId)?.type ?? "string",
+              }}
+            );
             process.stdout.write(JSON.stringify({{
               keys: Object.keys(tools).sort(),
               seedIds: seeds.map((seed) => seed.seedId),
@@ -152,6 +165,7 @@ class FrontendPreviewRegressionModuleTests(unittest.TestCase):
               defaultWhenContextDoesNotMatch,
               conditionOverrides,
               booleanOverrides,
+              fallbackOverrides,
             }}));
             """
         )
@@ -177,7 +191,8 @@ class FrontendPreviewRegressionModuleTests(unittest.TestCase):
         self.assertEqual(payload["selected"]["id"], "opt_b")
         self.assertEqual(payload["defaultWhenContextDoesNotMatch"]["id"], "early_a")
         self.assertEqual(payload["conditionOverrides"], {"score": 5})
-        self.assertEqual(payload["booleanOverrides"], {"flag": True})
+        self.assertEqual(payload["booleanOverrides"], {"score": 4, "flag": True})
+        self.assertEqual(payload["fallbackOverrides"], {"score": 4, "flag": False})
 
 
 if __name__ == "__main__":

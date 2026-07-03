@@ -134,8 +134,113 @@
     return String(right ?? "");
   }
 
+  function getUnsatisfiedConditionValue(rule = {}, options = {}) {
+    const variableId = cleanText(rule.variableId);
+    if (!variableId) {
+      return undefined;
+    }
+    const operator = cleanText(rule.operator, "==");
+    const type = getVariableType(variableId, options);
+    const right = normalizeVariableValue(variableId, rule.value, options);
+
+    if (type === "number") {
+      const numberValue = Number(right);
+      if (!Number.isFinite(numberValue)) {
+        return undefined;
+      }
+      if (operator === ">" || operator === "<") {
+        return numberValue;
+      }
+      if (operator === ">=") {
+        return numberValue - 1;
+      }
+      if (operator === "<=" || operator === "==") {
+        return numberValue + 1;
+      }
+      if (operator === "!=") {
+        return numberValue;
+      }
+      return undefined;
+    }
+
+    if (type === "boolean") {
+      return operator === "!=" ? Boolean(right) : !Boolean(right);
+    }
+
+    if (operator === "!=") {
+      return String(right ?? "");
+    }
+    return `${String(right ?? "")}__canvasia_route_test_alt__`;
+  }
+
+  function getVariableTestValue(variableId, overrides = {}, options = {}) {
+    if (Object.hasOwn(overrides, variableId)) {
+      return normalizeVariableValue(variableId, overrides[variableId], options);
+    }
+    return getVariableDefaultValue(variableId, options);
+  }
+
+  function evaluateConditionRule(rule = {}, overrides = {}, options = {}) {
+    const variableId = cleanText(rule.variableId);
+    const left = getVariableTestValue(variableId, overrides, options);
+    const right = normalizeVariableValue(variableId, rule.value, options);
+
+    switch (cleanText(rule.operator, "==")) {
+      case ">":
+        return left > right;
+      case ">=":
+        return left >= right;
+      case "<":
+        return left < right;
+      case "<=":
+        return left <= right;
+      case "!=":
+        return left !== right;
+      case "==":
+      default:
+        return left === right;
+    }
+  }
+
+  function conditionBranchMatches(branch = {}, overrides = {}, options = {}) {
+    return toArray(branch.when).every((rule) => evaluateConditionRule(rule, overrides, options));
+  }
+
+  function setOverrideIfCompatible(overrides, variableId, value, options = {}) {
+    const safeVariableId = cleanText(variableId);
+    if (!safeVariableId || value === undefined) {
+      return false;
+    }
+    const safeValue = normalizeVariableValue(safeVariableId, value, options);
+    if (
+      Object.hasOwn(overrides, safeVariableId) &&
+      normalizeVariableValue(safeVariableId, overrides[safeVariableId], options) !== safeValue
+    ) {
+      return false;
+    }
+    overrides[safeVariableId] = safeValue;
+    return true;
+  }
+
+  function falsifyConditionBranch(branch = {}, overrides = {}, options = {}, lockedVariables = new Set()) {
+    if (!conditionBranchMatches(branch, overrides, options)) {
+      return true;
+    }
+    return toArray(branch.when).some((rule) => {
+      const variableId = cleanText(rule?.variableId);
+      if (!variableId || lockedVariables.has(variableId)) {
+        return false;
+      }
+      const value = getUnsatisfiedConditionValue(rule, options);
+      if (!setOverrideIfCompatible(overrides, variableId, value, options)) {
+        return false;
+      }
+      return !evaluateConditionRule(rule, overrides, options);
+    });
+  }
+
   function buildConditionVariableOverrides(seed = {}, options = {}) {
-    if (seed.routeKind !== "condition" || !Number.isInteger(seed.blockIndex) || !Number.isInteger(seed.branchIndex)) {
+    if (!["condition", "fallback"].includes(seed.routeKind) || !Number.isInteger(seed.blockIndex)) {
       return {};
     }
     const scene = getSceneById(seed.sourceSceneId || seed.sceneId, options);
@@ -143,20 +248,32 @@
     if (block?.type !== "condition") {
       return {};
     }
-    const branch = toArray(block.branches)[seed.branchIndex];
-    if (!branch) {
-      return {};
+
+    const branches = toArray(block.branches);
+    const overrides = {};
+    const targetBranch = branches[seed.branchIndex];
+    const lockedVariables = new Set();
+
+    if (seed.routeKind === "condition") {
+      if (!targetBranch) {
+        return {};
+      }
+      toArray(targetBranch.when).forEach((rule) => {
+        const variableId = cleanText(rule?.variableId);
+        if (setOverrideIfCompatible(overrides, variableId, getSatisfiedConditionValue(rule, options), options)) {
+          lockedVariables.add(variableId);
+        }
+      });
+      branches.slice(0, seed.branchIndex).forEach((branch) => {
+        falsifyConditionBranch(branch, overrides, options, lockedVariables);
+      });
+      return overrides;
     }
 
-    return toArray(branch.when).reduce((overrides, rule) => {
-      const variableId = cleanText(rule?.variableId);
-      const value = getSatisfiedConditionValue(rule, options);
-      if (!variableId || value === undefined) {
-        return overrides;
-      }
-      overrides[variableId] = normalizeVariableValue(variableId, value, options);
-      return overrides;
-    }, {});
+    branches.forEach((branch) => {
+      falsifyConditionBranch(branch, overrides, options);
+    });
+    return overrides;
   }
 
   function buildRouteCaseSeed(point = {}, routeCase = {}) {
