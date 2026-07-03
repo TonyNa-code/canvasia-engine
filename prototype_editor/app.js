@@ -48,6 +48,7 @@ const storyBlockEditorTools = window.CanvasiaEditorStoryBlockEditors;
 const storyTemplateTools = window.CanvasiaEditorStoryTemplates;
 const { STORY_TEMPLATE_PRESETS } = storyTemplateTools;
 const scriptImporterTools = window.CanvasiaEditorScriptImporter;
+const routeAnalyzerTools = window.CanvasiaEditorRouteAnalyzer;
 
 function getBlockLabel(type) {
   return storyBlockCatalogTools.getBlockLabel(type) ?? BLOCK_LABELS[type] ?? type ?? "步骤";
@@ -11798,220 +11799,30 @@ function getDashboardTaskToneClass(tone) {
   return "";
 }
 
-function buildSceneRouteOverview() {
-  const entrySceneId = state.data.project.entrySceneId;
-  const incomingCounts = new Map();
-  const brokenRoutes = [];
-  const effectBlockTypes = new Set([
-    "particle_effect",
-    "screen_shake",
-    "screen_flash",
-    "screen_fade",
-    "camera_zoom",
-    "camera_pan",
-    "screen_filter",
-    "depth_blur",
-  ]);
-  const validationSceneIndex = buildRouteValidationSceneIndex();
-
-  const chapters = state.data.chapters.map((chapter, chapterIndex) => {
-    const sceneNodes = (chapter.sceneOrder ?? [])
-      .map((sceneId, sceneIndex) => {
-        const scene = state.data.scenesById.get(sceneId);
-        if (!scene) {
-          return null;
-        }
-
-        const routes = collectSceneRoutes(scene);
-        return {
-          id: scene.id,
-          name: scene.name,
-          status: getSafeSceneStatus(scene.status),
-          priority: getSafeScenePriority(scene.priority),
-          notes: String(scene.notes ?? "").trim(),
-          chapterId: chapter.chapterId,
-          chapterName: chapter.name,
-          chapterIndex,
-          sceneIndex,
-          blockCount: scene.blocks?.length ?? 0,
-          dialogueCount: (scene.blocks ?? []).filter((block) => block.type === "dialogue").length,
-          narrationCount: (scene.blocks ?? []).filter((block) => block.type === "narration").length,
-          choiceCount: (scene.blocks ?? []).filter((block) => block.type === "choice").length,
-          conditionCount: (scene.blocks ?? []).filter((block) => block.type === "condition").length,
-          routes,
-          isEntry: scene.id === entrySceneId,
-          ...buildRouteSceneProduction(scene, effectBlockTypes, validationSceneIndex.get(scene.id)),
-        };
-      })
-      .filter(Boolean);
-
-    return {
-      chapterId: chapter.chapterId,
-      name: chapter.name,
-      chapterIndex,
-      scenes: sceneNodes,
-      production: buildRouteChapterProduction(sceneNodes),
-    };
-  });
-
-  const nodes = chapters.flatMap((chapter) => chapter.scenes);
-
-  nodes.forEach((node) => {
-    node.routes.forEach((route) => {
-      if (route.targetExists) {
-        incomingCounts.set(route.targetSceneId, (incomingCounts.get(route.targetSceneId) ?? 0) + 1);
-      } else {
-        brokenRoutes.push(route);
-      }
-    });
-  });
-
-  nodes.forEach((node) => {
-    const validRoutes = node.routes.filter((route) => route.targetExists);
-    node.incomingCount = incomingCounts.get(node.id) ?? 0;
-    node.branchTargetCount = new Set(validRoutes.map((route) => route.targetSceneId)).size;
-    node.brokenRouteCount = node.routes.length - validRoutes.length;
-    node.isOrphan = !node.isEntry && node.incomingCount === 0;
-    node.isEnding = validRoutes.length === 0;
-  });
-
-  const alerts = [
-    ...brokenRoutes.map((route) => ({
-      sceneId: route.sourceSceneId,
-      sceneName: route.sourceSceneName,
-      label: "坏链",
-      tone: "danger",
-      message: `${route.shortLabel} 指向了一个不存在的场景。`,
-      meta: `${route.meta} -> ${route.targetSceneName}`,
-    })),
-    ...nodes
-      .filter((node) => node.isOrphan)
-      .map((node) => ({
-        sceneId: node.id,
-        sceneName: node.name,
-        label: "孤立",
-        tone: "warn",
-        message: "目前没有任何分支、跳转或条件会走到这个场景。",
-        meta: "如果这不是隐藏路线，可从别的场景补一条入口。",
-      })),
-    ...nodes
-      .filter((node) => node.isEnding && !node.isEntry)
-      .map((node) => ({
-        sceneId: node.id,
-        sceneName: node.name,
-        label: "收束",
-        tone: "soft",
-        message: "这个场景没有继续跳往别处的路线。",
-        meta: "如果它就是结局或章节收尾，那现在这样完全没问题。",
-      })),
-  ].sort((left, right) => getRouteAlertPriority(left.tone) - getRouteAlertPriority(right.tone));
-
+function getRouteAnalyzerOptions() {
   return {
-    chapters,
-    nodes,
-    alerts,
-    metrics: {
-      entrySceneName: state.data.scenesById.get(entrySceneId)?.name ?? "未设置",
-      branchingScenes: nodes.filter((node) => node.branchTargetCount > 1).length,
-      endingScenes: nodes.filter((node) => node.isEnding).length,
-      orphanScenes: nodes.filter((node) => node.isOrphan).length,
-      brokenRoutes: brokenRoutes.length,
-    },
+    getSafeSceneStatus,
+    getSafeScenePriority,
+    getSceneById: (sceneId) => state.data?.scenesById.get(sceneId) ?? null,
+    summarizeConditionBranch: summarizeConditionBranchForRoute,
+    truncateText,
   };
+}
+
+function buildSceneRouteOverview() {
+  return routeAnalyzerTools.buildSceneRouteOverview(state.data, state.validation, getRouteAnalyzerOptions());
 }
 
 function buildRouteValidationSceneIndex() {
-  const sceneIndex = new Map();
-
-  function bumpIssue(sceneId, tone) {
-    if (!sceneId) {
-      return;
-    }
-
-    const entry = sceneIndex.get(sceneId) ?? { errorCount: 0, warningCount: 0 };
-    if (tone === "error") {
-      entry.errorCount += 1;
-    } else {
-      entry.warningCount += 1;
-    }
-    sceneIndex.set(sceneId, entry);
-  }
-
-  state.validation.errors.forEach((issue) => {
-    const context = issue?.context;
-    if (context?.type === "story" || context?.type === "scene") {
-      bumpIssue(context.sceneId, "error");
-    }
-  });
-
-  state.validation.warnings.forEach((issue) => {
-    const context = issue?.context;
-    if (context?.type === "story" || context?.type === "scene") {
-      bumpIssue(context.sceneId, "warning");
-    }
-  });
-
-  return sceneIndex;
+  return routeAnalyzerTools.buildRouteValidationSceneIndex(state.validation);
 }
 
 function buildRouteSceneProduction(scene, effectBlockTypes, issueCounts = null) {
-  const blocks = scene.blocks ?? [];
-  const dialogueBlocks = blocks.filter((block) => block.type === "dialogue");
-  const hasStoryContent = blocks.some((block) => ["dialogue", "narration", "choice"].includes(block.type));
-  const hasBackground = blocks.some((block) => block.type === "background" && block.assetId);
-  const hasMusic = blocks.some((block) => block.type === "music_play" && block.assetId);
-  const hasEffects = blocks.some((block) => effectBlockTypes.has(block.type));
-  const missingVoiceCount = dialogueBlocks.filter((block) => !block.voiceAssetId).length;
-  const voicedDialogueCount = Math.max(dialogueBlocks.length - missingVoiceCount, 0);
-  const voiceProgress =
-    dialogueBlocks.length > 0 ? getDashboardProgressPercent(voicedDialogueCount, dialogueBlocks.length) : 100;
-  const baseScore =
-    (hasStoryContent ? 34 : 0) +
-    (hasBackground ? 18 : 0) +
-    (hasMusic ? 12 : 0) +
-    (hasEffects ? 15 : 0) +
-    (hasStoryContent ? Math.round((voiceProgress / 100) * 21) : 0);
-  const errorCount = issueCounts?.errorCount ?? 0;
-  const warningCount = issueCounts?.warningCount ?? 0;
-  const issuePenalty = Math.min(24, errorCount * 10 + warningCount * 4);
-  const completionScore = clamp(baseScore - issuePenalty, 0, 100);
-
-  return {
-    hasStoryContent,
-    hasBackground,
-    hasMusic,
-    hasEffects,
-    missingVoiceCount,
-    voicedDialogueCount,
-    voiceProgress,
-    completionScore,
-    errorCount,
-    warningCount,
-  };
+  return routeAnalyzerTools.buildRouteSceneProduction(scene, issueCounts, { effectBlockTypes });
 }
 
 function buildRouteChapterProduction(sceneNodes) {
-  if (!sceneNodes.length) {
-    return {
-      averageCompletion: 0,
-      readyCount: 0,
-      missingBackgroundCount: 0,
-      missingVoiceSceneCount: 0,
-      flatSceneCount: 0,
-      issueSceneCount: 0,
-    };
-  }
-
-  return {
-    averageCompletion: Math.round(
-      sceneNodes.reduce((sum, node) => sum + (node.completionScore ?? 0), 0) / sceneNodes.length
-    ),
-    readyCount: sceneNodes.filter((node) => (node.completionScore ?? 0) >= 80).length,
-    missingBackgroundCount: sceneNodes.filter((node) => node.hasStoryContent && !node.hasBackground).length,
-    missingVoiceSceneCount: sceneNodes.filter((node) => node.missingVoiceCount > 0).length,
-    flatSceneCount: sceneNodes.filter((node) => node.hasStoryContent && !node.hasEffects).length,
-    issueSceneCount: sceneNodes.filter((node) => (node.errorCount ?? 0) > 0 || (node.warningCount ?? 0) > 0).length,
-  };
+  return routeAnalyzerTools.buildRouteChapterProduction(sceneNodes);
 }
 
 function buildRouteSceneProductionNotes(node) {
@@ -12051,82 +11862,14 @@ function buildRouteSceneProductionNotes(node) {
 }
 
 function collectSceneRoutes(scene) {
-  const routes = [];
-
-  (scene.blocks ?? []).forEach((block, blockIndex) => {
-    if (block.type === "jump") {
-      routes.push(
-        createSceneRoute(scene, {
-          blockIndex,
-          routeKind: "jump",
-          targetSceneId: block.targetSceneId,
-          label: "直接跳转",
-          shortLabel: "跳转",
-          meta: `第 ${blockIndex + 1} 张卡片`,
-        })
-      );
-    }
-
-    if (block.type === "choice") {
-      (block.options ?? []).forEach((option, optionIndex) => {
-        routes.push(
-          createSceneRoute(scene, {
-            blockIndex,
-            routeKind: "choice",
-            targetSceneId: option.gotoSceneId,
-            label: truncateText(option.text || `选项 ${optionIndex + 1}`, 20),
-            shortLabel: "选项",
-            meta: `第 ${blockIndex + 1} 张卡片 / 选项 ${optionIndex + 1}`,
-          })
-        );
-      });
-    }
-
-    if (block.type === "condition") {
-      (block.branches ?? []).forEach((branch, branchIndex) => {
-        routes.push(
-          createSceneRoute(scene, {
-            blockIndex,
-            routeKind: "condition",
-            targetSceneId: branch.gotoSceneId,
-            label: summarizeConditionBranchForRoute(branch),
-            shortLabel: "条件",
-            meta: `第 ${blockIndex + 1} 张卡片 / 条件分支 ${branchIndex + 1}`,
-          })
-        );
-      });
-
-      routes.push(
-        createSceneRoute(scene, {
-          blockIndex,
-          routeKind: "fallback",
-          targetSceneId: block.elseGotoSceneId,
-          label: "都不满足时",
-          shortLabel: "否则",
-          meta: `第 ${blockIndex + 1} 张卡片 / 否则`,
-        })
-      );
-    }
-  });
-
-  return routes;
+  return routeAnalyzerTools.collectSceneRoutes(scene, getRouteAnalyzerOptions());
 }
 
 function createSceneRoute(scene, config) {
-  const targetScene = state.data.scenesById.get(config.targetSceneId);
-
-  return {
-    id: `${scene.id}-${config.blockIndex}-${config.routeKind}-${config.targetSceneId ?? "missing"}-${config.meta}`,
-    sourceSceneId: scene.id,
-    sourceSceneName: scene.name,
-    targetSceneId: config.targetSceneId ?? "",
-    targetSceneName: targetScene?.name ?? (config.targetSceneId || "未设置目标"),
-    targetExists: Boolean(targetScene),
-    routeKind: config.routeKind,
-    label: config.label,
-    shortLabel: config.shortLabel,
-    meta: config.meta,
-  };
+  return routeAnalyzerTools.createSceneRoute(scene, config, {
+    ...getRouteAnalyzerOptions(),
+    data: state.data,
+  });
 }
 
 function summarizeConditionBranchForRoute(branch) {
@@ -12149,13 +11892,7 @@ function summarizeConditionBranchForRoute(branch) {
 }
 
 function getRouteAlertPriority(tone) {
-  if (tone === "danger") {
-    return 0;
-  }
-  if (tone === "warn") {
-    return 1;
-  }
-  return 2;
+  return routeAnalyzerTools.getRouteAlertPriority(tone);
 }
 
 function renderRouteMetricCard(label, value, hint) {

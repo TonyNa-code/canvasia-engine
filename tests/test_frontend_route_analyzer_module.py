@@ -1,0 +1,124 @@
+from __future__ import annotations
+
+import json
+import subprocess
+import textwrap
+import unittest
+from pathlib import Path
+
+
+ROOT_DIR = Path(__file__).resolve().parents[1]
+MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "route_analyzer.js"
+
+
+class FrontendRouteAnalyzerModuleTests(unittest.TestCase):
+    def test_route_analyzer_builds_branch_metrics_and_alerts(self) -> None:
+        script = textwrap.dedent(
+            f"""
+            const fs = require("fs");
+            const vm = require("vm");
+            const context = {{ window: {{}} }};
+            context.globalThis = context;
+            vm.createContext(context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
+            const tools = context.window.CanvasiaEditorRouteAnalyzer;
+            const start = {{
+              id: "scene_start",
+              name: "Start",
+              status: "ready",
+              priority: "focus",
+              blocks: [
+                {{ id: "bg", type: "background", assetId: "bg_school" }},
+                {{ id: "music", type: "music_play", assetId: "bgm_daily" }},
+                {{ id: "line", type: "dialogue", text: "Hello", voiceAssetId: "" }},
+                {{
+                  id: "choice",
+                  type: "choice",
+                  options: [
+                    {{ text: "Go end", gotoSceneId: "scene_end" }},
+                    {{ text: "Missing", gotoSceneId: "scene_missing" }}
+                  ]
+                }},
+                {{
+                  id: "condition",
+                  type: "condition",
+                  branches: [{{ gotoSceneId: "scene_secret", when: [{{ variableId: "flag" }}] }}],
+                  elseGotoSceneId: ""
+                }}
+              ]
+            }};
+            const end = {{
+              id: "scene_end",
+              name: "End",
+              blocks: [{{ id: "n", type: "narration", text: "Done." }}]
+            }};
+            const secret = {{
+              id: "scene_secret",
+              name: "Secret",
+              blocks: [{{ id: "fx", type: "screen_flash" }}, {{ id: "n", type: "narration", text: "Secret." }}]
+            }};
+            const orphan = {{
+              id: "scene_orphan",
+              name: "Orphan",
+              blocks: [{{ id: "n", type: "narration", text: "Nobody reaches this." }}]
+            }};
+            const data = {{
+              project: {{ entrySceneId: "scene_start" }},
+              chapters: [
+                {{ chapterId: "ch1", name: "Chapter", sceneOrder: ["scene_start", "scene_end", "scene_secret", "scene_orphan"] }}
+              ],
+              scenesById: new Map([
+                ["scene_start", start],
+                ["scene_end", end],
+                ["scene_secret", secret],
+                ["scene_orphan", orphan]
+              ])
+            }};
+            const validation = {{
+              errors: [{{ context: {{ type: "scene", sceneId: "scene_start" }} }}],
+              warnings: [{{ context: {{ type: "story", sceneId: "scene_end" }} }}]
+            }};
+            const overview = tools.buildSceneRouteOverview(data, validation, {{
+              summarizeConditionBranch: () => "Flag route",
+            }});
+            const routeKinds = overview.nodes.find((node) => node.id === "scene_start").routes.map((route) => route.routeKind);
+            process.stdout.write(JSON.stringify({{
+              keys: Object.keys(tools).sort(),
+              metrics: overview.metrics,
+              alertLabels: overview.alerts.map((alert) => alert.label),
+              startNode: overview.nodes.find((node) => node.id === "scene_start"),
+              endNode: overview.nodes.find((node) => node.id === "scene_end"),
+              orphanNode: overview.nodes.find((node) => node.id === "scene_orphan"),
+              chapterProduction: overview.chapters[0].production,
+              routeKinds,
+            }}));
+            """
+        )
+        completed = subprocess.run(
+            ["node", "-e", script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        self.assertIn("buildSceneRouteOverview", payload["keys"])
+        self.assertEqual(payload["metrics"]["entrySceneName"], "Start")
+        self.assertEqual(payload["metrics"]["brokenRoutes"], 2)
+        self.assertEqual(payload["metrics"]["branchingScenes"], 1)
+        self.assertEqual(payload["metrics"]["endingScenes"], 3)
+        self.assertEqual(payload["metrics"]["orphanScenes"], 1)
+        self.assertEqual(payload["routeKinds"], ["choice", "choice", "condition", "fallback"])
+        self.assertEqual(payload["alertLabels"][:2], ["坏链", "坏链"])
+        self.assertTrue(payload["orphanNode"]["isOrphan"])
+        self.assertTrue(payload["endNode"]["isEnding"])
+        self.assertEqual(payload["startNode"]["missingVoiceCount"], 1)
+        self.assertEqual(payload["startNode"]["errorCount"], 1)
+        self.assertEqual(payload["endNode"]["warningCount"], 1)
+        self.assertGreater(payload["chapterProduction"]["averageCompletion"], 0)
+
+
+if __name__ == "__main__":
+    unittest.main()

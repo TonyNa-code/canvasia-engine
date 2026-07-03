@@ -110,7 +110,7 @@ Canvasia Engine 当前更适合这样理解：
   编辑器前端
 
 - [`prototype_editor/modules`](prototype_editor/modules)
-  前端纯逻辑模块，覆盖素材目录、创作助手、项目医生、成品目标路线、发布总控、变量、外观主题、项目历史等可单独测试的能力
+  前端纯逻辑模块，覆盖素材目录、创作助手、路线分析、项目医生、成品目标路线、发布总控、变量、外观主题、项目历史等可单独测试的能力
 
 - [`export_player_template`](export_player_template)
   导出后玩家端 Runtime 模板

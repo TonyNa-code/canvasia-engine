@@ -104,7 +104,7 @@ The project already includes a visual editor, export pipeline, native runtime pr
 - [`editor_local_security.py`](editor_local_security.py): loopback-only API request guard helpers
 - [`editor_snapshot_cache.py`](editor_snapshot_cache.py): reusable file-signature snapshot cache for read-heavy editor payloads
 - [`prototype_editor`](prototype_editor): visual editor frontend
-- [`prototype_editor/modules`](prototype_editor/modules): frontend pure-logic modules with standalone test coverage
+- [`prototype_editor/modules`](prototype_editor/modules): frontend pure-logic modules for route analysis, story templates, editor helpers, assistant workflows, release checks, and other testable editor capabilities
 - [`export_player_template`](export_player_template): exported Web Runtime template
 - [`native_runtime`](native_runtime): native Runtime player and related desktop runtime logic
 - [`template_project`](template_project): blank starter project template

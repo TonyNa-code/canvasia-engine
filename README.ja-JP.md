@@ -102,7 +102,7 @@ Canvasia Engine は、ビジュアルノベル / Galgame 制作者のための s
 
 - [`run_editor.py`](run_editor.py): ローカルエディタサーバー、プロジェクト管理、書き出し、パッケージング入口
 - [`prototype_editor`](prototype_editor): エディタ frontend
-- [`prototype_editor/modules`](prototype_editor/modules): 単体テスト可能な frontend 純ロジックモジュール
+- [`prototype_editor/modules`](prototype_editor/modules): ルート分析、ストーリーテンプレート、エディタ補助、Assistant、公開前チェックなどを扱う単体テスト可能な frontend 純ロジックモジュール
 - [`export_player_template`](export_player_template): 書き出し後の Web Runtime テンプレート
 - [`native_runtime`](native_runtime): ネイティブ Runtime player と desktop runtime 関連ロジック
 - [`template_project`](template_project): 空白プロジェクトテンプレート
