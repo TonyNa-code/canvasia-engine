@@ -43,6 +43,7 @@ SAMPLE_PROJECT_ID = "sample_heartbeat"
 DEFAULT_PORT = 8765
 EXPORTS_DIR = ROOT_DIR / "exports"
 EXPORT_TEMPLATE_DIR = ROOT_DIR / "export_player_template"
+EXPORT_PLAYER_SCRIPT_FILES = ("player.js", "runtime_controls.js")
 NATIVE_RUNTIME_TEMPLATE_DIR = ROOT_DIR / "native_runtime"
 EXPORT_RUNTIME_CACHE_DIR = ROOT_DIR / ".export_runtime_cache"
 SUPPORTED_RESOLUTIONS = {(1280, 720), (1920, 1080)}
@@ -8508,7 +8509,8 @@ def export_editor_suite_platform_package(
 def write_export_app_files(build_dir: Path, export_payload: dict) -> None:
     (build_dir / "index.html").write_text(render_export_index(export_payload), encoding="utf-8")
     shutil.copy2(EXPORT_TEMPLATE_DIR / "player.css", build_dir / "player.css")
-    shutil.copy2(EXPORT_TEMPLATE_DIR / "player.js", build_dir / "player.js")
+    for script_name in EXPORT_PLAYER_SCRIPT_FILES:
+        shutil.copy2(EXPORT_TEMPLATE_DIR / script_name, build_dir / script_name)
 
 
 def format_export_digest_number(value: object) -> str:
@@ -10477,6 +10479,7 @@ def export_web_build() -> dict:
             "entryHtml": "index.html",
             "playerCss": "player.css",
             "playerJs": "player.js",
+            "playerRuntimeControls": "runtime_controls.js",
             "iconPng": icon_files["pngFileName"],
             "iconIco": icon_files["icoFileName"],
             "launchSplash": splash_file["fileName"],

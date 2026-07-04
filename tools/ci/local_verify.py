@@ -115,7 +115,13 @@ def build_python_compile_step(python_executable: str) -> VerifyStep:
 def build_node_check_steps() -> list[VerifyStep]:
     module_scripts = discover_editor_module_scripts()
     script_paths = [f"prototype_editor/{script}" for script in module_scripts]
-    script_paths.extend(["prototype_editor/app.js", "export_player_template/player.js"])
+    script_paths.extend(
+        [
+            "prototype_editor/app.js",
+            "export_player_template/player.js",
+            "export_player_template/runtime_controls.js",
+        ]
+    )
     return [
         VerifyStep(
             name=f"Node syntax: {script_path}",

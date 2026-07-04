@@ -15,6 +15,7 @@ INDEX_PATH = EDITOR_DIR / "index.html"
 APP_PATH = EDITOR_DIR / "app.js"
 STYLES_PATH = EDITOR_DIR / "styles.css"
 PLAYER_PATH = ROOT_DIR / "export_player_template" / "player.js"
+RUNTIME_CONTROLS_PATH = ROOT_DIR / "export_player_template" / "runtime_controls.js"
 NATIVE_RUNTIME_PATH = ROOT_DIR / "native_runtime" / "runtime_player.py"
 MODULE_PATHS = tuple(sorted((EDITOR_DIR / "modules").glob("*.js")))
 ACTION_ATTRIBUTE_PATHS = (INDEX_PATH, APP_PATH, *MODULE_PATHS)
@@ -4699,6 +4700,7 @@ class FrontendActionHandlerTests(unittest.TestCase):
     def test_web_runtime_operation_guide_is_data_driven_and_keyboard_reachable(self) -> None:
         player_html = (ROOT_DIR / "export_player_template" / "index.html").read_text(encoding="utf-8")
         player_source = PLAYER_PATH.read_text(encoding="utf-8")
+        runtime_controls_source = RUNTIME_CONTROLS_PATH.read_text(encoding="utf-8")
         player_css = (ROOT_DIR / "export_player_template" / "player.css").read_text(encoding="utf-8")
         refs_block = player_source[player_source.index("const refs = {") : player_source.index("};", player_source.index("const refs = {"))]
         init_block = _extract_function_source(player_source, "init")
@@ -4711,14 +4713,16 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn('id="systemMenuOperationGuideButton"', player_html)
         self.assertIn('id="operationGuideDialog"', player_html)
         self.assertIn('id="operationGuideList"', player_html)
-        self.assertIn("const RUNTIME_SHORTCUT_GROUPS = Object.freeze", player_source)
+        self.assertIn('import { renderOperationGuideGroups } from "./runtime_controls.js";', player_source)
+        self.assertIn("export const RUNTIME_SHORTCUT_GROUPS = Object.freeze", runtime_controls_source)
+        self.assertIn("export function renderOperationGuideGroups", runtime_controls_source)
         self.assertIn("operationGuideOpen: false", player_source)
         self.assertIn('operationGuideButton: document.getElementById("operationGuideButton")', refs_block)
         self.assertIn('startOperationGuideButton: document.getElementById("startOperationGuideButton")', refs_block)
         self.assertIn('systemMenuOperationGuideButton: document.getElementById("systemMenuOperationGuideButton")', refs_block)
         self.assertIn("openOperationGuideDialog", init_block)
         self.assertIn("stopRuntimeAutoAdvance()", open_operation_guide)
-        self.assertIn("RUNTIME_SHORTCUT_GROUPS.map(renderOperationGuideGroup).join(\"\")", render_operation_guide)
+        self.assertIn("renderOperationGuideGroups()", render_operation_guide)
         self.assertIn('event.code === "F1"', handle_keydown)
         self.assertIn('event.shiftKey && event.code === "Slash"', handle_keydown)
         self.assertIn("closeOperationGuideDialog()", handle_keydown)
