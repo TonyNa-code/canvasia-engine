@@ -5041,11 +5041,33 @@ function getProjectRuntimeSettings(project = data.project) {
   const runtimeSettings = project?.runtimeSettings ?? {};
   return {
     formalSaveSlotCount: getSafeProjectFormalSaveSlotCount(runtimeSettings.formalSaveSlotCount),
+    defaultTextSpeed: getSafeTextSpeed(runtimeSettings.defaultTextSpeed ?? PLAYBACK_DEFAULTS.textSpeed),
+    defaultDialogTheme: getSafeDialogTheme(runtimeSettings.defaultDialogTheme ?? PLAYBACK_DEFAULTS.dialogTheme),
+    defaultUiThemeMode: getSafeUiThemeMode(runtimeSettings.defaultUiThemeMode ?? PLAYBACK_DEFAULTS.uiThemeMode),
+    defaultBgmVolume: getSafeVolumePercent(runtimeSettings.defaultBgmVolume, PLAYBACK_DEFAULTS.bgmVolume),
+    defaultSfxVolume: getSafeVolumePercent(runtimeSettings.defaultSfxVolume, PLAYBACK_DEFAULTS.sfxVolume),
+    defaultVoiceVolume: getSafeVolumePercent(runtimeSettings.defaultVoiceVolume, PLAYBACK_DEFAULTS.voiceVolume),
+    defaultVoiceEnabled: runtimeSettings.defaultVoiceEnabled !== false,
   };
 }
 
 function getProjectFormalSaveSlotCount(project = data.project) {
   return getProjectRuntimeSettings(project).formalSaveSlotCount;
+}
+
+function getProjectPlaybackDefaults(project = data.project) {
+  const runtimeSettings = getProjectRuntimeSettings(project);
+  return sanitizePlaybackSettings({
+    ...PLAYBACK_DEFAULTS,
+    textSpeed: runtimeSettings.defaultTextSpeed,
+    language: getDefaultRuntimeLanguage(),
+    dialogTheme: runtimeSettings.defaultDialogTheme,
+    uiThemeMode: runtimeSettings.defaultUiThemeMode,
+    voiceEnabled: runtimeSettings.defaultVoiceEnabled,
+    bgmVolume: runtimeSettings.defaultBgmVolume,
+    sfxVolume: runtimeSettings.defaultSfxVolume,
+    voiceVolume: runtimeSettings.defaultVoiceVolume,
+  });
 }
 
 function getSafeProjectDialogBoxPreset(value) {
@@ -5591,21 +5613,25 @@ function getSceneChapterName(scene) {
 
 function loadStoredPlaybackSettings() {
   const storage = getBrowserStorage();
+  const projectDefaults = getProjectPlaybackDefaults();
 
   if (!storage) {
-    return { ...PLAYBACK_DEFAULTS };
+    return projectDefaults;
   }
 
   try {
     const raw = storage.getItem(getPlaybackStorageKey());
 
     if (!raw) {
-      return { ...PLAYBACK_DEFAULTS };
+      return projectDefaults;
     }
 
-    return sanitizePlaybackSettings(JSON.parse(raw));
+    return sanitizePlaybackSettings({
+      ...projectDefaults,
+      ...JSON.parse(raw),
+    });
   } catch (error) {
-    return { ...PLAYBACK_DEFAULTS };
+    return projectDefaults;
   }
 }
 
@@ -7642,7 +7668,7 @@ function replayCurrentVoice() {
 }
 
 function resetPlaybackSettings() {
-  state.playback = sanitizePlaybackSettings({ ...PLAYBACK_DEFAULTS, language: getDefaultRuntimeLanguage() });
+  state.playback = getProjectPlaybackDefaults();
   persistPlaybackSettings();
   applyRuntimeUiTheme(state.playback.uiThemeMode);
   stopRuntimeAutoAdvance();

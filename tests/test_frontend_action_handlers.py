@@ -2307,6 +2307,7 @@ class FrontendActionHandlerTests(unittest.TestCase):
                 "saveProjectEditorMode",
                 "saveProjectReleaseVersion",
                 "saveProjectFormalSaveSlotCount",
+                "saveProjectRuntimePlaybackDefaults",
                 "saveProjectLocalizationSettings",
                 "addProjectVariable",
                 "saveProjectVariable",
@@ -2340,6 +2341,7 @@ class FrontendActionHandlerTests(unittest.TestCase):
             'await showEditorOperationFailure(error, "切换编辑模式失败", "编辑模式没有切换成功")',
             'await showEditorOperationFailure(error, "保存发布版本失败", "发布版本没有保存成功")',
             'await showEditorOperationFailure(error, "保存正式存档位失败", "正式存档位没有保存成功")',
+            'await showEditorOperationFailure(error, "保存默认播放体验失败", "成品默认播放体验没有保存成功")',
             'await showEditorOperationFailure(error, "保存多语言设置失败", "多语言设置没有保存成功")',
             'await showEditorOperationFailure(error, "新增变量失败", "变量没有新增成功")',
             'await showEditorOperationFailure(error, "保存变量失败", "变量没有保存成功")',
@@ -4728,6 +4730,29 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("closeOperationGuideDialog()", handle_keydown)
         self.assertIn(".operation-guide-list", player_css)
         self.assertIn(".operation-shortcut-keys kbd", player_css)
+
+    def test_web_runtime_applies_project_playback_defaults_before_player_overrides(self) -> None:
+        player_source = PLAYER_PATH.read_text(encoding="utf-8")
+        project_runtime_settings = _extract_function_source(player_source, "getProjectRuntimeSettings")
+        project_playback_defaults = _extract_function_source(player_source, "getProjectPlaybackDefaults")
+        load_playback_settings = _extract_function_source(player_source, "loadStoredPlaybackSettings")
+        reset_playback_settings = _extract_function_source(player_source, "resetPlaybackSettings")
+
+        for key in (
+            "defaultTextSpeed",
+            "defaultDialogTheme",
+            "defaultUiThemeMode",
+            "defaultBgmVolume",
+            "defaultSfxVolume",
+            "defaultVoiceVolume",
+            "defaultVoiceEnabled",
+        ):
+            self.assertIn(key, project_runtime_settings)
+            self.assertIn(key, project_playback_defaults)
+        self.assertIn("const projectDefaults = getProjectPlaybackDefaults()", load_playback_settings)
+        self.assertIn("...projectDefaults", load_playback_settings)
+        self.assertIn("...JSON.parse(raw)", load_playback_settings)
+        self.assertIn("state.playback = getProjectPlaybackDefaults()", reset_playback_settings)
 
     def test_typewriter_index_helpers_keep_unicode_characters_intact(self) -> None:
         for path in (APP_PATH, PLAYER_PATH):

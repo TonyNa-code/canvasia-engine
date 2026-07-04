@@ -30,6 +30,7 @@ from native_runtime.runtime_player import (
     build_native_runtime_control_guide,
     build_acceptance_automated_checks,
     build_native_runtime_vn_baseline_quality_report,
+    build_project_default_runtime_player_settings,
     build_vn_baseline_quality_doctor_check,
     build_save_dialog_page_data,
     build_native_video_preview_probe_report,
@@ -85,6 +86,26 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
         payload = json.loads(stdout.getvalue())
         self.assertEqual(payload["runtime"], "native")
         self.assertIn("quickActions", payload)
+
+    def test_native_runtime_defaults_can_follow_project_playback_settings(self) -> None:
+        defaults = build_project_default_runtime_player_settings(
+            {
+                "runtimeSettings": {
+                    "defaultTextSpeed": "instant",
+                    "defaultUiThemeMode": "dark",
+                    "defaultBgmVolume": 64,
+                    "defaultSfxVolume": 77,
+                    "defaultVoiceVolume": 88,
+                    "defaultVoiceEnabled": False,
+                }
+            }
+        )
+
+        self.assertEqual(defaults["textSpeed"], "instant")
+        self.assertEqual(defaults["themeMode"], "dark")
+        self.assertEqual(defaults["bgmVolume"], 64)
+        self.assertEqual(defaults["sfxVolume"], 77)
+        self.assertEqual(defaults["voiceVolume"], 0)
 
     @unittest.skipIf(pygame is None, "pygame-ce is not installed")
     def test_native_runtime_help_shortcut_map_preserves_alt_load_key(self) -> None:

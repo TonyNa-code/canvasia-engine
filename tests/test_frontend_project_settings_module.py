@@ -24,7 +24,19 @@ class FrontendProjectSettingsModuleTests(unittest.TestCase):
             const tools = context.window.CanvasiaEditorProjectSettings;
             const options = {{
               saveSlotCountLimits: {{ min: 3, max: 120 }},
-              defaultRuntimeSettings: {{ formalSaveSlotCount: 24 }},
+              defaultRuntimeSettings: {{
+                formalSaveSlotCount: 24,
+                defaultTextSpeed: "normal",
+                defaultDialogTheme: "project",
+                defaultUiThemeMode: "auto",
+                defaultBgmVolume: 72,
+                defaultSfxVolume: 85,
+                defaultVoiceVolume: 92,
+                defaultVoiceEnabled: true,
+              }},
+              runtimeTextSpeedLabels: {{ slow: "慢一点", normal: "正常", fast: "快一点", instant: "立刻显示" }},
+              runtimeDialogThemeLabels: {{ project: "项目样式", warm: "暖光标准", paper: "纸页回忆" }},
+              runtimeUiThemeModeLabels: {{ auto: "自动", light: "浅色", dark: "深色" }},
               dialogBoxPresetLabels: {{ moonlight: "夜色玻璃", warm: "暖光标准", custom: "自定义样式" }},
               dialogBoxShapeLabels: {{ rounded: "圆角框", square: "方角框", capsule: "胶囊框" }},
               dialogBoxAnchorLabels: {{ bottom: "底部", center: "居中", free: "自由" }},
@@ -125,7 +137,16 @@ class FrontendProjectSettingsModuleTests(unittest.TestCase):
             }};
             const project = {{
               resolution: {{ width: "1920", height: "bad" }},
-              runtimeSettings: {{ formalSaveSlotCount: "999" }},
+              runtimeSettings: {{
+                formalSaveSlotCount: "999",
+                defaultTextSpeed: "instant",
+                defaultDialogTheme: "paper",
+                defaultUiThemeMode: "dark",
+                defaultBgmVolume: "150",
+                defaultSfxVolume: "bad",
+                defaultVoiceVolume: "-5",
+                defaultVoiceEnabled: false,
+              }},
               dialogBoxConfig: {{
                 preset: "warm",
                 shape: "capsule",
@@ -205,6 +226,14 @@ class FrontendProjectSettingsModuleTests(unittest.TestCase):
                 tools.getSafeProjectFormalSaveSlotCount(200, options),
                 tools.getProjectFormalSaveSlotCount(project, options),
               ],
+              safeRuntimeValues: [
+                tools.getSafeProjectRuntimeTextSpeed("broken", options),
+                tools.getSafeProjectRuntimeDialogTheme("paper", options),
+                tools.getSafeProjectRuntimeUiThemeMode("bad", options),
+                tools.getSafeProjectRuntimeVolume("bad", 64, options),
+                tools.getSafeProjectRuntimeVolume(120, 64, options),
+              ],
+              runtimeConfig: tools.getProjectRuntimeSettings(project, options),
               safeDialogValues: [
                 tools.getSafeProjectDialogBoxPreset("bad", options),
                 tools.getSafeProjectDialogBoxShape("square", options),
@@ -274,6 +303,20 @@ class FrontendProjectSettingsModuleTests(unittest.TestCase):
         self.assertIn('data-width="1920"', payload["resolutionButtons"])
         self.assertIn("toolbar-button-primary", payload["resolutionButtons"])
         self.assertEqual(payload["slots"], [3, 3, 120, 120])
+        self.assertEqual(payload["safeRuntimeValues"], ["normal", "paper", "auto", 64, 100])
+        self.assertEqual(
+            payload["runtimeConfig"],
+            {
+                "formalSaveSlotCount": 120,
+                "defaultTextSpeed": "instant",
+                "defaultDialogTheme": "paper",
+                "defaultUiThemeMode": "dark",
+                "defaultBgmVolume": 100,
+                "defaultSfxVolume": 85,
+                "defaultVoiceVolume": 0,
+                "defaultVoiceEnabled": False,
+            },
+        )
         self.assertEqual(payload["safeDialogValues"], ["moonlight", "square", "free"])
         self.assertEqual(payload["dialogConfig"]["preset"], "warm")
         self.assertEqual(payload["dialogConfig"]["shape"], "capsule")

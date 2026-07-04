@@ -9301,6 +9301,26 @@ def get_safe_text_speed(value: object, fallback: str = "normal") -> str:
     return text_speed if text_speed in TEXT_SPEED_PRESETS else safe_fallback
 
 
+def build_project_default_runtime_player_settings(project: dict | None = None) -> dict:
+    defaults = dict(DEFAULT_RUNTIME_PLAYER_SETTINGS)
+    runtime_settings = project.get("runtimeSettings") if isinstance(project, dict) else {}
+    if not isinstance(runtime_settings, dict):
+        return defaults
+
+    theme_mode = str(runtime_settings.get("defaultUiThemeMode") or defaults["themeMode"]).strip().lower()
+    if theme_mode in RUNTIME_THEME_MODES:
+        defaults["themeMode"] = theme_mode
+    defaults["textSpeed"] = get_safe_text_speed(runtime_settings.get("defaultTextSpeed"), defaults["textSpeed"])
+    defaults["bgmVolume"] = get_safe_volume_percent(runtime_settings.get("defaultBgmVolume"), defaults["bgmVolume"])
+    defaults["sfxVolume"] = get_safe_volume_percent(runtime_settings.get("defaultSfxVolume"), defaults["sfxVolume"])
+    defaults["voiceVolume"] = (
+        get_safe_volume_percent(runtime_settings.get("defaultVoiceVolume"), defaults["voiceVolume"])
+        if runtime_settings.get("defaultVoiceEnabled") is not False
+        else 0
+    )
+    return sanitize_runtime_player_settings(defaults)
+
+
 def is_regional_indicator_symbol(char: str) -> bool:
     if not char:
         return False
@@ -9456,15 +9476,16 @@ def get_native_typewriter_step_delay_ms(speed: str, visible_text: str = "", full
     return base_delay + get_typewriter_punctuation_pause_ms(visible_text, full_text)
 
 
-def load_project_runtime_settings(project_id: str) -> dict:
+def load_project_runtime_settings(project_id: str, project: dict | None = None) -> dict:
+    project_defaults = build_project_default_runtime_player_settings(project)
     settings_path = get_project_settings_file_path(project_id)
     if not settings_path.is_file():
-        return dict(DEFAULT_RUNTIME_PLAYER_SETTINGS)
+        return project_defaults
     try:
         payload = json.loads(settings_path.read_text(encoding="utf-8"))
     except Exception:
-        return dict(DEFAULT_RUNTIME_PLAYER_SETTINGS)
-    return sanitize_runtime_player_settings(payload)
+        return project_defaults
+    return sanitize_runtime_player_settings({**project_defaults, **payload})
 
 
 def write_project_runtime_settings(project_id: str, settings: dict) -> Path:
@@ -9830,7 +9851,7 @@ class NativeRuntimePlayer:
         self.project_id = str(self.project.get("projectId") or "untitled_project")
         self.save_store = load_project_save_store(self.project_id, self.formal_save_slot_count)
         self.save_file_path = get_project_save_file_path(self.project_id)
-        self.runtime_settings = load_project_runtime_settings(self.project_id)
+        self.runtime_settings = load_project_runtime_settings(self.project_id, self.project)
         self.apply_runtime_language_setting()
         self.settings_file_path = get_project_settings_file_path(self.project_id)
         self.archive_progress = load_project_archive_progress(self.project_id)

@@ -534,7 +534,16 @@ class RunEditorSmokeTests(unittest.TestCase):
             resolution={"width": 1920, "height": 1080},
             release_version="1.2.3-beta",
             editor_mode="advanced",
-            runtime_settings={"formalSaveSlotCount": 60},
+            runtime_settings={
+                "formalSaveSlotCount": 60,
+                "defaultTextSpeed": "fast",
+                "defaultDialogTheme": "paper",
+                "defaultUiThemeMode": "dark",
+                "defaultBgmVolume": 64,
+                "defaultSfxVolume": 77,
+                "defaultVoiceVolume": 88,
+                "defaultVoiceEnabled": False,
+            },
             dialog_box_config={
                 "preset": "transparent",
                 "shape": "capsule",
@@ -640,6 +649,13 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(saved_project["editorMode"], "advanced")
         self.assertEqual(saved_project["resolution"]["width"], 1920)
         self.assertEqual(saved_project["runtimeSettings"]["formalSaveSlotCount"], 60)
+        self.assertEqual(saved_project["runtimeSettings"]["defaultTextSpeed"], "fast")
+        self.assertEqual(saved_project["runtimeSettings"]["defaultDialogTheme"], "paper")
+        self.assertEqual(saved_project["runtimeSettings"]["defaultUiThemeMode"], "dark")
+        self.assertEqual(saved_project["runtimeSettings"]["defaultBgmVolume"], 64)
+        self.assertEqual(saved_project["runtimeSettings"]["defaultSfxVolume"], 77)
+        self.assertEqual(saved_project["runtimeSettings"]["defaultVoiceVolume"], 88)
+        self.assertFalse(saved_project["runtimeSettings"]["defaultVoiceEnabled"])
         self.assertEqual(saved_project["dialogBoxConfig"]["preset"], "transparent")
         self.assertEqual(saved_project["dialogBoxConfig"]["shape"], "capsule")
         self.assertEqual(saved_project["dialogBoxConfig"]["widthPercent"], 82)
@@ -684,6 +700,17 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(saved_project["particleCustomPresets"][0]["name"], "暴雪测试")
         self.assertEqual(bundle["variables"]["variables"][0]["id"], "var_affection")
         self.assertEqual(bundle["variables"]["variables"][1]["defaultValue"], "common")
+
+        run_editor.save_project_settings(runtime_settings={"formalSaveSlotCount": 12})
+        merged_runtime_settings = run_editor.load_project_bundle()["project"]["runtimeSettings"]
+        self.assertEqual(merged_runtime_settings["formalSaveSlotCount"], 12)
+        self.assertEqual(merged_runtime_settings["defaultTextSpeed"], "fast")
+        self.assertEqual(merged_runtime_settings["defaultDialogTheme"], "paper")
+        self.assertEqual(merged_runtime_settings["defaultUiThemeMode"], "dark")
+        self.assertEqual(merged_runtime_settings["defaultBgmVolume"], 64)
+        self.assertEqual(merged_runtime_settings["defaultSfxVolume"], 77)
+        self.assertEqual(merged_runtime_settings["defaultVoiceVolume"], 88)
+        self.assertFalse(merged_runtime_settings["defaultVoiceEnabled"])
 
     def test_import_localization_patches_updates_character_chapter_scene_and_blocks(self) -> None:
         _, chapter_result = self.create_blank_project_with_chapter()

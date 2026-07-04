@@ -13,7 +13,34 @@
     preview: "预览导出",
   });
   const DEFAULT_SAVE_SLOT_COUNT_LIMITS = Object.freeze({ min: 3, max: 120 });
-  const DEFAULT_RUNTIME_SETTINGS = Object.freeze({ formalSaveSlotCount: 24 });
+  const DEFAULT_RUNTIME_TEXT_SPEED_LABELS = Object.freeze({
+    slow: "慢一点",
+    normal: "正常",
+    fast: "快一点",
+    instant: "立刻显示",
+  });
+  const DEFAULT_RUNTIME_DIALOG_THEME_LABELS = Object.freeze({
+    project: "项目样式",
+    warm: "暖光标准",
+    moonlight: "夜色月光",
+    paper: "纸页回忆",
+    transparent: "透明无框",
+  });
+  const DEFAULT_RUNTIME_UI_THEME_MODE_LABELS = Object.freeze({
+    auto: "自动切换",
+    light: "浅色模式",
+    dark: "深色模式",
+  });
+  const DEFAULT_RUNTIME_SETTINGS = Object.freeze({
+    formalSaveSlotCount: 24,
+    defaultTextSpeed: "normal",
+    defaultDialogTheme: "project",
+    defaultUiThemeMode: "auto",
+    defaultBgmVolume: 72,
+    defaultSfxVolume: 85,
+    defaultVoiceVolume: 92,
+    defaultVoiceEnabled: true,
+  });
   const DEFAULT_FRAME_SLICE = Object.freeze({ top: 18, right: 18, bottom: 18, left: 18 });
   const PROJECT_DIALOG_BOX_PRESET_LABELS = Object.freeze({
     moonlight: "夜色玻璃",
@@ -518,10 +545,44 @@
     );
   }
 
+  function getSafeProjectRuntimeTextSpeed(value, options = {}) {
+    const labels = options.runtimeTextSpeedLabels || DEFAULT_RUNTIME_TEXT_SPEED_LABELS;
+    const defaults = options.defaultRuntimeSettings || DEFAULT_RUNTIME_SETTINGS;
+    return getSafeLabelKey(labels, value, defaults.defaultTextSpeed);
+  }
+
+  function getSafeProjectRuntimeDialogTheme(value, options = {}) {
+    const labels = options.runtimeDialogThemeLabels || DEFAULT_RUNTIME_DIALOG_THEME_LABELS;
+    const defaults = options.defaultRuntimeSettings || DEFAULT_RUNTIME_SETTINGS;
+    return getSafeLabelKey(labels, value, defaults.defaultDialogTheme);
+  }
+
+  function getSafeProjectRuntimeUiThemeMode(value, options = {}) {
+    const labels = options.runtimeUiThemeModeLabels || DEFAULT_RUNTIME_UI_THEME_MODE_LABELS;
+    const defaults = options.defaultRuntimeSettings || DEFAULT_RUNTIME_SETTINGS;
+    return getSafeLabelKey(labels, value, defaults.defaultUiThemeMode);
+  }
+
+  function getSafeProjectRuntimeVolume(value, fallback = 100, options = {}) {
+    return clamp(Math.round(getSafeNumber(value, fallback, options)), 0, 100, options);
+  }
+
   function getProjectRuntimeSettings(project, options = {}) {
     const runtimeSettings = project?.runtimeSettings ?? {};
+    const defaults = options.defaultRuntimeSettings || DEFAULT_RUNTIME_SETTINGS;
     return {
       formalSaveSlotCount: getSafeProjectFormalSaveSlotCount(runtimeSettings.formalSaveSlotCount, options),
+      defaultTextSpeed: getSafeProjectRuntimeTextSpeed(runtimeSettings.defaultTextSpeed, options),
+      defaultDialogTheme: getSafeProjectRuntimeDialogTheme(runtimeSettings.defaultDialogTheme, options),
+      defaultUiThemeMode: getSafeProjectRuntimeUiThemeMode(runtimeSettings.defaultUiThemeMode, options),
+      defaultBgmVolume: getSafeProjectRuntimeVolume(runtimeSettings.defaultBgmVolume, defaults.defaultBgmVolume, options),
+      defaultSfxVolume: getSafeProjectRuntimeVolume(runtimeSettings.defaultSfxVolume, defaults.defaultSfxVolume, options),
+      defaultVoiceVolume: getSafeProjectRuntimeVolume(
+        runtimeSettings.defaultVoiceVolume,
+        defaults.defaultVoiceVolume,
+        options
+      ),
+      defaultVoiceEnabled: runtimeSettings.defaultVoiceEnabled !== false,
     };
   }
 
@@ -828,6 +889,10 @@
     getStageContainerStyle,
     renderResolutionButtons,
     getSafeProjectFormalSaveSlotCount,
+    getSafeProjectRuntimeTextSpeed,
+    getSafeProjectRuntimeDialogTheme,
+    getSafeProjectRuntimeUiThemeMode,
+    getSafeProjectRuntimeVolume,
     getProjectRuntimeSettings,
     getProjectFormalSaveSlotCount,
     getSafeProjectDialogBoxPreset,

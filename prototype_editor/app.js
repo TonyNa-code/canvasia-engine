@@ -599,6 +599,13 @@ const PROJECT_SAVE_SLOT_COUNT_LIMITS = {
 
 const DEFAULT_PROJECT_RUNTIME_SETTINGS = {
   formalSaveSlotCount: 24,
+  defaultTextSpeed: "normal",
+  defaultDialogTheme: "project",
+  defaultUiThemeMode: "auto",
+  defaultBgmVolume: 72,
+  defaultSfxVolume: 85,
+  defaultVoiceVolume: 92,
+  defaultVoiceEnabled: true,
 };
 
 const UI_THEME_MODE_LABELS = uiThemeTools?.UI_THEME_MODE_LABELS ?? {
@@ -4248,6 +4255,11 @@ async function handleClick(event) {
 
   if (action === "save-project-save-slot-count") {
     void saveProjectFormalSaveSlotCount();
+    return;
+  }
+
+  if (action === "save-project-runtime-playback-defaults") {
+    void saveProjectRuntimePlaybackDefaults();
     return;
   }
 
@@ -9463,6 +9475,9 @@ function getProjectSettingsOptions() {
     screenLabels: projectSettingsTools.SCREEN_LABELS,
     saveSlotCountLimits: PROJECT_SAVE_SLOT_COUNT_LIMITS,
     defaultRuntimeSettings: DEFAULT_PROJECT_RUNTIME_SETTINGS,
+    runtimeTextSpeedLabels: TEXT_SPEED_LABELS,
+    runtimeDialogThemeLabels: DIALOG_THEME_LABELS,
+    runtimeUiThemeModeLabels: UI_THEME_MODE_LABELS,
     dialogBoxPresetLabels: PROJECT_DIALOG_BOX_PRESET_LABELS,
     dialogBoxShapeLabels: PROJECT_DIALOG_BOX_SHAPE_LABELS,
     dialogBoxAnchorLabels: PROJECT_DIALOG_BOX_ANCHOR_LABELS,
@@ -38552,6 +38567,78 @@ function renderProjectRuntimeSettingsPanel() {
           </div>
           <div class="detail-meta">当前项目已配置 ${runtimeSettings.formalSaveSlotCount} 个正式存档位，正式读档会自动分页展示。</div>
         </section>
+        <section class="detail-card dialog-config-card">
+          <strong>成品默认播放体验</strong>
+          <p class="helper-text">这里控制玩家第一次打开导出游戏时的阅读节奏、主题和音量。玩家在游戏里手动调整后，会优先使用玩家自己的本地设置。</p>
+          <div class="playback-setting-grid dialog-config-grid">
+            <label class="playback-setting">
+              <span>默认文字速度</span>
+              <select id="projectRuntimeDefaultTextSpeedSelect">
+                ${Object.entries(TEXT_SPEED_LABELS)
+                  .map(
+                    ([speed, label]) =>
+                      `<option value="${speed}" ${runtimeSettings.defaultTextSpeed === speed ? "selected" : ""}>${escapeHtml(label)}</option>`
+                  )
+                  .join("")}
+              </select>
+            </label>
+            <label class="playback-setting">
+              <span>默认对话框主题</span>
+              <select id="projectRuntimeDefaultDialogThemeSelect">
+                ${Object.entries(DIALOG_THEME_LABELS)
+                  .map(
+                    ([theme, label]) =>
+                      `<option value="${theme}" ${runtimeSettings.defaultDialogTheme === theme ? "selected" : ""}>${escapeHtml(label)}</option>`
+                  )
+                  .join("")}
+              </select>
+            </label>
+            <label class="playback-setting">
+              <span>默认界面深浅</span>
+              <select id="projectRuntimeDefaultUiThemeModeSelect">
+                ${Object.entries(UI_THEME_MODE_LABELS)
+                  .map(
+                    ([mode, label]) =>
+                      `<option value="${mode}" ${runtimeSettings.defaultUiThemeMode === mode ? "selected" : ""}>${escapeHtml(label)}</option>`
+                  )
+                  .join("")}
+              </select>
+            </label>
+            <label class="toolbar-button playback-setting-inline">
+              <input
+                id="projectRuntimeDefaultVoiceEnabledInput"
+                type="checkbox"
+                ${runtimeSettings.defaultVoiceEnabled ? "checked" : ""}
+              />
+              默认开启语音
+            </label>
+          </div>
+          <div class="playback-volume-grid dialog-config-ranges">
+            <label class="playback-setting">
+              <span>默认 BGM 音量</span>
+              <input id="projectRuntimeDefaultBgmVolumeInput" type="range" min="0" max="100" step="1" value="${runtimeSettings.defaultBgmVolume}" />
+              <strong class="playback-volume-value">${runtimeSettings.defaultBgmVolume}%</strong>
+            </label>
+            <label class="playback-setting">
+              <span>默认音效音量</span>
+              <input id="projectRuntimeDefaultSfxVolumeInput" type="range" min="0" max="100" step="1" value="${runtimeSettings.defaultSfxVolume}" />
+              <strong class="playback-volume-value">${runtimeSettings.defaultSfxVolume}%</strong>
+            </label>
+            <label class="playback-setting">
+              <span>默认语音音量</span>
+              <input id="projectRuntimeDefaultVoiceVolumeInput" type="range" min="0" max="100" step="1" value="${runtimeSettings.defaultVoiceVolume}" />
+              <strong class="playback-volume-value">${runtimeSettings.defaultVoiceVolume}%</strong>
+            </label>
+          </div>
+          <div class="detail-actions">
+            <button class="toolbar-button toolbar-button-primary" data-action="save-project-runtime-playback-defaults">
+              保存默认播放体验
+            </button>
+          </div>
+          <div class="detail-meta">当前默认：${escapeHtml(TEXT_SPEED_LABELS[runtimeSettings.defaultTextSpeed] ?? runtimeSettings.defaultTextSpeed)} · ${escapeHtml(
+            DIALOG_THEME_LABELS[runtimeSettings.defaultDialogTheme] ?? runtimeSettings.defaultDialogTheme
+          )} · ${escapeHtml(UI_THEME_MODE_LABELS[runtimeSettings.defaultUiThemeMode] ?? runtimeSettings.defaultUiThemeMode)} · BGM ${runtimeSettings.defaultBgmVolume}% / 音效 ${runtimeSettings.defaultSfxVolume}% / 语音 ${runtimeSettings.defaultVoiceVolume}%</div>
+        </section>
         <div id="projectVariableLibraryPanelHost">
           ${renderProjectVariableLibraryPanel()}
         </div>
@@ -39169,6 +39256,39 @@ async function saveProjectFormalSaveSlotCount() {
     showToast(`正式存档位已更新为 ${getProjectFormalSaveSlotCount()} 个`);
   } catch (error) {
     await showEditorOperationFailure(error, "保存正式存档位失败", "正式存档位没有保存成功");
+  }
+}
+
+function readProjectRuntimePlaybackDefaultsFromInputs() {
+  const currentSettings = getProjectRuntimeSettings();
+  return getProjectRuntimeSettings({
+    runtimeSettings: {
+      ...currentSettings,
+      defaultTextSpeed: document.getElementById("projectRuntimeDefaultTextSpeedSelect")?.value,
+      defaultDialogTheme: document.getElementById("projectRuntimeDefaultDialogThemeSelect")?.value,
+      defaultUiThemeMode: document.getElementById("projectRuntimeDefaultUiThemeModeSelect")?.value,
+      defaultBgmVolume: document.getElementById("projectRuntimeDefaultBgmVolumeInput")?.value,
+      defaultSfxVolume: document.getElementById("projectRuntimeDefaultSfxVolumeInput")?.value,
+      defaultVoiceVolume: document.getElementById("projectRuntimeDefaultVoiceVolumeInput")?.value,
+      defaultVoiceEnabled: document.getElementById("projectRuntimeDefaultVoiceEnabledInput")?.checked !== false,
+    },
+  });
+}
+
+async function saveProjectRuntimePlaybackDefaults() {
+  const nextSettings = readProjectRuntimePlaybackDefaultsFromInputs();
+
+  try {
+    setSaveStatus("正在保存成品默认播放体验...");
+    await postJson(API_SAVE_PROJECT_SETTINGS, {
+      runtimeSettings: nextSettings,
+    });
+    await reloadProjectData({ ...getCurrentUiState() });
+    renderPreviewScreen();
+    setSaveStatus("成品默认播放体验已保存");
+    showToast("成品默认播放体验已保存");
+  } catch (error) {
+    await showEditorOperationFailure(error, "保存默认播放体验失败", "成品默认播放体验没有保存成功");
   }
 }
 
