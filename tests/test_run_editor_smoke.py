@@ -358,6 +358,15 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertIn("章节回放", content)
         return content
 
+    def assert_export_playtest_guide_file(self, guide_path: Path) -> str:
+        self.assertTrue(guide_path.is_file())
+        content = guide_path.read_text(encoding="utf-8")
+        self.assertIn("# 试玩与发布验收指南", content)
+        self.assertIn("## 打开方式", content)
+        self.assertIn("## 先验这几项", content)
+        self.assertIn(run_editor.UNLOCKABLE_CONTENT_REPORT_FILE_NAME, content)
+        return content
+
     def read_export_index_game_data(self, index_path: Path) -> dict:
         index_html = index_path.read_text(encoding="utf-8")
         prefix = "window.LIGHTWHISPER_GAME_DATA = "
@@ -2654,6 +2663,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / "app_icon.png").is_file())
         self.assertTrue((build_dir / "app_icon.ico").is_file())
         self.assertTrue(manifest_path.is_file())
+        self.assert_export_playtest_guide_file(build_dir / run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME)
         unlockable_manifest = self.assert_unlockable_content_manifest_file(
             build_dir / run_editor.UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME
         )
@@ -2674,6 +2684,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["playerRuntimeControls"], "runtime_controls.js")
         self.assertEqual(manifest["files"]["playerRuntimeSettings"], "runtime_settings.js")
         self.assertEqual(manifest["files"]["playerRuntimeAudio"], "runtime_audio.js")
+        self.assertEqual(manifest["files"]["playtestGuide"], run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME)
         self.assertEqual(manifest["files"]["unlockableContentManifest"], run_editor.UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME)
         self.assertEqual(manifest["files"]["unlockableContentReport"], run_editor.UNLOCKABLE_CONTENT_REPORT_FILE_NAME)
         provenance = self.assert_export_provenance_file(
@@ -2681,6 +2692,7 @@ class RunEditorSmokeTests(unittest.TestCase):
             {
                 "export_manifest.json",
                 "index.html",
+                run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME,
                 run_editor.UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME,
                 run_editor.UNLOCKABLE_CONTENT_REPORT_FILE_NAME,
                 "player.js",
@@ -2994,6 +3006,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue(Path(export_result["releaseArtifactIndexJsonPath"]).is_file())
         self.assertTrue(Path(export_result["releaseNotesPath"]).is_file())
         self.assertTrue(manifest_path.is_file())
+        self.assert_export_playtest_guide_file(build_dir / run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME)
         native_game_data = json.loads((build_dir / "game_data.json").read_text(encoding="utf-8"))
         self.assertEqual(native_game_data["i18n"]["defaultLanguage"], "ja-JP")
         self.assertEqual(native_game_data["i18n"]["supportedLanguages"], ["zh-CN", "ja-JP", "en-US"])
@@ -3032,6 +3045,9 @@ class RunEditorSmokeTests(unittest.TestCase):
                 for item in release_artifact_payload["uploadArtifacts"]
             )
         )
+        self.assertTrue(
+            any(item["name"] == export_result["playtestGuideName"] for item in release_artifact_payload["insideArchiveReports"])
+        )
         self.assertGreaterEqual(export_result["releaseArtifactUploadCount"], 5)
         self.assertTrue(export_result["releaseArtifactIndexPublicUrl"].endswith(".zip.release-artifacts.md"))
         self.assertTrue(export_result["releaseArtifactIndexJsonPublicUrl"].endswith(".zip.release-artifacts.json"))
@@ -3064,15 +3080,18 @@ class RunEditorSmokeTests(unittest.TestCase):
                 "export_manifest.json",
                 run_editor.NATIVE_RUNTIME_PLAYER_NAME,
                 "game_data.json",
+                run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME,
                 run_editor.UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME,
                 run_editor.UNLOCKABLE_CONTENT_REPORT_FILE_NAME,
             },
         )
         self.assertEqual(provenance["build"]["target"], run_editor.EXPORT_TARGET_NATIVE_RUNTIME)
+        self.assertEqual(manifest["files"]["playtestGuide"], run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME)
         self.assertEqual(manifest["files"]["unlockableContentManifest"], run_editor.UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME)
         self.assertEqual(manifest["files"]["unlockableContentReport"], run_editor.UNLOCKABLE_CONTENT_REPORT_FILE_NAME)
         self.assertEqual(manifest["runtime"]["mode"], "pygame_native")
         self.assertTrue(manifest["runtime"]["canBuildStandaloneApp"])
+        self.assertEqual(manifest["runtime"]["playtestGuide"], run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME)
         self.assertEqual(manifest["runtime"]["unlockableContentManifest"], run_editor.UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME)
         self.assertEqual(manifest["runtime"]["unlockableContentReport"], run_editor.UNLOCKABLE_CONTENT_REPORT_FILE_NAME)
         self.assertEqual(manifest["runtime"]["releaseCandidateReport"], run_editor.NATIVE_RUNTIME_RC_REPORT_NAME)
@@ -3591,6 +3610,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / "app" / "runtime_controls.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_settings.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_audio.js").is_file())
+        self.assert_export_playtest_guide_file(build_dir / run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME)
         self.assert_unlockable_content_manifest_file(build_dir / "app" / run_editor.UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME)
         self.assert_unlockable_content_report_file(build_dir / "app" / run_editor.UNLOCKABLE_CONTENT_REPORT_FILE_NAME)
         self.assertTrue(manifest_path.is_file())
@@ -3598,12 +3618,14 @@ class RunEditorSmokeTests(unittest.TestCase):
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         self.assertEqual(manifest["engine"]["exportTarget"], run_editor.EXPORT_TARGET_WINDOWS_NWJS)
         self.assert_export_manifest_has_subtle_engine_signature(manifest)
+        self.assertEqual(manifest["files"]["playtestGuide"], run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME)
         self.assertEqual(manifest["files"]["unlockableContentManifest"], f"app/{run_editor.UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}")
         self.assertEqual(manifest["files"]["unlockableContentReport"], f"app/{run_editor.UNLOCKABLE_CONTENT_REPORT_FILE_NAME}")
         provenance = self.assert_export_provenance_file(
             export_result,
             {
                 "export_manifest.json",
+                run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME,
                 "app/index.html",
                 f"app/{run_editor.UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
                 f"app/{run_editor.UNLOCKABLE_CONTENT_REPORT_FILE_NAME}",
@@ -3644,6 +3666,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / "app" / "runtime_controls.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_settings.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_audio.js").is_file())
+        self.assert_export_playtest_guide_file(build_dir / run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME)
         self.assert_unlockable_content_manifest_file(build_dir / "app" / run_editor.UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME)
         self.assert_unlockable_content_report_file(build_dir / "app" / run_editor.UNLOCKABLE_CONTENT_REPORT_FILE_NAME)
         self.assertTrue(manifest_path.is_file())
@@ -3651,12 +3674,14 @@ class RunEditorSmokeTests(unittest.TestCase):
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         self.assertEqual(manifest["engine"]["exportTarget"], run_editor.EXPORT_TARGET_MACOS_NWJS)
         self.assert_export_manifest_has_subtle_engine_signature(manifest)
+        self.assertEqual(manifest["files"]["playtestGuide"], run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME)
         self.assertEqual(manifest["files"]["unlockableContentManifest"], f"app/{run_editor.UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}")
         self.assertEqual(manifest["files"]["unlockableContentReport"], f"app/{run_editor.UNLOCKABLE_CONTENT_REPORT_FILE_NAME}")
         provenance = self.assert_export_provenance_file(
             export_result,
             {
                 "export_manifest.json",
+                run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME,
                 "app/index.html",
                 f"app/{run_editor.UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
                 f"app/{run_editor.UNLOCKABLE_CONTENT_REPORT_FILE_NAME}",
@@ -3772,6 +3797,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / "app" / "runtime_controls.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_settings.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_audio.js").is_file())
+        self.assert_export_playtest_guide_file(build_dir / run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME)
         self.assert_unlockable_content_manifest_file(build_dir / "app" / run_editor.UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME)
         self.assert_unlockable_content_report_file(build_dir / "app" / run_editor.UNLOCKABLE_CONTENT_REPORT_FILE_NAME)
         self.assertTrue(manifest_path.is_file())
@@ -3779,12 +3805,14 @@ class RunEditorSmokeTests(unittest.TestCase):
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         self.assertEqual(manifest["engine"]["exportTarget"], run_editor.EXPORT_TARGET_LINUX_NWJS)
         self.assert_export_manifest_has_subtle_engine_signature(manifest)
+        self.assertEqual(manifest["files"]["playtestGuide"], run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME)
         self.assertEqual(manifest["files"]["unlockableContentManifest"], f"app/{run_editor.UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}")
         self.assertEqual(manifest["files"]["unlockableContentReport"], f"app/{run_editor.UNLOCKABLE_CONTENT_REPORT_FILE_NAME}")
         provenance = self.assert_export_provenance_file(
             export_result,
             {
                 "export_manifest.json",
+                run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME,
                 "app/index.html",
                 f"app/{run_editor.UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
                 f"app/{run_editor.UNLOCKABLE_CONTENT_REPORT_FILE_NAME}",

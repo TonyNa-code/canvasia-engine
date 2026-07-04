@@ -104,6 +104,7 @@ Canvasia Engine は、ビジュアルノベル / Galgame 制作者のための s
 ## リポジトリ構成
 
 - [`run_editor.py`](run_editor.py): ローカルエディタサーバー、プロジェクト管理、書き出し、パッケージング入口
+- [`export_package_guide.py`](export_package_guide.py): 書き出しパッケージ向け playtest / acceptance guide 生成器
 - [`export_unlockable_manifest.py`](export_unlockable_manifest.py): 書き出し側の unlockable / gallery / replay カバレッジ manifest 生成器
 - [`prototype_editor`](prototype_editor): エディタ frontend
 - [`prototype_editor/modules`](prototype_editor/modules): ルート分析、ストーリーテンプレート、エディタ補助、Assistant、公開前チェックなどを扱う単体テスト可能な frontend 純ロジックモジュール
@@ -193,7 +194,7 @@ Canvasia は初期 i18n フローに対応しています。
 
 気軽に共有するなら Web 試遊パッケージが最も簡単です。よりアプリに近いデスクトップ再生フローを検証する場合は、ネイティブ Runtime パッケージを使います。
 
-すべての playable / runtime 書き出しには `unlockable_content_manifest.json` と `unlockable_content_report.md` も同梱されます。JSON は機械可読のカバレッジファイル、Markdown はテスター向けの確認レポートで、CG ギャラリー、音楽鑑賞、ボイス回想、キャラクター / 場所 / ナレーション / 関係アーカイブ、章回想、エンディング、実績の収録状況を確認できます。
+すべての playable / runtime 書き出しには `README_试玩验收先看这里.md`、`unlockable_content_manifest.json`、`unlockable_content_report.md` も同梱されます。README は起動手順と受け入れチェック、JSON は機械可読のカバレッジ、Markdown はテスター向けの確認レポートで、CG ギャラリー、音楽鑑賞、ボイス回想、キャラクター / 場所 / ナレーション / 関係アーカイブ、章回想、エンディング、実績の収録状況を確認できます。
 
 ## Release パッケージ
 

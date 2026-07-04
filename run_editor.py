@@ -30,6 +30,7 @@ from urllib.request import Request, urlopen
 
 from editor_local_security import is_local_editor_host, is_local_editor_origin
 from editor_snapshot_cache import SnapshotCache, build_file_cache_signature
+from export_package_guide import EXPORT_PLAYTEST_GUIDE_FILE_NAME, write_export_playtest_guide_file
 from export_unlockable_manifest import (
     UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME,
     UNLOCKABLE_CONTENT_REPORT_FILE_NAME,
@@ -9640,6 +9641,37 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
                 encoding="utf-8",
             )
 
+    playtest_guide_path = write_export_playtest_guide_file(
+        build_dir,
+        project=export_payload.get("project") or {},
+        target_label=str((export_payload.get("buildInfo") or {}).get("exportTargetLabel") or "原生 Runtime 包"),
+        release_version=str((export_payload.get("buildInfo") or {}).get("releaseVersion") or DEFAULT_EXPORT_RELEASE_VERSION),
+        launch_steps=[
+            f"macOS：双击 `{NATIVE_RUNTIME_MAC_COMMAND_NAME}`。",
+            f"Linux：运行 `./{NATIVE_RUNTIME_LINUX_COMMAND_NAME}`。",
+            f"Windows：双击 `{NATIVE_RUNTIME_WINDOWS_COMMAND_NAME}`。",
+            f"如果缺依赖，先执行 `python3 -m pip install -r {NATIVE_RUNTIME_REQUIREMENTS_NAME}`。",
+        ],
+        manifest_name="export_manifest.json",
+        unlockable_manifest_name=unlockable_manifest_path.name,
+        unlockable_report_name=unlockable_report_path.name,
+        provenance_name=EXPORT_PROVENANCE_FILE_NAME,
+        extra_reports=[
+            release_check_path.name,
+            rc_report_path.name,
+            release_control_report_path.name,
+            vn_baseline_markdown_path.name,
+            asset3d_summary_path.name,
+            NATIVE_RUNTIME_FILE_INTEGRITY_MARKDOWN_NAME,
+            NATIVE_RUNTIME_ACCEPTANCE_REPORT_NAME,
+        ],
+        runtime_notes=[
+            "原生 Runtime 仍是 Preview 路线，正式分发前建议在目标系统完整点测。",
+            "内嵌视频播放可选 PyAV / FFmpeg；缺少依赖时会尝试降级兜底。",
+        ],
+        missing_assets=(export_payload.get("buildInfo") or {}).get("missingAssets") or [],
+    )
+
     return {
         "gameDataName": game_data_path.name,
         "gameDataPath": str(game_data_path),
@@ -9647,6 +9679,8 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
         "unlockableContentManifestPath": str(unlockable_manifest_path),
         "unlockableContentReportName": unlockable_report_path.name,
         "unlockableContentReportPath": str(unlockable_report_path),
+        "playtestGuideName": playtest_guide_path.name,
+        "playtestGuidePath": str(playtest_guide_path),
         "playerName": NATIVE_RUNTIME_PLAYER_NAME,
         "playerPath": str(build_dir / NATIVE_RUNTIME_PLAYER_NAME),
         "readmeName": NATIVE_RUNTIME_README_NAME,
@@ -10282,6 +10316,7 @@ def export_native_runtime_build() -> dict:
         missing_assets=missing_assets,
         extra_files={
             "gameData": runtime_files["gameDataName"],
+            "playtestGuide": runtime_files["playtestGuideName"],
             "unlockableContentManifest": runtime_files["unlockableContentManifestName"],
             "unlockableContentReport": runtime_files["unlockableContentReportName"],
             "playerScript": runtime_files["playerName"],
@@ -10331,6 +10366,7 @@ def export_native_runtime_build() -> dict:
             "optionalVideoRequirements": runtime_files["videoRequirementsName"],
             "canBuildStandaloneApp": True,
             "appBuilder": runtime_files["appBuilderName"],
+            "playtestGuide": runtime_files["playtestGuideName"],
             "unlockableContentManifest": runtime_files["unlockableContentManifestName"],
             "unlockableContentReport": runtime_files["unlockableContentReportName"],
             "releaseCheck": runtime_files["releaseCheckName"],
@@ -10377,6 +10413,7 @@ def export_native_runtime_build() -> dict:
     archive_verifiers = write_export_archive_verifier_scripts(archive_path, archive_checksum["archiveSha256"])
     internal_reports = [
         {"name": manifest_path.name, "description": "导出清单，记录目标、版本、素材缺口和 Runtime 信息。"},
+        {"name": runtime_files["playtestGuideName"], "description": "试玩与发布验收指南，给测试员快速确认打开方式和验收重点。"},
         {"name": runtime_files["unlockableContentManifestName"], "description": "可解锁内容清单 JSON，记录图鉴、回想、成就和结局覆盖。"},
         {"name": runtime_files["unlockableContentReportName"], "description": "可解锁内容 Markdown 报告，方便测试员直接复查 EXTRA / 回想覆盖。"},
         {"name": runtime_files["releaseCheckName"], "description": "发布前自检 JSON。"},
@@ -10453,6 +10490,9 @@ def export_native_runtime_build() -> dict:
         "manifestPath": str(manifest_path),
         "manifestName": manifest_path.name,
         "manifestPublicUrl": f"/exports/{build_dir.name}/{manifest_path.name}",
+        "playtestGuideName": runtime_files["playtestGuideName"],
+        "playtestGuidePath": runtime_files["playtestGuidePath"],
+        "playtestGuidePublicUrl": f"/exports/{build_dir.name}/{runtime_files['playtestGuideName']}",
         "gameDataPath": runtime_files["gameDataPath"],
         "gameDataPublicUrl": f"/exports/{build_dir.name}/{runtime_files['gameDataName']}",
         "unlockableContentManifestName": runtime_files["unlockableContentManifestName"],
@@ -10630,6 +10670,7 @@ def export_web_build() -> dict:
             "playerRuntimeControls": "runtime_controls.js",
             "playerRuntimeSettings": "runtime_settings.js",
             "playerRuntimeAudio": "runtime_audio.js",
+            "playtestGuide": EXPORT_PLAYTEST_GUIDE_FILE_NAME,
             "unlockableContentManifest": UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME,
             "unlockableContentReport": UNLOCKABLE_CONTENT_REPORT_FILE_NAME,
             "iconPng": icon_files["pngFileName"],
@@ -10638,6 +10679,24 @@ def export_web_build() -> dict:
         },
     )
     manifest_path = write_export_manifest(build_dir, manifest)
+    playtest_guide_path = write_export_playtest_guide_file(
+        build_dir,
+        project=bundle["project"],
+        target_label="网页试玩包",
+        release_version=release_version,
+        launch_steps=[
+            "双击或用浏览器打开 `index.html`。",
+            "如果浏览器限制本地文件读取，请回到编辑器导出页使用预览链接，或把整个文件夹放到任意静态服务器。",
+            "对外发送时请压缩整个导出文件夹，不要只发送 `index.html`。",
+        ],
+        manifest_name=manifest_path.name,
+        unlockable_manifest_name=UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME,
+        unlockable_report_name=UNLOCKABLE_CONTENT_REPORT_FILE_NAME,
+        provenance_name=EXPORT_PROVENANCE_FILE_NAME,
+        extra_reports=[],
+        runtime_notes=["网页试玩包适合快速分享和轻量测试；正式发行前仍建议补做目标平台点测。"],
+        missing_assets=missing_assets,
+    )
     provenance_verifiers = write_export_provenance_verifier_files(build_dir)
     provenance_file = write_export_provenance_file(build_dir, bundle, manifest)
 
@@ -10650,6 +10709,8 @@ def export_web_build() -> dict:
         "publicIndexUrl": f"/exports/{build_dir.name}/index.html",
         "manifestPath": str(manifest_path),
         "manifestPublicUrl": f"/exports/{build_dir.name}/{manifest_path.name}",
+        "playtestGuidePath": str(playtest_guide_path),
+        "playtestGuidePublicUrl": f"/exports/{build_dir.name}/{playtest_guide_path.name}",
         "unlockableContentManifestPath": str(build_dir / UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME),
         "unlockableContentManifestPublicUrl": f"/exports/{build_dir.name}/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
         "unlockableContentReportPath": str(build_dir / UNLOCKABLE_CONTENT_REPORT_FILE_NAME),
@@ -11394,6 +11455,7 @@ def export_windows_nwjs_build() -> dict:
             "appRuntimeControls": "app/runtime_controls.js",
             "appRuntimeSettings": "app/runtime_settings.js",
             "appRuntimeAudio": "app/runtime_audio.js",
+            "playtestGuide": EXPORT_PLAYTEST_GUIDE_FILE_NAME,
             "unlockableContentManifest": f"app/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
             "unlockableContentReport": f"app/{UNLOCKABLE_CONTENT_REPORT_FILE_NAME}",
             "appPackage": "app/package.json",
@@ -11425,11 +11487,33 @@ def export_windows_nwjs_build() -> dict:
         manifest_path.name,
         manifest["engine"]["releaseVersion"],
     )
+    playtest_guide_path = write_export_playtest_guide_file(
+        build_dir,
+        project=bundle["project"],
+        target_label="Windows 桌面包",
+        release_version=release_version,
+        launch_steps=[
+            "优先双击 `启动游戏.cmd`。",
+            f"也可以直接双击 `{executable_name}`。",
+            "对外发送时请压缩整个导出文件夹，不要只发送单个 exe 或 cmd。",
+        ],
+        manifest_name=manifest_path.name,
+        unlockable_manifest_name=f"app/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
+        unlockable_report_name=f"app/{UNLOCKABLE_CONTENT_REPORT_FILE_NAME}",
+        provenance_name=EXPORT_PROVENANCE_FILE_NAME,
+        extra_reports=[readme_path.name],
+        runtime_notes=[
+            f"当前桌面模式：{runtime_mode_label}。",
+            f"当前打包方式：{package_mode_label}。",
+        ],
+        missing_assets=missing_assets,
+    )
     provenance_verifiers = write_export_provenance_verifier_files(build_dir)
     provenance_roots = [
         app_dir,
         manifest_path,
         readme_path,
+        playtest_guide_path,
         start_helper_path,
         root_icon_files["pngPath"],
         root_icon_files["icoPath"],
@@ -11489,6 +11573,8 @@ def export_windows_nwjs_build() -> dict:
         "splashPath": str(root_splash_file["path"]),
         "splashPublicUrl": f"/exports/{build_dir.name}/{root_splash_file['fileName']}",
         "readmePath": str(readme_path),
+        "playtestGuidePath": str(playtest_guide_path),
+        "playtestGuidePublicUrl": f"/exports/{build_dir.name}/{playtest_guide_path.name}",
         "copiedAssets": copied_assets,
         "missingAssets": len(missing_assets),
         "missingAssetNames": [asset.get("name") or asset.get("id") or "未命名素材" for asset in missing_assets[:5]],
@@ -11556,6 +11642,7 @@ def export_macos_nwjs_build() -> dict:
             "appRuntimeControls": "app/runtime_controls.js",
             "appRuntimeSettings": "app/runtime_settings.js",
             "appRuntimeAudio": "app/runtime_audio.js",
+            "playtestGuide": EXPORT_PLAYTEST_GUIDE_FILE_NAME,
             "unlockableContentManifest": f"app/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
             "unlockableContentReport": f"app/{UNLOCKABLE_CONTENT_REPORT_FILE_NAME}",
             "appPackage": "app/package.json",
@@ -11587,6 +11674,27 @@ def export_macos_nwjs_build() -> dict:
         manifest_path.name,
         release_version,
     )
+    playtest_guide_path = write_export_playtest_guide_file(
+        build_dir,
+        project=bundle["project"],
+        target_label="macOS 桌面包",
+        release_version=release_version,
+        launch_steps=[
+            f"优先双击 `{start_helper_path.name}`。",
+            f"也可以直接打开 `{app_bundle_name}`。",
+            "对外发送时请压缩整个导出文件夹，不要只发送 .app。",
+        ],
+        manifest_name=manifest_path.name,
+        unlockable_manifest_name=f"app/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
+        unlockable_report_name=f"app/{UNLOCKABLE_CONTENT_REPORT_FILE_NAME}",
+        provenance_name=EXPORT_PROVENANCE_FILE_NAME,
+        extra_reports=[readme_path.name],
+        runtime_notes=[
+            f"当前运行壳：NW.js {NWJS_RUNTIME_VERSION}。",
+            "未签名预览包可能触发 Gatekeeper 提示；正式发布前建议补签名和公证。",
+        ],
+        missing_assets=missing_assets,
+    )
     provenance_verifiers = write_export_provenance_verifier_files(build_dir)
     provenance_file = write_export_provenance_file(
         build_dir,
@@ -11596,6 +11704,7 @@ def export_macos_nwjs_build() -> dict:
             app_dir,
             manifest_path,
             readme_path,
+            playtest_guide_path,
             start_helper_path,
             root_icon_files["pngPath"],
             root_icon_files["icoPath"],
@@ -11656,6 +11765,8 @@ def export_macos_nwjs_build() -> dict:
         "splashPath": str(root_splash_file["path"]),
         "splashPublicUrl": f"/exports/{build_dir.name}/{root_splash_file['fileName']}",
         "readmePath": str(readme_path),
+        "playtestGuidePath": str(playtest_guide_path),
+        "playtestGuidePublicUrl": f"/exports/{build_dir.name}/{playtest_guide_path.name}",
         "copiedAssets": copied_assets,
         "missingAssets": len(missing_assets),
         "missingAssetNames": [asset.get("name") or asset.get("id") or "未命名素材" for asset in missing_assets[:5]],
@@ -11729,6 +11840,7 @@ def export_linux_nwjs_build() -> dict:
             "appRuntimeControls": "app/runtime_controls.js",
             "appRuntimeSettings": "app/runtime_settings.js",
             "appRuntimeAudio": "app/runtime_audio.js",
+            "playtestGuide": EXPORT_PLAYTEST_GUIDE_FILE_NAME,
             "unlockableContentManifest": f"app/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
             "unlockableContentReport": f"app/{UNLOCKABLE_CONTENT_REPORT_FILE_NAME}",
             "appPackage": "app/package.json",
@@ -11759,12 +11871,32 @@ def export_linux_nwjs_build() -> dict:
         manifest_path.name,
         release_version,
     )
+    playtest_guide_path = write_export_playtest_guide_file(
+        build_dir,
+        project=bundle["project"],
+        target_label="Linux 桌面包",
+        release_version=release_version,
+        launch_steps=[
+            f"优先运行 `./{start_helper_path.name}`。",
+            f"也可以直接运行 `./{executable_name}`。",
+            "如果脚本没有执行权限，先运行 `chmod +x 启动游戏.sh`。",
+            "对外发送时请压缩整个导出文件夹，不要只发送单个可执行文件。",
+        ],
+        manifest_name=manifest_path.name,
+        unlockable_manifest_name=f"app/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
+        unlockable_report_name=f"app/{UNLOCKABLE_CONTENT_REPORT_FILE_NAME}",
+        provenance_name=EXPORT_PROVENANCE_FILE_NAME,
+        extra_reports=[readme_path.name],
+        runtime_notes=[f"当前运行壳：NW.js {NWJS_RUNTIME_VERSION}。"],
+        missing_assets=missing_assets,
+    )
     provenance_verifiers = write_export_provenance_verifier_files(build_dir)
     provenance_roots = [
         app_dir,
         package_path,
         manifest_path,
         readme_path,
+        playtest_guide_path,
         start_helper_path,
         root_icon_files["pngPath"],
         root_icon_files["icoPath"],
@@ -11822,6 +11954,8 @@ def export_linux_nwjs_build() -> dict:
         "splashPath": str(root_splash_file["path"]),
         "splashPublicUrl": f"/exports/{build_dir.name}/{root_splash_file['fileName']}",
         "readmePath": str(readme_path),
+        "playtestGuidePath": str(playtest_guide_path),
+        "playtestGuidePublicUrl": f"/exports/{build_dir.name}/{playtest_guide_path.name}",
         "copiedAssets": copied_assets,
         "missingAssets": len(missing_assets),
         "missingAssetNames": [asset.get("name") or asset.get("id") or "未命名素材" for asset in missing_assets[:5]],
