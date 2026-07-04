@@ -4350,6 +4350,31 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("routeOverview: currentRouteOverview", source)
         self.assertIn("audioCueSheet: buildAudioCueSheet()", source)
 
+    def test_release_candidate_manifest_export_actions_are_wired(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        module_source = (EDITOR_DIR / "modules" / "release_candidate_manifest.js").read_text(encoding="utf-8")
+        combined_source = f"{source}\n{module_source}"
+        click_handler = _extract_function_source(source, "handleClick")
+        markdown_block_start = click_handler.index('action === "export-release-candidate-manifest-markdown"')
+        csv_block_start = click_handler.index('action === "export-release-candidate-manifest-csv"')
+        csv_block_end = click_handler.index('action === "export-release-control-report"', csv_block_start)
+        markdown_block = click_handler[markdown_block_start:csv_block_start]
+        csv_block = click_handler[csv_block_start:csv_block_end]
+
+        self.assertIn("const releaseCandidateManifestTools = window.CanvasiaEditorReleaseCandidateManifest", source)
+        self.assertIn('data-action="export-release-candidate-manifest-markdown"', combined_source)
+        self.assertIn('data-action="export-release-candidate-manifest-csv"', combined_source)
+        self.assertIn("exportReleaseCandidateManifestMarkdown();", markdown_block)
+        self.assertIn("exportReleaseCandidateManifestCsv();", csv_block)
+        self.assertIn("function buildReleaseCandidateManifest(", source)
+        self.assertIn("function renderReleaseCandidateManifestPanel(", source)
+        self.assertIn("function exportReleaseCandidateManifestMarkdown()", source)
+        self.assertIn("function exportReleaseCandidateManifestCsv()", source)
+        self.assertIn("releaseCandidateManifestTools.buildReleaseCandidateManifest", source)
+        self.assertIn("releaseCandidateManifestTools.renderReleaseCandidateManifestPanel", source)
+        self.assertIn("Release Candidate Manifest", combined_source)
+        self.assertIn("Manual signoff checklist", module_source)
+
     def test_scene_save_payload_preserves_scene_name_translations(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
         strip_scene_for_save = _extract_function_source(source, "stripSceneForSave")

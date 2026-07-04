@@ -68,6 +68,7 @@ const presentationTimelineTools = window.CanvasiaEditorPresentationTimeline;
 const localizationCoverageTools = window.CanvasiaEditorLocalizationCoverage;
 const runtimeCapabilityMatrixTools = window.CanvasiaEditorRuntimeCapabilityMatrix;
 const productionBacklogTools = window.CanvasiaEditorProductionBacklog;
+const releaseCandidateManifestTools = window.CanvasiaEditorReleaseCandidateManifest;
 
 function getBlockLabel(type) {
   return storyBlockCatalogTools.getBlockLabel(type) ?? BLOCK_LABELS[type] ?? type ?? "步骤";
@@ -3993,6 +3994,16 @@ async function handleClick(event) {
 
   if (action === "export-production-backlog-csv") {
     exportProductionBacklogCsv();
+    return;
+  }
+
+  if (action === "export-release-candidate-manifest-markdown") {
+    exportReleaseCandidateManifestMarkdown();
+    return;
+  }
+
+  if (action === "export-release-candidate-manifest-csv") {
+    exportReleaseCandidateManifestCsv();
     return;
   }
 
@@ -28831,6 +28842,17 @@ function buildProductionBacklogFileName(extension = "md") {
   return `${title}_production_backlog_${dateStamp}.${extension}`;
 }
 
+function buildReleaseCandidateManifestFileName(extension = "md") {
+  const date = new Date();
+  const dateStamp = [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("");
+  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
+  return `${title}_release_candidate_manifest_${dateStamp}.${extension}`;
+}
+
 function buildPlaytestHandoffFileName(extension = "md") {
   const date = new Date();
   const dateStamp = [
@@ -30393,6 +30415,55 @@ function exportProductionBacklogCsv() {
   showToast(`生产待办 CSV 已导出：${fileName}`);
 }
 
+function buildReleaseCandidateManifest(routeOverview = null) {
+  const currentRouteOverview = routeOverview ?? buildSceneRouteOverview();
+  const releaseItems = buildReleaseChecklistItems();
+  const releaseFixOrder = buildReleaseFixOrder(currentRouteOverview);
+  return releaseCandidateManifestTools.buildReleaseCandidateManifest({
+    data: state.data ?? {},
+    releaseVersion: getProjectReleaseVersion(),
+    editorMode: getProjectEditorMode(),
+    editorModeLabel: getEditorModeLabel(getProjectEditorMode()),
+    resolution: getProjectResolution(),
+    routeOverview: currentRouteOverview,
+    validation: {
+      errorCount: state.validation?.errors?.length ?? 0,
+      warningCount: state.validation?.warnings?.length ?? 0,
+    },
+    releaseChecklistItems: releaseItems,
+    finalPublishGate: buildFinalPublishGate(releaseItems, releaseFixOrder),
+    releaseFixOrder,
+    productionBacklog: buildProductionBacklog(currentRouteOverview),
+    runtimeCapabilityMatrix: buildRuntimeCapabilityMatrix(),
+    localizationCoverage: buildLocalizationCoverage(),
+    screenplay: buildScreenplayExport(),
+    directorCueSheet: buildDirectorCueSheet(),
+    voiceSheet: buildVoiceProductionSheet(),
+    exportResult: state.lastExportResult,
+    regressionResult: state.inspectionRegressionResult,
+  });
+}
+
+function exportReleaseCandidateManifestMarkdown() {
+  const fileName = buildReleaseCandidateManifestFileName("md");
+  const manifest = buildReleaseCandidateManifest();
+  const content = releaseCandidateManifestTools.buildReleaseCandidateMarkdown(manifest, {
+    projectTitle: state.data?.project?.title || "Canvasia Project",
+    generatedAt: formatDate(new Date().toISOString()),
+  });
+  downloadTextFile(fileName, content, "text/markdown;charset=utf-8");
+  setSaveStatus(`已导出 Release Candidate Manifest：${fileName}`);
+  showToast(`Release Candidate Manifest 已导出：${fileName}`);
+}
+
+function exportReleaseCandidateManifestCsv() {
+  const fileName = buildReleaseCandidateManifestFileName("csv");
+  const content = releaseCandidateManifestTools.buildReleaseCandidateCsv(buildReleaseCandidateManifest());
+  downloadTextFile(fileName, content, "text/csv;charset=utf-8");
+  setSaveStatus(`已导出 Release Candidate CSV：${fileName}`);
+  showToast(`Release Candidate CSV 已导出：${fileName}`);
+}
+
 function buildPlaytestHandoffContext() {
   const routeOverview = buildSceneRouteOverview();
   return {
@@ -31779,6 +31850,19 @@ function getProductionBacklogToneClass(status) {
   return "";
 }
 
+function getReleaseCandidateManifestToneClass(status) {
+  if (status === "blocked" || status === "review") {
+    return "danger-text";
+  }
+  if (status === "candidate") {
+    return "warn-text";
+  }
+  if (status === "ready") {
+    return "good-text";
+  }
+  return "";
+}
+
 function renderProductionTaskAction(task) {
   const action = task?.action ?? {};
   const screenAttribute = action.screen ? ` data-screen="${escapeHtml(action.screen)}"` : "";
@@ -31874,6 +31958,15 @@ function renderProductionBacklogPanel(routeOverview) {
       }
     </article>
   `;
+}
+
+function renderReleaseCandidateManifestPanel(routeOverview) {
+  return releaseCandidateManifestTools.renderReleaseCandidateManifestPanel(buildReleaseCandidateManifest(routeOverview), {
+    escapeHtml,
+    getToneClass: getReleaseCandidateManifestToneClass,
+    renderEmpty,
+    renderRouteMetricCard,
+  });
 }
 
 function renderRuntimeCapabilityMatrixPanel() {
@@ -32801,6 +32894,7 @@ function renderInspectionOverviewPanel(routeOverview) {
       ${renderCompactProjectMilestonePanel(routeOverview)}
       ${renderProjectDoctorPanel(routeOverview, issueItems)}
       ${renderProductionBacklogPanel(routeOverview)}
+      ${renderReleaseCandidateManifestPanel(routeOverview)}
       ${renderRuntimeCapabilityMatrixPanel()}
       ${renderSceneProductionBoardPanel()}
       ${renderScreenplayExportPanel()}
