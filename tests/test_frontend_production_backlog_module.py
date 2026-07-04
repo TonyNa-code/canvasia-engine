@@ -24,7 +24,42 @@ class FrontendProductionBacklogModuleTests(unittest.TestCase):
             const tools = context.window.CanvasiaEditorProductionBacklog;
             const backlog = tools.buildProductionBacklog({{
               projectTitle: "Backlog Demo",
-              routeOverview: {{ metrics: {{ brokenRoutes: 1, unreachableScenes: 2, orphanScenes: 0 }} }},
+              routeOverview: {{
+                metrics: {{ brokenRoutes: 1, unreachableScenes: 2, orphanScenes: 0 }},
+                routeTestingPlan: {{
+                  executionQueue: [
+                    {{
+                      severity: "blocker",
+                      status: "broken",
+                      title: "修复分支坏链",
+                      actionLabel: "重新选择目标场景",
+                      acceptanceCriteria: "确认状态变为可试玩。",
+                      chapterName: "第1章",
+                      sceneName: "分岔口",
+                      routeLabel: "选项：留下",
+                      targetLabel: "Missing",
+                    }},
+                    {{
+                      severity: "warn",
+                      status: "unreachable",
+                      title: "接通结局入口",
+                      actionLabel: "检查上游入口",
+                      acceptanceCriteria: "玩家能自然打到该结局。",
+                      chapterName: "第1章",
+                      sceneName: "隐藏结局",
+                      routeLabel: "结局路径",
+                      targetLabel: "Hidden End",
+                    }},
+                    {{
+                      severity: "test",
+                      status: "ready",
+                      title: "完整跑通结局",
+                      chapterName: "第1章",
+                      sceneName: "Good End",
+                    }},
+                  ],
+                }},
+              }},
               sceneBoard: {{
                 issues: [
                   {{ severity: "warn", title: "缺少背景", detail: "补一张教室背景。", chapterName: "第1章", sceneName: "教室黄昏" }},
@@ -49,6 +84,22 @@ class FrontendProductionBacklogModuleTests(unittest.TestCase):
                 ],
               }},
               audioCueSheet: {{
+                productionQueue: [
+                  {{
+                    severity: "blocker",
+                    title: "BGM 文件缺失",
+                    actionLabel: "补齐或重新绑定素材",
+                    detail: "缺少黄昏主题曲文件。",
+                    targetLabel: "第1章 · 雨夜 · 黄昏主题",
+                  }},
+                  {{
+                    severity: "tip",
+                    title: "试听 BGM 覆盖段",
+                    actionLabel: "从开头试听到切歌点",
+                    detail: "确认切歌不突兀。",
+                    targetLabel: "第1章 · 雨夜 · 放课后钢琴",
+                  }},
+                ],
                 issues: [
                   {{ severity: "warn", title: "BGM 缺少淡出", detail: "切曲太硬。", chapterName: "第1章", sceneName: "雨夜" }},
                 ],
@@ -107,15 +158,21 @@ class FrontendProductionBacklogModuleTests(unittest.TestCase):
         self.assertIn("buildProductionBacklog", payload["keys"])
         self.assertIn("buildProductionBacklogMarkdown", payload["keys"])
         self.assertIn("buildProductionBacklogCsv", payload["keys"])
+        self.assertIn("addRouteExecutionTasks", payload["keys"])
+        self.assertIn("addAudioProductionTasks", payload["keys"])
         self.assertEqual(payload["backlog"]["projectTitle"], "Backlog Demo")
-        self.assertEqual(payload["backlog"]["summary"]["taskCount"], 13)
-        self.assertEqual(payload["backlog"]["summary"]["blockerCount"], 3)
-        self.assertEqual(payload["backlog"]["summary"]["warningCount"], 7)
-        self.assertEqual(payload["backlog"]["summary"]["tipCount"], 3)
+        self.assertEqual(payload["backlog"]["summary"]["taskCount"], 17)
+        self.assertEqual(payload["backlog"]["summary"]["blockerCount"], 5)
+        self.assertEqual(payload["backlog"]["summary"]["warningCount"], 8)
+        self.assertEqual(payload["backlog"]["summary"]["tipCount"], 4)
         self.assertGreaterEqual(payload["backlog"]["summary"]["areaCount"], 9)
         self.assertEqual(payload["digest"]["status"], "blocked")
         self.assertEqual(payload["backlog"]["tasks"][0]["severity"], "blocker")
+        self.assertTrue(any(task["title"] == "修复分支坏链" for task in payload["backlog"]["tasks"]))
+        self.assertTrue(any(task["title"] == "BGM 文件缺失" for task in payload["backlog"]["tasks"]))
         self.assertIn("生产待办队列", payload["markdown"])
+        self.assertIn("修复分支坏链", payload["markdown"])
+        self.assertIn("BGM 文件缺失", payload["markdown"])
         self.assertIn("语音文件缺失", payload["markdown"])
         self.assertIn("Runtime 覆盖", payload["markdown"])
         self.assertIn('"素材依赖"', payload["csv"])

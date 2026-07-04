@@ -4299,6 +4299,8 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("function exportProductionBacklogCsv()", source)
         self.assertIn("productionBacklogTools.buildProductionBacklog", source)
         self.assertIn("productionBacklogTools.getProductionBacklogStatusDigest", source)
+        self.assertIn("routeOverview: currentRouteOverview", source)
+        self.assertIn("audioCueSheet: buildAudioCueSheet()", source)
 
     def test_scene_save_payload_preserves_scene_name_translations(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")

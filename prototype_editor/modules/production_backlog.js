@@ -169,6 +169,46 @@
       });
   }
 
+  function addRouteExecutionTasks(tasks, routeTestingPlan = {}) {
+    toArray(routeTestingPlan.executionQueue)
+      .filter((item) => item && item.status !== "ready")
+      .slice(0, 12)
+      .forEach((item) => {
+        addTask(tasks, {
+          area: "route",
+          severity: item.severity === "blocker" ? "blocker" : "warn",
+          title: item.title ?? (item.kind === "ending" ? "接通结局路径" : "处理路线点测问题"),
+          detail: cleanText(
+            `${item.actionLabel ?? "处理路线用例"}。${item.acceptanceCriteria ?? ""}`,
+            "处理路线执行队列里的阻塞项。"
+          ),
+          source: cleanText(`${item.chapterName ?? ""} / ${item.sceneName ?? ""} / ${item.routeLabel ?? ""} -> ${item.targetLabel ?? ""}`, "路线执行队列"),
+          action: AREA_ACTIONS.route,
+          priorityBoost: item.severity === "blocker" ? 24 : 14,
+        });
+      });
+  }
+
+  function addAudioProductionTasks(tasks, audioCueSheet = {}) {
+    toArray(audioCueSheet.productionQueue)
+      .filter((item) => item && item.severity !== "good")
+      .slice(0, 12)
+      .forEach((item) => {
+        addTask(tasks, {
+          area: "audio",
+          severity: item.severity,
+          title: item.title ?? "处理音频制作任务",
+          detail: cleanText(
+            `${item.actionLabel ?? "处理音频任务"}。${item.detail ?? ""}`,
+            "处理音频生产队列里的任务。"
+          ),
+          source: item.targetLabel ?? "音频制作队列",
+          action: AREA_ACTIONS.audio,
+          priorityBoost: item.severity === "blocker" ? 18 : item.severity === "warn" ? 9 : 4,
+        });
+      });
+  }
+
   function addRouteTasks(tasks, routeOverview = {}) {
     const metrics = routeOverview.metrics ?? {};
     const brokenRoutes = toCount(metrics.brokenRoutes);
@@ -255,11 +295,13 @@
   function buildProductionBacklog(context = {}) {
     const tasks = [];
     addRouteTasks(tasks, context.routeOverview);
+    addRouteExecutionTasks(tasks, context.routeOverview?.routeTestingPlan);
     addIssueTasks(tasks, "scene", context.sceneBoard?.issues, { fallbackTitle: "处理场景制作问题", fallbackSource: "场景生产看板" });
     addIssueTasks(tasks, "voice", context.voiceSheet?.issues, { fallbackTitle: "处理语音制作问题", fallbackSource: "语音制作清单" });
     addIssueTasks(tasks, "choice", context.choiceConsequenceSheet?.issues, { fallbackTitle: "处理选项问题", fallbackSource: "选项后果表" });
     addIssueTasks(tasks, "variable", context.variableInfluenceSheet?.issues, { fallbackTitle: "处理变量问题", fallbackSource: "变量影响表" });
     addIssueTasks(tasks, "asset", context.assetDependencySheet?.issues, { fallbackTitle: "处理素材依赖问题", fallbackSource: "素材依赖表" });
+    addAudioProductionTasks(tasks, context.audioCueSheet);
     addIssueTasks(tasks, "audio", context.audioCueSheet?.issues, { fallbackTitle: "处理音频调度问题", fallbackSource: "音频调度表" });
     addIssueTasks(tasks, "stage", context.stageDirectionSheet?.issues, { fallbackTitle: "处理角色调度问题", fallbackSource: "角色舞台调度表" });
     addIssueTasks(tasks, "presentation", context.presentationTimeline?.issues, { fallbackTitle: "处理演出节奏问题", fallbackSource: "演出时间轴" });
@@ -436,6 +478,8 @@
     getProductionBacklogStatusDigest,
     buildProductionBacklogMarkdown,
     buildProductionBacklogCsv,
+    addRouteExecutionTasks,
+    addAudioProductionTasks,
     getSeverityLabel,
   });
 })(typeof window !== "undefined" ? window : globalThis);
