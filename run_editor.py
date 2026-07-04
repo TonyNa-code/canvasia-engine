@@ -32,8 +32,10 @@ from editor_local_security import is_local_editor_host, is_local_editor_origin
 from editor_snapshot_cache import SnapshotCache, build_file_cache_signature
 from export_unlockable_manifest import (
     UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME,
+    UNLOCKABLE_CONTENT_REPORT_FILE_NAME,
     build_export_unlockable_content_manifest,
     write_unlockable_content_manifest_file,
+    write_unlockable_content_report_file,
 )
 from openai_asset_generation import (
     call_openai_asset_generation_model,
@@ -8631,6 +8633,7 @@ def write_export_app_files(build_dir: Path, export_payload: dict) -> None:
     unlockable_manifest = (export_payload.get("buildInfo") or {}).get("unlockableContentManifest")
     if isinstance(unlockable_manifest, dict):
         write_unlockable_content_manifest_file(build_dir, unlockable_manifest)
+        write_unlockable_content_report_file(build_dir, unlockable_manifest)
 
 
 def format_export_digest_number(value: object) -> str:
@@ -9019,6 +9022,10 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
     game_data_path.write_text(json.dumps(export_payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     unlockable_manifest = (export_payload.get("buildInfo") or {}).get("unlockableContentManifest")
     unlockable_manifest_path = write_unlockable_content_manifest_file(
+        build_dir,
+        unlockable_manifest if isinstance(unlockable_manifest, dict) else {},
+    )
+    unlockable_report_path = write_unlockable_content_report_file(
         build_dir,
         unlockable_manifest if isinstance(unlockable_manifest, dict) else {},
     )
@@ -9638,6 +9645,8 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
         "gameDataPath": str(game_data_path),
         "unlockableContentManifestName": unlockable_manifest_path.name,
         "unlockableContentManifestPath": str(unlockable_manifest_path),
+        "unlockableContentReportName": unlockable_report_path.name,
+        "unlockableContentReportPath": str(unlockable_report_path),
         "playerName": NATIVE_RUNTIME_PLAYER_NAME,
         "playerPath": str(build_dir / NATIVE_RUNTIME_PLAYER_NAME),
         "readmeName": NATIVE_RUNTIME_README_NAME,
@@ -10274,6 +10283,7 @@ def export_native_runtime_build() -> dict:
         extra_files={
             "gameData": runtime_files["gameDataName"],
             "unlockableContentManifest": runtime_files["unlockableContentManifestName"],
+            "unlockableContentReport": runtime_files["unlockableContentReportName"],
             "playerScript": runtime_files["playerName"],
             "readme": runtime_files["readmeName"],
             "requirements": runtime_files["requirementsName"],
@@ -10322,6 +10332,7 @@ def export_native_runtime_build() -> dict:
             "canBuildStandaloneApp": True,
             "appBuilder": runtime_files["appBuilderName"],
             "unlockableContentManifest": runtime_files["unlockableContentManifestName"],
+            "unlockableContentReport": runtime_files["unlockableContentReportName"],
             "releaseCheck": runtime_files["releaseCheckName"],
             "releaseCandidateReport": runtime_files["releaseCandidateReportName"],
             "releaseControlReport": runtime_files["releaseControlReportName"],
@@ -10367,6 +10378,7 @@ def export_native_runtime_build() -> dict:
     internal_reports = [
         {"name": manifest_path.name, "description": "导出清单，记录目标、版本、素材缺口和 Runtime 信息。"},
         {"name": runtime_files["unlockableContentManifestName"], "description": "可解锁内容清单 JSON，记录图鉴、回想、成就和结局覆盖。"},
+        {"name": runtime_files["unlockableContentReportName"], "description": "可解锁内容 Markdown 报告，方便测试员直接复查 EXTRA / 回想覆盖。"},
         {"name": runtime_files["releaseCheckName"], "description": "发布前自检 JSON。"},
         {"name": runtime_files["releaseCandidateReportName"], "description": "原生 Runtime 发布候选总报告。"},
         {"name": runtime_files["releaseControlReportName"], "description": "人工验收用发布总控 Markdown。"},
@@ -10446,6 +10458,9 @@ def export_native_runtime_build() -> dict:
         "unlockableContentManifestName": runtime_files["unlockableContentManifestName"],
         "unlockableContentManifestPath": runtime_files["unlockableContentManifestPath"],
         "unlockableContentManifestPublicUrl": f"/exports/{build_dir.name}/{runtime_files['unlockableContentManifestName']}",
+        "unlockableContentReportName": runtime_files["unlockableContentReportName"],
+        "unlockableContentReportPath": runtime_files["unlockableContentReportPath"],
+        "unlockableContentReportPublicUrl": f"/exports/{build_dir.name}/{runtime_files['unlockableContentReportName']}",
         "playerScriptPath": runtime_files["playerPath"],
         "playerScriptName": runtime_files["playerName"],
         "playerScriptPublicUrl": f"/exports/{build_dir.name}/{runtime_files['playerName']}",
@@ -10616,6 +10631,7 @@ def export_web_build() -> dict:
             "playerRuntimeSettings": "runtime_settings.js",
             "playerRuntimeAudio": "runtime_audio.js",
             "unlockableContentManifest": UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME,
+            "unlockableContentReport": UNLOCKABLE_CONTENT_REPORT_FILE_NAME,
             "iconPng": icon_files["pngFileName"],
             "iconIco": icon_files["icoFileName"],
             "launchSplash": splash_file["fileName"],
@@ -10636,6 +10652,8 @@ def export_web_build() -> dict:
         "manifestPublicUrl": f"/exports/{build_dir.name}/{manifest_path.name}",
         "unlockableContentManifestPath": str(build_dir / UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME),
         "unlockableContentManifestPublicUrl": f"/exports/{build_dir.name}/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
+        "unlockableContentReportPath": str(build_dir / UNLOCKABLE_CONTENT_REPORT_FILE_NAME),
+        "unlockableContentReportPublicUrl": f"/exports/{build_dir.name}/{UNLOCKABLE_CONTENT_REPORT_FILE_NAME}",
         "provenanceName": provenance_file["provenanceName"],
         "provenancePath": provenance_file["provenancePath"],
         "provenancePublicUrl": f"/exports/{build_dir.name}/{provenance_file['provenanceName']}",
@@ -11377,6 +11395,7 @@ def export_windows_nwjs_build() -> dict:
             "appRuntimeSettings": "app/runtime_settings.js",
             "appRuntimeAudio": "app/runtime_audio.js",
             "unlockableContentManifest": f"app/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
+            "unlockableContentReport": f"app/{UNLOCKABLE_CONTENT_REPORT_FILE_NAME}",
             "appPackage": "app/package.json",
             "iconPng": root_icon_files["pngFileName"],
             "iconIco": root_icon_files["icoFileName"],
@@ -11538,6 +11557,7 @@ def export_macos_nwjs_build() -> dict:
             "appRuntimeSettings": "app/runtime_settings.js",
             "appRuntimeAudio": "app/runtime_audio.js",
             "unlockableContentManifest": f"app/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
+            "unlockableContentReport": f"app/{UNLOCKABLE_CONTENT_REPORT_FILE_NAME}",
             "appPackage": "app/package.json",
             "iconPng": root_icon_files["pngFileName"],
             "iconIco": root_icon_files["icoFileName"],
@@ -11710,6 +11730,7 @@ def export_linux_nwjs_build() -> dict:
             "appRuntimeSettings": "app/runtime_settings.js",
             "appRuntimeAudio": "app/runtime_audio.js",
             "unlockableContentManifest": f"app/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
+            "unlockableContentReport": f"app/{UNLOCKABLE_CONTENT_REPORT_FILE_NAME}",
             "appPackage": "app/package.json",
             "iconPng": root_icon_files["pngFileName"],
             "iconIco": root_icon_files["icoFileName"],

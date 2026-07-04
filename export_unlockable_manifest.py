@@ -7,6 +7,7 @@ from pathlib import Path
 
 
 UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME = "unlockable_content_manifest.json"
+UNLOCKABLE_CONTENT_REPORT_FILE_NAME = "unlockable_content_report.md"
 
 
 def now_iso() -> str:
@@ -408,14 +409,29 @@ def collect_export_chapter_replay_group(bundle: dict) -> dict:
 
 def collect_export_scene_targets(block: dict) -> list[str]:
     targets: list[str] = []
-    for key in ("targetSceneId", "sceneId", "trueTargetSceneId", "falseTargetSceneId", "nextSceneId"):
+    for key in (
+        "targetSceneId",
+        "gotoSceneId",
+        "sceneId",
+        "trueTargetSceneId",
+        "falseTargetSceneId",
+        "elseGotoSceneId",
+        "nextSceneId",
+    ):
         value = export_clean_text(block.get(key))
         if value:
             targets.append(value)
     for collection_key in ("choices", "options", "branches"):
         for item in block.get(collection_key) or []:
             if isinstance(item, dict):
-                for key in ("targetSceneId", "sceneId", "trueTargetSceneId", "falseTargetSceneId"):
+                for key in (
+                    "targetSceneId",
+                    "gotoSceneId",
+                    "sceneId",
+                    "trueTargetSceneId",
+                    "falseTargetSceneId",
+                    "elseGotoSceneId",
+                ):
                     value = export_clean_text(item.get(key))
                     if value:
                         targets.append(value)
@@ -576,8 +592,116 @@ def write_unlockable_content_manifest_file(target_dir: Path, manifest: dict) -> 
     return path
 
 
+def markdown_cell(value: object) -> str:
+    return export_clean_text(value, "-").replace("|", "\\|")
+
+
+def build_unlockable_content_report_markdown(manifest: dict) -> str:
+    summary = manifest.get("summary") if isinstance(manifest.get("summary"), dict) else {}
+    groups = manifest.get("groups") if isinstance(manifest.get("groups"), list) else []
+    issues = manifest.get("issues") if isinstance(manifest.get("issues"), list) else []
+    status_labels = {
+        "ready": "通过",
+        "warn": "需复查",
+        "missing": "缺失",
+        "empty": "未使用",
+    }
+    lines = [
+        "# 可解锁内容随包报告",
+        "",
+        f"- 项目：{export_clean_text(manifest.get('projectTitle'), '未命名项目')}",
+        f"- 生成时间：{export_clean_text(manifest.get('generatedAt'), '-')}",
+        f"- 总条目：{summary.get('readyEntryCount', 0)}/{summary.get('totalEntryCount', 0)} 可用",
+        f"- 就绪度：{summary.get('readinessPercent', 0)}%",
+        f"- 警告：{summary.get('warningCount', 0)} 项",
+        f"- 结局：{summary.get('reachableEndingCount', 0)}/{summary.get('endingCount', 0)} 可达",
+        "",
+        "## 分组总览",
+        "",
+        "| 分组 | 状态 | 可用 | 总数 | 就绪度 |",
+        "| --- | --- | ---: | ---: | ---: |",
+    ]
+    for group in groups:
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    markdown_cell(group.get("label") or group.get("id")),
+                    markdown_cell(status_labels.get(str(group.get("status")), group.get("status"))),
+                    markdown_cell(group.get("readyCount", 0)),
+                    markdown_cell(group.get("totalCount", 0)),
+                    f"{markdown_cell(group.get('readinessPercent', 0))}%",
+                ]
+            )
+            + " |"
+        )
+
+    lines.extend(["", "## 优先复查", ""])
+    if issues:
+        for issue in issues[:20]:
+            lines.append(
+                f"- [{markdown_cell(issue.get('severity'))}] {markdown_cell(issue.get('title'))}：{markdown_cell(issue.get('detail'))}"
+            )
+        if len(issues) > 20:
+            lines.append(f"- 还有 {len(issues) - 20} 项问题，请查看 `{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}`。")
+    else:
+        lines.append("- 暂未发现可解锁内容阻塞项。")
+
+    lines.extend(["", "## 分组明细", ""])
+    for group in groups:
+        entries = group.get("entries") if isinstance(group.get("entries"), list) else []
+        lines.extend(
+            [
+                f"### {export_clean_text(group.get('label') or group.get('id'), '未命名分组')}",
+                "",
+                export_clean_text(group.get("detail"), "暂无说明。"),
+                "",
+            ]
+        )
+        if not entries:
+            lines.extend(["- 当前项目没有使用这一类内容。", ""])
+            continue
+        lines.extend(["| 条目 | 状态 | 说明 |", "| --- | --- | --- |"])
+        for entry in entries[:12]:
+            lines.append(
+                "| "
+                + " | ".join(
+                    [
+                        markdown_cell(entry.get("title")),
+                        markdown_cell(status_labels.get(str(entry.get("status")), entry.get("status"))),
+                        markdown_cell(entry.get("detail") or entry.get("source")),
+                    ]
+                )
+                + " |"
+            )
+        if len(entries) > 12:
+            lines.append(f"| 其余 {len(entries) - 12} 项 | 见 JSON | `{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}` |")
+        lines.append("")
+
+    lines.extend(
+        [
+            "## 使用建议",
+            "",
+            f"- 发布前先处理“优先复查”里的缺失素材、不可达结局和语音回听缺口。",
+            f"- 需要机器读取或做自动化验收时，请使用 `{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}`。",
+            "- 这份报告只描述导出包里实际携带和可推导的内容，不替代人工试玩。",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def write_unlockable_content_report_file(target_dir: Path, manifest: dict) -> Path:
+    path = target_dir / UNLOCKABLE_CONTENT_REPORT_FILE_NAME
+    path.write_text(build_unlockable_content_report_markdown(manifest), encoding="utf-8")
+    return path
+
+
 __all__ = [
     "UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME",
+    "UNLOCKABLE_CONTENT_REPORT_FILE_NAME",
     "build_export_unlockable_content_manifest",
+    "build_unlockable_content_report_markdown",
     "write_unlockable_content_manifest_file",
+    "write_unlockable_content_report_file",
 ]

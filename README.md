@@ -205,7 +205,7 @@ Open a project and go to the preview/export area to generate:
 
 The Web playable package is the easiest option for quick sharing. The native Runtime package is the route for testing a more app-like desktop playback flow.
 
-Every playable export also includes `unlockable_content_manifest.json`, a machine-readable coverage snapshot for CG galleries, music rooms, voice replay, archive pages, achievements, chapter replay, and endings. This gives creators and testers one stable file to check when confirming whether replay / extras content made it into the exported game.
+Every playable export also includes `unlockable_content_manifest.json` and `unlockable_content_report.md`. The JSON is a machine-readable coverage snapshot for CG galleries, music rooms, voice replay, archive pages, achievements, chapter replay, and endings; the Markdown report is a tester-friendly checklist for confirming whether replay / extras content made it into the exported game.
 
 ## Release Packages
 

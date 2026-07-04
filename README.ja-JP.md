@@ -193,7 +193,7 @@ Canvasia は初期 i18n フローに対応しています。
 
 気軽に共有するなら Web 試遊パッケージが最も簡単です。よりアプリに近いデスクトップ再生フローを検証する場合は、ネイティブ Runtime パッケージを使います。
 
-すべての playable / runtime 書き出しには `unlockable_content_manifest.json` も同梱されます。CG ギャラリー、音楽鑑賞、ボイス回想、キャラクター / 場所 / ナレーション / 関係アーカイブ、章回想、エンディング、実績の収録状況を確認できる機械可読のカバレッジファイルです。
+すべての playable / runtime 書き出しには `unlockable_content_manifest.json` と `unlockable_content_report.md` も同梱されます。JSON は機械可読のカバレッジファイル、Markdown はテスター向けの確認レポートで、CG ギャラリー、音楽鑑賞、ボイス回想、キャラクター / 場所 / ナレーション / 関係アーカイブ、章回想、エンディング、実績の収録状況を確認できます。
 
 ## Release パッケージ
 
