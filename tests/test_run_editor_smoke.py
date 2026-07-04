@@ -2546,6 +2546,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / "player.js").is_file())
         self.assertTrue((build_dir / "runtime_controls.js").is_file())
         self.assertTrue((build_dir / "runtime_settings.js").is_file())
+        self.assertTrue((build_dir / "runtime_audio.js").is_file())
         self.assertTrue((build_dir / "player.css").is_file())
         self.assertTrue((build_dir / "launch_splash.svg").is_file())
         self.assertTrue((build_dir / "app_icon.png").is_file())
@@ -2561,9 +2562,10 @@ class RunEditorSmokeTests(unittest.TestCase):
         )
         self.assertEqual(manifest["files"]["playerRuntimeControls"], "runtime_controls.js")
         self.assertEqual(manifest["files"]["playerRuntimeSettings"], "runtime_settings.js")
+        self.assertEqual(manifest["files"]["playerRuntimeAudio"], "runtime_audio.js")
         provenance = self.assert_export_provenance_file(
             export_result,
-            {"export_manifest.json", "index.html", "player.js", "runtime_controls.js", "runtime_settings.js", "player.css"},
+            {"export_manifest.json", "index.html", "player.js", "runtime_controls.js", "runtime_settings.js", "runtime_audio.js", "player.css"},
         )
         self.assertEqual(provenance["build"]["target"], run_editor.EXPORT_TARGET_WEB)
         self.assert_export_provenance_verifier_detects_tamper(export_result, "player.css")
@@ -3451,6 +3453,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue(Path(export_result["archivePath"]).is_file())
         self.assertTrue((build_dir / "app" / "runtime_controls.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_settings.js").is_file())
+        self.assertTrue((build_dir / "app" / "runtime_audio.js").is_file())
         self.assertTrue(manifest_path.is_file())
 
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -3458,7 +3461,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assert_export_manifest_has_subtle_engine_signature(manifest)
         provenance = self.assert_export_provenance_file(
             export_result,
-            {"export_manifest.json", "app/index.html", "app/player.js", "app/runtime_controls.js", "app/runtime_settings.js", "app/player.css"},
+            {"export_manifest.json", "app/index.html", "app/player.js", "app/runtime_controls.js", "app/runtime_settings.js", "app/runtime_audio.js", "app/player.css"},
         )
         self.assertEqual(provenance["build"]["target"], run_editor.EXPORT_TARGET_WINDOWS_NWJS)
 
@@ -3489,6 +3492,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue(Path(export_result["archivePath"]).is_file())
         self.assertTrue((build_dir / "app" / "runtime_controls.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_settings.js").is_file())
+        self.assertTrue((build_dir / "app" / "runtime_audio.js").is_file())
         self.assertTrue(manifest_path.is_file())
 
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -3496,7 +3500,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assert_export_manifest_has_subtle_engine_signature(manifest)
         provenance = self.assert_export_provenance_file(
             export_result,
-            {"export_manifest.json", "app/index.html", "app/player.js", "app/runtime_controls.js", "app/runtime_settings.js", "app/player.css"},
+            {"export_manifest.json", "app/index.html", "app/player.js", "app/runtime_controls.js", "app/runtime_settings.js", "app/runtime_audio.js", "app/player.css"},
         )
         self.assertEqual(provenance["build"]["target"], run_editor.EXPORT_TARGET_MACOS_NWJS)
         self.assertEqual(manifest["runtime"]["version"], run_editor.NWJS_RUNTIME_VERSION)
@@ -3602,6 +3606,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / "package.nw").is_file())
         self.assertTrue((build_dir / "app" / "runtime_controls.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_settings.js").is_file())
+        self.assertTrue((build_dir / "app" / "runtime_audio.js").is_file())
         self.assertTrue(manifest_path.is_file())
 
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -3609,7 +3614,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assert_export_manifest_has_subtle_engine_signature(manifest)
         provenance = self.assert_export_provenance_file(
             export_result,
-            {"export_manifest.json", "app/index.html", "app/player.js", "app/runtime_controls.js", "app/runtime_settings.js", "app/player.css", "package.nw"},
+            {"export_manifest.json", "app/index.html", "app/player.js", "app/runtime_controls.js", "app/runtime_settings.js", "app/runtime_audio.js", "app/player.css", "package.nw"},
         )
         self.assertEqual(provenance["build"]["target"], run_editor.EXPORT_TARGET_LINUX_NWJS)
         self.assertEqual(manifest["runtime"]["version"], run_editor.NWJS_RUNTIME_VERSION)
@@ -3627,6 +3632,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((bundle_dir / "export_player_template" / "player.js").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_controls.js").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_settings.js").is_file())
+        self.assertTrue((bundle_dir / "export_player_template" / "runtime_audio.js").is_file())
         self.assertTrue((bundle_dir / "template_project" / "project.json").is_file())
         self.assertTrue((bundle_dir / "projects").is_dir())
         self.assertTrue((bundle_dir / "exports").is_dir())

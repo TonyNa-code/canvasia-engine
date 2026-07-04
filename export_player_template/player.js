@@ -1,5 +1,15 @@
 import { renderOperationGuideGroups } from "./runtime_controls.js";
 import {
+  cancelAudioFade,
+  disposeAudio,
+  fadeAudioVolume,
+  getRuntimeMusicTargetVolume as getRuntimeMusicTargetVolumeBase,
+  getRuntimeSfxTargetVolume as getRuntimeSfxTargetVolumeBase,
+  getRuntimeVoiceTargetVolume as getRuntimeVoiceTargetVolumeBase,
+  getSafeAudioFadeMs,
+  stopTrackedAudios,
+} from "./runtime_audio.js";
+import {
   DIALOG_THEME_LABELS,
   PLAYBACK_DEFAULTS,
   TEXT_SPEED_LABELS,
@@ -7101,17 +7111,12 @@ function stopRuntimeAutoAdvance() {
 }
 
 function stopOneShotAudio() {
-  activeSfxAudios.forEach((audio) => {
-    audio.pause();
-    audio.src = "";
-  });
-  activeSfxAudios.clear();
+  stopTrackedAudios(activeSfxAudios);
 }
 
 function stopVoicePlayback({ resetStepKey = true } = {}) {
   if (state.voiceAudio) {
-    state.voiceAudio.pause();
-    state.voiceAudio.src = "";
+    disposeAudio(state.voiceAudio);
     state.voiceAudio = null;
   }
 
@@ -7278,10 +7283,7 @@ function syncVoice(snapshot) {
 }
 
 function getRuntimeVoiceTargetVolume(snapshot) {
-  return (
-    getVolumeRatio(state.playback.voiceVolume, 92) *
-    getVolumeRatio(snapshot?.block?.voiceVolume, 100)
-  );
+  return getRuntimeVoiceTargetVolumeBase(state.playback, snapshot);
 }
 
 function renderPlaybackControls(snapshot = getCurrentSnapshot()) {
@@ -10148,14 +10150,11 @@ function syncAudio(snapshot) {
 }
 
 function getRuntimeMusicTargetVolume(snapshot) {
-  return (
-    getVolumeRatio(state.playback.bgmVolume, 72) *
-    getVolumeRatio(snapshot?.visualState?.musicVolume ?? snapshot?.block?.volume, 100)
-  );
+  return getRuntimeMusicTargetVolumeBase(state.playback, snapshot);
 }
 
 function getRuntimeSfxTargetVolume(volumePercent = 100) {
-  return getVolumeRatio(state.playback.sfxVolume, 85) * getVolumeRatio(volumePercent, 100);
+  return getRuntimeSfxTargetVolumeBase(state.playback, volumePercent);
 }
 
 function syncOneShotAudio(snapshot) {
@@ -10376,64 +10375,6 @@ function finishCreditsPlayback({ skipped = false } = {}) {
   stopCreditsPlayback();
   movePreviewForward();
   renderRuntime();
-}
-
-function getSafeAudioFadeMs(value, fallback = 0) {
-  return Math.round(clamp(getSafeNumber(value, fallback), 0, 30000));
-}
-
-function cancelAudioFade(audio) {
-  if (!audio?._tnEngineFadeFrame) {
-    return;
-  }
-  window.cancelAnimationFrame(audio._tnEngineFadeFrame);
-  audio._tnEngineFadeFrame = null;
-}
-
-function disposeAudio(audio) {
-  if (!audio) {
-    return;
-  }
-  cancelAudioFade(audio);
-  audio.pause();
-  audio.src = "";
-}
-
-function fadeAudioVolume(audio, { from = audio?.volume ?? 0, to = 0, durationMs = 0, onComplete = null } = {}) {
-  if (!audio) {
-    return;
-  }
-
-  cancelAudioFade(audio);
-  const safeFrom = clamp(getSafeNumber(from, audio.volume || 0), 0, 1);
-  const safeTo = clamp(getSafeNumber(to, 0), 0, 1);
-  const safeDuration = getSafeAudioFadeMs(durationMs);
-
-  if (safeDuration <= 0) {
-    audio.volume = safeTo;
-    if (typeof onComplete === "function") {
-      onComplete();
-    }
-    return;
-  }
-
-  const startedAt = window.performance.now();
-  const tick = (now) => {
-    const progress = clamp((now - startedAt) / safeDuration, 0, 1);
-    const eased = progress * progress * (3 - 2 * progress);
-    audio.volume = safeFrom + (safeTo - safeFrom) * eased;
-    if (progress >= 1) {
-      audio._tnEngineFadeFrame = null;
-      if (typeof onComplete === "function") {
-        onComplete();
-      }
-      return;
-    }
-    audio._tnEngineFadeFrame = window.requestAnimationFrame(tick);
-  };
-
-  audio.volume = safeFrom;
-  audio._tnEngineFadeFrame = window.requestAnimationFrame(tick);
 }
 
 function fadeOutPreviousMusic(fadeOutMs = 0) {

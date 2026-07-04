@@ -121,6 +121,7 @@ def build_node_check_steps() -> list[VerifyStep]:
             "export_player_template/player.js",
             "export_player_template/runtime_controls.js",
             "export_player_template/runtime_settings.js",
+            "export_player_template/runtime_audio.js",
         ]
     )
     return [

@@ -56,15 +56,25 @@ jobs:
             tests/test_release_public_surface.py \
             tests/test_frontend_action_handlers.py \
             tests/test_frontend_asset_catalog_module.py \
+            tests/test_frontend_asset_dependency_sheet_module.py \
+            tests/test_frontend_audio_cue_sheet_module.py \
+            tests/test_frontend_audio_cue_sheet_panel_module.py \
             tests/test_frontend_editor_common_module.py \
             tests/test_frontend_beginner_tutorial_module.py \
+            tests/test_frontend_choice_consequence_sheet_module.py \
+            tests/test_frontend_command_palette_module.py \
             tests/test_frontend_creative_assistant_module.py \
             tests/test_frontend_openai_asset_generator_module.py \
             tests/test_frontend_particle_effects_module.py \
             tests/test_frontend_editor_filters_module.py \
             tests/test_frontend_entrypoint_modules.py \
             tests/test_frontend_editor_mode_module.py \
+            tests/test_frontend_localization_coverage_module.py \
+            tests/test_frontend_playtest_handoff_report_module.py \
+            tests/test_frontend_presentation_timeline_module.py \
+            tests/test_frontend_preview_regression_module.py \
             tests/test_frontend_preview_save_module.py \
+            tests/test_frontend_production_backlog_module.py \
             tests/test_frontend_project_center_module.py \
             tests/test_frontend_project_doctor_module.py \
             tests/test_frontend_project_milestones_module.py \
@@ -73,15 +83,26 @@ jobs:
             tests/test_frontend_recent_workspace_module.py \
             tests/test_frontend_release_control_module.py \
             tests/test_frontend_release_version_module.py \
+            tests/test_frontend_route_analyzer_module.py \
+            tests/test_frontend_route_testing_report_module.py \
+            tests/test_frontend_runtime_audio_module.py \
+            tests/test_frontend_runtime_capability_matrix_module.py \
+            tests/test_frontend_scene_production_board_module.py \
+            tests/test_frontend_script_import_mapping_module.py \
+            tests/test_frontend_script_importer_module.py \
             tests/test_frontend_script_readability_module.py \
             tests/test_frontend_script_voice_module.py \
+            tests/test_frontend_stage_direction_sheet_module.py \
             tests/test_frontend_story_block_catalog_module.py \
             tests/test_frontend_story_block_editors_module.py \
+            tests/test_frontend_story_block_registry_integration.py \
             tests/test_frontend_story_templates_module.py \
             tests/test_frontend_system_dialog_module.py \
             tests/test_frontend_ui_theme_module.py \
+            tests/test_frontend_variable_influence_sheet_module.py \
             tests/test_frontend_variables_module.py \
             tests/test_frontend_visual_effects_module.py \
+            tests/test_frontend_voice_production_sheet_module.py \
             tests/test_run_editor_smoke.py \
             tests/test_native_runtime_render_smoke.py \
             tests/test_browser_playwright_smoke.py
@@ -89,12 +110,21 @@ jobs:
       - name: Frontend syntax check
         run: |
           node --check prototype_editor/modules/asset_catalog.js
+          node --check prototype_editor/modules/asset_dependency_sheet.js
+          node --check prototype_editor/modules/audio_cue_sheet.js
+          node --check prototype_editor/modules/audio_cue_sheet_panel.js
           node --check prototype_editor/modules/beginner_tutorial.js
+          node --check prototype_editor/modules/choice_consequence_sheet.js
+          node --check prototype_editor/modules/command_palette.js
           node --check prototype_editor/modules/editor_common.js
           node --check prototype_editor/modules/creative_assistant.js
           node --check prototype_editor/modules/editor_filters.js
           node --check prototype_editor/modules/editor_mode.js
+          node --check prototype_editor/modules/localization_coverage.js
           node --check prototype_editor/modules/preview_save.js
+          node --check prototype_editor/modules/playtest_handoff_report.js
+          node --check prototype_editor/modules/presentation_timeline.js
+          node --check prototype_editor/modules/preview_regression.js
           node --check prototype_editor/modules/project_center.js
           node --check prototype_editor/modules/project_doctor.js
           node --check prototype_editor/modules/project_milestones.js
@@ -102,20 +132,33 @@ jobs:
           node --check prototype_editor/modules/project_settings.js
           node --check prototype_editor/modules/openai_asset_generator.js
           node --check prototype_editor/modules/particle_effects.js
+          node --check prototype_editor/modules/production_backlog.js
           node --check prototype_editor/modules/recent_workspace.js
           node --check prototype_editor/modules/release_control.js
           node --check prototype_editor/modules/release_version.js
+          node --check prototype_editor/modules/route_analyzer.js
+          node --check prototype_editor/modules/route_testing_report.js
+          node --check prototype_editor/modules/runtime_capability_matrix.js
+          node --check prototype_editor/modules/scene_production_board.js
+          node --check prototype_editor/modules/script_import_mapping.js
+          node --check prototype_editor/modules/script_importer.js
           node --check prototype_editor/modules/script_readability.js
           node --check prototype_editor/modules/script_voice.js
+          node --check prototype_editor/modules/stage_direction_sheet.js
           node --check prototype_editor/modules/story_block_catalog.js
           node --check prototype_editor/modules/story_block_editors.js
           node --check prototype_editor/modules/story_templates.js
           node --check prototype_editor/modules/system_dialog.js
           node --check prototype_editor/modules/ui_theme.js
+          node --check prototype_editor/modules/variable_influence_sheet.js
           node --check prototype_editor/modules/variables.js
           node --check prototype_editor/modules/visual_effects.js
+          node --check prototype_editor/modules/voice_production_sheet.js
           node --check prototype_editor/app.js
           node --check export_player_template/player.js
+          node --check export_player_template/runtime_controls.js
+          node --check export_player_template/runtime_settings.js
+          node --check export_player_template/runtime_audio.js
 
       - name: Release tooling tests
         run: |
@@ -128,7 +171,12 @@ jobs:
           python -m unittest discover -s tests -p 'test_release_public_surface.py' -v
           python -m unittest discover -s tests -p 'test_frontend_action_handlers.py' -v
           python -m unittest discover -s tests -p 'test_frontend_asset_catalog_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_asset_dependency_sheet_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_audio_cue_sheet_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_audio_cue_sheet_panel_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_beginner_tutorial_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_choice_consequence_sheet_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_command_palette_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_editor_common_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_creative_assistant_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_openai_asset_generator_module.py' -v
@@ -136,7 +184,12 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_editor_filters_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_entrypoint_modules.py' -v
           python -m unittest discover -s tests -p 'test_frontend_editor_mode_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_localization_coverage_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_playtest_handoff_report_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_presentation_timeline_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_preview_regression_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_preview_save_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_production_backlog_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_project_center_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_project_doctor_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_project_milestones_module.py' -v
@@ -145,15 +198,26 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_recent_workspace_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_release_control_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_release_version_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_route_analyzer_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_route_testing_report_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_runtime_audio_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_runtime_capability_matrix_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_scene_production_board_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_script_import_mapping_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_script_importer_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_script_readability_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_script_voice_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_stage_direction_sheet_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_story_block_catalog_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_story_block_editors_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_story_block_registry_integration.py' -v
           python -m unittest discover -s tests -p 'test_frontend_story_templates_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_system_dialog_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_ui_theme_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_variable_influence_sheet_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_variables_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_visual_effects_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_voice_production_sheet_module.py' -v
 
       - name: Backend smoke tests
         run: |

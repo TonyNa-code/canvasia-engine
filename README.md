@@ -219,6 +219,7 @@ python3 -m unittest tests.test_run_editor_smoke -v
 python3 -m unittest tests.test_frontend_particle_effects_module -v
 node --check prototype_editor/app.js
 node --check export_player_template/player.js
+node --check export_player_template/runtime_audio.js
 ```
 
 Some browser or native-rendering checks may require additional local dependencies.

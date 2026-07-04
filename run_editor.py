@@ -43,7 +43,7 @@ SAMPLE_PROJECT_ID = "sample_heartbeat"
 DEFAULT_PORT = 8765
 EXPORTS_DIR = ROOT_DIR / "exports"
 EXPORT_TEMPLATE_DIR = ROOT_DIR / "export_player_template"
-EXPORT_PLAYER_SCRIPT_FILES = ("player.js", "runtime_controls.js", "runtime_settings.js")
+EXPORT_PLAYER_SCRIPT_FILES = ("player.js", "runtime_controls.js", "runtime_settings.js", "runtime_audio.js")
 NATIVE_RUNTIME_TEMPLATE_DIR = ROOT_DIR / "native_runtime"
 EXPORT_RUNTIME_CACHE_DIR = ROOT_DIR / ".export_runtime_cache"
 SUPPORTED_RESOLUTIONS = {(1280, 720), (1920, 1080)}
@@ -10509,6 +10509,7 @@ def export_web_build() -> dict:
             "playerJs": "player.js",
             "playerRuntimeControls": "runtime_controls.js",
             "playerRuntimeSettings": "runtime_settings.js",
+            "playerRuntimeAudio": "runtime_audio.js",
             "iconPng": icon_files["pngFileName"],
             "iconIco": icon_files["icoFileName"],
             "launchSplash": splash_file["fileName"],
@@ -11263,6 +11264,10 @@ def export_windows_nwjs_build() -> dict:
             "launcher": executable_name,
             "archive": f"{build_dir.name}.zip",
             "appEntry": "app/index.html",
+            "appPlayerJs": "app/player.js",
+            "appRuntimeControls": "app/runtime_controls.js",
+            "appRuntimeSettings": "app/runtime_settings.js",
+            "appRuntimeAudio": "app/runtime_audio.js",
             "appPackage": "app/package.json",
             "iconPng": root_icon_files["pngFileName"],
             "iconIco": root_icon_files["icoFileName"],
@@ -11419,6 +11424,10 @@ def export_macos_nwjs_build() -> dict:
             "launcher": app_bundle_name,
             "archive": f"{build_dir.name}.zip",
             "appEntry": "app/index.html",
+            "appPlayerJs": "app/player.js",
+            "appRuntimeControls": "app/runtime_controls.js",
+            "appRuntimeSettings": "app/runtime_settings.js",
+            "appRuntimeAudio": "app/runtime_audio.js",
             "appPackage": "app/package.json",
             "iconPng": root_icon_files["pngFileName"],
             "iconIco": root_icon_files["icoFileName"],
@@ -11586,6 +11595,10 @@ def export_linux_nwjs_build() -> dict:
             "launcher": executable_name,
             "archive": f"{build_dir.name}.tar.gz",
             "appEntry": "app/index.html",
+            "appPlayerJs": "app/player.js",
+            "appRuntimeControls": "app/runtime_controls.js",
+            "appRuntimeSettings": "app/runtime_settings.js",
+            "appRuntimeAudio": "app/runtime_audio.js",
             "appPackage": "app/package.json",
             "iconPng": root_icon_files["pngFileName"],
             "iconIco": root_icon_files["icoFileName"],

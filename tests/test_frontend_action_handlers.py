@@ -17,6 +17,7 @@ STYLES_PATH = EDITOR_DIR / "styles.css"
 PLAYER_PATH = ROOT_DIR / "export_player_template" / "player.js"
 RUNTIME_CONTROLS_PATH = ROOT_DIR / "export_player_template" / "runtime_controls.js"
 RUNTIME_SETTINGS_PATH = ROOT_DIR / "export_player_template" / "runtime_settings.js"
+RUNTIME_AUDIO_PATH = ROOT_DIR / "export_player_template" / "runtime_audio.js"
 NATIVE_RUNTIME_PATH = ROOT_DIR / "native_runtime" / "runtime_player.py"
 MODULE_PATHS = tuple(sorted((EDITOR_DIR / "modules").glob("*.js")))
 ACTION_ATTRIBUTE_PATHS = (INDEX_PATH, APP_PATH, *MODULE_PATHS)
@@ -3235,9 +3236,10 @@ class FrontendActionHandlerTests(unittest.TestCase):
         handle_change = _extract_function_source(app_source, "handleChange")
         collect_edited_block = _extract_function_source(app_source, "collectEditedBlock")
         player_source = PLAYER_PATH.read_text(encoding="utf-8")
+        runtime_audio_source = RUNTIME_AUDIO_PATH.read_text(encoding="utf-8")
         sync_audio = _extract_function_source(player_source, "syncAudio")
         apply_block = _extract_function_source(player_source, "applyBlockToPreviewState")
-        fade_audio = _extract_function_source(player_source, "fadeAudioVolume")
+        fade_audio = _extract_function_source(runtime_audio_source, "fadeAudioVolume")
         stop_music = _extract_function_source(player_source, "stopMusic")
 
         self.assertIn("storyBlockEditorTools.renderMusicPlayEditor", music_editor)
@@ -3288,7 +3290,7 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("musicVolume = getSafeVolumePercent(block.volume, 100)", apply_block)
         self.assertIn("getMusicScopeFromBlock(block, sceneId)", apply_block)
         self.assertIn("applyMusicScopeBeforeBlock", player_source)
-        self.assertIn("window.requestAnimationFrame", fade_audio)
+        self.assertIn("requestAnimationFrame", fade_audio)
         self.assertIn("fadeOutPreviousMusic(fadeOutMs)", stop_music)
 
         native_source = NATIVE_RUNTIME_PATH.read_text(encoding="utf-8")
@@ -4739,6 +4741,7 @@ class FrontendActionHandlerTests(unittest.TestCase):
     def test_web_runtime_applies_project_playback_defaults_before_player_overrides(self) -> None:
         player_source = PLAYER_PATH.read_text(encoding="utf-8")
         runtime_settings_source = RUNTIME_SETTINGS_PATH.read_text(encoding="utf-8")
+        runtime_audio_source = RUNTIME_AUDIO_PATH.read_text(encoding="utf-8")
         project_runtime_settings = _extract_function_source(runtime_settings_source, "getProjectRuntimeSettings")
         module_playback_defaults = _extract_function_source(runtime_settings_source, "buildProjectPlaybackDefaults")
         project_playback_defaults = _extract_function_source(player_source, "getProjectPlaybackDefaults")
@@ -4747,7 +4750,11 @@ class FrontendActionHandlerTests(unittest.TestCase):
         reset_playback_settings = _extract_function_source(player_source, "resetPlaybackSettings")
 
         self.assertIn('from "./runtime_settings.js"', player_source)
+        self.assertIn('from "./runtime_audio.js"', player_source)
         self.assertIn("sanitizePlaybackSettings as sanitizePlaybackSettingsBase", player_source)
+        self.assertIn("export function getRuntimeMusicTargetVolume", runtime_audio_source)
+        self.assertIn("export function getRuntimeSfxTargetVolume", runtime_audio_source)
+        self.assertIn("export function getRuntimeVoiceTargetVolume", runtime_audio_source)
         for key in (
             "defaultTextSpeed",
             "defaultDialogTheme",
@@ -4902,6 +4909,7 @@ class FrontendActionHandlerTests(unittest.TestCase):
         app_source = APP_PATH.read_text(encoding="utf-8")
         story_editor_source = (EDITOR_DIR / "modules" / "story_block_editors.js").read_text(encoding="utf-8")
         player_source = PLAYER_PATH.read_text(encoding="utf-8")
+        runtime_audio_source = RUNTIME_AUDIO_PATH.read_text(encoding="utf-8")
         native_source = NATIVE_RUNTIME_PATH.read_text(encoding="utf-8")
 
         dialogue_editor_template = _extract_function_source(story_editor_source, "renderDialogueEditor")
@@ -4913,7 +4921,7 @@ class FrontendActionHandlerTests(unittest.TestCase):
         preview_voice_volume = _extract_function_source(app_source, "getPreviewVoiceTargetVolume")
         runtime_voice = _extract_function_source(player_source, "syncVoice")
         runtime_voice_asset = _extract_function_source(player_source, "getVoiceAssetId")
-        runtime_voice_volume = _extract_function_source(player_source, "getRuntimeVoiceTargetVolume")
+        runtime_voice_volume = _extract_function_source(runtime_audio_source, "getRuntimeVoiceTargetVolume")
         runtime_audio_update = _extract_function_source(player_source, "updateRuntimeAudioVolumes")
 
         self.assertIn("editorVoiceVolume", dialogue_editor_template)
