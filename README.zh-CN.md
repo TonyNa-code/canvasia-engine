@@ -111,6 +111,9 @@ Canvasia Engine 当前更适合这样理解：
 - [`export_package_guide.py`](export_package_guide.py)
   导出包侧试玩 / 发布验收说明生成器
 
+- [`export_release_readiness.py`](export_release_readiness.py)
+  导出包侧发布试玩就绪摘要和测试员交付门禁生成器
+
 - [`export_unlockable_manifest.py`](export_unlockable_manifest.py)
   导出包侧可解锁内容、图鉴、回想、结局和成就覆盖清单生成器
 
@@ -239,7 +242,7 @@ python run_editor.py
 - `原生 Runtime 包`：Preview 路线，已覆盖标题页主菜单、基础剧情主链、正式存档/读档、系统菜单设置项、语言切换、文本历史、自动播放、已读快进、项目字体、玩家档案/自动续玩、基础粒子与镜头演出、3D 资产结构 / 依赖清单、可选 PyAV/FFmpeg 音画同步内嵌视频播放、OpenCV 画面兜底、系统播放器桥接兜底、第一批资料馆，以及随包生成的发布候选总报告、发布总控报告与三系统验收清单。
 - `手机端 Runtime`：实验规划阶段，当前重点是触控、音频策略和界面适配验证。
 
-所有可试玩 / 可运行导出包都会随包生成 `README_试玩验收先看这里.md`、`unlockable_content_manifest.json` 和 `unlockable_content_report.md`。README 负责告诉测试员怎么打开、先验哪些基础功能；JSON 适合自动化验收读取；Markdown 报告适合直接查看 CG 图鉴、音乐回想、语音回听、角色 / 地点 / 旁白 / 关系图鉴、章节回放、结局收集和成就覆盖情况，方便确认 EXTRA / 回想内容有没有真的进入成品包。
+所有可试玩 / 可运行导出包都会随包生成 `README_试玩验收先看这里.md`、`release_readiness_summary.json`、`release_readiness_summary.md`、`unlockable_content_manifest.json` 和 `unlockable_content_report.md`。README 负责告诉测试员怎么打开、先验哪些基础功能；发布就绪摘要负责快速判断这包能不能交给别人试玩；可解锁内容 JSON / Markdown 报告适合直接查看 CG 图鉴、音乐回想、语音回听、角色 / 地点 / 旁白 / 关系图鉴、章节回放、结局收集和成就覆盖情况。
 
 ### 原生 Runtime 发布体检
 

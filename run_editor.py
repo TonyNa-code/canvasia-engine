@@ -31,6 +31,11 @@ from urllib.request import Request, urlopen
 from editor_local_security import is_local_editor_host, is_local_editor_origin
 from editor_snapshot_cache import SnapshotCache, build_file_cache_signature
 from export_package_guide import EXPORT_PLAYTEST_GUIDE_FILE_NAME, write_export_playtest_guide_file
+from export_release_readiness import (
+    EXPORT_RELEASE_READINESS_JSON_NAME,
+    EXPORT_RELEASE_READINESS_REPORT_NAME,
+    write_export_release_readiness_files,
+)
 from export_unlockable_manifest import (
     UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME,
     UNLOCKABLE_CONTENT_REPORT_FILE_NAME,
@@ -10317,6 +10322,8 @@ def export_native_runtime_build() -> dict:
         extra_files={
             "gameData": runtime_files["gameDataName"],
             "playtestGuide": runtime_files["playtestGuideName"],
+            "releaseReadinessSummary": EXPORT_RELEASE_READINESS_JSON_NAME,
+            "releaseReadinessReport": EXPORT_RELEASE_READINESS_REPORT_NAME,
             "unlockableContentManifest": runtime_files["unlockableContentManifestName"],
             "unlockableContentReport": runtime_files["unlockableContentReportName"],
             "playerScript": runtime_files["playerName"],
@@ -10367,6 +10374,8 @@ def export_native_runtime_build() -> dict:
             "canBuildStandaloneApp": True,
             "appBuilder": runtime_files["appBuilderName"],
             "playtestGuide": runtime_files["playtestGuideName"],
+            "releaseReadinessSummary": EXPORT_RELEASE_READINESS_JSON_NAME,
+            "releaseReadinessReport": EXPORT_RELEASE_READINESS_REPORT_NAME,
             "unlockableContentManifest": runtime_files["unlockableContentManifestName"],
             "unlockableContentReport": runtime_files["unlockableContentReportName"],
             "releaseCheck": runtime_files["releaseCheckName"],
@@ -10404,6 +10413,27 @@ def export_native_runtime_build() -> dict:
         },
     )
     manifest_path = write_export_manifest(build_dir, manifest)
+    release_readiness = write_export_release_readiness_files(
+        build_dir,
+        project=bundle["project"],
+        manifest=manifest,
+        missing_assets=missing_assets,
+        unlockable_manifest=(export_payload.get("buildInfo") or {}).get("unlockableContentManifest"),
+        report_files=[
+            manifest_path.name,
+            runtime_files["playtestGuideName"],
+            runtime_files["unlockableContentReportName"],
+            runtime_files["unlockableContentManifestName"],
+            runtime_files["releaseCandidateReportName"],
+            runtime_files["releaseControlReportName"],
+            runtime_files["vnBaselineQualityMarkdownName"],
+            runtime_files["asset3dSummaryName"],
+        ],
+        platform_notes=[
+            "原生 Runtime 是后续 App 化路线的重点包；正式分发前建议至少在目标系统完整跑通一次。",
+            "如果要提供给普通玩家，优先使用随包 App 打包脚本生成平台应用。",
+        ],
+    )
     provenance_verifiers = write_export_provenance_verifier_files(build_dir)
     provenance_file = write_export_provenance_file(build_dir, bundle, manifest)
     integrity_files = write_native_runtime_file_integrity_reports(build_dir)
@@ -10414,6 +10444,8 @@ def export_native_runtime_build() -> dict:
     internal_reports = [
         {"name": manifest_path.name, "description": "导出清单，记录目标、版本、素材缺口和 Runtime 信息。"},
         {"name": runtime_files["playtestGuideName"], "description": "试玩与发布验收指南，给测试员快速确认打开方式和验收重点。"},
+        {"name": release_readiness["releaseReadinessReportName"], "description": "发布试玩就绪摘要，快速判断是否适合发给测试员。"},
+        {"name": release_readiness["releaseReadinessSummaryName"], "description": "机器可读发布试玩就绪摘要 JSON。"},
         {"name": runtime_files["unlockableContentManifestName"], "description": "可解锁内容清单 JSON，记录图鉴、回想、成就和结局覆盖。"},
         {"name": runtime_files["unlockableContentReportName"], "description": "可解锁内容 Markdown 报告，方便测试员直接复查 EXTRA / 回想覆盖。"},
         {"name": runtime_files["releaseCheckName"], "description": "发布前自检 JSON。"},
@@ -10493,6 +10525,14 @@ def export_native_runtime_build() -> dict:
         "playtestGuideName": runtime_files["playtestGuideName"],
         "playtestGuidePath": runtime_files["playtestGuidePath"],
         "playtestGuidePublicUrl": f"/exports/{build_dir.name}/{runtime_files['playtestGuideName']}",
+        "releaseReadinessSummaryName": release_readiness["releaseReadinessSummaryName"],
+        "releaseReadinessSummaryPath": release_readiness["releaseReadinessSummaryPath"],
+        "releaseReadinessSummaryPublicUrl": f"/exports/{build_dir.name}/{release_readiness['releaseReadinessSummaryName']}",
+        "releaseReadinessReportName": release_readiness["releaseReadinessReportName"],
+        "releaseReadinessReportPath": release_readiness["releaseReadinessReportPath"],
+        "releaseReadinessReportPublicUrl": f"/exports/{build_dir.name}/{release_readiness['releaseReadinessReportName']}",
+        "releaseReadinessStatus": release_readiness["releaseReadinessStatus"],
+        "releaseReadinessScore": release_readiness["releaseReadinessScore"],
         "gameDataPath": runtime_files["gameDataPath"],
         "gameDataPublicUrl": f"/exports/{build_dir.name}/{runtime_files['gameDataName']}",
         "unlockableContentManifestName": runtime_files["unlockableContentManifestName"],
@@ -10671,6 +10711,8 @@ def export_web_build() -> dict:
             "playerRuntimeSettings": "runtime_settings.js",
             "playerRuntimeAudio": "runtime_audio.js",
             "playtestGuide": EXPORT_PLAYTEST_GUIDE_FILE_NAME,
+            "releaseReadinessSummary": EXPORT_RELEASE_READINESS_JSON_NAME,
+            "releaseReadinessReport": EXPORT_RELEASE_READINESS_REPORT_NAME,
             "unlockableContentManifest": UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME,
             "unlockableContentReport": UNLOCKABLE_CONTENT_REPORT_FILE_NAME,
             "iconPng": icon_files["pngFileName"],
@@ -10693,9 +10735,23 @@ def export_web_build() -> dict:
         unlockable_manifest_name=UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME,
         unlockable_report_name=UNLOCKABLE_CONTENT_REPORT_FILE_NAME,
         provenance_name=EXPORT_PROVENANCE_FILE_NAME,
-        extra_reports=[],
+        extra_reports=[EXPORT_RELEASE_READINESS_REPORT_NAME],
         runtime_notes=["网页试玩包适合快速分享和轻量测试；正式发行前仍建议补做目标平台点测。"],
         missing_assets=missing_assets,
+    )
+    release_readiness = write_export_release_readiness_files(
+        build_dir,
+        project=bundle["project"],
+        manifest=manifest,
+        missing_assets=missing_assets,
+        unlockable_manifest=(export_payload.get("buildInfo") or {}).get("unlockableContentManifest"),
+        report_files=[
+            manifest_path.name,
+            playtest_guide_path.name,
+            UNLOCKABLE_CONTENT_REPORT_FILE_NAME,
+            UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME,
+        ],
+        platform_notes=["网页试玩包适合快速传播；如果要正式上架，建议再导出桌面或原生 Runtime 包做目标系统验收。"],
     )
     provenance_verifiers = write_export_provenance_verifier_files(build_dir)
     provenance_file = write_export_provenance_file(build_dir, bundle, manifest)
@@ -10711,6 +10767,14 @@ def export_web_build() -> dict:
         "manifestPublicUrl": f"/exports/{build_dir.name}/{manifest_path.name}",
         "playtestGuidePath": str(playtest_guide_path),
         "playtestGuidePublicUrl": f"/exports/{build_dir.name}/{playtest_guide_path.name}",
+        "releaseReadinessSummaryName": release_readiness["releaseReadinessSummaryName"],
+        "releaseReadinessSummaryPath": release_readiness["releaseReadinessSummaryPath"],
+        "releaseReadinessSummaryPublicUrl": f"/exports/{build_dir.name}/{release_readiness['releaseReadinessSummaryName']}",
+        "releaseReadinessReportName": release_readiness["releaseReadinessReportName"],
+        "releaseReadinessReportPath": release_readiness["releaseReadinessReportPath"],
+        "releaseReadinessReportPublicUrl": f"/exports/{build_dir.name}/{release_readiness['releaseReadinessReportName']}",
+        "releaseReadinessStatus": release_readiness["releaseReadinessStatus"],
+        "releaseReadinessScore": release_readiness["releaseReadinessScore"],
         "unlockableContentManifestPath": str(build_dir / UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME),
         "unlockableContentManifestPublicUrl": f"/exports/{build_dir.name}/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
         "unlockableContentReportPath": str(build_dir / UNLOCKABLE_CONTENT_REPORT_FILE_NAME),
@@ -11456,6 +11520,8 @@ def export_windows_nwjs_build() -> dict:
             "appRuntimeSettings": "app/runtime_settings.js",
             "appRuntimeAudio": "app/runtime_audio.js",
             "playtestGuide": EXPORT_PLAYTEST_GUIDE_FILE_NAME,
+            "releaseReadinessSummary": EXPORT_RELEASE_READINESS_JSON_NAME,
+            "releaseReadinessReport": EXPORT_RELEASE_READINESS_REPORT_NAME,
             "unlockableContentManifest": f"app/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
             "unlockableContentReport": f"app/{UNLOCKABLE_CONTENT_REPORT_FILE_NAME}",
             "appPackage": "app/package.json",
@@ -11501,12 +11567,30 @@ def export_windows_nwjs_build() -> dict:
         unlockable_manifest_name=f"app/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
         unlockable_report_name=f"app/{UNLOCKABLE_CONTENT_REPORT_FILE_NAME}",
         provenance_name=EXPORT_PROVENANCE_FILE_NAME,
-        extra_reports=[readme_path.name],
+        extra_reports=[readme_path.name, EXPORT_RELEASE_READINESS_REPORT_NAME],
         runtime_notes=[
             f"当前桌面模式：{runtime_mode_label}。",
             f"当前打包方式：{package_mode_label}。",
         ],
         missing_assets=missing_assets,
+    )
+    release_readiness = write_export_release_readiness_files(
+        build_dir,
+        project=bundle["project"],
+        manifest=manifest,
+        missing_assets=missing_assets,
+        unlockable_manifest=(export_payload.get("buildInfo") or {}).get("unlockableContentManifest"),
+        report_files=[
+            manifest_path.name,
+            readme_path.name,
+            playtest_guide_path.name,
+            f"app/{UNLOCKABLE_CONTENT_REPORT_FILE_NAME}",
+            f"app/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
+        ],
+        platform_notes=[
+            f"当前桌面模式：{runtime_mode_label}。",
+            "Windows 预览包可能触发 SmartScreen；分发前建议附带来源说明和校验文件。",
+        ],
     )
     provenance_verifiers = write_export_provenance_verifier_files(build_dir)
     provenance_roots = [
@@ -11514,6 +11598,8 @@ def export_windows_nwjs_build() -> dict:
         manifest_path,
         readme_path,
         playtest_guide_path,
+        Path(release_readiness["releaseReadinessReportPath"]),
+        Path(release_readiness["releaseReadinessSummaryPath"]),
         start_helper_path,
         root_icon_files["pngPath"],
         root_icon_files["icoPath"],
@@ -11575,6 +11661,14 @@ def export_windows_nwjs_build() -> dict:
         "readmePath": str(readme_path),
         "playtestGuidePath": str(playtest_guide_path),
         "playtestGuidePublicUrl": f"/exports/{build_dir.name}/{playtest_guide_path.name}",
+        "releaseReadinessSummaryName": release_readiness["releaseReadinessSummaryName"],
+        "releaseReadinessSummaryPath": release_readiness["releaseReadinessSummaryPath"],
+        "releaseReadinessSummaryPublicUrl": f"/exports/{build_dir.name}/{release_readiness['releaseReadinessSummaryName']}",
+        "releaseReadinessReportName": release_readiness["releaseReadinessReportName"],
+        "releaseReadinessReportPath": release_readiness["releaseReadinessReportPath"],
+        "releaseReadinessReportPublicUrl": f"/exports/{build_dir.name}/{release_readiness['releaseReadinessReportName']}",
+        "releaseReadinessStatus": release_readiness["releaseReadinessStatus"],
+        "releaseReadinessScore": release_readiness["releaseReadinessScore"],
         "copiedAssets": copied_assets,
         "missingAssets": len(missing_assets),
         "missingAssetNames": [asset.get("name") or asset.get("id") or "未命名素材" for asset in missing_assets[:5]],
@@ -11643,6 +11737,8 @@ def export_macos_nwjs_build() -> dict:
             "appRuntimeSettings": "app/runtime_settings.js",
             "appRuntimeAudio": "app/runtime_audio.js",
             "playtestGuide": EXPORT_PLAYTEST_GUIDE_FILE_NAME,
+            "releaseReadinessSummary": EXPORT_RELEASE_READINESS_JSON_NAME,
+            "releaseReadinessReport": EXPORT_RELEASE_READINESS_REPORT_NAME,
             "unlockableContentManifest": f"app/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
             "unlockableContentReport": f"app/{UNLOCKABLE_CONTENT_REPORT_FILE_NAME}",
             "appPackage": "app/package.json",
@@ -11688,12 +11784,30 @@ def export_macos_nwjs_build() -> dict:
         unlockable_manifest_name=f"app/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
         unlockable_report_name=f"app/{UNLOCKABLE_CONTENT_REPORT_FILE_NAME}",
         provenance_name=EXPORT_PROVENANCE_FILE_NAME,
-        extra_reports=[readme_path.name],
+        extra_reports=[readme_path.name, EXPORT_RELEASE_READINESS_REPORT_NAME],
         runtime_notes=[
             f"当前运行壳：NW.js {NWJS_RUNTIME_VERSION}。",
             "未签名预览包可能触发 Gatekeeper 提示；正式发布前建议补签名和公证。",
         ],
         missing_assets=missing_assets,
+    )
+    release_readiness = write_export_release_readiness_files(
+        build_dir,
+        project=bundle["project"],
+        manifest=manifest,
+        missing_assets=missing_assets,
+        unlockable_manifest=(export_payload.get("buildInfo") or {}).get("unlockableContentManifest"),
+        report_files=[
+            manifest_path.name,
+            readme_path.name,
+            playtest_guide_path.name,
+            f"app/{UNLOCKABLE_CONTENT_REPORT_FILE_NAME}",
+            f"app/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
+        ],
+        platform_notes=[
+            f"当前运行壳：NW.js {NWJS_RUNTIME_VERSION}。",
+            "macOS 未签名预览包可能触发 Gatekeeper；正式发布前建议补签名和公证。",
+        ],
     )
     provenance_verifiers = write_export_provenance_verifier_files(build_dir)
     provenance_file = write_export_provenance_file(
@@ -11705,6 +11819,8 @@ def export_macos_nwjs_build() -> dict:
             manifest_path,
             readme_path,
             playtest_guide_path,
+            Path(release_readiness["releaseReadinessReportPath"]),
+            Path(release_readiness["releaseReadinessSummaryPath"]),
             start_helper_path,
             root_icon_files["pngPath"],
             root_icon_files["icoPath"],
@@ -11767,6 +11883,14 @@ def export_macos_nwjs_build() -> dict:
         "readmePath": str(readme_path),
         "playtestGuidePath": str(playtest_guide_path),
         "playtestGuidePublicUrl": f"/exports/{build_dir.name}/{playtest_guide_path.name}",
+        "releaseReadinessSummaryName": release_readiness["releaseReadinessSummaryName"],
+        "releaseReadinessSummaryPath": release_readiness["releaseReadinessSummaryPath"],
+        "releaseReadinessSummaryPublicUrl": f"/exports/{build_dir.name}/{release_readiness['releaseReadinessSummaryName']}",
+        "releaseReadinessReportName": release_readiness["releaseReadinessReportName"],
+        "releaseReadinessReportPath": release_readiness["releaseReadinessReportPath"],
+        "releaseReadinessReportPublicUrl": f"/exports/{build_dir.name}/{release_readiness['releaseReadinessReportName']}",
+        "releaseReadinessStatus": release_readiness["releaseReadinessStatus"],
+        "releaseReadinessScore": release_readiness["releaseReadinessScore"],
         "copiedAssets": copied_assets,
         "missingAssets": len(missing_assets),
         "missingAssetNames": [asset.get("name") or asset.get("id") or "未命名素材" for asset in missing_assets[:5]],
@@ -11841,6 +11965,8 @@ def export_linux_nwjs_build() -> dict:
             "appRuntimeSettings": "app/runtime_settings.js",
             "appRuntimeAudio": "app/runtime_audio.js",
             "playtestGuide": EXPORT_PLAYTEST_GUIDE_FILE_NAME,
+            "releaseReadinessSummary": EXPORT_RELEASE_READINESS_JSON_NAME,
+            "releaseReadinessReport": EXPORT_RELEASE_READINESS_REPORT_NAME,
             "unlockableContentManifest": f"app/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
             "unlockableContentReport": f"app/{UNLOCKABLE_CONTENT_REPORT_FILE_NAME}",
             "appPackage": "app/package.json",
@@ -11886,9 +12012,27 @@ def export_linux_nwjs_build() -> dict:
         unlockable_manifest_name=f"app/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
         unlockable_report_name=f"app/{UNLOCKABLE_CONTENT_REPORT_FILE_NAME}",
         provenance_name=EXPORT_PROVENANCE_FILE_NAME,
-        extra_reports=[readme_path.name],
+        extra_reports=[readme_path.name, EXPORT_RELEASE_READINESS_REPORT_NAME],
         runtime_notes=[f"当前运行壳：NW.js {NWJS_RUNTIME_VERSION}。"],
         missing_assets=missing_assets,
+    )
+    release_readiness = write_export_release_readiness_files(
+        build_dir,
+        project=bundle["project"],
+        manifest=manifest,
+        missing_assets=missing_assets,
+        unlockable_manifest=(export_payload.get("buildInfo") or {}).get("unlockableContentManifest"),
+        report_files=[
+            manifest_path.name,
+            readme_path.name,
+            playtest_guide_path.name,
+            f"app/{UNLOCKABLE_CONTENT_REPORT_FILE_NAME}",
+            f"app/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
+        ],
+        platform_notes=[
+            f"当前运行壳：NW.js {NWJS_RUNTIME_VERSION}。",
+            "Linux 分发前建议在目标发行版确认启动脚本权限和依赖库可用。",
+        ],
     )
     provenance_verifiers = write_export_provenance_verifier_files(build_dir)
     provenance_roots = [
@@ -11897,6 +12041,8 @@ def export_linux_nwjs_build() -> dict:
         manifest_path,
         readme_path,
         playtest_guide_path,
+        Path(release_readiness["releaseReadinessReportPath"]),
+        Path(release_readiness["releaseReadinessSummaryPath"]),
         start_helper_path,
         root_icon_files["pngPath"],
         root_icon_files["icoPath"],
@@ -11956,6 +12102,14 @@ def export_linux_nwjs_build() -> dict:
         "readmePath": str(readme_path),
         "playtestGuidePath": str(playtest_guide_path),
         "playtestGuidePublicUrl": f"/exports/{build_dir.name}/{playtest_guide_path.name}",
+        "releaseReadinessSummaryName": release_readiness["releaseReadinessSummaryName"],
+        "releaseReadinessSummaryPath": release_readiness["releaseReadinessSummaryPath"],
+        "releaseReadinessSummaryPublicUrl": f"/exports/{build_dir.name}/{release_readiness['releaseReadinessSummaryName']}",
+        "releaseReadinessReportName": release_readiness["releaseReadinessReportName"],
+        "releaseReadinessReportPath": release_readiness["releaseReadinessReportPath"],
+        "releaseReadinessReportPublicUrl": f"/exports/{build_dir.name}/{release_readiness['releaseReadinessReportName']}",
+        "releaseReadinessStatus": release_readiness["releaseReadinessStatus"],
+        "releaseReadinessScore": release_readiness["releaseReadinessScore"],
         "copiedAssets": copied_assets,
         "missingAssets": len(missing_assets),
         "missingAssetNames": [asset.get("name") or asset.get("id") or "未命名素材" for asset in missing_assets[:5]],

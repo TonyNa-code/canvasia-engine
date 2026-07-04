@@ -24,6 +24,7 @@ PYTHON_SYNTAX_FILES = [
     "editor_local_security.py",
     "editor_snapshot_cache.py",
     "export_package_guide.py",
+    "export_release_readiness.py",
     "export_unlockable_manifest.py",
     "run_editor.py",
     "native_runtime/runtime_player.py",
