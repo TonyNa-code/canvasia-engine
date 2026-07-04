@@ -76,16 +76,33 @@ class FrontendAudioCueSheetPanelModuleTests(unittest.TestCase):
                 }},
               ],
             }});
+            const voiceOnlySheet = sheetTools.buildAudioCueSheet({{
+              chapters: [{{ id: "chapter_1", name: "第1章" }}],
+              characters: [{{ id: "char_a", displayName: "悠奈" }}],
+              assetList: [{{ id: "voice_a", type: "voice", name: "悠奈_001", fileExists: true }}],
+              scenes: [
+                {{
+                  id: "scene_voice",
+                  chapterId: "chapter_1",
+                  name: "教室",
+                  blocks: [
+                    {{ id: "line_1", type: "dialogue", speakerId: "char_a", text: "欢迎回来。", voiceAssetId: "voice_a" }},
+                  ],
+                }},
+              ],
+            }});
             const emptyHtml = panelTools.renderAudioCueSheetPanel({{ summary: {{}}, issues: [], rangeRows: [] }});
             const issueHtml = panelTools.renderAudioCueSheetPanel(issueSheet);
             const rangeHtml = panelTools.renderAudioCueSheetPanel(rangeSheet);
             const sfxOnlyHtml = panelTools.renderAudioCueSheetPanel(sfxOnlySheet);
+            const voiceOnlyHtml = panelTools.renderAudioCueSheetPanel(voiceOnlySheet);
             process.stdout.write(JSON.stringify({{
               keys: Object.keys(panelTools).sort(),
               emptyHtml,
               issueHtml,
               rangeHtml,
               sfxOnlyHtml,
+              voiceOnlyHtml,
             }}));
             """
         )
@@ -102,6 +119,7 @@ class FrontendAudioCueSheetPanelModuleTests(unittest.TestCase):
         self.assertIn("renderAudioCueSheetPanel", payload["keys"])
         self.assertIn("renderAudioCueSheetPreview", payload["keys"])
         self.assertIn("renderSfxCueRow", payload["keys"])
+        self.assertIn("renderVoiceCueRow", payload["keys"])
         self.assertIn('data-action="export-audio-cue-sheet-markdown"', payload["rangeHtml"])
         self.assertIn('data-action="export-audio-cue-sheet-csv"', payload["rangeHtml"])
         self.assertIn("音频调度表", payload["rangeHtml"])
@@ -111,7 +129,10 @@ class FrontendAudioCueSheetPanelModuleTests(unittest.TestCase):
         self.assertIn("重点试听开始卡和结束卡前后", payload["rangeHtml"])
         self.assertIn("门铃", payload["sfxOnlyHtml"])
         self.assertIn("发布前抽查触发点即可", payload["sfxOnlyHtml"])
-        self.assertIn("当前项目还没有播放音乐或音效卡", payload["emptyHtml"])
+        self.assertIn("悠奈_001", payload["voiceOnlyHtml"])
+        self.assertIn("发布前抽查这一句语音即可", payload["voiceOnlyHtml"])
+        self.assertIn("语音卡", payload["voiceOnlyHtml"])
+        self.assertIn("当前项目还没有播放音乐、音效或已绑定语音", payload["emptyHtml"])
 
 
 if __name__ == "__main__":
