@@ -20,6 +20,7 @@ This guide explains the current maintenance boundaries for contributors who want
 - `prototype_editor/modules/route_testing_report.js` owns route QA report serialization, Markdown tables, standalone Markdown export content, and CSV rows. Keep route report formatting there instead of adding more report-specific table logic to `app.js`.
 - `prototype_editor/modules/scene_production_board.js` owns scene-level production task analysis and export formatting: per-scene completion scoring, next-action suggestions, recommended scene recipes, missing background / BGM / voice checks, text-length checks, choice crowding checks, bad route targets, Markdown, and CSV. Keep future scene workboard logic there so route analysis, story editing, and inspection UI stay focused.
 - `prototype_editor/modules/voice_production_sheet.js` owns project-level voice production analysis and export formatting: per-line voice readiness, missing voice bindings, missing or wrong-type voice assets, missing files, unknown speakers, long-line checks, per-speaker progress, Markdown, and CSV. Keep future voice handoff / recording QA logic there instead of growing `app.js` or the story-card editors.
+- `prototype_editor/modules/screenplay_exporter.js` owns full screenplay / production-script exports: chapter and scene ordering, dialogue / narration / choice / stage-direction flattening, voice-binding notes, status digest, Markdown, and CSV. Keep future proofreading, voice-actor handoff, translator script, or external-writing export logic there; `app.js` should only expose buttons, panel summaries, and downloads.
 - `prototype_editor/modules/preview_regression.js` owns automatic preview-regression seed selection, branch-choice targeting, and best-effort condition / fallback variable presets for route smoke tests. Keep future route-smoke prioritization there so `app.js` only runs the selected seeds through the editor preview runtime.
 - `prototype_editor/modules/playtest_handoff_report.js` owns tester-facing playtest handoff exports and intake: route cases, regression smoke results, fix queues, Markdown work orders, feedback templates, feedback CSV parsing, intake summaries, and CSV rows. Keep tester handoff wording and table formats there so `app.js` only wires buttons, downloads, and local file selection.
 - `prototype_editor/modules/choice_consequence_sheet.js` owns choice consequence analysis and export formatting: option target summaries, variable-effect summaries, fake-choice warnings, duplicate option checks, broken target checks, broken variable checks, Markdown, and CSV. Keep future choice-design QA there instead of scattering branch-consequence rules across route and inspection UI code.
@@ -42,6 +43,14 @@ When adding a new backend capability:
 3. Add a small unit test for the pure module.
 4. Add an integration or smoke test when the feature touches project files, exports, or runtime behavior.
 5. Add new Python modules to `tools/ci/local_verify.py` so `--profile syntax` catches syntax errors before release.
+
+When adding a new frontend-only editor capability:
+
+1. Put data shaping, analysis, export formatting, and status-digest logic in `prototype_editor/modules/<feature>.js`.
+2. Load the module before `./app.js` in `prototype_editor/index.html`, then update `tests/test_frontend_entrypoint_modules.py`.
+3. Keep `prototype_editor/app.js` as a thin UI/download/action shell; avoid adding large parsers, report builders, or cross-module scoring there.
+4. Add a module test such as `tests/test_frontend_<feature>_module.py`.
+5. Add action-handler coverage in `tests/test_frontend_action_handlers.py` when the feature exposes buttons or command actions.
 
 ## Project Data Cache
 

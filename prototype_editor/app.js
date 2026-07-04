@@ -54,6 +54,7 @@ const routeAnalyzerTools = window.CanvasiaEditorRouteAnalyzer;
 const routeTestingReportTools = window.CanvasiaEditorRouteTestingReport;
 const sceneProductionBoardTools = window.CanvasiaEditorSceneProductionBoard;
 const voiceProductionSheetTools = window.CanvasiaEditorVoiceProductionSheet;
+const screenplayExporterTools = window.CanvasiaEditorScreenplayExporter;
 const previewRegressionTools = window.CanvasiaEditorPreviewRegression;
 const playtestHandoffReportTools = window.CanvasiaEditorPlaytestHandoffReport;
 const choiceConsequenceSheetTools = window.CanvasiaEditorChoiceConsequenceSheet;
@@ -3876,6 +3877,16 @@ async function handleClick(event) {
 
   if (action === "export-voice-production-csv") {
     exportVoiceProductionCsv();
+    return;
+  }
+
+  if (action === "export-screenplay-markdown") {
+    exportScreenplayMarkdown();
+    return;
+  }
+
+  if (action === "export-screenplay-csv") {
+    exportScreenplayCsv();
     return;
   }
 
@@ -28688,6 +28699,17 @@ function buildVoiceProductionFileName(extension = "md") {
   return `${title}_voice_production_sheet_${dateStamp}.${extension}`;
 }
 
+function buildScreenplayFileName(extension = "md") {
+  const date = new Date();
+  const dateStamp = [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("");
+  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
+  return `${title}_screenplay_${dateStamp}.${extension}`;
+}
+
 function buildChoiceConsequenceFileName(extension = "md") {
   const date = new Date();
   const dateStamp = [
@@ -30019,6 +30041,30 @@ function exportVoiceProductionCsv() {
   downloadTextFile(fileName, content, "text/csv;charset=utf-8");
   setSaveStatus(`已导出语音制作 CSV：${fileName}`);
   showToast(`语音制作 CSV 已导出：${fileName}`);
+}
+
+function buildScreenplayExport() {
+  return screenplayExporterTools.buildScreenplayExport(state.data ?? {});
+}
+
+function exportScreenplayMarkdown() {
+  const fileName = buildScreenplayFileName("md");
+  const screenplay = buildScreenplayExport();
+  const content = screenplayExporterTools.buildScreenplayMarkdown(screenplay, {
+    projectTitle: state.data?.project?.title || "Canvasia Project",
+    generatedAt: formatDate(new Date().toISOString()),
+  });
+  downloadTextFile(fileName, content, "text/markdown;charset=utf-8");
+  setSaveStatus(`已导出完整剧本台本：${fileName}`);
+  showToast(`完整剧本台本已导出：${fileName}`);
+}
+
+function exportScreenplayCsv() {
+  const fileName = buildScreenplayFileName("csv");
+  const content = screenplayExporterTools.buildScreenplayCsv(buildScreenplayExport());
+  downloadTextFile(fileName, content, "text/csv;charset=utf-8");
+  setSaveStatus(`已导出剧本台本 CSV：${fileName}`);
+  showToast(`剧本台本 CSV 已导出：${fileName}`);
 }
 
 function buildChoiceConsequenceSheet() {
@@ -31625,7 +31671,17 @@ function getVoiceProductionToneClass(status) {
   if (status === "blocked") {
     return "danger-text";
   }
-  if (status === "warn") {
+  if (status === "warn" || status === "review") {
+    return "warn-text";
+  }
+  if (status === "ready") {
+    return "good-text";
+  }
+  return "";
+}
+
+function getScreenplayToneClass(status) {
+  if (status === "review") {
     return "warn-text";
   }
   if (status === "ready") {
@@ -32018,6 +32074,61 @@ function renderVoiceProductionPanel() {
               </div>
             `
             : renderEmpty("当前项目还没有角色台词。先在剧情页添加台词，再来这里生成配音制作清单。")
+      }
+    </article>
+  `;
+}
+
+function renderScreenplayExportPanel() {
+  const screenplay = buildScreenplayExport();
+  const digest = screenplayExporterTools.getScreenplayStatusDigest(screenplay);
+  const summary = screenplay.summary ?? {};
+  const previewEntries = (screenplay.entries ?? []).slice(0, 6);
+
+  return `
+    <article class="detail-card preview-sprint-panel">
+      <div class="panel-heading">
+        <h2>完整剧本台本</h2>
+        <span class="badge badge-soft ${getScreenplayToneClass(digest.status)}">${escapeHtml(digest.title)}</span>
+      </div>
+      <p class="helper-text">${escapeHtml(digest.detail)} 这里会把章节、场景、台词、旁白、选项和演出指令整理成一份可校对、可配音、可翻译、可归档的正式台本。</p>
+      <div class="preview-sprint-metrics">
+        ${renderRouteMetricCard("章节 / 场景", `${summary.chapterCount ?? 0} / ${summary.sceneCount ?? 0}`, "台本按这个顺序展开")}
+        ${renderRouteMetricCard("正文行", `${summary.lineCount ?? 0}`, "台词和旁白合计")}
+        ${renderRouteMetricCard("选项 / 演出", `${summary.choiceCount ?? 0} / ${summary.stageDirectionCount ?? 0}`, "分支和画面音效指令")}
+        ${renderRouteMetricCard("待绑语音", `${summary.missingVoiceCount ?? 0}`, "导出后也会标记给配音收尾")}
+      </div>
+      <div class="detail-actions">
+        <button class="toolbar-button toolbar-button-primary" data-action="export-screenplay-markdown">
+          导出完整剧本
+        </button>
+        <button class="toolbar-button" data-action="export-screenplay-csv">
+          导出台本 CSV
+        </button>
+        <button class="toolbar-button" data-action="switch-screen" data-screen="script">
+          去台词台本
+        </button>
+      </div>
+      ${
+        previewEntries.length > 0
+          ? `
+            <div class="list-stack compact-stack">
+              ${previewEntries
+                .map(
+                  (entry) => `
+                    <div class="route-testing-item">
+                      <div>
+                        <b>${escapeHtml(`${entry.chapterName} · ${entry.sceneName}`)}</b>
+                        <span>${escapeHtml(`${entry.kindLabel} · ${entry.speakerName || entry.blockType}`)}</span>
+                      </div>
+                      <span>${escapeHtml(truncateText(entry.text, 42))}</span>
+                    </div>
+                  `
+                )
+                .join("")}
+            </div>
+          `
+          : renderEmpty("当前项目还没有剧本内容。先在剧情页添加第一段旁白、台词或演出指令。")
       }
     </article>
   `;
@@ -32620,6 +32731,7 @@ function renderInspectionOverviewPanel(routeOverview) {
       ${renderProductionBacklogPanel(routeOverview)}
       ${renderRuntimeCapabilityMatrixPanel()}
       ${renderSceneProductionBoardPanel()}
+      ${renderScreenplayExportPanel()}
       ${renderVoiceProductionPanel()}
       ${renderChoiceConsequencePanel()}
       ${renderVariableInfluencePanel()}
