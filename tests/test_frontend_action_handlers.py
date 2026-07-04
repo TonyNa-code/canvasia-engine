@@ -4215,7 +4215,7 @@ class FrontendActionHandlerTests(unittest.TestCase):
         click_handler = _extract_function_source(source, "handleClick")
         markdown_block_start = click_handler.index('action === "export-asset-dependency-markdown"')
         csv_block_start = click_handler.index('action === "export-asset-dependency-csv"')
-        csv_block_end = click_handler.index('action === "export-audio-cue-sheet-markdown"', csv_block_start)
+        csv_block_end = click_handler.index('action === "export-asset-rights-markdown"', csv_block_start)
         markdown_block = click_handler[markdown_block_start:csv_block_start]
         csv_block = click_handler[csv_block_start:csv_block_end]
 
@@ -4230,6 +4230,29 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("function exportAssetDependencyCsv()", source)
         self.assertIn("assetDependencySheetTools.buildAssetDependencySheet", source)
         self.assertIn("assetDependencySheetTools.getAssetDependencyStatusDigest", source)
+
+    def test_asset_rights_sheet_export_actions_are_wired(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        module_source = (EDITOR_DIR / "modules" / "asset_rights_sheet.js").read_text(encoding="utf-8")
+        click_handler = _extract_function_source(source, "handleClick")
+        markdown_block_start = click_handler.index('action === "export-asset-rights-markdown"')
+        csv_block_start = click_handler.index('action === "export-asset-rights-csv"')
+        csv_block_end = click_handler.index('action === "export-audio-cue-sheet-markdown"', csv_block_start)
+        markdown_block = click_handler[markdown_block_start:csv_block_start]
+        csv_block = click_handler[csv_block_start:csv_block_end]
+
+        self.assertIn("const assetRightsSheetTools = window.CanvasiaEditorAssetRightsSheet", source)
+        self.assertIn('data-action="export-asset-rights-markdown"', module_source)
+        self.assertIn('data-action="export-asset-rights-csv"', module_source)
+        self.assertIn("exportAssetRightsMarkdown();", markdown_block)
+        self.assertIn("exportAssetRightsCsv();", csv_block)
+        self.assertIn("function buildAssetRightsSheet()", source)
+        self.assertIn("function renderAssetRightsPanel()", source)
+        self.assertIn("function exportAssetRightsMarkdown()", source)
+        self.assertIn("function exportAssetRightsCsv()", source)
+        self.assertIn("assetRightsSheetTools.buildAssetRightsSheet", source)
+        self.assertIn("assetRightsSheetTools.renderAssetRightsSheetPanel", source)
+        self.assertIn("assetRightsSheet: buildAssetRightsSheet()", source)
 
     def test_stage_direction_sheet_export_actions_are_wired(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")

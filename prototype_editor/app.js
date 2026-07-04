@@ -61,6 +61,7 @@ const playtestHandoffReportTools = window.CanvasiaEditorPlaytestHandoffReport;
 const choiceConsequenceSheetTools = window.CanvasiaEditorChoiceConsequenceSheet;
 const variableInfluenceSheetTools = window.CanvasiaEditorVariableInfluenceSheet;
 const assetDependencySheetTools = window.CanvasiaEditorAssetDependencySheet;
+const assetRightsSheetTools = window.CanvasiaEditorAssetRightsSheet;
 const audioCueSheetTools = window.CanvasiaEditorAudioCueSheet;
 const audioCueSheetPanelTools = window.CanvasiaEditorAudioCueSheetPanel;
 const stageDirectionSheetTools = window.CanvasiaEditorStageDirectionSheet;
@@ -3844,6 +3845,16 @@ async function handleClick(event) {
 
   if (action === "export-asset-dependency-csv") {
     exportAssetDependencyCsv();
+    return;
+  }
+
+  if (action === "export-asset-rights-markdown") {
+    exportAssetRightsMarkdown();
+    return;
+  }
+
+  if (action === "export-asset-rights-csv") {
+    exportAssetRightsCsv();
     return;
   }
 
@@ -28691,6 +28702,17 @@ function buildAssetDependencyFileName(extension = "md") {
   return `${title}_asset_dependency_sheet_${dateStamp}.${extension}`;
 }
 
+function buildAssetRightsFileName(extension = "md") {
+  const date = new Date();
+  const dateStamp = [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("");
+  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
+  return `${title}_asset_rights_sheet_${dateStamp}.${extension}`;
+}
+
 function buildAudioCueSheetFileName(extension = "md") {
   const date = new Date();
   const dateStamp = [
@@ -30122,6 +30144,30 @@ function exportAssetDependencyCsv() {
   showToast(`素材依赖 CSV 已导出：${fileName}`);
 }
 
+function buildAssetRightsSheet() {
+  return assetRightsSheetTools.buildAssetRightsSheet(state.data ?? {});
+}
+
+function exportAssetRightsMarkdown() {
+  const fileName = buildAssetRightsFileName("md");
+  const sheet = buildAssetRightsSheet();
+  const content = assetRightsSheetTools.buildAssetRightsMarkdown(sheet, {
+    projectTitle: state.data?.project?.title || "Canvasia Project",
+    generatedAt: formatDate(new Date().toISOString()),
+  });
+  downloadTextFile(fileName, content, "text/markdown;charset=utf-8");
+  setSaveStatus(`已导出素材授权清单：${fileName}`);
+  showToast(`素材授权清单已导出：${fileName}`);
+}
+
+function exportAssetRightsCsv() {
+  const fileName = buildAssetRightsFileName("csv");
+  const content = assetRightsSheetTools.buildAssetRightsCsv(buildAssetRightsSheet());
+  downloadTextFile(fileName, content, "text/csv;charset=utf-8");
+  setSaveStatus(`已导出素材授权 CSV：${fileName}`);
+  showToast(`素材授权 CSV 已导出：${fileName}`);
+}
+
 function buildAudioCueSheet() {
   return audioCueSheetTools.buildAudioCueSheet(state.data ?? {});
 }
@@ -30302,6 +30348,7 @@ function buildProductionBacklog(routeOverview = null) {
     choiceConsequenceSheet: buildChoiceConsequenceSheet(),
     variableInfluenceSheet: buildVariableInfluenceSheet(),
     assetDependencySheet: buildAssetDependencySheet(),
+    assetRightsSheet: buildAssetRightsSheet(),
     audioCueSheet: buildAudioCueSheet(),
     stageDirectionSheet: buildStageDirectionSheet(),
     presentationTimeline: buildPresentationTimeline(),
@@ -32475,6 +32522,13 @@ function renderAssetDependencyPanel() {
   `;
 }
 
+function renderAssetRightsPanel() {
+  return assetRightsSheetTools.renderAssetRightsSheetPanel(buildAssetRightsSheet(), {
+    escapeHtml,
+    renderRouteMetricCard,
+  });
+}
+
 function renderAudioCueSheetPanel() {
   return audioCueSheetPanelTools.renderAudioCueSheetPanel(buildAudioCueSheet());
 }
@@ -32818,6 +32872,7 @@ function renderInspectionOverviewPanel(routeOverview) {
       ${renderChoiceConsequencePanel()}
       ${renderVariableInfluencePanel()}
       ${renderAssetDependencyPanel()}
+      ${renderAssetRightsPanel()}
       ${renderAudioCueSheetPanel()}
       ${renderStageDirectionSheetPanel()}
       ${renderPresentationTimelinePanel()}

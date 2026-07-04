@@ -101,6 +101,13 @@ class FrontendProductionBacklogModuleTests(unittest.TestCase):
                   {{ severity: "tip", title: "未使用素材", detail: "可以清理。", assetName: "旧 CG" }},
                 ],
               }},
+              assetRightsSheet: {{
+                issues: [
+                  {{ severity: "blocker", title: "已使用素材不可商用", detail: "字体授权仅限个人使用。", assetName: "不可商用字体" }},
+                  {{ severity: "warn", title: "缺少来源或作者", detail: "BGM 没有登记来源。", assetName: "放课后钢琴" }},
+                  {{ severity: "tip", title: "未使用素材缺授权记录", detail: "备用 CG 之后使用前需要补记录。", assetName: "备用 CG" }},
+                ],
+              }},
               audioCueSheet: {{
                 productionQueue: [
                   {{
@@ -180,11 +187,11 @@ class FrontendProductionBacklogModuleTests(unittest.TestCase):
         self.assertIn("addAudioProductionTasks", payload["keys"])
         self.assertIn("addDirectorCueTasks", payload["keys"])
         self.assertEqual(payload["backlog"]["projectTitle"], "Backlog Demo")
-        self.assertEqual(payload["backlog"]["summary"]["taskCount"], 19)
-        self.assertEqual(payload["backlog"]["summary"]["blockerCount"], 6)
-        self.assertEqual(payload["backlog"]["summary"]["warningCount"], 9)
-        self.assertEqual(payload["backlog"]["summary"]["tipCount"], 4)
-        self.assertGreaterEqual(payload["backlog"]["summary"]["areaCount"], 10)
+        self.assertEqual(payload["backlog"]["summary"]["taskCount"], 22)
+        self.assertEqual(payload["backlog"]["summary"]["blockerCount"], 7)
+        self.assertEqual(payload["backlog"]["summary"]["warningCount"], 10)
+        self.assertEqual(payload["backlog"]["summary"]["tipCount"], 5)
+        self.assertGreaterEqual(payload["backlog"]["summary"]["areaCount"], 11)
         self.assertEqual(payload["digest"]["status"], "blocked")
         self.assertEqual(payload["backlog"]["tasks"][0]["severity"], "blocker")
         self.assertTrue(any(task["title"] == "修复分支坏链" for task in payload["backlog"]["tasks"]))
@@ -196,7 +203,10 @@ class FrontendProductionBacklogModuleTests(unittest.TestCase):
         self.assertIn("语音文件缺失", payload["markdown"])
         self.assertIn("Runtime 覆盖", payload["markdown"])
         self.assertIn("导演分镜", payload["markdown"])
+        self.assertIn("素材授权", payload["markdown"])
+        self.assertIn("已使用素材不可商用", payload["markdown"])
         self.assertIn('"素材依赖"', payload["csv"])
+        self.assertIn('"素材授权"', payload["csv"])
         self.assertEqual(payload["labels"], ["先修", "优先", "整理"])
 
 

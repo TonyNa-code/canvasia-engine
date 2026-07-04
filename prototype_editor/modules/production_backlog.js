@@ -7,6 +7,7 @@
     choice: "选项分支",
     variable: "变量逻辑",
     asset: "素材依赖",
+    rights: "素材授权",
     audio: "音频调度",
     stage: "角色调度",
     presentation: "演出节奏",
@@ -22,6 +23,7 @@
     choice: Object.freeze({ label: "调整选项", action: "switch-screen", screen: "story" }),
     variable: Object.freeze({ label: "检查变量", action: "switch-screen", screen: "story" }),
     asset: Object.freeze({ label: "去素材页", action: "switch-screen", screen: "assets" }),
+    rights: Object.freeze({ label: "补授权资料", action: "switch-screen", screen: "assets" }),
     audio: Object.freeze({ label: "调 BGM", action: "switch-screen", screen: "story" }),
     stage: Object.freeze({ label: "补角色演出", action: "switch-screen", screen: "story" }),
     presentation: Object.freeze({ label: "补演出卡", action: "switch-screen", screen: "story" }),
@@ -324,6 +326,7 @@
     addIssueTasks(tasks, "choice", context.choiceConsequenceSheet?.issues, { fallbackTitle: "处理选项问题", fallbackSource: "选项后果表" });
     addIssueTasks(tasks, "variable", context.variableInfluenceSheet?.issues, { fallbackTitle: "处理变量问题", fallbackSource: "变量影响表" });
     addIssueTasks(tasks, "asset", context.assetDependencySheet?.issues, { fallbackTitle: "处理素材依赖问题", fallbackSource: "素材依赖表" });
+    addIssueTasks(tasks, "rights", context.assetRightsSheet?.issues, { fallbackTitle: "补素材授权信息", fallbackSource: "素材授权清单", maxItems: 8 });
     addAudioProductionTasks(tasks, context.audioCueSheet);
     addIssueTasks(tasks, "audio", context.audioCueSheet?.issues, { fallbackTitle: "处理音频调度问题", fallbackSource: "音频调度表" });
     addIssueTasks(tasks, "stage", context.stageDirectionSheet?.issues, { fallbackTitle: "处理角色调度问题", fallbackSource: "角色舞台调度表" });
