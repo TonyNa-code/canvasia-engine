@@ -63,6 +63,7 @@ The project already includes a visual editor, export pipeline, native runtime pr
 - Optional OpenAI Image asset generation for backgrounds, sprites, CGs, and UI materials, with style-hint presets, sprite-to-character expression binding, prompt/model validation, and local-only API key handling
 - Formal save/load, quick save/load, system menu, text history, autoplay, skip-read, and voice replay
 - Entry reachability route analysis for broken links, orphan scenes, unreachable scenes, branch depth, ending candidates, playable ending path previews, and exportable route QA checklists
+- Scene pacing advisor for playable-scene rhythm, long text, flat presentation, fake choices, missing outro cues, and next-action guidance in production boards
 - Full screenplay / production-script exports for proofreading, voice recording, translation handoff, and archival review
 - Director cue-sheet exports that turn each scene into story, visual, audio, route, and effect production beats
 - Release Candidate manifests that bundle project inventory, deliverable status, release risks, unlockable-content readiness, and manual signoff checks for testers and public preview handoff

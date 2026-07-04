@@ -1,5 +1,6 @@
 (function attachSceneProductionBoardTools(global) {
   const storyBlockCatalogTools = global.CanvasiaEditorStoryBlockCatalog || {};
+  const scenePacingAdvisorTools = global.CanvasiaEditorScenePacingAdvisor || {};
 
   const EFFECT_BLOCK_TYPES = Object.freeze(
     typeof storyBlockCatalogTools.getEffectBlockTypes === "function"
@@ -520,6 +521,14 @@
       warningCount: issues.filter((issue) => issue.severity === "warn").length,
       tipCount: issues.filter((issue) => issue.severity === "tip").length,
     };
+    const pacingAnalysis =
+      typeof scenePacingAdvisorTools.analyzeScenePacing === "function"
+        ? scenePacingAdvisorTools.analyzeScenePacing(scene)
+        : null;
+    const pacingDigest =
+      pacingAnalysis && typeof scenePacingAdvisorTools.buildScenePacingDigest === "function"
+        ? scenePacingAdvisorTools.buildScenePacingDigest(pacingAnalysis)
+        : null;
     const completionScore = scoreSceneProduction(metrics, issueCounts);
     const status = getSceneStatus(issues, completionScore);
     const report = {
@@ -531,6 +540,11 @@
       issues,
       ...metrics,
       ...issueCounts,
+      pacingScore: pacingDigest?.score ?? completionScore,
+      pacingGrade: pacingDigest?.gradeLabel ?? getSceneStatusLabel(status),
+      pacingHeadline: pacingDigest?.headline ?? "",
+      pacingIssueSummary: pacingDigest?.issueSummary ?? "",
+      pacingActionSummary: pacingDigest?.actionSummary ?? "",
       nextAction: "",
       recipeSuggestion: null,
     };
@@ -570,6 +584,10 @@
       averageCompletion: scenes.length
         ? Math.round(scenes.reduce((total, scene) => total + scene.completionScore, 0) / scenes.length)
         : 0,
+      averagePacingScore: scenes.length
+        ? Math.round(scenes.reduce((total, scene) => total + (scene.pacingScore ?? 0), 0) / scenes.length)
+        : 0,
+      weakPacingSceneCount: scenes.filter((scene) => (scene.pacingScore ?? 0) < 72).length,
     };
 
     scenes.sort((left, right) => {
@@ -662,6 +680,9 @@
       scene.sceneName,
       `${scene.completionScore}%`,
       scene.nextAction,
+      `${scene.pacingScore ?? 0}%`,
+      scene.pacingGrade ?? "",
+      scene.pacingActionSummary ?? "",
       scene.blockCount,
       scene.dialogueCount,
       scene.missingVoiceCount,
@@ -691,11 +712,12 @@
       "## 总览",
       "",
       buildMarkdownTable(
-        ["场景", "平均完成度", "可试玩", "先修场景", "复查场景", "空场景", "缺背景", "缺 BGM", "待绑语音"],
+        ["场景", "平均完成度", "平均节奏分", "可试玩", "先修场景", "复查场景", "空场景", "缺背景", "缺 BGM", "待绑语音"],
         [
           [
             summary.sceneCount ?? 0,
             `${summary.averageCompletion ?? 0}%`,
+            `${summary.averagePacingScore ?? 0}%`,
             summary.readySceneCount ?? 0,
             summary.blockedSceneCount ?? 0,
             summary.warningSceneCount ?? 0,
@@ -709,7 +731,7 @@
       "",
       "## 场景任务",
       "",
-      buildMarkdownTable(["状态", "章节", "场景", "完成度", "下一步", "卡片", "台词", "待绑语音", "背景", "BGM", "演出", "推荐配方"], sceneRows) || "当前没有可列出的场景。",
+      buildMarkdownTable(["状态", "章节", "场景", "完成度", "下一步", "节奏分", "节奏等级", "节奏建议", "卡片", "台词", "待绑语音", "背景", "BGM", "演出", "推荐配方"], sceneRows) || "当前没有可列出的场景。",
       "",
       "## 优先问题",
       "",
@@ -726,6 +748,9 @@
       scene.sceneName,
       `${scene.completionScore}%`,
       scene.nextAction,
+      `${scene.pacingScore ?? 0}%`,
+      scene.pacingGrade ?? "",
+      scene.pacingActionSummary ?? "",
       scene.blockCount,
       scene.dialogueCount,
       scene.narrationCount,
@@ -741,7 +766,7 @@
       scene.issues.map((issue) => issue.title).join(" / "),
     ]);
     return `\uFEFF${buildCsv(
-      ["序号", "状态", "章节", "场景", "完成度", "下一步", "卡片", "台词", "旁白", "选项", "条件", "待绑语音", "语音完成度", "背景", "BGM", "演出", "推荐配方", "配方 ID", "问题"],
+      ["序号", "状态", "章节", "场景", "完成度", "下一步", "节奏分", "节奏等级", "节奏建议", "卡片", "台词", "旁白", "选项", "条件", "待绑语音", "语音完成度", "背景", "BGM", "演出", "推荐配方", "配方 ID", "问题"],
       rows
     )}\n`;
   }

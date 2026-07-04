@@ -8,6 +8,9 @@ from pathlib import Path
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
+CATALOG_MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "story_block_catalog.js"
+READABILITY_MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "script_readability.js"
+PACING_MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "scene_pacing_advisor.js"
 MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "scene_production_board.js"
 
 
@@ -21,6 +24,9 @@ class FrontendSceneProductionBoardModuleTests(unittest.TestCase):
             const context = {{ window: {{}} }};
             context.globalThis = context;
             vm.createContext(context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(CATALOG_MODULE_PATH))}, "utf8"), context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(READABILITY_MODULE_PATH))}, "utf8"), context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(PACING_MODULE_PATH))}, "utf8"), context);
             vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
             const tools = context.window.CanvasiaEditorSceneProductionBoard;
             const data = {{
@@ -115,6 +121,8 @@ class FrontendSceneProductionBoardModuleTests(unittest.TestCase):
         self.assertGreater(payload["board"]["summary"]["missingMusicSceneCount"], 0)
         self.assertEqual(payload["board"]["summary"]["missingVoiceLineCount"], 1)
         self.assertGreater(payload["board"]["summary"]["longTextSceneCount"], 0)
+        self.assertIn("averagePacingScore", payload["board"]["summary"])
+        self.assertGreater(payload["board"]["summary"]["weakPacingSceneCount"], 0)
         self.assertEqual(payload["digest"]["status"], "blocked")
         issue_codes = [issue["code"] for issue in payload["board"]["issues"]]
         self.assertIn("scene_bad_route_target", issue_codes)
@@ -127,12 +135,18 @@ class FrontendSceneProductionBoardModuleTests(unittest.TestCase):
         self.assertIn("scene_long_choice_text", issue_codes)
         self.assertNotIn("__continue__", json.dumps(payload["board"]["issues"], ensure_ascii=False))
         scenes_by_id = {scene["sceneId"]: scene for scene in payload["board"]["scenes"]}
+        self.assertIn("pacingScore", scenes_by_id["scene_start"])
+        self.assertIn("pacingActionSummary", scenes_by_id["scene_roof"])
+        self.assertLess(scenes_by_id["scene_roof"]["pacingScore"], scenes_by_id["scene_start"]["pacingScore"])
         self.assertIsNone(scenes_by_id["scene_start"]["recipeSuggestion"])
         self.assertEqual(scenes_by_id["scene_roof"]["recipeSuggestion"]["templateId"], "daily_conversation")
         self.assertEqual(scenes_by_id["scene_empty"]["recipeSuggestion"]["templateId"], "playable_scene")
         self.assertIn("# Demo Project 场景生产看板", payload["markdown"])
+        self.assertIn("平均节奏分", payload["markdown"])
+        self.assertIn("节奏建议", payload["markdown"])
         self.assertIn("教室黄昏", payload["markdown"])
         self.assertIn("补日常对话节奏", payload["markdown"])
+        self.assertIn('"节奏分"', payload["csv"])
         self.assertIn('"屋顶"', payload["csv"])
         self.assertIn('"daily_conversation"', payload["csv"])
         self.assertEqual(payload["readyLabel"], "可试玩")
