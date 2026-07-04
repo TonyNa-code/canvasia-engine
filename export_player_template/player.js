@@ -74,6 +74,7 @@ const refs = {
   startButton: document.getElementById("startButton"),
   startContinueButton: document.getElementById("startContinueButton"),
   startLoadButton: document.getElementById("startLoadButton"),
+  startOperationGuideButton: document.getElementById("startOperationGuideButton"),
   startProfileButton: document.getElementById("startProfileButton"),
   startVoiceReplayButton: document.getElementById("startVoiceReplayButton"),
   startAchievementButton: document.getElementById("startAchievementButton"),
@@ -107,6 +108,7 @@ const refs = {
   replayVoiceButton: document.getElementById("replayVoiceButton"),
   resetPlaybackButton: document.getElementById("resetPlaybackButton"),
   systemMenuButton: document.getElementById("systemMenuButton"),
+  operationGuideButton: document.getElementById("operationGuideButton"),
   buildInfoPanel: document.getElementById("buildInfoPanel"),
   variablesPanel: document.getElementById("variablesPanel"),
   missingAssetsPanel: document.getElementById("missingAssetsPanel"),
@@ -136,6 +138,7 @@ const refs = {
   systemMenuOpenLoadButton: document.getElementById("systemMenuOpenLoadButton"),
   systemMenuQuickSaveButton: document.getElementById("systemMenuQuickSaveButton"),
   systemMenuQuickLoadButton: document.getElementById("systemMenuQuickLoadButton"),
+  systemMenuOperationGuideButton: document.getElementById("systemMenuOperationGuideButton"),
   systemMenuReturnTitleButton: document.getElementById("systemMenuReturnTitleButton"),
   menuTextSpeedSelect: document.getElementById("menuTextSpeedSelect"),
   menuLanguageSelect: document.getElementById("menuLanguageSelect"),
@@ -192,6 +195,10 @@ const refs = {
   musicRoomNowPlaying: document.getElementById("musicRoomNowPlaying"),
   musicRoomList: document.getElementById("musicRoomList"),
   closeMusicRoomDialogButton: document.getElementById("closeMusicRoomDialogButton"),
+  operationGuideDialog: document.getElementById("operationGuideDialog"),
+  operationGuideDialogSummary: document.getElementById("operationGuideDialogSummary"),
+  operationGuideList: document.getElementById("operationGuideList"),
+  closeOperationGuideButton: document.getElementById("closeOperationGuideButton"),
   returnTitleDialog: document.getElementById("returnTitleDialog"),
   cancelReturnTitleButton: document.getElementById("cancelReturnTitleButton"),
   confirmReturnTitleButton: document.getElementById("confirmReturnTitleButton"),
@@ -312,6 +319,7 @@ const state = {
   selectedGalleryAssetId: null,
   musicRoomDialogOpen: false,
   currentMusicRoomAssetId: null,
+  operationGuideOpen: false,
   saveDialogOpen: false,
   saveDialogMode: "save",
   saveDialogPage: 0,
@@ -1298,6 +1306,38 @@ const PLAYBACK_DEFAULTS = {
   voiceVolume: 92,
 };
 
+const RUNTIME_SHORTCUT_GROUPS = Object.freeze([
+  Object.freeze({
+    title: "剧情推进",
+    description: "最常用的阅读、回看和显示控制。",
+    shortcuts: Object.freeze([
+      Object.freeze({ keys: Object.freeze(["Space", "Enter", "→"]), label: "继续 / 显示整句", detail: "打字机播放中会先显示整句，之后再推进剧情。" }),
+      Object.freeze({ keys: Object.freeze(["PageUp", "PageDown"]), label: "上一句 / 下一句", detail: "在已经走过的剧情历史中前后移动。" }),
+      Object.freeze({ keys: Object.freeze(["H", "右键"]), label: "隐藏 / 显示对话框", detail: "适合欣赏背景、CG 或人物立绘。" }),
+      Object.freeze({ keys: Object.freeze(["F1", "Shift + ?"]), label: "打开操作指南", detail: "随时查看当前 Runtime 支持的玩家操作。" }),
+    ]),
+  }),
+  Object.freeze({
+    title: "存档与系统",
+    description: "关键分支前后最容易用到的安全操作。",
+    shortcuts: Object.freeze([
+      Object.freeze({ keys: Object.freeze(["Q"]), label: "快速存档", detail: "把当前节点保存到快速存档位。" }),
+      Object.freeze({ keys: Object.freeze(["L"]), label: "快速读档", detail: "回到最近一次快速存档。" }),
+      Object.freeze({ keys: Object.freeze(["Esc"]), label: "关闭当前面板", detail: "优先关闭最上层弹窗，再回到游戏。" }),
+      Object.freeze({ keys: Object.freeze(["R"]), label: "重新开始", detail: "从入口场景重新开始本次试玩。" }),
+    ]),
+  }),
+  Object.freeze({
+    title: "自动播放",
+    description: "适合录屏、演示或连续阅读的操作。",
+    shortcuts: Object.freeze([
+      Object.freeze({ keys: Object.freeze(["S"]), label: "跳过已读开关", detail: "只跳过已经读过的文本，遇到未读内容会自动停下。" }),
+      Object.freeze({ keys: Object.freeze(["自动播放按钮"]), label: "自动播放", detail: "按文字长度、语音和等待卡节奏自动推进。" }),
+      Object.freeze({ keys: Object.freeze(["重播语音"]), label: "重播当前语音", detail: "当前台词有语音时可重新播放。" }),
+    ]),
+  }),
+]);
+
 const SAVE_SHORTCUT_COUNT = 3;
 const SAVE_DIALOG_PAGE_SIZE = 6;
 const DEFAULT_PROJECT_RUNTIME_SETTINGS = {
@@ -1621,6 +1661,7 @@ function init() {
   refs.startButton.addEventListener("click", startGame);
   refs.startContinueButton?.addEventListener("click", continueLastSession);
   refs.startLoadButton?.addEventListener("click", () => openSaveDialog("load"));
+  refs.startOperationGuideButton?.addEventListener("click", openOperationGuideDialog);
   refs.startProfileButton?.addEventListener("click", openProfileDialog);
   refs.startVoiceReplayButton?.addEventListener("click", openVoiceReplayDialog);
   refs.startAchievementButton?.addEventListener("click", openAchievementDialog);
@@ -1653,6 +1694,7 @@ function init() {
   refs.replayVoiceButton?.addEventListener("click", replayCurrentVoice);
   refs.resetPlaybackButton?.addEventListener("click", resetPlaybackSettings);
   refs.systemMenuButton?.addEventListener("click", openSystemMenu);
+  refs.operationGuideButton?.addEventListener("click", openOperationGuideDialog);
   refs.stageFrame?.addEventListener("click", handleStageFrameClick);
   refs.stageFrame?.addEventListener("contextmenu", handleStageFrameContextMenu);
   refs.historyPanel?.addEventListener("click", handleHistoryPanelClick);
@@ -1672,6 +1714,7 @@ function init() {
   });
   refs.systemMenuQuickSaveButton?.addEventListener("click", quickSaveCurrent);
   refs.systemMenuQuickLoadButton?.addEventListener("click", quickLoadCurrent);
+  refs.systemMenuOperationGuideButton?.addEventListener("click", openOperationGuideDialog);
   refs.systemMenuReturnTitleButton?.addEventListener("click", openReturnTitleDialog);
   refs.closeProfileDialogButton?.addEventListener("click", closeProfileDialog);
   refs.closeVoiceReplayDialogButton?.addEventListener("click", closeVoiceReplayDialog);
@@ -1684,6 +1727,7 @@ function init() {
   refs.closeEndingDialogButton?.addEventListener("click", closeEndingDialog);
   refs.closeGalleryDialogButton?.addEventListener("click", closeGalleryDialog);
   refs.closeMusicRoomDialogButton?.addEventListener("click", closeMusicRoomDialog);
+  refs.closeOperationGuideButton?.addEventListener("click", closeOperationGuideDialog);
   refs.achievementDialogList?.addEventListener("click", handleAchievementDialogClick);
   refs.narrationDialogList?.addEventListener("click", handleNarrationDialogClick);
   refs.relationDialogList?.addEventListener("click", handleRelationDialogClick);
@@ -2170,6 +2214,7 @@ function renderBeforeStart() {
   state.endingDialogOpen = false;
   state.galleryDialogOpen = false;
   state.musicRoomDialogOpen = false;
+  state.operationGuideOpen = false;
   state.returnTitleConfirmOpen = false;
   state.saveConfirmOpen = false;
   state.saveConfirmIntent = null;
@@ -2205,6 +2250,7 @@ function renderBeforeStart() {
   renderEndingDialog();
   renderGalleryDialog();
   renderMusicRoomDialog();
+  renderOperationGuideDialog();
   renderSaveDialog();
   renderSystemMenu();
   renderReturnTitleDialog();
@@ -2240,6 +2286,7 @@ function startGameFromScene(sceneId = getEntrySceneId()) {
   state.endingDialogOpen = false;
   state.galleryDialogOpen = false;
   state.musicRoomDialogOpen = false;
+  state.operationGuideOpen = false;
   state.returnTitleConfirmOpen = false;
   state.saveConfirmOpen = false;
   state.saveConfirmIntent = null;
@@ -2301,6 +2348,7 @@ function continueLastSession() {
   state.endingDialogOpen = false;
   state.galleryDialogOpen = false;
   state.musicRoomDialogOpen = false;
+  state.operationGuideOpen = false;
   state.returnTitleConfirmOpen = false;
   state.saveConfirmOpen = false;
   state.saveConfirmIntent = null;
@@ -3066,6 +3114,69 @@ function closeMusicRoomDialog() {
   stopMusicRoomPreview();
   renderMusicRoomDialog();
   return true;
+}
+
+function openOperationGuideDialog() {
+  state.operationGuideOpen = true;
+  stopRuntimeAutoAdvance();
+  renderOperationGuideDialog();
+  window.requestAnimationFrame(() => refs.closeOperationGuideButton?.focus());
+  return true;
+}
+
+function closeOperationGuideDialog() {
+  if (!state.operationGuideOpen) {
+    return false;
+  }
+
+  state.operationGuideOpen = false;
+  renderOperationGuideDialog();
+  return true;
+}
+
+function renderShortcutKeys(keys) {
+  return (Array.isArray(keys) ? keys : [])
+    .map((key) => `<kbd>${escapeHtml(key)}</kbd>`)
+    .join("");
+}
+
+function renderOperationGuideGroup(group) {
+  return `
+    <article class="operation-guide-group">
+      <div class="operation-guide-group-head">
+        <h3>${escapeHtml(group.title)}</h3>
+        <p>${escapeHtml(group.description)}</p>
+      </div>
+      <div class="operation-shortcut-list">
+        ${(group.shortcuts ?? [])
+          .map(
+            (shortcut) => `
+              <div class="operation-shortcut-row">
+                <div class="operation-shortcut-keys">${renderShortcutKeys(shortcut.keys)}</div>
+                <div>
+                  <strong>${escapeHtml(shortcut.label)}</strong>
+                  <p>${escapeHtml(shortcut.detail)}</p>
+                </div>
+              </div>
+            `
+          )
+          .join("")}
+      </div>
+    </article>
+  `;
+}
+
+function renderOperationGuideDialog() {
+  if (!refs.operationGuideDialog || !refs.operationGuideDialogSummary || !refs.operationGuideList) {
+    return;
+  }
+
+  refs.operationGuideDialog.hidden = !state.operationGuideOpen;
+  refs.operationGuideDialog.classList.toggle("is-visible", state.operationGuideOpen);
+  refs.operationGuideDialogSummary.textContent = state.started
+    ? "这些操作会直接作用于当前试玩进度；打开本页时自动播放会先暂停，避免错过剧情。"
+    : "开始试玩前可以先看一眼操作方式。导出包可以直接用鼠标，也支持常见视觉小说快捷键。";
+  refs.operationGuideList.innerHTML = RUNTIME_SHORTCUT_GROUPS.map(renderOperationGuideGroup).join("");
 }
 
 function handleCharacterDialogClick(event) {
@@ -7431,6 +7542,7 @@ function renderPlaybackControls(snapshot = getCurrentSnapshot()) {
   renderReturnTitleDialog();
   renderSaveConfirmDialog();
   renderSaveDialog();
+  renderOperationGuideDialog();
 }
 
 function renderRuntimeLanguageSelect(select) {
@@ -7609,6 +7721,20 @@ function resetPlaybackSettings() {
 
 function handleGlobalKeydown(event) {
   if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) {
+    return;
+  }
+
+  if (state.operationGuideOpen && event.code === "Escape") {
+    event.preventDefault();
+    closeOperationGuideDialog();
+    return;
+  }
+
+  if (state.operationGuideOpen) {
+    if (isKeyboardTypingTarget(event.target)) {
+      return;
+    }
+    event.preventDefault();
     return;
   }
 
@@ -7823,6 +7949,12 @@ function handleGlobalKeydown(event) {
   }
 
   if (isKeyboardTypingTarget(event.target)) {
+    return;
+  }
+
+  if (event.code === "F1" || (event.shiftKey && event.code === "Slash")) {
+    event.preventDefault();
+    openOperationGuideDialog();
     return;
   }
 
@@ -8672,6 +8804,7 @@ function confirmReturnToTitle() {
   renderEndingDialog();
   renderGalleryDialog();
   renderMusicRoomDialog();
+  renderOperationGuideDialog();
   renderReturnTitleDialog();
   renderSaveConfirmDialog();
   renderBeforeStart();

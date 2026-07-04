@@ -1321,6 +1321,100 @@ button {
   gap: 8px;
 }
 
+.operation-guide-dialog {
+  width: min(1040px, calc(100vw - 32px));
+}
+
+.operation-guide-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.operation-guide-group {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 22px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.52)),
+    radial-gradient(circle at top right, var(--accent), transparent 42%);
+  border: 1px solid var(--line);
+  box-shadow: 0 16px 36px rgba(36, 64, 110, 0.08);
+}
+
+.operation-guide-group-head h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.operation-guide-group-head p,
+.operation-shortcut-row p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  line-height: 1.6;
+  font-size: 13px;
+}
+
+.operation-shortcut-list {
+  display: grid;
+  gap: 10px;
+}
+
+.operation-shortcut-row {
+  display: grid;
+  grid-template-columns: minmax(126px, 0.48fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid rgba(120, 160, 210, 0.14);
+}
+
+.operation-shortcut-keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.operation-shortcut-keys kbd {
+  min-width: 34px;
+  padding: 5px 8px;
+  border-radius: 10px;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(112, 146, 190, 0.22);
+  box-shadow: inset 0 -2px 0 rgba(60, 92, 140, 0.1);
+}
+
+.operation-shortcut-row strong {
+  display: block;
+  font-size: 14px;
+}
+
+html[data-ui-theme="dark"] .operation-guide-group {
+  background:
+    linear-gradient(145deg, rgba(12, 22, 38, 0.9), rgba(8, 16, 30, 0.82)),
+    radial-gradient(circle at top right, rgba(107, 213, 255, 0.12), transparent 42%);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.28);
+}
+
+html[data-ui-theme="dark"] .operation-shortcut-row {
+  background: rgba(7, 15, 28, 0.72);
+  border-color: rgba(121, 220, 255, 0.12);
+}
+
+html[data-ui-theme="dark"] .operation-shortcut-keys kbd {
+  color: #eaf4ff;
+  background: rgba(18, 31, 54, 0.92);
+  border-color: rgba(121, 220, 255, 0.22);
+  box-shadow: inset 0 -2px 0 rgba(121, 220, 255, 0.12);
+}
+
 .save-dialog-slot-card {
   background: rgba(255, 255, 255, 0.8);
 }
@@ -1759,6 +1853,10 @@ button {
   .side-panel {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .operation-guide-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 860px) {
@@ -1813,7 +1911,12 @@ button {
   }
 
   .save-dialog-system-layout,
+  .operation-guide-list,
   .playback-setting-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .operation-shortcut-row {
     grid-template-columns: 1fr;
   }
 

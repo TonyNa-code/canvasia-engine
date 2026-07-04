@@ -38,6 +38,10 @@
             <span class="player-action-icon" aria-hidden="true">▣</span>
             <span>系统菜单</span>
           </button>
+          <button id="operationGuideButton" class="pill-button is-secondary" type="button">
+            <span class="player-action-icon" aria-hidden="true">?</span>
+            <span>操作指南</span>
+          </button>
           <button id="restartButton" class="pill-button" type="button">
             <span class="player-action-icon" aria-hidden="true">↺</span>
             <span>重新开始</span>
@@ -120,6 +124,7 @@
               <div class="start-action-group">
                 <button id="startContinueButton" class="pill-button" type="button" hidden><span class="player-action-icon" aria-hidden="true">↻</span><span>继续上次试玩</span></button>
                 <button id="startLoadButton" class="pill-button is-secondary" type="button" hidden><span class="player-action-icon" aria-hidden="true">⇪</span><span>打开读档</span></button>
+                <button id="startOperationGuideButton" class="pill-button is-secondary" type="button"><span class="player-action-icon" aria-hidden="true">?</span><span>操作说明</span></button>
                 <button id="startProfileButton" class="pill-button is-secondary" type="button" hidden><span class="player-action-icon" aria-hidden="true">◎</span><span>玩家档案</span></button>
                 <button id="startVoiceReplayButton" class="pill-button is-secondary" type="button" hidden><span class="player-action-icon" aria-hidden="true">◔</span><span>语音回听</span></button>
                 <button id="startAchievementButton" class="pill-button is-secondary" type="button" hidden><span class="player-action-icon" aria-hidden="true">✦</span><span>成就馆</span></button>
@@ -402,6 +407,7 @@
             <button id="systemMenuOpenLoadButton" class="pill-button" type="button">正式读档</button>
             <button id="systemMenuQuickSaveButton" class="pill-button" type="button">快速存档</button>
             <button id="systemMenuQuickLoadButton" class="pill-button" type="button">快速读档</button>
+            <button id="systemMenuOperationGuideButton" class="pill-button" type="button">操作指南</button>
             <button id="systemMenuReturnTitleButton" class="pill-button" type="button">返回标题页</button>
           </div>
           <div class="save-dialog-system-settings">
@@ -457,6 +463,20 @@
             </div>
           </div>
         </div>
+      </section>
+    </div>
+
+    <div id="operationGuideDialog" class="save-dialog-backdrop" hidden>
+      <section class="save-dialog save-dialog-extra operation-guide-dialog" role="dialog" aria-modal="true" aria-labelledby="operationGuideDialogTitle">
+        <div class="save-dialog-head">
+          <div>
+            <div class="eyebrow">Canvasia Engine · 操作指南</div>
+            <h2 id="operationGuideDialogTitle">运行时操作 / 快捷键</h2>
+            <p id="operationGuideDialogSummary" class="save-dialog-summary"></p>
+          </div>
+          <button id="closeOperationGuideButton" class="pill-button" type="button">关闭</button>
+        </div>
+        <div id="operationGuideList" class="operation-guide-list"></div>
       </section>
     </div>
 

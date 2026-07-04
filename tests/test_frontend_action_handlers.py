@@ -4696,6 +4696,35 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn('event.code === "PageDown"', handle_keydown)
         self.assertIn("jumpToHistory(nextIndex)", step_history)
 
+    def test_web_runtime_operation_guide_is_data_driven_and_keyboard_reachable(self) -> None:
+        player_html = (ROOT_DIR / "export_player_template" / "index.html").read_text(encoding="utf-8")
+        player_source = PLAYER_PATH.read_text(encoding="utf-8")
+        player_css = (ROOT_DIR / "export_player_template" / "player.css").read_text(encoding="utf-8")
+        refs_block = player_source[player_source.index("const refs = {") : player_source.index("};", player_source.index("const refs = {"))]
+        init_block = _extract_function_source(player_source, "init")
+        open_operation_guide = _extract_function_source(player_source, "openOperationGuideDialog")
+        render_operation_guide = _extract_function_source(player_source, "renderOperationGuideDialog")
+        handle_keydown = _extract_function_source(player_source, "handleGlobalKeydown")
+
+        self.assertIn('id="operationGuideButton"', player_html)
+        self.assertIn('id="startOperationGuideButton"', player_html)
+        self.assertIn('id="systemMenuOperationGuideButton"', player_html)
+        self.assertIn('id="operationGuideDialog"', player_html)
+        self.assertIn('id="operationGuideList"', player_html)
+        self.assertIn("const RUNTIME_SHORTCUT_GROUPS = Object.freeze", player_source)
+        self.assertIn("operationGuideOpen: false", player_source)
+        self.assertIn('operationGuideButton: document.getElementById("operationGuideButton")', refs_block)
+        self.assertIn('startOperationGuideButton: document.getElementById("startOperationGuideButton")', refs_block)
+        self.assertIn('systemMenuOperationGuideButton: document.getElementById("systemMenuOperationGuideButton")', refs_block)
+        self.assertIn("openOperationGuideDialog", init_block)
+        self.assertIn("stopRuntimeAutoAdvance()", open_operation_guide)
+        self.assertIn("RUNTIME_SHORTCUT_GROUPS.map(renderOperationGuideGroup).join(\"\")", render_operation_guide)
+        self.assertIn('event.code === "F1"', handle_keydown)
+        self.assertIn('event.shiftKey && event.code === "Slash"', handle_keydown)
+        self.assertIn("closeOperationGuideDialog()", handle_keydown)
+        self.assertIn(".operation-guide-list", player_css)
+        self.assertIn(".operation-shortcut-keys kbd", player_css)
+
     def test_typewriter_index_helpers_keep_unicode_characters_intact(self) -> None:
         for path in (APP_PATH, PLAYER_PATH):
             source = path.read_text(encoding="utf-8")
