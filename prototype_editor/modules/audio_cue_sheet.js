@@ -167,9 +167,11 @@
     const nextAudioControlIndex = blocks.findIndex(
       (candidate, index) => index > startIndex && ["music_play", "music_stop"].includes(candidate?.type)
     );
+    const nextAudioControlBlock = nextAudioControlIndex >= 0 ? blocks[nextAudioControlIndex] : null;
     let plannedEndIndex = blocks.length - 1;
     let endBlock = null;
     let endLabel = "场景末尾";
+    let validExplicitEnd = false;
 
     if (endMode === "until_next_music") {
       plannedEndIndex = nextAudioControlIndex >= 0 ? nextAudioControlIndex - 1 : blocks.length - 1;
@@ -210,6 +212,7 @@
         plannedEndIndex = targetIndex;
         endBlock = blocks[targetIndex];
         endLabel = summarizeBlock(endBlock, targetIndex);
+        validExplicitEnd = true;
         if (nextAudioControlIndex >= 0 && nextAudioControlIndex <= targetIndex) {
           pushIssue(
             issues,
@@ -229,8 +232,100 @@
       endBlock,
       endLabel,
       nextAudioControlIndex,
+      nextAudioControlBlock,
+      nextAudioControlLabel: nextAudioControlBlock ? summarizeBlock(nextAudioControlBlock, nextAudioControlIndex) : "",
+      validExplicitEnd,
       spanCount: Math.max(1, plannedEndIndex - startIndex + 1),
     };
+  }
+
+  function getAudioHandoffInfo(endInfo = {}) {
+    const nextIndex = Number.isFinite(endInfo.nextAudioControlIndex) ? endInfo.nextAudioControlIndex : -1;
+    const nextBlock = endInfo.nextAudioControlBlock;
+    const nextLabel = endInfo.nextAudioControlLabel || (nextBlock ? summarizeBlock(nextBlock, nextIndex) : "");
+
+    if (nextIndex >= 0 && nextIndex <= endInfo.plannedEndIndex) {
+      return {
+        type: "early_takeover",
+        label: `${nextLabel || `第 ${nextIndex + 1} 张`} 会提前接管`,
+        needsReview: true,
+      };
+    }
+    if (nextIndex >= 0 && endInfo.endMode === "until_next_music" && nextIndex === endInfo.plannedEndIndex + 1) {
+      return {
+        type: nextBlock?.type === "music_stop" ? "stop_handoff" : "music_handoff",
+        label: nextLabel ? `${nextLabel} 接管` : `第 ${nextIndex + 1} 张接管`,
+        needsReview: false,
+      };
+    }
+    if (endInfo.endMode === "after_block") {
+      if (!endInfo.validExplicitEnd) {
+        return {
+          type: "broken_range",
+          label: "结束卡片需要重新选择",
+          needsReview: true,
+        };
+      }
+      return {
+        type: "explicit_end",
+        label: `播放到 ${endInfo.endLabel}`,
+        needsReview: true,
+      };
+    }
+    if (endInfo.endMode === "scene_end") {
+      return {
+        type: "scene_end",
+        label: "覆盖到场景末尾",
+        needsReview: true,
+      };
+    }
+    return {
+      type: "open_tail",
+      label: "后续没有音乐卡接管",
+      needsReview: true,
+    };
+  }
+
+  function buildAudioCueAuditionHint(cue = {}) {
+    if (cue.status === "blocker") {
+      return "先修素材或范围，再试听。";
+    }
+    if (cue.handoffType === "music_handoff") {
+      return "从本段开头试听到下一首切入，确认切歌不突兀。";
+    }
+    if (cue.handoffType === "stop_handoff") {
+      return "试听到停止音乐卡，确认淡出长度合适。";
+    }
+    if (cue.handoffType === "explicit_end") {
+      return "重点试听开始卡和结束卡前后。";
+    }
+    if (cue.handoffType === "scene_end") {
+      return "从本段开始试听到场景末尾。";
+    }
+    return cue.status === "warn" ? "复查提示后再试听一次。" : "抽查这一段的开头和结尾。";
+  }
+
+  function finalizeAudioCueStatus(cue = {}) {
+    const issues = toArray(cue.issues);
+    cue.status = issues.some((issue) => issue.severity === "blocker")
+      ? "blocker"
+      : issues.some((issue) => issue.severity === "warn")
+        ? "warn"
+        : issues.length > 0
+          ? "tip"
+          : "good";
+    cue.statusLabel = cue.status === "blocker" ? "需先修" : cue.status === "warn" ? "建议复查" : cue.status === "tip" ? "可润色" : "正常";
+    cue.needsAudition = cue.status !== "good" || ["music_handoff", "stop_handoff", "explicit_end", "scene_end"].includes(cue.handoffType);
+    cue.auditionHint = buildAudioCueAuditionHint(cue);
+    return cue;
+  }
+
+  function addIssueToCue(cue = {}, severity, code, title, detail) {
+    if (!Array.isArray(cue.issues)) {
+      cue.issues = [];
+    }
+    pushIssue(cue.issues, severity, code, title, detail);
+    finalizeAudioCueStatus(cue);
   }
 
   function buildAudioCue(block = {}, context = {}) {
@@ -239,6 +334,7 @@
     const asset = assetId ? context.assetMap.get(assetId) : null;
     const startIndex = context.blockIndex ?? 0;
     const endInfo = getAudioControlEndIndex(block, context.blocks, startIndex, issues);
+    const handoffInfo = getAudioHandoffInfo(endInfo);
     const fadeInMs = Math.round(clampNumber(block.fadeInMs, 0, 30000, 0));
     const fadeOutMs = Math.round(clampNumber(block.fadeOutMs, 0, 30000, 600));
     const volume = Math.round(clampNumber(block.volume, 0, 100, 100));
@@ -270,6 +366,7 @@
       blockIndex: startIndex,
       startLabel: summarizeBlock(block, startIndex),
       endBlockId: endInfo.endBlock?.id ?? cleanText(block.endBlockId),
+      endBlockIndex: endInfo.plannedEndIndex,
       endLabel: endInfo.endLabel,
       spanCount: endInfo.spanCount,
       assetId,
@@ -281,17 +378,60 @@
       fadeOutMs,
       endMode: endInfo.endMode,
       endModeLabel: endInfo.endModeLabel,
+      handoffType: handoffInfo.type,
+      handoffLabel: handoffInfo.label,
+      handoffNeedsReview: handoffInfo.needsReview,
       issues,
     };
-    cue.status = issues.some((issue) => issue.severity === "blocker")
-      ? "blocker"
-      : issues.some((issue) => issue.severity === "warn")
-        ? "warn"
-        : issues.length > 0
-          ? "tip"
-          : "good";
-    cue.statusLabel = cue.status === "blocker" ? "需先修" : cue.status === "warn" ? "建议复查" : cue.status === "tip" ? "可润色" : "正常";
-    return cue;
+    return finalizeAudioCueStatus(cue);
+  }
+
+  function auditAudioCueContinuity(cues = []) {
+    toArray(cues).forEach((cue, index, orderedCues) => {
+      const nextCue = orderedCues[index + 1];
+      if (!nextCue || cue.sceneId !== nextCue.sceneId) {
+        return;
+      }
+      if (nextCue.blockIndex > (cue.endBlockIndex ?? cue.blockIndex) + 2) {
+        return;
+      }
+      if (cue.fadeOutMs <= 0 && nextCue.fadeInMs <= 0) {
+        addIssueToCue(
+          cue,
+          "warn",
+          "abrupt_music_handoff",
+          "切歌没有淡入淡出",
+          `下一首 ${nextCue.assetName} 也没有淡入，建议给前后 BGM 留 300-1200ms 过渡。`
+        );
+      }
+      if (cue.assetId && cue.assetId === nextCue.assetId && cue.endMode === "until_next_music") {
+        addIssueToCue(
+          cue,
+          "tip",
+          "duplicate_music_restart",
+          "同一首 BGM 连续重播",
+          "如果只是想让同一首歌继续循环，可以删掉后面重复的播放卡；如果想重头播放，则可以保留。"
+        );
+      }
+    });
+  }
+
+  function buildAudioCueRangeRows(cues = []) {
+    return toArray(cues).map((cue, index) => ({
+      id: cue.id,
+      index: index + 1,
+      chapterName: cue.chapterName,
+      sceneName: cue.sceneName,
+      assetName: cue.assetName,
+      assetId: cue.assetId,
+      coverageLabel: `${cue.startLabel} -> ${cue.endLabel}`,
+      handoffLabel: cue.handoffLabel,
+      spanLabel: `${cue.spanCount} 张卡`,
+      fadeLabel: `${cue.fadeInMs} / ${cue.fadeOutMs} ms`,
+      auditionHint: cue.auditionHint,
+      status: cue.status,
+      statusLabel: cue.statusLabel,
+    }));
   }
 
   function buildAudioCueSheet(data = {}) {
@@ -340,6 +480,9 @@
       }
     });
 
+    auditAudioCueContinuity(cues);
+    const rangeRows = buildAudioCueRangeRows(cues);
+
     const issues = cues
       .flatMap((cue) =>
         cue.issues.map((issue) => ({
@@ -355,9 +498,14 @@
 
     const summary = {
       cueCount: cues.length,
+      rangeSegmentCount: rangeRows.length,
       explicitRangeCount: cues.filter((cue) => cue.endMode === "after_block").length,
       sceneEndCount: cues.filter((cue) => cue.endMode === "scene_end").length,
+      handoffCount: cues.filter((cue) => ["music_handoff", "stop_handoff"].includes(cue.handoffType)).length,
+      openTailCount: cues.filter((cue) => cue.handoffType === "open_tail").length,
+      auditionNeededCount: cues.filter((cue) => cue.needsAudition).length,
       takeoverCount: cues.filter((cue) => cue.issues.some((issue) => issue.code.includes("taken_over"))).length,
+      abruptHandoffCount: cues.filter((cue) => cue.issues.some((issue) => issue.code === "abrupt_music_handoff")).length,
       missingAssetCount: cues.filter((cue) =>
         cue.issues.some((issue) => ["missing_asset", "unknown_asset", "asset_file_missing"].includes(issue.code))
       ).length,
@@ -375,6 +523,7 @@
     return {
       projectTitle: cleanText(data.project?.title, "Canvasia Project"),
       cues,
+      rangeRows,
       stops,
       scenesWithoutMusic,
       issues,
@@ -412,7 +561,7 @@
       status: "ready",
       tone: "good",
       title: "BGM 调度表可用于发布前试听",
-      detail: "当前音乐卡都有明确素材和可解释的播放范围。",
+      detail: `当前音乐卡都有明确素材和可解释的播放范围；其中 ${summary.auditionNeededCount ?? 0} 段建议发布前试听确认。`,
     };
   }
 
@@ -460,8 +609,18 @@
       cue.endModeLabel,
       cue.startLabel,
       cue.endLabel,
+      cue.handoffLabel,
       `${cue.fadeInMs} / ${cue.fadeOutMs} ms`,
       cue.statusLabel,
+    ]);
+    const rangeRows = toArray(sheet.rangeRows).slice(0, 120).map((row) => [
+      `${row.index}`,
+      `${row.chapterName} / ${row.sceneName}`,
+      row.assetName,
+      row.coverageLabel,
+      row.handoffLabel,
+      row.auditionHint,
+      row.statusLabel,
     ]);
     const issueRows = toArray(sheet.issues).slice(0, 120).map((issue, index) => [
       `${index + 1}`,
@@ -491,8 +650,11 @@
         ["项目", "数量"],
         [
           ["BGM 播放卡", `${summary.cueCount ?? 0}`],
+          ["覆盖段", `${summary.rangeSegmentCount ?? 0}`],
           ["指定范围", `${summary.explicitRangeCount ?? 0}`],
           ["场景结束范围", `${summary.sceneEndCount ?? 0}`],
+          ["自然接管", `${summary.handoffCount ?? 0}`],
+          ["建议试听", `${summary.auditionNeededCount ?? 0}`],
           ["停止音乐卡", `${summary.stopCount ?? 0}`],
           ["阻塞问题", `${summary.blockerCount ?? 0}`],
           ["复查提醒", `${summary.warningCount ?? 0}`],
@@ -500,9 +662,14 @@
         ]
       ),
       "",
+      "## BGM 覆盖范围速览",
+      "",
+      buildMarkdownTable(["序号", "章节 / 场景", "BGM", "覆盖范围", "接管方式", "试听提示", "状态"], rangeRows) ||
+        "当前没有可展示的 BGM 覆盖范围。",
+      "",
       "## BGM Cue 列表",
       "",
-      buildMarkdownTable(["序号", "章节", "场景", "BGM", "范围", "开始", "结束", "淡入/淡出", "状态"], cueRows) ||
+      buildMarkdownTable(["序号", "章节", "场景", "BGM", "范围", "开始", "结束", "接管方式", "淡入/淡出", "状态"], cueRows) ||
         "当前没有播放音乐卡。",
       "",
       "## 需要复查的问题",
@@ -526,16 +693,36 @@
       cue.assetId,
       cue.endModeLabel,
       cue.endLabel,
+      cue.handoffLabel,
       cue.spanCount,
       cue.volume,
       cue.loop ? "循环" : "不循环",
       cue.fadeInMs,
       cue.fadeOutMs,
+      cue.auditionHint,
       cue.statusLabel,
       cue.issues.map((issue) => issue.title).join(" / "),
     ]);
     return `\uFEFF${buildCsv(
-      ["序号", "章节", "场景", "开始卡片", "BGM", "素材ID", "范围", "结束位置", "覆盖卡片", "音量", "循环", "淡入ms", "淡出ms", "状态", "问题"],
+      [
+        "序号",
+        "章节",
+        "场景",
+        "开始卡片",
+        "BGM",
+        "素材ID",
+        "范围",
+        "结束位置",
+        "接管方式",
+        "覆盖卡片",
+        "音量",
+        "循环",
+        "淡入ms",
+        "淡出ms",
+        "试听提示",
+        "状态",
+        "问题",
+      ],
       rows
     )}\n`;
   }
@@ -543,6 +730,7 @@
   global.CanvasiaEditorAudioCueSheet = Object.freeze({
     getSafeMusicEndMode,
     getMusicEndModeLabel,
+    buildAudioCueRangeRows,
     buildAudioCueSheet,
     getAudioCueSheetStatusDigest,
     buildAudioCueSheetMarkdown,

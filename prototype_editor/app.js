@@ -32248,7 +32248,7 @@ function renderAudioCueSheetPanel() {
   const digest = audioCueSheetTools.getAudioCueSheetStatusDigest(sheet);
   const summary = sheet.summary ?? {};
   const topIssues = (sheet.issues ?? []).slice(0, 4);
-  const cuePreview = (sheet.cues ?? []).slice(0, 4);
+  const rangePreview = (sheet.rangeRows ?? []).slice(0, 4);
 
   return `
     <article class="detail-card preview-sprint-panel">
@@ -32259,9 +32259,9 @@ function renderAudioCueSheetPanel() {
       <p class="helper-text">${escapeHtml(digest.detail)} 适合发布前把“哪首歌覆盖哪段剧情、在哪里淡入淡出、哪里需要试听”一次看清。</p>
       <div class="preview-sprint-metrics">
         ${renderRouteMetricCard("BGM 卡", `${summary.cueCount ?? 0} 张`, "项目中所有播放音乐卡")}
-        ${renderRouteMetricCard("指定范围", `${summary.explicitRangeCount ?? 0} 段`, "从某段文本播到另一段文本")}
+        ${renderRouteMetricCard("覆盖段", `${summary.rangeSegmentCount ?? 0} 段`, "每首 BGM 实际覆盖的剧情范围")}
+        ${renderRouteMetricCard("建议试听", `${summary.auditionNeededCount ?? 0} 段`, "范围、接管或提示需要人工确认")}
         ${renderRouteMetricCard("阻塞 / 提醒", `${summary.blockerCount ?? 0} / ${summary.warningCount ?? 0}`, "缺素材、坏范围或提前接管")}
-        ${renderRouteMetricCard("无 BGM 场景", `${summary.scenesWithoutMusicCount ?? 0} 个`, "有内容但没有播放音乐卡")}
       </div>
       <div class="detail-actions">
         <button class="toolbar-button toolbar-button-primary" data-action="export-audio-cue-sheet-markdown">
@@ -32296,18 +32296,18 @@ function renderAudioCueSheetPanel() {
                 .join("")}
             </div>
           `
-          : cuePreview.length > 0
+          : rangePreview.length > 0
             ? `
               <div class="list-stack compact-stack">
-                ${cuePreview
+                ${rangePreview
                   .map(
-                    (cue) => `
+                    (row) => `
                       <div class="route-testing-item">
                         <div>
-                          <b>${escapeHtml(cue.assetName)}</b>
-                          <span>${escapeHtml(`${cue.chapterName} · ${cue.sceneName} · ${cue.endModeLabel}`)}</span>
+                          <b>${escapeHtml(row.assetName)}</b>
+                          <span>${escapeHtml(`${row.chapterName} · ${row.sceneName} · ${row.spanLabel}`)}</span>
                         </div>
-                        <span>${escapeHtml(`${cue.startLabel} -> ${cue.endLabel}`)}</span>
+                        <span>${escapeHtml(`${row.handoffLabel} · ${row.auditionHint}`)}</span>
                       </div>
                     `
                   )
