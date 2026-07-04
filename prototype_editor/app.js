@@ -1977,109 +1977,24 @@ function renderBlankStoryWorkspacePanel() {
 }
 
 function buildBeginnerDashboardWorkflow(routeOverview) {
-  const starterKitOverview = getStarterKitOverview();
-  const productionOverview = buildDashboardProductionOverview(routeOverview);
-  const hasStructure = state.data.chapters.length > 0 && state.data.scenes.length > 0;
-  const hasStoryContent = productionOverview.scenesWithContent > 0;
-  const hasStarterKit = !starterKitOverview.needsStarterKit;
-  const canPreviewAndExport = state.data.scenes.length > 0 && state.validation.errors.length === 0;
-  const hasExportRecord = Boolean(state.lastExportResult);
-  const exportMissingAssetCount = Number(state.lastExportResult?.missingAssets ?? 0) || 0;
-  const hasCleanExportRecord = hasExportRecord && exportMissingAssetCount <= 0;
-  const exportTargetLabel = state.lastExportResult?.targetLabel ?? state.lastExportResult?.target ?? "试玩包";
-
-  const steps = [
-    {
-      step: "第一步",
-      title: "创建项目骨架",
-      done: hasStructure,
-      description: hasStructure
-        ? `现在已经有 ${state.data.chapters.length} 个章节、${state.data.scenes.length} 个场景，可以直接继续往里写。`
-        : "先建立第一章和第一场景，后续剧情、素材和试玩流程才能继续展开。",
-      actions: hasStructure
-        ? [
-            { label: "进入剧情编辑", action: "switch-screen", dataset: { screen: "story" } },
-            { label: "继续看首页", action: "switch-screen", dataset: { screen: "dashboard" } },
-          ]
-        : [
-            { label: "一键创建第一章", action: "create-first-chapter" },
-            { label: "自定义名字再创建", action: "create-first-chapter-custom" },
-          ],
-    },
-    {
-      step: "第二步",
-      title: "写入第一版正文",
-      done: hasStoryContent,
-      description: hasStoryContent
-        ? `已经有 ${productionOverview.scenesWithContent} 个场景写了正文，现在可以继续补氛围和去向。`
-        : "先写出台词、旁白和选项，让试玩流程具备基础推进内容。",
-      actions: [
-        { label: hasStoryContent ? "继续写剧情" : "去写第一段剧情", action: "switch-screen", dataset: { screen: "story" } },
-        { label: "打开剧情页", action: "switch-screen", dataset: { screen: "story" } },
-      ],
-    },
-    {
-      step: "第三步",
-      title: "补角色、背景和音乐",
-      done: hasStarterKit,
-      description: hasStarterKit
-        ? "角色和基础素材骨架已经有了，后面直接替换成真实立绘、背景和 BGM 就行。"
-        : "补齐第一个角色、第一张背景和第一首 BGM 后，预览会更完整。",
-      actions: hasStarterKit
-        ? [
-            { label: "去角色页继续补", action: "switch-screen", dataset: { screen: "characters" } },
-            { label: "去素材页继续补", action: "switch-screen", dataset: { screen: "assets" } },
-          ]
-        : [
-            { label: "一键生成起步骨架", action: "create-starter-kit" },
-            { label: "自定义名字再生成", action: "create-starter-kit-custom" },
-          ],
-    },
-    {
-      step: "第四步",
-      title: "试玩与导出",
-      done: hasCleanExportRecord,
-      statusLabel: hasCleanExportRecord
-        ? "已导出"
-        : hasExportRecord
-          ? `已导出，缺 ${exportMissingAssetCount} 个素材`
-          : canPreviewAndExport
-            ? "可试玩，待导出"
-            : "先修错误",
-      statusTone: hasCleanExportRecord ? "good" : hasExportRecord || canPreviewAndExport ? "warn" : "danger",
-      description: hasCleanExportRecord
-        ? `最近已经导出过一版 ${exportTargetLabel}，后续修改后建议再导一版确认。`
-        : hasExportRecord
-          ? `最近已经导出过一版 ${exportTargetLabel}，但还有 ${exportMissingAssetCount} 个素材没找到；补齐后再导出才更接近可交付。`
-        : canPreviewAndExport
-          ? "当前没有结构错误，可以先试玩并导出一版；导出成功后这一步才算完成。"
-          : "先清理结构错误后再进入试玩与导出，避免导出的包一打开就断线。",
-      actions: hasCleanExportRecord
-        ? [
-            { label: "导出新版本", action: "export-build", dataset: { "export-target": "web" } },
-            { label: "去试玩复查", action: "switch-screen", dataset: { screen: "preview" } },
-          ]
-        : hasExportRecord
-          ? [
-              { label: "去素材页补缺口", action: "focus-asset-gap", dataset: { "asset-filter-mode": "urgent_missing" } },
-              { label: "重新导出试玩包", action: "export-build", dataset: { "export-target": "web" } },
-            ]
-        : canPreviewAndExport
-          ? [
-              { label: "去试玩这版", action: "switch-screen", dataset: { screen: "preview" } },
-              { label: "导出试玩包", action: "export-build", dataset: { "export-target": "web" } },
-            ]
-          : [
-              { label: "打开项目巡检", action: "switch-screen", dataset: { screen: "inspection" } },
-              { label: "去剧情页修", action: "switch-screen", dataset: { screen: "story" } },
-            ],
-    },
-  ];
-
-  return {
-    steps,
-    nextStep: steps.find((item) => !item.done) ?? steps[steps.length - 1],
-  };
+  const releaseCandidateReadiness = state.lastExportResult?.releaseCandidateReadinessEstimate ?? {};
+  return beginnerTutorialTools.buildBeginnerDashboardWorkflow({
+    data: state.data,
+    starterKitOverview: getStarterKitOverview(),
+    productionOverview: buildDashboardProductionOverview(routeOverview),
+    validation: state.validation,
+    previewProgress: hasBeginnerTutorialPreviewProgress(),
+    lastExportResult: state.lastExportResult,
+    regressionResult: state.inspectionRegressionResult,
+    releaseCandidateManifest: state.lastExportResult
+      ? {
+          status: state.lastExportResult.missingAssets > 0 ? "review" : "candidate",
+          readinessPercent: Number(
+            releaseCandidateReadiness.desktopPreviewPercent ?? releaseCandidateReadiness.commercialDesktopPercent ?? 0
+          ) || 0,
+        }
+      : null,
+  });
 }
 
 function getBeginnerWorkflowStepStatusLabel(step) {

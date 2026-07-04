@@ -259,6 +259,208 @@
     return "warn-text";
   }
 
+  function toCount(value, fallback = 0) {
+    const numberValue = Number(value);
+    if (!Number.isFinite(numberValue)) {
+      return fallback;
+    }
+    return Math.max(0, Math.round(numberValue));
+  }
+
+  function buildBeginnerDashboardWorkflow(context = {}) {
+    const data = context.data ?? {};
+    const project = data.project ?? null;
+    const chapters = Array.isArray(data.chapters) ? data.chapters : [];
+    const scenes = Array.isArray(data.scenes) ? data.scenes : [];
+    const starterKitOverview = context.starterKitOverview ?? {};
+    const productionOverview = context.productionOverview ?? {};
+    const validation = context.validation ?? {};
+    const lastExportResult = context.lastExportResult ?? null;
+    const regressionSummary = context.regressionResult?.summary ?? context.regressionSummary ?? null;
+    const hasProject = Boolean(project);
+    const hasStructure = hasProject && chapters.length > 0 && scenes.length > 0;
+    const scenesWithContent = toCount(productionOverview.scenesWithContent);
+    const hasStoryContent = scenesWithContent > 0;
+    const hasStarterKit = hasProject && !starterKitOverview.needsStarterKit;
+    const validationErrorCount = toCount(validation.errors?.length ?? validation.errorCount);
+    const validationWarningCount = toCount(validation.warnings?.length ?? validation.warningCount);
+    const previewReady = scenes.length > 0 && validationErrorCount === 0;
+    const previewProgress = Boolean(context.previewProgress);
+    const hasRegressionRun = Boolean(context.regressionResult);
+    const regressionFailCount = toCount(regressionSummary?.failCount);
+    const regressionWarnCount = toCount(regressionSummary?.warnCount);
+    const hasExportRecord = Boolean(lastExportResult);
+    const exportMissingAssetCount = toCount(lastExportResult?.missingAssets);
+    const hasCleanExportRecord = hasExportRecord && exportMissingAssetCount <= 0;
+    const exportTargetLabel = lastExportResult?.targetLabel ?? lastExportResult?.target ?? "试玩包";
+    const releaseManifest = context.releaseCandidateManifest ?? {};
+    const releaseReadiness = toCount(releaseManifest.readinessPercent);
+    const releaseStatus = String(releaseManifest.status ?? "");
+    const releaseCandidateReady = hasCleanExportRecord && (!releaseStatus || ["ready", "candidate"].includes(releaseStatus));
+
+    const steps = [
+      {
+        step: "第一步",
+        title: "创建项目骨架",
+        done: hasStructure,
+        description: hasStructure
+          ? `现在已经有 ${chapters.length} 个章节、${scenes.length} 个场景，可以直接继续往里写。`
+          : "先建立第一章和第一场景，后续剧情、素材和试玩流程才能继续展开。",
+        statusLabel: hasStructure ? "已完成" : "先开工",
+        statusTone: hasStructure ? "good" : "warn",
+        actions: hasStructure
+          ? [
+              { label: "进入剧情编辑", action: "switch-screen", dataset: { screen: "story" } },
+              { label: "继续看首页", action: "switch-screen", dataset: { screen: "dashboard" } },
+            ]
+          : [
+              { label: "一键创建第一章", action: "create-first-chapter" },
+              { label: "自定义名字再创建", action: "create-first-chapter-custom" },
+            ],
+      },
+      {
+        step: "第二步",
+        title: "写入第一版正文",
+        done: hasStoryContent,
+        description: hasStoryContent
+          ? `已经有 ${scenesWithContent} 个场景写了正文，现在可以继续补氛围和去向。`
+          : "先写出台词、旁白和选项，让试玩流程具备基础推进内容。",
+        statusLabel: hasStoryContent ? "正文已开始" : "待写第一句",
+        statusTone: hasStoryContent ? "good" : hasStructure ? "warn" : "soft",
+        actions: [
+          { label: hasStoryContent ? "继续写剧情" : "去写第一段剧情", action: "switch-screen", dataset: { screen: "story" } },
+          { label: "打开剧情页", action: "switch-screen", dataset: { screen: "story" } },
+        ],
+      },
+      {
+        step: "第三步",
+        title: "补角色、背景和音乐",
+        done: hasStarterKit,
+        description: hasStarterKit
+          ? "角色和基础素材骨架已经有了，后面直接替换成真实立绘、背景和 BGM 就行。"
+          : "补齐第一个角色、第一张背景和第一首 BGM 后，预览会更完整。",
+        statusLabel: hasStarterKit ? "基础素材已就绪" : "待补素材",
+        statusTone: hasStarterKit ? "good" : hasStructure ? "warn" : "soft",
+        actions: hasStarterKit
+          ? [
+              { label: "去角色页继续补", action: "switch-screen", dataset: { screen: "characters" } },
+              { label: "去素材页继续补", action: "switch-screen", dataset: { screen: "assets" } },
+            ]
+          : [
+              { label: "一键生成起步骨架", action: "create-starter-kit" },
+              { label: "自定义名字再生成", action: "create-starter-kit-custom" },
+            ],
+      },
+      {
+        step: "第四步",
+        title: "试玩一次并保存",
+        done: previewProgress,
+        statusLabel: previewProgress ? "已试玩" : previewReady ? "可试玩" : "先修错误",
+        statusTone: previewProgress ? "good" : previewReady ? "warn" : "danger",
+        description: previewProgress
+          ? "当前项目已经留下试玩进度，可以继续检查存档、读档、自动播放和文本历史。"
+          : previewReady
+            ? "当前没有结构错误，先跑一小段试玩并保存一次，能最快发现阅读节奏问题。"
+            : "先清理结构错误后再进入试玩，避免一打开就断线或黑屏。",
+        actions: previewReady
+          ? [
+              { label: "去试玩这版", action: "switch-screen", dataset: { screen: "preview" } },
+              { label: "回剧情页继续补", action: "switch-screen", dataset: { screen: "story" } },
+            ]
+          : [
+              { label: "打开项目巡检", action: "switch-screen", dataset: { screen: "inspection" } },
+              { label: "去剧情页修", action: "switch-screen", dataset: { screen: "story" } },
+            ],
+      },
+      {
+        step: "第五步",
+        title: "跑巡检和回归试玩",
+        done: previewReady && validationWarningCount <= 5 && (hasRegressionRun ? regressionFailCount === 0 : true),
+        statusLabel:
+          validationErrorCount > 0
+            ? "先修错误"
+            : hasRegressionRun
+              ? regressionFailCount > 0
+                ? `回归失败 ${regressionFailCount}`
+                : regressionWarnCount > 0
+                  ? `回归提醒 ${regressionWarnCount}`
+                  : "回归通过"
+              : validationWarningCount > 5
+                ? `提醒 ${validationWarningCount}`
+                : "建议跑回归",
+        statusTone:
+          validationErrorCount > 0 || regressionFailCount > 0
+            ? "danger"
+            : hasRegressionRun && regressionFailCount === 0 && validationWarningCount <= 5
+              ? "good"
+              : "warn",
+        description:
+          validationErrorCount > 0
+            ? `还有 ${validationErrorCount} 项结构错误，先用项目巡检定位。`
+            : hasRegressionRun
+              ? `自动回归试玩已经跑过：失败 ${regressionFailCount} / 提醒 ${regressionWarnCount}。`
+              : "发布前建议跑一次项目巡检和自动回归试玩，确认主要路线不会中途断掉。",
+        actions: [
+          { label: "打开项目巡检", action: "switch-screen", dataset: { screen: "inspection" } },
+          { label: "运行回归试玩", action: "run-preview-regression" },
+        ],
+      },
+      {
+        step: "第六步",
+        title: "导出发布候选版",
+        done: releaseCandidateReady,
+        statusLabel: releaseCandidateReady
+          ? releaseReadiness
+            ? `候选版 ${releaseReadiness}%`
+            : "已导出"
+          : hasExportRecord
+            ? `已导出，缺 ${exportMissingAssetCount} 个素材`
+            : previewReady
+              ? "待导出"
+              : "先修错误",
+        statusTone: releaseCandidateReady ? "good" : hasExportRecord || previewReady ? "warn" : "danger",
+        description: releaseCandidateReady
+          ? `最近已经导出过一版 ${exportTargetLabel}，可以继续整理 Release Candidate Manifest 和人工验收。`
+          : hasExportRecord
+            ? `最近已经导出过一版 ${exportTargetLabel}，但还有 ${exportMissingAssetCount} 个素材没找到；补齐后再导出才更接近可交付。`
+            : previewReady
+              ? "当前可以导出试玩包。导出成功后，再看 RC 清单和发布附件。"
+              : "先清理结构错误后再导出，避免分享出去的包打不开。",
+        actions: releaseCandidateReady
+          ? [
+              { label: "打开 RC 清单", action: "switch-screen", dataset: { screen: "inspection" } },
+              { label: "导出新版本", action: "export-build", dataset: { "export-target": "web" } },
+            ]
+          : hasExportRecord
+            ? [
+                { label: "去素材页补缺口", action: "focus-asset-gap", dataset: { "asset-filter-mode": "urgent_missing" } },
+                { label: "重新导出试玩包", action: "export-build", dataset: { "export-target": "web" } },
+              ]
+            : previewReady
+              ? [
+                  { label: "导出试玩包", action: "export-build", dataset: { "export-target": "web" } },
+                  { label: "打开项目巡检", action: "switch-screen", dataset: { screen: "inspection" } },
+                ]
+              : [
+                  { label: "打开项目巡检", action: "switch-screen", dataset: { screen: "inspection" } },
+                  { label: "去剧情页修", action: "switch-screen", dataset: { screen: "story" } },
+                ],
+      },
+    ];
+
+    return {
+      steps,
+      nextStep: steps.find((item) => !item.done) ?? steps[steps.length - 1],
+      summary: {
+        stepCount: steps.length,
+        completedCount: steps.filter((step) => step.done).length,
+        hasCleanExportRecord,
+        validationErrorCount,
+        validationWarningCount,
+      },
+    };
+  }
+
   function escapeHtml(value) {
     return String(value)
       .replaceAll("&", "&amp;")
@@ -285,7 +487,7 @@
       <div class="panel-heading">
         <div>
           <h2>新手开工顺序</h2>
-          <span class="panel-note">按当前项目进度显示 4 个主要步骤</span>
+          <span class="panel-note">按当前项目进度显示 6 个主要步骤</span>
         </div>
         <span class="badge badge-soft">当前进行项：${escape(nextStep.step)}</span>
       </div>
@@ -498,6 +700,7 @@
     getBeginnerTutorialSummary,
     renderBeginnerTutorialStepList,
     renderBeginnerTutorialContent,
+    buildBeginnerDashboardWorkflow,
     getBeginnerWorkflowStepStatusLabel,
     getBeginnerWorkflowStepToneClass,
     renderBeginnerDashboardWorkflow,

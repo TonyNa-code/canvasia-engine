@@ -51,7 +51,7 @@ The project already includes a visual editor, export pipeline, native runtime pr
 ## Core Features
 
 - Visual story editor with scenes, cards, dialogue, narration, choices, variables, and conditional branches
-- Project center with playable Demo projects, blank projects, beginner mode, and advanced mode
+- Project center with playable Demo projects, blank projects, beginner mode, advanced mode, and a six-stage creator workflow guide from project setup to Release Candidate export
 - Context-aware Command Palette with Cmd/Ctrl+K quick actions for project setup, navigation, recommended next steps, recent commands, story card insertion, a previewed first-playable-scene template, themes, tutorial access, and export flow
 - Production-ready scene recipes for OP hooks, daily dialogue rhythm, affection choices, climax direction, ED / credits, BGM range scoping, and variable-backed branch consequences
 - Plain-text and Ren'Py-style script import that previews `Character: line`, quoted dialogue, narration, choices with `[affection +1; flag=true]` consequences, `scene`, `show`, `hide`, `show ... scale / x / y / opacity / layer / flip`, per-line `speed slow / normal / fast / instant`, standalone variable cues such as `set route = common` and `add affection +1`, `if affection >= 2 -> good else -> normal`, `play / stop music`, `play sound`, `play video`, `wait / pause`, `shake`, `flash`, `zoom`, `pan`, `filter`, `blur`, `particle`, `credits`, `voice`, and `jump` cues as editable story / staging / text-speed / variable / condition / audio / video / timing / camera / atmosphere / route cards

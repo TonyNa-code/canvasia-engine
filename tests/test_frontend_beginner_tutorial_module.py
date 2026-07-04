@@ -68,6 +68,30 @@ class FrontendBeginnerTutorialModuleTests(unittest.TestCase):
                 }},
               ],
             }};
+            const generatedWorkflow = tools.buildBeginnerDashboardWorkflow({{
+              data: {{
+                project: {{ title: "测试项目" }},
+                chapters: [{{ chapterId: "chapter_1", name: "第一章" }}],
+                scenes: [{{ id: "scene_1", blocks: [{{ type: "dialogue", text: "你好" }}] }}],
+              }},
+              starterKitOverview: {{ needsStarterKit: false }},
+              productionOverview: {{ scenesWithContent: 1 }},
+              validation: {{ errors: [], warnings: [] }},
+              previewProgress: true,
+              lastExportResult: {{ targetLabel: "网页试玩包", missingAssets: 0 }},
+              regressionResult: {{ summary: {{ failCount: 0, warnCount: 0 }} }},
+              releaseCandidateManifest: {{ status: "candidate", readinessPercent: 86 }},
+            }});
+            const blockedWorkflow = tools.buildBeginnerDashboardWorkflow({{
+              data: {{
+                project: {{ title: "坏链项目" }},
+                chapters: [{{ chapterId: "chapter_1" }}],
+                scenes: [{{ id: "scene_1", blocks: [{{ type: "dialogue", text: "你好" }}] }}],
+              }},
+              starterKitOverview: {{ needsStarterKit: true }},
+              productionOverview: {{ scenesWithContent: 1 }},
+              validation: {{ errors: [{{ message: "坏链" }}], warnings: [] }},
+            }});
             const workflowMarkup = tools.renderBeginnerDashboardWorkflow(workflow, {{
               renderQuickActionButton: quickRenderer,
             }});
@@ -121,6 +145,8 @@ class FrontendBeginnerTutorialModuleTests(unittest.TestCase):
                 tools.getBeginnerWorkflowStepToneClass(workflow.steps[0]),
                 tools.getBeginnerWorkflowStepToneClass(workflow.steps[1]),
               ],
+              generatedWorkflow,
+              blockedWorkflow,
               workflowMarkup,
               fallbackWorkflowMarkup,
               advancedMarkup,
@@ -136,6 +162,7 @@ class FrontendBeginnerTutorialModuleTests(unittest.TestCase):
         result = json.loads(completed.stdout)
 
         self.assertIn("renderBeginnerDashboardWorkflow", result["keys"])
+        self.assertIn("buildBeginnerDashboardWorkflow", result["keys"])
         self.assertIn("renderBeginnerAdvancedToolsPanel", result["keys"])
         self.assertIn("renderStarterKitPanel", result["keys"])
         self.assertIn("renderBlankProjectStarterPanel", result["keys"])
@@ -158,7 +185,14 @@ class FrontendBeginnerTutorialModuleTests(unittest.TestCase):
         self.assertTrue(result["contentHasAction"])
         self.assertEqual(result["workflowStatus"], ["当前已完成", "等待处理"])
         self.assertEqual(result["workflowTone"], ["good-text", "danger-text"])
+        self.assertEqual(result["generatedWorkflow"]["summary"]["stepCount"], 6)
+        self.assertEqual(result["generatedWorkflow"]["summary"]["completedCount"], 6)
+        self.assertEqual(result["generatedWorkflow"]["steps"][3]["title"], "试玩一次并保存")
+        self.assertEqual(result["generatedWorkflow"]["steps"][5]["statusLabel"], "候选版 86%")
+        self.assertEqual(result["blockedWorkflow"]["nextStep"]["step"], "第三步")
+        self.assertEqual(result["blockedWorkflow"]["steps"][3]["statusLabel"], "先修错误")
         self.assertIn("新手开工顺序", result["workflowMarkup"])
+        self.assertIn("按当前项目进度显示 6 个主要步骤", result["workflowMarkup"])
         self.assertIn("写第一段 &lt;正文&gt;", result["workflowMarkup"])
         self.assertIn("先写一句 &amp; 试玩", result["workflowMarkup"])
         self.assertIn('data-action="switch-screen"', result["workflowMarkup"])
