@@ -30,6 +30,11 @@ from urllib.request import Request, urlopen
 
 from editor_local_security import is_local_editor_host, is_local_editor_origin
 from editor_snapshot_cache import SnapshotCache, build_file_cache_signature
+from export_unlockable_manifest import (
+    UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME,
+    build_export_unlockable_content_manifest,
+    write_unlockable_content_manifest_file,
+)
 from openai_asset_generation import (
     call_openai_asset_generation_model,
     normalize_openai_asset_generation_type,
@@ -5946,6 +5951,7 @@ def build_export_payload(bundle: dict, assets_doc: dict, copied_assets: int, mis
     project = bundle["project"]
     default_language = normalize_language_code(project.get("language"), DEFAULT_PROJECT_LANGUAGE)
     supported_languages = normalize_supported_languages(project.get("supportedLanguages"), default_language)
+    unlockable_manifest = build_export_unlockable_content_manifest(bundle, assets_doc)
     return {
         "project": project,
         "i18n": {
@@ -5967,6 +5973,7 @@ def build_export_payload(bundle: dict, assets_doc: dict, copied_assets: int, mis
             "copiedAssets": copied_assets,
             "missingAssets": missing_assets,
             "engineSignature": dict(EXPORT_ENGINE_SIGNATURE),
+            "unlockableContentManifest": unlockable_manifest,
             "protection": {
                 "profile": EXPORT_PROTECTION_PROFILE,
                 "level": "light",
@@ -8621,6 +8628,9 @@ def write_export_app_files(build_dir: Path, export_payload: dict) -> None:
     shutil.copy2(EXPORT_TEMPLATE_DIR / "player.css", build_dir / "player.css")
     for script_name in EXPORT_PLAYER_SCRIPT_FILES:
         shutil.copy2(EXPORT_TEMPLATE_DIR / script_name, build_dir / script_name)
+    unlockable_manifest = (export_payload.get("buildInfo") or {}).get("unlockableContentManifest")
+    if isinstance(unlockable_manifest, dict):
+        write_unlockable_content_manifest_file(build_dir, unlockable_manifest)
 
 
 def format_export_digest_number(value: object) -> str:
@@ -9007,6 +9017,11 @@ def build_native_runtime_release_control_markdown(payload: dict) -> str:
 def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
     game_data_path = build_dir / "game_data.json"
     game_data_path.write_text(json.dumps(export_payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    unlockable_manifest = (export_payload.get("buildInfo") or {}).get("unlockableContentManifest")
+    unlockable_manifest_path = write_unlockable_content_manifest_file(
+        build_dir,
+        unlockable_manifest if isinstance(unlockable_manifest, dict) else {},
+    )
 
     shutil.copy2(NATIVE_RUNTIME_PLAYER_SOURCE, build_dir / NATIVE_RUNTIME_PLAYER_NAME)
     shutil.copy2(NATIVE_RUNTIME_README_SOURCE, build_dir / NATIVE_RUNTIME_README_NAME)
@@ -9621,6 +9636,8 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
     return {
         "gameDataName": game_data_path.name,
         "gameDataPath": str(game_data_path),
+        "unlockableContentManifestName": unlockable_manifest_path.name,
+        "unlockableContentManifestPath": str(unlockable_manifest_path),
         "playerName": NATIVE_RUNTIME_PLAYER_NAME,
         "playerPath": str(build_dir / NATIVE_RUNTIME_PLAYER_NAME),
         "readmeName": NATIVE_RUNTIME_README_NAME,
@@ -10256,6 +10273,7 @@ def export_native_runtime_build() -> dict:
         missing_assets=missing_assets,
         extra_files={
             "gameData": runtime_files["gameDataName"],
+            "unlockableContentManifest": runtime_files["unlockableContentManifestName"],
             "playerScript": runtime_files["playerName"],
             "readme": runtime_files["readmeName"],
             "requirements": runtime_files["requirementsName"],
@@ -10303,6 +10321,7 @@ def export_native_runtime_build() -> dict:
             "optionalVideoRequirements": runtime_files["videoRequirementsName"],
             "canBuildStandaloneApp": True,
             "appBuilder": runtime_files["appBuilderName"],
+            "unlockableContentManifest": runtime_files["unlockableContentManifestName"],
             "releaseCheck": runtime_files["releaseCheckName"],
             "releaseCandidateReport": runtime_files["releaseCandidateReportName"],
             "releaseControlReport": runtime_files["releaseControlReportName"],
@@ -10347,6 +10366,7 @@ def export_native_runtime_build() -> dict:
     archive_verifiers = write_export_archive_verifier_scripts(archive_path, archive_checksum["archiveSha256"])
     internal_reports = [
         {"name": manifest_path.name, "description": "导出清单，记录目标、版本、素材缺口和 Runtime 信息。"},
+        {"name": runtime_files["unlockableContentManifestName"], "description": "可解锁内容清单 JSON，记录图鉴、回想、成就和结局覆盖。"},
         {"name": runtime_files["releaseCheckName"], "description": "发布前自检 JSON。"},
         {"name": runtime_files["releaseCandidateReportName"], "description": "原生 Runtime 发布候选总报告。"},
         {"name": runtime_files["releaseControlReportName"], "description": "人工验收用发布总控 Markdown。"},
@@ -10423,6 +10443,9 @@ def export_native_runtime_build() -> dict:
         "manifestPublicUrl": f"/exports/{build_dir.name}/{manifest_path.name}",
         "gameDataPath": runtime_files["gameDataPath"],
         "gameDataPublicUrl": f"/exports/{build_dir.name}/{runtime_files['gameDataName']}",
+        "unlockableContentManifestName": runtime_files["unlockableContentManifestName"],
+        "unlockableContentManifestPath": runtime_files["unlockableContentManifestPath"],
+        "unlockableContentManifestPublicUrl": f"/exports/{build_dir.name}/{runtime_files['unlockableContentManifestName']}",
         "playerScriptPath": runtime_files["playerPath"],
         "playerScriptName": runtime_files["playerName"],
         "playerScriptPublicUrl": f"/exports/{build_dir.name}/{runtime_files['playerName']}",
@@ -10592,6 +10615,7 @@ def export_web_build() -> dict:
             "playerRuntimeControls": "runtime_controls.js",
             "playerRuntimeSettings": "runtime_settings.js",
             "playerRuntimeAudio": "runtime_audio.js",
+            "unlockableContentManifest": UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME,
             "iconPng": icon_files["pngFileName"],
             "iconIco": icon_files["icoFileName"],
             "launchSplash": splash_file["fileName"],
@@ -10610,6 +10634,8 @@ def export_web_build() -> dict:
         "publicIndexUrl": f"/exports/{build_dir.name}/index.html",
         "manifestPath": str(manifest_path),
         "manifestPublicUrl": f"/exports/{build_dir.name}/{manifest_path.name}",
+        "unlockableContentManifestPath": str(build_dir / UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME),
+        "unlockableContentManifestPublicUrl": f"/exports/{build_dir.name}/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
         "provenanceName": provenance_file["provenanceName"],
         "provenancePath": provenance_file["provenancePath"],
         "provenancePublicUrl": f"/exports/{build_dir.name}/{provenance_file['provenanceName']}",
@@ -11350,6 +11376,7 @@ def export_windows_nwjs_build() -> dict:
             "appRuntimeControls": "app/runtime_controls.js",
             "appRuntimeSettings": "app/runtime_settings.js",
             "appRuntimeAudio": "app/runtime_audio.js",
+            "unlockableContentManifest": f"app/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
             "appPackage": "app/package.json",
             "iconPng": root_icon_files["pngFileName"],
             "iconIco": root_icon_files["icoFileName"],
@@ -11510,6 +11537,7 @@ def export_macos_nwjs_build() -> dict:
             "appRuntimeControls": "app/runtime_controls.js",
             "appRuntimeSettings": "app/runtime_settings.js",
             "appRuntimeAudio": "app/runtime_audio.js",
+            "unlockableContentManifest": f"app/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
             "appPackage": "app/package.json",
             "iconPng": root_icon_files["pngFileName"],
             "iconIco": root_icon_files["icoFileName"],
@@ -11681,6 +11709,7 @@ def export_linux_nwjs_build() -> dict:
             "appRuntimeControls": "app/runtime_controls.js",
             "appRuntimeSettings": "app/runtime_settings.js",
             "appRuntimeAudio": "app/runtime_audio.js",
+            "unlockableContentManifest": f"app/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
             "appPackage": "app/package.json",
             "iconPng": root_icon_files["pngFileName"],
             "iconIco": root_icon_files["icoFileName"],

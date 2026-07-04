@@ -110,6 +110,7 @@ The project already includes a visual editor, export pipeline, native runtime pr
 - [`run_editor.py`](run_editor.py): local editor server, project management, export pipeline, and packaging entry point
 - [`editor_local_security.py`](editor_local_security.py): loopback-only API request guard helpers
 - [`editor_snapshot_cache.py`](editor_snapshot_cache.py): reusable file-signature snapshot cache for read-heavy editor payloads
+- [`export_unlockable_manifest.py`](export_unlockable_manifest.py): export-side unlockable / gallery / replay coverage manifest builder
 - [`prototype_editor`](prototype_editor): visual editor frontend
 - [`prototype_editor/modules`](prototype_editor/modules): frontend pure-logic modules for route analysis, story templates, editor helpers, assistant workflows, release checks, and other testable editor capabilities
 - [`export_player_template`](export_player_template): exported Web Runtime template
@@ -203,6 +204,8 @@ Open a project and go to the preview/export area to generate:
 - Native Runtime package preview with standalone-app build scaffolding
 
 The Web playable package is the easiest option for quick sharing. The native Runtime package is the route for testing a more app-like desktop playback flow.
+
+Every playable export also includes `unlockable_content_manifest.json`, a machine-readable coverage snapshot for CG galleries, music rooms, voice replay, archive pages, achievements, chapter replay, and endings. This gives creators and testers one stable file to check when confirming whether replay / extras content made it into the exported game.
 
 ## Release Packages
 

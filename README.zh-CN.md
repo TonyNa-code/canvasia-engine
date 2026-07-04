@@ -108,6 +108,9 @@ Canvasia Engine 当前更适合这样理解：
 - [`run_editor.py`](run_editor.py)
   本地编辑器服务、导出链、项目管理、打包链的主入口
 
+- [`export_unlockable_manifest.py`](export_unlockable_manifest.py)
+  导出包侧可解锁内容、图鉴、回想、结局和成就覆盖清单生成器
+
 - [`prototype_editor`](prototype_editor)
   编辑器前端
 
@@ -232,6 +235,8 @@ python run_editor.py
 - `Windows / macOS / Linux 桌面包`：当前主要基于 NW.js 桌面 Runtime。
 - `原生 Runtime 包`：Preview 路线，已覆盖标题页主菜单、基础剧情主链、正式存档/读档、系统菜单设置项、语言切换、文本历史、自动播放、已读快进、项目字体、玩家档案/自动续玩、基础粒子与镜头演出、3D 资产结构 / 依赖清单、可选 PyAV/FFmpeg 音画同步内嵌视频播放、OpenCV 画面兜底、系统播放器桥接兜底、第一批资料馆，以及随包生成的发布候选总报告、发布总控报告与三系统验收清单。
 - `手机端 Runtime`：实验规划阶段，当前重点是触控、音频策略和界面适配验证。
+
+所有可试玩 / 可运行导出包都会随包生成 `unlockable_content_manifest.json`。这个 JSON 会记录 CG 图鉴、音乐回想、语音回听、角色 / 地点 / 旁白 / 关系图鉴、章节回放、结局收集和成就覆盖情况，方便创作者或测试员确认 EXTRA / 回想内容有没有真的进入成品包。
 
 ### 原生 Runtime 发布体检
 
