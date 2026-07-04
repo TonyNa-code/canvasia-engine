@@ -46,6 +46,7 @@ class FrontendStoryBlockCatalogModuleTests(unittest.TestCase):
                 effects: tools.getEffectBlockTypes(),
                 runtimeVisualEffects: tools.getRuntimeVisualEffectBlockTypes(),
                 storyContent: tools.getStoryContentBlockTypes(),
+                localizable: tools.getLocalizableBlockTypes(),
               }},
               runtimeRows: tools.getRuntimeCapabilityRows(),
               safeModes: [
@@ -116,6 +117,8 @@ class FrontendStoryBlockCatalogModuleTests(unittest.TestCase):
         self.assertIn("particle_effect", payload["tagTypes"]["effects"])
         self.assertIn("screen_fade", payload["tagTypes"]["runtimeVisualEffects"])
         self.assertIn("wait", payload["tagTypes"]["storyContent"])
+        self.assertIn("choice", payload["tagTypes"]["localizable"])
+        self.assertIn("credits_roll", payload["tagTypes"]["localizable"])
         self.assertGreaterEqual(len(payload["runtimeRows"]), 20)
         self.assertTrue(any(row["type"] == "wait" and row["nativeStatus"] == "full" for row in payload["runtimeRows"]))
         self.assertEqual(payload["safeModes"], ["scene_end", "until_next_music", "until_next_music"])

@@ -1,4 +1,6 @@
 (function attachLocalizationCoverageTools(global) {
+  const storyBlockCatalogTools = global.CanvasiaEditorStoryBlockCatalog || {};
+
   const DEFAULT_LANGUAGE = "zh-CN";
 
   const LANGUAGE_LABELS = Object.freeze({
@@ -9,12 +11,36 @@
     "ko-KR": "한국어",
   });
 
-  const BLOCK_LABELS = Object.freeze({
+  const FALLBACK_BLOCK_LABELS = Object.freeze({
     dialogue: "台词",
     narration: "旁白",
     choice: "选项",
     video_play: "视频标题",
     credits_roll: "片尾字幕",
+  });
+
+  const BLOCK_LABEL_OVERRIDES = Object.freeze({
+    video_play: "视频标题",
+  });
+
+  const LOCALIZABLE_BLOCK_TYPES = Object.freeze(
+    typeof storyBlockCatalogTools.getLocalizableBlockTypes === "function"
+      ? storyBlockCatalogTools.getLocalizableBlockTypes()
+      : Object.keys(FALLBACK_BLOCK_LABELS)
+  );
+
+  const LOCALIZABLE_TEXT_BLOCK_TYPES = Object.freeze(
+    LOCALIZABLE_BLOCK_TYPES.filter((type) => type === "dialogue" || type === "narration")
+  );
+
+  const LOCALIZABLE_TITLE_BLOCK_TYPES = Object.freeze(
+    LOCALIZABLE_BLOCK_TYPES.filter((type) => type === "video_play" || type === "credits_roll")
+  );
+
+  const BLOCK_LABELS = Object.freeze({
+    ...FALLBACK_BLOCK_LABELS,
+    ...(storyBlockCatalogTools.BLOCK_LABELS ?? {}),
+    ...BLOCK_LABEL_OVERRIDES,
   });
 
   function toArray(value) {
@@ -249,10 +275,10 @@
       locationLabel: blockLabel,
     };
 
-    if (["dialogue", "narration"].includes(block.type)) {
+    if (LOCALIZABLE_TEXT_BLOCK_TYPES.includes(block.type)) {
       addCoverageEntries(entries, block, { ...baseDescriptor, key: "text" }, context);
     }
-    if (block.type === "video_play" || block.type === "credits_roll") {
+    if (LOCALIZABLE_TITLE_BLOCK_TYPES.includes(block.type)) {
       addCoverageEntries(entries, block, { ...baseDescriptor, key: "title" }, context);
       if (cleanText(block.text) || Object.keys(getTranslationMap(block, "text")).length) {
         addCoverageEntries(entries, block, { ...baseDescriptor, key: "text" }, context);
@@ -890,6 +916,9 @@
   }
 
   global.CanvasiaEditorLocalizationCoverage = Object.freeze({
+    LOCALIZABLE_BLOCK_TYPES,
+    LOCALIZABLE_TEXT_BLOCK_TYPES,
+    LOCALIZABLE_TITLE_BLOCK_TYPES,
     getSupportedLanguages,
     getLanguageLabel,
     buildLocalizationCoverage,

@@ -1,7 +1,9 @@
 (function attachRouteAnalyzerTools(global) {
   "use strict";
 
-  const DEFAULT_EFFECT_BLOCK_TYPES = Object.freeze([
+  const storyBlockCatalogTools = global.CanvasiaEditorStoryBlockCatalog || {};
+
+  const FALLBACK_EFFECT_BLOCK_TYPES = Object.freeze([
     "particle_effect",
     "wait",
     "screen_shake",
@@ -12,6 +14,12 @@
     "screen_filter",
     "depth_blur",
   ]);
+
+  const DEFAULT_EFFECT_BLOCK_TYPES = Object.freeze(
+    typeof storyBlockCatalogTools.getEffectBlockTypes === "function"
+      ? storyBlockCatalogTools.getEffectBlockTypes()
+      : FALLBACK_EFFECT_BLOCK_TYPES
+  );
   const CHOICE_CONTINUE_TARGET = "__continue__";
 
   function isChoiceContinueTarget(value) {
@@ -617,6 +625,7 @@
 
   global.CanvasiaEditorRouteAnalyzer = Object.freeze({
     DEFAULT_EFFECT_BLOCK_TYPES,
+    FALLBACK_EFFECT_BLOCK_TYPES,
     buildRouteValidationSceneIndex,
     buildRouteSceneProduction,
     buildRouteChapterProduction,

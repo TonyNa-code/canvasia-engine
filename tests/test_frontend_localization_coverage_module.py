@@ -8,6 +8,7 @@ from pathlib import Path
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
+CATALOG_MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "story_block_catalog.js"
 MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "localization_coverage.js"
 
 
@@ -20,7 +21,9 @@ class FrontendLocalizationCoverageModuleTests(unittest.TestCase):
             const context = {{ window: {{}} }};
             context.globalThis = context;
             vm.createContext(context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(CATALOG_MODULE_PATH))}, "utf8"), context);
             vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
+            const catalogTools = context.window.CanvasiaEditorStoryBlockCatalog;
             const tools = context.window.CanvasiaEditorLocalizationCoverage;
             const data = {{
               project: {{
@@ -95,6 +98,8 @@ class FrontendLocalizationCoverageModuleTests(unittest.TestCase):
               markdown,
               csv,
               importPlan,
+              localizableBlockTypes: tools.LOCALIZABLE_BLOCK_TYPES,
+              catalogLocalizableBlockTypes: catalogTools.getLocalizableBlockTypes(),
             }}));
             """
         )
@@ -112,6 +117,9 @@ class FrontendLocalizationCoverageModuleTests(unittest.TestCase):
         self.assertIn("buildLocalizationCoverageMarkdown", payload["keys"])
         self.assertIn("buildLocalizationCoverageCsv", payload["keys"])
         self.assertIn("buildLocalizationImportPlan", payload["keys"])
+        self.assertEqual(payload["localizableBlockTypes"], payload["catalogLocalizableBlockTypes"])
+        self.assertIn("video_play", payload["localizableBlockTypes"])
+        self.assertIn("credits_roll", payload["localizableBlockTypes"])
         self.assertEqual(payload["coverage"]["defaultLanguage"], "zh-CN")
         self.assertEqual(payload["coverage"]["summary"]["targetLanguageCount"], 2)
         self.assertEqual(payload["coverage"]["summary"]["sourceTextCount"], 7)

@@ -8,6 +8,7 @@ from pathlib import Path
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
+CATALOG_MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "story_block_catalog.js"
 MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "route_analyzer.js"
 
 
@@ -20,7 +21,9 @@ class FrontendRouteAnalyzerModuleTests(unittest.TestCase):
             const context = {{ window: {{}} }};
             context.globalThis = context;
             vm.createContext(context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(CATALOG_MODULE_PATH))}, "utf8"), context);
             vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
+            const catalogTools = context.window.CanvasiaEditorStoryBlockCatalog;
             const tools = context.window.CanvasiaEditorRouteAnalyzer;
             const start = {{
               id: "scene_start",
@@ -104,6 +107,8 @@ class FrontendRouteAnalyzerModuleTests(unittest.TestCase):
               routeTestingPlan: overview.routeTestingPlan,
               chapterProduction: overview.chapters[0].production,
               routeKinds,
+              defaultEffectBlockTypes: tools.DEFAULT_EFFECT_BLOCK_TYPES,
+              catalogEffectBlockTypes: catalogTools.getEffectBlockTypes(),
             }}));
             """
         )
@@ -118,6 +123,9 @@ class FrontendRouteAnalyzerModuleTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 0, completed.stderr)
         payload = json.loads(completed.stdout)
         self.assertIn("buildSceneRouteOverview", payload["keys"])
+        self.assertEqual(payload["defaultEffectBlockTypes"], payload["catalogEffectBlockTypes"])
+        self.assertIn("wait", payload["defaultEffectBlockTypes"])
+        self.assertIn("screen_flash", payload["defaultEffectBlockTypes"])
         self.assertEqual(payload["metrics"]["entrySceneName"], "Start")
         self.assertEqual(payload["metrics"]["brokenRoutes"], 2)
         self.assertEqual(payload["metrics"]["branchingScenes"], 1)

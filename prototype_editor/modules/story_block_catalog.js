@@ -315,6 +315,10 @@
     return getBlockTypesByTag("storyContent");
   }
 
+  function getLocalizableBlockTypes() {
+    return getBlockTypesByTag("localizable");
+  }
+
   const MUSIC_END_MODE_LABELS = Object.freeze({
     until_next_music: "播到下一首或停止卡",
     scene_end: "播完整个场景",
@@ -451,6 +455,7 @@
     getTimelineAudioBeatBlockTypes,
     getEffectBlockTypes,
     getStoryContentBlockTypes,
+    getLocalizableBlockTypes,
     getBlockLabel,
     getCompactBlockLabel,
     getSafeMusicEndMode,
