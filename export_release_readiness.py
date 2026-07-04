@@ -69,16 +69,25 @@ def get_story_route_summary(story_route_map: dict | None) -> dict:
     return summary if isinstance(summary, dict) else {}
 
 
+def get_localization_summary(localization_audit: dict | None) -> dict:
+    if not isinstance(localization_audit, dict):
+        return {}
+    summary = localization_audit.get("summary")
+    return summary if isinstance(summary, dict) else {}
+
+
 def build_release_readiness_issues(
     manifest: dict,
     unlockable_manifest: dict | None,
     missing_assets: list[dict],
     story_route_map: dict | None = None,
+    localization_audit: dict | None = None,
 ) -> list[dict]:
     project = get_manifest_project(manifest)
     runtime = get_manifest_runtime(manifest)
     unlockable_summary = get_unlockable_summary(unlockable_manifest)
     story_route_summary = get_story_route_summary(story_route_map)
+    localization_summary = get_localization_summary(localization_audit)
     issues: list[dict] = []
 
     scene_count = as_int(project.get("sceneCount"))
@@ -193,6 +202,20 @@ def build_release_readiness_issues(
             )
         )
 
+    language_count = as_int(localization_summary.get("languageCount"), 1)
+    missing_translation_count = as_int(localization_summary.get("missingTranslationCount"))
+    if language_count > 1 and missing_translation_count:
+        completion_percent = as_int(localization_summary.get("completionPercent"))
+        issues.append(
+            make_readiness_issue(
+                "warning",
+                "localization_missing_translations",
+                "多语言翻译不完整",
+                f"本地化报告记录到 {missing_translation_count} 条缺失译文，当前覆盖率约 {completion_percent}%。",
+                "打开 localization_audit.md，优先补齐主线正文、选项和角色名。",
+            )
+        )
+
     return issues
 
 
@@ -201,11 +224,13 @@ def calculate_release_readiness_score(
     manifest: dict,
     unlockable_manifest: dict | None,
     story_route_map: dict | None = None,
+    localization_audit: dict | None = None,
 ) -> int:
     project = get_manifest_project(manifest)
     assets = get_manifest_assets(manifest)
     unlockable_summary = get_unlockable_summary(unlockable_manifest)
     story_route_summary = get_story_route_summary(story_route_map)
+    localization_summary = get_localization_summary(localization_audit)
     score = 100
     score -= 34 * sum(1 for issue in issues if issue.get("severity") == "blocker")
     score -= 9 * sum(1 for issue in issues if issue.get("severity") == "warning")
@@ -219,6 +244,10 @@ def calculate_release_readiness_score(
     unreachable_scene_count = as_int(story_route_summary.get("unreachableSceneCount"))
     if unreachable_scene_count:
         score -= min(12, unreachable_scene_count * 3)
+    language_count = as_int(localization_summary.get("languageCount"), 1)
+    localization_completion = as_int(localization_summary.get("completionPercent"), 100)
+    if language_count > 1 and localization_completion < 100:
+        score -= min(12, max(2, round((100 - localization_completion) / 7)))
     return clamp_score(score)
 
 
@@ -251,16 +280,30 @@ def build_export_release_readiness_summary(
     missing_assets: list[dict] | None = None,
     unlockable_manifest: dict | None = None,
     story_route_map: dict | None = None,
+    localization_audit: dict | None = None,
     report_files: list[str] | None = None,
     platform_notes: list[str] | None = None,
 ) -> dict:
     missing_assets = missing_assets or []
-    issues = build_release_readiness_issues(manifest, unlockable_manifest, missing_assets, story_route_map)
-    score = calculate_release_readiness_score(issues, manifest, unlockable_manifest, story_route_map)
+    issues = build_release_readiness_issues(
+        manifest,
+        unlockable_manifest,
+        missing_assets,
+        story_route_map,
+        localization_audit,
+    )
+    score = calculate_release_readiness_score(
+        issues,
+        manifest,
+        unlockable_manifest,
+        story_route_map,
+        localization_audit,
+    )
     gate = get_release_readiness_gate(score, issues)
     manifest_project = get_manifest_project(manifest)
     manifest_assets = get_manifest_assets(manifest)
     unlockable_summary = get_unlockable_summary(unlockable_manifest)
+    localization_summary = get_localization_summary(localization_audit)
 
     return {
         "formatVersion": 1,
@@ -294,6 +337,9 @@ def build_export_release_readiness_summary(
             "routeCount": as_int(get_story_route_summary(story_route_map).get("routeCount")),
             "brokenRoutes": as_int(get_story_route_summary(story_route_map).get("brokenRouteCount")),
             "unreachableScenes": as_int(get_story_route_summary(story_route_map).get("unreachableSceneCount")),
+            "localizationCompletionPercent": as_int(localization_summary.get("completionPercent"), 100),
+            "missingTranslations": as_int(localization_summary.get("missingTranslationCount")),
+            "localizationLanguageCount": as_int(localization_summary.get("languageCount"), 1),
         },
         "issues": issues,
         "reportFiles": [clean_release_text(item) for item in (report_files or []) if clean_release_text(item)],
@@ -350,6 +396,8 @@ def build_export_release_readiness_markdown(summary: dict) -> str:
         f"| 缺失素材 | {markdown_cell(metrics.get('missingAssets'))} |",
         f"| 可解锁内容就绪度 | {markdown_cell(metrics.get('unlockableReadinessPercent'))}% |",
         f"| 可达结局 | {markdown_cell(metrics.get('reachableEndings'))}/{markdown_cell(metrics.get('totalEndings'))} |",
+        f"| 本地化覆盖率 | {markdown_cell(metrics.get('localizationCompletionPercent'))}% |",
+        f"| 缺失译文 | {markdown_cell(metrics.get('missingTranslations'))} |",
         "",
         "## 优先处理",
         "",
@@ -389,6 +437,7 @@ def write_export_release_readiness_files(
     missing_assets: list[dict] | None = None,
     unlockable_manifest: dict | None = None,
     story_route_map: dict | None = None,
+    localization_audit: dict | None = None,
     report_files: list[str] | None = None,
     platform_notes: list[str] | None = None,
 ) -> dict:
@@ -398,6 +447,7 @@ def write_export_release_readiness_files(
         missing_assets=missing_assets,
         unlockable_manifest=unlockable_manifest,
         story_route_map=story_route_map,
+        localization_audit=localization_audit,
         report_files=report_files,
         platform_notes=platform_notes,
     )

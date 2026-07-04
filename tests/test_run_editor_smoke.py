@@ -392,6 +392,18 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertIn("## 路线明细", report)
         return payload
 
+    def assert_export_localization_audit_files(self, audit_path: Path, report_path: Path) -> dict:
+        self.assertTrue(audit_path.is_file())
+        self.assertTrue(report_path.is_file())
+        payload = json.loads(audit_path.read_text(encoding="utf-8"))
+        report = report_path.read_text(encoding="utf-8")
+        self.assertEqual(payload["formatVersion"], 1)
+        self.assertIn(payload["summary"]["status"], {"ready", "needs_translation", "single_language"})
+        self.assertIn("completionPercent", payload["summary"])
+        self.assertIn("# 本地化覆盖随包报告", report)
+        self.assertIn("## 核心指标", report)
+        return payload
+
     def read_export_index_game_data(self, index_path: Path) -> dict:
         index_html = index_path.read_text(encoding="utf-8")
         prefix = "window.LIGHTWHISPER_GAME_DATA = "
@@ -2694,6 +2706,11 @@ class RunEditorSmokeTests(unittest.TestCase):
             build_dir / run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
         )
         self.assertNotEqual(route_map_payload["summary"]["status"], "blocked")
+        localization_payload = self.assert_export_localization_audit_files(
+            build_dir / run_editor.EXPORT_LOCALIZATION_AUDIT_JSON_NAME,
+            build_dir / run_editor.EXPORT_LOCALIZATION_AUDIT_REPORT_NAME,
+        )
+        self.assertIn(localization_payload["summary"]["status"], {"ready", "needs_translation", "single_language"})
         readiness_payload = self.assert_export_release_readiness_files(
             build_dir / run_editor.EXPORT_RELEASE_READINESS_JSON_NAME,
             build_dir / run_editor.EXPORT_RELEASE_READINESS_REPORT_NAME,
@@ -2722,6 +2739,8 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["playtestGuide"], run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME)
         self.assertEqual(manifest["files"]["storyRouteMap"], run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME)
         self.assertEqual(manifest["files"]["storyRouteMapReport"], run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME)
+        self.assertEqual(manifest["files"]["localizationAudit"], run_editor.EXPORT_LOCALIZATION_AUDIT_JSON_NAME)
+        self.assertEqual(manifest["files"]["localizationAuditReport"], run_editor.EXPORT_LOCALIZATION_AUDIT_REPORT_NAME)
         self.assertEqual(manifest["files"]["releaseReadinessSummary"], run_editor.EXPORT_RELEASE_READINESS_JSON_NAME)
         self.assertEqual(manifest["files"]["releaseReadinessReport"], run_editor.EXPORT_RELEASE_READINESS_REPORT_NAME)
         self.assertEqual(manifest["files"]["unlockableContentManifest"], run_editor.UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME)
@@ -2734,6 +2753,8 @@ class RunEditorSmokeTests(unittest.TestCase):
                 run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME,
                 run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME,
                 run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
+                run_editor.EXPORT_LOCALIZATION_AUDIT_JSON_NAME,
+                run_editor.EXPORT_LOCALIZATION_AUDIT_REPORT_NAME,
                 run_editor.EXPORT_RELEASE_READINESS_JSON_NAME,
                 run_editor.EXPORT_RELEASE_READINESS_REPORT_NAME,
                 run_editor.UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME,
@@ -3055,6 +3076,11 @@ class RunEditorSmokeTests(unittest.TestCase):
             build_dir / run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
         )
         self.assertNotEqual(route_map_payload["summary"]["status"], "blocked")
+        localization_payload = self.assert_export_localization_audit_files(
+            build_dir / run_editor.EXPORT_LOCALIZATION_AUDIT_JSON_NAME,
+            build_dir / run_editor.EXPORT_LOCALIZATION_AUDIT_REPORT_NAME,
+        )
+        self.assertIn(localization_payload["summary"]["status"], {"ready", "needs_translation", "single_language"})
         readiness_payload = self.assert_export_release_readiness_files(
             build_dir / run_editor.EXPORT_RELEASE_READINESS_JSON_NAME,
             build_dir / run_editor.EXPORT_RELEASE_READINESS_REPORT_NAME,
@@ -3109,6 +3135,12 @@ class RunEditorSmokeTests(unittest.TestCase):
         )
         self.assertTrue(
             any(
+                item["name"] == export_result["localizationAuditReportName"]
+                for item in release_artifact_payload["insideArchiveReports"]
+            )
+        )
+        self.assertTrue(
+            any(
                 item["name"] == export_result["releaseReadinessReportName"]
                 for item in release_artifact_payload["insideArchiveReports"]
             )
@@ -3148,6 +3180,8 @@ class RunEditorSmokeTests(unittest.TestCase):
                 run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME,
                 run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME,
                 run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
+                run_editor.EXPORT_LOCALIZATION_AUDIT_JSON_NAME,
+                run_editor.EXPORT_LOCALIZATION_AUDIT_REPORT_NAME,
                 run_editor.EXPORT_RELEASE_READINESS_JSON_NAME,
                 run_editor.EXPORT_RELEASE_READINESS_REPORT_NAME,
                 run_editor.UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME,
@@ -3158,6 +3192,8 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["playtestGuide"], run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME)
         self.assertEqual(manifest["files"]["storyRouteMap"], run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME)
         self.assertEqual(manifest["files"]["storyRouteMapReport"], run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME)
+        self.assertEqual(manifest["files"]["localizationAudit"], run_editor.EXPORT_LOCALIZATION_AUDIT_JSON_NAME)
+        self.assertEqual(manifest["files"]["localizationAuditReport"], run_editor.EXPORT_LOCALIZATION_AUDIT_REPORT_NAME)
         self.assertEqual(manifest["files"]["releaseReadinessSummary"], run_editor.EXPORT_RELEASE_READINESS_JSON_NAME)
         self.assertEqual(manifest["files"]["releaseReadinessReport"], run_editor.EXPORT_RELEASE_READINESS_REPORT_NAME)
         self.assertEqual(manifest["files"]["unlockableContentManifest"], run_editor.UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME)
@@ -3167,6 +3203,8 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["runtime"]["playtestGuide"], run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME)
         self.assertEqual(manifest["runtime"]["storyRouteMap"], run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME)
         self.assertEqual(manifest["runtime"]["storyRouteMapReport"], run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME)
+        self.assertEqual(manifest["runtime"]["localizationAudit"], run_editor.EXPORT_LOCALIZATION_AUDIT_JSON_NAME)
+        self.assertEqual(manifest["runtime"]["localizationAuditReport"], run_editor.EXPORT_LOCALIZATION_AUDIT_REPORT_NAME)
         self.assertEqual(manifest["runtime"]["releaseReadinessSummary"], run_editor.EXPORT_RELEASE_READINESS_JSON_NAME)
         self.assertEqual(manifest["runtime"]["releaseReadinessReport"], run_editor.EXPORT_RELEASE_READINESS_REPORT_NAME)
         self.assertEqual(manifest["runtime"]["unlockableContentManifest"], run_editor.UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME)
@@ -3693,6 +3731,11 @@ class RunEditorSmokeTests(unittest.TestCase):
             build_dir / run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
         )
         self.assertNotEqual(route_map_payload["summary"]["status"], "blocked")
+        localization_payload = self.assert_export_localization_audit_files(
+            build_dir / run_editor.EXPORT_LOCALIZATION_AUDIT_JSON_NAME,
+            build_dir / run_editor.EXPORT_LOCALIZATION_AUDIT_REPORT_NAME,
+        )
+        self.assertIn(localization_payload["summary"]["status"], {"ready", "needs_translation", "single_language"})
         readiness_payload = self.assert_export_release_readiness_files(
             build_dir / run_editor.EXPORT_RELEASE_READINESS_JSON_NAME,
             build_dir / run_editor.EXPORT_RELEASE_READINESS_REPORT_NAME,
@@ -3708,6 +3751,8 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["playtestGuide"], run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME)
         self.assertEqual(manifest["files"]["storyRouteMap"], run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME)
         self.assertEqual(manifest["files"]["storyRouteMapReport"], run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME)
+        self.assertEqual(manifest["files"]["localizationAudit"], run_editor.EXPORT_LOCALIZATION_AUDIT_JSON_NAME)
+        self.assertEqual(manifest["files"]["localizationAuditReport"], run_editor.EXPORT_LOCALIZATION_AUDIT_REPORT_NAME)
         self.assertEqual(manifest["files"]["releaseReadinessSummary"], run_editor.EXPORT_RELEASE_READINESS_JSON_NAME)
         self.assertEqual(manifest["files"]["releaseReadinessReport"], run_editor.EXPORT_RELEASE_READINESS_REPORT_NAME)
         self.assertEqual(manifest["files"]["unlockableContentManifest"], f"app/{run_editor.UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}")
@@ -3719,6 +3764,8 @@ class RunEditorSmokeTests(unittest.TestCase):
                 run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME,
                 run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME,
                 run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
+                run_editor.EXPORT_LOCALIZATION_AUDIT_JSON_NAME,
+                run_editor.EXPORT_LOCALIZATION_AUDIT_REPORT_NAME,
                 run_editor.EXPORT_RELEASE_READINESS_JSON_NAME,
                 run_editor.EXPORT_RELEASE_READINESS_REPORT_NAME,
                 "app/index.html",
@@ -3767,6 +3814,11 @@ class RunEditorSmokeTests(unittest.TestCase):
             build_dir / run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
         )
         self.assertNotEqual(route_map_payload["summary"]["status"], "blocked")
+        localization_payload = self.assert_export_localization_audit_files(
+            build_dir / run_editor.EXPORT_LOCALIZATION_AUDIT_JSON_NAME,
+            build_dir / run_editor.EXPORT_LOCALIZATION_AUDIT_REPORT_NAME,
+        )
+        self.assertIn(localization_payload["summary"]["status"], {"ready", "needs_translation", "single_language"})
         readiness_payload = self.assert_export_release_readiness_files(
             build_dir / run_editor.EXPORT_RELEASE_READINESS_JSON_NAME,
             build_dir / run_editor.EXPORT_RELEASE_READINESS_REPORT_NAME,
@@ -3782,6 +3834,8 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["playtestGuide"], run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME)
         self.assertEqual(manifest["files"]["storyRouteMap"], run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME)
         self.assertEqual(manifest["files"]["storyRouteMapReport"], run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME)
+        self.assertEqual(manifest["files"]["localizationAudit"], run_editor.EXPORT_LOCALIZATION_AUDIT_JSON_NAME)
+        self.assertEqual(manifest["files"]["localizationAuditReport"], run_editor.EXPORT_LOCALIZATION_AUDIT_REPORT_NAME)
         self.assertEqual(manifest["files"]["releaseReadinessSummary"], run_editor.EXPORT_RELEASE_READINESS_JSON_NAME)
         self.assertEqual(manifest["files"]["releaseReadinessReport"], run_editor.EXPORT_RELEASE_READINESS_REPORT_NAME)
         self.assertEqual(manifest["files"]["unlockableContentManifest"], f"app/{run_editor.UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}")
@@ -3793,6 +3847,8 @@ class RunEditorSmokeTests(unittest.TestCase):
                 run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME,
                 run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME,
                 run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
+                run_editor.EXPORT_LOCALIZATION_AUDIT_JSON_NAME,
+                run_editor.EXPORT_LOCALIZATION_AUDIT_REPORT_NAME,
                 run_editor.EXPORT_RELEASE_READINESS_JSON_NAME,
                 run_editor.EXPORT_RELEASE_READINESS_REPORT_NAME,
                 "app/index.html",
@@ -3916,6 +3972,11 @@ class RunEditorSmokeTests(unittest.TestCase):
             build_dir / run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
         )
         self.assertNotEqual(route_map_payload["summary"]["status"], "blocked")
+        localization_payload = self.assert_export_localization_audit_files(
+            build_dir / run_editor.EXPORT_LOCALIZATION_AUDIT_JSON_NAME,
+            build_dir / run_editor.EXPORT_LOCALIZATION_AUDIT_REPORT_NAME,
+        )
+        self.assertIn(localization_payload["summary"]["status"], {"ready", "needs_translation", "single_language"})
         readiness_payload = self.assert_export_release_readiness_files(
             build_dir / run_editor.EXPORT_RELEASE_READINESS_JSON_NAME,
             build_dir / run_editor.EXPORT_RELEASE_READINESS_REPORT_NAME,
@@ -3931,6 +3992,8 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["playtestGuide"], run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME)
         self.assertEqual(manifest["files"]["storyRouteMap"], run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME)
         self.assertEqual(manifest["files"]["storyRouteMapReport"], run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME)
+        self.assertEqual(manifest["files"]["localizationAudit"], run_editor.EXPORT_LOCALIZATION_AUDIT_JSON_NAME)
+        self.assertEqual(manifest["files"]["localizationAuditReport"], run_editor.EXPORT_LOCALIZATION_AUDIT_REPORT_NAME)
         self.assertEqual(manifest["files"]["releaseReadinessSummary"], run_editor.EXPORT_RELEASE_READINESS_JSON_NAME)
         self.assertEqual(manifest["files"]["releaseReadinessReport"], run_editor.EXPORT_RELEASE_READINESS_REPORT_NAME)
         self.assertEqual(manifest["files"]["unlockableContentManifest"], f"app/{run_editor.UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}")
@@ -3942,6 +4005,8 @@ class RunEditorSmokeTests(unittest.TestCase):
                 run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME,
                 run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME,
                 run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
+                run_editor.EXPORT_LOCALIZATION_AUDIT_JSON_NAME,
+                run_editor.EXPORT_LOCALIZATION_AUDIT_REPORT_NAME,
                 run_editor.EXPORT_RELEASE_READINESS_JSON_NAME,
                 run_editor.EXPORT_RELEASE_READINESS_REPORT_NAME,
                 "app/index.html",

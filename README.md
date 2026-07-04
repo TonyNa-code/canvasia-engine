@@ -111,6 +111,7 @@ The project already includes a visual editor, export pipeline, native runtime pr
 - [`editor_local_security.py`](editor_local_security.py): loopback-only API request guard helpers
 - [`editor_snapshot_cache.py`](editor_snapshot_cache.py): reusable file-signature snapshot cache for read-heavy editor payloads
 - [`export_package_guide.py`](export_package_guide.py): exported package playtest / acceptance guide builder
+- [`export_localization_audit.py`](export_localization_audit.py): exported package localization coverage audit for multilingual releases
 - [`export_release_readiness.py`](export_release_readiness.py): exported package release-readiness summary and tester handoff gate builder
 - [`export_story_route_map.py`](export_story_route_map.py): exported package story route map, broken-link, and unreachable-scene report builder
 - [`export_unlockable_manifest.py`](export_unlockable_manifest.py): export-side unlockable / gallery / replay coverage manifest builder
@@ -208,7 +209,7 @@ Open a project and go to the preview/export area to generate:
 
 The Web playable package is the easiest option for quick sharing. The native Runtime package is the route for testing a more app-like desktop playback flow.
 
-Every playable export also includes `README_试玩验收先看这里.md`, `story_route_map.json`, `story_route_map.md`, `release_readiness_summary.json`, `release_readiness_summary.md`, `unlockable_content_manifest.json`, and `unlockable_content_report.md`. The README gives testers launch steps and acceptance checks; the story route map catches broken jumps and unreachable scenes; the release-readiness files summarize whether the package is ready to hand to testers; the unlockable JSON / Markdown pair covers CG galleries, music rooms, voice replay, archive pages, achievements, chapter replay, and endings.
+Every playable export also includes `README_试玩验收先看这里.md`, `story_route_map.json`, `story_route_map.md`, `localization_audit.json`, `localization_audit.md`, `release_readiness_summary.json`, `release_readiness_summary.md`, `unlockable_content_manifest.json`, and `unlockable_content_report.md`. The README gives testers launch steps and acceptance checks; the story route map catches broken jumps and unreachable scenes; the localization audit flags missing translations in multilingual projects; the release-readiness files summarize whether the package is ready to hand to testers; the unlockable JSON / Markdown pair covers CG galleries, music rooms, voice replay, archive pages, achievements, chapter replay, and endings.
 
 ## Release Packages
 

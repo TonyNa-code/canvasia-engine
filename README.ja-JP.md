@@ -105,6 +105,7 @@ Canvasia Engine は、ビジュアルノベル / Galgame 制作者のための s
 
 - [`run_editor.py`](run_editor.py): ローカルエディタサーバー、プロジェクト管理、書き出し、パッケージング入口
 - [`export_package_guide.py`](export_package_guide.py): 書き出しパッケージ向け playtest / acceptance guide 生成器
+- [`export_localization_audit.py`](export_localization_audit.py): 書き出しパッケージ向け localization coverage / missing translation audit 生成器
 - [`export_release_readiness.py`](export_release_readiness.py): 書き出しパッケージ向け release-readiness summary / tester handoff gate 生成器
 - [`export_story_route_map.py`](export_story_route_map.py): 書き出しパッケージ向け story route map / broken-link / unreachable-scene report 生成器
 - [`export_unlockable_manifest.py`](export_unlockable_manifest.py): 書き出し側の unlockable / gallery / replay カバレッジ manifest 生成器
@@ -196,7 +197,7 @@ Canvasia は初期 i18n フローに対応しています。
 
 気軽に共有するなら Web 試遊パッケージが最も簡単です。よりアプリに近いデスクトップ再生フローを検証する場合は、ネイティブ Runtime パッケージを使います。
 
-すべての playable / runtime 書き出しには `README_试玩验收先看这里.md`、`story_route_map.json`、`story_route_map.md`、`release_readiness_summary.json`、`release_readiness_summary.md`、`unlockable_content_manifest.json`、`unlockable_content_report.md` も同梱されます。README は起動手順と受け入れチェック、story route map は broken jumps / unreachable scenes / ending candidates の確認、release-readiness files はテスターへ渡せる状態かどうかの短い gate、unlockable JSON / Markdown は CG ギャラリー、音楽鑑賞、ボイス回想、キャラクター / 場所 / ナレーション / 関係アーカイブ、章回想、エンディング、実績の収録状況を確認するためのレポートです。
+すべての playable / runtime 書き出しには `README_试玩验收先看这里.md`、`story_route_map.json`、`story_route_map.md`、`localization_audit.json`、`localization_audit.md`、`release_readiness_summary.json`、`release_readiness_summary.md`、`unlockable_content_manifest.json`、`unlockable_content_report.md` も同梱されます。README は起動手順と受け入れチェック、story route map は broken jumps / unreachable scenes / ending candidates の確認、localization audit は multilingual project の missing translations、release-readiness files はテスターへ渡せる状態かどうかの短い gate、unlockable JSON / Markdown は CG ギャラリー、音楽鑑賞、ボイス回想、キャラクター / 場所 / ナレーション / 関係アーカイブ、章回想、エンディング、実績の収録状況を確認するためのレポートです。
 
 ## Release パッケージ
 

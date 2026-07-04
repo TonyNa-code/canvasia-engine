@@ -112,6 +112,29 @@ class ExportReleaseReadinessTests(unittest.TestCase):
         self.assertIn("story_route_broken_links", issue_codes)
         self.assertIn("story_route_unreachable_scenes", issue_codes)
 
+    def test_localization_audit_issues_affect_release_gate(self) -> None:
+        summary = build_export_release_readiness_summary(
+            project={"title": "Localization Gate Demo"},
+            manifest=make_manifest(),
+            localization_audit={
+                "summary": {
+                    "languageCount": 3,
+                    "completionPercent": 62,
+                    "missingTranslationCount": 11,
+                }
+            },
+            report_files=["localization_audit.md"],
+        )
+
+        self.assertEqual(summary["qualityGate"]["status"], "needs_review")
+        self.assertEqual(summary["metrics"]["localizationCompletionPercent"], 62)
+        self.assertEqual(summary["metrics"]["missingTranslations"], 11)
+        issue_codes = {issue["code"] for issue in summary["issues"]}
+        self.assertIn("localization_missing_translations", issue_codes)
+        markdown = build_export_release_readiness_markdown(summary)
+        self.assertIn("本地化覆盖率", markdown)
+        self.assertIn("localization_audit.md", markdown)
+
     def test_write_export_release_readiness_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             result = write_export_release_readiness_files(
