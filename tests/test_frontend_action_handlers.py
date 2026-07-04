@@ -4142,6 +4142,32 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("screenplayExporterTools.getScreenplayStatusDigest", source)
         self.assertIn("完整剧本台本", source)
 
+    def test_director_cue_sheet_export_actions_are_wired(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        module_source = (EDITOR_DIR / "modules" / "director_cue_sheet.js").read_text(encoding="utf-8")
+        combined_source = f"{source}\n{module_source}"
+        click_handler = _extract_function_source(source, "handleClick")
+        markdown_block_start = click_handler.index('action === "export-director-cue-sheet-markdown"')
+        csv_block_start = click_handler.index('action === "export-director-cue-sheet-csv"')
+        csv_block_end = click_handler.index('action === "export-choice-consequence-markdown"', csv_block_start)
+        markdown_block = click_handler[markdown_block_start:csv_block_start]
+        csv_block = click_handler[csv_block_start:csv_block_end]
+
+        self.assertIn("const directorCueSheetTools = window.CanvasiaEditorDirectorCueSheet", source)
+        self.assertIn('data-action="export-director-cue-sheet-markdown"', combined_source)
+        self.assertIn('data-action="export-director-cue-sheet-csv"', combined_source)
+        self.assertIn("exportDirectorCueSheetMarkdown();", markdown_block)
+        self.assertIn("exportDirectorCueSheetCsv();", csv_block)
+        self.assertIn("function buildDirectorCueSheet()", source)
+        self.assertIn("function renderDirectorCueSheetPanel()", source)
+        self.assertIn("function exportDirectorCueSheetMarkdown()", source)
+        self.assertIn("function exportDirectorCueSheetCsv()", source)
+        self.assertIn("directorCueSheetTools.buildDirectorCueSheet", source)
+        self.assertIn("directorCueSheetTools.renderDirectorCueSheetPanel(buildDirectorCueSheet()", source)
+        self.assertIn("directorCueSheet: buildDirectorCueSheet()", source)
+        self.assertIn("getDirectorCueStatusDigest", module_source)
+        self.assertIn("导演分镜清单", combined_source)
+
     def test_choice_consequence_sheet_export_actions_are_wired(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
         click_handler = _extract_function_source(source, "handleClick")

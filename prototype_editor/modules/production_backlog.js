@@ -2,6 +2,7 @@
   const AREA_LABELS = Object.freeze({
     route: "路线结构",
     scene: "场景制作",
+    director: "导演分镜",
     voice: "语音制作",
     choice: "选项分支",
     variable: "变量逻辑",
@@ -16,6 +17,7 @@
   const AREA_ACTIONS = Object.freeze({
     route: Object.freeze({ label: "看路线图", action: "switch-screen", screen: "dashboard" }),
     scene: Object.freeze({ label: "去剧情页", action: "switch-screen", screen: "story" }),
+    director: Object.freeze({ label: "补分镜", action: "switch-screen", screen: "story" }),
     voice: Object.freeze({ label: "去台词台本", action: "switch-screen", screen: "script" }),
     choice: Object.freeze({ label: "调整选项", action: "switch-screen", screen: "story" }),
     variable: Object.freeze({ label: "检查变量", action: "switch-screen", screen: "story" }),
@@ -209,6 +211,26 @@
       });
   }
 
+  function addDirectorCueTasks(tasks, directorCueSheet = {}) {
+    toArray(directorCueSheet.productionQueue)
+      .filter((item) => item && item.severity !== "good")
+      .slice(0, 12)
+      .forEach((item) => {
+        addTask(tasks, {
+          area: "director",
+          severity: item.severity,
+          title: item.title ?? "处理导演分镜任务",
+          detail: cleanText(
+            `${item.actionLabel ?? "处理分镜任务"}。${item.detail ?? ""}`,
+            "处理导演分镜清单里的制作任务。"
+          ),
+          source: item.targetLabel ?? cleanText(`${item.chapterName ?? ""} / ${item.sceneName ?? ""}`, "导演分镜清单"),
+          action: AREA_ACTIONS.director,
+          priorityBoost: item.severity === "blocker" ? 20 : item.severity === "warn" ? 11 : 5,
+        });
+      });
+  }
+
   function addRouteTasks(tasks, routeOverview = {}) {
     const metrics = routeOverview.metrics ?? {};
     const brokenRoutes = toCount(metrics.brokenRoutes);
@@ -297,6 +319,7 @@
     addRouteTasks(tasks, context.routeOverview);
     addRouteExecutionTasks(tasks, context.routeOverview?.routeTestingPlan);
     addIssueTasks(tasks, "scene", context.sceneBoard?.issues, { fallbackTitle: "处理场景制作问题", fallbackSource: "场景生产看板" });
+    addDirectorCueTasks(tasks, context.directorCueSheet);
     addIssueTasks(tasks, "voice", context.voiceSheet?.issues, { fallbackTitle: "处理语音制作问题", fallbackSource: "语音制作清单" });
     addIssueTasks(tasks, "choice", context.choiceConsequenceSheet?.issues, { fallbackTitle: "处理选项问题", fallbackSource: "选项后果表" });
     addIssueTasks(tasks, "variable", context.variableInfluenceSheet?.issues, { fallbackTitle: "处理变量问题", fallbackSource: "变量影响表" });
@@ -480,6 +503,7 @@
     buildProductionBacklogCsv,
     addRouteExecutionTasks,
     addAudioProductionTasks,
+    addDirectorCueTasks,
     getSeverityLabel,
   });
 })(typeof window !== "undefined" ? window : globalThis);

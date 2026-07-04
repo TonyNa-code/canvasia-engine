@@ -55,6 +55,7 @@ const routeTestingReportTools = window.CanvasiaEditorRouteTestingReport;
 const sceneProductionBoardTools = window.CanvasiaEditorSceneProductionBoard;
 const voiceProductionSheetTools = window.CanvasiaEditorVoiceProductionSheet;
 const screenplayExporterTools = window.CanvasiaEditorScreenplayExporter;
+const directorCueSheetTools = window.CanvasiaEditorDirectorCueSheet;
 const previewRegressionTools = window.CanvasiaEditorPreviewRegression;
 const playtestHandoffReportTools = window.CanvasiaEditorPlaytestHandoffReport;
 const choiceConsequenceSheetTools = window.CanvasiaEditorChoiceConsequenceSheet;
@@ -3887,6 +3888,16 @@ async function handleClick(event) {
 
   if (action === "export-screenplay-csv") {
     exportScreenplayCsv();
+    return;
+  }
+
+  if (action === "export-director-cue-sheet-markdown") {
+    exportDirectorCueSheetMarkdown();
+    return;
+  }
+
+  if (action === "export-director-cue-sheet-csv") {
+    exportDirectorCueSheetCsv();
     return;
   }
 
@@ -28710,6 +28721,17 @@ function buildScreenplayFileName(extension = "md") {
   return `${title}_screenplay_${dateStamp}.${extension}`;
 }
 
+function buildDirectorCueSheetFileName(extension = "md") {
+  const date = new Date();
+  const dateStamp = [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("");
+  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
+  return `${title}_director_cue_sheet_${dateStamp}.${extension}`;
+}
+
 function buildChoiceConsequenceFileName(extension = "md") {
   const date = new Date();
   const dateStamp = [
@@ -30067,6 +30089,30 @@ function exportScreenplayCsv() {
   showToast(`剧本台本 CSV 已导出：${fileName}`);
 }
 
+function buildDirectorCueSheet() {
+  return directorCueSheetTools.buildDirectorCueSheet(state.data ?? {});
+}
+
+function exportDirectorCueSheetMarkdown() {
+  const fileName = buildDirectorCueSheetFileName("md");
+  const sheet = buildDirectorCueSheet();
+  const content = directorCueSheetTools.buildDirectorCueMarkdown(sheet, {
+    projectTitle: state.data?.project?.title || "Canvasia Project",
+    generatedAt: formatDate(new Date().toISOString()),
+  });
+  downloadTextFile(fileName, content, "text/markdown;charset=utf-8");
+  setSaveStatus(`已导出导演分镜清单：${fileName}`);
+  showToast(`导演分镜清单已导出：${fileName}`);
+}
+
+function exportDirectorCueSheetCsv() {
+  const fileName = buildDirectorCueSheetFileName("csv");
+  const content = directorCueSheetTools.buildDirectorCueCsv(buildDirectorCueSheet());
+  downloadTextFile(fileName, content, "text/csv;charset=utf-8");
+  setSaveStatus(`已导出导演分镜 CSV：${fileName}`);
+  showToast(`导演分镜 CSV 已导出：${fileName}`);
+}
+
 function buildChoiceConsequenceSheet() {
   return choiceConsequenceSheetTools.buildChoiceConsequenceSheet(state.data ?? {});
 }
@@ -30314,6 +30360,7 @@ function buildProductionBacklog(routeOverview = null) {
     projectTitle: state.data?.project?.title || "Canvasia Project",
     routeOverview: currentRouteOverview,
     sceneBoard: buildSceneProductionBoard(),
+    directorCueSheet: buildDirectorCueSheet(),
     voiceSheet: buildVoiceProductionSheet(),
     choiceConsequenceSheet: buildChoiceConsequenceSheet(),
     variableInfluenceSheet: buildVariableInfluenceSheet(),
@@ -31681,7 +31728,23 @@ function getVoiceProductionToneClass(status) {
 }
 
 function getScreenplayToneClass(status) {
+  if (status === "blocked") {
+    return "danger-text";
+  }
   if (status === "review") {
+    return "warn-text";
+  }
+  if (status === "ready") {
+    return "good-text";
+  }
+  return "";
+}
+
+function getDirectorCueSheetToneClass(status) {
+  if (status === "blocked") {
+    return "danger-text";
+  }
+  if (status === "warn") {
     return "warn-text";
   }
   if (status === "ready") {
@@ -32132,6 +32195,15 @@ function renderScreenplayExportPanel() {
       }
     </article>
   `;
+}
+
+function renderDirectorCueSheetPanel() {
+  return directorCueSheetTools.renderDirectorCueSheetPanel(buildDirectorCueSheet(), {
+    escapeHtml,
+    getToneClass: getDirectorCueSheetToneClass,
+    renderEmpty,
+    renderRouteMetricCard,
+  });
 }
 
 function renderChoiceConsequencePanel() {
@@ -32732,6 +32804,7 @@ function renderInspectionOverviewPanel(routeOverview) {
       ${renderRuntimeCapabilityMatrixPanel()}
       ${renderSceneProductionBoardPanel()}
       ${renderScreenplayExportPanel()}
+      ${renderDirectorCueSheetPanel()}
       ${renderVoiceProductionPanel()}
       ${renderChoiceConsequencePanel()}
       ${renderVariableInfluencePanel()}

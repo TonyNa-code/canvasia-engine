@@ -32,6 +32,7 @@ class FrontendEntrypointModuleTests(unittest.TestCase):
             "./modules/script_voice.js",
             "./modules/voice_production_sheet.js",
             "./modules/screenplay_exporter.js",
+            "./modules/director_cue_sheet.js",
             "./modules/script_importer.js",
             "./modules/route_analyzer.js",
             "./modules/route_testing_report.js",

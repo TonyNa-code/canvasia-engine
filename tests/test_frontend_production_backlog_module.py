@@ -66,6 +66,24 @@ class FrontendProductionBacklogModuleTests(unittest.TestCase):
                   {{ severity: "tip", title: "演出变化偏少", detail: "加一次镜头推近。", chapterName: "第1章", sceneName: "天台" }},
                 ],
               }},
+              directorCueSheet: {{
+                productionQueue: [
+                  {{
+                    severity: "blocker",
+                    title: "分镜素材缺失",
+                    actionLabel: "先修复素材或空场景",
+                    detail: "音效门铃缺少真实文件。",
+                    targetLabel: "第1章 / 教室黄昏",
+                  }},
+                  {{
+                    severity: "warn",
+                    title: "场景缺少背景",
+                    actionLabel: "补齐基础演出",
+                    detail: "走廊独白有正文但没有背景。",
+                    targetLabel: "第1章 / 走廊独白",
+                  }},
+                ],
+              }},
               voiceSheet: {{
                 issues: [
                   {{ severity: "blocker", title: "语音文件缺失", detail: "悠奈 001 没有真实文件。", chapterName: "第1章", sceneName: "教室黄昏", speakerName: "悠奈" }},
@@ -160,21 +178,24 @@ class FrontendProductionBacklogModuleTests(unittest.TestCase):
         self.assertIn("buildProductionBacklogCsv", payload["keys"])
         self.assertIn("addRouteExecutionTasks", payload["keys"])
         self.assertIn("addAudioProductionTasks", payload["keys"])
+        self.assertIn("addDirectorCueTasks", payload["keys"])
         self.assertEqual(payload["backlog"]["projectTitle"], "Backlog Demo")
-        self.assertEqual(payload["backlog"]["summary"]["taskCount"], 17)
-        self.assertEqual(payload["backlog"]["summary"]["blockerCount"], 5)
-        self.assertEqual(payload["backlog"]["summary"]["warningCount"], 8)
+        self.assertEqual(payload["backlog"]["summary"]["taskCount"], 19)
+        self.assertEqual(payload["backlog"]["summary"]["blockerCount"], 6)
+        self.assertEqual(payload["backlog"]["summary"]["warningCount"], 9)
         self.assertEqual(payload["backlog"]["summary"]["tipCount"], 4)
-        self.assertGreaterEqual(payload["backlog"]["summary"]["areaCount"], 9)
+        self.assertGreaterEqual(payload["backlog"]["summary"]["areaCount"], 10)
         self.assertEqual(payload["digest"]["status"], "blocked")
         self.assertEqual(payload["backlog"]["tasks"][0]["severity"], "blocker")
         self.assertTrue(any(task["title"] == "修复分支坏链" for task in payload["backlog"]["tasks"]))
         self.assertTrue(any(task["title"] == "BGM 文件缺失" for task in payload["backlog"]["tasks"]))
+        self.assertTrue(any(task["area"] == "director" and task["title"] == "分镜素材缺失" for task in payload["backlog"]["tasks"]))
         self.assertIn("生产待办队列", payload["markdown"])
         self.assertIn("修复分支坏链", payload["markdown"])
         self.assertIn("BGM 文件缺失", payload["markdown"])
         self.assertIn("语音文件缺失", payload["markdown"])
         self.assertIn("Runtime 覆盖", payload["markdown"])
+        self.assertIn("导演分镜", payload["markdown"])
         self.assertIn('"素材依赖"', payload["csv"])
         self.assertEqual(payload["labels"], ["先修", "优先", "整理"])
 
