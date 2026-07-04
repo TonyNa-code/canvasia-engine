@@ -62,10 +62,23 @@ def get_unlockable_summary(unlockable_manifest: dict | None) -> dict:
     return summary if isinstance(summary, dict) else {}
 
 
-def build_release_readiness_issues(manifest: dict, unlockable_manifest: dict | None, missing_assets: list[dict]) -> list[dict]:
+def get_story_route_summary(story_route_map: dict | None) -> dict:
+    if not isinstance(story_route_map, dict):
+        return {}
+    summary = story_route_map.get("summary")
+    return summary if isinstance(summary, dict) else {}
+
+
+def build_release_readiness_issues(
+    manifest: dict,
+    unlockable_manifest: dict | None,
+    missing_assets: list[dict],
+    story_route_map: dict | None = None,
+) -> list[dict]:
     project = get_manifest_project(manifest)
     runtime = get_manifest_runtime(manifest)
     unlockable_summary = get_unlockable_summary(unlockable_manifest)
+    story_route_summary = get_story_route_summary(story_route_map)
     issues: list[dict] = []
 
     scene_count = as_int(project.get("sceneCount"))
@@ -104,6 +117,41 @@ def build_release_readiness_issues(manifest: dict, unlockable_manifest: dict | N
                 "导出包存在缺失素材",
                 f"导出流程记录到缺失素材：{preview_names}{more}。",
                 "先在素材库重新绑定文件，或删除不再使用的素材引用，再重新导出。",
+            )
+        )
+
+    if story_route_summary and not story_route_summary.get("entrySceneExists", True):
+        issues.append(
+            make_readiness_issue(
+                "blocker",
+                "story_entry_scene_missing",
+                "剧情入口场景不存在",
+                "剧情路线图没有找到项目设置里的入口场景。",
+                "在项目设置里重新指定存在的入口场景，再重新导出。",
+            )
+        )
+
+    broken_route_count = as_int(story_route_summary.get("brokenRouteCount"))
+    if broken_route_count:
+        issues.append(
+            make_readiness_issue(
+                "blocker",
+                "story_route_broken_links",
+                "剧情路线存在坏跳转",
+                f"剧情路线图记录到 {broken_route_count} 条目标不存在的跳转。",
+                "打开 story_route_map.md，逐条修复坏跳转后重新导出。",
+            )
+        )
+
+    unreachable_scene_count = as_int(story_route_summary.get("unreachableSceneCount"))
+    if unreachable_scene_count:
+        issues.append(
+            make_readiness_issue(
+                "warning",
+                "story_route_unreachable_scenes",
+                "存在入口不可达场景",
+                f"剧情路线图记录到 {unreachable_scene_count} 个从入口场景无法自然抵达的场景。",
+                "确认这些场景是隐藏内容、调试场景还是漏接路线；需要公开试玩的场景应接回主流程。",
             )
         )
 
@@ -148,10 +196,16 @@ def build_release_readiness_issues(manifest: dict, unlockable_manifest: dict | N
     return issues
 
 
-def calculate_release_readiness_score(issues: list[dict], manifest: dict, unlockable_manifest: dict | None) -> int:
+def calculate_release_readiness_score(
+    issues: list[dict],
+    manifest: dict,
+    unlockable_manifest: dict | None,
+    story_route_map: dict | None = None,
+) -> int:
     project = get_manifest_project(manifest)
     assets = get_manifest_assets(manifest)
     unlockable_summary = get_unlockable_summary(unlockable_manifest)
+    story_route_summary = get_story_route_summary(story_route_map)
     score = 100
     score -= 34 * sum(1 for issue in issues if issue.get("severity") == "blocker")
     score -= 9 * sum(1 for issue in issues if issue.get("severity") == "warning")
@@ -162,6 +216,9 @@ def calculate_release_readiness_score(issues: list[dict], manifest: dict, unlock
     readiness_percent = as_int(unlockable_summary.get("readinessPercent"), 100)
     if readiness_percent and readiness_percent < 100:
         score -= min(12, max(1, round((100 - readiness_percent) / 8)))
+    unreachable_scene_count = as_int(story_route_summary.get("unreachableSceneCount"))
+    if unreachable_scene_count:
+        score -= min(12, unreachable_scene_count * 3)
     return clamp_score(score)
 
 
@@ -193,12 +250,13 @@ def build_export_release_readiness_summary(
     manifest: dict,
     missing_assets: list[dict] | None = None,
     unlockable_manifest: dict | None = None,
+    story_route_map: dict | None = None,
     report_files: list[str] | None = None,
     platform_notes: list[str] | None = None,
 ) -> dict:
     missing_assets = missing_assets or []
-    issues = build_release_readiness_issues(manifest, unlockable_manifest, missing_assets)
-    score = calculate_release_readiness_score(issues, manifest, unlockable_manifest)
+    issues = build_release_readiness_issues(manifest, unlockable_manifest, missing_assets, story_route_map)
+    score = calculate_release_readiness_score(issues, manifest, unlockable_manifest, story_route_map)
     gate = get_release_readiness_gate(score, issues)
     manifest_project = get_manifest_project(manifest)
     manifest_assets = get_manifest_assets(manifest)
@@ -233,6 +291,9 @@ def build_export_release_readiness_summary(
             "totalUnlockables": as_int(unlockable_summary.get("totalEntryCount")),
             "reachableEndings": as_int(unlockable_summary.get("reachableEndingCount")),
             "totalEndings": as_int(unlockable_summary.get("endingCount")),
+            "routeCount": as_int(get_story_route_summary(story_route_map).get("routeCount")),
+            "brokenRoutes": as_int(get_story_route_summary(story_route_map).get("brokenRouteCount")),
+            "unreachableScenes": as_int(get_story_route_summary(story_route_map).get("unreachableSceneCount")),
         },
         "issues": issues,
         "reportFiles": [clean_release_text(item) for item in (report_files or []) if clean_release_text(item)],
@@ -327,6 +388,7 @@ def write_export_release_readiness_files(
     manifest: dict,
     missing_assets: list[dict] | None = None,
     unlockable_manifest: dict | None = None,
+    story_route_map: dict | None = None,
     report_files: list[str] | None = None,
     platform_notes: list[str] | None = None,
 ) -> dict:
@@ -335,6 +397,7 @@ def write_export_release_readiness_files(
         manifest=manifest,
         missing_assets=missing_assets,
         unlockable_manifest=unlockable_manifest,
+        story_route_map=story_route_map,
         report_files=report_files,
         platform_notes=platform_notes,
     )

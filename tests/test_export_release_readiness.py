@@ -91,6 +91,27 @@ class ExportReleaseReadinessTests(unittest.TestCase):
         self.assertIn("no_playable_story", issue_codes)
         self.assertIn("missing_export_assets", issue_codes)
 
+    def test_story_route_map_issues_affect_release_gate(self) -> None:
+        summary = build_export_release_readiness_summary(
+            project={"title": "Route Gate Demo"},
+            manifest=make_manifest(),
+            story_route_map={
+                "summary": {
+                    "entrySceneExists": True,
+                    "routeCount": 3,
+                    "brokenRouteCount": 1,
+                    "unreachableSceneCount": 2,
+                }
+            },
+        )
+
+        self.assertEqual(summary["qualityGate"]["status"], "blocked")
+        self.assertEqual(summary["metrics"]["brokenRoutes"], 1)
+        self.assertEqual(summary["metrics"]["unreachableScenes"], 2)
+        issue_codes = {issue["code"] for issue in summary["issues"]}
+        self.assertIn("story_route_broken_links", issue_codes)
+        self.assertIn("story_route_unreachable_scenes", issue_codes)
+
     def test_write_export_release_readiness_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             result = write_export_release_readiness_files(
