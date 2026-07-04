@@ -152,6 +152,21 @@
     target.push({ severity, code, title, detail });
   }
 
+  function getCueStatus(issues = []) {
+    const safeIssues = toArray(issues);
+    if (safeIssues.some((issue) => issue.severity === "blocker")) {
+      return "blocker";
+    }
+    if (safeIssues.some((issue) => issue.severity === "warn")) {
+      return "warn";
+    }
+    return safeIssues.length > 0 ? "tip" : "good";
+  }
+
+  function getCueStatusLabel(status) {
+    return status === "blocker" ? "需先修" : status === "warn" ? "建议复查" : status === "tip" ? "可润色" : "正常";
+  }
+
   function getIssueWeight(issue = {}) {
     if (issue.severity === "blocker") {
       return 100;
@@ -307,14 +322,8 @@
 
   function finalizeAudioCueStatus(cue = {}) {
     const issues = toArray(cue.issues);
-    cue.status = issues.some((issue) => issue.severity === "blocker")
-      ? "blocker"
-      : issues.some((issue) => issue.severity === "warn")
-        ? "warn"
-        : issues.length > 0
-          ? "tip"
-          : "good";
-    cue.statusLabel = cue.status === "blocker" ? "需先修" : cue.status === "warn" ? "建议复查" : cue.status === "tip" ? "可润色" : "正常";
+    cue.status = getCueStatus(issues);
+    cue.statusLabel = getCueStatusLabel(cue.status);
     cue.needsAudition = cue.status !== "good" || ["music_handoff", "stop_handoff", "explicit_end", "scene_end"].includes(cue.handoffType);
     cue.auditionHint = buildAudioCueAuditionHint(cue);
     return cue;
@@ -434,11 +443,112 @@
     }));
   }
 
+  function finalizeSfxCueStatus(cue = {}) {
+    cue.status = getCueStatus(cue.issues);
+    cue.statusLabel = getCueStatusLabel(cue.status);
+    cue.reviewHint =
+      cue.status === "blocker"
+        ? "先补齐音效素材，再做试玩确认。"
+        : cue.status === "warn"
+          ? "试听这一声的触发点和音量，避免突兀。"
+          : cue.status === "tip"
+            ? "可以顺手确认音效存在感。"
+            : "发布前抽查触发点即可。";
+    return cue;
+  }
+
+  function addIssueToSfxCue(cue = {}, severity, code, title, detail) {
+    if (!Array.isArray(cue.issues)) {
+      cue.issues = [];
+    }
+    pushIssue(cue.issues, severity, code, title, detail);
+    finalizeSfxCueStatus(cue);
+  }
+
+  function buildSfxCue(block = {}, context = {}) {
+    const issues = [];
+    const assetId = cleanText(block.assetId);
+    const assetHint = cleanText(block.assetHint);
+    const asset = assetId ? context.assetMap.get(assetId) : null;
+    const volume = Math.round(clampNumber(block.volume, 0, 100, 100));
+
+    if (!assetId) {
+      pushIssue(
+        issues,
+        "blocker",
+        "missing_sfx_asset",
+        "未选择音效素材",
+        assetHint ? `导入脚本提示为 ${assetHint}，但还没有绑定到素材库音效。` : "这张播放音效卡没有绑定任何音效素材。"
+      );
+    } else if (!asset) {
+      pushIssue(issues, "blocker", "unknown_sfx_asset", "音效素材不存在", `素材 ${assetId} 不在当前素材库中。`);
+    } else if (asset.type && asset.type !== "sfx") {
+      pushIssue(issues, "warn", "sfx_asset_type_mismatch", "素材类型不是音效", `当前素材类型是 ${asset.type}。`);
+    } else if (asset.fileExists === false) {
+      pushIssue(issues, "blocker", "sfx_file_missing", "音效文件缺失", "素材条目存在，但真实音效文件暂时不可用。");
+    }
+
+    if (volume <= 0) {
+      pushIssue(issues, "warn", "silent_sfx", "音效音量为 0", "这张音效卡会被触发，但玩家听不到。");
+    } else if (volume >= 96) {
+      pushIssue(issues, "tip", "very_loud_sfx", "音效音量接近满格", "爆发音效可以保留高音量，但脚步、门铃、环境声建议试听一下。");
+    }
+
+    const cue = {
+      id: cleanText(block.id, `sfx_${context.blockIndex + 1}`),
+      chapterId: context.chapter?.id ?? "",
+      chapterName: context.chapter?.name ?? "未分章",
+      sceneId: context.scene?.id ?? "",
+      sceneName: cleanText(context.scene?.name ?? context.scene?.title, `场景 ${context.sceneIndex + 1}`),
+      blockId: cleanText(block.id),
+      blockIndex: context.blockIndex ?? 0,
+      cueLabel: summarizeBlock(block, context.blockIndex ?? 0),
+      assetId,
+      assetHint,
+      assetName: cleanText(asset?.name ?? asset?.fileName, assetId || assetHint || "未选择音效"),
+      assetReady: Boolean(asset && asset.fileExists !== false),
+      volume,
+      issues,
+    };
+    return finalizeSfxCueStatus(cue);
+  }
+
+  function auditSceneSfxDensity(sceneSfxCues = []) {
+    const safeCues = toArray(sceneSfxCues);
+    if (safeCues.length <= 6) {
+      return;
+    }
+    addIssueToSfxCue(
+      safeCues[0],
+      "tip",
+      "dense_scene_sfx",
+      "当前场景音效较密",
+      `这个场景有 ${safeCues.length} 张音效卡。可以保留，但发布前建议从头试玩确认节奏不吵。`
+    );
+  }
+
+  function buildSfxCueRows(sfxCues = []) {
+    return toArray(sfxCues).map((cue, index) => ({
+      id: cue.id,
+      index: index + 1,
+      chapterName: cue.chapterName,
+      sceneName: cue.sceneName,
+      assetName: cue.assetName,
+      assetId: cue.assetId,
+      cueLabel: cue.cueLabel,
+      volumeLabel: `${cue.volume}%`,
+      reviewHint: cue.reviewHint,
+      status: cue.status,
+      statusLabel: cue.statusLabel,
+    }));
+  }
+
   function buildAudioCueSheet(data = {}) {
     const assetMap = buildAssetMap(data);
     const chapterMap = buildChapterMap(data);
     const scenes = getOrderedScenes(data);
     const cues = [];
+    const sfxCues = [];
     const stops = [];
     const scenesWithoutMusic = [];
 
@@ -450,12 +560,18 @@
       };
       const hasStoryContent = blocks.some(isStoryContentBlock);
       const sceneCues = [];
+      const sceneSfxCues = [];
 
       blocks.forEach((block, blockIndex) => {
         if (block?.type === "music_play") {
           const cue = buildAudioCue(block, { assetMap, blocks, blockIndex, scene, sceneIndex, chapter });
           cues.push(cue);
           sceneCues.push(cue);
+        }
+        if (block?.type === "sfx_play") {
+          const cue = buildSfxCue(block, { assetMap, blockIndex, scene, sceneIndex, chapter });
+          sfxCues.push(cue);
+          sceneSfxCues.push(cue);
         }
         if (block?.type === "music_stop") {
           stops.push({
@@ -469,6 +585,7 @@
           });
         }
       });
+      auditSceneSfxDensity(sceneSfxCues);
 
       if (hasStoryContent && sceneCues.length === 0) {
         scenesWithoutMusic.push({
@@ -482,22 +599,36 @@
 
     auditAudioCueContinuity(cues);
     const rangeRows = buildAudioCueRangeRows(cues);
+    const sfxRows = buildSfxCueRows(sfxCues);
 
-    const issues = cues
-      .flatMap((cue) =>
-        cue.issues.map((issue) => ({
-          ...issue,
-          cueId: cue.id,
-          chapterName: cue.chapterName,
-          sceneName: cue.sceneName,
-          assetName: cue.assetName,
-          startLabel: cue.startLabel,
-        }))
-      )
+    const musicIssues = cues.flatMap((cue) =>
+      cue.issues.map((issue) => ({
+        ...issue,
+        cueType: "bgm",
+        cueId: cue.id,
+        chapterName: cue.chapterName,
+        sceneName: cue.sceneName,
+        assetName: cue.assetName,
+        startLabel: cue.startLabel,
+      }))
+    );
+    const sfxIssues = sfxCues.flatMap((cue) =>
+      cue.issues.map((issue) => ({
+        ...issue,
+        cueType: "sfx",
+        cueId: cue.id,
+        chapterName: cue.chapterName,
+        sceneName: cue.sceneName,
+        assetName: cue.assetName,
+        startLabel: cue.cueLabel,
+      }))
+    );
+    const issues = [...musicIssues, ...sfxIssues]
       .sort((left, right) => getIssueWeight(right) - getIssueWeight(left) || left.sceneName.localeCompare(right.sceneName, "zh-CN"));
 
     const summary = {
       cueCount: cues.length,
+      sfxCueCount: sfxCues.length,
       rangeSegmentCount: rangeRows.length,
       explicitRangeCount: cues.filter((cue) => cue.endMode === "after_block").length,
       sceneEndCount: cues.filter((cue) => cue.endMode === "scene_end").length,
@@ -506,6 +637,10 @@
       auditionNeededCount: cues.filter((cue) => cue.needsAudition).length,
       takeoverCount: cues.filter((cue) => cue.issues.some((issue) => issue.code.includes("taken_over"))).length,
       abruptHandoffCount: cues.filter((cue) => cue.issues.some((issue) => issue.code === "abrupt_music_handoff")).length,
+      sfxIssueCount: sfxIssues.length,
+      missingSfxAssetCount: sfxCues.filter((cue) =>
+        cue.issues.some((issue) => ["missing_sfx_asset", "unknown_sfx_asset", "sfx_file_missing"].includes(issue.code))
+      ).length,
       missingAssetCount: cues.filter((cue) =>
         cue.issues.some((issue) => ["missing_asset", "unknown_asset", "asset_file_missing"].includes(issue.code))
       ).length,
@@ -524,6 +659,8 @@
       projectTitle: cleanText(data.project?.title, "Canvasia Project"),
       cues,
       rangeRows,
+      sfxCues,
+      sfxRows,
       stops,
       scenesWithoutMusic,
       issues,
@@ -533,19 +670,19 @@
 
   function getAudioCueSheetStatusDigest(sheet = {}) {
     const summary = sheet.summary ?? {};
-    if ((summary.cueCount ?? 0) === 0) {
+    if ((summary.cueCount ?? 0) === 0 && (summary.sfxCueCount ?? 0) === 0) {
       return {
         status: "empty",
         tone: "soft",
-        title: "还没有 BGM 调度",
-        detail: "项目里暂时没有播放音乐卡。可以先给入口场景加一首 BGM，再逐步做范围。",
+        title: "还没有音频调度",
+        detail: "项目里暂时没有播放音乐或音效卡。可以先给入口场景加一首 BGM，再补关键音效。",
       };
     }
     if ((summary.blockerCount ?? 0) > 0) {
       return {
         status: "blocked",
         tone: "danger",
-        title: `有 ${summary.blockerCount} 个 BGM 阻塞问题`,
+        title: `有 ${summary.blockerCount} 个音频阻塞问题`,
         detail: "优先修复缺素材、坏范围或真实文件缺失，再做发布前试听。",
       };
     }
@@ -553,15 +690,15 @@
       return {
         status: "warn",
         tone: "warn",
-        title: `有 ${summary.warningCount} 个 BGM 调度提醒`,
-        detail: "音乐能继续推进，但建议复查被提前接管或范围不清晰的位置。",
+        title: `有 ${summary.warningCount} 个音频调度提醒`,
+        detail: "音频能继续推进，但建议复查被提前接管、范围不清晰或音效异常的位置。",
       };
     }
     return {
       status: "ready",
       tone: "good",
-      title: "BGM 调度表可用于发布前试听",
-      detail: `当前音乐卡都有明确素材和可解释的播放范围；其中 ${summary.auditionNeededCount ?? 0} 段建议发布前试听确认。`,
+      title: "音频调度表可用于发布前试听",
+      detail: `当前 BGM 和音效都有明确素材；其中 ${summary.auditionNeededCount ?? 0} 段 BGM 建议发布前试听确认。`,
     };
   }
 
@@ -622,8 +759,18 @@
       row.auditionHint,
       row.statusLabel,
     ]);
+    const sfxRows = toArray(sheet.sfxRows).slice(0, 120).map((row) => [
+      `${row.index}`,
+      `${row.chapterName} / ${row.sceneName}`,
+      row.assetName,
+      row.cueLabel,
+      row.volumeLabel,
+      row.reviewHint,
+      row.statusLabel,
+    ]);
     const issueRows = toArray(sheet.issues).slice(0, 120).map((issue, index) => [
       `${index + 1}`,
+      issue.cueType === "sfx" ? "音效" : "BGM",
       issue.severity === "blocker" ? "阻塞" : issue.severity === "warn" ? "提醒" : "润色",
       issue.chapterName,
       issue.sceneName,
@@ -638,7 +785,7 @@
     ]);
 
     return `\uFEFF${[
-      `# ${projectTitle} BGM 调度表`,
+      `# ${projectTitle} 音频调度表`,
       "",
       `导出时间：${generatedAt}`,
       `状态：${digest.title}`,
@@ -650,6 +797,7 @@
         ["项目", "数量"],
         [
           ["BGM 播放卡", `${summary.cueCount ?? 0}`],
+          ["音效卡", `${summary.sfxCueCount ?? 0}`],
           ["覆盖段", `${summary.rangeSegmentCount ?? 0}`],
           ["指定范围", `${summary.explicitRangeCount ?? 0}`],
           ["场景结束范围", `${summary.sceneEndCount ?? 0}`],
@@ -658,6 +806,7 @@
           ["停止音乐卡", `${summary.stopCount ?? 0}`],
           ["阻塞问题", `${summary.blockerCount ?? 0}`],
           ["复查提醒", `${summary.warningCount ?? 0}`],
+          ["音效缺失", `${summary.missingSfxAssetCount ?? 0}`],
           ["无 BGM 内容场景", `${summary.scenesWithoutMusicCount ?? 0}`],
         ]
       ),
@@ -672,9 +821,14 @@
       buildMarkdownTable(["序号", "章节", "场景", "BGM", "范围", "开始", "结束", "接管方式", "淡入/淡出", "状态"], cueRows) ||
         "当前没有播放音乐卡。",
       "",
+      "## 音效 Cue 列表",
+      "",
+      buildMarkdownTable(["序号", "章节 / 场景", "音效", "触发位置", "音量", "试听提示", "状态"], sfxRows) ||
+        "当前没有播放音效卡。",
+      "",
       "## 需要复查的问题",
       "",
-      buildMarkdownTable(["序号", "级别", "章节", "场景", "问题", "说明"], issueRows) || "当前没有明显 BGM 调度问题。",
+      buildMarkdownTable(["序号", "类型", "级别", "章节", "场景", "问题", "说明"], issueRows) || "当前没有明显音频调度问题。",
       "",
       "## 暂无 BGM 的内容场景",
       "",
@@ -684,7 +838,8 @@
   }
 
   function buildAudioCueSheetCsv(sheet = {}) {
-    const rows = toArray(sheet.cues).map((cue, index) => [
+    const musicRows = toArray(sheet.cues).map((cue, index) => [
+      "BGM",
       `${index + 1}`,
       cue.chapterName,
       cue.sceneName,
@@ -703,16 +858,38 @@
       cue.statusLabel,
       cue.issues.map((issue) => issue.title).join(" / "),
     ]);
+    const sfxRows = toArray(sheet.sfxCues).map((cue, index) => [
+      "SFX",
+      `${index + 1}`,
+      cue.chapterName,
+      cue.sceneName,
+      cue.blockIndex + 1,
+      cue.assetName,
+      cue.assetId,
+      "播放一次音效",
+      cue.cueLabel,
+      "",
+      "",
+      cue.volume,
+      "",
+      "",
+      "",
+      cue.reviewHint,
+      cue.statusLabel,
+      cue.issues.map((issue) => issue.title).join(" / "),
+    ]);
+    const rows = [...musicRows, ...sfxRows];
     return `\uFEFF${buildCsv(
       [
+        "类型",
         "序号",
         "章节",
         "场景",
         "开始卡片",
-        "BGM",
+        "素材",
         "素材ID",
         "范围",
-        "结束位置",
+        "结束/触发位置",
         "接管方式",
         "覆盖卡片",
         "音量",
@@ -731,6 +908,7 @@
     getSafeMusicEndMode,
     getMusicEndModeLabel,
     buildAudioCueRangeRows,
+    buildSfxCueRows,
     buildAudioCueSheet,
     getAudioCueSheetStatusDigest,
     buildAudioCueSheetMarkdown,

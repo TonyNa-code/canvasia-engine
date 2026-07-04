@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import json
 import subprocess
 import textwrap
@@ -28,6 +29,8 @@ class FrontendAudioCueSheetModuleTests(unittest.TestCase):
               assetList: [
                 {{ id: "bgm_opening", type: "bgm", name: "放课后钢琴", fileExists: true }},
                 {{ id: "bgm_missing_file", type: "bgm", name: "缺文件 BGM", fileExists: false }},
+                {{ id: "sfx_door", type: "sfx", name: "门铃", fileExists: true }},
+                {{ id: "sfx_missing_file", type: "sfx", name: "缺文件音效", fileExists: false }},
               ],
               scenes: [
                 {{
@@ -38,6 +41,7 @@ class FrontendAudioCueSheetModuleTests(unittest.TestCase):
                     {{ id: "block_bg", type: "background", assetId: "bg_classroom" }},
                     {{ id: "block_music", type: "music_play", assetId: "bgm_opening", endMode: "after_block", endBlockId: "block_line_2", fadeInMs: 800, fadeOutMs: 1200, volume: 65 }},
                     {{ id: "block_line_1", type: "dialogue", text: "今天也留下来吗？" }},
+                    {{ id: "block_sfx", type: "sfx_play", assetId: "sfx_door", volume: 80 }},
                     {{ id: "block_line_2", type: "dialogue", text: "嗯，只待一会儿。" }},
                     {{ id: "block_stop", type: "music_stop", fadeOutMs: 500 }},
                   ],
@@ -56,6 +60,7 @@ class FrontendAudioCueSheetModuleTests(unittest.TestCase):
                   name: "坏范围",
                   blocks: [
                     {{ id: "block_bad_music", type: "music_play", assetId: "bgm_missing_file", endMode: "after_block", endBlockId: "not_exists", fadeInMs: 0, fadeOutMs: 0 }},
+                    {{ id: "block_bad_sfx", type: "sfx_play", assetId: "sfx_missing_file", volume: 0 }},
                     {{ id: "block_bad_line", type: "dialogue", text: "这段需要修音乐。" }},
                   ],
                 }},
@@ -92,25 +97,38 @@ class FrontendAudioCueSheetModuleTests(unittest.TestCase):
         self.assertIn("buildAudioCueSheetMarkdown", payload["keys"])
         self.assertIn("buildAudioCueSheetCsv", payload["keys"])
         self.assertEqual(payload["sheet"]["summary"]["cueCount"], 2)
+        self.assertEqual(payload["sheet"]["summary"]["sfxCueCount"], 2)
         self.assertEqual(payload["sheet"]["summary"]["rangeSegmentCount"], 2)
         self.assertEqual(payload["sheet"]["summary"]["explicitRangeCount"], 2)
         self.assertEqual(payload["sheet"]["summary"]["auditionNeededCount"], 2)
         self.assertEqual(payload["sheet"]["summary"]["stopCount"], 1)
         self.assertEqual(payload["sheet"]["summary"]["scenesWithoutMusicCount"], 1)
         self.assertEqual(payload["sheet"]["summary"]["missingAssetCount"], 1)
+        self.assertEqual(payload["sheet"]["summary"]["missingSfxAssetCount"], 1)
         self.assertEqual(payload["sheet"]["summary"]["missingEndBlockCount"], 1)
         self.assertEqual(payload["digest"]["status"], "blocked")
-        self.assertEqual(payload["sheet"]["cues"][0]["endLabel"], "第 4 张 · 台词 · 嗯，只待一会儿。")
+        self.assertEqual(payload["sheet"]["sfxCues"][0]["assetName"], "门铃")
+        self.assertEqual(payload["sheet"]["sfxCues"][1]["status"], "blocker")
+        self.assertEqual(payload["sheet"]["cues"][0]["endLabel"], "第 5 张 · 台词 · 嗯，只待一会儿。")
         self.assertEqual(payload["sheet"]["cues"][0]["handoffType"], "explicit_end")
-        self.assertIn("播放到 第 4 张", payload["sheet"]["rangeRows"][0]["handoffLabel"])
+        self.assertIn("播放到 第 5 张", payload["sheet"]["rangeRows"][0]["handoffLabel"])
         self.assertIn("重点试听开始卡和结束卡前后", payload["sheet"]["rangeRows"][0]["auditionHint"])
-        self.assertIn("# Demo Project BGM 调度表", payload["markdown"])
+        self.assertIn("# Demo Project 音频调度表", payload["markdown"])
         self.assertIn("BGM 覆盖范围速览", payload["markdown"])
         self.assertIn("BGM Cue 列表", payload["markdown"])
+        self.assertIn("音效 Cue 列表", payload["markdown"])
         self.assertIn("缺文件 BGM", payload["markdown"])
+        self.assertIn("缺文件音效", payload["markdown"])
         self.assertIn("接管方式", payload["csv"])
         self.assertIn('"BGM"', payload["csv"])
+        self.assertIn('"SFX"', payload["csv"])
         self.assertIn('"放课后钢琴"', payload["csv"])
+        self.assertIn('"门铃"', payload["csv"])
+        csv_rows = list(csv.reader(payload["csv"].lstrip("\ufeff").splitlines()))
+        self.assertTrue(csv_rows)
+        self.assertTrue(all(len(row) == len(csv_rows[0]) for row in csv_rows))
+        self.assertEqual(len(csv_rows[0]), 18)
+        self.assertEqual([row[0] for row in csv_rows[1:]], ["BGM", "BGM", "SFX", "SFX"])
 
 
 if __name__ == "__main__":

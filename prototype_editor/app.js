@@ -30052,16 +30052,16 @@ function exportAudioCueSheetMarkdown() {
     generatedAt: formatDate(new Date().toISOString()),
   });
   downloadTextFile(fileName, content, "text/markdown;charset=utf-8");
-  setSaveStatus(`已导出 BGM 调度表：${fileName}`);
-  showToast(`BGM 调度表已导出：${fileName}`);
+  setSaveStatus(`已导出音频调度表：${fileName}`);
+  showToast(`音频调度表已导出：${fileName}`);
 }
 
 function exportAudioCueSheetCsv() {
   const fileName = buildAudioCueSheetFileName("csv");
   const content = audioCueSheetTools.buildAudioCueSheetCsv(buildAudioCueSheet());
   downloadTextFile(fileName, content, "text/csv;charset=utf-8");
-  setSaveStatus(`已导出 BGM 调度 CSV：${fileName}`);
-  showToast(`BGM 调度 CSV 已导出：${fileName}`);
+  setSaveStatus(`已导出音频调度 CSV：${fileName}`);
+  showToast(`音频调度 CSV 已导出：${fileName}`);
 }
 
 function buildStageDirectionSheet() {

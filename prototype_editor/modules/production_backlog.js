@@ -260,7 +260,7 @@
     addIssueTasks(tasks, "choice", context.choiceConsequenceSheet?.issues, { fallbackTitle: "处理选项问题", fallbackSource: "选项后果表" });
     addIssueTasks(tasks, "variable", context.variableInfluenceSheet?.issues, { fallbackTitle: "处理变量问题", fallbackSource: "变量影响表" });
     addIssueTasks(tasks, "asset", context.assetDependencySheet?.issues, { fallbackTitle: "处理素材依赖问题", fallbackSource: "素材依赖表" });
-    addIssueTasks(tasks, "audio", context.audioCueSheet?.issues, { fallbackTitle: "处理音频调度问题", fallbackSource: "BGM 调度表" });
+    addIssueTasks(tasks, "audio", context.audioCueSheet?.issues, { fallbackTitle: "处理音频调度问题", fallbackSource: "音频调度表" });
     addIssueTasks(tasks, "stage", context.stageDirectionSheet?.issues, { fallbackTitle: "处理角色调度问题", fallbackSource: "角色舞台调度表" });
     addIssueTasks(tasks, "presentation", context.presentationTimeline?.issues, { fallbackTitle: "处理演出节奏问题", fallbackSource: "演出时间轴" });
     addIssueTasks(tasks, "localization", context.localizationCoverage?.issues, { fallbackTitle: "处理翻译覆盖问题", fallbackSource: "多语言覆盖报告", maxItems: 8 });

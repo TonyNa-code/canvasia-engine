@@ -62,14 +62,30 @@ class FrontendAudioCueSheetPanelModuleTests(unittest.TestCase):
                 }},
               ],
             }});
+            const sfxOnlySheet = sheetTools.buildAudioCueSheet({{
+              chapters: [{{ id: "chapter_1", name: "第1章" }}],
+              assetList: [{{ id: "sfx_door", type: "sfx", name: "门铃", fileExists: true }}],
+              scenes: [
+                {{
+                  id: "scene_sfx",
+                  chapterId: "chapter_1",
+                  name: "走廊",
+                  blocks: [
+                    {{ id: "sfx_1", type: "sfx_play", assetId: "sfx_door", volume: 75 }},
+                  ],
+                }},
+              ],
+            }});
             const emptyHtml = panelTools.renderAudioCueSheetPanel({{ summary: {{}}, issues: [], rangeRows: [] }});
             const issueHtml = panelTools.renderAudioCueSheetPanel(issueSheet);
             const rangeHtml = panelTools.renderAudioCueSheetPanel(rangeSheet);
+            const sfxOnlyHtml = panelTools.renderAudioCueSheetPanel(sfxOnlySheet);
             process.stdout.write(JSON.stringify({{
               keys: Object.keys(panelTools).sort(),
               emptyHtml,
               issueHtml,
               rangeHtml,
+              sfxOnlyHtml,
             }}));
             """
         )
@@ -85,13 +101,17 @@ class FrontendAudioCueSheetPanelModuleTests(unittest.TestCase):
         payload = json.loads(completed.stdout)
         self.assertIn("renderAudioCueSheetPanel", payload["keys"])
         self.assertIn("renderAudioCueSheetPreview", payload["keys"])
+        self.assertIn("renderSfxCueRow", payload["keys"])
         self.assertIn('data-action="export-audio-cue-sheet-markdown"', payload["rangeHtml"])
         self.assertIn('data-action="export-audio-cue-sheet-csv"', payload["rangeHtml"])
+        self.assertIn("音频调度表", payload["rangeHtml"])
         self.assertIn("缺文件 BGM", payload["issueHtml"])
         self.assertIn("结束卡片不存在", payload["issueHtml"])
         self.assertIn("放课后钢琴", payload["rangeHtml"])
         self.assertIn("重点试听开始卡和结束卡前后", payload["rangeHtml"])
-        self.assertIn("当前项目还没有播放音乐卡", payload["emptyHtml"])
+        self.assertIn("门铃", payload["sfxOnlyHtml"])
+        self.assertIn("发布前抽查触发点即可", payload["sfxOnlyHtml"])
+        self.assertIn("当前项目还没有播放音乐或音效卡", payload["emptyHtml"])
 
 
 if __name__ == "__main__":

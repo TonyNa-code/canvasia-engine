@@ -42,8 +42,8 @@
     }
     return {
       status: "empty",
-      title: "还没有 BGM 调度",
-      detail: "项目里暂时没有播放音乐卡。",
+      title: "还没有音频调度",
+      detail: "项目里暂时没有播放音乐或音效卡。",
     };
   }
 
@@ -58,7 +58,7 @@
           <strong>${escapeHtml(issue.title)}</strong>
           <span class="issue-tag ${toneClass}">${escapeHtml(severityLabel)}</span>
         </div>
-        <p>${escapeHtml(`${issue.chapterName ?? "未分章"} · ${issue.sceneName ?? "未命名场景"} · ${issue.assetName ?? "未选择 BGM"}`)}</p>
+        <p>${escapeHtml(`${issue.cueType === "sfx" ? "音效" : "BGM"} · ${issue.chapterName ?? "未分章"} · ${issue.sceneName ?? "未命名场景"} · ${issue.assetName ?? "未选择音频素材"}`)}</p>
         <div class="helper-text">${escapeHtml(issue.detail)}</div>
       </article>
     `;
@@ -76,9 +76,22 @@
     `;
   }
 
+  function renderSfxCueRow(row = {}) {
+    return `
+      <div class="route-testing-item">
+        <div>
+          <b>${escapeHtml(row.assetName)}</b>
+          <span>${escapeHtml(`${row.chapterName ?? "未分章"} · ${row.sceneName ?? "未命名场景"} · ${row.volumeLabel ?? "100%"}`)}</span>
+        </div>
+        <span>${escapeHtml(`${row.cueLabel ?? "音效触发点"} · ${row.reviewHint ?? "发布前试听这一声。"}`)}</span>
+      </div>
+    `;
+  }
+
   function renderAudioCueSheetPreview(sheet = {}) {
     const topIssues = (Array.isArray(sheet.issues) ? sheet.issues : []).slice(0, 4);
     const rangePreview = (Array.isArray(sheet.rangeRows) ? sheet.rangeRows : []).slice(0, 4);
+    const sfxPreview = (Array.isArray(sheet.sfxRows) ? sheet.sfxRows : []).slice(0, Math.max(0, 4 - rangePreview.length));
 
     if (topIssues.length > 0) {
       return `
@@ -87,14 +100,15 @@
         </div>
       `;
     }
-    if (rangePreview.length > 0) {
+    if (rangePreview.length > 0 || sfxPreview.length > 0) {
       return `
         <div class="list-stack compact-stack">
           ${rangePreview.map(renderAudioCueRangeRow).join("")}
+          ${sfxPreview.map(renderSfxCueRow).join("")}
         </div>
       `;
     }
-    return renderEmpty("当前项目还没有播放音乐卡。可以先在剧情页给入口场景加一首 BGM。");
+    return renderEmpty("当前项目还没有播放音乐或音效卡。可以先在剧情页给入口场景加一首 BGM，再补关键音效。");
   }
 
   function renderAudioCueSheetPanel(sheet = {}) {
@@ -104,22 +118,22 @@
     return `
       <article class="detail-card preview-sprint-panel">
         <div class="panel-heading">
-          <h2>BGM 调度表</h2>
+          <h2>音频调度表</h2>
           <span class="badge badge-soft ${getAudioCueSheetToneClass(digest.status)}">${escapeHtml(digest.title)}</span>
         </div>
-        <p class="helper-text">${escapeHtml(digest.detail)} 适合发布前把“哪首歌覆盖哪段剧情、在哪里淡入淡出、哪里需要试听”一次看清。</p>
+        <p class="helper-text">${escapeHtml(digest.detail)} 适合发布前把“哪首歌覆盖哪段剧情、哪些音效在哪触发、哪里需要试听”一次看清。</p>
         <div class="preview-sprint-metrics">
           ${renderRouteMetricCard("BGM 卡", `${summary.cueCount ?? 0} 张`, "项目中所有播放音乐卡")}
+          ${renderRouteMetricCard("音效卡", `${summary.sfxCueCount ?? 0} 张`, "门铃、脚步、心跳等触发音效")}
           ${renderRouteMetricCard("覆盖段", `${summary.rangeSegmentCount ?? 0} 段`, "每首 BGM 实际覆盖的剧情范围")}
-          ${renderRouteMetricCard("建议试听", `${summary.auditionNeededCount ?? 0} 段`, "范围、接管或提示需要人工确认")}
           ${renderRouteMetricCard("阻塞 / 提醒", `${summary.blockerCount ?? 0} / ${summary.warningCount ?? 0}`, "缺素材、坏范围或提前接管")}
         </div>
         <div class="detail-actions">
           <button class="toolbar-button toolbar-button-primary" data-action="export-audio-cue-sheet-markdown">
-            导出 BGM 调度表
+            导出音频调度表
           </button>
           <button class="toolbar-button" data-action="export-audio-cue-sheet-csv">
-            导出 BGM CSV
+            导出音频 CSV
           </button>
           <button class="toolbar-button" data-action="switch-screen" data-screen="story">
             去剧情页调整音乐
@@ -134,6 +148,7 @@
     getAudioCueSheetToneClass,
     renderAudioCueIssueCard,
     renderAudioCueRangeRow,
+    renderSfxCueRow,
     renderAudioCueSheetPreview,
     renderAudioCueSheetPanel,
   });
