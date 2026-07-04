@@ -665,6 +665,192 @@
     }));
   }
 
+  function getAudioProductionSeverityLabel(severity = "") {
+    if (severity === "blocker") {
+      return "先修";
+    }
+    if (severity === "warn") {
+      return "复查";
+    }
+    return "润色";
+  }
+
+  function getAudioIssueActionLabel(issue = {}) {
+    const code = String(issue.code ?? "");
+    if (code.includes("asset") || code.includes("file_missing")) {
+      return "补齐或重新绑定素材";
+    }
+    if (code.includes("end_block") || code.includes("range")) {
+      return "重新选择 BGM 结束范围";
+    }
+    if (code.includes("handoff") || code.includes("taken_over")) {
+      return "试听切歌点并调整淡入淡出";
+    }
+    if (code.includes("silent")) {
+      return "检查音量是否误设为 0";
+    }
+    if (code.includes("fade")) {
+      return "补 300-1200ms 淡入淡出";
+    }
+    return "打开对应场景复查";
+  }
+
+  function getAudioIssueTargetLabel(issue = {}) {
+    return cleanText(
+      [issue.chapterName, issue.sceneName, issue.startLabel || issue.assetName]
+        .filter(Boolean)
+        .join(" · "),
+      "未定位音频问题"
+    );
+  }
+
+  function getProductionTaskWeight(task = {}) {
+    const severityWeight = task.severity === "blocker" ? 1000 : task.severity === "warn" ? 600 : 220;
+    const code = String(task.code ?? "");
+    const codeWeight =
+      code.includes("file_missing") || code.includes("unknown") || code.includes("missing_asset")
+        ? 80
+        : code.includes("end_block") || code.includes("range")
+          ? 70
+          : code.includes("handoff") || code.includes("taken_over")
+            ? 45
+            : code.includes("scene_without_music")
+              ? 25
+              : code.includes("audition")
+                ? 10
+                : 0;
+    return severityWeight + codeWeight;
+  }
+
+  function buildAudioCueProductionQueue(sheet = {}) {
+    const tasks = [];
+
+    toArray(sheet.issues).forEach((issue, index) => {
+      tasks.push({
+        id: `issue_${issue.cueId ?? index}_${issue.code ?? index}`,
+        code: issue.code ?? "audio_issue",
+        severity: issue.severity ?? "tip",
+        phase: getAudioProductionSeverityLabel(issue.severity),
+        title: issue.title ?? "音频问题",
+        detail: issue.detail ?? "",
+        targetLabel: getAudioIssueTargetLabel(issue),
+        actionLabel: getAudioIssueActionLabel(issue),
+        cueType: issue.cueType ?? "audio",
+      });
+    });
+
+    toArray(sheet.scenesWithoutMusic).forEach((scene, index) => {
+      tasks.push({
+        id: `scene_without_music_${scene.sceneId || index}`,
+        code: "scene_without_music",
+        severity: "tip",
+        phase: "氛围",
+        title: "内容场景暂无 BGM",
+        detail: `这个场景有 ${scene.blockCount ?? 0} 张剧情卡，但还没有主动播放 BGM。`,
+        targetLabel: cleanText(`${scene.chapterName ?? "未分章"} · ${scene.sceneName ?? "未命名场景"}`),
+        actionLabel: "给场景开头补一张 BGM 播放卡",
+        cueType: "bgm",
+      });
+    });
+
+    toArray(sheet.cues)
+      .filter((cue) => cue.needsAudition)
+      .forEach((cue, index) => {
+        tasks.push({
+          id: `audition_bgm_${cue.id || index}`,
+          code: "audition_bgm_segment",
+          severity: cue.status === "blocker" ? "blocker" : cue.status === "warn" ? "warn" : "tip",
+          phase: cue.status === "blocker" ? "修完再听" : "试听",
+          title: "试听 BGM 覆盖段",
+          detail: cue.auditionHint,
+          targetLabel: `${cue.chapterName} · ${cue.sceneName} · ${cue.assetName}`,
+          actionLabel: cue.handoffLabel,
+          cueType: "bgm",
+        });
+      });
+
+    return tasks
+      .sort((left, right) => {
+        const weightDelta = getProductionTaskWeight(right) - getProductionTaskWeight(left);
+        if (weightDelta !== 0) {
+          return weightDelta;
+        }
+        return String(left.targetLabel ?? "").localeCompare(String(right.targetLabel ?? ""), "zh-CN");
+      })
+      .slice(0, 160)
+      .map((task, index) => ({
+        ...task,
+        rank: index + 1,
+      }));
+  }
+
+  function buildAudioCueAuditionChecklist(sheet = {}) {
+    const rows = [];
+
+    toArray(sheet.cues)
+      .filter((cue) => cue.needsAudition)
+      .forEach((cue, index) => {
+        rows.push({
+          id: `bgm_${cue.id || index}`,
+          type: "BGM",
+          priority: cue.status === "blocker" ? "修完再听" : cue.status === "warn" ? "重点试听" : "抽查",
+          targetLabel: `${cue.chapterName} · ${cue.sceneName}`,
+          assetName: cue.assetName,
+          cueLabel: `${cue.startLabel} -> ${cue.endLabel}`,
+          actionLabel: cue.auditionHint,
+          statusLabel: cue.statusLabel,
+        });
+      });
+
+    toArray(sheet.sfxCues)
+      .filter((cue, index) => cue.status !== "good" || index < 12)
+      .forEach((cue, index) => {
+        rows.push({
+          id: `sfx_${cue.id || index}`,
+          type: "SFX",
+          priority: cue.status === "blocker" ? "修完再听" : cue.status === "warn" ? "重点试听" : "抽查",
+          targetLabel: `${cue.chapterName} · ${cue.sceneName}`,
+          assetName: cue.assetName,
+          cueLabel: cue.cueLabel,
+          actionLabel: cue.reviewHint,
+          statusLabel: cue.statusLabel,
+        });
+      });
+
+    toArray(sheet.voiceCues)
+      .filter((cue, index) => cue.status !== "good" || index < 12)
+      .forEach((cue, index) => {
+        rows.push({
+          id: `voice_${cue.id || index}`,
+          type: "Voice",
+          priority: cue.status === "blocker" ? "修完再听" : cue.status === "warn" ? "重点试听" : "抽查",
+          targetLabel: `${cue.chapterName} · ${cue.sceneName} · ${cue.speakerName}`,
+          assetName: cue.assetName,
+          cueLabel: cue.textPreview || cue.cueLabel,
+          actionLabel: cue.reviewHint,
+          statusLabel: cue.statusLabel,
+        });
+      });
+
+    return rows.slice(0, 160).map((row, index) => ({
+      ...row,
+      rank: index + 1,
+    }));
+  }
+
+  function getAudioCueReadinessPercent(summary = {}) {
+    const cueTotal = (summary.cueCount ?? 0) + (summary.sfxCueCount ?? 0) + (summary.voiceCueCount ?? 0);
+    if (cueTotal <= 0) {
+      return 0;
+    }
+    const penalty =
+      (summary.blockerCount ?? 0) * 18 +
+      (summary.warningCount ?? 0) * 8 +
+      (summary.tipCount ?? 0) * 2 +
+      Math.min(24, (summary.scenesWithoutMusicCount ?? 0) * 4);
+    return Math.round(clampNumber(100 - penalty, 0, 100, 100));
+  }
+
   function buildAudioCueSheet(data = {}) {
     const assetMap = buildAssetMap(data);
     const chapterMap = buildChapterMap(data);
@@ -802,7 +988,7 @@
       tipCount: issues.filter((issue) => issue.severity === "tip").length,
     };
 
-    return {
+    const sheet = {
       projectTitle: cleanText(data.project?.title, "Canvasia Project"),
       cues,
       rangeRows,
@@ -814,6 +1000,17 @@
       scenesWithoutMusic,
       issues,
       summary,
+    };
+    const productionQueue = buildAudioCueProductionQueue(sheet);
+    const auditionChecklist = buildAudioCueAuditionChecklist(sheet);
+    summary.productionTaskCount = productionQueue.length;
+    summary.auditionChecklistCount = auditionChecklist.length;
+    summary.releaseReadinessPercent = getAudioCueReadinessPercent(summary);
+
+    return {
+      ...sheet,
+      productionQueue,
+      auditionChecklist,
     };
   }
 
@@ -936,6 +1133,25 @@
       issue.title,
       issue.detail,
     ]);
+    const productionRows = toArray(sheet.productionQueue).slice(0, 120).map((task) => [
+      `${task.rank}`,
+      task.phase,
+      task.cueType === "voice" ? "语音" : task.cueType === "sfx" ? "音效" : "BGM",
+      task.title,
+      task.targetLabel,
+      task.actionLabel,
+      task.detail,
+    ]);
+    const auditionRows = toArray(sheet.auditionChecklist).slice(0, 120).map((row) => [
+      `${row.rank}`,
+      row.priority,
+      row.type,
+      row.targetLabel,
+      row.assetName,
+      row.cueLabel,
+      row.actionLabel,
+      row.statusLabel,
+    ]);
     const sceneRows = toArray(sheet.scenesWithoutMusic).slice(0, 80).map((scene, index) => [
       `${index + 1}`,
       scene.chapterName,
@@ -969,8 +1185,21 @@
           ["音效缺失", `${summary.missingSfxAssetCount ?? 0}`],
           ["语音缺失", `${summary.missingVoiceAssetCount ?? 0}`],
           ["无 BGM 内容场景", `${summary.scenesWithoutMusicCount ?? 0}`],
+          ["制作任务", `${summary.productionTaskCount ?? 0}`],
+          ["试听清单", `${summary.auditionChecklistCount ?? 0}`],
+          ["发布就绪度", `${summary.releaseReadinessPercent ?? 0}%`],
         ]
       ),
+      "",
+      "## 制作优先队列",
+      "",
+      buildMarkdownTable(["序号", "阶段", "类型", "任务", "定位", "建议动作", "说明"], productionRows) ||
+        "当前没有需要排队处理的音频制作任务。",
+      "",
+      "## 发布前试听清单",
+      "",
+      buildMarkdownTable(["序号", "优先级", "类型", "位置", "素材", "触发/范围", "试听动作", "状态"], auditionRows) ||
+        "当前没有需要特别列出的试听项。",
       "",
       "## BGM 覆盖范围速览",
       "",
@@ -1096,6 +1325,8 @@
     buildAudioCueRangeRows,
     buildSfxCueRows,
     buildVoiceCueRows,
+    buildAudioCueProductionQueue,
+    buildAudioCueAuditionChecklist,
     buildAudioCueSheet,
     getAudioCueSheetStatusDigest,
     buildAudioCueSheetMarkdown,

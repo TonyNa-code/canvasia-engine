@@ -100,6 +100,70 @@
     `;
   }
 
+  function renderAudioProductionTaskCard(task = {}) {
+    const severityClass = task.severity === "blocker" ? "danger" : task.severity === "warn" ? "warn" : "soft";
+    const toneClass = task.severity === "blocker" ? "danger-text" : task.severity === "warn" ? "warn-text" : "";
+
+    return `
+      <article class="preview-sprint-card is-${severityClass}">
+        <div class="preview-sprint-head">
+          <strong>${escapeHtml(`${task.rank ?? "-"} · ${task.title ?? "音频制作任务"}`)}</strong>
+          <span class="issue-tag ${toneClass}">${escapeHtml(task.phase ?? "处理")}</span>
+        </div>
+        <p>${escapeHtml(`${task.targetLabel ?? "未定位"} · ${task.actionLabel ?? "打开对应位置复查"}`)}</p>
+        <div class="helper-text">${escapeHtml(task.detail ?? "")}</div>
+      </article>
+    `;
+  }
+
+  function renderAudioAuditionChecklistRow(row = {}) {
+    return `
+      <div class="route-testing-item">
+        <div>
+          <b>${escapeHtml(`${row.rank ?? "-"} · ${row.type ?? "Audio"} · ${row.assetName ?? "未命名素材"}`)}</b>
+          <span>${escapeHtml(`${row.targetLabel ?? "未定位"} · ${row.cueLabel ?? "触发点待确认"}`)}</span>
+        </div>
+        <span>${escapeHtml(`${row.priority ?? "抽查"} · ${row.actionLabel ?? "发布前试听"}`)}</span>
+      </div>
+    `;
+  }
+
+  function renderAudioProductionQueue(queue = []) {
+    const rows = Array.isArray(queue) ? queue.slice(0, 6) : [];
+    if (!rows.length) {
+      return "";
+    }
+    return `
+      <section class="preview-sprint-section">
+        <div class="panel-heading panel-heading-compact">
+          <h3>制作优先队列</h3>
+          <span class="badge badge-soft">先修阻塞，再复查听感</span>
+        </div>
+        <div class="preview-sprint-grid">
+          ${rows.map(renderAudioProductionTaskCard).join("")}
+        </div>
+      </section>
+    `;
+  }
+
+  function renderAudioAuditionChecklist(checklist = []) {
+    const rows = Array.isArray(checklist) ? checklist.slice(0, 8) : [];
+    if (!rows.length) {
+      return "";
+    }
+    return `
+      <section class="preview-sprint-section">
+        <div class="panel-heading panel-heading-compact">
+          <h3>发布前试听清单</h3>
+          <span class="badge badge-soft">${escapeHtml(`${checklist.length} 项`)}</span>
+        </div>
+        <div class="list-stack compact-stack">
+          ${rows.map(renderAudioAuditionChecklistRow).join("")}
+        </div>
+      </section>
+    `;
+  }
+
   function renderAudioCueSheetPreview(sheet = {}) {
     const topIssues = (Array.isArray(sheet.issues) ? sheet.issues : []).slice(0, 4);
     const rangePreview = (Array.isArray(sheet.rangeRows) ? sheet.rangeRows : []).slice(0, 4);
@@ -145,6 +209,9 @@
           ${renderRouteMetricCard("语音卡", `${summary.voiceCueCount ?? 0} 句`, "已绑定语音的台词和旁白")}
           ${renderRouteMetricCard("覆盖段", `${summary.rangeSegmentCount ?? 0} 段`, "每首 BGM 实际覆盖的剧情范围")}
           ${renderRouteMetricCard("阻塞 / 提醒", `${summary.blockerCount ?? 0} / ${summary.warningCount ?? 0}`, "缺素材、坏范围或提前接管")}
+          ${renderRouteMetricCard("就绪度", `${summary.releaseReadinessPercent ?? 0}%`, "按阻塞、提醒和缺 BGM 场景估算")}
+          ${renderRouteMetricCard("制作任务", `${summary.productionTaskCount ?? 0} 项`, "按发布优先级自动排序")}
+          ${renderRouteMetricCard("试听清单", `${summary.auditionChecklistCount ?? 0} 项`, "发布前建议抽查的音频点")}
         </div>
         <div class="detail-actions">
           <button class="toolbar-button toolbar-button-primary" data-action="export-audio-cue-sheet-markdown">
@@ -158,6 +225,8 @@
           </button>
         </div>
         ${renderAudioCueSheetPreview(sheet)}
+        ${renderAudioProductionQueue(sheet.productionQueue)}
+        ${renderAudioAuditionChecklist(sheet.auditionChecklist)}
       </article>
     `;
   }
@@ -168,6 +237,10 @@
     renderAudioCueRangeRow,
     renderSfxCueRow,
     renderVoiceCueRow,
+    renderAudioProductionTaskCard,
+    renderAudioAuditionChecklistRow,
+    renderAudioProductionQueue,
+    renderAudioAuditionChecklist,
     renderAudioCueSheetPreview,
     renderAudioCueSheetPanel,
   });
