@@ -60,6 +60,7 @@ const choiceConsequenceSheetTools = window.CanvasiaEditorChoiceConsequenceSheet;
 const variableInfluenceSheetTools = window.CanvasiaEditorVariableInfluenceSheet;
 const assetDependencySheetTools = window.CanvasiaEditorAssetDependencySheet;
 const audioCueSheetTools = window.CanvasiaEditorAudioCueSheet;
+const audioCueSheetPanelTools = window.CanvasiaEditorAudioCueSheetPanel;
 const stageDirectionSheetTools = window.CanvasiaEditorStageDirectionSheet;
 const presentationTimelineTools = window.CanvasiaEditorPresentationTimeline;
 const localizationCoverageTools = window.CanvasiaEditorLocalizationCoverage;
@@ -32230,94 +32231,8 @@ function renderAssetDependencyPanel() {
   `;
 }
 
-function getAudioCueSheetToneClass(status) {
-  if (status === "blocked") {
-    return "danger-text";
-  }
-  if (status === "warn") {
-    return "warn-text";
-  }
-  if (status === "ready") {
-    return "good-text";
-  }
-  return "";
-}
-
 function renderAudioCueSheetPanel() {
-  const sheet = buildAudioCueSheet();
-  const digest = audioCueSheetTools.getAudioCueSheetStatusDigest(sheet);
-  const summary = sheet.summary ?? {};
-  const topIssues = (sheet.issues ?? []).slice(0, 4);
-  const rangePreview = (sheet.rangeRows ?? []).slice(0, 4);
-
-  return `
-    <article class="detail-card preview-sprint-panel">
-      <div class="panel-heading">
-        <h2>BGM 调度表</h2>
-        <span class="badge badge-soft ${getAudioCueSheetToneClass(digest.status)}">${escapeHtml(digest.title)}</span>
-      </div>
-      <p class="helper-text">${escapeHtml(digest.detail)} 适合发布前把“哪首歌覆盖哪段剧情、在哪里淡入淡出、哪里需要试听”一次看清。</p>
-      <div class="preview-sprint-metrics">
-        ${renderRouteMetricCard("BGM 卡", `${summary.cueCount ?? 0} 张`, "项目中所有播放音乐卡")}
-        ${renderRouteMetricCard("覆盖段", `${summary.rangeSegmentCount ?? 0} 段`, "每首 BGM 实际覆盖的剧情范围")}
-        ${renderRouteMetricCard("建议试听", `${summary.auditionNeededCount ?? 0} 段`, "范围、接管或提示需要人工确认")}
-        ${renderRouteMetricCard("阻塞 / 提醒", `${summary.blockerCount ?? 0} / ${summary.warningCount ?? 0}`, "缺素材、坏范围或提前接管")}
-      </div>
-      <div class="detail-actions">
-        <button class="toolbar-button toolbar-button-primary" data-action="export-audio-cue-sheet-markdown">
-          导出 BGM 调度表
-        </button>
-        <button class="toolbar-button" data-action="export-audio-cue-sheet-csv">
-          导出 BGM CSV
-        </button>
-        <button class="toolbar-button" data-action="switch-screen" data-screen="story">
-          去剧情页调整音乐
-        </button>
-      </div>
-      ${
-        topIssues.length > 0
-          ? `
-            <div class="preview-sprint-grid">
-              ${topIssues
-                .map(
-                  (issue) => `
-                    <article class="preview-sprint-card is-${issue.severity === "blocker" ? "danger" : issue.severity === "warn" ? "warn" : "soft"}">
-                      <div class="preview-sprint-head">
-                        <strong>${escapeHtml(issue.title)}</strong>
-                        <span class="issue-tag ${issue.severity === "blocker" ? "danger-text" : issue.severity === "warn" ? "warn-text" : ""}">
-                          ${escapeHtml(issue.severity === "blocker" ? "先修" : issue.severity === "warn" ? "复查" : "润色")}
-                        </span>
-                      </div>
-                      <p>${escapeHtml(`${issue.chapterName} · ${issue.sceneName} · ${issue.assetName}`)}</p>
-                      <div class="helper-text">${escapeHtml(issue.detail)}</div>
-                    </article>
-                  `
-                )
-                .join("")}
-            </div>
-          `
-          : rangePreview.length > 0
-            ? `
-              <div class="list-stack compact-stack">
-                ${rangePreview
-                  .map(
-                    (row) => `
-                      <div class="route-testing-item">
-                        <div>
-                          <b>${escapeHtml(row.assetName)}</b>
-                          <span>${escapeHtml(`${row.chapterName} · ${row.sceneName} · ${row.spanLabel}`)}</span>
-                        </div>
-                        <span>${escapeHtml(`${row.handoffLabel} · ${row.auditionHint}`)}</span>
-                      </div>
-                    `
-                  )
-                  .join("")}
-              </div>
-            `
-            : renderEmpty("当前项目还没有播放音乐卡。可以先在剧情页给入口场景加一首 BGM。")
-      }
-    </article>
-  `;
+  return audioCueSheetPanelTools.renderAudioCueSheetPanel(buildAudioCueSheet());
 }
 
 function getStageDirectionSheetToneClass(status) {

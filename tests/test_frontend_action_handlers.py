@@ -4047,6 +4047,8 @@ class FrontendActionHandlerTests(unittest.TestCase):
 
     def test_audio_cue_sheet_export_actions_are_wired(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
+        panel_source = (ROOT_DIR / "prototype_editor" / "modules" / "audio_cue_sheet_panel.js").read_text(encoding="utf-8")
+        combined_source = f"{source}\n{panel_source}"
         click_handler = _extract_function_source(source, "handleClick")
         markdown_block_start = click_handler.index('action === "export-audio-cue-sheet-markdown"')
         csv_block_start = click_handler.index('action === "export-audio-cue-sheet-csv"')
@@ -4055,16 +4057,18 @@ class FrontendActionHandlerTests(unittest.TestCase):
         csv_block = click_handler[csv_block_start:csv_block_end]
 
         self.assertIn("const audioCueSheetTools = window.CanvasiaEditorAudioCueSheet", source)
-        self.assertIn('data-action="export-audio-cue-sheet-markdown"', source)
-        self.assertIn('data-action="export-audio-cue-sheet-csv"', source)
+        self.assertIn("const audioCueSheetPanelTools = window.CanvasiaEditorAudioCueSheetPanel", source)
+        self.assertIn('data-action="export-audio-cue-sheet-markdown"', combined_source)
+        self.assertIn('data-action="export-audio-cue-sheet-csv"', combined_source)
         self.assertIn("exportAudioCueSheetMarkdown();", markdown_block)
         self.assertIn("exportAudioCueSheetCsv();", csv_block)
         self.assertIn("function buildAudioCueSheet()", source)
         self.assertIn("function renderAudioCueSheetPanel()", source)
+        self.assertIn("audioCueSheetPanelTools.renderAudioCueSheetPanel(buildAudioCueSheet())", source)
         self.assertIn("function exportAudioCueSheetMarkdown()", source)
         self.assertIn("function exportAudioCueSheetCsv()", source)
         self.assertIn("audioCueSheetTools.buildAudioCueSheet", source)
-        self.assertIn("audioCueSheetTools.getAudioCueSheetStatusDigest", source)
+        self.assertIn("audioCueSheetTools.getAudioCueSheetStatusDigest", panel_source)
 
     def test_scene_production_board_export_actions_are_wired(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
