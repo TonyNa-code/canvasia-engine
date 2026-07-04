@@ -4502,6 +4502,21 @@ button.asset-gap-stat-card:hover {
   word-break: break-word;
 }
 
+.compact-toggle-row label {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 0;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.compact-toggle-row input[type="checkbox"] {
+  width: auto;
+  min-width: 18px;
+  margin: 0;
+}
+
 .editor-card {
   padding: 14px;
   border-radius: 18px;

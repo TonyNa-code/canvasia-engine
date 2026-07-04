@@ -401,6 +401,78 @@ class RunEditorSmokeTests(unittest.TestCase):
         run_editor.save_scene(chapter_id, updated_scene["id"], updated_scene)
         return updated_scene
 
+    def test_update_asset_metadata_persists_release_rights_fields(self) -> None:
+        self.create_blank_project_with_chapter()
+        run_editor.write_json(
+            run_editor.DATA_DIR / "assets.json",
+            {
+                "assets": [
+                    {
+                        "id": "bg_classroom",
+                        "type": "background",
+                        "name": "旧教室",
+                        "path": "",
+                        "tags": [],
+                    }
+                ]
+            },
+        )
+
+        result = run_editor.update_asset_metadata(
+            "bg_classroom",
+            name="黄昏教室",
+            tags="校园, 黄昏",
+            rights={
+                "license": "CC-BY 4.0",
+                "commercialUse": "allowed",
+                "sourceUrl": "https://example.com/background",
+                "author": "Studio A",
+                "credit": "Background by Studio A",
+                "generatedByAi": True,
+                "aiProvider": "OpenAI",
+                "prompt": "visual novel classroom at sunset",
+                "attributionRequired": True,
+            },
+        )
+
+        asset = result["asset"]
+        self.assertEqual(asset["name"], "黄昏教室")
+        self.assertEqual(asset["tags"], ["校园", "黄昏"])
+        self.assertEqual(asset["license"], "CC-BY 4.0")
+        self.assertEqual(asset["commercialUse"], "可商用")
+        self.assertEqual(asset["sourceUrl"], "https://example.com/background")
+        self.assertEqual(asset["author"], "Studio A")
+        self.assertEqual(asset["credit"], "Background by Studio A")
+        self.assertTrue(asset["generatedByAi"])
+        self.assertEqual(asset["aiProvider"], "OpenAI")
+        self.assertEqual(asset["prompt"], "visual novel classroom at sunset")
+        self.assertTrue(asset["attributionRequired"])
+
+        cleared = run_editor.update_asset_metadata(
+            "bg_classroom",
+            rights={
+                "license": "",
+                "commercialUse": "unknown",
+                "sourceUrl": "",
+                "author": "",
+                "credit": "",
+                "generatedByAi": False,
+                "aiProvider": "",
+                "prompt": "",
+                "attributionRequired": False,
+            },
+        )["asset"]
+
+        self.assertNotIn("license", cleared)
+        self.assertEqual(cleared["commercialUse"], "未确认")
+        self.assertNotIn("sourceUrl", cleared)
+        self.assertNotIn("author", cleared)
+        self.assertNotIn("credit", cleared)
+        self.assertFalse(cleared["generatedByAi"])
+        self.assertNotIn("aiProvider", cleared)
+        self.assertNotIn("prompt", cleared)
+        self.assertFalse(cleared["attributionRequired"])
+
     def test_starter_kit_bootstraps_first_scene_for_playable_demo(self) -> None:
         self.create_blank_project_with_chapter()
 

@@ -199,6 +199,20 @@ ASSET_TYPE_LABELS = {
     "model3d": "3D 模型",
     "scene3d": "3D 场景",
 }
+ASSET_RIGHTS_TEXT_LIMITS = {
+    "license": 160,
+    "sourceUrl": 500,
+    "author": 160,
+    "credit": 220,
+    "aiProvider": 120,
+    "prompt": 2000,
+}
+ASSET_RIGHTS_BOOLEAN_FIELDS = {"generatedByAi", "attributionRequired"}
+ASSET_COMMERCIAL_USE_LABELS = {
+    "unknown": "未确认",
+    "allowed": "可商用",
+    "forbidden": "不可商用",
+}
 BLOCK_LABELS = {
     "background": "切换背景",
     "dialogue": "台词",
@@ -1149,6 +1163,12 @@ def normalize_assets_document(payload: object) -> dict:
         asset["path"] = str(asset.get("path") or "").replace("\\", "/").strip()
         asset["tags"] = normalize_text_list(asset.get("tags"))
         asset["favorite"] = bool(asset.get("favorite"))
+        rights_payload = {
+            field: asset.get(field)
+            for field in (*ASSET_RIGHTS_TEXT_LIMITS.keys(), "commercialUse", *ASSET_RIGHTS_BOOLEAN_FIELDS)
+            if field in asset
+        }
+        apply_asset_rights_metadata(asset, rights_payload)
         normalized_assets.append(asset)
     return {
         "formatVersion": PROJECT_FORMAT_VERSION,
@@ -4506,6 +4526,62 @@ def normalize_asset_tags(tags: list[str] | str | None) -> list[str]:
     return normalized
 
 
+def normalize_asset_rights_text(value: object, max_length: int) -> str:
+    text = str(value or "").replace("\r\n", "\n").replace("\r", "\n").strip()
+    text = re.sub(r"[ \t]+", " ", text)
+    return text[:max_length].strip()
+
+
+def normalize_asset_commercial_use(value: object) -> str:
+    text = str(value or "").strip().lower()
+    if text in {"allowed", "commercial", "yes", "true", "可商用", "允许商用"}:
+        return ASSET_COMMERCIAL_USE_LABELS["allowed"]
+    if text in {"forbidden", "noncommercial", "no", "false", "不可商用", "禁止商用", "非商用"}:
+        return ASSET_COMMERCIAL_USE_LABELS["forbidden"]
+    return ASSET_COMMERCIAL_USE_LABELS["unknown"]
+
+
+def normalize_asset_rights_metadata(payload: object) -> dict:
+    if not isinstance(payload, dict):
+        return {}
+
+    normalized: dict[str, object] = {}
+    for field, max_length in ASSET_RIGHTS_TEXT_LIMITS.items():
+        if field in payload:
+            text = normalize_asset_rights_text(payload.get(field), max_length)
+            if text:
+                normalized[field] = text
+
+    if "commercialUse" in payload:
+        normalized["commercialUse"] = normalize_asset_commercial_use(payload.get("commercialUse"))
+
+    for field in ASSET_RIGHTS_BOOLEAN_FIELDS:
+        if field in payload:
+            normalized[field] = bool(payload.get(field))
+
+    return normalized
+
+
+def apply_asset_rights_metadata(asset: dict, payload: object) -> None:
+    if not isinstance(payload, dict):
+        return
+
+    normalized = normalize_asset_rights_metadata(payload)
+    for field in ASSET_RIGHTS_TEXT_LIMITS:
+        if field in payload:
+            if field in normalized:
+                asset[field] = normalized[field]
+            else:
+                asset.pop(field, None)
+
+    if "commercialUse" in payload:
+        asset["commercialUse"] = normalized.get("commercialUse", ASSET_COMMERCIAL_USE_LABELS["unknown"])
+
+    for field in ASSET_RIGHTS_BOOLEAN_FIELDS:
+        if field in payload:
+            asset[field] = bool(normalized.get(field, False))
+
+
 def delete_asset_file_if_unused(relative_path: str, assets: list[dict], skip_asset_id: str | None = None) -> bool:
     normalized = str(relative_path or "").strip()
     if not normalized:
@@ -4908,6 +4984,7 @@ def update_asset_metadata(
     name: str | None = None,
     tags: list[str] | str | None = None,
     favorite: bool | None = None,
+    rights: object | None = None,
 ) -> dict:
     if not asset_id:
         raise ValueError("保存素材信息时缺少 assetId。")
@@ -4930,6 +5007,9 @@ def update_asset_metadata(
 
     if favorite is not None:
         asset["favorite"] = bool(favorite)
+
+    if rights is not None:
+        apply_asset_rights_metadata(asset, rights)
 
     write_json(assets_path, assets_doc)
     touch_project()
@@ -13222,6 +13302,7 @@ class EditorRequestHandler(SimpleHTTPRequestHandler):
                     payload.get("name"),
                     payload.get("tags"),
                     payload.get("favorite"),
+                    payload.get("rights"),
                 ),
                 f"修改素材信息：{payload.get('name') or payload.get('assetId') or '未命名素材'}",
             )

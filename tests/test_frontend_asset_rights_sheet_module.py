@@ -101,6 +101,24 @@ class FrontendAssetRightsSheetModuleTests(unittest.TestCase):
             }});
             const csv = tools.buildAssetRightsCsv(sheet);
             const panel = tools.renderAssetRightsSheetPanel(sheet);
+            const editor = tools.renderAssetRightsEditor(data.assetList[0]);
+            const fakeDocument = {{
+              getElementById(id) {{
+                const values = {{
+                  assetRightsLicenseInput: {{ value: "自制授权" }},
+                  assetRightsCommercialInput: {{ value: "allowed" }},
+                  assetRightsSourceInput: {{ value: "本人绘制" }},
+                  assetRightsAuthorInput: {{ value: "Canvasia Team" }},
+                  assetRightsCreditInput: {{ value: "Art by Canvasia Team" }},
+                  assetRightsAiProviderInput: {{ value: "OpenAI" }},
+                  assetRightsPromptInput: {{ value: "visual novel classroom" }},
+                  assetRightsGeneratedByAiInput: {{ checked: true }},
+                  assetRightsAttributionRequiredInput: {{ checked: true }},
+                }};
+                return values[id] ?? {{ value: "", checked: false }};
+              }},
+            }};
+            const collected = tools.collectAssetRightsFormValues(fakeDocument);
             process.stdout.write(JSON.stringify({{
               keys: Object.keys(tools).sort(),
               sheet,
@@ -108,7 +126,10 @@ class FrontendAssetRightsSheetModuleTests(unittest.TestCase):
               markdown,
               csv,
               panel,
+              editor,
+              collected,
               bgLabel: tools.getAssetTypeLabel("background"),
+              commercialFormValue: tools.getAssetCommercialUseFormValue(data.assetList[0]),
             }}));
             """
         )
@@ -125,6 +146,8 @@ class FrontendAssetRightsSheetModuleTests(unittest.TestCase):
         self.assertIn("buildAssetRightsSheet", payload["keys"])
         self.assertIn("buildAssetRightsMarkdown", payload["keys"])
         self.assertIn("buildAssetRightsCsv", payload["keys"])
+        self.assertIn("collectAssetRightsFormValues", payload["keys"])
+        self.assertIn("renderAssetRightsEditor", payload["keys"])
         self.assertIn("renderAssetRightsSheetPanel", payload["keys"])
         self.assertEqual(payload["sheet"]["summary"]["assetCount"], 6)
         self.assertEqual(payload["sheet"]["summary"]["usedAssetCount"], 5)
@@ -150,6 +173,12 @@ class FrontendAssetRightsSheetModuleTests(unittest.TestCase):
         self.assertIn("Background by Studio A", payload["markdown"])
         self.assertIn('"不可商用字体"', payload["csv"])
         self.assertIn('data-action="export-asset-rights-markdown"', payload["panel"])
+        self.assertIn("assetRightsLicenseInput", payload["editor"])
+        self.assertEqual(payload["collected"]["license"], "自制授权")
+        self.assertEqual(payload["collected"]["commercialUse"], "可商用")
+        self.assertEqual(payload["collected"]["sourceUrl"], "本人绘制")
+        self.assertTrue(payload["collected"]["generatedByAi"])
+        self.assertEqual(payload["commercialFormValue"], "allowed")
         self.assertEqual(payload["bgLabel"], "背景")
 
 

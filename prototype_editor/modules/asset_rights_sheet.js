@@ -18,6 +18,11 @@
   const NON_COMMERCIAL_RE = /(non[-_\s]?commercial|cc[-_\s]?by[-_\s]?nc|personal only|editorial|不可商用|非商用|个人使用|禁止商用)/i;
   const ATTRIBUTION_RE = /(cc[-_\s]?by|attribution|署名|标注作者|需署名|credit required)/i;
   const PROVENANCE_RE = /(openai|midjourney|stable diffusion|sdxl|novelai|dall|sora|ai|人工智能|生成)/i;
+  const COMMERCIAL_USE_OPTIONS = Object.freeze({
+    unknown: "未确认",
+    allowed: "可商用",
+    forbidden: "不可商用",
+  });
 
   function toArray(value) {
     return Array.isArray(value) ? value : [];
@@ -169,6 +174,24 @@
       status: "unknown",
       label: commercialText || "未登记商用状态",
     };
+  }
+
+  function getAssetCommercialUseFormValue(asset = {}) {
+    const rawValue = cleanText(firstText(asset, ["commercialUse", "commercialAllowed", "usageRights", "rightsStatus", "terms"])).toLowerCase();
+    if (["allowed", "commercial", "yes", "true", "可商用", "允许商用"].includes(rawValue)) {
+      return "allowed";
+    }
+    if (["forbidden", "noncommercial", "no", "false", "不可商用", "禁止商用", "非商用"].includes(rawValue)) {
+      return "forbidden";
+    }
+    const status = getCommercialStatus(asset, firstText(asset, ["license", "licenseName", "licenseType", "licenseLabel", "rightsLicense"]));
+    if (status.status === "ready") {
+      return "allowed";
+    }
+    if (status.status === "blocked") {
+      return "forbidden";
+    }
+    return "unknown";
   }
 
   function needsAttribution(asset = {}, licenseLabel = "") {
@@ -582,6 +605,92 @@
     )}\n`;
   }
 
+  function renderAssetRightsEditor(asset = {}, options = {}) {
+    const escapeHtml = typeof options.escapeHtml === "function" ? options.escapeHtml : defaultEscapeHtml;
+    const commercialValue = getAssetCommercialUseFormValue(asset);
+    const generatedByAi = isAiGeneratedAsset(asset);
+    const attributionFlag = needsAttribution(asset, firstText(asset, ["license", "licenseName", "licenseType", "licenseLabel", "rightsLicense"]));
+    return `
+      <article class="detail-card asset-rights-editor-card">
+        <strong>发布授权资料</strong>
+        <p class="helper-text">这里记录素材来源、授权、署名和 AI 生成来源。发布前导出的“素材授权与署名清单”会直接读取这些信息。</p>
+        <div class="detail-stack">
+          <div class="detail-row">
+            <label for="assetRightsLicenseInput">授权 / 许可证</label>
+            <input id="assetRightsLicenseInput" type="text" value="${escapeHtml(firstText(asset, ["license", "licenseName", "licenseType", "licenseLabel", "rightsLicense"]))}" placeholder="例如：自制 / 已购买 / CC-BY 4.0 / Royalty-free" />
+          </div>
+          <div class="detail-row">
+            <label for="assetRightsCommercialInput">商用状态</label>
+            <select id="assetRightsCommercialInput">
+              ${Object.entries(COMMERCIAL_USE_OPTIONS)
+                .map(
+                  ([value, label]) => `
+                    <option value="${escapeHtml(value)}" ${commercialValue === value ? "selected" : ""}>${escapeHtml(label)}</option>
+                  `
+                )
+                .join("")}
+            </select>
+          </div>
+          <div class="detail-row">
+            <label for="assetRightsSourceInput">来源链接 / 购买记录</label>
+            <input id="assetRightsSourceInput" type="text" value="${escapeHtml(firstText(asset, ["sourceUrl", "sourceURL", "source", "origin", "assetSource", "downloadUrl"]))}" placeholder="素材站链接、购买记录、或“本人自制”" />
+          </div>
+          <div class="detail-row">
+            <label for="assetRightsAuthorInput">作者 / 提供方</label>
+            <input id="assetRightsAuthorInput" type="text" value="${escapeHtml(firstText(asset, ["author", "creator", "artist", "copyrightOwner", "owner"]))}" placeholder="作者、社团、素材包名称或自己" />
+          </div>
+          <div class="detail-row">
+            <label for="assetRightsCreditInput">Staff 署名文本</label>
+            <input id="assetRightsCreditInput" type="text" value="${escapeHtml(firstText(asset, ["credit", "attribution", "creditLine", "requiredCredit"]))}" placeholder="例如：Background by Studio A" />
+          </div>
+          <div class="detail-row">
+            <label for="assetRightsAiProviderInput">AI 服务 / 模型</label>
+            <input id="assetRightsAiProviderInput" type="text" value="${escapeHtml(firstText(asset, ["aiProvider", "provider", "generatedBy", "modelProvider", "model"]))}" placeholder="非 AI 素材可留空" />
+          </div>
+          <div class="detail-row">
+            <label for="assetRightsPromptInput">AI prompt / 来源备注</label>
+            <textarea id="assetRightsPromptInput" rows="3" placeholder="可记录 prompt 关键词、模型版本或二次处理说明">${escapeHtml(firstText(asset, ["prompt", "generationPrompt", "sourcePrompt"]))}</textarea>
+          </div>
+          <div class="detail-row compact-toggle-row">
+            <label>
+              <input id="assetRightsGeneratedByAiInput" type="checkbox" ${generatedByAi ? "checked" : ""} />
+              这是 AI 生成或 AI 辅助素材
+            </label>
+          </div>
+          <div class="detail-row compact-toggle-row">
+            <label>
+              <input id="assetRightsAttributionRequiredInput" type="checkbox" ${attributionFlag ? "checked" : ""} />
+              发布时需要署名
+            </label>
+          </div>
+        </div>
+      </article>
+    `;
+  }
+
+  function getInputValue(documentRef, id) {
+    return cleanText(documentRef?.getElementById?.(id)?.value);
+  }
+
+  function getInputChecked(documentRef, id) {
+    return Boolean(documentRef?.getElementById?.(id)?.checked);
+  }
+
+  function collectAssetRightsFormValues(documentRef = global.document) {
+    const commercialKey = getInputValue(documentRef, "assetRightsCommercialInput") || "unknown";
+    return {
+      license: getInputValue(documentRef, "assetRightsLicenseInput"),
+      commercialUse: COMMERCIAL_USE_OPTIONS[commercialKey] ?? COMMERCIAL_USE_OPTIONS.unknown,
+      sourceUrl: getInputValue(documentRef, "assetRightsSourceInput"),
+      author: getInputValue(documentRef, "assetRightsAuthorInput"),
+      credit: getInputValue(documentRef, "assetRightsCreditInput"),
+      generatedByAi: getInputChecked(documentRef, "assetRightsGeneratedByAiInput"),
+      aiProvider: getInputValue(documentRef, "assetRightsAiProviderInput"),
+      prompt: getInputValue(documentRef, "assetRightsPromptInput"),
+      attributionRequired: getInputChecked(documentRef, "assetRightsAttributionRequiredInput"),
+    };
+  }
+
   function defaultEscapeHtml(value) {
     return String(value ?? "")
       .replace(/&/g, "&amp;")
@@ -701,8 +810,11 @@
     getAssetRightsStatusDigest,
     buildAssetRightsMarkdown,
     buildAssetRightsCsv,
+    renderAssetRightsEditor,
+    collectAssetRightsFormValues,
     renderAssetRightsSheetPanel,
     getAssetTypeLabel,
     getAssetRightsToneClass,
+    getAssetCommercialUseFormValue,
   });
 })(typeof window !== "undefined" ? window : globalThis);

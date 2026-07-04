@@ -4254,6 +4254,19 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("assetRightsSheetTools.renderAssetRightsSheetPanel", source)
         self.assertIn("assetRightsSheet: buildAssetRightsSheet()", source)
 
+    def test_asset_rights_metadata_editor_is_saved_with_asset_meta(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        module_source = (EDITOR_DIR / "modules" / "asset_rights_sheet.js").read_text(encoding="utf-8")
+        render_details = _extract_function_source(source, "renderAssetDetails")
+        save_meta = _extract_function_source(source, "saveSelectedAssetMetadata")
+
+        self.assertIn("assetRightsSheetTools.renderAssetRightsEditor(asset", render_details)
+        self.assertIn("assetRightsSheetTools.collectAssetRightsFormValues(document)", save_meta)
+        self.assertIn("rights,", save_meta)
+        self.assertIn("assetRightsLicenseInput", module_source)
+        self.assertIn("assetRightsCommercialInput", module_source)
+        self.assertIn("assetRightsGeneratedByAiInput", module_source)
+
     def test_stage_direction_sheet_export_actions_are_wired(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
         click_handler = _extract_function_source(source, "handleClick")

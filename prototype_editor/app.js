@@ -22821,6 +22821,7 @@ function renderAssetDetails(asset, duplicateOverview = buildAssetDuplicateOvervi
       </div>
       ${renderInlineAssetTags(asset.tags ?? [])}
     </article>
+    ${assetRightsSheetTools.renderAssetRightsEditor(asset, { escapeHtml })}
     ${renderDetailRows([
       ["素材名称", asset.name],
       ["素材类型", getAssetTypeLabel(asset.type)],
@@ -23346,6 +23347,7 @@ async function saveSelectedAssetMetadata() {
   const tagsInput = document.getElementById("assetMetaTagsInput");
   const name = String(nameInput?.value ?? "").trim();
   const tags = parseAssetTagsInput(tagsInput?.value ?? "");
+  const rights = assetRightsSheetTools.collectAssetRightsFormValues(document);
 
   if (!name) {
     showEngineAlert("素材名称不能为空。");
@@ -23359,6 +23361,7 @@ async function saveSelectedAssetMetadata() {
       assetId: asset.id,
       name,
       tags,
+      rights,
     });
 
     if (state.assetTagFilter && !tags.includes(state.assetTagFilter)) {
