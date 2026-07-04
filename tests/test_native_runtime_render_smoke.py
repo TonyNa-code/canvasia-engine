@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import json
+import io
 import os
 import tempfile
 import unittest
 import warnings
+from contextlib import redirect_stdout
 from fractions import Fraction
 from pathlib import Path
 
@@ -25,6 +27,7 @@ from native_runtime.runtime_player import (
     NativeRuntimePlayer,
     OpenCvEmbeddedVideoPlayback,
     PyAvSynchronizedVideoPlayback,
+    build_native_runtime_control_guide,
     build_acceptance_automated_checks,
     build_native_runtime_vn_baseline_quality_report,
     build_vn_baseline_quality_doctor_check,
@@ -32,11 +35,14 @@ from native_runtime.runtime_player import (
     build_native_video_preview_probe_report,
     ellipsize_text,
     get_native_typewriter_step_delay_ms,
+    get_native_runtime_help_action_shortcut_map,
+    get_native_runtime_help_quick_actions,
     get_next_typewriter_index,
     get_runtime_screenshot_dir,
     get_typewriter_punctuation_pause_ms,
     load_project_archive_progress,
     load_opencv_video_frame_surface,
+    main as runtime_player_main,
     render_native_runtime_vn_baseline_quality_markdown,
     write_native_runtime_vn_baseline_quality_reports,
     write_project_auto_resume,
@@ -59,6 +65,36 @@ UI_ASSET_IDS = [
 
 
 class NativeRuntimeTextHelperTests(unittest.TestCase):
+    def test_native_runtime_control_guide_is_data_driven_and_cli_exportable(self) -> None:
+        guide = build_native_runtime_control_guide()
+
+        self.assertEqual(guide["runtime"], "native")
+        self.assertIn("F2", guide["openHelp"])
+        group_keys = [group["key"] for group in guide["groups"]]
+        self.assertIn("reading", group_keys)
+        self.assertIn("system", group_keys)
+        reading = next(group for group in guide["groups"] if group["key"] == "reading")
+        system = next(group for group in guide["groups"] if group["key"] == "system")
+        self.assertTrue(any("Enter" in control["keys"] and "Space" in control["keys"] for control in reading["controls"]))
+        self.assertTrue(any("F6" in control["keys"] and "F7" in control["keys"] for control in system["controls"]))
+        self.assertIn("settings", [action["key"] for action in get_native_runtime_help_quick_actions()])
+
+        stdout = io.StringIO()
+        with redirect_stdout(stdout):
+            self.assertEqual(runtime_player_main(["--describe-controls"]), 0)
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(payload["runtime"], "native")
+        self.assertIn("quickActions", payload)
+
+    @unittest.skipIf(pygame is None, "pygame-ce is not installed")
+    def test_native_runtime_help_shortcut_map_preserves_alt_load_key(self) -> None:
+        shortcut_map = get_native_runtime_help_action_shortcut_map(pygame)
+
+        self.assertEqual(shortcut_map[pygame.K_s], "settings")
+        self.assertEqual(shortcut_map[pygame.K_F7], "load")
+        self.assertEqual(shortcut_map[pygame.K_l], "load")
+        self.assertEqual(shortcut_map[pygame.K_m], "system")
+
     def test_typewriter_groups_latin_text_and_pauses_after_punctuation(self) -> None:
         text = "Hello, 世界！"
         family_text = "A👨‍👩‍👧‍👦B"

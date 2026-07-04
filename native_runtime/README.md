@@ -394,6 +394,12 @@ Runtime 启动失败时，会在用户目录写入错误日志：
 - `Ctrl + Shift + 1 / 2 / 3`：读入前 3 个正式存档位
 - `Esc`：关闭面板 / 退出预览
 
+维护或写教程时，可以直接导出 Runtime 当前内置的完整操作清单，避免 README、帮助层和实际快捷键长期不同步：
+
+```bash
+python3 runtime_player.py --describe-controls
+```
+
 存档文件会写到用户目录下：
 
 ```text

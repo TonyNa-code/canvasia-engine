@@ -421,6 +421,209 @@ SETTINGS_MENU_ITEMS = [
     ("sfxVolume", "音效音量"),
     ("voiceVolume", "语音音量"),
 ]
+NATIVE_RUNTIME_CONTROL_GROUPS = (
+    {
+        "key": "reading",
+        "title": "阅读推进",
+        "description": "面向玩家最常用的阅读、回看和清屏操作。",
+        "controls": (
+            {
+                "keys": ("Enter", "Space", "左键", "滚轮下"),
+                "label": "推进文本 / 确认",
+                "detail": "有打字机效果时先显示整句，之后再进入下一句或下一张卡片。",
+            },
+            {
+                "keys": ("A",),
+                "label": "自动播放",
+                "detail": "按文字长度、等待卡和语音状态自动推进。",
+            },
+            {
+                "keys": ("S",),
+                "label": "已读快进",
+                "detail": "只跳过本机已读文本，遇到未读内容、选项或视频会停下。",
+            },
+            {
+                "keys": ("H", "滚轮上"),
+                "label": "文本历史",
+                "detail": "打开已经显示过的文本记录；历史内可用 PageUp / PageDown 快速滚动。",
+            },
+            {
+                "keys": ("R", "V"),
+                "label": "历史语音回听",
+                "detail": "在文本历史中选中有语音的条目后可重听。",
+            },
+            {
+                "keys": ("U", "鼠标中键"),
+                "label": "隐藏 / 恢复 UI",
+                "detail": "清屏查看 CG、背景和立绘，再次点击或按键恢复。",
+            },
+        ),
+    },
+    {
+        "key": "system",
+        "title": "系统与存档",
+        "description": "关键分支、设置调整和发布点测时最常用。",
+        "controls": (
+            {
+                "keys": ("F1", "Tab", "右键"),
+                "label": "系统菜单",
+                "detail": "打开继续、存档、读档、设置、资料馆和退出入口。",
+            },
+            {
+                "keys": ("F2", "Shift + ?"),
+                "label": "操作帮助",
+                "detail": "随时打开原生操作中心；再次按 F2 可关闭。",
+            },
+            {
+                "keys": ("F5",),
+                "label": "快速存档",
+                "detail": "写入快速存档位，适合临时尝试分支。",
+            },
+            {
+                "keys": ("F8", "F9"),
+                "label": "快速读档",
+                "detail": "读入最近一次快速存档。",
+            },
+            {
+                "keys": ("F6", "F7"),
+                "label": "正式存档 / 读档",
+                "detail": "打开多页正式存档面板，支持创作者配置槽位数量。",
+            },
+            {
+                "keys": ("F11", "F12", "P"),
+                "label": "显示模式 / 截图",
+                "detail": "F11 切换窗口或全屏；F12 / P 保存当前画面截图。",
+            },
+            {
+                "keys": ("Esc",),
+                "label": "关闭面板 / 退出预览",
+                "detail": "优先关闭当前覆盖层，没有面板时退出预览。",
+            },
+        ),
+    },
+    {
+        "key": "archives",
+        "title": "资料馆与菜单",
+        "description": "标题页、系统菜单和资料馆中可用的快捷入口。",
+        "controls": (
+            {
+                "keys": ("N", "R", "L"),
+                "label": "标题页快捷入口",
+                "detail": "标题页中 N 开始新游戏，R 继续上次，L 打开读档。",
+            },
+            {
+                "keys": ("S", "A"),
+                "label": "标题页设置 / 资料馆",
+                "detail": "标题页中 S 打开体验设置，A 打开资料馆。",
+            },
+            {
+                "keys": ("←", "→"),
+                "label": "资料馆分页",
+                "detail": "在章节、音乐、CG、角色、结局和成就页之间切换。",
+            },
+            {
+                "keys": ("Ctrl + 1/2/3", "Ctrl + Shift + 1/2/3"),
+                "label": "前三个正式槽位直存 / 直读",
+                "detail": "适合点测时快速覆盖或读取常用检查点。",
+            },
+        ),
+    },
+)
+NATIVE_RUNTIME_HELP_QUICK_ACTIONS = (
+    {"key": "settings", "label": "体验设置", "shortcut": "S", "pygameKey": "K_s"},
+    {"key": "save", "label": "正式存档", "shortcut": "F6", "pygameKey": "K_F6"},
+    {"key": "load", "label": "读取存档", "shortcut": "F7 / L", "pygameKeys": ("K_F7", "K_l")},
+    {"key": "history", "label": "文本历史", "shortcut": "H", "pygameKey": "K_h"},
+    {"key": "archives", "label": "资料馆", "shortcut": "A", "pygameKey": "K_a"},
+    {"key": "profile", "label": "玩家档案", "shortcut": "P", "pygameKey": "K_p"},
+    {"key": "system", "label": "系统菜单", "shortcut": "M", "pygameKey": "K_m"},
+)
+
+
+def clone_native_runtime_control_groups() -> list[dict]:
+    return [
+        {
+            "key": str(group["key"]),
+            "title": str(group["title"]),
+            "description": str(group["description"]),
+            "controls": [
+                {
+                    "keys": [str(key) for key in control["keys"]],
+                    "label": str(control["label"]),
+                    "detail": str(control["detail"]),
+                }
+                for control in group["controls"]
+            ],
+        }
+        for group in NATIVE_RUNTIME_CONTROL_GROUPS
+    ]
+
+
+def get_native_runtime_control_group(group_key: str) -> dict | None:
+    safe_key = str(group_key or "")
+    for group in clone_native_runtime_control_groups():
+        if group["key"] == safe_key:
+            return group
+    return None
+
+
+def format_native_runtime_control_lines(group_key: str, limit: int | None = None) -> list[str]:
+    group = get_native_runtime_control_group(group_key)
+    if not group:
+        return []
+
+    controls = group["controls"]
+    if limit is not None:
+        controls = controls[: max(0, int(limit))]
+    return [f"{' / '.join(control['keys'])}：{control['label']}" for control in controls]
+
+
+def get_native_runtime_help_quick_actions(include_internal_keys: bool = False) -> list[dict]:
+    actions = []
+    for action in NATIVE_RUNTIME_HELP_QUICK_ACTIONS:
+        normalized = {
+            "key": str(action["key"]),
+            "label": str(action["label"]),
+            "shortcut": str(action["shortcut"]),
+        }
+        if include_internal_keys:
+            normalized["pygameKeys"] = [
+                str(key)
+                for key in action.get("pygameKeys", (action.get("pygameKey"),))
+                if key
+            ]
+            if normalized["pygameKeys"]:
+                normalized["pygameKey"] = normalized["pygameKeys"][0]
+        actions.append(normalized)
+    return actions
+
+
+def get_native_runtime_help_action_shortcut_map(pygame_module) -> dict[int, str]:
+    shortcut_map: dict[int, str] = {}
+    for action in get_native_runtime_help_quick_actions(include_internal_keys=True):
+        for key_attr in action["pygameKeys"]:
+            key_value = getattr(pygame_module, key_attr, None)
+            if key_value is not None:
+                shortcut_map[int(key_value)] = action["key"]
+    return shortcut_map
+
+
+def build_native_runtime_control_guide() -> dict:
+    return {
+        "runtime": "native",
+        "openHelp": ["F2", "Shift + ?"],
+        "systemMenu": ["F1", "Tab", "右键"],
+        "groups": clone_native_runtime_control_groups(),
+        "quickActions": get_native_runtime_help_quick_actions(),
+    }
+
+
+def print_native_runtime_control_guide() -> dict:
+    guide = build_native_runtime_control_guide()
+    print(json.dumps(guide, ensure_ascii=False, indent=2))
+    return guide
+
+
 NATIVE_VIDEO_PREVIEW_MODE = "cinematic_bridge_card"
 DEFAULT_SCENE3D_PREVIEW = {"yaw": 32.0, "pitch": 34.0, "zoom": 1.0, "interactionEnabled": True}
 CHARACTER_PRESENTATION_MODE_LABELS = {
@@ -14365,33 +14568,16 @@ class NativeRuntimePlayer:
             },
             {
                 "title": "阅读推进",
-                "lines": [
-                    "Enter / Space / 左键 / 滚轮下：推进文本",
-                    "A：自动播放 · S：已读快进",
-                    "H / 滚轮上：文本历史 · R / V：语音回听",
-                    "U / 鼠标中键：隐藏或恢复 UI",
-                ],
+                "lines": format_native_runtime_control_lines("reading"),
             },
             {
                 "title": "系统与存档",
-                "lines": [
-                    "F1 / Tab / 右键：系统菜单 · F2 / ?：操作帮助",
-                    "F5：快存 · F8/F9：快读",
-                    "F6：正式存档 · F7：读取存档",
-                    "F11：窗口 / 全屏 · F12 / P：截图",
-                ],
+                "lines": format_native_runtime_control_lines("system"),
             },
         ]
 
     def get_help_quick_actions(self) -> list[dict]:
-        return [
-            {"key": "settings", "label": "体验设置", "shortcut": "S"},
-            {"key": "save", "label": "正式存档", "shortcut": "F6"},
-            {"key": "load", "label": "读取存档", "shortcut": "F7"},
-            {"key": "history", "label": "文本历史", "shortcut": "H"},
-            {"key": "archives", "label": "资料馆", "shortcut": "A"},
-            {"key": "profile", "label": "玩家档案", "shortcut": "P"},
-        ]
+        return get_native_runtime_help_quick_actions()
 
     def activate_help_action(self, action_key: str) -> bool:
         if action_key == "settings":
@@ -15239,16 +15425,7 @@ class NativeRuntimePlayer:
     def handle_help_overlay_event(self, event) -> bool:
         pygame = self.pygame
         if event.type == pygame.KEYDOWN:
-            shortcut_map = {
-                pygame.K_s: "settings",
-                pygame.K_h: "history",
-                pygame.K_a: "archives",
-                pygame.K_p: "profile",
-                pygame.K_m: "system",
-                pygame.K_l: "load",
-                pygame.K_F6: "save",
-                pygame.K_F7: "load",
-            }
+            shortcut_map = get_native_runtime_help_action_shortcut_map(pygame)
             if event.key in shortcut_map:
                 return self.activate_help_action(shortcut_map[event.key])
             if event.key in (pygame.K_RETURN, pygame.K_SPACE):
@@ -15562,8 +15739,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--describe-model-preview", dest="describe_model_preview", help="输出 Live2D / 3D 角色预览桥摘要，不启动窗口")
     parser.add_argument("--describe-scene3d-preview", dest="describe_scene3d_preview", help="输出 3D 场景交互预览桥摘要，不启动窗口")
     parser.add_argument("--describe-save-dialog", dest="describe_save_dialog", help="输出正式存档面板摘要，不启动窗口")
+    parser.add_argument("--describe-controls", dest="describe_controls", action="store_true", help="输出原生 Runtime 操作与快捷键清单 JSON，不启动窗口")
     parser.add_argument("--page", dest="save_dialog_page", type=int, default=0, help="配合 --describe-save-dialog 使用，指定页码")
     args = parser.parse_args(argv)
+
+    if args.describe_controls:
+        print_native_runtime_control_guide()
+        return 0
 
     if args.validate_bundle:
         try:
