@@ -4237,20 +4237,32 @@ class FrontendActionHandlerTests(unittest.TestCase):
         click_handler = _extract_function_source(source, "handleClick")
         markdown_block_start = click_handler.index('action === "export-asset-rights-markdown"')
         csv_block_start = click_handler.index('action === "export-asset-rights-csv"')
-        csv_block_end = click_handler.index('action === "export-audio-cue-sheet-markdown"', csv_block_start)
+        copy_block_start = click_handler.index('action === "copy-asset-rights-credits-script"')
+        insert_block_start = click_handler.index('action === "add-asset-rights-credits-roll"')
+        insert_block_end = click_handler.index('action === "export-audio-cue-sheet-markdown"', insert_block_start)
         markdown_block = click_handler[markdown_block_start:csv_block_start]
-        csv_block = click_handler[csv_block_start:csv_block_end]
+        csv_block = click_handler[csv_block_start:copy_block_start]
+        copy_block = click_handler[copy_block_start:insert_block_start]
+        insert_block = click_handler[insert_block_start:insert_block_end]
 
         self.assertIn("const assetRightsSheetTools = window.CanvasiaEditorAssetRightsSheet", source)
         self.assertIn('data-action="export-asset-rights-markdown"', module_source)
         self.assertIn('data-action="export-asset-rights-csv"', module_source)
+        self.assertIn('data-action="copy-asset-rights-credits-script"', module_source)
+        self.assertIn('data-action="add-asset-rights-credits-roll"', module_source)
         self.assertIn("exportAssetRightsMarkdown();", markdown_block)
         self.assertIn("exportAssetRightsCsv();", csv_block)
+        self.assertIn("copyAssetRightsCreditsScript();", copy_block)
+        self.assertIn("addAssetRightsCreditsRoll();", insert_block)
         self.assertIn("function buildAssetRightsSheet()", source)
         self.assertIn("function renderAssetRightsPanel()", source)
         self.assertIn("function exportAssetRightsMarkdown()", source)
         self.assertIn("function exportAssetRightsCsv()", source)
+        self.assertIn("async function copyAssetRightsCreditsScript()", source)
+        self.assertIn("async function addAssetRightsCreditsRoll()", source)
         self.assertIn("assetRightsSheetTools.buildAssetRightsSheet", source)
+        self.assertIn("assetRightsSheetTools.buildAssetCreditsScript", source)
+        self.assertIn("assetRightsSheetTools.buildAssetCreditsRollDraft", source)
         self.assertIn("assetRightsSheetTools.renderAssetRightsSheetPanel", source)
         self.assertIn("assetRightsSheet: buildAssetRightsSheet()", source)
 

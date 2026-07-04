@@ -3858,6 +3858,16 @@ async function handleClick(event) {
     return;
   }
 
+  if (action === "copy-asset-rights-credits-script") {
+    void copyAssetRightsCreditsScript();
+    return;
+  }
+
+  if (action === "add-asset-rights-credits-roll") {
+    void addAssetRightsCreditsRoll();
+    return;
+  }
+
   if (action === "export-audio-cue-sheet-markdown") {
     exportAudioCueSheetMarkdown();
     return;
@@ -30169,6 +30179,63 @@ function exportAssetRightsCsv() {
   downloadTextFile(fileName, content, "text/csv;charset=utf-8");
   setSaveStatus(`已导出素材授权 CSV：${fileName}`);
   showToast(`素材授权 CSV 已导出：${fileName}`);
+}
+
+async function copyAssetRightsCreditsScript() {
+  const content = assetRightsSheetTools.buildAssetCreditsScript(buildAssetRightsSheet(), {
+    projectTitle: state.data?.project?.title || "Canvasia Project",
+  });
+  if (!content) {
+    showToast("还没有可生成 STAFF 的署名记录", "error");
+    return;
+  }
+  const copied = await copyTextToClipboard(content);
+  if (copied) {
+    showToast("STAFF 脚本已复制，可粘贴到脚本导入面板");
+  } else {
+    showEngineAlert(content);
+  }
+}
+
+async function addAssetRightsCreditsRoll() {
+  const scene = getSelectedScene();
+  if (!scene) {
+    showToast("先选中一个场景，再插入片尾 STAFF 卡", "error");
+    return;
+  }
+  const draft = assetRightsSheetTools.buildAssetCreditsRollDraft(buildAssetRightsSheet(), {
+    projectTitle: state.data?.project?.title || "Canvasia Project",
+  });
+  if (!draft.hasCredits) {
+    showToast("还没有可生成 STAFF 的署名记录", "error");
+    return;
+  }
+
+  const updatedScene = cloneScene(scene);
+  const newBlock = {
+    ...createDefaultBlock(updatedScene, "credits_roll"),
+    title: draft.title,
+    subtitle: draft.subtitle,
+    lines: draft.lines,
+    durationSeconds: draft.durationSeconds,
+    background: draft.background,
+    skippable: draft.skippable,
+  };
+  const selectedIndex = updatedScene.blocks.findIndex((block) => block.id === state.selectedBlockId);
+  const insertIndex = selectedIndex >= 0 ? selectedIndex + 1 : updatedScene.blocks.length;
+  updatedScene.blocks.splice(insertIndex, 0, newBlock);
+
+  const success = await persistScene(updatedScene, {
+    selectedSceneId: updatedScene.id,
+    selectedBlockId: newBlock.id,
+    previewSceneId: updatedScene.id,
+    previewBlockIndex: insertIndex,
+    successMessage: "已插入素材署名 STAFF 卡",
+  });
+
+  if (success && state.currentScreen !== "story") {
+    switchScreen("story");
+  }
 }
 
 function buildAudioCueSheet() {

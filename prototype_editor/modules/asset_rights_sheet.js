@@ -23,6 +23,20 @@
     allowed: "可商用",
     forbidden: "不可商用",
   });
+  const CREDIT_GROUP_LABELS = Object.freeze({
+    background: "背景",
+    sprite: "角色立绘",
+    cg: "CG",
+    ui: "UI",
+    font: "字体",
+    bgm: "音乐",
+    sfx: "音效",
+    voice: "语音",
+    video: "视频",
+    live2d: "Live2D",
+    model3d: "3D 模型",
+    scene3d: "3D 场景",
+  });
 
   function toArray(value) {
     return Array.isArray(value) ? value : [];
@@ -418,7 +432,7 @@
         .filter((record) => record.usageCount > 0 && (record.creditLabel || record.authorLabel || record.sourceLabel))
         .map((record) => ({
           assetName: record.assetName,
-          typeLabel: record.typeLabel,
+          typeLabel: getCreditGroupLabel(record.type),
           creditLine: cleanText(record.creditLabel, [record.assetName, record.authorLabel, record.sourceLabel].filter(Boolean).join(" / ")),
         })),
       summary: {
@@ -605,6 +619,66 @@
     )}\n`;
   }
 
+  function getCreditGroupLabel(type = "") {
+    return CREDIT_GROUP_LABELS[type] ?? getAssetTypeLabel(type);
+  }
+
+  function normalizeCreditLine(line = "") {
+    return cleanText(line)
+      .replace(/[|｜]+/g, " / ")
+      .replace(/\s{2,}/g, " ");
+  }
+
+  function buildAssetCreditsRollDraft(sheet = {}, options = {}) {
+    const projectTitle = cleanText(options.projectTitle ?? sheet.projectTitle, "Canvasia Project");
+    const creditEntries = toArray(sheet.creditRoll)
+      .map((entry) => ({
+        typeLabel: cleanText(entry.typeLabel, "素材"),
+        assetName: cleanText(entry.assetName, "未命名素材"),
+        creditLine: normalizeCreditLine(entry.creditLine),
+      }))
+      .filter((entry) => entry.creditLine);
+    const grouped = new Map();
+    creditEntries.forEach((entry) => {
+      const groupLabel = cleanText(entry.typeLabel, "素材");
+      if (!grouped.has(groupLabel)) {
+        grouped.set(groupLabel, []);
+      }
+      grouped.get(groupLabel).push(entry);
+    });
+    const lines = [];
+    grouped.forEach((entries, groupLabel) => {
+      lines.push(`【${groupLabel}】`);
+      entries
+        .sort((left, right) => left.assetName.localeCompare(right.assetName, "zh-CN"))
+        .forEach((entry) => {
+          lines.push(`${entry.assetName}：${entry.creditLine}`);
+        });
+    });
+    if (lines.length) {
+      lines.push("特别感谢：所有玩家");
+    }
+    return {
+      type: "credits_roll",
+      title: "STAFF",
+      subtitle: `${projectTitle} · Credits`,
+      lines,
+      durationSeconds: Math.max(18, Math.min(90, 12 + lines.length * 3)),
+      background: "dark",
+      skippable: true,
+      hasCredits: lines.length > 0,
+    };
+  }
+
+  function buildAssetCreditsScript(sheet = {}, options = {}) {
+    const draft = buildAssetCreditsRollDraft(sheet, options);
+    if (!draft.hasCredits) {
+      return "";
+    }
+    const safeLines = draft.lines.map((line) => normalizeCreditLine(line)).filter(Boolean).join("|");
+    return `credits title "${draft.title}" subtitle "${draft.subtitle}" duration ${draft.durationSeconds} dark lines "${safeLines}"`;
+  }
+
   function renderAssetRightsEditor(asset = {}, options = {}) {
     const escapeHtml = typeof options.escapeHtml === "function" ? options.escapeHtml : defaultEscapeHtml;
     const commercialValue = getAssetCommercialUseFormValue(asset);
@@ -733,6 +807,7 @@
     const summary = sheet.summary ?? {};
     const topIssues = toArray(sheet.issues).slice(0, 4);
     const creditPreview = toArray(sheet.creditRoll).slice(0, 4);
+    const creditsDraft = buildAssetCreditsRollDraft(sheet);
 
     return `
       <article class="detail-card preview-sprint-panel">
@@ -753,6 +828,12 @@
           </button>
           <button class="toolbar-button" data-action="export-asset-rights-csv">
             导出授权 CSV
+          </button>
+          <button class="toolbar-button" data-action="copy-asset-rights-credits-script" ${creditsDraft.hasCredits ? "" : "disabled"}>
+            复制 STAFF 脚本
+          </button>
+          <button class="toolbar-button" data-action="add-asset-rights-credits-roll" ${creditsDraft.hasCredits ? "" : "disabled"}>
+            插入片尾 STAFF 卡
           </button>
           <button class="toolbar-button" data-action="switch-screen" data-screen="assets">
             去素材库补资料
@@ -810,6 +891,8 @@
     getAssetRightsStatusDigest,
     buildAssetRightsMarkdown,
     buildAssetRightsCsv,
+    buildAssetCreditsRollDraft,
+    buildAssetCreditsScript,
     renderAssetRightsEditor,
     collectAssetRightsFormValues,
     renderAssetRightsSheetPanel,

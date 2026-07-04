@@ -101,6 +101,8 @@ class FrontendAssetRightsSheetModuleTests(unittest.TestCase):
             }});
             const csv = tools.buildAssetRightsCsv(sheet);
             const panel = tools.renderAssetRightsSheetPanel(sheet);
+            const creditsDraft = tools.buildAssetCreditsRollDraft(sheet, {{ projectTitle: "Rights Demo" }});
+            const creditsScript = tools.buildAssetCreditsScript(sheet, {{ projectTitle: "Rights Demo" }});
             const editor = tools.renderAssetRightsEditor(data.assetList[0]);
             const fakeDocument = {{
               getElementById(id) {{
@@ -126,6 +128,8 @@ class FrontendAssetRightsSheetModuleTests(unittest.TestCase):
               markdown,
               csv,
               panel,
+              creditsDraft,
+              creditsScript,
               editor,
               collected,
               bgLabel: tools.getAssetTypeLabel("background"),
@@ -146,6 +150,8 @@ class FrontendAssetRightsSheetModuleTests(unittest.TestCase):
         self.assertIn("buildAssetRightsSheet", payload["keys"])
         self.assertIn("buildAssetRightsMarkdown", payload["keys"])
         self.assertIn("buildAssetRightsCsv", payload["keys"])
+        self.assertIn("buildAssetCreditsRollDraft", payload["keys"])
+        self.assertIn("buildAssetCreditsScript", payload["keys"])
         self.assertIn("collectAssetRightsFormValues", payload["keys"])
         self.assertIn("renderAssetRightsEditor", payload["keys"])
         self.assertIn("renderAssetRightsSheetPanel", payload["keys"])
@@ -173,6 +179,13 @@ class FrontendAssetRightsSheetModuleTests(unittest.TestCase):
         self.assertIn("Background by Studio A", payload["markdown"])
         self.assertIn('"不可商用字体"', payload["csv"])
         self.assertIn('data-action="export-asset-rights-markdown"', payload["panel"])
+        self.assertIn('data-action="copy-asset-rights-credits-script"', payload["panel"])
+        self.assertIn('data-action="add-asset-rights-credits-roll"', payload["panel"])
+        self.assertTrue(payload["creditsDraft"]["hasCredits"])
+        self.assertEqual(payload["creditsDraft"]["type"], "credits_roll")
+        self.assertIn("黄昏教室：Background by Studio A", payload["creditsDraft"]["lines"])
+        self.assertIn('credits title "STAFF"', payload["creditsScript"])
+        self.assertIn("Background by Studio A", payload["creditsScript"])
         self.assertIn("assetRightsLicenseInput", payload["editor"])
         self.assertEqual(payload["collected"]["license"], "自制授权")
         self.assertEqual(payload["collected"]["commercialUse"], "可商用")
