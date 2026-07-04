@@ -43,7 +43,7 @@ SAMPLE_PROJECT_ID = "sample_heartbeat"
 DEFAULT_PORT = 8765
 EXPORTS_DIR = ROOT_DIR / "exports"
 EXPORT_TEMPLATE_DIR = ROOT_DIR / "export_player_template"
-EXPORT_PLAYER_SCRIPT_FILES = ("player.js", "runtime_controls.js")
+EXPORT_PLAYER_SCRIPT_FILES = ("player.js", "runtime_controls.js", "runtime_settings.js")
 NATIVE_RUNTIME_TEMPLATE_DIR = ROOT_DIR / "native_runtime"
 EXPORT_RUNTIME_CACHE_DIR = ROOT_DIR / ".export_runtime_cache"
 SUPPORTED_RESOLUTIONS = {(1280, 720), (1920, 1080)}
@@ -10508,6 +10508,7 @@ def export_web_build() -> dict:
             "playerCss": "player.css",
             "playerJs": "player.js",
             "playerRuntimeControls": "runtime_controls.js",
+            "playerRuntimeSettings": "runtime_settings.js",
             "iconPng": icon_files["pngFileName"],
             "iconIco": icon_files["icoFileName"],
             "launchSplash": splash_file["fileName"],

@@ -120,6 +120,7 @@ def build_node_check_steps() -> list[VerifyStep]:
             "prototype_editor/app.js",
             "export_player_template/player.js",
             "export_player_template/runtime_controls.js",
+            "export_player_template/runtime_settings.js",
         ]
     )
     return [

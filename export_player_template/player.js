@@ -1,4 +1,22 @@
 import { renderOperationGuideGroups } from "./runtime_controls.js";
+import {
+  DIALOG_THEME_LABELS,
+  PLAYBACK_DEFAULTS,
+  TEXT_SPEED_LABELS,
+  UI_THEME_MODE_LABELS,
+  buildProjectPlaybackDefaults,
+  formatVolumePercent,
+  getDialogThemeLabel,
+  getProjectFormalSaveSlotCount as getProjectFormalSaveSlotCountBase,
+  getSafeDialogTheme,
+  getSafeTextSpeed,
+  getSafeUiThemeMode,
+  getSafeVolumePercent,
+  getTextSpeedLabel,
+  getUiThemeModeLabel,
+  getVolumeRatio,
+  sanitizePlaybackSettings as sanitizePlaybackSettingsBase,
+} from "./runtime_settings.js";
 
 const DEFAULT_RUNTIME_LANGUAGE = "zh-CN";
 const CHOICE_CONTINUE_TARGET = "__continue__";
@@ -210,14 +228,6 @@ const refs = {
   cancelSaveConfirmButton: document.getElementById("cancelSaveConfirmButton"),
   confirmSaveConfirmButton: document.getElementById("confirmSaveConfirmButton"),
 };
-
-function getSafeUiThemeMode(mode) {
-  return Object.hasOwn(UI_THEME_MODE_LABELS, mode) ? mode : "auto";
-}
-
-function getUiThemeModeLabel(mode) {
-  return UI_THEME_MODE_LABELS[getSafeUiThemeMode(mode)];
-}
 
 function resolveUiTheme(mode = state.playback?.uiThemeMode ?? PLAYBACK_DEFAULTS.uiThemeMode, now = new Date()) {
   const safeMode = getSafeUiThemeMode(mode);
@@ -1243,13 +1253,6 @@ const CREDITS_BACKGROUND_LABELS = {
   transparent: "叠在当前画面上",
 };
 
-const TEXT_SPEED_LABELS = {
-  slow: "慢一点",
-  normal: "正常",
-  fast: "快一点",
-  instant: "立刻显示",
-};
-
 const typewriterGraphemeSegmenter =
   typeof Intl !== "undefined" && typeof Intl.Segmenter === "function"
     ? new Intl.Segmenter(undefined, { granularity: "grapheme" })
@@ -1281,38 +1284,8 @@ const TYPEWRITER_PERIOD_ABBREVIATIONS = new Set([
   "co",
 ]);
 
-const DIALOG_THEME_LABELS = {
-  project: "项目样式",
-  warm: "暖光标准",
-  moonlight: "夜色月光",
-  paper: "纸页回忆",
-  transparent: "透明无框",
-};
-
-const UI_THEME_MODE_LABELS = {
-  auto: "自动切换",
-  light: "浅色模式",
-  dark: "深色模式",
-};
-
-const PLAYBACK_DEFAULTS = {
-  textSpeed: "normal",
-  language: "",
-  dialogTheme: "project",
-  uiThemeMode: "auto",
-  autoPlay: false,
-  skipRead: false,
-  voiceEnabled: true,
-  bgmVolume: 72,
-  sfxVolume: 85,
-  voiceVolume: 92,
-};
-
 const SAVE_SHORTCUT_COUNT = 3;
 const SAVE_DIALOG_PAGE_SIZE = 6;
-const DEFAULT_PROJECT_RUNTIME_SETTINGS = {
-  formalSaveSlotCount: 24,
-};
 const DEFAULT_PROJECT_DIALOG_BOX_CONFIG = {
   preset: "moonlight",
   shape: "rounded",
@@ -5021,53 +4994,14 @@ function isTypewriterAbbreviationPeriod(anchorText, fullText = "") {
   return TYPEWRITER_PERIOD_ABBREVIATIONS.has(token) && /\s/.test(nextChar);
 }
 
-function getSafeTextSpeed(speed) {
-  return Object.hasOwn(TEXT_SPEED_LABELS, speed) ? speed : "normal";
-}
-
-function getTextSpeedLabel(speed) {
-  return TEXT_SPEED_LABELS[getSafeTextSpeed(speed)];
-}
-
-function getSafeProjectFormalSaveSlotCount(value) {
-  return clamp(
-    Math.round(getSafeNumber(value, DEFAULT_PROJECT_RUNTIME_SETTINGS.formalSaveSlotCount)),
-    3,
-    120
-  );
-}
-
-function getProjectRuntimeSettings(project = data.project) {
-  const runtimeSettings = project?.runtimeSettings ?? {};
-  return {
-    formalSaveSlotCount: getSafeProjectFormalSaveSlotCount(runtimeSettings.formalSaveSlotCount),
-    defaultTextSpeed: getSafeTextSpeed(runtimeSettings.defaultTextSpeed ?? PLAYBACK_DEFAULTS.textSpeed),
-    defaultDialogTheme: getSafeDialogTheme(runtimeSettings.defaultDialogTheme ?? PLAYBACK_DEFAULTS.dialogTheme),
-    defaultUiThemeMode: getSafeUiThemeMode(runtimeSettings.defaultUiThemeMode ?? PLAYBACK_DEFAULTS.uiThemeMode),
-    defaultBgmVolume: getSafeVolumePercent(runtimeSettings.defaultBgmVolume, PLAYBACK_DEFAULTS.bgmVolume),
-    defaultSfxVolume: getSafeVolumePercent(runtimeSettings.defaultSfxVolume, PLAYBACK_DEFAULTS.sfxVolume),
-    defaultVoiceVolume: getSafeVolumePercent(runtimeSettings.defaultVoiceVolume, PLAYBACK_DEFAULTS.voiceVolume),
-    defaultVoiceEnabled: runtimeSettings.defaultVoiceEnabled !== false,
-  };
+function getProjectPlaybackDefaults(project = data.project) {
+  return buildProjectPlaybackDefaults(project, getDefaultRuntimeLanguage(), {
+    getSafeLanguage: getSafeRuntimeLanguage,
+  });
 }
 
 function getProjectFormalSaveSlotCount(project = data.project) {
-  return getProjectRuntimeSettings(project).formalSaveSlotCount;
-}
-
-function getProjectPlaybackDefaults(project = data.project) {
-  const runtimeSettings = getProjectRuntimeSettings(project);
-  return sanitizePlaybackSettings({
-    ...PLAYBACK_DEFAULTS,
-    textSpeed: runtimeSettings.defaultTextSpeed,
-    language: getDefaultRuntimeLanguage(),
-    dialogTheme: runtimeSettings.defaultDialogTheme,
-    uiThemeMode: runtimeSettings.defaultUiThemeMode,
-    voiceEnabled: runtimeSettings.defaultVoiceEnabled,
-    bgmVolume: runtimeSettings.defaultBgmVolume,
-    sfxVolume: runtimeSettings.defaultSfxVolume,
-    voiceVolume: runtimeSettings.defaultVoiceVolume,
-  });
+  return getProjectFormalSaveSlotCountBase(project);
 }
 
 function getSafeProjectDialogBoxPreset(value) {
@@ -5501,14 +5435,6 @@ function buildDialogBoxPresentation(theme, project = data.project) {
   };
 }
 
-function getSafeDialogTheme(theme) {
-  return Object.hasOwn(DIALOG_THEME_LABELS, theme) ? theme : "project";
-}
-
-function getDialogThemeLabel(theme) {
-  return DIALOG_THEME_LABELS[getSafeDialogTheme(theme)];
-}
-
 function getBrowserStorage() {
   try {
     return window.localStorage;
@@ -5533,18 +5459,9 @@ function getPlaybackStorageKey() {
 }
 
 function sanitizePlaybackSettings(source = {}) {
-  return {
-    textSpeed: getSafeTextSpeed(source.textSpeed ?? PLAYBACK_DEFAULTS.textSpeed),
-    language: getSafeRuntimeLanguage(source.language ?? PLAYBACK_DEFAULTS.language),
-    dialogTheme: getSafeDialogTheme(source.dialogTheme ?? PLAYBACK_DEFAULTS.dialogTheme),
-    uiThemeMode: getSafeUiThemeMode(source.uiThemeMode ?? PLAYBACK_DEFAULTS.uiThemeMode),
-    autoPlay: Boolean(source.autoPlay ?? PLAYBACK_DEFAULTS.autoPlay),
-    skipRead: Boolean(source.skipRead ?? PLAYBACK_DEFAULTS.skipRead),
-    voiceEnabled: source.voiceEnabled !== false,
-    bgmVolume: getSafeVolumePercent(source.bgmVolume, PLAYBACK_DEFAULTS.bgmVolume),
-    sfxVolume: getSafeVolumePercent(source.sfxVolume, PLAYBACK_DEFAULTS.sfxVolume),
-    voiceVolume: getSafeVolumePercent(source.voiceVolume, PLAYBACK_DEFAULTS.voiceVolume),
-  };
+  return sanitizePlaybackSettingsBase(source, {
+    getSafeLanguage: getSafeRuntimeLanguage,
+  });
 }
 
 function getSupportedRuntimeLanguages() {
@@ -7091,24 +7008,6 @@ function persistReadHistory() {
   } catch (error) {
     // Ignore storage write failures so read history remains optional.
   }
-}
-
-function getSafeVolumePercent(value, fallback = 100) {
-  const numeric = Number(value);
-
-  if (!Number.isFinite(numeric)) {
-    return fallback;
-  }
-
-  return Math.min(100, Math.max(0, Math.round(numeric)));
-}
-
-function getVolumeRatio(value, fallback = 100) {
-  return getSafeVolumePercent(value, fallback) / 100;
-}
-
-function formatVolumePercent(value, fallback = 100) {
-  return `${getSafeVolumePercent(value, fallback)}%`;
 }
 
 function getTypewriterStepDelay(speed, visibleText = "", fullText = "") {

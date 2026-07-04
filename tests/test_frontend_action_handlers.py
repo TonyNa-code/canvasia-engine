@@ -16,6 +16,7 @@ APP_PATH = EDITOR_DIR / "app.js"
 STYLES_PATH = EDITOR_DIR / "styles.css"
 PLAYER_PATH = ROOT_DIR / "export_player_template" / "player.js"
 RUNTIME_CONTROLS_PATH = ROOT_DIR / "export_player_template" / "runtime_controls.js"
+RUNTIME_SETTINGS_PATH = ROOT_DIR / "export_player_template" / "runtime_settings.js"
 NATIVE_RUNTIME_PATH = ROOT_DIR / "native_runtime" / "runtime_player.py"
 MODULE_PATHS = tuple(sorted((EDITOR_DIR / "modules").glob("*.js")))
 ACTION_ATTRIBUTE_PATHS = (INDEX_PATH, APP_PATH, *MODULE_PATHS)
@@ -4733,11 +4734,16 @@ class FrontendActionHandlerTests(unittest.TestCase):
 
     def test_web_runtime_applies_project_playback_defaults_before_player_overrides(self) -> None:
         player_source = PLAYER_PATH.read_text(encoding="utf-8")
-        project_runtime_settings = _extract_function_source(player_source, "getProjectRuntimeSettings")
+        runtime_settings_source = RUNTIME_SETTINGS_PATH.read_text(encoding="utf-8")
+        project_runtime_settings = _extract_function_source(runtime_settings_source, "getProjectRuntimeSettings")
+        module_playback_defaults = _extract_function_source(runtime_settings_source, "buildProjectPlaybackDefaults")
         project_playback_defaults = _extract_function_source(player_source, "getProjectPlaybackDefaults")
+        project_formal_save_slots = _extract_function_source(player_source, "getProjectFormalSaveSlotCount")
         load_playback_settings = _extract_function_source(player_source, "loadStoredPlaybackSettings")
         reset_playback_settings = _extract_function_source(player_source, "resetPlaybackSettings")
 
+        self.assertIn('from "./runtime_settings.js"', player_source)
+        self.assertIn("sanitizePlaybackSettings as sanitizePlaybackSettingsBase", player_source)
         for key in (
             "defaultTextSpeed",
             "defaultDialogTheme",
@@ -4748,7 +4754,11 @@ class FrontendActionHandlerTests(unittest.TestCase):
             "defaultVoiceEnabled",
         ):
             self.assertIn(key, project_runtime_settings)
-            self.assertIn(key, project_playback_defaults)
+            self.assertIn(key, module_playback_defaults)
+        self.assertIn("buildProjectPlaybackDefaults(project, getDefaultRuntimeLanguage()", project_playback_defaults)
+        self.assertIn("getSafeLanguage: getSafeRuntimeLanguage", project_playback_defaults)
+        self.assertIn("function getProjectFormalSaveSlotCount(project = data.project)", player_source)
+        self.assertIn("getProjectFormalSaveSlotCountBase(project)", project_formal_save_slots)
         self.assertIn("const projectDefaults = getProjectPlaybackDefaults()", load_playback_settings)
         self.assertIn("...projectDefaults", load_playback_settings)
         self.assertIn("...JSON.parse(raw)", load_playback_settings)
