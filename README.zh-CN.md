@@ -56,7 +56,7 @@ Canvasia Engine 当前更适合这样理解：
 - 项目中心与空白新建项目
 - 新手模式 / 高级模式分层
 - 上下文感知指挥面板：可用 Cmd/Ctrl+K 快速搜索项目开工、页面跳转、推荐下一步、最近常用命令、剧情插卡、场景模板、主题切换、新手教程与导出入口
-- 商业段落配方：可一键插入 OP 前导、日常对话节奏、好感度选项、高潮演出段、ED / 片尾、BGM 范围调度和带变量后果的分支骨架
+- 商业段落配方：可一键插入 OP 前导、日常对话节奏、好感度选项、悬念线索、关系揭露、分支汇合、高潮演出段、ED / 片尾、BGM 范围调度和带变量后果的分支骨架
 - 手写剧本转剧情卡片：可把文档 / 备忘录里的 `角色：台词`、`角色 "台词"`、旁白、连续选项、`- 选项 -> 场景 [好感 +1; 已见面=true]` 变量后果、`设置 好感 为 2` / `add affection +1` 独立变量卡、`if 好感 >= 2 -> 好结局 else -> 普通结局` 条件分支，以及 `scene / show / hide / show ... scale / x / y / opacity / layer / flip / speed slow / normal / fast / instant / play music / stop music / play sound / play video / wait / pause / 等待 / 停顿 / shake / flash / zoom / pan / filter / blur / particle / credits / voice / jump` 等轻量演出、文字速度、音频、视频、节奏停顿、镜头、角色舞台、氛围和路线指令预览后插入当前场景
 - 角色、素材、台词台本、配音工作流
 - 项目默认语言 / 可切换语言配置，网页 Runtime 与原生 Runtime 可按中日英等语言读取翻译文本并自动回退

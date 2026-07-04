@@ -33,6 +33,15 @@
     ending_credits: Object.freeze({
       title: "ED 与片尾",
     }),
+    mystery_clue: Object.freeze({
+      title: "悬念线索",
+    }),
+    relationship_reveal: Object.freeze({
+      title: "关系揭露",
+    }),
+    branch_merge: Object.freeze({
+      title: "分支汇合",
+    }),
   });
 
   const STORY_TEMPLATE_BLOCK_RECIPES = deepFreeze({
@@ -476,6 +485,189 @@
         },
       },
     ],
+    mystery_clue: [
+      {
+        type: "music_play",
+        endAfterRecipeIndex: 7,
+        fields: {
+          loop: true,
+          volume: 72,
+          fadeInMs: 700,
+          fadeOutMs: 900,
+        },
+      },
+      {
+        type: "screen_filter",
+        fields: {
+          action: "apply",
+          preset: "cold",
+          strength: "soft",
+        },
+      },
+      {
+        type: "camera_pan",
+        fields: {
+          target: "right",
+          strength: "light",
+        },
+      },
+      {
+        type: "narration",
+        fields: {
+          text: "那张被折过的纸条，正安静地躺在窗台边。",
+        },
+      },
+      {
+        type: "wait",
+        fields: {
+          durationSeconds: 0.6,
+        },
+      },
+      {
+        type: "dialogue",
+        speaker: true,
+        fields: {
+          text: "等等，这不是昨天出现过的字迹吗？",
+        },
+      },
+      {
+        type: "choice",
+        choiceOptions: [
+          {
+            text: "把线索收起来",
+            gotoSceneId: "__continue__",
+            effects: [{ type: "variable_add", value: 1 }],
+          },
+          {
+            text: "暂时装作没看见",
+            gotoSceneId: "__continue__",
+            effects: [{ type: "variable_add", value: 0 }],
+          },
+        ],
+      },
+      {
+        type: "screen_filter",
+        fields: {
+          action: "clear",
+        },
+      },
+    ],
+    relationship_reveal: [
+      {
+        type: "character_show",
+        speaker: true,
+        fields: {
+          transition: "fade",
+          position: "center",
+          stage: {
+            offsetX: 0,
+            offsetY: 0,
+            scale: 108,
+            opacity: 100,
+            layer: 2,
+            flipX: false,
+          },
+        },
+      },
+      {
+        type: "camera_zoom",
+        fields: {
+          action: "zoom_in",
+          strength: "medium",
+          focus: "center",
+        },
+      },
+      {
+        type: "dialogue",
+        speaker: true,
+        fields: {
+          text: "其实，我一直有件事没有告诉你。",
+        },
+      },
+      {
+        type: "screen_shake",
+        fields: {
+          intensity: "light",
+          duration: "short",
+        },
+      },
+      {
+        type: "dialogue",
+        speaker: true,
+        fields: {
+          text: "那天救下我的人，就是你吧？",
+        },
+      },
+      {
+        type: "choice",
+        choiceOptions: [
+          {
+            text: "承认并说出真相",
+            gotoSceneId: "__continue__",
+            effects: [{ type: "variable_add", value: 2 }],
+          },
+          {
+            text: "先问她为什么知道",
+            gotoSceneId: "__continue__",
+            effects: [{ type: "variable_add", value: 1 }],
+          },
+        ],
+      },
+      {
+        type: "condition",
+        numberVariableCondition: {
+          operator: ">=",
+          value: 2,
+        },
+      },
+      {
+        type: "narration",
+        fields: {
+          text: "两个人之间那条看不见的线，终于被轻轻拉紧了。",
+        },
+      },
+    ],
+    branch_merge: [
+      {
+        type: "choice",
+        choiceOptions: [
+          {
+            text: "沿着熟悉的路回去",
+            gotoSceneId: "__continue__",
+            effects: [{ type: "variable_add", value: 1 }],
+          },
+          {
+            text: "绕到旧教学楼后面",
+            gotoSceneId: "__continue__",
+            effects: [{ type: "variable_add", value: 1 }],
+          },
+        ],
+      },
+      {
+        type: "narration",
+        fields: {
+          text: "无论选择哪条路，最后都通向同一个被月光照亮的操场。",
+        },
+      },
+      {
+        type: "condition",
+        numberVariableCondition: {
+          operator: ">=",
+          value: 1,
+        },
+      },
+      {
+        type: "dialogue",
+        speaker: true,
+        fields: {
+          text: "看来，我们还是在这里碰面了。",
+        },
+      },
+      {
+        type: "jump",
+        defaultJumpTarget: true,
+      },
+    ],
   });
 
   const STORY_TEMPLATE_PANEL_ITEMS = deepFreeze([
@@ -533,6 +725,21 @@
       templateId: "ending_credits",
       tone: "",
       description: "ED 黑场、收束旁白、片尾字幕和停音乐",
+    },
+    {
+      templateId: "mystery_clue",
+      tone: "good",
+      description: "冷色滤镜、镜头移动、线索发现和变量记录",
+    },
+    {
+      templateId: "relationship_reveal",
+      tone: "warn",
+      description: "角色居中、镜头推进、关系真相和条件分支",
+    },
+    {
+      templateId: "branch_merge",
+      tone: "",
+      description: "两组选项回到同一汇合点，适合收束分线",
     },
   ]);
 
@@ -637,6 +844,40 @@
     return STORY_TEMPLATE_PANEL_ITEMS;
   }
 
+  function uniqueValues(values) {
+    return Array.from(new Set(toArray(values).filter(Boolean)));
+  }
+
+  function getStoryTemplateRegistryHealth() {
+    const presetIds = Object.keys(STORY_TEMPLATE_PRESETS);
+    const recipeIds = Object.keys(STORY_TEMPLATE_BLOCK_RECIPES);
+    const panelIds = STORY_TEMPLATE_PANEL_ITEMS.map((item) => item?.templateId).filter(Boolean);
+    const allKnownIds = uniqueValues([...presetIds, ...recipeIds, ...panelIds]);
+    const duplicatePanelIds = uniqueValues(panelIds.filter((id, index) => panelIds.indexOf(id) !== index));
+    const missingPresetIds = allKnownIds.filter((id) => !STORY_TEMPLATE_PRESETS[id]);
+    const missingRecipeIds = allKnownIds.filter((id) => !Array.isArray(STORY_TEMPLATE_BLOCK_RECIPES[id]));
+    const emptyRecipeIds = recipeIds.filter((id) => !getStoryTemplateBlockRecipes(id).length);
+    const issues = [
+      ...duplicatePanelIds.map((id) => `duplicate_panel:${id}`),
+      ...missingPresetIds.map((id) => `missing_preset:${id}`),
+      ...missingRecipeIds.map((id) => `missing_recipe:${id}`),
+      ...emptyRecipeIds.map((id) => `empty_recipe:${id}`),
+    ];
+
+    return Object.freeze({
+      isHealthy: issues.length === 0,
+      issueCount: issues.length,
+      presetIds: Object.freeze([...presetIds]),
+      recipeIds: Object.freeze([...recipeIds]),
+      panelIds: Object.freeze([...panelIds]),
+      duplicatePanelIds: Object.freeze(duplicatePanelIds),
+      missingPresetIds: Object.freeze(missingPresetIds),
+      missingRecipeIds: Object.freeze(missingRecipeIds),
+      emptyRecipeIds: Object.freeze(emptyRecipeIds),
+      issues: Object.freeze(issues),
+    });
+  }
+
   function getTemplateLabel(template) {
     return PROJECT_TEMPLATE_LABELS[template] ?? template;
   }
@@ -652,6 +893,7 @@
     getStoryTemplateSummary,
     getStoryTemplateVariableRequirement,
     getStoryTemplatePanelItems,
+    getStoryTemplateRegistryHealth,
     getTemplateLabel,
   });
 })(typeof window !== "undefined" ? window : globalThis);

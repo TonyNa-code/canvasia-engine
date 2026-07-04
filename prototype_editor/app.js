@@ -36524,7 +36524,9 @@ function applyStoryTemplateSpeaker(block, speakerId) {
   if (block.type === "character_show") {
     block.characterId = speakerId;
     block.expressionId = getSafeExpressionId(speakerId, null);
-    block.position = getDefaultCharacterPosition(speakerId);
+    if (!String(block.position ?? "").trim()) {
+      block.position = getDefaultCharacterPosition(speakerId);
+    }
   }
 
   if (block.type === "character_hide") {
