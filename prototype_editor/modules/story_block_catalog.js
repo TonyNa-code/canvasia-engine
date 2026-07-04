@@ -279,6 +279,14 @@
     return STORY_BLOCK_DEFINITION_MAP[type] ?? null;
   }
 
+  function getKnownBlockTypes() {
+    return STORY_BLOCK_DEFINITIONS.map((definition) => definition.type);
+  }
+
+  function isKnownStoryBlockType(type) {
+    return Boolean(STORY_BLOCK_DEFINITION_MAP[type]);
+  }
+
   function getBlockTypesByTag(tag) {
     const safeTag = String(tag ?? "").trim();
     if (!safeTag) {
@@ -447,6 +455,8 @@
     MUSIC_END_MODE_LABELS,
     CHOICE_CONTINUE_TARGET,
     getStoryBlockDefinition,
+    getKnownBlockTypes,
+    isKnownStoryBlockType,
     getBlockTypesByTag,
     getRuntimeCapabilityRows,
     getRuntimeVisualEffectBlockTypes,

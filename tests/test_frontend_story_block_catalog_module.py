@@ -39,6 +39,11 @@ class FrontendStoryBlockCatalogModuleTests(unittest.TestCase):
                 tools.getStoryBlockDefinition("video_play"),
                 tools.getStoryBlockDefinition("missing"),
               ],
+              knownTypes: tools.getKnownBlockTypes(),
+              knownChecks: [
+                tools.isKnownStoryBlockType("dialogue"),
+                tools.isKnownStoryBlockType("unknown_card"),
+              ],
               tagTypes: {{
                 text: tools.getTimelineTextBlockTypes(),
                 visual: tools.getTimelineVisualBeatBlockTypes(),
@@ -103,6 +108,8 @@ class FrontendStoryBlockCatalogModuleTests(unittest.TestCase):
         payload = json.loads(completed.stdout)
         self.assertIn("getBlockLabel", payload["keys"])
         self.assertIn("getStoryBlockDefinition", payload["keys"])
+        self.assertIn("getKnownBlockTypes", payload["keys"])
+        self.assertIn("isKnownStoryBlockType", payload["keys"])
         self.assertIn("getRuntimeCapabilityRows", payload["keys"])
         self.assertIn("isChoiceContinueTarget", payload["keys"])
         self.assertIn("renderMusicEndModeOptions", payload["keys"])
@@ -111,6 +118,9 @@ class FrontendStoryBlockCatalogModuleTests(unittest.TestCase):
         self.assertEqual(payload["definitions"][0]["group"], "视频")
         self.assertEqual(payload["definitions"][0]["nativeStatus"], "partial")
         self.assertIsNone(payload["definitions"][1])
+        self.assertIn("dialogue", payload["knownTypes"])
+        self.assertIn("condition", payload["knownTypes"])
+        self.assertEqual(payload["knownChecks"], [True, False])
         self.assertIn("dialogue", payload["tagTypes"]["text"])
         self.assertIn("background", payload["tagTypes"]["visual"])
         self.assertIn("video_play", payload["tagTypes"]["audio"])

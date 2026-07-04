@@ -70,6 +70,12 @@ function getBlockLabel(type) {
   return storyBlockCatalogTools.getBlockLabel(type) ?? BLOCK_LABELS[type] ?? type ?? "步骤";
 }
 
+function isKnownStoryBlockType(type) {
+  return typeof storyBlockCatalogTools.isKnownStoryBlockType === "function"
+    ? storyBlockCatalogTools.isKnownStoryBlockType(type)
+    : Object.prototype.hasOwnProperty.call(BLOCK_LABELS, type);
+}
+
 function getSafeMusicEndMode(mode) {
   return storyBlockCatalogTools.getSafeMusicEndMode(mode);
 }
@@ -36061,9 +36067,15 @@ async function addBlock(blockType) {
   if (!scene) {
     return;
   }
+  const safeBlockType = String(blockType ?? "").trim();
+  if (!isKnownStoryBlockType(safeBlockType)) {
+    showToast("未知剧情卡片类型，已取消添加。", "error");
+    setSaveStatus(`无法添加未注册卡片：${safeBlockType || "空类型"}`, true);
+    return;
+  }
 
   const updatedScene = cloneScene(scene);
-  const newBlock = createDefaultBlock(updatedScene, blockType);
+  const newBlock = createDefaultBlock(updatedScene, safeBlockType);
   const selectedIndex = updatedScene.blocks.findIndex((block) => block.id === state.selectedBlockId);
   const insertIndex = selectedIndex >= 0 ? selectedIndex + 1 : updatedScene.blocks.length;
 
@@ -36074,7 +36086,7 @@ async function addBlock(blockType) {
     selectedBlockId: newBlock.id,
     previewSceneId: updatedScene.id,
     previewBlockIndex: insertIndex,
-    successMessage: `已新增${BLOCK_LABELS[blockType] ?? blockType}`,
+    successMessage: `已新增${getBlockLabel(safeBlockType)}`,
   });
 
   if (success && state.currentScreen !== "story") {
