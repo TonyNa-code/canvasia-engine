@@ -8,6 +8,7 @@ from pathlib import Path
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
+CATALOG_MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "story_block_catalog.js"
 MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "runtime_capability_matrix.js"
 
 
@@ -20,7 +21,9 @@ class FrontendRuntimeCapabilityMatrixModuleTests(unittest.TestCase):
             const context = {{ window: {{}} }};
             context.globalThis = context;
             vm.createContext(context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(CATALOG_MODULE_PATH))}, "utf8"), context);
             vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
+            const catalogTools = context.window.CanvasiaEditorStoryBlockCatalog;
             const tools = context.window.CanvasiaEditorRuntimeCapabilityMatrix;
             const data = {{
               project: {{ title: "Runtime Demo" }},
@@ -63,6 +66,8 @@ class FrontendRuntimeCapabilityMatrixModuleTests(unittest.TestCase):
               digest,
               markdown,
               csv,
+              capabilityRows: tools.CAPABILITY_ROWS,
+              catalogRuntimeRows: catalogTools.getRuntimeCapabilityRows(),
               labels: [
                 tools.getRuntimeStatusLabel("full"),
                 tools.getRuntimeStatusLabel("partial"),
@@ -85,6 +90,8 @@ class FrontendRuntimeCapabilityMatrixModuleTests(unittest.TestCase):
         self.assertIn("buildRuntimeAcceptanceChecklist", payload["keys"])
         self.assertIn("buildRuntimeCapabilityMarkdown", payload["keys"])
         self.assertIn("buildRuntimeCapabilityCsv", payload["keys"])
+        self.assertEqual(len(payload["capabilityRows"]), len(payload["catalogRuntimeRows"]))
+        self.assertTrue(any(row["type"] == "wait" for row in payload["capabilityRows"]))
         summary = payload["matrix"]["summary"]
         self.assertEqual(summary["totalBlockCount"], 6)
         self.assertEqual(summary["usedTypeCount"], 5)

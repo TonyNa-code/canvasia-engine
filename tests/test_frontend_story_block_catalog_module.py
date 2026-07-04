@@ -30,6 +30,24 @@ class FrontendStoryBlockCatalogModuleTests(unittest.TestCase):
                 tools.getBlockLabel("custom_block"),
                 tools.getBlockLabel(null),
               ],
+              compactLabels: [
+                tools.getCompactBlockLabel("music_play"),
+                tools.getCompactBlockLabel("screen_shake"),
+                tools.getCompactBlockLabel("custom_block"),
+              ],
+              definitions: [
+                tools.getStoryBlockDefinition("video_play"),
+                tools.getStoryBlockDefinition("missing"),
+              ],
+              tagTypes: {{
+                text: tools.getTimelineTextBlockTypes(),
+                visual: tools.getTimelineVisualBeatBlockTypes(),
+                audio: tools.getTimelineAudioBeatBlockTypes(),
+                effects: tools.getEffectBlockTypes(),
+                runtimeVisualEffects: tools.getRuntimeVisualEffectBlockTypes(),
+                storyContent: tools.getStoryContentBlockTypes(),
+              }},
+              runtimeRows: tools.getRuntimeCapabilityRows(),
               safeModes: [
                 tools.getSafeMusicEndMode("scene_end"),
                 tools.getSafeMusicEndMode("bad"),
@@ -83,9 +101,23 @@ class FrontendStoryBlockCatalogModuleTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 0, completed.stderr)
         payload = json.loads(completed.stdout)
         self.assertIn("getBlockLabel", payload["keys"])
+        self.assertIn("getStoryBlockDefinition", payload["keys"])
+        self.assertIn("getRuntimeCapabilityRows", payload["keys"])
         self.assertIn("isChoiceContinueTarget", payload["keys"])
         self.assertIn("renderMusicEndModeOptions", payload["keys"])
         self.assertEqual(payload["labels"], ["台词", "粒子特效", "custom_block", "步骤"])
+        self.assertEqual(payload["compactLabels"], ["播放 BGM", "震动", "custom_block"])
+        self.assertEqual(payload["definitions"][0]["group"], "视频")
+        self.assertEqual(payload["definitions"][0]["nativeStatus"], "partial")
+        self.assertIsNone(payload["definitions"][1])
+        self.assertIn("dialogue", payload["tagTypes"]["text"])
+        self.assertIn("background", payload["tagTypes"]["visual"])
+        self.assertIn("video_play", payload["tagTypes"]["audio"])
+        self.assertIn("particle_effect", payload["tagTypes"]["effects"])
+        self.assertIn("screen_fade", payload["tagTypes"]["runtimeVisualEffects"])
+        self.assertIn("wait", payload["tagTypes"]["storyContent"])
+        self.assertGreaterEqual(len(payload["runtimeRows"]), 20)
+        self.assertTrue(any(row["type"] == "wait" and row["nativeStatus"] == "full" for row in payload["runtimeRows"]))
         self.assertEqual(payload["safeModes"], ["scene_end", "until_next_music", "until_next_music"])
         self.assertEqual(payload["musicLabels"], ["播到指定卡片后", "播到下一首或停止卡"])
         self.assertIn('<option value="scene_end" selected>', payload["optionMarkup"])

@@ -1,4 +1,6 @@
 (function attachAssetDependencySheetTools(global) {
+  const storyBlockCatalogTools = global.CanvasiaEditorStoryBlockCatalog || {};
+
   const ASSET_TYPE_LABELS = Object.freeze({
     background: "背景",
     sprite: "立绘",
@@ -14,7 +16,7 @@
     scene3d: "3D 场景",
   });
 
-  const BLOCK_LABELS = Object.freeze({
+  const FALLBACK_BLOCK_LABELS = Object.freeze({
     background: "切换背景",
     dialogue: "台词",
     narration: "旁白",
@@ -39,6 +41,11 @@
     variable_add: "修改变量",
     choice: "选项",
     condition: "条件判断",
+  });
+
+  const BLOCK_LABELS = Object.freeze({
+    ...FALLBACK_BLOCK_LABELS,
+    ...(storyBlockCatalogTools.BLOCK_LABELS ?? {}),
   });
 
   const REFERENCE_SCOPE_LABELS = Object.freeze({

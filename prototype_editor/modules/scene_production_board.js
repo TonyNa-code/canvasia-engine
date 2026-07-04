@@ -1,19 +1,29 @@
 (function attachSceneProductionBoardTools(global) {
-  const EFFECT_BLOCK_TYPES = Object.freeze([
-    "particle_effect",
-    "wait",
-    "screen_shake",
-    "screen_flash",
-    "screen_fade",
-    "camera_zoom",
-    "camera_pan",
-    "screen_filter",
-    "depth_blur",
-  ]);
+  const storyBlockCatalogTools = global.CanvasiaEditorStoryBlockCatalog || {};
 
-  const STORY_BLOCK_TYPES = Object.freeze(["dialogue", "narration", "choice", "condition"]);
+  const EFFECT_BLOCK_TYPES = Object.freeze(
+    typeof storyBlockCatalogTools.getEffectBlockTypes === "function"
+      ? storyBlockCatalogTools.getEffectBlockTypes()
+      : [
+          "particle_effect",
+          "wait",
+          "screen_shake",
+          "screen_flash",
+          "screen_fade",
+          "camera_zoom",
+          "camera_pan",
+          "screen_filter",
+          "depth_blur",
+        ]
+  );
 
-  const BLOCK_LABELS = Object.freeze({
+  const STORY_BLOCK_TYPES = Object.freeze(
+    typeof storyBlockCatalogTools.getTimelineTextBlockTypes === "function"
+      ? [...storyBlockCatalogTools.getTimelineTextBlockTypes(), "condition"]
+      : ["dialogue", "narration", "choice", "condition"]
+  );
+
+  const FALLBACK_BLOCK_LABELS = Object.freeze({
     background: "切换背景",
     dialogue: "台词",
     narration: "旁白",
@@ -38,6 +48,11 @@
     variable_add: "修改变量",
     choice: "选项",
     condition: "条件判断",
+  });
+
+  const BLOCK_LABELS = Object.freeze({
+    ...FALLBACK_BLOCK_LABELS,
+    ...(storyBlockCatalogTools.BLOCK_LABELS ?? {}),
   });
 
   const TEXT_LONG_WARNING_LENGTH = 260;

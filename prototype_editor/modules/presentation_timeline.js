@@ -1,5 +1,7 @@
 (function attachPresentationTimelineTools(global) {
-  const BLOCK_LABELS = Object.freeze({
+  const storyBlockCatalogTools = global.CanvasiaEditorStoryBlockCatalog || {};
+
+  const FALLBACK_BLOCK_LABELS = Object.freeze({
     background: "背景",
     dialogue: "台词",
     narration: "旁白",
@@ -24,6 +26,11 @@
     jump: "跳转",
   });
 
+  const BLOCK_LABELS = Object.freeze({
+    ...FALLBACK_BLOCK_LABELS,
+    ...(storyBlockCatalogTools.BLOCK_COMPACT_LABELS ?? {}),
+  });
+
   const TEXT_SPEED_CHARS_PER_SECOND = Object.freeze({
     slow: 12,
     normal: 18,
@@ -31,24 +38,36 @@
     instant: 80,
   });
 
-  const STORY_TEXT_TYPES = new Set(["dialogue", "narration", "choice"]);
-  const VISUAL_BEAT_TYPES = new Set([
-    "background",
-    "character_show",
-    "character_hide",
-    "particle_effect",
-    "wait",
-    "screen_shake",
-    "screen_flash",
-    "screen_fade",
-    "camera_zoom",
-    "camera_pan",
-    "screen_filter",
-    "depth_blur",
-    "video_play",
-    "credits_roll",
-  ]);
-  const AUDIO_BEAT_TYPES = new Set(["music_play", "music_stop", "sfx_play", "video_play"]);
+  const STORY_TEXT_TYPES = new Set(
+    typeof storyBlockCatalogTools.getTimelineTextBlockTypes === "function"
+      ? storyBlockCatalogTools.getTimelineTextBlockTypes()
+      : ["dialogue", "narration", "choice"]
+  );
+  const VISUAL_BEAT_TYPES = new Set(
+    typeof storyBlockCatalogTools.getTimelineVisualBeatBlockTypes === "function"
+      ? storyBlockCatalogTools.getTimelineVisualBeatBlockTypes()
+      : [
+          "background",
+          "character_show",
+          "character_hide",
+          "particle_effect",
+          "wait",
+          "screen_shake",
+          "screen_flash",
+          "screen_fade",
+          "camera_zoom",
+          "camera_pan",
+          "screen_filter",
+          "depth_blur",
+          "video_play",
+          "credits_roll",
+        ]
+  );
+  const AUDIO_BEAT_TYPES = new Set(
+    typeof storyBlockCatalogTools.getTimelineAudioBeatBlockTypes === "function"
+      ? storyBlockCatalogTools.getTimelineAudioBeatBlockTypes()
+      : ["music_play", "music_stop", "sfx_play", "video_play"]
+  );
   const TIMELINE_TYPES = new Set([...STORY_TEXT_TYPES, ...VISUAL_BEAT_TYPES, ...AUDIO_BEAT_TYPES, "condition", "jump"]);
 
   function toArray(value) {

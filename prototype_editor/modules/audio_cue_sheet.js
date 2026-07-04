@@ -1,5 +1,7 @@
 (function attachAudioCueSheetTools(global) {
-  const BLOCK_LABELS = Object.freeze({
+  const storyBlockCatalogTools = global.CanvasiaEditorStoryBlockCatalog || {};
+
+  const FALLBACK_BLOCK_LABELS = Object.freeze({
     background: "背景",
     dialogue: "台词",
     narration: "旁白",
@@ -14,6 +16,11 @@
     choice: "选项",
     jump: "跳转",
     condition: "条件",
+  });
+
+  const BLOCK_LABELS = Object.freeze({
+    ...FALLBACK_BLOCK_LABELS,
+    ...(storyBlockCatalogTools.BLOCK_COMPACT_LABELS ?? {}),
   });
 
   const MUSIC_END_MODE_LABELS = Object.freeze({

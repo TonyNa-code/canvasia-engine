@@ -1,5 +1,7 @@
 (function attachRuntimeCapabilityMatrixTools(global) {
-  const CAPABILITY_ROWS = Object.freeze([
+  const storyBlockCatalogTools = global.CanvasiaEditorStoryBlockCatalog || {};
+
+  const FALLBACK_CAPABILITY_ROWS = Object.freeze([
     ["background", "画面", "full", "full", "背景 / CG 在 Web 与原生 Runtime 中播放；3D 场景会走原生结构检查与预览兜底。"],
     ["character_show", "角色", "full", "full", "支持角色登场、表情、站位、舞台参数和基础转场。"],
     ["character_hide", "角色", "full", "full", "支持角色离场和基础转场。"],
@@ -26,6 +28,21 @@
     ["depth_blur", "演出", "full", "full", "支持景深模糊和清除。"],
   ]).map(([type, group, webStatus, nativeStatus, note]) =>
     Object.freeze({ type, group, webStatus, nativeStatus, note })
+  );
+
+  const CAPABILITY_ROWS = Object.freeze(
+    (typeof storyBlockCatalogTools.getRuntimeCapabilityRows === "function"
+      ? storyBlockCatalogTools.getRuntimeCapabilityRows()
+      : FALLBACK_CAPABILITY_ROWS
+    ).map((row) =>
+      Object.freeze({
+        type: row.type,
+        group: row.group,
+        webStatus: row.webStatus,
+        nativeStatus: row.nativeStatus,
+        note: row.note,
+      })
+    )
   );
 
   const STATUS_LABELS = Object.freeze({
@@ -56,16 +73,11 @@
     check: "点测",
   });
 
-  const VISUAL_EFFECT_TYPES = new Set([
-    "wait",
-    "screen_shake",
-    "screen_flash",
-    "screen_fade",
-    "camera_zoom",
-    "camera_pan",
-    "screen_filter",
-    "depth_blur",
-  ]);
+  const VISUAL_EFFECT_TYPES = new Set(
+    typeof storyBlockCatalogTools.getRuntimeVisualEffectBlockTypes === "function"
+      ? storyBlockCatalogTools.getRuntimeVisualEffectBlockTypes()
+      : ["wait", "screen_shake", "screen_flash", "screen_fade", "camera_zoom", "camera_pan", "screen_filter", "depth_blur"]
+  );
 
   function toArray(value) {
     return Array.isArray(value) ? value : [];
@@ -727,6 +739,7 @@
 
   global.CanvasiaEditorRuntimeCapabilityMatrix = Object.freeze({
     CAPABILITY_ROWS,
+    FALLBACK_CAPABILITY_ROWS,
     buildRuntimeCapabilityMatrix,
     buildRuntimeAcceptanceChecklist,
     getRuntimeCapabilityStatusDigest,

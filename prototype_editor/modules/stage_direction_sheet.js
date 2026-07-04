@@ -1,11 +1,13 @@
 (function attachStageDirectionSheetTools(global) {
+  const storyBlockCatalogTools = global.CanvasiaEditorStoryBlockCatalog || {};
+
   const POSITION_LABELS = Object.freeze({
     left: "左侧",
     center: "中间",
     right: "右侧",
   });
 
-  const BLOCK_LABELS = Object.freeze({
+  const FALLBACK_BLOCK_LABELS = Object.freeze({
     background: "背景",
     dialogue: "台词",
     narration: "旁白",
@@ -16,6 +18,11 @@
     wait: "等待停顿",
     choice: "选项",
     jump: "跳转",
+  });
+
+  const BLOCK_LABELS = Object.freeze({
+    ...FALLBACK_BLOCK_LABELS,
+    ...(storyBlockCatalogTools.BLOCK_COMPACT_LABELS ?? {}),
   });
 
   function toArray(value) {
