@@ -184,6 +184,9 @@ class FrontendRouteAnalyzerModuleTests(unittest.TestCase):
         self.assertIn('if (action === "export-route-testing-plan-csv")', source)
         self.assertIn("function exportRouteTestingPlanMarkdown()", source)
         self.assertIn("function exportRouteTestingPlanCsv()", source)
+        self.assertIn("routeTestingReportTools.buildRouteTestingExecutionQueue(plan)", source)
+        self.assertIn("routeTestingReportTools.buildRouteTestingAcceptanceChecklist(plan)", source)
+        self.assertIn("routeTestingReportTools.getRouteTestingReadinessPercent(plan)", source)
 
 
 if __name__ == "__main__":

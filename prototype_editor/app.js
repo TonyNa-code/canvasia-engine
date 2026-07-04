@@ -12350,6 +12350,10 @@ function getRouteCaseStatusToneClass(status) {
 function renderRouteTestingPlanPanel(routeOverview) {
   const plan = routeOverview.routeTestingPlan ?? {};
   const summary = plan.summary ?? {};
+  const executionQueue = routeTestingReportTools.buildRouteTestingExecutionQueue(plan);
+  const acceptanceChecklist = routeTestingReportTools.buildRouteTestingAcceptanceChecklist(plan);
+  const readinessPercent = routeTestingReportTools.getRouteTestingReadinessPercent(plan);
+  const topExecutionItems = executionQueue.slice(0, 5);
   const decisionPoints = (plan.decisionPoints ?? []).slice(0, 4);
   const endingTestCases = (plan.endingTestCases ?? []).slice(0, 4);
   const blockedCases = (summary.brokenRouteCaseCount ?? 0) + (summary.unreachableRouteCaseCount ?? 0);
@@ -12378,8 +12382,56 @@ function renderRouteTestingPlanPanel(routeOverview) {
         ${renderRouteMetricCard("分支检查点", summary.decisionPointCount ?? 0, `${summary.reachableDecisionPointCount ?? 0} 个从入口可到`)}
         ${renderRouteMetricCard("路线用例", summary.routeCaseCount ?? 0, blockedCases > 0 ? `${blockedCases} 条需要先接通` : "当前用例都可进入测试")}
         ${renderRouteMetricCard("结局用例", summary.endingTestCaseCount ?? 0, `${summary.reachableEndingTestCaseCount ?? 0} 个可打到`)}
+        ${renderRouteMetricCard("执行队列", executionQueue.length, topExecutionItems.length > 0 ? "已按阻塞和深度排序" : "暂无可执行项")}
+        ${renderRouteMetricCard("路线就绪度", `${readinessPercent}%`, "按可试玩分支和可打到结局估算")}
       </div>
       <div class="route-testing-grid">
+        <article class="route-testing-card">
+          <strong>执行优先队列</strong>
+          <div class="list-stack compact-stack">
+            ${
+              topExecutionItems.length > 0
+                ? topExecutionItems
+                    .map(
+                      (item) => `
+                        <div class="route-testing-item">
+                          <div>
+                            <b>${escapeHtml(`${item.rank}. ${item.title}`)}</b>
+                            <span>${escapeHtml(`${item.chapterName} · ${item.sceneName} · ${item.routeLabel} -> ${item.targetLabel}`)}</span>
+                          </div>
+                          <div class="route-testing-chip-row">
+                            <span class="issue-tag ${item.severity === "blocker" ? "danger-text" : item.severity === "warn" ? "warn-text" : "good-text"}">
+                              ${escapeHtml(item.phase)}
+                            </span>
+                            <span class="issue-tag">${escapeHtml(item.actionLabel)}</span>
+                          </div>
+                          <div class="helper-text">${escapeHtml(item.acceptanceCriteria)}</div>
+                        </div>
+                      `
+                    )
+                    .join("")
+                : renderEmpty("当前没有路线执行项。")
+            }
+          </div>
+        </article>
+        <article class="route-testing-card">
+          <strong>验收标准</strong>
+          <div class="list-stack compact-stack">
+            ${acceptanceChecklist
+              .map(
+                (item) => `
+                  <div class="route-testing-item">
+                    <div>
+                      <b>${escapeHtml(item.label)}</b>
+                      <span>${escapeHtml(item.detail)}</span>
+                    </div>
+                    <span class="issue-tag ${item.done ? "good-text" : "warn-text"}">${escapeHtml(item.done ? "完成" : "待处理")}</span>
+                  </div>
+                `
+              )
+              .join("")}
+          </div>
+        </article>
         <article class="route-testing-card">
           <strong>优先分支点</strong>
           <div class="list-stack compact-stack">

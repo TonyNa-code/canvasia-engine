@@ -95,6 +95,9 @@ class FrontendRouteTestingReportModuleTests(unittest.TestCase):
               serialized: tools.serializeRouteTestingPlan(plan),
               summary: tools.getRouteTestingSummary(plan),
               digest: tools.getRouteTestingStatusDigest(plan),
+              executionQueue: tools.buildRouteTestingExecutionQueue(plan),
+              acceptanceChecklist: tools.buildRouteTestingAcceptanceChecklist(plan),
+              readiness: tools.getRouteTestingReadinessPercent(plan),
               tables,
               markdown,
               csv,
@@ -114,13 +117,25 @@ class FrontendRouteTestingReportModuleTests(unittest.TestCase):
         payload = json.loads(completed.stdout)
         self.assertIn("buildRouteTestingPlanMarkdown", payload["keys"])
         self.assertIn("buildRouteTestingPlanCsv", payload["keys"])
+        self.assertIn("buildRouteTestingExecutionQueue", payload["keys"])
+        self.assertIn("buildRouteTestingAcceptanceChecklist", payload["keys"])
+        self.assertIn("getRouteTestingReadinessPercent", payload["keys"])
         self.assertEqual(payload["summary"]["routeCaseCount"], 3)
         self.assertEqual(payload["summary"]["brokenRouteCaseCount"], 1)
         self.assertEqual(payload["summary"]["unreachableRouteCaseCount"], 1)
         self.assertEqual(payload["digest"]["status"], "blocked")
+        self.assertEqual(payload["executionQueue"][0]["severity"], "blocker")
+        self.assertEqual(payload["executionQueue"][0]["title"], "修复分支坏链")
+        self.assertTrue(any(item["id"] == "route_blockers_clear" for item in payload["acceptanceChecklist"]))
+        self.assertLess(payload["readiness"], 100)
+        self.assertIn("执行队列", payload["tables"]["summaryTable"])
+        self.assertIn("修复分支坏链", payload["tables"]["executionTable"])
         self.assertIn("Start \\| Branch", payload["tables"]["decisionTable"])
         self.assertIn("# Demo Project 路线试玩手册", payload["markdown"])
+        self.assertIn("## 执行优先队列", payload["markdown"])
+        self.assertIn("## 验收标准", payload["markdown"])
         self.assertIn("## 分支检查点", payload["markdown"])
+        self.assertIn('"执行队列"', payload["csv"])
         self.assertIn('"分支路线"', payload["csv"])
         self.assertIn('"结局路径"', payload["csv"])
         self.assertEqual(payload["escaped"], "a\\|b<br />c")
