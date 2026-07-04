@@ -98,6 +98,8 @@ const refs = {
   sfxVolumeValue: document.getElementById("sfxVolumeValue"),
   voiceVolumeRange: document.getElementById("voiceVolumeRange"),
   voiceVolumeValue: document.getElementById("voiceVolumeValue"),
+  previousHistoryButton: document.getElementById("previousHistoryButton"),
+  nextHistoryButton: document.getElementById("nextHistoryButton"),
   autoPlayToggleButton: document.getElementById("autoPlayToggleButton"),
   voiceToggleButton: document.getElementById("voiceToggleButton"),
   skipReadToggleButton: document.getElementById("skipReadToggleButton"),
@@ -1642,6 +1644,8 @@ function init() {
   refs.bgmVolumeRange?.addEventListener("input", handleBgmVolumeChange);
   refs.sfxVolumeRange?.addEventListener("input", handleSfxVolumeChange);
   refs.voiceVolumeRange?.addEventListener("input", handleVoiceVolumeChange);
+  refs.previousHistoryButton?.addEventListener("click", () => stepRuntimeHistory(-1));
+  refs.nextHistoryButton?.addEventListener("click", () => stepRuntimeHistory(1));
   refs.autoPlayToggleButton?.addEventListener("click", toggleAutoPlay);
   refs.voiceToggleButton?.addEventListener("click", toggleVoiceEnabled);
   refs.skipReadToggleButton?.addEventListener("click", toggleSkipRead);
@@ -7383,6 +7387,16 @@ function renderPlaybackControls(snapshot = getCurrentSnapshot()) {
     refs.menuVoiceVolumeValue.textContent = formatVolumePercent(state.playback.voiceVolume, 92);
   }
 
+  if (refs.previousHistoryButton) {
+    refs.previousHistoryButton.disabled = !canStepRuntimeHistory(-1);
+    refs.previousHistoryButton.textContent = "上一句";
+  }
+
+  if (refs.nextHistoryButton) {
+    refs.nextHistoryButton.disabled = !canStepRuntimeHistory(1);
+    refs.nextHistoryButton.textContent = "下一句";
+  }
+
   if (refs.autoPlayToggleButton) {
     refs.autoPlayToggleButton.textContent = `自动播放：${state.playback.autoPlay ? "开" : "关"}`;
   }
@@ -7842,6 +7856,18 @@ function handleGlobalKeydown(event) {
     return;
   }
 
+  if (event.code === "PageUp" && canStepRuntimeHistory(-1)) {
+    event.preventDefault();
+    stepRuntimeHistory(-1);
+    return;
+  }
+
+  if (event.code === "PageDown" && canStepRuntimeHistory(1)) {
+    event.preventDefault();
+    stepRuntimeHistory(1);
+    return;
+  }
+
   if (event.code === "Space" || event.code === "Enter" || event.code === "ArrowRight") {
     event.preventDefault();
     handleContinue();
@@ -7976,6 +8002,30 @@ function handleSaveSlotPanelClick(event) {
   if (clearButton) {
     requestSaveSlotClear(clearButton.dataset.clearSlot);
   }
+}
+
+function getRuntimeHistoryStepIndex(delta) {
+  const session = state.session;
+  const offset = Math.trunc(Number(delta) || 0);
+
+  if (!session || !Number.isInteger(session.position) || !offset) {
+    return null;
+  }
+
+  const nextIndex = session.position + offset;
+  if (nextIndex < 0 || nextIndex >= session.timeline.length) {
+    return null;
+  }
+  return nextIndex;
+}
+
+function canStepRuntimeHistory(delta) {
+  return getRuntimeHistoryStepIndex(delta) !== null;
+}
+
+function stepRuntimeHistory(delta) {
+  const nextIndex = getRuntimeHistoryStepIndex(delta);
+  return nextIndex === null ? false : jumpToHistory(nextIndex);
 }
 
 function jumpToHistory(rawIndex) {

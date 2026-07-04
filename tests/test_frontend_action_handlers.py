@@ -4673,6 +4673,29 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("self.get_current_line_text_speed() == \"instant\"", native_source)
         self.assertIn("self.current_line_next_reveal_at_ms", native_source)
 
+    def test_web_runtime_exposes_explicit_history_step_controls(self) -> None:
+        player_html = (ROOT_DIR / "export_player_template" / "index.html").read_text(encoding="utf-8")
+        player_source = PLAYER_PATH.read_text(encoding="utf-8")
+        refs_block = player_source[player_source.index("const refs = {") : player_source.index("};", player_source.index("const refs = {"))]
+        init_block = _extract_function_source(player_source, "init")
+        render_playback_controls = _extract_function_source(player_source, "renderPlaybackControls")
+        handle_keydown = _extract_function_source(player_source, "handleGlobalKeydown")
+        step_history = _extract_function_source(player_source, "stepRuntimeHistory")
+
+        self.assertIn('id="previousHistoryButton"', player_html)
+        self.assertIn('id="nextHistoryButton"', player_html)
+        self.assertIn('title="PageUp"', player_html)
+        self.assertIn('title="PageDown"', player_html)
+        self.assertIn('previousHistoryButton: document.getElementById("previousHistoryButton")', refs_block)
+        self.assertIn('nextHistoryButton: document.getElementById("nextHistoryButton")', refs_block)
+        self.assertIn("stepRuntimeHistory(-1)", init_block)
+        self.assertIn("stepRuntimeHistory(1)", init_block)
+        self.assertIn("refs.previousHistoryButton.disabled = !canStepRuntimeHistory(-1)", render_playback_controls)
+        self.assertIn("refs.nextHistoryButton.disabled = !canStepRuntimeHistory(1)", render_playback_controls)
+        self.assertIn('event.code === "PageUp"', handle_keydown)
+        self.assertIn('event.code === "PageDown"', handle_keydown)
+        self.assertIn("jumpToHistory(nextIndex)", step_history)
+
     def test_typewriter_index_helpers_keep_unicode_characters_intact(self) -> None:
         for path in (APP_PATH, PLAYER_PATH):
             source = path.read_text(encoding="utf-8")
