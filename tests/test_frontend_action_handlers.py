@@ -4101,6 +4101,13 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("sceneProductionBoardTools.getSceneProductionBoardStatusDigest", source)
         self.assertIn("scene.recipeSuggestion", source)
         self.assertIn("summary.recipeSuggestionCount", source)
+        self.assertIn("function getScenePacingToneClass", source)
+        self.assertIn("summary.averagePacingScore", source)
+        self.assertIn("summary.weakPacingSceneCount", source)
+        self.assertIn("scene.pacingHeadline", source)
+        self.assertIn("scene.pacingIssueSummary", source)
+        self.assertIn("scene.pacingActionSummary", source)
+        self.assertIn("getScenePacingToneClass(scene)", source)
 
     def test_voice_production_sheet_export_actions_are_wired(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")

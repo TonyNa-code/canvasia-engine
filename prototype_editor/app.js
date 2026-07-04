@@ -31866,6 +31866,17 @@ function getSceneProductionBoardToneClass(status) {
   return "";
 }
 
+function getScenePacingToneClass(scene = {}) {
+  const pacingScore = Number(scene.pacingScore ?? 0);
+  if (pacingScore >= 72) {
+    return "good-text";
+  }
+  if (pacingScore >= 52) {
+    return "warn-text";
+  }
+  return "danger-text";
+}
+
 function getVoiceProductionToneClass(status) {
   if (status === "blocked") {
     return "danger-text";
@@ -32172,9 +32183,11 @@ function renderSceneProductionBoardPanel() {
       <p class="helper-text">${escapeHtml(digest.detail)} 它会按场景整理缺背景、缺 BGM、待绑语音、长文本、坏跳转和演出不足，把“下一步该做什么”变成制作任务。</p>
       <div class="preview-sprint-metrics">
         ${renderRouteMetricCard("平均完成度", `${summary.averageCompletion ?? 0}%`, "所有场景的制作健康度")}
+        ${renderRouteMetricCard("平均节奏分", `${summary.averagePacingScore ?? 0}%`, "文本、演出、选择和收尾的节奏体检")}
         ${renderRouteMetricCard("可试玩 / 先修", `${summary.readySceneCount ?? 0} / ${summary.blockedSceneCount ?? 0}`, "能跑起来与需要先处理的场景")}
         ${renderRouteMetricCard("缺背景 / 缺 BGM", `${summary.missingBackgroundSceneCount ?? 0} / ${summary.missingMusicSceneCount ?? 0}`, "最基础的画面和氛围缺口")}
         ${renderRouteMetricCard("待绑语音", `${summary.missingVoiceLineCount ?? 0} 句`, "台词语音覆盖缺口")}
+        ${renderRouteMetricCard("节奏待打磨", `${summary.weakPacingSceneCount ?? 0} 个`, "节奏分低于可试玩线的场景")}
         ${renderRouteMetricCard("推荐配方", `${summary.recipeSuggestionCount ?? 0} 个`, "可以一键补齐场景骨架")}
       </div>
       <div class="detail-actions">
@@ -32205,6 +32218,18 @@ function renderSceneProductionBoardPanel() {
                       <p>${escapeHtml(`${scene.chapterName} · 下一步：${scene.nextAction}`)}</p>
                       <div class="helper-text">
                         ${escapeHtml(`卡片 ${scene.blockCount} · 台词 ${scene.dialogueCount} · 待绑语音 ${scene.missingVoiceCount} · 背景 ${scene.hasBackground ? "有" : "缺"} · BGM ${scene.hasMusic ? "有" : "缺"}`)}
+                      </div>
+                      <div class="route-testing-item">
+                        <div>
+                          <b>${escapeHtml(scene.pacingHeadline || `节奏：${scene.pacingGrade ?? "待分析"}`)}</b>
+                          <span>${escapeHtml(scene.pacingIssueSummary || "暂无明显节奏问题")}</span>
+                        </div>
+                        <span class="issue-tag ${getScenePacingToneClass(scene)}">
+                          ${escapeHtml(`${scene.pacingGrade ?? "节奏"} · ${scene.pacingScore ?? 0}%`)}
+                        </span>
+                      </div>
+                      <div class="helper-text">
+                        ${escapeHtml(`节奏建议：${scene.pacingActionSummary || "试玩确认"}`)}
                       </div>
                       ${
                         scene.recipeSuggestion
