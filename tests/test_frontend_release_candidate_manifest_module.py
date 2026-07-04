@@ -90,6 +90,22 @@ class FrontendReleaseCandidateManifestModuleTests(unittest.TestCase):
                 supportedLanguages: ["zh-CN", "en-US"],
                 issues: [{{ severity: "warn", title: "Missing translation", detail: "English line missing.", languageLabel: "English" }}],
               }},
+              unlockableContentManifest: {{
+                summary: {{
+                  totalEntryCount: 12,
+                  readyEntryCount: 9,
+                  missingEntryCount: 3,
+                  achievementCount: 4,
+                  endingCount: 2,
+                  reachableEndingCount: 1,
+                  readinessPercent: 75,
+                  warningCount: 2,
+                }},
+                issues: [
+                  {{ severity: "warn", groupId: "extra_cg", title: "CG 文件缺失", detail: "回忆 CG 没有可用文件。" }},
+                  {{ severity: "warn", groupId: "ending_collection", title: "结局当前不可达", detail: "Hidden Ending 暂时无法抵达。" }},
+                ],
+              }},
               screenplay: {{ summary: {{ lineCount: 2, choiceCount: 1 }} }},
               directorCueSheet: {{
                 summary: {{ sceneCount: 2, cueCount: 7, issueCount: 1, blockerCount: 1, warningCount: 0 }},
@@ -145,18 +161,26 @@ class FrontendReleaseCandidateManifestModuleTests(unittest.TestCase):
         self.assertEqual(manifest["content"]["blockCount"], 7)
         self.assertEqual(manifest["content"]["languageCount"], 2)
         self.assertEqual(manifest["assets"]["placeholderCount"], 1)
-        self.assertEqual(len(manifest["deliverables"]), 9)
+        self.assertEqual(len(manifest["deliverables"]), 10)
         self.assertEqual(manifest["status"], "blocked")
         self.assertEqual(payload["digest"]["status"], "blocked")
+        self.assertEqual(manifest["unlockables"]["totalEntryCount"], 12)
+        self.assertEqual(manifest["unlockables"]["readyEntryCount"], 9)
+        self.assertEqual(manifest["unlockables"]["reachableEndingCount"], 1)
         self.assertTrue(any(item["id"] == "playable_export" and item["status"] == "ready" for item in manifest["deliverables"]))
         self.assertTrue(any(item["id"] == "localization_pack" and item["status"] == "review" for item in manifest["deliverables"]))
+        self.assertTrue(any(item["id"] == "unlockable_manifest" and item["status"] == "review" for item in manifest["deliverables"]))
         self.assertTrue(any(risk["area"] == "Assets" and risk["title"] == "Missing BGM" for risk in manifest["risks"]))
         self.assertTrue(any(risk["area"] == "Director cues" for risk in manifest["risks"]))
+        self.assertTrue(any(risk["area"] == "Unlockables" and risk["title"] == "结局当前不可达" for risk in manifest["risks"]))
         self.assertTrue(any(item["id"] == "save_load" and item["required"] for item in manifest["signoffChecklist"]))
         self.assertTrue(any(item["id"] == "audio_mix" and item["required"] for item in manifest["signoffChecklist"]))
+        self.assertTrue(any(item["id"] == "extras_unlockables" and item["required"] for item in manifest["signoffChecklist"]))
         self.assertIn("# RC Demo Release Candidate Manifest", payload["markdown"])
         self.assertIn("## Manual Signoff", payload["markdown"])
+        self.assertIn("9/12", payload["markdown"])
         self.assertIn("Playable build", payload["markdown"])
+        self.assertIn("Unlockable content manifest", payload["markdown"])
         self.assertIn('"deliverable"', payload["csv"])
         self.assertIn('"signoff"', payload["csv"])
         self.assertIn('data-action="export-release-candidate-manifest-markdown"', payload["panel"])

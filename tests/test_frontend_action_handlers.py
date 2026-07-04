@@ -4444,6 +4444,7 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("function exportReleaseCandidateManifestCsv()", source)
         self.assertIn("releaseCandidateManifestTools.buildReleaseCandidateManifest", source)
         self.assertIn("releaseCandidateManifestTools.renderReleaseCandidateManifestPanel", source)
+        self.assertIn("unlockableContentManifest: buildUnlockableContentManifest(currentRouteOverview)", source)
         self.assertIn("Release Candidate Manifest", combined_source)
         self.assertIn("Manual signoff checklist", module_source)
 

@@ -30516,6 +30516,7 @@ function buildReleaseCandidateManifest(routeOverview = null) {
     productionBacklog: buildProductionBacklog(currentRouteOverview),
     runtimeCapabilityMatrix: buildRuntimeCapabilityMatrix(),
     localizationCoverage: buildLocalizationCoverage(),
+    unlockableContentManifest: buildUnlockableContentManifest(currentRouteOverview),
     screenplay: buildScreenplayExport(),
     directorCueSheet: buildDirectorCueSheet(),
     voiceSheet: buildVoiceProductionSheet(),

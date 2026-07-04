@@ -49,6 +49,12 @@
       description: "Language coverage and translator CSV handoff when the project has multiple languages.",
     },
     {
+      id: "unlockable_manifest",
+      label: "Unlockable content manifest",
+      owner: "Content",
+      description: "Gallery, replay, archive, ending, and achievement coverage for public-preview release.",
+    },
+    {
       id: "artifact_integrity",
       label: "Artifact integrity",
       owner: "Release",
@@ -129,6 +135,20 @@
       return "Ready";
     }
     return "Polish";
+  }
+
+  function getSeverityWeight(severity = "") {
+    const normalized = normalizeSeverity(severity);
+    if (normalized === "blocker") {
+      return 100;
+    }
+    if (normalized === "warn") {
+      return 60;
+    }
+    if (normalized === "tip") {
+      return 25;
+    }
+    return 0;
   }
 
   function buildCollectionMap(source, idField = "id") {
@@ -388,6 +408,7 @@
     const directorCueSheet = context.directorCueSheet ?? {};
     const voiceSheet = context.voiceSheet ?? {};
     const localizationCoverage = context.localizationCoverage ?? {};
+    const unlockableContentManifest = context.unlockableContentManifest ?? {};
     const exportResult = context.exportResult ?? null;
     const releaseChecklistItems = toArray(context.releaseChecklistItems);
 
@@ -497,6 +518,22 @@
         status: severity === "good" ? "ready" : "review",
         severity,
         detail: `${summary.readyPercent ?? 0}% localized, ${summary.missingCount ?? 0} missing translation(s).`,
+      };
+    }
+
+    if (id === "unlockable_manifest") {
+      const summary = unlockableContentManifest.summary ?? {};
+      if (summary.totalEntryCount === undefined) {
+        return { status: "missing", severity: "warn", detail: "Unlockable content manifest is not available." };
+      }
+      if ((summary.totalEntryCount ?? 0) === 0) {
+        return { status: "not_needed", severity: "good", detail: "No EXTRA / replay / archive content is configured yet." };
+      }
+      const severity = (summary.warningCount ?? 0) > 0 || (summary.missingEntryCount ?? 0) > 0 ? "warn" : "good";
+      return {
+        status: severity === "good" ? "ready" : "review",
+        severity,
+        detail: `${summary.readyEntryCount ?? 0}/${summary.totalEntryCount ?? 0} unlockable entries ready, ${summary.reachableEndingCount ?? 0}/${summary.endingCount ?? 0} endings reachable.`,
       };
     }
 
@@ -620,6 +657,19 @@
         })
       );
 
+    toArray(context.unlockableContentManifest?.issues)
+      .filter((issue) => normalizeSeverity(issue?.severity) !== "good")
+      .slice(0, 4)
+      .forEach((issue) =>
+        pushRisk(risks, {
+          severity: issue.severity,
+          area: "Unlockables",
+          title: issue.title,
+          detail: issue.detail,
+          source: issue.groupId ?? issue.assetId ?? issue.sceneId,
+        })
+      );
+
     toArray(context.directorCueSheet?.issues)
       .filter((issue) => normalizeSeverity(issue?.severity) === "blocker")
       .slice(0, 4)
@@ -713,6 +763,13 @@
         title: "Language switch and fallback check",
         detail: `${content.languageCount} language(s) configured; verify fallback text is readable.`,
         required: content.languageCount > 1,
+      },
+      {
+        id: "extras_unlockables",
+        target: "EXTRA / Replay",
+        title: "Gallery, replay, archive, ending, and achievement smoke",
+        detail: "Open the EXTRA / replay surfaces and verify unlocked items, thumbnails, audio replay, and ending entries are readable.",
+        required: toCount(context.unlockableContentManifest?.summary?.totalEntryCount) > 0,
       },
       {
         id: "native_runtime",
@@ -827,6 +884,15 @@
         usedTypeCount: toCount(context.runtimeCapabilityMatrix?.summary?.usedTypeCount),
         issueCount: toCount(context.runtimeCapabilityMatrix?.summary?.issueCount),
         acceptanceItemCount: toCount(context.runtimeCapabilityMatrix?.acceptance?.summary?.itemCount),
+      },
+      unlockables: {
+        totalEntryCount: toCount(context.unlockableContentManifest?.summary?.totalEntryCount),
+        readyEntryCount: toCount(context.unlockableContentManifest?.summary?.readyEntryCount),
+        missingEntryCount: toCount(context.unlockableContentManifest?.summary?.missingEntryCount),
+        achievementCount: toCount(context.unlockableContentManifest?.summary?.achievementCount),
+        endingCount: toCount(context.unlockableContentManifest?.summary?.endingCount),
+        reachableEndingCount: toCount(context.unlockableContentManifest?.summary?.reachableEndingCount),
+        readinessPercent: toCount(context.unlockableContentManifest?.summary?.readinessPercent),
       },
       latestExport: context.exportResult
         ? {
@@ -956,7 +1022,7 @@
       "## Snapshot",
       "",
       buildMarkdownTable(
-        ["Version", "Readiness", "Resolution", "Chapters", "Scenes", "Blocks", "Characters", "Assets", "Languages"],
+        ["Version", "Readiness", "Resolution", "Chapters", "Scenes", "Blocks", "Characters", "Assets", "Languages", "Unlockables"],
         [
           [
             manifest.project?.releaseVersion,
@@ -968,6 +1034,7 @@
             manifest.content?.characterCount ?? 0,
             manifest.assets?.totalCount ?? 0,
             toArray(manifest.content?.supportedLanguages).join(" / "),
+            `${manifest.unlockables?.readyEntryCount ?? 0}/${manifest.unlockables?.totalEntryCount ?? 0}`,
           ],
         ]
       ),
@@ -1047,7 +1114,11 @@
     const getToneClass = typeof options.getToneClass === "function" ? options.getToneClass : () => "";
     const digest = getReleaseCandidateStatusDigest(manifest);
     const topRisks = toArray(manifest.risks).slice(0, 4);
-    const deliverables = toArray(manifest.deliverables).slice(0, 5);
+    const allDeliverables = toArray(manifest.deliverables);
+    const deliverables = allDeliverables
+      .slice()
+      .sort((left, right) => getSeverityWeight(right.severity) - getSeverityWeight(left.severity))
+      .slice(0, 5);
     const signoffItems = toArray(manifest.signoffChecklist).filter((item) => item.required).slice(0, 5);
 
     return `
@@ -1060,7 +1131,7 @@
         <div class="preview-sprint-metrics">
           ${renderMetric("Readiness", `${manifest.readinessPercent ?? 0}%`, "release candidate estimate")}
           ${renderMetric("Scenes / Blocks", `${manifest.content?.sceneCount ?? 0} / ${manifest.content?.blockCount ?? 0}`, "playable content inventory")}
-          ${renderMetric("Deliverables", `${deliverables.filter((item) => item.severity === "good").length}/${manifest.deliverables?.length ?? 0}`, "ready release artifacts")}
+          ${renderMetric("Deliverables", `${allDeliverables.filter((item) => item.severity === "good").length}/${allDeliverables.length}`, "ready release artifacts")}
           ${renderMetric("Risks", `${topRisks.length ? manifest.risks.length : 0}`, "blockers and review items")}
         </div>
         <div class="detail-actions">
