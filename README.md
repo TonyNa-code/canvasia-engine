@@ -66,6 +66,7 @@ The project already includes a visual editor, export pipeline, native runtime pr
 - Full screenplay / production-script exports for proofreading, voice recording, translation handoff, and archival review
 - Director cue-sheet exports that turn each scene into story, visual, audio, route, and effect production beats
 - Release Candidate manifests that bundle project inventory, deliverable status, release risks, and manual signoff checks for testers and public preview handoff
+- Unlockable Content manifests with Markdown / CSV exports for CG gallery, music room, voice replay, character archive, location archive, narration archive, relationship archive, chapter replay, ending collection, and achievement coverage
 - Custom game UI skins, UI Kit binding, nine-slice textures, button states, layout controls, and visual novel textbox design
 - Extra galleries: CG replay, music room, character archive, location archive, narration archive, relationship archive, achievements, chapter replay, ending replay, and voice replay
 - Advanced particle presets, project particle libraries, camera effects, screen filters, flashes, shakes, and fade transitions
@@ -83,7 +84,7 @@ The project already includes a visual editor, export pipeline, native runtime pr
 | Canvasia Assistant | Available | Local template mode plus optional creator-owned API keys for major compatible providers. |
 | Project Safety Net | Available | Snapshots, restore, crash recovery, project doctor, repair queue, cross-module production backlog queues, release gates, release-control reports, Release Candidate manifests, and VN baseline quality checks for placeholder content, character sprites, backgrounds, BGM, choices, text density, and presentation polish. |
 | Game UI Customization | Available | Project UI skins, button states, nine-slice images, layout tuning, and textbox styling. |
-| Extras / Replay Systems | Available | CG, music, character, location, narration, relationship, achievement, chapter, ending, and voice replay systems. |
+| Extras / Replay Systems | Available | CG, music, character, location, narration, relationship, achievement, chapter, ending, and voice replay systems, plus exportable Unlockable Content manifests that catch missing gallery files, voice replay gaps, character archive visuals, and unreachable endings. |
 | Particles and Presentation | Available | Particle presets, custom particle settings, camera, filters, flashes, shakes, fades, and character presentation effects. |
 | Live2D / 3D Assets | Preview | Live2D, 3D character models, and 3D scene assets can be imported; native Runtime exports 3D structure and risk reports. |
 | Web / Desktop Exports | Preview | Web playable packages and desktop packages are available; signing and notarization depend on release notes. |

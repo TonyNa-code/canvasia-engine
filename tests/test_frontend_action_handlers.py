@@ -4398,6 +4398,30 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("routeOverview: currentRouteOverview", source)
         self.assertIn("audioCueSheet: buildAudioCueSheet()", source)
 
+    def test_unlockable_content_manifest_export_actions_are_wired(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        module_source = (EDITOR_DIR / "modules" / "unlockable_content_manifest.js").read_text(encoding="utf-8")
+        combined_source = f"{source}\n{module_source}"
+        click_handler = _extract_function_source(source, "handleClick")
+        markdown_block_start = click_handler.index('action === "export-unlockable-content-manifest-markdown"')
+        csv_block_start = click_handler.index('action === "export-unlockable-content-manifest-csv"')
+        csv_block_end = click_handler.index('action === "copy-asset-rights-credits-script"', csv_block_start)
+        markdown_block = click_handler[markdown_block_start:csv_block_start]
+        csv_block = click_handler[csv_block_start:csv_block_end]
+
+        self.assertIn("const unlockableContentManifestTools = window.CanvasiaEditorUnlockableContentManifest", source)
+        self.assertIn('data-action="export-unlockable-content-manifest-markdown"', combined_source)
+        self.assertIn('data-action="export-unlockable-content-manifest-csv"', combined_source)
+        self.assertIn("exportUnlockableContentManifestMarkdown();", markdown_block)
+        self.assertIn("exportUnlockableContentManifestCsv();", csv_block)
+        self.assertIn("function buildUnlockableContentManifest(", source)
+        self.assertIn("function renderUnlockableContentManifestPanel(", source)
+        self.assertIn("function exportUnlockableContentManifestMarkdown()", source)
+        self.assertIn("function exportUnlockableContentManifestCsv()", source)
+        self.assertIn("unlockableContentManifestTools.buildUnlockableContentManifest", source)
+        self.assertIn("unlockableContentManifestTools.renderUnlockableContentManifestPanel", source)
+        self.assertIn("unlockableContentManifest: buildUnlockableContentManifest(currentRouteOverview)", source)
+
     def test_release_candidate_manifest_export_actions_are_wired(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
         module_source = (EDITOR_DIR / "modules" / "release_candidate_manifest.js").read_text(encoding="utf-8")

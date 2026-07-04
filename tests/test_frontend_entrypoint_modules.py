@@ -49,6 +49,7 @@ class FrontendEntrypointModuleTests(unittest.TestCase):
             "./modules/runtime_capability_matrix.js",
             "./modules/production_backlog.js",
             "./modules/release_candidate_manifest.js",
+            "./modules/unlockable_content_manifest.js",
             "./modules/visual_effects.js",
             "./modules/particle_effects.js",
             "./modules/project_history.js",

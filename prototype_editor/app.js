@@ -70,6 +70,7 @@ const localizationCoverageTools = window.CanvasiaEditorLocalizationCoverage;
 const runtimeCapabilityMatrixTools = window.CanvasiaEditorRuntimeCapabilityMatrix;
 const productionBacklogTools = window.CanvasiaEditorProductionBacklog;
 const releaseCandidateManifestTools = window.CanvasiaEditorReleaseCandidateManifest;
+const unlockableContentManifestTools = window.CanvasiaEditorUnlockableContentManifest;
 
 function getBlockLabel(type) {
   return storyBlockCatalogTools.getBlockLabel(type) ?? BLOCK_LABELS[type] ?? type ?? "步骤";
@@ -3855,6 +3856,16 @@ async function handleClick(event) {
 
   if (action === "export-asset-rights-csv") {
     exportAssetRightsCsv();
+    return;
+  }
+
+  if (action === "export-unlockable-content-manifest-markdown") {
+    exportUnlockableContentManifestMarkdown();
+    return;
+  }
+
+  if (action === "export-unlockable-content-manifest-csv") {
+    exportUnlockableContentManifestCsv();
     return;
   }
 
@@ -28726,6 +28737,17 @@ function buildAssetRightsFileName(extension = "md") {
   return `${title}_asset_rights_sheet_${dateStamp}.${extension}`;
 }
 
+function buildUnlockableContentManifestFileName(extension = "md") {
+  const date = new Date();
+  const dateStamp = [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("");
+  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
+  return `${title}_unlockable_content_manifest_${dateStamp}.${extension}`;
+}
+
 function buildAudioCueSheetFileName(extension = "md") {
   const date = new Date();
   const dateStamp = [
@@ -30161,6 +30183,12 @@ function buildAssetRightsSheet() {
   return assetRightsSheetTools.buildAssetRightsSheet(state.data ?? {});
 }
 
+function buildUnlockableContentManifest(routeOverview = null) {
+  return unlockableContentManifestTools.buildUnlockableContentManifest(state.data ?? {}, {
+    routeOverview: routeOverview ?? buildSceneRouteOverview(),
+  });
+}
+
 function exportAssetRightsMarkdown() {
   const fileName = buildAssetRightsFileName("md");
   const sheet = buildAssetRightsSheet();
@@ -30179,6 +30207,25 @@ function exportAssetRightsCsv() {
   downloadTextFile(fileName, content, "text/csv;charset=utf-8");
   setSaveStatus(`已导出素材授权 CSV：${fileName}`);
   showToast(`素材授权 CSV 已导出：${fileName}`);
+}
+
+function exportUnlockableContentManifestMarkdown() {
+  const fileName = buildUnlockableContentManifestFileName("md");
+  const manifest = buildUnlockableContentManifest();
+  const content = unlockableContentManifestTools.buildUnlockableContentMarkdown(manifest, {
+    generatedAt: formatDate(new Date().toISOString()),
+  });
+  downloadTextFile(fileName, content, "text/markdown;charset=utf-8");
+  setSaveStatus(`已导出可解锁内容清单：${fileName}`);
+  showToast(`可解锁内容清单已导出：${fileName}`);
+}
+
+function exportUnlockableContentManifestCsv() {
+  const fileName = buildUnlockableContentManifestFileName("csv");
+  const content = unlockableContentManifestTools.buildUnlockableContentCsv(buildUnlockableContentManifest());
+  downloadTextFile(fileName, content, "text/csv;charset=utf-8");
+  setSaveStatus(`已导出可解锁内容 CSV：${fileName}`);
+  showToast(`可解锁内容 CSV 已导出：${fileName}`);
 }
 
 async function copyAssetRightsCreditsScript() {
@@ -30419,6 +30466,7 @@ function buildProductionBacklog(routeOverview = null) {
     variableInfluenceSheet: buildVariableInfluenceSheet(),
     assetDependencySheet: buildAssetDependencySheet(),
     assetRightsSheet: buildAssetRightsSheet(),
+    unlockableContentManifest: buildUnlockableContentManifest(currentRouteOverview),
     audioCueSheet: buildAudioCueSheet(),
     stageDirectionSheet: buildStageDirectionSheet(),
     presentationTimeline: buildPresentationTimeline(),
@@ -32599,6 +32647,16 @@ function renderAssetRightsPanel() {
   });
 }
 
+function renderUnlockableContentManifestPanel(routeOverview = null) {
+  return unlockableContentManifestTools.renderUnlockableContentManifestPanel(
+    buildUnlockableContentManifest(routeOverview),
+    {
+      escapeHtml,
+      renderRouteMetricCard,
+    }
+  );
+}
+
 function renderAudioCueSheetPanel() {
   return audioCueSheetPanelTools.renderAudioCueSheetPanel(buildAudioCueSheet());
 }
@@ -32943,6 +33001,7 @@ function renderInspectionOverviewPanel(routeOverview) {
       ${renderVariableInfluencePanel()}
       ${renderAssetDependencyPanel()}
       ${renderAssetRightsPanel()}
+      ${renderUnlockableContentManifestPanel(routeOverview)}
       ${renderAudioCueSheetPanel()}
       ${renderStageDirectionSheetPanel()}
       ${renderPresentationTimelinePanel()}
