@@ -40,6 +40,7 @@
     defaultSfxVolume: 85,
     defaultVoiceVolume: 92,
     defaultVoiceEnabled: true,
+    defaultVoiceDuckingEnabled: true,
   });
   const DEFAULT_FRAME_SLICE = Object.freeze({ top: 18, right: 18, bottom: 18, left: 18 });
   const PROJECT_DIALOG_BOX_PRESET_LABELS = Object.freeze({
@@ -583,6 +584,7 @@
         options
       ),
       defaultVoiceEnabled: runtimeSettings.defaultVoiceEnabled !== false,
+      defaultVoiceDuckingEnabled: runtimeSettings.defaultVoiceDuckingEnabled !== false,
     };
   }
 

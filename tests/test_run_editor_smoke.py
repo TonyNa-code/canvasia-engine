@@ -543,6 +543,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 "defaultSfxVolume": 77,
                 "defaultVoiceVolume": 88,
                 "defaultVoiceEnabled": False,
+                "defaultVoiceDuckingEnabled": False,
             },
             dialog_box_config={
                 "preset": "transparent",
@@ -656,6 +657,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(saved_project["runtimeSettings"]["defaultSfxVolume"], 77)
         self.assertEqual(saved_project["runtimeSettings"]["defaultVoiceVolume"], 88)
         self.assertFalse(saved_project["runtimeSettings"]["defaultVoiceEnabled"])
+        self.assertFalse(saved_project["runtimeSettings"]["defaultVoiceDuckingEnabled"])
         self.assertEqual(saved_project["dialogBoxConfig"]["preset"], "transparent")
         self.assertEqual(saved_project["dialogBoxConfig"]["shape"], "capsule")
         self.assertEqual(saved_project["dialogBoxConfig"]["widthPercent"], 82)
@@ -711,6 +713,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(merged_runtime_settings["defaultSfxVolume"], 77)
         self.assertEqual(merged_runtime_settings["defaultVoiceVolume"], 88)
         self.assertFalse(merged_runtime_settings["defaultVoiceEnabled"])
+        self.assertFalse(merged_runtime_settings["defaultVoiceDuckingEnabled"])
 
     def test_import_localization_patches_updates_character_chapter_scene_and_blocks(self) -> None:
         _, chapter_result = self.create_blank_project_with_chapter()

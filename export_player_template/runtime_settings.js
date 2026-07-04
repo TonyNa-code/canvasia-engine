@@ -27,6 +27,7 @@ export const PLAYBACK_DEFAULTS = Object.freeze({
   autoPlay: false,
   skipRead: false,
   voiceEnabled: true,
+  voiceDuckingEnabled: true,
   bgmVolume: 72,
   sfxVolume: 85,
   voiceVolume: 92,
@@ -115,6 +116,7 @@ export function getProjectRuntimeSettings(project = {}) {
     defaultSfxVolume: getSafeVolumePercent(runtimeSettings.defaultSfxVolume, PLAYBACK_DEFAULTS.sfxVolume),
     defaultVoiceVolume: getSafeVolumePercent(runtimeSettings.defaultVoiceVolume, PLAYBACK_DEFAULTS.voiceVolume),
     defaultVoiceEnabled: runtimeSettings.defaultVoiceEnabled !== false,
+    defaultVoiceDuckingEnabled: runtimeSettings.defaultVoiceDuckingEnabled !== false,
   };
 }
 
@@ -131,6 +133,7 @@ export function sanitizePlaybackSettings(source = {}, options = {}) {
     autoPlay: Boolean(source.autoPlay ?? PLAYBACK_DEFAULTS.autoPlay),
     skipRead: Boolean(source.skipRead ?? PLAYBACK_DEFAULTS.skipRead),
     voiceEnabled: source.voiceEnabled !== false,
+    voiceDuckingEnabled: source.voiceDuckingEnabled !== false,
     bgmVolume: getSafeVolumePercent(source.bgmVolume, PLAYBACK_DEFAULTS.bgmVolume),
     sfxVolume: getSafeVolumePercent(source.sfxVolume, PLAYBACK_DEFAULTS.sfxVolume),
     voiceVolume: getSafeVolumePercent(source.voiceVolume, PLAYBACK_DEFAULTS.voiceVolume),
@@ -147,6 +150,7 @@ export function buildProjectPlaybackDefaults(project = {}, defaultLanguage = "",
       dialogTheme: runtimeSettings.defaultDialogTheme,
       uiThemeMode: runtimeSettings.defaultUiThemeMode,
       voiceEnabled: runtimeSettings.defaultVoiceEnabled,
+      voiceDuckingEnabled: runtimeSettings.defaultVoiceDuckingEnabled,
       bgmVolume: runtimeSettings.defaultBgmVolume,
       sfxVolume: runtimeSettings.defaultSfxVolume,
       voiceVolume: runtimeSettings.defaultVoiceVolume,

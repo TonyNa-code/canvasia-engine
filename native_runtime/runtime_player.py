@@ -320,6 +320,7 @@ DEFAULT_RUNTIME_PLAYER_SETTINGS = {
     "bgmVolume": 85,
     "sfxVolume": 90,
     "voiceVolume": 100,
+    "voiceDuckingEnabled": "on",
 }
 READ_TEXT_KEY_LIMIT = 20000
 SNAPSHOT_TEXT_HISTORY_LIMIT = 120
@@ -416,6 +417,7 @@ SETTINGS_MENU_ITEMS = [
     ("dialogBoxOpacityPercent", "文本框透明度"),
     ("autoPlayDelayMs", "自动播放间隔"),
     ("autoPlayWaitForVoice", "自动播放等语音"),
+    ("voiceDuckingEnabled", "语音焦点"),
     ("masterVolume", "总音量"),
     ("bgmVolume", "BGM 音量"),
     ("sfxVolume", "音效音量"),
@@ -9264,6 +9266,11 @@ def sanitize_runtime_player_settings(value: dict | None) -> dict:
     ).strip().lower()
     if auto_play_wait_for_voice not in RUNTIME_TOGGLE_MODES:
         auto_play_wait_for_voice = DEFAULT_RUNTIME_PLAYER_SETTINGS["autoPlayWaitForVoice"]
+    voice_ducking_enabled = str(
+        source.get("voiceDuckingEnabled") or DEFAULT_RUNTIME_PLAYER_SETTINGS["voiceDuckingEnabled"]
+    ).strip().lower()
+    if voice_ducking_enabled not in RUNTIME_TOGGLE_MODES:
+        voice_ducking_enabled = DEFAULT_RUNTIME_PLAYER_SETTINGS["voiceDuckingEnabled"]
     return {
         "themeMode": theme_mode,
         "displayMode": display_mode,
@@ -9288,6 +9295,7 @@ def sanitize_runtime_player_settings(value: dict | None) -> dict:
             DEFAULT_RUNTIME_PLAYER_SETTINGS["autoPlayDelayMs"],
         ),
         "autoPlayWaitForVoice": auto_play_wait_for_voice,
+        "voiceDuckingEnabled": voice_ducking_enabled,
         "masterVolume": clamp_int(source.get("masterVolume"), 0, 100, DEFAULT_RUNTIME_PLAYER_SETTINGS["masterVolume"]),
         "bgmVolume": clamp_int(source.get("bgmVolume"), 0, 100, DEFAULT_RUNTIME_PLAYER_SETTINGS["bgmVolume"]),
         "sfxVolume": clamp_int(source.get("sfxVolume"), 0, 100, DEFAULT_RUNTIME_PLAYER_SETTINGS["sfxVolume"]),
@@ -9318,6 +9326,7 @@ def build_project_default_runtime_player_settings(project: dict | None = None) -
         if runtime_settings.get("defaultVoiceEnabled") is not False
         else 0
     )
+    defaults["voiceDuckingEnabled"] = "on" if runtime_settings.get("defaultVoiceDuckingEnabled") is not False else "off"
     return sanitize_runtime_player_settings(defaults)
 
 
@@ -9848,6 +9857,7 @@ class NativeRuntimePlayer:
         self.current_bgm_scope: dict | None = None
         self.current_voice_channel = None
         self.current_voice_volume_percent = 100
+        self.voice_playback_active = False
         self.project_id = str(self.project.get("projectId") or "untitled_project")
         self.save_store = load_project_save_store(self.project_id, self.formal_save_slot_count)
         self.save_file_path = get_project_save_file_path(self.project_id)
@@ -10010,13 +10020,25 @@ class NativeRuntimePlayer:
         channel = clamp(float(self.runtime_settings.get(channel_key, 100)) / 100, 0.0, 1.0)
         return master * channel
 
+    def apply_bgm_runtime_volume(self) -> None:
+        if self.pygame.mixer.get_init():
+            try:
+                self.pygame.mixer.music.set_volume(self.get_effective_bgm_volume())
+            except Exception:
+                pass
+
     def get_effective_bgm_volume(self, volume_percent: object | None = None) -> float:
         safe_volume_percent = (
             self.current_bgm_volume_percent
             if volume_percent is None
             else get_safe_volume_percent(volume_percent, 100)
         )
-        return self.get_effective_volume("bgmVolume") * (safe_volume_percent / 100)
+        voice_ducking_ratio = (
+            0.45
+            if self.runtime_settings.get("voiceDuckingEnabled") == "on" and self.is_voice_playing()
+            else 1.0
+        )
+        return self.get_effective_volume("bgmVolume") * (safe_volume_percent / 100) * voice_ducking_ratio
 
     def get_effective_voice_volume(self, volume_percent: object | None = None) -> float:
         safe_volume_percent = (
@@ -10066,14 +10088,20 @@ class NativeRuntimePlayer:
         except Exception:
             return False
 
+    def update_voice_playback_state(self, *, force: bool = False) -> None:
+        voice_active = self.is_voice_playing()
+        if voice_active == self.voice_playback_active and not force:
+            return
+        self.voice_playback_active = voice_active
+        if not voice_active:
+            self.current_voice_channel = None
+            self.current_voice_volume_percent = 100
+        self.apply_bgm_runtime_volume()
+
     def apply_runtime_settings(self) -> None:
         self.apply_text_scale()
         self.apply_display_mode()
-        if self.pygame.mixer.get_init():
-            try:
-                self.pygame.mixer.music.set_volume(self.get_effective_bgm_volume())
-            except Exception:
-                pass
+        self.update_voice_playback_state(force=True)
         if self.current_voice_channel:
             try:
                 self.current_voice_channel.set_volume(self.get_effective_voice_volume())
@@ -11628,11 +11656,11 @@ class NativeRuntimePlayer:
             options = list(AUTO_PLAY_DELAY_PRESETS)
             current_index = min(range(len(options)), key=lambda index: abs(options[index] - current))
             self.runtime_settings["autoPlayDelayMs"] = options[(current_index + direction) % len(options)]
-        elif setting_key == "autoPlayWaitForVoice":
-            current = str(self.runtime_settings.get("autoPlayWaitForVoice") or DEFAULT_RUNTIME_PLAYER_SETTINGS["autoPlayWaitForVoice"])
+        elif setting_key in {"autoPlayWaitForVoice", "voiceDuckingEnabled"}:
+            current = str(self.runtime_settings.get(setting_key) or DEFAULT_RUNTIME_PLAYER_SETTINGS[setting_key])
             options = list(RUNTIME_TOGGLE_MODES)
             current_index = options.index(current) if current in options else 0
-            self.runtime_settings["autoPlayWaitForVoice"] = options[(current_index + direction) % len(options)]
+            self.runtime_settings[setting_key] = options[(current_index + direction) % len(options)]
         elif setting_key in {"masterVolume", "bgmVolume", "sfxVolume", "voiceVolume"}:
             current_value = int(self.runtime_settings.get(setting_key) or DEFAULT_RUNTIME_PLAYER_SETTINGS[setting_key])
             self.runtime_settings[setting_key] = clamp_int(current_value + direction * 5, 0, 100, current_value)
@@ -11668,6 +11696,8 @@ class NativeRuntimePlayer:
             return f"{int(self.runtime_settings.get('autoPlayDelayMs') or DEFAULT_RUNTIME_PLAYER_SETTINGS['autoPlayDelayMs']) / 1000:.1f} 秒"
         if setting_key == "autoPlayWaitForVoice":
             return "开启" if self.runtime_settings.get("autoPlayWaitForVoice") == "on" else "关闭"
+        if setting_key == "voiceDuckingEnabled":
+            return "开启" if self.runtime_settings.get("voiceDuckingEnabled") == "on" else "关闭"
         return f"{int(self.runtime_settings.get(setting_key) or 0)}%"
 
     def activate_archive_entry(self, entry: dict | None) -> bool:
@@ -12537,11 +12567,19 @@ class NativeRuntimePlayer:
         try:
             self.current_voice_volume_percent = get_safe_volume_percent(volume_percent, 100)
             sound.set_volume(self.get_effective_voice_volume())
-            self.current_voice_channel = sound.play()
+            channel = sound.play()
+            if not channel:
+                self.current_voice_channel = None
+                self.current_voice_volume_percent = 100
+                self.update_voice_playback_state(force=True)
+                return False
+            self.current_voice_channel = channel
+            self.update_voice_playback_state(force=True)
             return True
         except Exception:
             self.current_voice_channel = None
             self.current_voice_volume_percent = 100
+            self.update_voice_playback_state(force=True)
             return False
 
     def stop_voice(self) -> None:
@@ -12552,6 +12590,7 @@ class NativeRuntimePlayer:
                 pass
         self.current_voice_channel = None
         self.current_voice_volume_percent = 100
+        self.update_voice_playback_state(force=True)
 
     def stop_embedded_video_playback(self) -> None:
         if self.embedded_video_playback:
@@ -14746,7 +14785,7 @@ class NativeRuntimePlayer:
         self.draw_game_ui_panel_frame(panel, "system")
         self.screen.blit(self.font_title.render("体验设置", True, palette["text"]), (panel.left + 28, panel.top + 24))
         self.screen.blit(
-            self.font_ui.render("主题 / 显示 / 语言 / 阅读辅助 / 文本框 / 自动播放 / 四路音量", True, palette["muted"]),
+            self.font_ui.render("主题 / 显示 / 语言 / 阅读辅助 / 文本框 / 自动播放 / 音量与语音焦点", True, palette["muted"]),
             (panel.left + 28, panel.top + 58),
         )
 
@@ -15678,6 +15717,7 @@ class NativeRuntimePlayer:
                     break
             self.update_stage_visual_effects(dt_seconds)
             self.update_particle_effect(dt_seconds)
+            self.update_voice_playback_state()
             self.update_flow_assist()
             self.render()
 

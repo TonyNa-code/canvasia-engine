@@ -607,6 +607,7 @@ const DEFAULT_PROJECT_RUNTIME_SETTINGS = {
   defaultSfxVolume: 85,
   defaultVoiceVolume: 92,
   defaultVoiceEnabled: true,
+  defaultVoiceDuckingEnabled: true,
 };
 
 const UI_THEME_MODE_LABELS = uiThemeTools?.UI_THEME_MODE_LABELS ?? {
@@ -38527,6 +38528,14 @@ function renderProjectRuntimeSettingsPanel() {
               />
               默认开启语音
             </label>
+            <label class="toolbar-button playback-setting-inline">
+              <input
+                id="projectRuntimeDefaultVoiceDuckingEnabledInput"
+                type="checkbox"
+                ${runtimeSettings.defaultVoiceDuckingEnabled ? "checked" : ""}
+              />
+              语音时压低 BGM
+            </label>
           </div>
           <div class="playback-volume-grid dialog-config-ranges">
             <label class="playback-setting">
@@ -38552,7 +38561,7 @@ function renderProjectRuntimeSettingsPanel() {
           </div>
           <div class="detail-meta">当前默认：${escapeHtml(TEXT_SPEED_LABELS[runtimeSettings.defaultTextSpeed] ?? runtimeSettings.defaultTextSpeed)} · ${escapeHtml(
             DIALOG_THEME_LABELS[runtimeSettings.defaultDialogTheme] ?? runtimeSettings.defaultDialogTheme
-          )} · ${escapeHtml(UI_THEME_MODE_LABELS[runtimeSettings.defaultUiThemeMode] ?? runtimeSettings.defaultUiThemeMode)} · BGM ${runtimeSettings.defaultBgmVolume}% / 音效 ${runtimeSettings.defaultSfxVolume}% / 语音 ${runtimeSettings.defaultVoiceVolume}%</div>
+          )} · ${escapeHtml(UI_THEME_MODE_LABELS[runtimeSettings.defaultUiThemeMode] ?? runtimeSettings.defaultUiThemeMode)} · BGM ${runtimeSettings.defaultBgmVolume}% / 音效 ${runtimeSettings.defaultSfxVolume}% / 语音 ${runtimeSettings.defaultVoiceVolume}% · 语音焦点${runtimeSettings.defaultVoiceDuckingEnabled ? "开" : "关"}</div>
         </section>
         <div id="projectVariableLibraryPanelHost">
           ${renderProjectVariableLibraryPanel()}
@@ -39186,6 +39195,8 @@ function readProjectRuntimePlaybackDefaultsFromInputs() {
       defaultSfxVolume: document.getElementById("projectRuntimeDefaultSfxVolumeInput")?.value,
       defaultVoiceVolume: document.getElementById("projectRuntimeDefaultVoiceVolumeInput")?.value,
       defaultVoiceEnabled: document.getElementById("projectRuntimeDefaultVoiceEnabledInput")?.checked !== false,
+      defaultVoiceDuckingEnabled:
+        document.getElementById("projectRuntimeDefaultVoiceDuckingEnabledInput")?.checked !== false,
     },
   });
 }

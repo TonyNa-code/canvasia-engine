@@ -63,6 +63,16 @@ class FrontendRuntimeAudioModuleTests(unittest.TestCase):
                 {{ bgmVolume: 50 }},
                 {{ block: {{ volume: 40 }} }}
               ),
+              duckedMusicVolume: tools.getRuntimeMusicTargetVolume(
+                {{ bgmVolume: 80, voiceDuckingEnabled: true }},
+                {{ visualState: {{ musicVolume: 50 }} }},
+                {{ voiceActive: true }}
+              ),
+              duckingDisabledVolume: tools.getRuntimeMusicTargetVolume(
+                {{ bgmVolume: 80, voiceDuckingEnabled: false }},
+                {{ visualState: {{ musicVolume: 50 }} }},
+                {{ voiceActive: true }}
+              ),
               sfxVolume: tools.getRuntimeSfxTargetVolume({{ sfxVolume: 80 }}, 25),
               voiceVolume: tools.getRuntimeVoiceTargetVolume(
                 {{ voiceVolume: 90 }},
@@ -97,6 +107,8 @@ class FrontendRuntimeAudioModuleTests(unittest.TestCase):
         self.assertIn("fadeAudioVolume", payload["keys"])
         self.assertAlmostEqual(payload["musicVolume"], 0.3)
         self.assertAlmostEqual(payload["musicBlockFallbackVolume"], 0.2)
+        self.assertAlmostEqual(payload["duckedMusicVolume"], 0.18)
+        self.assertAlmostEqual(payload["duckingDisabledVolume"], 0.4)
         self.assertAlmostEqual(payload["sfxVolume"], 0.2)
         self.assertAlmostEqual(payload["voiceVolume"], 0.45)
         self.assertEqual(payload["safeFade"], 900)

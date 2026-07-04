@@ -3,6 +3,7 @@ import { getSafeVolumePercent, getVolumeRatio } from "./runtime_settings.js";
 const DEFAULT_BGM_VOLUME = 72;
 const DEFAULT_SFX_VOLUME = 85;
 const DEFAULT_VOICE_VOLUME = 92;
+const VOICE_DUCKING_RATIO = 0.45;
 const MAX_AUDIO_FADE_MS = 30000;
 const AUDIO_FADE_FRAME_KEY = "_tnEngineFadeFrame";
 
@@ -27,10 +28,13 @@ export function getSafeAudioFadeMs(value, fallback = 0) {
   return Math.round(clamp(getSafeNumber(value, fallback), 0, MAX_AUDIO_FADE_MS));
 }
 
-export function getRuntimeMusicTargetVolume(playback = {}, snapshot = {}) {
+export function getRuntimeMusicTargetVolume(playback = {}, snapshot = {}, options = {}) {
+  const duckingRatio =
+    options.voiceActive && playback?.voiceDuckingEnabled !== false ? VOICE_DUCKING_RATIO : 1;
   return (
     getVolumeRatio(playback?.bgmVolume, DEFAULT_BGM_VOLUME) *
-    getVolumeRatio(snapshot?.visualState?.musicVolume ?? snapshot?.block?.volume, 100)
+    getVolumeRatio(snapshot?.visualState?.musicVolume ?? snapshot?.block?.volume, 100) *
+    duckingRatio
   );
 }
 

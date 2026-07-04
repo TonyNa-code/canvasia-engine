@@ -735,6 +735,7 @@ def build_default_project_runtime_settings() -> dict:
         "defaultSfxVolume": 85,
         "defaultVoiceVolume": 92,
         "defaultVoiceEnabled": True,
+        "defaultVoiceDuckingEnabled": True,
     }
 
 
@@ -766,6 +767,7 @@ def sanitize_project_runtime_settings(value: object) -> dict:
         "defaultSfxVolume": clamp_int(source.get("defaultSfxVolume"), defaults["defaultSfxVolume"], 0, 100),
         "defaultVoiceVolume": clamp_int(source.get("defaultVoiceVolume"), defaults["defaultVoiceVolume"], 0, 100),
         "defaultVoiceEnabled": source.get("defaultVoiceEnabled") is not False,
+        "defaultVoiceDuckingEnabled": source.get("defaultVoiceDuckingEnabled") is not False,
     }
 
 

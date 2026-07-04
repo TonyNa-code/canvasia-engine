@@ -133,6 +133,7 @@ const refs = {
   nextHistoryButton: document.getElementById("nextHistoryButton"),
   autoPlayToggleButton: document.getElementById("autoPlayToggleButton"),
   voiceToggleButton: document.getElementById("voiceToggleButton"),
+  voiceDuckingToggleButton: document.getElementById("voiceDuckingToggleButton"),
   skipReadToggleButton: document.getElementById("skipReadToggleButton"),
   dialogToggleButton: document.getElementById("dialogToggleButton"),
   replayVoiceButton: document.getElementById("replayVoiceButton"),
@@ -180,6 +181,7 @@ const refs = {
   menuSfxVolumeValue: document.getElementById("menuSfxVolumeValue"),
   menuVoiceVolumeRange: document.getElementById("menuVoiceVolumeRange"),
   menuVoiceVolumeValue: document.getElementById("menuVoiceVolumeValue"),
+  menuVoiceDuckingToggleButton: document.getElementById("menuVoiceDuckingToggleButton"),
   achievementDialog: document.getElementById("achievementDialog"),
   achievementDialogSummary: document.getElementById("achievementDialogSummary"),
   achievementDialogHero: document.getElementById("achievementDialogHero"),
@@ -1642,6 +1644,7 @@ function init() {
   refs.nextHistoryButton?.addEventListener("click", () => stepRuntimeHistory(1));
   refs.autoPlayToggleButton?.addEventListener("click", toggleAutoPlay);
   refs.voiceToggleButton?.addEventListener("click", toggleVoiceEnabled);
+  refs.voiceDuckingToggleButton?.addEventListener("click", toggleVoiceDuckingEnabled);
   refs.skipReadToggleButton?.addEventListener("click", toggleSkipRead);
   refs.dialogToggleButton?.addEventListener("click", toggleDialogVisibility);
   refs.replayVoiceButton?.addEventListener("click", replayCurrentVoice);
@@ -1702,6 +1705,7 @@ function init() {
   refs.menuBgmVolumeRange?.addEventListener("input", handleBgmVolumeChange);
   refs.menuSfxVolumeRange?.addEventListener("input", handleSfxVolumeChange);
   refs.menuVoiceVolumeRange?.addEventListener("input", handleVoiceVolumeChange);
+  refs.menuVoiceDuckingToggleButton?.addEventListener("click", toggleVoiceDuckingEnabled);
   document.addEventListener("keydown", handleGlobalKeydown);
   window.addEventListener("beforeunload", finalizePlayerSession);
   window.addEventListener("beforeunload", stopMusic);
@@ -7123,6 +7127,8 @@ function stopVoicePlayback({ resetStepKey = true } = {}) {
   if (resetStepKey) {
     state.currentVoiceStepKey = null;
   }
+
+  updateRuntimeAudioVolumes();
 }
 
 function updateRuntimeAudioVolumes() {
@@ -7142,6 +7148,16 @@ function updateRuntimeAudioVolumes() {
   activeSfxAudios.forEach((audio) => {
     audio.volume = getRuntimeSfxTargetVolume(audio._canvasiaSfxVolumePercent);
   });
+}
+
+function isRuntimeVoiceDuckingActive() {
+  return (
+    state.playback?.voiceDuckingEnabled !== false &&
+    state.playback?.voiceEnabled !== false &&
+    Boolean(state.voiceAudio) &&
+    !state.voiceAudio.paused &&
+    !state.voiceAudio.ended
+  );
 }
 
 function applyDialogTheme() {
@@ -7239,6 +7255,8 @@ function handleVoiceEnded() {
   const snapshot = getCurrentSnapshot();
   const stepKey = getCurrentStepKey(snapshot);
 
+  updateRuntimeAudioVolumes();
+
   if (stepKey && stepKey === state.currentVoiceStepKey) {
     scheduleRuntimeAutoAdvance(snapshot, { preferVoiceEnding: true });
   }
@@ -7246,6 +7264,7 @@ function handleVoiceEnded() {
 
 function handleVoiceError() {
   const snapshot = getCurrentSnapshot();
+  updateRuntimeAudioVolumes();
   scheduleRuntimeAutoAdvance(snapshot);
 }
 
@@ -7261,6 +7280,7 @@ function syncVoice(snapshot) {
 
   if (state.currentVoiceStepKey === stepKey && state.voiceAudio) {
     state.voiceAudio.volume = targetVolume;
+    updateRuntimeAudioVolumes();
     return;
   }
 
@@ -7274,12 +7294,17 @@ function syncVoice(snapshot) {
 
   const audio = new Audio(encodeURI(voiceUrl));
   audio.volume = targetVolume;
+  audio.addEventListener("play", updateRuntimeAudioVolumes);
+  audio.addEventListener("playing", updateRuntimeAudioVolumes);
+  audio.addEventListener("pause", updateRuntimeAudioVolumes);
   audio.addEventListener("ended", handleVoiceEnded);
   audio.addEventListener("error", handleVoiceError);
   audio.play().catch(() => {
     scheduleRuntimeAutoAdvance(snapshot);
+    updateRuntimeAudioVolumes();
   });
   state.voiceAudio = audio;
+  updateRuntimeAudioVolumes();
 }
 
 function getRuntimeVoiceTargetVolume(snapshot) {
@@ -7379,6 +7404,14 @@ function renderPlaybackControls(snapshot = getCurrentSnapshot()) {
 
   if (refs.voiceToggleButton) {
     refs.voiceToggleButton.textContent = `语音：${state.playback.voiceEnabled ? "开" : "关"}`;
+  }
+
+  if (refs.voiceDuckingToggleButton) {
+    refs.voiceDuckingToggleButton.textContent = `语音焦点：${state.playback.voiceDuckingEnabled !== false ? "开" : "关"}`;
+  }
+
+  if (refs.menuVoiceDuckingToggleButton) {
+    refs.menuVoiceDuckingToggleButton.textContent = `语音焦点：${state.playback.voiceDuckingEnabled !== false ? "开" : "关"}`;
   }
 
   if (refs.skipReadToggleButton) {
@@ -7547,6 +7580,13 @@ function toggleVoiceEnabled() {
   }
 
   renderRuntime();
+}
+
+function toggleVoiceDuckingEnabled() {
+  state.playback.voiceDuckingEnabled = state.playback.voiceDuckingEnabled === false;
+  persistPlaybackSettings();
+  updateRuntimeAudioVolumes();
+  renderPlaybackControls();
 }
 
 function replayCurrentVoice() {
@@ -10150,7 +10190,9 @@ function syncAudio(snapshot) {
 }
 
 function getRuntimeMusicTargetVolume(snapshot) {
-  return getRuntimeMusicTargetVolumeBase(state.playback, snapshot);
+  return getRuntimeMusicTargetVolumeBase(state.playback, snapshot, {
+    voiceActive: isRuntimeVoiceDuckingActive(),
+  });
 }
 
 function getRuntimeSfxTargetVolume(volumePercent = 100) {

@@ -33,6 +33,7 @@ class FrontendProjectSettingsModuleTests(unittest.TestCase):
                 defaultSfxVolume: 85,
                 defaultVoiceVolume: 92,
                 defaultVoiceEnabled: true,
+                defaultVoiceDuckingEnabled: true,
               }},
               runtimeTextSpeedLabels: {{ slow: "慢一点", normal: "正常", fast: "快一点", instant: "立刻显示" }},
               runtimeDialogThemeLabels: {{ project: "项目样式", warm: "暖光标准", paper: "纸页回忆" }},
@@ -146,6 +147,7 @@ class FrontendProjectSettingsModuleTests(unittest.TestCase):
                 defaultSfxVolume: "bad",
                 defaultVoiceVolume: "-5",
                 defaultVoiceEnabled: false,
+                defaultVoiceDuckingEnabled: false,
               }},
               dialogBoxConfig: {{
                 preset: "warm",
@@ -315,6 +317,7 @@ class FrontendProjectSettingsModuleTests(unittest.TestCase):
                 "defaultSfxVolume": 85,
                 "defaultVoiceVolume": 0,
                 "defaultVoiceEnabled": False,
+                "defaultVoiceDuckingEnabled": False,
             },
         )
         self.assertEqual(payload["safeDialogValues"], ["moonlight", "square", "free"])

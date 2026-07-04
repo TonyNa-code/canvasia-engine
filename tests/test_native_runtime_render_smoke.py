@@ -97,6 +97,7 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
                     "defaultSfxVolume": 77,
                     "defaultVoiceVolume": 88,
                     "defaultVoiceEnabled": False,
+                    "defaultVoiceDuckingEnabled": False,
                 }
             }
         )
@@ -106,6 +107,55 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
         self.assertEqual(defaults["bgmVolume"], 64)
         self.assertEqual(defaults["sfxVolume"], 77)
         self.assertEqual(defaults["voiceVolume"], 0)
+        self.assertEqual(defaults["voiceDuckingEnabled"], "off")
+
+    def test_native_runtime_voice_ducking_state_restores_bgm_after_voice_finishes(self) -> None:
+        class FakeMusic:
+            def __init__(self) -> None:
+                self.volume = None
+
+            def set_volume(self, volume: float) -> None:
+                self.volume = volume
+
+        class FakeMixer:
+            def __init__(self) -> None:
+                self.music = FakeMusic()
+
+            def get_init(self) -> bool:
+                return True
+
+        class FakePygame:
+            def __init__(self) -> None:
+                self.mixer = FakeMixer()
+
+        class FakeChannel:
+            def __init__(self, busy: bool) -> None:
+                self.busy = busy
+
+            def get_busy(self) -> bool:
+                return self.busy
+
+        player = NativeRuntimePlayer.__new__(NativeRuntimePlayer)
+        player.pygame = FakePygame()
+        player.runtime_settings = {
+            "masterVolume": 100,
+            "bgmVolume": 80,
+            "voiceDuckingEnabled": "on",
+        }
+        player.current_bgm_volume_percent = 100
+        player.current_voice_volume_percent = 100
+        player.current_voice_channel = FakeChannel(True)
+        player.voice_playback_active = False
+
+        player.update_voice_playback_state()
+        self.assertAlmostEqual(player.pygame.mixer.music.volume, 0.36)
+        self.assertTrue(player.voice_playback_active)
+
+        player.current_voice_channel.busy = False
+        player.update_voice_playback_state()
+        self.assertAlmostEqual(player.pygame.mixer.music.volume, 0.8)
+        self.assertFalse(player.voice_playback_active)
+        self.assertIsNone(player.current_voice_channel)
 
     @unittest.skipIf(pygame is None, "pygame-ce is not installed")
     def test_native_runtime_help_shortcut_map_preserves_alt_load_key(self) -> None:

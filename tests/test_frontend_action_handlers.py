@@ -4748,6 +4748,8 @@ class FrontendActionHandlerTests(unittest.TestCase):
         project_formal_save_slots = _extract_function_source(player_source, "getProjectFormalSaveSlotCount")
         load_playback_settings = _extract_function_source(player_source, "loadStoredPlaybackSettings")
         reset_playback_settings = _extract_function_source(player_source, "resetPlaybackSettings")
+        render_playback_controls = _extract_function_source(player_source, "renderPlaybackControls")
+        toggle_voice_ducking = _extract_function_source(player_source, "toggleVoiceDuckingEnabled")
 
         self.assertIn('from "./runtime_settings.js"', player_source)
         self.assertIn('from "./runtime_audio.js"', player_source)
@@ -4763,9 +4765,11 @@ class FrontendActionHandlerTests(unittest.TestCase):
             "defaultSfxVolume",
             "defaultVoiceVolume",
             "defaultVoiceEnabled",
+            "defaultVoiceDuckingEnabled",
         ):
             self.assertIn(key, project_runtime_settings)
             self.assertIn(key, module_playback_defaults)
+        self.assertIn("voiceDuckingEnabled", module_playback_defaults)
         self.assertIn("buildProjectPlaybackDefaults(project, getDefaultRuntimeLanguage()", project_playback_defaults)
         self.assertIn("getSafeLanguage: getSafeRuntimeLanguage", project_playback_defaults)
         self.assertIn("function getProjectFormalSaveSlotCount(project = data.project)", player_source)
@@ -4774,6 +4778,11 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("...projectDefaults", load_playback_settings)
         self.assertIn("...JSON.parse(raw)", load_playback_settings)
         self.assertIn("state.playback = getProjectPlaybackDefaults()", reset_playback_settings)
+        self.assertIn('id="voiceDuckingToggleButton"', player_html := (ROOT_DIR / "export_player_template" / "index.html").read_text(encoding="utf-8"))
+        self.assertIn('id="menuVoiceDuckingToggleButton"', player_html)
+        self.assertIn("refs.voiceDuckingToggleButton", render_playback_controls)
+        self.assertIn("refs.menuVoiceDuckingToggleButton", render_playback_controls)
+        self.assertIn("updateRuntimeAudioVolumes()", toggle_voice_ducking)
 
     def test_typewriter_index_helpers_keep_unicode_characters_intact(self) -> None:
         for path in (APP_PATH, PLAYER_PATH):
