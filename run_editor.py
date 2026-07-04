@@ -34,17 +34,15 @@ from export_package_guide import EXPORT_PLAYTEST_GUIDE_FILE_NAME, write_export_p
 from export_localization_audit import (
     EXPORT_LOCALIZATION_AUDIT_JSON_NAME,
     EXPORT_LOCALIZATION_AUDIT_REPORT_NAME,
-    write_export_localization_audit_files,
 )
+from export_quality_reports import write_export_quality_report_bundle
 from export_release_readiness import (
     EXPORT_RELEASE_READINESS_JSON_NAME,
     EXPORT_RELEASE_READINESS_REPORT_NAME,
-    write_export_release_readiness_files,
 )
 from export_story_route_map import (
     EXPORT_STORY_ROUTE_MAP_JSON_NAME,
     EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
-    write_export_story_route_map_files,
 )
 from export_unlockable_manifest import (
     UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME,
@@ -10431,21 +10429,18 @@ def export_native_runtime_build() -> dict:
         },
     )
     manifest_path = write_export_manifest(build_dir, manifest)
-    story_route_map = write_export_story_route_map_files(build_dir, bundle)
-    localization_audit = write_export_localization_audit_files(build_dir, bundle)
-    release_readiness = write_export_release_readiness_files(
+    quality_reports = write_export_quality_report_bundle(
         build_dir,
+        bundle=bundle,
         project=bundle["project"],
         manifest=manifest,
         missing_assets=missing_assets,
         unlockable_manifest=(export_payload.get("buildInfo") or {}).get("unlockableContentManifest"),
-        story_route_map=story_route_map["storyRouteMap"],
-        localization_audit=localization_audit["localizationAudit"],
-        report_files=[
+        base_report_files=[
             manifest_path.name,
             runtime_files["playtestGuideName"],
-            story_route_map["storyRouteMapReportName"],
-            localization_audit["localizationAuditReportName"],
+        ],
+        extra_report_files=[
             runtime_files["unlockableContentReportName"],
             runtime_files["unlockableContentManifestName"],
             runtime_files["releaseCandidateReportName"],
@@ -10458,6 +10453,9 @@ def export_native_runtime_build() -> dict:
             "如果要提供给普通玩家，优先使用随包 App 打包脚本生成平台应用。",
         ],
     )
+    story_route_map = quality_reports
+    localization_audit = quality_reports
+    release_readiness = quality_reports
     provenance_verifiers = write_export_provenance_verifier_files(build_dir)
     provenance_file = write_export_provenance_file(build_dir, bundle, manifest)
     integrity_files = write_native_runtime_file_integrity_reports(build_dir)
@@ -10790,26 +10788,26 @@ def export_web_build() -> dict:
         runtime_notes=["网页试玩包适合快速分享和轻量测试；正式发行前仍建议补做目标平台点测。"],
         missing_assets=missing_assets,
     )
-    story_route_map = write_export_story_route_map_files(build_dir, bundle)
-    localization_audit = write_export_localization_audit_files(build_dir, bundle)
-    release_readiness = write_export_release_readiness_files(
+    quality_reports = write_export_quality_report_bundle(
         build_dir,
+        bundle=bundle,
         project=bundle["project"],
         manifest=manifest,
         missing_assets=missing_assets,
         unlockable_manifest=(export_payload.get("buildInfo") or {}).get("unlockableContentManifest"),
-        story_route_map=story_route_map["storyRouteMap"],
-        localization_audit=localization_audit["localizationAudit"],
-        report_files=[
+        base_report_files=[
             manifest_path.name,
             playtest_guide_path.name,
-            story_route_map["storyRouteMapReportName"],
-            localization_audit["localizationAuditReportName"],
+        ],
+        extra_report_files=[
             UNLOCKABLE_CONTENT_REPORT_FILE_NAME,
             UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME,
         ],
         platform_notes=["网页试玩包适合快速传播；如果要正式上架，建议再导出桌面或原生 Runtime 包做目标系统验收。"],
     )
+    story_route_map = quality_reports
+    localization_audit = quality_reports
+    release_readiness = quality_reports
     provenance_verifiers = write_export_provenance_verifier_files(build_dir)
     provenance_file = write_export_provenance_file(build_dir, bundle, manifest)
 
@@ -11655,22 +11653,19 @@ def export_windows_nwjs_build() -> dict:
         ],
         missing_assets=missing_assets,
     )
-    story_route_map = write_export_story_route_map_files(build_dir, bundle)
-    localization_audit = write_export_localization_audit_files(build_dir, bundle)
-    release_readiness = write_export_release_readiness_files(
+    quality_reports = write_export_quality_report_bundle(
         build_dir,
+        bundle=bundle,
         project=bundle["project"],
         manifest=manifest,
         missing_assets=missing_assets,
         unlockable_manifest=(export_payload.get("buildInfo") or {}).get("unlockableContentManifest"),
-        story_route_map=story_route_map["storyRouteMap"],
-        localization_audit=localization_audit["localizationAudit"],
-        report_files=[
+        base_report_files=[
             manifest_path.name,
             readme_path.name,
             playtest_guide_path.name,
-            story_route_map["storyRouteMapReportName"],
-            localization_audit["localizationAuditReportName"],
+        ],
+        extra_report_files=[
             f"app/{UNLOCKABLE_CONTENT_REPORT_FILE_NAME}",
             f"app/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
         ],
@@ -11679,6 +11674,9 @@ def export_windows_nwjs_build() -> dict:
             "Windows 预览包可能触发 SmartScreen；分发前建议附带来源说明和校验文件。",
         ],
     )
+    story_route_map = quality_reports
+    localization_audit = quality_reports
+    release_readiness = quality_reports
     provenance_verifiers = write_export_provenance_verifier_files(build_dir)
     provenance_roots = [
         app_dir,
@@ -11906,22 +11904,19 @@ def export_macos_nwjs_build() -> dict:
         ],
         missing_assets=missing_assets,
     )
-    story_route_map = write_export_story_route_map_files(build_dir, bundle)
-    localization_audit = write_export_localization_audit_files(build_dir, bundle)
-    release_readiness = write_export_release_readiness_files(
+    quality_reports = write_export_quality_report_bundle(
         build_dir,
+        bundle=bundle,
         project=bundle["project"],
         manifest=manifest,
         missing_assets=missing_assets,
         unlockable_manifest=(export_payload.get("buildInfo") or {}).get("unlockableContentManifest"),
-        story_route_map=story_route_map["storyRouteMap"],
-        localization_audit=localization_audit["localizationAudit"],
-        report_files=[
+        base_report_files=[
             manifest_path.name,
             readme_path.name,
             playtest_guide_path.name,
-            story_route_map["storyRouteMapReportName"],
-            localization_audit["localizationAuditReportName"],
+        ],
+        extra_report_files=[
             f"app/{UNLOCKABLE_CONTENT_REPORT_FILE_NAME}",
             f"app/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
         ],
@@ -11930,6 +11925,9 @@ def export_macos_nwjs_build() -> dict:
             "macOS 未签名预览包可能触发 Gatekeeper；正式发布前建议补签名和公证。",
         ],
     )
+    story_route_map = quality_reports
+    localization_audit = quality_reports
+    release_readiness = quality_reports
     provenance_verifiers = write_export_provenance_verifier_files(build_dir)
     provenance_file = write_export_provenance_file(
         build_dir,
@@ -12165,22 +12163,19 @@ def export_linux_nwjs_build() -> dict:
         runtime_notes=[f"当前运行壳：NW.js {NWJS_RUNTIME_VERSION}。"],
         missing_assets=missing_assets,
     )
-    story_route_map = write_export_story_route_map_files(build_dir, bundle)
-    localization_audit = write_export_localization_audit_files(build_dir, bundle)
-    release_readiness = write_export_release_readiness_files(
+    quality_reports = write_export_quality_report_bundle(
         build_dir,
+        bundle=bundle,
         project=bundle["project"],
         manifest=manifest,
         missing_assets=missing_assets,
         unlockable_manifest=(export_payload.get("buildInfo") or {}).get("unlockableContentManifest"),
-        story_route_map=story_route_map["storyRouteMap"],
-        localization_audit=localization_audit["localizationAudit"],
-        report_files=[
+        base_report_files=[
             manifest_path.name,
             readme_path.name,
             playtest_guide_path.name,
-            story_route_map["storyRouteMapReportName"],
-            localization_audit["localizationAuditReportName"],
+        ],
+        extra_report_files=[
             f"app/{UNLOCKABLE_CONTENT_REPORT_FILE_NAME}",
             f"app/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
         ],
@@ -12189,6 +12184,9 @@ def export_linux_nwjs_build() -> dict:
             "Linux 分发前建议在目标发行版确认启动脚本权限和依赖库可用。",
         ],
     )
+    story_route_map = quality_reports
+    localization_audit = quality_reports
+    release_readiness = quality_reports
     provenance_verifiers = write_export_provenance_verifier_files(build_dir)
     provenance_roots = [
         app_dir,

@@ -112,6 +112,7 @@ The project already includes a visual editor, export pipeline, native runtime pr
 - [`editor_snapshot_cache.py`](editor_snapshot_cache.py): reusable file-signature snapshot cache for read-heavy editor payloads
 - [`export_package_guide.py`](export_package_guide.py): exported package playtest / acceptance guide builder
 - [`export_localization_audit.py`](export_localization_audit.py): exported package localization coverage audit for multilingual releases
+- [`export_quality_reports.py`](export_quality_reports.py): shared exported quality-report bundle orchestration
 - [`export_release_readiness.py`](export_release_readiness.py): exported package release-readiness summary and tester handoff gate builder
 - [`export_story_route_map.py`](export_story_route_map.py): exported package story route map, broken-link, and unreachable-scene report builder
 - [`export_unlockable_manifest.py`](export_unlockable_manifest.py): export-side unlockable / gallery / replay coverage manifest builder

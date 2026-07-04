@@ -114,6 +114,9 @@ Canvasia Engine 当前更适合这样理解：
 - [`export_localization_audit.py`](export_localization_audit.py)
   导出包侧本地化覆盖审计生成器，用于检查多语言项目漏译位置
 
+- [`export_quality_reports.py`](export_quality_reports.py)
+  导出包侧质量报告组合入口，统一生成剧情路线图、本地化审计和发布就绪摘要
+
 - [`export_release_readiness.py`](export_release_readiness.py)
   导出包侧发布试玩就绪摘要和测试员交付门禁生成器
 

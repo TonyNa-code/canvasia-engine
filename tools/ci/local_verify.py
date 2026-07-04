@@ -25,6 +25,7 @@ PYTHON_SYNTAX_FILES = [
     "editor_snapshot_cache.py",
     "export_localization_audit.py",
     "export_package_guide.py",
+    "export_quality_reports.py",
     "export_release_readiness.py",
     "export_story_route_map.py",
     "export_unlockable_manifest.py",
