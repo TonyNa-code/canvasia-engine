@@ -1,5 +1,6 @@
 (function attachAudioCueSheetTools(global) {
   const storyBlockCatalogTools = global.CanvasiaEditorStoryBlockCatalog || {};
+  const audioTimingTools = global.CanvasiaEditorAudioTimingEstimator || {};
 
   const FALLBACK_BLOCK_LABELS = Object.freeze({
     background: "背景",
@@ -192,6 +193,48 @@
 
   function getBlockId(block = {}) {
     return cleanText(block.id);
+  }
+
+  function formatAudioSegmentDuration(seconds) {
+    if (typeof audioTimingTools.formatEstimatedDuration === "function") {
+      return audioTimingTools.formatEstimatedDuration(seconds);
+    }
+    const safeSeconds = Math.max(0, Math.round(Number(seconds) || 0));
+    if (safeSeconds < 60) {
+      return `约 ${safeSeconds} 秒`;
+    }
+    const minutes = Math.floor(safeSeconds / 60);
+    const remainingSeconds = safeSeconds % 60;
+    return remainingSeconds > 0 ? `约 ${minutes}分${remainingSeconds}秒` : `约 ${minutes} 分钟`;
+  }
+
+  function estimateAudioCueTiming(blocks = [], startIndex = 0, endIndex = startIndex) {
+    if (typeof audioTimingTools.estimateBlockRangeTiming === "function") {
+      return audioTimingTools.estimateBlockRangeTiming(blocks, startIndex, endIndex);
+    }
+    const safeBlocks = toArray(blocks);
+    const safeStart = Math.max(0, Math.min(safeBlocks.length - 1, Number(startIndex) || 0));
+    const safeEnd = Math.max(safeStart, Math.min(safeBlocks.length - 1, Number(endIndex) || safeStart));
+    const blockCount = safeBlocks.length ? safeEnd - safeStart + 1 : 0;
+    return {
+      startIndex: safeStart,
+      endIndex: safeEnd,
+      blockCount,
+      estimatedSeconds: 0,
+      durationLabel: "约 0 秒",
+      readableCharacterCount: 0,
+      waitSeconds: 0,
+      textBlockCount: 0,
+      mediaBlockCount: 0,
+      tone: "silent",
+    };
+  }
+
+  function buildAudioCueTimingHint(timing = {}) {
+    if (typeof audioTimingTools.buildAudioSegmentTimingHint === "function") {
+      return audioTimingTools.buildAudioSegmentTimingHint(timing);
+    }
+    return `${timing.durationLabel || formatAudioSegmentDuration(timing.estimatedSeconds)}，约 ${timing.readableCharacterCount ?? 0} 字。`;
   }
 
   function getRecommendedAudioRangeEndBlockId(blocks = [], startIndex = 0) {
@@ -543,22 +586,23 @@
   }
 
   function buildAudioCueAuditionHint(cue = {}) {
+    const timingPrefix = cue.timingHint ? `${cue.timingHint} ` : "";
     if (cue.status === "blocker") {
-      return "先修素材或范围，再试听。";
+      return `${timingPrefix}先修素材或范围，再试听。`;
     }
     if (cue.handoffType === "music_handoff") {
-      return "从本段开头试听到下一首切入，确认切歌不突兀。";
+      return `${timingPrefix}从本段开头试听到下一首切入，确认切歌不突兀。`;
     }
     if (cue.handoffType === "stop_handoff") {
-      return "试听到停止音乐卡，确认淡出长度合适。";
+      return `${timingPrefix}试听到停止音乐卡，确认淡出长度合适。`;
     }
     if (cue.handoffType === "explicit_end") {
-      return "重点试听开始卡和结束卡前后。";
+      return `${timingPrefix}重点试听开始卡和结束卡前后。`;
     }
     if (cue.handoffType === "scene_end") {
-      return "从本段开始试听到场景末尾。";
+      return `${timingPrefix}从本段开始试听到场景末尾。`;
     }
-    return cue.status === "warn" ? "复查提示后再试听一次。" : "抽查这一段的开头和结尾。";
+    return cue.status === "warn" ? `${timingPrefix}复查提示后再试听一次。` : `${timingPrefix}抽查这一段的开头和结尾。`;
   }
 
   function finalizeAudioCueStatus(cue = {}) {
@@ -585,6 +629,7 @@
     const startIndex = context.blockIndex ?? 0;
     const endInfo = getAudioControlEndIndex(block, context.blocks, startIndex, issues);
     const handoffInfo = getAudioHandoffInfo(endInfo);
+    const timing = estimateAudioCueTiming(context.blocks, startIndex, endInfo.plannedEndIndex);
     const fadeInMs = Math.round(clampNumber(block.fadeInMs, 0, 30000, 0));
     const fadeOutMs = Math.round(clampNumber(block.fadeOutMs, 0, 30000, 600));
     const volume = Math.round(clampNumber(block.volume, 0, 100, 100));
@@ -604,6 +649,13 @@
     }
     if (endInfo.endMode !== "until_next_music" && fadeOutMs <= 0) {
       pushIssue(issues, "tip", "no_fade_out", "未设置范围淡出", "指定范围或场景结束 BGM 建议保留一点淡出时间。");
+    }
+    if (timing.tone === "silent") {
+      pushIssue(issues, "tip", "bgm_range_without_text", "BGM 范围几乎没有正文", "这段音乐覆盖的正文很少，建议确认是否只是短转场。");
+    } else if (timing.tone === "short" && endInfo.endMode === "after_block") {
+      pushIssue(issues, "tip", "short_bgm_segment", "BGM 覆盖段偏短", "这段指定范围预计时长较短，适合短提示或转场；如果是主旋律可以放宽结束点。");
+    } else if (timing.tone === "long") {
+      pushIssue(issues, "tip", "long_bgm_segment", "BGM 覆盖段较长", "这段预计播放时间较长，建议发布前重点试听循环和情绪是否疲劳。");
     }
 
     const cue = {
@@ -628,6 +680,14 @@
       fadeOutMs,
       endMode: endInfo.endMode,
       endModeLabel: endInfo.endModeLabel,
+      timing,
+      durationSeconds: timing.estimatedSeconds,
+      durationLabel: timing.durationLabel,
+      readableCharacterCount: timing.readableCharacterCount,
+      waitSeconds: timing.waitSeconds,
+      textBlockCount: timing.textBlockCount,
+      timingTone: timing.tone,
+      timingHint: buildAudioCueTimingHint(timing),
       handoffType: handoffInfo.type,
       handoffLabel: handoffInfo.label,
       handoffNeedsReview: handoffInfo.needsReview,
@@ -677,6 +737,9 @@
       coverageLabel: `${cue.startLabel} -> ${cue.endLabel}`,
       handoffLabel: cue.handoffLabel,
       spanLabel: `${cue.spanCount} 张卡`,
+      durationLabel: cue.durationLabel,
+      textLoadLabel: `${cue.readableCharacterCount ?? 0} 字 / ${cue.textBlockCount ?? cue.timing?.textBlockCount ?? 0} 段正文`,
+      timingHint: cue.timingHint,
       fadeLabel: `${cue.fadeInMs} / ${cue.fadeOutMs} ms`,
       auditionHint: cue.auditionHint,
       status: cue.status,
@@ -1286,6 +1349,10 @@
       sfxCueCount: sfxCues.length,
       voiceCueCount: voiceCues.length,
       rangeSegmentCount: rangeRows.length,
+      totalEstimatedMusicSeconds: Math.round(cues.reduce((total, cue) => total + (Number(cue.durationSeconds) || 0), 0)),
+      shortMusicSegmentCount: cues.filter((cue) => cue.timingTone === "short").length,
+      longMusicSegmentCount: cues.filter((cue) => cue.timingTone === "long").length,
+      silentMusicSegmentCount: cues.filter((cue) => cue.timingTone === "silent").length,
       explicitRangeCount: cues.filter((cue) => cue.endMode === "after_block").length,
       sceneEndCount: cues.filter((cue) => cue.endMode === "scene_end").length,
       handoffCount: cues.filter((cue) => ["music_handoff", "stop_handoff"].includes(cue.handoffType)).length,
@@ -1424,6 +1491,7 @@
       cue.sceneName,
       cue.assetName,
       cue.endModeLabel,
+      cue.durationLabel,
       cue.startLabel,
       cue.endLabel,
       cue.handoffLabel,
@@ -1435,6 +1503,8 @@
       `${row.chapterName} / ${row.sceneName}`,
       row.assetName,
       row.coverageLabel,
+      row.durationLabel,
+      row.textLoadLabel,
       row.handoffLabel,
       row.auditionHint,
       row.statusLabel,
@@ -1518,6 +1588,8 @@
           ["音效卡", `${summary.sfxCueCount ?? 0}`],
           ["语音卡", `${summary.voiceCueCount ?? 0}`],
           ["覆盖段", `${summary.rangeSegmentCount ?? 0}`],
+          ["BGM 预计总时长", formatAudioSegmentDuration(summary.totalEstimatedMusicSeconds ?? 0)],
+          ["偏短 / 偏长 / 空段", `${summary.shortMusicSegmentCount ?? 0} / ${summary.longMusicSegmentCount ?? 0} / ${summary.silentMusicSegmentCount ?? 0}`],
           ["指定范围", `${summary.explicitRangeCount ?? 0}`],
           ["范围建议", `${summary.rangeSuggestionCount ?? 0}`],
           ["场景结束范围", `${summary.sceneEndCount ?? 0}`],
@@ -1547,7 +1619,7 @@
       "",
       "## BGM 覆盖范围速览",
       "",
-      buildMarkdownTable(["序号", "章节 / 场景", "BGM", "覆盖范围", "接管方式", "试听提示", "状态"], rangeRows) ||
+      buildMarkdownTable(["序号", "章节 / 场景", "BGM", "覆盖范围", "预计时长", "正文量", "接管方式", "试听提示", "状态"], rangeRows) ||
         "当前没有可展示的 BGM 覆盖范围。",
       "",
       "## BGM 文本范围建议",
@@ -1557,7 +1629,7 @@
       "",
       "## BGM Cue 列表",
       "",
-      buildMarkdownTable(["序号", "章节", "场景", "BGM", "范围", "开始", "结束", "接管方式", "淡入/淡出", "状态"], cueRows) ||
+      buildMarkdownTable(["序号", "章节", "场景", "BGM", "范围", "预计时长", "开始", "结束", "接管方式", "淡入/淡出", "状态"], cueRows) ||
         "当前没有播放音乐卡。",
       "",
       "## 音效 Cue 列表",
@@ -1591,6 +1663,8 @@
       cue.assetName,
       cue.assetId,
       cue.endModeLabel,
+      cue.durationLabel,
+      cue.readableCharacterCount,
       cue.endLabel,
       cue.handoffLabel,
       cue.spanCount,
@@ -1611,6 +1685,8 @@
       cue.assetName,
       cue.assetId,
       "播放一次音效",
+      "",
+      "",
       cue.cueLabel,
       "",
       "",
@@ -1631,6 +1707,8 @@
       cue.assetName,
       cue.assetId,
       "播放语音",
+      "",
+      "",
       cue.cueLabel,
       "",
       "",
@@ -1653,6 +1731,8 @@
         "素材",
         "素材ID",
         "范围",
+        "预计时长",
+        "正文字符",
         "结束/触发位置",
         "接管方式",
         "覆盖卡片",
@@ -1682,6 +1762,7 @@
     buildAudioCueAutoFixSummary,
     buildAudioCueAutoFixPlan,
     getAudioCueAutoFixDigest,
+    formatAudioSegmentDuration,
     buildAudioCueSheet,
     getAudioCueSheetStatusDigest,
     buildAudioCueSheetMarkdown,

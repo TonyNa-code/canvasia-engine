@@ -49,6 +49,7 @@ class FrontendEntrypointModuleTests(unittest.TestCase):
             "./modules/playtest_handoff_report.js",
             "./modules/choice_consequence_sheet.js",
             "./modules/variable_influence_sheet.js",
+            "./modules/audio_timing_estimator.js",
             "./modules/audio_cue_sheet.js",
             "./modules/project_polish.js",
             "./modules/project_polish_receipt_panel.js",

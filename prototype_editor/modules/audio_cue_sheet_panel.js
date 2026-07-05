@@ -47,6 +47,19 @@
     };
   }
 
+  function formatAudioSegmentDuration(seconds) {
+    if (typeof audioCueSheetTools.formatAudioSegmentDuration === "function") {
+      return audioCueSheetTools.formatAudioSegmentDuration(seconds);
+    }
+    const safeSeconds = Math.max(0, Math.round(Number(seconds) || 0));
+    if (safeSeconds < 60) {
+      return `约 ${safeSeconds} 秒`;
+    }
+    const minutes = Math.floor(safeSeconds / 60);
+    const remainingSeconds = safeSeconds % 60;
+    return remainingSeconds > 0 ? `约 ${minutes}分${remainingSeconds}秒` : `约 ${minutes} 分钟`;
+  }
+
   function renderAudioCueIssueCard(issue = {}) {
     const severityClass = issue.severity === "blocker" ? "danger" : issue.severity === "warn" ? "warn" : "soft";
     const toneClass = issue.severity === "blocker" ? "danger-text" : issue.severity === "warn" ? "warn-text" : "";
@@ -69,9 +82,9 @@
       <div class="route-testing-item">
         <div>
           <b>${escapeHtml(row.assetName)}</b>
-          <span>${escapeHtml(`${row.chapterName ?? "未分章"} · ${row.sceneName ?? "未命名场景"} · ${row.spanLabel ?? "0 张卡"}`)}</span>
+          <span>${escapeHtml(`${row.chapterName ?? "未分章"} · ${row.sceneName ?? "未命名场景"} · ${row.spanLabel ?? "0 张卡"} · ${row.durationLabel ?? "约 0 秒"}`)}</span>
         </div>
-        <span>${escapeHtml(`${row.handoffLabel ?? "等待接管"} · ${row.auditionHint ?? "发布前试听这一段。"}`)}</span>
+        <span>${escapeHtml(`${row.textLoadLabel ?? "0 字 / 0 段正文"} · ${row.handoffLabel ?? "等待接管"} · ${row.auditionHint ?? "发布前试听这一段。"}`)}</span>
       </div>
     `;
   }
@@ -240,7 +253,9 @@
   }
 
   function renderAudioCueSheetPreview(sheet = {}) {
-    const topIssues = (Array.isArray(sheet.issues) ? sheet.issues : []).slice(0, 4);
+    const topIssues = (Array.isArray(sheet.issues) ? sheet.issues : [])
+      .filter((issue) => ["blocker", "warn"].includes(issue.severity))
+      .slice(0, 4);
     const rangePreview = (Array.isArray(sheet.rangeRows) ? sheet.rangeRows : []).slice(0, 4);
     const sfxPreview = (Array.isArray(sheet.sfxRows) ? sheet.sfxRows : []).slice(0, Math.max(0, 4 - rangePreview.length));
     const voicePreview = (Array.isArray(sheet.voiceRows) ? sheet.voiceRows : []).slice(
@@ -283,7 +298,9 @@
           ${renderRouteMetricCard("音效卡", `${summary.sfxCueCount ?? 0} 张`, "门铃、脚步、心跳等触发音效")}
           ${renderRouteMetricCard("语音卡", `${summary.voiceCueCount ?? 0} 句`, "已绑定语音的台词和旁白")}
           ${renderRouteMetricCard("覆盖段", `${summary.rangeSegmentCount ?? 0} 段`, "每首 BGM 实际覆盖的剧情范围")}
+          ${renderRouteMetricCard("BGM 预计", formatAudioSegmentDuration(summary.totalEstimatedMusicSeconds ?? 0), "按正文、等待和媒体卡粗略估算")}
           ${renderRouteMetricCard("范围建议", `${summary.rangeSuggestionCount ?? 0} 条`, "可一键绑定到具体文本段落")}
+          ${renderRouteMetricCard("短/长/空段", `${summary.shortMusicSegmentCount ?? 0}/${summary.longMusicSegmentCount ?? 0}/${summary.silentMusicSegmentCount ?? 0}`, "帮助定位需要试听的 BGM 段")}
           ${renderRouteMetricCard("阻塞 / 提醒", `${summary.blockerCount ?? 0} / ${summary.warningCount ?? 0}`, "缺素材、坏范围或提前接管")}
           ${renderRouteMetricCard("就绪度", `${summary.releaseReadinessPercent ?? 0}%`, "按阻塞、提醒和缺 BGM 场景估算")}
           ${renderRouteMetricCard("制作任务", `${summary.productionTaskCount ?? 0} 项`, "按发布优先级自动排序")}

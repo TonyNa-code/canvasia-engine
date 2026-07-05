@@ -9,6 +9,7 @@ from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 EDITOR_COMMON_PATH = ROOT_DIR / "prototype_editor" / "modules" / "editor_common.js"
+TIMING_PATH = ROOT_DIR / "prototype_editor" / "modules" / "audio_timing_estimator.js"
 AUDIO_CUE_SHEET_PATH = ROOT_DIR / "prototype_editor" / "modules" / "audio_cue_sheet.js"
 PANEL_PATH = ROOT_DIR / "prototype_editor" / "modules" / "audio_cue_sheet_panel.js"
 
@@ -24,6 +25,7 @@ class FrontendAudioCueSheetPanelModuleTests(unittest.TestCase):
             vm.createContext(context);
             for (const filePath of [
               {json.dumps(str(EDITOR_COMMON_PATH))},
+              {json.dumps(str(TIMING_PATH))},
               {json.dumps(str(AUDIO_CUE_SHEET_PATH))},
               {json.dumps(str(PANEL_PATH))},
             ]) {{
@@ -158,6 +160,11 @@ class FrontendAudioCueSheetPanelModuleTests(unittest.TestCase):
         self.assertIn("制作优先队列", payload["issueHtml"])
         self.assertIn("发布前试听清单", payload["rangeHtml"])
         self.assertIn("就绪度", payload["rangeHtml"])
+        self.assertIn("BGM 预计", payload["rangeHtml"])
+        self.assertIn("短/长/空段", payload["rangeHtml"])
+        self.assertIn("约 3 秒", payload["rangeHtml"])
+        self.assertIn("16 字 / 2 段正文", payload["rangeHtml"])
+        self.assertIn("BGM 覆盖段偏短", payload["rangeHtml"])
         self.assertIn("缺文件 BGM", payload["issueHtml"])
         self.assertIn("结束卡片不存在", payload["issueHtml"])
         self.assertIn("放课后钢琴", payload["rangeHtml"])

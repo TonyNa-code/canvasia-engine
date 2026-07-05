@@ -131,6 +131,7 @@ jobs:
           node --check prototype_editor/modules/runtime_preload_budget.js
           node --check prototype_editor/modules/asset_dependency_sheet.js
           node --check prototype_editor/modules/asset_rights_sheet.js
+          node --check prototype_editor/modules/audio_timing_estimator.js
           node --check prototype_editor/modules/audio_cue_sheet.js
           node --check prototype_editor/modules/project_polish.js
           node --check prototype_editor/modules/project_polish_receipt_panel.js

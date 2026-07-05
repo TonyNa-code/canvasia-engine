@@ -10,6 +10,7 @@ from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "audio_cue_sheet.js"
+TIMING_MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "audio_timing_estimator.js"
 
 
 class FrontendAudioCueSheetModuleTests(unittest.TestCase):
@@ -21,7 +22,9 @@ class FrontendAudioCueSheetModuleTests(unittest.TestCase):
             const context = {{ window: {{}} }};
             context.globalThis = context;
             vm.createContext(context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(TIMING_MODULE_PATH))}, "utf8"), context);
             vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
+            const timingTools = context.window.CanvasiaEditorAudioTimingEstimator;
             const tools = context.window.CanvasiaEditorAudioCueSheet;
             const data = {{
               project: {{ title: "Demo Project" }},
@@ -84,6 +87,7 @@ class FrontendAudioCueSheetModuleTests(unittest.TestCase):
             }});
             const csv = tools.buildAudioCueSheetCsv(sheet);
             process.stdout.write(JSON.stringify({{
+              timingKeys: Object.keys(timingTools).sort(),
               keys: Object.keys(tools).sort(),
               sheet,
               autoFixPlan,
@@ -104,6 +108,8 @@ class FrontendAudioCueSheetModuleTests(unittest.TestCase):
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
         payload = json.loads(completed.stdout)
+        self.assertIn("estimateBlockRangeTiming", payload["timingKeys"])
+        self.assertIn("buildAudioSegmentTimingHint", payload["timingKeys"])
         self.assertIn("buildAudioCueSheet", payload["keys"])
         self.assertIn("buildAudioCueRangeRows", payload["keys"])
         self.assertIn("buildVoiceCueRows", payload["keys"])
@@ -113,12 +119,17 @@ class FrontendAudioCueSheetModuleTests(unittest.TestCase):
         self.assertIn("applyAudioRangeSuggestionToScene", payload["keys"])
         self.assertIn("buildAudioCueAutoFixPlan", payload["keys"])
         self.assertIn("getAudioCueAutoFixDigest", payload["keys"])
+        self.assertIn("formatAudioSegmentDuration", payload["keys"])
         self.assertIn("buildAudioCueSheetMarkdown", payload["keys"])
         self.assertIn("buildAudioCueSheetCsv", payload["keys"])
         self.assertEqual(payload["sheet"]["summary"]["cueCount"], 2)
         self.assertEqual(payload["sheet"]["summary"]["sfxCueCount"], 2)
         self.assertEqual(payload["sheet"]["summary"]["voiceCueCount"], 2)
         self.assertEqual(payload["sheet"]["summary"]["rangeSegmentCount"], 2)
+        self.assertEqual(payload["sheet"]["summary"]["totalEstimatedMusicSeconds"], 6)
+        self.assertEqual(payload["sheet"]["summary"]["shortMusicSegmentCount"], 2)
+        self.assertEqual(payload["sheet"]["summary"]["longMusicSegmentCount"], 0)
+        self.assertEqual(payload["sheet"]["summary"]["silentMusicSegmentCount"], 0)
         self.assertEqual(payload["sheet"]["summary"]["explicitRangeCount"], 2)
         self.assertEqual(payload["sheet"]["summary"]["auditionNeededCount"], 2)
         self.assertEqual(payload["sheet"]["summary"]["stopCount"], 1)
@@ -148,6 +159,13 @@ class FrontendAudioCueSheetModuleTests(unittest.TestCase):
         self.assertEqual(payload["sheet"]["sfxCues"][1]["status"], "blocker")
         self.assertEqual(payload["sheet"]["voiceCues"][0]["speakerName"], "悠奈")
         self.assertEqual(payload["sheet"]["voiceCues"][1]["status"], "blocker")
+        self.assertEqual(payload["sheet"]["cues"][0]["durationLabel"], "约 4 秒")
+        self.assertEqual(payload["sheet"]["cues"][0]["readableCharacterCount"], 16)
+        self.assertEqual(payload["sheet"]["cues"][0]["textBlockCount"], 2)
+        self.assertEqual(payload["sheet"]["cues"][0]["timingTone"], "short")
+        self.assertIn("2 段正文", payload["sheet"]["cues"][0]["timingHint"])
+        self.assertEqual(payload["sheet"]["rangeRows"][0]["durationLabel"], "约 4 秒")
+        self.assertEqual(payload["sheet"]["rangeRows"][0]["textLoadLabel"], "16 字 / 2 段正文")
         self.assertTrue(payload["autoFixPlan"]["changed"])
         self.assertEqual(payload["autoFixPlan"]["changedSceneCount"], 1)
         self.assertEqual(payload["autoFixPlan"]["changedBlockCount"], 1)
@@ -165,7 +183,10 @@ class FrontendAudioCueSheetModuleTests(unittest.TestCase):
         self.assertIn("# Demo Project 音频调度表", payload["markdown"])
         self.assertIn("制作优先队列", payload["markdown"])
         self.assertIn("发布前试听清单", payload["markdown"])
+        self.assertIn("BGM 预计总时长", payload["markdown"])
         self.assertIn("BGM 覆盖范围速览", payload["markdown"])
+        self.assertIn("预计时长", payload["markdown"])
+        self.assertIn("正文量", payload["markdown"])
         self.assertIn("BGM 文本范围建议", payload["markdown"])
         self.assertIn("修正 BGM 文本范围", payload["markdown"])
         self.assertIn("BGM Cue 列表", payload["markdown"])
@@ -175,6 +196,9 @@ class FrontendAudioCueSheetModuleTests(unittest.TestCase):
         self.assertIn("缺文件音效", payload["markdown"])
         self.assertIn("缺文件语音", payload["markdown"])
         self.assertIn("接管方式", payload["csv"])
+        self.assertIn('"预计时长"', payload["csv"])
+        self.assertIn('"正文字符"', payload["csv"])
+        self.assertIn('"约 4 秒"', payload["csv"])
         self.assertIn('"BGM"', payload["csv"])
         self.assertIn('"SFX"', payload["csv"])
         self.assertIn('"Voice"', payload["csv"])
@@ -184,7 +208,7 @@ class FrontendAudioCueSheetModuleTests(unittest.TestCase):
         csv_rows = list(csv.reader(payload["csv"].lstrip("\ufeff").splitlines()))
         self.assertTrue(csv_rows)
         self.assertTrue(all(len(row) == len(csv_rows[0]) for row in csv_rows))
-        self.assertEqual(len(csv_rows[0]), 18)
+        self.assertEqual(len(csv_rows[0]), 20)
         self.assertEqual([row[0] for row in csv_rows[1:]], ["BGM", "BGM", "SFX", "SFX", "Voice", "Voice"])
 
 
