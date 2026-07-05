@@ -23,16 +23,12 @@ RENPY_PATH_SUFFIX_PATTERN = re.compile(
 
 COMMENT_ONLY_BLOCK_TYPES = {
     "particle_effect",
-    "screen_shake",
-    "screen_flash",
     "screen_filter",
     "depth_blur",
     "camera_zoom",
     "camera_pan",
-    "video_play",
-    "credits_roll",
-    "condition",
 }
+CONDITION_OPERATORS = {"==", "!=", ">=", "<=", ">", "<"}
 
 
 def as_list(value: Any) -> list:
@@ -51,7 +47,9 @@ def normalize_identifier(value: Any, fallback: str = "item") -> str:
 
 
 def quote_renpy(value: Any) -> str:
-    return '"' + str(value or "").replace("\\", "\\\\").replace('"', '\\"') + '"'
+    text = str(value or "").replace("\\", "\\\\").replace('"', '\\"')
+    text = text.replace("\r\n", "\n").replace("\r", "\n").replace("\n", "\\n")
+    return f'"{text}"'
 
 
 def value_to_renpy(value: Any) -> str:
@@ -60,6 +58,13 @@ def value_to_renpy(value: Any) -> str:
     if isinstance(value, (int, float)) and not isinstance(value, bool):
         return str(value)
     if value is None:
+        return "None"
+    text = clean_text(value)
+    if re.match(r"^(true|false)$", text, re.IGNORECASE):
+        return "True" if text.lower() == "true" else "False"
+    if re.match(r"^-?\d+(?:\.\d+)?$", text):
+        return text
+    if re.match(r"^(none|null)$", text, re.IGNORECASE):
         return "None"
     return quote_renpy(value)
 
@@ -70,6 +75,22 @@ def seconds_from_ms(value: Any) -> float:
     except (TypeError, ValueError):
         return 0
     return round(ms / 1000, 2) if ms > 0 else 0
+
+
+def number_to_renpy_delta(value: Any, warnings: list[dict], variable_id: str, **context: Any) -> str:
+    try:
+        delta = float(value if value not in (None, "") else 0)
+    except (TypeError, ValueError):
+        add_warning(
+            warnings,
+            "renpy_variable_add_value_review",
+            f"变量 {variable_id} 的增减值不是数字，已按 0 导出。",
+            **context,
+        )
+        return "0"
+    if delta.is_integer():
+        return str(int(delta))
+    return f"{delta:g}"
 
 
 def build_asset_map(assets_doc: dict | None) -> dict[str, dict]:
@@ -210,17 +231,18 @@ def build_sprite_definitions(
 
 def render_variable_effect(effect: dict, variable_map: dict[str, dict], warnings: list[dict], indent: str) -> list[str]:
     effect_type = clean_text(effect.get("type"))
-    variable_id = clean_text(effect.get("variableId"))
+    variable_id = clean_text(effect.get("variableId") or effect.get("variableHint"))
     variable_name = normalize_identifier(variable_id, "var")
-    value = value_to_renpy(effect.get("value"))
     if not variable_id:
         add_warning(warnings, "renpy_missing_variable_id", "变量效果缺少变量 ID，已保留为复核注释。")
         return [f"{indent}# Canvasia review variable effect: missing variable id"]
     if variable_id not in variable_map:
         add_warning(warnings, "renpy_unknown_variable", f"变量 {variable_id} 未在变量表中登记，Ren'Py 草稿仍会按同名变量写出。", variableId=variable_id)
     if effect_type == "variable_add":
+        value = number_to_renpy_delta(effect.get("value"), warnings, variable_id)
         return [f"{indent}$ {variable_name} += {value}"]
     if effect_type == "variable_set":
+        value = value_to_renpy(effect.get("value"))
         return [f"{indent}$ {variable_name} = {value}"]
     add_warning(warnings, "renpy_unknown_choice_effect", f"选项效果 {effect_type or 'unknown'} 暂未自动转换。", variableId=variable_id)
     return [f"{indent}# Canvasia review choice effect: {clean_text(effect_type, 'unknown')}"]
@@ -263,6 +285,140 @@ def render_review_comment(block: dict, warnings: list[dict], scene_id: str, bloc
     return [f"    # Canvasia review {block_type}: {quote_renpy(detail)}"]
 
 
+def normalize_condition_operator(operator: Any, warnings: list[dict], scene_id: str, block_index: int) -> str:
+    safe_operator = clean_text(operator, "==")
+    if safe_operator == "=":
+        return "=="
+    if safe_operator in CONDITION_OPERATORS:
+        return safe_operator
+    add_warning(
+        warnings,
+        "renpy_condition_operator_review",
+        f"条件运算符 {safe_operator} 暂不支持，已按 == 导出。",
+        sceneId=scene_id,
+        blockIndex=block_index,
+    )
+    return "=="
+
+
+def render_condition_rule_expression(rule: dict, context: dict) -> str:
+    warnings = context["warnings"]
+    scene_id = clean_text(context.get("sceneId"))
+    block_index = int(context.get("blockIndex") or 0)
+    variable_id = clean_text(rule.get("variableId") or rule.get("variableHint"))
+    if not variable_id:
+        add_warning(
+            warnings,
+            "renpy_condition_missing_variable",
+            "条件判断缺少变量 ID，已按 True 导出。",
+            sceneId=scene_id,
+            blockIndex=block_index,
+        )
+        return "True"
+    variable_name = normalize_identifier(variable_id, "var")
+    operator = normalize_condition_operator(rule.get("operator"), warnings, scene_id, block_index)
+    return f"{variable_name} {operator} {value_to_renpy(rule.get('value'))}"
+
+
+def render_condition_target_lines(target_scene_id: Any, context: dict, indent: str = "        ") -> list[str]:
+    target = clean_text(target_scene_id)
+    if not target:
+        add_warning(
+            context["warnings"],
+            "renpy_condition_missing_target",
+            "条件分支缺少目标场景，已导出 pass。",
+            sceneId=context.get("sceneId"),
+            blockIndex=context.get("blockIndex"),
+        )
+        return [f"{indent}pass"]
+    return [f"{indent}jump {get_scene_label(context['sceneLabelMap'], target)}"]
+
+
+def render_condition_block(block: dict, context: dict) -> list[str]:
+    branches = as_list(block.get("branches"))
+    if not branches:
+        add_warning(
+            context["warnings"],
+            "renpy_empty_condition",
+            "条件判断没有分支，已导出 pass。",
+            sceneId=context.get("sceneId"),
+            blockIndex=context.get("blockIndex"),
+        )
+        return ["    pass"]
+
+    lines: list[str] = []
+    for branch_index, branch in enumerate(branches):
+        expression = " and ".join(
+            filter(
+                None,
+                (render_condition_rule_expression(rule, context) for rule in as_list(branch.get("when"))),
+            )
+        ) or "True"
+        lines.append(f"    {'if' if branch_index == 0 else 'elif'} {expression}:")
+        target = branch.get("gotoSceneId") or branch.get("targetSceneId") or branch.get("targetHint")
+        lines.extend(render_condition_target_lines(target, context))
+
+    else_target = block.get("elseGotoSceneId") or block.get("elseTargetSceneId") or block.get("elseTargetHint")
+    if else_target:
+        lines.append("    else:")
+        lines.extend(render_condition_target_lines(else_target, context))
+    return lines
+
+
+def render_video_block(block: dict, context: dict) -> list[str]:
+    asset_map = context["assetMap"]
+    path = get_asset_path(asset_map, block.get("assetId"))
+    if not path:
+        add_warning(
+            context["warnings"],
+            "renpy_missing_video_asset",
+            "视频卡没有找到可播放素材，已导出复核注释。",
+            sceneId=context.get("sceneId"),
+            blockIndex=context.get("blockIndex"),
+        )
+        return [f"    # Canvasia review missing video: {quote_renpy(clean_text(block.get('assetId'), 'video'))}"]
+
+    lines: list[str] = []
+    try:
+        start = float(block.get("startTimeSeconds") or 0)
+    except (TypeError, ValueError):
+        start = 0
+    try:
+        end = float(block.get("endTimeSeconds") or 0)
+    except (TypeError, ValueError):
+        end = 0
+    if start > 0 or end > 0 or block.get("volume") not in (None, ""):
+        add_warning(
+            context["warnings"],
+            "renpy_video_timing_review",
+            "视频裁段或音量设置需要在 Ren'Py 中复核。",
+            sceneId=context.get("sceneId"),
+            blockIndex=context.get("blockIndex"),
+        )
+        lines.append(f"    # Canvasia review video timing: start={start:g}, end={end:g}, volume={block.get('volume', 'default')}")
+    lines.append(f"    $ renpy.movie_cutscene({quote_renpy(path)})")
+    return lines
+
+
+def render_credits_block(block: dict) -> list[str]:
+    title = clean_text(block.get("title"), "STAFF")
+    subtitle = clean_text(block.get("subtitle"))
+    credit_lines = [clean_text(line) for line in as_list(block.get("lines")) if clean_text(line)]
+    try:
+        duration = float(block.get("durationSeconds") or 12)
+    except (TypeError, ValueError):
+        duration = 12
+    text = "\n".join([line for line in [title, subtitle, *credit_lines] if line])
+    return [
+        "    window hide",
+        "    scene black with fade",
+        f"    show text {quote_renpy(text)} at truecenter with dissolve",
+        f"    $ renpy.pause({duration:g})",
+        "    hide text with dissolve",
+        "    window show",
+    ]
+
+
 def render_story_block(block: dict, context: dict) -> list[str]:
     block_type = clean_text(block.get("type"), "unknown")
     asset_map = context["assetMap"]
@@ -292,6 +448,18 @@ def render_story_block(block: dict, context: dict) -> list[str]:
         return [f"    stop music{f' fadeout {fade_out:g}' if fade_out else ''}"]
     if block_type == "sfx_play":
         return [f"    play sound {quote_renpy(get_asset_path(asset_map, block.get('assetId')) or 'audio/sfx.ogg')}"]
+    if block_type == "video_play":
+        return render_video_block(block, context)
+    if block_type == "credits_roll":
+        return render_credits_block(block)
+    if block_type == "condition":
+        return render_condition_block(block, context)
+    if block_type == "screen_shake":
+        return ["    with hpunch"]
+    if block_type == "screen_flash":
+        return ['    with Fade(0.08, 0.0, 0.28, color="#ffffff")']
+    if block_type == "screen_fade":
+        return ["    with fade"]
     if block_type in {"dialogue", "narration"}:
         line = clean_text(block.get("text") or (block.get("fields") or {}).get("text"), " ")
         output: list[str] = []

@@ -642,6 +642,10 @@ class RunEditorSmokeTests(unittest.TestCase):
             "voice",
             [build_upload_payload("line.wav", build_fake_wav_bytes())],
         )["assets"][0]
+        video_asset = run_editor.import_assets(
+            "video",
+            [build_upload_payload("opening_movie.mp4", b"fake-video-data")],
+        )["assets"][0]
         run_editor.write_json(
             run_editor.DATA_DIR / "characters.json",
             {
@@ -690,6 +694,17 @@ class RunEditorSmokeTests(unittest.TestCase):
                 },
                 {"id": "var", "type": "variable_add", "variableId": "affection", "value": 1},
                 {
+                    "id": "condition",
+                    "type": "condition",
+                    "branches": [
+                        {
+                            "when": [{"variableId": "affection", "operator": ">=", "value": "1"}],
+                            "gotoSceneId": chapter_result["scene"]["id"],
+                        }
+                    ],
+                    "elseGotoSceneId": chapter_result["scene"]["id"],
+                },
+                {
                     "id": "choice",
                     "type": "choice",
                     "options": [
@@ -701,6 +716,24 @@ class RunEditorSmokeTests(unittest.TestCase):
                     ],
                 },
                 {"id": "flash", "type": "screen_flash"},
+                {"id": "shake", "type": "screen_shake"},
+                {"id": "fade", "type": "screen_fade"},
+                {
+                    "id": "video",
+                    "type": "video_play",
+                    "assetId": video_asset["id"],
+                    "startTimeSeconds": 1.5,
+                    "endTimeSeconds": 12,
+                    "volume": 80,
+                },
+                {
+                    "id": "credits",
+                    "type": "credits_roll",
+                    "title": "STAFF",
+                    "subtitle": "Thanks",
+                    "lines": ["Scenario: Tester", "Engine: Canvasia"],
+                    "durationSeconds": 6,
+                },
             ],
         )
 
@@ -742,8 +775,16 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertIn('voice "assets/voice/', script)
         self.assertIn('heroine "Welcome back."', script)
         self.assertIn("$ affection += 1", script)
+        self.assertIn("if affection >= 1:", script)
+        self.assertIn(f"jump {scene['id']}", script)
         self.assertIn("$ flag_met = True", script)
-        self.assertIn("# Canvasia review screen_flash", script)
+        self.assertIn('with Fade(0.08, 0.0, 0.28, color="#ffffff")', script)
+        self.assertIn("with hpunch", script)
+        self.assertIn("with fade", script)
+        self.assertIn('$ renpy.movie_cutscene("assets/video/', script)
+        self.assertIn("# Canvasia review video timing: start=1.5, end=12, volume=80", script)
+        self.assertIn('show text "STAFF\\nThanks\\nScenario: Tester\\nEngine: Canvasia" at truecenter with dissolve', script)
+        self.assertNotIn("# Canvasia review screen_flash", script)
 
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         self.assertEqual(manifest["engine"]["exportTarget"], run_editor.EXPORT_TARGET_RENPY_DRAFT)
@@ -751,6 +792,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         renpy_manifest = json.loads(renpy_manifest_path.read_text(encoding="utf-8"))
         self.assertEqual(renpy_manifest["sceneCount"], 1)
         self.assertGreaterEqual(renpy_manifest["warningCount"], 1)
+        self.assertTrue(any(warning["code"] == "renpy_video_timing_review" for warning in renpy_manifest["warnings"]))
         quality_report = json.loads(Path(export_result["renpyQualityReportPath"]).read_text(encoding="utf-8"))
         self.assertEqual(quality_report["status"], "review")
         self.assertEqual(quality_report["summary"]["missingAssetReferenceCount"], 0)
