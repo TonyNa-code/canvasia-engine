@@ -29427,6 +29427,27 @@ function serializeReleaseReportAction(action) {
   };
 }
 
+function serializeReleaseRouteIssue(issue, index = 0) {
+  return {
+    order: index + 1,
+    id: issue?.id ?? "",
+    kind: issue?.kind ?? "",
+    tone: issue?.tone ?? "",
+    toneLabel: getReleaseStepToneLabel(issue?.tone),
+    status: issue?.status ?? "",
+    statusLabel: issue?.statusLabel ?? "",
+    title: issue?.title ?? "",
+    chapterName: issue?.chapterName ?? "",
+    sceneId: issue?.sceneId ?? "",
+    sceneName: issue?.sceneName ?? "",
+    routeDepth: issue?.routeDepth ?? null,
+    routeLabel: issue?.routeLabel ?? "",
+    targetSceneId: issue?.targetSceneId ?? "",
+    targetLabel: issue?.targetLabel ?? "",
+    actionHint: issue?.actionHint ?? "",
+  };
+}
+
 function serializeRuntimePreloadBudgetForRelease(report, digest) {
   if (releaseControlTools?.serializeRuntimePreloadBudgetForRelease) {
     return releaseControlTools.serializeRuntimePreloadBudgetForRelease(report, digest);
@@ -29777,6 +29798,7 @@ function buildReleaseControlReportPayload() {
         statusLabel: step.statusLabel,
         description: step.description,
         actions: (step.actions ?? []).map(serializeReleaseReportAction).filter(Boolean),
+        routeIssueQueue: (step.routeIssueQueue ?? []).map(serializeReleaseRouteIssue),
       })),
     },
     projectDoctor: {
@@ -30147,6 +30169,16 @@ function buildInspectionReportContent() {
         `   当前状态：${step.statusLabel}`,
         ""
       );
+      (step.routeIssueQueue ?? []).slice(0, 6).forEach((issue, issueIndex) => {
+        const issueLabel = [issue.sceneName, issue.routeLabel, issue.targetLabel].filter(Boolean).join(" / ");
+        lines.push(
+          `   ${index + 1}.${issueIndex + 1} ${issue.title}：${issueLabel || issue.statusLabel || "路线待确认"}`,
+          `       状态：${issue.statusLabel ?? "待确认"}${issue.actionHint ? ` / 提示：${issue.actionHint}` : ""}`
+        );
+      });
+      if ((step.routeIssueQueue ?? []).length > 0) {
+        lines.push("");
+      }
     });
   } else {
     lines.push(`1. ${formatReleaseReportNextStepAdvice(nextStep)}`);
@@ -30303,6 +30335,19 @@ function buildReleaseControlReportContent() {
       step.statusLabel,
       step.description,
     ])
+  );
+  const routeFixIssueTable = buildMarkdownTable(
+    ["顺序", "所属步骤", "路线问题", "位置", "目标", "状态"],
+    releaseFixOrder.steps.flatMap((step, stepIndex) =>
+      (step.routeIssueQueue ?? []).map((issue, issueIndex) => [
+        `${stepIndex + 1}.${issueIndex + 1}`,
+        step.title,
+        issue.title,
+        [issue.chapterName, issue.sceneName, issue.routeLabel].filter(Boolean).join(" / "),
+        issue.targetLabel || issue.targetSceneId || "未标注",
+        issue.statusLabel ?? "待确认",
+      ])
+    )
   );
   const issueTable = buildMarkdownTable(
     ["类型", "标题", "位置 / 摘要"],
@@ -30468,6 +30513,9 @@ function buildReleaseControlReportContent() {
   );
 
   lines.push("## 发布前修复顺序", "", fixOrderTable || formatReleaseReportNextStepAdvice(nextStep), "");
+  if (routeFixIssueTable) {
+    lines.push("### 具体路线阻塞", "", routeFixIssueTable, "");
+  }
 
   lines.push("## 素材性能预算", "");
   if (mediaBudgetReport.count > 0) {
@@ -31772,6 +31820,29 @@ function buildReleaseFixOrder(routeOverview) {
   };
 }
 
+function renderReleaseRouteIssueQueue(routeIssueQueue = []) {
+  const issues = (routeIssueQueue ?? []).slice(0, 4);
+  if (!issues.length) {
+    return "";
+  }
+
+  return `
+    <div class="project-doctor-recovery">
+      <strong>具体路线问题</strong>
+      <span>
+        ${issues
+          .map((issue, index) => {
+            const issueLabel = [issue.sceneName, issue.routeLabel, issue.targetLabel]
+              .filter(Boolean)
+              .join(" / ");
+            return `${index + 1}. ${escapeHtml(issue.title ?? "路线待处理")}：${escapeHtml(issueLabel || issue.statusLabel || "未标注位置")}`;
+          })
+          .join("<br>")}
+      </span>
+    </div>
+  `;
+}
+
 function renderReleaseFixOrderStep(step, index) {
   return `
     <article class="preview-sprint-card is-${step.tone}">
@@ -31780,6 +31851,7 @@ function renderReleaseFixOrderStep(step, index) {
         <span class="issue-tag ${getDashboardTaskToneClass(step.tone)}">${escapeHtml(step.statusLabel)}</span>
       </div>
       <p>${escapeHtml(step.description)}</p>
+      ${renderReleaseRouteIssueQueue(step.routeIssueQueue)}
       <div class="preview-sprint-actions">
         ${(step.actions ?? []).map((action, actionIndex) => renderQuickActionButton(action, actionIndex === 0)).join("")}
       </div>

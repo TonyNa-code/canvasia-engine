@@ -50,6 +50,22 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
         self.assertIn("## 路线试玩手册", report_body)
         self.assertLess(report_body.index("const routeTestingPlan"), report_body.index("const routeTestingTables"))
 
+    def test_release_fix_order_surfaces_route_issue_queue_in_ui_and_reports(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        payload_start = source.index("function buildReleaseControlReportPayload()")
+        payload_end = source.index("function buildInspectionReportContent()")
+        payload_body = source[payload_start:payload_end]
+        report_start = source.index("function buildReleaseControlReportContent()")
+        report_end = source.index("function exportReleaseControlReport()")
+        report_body = source[report_start:report_end]
+
+        self.assertIn("function serializeReleaseRouteIssue", source)
+        self.assertIn("function renderReleaseRouteIssueQueue", source)
+        self.assertIn("${renderReleaseRouteIssueQueue(step.routeIssueQueue)}", source)
+        self.assertIn("routeIssueQueue: (step.routeIssueQueue ?? []).map(serializeReleaseRouteIssue)", payload_body)
+        self.assertIn("const routeFixIssueTable = buildMarkdownTable", report_body)
+        self.assertIn("### 具体路线阻塞", report_body)
+
     def test_release_report_includes_runtime_preload_budget_context(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
         report_start = source.index("function buildReleaseControlReportContent()")
@@ -538,6 +554,8 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
         self.assertEqual(payload["routeStep"]["actions"][0]["sceneId"], "scene_branch")
         self.assertEqual(payload["plan"]["steps"][0]["title"], "先修路线坏链")
         self.assertEqual(payload["plan"]["steps"][0]["tone"], "danger")
+        self.assertEqual(len(payload["plan"]["steps"][0]["routeIssueQueue"]), 2)
+        self.assertEqual(payload["plan"]["steps"][0]["routeIssueQueue"][0]["sceneName"], "分岔口")
         self.assertEqual(payload["plan"]["blockerCount"], 1)
 
     def test_creative_quality_audit_adds_vn_baseline_polish_steps(self) -> None:
