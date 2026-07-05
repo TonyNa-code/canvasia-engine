@@ -706,11 +706,17 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue(script_path.is_file())
         self.assertTrue((build_dir / "game" / run_editor.RENPY_OPTIONS_FILE_NAME).is_file())
         self.assertTrue((build_dir / run_editor.RENPY_REVIEW_FILE_NAME).is_file())
+        self.assertTrue((build_dir / run_editor.RENPY_QUALITY_MARKDOWN_FILE_NAME).is_file())
+        self.assertTrue((build_dir / run_editor.RENPY_QUALITY_REPORT_FILE_NAME).is_file())
+        self.assertTrue((build_dir / run_editor.RENPY_VERIFY_SCRIPT_FILE_NAME).is_file())
         self.assertTrue((build_dir / run_editor.RENPY_README_FILE_NAME).is_file())
         self.assertTrue(renpy_manifest_path.is_file())
         self.assertTrue(archive_path.is_file())
         self.assertTrue(Path(export_result["archiveChecksumPath"]).is_file())
         self.assertEqual(hashlib.sha256(archive_path.read_bytes()).hexdigest(), export_result["archiveSha256"])
+        self.assertEqual(export_result["renpyQualityStatus"], "review")
+        self.assertEqual(export_result["renpyQualitySummary"]["errorCount"], 0)
+        self.assertGreaterEqual(export_result["renpyQualitySummary"]["reviewCount"], 1)
 
         script = script_path.read_text(encoding="utf-8")
         self.assertIn("default affection = 0", script)
@@ -732,11 +738,29 @@ class RunEditorSmokeTests(unittest.TestCase):
         renpy_manifest = json.loads(renpy_manifest_path.read_text(encoding="utf-8"))
         self.assertEqual(renpy_manifest["sceneCount"], 1)
         self.assertGreaterEqual(renpy_manifest["warningCount"], 1)
+        quality_report = json.loads(Path(export_result["renpyQualityReportPath"]).read_text(encoding="utf-8"))
+        self.assertEqual(quality_report["status"], "review")
+        self.assertEqual(quality_report["summary"]["missingAssetReferenceCount"], 0)
+        self.assertTrue(any(issue["code"] == "renpy_review_comments_present" for issue in quality_report["issues"]))
+        quality_markdown = Path(export_result["renpyQualityMarkdownPath"]).read_text(encoding="utf-8")
+        self.assertIn("# Canvasia Ren'Py Bundle Quality Report", quality_markdown)
+        verifier_result = subprocess.run(
+            [sys.executable, export_result["renpyVerifierPath"]],
+            cwd=build_dir,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(verifier_result.returncode, 0, verifier_result.stdout + verifier_result.stderr)
+        self.assertIn("verification passed", verifier_result.stdout)
 
         with zipfile.ZipFile(archive_path) as archive:
             names = set(archive.namelist())
         self.assertIn(f"game/{run_editor.RENPY_SCRIPT_FILE_NAME}", names)
         self.assertIn(run_editor.RENPY_REVIEW_FILE_NAME, names)
+        self.assertIn(run_editor.RENPY_QUALITY_MARKDOWN_FILE_NAME, names)
+        self.assertIn(run_editor.RENPY_QUALITY_REPORT_FILE_NAME, names)
+        self.assertIn(run_editor.RENPY_VERIFY_SCRIPT_FILE_NAME, names)
         self.assertTrue(any(name.startswith("game/assets/background/") for name in names))
 
     def test_starter_kit_rolls_back_when_first_scene_bootstrap_fails(self) -> None:

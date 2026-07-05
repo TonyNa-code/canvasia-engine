@@ -4600,6 +4600,14 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("打开迁移备注", source)
         self.assertIn("renpyManifestPublicUrl", source)
         self.assertIn("打开 Ren'Py Manifest", source)
+        self.assertIn("renpyQualityStatus", export_build)
+        self.assertIn("renpyQualityMarkdownPublicUrl", source)
+        self.assertIn("打开 Ren'Py 自检报告", source)
+        self.assertIn("renpyQualityReportPublicUrl", source)
+        self.assertIn("打开 Ren'Py 自检 JSON", source)
+        self.assertIn("renpyVerifierPublicUrl", source)
+        self.assertIn("打开 Ren'Py 校验脚本", source)
+        self.assertIn("自检发现阻断项", export_build)
 
     def test_native_export_surface_links_vn_baseline_quality_reports(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")

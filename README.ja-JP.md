@@ -202,7 +202,7 @@ Canvasia は初期 i18n フローに対応しています。
 
 気軽に共有するなら Web 試遊パッケージが最も簡単です。よりアプリに近いデスクトップ再生フローを検証する場合は、ネイティブ Runtime パッケージを使います。
 
-Ren'Py Starter Bundle は `game/script.rpy`、`game/options.rpy`、`game/assets/` にコピーされた素材、migration manifest、カスタム Canvasia 演出の review notes を含む zip を生成します。
+Ren'Py Starter Bundle は `game/script.rpy`、`game/options.rpy`、`game/assets/` にコピーされた素材、migration manifest、カスタム Canvasia 演出の review notes、bundle quality report、label / jump / 参照ファイルを確認する local verifier script を含む zip を生成します。
 
 すべての playable / runtime 書き出しには `README_试玩验收先看这里.md`、`story_route_map.json`、`story_route_map.md`、`localization_audit.json`、`localization_audit.md`、`release_readiness_summary.json`、`release_readiness_summary.md`、`unlockable_content_manifest.json`、`unlockable_content_report.md` も同梱されます。README は起動手順と受け入れチェック、story route map は broken jumps / unreachable scenes / ending candidates の確認、localization audit は multilingual project の missing translations、release-readiness files はテスターへ渡せる状態かどうかの短い gate、unlockable JSON / Markdown は CG ギャラリー、音楽鑑賞、ボイス回想、キャラクター / 場所 / ナレーション / 関係アーカイブ、章回想、エンディング、実績の収録状況を確認するためのレポートです。
 

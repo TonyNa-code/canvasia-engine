@@ -214,7 +214,7 @@ Open a project and go to the preview/export area to generate:
 
 The Web playable package is the easiest option for quick sharing. The native Runtime package is the route for testing a more app-like desktop playback flow.
 
-The Ren'Py Starter Bundle exports a zip with `game/script.rpy`, `game/options.rpy`, copied assets under `game/assets/`, a migration manifest, and review notes for custom Canvasia effects that should be finished inside Ren'Py.
+The Ren'Py Starter Bundle exports a zip with `game/script.rpy`, `game/options.rpy`, copied assets under `game/assets/`, a migration manifest, review notes for custom Canvasia effects, a bundle quality report, and a local verifier script for labels, jumps, and referenced files.
 
 Every playable export also includes `README_试玩验收先看这里.md`, `story_route_map.json`, `story_route_map.md`, `localization_audit.json`, `localization_audit.md`, `release_readiness_summary.json`, `release_readiness_summary.md`, `unlockable_content_manifest.json`, and `unlockable_content_report.md`. The README gives testers launch steps and acceptance checks; the story route map catches broken jumps and unreachable scenes; the localization audit flags missing translations in multilingual projects; the release-readiness files summarize whether the package is ready to hand to testers; the unlockable JSON / Markdown pair covers CG galleries, music rooms, voice replay, archive pages, achievements, chapter replay, and endings.
 

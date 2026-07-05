@@ -10,9 +10,16 @@ RENPY_GAME_DIR_NAME = "game"
 RENPY_SCRIPT_FILE_NAME = "script.rpy"
 RENPY_OPTIONS_FILE_NAME = "options.rpy"
 RENPY_MANIFEST_FILE_NAME = "canvasia_renpy_migration_manifest.json"
+RENPY_QUALITY_REPORT_FILE_NAME = "canvasia_renpy_quality_report.json"
+RENPY_QUALITY_MARKDOWN_FILE_NAME = "CANVASIA_RENPY_QUALITY_REPORT.md"
 RENPY_REVIEW_FILE_NAME = "CANVASIA_RENPY_MIGRATION_NOTES.md"
 RENPY_README_FILE_NAME = "README_Canvasia_RenPy_Starter.md"
+RENPY_VERIFY_SCRIPT_FILE_NAME = "verify_renpy_starter_bundle.py"
 CHOICE_CONTINUE_TARGET = "__continue__"
+RENPY_PATH_SUFFIX_PATTERN = re.compile(
+    r"\.(?:png|jpe?g|webp|gif|avif|mp3|ogg|wav|m4a|aac|flac|mp4|webm|mov|m4v)$",
+    re.IGNORECASE,
+)
 
 COMMENT_ONLY_BLOCK_TYPES = {
     "particle_effect",
@@ -441,18 +448,265 @@ def build_renpy_readme(export_result: dict) -> str:
             f"- `{RENPY_GAME_DIR_NAME}/assets/`: copied assets referenced by the generated script.",
             f"- `{RENPY_REVIEW_FILE_NAME}`: review notes for custom effects and migration gaps.",
             f"- `{RENPY_MANIFEST_FILE_NAME}`: machine-readable export summary.",
+            f"- `{RENPY_QUALITY_MARKDOWN_FILE_NAME}` / `{RENPY_QUALITY_REPORT_FILE_NAME}`: bundle integrity and migration quality checks.",
+            f"- `{RENPY_VERIFY_SCRIPT_FILE_NAME}`: local verifier for labels, jumps, and referenced files.",
             "",
             "## How to continue",
             "",
             "1. Create or open a Ren'Py project.",
             f"2. Copy the `{RENPY_GAME_DIR_NAME}` folder contents into the Ren'Py project's `game` folder.",
             f"3. Open `{RENPY_REVIEW_FILE_NAME}` and replace review comments with native Ren'Py transforms, screens, or Python logic where needed.",
-            "4. Run the project in Ren'Py and resolve label, asset, or transform issues reported by the launcher.",
+            f"4. Run `python3 {RENPY_VERIFY_SCRIPT_FILE_NAME}` from this folder to catch broken labels or missing files before opening Ren'Py.",
+            "5. Run the project in Ren'Py and resolve label, asset, or transform issues reported by the launcher.",
             "",
             f"Review items generated: {export_result.get('warningCount', 0)}",
             "",
         ]
     )
+
+
+def is_renpy_asset_reference(value: str) -> bool:
+    clean_value = value.strip().replace("\\", "/")
+    return bool(clean_value and not clean_value.startswith(("#", "data:", "http://", "https://")) and RENPY_PATH_SUFFIX_PATTERN.search(clean_value))
+
+
+def collect_renpy_script_references(script: str) -> dict:
+    label_counts: dict[str, int] = {}
+    jumps: list[str] = []
+    asset_references: list[str] = []
+    label_pattern = re.compile(r"^\s*label\s+([A-Za-z_][A-Za-z0-9_]*)\s*:", re.MULTILINE)
+    jump_pattern = re.compile(r"^\s*jump\s+([A-Za-z_][A-Za-z0-9_]*)\b", re.MULTILINE)
+    quoted_pattern = re.compile(r'"((?:\\"|[^"])*)"')
+
+    for match in label_pattern.finditer(script):
+        label = match.group(1)
+        label_counts[label] = label_counts.get(label, 0) + 1
+    for match in jump_pattern.finditer(script):
+        jumps.append(match.group(1))
+    for match in quoted_pattern.finditer(script):
+        value = match.group(1).replace('\\"', '"').replace("\\\\", "\\")
+        if is_renpy_asset_reference(value):
+            asset_references.append(value.replace("\\", "/"))
+
+    return {
+        "labels": sorted(label_counts),
+        "duplicateLabels": sorted(label for label, count in label_counts.items() if count > 1),
+        "jumps": sorted(dict.fromkeys(jumps)),
+        "assetReferences": sorted(dict.fromkeys(asset_references)),
+    }
+
+
+def add_quality_issue(issues: list[dict], severity: str, code: str, message: str, **context: Any) -> None:
+    issues.append(
+        {
+            "severity": severity,
+            "code": code,
+            "message": message,
+            **{key: value for key, value in context.items() if value not in (None, "", [])},
+        }
+    )
+
+
+def build_renpy_quality_report(build_dir: Path, export_result: dict) -> dict:
+    root = Path(build_dir)
+    game_dir = root / RENPY_GAME_DIR_NAME
+    script_path = game_dir / RENPY_SCRIPT_FILE_NAME
+    options_path = game_dir / RENPY_OPTIONS_FILE_NAME
+    issues: list[dict] = []
+    references = {"labels": [], "duplicateLabels": [], "jumps": [], "assetReferences": []}
+
+    if not script_path.is_file():
+        add_quality_issue(issues, "error", "renpy_missing_script", "game/script.rpy is missing.")
+        script = ""
+    else:
+        script = script_path.read_text(encoding="utf-8")
+        if not script.strip():
+            add_quality_issue(issues, "error", "renpy_empty_script", "game/script.rpy is empty.")
+        references = collect_renpy_script_references(script)
+
+    if not options_path.is_file():
+        add_quality_issue(issues, "error", "renpy_missing_options", "game/options.rpy is missing.")
+
+    labels = set(references["labels"])
+    if export_result.get("sceneCount", 0) and not labels:
+        add_quality_issue(issues, "error", "renpy_missing_labels", "No Ren'Py labels were generated for the project scenes.")
+
+    for label in references["duplicateLabels"]:
+        add_quality_issue(issues, "error", "renpy_duplicate_label", f"Duplicate Ren'Py label: {label}", label=label)
+
+    for jump in references["jumps"]:
+        if jump not in labels:
+            add_quality_issue(issues, "error", "renpy_undefined_jump", f"Jump target is not defined: {jump}", label=jump)
+
+    missing_asset_references: list[str] = []
+    for asset_reference in references["assetReferences"]:
+        if not (game_dir / asset_reference).is_file():
+            missing_asset_references.append(asset_reference)
+            add_quality_issue(
+                issues,
+                "error",
+                "renpy_missing_asset_reference",
+                f"Referenced asset is missing from game folder: {asset_reference}",
+                path=asset_reference,
+            )
+
+    review_comment_count = script.count("Canvasia review")
+    if review_comment_count:
+        add_quality_issue(
+            issues,
+            "review",
+            "renpy_review_comments_present",
+            f"{review_comment_count} generated review comments should be checked in Ren'Py.",
+            count=review_comment_count,
+        )
+
+    for warning in as_list(export_result.get("warnings")):
+        add_quality_issue(
+            issues,
+            "review",
+            clean_text(warning.get("code"), "renpy_migration_review"),
+            clean_text(warning.get("message"), "Review generated migration item."),
+            sceneId=warning.get("sceneId"),
+            blockIndex=warning.get("blockIndex"),
+        )
+
+    error_count = sum(1 for issue in issues if issue["severity"] == "error")
+    review_count = sum(1 for issue in issues if issue["severity"] == "review")
+    status = "blocked" if error_count else "review" if review_count else "ready"
+
+    return {
+        "formatVersion": 1,
+        "status": status,
+        "summary": {
+            "labelCount": len(references["labels"]),
+            "jumpCount": len(references["jumps"]),
+            "assetReferenceCount": len(references["assetReferences"]),
+            "missingAssetReferenceCount": len(missing_asset_references),
+            "duplicateLabelCount": len(references["duplicateLabels"]),
+            "reviewCommentCount": review_comment_count,
+            "errorCount": error_count,
+            "reviewCount": review_count,
+        },
+        "files": {
+            "script": f"{RENPY_GAME_DIR_NAME}/{RENPY_SCRIPT_FILE_NAME}",
+            "options": f"{RENPY_GAME_DIR_NAME}/{RENPY_OPTIONS_FILE_NAME}",
+            "reviewNotes": RENPY_REVIEW_FILE_NAME,
+            "manifest": RENPY_MANIFEST_FILE_NAME,
+        },
+        "references": references,
+        "issues": issues,
+    }
+
+
+def build_renpy_quality_markdown(report: dict) -> str:
+    summary = report.get("summary") if isinstance(report.get("summary"), dict) else {}
+    issues = as_list(report.get("issues"))
+    lines = [
+        "# Canvasia Ren'Py Bundle Quality Report",
+        "",
+        f"- Status: {clean_text(report.get('status'), 'unknown')}",
+        f"- Labels: {summary.get('labelCount', 0)}",
+        f"- Jumps: {summary.get('jumpCount', 0)}",
+        f"- Asset references: {summary.get('assetReferenceCount', 0)}",
+        f"- Missing asset references: {summary.get('missingAssetReferenceCount', 0)}",
+        f"- Review comments: {summary.get('reviewCommentCount', 0)}",
+        "",
+    ]
+    if not issues:
+        lines.extend(["No issues were found by the generated bundle checks.", ""])
+        return "\n".join(lines)
+    lines.extend(["| Severity | Code | Message |", "| --- | --- | --- |"])
+    for issue in issues:
+        lines.append(
+            "| "
+            + " | ".join(
+                clean_text(value).replace("|", "\\|")
+                for value in [issue.get("severity"), issue.get("code"), issue.get("message")]
+            )
+            + " |"
+        )
+    lines.append("")
+    return "\n".join(lines)
+
+
+def build_renpy_verifier_script() -> str:
+    return f'''from __future__ import annotations
+
+import re
+import sys
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parent
+GAME_DIR = ROOT / "{RENPY_GAME_DIR_NAME}"
+SCRIPT_PATH = GAME_DIR / "{RENPY_SCRIPT_FILE_NAME}"
+OPTIONS_PATH = GAME_DIR / "{RENPY_OPTIONS_FILE_NAME}"
+PATH_SUFFIX_PATTERN = re.compile(r"\\.(?:png|jpe?g|webp|gif|avif|mp3|ogg|wav|m4a|aac|flac|mp4|webm|mov|m4v)$", re.IGNORECASE)
+
+
+def is_asset_reference(value: str) -> bool:
+    clean = value.strip().replace("\\\\", "/")
+    return bool(clean and not clean.startswith(("#", "data:", "http://", "https://")) and PATH_SUFFIX_PATTERN.search(clean))
+
+
+def main() -> int:
+    issues = []
+    if not SCRIPT_PATH.is_file():
+        issues.append("missing game/script.rpy")
+        script = ""
+    else:
+        script = SCRIPT_PATH.read_text(encoding="utf-8")
+        if not script.strip():
+            issues.append("empty game/script.rpy")
+    if not OPTIONS_PATH.is_file():
+        issues.append("missing game/options.rpy")
+
+    labels = re.findall(r"^\\s*label\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*:", script, flags=re.MULTILINE)
+    label_set = set(labels)
+    for label in sorted(label for label in label_set if labels.count(label) > 1):
+        issues.append(f"duplicate label: {{label}}")
+    for jump in sorted(set(re.findall(r"^\\s*jump\\s+([A-Za-z_][A-Za-z0-9_]*)\\b", script, flags=re.MULTILINE))):
+        if jump not in label_set:
+            issues.append(f"undefined jump target: {{jump}}")
+    for quoted in re.findall(r'"((?:\\\\"|[^"])*)"', script):
+        path = quoted.replace('\\\\"', '"').replace("\\\\\\\\", "\\\\").replace("\\\\", "/")
+        if is_asset_reference(path) and not (GAME_DIR / path).is_file():
+            issues.append(f"missing asset reference: {{path}}")
+
+    if issues:
+        print("Canvasia Ren'Py Starter verification failed:")
+        for issue in issues:
+            print(f"- {{issue}}")
+        return 1
+    print(f"Canvasia Ren'Py Starter verification passed: {{len(label_set)}} labels, {{script.count('Canvasia review')}} review comments.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+'''
+
+
+def write_renpy_quality_files(build_dir: Path, export_result: dict) -> dict:
+    report = build_renpy_quality_report(build_dir, export_result)
+    report_path = build_dir / RENPY_QUALITY_REPORT_FILE_NAME
+    markdown_path = build_dir / RENPY_QUALITY_MARKDOWN_FILE_NAME
+    verifier_path = build_dir / RENPY_VERIFY_SCRIPT_FILE_NAME
+
+    report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    markdown_path.write_text(build_renpy_quality_markdown(report), encoding="utf-8")
+    verifier_path.write_text(build_renpy_verifier_script(), encoding="utf-8")
+
+    return {
+        "qualityStatus": report["status"],
+        "qualitySummary": report["summary"],
+        "qualityReportName": RENPY_QUALITY_REPORT_FILE_NAME,
+        "qualityReportPath": str(report_path),
+        "qualityMarkdownName": RENPY_QUALITY_MARKDOWN_FILE_NAME,
+        "qualityMarkdownPath": str(markdown_path),
+        "verifierName": RENPY_VERIFY_SCRIPT_FILE_NAME,
+        "verifierPath": str(verifier_path),
+    }
 
 
 def write_renpy_starter_project(build_dir: Path, bundle: dict, assets_doc: dict | None = None) -> dict:
@@ -470,6 +724,7 @@ def write_renpy_starter_project(build_dir: Path, bundle: dict, assets_doc: dict 
     manifest_path.write_text(json.dumps({key: value for key, value in export_result.items() if key != "script"}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     review_path.write_text(build_renpy_review_notes(export_result), encoding="utf-8")
     readme_path.write_text(build_renpy_readme(export_result), encoding="utf-8")
+    quality_files = write_renpy_quality_files(build_dir, export_result)
 
     return {
         **{key: value for key, value in export_result.items() if key != "script"},
@@ -483,4 +738,5 @@ def write_renpy_starter_project(build_dir: Path, bundle: dict, assets_doc: dict 
         "reviewPath": str(review_path),
         "readmeName": RENPY_README_FILE_NAME,
         "readmePath": str(readme_path),
+        **quality_files,
     }

@@ -54,9 +54,12 @@ from export_unlockable_manifest import (
 from renpy_export import (
     RENPY_MANIFEST_FILE_NAME,
     RENPY_OPTIONS_FILE_NAME,
+    RENPY_QUALITY_MARKDOWN_FILE_NAME,
+    RENPY_QUALITY_REPORT_FILE_NAME,
     RENPY_README_FILE_NAME,
     RENPY_REVIEW_FILE_NAME,
     RENPY_SCRIPT_FILE_NAME,
+    RENPY_VERIFY_SCRIPT_FILE_NAME,
     write_renpy_starter_project,
 )
 from openai_asset_generation import (
@@ -10906,6 +10909,9 @@ def export_renpy_draft_build() -> dict:
             "renpyOptions": renpy_files["optionsName"],
             "renpyManifest": renpy_files["manifestName"],
             "renpyReviewNotes": renpy_files["reviewName"],
+            "renpyQualityReport": renpy_files["qualityReportName"],
+            "renpyQualityMarkdown": renpy_files["qualityMarkdownName"],
+            "renpyVerifier": renpy_files["verifierName"],
             "readme": renpy_files["readmeName"],
         },
         runtime_info={
@@ -10915,6 +10921,9 @@ def export_renpy_draft_build() -> dict:
             "script": renpy_files["scriptName"],
             "reviewNotes": renpy_files["reviewName"],
             "reviewItemCount": renpy_files["warningCount"],
+            "qualityStatus": renpy_files["qualityStatus"],
+            "qualitySummary": renpy_files["qualitySummary"],
+            "verifier": renpy_files["verifierName"],
         },
     )
     manifest_path = write_export_manifest(build_dir, manifest)
@@ -10953,6 +10962,17 @@ def export_renpy_draft_build() -> dict:
         "renpyReviewName": renpy_files["reviewName"],
         "renpyReviewPath": renpy_files["reviewPath"],
         "renpyReviewPublicUrl": f"/exports/{build_dir.name}/{renpy_files['reviewName']}",
+        "renpyQualityReportName": renpy_files["qualityReportName"],
+        "renpyQualityReportPath": renpy_files["qualityReportPath"],
+        "renpyQualityReportPublicUrl": f"/exports/{build_dir.name}/{renpy_files['qualityReportName']}",
+        "renpyQualityMarkdownName": renpy_files["qualityMarkdownName"],
+        "renpyQualityMarkdownPath": renpy_files["qualityMarkdownPath"],
+        "renpyQualityMarkdownPublicUrl": f"/exports/{build_dir.name}/{renpy_files['qualityMarkdownName']}",
+        "renpyVerifierName": renpy_files["verifierName"],
+        "renpyVerifierPath": renpy_files["verifierPath"],
+        "renpyVerifierPublicUrl": f"/exports/{build_dir.name}/{renpy_files['verifierName']}",
+        "renpyQualityStatus": renpy_files["qualityStatus"],
+        "renpyQualitySummary": renpy_files["qualitySummary"],
         "renpyReadmeName": renpy_files["readmeName"],
         "renpyReadmePath": renpy_files["readmePath"],
         "renpyReadmePublicUrl": f"/exports/{build_dir.name}/{renpy_files['readmeName']}",

@@ -252,7 +252,7 @@ python run_editor.py
 ### 平台状态
 
 - `网页试玩包`：适合快速预览、网页分发和轻量测试。
-- `Ren'Py Starter Bundle`：会导出 zip，内含 `game/script.rpy`、`game/options.rpy`、复制后的 `game/assets/` 素材、迁移 manifest 和自定义演出复核备注，适合把项目迁移到 Ren'Py 后继续开发。
+- `Ren'Py Starter Bundle`：会导出 zip，内含 `game/script.rpy`、`game/options.rpy`、复制后的 `game/assets/` 素材、迁移 manifest、自定义演出复核备注、包内自检报告和本地校验脚本，适合把项目迁移到 Ren'Py 后继续开发。
 - `Windows / macOS / Linux 桌面包`：当前主要基于 NW.js 桌面 Runtime。
 - `原生 Runtime 包`：Preview 路线，已覆盖标题页主菜单、基础剧情主链、正式存档/读档、系统菜单设置项、语言切换、文本历史、自动播放、已读快进、项目字体、玩家档案/自动续玩、基础粒子与镜头演出、3D 资产结构 / 依赖清单、可选 PyAV/FFmpeg 音画同步内嵌视频播放、OpenCV 画面兜底、系统播放器桥接兜底、第一批资料馆，以及随包生成的发布候选总报告、发布总控报告与三系统验收清单。
 - `手机端 Runtime`：实验规划阶段，当前重点是触控、音频策略和界面适配验证。

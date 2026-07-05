@@ -26947,6 +26947,48 @@ function renderProjectValidationSummary() {
             : ""
         }
         ${
+          exportResult?.target === "renpy_draft" && exportResult?.renpyQualityMarkdownPublicUrl
+            ? `
+              <a
+                class="toolbar-button toolbar-button-primary"
+                href="${escapeHtml(exportResult.renpyQualityMarkdownPublicUrl)}"
+                target="_blank"
+                rel="noreferrer"
+              >
+                打开 Ren'Py 自检报告
+              </a>
+            `
+            : ""
+        }
+        ${
+          exportResult?.target === "renpy_draft" && exportResult?.renpyQualityReportPublicUrl
+            ? `
+              <a
+                class="toolbar-button"
+                href="${escapeHtml(exportResult.renpyQualityReportPublicUrl)}"
+                target="_blank"
+                rel="noreferrer"
+              >
+                打开 Ren'Py 自检 JSON
+              </a>
+            `
+            : ""
+        }
+        ${
+          exportResult?.target === "renpy_draft" && exportResult?.renpyVerifierPublicUrl
+            ? `
+              <a
+                class="toolbar-button"
+                href="${escapeHtml(exportResult.renpyVerifierPublicUrl)}"
+                target="_blank"
+                rel="noreferrer"
+              >
+                打开 Ren'Py 校验脚本
+              </a>
+            `
+            : ""
+        }
+        ${
           exportResult?.target === "native_runtime" && exportResult?.archiveChecksumPublicUrl
             ? `
               <a
@@ -41031,7 +41073,16 @@ async function exportBuild(target = "web") {
     }
 
     if (exportTarget === "renpy_draft") {
-      setSaveStatus("Ren'Py Starter Bundle 已经导出，可下载 zip 或打开迁移备注继续整理");
+      if (result.renpyQualityStatus === "blocked") {
+        setSaveStatus("Ren'Py Starter Bundle 已经导出，但自检发现阻断项，请先打开自检报告", true);
+        showToast("Ren'Py Starter Bundle 已导出，但需要先处理自检报告", "error");
+        return;
+      }
+      const reviewHint =
+        result.renpyQualityStatus === "review"
+          ? `，还有 ${result.renpyReviewItemCount ?? 0} 个迁移复核项`
+          : "";
+      setSaveStatus(`Ren'Py Starter Bundle 已经导出${reviewHint}，可下载 zip 或打开自检报告继续整理`);
       showToast("Ren'Py Starter Bundle 已经导出");
       return;
     }
