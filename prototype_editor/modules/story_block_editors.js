@@ -429,6 +429,13 @@
       >
         拆成长文本卡片
       </button>
+      <button
+        type="button"
+        class="toolbar-button"
+        data-action="split-readable-scene"
+      >
+        整理本场长文本
+      </button>
     </div>
   `;
   }

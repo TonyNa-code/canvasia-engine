@@ -167,6 +167,141 @@
     return chunks;
   }
 
+  function cloneReadableValue(value) {
+    return JSON.parse(JSON.stringify(value ?? null));
+  }
+
+  function normalizeReadableSceneBlocks(sceneOrBlocks) {
+    if (Array.isArray(sceneOrBlocks)) {
+      return sceneOrBlocks;
+    }
+
+    return Array.isArray(sceneOrBlocks?.blocks) ? sceneOrBlocks.blocks : [];
+  }
+
+  function isReadableTextBlock(block) {
+    return block?.type === "dialogue" || block?.type === "narration";
+  }
+
+  function createReadableBlockIdAllocator(sceneOrBlocks = []) {
+    const existing = new Set(
+      normalizeReadableSceneBlocks(sceneOrBlocks)
+        .map((block) => String(block?.id ?? "").trim())
+        .filter(Boolean)
+    );
+    let number = 1;
+
+    return () => {
+      let blockId = "";
+      do {
+        blockId = `block_${String(number).padStart(3, "0")}`;
+        number += 1;
+      } while (existing.has(blockId));
+      existing.add(blockId);
+      return blockId;
+    };
+  }
+
+  function clearReadableSplitVoiceBinding(block) {
+    delete block.voiceAssetId;
+    delete block.voiceVolume;
+    delete block.voice;
+    return block;
+  }
+
+  function buildReadableBlockSplitPlan(block, options = {}) {
+    const safeBlock = block && typeof block === "object" ? block : null;
+    if (!isReadableTextBlock(safeBlock)) {
+      return {
+        canSplit: false,
+        reason: "unsupported_block",
+        originalBlockId: String(safeBlock?.id ?? ""),
+        chunkCount: 0,
+        chunks: [],
+        blocks: [],
+      };
+    }
+
+    const chunks = splitReadableTextIntoChunks(safeBlock.text, options.limit);
+    if (chunks.length < 2) {
+      return {
+        canSplit: false,
+        reason: "short_text",
+        originalBlockId: String(safeBlock.id ?? ""),
+        chunkCount: chunks.length,
+        chunks,
+        blocks: [],
+      };
+    }
+
+    const allocateBlockId =
+      typeof options.allocateBlockId === "function"
+        ? options.allocateBlockId
+        : createReadableBlockIdAllocator(options.scene ?? options.blocks ?? []);
+    const splitBlocks = chunks.map((chunk, index) => {
+      const nextBlock = cloneReadableValue(safeBlock) ?? {};
+      nextBlock.id = index === 0 ? safeBlock.id : allocateBlockId();
+      nextBlock.text = chunk;
+
+      if (index > 0) {
+        clearReadableSplitVoiceBinding(nextBlock);
+      }
+
+      return nextBlock;
+    });
+
+    return {
+      canSplit: true,
+      reason: "split",
+      originalBlockId: String(safeBlock.id ?? ""),
+      firstBlockId: String(splitBlocks[0]?.id ?? ""),
+      chunkCount: splitBlocks.length,
+      chunks,
+      blocks: splitBlocks,
+    };
+  }
+
+  function buildReadableSceneSplitPlan(scene, options = {}) {
+    const sourceBlocks = normalizeReadableSceneBlocks(scene);
+    const nextScene = cloneReadableValue(scene) ?? {};
+    const allocateBlockId = createReadableBlockIdAllocator(sourceBlocks);
+    const splitEntries = [];
+    const nextBlocks = [];
+
+    sourceBlocks.forEach((block, index) => {
+      const plan = buildReadableBlockSplitPlan(block, {
+        ...options,
+        allocateBlockId,
+      });
+
+      if (!plan.canSplit) {
+        nextBlocks.push(cloneReadableValue(block));
+        return;
+      }
+
+      nextBlocks.push(...plan.blocks);
+      splitEntries.push({
+        blockId: plan.originalBlockId,
+        firstBlockId: plan.firstBlockId,
+        index,
+        chunkCount: plan.chunkCount,
+        addedBlockCount: Math.max(0, plan.chunkCount - 1),
+      });
+    });
+
+    nextScene.blocks = nextBlocks;
+
+    return {
+      changed: splitEntries.length > 0,
+      scene: nextScene,
+      splitEntries,
+      splitCount: splitEntries.length,
+      addedBlockCount: nextBlocks.length - sourceBlocks.length,
+      firstSplitBlockId: splitEntries[0]?.firstBlockId ?? "",
+      firstSplitIndex: splitEntries[0]?.index ?? -1,
+    };
+  }
+
   function getReadableTextToolState(text) {
     const metrics = getReadableTextMetrics(text);
     const isLong = isReadableTextLong(text);
@@ -199,5 +334,9 @@
     splitLongReadableSegment,
     shouldJoinReadableSegmentsWithSpace,
     splitReadableTextIntoChunks,
+    isReadableTextBlock,
+    createReadableBlockIdAllocator,
+    buildReadableBlockSplitPlan,
+    buildReadableSceneSplitPlan,
   });
 })(typeof window !== "undefined" ? window : globalThis);

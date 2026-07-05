@@ -544,6 +544,7 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
         self.assertIn("台词可读性", payload["readableMarkup"])
         self.assertIn("建议拆分", payload["readableMarkup"])
         self.assertIn("拆成长文本卡片", payload["readableMarkup"])
+        self.assertIn("整理本场长文本", payload["readableMarkup"])
         self.assertIn("编辑这句台词", payload["dialogueMarkup"])
         self.assertIn("这句还没有语音", payload["dialogueMarkup"])
         self.assertIn('data-scene-id="scene_a"', payload["dialogueMarkup"])

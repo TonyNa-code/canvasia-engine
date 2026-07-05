@@ -25,6 +25,31 @@ class FrontendScriptReadabilityModuleTests(unittest.TestCase):
             const chineseText = "第一句很短。第二句也很短。第三句继续前进。第四句收束。";
             const englishText = "Alice opens the door Bob enters the room Carol smiles";
             const splitCandidate = "第一句很短。第二句也很短。".repeat(18);
+            const splitScene = {{
+              id: "scene_a",
+              blocks: [
+                {{
+                  id: "block_001",
+                  type: "dialogue",
+                  speakerId: "heroine",
+                  text: splitCandidate,
+                  voiceAssetId: "voice_001",
+                  voiceVolume: 72,
+                  voice: {{ assetId: "voice_nested" }},
+                }},
+                {{ id: "block_002", type: "narration", text: "短旁白。" }},
+                {{ id: "block_003", type: "choice", text: "选择" }},
+              ],
+            }};
+            const blockSplitPlan = tools.buildReadableBlockSplitPlan(splitScene.blocks[0], {{
+              blocks: splitScene.blocks,
+              limit: 80,
+            }});
+            const sceneSplitPlan = tools.buildReadableSceneSplitPlan(splitScene, {{ limit: 80 }});
+            const unsupportedPlan = tools.buildReadableBlockSplitPlan(
+              {{ id: "choice_1", type: "choice", text: splitCandidate }},
+              {{ limit: 80 }}
+            );
             const longText = "很".repeat(261);
             const lineHeavyText = "一\\n二\\n三\\n四\\n五\\n六";
             const result = {{
@@ -63,6 +88,31 @@ class FrontendScriptReadabilityModuleTests(unittest.TestCase):
               zeroLimitChunks: tools.splitReadableTextIntoChunks("短句。", 0),
               invalidLimitChunks: tools.splitReadableTextIntoChunks("短句。", "bad"),
               emptyChunks: tools.splitReadableTextIntoChunks("   "),
+              readableBlockChecks: [
+                tools.isReadableTextBlock(splitScene.blocks[0]),
+                tools.isReadableTextBlock(splitScene.blocks[2]),
+              ],
+              blockSplitPlan: {{
+                canSplit: blockSplitPlan.canSplit,
+                reason: blockSplitPlan.reason,
+                firstBlockId: blockSplitPlan.firstBlockId,
+                chunkCount: blockSplitPlan.chunkCount,
+                ids: blockSplitPlan.blocks.map((block) => block.id),
+                duplicateVoiceAssetId: blockSplitPlan.blocks[1]?.voiceAssetId ?? null,
+                duplicateVoiceVolume: blockSplitPlan.blocks[1]?.voiceVolume ?? null,
+                duplicateVoice: blockSplitPlan.blocks[1]?.voice ?? null,
+              }},
+              sceneSplitPlan: {{
+                changed: sceneSplitPlan.changed,
+                splitCount: sceneSplitPlan.splitCount,
+                addedBlockCount: sceneSplitPlan.addedBlockCount,
+                firstSplitBlockId: sceneSplitPlan.firstSplitBlockId,
+                firstSplitIndex: sceneSplitPlan.firstSplitIndex,
+                blockCount: sceneSplitPlan.scene.blocks.length,
+                ids: sceneSplitPlan.scene.blocks.map((block) => block.id),
+                secondVoiceAssetId: sceneSplitPlan.scene.blocks[1]?.voiceAssetId ?? null,
+              }},
+              unsupportedReason: unsupportedPlan.reason,
             }};
             process.stdout.write(JSON.stringify(result));
             """
@@ -100,6 +150,25 @@ class FrontendScriptReadabilityModuleTests(unittest.TestCase):
         self.assertEqual(payload["zeroLimitChunks"], ["短句。"])
         self.assertEqual(payload["invalidLimitChunks"], ["短句。"])
         self.assertEqual(payload["emptyChunks"], [])
+        self.assertEqual(payload["readableBlockChecks"], [True, False])
+        self.assertTrue(payload["blockSplitPlan"]["canSplit"])
+        self.assertEqual(payload["blockSplitPlan"]["reason"], "split")
+        self.assertEqual(payload["blockSplitPlan"]["firstBlockId"], "block_001")
+        self.assertGreaterEqual(payload["blockSplitPlan"]["chunkCount"], 2)
+        self.assertEqual(payload["blockSplitPlan"]["ids"][0], "block_001")
+        self.assertNotIn("block_002", payload["blockSplitPlan"]["ids"][1:])
+        self.assertIsNone(payload["blockSplitPlan"]["duplicateVoiceAssetId"])
+        self.assertIsNone(payload["blockSplitPlan"]["duplicateVoiceVolume"])
+        self.assertIsNone(payload["blockSplitPlan"]["duplicateVoice"])
+        self.assertTrue(payload["sceneSplitPlan"]["changed"])
+        self.assertEqual(payload["sceneSplitPlan"]["splitCount"], 1)
+        self.assertGreaterEqual(payload["sceneSplitPlan"]["addedBlockCount"], 1)
+        self.assertEqual(payload["sceneSplitPlan"]["firstSplitBlockId"], "block_001")
+        self.assertEqual(payload["sceneSplitPlan"]["firstSplitIndex"], 0)
+        self.assertGreater(payload["sceneSplitPlan"]["blockCount"], 3)
+        self.assertEqual(len(payload["sceneSplitPlan"]["ids"]), len(set(payload["sceneSplitPlan"]["ids"])))
+        self.assertIsNone(payload["sceneSplitPlan"]["secondVoiceAssetId"])
+        self.assertEqual(payload["unsupportedReason"], "unsupported_block")
 
 
 if __name__ == "__main__":

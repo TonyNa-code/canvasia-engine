@@ -4771,6 +4771,11 @@ async function handleClick(event) {
     return;
   }
 
+  if (action === "split-readable-scene") {
+    void splitSelectedSceneReadableBlocks();
+    return;
+  }
+
   if (action === "create-starter-variables") {
     void ensureStarterVariables({ forceStarterPack: true, reason: "正在创建基础变量库..." });
     return;
@@ -37049,6 +37054,7 @@ async function deleteSelectedBlock() {
   }
 
   const updatedScene = cloneScene(scene);
+  updatedScene.blocks = Array.isArray(updatedScene.blocks) ? updatedScene.blocks : [];
   const blockIndex = updatedScene.blocks.findIndex((item) => item.id === block.id);
 
   if (blockIndex < 0) {
@@ -41449,36 +41455,6 @@ function updateReadableTextQualityToolsFromInput(input) {
   }
 }
 
-function findReadableSplitIndex(text, limit) {
-  return scriptReadabilityTools.findReadableSplitIndex(text, limit);
-}
-
-function splitLongReadableSegment(segment, limit) {
-  return scriptReadabilityTools.splitLongReadableSegment(segment, limit);
-}
-
-function shouldJoinReadableSegmentsWithSpace(left, right) {
-  return scriptReadabilityTools.shouldJoinReadableSegmentsWithSpace(left, right);
-}
-
-function splitReadableTextIntoChunks(text, limit = VN_TEXT_SPLIT_TARGET_LENGTH) {
-  return scriptReadabilityTools.splitReadableTextIntoChunks(text, limit);
-}
-
-function createBlockIdAllocator(scene) {
-  const existing = new Set((scene.blocks ?? []).map((block) => block.id));
-  return () => {
-    let number = 1;
-    let blockId = "";
-    do {
-      blockId = `block_${String(number).padStart(3, "0")}`;
-      number += 1;
-    } while (existing.has(blockId));
-    existing.add(blockId);
-    return blockId;
-  };
-}
-
 async function splitSelectedReadableBlock() {
   const scene = getSelectedScene();
   const block = getSelectedBlock();
@@ -41493,15 +41469,6 @@ async function splitSelectedReadableBlock() {
     return false;
   }
 
-  const editedBlock = collectEditedBlock(block);
-  const chunks = splitReadableTextIntoChunks(editedBlock.text);
-
-  if (chunks.length < 2) {
-    setSaveStatus("当前文本还不需要拆成多张卡片");
-    showToast("当前文本长度还适合放在一张卡片里");
-    return false;
-  }
-
   const updatedScene = cloneScene(scene);
   const blockIndex = updatedScene.blocks.findIndex((item) => item.id === block.id);
 
@@ -41509,33 +41476,70 @@ async function splitSelectedReadableBlock() {
     return false;
   }
 
-  const allocateBlockId = createBlockIdAllocator(updatedScene);
-  const splitBlocks = chunks.map((chunk, index) => {
-    const nextBlock = JSON.parse(JSON.stringify(editedBlock));
-    nextBlock.id = index === 0 ? block.id : allocateBlockId();
-    nextBlock.text = chunk;
-
-    if (index > 0 && nextBlock.type === "dialogue") {
-      delete nextBlock.voiceAssetId;
-      delete nextBlock.voiceVolume;
-    }
-
-    return nextBlock;
+  const editedBlock = collectEditedBlock(block);
+  updatedScene.blocks[blockIndex] = editedBlock;
+  const splitPlan = scriptReadabilityTools.buildReadableBlockSplitPlan(editedBlock, {
+    blocks: updatedScene.blocks,
   });
 
-  updatedScene.blocks.splice(blockIndex, 1, ...splitBlocks);
+  if (!splitPlan.canSplit) {
+    setSaveStatus("当前文本还不需要拆成多张卡片");
+    showToast("当前文本长度还适合放在一张卡片里");
+    return false;
+  }
+
+  updatedScene.blocks.splice(blockIndex, 1, ...splitPlan.blocks);
 
   const success = await persistScene(updatedScene, {
     selectedSceneId: updatedScene.id,
-    selectedBlockId: splitBlocks[0].id,
+    selectedBlockId: splitPlan.firstBlockId,
     previewSceneId: updatedScene.id,
     previewBlockIndex: blockIndex,
-    successMessage: `已拆分为 ${splitBlocks.length} 张卡片`,
+    successMessage: `已拆分为 ${splitPlan.chunkCount} 张卡片`,
   });
 
   if (success) {
     clearPendingStoryChanges();
-    showToast(`已拆分为 ${splitBlocks.length} 张卡片`);
+    showToast(`已拆分为 ${splitPlan.chunkCount} 张卡片`);
+  }
+
+  return success;
+}
+
+async function splitSelectedSceneReadableBlocks() {
+  const scene = getSelectedScene();
+  const block = getSelectedBlock();
+
+  if (!scene) {
+    return false;
+  }
+
+  const updatedScene = cloneScene(scene);
+  updatedScene.blocks = Array.isArray(updatedScene.blocks) ? updatedScene.blocks : [];
+  const selectedIndex = updatedScene.blocks.findIndex((item) => item.id === block?.id);
+  if (block && selectedIndex >= 0 && (block.type === "dialogue" || block.type === "narration")) {
+    updatedScene.blocks[selectedIndex] = collectEditedBlock(block);
+  }
+
+  const splitPlan = scriptReadabilityTools.buildReadableSceneSplitPlan(updatedScene);
+
+  if (!splitPlan.changed) {
+    setSaveStatus("当前场景没有需要自动拆分的长文本");
+    showToast("当前场景的台词和旁白长度都还舒适");
+    return false;
+  }
+
+  const success = await persistScene(splitPlan.scene, {
+    selectedSceneId: splitPlan.scene.id,
+    selectedBlockId: splitPlan.firstSplitBlockId || state.selectedBlockId,
+    previewSceneId: splitPlan.scene.id,
+    previewBlockIndex: Math.max(splitPlan.firstSplitIndex, 0),
+    successMessage: `已整理 ${splitPlan.splitCount} 张长文本，新增 ${splitPlan.addedBlockCount} 张卡片`,
+  });
+
+  if (success) {
+    clearPendingStoryChanges();
+    showToast(`已整理本场 ${splitPlan.splitCount} 张长文本`);
   }
 
   return success;
