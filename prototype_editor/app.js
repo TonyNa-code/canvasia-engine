@@ -194,35 +194,10 @@ const beginnerTutorialTools = window.CanvasiaEditorBeginnerTutorial;
 const projectCenterTools = window.CanvasiaEditorProjectCenter;
 const commandPaletteTools = window.CanvasiaEditorCommandPalette;
 
-const ASSET_TYPE_LABELS = assetCatalogTools?.ASSET_TYPE_LABELS ?? {
-  background: "背景",
-  sprite: "立绘",
-  cg: "CG",
-  bgm: "音乐",
-  sfx: "音效",
-  voice: "语音",
-  video: "视频",
-  ui: "界面素材",
-  font: "字体",
-  live2d: "Live2D",
-  model3d: "3D 模型",
-  scene3d: "3D 场景",
-};
-
-const ASSET_PRESET_TAGS = assetCatalogTools?.ASSET_PRESET_TAGS ?? {
-  background: ["校园", "教室", "走廊", "屋顶", "黄昏", "夜晚", "日常"],
-  sprite: ["默认", "微笑", "害羞", "生气", "悲伤", "女主", "主角"],
-  cg: ["主线", "回忆", "约会", "告白", "高潮", "甜蜜"],
-  bgm: ["日常", "温柔", "紧张", "恋爱", "悲伤", "高潮"],
-  sfx: ["学校", "脚步", "环境", "提示", "门", "点击"],
-  voice: ["女主", "主角", "日常", "情绪", "告白", "独白"],
-  video: ["OP", "ED", "PV", "过场"],
-  ui: ["按钮", "对话框", "名字框", "图标", "菜单"],
-  font: ["正文", "标题", "圆体", "宋体", "手写", "授权确认"],
-  live2d: ["角色", "模型", "表情", "呼吸", "口型"],
-  model3d: ["角色", "GLB", "VRM", "待机", "动作"],
-  scene3d: ["场景", "地图", "房间", "GLB", "交互"],
-};
+const {
+  ASSET_TYPE_LABELS,
+  CHARACTER_PRESENTATION_MODE_LABELS,
+} = assetCatalogTools;
 
 const ASSET_REPLACE_ACCEPTS = {
   background: "image/*,.png,.jpg,.jpeg,.webp,.gif,.avif",
@@ -260,48 +235,6 @@ const ASSET_REPLACE_FORMAT_LABELS = {
   live2d: "model3.json / moc3 / motion3.json / physics3.json / exp3.json",
   model3d: "GLB / GLTF / VRM / FBX / OBJ",
   scene3d: "GLB / GLTF / VRM / FBX / OBJ",
-};
-
-const CHARACTER_PRESENTATION_MODE_LABELS = assetCatalogTools?.CHARACTER_PRESENTATION_MODE_LABELS ?? {
-  sprite: "普通立绘",
-  layered_sprite: "差分立绘",
-  live2d: "Live2D",
-  model3d: "3D 模型",
-};
-
-const ASSET_FILTER_MODE_LABELS = assetCatalogTools?.ASSET_FILTER_MODE_LABELS ?? {
-  all: "显示全部",
-  unused: "仅看未使用",
-  missing_file: "仅看待导入",
-  urgent_missing: "仅看已引用缺口",
-  duplicate: "仅看疑似重复",
-  asset3d_risk: "仅看 3D 发布风险",
-  media_budget: "仅看素材预算风险",
-};
-
-const ASSET_FILTER_MODE_STATUS_LABELS = assetCatalogTools?.ASSET_FILTER_MODE_STATUS_LABELS ?? {
-  all: "全部素材",
-  unused: "未使用素材",
-  missing_file: "待导入素材",
-  urgent_missing: "已被项目引用但缺文件的素材",
-  duplicate: "疑似重复素材",
-  asset3d_risk: "最近一次 3D 发布体检标记的风险素材",
-  media_budget: "体积偏大、建议发布前压缩的素材",
-};
-
-const ASSET_MEDIA_BUDGET_LIMITS = assetCatalogTools?.ASSET_MEDIA_BUDGET_LIMITS ?? {
-  background: { warnBytes: 8 * 1024 * 1024, blockerBytes: 24 * 1024 * 1024, label: "背景图" },
-  sprite: { warnBytes: 6 * 1024 * 1024, blockerBytes: 18 * 1024 * 1024, label: "立绘" },
-  cg: { warnBytes: 10 * 1024 * 1024, blockerBytes: 32 * 1024 * 1024, label: "CG" },
-  ui: { warnBytes: 4 * 1024 * 1024, blockerBytes: 16 * 1024 * 1024, label: "界面素材" },
-  bgm: { warnBytes: 18 * 1024 * 1024, blockerBytes: 60 * 1024 * 1024, label: "音乐" },
-  sfx: { warnBytes: 6 * 1024 * 1024, blockerBytes: 18 * 1024 * 1024, label: "音效" },
-  voice: { warnBytes: 8 * 1024 * 1024, blockerBytes: 24 * 1024 * 1024, label: "语音" },
-  video: { warnBytes: 120 * 1024 * 1024, blockerBytes: 500 * 1024 * 1024, label: "视频" },
-  font: { warnBytes: 20 * 1024 * 1024, blockerBytes: 60 * 1024 * 1024, label: "字体" },
-  live2d: { warnBytes: 40 * 1024 * 1024, blockerBytes: 120 * 1024 * 1024, label: "Live2D" },
-  model3d: { warnBytes: 80 * 1024 * 1024, blockerBytes: 300 * 1024 * 1024, label: "3D 模型" },
-  scene3d: { warnBytes: 120 * 1024 * 1024, blockerBytes: 500 * 1024 * 1024, label: "3D 场景" },
 };
 
 const creativeAssistantTools = window.CanvasiaEditorCreativeAssistant;
@@ -14635,9 +14568,7 @@ function renderAssetsScreen() {
 }
 
 function getSafeCharacterPresentationMode(mode) {
-  return assetCatalogTools?.getSafeCharacterPresentationMode?.(mode) ?? (
-    Object.prototype.hasOwnProperty.call(CHARACTER_PRESENTATION_MODE_LABELS, mode) ? mode : "sprite"
-  );
+  return assetCatalogTools.getSafeCharacterPresentationMode(mode);
 }
 
 function getCharacterPresentation(character) {
@@ -14665,9 +14596,7 @@ function getCharacterPresentation(character) {
 
 function getCharacterPresentationModeLabel(character) {
   const presentation = getCharacterPresentation(character);
-  return assetCatalogTools?.getCharacterPresentationModeLabel?.(presentation.mode) ?? (
-    CHARACTER_PRESENTATION_MODE_LABELS[presentation.mode] ?? CHARACTER_PRESENTATION_MODE_LABELS.sprite
-  );
+  return assetCatalogTools.getCharacterPresentationModeLabel(presentation.mode);
 }
 
 function getCharacterPresentationPrimaryAssetId(character) {
@@ -23619,18 +23548,7 @@ function getAssetEmptyMessage(fallback = "这个分类里暂时没有素材。")
 }
 
 function parseAssetTagsInput(value) {
-  if (assetCatalogTools?.parseAssetTagsInput) {
-    return assetCatalogTools.parseAssetTagsInput(value);
-  }
-
-  return Array.from(
-    new Set(
-      String(value ?? "")
-        .split(/[\n,，、;；]+/)
-        .map((tag) => tag.trim())
-        .filter(Boolean)
-    )
-  ).slice(0, 20);
+  return assetCatalogTools.parseAssetTagsInput(value);
 }
 
 function clearAssetSearchFilters() {
@@ -23773,9 +23691,12 @@ async function saveCharacterPresentation(characterId) {
 async function applyBulkAssetTags(mode) {
   const checkedAssets = getCurrentCheckedAssetsOfSelectedType();
   const filteredAssets = getCurrentFilteredAssetsOfSelectedType();
-  const operation = assetCatalogTools?.buildBulkAssetTagOperation
-    ? assetCatalogTools.buildBulkAssetTagOperation(mode, refs.assetBulkTagsInput?.value ?? "", checkedAssets, filteredAssets)
-    : null;
+  const operation = assetCatalogTools.buildBulkAssetTagOperation(
+    mode,
+    refs.assetBulkTagsInput?.value ?? "",
+    checkedAssets,
+    filteredAssets
+  );
   const assets = operation?.assets ?? (checkedAssets.length > 0 ? checkedAssets : filteredAssets);
   if (!assets.length) {
     setSaveStatus("当前筛选结果里没有可批量处理的素材", true);
@@ -23830,9 +23751,7 @@ async function applyBulkAssetTags(mode) {
 async function applyPresetTag(tag) {
   const checkedAssets = getCurrentCheckedAssetsOfSelectedType();
   const selectedAsset = getSelectedAsset();
-  const operation = assetCatalogTools?.buildPresetAssetTagOperation
-    ? assetCatalogTools.buildPresetAssetTagOperation(tag, checkedAssets, selectedAsset)
-    : null;
+  const operation = assetCatalogTools.buildPresetAssetTagOperation(tag, checkedAssets, selectedAsset);
   const cleanTag = operation?.tag ?? String(tag ?? "").trim();
   if (!cleanTag) {
     return;
@@ -45076,48 +44995,27 @@ function cloneScene(scene) {
 }
 
 function isAssetUnused(assetId, data = state.data) {
-  if (assetCatalogTools?.isAssetUnused) {
-    return assetCatalogTools.isAssetUnused(assetId, data);
-  }
-
-  return (data.assetUsage.get(assetId) ?? []).length === 0;
+  return assetCatalogTools.isAssetUnused(assetId, data);
 }
 
 function getUnusedAssets(data = state.data) {
-  if (assetCatalogTools?.getUnusedAssets) {
-    return assetCatalogTools.getUnusedAssets(data);
-  }
-
-  return data.assetList.filter((asset) => isAssetUnused(asset.id, data));
+  return assetCatalogTools.getUnusedAssets(data);
 }
 
 function isAssetMissingFile(asset) {
-  if (assetCatalogTools?.isAssetMissingFile) {
-    return assetCatalogTools.isAssetMissingFile(asset);
-  }
-
-  return !Boolean(asset?.fileExists);
+  return assetCatalogTools.isAssetMissingFile(asset);
 }
 
 function getSafeAssetFilterMode(filterMode) {
-  return assetCatalogTools?.getSafeAssetFilterMode?.(filterMode) ?? (
-    Object.prototype.hasOwnProperty.call(ASSET_FILTER_MODE_LABELS, String(filterMode ?? "").trim())
-      ? String(filterMode ?? "").trim()
-      : "all"
-  );
+  return assetCatalogTools.getSafeAssetFilterMode(filterMode);
 }
 
 function getAssetFilterModeLabel(filterMode) {
-  return assetCatalogTools?.getAssetFilterModeLabel?.(filterMode) ?? (
-    ASSET_FILTER_MODE_LABELS[getSafeAssetFilterMode(filterMode)] ?? ASSET_FILTER_MODE_LABELS.all
-  );
+  return assetCatalogTools.getAssetFilterModeLabel(filterMode);
 }
 
 function getAssetFilterModeStatusLabel(filterMode) {
-  return assetCatalogTools?.getAssetFilterModeStatusLabel?.(filterMode) ?? (
-    ASSET_FILTER_MODE_STATUS_LABELS[getSafeAssetFilterMode(filterMode)] ??
-    ASSET_FILTER_MODE_STATUS_LABELS.all
-  );
+  return assetCatalogTools.getAssetFilterModeStatusLabel(filterMode);
 }
 
 function getLatestNativeRuntime3dDigest() {
@@ -45184,117 +45082,19 @@ function getNativeRuntime3dRiskForAsset(assetId) {
 }
 
 function getAssetMediaBudgetLimit(asset) {
-  return assetCatalogTools?.getAssetMediaBudgetLimit?.(asset) ?? (
-    asset ? ASSET_MEDIA_BUDGET_LIMITS[asset.type] ?? null : null
-  );
+  return assetCatalogTools.getAssetMediaBudgetLimit(asset);
 }
 
 function getAssetMediaBudgetSuggestion(asset, severity = "warn") {
-  if (assetCatalogTools?.getAssetMediaBudgetSuggestion) {
-    return assetCatalogTools.getAssetMediaBudgetSuggestion(asset, severity);
-  }
-
-  switch (asset?.type) {
-    case "background":
-    case "sprite":
-    case "cg":
-    case "ui":
-      return severity === "blocker"
-        ? "建议先压到 WebP/高质量 JPEG，或拆分超大 PNG；否则桌面包体和加载峰值都会偏重。"
-        : "建议发布前压缩图片，透明素材优先 WebP/PNGQuant，背景和 CG 可考虑高质量 JPEG/WebP。";
-    case "bgm":
-      return "建议将无压缩或超大音频转为 OGG/MP3，并确认循环点；音乐体积过大时会明显抬高下载包。";
-    case "sfx":
-    case "voice":
-      return "建议把语音/音效批量转成 OGG/MP3，并按章节或角色整理，避免单文件过大影响加载。";
-    case "video":
-      return "建议用 H.264/H.265 重新编码，并控制码率、分辨率和时长；OP/ED 可保留高质版但最好另做预览压缩版。";
-    case "font":
-      return "建议确认字体授权并做子集化；只保留项目实际需要的字重和字符范围。";
-    case "live2d":
-      return "建议清理未用纹理和动作文件，压缩贴图，并保留一份可编辑源文件在项目外归档。";
-    case "model3d":
-    case "scene3d":
-      return "建议压缩贴图、减少内嵌大纹理，并用 3D 资产清单同步确认面数、材质和 draw call 预算。";
-    default:
-      return "建议在正式发布前压缩这个素材，降低包体和加载风险。";
-  }
+  return assetCatalogTools.getAssetMediaBudgetSuggestion(asset, severity);
 }
 
 function getAssetMediaBudgetRisk(asset) {
-  if (assetCatalogTools?.getAssetMediaBudgetRisk) {
-    return assetCatalogTools.getAssetMediaBudgetRisk(asset);
-  }
-
-  const limit = getAssetMediaBudgetLimit(asset);
-  const size = Number(asset?.fileSizeBytes ?? 0);
-  if (!limit || !asset?.fileExists || !Number.isFinite(size) || size <= limit.warnBytes) {
-    return null;
-  }
-
-  const severity = size >= limit.blockerBytes ? "blocker" : "warn";
-  const overRatio = limit.warnBytes > 0 ? size / limit.warnBytes : 0;
-  return {
-    assetId: asset.id,
-    type: asset.type,
-    typeLabel: getAssetTypeLabel(asset.type),
-    name: asset.name,
-    fileSizeBytes: size,
-    fileSizeLabel: formatFileSize(size),
-    warnBytes: limit.warnBytes,
-    warnLabel: formatFileSize(limit.warnBytes),
-    blockerBytes: limit.blockerBytes,
-    blockerLabel: formatFileSize(limit.blockerBytes),
-    severity,
-    severityLabel: severity === "blocker" ? "明显超预算" : "建议压缩",
-    overRatio,
-    summary: `${getAssetTypeLabel(asset.type)} ${formatFileSize(size)}，建议控制在 ${formatFileSize(limit.warnBytes)} 左右。`,
-    suggestion: getAssetMediaBudgetSuggestion(asset, severity),
-  };
+  return assetCatalogTools.getAssetMediaBudgetRisk(asset);
 }
 
 function buildAssetMediaBudgetReport(data = state.data) {
-  if (assetCatalogTools?.buildAssetMediaBudgetReport) {
-    return assetCatalogTools.buildAssetMediaBudgetReport(data);
-  }
-
-  const assets = data?.assetList ?? [];
-  const items = assets
-    .map((asset) => getAssetMediaBudgetRisk(asset))
-    .filter(Boolean)
-    .sort((left, right) => {
-      const severityDiff = Number(right.severity === "blocker") - Number(left.severity === "blocker");
-      if (severityDiff !== 0) {
-        return severityDiff;
-      }
-      return right.fileSizeBytes - left.fileSizeBytes;
-    });
-  const assetIds = new Set(items.map((item) => item.assetId));
-  const totalBytes = items.reduce((sum, item) => sum + item.fileSizeBytes, 0);
-  const blockerCount = items.filter((item) => item.severity === "blocker").length;
-  const perType = Object.keys(ASSET_TYPE_LABELS)
-    .map((type) => {
-      const typeItems = items.filter((item) => item.type === type);
-      return {
-        type,
-        label: getAssetTypeLabel(type),
-        count: typeItems.length,
-        totalBytes: typeItems.reduce((sum, item) => sum + item.fileSizeBytes, 0),
-      };
-    })
-    .filter((item) => item.count > 0);
-
-  return {
-    items,
-    assetIds,
-    count: items.length,
-    blockerCount,
-    warnCount: Math.max(items.length - blockerCount, 0),
-    totalBytes,
-    totalLabel: formatFileSize(totalBytes),
-    largest: items[0] ?? null,
-    perType,
-  };
+  return assetCatalogTools.buildAssetMediaBudgetReport(data);
 }
 
 function countNativeRuntime3dRiskAssetsByType(assetType = null, data = state.data) {
@@ -45317,728 +45117,124 @@ function getVisibleAssets(
     favoriteOnly = state.assetFavoriteOnly,
   } = {}
 ) {
-  if (assetCatalogTools?.getVisibleAssets) {
-    return assetCatalogTools.getVisibleAssets(data, {
-      filterMode,
-      searchQuery,
-      tagFilter,
-      sortMode,
-      favoriteOnly,
-      nativeRuntime3dRiskAssetIds: getNativeRuntime3dRiskAssetIdSet(),
-    });
-  }
-
-  const safeFilterMode = getSafeAssetFilterMode(filterMode);
-  let assets = [];
-
-  if (safeFilterMode === "unused") {
-    assets = getUnusedAssets(data);
-  } else if (safeFilterMode === "missing_file") {
-    assets = data.assetList.filter((asset) => isAssetMissingFile(asset));
-  } else if (safeFilterMode === "urgent_missing") {
-    assets = data.assetList.filter((asset) => isAssetUrgentMissing(asset, data));
-  } else if (safeFilterMode === "duplicate") {
-    const duplicateOverview = buildAssetDuplicateOverview(data);
-    assets = data.assetList.filter((asset) => duplicateOverview.assetIdSet.has(asset.id));
-  } else if (safeFilterMode === "asset3d_risk") {
-    const riskAssetIds = getNativeRuntime3dRiskAssetIdSet();
-    assets = data.assetList.filter((asset) => riskAssetIds.has(asset.id));
-  } else if (safeFilterMode === "media_budget") {
-    const mediaBudgetAssetIds = buildAssetMediaBudgetReport(data).assetIds;
-    assets = data.assetList.filter((asset) => mediaBudgetAssetIds.has(asset.id));
-  } else {
-    assets = data.assetList;
-  }
-
-  const cleanTag = String(tagFilter ?? "").trim();
-  if (cleanTag) {
-    assets = assets.filter((asset) => (asset.tags ?? []).includes(cleanTag));
-  }
-
-  if (favoriteOnly) {
-    assets = assets.filter((asset) => Boolean(asset.favorite));
-  }
-
-  const query = normalizeAssetSearchQuery(searchQuery);
-  if (query) {
-    assets = assets.filter((asset) => {
-      const haystack = normalizeAssetSearchQuery([
-        asset.name,
-        asset.id,
-        asset.path,
-        ...(asset.tags ?? []),
-        getAssetTypeLabel(asset.type),
-      ].join(" "));
-      return haystack.includes(query);
-    });
-  }
-
-  if (safeFilterMode === "duplicate" && sortMode === "default") {
-    const duplicateOverview = buildAssetDuplicateOverview(data);
-    return [...assets].sort((left, right) => {
-      const leftInfo = duplicateOverview.infoByAssetId.get(left.id);
-      const rightInfo = duplicateOverview.infoByAssetId.get(right.id);
-      const scoreDiff = (rightInfo?.score ?? 0) - (leftInfo?.score ?? 0);
-      if (scoreDiff !== 0) {
-        return scoreDiff;
-      }
-      const relatedDiff = (rightInfo?.relatedCount ?? 0) - (leftInfo?.relatedCount ?? 0);
-      if (relatedDiff !== 0) {
-        return relatedDiff;
-      }
-      return left.name.localeCompare(right.name, "zh-Hans-CN");
-    });
-  }
-
-  return sortAssets(assets, sortMode);
+  return assetCatalogTools.getVisibleAssets(data, {
+    filterMode,
+    searchQuery,
+    tagFilter,
+    sortMode,
+    favoriteOnly,
+    nativeRuntime3dRiskAssetIds: getNativeRuntime3dRiskAssetIdSet(),
+  });
 }
 
 function sortAssets(assets, sortMode = state.assetSortMode) {
-  if (assetCatalogTools?.sortAssets) {
-    return assetCatalogTools.sortAssets(assets, sortMode, state.data);
-  }
-
-  const list = [...assets];
-
-  if (sortMode === "recent") {
-    return list.reverse();
-  }
-
-  if (sortMode === "name") {
-    return list.sort((left, right) => left.name.localeCompare(right.name, "zh-Hans-CN"));
-  }
-
-  if (sortMode === "usage") {
-    return list.sort((left, right) => {
-      const usageDiff = getAssetUsageCount(right.id) - getAssetUsageCount(left.id);
-      if (usageDiff !== 0) {
-        return usageDiff;
-      }
-      return left.name.localeCompare(right.name, "zh-Hans-CN");
-    });
-  }
-
-  if (sortMode === "favorite") {
-    return list.sort((left, right) => {
-      const favoriteDiff = Number(Boolean(right.favorite)) - Number(Boolean(left.favorite));
-      if (favoriteDiff !== 0) {
-        return favoriteDiff;
-      }
-      const usageDiff = getAssetUsageCount(right.id) - getAssetUsageCount(left.id);
-      if (usageDiff !== 0) {
-        return usageDiff;
-      }
-      return left.name.localeCompare(right.name, "zh-Hans-CN");
-    });
-  }
-
-  return list;
+  return assetCatalogTools.sortAssets(assets, sortMode, state.data);
 }
 
 function getAssetUsageCount(assetId, data = state.data) {
-  if (assetCatalogTools?.getAssetUsageCount) {
-    return assetCatalogTools.getAssetUsageCount(assetId, data);
-  }
-
-  return data?.assetUsage?.get(assetId)?.length ?? 0;
+  return assetCatalogTools.getAssetUsageCount(assetId, data);
 }
 
 function normalizeAssetDuplicateToken(value) {
-  if (assetCatalogTools?.normalizeAssetDuplicateToken) {
-    return assetCatalogTools.normalizeAssetDuplicateToken(value);
-  }
-
-  return String(value ?? "")
-    .trim()
-    .toLowerCase()
-    .replace(/[\\/]+/g, "/")
-    .replace(/\.[a-z0-9]{2,5}$/i, "")
-    .replace(/(?:\s*[\(\[（【]?(copy|副本|复制|拷贝)\s*[\)\]）】]?|\s*[\(\[（【]\d+[\)\]）】])$/gi, "")
-    .replace(/[\s_\-·.()[\]（）【】]+/g, "");
+  return assetCatalogTools.normalizeAssetDuplicateToken(value);
 }
 
 function getAssetPathBasename(assetPath) {
-  if (assetCatalogTools?.getAssetPathBasename) {
-    return assetCatalogTools.getAssetPathBasename(assetPath);
-  }
-
-  const path = String(assetPath ?? "").trim();
-  if (!path) {
-    return "";
-  }
-  const parts = path.replace(/\\/g, "/").split("/");
-  return parts[parts.length - 1] ?? "";
+  return assetCatalogTools.getAssetPathBasename(assetPath);
 }
 
 function getAssetDuplicateReasonLabels(info, relatedAssetId = null) {
-  if (assetCatalogTools?.getAssetDuplicateReasonLabels) {
-    return assetCatalogTools.getAssetDuplicateReasonLabels(info, relatedAssetId);
-  }
-
-  const labels = [];
-  const matches = {
-    exactPath: relatedAssetId ? info.pathMatchIds.has(relatedAssetId) : info.pathMatchIds.size > 0,
-    sameName: relatedAssetId ? info.nameMatchIds.has(relatedAssetId) : info.nameMatchIds.size > 0,
-    sameStem: relatedAssetId ? info.stemMatchIds.has(relatedAssetId) : info.stemMatchIds.size > 0,
-  };
-
-  if (matches.exactPath) {
-    labels.push({ text: "同一路径", toneClass: "danger-text" });
-  }
-  if (matches.sameName) {
-    labels.push({ text: "名字几乎一样", toneClass: "warn-text" });
-  }
-  if (matches.sameStem) {
-    labels.push({ text: "文件名几乎一样", toneClass: "warn-text" });
-  }
-
-  return labels;
+  return assetCatalogTools.getAssetDuplicateReasonLabels(info, relatedAssetId);
 }
 
 function getAssetDuplicatePreferenceScore(asset, data = state.data) {
-  if (assetCatalogTools?.getAssetDuplicatePreferenceScore) {
-    return assetCatalogTools.getAssetDuplicatePreferenceScore(asset, data);
-  }
-
-  if (!asset) {
-    return -1;
-  }
-
-  return (
-    getAssetUsageCount(asset.id, data) * 100 +
-    (asset.fileExists ? 40 : 0) +
-    (asset.favorite ? 16 : 0) +
-    Math.min((asset.tags ?? []).length, 4) * 4 +
-    (asset.fileSizeBytes ? 1 : 0)
-  );
+  return assetCatalogTools.getAssetDuplicatePreferenceScore(asset, data);
 }
 
 function buildAssetDuplicatePreferenceNotes(asset, data = state.data) {
-  if (assetCatalogTools?.buildAssetDuplicatePreferenceNotes) {
-    return assetCatalogTools.buildAssetDuplicatePreferenceNotes(asset, data);
-  }
-
-  if (!asset) {
-    return [];
-  }
-
-  const notes = [];
-  const usageCount = getAssetUsageCount(asset.id, data);
-
-  if (usageCount > 0) {
-    notes.push(`已经被剧情使用 ${usageCount} 处`);
-  }
-  if (asset.fileExists) {
-    notes.push("真实文件已经就绪");
-  }
-  if (asset.favorite) {
-    notes.push("你已经收藏过它");
-  }
-  if ((asset.tags ?? []).length > 0) {
-    notes.push(`标签更完整（${(asset.tags ?? []).length} 个）`);
-  }
-  if (notes.length === 0) {
-    notes.push(asset.path ? "路径更明确，适合作为主版本" : "名字更稳定，适合作为主版本");
-  }
-
-  return notes.slice(0, 3);
+  return assetCatalogTools.buildAssetDuplicatePreferenceNotes(asset, data);
 }
 
 function buildAssetDuplicateOverview(data = state.data) {
-  if (assetCatalogTools?.buildAssetDuplicateOverview) {
-    return assetCatalogTools.buildAssetDuplicateOverview(data);
-  }
-
-  const pathGroups = new Map();
-  const nameGroups = new Map();
-  const stemGroups = new Map();
-  const infoSeed = new Map();
-
-  const ensureInfo = (assetId) => {
-    if (!infoSeed.has(assetId)) {
-      infoSeed.set(assetId, {
-        assetId,
-        relatedIds: new Set(),
-        pathMatchIds: new Set(),
-        nameMatchIds: new Set(),
-        stemMatchIds: new Set(),
-        score: 0,
-      });
-    }
-    return infoSeed.get(assetId);
-  };
-
-  (data?.assetList ?? []).forEach((asset) => {
-    const normalizedPath = String(asset.path ?? "").trim().toLowerCase().replace(/\\/g, "/");
-    const nameKey = normalizeAssetDuplicateToken(asset.name);
-    const stemKey = normalizeAssetDuplicateToken(getAssetPathBasename(asset.path));
-
-    if (normalizedPath) {
-      const group = pathGroups.get(normalizedPath) ?? [];
-      group.push(asset);
-      pathGroups.set(normalizedPath, group);
-    }
-
-    if (nameKey) {
-      const group = nameGroups.get(`${asset.type}:${nameKey}`) ?? [];
-      group.push(asset);
-      nameGroups.set(`${asset.type}:${nameKey}`, group);
-    }
-
-    if (stemKey) {
-      const group = stemGroups.get(`${asset.type}:${stemKey}`) ?? [];
-      group.push(asset);
-      stemGroups.set(`${asset.type}:${stemKey}`, group);
-    }
-  });
-
-  const markGroup = (group, key, weight) => {
-    if ((group?.length ?? 0) < 2) {
-      return;
-    }
-
-    group.forEach((asset) => {
-      const info = ensureInfo(asset.id);
-      group.forEach((otherAsset) => {
-        if (otherAsset.id === asset.id) {
-          return;
-        }
-        info.relatedIds.add(otherAsset.id);
-        if (key === "path") {
-          info.pathMatchIds.add(otherAsset.id);
-        } else if (key === "name") {
-          info.nameMatchIds.add(otherAsset.id);
-        } else if (key === "stem") {
-          info.stemMatchIds.add(otherAsset.id);
-        }
-      });
-      info.score += weight;
-    });
-  };
-
-  pathGroups.forEach((group) => markGroup(group, "path", 5));
-  nameGroups.forEach((group) => markGroup(group, "name", 3));
-  stemGroups.forEach((group) => markGroup(group, "stem", 2));
-
-  const rawEntries = Array.from(infoSeed.values())
-    .filter((info) => info.relatedIds.size > 0)
-    .map((info) => {
-      const asset = data.assetsById.get(info.assetId);
-      const reasonParts = [];
-
-      if (info.pathMatchIds.size > 0) {
-        reasonParts.push(`和 ${info.pathMatchIds.size} 个素材指向同一路径`);
-      }
-      if (info.nameMatchIds.size > 0) {
-        reasonParts.push(`名字和 ${info.nameMatchIds.size} 个素材几乎一样`);
-      }
-      if (info.stemMatchIds.size > 0) {
-        reasonParts.push(`文件名和 ${info.stemMatchIds.size} 个素材几乎一样`);
-      }
-
-      return {
-        ...info,
-        asset,
-        relatedIds: Array.from(info.relatedIds),
-        tone: info.pathMatchIds.size > 0 ? "danger" : info.nameMatchIds.size > 0 ? "warn" : "soft",
-        relatedCount: info.relatedIds.size,
-        summary: reasonParts.join(" · "),
-        reasonNote:
-          info.pathMatchIds.size > 0
-            ? "这组素材里至少有两项指向了同一个文件路径，通常很适合回头合并或确认是不是误导入。"
-            : "这些素材的名字或文件名非常接近，可回头确认是不是同一组素材的重复版本。",
-      };
-    });
-
-  const adjacency = new Map(rawEntries.map((entry) => [entry.assetId, new Set(entry.relatedIds)]));
-  const visited = new Set();
-  const clusters = [];
-
-  adjacency.forEach((_, startId) => {
-    if (visited.has(startId)) {
-      return;
-    }
-
-    const stack = [startId];
-    const assetIds = [];
-
-    while (stack.length > 0) {
-      const assetId = stack.pop();
-      if (!assetId || visited.has(assetId)) {
-        continue;
-      }
-      visited.add(assetId);
-      assetIds.push(assetId);
-      (adjacency.get(assetId) ?? new Set()).forEach((relatedId) => {
-        if (!visited.has(relatedId)) {
-          stack.push(relatedId);
-        }
-      });
-    }
-
-    const assets = assetIds
-      .map((assetId) => data.assetsById.get(assetId))
-      .filter(Boolean)
-      .sort((left, right) => {
-        const scoreDiff = getAssetDuplicatePreferenceScore(right, data) - getAssetDuplicatePreferenceScore(left, data);
-        if (scoreDiff !== 0) {
-          return scoreDiff;
-        }
-        return left.name.localeCompare(right.name, "zh-Hans-CN");
-      });
-
-    if (!assets.length) {
-      return;
-    }
-
-    const clusterEntries = assetIds
-      .map((assetId) => rawEntries.find((entry) => entry.assetId === assetId))
-      .filter(Boolean);
-    const preferredAsset = assets[0];
-    const preferredNotes = buildAssetDuplicatePreferenceNotes(preferredAsset, data);
-    const usedAssetsCount = assets.filter((asset) => getAssetUsageCount(asset.id, data) > 0).length;
-    const readyAssetsCount = assets.filter((asset) => asset.fileExists).length;
-    const tone = clusterEntries.some((entry) => entry.pathMatchIds.size > 0)
-      ? "danger"
-      : usedAssetsCount > 1
-        ? "warn"
-        : "soft";
-    const clusterId = `duplicate_cluster_${clusters.length + 1}`;
-
-    clusters.push({
-      id: clusterId,
-      assetIds,
-      assets,
-      preferredAssetId: preferredAsset.id,
-      preferredAsset,
-      preferredNotes,
-      tone,
-      usedAssetsCount,
-      readyAssetsCount,
-      reasonLabels: getAssetDuplicateReasonLabels({
-        pathMatchIds: new Set(clusterEntries.flatMap((entry) => Array.from(entry.pathMatchIds))),
-        nameMatchIds: new Set(clusterEntries.flatMap((entry) => Array.from(entry.nameMatchIds))),
-        stemMatchIds: new Set(clusterEntries.flatMap((entry) => Array.from(entry.stemMatchIds))),
-      }),
-      summary: `这一组共 ${assets.length} 项，优先保留 ${preferredAsset.name}`,
-      recommendation:
-        usedAssetsCount > 1
-          ? `这一组里已经有 ${usedAssetsCount} 项被剧情引用，可先围着“${preferredAsset.name}”统一整理。`
-          : `这一组可先以“${preferredAsset.name}”为主版本，再决定其他条目是删除、改名还是补标签。`,
-      priorityScore:
-        (clusterEntries.some((entry) => entry.pathMatchIds.size > 0) ? 120 : 0) +
-        usedAssetsCount * 28 +
-        readyAssetsCount * 10 +
-        assets.length * 6,
-    });
-  });
-
-  clusters.sort((left, right) => {
-    if (right.priorityScore !== left.priorityScore) {
-      return right.priorityScore - left.priorityScore;
-    }
-    return left.preferredAsset.name.localeCompare(right.preferredAsset.name, "zh-Hans-CN");
-  });
-
-  const clusterByAssetId = new Map();
-  clusters.forEach((cluster) => {
-    cluster.assetIds.forEach((assetId) => {
-      clusterByAssetId.set(assetId, cluster);
-    });
-  });
-
-  const entries = rawEntries
-    .map((entry) => {
-      const cluster = clusterByAssetId.get(entry.assetId);
-      const isPreferred = cluster?.preferredAssetId === entry.assetId;
-      const recommendationText = isPreferred
-        ? `这一项更适合作为主版本保留。`
-        : `优先保留：${cluster?.preferredAsset?.name ?? "另一项更完整的素材"}`;
-
-      return {
-        ...entry,
-        clusterId: cluster?.id ?? "",
-        preferredAssetId: cluster?.preferredAssetId ?? "",
-        preferredAsset: cluster?.preferredAsset ?? null,
-        preferredNotes: cluster?.preferredNotes ?? [],
-        isPreferred,
-        summary: `${entry.summary} · ${recommendationText}`,
-        recommendationText,
-      };
-    })
-    .sort((left, right) => {
-      if (right.score !== left.score) {
-        return right.score - left.score;
-      }
-      if (right.relatedCount !== left.relatedCount) {
-        return right.relatedCount - left.relatedCount;
-      }
-      return left.asset.name.localeCompare(right.asset.name, "zh-Hans-CN");
-    });
-
-  const perType = Object.keys(ASSET_TYPE_LABELS).map((type) => ({
-    type,
-    label: getAssetTypeLabel(type),
-    duplicateCount: entries.filter((entry) => entry.asset?.type === type).length,
-  }));
-
-  return {
-    count: entries.length,
-    entries,
-    assetIdSet: new Set(entries.map((entry) => entry.assetId)),
-    infoByAssetId: new Map(entries.map((entry) => [entry.assetId, entry])),
-    clusters,
-    clusterByAssetId,
-    perType,
-    perTypeMap: new Map(perType.map((entry) => [entry.type, entry])),
-    priorityTypes: perType
-      .filter((entry) => entry.duplicateCount > 0)
-      .sort((left, right) => {
-        if (right.duplicateCount !== left.duplicateCount) {
-          return right.duplicateCount - left.duplicateCount;
-        }
-        return left.label.localeCompare(right.label, "zh-Hans-CN");
-      })
-      .slice(0, 4),
-    priorityClusters: clusters.slice(0, 4),
-  };
+  return assetCatalogTools.buildAssetDuplicateOverview(data);
 }
 
 function isAssetUrgentMissing(asset, data = state.data) {
-  if (assetCatalogTools?.isAssetUrgentMissing) {
-    return assetCatalogTools.isAssetUrgentMissing(asset, data);
-  }
-
-  return isAssetMissingFile(asset) && getAssetUsageCount(asset.id, data) > 0;
+  return assetCatalogTools.isAssetUrgentMissing(asset, data);
 }
 
 function buildAssetGapOverview(data = state.data, duplicateOverview = buildAssetDuplicateOverview(data)) {
-  if (assetCatalogTools?.buildAssetGapOverview) {
-    return assetCatalogTools.buildAssetGapOverview(data, duplicateOverview);
-  }
-
-  const perType = Object.keys(ASSET_TYPE_LABELS).map((type) => {
-    const assets = data.assetList.filter((asset) => asset.type === type);
-    const missingCount = assets.filter((asset) => isAssetMissingFile(asset)).length;
-    const urgentMissingCount = assets.filter((asset) => isAssetUrgentMissing(asset, data)).length;
-    const unusedCount = assets.filter((asset) => isAssetUnused(asset.id, data)).length;
-    const duplicateCount = duplicateOverview.perTypeMap.get(type)?.duplicateCount ?? 0;
-    return {
-      type,
-      label: getAssetTypeLabel(type),
-      totalCount: assets.length,
-      readyCount: assets.length - missingCount,
-      missingCount,
-      urgentMissingCount,
-      unusedCount,
-      duplicateCount,
-    };
-  });
-
-  return {
-    totalCount: data.assetList.length,
-    readyCount: data.assetList.filter((asset) => !isAssetMissingFile(asset)).length,
-    missingCount: data.assetList.filter((asset) => isAssetMissingFile(asset)).length,
-    urgentMissingCount: data.assetList.filter((asset) => isAssetUrgentMissing(asset, data)).length,
-    unusedCount: getUnusedAssets(data).length,
-    duplicateCount: duplicateOverview.count,
-    perType,
-    perTypeMap: new Map(perType.map((entry) => [entry.type, entry])),
-    priorityTypes: perType
-      .filter((entry) => entry.missingCount > 0 || entry.duplicateCount > 0)
-      .sort((left, right) => {
-        if (right.urgentMissingCount !== left.urgentMissingCount) {
-          return right.urgentMissingCount - left.urgentMissingCount;
-        }
-        if (right.missingCount !== left.missingCount) {
-          return right.missingCount - left.missingCount;
-        }
-        if (right.duplicateCount !== left.duplicateCount) {
-          return right.duplicateCount - left.duplicateCount;
-        }
-        return left.label.localeCompare(right.label, "zh-Hans-CN");
-      })
-      .slice(0, 4),
-  };
+  return assetCatalogTools.buildAssetGapOverview(data, duplicateOverview);
 }
 
 function getAssetTypeGapSummaryText(assetType, assetPool = null, data = state.data, duplicateOverview = buildAssetDuplicateOverview(data)) {
-  if (assetCatalogTools?.getAssetTypeGapSummaryText) {
-    return assetCatalogTools.getAssetTypeGapSummaryText(assetType, assetPool, data, duplicateOverview);
-  }
-
-  const assets =
-    assetPool ?? data.assetList.filter((asset) => asset.type === assetType);
-  const totalCount = assets.length;
-  const missingCount = assets.filter((asset) => isAssetMissingFile(asset)).length;
-  const urgentMissingCount = assets.filter((asset) => isAssetUrgentMissing(asset, data)).length;
-  const duplicateCount = duplicateOverview.perTypeMap.get(assetType)?.duplicateCount ?? 0;
-
-  if (totalCount === 0) {
-    return "这一类暂时还没有素材";
-  }
-
-  if (missingCount === 0 && duplicateCount === 0) {
-    return `全量 ${totalCount} 个素材都已经导入完成`;
-  }
-
-  if (urgentMissingCount > 0) {
-    return `全量 ${totalCount} 个里待导入 ${missingCount} 个，其中已引用缺口 ${urgentMissingCount} 个${
-      duplicateCount > 0 ? `，另有疑似重复 ${duplicateCount} 个` : ""
-    }`;
-  }
-
-  if (missingCount > 0) {
-    return `全量 ${totalCount} 个里待导入 ${missingCount} 个${
-      duplicateCount > 0 ? `，另有疑似重复 ${duplicateCount} 个` : ""
-    }`;
-  }
-
-  return `全量 ${totalCount} 个素材都已经就绪，当前重点是整理疑似重复 ${duplicateCount} 个`;
+  return assetCatalogTools.getAssetTypeGapSummaryText(assetType, assetPool, data, duplicateOverview);
 }
 
 function normalizeAssetSearchQuery(value) {
-  if (assetCatalogTools?.normalizeAssetSearchQuery) {
-    return assetCatalogTools.normalizeAssetSearchQuery(value);
-  }
-
-  return String(value ?? "").trim().toLowerCase();
+  return assetCatalogTools.normalizeAssetSearchQuery(value);
 }
 
 function getAssetSortLabel(sortMode) {
-  if (assetCatalogTools?.getAssetSortLabel) {
-    return assetCatalogTools.getAssetSortLabel(sortMode);
-  }
-
-  const labels = {
-    default: "默认顺序",
-    recent: "最近导入在前",
-    name: "按名称排序",
-    usage: "按使用次数排序",
-    favorite: "收藏优先",
-  };
-  return labels[sortMode] ?? sortMode;
+  return assetCatalogTools.getAssetSortLabel(sortMode);
 }
 
 function getCurrentFilteredAssetsOfSelectedType(data = state.data) {
-  if (assetCatalogTools?.getCurrentFilteredAssetsOfSelectedType) {
-    return assetCatalogTools.getCurrentFilteredAssetsOfSelectedType(data, state.selectedAssetType, {
-      filterMode: state.assetFilterMode,
-      searchQuery: state.assetSearchQuery,
-      tagFilter: state.assetTagFilter,
-      sortMode: state.assetSortMode,
-      favoriteOnly: state.assetFavoriteOnly,
-      nativeRuntime3dRiskAssetIds: getNativeRuntime3dRiskAssetIdSet(),
-    });
-  }
-
-  return getVisibleAssets(data).filter((asset) => asset.type === state.selectedAssetType);
+  return assetCatalogTools.getCurrentFilteredAssetsOfSelectedType(data, state.selectedAssetType, {
+    filterMode: state.assetFilterMode,
+    searchQuery: state.assetSearchQuery,
+    tagFilter: state.assetTagFilter,
+    sortMode: state.assetSortMode,
+    favoriteOnly: state.assetFavoriteOnly,
+    nativeRuntime3dRiskAssetIds: getNativeRuntime3dRiskAssetIdSet(),
+  });
 }
 
 function getCheckedAssetIds(data = state.data) {
-  if (assetCatalogTools?.getCheckedAssetIds) {
-    return assetCatalogTools.getCheckedAssetIds(state.assetCheckedIds, data);
-  }
-
-  const validIds = new Set((data?.assetList ?? []).map((asset) => asset.id));
-  const uniqueIds = [];
-  const seenIds = new Set();
-
-  (state.assetCheckedIds ?? []).forEach((assetId) => {
-    const cleanId = String(assetId ?? "").trim();
-    if (!cleanId || seenIds.has(cleanId) || !validIds.has(cleanId)) {
-      return;
-    }
-    uniqueIds.push(cleanId);
-    seenIds.add(cleanId);
-  });
-
-  return uniqueIds;
+  return assetCatalogTools.getCheckedAssetIds(state.assetCheckedIds, data);
 }
 
 function pruneAssetCheckedIds(checkedIds = state.assetCheckedIds, data = state.data) {
-  if (assetCatalogTools?.pruneAssetCheckedIds) {
-    return assetCatalogTools.pruneAssetCheckedIds(checkedIds, data);
-  }
-
-  const validIds = new Set((data?.assetList ?? []).map((asset) => asset.id));
-  const nextIds = [];
-  const seenIds = new Set();
-
-  (checkedIds ?? []).forEach((assetId) => {
-    const cleanId = String(assetId ?? "").trim();
-    if (!cleanId || seenIds.has(cleanId) || !validIds.has(cleanId)) {
-      return;
-    }
-    nextIds.push(cleanId);
-    seenIds.add(cleanId);
-  });
-
-  return nextIds;
+  return assetCatalogTools.pruneAssetCheckedIds(checkedIds, data);
 }
 
 function getCurrentCheckedAssetIds(data = state.data) {
-  if (assetCatalogTools?.getCurrentCheckedAssetIds) {
-    return assetCatalogTools.getCurrentCheckedAssetIds(state.assetCheckedIds, data, state.selectedAssetType, {
+  return assetCatalogTools.getCurrentCheckedAssetIds(state.assetCheckedIds, data, state.selectedAssetType, {
+    filterMode: state.assetFilterMode,
+    searchQuery: state.assetSearchQuery,
+    tagFilter: state.assetTagFilter,
+    sortMode: state.assetSortMode,
+    favoriteOnly: state.assetFavoriteOnly,
+    nativeRuntime3dRiskAssetIds: getNativeRuntime3dRiskAssetIdSet(),
+  });
+}
+
+function getCurrentCheckedAssetsOfSelectedType(data = state.data) {
+  return assetCatalogTools.getCurrentCheckedAssetsOfSelectedType(
+    state.assetCheckedIds,
+    data,
+    state.selectedAssetType,
+    {
       filterMode: state.assetFilterMode,
       searchQuery: state.assetSearchQuery,
       tagFilter: state.assetTagFilter,
       sortMode: state.assetSortMode,
       favoriteOnly: state.assetFavoriteOnly,
       nativeRuntime3dRiskAssetIds: getNativeRuntime3dRiskAssetIdSet(),
-    });
-  }
-
-  const currentTypeIds = new Set(getCurrentFilteredAssetsOfSelectedType(data).map((asset) => asset.id));
-  return getCheckedAssetIds(data).filter((assetId) => currentTypeIds.has(assetId));
-}
-
-function getCurrentCheckedAssetsOfSelectedType(data = state.data) {
-  if (assetCatalogTools?.getCurrentCheckedAssetsOfSelectedType) {
-    return assetCatalogTools.getCurrentCheckedAssetsOfSelectedType(
-      state.assetCheckedIds,
-      data,
-      state.selectedAssetType,
-      {
-        filterMode: state.assetFilterMode,
-        searchQuery: state.assetSearchQuery,
-        tagFilter: state.assetTagFilter,
-        sortMode: state.assetSortMode,
-        favoriteOnly: state.assetFavoriteOnly,
-        nativeRuntime3dRiskAssetIds: getNativeRuntime3dRiskAssetIdSet(),
-      }
-    );
-  }
-
-  const checkedIds = new Set(getCurrentCheckedAssetIds(data));
-  return getCurrentFilteredAssetsOfSelectedType(data).filter((asset) => checkedIds.has(asset.id));
+    }
+  );
 }
 
 function isAssetChecked(assetId, data = state.data) {
-  if (assetCatalogTools?.isAssetChecked) {
-    return assetCatalogTools.isAssetChecked(assetId, state.assetCheckedIds, data);
-  }
-
-  return getCheckedAssetIds(data).includes(assetId);
+  return assetCatalogTools.isAssetChecked(assetId, state.assetCheckedIds, data);
 }
 
 function toggleAssetChecked(assetId, checked) {
-  if (assetCatalogTools?.toggleAssetChecked) {
-    state.assetCheckedIds = assetCatalogTools.toggleAssetChecked(state.assetCheckedIds, assetId, checked, state.data);
-    return;
-  }
-
-  const nextCheckedIds = new Set(getCheckedAssetIds());
-  if (checked) {
-    nextCheckedIds.add(assetId);
-  } else {
-    nextCheckedIds.delete(assetId);
-  }
-  state.assetCheckedIds = Array.from(nextCheckedIds);
+  state.assetCheckedIds = assetCatalogTools.toggleAssetChecked(state.assetCheckedIds, assetId, checked, state.data);
 }
 
 function getAssetPresetTags(assetType) {
-  return assetCatalogTools?.getAssetPresetTags?.(assetType) ?? ASSET_PRESET_TAGS[assetType] ?? [];
+  return assetCatalogTools.getAssetPresetTags(assetType);
 }
 
 function getSafeCharacterId(characterId) {
@@ -46059,12 +45255,7 @@ function getSafeExpressionId(characterId, expressionId) {
 }
 
 function getSafeAssetIdByType(assetType, assetId = null) {
-  if (assetCatalogTools?.getSafeAssetIdByType) {
-    return assetCatalogTools.getSafeAssetIdByType(assetType, assetId, state.data);
-  }
-
-  const assets = state.data.assetList.filter((asset) => asset.type === assetType);
-  return assets.some((asset) => asset.id === assetId) ? assetId : assets[0]?.id ?? "";
+  return assetCatalogTools.getSafeAssetIdByType(assetType, assetId, state.data);
 }
 
 function getSafeSceneId(sceneId, fallbackSceneId = null) {
@@ -49036,7 +48227,7 @@ function getDefaultCharacterPosition(characterId) {
 }
 
 function getAssetTypeLabel(type) {
-  return assetCatalogTools?.getAssetTypeLabel?.(type) ?? ASSET_TYPE_LABELS[type] ?? type;
+  return assetCatalogTools.getAssetTypeLabel(type);
 }
 
 function getTemplateLabel(template) {
@@ -49044,35 +48235,19 @@ function getTemplateLabel(template) {
 }
 
 function isImageAssetType(type) {
-  if (assetCatalogTools?.isImageAssetType) {
-    return assetCatalogTools.isImageAssetType(type);
-  }
-
-  return ["background", "sprite", "cg", "ui"].includes(type);
+  return assetCatalogTools.isImageAssetType(type);
 }
 
 function isAudioAssetType(type) {
-  if (assetCatalogTools?.isAudioAssetType) {
-    return assetCatalogTools.isAudioAssetType(type);
-  }
-
-  return ["bgm", "sfx", "voice"].includes(type);
+  return assetCatalogTools.isAudioAssetType(type);
 }
 
 function isVideoAssetType(type) {
-  if (assetCatalogTools?.isVideoAssetType) {
-    return assetCatalogTools.isVideoAssetType(type);
-  }
-
-  return type === "video";
+  return assetCatalogTools.isVideoAssetType(type);
 }
 
 function isScene3dAssetType(type) {
-  if (assetCatalogTools?.isScene3dAssetType) {
-    return assetCatalogTools.isScene3dAssetType(type);
-  }
-
-  return type === "scene3d";
+  return assetCatalogTools.isScene3dAssetType(type);
 }
 
 function getSafeVideoFit(value) {

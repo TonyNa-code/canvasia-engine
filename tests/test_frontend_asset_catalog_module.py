@@ -9,6 +9,7 @@ from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "asset_catalog.js"
+APP_PATH = ROOT_DIR / "prototype_editor" / "app.js"
 
 
 class FrontendAssetCatalogModuleTests(unittest.TestCase):
@@ -585,6 +586,16 @@ class FrontendAssetCatalogModuleTests(unittest.TestCase):
         self.assertFalse(payload["tagOperations"]["presetEmpty"]["canApply"])
         self.assertEqual(payload["tagOperations"]["presetNoAssets"]["error"], "no_assets")
         self.assertFalse(payload["tagOperations"]["presetNoAssets"]["canApply"])
+
+    def test_editor_app_delegates_asset_catalog_logic_to_module(self) -> None:
+        app_source = APP_PATH.read_text(encoding="utf-8")
+
+        self.assertNotIn("const ASSET_MEDIA_BUDGET_LIMITS =", app_source)
+        self.assertNotIn("const ASSET_FILTER_MODE_LABELS =", app_source)
+        self.assertIn("return assetCatalogTools.buildAssetDuplicateOverview(data);", app_source)
+        self.assertIn("return assetCatalogTools.getVisibleAssets(data, {", app_source)
+        self.assertIn("return assetCatalogTools.buildAssetMediaBudgetReport(data);", app_source)
+        self.assertIn("state.assetCheckedIds = assetCatalogTools.toggleAssetChecked", app_source)
 
 
 if __name__ == "__main__":
