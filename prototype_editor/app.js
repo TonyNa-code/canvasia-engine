@@ -917,6 +917,7 @@ const state = {
   projectPresentationPolishInFlight: false,
   projectReadableSplitInFlight: false,
   audioCueAutoFixInFlight: false,
+  stageDirectionAutoFixInFlight: false,
   projectCreateInFlight: false,
   projectOpenInFlightId: "",
   projectRenameInFlightId: "",
@@ -3955,6 +3956,11 @@ async function handleClick(event) {
 
   if (action === "export-stage-direction-sheet-csv") {
     exportStageDirectionSheetCsv();
+    return;
+  }
+
+  if (action === "apply-stage-direction-autofix") {
+    void applyStageDirectionAutoFix();
     return;
   }
 
@@ -10762,6 +10768,20 @@ function setAudioCueAutoFixInFlight(isInFlight) {
     isBusy: state.audioCueAutoFixInFlight,
     busyLabel: "补齐音频中...",
     idleLabelKey: "audioCueAutoFixIdleLabel",
+  });
+}
+
+function setStageDirectionAutoFixInFlight(isInFlight) {
+  state.stageDirectionAutoFixInFlight = Boolean(isInFlight);
+  if (!state.stageDirectionAutoFixInFlight && state.currentScreen === "inspection") {
+    renderAll();
+    return;
+  }
+  setActionButtonBusyState({
+    selector: '[data-action="apply-stage-direction-autofix"]',
+    isBusy: state.stageDirectionAutoFixInFlight,
+    busyLabel: "补齐舞台中...",
+    idleLabelKey: "stageDirectionAutoFixIdleLabel",
   });
 }
 
@@ -30703,6 +30723,56 @@ function buildStageDirectionSheet() {
   return stageDirectionSheetTools.buildStageDirectionSheet(state.data ?? {});
 }
 
+async function applyStageDirectionAutoFix() {
+  if (state.stageDirectionAutoFixInFlight) {
+    showToast("角色舞台参数正在补齐中，请稍等");
+    return false;
+  }
+  if (typeof stageDirectionSheetTools?.buildStageDirectionAutoFixPlan !== "function") {
+    showToast("当前版本暂时不能自动补齐舞台参数", "error");
+    return false;
+  }
+
+  const plan = stageDirectionSheetTools.buildStageDirectionAutoFixPlan(state.data ?? {});
+  if (!plan.changed) {
+    setSaveStatus("角色舞台基础参数已经比较完整");
+    showToast("角色舞台基础参数已经比较完整");
+    return false;
+  }
+
+  setStageDirectionAutoFixInFlight(true);
+  setSaveStatus(`正在补齐 ${plan.changedSceneCount} 个场景的角色舞台参数...`);
+
+  try {
+    for (const scenePlan of plan.scenePlans) {
+      const success = await persistScene(scenePlan.scene, {
+        reloadAfterSave: false,
+        selectedSceneId: scenePlan.sceneId,
+        selectedBlockId: scenePlan.firstChangedBlockId,
+        previewSceneId: scenePlan.sceneId,
+        previewBlockIndex: Math.max(scenePlan.firstChangedIndex ?? 0, 0),
+        successMessage: `已补齐角色舞台参数：${scenePlan.sceneName}`,
+      });
+      if (!success) {
+        return false;
+      }
+    }
+
+    await reloadProjectData({
+      ...getCurrentUiState(),
+      selectedSceneId: plan.firstChangedSceneId || state.selectedSceneId,
+      selectedBlockId: plan.firstChangedBlockId || state.selectedBlockId,
+      previewSceneId: plan.firstChangedSceneId || state.previewSceneId,
+      previewBlockIndex: Math.max(plan.firstChangedIndex ?? 0, 0),
+    });
+    setSaveStatus(plan.summary);
+    showToast(plan.summary);
+    return true;
+  } finally {
+    setStageDirectionAutoFixInFlight(false);
+  }
+}
+
 function exportStageDirectionSheetMarkdown() {
   const fileName = buildStageDirectionSheetFileName("md");
   const sheet = buildStageDirectionSheet();
@@ -33103,6 +33173,9 @@ function renderStageDirectionSheetPanel() {
   const sheet = buildStageDirectionSheet();
   const digest = stageDirectionSheetTools.getStageDirectionStatusDigest(sheet);
   const summary = sheet.summary ?? {};
+  const autoFixPlan = sheet.autoFixPlan && typeof sheet.autoFixPlan === "object"
+    ? sheet.autoFixPlan
+    : { changed: false, operationCount: 0, changedSceneCount: 0, changedBlockCount: 0 };
   const topIssues = (sheet.issues ?? []).slice(0, 4);
   const eventPreview = (sheet.events ?? []).slice(0, 4);
 
@@ -33118,6 +33191,7 @@ function renderStageDirectionSheetPanel() {
         ${renderRouteMetricCard("自动补位", `${summary.speakerAutoPlaceCount ?? 0} 句`, "说话人未提前登场")}
         ${renderRouteMetricCard("立绘 / 表情缺口", `${summary.missingVisualCount ?? 0} 个`, "缺立绘、缺文件或坏表情")}
         ${renderRouteMetricCard("无背景场景", `${summary.missingBackgroundSceneCount ?? 0} 个`, "有内容但没有明确背景")}
+        ${renderRouteMetricCard("可自动补齐", `${summary.autoFixOperationCount ?? 0} 项`, "硬切、缺时长、缺舞台参数")}
       </div>
       <div class="detail-actions">
         <button class="toolbar-button toolbar-button-primary" data-action="export-stage-direction-sheet-markdown">
@@ -33125,6 +33199,14 @@ function renderStageDirectionSheetPanel() {
         </button>
         <button class="toolbar-button" data-action="export-stage-direction-sheet-csv">
           导出舞台调度 CSV
+        </button>
+        <button
+          class="toolbar-button"
+          data-action="apply-stage-direction-autofix"
+          title="${escapeHtml(autoFixPlan.changed ? `会处理 ${autoFixPlan.changedSceneCount ?? 0} 个场景、${autoFixPlan.changedBlockCount ?? 0} 张角色卡。` : "角色登场/退场的基础舞台参数已经比较完整。")}"
+          ${autoFixPlan.changed ? "" : 'disabled aria-disabled="true"'}
+        >
+          ${escapeHtml(autoFixPlan.changed ? `补齐 ${autoFixPlan.operationCount ?? 0} 个舞台参数` : "舞台基础参数已完整")}
         </button>
         <button class="toolbar-button" data-action="switch-screen" data-screen="story">
           去剧情页调整登场

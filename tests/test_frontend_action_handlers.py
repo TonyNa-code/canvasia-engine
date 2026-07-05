@@ -4746,20 +4746,26 @@ class FrontendActionHandlerTests(unittest.TestCase):
         click_handler = _extract_function_source(source, "handleClick")
         markdown_block_start = click_handler.index('action === "export-stage-direction-sheet-markdown"')
         csv_block_start = click_handler.index('action === "export-stage-direction-sheet-csv"')
+        autofix_block_start = click_handler.index('action === "apply-stage-direction-autofix"')
         csv_block_end = click_handler.index('action === "export-release-control-report"', csv_block_start)
         markdown_block = click_handler[markdown_block_start:csv_block_start]
-        csv_block = click_handler[csv_block_start:csv_block_end]
+        csv_block = click_handler[csv_block_start:autofix_block_start]
+        autofix_block = click_handler[autofix_block_start:csv_block_end]
 
         self.assertIn("const stageDirectionSheetTools = window.CanvasiaEditorStageDirectionSheet", source)
         self.assertIn('data-action="export-stage-direction-sheet-markdown"', source)
         self.assertIn('data-action="export-stage-direction-sheet-csv"', source)
+        self.assertIn('data-action="apply-stage-direction-autofix"', source)
         self.assertIn("exportStageDirectionSheetMarkdown();", markdown_block)
         self.assertIn("exportStageDirectionSheetCsv();", csv_block)
+        self.assertIn("void applyStageDirectionAutoFix();", autofix_block)
         self.assertIn("function buildStageDirectionSheet()", source)
         self.assertIn("function renderStageDirectionSheetPanel()", source)
         self.assertIn("function exportStageDirectionSheetMarkdown()", source)
         self.assertIn("function exportStageDirectionSheetCsv()", source)
+        self.assertIn("async function applyStageDirectionAutoFix()", source)
         self.assertIn("stageDirectionSheetTools.buildStageDirectionSheet", source)
+        self.assertIn("stageDirectionSheetTools.buildStageDirectionAutoFixPlan", source)
         self.assertIn("stageDirectionSheetTools.getStageDirectionStatusDigest", source)
 
     def test_presentation_timeline_export_actions_are_wired(self) -> None:

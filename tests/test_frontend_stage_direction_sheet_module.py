@@ -74,6 +74,7 @@ class FrontendStageDirectionSheetModuleTests(unittest.TestCase):
               ],
             }};
             const sheet = tools.buildStageDirectionSheet(data);
+            const autoFixPlan = tools.buildStageDirectionAutoFixPlan(data);
             const digest = tools.getStageDirectionStatusDigest(sheet);
             const markdown = tools.buildStageDirectionSheetMarkdown(sheet, {{
               projectTitle: "Demo Project",
@@ -83,6 +84,7 @@ class FrontendStageDirectionSheetModuleTests(unittest.TestCase):
             process.stdout.write(JSON.stringify({{
               keys: Object.keys(tools).sort(),
               sheet,
+              autoFixPlan,
               digest,
               markdown,
               csv,
@@ -100,17 +102,34 @@ class FrontendStageDirectionSheetModuleTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 0, completed.stderr)
         payload = json.loads(completed.stdout)
         self.assertIn("buildStageDirectionSheet", payload["keys"])
+        self.assertIn("buildStageDirectionAutoFixPlan", payload["keys"])
+        self.assertIn("buildStageDirectionAutoFixSummary", payload["keys"])
         self.assertIn("buildStageDirectionSheetMarkdown", payload["keys"])
         self.assertIn("buildStageDirectionSheetCsv", payload["keys"])
         self.assertEqual(payload["sheet"]["summary"]["eventCount"], 5)
         self.assertEqual(payload["sheet"]["summary"]["speakerAutoPlaceCount"], 1)
         self.assertEqual(payload["sheet"]["summary"]["missingBackgroundSceneCount"], 1)
         self.assertEqual(payload["sheet"]["summary"]["missingVisualCount"], 1)
+        self.assertEqual(payload["sheet"]["summary"]["autoFixSceneCount"], 1)
+        self.assertEqual(payload["sheet"]["summary"]["autoFixBlockCount"], 2)
+        self.assertEqual(payload["sheet"]["summary"]["autoFixOperationCount"], 5)
         self.assertEqual(payload["digest"]["status"], "blocked")
+        self.assertTrue(payload["autoFixPlan"]["changed"])
+        self.assertEqual(payload["autoFixPlan"]["changedSceneCount"], 1)
+        self.assertEqual(payload["autoFixPlan"]["changedBlockCount"], 2)
+        self.assertEqual(payload["autoFixPlan"]["operationCount"], 5)
+        fixed_blocks = payload["autoFixPlan"]["scenePlans"][0]["scene"]["blocks"]
+        self.assertEqual(fixed_blocks[2]["transition"], "fade")
+        self.assertEqual(fixed_blocks[2]["transitionDurationMs"], 600)
+        self.assertEqual(fixed_blocks[2]["stage"]["scale"], 100)
+        self.assertEqual(fixed_blocks[4]["transition"], "fade")
+        self.assertEqual(fixed_blocks[4]["transitionDurationMs"], 420)
+        self.assertIn("已准备修复 1 个场景", payload["autoFixPlan"]["summary"])
         self.assertIn("dialogue_speaker_not_visible", [issue["code"] for issue in payload["sheet"]["issues"]])
         self.assertIn("character_visual_file_missing", [issue["code"] for issue in payload["sheet"]["issues"]])
         self.assertIn("character_hide_not_visible", [issue["code"] for issue in payload["sheet"]["issues"]])
         self.assertIn("# Demo Project 角色舞台调度表", payload["markdown"])
+        self.assertIn("可自动补齐参数", payload["markdown"])
         self.assertIn("蓝白女主", payload["markdown"])
         self.assertIn('"角色"', payload["csv"])
         self.assertIn("立绘可用：女主微笑", payload["csv"])

@@ -25,6 +25,25 @@
     ...(storyBlockCatalogTools.BLOCK_COMPACT_LABELS ?? {}),
   });
 
+  const STAGE_DIRECTION_AUTO_FIX_DEFAULTS = Object.freeze({
+    characterShowTransition: "fade",
+    characterHideTransition: "fade",
+    characterShowDurationMs: 600,
+    characterHideDurationMs: 420,
+  });
+
+  const CHARACTER_STAGE_DEFAULTS = Object.freeze({
+    offsetX: 0,
+    offsetY: 0,
+    scale: 100,
+    opacity: 100,
+    layer: 0,
+    flipX: false,
+  });
+
+  const VALID_POSITIONS = Object.freeze(["left", "center", "right"]);
+  const VALID_CHARACTER_TRANSITIONS = Object.freeze(["fade", "slide_left", "slide_right", "rise", "pop", "none"]);
+
   function toArray(value) {
     return Array.isArray(value) ? value : [];
   }
@@ -32,6 +51,54 @@
   function cleanText(value, fallback = "") {
     const text = String(value ?? "").replace(/\s+/g, " ").trim();
     return text || fallback;
+  }
+
+  function clampNumber(value, minimum, maximum, fallback = minimum) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) {
+      return fallback;
+    }
+    return Math.min(Math.max(number, minimum), maximum);
+  }
+
+  function getSafePositionValue(position, fallback = "center") {
+    const safePosition = cleanText(position);
+    return VALID_POSITIONS.includes(safePosition) ? safePosition : fallback;
+  }
+
+  function getSafeCharacterTransitionValue(transition, fallback = "fade") {
+    const safeTransition = cleanText(transition);
+    return VALID_CHARACTER_TRANSITIONS.includes(safeTransition) ? safeTransition : fallback;
+  }
+
+  function getSafeTransitionDurationMs(value, fallback = 600) {
+    return Math.round(clampNumber(value, 0, 5000, fallback));
+  }
+
+  function normalizeCharacterStage(stageSource = {}) {
+    const source = stageSource && typeof stageSource === "object" ? stageSource : {};
+    return {
+      offsetX: Math.round(clampNumber(source.offsetX, -100, 100, CHARACTER_STAGE_DEFAULTS.offsetX)),
+      offsetY: Math.round(clampNumber(source.offsetY, -100, 100, CHARACTER_STAGE_DEFAULTS.offsetY)),
+      scale: Math.round(clampNumber(source.scale, 45, 220, CHARACTER_STAGE_DEFAULTS.scale)),
+      opacity: Math.round(clampNumber(source.opacity, 0, 100, CHARACTER_STAGE_DEFAULTS.opacity)),
+      layer: Math.round(clampNumber(source.layer, -10, 10, CHARACTER_STAGE_DEFAULTS.layer)),
+      flipX: Boolean(source.flipX),
+    };
+  }
+
+  function isSameStage(left = {}, right = {}) {
+    return ["offsetX", "offsetY", "scale", "opacity", "layer", "flipX"].every((key) => left[key] === right[key]);
+  }
+
+  function cloneSceneForStageFix(scene = {}) {
+    return {
+      ...scene,
+      blocks: toArray(scene.blocks).map((block) => ({
+        ...block,
+        ...(block?.stage && typeof block.stage === "object" ? { stage: { ...block.stage } } : {}),
+      })),
+    };
   }
 
   function getPositionLabel(position) {
@@ -483,6 +550,10 @@
       warningCount: issues.filter((issue) => issue.severity === "warn").length,
       tipCount: issues.filter((issue) => issue.severity === "tip").length,
     };
+    const autoFixPlan = buildStageDirectionAutoFixPlan(data);
+    summary.autoFixSceneCount = autoFixPlan.changedSceneCount;
+    summary.autoFixBlockCount = autoFixPlan.changedBlockCount;
+    summary.autoFixOperationCount = autoFixPlan.operationCount;
 
     return {
       projectTitle: cleanText(data.project?.title, "Canvasia Project"),
@@ -490,6 +561,198 @@
       events,
       issues,
       summary,
+      autoFixPlan,
+    };
+  }
+
+  function buildStageDirectionAutoFixSummary(scenePlans = []) {
+    const safePlans = toArray(scenePlans);
+    const blockCount = safePlans.reduce((total, plan) => total + (plan.changedBlockCount ?? 0), 0);
+    const operationCount = safePlans.reduce((total, plan) => total + (plan.operationCount ?? 0), 0);
+    if (!safePlans.length) {
+      return "角色舞台基础参数已经比较完整";
+    }
+    return `已准备修复 ${safePlans.length} 个场景、${blockCount} 张角色卡、${operationCount} 个舞台参数`;
+  }
+
+  function getStageDirectionAutoFixDefaults(options = {}) {
+    return {
+      characterShowTransition: getSafeCharacterTransitionValue(
+        options.characterShowTransition,
+        STAGE_DIRECTION_AUTO_FIX_DEFAULTS.characterShowTransition
+      ),
+      characterHideTransition: getSafeCharacterTransitionValue(
+        options.characterHideTransition,
+        STAGE_DIRECTION_AUTO_FIX_DEFAULTS.characterHideTransition
+      ),
+      characterShowDurationMs: getSafeTransitionDurationMs(
+        options.characterShowDurationMs,
+        STAGE_DIRECTION_AUTO_FIX_DEFAULTS.characterShowDurationMs
+      ),
+      characterHideDurationMs: getSafeTransitionDurationMs(
+        options.characterHideDurationMs,
+        STAGE_DIRECTION_AUTO_FIX_DEFAULTS.characterHideDurationMs
+      ),
+    };
+  }
+
+  function pushStageAutoFixOperation(operations, changedBlockIds, block, blockIndex, label, detail) {
+    changedBlockIds.add(cleanText(block?.id) || `block_${blockIndex + 1}`);
+    operations.push({
+      blockId: cleanText(block?.id),
+      blockIndex,
+      label,
+      detail,
+    });
+  }
+
+  function applyCharacterShowAutoFix(block, blockIndex, context = {}) {
+    const operations = context.operations;
+    const changedBlockIds = context.changedBlockIds;
+    const defaults = context.defaults;
+    const character = context.characterMap.get(cleanText(block.characterId));
+    const fallbackPosition = getSafePositionValue(character?.defaultPosition, "center");
+    const nextPosition = getSafePositionValue(block.position, fallbackPosition);
+    if (cleanText(block.position) !== nextPosition) {
+      block.position = nextPosition;
+      pushStageAutoFixOperation(
+        operations,
+        changedBlockIds,
+        block,
+        blockIndex,
+        "补角色站位",
+        `站位已设为 ${getPositionLabel(nextPosition)}。`
+      );
+    }
+
+    const transition = getSafeCharacterTransitionValue(block.transition, defaults.characterShowTransition);
+    if (!cleanText(block.transition) || transition === "none") {
+      block.transition = defaults.characterShowTransition;
+      pushStageAutoFixOperation(
+        operations,
+        changedBlockIds,
+        block,
+        blockIndex,
+        "补登场转场",
+        `角色登场已改为 ${defaults.characterShowTransition === "fade" ? "淡入" : defaults.characterShowTransition}。`
+      );
+    } else if (block.transition !== transition) {
+      block.transition = transition;
+      pushStageAutoFixOperation(operations, changedBlockIds, block, blockIndex, "修正登场转场", "无法识别的转场已改为安全值。");
+    }
+
+    const durationMs = getSafeTransitionDurationMs(block.transitionDurationMs, defaults.characterShowDurationMs);
+    if (durationMs <= 0 || Number(block.transitionDurationMs) !== durationMs) {
+      block.transitionDurationMs = durationMs > 0 ? durationMs : defaults.characterShowDurationMs;
+      pushStageAutoFixOperation(
+        operations,
+        changedBlockIds,
+        block,
+        blockIndex,
+        "补登场时长",
+        `登场转场时长已设为 ${block.transitionDurationMs}ms。`
+      );
+    }
+
+    const normalizedStage = normalizeCharacterStage(block.stage);
+    const hadStage = block.stage && typeof block.stage === "object";
+    if (!hadStage || !isSameStage(normalizedStage, block.stage)) {
+      block.stage = normalizedStage;
+      pushStageAutoFixOperation(
+        operations,
+        changedBlockIds,
+        block,
+        blockIndex,
+        hadStage ? "修正立绘舞台参数" : "补立绘舞台参数",
+        "已补齐缩放、透明度、层级和偏移参数。"
+      );
+    }
+  }
+
+  function applyCharacterHideAutoFix(block, blockIndex, context = {}) {
+    const operations = context.operations;
+    const changedBlockIds = context.changedBlockIds;
+    const defaults = context.defaults;
+    const transition = getSafeCharacterTransitionValue(block.transition, defaults.characterHideTransition);
+    if (!cleanText(block.transition) || transition === "none") {
+      block.transition = defaults.characterHideTransition;
+      pushStageAutoFixOperation(
+        operations,
+        changedBlockIds,
+        block,
+        blockIndex,
+        "补退场转场",
+        `角色退场已改为 ${defaults.characterHideTransition === "fade" ? "淡出" : defaults.characterHideTransition}。`
+      );
+    } else if (block.transition !== transition) {
+      block.transition = transition;
+      pushStageAutoFixOperation(operations, changedBlockIds, block, blockIndex, "修正退场转场", "无法识别的转场已改为安全值。");
+    }
+
+    const durationMs = getSafeTransitionDurationMs(block.transitionDurationMs, defaults.characterHideDurationMs);
+    if (durationMs <= 0 || Number(block.transitionDurationMs) !== durationMs) {
+      block.transitionDurationMs = durationMs > 0 ? durationMs : defaults.characterHideDurationMs;
+      pushStageAutoFixOperation(
+        operations,
+        changedBlockIds,
+        block,
+        blockIndex,
+        "补退场时长",
+        `退场转场时长已设为 ${block.transitionDurationMs}ms。`
+      );
+    }
+  }
+
+  function buildStageDirectionAutoFixPlan(data = {}, options = {}) {
+    const defaults = getStageDirectionAutoFixDefaults(options);
+    const characterMap = buildCharacterMap(data);
+    const chapterMap = buildChapterMap(data);
+    const scenePlans = [];
+
+    getOrderedScenes(data).forEach((scene, sceneIndex) => {
+      const updatedScene = cloneSceneForStageFix(scene);
+      const operations = [];
+      const changedBlockIds = new Set();
+
+      toArray(updatedScene.blocks).forEach((block, blockIndex) => {
+        const context = { characterMap, defaults, operations, changedBlockIds };
+        if (block?.type === "character_show") {
+          applyCharacterShowAutoFix(block, blockIndex, context);
+        } else if (block?.type === "character_hide") {
+          applyCharacterHideAutoFix(block, blockIndex, context);
+        }
+      });
+
+      if (operations.length > 0) {
+        const chapter = chapterMap.get(String(scene?.chapterId ?? "")) ?? {
+          id: String(scene?.chapterId ?? ""),
+          name: "未分章",
+        };
+        scenePlans.push({
+          scene: updatedScene,
+          sceneId: cleanText(scene?.id),
+          sceneName: cleanText(scene?.name ?? scene?.title, `场景 ${sceneIndex + 1}`),
+          chapterId: chapter.id,
+          chapterName: chapter.name,
+          operations,
+          operationCount: operations.length,
+          changedBlockCount: changedBlockIds.size,
+          firstChangedBlockId: operations[0]?.blockId ?? "",
+          firstChangedIndex: operations[0]?.blockIndex ?? 0,
+        });
+      }
+    });
+
+    return {
+      changed: scenePlans.length > 0,
+      scenePlans,
+      changedSceneCount: scenePlans.length,
+      changedBlockCount: scenePlans.reduce((total, plan) => total + (plan.changedBlockCount ?? 0), 0),
+      operationCount: scenePlans.reduce((total, plan) => total + (plan.operationCount ?? 0), 0),
+      firstChangedSceneId: scenePlans[0]?.sceneId ?? "",
+      firstChangedBlockId: scenePlans[0]?.firstChangedBlockId ?? "",
+      firstChangedIndex: scenePlans[0]?.firstChangedIndex ?? 0,
+      summary: buildStageDirectionAutoFixSummary(scenePlans),
     };
   }
 
@@ -602,6 +865,8 @@
           ["无背景内容场景", `${summary.missingBackgroundSceneCount ?? 0}`],
           ["说话人自动补位", `${summary.speakerAutoPlaceCount ?? 0}`],
           ["立绘/表情缺口", `${summary.missingVisualCount ?? 0}`],
+          ["可自动补齐场景", `${summary.autoFixSceneCount ?? 0}`],
+          ["可自动补齐参数", `${summary.autoFixOperationCount ?? 0}`],
           ["阻塞问题", `${summary.blockerCount ?? 0}`],
           ["复查提醒", `${summary.warningCount ?? 0}`],
         ]
@@ -642,7 +907,10 @@
   }
 
   global.CanvasiaEditorStageDirectionSheet = Object.freeze({
+    STAGE_DIRECTION_AUTO_FIX_DEFAULTS,
     buildStageDirectionSheet,
+    buildStageDirectionAutoFixPlan,
+    buildStageDirectionAutoFixSummary,
     getStageDirectionStatusDigest,
     buildStageDirectionSheetMarkdown,
     buildStageDirectionSheetCsv,
