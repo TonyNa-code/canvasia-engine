@@ -151,6 +151,16 @@
     return 0;
   }
 
+  function formatEstimatedDuration(seconds) {
+    const safeSeconds = Math.max(0, Math.round(Number(seconds) || 0));
+    if (safeSeconds < 60) {
+      return `about ${safeSeconds}s`;
+    }
+    const minutes = Math.floor(safeSeconds / 60);
+    const remainingSeconds = safeSeconds % 60;
+    return remainingSeconds > 0 ? `about ${minutes}m ${remainingSeconds}s` : `about ${minutes}m`;
+  }
+
   function buildCollectionMap(source, idField = "id") {
     const result = new Map();
     if (source instanceof Map) {
@@ -340,6 +350,40 @@
     };
   }
 
+  function buildProductionTimingSummary(context = {}) {
+    const directorSummary = context.directorCueSheet?.summary ?? {};
+    const sceneCount = toCount(directorSummary.sceneCount);
+    const totalEstimatedSeconds = toCount(directorSummary.totalEstimatedSeconds);
+    const averageSceneSeconds =
+      directorSummary.averageSceneSeconds !== undefined
+        ? toCount(directorSummary.averageSceneSeconds)
+        : sceneCount
+          ? Math.round(totalEstimatedSeconds / sceneCount)
+          : 0;
+    const shortSceneCount = toCount(directorSummary.shortSceneCount);
+    const longSceneCount = toCount(directorSummary.longSceneCount);
+    const silentSceneCount = toCount(directorSummary.silentSceneCount);
+    const hasTimingData =
+      totalEstimatedSeconds > 0 ||
+      shortSceneCount > 0 ||
+      longSceneCount > 0 ||
+      silentSceneCount > 0 ||
+      directorSummary.averageSceneSeconds !== undefined;
+    return {
+      available: hasTimingData,
+      sceneCount,
+      totalEstimatedSeconds,
+      totalEstimatedLabel: hasTimingData ? formatEstimatedDuration(totalEstimatedSeconds) : "not estimated",
+      averageSceneSeconds,
+      averageSceneLabel: hasTimingData ? formatEstimatedDuration(averageSceneSeconds) : "not estimated",
+      shortSceneCount,
+      longSceneCount,
+      silentSceneCount,
+      reviewSceneCount: shortSceneCount + longSceneCount + silentSceneCount,
+      timingRiskLabel: `${shortSceneCount} short / ${longSceneCount} long / ${silentSceneCount} empty`,
+    };
+  }
+
   function getAssetSize(asset = {}) {
     return toCount(asset.fileSizeBytes ?? asset.sizeBytes ?? asset.bytes ?? asset.fileSize);
   }
@@ -488,10 +532,12 @@
         return { status: "missing", severity: "warn", detail: "Director cue sheet is not available." };
       }
       const severity = summary.blockerCount ? "blocker" : summary.warningCount ? "warn" : "good";
+      const timing = buildProductionTimingSummary(context);
+      const timingDetail = timing.available ? ` Estimated runtime ${timing.totalEstimatedLabel}; ${timing.timingRiskLabel}.` : "";
       return {
         status: severity === "good" ? "ready" : "review",
         severity,
-        detail: `${summary.sceneCount ?? 0} scene(s), ${summary.cueCount ?? 0} cue(s), ${summary.issueCount ?? 0} cue issue(s).`,
+        detail: `${summary.sceneCount ?? 0} scene(s), ${summary.cueCount ?? 0} cue(s), ${summary.issueCount ?? 0} cue issue(s).${timingDetail}`,
       };
     }
 
@@ -707,6 +753,7 @@
   }
 
   function buildSignoffChecklist(content = {}, context = {}) {
+    const productionTiming = buildProductionTimingSummary(context);
     const items = [
       {
         id: "open_build",
@@ -742,6 +789,15 @@
         title: "BGM, SFX, voice, and fade timing check",
         detail: "Listen through at least one scene transition that changes music or voice.",
         required: Boolean(content.hasAudio || context.voiceSheet?.summary?.lineCount),
+      },
+      {
+        id: "pacing_runtime",
+        target: "Pacing",
+        title: "Estimated scene duration and pacing pass",
+        detail: productionTiming.available
+          ? `Estimated total runtime ${productionTiming.totalEstimatedLabel}; review ${productionTiming.timingRiskLabel}.`
+          : "Run the director cue sheet first so the release handoff can include scene duration estimates.",
+        required: Boolean(content.sceneCount > 0),
       },
       {
         id: "stage_motion",
@@ -850,6 +906,7 @@
     const resolution = getResolution(data, context);
     const content = buildContentInventory(data, context);
     const assets = buildAssetInventory(data);
+    const productionTiming = buildProductionTimingSummary(context);
     const deliverables = buildDeliverables(context);
     const risks = buildRiskRegister(context);
     const signoffChecklist = buildSignoffChecklist(content, context);
@@ -880,6 +937,7 @@
         warningCount: toCount(context.productionBacklog?.summary?.warningCount),
         readinessPercent: toCount(context.productionBacklog?.summary?.readinessPercent),
       },
+      productionTiming,
       runtime: {
         usedTypeCount: toCount(context.runtimeCapabilityMatrix?.summary?.usedTypeCount),
         issueCount: toCount(context.runtimeCapabilityMatrix?.summary?.issueCount),
@@ -1022,11 +1080,26 @@
       "## Snapshot",
       "",
       buildMarkdownTable(
-        ["Version", "Readiness", "Resolution", "Chapters", "Scenes", "Blocks", "Characters", "Assets", "Languages", "Unlockables"],
+        [
+          "Version",
+          "Readiness",
+          "Estimated Runtime",
+          "Pacing Review",
+          "Resolution",
+          "Chapters",
+          "Scenes",
+          "Blocks",
+          "Characters",
+          "Assets",
+          "Languages",
+          "Unlockables",
+        ],
         [
           [
             manifest.project?.releaseVersion,
             `${manifest.readinessPercent ?? 0}%`,
+            manifest.productionTiming?.totalEstimatedLabel ?? "not estimated",
+            manifest.productionTiming?.timingRiskLabel ?? "0 short / 0 long / 0 empty",
             `${manifest.project?.resolution?.width ?? 0} x ${manifest.project?.resolution?.height ?? 0}`,
             manifest.content?.chapterCount ?? 0,
             manifest.content?.sceneCount ?? 0,
@@ -1059,6 +1132,28 @@
   }
 
   function buildReleaseCandidateCsv(manifest = {}) {
+    const timingRows = manifest.productionTiming
+      ? [
+          [
+            "timing",
+            "estimated_runtime",
+            "Estimated runtime",
+            "Pacing",
+            manifest.productionTiming.available ? "ready" : "missing",
+            manifest.productionTiming.totalEstimatedLabel,
+            manifest.productionTiming.timingRiskLabel,
+          ],
+          [
+            "timing",
+            "average_scene",
+            "Average scene duration",
+            "Pacing",
+            manifest.productionTiming.available ? "ready" : "missing",
+            manifest.productionTiming.averageSceneLabel,
+            `${manifest.productionTiming.reviewSceneCount ?? 0} scene(s) should be reviewed for pacing.`,
+          ],
+        ]
+      : [];
     const deliverableRows = toArray(manifest.deliverables).map((item) => [
       "deliverable",
       item.id,
@@ -1087,6 +1182,7 @@
       item.detail,
     ]);
     return `\uFEFF${buildCsv(["kind", "id", "title", "owner_or_target", "status", "label", "detail"], [
+      ...timingRows,
       ...deliverableRows,
       ...riskRows,
       ...signoffRows,
@@ -1130,6 +1226,11 @@
         <p class="helper-text">${escapeHtml(digest.detail)} This manifest turns the current editor state into a handoff sheet for testers, translators, runtime checks, and public-preview packaging.</p>
         <div class="preview-sprint-metrics">
           ${renderMetric("Readiness", `${manifest.readinessPercent ?? 0}%`, "release candidate estimate")}
+          ${renderMetric(
+            "Estimated Runtime",
+            manifest.productionTiming?.totalEstimatedLabel ?? "not estimated",
+            manifest.productionTiming?.timingRiskLabel ?? "run director cues first"
+          )}
           ${renderMetric("Scenes / Blocks", `${manifest.content?.sceneCount ?? 0} / ${manifest.content?.blockCount ?? 0}`, "playable content inventory")}
           ${renderMetric("Deliverables", `${allDeliverables.filter((item) => item.severity === "good").length}/${allDeliverables.length}`, "ready release artifacts")}
           ${renderMetric("Risks", `${topRisks.length ? manifest.risks.length : 0}`, "blockers and review items")}

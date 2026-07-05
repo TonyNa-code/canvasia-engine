@@ -108,7 +108,18 @@ class FrontendReleaseCandidateManifestModuleTests(unittest.TestCase):
               }},
               screenplay: {{ summary: {{ lineCount: 2, choiceCount: 1 }} }},
               directorCueSheet: {{
-                summary: {{ sceneCount: 2, cueCount: 7, issueCount: 1, blockerCount: 1, warningCount: 0 }},
+                summary: {{
+                  sceneCount: 2,
+                  cueCount: 7,
+                  issueCount: 1,
+                  blockerCount: 1,
+                  warningCount: 0,
+                  totalEstimatedSeconds: 126,
+                  averageSceneSeconds: 63,
+                  shortSceneCount: 1,
+                  longSceneCount: 0,
+                  silentSceneCount: 0,
+                }},
                 issues: [{{ severity: "blocker", title: "Scene lacks background", detail: "Add a background.", chapterName: "Chapter 1", sceneName: "Ending" }}],
               }},
               voiceSheet: {{ summary: {{ lineCount: 1, readyLineCount: 1, missingVoiceCount: 0, missingFileCount: 0, missingAssetCount: 0 }} }},
@@ -161,6 +172,10 @@ class FrontendReleaseCandidateManifestModuleTests(unittest.TestCase):
         self.assertEqual(manifest["content"]["blockCount"], 7)
         self.assertEqual(manifest["content"]["languageCount"], 2)
         self.assertEqual(manifest["assets"]["placeholderCount"], 1)
+        self.assertTrue(manifest["productionTiming"]["available"])
+        self.assertEqual(manifest["productionTiming"]["totalEstimatedSeconds"], 126)
+        self.assertEqual(manifest["productionTiming"]["totalEstimatedLabel"], "about 2m 6s")
+        self.assertEqual(manifest["productionTiming"]["timingRiskLabel"], "1 short / 0 long / 0 empty")
         self.assertEqual(len(manifest["deliverables"]), 10)
         self.assertEqual(manifest["status"], "blocked")
         self.assertEqual(payload["digest"]["status"], "blocked")
@@ -175,15 +190,22 @@ class FrontendReleaseCandidateManifestModuleTests(unittest.TestCase):
         self.assertTrue(any(risk["area"] == "Unlockables" and risk["title"] == "结局当前不可达" for risk in manifest["risks"]))
         self.assertTrue(any(item["id"] == "save_load" and item["required"] for item in manifest["signoffChecklist"]))
         self.assertTrue(any(item["id"] == "audio_mix" and item["required"] for item in manifest["signoffChecklist"]))
+        self.assertTrue(any(item["id"] == "pacing_runtime" and item["required"] for item in manifest["signoffChecklist"]))
         self.assertTrue(any(item["id"] == "extras_unlockables" and item["required"] for item in manifest["signoffChecklist"]))
         self.assertIn("# RC Demo Release Candidate Manifest", payload["markdown"])
         self.assertIn("## Manual Signoff", payload["markdown"])
+        self.assertIn("Estimated Runtime", payload["markdown"])
+        self.assertIn("about 2m 6s", payload["markdown"])
+        self.assertIn("1 short / 0 long / 0 empty", payload["markdown"])
         self.assertIn("9/12", payload["markdown"])
         self.assertIn("Playable build", payload["markdown"])
         self.assertIn("Unlockable content manifest", payload["markdown"])
         self.assertIn('"deliverable"', payload["csv"])
+        self.assertIn('"timing","estimated_runtime"', payload["csv"])
         self.assertIn('"signoff"', payload["csv"])
         self.assertIn('data-action="export-release-candidate-manifest-markdown"', payload["panel"])
+        self.assertIn("Estimated Runtime", payload["panel"])
+        self.assertIn("about 2m 6s", payload["panel"])
         self.assertIn("Manual signoff checklist", payload["panel"])
 
 
