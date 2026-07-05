@@ -22,6 +22,7 @@ class FrontendEntrypointModuleTests(unittest.TestCase):
             "./modules/story_templates.js",
             "./modules/editor_common.js",
             "./modules/variables.js",
+            "./modules/project_runtime_settings.js",
             "./modules/project_settings.js",
             "./modules/dialog_box_readability.js",
             "./modules/validation_cache.js",

@@ -9,6 +9,7 @@ from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "renpy_exporter.js"
+RUNTIME_SETTINGS_MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "project_runtime_settings.js"
 
 
 class FrontendRenpyExporterModuleTests(unittest.TestCase):
@@ -20,6 +21,7 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
             const context = {{ window: {{}} }};
             context.globalThis = context;
             vm.createContext(context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(RUNTIME_SETTINGS_MODULE_PATH))}, "utf8"), context);
             vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
             const tools = context.window.CanvasiaEditorRenpyExporter;
             const data = {{

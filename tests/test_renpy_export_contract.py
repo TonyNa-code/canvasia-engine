@@ -10,6 +10,7 @@ import renpy_export
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
+FRONTEND_RUNTIME_SETTINGS_MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "project_runtime_settings.js"
 FRONTEND_MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "renpy_exporter.js"
 
 
@@ -21,6 +22,7 @@ def load_frontend_payload(script_body: str) -> dict:
         const context = {{ window: {{}} }};
         context.globalThis = context;
         vm.createContext(context);
+        vm.runInContext(fs.readFileSync({json.dumps(str(FRONTEND_RUNTIME_SETTINGS_MODULE_PATH))}, "utf8"), context);
         vm.runInContext(fs.readFileSync({json.dumps(str(FRONTEND_MODULE_PATH))}, "utf8"), context);
         const tools = context.window.CanvasiaEditorRenpyExporter;
         {script_body}

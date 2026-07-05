@@ -1,6 +1,7 @@
 (function attachRenpyExporterTools(global) {
   "use strict";
 
+  const runtimeSettingsTools = global.CanvasiaEditorProjectRuntimeSettings;
   const CHOICE_CONTINUE_TARGET = "__continue__";
   const BLOCK_TYPES_REQUIRING_COMMENT = Object.freeze([]);
   const CONDITION_OPERATORS = Object.freeze(["==", "!=", ">=", "<=", ">", "<"]);
@@ -29,19 +30,6 @@
     fast: 72,
     instant: 10000,
   });
-  const PROJECT_RUNTIME_DEFAULTS = Object.freeze({
-    formalSaveSlotCount: 24,
-    defaultTextSpeed: "normal",
-    defaultDialogTheme: "project",
-    defaultUiThemeMode: "auto",
-    defaultBgmVolume: 72,
-    defaultSfxVolume: 85,
-    defaultVoiceVolume: 92,
-    defaultVoiceEnabled: true,
-    defaultVoiceDuckingEnabled: true,
-  });
-  const PROJECT_RUNTIME_DIALOG_THEMES = Object.freeze(["project", "warm", "moonlight", "paper", "transparent"]);
-  const PROJECT_RUNTIME_UI_THEME_MODES = Object.freeze(["auto", "light", "dark"]);
   const BACKGROUND_TRANSITION_DEFAULT_MS = 360;
   const EFFECT_DURATION_SECONDS = Object.freeze({
     short: 0.42,
@@ -313,44 +301,28 @@
     return ratio === 1 ? "" : ` volume ${ratio}`;
   }
 
-  function clampRuntimeInt(value, fallback, min, max) {
-    const number = Number.parseInt(value, 10);
-    return Math.round(clampNumber(Number.isFinite(number) ? number : fallback, min, max));
-  }
-
   function sanitizeProjectRuntimeSettings(value = {}) {
-    const source = value && typeof value === "object" ? value : {};
-    const textSpeed = cleanText(source.defaultTextSpeed || PROJECT_RUNTIME_DEFAULTS.defaultTextSpeed).toLowerCase();
-    const dialogTheme = cleanText(source.defaultDialogTheme || PROJECT_RUNTIME_DEFAULTS.defaultDialogTheme).toLowerCase();
-    const uiThemeMode = cleanText(source.defaultUiThemeMode || PROJECT_RUNTIME_DEFAULTS.defaultUiThemeMode).toLowerCase();
-    return {
-      formalSaveSlotCount: clampRuntimeInt(source.formalSaveSlotCount, PROJECT_RUNTIME_DEFAULTS.formalSaveSlotCount, 3, 120),
-      defaultTextSpeed: Object.hasOwn(TEXT_SPEED_CPS, textSpeed) ? textSpeed : PROJECT_RUNTIME_DEFAULTS.defaultTextSpeed,
-      defaultDialogTheme: PROJECT_RUNTIME_DIALOG_THEMES.includes(dialogTheme) ? dialogTheme : PROJECT_RUNTIME_DEFAULTS.defaultDialogTheme,
-      defaultUiThemeMode: PROJECT_RUNTIME_UI_THEME_MODES.includes(uiThemeMode) ? uiThemeMode : PROJECT_RUNTIME_DEFAULTS.defaultUiThemeMode,
-      defaultBgmVolume: clampRuntimeInt(source.defaultBgmVolume, PROJECT_RUNTIME_DEFAULTS.defaultBgmVolume, 0, 100),
-      defaultSfxVolume: clampRuntimeInt(source.defaultSfxVolume, PROJECT_RUNTIME_DEFAULTS.defaultSfxVolume, 0, 100),
-      defaultVoiceVolume: clampRuntimeInt(source.defaultVoiceVolume, PROJECT_RUNTIME_DEFAULTS.defaultVoiceVolume, 0, 100),
-      defaultVoiceEnabled: source.defaultVoiceEnabled !== false,
-      defaultVoiceDuckingEnabled: source.defaultVoiceDuckingEnabled !== false,
-    };
+    if (typeof runtimeSettingsTools?.getProjectRuntimeSettings !== "function") {
+      throw new Error("CanvasiaEditorProjectRuntimeSettings must be loaded before renpy_exporter.js");
+    }
+    return runtimeSettingsTools.getProjectRuntimeSettings({ runtimeSettings: value });
   }
 
   function getEffectiveTextSpeed(block = {}, runtimeSettings = {}) {
-    const explicitSpeed = getSafeTextSpeed(block.textSpeed);
-    if (explicitSpeed) {
-      return explicitSpeed;
+    if (typeof runtimeSettingsTools?.getEffectiveTextSpeed !== "function") {
+      throw new Error("CanvasiaEditorProjectRuntimeSettings must be loaded before renpy_exporter.js");
     }
-    const defaultSpeed = sanitizeProjectRuntimeSettings(runtimeSettings).defaultTextSpeed;
-    return defaultSpeed === "normal" ? "" : defaultSpeed;
+    return runtimeSettingsTools.getEffectiveTextSpeed(block, runtimeSettings);
   }
 
   function renderRuntimeVolumeClause(block = {}, context = {}, runtimeKey) {
     if (block.volume !== undefined && block.volume !== null && block.volume !== "") {
       return renderVolumeClause(block.volume);
     }
-    const settings = sanitizeProjectRuntimeSettings(context.runtimeSettings);
-    return renderVolumeClause(settings[runtimeKey]);
+    if (typeof runtimeSettingsTools?.getRuntimeVolumeRatio !== "function") {
+      throw new Error("CanvasiaEditorProjectRuntimeSettings must be loaded before renpy_exporter.js");
+    }
+    return renderVolumeClause(runtimeSettingsTools.getRuntimeVolumeRatio(context.runtimeSettings, runtimeKey) * 100);
   }
 
   function getVideoCueSeconds(value) {
@@ -986,11 +958,6 @@
 
   function getBlockText(block = {}) {
     return cleanText(block.text ?? block.fields?.text);
-  }
-
-  function getSafeTextSpeed(speed) {
-    const safeSpeed = cleanText(speed);
-    return Object.hasOwn(TEXT_SPEED_CPS, safeSpeed) ? safeSpeed : "";
   }
 
   function renderRenpyText(block = {}, context = {}) {

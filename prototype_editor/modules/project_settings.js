@@ -1,4 +1,5 @@
 (function attachProjectSettingsTools(global) {
+  const runtimeSettingsTools = global.CanvasiaEditorProjectRuntimeSettings;
   const DEFAULT_RESOLUTION = Object.freeze({ width: 1280, height: 720 });
   const SUPPORTED_RESOLUTIONS = Object.freeze([
     Object.freeze({ width: 1280, height: 720, label: "HD 1280 × 720" }),
@@ -12,7 +13,8 @@
     script: "台词台本",
     preview: "预览导出",
   });
-  const DEFAULT_SAVE_SLOT_COUNT_LIMITS = Object.freeze({ min: 3, max: 120 });
+  const DEFAULT_SAVE_SLOT_COUNT_LIMITS =
+    runtimeSettingsTools?.DEFAULT_SAVE_SLOT_COUNT_LIMITS ?? Object.freeze({ min: 3, max: 120 });
   const DEFAULT_RUNTIME_TEXT_SPEED_LABELS = Object.freeze({
     slow: "慢一点",
     normal: "正常",
@@ -31,17 +33,19 @@
     light: "浅色模式",
     dark: "深色模式",
   });
-  const DEFAULT_RUNTIME_SETTINGS = Object.freeze({
-    formalSaveSlotCount: 24,
-    defaultTextSpeed: "normal",
-    defaultDialogTheme: "project",
-    defaultUiThemeMode: "auto",
-    defaultBgmVolume: 72,
-    defaultSfxVolume: 85,
-    defaultVoiceVolume: 92,
-    defaultVoiceEnabled: true,
-    defaultVoiceDuckingEnabled: true,
-  });
+  const DEFAULT_RUNTIME_SETTINGS =
+    runtimeSettingsTools?.DEFAULT_RUNTIME_SETTINGS ??
+    Object.freeze({
+      formalSaveSlotCount: 24,
+      defaultTextSpeed: "normal",
+      defaultDialogTheme: "project",
+      defaultUiThemeMode: "auto",
+      defaultBgmVolume: 72,
+      defaultSfxVolume: 85,
+      defaultVoiceVolume: 92,
+      defaultVoiceEnabled: true,
+      defaultVoiceDuckingEnabled: true,
+    });
   const DEFAULT_FRAME_SLICE = Object.freeze({ top: 18, right: 18, bottom: 18, left: 18 });
   const PROJECT_DIALOG_BOX_PRESET_LABELS = Object.freeze({
     moonlight: "夜色玻璃",
@@ -536,39 +540,52 @@
   }
 
   function getSafeProjectFormalSaveSlotCount(value, options = {}) {
+    if (runtimeSettingsTools?.getSafeProjectFormalSaveSlotCount) {
+      return runtimeSettingsTools.getSafeProjectFormalSaveSlotCount(value, options);
+    }
     const limits = options.saveSlotCountLimits || DEFAULT_SAVE_SLOT_COUNT_LIMITS;
     const defaults = options.defaultRuntimeSettings || DEFAULT_RUNTIME_SETTINGS;
-    return clamp(
-      Math.round(getSafeNumber(value, defaults.formalSaveSlotCount, options)),
-      limits.min,
-      limits.max,
-      options
-    );
+    return clamp(Math.round(getSafeNumber(value, defaults.formalSaveSlotCount, options)), limits.min, limits.max, options);
   }
 
   function getSafeProjectRuntimeTextSpeed(value, options = {}) {
+    if (runtimeSettingsTools?.getSafeProjectRuntimeTextSpeed) {
+      return runtimeSettingsTools.getSafeProjectRuntimeTextSpeed(value, options);
+    }
     const labels = options.runtimeTextSpeedLabels || DEFAULT_RUNTIME_TEXT_SPEED_LABELS;
     const defaults = options.defaultRuntimeSettings || DEFAULT_RUNTIME_SETTINGS;
     return getSafeLabelKey(labels, value, defaults.defaultTextSpeed);
   }
 
   function getSafeProjectRuntimeDialogTheme(value, options = {}) {
+    if (runtimeSettingsTools?.getSafeProjectRuntimeDialogTheme) {
+      return runtimeSettingsTools.getSafeProjectRuntimeDialogTheme(value, options);
+    }
     const labels = options.runtimeDialogThemeLabels || DEFAULT_RUNTIME_DIALOG_THEME_LABELS;
     const defaults = options.defaultRuntimeSettings || DEFAULT_RUNTIME_SETTINGS;
     return getSafeLabelKey(labels, value, defaults.defaultDialogTheme);
   }
 
   function getSafeProjectRuntimeUiThemeMode(value, options = {}) {
+    if (runtimeSettingsTools?.getSafeProjectRuntimeUiThemeMode) {
+      return runtimeSettingsTools.getSafeProjectRuntimeUiThemeMode(value, options);
+    }
     const labels = options.runtimeUiThemeModeLabels || DEFAULT_RUNTIME_UI_THEME_MODE_LABELS;
     const defaults = options.defaultRuntimeSettings || DEFAULT_RUNTIME_SETTINGS;
     return getSafeLabelKey(labels, value, defaults.defaultUiThemeMode);
   }
 
   function getSafeProjectRuntimeVolume(value, fallback = 100, options = {}) {
+    if (runtimeSettingsTools?.getSafeProjectRuntimeVolume) {
+      return runtimeSettingsTools.getSafeProjectRuntimeVolume(value, fallback, options);
+    }
     return clamp(Math.round(getSafeNumber(value, fallback, options)), 0, 100, options);
   }
 
   function getProjectRuntimeSettings(project, options = {}) {
+    if (runtimeSettingsTools?.getProjectRuntimeSettings) {
+      return runtimeSettingsTools.getProjectRuntimeSettings(project, options);
+    }
     const runtimeSettings = project?.runtimeSettings ?? {};
     const defaults = options.defaultRuntimeSettings || DEFAULT_RUNTIME_SETTINGS;
     return {
@@ -589,6 +606,9 @@
   }
 
   function getProjectFormalSaveSlotCount(project, options = {}) {
+    if (runtimeSettingsTools?.getProjectFormalSaveSlotCount) {
+      return runtimeSettingsTools.getProjectFormalSaveSlotCount(project, options);
+    }
     return getProjectRuntimeSettings(project, options).formalSaveSlotCount;
   }
 
