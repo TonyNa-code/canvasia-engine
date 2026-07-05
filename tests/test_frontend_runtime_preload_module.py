@@ -106,6 +106,117 @@ class FrontendRuntimePreloadModuleTests(unittest.TestCase):
         self.assertTrue(payload["status"]["finished"])
         self.assertGreaterEqual(payload["eventCount"], 3)
 
+    def test_runtime_preload_limits_concurrency_and_delays_deferred_assets(self) -> None:
+        script = textwrap.dedent(
+            f"""
+            import * as tools from {json.dumps(MODULE_PATH.as_uri())};
+
+            const pending = [];
+            const idleCallbacks = [];
+            const started = [];
+            const events = [];
+            let browserActive = 0;
+            let maxBrowserActive = 0;
+
+            function tick() {{
+              return new Promise((resolve) => setTimeout(resolve, 0));
+            }}
+
+            class SlowImage {{
+              set src(value) {{
+                this._src = value;
+                started.push(value);
+                browserActive += 1;
+                maxBrowserActive = Math.max(maxBrowserActive, browserActive);
+                pending.push(() => {{
+                  browserActive -= 1;
+                  this.onload?.();
+                }});
+              }}
+              get src() {{
+                return this._src;
+              }}
+            }}
+
+            const manifest = {{
+              formatVersion: 1,
+              entries: [
+                {{ assetId: "critical_a", type: "background", url: "assets/background/a.png", phase: "critical", priority: 100 }},
+                {{ assetId: "critical_b", type: "background", url: "assets/background/b.png", phase: "critical", priority: 99 }},
+                {{ assetId: "critical_c", type: "background", url: "assets/background/c.png", phase: "critical", priority: 98 }},
+                {{ assetId: "critical_d", type: "background", url: "assets/background/d.png", phase: "critical", priority: 97 }},
+                {{ assetId: "early_a", type: "background", url: "assets/background/early.png", phase: "early", priority: 72 }},
+              ],
+            }};
+
+            const controller = tools.startRuntimePreload(manifest, {{
+              ImageCtor: SlowImage,
+              maxConcurrent: 2,
+              requestIdleCallback(callback) {{ idleCallbacks.push(callback); }},
+              timeoutMs: 500,
+              onProgress(status) {{ events.push(status); }},
+            }});
+
+            await tick();
+            const afterStart = controller.getStatus();
+            const firstWave = started.map((value) => value.split("/").pop());
+
+            while (pending.length) {{
+              const finish = pending.shift();
+              finish();
+              await tick();
+              if (controller.getStatus().loadedCount >= 4) {{
+                break;
+              }}
+            }}
+            await tick();
+            const beforeIdle = controller.getStatus();
+            const beforeIdleStarted = started.map((value) => value.split("/").pop());
+
+            idleCallbacks.shift()?.();
+            await tick();
+            const afterIdleStarted = started.map((value) => value.split("/").pop());
+            while (pending.length) {{
+              const finish = pending.shift();
+              finish();
+              await tick();
+            }}
+            await tick();
+
+            process.stdout.write(JSON.stringify({{
+              afterStart,
+              beforeIdle,
+              finalStatus: controller.getStatus(),
+              firstWave,
+              beforeIdleStarted,
+              afterIdleStarted,
+              maxBrowserActive,
+              eventCount: events.length,
+            }}));
+            """
+        )
+        completed = subprocess.run(
+            ["node", "--input-type=module", "-e", script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        self.assertEqual(payload["afterStart"]["activeCount"], 2)
+        self.assertEqual(payload["afterStart"]["maxConcurrent"], 2)
+        self.assertEqual(payload["firstWave"], ["a.png", "b.png"])
+        self.assertEqual(payload["beforeIdle"]["loadedCount"], 4)
+        self.assertFalse(payload["beforeIdle"]["finished"])
+        self.assertNotIn("early.png", payload["beforeIdleStarted"])
+        self.assertIn("early.png", payload["afterIdleStarted"])
+        self.assertLessEqual(payload["maxBrowserActive"], 2)
+        self.assertEqual(payload["finalStatus"]["loadedCount"], 5)
+        self.assertTrue(payload["finalStatus"]["finished"])
+        self.assertGreaterEqual(payload["eventCount"], 5)
+
 
 if __name__ == "__main__":
     unittest.main()

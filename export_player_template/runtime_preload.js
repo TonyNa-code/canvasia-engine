@@ -199,12 +199,16 @@ function scheduleIdle(callback, idleScheduler = globalThis.requestIdleCallback) 
 
 export function startRuntimePreload(manifest, options = {}) {
   const normalized = normalizeRuntimePreloadManifest(manifest);
+  const maxConcurrent = Math.max(1, Math.min(8, Math.floor(Number(options.maxConcurrent)) || 4));
   const status = {
     totalCount: normalized.entries.length,
     queuedCount: normalized.entries.length,
     loadedCount: 0,
     failedCount: 0,
     criticalCount: normalized.entries.filter((entry) => entry.phase === "critical").length,
+    activeCount: 0,
+    waitingCount: normalized.entries.length,
+    maxConcurrent,
     started: normalized.entries.length > 0,
     finished: normalized.entries.length === 0,
   };
@@ -217,38 +221,73 @@ export function startRuntimePreload(manifest, options = {}) {
   };
   const onProgress = typeof options.onProgress === "function" ? options.onProgress : null;
   let stopped = false;
+  let deferredReady = false;
+
+  const criticalQueue = normalized.entries.filter((entry) => entry.phase === "critical");
+  const deferredQueue = normalized.entries.filter((entry) => entry.phase !== "critical");
+  const updateWaitingCount = () => {
+    status.waitingCount = criticalQueue.length + (deferredReady ? deferredQueue.length : 0);
+  };
+  const emitProgress = () => onProgress?.({ ...status });
 
   const mark = (ok) => {
     if (stopped) {
       return;
     }
+    status.activeCount = Math.max(0, status.activeCount - 1);
     if (ok) {
       status.loadedCount += 1;
     } else {
       status.failedCount += 1;
     }
     status.finished = status.loadedCount + status.failedCount >= status.totalCount;
-    onProgress?.({ ...status });
+    updateWaitingCount();
+    emitProgress();
+    pumpQueue();
   };
 
-  const loadEntries = (entries) => {
-    entries.forEach((entry) => {
+  const takeNextEntry = () => {
+    if (criticalQueue.length) {
+      return criticalQueue.shift();
+    }
+    if (deferredReady && deferredQueue.length) {
+      return deferredQueue.shift();
+    }
+    return null;
+  };
+
+  function pumpQueue() {
+    if (stopped || status.finished) {
+      return;
+    }
+    updateWaitingCount();
+    while (status.activeCount < maxConcurrent) {
+      const entry = takeNextEntry();
+      if (!entry) {
+        break;
+      }
+      status.activeCount += 1;
+      updateWaitingCount();
       preloadEntry(entry, safeOptions).then(mark).catch(() => mark(false));
-    });
-  };
+    }
+  }
 
-  const criticalEntries = normalized.entries.filter((entry) => entry.phase === "critical");
-  const deferredEntries = normalized.entries.filter((entry) => entry.phase !== "critical");
-  loadEntries(criticalEntries);
+  pumpQueue();
   scheduleIdle(() => {
     if (!stopped) {
-      loadEntries(deferredEntries);
+      deferredReady = true;
+      pumpQueue();
     }
   }, options.requestIdleCallback);
 
   return {
     stop() {
       stopped = true;
+      criticalQueue.length = 0;
+      deferredQueue.length = 0;
+      status.activeCount = 0;
+      status.waitingCount = 0;
+      status.finished = true;
     },
     getStatus() {
       return { ...status };
