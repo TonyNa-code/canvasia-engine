@@ -46,6 +46,33 @@ class FrontendScriptReadabilityModuleTests(unittest.TestCase):
               limit: 80,
             }});
             const sceneSplitPlan = tools.buildReadableSceneSplitPlan(splitScene, {{ limit: 80 }});
+            const projectData = {{
+              chapters: [
+                {{ chapterId: "chapter_1", name: "第一章", sceneOrder: ["scene_clean", "scene_a"] }},
+                {{ chapterId: "chapter_2", name: "第二章", scenes: [
+                  {{
+                    id: "scene_b",
+                    name: "雨夜",
+                    blocks: [
+                      {{ id: "rain_line", type: "narration", text: splitCandidate }},
+                    ],
+                  }},
+                ] }},
+              ],
+              scenes: [
+                {{ id: "scene_clean", name: "短文本", blocks: [{{ id: "short", type: "dialogue", text: "短句。" }}] }},
+                splitScene,
+                {{
+                  id: "scene_orphan",
+                  name: "额外场景",
+                  blocks: [
+                    {{ id: "orphan_line", type: "dialogue", text: splitCandidate }},
+                  ],
+                }},
+              ],
+            }};
+            const projectSplitPlan = tools.buildReadableProjectSplitPlan(projectData, {{ limit: 80 }});
+            const projectDigest = tools.getReadableProjectSplitDigest(projectData, {{ limit: 80, sceneNameLimit: 2 }});
             const unsupportedPlan = tools.buildReadableBlockSplitPlan(
               {{ id: "choice_1", type: "choice", text: splitCandidate }},
               {{ limit: 80 }}
@@ -112,6 +139,24 @@ class FrontendScriptReadabilityModuleTests(unittest.TestCase):
                 ids: sceneSplitPlan.scene.blocks.map((block) => block.id),
                 secondVoiceAssetId: sceneSplitPlan.scene.blocks[1]?.voiceAssetId ?? null,
               }},
+              projectSceneIds: tools.getProjectReadableSceneList(projectData).map((scene) => scene.id),
+              projectSplitPlan: {{
+                changed: projectSplitPlan.changed,
+                changedSceneCount: projectSplitPlan.changedSceneCount,
+                splitCount: projectSplitPlan.splitCount,
+                addedBlockCount: projectSplitPlan.addedBlockCount,
+                firstChangedSceneId: projectSplitPlan.firstChangedSceneId,
+                firstSplitBlockId: projectSplitPlan.firstSplitBlockId,
+                sceneNames: projectSplitPlan.scenePlans.map((plan) => plan.sceneName),
+                firstAddedVoiceAssetId: projectSplitPlan.scenePlans[0].scene.blocks[1]?.voiceAssetId ?? null,
+                summary: projectSplitPlan.summary,
+              }},
+              projectDigest: {{
+                canApply: projectDigest.canApply,
+                actionLabel: projectDigest.actionLabel,
+                badgeLabel: projectDigest.badgeLabel,
+                helperText: projectDigest.helperText,
+              }},
               unsupportedReason: unsupportedPlan.reason,
             }};
             process.stdout.write(JSON.stringify(result));
@@ -168,6 +213,20 @@ class FrontendScriptReadabilityModuleTests(unittest.TestCase):
         self.assertGreater(payload["sceneSplitPlan"]["blockCount"], 3)
         self.assertEqual(len(payload["sceneSplitPlan"]["ids"]), len(set(payload["sceneSplitPlan"]["ids"])))
         self.assertIsNone(payload["sceneSplitPlan"]["secondVoiceAssetId"])
+        self.assertEqual(payload["projectSceneIds"], ["scene_clean", "scene_a", "scene_b", "scene_orphan"])
+        self.assertTrue(payload["projectSplitPlan"]["changed"])
+        self.assertEqual(payload["projectSplitPlan"]["changedSceneCount"], 3)
+        self.assertEqual(payload["projectSplitPlan"]["splitCount"], 3)
+        self.assertGreaterEqual(payload["projectSplitPlan"]["addedBlockCount"], 3)
+        self.assertEqual(payload["projectSplitPlan"]["firstChangedSceneId"], "scene_a")
+        self.assertEqual(payload["projectSplitPlan"]["firstSplitBlockId"], "block_001")
+        self.assertEqual(payload["projectSplitPlan"]["sceneNames"], ["scene_a", "雨夜", "额外场景"])
+        self.assertIsNone(payload["projectSplitPlan"]["firstAddedVoiceAssetId"])
+        self.assertIn("已准备整理 3 个场景", payload["projectSplitPlan"]["summary"])
+        self.assertTrue(payload["projectDigest"]["canApply"])
+        self.assertIn("整理全项目长文本", payload["projectDigest"]["actionLabel"])
+        self.assertIn("3 个场景可整理", payload["projectDigest"]["badgeLabel"])
+        self.assertIn("不改文字内容", payload["projectDigest"]["helperText"])
         self.assertEqual(payload["unsupportedReason"], "unsupported_block")
 
 

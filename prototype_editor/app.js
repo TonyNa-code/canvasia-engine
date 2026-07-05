@@ -909,6 +909,7 @@ const state = {
   starterVariablesPromise: null,
   projectCenterRefreshInFlight: false,
   projectPresentationPolishInFlight: false,
+  projectReadableSplitInFlight: false,
   audioCueAutoFixInFlight: false,
   projectCreateInFlight: false,
   projectOpenInFlightId: "",
@@ -4781,6 +4782,11 @@ async function handleClick(event) {
 
   if (action === "split-readable-scene") {
     void splitSelectedSceneReadableBlocks();
+    return;
+  }
+
+  if (action === "split-readable-project") {
+    void splitProjectReadableBlocks();
     return;
   }
 
@@ -10579,6 +10585,15 @@ function renderDashboardPrimaryActions(isBlankProject) {
   const projectPolishLabel = state.projectPresentationPolishInFlight
     ? "全项目润色中..."
     : projectPolishDigest?.actionLabel ?? "润色全项目演出";
+  const projectReadableDigest =
+    typeof scriptReadabilityTools !== "undefined" && typeof scriptReadabilityTools?.getReadableProjectSplitDigest === "function"
+      ? scriptReadabilityTools.getReadableProjectSplitDigest(state.data)
+      : null;
+  const projectReadableDisabled =
+    state.projectReadableSplitInFlight || (projectReadableDigest ? !projectReadableDigest.canApply : false);
+  const projectReadableLabel = state.projectReadableSplitInFlight
+    ? "长文本整理中..."
+    : projectReadableDigest?.actionLabel ?? "整理全项目长文本";
   const safeEscapeHtml =
     typeof escapeHtml === "function"
       ? escapeHtml
@@ -10599,6 +10614,14 @@ function renderDashboardPrimaryActions(isBlankProject) {
       title="${safeEscapeHtml(projectPolishDigest?.helperText ?? "批量补齐全项目基础转场、淡入淡出、音量和文字速度。")}"
     >
       ${safeEscapeHtml(projectPolishLabel)}
+    </button>
+    <button
+      class="toolbar-button"
+      data-action="split-readable-project"
+      ${projectReadableDisabled ? 'disabled aria-disabled="true"' : ""}
+      title="${safeEscapeHtml(projectReadableDigest?.helperText ?? "批量把过长台词和旁白拆成更适合阅读的卡片。")}"
+    >
+      ${safeEscapeHtml(projectReadableLabel)}
     </button>
     <button class="toolbar-button" data-action="switch-screen" data-screen="preview">
       查看试玩页
@@ -10673,6 +10696,20 @@ function setProjectPresentationPolishInFlight(isInFlight) {
     isBusy: state.projectPresentationPolishInFlight,
     busyLabel: "全项目润色中...",
     idleLabelKey: "projectPresentationPolishIdleLabel",
+  });
+}
+
+function setProjectReadableSplitInFlight(isInFlight) {
+  state.projectReadableSplitInFlight = Boolean(isInFlight);
+  if (!state.projectReadableSplitInFlight && state.currentScreen === "dashboard") {
+    renderDashboard();
+    return;
+  }
+  setActionButtonBusyState({
+    selector: '[data-action="split-readable-project"]',
+    isBusy: state.projectReadableSplitInFlight,
+    busyLabel: "长文本整理中...",
+    idleLabelKey: "projectReadableSplitIdleLabel",
   });
 }
 
@@ -41679,6 +41716,56 @@ async function splitSelectedSceneReadableBlocks() {
   }
 
   return success;
+}
+
+async function splitProjectReadableBlocks() {
+  if (state.projectReadableSplitInFlight) {
+    showToast("全项目长文本正在整理中，请稍等");
+    return false;
+  }
+  if (typeof scriptReadabilityTools?.buildReadableProjectSplitPlan !== "function") {
+    showToast("当前版本暂时不能批量整理长文本", "error");
+    return false;
+  }
+
+  const splitPlan = scriptReadabilityTools.buildReadableProjectSplitPlan(state.data ?? {});
+  if (!splitPlan.changed) {
+    setSaveStatus("全项目台词和旁白长度已经比较舒适");
+    showToast("全项目台词和旁白长度已经比较舒适");
+    return false;
+  }
+
+  setProjectReadableSplitInFlight(true);
+  setSaveStatus(`正在整理 ${splitPlan.changedSceneCount} 个场景的长文本...`);
+
+  try {
+    for (const scenePlan of splitPlan.scenePlans) {
+      const success = await persistScene(scenePlan.scene, {
+        reloadAfterSave: false,
+        selectedSceneId: scenePlan.sceneId,
+        selectedBlockId: scenePlan.firstSplitBlockId,
+        previewSceneId: scenePlan.sceneId,
+        previewBlockIndex: Math.max(scenePlan.firstSplitIndex, 0),
+        successMessage: `已整理长文本：${scenePlan.sceneName}`,
+      });
+      if (!success) {
+        return false;
+      }
+    }
+
+    await reloadProjectData({
+      ...getCurrentUiState(),
+      selectedSceneId: splitPlan.firstChangedSceneId || state.selectedSceneId,
+      selectedBlockId: splitPlan.firstSplitBlockId || state.selectedBlockId,
+      previewSceneId: splitPlan.firstChangedSceneId || state.previewSceneId,
+      previewBlockIndex: Math.max(splitPlan.firstSplitIndex, 0),
+    });
+    setSaveStatus(splitPlan.summary);
+    showToast(splitPlan.summary);
+    return true;
+  } finally {
+    setProjectReadableSplitInFlight(false);
+  }
 }
 
 async function polishSelectedScenePresentation() {

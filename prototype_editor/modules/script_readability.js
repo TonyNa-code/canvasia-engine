@@ -171,12 +171,81 @@
     return JSON.parse(JSON.stringify(value ?? null));
   }
 
+  function toReadableArray(value) {
+    return Array.isArray(value) ? value : [];
+  }
+
   function normalizeReadableSceneBlocks(sceneOrBlocks) {
     if (Array.isArray(sceneOrBlocks)) {
       return sceneOrBlocks;
     }
 
     return Array.isArray(sceneOrBlocks?.blocks) ? sceneOrBlocks.blocks : [];
+  }
+
+  function cleanReadableText(value, fallback = "") {
+    const text = String(value ?? "").trim();
+    return text || fallback;
+  }
+
+  function addReadableSceneToLookup(lookup, scene, fallbackId = "") {
+    const sceneId = cleanReadableText(scene?.id, cleanReadableText(fallbackId));
+    if (sceneId && !lookup.has(sceneId)) {
+      lookup.set(sceneId, scene);
+    }
+  }
+
+  function buildReadableSceneLookup(data = {}) {
+    const lookup = new Map();
+    if (data.scenesById && typeof data.scenesById.forEach === "function") {
+      data.scenesById.forEach((scene, id) => addReadableSceneToLookup(lookup, scene, id));
+    } else if (data.scenesById && typeof data.scenesById === "object") {
+      Object.entries(data.scenesById).forEach(([id, scene]) => addReadableSceneToLookup(lookup, scene, id));
+    }
+    toReadableArray(data.scenes).forEach((scene) => addReadableSceneToLookup(lookup, scene));
+    toReadableArray(data.chapters).forEach((chapter) => {
+      toReadableArray(chapter.scenes).forEach((scene) => addReadableSceneToLookup(lookup, scene));
+    });
+    return lookup;
+  }
+
+  function getReadableSceneFromLookup(lookup, sceneId) {
+    const safeId = cleanReadableText(sceneId);
+    return safeId ? lookup.get(safeId) ?? null : null;
+  }
+
+  function getProjectReadableSceneList(data = {}) {
+    const lookup = buildReadableSceneLookup(data);
+    const scenes = [];
+    const seen = new Set();
+    const pushScene = (scene, chapter = {}) => {
+      const sceneId = cleanReadableText(scene?.id);
+      if (!sceneId || seen.has(sceneId)) {
+        return;
+      }
+      seen.add(sceneId);
+      scenes.push({
+        ...(scene ?? {}),
+        id: sceneId,
+        chapterId: cleanReadableText(scene?.chapterId) || cleanReadableText(chapter.chapterId ?? chapter.id),
+        chapterName: cleanReadableText(scene?.chapterName) || cleanReadableText(chapter.name ?? chapter.title),
+      });
+    };
+
+    toReadableArray(data.chapters).forEach((chapter) => {
+      const sceneIds = toReadableArray(chapter.sceneOrder).map((sceneId) => cleanReadableText(sceneId)).filter(Boolean);
+      if (sceneIds.length) {
+        sceneIds.forEach((sceneId) => pushScene(getReadableSceneFromLookup(lookup, sceneId), chapter));
+        return;
+      }
+      toReadableArray(chapter.scenes).forEach((scene) => pushScene(scene, chapter));
+    });
+
+    toReadableArray(data.scenes).forEach((scene) => pushScene(scene));
+    if (data.scenesById && typeof data.scenesById.forEach === "function") {
+      data.scenesById.forEach((scene) => pushScene(scene));
+    }
+    return scenes;
   }
 
   function isReadableTextBlock(block) {
@@ -302,6 +371,63 @@
     };
   }
 
+  function buildReadableProjectSplitSummary(scenePlans = []) {
+    const safePlans = toReadableArray(scenePlans);
+    const splitCount = safePlans.reduce((total, plan) => total + (plan.splitCount ?? 0), 0);
+    const addedBlockCount = safePlans.reduce((total, plan) => total + (plan.addedBlockCount ?? 0), 0);
+    if (!safePlans.length) {
+      return "全项目台词和旁白长度已经比较舒适";
+    }
+    return `已准备整理 ${safePlans.length} 个场景、${splitCount} 张长文本，预计新增 ${addedBlockCount} 张卡片`;
+  }
+
+  function buildReadableProjectSplitPlan(data = {}, options = {}) {
+    const scenePlans = getProjectReadableSceneList(data)
+      .map((scene) => {
+        const plan = buildReadableSceneSplitPlan(scene, options);
+        return plan.changed
+          ? {
+              ...plan,
+              sceneId: cleanReadableText(scene.id),
+              sceneName: cleanReadableText(scene.name ?? scene.title, scene.id),
+              chapterId: cleanReadableText(scene.chapterId),
+              chapterName: cleanReadableText(scene.chapterName),
+            }
+          : null;
+      })
+      .filter(Boolean);
+
+    return {
+      changed: scenePlans.length > 0,
+      scenePlans,
+      changedSceneCount: scenePlans.length,
+      splitCount: scenePlans.reduce((total, plan) => total + (plan.splitCount ?? 0), 0),
+      addedBlockCount: scenePlans.reduce((total, plan) => total + (plan.addedBlockCount ?? 0), 0),
+      firstChangedSceneId: scenePlans[0]?.sceneId ?? "",
+      firstSplitBlockId: scenePlans[0]?.firstSplitBlockId ?? "",
+      firstSplitIndex: scenePlans[0]?.firstSplitIndex ?? -1,
+      summary: buildReadableProjectSplitSummary(scenePlans),
+    };
+  }
+
+  function getReadableProjectSplitDigest(data = {}, options = {}) {
+    const plan = buildReadableProjectSplitPlan(data, options);
+    const previewNames = plan.scenePlans
+      .slice(0, Math.max(1, Number(options.sceneNameLimit) || 3))
+      .map((scenePlan) => scenePlan.sceneName)
+      .filter(Boolean);
+
+    return {
+      canApply: plan.changed,
+      actionLabel: plan.changed ? `整理全项目长文本 ${plan.splitCount} 张` : "全项目文本长度舒适",
+      badgeLabel: plan.changed ? `${plan.changedSceneCount} 个场景可整理` : "无需拆卡",
+      helperText: plan.changed
+        ? `会处理 ${previewNames.join("、")}${plan.changedSceneCount > previewNames.length ? " 等场景" : ""}；只拆台词和旁白，不改文字内容。`
+        : "全项目台词和旁白长度已经比较舒适。",
+      plan,
+    };
+  }
+
   function getReadableTextToolState(text) {
     const metrics = getReadableTextMetrics(text);
     const isLong = isReadableTextLong(text);
@@ -338,5 +464,9 @@
     createReadableBlockIdAllocator,
     buildReadableBlockSplitPlan,
     buildReadableSceneSplitPlan,
+    getProjectReadableSceneList,
+    buildReadableProjectSplitSummary,
+    buildReadableProjectSplitPlan,
+    getReadableProjectSplitDigest,
   });
 })(typeof window !== "undefined" ? window : globalThis);

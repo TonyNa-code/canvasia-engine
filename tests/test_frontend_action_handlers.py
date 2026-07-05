@@ -1926,6 +1926,8 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn('disabled aria-disabled="true"', payload["busyBlankMarkup"])
         self.assertIn("进入剧情编辑", payload["activeMarkup"])
         self.assertIn('data-action="switch-screen" data-screen="story"', payload["activeMarkup"])
+        self.assertIn('data-action="split-readable-project"', payload["activeMarkup"])
+        self.assertIn("整理全项目长文本", payload["activeMarkup"])
         self.assertIn("查看试玩页", payload["activeMarkup"])
         self.assertIn("打开素材页", payload["activeMarkup"])
         self.assertNotIn('data-action="create-first-chapter"', payload["activeMarkup"])
