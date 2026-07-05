@@ -301,6 +301,37 @@
     return ratio === 1 ? "" : ` volume ${ratio}`;
   }
 
+  function getVideoCueSeconds(value) {
+    const number = Number(value ?? 0);
+    return Number.isFinite(number) && number > 0 ? Number(number.toFixed(2)) : 0;
+  }
+
+  function buildVideoPlaybackSpec(path, block = {}, context = {}) {
+    const start = getVideoCueSeconds(block.startTimeSeconds);
+    let end = getVideoCueSeconds(block.endTimeSeconds);
+    const volume = getSafeVolumeRatio(block.volume, 100);
+    if (end > 0 && end <= start) {
+      pushWarning(context.warnings ?? [], "renpy_video_timing_review", "视频结束时间早于或等于开始时间，已忽略结束时间。", getWarningContext(context));
+      end = 0;
+    }
+
+    const clauses = [];
+    if (start > 0) {
+      clauses.push("from", formatRenpySeconds(start));
+    }
+    if (end > 0) {
+      clauses.push("to", formatRenpySeconds(end));
+    }
+    if (volume !== 1) {
+      clauses.push("volume", formatRenpySeconds(volume));
+    }
+    const playbackPath = clauses.length ? `<${clauses.join(" ")}>${path}` : path;
+    return {
+      path: playbackPath,
+      delay: end > start ? Number((end - start).toFixed(2)) : 0,
+    };
+  }
+
   function renderMusicLoopClause(block = {}) {
     if (block.loop === true) {
       return " loop";
@@ -1057,15 +1088,9 @@
       return [`    # Canvasia review missing video: ${quoteRenpy(cleanText(block.assetId, "video"))}`];
     }
 
-    const lines = [];
-    const start = Number(block.startTimeSeconds ?? 0);
-    const end = Number(block.endTimeSeconds ?? 0);
-    if ((Number.isFinite(start) && start > 0) || (Number.isFinite(end) && end > 0) || block.volume) {
-      pushWarning(context.warnings ?? [], "renpy_video_timing_review", "视频裁段或音量设置需要在 Ren'Py 中复核。", getWarningContext(context));
-      lines.push(`    # Canvasia review video timing: start=${Number.isFinite(start) ? start : 0}, end=${Number.isFinite(end) ? end : 0}, volume=${block.volume ?? "default"}`);
-    }
-    lines.push(`    $ renpy.movie_cutscene(${quoteRenpy(path)})`);
-    return lines;
+    const playback = buildVideoPlaybackSpec(path, block, context);
+    const delayClause = playback.delay > 0 ? `, delay=${formatRenpySeconds(playback.delay)}` : "";
+    return [`    $ renpy.movie_cutscene(${quoteRenpy(playback.path)}${delayClause})`];
   }
 
   function renderCreditsBlock(block = {}) {

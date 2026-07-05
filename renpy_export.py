@@ -20,6 +20,7 @@ RENPY_PATH_SUFFIX_PATTERN = re.compile(
     r"\.(?:png|jpe?g|webp|gif|avif|mp3|ogg|wav|m4a|aac|flac|mp4|webm|mov|m4v)$",
     re.IGNORECASE,
 )
+RENPY_PLAYBACK_SPEC_PREFIX_PATTERN = re.compile(r"^<[^>]+>")
 
 COMMENT_ONLY_BLOCK_TYPES: set[str] = set()
 CONDITION_OPERATORS = {"==", "!=", ">=", "<=", ">", "<"}
@@ -200,6 +201,42 @@ def get_safe_volume_ratio(value: Any, fallback: float = 100) -> float:
 def render_volume_clause(value: Any, fallback: float = 100) -> str:
     ratio = get_safe_volume_ratio(value, fallback)
     return "" if ratio == 1 else f" volume {ratio:g}"
+
+
+def get_video_cue_seconds(value: Any) -> float:
+    try:
+        seconds = float(value if value not in (None, "") else 0)
+    except (TypeError, ValueError):
+        seconds = 0
+    return round(seconds, 2) if seconds > 0 else 0
+
+
+def build_video_playback_spec(path: str, block: dict, context: dict) -> dict:
+    start = get_video_cue_seconds(block.get("startTimeSeconds"))
+    end = get_video_cue_seconds(block.get("endTimeSeconds"))
+    volume = get_safe_volume_ratio(block.get("volume"), 100)
+    if end > 0 and end <= start:
+        add_warning(
+            context["warnings"],
+            "renpy_video_timing_review",
+            "视频结束时间早于或等于开始时间，已忽略结束时间。",
+            sceneId=context.get("sceneId"),
+            blockIndex=context.get("blockIndex"),
+        )
+        end = 0
+
+    clauses: list[str] = []
+    if start > 0:
+        clauses.extend(["from", format_renpy_seconds(start)])
+    if end > 0:
+        clauses.extend(["to", format_renpy_seconds(end)])
+    if volume != 1:
+        clauses.extend(["volume", format_renpy_seconds(volume)])
+    playback_path = f"<{' '.join(clauses)}>{path}" if clauses else path
+    return {
+        "path": playback_path,
+        "delay": round(end - start, 2) if end > start else 0,
+    }
 
 
 def render_music_loop_clause(block: dict) -> str:
@@ -1058,26 +1095,9 @@ def render_video_block(block: dict, context: dict) -> list[str]:
         )
         return [f"    # Canvasia review missing video: {quote_renpy(clean_text(block.get('assetId'), 'video'))}"]
 
-    lines: list[str] = []
-    try:
-        start = float(block.get("startTimeSeconds") or 0)
-    except (TypeError, ValueError):
-        start = 0
-    try:
-        end = float(block.get("endTimeSeconds") or 0)
-    except (TypeError, ValueError):
-        end = 0
-    if start > 0 or end > 0 or block.get("volume") not in (None, ""):
-        add_warning(
-            context["warnings"],
-            "renpy_video_timing_review",
-            "视频裁段或音量设置需要在 Ren'Py 中复核。",
-            sceneId=context.get("sceneId"),
-            blockIndex=context.get("blockIndex"),
-        )
-        lines.append(f"    # Canvasia review video timing: start={start:g}, end={end:g}, volume={block.get('volume', 'default')}")
-    lines.append(f"    $ renpy.movie_cutscene({quote_renpy(path)})")
-    return lines
+    playback = build_video_playback_spec(path, block, context)
+    delay_clause = f", delay={format_renpy_seconds(playback['delay'])}" if playback["delay"] > 0 else ""
+    return [f"    $ renpy.movie_cutscene({quote_renpy(playback['path'])}{delay_clause})"]
 
 
 def render_credits_block(block: dict) -> list[str]:
@@ -1388,8 +1408,18 @@ def build_renpy_readme(export_result: dict) -> str:
     )
 
 
-def is_renpy_asset_reference(value: str) -> bool:
+def normalize_renpy_asset_reference(value: str) -> str:
     clean_value = value.strip().replace("\\", "/")
+    while clean_value.startswith("<"):
+        next_value = RENPY_PLAYBACK_SPEC_PREFIX_PATTERN.sub("", clean_value, count=1).strip()
+        if next_value == clean_value:
+            break
+        clean_value = next_value
+    return clean_value
+
+
+def is_renpy_asset_reference(value: str) -> bool:
+    clean_value = normalize_renpy_asset_reference(value)
     return bool(clean_value and not clean_value.startswith(("#", "data:", "http://", "https://")) and RENPY_PATH_SUFFIX_PATTERN.search(clean_value))
 
 
@@ -1409,7 +1439,7 @@ def collect_renpy_script_references(script: str) -> dict:
     for match in quoted_pattern.finditer(script):
         value = match.group(1).replace('\\"', '"').replace("\\\\", "\\")
         if is_renpy_asset_reference(value):
-            asset_references.append(value.replace("\\", "/"))
+            asset_references.append(normalize_renpy_asset_reference(value))
 
     return {
         "labels": sorted(label_counts),
@@ -1565,10 +1595,21 @@ GAME_DIR = ROOT / "{RENPY_GAME_DIR_NAME}"
 SCRIPT_PATH = GAME_DIR / "{RENPY_SCRIPT_FILE_NAME}"
 OPTIONS_PATH = GAME_DIR / "{RENPY_OPTIONS_FILE_NAME}"
 PATH_SUFFIX_PATTERN = re.compile(r"\\.(?:png|jpe?g|webp|gif|avif|mp3|ogg|wav|m4a|aac|flac|mp4|webm|mov|m4v)$", re.IGNORECASE)
+PLAYBACK_SPEC_PREFIX_PATTERN = re.compile(r"^<[^>]+>")
+
+
+def normalize_asset_reference(value: str) -> str:
+    clean = value.strip().replace("\\\\", "/")
+    while clean.startswith("<"):
+        next_clean = PLAYBACK_SPEC_PREFIX_PATTERN.sub("", clean, count=1).strip()
+        if next_clean == clean:
+            break
+        clean = next_clean
+    return clean
 
 
 def is_asset_reference(value: str) -> bool:
-    clean = value.strip().replace("\\\\", "/")
+    clean = normalize_asset_reference(value)
     return bool(clean and not clean.startswith(("#", "data:", "http://", "https://")) and PATH_SUFFIX_PATTERN.search(clean))
 
 
@@ -1593,8 +1634,9 @@ def main() -> int:
             issues.append(f"undefined jump target: {{jump}}")
     for quoted in re.findall(r'"((?:\\\\"|[^"])*)"', script):
         path = quoted.replace('\\\\"', '"').replace("\\\\\\\\", "\\\\").replace("\\\\", "/")
-        if is_asset_reference(path) and not (GAME_DIR / path).is_file():
-            issues.append(f"missing asset reference: {{path}}")
+        normalized_path = normalize_asset_reference(path)
+        if is_asset_reference(normalized_path) and not (GAME_DIR / normalized_path).is_file():
+            issues.append(f"missing asset reference: {{normalized_path}}")
 
     if issues:
         print("Canvasia Ren'Py Starter verification failed:")

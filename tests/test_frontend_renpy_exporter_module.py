@@ -139,7 +139,7 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
         self.assertEqual(payload["draft"]["characterCount"], 1)
         self.assertEqual(payload["draft"]["variableDefinitionCount"], 2)
         self.assertGreaterEqual(payload["draft"]["assetDefinitionCount"], 1)
-        self.assertEqual(payload["digest"]["status"], "review")
+        self.assertEqual(payload["digest"]["status"], "ready")
         self.assertIn('define yuna = Character("悠奈")', payload["draft"]["script"])
         self.assertIn("default affection = 0", payload["draft"]["script"])
         self.assertIn('default route = "common"', payload["draft"]["script"])
@@ -169,7 +169,7 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
         self.assertIn('$ route = "good"', payload["draft"]["script"])
         self.assertIn("$ affection += 2", payload["draft"]["script"])
         self.assertIn("if affection >= 2:", payload["draft"]["script"])
-        self.assertIn("$ renpy.movie_cutscene(\"video/op.webm\")", payload["draft"]["script"])
+        self.assertIn('$ renpy.movie_cutscene("<from 1.5 to 12 volume 0.8>video/op.webm", delay=10.5)', payload["draft"]["script"])
         self.assertIn("jump scene_end", payload["draft"]["script"])
         self.assertIn("$ renpy.pause(1.2)", payload["draft"]["script"])
         self.assertIn("with hpunch", payload["draft"]["script"])
@@ -182,10 +182,10 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
         self.assertIn('show text "STAFF\\nThank you\\n企划：Canvasia\\n剧本：Tester" at truecenter with dissolve', payload["draft"]["script"])
         self.assertNotIn("renpy_choice_effects_review", payload["manifest"])
         self.assertNotIn("renpy_comment_only_block", payload["manifest"])
-        self.assertIn("renpy_video_timing_review", payload["manifest"])
+        self.assertNotIn("renpy_video_timing_review", payload["manifest"])
         self.assertNotIn("renpy_music_scope_review", payload["manifest"])
         self.assertIn("变量默认值：2", payload["manifest"])
-        self.assertIn("scene_open", payload["manifest"])
+        self.assertIn("暂无需要人工复核的迁移提示。", payload["manifest"])
 
 
 if __name__ == "__main__":
