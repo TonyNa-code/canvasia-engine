@@ -574,6 +574,27 @@
     };
   }
 
+  function getProductionBacklogOverviewValue(context = {}) {
+    const backlog = context.productionBacklog && typeof context.productionBacklog === "object" ? context.productionBacklog : {};
+    const summary =
+      context.productionBacklogSummary && typeof context.productionBacklogSummary === "object"
+        ? context.productionBacklogSummary
+        : backlog.summary && typeof backlog.summary === "object"
+          ? backlog.summary
+          : null;
+    if (!summary) {
+      return "";
+    }
+    const taskCount = toCount(summary.taskCount);
+    const blockerCount = toCount(summary.blockerCount);
+    const warningCount = toCount(summary.warningCount);
+    const tipCount = toCount(summary.tipCount);
+    const readinessPercent = toCount(summary.readinessPercent);
+    return taskCount > 0
+      ? `${taskCount} 项，先修 ${blockerCount} / 优先 ${warningCount} / 润色 ${tipCount}，就绪度 ${readinessPercent}%`
+      : `0 项，就绪度 ${readinessPercent || 100}%`;
+  }
+
   function buildReleaseControlOverviewRows(context = {}) {
     const routeMetrics = context.routeMetrics ?? context.routeOverview?.metrics ?? {};
     const endingPaths = toArray(context.endingPaths ?? context.routeOverview?.endingPaths);
@@ -582,6 +603,7 @@
     const projectMilestoneGapDigest = context.projectMilestoneGapDigest ?? {};
     const mediaBudgetReport = context.mediaBudgetReport ?? {};
     const runtimePreloadBudgetRelease = context.runtimePreloadBudgetRelease ?? {};
+    const productionBacklogOverviewValue = getProductionBacklogOverviewValue(context);
     const firstReachableEndingPathLabel =
       context.firstReachableEndingPathLabel ?? endingPaths.find((path) => path?.isReachable)?.pathLabel ?? "暂未接通";
     const nextMilestoneTitle = projectMilestonePlan.nextMilestone?.title ?? "继续推进当前项目";
@@ -594,6 +616,7 @@
       ["素材预算风险", `${toCount(mediaBudgetReport.count)} 个，合计 ${mediaBudgetReport.totalLabel ?? "0 B"}`],
       ["首屏加载压力", runtimePreloadBudgetRelease.summaryLine ?? "首屏加载健康，首屏 0 B / 早期 0 B"],
       ["闲置素材", `${toCount(context.unusedAssetCount)} 个`],
+      ...(productionBacklogOverviewValue ? [["生产待办", productionBacklogOverviewValue]] : []),
       ["入口场景", routeMetrics.entrySceneName ?? "暂未设置"],
       [
         "分支 / 收束 / 孤立场景",

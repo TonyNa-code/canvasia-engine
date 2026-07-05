@@ -82,12 +82,15 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
         self.assertIn("const runtimePreloadBudgetReport = buildRuntimePreloadBudgetReport()", report_body)
         self.assertIn("const runtimePreloadBudgetDigest = runtimePreloadBudgetTools.getRuntimePreloadBudgetDigest", report_body)
         self.assertIn("const runtimePreloadBudgetRelease = serializeRuntimePreloadBudgetForRelease", report_body)
+        self.assertIn("const productionBacklog = buildProductionBacklog(routeOverview)", report_body)
         self.assertIn("## Runtime 首屏加载预算", report_body)
         self.assertIn("runtimePreloadBudgetRelease.phaseRows", report_body)
         self.assertIn("runtimePreloadBudgetRelease.warningRows", report_body)
         self.assertIn("const releaseOverviewRows = buildReleaseControlOverviewRows", report_body)
         self.assertIn('buildMarkdownTable(["指标", "结果"], releaseOverviewRows)', report_body)
+        self.assertIn("productionBacklogSummary: productionBacklog.summary", report_body)
         self.assertIn("runtimePreloadBudget: runtimePreloadBudgetRelease", payload_body)
+        self.assertIn("productionBacklog: {", payload_body)
         self.assertIn("const runtimePreloadBudgetRelease = serializeRuntimePreloadBudgetForRelease", payload_body)
 
     def test_release_next_step_advice_is_module_backed(self) -> None:
@@ -230,6 +233,7 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
                 routeTestingSummary: {{ decisionPointCount: 2, routeCaseCount: 4, endingTestCaseCount: 3 }},
                 projectMilestonePlan: {{ nextMilestone: {{ title: "第一版可试玩 Demo" }}, overallScore: 72 }},
                 projectMilestoneGapDigest: {{ eyebrow: "当前阶段缺口", title: "补齐试玩确认" }},
+                productionBacklogSummary: {{ taskCount: 9, blockerCount: 2, warningCount: 4, tipCount: 3, readinessPercent: 48 }},
               }}),
               nextSteps: [
                 releaseNextStep,
@@ -337,10 +341,12 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
         self.assertEqual(payload["runtimePreloadRelease"]["phaseRows"][0][5], "超过建议预算")
         self.assertEqual(payload["runtimePreloadRelease"]["warningRows"][0][0], "高风险")
         self.assertEqual(payload["runtimePreloadRelease"]["topEntries"][0]["assetId"], "asset_op")
-        self.assertEqual(payload["overviewRows"][0], ["结构错误", "2 项"])
-        self.assertEqual(payload["overviewRows"][4], ["首屏加载压力", "首屏压力偏高，首屏 180 MB / 早期 180 MB"])
-        self.assertEqual(payload["overviewRows"][9], ["第一条结局路径", "开场 -> 真结局"])
-        self.assertEqual(payload["overviewRows"][13], ["成品目标路线", "第一版可试玩 Demo（72%）"])
+        overview_rows = {row[0]: row[1] for row in payload["overviewRows"]}
+        self.assertEqual(overview_rows["结构错误"], "2 项")
+        self.assertEqual(overview_rows["首屏加载压力"], "首屏压力偏高，首屏 180 MB / 早期 180 MB")
+        self.assertEqual(overview_rows["生产待办"], "9 项，先修 2 / 优先 4 / 润色 3，就绪度 48%")
+        self.assertEqual(overview_rows["第一条结局路径"], "开场 -> 真结局")
+        self.assertEqual(overview_rows["成品目标路线"], "第一版可试玩 Demo（72%）")
         self.assertEqual(payload["nextSteps"][0]["source"], "release_fix_order")
         self.assertEqual(payload["nextSteps"][0]["sourceLabel"], "发布修复顺序")
         self.assertEqual(payload["nextSteps"][0]["action"]["screen"], "inspection")

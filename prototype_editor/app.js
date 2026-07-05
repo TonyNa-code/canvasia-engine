@@ -29704,6 +29704,7 @@ function buildReleaseControlReportPayload() {
   const releaseSummary = buildReleaseChecklistSummary(releaseItems);
   const releaseFixOrder = buildReleaseFixOrder(routeOverview);
   const finalPublishGate = buildFinalPublishGate(releaseItems, releaseFixOrder, routeOverview);
+  const productionBacklog = buildProductionBacklog(routeOverview);
   const projectDoctorQueue = buildProjectDoctorQueue(routeOverview, issueItems);
   const projectDoctorSummary = buildProjectDoctorSummary(projectDoctorQueue);
   const projectMilestonePlan = buildProjectMilestonePlan(routeOverview);
@@ -29788,6 +29789,23 @@ function buildReleaseControlReportPayload() {
     projectMilestones: {
       ...serializeProjectMilestonePlan(projectMilestonePlan),
       gapDigest: serializeProjectMilestoneGapDigest(projectMilestoneGapDigest),
+    },
+    productionBacklog: {
+      taskCount: productionBacklog.summary?.taskCount ?? 0,
+      blockerCount: productionBacklog.summary?.blockerCount ?? 0,
+      warningCount: productionBacklog.summary?.warningCount ?? 0,
+      tipCount: productionBacklog.summary?.tipCount ?? 0,
+      readinessPercent: productionBacklog.summary?.readinessPercent ?? 0,
+      topAreaLabel: productionBacklog.summary?.topAreaLabel ?? "",
+      nextTask: productionBacklog.nextTask
+        ? {
+            title: productionBacklog.nextTask.title,
+            severity: productionBacklog.nextTask.severity,
+            areaLabel: productionBacklog.nextTask.areaLabel,
+            source: productionBacklog.nextTask.source,
+            action: serializeReleaseReportAction(productionBacklog.nextTask.action),
+          }
+        : null,
     },
     releaseChecklist: releaseItems.map((item) => ({
       title: item.title,
@@ -30252,6 +30270,7 @@ function buildReleaseControlReportContent() {
   const releaseSummary = buildReleaseChecklistSummary(releaseItems);
   const releaseFixOrder = buildReleaseFixOrder(routeOverview);
   const finalPublishGate = buildFinalPublishGate(releaseItems, releaseFixOrder, routeOverview);
+  const productionBacklog = buildProductionBacklog(routeOverview);
   const projectDoctorQueue = buildProjectDoctorQueue(routeOverview, issueItems);
   const projectDoctorSummary = buildProjectDoctorSummary(projectDoctorQueue);
   const projectMilestonePlan = buildProjectMilestonePlan(routeOverview);
@@ -30423,6 +30442,7 @@ function buildReleaseControlReportContent() {
     unusedAssetCount: getUnusedAssets().length,
     mediaBudgetReport,
     runtimePreloadBudgetRelease,
+    productionBacklogSummary: productionBacklog.summary,
     routeMetrics: routeOverview.metrics,
     endingPaths: routeOverview.endingPaths,
     routeTestingSummary,
