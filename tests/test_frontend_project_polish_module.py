@@ -76,6 +76,14 @@ class FrontendProjectPolishModuleTests(unittest.TestCase):
             }};
             const plan = tools.buildProjectOneClickPolishPlan(data, {{ readable: {{ limit: 80 }} }});
             const digest = tools.getProjectOneClickPolishDigest(data, {{ readable: {{ limit: 80 }}, sceneNameLimit: 1 }});
+            const receipt = tools.buildProjectOneClickPolishReceipt(plan, {{
+              projectTitle: "Demo Project",
+              safetySnapshotLabel: "发布前整理前自动检查点",
+              generatedAt: "2026-05-10T10:00:00.000Z",
+            }});
+            const receiptFileName = tools.buildProjectOneClickPolishReceiptFileName(receipt);
+            const receiptMarkdown = tools.buildProjectOneClickPolishReceiptMarkdown(receipt);
+            const receiptClipboard = tools.buildProjectOneClickPolishReceiptClipboardSummary(receipt);
             const cleanData = {{
               scenes: [
                 {{
@@ -139,6 +147,19 @@ class FrontendProjectPolishModuleTests(unittest.TestCase):
                 badgeLabel: cleanDigest.badgeLabel,
                 helperText: cleanDigest.helperText,
               }},
+              receipt: {{
+                receiptId: receipt.receiptId,
+                generatedAt: receipt.generatedAt,
+                projectTitle: receipt.projectTitle,
+                safetySnapshotLabel: receipt.safetySnapshotLabel,
+                changedSceneCount: receipt.changedSceneCount,
+                totalOperationCount: receipt.totalOperationCount,
+                sceneNames: receipt.scenePlans.map((scenePlan) => scenePlan.sceneName),
+                nextActionCount: receipt.nextActions.length,
+              }},
+              receiptFileName,
+              receiptMarkdown,
+              receiptClipboard,
               sourceStillUntouched: {{
                 originalBlockCount: data.scenes[0].blocks.length,
                 originalFadeInMs: data.scenes[0].blocks[0].fadeInMs,
@@ -160,6 +181,8 @@ class FrontendProjectPolishModuleTests(unittest.TestCase):
         payload = json.loads(completed.stdout)
         self.assertIn("buildProjectOneClickPolishPlan", payload["keys"])
         self.assertIn("getProjectOneClickPolishDigest", payload["keys"])
+        self.assertIn("buildProjectOneClickPolishReceiptMarkdown", payload["keys"])
+        self.assertIn("buildProjectOneClickPolishReceiptClipboardSummary", payload["keys"])
         self.assertTrue(payload["plan"]["changed"])
         self.assertEqual(payload["plan"]["changedSceneCount"], 1)
         self.assertEqual(payload["plan"]["firstChangedSceneId"], "scene_intro")
@@ -192,6 +215,22 @@ class FrontendProjectPolishModuleTests(unittest.TestCase):
         self.assertFalse(payload["cleanDigest"]["canApply"])
         self.assertEqual(payload["cleanDigest"]["actionLabel"], "发布前整理已完成")
         self.assertEqual(payload["cleanDigest"]["badgeLabel"], "无需处理")
+        self.assertEqual(payload["receipt"]["receiptId"], "polish-20260510100000")
+        self.assertEqual(payload["receipt"]["generatedAt"], "2026-05-10T10:00:00.000Z")
+        self.assertEqual(payload["receipt"]["projectTitle"], "Demo Project")
+        self.assertEqual(payload["receipt"]["safetySnapshotLabel"], "发布前整理前自动检查点")
+        self.assertEqual(payload["receipt"]["changedSceneCount"], 1)
+        self.assertGreater(payload["receipt"]["totalOperationCount"], 0)
+        self.assertEqual(payload["receipt"]["sceneNames"], ["开场"])
+        self.assertGreaterEqual(payload["receipt"]["nextActionCount"], 3)
+        self.assertEqual(payload["receiptFileName"], "demo-project-polish-20260510100000.md")
+        self.assertIn("# 发布前整理回执", payload["receiptMarkdown"])
+        self.assertIn("| 回执编号 | polish-20260510100000 |", payload["receiptMarkdown"])
+        self.assertIn("| 安全检查点 | 发布前整理前自动检查点 |", payload["receiptMarkdown"])
+        self.assertIn("| 开场 | scene_intro |", payload["receiptMarkdown"])
+        self.assertIn("发布前整理回执：", payload["receiptClipboard"])
+        self.assertIn("回执编号：polish-20260510100000", payload["receiptClipboard"])
+        self.assertIn("安全检查点：发布前整理前自动检查点", payload["receiptClipboard"])
         self.assertEqual(payload["sourceStillUntouched"]["originalBlockCount"], 4)
         self.assertEqual(payload["sourceStillUntouched"]["originalFadeInMs"], 0)
         self.assertEqual(payload["sourceStillUntouched"]["originalEndBlockId"], "missing_block")

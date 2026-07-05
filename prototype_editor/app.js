@@ -854,6 +854,7 @@ const state = {
   inspectionRegressionResult: null,
   playtestFeedbackIntake: null,
   projectDoctorRepairReceipt: null,
+  projectOneClickPolishReceipt: null,
   projectVariableSearchQuery: "",
   projectVariableFilterMode: "all",
   projectVariableDrafts: {},
@@ -1833,6 +1834,7 @@ function resetProjectScopedUiState() {
   state.inspectionRegressionResult = null;
   state.playtestFeedbackIntake = null;
   state.projectDoctorRepairReceipt = null;
+  state.projectOneClickPolishReceipt = null;
   state.projectVariableSearchQuery = "";
   state.projectVariableFilterMode = "all";
   state.projectVariableDrafts = {};
@@ -4794,6 +4796,16 @@ async function handleClick(event) {
 
   if (action === "run-project-one-click-polish") {
     void runProjectOneClickPolish();
+    return;
+  }
+
+  if (action === "copy-project-one-click-polish-receipt-summary") {
+    void copyProjectOneClickPolishReceiptSummary();
+    return;
+  }
+
+  if (action === "export-project-one-click-polish-receipt") {
+    exportProjectOneClickPolishReceipt();
     return;
   }
 
@@ -10611,6 +10623,7 @@ function renderDashboardPrimaryActions(isBlankProject) {
   const projectReadableLabel = state.projectReadableSplitInFlight
     ? "长文本整理中..."
     : projectReadableDigest?.actionLabel ?? "整理全项目长文本";
+  const hasOneClickPolishReceipt = Boolean(state.projectOneClickPolishReceipt);
   const safeEscapeHtml =
     typeof escapeHtml === "function"
       ? escapeHtml
@@ -10632,6 +10645,18 @@ function renderDashboardPrimaryActions(isBlankProject) {
     >
       ${safeEscapeHtml(oneClickPolishLabel)}
     </button>
+    ${
+      hasOneClickPolishReceipt
+        ? `
+          <button class="toolbar-button" data-action="copy-project-one-click-polish-receipt-summary">
+            复制整理回执
+          </button>
+          <button class="toolbar-button" data-action="export-project-one-click-polish-receipt">
+            导出整理回执
+          </button>
+        `
+        : ""
+    }
     <button
       class="toolbar-button"
       data-action="polish-project-presentation"
@@ -41826,6 +41851,14 @@ async function runProjectOneClickPolish() {
       previewSceneId: polishPlan.firstChangedSceneId || state.previewSceneId,
       previewBlockIndex: Math.max(polishPlan.firstChangedIndex ?? 0, 0),
     });
+    state.projectOneClickPolishReceipt = buildProjectOneClickPolishReceipt(polishPlan, {
+      safetySnapshotLabel,
+      generatedAt: new Date().toISOString(),
+      projectTitle: state.data?.project?.title,
+    });
+    if (state.currentScreen === "dashboard") {
+      renderDashboard();
+    }
     const snapshotSuffix = safetySnapshotLabel ? `；整理前已存「${safetySnapshotLabel}」` : "";
     setSaveStatus(`${polishPlan.summary}${snapshotSuffix}`);
     showToast(`${polishPlan.summary}${snapshotSuffix}`);
@@ -41842,6 +41875,53 @@ async function runProjectOneClickPolish() {
   } finally {
     setProjectOneClickPolishInFlight(false);
   }
+}
+
+function buildProjectOneClickPolishReceipt(polishPlan, context = {}) {
+  if (typeof projectPolishTools?.buildProjectOneClickPolishReceipt === "function") {
+    return projectPolishTools.buildProjectOneClickPolishReceipt(polishPlan, context);
+  }
+  return null;
+}
+
+function exportProjectOneClickPolishReceipt() {
+  if (!state.projectOneClickPolishReceipt) {
+    showToast("还没有发布前整理回执可导出，请先执行一键发布前整理。", "error");
+    setSaveStatus("暂无发布前整理回执可导出", true);
+    return false;
+  }
+
+  const fileName =
+    projectPolishTools?.buildProjectOneClickPolishReceiptFileName?.(state.projectOneClickPolishReceipt) ??
+    "project-polish-receipt.md";
+  const content =
+    projectPolishTools?.buildProjectOneClickPolishReceiptMarkdown?.(state.projectOneClickPolishReceipt) ?? "";
+  downloadTextFile(fileName, content, "text/markdown;charset=utf-8");
+  setSaveStatus(`已导出发布前整理回执：${fileName}`);
+  showToast("发布前整理回执已导出");
+  return true;
+}
+
+async function copyProjectOneClickPolishReceiptSummary() {
+  if (!state.projectOneClickPolishReceipt) {
+    showToast("还没有发布前整理回执可复制，请先执行一键发布前整理。", "error");
+    setSaveStatus("暂无发布前整理回执可复制", true);
+    return false;
+  }
+
+  const receiptId = state.projectOneClickPolishReceipt.receiptId ?? "polish-receipt";
+  const content =
+    projectPolishTools?.buildProjectOneClickPolishReceiptClipboardSummary?.(state.projectOneClickPolishReceipt) ?? "";
+  const copied = await copyTextToClipboard(content);
+  if (!copied) {
+    showToast("复制失败，可以改用“导出整理回执”保存文件。", "error");
+    setSaveStatus("发布前整理回执复制失败", true);
+    return false;
+  }
+
+  setSaveStatus(`已复制发布前整理回执摘要：${receiptId}`);
+  showToast("发布前整理回执摘要已复制");
+  return true;
 }
 
 async function splitProjectReadableBlocks() {
@@ -42701,6 +42781,9 @@ async function reloadProjectData(preserved = {}) {
   state.validation = runValidation(data);
   if (!preserved.preserveProjectDoctorRepairReceipt) {
     state.projectDoctorRepairReceipt = null;
+  }
+  if (!preserved.preserveProjectOneClickPolishReceipt) {
+    state.projectOneClickPolishReceipt = null;
   }
   updateErrorRecoveryState(null);
 

@@ -1897,13 +1897,15 @@ class FrontendActionHandlerTests(unittest.TestCase):
 
         script = textwrap.dedent(
             f"""
-            const state = {{ chapterCreateInFlight: false }};
+            const state = {{ chapterCreateInFlight: false, projectOneClickPolishReceipt: null }};
             function renderDashboardPrimaryActions(isBlankProject) {render_dashboard_actions}
             const blankMarkup = renderDashboardPrimaryActions(true);
             const activeMarkup = renderDashboardPrimaryActions(false);
+            state.projectOneClickPolishReceipt = {{ receiptId: "polish-demo" }};
+            const activeWithReceiptMarkup = renderDashboardPrimaryActions(false);
             state.chapterCreateInFlight = true;
             const busyBlankMarkup = renderDashboardPrimaryActions(true);
-            process.stdout.write(JSON.stringify({{ blankMarkup, activeMarkup, busyBlankMarkup }}));
+            process.stdout.write(JSON.stringify({{ blankMarkup, activeMarkup, activeWithReceiptMarkup, busyBlankMarkup }}));
             """
         )
         completed = subprocess.run(
@@ -1933,6 +1935,10 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("查看试玩页", payload["activeMarkup"])
         self.assertIn("打开素材页", payload["activeMarkup"])
         self.assertNotIn('data-action="create-first-chapter"', payload["activeMarkup"])
+        self.assertIn('data-action="copy-project-one-click-polish-receipt-summary"', payload["activeWithReceiptMarkup"])
+        self.assertIn('data-action="export-project-one-click-polish-receipt"', payload["activeWithReceiptMarkup"])
+        self.assertIn("复制整理回执", payload["activeWithReceiptMarkup"])
+        self.assertIn("导出整理回执", payload["activeWithReceiptMarkup"])
 
     def test_project_one_click_polish_action_is_wired(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
@@ -1943,12 +1949,21 @@ class FrontendActionHandlerTests(unittest.TestCase):
 
         self.assertIn("const projectPolishTools = window.CanvasiaEditorProjectPolish", source)
         self.assertIn("projectOneClickPolishInFlight", source)
+        self.assertIn("projectOneClickPolishReceipt", source)
         self.assertIn('data-action="run-project-one-click-polish"', source)
+        self.assertIn('data-action="copy-project-one-click-polish-receipt-summary"', source)
+        self.assertIn('data-action="export-project-one-click-polish-receipt"', source)
         self.assertIn("void runProjectOneClickPolish();", one_click_block)
+        self.assertIn("void copyProjectOneClickPolishReceiptSummary();", one_click_block)
+        self.assertIn("exportProjectOneClickPolishReceipt();", one_click_block)
         self.assertIn("function setProjectOneClickPolishInFlight", source)
         self.assertIn("async function runProjectOneClickPolish()", source)
         self.assertIn("async function saveProjectHistoryCheckpoint", source)
+        self.assertIn("function exportProjectOneClickPolishReceipt()", source)
+        self.assertIn("async function copyProjectOneClickPolishReceiptSummary()", source)
         self.assertIn("projectPolishTools.buildProjectOneClickPolishPlan", source)
+        self.assertIn("projectPolishTools.buildProjectOneClickPolishReceipt", source)
+        self.assertIn("projectPolishTools?.buildProjectOneClickPolishReceiptMarkdown", source)
         self.assertIn("saveProjectHistoryCheckpoint(\"发布前整理前自动检查点\"", source)
         self.assertIn("postJson(API_CREATE_PROJECT_HISTORY_SNAPSHOT", source)
         self.assertIn("setProjectOneClickPolishInFlight(true)", source)
@@ -1958,6 +1973,7 @@ class FrontendActionHandlerTests(unittest.TestCase):
     def test_project_one_click_polish_saves_checkpoint_before_scene_writes(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
         save_checkpoint = _extract_function_source(source, "saveProjectHistoryCheckpoint")
+        build_receipt = _extract_function_source(source, "buildProjectOneClickPolishReceipt")
         run_one_click = _extract_function_source(source, "runProjectOneClickPolish")
         script = textwrap.dedent(
             f"""
@@ -1996,6 +2012,10 @@ class FrontendActionHandlerTests(unittest.TestCase):
                   summary: "发布前整理完成：补齐 3 项",
                 }};
               }},
+              buildProjectOneClickPolishReceipt(plan, context) {{
+                calls.push(["receipt", context.safetySnapshotLabel, context.projectTitle]);
+                return {{ receiptId: "polish-demo", summary: plan.summary, safetySnapshotLabel: context.safetySnapshotLabel }};
+              }},
             }};
             function setProjectOneClickPolishInFlight(value) {{
               state.projectOneClickPolishInFlight = Boolean(value);
@@ -2031,7 +2051,11 @@ class FrontendActionHandlerTests(unittest.TestCase):
               return {{ selectedSceneId: "old_scene", selectedBlockId: "old_block", previewSceneId: "old_preview" }};
             }}
             async function reloadProjectData(payload) {{
+              state.data = {{ project: {{ title: "Demo Reloaded" }} }};
               calls.push(["reload", payload.selectedSceneId, payload.selectedBlockId, payload.previewBlockIndex]);
+            }}
+            function renderDashboard() {{
+              calls.push(["render-dashboard", state.projectOneClickPolishReceipt?.receiptId || ""]);
             }}
             function showFatalProjectLoadError(error) {{
               calls.push(["fatal", error && error.message]);
@@ -2040,6 +2064,7 @@ class FrontendActionHandlerTests(unittest.TestCase):
               calls.push(["failure", title, detail, error && error.message]);
             }}
             async function saveProjectHistoryCheckpoint(label, options = {{}}) {save_checkpoint}
+            function buildProjectOneClickPolishReceipt(polishPlan, context = {{}}) {build_receipt}
             async function runProjectOneClickPolish() {run_one_click}
 
             const result = await runProjectOneClickPolish();
@@ -2061,14 +2086,88 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertTrue(payload["result"])
         self.assertLess(call_names.index("checkpoint"), call_names.index("persist"))
         self.assertLess(call_names.index("persist"), call_names.index("reload"))
+        self.assertLess(call_names.index("reload"), call_names.index("receipt"))
+        self.assertLess(call_names.index("receipt"), call_names.index("render-dashboard"))
         self.assertEqual(calls[call_names.index("checkpoint")][1], "/api/create-project-history-snapshot")
         self.assertEqual(calls[call_names.index("checkpoint")][2], "发布前整理前自动检查点")
         self.assertIn(["persist", "scene_intro", "line_1", 2], calls)
         self.assertIn(["reload", "scene_intro", "line_1", 2], calls)
+        self.assertIn(["receipt", "发布前整理前自动检查点", "Demo Reloaded"], calls)
+        self.assertIn(["render-dashboard", "polish-demo"], calls)
         self.assertIn(["busy", True], calls)
         self.assertEqual(calls[-1], ["busy", False])
         toast_messages = [call[1] for call in calls if call[0] == "toast"]
         self.assertTrue(any("整理前已存" in message for message in toast_messages))
+
+    def test_project_one_click_polish_receipt_copy_and_export_actions_report_result(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        export_receipt = _extract_function_source(source, "exportProjectOneClickPolishReceipt")
+        copy_receipt = _extract_function_source(source, "copyProjectOneClickPolishReceiptSummary")
+        script = textwrap.dedent(
+            f"""
+            const calls = [];
+            const state = {{ projectOneClickPolishReceipt: null }};
+            const projectPolishTools = {{
+              buildProjectOneClickPolishReceiptFileName(receipt) {{
+                calls.push(["file", receipt.receiptId]);
+                return "demo-polish.md";
+              }},
+              buildProjectOneClickPolishReceiptMarkdown(receipt) {{
+                calls.push(["markdown", receipt.receiptId]);
+                return "# 发布前整理回执";
+              }},
+              buildProjectOneClickPolishReceiptClipboardSummary(receipt) {{
+                calls.push(["summary", receipt.receiptId]);
+                return `SUMMARY:${{receipt.receiptId}}`;
+              }},
+            }};
+            function showToast(message, tone) {{
+              calls.push(["toast", message, tone || ""]);
+            }}
+            function setSaveStatus(message, isError = false) {{
+              calls.push(["status", message, Boolean(isError)]);
+            }}
+            function downloadTextFile(fileName, content, mimeType) {{
+              calls.push(["download", fileName, content, mimeType]);
+            }}
+            async function copyTextToClipboard(text) {{
+              calls.push(["copy", text]);
+              return text.includes("ok");
+            }}
+            function exportProjectOneClickPolishReceipt() {export_receipt}
+            async function copyProjectOneClickPolishReceiptSummary() {copy_receipt}
+
+            const noExport = exportProjectOneClickPolishReceipt();
+            const noCopy = await copyProjectOneClickPolishReceiptSummary();
+            state.projectOneClickPolishReceipt = {{ receiptId: "ok-polish" }};
+            const exported = exportProjectOneClickPolishReceipt();
+            const copied = await copyProjectOneClickPolishReceiptSummary();
+            state.projectOneClickPolishReceipt = {{ receiptId: "bad-polish" }};
+            const failedCopy = await copyProjectOneClickPolishReceiptSummary();
+            process.stdout.write(JSON.stringify({{ noExport, noCopy, exported, copied, failedCopy, calls }}));
+            """
+        )
+        completed = subprocess.run(
+            ["node", "-e", script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        self.assertFalse(payload["noExport"])
+        self.assertFalse(payload["noCopy"])
+        self.assertTrue(payload["exported"])
+        self.assertTrue(payload["copied"])
+        self.assertFalse(payload["failedCopy"])
+        self.assertIn(["download", "demo-polish.md", "# 发布前整理回执", "text/markdown;charset=utf-8"], payload["calls"])
+        self.assertIn(["copy", "SUMMARY:ok-polish"], payload["calls"])
+        self.assertIn(["status", "暂无发布前整理回执可导出", True], payload["calls"])
+        self.assertIn(["status", "暂无发布前整理回执可复制", True], payload["calls"])
+        self.assertIn(["status", "已导出发布前整理回执：demo-polish.md", False], payload["calls"])
+        self.assertIn(["status", "已复制发布前整理回执摘要：ok-polish", False], payload["calls"])
+        self.assertIn(["status", "发布前整理回执复制失败", True], payload["calls"])
 
     def test_create_chapter_ignores_duplicate_clicks_while_pending(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
