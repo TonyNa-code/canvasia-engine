@@ -1844,14 +1844,16 @@ function getRuntimePreloadStatusText() {
   const loadedCount = status?.loadedCount ?? 0;
   const failedCount = status?.failedCount ?? 0;
   const failureText = failedCount > 0 ? ` · ${failedCount} 个稍后重试` : "";
+  const sizeText = formatRuntimePreloadSize(summary);
   return [
     `首屏 ${summary.criticalCount} 个`,
     `全局 ${summary.totalCount} 个`,
+    sizeText,
     `图片 ${summary.imageCount}`,
     `音频 ${summary.audioCount}`,
     `视频 ${summary.videoCount}`,
     `已预热 ${loadedCount}/${summary.totalCount}${failureText}`,
-  ].join(" · ");
+  ].filter(Boolean).join(" · ");
 }
 
 function getRuntimePreloadMetaText() {
@@ -1859,7 +1861,36 @@ function getRuntimePreloadMetaText() {
   if (!summary.totalCount) {
     return "";
   }
-  return ` · 预热 ${summary.criticalCount}/${summary.totalCount} 个素材`;
+  const sizeText = formatRuntimePreloadSize(summary);
+  return ` · 预热 ${summary.criticalCount}/${summary.totalCount} 个素材${sizeText ? ` · ${sizeText}` : ""}`;
+}
+
+function formatRuntimePreloadSize(summary) {
+  const criticalSizeBytes = Number(summary?.criticalSizeBytes ?? 0);
+  const totalSizeBytes = Number(summary?.totalSizeBytes ?? 0);
+  if (!Number.isFinite(totalSizeBytes) || totalSizeBytes <= 0) {
+    return "";
+  }
+  const criticalLabel = formatRuntimePreloadBytes(Math.max(0, criticalSizeBytes));
+  const totalLabel = formatRuntimePreloadBytes(totalSizeBytes);
+  return `首屏体积 ${criticalLabel} / 预热合计 ${totalLabel}`;
+}
+
+function formatRuntimePreloadBytes(bytes) {
+  const units = ["B", "KB", "MB", "GB"];
+  let value = Number(bytes);
+  if (!Number.isFinite(value) || value <= 0) {
+    return "0 B";
+  }
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  if (unitIndex === 0) {
+    return `${Math.round(value)} B`;
+  }
+  return `${value.toFixed(1)} ${units[unitIndex]}`;
 }
 
 function buildEndingScenePreview(scene) {

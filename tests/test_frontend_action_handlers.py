@@ -3261,6 +3261,23 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("lastEditorRuntimeErrorKey", source)
         self.assertIn("[Canvasia Engine] Editor runtime error", source)
 
+    def test_export_player_surfaces_runtime_preload_size_context(self) -> None:
+        source = PLAYER_PATH.read_text(encoding="utf-8")
+        status_text = _extract_function_source(source, "getRuntimePreloadStatusText")
+        meta_text = _extract_function_source(source, "getRuntimePreloadMetaText")
+        size_formatter = _extract_function_source(source, "formatRuntimePreloadSize")
+        byte_formatter = _extract_function_source(source, "formatRuntimePreloadBytes")
+
+        self.assertIn("formatRuntimePreloadSize(summary)", status_text)
+        self.assertIn("formatRuntimePreloadSize(summary)", meta_text)
+        self.assertIn("首屏体积", size_formatter)
+        self.assertIn("预热合计", size_formatter)
+        self.assertIn("criticalSizeBytes", size_formatter)
+        self.assertIn("totalSizeBytes", size_formatter)
+        self.assertIn("formatRuntimePreloadBytes", size_formatter)
+        self.assertIn("toFixed(1)", byte_formatter)
+        self.assertNotIn("formatFileSize(", source)
+
     def test_handle_click_ignores_disabled_actions_before_dispatch(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
         click_handler = _extract_function_source(source, "handleClick")
