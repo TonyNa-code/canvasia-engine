@@ -26245,13 +26245,18 @@ function buildReleaseChecklistSummary(items = buildReleaseChecklistItems()) {
   };
 }
 
-function buildFinalPublishGate(items = buildReleaseChecklistItems(), releaseFixOrder = null) {
+function buildFinalPublishGate(items = buildReleaseChecklistItems(), releaseFixOrder = null, routeOverview = null) {
+  const productionBacklog = routeOverview && productionBacklogTools?.buildProductionBacklog
+    ? buildProductionBacklog(routeOverview)
+    : null;
   if (releaseControlTools?.buildFinalPublishGate) {
     return releaseControlTools.buildFinalPublishGate({
       releaseChecklistItems: items,
       releaseFixOrder,
       regressionResult: state.inspectionRegressionResult,
       exportResult: state.lastExportResult,
+      productionBacklogSummary: productionBacklog?.summary ?? null,
+      productionBacklogNextTask: productionBacklog?.nextTask ?? null,
     });
   }
 
@@ -26344,7 +26349,7 @@ function renderFinalPublishGateChecklist(items = []) {
 function renderFinalPublishGatePanel(routeOverview) {
   const releaseItems = buildReleaseChecklistItems();
   const releaseFixOrder = buildReleaseFixOrder(routeOverview);
-  const gate = buildFinalPublishGate(releaseItems, releaseFixOrder);
+  const gate = buildFinalPublishGate(releaseItems, releaseFixOrder, routeOverview);
   const actions = [gate.primaryAction, ...(gate.secondaryActions ?? [])].filter(Boolean).slice(0, 3);
   const toneClass = gate.tone === "danger" ? "danger-text" : gate.tone === "warn" ? "warn-text" : "good-text";
 
@@ -29698,7 +29703,7 @@ function buildReleaseControlReportPayload() {
   const releaseItems = buildReleaseChecklistItems();
   const releaseSummary = buildReleaseChecklistSummary(releaseItems);
   const releaseFixOrder = buildReleaseFixOrder(routeOverview);
-  const finalPublishGate = buildFinalPublishGate(releaseItems, releaseFixOrder);
+  const finalPublishGate = buildFinalPublishGate(releaseItems, releaseFixOrder, routeOverview);
   const projectDoctorQueue = buildProjectDoctorQueue(routeOverview, issueItems);
   const projectDoctorSummary = buildProjectDoctorSummary(projectDoctorQueue);
   const projectMilestonePlan = buildProjectMilestonePlan(routeOverview);
@@ -29990,7 +29995,7 @@ function buildInspectionReportContent() {
   const releaseItems = buildReleaseChecklistItems();
   const releaseSummary = buildReleaseChecklistSummary(releaseItems);
   const releaseFixOrder = buildReleaseFixOrder(routeOverview);
-  const finalPublishGate = buildFinalPublishGate(releaseItems, releaseFixOrder);
+  const finalPublishGate = buildFinalPublishGate(releaseItems, releaseFixOrder, routeOverview);
   const projectDoctorQueue = buildProjectDoctorQueue(routeOverview, issueItems);
   const projectDoctorSummary = buildProjectDoctorSummary(projectDoctorQueue);
   const projectMilestonePlan = buildProjectMilestonePlan(routeOverview);
@@ -30246,7 +30251,7 @@ function buildReleaseControlReportContent() {
   const releaseItems = buildReleaseChecklistItems();
   const releaseSummary = buildReleaseChecklistSummary(releaseItems);
   const releaseFixOrder = buildReleaseFixOrder(routeOverview);
-  const finalPublishGate = buildFinalPublishGate(releaseItems, releaseFixOrder);
+  const finalPublishGate = buildFinalPublishGate(releaseItems, releaseFixOrder, routeOverview);
   const projectDoctorQueue = buildProjectDoctorQueue(routeOverview, issueItems);
   const projectDoctorSummary = buildProjectDoctorSummary(projectDoctorQueue);
   const projectMilestonePlan = buildProjectMilestonePlan(routeOverview);
@@ -31350,7 +31355,7 @@ function buildReleaseCandidateManifest(routeOverview = null) {
       warningCount: state.validation?.warnings?.length ?? 0,
     },
     releaseChecklistItems: releaseItems,
-    finalPublishGate: buildFinalPublishGate(releaseItems, releaseFixOrder),
+    finalPublishGate: buildFinalPublishGate(releaseItems, releaseFixOrder, currentRouteOverview),
     releaseFixOrder,
     productionBacklog: buildProductionBacklog(currentRouteOverview),
     runtimeCapabilityMatrix: buildRuntimeCapabilityMatrix(),

@@ -128,14 +128,93 @@
     return match?.action ?? null;
   }
 
-  function buildGateChecklistItems(items = [], releaseFixOrder = null, status = "blocked") {
+  function hasObjectKey(source, key) {
+    return Boolean(source && typeof source === "object" && Object.prototype.hasOwnProperty.call(source, key));
+  }
+
+  function getProductionBacklogGateSignal(context = {}) {
+    const backlog = context.productionBacklog && typeof context.productionBacklog === "object" ? context.productionBacklog : {};
+    const summary =
+      context.productionBacklogSummary && typeof context.productionBacklogSummary === "object"
+        ? context.productionBacklogSummary
+        : backlog.summary && typeof backlog.summary === "object"
+          ? backlog.summary
+          : {};
+    const nextTask =
+      context.productionBacklogNextTask && typeof context.productionBacklogNextTask === "object"
+        ? context.productionBacklogNextTask
+        : backlog.nextTask && typeof backlog.nextTask === "object"
+          ? backlog.nextTask
+          : null;
+    const available =
+      hasObjectKey(summary, "taskCount") ||
+      hasObjectKey(summary, "blockerCount") ||
+      hasObjectKey(summary, "warningCount") ||
+      hasObjectKey(summary, "tipCount");
+
+    return {
+      available,
+      taskCount: available ? toCount(summary.taskCount) : 0,
+      blockerCount: available ? toCount(summary.blockerCount) : 0,
+      warningCount: available ? toCount(summary.warningCount) : 0,
+      tipCount: available ? toCount(summary.tipCount) : 0,
+      nextTask,
+    };
+  }
+
+  function getProductionBacklogGateDetail(signal = {}) {
+    if (!signal.available) {
+      return "生产待办尚未生成。";
+    }
+    if (signal.taskCount <= 0) {
+      return "生产待办已经清空。";
+    }
+    return `生产待办还有 ${signal.blockerCount} 个先修、${signal.warningCount} 个优先、${signal.tipCount} 个润色。`;
+  }
+
+  function getProductionBacklogGateAction(signal = {}) {
+    const taskAction = signal.nextTask?.action;
+    if (taskAction && typeof taskAction === "object") {
+      return taskAction;
+    }
+    return { label: "打开项目巡检", action: "switch-screen", screen: "inspection" };
+  }
+
+  function buildProductionBacklogGateItems(signal = {}, status = "blocked") {
+    if (!signal.available) {
+      return [];
+    }
+    if (status === "blocked" && signal.blockerCount > 0) {
+      return [
+        {
+          title: signal.nextTask?.title ? `生产待办：${signal.nextTask.title}` : "清空生产待办先修项",
+          description: `${getProductionBacklogGateDetail(signal)}公开发布前建议先清空先修任务。`,
+          action: getProductionBacklogGateAction(signal),
+        },
+      ];
+    }
+    if (status === "preview" && signal.warningCount > 0) {
+      return [
+        {
+          title: "确认生产待办优先项",
+          description: `${getProductionBacklogGateDetail(signal)}Preview 可以带说明发布，但正式发布前建议继续处理。`,
+          action: getProductionBacklogGateAction(signal),
+        },
+      ];
+    }
+    return [];
+  }
+
+  function buildGateChecklistItems(items = [], releaseFixOrder = null, status = "blocked", productionBacklogSignal = {}) {
     const safeItems = Array.isArray(items) ? items : [];
     const priorityItems =
       status === "blocked"
         ? safeItems.filter((item) => item?.severity === "blocker")
         : safeItems.filter((item) => item?.severity === "warn");
-    if (priorityItems.length > 0) {
-      return priorityItems.slice(0, 3).map((item) => ({
+    const productionItems = buildProductionBacklogGateItems(productionBacklogSignal, status);
+    const combinedItems = [...priorityItems, ...productionItems];
+    if (combinedItems.length > 0) {
+      return combinedItems.slice(0, 3).map((item) => ({
         label: item.title ?? "待处理项",
         detail: item.description ?? item.status ?? "发布前建议处理。",
         done: false,
@@ -160,19 +239,25 @@
     const regressionFailCount = toCount(regressionSummary?.failCount);
     const regressionWarnCount = toCount(regressionSummary?.warnCount);
     const { blockerCount, warnCount, readyCount, totalCount } = getReleaseChecklistCounts(releaseChecklistItems);
-    const hasBlockers = blockerCount > 0 || regressionFailCount > 0;
-    const hasWarnings = warnCount > 0 || regressionWarnCount > 0 || !hasRegressionRun;
+    const productionBacklogSignal = getProductionBacklogGateSignal(context);
+    const productionBlockerCount = productionBacklogSignal.blockerCount;
+    const productionWarnCount = productionBacklogSignal.warningCount;
+    const totalBlockerCount = blockerCount + regressionFailCount + productionBlockerCount;
+    const totalWarnCount = warnCount + regressionWarnCount + (hasRegressionRun ? 0 : 1) + productionWarnCount;
+    const hasBlockers = totalBlockerCount > 0;
+    const hasWarnings = totalWarnCount > 0;
     const status = hasBlockers ? "blocked" : hasWarnings ? "preview" : "ready";
     const firstBlockerAction = getFirstReleaseAction(releaseChecklistItems, "blocker");
     const firstWarnAction = getFirstReleaseAction(releaseChecklistItems, "warn");
+    const productionBacklogAction = getProductionBacklogGateAction(productionBacklogSignal);
     const exportLabel = exportResult?.targetLabel || exportResult?.target || "尚未导出";
     const primaryAction =
       status === "blocked"
-        ? firstBlockerAction || releaseFixOrder?.steps?.[0]?.actions?.[0] || { label: "一键生成修复顺序", action: "generate-release-fix-order" }
+        ? firstBlockerAction || (productionBlockerCount > 0 ? productionBacklogAction : null) || releaseFixOrder?.steps?.[0]?.actions?.[0] || { label: "一键生成修复顺序", action: "generate-release-fix-order" }
         : status === "preview"
           ? (!hasRegressionRun
               ? { label: "先跑自动回归试玩", action: "run-preview-regression" }
-              : firstWarnAction || { label: "导出发布总控报告", action: "export-release-control-report" })
+              : firstWarnAction || (productionWarnCount > 0 ? productionBacklogAction : null) || { label: "导出发布总控报告", action: "export-release-control-report" })
           : { label: "导出发布总控报告", action: "export-release-control-report" };
     const secondaryActions =
       status === "ready"
@@ -191,25 +276,34 @@
       badge: status === "blocked" ? "暂缓发布" : status === "preview" ? "可发 Preview" : "可以公开发布",
       title:
         status === "blocked"
-          ? `暂缓公开发布：还有 ${blockerCount + regressionFailCount} 个阻塞项`
+          ? `暂缓公开发布：还有 ${totalBlockerCount} 个阻塞项`
           : status === "preview"
             ? "可以发布 Preview，但建议先确认提醒项"
             : "可以进入公开发布流程",
       description:
         status === "blocked"
-          ? "这些问题可能造成断线、缺素材、包体异常或回归失败。建议先按门禁里的主按钮处理，再重新导出。"
+          ? "这些问题可能造成断线、缺素材、制作先修未完成、包体异常或回归失败。建议先按门禁里的主按钮处理，再重新导出。"
           : status === "preview"
             ? "当前没有硬阻塞，适合按 Preview / Early Access 口径发布；如果想更稳，先把提醒和回归试玩补齐。"
             : "当前发布检查、回归和导出状态都比较干净，可以开始整理 GitHub Release 附件和发布说明。",
       metrics: [
-        { label: "阻塞", value: `${blockerCount + regressionFailCount} 个`, hint: "公开发布前建议清零" },
-        { label: "提醒", value: `${warnCount + regressionWarnCount + (hasRegressionRun ? 0 : 1)} 个`, hint: "Preview 可带说明发布" },
+        { label: "阻塞", value: `${totalBlockerCount} 个`, hint: "公开发布前建议清零" },
+        { label: "提醒", value: `${totalWarnCount} 个`, hint: "Preview 可带说明发布" },
         { label: "通过", value: `${readyCount}/${totalCount}`, hint: "发布检查清单已就绪项" },
         { label: "最近导出", value: exportLabel, hint: hasRegressionRun ? "已跑过自动回归" : "还没跑自动回归" },
+        ...(productionBacklogSignal.available
+          ? [
+              {
+                label: "生产待办",
+                value: `${productionBacklogSignal.taskCount} 项`,
+                hint: getProductionBacklogGateDetail(productionBacklogSignal),
+              },
+            ]
+          : []),
       ],
       primaryAction: serializeReleaseReportAction(primaryAction),
       secondaryActions: secondaryActions.map(serializeReleaseReportAction).filter(Boolean),
-      checklist: buildGateChecklistItems(releaseChecklistItems, releaseFixOrder, status),
+      checklist: buildGateChecklistItems(releaseChecklistItems, releaseFixOrder, status, productionBacklogSignal),
     };
   }
 

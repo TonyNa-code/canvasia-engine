@@ -21,6 +21,9 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
         self.assertIn("creativeQuality: buildReleaseCreativeQualityContext()", source)
         self.assertIn("runtimeCapabilityMatrix: buildRuntimeCapabilityMatrix()", source)
         self.assertIn("routeTestingPlan: routeOverview?.routeTestingPlan ?? {}", source)
+        self.assertIn("productionBacklogSummary: productionBacklog?.summary ?? null", source)
+        self.assertIn("productionBacklogNextTask: productionBacklog?.nextTask ?? null", source)
+        self.assertIn("buildFinalPublishGate(releaseItems, releaseFixOrder, routeOverview)", source)
         self.assertIn("function serializeFinalPublishGate", source)
         self.assertIn("function renderFinalPublishGatePanel", source)
         self.assertIn("最终发表门禁", source)
@@ -271,6 +274,25 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
                 hasRegressionRun: true,
                 exportResult: {{ targetLabel: "macOS 桌面包" }},
               }}),
+              productionBlockedGate: tools.buildFinalPublishGate({{
+                releaseChecklistItems: [
+                  {{ severity: "good", title: "发布版本" }},
+                  {{ severity: "good", title: "结构错误" }},
+                ],
+                regressionSummary: {{ failCount: 0, warnCount: 0 }},
+                hasRegressionRun: true,
+                exportResult: {{ targetLabel: "Linux 桌面包" }},
+                productionBacklogSummary: {{
+                  taskCount: 4,
+                  blockerCount: 1,
+                  warningCount: 2,
+                  tipCount: 1,
+                }},
+                productionBacklogNextTask: {{
+                  title: "补齐空白场景内容",
+                  action: {{ label: "补演出卡", action: "switch-screen", screen: "story" }},
+                }},
+              }}),
               vnEssentialsSteps: tools.buildVnEssentialsReleaseSteps({{
                 issues: [
                   {{ code: "bgm_scope_missing", area: "audio", severity: "warn", severityLabel: "基础缺口", title: "多首 BGM 缺少明确播放范围", detail: "两首曲子没有结束范围。", suggestion: "给关键曲目设置结束范围。" }},
@@ -340,6 +362,14 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
         self.assertEqual(payload["readyGate"]["badge"], "可以公开发布")
         self.assertEqual(payload["readyGate"]["primaryAction"]["action"], "export-release-control-report")
         self.assertEqual(payload["readyGate"]["secondaryActions"][0]["dataset"], {"export-target": "web"})
+        self.assertEqual(payload["productionBlockedGate"]["status"], "blocked")
+        self.assertEqual(payload["productionBlockedGate"]["primaryAction"]["screen"], "story")
+        self.assertEqual(payload["productionBlockedGate"]["metrics"][0]["value"], "1 个")
+        self.assertEqual(payload["productionBlockedGate"]["metrics"][1]["value"], "2 个")
+        self.assertEqual(payload["productionBlockedGate"]["metrics"][4]["label"], "生产待办")
+        self.assertEqual(payload["productionBlockedGate"]["metrics"][4]["value"], "4 项")
+        self.assertEqual(payload["productionBlockedGate"]["checklist"][0]["label"], "生产待办：补齐空白场景内容")
+        self.assertIn("制作先修未完成", payload["productionBlockedGate"]["description"])
         self.assertEqual([step["title"] for step in payload["vnEssentialsSteps"]], ["多首 BGM 缺少明确播放范围", "文本框可读性需要复看"])
         self.assertEqual(payload["vnEssentialsSteps"][0]["tone"], "warn")
         self.assertEqual(payload["vnEssentialsSteps"][0]["actions"][0]["screen"], "story")
