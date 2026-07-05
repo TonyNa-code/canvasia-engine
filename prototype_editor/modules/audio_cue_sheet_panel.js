@@ -116,6 +116,51 @@
     `;
   }
 
+  function renderAudioRangeSuggestionCard(suggestion = {}) {
+    const toneClass = suggestion.tone === "warn" ? "warn-text" : "";
+    return `
+      <article class="preview-sprint-card is-${suggestion.tone === "warn" ? "warn" : "soft"}">
+        <div class="preview-sprint-head">
+          <strong>${escapeHtml(suggestion.title ?? "建议明确 BGM 文本范围")}</strong>
+          <span class="issue-tag ${toneClass}">${escapeHtml(suggestion.tone === "warn" ? "建议先修" : "可优化")}</span>
+        </div>
+        <p>${escapeHtml(`${suggestion.assetName ?? "BGM"} · ${suggestion.chapterName ?? "未分章"} · ${suggestion.sceneName ?? "未命名场景"}`)}</p>
+        <div class="helper-text">${escapeHtml(`${suggestion.startLabel ?? "开始卡"} -> ${suggestion.endLabel ?? "建议结束卡"}。${suggestion.detail ?? ""}`)}</div>
+        <div class="detail-actions compact-actions">
+          <button
+            type="button"
+            class="toolbar-button"
+            data-action="apply-audio-range-suggestion"
+            data-scene-id="${escapeHtml(suggestion.sceneId ?? "")}"
+            data-block-id="${escapeHtml(suggestion.blockId ?? "")}"
+            data-end-block-id="${escapeHtml(suggestion.endBlockId ?? "")}"
+            data-fade-out-ms="${escapeHtml(String(suggestion.fadeOutMs ?? 900))}"
+          >
+            ${escapeHtml(suggestion.actionLabel ?? "套用这个范围")}
+          </button>
+        </div>
+      </article>
+    `;
+  }
+
+  function renderAudioRangeSuggestions(suggestions = []) {
+    const rows = Array.isArray(suggestions) ? suggestions.slice(0, 4) : [];
+    if (!rows.length) {
+      return "";
+    }
+    return `
+      <section class="preview-sprint-section">
+        <div class="panel-heading panel-heading-compact">
+          <h3>BGM 文本范围建议</h3>
+          <span class="badge badge-soft">${escapeHtml(`${suggestions.length} 条`)}</span>
+        </div>
+        <div class="preview-sprint-grid">
+          ${rows.map(renderAudioRangeSuggestionCard).join("")}
+        </div>
+      </section>
+    `;
+  }
+
   function renderAudioAuditionChecklistRow(row = {}) {
     return `
       <div class="route-testing-item">
@@ -238,6 +283,7 @@
           ${renderRouteMetricCard("音效卡", `${summary.sfxCueCount ?? 0} 张`, "门铃、脚步、心跳等触发音效")}
           ${renderRouteMetricCard("语音卡", `${summary.voiceCueCount ?? 0} 句`, "已绑定语音的台词和旁白")}
           ${renderRouteMetricCard("覆盖段", `${summary.rangeSegmentCount ?? 0} 段`, "每首 BGM 实际覆盖的剧情范围")}
+          ${renderRouteMetricCard("范围建议", `${summary.rangeSuggestionCount ?? 0} 条`, "可一键绑定到具体文本段落")}
           ${renderRouteMetricCard("阻塞 / 提醒", `${summary.blockerCount ?? 0} / ${summary.warningCount ?? 0}`, "缺素材、坏范围或提前接管")}
           ${renderRouteMetricCard("就绪度", `${summary.releaseReadinessPercent ?? 0}%`, "按阻塞、提醒和缺 BGM 场景估算")}
           ${renderRouteMetricCard("制作任务", `${summary.productionTaskCount ?? 0} 项`, "按发布优先级自动排序")}
@@ -256,6 +302,7 @@
           </button>
         </div>
         ${renderAudioCueSheetPreview(sheet)}
+        ${renderAudioRangeSuggestions(sheet.rangeSuggestions)}
         ${renderAudioProductionQueue(sheet.productionQueue)}
         ${renderAudioAuditionChecklist(sheet.auditionChecklist)}
       </article>
@@ -269,6 +316,8 @@
     renderSfxCueRow,
     renderVoiceCueRow,
     renderAudioProductionTaskCard,
+    renderAudioRangeSuggestionCard,
+    renderAudioRangeSuggestions,
     renderAudioAuditionChecklistRow,
     renderAudioProductionQueue,
     renderAudioAuditionChecklist,

@@ -861,6 +861,118 @@
     }));
   }
 
+  function getAudioRangeSuggestionTone(code = "") {
+    if (["invalid_explicit_range", "missing_explicit_range", "backward_explicit_range"].includes(code)) {
+      return "warn";
+    }
+    return "soft";
+  }
+
+  function buildAudioRangeSuggestion(block = {}, context = {}, cue = {}) {
+    const blocks = toArray(context.blocks);
+    const startIndex = context.blockIndex ?? 0;
+    const blockId = getBlockId(block);
+    const recommendedEndBlockId = getRecommendedAudioRangeEndBlockId(blocks, startIndex);
+    const recommendedEndIndex = blocks.findIndex((candidate) => getBlockId(candidate) === recommendedEndBlockId);
+    if (!blockId || !recommendedEndBlockId || recommendedEndIndex < startIndex) {
+      return null;
+    }
+
+    const endMode = getSafeMusicEndMode(block.endMode);
+    const currentEndBlockId = cleanText(block.endBlockId);
+    const currentEndIndex = blocks.findIndex((candidate) => getBlockId(candidate) === currentEndBlockId);
+    const isAlreadyRecommendedExplicitRange =
+      endMode === "after_block" && currentEndBlockId === recommendedEndBlockId && Math.round(clampNumber(block.fadeOutMs, 0, 30000, 0)) > 0;
+    if (isAlreadyRecommendedExplicitRange) {
+      return null;
+    }
+
+    let code = "make_explicit_range";
+    let reason = "当前 BGM 依赖自动接管；显式绑定到一段文本后，后期替换音乐、插入演出或导出审听表会更清楚。";
+    if (endMode === "after_block" && !currentEndBlockId) {
+      code = "missing_explicit_range";
+      reason = "这首 BGM 已选择“播放到指定卡片”，但还没有结束卡片。";
+    } else if (endMode === "after_block" && currentEndIndex < 0) {
+      code = "invalid_explicit_range";
+      reason = "当前结束卡片已经找不到，可以用系统建议的文本范围重新绑定。";
+    } else if (endMode === "after_block" && currentEndIndex < startIndex) {
+      code = "backward_explicit_range";
+      reason = "当前结束卡片排在播放卡之前，需要重新指定一个正文范围。";
+    } else if (endMode === "scene_end") {
+      code = "scene_end_to_explicit_range";
+      reason = "当前 BGM 覆盖到场景末尾；如果结尾还有等待、片尾或转场，显式结束点更稳。";
+    }
+
+    const fadeOutMs = Math.round(clampNumber(block.fadeOutMs, 0, 30000, 0)) || AUDIO_CUE_AUTO_FIX_DEFAULTS.musicFadeOutMs;
+    const recommendedEndLabel = summarizeBlock(blocks[recommendedEndIndex], recommendedEndIndex);
+    const startLabel = cue.startLabel || summarizeBlock(block, startIndex);
+    const assetName = cue.assetName || cleanText(block.assetId, "未选择 BGM");
+    const tone = getAudioRangeSuggestionTone(code);
+
+    return {
+      id: `${cleanText(context.scene?.id, "scene")}_${blockId}_${recommendedEndBlockId}`,
+      code,
+      tone,
+      confidence: tone === "warn" ? "high" : "medium",
+      sceneId: cleanText(context.scene?.id),
+      sceneName: cleanText(context.scene?.name ?? context.scene?.title, `场景 ${(context.sceneIndex ?? 0) + 1}`),
+      chapterId: context.chapter?.id ?? "",
+      chapterName: context.chapter?.name ?? "未分章",
+      blockId,
+      blockIndex: startIndex,
+      endBlockId: recommendedEndBlockId,
+      endBlockIndex: recommendedEndIndex,
+      endMode: "after_block",
+      fadeOutMs,
+      assetId: cue.assetId || cleanText(block.assetId),
+      assetName,
+      title: tone === "warn" ? "修正 BGM 文本范围" : "建议明确 BGM 文本范围",
+      detail: `${reason} 建议从 ${startLabel} 播到 ${recommendedEndLabel}。`,
+      startLabel,
+      endLabel: recommendedEndLabel,
+      currentRangeLabel: cue.handoffLabel || getMusicEndModeLabel(endMode),
+      actionLabel: "套用这个范围",
+    };
+  }
+
+  function applyAudioRangeSuggestionToScene(scene = {}, suggestion = {}) {
+    const updatedScene = cloneSceneForAudioFix(scene);
+    const blocks = toArray(updatedScene.blocks);
+    const blockId = cleanText(suggestion.blockId);
+    const endBlockId = cleanText(suggestion.endBlockId ?? suggestion.recommendedEndBlockId);
+    const blockIndex = blocks.findIndex((block) => getBlockId(block) === blockId);
+    const endBlockIndex = blocks.findIndex((block) => getBlockId(block) === endBlockId);
+
+    if (blockIndex < 0) {
+      return { ok: false, error: "找不到要调整的 BGM 播放卡。" };
+    }
+    if (blocks[blockIndex]?.type !== "music_play") {
+      return { ok: false, error: "目标卡片不是 BGM 播放卡，无法套用音频范围。" };
+    }
+    if (endBlockIndex < 0) {
+      return { ok: false, error: "找不到建议的结束卡片，可能场景内容已经变化。" };
+    }
+    if (endBlockIndex < blockIndex) {
+      return { ok: false, error: "建议的结束卡片在 BGM 播放卡之前，无法套用。" };
+    }
+
+    const block = blocks[blockIndex];
+    block.endMode = "after_block";
+    block.endBlockId = endBlockId;
+    const nextFadeOutMs = Math.round(clampNumber(suggestion.fadeOutMs ?? block.fadeOutMs, 0, 30000, 0));
+    block.fadeOutMs = nextFadeOutMs > 0 ? nextFadeOutMs : AUDIO_CUE_AUTO_FIX_DEFAULTS.musicFadeOutMs;
+
+    return {
+      ok: true,
+      scene: updatedScene,
+      blockId,
+      endBlockId,
+      blockIndex,
+      endBlockIndex,
+      message: `已把 BGM 范围绑定到第 ${endBlockIndex + 1} 张卡片。`,
+    };
+  }
+
   function getAudioProductionSeverityLabel(severity = "") {
     if (severity === "blocker") {
       return "先修";
@@ -920,6 +1032,20 @@
 
   function buildAudioCueProductionQueue(sheet = {}) {
     const tasks = [];
+
+    toArray(sheet.rangeSuggestions).forEach((suggestion, index) => {
+      tasks.push({
+        id: `range_suggestion_${suggestion.id || index}`,
+        code: suggestion.code ?? "bgm_range_suggestion",
+        severity: suggestion.tone === "warn" ? "warn" : "tip",
+        phase: suggestion.tone === "warn" ? "修范围" : "范围",
+        title: suggestion.title ?? "明确 BGM 覆盖范围",
+        detail: suggestion.detail ?? "",
+        targetLabel: cleanText(`${suggestion.chapterName ?? "未分章"} · ${suggestion.sceneName ?? "未命名场景"} · ${suggestion.assetName ?? "BGM"}`),
+        actionLabel: suggestion.actionLabel ?? "套用建议范围",
+        cueType: "bgm",
+      });
+    });
 
     toArray(sheet.issues).forEach((issue, index) => {
       tasks.push({
@@ -1056,6 +1182,7 @@
     const sfxCues = [];
     const voiceCues = [];
     const stops = [];
+    const rangeSuggestions = [];
     const scenesWithoutMusic = [];
 
     scenes.forEach((scene, sceneIndex) => {
@@ -1073,6 +1200,10 @@
           const cue = buildAudioCue(block, { assetMap, blocks, blockIndex, scene, sceneIndex, chapter });
           cues.push(cue);
           sceneCues.push(cue);
+          const suggestion = buildAudioRangeSuggestion(block, { blocks, blockIndex, scene, sceneIndex, chapter }, cue);
+          if (suggestion) {
+            rangeSuggestions.push(suggestion);
+          }
         }
         if (block?.type === "sfx_play") {
           const cue = buildSfxCue(block, { assetMap, blockIndex, scene, sceneIndex, chapter });
@@ -1194,6 +1325,7 @@
       voiceRows,
       stops,
       scenesWithoutMusic,
+      rangeSuggestions,
       issues,
       summary,
     };
@@ -1206,6 +1338,7 @@
     summary.autoFixSceneCount = autoFixPlan.changedSceneCount;
     summary.autoFixBlockCount = autoFixPlan.changedBlockCount;
     summary.autoFixOperationCount = autoFixPlan.operationCount;
+    summary.rangeSuggestionCount = rangeSuggestions.length;
 
     return {
       ...sheet,
@@ -1306,6 +1439,15 @@
       row.auditionHint,
       row.statusLabel,
     ]);
+    const rangeSuggestionRows = toArray(sheet.rangeSuggestions).slice(0, 120).map((suggestion, index) => [
+      `${index + 1}`,
+      suggestion.tone === "warn" ? "建议先修" : "可优化",
+      `${suggestion.chapterName} / ${suggestion.sceneName}`,
+      suggestion.assetName,
+      suggestion.startLabel,
+      suggestion.endLabel,
+      suggestion.detail,
+    ]);
     const sfxRows = toArray(sheet.sfxRows).slice(0, 120).map((row) => [
       `${row.index}`,
       `${row.chapterName} / ${row.sceneName}`,
@@ -1377,6 +1519,7 @@
           ["语音卡", `${summary.voiceCueCount ?? 0}`],
           ["覆盖段", `${summary.rangeSegmentCount ?? 0}`],
           ["指定范围", `${summary.explicitRangeCount ?? 0}`],
+          ["范围建议", `${summary.rangeSuggestionCount ?? 0}`],
           ["场景结束范围", `${summary.sceneEndCount ?? 0}`],
           ["自然接管", `${summary.handoffCount ?? 0}`],
           ["建议试听", `${summary.auditionNeededCount ?? 0}`],
@@ -1406,6 +1549,11 @@
       "",
       buildMarkdownTable(["序号", "章节 / 场景", "BGM", "覆盖范围", "接管方式", "试听提示", "状态"], rangeRows) ||
         "当前没有可展示的 BGM 覆盖范围。",
+      "",
+      "## BGM 文本范围建议",
+      "",
+      buildMarkdownTable(["序号", "类型", "章节 / 场景", "BGM", "开始", "建议结束", "说明"], rangeSuggestionRows) ||
+        "当前没有需要单独建议的 BGM 文本范围。",
       "",
       "## BGM Cue 列表",
       "",
@@ -1527,6 +1675,8 @@
     buildAudioCueRangeRows,
     buildSfxCueRows,
     buildVoiceCueRows,
+    buildAudioRangeSuggestion,
+    applyAudioRangeSuggestionToScene,
     buildAudioCueProductionQueue,
     buildAudioCueAuditionChecklist,
     buildAudioCueAutoFixSummary,

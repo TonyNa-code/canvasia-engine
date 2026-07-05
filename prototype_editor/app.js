@@ -3943,6 +3943,11 @@ async function handleClick(event) {
     return;
   }
 
+  if (action === "apply-audio-range-suggestion") {
+    void applyAudioRangeSuggestion(actionTarget.dataset);
+    return;
+  }
+
   if (action === "export-stage-direction-sheet-markdown") {
     exportStageDirectionSheetMarkdown();
     return;
@@ -30654,6 +30659,44 @@ async function applyAudioCueAutoFix() {
   } finally {
     setAudioCueAutoFixInFlight(false);
   }
+}
+
+async function applyAudioRangeSuggestion(dataset = {}) {
+  const sceneId = getSafeSceneId(dataset.sceneId);
+  const scene = state.data?.scenesById.get(sceneId);
+  if (!scene) {
+    showToast("找不到要调整的场景，可能项目已经刷新过", "error");
+    return false;
+  }
+  if (typeof audioCueSheetTools?.applyAudioRangeSuggestionToScene !== "function") {
+    showToast("当前版本暂时不能套用 BGM 范围建议", "error");
+    return false;
+  }
+
+  const result = audioCueSheetTools.applyAudioRangeSuggestionToScene(scene, {
+    blockId: dataset.blockId,
+    endBlockId: dataset.endBlockId,
+    fadeOutMs: dataset.fadeOutMs,
+  });
+  if (!result.ok) {
+    showToast(result.error || "BGM 范围建议没有套用成功", "error");
+    return false;
+  }
+
+  const success = await persistScene(result.scene, {
+    selectedSceneId: sceneId,
+    selectedBlockId: result.blockId,
+    previewSceneId: sceneId,
+    previewBlockIndex: Math.max(result.blockIndex ?? 0, 0),
+    successMessage: result.message || "已套用 BGM 范围建议",
+  });
+  if (success && state.currentScreen !== "inspection") {
+    switchScreen("inspection");
+  }
+  if (success) {
+    showToast(result.message || "已套用 BGM 范围建议");
+  }
+  return success;
 }
 
 function buildStageDirectionSheet() {

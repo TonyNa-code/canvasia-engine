@@ -62,6 +62,22 @@ class FrontendAudioCueSheetPanelModuleTests(unittest.TestCase):
                 }},
               ],
             }});
+            const suggestionSheet = sheetTools.buildAudioCueSheet({{
+              chapters: [{{ id: "chapter_1", name: "第1章" }}],
+              assetList: [{{ id: "bgm_ok", type: "bgm", name: "雨夜钢琴", fileExists: true }}],
+              scenes: [
+                {{
+                  id: "scene_suggestion",
+                  chapterId: "chapter_1",
+                  name: "雨夜教室",
+                  blocks: [
+                    {{ id: "music_1", type: "music_play", assetId: "bgm_ok", endMode: "until_next_music", fadeInMs: 600 }},
+                    {{ id: "line_1", type: "dialogue", text: "雨还没停。" }},
+                    {{ id: "line_2", type: "narration", text: "窗外的灯慢慢暗下去。" }},
+                  ],
+                }},
+              ],
+            }});
             const sfxOnlySheet = sheetTools.buildAudioCueSheet({{
               chapters: [{{ id: "chapter_1", name: "第1章" }}],
               assetList: [{{ id: "sfx_door", type: "sfx", name: "门铃", fileExists: true }}],
@@ -94,6 +110,7 @@ class FrontendAudioCueSheetPanelModuleTests(unittest.TestCase):
             const emptyHtml = panelTools.renderAudioCueSheetPanel({{ summary: {{}}, issues: [], rangeRows: [] }});
             const issueHtml = panelTools.renderAudioCueSheetPanel(issueSheet);
             const rangeHtml = panelTools.renderAudioCueSheetPanel(rangeSheet);
+            const suggestionHtml = panelTools.renderAudioCueSheetPanel(suggestionSheet);
             const sfxOnlyHtml = panelTools.renderAudioCueSheetPanel(sfxOnlySheet);
             const voiceOnlyHtml = panelTools.renderAudioCueSheetPanel(voiceOnlySheet);
             process.stdout.write(JSON.stringify({{
@@ -101,6 +118,7 @@ class FrontendAudioCueSheetPanelModuleTests(unittest.TestCase):
               emptyHtml,
               issueHtml,
               rangeHtml,
+              suggestionHtml,
               sfxOnlyHtml,
               voiceOnlyHtml,
             }}));
@@ -120,6 +138,8 @@ class FrontendAudioCueSheetPanelModuleTests(unittest.TestCase):
         self.assertIn("renderAudioCueSheetPreview", payload["keys"])
         self.assertIn("renderAudioProductionQueue", payload["keys"])
         self.assertIn("renderAudioAuditionChecklist", payload["keys"])
+        self.assertIn("renderAudioRangeSuggestionCard", payload["keys"])
+        self.assertIn("renderAudioRangeSuggestions", payload["keys"])
         self.assertIn("renderAudioCueAutoFixButton", payload["keys"])
         self.assertIn("renderSfxCueRow", payload["keys"])
         self.assertIn("renderVoiceCueRow", payload["keys"])
@@ -130,6 +150,11 @@ class FrontendAudioCueSheetPanelModuleTests(unittest.TestCase):
         self.assertIn("音频基础参数已完整", payload["rangeHtml"])
         self.assertIn('disabled aria-disabled="true"', payload["rangeHtml"])
         self.assertIn("音频调度表", payload["rangeHtml"])
+        self.assertIn("BGM 文本范围建议", payload["suggestionHtml"])
+        self.assertIn("雨夜钢琴", payload["suggestionHtml"])
+        self.assertIn('data-action="apply-audio-range-suggestion"', payload["suggestionHtml"])
+        self.assertIn('data-scene-id="scene_suggestion"', payload["suggestionHtml"])
+        self.assertIn('data-end-block-id="line_2"', payload["suggestionHtml"])
         self.assertIn("制作优先队列", payload["issueHtml"])
         self.assertIn("发布前试听清单", payload["rangeHtml"])
         self.assertIn("就绪度", payload["rangeHtml"])

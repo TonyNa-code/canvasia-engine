@@ -73,6 +73,10 @@ class FrontendAudioCueSheetModuleTests(unittest.TestCase):
             }};
             const sheet = tools.buildAudioCueSheet(data);
             const autoFixPlan = tools.buildAudioCueAutoFixPlan(data);
+            const rangeSuggestionApplyResult = tools.applyAudioRangeSuggestionToScene(
+              data.scenes[2],
+              sheet.rangeSuggestions[0]
+            );
             const digest = tools.getAudioCueSheetStatusDigest(sheet);
             const markdown = tools.buildAudioCueSheetMarkdown(sheet, {{
               projectTitle: "Demo Project",
@@ -83,6 +87,7 @@ class FrontendAudioCueSheetModuleTests(unittest.TestCase):
               keys: Object.keys(tools).sort(),
               sheet,
               autoFixPlan,
+              rangeSuggestionApplyResult,
               digest,
               markdown,
               csv,
@@ -104,6 +109,8 @@ class FrontendAudioCueSheetModuleTests(unittest.TestCase):
         self.assertIn("buildVoiceCueRows", payload["keys"])
         self.assertIn("buildAudioCueProductionQueue", payload["keys"])
         self.assertIn("buildAudioCueAuditionChecklist", payload["keys"])
+        self.assertIn("buildAudioRangeSuggestion", payload["keys"])
+        self.assertIn("applyAudioRangeSuggestionToScene", payload["keys"])
         self.assertIn("buildAudioCueAutoFixPlan", payload["keys"])
         self.assertIn("getAudioCueAutoFixDigest", payload["keys"])
         self.assertIn("buildAudioCueSheetMarkdown", payload["keys"])
@@ -120,6 +127,7 @@ class FrontendAudioCueSheetModuleTests(unittest.TestCase):
         self.assertEqual(payload["sheet"]["summary"]["missingSfxAssetCount"], 1)
         self.assertEqual(payload["sheet"]["summary"]["missingVoiceAssetCount"], 1)
         self.assertEqual(payload["sheet"]["summary"]["missingEndBlockCount"], 1)
+        self.assertEqual(payload["sheet"]["summary"]["rangeSuggestionCount"], 1)
         self.assertEqual(payload["sheet"]["summary"]["autoFixSceneCount"], 1)
         self.assertEqual(payload["sheet"]["summary"]["autoFixBlockCount"], 1)
         self.assertEqual(payload["sheet"]["summary"]["autoFixOperationCount"], 3)
@@ -129,7 +137,13 @@ class FrontendAudioCueSheetModuleTests(unittest.TestCase):
         self.assertEqual(payload["digest"]["status"], "blocked")
         self.assertEqual(payload["sheet"]["productionQueue"][0]["severity"], "blocker")
         self.assertIn("补齐或重新绑定素材", [item["actionLabel"] for item in payload["sheet"]["productionQueue"]])
+        self.assertIn("套用这个范围", [item["actionLabel"] for item in payload["sheet"]["productionQueue"]])
         self.assertIn("修完再听", [item["priority"] for item in payload["sheet"]["auditionChecklist"]])
+        self.assertEqual(payload["sheet"]["rangeSuggestions"][0]["endBlockId"], "block_bad_line")
+        self.assertEqual(payload["sheet"]["rangeSuggestions"][0]["tone"], "warn")
+        self.assertTrue(payload["rangeSuggestionApplyResult"]["ok"])
+        self.assertEqual(payload["rangeSuggestionApplyResult"]["scene"]["blocks"][0]["endBlockId"], "block_bad_line")
+        self.assertEqual(payload["rangeSuggestionApplyResult"]["scene"]["blocks"][0]["fadeOutMs"], 900)
         self.assertEqual(payload["sheet"]["sfxCues"][0]["assetName"], "门铃")
         self.assertEqual(payload["sheet"]["sfxCues"][1]["status"], "blocker")
         self.assertEqual(payload["sheet"]["voiceCues"][0]["speakerName"], "悠奈")
@@ -152,6 +166,8 @@ class FrontendAudioCueSheetModuleTests(unittest.TestCase):
         self.assertIn("制作优先队列", payload["markdown"])
         self.assertIn("发布前试听清单", payload["markdown"])
         self.assertIn("BGM 覆盖范围速览", payload["markdown"])
+        self.assertIn("BGM 文本范围建议", payload["markdown"])
+        self.assertIn("修正 BGM 文本范围", payload["markdown"])
         self.assertIn("BGM Cue 列表", payload["markdown"])
         self.assertIn("音效 Cue 列表", payload["markdown"])
         self.assertIn("语音 Cue 列表", payload["markdown"])
