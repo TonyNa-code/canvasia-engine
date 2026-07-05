@@ -354,6 +354,101 @@
       });
   }
 
+  function formatBacklogDuration(seconds) {
+    const safeSeconds = Math.max(0, Math.round(Number(seconds) || 0));
+    if (safeSeconds <= 0) {
+      return "约 0 秒";
+    }
+    if (safeSeconds < 60) {
+      return `约 ${safeSeconds} 秒`;
+    }
+    const minutes = Math.floor(safeSeconds / 60);
+    const remainingSeconds = safeSeconds % 60;
+    return remainingSeconds > 0 ? `约 ${minutes}分${remainingSeconds}秒` : `约 ${minutes} 分钟`;
+  }
+
+  function getTimingCount(summary = {}, scenes = [], key, tone) {
+    return toCount(summary[key], toArray(scenes).filter((scene) => cleanText(scene?.timingTone) === tone).length);
+  }
+
+  function getTimingLabel(summary = {}, labelKey, secondsKey) {
+    return cleanText(summary[labelKey]) || formatBacklogDuration(summary[secondsKey]);
+  }
+
+  function getTimingSceneExamples(directorCueSheet = {}, tone, maxItems = 3) {
+    return toArray(directorCueSheet.scenes)
+      .filter((scene) => cleanText(scene?.timingTone) === tone)
+      .slice(0, maxItems)
+      .map((scene) => {
+        const target = cleanText(`${scene.chapterName ?? ""} / ${scene.sceneName ?? ""}`, "未命名场景");
+        const timing = cleanText(scene.durationLabel ?? scene.timingBrief);
+        return timing ? `${target}（${timing}）` : target;
+      })
+      .join("；");
+  }
+
+  function addDirectorTimingTasks(tasks, directorCueSheet = {}) {
+    const summary = directorCueSheet.summary ?? {};
+    const scenes = toArray(directorCueSheet.scenes);
+    const shortSceneCount = getTimingCount(summary, scenes, "shortSceneCount", "short");
+    const longSceneCount = getTimingCount(summary, scenes, "longSceneCount", "long");
+    const silentSceneCount = getTimingCount(summary, scenes, "silentSceneCount", "silent");
+    const sceneCount = toCount(summary.sceneCount, scenes.length);
+    const totalEstimatedLabel = getTimingLabel(summary, "totalEstimatedLabel", "totalEstimatedSeconds");
+    const averageSceneLabel = getTimingLabel(summary, "averageSceneLabel", "averageSceneSeconds");
+
+    if (silentSceneCount > 0) {
+      const examples = getTimingSceneExamples(directorCueSheet, "silent");
+      addTask(tasks, {
+        area: "presentation",
+        severity: "warn",
+        title: "补齐空白场景内容",
+        detail: cleanText(
+          `导演分镜发现 ${silentSceneCount} 个场景几乎没有正文或媒体，可能是占位场景误入发布包。${examples ? `优先检查：${examples}。` : ""}`,
+          "复查导演分镜里没有正文或媒体的场景。"
+        ),
+        source: `${sceneCount} 个场景的时长复查`,
+        count: silentSceneCount,
+        action: AREA_ACTIONS.presentation,
+        priorityBoost: 16,
+      });
+    }
+
+    if (longSceneCount > 0) {
+      const examples = getTimingSceneExamples(directorCueSheet, "long");
+      addTask(tasks, {
+        area: "presentation",
+        severity: "warn",
+        title: "拆分过长场景节奏",
+        detail: cleanText(
+          `预计总时长 ${totalEstimatedLabel}，平均每场 ${averageSceneLabel}；其中 ${longSceneCount} 个场景偏长。${examples ? `优先检查：${examples}。` : ""}`,
+          "复查过长场景，必要时拆分为多个镜头、选项或演出段落。"
+        ),
+        source: "导演分镜时长估算",
+        count: longSceneCount,
+        action: AREA_ACTIONS.presentation,
+        priorityBoost: 12,
+      });
+    }
+
+    if (shortSceneCount > 0) {
+      const examples = getTimingSceneExamples(directorCueSheet, "short");
+      addTask(tasks, {
+        area: "presentation",
+        severity: "tip",
+        title: "复查过短场景节奏",
+        detail: cleanText(
+          `有 ${shortSceneCount} 个场景预计很快结束，发布前建议确认它们是刻意的转场、演出停顿或短分支。${examples ? `优先检查：${examples}。` : ""}`,
+          "复查过短场景是否缺少正文、等待时间或转场演出。"
+        ),
+        source: "导演分镜时长估算",
+        count: shortSceneCount,
+        action: AREA_ACTIONS.presentation,
+        priorityBoost: 6,
+      });
+    }
+  }
+
   function getRuntimePreloadPriorityBoost(warning = {}) {
     const code = cleanText(warning.code);
     if (code === "critical_missing_assets") {
@@ -524,6 +619,7 @@
     addRouteExecutionTasks(tasks, context.routeOverview?.routeTestingPlan);
     addIssueTasks(tasks, "scene", context.sceneBoard?.issues, { fallbackTitle: "处理场景制作问题", fallbackSource: "场景生产看板" });
     addDirectorCueTasks(tasks, context.directorCueSheet);
+    addDirectorTimingTasks(tasks, context.directorCueSheet);
     addIssueTasks(tasks, "voice", context.voiceSheet?.issues, { fallbackTitle: "处理语音制作问题", fallbackSource: "语音制作清单" });
     addIssueTasks(tasks, "choice", context.choiceConsequenceSheet?.issues, { fallbackTitle: "处理选项问题", fallbackSource: "选项后果表" });
     addIssueTasks(tasks, "variable", context.variableInfluenceSheet?.issues, { fallbackTitle: "处理变量问题", fallbackSource: "变量影响表" });
@@ -718,6 +814,7 @@
     buildRouteExecutionQueueFromPlan,
     addAudioProductionTasks,
     addDirectorCueTasks,
+    addDirectorTimingTasks,
     addRuntimePreloadBudgetTasks,
     addVnEssentialsTasks,
     getSeverityLabel,

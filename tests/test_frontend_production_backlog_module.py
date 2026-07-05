@@ -66,6 +66,39 @@ class FrontendProductionBacklogModuleTests(unittest.TestCase):
                 ],
               }},
               directorCueSheet: {{
+                summary: {{
+                  sceneCount: 3,
+                  totalEstimatedSeconds: 424,
+                  totalEstimatedLabel: "约 7分4秒",
+                  averageSceneSeconds: 141,
+                  averageSceneLabel: "约 2分21秒",
+                  shortSceneCount: 1,
+                  longSceneCount: 1,
+                  silentSceneCount: 1,
+                }},
+                scenes: [
+                  {{
+                    chapterName: "第1章",
+                    sceneName: "一句话转场",
+                    timingTone: "short",
+                    durationLabel: "约 4 秒",
+                    timingBrief: "约 4 秒 · 1 段正文 / 约 8 字",
+                  }},
+                  {{
+                    chapterName: "第1章",
+                    sceneName: "长独白",
+                    timingTone: "long",
+                    durationLabel: "约 7 分钟",
+                    timingBrief: "约 7 分钟 · 30 段正文 / 约 1800 字",
+                  }},
+                  {{
+                    chapterName: "第2章",
+                    sceneName: "空白占位",
+                    timingTone: "silent",
+                    durationLabel: "约 0 秒",
+                    timingBrief: "约 0 秒 · 几乎没有正文",
+                  }},
+                ],
                 productionQueue: [
                   {{
                     severity: "blocker",
@@ -231,22 +264,26 @@ class FrontendProductionBacklogModuleTests(unittest.TestCase):
         self.assertIn("buildRouteExecutionQueueFromPlan", payload["keys"])
         self.assertIn("addAudioProductionTasks", payload["keys"])
         self.assertIn("addDirectorCueTasks", payload["keys"])
+        self.assertIn("addDirectorTimingTasks", payload["keys"])
         self.assertIn("addRuntimePreloadBudgetTasks", payload["keys"])
         self.assertIn("addVnEssentialsTasks", payload["keys"])
         self.assertEqual(payload["backlog"]["projectTitle"], "Backlog Demo")
         self.assertEqual(len(payload["routeQueue"]), 2)
         self.assertEqual(payload["routeQueue"][0]["title"], "修复分支坏链")
         self.assertEqual(payload["routeQueue"][1]["title"], "接通结局入口")
-        self.assertEqual(payload["backlog"]["summary"]["taskCount"], 26)
+        self.assertEqual(payload["backlog"]["summary"]["taskCount"], 29)
         self.assertEqual(payload["backlog"]["summary"]["blockerCount"], 8)
-        self.assertEqual(payload["backlog"]["summary"]["warningCount"], 12)
-        self.assertEqual(payload["backlog"]["summary"]["tipCount"], 6)
+        self.assertEqual(payload["backlog"]["summary"]["warningCount"], 14)
+        self.assertEqual(payload["backlog"]["summary"]["tipCount"], 7)
         self.assertGreaterEqual(payload["backlog"]["summary"]["areaCount"], 12)
         self.assertEqual(payload["digest"]["status"], "blocked")
         self.assertEqual(payload["backlog"]["tasks"][0]["severity"], "blocker")
         self.assertTrue(any(task["title"] == "修复分支坏链" for task in payload["backlog"]["tasks"]))
         self.assertTrue(any(task["title"] == "BGM 文件缺失" for task in payload["backlog"]["tasks"]))
         self.assertTrue(any(task["area"] == "director" and task["title"] == "分镜素材缺失" for task in payload["backlog"]["tasks"]))
+        self.assertTrue(any(task["area"] == "presentation" and task["title"] == "补齐空白场景内容" for task in payload["backlog"]["tasks"]))
+        self.assertTrue(any(task["area"] == "presentation" and task["title"] == "拆分过长场景节奏" for task in payload["backlog"]["tasks"]))
+        self.assertTrue(any(task["area"] == "presentation" and task["title"] == "复查过短场景节奏" for task in payload["backlog"]["tasks"]))
         self.assertTrue(any(task["area"] == "loading" and task["title"] == "首屏必备素材过重" for task in payload["backlog"]["tasks"]))
         self.assertTrue(any(task["area"] == "audio" and task["title"] == "多首 BGM 缺少明确播放范围" for task in payload["backlog"]["tasks"]))
         self.assertTrue(any(task["area"] == "runtime" and task["title"] == "游戏 UI 仍接近默认皮肤" for task in payload["backlog"]["tasks"]))
@@ -256,6 +293,9 @@ class FrontendProductionBacklogModuleTests(unittest.TestCase):
         self.assertIn("语音文件缺失", payload["markdown"])
         self.assertIn("Runtime 覆盖", payload["markdown"])
         self.assertIn("导演分镜", payload["markdown"])
+        self.assertIn("补齐空白场景内容", payload["markdown"])
+        self.assertIn("拆分过长场景节奏", payload["markdown"])
+        self.assertIn("复查过短场景节奏", payload["markdown"])
         self.assertIn("素材授权", payload["markdown"])
         self.assertIn("已使用素材不可商用", payload["markdown"])
         self.assertIn("首屏加载", payload["markdown"])
