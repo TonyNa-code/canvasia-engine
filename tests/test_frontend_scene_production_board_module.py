@@ -77,6 +77,54 @@ class FrontendSceneProductionBoardModuleTests(unittest.TestCase):
                       ],
                     }},
                     {{ id: "scene_empty", name: "空场景", blocks: [] }},
+                    {{
+                      id: "scene_fake_choice",
+                      name: "假选项",
+                      blocks: [
+                        {{ id: "bg", type: "background", assetId: "bg_room" }},
+                        {{ id: "music", type: "music_play", assetId: "bgm_room" }},
+                        {{ id: "line", type: "dialogue", text: "你要怎么回答？", voiceAssetId: "voice_002" }},
+                        {{
+                          id: "choice",
+                          type: "choice",
+                          options: [
+                            {{ text: "点头", gotoSceneId: "__continue__" }},
+                            {{ text: "沉默", gotoSceneId: "__continue__" }},
+                          ],
+                        }},
+                        {{ id: "fade", type: "screen_fade" }},
+                      ],
+                    }},
+                    {{
+                      id: "scene_variable_payoff",
+                      name: "未回收变量",
+                      blocks: [
+                        {{ id: "bg", type: "background", assetId: "bg_hall" }},
+                        {{ id: "music", type: "music_play", assetId: "bgm_hall" }},
+                        {{ id: "line", type: "dialogue", text: "这个选择会被记住吗？", voiceAssetId: "voice_003" }},
+                        {{
+                          id: "choice",
+                          type: "choice",
+                          options: [
+                            {{ text: "相信她", gotoSceneId: "__continue__", effects: [{{ type: "variable_add", value: 1 }}] }},
+                            {{ text: "保持距离", gotoSceneId: "__continue__", effects: [{{ type: "variable_add", value: 1 }}] }},
+                          ],
+                        }},
+                        {{ id: "fade", type: "screen_fade" }},
+                      ],
+                    }},
+                    {{
+                      id: "scene_relationship",
+                      name: "关系铺垫",
+                      blocks: [
+                        {{ id: "bg", type: "background", assetId: "bg_station" }},
+                        {{ id: "music", type: "music_play", assetId: "bgm_station" }},
+                        {{ id: "line_1", type: "dialogue", text: "其实我一直想问你一件事。", voiceAssetId: "voice_004" }},
+                        {{ id: "wait", type: "wait" }},
+                        {{ id: "line_2", type: "dialogue", text: "那天你为什么会在那里？", voiceAssetId: "voice_005" }},
+                        {{ id: "fade", type: "screen_fade" }},
+                      ],
+                    }},
                   ],
                 }},
               ],
@@ -112,11 +160,11 @@ class FrontendSceneProductionBoardModuleTests(unittest.TestCase):
         self.assertIn("buildSceneProductionBoardMarkdown", payload["keys"])
         self.assertIn("buildSceneProductionBoardCsv", payload["keys"])
         self.assertIn("getSceneRecipeSuggestion", payload["keys"])
-        self.assertEqual(payload["board"]["summary"]["sceneCount"], 3)
+        self.assertEqual(payload["board"]["summary"]["sceneCount"], 6)
         self.assertGreater(payload["board"]["summary"]["blockedSceneCount"], 0)
         self.assertGreater(payload["board"]["summary"]["warningSceneCount"], 0)
         self.assertEqual(payload["board"]["summary"]["emptySceneCount"], 1)
-        self.assertEqual(payload["board"]["summary"]["recipeSuggestionCount"], 2)
+        self.assertEqual(payload["board"]["summary"]["recipeSuggestionCount"], 5)
         self.assertGreater(payload["board"]["summary"]["missingBackgroundSceneCount"], 0)
         self.assertGreater(payload["board"]["summary"]["missingMusicSceneCount"], 0)
         self.assertEqual(payload["board"]["summary"]["missingVoiceLineCount"], 1)
@@ -141,6 +189,10 @@ class FrontendSceneProductionBoardModuleTests(unittest.TestCase):
         self.assertIsNone(scenes_by_id["scene_start"]["recipeSuggestion"])
         self.assertEqual(scenes_by_id["scene_roof"]["recipeSuggestion"]["templateId"], "daily_conversation")
         self.assertEqual(scenes_by_id["scene_empty"]["recipeSuggestion"]["templateId"], "playable_scene")
+        self.assertEqual(scenes_by_id["scene_fake_choice"]["recipeSuggestion"]["templateId"], "affection_choice")
+        self.assertEqual(scenes_by_id["scene_variable_payoff"]["recipeSuggestion"]["templateId"], "branch_merge")
+        self.assertEqual(scenes_by_id["scene_relationship"]["recipeSuggestion"]["templateId"], "relationship_reveal")
+        self.assertIn("pacing_branch_without_payoff", scenes_by_id["scene_variable_payoff"]["pacingIssueCodes"])
         self.assertIn("# Demo Project 场景生产看板", payload["markdown"])
         self.assertIn("平均节奏分", payload["markdown"])
         self.assertIn("节奏建议", payload["markdown"])
@@ -149,6 +201,8 @@ class FrontendSceneProductionBoardModuleTests(unittest.TestCase):
         self.assertIn('"节奏分"', payload["csv"])
         self.assertIn('"屋顶"', payload["csv"])
         self.assertIn('"daily_conversation"', payload["csv"])
+        self.assertIn('"branch_merge"', payload["csv"])
+        self.assertIn('"relationship_reveal"', payload["csv"])
         self.assertEqual(payload["readyLabel"], "可试玩")
 
 

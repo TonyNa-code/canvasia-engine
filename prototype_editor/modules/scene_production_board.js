@@ -98,6 +98,27 @@
       detail: "这段已经比较完整，接下来可以补一个收束和转场，让试玩段落更像正式作品。",
       priority: 42,
     }),
+    mystery_clue: Object.freeze({
+      templateId: "mystery_clue",
+      title: "补一个悬念钩子",
+      actionLabel: "插入悬念线索",
+      detail: "这段已经能读，但还缺一个记忆点；可以补线索、冷色滤镜和变量记录，让玩家有继续点下去的理由。",
+      priority: 61,
+    }),
+    relationship_reveal: Object.freeze({
+      templateId: "relationship_reveal",
+      title: "补关系揭露段",
+      actionLabel: "插入关系揭露",
+      detail: "角色互动已经有基础，可以补一段居中立绘、镜头推进和关系真相，让场景有更明确的情绪锚点。",
+      priority: 59,
+    }),
+    branch_merge: Object.freeze({
+      templateId: "branch_merge",
+      title: "补分支回收点",
+      actionLabel: "插入分支汇合",
+      detail: "选项已经记录了变量，但还缺兑现选择的条件或汇合点；先补一个分支回收骨架，避免选择像摆设。",
+      priority: 68,
+    }),
   });
 
   function toArray(value) {
@@ -325,8 +346,13 @@
     return "继续打磨";
   }
 
+  function getPacingIssueCodes(report = {}) {
+    return new Set(toArray(report.pacingIssueCodes));
+  }
+
   function getSceneRecipeSuggestion(report = {}) {
     const issues = toArray(report.issues);
+    const pacingIssueCodes = getPacingIssueCodes(report);
     const hasBlockingRoute = issues.some((issue) => issue.code === "scene_bad_route_target");
     if (hasBlockingRoute) {
       return null;
@@ -334,11 +360,23 @@
     if (!report.hasStoryContent || (report.blockCount ?? 0) === 0) {
       return SCENE_RECIPE_SUGGESTIONS.playable_scene;
     }
+    if (pacingIssueCodes.has("pacing_branch_without_payoff")) {
+      return SCENE_RECIPE_SUGGESTIONS.branch_merge;
+    }
+    if (pacingIssueCodes.has("pacing_missing_outro")) {
+      return SCENE_RECIPE_SUGGESTIONS.scene_outro;
+    }
+    if (pacingIssueCodes.has("pacing_choice_without_consequence")) {
+      return SCENE_RECIPE_SUGGESTIONS.affection_choice;
+    }
     if (!report.hasBackground || !report.hasMusic) {
       return SCENE_RECIPE_SUGGESTIONS.daily_conversation;
     }
     if ((report.choiceCount ?? 0) === 0 && ((report.dialogueCount ?? 0) + (report.narrationCount ?? 0)) >= 2) {
-      return SCENE_RECIPE_SUGGESTIONS.affection_choice;
+      if ((report.hasEffects || (report.pacingScore ?? 0) >= 72) && report.dialogueCount >= 2) {
+        return SCENE_RECIPE_SUGGESTIONS.relationship_reveal;
+      }
+      return SCENE_RECIPE_SUGGESTIONS.mystery_clue;
     }
     if (!report.hasEffects) {
       return SCENE_RECIPE_SUGGESTIONS.climax_sequence;
@@ -529,6 +567,7 @@
       pacingAnalysis && typeof scenePacingAdvisorTools.buildScenePacingDigest === "function"
         ? scenePacingAdvisorTools.buildScenePacingDigest(pacingAnalysis)
         : null;
+    const pacingIssueCodes = toArray(pacingAnalysis?.issues).map((issue) => issue?.code).filter(Boolean);
     const completionScore = scoreSceneProduction(metrics, issueCounts);
     const status = getSceneStatus(issues, completionScore);
     const report = {
@@ -545,6 +584,7 @@
       pacingHeadline: pacingDigest?.headline ?? "",
       pacingIssueSummary: pacingDigest?.issueSummary ?? "",
       pacingActionSummary: pacingDigest?.actionSummary ?? "",
+      pacingIssueCodes,
       nextAction: "",
       recipeSuggestion: null,
     };
