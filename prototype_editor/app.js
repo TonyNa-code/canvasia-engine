@@ -586,29 +586,6 @@ const getTextSpeedLabel = visualEffectTools.getTextSpeedLabel;
 const getSafeDialogTheme = visualEffectTools.getSafeDialogTheme;
 const getDialogThemeLabel = visualEffectTools.getDialogThemeLabel;
 
-const STARTER_VARIABLE_PRESETS = variableTools?.STARTER_VARIABLE_PRESETS ?? [
-  {
-    id: "var_affection",
-    name: "好感度",
-    type: "number",
-    defaultValue: 0,
-    min: -100,
-    max: 100,
-  },
-  {
-    id: "var_route",
-    name: "路线标记",
-    type: "string",
-    defaultValue: "common",
-  },
-  {
-    id: "var_flag",
-    name: "剧情开关",
-    type: "boolean",
-    defaultValue: false,
-  },
-];
-
 const PROJECT_SAVE_SLOT_COUNT_LIMITS = {
   min: 3,
   max: 120,
@@ -46131,99 +46108,27 @@ function getVariableToolOptions(options = {}) {
 }
 
 function parseVariableNumberBound(value) {
-  if (variableTools?.parseVariableNumberBound) {
-    return variableTools.parseVariableNumberBound(value);
-  }
-
-  if (value === null || value === undefined || typeof value === "boolean") {
-    return null;
-  }
-
-  const parsed = Number.parseFloat(value);
-  return Number.isFinite(parsed) ? parsed : null;
+  return variableTools.parseVariableNumberBound(value);
 }
 
 function getVariableNumberBounds(variableOrId) {
-  if (variableTools?.getVariableNumberBounds) {
-    return variableTools.getVariableNumberBounds(variableOrId, getVariableToolOptions());
-  }
-
-  const variable =
-    typeof variableOrId === "string" ? state.data.variablesById.get(variableOrId) : variableOrId;
-
-  if (!variable) {
-    return [null, null];
-  }
-
-  return [
-    parseVariableNumberBound(variable.min ?? variable.minValue),
-    parseVariableNumberBound(variable.max ?? variable.maxValue),
-  ];
+  return variableTools.getVariableNumberBounds(variableOrId, getVariableToolOptions());
 }
 
 function getFilteredVariables(typeFilter = null) {
-  if (variableTools?.getFilteredVariables) {
-    return variableTools.getFilteredVariables(typeFilter, getVariableToolOptions());
-  }
-
-  return state.data.variables.filter((variable) => !typeFilter || variable.type === typeFilter);
+  return variableTools.getFilteredVariables(typeFilter, getVariableToolOptions());
 }
 
 function hasUsableVariable(typeFilter = null) {
-  if (variableTools?.hasUsableVariable) {
-    return variableTools.hasUsableVariable(typeFilter, getVariableToolOptions());
-  }
-
-  return getFilteredVariables(typeFilter).length > 0;
+  return variableTools.hasUsableVariable(typeFilter, getVariableToolOptions());
 }
 
 function createStarterVariableCopy(preset, existingIds) {
-  if (variableTools?.createStarterVariableCopy) {
-    return variableTools.createStarterVariableCopy(preset, existingIds);
-  }
-
-  const nextVariable = JSON.parse(JSON.stringify(preset));
-  const baseId = nextVariable.id;
-  let candidateId = baseId;
-  let suffix = 2;
-
-  while (existingIds.has(candidateId)) {
-    candidateId = `${baseId}_${String(suffix).padStart(2, "0")}`;
-    suffix += 1;
-  }
-
-  nextVariable.id = candidateId;
-  existingIds.add(candidateId);
-  return nextVariable;
+  return variableTools.createStarterVariableCopy(preset, existingIds);
 }
 
 function buildStarterVariableLibrary(existingVariables = state.data.variables, options = {}) {
-  if (variableTools?.buildStarterVariableLibrary) {
-    return variableTools.buildStarterVariableLibrary(existingVariables, options);
-  }
-
-  const existing = Array.isArray(existingVariables)
-    ? existingVariables.map((variable) => JSON.parse(JSON.stringify(variable)))
-    : [];
-  const existingIds = new Set(existing.map((variable) => variable.id).filter(Boolean));
-  const shouldAddAll = Boolean(options.forceStarterPack) || existing.length === 0;
-  const nextVariables = [...existing];
-
-  STARTER_VARIABLE_PRESETS.forEach((preset) => {
-    const alreadyHasPreset = nextVariables.some(
-      (variable) => variable.id === preset.id && variable.type === preset.type
-    );
-    const alreadyHasType = nextVariables.some((variable) => variable.type === preset.type);
-    const shouldAdd =
-      shouldAddAll ||
-      (options.requireNumber && preset.type === "number" && !alreadyHasType);
-
-    if (shouldAdd && !alreadyHasPreset) {
-      nextVariables.push(createStarterVariableCopy(preset, existingIds));
-    }
-  });
-
-  return nextVariables;
+  return variableTools.buildStarterVariableLibrary(existingVariables, options);
 }
 
 async function ensureStarterVariables(options = {}) {
@@ -46271,405 +46176,88 @@ async function ensureStarterVariables(options = {}) {
 }
 
 function getSafeVariableId(variableId, typeFilter = null) {
-  if (variableTools?.getSafeVariableId) {
-    return variableTools.getSafeVariableId(variableId, typeFilter, getVariableToolOptions());
-  }
-
-  const variables = getFilteredVariables(typeFilter);
-
-  if (variables.some((variable) => variable.id === variableId)) {
-    return variableId;
-  }
-
-  if (!typeFilter && state.data.variablesById.has(variableId)) {
-    return variableId;
-  }
-
-  return variables[0]?.id ?? (!typeFilter ? state.data.variables[0]?.id ?? "" : "");
+  return variableTools.getSafeVariableId(variableId, typeFilter, getVariableToolOptions());
 }
 
 function getVariableType(variableId) {
-  if (variableTools?.getVariableType) {
-    return variableTools.getVariableType(variableId, getVariableToolOptions());
-  }
-
-  return state.data.variablesById.get(variableId)?.type ?? "string";
+  return variableTools.getVariableType(variableId, getVariableToolOptions());
 }
 
 function getVariableTypeLabel(type) {
-  if (variableTools?.getVariableTypeLabel) {
-    return variableTools.getVariableTypeLabel(type);
-  }
-
-  if (type === "number") return "数字";
-  if (type === "boolean") return "开关";
-  return "文本";
+  return variableTools.getVariableTypeLabel(type);
 }
 
 function normalizeVariableValue(variableId, value) {
-  if (variableTools?.normalizeVariableValue) {
-    return variableTools.normalizeVariableValue(variableId, value, getVariableToolOptions());
-  }
-
-  const variable = state.data.variablesById.get(variableId);
-  const type = variable?.type ?? "string";
-  const fallback = variable?.defaultValue;
-
-  if (type === "number") {
-    const parsed = typeof value === "number" ? value : Number.parseFloat(value ?? "");
-    if (Number.isFinite(parsed)) {
-      return parsed;
-    }
-    return typeof fallback === "number" ? fallback : 0;
-  }
-
-  if (type === "boolean") {
-    if (typeof value === "boolean") {
-      return value;
-    }
-    if (value === "true") {
-      return true;
-    }
-    if (value === "false") {
-      return false;
-    }
-    return typeof fallback === "boolean" ? fallback : false;
-  }
-
-  if (value === null || value === undefined) {
-    return typeof fallback === "string" ? fallback : "";
-  }
-
-  return String(value);
+  return variableTools.normalizeVariableValue(variableId, value, getVariableToolOptions());
 }
 
 function formatVariableValue(variableId, value) {
-  if (variableTools?.formatVariableValue) {
-    return variableTools.formatVariableValue(variableId, value, getVariableToolOptions());
-  }
-
-  const safeValue = normalizeVariableValue(variableId, value);
-
-  if (typeof safeValue === "boolean") {
-    return safeValue ? "是" : "否";
-  }
-
-  return String(safeValue);
+  return variableTools.formatVariableValue(variableId, value, getVariableToolOptions());
 }
 
 function getVariableDefaultValue(variableId) {
-  if (variableTools?.getVariableDefaultValue) {
-    return variableTools.getVariableDefaultValue(variableId, getVariableToolOptions());
-  }
-
-  const variable = state.data.variablesById.get(variableId);
-  const value = normalizeVariableValue(variableId, variable?.defaultValue);
-  return typeof value === "number" ? clampPreviewVariableNumber(variableId, value) : value;
+  return variableTools.getVariableDefaultValue(variableId, getVariableToolOptions());
 }
 
 function renderVariableOptions(selectedVariableId, typeFilter = null) {
-  if (variableTools?.renderVariableOptions) {
-    return variableTools.renderVariableOptions(selectedVariableId, typeFilter, getVariableToolOptions());
-  }
-
-  const variables = getFilteredVariables(typeFilter);
-
-  if (variables.length === 0) {
-    return `<option value="">当前没有可用变量</option>`;
-  }
-
-  return variables
-    .map(
-      (variable) => `
-        <option value="${variable.id}" ${variable.id === selectedVariableId ? "selected" : ""}>
-          ${escapeHtml(variable.name)} · ${escapeHtml(getVariableTypeLabel(variable.type))}
-        </option>
-      `
-    )
-    .join("");
+  return variableTools.renderVariableOptions(selectedVariableId, typeFilter, getVariableToolOptions());
 }
 
 function renderVariableSetValueFields(variableId, value) {
-  if (variableTools?.renderVariableSetValueFields) {
-    return variableTools.renderVariableSetValueFields(variableId, value, getVariableToolOptions());
-  }
-
-  const type = getVariableType(variableId);
-  const safeValue = normalizeVariableValue(variableId, value);
-
-  if (type === "number") {
-    return `
-      <div class="detail-row">
-        <label for="editorVariableValueNumber">要设置成多少</label>
-        <input
-          id="editorVariableValueNumber"
-          type="number"
-          step="1"
-          value="${escapeHtml(String(safeValue))}"
-        />
-      </div>
-      <div class="helper-text">当前变量是数字型，会直接写入这个数值。</div>
-    `;
-  }
-
-  if (type === "boolean") {
-    return `
-      <div class="detail-row">
-        <label for="editorVariableValueBoolean">要设置成什么状态</label>
-        <select id="editorVariableValueBoolean">
-          <option value="true" ${safeValue === true ? "selected" : ""}>是</option>
-          <option value="false" ${safeValue === false ? "selected" : ""}>否</option>
-        </select>
-      </div>
-      <div class="helper-text">当前变量是开关型，只有“是 / 否”两种结果。</div>
-    `;
-  }
-
-  return `
-    <div class="detail-row">
-      <label for="editorVariableValueString">要设置成什么文字</label>
-      <input
-        id="editorVariableValueString"
-        type="text"
-        value="${escapeHtml(safeValue)}"
-        placeholder="例如：walk_home"
-      />
-    </div>
-    <div class="helper-text">当前变量是文本型，适合写路线名、状态名或标记词。</div>
-  `;
+  return variableTools.renderVariableSetValueFields(variableId, value, getVariableToolOptions());
 }
 
 function renderConditionValueFields(variableId, value) {
-  if (variableTools?.renderConditionValueFields) {
-    return variableTools.renderConditionValueFields(variableId, value, getVariableToolOptions());
-  }
-
-  const type = getVariableType(variableId);
-  const safeValue = normalizeVariableValue(variableId, value);
-
-  if (type === "number") {
-    return `
-      <div class="detail-row">
-        <label>比较的数值</label>
-        <input data-field="condition-value-number" type="number" step="1" value="${escapeHtml(
-          String(safeValue)
-        )}" />
-      </div>
-    `;
-  }
-
-  if (type === "boolean") {
-    return `
-      <div class="detail-row">
-        <label>比较的开关结果</label>
-        <select data-field="condition-value-boolean">
-          <option value="true" ${safeValue === true ? "selected" : ""}>是</option>
-          <option value="false" ${safeValue === false ? "selected" : ""}>否</option>
-        </select>
-      </div>
-    `;
-  }
-
-  return `
-    <div class="detail-row">
-      <label>比较的文字</label>
-      <input
-        data-field="condition-value-string"
-        type="text"
-        value="${escapeHtml(safeValue)}"
-        placeholder="例如：walk_home"
-      />
-    </div>
-  `;
+  return variableTools.renderConditionValueFields(variableId, value, getVariableToolOptions());
 }
 
 function getConditionOperators(variableId) {
-  if (variableTools?.getConditionOperators) {
-    return variableTools.getConditionOperators(variableId, getVariableToolOptions());
-  }
-
-  if (getVariableType(variableId) === "number") {
-    return [
-      [">=", "大于等于"],
-      [">", "大于"],
-      ["<=", "小于等于"],
-      ["<", "小于"],
-      ["==", "等于"],
-      ["!=", "不等于"],
-    ];
-  }
-
-  return [
-    ["==", "等于"],
-    ["!=", "不等于"],
-  ];
+  return variableTools.getConditionOperators(variableId, getVariableToolOptions());
 }
 
 function getSafeConditionOperator(variableId, operator) {
-  if (variableTools?.getSafeConditionOperator) {
-    return variableTools.getSafeConditionOperator(variableId, operator, getVariableToolOptions());
-  }
-
-  const operators = getConditionOperators(variableId);
-  return operators.some(([value]) => value === operator) ? operator : operators[0]?.[0] ?? "==";
+  return variableTools.getSafeConditionOperator(variableId, operator, getVariableToolOptions());
 }
 
 function renderConditionOperatorOptions(variableId, selectedOperator) {
-  if (variableTools?.renderConditionOperatorOptions) {
-    return variableTools.renderConditionOperatorOptions(
-      variableId,
-      selectedOperator,
-      getVariableToolOptions()
-    );
-  }
-
-  return getConditionOperators(variableId)
-    .map(
-      ([value, label]) => `
-        <option value="${value}" ${value === selectedOperator ? "selected" : ""}>
-          ${escapeHtml(label)}
-        </option>
-      `
-    )
-    .join("");
+  return variableTools.renderConditionOperatorOptions(
+    variableId,
+    selectedOperator,
+    getVariableToolOptions()
+  );
 }
 
 function isEditableChoiceEffect(effect) {
-  if (variableTools?.isEditableChoiceEffect) {
-    return variableTools.isEditableChoiceEffect(effect);
-  }
-
-  return effect?.type === "variable_set" || effect?.type === "variable_add";
+  return variableTools.isEditableChoiceEffect(effect);
 }
 
 function getEditableChoiceEffects(effects = []) {
-  if (variableTools?.getEditableChoiceEffects) {
-    return variableTools.getEditableChoiceEffects(effects);
-  }
-
-  return (effects ?? []).filter((effect) => isEditableChoiceEffect(effect));
+  return variableTools.getEditableChoiceEffects(effects);
 }
 
 function getSafeChoiceEffectType(effectType) {
-  if (variableTools?.getSafeChoiceEffectType) {
-    return variableTools.getSafeChoiceEffectType(effectType);
-  }
-
-  return effectType === "variable_add" ? "variable_add" : "variable_set";
+  return variableTools.getSafeChoiceEffectType(effectType);
 }
 
 function getChoiceEffectVariableId(effectType, variableId) {
-  if (variableTools?.getChoiceEffectVariableId) {
-    return variableTools.getChoiceEffectVariableId(effectType, variableId, getVariableToolOptions());
-  }
-
-  return effectType === "variable_add"
-    ? getSafeVariableId(variableId, "number")
-    : getSafeVariableId(variableId);
+  return variableTools.getChoiceEffectVariableId(effectType, variableId, getVariableToolOptions());
 }
 
 function normalizeChoiceEffect(effect = {}) {
-  if (variableTools?.normalizeChoiceEffect) {
-    return variableTools.normalizeChoiceEffect(effect, getVariableToolOptions());
-  }
-
-  const type = getSafeChoiceEffectType(effect.type);
-  const variableId = getChoiceEffectVariableId(type, effect.variableId);
-
-  if (type === "variable_add") {
-    return {
-      type,
-      variableId,
-      value: getSafeNumber(effect.value, 1),
-    };
-  }
-
-  return {
-    type,
-    variableId,
-    value: normalizeVariableValue(variableId, effect.value),
-  };
+  return variableTools.normalizeChoiceEffect(effect, getVariableToolOptions());
 }
 
 function renderChoiceEffectTypeOptions(selectedType) {
-  if (variableTools?.renderChoiceEffectTypeOptions) {
-    return variableTools.renderChoiceEffectTypeOptions(selectedType, getVariableToolOptions());
-  }
-
-  return [
-    ["variable_add", "给数字变量加减数值"],
-    ["variable_set", "把变量直接改成指定值"],
-  ]
-    .map(
-      ([value, label]) => `
-        <option value="${value}" ${value === selectedType ? "selected" : ""}>
-          ${escapeHtml(label)}
-        </option>
-      `
-    )
-    .join("");
+  return variableTools.renderChoiceEffectTypeOptions(selectedType, getVariableToolOptions());
 }
 
 function renderChoiceEffectValueFields(effectType, variableId, value) {
-  if (variableTools?.renderChoiceEffectValueFields) {
-    return variableTools.renderChoiceEffectValueFields(effectType, variableId, value, getVariableToolOptions());
-  }
-
-  if (effectType === "variable_add") {
-    return `
-      <div class="detail-row">
-        <label>变化值</label>
-        <input
-          data-field="choice-effect-value-number"
-          type="number"
-          step="1"
-          value="${escapeHtml(String(getSafeNumber(value, 1)))}"
-        />
-      </div>
-      <div class="helper-text">正数表示增加，负数表示减少。</div>
-    `;
-  }
-
-  const type = getVariableType(variableId);
-  const safeValue = normalizeVariableValue(variableId, value);
-
-  if (type === "number") {
-    return `
-      <div class="detail-row">
-        <label>设置成多少</label>
-        <input
-          data-field="choice-effect-value-number"
-          type="number"
-          step="1"
-          value="${escapeHtml(String(safeValue))}"
-        />
-      </div>
-    `;
-  }
-
-  if (type === "boolean") {
-    return `
-      <div class="detail-row">
-        <label>设置成什么状态</label>
-        <select data-field="choice-effect-value-boolean">
-          <option value="true" ${safeValue === true ? "selected" : ""}>是</option>
-          <option value="false" ${safeValue === false ? "selected" : ""}>否</option>
-        </select>
-      </div>
-    `;
-  }
-
-  return `
-    <div class="detail-row">
-      <label>设置成什么文字</label>
-      <input
-        data-field="choice-effect-value-string"
-        type="text"
-        value="${escapeHtml(safeValue)}"
-        placeholder="例如：walk_home"
-      />
-    </div>
-  `;
+  return variableTools.renderChoiceEffectValueFields(
+    effectType,
+    variableId,
+    value,
+    getVariableToolOptions()
+  );
 }
 
 function readChoiceEffectValue(effectEditor, effectType, variableId) {

@@ -9,6 +9,7 @@ from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "variables.js"
+APP_PATH = ROOT_DIR / "prototype_editor" / "app.js"
 
 
 class FrontendVariablesModuleTests(unittest.TestCase):
@@ -142,6 +143,13 @@ class FrontendVariablesModuleTests(unittest.TestCase):
         self.assertIn('<option value=">=" selected>', payload["render"][4])
         self.assertIn("给数字变量加减数值", payload["render"][5])
         self.assertIn('value="a&lt;b"', payload["render"][6])
+
+    def test_editor_app_keeps_variable_presets_in_variables_module(self) -> None:
+        app_source = APP_PATH.read_text(encoding="utf-8")
+
+        self.assertNotIn("const STARTER_VARIABLE_PRESETS =", app_source)
+        self.assertIn("return variableTools.buildStarterVariableLibrary(existingVariables, options);", app_source)
+        self.assertIn("return variableTools.normalizeChoiceEffect(effect, getVariableToolOptions());", app_source)
 
 
 if __name__ == "__main__":
