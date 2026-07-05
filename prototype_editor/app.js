@@ -29569,6 +29569,7 @@ function buildReleaseControlReportPayload() {
   const projectMilestonePlan = buildProjectMilestonePlan(routeOverview);
   const projectMilestoneGapDigest = buildProjectMilestoneGapDigest(projectMilestonePlan);
   const mediaBudgetReport = buildAssetMediaBudgetReport();
+  const runtimePreloadBudgetReport = buildRuntimePreloadBudgetReport();
   const native3dDigest = getLatestNativeRuntime3dDigest();
   const regressionResult = state.inspectionRegressionResult;
   const regressionFixQueue = buildPreviewRegressionFixQueue();
@@ -29740,6 +29741,44 @@ function buildReleaseControlReportPayload() {
           severityLabel: item.severityLabel,
           summary: item.summary,
           suggestion: item.suggestion,
+        })),
+      },
+      runtimePreloadBudget: {
+        releaseRiskLevel: runtimePreloadBudgetReport.releaseRiskLevel,
+        warningCount:
+          (runtimePreloadBudgetReport.totals?.dangerCount ?? 0) + (runtimePreloadBudgetReport.totals?.warnCount ?? 0),
+        dangerCount: runtimePreloadBudgetReport.totals?.dangerCount ?? 0,
+        warnCount: runtimePreloadBudgetReport.totals?.warnCount ?? 0,
+        totalEntries: runtimePreloadBudgetReport.totals?.totalEntries ?? 0,
+        totalBytes: runtimePreloadBudgetReport.totals?.totalBytes ?? 0,
+        totalLabel: runtimePreloadBudgetReport.totals?.totalLabel ?? "0 B",
+        criticalBytes: runtimePreloadBudgetReport.phases?.critical?.bytes ?? 0,
+        criticalBytesLabel: runtimePreloadBudgetReport.phases?.critical?.bytesLabel ?? "0 B",
+        earlyBytes: runtimePreloadBudgetReport.phases?.early?.bytes ?? 0,
+        earlyBytesLabel: runtimePreloadBudgetReport.phases?.early?.bytesLabel ?? "0 B",
+        warnings: (runtimePreloadBudgetReport.warnings ?? []).slice(0, 20).map((warning) => ({
+          code: warning.code,
+          severity: warning.severity,
+          title: warning.title,
+          detail: warning.detail,
+          actionHint: warning.actionHint,
+          assetId: warning.assetId,
+          assetName: warning.assetName,
+          sceneId: warning.sceneId,
+          sceneName: warning.sceneName,
+        })),
+        topEntries: (runtimePreloadBudgetReport.topEntries ?? []).slice(0, 20).map((entry) => ({
+          assetId: entry.id,
+          name: entry.name,
+          type: entry.type,
+          typeLabel: entry.typeLabel,
+          phase: entry.phase,
+          sizeBytes: entry.sizeBytes,
+          sizeLabel: entry.sizeLabel,
+          fileExists: entry.fileExists,
+          sceneId: entry.sceneId,
+          sceneName: entry.sceneName,
+          reason: entry.reason,
         })),
       },
       native3dRisk: native3dDigest
@@ -30111,6 +30150,8 @@ function buildReleaseControlReportContent() {
   const projectMilestoneGapDigest = buildProjectMilestoneGapDigest(projectMilestonePlan);
   const nextStep = buildReleaseReportNextStep(releaseFixOrder, projectMilestoneGapDigest);
   const mediaBudgetReport = buildAssetMediaBudgetReport();
+  const runtimePreloadBudgetReport = buildRuntimePreloadBudgetReport();
+  const runtimePreloadBudgetDigest = runtimePreloadBudgetTools.getRuntimePreloadBudgetDigest(runtimePreloadBudgetReport);
   const native3dDigest = getLatestNativeRuntime3dDigest();
   const regressionResult = state.inspectionRegressionResult;
   const regressionFixQueue = buildPreviewRegressionFixQueue();
@@ -30166,6 +30207,27 @@ function buildReleaseControlReportContent() {
       item.warnLabel,
       item.severityLabel,
       item.suggestion,
+    ])
+  );
+  const runtimePreloadBudgetWarningTable = buildMarkdownTable(
+    ["级别", "问题", "对象", "说明", "建议"],
+    (runtimePreloadBudgetReport.warnings ?? []).slice(0, 12).map((warning) => [
+      warning.severity === "danger" ? "高风险" : warning.severity === "warn" ? "提醒" : "提示",
+      warning.title,
+      warning.assetName || warning.sceneName || "首屏 / 早期路线",
+      warning.detail,
+      warning.actionHint,
+    ])
+  );
+  const runtimePreloadBudgetPhaseTable = buildMarkdownTable(
+    ["阶段", "数量", "体积", "建议预算", "缺文件", "状态"],
+    (runtimePreloadBudgetReport.phaseList ?? []).map((phase) => [
+      phase.label,
+      `${phase.count ?? 0}`,
+      phase.bytesLabel ?? "0 B",
+      phase.budgetLabel ?? "未设置",
+      `${phase.missingFileCount ?? 0}`,
+      phase.overBudget ? "超过建议预算" : "正常",
     ])
   );
   const native3dIssueTable = buildMarkdownTable(
@@ -30269,6 +30331,10 @@ function buildReleaseControlReportContent() {
         ["补充提醒", `${state.validation.warnings.length} 项`],
         ["已引用缺口素材", `${state.data.assetList.filter((asset) => isAssetUrgentMissing(asset)).length} 个`],
         ["素材预算风险", `${mediaBudgetReport.count} 个，合计 ${mediaBudgetReport.totalLabel}`],
+        [
+          "首屏加载压力",
+          `${runtimePreloadBudgetDigest.title}，首屏 ${runtimePreloadBudgetReport.phases?.critical?.bytesLabel ?? "0 B"} / 早期 ${runtimePreloadBudgetReport.phases?.early?.bytesLabel ?? "0 B"}`,
+        ],
         ["闲置素材", `${getUnusedAssets().length} 个`],
         ["入口场景", routeOverview.metrics.entrySceneName],
         ["分支 / 收束 / 孤立场景", `${routeOverview.metrics.branchingScenes} / ${routeOverview.metrics.endingScenes} / ${routeOverview.metrics.orphanScenes}`],
@@ -30372,6 +30438,19 @@ function buildReleaseControlReportContent() {
   } else {
     lines.push("当前没有明显超出建议预算的大图、大音频、大视频、Live2D 或 3D 资产。", "");
   }
+
+  lines.push(
+    "## Runtime 首屏加载预算",
+    "",
+    `- 状态：${runtimePreloadBudgetDigest.title}`,
+    `- 摘要：${runtimePreloadBudgetDigest.detail}`,
+    `- 首屏 / 早期 / 总预热：${runtimePreloadBudgetReport.phases?.critical?.bytesLabel ?? "0 B"} / ${runtimePreloadBudgetReport.phases?.early?.bytesLabel ?? "0 B"} / ${runtimePreloadBudgetReport.totals?.totalLabel ?? "0 B"}`,
+    "",
+    runtimePreloadBudgetPhaseTable || "当前没有可统计的 Runtime 预热阶段。",
+    "",
+    runtimePreloadBudgetWarningTable || "当前没有明显首屏加载问题。",
+    ""
+  );
 
   lines.push("## 3D 发布风险", "");
   if (native3dDigest) {
@@ -31396,6 +31475,7 @@ function buildReleaseFixOrder(routeOverview) {
       routeMetrics: routeOverview?.metrics ?? {},
       urgentMissingAssetsCount: state.data.assetList.filter((asset) => isAssetUrgentMissing(asset)).length,
       mediaBudgetReport: buildAssetMediaBudgetReport(),
+      runtimePreloadBudget: buildRuntimePreloadBudgetReport(),
       unusedAssetCount: getUnusedAssets().length,
       exportResult: state.lastExportResult,
       creativeQuality: buildReleaseCreativeQualityContext(),
@@ -31408,6 +31488,7 @@ function buildReleaseFixOrder(routeOverview) {
   const hasStoredReleaseVersion = Boolean(String(project.releaseVersion ?? "").trim());
   const urgentMissingAssets = state.data.assetList.filter((asset) => isAssetUrgentMissing(asset)).length;
   const mediaBudgetReport = buildAssetMediaBudgetReport();
+  const runtimePreloadBudgetReport = buildRuntimePreloadBudgetReport();
   const unusedAssets = getUnusedAssets();
   const missingVoiceWarnings = state.validation.warnings.filter(
     (issue) => issue.message === "这句台词还没有绑定语音。"
@@ -31504,6 +31585,28 @@ function buildReleaseFixOrder(routeOverview) {
               assetId: largest.assetId,
             }
           : { label: "去素材页", action: "switch-screen", screen: "assets" },
+      ],
+    });
+  }
+
+  if (runtimePreloadBudgetReport.releaseRiskLevel !== "ready") {
+    const blockerCount = runtimePreloadBudgetReport.totals?.dangerCount ?? 0;
+    const riskCount = blockerCount + (runtimePreloadBudgetReport.totals?.warnCount ?? 0);
+    const primaryIssue =
+      (runtimePreloadBudgetReport.warnings ?? []).find((warning) => warning.severity === "danger") ||
+      (runtimePreloadBudgetReport.warnings ?? []).find((warning) => warning.severity === "warn");
+    steps.push({
+      tone: blockerCount > 0 ? "warn" : "soft",
+      title: "处理首屏加载压力",
+      statusLabel: blockerCount > 0 ? `高风险 ${blockerCount} 项` : `建议优化 ${riskCount} 项`,
+      description: primaryIssue
+        ? `${primaryIssue.detail}${primaryIssue.actionHint ? ` ${primaryIssue.actionHint}` : ""}`
+        : `首屏 ${runtimePreloadBudgetReport.phases?.critical?.bytesLabel ?? "0 B"}，早期路线 ${
+            runtimePreloadBudgetReport.phases?.early?.bytesLabel ?? "0 B"
+          }，发布前建议先做一轮瘦身。`,
+      actions: [
+        { label: "查看首屏预算", action: "switch-screen", screen: "inspection" },
+        { label: "导出瘦身建议", action: "export-runtime-preload-budget-markdown" },
       ],
     });
   }

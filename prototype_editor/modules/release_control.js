@@ -11,6 +11,10 @@
     return Math.max(0, Math.round(numberValue));
   }
 
+  function toArray(value) {
+    return Array.isArray(value) ? value : [];
+  }
+
   function normalizeResolution(resolution = {}) {
     return {
       width: toCount(resolution.width),
@@ -225,6 +229,70 @@
     );
   }
 
+  function getRuntimePreloadBudgetRiskCount(report = {}) {
+    const totals = report?.totals ?? {};
+    const countedWarnings = toCount(totals.dangerCount) + toCount(totals.warnCount);
+    if (countedWarnings > 0) {
+      return countedWarnings;
+    }
+    return toArray(report?.warnings).filter((warning) => ["danger", "warn"].includes(warning?.severity)).length;
+  }
+
+  function getRuntimePreloadBudgetBlockerCount(report = {}) {
+    const totals = report?.totals ?? {};
+    const countedDangers = toCount(totals.dangerCount);
+    if (countedDangers > 0) {
+      return countedDangers;
+    }
+    return toArray(report?.warnings).filter((warning) => warning?.severity === "danger").length;
+  }
+
+  function getRuntimePreloadBudgetPrimaryIssue(report = {}) {
+    const warnings = toArray(report?.warnings);
+    const warningIssue = warnings.find((warning) => warning?.severity === "danger") || warnings.find((warning) => warning?.severity === "warn");
+    if (warningIssue) {
+      return warningIssue;
+    }
+
+    const topEntry = toArray(report?.topEntries).find((entry) => entry?.name);
+    if (!topEntry) {
+      return null;
+    }
+
+    return {
+      title: "首屏预热素材偏重",
+      detail: `${topEntry.name} 当前 ${topEntry.sizeLabel ?? "未知体积"}，位于 ${topEntry.sceneName || "首屏 / 早期路线"}。`,
+      actionHint: "优先压缩入口场景的大图、长 BGM、OP 视频，或把非首屏素材延后到实际使用时加载。",
+      assetId: topEntry.id,
+    };
+  }
+
+  function buildRuntimePreloadBudgetFixStep(report = {}) {
+    const riskCount = getRuntimePreloadBudgetRiskCount(report);
+    if (riskCount <= 0) {
+      return null;
+    }
+
+    const blockerCount = getRuntimePreloadBudgetBlockerCount(report);
+    const primaryIssue = getRuntimePreloadBudgetPrimaryIssue(report);
+    const critical = report?.phases?.critical ?? {};
+    const early = report?.phases?.early ?? {};
+    const totalLabel = report?.totals?.totalLabel ?? "未统计";
+
+    return {
+      tone: blockerCount > 0 ? "warn" : "soft",
+      title: "处理首屏加载压力",
+      statusLabel: blockerCount > 0 ? `高风险 ${blockerCount} 项` : `建议优化 ${riskCount} 项`,
+      description: primaryIssue
+        ? `${primaryIssue.detail}${primaryIssue.actionHint ? ` ${primaryIssue.actionHint}` : ""}`
+        : `首屏 ${critical.bytesLabel ?? "0 B"}，早期路线 ${early.bytesLabel ?? "0 B"}，预热合计 ${totalLabel}；发布前建议先做一轮瘦身。`,
+      actions: [
+        { label: "查看首屏预算", action: "switch-screen", screen: "inspection" },
+        { label: "导出瘦身建议", action: "export-runtime-preload-budget-markdown" },
+      ],
+    };
+  }
+
   function buildCreativeQualityAudit(context = {}) {
     const quality = context.creativeQuality ?? {};
     const storySceneCount = toCount(quality.storySceneCount);
@@ -382,6 +450,7 @@
     const mediaBudgetReport = context.mediaBudgetReport ?? {};
     const mediaBudgetCount = toCount(mediaBudgetReport.count);
     const mediaBudgetBlockerCount = toCount(mediaBudgetReport.blockerCount);
+    const runtimePreloadBudget = context.runtimePreloadBudget ?? {};
     const desktopReady = isDesktopExportReady(context.exportResult);
     const firstErrorAction = context.firstErrorAction ?? null;
     const firstVoiceAction = context.firstVoiceAction ?? null;
@@ -477,6 +546,11 @@
             : { label: "去素材页", action: "switch-screen", screen: "assets" },
         ],
       });
+    }
+
+    const runtimePreloadStep = buildRuntimePreloadBudgetFixStep(runtimePreloadBudget);
+    if (runtimePreloadStep) {
+      steps.push(runtimePreloadStep);
     }
 
     if (missingVoiceWarningsCount > 0) {
@@ -598,6 +672,10 @@
     buildFinalPublishGate,
     splitReleaseWarnings,
     isDesktopExportReady,
+    getRuntimePreloadBudgetRiskCount,
+    getRuntimePreloadBudgetBlockerCount,
+    getRuntimePreloadBudgetPrimaryIssue,
+    buildRuntimePreloadBudgetFixStep,
     buildCreativeQualityAudit,
     buildReleaseFixOrder,
   });

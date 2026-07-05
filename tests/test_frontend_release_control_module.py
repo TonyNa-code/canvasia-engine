@@ -48,6 +48,24 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
         self.assertIn("## 路线试玩手册", report_body)
         self.assertLess(report_body.index("const routeTestingPlan"), report_body.index("const routeTestingTables"))
 
+    def test_release_report_includes_runtime_preload_budget_context(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        report_start = source.index("function buildReleaseControlReportContent()")
+        report_end = source.index("function exportReleaseControlReport()")
+        report_body = source[report_start:report_end]
+        payload_start = source.index("function buildReleaseControlReportPayload()")
+        payload_end = source.index("function buildInspectionReportContent()")
+        payload_body = source[payload_start:payload_end]
+
+        self.assertIn("const runtimePreloadBudgetReport = buildRuntimePreloadBudgetReport()", report_body)
+        self.assertIn("const runtimePreloadBudgetDigest = runtimePreloadBudgetTools.getRuntimePreloadBudgetDigest", report_body)
+        self.assertIn("## Runtime 首屏加载预算", report_body)
+        self.assertIn("runtimePreloadBudgetPhaseTable", report_body)
+        self.assertIn("runtimePreloadBudgetWarningTable", report_body)
+        self.assertIn("runtimePreloadBudget: {", payload_body)
+        self.assertIn("criticalBytesLabel", payload_body)
+        self.assertIn("topEntries: (runtimePreloadBudgetReport.topEntries ?? [])", payload_body)
+
     def test_release_control_helpers_work_without_browser_dom(self) -> None:
         script = textwrap.dedent(
             f"""
@@ -96,6 +114,21 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
                 {{ message: tools.MISSING_VOICE_WARNING_MESSAGE }},
                 {{ message: "文本偏长。" }},
               ]),
+              runtimePreloadCounts: [
+                tools.getRuntimePreloadBudgetRiskCount({{ totals: {{ dangerCount: 1, warnCount: 2 }} }}),
+                tools.getRuntimePreloadBudgetBlockerCount({{ warnings: [{{ severity: "danger" }}, {{ severity: "warn" }}] }}),
+                tools.buildRuntimePreloadBudgetFixStep({{
+                  releaseRiskLevel: "warn",
+                  totals: {{ dangerCount: 0, warnCount: 1, totalLabel: "140 MB" }},
+                  phases: {{
+                    critical: {{ bytesLabel: "82 MB" }},
+                    early: {{ bytesLabel: "140 MB" }},
+                  }},
+                  warnings: [
+                    {{ severity: "warn", title: "开局过重", detail: "早期路线偏重。", actionHint: "把 OP 延后。" }},
+                  ],
+                }}).title,
+              ],
               desktopReady: [
                 tools.isDesktopExportReady({{ target: "windows_nwjs", runtimeMode: "nwjs", missingAssets: 0 }}),
                 tools.isDesktopExportReady({{ target: "windows_nwjs", runtimeMode: "fallback", missingAssets: 0 }}),
@@ -159,6 +192,7 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
         self.assertEqual(payload["goodSummary"]["badge"], "可以交付")
         self.assertEqual(len(payload["splitWarnings"]["missingVoiceWarnings"]), 1)
         self.assertEqual(len(payload["splitWarnings"]["nonVoiceWarnings"]), 1)
+        self.assertEqual(payload["runtimePreloadCounts"], [3, 1, "处理首屏加载压力"])
         self.assertEqual(payload["desktopReady"], [True, False, False, False])
         self.assertEqual(payload["blockedGate"]["status"], "blocked")
         self.assertEqual(payload["blockedGate"]["badge"], "暂缓发布")
@@ -203,6 +237,20 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
                 totalLabel: "680 MB",
                 largest: {{ name: "opening.mp4", assetId: "video_op" }},
               }},
+              runtimePreloadBudget: {{
+                releaseRiskLevel: "danger",
+                totals: {{ dangerCount: 1, warnCount: 1, totalLabel: "360 MB" }},
+                phases: {{
+                  critical: {{ bytesLabel: "180 MB" }},
+                  early: {{ bytesLabel: "360 MB" }},
+                }},
+                warnings: [
+                  {{ severity: "danger", title: "首屏必备素材过重", detail: "首屏阶段已经达到 180 MB。", actionHint: "先压入口背景和 OP。" }},
+                ],
+                topEntries: [
+                  {{ id: "op_video", name: "opening.mp4", sizeLabel: "260 MB", sceneName: "开场" }},
+                ],
+              }},
               unusedAssetCount: 4,
               exportResult: {{ target: "web", runtimeMode: "web", missingAssets: 0 }},
             }});
@@ -243,6 +291,7 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
                 "检查孤立场景和路线入口",
                 "补齐已引用缺口素材",
                 "压缩超预算素材",
+                "处理首屏加载压力",
                 "集中补待绑语音",
                 "确认发布版本和分辨率",
                 "顺手处理补充提醒",
@@ -251,11 +300,12 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
             ],
         )
         self.assertEqual(blocker_plan["blockerCount"], 1)
-        self.assertEqual(blocker_plan["urgentCount"], 5)
+        self.assertEqual(blocker_plan["urgentCount"], 6)
         self.assertEqual(blocker_plan["steps"][0]["actions"][1]["label"], "打开第一条错误")
         self.assertEqual(blocker_plan["steps"][1]["statusLabel"], "还有 1 个孤立场景 / 2 个不可达场景")
         self.assertEqual(blocker_plan["steps"][3]["actions"][1]["assetId"], "video_op")
-        self.assertEqual(blocker_plan["steps"][5]["actions"][0]["action"], "save-release-version")
+        self.assertEqual(blocker_plan["steps"][4]["actions"][1]["action"], "export-runtime-preload-budget-markdown")
+        self.assertEqual(blocker_plan["steps"][6]["actions"][0]["action"], "save-release-version")
 
         ready_plan = payload["readyPlan"]
         self.assertEqual(len(ready_plan["steps"]), 1)
