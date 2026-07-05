@@ -3205,6 +3205,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / run_editor.RUNTIME_PRELOAD_MANIFEST_FILE_NAME).is_file())
         self.assertTrue((build_dir / run_editor.RUNTIME_PRELOAD_REPORT_FILE_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_PLAYER_NAME).is_file())
+        self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_PRELOAD_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_README_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_REQUIREMENTS_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_BUILD_REQUIREMENTS_NAME).is_file())
@@ -3364,6 +3365,7 @@ class RunEditorSmokeTests(unittest.TestCase):
             {
                 "export_manifest.json",
                 run_editor.NATIVE_RUNTIME_PLAYER_NAME,
+                run_editor.NATIVE_RUNTIME_PRELOAD_NAME,
                 "game_data.json",
                 run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME,
                 run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME,
@@ -3390,6 +3392,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["unlockableContentReport"], run_editor.UNLOCKABLE_CONTENT_REPORT_FILE_NAME)
         self.assertEqual(manifest["files"]["runtimePreloadManifest"], run_editor.RUNTIME_PRELOAD_MANIFEST_FILE_NAME)
         self.assertEqual(manifest["files"]["runtimePreloadReport"], run_editor.RUNTIME_PRELOAD_REPORT_FILE_NAME)
+        self.assertEqual(manifest["files"]["runtimePreloadModule"], run_editor.NATIVE_RUNTIME_PRELOAD_NAME)
         self.assertEqual(manifest["runtime"]["mode"], "pygame_native")
         self.assertTrue(manifest["runtime"]["canBuildStandaloneApp"])
         self.assertEqual(manifest["runtime"]["playtestGuide"], run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME)
@@ -3403,6 +3406,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["runtime"]["unlockableContentReport"], run_editor.UNLOCKABLE_CONTENT_REPORT_FILE_NAME)
         self.assertEqual(manifest["runtime"]["runtimePreloadManifest"], run_editor.RUNTIME_PRELOAD_MANIFEST_FILE_NAME)
         self.assertEqual(manifest["runtime"]["runtimePreloadReport"], run_editor.RUNTIME_PRELOAD_REPORT_FILE_NAME)
+        self.assertEqual(manifest["runtime"]["runtimePreloadModule"], run_editor.NATIVE_RUNTIME_PRELOAD_NAME)
         self.assertEqual(
             manifest["runtime"]["runtimePreloadSummary"]["totalEntries"],
             native_preload_manifest["summary"]["totalEntries"],

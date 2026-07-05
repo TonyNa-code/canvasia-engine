@@ -149,9 +149,9 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             player.build_info = {
                 "runtimePreloadManifest": {
                     "entries": [
-                        {"assetId": "opening_video", "type": "video", "priority": 10, "preloadIndex": 3},
-                        {"assetId": "click_sfx", "type": "sfx", "priority": 90, "preloadIndex": 2},
-                        {"assetId": "title_ui", "type": "ui", "priority": 100, "preloadIndex": 1},
+                        {"assetId": "opening_video", "type": "video", "phase": "critical", "priority": 10, "preloadIndex": 3},
+                        {"assetId": "click_sfx", "type": "sfx", "phase": "critical", "priority": 90, "preloadIndex": 2},
+                        {"assetId": "title_ui", "type": "ui", "phase": "critical", "priority": 100, "preloadIndex": 1},
                     ]
                 }
             }
@@ -180,6 +180,73 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
         self.assertEqual(status["loadedEntries"], 3)
         self.assertEqual(player.image_cache["title_ui"], "image:title_ui")
         self.assertEqual(player.sound_cache["click_sfx"], "sound:click_sfx")
+
+    def test_runtime_preload_manifest_spreads_noncritical_assets(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_dir = Path(temp_dir)
+            title_path = bundle_dir / "assets" / "ui" / "title.png"
+            gallery_path = bundle_dir / "assets" / "ui" / "gallery.png"
+            ending_path = bundle_dir / "assets" / "video" / "ending.mp4"
+            for path in [title_path, gallery_path, ending_path]:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(b"asset")
+
+            class FakeMixer:
+                def get_init(self) -> bool:
+                    return True
+
+            class FakePygame:
+                mixer = FakeMixer()
+
+            player = NativeRuntimePlayer.__new__(NativeRuntimePlayer)
+            player.bundle_dir = bundle_dir
+            player.pygame = FakePygame()
+            player.title_screen_active = False
+            player.assets_by_id = {
+                "title_ui": {"id": "title_ui", "type": "ui", "exportUrl": title_path.relative_to(bundle_dir).as_posix()},
+                "gallery_ui": {"id": "gallery_ui", "type": "ui", "exportUrl": gallery_path.relative_to(bundle_dir).as_posix()},
+                "ending_video": {"id": "ending_video", "type": "video", "exportUrl": ending_path.relative_to(bundle_dir).as_posix()},
+            }
+            player.build_info = {
+                "runtimePreloadManifest": {
+                    "entries": [
+                        {"assetId": "title_ui", "type": "ui", "phase": "critical", "priority": 100, "preloadIndex": 1},
+                        {"assetId": "gallery_ui", "type": "ui", "phase": "early", "priority": 72, "preloadIndex": 2},
+                        {"assetId": "ending_video", "type": "video", "phase": "deferred", "priority": 38, "preloadIndex": 3},
+                    ]
+                }
+            }
+            player.image_cache = {}
+            player.sound_cache = {}
+            player.runtime_preload_manifest = player.get_runtime_preload_manifest()
+            player.runtime_preload_pending_entries = []
+            player.runtime_preload_finished_asset_ids = set()
+
+            def fake_load_image(asset_id: str | None):
+                player.image_cache[asset_id] = f"image:{asset_id}"
+                return player.image_cache[asset_id]
+
+            player._load_image = fake_load_image
+            player._load_sound = lambda asset_id: f"sound:{asset_id}"
+
+            status = player.preload_runtime_assets()
+            self.assertEqual(status["status"], "warming")
+            self.assertEqual(status["loadedEntries"], 1)
+            self.assertEqual(status["pendingEntries"], 2)
+            self.assertIn("title_ui", player.image_cache)
+            self.assertNotIn("gallery_ui", player.image_cache)
+
+            player.update_runtime_preload_queue(max_entries=1)
+            self.assertEqual(player.runtime_preload_status["status"], "warming")
+            self.assertEqual(player.runtime_preload_status["loadedEntries"], 2)
+            self.assertEqual(player.runtime_preload_status["pendingEntries"], 1)
+            self.assertIn("gallery_ui", player.image_cache)
+
+            player.update_runtime_preload_queue(max_entries=1)
+
+        self.assertEqual(player.runtime_preload_status["status"], "ready")
+        self.assertEqual(player.runtime_preload_status["loadedEntries"], 3)
+        self.assertEqual(player.runtime_preload_status["pendingEntries"], 0)
 
     def test_native_runtime_voice_ducking_state_restores_bgm_after_voice_finishes(self) -> None:
         class FakeMusic:

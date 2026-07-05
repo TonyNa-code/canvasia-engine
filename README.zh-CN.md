@@ -257,7 +257,7 @@ python run_editor.py
 - `网页试玩包`：适合快速预览、网页分发和轻量测试；导出包会附带 `runtime_preload_manifest.json` 与 `RUNTIME_PRELOAD_REPORT.md`，Runtime 会优先预热首屏和早期路线素材，减少第一次切背景、立绘、BGM 时的卡顿。
 - `Ren'Py Starter Bundle`：会导出 zip，内含 `game/script.rpy`、`game/options.rpy`、复制后的 `game/assets/` 素材、迁移 manifest、自定义演出复核备注、包内自检报告和本地校验脚本，适合把项目迁移到 Ren'Py 后继续开发。
 - `Windows / macOS / Linux 桌面包`：当前主要基于 NW.js 桌面 Runtime。
-- `原生 Runtime 包`：Preview 路线，已覆盖标题页主菜单、基础剧情主链、正式存档/读档、系统菜单设置项、语言切换、文本历史、自动播放、已读快进、项目字体、资源预热清单读取、玩家档案/自动续玩、基础粒子与镜头演出、3D 资产结构 / 依赖清单、可选 PyAV/FFmpeg 音画同步内嵌视频播放、OpenCV 画面兜底、系统播放器桥接兜底、第一批资料馆，以及随包生成的发布候选总报告、发布总控报告与三系统验收清单；启动时会提前缓存图片和短音频，并确认 BGM / 视频这类流媒体路径是否就绪。
+- `原生 Runtime 包`：Preview 路线，已覆盖标题页主菜单、基础剧情主链、正式存档/读档、系统菜单设置项、语言切换、文本历史、自动播放、已读快进、项目字体、资源预热清单读取、玩家档案/自动续玩、基础粒子与镜头演出、3D 资产结构 / 依赖清单、可选 PyAV/FFmpeg 音画同步内嵌视频播放、OpenCV 画面兜底、系统播放器桥接兜底、第一批资料馆，以及随包生成的发布候选总报告、发布总控报告与三系统验收清单；启动时会优先缓存关键图片和短音频，后续素材则以小步后台队列继续预热，并确认 BGM / 视频这类流媒体路径是否就绪。
 - `手机端 Runtime`：实验规划阶段，当前重点是触控、音频策略和界面适配验证。
 
 所有可试玩 / 可运行导出包都会随包生成 `README_试玩验收先看这里.md`、`story_route_map.json`、`story_route_map.md`、`localization_audit.json`、`localization_audit.md`、`release_readiness_summary.json`、`release_readiness_summary.md`、`unlockable_content_manifest.json` 和 `unlockable_content_report.md`。README 负责告诉测试员怎么打开、先验哪些基础功能；剧情路线图负责检查坏跳转、入口不可达场景和结局候选；本地化审计负责检查多语言项目的漏译位置；发布就绪摘要负责快速判断这包能不能交给别人试玩；可解锁内容 JSON / Markdown 报告适合直接查看 CG 图鉴、音乐回想、语音回听、角色 / 地点 / 旁白 / 关系图鉴、章节回放、结局收集和成就覆盖情况。

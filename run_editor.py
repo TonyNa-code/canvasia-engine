@@ -407,12 +407,14 @@ EDITOR_SIGNING_ENV_EXAMPLE_SOURCE = ROOT_DIR / "docs" / "maintainers" / "release
 EDITOR_SIGNING_CHECK_SCRIPT_SOURCE = ROOT_DIR / "tools" / "release" / "check_editor_signing_readiness.py"
 EDITOR_SIGNING_CHECK_COMMAND_SOURCE = ROOT_DIR / "tools" / "release" / "run_signing_readiness.command"
 NATIVE_RUNTIME_PLAYER_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_player.py"
+NATIVE_RUNTIME_PRELOAD_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_preload.py"
 NATIVE_RUNTIME_README_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "README.md"
 NATIVE_RUNTIME_REQUIREMENTS_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "requirements.txt"
 NATIVE_RUNTIME_BUILD_REQUIREMENTS_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "requirements-build.txt"
 NATIVE_RUNTIME_VIDEO_REQUIREMENTS_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "requirements-video.txt"
 NATIVE_RUNTIME_BRAND_LOGO_SOURCE = ROOT_DIR / "prototype_editor" / "assets" / "canvasia-brand-logo.png"
 NATIVE_RUNTIME_PLAYER_NAME = "runtime_player.py"
+NATIVE_RUNTIME_PRELOAD_NAME = "runtime_preload.py"
 NATIVE_RUNTIME_README_NAME = "README_原生_Runtime_包先看这里.md"
 NATIVE_RUNTIME_REQUIREMENTS_NAME = "requirements-native-runtime.txt"
 NATIVE_RUNTIME_BUILD_REQUIREMENTS_NAME = "requirements-native-runtime-build.txt"
@@ -9079,6 +9081,7 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
     )
 
     shutil.copy2(NATIVE_RUNTIME_PLAYER_SOURCE, build_dir / NATIVE_RUNTIME_PLAYER_NAME)
+    shutil.copy2(NATIVE_RUNTIME_PRELOAD_SOURCE, build_dir / NATIVE_RUNTIME_PRELOAD_NAME)
     shutil.copy2(NATIVE_RUNTIME_README_SOURCE, build_dir / NATIVE_RUNTIME_README_NAME)
     shutil.copy2(NATIVE_RUNTIME_REQUIREMENTS_SOURCE, build_dir / NATIVE_RUNTIME_REQUIREMENTS_NAME)
     shutil.copy2(NATIVE_RUNTIME_BUILD_REQUIREMENTS_SOURCE, build_dir / NATIVE_RUNTIME_BUILD_REQUIREMENTS_NAME)
@@ -9738,6 +9741,8 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
         "playtestGuidePath": str(playtest_guide_path),
         "playerName": NATIVE_RUNTIME_PLAYER_NAME,
         "playerPath": str(build_dir / NATIVE_RUNTIME_PLAYER_NAME),
+        "runtimePreloadModuleName": NATIVE_RUNTIME_PRELOAD_NAME,
+        "runtimePreloadModulePath": str(build_dir / NATIVE_RUNTIME_PRELOAD_NAME),
         "readmeName": NATIVE_RUNTIME_README_NAME,
         "readmePath": str(build_dir / NATIVE_RUNTIME_README_NAME),
         "requirementsName": NATIVE_RUNTIME_REQUIREMENTS_NAME,
@@ -10383,6 +10388,7 @@ def export_native_runtime_build() -> dict:
             "runtimePreloadManifest": runtime_files["runtimePreloadManifestName"],
             "runtimePreloadReport": runtime_files["runtimePreloadReportName"],
             "playerScript": runtime_files["playerName"],
+            "runtimePreloadModule": runtime_files["runtimePreloadModuleName"],
             "readme": runtime_files["readmeName"],
             "requirements": runtime_files["requirementsName"],
             "buildRequirements": runtime_files["buildRequirementsName"],
@@ -10441,6 +10447,7 @@ def export_native_runtime_build() -> dict:
             "runtimePreloadManifest": runtime_files["runtimePreloadManifestName"],
             "runtimePreloadReport": runtime_files["runtimePreloadReportName"],
             "runtimePreloadSummary": runtime_files["runtimePreloadSummary"],
+            "runtimePreloadModule": runtime_files["runtimePreloadModuleName"],
             "releaseCheck": runtime_files["releaseCheckName"],
             "releaseCandidateReport": runtime_files["releaseCandidateReportName"],
             "releaseControlReport": runtime_files["releaseControlReportName"],
@@ -10525,6 +10532,7 @@ def export_native_runtime_build() -> dict:
         {"name": runtime_files["unlockableContentReportName"], "description": "可解锁内容 Markdown 报告，方便测试员直接复查 EXTRA / 回想覆盖。"},
         {"name": runtime_files["runtimePreloadManifestName"], "description": "Runtime 资源预热清单 JSON，记录首屏和早期路线素材。"},
         {"name": runtime_files["runtimePreloadReportName"], "description": "Runtime 资源预热 Markdown 报告，方便复查卡顿风险。"},
+        {"name": runtime_files["runtimePreloadModuleName"], "description": "原生 Runtime 资源预热策略模块。"},
         {"name": runtime_files["releaseCheckName"], "description": "发布前自检 JSON。"},
         {"name": runtime_files["releaseCandidateReportName"], "description": "原生 Runtime 发布候选总报告。"},
         {"name": runtime_files["releaseControlReportName"], "description": "人工验收用发布总控 Markdown。"},
@@ -10643,6 +10651,9 @@ def export_native_runtime_build() -> dict:
         "playerScriptPath": runtime_files["playerPath"],
         "playerScriptName": runtime_files["playerName"],
         "playerScriptPublicUrl": f"/exports/{build_dir.name}/{runtime_files['playerName']}",
+        "runtimePreloadModuleName": runtime_files["runtimePreloadModuleName"],
+        "runtimePreloadModulePath": runtime_files["runtimePreloadModulePath"],
+        "runtimePreloadModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimePreloadModuleName']}",
         "readmeName": runtime_files["readmeName"],
         "readmePath": runtime_files["readmePath"],
         "readmePublicUrl": f"/exports/{build_dir.name}/{runtime_files['readmeName']}",
