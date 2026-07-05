@@ -210,19 +210,81 @@ def render_music_loop_clause(block: dict) -> str:
     return ""
 
 
-def render_music_scope_review(block: dict, context: dict) -> list[str]:
-    end_mode = clean_text(block.get("endMode"), "until_next_music")
-    if end_mode not in {"scene_end", "after_block"}:
-        return []
-    end_block_id = clean_text(block.get("endBlockId"), "auto")
+def is_music_control_block(block: dict) -> bool:
+    return clean_text(block.get("type")) in {"music_play", "music_stop"}
+
+
+def add_music_scope_warning(block: dict, context: dict, code: str, message: str) -> None:
     add_warning(
         context["warnings"],
-        "renpy_music_scope_review",
-        "BGM 播放范围需要在 Ren'Py 中复核并按需要补 stop music。",
+        code,
+        message,
         sceneId=context.get("sceneId"),
         blockIndex=context.get("blockIndex"),
+        blockId=clean_text(block.get("id")),
     )
-    return [f"    # Canvasia review music scope: endMode={end_mode}, endBlockId={end_block_id}, fadeOutMs={block.get('fadeOutMs', 'default')}"]
+
+
+def get_music_scope_stop_lines(block: dict, end_mode: str = "scene_end", end_block_id: str = "") -> list[str]:
+    fade_out = seconds_from_ms(block.get("fadeOutMs"))
+    target_suffix = f" after {end_block_id}" if end_block_id else ""
+    return [
+        f"    # Canvasia music scope end: {end_mode}{target_suffix}",
+        f"    stop music{f' fadeout {fade_out:g}' if fade_out else ''}",
+    ]
+
+
+def add_music_scope_stop(plan: dict, timing: str, block_index: int, lines: list[str]) -> None:
+    bucket = plan["before"] if timing == "before" else plan["after"]
+    bucket.setdefault(block_index, []).extend(lines)
+
+
+def build_music_scope_stop_plan(blocks: list[dict], context: dict) -> dict:
+    normalized_blocks = as_list(blocks)
+    plan: dict[str, dict[int, list[str]]] = {"before": {}, "after": {}}
+    for block_index, block in enumerate(normalized_blocks):
+        if clean_text(block.get("type")) != "music_play":
+            continue
+        scoped_context = {**context, "blockIndex": block_index}
+        end_mode = clean_text(block.get("endMode"), "until_next_music")
+        if end_mode not in {"scene_end", "after_block"}:
+            continue
+        next_audio_control_index = next(
+            (candidate_index for candidate_index, candidate in enumerate(normalized_blocks) if candidate_index > block_index and is_music_control_block(candidate)),
+            -1,
+        )
+        stop_index = len(normalized_blocks) - 1
+        timing = "after"
+        end_block_id = ""
+
+        if end_mode == "after_block":
+            end_block_id = clean_text(block.get("endBlockId"))
+            target_index = next(
+                (candidate_index for candidate_index, candidate in enumerate(normalized_blocks) if clean_text(candidate.get("id")) == end_block_id),
+                -1,
+            )
+            if not end_block_id:
+                add_music_scope_warning(block, scoped_context, "renpy_music_scope_missing_end_block", "BGM 指定范围缺少结束卡片，已保留播放到下一首音乐或场景结束。")
+                continue
+            if target_index < 0:
+                add_music_scope_warning(block, scoped_context, "renpy_music_scope_invalid_end_block", f"BGM 指定范围的结束卡片 {end_block_id} 不存在，已保留播放到下一首音乐或场景结束。")
+                continue
+            if target_index < block_index:
+                add_music_scope_warning(block, scoped_context, "renpy_music_scope_end_before_start", f"BGM 指定范围的结束卡片 {end_block_id} 位于播放卡之前，已保留播放到下一首音乐或场景结束。")
+                continue
+            stop_index = target_index
+        else:
+            last_type = clean_text(normalized_blocks[stop_index].get("type")) if normalized_blocks else ""
+            if last_type in {"jump", "return"}:
+                timing = "before"
+            elif last_type == "choice":
+                add_music_scope_warning(block, scoped_context, "renpy_music_scope_terminal_choice_review", "BGM 设置为场景结束，但场景以选项结束；Ren'Py 菜单分支需要按路线决定是否停止音乐。")
+                continue
+
+        if 0 <= next_audio_control_index <= stop_index:
+            continue
+        add_music_scope_stop(plan, timing, stop_index, get_music_scope_stop_lines(block, end_mode, end_block_id))
+    return plan
 
 
 def number_to_renpy_delta(value: Any, warnings: list[dict], variable_id: str, **context: Any) -> str:
@@ -1113,10 +1175,7 @@ def render_story_block(block: dict, context: dict) -> list[str]:
     if block_type == "music_play":
         fade_in = seconds_from_ms(block.get("fadeInMs"))
         fade_suffix = f" fadein {fade_in:g}" if fade_in else ""
-        return [
-            f"    play music {quote_renpy(get_asset_path(asset_map, block.get('assetId')) or 'audio/bgm.ogg')}{fade_suffix}{render_music_loop_clause(block)}{render_volume_clause(block.get('volume'))}",
-            *render_music_scope_review(block, context),
-        ]
+        return [f"    play music {quote_renpy(get_asset_path(asset_map, block.get('assetId')) or 'audio/bgm.ogg')}{fade_suffix}{render_music_loop_clause(block)}{render_volume_clause(block.get('volume'))}"]
     if block_type == "music_stop":
         fade_out = seconds_from_ms(block.get("fadeOutMs"))
         return [f"    stop music{f' fadeout {fade_out:g}' if fade_out else ''}"]
@@ -1211,10 +1270,13 @@ def build_renpy_draft_export(bundle: dict, assets_doc: dict | None = None) -> di
         lines.append(f"label {record['sceneLabel']}:")
         blocks = as_list(scene.get("blocks"))
         camera_state = get_default_camera_state()
+        music_scope_stop_plan = build_music_scope_stop_plan(blocks, {"warnings": warnings, "sceneId": scene_id})
         if not blocks:
             add_warning(warnings, "renpy_empty_scene", "空场景已导出 pass。", sceneId=scene_id)
             lines.append("    pass")
         for block_index, block in enumerate(blocks):
+            if block_index in music_scope_stop_plan["before"]:
+                lines.extend(music_scope_stop_plan["before"][block_index])
             block_context = {
                 "assetMap": asset_map,
                 "characterMap": character_map,
@@ -1227,6 +1289,8 @@ def build_renpy_draft_export(bundle: dict, assets_doc: dict | None = None) -> di
                 "projectResolution": project_resolution,
             }
             lines.extend(render_story_block(block, block_context))
+            if block_index in music_scope_stop_plan["after"]:
+                lines.extend(music_scope_stop_plan["after"][block_index])
         last_type = clean_text((blocks[-1] if blocks else {}).get("type"))
         if last_type not in {"jump", "choice", "return", "credits_roll"}:
             lines.append("    return")

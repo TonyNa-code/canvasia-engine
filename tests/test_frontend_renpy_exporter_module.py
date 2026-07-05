@@ -48,7 +48,7 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
                       name: "教室黄昏",
                       blocks: [
                         {{ type: "background", assetId: "bg_rooftop", transition: "fade", transitionDurationMs: 900 }},
-                        {{ type: "music_play", assetId: "bgm_piano", fadeInMs: 800, fadeOutMs: 900, loop: false, volume: 82, endMode: "scene_end" }},
+                        {{ id: "music", type: "music_play", assetId: "bgm_piano", fadeInMs: 800, fadeOutMs: 900, loop: false, volume: 82, endMode: "after_block", endBlockId: "line" }},
                         {{
                           type: "character_show",
                           characterId: "yuna",
@@ -58,7 +58,7 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
                           transitionDurationMs: 720,
                           stage: {{ offsetX: -8, offsetY: -5, scale: 118, opacity: 90, layer: 2, flipX: true }},
                         }},
-                        {{ type: "dialogue", speakerId: "yuna", text: "欢迎回来。", voiceAssetId: "voice_yuna_001", textSpeed: "fast" }},
+                        {{ id: "line", type: "dialogue", speakerId: "yuna", text: "欢迎回来。", voiceAssetId: "voice_yuna_001", textSpeed: "fast" }},
                         {{ type: "sfx_play", assetId: "sfx_bell", volume: 65 }},
                         {{ type: "narration", text: "风吹过屋顶。", textSpeed: "instant" }},
                         {{ type: "particle_effect", action: "start", preset: "snow", intensity: "medium", speed: "medium", wind: "still", area: "full" }},
@@ -147,7 +147,8 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
         self.assertIn("label scene_open:", payload["draft"]["script"])
         self.assertIn("scene bg_rooftop with Dissolve(0.9)", payload["draft"]["script"])
         self.assertIn('play music "bgm/piano.ogg" fadein 0.8 noloop volume 0.82', payload["draft"]["script"])
-        self.assertIn("# Canvasia review music scope: endMode=scene_end, endBlockId=auto, fadeOutMs=900", payload["draft"]["script"])
+        self.assertIn("# Canvasia music scope end: after_block after line", payload["draft"]["script"])
+        self.assertIn("stop music fadeout 0.9", payload["draft"]["script"])
         self.assertIn("transform canvasia_stage_scene_open_3:", payload["draft"]["script"])
         self.assertIn("    xalign 0.67", payload["draft"]["script"])
         self.assertIn("    yalign 0.95", payload["draft"]["script"])
@@ -182,7 +183,7 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
         self.assertNotIn("renpy_choice_effects_review", payload["manifest"])
         self.assertNotIn("renpy_comment_only_block", payload["manifest"])
         self.assertIn("renpy_video_timing_review", payload["manifest"])
-        self.assertIn("renpy_music_scope_review", payload["manifest"])
+        self.assertNotIn("renpy_music_scope_review", payload["manifest"])
         self.assertIn("变量默认值：2", payload["manifest"])
         self.assertIn("scene_open", payload["manifest"])
 

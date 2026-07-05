@@ -311,14 +311,83 @@
     return "";
   }
 
-  function pushMusicScopeReview(block = {}, context = {}) {
-    const endMode = cleanText(block.endMode, "until_next_music");
-    if (!["scene_end", "after_block"].includes(endMode)) {
-      return [];
-    }
-    const endBlockId = cleanText(block.endBlockId);
-    pushWarning(context.warnings ?? [], "renpy_music_scope_review", "BGM 播放范围需要在 Ren'Py 中复核并按需要补 stop music。", getWarningContext(context));
-    return [`    # Canvasia review music scope: endMode=${endMode}, endBlockId=${endBlockId || "auto"}, fadeOutMs=${block.fadeOutMs ?? "default"}`];
+  function isMusicControlBlock(block = {}) {
+    return ["music_play", "music_stop"].includes(cleanText(block.type));
+  }
+
+  function pushMusicScopeWarning(block = {}, context = {}, code, message) {
+    pushWarning(context.warnings ?? [], code, message, {
+      ...getWarningContext(context),
+      blockId: cleanText(block.id),
+    });
+  }
+
+  function getMusicScopeStopLines(block = {}, endMode = "scene_end", endBlockId = "") {
+    const fadeOut = secondsFromMs(block.fadeOutMs);
+    const targetSuffix = endBlockId ? ` after ${endBlockId}` : "";
+    return [
+      `    # Canvasia music scope end: ${endMode}${targetSuffix}`,
+      `    stop music${fadeOut ? ` fadeout ${fadeOut}` : ""}`,
+    ];
+  }
+
+  function addMusicScopeStop(plan, timing, blockIndex, lines = []) {
+    const bucket = timing === "before" ? plan.before : plan.after;
+    const existing = bucket.get(blockIndex) ?? [];
+    bucket.set(blockIndex, existing.concat(lines));
+  }
+
+  function buildMusicScopeStopPlan(blocks = [], context = {}) {
+    const normalizedBlocks = toArray(blocks);
+    const plan = { before: new Map(), after: new Map() };
+    normalizedBlocks.forEach((block, blockIndex) => {
+      if (cleanText(block?.type) !== "music_play") {
+        return;
+      }
+      const scopedContext = { ...context, blockIndex };
+      const endMode = cleanText(block.endMode, "until_next_music");
+      if (!["scene_end", "after_block"].includes(endMode)) {
+        return;
+      }
+      const nextAudioControlIndex = normalizedBlocks.findIndex(
+        (candidate, candidateIndex) => candidateIndex > blockIndex && isMusicControlBlock(candidate)
+      );
+      let stopIndex = normalizedBlocks.length - 1;
+      let timing = "after";
+      let endBlockId = "";
+
+      if (endMode === "after_block") {
+        endBlockId = cleanText(block.endBlockId);
+        const targetIndex = normalizedBlocks.findIndex((candidate) => cleanText(candidate?.id) === endBlockId);
+        if (!endBlockId) {
+          pushMusicScopeWarning(block, scopedContext, "renpy_music_scope_missing_end_block", "BGM 指定范围缺少结束卡片，已保留播放到下一首音乐或场景结束。");
+          return;
+        }
+        if (targetIndex < 0) {
+          pushMusicScopeWarning(block, scopedContext, "renpy_music_scope_invalid_end_block", `BGM 指定范围的结束卡片 ${endBlockId} 不存在，已保留播放到下一首音乐或场景结束。`);
+          return;
+        }
+        if (targetIndex < blockIndex) {
+          pushMusicScopeWarning(block, scopedContext, "renpy_music_scope_end_before_start", `BGM 指定范围的结束卡片 ${endBlockId} 位于播放卡之前，已保留播放到下一首音乐或场景结束。`);
+          return;
+        }
+        stopIndex = targetIndex;
+      } else {
+        const lastType = cleanText(normalizedBlocks[stopIndex]?.type);
+        if (["jump", "return"].includes(lastType)) {
+          timing = "before";
+        } else if (lastType === "choice") {
+          pushMusicScopeWarning(block, scopedContext, "renpy_music_scope_terminal_choice_review", "BGM 设置为场景结束，但场景以选项结束；Ren'Py 菜单分支需要按路线决定是否停止音乐。");
+          return;
+        }
+      }
+
+      if (nextAudioControlIndex >= 0 && nextAudioControlIndex <= stopIndex) {
+        return;
+      }
+      addMusicScopeStop(plan, timing, stopIndex, getMusicScopeStopLines(block, endMode, endBlockId));
+    });
+    return plan;
   }
 
   function clampNumber(value, min, max) {
@@ -1062,7 +1131,6 @@
       const fadeIn = secondsFromMs(block.fadeInMs);
       return [
         `    play music ${quoteRenpy(path || "audio/bgm.ogg")}${fadeIn ? ` fadein ${fadeIn}` : ""}${renderMusicLoopClause(block)}${renderVolumeClause(block.volume)}`,
-        ...pushMusicScopeReview(block, context),
       ];
     }
     if (type === "music_stop") {
@@ -1176,8 +1244,11 @@
         pushWarning(warnings, "renpy_empty_scene", "空场景已导出 pass。", { sceneId });
         lines.push("    pass");
       } else {
+        const musicScopeStopPlan = buildMusicScopeStopPlan(blocks, { warnings, sceneId });
         blocks.forEach((block, blockIndex) => {
+          (musicScopeStopPlan.before.get(blockIndex) ?? []).forEach((line) => lines.push(line));
           renderBlock(block, { assetMap, characterMap, sceneMap, warnings, sceneId, blockIndex, cameraState, projectResolution }).forEach((line) => lines.push(line));
+          (musicScopeStopPlan.after.get(blockIndex) ?? []).forEach((line) => lines.push(line));
         });
       }
       const lastBlock = blocks[blocks.length - 1];

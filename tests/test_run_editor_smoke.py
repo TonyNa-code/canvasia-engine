@@ -695,7 +695,8 @@ class RunEditorSmokeTests(unittest.TestCase):
                     "fadeOutMs": 900,
                     "loop": False,
                     "volume": 82,
-                    "endMode": "scene_end",
+                    "endMode": "after_block",
+                    "endBlockId": "line",
                 },
                 {
                     "id": "show",
@@ -818,7 +819,8 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertIn(f"show heroine expr_default at canvasia_stage_{scene['id']}_3 zorder 22 with Dissolve(0.72)", script)
         self.assertIn('play music "assets/bgm/', script)
         self.assertIn("fadein 0.8 noloop volume 0.82", script)
-        self.assertIn("# Canvasia review music scope: endMode=scene_end, endBlockId=auto, fadeOutMs=900", script)
+        self.assertIn("# Canvasia music scope end: after_block after line", script)
+        self.assertIn("stop music fadeout 0.9", script)
         self.assertIn('voice "assets/voice/', script)
         self.assertIn('heroine "{cps=72}Welcome back.{/cps}"', script)
         self.assertIn('play sound "assets/sfx/', script)
@@ -848,7 +850,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         renpy_manifest = json.loads(renpy_manifest_path.read_text(encoding="utf-8"))
         self.assertEqual(renpy_manifest["sceneCount"], 1)
         self.assertGreaterEqual(renpy_manifest["warningCount"], 1)
-        self.assertTrue(any(warning["code"] == "renpy_music_scope_review" for warning in renpy_manifest["warnings"]))
+        self.assertFalse(any(warning["code"] == "renpy_music_scope_review" for warning in renpy_manifest["warnings"]))
         self.assertTrue(any(warning["code"] == "renpy_video_timing_review" for warning in renpy_manifest["warnings"]))
         self.assertFalse(any(warning["code"] == "renpy_review_block" and warning.get("message", "").startswith(("screen_filter", "depth_blur")) for warning in renpy_manifest["warnings"]))
         self.assertFalse(any(warning["code"] == "renpy_review_block" and warning.get("message", "").startswith("particle_effect") for warning in renpy_manifest["warnings"]))
