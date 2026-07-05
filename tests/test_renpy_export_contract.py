@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import tempfile
 import textwrap
 import unittest
 from pathlib import Path
@@ -394,6 +395,7 @@ class RenpyExportContractTests(unittest.TestCase):
         self.assertIn("define canvasia_default_sound_volume = 0.77", options)
         self.assertIn("define canvasia_default_voice_volume = 0.88", options)
         self.assertIn("define canvasia_voice_enabled = False", options)
+        self.assertIn("define canvasia_voice_ducking_enabled = True", options)
         self.assertIn("define canvasia_formal_save_slot_count = 60", options)
         self.assertIn("default preferences.text_cps = 72", options)
         self.assertIn("default preferences.volume.music = 0.64", options)
@@ -405,6 +407,53 @@ class RenpyExportContractTests(unittest.TestCase):
         )
         self.assertIn("default preferences.text_cps = 0", instant_options)
         self.assertIn("default preferences.volume.voice = 0.88", instant_options)
+
+    def test_renpy_quality_report_blocks_missing_runtime_preferences(self) -> None:
+        bundle = {
+            "project": {
+                "title": "Runtime Quality Demo",
+                "runtimeSettings": {
+                    "defaultTextSpeed": "fast",
+                    "defaultBgmVolume": 64,
+                    "defaultSfxVolume": 77,
+                    "defaultVoiceVolume": 88,
+                    "defaultVoiceEnabled": False,
+                    "formalSaveSlotCount": 60,
+                },
+            }
+        }
+        export_result = {
+            "sceneCount": 1,
+            "runtimeSettings": bundle["project"]["runtimeSettings"],
+            "warnings": [],
+        }
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            build_dir = Path(temp_dir)
+            game_dir = build_dir / renpy_export.RENPY_GAME_DIR_NAME
+            game_dir.mkdir()
+            (game_dir / renpy_export.RENPY_SCRIPT_FILE_NAME).write_text("label start:\n    return\n", encoding="utf-8")
+            (game_dir / renpy_export.RENPY_SCREENS_FILE_NAME).write_text(
+                "screen say(who, what):\n    text what\n\nstyle canvasia_say_window is default:\n    pass\n",
+                encoding="utf-8",
+            )
+            options_path = game_dir / renpy_export.RENPY_OPTIONS_FILE_NAME
+            options = renpy_export.build_renpy_options_file(bundle)
+            options_path.write_text(options, encoding="utf-8")
+
+            report = renpy_export.build_renpy_quality_report(build_dir, export_result)
+            self.assertEqual(report["status"], "ready")
+            self.assertGreaterEqual(report["summary"]["runtimePreferenceCount"], 10)
+            self.assertEqual(report["summary"]["missingRuntimePreferenceCount"], 0)
+            self.assertTrue(report["summary"]["optionsPresent"])
+
+            options_path.write_text(options.replace("default preferences.volume.voice = 0\n", ""), encoding="utf-8")
+            broken_report = renpy_export.build_renpy_quality_report(build_dir, export_result)
+            self.assertEqual(broken_report["status"], "blocked")
+            self.assertEqual(broken_report["summary"]["missingRuntimePreferenceCount"], 1)
+            self.assertTrue(
+                any(issue["code"] == "renpy_missing_runtime_preference" for issue in broken_report["issues"])
+            )
 
 
 if __name__ == "__main__":

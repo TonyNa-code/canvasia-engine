@@ -918,6 +918,8 @@ class RunEditorSmokeTests(unittest.TestCase):
         quality_report = json.loads(Path(export_result["renpyQualityReportPath"]).read_text(encoding="utf-8"))
         self.assertEqual(quality_report["status"], "ready")
         self.assertEqual(quality_report["summary"]["missingAssetReferenceCount"], 0)
+        self.assertGreaterEqual(quality_report["summary"]["runtimePreferenceCount"], 10)
+        self.assertEqual(quality_report["summary"]["missingRuntimePreferenceCount"], 0)
         self.assertEqual(quality_report["files"]["screens"], f"game/{run_editor.RENPY_SCREENS_FILE_NAME}")
         quality_asset_references = "\n".join(quality_report["references"]["assetReferences"])
         self.assertIn("assets/ui/", quality_asset_references)
@@ -925,6 +927,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertFalse(any(issue["code"] == "renpy_review_comments_present" for issue in quality_report["issues"]))
         quality_markdown = Path(export_result["renpyQualityMarkdownPath"]).read_text(encoding="utf-8")
         self.assertIn("# Canvasia Ren'Py Bundle Quality Report", quality_markdown)
+        self.assertIn("Runtime preferences", quality_markdown)
         verifier_result = subprocess.run(
             [sys.executable, export_result["renpyVerifierPath"]],
             cwd=build_dir,

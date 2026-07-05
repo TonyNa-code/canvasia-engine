@@ -1445,7 +1445,6 @@ def build_renpy_options_file(bundle: dict) -> str:
     width = int(resolution.get("width") or 1280)
     height = int(resolution.get("height") or 720)
     title = clean_text(project.get("title"), "Canvasia Project")
-    runtime_summary = get_renpy_runtime_summary(project.get("runtimeSettings"))
     return "\n".join(
         [
             f"define config.name = {quote_renpy(title)}",
@@ -1453,24 +1452,39 @@ def build_renpy_options_file(bundle: dict) -> str:
             f"define config.screen_width = {width}",
             f"define config.screen_height = {height}",
             "",
-            "# Canvasia project runtime defaults. Scene cards can still override these per line.",
-            f"define canvasia_default_text_speed = {quote_renpy(runtime_summary['defaultTextSpeed'])}",
-            f"define canvasia_default_text_cps = {runtime_summary['defaultTextCps']}",
-            f"define canvasia_default_music_volume = {runtime_summary['defaultBgmVolume']:g}",
-            f"define canvasia_default_sound_volume = {runtime_summary['defaultSfxVolume']:g}",
-            f"define canvasia_default_voice_volume = {runtime_summary['defaultVoiceVolume']:g}",
-            f"define canvasia_voice_enabled = {value_to_renpy(runtime_summary['defaultVoiceEnabled'])}",
-            f"define canvasia_voice_ducking_enabled = {value_to_renpy(runtime_summary['defaultVoiceDuckingEnabled'])}",
-            f"define canvasia_formal_save_slot_count = {runtime_summary['formalSaveSlotCount']}",
-            "",
-            "# Ren'Py Preferences defaults applied when the player starts this project for the first time.",
-            f"default preferences.text_cps = {runtime_summary['renpyPreferenceTextCps']}",
-            f"default preferences.volume.music = {runtime_summary['defaultBgmVolume']:g}",
-            f"default preferences.volume.sfx = {runtime_summary['defaultSfxVolume']:g}",
-            f"default preferences.volume.voice = {runtime_summary['effectiveVoiceVolume']:g}",
+            *build_renpy_runtime_preference_lines(project.get("runtimeSettings")),
             "",
         ]
     )
+
+
+def build_renpy_runtime_preference_lines(runtime_settings: dict | None) -> list[str]:
+    runtime_summary = get_renpy_runtime_summary(runtime_settings)
+    return [
+        "# Canvasia project runtime defaults. Scene cards can still override these per line.",
+        f"define canvasia_default_text_speed = {quote_renpy(runtime_summary['defaultTextSpeed'])}",
+        f"define canvasia_default_text_cps = {runtime_summary['defaultTextCps']}",
+        f"define canvasia_default_music_volume = {runtime_summary['defaultBgmVolume']:g}",
+        f"define canvasia_default_sound_volume = {runtime_summary['defaultSfxVolume']:g}",
+        f"define canvasia_default_voice_volume = {runtime_summary['defaultVoiceVolume']:g}",
+        f"define canvasia_voice_enabled = {value_to_renpy(runtime_summary['defaultVoiceEnabled'])}",
+        f"define canvasia_voice_ducking_enabled = {value_to_renpy(runtime_summary['defaultVoiceDuckingEnabled'])}",
+        f"define canvasia_formal_save_slot_count = {runtime_summary['formalSaveSlotCount']}",
+        "",
+        "# Ren'Py Preferences defaults applied when the player starts this project for the first time.",
+        f"default preferences.text_cps = {runtime_summary['renpyPreferenceTextCps']}",
+        f"default preferences.volume.music = {runtime_summary['defaultBgmVolume']:g}",
+        f"default preferences.volume.sfx = {runtime_summary['defaultSfxVolume']:g}",
+        f"default preferences.volume.voice = {runtime_summary['effectiveVoiceVolume']:g}",
+    ]
+
+
+def build_renpy_runtime_preference_markers(runtime_settings: dict | None) -> list[str]:
+    return [
+        line
+        for line in build_renpy_runtime_preference_lines(runtime_settings)
+        if line and not line.startswith("#")
+    ]
 
 
 def get_dialog_box_config(bundle: dict) -> dict:
@@ -1715,13 +1729,13 @@ def build_renpy_readme(export_result: dict) -> str:
             "## Files",
             "",
             f"- `{RENPY_GAME_DIR_NAME}/{RENPY_SCRIPT_FILE_NAME}`: converted labels, dialogue, choices, audio cues, variables, and basic presentation commands.",
-            f"- `{RENPY_GAME_DIR_NAME}/{RENPY_OPTIONS_FILE_NAME}`: project title and resolution defaults.",
+            f"- `{RENPY_GAME_DIR_NAME}/{RENPY_OPTIONS_FILE_NAME}`: project title, resolution, and default text/audio preferences.",
             f"- `{RENPY_GAME_DIR_NAME}/{RENPY_SCREENS_FILE_NAME}`: generated dialogue screen and textbox style based on the project textbox settings.",
             f"- `{RENPY_GAME_DIR_NAME}/assets/`: copied assets referenced by the generated script.",
             f"- `{RENPY_REVIEW_FILE_NAME}`: review notes for custom effects and migration gaps.",
             f"- `{RENPY_MANIFEST_FILE_NAME}`: machine-readable export summary.",
             f"- `{RENPY_QUALITY_MARKDOWN_FILE_NAME}` / `{RENPY_QUALITY_REPORT_FILE_NAME}`: bundle integrity and migration quality checks.",
-            f"- `{RENPY_VERIFY_SCRIPT_FILE_NAME}`: local verifier for labels, jumps, and referenced files.",
+            f"- `{RENPY_VERIFY_SCRIPT_FILE_NAME}`: local verifier for labels, jumps, runtime preferences, and referenced files.",
             "",
             "## How to continue",
             "",
@@ -1810,6 +1824,8 @@ def build_renpy_quality_report(build_dir: Path, export_result: dict) -> dict:
     screens_path = game_dir / RENPY_SCREENS_FILE_NAME
     issues: list[dict] = []
     references = {"labels": [], "duplicateLabels": [], "jumps": [], "assetReferences": []}
+    runtime_preference_markers = build_renpy_runtime_preference_markers(export_result.get("runtimeSettings"))
+    missing_runtime_preference_markers: list[str] = []
 
     if not script_path.is_file():
         add_quality_issue(issues, "error", "renpy_missing_script", "game/script.rpy is missing.")
@@ -1822,6 +1838,21 @@ def build_renpy_quality_report(build_dir: Path, export_result: dict) -> dict:
 
     if not options_path.is_file():
         add_quality_issue(issues, "error", "renpy_missing_options", "game/options.rpy is missing.")
+        options = ""
+    else:
+        options = options_path.read_text(encoding="utf-8")
+        if not options.strip():
+            add_quality_issue(issues, "error", "renpy_empty_options", "game/options.rpy is empty.")
+        for marker in runtime_preference_markers:
+            if marker not in options:
+                missing_runtime_preference_markers.append(marker)
+                add_quality_issue(
+                    issues,
+                    "error",
+                    "renpy_missing_runtime_preference",
+                    f"game/options.rpy is missing runtime preference: {marker}",
+                    marker=marker,
+                )
     if not screens_path.is_file():
         add_quality_issue(issues, "error", "renpy_missing_screens", "game/screens.rpy is missing.")
         screens = ""
@@ -1888,8 +1919,11 @@ def build_renpy_quality_report(build_dir: Path, export_result: dict) -> dict:
             "jumpCount": len(references["jumps"]),
             "assetReferenceCount": len(references["assetReferences"]),
             "missingAssetReferenceCount": len(missing_asset_references),
+            "runtimePreferenceCount": len(runtime_preference_markers),
+            "missingRuntimePreferenceCount": len(missing_runtime_preference_markers),
             "duplicateLabelCount": len(references["duplicateLabels"]),
             "reviewCommentCount": review_comment_count,
+            "optionsPresent": bool(options.strip()),
             "screensPresent": bool(screens.strip()),
             "errorCount": error_count,
             "reviewCount": review_count,
@@ -1917,6 +1951,8 @@ def build_renpy_quality_markdown(report: dict) -> str:
         f"- Jumps: {summary.get('jumpCount', 0)}",
         f"- Asset references: {summary.get('assetReferenceCount', 0)}",
         f"- Missing asset references: {summary.get('missingAssetReferenceCount', 0)}",
+        f"- Runtime preferences: {summary.get('runtimePreferenceCount', 0) - summary.get('missingRuntimePreferenceCount', 0)} / {summary.get('runtimePreferenceCount', 0)}",
+        f"- Missing runtime preferences: {summary.get('missingRuntimePreferenceCount', 0)}",
         f"- Review comments: {summary.get('reviewCommentCount', 0)}",
         "",
     ]
@@ -1952,6 +1988,20 @@ OPTIONS_PATH = GAME_DIR / "{RENPY_OPTIONS_FILE_NAME}"
 SCREENS_PATH = GAME_DIR / "{RENPY_SCREENS_FILE_NAME}"
 PATH_SUFFIX_PATTERN = re.compile(r"\\.(?:png|jpe?g|webp|gif|avif|mp3|ogg|wav|m4a|aac|flac|mp4|webm|mov|m4v|ttf|otf|ttc|woff2?)$", re.IGNORECASE)
 PLAYBACK_SPEC_PREFIX_PATTERN = re.compile(r"^<[^>]+>")
+REQUIRED_OPTIONS_SNIPPETS = (
+    "define canvasia_default_text_speed =",
+    "define canvasia_default_text_cps =",
+    "define canvasia_default_music_volume =",
+    "define canvasia_default_sound_volume =",
+    "define canvasia_default_voice_volume =",
+    "define canvasia_voice_enabled =",
+    "define canvasia_voice_ducking_enabled =",
+    "define canvasia_formal_save_slot_count =",
+    "default preferences.text_cps =",
+    "default preferences.volume.music =",
+    "default preferences.volume.sfx =",
+    "default preferences.volume.voice =",
+)
 
 
 def normalize_asset_reference(value: str) -> str:
@@ -1980,6 +2030,13 @@ def main() -> int:
             issues.append("empty game/script.rpy")
     if not OPTIONS_PATH.is_file():
         issues.append("missing game/options.rpy")
+    else:
+        options = OPTIONS_PATH.read_text(encoding="utf-8")
+        if not options.strip():
+            issues.append("empty game/options.rpy")
+        for snippet in REQUIRED_OPTIONS_SNIPPETS:
+            if snippet not in options:
+                issues.append(f"missing options runtime preference: {{snippet}}")
     if not SCREENS_PATH.is_file():
         issues.append("missing game/screens.rpy")
         screens = ""
