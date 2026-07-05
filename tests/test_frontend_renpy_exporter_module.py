@@ -84,6 +84,14 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
                         {{ type: "screen_fade", action: "fade_in", color: "white", duration: "medium" }},
                         {{ type: "camera_zoom", action: "zoom_in", strength: "medium", focus: "left" }},
                         {{ type: "camera_pan", target: "right", strength: "medium" }},
+                        {{
+                          type: "screen_filter",
+                          action: "apply",
+                          preset: "mono",
+                          strength: "strong",
+                          grade: {{ brightness: 112, contrast: 120, saturation: 85, hue: 12, temperature: 25, vignette: 0 }},
+                        }},
+                        {{ type: "depth_blur", action: "apply", focus: "full", strength: "strong" }},
                         {{ type: "jump", targetSceneId: "scene_end" }},
                       ],
                     }},
@@ -163,8 +171,11 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
         self.assertIn('with Fade(0, 0, 0.78, color="#fffcf7")', payload["draft"]["script"])
         self.assertIn("camera:\n        subpixel True\n        xalign 0.28\n        yalign 0.52\n        zoom 1.16\n        xoffset 0", payload["draft"]["script"])
         self.assertIn("camera:\n        subpixel True\n        xalign 0.28\n        yalign 0.52\n        zoom 1.16\n        xoffset -102", payload["draft"]["script"])
+        self.assertIn('matrixcolor TintMatrix("#ffffff") * SaturationMatrix(0) * BrightnessMatrix(0.12) * ContrastMatrix(1.2) * SaturationMatrix(0.85) * HueMatrix(10)', payload["draft"]["script"])
+        self.assertIn("        blur 6", payload["draft"]["script"])
         self.assertIn('show text "STAFF\\nThank you\\n企划：Canvasia\\n剧本：Tester" at truecenter with dissolve', payload["draft"]["script"])
         self.assertNotIn("renpy_choice_effects_review", payload["manifest"])
+        self.assertNotIn("renpy_comment_only_block", payload["manifest"])
         self.assertIn("renpy_video_timing_review", payload["manifest"])
         self.assertIn("renpy_music_scope_review", payload["manifest"])
         self.assertIn("变量默认值：2", payload["manifest"])

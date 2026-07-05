@@ -4,8 +4,6 @@
   const CHOICE_CONTINUE_TARGET = "__continue__";
   const BLOCK_TYPES_REQUIRING_COMMENT = Object.freeze([
     "particle_effect",
-    "screen_filter",
-    "depth_blur",
   ]);
   const POSITION_XALIGN = Object.freeze({ left: 0.25, center: 0.5, right: 0.75 });
   const DEFAULT_CHARACTER_STAGE = Object.freeze({
@@ -59,6 +57,30 @@
   });
   const CAMERA_FOCUS_XALIGN = Object.freeze({ left: 0.28, center: 0.5, right: 0.72 });
   const CAMERA_PAN_PERCENT = Object.freeze({ light: 4, medium: 8, heavy: 12 });
+  const CAMERA_EFFECT_STRENGTH = Object.freeze({ soft: 0.65, medium: 1, strong: 1.35 });
+  const SCREEN_FILTER_PRESETS = Object.freeze({
+    memory: Object.freeze({ tint: "#ffeec2", saturation: 0.82, brightness: 0.03 }),
+    mono: Object.freeze({ tint: "#ffffff", saturation: 0 }),
+    dream: Object.freeze({ tint: "#eee4ff", saturation: 0.92, brightness: 0.05 }),
+    cold: Object.freeze({ tint: "#dcecff", saturation: 0.86, brightness: -0.01 }),
+  });
+  const SCREEN_COLOR_GRADE_DEFAULTS = Object.freeze({
+    brightness: 100,
+    contrast: 100,
+    saturation: 100,
+    hue: 0,
+    temperature: 0,
+    vignette: 0,
+  });
+  const SCREEN_COLOR_GRADE_LIMITS = Object.freeze({
+    brightness: Object.freeze([40, 180]),
+    contrast: Object.freeze([40, 180]),
+    saturation: Object.freeze([0, 220]),
+    hue: Object.freeze([-180, 180]),
+    temperature: Object.freeze([-100, 100]),
+    vignette: Object.freeze([0, 100]),
+  });
+  const DEPTH_BLUR_PIXELS = Object.freeze({ soft: 2, medium: 4, strong: 6 });
 
   function toArray(value) {
     return Array.isArray(value) ? value : [];
@@ -432,6 +454,31 @@
     return ["left", "center", "right"].includes(safeTarget) ? safeTarget : "center";
   }
 
+  function getSafeEffectStrength(strength) {
+    const safeStrength = cleanText(strength, "medium");
+    return Object.hasOwn(CAMERA_EFFECT_STRENGTH, safeStrength) ? safeStrength : "medium";
+  }
+
+  function getSafeScreenFilterAction(action) {
+    const safeAction = cleanText(action, "apply");
+    return ["apply", "clear"].includes(safeAction) ? safeAction : "apply";
+  }
+
+  function getSafeScreenFilterPreset(preset) {
+    const safePreset = cleanText(preset, "memory");
+    return Object.hasOwn(SCREEN_FILTER_PRESETS, safePreset) ? safePreset : "memory";
+  }
+
+  function getSafeDepthBlurAction(action) {
+    const safeAction = cleanText(action, "apply");
+    return ["apply", "clear"].includes(safeAction) ? safeAction : "apply";
+  }
+
+  function getSafeDepthBlurFocus(focus) {
+    const safeFocus = cleanText(focus, "full");
+    return ["left", "center", "right", "full"].includes(safeFocus) ? safeFocus : "full";
+  }
+
   function getCameraPanOffset(target, strength, resolution = DEFAULT_PROJECT_RESOLUTION) {
     const safeTarget = getSafeCameraPanTarget(target);
     if (safeTarget === "center") {
@@ -447,6 +494,8 @@
       zoomScale: 1,
       focus: "center",
       panOffset: 0,
+      matrixcolor: "",
+      blur: 0,
     };
   }
 
@@ -460,12 +509,19 @@
   function renderCameraStatement(state = getDefaultCameraState()) {
     const zoomScale = Number(state.zoomScale ?? 1);
     const panOffset = Number(state.panOffset ?? 0);
+    const blur = Number(state.blur ?? 0);
     const focus = getSafeCameraFocus(state.focus);
-    const neutral = Math.abs(zoomScale - 1) < 0.001 && panOffset === 0 && focus === "center";
+    const matrixcolor = cleanText(state.matrixcolor);
+    const neutral =
+      Math.abs(zoomScale - 1) < 0.001 &&
+      panOffset === 0 &&
+      focus === "center" &&
+      !matrixcolor &&
+      (!Number.isFinite(blur) || blur <= 0);
     if (neutral) {
       return ["    camera"];
     }
-    return [
+    const lines = [
       "    camera:",
       "        subpixel True",
       `        xalign ${formatRenpyFloat(CAMERA_FOCUS_XALIGN[focus], 2)}`,
@@ -474,6 +530,13 @@
       `        xoffset ${Math.round(panOffset)}`,
       "        yoffset 0",
     ];
+    if (matrixcolor) {
+      lines.push(`        matrixcolor ${matrixcolor}`);
+    }
+    if (Number.isFinite(blur) && blur > 0) {
+      lines.push(`        blur ${formatRenpyFloat(blur, 2)}`);
+    }
+    return lines;
   }
 
   function renderCameraZoomBlock(block = {}, context = {}) {
@@ -493,6 +556,80 @@
   function renderCameraPanBlock(block = {}, context = {}) {
     const state = getCameraState(context);
     state.panOffset = getCameraPanOffset(block.target, block.strength, context.projectResolution ?? DEFAULT_PROJECT_RESOLUTION);
+    return renderCameraStatement(state);
+  }
+
+  function getSafeScreenColorGrade(source = {}) {
+    const raw = source && typeof source === "object" ? source : {};
+    return Object.fromEntries(
+      Object.entries(SCREEN_COLOR_GRADE_DEFAULTS).map(([key, fallback]) => {
+        const [minimum, maximum] = SCREEN_COLOR_GRADE_LIMITS[key];
+        const value = Number(raw[key]);
+        return [key, Math.round(clampNumber(Number.isFinite(value) ? value : fallback, minimum, maximum))];
+      })
+    );
+  }
+
+  function getStrengthAdjustedValue(base, neutral, strength) {
+    const multiplier = CAMERA_EFFECT_STRENGTH[getSafeEffectStrength(strength)] ?? 1;
+    return neutral + (base - neutral) * multiplier;
+  }
+
+  function formatMatrixNumber(value) {
+    const number = Number(value);
+    return Number.isFinite(number) ? Number(number.toFixed(3)).toString() : "0";
+  }
+
+  function getScreenFilterMatrixExpression(block = {}) {
+    const preset = SCREEN_FILTER_PRESETS[getSafeScreenFilterPreset(block.preset)];
+    const strength = getSafeEffectStrength(block.strength);
+    const grade = getSafeScreenColorGrade(block.grade);
+    const parts = [
+      `TintMatrix("${preset.tint}")`,
+      `SaturationMatrix(${formatMatrixNumber(clampNumber(getStrengthAdjustedValue(preset.saturation, 1, strength), 0, 2.2))})`,
+    ];
+    const presetBrightness = getStrengthAdjustedValue(preset.brightness ?? 0, 0, strength);
+    if (Math.abs(presetBrightness) > 0.001) {
+      parts.push(`BrightnessMatrix(${formatMatrixNumber(clampNumber(presetBrightness, -1, 1))})`);
+    }
+    if (grade.brightness !== SCREEN_COLOR_GRADE_DEFAULTS.brightness) {
+      parts.push(`BrightnessMatrix(${formatMatrixNumber(clampNumber((grade.brightness - 100) / 100, -1, 1))})`);
+    }
+    if (grade.contrast !== SCREEN_COLOR_GRADE_DEFAULTS.contrast) {
+      parts.push(`ContrastMatrix(${formatMatrixNumber(clampNumber(grade.contrast / 100, 0, 2.2))})`);
+    }
+    if (grade.saturation !== SCREEN_COLOR_GRADE_DEFAULTS.saturation) {
+      parts.push(`SaturationMatrix(${formatMatrixNumber(clampNumber(grade.saturation / 100, 0, 2.2))})`);
+    }
+    const hue = grade.hue - grade.temperature * 0.08;
+    if (Math.abs(hue) > 0.001) {
+      parts.push(`HueMatrix(${formatMatrixNumber(hue)})`);
+    }
+    return parts.join(" * ");
+  }
+
+  function renderScreenFilterBlock(block = {}, context = {}) {
+    const state = getCameraState(context);
+    if (getSafeScreenFilterAction(block.action) === "clear") {
+      state.matrixcolor = "";
+    } else {
+      state.matrixcolor = getScreenFilterMatrixExpression(block);
+    }
+    return renderCameraStatement(state);
+  }
+
+  function renderDepthBlurBlock(block = {}, context = {}) {
+    const state = getCameraState(context);
+    if (getSafeDepthBlurAction(block.action) === "clear") {
+      state.blur = 0;
+      return renderCameraStatement(state);
+    }
+    const focus = getSafeDepthBlurFocus(block.focus);
+    const strength = getSafeEffectStrength(block.strength);
+    if (focus !== "full") {
+      pushWarning(context.warnings ?? [], "renpy_depth_blur_focus_review", "Ren'Py 草稿已导出全层 blur；指定角色侧清晰需要在 Ren'Py 中改成分层镜头。", getWarningContext(context));
+    }
+    state.blur = DEPTH_BLUR_PIXELS[strength] ?? DEPTH_BLUR_PIXELS.medium;
     return renderCameraStatement(state);
   }
 
@@ -863,6 +1000,12 @@
     }
     if (type === "camera_pan") {
       return renderCameraPanBlock(block, context);
+    }
+    if (type === "screen_filter") {
+      return renderScreenFilterBlock(block, context);
+    }
+    if (type === "depth_blur") {
+      return renderDepthBlurBlock(block, context);
     }
     if (type === "dialogue") {
       const characterId = cleanText(block.speakerId);

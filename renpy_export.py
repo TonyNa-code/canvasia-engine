@@ -23,8 +23,6 @@ RENPY_PATH_SUFFIX_PATTERN = re.compile(
 
 COMMENT_ONLY_BLOCK_TYPES = {
     "particle_effect",
-    "screen_filter",
-    "depth_blur",
 }
 CONDITION_OPERATORS = {"==", "!=", ">=", "<=", ">", "<"}
 POSITION_XALIGN = {"left": 0.25, "center": 0.5, "right": 0.75}
@@ -79,6 +77,30 @@ CAMERA_ZOOM_SCALE = {
 }
 CAMERA_FOCUS_XALIGN = {"left": 0.28, "center": 0.5, "right": 0.72}
 CAMERA_PAN_PERCENT = {"light": 4, "medium": 8, "heavy": 12}
+CAMERA_EFFECT_STRENGTH = {"soft": 0.65, "medium": 1.0, "strong": 1.35}
+SCREEN_FILTER_PRESETS = {
+    "memory": {"tint": "#ffeec2", "saturation": 0.82, "brightness": 0.03},
+    "mono": {"tint": "#ffffff", "saturation": 0.0, "brightness": 0.0},
+    "dream": {"tint": "#eee4ff", "saturation": 0.92, "brightness": 0.05},
+    "cold": {"tint": "#dcecff", "saturation": 0.86, "brightness": -0.01},
+}
+SCREEN_COLOR_GRADE_DEFAULTS = {
+    "brightness": 100,
+    "contrast": 100,
+    "saturation": 100,
+    "hue": 0,
+    "temperature": 0,
+    "vignette": 0,
+}
+SCREEN_COLOR_GRADE_LIMITS = {
+    "brightness": (40, 180),
+    "contrast": (40, 180),
+    "saturation": (0, 220),
+    "hue": (-180, 180),
+    "temperature": (-100, 100),
+    "vignette": (0, 100),
+}
+DEPTH_BLUR_PIXELS = {"soft": 2.0, "medium": 4.0, "strong": 6.0}
 
 
 def as_list(value: Any) -> list:
@@ -366,6 +388,31 @@ def get_safe_camera_pan_target(value: Any) -> str:
     return target if target in {"left", "center", "right"} else "center"
 
 
+def get_safe_effect_strength(value: Any) -> str:
+    strength = clean_text(value, "medium")
+    return strength if strength in CAMERA_EFFECT_STRENGTH else "medium"
+
+
+def get_safe_screen_filter_action(value: Any) -> str:
+    action = clean_text(value, "apply")
+    return action if action in {"apply", "clear"} else "apply"
+
+
+def get_safe_screen_filter_preset(value: Any) -> str:
+    preset = clean_text(value, "memory")
+    return preset if preset in SCREEN_FILTER_PRESETS else "memory"
+
+
+def get_safe_depth_blur_action(value: Any) -> str:
+    action = clean_text(value, "apply")
+    return action if action in {"apply", "clear"} else "apply"
+
+
+def get_safe_depth_blur_focus(value: Any) -> str:
+    focus = clean_text(value, "full")
+    return focus if focus in {"left", "center", "right", "full"} else "full"
+
+
 def get_camera_pan_offset(target: Any, strength: Any, resolution: dict[str, int]) -> int:
     safe_target = get_safe_camera_pan_target(target)
     if safe_target == "center":
@@ -376,7 +423,7 @@ def get_camera_pan_offset(target: Any, strength: Any, resolution: dict[str, int]
 
 
 def get_default_camera_state() -> dict[str, Any]:
-    return {"zoomScale": 1.0, "focus": "center", "panOffset": 0}
+    return {"zoomScale": 1.0, "focus": "center", "panOffset": 0, "matrixcolor": "", "blur": 0.0}
 
 
 def get_camera_state(context: dict) -> dict[str, Any]:
@@ -396,11 +443,16 @@ def render_camera_statement(state: dict[str, Any]) -> list[str]:
         pan_offset = int(round(float(state.get("panOffset", 0))))
     except (TypeError, ValueError):
         pan_offset = 0
+    try:
+        blur = float(state.get("blur", 0))
+    except (TypeError, ValueError):
+        blur = 0
     focus = get_safe_camera_focus(state.get("focus"))
-    neutral = abs(zoom_scale - 1) < 0.001 and pan_offset == 0 and focus == "center"
+    matrixcolor = clean_text(state.get("matrixcolor"))
+    neutral = abs(zoom_scale - 1) < 0.001 and pan_offset == 0 and focus == "center" and not matrixcolor and blur <= 0
     if neutral:
         return ["    camera"]
-    return [
+    lines = [
         "    camera:",
         "        subpixel True",
         f"        xalign {format_renpy_float(CAMERA_FOCUS_XALIGN[focus], 2)}",
@@ -409,6 +461,11 @@ def render_camera_statement(state: dict[str, Any]) -> list[str]:
         f"        xoffset {pan_offset}",
         "        yoffset 0",
     ]
+    if matrixcolor:
+        lines.append(f"        matrixcolor {matrixcolor}")
+    if blur > 0:
+        lines.append(f"        blur {format_renpy_float(blur, 2)}")
+    return lines
 
 
 def render_camera_zoom_block(block: dict, context: dict) -> list[str]:
@@ -428,6 +485,83 @@ def render_camera_pan_block(block: dict, context: dict) -> list[str]:
     state = get_camera_state(context)
     resolution = context.get("projectResolution") if isinstance(context.get("projectResolution"), dict) else DEFAULT_PROJECT_RESOLUTION
     state["panOffset"] = get_camera_pan_offset(block.get("target"), block.get("strength"), resolution)
+    return render_camera_statement(state)
+
+
+def get_safe_screen_color_grade(source: Any) -> dict[str, int]:
+    raw = source if isinstance(source, dict) else {}
+    grade: dict[str, int] = {}
+    for key, fallback in SCREEN_COLOR_GRADE_DEFAULTS.items():
+        minimum, maximum = SCREEN_COLOR_GRADE_LIMITS[key]
+        try:
+            value = float(raw.get(key, fallback))
+        except (TypeError, ValueError):
+            value = fallback
+        grade[key] = int(round(clamp_number(value, minimum, maximum)))
+    return grade
+
+
+def get_strength_adjusted_value(base: float, neutral: float, strength: Any) -> float:
+    multiplier = CAMERA_EFFECT_STRENGTH[get_safe_effect_strength(strength)]
+    return neutral + (base - neutral) * multiplier
+
+
+def format_matrix_number(value: Any) -> str:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        number = 0
+    return f"{number:.3f}".rstrip("0").rstrip(".") or "0"
+
+
+def get_screen_filter_matrix_expression(block: dict) -> str:
+    preset = SCREEN_FILTER_PRESETS[get_safe_screen_filter_preset(block.get("preset"))]
+    strength = get_safe_effect_strength(block.get("strength"))
+    grade = get_safe_screen_color_grade(block.get("grade"))
+    parts = [
+        f"TintMatrix(\"{preset['tint']}\")",
+        f"SaturationMatrix({format_matrix_number(clamp_number(get_strength_adjusted_value(float(preset['saturation']), 1, strength), 0, 2.2))})",
+    ]
+    preset_brightness = get_strength_adjusted_value(float(preset.get("brightness") or 0), 0, strength)
+    if abs(preset_brightness) > 0.001:
+        parts.append(f"BrightnessMatrix({format_matrix_number(clamp_number(preset_brightness, -1, 1))})")
+    if grade["brightness"] != SCREEN_COLOR_GRADE_DEFAULTS["brightness"]:
+        parts.append(f"BrightnessMatrix({format_matrix_number(clamp_number((grade['brightness'] - 100) / 100, -1, 1))})")
+    if grade["contrast"] != SCREEN_COLOR_GRADE_DEFAULTS["contrast"]:
+        parts.append(f"ContrastMatrix({format_matrix_number(clamp_number(grade['contrast'] / 100, 0, 2.2))})")
+    if grade["saturation"] != SCREEN_COLOR_GRADE_DEFAULTS["saturation"]:
+        parts.append(f"SaturationMatrix({format_matrix_number(clamp_number(grade['saturation'] / 100, 0, 2.2))})")
+    hue = grade["hue"] - grade["temperature"] * 0.08
+    if abs(hue) > 0.001:
+        parts.append(f"HueMatrix({format_matrix_number(hue)})")
+    return " * ".join(parts)
+
+
+def render_screen_filter_block(block: dict, context: dict) -> list[str]:
+    state = get_camera_state(context)
+    if get_safe_screen_filter_action(block.get("action")) == "clear":
+        state["matrixcolor"] = ""
+    else:
+        state["matrixcolor"] = get_screen_filter_matrix_expression(block)
+    return render_camera_statement(state)
+
+
+def render_depth_blur_block(block: dict, context: dict) -> list[str]:
+    state = get_camera_state(context)
+    if get_safe_depth_blur_action(block.get("action")) == "clear":
+        state["blur"] = 0
+        return render_camera_statement(state)
+    focus = get_safe_depth_blur_focus(block.get("focus"))
+    strength = get_safe_effect_strength(block.get("strength"))
+    if focus != "full":
+        add_warning(
+            context["warnings"],
+            "renpy_depth_blur_focus_review",
+            "Ren'Py 草稿已导出全层 blur；指定角色侧清晰需要在 Ren'Py 中改成分层镜头。",
+            sceneId=context.get("sceneId"),
+            blockIndex=context.get("blockIndex"),
+        )
+    state["blur"] = DEPTH_BLUR_PIXELS[strength]
     return render_camera_statement(state)
 
 
@@ -895,6 +1029,10 @@ def render_story_block(block: dict, context: dict) -> list[str]:
         return render_camera_zoom_block(block, context)
     if block_type == "camera_pan":
         return render_camera_pan_block(block, context)
+    if block_type == "screen_filter":
+        return render_screen_filter_block(block, context)
+    if block_type == "depth_blur":
+        return render_depth_blur_block(block, context)
     if block_type in {"dialogue", "narration"}:
         line = render_renpy_text(block)
         output: list[str] = []

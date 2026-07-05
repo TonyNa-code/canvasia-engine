@@ -745,6 +745,15 @@ class RunEditorSmokeTests(unittest.TestCase):
                 {"id": "zoom", "type": "camera_zoom", "action": "zoom_in", "strength": "medium", "focus": "left"},
                 {"id": "pan", "type": "camera_pan", "target": "right", "strength": "medium"},
                 {
+                    "id": "filter",
+                    "type": "screen_filter",
+                    "action": "apply",
+                    "preset": "mono",
+                    "strength": "strong",
+                    "grade": {"brightness": 112, "contrast": 120, "saturation": 85, "hue": 12, "temperature": 25, "vignette": 0},
+                },
+                {"id": "blur", "type": "depth_blur", "action": "apply", "focus": "full", "strength": "strong"},
+                {
                     "id": "video",
                     "type": "video_play",
                     "assetId": video_asset["id"],
@@ -821,6 +830,8 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertIn('with Fade(0, 0, 0.78, color="#fffcf7")', script)
         self.assertIn("camera:\n        subpixel True\n        xalign 0.28\n        yalign 0.52\n        zoom 1.16\n        xoffset 0", script)
         self.assertIn("camera:\n        subpixel True\n        xalign 0.28\n        yalign 0.52\n        zoom 1.16\n        xoffset -154", script)
+        self.assertIn('matrixcolor TintMatrix("#ffffff") * SaturationMatrix(0) * BrightnessMatrix(0.12) * ContrastMatrix(1.2) * SaturationMatrix(0.85) * HueMatrix(10)', script)
+        self.assertIn("        blur 6", script)
         self.assertIn('$ renpy.movie_cutscene("assets/video/', script)
         self.assertIn("# Canvasia review video timing: start=1.5, end=12, volume=80", script)
         self.assertIn('show text "STAFF\\nThanks\\nScenario: Tester\\nEngine: Canvasia" at truecenter with dissolve', script)
@@ -834,6 +845,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertGreaterEqual(renpy_manifest["warningCount"], 1)
         self.assertTrue(any(warning["code"] == "renpy_music_scope_review" for warning in renpy_manifest["warnings"]))
         self.assertTrue(any(warning["code"] == "renpy_video_timing_review" for warning in renpy_manifest["warnings"]))
+        self.assertFalse(any(warning["code"] == "renpy_review_block" and warning.get("message", "").startswith(("screen_filter", "depth_blur")) for warning in renpy_manifest["warnings"]))
         quality_report = json.loads(Path(export_result["renpyQualityReportPath"]).read_text(encoding="utf-8"))
         self.assertEqual(quality_report["status"], "review")
         self.assertEqual(quality_report["summary"]["missingAssetReferenceCount"], 0)
