@@ -123,14 +123,21 @@
     return Number(((settings[key] ?? 100) / 100).toFixed(2));
   }
 
+  function getRenpyPreferenceTextCps(defaultSpeed) {
+    return defaultSpeed === "instant" ? 0 : TEXT_SPEED_CPS[defaultSpeed];
+  }
+
   function getRenpyRuntimeSummary(runtimeSettings = {}, options = {}) {
     const settings = getProjectRuntimeSettings({ runtimeSettings }, options);
+    const voiceVolume = settings.defaultVoiceEnabled ? getRuntimeVolumeRatio(settings, "defaultVoiceVolume", options) : 0;
     return {
       defaultTextSpeed: settings.defaultTextSpeed,
       defaultTextCps: TEXT_SPEED_CPS[settings.defaultTextSpeed],
+      renpyPreferenceTextCps: getRenpyPreferenceTextCps(settings.defaultTextSpeed),
       defaultBgmVolume: getRuntimeVolumeRatio(settings, "defaultBgmVolume", options),
       defaultSfxVolume: getRuntimeVolumeRatio(settings, "defaultSfxVolume", options),
       defaultVoiceVolume: getRuntimeVolumeRatio(settings, "defaultVoiceVolume", options),
+      effectiveVoiceVolume: voiceVolume,
       defaultVoiceEnabled: settings.defaultVoiceEnabled,
       defaultVoiceDuckingEnabled: settings.defaultVoiceDuckingEnabled,
       formalSaveSlotCount: settings.formalSaveSlotCount,
@@ -153,6 +160,7 @@
     getEffectiveTextSpeed,
     getEffectiveTextCps,
     getRuntimeVolumeRatio,
+    getRenpyPreferenceTextCps,
     getRenpyRuntimeSummary,
   });
 })(typeof window !== "undefined" ? window : globalThis);

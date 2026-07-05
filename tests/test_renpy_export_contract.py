@@ -395,6 +395,16 @@ class RenpyExportContractTests(unittest.TestCase):
         self.assertIn("define canvasia_default_voice_volume = 0.88", options)
         self.assertIn("define canvasia_voice_enabled = False", options)
         self.assertIn("define canvasia_formal_save_slot_count = 60", options)
+        self.assertIn("default preferences.text_cps = 72", options)
+        self.assertIn("default preferences.volume.music = 0.64", options)
+        self.assertIn("default preferences.volume.sfx = 0.77", options)
+        self.assertIn("default preferences.volume.voice = 0", options)
+
+        instant_options = renpy_export.build_renpy_options_file(
+            {"project": {"runtimeSettings": {"defaultTextSpeed": "instant", "defaultVoiceEnabled": True, "defaultVoiceVolume": 88}}}
+        )
+        self.assertIn("default preferences.text_cps = 0", instant_options)
+        self.assertIn("default preferences.volume.voice = 0.88", instant_options)
 
 
 if __name__ == "__main__":

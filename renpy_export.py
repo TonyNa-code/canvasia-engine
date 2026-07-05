@@ -1463,6 +1463,12 @@ def build_renpy_options_file(bundle: dict) -> str:
             f"define canvasia_voice_ducking_enabled = {value_to_renpy(runtime_summary['defaultVoiceDuckingEnabled'])}",
             f"define canvasia_formal_save_slot_count = {runtime_summary['formalSaveSlotCount']}",
             "",
+            "# Ren'Py Preferences defaults applied when the player starts this project for the first time.",
+            f"default preferences.text_cps = {runtime_summary['renpyPreferenceTextCps']}",
+            f"default preferences.volume.music = {runtime_summary['defaultBgmVolume']:g}",
+            f"default preferences.volume.sfx = {runtime_summary['defaultSfxVolume']:g}",
+            f"default preferences.volume.voice = {runtime_summary['effectiveVoiceVolume']:g}",
+            "",
         ]
     )
 

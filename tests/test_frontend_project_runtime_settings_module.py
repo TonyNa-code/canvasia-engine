@@ -44,6 +44,7 @@ class FrontendProjectRuntimeSettingsModuleTests(unittest.TestCase):
               cps: tools.getEffectiveTextCps({{}}, settings),
               bgmRatio: tools.getRuntimeVolumeRatio(settings, "defaultBgmVolume"),
               summary: tools.getRenpyRuntimeSummary(settings),
+              instantSummary: tools.getRenpyRuntimeSummary({{ defaultTextSpeed: "instant" }}),
             }}));
             """
         )
@@ -78,7 +79,11 @@ class FrontendProjectRuntimeSettingsModuleTests(unittest.TestCase):
         self.assertEqual(payload["cps"], 72)
         self.assertEqual(payload["bgmRatio"], 0.64)
         self.assertEqual(payload["summary"]["defaultTextCps"], 72)
+        self.assertEqual(payload["summary"]["renpyPreferenceTextCps"], 72)
+        self.assertEqual(payload["summary"]["effectiveVoiceVolume"], 0)
         self.assertEqual(payload["summary"]["formalSaveSlotCount"], 120)
+        self.assertEqual(payload["instantSummary"]["defaultTextCps"], 10000)
+        self.assertEqual(payload["instantSummary"]["renpyPreferenceTextCps"], 0)
 
 
 if __name__ == "__main__":

@@ -94,15 +94,22 @@ def get_runtime_volume_ratio(runtime_settings: dict | None, key: str) -> float:
     return round(settings.get(key, 100) / 100, 2)
 
 
+def get_renpy_preference_text_cps(default_speed: str) -> int:
+    return 0 if default_speed == "instant" else PROJECT_RUNTIME_TEXT_SPEED_CPS[default_speed]
+
+
 def get_renpy_runtime_summary(runtime_settings: dict | None) -> dict:
     settings = sanitize_project_runtime_settings(runtime_settings)
     default_speed = settings["defaultTextSpeed"]
+    voice_volume = get_runtime_volume_ratio(settings, "defaultVoiceVolume") if settings["defaultVoiceEnabled"] else 0
     return {
         "defaultTextSpeed": default_speed,
         "defaultTextCps": PROJECT_RUNTIME_TEXT_SPEED_CPS[default_speed],
+        "renpyPreferenceTextCps": get_renpy_preference_text_cps(default_speed),
         "defaultBgmVolume": get_runtime_volume_ratio(settings, "defaultBgmVolume"),
         "defaultSfxVolume": get_runtime_volume_ratio(settings, "defaultSfxVolume"),
         "defaultVoiceVolume": get_runtime_volume_ratio(settings, "defaultVoiceVolume"),
+        "effectiveVoiceVolume": voice_volume,
         "defaultVoiceEnabled": bool(settings["defaultVoiceEnabled"]),
         "defaultVoiceDuckingEnabled": bool(settings["defaultVoiceDuckingEnabled"]),
         "formalSaveSlotCount": settings["formalSaveSlotCount"],
