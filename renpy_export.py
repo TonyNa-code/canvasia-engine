@@ -25,8 +25,6 @@ COMMENT_ONLY_BLOCK_TYPES = {
     "particle_effect",
     "screen_filter",
     "depth_blur",
-    "camera_zoom",
-    "camera_pan",
 }
 CONDITION_OPERATORS = {"==", "!=", ">=", "<=", ">", "<"}
 POSITION_XALIGN = {"left": 0.25, "center": 0.5, "right": 0.75}
@@ -74,6 +72,13 @@ FADE_COLOR_HEX = {
     "black": "#120e0c",
     "white": "#fffcf7",
 }
+DEFAULT_PROJECT_RESOLUTION = {"width": 1280, "height": 720}
+CAMERA_ZOOM_SCALE = {
+    "zoom_in": {"light": 1.08, "medium": 1.16, "heavy": 1.26},
+    "zoom_out": {"light": 0.96, "medium": 0.92, "heavy": 0.88},
+}
+CAMERA_FOCUS_XALIGN = {"left": 0.28, "center": 0.5, "right": 0.72}
+CAMERA_PAN_PERCENT = {"light": 4, "medium": 8, "heavy": 12}
 
 
 def as_list(value: Any) -> list:
@@ -112,6 +117,23 @@ def value_to_renpy(value: Any) -> str:
     if re.match(r"^(none|null)$", text, re.IGNORECASE):
         return "None"
     return quote_renpy(value)
+
+
+def get_project_resolution(bundle: dict) -> dict[str, int]:
+    project = bundle.get("project") if isinstance(bundle.get("project"), dict) else {}
+    resolution = project.get("resolution") if isinstance(project.get("resolution"), dict) else {}
+    try:
+        width = int(float(resolution.get("width") or DEFAULT_PROJECT_RESOLUTION["width"]))
+    except (TypeError, ValueError):
+        width = DEFAULT_PROJECT_RESOLUTION["width"]
+    try:
+        height = int(float(resolution.get("height") or DEFAULT_PROJECT_RESOLUTION["height"]))
+    except (TypeError, ValueError):
+        height = DEFAULT_PROJECT_RESOLUTION["height"]
+    return {
+        "width": width if width > 0 else DEFAULT_PROJECT_RESOLUTION["width"],
+        "height": height if height > 0 else DEFAULT_PROJECT_RESOLUTION["height"],
+    }
 
 
 def seconds_from_ms(value: Any) -> float:
@@ -322,6 +344,91 @@ def get_background_transition_expression(block: dict, context: dict) -> str:
         blockIndex=context.get("blockIndex"),
     )
     return f"Dissolve({format_renpy_seconds(seconds)})"
+
+
+def get_safe_camera_zoom_action(value: Any) -> str:
+    action = clean_text(value, "zoom_in")
+    return action if action in {"zoom_in", "zoom_out", "reset"} else "zoom_in"
+
+
+def get_safe_camera_strength(value: Any) -> str:
+    strength = clean_text(value, "medium")
+    return strength if strength in {"light", "medium", "heavy"} else "medium"
+
+
+def get_safe_camera_focus(value: Any) -> str:
+    focus = clean_text(value, "center")
+    return focus if focus in CAMERA_FOCUS_XALIGN else "center"
+
+
+def get_safe_camera_pan_target(value: Any) -> str:
+    target = clean_text(value, "center")
+    return target if target in {"left", "center", "right"} else "center"
+
+
+def get_camera_pan_offset(target: Any, strength: Any, resolution: dict[str, int]) -> int:
+    safe_target = get_safe_camera_pan_target(target)
+    if safe_target == "center":
+        return 0
+    percent = CAMERA_PAN_PERCENT[get_safe_camera_strength(strength)]
+    offset = round(float(resolution.get("width") or DEFAULT_PROJECT_RESOLUTION["width"]) * percent / 100)
+    return offset if safe_target == "left" else -offset
+
+
+def get_default_camera_state() -> dict[str, Any]:
+    return {"zoomScale": 1.0, "focus": "center", "panOffset": 0}
+
+
+def get_camera_state(context: dict) -> dict[str, Any]:
+    camera_state = context.get("cameraState")
+    if not isinstance(camera_state, dict):
+        camera_state = get_default_camera_state()
+        context["cameraState"] = camera_state
+    return camera_state
+
+
+def render_camera_statement(state: dict[str, Any]) -> list[str]:
+    try:
+        zoom_scale = float(state.get("zoomScale", 1))
+    except (TypeError, ValueError):
+        zoom_scale = 1.0
+    try:
+        pan_offset = int(round(float(state.get("panOffset", 0))))
+    except (TypeError, ValueError):
+        pan_offset = 0
+    focus = get_safe_camera_focus(state.get("focus"))
+    neutral = abs(zoom_scale - 1) < 0.001 and pan_offset == 0 and focus == "center"
+    if neutral:
+        return ["    camera"]
+    return [
+        "    camera:",
+        "        subpixel True",
+        f"        xalign {format_renpy_float(CAMERA_FOCUS_XALIGN[focus], 2)}",
+        "        yalign 0.52",
+        f"        zoom {format_renpy_float(zoom_scale, 2)}",
+        f"        xoffset {pan_offset}",
+        "        yoffset 0",
+    ]
+
+
+def render_camera_zoom_block(block: dict, context: dict) -> list[str]:
+    state = get_camera_state(context)
+    action = get_safe_camera_zoom_action(block.get("action"))
+    if action == "reset":
+        state["zoomScale"] = 1.0
+        state["focus"] = "center"
+    else:
+        strength = get_safe_camera_strength(block.get("strength"))
+        state["zoomScale"] = CAMERA_ZOOM_SCALE.get(action, CAMERA_ZOOM_SCALE["zoom_in"])[strength]
+        state["focus"] = get_safe_camera_focus(block.get("focus"))
+    return render_camera_statement(state)
+
+
+def render_camera_pan_block(block: dict, context: dict) -> list[str]:
+    state = get_camera_state(context)
+    resolution = context.get("projectResolution") if isinstance(context.get("projectResolution"), dict) else DEFAULT_PROJECT_RESOLUTION
+    state["panOffset"] = get_camera_pan_offset(block.get("target"), block.get("strength"), resolution)
+    return render_camera_statement(state)
 
 
 def get_character_transition_expression(block: dict, context: dict, direction: str = "show") -> str:
@@ -784,6 +891,10 @@ def render_story_block(block: dict, context: dict) -> list[str]:
         return render_screen_flash_block(block)
     if block_type == "screen_fade":
         return render_screen_fade_block(block, context)
+    if block_type == "camera_zoom":
+        return render_camera_zoom_block(block, context)
+    if block_type == "camera_pan":
+        return render_camera_pan_block(block, context)
     if block_type in {"dialogue", "narration"}:
         line = render_renpy_text(block)
         output: list[str] = []
@@ -823,6 +934,7 @@ def build_renpy_draft_export(bundle: dict, assets_doc: dict | None = None) -> di
     variable_map = build_variable_map(bundle)
     scene_records = build_scene_records(bundle)
     scene_label_map = {record["sceneId"]: record["sceneLabel"] for record in scene_records}
+    project_resolution = get_project_resolution(bundle)
     warnings: list[dict] = []
     sprite_definitions, _defined_sprites = build_sprite_definitions(character_map, asset_map, warnings)
     character_stage_transforms = build_character_stage_transform_definitions(scene_records, scene_label_map)
@@ -849,6 +961,7 @@ def build_renpy_draft_export(bundle: dict, assets_doc: dict | None = None) -> di
         lines.append(f"# {record['chapterName']} / {scene_name}")
         lines.append(f"label {record['sceneLabel']}:")
         blocks = as_list(scene.get("blocks"))
+        camera_state = get_default_camera_state()
         if not blocks:
             add_warning(warnings, "renpy_empty_scene", "空场景已导出 pass。", sceneId=scene_id)
             lines.append("    pass")
@@ -861,6 +974,8 @@ def build_renpy_draft_export(bundle: dict, assets_doc: dict | None = None) -> di
                 "warnings": warnings,
                 "sceneId": scene_id,
                 "blockIndex": block_index,
+                "cameraState": camera_state,
+                "projectResolution": project_resolution,
             }
             lines.extend(render_story_block(block, block_context))
         last_type = clean_text((blocks[-1] if blocks else {}).get("type"))

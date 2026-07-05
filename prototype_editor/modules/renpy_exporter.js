@@ -6,8 +6,6 @@
     "particle_effect",
     "screen_filter",
     "depth_blur",
-    "camera_zoom",
-    "camera_pan",
   ]);
   const POSITION_XALIGN = Object.freeze({ left: 0.25, center: 0.5, right: 0.75 });
   const DEFAULT_CHARACTER_STAGE = Object.freeze({
@@ -54,6 +52,13 @@
     black: "#120e0c",
     white: "#fffcf7",
   });
+  const DEFAULT_PROJECT_RESOLUTION = Object.freeze({ width: 1280, height: 720 });
+  const CAMERA_ZOOM_SCALE = Object.freeze({
+    zoom_in: Object.freeze({ light: 1.08, medium: 1.16, heavy: 1.26 }),
+    zoom_out: Object.freeze({ light: 0.96, medium: 0.92, heavy: 0.88 }),
+  });
+  const CAMERA_FOCUS_XALIGN = Object.freeze({ left: 0.28, center: 0.5, right: 0.72 });
+  const CAMERA_PAN_PERCENT = Object.freeze({ light: 4, medium: 8, heavy: 12 });
 
   function toArray(value) {
     return Array.isArray(value) ? value : [];
@@ -80,6 +85,16 @@
 
   function getProjectTitle(data = {}, options = {}) {
     return cleanText(options.projectTitle ?? data.project?.title ?? data.title, "Canvasia Project");
+  }
+
+  function getProjectResolution(data = {}) {
+    const resolution = data.project?.resolution ?? data.resolution ?? {};
+    const width = Number(resolution.width ?? DEFAULT_PROJECT_RESOLUTION.width);
+    const height = Number(resolution.height ?? DEFAULT_PROJECT_RESOLUTION.height);
+    return {
+      width: Number.isFinite(width) && width > 0 ? Math.round(width) : DEFAULT_PROJECT_RESOLUTION.width,
+      height: Number.isFinite(height) && height > 0 ? Math.round(height) : DEFAULT_PROJECT_RESOLUTION.height,
+    };
   }
 
   function getAssetList(data = {}) {
@@ -395,6 +410,90 @@
     const assetId = cleanText(block.assetId, "missing_background");
     const transition = getBackgroundTransitionExpression(block, context);
     return [`    scene ${normalizeIdentifier(assetId, "background")}${transition ? ` with ${transition}` : ""}`];
+  }
+
+  function getSafeCameraZoomAction(action) {
+    const safeAction = cleanText(action, "zoom_in");
+    return ["zoom_in", "zoom_out", "reset"].includes(safeAction) ? safeAction : "zoom_in";
+  }
+
+  function getSafeCameraStrength(strength) {
+    const safeStrength = cleanText(strength, "medium");
+    return ["light", "medium", "heavy"].includes(safeStrength) ? safeStrength : "medium";
+  }
+
+  function getSafeCameraFocus(focus) {
+    const safeFocus = cleanText(focus, "center");
+    return Object.hasOwn(CAMERA_FOCUS_XALIGN, safeFocus) ? safeFocus : "center";
+  }
+
+  function getSafeCameraPanTarget(target) {
+    const safeTarget = cleanText(target, "center");
+    return ["left", "center", "right"].includes(safeTarget) ? safeTarget : "center";
+  }
+
+  function getCameraPanOffset(target, strength, resolution = DEFAULT_PROJECT_RESOLUTION) {
+    const safeTarget = getSafeCameraPanTarget(target);
+    if (safeTarget === "center") {
+      return 0;
+    }
+    const percent = CAMERA_PAN_PERCENT[getSafeCameraStrength(strength)] ?? CAMERA_PAN_PERCENT.medium;
+    const offset = Math.round((resolution.width * percent) / 100);
+    return safeTarget === "left" ? offset : -offset;
+  }
+
+  function getDefaultCameraState() {
+    return {
+      zoomScale: 1,
+      focus: "center",
+      panOffset: 0,
+    };
+  }
+
+  function getCameraState(context = {}) {
+    if (!context.cameraState) {
+      context.cameraState = getDefaultCameraState();
+    }
+    return context.cameraState;
+  }
+
+  function renderCameraStatement(state = getDefaultCameraState()) {
+    const zoomScale = Number(state.zoomScale ?? 1);
+    const panOffset = Number(state.panOffset ?? 0);
+    const focus = getSafeCameraFocus(state.focus);
+    const neutral = Math.abs(zoomScale - 1) < 0.001 && panOffset === 0 && focus === "center";
+    if (neutral) {
+      return ["    camera"];
+    }
+    return [
+      "    camera:",
+      "        subpixel True",
+      `        xalign ${formatRenpyFloat(CAMERA_FOCUS_XALIGN[focus], 2)}`,
+      "        yalign 0.52",
+      `        zoom ${formatRenpyFloat(zoomScale, 2)}`,
+      `        xoffset ${Math.round(panOffset)}`,
+      "        yoffset 0",
+    ];
+  }
+
+  function renderCameraZoomBlock(block = {}, context = {}) {
+    const state = getCameraState(context);
+    const action = getSafeCameraZoomAction(block.action);
+    if (action === "reset") {
+      state.zoomScale = 1;
+      state.focus = "center";
+    } else {
+      const strength = getSafeCameraStrength(block.strength);
+      state.zoomScale = CAMERA_ZOOM_SCALE[action]?.[strength] ?? CAMERA_ZOOM_SCALE.zoom_in.medium;
+      state.focus = getSafeCameraFocus(block.focus);
+    }
+    return renderCameraStatement(state);
+  }
+
+  function renderCameraPanBlock(block = {}, context = {}) {
+    const state = getCameraState(context);
+    state.panOffset = getCameraPanOffset(block.target, block.strength, context.projectResolution ?? DEFAULT_PROJECT_RESOLUTION);
+    return renderCameraStatement(state);
   }
 
   function getCharacterTransitionExpression(block = {}, context = {}, direction = "show") {
@@ -759,6 +858,12 @@
     if (type === "screen_fade") {
       return renderScreenFadeBlock(block, context);
     }
+    if (type === "camera_zoom") {
+      return renderCameraZoomBlock(block, context);
+    }
+    if (type === "camera_pan") {
+      return renderCameraPanBlock(block, context);
+    }
     if (type === "dialogue") {
       const characterId = cleanText(block.speakerId);
       const line = renderRenpyText(block);
@@ -799,6 +904,7 @@
     const characterMap = buildCharacterMap(data);
     const sceneMap = buildSceneMap(data);
     const sceneRecords = getSceneRecords(data);
+    const projectResolution = getProjectResolution(data);
     const warnings = [];
     const characterStageTransforms = buildCharacterStageTransformDefinitions(sceneRecords, sceneMap);
     const lines = [
@@ -818,6 +924,7 @@
     sceneRecords.forEach((record, sceneIndex) => {
       const scene = record.scene ?? {};
       const sceneId = cleanText(scene.id, `scene_${sceneIndex + 1}`);
+      const cameraState = getDefaultCameraState();
       lines.push(`# ${record.chapterName} / ${cleanText(scene.name ?? scene.title, sceneId)}`);
       lines.push(`label ${getSceneLabel(sceneId, sceneMap)}:`);
       const blocks = toArray(scene.blocks);
@@ -826,7 +933,7 @@
         lines.push("    pass");
       } else {
         blocks.forEach((block, blockIndex) => {
-          renderBlock(block, { assetMap, characterMap, sceneMap, warnings, sceneId, blockIndex }).forEach((line) => lines.push(line));
+          renderBlock(block, { assetMap, characterMap, sceneMap, warnings, sceneId, blockIndex, cameraState, projectResolution }).forEach((line) => lines.push(line));
         });
       }
       const lastBlock = blocks[blocks.length - 1];

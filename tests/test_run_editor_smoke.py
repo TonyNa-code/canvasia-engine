@@ -742,6 +742,8 @@ class RunEditorSmokeTests(unittest.TestCase):
                 {"id": "flash", "type": "screen_flash", "color": "warm", "intensity": "strong", "duration": "long"},
                 {"id": "shake", "type": "screen_shake"},
                 {"id": "fade", "type": "screen_fade", "action": "fade_in", "color": "white", "duration": "medium"},
+                {"id": "zoom", "type": "camera_zoom", "action": "zoom_in", "strength": "medium", "focus": "left"},
+                {"id": "pan", "type": "camera_pan", "target": "right", "strength": "medium"},
                 {
                     "id": "video",
                     "type": "video_play",
@@ -817,6 +819,8 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertIn('with Fade(0.24, 0.14, 0.82, color="#ffeccc")', script)
         self.assertIn("with hpunch", script)
         self.assertIn('with Fade(0, 0, 0.78, color="#fffcf7")', script)
+        self.assertIn("camera:\n        subpixel True\n        xalign 0.28\n        yalign 0.52\n        zoom 1.16\n        xoffset 0", script)
+        self.assertIn("camera:\n        subpixel True\n        xalign 0.28\n        yalign 0.52\n        zoom 1.16\n        xoffset -154", script)
         self.assertIn('$ renpy.movie_cutscene("assets/video/', script)
         self.assertIn("# Canvasia review video timing: start=1.5, end=12, volume=80", script)
         self.assertIn('show text "STAFF\\nThanks\\nScenario: Tester\\nEngine: Canvasia" at truecenter with dissolve', script)
