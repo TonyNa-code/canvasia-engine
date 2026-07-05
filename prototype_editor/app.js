@@ -29425,6 +29425,39 @@ function serializeRuntimePreloadBudgetForRelease(report, digest) {
   };
 }
 
+function buildReleaseControlOverviewRows(context) {
+  if (releaseControlTools?.buildReleaseControlOverviewRows) {
+    return releaseControlTools.buildReleaseControlOverviewRows(context);
+  }
+
+  const routeMetrics = context?.routeMetrics ?? {};
+  const routeTestingSummary = context?.routeTestingSummary ?? {};
+  const mediaBudgetReport = context?.mediaBudgetReport ?? {};
+  const runtimePreloadBudgetRelease = context?.runtimePreloadBudgetRelease ?? {};
+  const projectMilestonePlan = context?.projectMilestonePlan ?? {};
+  const projectMilestoneGapDigest = context?.projectMilestoneGapDigest ?? {};
+  return [
+    ["结构错误", `${context?.errorCount ?? 0} 项`],
+    ["补充提醒", `${context?.warningCount ?? 0} 项`],
+    ["已引用缺口素材", `${context?.urgentMissingAssetsCount ?? 0} 个`],
+    ["素材预算风险", `${mediaBudgetReport.count ?? 0} 个，合计 ${mediaBudgetReport.totalLabel ?? "0 B"}`],
+    ["首屏加载压力", runtimePreloadBudgetRelease.summaryLine ?? "首屏加载健康，首屏 0 B / 早期 0 B"],
+    ["闲置素材", `${context?.unusedAssetCount ?? 0} 个`],
+    ["入口场景", routeMetrics.entrySceneName ?? "暂未设置"],
+    ["分支 / 收束 / 孤立场景", `${routeMetrics.branchingScenes ?? 0} / ${routeMetrics.endingScenes ?? 0} / ${routeMetrics.orphanScenes ?? 0}`],
+    ["可打到结局", `${routeMetrics.reachableEndingScenes ?? 0} / ${routeMetrics.endingScenes ?? 0}`],
+    ["第一条结局路径", context?.firstReachableEndingPathLabel ?? "暂未接通"],
+    ["可达 / 不可达 / 最长深度", `${routeMetrics.reachableScenes ?? 0} / ${routeMetrics.unreachableScenes ?? 0} / ${routeMetrics.maxRouteDepth ?? 0} 步`],
+    [
+      "路线试玩手册",
+      `${routeTestingSummary.decisionPointCount ?? 0} 个分支点 / ${routeTestingSummary.routeCaseCount ?? 0} 条路线用例 / ${routeTestingSummary.endingTestCaseCount ?? 0} 个结局用例`,
+    ],
+    ["坏链数量", `${routeMetrics.brokenRoutes ?? 0} 条`],
+    ["成品目标路线", `${projectMilestonePlan.nextMilestone?.title ?? "继续推进当前项目"}（${projectMilestonePlan.overallScore ?? 0}%）`],
+    [projectMilestoneGapDigest.eyebrow ?? "当前阶段缺口", projectMilestoneGapDigest.title ?? "继续补齐当前阶段"],
+  ];
+}
+
 function serializeProjectMilestoneCheck(check) {
   return {
     id: check?.id ?? "",
@@ -30291,6 +30324,19 @@ function buildReleaseControlReportContent() {
     ])
   );
   const routeTestingTables = routeTestingReportTools.buildRouteTestingReportTables(routeTestingPlan);
+  const releaseOverviewRows = buildReleaseControlOverviewRows({
+    errorCount: state.validation.errors.length,
+    warningCount: state.validation.warnings.length,
+    urgentMissingAssetsCount: state.data.assetList.filter((asset) => isAssetUrgentMissing(asset)).length,
+    unusedAssetCount: getUnusedAssets().length,
+    mediaBudgetReport,
+    runtimePreloadBudgetRelease,
+    routeMetrics: routeOverview.metrics,
+    endingPaths: routeOverview.endingPaths,
+    routeTestingSummary,
+    projectMilestonePlan,
+    projectMilestoneGapDigest,
+  });
 
   const lines = [
     `# ${state.data.project.title} 发布前总控报告`,
@@ -30305,29 +30351,7 @@ function buildReleaseControlReportContent() {
     "",
     releaseSummary.description,
     "",
-    buildMarkdownTable(
-      ["指标", "结果"],
-      [
-        ["结构错误", `${state.validation.errors.length} 项`],
-        ["补充提醒", `${state.validation.warnings.length} 项`],
-        ["已引用缺口素材", `${state.data.assetList.filter((asset) => isAssetUrgentMissing(asset)).length} 个`],
-        ["素材预算风险", `${mediaBudgetReport.count} 个，合计 ${mediaBudgetReport.totalLabel}`],
-        [
-          "首屏加载压力",
-          runtimePreloadBudgetRelease.summaryLine,
-        ],
-        ["闲置素材", `${getUnusedAssets().length} 个`],
-        ["入口场景", routeOverview.metrics.entrySceneName],
-        ["分支 / 收束 / 孤立场景", `${routeOverview.metrics.branchingScenes} / ${routeOverview.metrics.endingScenes} / ${routeOverview.metrics.orphanScenes}`],
-        ["可打到结局", `${routeOverview.metrics.reachableEndingScenes} / ${routeOverview.metrics.endingScenes}`],
-        ["第一条结局路径", routeOverview.endingPaths?.find((path) => path.isReachable)?.pathLabel ?? "暂未接通"],
-        ["可达 / 不可达 / 最长深度", `${routeOverview.metrics.reachableScenes} / ${routeOverview.metrics.unreachableScenes} / ${routeOverview.metrics.maxRouteDepth} 步`],
-        ["路线试玩手册", `${routeTestingSummary.decisionPointCount ?? 0} 个分支点 / ${routeTestingSummary.routeCaseCount ?? 0} 条路线用例 / ${routeTestingSummary.endingTestCaseCount ?? 0} 个结局用例`],
-        ["坏链数量", `${routeOverview.metrics.brokenRoutes} 条`],
-        ["成品目标路线", `${projectMilestonePlan.nextMilestone?.title ?? "继续推进当前项目"}（${projectMilestonePlan.overallScore ?? 0}%）`],
-        [projectMilestoneGapDigest.eyebrow ?? "当前阶段缺口", projectMilestoneGapDigest.title],
-      ]
-    ),
+    buildMarkdownTable(["指标", "结果"], releaseOverviewRows),
     "",
     "## 路线试玩手册",
     "",

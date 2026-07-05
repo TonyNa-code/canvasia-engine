@@ -360,6 +360,47 @@
     };
   }
 
+  function buildReleaseControlOverviewRows(context = {}) {
+    const routeMetrics = context.routeMetrics ?? context.routeOverview?.metrics ?? {};
+    const endingPaths = toArray(context.endingPaths ?? context.routeOverview?.endingPaths);
+    const routeTestingSummary = context.routeTestingSummary ?? context.routeOverview?.routeTestingPlan?.summary ?? {};
+    const projectMilestonePlan = context.projectMilestonePlan ?? {};
+    const projectMilestoneGapDigest = context.projectMilestoneGapDigest ?? {};
+    const mediaBudgetReport = context.mediaBudgetReport ?? {};
+    const runtimePreloadBudgetRelease = context.runtimePreloadBudgetRelease ?? {};
+    const firstReachableEndingPathLabel =
+      context.firstReachableEndingPathLabel ?? endingPaths.find((path) => path?.isReachable)?.pathLabel ?? "暂未接通";
+    const nextMilestoneTitle = projectMilestonePlan.nextMilestone?.title ?? "继续推进当前项目";
+    const milestoneScore = toCount(projectMilestonePlan.overallScore);
+
+    return [
+      ["结构错误", `${toCount(context.errorCount)} 项`],
+      ["补充提醒", `${toCount(context.warningCount)} 项`],
+      ["已引用缺口素材", `${toCount(context.urgentMissingAssetsCount)} 个`],
+      ["素材预算风险", `${toCount(mediaBudgetReport.count)} 个，合计 ${mediaBudgetReport.totalLabel ?? "0 B"}`],
+      ["首屏加载压力", runtimePreloadBudgetRelease.summaryLine ?? "首屏加载健康，首屏 0 B / 早期 0 B"],
+      ["闲置素材", `${toCount(context.unusedAssetCount)} 个`],
+      ["入口场景", routeMetrics.entrySceneName ?? "暂未设置"],
+      [
+        "分支 / 收束 / 孤立场景",
+        `${toCount(routeMetrics.branchingScenes)} / ${toCount(routeMetrics.endingScenes)} / ${toCount(routeMetrics.orphanScenes)}`,
+      ],
+      ["可打到结局", `${toCount(routeMetrics.reachableEndingScenes)} / ${toCount(routeMetrics.endingScenes)}`],
+      ["第一条结局路径", firstReachableEndingPathLabel],
+      [
+        "可达 / 不可达 / 最长深度",
+        `${toCount(routeMetrics.reachableScenes)} / ${toCount(routeMetrics.unreachableScenes)} / ${toCount(routeMetrics.maxRouteDepth)} 步`,
+      ],
+      [
+        "路线试玩手册",
+        `${toCount(routeTestingSummary.decisionPointCount)} 个分支点 / ${toCount(routeTestingSummary.routeCaseCount)} 条路线用例 / ${toCount(routeTestingSummary.endingTestCaseCount)} 个结局用例`,
+      ],
+      ["坏链数量", `${toCount(routeMetrics.brokenRoutes)} 条`],
+      ["成品目标路线", `${nextMilestoneTitle}（${milestoneScore}%）`],
+      [projectMilestoneGapDigest.eyebrow ?? "当前阶段缺口", projectMilestoneGapDigest.title ?? "继续补齐当前阶段"],
+    ];
+  }
+
   function buildRuntimePreloadBudgetFixStep(report = {}) {
     const riskCount = getRuntimePreloadBudgetRiskCount(report);
     if (riskCount <= 0) {
@@ -769,6 +810,7 @@
     getRuntimePreloadBudgetBlockerCount,
     getRuntimePreloadBudgetPrimaryIssue,
     serializeRuntimePreloadBudgetForRelease,
+    buildReleaseControlOverviewRows,
     buildRuntimePreloadBudgetFixStep,
     buildCreativeQualityAudit,
     buildReleaseFixOrder,

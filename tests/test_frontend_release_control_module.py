@@ -63,6 +63,8 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
         self.assertIn("## Runtime 首屏加载预算", report_body)
         self.assertIn("runtimePreloadBudgetRelease.phaseRows", report_body)
         self.assertIn("runtimePreloadBudgetRelease.warningRows", report_body)
+        self.assertIn("const releaseOverviewRows = buildReleaseControlOverviewRows", report_body)
+        self.assertIn('buildMarkdownTable(["指标", "结果"], releaseOverviewRows)', report_body)
         self.assertIn("runtimePreloadBudget: runtimePreloadBudgetRelease", payload_body)
         self.assertIn("const runtimePreloadBudgetRelease = serializeRuntimePreloadBudgetForRelease", payload_body)
 
@@ -147,6 +149,32 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
                   {{ id: "asset_op", name: "OP", type: "video", typeLabel: "视频", phase: "critical", sizeBytes: 260 * 1024 * 1024, sizeLabel: "260 MB", fileExists: false, sceneId: "scene_1", sceneName: "开场", reason: "开场 / video_play" }},
                 ],
               }}, {{ title: "首屏压力偏高", detail: "先处理入口压力。" }}),
+              overviewRows: tools.buildReleaseControlOverviewRows({{
+                errorCount: 2,
+                warningCount: 3,
+                urgentMissingAssetsCount: 4,
+                unusedAssetCount: 5,
+                mediaBudgetReport: {{ count: 6, totalLabel: "480 MB" }},
+                runtimePreloadBudgetRelease: {{ summaryLine: "首屏压力偏高，首屏 180 MB / 早期 180 MB" }},
+                routeMetrics: {{
+                  entrySceneName: "开场",
+                  branchingScenes: 2,
+                  endingScenes: 3,
+                  orphanScenes: 1,
+                  reachableEndingScenes: 2,
+                  reachableScenes: 8,
+                  unreachableScenes: 1,
+                  maxRouteDepth: 5,
+                  brokenRoutes: 1,
+                }},
+                endingPaths: [
+                  {{ isReachable: false, pathLabel: "坏线" }},
+                  {{ isReachable: true, pathLabel: "开场 -> 真结局" }},
+                ],
+                routeTestingSummary: {{ decisionPointCount: 2, routeCaseCount: 4, endingTestCaseCount: 3 }},
+                projectMilestonePlan: {{ nextMilestone: {{ title: "第一版可试玩 Demo" }}, overallScore: 72 }},
+                projectMilestoneGapDigest: {{ eyebrow: "当前阶段缺口", title: "补齐试玩确认" }},
+              }}),
               desktopReady: [
                 tools.isDesktopExportReady({{ target: "windows_nwjs", runtimeMode: "nwjs", missingAssets: 0 }}),
                 tools.isDesktopExportReady({{ target: "windows_nwjs", runtimeMode: "fallback", missingAssets: 0 }}),
@@ -217,6 +245,10 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
         self.assertEqual(payload["runtimePreloadRelease"]["phaseRows"][0][5], "超过建议预算")
         self.assertEqual(payload["runtimePreloadRelease"]["warningRows"][0][0], "高风险")
         self.assertEqual(payload["runtimePreloadRelease"]["topEntries"][0]["assetId"], "asset_op")
+        self.assertEqual(payload["overviewRows"][0], ["结构错误", "2 项"])
+        self.assertEqual(payload["overviewRows"][4], ["首屏加载压力", "首屏压力偏高，首屏 180 MB / 早期 180 MB"])
+        self.assertEqual(payload["overviewRows"][9], ["第一条结局路径", "开场 -> 真结局"])
+        self.assertEqual(payload["overviewRows"][13], ["成品目标路线", "第一版可试玩 Demo（72%）"])
         self.assertEqual(payload["desktopReady"], [True, False, False, False])
         self.assertEqual(payload["blockedGate"]["status"], "blocked")
         self.assertEqual(payload["blockedGate"]["badge"], "暂缓发布")
