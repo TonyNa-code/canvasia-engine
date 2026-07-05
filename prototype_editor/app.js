@@ -29568,6 +29568,10 @@ function formatProjectMilestoneActions(actions = []) {
 }
 
 function buildReleaseReportNextStep(releaseFixOrder, projectMilestoneGapDigest) {
+  if (releaseControlTools?.buildReleaseReportNextStep) {
+    return releaseControlTools.buildReleaseReportNextStep(releaseFixOrder, projectMilestoneGapDigest);
+  }
+
   const firstReleaseStep = releaseFixOrder?.steps?.[0];
   if (firstReleaseStep) {
     const action = firstReleaseStep.actions?.[0] ?? null;
@@ -29605,11 +29609,19 @@ function buildReleaseReportNextStep(releaseFixOrder, projectMilestoneGapDigest) 
 }
 
 function formatReleaseReportNextStepActionHint(nextStep) {
+  if (releaseControlTools?.formatReleaseReportNextStepActionHint) {
+    return releaseControlTools.formatReleaseReportNextStepActionHint(nextStep);
+  }
+
   const actionLabel = nextStep?.action?.label;
   return actionLabel ? `建议按钮：${actionLabel}。` : "";
 }
 
 function formatReleaseReportNextStepAdvice(nextStep) {
+  if (releaseControlTools?.formatReleaseReportNextStepAdvice) {
+    return releaseControlTools.formatReleaseReportNextStepAdvice(nextStep);
+  }
+
   const actionHint = formatReleaseReportNextStepActionHint(nextStep);
   if (nextStep?.source === "release_fix_order") {
     return `先处理「${nextStep.title}」，再重新导出一版原生 Runtime / 桌面包确认。${actionHint}`;
@@ -30026,15 +30038,7 @@ function buildInspectionReportContent() {
   }
 
   lines.push("处理动作：");
-  if (state.validation.errors.length > 0) {
-    lines.push("- 先清结构错误，再继续试玩和正式导出。");
-  } else if ((exportResult?.missingAssets ?? 0) > 0) {
-    lines.push("- 先补导出缺失素材，再重新导一版包确认。");
-  } else if (state.validation.warnings.length > 0) {
-    lines.push("- 现在没有硬阻塞，可以边试玩边压提醒项。");
-  } else {
-    lines.push("- 当前巡检结果比较干净，可以继续做正式导出和最终试玩。");
-  }
+  lines.push(`- ${formatReleaseReportNextStepAdvice(nextStep)}`);
 
   lines.push("", "项目医生修复队列：");
   lines.push(`- ${projectDoctorSummary.badge}：${projectDoctorSummary.title}`);

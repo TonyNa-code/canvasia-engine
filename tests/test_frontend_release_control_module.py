@@ -68,6 +68,18 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
         self.assertIn("runtimePreloadBudget: runtimePreloadBudgetRelease", payload_body)
         self.assertIn("const runtimePreloadBudgetRelease = serializeRuntimePreloadBudgetForRelease", payload_body)
 
+    def test_release_next_step_advice_is_module_backed(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        inspection_start = source.index("function buildInspectionReportContent()")
+        inspection_end = source.index("function buildReleaseControlReportContent()")
+        inspection_body = source[inspection_start:inspection_end]
+
+        self.assertIn("releaseControlTools?.buildReleaseReportNextStep", source)
+        self.assertIn("releaseControlTools?.formatReleaseReportNextStepActionHint", source)
+        self.assertIn("releaseControlTools?.formatReleaseReportNextStepAdvice", source)
+        self.assertIn("lines.push(`- ${formatReleaseReportNextStepAdvice(nextStep)}`);", inspection_body)
+        self.assertNotIn("先清结构错误，再继续试玩和正式导出。", inspection_body)
+
     def test_release_control_helpers_work_without_browser_dom(self) -> None:
         script = textwrap.dedent(
             f"""
@@ -85,6 +97,28 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
               dataset: {{ "asset-filter-mode": "media_budget" }},
               privateValue: "should not leak",
             }};
+            const releaseNextStep = tools.buildReleaseReportNextStep({{
+              steps: [
+                {{
+                  title: "处理首屏加载压力",
+                  description: "首屏偏重。",
+                  statusLabel: "高风险 1 项",
+                  actions: [{{ label: "查看首屏预算", action: "switch-screen", screen: "inspection" }}],
+                }},
+              ],
+            }}, null);
+            const milestoneNextStep = tools.buildReleaseReportNextStep({{ steps: [] }}, {{
+              status: "gap",
+              eyebrow: "当前阶段缺口",
+              title: "第一版可试玩 Demo",
+              description: "先把 Demo 跑起来。",
+              primaryGap: {{
+                label: "补试玩确认",
+                missing: "缺一次完整试玩。",
+                action: {{ label: "去试玩确认", action: "switch-screen", screen: "preview" }},
+              }},
+            }});
+            const readyNextStep = tools.buildReleaseReportNextStep({{ steps: [] }}, {{ status: "ready" }});
             const result = {{
               labels: [
                 tools.getReleaseSeverityLabel("blocker"),
@@ -175,6 +209,16 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
                 projectMilestonePlan: {{ nextMilestone: {{ title: "第一版可试玩 Demo" }}, overallScore: 72 }},
                 projectMilestoneGapDigest: {{ eyebrow: "当前阶段缺口", title: "补齐试玩确认" }},
               }}),
+              nextSteps: [
+                releaseNextStep,
+                milestoneNextStep,
+                readyNextStep,
+              ],
+              nextStepAdvice: [
+                tools.formatReleaseReportNextStepAdvice(releaseNextStep),
+                tools.formatReleaseReportNextStepAdvice(milestoneNextStep),
+                tools.formatReleaseReportNextStepAdvice(readyNextStep),
+              ],
               desktopReady: [
                 tools.isDesktopExportReady({{ target: "windows_nwjs", runtimeMode: "nwjs", missingAssets: 0 }}),
                 tools.isDesktopExportReady({{ target: "windows_nwjs", runtimeMode: "fallback", missingAssets: 0 }}),
@@ -249,6 +293,15 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
         self.assertEqual(payload["overviewRows"][4], ["首屏加载压力", "首屏压力偏高，首屏 180 MB / 早期 180 MB"])
         self.assertEqual(payload["overviewRows"][9], ["第一条结局路径", "开场 -> 真结局"])
         self.assertEqual(payload["overviewRows"][13], ["成品目标路线", "第一版可试玩 Demo（72%）"])
+        self.assertEqual(payload["nextSteps"][0]["source"], "release_fix_order")
+        self.assertEqual(payload["nextSteps"][0]["sourceLabel"], "发布修复顺序")
+        self.assertEqual(payload["nextSteps"][0]["action"]["screen"], "inspection")
+        self.assertIn("处理首屏加载压力", payload["nextStepAdvice"][0])
+        self.assertEqual(payload["nextSteps"][1]["source"], "project_milestone_gap")
+        self.assertEqual(payload["nextSteps"][1]["action"]["label"], "去试玩确认")
+        self.assertIn("补试玩确认", payload["nextStepAdvice"][1])
+        self.assertEqual(payload["nextSteps"][2]["tone"], "good")
+        self.assertEqual(payload["nextStepAdvice"][2], "当前没有明显阻塞，可以直接做最终试玩和正式导出。")
         self.assertEqual(payload["desktopReady"], [True, False, False, False])
         self.assertEqual(payload["blockedGate"]["status"], "blocked")
         self.assertEqual(payload["blockedGate"]["badge"], "暂缓发布")

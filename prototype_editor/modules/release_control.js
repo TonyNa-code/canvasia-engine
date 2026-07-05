@@ -213,6 +213,80 @@
     };
   }
 
+  function formatReleaseReportNextStepActionHint(nextStep) {
+    const actionLabel = nextStep?.action?.label;
+    return actionLabel ? `建议按钮：${actionLabel}。` : "";
+  }
+
+  function formatReleaseReportNextStepAdvice(nextStep) {
+    const actionHint = formatReleaseReportNextStepActionHint(nextStep);
+    if (nextStep?.source === "release_fix_order") {
+      return `先处理「${nextStep.title}」，再重新导出一版原生 Runtime / 桌面包确认。${actionHint}`;
+    }
+    if (nextStep?.source === "project_milestone_gap") {
+      return `发布修复队列暂时没有硬阻塞；先补「${nextStep.title}」，再重新巡检和试玩。${actionHint}`;
+    }
+    return "当前没有明显阻塞，可以直接做最终试玩和正式导出。";
+  }
+
+  function completeReleaseReportNextStep(nextStep) {
+    const actionHint = formatReleaseReportNextStepActionHint(nextStep);
+    const advice = formatReleaseReportNextStepAdvice(nextStep);
+    return {
+      ...nextStep,
+      actionHint,
+      advice,
+      sourceLabel:
+        nextStep?.source === "release_fix_order"
+          ? "发布修复顺序"
+          : nextStep?.source === "project_milestone_gap"
+            ? "成品目标路线"
+            : "最终确认",
+      tone:
+        nextStep?.source === "release_fix_order"
+          ? "warn"
+          : nextStep?.source === "project_milestone_gap"
+            ? "soft"
+            : "good",
+    };
+  }
+
+  function buildReleaseReportNextStep(releaseFixOrder = null, projectMilestoneGapDigest = null) {
+    const firstReleaseStep = releaseFixOrder?.steps?.[0];
+    if (firstReleaseStep) {
+      return completeReleaseReportNextStep({
+        title: firstReleaseStep.title,
+        description: firstReleaseStep.description,
+        statusLabel: firstReleaseStep.statusLabel,
+        action: serializeReleaseReportAction(firstReleaseStep.actions?.[0] ?? null),
+        source: "release_fix_order",
+      });
+    }
+
+    if (projectMilestoneGapDigest && projectMilestoneGapDigest.status !== "ready") {
+      const primaryGap = projectMilestoneGapDigest?.primaryGap;
+      const action = primaryGap?.action ?? projectMilestoneGapDigest?.nextAction ?? null;
+      return completeReleaseReportNextStep({
+        title: primaryGap?.label ?? projectMilestoneGapDigest?.title ?? "继续推进成品目标路线",
+        description:
+          primaryGap?.missing ??
+          projectMilestoneGapDigest?.description ??
+          "先按成品目标路线补齐当前阶段，再重新巡检和试玩。",
+        statusLabel: projectMilestoneGapDigest?.eyebrow ?? "当前阶段缺口",
+        action: serializeReleaseReportAction(action),
+        source: "project_milestone_gap",
+      });
+    }
+
+    return completeReleaseReportNextStep({
+      title: "最终试玩和正式导出",
+      description: "当前没有明显阻塞，可以直接做最终试玩和正式导出。",
+      statusLabel: "可以继续",
+      action: null,
+      source: "release_ready",
+    });
+  }
+
   function splitReleaseWarnings(warningIssues = []) {
     const safeWarnings = Array.isArray(warningIssues) ? warningIssues : [];
     return {
@@ -804,6 +878,9 @@
     serializeReleaseReportAction,
     buildReleaseChecklistSummary,
     buildFinalPublishGate,
+    buildReleaseReportNextStep,
+    formatReleaseReportNextStepActionHint,
+    formatReleaseReportNextStepAdvice,
     splitReleaseWarnings,
     isDesktopExportReady,
     getRuntimePreloadBudgetRiskCount,
