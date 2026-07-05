@@ -122,6 +122,7 @@ const buildTemplateAssetUrl = (relativePath) =>
   editorCommonTools.buildTemplateAssetUrl(relativePath, state.data?.currentProject?.publicRoot ?? "");
 const projectSettingsTools = window.CanvasiaEditorProjectSettings;
 const dialogBoxReadabilityTools = window.CanvasiaEditorDialogBoxReadability;
+const validationCacheTools = window.CanvasiaEditorValidationCache;
 const {
   PROJECT_DIALOG_BOX_PRESET_LABELS,
   PROJECT_DIALOG_BOX_SHAPE_LABELS,
@@ -877,6 +878,7 @@ const state = {
   previewSession: null,
   data: null,
   validation: null,
+  projectDataRevision: 0,
   lastExportResult: null,
   hasPendingStoryChanges: false,
   activeAssetAudioId: null,
@@ -980,6 +982,7 @@ function scheduleEditorUiThemeAutoRefresh() {
 }
 
 const nativeWindowAlert = typeof window.alert === "function" ? window.alert.bind(window) : null;
+const projectValidationCache = validationCacheTools.createValidationCache();
 let autoSaveTimer = null;
 let autoSavePromise = null;
 let storyChangeVersion = 0;
@@ -1584,6 +1587,7 @@ function showFatalProjectLoadError(error) {
   refs.errorMessage.textContent = getProjectLoadErrorMessage(error);
   state.data = null;
   state.validation = null;
+  resetProjectValidationCache();
   state.lastExportResult = null;
   state.projectHistory = error?.recovery ?? null;
   state.projectSessionRecovery = null;
@@ -1896,6 +1900,7 @@ function resetProjectScopedUiState() {
 function hydrateProjectRuntime(data) {
   resetProjectScopedUiState();
   state.data = data;
+  markProjectDataRevisionChanged();
   state.projectHistory = data.history ?? null;
   state.projectSessionRecovery = data.sessionRecovery ?? null;
   if (data.currentProject?.projectId) {
@@ -1909,7 +1914,7 @@ function hydrateProjectRuntime(data) {
   state.previewQuickSave = loadStoredPreviewQuickSave(data.project);
   state.recentWorkspaceItems = loadStoredRecentWorkspaceItems(data.project);
   state.commandPaletteRecentIds = loadStoredCommandPaletteRecentIds(data.project);
-  state.validation = runValidation(data);
+  refreshCurrentValidation({ force: true, updateTopbar: false });
   updateErrorRecoveryState(null);
   initializeSelection(data);
   renderAll();
@@ -1920,11 +1925,48 @@ function clearLoadedProjectState() {
   resetProjectScopedUiState();
   state.data = null;
   state.validation = null;
+  resetProjectValidationCache();
   state.lastExportResult = null;
   state.projectHistory = null;
   state.projectSessionRecovery = null;
   state.commandPaletteRecentIds = loadStoredCommandPaletteRecentIds(null);
   updateErrorRecoveryState(null);
+}
+
+function markProjectDataRevisionChanged() {
+  state.projectDataRevision += 1;
+  resetProjectValidationCache();
+}
+
+function resetProjectValidationCache() {
+  projectValidationCache.invalidate();
+}
+
+function getCurrentValidation(options = {}) {
+  if (!state.data) {
+    state.validation = validationCacheTools.EMPTY_VALIDATION;
+    return state.validation;
+  }
+
+  const pendingKey = state.hasPendingStoryChanges ? `dirty-${storyChangeVersion}` : "clean";
+  const cacheKey = [
+    state.projectDataRevision,
+    state.data.currentProject?.projectId ?? "",
+    state.data.project?.entrySceneId ?? "",
+    pendingKey,
+  ].join(":");
+  state.validation = projectValidationCache.getOrCompute(cacheKey, () => runValidation(state.data), {
+    force: options.force === true,
+  });
+  return state.validation;
+}
+
+function refreshCurrentValidation(options = {}) {
+  const validation = getCurrentValidation(options);
+  if (options.updateTopbar !== false) {
+    updateTopbar();
+  }
+  return validation;
 }
 
 function isCurrentProjectBlank() {
@@ -2446,7 +2488,7 @@ function setBeginnerTutorialStep(stepIndex) {
 
 function getCommandPaletteContext() {
   const starterOverview = state.data ? getStarterKitOverview() : {};
-  const validation = state.data ? state.validation ?? runValidation(state.data) : { errors: [], warnings: [] };
+  const validation = getCurrentValidation();
   const selectedScene = state.data ? getSelectedScene() : null;
   const selectedBlock = state.data ? getSelectedBlock() : null;
   const projectHistory = state.data ? getSafeProjectHistory() : null;
@@ -3742,8 +3784,7 @@ async function handleClick(event) {
   }
 
   if (action === "run-project-inspection") {
-    state.validation = runValidation(state.data);
-    updateTopbar();
+    refreshCurrentValidation();
     renderInspectionScreen();
     if (state.currentScreen === "preview") {
       renderPreviewScreen();
@@ -3779,8 +3820,7 @@ async function handleClick(event) {
   }
 
   if (action === "generate-release-fix-order") {
-    state.validation = runValidation(state.data);
-    updateTopbar();
+    refreshCurrentValidation();
     renderInspectionScreen();
     if (state.currentScreen === "preview") {
       renderPreviewScreen();
@@ -3799,8 +3839,7 @@ async function handleClick(event) {
   }
 
   if (action === "run-preview-regression") {
-    state.validation = runValidation(state.data);
-    updateTopbar();
+    refreshCurrentValidation();
     state.inspectionRegressionResult = runPreviewRegressionSmokeTest(buildSceneRouteOverview());
     renderInspectionScreen();
     if (state.currentScreen === "preview") {
@@ -4022,8 +4061,7 @@ async function handleClick(event) {
   }
 
   if (action === "export-release-control-report") {
-    state.validation = runValidation(state.data);
-    updateTopbar();
+    refreshCurrentValidation();
     exportReleaseControlReport();
     if (state.currentScreen === "inspection") {
       renderInspectionScreen();
@@ -4035,8 +4073,7 @@ async function handleClick(event) {
   }
 
   if (action === "export-release-control-json") {
-    state.validation = runValidation(state.data);
-    updateTopbar();
+    refreshCurrentValidation();
     exportReleaseControlJsonReport();
     if (state.currentScreen === "inspection") {
       renderInspectionScreen();
@@ -4048,8 +4085,7 @@ async function handleClick(event) {
   }
 
   if (action === "export-route-testing-plan-markdown") {
-    state.validation = runValidation(state.data);
-    updateTopbar();
+    refreshCurrentValidation();
     exportRouteTestingPlanMarkdown();
     if (state.currentScreen === "dashboard") {
       renderDashboard();
@@ -4058,8 +4094,7 @@ async function handleClick(event) {
   }
 
   if (action === "export-route-testing-plan-csv") {
-    state.validation = runValidation(state.data);
-    updateTopbar();
+    refreshCurrentValidation();
     exportRouteTestingPlanCsv();
     if (state.currentScreen === "dashboard") {
       renderDashboard();
@@ -4068,8 +4103,7 @@ async function handleClick(event) {
   }
 
   if (action === "export-playtest-handoff-markdown") {
-    state.validation = runValidation(state.data);
-    updateTopbar();
+    refreshCurrentValidation();
     exportPlaytestHandoffMarkdown();
     if (state.currentScreen === "inspection") {
       renderInspectionScreen();
@@ -4081,8 +4115,7 @@ async function handleClick(event) {
   }
 
   if (action === "export-playtest-handoff-csv") {
-    state.validation = runValidation(state.data);
-    updateTopbar();
+    refreshCurrentValidation();
     exportPlaytestHandoffCsv();
     if (state.currentScreen === "inspection") {
       renderInspectionScreen();
@@ -4094,8 +4127,7 @@ async function handleClick(event) {
   }
 
   if (action === "export-playtest-feedback-template-markdown") {
-    state.validation = runValidation(state.data);
-    updateTopbar();
+    refreshCurrentValidation();
     exportPlaytestFeedbackTemplateMarkdown();
     if (state.currentScreen === "inspection") {
       renderInspectionScreen();
@@ -4107,8 +4139,7 @@ async function handleClick(event) {
   }
 
   if (action === "export-playtest-feedback-template-csv") {
-    state.validation = runValidation(state.data);
-    updateTopbar();
+    refreshCurrentValidation();
     exportPlaytestFeedbackTemplateCsv();
     if (state.currentScreen === "inspection") {
       renderInspectionScreen();
@@ -30892,8 +30923,7 @@ async function importLocalizationCoverageCsv(file) {
       previewStartSceneId: state.previewStartSceneId,
       previewBlockIndex: state.previewBlockIndex,
     });
-    state.validation = runValidation(state.data);
-    updateTopbar();
+    refreshCurrentValidation();
 
     const changedTargets = [
       summary.characterChanged ? "角色" : "",
@@ -43029,9 +43059,10 @@ async function persistScene(updatedScene, options = {}) {
 async function reloadProjectData(preserved = {}) {
   const data = await loadProjectData();
   state.data = data;
+  markProjectDataRevisionChanged();
   state.projectHistory = data.history ?? null;
   state.projectSessionRecovery = data.sessionRecovery ?? null;
-  state.validation = runValidation(data);
+  refreshCurrentValidation({ force: true, updateTopbar: false });
   if (!preserved.preserveProjectDoctorRepairReceipt) {
     state.projectDoctorRepairReceipt = null;
   }
@@ -43134,8 +43165,8 @@ function applySceneToLocalState(updatedScene) {
     characters: state.data.characters,
     charactersById: state.data.charactersById,
   });
-  state.validation = runValidation(state.data);
-  updateTopbar();
+  markProjectDataRevisionChanged();
+  refreshCurrentValidation({ force: true });
 }
 
 function appendChoiceOptionEditor() {

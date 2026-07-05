@@ -113,6 +113,7 @@ jobs:
             tests/test_frontend_system_dialog_module.py \
             tests/test_frontend_ui_theme_module.py \
             tests/test_frontend_unlockable_content_manifest_module.py \
+            tests/test_frontend_validation_cache_module.py \
             tests/test_frontend_variable_influence_sheet_module.py \
             tests/test_frontend_variables_module.py \
             tests/test_frontend_visual_effects_module.py \
@@ -177,6 +178,7 @@ jobs:
           node --check prototype_editor/modules/system_dialog.js
           node --check prototype_editor/modules/ui_theme.js
           node --check prototype_editor/modules/unlockable_content_manifest.js
+          node --check prototype_editor/modules/validation_cache.js
           node --check prototype_editor/modules/variable_influence_sheet.js
           node --check prototype_editor/modules/variables.js
           node --check prototype_editor/modules/visual_effects.js
@@ -254,6 +256,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_system_dialog_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_ui_theme_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_unlockable_content_manifest_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_validation_cache_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_variable_influence_sheet_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_variables_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_visual_effects_module.py' -v
