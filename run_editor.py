@@ -8843,12 +8843,34 @@ def get_native_runtime_release_control_status(
     release_check_payload: dict | None,
     rc_report_payload: dict | None,
     asset3d_digest: dict | None,
+    performance_budget_payload: dict | None = None,
+    vn_baseline_quality_payload: dict | None = None,
 ) -> dict:
     release_summary = release_check_payload.get("summary") if isinstance(release_check_payload, dict) else {}
     rc_summary = rc_report_payload.get("summary") if isinstance(rc_report_payload, dict) else {}
     release_status = str(release_check_payload.get("status") or "unavailable") if isinstance(release_check_payload, dict) else "unavailable"
     rc_status = str(rc_report_payload.get("status") or "unavailable") if isinstance(rc_report_payload, dict) else "unavailable"
     asset_status = str(asset3d_digest.get("status") or "unavailable") if isinstance(asset3d_digest, dict) else "unavailable"
+    performance_status = (
+        str(performance_budget_payload.get("status") or "unavailable")
+        if isinstance(performance_budget_payload, dict)
+        else "unavailable"
+    )
+    performance_summary = (
+        performance_budget_payload.get("summary")
+        if isinstance(performance_budget_payload, dict) and isinstance(performance_budget_payload.get("summary"), dict)
+        else {}
+    )
+    vn_status = (
+        str(vn_baseline_quality_payload.get("status") or "unavailable")
+        if isinstance(vn_baseline_quality_payload, dict)
+        else "unavailable"
+    )
+    vn_summary = (
+        vn_baseline_quality_payload.get("summary")
+        if isinstance(vn_baseline_quality_payload, dict) and isinstance(vn_baseline_quality_payload.get("summary"), dict)
+        else {}
+    )
 
     release_errors = int(release_summary.get("errors") or 0) if isinstance(release_summary, dict) else 0
     blockers = int(rc_summary.get("blockers") or 0) if isinstance(rc_summary, dict) else 0
@@ -8857,24 +8879,37 @@ def get_native_runtime_release_control_status(
     top_3d_issues = asset3d_digest.get("topIssues") if isinstance(asset3d_digest, dict) else []
     has_3d_issues = bool(top_3d_issues)
 
-    if release_status == "fail" or rc_status == "blocked" or release_errors or blockers:
+    if (
+        release_status == "fail"
+        or rc_status == "blocked"
+        or performance_status == "needs_fix"
+        or release_errors
+        or blockers
+        or int(vn_summary.get("warnCount") or 0)
+        or int(performance_summary.get("hardCount") or 0)
+    ):
         return {
             "status": "blocked",
             "label": "阻塞发布",
-            "summary": "存在发布阻塞项，应先修复再进入三系统打包或分发。",
+            "summary": "存在发布阻塞项、VN 基础体验缺口或性能预算硬问题，应先修复再进入三系统打包或分发。",
         }
     if (
         release_status == "unavailable"
         or rc_status == "unavailable"
         or asset_status == "unavailable"
+        or vn_status == "unavailable"
+        or performance_status in {"unavailable", "needs_review"}
         or optional_failures
         or warnings
         or has_3d_issues
+        or int(vn_summary.get("softCount") or 0)
+        or int(performance_summary.get("warnCount") or 0)
+        or int(performance_summary.get("softCount") or 0)
     ):
         return {
             "status": "needs_review",
             "label": "需要复核",
-            "summary": "主链没有阻塞项，但仍有警告、可选能力失败或资产风险需要发布前确认。",
+            "summary": "主链没有阻塞项，但仍有警告、可选能力失败、资产风险、VN 润色项或性能预算风险需要发布前确认。",
         }
     return {
         "status": "ready",
@@ -8887,6 +8922,8 @@ def build_native_runtime_release_control_next_steps(
     release_check_payload: dict | None,
     rc_report_payload: dict | None,
     asset3d_digest: dict | None,
+    performance_budget_payload: dict | None,
+    vn_baseline_quality_payload: dict | None,
     quality_gate: dict,
 ) -> list[str]:
     steps: list[str] = []
@@ -8924,6 +8961,22 @@ def build_native_runtime_release_control_next_steps(
         for recommendation in asset3d_digest.get("recommendations") or []:
             add_step(recommendation)
 
+    if isinstance(vn_baseline_quality_payload, dict):
+        for issue in (vn_baseline_quality_payload.get("issues") or [])[:5]:
+            if not isinstance(issue, dict):
+                continue
+            title = issue.get("title") or issue.get("code") or "VN 基础质感"
+            suggestion = issue.get("suggestion") or issue.get("detail") or "复核基础视觉小说体验。"
+            add_step(f"处理 VN 基础质感「{title}」：{suggestion}")
+
+    if isinstance(performance_budget_payload, dict):
+        for issue in (performance_budget_payload.get("issues") or [])[:5]:
+            if not isinstance(issue, dict):
+                continue
+            title = issue.get("title") or issue.get("code") or "性能预算"
+            suggestion = issue.get("suggestion") or issue.get("detail") or "复核素材体积、包体和剧情规模。"
+            add_step(f"处理性能预算「{title}」：{suggestion}")
+
     return steps[:10]
 
 
@@ -8932,6 +8985,8 @@ def build_native_runtime_release_control_payload(
     release_check_payload: dict | None,
     rc_report_payload: dict | None,
     asset3d_digest: dict | None,
+    performance_budget_payload: dict | None = None,
+    vn_baseline_quality_payload: dict | None = None,
 ) -> dict:
     project = export_payload.get("project") if isinstance(export_payload.get("project"), dict) else {}
     build_info = export_payload.get("buildInfo") if isinstance(export_payload.get("buildInfo"), dict) else {}
@@ -8939,11 +8994,36 @@ def build_native_runtime_release_control_payload(
     release_issues = release_check_payload.get("issues") if isinstance(release_check_payload, dict) else []
     rc_summary = rc_report_payload.get("summary") if isinstance(rc_report_payload, dict) else {}
     readiness = rc_report_payload.get("readinessEstimate") if isinstance(rc_report_payload, dict) else {}
-    quality_gate = get_native_runtime_release_control_status(release_check_payload, rc_report_payload, asset3d_digest)
+    performance_summary = (
+        performance_budget_payload.get("summary")
+        if isinstance(performance_budget_payload, dict) and isinstance(performance_budget_payload.get("summary"), dict)
+        else {}
+    )
+    vn_baseline_summary = (
+        vn_baseline_quality_payload.get("summary")
+        if isinstance(vn_baseline_quality_payload, dict)
+        and isinstance(vn_baseline_quality_payload.get("summary"), dict)
+        else {"statusLabel": "未生成", "issueCount": 1, "warnCount": 1, "softCount": 0}
+    )
+    vn_baseline_metrics = (
+        vn_baseline_quality_payload.get("metrics")
+        if isinstance(vn_baseline_quality_payload, dict)
+        and isinstance(vn_baseline_quality_payload.get("metrics"), dict)
+        else {}
+    )
+    quality_gate = get_native_runtime_release_control_status(
+        release_check_payload,
+        rc_report_payload,
+        asset3d_digest,
+        performance_budget_payload,
+        vn_baseline_quality_payload,
+    )
     next_steps = build_native_runtime_release_control_next_steps(
         release_check_payload,
         rc_report_payload,
         asset3d_digest,
+        performance_budget_payload,
+        vn_baseline_quality_payload,
         quality_gate,
     )
 
@@ -8978,6 +9058,23 @@ def build_native_runtime_release_control_payload(
             "commercialReleaseGaps": rc_report_payload.get("commercialReleaseGaps") if isinstance(rc_report_payload, dict) else [],
         },
         "asset3d": asset3d_digest if isinstance(asset3d_digest, dict) else build_native_3d_asset_export_digest(None),
+        "vnBaselineQuality": {
+            "status": vn_baseline_quality_payload.get("status") if isinstance(vn_baseline_quality_payload, dict) else "unavailable",
+            "summary": vn_baseline_summary if isinstance(vn_baseline_summary, dict) else {},
+            "metrics": vn_baseline_metrics if isinstance(vn_baseline_metrics, dict) else {},
+            "topIssues": (vn_baseline_quality_payload.get("issues") or [])[:8] if isinstance(vn_baseline_quality_payload, dict) else [],
+            "markdown": NATIVE_RUNTIME_VN_BASELINE_QUALITY_MARKDOWN_NAME,
+            "json": NATIVE_RUNTIME_VN_BASELINE_QUALITY_REPORT_NAME,
+        },
+        "performanceBudget": {
+            "status": performance_budget_payload.get("status") if isinstance(performance_budget_payload, dict) else "unavailable",
+            "summary": performance_summary if isinstance(performance_summary, dict) else {},
+            "assetGroups": performance_budget_payload.get("assetGroups") if isinstance(performance_budget_payload, dict) else {},
+            "budgets": performance_budget_payload.get("budgets") if isinstance(performance_budget_payload, dict) else {},
+            "topIssues": (performance_budget_payload.get("issues") or [])[:8] if isinstance(performance_budget_payload, dict) else [],
+            "markdown": NATIVE_RUNTIME_PERFORMANCE_BUDGET_MARKDOWN_NAME,
+            "json": NATIVE_RUNTIME_PERFORMANCE_BUDGET_REPORT_NAME,
+        },
         "nextSteps": next_steps,
         "includedReports": {
             "releaseCheck": NATIVE_RUNTIME_RELEASE_CHECK_NAME,
@@ -8987,6 +9084,10 @@ def build_native_runtime_release_control_payload(
             "releaseControlJson": NATIVE_RUNTIME_RELEASE_CONTROL_JSON_NAME,
             "fileIntegrityReport": NATIVE_RUNTIME_FILE_INTEGRITY_REPORT_NAME,
             "fileIntegrityMarkdown": NATIVE_RUNTIME_FILE_INTEGRITY_MARKDOWN_NAME,
+            "vnBaselineQualityMarkdown": NATIVE_RUNTIME_VN_BASELINE_QUALITY_MARKDOWN_NAME,
+            "vnBaselineQualityJson": NATIVE_RUNTIME_VN_BASELINE_QUALITY_REPORT_NAME,
+            "performanceBudgetMarkdown": NATIVE_RUNTIME_PERFORMANCE_BUDGET_MARKDOWN_NAME,
+            "performanceBudgetJson": NATIVE_RUNTIME_PERFORMANCE_BUDGET_REPORT_NAME,
         },
     }
 
@@ -8998,10 +9099,18 @@ def build_native_runtime_release_control_markdown(payload: dict) -> str:
     release_check = payload.get("releaseCheck") if isinstance(payload.get("releaseCheck"), dict) else {}
     release_candidate = payload.get("releaseCandidate") if isinstance(payload.get("releaseCandidate"), dict) else {}
     asset3d = payload.get("asset3d") if isinstance(payload.get("asset3d"), dict) else {}
+    vn_baseline = payload.get("vnBaselineQuality") if isinstance(payload.get("vnBaselineQuality"), dict) else {}
+    performance_budget = payload.get("performanceBudget") if isinstance(payload.get("performanceBudget"), dict) else {}
     readiness = release_candidate.get("readinessEstimate") if isinstance(release_candidate.get("readinessEstimate"), dict) else {}
     release_summary = release_check.get("summary") if isinstance(release_check.get("summary"), dict) else {}
     rc_summary = release_candidate.get("summary") if isinstance(release_candidate.get("summary"), dict) else {}
     asset_metrics = asset3d.get("metrics") if isinstance(asset3d.get("metrics"), list) else []
+    vn_summary = vn_baseline.get("summary") if isinstance(vn_baseline.get("summary"), dict) else {}
+    vn_metrics = vn_baseline.get("metrics") if isinstance(vn_baseline.get("metrics"), dict) else {}
+    performance_summary = performance_budget.get("summary") if isinstance(performance_budget.get("summary"), dict) else {}
+    performance_asset_groups = (
+        performance_budget.get("assetGroups") if isinstance(performance_budget.get("assetGroups"), dict) else {}
+    )
     next_steps = payload.get("nextSteps") if isinstance(payload.get("nextSteps"), list) else []
 
     lines = [
@@ -9027,8 +9136,53 @@ def build_native_runtime_release_control_markdown(payload: dict) -> str:
         f"| 桌面 Preview 估算 | {readiness.get('desktopPreviewPercent', 'n/a')}% |",
         f"| 商业桌面估算 | {readiness.get('commercialDesktopPercent', 'n/a')}% |",
         f"| 3D 摘要 | {asset3d.get('summaryLine') or '未生成'} |",
+        f"| VN 基础质感 | {vn_summary.get('statusLabel') or vn_baseline.get('status') or '未生成'} |",
+        f"| 性能预算 | {performance_summary.get('statusLabel') or performance_budget.get('status') or '未生成'} |",
         "",
     ]
+
+    if vn_baseline:
+        lines.extend(["## VN 基础质感", "", "| 指标 | 值 |", "| --- | --- |"])
+        for label, value in [
+            ("状态", vn_summary.get("statusLabel") or vn_baseline.get("status")),
+            ("问题 / 缺口 / 润色项", f"{int(vn_summary.get('issueCount') or 0)} / {int(vn_summary.get('warnCount') or 0)} / {int(vn_summary.get('softCount') or 0)}"),
+            ("场景 / 文本 / 选项", f"{int(vn_metrics.get('storySceneCount') or 0)} / {int(vn_metrics.get('dialogueCount') or 0) + int(vn_metrics.get('narrationCount') or 0)} / {int(vn_metrics.get('choiceCount') or 0)}"),
+            ("BGM / 语音 / CG 素材", f"{int(vn_metrics.get('bgmAssetCount') or 0)} / {int(vn_metrics.get('voiceAssetCount') or 0)} / {int(vn_metrics.get('cgAssetCount') or 0)}"),
+        ]:
+            lines.append(f"| {label} | {value or '0'} |")
+        top_vn_issues = vn_baseline.get("topIssues") if isinstance(vn_baseline.get("topIssues"), list) else []
+        if top_vn_issues:
+            lines.extend(["", "优先处理："])
+            for issue in top_vn_issues[:5]:
+                if isinstance(issue, dict):
+                    lines.append(f"- {issue.get('title') or 'VN 基础质感'}：{issue.get('suggestion') or issue.get('detail') or '需要复核'}")
+        lines.append("")
+
+    if performance_budget:
+        lines.extend(["## 性能预算", "", "| 指标 | 值 |", "| --- | --- |"])
+        for label, value in [
+            ("状态", performance_summary.get("statusLabel") or performance_budget.get("status")),
+            ("总素材 / 已引用", f"{int(performance_summary.get('assetCount') or 0)} / {int(performance_summary.get('referencedAssetCount') or 0)}"),
+            ("总体积 / 已引用体积", f"{performance_summary.get('totalAssetLabel') or '0 B'} / {performance_summary.get('referencedAssetLabel') or '0 B'}"),
+            ("缺失引用素材", performance_summary.get("missingReferencedAssetCount")),
+            ("未使用随包素材", performance_summary.get("unreferencedExistingAssetCount")),
+            ("场景 / 卡片", f"{int(performance_summary.get('sceneCount') or 0)} / {int(performance_summary.get('storyBlockCount') or 0)}"),
+            ("图片 / 音频 / 视频体积", " / ".join(
+                str((performance_asset_groups.get(key) or {}).get("label") or "0 B")
+                for key in ("image", "audio", "video")
+            )),
+            ("硬问题 / 警告 / 提醒", f"{int(performance_summary.get('hardCount') or 0)} / {int(performance_summary.get('warnCount') or 0)} / {int(performance_summary.get('softCount') or 0)}"),
+        ]:
+            lines.append(f"| {label} | {value or '0'} |")
+        top_performance_issues = (
+            performance_budget.get("topIssues") if isinstance(performance_budget.get("topIssues"), list) else []
+        )
+        if top_performance_issues:
+            lines.extend(["", "优先处理："])
+            for issue in top_performance_issues[:5]:
+                if isinstance(issue, dict):
+                    lines.append(f"- {issue.get('title') or '性能预算'}：{issue.get('suggestion') or issue.get('detail') or '需要复核'}")
+        lines.append("")
 
     if asset_metrics:
         lines.extend(["## 3D 风险快照", "", "| 指标 | 值 |", "| --- | --- |"])
@@ -9149,6 +9303,7 @@ def write_native_runtime_performance_budget_reports(build_dir: Path) -> dict:
     return {
         "performanceBudgetStatus": str(payload.get("status") or "unavailable"),
         "performanceBudgetSummary": summary,
+        "performanceBudgetPayload": payload,
         "performanceBudgetReportName": report_path.name,
         "performanceBudgetReportPath": str(report_path),
         "performanceBudgetMarkdownName": markdown_path.name,
@@ -9741,6 +9896,7 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
             release_check_payload if isinstance(release_check_payload, dict) else None,
             rc_report_payload if isinstance(rc_report_payload, dict) else None,
             asset3d_report_digest,
+            performance_budget_files.get("performanceBudgetPayload"),
         )
         release_control_json_path.write_text(
             json.dumps(release_control_payload, ensure_ascii=False, indent=2) + "\n",

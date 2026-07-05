@@ -3522,11 +3522,21 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertGreaterEqual(export_result["releaseCandidateReadinessEstimate"]["desktopPreviewPercent"], 75)
         self.assertTrue(export_result["releaseCandidateReportPublicUrl"].endswith(run_editor.NATIVE_RUNTIME_RC_REPORT_NAME))
 
+        performance_budget_payload = json.loads((build_dir / run_editor.NATIVE_RUNTIME_PERFORMANCE_BUDGET_REPORT_NAME).read_text(encoding="utf-8"))
+        self.assertIn(performance_budget_payload["status"], {"ready", "needs_review"})
+        self.assertEqual(export_result["performanceBudgetStatus"], performance_budget_payload["status"])
+        self.assertGreaterEqual(performance_budget_payload["summary"]["assetCount"], 1)
+
         release_control_payload = json.loads((build_dir / run_editor.NATIVE_RUNTIME_RELEASE_CONTROL_JSON_NAME).read_text(encoding="utf-8"))
         self.assertEqual(release_control_payload["formatVersion"], 1)
         self.assertEqual(release_control_payload["project"]["title"], "自动化测试项目")
         self.assertIn(release_control_payload["qualityGate"]["status"], {"ready", "needs_review"})
         self.assertEqual(release_control_payload["vnBaselineQuality"]["status"], "ready")
+        self.assertIn(release_control_payload["performanceBudget"]["status"], {"ready", "needs_review"})
+        self.assertEqual(
+            release_control_payload["performanceBudget"]["summary"]["assetCount"],
+            performance_budget_payload["summary"]["assetCount"],
+        )
         self.assertEqual(release_control_payload["releaseCheck"]["status"], "pass")
         self.assertIn(release_control_payload["releaseCandidate"]["status"], {"preview_ready", "preview_ready_with_warnings"})
         self.assertEqual(release_control_payload["asset3d"]["status"], export_result["asset3dReportDigest"]["status"])
@@ -3534,15 +3544,12 @@ class RunEditorSmokeTests(unittest.TestCase):
         release_control_markdown = (build_dir / run_editor.NATIVE_RUNTIME_RELEASE_CONTROL_REPORT_NAME).read_text(encoding="utf-8")
         self.assertIn("# 原生 Runtime 发布总控报告", release_control_markdown)
         self.assertIn("## 核心指标", release_control_markdown)
+        self.assertIn("## 性能预算", release_control_markdown)
         self.assertTrue(export_result["releaseControlReportPublicUrl"].endswith(run_editor.NATIVE_RUNTIME_RELEASE_CONTROL_REPORT_NAME))
         self.assertTrue(export_result["releaseControlJsonPublicUrl"].endswith(run_editor.NATIVE_RUNTIME_RELEASE_CONTROL_JSON_NAME))
         self.assertEqual(export_result["vnBaselineQualityStatus"], "ready")
         self.assertTrue(export_result["vnBaselineQualityReportPublicUrl"].endswith(run_editor.NATIVE_RUNTIME_VN_BASELINE_QUALITY_REPORT_NAME))
         self.assertTrue(export_result["vnBaselineQualityMarkdownPublicUrl"].endswith(run_editor.NATIVE_RUNTIME_VN_BASELINE_QUALITY_MARKDOWN_NAME))
-        performance_budget_payload = json.loads((build_dir / run_editor.NATIVE_RUNTIME_PERFORMANCE_BUDGET_REPORT_NAME).read_text(encoding="utf-8"))
-        self.assertIn(performance_budget_payload["status"], {"ready", "needs_review"})
-        self.assertEqual(export_result["performanceBudgetStatus"], performance_budget_payload["status"])
-        self.assertGreaterEqual(performance_budget_payload["summary"]["assetCount"], 1)
         performance_budget_markdown = (build_dir / run_editor.NATIVE_RUNTIME_PERFORMANCE_BUDGET_MARKDOWN_NAME).read_text(encoding="utf-8")
         self.assertIn("# 原生 Runtime 性能预算报告", performance_budget_markdown)
         self.assertTrue(export_result["runtimePerformanceModulePublicUrl"].endswith(run_editor.NATIVE_RUNTIME_PERFORMANCE_NAME))
@@ -3567,6 +3574,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         release_control_cli_payload = json.loads(release_control_cli_json.stdout)
         self.assertEqual(release_control_cli_payload["project"]["title"], "自动化测试项目")
         self.assertIn(release_control_cli_payload["qualityGate"]["status"], {"ready", "needs_review"})
+        self.assertIn(release_control_cli_payload["performanceBudget"]["status"], {"ready", "needs_review"})
 
         release_control_cli_markdown = subprocess.run(
             [
@@ -3581,6 +3589,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         )
         self.assertEqual(release_control_cli_markdown.returncode, 0, release_control_cli_markdown.stdout + release_control_cli_markdown.stderr)
         self.assertIn("# 原生 Runtime 发布总控报告", release_control_cli_markdown.stdout)
+        self.assertIn("## 性能预算", release_control_cli_markdown.stdout)
 
         release_control_cli_write = subprocess.run(
             [
@@ -3635,6 +3644,8 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue(acceptance_payload["manualCheckGroups"])
         self.assertTrue(acceptance_payload["recommendedCommands"])
         self.assertIn("vn_baseline_quality", {check["id"] for check in acceptance_payload["automatedChecks"]})
+        self.assertIn("performance_budget", {check["id"] for check in acceptance_payload["automatedChecks"]})
+        self.assertIn(run_editor.NATIVE_RUNTIME_PERFORMANCE_BUDGET_MARKDOWN_NAME, acceptance_payload["includedReports"].values())
         acceptance_markdown = (build_dir / run_editor.NATIVE_RUNTIME_ACCEPTANCE_REPORT_NAME).read_text(encoding="utf-8")
         self.assertIn("# 原生 Runtime 发布验收清单", acceptance_markdown)
         self.assertIn("## 人工逐项点测", acceptance_markdown)

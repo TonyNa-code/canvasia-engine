@@ -136,11 +136,11 @@ python3 runtime_player.py --rc-report .
 编辑器导出的完整原生 Runtime 包会额外附带：
 
 - `native-runtime-release-control-report.md`：给人工验收看的总控报告，汇总发布自检、RC 状态、3D 风险摘要、发布门禁和下一步处理顺序。
-- `native-runtime-release-control-report.json`：给自动化脚本或 CI 读取的同一份结论，字段包含 `qualityGate`、`releaseCheck`、`releaseCandidate`、`asset3d`、`vnBaselineQuality` 和 `nextSteps`。
+- `native-runtime-release-control-report.json`：给自动化脚本或 CI 读取的同一份结论，字段包含 `qualityGate`、`releaseCheck`、`releaseCandidate`、`asset3d`、`vnBaselineQuality`、`performanceBudget` 和 `nextSteps`。
 - `native-runtime-vn-baseline-quality.md` / `native-runtime-vn-baseline-quality.json`：检查视觉小说基础体验是否像完整作品，覆盖立绘兜底、背景覆盖、BGM 进入点、选项、空文本、占位素材和轻量演出润色。
 - `native-runtime-performance-budget.md` / `native-runtime-performance-budget.json`：检查包体、已引用素材体积、图片/音频/视频预算、单个过大素材、剧情规模和未使用素材，帮助发布前压缩和拆分资源。
 
-这两份文件会在导出包生成时自动写入。若需要重新计算底层检查，可以先运行 `--release-check`、`--doctor`、`--release-candidate-report` 和 `--describe-3d-assets`，再重新从编辑器导出一版包。
+这些报告会在导出包生成时自动写入。若需要重新计算底层检查，可以先运行 `--release-check`、`--doctor`、`--release-candidate-report`、`--describe-3d-assets` 和 `--performance-budget-report`，再重新从编辑器导出一版包。
 
 也可以直接在导出的原生 Runtime 包里刷新总控报告：
 
@@ -167,7 +167,7 @@ python3 runtime_player.py --performance-budget-report .
 
 编辑器导出的完整原生 Runtime 包会额外附带：
 
-- `native-runtime-release-acceptance.md`：面向发布前人工点测的清单，包含自动检查结果、VN 基础质感、macOS / Windows / Linux 三系统验收项，以及启动、读档、音画、回想馆、成品分发等逐项确认框。
+- `native-runtime-release-acceptance.md`：面向发布前人工点测的清单，包含自动检查结果、VN 基础质感、性能预算、macOS / Windows / Linux 三系统验收项，以及启动、读档、音画、回想馆、成品分发等逐项确认框。
 - `native-runtime-release-acceptance.json`：同一份清单的机器可读版本，可供 CI、发布脚本或外部工具读取。
 
 这份清单会在导出包生成时自动写入。建议在正式分享或发布前打开 Markdown 版本，按目标系统完成最后一轮人工点测。

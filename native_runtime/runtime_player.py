@@ -7624,6 +7624,7 @@ def get_native_runtime_release_control_status(
     release_candidate: dict,
     asset3d_digest: dict,
     vn_baseline_quality: dict | None = None,
+    performance_budget: dict | None = None,
 ) -> dict:
     release_summary = release_check.get("summary") if isinstance(release_check.get("summary"), dict) else {}
     rc_summary = release_candidate.get("summary") if isinstance(release_candidate.get("summary"), dict) else {}
@@ -7632,17 +7633,24 @@ def get_native_runtime_release_control_status(
         if isinstance(vn_baseline_quality, dict) and isinstance(vn_baseline_quality.get("summary"), dict)
         else {}
     )
+    performance_summary = (
+        performance_budget.get("summary")
+        if isinstance(performance_budget, dict) and isinstance(performance_budget.get("summary"), dict)
+        else {}
+    )
     if (
         release_check.get("status") == "fail"
         or release_candidate.get("status") == "blocked"
+        or (isinstance(performance_budget, dict) and performance_budget.get("status") == "needs_fix")
         or int(release_summary.get("errors") or 0)
         or int(rc_summary.get("blockers") or 0)
         or int(vn_summary.get("warnCount") or 0)
+        or int(performance_summary.get("hardCount") or 0)
     ):
         return {
             "status": "blocked",
             "label": "阻塞发布",
-            "summary": "存在发布阻塞项或 VN 基础体验缺口，应先修复再进入三系统打包或分发。",
+            "summary": "存在发布阻塞项、VN 基础体验缺口或性能预算硬问题，应先修复再进入三系统打包或分发。",
         }
     if (
         release_candidate.get("status") != "preview_ready"
@@ -7650,11 +7658,14 @@ def get_native_runtime_release_control_status(
         or int(rc_summary.get("warnings") or 0)
         or bool(asset3d_digest.get("topIssues"))
         or int(vn_summary.get("softCount") or 0)
+        or (isinstance(performance_budget, dict) and performance_budget.get("status") == "needs_review")
+        or int(performance_summary.get("warnCount") or 0)
+        or int(performance_summary.get("softCount") or 0)
     ):
         return {
             "status": "needs_review",
             "label": "需要复核",
-            "summary": "主链没有阻塞项，但仍有警告、可选能力失败、资产风险或 VN 润色项需要发布前确认。",
+            "summary": "主链没有阻塞项，但仍有警告、可选能力失败、资产风险、VN 润色项或性能预算风险需要发布前确认。",
         }
     return {
         "status": "ready",
@@ -7668,6 +7679,7 @@ def build_native_runtime_release_control_next_steps(
     release_candidate: dict,
     asset3d_digest: dict,
     vn_baseline_quality: dict,
+    performance_budget: dict,
     quality_gate: dict,
 ) -> list[str]:
     steps: list[str] = []
@@ -7700,6 +7712,11 @@ def build_native_runtime_release_control_next_steps(
             title = issue.get("title") or issue.get("code") or "VN 基础质感"
             suggestion = issue.get("suggestion") or issue.get("detail") or "复核基础视觉小说体验。"
             add_step(f"处理 VN 基础质感「{title}」：{suggestion}")
+    for issue in (performance_budget.get("issues") if isinstance(performance_budget.get("issues"), list) else [])[:5]:
+        if isinstance(issue, dict):
+            title = issue.get("title") or issue.get("code") or "性能预算"
+            suggestion = issue.get("suggestion") or issue.get("detail") or "复核素材体积、包体和剧情规模。"
+            add_step(f"处理性能预算「{title}」：{suggestion}")
     return steps[:10]
 
 
@@ -7712,11 +7729,13 @@ def build_native_runtime_release_control_payload(bundle_dir: Path) -> dict:
     asset3d_report = build_native_3d_asset_report(bundle_dir)
     asset3d_digest = build_native_runtime_3d_risk_digest(asset3d_report)
     vn_baseline_quality = build_native_runtime_vn_baseline_quality_report(bundle_dir)
+    performance_budget = build_native_runtime_performance_budget_report(bundle_dir)
     quality_gate = get_native_runtime_release_control_status(
         release_check,
         release_candidate,
         asset3d_digest,
         vn_baseline_quality,
+        performance_budget,
     )
     return {
         "formatVersion": 1,
@@ -7759,11 +7778,21 @@ def build_native_runtime_release_control_payload(bundle_dir: Path) -> dict:
             "markdown": VN_BASELINE_QUALITY_MARKDOWN_NAME,
             "json": VN_BASELINE_QUALITY_REPORT_NAME,
         },
+        "performanceBudget": {
+            "status": performance_budget.get("status"),
+            "summary": performance_budget.get("summary") or {},
+            "assetGroups": performance_budget.get("assetGroups") or {},
+            "budgets": performance_budget.get("budgets") or {},
+            "topIssues": (performance_budget.get("issues") or [])[:8],
+            "markdown": PERFORMANCE_BUDGET_MARKDOWN_NAME,
+            "json": PERFORMANCE_BUDGET_REPORT_NAME,
+        },
         "nextSteps": build_native_runtime_release_control_next_steps(
             release_check,
             release_candidate,
             asset3d_digest,
             vn_baseline_quality,
+            performance_budget,
             quality_gate,
         ),
         "includedReports": {
@@ -7778,6 +7807,8 @@ def build_native_runtime_release_control_payload(bundle_dir: Path) -> dict:
             "acceptanceJson": ACCEPTANCE_JSON_NAME,
             "vnBaselineQualityMarkdown": VN_BASELINE_QUALITY_MARKDOWN_NAME,
             "vnBaselineQualityJson": VN_BASELINE_QUALITY_REPORT_NAME,
+            "performanceBudgetMarkdown": PERFORMANCE_BUDGET_MARKDOWN_NAME,
+            "performanceBudgetJson": PERFORMANCE_BUDGET_REPORT_NAME,
         },
     }
 
@@ -7790,11 +7821,16 @@ def render_native_runtime_release_control_markdown(payload: dict) -> str:
     release_candidate = payload.get("releaseCandidate") if isinstance(payload.get("releaseCandidate"), dict) else {}
     asset3d = payload.get("asset3d") if isinstance(payload.get("asset3d"), dict) else {}
     vn_baseline = payload.get("vnBaselineQuality") if isinstance(payload.get("vnBaselineQuality"), dict) else {}
+    performance_budget = payload.get("performanceBudget") if isinstance(payload.get("performanceBudget"), dict) else {}
     release_summary = release_check.get("summary") if isinstance(release_check.get("summary"), dict) else {}
     rc_summary = release_candidate.get("summary") if isinstance(release_candidate.get("summary"), dict) else {}
     readiness = release_candidate.get("readinessEstimate") if isinstance(release_candidate.get("readinessEstimate"), dict) else {}
     vn_summary = vn_baseline.get("summary") if isinstance(vn_baseline.get("summary"), dict) else {}
     vn_metrics = vn_baseline.get("metrics") if isinstance(vn_baseline.get("metrics"), dict) else {}
+    performance_summary = performance_budget.get("summary") if isinstance(performance_budget.get("summary"), dict) else {}
+    performance_asset_groups = (
+        performance_budget.get("assetGroups") if isinstance(performance_budget.get("assetGroups"), dict) else {}
+    )
     lines = [
         "# 原生 Runtime 发布总控报告",
         "",
@@ -7819,6 +7855,7 @@ def render_native_runtime_release_control_markdown(payload: dict) -> str:
         f"| 商业桌面估算 | {format_markdown_value(readiness.get('commercialDesktopPercent'), 'n/a')}% |",
         f"| 3D 摘要 | {format_markdown_value(asset3d.get('summaryLine'), '未生成')} |",
         f"| VN 基础质感 | {format_markdown_value(vn_summary.get('statusLabel'), vn_baseline.get('status') or '未生成')} |",
+        f"| 性能预算 | {format_markdown_value(performance_summary.get('statusLabel'), performance_budget.get('status') or '未生成')} |",
         "",
     ]
     if vn_baseline:
@@ -7892,6 +7929,35 @@ def render_native_runtime_release_control_markdown(payload: dict) -> str:
                         f"{format_markdown_value(issue.get('suggestion') or issue.get('detail'), '需要复核')}"
                     )
         lines.append("")
+    if performance_budget:
+        lines.extend(["## 性能预算", "", "| 指标 | 值 |", "| --- | --- |"])
+        for label, value in [
+            ("状态", performance_summary.get("statusLabel") or performance_budget.get("status")),
+            ("总素材 / 已引用", f"{int(performance_summary.get('assetCount') or 0)} / {int(performance_summary.get('referencedAssetCount') or 0)}"),
+            ("总体积 / 已引用体积", f"{format_markdown_value(performance_summary.get('totalAssetLabel'), '0 B')} / {format_markdown_value(performance_summary.get('referencedAssetLabel'), '0 B')}"),
+            ("缺失引用素材", performance_summary.get("missingReferencedAssetCount")),
+            ("未使用随包素材", performance_summary.get("unreferencedExistingAssetCount")),
+            ("场景 / 卡片", f"{int(performance_summary.get('sceneCount') or 0)} / {int(performance_summary.get('storyBlockCount') or 0)}"),
+            ("最长场景", f"{format_markdown_value(performance_summary.get('longestSceneName'), '无')} / {int(performance_summary.get('maxBlocksPerScene') or 0)} 张卡片"),
+            ("图片 / 音频 / 视频体积", " / ".join(
+                format_markdown_value((performance_asset_groups.get(key) or {}).get("label"), "0 B")
+                for key in ("image", "audio", "video")
+            )),
+            ("硬问题 / 警告 / 提醒", f"{int(performance_summary.get('hardCount') or 0)} / {int(performance_summary.get('warnCount') or 0)} / {int(performance_summary.get('softCount') or 0)}"),
+        ]:
+            lines.append(f"| {label} | {format_markdown_value(value, '0')} |")
+        top_performance_issues = (
+            performance_budget.get("topIssues") if isinstance(performance_budget.get("topIssues"), list) else []
+        )
+        if top_performance_issues:
+            lines.extend(["", "优先处理："])
+            for issue in top_performance_issues[:5]:
+                if isinstance(issue, dict):
+                    lines.append(
+                        f"- {format_markdown_value(issue.get('title'), '性能预算')}："
+                        f"{format_markdown_value(issue.get('suggestion') or issue.get('detail'), '需要复核')}"
+                    )
+        lines.append("")
     metrics = asset3d.get("metrics") if isinstance(asset3d.get("metrics"), list) else []
     if metrics:
         lines.extend(["## 3D 风险快照", "", "| 指标 | 值 |", "| --- | --- |"])
@@ -7929,6 +7995,7 @@ def render_native_runtime_release_control_markdown(payload: dict) -> str:
 def write_native_runtime_release_control_reports(bundle_dir: Path) -> dict:
     payload = build_native_runtime_release_control_payload(bundle_dir)
     write_native_runtime_vn_baseline_quality_reports(bundle_dir)
+    write_native_runtime_performance_budget_reports(bundle_dir)
     (bundle_dir / "native-runtime-release-control-report.json").write_text(
         json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
@@ -7961,6 +8028,9 @@ def build_acceptance_automated_checks(release_control: dict, integrity_verificat
     vn_baseline = (
         release_control.get("vnBaselineQuality") if isinstance(release_control.get("vnBaselineQuality"), dict) else {}
     )
+    performance_budget = (
+        release_control.get("performanceBudget") if isinstance(release_control.get("performanceBudget"), dict) else {}
+    )
     return [
         {
             "id": "release_check",
@@ -7989,6 +8059,13 @@ def build_acceptance_automated_checks(release_control: dict, integrity_verificat
             "status": str(vn_baseline.get("status") or "unavailable"),
             "summary": vn_baseline.get("summary") or {},
             "command": "python3 runtime_player.py --vn-baseline-quality-report .",
+        },
+        {
+            "id": "performance_budget",
+            "label": "性能预算",
+            "status": str(performance_budget.get("status") or "unavailable"),
+            "summary": performance_budget.get("summary") or {},
+            "command": "python3 runtime_player.py --performance-budget-report .",
         },
         {
             "id": "file_integrity",
@@ -8165,6 +8242,7 @@ def build_native_runtime_acceptance_payload(bundle_dir: Path) -> dict:
         "recommendedCommands": [
             "python3 runtime_player.py --doctor .",
             "python3 runtime_player.py --verify-file-integrity .",
+            "python3 runtime_player.py --performance-budget-report .",
             "python3 runtime_player.py --release-control-report .",
             "python3 runtime_player.py --acceptance-report .",
         ],
@@ -8175,6 +8253,8 @@ def build_native_runtime_acceptance_payload(bundle_dir: Path) -> dict:
             "releaseControlJson": "native-runtime-release-control-report.json",
             "fileIntegrityJson": FILE_INTEGRITY_REPORT_NAME,
             "fileIntegrityMarkdown": FILE_INTEGRITY_MARKDOWN_NAME,
+            "performanceBudgetJson": PERFORMANCE_BUDGET_REPORT_NAME,
+            "performanceBudgetMarkdown": PERFORMANCE_BUDGET_MARKDOWN_NAME,
         },
     }
 
