@@ -9,6 +9,7 @@ from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "editor_filters.js"
+APP_PATH = ROOT_DIR / "prototype_editor" / "app.js"
 
 
 class FrontendEditorFiltersModuleTests(unittest.TestCase):
@@ -357,6 +358,17 @@ class FrontendEditorFiltersModuleTests(unittest.TestCase):
         self.assertEqual(payload["searchScores"], [22, 14, 6, -1, -1])
         self.assertEqual(payload["sortedTitles"], ["甲", "丙", "乙", "空分"])
         self.assertEqual(payload["constants"], ["台词和选项", "演出偏素", "待绑语音"])
+
+    def test_editor_app_uses_editor_filter_module_labels(self) -> None:
+        app_source = APP_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("} = editorFilterTools;", app_source)
+        self.assertNotIn("const DASHBOARD_SEARCH_MODE_LABELS = editorFilterTools?.DASHBOARD_SEARCH_MODE_LABELS", app_source)
+        self.assertNotIn("const STORY_BLOCK_TYPE_FILTER_LABELS = editorFilterTools?.STORY_BLOCK_TYPE_FILTER_LABELS", app_source)
+        self.assertNotIn("const SCRIPT_ISSUE_FILTER_LABELS = editorFilterTools?.SCRIPT_ISSUE_FILTER_LABELS", app_source)
+        self.assertIn("return editorFilterTools.getSafeDashboardSearchMode(mode);", app_source)
+        self.assertIn("return editorFilterTools.getStoryBlockGroup(type);", app_source)
+        self.assertIn("return editorFilterTools.getScriptIssueFilterLabel(value);", app_source)
 
 
 if __name__ == "__main__":

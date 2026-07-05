@@ -287,180 +287,36 @@ const CREATIVE_ASSISTANT_PROMPT_SAMPLES = creativeAssistantTools?.CREATIVE_ASSIS
   "黄昏天台，青梅竹马终于谈起三年前的误会",
 ];
 
-const SHAKE_INTENSITY_LABELS = visualEffectTools?.SHAKE_INTENSITY_LABELS ?? {
-  light: "轻微",
-  medium: "明显",
-  heavy: "很强",
-};
-
-const EFFECT_DURATION_LABELS = visualEffectTools?.EFFECT_DURATION_LABELS ?? {
-  short: "短一下",
-  medium: "正常",
-  long: "久一点",
-};
-
-const FLASH_COLOR_LABELS = visualEffectTools?.FLASH_COLOR_LABELS ?? {
-  white: "白闪",
-  warm: "暖光",
-  red: "红闪",
-  black: "黑闪",
-};
-
-const FLASH_INTENSITY_LABELS = visualEffectTools?.FLASH_INTENSITY_LABELS ?? {
-  soft: "柔和",
-  medium: "明显",
-  strong: "很亮",
-};
-
-const FADE_ACTION_LABELS = visualEffectTools?.FADE_ACTION_LABELS ?? {
-  fade_out: "慢慢淡出",
-  fade_in: "慢慢亮起",
-};
-
-const FADE_COLOR_LABELS = visualEffectTools?.FADE_COLOR_LABELS ?? {
-  black: "黑场",
-  white: "白场",
-};
-
-const CAMERA_ZOOM_ACTION_LABELS = visualEffectTools?.CAMERA_ZOOM_ACTION_LABELS ?? {
-  zoom_in: "推近镜头",
-  zoom_out: "拉远镜头",
-  reset: "恢复正常",
-};
-
-const CAMERA_ZOOM_STRENGTH_LABELS = visualEffectTools?.CAMERA_ZOOM_STRENGTH_LABELS ?? {
-  light: "轻一点",
-  medium: "明显",
-  heavy: "更强",
-};
-
-const CAMERA_ZOOM_FOCUS_LABELS = visualEffectTools?.CAMERA_ZOOM_FOCUS_LABELS ?? {
-  left: "看左侧",
-  center: "看中间",
-  right: "看右侧",
-};
-
-const SCREEN_FILTER_ACTION_LABELS = visualEffectTools?.SCREEN_FILTER_ACTION_LABELS ?? {
-  apply: "开启滤镜",
-  clear: "关闭滤镜",
-};
-
-const SCREEN_FILTER_PRESET_LABELS = visualEffectTools?.SCREEN_FILTER_PRESET_LABELS ?? {
-  memory: "暖色回忆",
-  mono: "黑白回忆",
-  dream: "梦境柔光",
-  cold: "冷色回放",
-};
-
-const SCREEN_FILTER_STRENGTH_LABELS = visualEffectTools?.SCREEN_FILTER_STRENGTH_LABELS ?? {
-  soft: "轻一点",
-  medium: "正常",
-  strong: "更明显",
-};
-
-const SCREEN_COLOR_GRADE_DEFAULTS = visualEffectTools?.SCREEN_COLOR_GRADE_DEFAULTS ?? Object.freeze({
-  brightness: 100,
-  contrast: 100,
-  saturation: 100,
-  hue: 0,
-  temperature: 0,
-  vignette: 0,
-});
-
-const SCREEN_COLOR_GRADE_LIMITS = visualEffectTools?.SCREEN_COLOR_GRADE_LIMITS ?? Object.freeze({
-  brightness: Object.freeze([40, 180]),
-  contrast: Object.freeze([40, 180]),
-  saturation: Object.freeze([0, 220]),
-  hue: Object.freeze([-180, 180]),
-  temperature: Object.freeze([-100, 100]),
-  vignette: Object.freeze([0, 100]),
-});
-
-const CAMERA_PAN_TARGET_LABELS = visualEffectTools?.CAMERA_PAN_TARGET_LABELS ?? {
-  left: "向左看",
-  center: "回到中间",
-  right: "向右看",
-};
-
-const CAMERA_PAN_STRENGTH_LABELS = visualEffectTools?.CAMERA_PAN_STRENGTH_LABELS ?? {
-  light: "轻一点",
-  medium: "明显",
-  heavy: "更远",
-};
-
-const DEPTH_BLUR_ACTION_LABELS = visualEffectTools?.DEPTH_BLUR_ACTION_LABELS ?? {
-  apply: "开启景深",
-  clear: "关闭景深",
-};
-
-const DEPTH_BLUR_FOCUS_LABELS = visualEffectTools?.DEPTH_BLUR_FOCUS_LABELS ?? {
-  left: "左侧角色更清楚",
-  center: "中间角色更清楚",
-  right: "右侧角色更清楚",
-  full: "只虚化背景",
-};
-
-const DEPTH_BLUR_STRENGTH_LABELS = visualEffectTools?.DEPTH_BLUR_STRENGTH_LABELS ?? {
-  soft: "轻一点",
-  medium: "正常",
-  strong: "更明显",
-};
-
-const VIDEO_FIT_LABELS = visualEffectTools?.VIDEO_FIT_LABELS ?? {
-  contain: "完整显示",
-  cover: "铺满裁切",
-  fill: "拉伸填满",
-};
-
-const VIDEO_VOLUME_LABELS = visualEffectTools?.VIDEO_VOLUME_LABELS ?? {
-  0: "静音",
-  25: "25%",
-  50: "50%",
-  75: "75%",
-  100: "100%",
-};
-
-const CREDITS_BACKGROUND_LABELS = visualEffectTools?.CREDITS_BACKGROUND_LABELS ?? {
-  dark: "深色电影片尾",
-  light: "浅色清爽片尾",
-  transparent: "叠在当前画面上",
-};
-
-const POSITION_LABELS = visualEffectTools?.POSITION_LABELS ?? {
-  left: "左侧",
-  center: "中间",
-  right: "右侧",
-};
-
-const CHARACTER_TRANSITION_LABELS = visualEffectTools?.CHARACTER_TRANSITION_LABELS ?? {
-  fade: "淡入淡出",
-  slide_left: "从左侧滑入 / 滑出",
-  slide_right: "从右侧滑入 / 滑出",
-  rise: "向上浮现",
-  pop: "轻微弹出",
-  none: "直接切换",
-};
-
-const BASIC_TRANSITION_LABELS = visualEffectTools?.BASIC_TRANSITION_LABELS ?? {
-  fade: "淡入淡出",
-  none: "直接切换",
-};
-
-const DEFAULT_CHARACTER_STAGE = visualEffectTools?.DEFAULT_CHARACTER_STAGE ?? {
-  offsetX: 0,
-  offsetY: 0,
-  scale: 100,
-  opacity: 100,
-  layer: 0,
-  flipX: false,
-};
-
-const TEXT_SPEED_LABELS = visualEffectTools?.TEXT_SPEED_LABELS ?? {
-  slow: "慢一点",
-  normal: "正常",
-  fast: "快一点",
-  instant: "立刻显示",
-};
+const {
+  SHAKE_INTENSITY_LABELS,
+  EFFECT_DURATION_LABELS,
+  FLASH_COLOR_LABELS,
+  FLASH_INTENSITY_LABELS,
+  FADE_ACTION_LABELS,
+  FADE_COLOR_LABELS,
+  CAMERA_ZOOM_ACTION_LABELS,
+  CAMERA_ZOOM_STRENGTH_LABELS,
+  CAMERA_ZOOM_FOCUS_LABELS,
+  SCREEN_FILTER_ACTION_LABELS,
+  SCREEN_FILTER_PRESET_LABELS,
+  SCREEN_FILTER_STRENGTH_LABELS,
+  SCREEN_COLOR_GRADE_DEFAULTS,
+  SCREEN_COLOR_GRADE_LIMITS,
+  CAMERA_PAN_TARGET_LABELS,
+  CAMERA_PAN_STRENGTH_LABELS,
+  DEPTH_BLUR_ACTION_LABELS,
+  DEPTH_BLUR_FOCUS_LABELS,
+  DEPTH_BLUR_STRENGTH_LABELS,
+  VIDEO_FIT_LABELS,
+  VIDEO_VOLUME_LABELS,
+  CREDITS_BACKGROUND_LABELS,
+  POSITION_LABELS,
+  CHARACTER_TRANSITION_LABELS,
+  BASIC_TRANSITION_LABELS,
+  DEFAULT_CHARACTER_STAGE,
+  TEXT_SPEED_LABELS,
+  DIALOG_THEME_LABELS,
+} = visualEffectTools;
 
 const typewriterGraphemeSegmenter =
   typeof Intl !== "undefined" && typeof Intl.Segmenter === "function"
@@ -492,14 +348,6 @@ const TYPEWRITER_PERIOD_ABBREVIATIONS = new Set([
   "ltd",
   "co",
 ]);
-
-const DIALOG_THEME_LABELS = visualEffectTools?.DIALOG_THEME_LABELS ?? {
-  project: "项目样式",
-  warm: "暖光标准",
-  moonlight: "夜色月光",
-  paper: "纸页回忆",
-  transparent: "透明无框",
-};
 
 const getSafePosition = visualEffectTools.getSafePosition;
 const getSafeTransition = visualEffectTools.getSafeTransition;
@@ -542,38 +390,21 @@ const UI_THEME_MODE_LABELS = uiThemeTools?.UI_THEME_MODE_LABELS ?? {
   dark: "深色模式",
 };
 
-const DASHBOARD_SEARCH_MODE_LABELS = editorFilterTools?.DASHBOARD_SEARCH_MODE_LABELS ?? {
-  all: "全部结果",
-  scenes: "场景",
-  characters: "角色",
-  lines: "台词和选项",
-};
-
-const ROUTE_MAP_FILTER_LABELS = editorFilterTools?.ROUTE_MAP_FILTER_LABELS ?? {
-  all: "全部场景",
-  issues: "有问题",
-  missing_background: "缺背景",
-  missing_music: "缺 BGM",
-  missing_voice: "缺语音",
-  unreachable: "不可达",
-  flat: "演出偏素",
-  empty: "正文未开始",
-  ready: "完成度高",
-};
-
-const SCENE_STATUS_LABELS = editorFilterTools?.SCENE_STATUS_LABELS ?? {
-  outline: "待开写",
-  drafting: "写作中",
-  polishing: "润色中",
-  ready: "可试玩",
-};
-
-const SCENE_PRIORITY_LABELS = editorFilterTools?.SCENE_PRIORITY_LABELS ?? {
-  normal: "正常",
-  focus: "优先处理",
-  rush: "马上处理",
-  parked: "先放一放",
-};
+const {
+  DASHBOARD_SEARCH_MODE_LABELS,
+  ROUTE_MAP_FILTER_LABELS,
+  SCENE_STATUS_LABELS,
+  SCENE_PRIORITY_LABELS,
+  STORY_BLOCK_TYPE_FILTER_LABELS,
+  STORY_BLOCK_ISSUE_FILTER_LABELS,
+  STORY_SCENE_TREE_FILTER_LABELS,
+  CHARACTER_FILTER_LABELS,
+  PREVIEW_ISSUE_FILTER_LABELS,
+  PREVIEW_SCENE_FILTER_LABELS,
+  SCRIPT_TYPE_LABELS,
+  SCRIPT_VOICE_FILTER_LABELS,
+  SCRIPT_ISSUE_FILTER_LABELS,
+} = editorFilterTools;
 
 const EDITOR_MODE_LABELS = editorModeTools?.EDITOR_MODE_LABELS ?? {
   beginner: "新手模式",
@@ -589,80 +420,6 @@ const PROJECT_LANGUAGE_LABELS = {
 const NAV_SCREEN_LABELS = editorModeTools?.NAV_SCREEN_LABELS ?? {};
 const BEGINNER_STORY_TOOLBAR_ACTIONS = editorModeTools?.BEGINNER_STORY_TOOLBAR_ACTIONS ?? new Set();
 const BEGINNER_ASSET_TOOLBAR_ACTIONS = editorModeTools?.BEGINNER_ASSET_TOOLBAR_ACTIONS ?? new Set();
-
-const STORY_BLOCK_TYPE_FILTER_LABELS = editorFilterTools?.STORY_BLOCK_TYPE_FILTER_LABELS ?? {
-  all: "全部卡片",
-  story: "只看正文",
-  effect: "只看演出",
-  logic: "只看逻辑",
-  video: "只看视频",
-  dialogue: "只看台词",
-  choice: "只看选项",
-};
-
-const STORY_BLOCK_ISSUE_FILTER_LABELS = editorFilterTools?.STORY_BLOCK_ISSUE_FILTER_LABELS ?? {
-  all: "全部状态",
-  any: "只看有问题",
-  missing_voice: "待绑语音",
-  missing_asset: "待补素材",
-  broken_target: "跳转待修",
-  variable_logic: "变量待修",
-  too_long: "偏长文本",
-};
-
-const STORY_SCENE_TREE_FILTER_LABELS = editorFilterTools?.STORY_SCENE_TREE_FILTER_LABELS ?? {
-  all: "全部场景",
-  focus: "重点场景",
-  ready: "可试玩",
-  issues: "有问题",
-  notes: "有便签",
-};
-
-const CHARACTER_FILTER_LABELS = editorFilterTools?.CHARACTER_FILTER_LABELS ?? {
-  all: "全部角色",
-  missing_voice: "待配音",
-  voiced: "语音已齐",
-  major: "台词较多",
-  silent: "暂无台词",
-};
-
-const PREVIEW_ISSUE_FILTER_LABELS = editorFilterTools?.PREVIEW_ISSUE_FILTER_LABELS ?? {
-  all: "全部检查",
-  errors: "结构错误",
-  warnings: "补充提醒",
-  export_missing: "导出缺失",
-  media_budget: "素材预算",
-  unused_assets: "未使用素材",
-};
-
-const PREVIEW_SCENE_FILTER_LABELS = editorFilterTools?.PREVIEW_SCENE_FILTER_LABELS ?? {
-  all: "全部起点",
-  focus: "重点场景",
-  ready: "可试玩",
-  issues: "有问题",
-};
-
-const SCRIPT_TYPE_LABELS = editorFilterTools?.SCRIPT_TYPE_LABELS ?? {
-  dialogue: "台词",
-  narration: "旁白",
-  choice: "选项",
-};
-
-const SCRIPT_VOICE_FILTER_LABELS = editorFilterTools?.SCRIPT_VOICE_FILTER_LABELS ?? {
-  all: "全部状态",
-  missing: "待绑语音",
-  voiced: "已绑语音",
-  not_required: "不需要语音",
-};
-
-const SCRIPT_ISSUE_FILTER_LABELS = editorFilterTools?.SCRIPT_ISSUE_FILTER_LABELS ?? {
-  all: "全部问题状态",
-  any: "只看有问题",
-  placeholder: "待补正文",
-  too_long: "偏长内容",
-  duplicate: "疑似重复",
-  missing_voice: "待绑语音",
-};
 
 const PREVIEW_PLAYBACK_DEFAULTS = {
   textSpeed: "normal",
@@ -12869,119 +12626,47 @@ function renderRouteAlerts(routeOverview) {
 }
 
 function getSafeDashboardSearchMode(mode) {
-  if (editorFilterTools?.getSafeDashboardSearchMode) {
-    return editorFilterTools.getSafeDashboardSearchMode(mode);
-  }
-
-  return Object.prototype.hasOwnProperty.call(DASHBOARD_SEARCH_MODE_LABELS, mode) ? mode : "all";
+  return editorFilterTools.getSafeDashboardSearchMode(mode);
 }
 
 function getDashboardSearchModeLabel(mode) {
-  if (editorFilterTools?.getDashboardSearchModeLabel) {
-    return editorFilterTools.getDashboardSearchModeLabel(mode);
-  }
-
-  return DASHBOARD_SEARCH_MODE_LABELS[getSafeDashboardSearchMode(mode)] ?? DASHBOARD_SEARCH_MODE_LABELS.all;
+  return editorFilterTools.getDashboardSearchModeLabel(mode);
 }
 
 function getSafeRouteMapFilter(mode) {
-  if (editorFilterTools?.getSafeRouteMapFilter) {
-    return editorFilterTools.getSafeRouteMapFilter(mode);
-  }
-
-  return Object.prototype.hasOwnProperty.call(ROUTE_MAP_FILTER_LABELS, mode) ? mode : "all";
+  return editorFilterTools.getSafeRouteMapFilter(mode);
 }
 
 function getRouteMapFilterLabel(mode) {
-  if (editorFilterTools?.getRouteMapFilterLabel) {
-    return editorFilterTools.getRouteMapFilterLabel(mode);
-  }
-
-  return ROUTE_MAP_FILTER_LABELS[getSafeRouteMapFilter(mode)] ?? ROUTE_MAP_FILTER_LABELS.all;
+  return editorFilterTools.getRouteMapFilterLabel(mode);
 }
 
 function getSafeSceneStatus(value) {
-  if (editorFilterTools?.getSafeSceneStatus) {
-    return editorFilterTools.getSafeSceneStatus(value);
-  }
-
-  return Object.prototype.hasOwnProperty.call(SCENE_STATUS_LABELS, value) ? value : "drafting";
+  return editorFilterTools.getSafeSceneStatus(value);
 }
 
 function getSceneStatusLabel(value) {
-  if (editorFilterTools?.getSceneStatusLabel) {
-    return editorFilterTools.getSceneStatusLabel(value);
-  }
-
-  return SCENE_STATUS_LABELS[getSafeSceneStatus(value)] ?? SCENE_STATUS_LABELS.drafting;
+  return editorFilterTools.getSceneStatusLabel(value);
 }
 
 function getSafeScenePriority(value) {
-  if (editorFilterTools?.getSafeScenePriority) {
-    return editorFilterTools.getSafeScenePriority(value);
-  }
-
-  return Object.prototype.hasOwnProperty.call(SCENE_PRIORITY_LABELS, value) ? value : "normal";
+  return editorFilterTools.getSafeScenePriority(value);
 }
 
 function getScenePriorityLabel(value) {
-  if (editorFilterTools?.getScenePriorityLabel) {
-    return editorFilterTools.getScenePriorityLabel(value);
-  }
-
-  return SCENE_PRIORITY_LABELS[getSafeScenePriority(value)] ?? SCENE_PRIORITY_LABELS.normal;
+  return editorFilterTools.getScenePriorityLabel(value);
 }
 
 function getSceneStatusToneClass(status) {
-  if (editorFilterTools?.getSceneStatusToneClass) {
-    return editorFilterTools.getSceneStatusToneClass(status);
-  }
-
-  const safeStatus = getSafeSceneStatus(status);
-  if (safeStatus === "ready") {
-    return "good-text";
-  }
-  if (safeStatus === "polishing") {
-    return "warn-text";
-  }
-  return "";
+  return editorFilterTools.getSceneStatusToneClass(status);
 }
 
 function getScenePriorityToneClass(priority) {
-  if (editorFilterTools?.getScenePriorityToneClass) {
-    return editorFilterTools.getScenePriorityToneClass(priority);
-  }
-
-  const safePriority = getSafeScenePriority(priority);
-  if (safePriority === "rush") {
-    return "danger-text";
-  }
-  if (safePriority === "focus") {
-    return "warn-text";
-  }
-  return "";
+  return editorFilterTools.getScenePriorityToneClass(priority);
 }
 
 function getSceneQuickButtonToneClass(kind, value) {
-  if (editorFilterTools?.getSceneQuickButtonToneClass) {
-    return editorFilterTools.getSceneQuickButtonToneClass(kind, value);
-  }
-
-  if (kind === "status") {
-    return getSafeSceneStatus(value) === "ready" ? "is-good" : "is-soft";
-  }
-
-  const safePriority = getSafeScenePriority(value);
-  if (safePriority === "rush") {
-    return "is-danger";
-  }
-  if (safePriority === "focus") {
-    return "is-warn";
-  }
-  if (safePriority === "parked") {
-    return "is-muted";
-  }
-  return "is-soft";
+  return editorFilterTools.getSceneQuickButtonToneClass(kind, value);
 }
 
 function renderScenePlanningBadges(scene) {
@@ -13187,66 +12872,27 @@ function focusStoryBlockFilters({
 }
 
 function getSafeStoryBlockTypeFilter(value) {
-  if (editorFilterTools?.getSafeStoryBlockTypeFilter) {
-    return editorFilterTools.getSafeStoryBlockTypeFilter(value);
-  }
-
-  return Object.prototype.hasOwnProperty.call(STORY_BLOCK_TYPE_FILTER_LABELS, value) ? value : "all";
+  return editorFilterTools.getSafeStoryBlockTypeFilter(value);
 }
 
 function getStoryBlockTypeFilterLabel(value) {
-  if (editorFilterTools?.getStoryBlockTypeFilterLabel) {
-    return editorFilterTools.getStoryBlockTypeFilterLabel(value);
-  }
-
-  return STORY_BLOCK_TYPE_FILTER_LABELS[getSafeStoryBlockTypeFilter(value)] ?? STORY_BLOCK_TYPE_FILTER_LABELS.all;
+  return editorFilterTools.getStoryBlockTypeFilterLabel(value);
 }
 
 function getSafeStoryBlockIssueFilter(value) {
-  if (editorFilterTools?.getSafeStoryBlockIssueFilter) {
-    return editorFilterTools.getSafeStoryBlockIssueFilter(value);
-  }
-
-  return Object.prototype.hasOwnProperty.call(STORY_BLOCK_ISSUE_FILTER_LABELS, value) ? value : "all";
+  return editorFilterTools.getSafeStoryBlockIssueFilter(value);
 }
 
 function getStoryBlockIssueFilterLabel(value) {
-  if (editorFilterTools?.getStoryBlockIssueFilterLabel) {
-    return editorFilterTools.getStoryBlockIssueFilterLabel(value);
-  }
-
-  return STORY_BLOCK_ISSUE_FILTER_LABELS[getSafeStoryBlockIssueFilter(value)] ?? STORY_BLOCK_ISSUE_FILTER_LABELS.all;
+  return editorFilterTools.getStoryBlockIssueFilterLabel(value);
 }
 
 function getStoryBlockGroup(type) {
-  if (editorFilterTools?.getStoryBlockGroup) {
-    return editorFilterTools.getStoryBlockGroup(type);
-  }
-
-  if (type === "dialogue" || type === "narration" || type === "choice") {
-    return "story";
-  }
-
-  if (type === "jump" || type === "variable_set" || type === "variable_add" || type === "condition") {
-    return "logic";
-  }
-
-  return "effect";
+  return editorFilterTools.getStoryBlockGroup(type);
 }
 
 function getStoryBlockGroupLabel(type) {
-  if (editorFilterTools?.getStoryBlockGroupLabel) {
-    return editorFilterTools.getStoryBlockGroupLabel(type);
-  }
-
-  const group = getStoryBlockGroup(type);
-  if (group === "story") {
-    return "正文";
-  }
-  if (group === "logic") {
-    return "逻辑";
-  }
-  return "演出";
+  return editorFilterTools.getStoryBlockGroupLabel(type);
 }
 
 function getBlockExpressionAssetId(block) {
@@ -13377,67 +13023,35 @@ function getStoryBlockIssueItems(block) {
 }
 
 function getSafeStorySceneTreeFilter(value) {
-  if (editorFilterTools?.getSafeStorySceneTreeFilter) {
-    return editorFilterTools.getSafeStorySceneTreeFilter(value);
-  }
-
-  return Object.prototype.hasOwnProperty.call(STORY_SCENE_TREE_FILTER_LABELS, value) ? value : "all";
+  return editorFilterTools.getSafeStorySceneTreeFilter(value);
 }
 
 function getStorySceneTreeFilterLabel(value) {
-  if (editorFilterTools?.getStorySceneTreeFilterLabel) {
-    return editorFilterTools.getStorySceneTreeFilterLabel(value);
-  }
-
-  return STORY_SCENE_TREE_FILTER_LABELS[getSafeStorySceneTreeFilter(value)] ?? STORY_SCENE_TREE_FILTER_LABELS.all;
+  return editorFilterTools.getStorySceneTreeFilterLabel(value);
 }
 
 function getSafeCharacterFilterMode(value) {
-  if (editorFilterTools?.getSafeCharacterFilterMode) {
-    return editorFilterTools.getSafeCharacterFilterMode(value);
-  }
-
-  return Object.prototype.hasOwnProperty.call(CHARACTER_FILTER_LABELS, value) ? value : "all";
+  return editorFilterTools.getSafeCharacterFilterMode(value);
 }
 
 function getCharacterFilterLabel(value) {
-  if (editorFilterTools?.getCharacterFilterLabel) {
-    return editorFilterTools.getCharacterFilterLabel(value);
-  }
-
-  return CHARACTER_FILTER_LABELS[getSafeCharacterFilterMode(value)] ?? CHARACTER_FILTER_LABELS.all;
+  return editorFilterTools.getCharacterFilterLabel(value);
 }
 
 function getSafePreviewIssueFilterMode(value) {
-  if (editorFilterTools?.getSafePreviewIssueFilterMode) {
-    return editorFilterTools.getSafePreviewIssueFilterMode(value);
-  }
-
-  return Object.prototype.hasOwnProperty.call(PREVIEW_ISSUE_FILTER_LABELS, value) ? value : "all";
+  return editorFilterTools.getSafePreviewIssueFilterMode(value);
 }
 
 function getPreviewIssueFilterLabel(value) {
-  if (editorFilterTools?.getPreviewIssueFilterLabel) {
-    return editorFilterTools.getPreviewIssueFilterLabel(value);
-  }
-
-  return PREVIEW_ISSUE_FILTER_LABELS[getSafePreviewIssueFilterMode(value)] ?? PREVIEW_ISSUE_FILTER_LABELS.all;
+  return editorFilterTools.getPreviewIssueFilterLabel(value);
 }
 
 function getSafePreviewSceneFilterMode(value) {
-  if (editorFilterTools?.getSafePreviewSceneFilterMode) {
-    return editorFilterTools.getSafePreviewSceneFilterMode(value);
-  }
-
-  return Object.prototype.hasOwnProperty.call(PREVIEW_SCENE_FILTER_LABELS, value) ? value : "all";
+  return editorFilterTools.getSafePreviewSceneFilterMode(value);
 }
 
 function getPreviewSceneFilterLabel(value) {
-  if (editorFilterTools?.getPreviewSceneFilterLabel) {
-    return editorFilterTools.getPreviewSceneFilterLabel(value);
-  }
-
-  return PREVIEW_SCENE_FILTER_LABELS[getSafePreviewSceneFilterMode(value)] ?? PREVIEW_SCENE_FILTER_LABELS.all;
+  return editorFilterTools.getPreviewSceneFilterLabel(value);
 }
 
 function resetCharacterFilters() {
@@ -17736,19 +17350,11 @@ function getScriptVoiceStatusText(status) {
 }
 
 function getSafeScriptIssueFilter(value) {
-  if (editorFilterTools?.getSafeScriptIssueFilter) {
-    return editorFilterTools.getSafeScriptIssueFilter(value);
-  }
-
-  return Object.prototype.hasOwnProperty.call(SCRIPT_ISSUE_FILTER_LABELS, value) ? value : "all";
+  return editorFilterTools.getSafeScriptIssueFilter(value);
 }
 
 function getScriptIssueFilterLabel(value) {
-  if (editorFilterTools?.getScriptIssueFilterLabel) {
-    return editorFilterTools.getScriptIssueFilterLabel(value);
-  }
-
-  return SCRIPT_ISSUE_FILTER_LABELS[getSafeScriptIssueFilter(value)] ?? SCRIPT_ISSUE_FILTER_LABELS.all;
+  return editorFilterTools.getScriptIssueFilterLabel(value);
 }
 
 function buildScriptExportFileName(format) {
@@ -18106,35 +17712,19 @@ function getSafeScriptCharacterFilter(characterId) {
 }
 
 function getSafeScriptTypeFilter(type) {
-  if (editorFilterTools?.getSafeScriptTypeFilter) {
-    return editorFilterTools.getSafeScriptTypeFilter(type);
-  }
-
-  return Object.prototype.hasOwnProperty.call(SCRIPT_TYPE_LABELS, type) ? type : "all";
+  return editorFilterTools.getSafeScriptTypeFilter(type);
 }
 
 function getSafeScriptVoiceFilter(value) {
-  if (editorFilterTools?.getSafeScriptVoiceFilter) {
-    return editorFilterTools.getSafeScriptVoiceFilter(value);
-  }
-
-  return Object.prototype.hasOwnProperty.call(SCRIPT_VOICE_FILTER_LABELS, value) ? value : "all";
+  return editorFilterTools.getSafeScriptVoiceFilter(value);
 }
 
 function getScriptTypeLabel(type) {
-  if (editorFilterTools?.getScriptTypeLabel) {
-    return editorFilterTools.getScriptTypeLabel(type);
-  }
-
-  return type === "all" ? "全部内容" : SCRIPT_TYPE_LABELS[getSafeScriptTypeFilter(type)] ?? "全部内容";
+  return editorFilterTools.getScriptTypeLabel(type);
 }
 
 function getScriptVoiceFilterLabel(value) {
-  if (editorFilterTools?.getScriptVoiceFilterLabel) {
-    return editorFilterTools.getScriptVoiceFilterLabel(value);
-  }
-
-  return SCRIPT_VOICE_FILTER_LABELS[getSafeScriptVoiceFilter(value)] ?? SCRIPT_VOICE_FILTER_LABELS.all;
+  return editorFilterTools.getScriptVoiceFilterLabel(value);
 }
 
 function getScriptChapterFilterLabel(chapterId) {

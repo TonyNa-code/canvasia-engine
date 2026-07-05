@@ -9,6 +9,7 @@ from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "visual_effects.js"
+APP_PATH = ROOT_DIR / "prototype_editor" / "app.js"
 
 
 class FrontendVisualEffectsModuleTests(unittest.TestCase):
@@ -236,6 +237,16 @@ class FrontendVisualEffectsModuleTests(unittest.TestCase):
             "--sprite-offset-x:12%;--sprite-offset-y:-8%;--sprite-scale:1.250;--sprite-opacity:0.70;--sprite-layer:3;--sprite-flip-x:-1;z-index:23;",
         )
         self.assertEqual(payload["characterStage"][18], "X 12% / Y -8% / 125% / 透明 70% / 层级 3 / 镜像")
+
+    def test_editor_app_uses_visual_effect_module_constants(self) -> None:
+        app_source = APP_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("} = visualEffectTools;", app_source)
+        self.assertNotIn("const SHAKE_INTENSITY_LABELS = visualEffectTools?.SHAKE_INTENSITY_LABELS", app_source)
+        self.assertNotIn("const SCREEN_COLOR_GRADE_DEFAULTS = visualEffectTools?.SCREEN_COLOR_GRADE_DEFAULTS", app_source)
+        self.assertNotIn("const DIALOG_THEME_LABELS = visualEffectTools?.DIALOG_THEME_LABELS", app_source)
+        self.assertIn("TEXT_SPEED_LABELS,", app_source)
+        self.assertIn("DIALOG_THEME_LABELS,", app_source)
 
 
 if __name__ == "__main__":
