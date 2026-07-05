@@ -2445,6 +2445,7 @@ function getCommandPaletteContext() {
   const validation = state.data ? state.validation ?? runValidation(state.data) : { errors: [], warnings: [] };
   const selectedScene = state.data ? getSelectedScene() : null;
   const selectedBlock = state.data ? getSelectedBlock() : null;
+  const projectHistory = state.data ? getSafeProjectHistory() : null;
   const oneClickPolishDigest =
     state.data && typeof projectPolishTools?.getProjectOneClickPolishDigest === "function"
       ? projectPolishTools.getProjectOneClickPolishDigest(state.data)
@@ -2468,6 +2469,8 @@ function getCommandPaletteContext() {
     oneClickPolishDigest,
     hasOneClickPolishReceipt: Boolean(state.projectOneClickPolishReceipt),
     projectOneClickPolishInFlight: Boolean(state.projectOneClickPolishInFlight),
+    projectHistoryCanUndo: Boolean(projectHistory?.canUndo),
+    projectHistoryCanRedo: Boolean(projectHistory?.canRedo),
   };
 }
 

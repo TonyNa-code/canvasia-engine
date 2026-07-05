@@ -87,6 +87,17 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
               hasOneClickPolishReceipt: false,
               oneClickPolishDigest: {{ canApply: false, actionLabel: "发布前整理已完成" }},
             }});
+            const safetyNoProject = tools.buildProjectSafetyCommands({{ hasProject: false }});
+            const safetyNoHistory = tools.buildProjectSafetyCommands({{
+              hasProject: true,
+              projectHistoryCanUndo: false,
+              projectHistoryCanRedo: false,
+            }});
+            const safetyWithHistory = tools.buildProjectSafetyCommands({{
+              hasProject: true,
+              projectHistoryCanUndo: true,
+              projectHistoryCanRedo: true,
+            }});
             const storySearch = tools.filterCommandPaletteCommands(project, "剧情");
             const dialogueSearch = tools.filterCommandPaletteCommands(projectWithScene, "台词");
             const playableSearch = tools.filterCommandPaletteCommands(projectWithScene, "可试玩");
@@ -94,6 +105,8 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
             const creditsSearch = tools.filterCommandPaletteCommands(projectWithScene, "片尾");
             const branchMergeSearch = tools.filterCommandPaletteCommands(projectWithScene, "汇合");
             const releaseSearch = tools.filterCommandPaletteCommands(projectReleaseReady, "发布 整理");
+            const safetySearch = tools.filterCommandPaletteCommands(projectReleaseReady, "快照");
+            const rollbackSearch = tools.filterCommandPaletteCommands(projectReleaseReady, "恢复 版本");
             const exportCommand = project.find((command) => command.id === "export-web");
             const firstChapterCommand = project.find((command) => command.id === "create-first-chapter");
             const disabledDialogueCommand = project.find((command) => command.id === "insert-dialogue");
@@ -136,6 +149,11 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
               releaseExportDisabled: releaseExportCommand.disabled,
               releaseExportAction: releaseExportCommand.action,
               releaseSearchIds: releaseSearch.map((command) => command.id),
+              safetyNoProjectDisabled: safetyNoProject.map((command) => command.disabled),
+              safetyNoHistory: safetyNoHistory.map((command) => [command.id, command.disabled, command.disabledReason]),
+              safetyWithHistory: safetyWithHistory.map((command) => [command.id, command.disabled, command.action]),
+              safetySearchIds: safetySearch.map((command) => command.id),
+              rollbackSearchIds: rollbackSearch.map((command) => command.id),
               playableSearchIds: playableSearch.map((command) => command.id),
               affectionSearchIds: affectionSearch.map((command) => command.id),
               creditsSearchIds: creditsSearch.map((command) => command.id),
@@ -148,6 +166,7 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
         payload = self.run_node(script)
 
         self.assertIn("buildReleaseWorkflowCommands", payload["keys"])
+        self.assertIn("buildProjectSafetyCommands", payload["keys"])
         self.assertTrue(payload["noProjectStoryDisabled"])
         self.assertFalse(payload["noProjectDemoDisabled"])
         self.assertFalse(payload["exportDisabled"])
@@ -180,6 +199,14 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
         self.assertEqual(payload["releaseExportAction"], "export-project-one-click-polish-receipt")
         self.assertIn("release-one-click-polish", payload["releaseSearchIds"])
         self.assertIn("release-export-polish-receipt", payload["releaseSearchIds"])
+        self.assertTrue(all(payload["safetyNoProjectDisabled"]))
+        self.assertIn(["safety-create-checkpoint", False, ""], payload["safetyNoHistory"])
+        self.assertIn(["safety-undo-history", True, "现在没有更早的项目版本可以恢复"], payload["safetyNoHistory"])
+        self.assertIn(["safety-restore-previous", True, "现在没有更早的项目版本可以恢复"], payload["safetyNoHistory"])
+        self.assertIn(["safety-redo-history", False, "redo-project-history"], payload["safetyWithHistory"])
+        self.assertIn(["safety-restore-previous", False, "restore-previous-version"], payload["safetyWithHistory"])
+        self.assertIn("safety-create-checkpoint", payload["safetySearchIds"])
+        self.assertIn("safety-restore-previous", payload["rollbackSearchIds"])
         self.assertIn("template-playable-scene", payload["playableSearchIds"])
         self.assertIn("template-affection-choice", payload["affectionSearchIds"])
         self.assertIn("template-ending-credits", payload["creditsSearchIds"])

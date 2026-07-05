@@ -343,6 +343,40 @@
     },
   ];
 
+  const PROJECT_SAFETY_COMMANDS = [
+    {
+      id: "safety-create-checkpoint",
+      title: "创建安全快照",
+      subtitle: "给当前项目手动存一份可回退版本",
+      action: "create-history-checkpoint",
+      keywords: ["快照", "安全", "备份", "checkpoint", "save"],
+    },
+    {
+      id: "safety-undo-history",
+      title: "撤销上一步项目操作",
+      subtitle: "回到项目历史里的上一份状态",
+      action: "undo-project-history",
+      requiresUndo: true,
+      keywords: ["撤销", "回退", "undo", "历史"],
+    },
+    {
+      id: "safety-redo-history",
+      title: "重做下一步项目操作",
+      subtitle: "重新应用刚撤销的项目状态",
+      action: "redo-project-history",
+      requiresRedo: true,
+      keywords: ["重做", "redo", "历史"],
+    },
+    {
+      id: "safety-restore-previous",
+      title: "恢复到上个版本",
+      subtitle: "从项目历史里恢复最近一次更早版本",
+      action: "restore-previous-version",
+      requiresUndo: true,
+      keywords: ["恢复", "上个版本", "版本", "history", "rollback"],
+    },
+  ];
+
   function normalizeSearchText(value) {
     return String(value ?? "").trim().toLowerCase();
   }
@@ -626,6 +660,33 @@
     });
   }
 
+  function buildProjectSafetyCommands(context = {}) {
+    const hasProject = Boolean(context.hasProject);
+    const canUndo = Boolean(context.projectHistoryCanUndo);
+    const canRedo = Boolean(context.projectHistoryCanRedo);
+    const disabledProjectTitle = "先新建或打开项目后可用";
+
+    return PROJECT_SAFETY_COMMANDS.map((command) => {
+      const disabled =
+        !hasProject ||
+        (Boolean(command.requiresUndo) && !canUndo) ||
+        (Boolean(command.requiresRedo) && !canRedo);
+      const disabledReason = !hasProject
+        ? disabledProjectTitle
+        : Boolean(command.requiresUndo) && !canUndo
+          ? "现在没有更早的项目版本可以恢复"
+          : Boolean(command.requiresRedo) && !canRedo
+            ? "现在没有可重做的项目版本"
+            : "";
+      return {
+        ...command,
+        section: "安全网",
+        disabled,
+        disabledReason,
+      };
+    });
+  }
+
   function prioritizeRecommendedCommands(commands = [], context = {}) {
     const recommendedIds = getRecommendedCommandIds(context);
     if (!recommendedIds.length || !commands.length) {
@@ -819,6 +880,7 @@
         disabledReason: !hasProject ? disabledProjectTitle : !needsStarterKit ? "当前项目暂不需要起步骨架" : "",
         keywords: ["角色", "背景", "bgm", "起步"],
       },
+      ...buildProjectSafetyCommands(context),
       ...buildReleaseWorkflowCommands(context),
       {
         id: "export-web",
@@ -906,6 +968,7 @@
     clampCommandPaletteIndex,
     renderCommandPaletteList,
     buildReleaseWorkflowCommands,
+    buildProjectSafetyCommands,
     getRecommendedCommandIds,
     getStoryTemplateRecommendationCommandIds,
     prioritizeRecommendedCommands,
