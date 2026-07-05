@@ -32,6 +32,12 @@
     slide_right: "moveoutright",
     rise: "moveoutbottom",
   });
+  const TEXT_SPEED_CPS = Object.freeze({
+    slow: 24,
+    normal: 42,
+    fast: 72,
+    instant: 10000,
+  });
 
   function toArray(value) {
     return Array.isArray(value) ? value : [];
@@ -359,6 +365,20 @@
     return cleanText(block.text ?? block.fields?.text);
   }
 
+  function getSafeTextSpeed(speed) {
+    const safeSpeed = cleanText(speed);
+    return Object.hasOwn(TEXT_SPEED_CPS, safeSpeed) ? safeSpeed : "";
+  }
+
+  function renderRenpyText(block = {}) {
+    const line = getBlockText(block) || " ";
+    const textSpeed = getSafeTextSpeed(block.textSpeed);
+    if (!textSpeed) {
+      return line;
+    }
+    return `{cps=${TEXT_SPEED_CPS[textSpeed]}}${line}{/cps}`;
+  }
+
   function getVoiceAssetId(block = {}) {
     return cleanText(block.voiceAssetId ?? block.voice?.assetId);
   }
@@ -634,16 +654,16 @@
     }
     if (type === "dialogue") {
       const characterId = cleanText(block.speakerId);
-      const line = getBlockText(block);
+      const line = renderRenpyText(block);
       const voiceLines = renderVoicePrefix(block, context);
       if (!characterId) {
         pushWarning(warnings, "renpy_missing_speaker", "台词缺少说话人，已作为旁白导出。", getWarningContext(context));
-        return [...voiceLines, `    ${quoteRenpy(line || " ")}`];
+        return [...voiceLines, `    ${quoteRenpy(line)}`];
       }
-      return [...voiceLines, `    ${normalizeIdentifier(characterId, "character")} ${quoteRenpy(line || " ")}`];
+      return [...voiceLines, `    ${normalizeIdentifier(characterId, "character")} ${quoteRenpy(line)}`];
     }
     if (type === "narration") {
-      return [...renderVoicePrefix(block, context), `    ${quoteRenpy(getBlockText(block) || " ")}`];
+      return [...renderVoicePrefix(block, context), `    ${quoteRenpy(renderRenpyText(block))}`];
     }
     if (type === "choice") {
       return renderChoiceBlock(block, context);

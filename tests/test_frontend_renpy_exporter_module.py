@@ -57,8 +57,8 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
                           transitionDurationMs: 720,
                           stage: {{ offsetX: -8, offsetY: -5, scale: 118, opacity: 90, layer: 2, flipX: true }},
                         }},
-                        {{ type: "dialogue", speakerId: "yuna", text: "欢迎回来。", voiceAssetId: "voice_yuna_001" }},
-                        {{ type: "narration", text: "风吹过屋顶。" }},
+                        {{ type: "dialogue", speakerId: "yuna", text: "欢迎回来。", voiceAssetId: "voice_yuna_001", textSpeed: "fast" }},
+                        {{ type: "narration", text: "风吹过屋顶。", textSpeed: "instant" }},
                         {{
                           type: "choice",
                           options: [
@@ -86,7 +86,7 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
                       id: "scene_end",
                       name: "屋顶晚风",
                       blocks: [
-                        {{ type: "narration", text: "风把答案吹散了。" }},
+                        {{ type: "narration", text: "风把答案吹散了。", textSpeed: "slow" }},
                         {{ type: "music_stop", fadeOutMs: 600 }},
                         {{ type: "credits_roll", title: "STAFF", subtitle: "Thank you", lines: ["企划：Canvasia", "剧本：Tester"], durationSeconds: 6 }},
                       ],
@@ -140,7 +140,9 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
         self.assertIn("    alpha 0.9", payload["draft"]["script"])
         self.assertIn("show yuna smile at canvasia_stage_scene_open_3 zorder 22 with Dissolve(0.72)", payload["draft"]["script"])
         self.assertIn('voice "voice/yuna_001.ogg"', payload["draft"]["script"])
-        self.assertIn('yuna "欢迎回来。"', payload["draft"]["script"])
+        self.assertIn('yuna "{cps=72}欢迎回来。{/cps}"', payload["draft"]["script"])
+        self.assertIn('"{cps=10000}风吹过屋顶。{/cps}"', payload["draft"]["script"])
+        self.assertIn('"{cps=24}风把答案吹散了。{/cps}"', payload["draft"]["script"])
         self.assertIn("menu:", payload["draft"]["script"])
         self.assertIn("$ affection += 1", payload["draft"]["script"])
         self.assertIn('$ route = "good"', payload["draft"]["script"])

@@ -694,6 +694,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                     "speakerId": "heroine",
                     "text": "Welcome back.",
                     "voiceAssetId": voice_asset["id"],
+                    "textSpeed": "fast",
                 },
                 {"id": "var", "type": "variable_add", "variableId": "affection", "value": 1},
                 {
@@ -783,7 +784,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertIn(f"show heroine expr_default at canvasia_stage_{scene['id']}_3 zorder 22 with Dissolve(0.72)", script)
         self.assertIn('play music "assets/bgm/', script)
         self.assertIn('voice "assets/voice/', script)
-        self.assertIn('heroine "Welcome back."', script)
+        self.assertIn('heroine "{cps=72}Welcome back.{/cps}"', script)
         self.assertIn("$ affection += 1", script)
         self.assertIn("if affection >= 1:", script)
         self.assertIn(f"jump {scene['id']}", script)

@@ -52,6 +52,12 @@ CHARACTER_HIDE_TRANSITIONS = {
     "slide_right": "moveoutright",
     "rise": "moveoutbottom",
 }
+TEXT_SPEED_CPS = {
+    "slow": 24,
+    "normal": 42,
+    "fast": 72,
+    "instant": 10000,
+}
 
 
 def as_list(value: Any) -> list:
@@ -144,6 +150,17 @@ def get_safe_stage_bool(raw: dict, key: str, fallback: bool = False) -> bool:
 def get_safe_position(value: Any) -> str:
     position = clean_text(value, "center")
     return position if position in POSITION_XALIGN else "center"
+
+
+def get_safe_text_speed(value: Any) -> str:
+    speed = clean_text(value)
+    return speed if speed in TEXT_SPEED_CPS else ""
+
+
+def render_renpy_text(block: dict) -> str:
+    line = clean_text(block.get("text") or (block.get("fields") or {}).get("text"), " ")
+    speed = get_safe_text_speed(block.get("textSpeed"))
+    return f"{{cps={TEXT_SPEED_CPS[speed]}}}{line}{{/cps}}" if speed else line
 
 
 def get_safe_character_stage(source: Any) -> dict:
@@ -644,7 +661,7 @@ def render_story_block(block: dict, context: dict) -> list[str]:
     if block_type == "screen_fade":
         return ["    with fade"]
     if block_type in {"dialogue", "narration"}:
-        line = clean_text(block.get("text") or (block.get("fields") or {}).get("text"), " ")
+        line = render_renpy_text(block)
         output: list[str] = []
         voice_path = get_asset_path(asset_map, block.get("voiceAssetId"))
         if voice_path:
