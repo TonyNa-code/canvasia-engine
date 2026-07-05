@@ -56,8 +56,8 @@ class FrontendRuntimePreloadModuleTests(unittest.TestCase):
               formatVersion: 1,
               entries: [
                 {{ assetId: "bg_intro", type: "background", url: "assets/background/bg_intro.png", phase: "critical", priority: 100 }},
-                {{ assetId: "bgm_intro", type: "bgm", url: "assets/bgm/intro.wav", phase: "early", priority: 72 }},
-                {{ assetId: "op_video", type: "video", url: "assets/video/op.mp4", phase: "deferred", priority: 30 }},
+                {{ assetId: "bgm_intro", type: "bgm", url: "assets/bgm/intro.wav", phase: "early", priority: 72, sizeBytes: 4096 }},
+                {{ assetId: "op_video", type: "video", url: "assets/video/op.mp4", phase: "deferred", priority: 30, sizeBytes: 8192 }},
               ],
             }};
 
@@ -100,6 +100,9 @@ class FrontendRuntimePreloadModuleTests(unittest.TestCase):
         self.assertEqual(payload["summary"]["imageCount"], 1)
         self.assertEqual(payload["summary"]["audioCount"], 1)
         self.assertEqual(payload["summary"]["videoCount"], 1)
+        self.assertEqual(payload["summary"]["totalSizeBytes"], 12288)
+        self.assertEqual(payload["summary"]["earlySizeBytes"], 4096)
+        self.assertEqual(payload["summary"]["videoSizeBytes"], 8192)
         self.assertEqual(payload["normalized"][0], "bg_intro")
         self.assertEqual(payload["status"]["loadedCount"], 3)
         self.assertEqual(payload["status"]["failedCount"], 0)

@@ -166,6 +166,7 @@ def build_release_tooling_steps(python_executable: str) -> list[VerifyStep]:
         build_unittest_step("Local verify tooling", "test_local_verify_tool.py", "release-tests", python_executable),
         build_unittest_step("Project health tooling", "test_project_health_tool.py", "release-tests", python_executable),
         build_unittest_step("Ren'Py export contract", "test_renpy_export_contract.py", "release-tests", python_executable),
+        build_unittest_step("Runtime preload export contract", "test_export_runtime_preload.py", "release-tests", python_executable),
         VerifyStep(
             name="Template project health check",
             category="release-tests",

@@ -10,6 +10,11 @@ function safeText(value) {
   return String(value ?? "").trim();
 }
 
+function normalizeSizeBytes(value) {
+  const size = Number(value);
+  return Number.isFinite(size) ? Math.max(0, Math.floor(size)) : 0;
+}
+
 function normalizePreloadPhase(value) {
   return ["critical", "early", "deferred", "library"].includes(value) ? value : "deferred";
 }
@@ -33,6 +38,8 @@ function normalizePreloadEntry(entry, index = 0) {
     name: safeText(entry.name) || assetId,
     phase: normalizePreloadPhase(entry.phase),
     priority: Number.isFinite(Number(entry.priority)) ? Number(entry.priority) : 0,
+    sizeBytes: normalizeSizeBytes(entry.sizeBytes),
+    sizeLabel: safeText(entry.sizeLabel),
     reason: safeText(entry.reason),
     preloadIndex: Number.isFinite(Number(entry.preloadIndex)) ? Number(entry.preloadIndex) : index + 1,
   };
@@ -63,26 +70,45 @@ export function getRuntimePreloadSummary(manifest) {
     criticalCount: 0,
     earlyCount: 0,
     deferredCount: 0,
+    libraryCount: 0,
     imageCount: 0,
     audioCount: 0,
     videoCount: 0,
+    totalSizeBytes: 0,
+    criticalSizeBytes: 0,
+    earlySizeBytes: 0,
+    deferredSizeBytes: 0,
+    librarySizeBytes: 0,
+    imageSizeBytes: 0,
+    audioSizeBytes: 0,
+    videoSizeBytes: 0,
   };
 
   normalized.entries.forEach((entry) => {
+    summary.totalSizeBytes += entry.sizeBytes;
     if (entry.phase === "critical") {
       summary.criticalCount += 1;
+      summary.criticalSizeBytes += entry.sizeBytes;
     } else if (entry.phase === "early") {
       summary.earlyCount += 1;
+      summary.earlySizeBytes += entry.sizeBytes;
+    } else if (entry.phase === "library") {
+      summary.libraryCount += 1;
+      summary.librarySizeBytes += entry.sizeBytes;
     } else {
       summary.deferredCount += 1;
+      summary.deferredSizeBytes += entry.sizeBytes;
     }
 
     if (IMAGE_TYPES.has(entry.type)) {
       summary.imageCount += 1;
+      summary.imageSizeBytes += entry.sizeBytes;
     } else if (AUDIO_TYPES.has(entry.type)) {
       summary.audioCount += 1;
+      summary.audioSizeBytes += entry.sizeBytes;
     } else if (VIDEO_TYPES.has(entry.type)) {
       summary.videoCount += 1;
+      summary.videoSizeBytes += entry.sizeBytes;
     }
   });
 

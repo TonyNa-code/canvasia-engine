@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -13,6 +14,18 @@ IMAGE_ASSET_TYPES = {"background", "sprite", "cg", "ui"}
 AUDIO_ASSET_TYPES = {"bgm", "sfx", "voice"}
 VIDEO_ASSET_TYPES = {"video"}
 PRELOADABLE_ASSET_TYPES = IMAGE_ASSET_TYPES | AUDIO_ASSET_TYPES | VIDEO_ASSET_TYPES
+SIZE_UNIT_BYTES = {
+    "b": 1,
+    "byte": 1,
+    "bytes": 1,
+    "kb": 1024,
+    "kib": 1024,
+    "mb": 1024 * 1024,
+    "mib": 1024 * 1024,
+    "gb": 1024 * 1024 * 1024,
+    "gib": 1024 * 1024 * 1024,
+}
+SIZE_VALUE_PATTERN = re.compile(r"^\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z]+)?\s*$")
 
 
 def now_iso() -> str:
@@ -21,6 +34,45 @@ def now_iso() -> str:
 
 def safe_text(value: object) -> str:
     return str(value or "").strip()
+
+
+def normalize_asset_size_bytes(asset: dict | None) -> int:
+    source = asset if isinstance(asset, dict) else {}
+    for key in ("fileSizeBytes", "sizeBytes", "byteSize", "fileSize", "size"):
+        value = source.get(key)
+        if isinstance(value, bool) or value in (None, ""):
+            continue
+        if isinstance(value, (int, float)):
+            return max(0, int(value))
+        raw_value = safe_text(value).replace(",", "")
+        if raw_value.isdigit():
+            return max(0, int(raw_value))
+        match = SIZE_VALUE_PATTERN.match(raw_value)
+        if match:
+            amount = float(match.group(1))
+            unit = (match.group(2) or "b").lower()
+            multiplier = SIZE_UNIT_BYTES.get(unit)
+            if multiplier:
+                return max(0, int(amount * multiplier))
+    return 0
+
+
+def format_bytes(size_bytes: object) -> str:
+    try:
+        size = max(0, int(size_bytes or 0))
+    except (TypeError, ValueError):
+        size = 0
+    units = ["B", "KB", "MB", "GB"]
+    value = float(size)
+    unit = units[0]
+    for candidate in units:
+        unit = candidate
+        if value < 1024 or candidate == units[-1]:
+            break
+        value /= 1024
+    if unit == "B":
+        return f"{int(value)} B"
+    return f"{value:.1f} {unit}"
 
 
 def get_ordered_scenes(bundle: dict) -> list[dict]:
@@ -148,6 +200,7 @@ def build_runtime_preload_manifest(
         if asset_type not in PRELOADABLE_ASSET_TYPES or not export_url or asset.get("isMissing"):
             return
 
+        size_bytes = normalize_asset_size_bytes(asset)
         priority = get_phase_priority(phase) + bonus
         existing = candidates.get(safe_asset_id)
         if existing and existing["priority"] >= priority:
@@ -161,6 +214,8 @@ def build_runtime_preload_manifest(
             "type": asset_type,
             "name": safe_text(asset.get("name")) or safe_asset_id,
             "url": export_url,
+            "sizeBytes": size_bytes,
+            "sizeLabel": format_bytes(size_bytes) if size_bytes else "Unknown",
             "phase": phase,
             "priority": priority,
             "sceneId": safe_text((scene or {}).get("id")),
@@ -236,9 +291,21 @@ def build_runtime_preload_manifest(
 
     type_counts: dict[str, int] = {}
     phase_counts: dict[str, int] = {}
+    type_bytes: dict[str, int] = {}
+    phase_bytes: dict[str, int] = {}
     for entry in entries:
-        type_counts[entry["type"]] = type_counts.get(entry["type"], 0) + 1
-        phase_counts[entry["phase"]] = phase_counts.get(entry["phase"], 0) + 1
+        asset_type = entry["type"]
+        phase = entry["phase"]
+        size_bytes = int(entry.get("sizeBytes") or 0)
+        type_counts[asset_type] = type_counts.get(asset_type, 0) + 1
+        phase_counts[phase] = phase_counts.get(phase, 0) + 1
+        type_bytes[asset_type] = type_bytes.get(asset_type, 0) + size_bytes
+        phase_bytes[phase] = phase_bytes.get(phase, 0) + size_bytes
+
+    total_bytes = sum(phase_bytes.values())
+    image_bytes = sum(type_bytes.get(asset_type, 0) for asset_type in IMAGE_ASSET_TYPES)
+    audio_bytes = sum(type_bytes.get(asset_type, 0) for asset_type in AUDIO_ASSET_TYPES)
+    video_bytes = sum(type_bytes.get(asset_type, 0) for asset_type in VIDEO_ASSET_TYPES)
 
     return {
         "formatVersion": RUNTIME_PRELOAD_FORMAT_VERSION,
@@ -253,7 +320,39 @@ def build_runtime_preload_manifest(
             "imageEntries": sum(type_counts.get(asset_type, 0) for asset_type in IMAGE_ASSET_TYPES),
             "audioEntries": sum(type_counts.get(asset_type, 0) for asset_type in AUDIO_ASSET_TYPES),
             "videoEntries": sum(type_counts.get(asset_type, 0) for asset_type in VIDEO_ASSET_TYPES),
+            "totalBytes": total_bytes,
+            "totalBytesLabel": format_bytes(total_bytes),
+            "criticalBytes": phase_bytes.get("critical", 0),
+            "criticalBytesLabel": format_bytes(phase_bytes.get("critical", 0)),
+            "earlyBytes": phase_bytes.get("early", 0),
+            "earlyBytesLabel": format_bytes(phase_bytes.get("early", 0)),
+            "deferredBytes": phase_bytes.get("deferred", 0),
+            "deferredBytesLabel": format_bytes(phase_bytes.get("deferred", 0)),
+            "libraryBytes": phase_bytes.get("library", 0),
+            "libraryBytesLabel": format_bytes(phase_bytes.get("library", 0)),
+            "imageBytes": image_bytes,
+            "imageBytesLabel": format_bytes(image_bytes),
+            "audioBytes": audio_bytes,
+            "audioBytesLabel": format_bytes(audio_bytes),
+            "videoBytes": video_bytes,
+            "videoBytesLabel": format_bytes(video_bytes),
         },
+        "largestEntries": sorted(
+            [
+                {
+                    "assetId": entry.get("assetId"),
+                    "name": entry.get("name"),
+                    "type": entry.get("type"),
+                    "phase": entry.get("phase"),
+                    "sizeBytes": int(entry.get("sizeBytes") or 0),
+                    "sizeLabel": entry.get("sizeLabel") or format_bytes(entry.get("sizeBytes")),
+                }
+                for entry in entries
+                if int(entry.get("sizeBytes") or 0) > 0
+            ],
+            key=lambda item: int(item.get("sizeBytes") or 0),
+            reverse=True,
+        )[:10],
         "entries": entries,
     }
 
@@ -272,6 +371,9 @@ def build_runtime_preload_report(manifest: dict) -> str:
         f"- Critical first-play entries: {summary.get('criticalEntries', 0)}",
         f"- Early route entries: {summary.get('earlyEntries', 0)}",
         f"- Deferred route entries: {summary.get('deferredEntries', 0)}",
+        f"- Total preload size: {summary.get('totalBytesLabel', '0 B')}",
+        f"- Critical first-play size: {summary.get('criticalBytesLabel', '0 B')}",
+        f"- Early route size: {summary.get('earlyBytesLabel', '0 B')}",
         f"- Images: {summary.get('imageEntries', 0)}",
         f"- Audio: {summary.get('audioEntries', 0)}",
         f"- Video: {summary.get('videoEntries', 0)}",
@@ -288,10 +390,22 @@ def build_runtime_preload_report(manifest: dict) -> str:
                 f"{entry.get('preloadIndex')}. "
                 f"`{entry.get('assetId')}` "
                 f"({entry.get('type')} / {entry.get('phase')}) "
+                f"{entry.get('sizeLabel') or 'Unknown'} "
                 f"- {entry.get('reason') or 'runtime asset'}"
             )
         if len(entries) > 40:
             lines.append(f"- ...and {len(entries) - 40} more entries.")
+
+    largest_entries = manifest.get("largestEntries") if isinstance(manifest.get("largestEntries"), list) else []
+    if largest_entries:
+        lines.extend(["", "## Largest Preload Entries", ""])
+        for entry in largest_entries[:10]:
+            lines.append(
+                "- "
+                f"`{entry.get('assetId')}` "
+                f"({entry.get('type')} / {entry.get('phase')}) "
+                f"{entry.get('sizeLabel') or format_bytes(entry.get('sizeBytes'))}"
+            )
 
     lines.append("")
     return "\n".join(lines)
