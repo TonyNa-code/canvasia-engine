@@ -12609,6 +12609,9 @@ function renderRouteTestingPlanPanel(routeOverview) {
   const summary = plan.summary ?? {};
   const executionQueue = routeTestingReportTools.buildRouteTestingExecutionQueue(plan);
   const acceptanceChecklist = routeTestingReportTools.buildRouteTestingAcceptanceChecklist(plan);
+  const workbook = routeTestingReportTools.buildRouteTestingWorkbook(plan);
+  const workbookLanes = workbook.lanes ?? [];
+  const nextWorkbookAction = workbook.nextBestAction;
   const readinessPercent = routeTestingReportTools.getRouteTestingReadinessPercent(plan);
   const topExecutionItems = executionQueue.slice(0, 5);
   const decisionPoints = (plan.decisionPoints ?? []).slice(0, 4);
@@ -12688,6 +12691,36 @@ function renderRouteTestingPlanPanel(routeOverview) {
               )
               .join("")}
           </div>
+        </article>
+        <article class="route-testing-card">
+          <strong>发布前路线工作簿</strong>
+          <div class="route-testing-chip-row">
+            ${workbookLanes
+              .map(
+                (lane) => `
+                  <span class="issue-tag ${lane.tone === "warn" ? "warn-text" : lane.tone === "good" ? "good-text" : ""}">
+                    ${escapeHtml(lane.label)} · ${escapeHtml(lane.itemCount)}
+                  </span>
+                `
+              )
+              .join("")}
+          </div>
+          ${
+            nextWorkbookAction
+              ? `
+                <div class="route-testing-item">
+                  <div>
+                    <b>${escapeHtml(`下一步：${nextWorkbookAction.title}`)}</b>
+                    <span>${escapeHtml(
+                      `${nextWorkbookAction.chapterName} · ${nextWorkbookAction.sceneName} · ${nextWorkbookAction.routeKindLabel}`
+                    )}</span>
+                  </div>
+                  <div class="helper-text">${escapeHtml(nextWorkbookAction.manualSteps?.[0] ?? nextWorkbookAction.actionLabel)}</div>
+                  <div class="helper-text">${escapeHtml(nextWorkbookAction.variablePresetHint)}</div>
+                </div>
+              `
+              : renderEmpty("当前路线工作簿没有需要执行的项目。")
+          }
         </article>
         <article class="route-testing-card">
           <strong>优先分支点</strong>

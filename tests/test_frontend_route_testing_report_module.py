@@ -45,18 +45,32 @@ class FrontendRouteTestingReportModuleTests(unittest.TestCase):
                   unreachableTargetCount: 1,
                   routeCases: [
                     {{
+                      order: 1,
+                      routeId: "route_good",
+                      routeKind: "choice",
                       label: "选项：Go End",
+                      sourceSceneId: "scene_start",
+                      targetSceneId: "scene_good",
                       targetSceneName: "Good End",
                       targetExists: true,
                       status: "ready",
                       statusLabel: "可试玩",
+                      blockIndex: 3,
+                      optionIndex: 0,
                     }},
                     {{
+                      order: 2,
+                      routeId: "route_lost",
+                      routeKind: "condition",
                       label: "选项：Lost",
+                      sourceSceneId: "scene_start",
+                      targetSceneId: "scene_missing",
                       targetSceneName: "Missing",
                       targetExists: false,
                       status: "broken",
                       statusLabel: "坏链",
+                      blockIndex: 4,
+                      branchIndex: 0,
                     }},
                   ],
                 }},
@@ -99,6 +113,8 @@ class FrontendRouteTestingReportModuleTests(unittest.TestCase):
               acceptanceChecklist: tools.buildRouteTestingAcceptanceChecklist(plan),
               readiness: tools.getRouteTestingReadinessPercent(plan),
               tables,
+              workbook: tools.buildRouteTestingWorkbook(plan),
+              workbookTable: tools.buildRouteTestingWorkbookTable(plan),
               markdown,
               csv,
               escaped: tools.escapeMarkdownTableCell("a|b\\nc"),
@@ -119,17 +135,28 @@ class FrontendRouteTestingReportModuleTests(unittest.TestCase):
         self.assertIn("buildRouteTestingPlanCsv", payload["keys"])
         self.assertIn("buildRouteTestingExecutionQueue", payload["keys"])
         self.assertIn("buildRouteTestingAcceptanceChecklist", payload["keys"])
+        self.assertIn("buildRouteTestingWorkbook", payload["keys"])
+        self.assertIn("buildRouteTestingWorkbookTable", payload["keys"])
+        self.assertIn("getRouteKindLabel", payload["keys"])
         self.assertIn("getRouteTestingReadinessPercent", payload["keys"])
+        self.assertEqual(payload["serialized"]["decisionPoints"][0]["routeCases"][0]["routeKind"], "choice")
         self.assertEqual(payload["summary"]["routeCaseCount"], 3)
         self.assertEqual(payload["summary"]["brokenRouteCaseCount"], 1)
         self.assertEqual(payload["summary"]["unreachableRouteCaseCount"], 1)
         self.assertEqual(payload["digest"]["status"], "blocked")
         self.assertEqual(payload["executionQueue"][0]["severity"], "blocker")
         self.assertEqual(payload["executionQueue"][0]["title"], "修复分支坏链")
+        self.assertEqual(payload["executionQueue"][0]["routeKind"], "condition")
         self.assertTrue(any(item["id"] == "route_blockers_clear" for item in payload["acceptanceChecklist"]))
+        self.assertEqual(payload["workbook"]["lanes"][0]["id"], "repair")
+        self.assertEqual(payload["workbook"]["nextBestAction"]["routeKindLabel"], "条件分支")
+        self.assertIn("自动回归会尝试把条件变量", payload["workbook"]["nextBestAction"]["variablePresetHint"])
+        self.assertIn("变量 / 状态提示", payload["workbookTable"])
         self.assertLess(payload["readiness"], 100)
         self.assertIn("执行队列", payload["tables"]["summaryTable"])
         self.assertIn("修复分支坏链", payload["tables"]["executionTable"])
+        self.assertIn("发布前路线工作簿", payload["markdown"])
+        self.assertIn("路线工作簿", payload["csv"])
         self.assertIn("Start \\| Branch", payload["tables"]["decisionTable"])
         self.assertIn("# Demo Project 路线试玩手册", payload["markdown"])
         self.assertIn("## 执行优先队列", payload["markdown"])
