@@ -12,19 +12,10 @@
     layer: 0,
     flipX: false,
   });
-  const CHARACTER_SHOW_TRANSITIONS = Object.freeze({
-    fade: "dissolve",
-    dissolve: "dissolve",
-    slide_left: "moveinleft",
-    slide_right: "moveinright",
-    rise: "moveinbottom",
-  });
-  const CHARACTER_HIDE_TRANSITIONS = Object.freeze({
-    fade: "dissolve",
-    dissolve: "dissolve",
-    slide_left: "moveoutleft",
-    slide_right: "moveoutright",
-    rise: "moveoutbottom",
+  const CHARACTER_MOVE_TRANSFORMS = Object.freeze({
+    slide_left: "offscreenleft",
+    slide_right: "offscreenright",
+    rise: "offscreenbottom",
   });
   const TEXT_SPEED_CPS = Object.freeze({
     slow: 24,
@@ -840,16 +831,16 @@
     if (["fade", "dissolve"].includes(transition)) {
       return `Dissolve(${seconds})`;
     }
+    if (CHARACTER_MOVE_TRANSFORMS[transition]) {
+      const transform = CHARACTER_MOVE_TRANSFORMS[transition];
+      const argumentName = direction === "hide" ? "leave" : "enter";
+      const warpName = direction === "hide" ? "leave_time_warp" : "enter_time_warp";
+      const warp = direction === "hide" ? "_warper.easein" : "_warper.easeout";
+      return `MoveTransition(${seconds}, ${argumentName}=${transform}, ${warpName}=${warp})`;
+    }
     if (transition === "pop") {
       pushWarning(context.warnings ?? [], "renpy_character_transition_review", "轻微弹出转场已按淡入导出，请在 Ren'Py 中按需要替换为自定义 ATL。", getWarningContext(context));
       return `Dissolve(${seconds})`;
-    }
-    const table = direction === "hide" ? CHARACTER_HIDE_TRANSITIONS : CHARACTER_SHOW_TRANSITIONS;
-    if (table[transition]) {
-      if (seconds !== 0.6) {
-        pushWarning(context.warnings ?? [], "renpy_character_transition_timing_review", `${transition} 转场时长需要在 Ren'Py 中复核。`, getWarningContext(context));
-      }
-      return table[transition];
     }
     pushWarning(context.warnings ?? [], "renpy_character_transition_review", `角色转场 ${transition} 暂未精确映射，已按淡入导出。`, getWarningContext(context));
     return `Dissolve(${seconds})`;

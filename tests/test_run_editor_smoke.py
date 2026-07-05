@@ -704,7 +704,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                     "characterId": "heroine",
                     "expressionId": "expr_default",
                     "position": "right",
-                    "transition": "fade",
+                    "transition": "slide_left",
                     "transitionDurationMs": 720,
                     "stage": {"offsetX": -8, "offsetY": -5, "scale": 118, "opacity": 90, "layer": 2, "flipX": True},
                 },
@@ -756,6 +756,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 },
                 {"id": "blur", "type": "depth_blur", "action": "apply", "focus": "full", "strength": "strong"},
                 {"id": "particles_stop", "type": "particle_effect", "action": "stop"},
+                {"id": "hide", "type": "character_hide", "characterId": "heroine", "transition": "rise", "transitionDurationMs": 850},
                 {
                     "id": "video",
                     "type": "video_play",
@@ -816,7 +817,10 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertIn("    xzoom -1.18", script)
         self.assertIn("    yzoom 1.18", script)
         self.assertIn("    alpha 0.9", script)
-        self.assertIn(f"show heroine expr_default at canvasia_stage_{scene['id']}_3 zorder 22 with Dissolve(0.72)", script)
+        self.assertIn(
+            f"show heroine expr_default at canvasia_stage_{scene['id']}_3 zorder 22 with MoveTransition(0.72, enter=offscreenleft, enter_time_warp=_warper.easeout)",
+            script,
+        )
         self.assertIn('play music "assets/bgm/', script)
         self.assertIn("fadein 0.8 noloop volume 0.82", script)
         self.assertIn("# Canvasia music scope end: after_block after line", script)
@@ -839,6 +843,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertIn("camera:\n        subpixel True\n        xalign 0.28\n        yalign 0.52\n        zoom 1.16\n        xoffset -154", script)
         self.assertIn('matrixcolor TintMatrix("#ffffff") * SaturationMatrix(0) * BrightnessMatrix(0.12) * ContrastMatrix(1.2) * SaturationMatrix(0.85) * HueMatrix(10)', script)
         self.assertIn("        blur 6", script)
+        self.assertIn("hide heroine with MoveTransition(0.85, leave=offscreenbottom, leave_time_warp=_warper.easein)", script)
         self.assertIn('$ renpy.movie_cutscene("<from 1.5 to 12 volume 0.8>assets/video/', script)
         self.assertIn('delay=10.5)', script)
         self.assertNotIn("# Canvasia review video timing", script)

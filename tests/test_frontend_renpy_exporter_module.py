@@ -54,7 +54,7 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
                           characterId: "yuna",
                           expressionId: "smile",
                           position: "right",
-                          transition: "fade",
+                          transition: "slide_left",
                           transitionDurationMs: 720,
                           stage: {{ offsetX: -8, offsetY: -5, scale: 118, opacity: 90, layer: 2, flipX: true }},
                         }},
@@ -94,6 +94,7 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
                         }},
                         {{ type: "depth_blur", action: "apply", focus: "full", strength: "strong" }},
                         {{ type: "particle_effect", action: "stop" }},
+                        {{ type: "character_hide", characterId: "yuna", transition: "rise", transitionDurationMs: 850 }},
                         {{ type: "jump", targetSceneId: "scene_end" }},
                       ],
                     }},
@@ -155,7 +156,7 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
         self.assertIn("    xzoom -1.18", payload["draft"]["script"])
         self.assertIn("    yzoom 1.18", payload["draft"]["script"])
         self.assertIn("    alpha 0.9", payload["draft"]["script"])
-        self.assertIn("show yuna smile at canvasia_stage_scene_open_3 zorder 22 with Dissolve(0.72)", payload["draft"]["script"])
+        self.assertIn("show yuna smile at canvasia_stage_scene_open_3 zorder 22 with MoveTransition(0.72, enter=offscreenleft, enter_time_warp=_warper.easeout)", payload["draft"]["script"])
         self.assertIn('voice "voice/yuna_001.ogg"', payload["draft"]["script"])
         self.assertIn('yuna "{cps=72}欢迎回来。{/cps}"', payload["draft"]["script"])
         self.assertIn('play sound "sfx/bell.ogg" volume 0.65', payload["draft"]["script"])
@@ -179,6 +180,7 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
         self.assertIn("camera:\n        subpixel True\n        xalign 0.28\n        yalign 0.52\n        zoom 1.16\n        xoffset -102", payload["draft"]["script"])
         self.assertIn('matrixcolor TintMatrix("#ffffff") * SaturationMatrix(0) * BrightnessMatrix(0.12) * ContrastMatrix(1.2) * SaturationMatrix(0.85) * HueMatrix(10)', payload["draft"]["script"])
         self.assertIn("        blur 6", payload["draft"]["script"])
+        self.assertIn("hide yuna with MoveTransition(0.85, leave=offscreenbottom, leave_time_warp=_warper.easein)", payload["draft"]["script"])
         self.assertIn('show text "STAFF\\nThank you\\n企划：Canvasia\\n剧本：Tester" at truecenter with dissolve', payload["draft"]["script"])
         self.assertNotIn("renpy_choice_effects_review", payload["manifest"])
         self.assertNotIn("renpy_comment_only_block", payload["manifest"])

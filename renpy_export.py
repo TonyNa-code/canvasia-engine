@@ -33,19 +33,10 @@ DEFAULT_CHARACTER_STAGE = {
     "layer": 0,
     "flipX": False,
 }
-CHARACTER_SHOW_TRANSITIONS = {
-    "fade": "dissolve",
-    "dissolve": "dissolve",
-    "slide_left": "moveinleft",
-    "slide_right": "moveinright",
-    "rise": "moveinbottom",
-}
-CHARACTER_HIDE_TRANSITIONS = {
-    "fade": "dissolve",
-    "dissolve": "dissolve",
-    "slide_left": "moveoutleft",
-    "slide_right": "moveoutright",
-    "rise": "moveoutbottom",
+CHARACTER_MOVE_TRANSFORMS = {
+    "slide_left": "offscreenleft",
+    "slide_right": "offscreenright",
+    "rise": "offscreenbottom",
 }
 TEXT_SPEED_CPS = {
     "slow": 24,
@@ -780,6 +771,12 @@ def get_character_transition_expression(block: dict, context: dict, direction: s
         return ""
     if transition in {"fade", "dissolve"}:
         return f"Dissolve({seconds:g})"
+    if transition in CHARACTER_MOVE_TRANSFORMS:
+        transform = CHARACTER_MOVE_TRANSFORMS[transition]
+        argument_name = "leave" if direction == "hide" else "enter"
+        warp_name = "leave_time_warp" if direction == "hide" else "enter_time_warp"
+        warp = "_warper.easein" if direction == "hide" else "_warper.easeout"
+        return f"MoveTransition({seconds:g}, {argument_name}={transform}, {warp_name}={warp})"
     if transition == "pop":
         add_warning(
             context["warnings"],
@@ -789,17 +786,6 @@ def get_character_transition_expression(block: dict, context: dict, direction: s
             blockIndex=context.get("blockIndex"),
         )
         return f"Dissolve({seconds:g})"
-    transition_map = CHARACTER_HIDE_TRANSITIONS if direction == "hide" else CHARACTER_SHOW_TRANSITIONS
-    if transition in transition_map:
-        if seconds != 0.6:
-            add_warning(
-                context["warnings"],
-                "renpy_character_transition_timing_review",
-                f"{transition} 转场时长需要在 Ren'Py 中复核。",
-                sceneId=context.get("sceneId"),
-                blockIndex=context.get("blockIndex"),
-            )
-        return transition_map[transition]
     add_warning(
         context["warnings"],
         "renpy_character_transition_review",
