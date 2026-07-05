@@ -304,6 +304,96 @@ class RenpyExportContractTests(unittest.TestCase):
         self.assertEqual(summary["fontAssetPath"], "assets/font/story.ttf")
         self.assertEqual(summary["fontFamily"], "Story Serif")
 
+    def test_project_runtime_defaults_feed_renpy_draft_exporters(self) -> None:
+        frontend = load_frontend_payload(
+            """
+            const data = {
+              project: {
+                title: "Runtime Defaults Demo",
+                runtimeSettings: {
+                  defaultTextSpeed: "fast",
+                  defaultBgmVolume: 64,
+                  defaultSfxVolume: 77,
+                  defaultVoiceVolume: 88,
+                  defaultVoiceEnabled: false,
+                  formalSaveSlotCount: 60,
+                },
+              },
+              assetList: [
+                { id: "bgm_theme", type: "bgm", path: "audio/theme.ogg" },
+                { id: "sfx_bell", type: "sfx", path: "audio/bell.ogg" },
+              ],
+              characters: [{ id: "hero", displayName: "Hero" }],
+              chapters: [{
+                name: "Opening",
+                scenes: [{
+                  id: "scene_open",
+                  blocks: [
+                    { type: "music_play", assetId: "bgm_theme", loop: true },
+                    { type: "dialogue", speakerId: "hero", text: "The project default speed is active." },
+                    { type: "sfx_play", assetId: "sfx_bell" },
+                  ],
+                }],
+              }],
+            };
+            process.stdout.write(JSON.stringify(tools.buildRenpyDraftExport(data)));
+            """
+        )
+
+        bundle = {
+            "project": {
+                "title": "Runtime Defaults Demo",
+                "runtimeSettings": {
+                    "defaultTextSpeed": "fast",
+                    "defaultBgmVolume": 64,
+                    "defaultSfxVolume": 77,
+                    "defaultVoiceVolume": 88,
+                    "defaultVoiceEnabled": False,
+                    "formalSaveSlotCount": 60,
+                },
+            },
+            "characters": {"characters": [{"id": "hero", "displayName": "Hero"}]},
+            "chapters": [
+                {
+                    "name": "Opening",
+                    "scenes": [
+                        {
+                            "id": "scene_open",
+                            "blocks": [
+                                {"type": "music_play", "assetId": "bgm_theme", "loop": True},
+                                {"type": "dialogue", "speakerId": "hero", "text": "The project default speed is active."},
+                                {"type": "sfx_play", "assetId": "sfx_bell"},
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+        assets_doc = {
+            "assets": [
+                {"id": "bgm_theme", "type": "bgm", "exportUrl": "audio/theme.ogg"},
+                {"id": "sfx_bell", "type": "sfx", "exportUrl": "audio/bell.ogg"},
+            ]
+        }
+
+        backend = renpy_export.build_renpy_draft_export(bundle, assets_doc)
+        options = renpy_export.build_renpy_options_file(bundle)
+
+        for script in (frontend["script"], backend["script"]):
+            self.assertIn('play music "audio/theme.ogg" loop volume 0.64', script)
+            self.assertIn('hero "{cps=72}The project default speed is active.{/cps}"', script)
+            self.assertIn('play sound "audio/bell.ogg" volume 0.77', script)
+
+        self.assertEqual(frontend["runtimeSettings"]["defaultTextSpeed"], "fast")
+        self.assertEqual(backend["runtimeSettings"]["defaultBgmVolume"], 64)
+        self.assertIn('define canvasia_default_text_speed = "fast"', options)
+        self.assertIn("define canvasia_default_text_cps = 72", options)
+        self.assertIn("define canvasia_default_music_volume = 0.64", options)
+        self.assertIn("define canvasia_default_sound_volume = 0.77", options)
+        self.assertIn("define canvasia_default_voice_volume = 0.88", options)
+        self.assertIn("define canvasia_voice_enabled = False", options)
+        self.assertIn("define canvasia_formal_save_slot_count = 60", options)
+
 
 if __name__ == "__main__":
     unittest.main()

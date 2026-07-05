@@ -29,6 +29,19 @@
     fast: 72,
     instant: 10000,
   });
+  const PROJECT_RUNTIME_DEFAULTS = Object.freeze({
+    formalSaveSlotCount: 24,
+    defaultTextSpeed: "normal",
+    defaultDialogTheme: "project",
+    defaultUiThemeMode: "auto",
+    defaultBgmVolume: 72,
+    defaultSfxVolume: 85,
+    defaultVoiceVolume: 92,
+    defaultVoiceEnabled: true,
+    defaultVoiceDuckingEnabled: true,
+  });
+  const PROJECT_RUNTIME_DIALOG_THEMES = Object.freeze(["project", "warm", "moonlight", "paper", "transparent"]);
+  const PROJECT_RUNTIME_UI_THEME_MODES = Object.freeze(["auto", "light", "dark"]);
   const BACKGROUND_TRANSITION_DEFAULT_MS = 360;
   const EFFECT_DURATION_SECONDS = Object.freeze({
     short: 0.42,
@@ -298,6 +311,46 @@
   function renderVolumeClause(value, fallback = 100) {
     const ratio = getSafeVolumeRatio(value, fallback);
     return ratio === 1 ? "" : ` volume ${ratio}`;
+  }
+
+  function clampRuntimeInt(value, fallback, min, max) {
+    const number = Number.parseInt(value, 10);
+    return Math.round(clampNumber(Number.isFinite(number) ? number : fallback, min, max));
+  }
+
+  function sanitizeProjectRuntimeSettings(value = {}) {
+    const source = value && typeof value === "object" ? value : {};
+    const textSpeed = cleanText(source.defaultTextSpeed || PROJECT_RUNTIME_DEFAULTS.defaultTextSpeed).toLowerCase();
+    const dialogTheme = cleanText(source.defaultDialogTheme || PROJECT_RUNTIME_DEFAULTS.defaultDialogTheme).toLowerCase();
+    const uiThemeMode = cleanText(source.defaultUiThemeMode || PROJECT_RUNTIME_DEFAULTS.defaultUiThemeMode).toLowerCase();
+    return {
+      formalSaveSlotCount: clampRuntimeInt(source.formalSaveSlotCount, PROJECT_RUNTIME_DEFAULTS.formalSaveSlotCount, 3, 120),
+      defaultTextSpeed: Object.hasOwn(TEXT_SPEED_CPS, textSpeed) ? textSpeed : PROJECT_RUNTIME_DEFAULTS.defaultTextSpeed,
+      defaultDialogTheme: PROJECT_RUNTIME_DIALOG_THEMES.includes(dialogTheme) ? dialogTheme : PROJECT_RUNTIME_DEFAULTS.defaultDialogTheme,
+      defaultUiThemeMode: PROJECT_RUNTIME_UI_THEME_MODES.includes(uiThemeMode) ? uiThemeMode : PROJECT_RUNTIME_DEFAULTS.defaultUiThemeMode,
+      defaultBgmVolume: clampRuntimeInt(source.defaultBgmVolume, PROJECT_RUNTIME_DEFAULTS.defaultBgmVolume, 0, 100),
+      defaultSfxVolume: clampRuntimeInt(source.defaultSfxVolume, PROJECT_RUNTIME_DEFAULTS.defaultSfxVolume, 0, 100),
+      defaultVoiceVolume: clampRuntimeInt(source.defaultVoiceVolume, PROJECT_RUNTIME_DEFAULTS.defaultVoiceVolume, 0, 100),
+      defaultVoiceEnabled: source.defaultVoiceEnabled !== false,
+      defaultVoiceDuckingEnabled: source.defaultVoiceDuckingEnabled !== false,
+    };
+  }
+
+  function getEffectiveTextSpeed(block = {}, runtimeSettings = {}) {
+    const explicitSpeed = getSafeTextSpeed(block.textSpeed);
+    if (explicitSpeed) {
+      return explicitSpeed;
+    }
+    const defaultSpeed = sanitizeProjectRuntimeSettings(runtimeSettings).defaultTextSpeed;
+    return defaultSpeed === "normal" ? "" : defaultSpeed;
+  }
+
+  function renderRuntimeVolumeClause(block = {}, context = {}, runtimeKey) {
+    if (block.volume !== undefined && block.volume !== null && block.volume !== "") {
+      return renderVolumeClause(block.volume);
+    }
+    const settings = sanitizeProjectRuntimeSettings(context.runtimeSettings);
+    return renderVolumeClause(settings[runtimeKey]);
   }
 
   function getVideoCueSeconds(value) {
@@ -940,9 +993,9 @@
     return Object.hasOwn(TEXT_SPEED_CPS, safeSpeed) ? safeSpeed : "";
   }
 
-  function renderRenpyText(block = {}) {
+  function renderRenpyText(block = {}, context = {}) {
     const line = getBlockText(block) || " ";
-    const textSpeed = getSafeTextSpeed(block.textSpeed);
+    const textSpeed = getEffectiveTextSpeed(block, context.runtimeSettings);
     if (!textSpeed) {
       return line;
     }
@@ -1193,7 +1246,7 @@
       const path = getAssetPath(assetMap, block.assetId);
       const fadeIn = secondsFromMs(block.fadeInMs);
       return [
-        `    play music ${quoteRenpy(path || "audio/bgm.ogg")}${fadeIn ? ` fadein ${fadeIn}` : ""}${renderMusicLoopClause(block)}${renderVolumeClause(block.volume)}`,
+        `    play music ${quoteRenpy(path || "audio/bgm.ogg")}${fadeIn ? ` fadein ${fadeIn}` : ""}${renderMusicLoopClause(block)}${renderRuntimeVolumeClause(block, context, "defaultBgmVolume")}`,
       ];
     }
     if (type === "music_stop") {
@@ -1201,7 +1254,7 @@
       return [`    stop music${fadeOut ? ` fadeout ${fadeOut}` : ""}`];
     }
     if (type === "sfx_play") {
-      return [`    play sound ${quoteRenpy(getAssetPath(assetMap, block.assetId) || "audio/sfx.ogg")}${renderVolumeClause(block.volume)}`];
+      return [`    play sound ${quoteRenpy(getAssetPath(assetMap, block.assetId) || "audio/sfx.ogg")}${renderRuntimeVolumeClause(block, context, "defaultSfxVolume")}`];
     }
     if (type === "video_play") {
       return renderVideoBlock(block, context);
@@ -1241,7 +1294,7 @@
     }
     if (type === "dialogue") {
       const characterId = cleanText(block.speakerId);
-      const line = renderRenpyText(block);
+      const line = renderRenpyText(block, context);
       const voiceLines = renderVoicePrefix(block, context);
       if (!characterId) {
         pushWarning(warnings, "renpy_missing_speaker", "台词缺少说话人，已作为旁白导出。", getWarningContext(context));
@@ -1250,7 +1303,7 @@
       return [...voiceLines, `    ${normalizeIdentifier(characterId, "character")} ${quoteRenpy(line)}`];
     }
     if (type === "narration") {
-      return [...renderVoicePrefix(block, context), `    ${quoteRenpy(renderRenpyText(block))}`];
+      return [...renderVoicePrefix(block, context), `    ${quoteRenpy(renderRenpyText(block, context))}`];
     }
     if (type === "choice") {
       return renderChoiceBlock(block, context);
@@ -1280,6 +1333,7 @@
     const sceneMap = buildSceneMap(data);
     const sceneRecords = getSceneRecords(data);
     const projectResolution = getProjectResolution(data);
+    const runtimeSettings = sanitizeProjectRuntimeSettings(data.project?.runtimeSettings);
     const warnings = [];
     const characterStageTransforms = buildCharacterStageTransformDefinitions(sceneRecords, sceneMap);
     const lines = [
@@ -1310,7 +1364,7 @@
         const musicScopeStopPlan = buildMusicScopeStopPlan(blocks, { warnings, sceneId });
         blocks.forEach((block, blockIndex) => {
           (musicScopeStopPlan.before.get(blockIndex) ?? []).forEach((line) => lines.push(line));
-          renderBlock(block, { assetMap, characterMap, sceneMap, warnings, sceneId, blockIndex, cameraState, projectResolution }).forEach((line) => lines.push(line));
+          renderBlock(block, { assetMap, characterMap, sceneMap, warnings, sceneId, blockIndex, cameraState, projectResolution, runtimeSettings }).forEach((line) => lines.push(line));
           (musicScopeStopPlan.after.get(blockIndex) ?? []).forEach((line) => lines.push(line));
         });
       }
@@ -1330,6 +1384,7 @@
       variableDefinitionCount: buildVariableDefinitions(data).length,
       warningCount: warnings.length,
       warnings,
+      runtimeSettings,
       script: `${lines.join("\n").replace(/\n{3,}/g, "\n\n").trim()}\n`,
     };
   }
@@ -1387,6 +1442,7 @@
       characterMoveTransforms: { ...CHARACTER_MOVE_TRANSFORMS },
       characterPopTransitions: { ...CHARACTER_POP_TRANSITIONS },
       textSpeedCps: { ...TEXT_SPEED_CPS },
+      runtimeDefaults: sanitizeProjectRuntimeSettings({}),
       effectDurationSeconds: { ...EFFECT_DURATION_SECONDS },
       cameraFocusKeys: Object.keys(CAMERA_FOCUS_XALIGN).sort(),
       particleImageAssetTypes: [...PARTICLE_IMAGE_ASSET_TYPES],
@@ -1404,5 +1460,6 @@
     buildRenpyDraftManifest,
     getRenpyExportContract,
     renderBlock,
+    sanitizeProjectRuntimeSettings,
   });
 })(typeof window !== "undefined" ? window : globalThis);

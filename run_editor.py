@@ -83,6 +83,10 @@ from openai_asset_generation import (
     call_openai_asset_generation_model,
     normalize_openai_asset_generation_type,
 )
+from project_runtime_settings import (
+    build_default_project_runtime_settings,
+    sanitize_project_runtime_settings,
+)
 
 
 ROOT_DIR = Path(__file__).resolve().parent
@@ -131,12 +135,6 @@ SUPPORTED_PROJECT_LANGUAGES = {
     "en-US": "English",
 }
 DEFAULT_EDITOR_MODE = "beginner"
-DEFAULT_FORMAL_SAVE_SLOT_COUNT = 24
-MIN_FORMAL_SAVE_SLOT_COUNT = 3
-MAX_FORMAL_SAVE_SLOT_COUNT = 120
-PROJECT_RUNTIME_TEXT_SPEEDS = {"slow", "normal", "fast", "instant"}
-PROJECT_RUNTIME_DIALOG_THEMES = {"project", "warm", "moonlight", "paper", "transparent"}
-PROJECT_RUNTIME_UI_THEME_MODES = {"auto", "light", "dark"}
 DEFAULT_DIALOG_BOX_CONFIG = {
     "preset": "moonlight",
     "shape": "rounded",
@@ -799,50 +797,12 @@ def sanitize_hex_color(value: object, fallback: str) -> str:
     return str(value).strip().lower() if is_valid_hex_color(value) else fallback
 
 
-def build_default_project_runtime_settings() -> dict:
-    return {
-        "formalSaveSlotCount": DEFAULT_FORMAL_SAVE_SLOT_COUNT,
-        "defaultTextSpeed": "normal",
-        "defaultDialogTheme": "project",
-        "defaultUiThemeMode": "auto",
-        "defaultBgmVolume": 72,
-        "defaultSfxVolume": 85,
-        "defaultVoiceVolume": 92,
-        "defaultVoiceEnabled": True,
-        "defaultVoiceDuckingEnabled": True,
-    }
-
-
 def build_default_dialog_box_config() -> dict:
     return dict(DEFAULT_DIALOG_BOX_CONFIG)
 
 
 def build_default_game_ui_config() -> dict:
     return json.loads(json.dumps(DEFAULT_GAME_UI_CONFIG, ensure_ascii=False))
-
-
-def sanitize_project_runtime_settings(value: object) -> dict:
-    source = value if isinstance(value, dict) else {}
-    defaults = build_default_project_runtime_settings()
-    text_speed = str(source.get("defaultTextSpeed") or defaults["defaultTextSpeed"]).strip().lower()
-    dialog_theme = str(source.get("defaultDialogTheme") or defaults["defaultDialogTheme"]).strip().lower()
-    ui_theme_mode = str(source.get("defaultUiThemeMode") or defaults["defaultUiThemeMode"]).strip().lower()
-    return {
-        "formalSaveSlotCount": clamp_int(
-            source.get("formalSaveSlotCount"),
-            DEFAULT_FORMAL_SAVE_SLOT_COUNT,
-            MIN_FORMAL_SAVE_SLOT_COUNT,
-            MAX_FORMAL_SAVE_SLOT_COUNT,
-        ),
-        "defaultTextSpeed": text_speed if text_speed in PROJECT_RUNTIME_TEXT_SPEEDS else defaults["defaultTextSpeed"],
-        "defaultDialogTheme": dialog_theme if dialog_theme in PROJECT_RUNTIME_DIALOG_THEMES else defaults["defaultDialogTheme"],
-        "defaultUiThemeMode": ui_theme_mode if ui_theme_mode in PROJECT_RUNTIME_UI_THEME_MODES else defaults["defaultUiThemeMode"],
-        "defaultBgmVolume": clamp_int(source.get("defaultBgmVolume"), defaults["defaultBgmVolume"], 0, 100),
-        "defaultSfxVolume": clamp_int(source.get("defaultSfxVolume"), defaults["defaultSfxVolume"], 0, 100),
-        "defaultVoiceVolume": clamp_int(source.get("defaultVoiceVolume"), defaults["defaultVoiceVolume"], 0, 100),
-        "defaultVoiceEnabled": source.get("defaultVoiceEnabled") is not False,
-        "defaultVoiceDuckingEnabled": source.get("defaultVoiceDuckingEnabled") is not False,
-    }
 
 
 def sanitize_dialog_box_config(value: object) -> dict:

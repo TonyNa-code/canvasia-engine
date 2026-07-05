@@ -5,6 +5,15 @@ import re
 from pathlib import Path
 from typing import Any
 
+from project_runtime_settings import (
+    PROJECT_RUNTIME_TEXT_SPEED_CPS,
+    get_effective_text_cps,
+    get_renpy_runtime_summary,
+    get_runtime_settings_from_bundle,
+    get_runtime_volume_ratio,
+    sanitize_project_runtime_settings,
+)
+
 
 RENPY_GAME_DIR_NAME = "game"
 RENPY_SCRIPT_FILE_NAME = "script.rpy"
@@ -44,12 +53,7 @@ CHARACTER_POP_TRANSITIONS = {
     "show": "zoomin",
     "hide": "zoomout",
 }
-TEXT_SPEED_CPS = {
-    "slow": 24,
-    "normal": 42,
-    "fast": 72,
-    "instant": 10000,
-}
+TEXT_SPEED_CPS = dict(PROJECT_RUNTIME_TEXT_SPEED_CPS)
 BACKGROUND_TRANSITION_DEFAULT_MS = 360
 EFFECT_DURATION_SECONDS = {
     "short": 0.42,
@@ -151,6 +155,7 @@ def get_renpy_export_contract() -> dict:
         "characterMoveTransforms": dict(CHARACTER_MOVE_TRANSFORMS),
         "characterPopTransitions": dict(CHARACTER_POP_TRANSITIONS),
         "textSpeedCps": dict(TEXT_SPEED_CPS),
+        "runtimeDefaults": sanitize_project_runtime_settings({}),
         "effectDurationSeconds": dict(EFFECT_DURATION_SECONDS),
         "cameraFocusKeys": sorted(CAMERA_FOCUS_XALIGN),
         "particleImageAssetTypes": list(PARTICLE_IMAGE_ASSET_TYPES),
@@ -265,6 +270,12 @@ def get_safe_volume_ratio(value: Any, fallback: float = 100) -> float:
 def render_volume_clause(value: Any, fallback: float = 100) -> str:
     ratio = get_safe_volume_ratio(value, fallback)
     return "" if ratio == 1 else f" volume {ratio:g}"
+
+
+def render_runtime_volume_clause(block: dict, context: dict, runtime_key: str) -> str:
+    if block.get("volume") not in (None, ""):
+        return render_volume_clause(block.get("volume"))
+    return render_volume_clause(get_runtime_volume_ratio(context.get("runtimeSettings"), runtime_key) * 100)
 
 
 def get_video_cue_seconds(value: Any) -> float:
@@ -434,15 +445,10 @@ def get_safe_position(value: Any) -> str:
     return position if position in POSITION_XALIGN else "center"
 
 
-def get_safe_text_speed(value: Any) -> str:
-    speed = clean_text(value)
-    return speed if speed in TEXT_SPEED_CPS else ""
-
-
-def render_renpy_text(block: dict) -> str:
+def render_renpy_text(block: dict, context: dict | None = None) -> str:
     line = clean_text(block.get("text") or (block.get("fields") or {}).get("text"), " ")
-    speed = get_safe_text_speed(block.get("textSpeed"))
-    return f"{{cps={TEXT_SPEED_CPS[speed]}}}{line}{{/cps}}" if speed else line
+    cps = get_effective_text_cps(block, (context or {}).get("runtimeSettings"))
+    return f"{{cps={cps}}}{line}{{/cps}}" if cps else line
 
 
 def get_safe_character_stage(source: Any) -> dict:
@@ -1293,12 +1299,14 @@ def render_story_block(block: dict, context: dict) -> list[str]:
     if block_type == "music_play":
         fade_in = seconds_from_ms(block.get("fadeInMs"))
         fade_suffix = f" fadein {fade_in:g}" if fade_in else ""
-        return [f"    play music {quote_renpy(get_asset_path(asset_map, block.get('assetId')) or 'audio/bgm.ogg')}{fade_suffix}{render_music_loop_clause(block)}{render_volume_clause(block.get('volume'))}"]
+        volume_suffix = render_runtime_volume_clause(block, context, "defaultBgmVolume")
+        return [f"    play music {quote_renpy(get_asset_path(asset_map, block.get('assetId')) or 'audio/bgm.ogg')}{fade_suffix}{render_music_loop_clause(block)}{volume_suffix}"]
     if block_type == "music_stop":
         fade_out = seconds_from_ms(block.get("fadeOutMs"))
         return [f"    stop music{f' fadeout {fade_out:g}' if fade_out else ''}"]
     if block_type == "sfx_play":
-        return [f"    play sound {quote_renpy(get_asset_path(asset_map, block.get('assetId')) or 'audio/sfx.ogg')}{render_volume_clause(block.get('volume'))}"]
+        volume_suffix = render_runtime_volume_clause(block, context, "defaultSfxVolume")
+        return [f"    play sound {quote_renpy(get_asset_path(asset_map, block.get('assetId')) or 'audio/sfx.ogg')}{volume_suffix}"]
     if block_type == "video_play":
         return render_video_block(block, context)
     if block_type == "credits_roll":
@@ -1322,7 +1330,7 @@ def render_story_block(block: dict, context: dict) -> list[str]:
     if block_type == "particle_effect":
         return render_particle_block(block, context)
     if block_type in {"dialogue", "narration"}:
-        line = render_renpy_text(block)
+        line = render_renpy_text(block, context)
         output: list[str] = []
         voice_path = get_asset_path(asset_map, block.get("voiceAssetId"))
         if voice_path:
@@ -1361,6 +1369,7 @@ def build_renpy_draft_export(bundle: dict, assets_doc: dict | None = None) -> di
     scene_records = build_scene_records(bundle)
     scene_label_map = {record["sceneId"]: record["sceneLabel"] for record in scene_records}
     project_resolution = get_project_resolution(bundle)
+    runtime_settings = get_runtime_settings_from_bundle(bundle)
     warnings: list[dict] = []
     sprite_definitions, _defined_sprites = build_sprite_definitions(character_map, asset_map, warnings)
     character_stage_transforms = build_character_stage_transform_definitions(scene_records, scene_label_map)
@@ -1405,6 +1414,7 @@ def build_renpy_draft_export(bundle: dict, assets_doc: dict | None = None) -> di
                 "blockIndex": block_index,
                 "cameraState": camera_state,
                 "projectResolution": project_resolution,
+                "runtimeSettings": runtime_settings,
             }
             lines.extend(render_story_block(block, block_context))
             if block_index in music_scope_stop_plan["after"]:
@@ -1424,6 +1434,7 @@ def build_renpy_draft_export(bundle: dict, assets_doc: dict | None = None) -> di
         "assetDefinitionCount": len(build_asset_image_definitions(asset_map)) + len(sprite_definitions),
         "warningCount": len(warnings),
         "warnings": warnings,
+        "runtimeSettings": runtime_settings,
         "script": script,
     }
 
@@ -1434,12 +1445,23 @@ def build_renpy_options_file(bundle: dict) -> str:
     width = int(resolution.get("width") or 1280)
     height = int(resolution.get("height") or 720)
     title = clean_text(project.get("title"), "Canvasia Project")
+    runtime_summary = get_renpy_runtime_summary(project.get("runtimeSettings"))
     return "\n".join(
         [
             f"define config.name = {quote_renpy(title)}",
             "define config.version = \"0.1\"",
             f"define config.screen_width = {width}",
             f"define config.screen_height = {height}",
+            "",
+            "# Canvasia project runtime defaults. Scene cards can still override these per line.",
+            f"define canvasia_default_text_speed = {quote_renpy(runtime_summary['defaultTextSpeed'])}",
+            f"define canvasia_default_text_cps = {runtime_summary['defaultTextCps']}",
+            f"define canvasia_default_music_volume = {runtime_summary['defaultBgmVolume']:g}",
+            f"define canvasia_default_sound_volume = {runtime_summary['defaultSfxVolume']:g}",
+            f"define canvasia_default_voice_volume = {runtime_summary['defaultVoiceVolume']:g}",
+            f"define canvasia_voice_enabled = {value_to_renpy(runtime_summary['defaultVoiceEnabled'])}",
+            f"define canvasia_voice_ducking_enabled = {value_to_renpy(runtime_summary['defaultVoiceDuckingEnabled'])}",
+            f"define canvasia_formal_save_slot_count = {runtime_summary['formalSaveSlotCount']}",
             "",
         ]
     )
