@@ -31484,6 +31484,7 @@ function buildReleaseFixOrder(routeOverview) {
       routeMetrics: routeOverview?.metrics ?? {},
       urgentMissingAssetsCount: state.data.assetList.filter((asset) => isAssetUrgentMissing(asset)).length,
       mediaBudgetReport: buildAssetMediaBudgetReport(),
+      runtimeCapabilityMatrix: buildRuntimeCapabilityMatrix(),
       runtimePreloadBudget: buildRuntimePreloadBudgetReport(),
       unusedAssetCount: getUnusedAssets().length,
       exportResult: state.lastExportResult,
@@ -32694,10 +32695,10 @@ function getDirectorCueSheetToneClass(status) {
 }
 
 function getRuntimeCapabilityToneClass(status) {
-  if (status === "blocked") {
+  if (status === "blocked" || status === "needs_fix") {
     return "danger-text";
   }
-  if (status === "warn") {
+  if (status === "warn" || status === "needs_polish") {
     return "warn-text";
   }
   if (status === "ready") {
@@ -32843,9 +32844,13 @@ function renderRuntimeCapabilityMatrixPanel() {
   const digest = runtimeCapabilityMatrixTools.getRuntimeCapabilityStatusDigest(matrix);
   const summary = matrix.summary ?? {};
   const acceptanceSummary = matrix.acceptance?.summary ?? {};
+  const essentials = matrix.essentials ?? {};
+  const essentialsSummary = essentials.summary ?? {};
   const issueRows = (matrix.issues ?? []).slice(0, 4);
   const usedRows = (matrix.usedRows ?? []).slice(0, 6);
   const acceptanceItems = Array.isArray(matrix.acceptance?.items) ? matrix.acceptance.items.slice(0, 4) : [];
+  const essentialAreas = Array.isArray(essentials.areas) ? essentials.areas.slice(0, 6) : [];
+  const essentialIssues = Array.isArray(essentials.issues) ? essentials.issues.slice(0, 4) : [];
 
   return `
     <article class="detail-card preview-sprint-panel">
@@ -32858,6 +32863,8 @@ function renderRuntimeCapabilityMatrixPanel() {
         ${renderRouteMetricCard("剧情卡片", `${summary.totalBlockCount ?? 0} 张`, "当前项目实际扫描")}
         ${renderRouteMetricCard("已用类型 / 完整", `${summary.usedTypeCount ?? 0} / ${summary.fullUsedTypeCount ?? 0}`, "卡片类型覆盖情况")}
         ${renderRouteMetricCard("需验收 / 未知", `${summary.partialUsedTypeCount ?? 0} / ${summary.unknownUsedTypeCount ?? 0}`, "发布前重点确认")}
+        ${renderRouteMetricCard("基础成熟度", `${essentialsSummary.score ?? 0}/100`, `${essentials.statusLabel ?? "待检查"} · 稳 ${essentialsSummary.readyAreaCount ?? 0}/${essentialsSummary.areaCount ?? 0}`)}
+        ${renderRouteMetricCard("基础缺口", `${essentialsSummary.warnCount ?? 0} / ${essentialsSummary.softCount ?? 0}`, "先补基础 / 体验打磨")}
         ${renderRouteMetricCard("Runtime 验收", `${acceptanceSummary.itemCount ?? 0} 项`, `Web ${acceptanceSummary.webItemCount ?? 0} · 原生 ${acceptanceSummary.nativeItemCount ?? 0}`)}
       </div>
       <div class="detail-actions">
@@ -32912,6 +32919,58 @@ function renderRuntimeCapabilityMatrixPanel() {
               </div>
             `
             : renderEmpty("当前项目还没有剧情卡片。写完第一场后，这里会检查导出 Runtime 的覆盖状态。")
+      }
+      ${
+        essentialAreas.length > 0
+          ? `
+            <div class="section-subhead">
+              <div>
+                <h3>VN 基础能力成熟度</h3>
+                <p>${escapeHtml(essentialsSummary.recommendation ?? "把基础功能域补齐后，再跑导出包点测。")}</p>
+              </div>
+              <span class="issue-tag ${getRuntimeCapabilityToneClass(essentials.status)}">${escapeHtml(essentials.statusLabel ?? "待检查")}</span>
+            </div>
+            <div class="list-stack compact-stack">
+              ${essentialAreas
+                .map(
+                  (area) => `
+                    <div class="route-testing-item">
+                      <div>
+                        <b>${escapeHtml(area.label)}</b>
+                        <span>${escapeHtml(`${area.summary} · ${area.detail}`)}</span>
+                      </div>
+                      <span class="${escapeHtml(getRuntimeCapabilityToneClass(area.status))}">${escapeHtml(area.statusLabel)}</span>
+                    </div>
+                  `
+                )
+                .join("")}
+            </div>
+          `
+          : ""
+      }
+      ${
+        essentialIssues.length > 0
+          ? `
+            <div class="preview-sprint-grid">
+              ${essentialIssues
+                .map(
+                  (issue) => `
+                    <article class="preview-sprint-card is-${issue.severity === "warn" ? "warn" : "soft"}">
+                      <div class="preview-sprint-head">
+                        <strong>${escapeHtml(issue.title)}</strong>
+                        <span class="issue-tag ${issue.severity === "warn" ? "warn-text" : ""}">
+                          ${escapeHtml(issue.severityLabel)}
+                        </span>
+                      </div>
+                      <p>${escapeHtml(issue.detail)}</p>
+                      <div class="helper-text">${escapeHtml(issue.suggestion)}</div>
+                    </article>
+                  `
+                )
+                .join("")}
+            </div>
+          `
+          : ""
       }
       ${
         acceptanceItems.length > 0

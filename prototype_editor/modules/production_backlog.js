@@ -35,6 +35,18 @@
     unlockable: Object.freeze({ label: "看可解锁清单", action: "switch-screen", screen: "inspection" }),
   });
 
+  const VN_ESSENTIAL_BACKLOG_AREAS = Object.freeze({
+    story: "scene",
+    visual: "scene",
+    character: "stage",
+    audio: "audio",
+    branch: "choice",
+    textbox: "runtime",
+    system: "runtime",
+    ui: "runtime",
+    media: "runtime",
+  });
+
   function toArray(value) {
     return Array.isArray(value) ? value : [];
   }
@@ -295,6 +307,29 @@
     }
   }
 
+  function addVnEssentialsTasks(tasks, essentials = {}) {
+    toArray(essentials.issues)
+      .filter((issue) => normalizeSeverity(issue?.severity) !== "good")
+      .slice(0, 12)
+      .forEach((issue) => {
+        const issueArea = cleanText(issue.area, "runtime");
+        const area = VN_ESSENTIAL_BACKLOG_AREAS[issueArea] || "runtime";
+        const severity = issue.severity === "warn" ? "warn" : "tip";
+        addTask(tasks, {
+          area,
+          severity,
+          title: issue.title ?? "处理视觉小说基础能力缺口",
+          detail: cleanText(
+            `${issue.detail ?? ""}${issue.suggestion ? ` 建议：${issue.suggestion}` : ""}`,
+            "把这项基础能力补齐后，再导出试玩包确认。"
+          ),
+          source: "VN 基础能力成熟度",
+          action: area === "runtime" ? AREA_ACTIONS.runtime : AREA_ACTIONS[area],
+          priorityBoost: severity === "warn" ? 18 : 6,
+        });
+      });
+  }
+
   function addRouteTasks(tasks, routeOverview = {}) {
     const metrics = routeOverview.metrics ?? {};
     const brokenRoutes = toCount(metrics.brokenRoutes);
@@ -395,6 +430,7 @@
     addIssueTasks(tasks, "presentation", context.presentationTimeline?.issues, { fallbackTitle: "处理演出节奏问题", fallbackSource: "演出时间轴" });
     addIssueTasks(tasks, "localization", context.localizationCoverage?.issues, { fallbackTitle: "处理翻译覆盖问题", fallbackSource: "多语言覆盖报告", maxItems: 8 });
     addIssueTasks(tasks, "runtime", context.runtimeCapabilityMatrix?.issues, { fallbackTitle: "处理 Runtime 覆盖风险", fallbackSource: "Runtime 覆盖矩阵", maxItems: 8, priorityBoost: 16 });
+    addVnEssentialsTasks(tasks, context.runtimeCapabilityMatrix?.essentials);
     addRuntimePreloadBudgetTasks(tasks, context.runtimePreloadBudget);
     addIssueTasks(tasks, "unlockable", context.unlockableContentManifest?.issues, {
       fallbackTitle: "处理图鉴 / 回想内容缺口",
@@ -577,6 +613,7 @@
     addAudioProductionTasks,
     addDirectorCueTasks,
     addRuntimePreloadBudgetTasks,
+    addVnEssentialsTasks,
     getSeverityLabel,
   });
 })(typeof window !== "undefined" ? window : globalThis);

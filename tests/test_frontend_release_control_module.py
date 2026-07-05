@@ -19,6 +19,7 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
         self.assertIn("function buildFinalPublishGate", source)
         self.assertIn("function buildReleaseCreativeQualityContext", source)
         self.assertIn("creativeQuality: buildReleaseCreativeQualityContext()", source)
+        self.assertIn("runtimeCapabilityMatrix: buildRuntimeCapabilityMatrix()", source)
         self.assertIn("function serializeFinalPublishGate", source)
         self.assertIn("function renderFinalPublishGatePanel", source)
         self.assertIn("最终发表门禁", source)
@@ -253,6 +254,13 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
                 hasRegressionRun: true,
                 exportResult: {{ targetLabel: "macOS 桌面包" }},
               }}),
+              vnEssentialsSteps: tools.buildVnEssentialsReleaseSteps({{
+                issues: [
+                  {{ code: "bgm_scope_missing", area: "audio", severity: "warn", severityLabel: "基础缺口", title: "多首 BGM 缺少明确播放范围", detail: "两首曲子没有结束范围。", suggestion: "给关键曲目设置结束范围。" }},
+                  {{ code: "dialog_box_readability", area: "textbox", severity: "soft", severityLabel: "体验打磨", title: "文本框可读性需要复看", detail: "正文对比度偏低。", suggestion: "提高文本框底色和文字对比度。" }},
+                  {{ code: "background_coverage", area: "visual", severity: "warn", title: "背景覆盖不完整", detail: "已有创作品质检查覆盖，不应重复塞进基础项发布顺序。" }},
+                ],
+              }}),
             }};
             process.stdout.write(JSON.stringify(result));
             """
@@ -315,6 +323,10 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
         self.assertEqual(payload["readyGate"]["badge"], "可以公开发布")
         self.assertEqual(payload["readyGate"]["primaryAction"]["action"], "export-release-control-report")
         self.assertEqual(payload["readyGate"]["secondaryActions"][0]["dataset"], {"export-target": "web"})
+        self.assertEqual([step["title"] for step in payload["vnEssentialsSteps"]], ["多首 BGM 缺少明确播放范围", "文本框可读性需要复看"])
+        self.assertEqual(payload["vnEssentialsSteps"][0]["tone"], "warn")
+        self.assertEqual(payload["vnEssentialsSteps"][0]["actions"][0]["screen"], "story")
+        self.assertEqual(payload["vnEssentialsSteps"][1]["actions"][0]["screen"], "project")
 
     def test_release_fix_order_prioritizes_blockers_before_polish(self) -> None:
         script = textwrap.dedent(
@@ -340,13 +352,20 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
               firstWarningAction: {{ action: "preview-story-location", sceneId: "scene_2", blockId: "line_9" }},
               routeMetrics: {{ orphanScenes: 1, unreachableScenes: 2 }},
               urgentMissingAssetsCount: 3,
-              mediaBudgetReport: {{
-                count: 2,
-                blockerCount: 1,
-                totalLabel: "680 MB",
-                largest: {{ name: "opening.mp4", assetId: "video_op" }},
-              }},
-              runtimePreloadBudget: {{
+	              mediaBudgetReport: {{
+	                count: 2,
+	                blockerCount: 1,
+	                totalLabel: "680 MB",
+	                largest: {{ name: "opening.mp4", assetId: "video_op" }},
+	              }},
+	              runtimeCapabilityMatrix: {{
+	                essentials: {{
+	                  issues: [
+	                    {{ code: "bgm_scope_missing", area: "audio", severity: "warn", severityLabel: "基础缺口", title: "多首 BGM 缺少明确播放范围", detail: "两首曲子没有结束范围。", suggestion: "给关键曲目设置结束范围。" }},
+	                  ],
+	                }},
+	              }},
+	              runtimePreloadBudget: {{
                 releaseRiskLevel: "danger",
                 totals: {{ dangerCount: 1, warnCount: 1, totalLabel: "360 MB" }},
                 phases: {{
@@ -397,10 +416,11 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
             titles,
             [
                 "先清结构错误",
-                "检查孤立场景和路线入口",
-                "补齐已引用缺口素材",
-                "压缩超预算素材",
-                "处理首屏加载压力",
+	                "检查孤立场景和路线入口",
+	                "补齐已引用缺口素材",
+	                "多首 BGM 缺少明确播放范围",
+	                "压缩超预算素材",
+	                "处理首屏加载压力",
                 "集中补待绑语音",
                 "确认发布版本和分辨率",
                 "顺手处理补充提醒",
@@ -409,12 +429,13 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
             ],
         )
         self.assertEqual(blocker_plan["blockerCount"], 1)
-        self.assertEqual(blocker_plan["urgentCount"], 6)
+        self.assertEqual(blocker_plan["urgentCount"], 7)
         self.assertEqual(blocker_plan["steps"][0]["actions"][1]["label"], "打开第一条错误")
         self.assertEqual(blocker_plan["steps"][1]["statusLabel"], "还有 1 个孤立场景 / 2 个不可达场景")
-        self.assertEqual(blocker_plan["steps"][3]["actions"][1]["assetId"], "video_op")
-        self.assertEqual(blocker_plan["steps"][4]["actions"][1]["action"], "export-runtime-preload-budget-markdown")
-        self.assertEqual(blocker_plan["steps"][6]["actions"][0]["action"], "save-release-version")
+        self.assertEqual(blocker_plan["steps"][3]["actions"][0]["screen"], "story")
+        self.assertEqual(blocker_plan["steps"][4]["actions"][1]["assetId"], "video_op")
+        self.assertEqual(blocker_plan["steps"][5]["actions"][1]["action"], "export-runtime-preload-budget-markdown")
+        self.assertEqual(blocker_plan["steps"][7]["actions"][0]["action"], "save-release-version")
 
         ready_plan = payload["readyPlan"]
         self.assertEqual(len(ready_plan["steps"]), 1)

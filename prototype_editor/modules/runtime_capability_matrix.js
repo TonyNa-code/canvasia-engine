@@ -1,5 +1,7 @@
 (function attachRuntimeCapabilityMatrixTools(global) {
   const storyBlockCatalogTools = global.CanvasiaEditorStoryBlockCatalog || {};
+  const dialogBoxReadabilityTools = global.CanvasiaEditorDialogBoxReadability || {};
+  const projectSettingsTools = global.CanvasiaEditorProjectSettings || {};
 
   const FALLBACK_CAPABILITY_ROWS = Object.freeze([
     ["background", "画面", "full", "full", "背景 / CG 在 Web 与原生 Runtime 中播放；3D 场景会走原生结构检查与预览兜底。"],
@@ -79,6 +81,20 @@
       : ["wait", "screen_shake", "screen_flash", "screen_fade", "camera_zoom", "camera_pan", "screen_filter", "depth_blur"]
   );
 
+  const VN_ESSENTIAL_STATUS_LABELS = Object.freeze({
+    ready: "基础稳",
+    needs_fix: "先补基础",
+    needs_polish: "建议打磨",
+    empty: "待开始",
+  });
+
+  const VN_ESSENTIAL_SEVERITY_LABELS = Object.freeze({
+    warn: "基础缺口",
+    soft: "体验打磨",
+  });
+
+  const DEFAULT_FORMAL_SAVE_SLOT_COUNT = 24;
+
   function toArray(value) {
     return Array.isArray(value) ? value : [];
   }
@@ -86,6 +102,15 @@
   function cleanText(value, fallback = "") {
     const text = String(value ?? "").replace(/\s+/g, " ").trim();
     return text || fallback;
+  }
+
+  function toNumber(value, fallback = 0) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : fallback;
+  }
+
+  function clampNumber(value, minimum, maximum, fallback = minimum) {
+    return Math.min(Math.max(toNumber(value, fallback), minimum), maximum);
   }
 
   function buildCollectionMap(source, idField = "id") {
@@ -217,6 +242,10 @@
 
   function getRuntimeAcceptanceTargetLabel(target = "") {
     return ACCEPTANCE_TARGET_LABELS[target] ?? cleanText(target, "全 Runtime");
+  }
+
+  function getVnEssentialStatusLabel(status = "") {
+    return VN_ESSENTIAL_STATUS_LABELS[status] ?? cleanText(status, "未知");
   }
 
   function getWorstStatus(...statuses) {
@@ -466,6 +495,404 @@
     return { items, summary: checklistSummary };
   }
 
+  function getSceneBlockRecords(data = {}) {
+    const records = [];
+    getSceneRecords(data).forEach((record) => {
+      toArray(record.scene?.blocks).forEach((block, blockIndex) => {
+        records.push({ ...record, block, blockIndex });
+      });
+    });
+    return records;
+  }
+
+  function getProjectRuntimeSettings(project = {}) {
+    if (typeof projectSettingsTools.getProjectRuntimeSettings === "function") {
+      return projectSettingsTools.getProjectRuntimeSettings(project);
+    }
+    const source = project?.runtimeSettings ?? {};
+    return {
+      formalSaveSlotCount: clampNumber(
+        Math.round(toNumber(source.formalSaveSlotCount, DEFAULT_FORMAL_SAVE_SLOT_COUNT)),
+        3,
+        120,
+        DEFAULT_FORMAL_SAVE_SLOT_COUNT
+      ),
+    };
+  }
+
+  function hasAssetReference(block = {}) {
+    return Boolean(cleanText(block.assetId) || cleanText(block.backgroundAssetId) || cleanText(block.cgAssetId));
+  }
+
+  function hasMeaningfulTransition(block = {}) {
+    const transition = cleanText(block.transition, "none").toLowerCase();
+    if (!transition || transition === "none") {
+      return false;
+    }
+    if (!Object.hasOwn(block, "transitionDurationMs")) {
+      return true;
+    }
+    return toNumber(block.transitionDurationMs, 0) !== 0;
+  }
+
+  function hasCharacterStageAdjustment(block = {}) {
+    const stage = block.stage && typeof block.stage === "object" ? block.stage : {};
+    return (
+      toNumber(stage.scale ?? block.scale, 100) !== 100 ||
+      toNumber(stage.opacity ?? block.opacity, 100) !== 100 ||
+      toNumber(stage.offsetX ?? block.offsetX, 0) !== 0 ||
+      toNumber(stage.offsetY ?? block.offsetY, 0) !== 0 ||
+      toNumber(stage.layer ?? block.layer, 0) !== 0 ||
+      Boolean(stage.flipX ?? block.flipX)
+    );
+  }
+
+  function getMusicEndMode(block = {}) {
+    if (typeof storyBlockCatalogTools.getSafeMusicEndMode === "function") {
+      return storyBlockCatalogTools.getSafeMusicEndMode(block.endMode);
+    }
+    const mode = cleanText(block.endMode, "until_next_music");
+    return Object.hasOwn({ until_next_music: true, scene_end: true, after_block: true }, mode) ? mode : "until_next_music";
+  }
+
+  function buildVnEssentialIssue(severity, code, title, detail, suggestion, area = "story") {
+    return {
+      severity: severity === "warn" ? "warn" : "soft",
+      severityLabel: VN_ESSENTIAL_SEVERITY_LABELS[severity === "warn" ? "warn" : "soft"],
+      code,
+      area,
+      title: cleanText(title, "基础能力提示"),
+      detail: cleanText(detail, "当前项目还有可打磨的基础项。"),
+      suggestion: cleanText(suggestion, "按提示补齐后，再导出试玩包验证一次。"),
+    };
+  }
+
+  function buildVnEssentialArea(id, label, issueCodes = [], issues = [], summary = "", detail = "") {
+    const relatedIssues = toArray(issues).filter((issue) => issueCodes.includes(issue.code));
+    const status = relatedIssues.some((issue) => issue.severity === "warn")
+      ? "needs_fix"
+      : relatedIssues.length > 0
+        ? "needs_polish"
+        : "ready";
+    return {
+      id,
+      label,
+      status,
+      statusLabel: getVnEssentialStatusLabel(status),
+      issueCount: relatedIssues.length,
+      warnCount: relatedIssues.filter((issue) => issue.severity === "warn").length,
+      softCount: relatedIssues.filter((issue) => issue.severity === "soft").length,
+      summary: cleanText(summary, label),
+      detail: cleanText(detail, relatedIssues[0]?.suggestion ?? "这一块基础体验暂时稳定。"),
+    };
+  }
+
+  function getDialogBoxReadabilityReport(data = {}) {
+    if (typeof dialogBoxReadabilityTools.buildDialogBoxReadabilityReport !== "function") {
+      return null;
+    }
+    try {
+      return dialogBoxReadabilityTools.buildDialogBoxReadabilityReport(data);
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function buildVnEssentialsAudit(data = {}) {
+    const blockRecords = getSceneBlockRecords(data);
+    const sceneRecords = getSceneRecords(data);
+    const sceneCount = sceneRecords.length;
+    const project = data.project ?? {};
+    const runtimeSettings = getProjectRuntimeSettings(project);
+    const assetMap = buildAssetMap(data);
+    const issues = [];
+    const sceneIdsWithBackground = new Set();
+    const sceneIdsWithMusic = new Set();
+    const sceneIdsWithEffects = new Set();
+    const characterPositions = new Set();
+    const referencedBgAssetIds = new Set();
+    const referencedMusicAssetIds = new Set();
+    const assetCounts = { bgm: 0, video: 0, ui: 0, font: 0 };
+
+    getAssetList(data).forEach((asset) => {
+      const assetType = cleanText(asset?.type);
+      if (assetType === "bgm" || assetType === "audio") {
+        assetCounts.bgm += 1;
+      }
+      if (assetType === "video") {
+        assetCounts.video += 1;
+      }
+      if (assetType === "ui") {
+        assetCounts.ui += 1;
+      }
+      if (assetType === "font") {
+        assetCounts.font += 1;
+      }
+    });
+
+    const metrics = {
+      sceneCount,
+      blockCount: blockRecords.length,
+      dialogueCount: 0,
+      narrationCount: 0,
+      choiceCount: 0,
+      conditionCount: 0,
+      jumpCount: 0,
+      variableMutationCount: 0,
+      choiceEffectCount: 0,
+      backgroundBlockCount: 0,
+      backgroundTransitionCount: 0,
+      scenesWithBackground: 0,
+      characterShowCount: 0,
+      characterHideCount: 0,
+      characterTransitionCount: 0,
+      characterPositionVariantCount: 0,
+      characterStageAdjustmentCount: 0,
+      musicPlayCount: 0,
+      musicStopCount: 0,
+      musicScopedCount: 0,
+      musicFadeInCount: 0,
+      musicFadeOutCount: 0,
+      sfxPlayCount: 0,
+      videoPlayCount: 0,
+      scenesWithMusic: 0,
+      scenesWithEffects: 0,
+      textBoxIssueCount: 0,
+      textBoxDangerCount: 0,
+      formalSaveSlotCount: runtimeSettings.formalSaveSlotCount,
+      bgmAssetCount: assetCounts.bgm,
+      videoAssetCount: assetCounts.video,
+      uiAssetCount: assetCounts.ui,
+      fontAssetCount: assetCounts.font,
+      referencedBackgroundAssetCount: 0,
+      referencedMusicAssetCount: 0,
+    };
+
+    blockRecords.forEach(({ block, scene }) => {
+      const type = cleanText(block?.type, "unknown");
+      const sceneId = cleanText(scene?.id ?? scene?.sceneId, `scene_${metrics.sceneCount}`);
+      if (["screen_shake", "screen_flash", "screen_fade", "camera_zoom", "camera_pan", "screen_filter", "depth_blur", "particle_effect", "wait"].includes(type)) {
+        sceneIdsWithEffects.add(sceneId);
+      }
+
+      if (type === "dialogue") {
+        metrics.dialogueCount += 1;
+      } else if (type === "narration") {
+        metrics.narrationCount += 1;
+      } else if (type === "choice") {
+        metrics.choiceCount += 1;
+        toArray(block.options).forEach((option) => {
+          metrics.choiceEffectCount += toArray(option?.effects).length;
+        });
+      } else if (type === "condition") {
+        metrics.conditionCount += 1;
+      } else if (type === "jump") {
+        metrics.jumpCount += 1;
+      } else if (type === "variable_set" || type === "variable_add") {
+        metrics.variableMutationCount += 1;
+      } else if (type === "background") {
+        metrics.backgroundBlockCount += 1;
+        sceneIdsWithBackground.add(sceneId);
+        if (hasMeaningfulTransition(block)) {
+          metrics.backgroundTransitionCount += 1;
+        }
+        if (hasAssetReference(block)) {
+          referencedBgAssetIds.add(cleanText(block.assetId ?? block.backgroundAssetId ?? block.cgAssetId));
+        }
+      } else if (type === "character_show") {
+        metrics.characterShowCount += 1;
+        characterPositions.add(cleanText(block.position, "center"));
+        if (hasMeaningfulTransition(block)) {
+          metrics.characterTransitionCount += 1;
+        }
+        if (hasCharacterStageAdjustment(block)) {
+          metrics.characterStageAdjustmentCount += 1;
+        }
+      } else if (type === "character_hide") {
+        metrics.characterHideCount += 1;
+        if (hasMeaningfulTransition(block)) {
+          metrics.characterTransitionCount += 1;
+        }
+      } else if (type === "music_play") {
+        metrics.musicPlayCount += 1;
+        sceneIdsWithMusic.add(sceneId);
+        const endMode = getMusicEndMode(block);
+        if (endMode !== "until_next_music") {
+          metrics.musicScopedCount += 1;
+        }
+        if (toNumber(block.fadeInMs, 0) > 0) {
+          metrics.musicFadeInCount += 1;
+        }
+        if (endMode !== "until_next_music" && toNumber(block.fadeOutMs, 0) > 0) {
+          metrics.musicFadeOutCount += 1;
+        }
+        if (cleanText(block.assetId)) {
+          referencedMusicAssetIds.add(cleanText(block.assetId));
+        }
+      } else if (type === "music_stop") {
+        metrics.musicStopCount += 1;
+        if (toNumber(block.fadeOutMs, 0) > 0) {
+          metrics.musicFadeOutCount += 1;
+        }
+      } else if (type === "sfx_play") {
+        metrics.sfxPlayCount += 1;
+      } else if (type === "video_play") {
+        metrics.videoPlayCount += 1;
+      }
+    });
+
+    metrics.scenesWithBackground = sceneIdsWithBackground.size;
+    metrics.scenesWithMusic = sceneIdsWithMusic.size;
+    metrics.scenesWithEffects = sceneIdsWithEffects.size;
+    metrics.characterPositionVariantCount = characterPositions.size;
+    metrics.referencedBackgroundAssetCount = [...referencedBgAssetIds].filter((id) => assetMap.has(id)).length;
+    metrics.referencedMusicAssetCount = [...referencedMusicAssetIds].filter((id) => assetMap.has(id)).length;
+    metrics.textBlockCount = metrics.dialogueCount + metrics.narrationCount + metrics.choiceCount;
+    metrics.branchBlockCount = metrics.choiceCount + metrics.conditionCount + metrics.jumpCount;
+
+    if (sceneCount > 0 && metrics.textBlockCount === 0) {
+      issues.push(buildVnEssentialIssue("warn", "story_text_missing", "缺少可读剧情文本", "当前项目已有场景，但没有台词、旁白或选项卡片。", "先补一段可从入口读到的文本，再做导出试玩。", "story"));
+    }
+    if (sceneCount > 0 && metrics.scenesWithBackground < sceneCount) {
+      issues.push(buildVnEssentialIssue("warn", "background_coverage", "背景覆盖不完整", `${sceneCount - metrics.scenesWithBackground} 个场景还没有背景 / CG / 3D 场景卡片。`, "给每个可试玩场景至少放一张画面素材，避免黑屏式试玩体验。", "visual"));
+    }
+    if (metrics.backgroundBlockCount >= 2 && metrics.backgroundTransitionCount === 0) {
+      issues.push(buildVnEssentialIssue("soft", "background_transition_missing", "背景切换缺少基础转场", "多张背景卡片没有检测到淡入淡出或其他过渡。", "章节开头或场景切换建议设置 400-1000ms 的淡入淡出。", "visual"));
+    }
+    if (metrics.dialogueCount >= 3 && metrics.characterShowCount === 0) {
+      issues.push(buildVnEssentialIssue("soft", "character_stage_missing", "人物登场演出偏弱", "台词已经成段，但没有检测到角色登场卡片。", "给主要角色补显示/隐藏、位置、缩放和淡入淡出，让试玩更像正式 VN。", "character"));
+    }
+    if (sceneCount >= 2 && metrics.characterShowCount > 0 && metrics.characterHideCount === 0) {
+      issues.push(buildVnEssentialIssue("soft", "character_hide_missing", "角色退场节奏未标记", "检测到角色登场，但没有隐藏角色卡片。", "章节切换或角色离场时补隐藏卡片，避免立绘残留。", "character"));
+    }
+    if (metrics.characterShowCount >= 3 && metrics.characterTransitionCount === 0) {
+      issues.push(buildVnEssentialIssue("soft", "character_transition_missing", "人物登场缺少基础转场", `${metrics.characterShowCount} 次角色登场没有使用淡入、滑入、上浮或弹出。`, "关键情绪点给角色登退场加轻量转场，减少硬切。", "character"));
+    }
+    if (metrics.characterShowCount >= 3 && metrics.characterPositionVariantCount <= 1) {
+      issues.push(buildVnEssentialIssue("soft", "character_position_static", "人物站位过于固定", `角色登场只使用了 ${metrics.characterPositionVariantCount} 种站位。`, "对话双方或重点角色建议使用 left / center / right 等站位变化。", "character"));
+    }
+    if (metrics.characterShowCount >= 4 && metrics.characterStageAdjustmentCount === 0) {
+      issues.push(buildVnEssentialIssue("soft", "character_stage_static", "人物舞台参数没有变化", "多次角色登场没有检测到缩放、透明度、偏移、翻转或层级调整。", "近景、回忆或压迫感段落可以适当使用缩放/透明度/偏移。", "character"));
+    }
+    if (sceneCount >= 2 && metrics.musicPlayCount === 0) {
+      issues.push(buildVnEssentialIssue("soft", "bgm_plan_missing", "缺少 BGM 进入点", "多场景项目没有检测到播放 BGM 卡片。", "为章节开头、转场或情绪段落设置 BGM，并确认导出包里能按范围切换。", "audio"));
+    }
+    if (metrics.musicPlayCount >= 2 && metrics.musicScopedCount === 0 && metrics.musicStopCount === 0) {
+      issues.push(buildVnEssentialIssue("warn", "bgm_scope_missing", "多首 BGM 缺少明确播放范围", `检测到 ${metrics.musicPlayCount} 个 BGM 播放点，但没有 scene_end / after_block 范围或停止音乐卡片。`, "给每首关键曲目设置结束范围，避免音乐覆盖到不该出现的文本段落。", "audio"));
+    }
+    if (metrics.musicPlayCount > 0 && metrics.musicFadeInCount < metrics.musicPlayCount) {
+      issues.push(buildVnEssentialIssue("soft", "bgm_fade_in_missing", "部分 BGM 没有淡入", `${metrics.musicPlayCount - metrics.musicFadeInCount} 个 BGM 播放点没有设置淡入时间。`, "给 BGM 播放卡片设置 400-1000ms 淡入，减少切歌突兀感。", "audio"));
+    }
+    if (metrics.musicStopCount > 0 && metrics.musicFadeOutCount < metrics.musicStopCount) {
+      issues.push(buildVnEssentialIssue("soft", "bgm_fade_out_missing", "部分停止音乐没有淡出", `${metrics.musicStopCount - metrics.musicFadeOutCount} 个停止音乐卡片没有淡出。`, "给停止音乐卡片设置淡出，让场景切换和静音段落更自然。", "audio"));
+    }
+    if (sceneCount >= 3 && metrics.sfxPlayCount === 0) {
+      issues.push(buildVnEssentialIssue("soft", "sfx_plan_missing", "缺少基础音效点", "多场景项目没有检测到音效卡片。", "给脚步、门铃、短信提示、心跳或关键演出补少量音效点。", "audio"));
+    }
+    if (metrics.videoAssetCount > 0 && metrics.videoPlayCount === 0) {
+      issues.push(buildVnEssentialIssue("soft", "video_asset_unused", "视频素材还没有进入剧情", `检测到 ${metrics.videoAssetCount} 个视频素材，但没有播放视频卡片。`, "如果这些是 OP、ED 或过场动画，建议放入对应章节并跑一次 Runtime 视频验收。", "media"));
+    }
+    if (sceneCount >= 2 && metrics.choiceCount === 0) {
+      issues.push(buildVnEssentialIssue("soft", "choice_node_missing", "缺少可交互选项", "多场景项目没有检测到选项卡片。", "如果目标不是纯电子书，建议至少加入一个选项、分支或可回收差分。", "branch"));
+    }
+    if (metrics.choiceCount > 0 && metrics.choiceEffectCount === 0 && metrics.variableMutationCount === 0 && metrics.conditionCount === 0) {
+      issues.push(buildVnEssentialIssue("soft", "choice_consequence_missing", "选项后果还不明显", "检测到选项，但没有变量效果、变量卡片或条件分支。", "为关键选项补好感度、路线旗标或后续条件读取，避免玩家觉得是假按钮。", "branch"));
+    }
+    if (sceneCount >= 6 && metrics.formalSaveSlotCount < 12) {
+      issues.push(buildVnEssentialIssue("soft", "save_slot_count_low", "正式存档位可能偏少", `当前 ${sceneCount} 个场景配置了 ${metrics.formalSaveSlotCount} 个正式存档位。`, "中长篇 Demo 建议至少 12-24 个正式存档位；多路线作品可提高到 50 个以上。", "system"));
+    }
+
+    const dialogBoxReport = getDialogBoxReadabilityReport(data);
+    if (dialogBoxReport) {
+      metrics.textBoxIssueCount = toArray(dialogBoxReport.issues).length;
+      metrics.textBoxDangerCount = toArray(dialogBoxReport.issues).filter((issue) => issue.severity === "danger").length;
+      if (metrics.textBoxIssueCount > 0) {
+        const firstIssue = dialogBoxReport.issues[0];
+        issues.push(
+          buildVnEssentialIssue(
+            metrics.textBoxDangerCount > 0 ? "warn" : "soft",
+            "dialog_box_readability",
+            "文本框可读性需要复看",
+            `${firstIssue.title}：${firstIssue.detail}`,
+            "到项目设置里使用文本框可读性自动优化，或手动调整底色、透明度、宽高、内边距和文字颜色。",
+            "textbox"
+          )
+        );
+      }
+    }
+
+    const gameUiConfig = project.gameUiConfig ?? {};
+    const hasCustomUiAsset = [
+      "titleLogoAssetId",
+      "titleBackgroundAssetId",
+      "panelFrameAssetId",
+      "buttonFrameAssetId",
+      "saveSlotFrameAssetId",
+      "systemPanelFrameAssetId",
+      "uiOverlayAssetId",
+      "fontAssetId",
+    ].some((field) => cleanText(gameUiConfig[field]));
+    const hasCustomUiPalette = Boolean(cleanText(gameUiConfig.fontFamily)) || cleanText(gameUiConfig.preset) === "custom";
+    if (sceneCount >= 2 && !hasCustomUiAsset && !hasCustomUiPalette) {
+      issues.push(buildVnEssentialIssue("soft", "game_ui_skin_default", "游戏 UI 仍接近默认皮肤", "没有检测到标题图、Logo、九宫格按钮/面板、字体或自定义 UI 贴图。", "正式发布前可以保留默认皮肤，但建议至少换标题图、Logo 或按钮状态，让作品更有辨识度。", "ui"));
+    }
+    if (metrics.fontAssetCount > 0 && !cleanText(gameUiConfig.fontAssetId)) {
+      issues.push(buildVnEssentialIssue("soft", "font_asset_unbound", "字体素材尚未绑定到游戏 UI", `素材库里有 ${metrics.fontAssetCount} 个字体素材，但项目 UI 没有绑定字体素材。`, "如果这是作品正式字体，建议在项目设置里绑定，保证导出包和原生 Runtime 字体一致。", "ui"));
+    }
+
+    const areas = [
+      buildVnEssentialArea("story", "剧情文本", ["story_text_missing"], issues, `${metrics.textBlockCount} 个文本/选项块`, "先保证入口能读到一段完整剧情。"),
+      buildVnEssentialArea("visual", "画面背景", ["background_coverage", "background_transition_missing"], issues, `${metrics.scenesWithBackground}/${sceneCount} 个场景有背景`, "每个可试玩场景至少要有画面锚点。"),
+      buildVnEssentialArea(
+        "character",
+        "人物舞台",
+        ["character_stage_missing", "character_hide_missing", "character_transition_missing", "character_position_static", "character_stage_static"],
+        issues,
+        `${metrics.characterShowCount} 次登场 / ${metrics.characterPositionVariantCount} 种站位`,
+        "检查立绘显示、隐藏、站位、缩放和转场。"
+      ),
+      buildVnEssentialArea(
+        "audio",
+        "音频调度",
+        ["bgm_plan_missing", "bgm_scope_missing", "bgm_fade_in_missing", "bgm_fade_out_missing", "sfx_plan_missing"],
+        issues,
+        `${metrics.musicPlayCount} 个 BGM / ${metrics.sfxPlayCount} 个音效`,
+        "BGM 应按文本范围、场景或停止卡控制，而不是机械连播。"
+      ),
+      buildVnEssentialArea("branch", "分支变量", ["choice_node_missing", "choice_consequence_missing"], issues, `${metrics.choiceCount} 个选项 / ${metrics.conditionCount} 个条件`, "至少让关键选项有可解释后果。"),
+      buildVnEssentialArea("textbox", "文本框可读性", ["dialog_box_readability"], issues, `${metrics.textBoxIssueCount} 个可读性提示`, "长文本、浅色背景和复杂 CG 下要能看清。"),
+      buildVnEssentialArea("system", "存档与系统项", ["save_slot_count_low"], issues, `${metrics.formalSaveSlotCount} 个正式存档位`, "中长篇作品需要足够手动存档空间。"),
+      buildVnEssentialArea("ui", "游戏 UI 皮肤", ["game_ui_skin_default", "font_asset_unbound"], issues, hasCustomUiAsset || hasCustomUiPalette ? "已检测到自定义 UI 线索" : "接近默认皮肤", "作品自己的 Logo、字体、按钮和面板会显著提升完成感。"),
+      buildVnEssentialArea("media", "视频与额外素材", ["video_asset_unused"], issues, `${metrics.videoPlayCount}/${metrics.videoAssetCount} 个视频已入剧情`, "OP / ED / 过场视频要确认能在导出包播放。"),
+    ];
+
+    const warnCount = issues.filter((issue) => issue.severity === "warn").length;
+    const softCount = issues.filter((issue) => issue.severity === "soft").length;
+    const readyAreaCount = areas.filter((area) => area.status === "ready").length;
+    const score = sceneCount === 0
+      ? 0
+      : Math.max(0, Math.round(100 - warnCount * 14 - softCount * 6 - (areas.length - readyAreaCount) * 2));
+    const status = sceneCount === 0 ? "empty" : warnCount > 0 ? "needs_fix" : softCount > 0 ? "needs_polish" : "ready";
+
+    return {
+      status,
+      statusLabel: getVnEssentialStatusLabel(status),
+      summary: {
+        score,
+        areaCount: areas.length,
+        readyAreaCount,
+        attentionAreaCount: areas.length - readyAreaCount,
+        warnCount,
+        softCount,
+        issueCount: issues.length,
+        recommendation: issues[0]?.suggestion ?? (sceneCount === 0 ? "先创建第一个场景和第一段文本。" : "基础视觉小说体验未发现明显缺口，可以继续做实机点测。"),
+      },
+      metrics,
+      areas,
+      issues,
+    };
+  }
+
   function addUsage(usageMap, block, record, assetMap) {
     const type = cleanText(block?.type, "unknown");
     const usage =
@@ -579,6 +1006,7 @@
     };
 
     const acceptance = buildRuntimeAcceptanceChecklist(allRows, summary);
+    const essentials = buildVnEssentialsAudit(data);
 
     return {
       projectTitle: cleanText(data.project?.title, "Canvasia Project"),
@@ -587,6 +1015,7 @@
       issues,
       summary,
       acceptance,
+      essentials,
     };
   }
 
@@ -678,6 +1107,21 @@
       item.relatedBlockTypes.join(" / "),
       item.detail,
     ]);
+    const essentials = matrix.essentials ?? {};
+    const essentialsSummary = essentials.summary ?? {};
+    const essentialAreaRows = toArray(essentials.areas).map((area) => [
+      area.label,
+      area.statusLabel,
+      area.summary,
+      area.detail,
+    ]);
+    const essentialIssueRows = toArray(essentials.issues).map((issue, index) => [
+      index + 1,
+      issue.severityLabel,
+      issue.title,
+      issue.detail,
+      issue.suggestion,
+    ]);
 
     return [
       `# ${projectTitle} Runtime 覆盖矩阵`,
@@ -711,6 +1155,27 @@
       buildMarkdownTable(["分组", "卡片类型", "使用次数", "Web Runtime", "原生 Runtime", "总体", "使用场景", "说明"], usedRows) ||
         "当前项目还没有剧情卡片。",
       "",
+      "## VN 基础能力成熟度",
+      "",
+      buildMarkdownTable(
+        ["基础分", "状态", "稳妥项", "需关注项", "基础缺口", "体验打磨", "建议"],
+        [
+          [
+            `${essentialsSummary.score ?? 0}/100`,
+            essentials.statusLabel ?? "待检查",
+            essentialsSummary.readyAreaCount ?? 0,
+            essentialsSummary.attentionAreaCount ?? 0,
+            essentialsSummary.warnCount ?? 0,
+            essentialsSummary.softCount ?? 0,
+            essentialsSummary.recommendation ?? "",
+          ],
+        ]
+      ),
+      "",
+      buildMarkdownTable(["领域", "状态", "当前情况", "处理提示"], essentialAreaRows) || "当前项目还没有可分析的 VN 基础能力。",
+      "",
+      buildMarkdownTable(["序号", "级别", "基础缺口", "说明", "建议"], essentialIssueRows) || "当前没有明显基础能力缺口。",
+      "",
       "## 需要重点验收",
       "",
       buildMarkdownTable(["序号", "级别", "卡片类型", "使用次数", "场景", "说明"], issueRows) || "当前没有 Runtime 覆盖风险。",
@@ -742,10 +1207,12 @@
     FALLBACK_CAPABILITY_ROWS,
     buildRuntimeCapabilityMatrix,
     buildRuntimeAcceptanceChecklist,
+    buildVnEssentialsAudit,
     getRuntimeCapabilityStatusDigest,
     buildRuntimeCapabilityMarkdown,
     buildRuntimeCapabilityCsv,
     getRuntimeStatusLabel,
     getRuntimeAcceptanceTargetLabel,
+    getVnEssentialStatusLabel,
   });
 })(typeof window !== "undefined" ? window : globalThis);

@@ -644,6 +644,43 @@
     return steps;
   }
 
+  function buildVnEssentialsReleaseSteps(essentials = {}) {
+    const releaseCodes = new Set([
+      "bgm_scope_missing",
+      "bgm_fade_in_missing",
+      "bgm_fade_out_missing",
+      "dialog_box_readability",
+      "game_ui_skin_default",
+      "font_asset_unbound",
+      "video_asset_unused",
+      "choice_consequence_missing",
+    ]);
+    const actionByArea = {
+      audio: { label: "去剧情页调 BGM", action: "switch-screen", screen: "story" },
+      textbox: { label: "去项目设置调文本框", action: "switch-screen", screen: "project" },
+      ui: { label: "去项目设置调游戏 UI", action: "switch-screen", screen: "project" },
+      media: { label: "去剧情页安排视频", action: "switch-screen", screen: "story" },
+      branch: { label: "去剧情页补选项后果", action: "switch-screen", screen: "story" },
+    };
+
+    return toArray(essentials?.issues)
+      .filter((issue) => releaseCodes.has(issue?.code))
+      .slice(0, 6)
+      .map((issue) => {
+        const area = String(issue?.area ?? "").trim();
+        return {
+          tone: issue?.severity === "warn" ? "warn" : "soft",
+          title: issue?.title ?? "补齐视觉小说基础能力",
+          statusLabel: issue?.severityLabel ?? (issue?.severity === "warn" ? "基础缺口" : "体验打磨"),
+          description: `${issue?.detail ?? ""}${issue?.suggestion ? ` ${issue.suggestion}` : ""}`.trim() || "发布前建议补齐这项基础能力。",
+          actions: [
+            actionByArea[area] ?? { label: "查看 Runtime 基础成熟度", action: "switch-screen", screen: "inspection" },
+            { label: "导出 Runtime 矩阵", action: "export-runtime-capability-markdown" },
+          ],
+        };
+      });
+  }
+
   function buildReleaseFixOrder(context = {}) {
     const routeMetrics = context.routeMetrics ?? context.routeOverview?.metrics ?? {};
     const resolution = normalizeResolution(context.resolution);
@@ -726,6 +763,7 @@
     }
 
     steps.push(...buildCreativeQualityAudit(context));
+    steps.push(...buildVnEssentialsReleaseSteps(context.runtimeCapabilityMatrix?.essentials));
 
     if (mediaBudgetCount > 0) {
       const largest = mediaBudgetReport.largest ?? null;
@@ -890,6 +928,7 @@
     buildReleaseControlOverviewRows,
     buildRuntimePreloadBudgetFixStep,
     buildCreativeQualityAudit,
+    buildVnEssentialsReleaseSteps,
     buildReleaseFixOrder,
   });
 })(typeof window !== "undefined" ? window : globalThis);
