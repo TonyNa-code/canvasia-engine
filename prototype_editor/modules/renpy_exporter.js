@@ -4,17 +4,10 @@
   const CHOICE_CONTINUE_TARGET = "__continue__";
   const BLOCK_TYPES_REQUIRING_COMMENT = Object.freeze([
     "particle_effect",
-    "screen_shake",
-    "screen_flash",
     "screen_filter",
     "depth_blur",
     "camera_zoom",
     "camera_pan",
-    "video_play",
-    "credits_roll",
-    "variable_set",
-    "variable_add",
-    "condition",
   ]);
 
   function toArray(value) {
@@ -37,7 +30,7 @@
   }
 
   function quoteRenpy(value) {
-    return `"${String(value ?? "").replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+    return `"${String(value ?? "").replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\r?\n/g, "\\n")}"`;
   }
 
   function getProjectTitle(data = {}, options = {}) {
@@ -57,6 +50,14 @@
       ? data.characters
       : Array.isArray(data.characters?.characters)
         ? data.characters.characters
+        : [];
+  }
+
+  function getVariableList(data = {}) {
+    return Array.isArray(data.variables)
+      ? data.variables
+      : Array.isArray(data.variables?.variables)
+        ? data.variables.variables
         : [];
   }
 
@@ -196,6 +197,38 @@
     return cleanText(block.text ?? block.fields?.text);
   }
 
+  function getVoiceAssetId(block = {}) {
+    return cleanText(block.voiceAssetId ?? block.voice?.assetId);
+  }
+
+  function renderRenpyLiteral(value) {
+    if (typeof value === "boolean") {
+      return value ? "True" : "False";
+    }
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return String(value);
+    }
+    if (value === null) {
+      return "None";
+    }
+
+    const text = String(value ?? "").trim();
+    if (/^(true|false)$/i.test(text)) {
+      return text.toLowerCase() === "true" ? "True" : "False";
+    }
+    if (/^-?\d+(?:\.\d+)?$/.test(text)) {
+      return text;
+    }
+    if (/^(none|null)$/i.test(text)) {
+      return "None";
+    }
+    return quoteRenpy(text);
+  }
+
+  function getVariableIdentifier(value, fallback = "var") {
+    return normalizeIdentifier(value, fallback);
+  }
+
   function buildCharacterDefinitions(characterMap = new Map()) {
     return Array.from(characterMap.entries())
       .map(([characterId, character]) => {
@@ -217,6 +250,13 @@
       .sort();
   }
 
+  function buildVariableDefinitions(data = {}) {
+    return getVariableList(data)
+      .filter((variable) => cleanText(variable?.id))
+      .map((variable) => `default ${getVariableIdentifier(variable.id)} = ${renderRenpyLiteral(variable.defaultValue)}`)
+      .sort();
+  }
+
   function pushWarning(warnings, code, message, context = {}) {
     warnings.push({ code, message, ...context });
   }
@@ -235,6 +275,125 @@
     return [`    # Canvasia review ${type}: ${quoteRenpy(getBlockText(block) || cleanText(block.preset ?? block.action ?? block.assetId, "manual port"))}`];
   }
 
+  function renderVoicePrefix(block = {}, context = {}, indent = "    ") {
+    const voiceAssetId = getVoiceAssetId(block);
+    if (!voiceAssetId) {
+      return [];
+    }
+    const path = getAssetPath(context.assetMap ?? new Map(), voiceAssetId);
+    if (!path) {
+      pushWarning(context.warnings ?? [], "renpy_missing_voice_asset", `语音 ${voiceAssetId} 没有找到素材路径。`, getWarningContext(context));
+      return [`${indent}# Canvasia review missing voice asset: ${quoteRenpy(voiceAssetId)}`];
+    }
+    return [`${indent}voice ${quoteRenpy(path)}`];
+  }
+
+  function getEffectVariableId(effect = {}) {
+    return cleanText(effect.variableId ?? effect.variableHint);
+  }
+
+  function renderVariableEffect(effect = {}, context = {}, indent = "    ") {
+    const variableId = getEffectVariableId(effect);
+    const warnings = context.warnings ?? [];
+    if (!variableId) {
+      pushWarning(warnings, "renpy_missing_variable_id", "变量卡缺少变量 ID，已导出 pass。", getWarningContext(context));
+      return [`${indent}pass`];
+    }
+
+    if (effect.type === "variable_add") {
+      const delta = Number(effect.value ?? 0);
+      if (!Number.isFinite(delta)) {
+        pushWarning(warnings, "renpy_variable_add_value_review", `变量 ${variableId} 的增减值不是数字，已按 0 导出。`, getWarningContext(context));
+      }
+      return [`${indent}$ ${getVariableIdentifier(variableId)} += ${Number.isFinite(delta) ? delta : 0}`];
+    }
+
+    return [`${indent}$ ${getVariableIdentifier(variableId)} = ${renderRenpyLiteral(effect.value)}`];
+  }
+
+  function normalizeConditionOperator(operator) {
+    const safeOperator = cleanText(operator, "==");
+    return safeOperator === "=" ? "==" : safeOperator;
+  }
+
+  function renderConditionRuleExpression(rule = {}, context = {}) {
+    const variableId = cleanText(rule.variableId ?? rule.variableHint);
+    if (!variableId) {
+      pushWarning(context.warnings ?? [], "renpy_condition_missing_variable", "条件判断缺少变量 ID，已按 True 导出。", getWarningContext(context));
+      return "True";
+    }
+    return `${getVariableIdentifier(variableId)} ${normalizeConditionOperator(rule.operator)} ${renderRenpyLiteral(rule.value)}`;
+  }
+
+  function renderConditionTargetLines(targetSceneId, context = {}, indent = "        ") {
+    const target = cleanText(targetSceneId);
+    if (!target) {
+      pushWarning(context.warnings ?? [], "renpy_condition_missing_target", "条件分支缺少目标场景，已导出 pass。", getWarningContext(context));
+      return [`${indent}pass`];
+    }
+    return [`${indent}jump ${getSceneLabel(target, context.sceneMap)}`];
+  }
+
+  function renderConditionBlock(block = {}, context = {}) {
+    const branches = toArray(block.branches);
+    if (!branches.length) {
+      pushWarning(context.warnings ?? [], "renpy_empty_condition", "条件判断没有分支，已导出 pass。", getWarningContext(context));
+      return ["    pass"];
+    }
+
+    const lines = [];
+    branches.forEach((branch, index) => {
+      const expression = toArray(branch.when)
+        .map((rule) => renderConditionRuleExpression(rule, context))
+        .filter(Boolean)
+        .join(" and ") || "True";
+      lines.push(`    ${index === 0 ? "if" : "elif"} ${expression}:`);
+      renderConditionTargetLines(branch.gotoSceneId ?? branch.targetSceneId ?? branch.targetHint, context).forEach((line) => lines.push(line));
+    });
+
+    const elseTarget = block.elseGotoSceneId ?? block.elseTargetSceneId ?? block.elseTargetHint;
+    if (elseTarget) {
+      lines.push("    else:");
+      renderConditionTargetLines(elseTarget, context).forEach((line) => lines.push(line));
+    }
+
+    return lines;
+  }
+
+  function renderVideoBlock(block = {}, context = {}) {
+    const path = getAssetPath(context.assetMap ?? new Map(), block.assetId);
+    if (!path) {
+      pushWarning(context.warnings ?? [], "renpy_missing_video_asset", "视频卡没有找到可播放素材，已导出复核注释。", getWarningContext(context));
+      return [`    # Canvasia review missing video: ${quoteRenpy(cleanText(block.assetId, "video"))}`];
+    }
+
+    const lines = [];
+    const start = Number(block.startTimeSeconds ?? 0);
+    const end = Number(block.endTimeSeconds ?? 0);
+    if ((Number.isFinite(start) && start > 0) || (Number.isFinite(end) && end > 0) || block.volume) {
+      pushWarning(context.warnings ?? [], "renpy_video_timing_review", "视频裁段或音量设置需要在 Ren'Py 中复核。", getWarningContext(context));
+      lines.push(`    # Canvasia review video timing: start=${Number.isFinite(start) ? start : 0}, end=${Number.isFinite(end) ? end : 0}, volume=${block.volume ?? "default"}`);
+    }
+    lines.push(`    $ renpy.movie_cutscene(${quoteRenpy(path)})`);
+    return lines;
+  }
+
+  function renderCreditsBlock(block = {}) {
+    const title = cleanText(block.title, "STAFF");
+    const subtitle = cleanText(block.subtitle);
+    const lines = toArray(block.lines).map((line) => cleanText(line)).filter(Boolean);
+    const duration = Number(block.durationSeconds ?? 12);
+    const text = [title, subtitle, ...lines].filter(Boolean).join("\n");
+    return [
+      "    window hide",
+      "    scene black with fade",
+      `    show text ${quoteRenpy(text)} at truecenter with dissolve`,
+      `    $ renpy.pause(${Number.isFinite(duration) && duration > 0 ? duration : 12})`,
+      "    hide text with dissolve",
+      "    window show",
+    ];
+  }
+
   function renderChoiceBlock(block = {}, context = {}) {
     const lines = ["    menu:"];
     const options = toArray(block.options);
@@ -250,13 +409,9 @@
       const effectCount = toArray(option.effects).length;
       lines.push(`        ${quoteRenpy(optionText)}:`);
       if (effectCount > 0) {
-        pushWarning(
-          warnings,
-          "renpy_choice_effects_review",
-          `选项「${optionText}」包含 ${effectCount} 个变量或状态效果，需要在 Ren'Py 中手动确认。`,
-          { ...getWarningContext(context), optionIndex }
-        );
-        lines.push(`            # Canvasia review choice effects: ${effectCount}`);
+        toArray(option.effects).forEach((effect) => {
+          renderVariableEffect(effect, { ...context, optionIndex }, "            ").forEach((line) => lines.push(line));
+        });
       }
       if (targetSceneId && targetSceneId !== CHOICE_CONTINUE_TARGET) {
         lines.push(`            jump ${getSceneLabel(targetSceneId, context.sceneMap)}`);
@@ -297,17 +452,39 @@
     if (type === "sfx_play") {
       return [`    play sound ${quoteRenpy(getAssetPath(assetMap, block.assetId) || "audio/sfx.ogg")}`];
     }
+    if (type === "video_play") {
+      return renderVideoBlock(block, context);
+    }
+    if (type === "credits_roll") {
+      return renderCreditsBlock(block);
+    }
+    if (type === "variable_set" || type === "variable_add") {
+      return renderVariableEffect(block, context);
+    }
+    if (type === "condition") {
+      return renderConditionBlock(block, context);
+    }
+    if (type === "screen_shake") {
+      return ["    with hpunch"];
+    }
+    if (type === "screen_flash") {
+      return ['    with Fade(0.08, 0.0, 0.28, color="#ffffff")'];
+    }
+    if (type === "screen_fade") {
+      return ["    with fade"];
+    }
     if (type === "dialogue") {
       const characterId = cleanText(block.speakerId);
       const line = getBlockText(block);
+      const voiceLines = renderVoicePrefix(block, context);
       if (!characterId) {
         pushWarning(warnings, "renpy_missing_speaker", "台词缺少说话人，已作为旁白导出。", getWarningContext(context));
-        return [`    ${quoteRenpy(line || " ")}`];
+        return [...voiceLines, `    ${quoteRenpy(line || " ")}`];
       }
-      return [`    ${normalizeIdentifier(characterId, "character")} ${quoteRenpy(line || " ")}`];
+      return [...voiceLines, `    ${normalizeIdentifier(characterId, "character")} ${quoteRenpy(line || " ")}`];
     }
     if (type === "narration") {
-      return [`    ${quoteRenpy(getBlockText(block) || " ")}`];
+      return [...renderVoicePrefix(block, context), `    ${quoteRenpy(getBlockText(block) || " ")}`];
     }
     if (type === "choice") {
       return renderChoiceBlock(block, context);
@@ -345,6 +522,8 @@
       "",
       ...buildCharacterDefinitions(characterMap),
       "",
+      ...buildVariableDefinitions(data),
+      "",
     ];
 
     sceneRecords.forEach((record, sceneIndex) => {
@@ -374,6 +553,7 @@
       sceneCount: sceneRecords.length,
       characterCount: characterMap.size,
       assetDefinitionCount: buildImageDefinitions(assetMap).length,
+      variableDefinitionCount: buildVariableDefinitions(data).length,
       warningCount: warnings.length,
       warnings,
       script: `${lines.join("\n").replace(/\n{3,}/g, "\n\n").trim()}\n`,
@@ -415,6 +595,7 @@
       "",
       `场景数：${exportResult.sceneCount ?? 0}`,
       `角色定义：${exportResult.characterCount ?? 0}`,
+      `变量默认值：${exportResult.variableDefinitionCount ?? 0}`,
       `图片定义：${exportResult.assetDefinitionCount ?? 0}`,
       `需要复核：${exportResult.warningCount ?? 0}`,
       "",
