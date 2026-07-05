@@ -149,6 +149,27 @@ class FrontendProductionBacklogModuleTests(unittest.TestCase):
                   {{ severity: "warn", title: "video_play：需要验收", detail: "原生 Runtime 视频依赖目标平台兜底。", blockType: "video_play", group: "视频", usedCount: 1, sceneNames: ["OP"] }},
                 ],
               }},
+              runtimePreloadBudget: {{
+                releaseRiskLevel: "danger",
+                warnings: [
+                  {{
+                    code: "critical_over_budget",
+                    severity: "danger",
+                    title: "首屏必备素材过重",
+                    detail: "入口场景 OP 和 BGM 过大。",
+                    actionHint: "先压缩 OP 或延后播放。",
+                    assetName: "开场 OP",
+                  }},
+                  {{
+                    code: "scene_hotspot",
+                    severity: "warn",
+                    title: "单场景加载热点偏重",
+                    detail: "开场场景首屏素材过多。",
+                    actionHint: "压缩背景和立绘。",
+                    sceneName: "开场",
+                  }},
+                ],
+              }},
             }});
             const digest = tools.getProductionBacklogStatusDigest(backlog);
             const markdown = tools.buildProductionBacklogMarkdown(backlog, {{
@@ -186,17 +207,19 @@ class FrontendProductionBacklogModuleTests(unittest.TestCase):
         self.assertIn("addRouteExecutionTasks", payload["keys"])
         self.assertIn("addAudioProductionTasks", payload["keys"])
         self.assertIn("addDirectorCueTasks", payload["keys"])
+        self.assertIn("addRuntimePreloadBudgetTasks", payload["keys"])
         self.assertEqual(payload["backlog"]["projectTitle"], "Backlog Demo")
-        self.assertEqual(payload["backlog"]["summary"]["taskCount"], 22)
-        self.assertEqual(payload["backlog"]["summary"]["blockerCount"], 7)
-        self.assertEqual(payload["backlog"]["summary"]["warningCount"], 10)
+        self.assertEqual(payload["backlog"]["summary"]["taskCount"], 24)
+        self.assertEqual(payload["backlog"]["summary"]["blockerCount"], 8)
+        self.assertEqual(payload["backlog"]["summary"]["warningCount"], 11)
         self.assertEqual(payload["backlog"]["summary"]["tipCount"], 5)
-        self.assertGreaterEqual(payload["backlog"]["summary"]["areaCount"], 11)
+        self.assertGreaterEqual(payload["backlog"]["summary"]["areaCount"], 12)
         self.assertEqual(payload["digest"]["status"], "blocked")
         self.assertEqual(payload["backlog"]["tasks"][0]["severity"], "blocker")
         self.assertTrue(any(task["title"] == "修复分支坏链" for task in payload["backlog"]["tasks"]))
         self.assertTrue(any(task["title"] == "BGM 文件缺失" for task in payload["backlog"]["tasks"]))
         self.assertTrue(any(task["area"] == "director" and task["title"] == "分镜素材缺失" for task in payload["backlog"]["tasks"]))
+        self.assertTrue(any(task["area"] == "loading" and task["title"] == "首屏必备素材过重" for task in payload["backlog"]["tasks"]))
         self.assertIn("生产待办队列", payload["markdown"])
         self.assertIn("修复分支坏链", payload["markdown"])
         self.assertIn("BGM 文件缺失", payload["markdown"])
@@ -205,8 +228,11 @@ class FrontendProductionBacklogModuleTests(unittest.TestCase):
         self.assertIn("导演分镜", payload["markdown"])
         self.assertIn("素材授权", payload["markdown"])
         self.assertIn("已使用素材不可商用", payload["markdown"])
+        self.assertIn("首屏加载", payload["markdown"])
+        self.assertIn("首屏必备素材过重", payload["markdown"])
         self.assertIn('"素材依赖"', payload["csv"])
         self.assertIn('"素材授权"', payload["csv"])
+        self.assertIn('"首屏加载"', payload["csv"])
         self.assertEqual(payload["labels"], ["先修", "优先", "整理"])
 
 

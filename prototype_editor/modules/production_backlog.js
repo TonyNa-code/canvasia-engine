@@ -13,6 +13,7 @@
     presentation: "演出节奏",
     localization: "多语言",
     runtime: "Runtime 覆盖",
+    loading: "首屏加载",
     unlockable: "图鉴回想",
   });
 
@@ -30,6 +31,7 @@
     presentation: Object.freeze({ label: "补演出卡", action: "switch-screen", screen: "story" }),
     localization: Object.freeze({ label: "看翻译报告", action: "switch-screen", screen: "inspection" }),
     runtime: Object.freeze({ label: "看 Runtime 覆盖", action: "switch-screen", screen: "inspection" }),
+    loading: Object.freeze({ label: "看首屏预算", action: "switch-screen", screen: "inspection" }),
     unlockable: Object.freeze({ label: "看可解锁清单", action: "switch-screen", screen: "inspection" }),
   });
 
@@ -235,6 +237,64 @@
       });
   }
 
+  function getRuntimePreloadPriorityBoost(warning = {}) {
+    const code = cleanText(warning.code);
+    if (code === "critical_missing_assets") {
+      return 28;
+    }
+    if (code === "critical_over_budget") {
+      return 24;
+    }
+    if (code === "single_asset_over_budget") {
+      return 18;
+    }
+    if (code === "early_over_budget" || code === "scene_hotspot") {
+      return 14;
+    }
+    return normalizeSeverity(warning.severity) === "blocker" ? 18 : 8;
+  }
+
+  function addRuntimePreloadBudgetTasks(tasks, runtimePreloadBudget = {}) {
+    const warnings = toArray(runtimePreloadBudget.warnings)
+      .filter((warning) => normalizeSeverity(warning?.severity) !== "good")
+      .sort((left, right) => {
+        const severityDelta =
+          getSeverityWeight(normalizeSeverity(right?.severity)) - getSeverityWeight(normalizeSeverity(left?.severity));
+        if (severityDelta !== 0) {
+          return severityDelta;
+        }
+        return getRuntimePreloadPriorityBoost(right) - getRuntimePreloadPriorityBoost(left);
+      })
+      .slice(0, 10);
+
+    warnings.forEach((warning) => {
+      addTask(tasks, {
+        area: "loading",
+        severity: warning.severity,
+        title: warning.title ?? "处理首屏加载压力",
+        detail: cleanText(
+          `${warning.detail ?? ""}${warning.actionHint ? ` 建议：${warning.actionHint}` : ""}`,
+          "处理入口场景或早期路线里的加载压力。"
+        ),
+        source: cleanText(warning.assetName || warning.sceneName, "Runtime 首屏加载预算"),
+        action: AREA_ACTIONS.loading,
+        priorityBoost: getRuntimePreloadPriorityBoost(warning),
+      });
+    });
+
+    if (!warnings.length && normalizeSeverity(runtimePreloadBudget.releaseRiskLevel) !== "good") {
+      addTask(tasks, {
+        area: "loading",
+        severity: runtimePreloadBudget.releaseRiskLevel,
+        title: "复核 Runtime 首屏加载预算",
+        detail: "当前首屏加载预算存在风险，但没有细分到具体提醒。建议打开预算报告确认入口场景素材压力。",
+        source: "Runtime 首屏加载预算",
+        action: AREA_ACTIONS.loading,
+        priorityBoost: 10,
+      });
+    }
+  }
+
   function addRouteTasks(tasks, routeOverview = {}) {
     const metrics = routeOverview.metrics ?? {};
     const brokenRoutes = toCount(metrics.brokenRoutes);
@@ -335,6 +395,7 @@
     addIssueTasks(tasks, "presentation", context.presentationTimeline?.issues, { fallbackTitle: "处理演出节奏问题", fallbackSource: "演出时间轴" });
     addIssueTasks(tasks, "localization", context.localizationCoverage?.issues, { fallbackTitle: "处理翻译覆盖问题", fallbackSource: "多语言覆盖报告", maxItems: 8 });
     addIssueTasks(tasks, "runtime", context.runtimeCapabilityMatrix?.issues, { fallbackTitle: "处理 Runtime 覆盖风险", fallbackSource: "Runtime 覆盖矩阵", maxItems: 8, priorityBoost: 16 });
+    addRuntimePreloadBudgetTasks(tasks, context.runtimePreloadBudget);
     addIssueTasks(tasks, "unlockable", context.unlockableContentManifest?.issues, {
       fallbackTitle: "处理图鉴 / 回想内容缺口",
       fallbackSource: "可解锁内容清单",
@@ -515,6 +576,7 @@
     addRouteExecutionTasks,
     addAudioProductionTasks,
     addDirectorCueTasks,
+    addRuntimePreloadBudgetTasks,
     getSeverityLabel,
   });
 })(typeof window !== "undefined" ? window : globalThis);

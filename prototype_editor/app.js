@@ -31136,6 +31136,7 @@ function buildProductionBacklog(routeOverview = null) {
     presentationTimeline: buildPresentationTimeline(),
     localizationCoverage: buildLocalizationCoverage(),
     runtimeCapabilityMatrix: buildRuntimeCapabilityMatrix(),
+    runtimePreloadBudget: buildRuntimePreloadBudgetReport(),
   });
 }
 
@@ -32649,7 +32650,7 @@ function renderProductionBacklogPanel(routeOverview) {
         <h2>生产待办队列</h2>
         <span class="badge badge-soft ${getProductionBacklogToneClass(digest.status)}">${escapeHtml(digest.title)}</span>
       </div>
-      <p class="helper-text">${escapeHtml(digest.detail)} 它会把路线、场景、语音、选项、变量、素材、BGM、角色演出、时间轴和多语言问题合并成一条可执行队列，适合每天开工先看。</p>
+      <p class="helper-text">${escapeHtml(digest.detail)} 它会把路线、场景、语音、选项、变量、素材、BGM、首屏加载、角色演出、时间轴和多语言问题合并成一条可执行队列，适合每天开工先看。</p>
       <div class="preview-sprint-metrics">
         ${renderRouteMetricCard("总任务", `${summary.taskCount ?? 0} 项`, "跨模块自动汇总")}
         ${renderRouteMetricCard("先修 / 优先", `${summary.blockerCount ?? 0} / ${summary.warningCount ?? 0}`, "先处理会阻塞试玩或发布的项")}
