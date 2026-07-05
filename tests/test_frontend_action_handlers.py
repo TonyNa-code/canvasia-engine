@@ -19,6 +19,7 @@ RUNTIME_CONTROLS_PATH = ROOT_DIR / "export_player_template" / "runtime_controls.
 RUNTIME_SETTINGS_PATH = ROOT_DIR / "export_player_template" / "runtime_settings.js"
 RUNTIME_AUDIO_PATH = ROOT_DIR / "export_player_template" / "runtime_audio.js"
 NATIVE_RUNTIME_PATH = ROOT_DIR / "native_runtime" / "runtime_player.py"
+PROJECT_POLISH_RECEIPT_PANEL_PATH = EDITOR_DIR / "modules" / "project_polish_receipt_panel.js"
 MODULE_PATHS = tuple(sorted((EDITOR_DIR / "modules").glob("*.js")))
 ACTION_ATTRIBUTE_PATHS = (INDEX_PATH, APP_PATH, *MODULE_PATHS)
 ACTION_CONFIG_PATHS = (APP_PATH, *MODULE_PATHS)
@@ -1943,13 +1944,21 @@ class FrontendActionHandlerTests(unittest.TestCase):
     def test_project_one_click_polish_receipt_panel_renders_actionable_next_steps(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
         render_dashboard = _extract_function_source(source, "renderDashboard")
-        normalize_next_action = _extract_function_source(source, "normalizeProjectOneClickPolishNextAction")
-        receipt_panel = _extract_function_source(source, "renderProjectOneClickPolishReceiptPanel")
+        receipt_panel_wrapper = _extract_function_source(source, "renderProjectOneClickPolishReceiptPanel")
 
         self.assertIn("renderProjectOneClickPolishReceiptPanel()", render_dashboard)
+        self.assertIn("const projectPolishReceiptPanelTools = window.CanvasiaEditorProjectPolishReceiptPanel", source)
+        self.assertIn("projectPolishReceiptPanelTools?.renderProjectOneClickPolishReceiptPanel", receipt_panel_wrapper)
 
         script = textwrap.dedent(
             f"""
+            const fs = require("fs");
+            const vm = require("vm");
+            const context = {{ window: {{}} }};
+            context.globalThis = context;
+            vm.createContext(context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(PROJECT_POLISH_RECEIPT_PANEL_PATH))}, "utf8"), context);
+            const tools = context.window.CanvasiaEditorProjectPolishReceiptPanel;
             const state = {{
               projectOneClickPolishReceipt: {{
                 receiptId: "polish-demo",
@@ -1986,25 +1995,25 @@ class FrontendActionHandlerTests(unittest.TestCase):
                 ],
               }},
             }};
-            function escapeHtml(value) {{
-              return String(value ?? "");
-            }}
-            function renderRouteMetricCard(label, value, hint) {{
-              return `<article class="route-metric-card"><span>${{label}}</span><strong>${{value}}</strong><small>${{hint}}</small></article>`;
-            }}
-            function renderQuickActionButton(action, emphasized = false) {{
-              return `<button class="${{emphasized ? "toolbar-button-primary" : "toolbar-button"}}" data-action="${{action.action ?? ""}}" data-screen="${{action.screen ?? ""}}">${{action.label ?? ""}}</button>`;
-            }}
-            function normalizeProjectOneClickPolishNextAction(action, index = 0) {normalize_next_action}
-            function renderProjectOneClickPolishReceiptPanel(receipt = state.projectOneClickPolishReceipt) {receipt_panel}
-            const markup = renderProjectOneClickPolishReceiptPanel();
+            const helpers = {{
+              escapeHtml(value) {{
+                return String(value ?? "");
+              }},
+              renderRouteMetricCard(label, value, hint) {{
+                return `<article class="route-metric-card"><span>${{label}}</span><strong>${{value}}</strong><small>${{hint}}</small></article>`;
+              }},
+              renderQuickActionButton(action, emphasized = false) {{
+                return `<button class="${{emphasized ? "toolbar-button-primary" : "toolbar-button"}}" data-action="${{action.action ?? ""}}" data-screen="${{action.screen ?? ""}}">${{action.label ?? ""}}</button>`;
+              }},
+            }};
+            const markup = tools.renderProjectOneClickPolishReceiptPanel(state.projectOneClickPolishReceipt, helpers);
             state.projectOneClickPolishReceipt = {{
               receiptId: "legacy-polish",
               nextActions: ["打开项目巡检，确认没有新增错误。"],
               scenePlans: [],
             }};
-            const legacyMarkup = renderProjectOneClickPolishReceiptPanel();
-            process.stdout.write(JSON.stringify({{ markup, legacyMarkup }}));
+            const legacyMarkup = tools.renderProjectOneClickPolishReceiptPanel(state.projectOneClickPolishReceipt, helpers);
+            process.stdout.write(JSON.stringify({{ keys: Object.keys(tools).sort(), markup, legacyMarkup }}));
             """
         )
         completed = subprocess.run(
@@ -2016,6 +2025,8 @@ class FrontendActionHandlerTests(unittest.TestCase):
         )
         self.assertEqual(completed.returncode, 0, completed.stderr)
         payload = json.loads(completed.stdout)
+        self.assertIn("normalizeProjectOneClickPolishNextAction", payload["keys"])
+        self.assertIn("renderProjectOneClickPolishReceiptPanel", payload["keys"])
         self.assertIn("最近发布前整理", payload["markup"])
         self.assertIn("发布前整理完成：补齐 8 项", payload["markup"])
         self.assertIn("发布前整理前自动检查点", payload["markup"])
@@ -2038,6 +2049,7 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("const projectPolishTools = window.CanvasiaEditorProjectPolish", source)
         self.assertIn("projectOneClickPolishInFlight", source)
         self.assertIn("projectOneClickPolishReceipt", source)
+        self.assertIn("const projectPolishReceiptPanelTools = window.CanvasiaEditorProjectPolishReceiptPanel", source)
         self.assertIn('data-action="run-project-one-click-polish"', source)
         self.assertIn('data-action="copy-project-one-click-polish-receipt-summary"', source)
         self.assertIn('data-action="export-project-one-click-polish-receipt"', source)
@@ -2046,7 +2058,7 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("exportProjectOneClickPolishReceipt();", one_click_block)
         self.assertIn("function setProjectOneClickPolishInFlight", source)
         self.assertIn("function renderProjectOneClickPolishReceiptPanel", source)
-        self.assertIn("function normalizeProjectOneClickPolishNextAction", source)
+        self.assertIn("projectPolishReceiptPanelTools?.renderProjectOneClickPolishReceiptPanel", source)
         self.assertIn("async function runProjectOneClickPolish()", source)
         self.assertIn("async function saveProjectHistoryCheckpoint", source)
         self.assertIn("function exportProjectOneClickPolishReceipt()", source)
