@@ -28,6 +28,7 @@ class FrontendEntrypointModuleTests(unittest.TestCase):
             "./modules/preview_save.js",
             "./modules/recent_workspace.js",
             "./modules/editor_filters.js",
+            "./modules/dashboard_primary_actions.js",
             "./modules/script_readability.js",
             "./modules/scene_pacing_advisor.js",
             "./modules/scene_polish.js",

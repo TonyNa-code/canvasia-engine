@@ -131,6 +131,7 @@ jobs:
           node --check prototype_editor/modules/beginner_tutorial.js
           node --check prototype_editor/modules/choice_consequence_sheet.js
           node --check prototype_editor/modules/command_palette.js
+          node --check prototype_editor/modules/dashboard_primary_actions.js
           node --check prototype_editor/modules/editor_common.js
           node --check prototype_editor/modules/creative_assistant.js
           node --check prototype_editor/modules/director_cue_sheet.js

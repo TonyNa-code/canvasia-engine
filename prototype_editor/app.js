@@ -145,6 +145,7 @@ const uiThemeTools = window.CanvasiaEditorUiTheme;
 const previewSaveTools = window.CanvasiaEditorPreviewSave;
 const recentWorkspaceTools = window.CanvasiaEditorRecentWorkspace;
 const editorFilterTools = window.CanvasiaEditorFilters;
+const dashboardPrimaryActionTools = window.CanvasiaEditorDashboardPrimaryActions;
 const scriptReadabilityTools = window.CanvasiaEditorScriptReadability;
 const {
   VN_TEXT_LONG_WARNING_LENGTH,
@@ -10578,112 +10579,38 @@ function rerenderProjectHistoryPanel(options = {}) {
 }
 
 function renderDashboardPrimaryActions(isBlankProject) {
-  if (isBlankProject) {
-    return `
-      <button class="toolbar-button toolbar-button-primary" data-action="create-first-chapter" ${
-        state.chapterCreateInFlight ? 'disabled aria-disabled="true" aria-busy="true"' : ""
-      }>
-        创建第一章和第一场
-      </button>
-      <button class="toolbar-button" data-action="create-first-chapter-custom" ${
-        state.chapterCreateInFlight ? 'disabled aria-disabled="true" aria-busy="true"' : ""
-      }>
-        自定义名字再创建
-      </button>
-      <button class="toolbar-button" data-action="open-beginner-tutorial" data-step-index="1">
-        看 6 步教程
-      </button>
-    `;
-  }
-
   const oneClickPolishDigest =
+    !isBlankProject &&
     typeof projectPolishTools !== "undefined" &&
     typeof projectPolishTools?.getProjectOneClickPolishDigest === "function"
       ? projectPolishTools.getProjectOneClickPolishDigest(state.data)
       : null;
-  const oneClickPolishDisabled =
-    state.projectOneClickPolishInFlight || (oneClickPolishDigest ? !oneClickPolishDigest.canApply : false);
-  const oneClickPolishLabel = state.projectOneClickPolishInFlight
-    ? "发布前整理中..."
-    : oneClickPolishDigest?.actionLabel ?? "一键发布前整理";
   const projectPolishDigest =
+    !isBlankProject &&
     typeof scenePolishTools !== "undefined" && typeof scenePolishTools?.getProjectPresentationPolishDigest === "function"
       ? scenePolishTools.getProjectPresentationPolishDigest(state.data)
       : null;
-  const projectPolishDisabled =
-    state.projectPresentationPolishInFlight || (projectPolishDigest ? !projectPolishDigest.canApply : false);
-  const projectPolishLabel = state.projectPresentationPolishInFlight
-    ? "全项目润色中..."
-    : projectPolishDigest?.actionLabel ?? "润色全项目演出";
   const projectReadableDigest =
+    !isBlankProject &&
     typeof scriptReadabilityTools !== "undefined" && typeof scriptReadabilityTools?.getReadableProjectSplitDigest === "function"
       ? scriptReadabilityTools.getReadableProjectSplitDigest(state.data)
       : null;
-  const projectReadableDisabled =
-    state.projectReadableSplitInFlight || (projectReadableDigest ? !projectReadableDigest.canApply : false);
-  const projectReadableLabel = state.projectReadableSplitInFlight
-    ? "长文本整理中..."
-    : projectReadableDigest?.actionLabel ?? "整理全项目长文本";
-  const hasOneClickPolishReceipt = Boolean(state.projectOneClickPolishReceipt);
-  const safeEscapeHtml =
-    typeof escapeHtml === "function"
-      ? escapeHtml
-      : (value) =>
-          String(value ?? "").replace(/[&<>"']/g, (char) => {
-            const entities = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
-            return entities[char] ?? char;
-          });
-
-  return `
-    <button class="toolbar-button toolbar-button-primary" data-action="switch-screen" data-screen="story">
-      进入剧情编辑
-    </button>
-    <button
-      class="toolbar-button toolbar-button-primary"
-      data-action="run-project-one-click-polish"
-      ${oneClickPolishDisabled ? 'disabled aria-disabled="true"' : ""}
-      title="${safeEscapeHtml(oneClickPolishDigest?.helperText ?? "依次整理长文本、基础演出和音频范围，适合发布前快速补齐。")}"
-    >
-      ${safeEscapeHtml(oneClickPolishLabel)}
-    </button>
-    ${
-      hasOneClickPolishReceipt
-        ? `
-          <button class="toolbar-button" data-action="copy-project-one-click-polish-receipt-summary">
-            复制整理回执
-          </button>
-          <button class="toolbar-button" data-action="export-project-one-click-polish-receipt">
-            导出整理回执
-          </button>
-        `
-        : ""
-    }
-    <button
-      class="toolbar-button"
-      data-action="polish-project-presentation"
-      ${projectPolishDisabled ? 'disabled aria-disabled="true"' : ""}
-      title="${safeEscapeHtml(projectPolishDigest?.helperText ?? "批量补齐全项目基础转场、淡入淡出、音量和文字速度。")}"
-    >
-      ${safeEscapeHtml(projectPolishLabel)}
-    </button>
-    <button
-      class="toolbar-button"
-      data-action="split-readable-project"
-      ${projectReadableDisabled ? 'disabled aria-disabled="true"' : ""}
-      title="${safeEscapeHtml(projectReadableDigest?.helperText ?? "批量把过长台词和旁白拆成更适合阅读的卡片。")}"
-    >
-      ${safeEscapeHtml(projectReadableLabel)}
-    </button>
-    <button class="toolbar-button" data-action="switch-screen" data-screen="preview">
-      查看试玩页
-    </button>
-    <button class="toolbar-button" data-action="switch-screen" data-screen="assets">
-      打开素材页
-    </button>
-    <button class="toolbar-button" data-action="open-beginner-tutorial">
-      打开新手教程
-    </button>
-  `;
+  return (
+    dashboardPrimaryActionTools?.renderDashboardPrimaryActions?.(
+      {
+        isBlankProject,
+        chapterCreateInFlight: state.chapterCreateInFlight,
+        projectOneClickPolishInFlight: state.projectOneClickPolishInFlight,
+        projectPresentationPolishInFlight: state.projectPresentationPolishInFlight,
+        projectReadableSplitInFlight: state.projectReadableSplitInFlight,
+        hasOneClickPolishReceipt: Boolean(state.projectOneClickPolishReceipt),
+        oneClickPolishDigest,
+        projectPolishDigest,
+        projectReadableDigest,
+      },
+      { escapeHtml }
+    ) ?? ""
+  );
 }
 
 function renderProjectOneClickPolishReceiptPanel(receipt = state.projectOneClickPolishReceipt) {

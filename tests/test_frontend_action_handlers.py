@@ -20,6 +20,7 @@ RUNTIME_SETTINGS_PATH = ROOT_DIR / "export_player_template" / "runtime_settings.
 RUNTIME_AUDIO_PATH = ROOT_DIR / "export_player_template" / "runtime_audio.js"
 NATIVE_RUNTIME_PATH = ROOT_DIR / "native_runtime" / "runtime_player.py"
 PROJECT_POLISH_RECEIPT_PANEL_PATH = EDITOR_DIR / "modules" / "project_polish_receipt_panel.js"
+DASHBOARD_PRIMARY_ACTIONS_PATH = EDITOR_DIR / "modules" / "dashboard_primary_actions.js"
 MODULE_PATHS = tuple(sorted((EDITOR_DIR / "modules").glob("*.js")))
 ACTION_ATTRIBUTE_PATHS = (INDEX_PATH, APP_PATH, *MODULE_PATHS)
 ACTION_CONFIG_PATHS = (APP_PATH, *MODULE_PATHS)
@@ -1891,14 +1892,44 @@ class FrontendActionHandlerTests(unittest.TestCase):
         render_dashboard_actions = _extract_function_source(source, "renderDashboardPrimaryActions")
 
         self.assertIn("renderDashboardPrimaryActions(isBlankProject)", render_dashboard)
-        self.assertIn('data-action="create-first-chapter"', render_dashboard_actions)
-        self.assertIn('data-action="create-first-chapter-custom"', render_dashboard_actions)
-        self.assertIn('data-step-index="1"', render_dashboard_actions)
-        self.assertIn('data-action="switch-screen" data-screen="story"', render_dashboard_actions)
+        self.assertIn("const dashboardPrimaryActionTools = window.CanvasiaEditorDashboardPrimaryActions", source)
+        self.assertIn("dashboardPrimaryActionTools?.renderDashboardPrimaryActions", render_dashboard_actions)
 
         script = textwrap.dedent(
             f"""
-            const state = {{ chapterCreateInFlight: false, projectOneClickPolishReceipt: null }};
+            const fs = require("fs");
+            const vm = require("vm");
+            const context = {{ window: {{}} }};
+            context.globalThis = context;
+            vm.createContext(context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(DASHBOARD_PRIMARY_ACTIONS_PATH))}, "utf8"), context);
+            const dashboardPrimaryActionTools = context.window.CanvasiaEditorDashboardPrimaryActions;
+            const state = {{
+              data: {{}},
+              chapterCreateInFlight: false,
+              projectOneClickPolishReceipt: null,
+              projectOneClickPolishInFlight: false,
+              projectPresentationPolishInFlight: false,
+              projectReadableSplitInFlight: false,
+            }};
+            const projectPolishTools = {{
+              getProjectOneClickPolishDigest() {{
+                return {{ canApply: true, actionLabel: "一键发布前整理 5 项", helperText: "整理长文本和演出" }};
+              }},
+            }};
+            const scenePolishTools = {{
+              getProjectPresentationPolishDigest() {{
+                return {{ canApply: true, actionLabel: "润色全项目演出 2 项", helperText: "补齐基础转场" }};
+              }},
+            }};
+            const scriptReadabilityTools = {{
+              getReadableProjectSplitDigest() {{
+                return {{ canApply: true, actionLabel: "整理全项目长文本 3 项", helperText: "拆分过长文本" }};
+              }},
+            }};
+            function escapeHtml(value) {{
+              return String(value ?? "");
+            }}
             function renderDashboardPrimaryActions(isBlankProject) {render_dashboard_actions}
             const blankMarkup = renderDashboardPrimaryActions(true);
             const activeMarkup = renderDashboardPrimaryActions(false);
@@ -1930,9 +1961,9 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("进入剧情编辑", payload["activeMarkup"])
         self.assertIn('data-action="switch-screen" data-screen="story"', payload["activeMarkup"])
         self.assertIn('data-action="run-project-one-click-polish"', payload["activeMarkup"])
-        self.assertIn("一键发布前整理", payload["activeMarkup"])
+        self.assertIn("一键发布前整理 5 项", payload["activeMarkup"])
         self.assertIn('data-action="split-readable-project"', payload["activeMarkup"])
-        self.assertIn("整理全项目长文本", payload["activeMarkup"])
+        self.assertIn("整理全项目长文本 3 项", payload["activeMarkup"])
         self.assertIn("查看试玩页", payload["activeMarkup"])
         self.assertIn("打开素材页", payload["activeMarkup"])
         self.assertNotIn('data-action="create-first-chapter"', payload["activeMarkup"])
@@ -2041,18 +2072,23 @@ class FrontendActionHandlerTests(unittest.TestCase):
 
     def test_project_one_click_polish_action_is_wired(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
+        dashboard_actions_source = DASHBOARD_PRIMARY_ACTIONS_PATH.read_text(encoding="utf-8")
+        receipt_panel_source = PROJECT_POLISH_RECEIPT_PANEL_PATH.read_text(encoding="utf-8")
+        ui_sources = "\n".join([source, dashboard_actions_source, receipt_panel_source])
         click_handler = _extract_function_source(source, "handleClick")
         one_click_block_start = click_handler.index('action === "run-project-one-click-polish"')
         one_click_block_end = click_handler.index('action === "polish-scene-presentation"', one_click_block_start)
         one_click_block = click_handler[one_click_block_start:one_click_block_end]
 
         self.assertIn("const projectPolishTools = window.CanvasiaEditorProjectPolish", source)
+        self.assertIn("const dashboardPrimaryActionTools = window.CanvasiaEditorDashboardPrimaryActions", source)
         self.assertIn("projectOneClickPolishInFlight", source)
         self.assertIn("projectOneClickPolishReceipt", source)
         self.assertIn("const projectPolishReceiptPanelTools = window.CanvasiaEditorProjectPolishReceiptPanel", source)
-        self.assertIn('data-action="run-project-one-click-polish"', source)
-        self.assertIn('data-action="copy-project-one-click-polish-receipt-summary"', source)
-        self.assertIn('data-action="export-project-one-click-polish-receipt"', source)
+        self.assertIn('action: "run-project-one-click-polish"', dashboard_actions_source)
+        self.assertIn('action: "copy-project-one-click-polish-receipt-summary"', dashboard_actions_source)
+        self.assertIn('data-action="copy-project-one-click-polish-receipt-summary"', receipt_panel_source)
+        self.assertIn('action: "export-project-one-click-polish-receipt"', ui_sources)
         self.assertIn("void runProjectOneClickPolish();", one_click_block)
         self.assertIn("void copyProjectOneClickPolishReceiptSummary();", one_click_block)
         self.assertIn("exportProjectOneClickPolishReceipt();", one_click_block)
