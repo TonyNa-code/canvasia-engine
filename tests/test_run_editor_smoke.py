@@ -654,6 +654,17 @@ class RunEditorSmokeTests(unittest.TestCase):
             "ui",
             [build_upload_payload("snowflake.png", build_fake_png_bytes())],
         )["assets"][0]
+        panel_asset = run_editor.import_assets(
+            "ui",
+            [build_upload_payload("dialog_panel.png", build_fake_png_bytes())],
+        )["assets"][0]
+        project_doc = run_editor.read_json(run_editor.PROJECT_PATH)
+        project_doc["dialogBoxConfig"] = {
+            **project_doc.get("dialogBoxConfig", {}),
+            "panelAssetId": panel_asset["id"],
+            "panelAssetFit": "contain",
+        }
+        run_editor.write_json(run_editor.PROJECT_PATH, project_doc)
         run_editor.write_json(
             run_editor.DATA_DIR / "characters.json",
             {
@@ -871,7 +882,9 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertIn("screen say(who, what):", screens)
         self.assertIn("style canvasia_say_window is default:", screens)
         self.assertIn("style canvasia_say_what is default:", screens)
-        self.assertIn('background "#0c1422eb"', screens)
+        self.assertIn('background Frame("assets/ui/', screens)
+        self.assertIn('dialog_panel.png", 24, 24, 24, 24)', screens)
+        self.assertIn("panel=assets/ui/", screens)
         self.assertIn('color "#f3f6ff"', screens)
 
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -881,6 +894,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         renpy_manifest = json.loads(renpy_manifest_path.read_text(encoding="utf-8"))
         self.assertEqual(renpy_manifest["sceneCount"], 1)
         self.assertEqual(renpy_manifest["dialogScreen"]["anchor"], "bottom")
+        self.assertIn("assets/ui/", renpy_manifest["dialogScreen"]["panelAssetPath"])
         self.assertEqual(renpy_manifest["warningCount"], 0)
         self.assertFalse(any(warning["code"] == "renpy_music_scope_review" for warning in renpy_manifest["warnings"]))
         self.assertFalse(any(warning["code"] == "renpy_video_timing_review" for warning in renpy_manifest["warnings"]))
@@ -890,6 +904,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(quality_report["status"], "ready")
         self.assertEqual(quality_report["summary"]["missingAssetReferenceCount"], 0)
         self.assertEqual(quality_report["files"]["screens"], f"game/{run_editor.RENPY_SCREENS_FILE_NAME}")
+        self.assertIn("assets/ui/", "\n".join(quality_report["references"]["assetReferences"]))
         self.assertFalse(any(issue["code"] == "renpy_review_comments_present" for issue in quality_report["issues"]))
         quality_markdown = Path(export_result["renpyQualityMarkdownPath"]).read_text(encoding="utf-8")
         self.assertIn("# Canvasia Ren'Py Bundle Quality Report", quality_markdown)

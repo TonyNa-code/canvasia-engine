@@ -262,6 +262,34 @@ class RenpyExportContractTests(unittest.TestCase):
         self.assertEqual(summary["anchor"], "center")
         self.assertEqual(summary["borderColor"], "#6fdfff00")
 
+    def test_dialog_box_panel_asset_exports_to_renpy_frame_background(self) -> None:
+        bundle = {
+            "project": {
+                "resolution": {"width": 1920, "height": 1080},
+                "dialogBoxConfig": {
+                    "panelAssetId": "dialog_panel",
+                    "panelAssetFit": "contain",
+                },
+            }
+        }
+        assets_doc = {
+            "assets": [
+                {
+                    "id": "dialog_panel",
+                    "type": "ui",
+                    "exportUrl": "assets/ui/dialog_panel.png",
+                }
+            ]
+        }
+
+        screens = renpy_export.build_renpy_screens_file(bundle, assets_doc)
+        summary = renpy_export.build_renpy_dialog_screen_summary(bundle, assets_doc)
+
+        self.assertIn('background Frame("assets/ui/dialog_panel.png", 24, 24, 24, 24)', screens)
+        self.assertIn("panel=assets/ui/dialog_panel.png", screens)
+        self.assertEqual(summary["panelAssetPath"], "assets/ui/dialog_panel.png")
+        self.assertEqual(summary["panelAssetFit"], "contain")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -81,11 +81,15 @@ DEFAULT_DIALOG_BOX_CONFIG = {
     "hintColor": "#c8d6ea",
     "borderWidth": 1,
     "shadowStrength": 30,
+    "panelAssetId": "",
+    "panelAssetFit": "cover",
     "anchor": "bottom",
     "offsetXPercent": 0,
     "offsetYPercent": 0,
 }
 TEXTBOX_ANCHORS = {"bottom", "center", "top", "free"}
+TEXTBOX_PANEL_IMAGE_ASSET_TYPES = {"background", "sprite", "cg", "image", "ui"}
+TEXTBOX_PANEL_FRAME_SLICE = {"left": 24, "top": 24, "right": 24, "bottom": 24}
 CAMERA_ZOOM_SCALE = {
     "zoom_in": {"light": 1.08, "medium": 1.16, "heavy": 1.26},
     "zoom_out": {"light": 0.96, "medium": 0.92, "heavy": 0.88},
@@ -1461,19 +1465,37 @@ def get_dialog_box_config(bundle: dict) -> dict:
         "hintColor": normalize_hex_color(source.get("hintColor"), defaults["hintColor"]),
         "borderWidth": clamp_config_int(source.get("borderWidth"), defaults["borderWidth"], 0, 4),
         "shadowStrength": clamp_config_int(source.get("shadowStrength"), defaults["shadowStrength"], 0, 48),
+        "panelAssetId": clean_text(source.get("panelAssetId"), defaults["panelAssetId"]),
+        "panelAssetFit": "contain" if clean_text(source.get("panelAssetFit"), defaults["panelAssetFit"]).lower() == "contain" else "cover",
         "anchor": anchor,
         "offsetXPercent": clamp_config_int(source.get("offsetXPercent"), defaults["offsetXPercent"], -35, 35),
         "offsetYPercent": clamp_config_int(source.get("offsetYPercent"), defaults["offsetYPercent"], -35, 35),
     }
 
 
-def build_renpy_dialog_screen_summary(bundle: dict) -> dict:
+def get_dialog_panel_asset_path(config: dict, asset_map: dict[str, dict]) -> str:
+    panel_asset_id = clean_text(config.get("panelAssetId"))
+    if not panel_asset_id:
+        return ""
+    asset = asset_map.get(panel_asset_id)
+    if not asset:
+        return ""
+    asset_type = clean_text(asset.get("type")).lower()
+    if asset_type not in TEXTBOX_PANEL_IMAGE_ASSET_TYPES:
+        return ""
+    if asset.get("isMissing") is True and not asset.get("exportUrl"):
+        return ""
+    return get_asset_path(asset_map, panel_asset_id)
+
+
+def build_renpy_dialog_screen_summary(bundle: dict, assets_doc: dict | None = None) -> dict:
     resolution = get_project_resolution(bundle)
     config = get_dialog_box_config(bundle)
-    return build_dialog_screen_layout(resolution, config)
+    asset_map = build_asset_map(assets_doc or bundle.get("assets") or {})
+    return build_dialog_screen_layout(resolution, config, asset_map)
 
 
-def build_dialog_screen_layout(resolution: dict, config: dict) -> dict:
+def build_dialog_screen_layout(resolution: dict, config: dict, asset_map: dict[str, dict] | None = None) -> dict:
     width = int(resolution.get("width") or DEFAULT_PROJECT_RESOLUTION["width"])
     height = int(resolution.get("height") or DEFAULT_PROJECT_RESOLUTION["height"])
     box_width = int(round(width * config["widthPercent"] / 100))
@@ -1505,6 +1527,10 @@ def build_dialog_screen_layout(resolution: dict, config: dict) -> dict:
         "background": hex_with_alpha(config["backgroundColor"], config["backgroundOpacity"], DEFAULT_DIALOG_BOX_CONFIG["backgroundColor"], DEFAULT_DIALOG_BOX_CONFIG["backgroundOpacity"]),
         "borderColor": hex_with_alpha(config["borderColor"], config["borderOpacity"], DEFAULT_DIALOG_BOX_CONFIG["borderColor"], DEFAULT_DIALOG_BOX_CONFIG["borderOpacity"]),
         "borderWidth": config["borderWidth"],
+        "panelAssetId": config["panelAssetId"],
+        "panelAssetPath": get_dialog_panel_asset_path(config, asset_map or {}),
+        "panelAssetFit": config["panelAssetFit"],
+        "panelFrameSlice": dict(TEXTBOX_PANEL_FRAME_SLICE),
         "textColor": config["textColor"],
         "speakerColor": config["speakerColor"],
         "hintColor": config["hintColor"],
@@ -1514,9 +1540,22 @@ def build_dialog_screen_layout(resolution: dict, config: dict) -> dict:
     }
 
 
-def build_renpy_screens_file(bundle: dict) -> str:
-    summary = build_renpy_dialog_screen_summary(bundle)
+def build_dialog_background_expression(summary: dict) -> str:
+    panel_path = clean_text(summary.get("panelAssetPath"))
+    if panel_path:
+        frame_slice = summary.get("panelFrameSlice") if isinstance(summary.get("panelFrameSlice"), dict) else TEXTBOX_PANEL_FRAME_SLICE
+        left = clamp_config_int(frame_slice.get("left"), TEXTBOX_PANEL_FRAME_SLICE["left"], 0, 96)
+        top = clamp_config_int(frame_slice.get("top"), TEXTBOX_PANEL_FRAME_SLICE["top"], 0, 96)
+        right = clamp_config_int(frame_slice.get("right"), TEXTBOX_PANEL_FRAME_SLICE["right"], 0, 96)
+        bottom = clamp_config_int(frame_slice.get("bottom"), TEXTBOX_PANEL_FRAME_SLICE["bottom"], 0, 96)
+        return f"Frame({quote_renpy(panel_path)}, {left}, {top}, {right}, {bottom})"
+    return quote_renpy(summary["background"])
+
+
+def build_renpy_screens_file(bundle: dict, assets_doc: dict | None = None) -> str:
+    summary = build_renpy_dialog_screen_summary(bundle, assets_doc)
     padding = tuple(summary["padding"])
+    background_expression = build_dialog_background_expression(summary)
     return "\n".join(
         [
             "# Canvasia Ren'Py dialogue screen",
@@ -1540,7 +1579,7 @@ def build_renpy_screens_file(bundle: dict) -> str:
             f"    xsize {summary['xsize']}",
             f"    yminimum {summary['yminimum']}",
             f"    padding {padding}",
-            f"    background {quote_renpy(summary['background'])}",
+            f"    background {background_expression}",
             "",
             "style canvasia_say_who is default:",
             f"    color {quote_renpy(summary['speakerColor'])}",
@@ -1555,7 +1594,7 @@ def build_renpy_screens_file(bundle: dict) -> str:
             "    outlines [(1, \"#00000066\", 0, 0)]",
             "",
             "# Canvasia textbox reference:",
-            f"# anchor={summary['anchor']} widthPercent={summary['widthPercent']} border={summary['borderColor']} borderWidth={summary['borderWidth']} shadow={summary['shadowStrength']}",
+            f"# anchor={summary['anchor']} widthPercent={summary['widthPercent']} panel={summary['panelAssetPath'] or 'color'} border={summary['borderColor']} borderWidth={summary['borderWidth']} shadow={summary['shadowStrength']}",
             "",
         ]
     )
@@ -1664,6 +1703,19 @@ def collect_renpy_script_references(script: str) -> dict:
     }
 
 
+def merge_renpy_reference_sets(primary: dict, secondary: dict) -> dict:
+    return {
+        "labels": sorted(dict.fromkeys([*as_list(primary.get("labels")), *as_list(secondary.get("labels"))])),
+        "duplicateLabels": sorted(
+            dict.fromkeys([*as_list(primary.get("duplicateLabels")), *as_list(secondary.get("duplicateLabels"))])
+        ),
+        "jumps": sorted(dict.fromkeys([*as_list(primary.get("jumps")), *as_list(secondary.get("jumps"))])),
+        "assetReferences": sorted(
+            dict.fromkeys([*as_list(primary.get("assetReferences")), *as_list(secondary.get("assetReferences"))])
+        ),
+    }
+
+
 def add_quality_issue(issues: list[dict], severity: str, code: str, message: str, **context: Any) -> None:
     issues.append(
         {
@@ -1700,6 +1752,7 @@ def build_renpy_quality_report(build_dir: Path, export_result: dict) -> dict:
         screens = ""
     else:
         screens = screens_path.read_text(encoding="utf-8")
+        references = merge_renpy_reference_sets(references, collect_renpy_script_references(screens))
         if "screen say(who, what):" not in screens:
             add_quality_issue(issues, "error", "renpy_missing_say_screen", "game/screens.rpy does not define the say screen.")
         if "style canvasia_say_window" not in screens:
@@ -1869,7 +1922,7 @@ def main() -> int:
     for jump in sorted(set(re.findall(r"^\\s*jump\\s+([A-Za-z_][A-Za-z0-9_]*)\\b", script, flags=re.MULTILINE))):
         if jump not in label_set:
             issues.append(f"undefined jump target: {{jump}}")
-    for quoted in re.findall(r'"((?:\\\\"|[^"])*)"', script):
+    for quoted in re.findall(r'"((?:\\\\"|[^"])*)"', script + "\\n" + screens):
         path = quoted.replace('\\\\"', '"').replace("\\\\\\\\", "\\\\").replace("\\\\", "/")
         normalized_path = normalize_asset_reference(path)
         if is_asset_reference(normalized_path) and not (GAME_DIR / normalized_path).is_file():
@@ -1913,7 +1966,7 @@ def write_renpy_quality_files(build_dir: Path, export_result: dict) -> dict:
 
 def write_renpy_starter_project(build_dir: Path, bundle: dict, assets_doc: dict | None = None) -> dict:
     export_result = build_renpy_draft_export(bundle, assets_doc)
-    dialog_screen_summary = build_renpy_dialog_screen_summary(bundle)
+    dialog_screen_summary = build_renpy_dialog_screen_summary(bundle, assets_doc)
     export_result = {
         **export_result,
         "dialogScreen": dialog_screen_summary,
@@ -1929,7 +1982,7 @@ def write_renpy_starter_project(build_dir: Path, bundle: dict, assets_doc: dict 
 
     script_path.write_text(export_result["script"], encoding="utf-8")
     options_path.write_text(build_renpy_options_file(bundle), encoding="utf-8")
-    screens_path.write_text(build_renpy_screens_file(bundle), encoding="utf-8")
+    screens_path.write_text(build_renpy_screens_file(bundle, assets_doc), encoding="utf-8")
     manifest_path.write_text(json.dumps({key: value for key, value in export_result.items() if key != "script"}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     review_path.write_text(build_renpy_review_notes(export_result), encoding="utf-8")
     readme_path.write_text(build_renpy_readme(export_result), encoding="utf-8")
