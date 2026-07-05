@@ -1,4 +1,6 @@
 (function attachDirectorCueSheetTools(global) {
+  const audioTimingTools = global.CanvasiaEditorAudioTimingEstimator || {};
+
   const CUE_GROUP_LABELS = Object.freeze({
     story: "剧情",
     visual: "画面",
@@ -213,6 +215,47 @@
     }
     const scene = sceneMap.get(cleanId);
     return cleanText(scene?.name, cleanId);
+  }
+
+  function formatEstimatedDuration(seconds) {
+    if (typeof audioTimingTools.formatEstimatedDuration === "function") {
+      return audioTimingTools.formatEstimatedDuration(seconds);
+    }
+    const safeSeconds = Math.max(0, Math.round(Number(seconds) || 0));
+    if (safeSeconds < 60) {
+      return `约 ${safeSeconds} 秒`;
+    }
+    const minutes = Math.floor(safeSeconds / 60);
+    const remainingSeconds = safeSeconds % 60;
+    return remainingSeconds > 0 ? `约 ${minutes}分${remainingSeconds}秒` : `约 ${minutes} 分钟`;
+  }
+
+  function estimateSceneTiming(blocks = []) {
+    const safeBlocks = toArray(blocks);
+    if (typeof audioTimingTools.estimateBlockRangeTiming === "function") {
+      return audioTimingTools.estimateBlockRangeTiming(safeBlocks, 0, Math.max(0, safeBlocks.length - 1));
+    }
+    return {
+      estimatedSeconds: 0,
+      durationLabel: "约 0 秒",
+      readableCharacterCount: 0,
+      waitSeconds: 0,
+      textBlockCount: 0,
+      mediaBlockCount: 0,
+      tone: safeBlocks.length ? "silent" : "silent",
+    };
+  }
+
+  function buildSceneTimingBrief(timing = {}) {
+    const durationLabel = timing.durationLabel || formatEstimatedDuration(timing.estimatedSeconds);
+    const textBlockCount = timing.textBlockCount ?? 0;
+    const characterCount = timing.readableCharacterCount ?? 0;
+    const waitSeconds = Number(timing.waitSeconds) || 0;
+    const waitLabel = waitSeconds > 0 ? `，等待 ${formatEstimatedDuration(waitSeconds).replace(/^约 /, "")}` : "";
+    if (timing.tone === "silent") {
+      return `${durationLabel} · 几乎没有正文`;
+    }
+    return `${durationLabel} · ${textBlockCount} 段正文 / 约 ${characterCount} 字${waitLabel}`;
   }
 
   function getIssueWeight(issue = {}) {
@@ -489,11 +532,13 @@
 
   function buildSceneCue(record, sheetIssues, context) {
     const scene = record.scene ?? {};
+    const timing = estimateSceneTiming(scene.blocks);
     const sceneCue = {
       sceneId: cleanText(scene.id),
       sceneName: cleanText(scene.name ?? scene.title, "未命名场景"),
       chapterId: cleanText(record.chapterId),
       chapterName: cleanText(record.chapterName, "未分章"),
+      timing,
       cues: [],
       issues: [],
       requiredAssets: [],
@@ -579,6 +624,13 @@
       audioCueCount: groupCounts.audio ?? 0,
       effectCueCount: groupCounts.effect ?? 0,
       routeCueCount: groupCounts.route ?? 0,
+      durationSeconds: sceneCue.timing.estimatedSeconds ?? 0,
+      durationLabel: sceneCue.timing.durationLabel ?? formatEstimatedDuration(sceneCue.timing.estimatedSeconds),
+      timingBrief: buildSceneTimingBrief(sceneCue.timing),
+      readableCharacterCount: sceneCue.timing.readableCharacterCount ?? 0,
+      textBlockCount: sceneCue.timing.textBlockCount ?? 0,
+      waitSeconds: sceneCue.timing.waitSeconds ?? 0,
+      timingTone: sceneCue.timing.tone ?? "silent",
       readiness,
     };
   }
@@ -588,9 +640,15 @@
     const warningCount = issues.filter((issue) => issue.severity === "warn").length;
     const tipCount = issues.filter((issue) => issue.severity === "tip").length;
     const totalScore = scenes.reduce((sum, scene) => sum + (scene.readiness?.score ?? 0), 0);
+    const totalEstimatedSeconds = Math.round(scenes.reduce((sum, scene) => sum + (Number(scene.durationSeconds) || 0), 0));
     return {
       sceneCount: scenes.length,
       cueCount: scenes.reduce((sum, scene) => sum + scene.cueCount, 0),
+      totalEstimatedSeconds,
+      averageSceneSeconds: scenes.length ? Math.round(totalEstimatedSeconds / scenes.length) : 0,
+      shortSceneCount: scenes.filter((scene) => scene.timingTone === "short").length,
+      longSceneCount: scenes.filter((scene) => scene.timingTone === "long").length,
+      silentSceneCount: scenes.filter((scene) => scene.timingTone === "silent").length,
       storyCueCount: scenes.reduce((sum, scene) => sum + scene.storyCueCount, 0),
       visualCueCount: scenes.reduce((sum, scene) => sum + scene.visualCueCount, 0),
       audioCueCount: scenes.reduce((sum, scene) => sum + scene.audioCueCount, 0),
@@ -696,6 +754,8 @@
     const sceneRows = toArray(sheet.scenes).map((scene) => [
       scene.chapterName,
       scene.sceneName,
+      scene.durationLabel,
+      scene.timingBrief,
       scene.cueCount,
       scene.requiredAssetCount,
       scene.missingAssetCount,
@@ -717,10 +777,13 @@
       "## 总览",
       "",
       buildMarkdownTable(
-        ["场景", "节拍", "剧情", "画面", "声音", "演出", "路线", "缺素材", "平均就绪度"],
+        ["场景", "预计总时长", "平均场景", "短/长/空场景", "节拍", "剧情", "画面", "声音", "演出", "路线", "缺素材", "平均就绪度"],
         [
           [
             summary.sceneCount ?? 0,
+            formatEstimatedDuration(summary.totalEstimatedSeconds ?? 0),
+            formatEstimatedDuration(summary.averageSceneSeconds ?? 0),
+            `${summary.shortSceneCount ?? 0}/${summary.longSceneCount ?? 0}/${summary.silentSceneCount ?? 0}`,
             summary.cueCount ?? 0,
             summary.storyCueCount ?? 0,
             summary.visualCueCount ?? 0,
@@ -735,7 +798,7 @@
       "",
       "## 场景分布",
       "",
-      buildMarkdownTable(["章节", "场景", "节拍", "资产", "缺素材", "状态", "就绪度"], sceneRows) || "当前没有场景。",
+      buildMarkdownTable(["章节", "场景", "预计时长", "时长摘要", "节拍", "资产", "缺素材", "状态", "就绪度"], sceneRows) || "当前没有场景。",
       "",
       "## 场景 cue cards",
       "",
@@ -745,6 +808,7 @@
       lines.push(`### ${scene.chapterName} / ${scene.sceneName}`);
       lines.push("");
       lines.push(`状态：${scene.readiness?.label ?? "未知"} / ${scene.readiness?.score ?? 0}%`);
+      lines.push(`预计时长：${scene.timingBrief ?? scene.durationLabel ?? "约 0 秒"}`);
       lines.push("");
       toArray(scene.cues).slice(0, 18).forEach((cue) => {
         lines.push(`- [${cue.groupLabel}] 第 ${cue.blockIndex + 1} 张：${cue.text}`);
@@ -783,6 +847,8 @@
           sheet.projectTitle,
           scene.chapterName,
           scene.sceneName,
+          scene.durationLabel,
+          scene.timingBrief,
           cue.blockIndex + 1,
           cue.groupLabel,
           cue.blockLabel,
@@ -796,7 +862,7 @@
       });
     });
     return `\uFEFF${buildCsv(
-      ["项目", "章节", "场景", "卡片序号", "节拍", "卡片类型", "说明", "角色", "关联资产", "目标", "场景状态", "场景问题"],
+      ["项目", "章节", "场景", "场景预计时长", "场景时长摘要", "卡片序号", "节拍", "卡片类型", "说明", "角色", "关联资产", "目标", "场景状态", "场景问题"],
       rows
     )}\n`;
   }
@@ -848,6 +914,8 @@
         <p class="helper-text">${escape(digest.detail)} 它会把每个场景拆成剧情、画面、声音、演出、路线节拍，方便像真正制作表一样检查“这一场到底还缺什么”。</p>
         <div class="preview-sprint-metrics">
           ${metric("场景 / 节拍", `${summary.sceneCount ?? 0} / ${summary.cueCount ?? 0}`, "导演视角下的制作 cue")}
+          ${metric("预计 / 平均", `${formatEstimatedDuration(summary.totalEstimatedSeconds ?? 0)} / ${formatEstimatedDuration(summary.averageSceneSeconds ?? 0)}`, "按正文、等待和媒体卡估算")}
+          ${metric("短/长/空场景", `${summary.shortSceneCount ?? 0}/${summary.longSceneCount ?? 0}/${summary.silentSceneCount ?? 0}`, "帮助定位节奏不均衡的场景")}
           ${metric("画面 / 声音", `${summary.visualCueCount ?? 0} / ${summary.audioCueCount ?? 0}`, "背景、立绘、视频、BGM、音效")}
           ${metric("演出 / 路线", `${summary.effectCueCount ?? 0} / ${summary.routeCueCount ?? 0}`, "镜头、粒子、滤镜、选项和跳转")}
           ${metric("缺素材 / 就绪度", `${summary.missingAssetCount ?? 0} / ${summary.readinessPercent ?? 0}%`, "导出前最该先补的制作缺口")}
@@ -894,7 +962,7 @@
                         <div class="route-testing-item">
                           <div>
                             <b>${escape(`${scene.chapterName} · ${scene.sceneName}`)}</b>
-                            <span>${escape(`节拍 ${scene.cueCount} · 资产 ${scene.requiredAssetCount} · 缺口 ${scene.missingAssetCount}`)}</span>
+                            <span>${escape(`${scene.timingBrief ?? scene.durationLabel ?? "约 0 秒"} · 节拍 ${scene.cueCount} · 资产 ${scene.requiredAssetCount} · 缺口 ${scene.missingAssetCount}`)}</span>
                           </div>
                           <span>${escape(`${scene.readiness?.label ?? "未知"} · ${scene.readiness?.score ?? 0}%`)}</span>
                         </div>

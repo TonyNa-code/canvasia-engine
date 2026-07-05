@@ -8,6 +8,7 @@ from pathlib import Path
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
+TIMING_MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "audio_timing_estimator.js"
 MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "director_cue_sheet.js"
 
 
@@ -20,6 +21,7 @@ class FrontendDirectorCueSheetModuleTests(unittest.TestCase):
             const context = {{ window: {{}} }};
             context.globalThis = context;
             vm.createContext(context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(TIMING_MODULE_PATH))}, "utf8"), context);
             vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
             const tools = context.window.CanvasiaEditorDirectorCueSheet;
             const data = {{
@@ -102,6 +104,11 @@ class FrontendDirectorCueSheetModuleTests(unittest.TestCase):
         self.assertEqual(payload["sheet"]["projectTitle"], "Director Demo")
         self.assertEqual(payload["sheet"]["summary"]["sceneCount"], 2)
         self.assertEqual(payload["sheet"]["summary"]["cueCount"], 12)
+        self.assertEqual(payload["sheet"]["summary"]["totalEstimatedSeconds"], 14)
+        self.assertEqual(payload["sheet"]["summary"]["averageSceneSeconds"], 7)
+        self.assertEqual(payload["sheet"]["summary"]["shortSceneCount"], 1)
+        self.assertEqual(payload["sheet"]["summary"]["longSceneCount"], 0)
+        self.assertEqual(payload["sheet"]["summary"]["silentSceneCount"], 0)
         self.assertEqual(payload["sheet"]["summary"]["missingAssetCount"], 1)
         self.assertEqual(payload["sheet"]["summary"]["blockerCount"], 1)
         self.assertEqual(payload["sheet"]["summary"]["warningCount"], 1)
@@ -113,14 +120,24 @@ class FrontendDirectorCueSheetModuleTests(unittest.TestCase):
         self.assertIn("director_scene_no_audio_anchor", issue_codes)
         self.assertIn("director_speaker_not_staged", issue_codes)
         self.assertNotIn("yuna", [issue.get("speakerId") for issue in payload["sheet"]["issues"] if issue["code"] == "director_speaker_not_staged"])
+        self.assertEqual(payload["sheet"]["scenes"][0]["durationLabel"], "约 9 秒")
+        self.assertEqual(payload["sheet"]["scenes"][0]["timingBrief"], "约 9 秒 · 3 段正文 / 约 21 字")
+        self.assertEqual(payload["sheet"]["scenes"][1]["timingTone"], "short")
+        self.assertEqual(payload["sheet"]["scenes"][1]["readableCharacterCount"], 24)
         self.assertEqual(payload["sheet"]["productionQueue"][0]["title"], "音效文件缺失")
         self.assertIn("# Director Demo 导演分镜清单", payload["markdown"])
+        self.assertIn("预计总时长", payload["markdown"])
+        self.assertIn("预计时长", payload["markdown"])
+        self.assertIn("约 9 秒 · 3 段正文 / 约 21 字", payload["markdown"])
         self.assertIn("教室黄昏", payload["markdown"])
         self.assertIn("[画面] 第 1 张：切换背景：旧校舍教室", payload["markdown"])
         self.assertIn("音效文件缺失", payload["markdown"])
         self.assertTrue(payload["csv"].startswith("\ufeff"))
         self.assertIn("导演分镜清单", payload["markdown"])
-        self.assertIn('"Director Demo","第1章","教室黄昏"', payload["csv"])
+        self.assertIn('"场景预计时长"', payload["csv"])
+        self.assertIn('"Director Demo","第1章","教室黄昏","约 9 秒"', payload["csv"])
+        self.assertIn("预计 / 平均", payload["panel"])
+        self.assertIn("短/长/空场景", payload["panel"])
         self.assertIn('data-action="export-director-cue-sheet-markdown"', payload["panel"])
 
 
