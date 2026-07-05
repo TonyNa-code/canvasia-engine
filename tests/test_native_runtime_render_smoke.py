@@ -292,11 +292,55 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
         self.assertEqual(report["summary"]["totalEntries"], 2)
         self.assertEqual(report["summary"]["criticalEntries"], 1)
         self.assertEqual(report["summary"]["missingFileEntries"], 1)
+        self.assertEqual(report["summary"]["sizeBudget"]["totalBytes"], 5)
+        self.assertEqual(report["entries"][0]["sizeBytes"], 5)
         self.assertEqual(report["missingEntries"][0]["assetId"], "missing_sfx")
         self.assertEqual(doctor_check["id"], "runtime_preload")
         self.assertEqual(doctor_check["status"], "fail")
         self.assertEqual(cli_payload["status"], "needs_fix")
         self.assertEqual(cli_payload["missingEntries"][0]["assetId"], "missing_sfx")
+
+    def test_runtime_preload_report_warns_on_large_critical_budget(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_dir = Path(temp_dir)
+            title_path = bundle_dir / "assets" / "ui" / "oversized-title.png"
+            title_path.parent.mkdir(parents=True, exist_ok=True)
+            with title_path.open("wb") as file_handle:
+                file_handle.truncate(100 * 1024 * 1024)
+            game_data = {
+                "project": {"projectId": "preload_budget_smoke", "title": "Preload Budget Smoke"},
+                "assets": {
+                    "assets": [
+                        {
+                            "id": "oversized_title",
+                            "type": "ui",
+                            "name": "Oversized Title",
+                            "exportUrl": title_path.relative_to(bundle_dir).as_posix(),
+                        }
+                    ]
+                },
+                "characters": {"characters": []},
+                "chapters": [],
+                "buildInfo": {
+                    "runtimePreloadManifest": {
+                        "entries": [
+                            {"assetId": "oversized_title", "type": "ui", "phase": "critical", "priority": 100},
+                        ]
+                    }
+                },
+            }
+            (bundle_dir / "game_data.json").write_text(json.dumps(game_data, ensure_ascii=False), encoding="utf-8")
+
+            report = build_native_runtime_preload_report(bundle_dir)
+            doctor_check = build_runtime_preload_doctor_check(bundle_dir)
+
+        size_budget = report["summary"]["sizeBudget"]
+        self.assertEqual(report["status"], "needs_review")
+        self.assertTrue(size_budget["criticalOverBudget"])
+        self.assertEqual(size_budget["criticalBytes"], 100 * 1024 * 1024)
+        self.assertEqual(size_budget["largestEntries"][0]["assetId"], "oversized_title")
+        self.assertEqual(doctor_check["status"], "warn")
+        self.assertIn("critical", doctor_check["message"])
 
     def test_native_runtime_voice_ducking_state_restores_bgm_after_voice_finishes(self) -> None:
         class FakeMusic:

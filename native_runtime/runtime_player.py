@@ -30,6 +30,7 @@ try:
         build_runtime_preload_status,
         finalize_runtime_preload_status,
         format_runtime_preload_status_line,
+        build_runtime_preload_size_budget,
         get_runtime_preload_manifest,
         is_runtime_preload_startup_entry,
         mark_runtime_preload_entry,
@@ -44,6 +45,7 @@ except ImportError:  # pragma: no cover - exported native packages import from t
         build_runtime_preload_status,
         finalize_runtime_preload_status,
         format_runtime_preload_status_line,
+        build_runtime_preload_size_budget,
         get_runtime_preload_manifest,
         is_runtime_preload_startup_entry,
         mark_runtime_preload_entry,
@@ -4951,6 +4953,7 @@ def build_native_runtime_preload_report(bundle_dir: Path) -> dict:
         asset = assets_by_id.get(asset_id)
         asset_path = get_asset_runtime_path(bundle_dir, asset)
         declared_path = str((asset or {}).get("exportUrl") or entry.get("url") or "").strip()
+        size_bytes = asset_path.stat().st_size if asset_path else 0
         is_critical = is_runtime_preload_startup_entry(entry)
         if is_critical:
             critical_entries += 1
@@ -4965,12 +4968,15 @@ def build_native_runtime_preload_report(bundle_dir: Path) -> dict:
             "declaredPath": declared_path,
             "path": str(asset_path) if asset_path else "",
             "pathExists": bool(asset_path),
+            "sizeBytes": size_bytes,
+            "sizeLabel": format_file_size_label(size_bytes),
             "reason": str(entry.get("reason") or ""),
         }
         if not asset_path:
             missing_entries.append(entry_report)
         entry_reports.append(entry_report)
 
+    size_budget = build_runtime_preload_size_budget(entry_reports)
     if not isinstance(manifest, dict) or not manifest:
         status = "missing_manifest"
         recommendation = "导出包没有 Runtime 资源预热清单；请用新版编辑器重新导出。"
@@ -4983,6 +4989,18 @@ def build_native_runtime_preload_report(bundle_dir: Path) -> dict:
     elif critical_entries <= 0:
         status = "needs_review"
         recommendation = "预热清单没有 critical 首屏资源；建议至少覆盖标题页、开场背景或首句语音。"
+    elif size_budget.get("status") == "warn":
+        status = "needs_review"
+        if size_budget.get("criticalOverBudget"):
+            recommendation = (
+                f"critical 首屏预热体积 {size_budget.get('criticalLabel')} 超过建议预算 "
+                f"{size_budget.get('criticalBudgetLabel')}；建议压缩标题页/开场图或把非首屏素材降为 early。"
+            )
+        else:
+            recommendation = (
+                f"预热队列总体积 {size_budget.get('totalLabel')} 超过建议预算 "
+                f"{size_budget.get('totalBudgetLabel')}；建议拆分大素材或降低非关键资源优先级。"
+            )
     else:
         status = "ready"
         recommendation = "资源预热清单和包内素材路径可用。"
@@ -4992,6 +5010,7 @@ def build_native_runtime_preload_report(bundle_dir: Path) -> dict:
         "criticalEntries": critical_entries,
         "missingFileEntries": len(missing_entries),
         "manifestPresent": bool(manifest),
+        "sizeBudget": size_budget,
     }
     return {
         "formatVersion": 1,

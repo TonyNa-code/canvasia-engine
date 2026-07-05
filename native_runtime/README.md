@@ -78,6 +78,8 @@ python3 runtime_player.py --validate-bundle .
 python3 runtime_player.py --describe-runtime-preload .
 ```
 
+`--describe-runtime-preload` 会检查预热清单、缺失素材、critical 首屏资源体积和整体预热队列体积，适合在发布前定位“打开游戏第一下卡顿”的风险。
+
 ## 维护者渲染 smoke
 
 如果是在源码仓库里验证原生 Runtime 的真实 Pygame 绘制链，可以回到仓库根目录运行：

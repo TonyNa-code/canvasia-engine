@@ -11,6 +11,26 @@ RUNTIME_PRELOAD_SUPPORTED_TYPES = (
 )
 RUNTIME_PRELOAD_STARTUP_PHASES = {"critical"}
 RUNTIME_PRELOAD_DEFAULT_FRAME_BUDGET = 1
+RUNTIME_PRELOAD_CRITICAL_BUDGET_BYTES = 96 * 1024 * 1024
+RUNTIME_PRELOAD_TOTAL_BUDGET_BYTES = 512 * 1024 * 1024
+
+
+def format_bytes(size_bytes: object) -> str:
+    try:
+        size = max(0, int(size_bytes or 0))
+    except (TypeError, ValueError):
+        size = 0
+    units = ["B", "KB", "MB", "GB"]
+    value = float(size)
+    unit = units[0]
+    for candidate in units:
+        unit = candidate
+        if value < 1024 or candidate == units[-1]:
+            break
+        value /= 1024
+    if unit == "B":
+        return f"{int(value)} B"
+    return f"{value:.1f} {unit}"
 
 
 def clamp_int(value: object, minimum: int, maximum: int, default: int) -> int:
@@ -72,6 +92,58 @@ def normalize_runtime_preload_entries(manifest: dict | None, assets_by_id: dict)
 
 def is_runtime_preload_startup_entry(entry: dict) -> bool:
     return str(entry.get("phase") or "").strip() in RUNTIME_PRELOAD_STARTUP_PHASES
+
+
+def build_runtime_preload_size_budget(
+    entry_reports: list[dict],
+    *,
+    critical_budget_bytes: int = RUNTIME_PRELOAD_CRITICAL_BUDGET_BYTES,
+    total_budget_bytes: int = RUNTIME_PRELOAD_TOTAL_BUDGET_BYTES,
+) -> dict:
+    total_bytes = 0
+    critical_bytes = 0
+    by_type: dict[str, int] = {}
+    largest_entries: list[dict] = []
+    for entry in entry_reports:
+        if not isinstance(entry, dict):
+            continue
+        size_bytes = max(0, int(entry.get("sizeBytes") or 0))
+        asset_type = str(entry.get("type") or "unknown")
+        total_bytes += size_bytes
+        by_type[asset_type] = by_type.get(asset_type, 0) + size_bytes
+        if entry.get("startup"):
+            critical_bytes += size_bytes
+        if size_bytes > 0:
+            largest_entries.append(
+                {
+                    "assetId": entry.get("assetId") or "",
+                    "name": entry.get("name") or entry.get("assetId") or "",
+                    "type": asset_type,
+                    "phase": entry.get("phase") or "",
+                    "sizeBytes": size_bytes,
+                    "sizeLabel": format_bytes(size_bytes),
+                    "startup": bool(entry.get("startup")),
+                }
+            )
+    largest_entries.sort(key=lambda item: int(item.get("sizeBytes") or 0), reverse=True)
+    critical_over_budget = critical_bytes > critical_budget_bytes
+    total_over_budget = total_bytes > total_budget_bytes
+    return {
+        "status": "warn" if critical_over_budget or total_over_budget else "ready",
+        "totalBytes": total_bytes,
+        "totalLabel": format_bytes(total_bytes),
+        "criticalBytes": critical_bytes,
+        "criticalLabel": format_bytes(critical_bytes),
+        "totalBudgetBytes": total_budget_bytes,
+        "totalBudgetLabel": format_bytes(total_budget_bytes),
+        "criticalBudgetBytes": critical_budget_bytes,
+        "criticalBudgetLabel": format_bytes(critical_budget_bytes),
+        "criticalOverBudget": critical_over_budget,
+        "totalOverBudget": total_over_budget,
+        "byTypeBytes": by_type,
+        "byTypeLabels": {asset_type: format_bytes(size) for asset_type, size in sorted(by_type.items())},
+        "largestEntries": largest_entries[:8],
+    }
 
 
 def build_empty_runtime_preload_status() -> dict:
