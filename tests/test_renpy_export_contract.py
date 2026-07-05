@@ -83,6 +83,50 @@ class RenpyExportContractTests(unittest.TestCase):
         self.assertEqual(frontend["warnings"][0]["code"], "renpy_condition_operator_review")
         self.assertEqual(backend_warnings[0]["code"], "renpy_condition_operator_review")
 
+    def test_pop_character_transition_uses_native_renpy_zoom_transitions(self) -> None:
+        frontend = load_frontend_payload(
+            """
+            const showWarnings = [];
+            const hideWarnings = [];
+            const showLines = tools.renderBlock({
+              type: "character_show",
+              characterId: "heroine",
+              position: "center",
+              transition: "pop",
+              transitionDurationMs: 720,
+            }, { warnings: showWarnings, sceneId: "scene_open", blockIndex: 2 });
+            const hideLines = tools.renderBlock({
+              type: "character_hide",
+              characterId: "heroine",
+              transition: "pop",
+              transitionDurationMs: 720,
+            }, { warnings: hideWarnings, sceneId: "scene_open", blockIndex: 8 });
+            process.stdout.write(JSON.stringify({ showLines, hideLines, showWarnings, hideWarnings }));
+            """
+        )
+
+        backend_show_warnings: list[dict] = []
+        backend_hide_warnings: list[dict] = []
+        backend_show_transition = renpy_export.get_character_transition_expression(
+            {"transition": "pop", "transitionDurationMs": 720},
+            {"warnings": backend_show_warnings, "sceneId": "scene_open", "blockIndex": 2},
+            "show",
+        )
+        backend_hide_transition = renpy_export.get_character_transition_expression(
+            {"transition": "pop", "transitionDurationMs": 720},
+            {"warnings": backend_hide_warnings, "sceneId": "scene_open", "blockIndex": 8},
+            "hide",
+        )
+
+        self.assertIn("show heroine at center with zoomin", "\n".join(frontend["showLines"]))
+        self.assertIn("hide heroine with zoomout", "\n".join(frontend["hideLines"]))
+        self.assertEqual(backend_show_transition, "zoomin")
+        self.assertEqual(backend_hide_transition, "zoomout")
+        self.assertEqual(frontend["showWarnings"], [])
+        self.assertEqual(frontend["hideWarnings"], [])
+        self.assertEqual(backend_show_warnings, [])
+        self.assertEqual(backend_hide_warnings, [])
+
 
 if __name__ == "__main__":
     unittest.main()

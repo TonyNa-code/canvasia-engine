@@ -39,6 +39,10 @@ CHARACTER_MOVE_TRANSFORMS = {
     "slide_right": "offscreenright",
     "rise": "offscreenbottom",
 }
+CHARACTER_POP_TRANSITIONS = {
+    "show": "zoomin",
+    "hide": "zoomout",
+}
 TEXT_SPEED_CPS = {
     "slow": 24,
     "normal": 42,
@@ -118,6 +122,7 @@ def get_renpy_export_contract() -> dict:
         "backgroundTransitionDefaultMs": BACKGROUND_TRANSITION_DEFAULT_MS,
         "conditionOperators": list(CONDITION_OPERATOR_ORDER),
         "characterMoveTransforms": dict(CHARACTER_MOVE_TRANSFORMS),
+        "characterPopTransitions": dict(CHARACTER_POP_TRANSITIONS),
         "textSpeedCps": dict(TEXT_SPEED_CPS),
         "effectDurationSeconds": dict(EFFECT_DURATION_SECONDS),
         "cameraFocusKeys": sorted(CAMERA_FOCUS_XALIGN),
@@ -794,14 +799,7 @@ def get_character_transition_expression(block: dict, context: dict, direction: s
         warp = "_warper.easein" if direction == "hide" else "_warper.easeout"
         return f"MoveTransition({seconds:g}, {argument_name}={transform}, {warp_name}={warp})"
     if transition == "pop":
-        add_warning(
-            context["warnings"],
-            "renpy_character_transition_review",
-            "轻微弹出转场已按淡入导出，请在 Ren'Py 中按需要替换为自定义 ATL。",
-            sceneId=context.get("sceneId"),
-            blockIndex=context.get("blockIndex"),
-        )
-        return f"Dissolve({seconds:g})"
+        return CHARACTER_POP_TRANSITIONS.get(direction, CHARACTER_POP_TRANSITIONS["show"])
     add_warning(
         context["warnings"],
         "renpy_character_transition_review",

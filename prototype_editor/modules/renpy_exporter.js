@@ -19,6 +19,10 @@
     slide_right: "offscreenright",
     rise: "offscreenbottom",
   });
+  const CHARACTER_POP_TRANSITIONS = Object.freeze({
+    show: "zoomin",
+    hide: "zoomout",
+  });
   const TEXT_SPEED_CPS = Object.freeze({
     slow: 24,
     normal: 42,
@@ -841,8 +845,7 @@
       return `MoveTransition(${seconds}, ${argumentName}=${transform}, ${warpName}=${warp})`;
     }
     if (transition === "pop") {
-      pushWarning(context.warnings ?? [], "renpy_character_transition_review", "轻微弹出转场已按淡入导出，请在 Ren'Py 中按需要替换为自定义 ATL。", getWarningContext(context));
-      return `Dissolve(${seconds})`;
+      return CHARACTER_POP_TRANSITIONS[direction] ?? CHARACTER_POP_TRANSITIONS.show;
     }
     pushWarning(context.warnings ?? [], "renpy_character_transition_review", `角色转场 ${transition} 暂未精确映射，已按淡入导出。`, getWarningContext(context));
     return `Dissolve(${seconds})`;
@@ -1347,6 +1350,7 @@
       backgroundTransitionDefaultMs: BACKGROUND_TRANSITION_DEFAULT_MS,
       conditionOperators: [...CONDITION_OPERATORS],
       characterMoveTransforms: { ...CHARACTER_MOVE_TRANSFORMS },
+      characterPopTransitions: { ...CHARACTER_POP_TRANSITIONS },
       textSpeedCps: { ...TEXT_SPEED_CPS },
       effectDurationSeconds: { ...EFFECT_DURATION_SECONDS },
       cameraFocusKeys: Object.keys(CAMERA_FOCUS_XALIGN).sort(),
