@@ -3282,6 +3282,28 @@ class RunEditorSmokeTests(unittest.TestCase):
             export_result["runtimePreloadSummary"]["totalEntries"],
             native_preload_manifest["summary"]["totalEntries"],
         )
+        runtime_preload_description = subprocess.run(
+            [
+                sys.executable,
+                str(build_dir / run_editor.NATIVE_RUNTIME_PLAYER_NAME),
+                "--describe-runtime-preload",
+                str(build_dir),
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(
+            runtime_preload_description.returncode,
+            0,
+            runtime_preload_description.stdout + runtime_preload_description.stderr,
+        )
+        runtime_preload_payload = json.loads(runtime_preload_description.stdout)
+        self.assertEqual(runtime_preload_payload["status"], "ready")
+        self.assertEqual(
+            runtime_preload_payload["summary"]["totalEntries"],
+            native_preload_manifest["summary"]["totalEntries"],
+        )
         native_player_source = (build_dir / run_editor.NATIVE_RUNTIME_PLAYER_NAME).read_text(encoding="utf-8")
         self.assertIn('("language", "语言")', native_player_source)
 

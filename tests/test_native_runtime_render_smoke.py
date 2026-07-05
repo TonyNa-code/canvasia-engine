@@ -28,9 +28,11 @@ from native_runtime.runtime_player import (
     OpenCvEmbeddedVideoPlayback,
     PyAvSynchronizedVideoPlayback,
     build_native_runtime_control_guide,
+    build_native_runtime_preload_report,
     build_acceptance_automated_checks,
     build_native_runtime_vn_baseline_quality_report,
     build_project_default_runtime_player_settings,
+    build_runtime_preload_doctor_check,
     build_vn_baseline_quality_doctor_check,
     build_save_dialog_page_data,
     build_native_video_preview_probe_report,
@@ -247,6 +249,54 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
         self.assertEqual(player.runtime_preload_status["status"], "ready")
         self.assertEqual(player.runtime_preload_status["loadedEntries"], 3)
         self.assertEqual(player.runtime_preload_status["pendingEntries"], 0)
+
+    def test_runtime_preload_report_and_doctor_flag_missing_entries(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_dir = Path(temp_dir)
+            title_path = bundle_dir / "assets" / "ui" / "title.png"
+            title_path.parent.mkdir(parents=True, exist_ok=True)
+            title_path.write_bytes(b"asset")
+            game_data = {
+                "project": {"projectId": "preload_report_smoke", "title": "Preload Report Smoke"},
+                "assets": {
+                    "assets": [
+                        {
+                            "id": "title_ui",
+                            "type": "ui",
+                            "name": "Title UI",
+                            "exportUrl": title_path.relative_to(bundle_dir).as_posix(),
+                        }
+                    ]
+                },
+                "characters": {"characters": []},
+                "chapters": [],
+                "buildInfo": {
+                    "runtimePreloadManifest": {
+                        "entries": [
+                            {"assetId": "title_ui", "type": "ui", "phase": "critical", "priority": 100},
+                            {"assetId": "missing_sfx", "type": "sfx", "phase": "early", "priority": 72},
+                        ]
+                    }
+                },
+            }
+            (bundle_dir / "game_data.json").write_text(json.dumps(game_data, ensure_ascii=False), encoding="utf-8")
+
+            report = build_native_runtime_preload_report(bundle_dir)
+            doctor_check = build_runtime_preload_doctor_check(bundle_dir)
+            stdout = io.StringIO()
+            with redirect_stdout(stdout):
+                self.assertEqual(runtime_player_main(["--describe-runtime-preload", str(bundle_dir)]), 1)
+            cli_payload = json.loads(stdout.getvalue())
+
+        self.assertEqual(report["status"], "needs_fix")
+        self.assertEqual(report["summary"]["totalEntries"], 2)
+        self.assertEqual(report["summary"]["criticalEntries"], 1)
+        self.assertEqual(report["summary"]["missingFileEntries"], 1)
+        self.assertEqual(report["missingEntries"][0]["assetId"], "missing_sfx")
+        self.assertEqual(doctor_check["id"], "runtime_preload")
+        self.assertEqual(doctor_check["status"], "fail")
+        self.assertEqual(cli_payload["status"], "needs_fix")
+        self.assertEqual(cli_payload["missingEntries"][0]["assetId"], "missing_sfx")
 
     def test_native_runtime_voice_ducking_state_restores_bgm_after_voice_finishes(self) -> None:
         class FakeMusic:

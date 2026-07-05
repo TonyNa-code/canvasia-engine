@@ -4930,6 +4930,88 @@ def print_native_video_preview_probe_report(bundle_dir: Path) -> None:
     print(json.dumps(report, ensure_ascii=False, indent=2))
 
 
+def build_native_runtime_preload_report(bundle_dir: Path) -> dict:
+    data_path = bundle_dir / DEFAULT_GAME_DATA_NAME
+    payload = load_game_data(data_path)
+    assets = (payload.get("assets") if isinstance(payload.get("assets"), dict) else {}).get("assets") or []
+    assets_by_id = {
+        str(asset.get("id")): asset
+        for asset in assets
+        if isinstance(asset, dict) and str(asset.get("id") or "").strip()
+    }
+    manifest = get_runtime_preload_manifest(payload.get("buildInfo") if isinstance(payload.get("buildInfo"), dict) else {})
+    entries = normalize_runtime_preload_entries(manifest, assets_by_id)
+    queue_status = build_runtime_preload_status(entries)
+    missing_entries: list[dict] = []
+    entry_reports: list[dict] = []
+    critical_entries = 0
+
+    for entry in entries:
+        asset_id = str(entry.get("assetId") or "")
+        asset = assets_by_id.get(asset_id)
+        asset_path = get_asset_runtime_path(bundle_dir, asset)
+        declared_path = str((asset or {}).get("exportUrl") or entry.get("url") or "").strip()
+        is_critical = is_runtime_preload_startup_entry(entry)
+        if is_critical:
+            critical_entries += 1
+        entry_report = {
+            "assetId": asset_id,
+            "name": str((asset or {}).get("name") or entry.get("name") or asset_id),
+            "type": str(entry.get("type") or ""),
+            "phase": str(entry.get("phase") or ""),
+            "priority": int(entry.get("priority") or 0),
+            "preloadIndex": int(entry.get("preloadIndex") or 0),
+            "startup": is_critical,
+            "declaredPath": declared_path,
+            "path": str(asset_path) if asset_path else "",
+            "pathExists": bool(asset_path),
+            "reason": str(entry.get("reason") or ""),
+        }
+        if not asset_path:
+            missing_entries.append(entry_report)
+        entry_reports.append(entry_report)
+
+    if not isinstance(manifest, dict) or not manifest:
+        status = "missing_manifest"
+        recommendation = "导出包没有 Runtime 资源预热清单；请用新版编辑器重新导出。"
+    elif not entries:
+        status = "empty"
+        recommendation = "没有发现可预热资源；如果项目有背景、立绘、音频或视频，请检查素材是否已入剧情。"
+    elif missing_entries:
+        status = "needs_fix"
+        recommendation = "预热清单中存在缺失素材；请重新导入素材或重新导出包。"
+    elif critical_entries <= 0:
+        status = "needs_review"
+        recommendation = "预热清单没有 critical 首屏资源；建议至少覆盖标题页、开场背景或首句语音。"
+    else:
+        status = "ready"
+        recommendation = "资源预热清单和包内素材路径可用。"
+
+    summary = {
+        **queue_status,
+        "criticalEntries": critical_entries,
+        "missingFileEntries": len(missing_entries),
+        "manifestPresent": bool(manifest),
+    }
+    return {
+        "formatVersion": 1,
+        "status": status,
+        "checkedAt": now_iso(),
+        "bundleDir": str(bundle_dir),
+        "gameDataPath": str(data_path),
+        "recommendation": recommendation,
+        "summary": summary,
+        "entries": entry_reports,
+        "missingEntries": missing_entries,
+    }
+
+
+def print_native_runtime_preload_report(bundle_dir: Path) -> dict:
+    report = build_native_runtime_preload_report(bundle_dir)
+    print(json.dumps(report, ensure_ascii=False, indent=2))
+    return report
+
+
 def get_doctor_status(checks: list[dict]) -> str:
     if any(check.get("status") == "fail" for check in checks):
         return "fail"
@@ -5035,6 +5117,25 @@ def build_vn_baseline_quality_doctor_check(bundle_dir: Path) -> dict:
         status = "fail"
         message = f"视觉小说基础质感还有 {summary.get('warnCount', 0)} 个需要修复的问题。"
     return build_doctor_check("vn_baseline_quality", "VN 基础质感", status, message, details=report)
+
+
+def build_runtime_preload_doctor_check(bundle_dir: Path) -> dict:
+    report = build_native_runtime_preload_report(bundle_dir)
+    report_status = str(report.get("status") or "")
+    summary = report.get("summary") if isinstance(report.get("summary"), dict) else {}
+    if report_status == "ready":
+        status = "pass"
+        message = f"资源预热清单可用，{summary.get('criticalEntries', 0)} 个关键资源会优先准备。"
+    elif report_status == "needs_fix":
+        status = "fail"
+        message = f"资源预热清单有 {summary.get('missingFileEntries', 0)} 个缺失素材。"
+    elif report_status == "missing_manifest":
+        status = "fail"
+        message = "导出包缺少 Runtime 资源预热清单。"
+    else:
+        status = "warn"
+        message = str(report.get("recommendation") or "资源预热清单需要复核。")
+    return build_doctor_check("runtime_preload", "Runtime 资源预热", status, message, details=report)
 
 
 def build_report_doctor_check(check_id: str, label: str, report_builder, bundle_dir: Path) -> dict:
@@ -5180,6 +5281,7 @@ def build_native_runtime_doctor_report(bundle_dir: Path) -> dict:
     checks.append(run_doctor_callable_check("bundle_structure", "导出包结构", validate_bundle, bundle_dir))
     checks.append(build_release_check_doctor_check(bundle_dir))
     checks.append(build_vn_baseline_quality_doctor_check(bundle_dir))
+    checks.append(build_runtime_preload_doctor_check(bundle_dir))
     checks.append(
         run_doctor_with_temporary_home(
             lambda: build_report_doctor_check("title_screen", "标题页摘要", build_native_title_screen_report, bundle_dir)
@@ -15889,6 +15991,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--exercise-visual-effects", dest="exercise_visual_effects", help="检查原生 Runtime 高级演出配置能否规范化")
     parser.add_argument("--exercise-profile", dest="exercise_profile", help="检查原生 Runtime 玩家档案和续玩记录能否写入和读回")
     parser.add_argument("--describe-title-screen", dest="describe_title_screen", help="输出原生 Runtime 标题页配置摘要，不启动窗口")
+    parser.add_argument("--describe-runtime-preload", dest="describe_runtime_preload", help="输出 Runtime 资源预热清单诊断 JSON，不启动窗口")
     parser.add_argument("--describe-video-bridge", dest="describe_video_bridge", help="输出原生 Runtime 视频桥接摘要，不启动窗口")
     parser.add_argument("--describe-video-backends", dest="describe_video_backends", help="输出原生 Runtime 可选视频后端摘要，不启动窗口")
     parser.add_argument("--probe-video-preview", dest="probe_video_preview", help="输出原生 Runtime 可选视频帧 / 内嵌画面探针，不启动窗口")
@@ -16140,6 +16243,14 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         except NativeRuntimeError as error:
             print(f"Native runtime title screen description failed: {error}")
+            return 1
+
+    if args.describe_runtime_preload:
+        try:
+            report = print_native_runtime_preload_report(Path(args.describe_runtime_preload).resolve())
+            return 1 if report.get("status") in {"needs_fix", "missing_manifest"} else 0
+        except NativeRuntimeError as error:
+            print(f"Native runtime preload description failed: {error}")
             return 1
 
     if args.describe_video_bridge:

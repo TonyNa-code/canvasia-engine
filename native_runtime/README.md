@@ -75,6 +75,7 @@ python3 -m pip install -r requirements-native-runtime.txt
 
 ```bash
 python3 runtime_player.py --validate-bundle .
+python3 runtime_player.py --describe-runtime-preload .
 ```
 
 ## 维护者渲染 smoke
