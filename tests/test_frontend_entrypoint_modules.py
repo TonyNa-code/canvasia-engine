@@ -32,6 +32,7 @@ class FrontendEntrypointModuleTests(unittest.TestCase):
             "./modules/script_readability.js",
             "./modules/scene_pacing_advisor.js",
             "./modules/scene_polish.js",
+            "./modules/scene_mood_recipes.js",
             "./modules/script_voice.js",
             "./modules/voice_production_sheet.js",
             "./modules/screenplay_exporter.js",

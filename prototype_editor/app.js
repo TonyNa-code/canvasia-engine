@@ -68,6 +68,7 @@ const audioCueSheetPanelTools = window.CanvasiaEditorAudioCueSheetPanel;
 const stageDirectionSheetTools = window.CanvasiaEditorStageDirectionSheet;
 const presentationTimelineTools = window.CanvasiaEditorPresentationTimeline;
 const scenePolishTools = window.CanvasiaEditorScenePolish;
+const sceneMoodRecipeTools = window.CanvasiaEditorSceneMoodRecipes;
 const projectPolishTools = window.CanvasiaEditorProjectPolish;
 const projectPolishReceiptPanelTools = window.CanvasiaEditorProjectPolishReceiptPanel;
 const localizationCoverageTools = window.CanvasiaEditorLocalizationCoverage;
@@ -4515,6 +4516,11 @@ async function handleClick(event) {
 
   if (action === "apply-story-template-to-scene") {
     void applyStoryTemplateToScene(actionTarget.dataset.sceneId, actionTarget.dataset.templateId);
+    return;
+  }
+
+  if (action === "apply-scene-mood-recipe") {
+    void applySceneMoodRecipe(actionTarget.dataset.recipeId);
     return;
   }
 
@@ -34193,6 +34199,22 @@ function renderStorySceneOptimizerSection(scene, overview) {
   `;
 }
 
+function renderSceneMoodRecipePanel(scene, overview) {
+  if (!sceneMoodRecipeTools?.renderSceneMoodRecipePanel) {
+    return "";
+  }
+
+  return sceneMoodRecipeTools.renderSceneMoodRecipePanel(
+    scene,
+    {
+      overview,
+      bgmAssetId: getSafeAssetIdByType("bgm"),
+      selectedBlockId: state.selectedBlockId,
+    },
+    { escapeHtml }
+  );
+}
+
 function renderStorySceneStructurePanel(scene, routeNode = null) {
   const overview = buildStorySceneStructureOverview(scene, routeNode);
   const tone = getScenePlanningTone(overview);
@@ -34283,6 +34305,7 @@ function renderStorySceneStructurePanel(scene, routeNode = null) {
         </article>
       </div>
       ${renderStorySceneOptimizerSection(scene, overview)}
+      ${renderSceneMoodRecipePanel(scene, overview)}
       <article class="production-task-card story-structure-section story-structure-next-card is-good">
         <div class="production-task-top">
           <strong>下一步最值钱的优化</strong>
@@ -36827,6 +36850,38 @@ async function addBlock(blockType) {
 
   if (success && state.currentScreen !== "story") {
     switchScreen("story");
+  }
+}
+
+async function applySceneMoodRecipe(recipeId) {
+  const scene = getSelectedScene();
+  if (!scene || !sceneMoodRecipeTools?.applySceneMoodRecipe) {
+    showToast("先选中一个场景再套演出配方", "error");
+    return;
+  }
+
+  const result = sceneMoodRecipeTools.applySceneMoodRecipe(scene, recipeId, {
+    insertAfterBlockId: state.selectedBlockId,
+    bgmAssetId: getSafeAssetIdByType("bgm"),
+  });
+
+  if (!result.applied) {
+    showToast(result.summary ?? "这组演出配方暂时不能套用", "error");
+    setSaveStatus(result.summary ?? "演出配方没有套用", true);
+    return;
+  }
+
+  const firstBlockId = result.blocks[0]?.id ?? state.selectedBlockId;
+  const success = await persistScene(result.scene, {
+    selectedSceneId: result.scene.id,
+    selectedBlockId: firstBlockId,
+    previewSceneId: result.scene.id,
+    previewBlockIndex: result.insertIndex,
+    successMessage: result.summary,
+  });
+
+  if (success) {
+    showToast(result.summary);
   }
 }
 

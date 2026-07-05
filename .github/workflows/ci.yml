@@ -95,6 +95,7 @@ jobs:
             tests/test_frontend_runtime_audio_module.py \
             tests/test_frontend_runtime_preload_module.py \
             tests/test_frontend_runtime_capability_matrix_module.py \
+            tests/test_frontend_scene_mood_recipes_module.py \
             tests/test_frontend_scene_pacing_advisor_module.py \
             tests/test_frontend_scene_polish_module.py \
             tests/test_frontend_scene_production_board_module.py \
@@ -158,6 +159,7 @@ jobs:
           node --check prototype_editor/modules/route_analyzer.js
           node --check prototype_editor/modules/route_testing_report.js
           node --check prototype_editor/modules/runtime_capability_matrix.js
+          node --check prototype_editor/modules/scene_mood_recipes.js
           node --check prototype_editor/modules/scene_pacing_advisor.js
           node --check prototype_editor/modules/scene_polish.js
           node --check prototype_editor/modules/scene_production_board.js
@@ -232,6 +234,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_runtime_audio_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_preload_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_capability_matrix_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_scene_mood_recipes_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_scene_pacing_advisor_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_scene_polish_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_scene_production_board_module.py' -v
