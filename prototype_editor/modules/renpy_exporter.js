@@ -3,6 +3,8 @@
 
   const CHOICE_CONTINUE_TARGET = "__continue__";
   const BLOCK_TYPES_REQUIRING_COMMENT = Object.freeze([]);
+  const CONDITION_OPERATORS = Object.freeze(["==", "!=", ">=", "<=", ">", "<"]);
+  const CONDITION_OPERATOR_SET = Object.freeze(new Set(CONDITION_OPERATORS));
   const POSITION_XALIGN = Object.freeze({ left: 0.25, center: 0.5, right: 0.75 });
   const DEFAULT_CHARACTER_STAGE = Object.freeze({
     offsetX: 0,
@@ -1023,9 +1025,16 @@
     return [`${indent}$ ${getVariableIdentifier(variableId)} = ${renderRenpyLiteral(effect.value)}`];
   }
 
-  function normalizeConditionOperator(operator) {
+  function normalizeConditionOperator(operator, context = {}) {
     const safeOperator = cleanText(operator, "==");
-    return safeOperator === "=" ? "==" : safeOperator;
+    if (safeOperator === "=") {
+      return "==";
+    }
+    if (CONDITION_OPERATOR_SET.has(safeOperator)) {
+      return safeOperator;
+    }
+    pushWarning(context.warnings ?? [], "renpy_condition_operator_review", `条件运算符 ${safeOperator} 暂不支持，已按 == 导出。`, getWarningContext(context));
+    return "==";
   }
 
   function renderConditionRuleExpression(rule = {}, context = {}) {
@@ -1034,7 +1043,7 @@
       pushWarning(context.warnings ?? [], "renpy_condition_missing_variable", "条件判断缺少变量 ID，已按 True 导出。", getWarningContext(context));
       return "True";
     }
-    return `${getVariableIdentifier(variableId)} ${normalizeConditionOperator(rule.operator)} ${renderRenpyLiteral(rule.value)}`;
+    return `${getVariableIdentifier(variableId)} ${normalizeConditionOperator(rule.operator, context)} ${renderRenpyLiteral(rule.value)}`;
   }
 
   function renderConditionTargetLines(targetSceneId, context = {}, indent = "        ") {
@@ -1332,6 +1341,20 @@
     ].join("\n");
   }
 
+  function getRenpyExportContract() {
+    return {
+      formatVersion: 1,
+      backgroundTransitionDefaultMs: BACKGROUND_TRANSITION_DEFAULT_MS,
+      conditionOperators: [...CONDITION_OPERATORS],
+      characterMoveTransforms: { ...CHARACTER_MOVE_TRANSFORMS },
+      textSpeedCps: { ...TEXT_SPEED_CPS },
+      effectDurationSeconds: { ...EFFECT_DURATION_SECONDS },
+      cameraFocusKeys: Object.keys(CAMERA_FOCUS_XALIGN).sort(),
+      particlePresetKeys: Object.keys(PARTICLE_PRESET_DEFAULTS).sort(),
+      screenFilterPresetKeys: Object.keys(SCREEN_FILTER_PRESETS).sort(),
+    };
+  }
+
   global.CanvasiaEditorRenpyExporter = Object.freeze({
     CHOICE_CONTINUE_TARGET,
     normalizeIdentifier,
@@ -1339,6 +1362,7 @@
     buildRenpyDraftExport,
     getRenpyDraftStatusDigest,
     buildRenpyDraftManifest,
+    getRenpyExportContract,
     renderBlock,
   });
 })(typeof window !== "undefined" ? window : globalThis);

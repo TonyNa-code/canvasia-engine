@@ -57,7 +57,9 @@ class LocalVerifyToolTests(unittest.TestCase):
         self.assertTrue(any("test_editor_infrastructure.py" in command for command in commands))
         self.assertTrue(any("test_frontend_project_milestones_module.py" in command for command in commands))
         self.assertTrue(any("test_frontend_release_control_module.py" in command for command in commands))
+        self.assertTrue(any("test_renpy_export_contract.py" in command for command in commands))
         self.assertTrue(any("test_release_public_surface.py" in command for command in commands))
+        self.assertTrue(any("renpy_export.py" in command for command in commands))
         self.assertTrue(any("tools/ci/project_health.py template_project" in command for command in commands))
         self.assertTrue(any("test_browser_playwright_smoke.py" in command for command in commands))
 

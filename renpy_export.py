@@ -23,7 +23,8 @@ RENPY_PATH_SUFFIX_PATTERN = re.compile(
 RENPY_PLAYBACK_SPEC_PREFIX_PATTERN = re.compile(r"^<[^>]+>")
 
 COMMENT_ONLY_BLOCK_TYPES: set[str] = set()
-CONDITION_OPERATORS = {"==", "!=", ">=", "<=", ">", "<"}
+CONDITION_OPERATOR_ORDER = ["==", "!=", ">=", "<=", ">", "<"]
+CONDITION_OPERATORS = set(CONDITION_OPERATOR_ORDER)
 POSITION_XALIGN = {"left": 0.25, "center": 0.5, "right": 0.75}
 DEFAULT_CHARACTER_STAGE = {
     "offsetX": 0,
@@ -108,6 +109,21 @@ PARTICLE_PRESET_DEFAULTS = {
 PARTICLE_INTENSITY_MULTIPLIER = {"light": 0.62, "medium": 1.0, "heavy": 1.55}
 PARTICLE_SPEED_MULTIPLIER = {"slow": 0.72, "medium": 1.0, "fast": 1.35}
 PARTICLE_WIND_SPEED = {"left": -55.0, "still": 0.0, "right": 55.0}
+
+
+def get_renpy_export_contract() -> dict:
+    """Expose the shared export rule surface so tests can catch JS/Python drift."""
+    return {
+        "formatVersion": 1,
+        "backgroundTransitionDefaultMs": BACKGROUND_TRANSITION_DEFAULT_MS,
+        "conditionOperators": list(CONDITION_OPERATOR_ORDER),
+        "characterMoveTransforms": dict(CHARACTER_MOVE_TRANSFORMS),
+        "textSpeedCps": dict(TEXT_SPEED_CPS),
+        "effectDurationSeconds": dict(EFFECT_DURATION_SECONDS),
+        "cameraFocusKeys": sorted(CAMERA_FOCUS_XALIGN),
+        "particlePresetKeys": sorted(PARTICLE_PRESET_DEFAULTS),
+        "screenFilterPresetKeys": sorted(SCREEN_FILTER_PRESETS),
+    }
 
 
 def as_list(value: Any) -> list:

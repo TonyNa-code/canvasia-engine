@@ -31,6 +31,7 @@ PYTHON_SYNTAX_FILES = [
     "export_runtime_preload.py",
     "export_story_route_map.py",
     "export_unlockable_manifest.py",
+    "renpy_export.py",
     "run_editor.py",
     "native_runtime/runtime_player.py",
     "native_runtime/build_native_runtime_app.py",
@@ -164,6 +165,7 @@ def build_release_tooling_steps(python_executable: str) -> list[VerifyStep]:
         build_unittest_step("GitHub status tooling", "test_github_status_tool.py", "release-tests", python_executable),
         build_unittest_step("Local verify tooling", "test_local_verify_tool.py", "release-tests", python_executable),
         build_unittest_step("Project health tooling", "test_project_health_tool.py", "release-tests", python_executable),
+        build_unittest_step("Ren'Py export contract", "test_renpy_export_contract.py", "release-tests", python_executable),
         VerifyStep(
             name="Template project health check",
             category="release-tests",
