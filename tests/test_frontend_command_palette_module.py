@@ -64,19 +64,47 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
               needsStarterKit: false,
               errorCount: 0,
             }});
+            const projectReleaseReady = tools.buildCommandPaletteCommands({{
+              hasProject: true,
+              hasSelectedScene: true,
+              selectedSceneTitle: "雨夜教室",
+              selectedSceneBlockCount: 4,
+              selectedBlockType: "dialogue",
+              chapterCount: 1,
+              sceneCount: 1,
+              needsStarterKit: false,
+              errorCount: 0,
+              hasOneClickPolishReceipt: true,
+              oneClickPolishDigest: {{
+                canApply: true,
+                actionLabel: "一键发布前整理 8 项",
+                helperText: "会整理 2 个场景的长文本、演出和音频范围。",
+              }},
+            }});
+            const releaseNoProject = tools.buildReleaseWorkflowCommands({{ hasProject: false }});
+            const releaseWithoutReceipt = tools.buildReleaseWorkflowCommands({{
+              hasProject: true,
+              hasOneClickPolishReceipt: false,
+              oneClickPolishDigest: {{ canApply: false, actionLabel: "发布前整理已完成" }},
+            }});
             const storySearch = tools.filterCommandPaletteCommands(project, "剧情");
             const dialogueSearch = tools.filterCommandPaletteCommands(projectWithScene, "台词");
             const playableSearch = tools.filterCommandPaletteCommands(projectWithScene, "可试玩");
             const affectionSearch = tools.filterCommandPaletteCommands(projectWithScene, "好感度");
             const creditsSearch = tools.filterCommandPaletteCommands(projectWithScene, "片尾");
             const branchMergeSearch = tools.filterCommandPaletteCommands(projectWithScene, "汇合");
+            const releaseSearch = tools.filterCommandPaletteCommands(projectReleaseReady, "发布 整理");
             const exportCommand = project.find((command) => command.id === "export-web");
             const firstChapterCommand = project.find((command) => command.id === "create-first-chapter");
             const disabledDialogueCommand = project.find((command) => command.id === "insert-dialogue");
             const enabledDialogueCommand = projectWithScene.find((command) => command.id === "insert-dialogue");
             const templateCommand = projectWithScene.find((command) => command.id === "template-opening-intro");
             const playableTemplateCommand = projectWithScene.find((command) => command.id === "template-playable-scene");
+            const releaseOneClickCommand = projectReleaseReady.find((command) => command.id === "release-one-click-polish");
+            const releaseCopyCommand = projectReleaseReady.find((command) => command.id === "release-copy-polish-receipt");
+            const releaseExportCommand = projectReleaseReady.find((command) => command.id === "release-export-polish-receipt");
             process.stdout.write(JSON.stringify({{
+              keys: Object.keys(tools).sort(),
               noProjectStoryDisabled: noProject.find((command) => command.id === "screen-story").disabled,
               noProjectDemoDisabled: noProject.find((command) => command.id === "create-playable-demo").disabled,
               exportDisabled: exportCommand.disabled,
@@ -97,6 +125,17 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
               dialogueRecentIds: projectAfterDialogue.slice(4, 6).map((command) => command.id),
               dialogueRecentSections: projectAfterDialogue.slice(4, 6).map((command) => command.section),
               directRecommendedIds: tools.getRecommendedCommandIds({{ hasProject: true, hasSelectedScene: true, selectedBlockType: "dialogue", selectedSceneBlockCount: 2 }}),
+              noSceneRecommendedIds: tools.getRecommendedCommandIds({{ hasProject: true, hasSelectedScene: false }}),
+              releaseNoProjectDisabled: releaseNoProject.map((command) => command.disabled),
+              releaseWithoutReceipt: releaseWithoutReceipt.map((command) => [command.id, command.disabled, command.disabledReason]),
+              releaseOneClickTitle: releaseOneClickCommand.title,
+              releaseOneClickSubtitle: releaseOneClickCommand.subtitle,
+              releaseOneClickAction: releaseOneClickCommand.action,
+              releaseCopyDisabled: releaseCopyCommand.disabled,
+              releaseCopyAction: releaseCopyCommand.action,
+              releaseExportDisabled: releaseExportCommand.disabled,
+              releaseExportAction: releaseExportCommand.action,
+              releaseSearchIds: releaseSearch.map((command) => command.id),
               playableSearchIds: playableSearch.map((command) => command.id),
               affectionSearchIds: affectionSearch.map((command) => command.id),
               creditsSearchIds: creditsSearch.map((command) => command.id),
@@ -108,6 +147,7 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
         )
         payload = self.run_node(script)
 
+        self.assertIn("buildReleaseWorkflowCommands", payload["keys"])
         self.assertTrue(payload["noProjectStoryDisabled"])
         self.assertFalse(payload["noProjectDemoDisabled"])
         self.assertFalse(payload["exportDisabled"])
@@ -128,6 +168,18 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
         self.assertEqual(payload["dialogueRecentIds"], ["insert-video", "screen-preview"])
         self.assertEqual(payload["dialogueRecentSections"], ["最近", "最近"])
         self.assertEqual(payload["directRecommendedIds"][:2], ["insert-dialogue", "insert-choice"])
+        self.assertIn("release-one-click-polish", payload["noSceneRecommendedIds"])
+        self.assertTrue(all(payload["releaseNoProjectDisabled"]))
+        self.assertIn(["release-copy-polish-receipt", True, "先执行一次一键发布前整理后才有回执"], payload["releaseWithoutReceipt"])
+        self.assertEqual(payload["releaseOneClickTitle"], "一键发布前整理 8 项")
+        self.assertIn("会整理 2 个场景", payload["releaseOneClickSubtitle"])
+        self.assertEqual(payload["releaseOneClickAction"], "run-project-one-click-polish")
+        self.assertFalse(payload["releaseCopyDisabled"])
+        self.assertEqual(payload["releaseCopyAction"], "copy-project-one-click-polish-receipt-summary")
+        self.assertFalse(payload["releaseExportDisabled"])
+        self.assertEqual(payload["releaseExportAction"], "export-project-one-click-polish-receipt")
+        self.assertIn("release-one-click-polish", payload["releaseSearchIds"])
+        self.assertIn("release-export-polish-receipt", payload["releaseSearchIds"])
         self.assertIn("template-playable-scene", payload["playableSearchIds"])
         self.assertIn("template-affection-choice", payload["affectionSearchIds"])
         self.assertIn("template-ending-credits", payload["creditsSearchIds"])

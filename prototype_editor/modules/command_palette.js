@@ -303,6 +303,46 @@
     STORY_TEMPLATE_COMMANDS.map((command) => [command.templateId, command.id])
   );
 
+  const RELEASE_WORKFLOW_COMMANDS = [
+    {
+      id: "release-one-click-polish",
+      title: "一键发布前整理",
+      subtitle: "批量整理长文本、基础演出和音频范围，并生成整理回执",
+      action: "run-project-one-click-polish",
+      keywords: ["发布", "整理", "一键", "回执", "polish"],
+    },
+    {
+      id: "release-run-inspection",
+      title: "重新巡检项目",
+      subtitle: "刷新错误、提醒和发布前修复顺序",
+      action: "run-project-inspection",
+      keywords: ["巡检", "检查", "错误", "发布"],
+    },
+    {
+      id: "release-preview-regression",
+      title: "跑自动试玩回归",
+      subtitle: "按路线抽样检查可试玩流程",
+      action: "run-preview-regression",
+      keywords: ["试玩", "回归", "自动", "测试"],
+    },
+    {
+      id: "release-copy-polish-receipt",
+      title: "复制发布前整理摘要",
+      subtitle: "把最近一次整理回执复制到剪贴板",
+      action: "copy-project-one-click-polish-receipt-summary",
+      requiresPolishReceipt: true,
+      keywords: ["复制", "摘要", "整理", "回执"],
+    },
+    {
+      id: "release-export-polish-receipt",
+      title: "导出发布前整理回执",
+      subtitle: "保存最近一次发布前整理明细 Markdown",
+      action: "export-project-one-click-polish-receipt",
+      requiresPolishReceipt: true,
+      keywords: ["导出", "markdown", "整理", "回执"],
+    },
+  ];
+
   function normalizeSearchText(value) {
     return String(value ?? "").trim().toLowerCase();
   }
@@ -457,7 +497,7 @@
     }
 
     if (!hasSelectedScene) {
-      return ["create-first-chapter", "create-starter-kit", "screen-story", "open-beginner-tutorial"];
+      return ["create-first-chapter", "create-starter-kit", "screen-story", "release-one-click-polish", "open-beginner-tutorial"];
     }
 
     const templateRecommendationIds = getStoryTemplateRecommendationCommandIds(context);
@@ -539,7 +579,51 @@
       );
     }
 
-    return mergeRecommendedCommandIds(["insert-dialogue", "insert-narration"], templateRecommendationIds, ["insert-choice", "screen-preview"]);
+    return mergeRecommendedCommandIds(
+      ["insert-dialogue", "insert-narration"],
+      templateRecommendationIds,
+      ["insert-choice", "screen-preview", "release-one-click-polish"]
+    );
+  }
+
+  function buildReleaseWorkflowCommands(context = {}) {
+    const hasProject = Boolean(context.hasProject);
+    const hasPolishReceipt = Boolean(context.hasOneClickPolishReceipt);
+    const oneClickPolishDigest = context.oneClickPolishDigest ?? null;
+    const polishCanApply = oneClickPolishDigest ? Boolean(oneClickPolishDigest.canApply) : hasProject;
+    const disabledProjectTitle = "先新建或打开项目后可用";
+
+    return RELEASE_WORKFLOW_COMMANDS.map((command) => {
+      const requiresPolishReceipt = Boolean(command.requiresPolishReceipt);
+      const disabled =
+        !hasProject ||
+        (command.id === "release-one-click-polish" && !polishCanApply) ||
+        (command.id === "release-one-click-polish" && Boolean(context.projectOneClickPolishInFlight)) ||
+        (requiresPolishReceipt && !hasPolishReceipt);
+      const disabledReason = !hasProject
+        ? disabledProjectTitle
+        : command.id === "release-one-click-polish" && context.projectOneClickPolishInFlight
+          ? "发布前整理正在进行中"
+          : command.id === "release-one-click-polish" && !polishCanApply
+            ? "当前项目基础内容已经整理过，可直接巡检或试玩"
+            : requiresPolishReceipt && !hasPolishReceipt
+              ? "先执行一次一键发布前整理后才有回执"
+              : "";
+      return {
+        ...command,
+        section: "发布收尾",
+        title:
+          command.id === "release-one-click-polish" && oneClickPolishDigest?.actionLabel
+            ? oneClickPolishDigest.actionLabel
+            : command.title,
+        subtitle:
+          command.id === "release-one-click-polish" && oneClickPolishDigest?.helperText
+            ? oneClickPolishDigest.helperText
+            : command.subtitle,
+        disabled,
+        disabledReason,
+      };
+    });
   }
 
   function prioritizeRecommendedCommands(commands = [], context = {}) {
@@ -735,6 +819,7 @@
         disabledReason: !hasProject ? disabledProjectTitle : !needsStarterKit ? "当前项目暂不需要起步骨架" : "",
         keywords: ["角色", "背景", "bgm", "起步"],
       },
+      ...buildReleaseWorkflowCommands(context),
       {
         id: "export-web",
         title: "导出 Web 试玩包",
@@ -820,6 +905,7 @@
     filterCommandPaletteCommands,
     clampCommandPaletteIndex,
     renderCommandPaletteList,
+    buildReleaseWorkflowCommands,
     getRecommendedCommandIds,
     getStoryTemplateRecommendationCommandIds,
     prioritizeRecommendedCommands,
