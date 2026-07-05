@@ -64,6 +64,7 @@ class FrontendEntrypointModuleTests(unittest.TestCase):
             "./modules/visual_effects.js",
             "./modules/particle_effects.js",
             "./modules/project_history.js",
+            "./modules/asset_usage_map.js",
             "./modules/asset_catalog.js",
             "./modules/asset_footprint.js",
             "./modules/runtime_preload_budget.js",

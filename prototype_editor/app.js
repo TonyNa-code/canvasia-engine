@@ -61,6 +61,7 @@ const previewRegressionTools = window.CanvasiaEditorPreviewRegression;
 const playtestHandoffReportTools = window.CanvasiaEditorPlaytestHandoffReport;
 const choiceConsequenceSheetTools = window.CanvasiaEditorChoiceConsequenceSheet;
 const variableInfluenceSheetTools = window.CanvasiaEditorVariableInfluenceSheet;
+const assetUsageMapTools = window.CanvasiaEditorAssetUsageMap;
 const assetDependencySheetTools = window.CanvasiaEditorAssetDependencySheet;
 const assetRightsSheetTools = window.CanvasiaEditorAssetRightsSheet;
 const audioCueSheetTools = window.CanvasiaEditorAudioCueSheet;
@@ -1297,7 +1298,8 @@ async function loadProjectData() {
     });
   });
 
-  const assetUsage = buildAssetUsageMap({
+  const assetUsage = assetUsageMapTools.buildAssetUsageMap({
+    project,
     chapters,
     characters,
     charactersById,
@@ -43864,7 +43866,8 @@ function applySceneToLocalState(updatedScene) {
   }
 
   state.data.scenesById.set(updatedScene.id, fullScene);
-  state.data.assetUsage = buildAssetUsageMap({
+  state.data.assetUsage = assetUsageMapTools.buildAssetUsageMap({
+    project: state.data.project,
     chapters: state.data.chapters,
     characters: state.data.characters,
     charactersById: state.data.charactersById,
@@ -48721,105 +48724,6 @@ function computeVisualState(scene, blockIndex) {
   );
 
   return visual;
-}
-
-function buildAssetUsageMap({ chapters, characters, charactersById }) {
-  const usage = new Map();
-
-  function addUsage(assetId, entry) {
-    if (!assetId) {
-      return;
-    }
-    const list = usage.get(assetId) ?? [];
-    list.push(entry);
-    usage.set(assetId, list);
-  }
-
-  for (const character of characters ?? []) {
-    addUsage(character.defaultSpriteId, {
-      kind: "character",
-      characterId: character.id,
-      label: `角色默认立绘：${character.displayName}`,
-      meta: "角色资料页 / 默认立绘",
-    });
-    const presentation = getCharacterPresentation(character);
-    addUsage(presentation.fallbackSpriteAssetId, {
-      kind: "character",
-      characterId: character.id,
-      label: `角色高级表现兜底：${character.displayName}`,
-      meta: "角色资料页 / 高级表现",
-    });
-    addUsage(presentation.live2d.modelAssetId, {
-      kind: "character",
-      characterId: character.id,
-      label: `角色 Live2D 模型：${character.displayName}`,
-      meta: "角色资料页 / 高级表现",
-    });
-    addUsage(presentation.model3d.modelAssetId, {
-      kind: "character",
-      characterId: character.id,
-      label: `角色 3D 模型：${character.displayName}`,
-      meta: "角色资料页 / 高级表现",
-    });
-    for (const expression of character.expressions ?? []) {
-      addUsage(expression.spriteAssetId, {
-        kind: "character",
-        characterId: character.id,
-        label: `角色表情：${character.displayName} / ${expression.name}`,
-        meta: "角色资料页 / 表情设置",
-      });
-      (expression.layerAssetIds ?? []).forEach((layerAssetId) => {
-        addUsage(layerAssetId, {
-          kind: "character",
-          characterId: character.id,
-          label: `角色差分图层：${character.displayName} / ${expression.name}`,
-          meta: "角色资料页 / 表情差分",
-        });
-      });
-    }
-  }
-
-  chapters.forEach((chapter) => {
-    (chapter.scenes ?? []).forEach((scene) => {
-      (scene.blocks ?? []).forEach((block, blockIndex) => {
-        if (block.assetId) {
-          addUsage(block.assetId, {
-            kind: "story",
-            sceneId: scene.id,
-            blockId: block.id,
-            label: `场景：${scene.name} / ${BLOCK_LABELS[block.type] ?? block.type}`,
-            meta: `${chapter.name} · 第 ${blockIndex + 1} 张卡片`,
-          });
-        }
-        if (block.voiceAssetId) {
-          addUsage(block.voiceAssetId, {
-            kind: "story",
-            sceneId: scene.id,
-            blockId: block.id,
-            label: `场景：${scene.name} / ${BLOCK_LABELS[block.type] ?? "正文"}语音`,
-            meta: `${chapter.name} · 第 ${blockIndex + 1} 张卡片`,
-          });
-        }
-        if (block.type === "dialogue" || block.type === "character_show") {
-          const characterId = block.speakerId ?? block.characterId;
-          const expressionId = block.expressionId;
-          const character = charactersById.get(characterId);
-          const expression = character?.expressions?.find((item) => item.id === expressionId);
-          addUsage(expression?.spriteAssetId, {
-            kind: "story",
-            sceneId: scene.id,
-            blockId: block.id,
-            label: `场景：${scene.name} / ${character?.displayName ?? characterId} ${
-              expression?.name ?? ""
-            }`.trim(),
-            meta: `${chapter.name} · 第 ${blockIndex + 1} 张卡片`,
-          });
-        }
-      });
-    });
-  });
-
-  return usage;
 }
 
 function runValidation(data) {
