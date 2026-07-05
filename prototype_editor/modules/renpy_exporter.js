@@ -9,6 +9,29 @@
     "camera_zoom",
     "camera_pan",
   ]);
+  const POSITION_XALIGN = Object.freeze({ left: 0.25, center: 0.5, right: 0.75 });
+  const DEFAULT_CHARACTER_STAGE = Object.freeze({
+    offsetX: 0,
+    offsetY: 0,
+    scale: 100,
+    opacity: 100,
+    layer: 0,
+    flipX: false,
+  });
+  const CHARACTER_SHOW_TRANSITIONS = Object.freeze({
+    fade: "dissolve",
+    dissolve: "dissolve",
+    slide_left: "moveinleft",
+    slide_right: "moveinright",
+    rise: "moveinbottom",
+  });
+  const CHARACTER_HIDE_TRANSITIONS = Object.freeze({
+    fade: "dissolve",
+    dissolve: "dissolve",
+    slide_left: "moveoutleft",
+    slide_right: "moveoutright",
+    rise: "moveoutbottom",
+  });
 
   function toArray(value) {
     return Array.isArray(value) ? value : [];
@@ -191,6 +214,145 @@
   function secondsFromMs(ms) {
     const value = Number(ms ?? 0);
     return Number.isFinite(value) && value > 0 ? Number((value / 1000).toFixed(2)) : 0;
+  }
+
+  function clampNumber(value, min, max) {
+    return Math.min(Math.max(value, min), max);
+  }
+
+  function getSafeStageNumber(value, fallback, min, max) {
+    const number = Number(value ?? fallback);
+    return clampNumber(Number.isFinite(number) ? number : fallback, min, max);
+  }
+
+  function getSafeStageBoolean(value, fallback = false) {
+    if (typeof value === "boolean") {
+      return value;
+    }
+    if (typeof value === "string") {
+      const normalized = value.trim().toLowerCase();
+      if (["true", "1", "yes", "on"].includes(normalized)) {
+        return true;
+      }
+      if (["false", "0", "no", "off", ""].includes(normalized)) {
+        return false;
+      }
+    }
+    return fallback;
+  }
+
+  function getSafePosition(position) {
+    const safePosition = cleanText(position, "center");
+    return Object.hasOwn(POSITION_XALIGN, safePosition) ? safePosition : "center";
+  }
+
+  function getSafeCharacterStage(stageSource = {}) {
+    const raw = stageSource && typeof stageSource === "object" ? stageSource : {};
+    return {
+      offsetX: Math.round(getSafeStageNumber(raw.offsetX, DEFAULT_CHARACTER_STAGE.offsetX, -60, 60)),
+      offsetY: Math.round(getSafeStageNumber(raw.offsetY, DEFAULT_CHARACTER_STAGE.offsetY, -45, 45)),
+      scale: Math.round(getSafeStageNumber(raw.scale, DEFAULT_CHARACTER_STAGE.scale, 45, 220)),
+      opacity: Math.round(getSafeStageNumber(raw.opacity, DEFAULT_CHARACTER_STAGE.opacity, 0, 100)),
+      layer: Math.round(getSafeStageNumber(raw.layer, DEFAULT_CHARACTER_STAGE.layer, -10, 10)),
+      flipX: getSafeStageBoolean(raw.flipX, DEFAULT_CHARACTER_STAGE.flipX),
+    };
+  }
+
+  function hasCustomCharacterStage(stageSource = {}) {
+    const stage = getSafeCharacterStage(stageSource);
+    return Object.entries(DEFAULT_CHARACTER_STAGE).some(([key, value]) => stage[key] !== value);
+  }
+
+  function formatRenpyFloat(value, digits = 3) {
+    return Number(value.toFixed(digits)).toString();
+  }
+
+  function getCharacterStageTransformName(sceneId, sceneMap, blockIndex) {
+    return normalizeIdentifier(`canvasia_stage_${getSceneLabel(sceneId, sceneMap)}_${Number(blockIndex ?? 0) + 1}`, "canvasia_stage");
+  }
+
+  function getCharacterStageTransformDefinition(block = {}, context = {}) {
+    const stage = getSafeCharacterStage(block.stage);
+    const position = getSafePosition(block.position);
+    const name = getCharacterStageTransformName(context.sceneId, context.sceneMap, context.blockIndex);
+    const xalign = clampNumber((POSITION_XALIGN[position] ?? POSITION_XALIGN.center) + stage.offsetX / 100, -0.2, 1.2);
+    const yalign = clampNumber(1 + stage.offsetY / 100, -0.2, 1.2);
+    const zoom = stage.scale / 100;
+    const xzoom = stage.flipX ? -zoom : zoom;
+    return [
+      `transform ${name}:`,
+      `    xalign ${formatRenpyFloat(xalign)}`,
+      `    yalign ${formatRenpyFloat(yalign)}`,
+      `    xzoom ${formatRenpyFloat(xzoom)}`,
+      `    yzoom ${formatRenpyFloat(zoom)}`,
+      `    alpha ${formatRenpyFloat(stage.opacity / 100, 2)}`,
+    ];
+  }
+
+  function buildCharacterStageTransformDefinitions(sceneRecords = [], sceneMap = new Map()) {
+    const definitions = [];
+    sceneRecords.forEach((record, sceneIndex) => {
+      const scene = record.scene ?? {};
+      const sceneId = cleanText(scene.id, `scene_${sceneIndex + 1}`);
+      toArray(scene.blocks).forEach((block, blockIndex) => {
+        if (cleanText(block?.type) !== "character_show" || !hasCustomCharacterStage(block?.stage)) {
+          return;
+        }
+        definitions.push(...getCharacterStageTransformDefinition(block, { sceneId, sceneMap, blockIndex }), "");
+      });
+    });
+    return definitions;
+  }
+
+  function getTransitionDurationSeconds(block = {}) {
+    const value = Number(block.transitionDurationMs ?? 600);
+    const ms = Number.isFinite(value) ? clampNumber(value, 0, 5000) : 600;
+    return Number((ms / 1000).toFixed(2));
+  }
+
+  function getCharacterTransitionExpression(block = {}, context = {}, direction = "show") {
+    const transition = cleanText(block.transition, "fade");
+    if (transition === "none" || getTransitionDurationSeconds(block) <= 0) {
+      return "";
+    }
+    const seconds = getTransitionDurationSeconds(block);
+    if (["fade", "dissolve"].includes(transition)) {
+      return `Dissolve(${seconds})`;
+    }
+    if (transition === "pop") {
+      pushWarning(context.warnings ?? [], "renpy_character_transition_review", "轻微弹出转场已按淡入导出，请在 Ren'Py 中按需要替换为自定义 ATL。", getWarningContext(context));
+      return `Dissolve(${seconds})`;
+    }
+    const table = direction === "hide" ? CHARACTER_HIDE_TRANSITIONS : CHARACTER_SHOW_TRANSITIONS;
+    if (table[transition]) {
+      if (seconds !== 0.6) {
+        pushWarning(context.warnings ?? [], "renpy_character_transition_timing_review", `${transition} 转场时长需要在 Ren'Py 中复核。`, getWarningContext(context));
+      }
+      return table[transition];
+    }
+    pushWarning(context.warnings ?? [], "renpy_character_transition_review", `角色转场 ${transition} 暂未精确映射，已按淡入导出。`, getWarningContext(context));
+    return `Dissolve(${seconds})`;
+  }
+
+  function renderCharacterShowBlock(block = {}, context = {}) {
+    const characterId = cleanText(block.characterId, "character");
+    const expression = cleanText(block.expressionId);
+    const stage = getSafeCharacterStage(block.stage);
+    const customStage = hasCustomCharacterStage(stage);
+    const atTarget = customStage
+      ? getCharacterStageTransformName(context.sceneId, context.sceneMap, context.blockIndex)
+      : getSafePosition(block.position);
+    const transition = getCharacterTransitionExpression(block, context, "show");
+    const expressionSuffix = expression ? ` ${normalizeIdentifier(expression, "expr")}` : "";
+    const zorderSuffix = customStage && stage.layer ? ` zorder ${20 + stage.layer}` : "";
+    return [
+      `    show ${normalizeIdentifier(characterId, "character")}${expressionSuffix} at ${atTarget}${zorderSuffix}${transition ? ` with ${transition}` : ""}`,
+    ];
+  }
+
+  function renderCharacterHideBlock(block = {}, context = {}) {
+    const transition = getCharacterTransitionExpression(block, context, "hide");
+    return [`    hide ${normalizeIdentifier(block.characterId, "character")}${transition ? ` with ${transition}` : ""}`];
   }
 
   function getBlockText(block = {}) {
@@ -432,13 +594,10 @@
       return [`    scene ${normalizeIdentifier(assetId, "background")} with fade`];
     }
     if (type === "character_show") {
-      const characterId = cleanText(block.characterId, "character");
-      const expression = cleanText(block.expressionId);
-      const position = cleanText(block.position, "center");
-      return [`    show ${normalizeIdentifier(characterId, "character")}${expression ? ` ${normalizeIdentifier(expression, "expr")}` : ""} at ${position} with dissolve`];
+      return renderCharacterShowBlock(block, context);
     }
     if (type === "character_hide") {
-      return [`    hide ${normalizeIdentifier(block.characterId, "character")} with dissolve`];
+      return renderCharacterHideBlock(block, context);
     }
     if (type === "music_play") {
       const path = getAssetPath(assetMap, block.assetId);
@@ -514,12 +673,15 @@
     const sceneMap = buildSceneMap(data);
     const sceneRecords = getSceneRecords(data);
     const warnings = [];
+    const characterStageTransforms = buildCharacterStageTransformDefinitions(sceneRecords, sceneMap);
     const lines = [
       `# ${getProjectTitle(data, options)} - Canvasia Ren'Py draft`,
       "# Generated as a migration-friendly draft. Review labels, assets, and custom effects before shipping.",
       "",
       ...buildImageDefinitions(assetMap),
       "",
+      ...characterStageTransforms,
+      ...(characterStageTransforms.length ? [""] : []),
       ...buildCharacterDefinitions(characterMap),
       "",
       ...buildVariableDefinitions(data),

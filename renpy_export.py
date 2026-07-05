@@ -29,6 +29,29 @@ COMMENT_ONLY_BLOCK_TYPES = {
     "camera_pan",
 }
 CONDITION_OPERATORS = {"==", "!=", ">=", "<=", ">", "<"}
+POSITION_XALIGN = {"left": 0.25, "center": 0.5, "right": 0.75}
+DEFAULT_CHARACTER_STAGE = {
+    "offsetX": 0,
+    "offsetY": 0,
+    "scale": 100,
+    "opacity": 100,
+    "layer": 0,
+    "flipX": False,
+}
+CHARACTER_SHOW_TRANSITIONS = {
+    "fade": "dissolve",
+    "dissolve": "dissolve",
+    "slide_left": "moveinleft",
+    "slide_right": "moveinright",
+    "rise": "moveinbottom",
+}
+CHARACTER_HIDE_TRANSITIONS = {
+    "fade": "dissolve",
+    "dissolve": "dissolve",
+    "slide_left": "moveoutleft",
+    "slide_right": "moveoutright",
+    "rise": "moveoutbottom",
+}
 
 
 def as_list(value: Any) -> list:
@@ -91,6 +114,147 @@ def number_to_renpy_delta(value: Any, warnings: list[dict], variable_id: str, **
     if delta.is_integer():
         return str(int(delta))
     return f"{delta:g}"
+
+
+def clamp_number(value: float, minimum: float, maximum: float) -> float:
+    return min(max(value, minimum), maximum)
+
+
+def get_safe_stage_number(raw: dict, key: str, fallback: float, minimum: float, maximum: float) -> float:
+    try:
+        value = float(raw.get(key, fallback))
+    except (TypeError, ValueError):
+        value = fallback
+    return clamp_number(value, minimum, maximum)
+
+
+def get_safe_stage_bool(raw: dict, key: str, fallback: bool = False) -> bool:
+    value = raw.get(key, fallback)
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"true", "1", "yes", "on"}:
+            return True
+        if normalized in {"false", "0", "no", "off", ""}:
+            return False
+    return fallback
+
+
+def get_safe_position(value: Any) -> str:
+    position = clean_text(value, "center")
+    return position if position in POSITION_XALIGN else "center"
+
+
+def get_safe_character_stage(source: Any) -> dict:
+    raw = source if isinstance(source, dict) else {}
+    return {
+        "offsetX": round(get_safe_stage_number(raw, "offsetX", 0, -60, 60)),
+        "offsetY": round(get_safe_stage_number(raw, "offsetY", 0, -45, 45)),
+        "scale": round(get_safe_stage_number(raw, "scale", 100, 45, 220)),
+        "opacity": round(get_safe_stage_number(raw, "opacity", 100, 0, 100)),
+        "layer": round(get_safe_stage_number(raw, "layer", 0, -10, 10)),
+        "flipX": get_safe_stage_bool(raw, "flipX"),
+    }
+
+
+def has_custom_character_stage(source: Any) -> bool:
+    stage = get_safe_character_stage(source)
+    return any(stage[key] != value for key, value in DEFAULT_CHARACTER_STAGE.items())
+
+
+def format_renpy_float(value: float, digits: int = 3) -> str:
+    return f"{value:.{digits}f}".rstrip("0").rstrip(".") or "0"
+
+
+def get_character_stage_transform_name(scene_label_map: dict[str, str], scene_id: Any, block_index: Any) -> str:
+    label = get_scene_label(scene_label_map, scene_id)
+    return normalize_identifier(f"canvasia_stage_{label}_{int(block_index or 0) + 1}", "canvasia_stage")
+
+
+def render_character_stage_transform_definition(block: dict, context: dict) -> list[str]:
+    stage = get_safe_character_stage(block.get("stage"))
+    position = get_safe_position(block.get("position"))
+    transform_name = get_character_stage_transform_name(context["sceneLabelMap"], context.get("sceneId"), context.get("blockIndex"))
+    xalign = clamp_number(POSITION_XALIGN[position] + stage["offsetX"] / 100, -0.2, 1.2)
+    yalign = clamp_number(1 + stage["offsetY"] / 100, -0.2, 1.2)
+    zoom = stage["scale"] / 100
+    xzoom = -zoom if stage["flipX"] else zoom
+    return [
+        f"transform {transform_name}:",
+        f"    xalign {format_renpy_float(xalign)}",
+        f"    yalign {format_renpy_float(yalign)}",
+        f"    xzoom {format_renpy_float(xzoom)}",
+        f"    yzoom {format_renpy_float(zoom)}",
+        f"    alpha {format_renpy_float(stage['opacity'] / 100, 2)}",
+    ]
+
+
+def build_character_stage_transform_definitions(scene_records: list[dict], scene_label_map: dict[str, str]) -> list[str]:
+    lines: list[str] = []
+    for record in scene_records:
+        scene = record["scene"]
+        scene_id = record["sceneId"]
+        for block_index, block in enumerate(as_list(scene.get("blocks"))):
+            if clean_text(block.get("type")) != "character_show" or not has_custom_character_stage(block.get("stage")):
+                continue
+            lines.extend(
+                render_character_stage_transform_definition(
+                    block,
+                    {
+                        "sceneLabelMap": scene_label_map,
+                        "sceneId": scene_id,
+                        "blockIndex": block_index,
+                    },
+                )
+            )
+            lines.append("")
+    return lines
+
+
+def get_transition_duration_seconds(block: dict) -> float:
+    try:
+        ms = float(block.get("transitionDurationMs", 600))
+    except (TypeError, ValueError):
+        ms = 600
+    return round(clamp_number(ms, 0, 5000) / 1000, 2)
+
+
+def get_character_transition_expression(block: dict, context: dict, direction: str = "show") -> str:
+    transition = clean_text(block.get("transition"), "fade")
+    seconds = get_transition_duration_seconds(block)
+    if transition == "none" or seconds <= 0:
+        return ""
+    if transition in {"fade", "dissolve"}:
+        return f"Dissolve({seconds:g})"
+    if transition == "pop":
+        add_warning(
+            context["warnings"],
+            "renpy_character_transition_review",
+            "轻微弹出转场已按淡入导出，请在 Ren'Py 中按需要替换为自定义 ATL。",
+            sceneId=context.get("sceneId"),
+            blockIndex=context.get("blockIndex"),
+        )
+        return f"Dissolve({seconds:g})"
+    transition_map = CHARACTER_HIDE_TRANSITIONS if direction == "hide" else CHARACTER_SHOW_TRANSITIONS
+    if transition in transition_map:
+        if seconds != 0.6:
+            add_warning(
+                context["warnings"],
+                "renpy_character_transition_timing_review",
+                f"{transition} 转场时长需要在 Ren'Py 中复核。",
+                sceneId=context.get("sceneId"),
+                blockIndex=context.get("blockIndex"),
+            )
+        return transition_map[transition]
+    add_warning(
+        context["warnings"],
+        "renpy_character_transition_review",
+        f"角色转场 {transition} 暂未精确映射，已按淡入导出。",
+        sceneId=context.get("sceneId"),
+        blockIndex=context.get("blockIndex"),
+    )
+    return f"Dissolve({seconds:g})"
 
 
 def build_asset_map(assets_doc: dict | None) -> dict[str, dict]:
@@ -419,6 +583,29 @@ def render_credits_block(block: dict) -> list[str]:
     ]
 
 
+def render_character_show_block(block: dict, context: dict) -> list[str]:
+    character_id = clean_text(block.get("characterId"), "character")
+    expression_id = clean_text(block.get("expressionId"))
+    stage = get_safe_character_stage(block.get("stage"))
+    custom_stage = has_custom_character_stage(stage)
+    at_target = (
+        get_character_stage_transform_name(context["sceneLabelMap"], context.get("sceneId"), context.get("blockIndex"))
+        if custom_stage
+        else get_safe_position(block.get("position"))
+    )
+    transition = get_character_transition_expression(block, context, "show")
+    expression = f" {normalize_identifier(expression_id, 'expr')}" if expression_id else ""
+    zorder = f" zorder {20 + stage['layer']}" if custom_stage and stage["layer"] else ""
+    transition_suffix = f" with {transition}" if transition else ""
+    return [f"    show {normalize_identifier(character_id, 'character')}{expression} at {at_target}{zorder}{transition_suffix}"]
+
+
+def render_character_hide_block(block: dict, context: dict) -> list[str]:
+    transition = get_character_transition_expression(block, context, "hide")
+    transition_suffix = f" with {transition}" if transition else ""
+    return [f"    hide {normalize_identifier(block.get('characterId'), 'character')}{transition_suffix}"]
+
+
 def render_story_block(block: dict, context: dict) -> list[str]:
     block_type = clean_text(block.get("type"), "unknown")
     asset_map = context["assetMap"]
@@ -432,13 +619,9 @@ def render_story_block(block: dict, context: dict) -> list[str]:
         asset_id = clean_text(block.get("assetId"), "missing_background")
         return [f"    scene {normalize_identifier(asset_id, 'background')} with fade"]
     if block_type == "character_show":
-        character_id = clean_text(block.get("characterId"), "character")
-        expression_id = clean_text(block.get("expressionId"))
-        position = clean_text(block.get("position"), "center")
-        expression = f" {normalize_identifier(expression_id, 'expr')}" if expression_id else ""
-        return [f"    show {normalize_identifier(character_id, 'character')}{expression} at {position} with dissolve"]
+        return render_character_show_block(block, context)
     if block_type == "character_hide":
-        return [f"    hide {normalize_identifier(block.get('characterId'), 'character')} with dissolve"]
+        return render_character_hide_block(block, context)
     if block_type == "music_play":
         fade_in = seconds_from_ms(block.get("fadeInMs"))
         fade_suffix = f" fadein {fade_in:g}" if fade_in else ""
@@ -501,6 +684,7 @@ def build_renpy_draft_export(bundle: dict, assets_doc: dict | None = None) -> di
     scene_label_map = {record["sceneId"]: record["sceneLabel"] for record in scene_records}
     warnings: list[dict] = []
     sprite_definitions, _defined_sprites = build_sprite_definitions(character_map, asset_map, warnings)
+    character_stage_transforms = build_character_stage_transform_definitions(scene_records, scene_label_map)
 
     lines = [
         f"# {clean_text(project.get('title'), 'Canvasia Project')} - Canvasia Ren'Py Starter",
@@ -511,6 +695,8 @@ def build_renpy_draft_export(bundle: dict, assets_doc: dict | None = None) -> di
         *build_asset_image_definitions(asset_map),
         *sprite_definitions,
         "",
+        *character_stage_transforms,
+        *([""] if character_stage_transforms else []),
         *build_character_definitions(character_map),
         "",
     ]

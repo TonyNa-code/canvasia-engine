@@ -683,7 +683,10 @@ class RunEditorSmokeTests(unittest.TestCase):
                     "type": "character_show",
                     "characterId": "heroine",
                     "expressionId": "expr_default",
-                    "position": "center",
+                    "position": "right",
+                    "transition": "fade",
+                    "transitionDurationMs": 720,
+                    "stage": {"offsetX": -8, "offsetY": -5, "scale": 118, "opacity": 90, "layer": 2, "flipX": True},
                 },
                 {
                     "id": "line",
@@ -771,6 +774,13 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertIn(f"image {background_asset['id']}", script)
         self.assertIn("image heroine expr_default", script)
         self.assertIn(f"label {scene['id']}:", script)
+        self.assertIn(f"transform canvasia_stage_{scene['id']}_3:", script)
+        self.assertIn("    xalign 0.67", script)
+        self.assertIn("    yalign 0.95", script)
+        self.assertIn("    xzoom -1.18", script)
+        self.assertIn("    yzoom 1.18", script)
+        self.assertIn("    alpha 0.9", script)
+        self.assertIn(f"show heroine expr_default at canvasia_stage_{scene['id']}_3 zorder 22 with Dissolve(0.72)", script)
         self.assertIn('play music "assets/bgm/', script)
         self.assertIn('voice "assets/voice/', script)
         self.assertIn('heroine "Welcome back."', script)

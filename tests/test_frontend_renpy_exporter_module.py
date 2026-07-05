@@ -48,7 +48,15 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
                       blocks: [
                         {{ type: "background", assetId: "bg_rooftop" }},
                         {{ type: "music_play", assetId: "bgm_piano", fadeInMs: 800 }},
-                        {{ type: "character_show", characterId: "yuna", expressionId: "smile", position: "center" }},
+                        {{
+                          type: "character_show",
+                          characterId: "yuna",
+                          expressionId: "smile",
+                          position: "right",
+                          transition: "fade",
+                          transitionDurationMs: 720,
+                          stage: {{ offsetX: -8, offsetY: -5, scale: 118, opacity: 90, layer: 2, flipX: true }},
+                        }},
                         {{ type: "dialogue", speakerId: "yuna", text: "欢迎回来。", voiceAssetId: "voice_yuna_001" }},
                         {{ type: "narration", text: "风吹过屋顶。" }},
                         {{
@@ -124,7 +132,13 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
         self.assertIn("label scene_open:", payload["draft"]["script"])
         self.assertIn("scene bg_rooftop with fade", payload["draft"]["script"])
         self.assertIn('play music "bgm/piano.ogg" fadein 0.8', payload["draft"]["script"])
-        self.assertIn("show yuna smile at center with dissolve", payload["draft"]["script"])
+        self.assertIn("transform canvasia_stage_scene_open_3:", payload["draft"]["script"])
+        self.assertIn("    xalign 0.67", payload["draft"]["script"])
+        self.assertIn("    yalign 0.95", payload["draft"]["script"])
+        self.assertIn("    xzoom -1.18", payload["draft"]["script"])
+        self.assertIn("    yzoom 1.18", payload["draft"]["script"])
+        self.assertIn("    alpha 0.9", payload["draft"]["script"])
+        self.assertIn("show yuna smile at canvasia_stage_scene_open_3 zorder 22 with Dissolve(0.72)", payload["draft"]["script"])
         self.assertIn('voice "voice/yuna_001.ogg"', payload["draft"]["script"])
         self.assertIn('yuna "欢迎回来。"', payload["draft"]["script"])
         self.assertIn("menu:", payload["draft"]["script"])
