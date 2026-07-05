@@ -28,6 +28,69 @@
     };
   }
 
+  function hasObjectKey(source, key) {
+    return Boolean(source && typeof source === "object" && Object.prototype.hasOwnProperty.call(source, key));
+  }
+
+  function getProductionBacklogSignal(context = {}) {
+    const backlog = context.productionBacklog && typeof context.productionBacklog === "object" ? context.productionBacklog : {};
+    const summary =
+      context.productionBacklogSummary && typeof context.productionBacklogSummary === "object"
+        ? context.productionBacklogSummary
+        : backlog.summary && typeof backlog.summary === "object"
+          ? backlog.summary
+          : {};
+    const nextTask =
+      context.productionBacklogNextTask && typeof context.productionBacklogNextTask === "object"
+        ? context.productionBacklogNextTask
+        : backlog.nextTask && typeof backlog.nextTask === "object"
+          ? backlog.nextTask
+          : null;
+    const hasSignal =
+      hasObjectKey(summary, "taskCount") ||
+      hasObjectKey(summary, "blockerCount") ||
+      hasObjectKey(summary, "warningCount") ||
+      hasObjectKey(summary, "tipCount");
+
+    return {
+      available: hasSignal,
+      taskCount: hasSignal ? toCount(summary.taskCount) : 0,
+      blockerCount: hasSignal ? toCount(summary.blockerCount) : 0,
+      warningCount: hasSignal ? toCount(summary.warningCount) : 0,
+      tipCount: hasSignal ? toCount(summary.tipCount) : 0,
+      readinessPercent: hasSignal ? clampPercent(summary.readinessPercent ?? 100) : 100,
+      topAreaLabel: String(summary.topAreaLabel ?? ""),
+      nextTask,
+    };
+  }
+
+  function buildProductionBacklogDetail(signal = {}) {
+    if (!signal.available) {
+      return "生产待办尚未生成";
+    }
+    if (signal.taskCount <= 0) {
+      return "生产待办已清空";
+    }
+    return `${signal.blockerCount} 个先修 / ${signal.warningCount} 个优先 / ${signal.tipCount} 个润色`;
+  }
+
+  function buildProductionBacklogAction(signal = {}, fallbackAction = null) {
+    const taskAction = signal.nextTask?.action;
+    if (taskAction && typeof taskAction === "object") {
+      return createAction(taskAction.label || "处理下一项待办", taskAction.action || "switch-screen", {
+        href: taskAction.href,
+        screen: taskAction.screen,
+        sceneId: taskAction.sceneId,
+        blockId: taskAction.blockId,
+        characterId: taskAction.characterId,
+        chapterId: taskAction.chapterId,
+        assetId: taskAction.assetId,
+        dataset: taskAction.dataset,
+      });
+    }
+    return fallbackAction;
+  }
+
   function createCheck({ id, label, done, detail, missing, weight = 1, action = null }) {
     return {
       id,
@@ -139,6 +202,7 @@
     const effectCoverage = getPercent(scenesWithEffects, totalScenes);
     const voiceCoverage = totalDialogueCount > 0 ? getPercent(voicedDialogueCount, totalDialogueCount) : 100;
     const assetCoverage = totalAssetCount > 0 ? getPercent(readyAssetCount, totalAssetCount) : 0;
+    const productionBacklogSignal = getProductionBacklogSignal(context);
 
     const actions = {
       createChapter: createAction("创建第一章", "create-first-chapter"),
@@ -155,6 +219,7 @@
       regression: createAction("运行回归试玩", "run-preview-regression"),
       exportWeb: createAction("导出网页包", "export-build", { dataset: { "export-target": "web" } }),
     };
+    actions.productionBacklog = buildProductionBacklogAction(productionBacklogSignal, actions.inspection);
 
     const milestones = [
       createMilestone({
@@ -288,6 +353,17 @@
             missing: "把明显提醒项降到 5 项以内。",
             action: actions.inspection,
           }),
+          createCheck({
+            id: "production_queue_under_control",
+            label: "生产待办可控",
+            done:
+              !productionBacklogSignal.available ||
+              (productionBacklogSignal.blockerCount === 0 && productionBacklogSignal.warningCount <= 6),
+            detail: buildProductionBacklogDetail(productionBacklogSignal),
+            missing: "先处理生产待办里的先修项和主要优先项。",
+            weight: 2,
+            action: actions.productionBacklog,
+          }),
         ],
         fallbackActions: [actions.preview, actions.inspection],
       }),
@@ -315,6 +391,17 @@
             missing: "修复所有坏链。",
             weight: 3,
             action: actions.inspection,
+          }),
+          createCheck({
+            id: "zero_production_blockers",
+            label: "生产先修清零",
+            done: !productionBacklogSignal.available || productionBacklogSignal.blockerCount === 0,
+            detail: buildProductionBacklogDetail(productionBacklogSignal),
+            missing: productionBacklogSignal.nextTask?.title
+              ? `先处理生产待办：${productionBacklogSignal.nextTask.title}。`
+              : "先清空生产待办队列里的先修任务。",
+            weight: 3,
+            action: actions.productionBacklog,
           }),
           createCheck({
             id: "reachable_scenes",

@@ -11202,6 +11202,9 @@ function renderDashboardProductionBoard(routeOverview) {
 function buildProjectMilestoneContext(routeOverview, overview = buildDashboardProductionOverview(routeOverview)) {
   const starterKitOverview = getStarterKitOverview();
   const regressionSummary = state.inspectionRegressionResult?.summary ?? null;
+  const productionBacklog = productionBacklogTools?.buildProductionBacklog
+    ? buildProductionBacklog(routeOverview)
+    : null;
 
   return {
     totalChapters: state.data.chapters?.length ?? 0,
@@ -11229,6 +11232,8 @@ function buildProjectMilestoneContext(routeOverview, overview = buildDashboardPr
       !starterKitOverview.missingBgm,
     hasExport: Boolean(state.lastExportResult),
     regressionPass: Boolean(regressionSummary && (regressionSummary.failCount ?? 0) === 0),
+    productionBacklogSummary: productionBacklog?.summary ?? null,
+    productionBacklogNextTask: productionBacklog?.nextTask ?? null,
   };
 }
 

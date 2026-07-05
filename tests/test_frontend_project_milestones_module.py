@@ -173,6 +173,70 @@ class FrontendProjectMilestonesModuleTests(unittest.TestCase):
         self.assertEqual(payload["releaseGap"]["missing"], "发布前把 Demo 占位素材和待补正文替换掉。")
         self.assertEqual(payload["releaseAction"]["screen"], "story")
 
+    def test_project_milestones_use_production_backlog_blockers(self) -> None:
+        payload = self.run_module_script(
+            """
+            const plan = tools.buildProjectMilestonePlan({
+              totalChapters: 3,
+              totalScenes: 5,
+              scenesWithContent: 5,
+              scenesWithBackground: 5,
+              scenesWithMusic: 4,
+              scenesWithEffects: 2,
+              totalDialogueCount: 20,
+              voicedDialogueCount: 14,
+              readyAssetCount: 20,
+              totalAssetCount: 20,
+              validationErrorCount: 0,
+              validationWarningCount: 0,
+              brokenRoutes: 0,
+              orphanScenes: 0,
+              unreachableScenes: 0,
+              placeholderAssetCount: 0,
+              placeholderScriptCount: 0,
+              hasStarterKit: true,
+              hasExport: true,
+              regressionPass: true,
+              productionBacklogSummary: {
+                taskCount: 5,
+                blockerCount: 2,
+                warningCount: 1,
+                tipCount: 2,
+                readinessPercent: 42,
+                topAreaLabel: "演出节奏",
+              },
+              productionBacklogNextTask: {
+                title: "补齐空白场景内容",
+                action: { label: "补演出卡", action: "switch-screen", screen: "story" },
+              },
+            });
+            const vertical = plan.milestones.find((milestone) => milestone.id === "vertical_slice");
+            const release = plan.milestones.find((milestone) => milestone.id === "release_candidate");
+            const verticalGap = vertical.blockers.find((check) => check.id === "production_queue_under_control");
+            const releaseGap = release.blockers.find((check) => check.id === "zero_production_blockers");
+            const brief = tools.buildProjectMilestoneActionBrief(plan);
+            process.stdout.write(JSON.stringify({
+              nextTitle: plan.nextMilestone.title,
+              completedCount: plan.completedCount,
+              verticalGap,
+              releaseGap,
+              brief,
+            }));
+            """
+        )
+
+        self.assertEqual(payload["nextTitle"], "体验版打磨")
+        self.assertEqual(payload["completedCount"], 1)
+        self.assertEqual(payload["verticalGap"]["label"], "生产待办可控")
+        self.assertEqual(payload["verticalGap"]["detail"], "2 个先修 / 1 个优先 / 2 个润色")
+        self.assertEqual(payload["verticalGap"]["missing"], "先处理生产待办里的先修项和主要优先项。")
+        self.assertEqual(payload["verticalGap"]["action"]["action"], "switch-screen")
+        self.assertEqual(payload["verticalGap"]["action"]["screen"], "story")
+        self.assertEqual(payload["releaseGap"]["label"], "生产先修清零")
+        self.assertEqual(payload["releaseGap"]["missing"], "先处理生产待办：补齐空白场景内容。")
+        self.assertIn("生产待办", payload["brief"]["title"])
+        self.assertEqual(payload["brief"]["primaryAction"]["screen"], "story")
+
     def test_project_milestone_gap_digest_uses_current_phase_before_release(self) -> None:
         payload = self.run_module_script(
             """
@@ -504,6 +568,8 @@ class FrontendProjectMilestonesModuleTests(unittest.TestCase):
         self.assertIn('asset.tags.includes("占位素材")', source)
         self.assertIn('entry.issues ?? []).includes("placeholder")', source)
         self.assertIn("function serializeProjectMilestoneGapDigest", source)
+        self.assertIn("productionBacklogSummary: productionBacklog?.summary ?? null", source)
+        self.assertIn("productionBacklogNextTask: productionBacklog?.nextTask ?? null", source)
         self.assertIn("function buildReleaseReportNextStep", source)
         self.assertIn("function formatReleaseReportNextStepActionHint", source)
         self.assertIn("function formatReleaseReportNextStepAdvice", source)
