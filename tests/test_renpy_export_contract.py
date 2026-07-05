@@ -270,6 +270,11 @@ class RenpyExportContractTests(unittest.TestCase):
                     "panelAssetId": "dialog_panel",
                     "panelAssetFit": "contain",
                 },
+                "gameUiConfig": {
+                    "fontStyle": "serif",
+                    "fontFamily": "Story Serif",
+                    "fontAssetId": "font_story",
+                },
             }
         }
         assets_doc = {
@@ -278,6 +283,11 @@ class RenpyExportContractTests(unittest.TestCase):
                     "id": "dialog_panel",
                     "type": "ui",
                     "exportUrl": "assets/ui/dialog_panel.png",
+                },
+                {
+                    "id": "font_story",
+                    "type": "font",
+                    "exportUrl": "assets/font/story.ttf",
                 }
             ]
         }
@@ -287,8 +297,12 @@ class RenpyExportContractTests(unittest.TestCase):
 
         self.assertIn('background Frame("assets/ui/dialog_panel.png", 24, 24, 24, 24)', screens)
         self.assertIn("panel=assets/ui/dialog_panel.png", screens)
+        self.assertIn('    font "assets/font/story.ttf"', screens)
+        self.assertIn("font=assets/font/story.ttf", screens)
         self.assertEqual(summary["panelAssetPath"], "assets/ui/dialog_panel.png")
         self.assertEqual(summary["panelAssetFit"], "contain")
+        self.assertEqual(summary["fontAssetPath"], "assets/font/story.ttf")
+        self.assertEqual(summary["fontFamily"], "Story Serif")
 
 
 if __name__ == "__main__":

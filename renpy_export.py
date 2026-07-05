@@ -18,7 +18,7 @@ RENPY_README_FILE_NAME = "README_Canvasia_RenPy_Starter.md"
 RENPY_VERIFY_SCRIPT_FILE_NAME = "verify_renpy_starter_bundle.py"
 CHOICE_CONTINUE_TARGET = "__continue__"
 RENPY_PATH_SUFFIX_PATTERN = re.compile(
-    r"\.(?:png|jpe?g|webp|gif|avif|mp3|ogg|wav|m4a|aac|flac|mp4|webm|mov|m4v)$",
+    r"\.(?:png|jpe?g|webp|gif|avif|mp3|ogg|wav|m4a|aac|flac|mp4|webm|mov|m4v|ttf|otf|ttc|woff2?)$",
     re.IGNORECASE,
 )
 RENPY_PLAYBACK_SPEC_PREFIX_PATTERN = re.compile(r"^<[^>]+>")
@@ -90,6 +90,7 @@ DEFAULT_DIALOG_BOX_CONFIG = {
 TEXTBOX_ANCHORS = {"bottom", "center", "top", "free"}
 TEXTBOX_PANEL_IMAGE_ASSET_TYPES = {"background", "sprite", "cg", "image", "ui"}
 TEXTBOX_PANEL_FRAME_SLICE = {"left": 24, "top": 24, "right": 24, "bottom": 24}
+TEXTBOX_FONT_ASSET_TYPES = {"font"}
 CAMERA_ZOOM_SCALE = {
     "zoom_in": {"light": 1.08, "medium": 1.16, "heavy": 1.26},
     "zoom_out": {"light": 0.96, "medium": 0.92, "heavy": 0.88},
@@ -1473,6 +1474,19 @@ def get_dialog_box_config(bundle: dict) -> dict:
     }
 
 
+def get_game_ui_font_config(bundle: dict) -> dict:
+    project = bundle.get("project") if isinstance(bundle.get("project"), dict) else {}
+    source = project.get("gameUiConfig") if isinstance(project.get("gameUiConfig"), dict) else {}
+    font_style = clean_text(source.get("fontStyle"), "modern").lower()
+    if font_style not in {"modern", "serif", "rounded"}:
+        font_style = "modern"
+    return {
+        "fontStyle": font_style,
+        "fontFamily": clean_text(source.get("fontFamily"))[:80],
+        "fontAssetId": clean_text(source.get("fontAssetId")),
+    }
+
+
 def get_dialog_panel_asset_path(config: dict, asset_map: dict[str, dict]) -> str:
     panel_asset_id = clean_text(config.get("panelAssetId"))
     if not panel_asset_id:
@@ -1488,14 +1502,35 @@ def get_dialog_panel_asset_path(config: dict, asset_map: dict[str, dict]) -> str
     return get_asset_path(asset_map, panel_asset_id)
 
 
+def get_dialog_font_asset_path(config: dict, asset_map: dict[str, dict]) -> str:
+    font_asset_id = clean_text(config.get("fontAssetId"))
+    if not font_asset_id:
+        return ""
+    asset = asset_map.get(font_asset_id)
+    if not asset:
+        return ""
+    asset_type = clean_text(asset.get("type")).lower()
+    if asset_type not in TEXTBOX_FONT_ASSET_TYPES:
+        return ""
+    if asset.get("isMissing") is True and not asset.get("exportUrl"):
+        return ""
+    return get_asset_path(asset_map, font_asset_id)
+
+
 def build_renpy_dialog_screen_summary(bundle: dict, assets_doc: dict | None = None) -> dict:
     resolution = get_project_resolution(bundle)
     config = get_dialog_box_config(bundle)
+    font_config = get_game_ui_font_config(bundle)
     asset_map = build_asset_map(assets_doc or bundle.get("assets") or {})
-    return build_dialog_screen_layout(resolution, config, asset_map)
+    return build_dialog_screen_layout(resolution, config, asset_map, font_config)
 
 
-def build_dialog_screen_layout(resolution: dict, config: dict, asset_map: dict[str, dict] | None = None) -> dict:
+def build_dialog_screen_layout(
+    resolution: dict,
+    config: dict,
+    asset_map: dict[str, dict] | None = None,
+    font_config: dict | None = None,
+) -> dict:
     width = int(resolution.get("width") or DEFAULT_PROJECT_RESOLUTION["width"])
     height = int(resolution.get("height") or DEFAULT_PROJECT_RESOLUTION["height"])
     box_width = int(round(width * config["widthPercent"] / 100))
@@ -1531,6 +1566,10 @@ def build_dialog_screen_layout(resolution: dict, config: dict, asset_map: dict[s
         "panelAssetPath": get_dialog_panel_asset_path(config, asset_map or {}),
         "panelAssetFit": config["panelAssetFit"],
         "panelFrameSlice": dict(TEXTBOX_PANEL_FRAME_SLICE),
+        "fontAssetId": clean_text((font_config or {}).get("fontAssetId")),
+        "fontAssetPath": get_dialog_font_asset_path(font_config or {}, asset_map or {}),
+        "fontFamily": clean_text((font_config or {}).get("fontFamily")),
+        "fontStyle": clean_text((font_config or {}).get("fontStyle"), "modern"),
         "textColor": config["textColor"],
         "speakerColor": config["speakerColor"],
         "hintColor": config["hintColor"],
@@ -1552,10 +1591,16 @@ def build_dialog_background_expression(summary: dict) -> str:
     return quote_renpy(summary["background"])
 
 
+def build_dialog_font_style_lines(summary: dict) -> list[str]:
+    font_path = clean_text(summary.get("fontAssetPath"))
+    return [f"    font {quote_renpy(font_path)}"] if font_path else []
+
+
 def build_renpy_screens_file(bundle: dict, assets_doc: dict | None = None) -> str:
     summary = build_renpy_dialog_screen_summary(bundle, assets_doc)
     padding = tuple(summary["padding"])
     background_expression = build_dialog_background_expression(summary)
+    font_style_lines = build_dialog_font_style_lines(summary)
     return "\n".join(
         [
             "# Canvasia Ren'Py dialogue screen",
@@ -1583,18 +1628,20 @@ def build_renpy_screens_file(bundle: dict, assets_doc: dict | None = None) -> st
             "",
             "style canvasia_say_who is default:",
             f"    color {quote_renpy(summary['speakerColor'])}",
+            *font_style_lines,
             "    size 30",
             "    bold True",
             "    outlines [(1, \"#00000088\", 0, 0)]",
             "",
             "style canvasia_say_what is default:",
             f"    color {quote_renpy(summary['textColor'])}",
+            *font_style_lines,
             "    size 32",
             "    line_spacing 8",
             "    outlines [(1, \"#00000066\", 0, 0)]",
             "",
             "# Canvasia textbox reference:",
-            f"# anchor={summary['anchor']} widthPercent={summary['widthPercent']} panel={summary['panelAssetPath'] or 'color'} border={summary['borderColor']} borderWidth={summary['borderWidth']} shadow={summary['shadowStrength']}",
+            f"# anchor={summary['anchor']} widthPercent={summary['widthPercent']} panel={summary['panelAssetPath'] or 'color'} font={summary['fontAssetPath'] or summary['fontFamily'] or summary['fontStyle']} border={summary['borderColor']} borderWidth={summary['borderWidth']} shadow={summary['shadowStrength']}",
             "",
         ]
     )
@@ -1875,7 +1922,7 @@ GAME_DIR = ROOT / "{RENPY_GAME_DIR_NAME}"
 SCRIPT_PATH = GAME_DIR / "{RENPY_SCRIPT_FILE_NAME}"
 OPTIONS_PATH = GAME_DIR / "{RENPY_OPTIONS_FILE_NAME}"
 SCREENS_PATH = GAME_DIR / "{RENPY_SCREENS_FILE_NAME}"
-PATH_SUFFIX_PATTERN = re.compile(r"\\.(?:png|jpe?g|webp|gif|avif|mp3|ogg|wav|m4a|aac|flac|mp4|webm|mov|m4v)$", re.IGNORECASE)
+PATH_SUFFIX_PATTERN = re.compile(r"\\.(?:png|jpe?g|webp|gif|avif|mp3|ogg|wav|m4a|aac|flac|mp4|webm|mov|m4v|ttf|otf|ttc|woff2?)$", re.IGNORECASE)
 PLAYBACK_SPEC_PREFIX_PATTERN = re.compile(r"^<[^>]+>")
 
 

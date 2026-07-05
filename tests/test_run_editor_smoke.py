@@ -658,13 +658,24 @@ class RunEditorSmokeTests(unittest.TestCase):
             "ui",
             [build_upload_payload("dialog_panel.png", build_fake_png_bytes())],
         )["assets"][0]
+        font_asset = run_editor.import_assets(
+            "font",
+            [build_upload_payload("story.ttf", b"fake-font-data")],
+        )["assets"][0]
         project_doc = run_editor.read_json(run_editor.PROJECT_PATH)
         project_doc["dialogBoxConfig"] = {
             **project_doc.get("dialogBoxConfig", {}),
             "panelAssetId": panel_asset["id"],
             "panelAssetFit": "contain",
         }
+        project_doc["gameUiConfig"] = {
+            **project_doc.get("gameUiConfig", {}),
+            "fontStyle": "serif",
+            "fontFamily": "Story Serif",
+            "fontAssetId": font_asset["id"],
+        }
         run_editor.write_json(run_editor.PROJECT_PATH, project_doc)
+        run_editor.clear_project_bundle_cache()
         run_editor.write_json(
             run_editor.DATA_DIR / "characters.json",
             {
@@ -885,6 +896,9 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertIn('background Frame("assets/ui/', screens)
         self.assertIn('dialog_panel.png", 24, 24, 24, 24)', screens)
         self.assertIn("panel=assets/ui/", screens)
+        self.assertIn('font "assets/font/', screens)
+        self.assertIn('story.ttf"', screens)
+        self.assertIn("font=assets/font/", screens)
         self.assertIn('color "#f3f6ff"', screens)
 
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -895,6 +909,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(renpy_manifest["sceneCount"], 1)
         self.assertEqual(renpy_manifest["dialogScreen"]["anchor"], "bottom")
         self.assertIn("assets/ui/", renpy_manifest["dialogScreen"]["panelAssetPath"])
+        self.assertIn("assets/font/", renpy_manifest["dialogScreen"]["fontAssetPath"])
         self.assertEqual(renpy_manifest["warningCount"], 0)
         self.assertFalse(any(warning["code"] == "renpy_music_scope_review" for warning in renpy_manifest["warnings"]))
         self.assertFalse(any(warning["code"] == "renpy_video_timing_review" for warning in renpy_manifest["warnings"]))
@@ -904,7 +919,9 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(quality_report["status"], "ready")
         self.assertEqual(quality_report["summary"]["missingAssetReferenceCount"], 0)
         self.assertEqual(quality_report["files"]["screens"], f"game/{run_editor.RENPY_SCREENS_FILE_NAME}")
-        self.assertIn("assets/ui/", "\n".join(quality_report["references"]["assetReferences"]))
+        quality_asset_references = "\n".join(quality_report["references"]["assetReferences"])
+        self.assertIn("assets/ui/", quality_asset_references)
+        self.assertIn("assets/font/", quality_asset_references)
         self.assertFalse(any(issue["code"] == "renpy_review_comments_present" for issue in quality_report["issues"]))
         quality_markdown = Path(export_result["renpyQualityMarkdownPath"]).read_text(encoding="utf-8")
         self.assertIn("# Canvasia Ren'Py Bundle Quality Report", quality_markdown)
@@ -928,6 +945,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertIn(run_editor.RENPY_VERIFY_SCRIPT_FILE_NAME, names)
         self.assertTrue(any(name.startswith("game/assets/background/") for name in names))
         self.assertTrue(any(name.startswith("game/assets/ui/") for name in names))
+        self.assertTrue(any(name.startswith("game/assets/font/") for name in names))
 
     def test_starter_kit_rolls_back_when_first_scene_bootstrap_fails(self) -> None:
         self.create_blank_project_with_chapter()
