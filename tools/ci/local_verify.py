@@ -26,6 +26,7 @@ PYTHON_SYNTAX_FILES = [
     "export_localization_audit.py",
     "export_package_guide.py",
     "export_quality_reports.py",
+    "export_release_control.py",
     "export_release_readiness.py",
     "export_runtime_preload.py",
     "export_story_route_map.py",

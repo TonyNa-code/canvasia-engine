@@ -39,6 +39,7 @@ jobs:
       - name: Python syntax check
         run: |
           python -m py_compile \
+            export_release_control.py \
             run_editor.py \
             native_runtime/runtime_player.py \
             native_runtime/build_native_runtime_app.py \
@@ -53,10 +54,12 @@ jobs:
             tests/test_local_verify_tool.py \
             tests/test_project_health_tool.py \
             tests/test_prepare_preview_release.py \
+            tests/test_export_release_control.py \
             tests/test_release_public_surface.py \
             tests/test_frontend_action_handlers.py \
             tests/test_frontend_asset_catalog_module.py \
             tests/test_frontend_asset_dependency_sheet_module.py \
+            tests/test_frontend_asset_rights_sheet_module.py \
             tests/test_frontend_audio_cue_sheet_module.py \
             tests/test_frontend_audio_cue_sheet_panel_module.py \
             tests/test_frontend_editor_common_module.py \
@@ -64,6 +67,7 @@ jobs:
             tests/test_frontend_choice_consequence_sheet_module.py \
             tests/test_frontend_command_palette_module.py \
             tests/test_frontend_creative_assistant_module.py \
+            tests/test_frontend_director_cue_sheet_module.py \
             tests/test_frontend_openai_asset_generator_module.py \
             tests/test_frontend_particle_effects_module.py \
             tests/test_frontend_editor_filters_module.py \
@@ -83,11 +87,16 @@ jobs:
             tests/test_frontend_recent_workspace_module.py \
             tests/test_frontend_release_control_module.py \
             tests/test_frontend_release_version_module.py \
+            tests/test_frontend_release_candidate_manifest_module.py \
+            tests/test_frontend_renpy_exporter_module.py \
             tests/test_frontend_route_analyzer_module.py \
             tests/test_frontend_route_testing_report_module.py \
             tests/test_frontend_runtime_audio_module.py \
+            tests/test_frontend_runtime_preload_module.py \
             tests/test_frontend_runtime_capability_matrix_module.py \
+            tests/test_frontend_scene_pacing_advisor_module.py \
             tests/test_frontend_scene_production_board_module.py \
+            tests/test_frontend_screenplay_exporter_module.py \
             tests/test_frontend_script_import_mapping_module.py \
             tests/test_frontend_script_importer_module.py \
             tests/test_frontend_script_readability_module.py \
@@ -99,6 +108,7 @@ jobs:
             tests/test_frontend_story_templates_module.py \
             tests/test_frontend_system_dialog_module.py \
             tests/test_frontend_ui_theme_module.py \
+            tests/test_frontend_unlockable_content_manifest_module.py \
             tests/test_frontend_variable_influence_sheet_module.py \
             tests/test_frontend_variables_module.py \
             tests/test_frontend_visual_effects_module.py \
@@ -111,6 +121,7 @@ jobs:
         run: |
           node --check prototype_editor/modules/asset_catalog.js
           node --check prototype_editor/modules/asset_dependency_sheet.js
+          node --check prototype_editor/modules/asset_rights_sheet.js
           node --check prototype_editor/modules/audio_cue_sheet.js
           node --check prototype_editor/modules/audio_cue_sheet_panel.js
           node --check prototype_editor/modules/beginner_tutorial.js
@@ -118,6 +129,7 @@ jobs:
           node --check prototype_editor/modules/command_palette.js
           node --check prototype_editor/modules/editor_common.js
           node --check prototype_editor/modules/creative_assistant.js
+          node --check prototype_editor/modules/director_cue_sheet.js
           node --check prototype_editor/modules/editor_filters.js
           node --check prototype_editor/modules/editor_mode.js
           node --check prototype_editor/modules/localization_coverage.js
@@ -135,11 +147,15 @@ jobs:
           node --check prototype_editor/modules/production_backlog.js
           node --check prototype_editor/modules/recent_workspace.js
           node --check prototype_editor/modules/release_control.js
+          node --check prototype_editor/modules/release_candidate_manifest.js
           node --check prototype_editor/modules/release_version.js
+          node --check prototype_editor/modules/renpy_exporter.js
           node --check prototype_editor/modules/route_analyzer.js
           node --check prototype_editor/modules/route_testing_report.js
           node --check prototype_editor/modules/runtime_capability_matrix.js
+          node --check prototype_editor/modules/scene_pacing_advisor.js
           node --check prototype_editor/modules/scene_production_board.js
+          node --check prototype_editor/modules/screenplay_exporter.js
           node --check prototype_editor/modules/script_import_mapping.js
           node --check prototype_editor/modules/script_importer.js
           node --check prototype_editor/modules/script_readability.js
@@ -150,6 +166,7 @@ jobs:
           node --check prototype_editor/modules/story_templates.js
           node --check prototype_editor/modules/system_dialog.js
           node --check prototype_editor/modules/ui_theme.js
+          node --check prototype_editor/modules/unlockable_content_manifest.js
           node --check prototype_editor/modules/variable_influence_sheet.js
           node --check prototype_editor/modules/variables.js
           node --check prototype_editor/modules/visual_effects.js
@@ -168,10 +185,12 @@ jobs:
           python -m unittest discover -s tests -p 'test_project_health_tool.py' -v
           python tools/ci/project_health.py template_project --json-report verification_reports/project-health-template.json --markdown-report verification_reports/project-health-template.md
           python -m unittest discover -s tests -p 'test_prepare_preview_release.py' -v
+          python -m unittest discover -s tests -p 'test_export_release_control.py' -v
           python -m unittest discover -s tests -p 'test_release_public_surface.py' -v
           python -m unittest discover -s tests -p 'test_frontend_action_handlers.py' -v
           python -m unittest discover -s tests -p 'test_frontend_asset_catalog_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_asset_dependency_sheet_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_asset_rights_sheet_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_audio_cue_sheet_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_audio_cue_sheet_panel_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_beginner_tutorial_module.py' -v
@@ -179,6 +198,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_command_palette_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_editor_common_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_creative_assistant_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_director_cue_sheet_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_openai_asset_generator_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_particle_effects_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_editor_filters_module.py' -v
@@ -197,12 +217,17 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_project_settings_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_recent_workspace_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_release_control_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_release_candidate_manifest_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_release_version_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_renpy_exporter_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_route_analyzer_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_route_testing_report_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_audio_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_runtime_preload_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_capability_matrix_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_scene_pacing_advisor_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_scene_production_board_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_screenplay_exporter_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_script_import_mapping_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_script_importer_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_script_readability_module.py' -v
@@ -214,6 +239,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_story_templates_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_system_dialog_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_ui_theme_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_unlockable_content_manifest_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_variable_influence_sheet_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_variables_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_visual_effects_module.py' -v

@@ -40,6 +40,12 @@ from export_release_readiness import (
     EXPORT_RELEASE_READINESS_JSON_NAME,
     EXPORT_RELEASE_READINESS_REPORT_NAME,
 )
+from export_release_control import (
+    build_native_runtime_release_control_markdown as build_release_control_markdown_payload,
+    build_native_runtime_release_control_next_steps as build_release_control_next_steps,
+    build_native_runtime_release_control_payload as build_release_control_payload,
+    get_native_runtime_release_control_status as get_release_control_status,
+)
 from export_runtime_preload import (
     RUNTIME_PRELOAD_MANIFEST_FILE_NAME,
     RUNTIME_PRELOAD_REPORT_FILE_NAME,
@@ -8839,6 +8845,22 @@ def build_native_3d_asset_export_digest(report_payload: dict | None) -> dict:
     }
 
 
+def get_native_runtime_release_control_report_names() -> dict:
+    return {
+        "releaseCheck": NATIVE_RUNTIME_RELEASE_CHECK_NAME,
+        "releaseCandidateReport": NATIVE_RUNTIME_RC_REPORT_NAME,
+        "asset3dDigest": NATIVE_RUNTIME_3D_ASSET_DIGEST_NAME,
+        "releaseControlReport": NATIVE_RUNTIME_RELEASE_CONTROL_REPORT_NAME,
+        "releaseControlJson": NATIVE_RUNTIME_RELEASE_CONTROL_JSON_NAME,
+        "fileIntegrityReport": NATIVE_RUNTIME_FILE_INTEGRITY_REPORT_NAME,
+        "fileIntegrityMarkdown": NATIVE_RUNTIME_FILE_INTEGRITY_MARKDOWN_NAME,
+        "vnBaselineQualityMarkdown": NATIVE_RUNTIME_VN_BASELINE_QUALITY_MARKDOWN_NAME,
+        "vnBaselineQualityJson": NATIVE_RUNTIME_VN_BASELINE_QUALITY_REPORT_NAME,
+        "performanceBudgetMarkdown": NATIVE_RUNTIME_PERFORMANCE_BUDGET_MARKDOWN_NAME,
+        "performanceBudgetJson": NATIVE_RUNTIME_PERFORMANCE_BUDGET_REPORT_NAME,
+    }
+
+
 def get_native_runtime_release_control_status(
     release_check_payload: dict | None,
     rc_report_payload: dict | None,
@@ -8846,76 +8868,13 @@ def get_native_runtime_release_control_status(
     performance_budget_payload: dict | None = None,
     vn_baseline_quality_payload: dict | None = None,
 ) -> dict:
-    release_summary = release_check_payload.get("summary") if isinstance(release_check_payload, dict) else {}
-    rc_summary = rc_report_payload.get("summary") if isinstance(rc_report_payload, dict) else {}
-    release_status = str(release_check_payload.get("status") or "unavailable") if isinstance(release_check_payload, dict) else "unavailable"
-    rc_status = str(rc_report_payload.get("status") or "unavailable") if isinstance(rc_report_payload, dict) else "unavailable"
-    asset_status = str(asset3d_digest.get("status") or "unavailable") if isinstance(asset3d_digest, dict) else "unavailable"
-    performance_status = (
-        str(performance_budget_payload.get("status") or "unavailable")
-        if isinstance(performance_budget_payload, dict)
-        else "unavailable"
+    return get_release_control_status(
+        release_check_payload,
+        rc_report_payload,
+        asset3d_digest,
+        performance_budget_payload,
+        vn_baseline_quality_payload,
     )
-    performance_summary = (
-        performance_budget_payload.get("summary")
-        if isinstance(performance_budget_payload, dict) and isinstance(performance_budget_payload.get("summary"), dict)
-        else {}
-    )
-    vn_status = (
-        str(vn_baseline_quality_payload.get("status") or "unavailable")
-        if isinstance(vn_baseline_quality_payload, dict)
-        else "unavailable"
-    )
-    vn_summary = (
-        vn_baseline_quality_payload.get("summary")
-        if isinstance(vn_baseline_quality_payload, dict) and isinstance(vn_baseline_quality_payload.get("summary"), dict)
-        else {}
-    )
-
-    release_errors = int(release_summary.get("errors") or 0) if isinstance(release_summary, dict) else 0
-    blockers = int(rc_summary.get("blockers") or 0) if isinstance(rc_summary, dict) else 0
-    optional_failures = int(rc_summary.get("optionalFailures") or 0) if isinstance(rc_summary, dict) else 0
-    warnings = int(rc_summary.get("warnings") or 0) if isinstance(rc_summary, dict) else 0
-    top_3d_issues = asset3d_digest.get("topIssues") if isinstance(asset3d_digest, dict) else []
-    has_3d_issues = bool(top_3d_issues)
-
-    if (
-        release_status == "fail"
-        or rc_status == "blocked"
-        or performance_status == "needs_fix"
-        or release_errors
-        or blockers
-        or int(vn_summary.get("warnCount") or 0)
-        or int(performance_summary.get("hardCount") or 0)
-    ):
-        return {
-            "status": "blocked",
-            "label": "阻塞发布",
-            "summary": "存在发布阻塞项、VN 基础体验缺口或性能预算硬问题，应先修复再进入三系统打包或分发。",
-        }
-    if (
-        release_status == "unavailable"
-        or rc_status == "unavailable"
-        or asset_status == "unavailable"
-        or vn_status == "unavailable"
-        or performance_status in {"unavailable", "needs_review"}
-        or optional_failures
-        or warnings
-        or has_3d_issues
-        or int(vn_summary.get("softCount") or 0)
-        or int(performance_summary.get("warnCount") or 0)
-        or int(performance_summary.get("softCount") or 0)
-    ):
-        return {
-            "status": "needs_review",
-            "label": "需要复核",
-            "summary": "主链没有阻塞项，但仍有警告、可选能力失败、资产风险、VN 润色项或性能预算风险需要发布前确认。",
-        }
-    return {
-        "status": "ready",
-        "label": "可进入发布候选",
-        "summary": "导出包自检、RC 汇总和 3D 风险摘要没有发现阻塞项。",
-    }
 
 
 def build_native_runtime_release_control_next_steps(
@@ -8926,58 +8885,14 @@ def build_native_runtime_release_control_next_steps(
     vn_baseline_quality_payload: dict | None,
     quality_gate: dict,
 ) -> list[str]:
-    steps: list[str] = []
-
-    def add_step(value: object) -> None:
-        text = str(value or "").strip()
-        if text and text not in steps:
-            steps.append(text)
-
-    if quality_gate.get("status") == "blocked":
-        add_step("先修复发布自检或 RC 报告里的阻塞项，再重新导出原生 Runtime 包。")
-    elif quality_gate.get("status") == "needs_review":
-        add_step("发布前复核警告项、3D 风险和目标系统 Preview 点测结果。")
-    else:
-        add_step("在目标系统运行 Preview 包，完成一次人工逐按钮长流程点测。")
-
-    if isinstance(rc_report_payload, dict):
-        for action in rc_report_payload.get("nextActions") or []:
-            add_step(action)
-
-    if isinstance(release_check_payload, dict):
-        for issue in (release_check_payload.get("issues") or [])[:5]:
-            if not isinstance(issue, dict):
-                continue
-            suggestion = issue.get("suggestion") or issue.get("message")
-            add_step(suggestion)
-
-    if isinstance(asset3d_digest, dict):
-        for issue in asset3d_digest.get("topIssues") or []:
-            if not isinstance(issue, dict):
-                continue
-            name = issue.get("name") or issue.get("assetId") or "未命名 3D 资产"
-            action = issue.get("recommendedAction") or issue.get("summary") or "复核 3D 资产导入状态。"
-            add_step(f"复核 3D 资产「{name}」：{action}")
-        for recommendation in asset3d_digest.get("recommendations") or []:
-            add_step(recommendation)
-
-    if isinstance(vn_baseline_quality_payload, dict):
-        for issue in (vn_baseline_quality_payload.get("issues") or [])[:5]:
-            if not isinstance(issue, dict):
-                continue
-            title = issue.get("title") or issue.get("code") or "VN 基础质感"
-            suggestion = issue.get("suggestion") or issue.get("detail") or "复核基础视觉小说体验。"
-            add_step(f"处理 VN 基础质感「{title}」：{suggestion}")
-
-    if isinstance(performance_budget_payload, dict):
-        for issue in (performance_budget_payload.get("issues") or [])[:5]:
-            if not isinstance(issue, dict):
-                continue
-            title = issue.get("title") or issue.get("code") or "性能预算"
-            suggestion = issue.get("suggestion") or issue.get("detail") or "复核素材体积、包体和剧情规模。"
-            add_step(f"处理性能预算「{title}」：{suggestion}")
-
-    return steps[:10]
+    return build_release_control_next_steps(
+        release_check_payload,
+        rc_report_payload,
+        asset3d_digest,
+        performance_budget_payload,
+        vn_baseline_quality_payload,
+        quality_gate,
+    )
 
 
 def build_native_runtime_release_control_payload(
@@ -8988,238 +8903,24 @@ def build_native_runtime_release_control_payload(
     performance_budget_payload: dict | None = None,
     vn_baseline_quality_payload: dict | None = None,
 ) -> dict:
-    project = export_payload.get("project") if isinstance(export_payload.get("project"), dict) else {}
-    build_info = export_payload.get("buildInfo") if isinstance(export_payload.get("buildInfo"), dict) else {}
-    release_summary = release_check_payload.get("summary") if isinstance(release_check_payload, dict) else {}
-    release_issues = release_check_payload.get("issues") if isinstance(release_check_payload, dict) else []
-    rc_summary = rc_report_payload.get("summary") if isinstance(rc_report_payload, dict) else {}
-    readiness = rc_report_payload.get("readinessEstimate") if isinstance(rc_report_payload, dict) else {}
-    performance_summary = (
-        performance_budget_payload.get("summary")
-        if isinstance(performance_budget_payload, dict) and isinstance(performance_budget_payload.get("summary"), dict)
-        else {}
-    )
-    vn_baseline_summary = (
-        vn_baseline_quality_payload.get("summary")
-        if isinstance(vn_baseline_quality_payload, dict)
-        and isinstance(vn_baseline_quality_payload.get("summary"), dict)
-        else {"statusLabel": "未生成", "issueCount": 1, "warnCount": 1, "softCount": 0}
-    )
-    vn_baseline_metrics = (
-        vn_baseline_quality_payload.get("metrics")
-        if isinstance(vn_baseline_quality_payload, dict)
-        and isinstance(vn_baseline_quality_payload.get("metrics"), dict)
-        else {}
-    )
-    quality_gate = get_native_runtime_release_control_status(
+    return build_release_control_payload(
+        export_payload,
         release_check_payload,
         rc_report_payload,
         asset3d_digest,
         performance_budget_payload,
         vn_baseline_quality_payload,
+        report_names=get_native_runtime_release_control_report_names(),
+        export_target=EXPORT_TARGET_NATIVE_RUNTIME,
+        default_release_version=DEFAULT_EXPORT_RELEASE_VERSION,
     )
-    next_steps = build_native_runtime_release_control_next_steps(
-        release_check_payload,
-        rc_report_payload,
-        asset3d_digest,
-        performance_budget_payload,
-        vn_baseline_quality_payload,
-        quality_gate,
-    )
-
-    return {
-        "formatVersion": 1,
-        "generatedAt": now_iso(),
-        "engine": {
-            "name": "Canvasia Engine",
-            "target": EXPORT_TARGET_NATIVE_RUNTIME,
-            "targetLabel": "原生 Runtime 包",
-            "runtimeMode": build_info.get("runtimeMode") or "pygame_native",
-            "releaseVersion": build_info.get("releaseVersion") or DEFAULT_EXPORT_RELEASE_VERSION,
-        },
-        "project": {
-            "projectId": project.get("projectId"),
-            "title": project.get("title") or "未命名项目",
-            "language": project.get("language") or "zh-CN",
-            "entrySceneId": project.get("entrySceneId"),
-            "resolution": project.get("resolution") or {"width": 1280, "height": 720},
-        },
-        "qualityGate": quality_gate,
-        "releaseCheck": {
-            "status": release_check_payload.get("status") if isinstance(release_check_payload, dict) else "unavailable",
-            "summary": release_summary if isinstance(release_summary, dict) else {},
-            "topIssues": release_issues[:8] if isinstance(release_issues, list) else [],
-        },
-        "releaseCandidate": {
-            "status": rc_report_payload.get("status") if isinstance(rc_report_payload, dict) else "unavailable",
-            "summary": rc_summary if isinstance(rc_summary, dict) else {},
-            "readinessEstimate": readiness if isinstance(readiness, dict) else {},
-            "videoStrategy": rc_report_payload.get("videoStrategy") if isinstance(rc_report_payload, dict) else {},
-            "commercialReleaseGaps": rc_report_payload.get("commercialReleaseGaps") if isinstance(rc_report_payload, dict) else [],
-        },
-        "asset3d": asset3d_digest if isinstance(asset3d_digest, dict) else build_native_3d_asset_export_digest(None),
-        "vnBaselineQuality": {
-            "status": vn_baseline_quality_payload.get("status") if isinstance(vn_baseline_quality_payload, dict) else "unavailable",
-            "summary": vn_baseline_summary if isinstance(vn_baseline_summary, dict) else {},
-            "metrics": vn_baseline_metrics if isinstance(vn_baseline_metrics, dict) else {},
-            "topIssues": (vn_baseline_quality_payload.get("issues") or [])[:8] if isinstance(vn_baseline_quality_payload, dict) else [],
-            "markdown": NATIVE_RUNTIME_VN_BASELINE_QUALITY_MARKDOWN_NAME,
-            "json": NATIVE_RUNTIME_VN_BASELINE_QUALITY_REPORT_NAME,
-        },
-        "performanceBudget": {
-            "status": performance_budget_payload.get("status") if isinstance(performance_budget_payload, dict) else "unavailable",
-            "summary": performance_summary if isinstance(performance_summary, dict) else {},
-            "assetGroups": performance_budget_payload.get("assetGroups") if isinstance(performance_budget_payload, dict) else {},
-            "budgets": performance_budget_payload.get("budgets") if isinstance(performance_budget_payload, dict) else {},
-            "topIssues": (performance_budget_payload.get("issues") or [])[:8] if isinstance(performance_budget_payload, dict) else [],
-            "markdown": NATIVE_RUNTIME_PERFORMANCE_BUDGET_MARKDOWN_NAME,
-            "json": NATIVE_RUNTIME_PERFORMANCE_BUDGET_REPORT_NAME,
-        },
-        "nextSteps": next_steps,
-        "includedReports": {
-            "releaseCheck": NATIVE_RUNTIME_RELEASE_CHECK_NAME,
-            "releaseCandidateReport": NATIVE_RUNTIME_RC_REPORT_NAME,
-            "asset3dDigest": NATIVE_RUNTIME_3D_ASSET_DIGEST_NAME,
-            "releaseControlReport": NATIVE_RUNTIME_RELEASE_CONTROL_REPORT_NAME,
-            "releaseControlJson": NATIVE_RUNTIME_RELEASE_CONTROL_JSON_NAME,
-            "fileIntegrityReport": NATIVE_RUNTIME_FILE_INTEGRITY_REPORT_NAME,
-            "fileIntegrityMarkdown": NATIVE_RUNTIME_FILE_INTEGRITY_MARKDOWN_NAME,
-            "vnBaselineQualityMarkdown": NATIVE_RUNTIME_VN_BASELINE_QUALITY_MARKDOWN_NAME,
-            "vnBaselineQualityJson": NATIVE_RUNTIME_VN_BASELINE_QUALITY_REPORT_NAME,
-            "performanceBudgetMarkdown": NATIVE_RUNTIME_PERFORMANCE_BUDGET_MARKDOWN_NAME,
-            "performanceBudgetJson": NATIVE_RUNTIME_PERFORMANCE_BUDGET_REPORT_NAME,
-        },
-    }
 
 
 def build_native_runtime_release_control_markdown(payload: dict) -> str:
-    project = payload.get("project") if isinstance(payload.get("project"), dict) else {}
-    engine = payload.get("engine") if isinstance(payload.get("engine"), dict) else {}
-    quality_gate = payload.get("qualityGate") if isinstance(payload.get("qualityGate"), dict) else {}
-    release_check = payload.get("releaseCheck") if isinstance(payload.get("releaseCheck"), dict) else {}
-    release_candidate = payload.get("releaseCandidate") if isinstance(payload.get("releaseCandidate"), dict) else {}
-    asset3d = payload.get("asset3d") if isinstance(payload.get("asset3d"), dict) else {}
-    vn_baseline = payload.get("vnBaselineQuality") if isinstance(payload.get("vnBaselineQuality"), dict) else {}
-    performance_budget = payload.get("performanceBudget") if isinstance(payload.get("performanceBudget"), dict) else {}
-    readiness = release_candidate.get("readinessEstimate") if isinstance(release_candidate.get("readinessEstimate"), dict) else {}
-    release_summary = release_check.get("summary") if isinstance(release_check.get("summary"), dict) else {}
-    rc_summary = release_candidate.get("summary") if isinstance(release_candidate.get("summary"), dict) else {}
-    asset_metrics = asset3d.get("metrics") if isinstance(asset3d.get("metrics"), list) else []
-    vn_summary = vn_baseline.get("summary") if isinstance(vn_baseline.get("summary"), dict) else {}
-    vn_metrics = vn_baseline.get("metrics") if isinstance(vn_baseline.get("metrics"), dict) else {}
-    performance_summary = performance_budget.get("summary") if isinstance(performance_budget.get("summary"), dict) else {}
-    performance_asset_groups = (
-        performance_budget.get("assetGroups") if isinstance(performance_budget.get("assetGroups"), dict) else {}
+    return build_release_control_markdown_payload(
+        payload,
+        default_release_version=DEFAULT_EXPORT_RELEASE_VERSION,
     )
-    next_steps = payload.get("nextSteps") if isinstance(payload.get("nextSteps"), list) else []
-
-    lines = [
-        "# 原生 Runtime 发布总控报告",
-        "",
-        f"- 项目：{project.get('title') or '未命名项目'}",
-        f"- 版本：{engine.get('releaseVersion') or DEFAULT_EXPORT_RELEASE_VERSION}",
-        f"- 生成时间：{payload.get('generatedAt') or now_iso()}",
-        f"- 总体状态：{quality_gate.get('label') or '需要复核'}",
-        "",
-        "## 总结",
-        "",
-        quality_gate.get("summary") or "请结合随包 JSON 报告复核导出状态。",
-        "",
-        "## 核心指标",
-        "",
-        "| 项目 | 值 |",
-        "| --- | --- |",
-        f"| 发布自检 | {release_check.get('status') or 'unavailable'} |",
-        f"| 自检错误 / 警告 | {int(release_summary.get('errors') or 0)} / {int(release_summary.get('warnings') or 0)} |",
-        f"| RC 状态 | {release_candidate.get('status') or 'unavailable'} |",
-        f"| RC 阻塞 / 可选失败 / 警告 | {int(rc_summary.get('blockers') or 0)} / {int(rc_summary.get('optionalFailures') or 0)} / {int(rc_summary.get('warnings') or 0)} |",
-        f"| 桌面 Preview 估算 | {readiness.get('desktopPreviewPercent', 'n/a')}% |",
-        f"| 商业桌面估算 | {readiness.get('commercialDesktopPercent', 'n/a')}% |",
-        f"| 3D 摘要 | {asset3d.get('summaryLine') or '未生成'} |",
-        f"| VN 基础质感 | {vn_summary.get('statusLabel') or vn_baseline.get('status') or '未生成'} |",
-        f"| 性能预算 | {performance_summary.get('statusLabel') or performance_budget.get('status') or '未生成'} |",
-        "",
-    ]
-
-    if vn_baseline:
-        lines.extend(["## VN 基础质感", "", "| 指标 | 值 |", "| --- | --- |"])
-        for label, value in [
-            ("状态", vn_summary.get("statusLabel") or vn_baseline.get("status")),
-            ("问题 / 缺口 / 润色项", f"{int(vn_summary.get('issueCount') or 0)} / {int(vn_summary.get('warnCount') or 0)} / {int(vn_summary.get('softCount') or 0)}"),
-            ("场景 / 文本 / 选项", f"{int(vn_metrics.get('storySceneCount') or 0)} / {int(vn_metrics.get('dialogueCount') or 0) + int(vn_metrics.get('narrationCount') or 0)} / {int(vn_metrics.get('choiceCount') or 0)}"),
-            ("BGM / 语音 / CG 素材", f"{int(vn_metrics.get('bgmAssetCount') or 0)} / {int(vn_metrics.get('voiceAssetCount') or 0)} / {int(vn_metrics.get('cgAssetCount') or 0)}"),
-        ]:
-            lines.append(f"| {label} | {value or '0'} |")
-        top_vn_issues = vn_baseline.get("topIssues") if isinstance(vn_baseline.get("topIssues"), list) else []
-        if top_vn_issues:
-            lines.extend(["", "优先处理："])
-            for issue in top_vn_issues[:5]:
-                if isinstance(issue, dict):
-                    lines.append(f"- {issue.get('title') or 'VN 基础质感'}：{issue.get('suggestion') or issue.get('detail') or '需要复核'}")
-        lines.append("")
-
-    if performance_budget:
-        lines.extend(["## 性能预算", "", "| 指标 | 值 |", "| --- | --- |"])
-        for label, value in [
-            ("状态", performance_summary.get("statusLabel") or performance_budget.get("status")),
-            ("总素材 / 已引用", f"{int(performance_summary.get('assetCount') or 0)} / {int(performance_summary.get('referencedAssetCount') or 0)}"),
-            ("总体积 / 已引用体积", f"{performance_summary.get('totalAssetLabel') or '0 B'} / {performance_summary.get('referencedAssetLabel') or '0 B'}"),
-            ("缺失引用素材", performance_summary.get("missingReferencedAssetCount")),
-            ("未使用随包素材", performance_summary.get("unreferencedExistingAssetCount")),
-            ("场景 / 卡片", f"{int(performance_summary.get('sceneCount') or 0)} / {int(performance_summary.get('storyBlockCount') or 0)}"),
-            ("图片 / 音频 / 视频体积", " / ".join(
-                str((performance_asset_groups.get(key) or {}).get("label") or "0 B")
-                for key in ("image", "audio", "video")
-            )),
-            ("硬问题 / 警告 / 提醒", f"{int(performance_summary.get('hardCount') or 0)} / {int(performance_summary.get('warnCount') or 0)} / {int(performance_summary.get('softCount') or 0)}"),
-        ]:
-            lines.append(f"| {label} | {value or '0'} |")
-        top_performance_issues = (
-            performance_budget.get("topIssues") if isinstance(performance_budget.get("topIssues"), list) else []
-        )
-        if top_performance_issues:
-            lines.extend(["", "优先处理："])
-            for issue in top_performance_issues[:5]:
-                if isinstance(issue, dict):
-                    lines.append(f"- {issue.get('title') or '性能预算'}：{issue.get('suggestion') or issue.get('detail') or '需要复核'}")
-        lines.append("")
-
-    if asset_metrics:
-        lines.extend(["## 3D 风险快照", "", "| 指标 | 值 |", "| --- | --- |"])
-        for metric in asset_metrics:
-            if not isinstance(metric, dict):
-                continue
-            lines.append(f"| {metric.get('label') or '指标'} | {metric.get('value') or '-'} |")
-        lines.append("")
-
-    top_issues = asset3d.get("topIssues") if isinstance(asset3d.get("topIssues"), list) else []
-    if top_issues:
-        lines.extend(["## 优先处理 3D 资产", ""])
-        for issue in top_issues:
-            if not isinstance(issue, dict):
-                continue
-            lines.append(
-                f"- {issue.get('name') or issue.get('assetId') or '未命名 3D 资产'}："
-                f"{issue.get('summary') or issue.get('statusLabel') or '需要复核'}"
-            )
-        lines.append("")
-
-    lines.extend(["## 下一步", ""])
-    for index, step in enumerate(next_steps or ["完成目标系统实机点测。"], start=1):
-        lines.append(f"{index}. {step}")
-    lines.extend(
-        [
-            "",
-            "## 随包文件",
-            "",
-            f"- `{NATIVE_RUNTIME_RELEASE_CHECK_NAME}`",
-            f"- `{NATIVE_RUNTIME_RC_REPORT_NAME}`",
-            f"- `{NATIVE_RUNTIME_3D_ASSET_DIGEST_NAME}`",
-            f"- `{NATIVE_RUNTIME_RELEASE_CONTROL_JSON_NAME}`",
-            "",
-        ]
-    )
-    return "\n".join(lines)
 
 
 def refresh_native_runtime_preload_report(build_dir: Path, report_path: Path) -> bool:
