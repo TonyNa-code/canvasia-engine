@@ -1947,9 +1947,128 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("void runProjectOneClickPolish();", one_click_block)
         self.assertIn("function setProjectOneClickPolishInFlight", source)
         self.assertIn("async function runProjectOneClickPolish()", source)
+        self.assertIn("async function saveProjectHistoryCheckpoint", source)
         self.assertIn("projectPolishTools.buildProjectOneClickPolishPlan", source)
+        self.assertIn("saveProjectHistoryCheckpoint(\"发布前整理前自动检查点\"", source)
+        self.assertIn("postJson(API_CREATE_PROJECT_HISTORY_SNAPSHOT", source)
         self.assertIn("setProjectOneClickPolishInFlight(true)", source)
         self.assertIn("setProjectOneClickPolishInFlight(false)", source)
+        self.assertIn('await showEditorOperationFailure(error, "发布前整理失败", "发布前整理没有成功")', source)
+
+    def test_project_one_click_polish_saves_checkpoint_before_scene_writes(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        save_checkpoint = _extract_function_source(source, "saveProjectHistoryCheckpoint")
+        run_one_click = _extract_function_source(source, "runProjectOneClickPolish")
+        script = textwrap.dedent(
+            f"""
+            const API_CREATE_PROJECT_HISTORY_SNAPSHOT = "/api/create-project-history-snapshot";
+            const calls = [];
+            const state = {{
+              data: {{ project: {{ title: "Demo" }} }},
+              currentScreen: "dashboard",
+              projectHistory: null,
+              projectOneClickPolishInFlight: false,
+              projectReadableSplitInFlight: false,
+              projectPresentationPolishInFlight: false,
+              audioCueAutoFixInFlight: false,
+              selectedSceneId: "old_scene",
+              selectedBlockId: "old_block",
+              previewSceneId: "old_preview",
+            }};
+            const projectPolishTools = {{
+              buildProjectOneClickPolishPlan() {{
+                calls.push(["plan"]);
+                return {{
+                  changed: true,
+                  changedSceneCount: 1,
+                  scenePlans: [
+                    {{
+                      sceneId: "scene_intro",
+                      sceneName: "开场",
+                      firstChangedBlockId: "line_1",
+                      firstChangedIndex: 2,
+                      scene: {{ id: "scene_intro", blocks: [{{ id: "line_1", type: "dialogue", text: "你好" }}] }},
+                    }},
+                  ],
+                  firstChangedSceneId: "scene_intro",
+                  firstChangedBlockId: "line_1",
+                  firstChangedIndex: 2,
+                  summary: "发布前整理完成：补齐 3 项",
+                }};
+              }},
+            }};
+            function setProjectOneClickPolishInFlight(value) {{
+              state.projectOneClickPolishInFlight = Boolean(value);
+              calls.push(["busy", Boolean(value)]);
+            }}
+            function setSaveStatus(message) {{
+              calls.push(["status", message]);
+            }}
+            function showToast(message, tone) {{
+              calls.push(["toast", message, tone || ""]);
+            }}
+            function getSafeProjectHistory(history) {{
+              return {{ currentSnapshot: {{ label: "发布前整理前自动检查点" }} }};
+            }}
+            function updateTopbar() {{
+              calls.push(["topbar"]);
+            }}
+            function updateErrorRecoveryState() {{
+              calls.push(["recovery-state"]);
+            }}
+            function rerenderProjectHistoryPanel() {{
+              calls.push(["history-panel"]);
+            }}
+            async function postJson(url, payload) {{
+              calls.push(["checkpoint", url, payload.label]);
+              return {{ history: {{ currentSnapshot: {{ label: payload.label }} }} }};
+            }}
+            async function persistScene(scene, options) {{
+              calls.push(["persist", scene.id, options.selectedBlockId, options.previewBlockIndex]);
+              return true;
+            }}
+            function getCurrentUiState() {{
+              return {{ selectedSceneId: "old_scene", selectedBlockId: "old_block", previewSceneId: "old_preview" }};
+            }}
+            async function reloadProjectData(payload) {{
+              calls.push(["reload", payload.selectedSceneId, payload.selectedBlockId, payload.previewBlockIndex]);
+            }}
+            function showFatalProjectLoadError(error) {{
+              calls.push(["fatal", error && error.message]);
+            }}
+            async function showEditorOperationFailure(error, title, detail) {{
+              calls.push(["failure", title, detail, error && error.message]);
+            }}
+            async function saveProjectHistoryCheckpoint(label, options = {{}}) {save_checkpoint}
+            async function runProjectOneClickPolish() {run_one_click}
+
+            const result = await runProjectOneClickPolish();
+            process.stdout.write(JSON.stringify({{ result, calls }}));
+            """
+        )
+        completed = subprocess.run(
+            ["node", "-e", script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        calls = payload["calls"]
+        call_names = [call[0] for call in calls]
+
+        self.assertTrue(payload["result"])
+        self.assertLess(call_names.index("checkpoint"), call_names.index("persist"))
+        self.assertLess(call_names.index("persist"), call_names.index("reload"))
+        self.assertEqual(calls[call_names.index("checkpoint")][1], "/api/create-project-history-snapshot")
+        self.assertEqual(calls[call_names.index("checkpoint")][2], "发布前整理前自动检查点")
+        self.assertIn(["persist", "scene_intro", "line_1", 2], calls)
+        self.assertIn(["reload", "scene_intro", "line_1", 2], calls)
+        self.assertIn(["busy", True], calls)
+        self.assertEqual(calls[-1], ["busy", False])
+        toast_messages = [call[1] for call in calls if call[0] == "toast"]
+        self.assertTrue(any("整理前已存" in message for message in toast_messages))
 
     def test_create_chapter_ignores_duplicate_clicks_while_pending(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")

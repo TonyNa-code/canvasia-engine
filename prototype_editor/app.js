@@ -37587,15 +37587,9 @@ async function createHistoryCheckpoint() {
   }
 
   try {
-    setSaveStatus("正在保存检查点...");
-    const result = await postJson(API_CREATE_PROJECT_HISTORY_SNAPSHOT, { label });
-    state.projectHistory = result.history ?? state.projectHistory;
-    updateTopbar();
-    updateErrorRecoveryState();
-    if (state.currentScreen === "dashboard") {
-      rerenderProjectHistoryPanel();
-    }
-    const currentLabel = getSafeProjectHistory(result.history).currentSnapshot?.label ?? label;
+    const { currentLabel } = await saveProjectHistoryCheckpoint(label, {
+      statusMessage: "正在保存检查点...",
+    });
     setSaveStatus(`已存检查点：${currentLabel}`);
     showToast(`已存检查点：${currentLabel}`);
   } catch (error) {
@@ -37607,6 +37601,24 @@ async function createHistoryCheckpoint() {
 
     await showEditorOperationFailure(error, "保存检查点失败", "检查点没有保存成功");
   }
+}
+
+async function saveProjectHistoryCheckpoint(label, options = {}) {
+  const safeLabel = String(label ?? "").trim() || "手动检查点";
+  setSaveStatus(options.statusMessage ?? "正在保存检查点...");
+  const result = await postJson(API_CREATE_PROJECT_HISTORY_SNAPSHOT, { label: safeLabel });
+  state.projectHistory = result.history ?? state.projectHistory;
+  updateTopbar();
+  updateErrorRecoveryState();
+  if (state.currentScreen === "dashboard") {
+    rerenderProjectHistoryPanel();
+  }
+  const currentLabel = getSafeProjectHistory(result.history).currentSnapshot?.label ?? safeLabel;
+  return {
+    result,
+    currentLabel,
+    history: result.history ?? state.projectHistory,
+  };
 }
 
 async function previewProjectHistoryRestore(snapshot) {
@@ -41783,9 +41795,16 @@ async function runProjectOneClickPolish() {
   }
 
   setProjectOneClickPolishInFlight(true);
-  setSaveStatus(`正在整理 ${polishPlan.changedSceneCount} 个场景的发布前基础项...`);
+  setSaveStatus("正在保存发布前整理安全检查点...");
+  let safetySnapshotLabel = "";
 
   try {
+    const checkpoint = await saveProjectHistoryCheckpoint("发布前整理前自动检查点", {
+      statusMessage: "正在保存发布前整理安全检查点...",
+    });
+    safetySnapshotLabel = checkpoint.currentLabel;
+    setSaveStatus(`安全检查点已保存，正在整理 ${polishPlan.changedSceneCount} 个场景...`);
+
     for (const scenePlan of polishPlan.scenePlans) {
       const success = await persistScene(scenePlan.scene, {
         reloadAfterSave: false,
@@ -41807,9 +41826,19 @@ async function runProjectOneClickPolish() {
       previewSceneId: polishPlan.firstChangedSceneId || state.previewSceneId,
       previewBlockIndex: Math.max(polishPlan.firstChangedIndex ?? 0, 0),
     });
-    setSaveStatus(polishPlan.summary);
-    showToast(polishPlan.summary);
+    const snapshotSuffix = safetySnapshotLabel ? `；整理前已存「${safetySnapshotLabel}」` : "";
+    setSaveStatus(`${polishPlan.summary}${snapshotSuffix}`);
+    showToast(`${polishPlan.summary}${snapshotSuffix}`);
     return true;
+  } catch (error) {
+    if (error?.recovery) {
+      showFatalProjectLoadError(error);
+      showToast("发布前整理前保存安全检查点失败，但恢复入口还在", "error");
+      return false;
+    }
+
+    await showEditorOperationFailure(error, "发布前整理失败", "发布前整理没有成功");
+    return false;
   } finally {
     setProjectOneClickPolishInFlight(false);
   }
