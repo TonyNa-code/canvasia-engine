@@ -23,6 +23,7 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
         self.assertIn("routeTestingPlan: routeOverview?.routeTestingPlan ?? {}", source)
         self.assertIn("productionBacklogSummary: productionBacklog?.summary ?? null", source)
         self.assertIn("productionBacklogNextTask: productionBacklog?.nextTask ?? null", source)
+        self.assertIn("function buildReleaseFixOrder(routeOverview)", source)
         self.assertIn("buildFinalPublishGate(releaseItems, releaseFixOrder, routeOverview)", source)
         self.assertIn("function serializeFinalPublishGate", source)
         self.assertIn("function renderFinalPublishGatePanel", source)
@@ -490,6 +491,88 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
         self.assertEqual(ready_plan["steps"][0]["tone"], "good")
         self.assertEqual(ready_plan["blockerCount"], 0)
         self.assertEqual(ready_plan["urgentCount"], 0)
+
+    def test_release_fix_order_surfaces_production_backlog_steps(self) -> None:
+        script = textwrap.dedent(
+            f"""
+            const fs = require("fs");
+            const vm = require("vm");
+            const context = {{ window: {{}} }};
+            context.globalThis = context;
+            vm.createContext(context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
+            const tools = context.window.CanvasiaEditorReleaseControl;
+            const baseContext = {{
+              resolution: {{ width: 1920, height: 1080 }},
+              releaseVersion: "1.2.0",
+              hasStoredReleaseVersion: true,
+              errorCount: 0,
+              warningIssues: [],
+              routeMetrics: {{ orphanScenes: 0, unreachableScenes: 0 }},
+              urgentMissingAssetsCount: 0,
+              mediaBudgetReport: {{ count: 0, blockerCount: 0 }},
+              runtimePreloadBudget: {{ releaseRiskLevel: "ready" }},
+              unusedAssetCount: 0,
+              exportResult: {{ target: "macos_nwjs", runtimeMode: "nwjs", missingAssets: 0 }},
+            }};
+            const blockerPlan = tools.buildReleaseFixOrder({{
+              ...baseContext,
+              productionBacklogSummary: {{ taskCount: 4, blockerCount: 1, warningCount: 2, tipCount: 1 }},
+              productionBacklogNextTask: {{
+                title: "补齐空白场景内容",
+                action: {{ label: "补演出卡", action: "switch-screen", screen: "story" }},
+              }},
+            }});
+            const warnPlan = tools.buildReleaseFixOrder({{
+              ...baseContext,
+              productionBacklogSummary: {{ taskCount: 3, blockerCount: 0, warningCount: 2, tipCount: 1 }},
+              productionBacklogNextTask: {{
+                title: "确认 BGM 播放范围",
+                action: {{ label: "调 BGM", action: "switch-screen", screen: "story" }},
+              }},
+            }});
+            const softPlan = tools.buildReleaseFixOrder({{
+              ...baseContext,
+              productionBacklogSummary: {{ taskCount: 2, blockerCount: 0, warningCount: 0, tipCount: 2 }},
+              productionBacklogNextTask: {{
+                title: "复查过短场景节奏",
+                action: {{ label: "补演出", action: "switch-screen", screen: "story" }},
+              }},
+            }});
+            process.stdout.write(JSON.stringify({{
+              blockerPlan,
+              warnPlan,
+              softPlan,
+            }}));
+            """
+        )
+        completed = subprocess.run(
+            ["node", "-e", script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        blocker_step = payload["blockerPlan"]["steps"][0]
+        warn_step = payload["warnPlan"]["steps"][0]
+        soft_step = payload["softPlan"]["steps"][0]
+
+        self.assertEqual(blocker_step["tone"], "danger")
+        self.assertEqual(blocker_step["title"], "处理生产待办先修项")
+        self.assertEqual(blocker_step["statusLabel"], "先修 1 / 优先 2 / 润色 1")
+        self.assertEqual(blocker_step["actions"][0]["screen"], "story")
+        self.assertEqual(blocker_step["actions"][1]["action"], "export-production-backlog-markdown")
+        self.assertEqual(payload["blockerPlan"]["blockerCount"], 1)
+        self.assertEqual(warn_step["tone"], "warn")
+        self.assertEqual(warn_step["title"], "确认生产待办优先项")
+        self.assertEqual(payload["warnPlan"]["urgentCount"], 1)
+        self.assertEqual(soft_step["tone"], "soft")
+        self.assertEqual(soft_step["title"], "收尾生产待办润色项")
+        self.assertEqual(payload["softPlan"]["blockerCount"], 0)
+        self.assertEqual(payload["softPlan"]["urgentCount"], 0)
 
     def test_release_fix_order_promotes_route_playtest_blockers(self) -> None:
         script = textwrap.dedent(

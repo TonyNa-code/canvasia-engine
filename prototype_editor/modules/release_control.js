@@ -205,6 +205,52 @@
     return [];
   }
 
+  function buildProductionBacklogFixStep(context = {}) {
+    const signal = getProductionBacklogGateSignal(context);
+    if (!signal.available || signal.taskCount <= 0) {
+      return null;
+    }
+    const primaryAction = getProductionBacklogGateAction(signal);
+    const actions = [
+      {
+        ...primaryAction,
+        label: primaryAction.label || "处理下一项生产待办",
+      },
+      { label: "导出生产待办队列", action: "export-production-backlog-markdown" },
+    ];
+    const statusLabel = `先修 ${signal.blockerCount} / 优先 ${signal.warningCount} / 润色 ${signal.tipCount}`;
+    const nextTaskLabel = signal.nextTask?.title ? `下一项：${signal.nextTask.title}。` : "";
+
+    if (signal.blockerCount > 0) {
+      return {
+        tone: "danger",
+        title: "处理生产待办先修项",
+        statusLabel,
+        description: `${nextTaskLabel}这些先修项来自跨模块制作队列，可能包含缺文件、坏引用、授权、节奏或 Runtime 交付风险。`,
+        actions,
+      };
+    }
+    if (signal.warningCount > 0) {
+      return {
+        tone: "warn",
+        title: "确认生产待办优先项",
+        statusLabel,
+        description: `${nextTaskLabel}当前没有生产先修项，但这些优先项会影响 Preview 的完成度和观感。`,
+        actions,
+      };
+    }
+    if (signal.tipCount > 0) {
+      return {
+        tone: "soft",
+        title: "收尾生产待办润色项",
+        statusLabel,
+        description: `${nextTaskLabel}剩余多为润色项，适合在正式发布前做最后一轮体验打磨。`,
+        actions,
+      };
+    }
+    return null;
+  }
+
   function buildGateChecklistItems(items = [], releaseFixOrder = null, status = "blocked", productionBacklogSignal = {}) {
     const safeItems = Array.isArray(items) ? items : [];
     const priorityItems =
@@ -934,6 +980,11 @@
     const routePlaytestFixStep = buildRoutePlaytestFixStep(routeTestingPlan);
     if (routePlaytestFixStep) {
       steps.push(routePlaytestFixStep);
+    }
+
+    const productionBacklogFixStep = buildProductionBacklogFixStep(context);
+    if (productionBacklogFixStep) {
+      steps.push(productionBacklogFixStep);
     }
 
     const orphanSceneCount = toCount(routeMetrics.orphanScenes);

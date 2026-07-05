@@ -31555,6 +31555,9 @@ function buildReleaseFixOrder(routeOverview) {
     const project = state.data?.project ?? {};
     const validationErrors = state.validation?.errors ?? [];
     const validationWarnings = state.validation?.warnings ?? [];
+    const productionBacklog = productionBacklogTools?.buildProductionBacklog
+      ? buildProductionBacklog(routeOverview)
+      : null;
     const missingVoiceWarnings = validationWarnings.filter(
       (issue) => issue.message === "这句台词还没有绑定语音。"
     );
@@ -31579,6 +31582,8 @@ function buildReleaseFixOrder(routeOverview) {
       mediaBudgetReport: buildAssetMediaBudgetReport(),
       runtimeCapabilityMatrix: buildRuntimeCapabilityMatrix(),
       runtimePreloadBudget: buildRuntimePreloadBudgetReport(),
+      productionBacklogSummary: productionBacklog?.summary ?? null,
+      productionBacklogNextTask: productionBacklog?.nextTask ?? null,
       unusedAssetCount: getUnusedAssets().length,
       exportResult: state.lastExportResult,
       creativeQuality: buildReleaseCreativeQualityContext(),
