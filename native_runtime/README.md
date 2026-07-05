@@ -76,9 +76,10 @@ python3 -m pip install -r requirements-native-runtime.txt
 ```bash
 python3 runtime_player.py --validate-bundle .
 python3 runtime_player.py --describe-runtime-preload .
+python3 runtime_player.py --describe-runtime-preload-markdown .
 ```
 
-`--describe-runtime-preload` 会检查预热清单、缺失素材、critical 首屏资源体积和整体预热队列体积，适合在发布前定位“打开游戏第一下卡顿”的风险。
+`--describe-runtime-preload` 会输出适合自动化读取的 JSON；`--describe-runtime-preload-markdown` 会输出适合人工复查的 Markdown。两者都会检查预热清单、缺失素材、critical 首屏资源体积和整体预热队列体积，适合在发布前定位“打开游戏第一下卡顿”的风险。
 
 ## 维护者渲染 smoke
 

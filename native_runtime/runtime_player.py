@@ -5031,6 +5031,83 @@ def print_native_runtime_preload_report(bundle_dir: Path) -> dict:
     return report
 
 
+def render_native_runtime_preload_markdown(report: dict) -> str:
+    summary = report.get("summary") if isinstance(report.get("summary"), dict) else {}
+    size_budget = summary.get("sizeBudget") if isinstance(summary.get("sizeBudget"), dict) else {}
+    entries = report.get("entries") if isinstance(report.get("entries"), list) else []
+    missing_entries = report.get("missingEntries") if isinstance(report.get("missingEntries"), list) else []
+    largest_entries = size_budget.get("largestEntries") if isinstance(size_budget.get("largestEntries"), list) else []
+    lines = [
+        "# Runtime 资源预热报告",
+        "",
+        f"- 状态：{report.get('status') or 'unknown'}",
+        f"- 建议：{report.get('recommendation') or '暂无'}",
+        f"- 预热条目：{summary.get('totalEntries', 0)}",
+        f"- critical 首屏条目：{summary.get('criticalEntries', 0)}",
+        f"- 缺失素材：{summary.get('missingFileEntries', 0)}",
+        f"- critical 首屏体积：{size_budget.get('criticalLabel', '0 B')} / 建议 {size_budget.get('criticalBudgetLabel', '0 B')}",
+        f"- 预热队列总体积：{size_budget.get('totalLabel', '0 B')} / 建议 {size_budget.get('totalBudgetLabel', '0 B')}",
+        "",
+        "## 体积预算",
+        "",
+        "| 项目 | 状态 | 当前 | 建议预算 |",
+        "| --- | --- | --- | --- |",
+        (
+            f"| critical 首屏 | {'超出' if size_budget.get('criticalOverBudget') else '正常'} | "
+            f"{size_budget.get('criticalLabel', '0 B')} | {size_budget.get('criticalBudgetLabel', '0 B')} |"
+        ),
+        (
+            f"| 整体预热队列 | {'超出' if size_budget.get('totalOverBudget') else '正常'} | "
+            f"{size_budget.get('totalLabel', '0 B')} | {size_budget.get('totalBudgetLabel', '0 B')} |"
+        ),
+        "",
+        "## 最大素材",
+        "",
+    ]
+    if largest_entries:
+        lines.extend(["| 素材 | 类型 | 阶段 | 体积 |", "| --- | --- | --- | --- |"])
+        for entry in largest_entries:
+            lines.append(
+                f"| {entry.get('name') or entry.get('assetId') or '未命名'} | "
+                f"{entry.get('type') or '-'} | {entry.get('phase') or '-'} | {entry.get('sizeLabel') or '0 B'} |"
+            )
+    else:
+        lines.append("- 没有可统计体积的预热素材。")
+    lines.extend(["", "## 缺失素材", ""])
+    if missing_entries:
+        lines.extend(["| 素材 | 类型 | 路径 |", "| --- | --- | --- |"])
+        for entry in missing_entries[:20]:
+            lines.append(
+                f"| {entry.get('name') or entry.get('assetId') or '未命名'} | "
+                f"{entry.get('type') or '-'} | `{entry.get('declaredPath') or '未声明路径'}` |"
+            )
+        if len(missing_entries) > 20:
+            lines.append(f"| 其余缺失素材 | - | 还有 {len(missing_entries) - 20} 项 |")
+    else:
+        lines.append("- 没有缺失素材。")
+    lines.extend(["", "## 预热队列", ""])
+    if entries:
+        lines.extend(["| # | 素材 | 类型 | 阶段 | 体积 | 用途 |", "| --- | --- | --- | --- | --- | --- |"])
+        for entry in entries[:40]:
+            lines.append(
+                f"| {entry.get('preloadIndex') or '-'} | {entry.get('name') or entry.get('assetId') or '未命名'} | "
+                f"{entry.get('type') or '-'} | {entry.get('phase') or '-'} | {entry.get('sizeLabel') or '0 B'} | "
+                f"{entry.get('reason') or 'runtime asset'} |"
+            )
+        if len(entries) > 40:
+            lines.append(f"| ... | 其余条目 | - | - | - | 还有 {len(entries) - 40} 项 |")
+    else:
+        lines.append("- 当前没有可预热条目。")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def print_native_runtime_preload_markdown_report(bundle_dir: Path) -> dict:
+    report = build_native_runtime_preload_report(bundle_dir)
+    print(render_native_runtime_preload_markdown(report), end="")
+    return report
+
+
 def get_doctor_status(checks: list[dict]) -> str:
     if any(check.get("status") == "fail" for check in checks):
         return "fail"
@@ -16011,6 +16088,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--exercise-profile", dest="exercise_profile", help="检查原生 Runtime 玩家档案和续玩记录能否写入和读回")
     parser.add_argument("--describe-title-screen", dest="describe_title_screen", help="输出原生 Runtime 标题页配置摘要，不启动窗口")
     parser.add_argument("--describe-runtime-preload", dest="describe_runtime_preload", help="输出 Runtime 资源预热清单诊断 JSON，不启动窗口")
+    parser.add_argument("--describe-runtime-preload-markdown", "--describe-runtime-preload-md", dest="describe_runtime_preload_markdown", help="输出 Runtime 资源预热 Markdown 报告，不启动窗口")
     parser.add_argument("--describe-video-bridge", dest="describe_video_bridge", help="输出原生 Runtime 视频桥接摘要，不启动窗口")
     parser.add_argument("--describe-video-backends", dest="describe_video_backends", help="输出原生 Runtime 可选视频后端摘要，不启动窗口")
     parser.add_argument("--probe-video-preview", dest="probe_video_preview", help="输出原生 Runtime 可选视频帧 / 内嵌画面探针，不启动窗口")
@@ -16270,6 +16348,16 @@ def main(argv: list[str] | None = None) -> int:
             return 1 if report.get("status") in {"needs_fix", "missing_manifest"} else 0
         except NativeRuntimeError as error:
             print(f"Native runtime preload description failed: {error}")
+            return 1
+
+    if args.describe_runtime_preload_markdown:
+        try:
+            report = print_native_runtime_preload_markdown_report(
+                Path(args.describe_runtime_preload_markdown).resolve()
+            )
+            return 1 if report.get("status") in {"needs_fix", "missing_manifest"} else 0
+        except NativeRuntimeError as error:
+            print(f"Native runtime preload Markdown failed: {error}")
             return 1
 
     if args.describe_video_bridge:

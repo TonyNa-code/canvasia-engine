@@ -46,6 +46,7 @@ from native_runtime.runtime_player import (
     load_project_archive_progress,
     load_opencv_video_frame_surface,
     main as runtime_player_main,
+    render_native_runtime_preload_markdown,
     render_native_runtime_vn_baseline_quality_markdown,
     write_native_runtime_vn_baseline_quality_reports,
     write_project_auto_resume,
@@ -287,6 +288,10 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             with redirect_stdout(stdout):
                 self.assertEqual(runtime_player_main(["--describe-runtime-preload", str(bundle_dir)]), 1)
             cli_payload = json.loads(stdout.getvalue())
+            markdown = render_native_runtime_preload_markdown(report)
+            markdown_stdout = io.StringIO()
+            with redirect_stdout(markdown_stdout):
+                self.assertEqual(runtime_player_main(["--describe-runtime-preload-markdown", str(bundle_dir)]), 1)
 
         self.assertEqual(report["status"], "needs_fix")
         self.assertEqual(report["summary"]["totalEntries"], 2)
@@ -299,6 +304,11 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
         self.assertEqual(doctor_check["status"], "fail")
         self.assertEqual(cli_payload["status"], "needs_fix")
         self.assertEqual(cli_payload["missingEntries"][0]["assetId"], "missing_sfx")
+        self.assertIn("Runtime 资源预热报告", markdown)
+        self.assertIn("体积预算", markdown)
+        self.assertIn("missing_sfx", markdown)
+        self.assertIn("Runtime 资源预热报告", markdown_stdout.getvalue())
+        self.assertIn("missing_sfx", markdown_stdout.getvalue())
 
     def test_runtime_preload_report_warns_on_large_critical_budget(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

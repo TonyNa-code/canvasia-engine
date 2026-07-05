@@ -9062,6 +9062,24 @@ def build_native_runtime_release_control_markdown(payload: dict) -> str:
     return "\n".join(lines)
 
 
+def refresh_native_runtime_preload_report(build_dir: Path, report_path: Path) -> bool:
+    runtime_preload_markdown = subprocess.run(
+        [
+            sys.executable,
+            str(build_dir / NATIVE_RUNTIME_PLAYER_NAME),
+            "--describe-runtime-preload-markdown",
+            str(build_dir),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if not runtime_preload_markdown.stdout.strip():
+        return False
+    report_path.write_text(runtime_preload_markdown.stdout.rstrip() + "\n", encoding="utf-8")
+    return True
+
+
 def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
     game_data_path = build_dir / "game_data.json"
     game_data_path.write_text(json.dumps(export_payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -9092,6 +9110,9 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
         brand_logo_path = build_dir / NATIVE_RUNTIME_BRAND_LOGO_NAME
         brand_logo_path.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(NATIVE_RUNTIME_BRAND_LOGO_SOURCE, brand_logo_path)
+
+    # Render the public preload report through the copied runtime so it stays aligned with player diagnostics.
+    refresh_native_runtime_preload_report(build_dir, Path(runtime_preload_files["runtimePreloadReportPath"]))
 
     mac_launcher_path = build_dir / NATIVE_RUNTIME_MAC_COMMAND_NAME
     linux_launcher_path = build_dir / NATIVE_RUNTIME_LINUX_COMMAND_NAME
