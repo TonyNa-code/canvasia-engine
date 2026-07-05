@@ -4135,22 +4135,39 @@ class FrontendActionHandlerTests(unittest.TestCase):
         click_handler = _extract_function_source(source, "handleClick")
         markdown_block_start = click_handler.index('action === "export-screenplay-markdown"')
         csv_block_start = click_handler.index('action === "export-screenplay-csv"')
-        csv_block_end = click_handler.index('action === "export-choice-consequence-markdown"', csv_block_start)
+        renpy_block_start = click_handler.index('action === "export-renpy-draft"')
+        renpy_manifest_block_start = click_handler.index('action === "export-renpy-draft-manifest"')
+        csv_block_end = renpy_block_start
+        renpy_block_end = renpy_manifest_block_start
+        renpy_manifest_block_end = click_handler.index('action === "export-director-cue-sheet-markdown"', renpy_manifest_block_start)
         markdown_block = click_handler[markdown_block_start:csv_block_start]
         csv_block = click_handler[csv_block_start:csv_block_end]
+        renpy_block = click_handler[renpy_block_start:renpy_block_end]
+        renpy_manifest_block = click_handler[renpy_manifest_block_start:renpy_manifest_block_end]
 
         self.assertIn("const screenplayExporterTools = window.CanvasiaEditorScreenplayExporter", source)
+        self.assertIn("const renpyExporterTools = window.CanvasiaEditorRenpyExporter", source)
         self.assertIn('data-action="export-screenplay-markdown"', source)
         self.assertIn('data-action="export-screenplay-csv"', source)
+        self.assertIn('data-action="export-renpy-draft"', source)
+        self.assertIn('data-action="export-renpy-draft-manifest"', source)
         self.assertIn("exportScreenplayMarkdown();", markdown_block)
         self.assertIn("exportScreenplayCsv();", csv_block)
+        self.assertIn("exportRenpyDraftScript();", renpy_block)
+        self.assertIn("exportRenpyDraftManifest();", renpy_manifest_block)
         self.assertIn("function buildScreenplayExport()", source)
+        self.assertIn("function buildRenpyDraftExport()", source)
         self.assertIn("function renderScreenplayExportPanel()", source)
         self.assertIn("function exportScreenplayMarkdown()", source)
         self.assertIn("function exportScreenplayCsv()", source)
+        self.assertIn("function exportRenpyDraftScript()", source)
+        self.assertIn("function exportRenpyDraftManifest()", source)
         self.assertIn("screenplayExporterTools.buildScreenplayExport", source)
         self.assertIn("screenplayExporterTools.getScreenplayStatusDigest", source)
+        self.assertIn("renpyExporterTools.buildRenpyDraftExport", source)
+        self.assertIn("renpyExporterTools.getRenpyDraftStatusDigest", source)
         self.assertIn("完整剧本台本", source)
+        self.assertIn("Ren'Py 草稿", source)
 
     def test_director_cue_sheet_export_actions_are_wired(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")

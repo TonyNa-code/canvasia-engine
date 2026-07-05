@@ -64,18 +64,19 @@ Canvasia Engine は、ビジュアルノベル / Galgame 制作者のための s
 - 通常セーブ / ロード、クイックセーブ / ロード、システムメニュー、テキスト履歴、自動再生、既読スキップ、ボイス回想
 - 入口からの到達可能性にもとづくルート分析。壊れたリンク、孤立シーン、入口から到達できないシーン、分岐深度、エンディング候補、到達可能なエンディング経路プレビュー、エクスポート可能なルート QA チェックリストを確認可能
 - Scene pacing advisor により、試遊シーンのリズム、長文、平坦な演出、実質的な結果を持たない選択肢、収束不足を確認し、scene production board で次の作業を提示
+- Ren'Py draft export により、シーン、台詞、ナレーション、選択肢、基本的な背景 / 立ち絵 / BGM、待機、ジャンプを `.rpy` の下書きへ変換し、手作業で確認すべきカスタム演出を migration notes として出力
 - ゲーム UI スキン、UI Kit 素材バインド、9-slice テクスチャ、ボタン状態、レイアウト調整、ビジュアルノベル用テキストボックス設計
 - CG 回想、音楽鑑賞、キャラクター図鑑、場所図鑑、ナレーション図鑑、関係図鑑、実績、章回想、エンディング回想、ボイス回想。CG、BGM、ボイス、図鑑、章、エンディング、実績の抜けを確認できる Unlockable Content manifest / CSV も出力可能
 - 高度なパーティクルプリセット、プロジェクト単位のパーティクルライブラリ、カメラ演出、フィルター、フラッシュ、画面揺れ、フェード
 - Live2D / 3D キャラクターと 3D シーン素材のインポート、ネイティブ Runtime での glTF / GLB / VRM 構造レポート
 - Web 試遊パッケージ、デスクトップ書き出し、エディタデスクトップビルド、ネイティブ Runtime preview パッケージ
-- ローカル CI precheck、backend smoke、Playwright browser smoke、ボタン配線チェック、条件 / fallback 変数プリセット付き分岐対応 preview regression、release-control report、production backlog queue、Runtime capability matrix と export acceptance checklist、pacing-aware one-click recipe suggestion 付き scene production board、voice production sheet、choice consequence audit、variable influence audit、asset dependency audit、unlockable-content audit、BGM cue sheet audit、character stage-direction audit、presentation timeline audit、テスター引き継ぎワークオーダー、プレイテストフィードバックテンプレートと取り込みサマリー、VN baseline quality audit、ファイル整合性検証
+- ローカル CI precheck、backend smoke、Playwright browser smoke、ボタン配線チェック、Ren'Py draft export test、条件 / fallback 変数プリセット付き分岐対応 preview regression、release-control report、production backlog queue、Runtime capability matrix と export acceptance checklist、pacing-aware one-click recipe suggestion 付き scene production board、voice production sheet、choice consequence audit、variable influence audit、asset dependency audit、unlockable-content audit、BGM cue sheet audit、character stage-direction audit、presentation timeline audit、テスター引き継ぎワークオーダー、プレイテストフィードバックテンプレートと取り込みサマリー、VN baseline quality audit、ファイル整合性検証
 
 ## 機能ステータス
 
 | 領域 | 状態 | 説明 |
 | --- | --- | --- |
-| ストーリー / 分岐編集 | Available | カード、選択肢、ジャンプ、変数、条件分岐、入口到達可能性チェック、リズム分析に連動した配方提案つきシーン制作ボード、ボイス制作シート、シーングラフ確認、台本テキストからカードへのインポートに対応。 |
+| ストーリー / 分岐編集 | Available | カード、選択肢、ジャンプ、変数、条件分岐、入口到達可能性チェック、リズム分析に連動した配方提案つきシーン制作ボード、フル台本、Ren'Py draft export、ボイス制作シート、シーングラフ確認、台本テキストからカードへのインポートに対応。 |
 | 素材管理 | Available | インポート、置き換え、削除、使用中保護、依存関係レポート、容量予算ヒント、画風プリセット / 立ち絵表情紐付け / プロンプト / モデル / 形式検証付きの任意 OpenAI Image 生成に対応。 |
 | 多言語 / i18n | Preview | プロジェクト言語設定、多言語カバレッジレポート、キャラクター / 章 / シーン / ストーリーカード翻訳の安全な CSV 再インポート、書き出しメタデータ、Web Runtime 言語切替、ネイティブ Runtime 言語切替、フォールバック動作に対応。 |
 | Canvasia Assistant | Available | ローカルテンプレートと、制作者自身の API Key を使う主要互換プロバイダーに対応。 |

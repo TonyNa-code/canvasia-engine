@@ -55,6 +55,7 @@ const routeTestingReportTools = window.CanvasiaEditorRouteTestingReport;
 const sceneProductionBoardTools = window.CanvasiaEditorSceneProductionBoard;
 const voiceProductionSheetTools = window.CanvasiaEditorVoiceProductionSheet;
 const screenplayExporterTools = window.CanvasiaEditorScreenplayExporter;
+const renpyExporterTools = window.CanvasiaEditorRenpyExporter;
 const directorCueSheetTools = window.CanvasiaEditorDirectorCueSheet;
 const previewRegressionTools = window.CanvasiaEditorPreviewRegression;
 const playtestHandoffReportTools = window.CanvasiaEditorPlaytestHandoffReport;
@@ -3806,6 +3807,16 @@ async function handleClick(event) {
 
   if (action === "export-screenplay-csv") {
     exportScreenplayCsv();
+    return;
+  }
+
+  if (action === "export-renpy-draft") {
+    exportRenpyDraftScript();
+    return;
+  }
+
+  if (action === "export-renpy-draft-manifest") {
+    exportRenpyDraftManifest();
     return;
   }
 
@@ -28682,6 +28693,17 @@ function buildScreenplayFileName(extension = "md") {
   return `${title}_screenplay_${dateStamp}.${extension}`;
 }
 
+function buildRenpyDraftFileName(extension = "rpy") {
+  const date = new Date();
+  const dateStamp = [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("");
+  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
+  return `${title}_renpy_draft_${dateStamp}.${extension}`;
+}
+
 function buildDirectorCueSheetFileName(extension = "md") {
   const date = new Date();
   const dateStamp = [
@@ -30081,6 +30103,27 @@ function exportScreenplayCsv() {
   downloadTextFile(fileName, content, "text/csv;charset=utf-8");
   setSaveStatus(`已导出剧本台本 CSV：${fileName}`);
   showToast(`剧本台本 CSV 已导出：${fileName}`);
+}
+
+function buildRenpyDraftExport() {
+  return renpyExporterTools.buildRenpyDraftExport(state.data ?? {});
+}
+
+function exportRenpyDraftScript() {
+  const fileName = buildRenpyDraftFileName("rpy");
+  const result = buildRenpyDraftExport();
+  downloadTextFile(fileName, result.script, "text/plain;charset=utf-8");
+  setSaveStatus(`已导出 Ren'Py 草稿：${fileName}`);
+  showToast(`Ren'Py 草稿已导出：${fileName}`);
+}
+
+function exportRenpyDraftManifest() {
+  const fileName = buildRenpyDraftFileName("md");
+  const result = buildRenpyDraftExport();
+  const content = renpyExporterTools.buildRenpyDraftManifest(result);
+  downloadTextFile(fileName, content, "text/markdown;charset=utf-8");
+  setSaveStatus(`已导出 Ren'Py 迁移备注：${fileName}`);
+  showToast(`Ren'Py 迁移备注已导出：${fileName}`);
 }
 
 function buildDirectorCueSheet() {
@@ -32344,6 +32387,8 @@ function renderVoiceProductionPanel() {
 function renderScreenplayExportPanel() {
   const screenplay = buildScreenplayExport();
   const digest = screenplayExporterTools.getScreenplayStatusDigest(screenplay);
+  const renpyDraft = buildRenpyDraftExport();
+  const renpyDigest = renpyExporterTools.getRenpyDraftStatusDigest(renpyDraft);
   const summary = screenplay.summary ?? {};
   const previewEntries = (screenplay.entries ?? []).slice(0, 6);
 
@@ -32353,12 +32398,13 @@ function renderScreenplayExportPanel() {
         <h2>完整剧本台本</h2>
         <span class="badge badge-soft ${getScreenplayToneClass(digest.status)}">${escapeHtml(digest.title)}</span>
       </div>
-      <p class="helper-text">${escapeHtml(digest.detail)} 这里会把章节、场景、台词、旁白、选项和演出指令整理成一份可校对、可配音、可翻译、可归档的正式台本。</p>
+      <p class="helper-text">${escapeHtml(digest.detail)} 这里会把章节、场景、台词、旁白、选项和演出指令整理成一份可校对、可配音、可翻译、可归档的正式台本，也可以生成便于迁移或协作的 Ren'Py 草稿。</p>
       <div class="preview-sprint-metrics">
         ${renderRouteMetricCard("章节 / 场景", `${summary.chapterCount ?? 0} / ${summary.sceneCount ?? 0}`, "台本按这个顺序展开")}
         ${renderRouteMetricCard("正文行", `${summary.lineCount ?? 0}`, "台词和旁白合计")}
         ${renderRouteMetricCard("选项 / 演出", `${summary.choiceCount ?? 0} / ${summary.stageDirectionCount ?? 0}`, "分支和画面音效指令")}
         ${renderRouteMetricCard("待绑语音", `${summary.missingVoiceCount ?? 0}`, "导出后也会标记给配音收尾")}
+        ${renderRouteMetricCard("Ren'Py 草稿", `${renpyDraft.sceneCount ?? 0} 场`, renpyDigest.title)}
       </div>
       <div class="detail-actions">
         <button class="toolbar-button toolbar-button-primary" data-action="export-screenplay-markdown">
@@ -32366,6 +32412,12 @@ function renderScreenplayExportPanel() {
         </button>
         <button class="toolbar-button" data-action="export-screenplay-csv">
           导出台本 CSV
+        </button>
+        <button class="toolbar-button" data-action="export-renpy-draft">
+          导出 Ren'Py 草稿
+        </button>
+        <button class="toolbar-button" data-action="export-renpy-draft-manifest">
+          导出迁移备注
         </button>
         <button class="toolbar-button" data-action="switch-screen" data-screen="script">
           去台词台本
