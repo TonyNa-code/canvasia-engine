@@ -638,6 +638,10 @@ class RunEditorSmokeTests(unittest.TestCase):
             "bgm",
             [build_upload_payload("theme.wav", build_fake_wav_bytes())],
         )["assets"][0]
+        sfx_asset = run_editor.import_assets(
+            "sfx",
+            [build_upload_payload("bell.wav", build_fake_wav_bytes())],
+        )["assets"][0]
         voice_asset = run_editor.import_assets(
             "voice",
             [build_upload_payload("line.wav", build_fake_wav_bytes())],
@@ -677,7 +681,16 @@ class RunEditorSmokeTests(unittest.TestCase):
             chapter_result["scene"],
             [
                 {"id": "bg", "type": "background", "assetId": background_asset["id"]},
-                {"id": "music", "type": "music_play", "assetId": bgm_asset["id"], "fadeInMs": 800},
+                {
+                    "id": "music",
+                    "type": "music_play",
+                    "assetId": bgm_asset["id"],
+                    "fadeInMs": 800,
+                    "fadeOutMs": 900,
+                    "loop": False,
+                    "volume": 82,
+                    "endMode": "scene_end",
+                },
                 {
                     "id": "show",
                     "type": "character_show",
@@ -696,6 +709,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                     "voiceAssetId": voice_asset["id"],
                     "textSpeed": "fast",
                 },
+                {"id": "sfx", "type": "sfx_play", "assetId": sfx_asset["id"], "volume": 65},
                 {"id": "var", "type": "variable_add", "variableId": "affection", "value": 1},
                 {
                     "id": "condition",
@@ -783,8 +797,12 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertIn("    alpha 0.9", script)
         self.assertIn(f"show heroine expr_default at canvasia_stage_{scene['id']}_3 zorder 22 with Dissolve(0.72)", script)
         self.assertIn('play music "assets/bgm/', script)
+        self.assertIn("fadein 0.8 noloop volume 0.82", script)
+        self.assertIn("# Canvasia review music scope: endMode=scene_end, endBlockId=auto, fadeOutMs=900", script)
         self.assertIn('voice "assets/voice/', script)
         self.assertIn('heroine "{cps=72}Welcome back.{/cps}"', script)
+        self.assertIn('play sound "assets/sfx/', script)
+        self.assertIn("volume 0.65", script)
         self.assertIn("$ affection += 1", script)
         self.assertIn("if affection >= 1:", script)
         self.assertIn(f"jump {scene['id']}", script)
@@ -803,6 +821,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         renpy_manifest = json.loads(renpy_manifest_path.read_text(encoding="utf-8"))
         self.assertEqual(renpy_manifest["sceneCount"], 1)
         self.assertGreaterEqual(renpy_manifest["warningCount"], 1)
+        self.assertTrue(any(warning["code"] == "renpy_music_scope_review" for warning in renpy_manifest["warnings"]))
         self.assertTrue(any(warning["code"] == "renpy_video_timing_review" for warning in renpy_manifest["warnings"]))
         quality_report = json.loads(Path(export_result["renpyQualityReportPath"]).read_text(encoding="utf-8"))
         self.assertEqual(quality_report["status"], "review")

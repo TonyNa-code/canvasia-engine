@@ -106,6 +106,42 @@ def seconds_from_ms(value: Any) -> float:
     return round(ms / 1000, 2) if ms > 0 else 0
 
 
+def get_safe_volume_ratio(value: Any, fallback: float = 100) -> float:
+    try:
+        percent = float(value if value not in (None, "") else fallback)
+    except (TypeError, ValueError):
+        percent = fallback
+    return round(clamp_number(percent, 0, 100) / 100, 2)
+
+
+def render_volume_clause(value: Any, fallback: float = 100) -> str:
+    ratio = get_safe_volume_ratio(value, fallback)
+    return "" if ratio == 1 else f" volume {ratio:g}"
+
+
+def render_music_loop_clause(block: dict) -> str:
+    if block.get("loop") is True:
+        return " loop"
+    if block.get("loop") is False:
+        return " noloop"
+    return ""
+
+
+def render_music_scope_review(block: dict, context: dict) -> list[str]:
+    end_mode = clean_text(block.get("endMode"), "until_next_music")
+    if end_mode not in {"scene_end", "after_block"}:
+        return []
+    end_block_id = clean_text(block.get("endBlockId"), "auto")
+    add_warning(
+        context["warnings"],
+        "renpy_music_scope_review",
+        "BGM 播放范围需要在 Ren'Py 中复核并按需要补 stop music。",
+        sceneId=context.get("sceneId"),
+        blockIndex=context.get("blockIndex"),
+    )
+    return [f"    # Canvasia review music scope: endMode={end_mode}, endBlockId={end_block_id}, fadeOutMs={block.get('fadeOutMs', 'default')}"]
+
+
 def number_to_renpy_delta(value: Any, warnings: list[dict], variable_id: str, **context: Any) -> str:
     try:
         delta = float(value if value not in (None, "") else 0)
@@ -642,12 +678,15 @@ def render_story_block(block: dict, context: dict) -> list[str]:
     if block_type == "music_play":
         fade_in = seconds_from_ms(block.get("fadeInMs"))
         fade_suffix = f" fadein {fade_in:g}" if fade_in else ""
-        return [f"    play music {quote_renpy(get_asset_path(asset_map, block.get('assetId')) or 'audio/bgm.ogg')}{fade_suffix}"]
+        return [
+            f"    play music {quote_renpy(get_asset_path(asset_map, block.get('assetId')) or 'audio/bgm.ogg')}{fade_suffix}{render_music_loop_clause(block)}{render_volume_clause(block.get('volume'))}",
+            *render_music_scope_review(block, context),
+        ]
     if block_type == "music_stop":
         fade_out = seconds_from_ms(block.get("fadeOutMs"))
         return [f"    stop music{f' fadeout {fade_out:g}' if fade_out else ''}"]
     if block_type == "sfx_play":
-        return [f"    play sound {quote_renpy(get_asset_path(asset_map, block.get('assetId')) or 'audio/sfx.ogg')}"]
+        return [f"    play sound {quote_renpy(get_asset_path(asset_map, block.get('assetId')) or 'audio/sfx.ogg')}{render_volume_clause(block.get('volume'))}"]
     if block_type == "video_play":
         return render_video_block(block, context)
     if block_type == "credits_roll":

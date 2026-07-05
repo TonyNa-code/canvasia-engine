@@ -27,6 +27,7 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
               assetList: [
                 {{ id: "bg_rooftop", type: "background", name: "屋顶黄昏", path: "bg/rooftop.png" }},
                 {{ id: "bgm_piano", type: "bgm", name: "放课后钢琴", path: "bgm/piano.ogg" }},
+                {{ id: "sfx_bell", type: "sfx", name: "铃声", path: "sfx/bell.ogg" }},
                 {{ id: "voice_yuna_001", type: "voice", name: "悠奈_001", path: "voice/yuna_001.ogg" }},
                 {{ id: "op_movie", type: "video", name: "Opening", path: "video/op.webm" }},
               ],
@@ -47,7 +48,7 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
                       name: "教室黄昏",
                       blocks: [
                         {{ type: "background", assetId: "bg_rooftop" }},
-                        {{ type: "music_play", assetId: "bgm_piano", fadeInMs: 800 }},
+                        {{ type: "music_play", assetId: "bgm_piano", fadeInMs: 800, fadeOutMs: 900, loop: false, volume: 82, endMode: "scene_end" }},
                         {{
                           type: "character_show",
                           characterId: "yuna",
@@ -58,6 +59,7 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
                           stage: {{ offsetX: -8, offsetY: -5, scale: 118, opacity: 90, layer: 2, flipX: true }},
                         }},
                         {{ type: "dialogue", speakerId: "yuna", text: "欢迎回来。", voiceAssetId: "voice_yuna_001", textSpeed: "fast" }},
+                        {{ type: "sfx_play", assetId: "sfx_bell", volume: 65 }},
                         {{ type: "narration", text: "风吹过屋顶。", textSpeed: "instant" }},
                         {{
                           type: "choice",
@@ -131,7 +133,8 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
         self.assertIn('image bg_rooftop = "bg/rooftop.png"', payload["draft"]["script"])
         self.assertIn("label scene_open:", payload["draft"]["script"])
         self.assertIn("scene bg_rooftop with fade", payload["draft"]["script"])
-        self.assertIn('play music "bgm/piano.ogg" fadein 0.8', payload["draft"]["script"])
+        self.assertIn('play music "bgm/piano.ogg" fadein 0.8 noloop volume 0.82', payload["draft"]["script"])
+        self.assertIn("# Canvasia review music scope: endMode=scene_end, endBlockId=auto, fadeOutMs=900", payload["draft"]["script"])
         self.assertIn("transform canvasia_stage_scene_open_3:", payload["draft"]["script"])
         self.assertIn("    xalign 0.67", payload["draft"]["script"])
         self.assertIn("    yalign 0.95", payload["draft"]["script"])
@@ -141,6 +144,7 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
         self.assertIn("show yuna smile at canvasia_stage_scene_open_3 zorder 22 with Dissolve(0.72)", payload["draft"]["script"])
         self.assertIn('voice "voice/yuna_001.ogg"', payload["draft"]["script"])
         self.assertIn('yuna "{cps=72}欢迎回来。{/cps}"', payload["draft"]["script"])
+        self.assertIn('play sound "sfx/bell.ogg" volume 0.65', payload["draft"]["script"])
         self.assertIn('"{cps=10000}风吹过屋顶。{/cps}"', payload["draft"]["script"])
         self.assertIn('"{cps=24}风把答案吹散了。{/cps}"', payload["draft"]["script"])
         self.assertIn("menu:", payload["draft"]["script"])
@@ -156,6 +160,7 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
         self.assertIn('show text "STAFF\\nThank you\\n企划：Canvasia\\n剧本：Tester" at truecenter with dissolve', payload["draft"]["script"])
         self.assertNotIn("renpy_choice_effects_review", payload["manifest"])
         self.assertIn("renpy_video_timing_review", payload["manifest"])
+        self.assertIn("renpy_music_scope_review", payload["manifest"])
         self.assertIn("变量默认值：2", payload["manifest"])
         self.assertIn("scene_open", payload["manifest"])
 

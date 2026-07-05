@@ -222,6 +222,37 @@
     return Number.isFinite(value) && value > 0 ? Number((value / 1000).toFixed(2)) : 0;
   }
 
+  function getSafeVolumeRatio(value, fallback = 100) {
+    const number = Number(value ?? fallback);
+    const percent = clampNumber(Number.isFinite(number) ? number : fallback, 0, 100);
+    return Number((percent / 100).toFixed(2));
+  }
+
+  function renderVolumeClause(value, fallback = 100) {
+    const ratio = getSafeVolumeRatio(value, fallback);
+    return ratio === 1 ? "" : ` volume ${ratio}`;
+  }
+
+  function renderMusicLoopClause(block = {}) {
+    if (block.loop === true) {
+      return " loop";
+    }
+    if (block.loop === false) {
+      return " noloop";
+    }
+    return "";
+  }
+
+  function pushMusicScopeReview(block = {}, context = {}) {
+    const endMode = cleanText(block.endMode, "until_next_music");
+    if (!["scene_end", "after_block"].includes(endMode)) {
+      return [];
+    }
+    const endBlockId = cleanText(block.endBlockId);
+    pushWarning(context.warnings ?? [], "renpy_music_scope_review", "BGM 播放范围需要在 Ren'Py 中复核并按需要补 stop music。", getWarningContext(context));
+    return [`    # Canvasia review music scope: endMode=${endMode}, endBlockId=${endBlockId || "auto"}, fadeOutMs=${block.fadeOutMs ?? "default"}`];
+  }
+
   function clampNumber(value, min, max) {
     return Math.min(Math.max(value, min), max);
   }
@@ -622,14 +653,17 @@
     if (type === "music_play") {
       const path = getAssetPath(assetMap, block.assetId);
       const fadeIn = secondsFromMs(block.fadeInMs);
-      return [`    play music ${quoteRenpy(path || "audio/bgm.ogg")}${fadeIn ? ` fadein ${fadeIn}` : ""}`];
+      return [
+        `    play music ${quoteRenpy(path || "audio/bgm.ogg")}${fadeIn ? ` fadein ${fadeIn}` : ""}${renderMusicLoopClause(block)}${renderVolumeClause(block.volume)}`,
+        ...pushMusicScopeReview(block, context),
+      ];
     }
     if (type === "music_stop") {
       const fadeOut = secondsFromMs(block.fadeOutMs);
       return [`    stop music${fadeOut ? ` fadeout ${fadeOut}` : ""}`];
     }
     if (type === "sfx_play") {
-      return [`    play sound ${quoteRenpy(getAssetPath(assetMap, block.assetId) || "audio/sfx.ogg")}`];
+      return [`    play sound ${quoteRenpy(getAssetPath(assetMap, block.assetId) || "audio/sfx.ogg")}${renderVolumeClause(block.volume)}`];
     }
     if (type === "video_play") {
       return renderVideoBlock(block, context);
