@@ -263,9 +263,9 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             player.build_info = {
                 "runtimePreloadManifest": {
                     "entries": [
-                        {"assetId": "opening_video", "type": "video", "phase": "critical", "priority": 10, "preloadIndex": 3},
-                        {"assetId": "click_sfx", "type": "sfx", "phase": "critical", "priority": 90, "preloadIndex": 2},
-                        {"assetId": "title_ui", "type": "ui", "phase": "critical", "priority": 100, "preloadIndex": 1},
+                        {"assetId": "opening_video", "type": "video", "phase": "critical", "priority": 10, "preloadIndex": 3, "sizeBytes": 4096},
+                        {"assetId": "click_sfx", "type": "sfx", "phase": "critical", "priority": 90, "preloadIndex": 2, "sizeBytes": 2048},
+                        {"assetId": "title_ui", "type": "ui", "phase": "critical", "priority": 100, "preloadIndex": 1, "sizeBytes": 1024},
                     ]
                 }
             }
@@ -292,6 +292,11 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
         self.assertEqual(status["loadedSoundEntries"], 1)
         self.assertEqual(status["readyStreamEntries"], 1)
         self.assertEqual(status["loadedEntries"], 3)
+        self.assertEqual(status["totalBytes"], 7168)
+        self.assertEqual(status["criticalBytes"], 7168)
+        self.assertEqual(status["loadedBytes"], 7168)
+        self.assertIn("首屏 7.0 KB", status["summaryText"])
+        self.assertIn("合计 7.0 KB", player.get_runtime_preload_status_line())
         self.assertEqual(player.image_cache["title_ui"], "image:title_ui")
         self.assertEqual(player.sound_cache["click_sfx"], "sound:click_sfx")
 
@@ -324,9 +329,9 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             player.build_info = {
                 "runtimePreloadManifest": {
                     "entries": [
-                        {"assetId": "title_ui", "type": "ui", "phase": "critical", "priority": 100, "preloadIndex": 1},
-                        {"assetId": "gallery_ui", "type": "ui", "phase": "early", "priority": 72, "preloadIndex": 2},
-                        {"assetId": "ending_video", "type": "video", "phase": "deferred", "priority": 38, "preloadIndex": 3},
+                        {"assetId": "title_ui", "type": "ui", "phase": "critical", "priority": 100, "preloadIndex": 1, "sizeBytes": 1024},
+                        {"assetId": "gallery_ui", "type": "ui", "phase": "early", "priority": 72, "preloadIndex": 2, "sizeBytes": 2048},
+                        {"assetId": "ending_video", "type": "video", "phase": "deferred", "priority": 38, "preloadIndex": 3, "sizeBytes": 4096},
                     ]
                 }
             }
@@ -347,6 +352,10 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             self.assertEqual(status["status"], "warming")
             self.assertEqual(status["loadedEntries"], 1)
             self.assertEqual(status["pendingEntries"], 2)
+            self.assertEqual(status["loadedBytes"], 1024)
+            self.assertEqual(status["totalBytes"], 7168)
+            self.assertIn("后台继续 2 项", status["summaryText"])
+            self.assertIn("已准备 1.0 KB", status["summaryText"])
             self.assertIn("title_ui", player.image_cache)
             self.assertNotIn("gallery_ui", player.image_cache)
 
@@ -354,6 +363,7 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             self.assertEqual(player.runtime_preload_status["status"], "warming")
             self.assertEqual(player.runtime_preload_status["loadedEntries"], 2)
             self.assertEqual(player.runtime_preload_status["pendingEntries"], 1)
+            self.assertEqual(player.runtime_preload_status["loadedBytes"], 3072)
             self.assertIn("gallery_ui", player.image_cache)
 
             player.update_runtime_preload_queue(max_entries=1)
@@ -361,6 +371,8 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
         self.assertEqual(player.runtime_preload_status["status"], "ready")
         self.assertEqual(player.runtime_preload_status["loadedEntries"], 3)
         self.assertEqual(player.runtime_preload_status["pendingEntries"], 0)
+        self.assertEqual(player.runtime_preload_status["loadedBytes"], 7168)
+        self.assertIn("合计 7.0 KB", player.runtime_preload_status["summaryText"])
 
     def test_runtime_preload_report_and_doctor_flag_missing_entries(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

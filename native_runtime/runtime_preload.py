@@ -41,6 +41,13 @@ def clamp_int(value: object, minimum: int, maximum: int, default: int) -> int:
     return max(minimum, min(maximum, integer))
 
 
+def normalize_size_bytes(value: object) -> int:
+    try:
+        return max(0, int(value or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
 def get_runtime_preload_manifest(build_info: dict | None) -> dict:
     if not isinstance(build_info, dict):
         return {}
@@ -73,10 +80,12 @@ def normalize_runtime_preload_entries(manifest: dict | None, assets_by_id: dict)
         normalized_entries.append(
             {
                 "assetId": asset_id,
+                "name": str(entry.get("name") or asset.get("name") or asset_id),
                 "type": asset_type,
                 "phase": str(entry.get("phase") or "deferred").strip() or "deferred",
                 "priority": clamp_int(entry.get("priority"), 0, 999, 0),
                 "preloadIndex": clamp_int(entry.get("preloadIndex"), 0, 9999, len(normalized_entries) + 1),
+                "sizeBytes": normalize_size_bytes(entry.get("sizeBytes") if "sizeBytes" in entry else asset.get("fileSizeBytes")),
                 "reason": str(entry.get("reason") or ""),
             }
         )
@@ -161,6 +170,9 @@ def build_empty_runtime_preload_status() -> dict:
         "missingEntries": 0,
         "failedEntries": 0,
         "audioUnavailableEntries": 0,
+        "totalBytes": 0,
+        "criticalBytes": 0,
+        "loadedBytes": 0,
         "missingAssetIds": [],
         "failedAssetIds": [],
         "skippedAssetIds": [],
@@ -174,6 +186,10 @@ def build_runtime_preload_status(entries: list[dict]) -> dict:
     status["pendingEntries"] = len(entries)
     for entry in entries:
         asset_type = str(entry.get("type") or "")
+        size_bytes = normalize_size_bytes(entry.get("sizeBytes"))
+        status["totalBytes"] += size_bytes
+        if is_runtime_preload_startup_entry(entry):
+            status["criticalBytes"] += size_bytes
         if asset_type in RUNTIME_PRELOAD_IMAGE_TYPES:
             status["imageEntries"] += 1
         elif asset_type in RUNTIME_PRELOAD_SOUND_TYPES:
@@ -187,6 +203,8 @@ def mark_runtime_preload_entry(status: dict, entry: dict, outcome: str) -> dict:
     asset_id = str(entry.get("assetId") or "")
     if status.get("pendingEntries"):
         status["pendingEntries"] = max(0, int(status.get("pendingEntries") or 0) - 1)
+    if outcome in {"loaded_image", "loaded_sound", "ready_stream"}:
+        status["loadedBytes"] = normalize_size_bytes(status.get("loadedBytes")) + normalize_size_bytes(entry.get("sizeBytes"))
     if outcome == "loaded_image":
         status["loadedImageEntries"] += 1
     elif outcome == "loaded_sound":
@@ -249,6 +267,14 @@ def format_runtime_preload_status_line(status: dict | None = None) -> str:
         f" · 音效 {int(source.get('loadedSoundEntries') or 0)}/{int(source.get('soundEntries') or 0)}"
         f" · 流媒体 {int(source.get('readyStreamEntries') or 0)}/{int(source.get('streamEntries') or 0)}"
     )
+    total_bytes = normalize_size_bytes(source.get("totalBytes"))
+    if total_bytes > 0:
+        detail = (
+            f"{detail}"
+            f" · 已准备 {format_bytes(source.get('loadedBytes'))}"
+            f" · 首屏 {format_bytes(source.get('criticalBytes'))}"
+            f" · 合计 {format_bytes(total_bytes)}"
+        )
     if pending_entries > 0:
         return f"资源预热：{loaded_entries}/{total_entries} 已准备，后台继续 {pending_entries} 项（{detail}）"
     if issue_count > 0:
