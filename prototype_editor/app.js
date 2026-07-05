@@ -67,6 +67,7 @@ const audioCueSheetTools = window.CanvasiaEditorAudioCueSheet;
 const audioCueSheetPanelTools = window.CanvasiaEditorAudioCueSheetPanel;
 const stageDirectionSheetTools = window.CanvasiaEditorStageDirectionSheet;
 const presentationTimelineTools = window.CanvasiaEditorPresentationTimeline;
+const scenePolishTools = window.CanvasiaEditorScenePolish;
 const localizationCoverageTools = window.CanvasiaEditorLocalizationCoverage;
 const runtimeCapabilityMatrixTools = window.CanvasiaEditorRuntimeCapabilityMatrix;
 const productionBacklogTools = window.CanvasiaEditorProductionBacklog;
@@ -4773,6 +4774,11 @@ async function handleClick(event) {
 
   if (action === "split-readable-scene") {
     void splitSelectedSceneReadableBlocks();
+    return;
+  }
+
+  if (action === "polish-scene-presentation") {
+    void polishSelectedScenePresentation();
     return;
   }
 
@@ -33931,12 +33937,16 @@ function buildStorySceneOptimizerCards(scene, overview) {
 
   const effectActions = [];
   const effectTags = [];
+  if (overview.hasStoryContent) {
+    effectActions.push({ label: "一键润色本场演出", action: "polish-scene-presentation", primary: true });
+    effectTags.push("自动补基础转场和淡入淡出");
+  }
   if (overview.hasStoryContent && !overview.hasEffects) {
-    effectActions.push({ label: "加粒子特效", action: "add-particle-effect", primary: true });
+    effectActions.push({ label: "加粒子特效", action: "add-particle-effect" });
     effectActions.push({ label: "加镜头推近", action: "add-camera-zoom" });
     effectTags.push("演出还没开始点缀");
   } else if (overview.effectCount > 0 && overview.effectCount < 2 && overview.storyCount >= 3) {
-    effectActions.push({ label: "再补一张镜头卡", action: "add-camera-pan", primary: true });
+    effectActions.push({ label: "再补一张镜头卡", action: "add-camera-pan" });
     effectActions.push({ label: "加闪屏或震动", action: "add-screen-flash" });
     effectTags.push("演出还可以再抬一点");
   }
@@ -41540,6 +41550,45 @@ async function splitSelectedSceneReadableBlocks() {
   if (success) {
     clearPendingStoryChanges();
     showToast(`已整理本场 ${splitPlan.splitCount} 张长文本`);
+  }
+
+  return success;
+}
+
+async function polishSelectedScenePresentation() {
+  const scene = getSelectedScene();
+  const block = getSelectedBlock();
+
+  if (!scene) {
+    showToast("先选中一个场景，再润色演出", "error");
+    return false;
+  }
+
+  const updatedScene = cloneScene(scene);
+  updatedScene.blocks = Array.isArray(updatedScene.blocks) ? updatedScene.blocks : [];
+  const selectedIndex = updatedScene.blocks.findIndex((item) => item.id === block?.id);
+  if (block && selectedIndex >= 0) {
+    updatedScene.blocks[selectedIndex] = collectEditedBlock(block);
+  }
+
+  const polishPlan = scenePolishTools.buildScenePresentationPolishPlan(updatedScene);
+  if (!polishPlan.changed) {
+    setSaveStatus("本场基础演出参数已经比较完整");
+    showToast("本场基础演出参数已经比较完整");
+    return false;
+  }
+
+  const success = await persistScene(polishPlan.scene, {
+    selectedSceneId: polishPlan.scene.id,
+    selectedBlockId: polishPlan.firstChangedBlockId || state.selectedBlockId,
+    previewSceneId: polishPlan.scene.id,
+    previewBlockIndex: Math.max(polishPlan.firstChangedIndex, 0),
+    successMessage: polishPlan.summary,
+  });
+
+  if (success) {
+    clearPendingStoryChanges();
+    showToast(polishPlan.summary);
   }
 
   return success;
