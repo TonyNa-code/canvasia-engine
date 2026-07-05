@@ -52,6 +52,12 @@ from native_runtime.runtime_player import (
     write_project_auto_resume,
     wrap_text,
 )
+from native_runtime.runtime_performance import (
+    PERFORMANCE_BUDGET_MARKDOWN_NAME,
+    PERFORMANCE_BUDGET_REPORT_NAME,
+    build_native_runtime_performance_budget_report,
+    render_native_runtime_performance_budget_markdown,
+)
 
 
 UI_ASSET_IDS = [
@@ -111,6 +117,111 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
         self.assertEqual(defaults["sfxVolume"], 77)
         self.assertEqual(defaults["voiceVolume"], 0)
         self.assertEqual(defaults["voiceDuckingEnabled"], "off")
+
+    def test_native_runtime_performance_budget_reports_missing_and_heavy_assets(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_dir = Path(temp_dir)
+            bg_path = bundle_dir / "assets" / "backgrounds" / "large-bg.png"
+            bgm_path = bundle_dir / "assets" / "bgm" / "theme.ogg"
+            unused_path = bundle_dir / "assets" / "cg" / "unused.png"
+            for path, content in [
+                (bg_path, b"b" * 24),
+                (bgm_path, b"m" * 6),
+                (unused_path, b"u" * 5),
+            ]:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(content)
+            game_data = {
+                "project": {"projectId": "perf_budget_smoke", "title": "Performance Budget Smoke"},
+                "assets": {
+                    "assets": [
+                        {
+                            "id": "large_bg",
+                            "type": "background",
+                            "name": "Large BG",
+                            "exportUrl": bg_path.relative_to(bundle_dir).as_posix(),
+                        },
+                        {
+                            "id": "theme_bgm",
+                            "type": "bgm",
+                            "name": "Theme BGM",
+                            "exportUrl": bgm_path.relative_to(bundle_dir).as_posix(),
+                        },
+                        {
+                            "id": "missing_voice",
+                            "type": "voice",
+                            "name": "Missing Voice",
+                            "exportUrl": "assets/voice/missing.ogg",
+                        },
+                        {
+                            "id": "unused_cg",
+                            "type": "cg",
+                            "name": "Unused CG",
+                            "exportUrl": unused_path.relative_to(bundle_dir).as_posix(),
+                        },
+                    ]
+                },
+                "characters": {"characters": []},
+                "variables": {"variables": []},
+                "chapters": [
+                    {
+                        "chapterId": "chapter_1",
+                        "name": "Chapter 1",
+                        "scenes": [
+                            {
+                                "id": "scene_1",
+                                "name": "Scene 1",
+                                "blocks": [
+                                    {"id": "bg", "type": "background", "assetId": "large_bg"},
+                                    {"id": "music", "type": "music_play", "assetId": "theme_bgm"},
+                                    {
+                                        "id": "line",
+                                        "type": "dialogue",
+                                        "text": "hello",
+                                        "voiceAssetId": "missing_voice",
+                                    },
+                                ],
+                            }
+                        ],
+                    }
+                ],
+            }
+            (bundle_dir / "game_data.json").write_text(json.dumps(game_data, ensure_ascii=False), encoding="utf-8")
+
+            report = build_native_runtime_performance_budget_report(
+                bundle_dir,
+                budgets={
+                    "totalAssetBudgetBytes": 16,
+                    "referencedAssetBudgetBytes": 16,
+                    "imageAssetBudgetBytes": 20,
+                    "singleImageBudgetBytes": 12,
+                },
+            )
+            markdown = render_native_runtime_performance_budget_markdown(report)
+            json_stdout = io.StringIO()
+            with redirect_stdout(json_stdout):
+                self.assertEqual(runtime_player_main(["--performance-budget-json", str(bundle_dir)]), 1)
+            md_stdout = io.StringIO()
+            with redirect_stdout(md_stdout):
+                self.assertEqual(runtime_player_main(["--performance-budget-report", str(bundle_dir)]), 1)
+            write_stdout = io.StringIO()
+            with redirect_stdout(write_stdout):
+                self.assertEqual(runtime_player_main(["--write-performance-budget-reports", str(bundle_dir)]), 1)
+
+            cli_payload = json.loads(json_stdout.getvalue())
+            write_payload = json.loads(write_stdout.getvalue())
+            self.assertEqual(report["status"], "needs_fix")
+            self.assertEqual(report["summary"]["missingReferencedAssetCount"], 1)
+            self.assertTrue(any(issue["code"] == "missing_referenced_assets" for issue in report["issues"]))
+            self.assertTrue(any(issue["code"] == "totalAssets_over_budget" for issue in report["issues"]))
+            self.assertIn("原生 Runtime 性能预算报告", markdown)
+            self.assertIn("Missing Voice", markdown)
+            self.assertEqual(cli_payload["status"], "needs_fix")
+            self.assertIn("原生 Runtime 性能预算报告", md_stdout.getvalue())
+            self.assertEqual(write_payload["markdown"], PERFORMANCE_BUDGET_MARKDOWN_NAME)
+            self.assertEqual(write_payload["json"], PERFORMANCE_BUDGET_REPORT_NAME)
+            self.assertTrue((bundle_dir / PERFORMANCE_BUDGET_MARKDOWN_NAME).is_file())
+            self.assertTrue((bundle_dir / PERFORMANCE_BUDGET_REPORT_NAME).is_file())
 
     def test_runtime_preload_manifest_can_warm_assets_without_window(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

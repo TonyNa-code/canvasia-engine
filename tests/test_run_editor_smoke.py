@@ -3436,6 +3436,9 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["runtimePreloadManifest"], run_editor.RUNTIME_PRELOAD_MANIFEST_FILE_NAME)
         self.assertEqual(manifest["files"]["runtimePreloadReport"], run_editor.RUNTIME_PRELOAD_REPORT_FILE_NAME)
         self.assertEqual(manifest["files"]["runtimePreloadModule"], run_editor.NATIVE_RUNTIME_PRELOAD_NAME)
+        self.assertEqual(manifest["files"]["runtimePerformanceModule"], run_editor.NATIVE_RUNTIME_PERFORMANCE_NAME)
+        self.assertEqual(manifest["files"]["performanceBudgetReport"], run_editor.NATIVE_RUNTIME_PERFORMANCE_BUDGET_REPORT_NAME)
+        self.assertEqual(manifest["files"]["performanceBudgetMarkdown"], run_editor.NATIVE_RUNTIME_PERFORMANCE_BUDGET_MARKDOWN_NAME)
         self.assertEqual(manifest["runtime"]["mode"], "pygame_native")
         self.assertTrue(manifest["runtime"]["canBuildStandaloneApp"])
         self.assertEqual(manifest["runtime"]["playtestGuide"], run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME)
@@ -3450,6 +3453,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["runtime"]["runtimePreloadManifest"], run_editor.RUNTIME_PRELOAD_MANIFEST_FILE_NAME)
         self.assertEqual(manifest["runtime"]["runtimePreloadReport"], run_editor.RUNTIME_PRELOAD_REPORT_FILE_NAME)
         self.assertEqual(manifest["runtime"]["runtimePreloadModule"], run_editor.NATIVE_RUNTIME_PRELOAD_NAME)
+        self.assertEqual(manifest["runtime"]["runtimePerformanceModule"], run_editor.NATIVE_RUNTIME_PERFORMANCE_NAME)
         self.assertEqual(
             manifest["runtime"]["runtimePreloadSummary"]["totalEntries"],
             native_preload_manifest["summary"]["totalEntries"],
@@ -3459,6 +3463,9 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["runtime"]["releaseControlJson"], run_editor.NATIVE_RUNTIME_RELEASE_CONTROL_JSON_NAME)
         self.assertEqual(manifest["runtime"]["vnBaselineQualityReport"], run_editor.NATIVE_RUNTIME_VN_BASELINE_QUALITY_REPORT_NAME)
         self.assertEqual(manifest["runtime"]["vnBaselineQualityMarkdown"], run_editor.NATIVE_RUNTIME_VN_BASELINE_QUALITY_MARKDOWN_NAME)
+        self.assertEqual(manifest["runtime"]["performanceBudgetReport"], run_editor.NATIVE_RUNTIME_PERFORMANCE_BUDGET_REPORT_NAME)
+        self.assertEqual(manifest["runtime"]["performanceBudgetMarkdown"], run_editor.NATIVE_RUNTIME_PERFORMANCE_BUDGET_MARKDOWN_NAME)
+        self.assertIn(manifest["runtime"]["performanceBudgetStatus"], {"ready", "needs_review", "needs_fix", "unavailable"})
         self.assertEqual(manifest["runtime"]["releaseControlReporter"]["macos"], run_editor.NATIVE_RUNTIME_MAC_RELEASE_CONTROL_COMMAND_NAME)
         self.assertEqual(manifest["runtime"]["releaseControlReporter"]["linux"], run_editor.NATIVE_RUNTIME_LINUX_RELEASE_CONTROL_COMMAND_NAME)
         self.assertEqual(manifest["runtime"]["releaseControlReporter"]["windows"], run_editor.NATIVE_RUNTIME_WINDOWS_RELEASE_CONTROL_COMMAND_NAME)
@@ -3480,6 +3487,8 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["releaseControlJson"], run_editor.NATIVE_RUNTIME_RELEASE_CONTROL_JSON_NAME)
         self.assertEqual(manifest["files"]["vnBaselineQualityReport"], run_editor.NATIVE_RUNTIME_VN_BASELINE_QUALITY_REPORT_NAME)
         self.assertEqual(manifest["files"]["vnBaselineQualityMarkdown"], run_editor.NATIVE_RUNTIME_VN_BASELINE_QUALITY_MARKDOWN_NAME)
+        self.assertEqual(manifest["files"]["performanceBudgetReport"], run_editor.NATIVE_RUNTIME_PERFORMANCE_BUDGET_REPORT_NAME)
+        self.assertEqual(manifest["files"]["performanceBudgetMarkdown"], run_editor.NATIVE_RUNTIME_PERFORMANCE_BUDGET_MARKDOWN_NAME)
         self.assertEqual(manifest["files"]["macReleaseControlReporter"], run_editor.NATIVE_RUNTIME_MAC_RELEASE_CONTROL_COMMAND_NAME)
         self.assertEqual(manifest["files"]["linuxReleaseControlReporter"], run_editor.NATIVE_RUNTIME_LINUX_RELEASE_CONTROL_COMMAND_NAME)
         self.assertEqual(manifest["files"]["windowsReleaseControlReporter"], run_editor.NATIVE_RUNTIME_WINDOWS_RELEASE_CONTROL_COMMAND_NAME)
@@ -3530,6 +3539,15 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(export_result["vnBaselineQualityStatus"], "ready")
         self.assertTrue(export_result["vnBaselineQualityReportPublicUrl"].endswith(run_editor.NATIVE_RUNTIME_VN_BASELINE_QUALITY_REPORT_NAME))
         self.assertTrue(export_result["vnBaselineQualityMarkdownPublicUrl"].endswith(run_editor.NATIVE_RUNTIME_VN_BASELINE_QUALITY_MARKDOWN_NAME))
+        performance_budget_payload = json.loads((build_dir / run_editor.NATIVE_RUNTIME_PERFORMANCE_BUDGET_REPORT_NAME).read_text(encoding="utf-8"))
+        self.assertIn(performance_budget_payload["status"], {"ready", "needs_review"})
+        self.assertEqual(export_result["performanceBudgetStatus"], performance_budget_payload["status"])
+        self.assertGreaterEqual(performance_budget_payload["summary"]["assetCount"], 1)
+        performance_budget_markdown = (build_dir / run_editor.NATIVE_RUNTIME_PERFORMANCE_BUDGET_MARKDOWN_NAME).read_text(encoding="utf-8")
+        self.assertIn("# 原生 Runtime 性能预算报告", performance_budget_markdown)
+        self.assertTrue(export_result["runtimePerformanceModulePublicUrl"].endswith(run_editor.NATIVE_RUNTIME_PERFORMANCE_NAME))
+        self.assertTrue(export_result["performanceBudgetReportPublicUrl"].endswith(run_editor.NATIVE_RUNTIME_PERFORMANCE_BUDGET_REPORT_NAME))
+        self.assertTrue(export_result["performanceBudgetMarkdownPublicUrl"].endswith(run_editor.NATIVE_RUNTIME_PERFORMANCE_BUDGET_MARKDOWN_NAME))
         self.assertTrue(export_result["macReleaseControlReporterPublicUrl"].endswith(run_editor.NATIVE_RUNTIME_MAC_RELEASE_CONTROL_COMMAND_NAME))
         self.assertTrue(export_result["linuxReleaseControlReporterPublicUrl"].endswith(run_editor.NATIVE_RUNTIME_LINUX_RELEASE_CONTROL_COMMAND_NAME))
         self.assertTrue(export_result["windowsReleaseControlReporterPublicUrl"].endswith(run_editor.NATIVE_RUNTIME_WINDOWS_RELEASE_CONTROL_COMMAND_NAME))
@@ -3576,6 +3594,20 @@ class RunEditorSmokeTests(unittest.TestCase):
             check=False,
         )
         self.assertEqual(release_control_cli_write.returncode, 0, release_control_cli_write.stdout + release_control_cli_write.stderr)
+
+        performance_budget_cli = subprocess.run(
+            [
+                sys.executable,
+                str(build_dir / run_editor.NATIVE_RUNTIME_PLAYER_NAME),
+                "--performance-budget-report",
+                str(build_dir),
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(performance_budget_cli.returncode, 0, performance_budget_cli.stdout + performance_budget_cli.stderr)
+        self.assertIn("# 原生 Runtime 性能预算报告", performance_budget_cli.stdout)
 
         integrity_payload = json.loads((build_dir / run_editor.NATIVE_RUNTIME_FILE_INTEGRITY_REPORT_NAME).read_text(encoding="utf-8"))
         self.assertEqual(integrity_payload["formatVersion"], 1)
@@ -3799,6 +3831,12 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue(all(entry["exists"] for entry in app_builder_payload["fileIntegrity"]["checkers"]))
         self.assertGreater(app_builder_payload["fileIntegrity"]["report"]["summary"]["fileCount"], 10)
         self.assertIn("# 原生 Runtime 文件完整性报告", app_builder_payload["fileIntegrity"]["markdown"]["preview"])
+        self.assertEqual(app_builder_payload["performanceBudget"]["reportName"], run_editor.NATIVE_RUNTIME_PERFORMANCE_BUDGET_REPORT_NAME)
+        self.assertEqual(app_builder_payload["performanceBudget"]["markdownName"], run_editor.NATIVE_RUNTIME_PERFORMANCE_BUDGET_MARKDOWN_NAME)
+        self.assertTrue(app_builder_payload["performanceBudget"]["report"]["exists"])
+        self.assertTrue(app_builder_payload["performanceBudget"]["markdown"]["exists"])
+        self.assertIn(app_builder_payload["performanceBudget"]["report"]["status"], {"ready", "needs_review"})
+        self.assertIn("# 原生 Runtime 性能预算报告", app_builder_payload["performanceBudget"]["markdown"]["preview"])
         self.assertEqual(app_builder_payload["asset3d"]["reportName"], run_editor.NATIVE_RUNTIME_3D_ASSET_REPORT_NAME)
         self.assertEqual(app_builder_payload["asset3d"]["summaryName"], run_editor.NATIVE_RUNTIME_3D_ASSET_SUMMARY_NAME)
         self.assertEqual(app_builder_payload["asset3d"]["digestName"], run_editor.NATIVE_RUNTIME_3D_ASSET_DIGEST_NAME)

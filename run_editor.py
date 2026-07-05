@@ -46,6 +46,10 @@ from export_runtime_preload import (
     build_runtime_preload_manifest,
     write_runtime_preload_files,
 )
+from native_runtime.runtime_performance import (
+    PERFORMANCE_BUDGET_MARKDOWN_NAME as NATIVE_RUNTIME_PERFORMANCE_BUDGET_MARKDOWN_NAME,
+    PERFORMANCE_BUDGET_REPORT_NAME as NATIVE_RUNTIME_PERFORMANCE_BUDGET_REPORT_NAME,
+)
 from export_story_route_map import (
     EXPORT_STORY_ROUTE_MAP_JSON_NAME,
     EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
@@ -408,6 +412,7 @@ EDITOR_SIGNING_CHECK_SCRIPT_SOURCE = ROOT_DIR / "tools" / "release" / "check_edi
 EDITOR_SIGNING_CHECK_COMMAND_SOURCE = ROOT_DIR / "tools" / "release" / "run_signing_readiness.command"
 NATIVE_RUNTIME_PLAYER_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_player.py"
 NATIVE_RUNTIME_PRELOAD_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_preload.py"
+NATIVE_RUNTIME_PERFORMANCE_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_performance.py"
 NATIVE_RUNTIME_README_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "README.md"
 NATIVE_RUNTIME_REQUIREMENTS_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "requirements.txt"
 NATIVE_RUNTIME_BUILD_REQUIREMENTS_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "requirements-build.txt"
@@ -415,6 +420,7 @@ NATIVE_RUNTIME_VIDEO_REQUIREMENTS_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "requir
 NATIVE_RUNTIME_BRAND_LOGO_SOURCE = ROOT_DIR / "prototype_editor" / "assets" / "canvasia-brand-logo.png"
 NATIVE_RUNTIME_PLAYER_NAME = "runtime_player.py"
 NATIVE_RUNTIME_PRELOAD_NAME = "runtime_preload.py"
+NATIVE_RUNTIME_PERFORMANCE_NAME = "runtime_performance.py"
 NATIVE_RUNTIME_README_NAME = "README_原生_Runtime_包先看这里.md"
 NATIVE_RUNTIME_REQUIREMENTS_NAME = "requirements-native-runtime.txt"
 NATIVE_RUNTIME_BUILD_REQUIREMENTS_NAME = "requirements-native-runtime-build.txt"
@@ -9080,6 +9086,76 @@ def refresh_native_runtime_preload_report(build_dir: Path, report_path: Path) ->
     return True
 
 
+def write_native_runtime_performance_budget_reports(build_dir: Path) -> dict:
+    report_path = build_dir / NATIVE_RUNTIME_PERFORMANCE_BUDGET_REPORT_NAME
+    markdown_path = build_dir / NATIVE_RUNTIME_PERFORMANCE_BUDGET_MARKDOWN_NAME
+    performance_budget = subprocess.run(
+        [
+            sys.executable,
+            str(build_dir / NATIVE_RUNTIME_PLAYER_NAME),
+            "--write-performance-budget-reports",
+            str(build_dir),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    payload = None
+    if report_path.is_file():
+        try:
+            payload = json.loads(report_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            payload = None
+    if not isinstance(payload, dict):
+        message = performance_budget.stderr.strip() or performance_budget.stdout.strip() or "性能预算报告生成失败。"
+        payload = {
+            "formatVersion": 1,
+            "generatedAt": now_iso(),
+            "status": "unavailable",
+            "summary": {
+                "statusLabel": "报告未生成",
+                "recommendation": message,
+            },
+            "issues": [
+                {
+                    "severity": "warn",
+                    "code": "performance_budget_unavailable",
+                    "title": "性能预算报告未生成",
+                    "detail": message,
+                    "suggestion": "可手动运行 python runtime_player.py --write-performance-budget-reports . 重新生成。",
+                }
+            ],
+        }
+        report_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        markdown_path.write_text(
+            "\n".join(
+                [
+                    "# 原生 Runtime 性能预算报告",
+                    "",
+                    "- 状态：报告未生成",
+                    f"- 原因：{message}",
+                    "",
+                    "可手动运行：",
+                    "",
+                    "```bash",
+                    "python3 runtime_player.py --write-performance-budget-reports .",
+                    "```",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+    summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
+    return {
+        "performanceBudgetStatus": str(payload.get("status") or "unavailable"),
+        "performanceBudgetSummary": summary,
+        "performanceBudgetReportName": report_path.name,
+        "performanceBudgetReportPath": str(report_path),
+        "performanceBudgetMarkdownName": markdown_path.name,
+        "performanceBudgetMarkdownPath": str(markdown_path),
+    }
+
+
 def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
     game_data_path = build_dir / "game_data.json"
     game_data_path.write_text(json.dumps(export_payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -9100,6 +9176,7 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
 
     shutil.copy2(NATIVE_RUNTIME_PLAYER_SOURCE, build_dir / NATIVE_RUNTIME_PLAYER_NAME)
     shutil.copy2(NATIVE_RUNTIME_PRELOAD_SOURCE, build_dir / NATIVE_RUNTIME_PRELOAD_NAME)
+    shutil.copy2(NATIVE_RUNTIME_PERFORMANCE_SOURCE, build_dir / NATIVE_RUNTIME_PERFORMANCE_NAME)
     shutil.copy2(NATIVE_RUNTIME_README_SOURCE, build_dir / NATIVE_RUNTIME_README_NAME)
     shutil.copy2(NATIVE_RUNTIME_REQUIREMENTS_SOURCE, build_dir / NATIVE_RUNTIME_REQUIREMENTS_NAME)
     shutil.copy2(NATIVE_RUNTIME_BUILD_REQUIREMENTS_SOURCE, build_dir / NATIVE_RUNTIME_BUILD_REQUIREMENTS_NAME)
@@ -9113,6 +9190,7 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
 
     # Render the public preload report through the copied runtime so it stays aligned with player diagnostics.
     refresh_native_runtime_preload_report(build_dir, Path(runtime_preload_files["runtimePreloadReportPath"]))
+    performance_budget_files = write_native_runtime_performance_budget_reports(build_dir)
 
     mac_launcher_path = build_dir / NATIVE_RUNTIME_MAC_COMMAND_NAME
     linux_launcher_path = build_dir / NATIVE_RUNTIME_LINUX_COMMAND_NAME
@@ -9733,6 +9811,7 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
             rc_report_path.name,
             release_control_report_path.name,
             vn_baseline_markdown_path.name,
+            performance_budget_files["performanceBudgetMarkdownName"],
             asset3d_summary_path.name,
             NATIVE_RUNTIME_FILE_INTEGRITY_MARKDOWN_NAME,
             NATIVE_RUNTIME_ACCEPTANCE_REPORT_NAME,
@@ -9764,6 +9843,8 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
         "playerPath": str(build_dir / NATIVE_RUNTIME_PLAYER_NAME),
         "runtimePreloadModuleName": NATIVE_RUNTIME_PRELOAD_NAME,
         "runtimePreloadModulePath": str(build_dir / NATIVE_RUNTIME_PRELOAD_NAME),
+        "runtimePerformanceModuleName": NATIVE_RUNTIME_PERFORMANCE_NAME,
+        "runtimePerformanceModulePath": str(build_dir / NATIVE_RUNTIME_PERFORMANCE_NAME),
         "readmeName": NATIVE_RUNTIME_README_NAME,
         "readmePath": str(build_dir / NATIVE_RUNTIME_README_NAME),
         "requirementsName": NATIVE_RUNTIME_REQUIREMENTS_NAME,
@@ -9791,6 +9872,12 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
         "vnBaselineQualityMarkdownName": vn_baseline_markdown_path.name,
         "vnBaselineQualityMarkdownPath": str(vn_baseline_markdown_path),
         "vnBaselineQualityStatus": str((release_control_payload.get("vnBaselineQuality") or {}).get("status") or "unavailable"),
+        "performanceBudgetReportName": performance_budget_files["performanceBudgetReportName"],
+        "performanceBudgetReportPath": performance_budget_files["performanceBudgetReportPath"],
+        "performanceBudgetMarkdownName": performance_budget_files["performanceBudgetMarkdownName"],
+        "performanceBudgetMarkdownPath": performance_budget_files["performanceBudgetMarkdownPath"],
+        "performanceBudgetStatus": performance_budget_files["performanceBudgetStatus"],
+        "performanceBudgetSummary": performance_budget_files["performanceBudgetSummary"],
         "asset3dReportName": asset3d_report_path.name,
         "asset3dReportPath": str(asset3d_report_path),
         "asset3dSummaryName": asset3d_summary_path.name,
@@ -10410,6 +10497,7 @@ def export_native_runtime_build() -> dict:
             "runtimePreloadReport": runtime_files["runtimePreloadReportName"],
             "playerScript": runtime_files["playerName"],
             "runtimePreloadModule": runtime_files["runtimePreloadModuleName"],
+            "runtimePerformanceModule": runtime_files["runtimePerformanceModuleName"],
             "readme": runtime_files["readmeName"],
             "requirements": runtime_files["requirementsName"],
             "buildRequirements": runtime_files["buildRequirementsName"],
@@ -10421,6 +10509,8 @@ def export_native_runtime_build() -> dict:
             "releaseControlJson": runtime_files["releaseControlJsonName"],
             "vnBaselineQualityReport": runtime_files["vnBaselineQualityReportName"],
             "vnBaselineQualityMarkdown": runtime_files["vnBaselineQualityMarkdownName"],
+            "performanceBudgetReport": runtime_files["performanceBudgetReportName"],
+            "performanceBudgetMarkdown": runtime_files["performanceBudgetMarkdownName"],
             "acceptanceReport": NATIVE_RUNTIME_ACCEPTANCE_REPORT_NAME,
             "acceptanceJson": NATIVE_RUNTIME_ACCEPTANCE_JSON_NAME,
             "fileIntegrityReport": NATIVE_RUNTIME_FILE_INTEGRITY_REPORT_NAME,
@@ -10469,6 +10559,7 @@ def export_native_runtime_build() -> dict:
             "runtimePreloadReport": runtime_files["runtimePreloadReportName"],
             "runtimePreloadSummary": runtime_files["runtimePreloadSummary"],
             "runtimePreloadModule": runtime_files["runtimePreloadModuleName"],
+            "runtimePerformanceModule": runtime_files["runtimePerformanceModuleName"],
             "releaseCheck": runtime_files["releaseCheckName"],
             "releaseCandidateReport": runtime_files["releaseCandidateReportName"],
             "releaseControlReport": runtime_files["releaseControlReportName"],
@@ -10477,6 +10568,10 @@ def export_native_runtime_build() -> dict:
             "vnBaselineQualityReport": runtime_files["vnBaselineQualityReportName"],
             "vnBaselineQualityMarkdown": runtime_files["vnBaselineQualityMarkdownName"],
             "vnBaselineQualityStatus": runtime_files["vnBaselineQualityStatus"],
+            "performanceBudgetReport": runtime_files["performanceBudgetReportName"],
+            "performanceBudgetMarkdown": runtime_files["performanceBudgetMarkdownName"],
+            "performanceBudgetStatus": runtime_files["performanceBudgetStatus"],
+            "performanceBudgetSummary": runtime_files["performanceBudgetSummary"],
             "releaseControlReporter": {
                 "macos": runtime_files["macReleaseControlReporterName"],
                 "linux": runtime_files["linuxReleaseControlReporterName"],
@@ -10523,6 +10618,7 @@ def export_native_runtime_build() -> dict:
             runtime_files["releaseCandidateReportName"],
             runtime_files["releaseControlReportName"],
             runtime_files["vnBaselineQualityMarkdownName"],
+            runtime_files["performanceBudgetMarkdownName"],
             runtime_files["asset3dSummaryName"],
         ],
         platform_notes=[
@@ -10560,6 +10656,8 @@ def export_native_runtime_build() -> dict:
         {"name": runtime_files["releaseControlJsonName"], "description": "机器可读发布总控 JSON。"},
         {"name": runtime_files["vnBaselineQualityMarkdownName"], "description": "视觉小说基础质感 Markdown 报告。"},
         {"name": runtime_files["vnBaselineQualityReportName"], "description": "机器可读 VN 基础质感 JSON。"},
+        {"name": runtime_files["performanceBudgetMarkdownName"], "description": "原生 Runtime 性能预算 Markdown，复查包体、素材体积和剧情规模。"},
+        {"name": runtime_files["performanceBudgetReportName"], "description": "机器可读原生 Runtime 性能预算 JSON。"},
         {"name": integrity_files["fileIntegrityMarkdownName"], "description": "包内核心文件完整性 Markdown。"},
         {"name": integrity_files["fileIntegrityReportName"], "description": "包内核心文件 SHA-256 JSON。"},
         {"name": provenance_file["provenanceName"], "description": "低调来源标记与文件指纹清单。"},
@@ -10675,6 +10773,9 @@ def export_native_runtime_build() -> dict:
         "runtimePreloadModuleName": runtime_files["runtimePreloadModuleName"],
         "runtimePreloadModulePath": runtime_files["runtimePreloadModulePath"],
         "runtimePreloadModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimePreloadModuleName']}",
+        "runtimePerformanceModuleName": runtime_files["runtimePerformanceModuleName"],
+        "runtimePerformanceModulePath": runtime_files["runtimePerformanceModulePath"],
+        "runtimePerformanceModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimePerformanceModuleName']}",
         "readmeName": runtime_files["readmeName"],
         "readmePath": runtime_files["readmePath"],
         "readmePublicUrl": f"/exports/{build_dir.name}/{runtime_files['readmeName']}",
@@ -10711,6 +10812,14 @@ def export_native_runtime_build() -> dict:
         "vnBaselineQualityMarkdownPath": runtime_files["vnBaselineQualityMarkdownPath"],
         "vnBaselineQualityMarkdownPublicUrl": f"/exports/{build_dir.name}/{runtime_files['vnBaselineQualityMarkdownName']}",
         "vnBaselineQualityStatus": runtime_files["vnBaselineQualityStatus"],
+        "performanceBudgetReportName": runtime_files["performanceBudgetReportName"],
+        "performanceBudgetReportPath": runtime_files["performanceBudgetReportPath"],
+        "performanceBudgetReportPublicUrl": f"/exports/{build_dir.name}/{runtime_files['performanceBudgetReportName']}",
+        "performanceBudgetMarkdownName": runtime_files["performanceBudgetMarkdownName"],
+        "performanceBudgetMarkdownPath": runtime_files["performanceBudgetMarkdownPath"],
+        "performanceBudgetMarkdownPublicUrl": f"/exports/{build_dir.name}/{runtime_files['performanceBudgetMarkdownName']}",
+        "performanceBudgetStatus": runtime_files["performanceBudgetStatus"],
+        "performanceBudgetSummary": runtime_files["performanceBudgetSummary"],
         "fileIntegrityReportName": integrity_files["fileIntegrityReportName"],
         "fileIntegrityReportPath": integrity_files["fileIntegrityReportPath"],
         "fileIntegrityReportPublicUrl": f"/exports/{build_dir.name}/{integrity_files['fileIntegrityReportName']}",

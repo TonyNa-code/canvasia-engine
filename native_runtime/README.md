@@ -77,9 +77,12 @@ python3 -m pip install -r requirements-native-runtime.txt
 python3 runtime_player.py --validate-bundle .
 python3 runtime_player.py --describe-runtime-preload .
 python3 runtime_player.py --describe-runtime-preload-markdown .
+python3 runtime_player.py --performance-budget-report .
 ```
 
 `--describe-runtime-preload` 会输出适合自动化读取的 JSON；`--describe-runtime-preload-markdown` 会输出适合人工复查的 Markdown。两者都会检查预热清单、缺失素材、critical 首屏资源体积和整体预热队列体积，适合在发布前定位“打开游戏第一下卡顿”的风险。
+
+`--performance-budget-report` 会输出作品规模和素材体积预算报告，适合检查包体是否过大、单个素材是否过重、剧情场景是否需要拆分。
 
 ## 维护者渲染 smoke
 
@@ -135,6 +138,7 @@ python3 runtime_player.py --rc-report .
 - `native-runtime-release-control-report.md`：给人工验收看的总控报告，汇总发布自检、RC 状态、3D 风险摘要、发布门禁和下一步处理顺序。
 - `native-runtime-release-control-report.json`：给自动化脚本或 CI 读取的同一份结论，字段包含 `qualityGate`、`releaseCheck`、`releaseCandidate`、`asset3d`、`vnBaselineQuality` 和 `nextSteps`。
 - `native-runtime-vn-baseline-quality.md` / `native-runtime-vn-baseline-quality.json`：检查视觉小说基础体验是否像完整作品，覆盖立绘兜底、背景覆盖、BGM 进入点、选项、空文本、占位素材和轻量演出润色。
+- `native-runtime-performance-budget.md` / `native-runtime-performance-budget.json`：检查包体、已引用素材体积、图片/音频/视频预算、单个过大素材、剧情规模和未使用素材，帮助发布前压缩和拆分资源。
 
 这两份文件会在导出包生成时自动写入。若需要重新计算底层检查，可以先运行 `--release-check`、`--doctor`、`--release-candidate-report` 和 `--describe-3d-assets`，再重新从编辑器导出一版包。
 
@@ -150,6 +154,7 @@ python3 runtime_player.py --write-release-control-reports .
 python3 runtime_player.py --release-control-json .
 python3 runtime_player.py --release-control-report .
 python3 runtime_player.py --vn-baseline-quality-report .
+python3 runtime_player.py --performance-budget-report .
 ```
 
 随包脚本会自动调用同一条刷新命令：

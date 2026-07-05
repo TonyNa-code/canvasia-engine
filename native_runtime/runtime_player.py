@@ -52,6 +52,23 @@ except ImportError:  # pragma: no cover - exported native packages import from t
         normalize_runtime_preload_entries,
     )
 
+try:
+    from .runtime_performance import (
+        PERFORMANCE_BUDGET_MARKDOWN_NAME,
+        PERFORMANCE_BUDGET_REPORT_NAME,
+        build_native_runtime_performance_budget_report,
+        render_native_runtime_performance_budget_markdown,
+        write_native_runtime_performance_budget_reports,
+    )
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_performance import (
+        PERFORMANCE_BUDGET_MARKDOWN_NAME,
+        PERFORMANCE_BUDGET_REPORT_NAME,
+        build_native_runtime_performance_budget_report,
+        render_native_runtime_performance_budget_markdown,
+        write_native_runtime_performance_budget_reports,
+    )
+
 
 ASSET_TYPE_IMAGE = {"background", "sprite", "cg", "ui"}
 ASSET_TYPE_FONT = {"font"}
@@ -80,6 +97,8 @@ FILE_INTEGRITY_EXCLUDED_FILE_NAMES = {
     "native_app_package_manifest.json",
     VN_BASELINE_QUALITY_REPORT_NAME,
     VN_BASELINE_QUALITY_MARKDOWN_NAME,
+    PERFORMANCE_BUDGET_REPORT_NAME,
+    PERFORMANCE_BUDGET_MARKDOWN_NAME,
 }
 FILE_INTEGRITY_EXCLUDED_PREFIXES = {
     "__pycache__",
@@ -2811,6 +2830,18 @@ def print_native_runtime_file_integrity_markdown_report(bundle_dir: Path) -> dic
 def print_native_runtime_file_integrity_verification(bundle_dir: Path) -> dict:
     report = build_native_runtime_file_integrity_verification(bundle_dir)
     print(json.dumps(report, ensure_ascii=False, indent=2))
+    return report
+
+
+def print_native_runtime_performance_budget_json_report(bundle_dir: Path) -> dict:
+    report = build_native_runtime_performance_budget_report(bundle_dir)
+    print(json.dumps(report, ensure_ascii=False, indent=2))
+    return report
+
+
+def print_native_runtime_performance_budget_markdown_report(bundle_dir: Path) -> dict:
+    report = build_native_runtime_performance_budget_report(bundle_dir)
+    print(render_native_runtime_performance_budget_markdown(report), end="")
     return report
 
 
@@ -16080,6 +16111,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--file-integrity-markdown", "--file-integrity-md", dest="file_integrity_markdown", help="输出原生 Runtime 文件完整性 Markdown 报告，不启动窗口")
     parser.add_argument("--write-file-integrity-reports", dest="write_file_integrity_reports", help="写入原生 Runtime 文件完整性 Markdown / JSON 报告，不启动窗口")
     parser.add_argument("--verify-file-integrity", dest="verify_file_integrity", help="校验原生 Runtime 文件完整性报告，不启动窗口")
+    parser.add_argument("--performance-budget-json", "--performance-budget", dest="performance_budget_json", help="输出原生 Runtime 性能预算 JSON 报告，不启动窗口")
+    parser.add_argument("--performance-budget-report", "--performance-budget-md", dest="performance_budget_report", help="输出原生 Runtime 性能预算 Markdown 报告，不启动窗口")
+    parser.add_argument("--write-performance-budget-reports", dest="write_performance_budget_reports", help="写入原生 Runtime 性能预算 Markdown / JSON 报告，不启动窗口")
     parser.add_argument("--exercise-save-load", dest="exercise_save_load", help="检查存档文件能否写入和读回")
     parser.add_argument("--exercise-settings", dest="exercise_settings", help="检查原生 Runtime 设置能否写入和读回")
     parser.add_argument("--exercise-archives", dest="exercise_archives", help="检查原生 Runtime 资料馆进度能否写入和读回")
@@ -16284,6 +16318,42 @@ def main(argv: list[str] | None = None) -> int:
             return 1 if report.get("status") == "fail" else 0
         except NativeRuntimeError as error:
             print(f"Native runtime file integrity verification failed: {error}")
+            return 1
+
+    if args.performance_budget_json:
+        try:
+            report = print_native_runtime_performance_budget_json_report(Path(args.performance_budget_json).resolve())
+            return 1 if report.get("status") == "needs_fix" else 0
+        except (NativeRuntimeError, OSError, json.JSONDecodeError) as error:
+            print(f"Native runtime performance budget report failed: {error}")
+            return 1
+
+    if args.performance_budget_report:
+        try:
+            report = print_native_runtime_performance_budget_markdown_report(Path(args.performance_budget_report).resolve())
+            return 1 if report.get("status") == "needs_fix" else 0
+        except (NativeRuntimeError, OSError, json.JSONDecodeError) as error:
+            print(f"Native runtime performance budget markdown failed: {error}")
+            return 1
+
+    if args.write_performance_budget_reports:
+        try:
+            payload = write_native_runtime_performance_budget_reports(Path(args.write_performance_budget_reports).resolve())
+            print(
+                json.dumps(
+                    {
+                        "status": payload.get("status"),
+                        "label": payload.get("summary", {}).get("statusLabel"),
+                        "markdown": PERFORMANCE_BUDGET_MARKDOWN_NAME,
+                        "json": PERFORMANCE_BUDGET_REPORT_NAME,
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
+            return 1 if payload.get("status") == "needs_fix" else 0
+        except (NativeRuntimeError, OSError, json.JSONDecodeError) as error:
+            print(f"Native runtime performance budget report write failed: {error}")
             return 1
 
     if args.exercise_save_load:
