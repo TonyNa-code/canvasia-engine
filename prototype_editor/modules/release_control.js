@@ -267,6 +267,99 @@
     };
   }
 
+  function getRuntimePreloadBudgetReleaseTitle(report = {}, digest = {}) {
+    if (digest?.title) {
+      return digest.title;
+    }
+    const level = report?.releaseRiskLevel ?? "ready";
+    return level === "danger" ? "首屏压力偏高" : level === "warn" ? "开局建议瘦身" : "首屏加载健康";
+  }
+
+  function getRuntimePreloadBudgetReleaseDetail(report = {}, digest = {}) {
+    if (digest?.detail) {
+      return digest.detail;
+    }
+    const level = report?.releaseRiskLevel ?? "ready";
+    if (level === "danger") {
+      return "正式发包前建议先处理入口场景的大素材和缺文件。";
+    }
+    if (level === "warn") {
+      return "当前没有硬阻塞，但开局路线值得做一轮压缩或延后加载。";
+    }
+    return "首屏和早期路线没有明显预热压力。";
+  }
+
+  function serializeRuntimePreloadBudgetForRelease(report = {}, digest = {}) {
+    const critical = report?.phases?.critical ?? {};
+    const early = report?.phases?.early ?? {};
+    const totals = report?.totals ?? {};
+    const title = getRuntimePreloadBudgetReleaseTitle(report, digest);
+    const detail = getRuntimePreloadBudgetReleaseDetail(report, digest);
+    const warningCount = getRuntimePreloadBudgetRiskCount(report);
+    const dangerCount = getRuntimePreloadBudgetBlockerCount(report);
+    const warnCount = Math.max(0, warningCount - dangerCount);
+    const criticalBytesLabel = critical.bytesLabel ?? "0 B";
+    const earlyBytesLabel = early.bytesLabel ?? "0 B";
+    const totalLabel = totals.totalLabel ?? "0 B";
+
+    return {
+      releaseRiskLevel: report?.releaseRiskLevel ?? "ready",
+      title,
+      detail,
+      summaryLine: `${title}，首屏 ${criticalBytesLabel} / 早期 ${earlyBytesLabel}`,
+      budgetLine: `${criticalBytesLabel} / ${earlyBytesLabel} / ${totalLabel}`,
+      warningCount,
+      dangerCount,
+      warnCount,
+      totalEntries: toCount(totals.totalEntries),
+      totalBytes: toCount(totals.totalBytes),
+      totalLabel,
+      criticalBytes: toCount(critical.bytes),
+      criticalBytesLabel,
+      earlyBytes: toCount(early.bytes),
+      earlyBytesLabel,
+      phaseRows: toArray(report?.phaseList).map((phase) => [
+        phase?.label ?? "",
+        `${phase?.count ?? 0}`,
+        phase?.bytesLabel ?? "0 B",
+        phase?.budgetLabel ?? "未设置",
+        `${phase?.missingFileCount ?? 0}`,
+        phase?.overBudget ? "超过建议预算" : "正常",
+      ]),
+      warningRows: toArray(report?.warnings).slice(0, 12).map((warning) => [
+        warning?.severity === "danger" ? "高风险" : warning?.severity === "warn" ? "提醒" : "提示",
+        warning?.title ?? "",
+        warning?.assetName || warning?.sceneName || "首屏 / 早期路线",
+        warning?.detail ?? "",
+        warning?.actionHint ?? "",
+      ]),
+      warnings: toArray(report?.warnings).slice(0, 20).map((warning) => ({
+        code: warning?.code ?? "",
+        severity: warning?.severity ?? "",
+        title: warning?.title ?? "",
+        detail: warning?.detail ?? "",
+        actionHint: warning?.actionHint ?? "",
+        assetId: warning?.assetId ?? "",
+        assetName: warning?.assetName ?? "",
+        sceneId: warning?.sceneId ?? "",
+        sceneName: warning?.sceneName ?? "",
+      })),
+      topEntries: toArray(report?.topEntries).slice(0, 20).map((entry) => ({
+        assetId: entry?.id ?? "",
+        name: entry?.name ?? "",
+        type: entry?.type ?? "",
+        typeLabel: entry?.typeLabel ?? "",
+        phase: entry?.phase ?? "",
+        sizeBytes: toCount(entry?.sizeBytes),
+        sizeLabel: entry?.sizeLabel ?? "",
+        fileExists: entry?.fileExists !== false,
+        sceneId: entry?.sceneId ?? "",
+        sceneName: entry?.sceneName ?? "",
+        reason: entry?.reason ?? "",
+      })),
+    };
+  }
+
   function buildRuntimePreloadBudgetFixStep(report = {}) {
     const riskCount = getRuntimePreloadBudgetRiskCount(report);
     if (riskCount <= 0) {
@@ -675,6 +768,7 @@
     getRuntimePreloadBudgetRiskCount,
     getRuntimePreloadBudgetBlockerCount,
     getRuntimePreloadBudgetPrimaryIssue,
+    serializeRuntimePreloadBudgetForRelease,
     buildRuntimePreloadBudgetFixStep,
     buildCreativeQualityAudit,
     buildReleaseFixOrder,

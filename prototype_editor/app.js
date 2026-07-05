@@ -29394,6 +29394,37 @@ function serializeReleaseReportAction(action) {
   };
 }
 
+function serializeRuntimePreloadBudgetForRelease(report, digest) {
+  if (releaseControlTools?.serializeRuntimePreloadBudgetForRelease) {
+    return releaseControlTools.serializeRuntimePreloadBudgetForRelease(report, digest);
+  }
+
+  const critical = report?.phases?.critical ?? {};
+  const early = report?.phases?.early ?? {};
+  const totals = report?.totals ?? {};
+  return {
+    releaseRiskLevel: report?.releaseRiskLevel ?? "ready",
+    title: digest?.title ?? "首屏加载健康",
+    detail: digest?.detail ?? "首屏和早期路线没有明显预热压力。",
+    summaryLine: `${digest?.title ?? "首屏加载健康"}，首屏 ${critical.bytesLabel ?? "0 B"} / 早期 ${early.bytesLabel ?? "0 B"}`,
+    budgetLine: `${critical.bytesLabel ?? "0 B"} / ${early.bytesLabel ?? "0 B"} / ${totals.totalLabel ?? "0 B"}`,
+    warningCount: (totals.dangerCount ?? 0) + (totals.warnCount ?? 0),
+    dangerCount: totals.dangerCount ?? 0,
+    warnCount: totals.warnCount ?? 0,
+    totalEntries: totals.totalEntries ?? 0,
+    totalBytes: totals.totalBytes ?? 0,
+    totalLabel: totals.totalLabel ?? "0 B",
+    criticalBytes: critical.bytes ?? 0,
+    criticalBytesLabel: critical.bytesLabel ?? "0 B",
+    earlyBytes: early.bytes ?? 0,
+    earlyBytesLabel: early.bytesLabel ?? "0 B",
+    phaseRows: [],
+    warningRows: [],
+    warnings: [],
+    topEntries: [],
+  };
+}
+
 function serializeProjectMilestoneCheck(check) {
   return {
     id: check?.id ?? "",
@@ -29570,6 +29601,8 @@ function buildReleaseControlReportPayload() {
   const projectMilestoneGapDigest = buildProjectMilestoneGapDigest(projectMilestonePlan);
   const mediaBudgetReport = buildAssetMediaBudgetReport();
   const runtimePreloadBudgetReport = buildRuntimePreloadBudgetReport();
+  const runtimePreloadBudgetDigest = runtimePreloadBudgetTools.getRuntimePreloadBudgetDigest(runtimePreloadBudgetReport);
+  const runtimePreloadBudgetRelease = serializeRuntimePreloadBudgetForRelease(runtimePreloadBudgetReport, runtimePreloadBudgetDigest);
   const native3dDigest = getLatestNativeRuntime3dDigest();
   const regressionResult = state.inspectionRegressionResult;
   const regressionFixQueue = buildPreviewRegressionFixQueue();
@@ -29743,44 +29776,7 @@ function buildReleaseControlReportPayload() {
           suggestion: item.suggestion,
         })),
       },
-      runtimePreloadBudget: {
-        releaseRiskLevel: runtimePreloadBudgetReport.releaseRiskLevel,
-        warningCount:
-          (runtimePreloadBudgetReport.totals?.dangerCount ?? 0) + (runtimePreloadBudgetReport.totals?.warnCount ?? 0),
-        dangerCount: runtimePreloadBudgetReport.totals?.dangerCount ?? 0,
-        warnCount: runtimePreloadBudgetReport.totals?.warnCount ?? 0,
-        totalEntries: runtimePreloadBudgetReport.totals?.totalEntries ?? 0,
-        totalBytes: runtimePreloadBudgetReport.totals?.totalBytes ?? 0,
-        totalLabel: runtimePreloadBudgetReport.totals?.totalLabel ?? "0 B",
-        criticalBytes: runtimePreloadBudgetReport.phases?.critical?.bytes ?? 0,
-        criticalBytesLabel: runtimePreloadBudgetReport.phases?.critical?.bytesLabel ?? "0 B",
-        earlyBytes: runtimePreloadBudgetReport.phases?.early?.bytes ?? 0,
-        earlyBytesLabel: runtimePreloadBudgetReport.phases?.early?.bytesLabel ?? "0 B",
-        warnings: (runtimePreloadBudgetReport.warnings ?? []).slice(0, 20).map((warning) => ({
-          code: warning.code,
-          severity: warning.severity,
-          title: warning.title,
-          detail: warning.detail,
-          actionHint: warning.actionHint,
-          assetId: warning.assetId,
-          assetName: warning.assetName,
-          sceneId: warning.sceneId,
-          sceneName: warning.sceneName,
-        })),
-        topEntries: (runtimePreloadBudgetReport.topEntries ?? []).slice(0, 20).map((entry) => ({
-          assetId: entry.id,
-          name: entry.name,
-          type: entry.type,
-          typeLabel: entry.typeLabel,
-          phase: entry.phase,
-          sizeBytes: entry.sizeBytes,
-          sizeLabel: entry.sizeLabel,
-          fileExists: entry.fileExists,
-          sceneId: entry.sceneId,
-          sceneName: entry.sceneName,
-          reason: entry.reason,
-        })),
-      },
+      runtimePreloadBudget: runtimePreloadBudgetRelease,
       native3dRisk: native3dDigest
         ? {
             status: native3dDigest.status ?? "",
@@ -30152,6 +30148,7 @@ function buildReleaseControlReportContent() {
   const mediaBudgetReport = buildAssetMediaBudgetReport();
   const runtimePreloadBudgetReport = buildRuntimePreloadBudgetReport();
   const runtimePreloadBudgetDigest = runtimePreloadBudgetTools.getRuntimePreloadBudgetDigest(runtimePreloadBudgetReport);
+  const runtimePreloadBudgetRelease = serializeRuntimePreloadBudgetForRelease(runtimePreloadBudgetReport, runtimePreloadBudgetDigest);
   const native3dDigest = getLatestNativeRuntime3dDigest();
   const regressionResult = state.inspectionRegressionResult;
   const regressionFixQueue = buildPreviewRegressionFixQueue();
@@ -30209,26 +30206,10 @@ function buildReleaseControlReportContent() {
       item.suggestion,
     ])
   );
-  const runtimePreloadBudgetWarningTable = buildMarkdownTable(
-    ["级别", "问题", "对象", "说明", "建议"],
-    (runtimePreloadBudgetReport.warnings ?? []).slice(0, 12).map((warning) => [
-      warning.severity === "danger" ? "高风险" : warning.severity === "warn" ? "提醒" : "提示",
-      warning.title,
-      warning.assetName || warning.sceneName || "首屏 / 早期路线",
-      warning.detail,
-      warning.actionHint,
-    ])
-  );
+  const runtimePreloadBudgetWarningTable = buildMarkdownTable(["级别", "问题", "对象", "说明", "建议"], runtimePreloadBudgetRelease.warningRows);
   const runtimePreloadBudgetPhaseTable = buildMarkdownTable(
     ["阶段", "数量", "体积", "建议预算", "缺文件", "状态"],
-    (runtimePreloadBudgetReport.phaseList ?? []).map((phase) => [
-      phase.label,
-      `${phase.count ?? 0}`,
-      phase.bytesLabel ?? "0 B",
-      phase.budgetLabel ?? "未设置",
-      `${phase.missingFileCount ?? 0}`,
-      phase.overBudget ? "超过建议预算" : "正常",
-    ])
+    runtimePreloadBudgetRelease.phaseRows
   );
   const native3dIssueTable = buildMarkdownTable(
     ["素材", "类型", "状态", "风险", "引用", "建议"],
@@ -30333,7 +30314,7 @@ function buildReleaseControlReportContent() {
         ["素材预算风险", `${mediaBudgetReport.count} 个，合计 ${mediaBudgetReport.totalLabel}`],
         [
           "首屏加载压力",
-          `${runtimePreloadBudgetDigest.title}，首屏 ${runtimePreloadBudgetReport.phases?.critical?.bytesLabel ?? "0 B"} / 早期 ${runtimePreloadBudgetReport.phases?.early?.bytesLabel ?? "0 B"}`,
+          runtimePreloadBudgetRelease.summaryLine,
         ],
         ["闲置素材", `${getUnusedAssets().length} 个`],
         ["入口场景", routeOverview.metrics.entrySceneName],
@@ -30442,9 +30423,9 @@ function buildReleaseControlReportContent() {
   lines.push(
     "## Runtime 首屏加载预算",
     "",
-    `- 状态：${runtimePreloadBudgetDigest.title}`,
-    `- 摘要：${runtimePreloadBudgetDigest.detail}`,
-    `- 首屏 / 早期 / 总预热：${runtimePreloadBudgetReport.phases?.critical?.bytesLabel ?? "0 B"} / ${runtimePreloadBudgetReport.phases?.early?.bytesLabel ?? "0 B"} / ${runtimePreloadBudgetReport.totals?.totalLabel ?? "0 B"}`,
+    `- 状态：${runtimePreloadBudgetRelease.title}`,
+    `- 摘要：${runtimePreloadBudgetRelease.detail}`,
+    `- 首屏 / 早期 / 总预热：${runtimePreloadBudgetRelease.budgetLine}`,
     "",
     runtimePreloadBudgetPhaseTable || "当前没有可统计的 Runtime 预热阶段。",
     "",

@@ -59,12 +59,12 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
 
         self.assertIn("const runtimePreloadBudgetReport = buildRuntimePreloadBudgetReport()", report_body)
         self.assertIn("const runtimePreloadBudgetDigest = runtimePreloadBudgetTools.getRuntimePreloadBudgetDigest", report_body)
+        self.assertIn("const runtimePreloadBudgetRelease = serializeRuntimePreloadBudgetForRelease", report_body)
         self.assertIn("## Runtime 首屏加载预算", report_body)
-        self.assertIn("runtimePreloadBudgetPhaseTable", report_body)
-        self.assertIn("runtimePreloadBudgetWarningTable", report_body)
-        self.assertIn("runtimePreloadBudget: {", payload_body)
-        self.assertIn("criticalBytesLabel", payload_body)
-        self.assertIn("topEntries: (runtimePreloadBudgetReport.topEntries ?? [])", payload_body)
+        self.assertIn("runtimePreloadBudgetRelease.phaseRows", report_body)
+        self.assertIn("runtimePreloadBudgetRelease.warningRows", report_body)
+        self.assertIn("runtimePreloadBudget: runtimePreloadBudgetRelease", payload_body)
+        self.assertIn("const runtimePreloadBudgetRelease = serializeRuntimePreloadBudgetForRelease", payload_body)
 
     def test_release_control_helpers_work_without_browser_dom(self) -> None:
         script = textwrap.dedent(
@@ -129,6 +129,24 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
                   ],
                 }}).title,
               ],
+              runtimePreloadRelease: tools.serializeRuntimePreloadBudgetForRelease({{
+                releaseRiskLevel: "danger",
+                totals: {{ dangerCount: 1, warnCount: 1, totalEntries: 3, totalBytes: 360 * 1024 * 1024, totalLabel: "360 MB" }},
+                phases: {{
+                  critical: {{ label: "首屏必备", count: 2, bytes: 180 * 1024 * 1024, bytesLabel: "180 MB", budgetLabel: "96 MB", missingFileCount: 1, overBudget: true }},
+                  early: {{ label: "早期路线", count: 1, bytes: 180 * 1024 * 1024, bytesLabel: "180 MB", budgetLabel: "256 MB", missingFileCount: 0, overBudget: false }},
+                }},
+                phaseList: [
+                  {{ label: "首屏必备", count: 2, bytesLabel: "180 MB", budgetLabel: "96 MB", missingFileCount: 1, overBudget: true }},
+                ],
+                warnings: [
+                  {{ code: "critical_over_budget", severity: "danger", title: "首屏必备素材过重", detail: "首屏过重。", actionHint: "压入口素材。", assetId: "asset_op", assetName: "OP" }},
+                  {{ code: "early_over_budget", severity: "warn", title: "早期路线偏重", detail: "早期偏重。", actionHint: "延后加载。", sceneId: "scene_1", sceneName: "开场" }},
+                ],
+                topEntries: [
+                  {{ id: "asset_op", name: "OP", type: "video", typeLabel: "视频", phase: "critical", sizeBytes: 260 * 1024 * 1024, sizeLabel: "260 MB", fileExists: false, sceneId: "scene_1", sceneName: "开场", reason: "开场 / video_play" }},
+                ],
+              }}, {{ title: "首屏压力偏高", detail: "先处理入口压力。" }}),
               desktopReady: [
                 tools.isDesktopExportReady({{ target: "windows_nwjs", runtimeMode: "nwjs", missingAssets: 0 }}),
                 tools.isDesktopExportReady({{ target: "windows_nwjs", runtimeMode: "fallback", missingAssets: 0 }}),
@@ -193,6 +211,12 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
         self.assertEqual(len(payload["splitWarnings"]["missingVoiceWarnings"]), 1)
         self.assertEqual(len(payload["splitWarnings"]["nonVoiceWarnings"]), 1)
         self.assertEqual(payload["runtimePreloadCounts"], [3, 1, "处理首屏加载压力"])
+        self.assertEqual(payload["runtimePreloadRelease"]["summaryLine"], "首屏压力偏高，首屏 180 MB / 早期 180 MB")
+        self.assertEqual(payload["runtimePreloadRelease"]["budgetLine"], "180 MB / 180 MB / 360 MB")
+        self.assertEqual(payload["runtimePreloadRelease"]["warningCount"], 2)
+        self.assertEqual(payload["runtimePreloadRelease"]["phaseRows"][0][5], "超过建议预算")
+        self.assertEqual(payload["runtimePreloadRelease"]["warningRows"][0][0], "高风险")
+        self.assertEqual(payload["runtimePreloadRelease"]["topEntries"][0]["assetId"], "asset_op")
         self.assertEqual(payload["desktopReady"], [True, False, False, False])
         self.assertEqual(payload["blockedGate"]["status"], "blocked")
         self.assertEqual(payload["blockedGate"]["badge"], "暂缓发布")
