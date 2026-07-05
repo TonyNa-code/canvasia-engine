@@ -75,6 +75,7 @@ from renpy_export import (
     RENPY_README_FILE_NAME,
     RENPY_REVIEW_FILE_NAME,
     RENPY_SCRIPT_FILE_NAME,
+    RENPY_SCREENS_FILE_NAME,
     RENPY_VERIFY_SCRIPT_FILE_NAME,
     write_renpy_starter_project,
 )
@@ -10959,6 +10960,7 @@ def export_renpy_draft_build() -> dict:
         extra_files={
             "renpyScript": renpy_files["scriptName"],
             "renpyOptions": renpy_files["optionsName"],
+            "renpyScreens": renpy_files["screensName"],
             "renpyManifest": renpy_files["manifestName"],
             "renpyReviewNotes": renpy_files["reviewName"],
             "renpyQualityReport": renpy_files["qualityReportName"],
@@ -10971,6 +10973,7 @@ def export_renpy_draft_build() -> dict:
             "modeLabel": "Ren'Py Starter Bundle",
             "warning": "这是迁移友好的 Ren'Py 起始包；自定义演出、复杂变量逻辑和 UI 仍需在 Ren'Py 中复核。",
             "script": renpy_files["scriptName"],
+            "screens": renpy_files["screensName"],
             "reviewNotes": renpy_files["reviewName"],
             "reviewItemCount": renpy_files["warningCount"],
             "qualityStatus": renpy_files["qualityStatus"],
@@ -11008,6 +11011,9 @@ def export_renpy_draft_build() -> dict:
         "renpyOptionsName": renpy_files["optionsName"],
         "renpyOptionsPath": renpy_files["optionsPath"],
         "renpyOptionsPublicUrl": f"/exports/{build_dir.name}/{renpy_files['optionsName']}",
+        "renpyScreensName": renpy_files["screensName"],
+        "renpyScreensPath": renpy_files["screensPath"],
+        "renpyScreensPublicUrl": f"/exports/{build_dir.name}/{renpy_files['screensName']}",
         "renpyManifestName": renpy_files["manifestName"],
         "renpyManifestPath": renpy_files["manifestPath"],
         "renpyManifestPublicUrl": f"/exports/{build_dir.name}/{renpy_files['manifestName']}",

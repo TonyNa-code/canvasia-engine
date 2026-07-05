@@ -9,6 +9,7 @@ from typing import Any
 RENPY_GAME_DIR_NAME = "game"
 RENPY_SCRIPT_FILE_NAME = "script.rpy"
 RENPY_OPTIONS_FILE_NAME = "options.rpy"
+RENPY_SCREENS_FILE_NAME = "screens.rpy"
 RENPY_MANIFEST_FILE_NAME = "canvasia_renpy_migration_manifest.json"
 RENPY_QUALITY_REPORT_FILE_NAME = "canvasia_renpy_quality_report.json"
 RENPY_QUALITY_MARKDOWN_FILE_NAME = "CANVASIA_RENPY_QUALITY_REPORT.md"
@@ -66,6 +67,25 @@ FADE_COLOR_HEX = {
     "white": "#fffcf7",
 }
 DEFAULT_PROJECT_RESOLUTION = {"width": 1280, "height": 720}
+DEFAULT_DIALOG_BOX_CONFIG = {
+    "widthPercent": 76,
+    "minHeight": 148,
+    "paddingX": 18,
+    "paddingY": 14,
+    "backgroundColor": "#0c1422",
+    "backgroundOpacity": 92,
+    "borderColor": "#79dcff",
+    "borderOpacity": 18,
+    "textColor": "#f3f6ff",
+    "speakerColor": "#ffffff",
+    "hintColor": "#c8d6ea",
+    "borderWidth": 1,
+    "shadowStrength": 30,
+    "anchor": "bottom",
+    "offsetXPercent": 0,
+    "offsetYPercent": 0,
+}
+TEXTBOX_ANCHORS = {"bottom", "center", "top", "free"}
 CAMERA_ZOOM_SCALE = {
     "zoom_in": {"light": 1.08, "medium": 1.16, "heavy": 1.26},
     "zoom_out": {"light": 0.96, "medium": 0.92, "heavy": 0.88},
@@ -141,6 +161,30 @@ def as_list(value: Any) -> list:
 def clean_text(value: Any, fallback: str = "") -> str:
     text = re.sub(r"\s+", " ", str(value or "")).strip()
     return text or fallback
+
+
+def clamp_config_number(value: Any, fallback: float, minimum: float, maximum: float) -> float:
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        numeric = fallback
+    return max(minimum, min(maximum, numeric))
+
+
+def clamp_config_int(value: Any, fallback: int, minimum: int, maximum: int) -> int:
+    return int(round(clamp_config_number(value, fallback, minimum, maximum)))
+
+
+def normalize_hex_color(value: Any, fallback: str = "#ffffff") -> str:
+    text = clean_text(value).lower()
+    return text if re.fullmatch(r"#[0-9a-f]{6}", text) else fallback
+
+
+def hex_with_alpha(color: Any, opacity: Any, fallback: str = "#ffffff", fallback_opacity: int = 100) -> str:
+    safe_color = normalize_hex_color(color, fallback)
+    safe_opacity = clamp_config_int(opacity, fallback_opacity, 0, 100)
+    alpha = int(round(255 * safe_opacity / 100))
+    return f"{safe_color}{alpha:02x}"
 
 
 def normalize_identifier(value: Any, fallback: str = "item") -> str:
@@ -1396,6 +1440,127 @@ def build_renpy_options_file(bundle: dict) -> str:
     )
 
 
+def get_dialog_box_config(bundle: dict) -> dict:
+    project = bundle.get("project") if isinstance(bundle.get("project"), dict) else {}
+    source = project.get("dialogBoxConfig") if isinstance(project.get("dialogBoxConfig"), dict) else {}
+    defaults = DEFAULT_DIALOG_BOX_CONFIG
+    anchor = clean_text(source.get("anchor"), defaults["anchor"]).lower()
+    if anchor not in TEXTBOX_ANCHORS:
+        anchor = defaults["anchor"]
+    return {
+        "widthPercent": clamp_config_int(source.get("widthPercent"), defaults["widthPercent"], 55, 100),
+        "minHeight": clamp_config_int(source.get("minHeight"), defaults["minHeight"], 96, 320),
+        "paddingX": clamp_config_int(source.get("paddingX"), defaults["paddingX"], 8, 72),
+        "paddingY": clamp_config_int(source.get("paddingY"), defaults["paddingY"], 6, 48),
+        "backgroundColor": normalize_hex_color(source.get("backgroundColor"), defaults["backgroundColor"]),
+        "backgroundOpacity": clamp_config_int(source.get("backgroundOpacity"), defaults["backgroundOpacity"], 0, 100),
+        "borderColor": normalize_hex_color(source.get("borderColor"), defaults["borderColor"]),
+        "borderOpacity": clamp_config_int(source.get("borderOpacity"), defaults["borderOpacity"], 0, 100),
+        "textColor": normalize_hex_color(source.get("textColor"), defaults["textColor"]),
+        "speakerColor": normalize_hex_color(source.get("speakerColor"), defaults["speakerColor"]),
+        "hintColor": normalize_hex_color(source.get("hintColor"), defaults["hintColor"]),
+        "borderWidth": clamp_config_int(source.get("borderWidth"), defaults["borderWidth"], 0, 4),
+        "shadowStrength": clamp_config_int(source.get("shadowStrength"), defaults["shadowStrength"], 0, 48),
+        "anchor": anchor,
+        "offsetXPercent": clamp_config_int(source.get("offsetXPercent"), defaults["offsetXPercent"], -35, 35),
+        "offsetYPercent": clamp_config_int(source.get("offsetYPercent"), defaults["offsetYPercent"], -35, 35),
+    }
+
+
+def build_renpy_dialog_screen_summary(bundle: dict) -> dict:
+    resolution = get_project_resolution(bundle)
+    config = get_dialog_box_config(bundle)
+    return build_dialog_screen_layout(resolution, config)
+
+
+def build_dialog_screen_layout(resolution: dict, config: dict) -> dict:
+    width = int(resolution.get("width") or DEFAULT_PROJECT_RESOLUTION["width"])
+    height = int(resolution.get("height") or DEFAULT_PROJECT_RESOLUTION["height"])
+    box_width = int(round(width * config["widthPercent"] / 100))
+    offset_x = int(round(width * config["offsetXPercent"] / 100))
+    offset_y = int(round(height * config["offsetYPercent"] / 100))
+    anchor = config["anchor"]
+    xanchor = 0.5
+    xpos = int(round(width / 2 + offset_x))
+    if anchor == "top":
+        yanchor = 0.0
+        ypos = int(round(height * 0.08 + offset_y))
+    elif anchor == "center":
+        yanchor = 0.5
+        ypos = int(round(height / 2 + offset_y))
+    elif anchor == "free":
+        yanchor = 0.5
+        ypos = int(round(height / 2 + offset_y))
+    else:
+        yanchor = 1.0
+        ypos = int(round(height * 0.94 + offset_y))
+    return {
+        "xpos": xpos,
+        "ypos": ypos,
+        "xanchor": xanchor,
+        "yanchor": yanchor,
+        "xsize": box_width,
+        "yminimum": config["minHeight"],
+        "padding": [config["paddingX"], config["paddingY"], config["paddingX"], config["paddingY"]],
+        "background": hex_with_alpha(config["backgroundColor"], config["backgroundOpacity"], DEFAULT_DIALOG_BOX_CONFIG["backgroundColor"], DEFAULT_DIALOG_BOX_CONFIG["backgroundOpacity"]),
+        "borderColor": hex_with_alpha(config["borderColor"], config["borderOpacity"], DEFAULT_DIALOG_BOX_CONFIG["borderColor"], DEFAULT_DIALOG_BOX_CONFIG["borderOpacity"]),
+        "borderWidth": config["borderWidth"],
+        "textColor": config["textColor"],
+        "speakerColor": config["speakerColor"],
+        "hintColor": config["hintColor"],
+        "anchor": anchor,
+        "widthPercent": config["widthPercent"],
+        "shadowStrength": config["shadowStrength"],
+    }
+
+
+def build_renpy_screens_file(bundle: dict) -> str:
+    summary = build_renpy_dialog_screen_summary(bundle)
+    padding = tuple(summary["padding"])
+    return "\n".join(
+        [
+            "# Canvasia Ren'Py dialogue screen",
+            "# Generated from the project textbox settings. You can keep editing it in Ren'Py.",
+            "",
+            "screen say(who, what):",
+            "    window:",
+            "        id \"window\"",
+            "        style \"canvasia_say_window\"",
+            "",
+            "        if who is not None:",
+            "            text who id \"who\" style \"canvasia_say_who\"",
+            "",
+            "        text what id \"what\" style \"canvasia_say_what\"",
+            "",
+            "style canvasia_say_window is default:",
+            f"    xpos {summary['xpos']}",
+            f"    ypos {summary['ypos']}",
+            f"    xanchor {format_renpy_float(summary['xanchor'], 2)}",
+            f"    yanchor {format_renpy_float(summary['yanchor'], 2)}",
+            f"    xsize {summary['xsize']}",
+            f"    yminimum {summary['yminimum']}",
+            f"    padding {padding}",
+            f"    background {quote_renpy(summary['background'])}",
+            "",
+            "style canvasia_say_who is default:",
+            f"    color {quote_renpy(summary['speakerColor'])}",
+            "    size 30",
+            "    bold True",
+            "    outlines [(1, \"#00000088\", 0, 0)]",
+            "",
+            "style canvasia_say_what is default:",
+            f"    color {quote_renpy(summary['textColor'])}",
+            "    size 32",
+            "    line_spacing 8",
+            "    outlines [(1, \"#00000066\", 0, 0)]",
+            "",
+            "# Canvasia textbox reference:",
+            f"# anchor={summary['anchor']} widthPercent={summary['widthPercent']} border={summary['borderColor']} borderWidth={summary['borderWidth']} shadow={summary['shadowStrength']}",
+            "",
+        ]
+    )
+
+
 def build_renpy_review_notes(export_result: dict) -> str:
     warnings = as_list(export_result.get("warnings"))
     lines = [
@@ -1437,6 +1602,7 @@ def build_renpy_readme(export_result: dict) -> str:
             "",
             f"- `{RENPY_GAME_DIR_NAME}/{RENPY_SCRIPT_FILE_NAME}`: converted labels, dialogue, choices, audio cues, variables, and basic presentation commands.",
             f"- `{RENPY_GAME_DIR_NAME}/{RENPY_OPTIONS_FILE_NAME}`: project title and resolution defaults.",
+            f"- `{RENPY_GAME_DIR_NAME}/{RENPY_SCREENS_FILE_NAME}`: generated dialogue screen and textbox style based on the project textbox settings.",
             f"- `{RENPY_GAME_DIR_NAME}/assets/`: copied assets referenced by the generated script.",
             f"- `{RENPY_REVIEW_FILE_NAME}`: review notes for custom effects and migration gaps.",
             f"- `{RENPY_MANIFEST_FILE_NAME}`: machine-readable export summary.",
@@ -1514,6 +1680,7 @@ def build_renpy_quality_report(build_dir: Path, export_result: dict) -> dict:
     game_dir = root / RENPY_GAME_DIR_NAME
     script_path = game_dir / RENPY_SCRIPT_FILE_NAME
     options_path = game_dir / RENPY_OPTIONS_FILE_NAME
+    screens_path = game_dir / RENPY_SCREENS_FILE_NAME
     issues: list[dict] = []
     references = {"labels": [], "duplicateLabels": [], "jumps": [], "assetReferences": []}
 
@@ -1528,6 +1695,15 @@ def build_renpy_quality_report(build_dir: Path, export_result: dict) -> dict:
 
     if not options_path.is_file():
         add_quality_issue(issues, "error", "renpy_missing_options", "game/options.rpy is missing.")
+    if not screens_path.is_file():
+        add_quality_issue(issues, "error", "renpy_missing_screens", "game/screens.rpy is missing.")
+        screens = ""
+    else:
+        screens = screens_path.read_text(encoding="utf-8")
+        if "screen say(who, what):" not in screens:
+            add_quality_issue(issues, "error", "renpy_missing_say_screen", "game/screens.rpy does not define the say screen.")
+        if "style canvasia_say_window" not in screens:
+            add_quality_issue(issues, "error", "renpy_missing_textbox_style", "game/screens.rpy does not include the generated textbox style.")
 
     labels = set(references["labels"])
     if export_result.get("sceneCount", 0) and not labels:
@@ -1586,12 +1762,14 @@ def build_renpy_quality_report(build_dir: Path, export_result: dict) -> dict:
             "missingAssetReferenceCount": len(missing_asset_references),
             "duplicateLabelCount": len(references["duplicateLabels"]),
             "reviewCommentCount": review_comment_count,
+            "screensPresent": bool(screens.strip()),
             "errorCount": error_count,
             "reviewCount": review_count,
         },
         "files": {
             "script": f"{RENPY_GAME_DIR_NAME}/{RENPY_SCRIPT_FILE_NAME}",
             "options": f"{RENPY_GAME_DIR_NAME}/{RENPY_OPTIONS_FILE_NAME}",
+            "screens": f"{RENPY_GAME_DIR_NAME}/{RENPY_SCREENS_FILE_NAME}",
             "reviewNotes": RENPY_REVIEW_FILE_NAME,
             "manifest": RENPY_MANIFEST_FILE_NAME,
         },
@@ -1643,6 +1821,7 @@ ROOT = Path(__file__).resolve().parent
 GAME_DIR = ROOT / "{RENPY_GAME_DIR_NAME}"
 SCRIPT_PATH = GAME_DIR / "{RENPY_SCRIPT_FILE_NAME}"
 OPTIONS_PATH = GAME_DIR / "{RENPY_OPTIONS_FILE_NAME}"
+SCREENS_PATH = GAME_DIR / "{RENPY_SCREENS_FILE_NAME}"
 PATH_SUFFIX_PATTERN = re.compile(r"\\.(?:png|jpe?g|webp|gif|avif|mp3|ogg|wav|m4a|aac|flac|mp4|webm|mov|m4v)$", re.IGNORECASE)
 PLAYBACK_SPEC_PREFIX_PATTERN = re.compile(r"^<[^>]+>")
 
@@ -1673,6 +1852,15 @@ def main() -> int:
             issues.append("empty game/script.rpy")
     if not OPTIONS_PATH.is_file():
         issues.append("missing game/options.rpy")
+    if not SCREENS_PATH.is_file():
+        issues.append("missing game/screens.rpy")
+        screens = ""
+    else:
+        screens = SCREENS_PATH.read_text(encoding="utf-8")
+        if "screen say(who, what):" not in screens:
+            issues.append("missing Ren'Py say screen in game/screens.rpy")
+        if "style canvasia_say_window" not in screens:
+            issues.append("missing Canvasia textbox style in game/screens.rpy")
 
     labels = re.findall(r"^\\s*label\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*:", script, flags=re.MULTILINE)
     label_set = set(labels)
@@ -1725,16 +1913,23 @@ def write_renpy_quality_files(build_dir: Path, export_result: dict) -> dict:
 
 def write_renpy_starter_project(build_dir: Path, bundle: dict, assets_doc: dict | None = None) -> dict:
     export_result = build_renpy_draft_export(bundle, assets_doc)
+    dialog_screen_summary = build_renpy_dialog_screen_summary(bundle)
+    export_result = {
+        **export_result,
+        "dialogScreen": dialog_screen_summary,
+    }
     game_dir = build_dir / RENPY_GAME_DIR_NAME
     game_dir.mkdir(parents=True, exist_ok=True)
     script_path = game_dir / RENPY_SCRIPT_FILE_NAME
     options_path = game_dir / RENPY_OPTIONS_FILE_NAME
+    screens_path = game_dir / RENPY_SCREENS_FILE_NAME
     manifest_path = build_dir / RENPY_MANIFEST_FILE_NAME
     review_path = build_dir / RENPY_REVIEW_FILE_NAME
     readme_path = build_dir / RENPY_README_FILE_NAME
 
     script_path.write_text(export_result["script"], encoding="utf-8")
     options_path.write_text(build_renpy_options_file(bundle), encoding="utf-8")
+    screens_path.write_text(build_renpy_screens_file(bundle), encoding="utf-8")
     manifest_path.write_text(json.dumps({key: value for key, value in export_result.items() if key != "script"}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     review_path.write_text(build_renpy_review_notes(export_result), encoding="utf-8")
     readme_path.write_text(build_renpy_readme(export_result), encoding="utf-8")
@@ -1746,6 +1941,8 @@ def write_renpy_starter_project(build_dir: Path, bundle: dict, assets_doc: dict 
         "scriptPath": str(script_path),
         "optionsName": f"{RENPY_GAME_DIR_NAME}/{RENPY_OPTIONS_FILE_NAME}",
         "optionsPath": str(options_path),
+        "screensName": f"{RENPY_GAME_DIR_NAME}/{RENPY_SCREENS_FILE_NAME}",
+        "screensPath": str(screens_path),
         "manifestName": RENPY_MANIFEST_FILE_NAME,
         "manifestPath": str(manifest_path),
         "reviewName": RENPY_REVIEW_FILE_NAME,

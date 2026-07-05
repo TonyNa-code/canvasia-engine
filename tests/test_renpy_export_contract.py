@@ -227,6 +227,41 @@ class RenpyExportContractTests(unittest.TestCase):
         self.assertEqual(frontend["warnings"][0]["code"], "renpy_particle_asset_type_review")
         self.assertEqual(backend_warnings[0]["code"], "renpy_particle_asset_type_review")
 
+    def test_dialog_box_config_exports_to_renpy_say_screen(self) -> None:
+        bundle = {
+            "project": {
+                "resolution": {"width": 1920, "height": 1080},
+                "dialogBoxConfig": {
+                    "widthPercent": 82,
+                    "minHeight": 132,
+                    "backgroundColor": "#10243a",
+                    "backgroundOpacity": 12,
+                    "borderColor": "#6fdfff",
+                    "borderOpacity": 0,
+                    "textColor": "#f0f6ff",
+                    "speakerColor": "#ffffff",
+                    "anchor": "center",
+                    "offsetXPercent": 12,
+                    "offsetYPercent": -8,
+                },
+            }
+        }
+
+        screens = renpy_export.build_renpy_screens_file(bundle)
+        summary = renpy_export.build_renpy_dialog_screen_summary(bundle)
+
+        self.assertIn("screen say(who, what):", screens)
+        self.assertIn("style canvasia_say_window is default:", screens)
+        self.assertIn("    xpos 1190", screens)
+        self.assertIn("    ypos 454", screens)
+        self.assertIn("    yanchor 0.5", screens)
+        self.assertIn("    xsize 1574", screens)
+        self.assertIn("    yminimum 132", screens)
+        self.assertIn('    background "#10243a1f"', screens)
+        self.assertIn('    color "#f0f6ff"', screens)
+        self.assertEqual(summary["anchor"], "center")
+        self.assertEqual(summary["borderColor"], "#6fdfff00")
+
 
 if __name__ == "__main__":
     unittest.main()
