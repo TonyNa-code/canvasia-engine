@@ -150,9 +150,34 @@
     return `已润色 ${safeOperations.length} 张卡片，补齐 ${fieldCount} 个演出参数`;
   }
 
+  function getScenePresentationPolishDigest(scene, options = {}) {
+    const plan = buildScenePresentationPolishPlan(scene, options);
+    const tagLimit = Math.max(1, Number(options.tagLimit) || 4);
+    const changeLabels = [];
+    plan.operations.forEach((operation) => {
+      operation.fields.forEach((field) => {
+        if (field.label && !changeLabels.includes(field.label)) {
+          changeLabels.push(field.label);
+        }
+      });
+    });
+
+    return {
+      canApply: plan.changed,
+      actionLabel: plan.changed ? `润色 ${plan.changedFieldCount} 个演出参数` : "演出参数已完整",
+      badgeLabel: plan.changed ? `${plan.changedBlockCount} 张卡片可润色` : "无需处理",
+      helperText: plan.changed
+        ? `会补齐 ${changeLabels.slice(0, tagLimit).join("、") || "基础演出参数"}。`
+        : "本场的文字速度、转场、淡入淡出和音量已经比较完整。",
+      tags: plan.changed ? changeLabels.slice(0, tagLimit) : ["基础演出已完整"],
+      plan,
+    };
+  }
+
   global.CanvasiaEditorScenePolish = Object.freeze({
     DEFAULTS,
     buildScenePresentationPolishPlan,
     buildScenePresentationPolishSummary,
+    getScenePresentationPolishDigest,
   });
 })(typeof window !== "undefined" ? window : globalThis);

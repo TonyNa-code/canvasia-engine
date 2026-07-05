@@ -33811,8 +33811,9 @@ function renderStorySceneOptimizerButton(button) {
   const dataset = Object.entries(button.dataset ?? {})
     .map(([key, value]) => ` data-${key}="${escapeHtml(String(value))}"`)
     .join("");
+  const disabled = button.disabled ? " disabled" : "";
   return `
-    <button type="button" class="${className}" data-action="${escapeHtml(button.action)}"${dataset}>
+    <button type="button" class="${className}" data-action="${escapeHtml(button.action)}"${dataset}${disabled}>
       ${escapeHtml(button.label)}
     </button>
   `;
@@ -33937,9 +33938,18 @@ function buildStorySceneOptimizerCards(scene, overview) {
 
   const effectActions = [];
   const effectTags = [];
+  const polishDigest =
+    typeof scenePolishTools?.getScenePresentationPolishDigest === "function"
+      ? scenePolishTools.getScenePresentationPolishDigest(scene)
+      : null;
   if (overview.hasStoryContent) {
-    effectActions.push({ label: "一键润色本场演出", action: "polish-scene-presentation", primary: true });
-    effectTags.push("自动补基础转场和淡入淡出");
+    effectActions.push({
+      label: polishDigest?.actionLabel ?? "一键润色本场演出",
+      action: "polish-scene-presentation",
+      primary: true,
+      disabled: polishDigest ? !polishDigest.canApply : false,
+    });
+    effectTags.push(...(polishDigest?.tags?.length ? polishDigest.tags : ["自动补基础转场和淡入淡出"]));
   }
   if (overview.hasStoryContent && !overview.hasEffects) {
     effectActions.push({ label: "加粒子特效", action: "add-particle-effect" });

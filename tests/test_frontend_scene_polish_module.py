@@ -36,11 +36,14 @@ class FrontendScenePolishModuleTests(unittest.TestCase):
               ],
             }};
             const plan = tools.buildScenePresentationPolishPlan(scene);
-            const cleanPlan = tools.buildScenePresentationPolishPlan({{ id: "clean", blocks: [
+            const cleanScene = {{ id: "clean", blocks: [
               {{ id: "line_ok", type: "dialogue", text: "短句", textSpeed: "fast" }},
               {{ id: "bg_ok", type: "background", transition: "crossfade", transitionDurationMs: 800 }},
               {{ id: "music_ok", type: "music_play", fadeInMs: 700, fadeOutMs: 900, volume: 65, loop: false, endMode: "after_block" }},
-            ] }});
+            ] }};
+            const cleanPlan = tools.buildScenePresentationPolishPlan(cleanScene);
+            const digest = tools.getScenePresentationPolishDigest(scene, {{ tagLimit: 3 }});
+            const cleanDigest = tools.getScenePresentationPolishDigest(cleanScene);
             process.stdout.write(JSON.stringify({{
               defaultTransition: tools.DEFAULTS.transition,
               changed: plan.changed,
@@ -53,6 +56,20 @@ class FrontendScenePolishModuleTests(unittest.TestCase):
               operationLabels: plan.operations.flatMap((operation) => operation.fields.map((field) => field.label)),
               cleanChanged: cleanPlan.changed,
               cleanSummary: cleanPlan.summary,
+              digest: {{
+                canApply: digest.canApply,
+                actionLabel: digest.actionLabel,
+                badgeLabel: digest.badgeLabel,
+                helperText: digest.helperText,
+                tags: digest.tags,
+              }},
+              cleanDigest: {{
+                canApply: cleanDigest.canApply,
+                actionLabel: cleanDigest.actionLabel,
+                badgeLabel: cleanDigest.badgeLabel,
+                helperText: cleanDigest.helperText,
+                tags: cleanDigest.tags,
+              }},
             }}));
             """
         )
@@ -92,6 +109,15 @@ class FrontendScenePolishModuleTests(unittest.TestCase):
         self.assertIn("补 BGM 淡入", payload["operationLabels"])
         self.assertFalse(payload["cleanChanged"])
         self.assertEqual(payload["cleanSummary"], "本场基础演出参数已经比较完整")
+        self.assertTrue(payload["digest"]["canApply"])
+        self.assertIn("润色", payload["digest"]["actionLabel"])
+        self.assertIn("张卡片可润色", payload["digest"]["badgeLabel"])
+        self.assertIn("会补齐", payload["digest"]["helperText"])
+        self.assertLessEqual(len(payload["digest"]["tags"]), 3)
+        self.assertIn("补文字速度", payload["digest"]["tags"])
+        self.assertFalse(payload["cleanDigest"]["canApply"])
+        self.assertEqual(payload["cleanDigest"]["actionLabel"], "演出参数已完整")
+        self.assertEqual(payload["cleanDigest"]["tags"], ["基础演出已完整"])
 
 
 if __name__ == "__main__":
