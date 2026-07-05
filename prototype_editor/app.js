@@ -9778,6 +9778,7 @@ function renderStoryEditorModeBanner(scene = null) {
     mode,
     hiddenCount,
     playableTemplateSummary: storyTemplateTools.getStoryTemplateSummary("playable_scene", { getBlockLabel }),
+    getBlockLabel,
     escapeHtml,
     renderQuickActionButton,
   });

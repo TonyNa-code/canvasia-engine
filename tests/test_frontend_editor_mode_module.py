@@ -9,6 +9,7 @@ from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "editor_mode.js"
+STORY_TEMPLATE_MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "story_templates.js"
 
 
 class FrontendEditorModeModuleTests(unittest.TestCase):
@@ -181,6 +182,66 @@ class FrontendEditorModeModuleTests(unittest.TestCase):
         self.assertIn("新手上手顺序", payload["beginnerBannerMarkup"])
         self.assertIn("完整工具栏已展开", payload["advancedBannerMarkup"])
         self.assertNotIn("新手上手顺序", payload["advancedBannerMarkup"])
+
+    def test_editor_mode_workflow_reuses_story_template_recommendations_when_available(self) -> None:
+        script = textwrap.dedent(
+            f"""
+            const fs = require("fs");
+            const vm = require("vm");
+            const context = {{ window: {{}} }};
+            context.globalThis = context;
+            vm.createContext(context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(STORY_TEMPLATE_MODULE_PATH))}, "utf8"), context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
+            const tools = context.window.CanvasiaEditorMode;
+            const quickRenderer = (action, primary) =>
+              `<button data-action="${{action.action}}" data-primary="${{primary}}" data-template-id="${{action.dataset?.["template-id"] ?? ""}}">${{action.label}}</button>`;
+            const videoWorkflow = tools.buildBeginnerStoryWorkflow({{
+              id: "scene_op",
+              blocks: [
+                {{ type: "video_play" }},
+              ],
+            }}, {{
+              getBlockLabel: (type) => type === "credits_roll" ? "片尾字幕" : `卡片:${{type}}`,
+            }});
+            const videoMarkup = tools.renderBeginnerStoryWorkflow({{
+              id: "scene_op",
+              blocks: [
+                {{ type: "video_play" }},
+              ],
+            }}, {{
+              getBlockLabel: (type) => type === "credits_roll" ? "片尾字幕" : `卡片:${{type}}`,
+              renderQuickActionButton: quickRenderer,
+            }});
+            const emptyWorkflow = tools.buildBeginnerStoryWorkflow({{
+              id: "scene_empty",
+              blocks: [],
+            }});
+            process.stdout.write(JSON.stringify({{
+              videoWorkflow,
+              videoMarkup,
+              emptyWorkflow,
+            }}));
+            """
+        )
+        completed = subprocess.run(
+            ["node", "-e", script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        self.assertEqual(payload["videoWorkflow"]["nextStep"]["step"], "第一步")
+        self.assertEqual(payload["videoWorkflow"]["nextStep"]["title"], "按当前内容补下一段演出")
+        self.assertEqual(payload["videoWorkflow"]["nextStep"]["actions"][0]["dataset"]["template-id"], "ending_credits")
+        self.assertEqual(payload["videoWorkflow"]["nextStep"]["templateSummary"]["title"], "ED 与片尾")
+        self.assertIn("片尾字幕", payload["videoWorkflow"]["nextStep"]["templateSummary"]["labels"])
+        self.assertIn('data-template-id="ending_credits"', payload["videoMarkup"])
+        self.assertIn("ED 与片尾 · 将插入", payload["videoMarkup"])
+        self.assertEqual(payload["emptyWorkflow"]["nextStep"]["actions"][0]["dataset"]["template-id"], "playable_scene")
 
 
 if __name__ == "__main__":

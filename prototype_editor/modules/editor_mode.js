@@ -1,4 +1,6 @@
 (function attachEditorModeTools(global) {
+  const storyTemplateTools = global.CanvasiaEditorStoryTemplates || {};
+
   const EDITOR_MODE_LABELS = Object.freeze({
     beginner: "新手模式",
     advanced: "高级模式",
@@ -189,6 +191,49 @@
     `;
   }
 
+  function getWorkflowTemplateSummary(templateId, options = {}) {
+    const safeTemplateId = String(templateId ?? "").trim();
+    if (!safeTemplateId) {
+      return null;
+    }
+
+    if (typeof storyTemplateTools.getStoryTemplateSummary === "function") {
+      return normalizeWorkflowTemplateSummary(
+        storyTemplateTools.getStoryTemplateSummary(safeTemplateId, {
+          getBlockLabel: typeof options.getBlockLabel === "function" ? options.getBlockLabel : undefined,
+        })
+      );
+    }
+
+    if (safeTemplateId === "playable_scene") {
+      return normalizeWorkflowTemplateSummary(options.playableTemplateSummary);
+    }
+
+    return null;
+  }
+
+  function getRecommendedWorkflowTemplate(scene, options = {}) {
+    const blocks = Array.isArray(scene?.blocks) ? scene.blocks : [];
+    let templateId = "playable_scene";
+    let reason = "";
+
+    if (typeof storyTemplateTools.getStoryTemplateRecommendationPlan === "function") {
+      const plan = storyTemplateTools.getStoryTemplateRecommendationPlan(scene, { limit: 1 });
+      const recommendation = Array.isArray(plan?.recommendations) ? plan.recommendations[0] : null;
+      templateId = String(recommendation?.templateId ?? templateId).trim() || templateId;
+      reason = String(recommendation?.reason ?? "").trim();
+    }
+
+    const summary = getWorkflowTemplateSummary(templateId, options);
+    return {
+      templateId,
+      title: summary?.title ?? templateId,
+      actionLabel: templateId === "playable_scene" && blocks.length <= 0 ? "生成可试玩段落" : `套用：${summary?.title ?? "推荐模板"}`,
+      description: reason,
+      templateSummary: summary,
+    };
+  }
+
   function renderEditorModeSwitchButtons(mode = "beginner", options = {}) {
     const escape = getEscapeHtml(options);
     const safeMode = getSafeEditorMode(mode);
@@ -262,18 +307,20 @@
     const hasMusic = blocks.some((block) => block.type === "music_play");
     const hasBranchOrJump = blocks.some((block) => STORY_ROUTE_BLOCK_TYPES.includes(block.type));
     const hasPolish = blocks.some((block) => STORY_POLISH_BLOCK_TYPES.includes(block.type));
-    const playableTemplateSummary = normalizeWorkflowTemplateSummary(options.playableTemplateSummary);
+    const recommendedTemplate = getRecommendedWorkflowTemplate(scene, options);
+    const recommendedTemplateSummary = normalizeWorkflowTemplateSummary(recommendedTemplate.templateSummary);
+    const isRecommendedPlayable = recommendedTemplate.templateId === "playable_scene";
 
     const steps = [
       {
         step: "第一步",
-        title: storyCount > 0 ? "写入这一场的基础正文" : "先生成一段可试玩剧情",
+        title: storyCount > 0 ? "写入这一场的基础正文" : isRecommendedPlayable ? "先生成一段可试玩剧情" : "按当前内容补下一段演出",
         done: storyCount > 0,
         description:
           storyCount > 0
             ? `这一场已经有 ${storyCount} 张正文卡片了，可以继续往下补氛围和去向。`
-            : "一键放入背景、音乐、角色登场、对白、选择项和淡出收束，先让这一场跑起来。",
-        ...(storyCount <= 0 && playableTemplateSummary ? { templateSummary: playableTemplateSummary } : {}),
+            : recommendedTemplate.description || "一键放入背景、音乐、角色登场、对白、选择项和淡出收束，先让这一场跑起来。",
+        ...(storyCount <= 0 && recommendedTemplateSummary ? { templateSummary: recommendedTemplateSummary } : {}),
         actions:
           storyCount > 0
             ? [
@@ -281,7 +328,7 @@
                 { label: "加一张旁白", action: "add-narration" },
               ]
             : [
-                { label: "生成可试玩段落", action: "apply-story-template", dataset: { "template-id": "playable_scene" } },
+                { label: recommendedTemplate.actionLabel, action: "apply-story-template", dataset: { "template-id": recommendedTemplate.templateId } },
                 { label: "先加一句台词", action: "add-dialogue" },
               ],
       },
