@@ -38,6 +38,22 @@
     fast: 72,
     instant: 10000,
   });
+  const BACKGROUND_TRANSITION_DEFAULT_MS = 360;
+  const EFFECT_DURATION_SECONDS = Object.freeze({
+    short: 0.42,
+    medium: 0.78,
+    long: 1.2,
+  });
+  const FLASH_COLOR_HEX = Object.freeze({
+    white: "#ffffff",
+    warm: "#ffeccc",
+    red: "#ff7878",
+    black: "#201816",
+  });
+  const FADE_COLOR_HEX = Object.freeze({
+    black: "#120e0c",
+    white: "#fffcf7",
+  });
 
   function toArray(value) {
     return Array.isArray(value) ? value : [];
@@ -257,6 +273,11 @@
     return Math.min(Math.max(value, min), max);
   }
 
+  function formatRenpySeconds(value) {
+    const seconds = Number(value);
+    return Number.isFinite(seconds) ? Number(seconds.toFixed(2)).toString() : "0";
+  }
+
   function getSafeStageNumber(value, fallback, min, max) {
     const number = Number(value ?? fallback);
     return clampNumber(Number.isFinite(number) ? number : fallback, min, max);
@@ -341,10 +362,39 @@
     return definitions;
   }
 
-  function getTransitionDurationSeconds(block = {}) {
-    const value = Number(block.transitionDurationMs ?? 600);
-    const ms = Number.isFinite(value) ? clampNumber(value, 0, 5000) : 600;
+  function getTransitionDurationSeconds(block = {}, fallbackMs = 600) {
+    const value = Number(block.transitionDurationMs ?? fallbackMs);
+    const ms = Number.isFinite(value) ? clampNumber(value, 0, 5000) : fallbackMs;
     return Number((ms / 1000).toFixed(2));
+  }
+
+  function getScreenEffectDurationSeconds(block = {}) {
+    const duration = cleanText(block.duration, "medium");
+    return EFFECT_DURATION_SECONDS[duration] ?? EFFECT_DURATION_SECONDS.medium;
+  }
+
+  function getEffectColorHex(table, value, fallback) {
+    const key = cleanText(value, fallback);
+    return table[key] ?? table[fallback];
+  }
+
+  function getBackgroundTransitionExpression(block = {}, context = {}) {
+    const transition = cleanText(block.transition, "fade");
+    const seconds = getTransitionDurationSeconds(block, BACKGROUND_TRANSITION_DEFAULT_MS);
+    if (transition === "none" || seconds <= 0) {
+      return "";
+    }
+    if (["fade", "dissolve", "crossfade"].includes(transition)) {
+      return `Dissolve(${formatRenpySeconds(seconds)})`;
+    }
+    pushWarning(context.warnings ?? [], "renpy_background_transition_review", `背景转场 ${transition} 暂未精确映射，已按淡入淡出导出。`, getWarningContext(context));
+    return `Dissolve(${formatRenpySeconds(seconds)})`;
+  }
+
+  function renderBackgroundBlock(block = {}, context = {}) {
+    const assetId = cleanText(block.assetId, "missing_background");
+    const transition = getBackgroundTransitionExpression(block, context);
+    return [`    scene ${normalizeIdentifier(assetId, "background")}${transition ? ` with ${transition}` : ""}`];
   }
 
   function getCharacterTransitionExpression(block = {}, context = {}, direction = "show") {
@@ -390,6 +440,30 @@
   function renderCharacterHideBlock(block = {}, context = {}) {
     const transition = getCharacterTransitionExpression(block, context, "hide");
     return [`    hide ${normalizeIdentifier(block.characterId, "character")}${transition ? ` with ${transition}` : ""}`];
+  }
+
+  function renderScreenFlashBlock(block = {}) {
+    const duration = getScreenEffectDurationSeconds(block);
+    const outTime = clampNumber(duration * 0.2, 0.05, 0.28);
+    const holdTime = clampNumber(duration * 0.12, 0.03, 0.16);
+    const inTime = Math.max(0.05, duration - outTime - holdTime);
+    const color = getEffectColorHex(FLASH_COLOR_HEX, block.color, "white");
+    return [
+      `    with Fade(${formatRenpySeconds(outTime)}, ${formatRenpySeconds(holdTime)}, ${formatRenpySeconds(inTime)}, color="${color}")`,
+    ];
+  }
+
+  function renderScreenFadeBlock(block = {}, context = {}) {
+    const action = cleanText(block.action, "fade_out");
+    const duration = getScreenEffectDurationSeconds(block);
+    const color = getEffectColorHex(FADE_COLOR_HEX, block.color, "black");
+    if (action === "fade_in") {
+      return [`    with Fade(0, 0, ${formatRenpySeconds(duration)}, color="${color}")`];
+    }
+    if (action !== "fade_out") {
+      pushWarning(context.warnings ?? [], "renpy_screen_fade_action_review", `黑场动作 ${action} 暂未识别，已按淡出导出。`, getWarningContext(context));
+    }
+    return [`    with Fade(${formatRenpySeconds(duration)}, 0, 0, color="${color}")`];
   }
 
   function getBlockText(block = {}) {
@@ -641,8 +715,7 @@
     const characterMap = context.characterMap ?? new Map();
     const warnings = context.warnings ?? [];
     if (type === "background") {
-      const assetId = cleanText(block.assetId, "missing_background");
-      return [`    scene ${normalizeIdentifier(assetId, "background")} with fade`];
+      return renderBackgroundBlock(block, context);
     }
     if (type === "character_show") {
       return renderCharacterShowBlock(block, context);
@@ -681,10 +754,10 @@
       return ["    with hpunch"];
     }
     if (type === "screen_flash") {
-      return ['    with Fade(0.08, 0.0, 0.28, color="#ffffff")'];
+      return renderScreenFlashBlock(block);
     }
     if (type === "screen_fade") {
-      return ["    with fade"];
+      return renderScreenFadeBlock(block, context);
     }
     if (type === "dialogue") {
       const characterId = cleanText(block.speakerId);

@@ -58,6 +58,22 @@ TEXT_SPEED_CPS = {
     "fast": 72,
     "instant": 10000,
 }
+BACKGROUND_TRANSITION_DEFAULT_MS = 360
+EFFECT_DURATION_SECONDS = {
+    "short": 0.42,
+    "medium": 0.78,
+    "long": 1.2,
+}
+FLASH_COLOR_HEX = {
+    "white": "#ffffff",
+    "warm": "#ffeccc",
+    "red": "#ff7878",
+    "black": "#201816",
+}
+FADE_COLOR_HEX = {
+    "black": "#120e0c",
+    "white": "#fffcf7",
+}
 
 
 def as_list(value: Any) -> list:
@@ -104,6 +120,14 @@ def seconds_from_ms(value: Any) -> float:
     except (TypeError, ValueError):
         return 0
     return round(ms / 1000, 2) if ms > 0 else 0
+
+
+def format_renpy_seconds(value: Any) -> str:
+    try:
+        seconds = float(value)
+    except (TypeError, ValueError):
+        seconds = 0
+    return f"{seconds:.2f}".rstrip("0").rstrip(".") or "0"
 
 
 def get_safe_volume_ratio(value: Any, fallback: float = 100) -> float:
@@ -265,12 +289,39 @@ def build_character_stage_transform_definitions(scene_records: list[dict], scene
     return lines
 
 
-def get_transition_duration_seconds(block: dict) -> float:
+def get_transition_duration_seconds(block: dict, fallback_ms: float = 600) -> float:
     try:
-        ms = float(block.get("transitionDurationMs", 600))
+        ms = float(block.get("transitionDurationMs", fallback_ms))
     except (TypeError, ValueError):
-        ms = 600
+        ms = fallback_ms
     return round(clamp_number(ms, 0, 5000) / 1000, 2)
+
+
+def get_screen_effect_duration_seconds(block: dict) -> float:
+    duration = clean_text(block.get("duration"), "medium")
+    return EFFECT_DURATION_SECONDS.get(duration, EFFECT_DURATION_SECONDS["medium"])
+
+
+def get_effect_color_hex(table: dict[str, str], value: Any, fallback: str) -> str:
+    key = clean_text(value, fallback)
+    return table.get(key, table[fallback])
+
+
+def get_background_transition_expression(block: dict, context: dict) -> str:
+    transition = clean_text(block.get("transition"), "fade")
+    seconds = get_transition_duration_seconds(block, BACKGROUND_TRANSITION_DEFAULT_MS)
+    if transition == "none" or seconds <= 0:
+        return ""
+    if transition in {"fade", "dissolve", "crossfade"}:
+        return f"Dissolve({format_renpy_seconds(seconds)})"
+    add_warning(
+        context["warnings"],
+        "renpy_background_transition_review",
+        f"背景转场 {transition} 暂未精确映射，已按淡入淡出导出。",
+        sceneId=context.get("sceneId"),
+        blockIndex=context.get("blockIndex"),
+    )
+    return f"Dissolve({format_renpy_seconds(seconds)})"
 
 
 def get_character_transition_expression(block: dict, context: dict, direction: str = "show") -> str:
@@ -659,6 +710,41 @@ def render_character_hide_block(block: dict, context: dict) -> list[str]:
     return [f"    hide {normalize_identifier(block.get('characterId'), 'character')}{transition_suffix}"]
 
 
+def render_background_block(block: dict, context: dict) -> list[str]:
+    asset_id = clean_text(block.get("assetId"), "missing_background")
+    transition = get_background_transition_expression(block, context)
+    transition_suffix = f" with {transition}" if transition else ""
+    return [f"    scene {normalize_identifier(asset_id, 'background')}{transition_suffix}"]
+
+
+def render_screen_flash_block(block: dict) -> list[str]:
+    duration = get_screen_effect_duration_seconds(block)
+    out_time = clamp_number(duration * 0.2, 0.05, 0.28)
+    hold_time = clamp_number(duration * 0.12, 0.03, 0.16)
+    in_time = max(0.05, duration - out_time - hold_time)
+    color = get_effect_color_hex(FLASH_COLOR_HEX, block.get("color"), "white")
+    return [
+        f"    with Fade({format_renpy_seconds(out_time)}, {format_renpy_seconds(hold_time)}, {format_renpy_seconds(in_time)}, color=\"{color}\")"
+    ]
+
+
+def render_screen_fade_block(block: dict, context: dict) -> list[str]:
+    action = clean_text(block.get("action"), "fade_out")
+    duration = get_screen_effect_duration_seconds(block)
+    color = get_effect_color_hex(FADE_COLOR_HEX, block.get("color"), "black")
+    if action == "fade_in":
+        return [f"    with Fade(0, 0, {format_renpy_seconds(duration)}, color=\"{color}\")"]
+    if action != "fade_out":
+        add_warning(
+            context["warnings"],
+            "renpy_screen_fade_action_review",
+            f"黑场动作 {action} 暂未识别，已按淡出导出。",
+            sceneId=context.get("sceneId"),
+            blockIndex=context.get("blockIndex"),
+        )
+    return [f"    with Fade({format_renpy_seconds(duration)}, 0, 0, color=\"{color}\")"]
+
+
 def render_story_block(block: dict, context: dict) -> list[str]:
     block_type = clean_text(block.get("type"), "unknown")
     asset_map = context["assetMap"]
@@ -669,8 +755,7 @@ def render_story_block(block: dict, context: dict) -> list[str]:
     block_index = int(context.get("blockIndex") or 0)
 
     if block_type == "background":
-        asset_id = clean_text(block.get("assetId"), "missing_background")
-        return [f"    scene {normalize_identifier(asset_id, 'background')} with fade"]
+        return render_background_block(block, context)
     if block_type == "character_show":
         return render_character_show_block(block, context)
     if block_type == "character_hide":
@@ -696,9 +781,9 @@ def render_story_block(block: dict, context: dict) -> list[str]:
     if block_type == "screen_shake":
         return ["    with hpunch"]
     if block_type == "screen_flash":
-        return ['    with Fade(0.08, 0.0, 0.28, color="#ffffff")']
+        return render_screen_flash_block(block)
     if block_type == "screen_fade":
-        return ["    with fade"]
+        return render_screen_fade_block(block, context)
     if block_type in {"dialogue", "narration"}:
         line = render_renpy_text(block)
         output: list[str] = []

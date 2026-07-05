@@ -47,7 +47,7 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
                       id: "scene_open",
                       name: "教室黄昏",
                       blocks: [
-                        {{ type: "background", assetId: "bg_rooftop" }},
+                        {{ type: "background", assetId: "bg_rooftop", transition: "fade", transitionDurationMs: 900 }},
                         {{ type: "music_play", assetId: "bgm_piano", fadeInMs: 800, fadeOutMs: 900, loop: false, volume: 82, endMode: "scene_end" }},
                         {{
                           type: "character_show",
@@ -80,7 +80,8 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
                         {{ type: "video_play", assetId: "op_movie", startTimeSeconds: 1.5, endTimeSeconds: 12, volume: 80 }},
                         {{ type: "wait", durationSeconds: 1.2 }},
                         {{ type: "screen_shake" }},
-                        {{ type: "screen_flash" }},
+                        {{ type: "screen_flash", color: "warm", intensity: "strong", duration: "long" }},
+                        {{ type: "screen_fade", action: "fade_in", color: "white", duration: "medium" }},
                         {{ type: "jump", targetSceneId: "scene_end" }},
                       ],
                     }},
@@ -132,7 +133,7 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
         self.assertIn('default route = "common"', payload["draft"]["script"])
         self.assertIn('image bg_rooftop = "bg/rooftop.png"', payload["draft"]["script"])
         self.assertIn("label scene_open:", payload["draft"]["script"])
-        self.assertIn("scene bg_rooftop with fade", payload["draft"]["script"])
+        self.assertIn("scene bg_rooftop with Dissolve(0.9)", payload["draft"]["script"])
         self.assertIn('play music "bgm/piano.ogg" fadein 0.8 noloop volume 0.82', payload["draft"]["script"])
         self.assertIn("# Canvasia review music scope: endMode=scene_end, endBlockId=auto, fadeOutMs=900", payload["draft"]["script"])
         self.assertIn("transform canvasia_stage_scene_open_3:", payload["draft"]["script"])
@@ -156,7 +157,8 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
         self.assertIn("jump scene_end", payload["draft"]["script"])
         self.assertIn("$ renpy.pause(1.2)", payload["draft"]["script"])
         self.assertIn("with hpunch", payload["draft"]["script"])
-        self.assertIn('with Fade(0.08, 0.0, 0.28, color="#ffffff")', payload["draft"]["script"])
+        self.assertIn('with Fade(0.24, 0.14, 0.82, color="#ffeccc")', payload["draft"]["script"])
+        self.assertIn('with Fade(0, 0, 0.78, color="#fffcf7")', payload["draft"]["script"])
         self.assertIn('show text "STAFF\\nThank you\\n企划：Canvasia\\n剧本：Tester" at truecenter with dissolve', payload["draft"]["script"])
         self.assertNotIn("renpy_choice_effects_review", payload["manifest"])
         self.assertIn("renpy_video_timing_review", payload["manifest"])

@@ -680,7 +680,13 @@ class RunEditorSmokeTests(unittest.TestCase):
             chapter_result["chapterId"],
             chapter_result["scene"],
             [
-                {"id": "bg", "type": "background", "assetId": background_asset["id"]},
+                {
+                    "id": "bg",
+                    "type": "background",
+                    "assetId": background_asset["id"],
+                    "transition": "fade",
+                    "transitionDurationMs": 900,
+                },
                 {
                     "id": "music",
                     "type": "music_play",
@@ -733,9 +739,9 @@ class RunEditorSmokeTests(unittest.TestCase):
                         }
                     ],
                 },
-                {"id": "flash", "type": "screen_flash"},
+                {"id": "flash", "type": "screen_flash", "color": "warm", "intensity": "strong", "duration": "long"},
                 {"id": "shake", "type": "screen_shake"},
-                {"id": "fade", "type": "screen_fade"},
+                {"id": "fade", "type": "screen_fade", "action": "fade_in", "color": "white", "duration": "medium"},
                 {
                     "id": "video",
                     "type": "video_play",
@@ -787,6 +793,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertIn("default flag_met = False", script)
         self.assertIn('define heroine = Character("Heroine")', script)
         self.assertIn(f"image {background_asset['id']}", script)
+        self.assertIn(f"scene {background_asset['id']} with Dissolve(0.9)", script)
         self.assertIn("image heroine expr_default", script)
         self.assertIn(f"label {scene['id']}:", script)
         self.assertIn(f"transform canvasia_stage_{scene['id']}_3:", script)
@@ -807,9 +814,9 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertIn("if affection >= 1:", script)
         self.assertIn(f"jump {scene['id']}", script)
         self.assertIn("$ flag_met = True", script)
-        self.assertIn('with Fade(0.08, 0.0, 0.28, color="#ffffff")', script)
+        self.assertIn('with Fade(0.24, 0.14, 0.82, color="#ffeccc")', script)
         self.assertIn("with hpunch", script)
-        self.assertIn("with fade", script)
+        self.assertIn('with Fade(0, 0, 0.78, color="#fffcf7")', script)
         self.assertIn('$ renpy.movie_cutscene("assets/video/', script)
         self.assertIn("# Canvasia review video timing: start=1.5, end=12, volume=80", script)
         self.assertIn('show text "STAFF\\nThanks\\nScenario: Tester\\nEngine: Canvasia" at truecenter with dissolve', script)
