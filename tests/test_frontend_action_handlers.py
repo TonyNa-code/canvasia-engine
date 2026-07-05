@@ -4093,6 +4093,7 @@ class FrontendActionHandlerTests(unittest.TestCase):
 
     def test_scene_production_board_export_actions_are_wired(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
+        scene_production_source = (EDITOR_DIR / "modules" / "scene_production_board.js").read_text(encoding="utf-8")
         click_handler = _extract_function_source(source, "handleClick")
         markdown_block_start = click_handler.index('action === "export-scene-production-board-markdown"')
         csv_block_start = click_handler.index('action === "export-scene-production-board-csv"')
@@ -4115,6 +4116,7 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("function exportSceneProductionBoardCsv()", source)
         self.assertIn("sceneProductionBoardTools.buildSceneProductionBoard", source)
         self.assertIn("sceneProductionBoardTools.getSceneProductionBoardStatusDigest", source)
+        self.assertIn("getStoryTemplateRecommendationSuggestion", scene_production_source)
         self.assertIn("scene.recipeSuggestion", source)
         self.assertIn("summary.recipeSuggestionCount", source)
         self.assertIn("function getScenePacingToneClass", source)

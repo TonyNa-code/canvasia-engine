@@ -11,6 +11,7 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 CATALOG_MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "story_block_catalog.js"
 READABILITY_MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "script_readability.js"
 PACING_MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "scene_pacing_advisor.js"
+STORY_TEMPLATE_MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "story_templates.js"
 MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "scene_production_board.js"
 
 
@@ -204,6 +205,73 @@ class FrontendSceneProductionBoardModuleTests(unittest.TestCase):
         self.assertIn('"branch_merge"', payload["csv"])
         self.assertIn('"relationship_reveal"', payload["csv"])
         self.assertEqual(payload["readyLabel"], "可试玩")
+
+    def test_scene_production_board_reuses_story_template_recommendations_when_available(self) -> None:
+        script = textwrap.dedent(
+            f"""
+            const fs = require("fs");
+            const vm = require("vm");
+            const context = {{ window: {{}} }};
+            context.globalThis = context;
+            vm.createContext(context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(CATALOG_MODULE_PATH))}, "utf8"), context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(READABILITY_MODULE_PATH))}, "utf8"), context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(PACING_MODULE_PATH))}, "utf8"), context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(STORY_TEMPLATE_MODULE_PATH))}, "utf8"), context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
+            const tools = context.window.CanvasiaEditorSceneProductionBoard;
+            const directVideoSuggestion = tools.getStoryTemplateRecommendationSuggestion({{
+              blocks: [
+                {{ id: "op", type: "video_play" }},
+              ],
+            }});
+            const directUnknownSuggestion = tools.getStoryTemplateRecommendationSuggestion({{
+              blocks: [
+                {{ id: "unknown", type: "custom_block" }},
+              ],
+            }});
+            const board = tools.buildSceneProductionBoard({{
+              project: {{ title: "Video Project" }},
+              chapters: [
+                {{
+                  chapterId: "chapter_video",
+                  name: "OP",
+                  scenes: [
+                    {{
+                      id: "scene_op",
+                      name: "片头",
+                      blocks: [
+                        {{ id: "op", type: "video_play", title: "Opening" }},
+                      ],
+                    }},
+                  ],
+                }},
+              ],
+            }});
+            process.stdout.write(JSON.stringify({{
+              directVideoSuggestion,
+              directUnknownSuggestion,
+              board,
+            }}));
+            """
+        )
+        completed = subprocess.run(
+            ["node", "-e", script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        self.assertEqual(payload["directVideoSuggestion"]["templateId"], "ending_credits")
+        self.assertEqual(payload["directVideoSuggestion"]["source"], "story_template_recommendation")
+        self.assertEqual(payload["directUnknownSuggestion"]["templateId"], "opening_intro")
+        scene = payload["board"]["scenes"][0]
+        self.assertEqual(scene["recipeSuggestion"]["templateId"], "ending_credits")
+        self.assertEqual(scene["recipeSuggestion"]["source"], "story_template_recommendation")
+        self.assertEqual(payload["board"]["summary"]["recipeSuggestionCount"], 1)
 
 
 if __name__ == "__main__":

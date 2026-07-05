@@ -1,6 +1,7 @@
 (function attachSceneProductionBoardTools(global) {
   const storyBlockCatalogTools = global.CanvasiaEditorStoryBlockCatalog || {};
   const scenePacingAdvisorTools = global.CanvasiaEditorScenePacingAdvisor || {};
+  const storyTemplateTools = global.CanvasiaEditorStoryTemplates || {};
 
   const EFFECT_BLOCK_TYPES = Object.freeze(
     typeof storyBlockCatalogTools.getEffectBlockTypes === "function"
@@ -77,12 +78,33 @@
       detail: "这个场景已经有内容，但基础画面或 BGM 氛围不够完整，适合补一组日常对话节奏。",
       priority: 72,
     }),
+    opening_intro: Object.freeze({
+      templateId: "opening_intro",
+      title: "补开场铺垫",
+      actionLabel: "插入开场铺垫",
+      detail: "先建立地点、音乐、旁白和第一句对白，让场景入口更清楚。",
+      priority: 70,
+    }),
+    branch_choice: Object.freeze({
+      templateId: "branch_choice",
+      title: "补一个选择入口",
+      actionLabel: "插入选项分支",
+      detail: "当前段落已经有对白，可以补一个玩家选择点，让剧情从阅读进入互动。",
+      priority: 66,
+    }),
     affection_choice: Object.freeze({
       templateId: "affection_choice",
       title: "加一个有后果的选项",
       actionLabel: "插入好感选项",
       detail: "正文已经能读了，可以加一组带变量后果的选项，让玩家感觉选择真的有意义。",
       priority: 64,
+    }),
+    emotion_burst: Object.freeze({
+      templateId: "emotion_burst",
+      title: "补情绪爆点",
+      actionLabel: "插入情绪爆点",
+      detail: "角色和对白已经就位，可以用镜头、震动和闪屏把关键句顶起来。",
+      priority: 62,
     }),
     climax_sequence: Object.freeze({
       templateId: "climax_sequence",
@@ -91,12 +113,33 @@
       detail: "这个场景演出变化偏少，适合用镜头、闪屏、震动和景深把关键句抬起来。",
       priority: 58,
     }),
+    memory_entry: Object.freeze({
+      templateId: "memory_entry",
+      title: "转入回忆段落",
+      actionLabel: "插入回忆入口",
+      detail: "旁白较多时可以补黑场、回忆滤镜和回忆对白，让段落更有画面层次。",
+      priority: 56,
+    }),
     scene_outro: Object.freeze({
       templateId: "scene_outro",
       title: "补场景收尾",
       actionLabel: "插入场景收尾",
       detail: "这段已经比较完整，接下来可以补一个收束和转场，让试玩段落更像正式作品。",
       priority: 42,
+    }),
+    ending_credits: Object.freeze({
+      templateId: "ending_credits",
+      title: "补 ED 与片尾",
+      actionLabel: "插入片尾字幕",
+      detail: "视频或结尾段落后可以补收束旁白、片尾字幕和音乐停止，形成完整发布感。",
+      priority: 60,
+    }),
+    op_movie_hook: Object.freeze({
+      templateId: "op_movie_hook",
+      title: "补 OP 衔接",
+      actionLabel: "插入 OP 前导",
+      detail: "适合把片头视频、黑场过渡和正式第一幕衔接成更像商业作品的入口。",
+      priority: 54,
     }),
     mystery_clue: Object.freeze({
       templateId: "mystery_clue",
@@ -350,14 +393,66 @@
     return new Set(toArray(report.pacingIssueCodes));
   }
 
-  function getSceneRecipeSuggestion(report = {}) {
+  function getSceneRecipeSuggestionByTemplateId(templateId, overrides = {}) {
+    const safeTemplateId = cleanText(templateId);
+    if (!safeTemplateId) {
+      return null;
+    }
+
+    const base = SCENE_RECIPE_SUGGESTIONS[safeTemplateId];
+    const preset =
+      typeof storyTemplateTools.getStoryTemplatePreset === "function"
+        ? storyTemplateTools.getStoryTemplatePreset(safeTemplateId)
+        : null;
+    if (!base && !preset) {
+      return null;
+    }
+
+    return Object.freeze({
+      templateId: safeTemplateId,
+      title: preset?.title ? `套用：${preset.title}` : safeTemplateId,
+      actionLabel: "插入推荐配方",
+      detail: "按当前场景状态补一组更完整的剧情卡片。",
+      priority: 50,
+      ...(base ?? {}),
+      ...overrides,
+    });
+  }
+
+  function getStoryTemplateRecommendationSuggestion(scene = null) {
+    if (!scene || typeof storyTemplateTools.getStoryTemplateRecommendationPlan !== "function") {
+      return null;
+    }
+
+    const plan = storyTemplateTools.getStoryTemplateRecommendationPlan(scene, { limit: 4 });
+    return (
+      toArray(plan?.recommendations)
+        .map((item) => {
+          const reason = cleanText(item?.reason);
+          return getSceneRecipeSuggestionByTemplateId(item?.templateId, {
+            ...(reason ? { detail: reason } : {}),
+            priority: Math.max(Number(item?.score) || 0, SCENE_RECIPE_SUGGESTIONS[item?.templateId]?.priority ?? 0),
+            source: "story_template_recommendation",
+            recommendationRank: item?.rank ?? null,
+            recommendationScore: item?.score ?? null,
+          });
+        })
+        .find(Boolean) ?? null
+    );
+  }
+
+  function getSceneRecipeSuggestion(report = {}, scene = null) {
     const issues = toArray(report.issues);
     const pacingIssueCodes = getPacingIssueCodes(report);
     const hasBlockingRoute = issues.some((issue) => issue.code === "scene_bad_route_target");
     if (hasBlockingRoute) {
       return null;
     }
+    const storyTemplateSuggestion = getStoryTemplateRecommendationSuggestion(scene);
     if (!report.hasStoryContent || (report.blockCount ?? 0) === 0) {
+      if ((report.blockCount ?? 0) > 0 && storyTemplateSuggestion) {
+        return storyTemplateSuggestion;
+      }
       return SCENE_RECIPE_SUGGESTIONS.playable_scene;
     }
     if (pacingIssueCodes.has("pacing_branch_without_payoff")) {
@@ -384,7 +479,7 @@
     if (report.status === "ready" && (report.choiceCount ?? 0) > 0) {
       return SCENE_RECIPE_SUGGESTIONS.scene_outro;
     }
-    return null;
+    return storyTemplateSuggestion;
   }
 
   function getRouteTargetIssues(scene, blocks = [], sceneMap = new Map(), baseContext = {}) {
@@ -589,7 +684,7 @@
       recipeSuggestion: null,
     };
     report.nextAction = getSceneNextAction(report);
-    report.recipeSuggestion = getSceneRecipeSuggestion(report);
+    report.recipeSuggestion = getSceneRecipeSuggestion(report, scene);
     return report;
   }
 
@@ -819,5 +914,6 @@
     getSceneStatusLabel,
     getSceneNextAction,
     getSceneRecipeSuggestion,
+    getStoryTemplateRecommendationSuggestion,
   });
 })(typeof window !== "undefined" ? window : globalThis);
