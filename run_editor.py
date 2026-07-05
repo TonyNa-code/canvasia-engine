@@ -9072,6 +9072,11 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
         build_dir,
         unlockable_manifest if isinstance(unlockable_manifest, dict) else {},
     )
+    runtime_preload_manifest = (export_payload.get("buildInfo") or {}).get("runtimePreloadManifest")
+    runtime_preload_files = write_runtime_preload_files(
+        build_dir,
+        runtime_preload_manifest if isinstance(runtime_preload_manifest, dict) else {},
+    )
 
     shutil.copy2(NATIVE_RUNTIME_PLAYER_SOURCE, build_dir / NATIVE_RUNTIME_PLAYER_NAME)
     shutil.copy2(NATIVE_RUNTIME_README_SOURCE, build_dir / NATIVE_RUNTIME_README_NAME)
@@ -9699,6 +9704,7 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
         unlockable_report_name=unlockable_report_path.name,
         provenance_name=EXPORT_PROVENANCE_FILE_NAME,
         extra_reports=[
+            runtime_preload_files["runtimePreloadReportName"],
             release_check_path.name,
             rc_report_path.name,
             release_control_report_path.name,
@@ -9721,6 +9727,13 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
         "unlockableContentManifestPath": str(unlockable_manifest_path),
         "unlockableContentReportName": unlockable_report_path.name,
         "unlockableContentReportPath": str(unlockable_report_path),
+        "runtimePreloadManifestName": runtime_preload_files["runtimePreloadManifestName"],
+        "runtimePreloadManifestPath": runtime_preload_files["runtimePreloadManifestPath"],
+        "runtimePreloadReportName": runtime_preload_files["runtimePreloadReportName"],
+        "runtimePreloadReportPath": runtime_preload_files["runtimePreloadReportPath"],
+        "runtimePreloadSummary": (
+            runtime_preload_manifest.get("summary", {}) if isinstance(runtime_preload_manifest, dict) else {}
+        ),
         "playtestGuideName": playtest_guide_path.name,
         "playtestGuidePath": str(playtest_guide_path),
         "playerName": NATIVE_RUNTIME_PLAYER_NAME,
@@ -10367,6 +10380,8 @@ def export_native_runtime_build() -> dict:
             "releaseReadinessReport": EXPORT_RELEASE_READINESS_REPORT_NAME,
             "unlockableContentManifest": runtime_files["unlockableContentManifestName"],
             "unlockableContentReport": runtime_files["unlockableContentReportName"],
+            "runtimePreloadManifest": runtime_files["runtimePreloadManifestName"],
+            "runtimePreloadReport": runtime_files["runtimePreloadReportName"],
             "playerScript": runtime_files["playerName"],
             "readme": runtime_files["readmeName"],
             "requirements": runtime_files["requirementsName"],
@@ -10423,6 +10438,9 @@ def export_native_runtime_build() -> dict:
             "releaseReadinessReport": EXPORT_RELEASE_READINESS_REPORT_NAME,
             "unlockableContentManifest": runtime_files["unlockableContentManifestName"],
             "unlockableContentReport": runtime_files["unlockableContentReportName"],
+            "runtimePreloadManifest": runtime_files["runtimePreloadManifestName"],
+            "runtimePreloadReport": runtime_files["runtimePreloadReportName"],
+            "runtimePreloadSummary": runtime_files["runtimePreloadSummary"],
             "releaseCheck": runtime_files["releaseCheckName"],
             "releaseCandidateReport": runtime_files["releaseCandidateReportName"],
             "releaseControlReport": runtime_files["releaseControlReportName"],
@@ -10472,6 +10490,8 @@ def export_native_runtime_build() -> dict:
         extra_report_files=[
             runtime_files["unlockableContentReportName"],
             runtime_files["unlockableContentManifestName"],
+            runtime_files["runtimePreloadReportName"],
+            runtime_files["runtimePreloadManifestName"],
             runtime_files["releaseCandidateReportName"],
             runtime_files["releaseControlReportName"],
             runtime_files["vnBaselineQualityMarkdownName"],
@@ -10503,6 +10523,8 @@ def export_native_runtime_build() -> dict:
         {"name": release_readiness["releaseReadinessSummaryName"], "description": "机器可读发布试玩就绪摘要 JSON。"},
         {"name": runtime_files["unlockableContentManifestName"], "description": "可解锁内容清单 JSON，记录图鉴、回想、成就和结局覆盖。"},
         {"name": runtime_files["unlockableContentReportName"], "description": "可解锁内容 Markdown 报告，方便测试员直接复查 EXTRA / 回想覆盖。"},
+        {"name": runtime_files["runtimePreloadManifestName"], "description": "Runtime 资源预热清单 JSON，记录首屏和早期路线素材。"},
+        {"name": runtime_files["runtimePreloadReportName"], "description": "Runtime 资源预热 Markdown 报告，方便复查卡顿风险。"},
         {"name": runtime_files["releaseCheckName"], "description": "发布前自检 JSON。"},
         {"name": runtime_files["releaseCandidateReportName"], "description": "原生 Runtime 发布候选总报告。"},
         {"name": runtime_files["releaseControlReportName"], "description": "人工验收用发布总控 Markdown。"},
@@ -10611,6 +10633,13 @@ def export_native_runtime_build() -> dict:
         "unlockableContentReportName": runtime_files["unlockableContentReportName"],
         "unlockableContentReportPath": runtime_files["unlockableContentReportPath"],
         "unlockableContentReportPublicUrl": f"/exports/{build_dir.name}/{runtime_files['unlockableContentReportName']}",
+        "runtimePreloadManifestName": runtime_files["runtimePreloadManifestName"],
+        "runtimePreloadManifestPath": runtime_files["runtimePreloadManifestPath"],
+        "runtimePreloadManifestPublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimePreloadManifestName']}",
+        "runtimePreloadReportName": runtime_files["runtimePreloadReportName"],
+        "runtimePreloadReportPath": runtime_files["runtimePreloadReportPath"],
+        "runtimePreloadReportPublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimePreloadReportName']}",
+        "runtimePreloadSummary": runtime_files["runtimePreloadSummary"],
         "playerScriptPath": runtime_files["playerPath"],
         "playerScriptName": runtime_files["playerName"],
         "playerScriptPublicUrl": f"/exports/{build_dir.name}/{runtime_files['playerName']}",

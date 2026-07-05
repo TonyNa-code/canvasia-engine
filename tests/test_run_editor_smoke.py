@@ -3202,6 +3202,8 @@ class RunEditorSmokeTests(unittest.TestCase):
             build_dir / run_editor.UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME
         )
         self.assert_unlockable_content_report_file(build_dir / run_editor.UNLOCKABLE_CONTENT_REPORT_FILE_NAME)
+        self.assertTrue((build_dir / run_editor.RUNTIME_PRELOAD_MANIFEST_FILE_NAME).is_file())
+        self.assertTrue((build_dir / run_editor.RUNTIME_PRELOAD_REPORT_FILE_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_PLAYER_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_README_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_REQUIREMENTS_NAME).is_file())
@@ -3262,11 +3264,22 @@ class RunEditorSmokeTests(unittest.TestCase):
         )
         self.assertNotEqual(readiness_payload["qualityGate"]["status"], "blocked")
         native_game_data = json.loads((build_dir / "game_data.json").read_text(encoding="utf-8"))
+        native_preload_manifest = json.loads(
+            (build_dir / run_editor.RUNTIME_PRELOAD_MANIFEST_FILE_NAME).read_text(encoding="utf-8")
+        )
         self.assertEqual(native_game_data["i18n"]["defaultLanguage"], "ja-JP")
         self.assertEqual(native_game_data["i18n"]["supportedLanguages"], ["zh-CN", "ja-JP", "en-US"])
         self.assertEqual(
             native_game_data["buildInfo"]["unlockableContentManifest"]["summary"]["totalEntryCount"],
             native_unlockable_manifest["summary"]["totalEntryCount"],
+        )
+        self.assertEqual(
+            native_game_data["buildInfo"]["runtimePreloadManifest"]["summary"]["totalEntries"],
+            native_preload_manifest["summary"]["totalEntries"],
+        )
+        self.assertEqual(
+            export_result["runtimePreloadSummary"]["totalEntries"],
+            native_preload_manifest["summary"]["totalEntries"],
         )
         native_player_source = (build_dir / run_editor.NATIVE_RUNTIME_PLAYER_NAME).read_text(encoding="utf-8")
         self.assertIn('("language", "语言")', native_player_source)
@@ -3361,6 +3374,8 @@ class RunEditorSmokeTests(unittest.TestCase):
                 run_editor.EXPORT_RELEASE_READINESS_REPORT_NAME,
                 run_editor.UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME,
                 run_editor.UNLOCKABLE_CONTENT_REPORT_FILE_NAME,
+                run_editor.RUNTIME_PRELOAD_MANIFEST_FILE_NAME,
+                run_editor.RUNTIME_PRELOAD_REPORT_FILE_NAME,
             },
         )
         self.assertEqual(provenance["build"]["target"], run_editor.EXPORT_TARGET_NATIVE_RUNTIME)
@@ -3373,6 +3388,8 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["releaseReadinessReport"], run_editor.EXPORT_RELEASE_READINESS_REPORT_NAME)
         self.assertEqual(manifest["files"]["unlockableContentManifest"], run_editor.UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME)
         self.assertEqual(manifest["files"]["unlockableContentReport"], run_editor.UNLOCKABLE_CONTENT_REPORT_FILE_NAME)
+        self.assertEqual(manifest["files"]["runtimePreloadManifest"], run_editor.RUNTIME_PRELOAD_MANIFEST_FILE_NAME)
+        self.assertEqual(manifest["files"]["runtimePreloadReport"], run_editor.RUNTIME_PRELOAD_REPORT_FILE_NAME)
         self.assertEqual(manifest["runtime"]["mode"], "pygame_native")
         self.assertTrue(manifest["runtime"]["canBuildStandaloneApp"])
         self.assertEqual(manifest["runtime"]["playtestGuide"], run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME)
@@ -3384,6 +3401,12 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["runtime"]["releaseReadinessReport"], run_editor.EXPORT_RELEASE_READINESS_REPORT_NAME)
         self.assertEqual(manifest["runtime"]["unlockableContentManifest"], run_editor.UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME)
         self.assertEqual(manifest["runtime"]["unlockableContentReport"], run_editor.UNLOCKABLE_CONTENT_REPORT_FILE_NAME)
+        self.assertEqual(manifest["runtime"]["runtimePreloadManifest"], run_editor.RUNTIME_PRELOAD_MANIFEST_FILE_NAME)
+        self.assertEqual(manifest["runtime"]["runtimePreloadReport"], run_editor.RUNTIME_PRELOAD_REPORT_FILE_NAME)
+        self.assertEqual(
+            manifest["runtime"]["runtimePreloadSummary"]["totalEntries"],
+            native_preload_manifest["summary"]["totalEntries"],
+        )
         self.assertEqual(manifest["runtime"]["releaseCandidateReport"], run_editor.NATIVE_RUNTIME_RC_REPORT_NAME)
         self.assertEqual(manifest["runtime"]["releaseControlReport"], run_editor.NATIVE_RUNTIME_RELEASE_CONTROL_REPORT_NAME)
         self.assertEqual(manifest["runtime"]["releaseControlJson"], run_editor.NATIVE_RUNTIME_RELEASE_CONTROL_JSON_NAME)

@@ -24,6 +24,14 @@ from pathlib import Path
 
 ASSET_TYPE_IMAGE = {"background", "sprite", "cg", "ui"}
 ASSET_TYPE_FONT = {"font"}
+RUNTIME_PRELOAD_IMAGE_TYPES = set(ASSET_TYPE_IMAGE)
+RUNTIME_PRELOAD_SOUND_TYPES = {"sfx", "voice"}
+RUNTIME_PRELOAD_STREAM_TYPES = {"bgm", "video"}
+RUNTIME_PRELOAD_SUPPORTED_TYPES = (
+    RUNTIME_PRELOAD_IMAGE_TYPES
+    | RUNTIME_PRELOAD_SOUND_TYPES
+    | RUNTIME_PRELOAD_STREAM_TYPES
+)
 DEFAULT_PROJECT_LANGUAGE = "zh-CN"
 DEFAULT_GAME_DATA_NAME = "game_data.json"
 CHOICE_CONTINUE_TARGET = "__continue__"
@@ -9852,6 +9860,8 @@ class NativeRuntimePlayer:
         self.image_cache: dict[str, object] = {}
         self.image_file_cache: dict[str, object] = {}
         self.sound_cache: dict[str, object] = {}
+        self.runtime_preload_manifest = self.get_runtime_preload_manifest()
+        self.runtime_preload_status = self.build_empty_runtime_preload_status()
         self.current_bgm_asset_id: str | None = None
         self.current_bgm_volume_percent = 100
         self.current_bgm_scope: dict | None = None
@@ -9936,6 +9946,7 @@ class NativeRuntimePlayer:
 
         self._initialize_audio()
         self.apply_runtime_settings()
+        self.runtime_preload_status = self.preload_runtime_assets()
         self.record_player_session_start()
         self.open_title_screen()
 
@@ -10014,6 +10025,157 @@ class NativeRuntimePlayer:
             self.pygame.mixer.init()
         except Exception:
             self.status_message = "当前设备没有初始化音频输出，运行时会继续，但音乐和语音不会播放。"
+
+    def get_runtime_preload_manifest(self) -> dict:
+        if not isinstance(self.build_info, dict):
+            return {}
+        manifest = self.build_info.get("runtimePreloadManifest")
+        return manifest if isinstance(manifest, dict) else {}
+
+    def get_runtime_preload_entries(self) -> list[dict]:
+        manifest = self.runtime_preload_manifest if isinstance(self.runtime_preload_manifest, dict) else {}
+        entries = manifest.get("entries") if isinstance(manifest.get("entries"), list) else []
+        normalized_entries: list[dict] = []
+        seen_asset_ids: set[str] = set()
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            asset_id = str(entry.get("assetId") or "").strip()
+            if not asset_id or asset_id in seen_asset_ids:
+                continue
+            asset = self.assets_by_id.get(asset_id) or {}
+            entry_asset_type = str(entry.get("type") or "").strip()
+            asset_type = (
+                entry_asset_type
+                if entry_asset_type in RUNTIME_PRELOAD_SUPPORTED_TYPES
+                else str(asset.get("type") or "").strip()
+            )
+            if asset_type not in RUNTIME_PRELOAD_SUPPORTED_TYPES:
+                continue
+            seen_asset_ids.add(asset_id)
+            normalized_entries.append(
+                {
+                    "assetId": asset_id,
+                    "type": asset_type,
+                    "phase": str(entry.get("phase") or "deferred"),
+                    "priority": clamp_int(entry.get("priority"), 0, 999, 0),
+                    "preloadIndex": clamp_int(entry.get("preloadIndex"), 0, 9999, len(normalized_entries) + 1),
+                    "reason": str(entry.get("reason") or ""),
+                }
+            )
+        return sorted(
+            normalized_entries,
+            key=lambda item: (
+                -int(item.get("priority") or 0),
+                int(item.get("preloadIndex") or 0),
+                str(item.get("assetId") or ""),
+            ),
+        )
+
+    def build_empty_runtime_preload_status(self) -> dict:
+        return {
+            "status": "empty",
+            "totalEntries": 0,
+            "loadedEntries": 0,
+            "imageEntries": 0,
+            "loadedImageEntries": 0,
+            "soundEntries": 0,
+            "loadedSoundEntries": 0,
+            "streamEntries": 0,
+            "readyStreamEntries": 0,
+            "missingEntries": 0,
+            "failedEntries": 0,
+            "audioUnavailableEntries": 0,
+            "missingAssetIds": [],
+            "failedAssetIds": [],
+            "skippedAssetIds": [],
+            "summaryText": "资源预热：无待加载素材",
+        }
+
+    def preload_runtime_assets(self) -> dict:
+        entries = self.get_runtime_preload_entries()
+        status = self.build_empty_runtime_preload_status()
+        status["totalEntries"] = len(entries)
+        if not entries:
+            return status
+
+        for entry in entries:
+            asset_id = str(entry.get("assetId") or "")
+            asset_type = str(entry.get("type") or "")
+            asset = self.assets_by_id.get(asset_id)
+            asset_path = get_asset_runtime_path(self.bundle_dir, asset)
+
+            if asset_type in RUNTIME_PRELOAD_IMAGE_TYPES:
+                status["imageEntries"] += 1
+            elif asset_type in RUNTIME_PRELOAD_SOUND_TYPES:
+                status["soundEntries"] += 1
+            elif asset_type in RUNTIME_PRELOAD_STREAM_TYPES:
+                status["streamEntries"] += 1
+
+            if not asset_path:
+                status["missingEntries"] += 1
+                status["missingAssetIds"].append(asset_id)
+                continue
+
+            if asset_type in RUNTIME_PRELOAD_IMAGE_TYPES:
+                if self._load_image(asset_id):
+                    status["loadedImageEntries"] += 1
+                else:
+                    status["failedEntries"] += 1
+                    status["failedAssetIds"].append(asset_id)
+                continue
+
+            if asset_type in RUNTIME_PRELOAD_SOUND_TYPES:
+                if not self.pygame.mixer.get_init():
+                    status["audioUnavailableEntries"] += 1
+                    status["skippedAssetIds"].append(asset_id)
+                    continue
+                if self._load_sound(asset_id):
+                    status["loadedSoundEntries"] += 1
+                else:
+                    status["failedEntries"] += 1
+                    status["failedAssetIds"].append(asset_id)
+                continue
+
+            status["readyStreamEntries"] += 1
+
+        status["loadedEntries"] = (
+            status["loadedImageEntries"]
+            + status["loadedSoundEntries"]
+            + status["readyStreamEntries"]
+        )
+        issue_count = status["missingEntries"] + status["failedEntries"] + status["audioUnavailableEntries"]
+        if issue_count <= 0:
+            status["status"] = "ready"
+        elif status["loadedEntries"] > 0:
+            status["status"] = "partial"
+        else:
+            status["status"] = "blocked"
+        status["summaryText"] = self.format_runtime_preload_status_line(status)
+        return status
+
+    def format_runtime_preload_status_line(self, status: dict | None = None) -> str:
+        source = status if isinstance(status, dict) else getattr(self, "runtime_preload_status", {})
+        total_entries = int(source.get("totalEntries") or 0)
+        if total_entries <= 0:
+            return "资源预热：无待加载素材"
+        loaded_entries = int(source.get("loadedEntries") or 0)
+        issue_count = (
+            int(source.get("missingEntries") or 0)
+            + int(source.get("failedEntries") or 0)
+            + int(source.get("audioUnavailableEntries") or 0)
+        )
+        detail = (
+            f"图片 {int(source.get('loadedImageEntries') or 0)}/{int(source.get('imageEntries') or 0)}"
+            f" · 音效 {int(source.get('loadedSoundEntries') or 0)}/{int(source.get('soundEntries') or 0)}"
+            f" · 流媒体 {int(source.get('readyStreamEntries') or 0)}/{int(source.get('streamEntries') or 0)}"
+        )
+        if issue_count > 0:
+            return f"资源预热：{loaded_entries}/{total_entries} 已准备，需复查 {issue_count} 项（{detail}）"
+        return f"资源预热：{loaded_entries}/{total_entries} 已准备（{detail}）"
+
+    def get_runtime_preload_status_line(self) -> str:
+        return self.format_runtime_preload_status_line(getattr(self, "runtime_preload_status", {}))
 
     def get_effective_volume(self, channel_key: str) -> float:
         master = clamp(float(self.runtime_settings.get("masterVolume", 100)) / 100, 0.0, 1.0)
@@ -11390,7 +11552,7 @@ class NativeRuntimePlayer:
         self.stage_background_asset_id = self.get_title_preview_background_asset_id() or None
         self.background_transition = None
         self.leaving_characters = {}
-        self.status_message = "标题页：选择开始、续玩、读档或设置。"
+        self.status_message = f"标题页：选择开始、续玩、读档或设置。 · {self.get_runtime_preload_status_line()}"
 
     def start_story_from_title(self) -> None:
         self.stop_embedded_video_playback()

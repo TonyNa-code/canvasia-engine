@@ -109,6 +109,78 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
         self.assertEqual(defaults["voiceVolume"], 0)
         self.assertEqual(defaults["voiceDuckingEnabled"], "off")
 
+    def test_runtime_preload_manifest_can_warm_assets_without_window(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_dir = Path(temp_dir)
+            image_path = bundle_dir / "assets" / "ui" / "title.png"
+            sound_path = bundle_dir / "assets" / "sfx" / "click.wav"
+            video_path = bundle_dir / "assets" / "video" / "op.mp4"
+            for path in [image_path, sound_path, video_path]:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(b"asset")
+
+            class FakeMixer:
+                def get_init(self) -> bool:
+                    return True
+
+            class FakePygame:
+                mixer = FakeMixer()
+
+            player = NativeRuntimePlayer.__new__(NativeRuntimePlayer)
+            player.bundle_dir = bundle_dir
+            player.pygame = FakePygame()
+            player.assets_by_id = {
+                "title_ui": {
+                    "id": "title_ui",
+                    "type": "ui",
+                    "exportUrl": image_path.relative_to(bundle_dir).as_posix(),
+                },
+                "click_sfx": {
+                    "id": "click_sfx",
+                    "type": "sfx",
+                    "exportUrl": sound_path.relative_to(bundle_dir).as_posix(),
+                },
+                "opening_video": {
+                    "id": "opening_video",
+                    "type": "video",
+                    "exportUrl": video_path.relative_to(bundle_dir).as_posix(),
+                },
+            }
+            player.build_info = {
+                "runtimePreloadManifest": {
+                    "entries": [
+                        {"assetId": "opening_video", "type": "video", "priority": 10, "preloadIndex": 3},
+                        {"assetId": "click_sfx", "type": "sfx", "priority": 90, "preloadIndex": 2},
+                        {"assetId": "title_ui", "type": "ui", "priority": 100, "preloadIndex": 1},
+                    ]
+                }
+            }
+            player.image_cache = {}
+            player.sound_cache = {}
+            player.runtime_preload_manifest = player.get_runtime_preload_manifest()
+
+            def fake_load_image(asset_id: str | None):
+                player.image_cache[asset_id] = f"image:{asset_id}"
+                return player.image_cache[asset_id]
+
+            def fake_load_sound(asset_id: str | None):
+                player.sound_cache[asset_id] = f"sound:{asset_id}"
+                return player.sound_cache[asset_id]
+
+            player._load_image = fake_load_image
+            player._load_sound = fake_load_sound
+
+            status = player.preload_runtime_assets()
+
+        self.assertEqual(status["status"], "ready")
+        self.assertEqual(status["totalEntries"], 3)
+        self.assertEqual(status["loadedImageEntries"], 1)
+        self.assertEqual(status["loadedSoundEntries"], 1)
+        self.assertEqual(status["readyStreamEntries"], 1)
+        self.assertEqual(status["loadedEntries"], 3)
+        self.assertEqual(player.image_cache["title_ui"], "image:title_ui")
+        self.assertEqual(player.sound_cache["click_sfx"], "sound:click_sfx")
+
     def test_native_runtime_voice_ducking_state_restores_bgm_after_voice_finishes(self) -> None:
         class FakeMusic:
             def __init__(self) -> None:
@@ -2328,7 +2400,49 @@ class NativeRuntimeRenderSmokeTests(unittest.TestCase):
                     ],
                 }
             ],
-            "buildInfo": {"exportTargetLabel": "Headless Native Runtime"},
+            "buildInfo": {
+                "exportTargetLabel": "Headless Native Runtime",
+                "runtimePreloadManifest": {
+                    "formatVersion": 1,
+                    "entrySceneId": "scene_start",
+                    "summary": {
+                        "totalEntries": 3,
+                        "criticalEntries": 3,
+                        "earlyEntries": 0,
+                        "deferredEntries": 0,
+                        "libraryEntries": 0,
+                        "imageEntries": 2,
+                        "audioEntries": 0,
+                        "videoEntries": 1,
+                    },
+                    "entries": [
+                        {
+                            "assetId": "title_background",
+                            "type": "ui",
+                            "phase": "critical",
+                            "priority": 100,
+                            "preloadIndex": 1,
+                            "reason": "title screen",
+                        },
+                        {
+                            "assetId": "panel_frame",
+                            "type": "ui",
+                            "phase": "critical",
+                            "priority": 92,
+                            "preloadIndex": 2,
+                            "reason": "system panels",
+                        },
+                        {
+                            "assetId": "opening_video",
+                            "type": "video",
+                            "phase": "critical",
+                            "priority": 84,
+                            "preloadIndex": 3,
+                            "reason": "opening movie",
+                        },
+                    ],
+                },
+            },
         }
         data_path = self.bundle_dir / "game_data.json"
         data_path.write_text(json.dumps(game_data, ensure_ascii=False), encoding="utf-8")
@@ -2338,6 +2452,23 @@ class NativeRuntimeRenderSmokeTests(unittest.TestCase):
         image_to_bytes = getattr(pygame.image, "tobytes", pygame.image.tostring)
         frame_bytes = image_to_bytes(player.screen, "RGB")
         self.assertTrue(any(channel != 0 for channel in frame_bytes))
+
+    def test_runtime_preload_manifest_populates_native_caches(self) -> None:
+        data_path = self.write_game_data()
+        player = NativeRuntimePlayer(pygame, data_path)
+
+        status = player.runtime_preload_status
+        self.assertEqual(status["status"], "ready")
+        self.assertEqual(status["totalEntries"], 3)
+        self.assertEqual(status["imageEntries"], 2)
+        self.assertEqual(status["loadedImageEntries"], 2)
+        self.assertEqual(status["streamEntries"], 1)
+        self.assertEqual(status["readyStreamEntries"], 1)
+        self.assertEqual(status["loadedEntries"], 3)
+        self.assertIn("title_background", player.image_cache)
+        self.assertIn("panel_frame", player.image_cache)
+        self.assertIn("资源预热：3/3", player.get_runtime_preload_status_line())
+        self.assertIn("资源预热：3/3", player.status_message)
 
     def test_text_wrapping_preserves_words_newlines_and_ellipsis(self) -> None:
         font = pygame.font.Font(None, 24)
