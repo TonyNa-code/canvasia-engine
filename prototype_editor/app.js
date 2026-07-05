@@ -184,6 +184,7 @@ const {
 const variableTools = window.CanvasiaEditorVariables;
 const projectHistoryTools = window.CanvasiaEditorProjectHistory;
 const assetCatalogTools = window.CanvasiaEditorAssetCatalog;
+const assetFootprintTools = window.CanvasiaEditorAssetFootprint;
 const projectDoctorTools = window.CanvasiaEditorProjectDoctor;
 const projectMilestoneTools = window.CanvasiaEditorProjectMilestones ?? window.CanvasiaProjectMilestones;
 const openAiAssetTools = window.CanvasiaEditorOpenAiAssetGenerator;
@@ -3935,13 +3936,23 @@ async function handleClick(event) {
     return;
   }
 
-  if (action === "export-asset-dependency-csv") {
-    exportAssetDependencyCsv();
-    return;
-  }
+	  if (action === "export-asset-dependency-csv") {
+	    exportAssetDependencyCsv();
+	    return;
+	  }
 
-  if (action === "export-asset-rights-markdown") {
-    exportAssetRightsMarkdown();
+	  if (action === "export-asset-footprint-markdown") {
+	    exportAssetFootprintMarkdown();
+	    return;
+	  }
+
+	  if (action === "export-asset-footprint-csv") {
+	    exportAssetFootprintCsv();
+	    return;
+	  }
+
+	  if (action === "export-asset-rights-markdown") {
+	    exportAssetRightsMarkdown();
     return;
   }
 
@@ -14501,11 +14512,11 @@ function renderAssetsScreen() {
     refs.assetSortSelect.value = state.assetSortMode;
   }
 
-  if (refs.assetGapBoard) {
-    refs.assetGapBoard.innerHTML = isAdvancedMode
-      ? `${openAiAssetGeneratorPanel}${starterKitPanel}${renderAssetGapBoard(duplicateOverview)}`
-      : `${openAiAssetGeneratorPanel}${starterKitPanel}${renderBeginnerAssetsGuide(selectedAsset, duplicateOverview)}`;
-  }
+	  if (refs.assetGapBoard) {
+	    refs.assetGapBoard.innerHTML = isAdvancedMode
+	      ? `${openAiAssetGeneratorPanel}${starterKitPanel}${renderAssetFootprintPanel({ compact: true })}${renderAssetGapBoard(duplicateOverview)}`
+	      : `${openAiAssetGeneratorPanel}${starterKitPanel}${renderAssetFootprintPanel({ compact: true })}${renderBeginnerAssetsGuide(selectedAsset, duplicateOverview)}`;
+	  }
 
   if (refs.assetTagFilterBar) {
     refs.assetTagFilterBar.innerHTML = isAdvancedMode ? renderAssetTagFilterBar(selectedTypeAssets) : "";
@@ -25862,12 +25873,14 @@ function buildReleaseChecklistItems() {
   const project = state.data?.project ?? {};
   const resolution = getProjectResolution(project);
   const releaseVersion = getProjectReleaseVersion(project);
-  const hasStoredReleaseVersion = Boolean(String(project.releaseVersion ?? "").trim());
-  const urgentMissingAssets = state.data.assetList.filter((asset) => isAssetUrgentMissing(asset)).length;
-  const mediaBudgetReport = buildAssetMediaBudgetReport();
-  const missingVoiceWarnings = state.validation.warnings.filter(
-    (issue) => issue.message === "这句台词还没有绑定语音。"
-  ).length;
+	  const hasStoredReleaseVersion = Boolean(String(project.releaseVersion ?? "").trim());
+	  const urgentMissingAssets = state.data.assetList.filter((asset) => isAssetUrgentMissing(asset)).length;
+	  const mediaBudgetReport = buildAssetMediaBudgetReport();
+	  const assetFootprintReport = buildAssetFootprintReport();
+	  const assetFootprintDigest = assetFootprintTools.getAssetFootprintDigest(assetFootprintReport);
+	  const missingVoiceWarnings = state.validation.warnings.filter(
+	    (issue) => issue.message === "这句台词还没有绑定语音。"
+	  ).length;
   const exportResult = state.lastExportResult;
   const nativeRcStatus = exportResult?.target === "native_runtime" ? exportResult.releaseCandidateReportStatus : "";
   const nativeRcSummary = exportResult?.releaseCandidateReportSummary ?? {};
@@ -25943,9 +25956,9 @@ function buildReleaseChecklistItems() {
             }
           : null,
     },
-    {
-      severity: mediaBudgetReport.blockerCount > 0 ? "blocker" : mediaBudgetReport.count > 0 ? "warn" : "good",
-      title: "素材性能预算",
+	    {
+	      severity: mediaBudgetReport.blockerCount > 0 ? "blocker" : mediaBudgetReport.count > 0 ? "warn" : "good",
+	      title: "素材性能预算",
       toneClass: mediaBudgetReport.blockerCount > 0 ? "danger-text" : mediaBudgetReport.count > 0 ? "warn-text" : "good-text",
       status:
         mediaBudgetReport.count === 0
@@ -25965,11 +25978,38 @@ function buildReleaseChecklistItems() {
               label: "只看体积风险素材",
               action: "focus-asset-gap",
               dataset: { "asset-filter-mode": "media_budget" },
-            }
-          : null,
-    },
-    {
-      severity: missingVoiceWarnings === 0 ? "good" : "warn",
+	            }
+	          : null,
+	    },
+	    {
+	      severity:
+	        assetFootprintReport.releaseRiskLevel === "danger"
+	          ? "blocker"
+	          : assetFootprintReport.releaseRiskLevel === "warn"
+	            ? "warn"
+	            : "good",
+	      title: "发布包体积",
+	      toneClass: getAssetFootprintToneClass(assetFootprintReport.releaseRiskLevel),
+	      status:
+	        assetFootprintReport.releaseRiskLevel === "ready"
+	          ? "体积健康"
+	          : assetFootprintReport.releaseRiskLevel === "danger"
+	            ? "包体偏重"
+	            : "建议压缩",
+	      description: `${assetFootprintDigest.detail} 当前已记录素材合计 ${
+	        assetFootprintReport.totals?.totalLabel ?? "0 B"
+	      }，未知体积 ${assetFootprintReport.totals?.missingSizeCount ?? 0} 个。`,
+	      action:
+	        assetFootprintReport.releaseRiskLevel === "ready"
+	          ? { label: "导出体积清单", action: "export-asset-footprint-markdown" }
+	          : {
+	              label: "查看体积雷达",
+	              action: "switch-screen",
+	              screen: "inspection",
+	            },
+	    },
+	    {
+	      severity: missingVoiceWarnings === 0 ? "good" : "warn",
       title: "语音覆盖",
       toneClass: missingVoiceWarnings === 0 ? "good-text" : "warn-text",
       status: missingVoiceWarnings === 0 ? "当前没有待绑语音提醒" : `还差 ${missingVoiceWarnings} 句`,
@@ -29079,6 +29119,17 @@ function buildAssetDependencyFileName(extension = "md") {
   return `${title}_asset_dependency_sheet_${dateStamp}.${extension}`;
 }
 
+function buildAssetFootprintFileName(extension = "md") {
+  const date = new Date();
+  const dateStamp = [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("");
+  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
+  return `${title}_asset_footprint_${dateStamp}.${extension}`;
+}
+
 function buildAssetRightsFileName(extension = "md") {
   const date = new Date();
   const dateStamp = [
@@ -30551,6 +30602,33 @@ function exportAssetDependencyCsv() {
   downloadTextFile(fileName, content, "text/csv;charset=utf-8");
   setSaveStatus(`已导出素材依赖 CSV：${fileName}`);
   showToast(`素材依赖 CSV 已导出：${fileName}`);
+}
+
+function buildAssetFootprintReport(data = state.data) {
+  const unusedAssetIds = new Set(getUnusedAssets(data).map((asset) => asset.id));
+  return assetFootprintTools.buildAssetFootprintReport(data ?? {}, {
+    unusedAssetIds,
+  });
+}
+
+function exportAssetFootprintMarkdown() {
+  const fileName = buildAssetFootprintFileName("md");
+  const report = buildAssetFootprintReport();
+  const content = assetFootprintTools.buildAssetFootprintMarkdown(report, {
+    projectTitle: state.data?.project?.title || "Canvasia Project",
+    generatedAt: formatDate(new Date().toISOString()),
+  });
+  downloadTextFile(fileName, content, "text/markdown;charset=utf-8");
+  setSaveStatus(`已导出素材体积雷达：${fileName}`);
+  showToast(`素材体积雷达已导出：${fileName}`);
+}
+
+function exportAssetFootprintCsv() {
+  const fileName = buildAssetFootprintFileName("csv");
+  const content = assetFootprintTools.buildAssetFootprintCsv(buildAssetFootprintReport());
+  downloadTextFile(fileName, content, "text/csv;charset=utf-8");
+  setSaveStatus(`已导出素材体积 CSV：${fileName}`);
+  showToast(`素材体积 CSV 已导出：${fileName}`);
 }
 
 function buildAssetRightsSheet() {
@@ -33107,6 +33185,111 @@ function getAssetDependencyToneClass(status) {
   return "";
 }
 
+function getAssetFootprintToneClass(level) {
+  if (level === "danger") {
+    return "danger-text";
+  }
+  if (level === "warn") {
+    return "warn-text";
+  }
+  return "good-text";
+}
+
+function renderAssetFootprintPanel({ compact = false } = {}) {
+  const report = buildAssetFootprintReport();
+  const digest = assetFootprintTools.getAssetFootprintDigest(report);
+  const totals = report.totals ?? {};
+  const topAssets = (report.topAssets ?? []).slice(0, compact ? 3 : 6);
+  const categories = (report.categories ?? []).slice(0, compact ? 3 : 5);
+  const warnings = (report.warnings ?? []).filter((warning) => warning.severity !== "tip").slice(0, compact ? 2 : 4);
+  const toneClass = getAssetFootprintToneClass(digest.level);
+
+  return `
+    <article class="detail-card preview-sprint-panel asset-footprint-panel">
+      <div class="panel-heading">
+        <h2>素材体积雷达</h2>
+        <span class="badge badge-soft ${toneClass}">${escapeHtml(digest.title)}</span>
+      </div>
+      <p class="helper-text">${escapeHtml(digest.detail)} 它会按图片、音频、视频、Live2D、3D 和字体分类统计包体，适合发包前判断先压缩哪里。</p>
+      <div class="preview-sprint-metrics">
+        ${renderRouteMetricCard("素材总量", `${totals.assetCount ?? 0} 个`, "项目登记素材")}
+        ${renderRouteMetricCard("已记录体积", totals.totalLabel ?? "0 B", "当前可估算包体")}
+        ${renderRouteMetricCard("体积风险", `${totals.riskAssetCount ?? 0} 个`, "建议发布前压缩")}
+        ${renderRouteMetricCard("未知体积", `${totals.missingSizeCount ?? 0} 个`, "会低估真实包体")}
+      </div>
+      <div class="detail-actions">
+        <button class="toolbar-button toolbar-button-primary" data-action="export-asset-footprint-markdown">
+          ${escapeHtml(digest.actionLabel)}
+        </button>
+        <button class="toolbar-button" data-action="export-asset-footprint-csv">
+          导出 CSV
+        </button>
+        <button class="toolbar-button" data-action="focus-asset-gap" data-asset-filter-mode="media_budget">
+          只看体积风险
+        </button>
+      </div>
+      ${
+        categories.length > 0
+          ? `
+            <div class="preview-sprint-grid">
+              ${categories
+                .map(
+                  (category) => `
+                    <article class="preview-sprint-card is-${category.riskCount > 0 ? "warn" : "soft"}">
+                      <div class="preview-sprint-head">
+                        <strong>${escapeHtml(category.label)}</strong>
+                        <span class="issue-tag ${category.riskCount > 0 ? "warn-text" : "good-text"}">${escapeHtml(category.totalLabel)}</span>
+                      </div>
+                      <p>${escapeHtml(`${category.count} 个素材${category.riskCount > 0 ? ` · ${category.riskCount} 个建议压缩` : " · 暂无明显风险"}`)}</p>
+                      <div class="helper-text">${escapeHtml(
+                        category.largest ? `最大项：${category.largest.name} · ${category.largest.sizeLabel}` : "暂无可列出的素材"
+                      )}</div>
+                    </article>
+                  `
+                )
+                .join("")}
+            </div>
+          `
+          : renderEmpty("当前还没有可统计体积的素材。导入真实文件后，这里会自动显示发布包体积雷达。")
+      }
+      ${
+        !compact && topAssets.length > 0
+          ? `
+            <div class="list-stack compact-stack">
+              ${topAssets
+                .map(
+                  (asset) => `
+                    <article class="asset-dependency-row">
+                      <div>
+                        <b>${escapeHtml(asset.name)}</b>
+                        <span>${escapeHtml(`${asset.typeLabel} · ${asset.categoryLabel}`)}</span>
+                      </div>
+                      <span class="${asset.risk === "danger" ? "danger-text" : asset.risk === "warn" ? "warn-text" : ""}">
+                        ${escapeHtml(asset.sizeLabel)}
+                      </span>
+                    </article>
+                  `
+                )
+                .join("")}
+            </div>
+          `
+          : ""
+      }
+      ${
+        warnings.length > 0
+          ? `
+            <div class="story-filter-chip-row">
+              ${warnings
+                .map((warning) => `<span class="issue-tag ${getAssetFootprintToneClass(warning.severity)}">${escapeHtml(warning.title)}</span>`)
+                .join("")}
+            </div>
+          `
+          : `<p class="helper-text">当前没有明显体积风险；如果准备上架，可以导出报告留档。</p>`
+      }
+    </article>
+  `;
+}
+
 function renderAssetDependencyPanel() {
   const sheet = buildAssetDependencySheet();
   const digest = assetDependencySheetTools.getAssetDependencyStatusDigest(sheet);
@@ -33618,11 +33801,12 @@ function renderInspectionScreen() {
   const routeOverview = buildSceneRouteOverview();
   const issueItems = buildPreviewIssueItems();
 
-  refs.inspectionContent.innerHTML = `
-    ${renderInspectionOverviewPanel(routeOverview)}
-    ${renderInspectionIssuePanel(issueItems)}
-  `;
-}
+	  refs.inspectionContent.innerHTML = `
+	    ${renderInspectionOverviewPanel(routeOverview)}
+	    ${renderAssetFootprintPanel()}
+	    ${renderInspectionIssuePanel(issueItems)}
+	  `;
+	}
 
 function renderPreviewIssueItemCard(item) {
   return `

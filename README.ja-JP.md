@@ -55,7 +55,7 @@ Canvasia Engine は、ビジュアルノベル / Galgame 制作者のための s
 - 文脈対応の Command Palette で、Cmd/Ctrl+K からプロジェクト開始、画面移動、次のおすすめ操作、最近使ったコマンド、ストーリーカード挿入、内容を確認できる最初のプレイ可能シーンテンプレート、テーマ切替、チュートリアル、書き出し入口をすばやく検索
 - OP 導入、日常会話、好感度選択肢、ミステリー手がかり、関係性の開示、分岐合流、クライマックス演出、ED / credits、BGM 範囲指定、変数つき分岐をまとめて挿入できる制作向けシーンレシピ
 - 通常の台本テキストをプレビューし、`キャラクター: 台詞`、ナレーション行、連続した選択肢行、`wait 0.8` / `pause 1200ms` のようなテンポ調整キューを編集可能なストーリーカードへ変換
-- 背景、立ち絵、CG、BGM、効果音、ボイス、フォント、UI 素材、Live2D、3D モデル、3D シーン素材の管理
+- 背景、立ち絵、CG、BGM、効果音、ボイス、フォント、UI 素材、Live2D、3D モデル、3D シーン素材の管理。パッケージ容量リスクを確認できる asset footprint radar / CSV も含みます。
 - プロジェクトのデフォルト言語と、プレイヤーが切り替えられる言語設定
 - シーン名、章名、台詞、選択肢、キャラクター名の翻訳テキストを Runtime 側で読み取り、未翻訳部分は安全にフォールバック
 - 未翻訳や原文コピーの疑いがある項目を確認できる多言語カバレッジレポート、CSV 書き出し、安全な CSV 再インポート
@@ -70,14 +70,14 @@ Canvasia Engine は、ビジュアルノベル / Galgame 制作者のための s
 - 高度なパーティクルプリセット、プロジェクト単位のパーティクルライブラリ、カメラ演出、フィルター、フラッシュ、画面揺れ、フェード
 - Live2D / 3D キャラクターと 3D シーン素材のインポート、ネイティブ Runtime での glTF / GLB / VRM 構造レポート
 - Web 試遊パッケージ、デスクトップ書き出し、エディタデスクトップビルド、ネイティブ Runtime preview パッケージ。Web / desktop / native Runtime は preload manifest により、最初のシーンと序盤ルートの素材を優先的に準備します。
-- ローカル CI precheck、backend smoke、Playwright browser smoke、ボタン配線チェック、Ren'Py draft export test、条件 / fallback 変数プリセット付き分岐対応 preview regression、release-control report、production backlog queue、Runtime capability matrix と export acceptance checklist、pacing-aware one-click recipe suggestion 付き scene production board、voice production sheet、choice consequence audit、variable influence audit、asset dependency audit、unlockable-content audit、BGM cue sheet audit、character stage-direction audit、presentation timeline audit、テスター引き継ぎワークオーダー、プレイテストフィードバックテンプレートと取り込みサマリー、VN baseline quality audit、ファイル整合性検証
+- ローカル CI precheck、backend smoke、Playwright browser smoke、ボタン配線チェック、Ren'Py draft export test、条件 / fallback 変数プリセット付き分岐対応 preview regression、release-control report、production backlog queue、Runtime capability matrix と export acceptance checklist、pacing-aware one-click recipe suggestion 付き scene production board、voice production sheet、choice consequence audit、variable influence audit、asset dependency audit、asset footprint audit、unlockable-content audit、BGM cue sheet audit、character stage-direction audit、presentation timeline audit、テスター引き継ぎワークオーダー、プレイテストフィードバックテンプレートと取り込みサマリー、VN baseline quality audit、ファイル整合性検証
 
 ## 機能ステータス
 
 | 領域 | 状態 | 説明 |
 | --- | --- | --- |
 | ストーリー / 分岐編集 | Available | カード、選択肢、ジャンプ、変数、条件分岐、入口到達可能性チェック、リズム分析に連動した配方提案つきシーン制作ボード、フル台本、Ren'Py draft export、ボイス制作シート、シーングラフ確認、台本テキストからカードへのインポートに対応。 |
-| 素材管理 | Available | インポート、置き換え、削除、使用中保護、依存関係レポート、容量予算ヒント、画風プリセット / 立ち絵表情紐付け / プロンプト / モデル / 形式検証付きの任意 OpenAI Image 生成に対応。 |
+| 素材管理 | Available | インポート、置き換え、削除、使用中保護、依存関係レポート、asset footprint radar、容量予算ヒント、画風プリセット / 立ち絵表情紐付け / プロンプト / モデル / 形式検証付きの任意 OpenAI Image 生成に対応。 |
 | 多言語 / i18n | Preview | プロジェクト言語設定、多言語カバレッジレポート、キャラクター / 章 / シーン / ストーリーカード翻訳の安全な CSV 再インポート、書き出しメタデータ、Web Runtime 言語切替、ネイティブ Runtime 言語切替、フォールバック動作に対応。 |
 | Canvasia Assistant | Available | ローカルテンプレートと、制作者自身の API Key を使う主要互換プロバイダーに対応。 |
 | プロジェクト安全網 | Available | スナップショット、復元、クラッシュ復旧、プロジェクト Doctor、修復キュー、公開前チェック、release-control report、プレースホルダー、立ち絵、背景、BGM、選択肢、テキスト密度、演出の基礎品質チェック。 |
