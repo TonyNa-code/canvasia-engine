@@ -83,6 +83,7 @@ jobs:
             tests/test_frontend_project_doctor_module.py \
             tests/test_frontend_project_milestones_module.py \
             tests/test_frontend_project_history_module.py \
+            tests/test_frontend_project_polish_module.py \
             tests/test_frontend_project_settings_module.py \
             tests/test_frontend_recent_workspace_module.py \
             tests/test_frontend_release_control_module.py \
@@ -124,6 +125,7 @@ jobs:
           node --check prototype_editor/modules/asset_dependency_sheet.js
           node --check prototype_editor/modules/asset_rights_sheet.js
           node --check prototype_editor/modules/audio_cue_sheet.js
+          node --check prototype_editor/modules/project_polish.js
           node --check prototype_editor/modules/audio_cue_sheet_panel.js
           node --check prototype_editor/modules/beginner_tutorial.js
           node --check prototype_editor/modules/choice_consequence_sheet.js
@@ -216,6 +218,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_project_doctor_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_project_milestones_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_project_history_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_project_polish_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_project_settings_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_recent_workspace_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_release_control_module.py' -v

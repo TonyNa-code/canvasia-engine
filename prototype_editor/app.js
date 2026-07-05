@@ -68,6 +68,7 @@ const audioCueSheetPanelTools = window.CanvasiaEditorAudioCueSheetPanel;
 const stageDirectionSheetTools = window.CanvasiaEditorStageDirectionSheet;
 const presentationTimelineTools = window.CanvasiaEditorPresentationTimeline;
 const scenePolishTools = window.CanvasiaEditorScenePolish;
+const projectPolishTools = window.CanvasiaEditorProjectPolish;
 const localizationCoverageTools = window.CanvasiaEditorLocalizationCoverage;
 const runtimeCapabilityMatrixTools = window.CanvasiaEditorRuntimeCapabilityMatrix;
 const productionBacklogTools = window.CanvasiaEditorProductionBacklog;
@@ -908,6 +909,7 @@ const state = {
   storyBlockDrag: null,
   starterVariablesPromise: null,
   projectCenterRefreshInFlight: false,
+  projectOneClickPolishInFlight: false,
   projectPresentationPolishInFlight: false,
   projectReadableSplitInFlight: false,
   audioCueAutoFixInFlight: false,
@@ -4787,6 +4789,11 @@ async function handleClick(event) {
 
   if (action === "split-readable-project") {
     void splitProjectReadableBlocks();
+    return;
+  }
+
+  if (action === "run-project-one-click-polish") {
+    void runProjectOneClickPolish();
     return;
   }
 
@@ -10576,6 +10583,16 @@ function renderDashboardPrimaryActions(isBlankProject) {
     `;
   }
 
+  const oneClickPolishDigest =
+    typeof projectPolishTools !== "undefined" &&
+    typeof projectPolishTools?.getProjectOneClickPolishDigest === "function"
+      ? projectPolishTools.getProjectOneClickPolishDigest(state.data)
+      : null;
+  const oneClickPolishDisabled =
+    state.projectOneClickPolishInFlight || (oneClickPolishDigest ? !oneClickPolishDigest.canApply : false);
+  const oneClickPolishLabel = state.projectOneClickPolishInFlight
+    ? "发布前整理中..."
+    : oneClickPolishDigest?.actionLabel ?? "一键发布前整理";
   const projectPolishDigest =
     typeof scenePolishTools !== "undefined" && typeof scenePolishTools?.getProjectPresentationPolishDigest === "function"
       ? scenePolishTools.getProjectPresentationPolishDigest(state.data)
@@ -10606,6 +10623,14 @@ function renderDashboardPrimaryActions(isBlankProject) {
   return `
     <button class="toolbar-button toolbar-button-primary" data-action="switch-screen" data-screen="story">
       进入剧情编辑
+    </button>
+    <button
+      class="toolbar-button toolbar-button-primary"
+      data-action="run-project-one-click-polish"
+      ${oneClickPolishDisabled ? 'disabled aria-disabled="true"' : ""}
+      title="${safeEscapeHtml(oneClickPolishDigest?.helperText ?? "依次整理长文本、基础演出和音频范围，适合发布前快速补齐。")}"
+    >
+      ${safeEscapeHtml(oneClickPolishLabel)}
     </button>
     <button
       class="toolbar-button"
@@ -10682,6 +10707,20 @@ function setProjectCenterRefreshInFlight(isInFlight) {
     isBusy: state.projectCenterRefreshInFlight,
     busyLabel: "刷新中...",
     idleLabelKey: "projectCenterRefreshIdleLabel",
+  });
+}
+
+function setProjectOneClickPolishInFlight(isInFlight) {
+  state.projectOneClickPolishInFlight = Boolean(isInFlight);
+  if (!state.projectOneClickPolishInFlight && state.currentScreen === "dashboard") {
+    renderDashboard();
+    return;
+  }
+  setActionButtonBusyState({
+    selector: '[data-action="run-project-one-click-polish"]',
+    isBusy: state.projectOneClickPolishInFlight,
+    busyLabel: "发布前整理中...",
+    idleLabelKey: "projectOneClickPolishIdleLabel",
   });
 }
 
@@ -41716,6 +41755,64 @@ async function splitSelectedSceneReadableBlocks() {
   }
 
   return success;
+}
+
+async function runProjectOneClickPolish() {
+  if (state.projectOneClickPolishInFlight) {
+    showToast("发布前整理正在进行中，请稍等");
+    return false;
+  }
+  if (
+    state.projectReadableSplitInFlight ||
+    state.projectPresentationPolishInFlight ||
+    state.audioCueAutoFixInFlight
+  ) {
+    showToast("已有项目整理任务正在进行中，请稍等");
+    return false;
+  }
+  if (typeof projectPolishTools?.buildProjectOneClickPolishPlan !== "function") {
+    showToast("当前版本暂时不能执行一键发布前整理", "error");
+    return false;
+  }
+
+  const polishPlan = projectPolishTools.buildProjectOneClickPolishPlan(state.data ?? {});
+  if (!polishPlan.changed) {
+    setSaveStatus("发布前整理已完成：项目基础内容已经比较适合检查");
+    showToast("发布前整理已完成");
+    return false;
+  }
+
+  setProjectOneClickPolishInFlight(true);
+  setSaveStatus(`正在整理 ${polishPlan.changedSceneCount} 个场景的发布前基础项...`);
+
+  try {
+    for (const scenePlan of polishPlan.scenePlans) {
+      const success = await persistScene(scenePlan.scene, {
+        reloadAfterSave: false,
+        selectedSceneId: scenePlan.sceneId,
+        selectedBlockId: scenePlan.firstChangedBlockId,
+        previewSceneId: scenePlan.sceneId,
+        previewBlockIndex: Math.max(scenePlan.firstChangedIndex ?? 0, 0),
+        successMessage: `已整理：${scenePlan.sceneName}`,
+      });
+      if (!success) {
+        return false;
+      }
+    }
+
+    await reloadProjectData({
+      ...getCurrentUiState(),
+      selectedSceneId: polishPlan.firstChangedSceneId || state.selectedSceneId,
+      selectedBlockId: polishPlan.firstChangedBlockId || state.selectedBlockId,
+      previewSceneId: polishPlan.firstChangedSceneId || state.previewSceneId,
+      previewBlockIndex: Math.max(polishPlan.firstChangedIndex ?? 0, 0),
+    });
+    setSaveStatus(polishPlan.summary);
+    showToast(polishPlan.summary);
+    return true;
+  } finally {
+    setProjectOneClickPolishInFlight(false);
+  }
 }
 
 async function splitProjectReadableBlocks() {

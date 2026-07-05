@@ -1926,11 +1926,30 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn('disabled aria-disabled="true"', payload["busyBlankMarkup"])
         self.assertIn("进入剧情编辑", payload["activeMarkup"])
         self.assertIn('data-action="switch-screen" data-screen="story"', payload["activeMarkup"])
+        self.assertIn('data-action="run-project-one-click-polish"', payload["activeMarkup"])
+        self.assertIn("一键发布前整理", payload["activeMarkup"])
         self.assertIn('data-action="split-readable-project"', payload["activeMarkup"])
         self.assertIn("整理全项目长文本", payload["activeMarkup"])
         self.assertIn("查看试玩页", payload["activeMarkup"])
         self.assertIn("打开素材页", payload["activeMarkup"])
         self.assertNotIn('data-action="create-first-chapter"', payload["activeMarkup"])
+
+    def test_project_one_click_polish_action_is_wired(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        click_handler = _extract_function_source(source, "handleClick")
+        one_click_block_start = click_handler.index('action === "run-project-one-click-polish"')
+        one_click_block_end = click_handler.index('action === "polish-scene-presentation"', one_click_block_start)
+        one_click_block = click_handler[one_click_block_start:one_click_block_end]
+
+        self.assertIn("const projectPolishTools = window.CanvasiaEditorProjectPolish", source)
+        self.assertIn("projectOneClickPolishInFlight", source)
+        self.assertIn('data-action="run-project-one-click-polish"', source)
+        self.assertIn("void runProjectOneClickPolish();", one_click_block)
+        self.assertIn("function setProjectOneClickPolishInFlight", source)
+        self.assertIn("async function runProjectOneClickPolish()", source)
+        self.assertIn("projectPolishTools.buildProjectOneClickPolishPlan", source)
+        self.assertIn("setProjectOneClickPolishInFlight(true)", source)
+        self.assertIn("setProjectOneClickPolishInFlight(false)", source)
 
     def test_create_chapter_ignores_duplicate_clicks_while_pending(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
