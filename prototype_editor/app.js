@@ -2447,6 +2447,18 @@ function getCommandPaletteContext() {
   const selectedScene = state.data ? getSelectedScene() : null;
   const selectedBlock = state.data ? getSelectedBlock() : null;
   const projectHistory = state.data ? getSafeProjectHistory() : null;
+  const sceneMoodContext =
+    selectedScene && typeof sceneMoodRecipeTools?.analyzeSceneMoodReadiness === "function"
+      ? { bgmAssetId: getSafeAssetIdByType("bgm") }
+      : null;
+  const sceneMoodReadiness =
+    selectedScene && sceneMoodContext
+      ? sceneMoodRecipeTools.analyzeSceneMoodReadiness(selectedScene, sceneMoodContext)
+      : null;
+  const sceneMoodRecipeSuggestions =
+    selectedScene && sceneMoodContext && typeof sceneMoodRecipeTools?.getSceneMoodRecipeSuggestions === "function"
+      ? sceneMoodRecipeTools.getSceneMoodRecipeSuggestions(selectedScene, sceneMoodContext, { limit: 5 })
+      : [];
   const oneClickPolishDigest =
     state.data && typeof projectPolishTools?.getProjectOneClickPolishDigest === "function"
       ? projectPolishTools.getProjectOneClickPolishDigest(state.data)
@@ -2472,6 +2484,9 @@ function getCommandPaletteContext() {
     projectOneClickPolishInFlight: Boolean(state.projectOneClickPolishInFlight),
     projectHistoryCanUndo: Boolean(projectHistory?.canUndo),
     projectHistoryCanRedo: Boolean(projectHistory?.canRedo),
+    sceneMoodCanApply: Boolean(sceneMoodReadiness?.canApply),
+    sceneMoodEmptyReason: sceneMoodReadiness?.emptyReason ?? "",
+    sceneMoodRecipeSuggestions,
   };
 }
 

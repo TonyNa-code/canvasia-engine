@@ -1,5 +1,6 @@
 (function attachCommandPaletteTools(global) {
   const COMMAND_PALETTE_RECENT_LIMIT = 6;
+  const sceneMoodRecipeTools = global.CanvasiaEditorSceneMoodRecipes || {};
 
   const SCREEN_COMMANDS = [
     { id: "screen-dashboard", title: "回到制作首页", screen: "dashboard", section: "导航", keywords: ["首页", "路线", "dashboard"] },
@@ -561,21 +562,21 @@
       return mergeRecommendedCommandIds(
         ["insert-dialogue", "insert-camera-zoom"],
         templateRecommendationIds,
-        ["template-emotion-burst", "insert-choice"]
+        ["template-emotion-burst", "mood-recipe-warm-confession", "insert-choice"]
       );
     }
     if (selectedBlockType === "dialogue") {
       return mergeRecommendedCommandIds(
         ["insert-dialogue", "insert-choice"],
         templateRecommendationIds,
-        ["template-emotion-burst", "insert-narration"]
+        ["template-emotion-burst", "mood-recipe-climax-pulse", "mood-recipe-warm-confession", "insert-narration"]
       );
     }
     if (selectedBlockType === "narration") {
       return mergeRecommendedCommandIds(
         ["insert-dialogue", "insert-background", "insert-fade"],
         templateRecommendationIds,
-        ["template-memory-entry"]
+        ["template-memory-entry", "mood-recipe-rain-memory"]
       );
     }
     if (selectedBlockType === "choice") {
@@ -603,7 +604,7 @@
       return mergeRecommendedCommandIds(
         ["insert-narration", "insert-dialogue"],
         templateRecommendationIds,
-        ["insert-character-show", "insert-fade"]
+        ["mood-recipe-quiet-ending", "insert-character-show", "insert-fade"]
       );
     }
     if (selectedBlockType === "music_stop" || selectedBlockType === "character_hide" || selectedBlockType === "jump") {
@@ -685,6 +686,54 @@
         disabledReason,
       };
     });
+  }
+
+  function getSceneMoodRecipeCommandSource(context = {}) {
+    const source = Array.isArray(context.sceneMoodRecipeSuggestions) && context.sceneMoodRecipeSuggestions.length
+      ? context.sceneMoodRecipeSuggestions
+      : Array.isArray(sceneMoodRecipeTools.SCENE_MOOD_RECIPES)
+        ? sceneMoodRecipeTools.SCENE_MOOD_RECIPES
+        : [];
+
+    return source
+      .map((recipe) => ({
+        id: String(recipe?.id ?? "").trim(),
+        title: String(recipe?.title ?? "").trim(),
+        subtitle: String(recipe?.subtitle ?? "").trim(),
+        tags: Array.isArray(recipe?.tags) ? recipe.tags.map((tag) => String(tag ?? "").trim()).filter(Boolean) : [],
+      }))
+      .filter((recipe) => recipe.id && recipe.title);
+  }
+
+  function buildSceneMoodRecipeCommands(context = {}) {
+    const hasProject = Boolean(context.hasProject);
+    const hasSelectedScene = Boolean(context.hasSelectedScene);
+    const hasExplicitReadiness = Object.prototype.hasOwnProperty.call(context, "sceneMoodCanApply");
+    const sceneMoodCanApply = hasExplicitReadiness
+      ? Boolean(context.sceneMoodCanApply)
+      : hasSelectedScene && Number(context.selectedSceneBlockCount ?? 0) > 0;
+    const disabledProjectTitle = "先新建或打开项目后可用";
+    const disabledSceneTitle = hasProject ? "先创建或选择一个场景后可用" : disabledProjectTitle;
+    const disabledReason = !hasSelectedScene
+      ? disabledSceneTitle
+      : !sceneMoodCanApply
+        ? context.sceneMoodEmptyReason || "先写一两句正文或补背景，再套演出配方会更自然"
+        : "";
+    const sceneSubtitle = context.selectedSceneTitle
+      ? `套到当前场景：${context.selectedSceneTitle}`
+      : "套到当前选中的场景";
+
+    return getSceneMoodRecipeCommandSource(context).map((recipe) => ({
+      id: `mood-recipe-${recipe.id}`,
+      title: `套用演出配方：${recipe.title}`,
+      subtitle: sceneMoodCanApply ? `${recipe.subtitle} · ${sceneSubtitle}` : disabledReason,
+      section: "演出配方",
+      action: "apply-scene-mood-recipe",
+      dataset: { "recipe-id": recipe.id },
+      disabled: !hasSelectedScene || !sceneMoodCanApply,
+      disabledReason,
+      keywords: ["演出", "配方", "氛围", "mood", "recipe", recipe.title, recipe.subtitle, ...recipe.tags],
+    }));
   }
 
   function prioritizeRecommendedCommands(commands = [], context = {}) {
@@ -860,6 +909,7 @@
         disabled: !hasSelectedScene,
         disabledReason: hasSelectedScene ? "" : disabledSceneTitle,
       })),
+      ...buildSceneMoodRecipeCommands(context),
       {
         id: "create-first-chapter",
         title: "一键创建第一章和第一场景",
@@ -969,6 +1019,7 @@
     renderCommandPaletteList,
     buildReleaseWorkflowCommands,
     buildProjectSafetyCommands,
+    buildSceneMoodRecipeCommands,
     getRecommendedCommandIds,
     getStoryTemplateRecommendationCommandIds,
     prioritizeRecommendedCommands,

@@ -10,6 +10,7 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "command_palette.js"
 STORY_TEMPLATE_MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "story_templates.js"
+SCENE_MOOD_MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "scene_mood_recipes.js"
 
 
 class FrontendCommandPaletteModuleTests(unittest.TestCase):
@@ -32,6 +33,7 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
             const context = {{ window: {{}} }};
             context.globalThis = context;
             vm.createContext(context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(SCENE_MOOD_MODULE_PATH))}, "utf8"), context);
             vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
             const tools = context.window.CanvasiaEditorCommandPalette;
             const noProject = tools.buildCommandPaletteCommands({{ hasProject: false }});
@@ -98,12 +100,37 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
               projectHistoryCanUndo: true,
               projectHistoryCanRedo: true,
             }});
+            const moodNoScene = tools.buildSceneMoodRecipeCommands({{
+              hasProject: true,
+              hasSelectedScene: false,
+            }});
+            const moodEmptyScene = tools.buildSceneMoodRecipeCommands({{
+              hasProject: true,
+              hasSelectedScene: true,
+              selectedSceneTitle: "空场景",
+              selectedSceneBlockCount: 0,
+              sceneMoodCanApply: false,
+              sceneMoodEmptyReason: "先写正文再套配方",
+            }});
+            const moodReady = tools.buildSceneMoodRecipeCommands({{
+              hasProject: true,
+              hasSelectedScene: true,
+              selectedSceneTitle: "雨夜教室",
+              selectedSceneBlockCount: 3,
+              sceneMoodCanApply: true,
+              sceneMoodRecipeSuggestions: [
+                {{ id: "warm-confession", title: "心动特写", subtitle: "适合告白", tags: ["柔光", "景深"] }},
+                {{ id: "mystery-pressure", title: "悬疑压迫", subtitle: "适合危险临近", tags: ["冷色"] }},
+              ],
+            }});
             const storySearch = tools.filterCommandPaletteCommands(project, "剧情");
             const dialogueSearch = tools.filterCommandPaletteCommands(projectWithScene, "台词");
             const playableSearch = tools.filterCommandPaletteCommands(projectWithScene, "可试玩");
             const affectionSearch = tools.filterCommandPaletteCommands(projectWithScene, "好感度");
             const creditsSearch = tools.filterCommandPaletteCommands(projectWithScene, "片尾");
             const branchMergeSearch = tools.filterCommandPaletteCommands(projectWithScene, "汇合");
+            const moodSearch = tools.filterCommandPaletteCommands(projectAfterDialogue, "心动");
+            const rainMoodSearch = tools.filterCommandPaletteCommands(projectAfterDialogue, "雨夜");
             const releaseSearch = tools.filterCommandPaletteCommands(projectReleaseReady, "发布 整理");
             const safetySearch = tools.filterCommandPaletteCommands(projectReleaseReady, "快照");
             const rollbackSearch = tools.filterCommandPaletteCommands(projectReleaseReady, "恢复 版本");
@@ -135,8 +162,8 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
               emptySceneRecommendedIds: projectWithScene.slice(0, 4).map((command) => command.id),
               emptySceneRecommendedSections: projectWithScene.slice(0, 2).map((command) => command.section),
               dialogueRecommendedIds: projectAfterDialogue.slice(0, 4).map((command) => command.id),
-              dialogueRecentIds: projectAfterDialogue.slice(4, 6).map((command) => command.id),
-              dialogueRecentSections: projectAfterDialogue.slice(4, 6).map((command) => command.section),
+              dialogueRecentIds: projectAfterDialogue.filter((command) => command.section === "最近").map((command) => command.id),
+              dialogueRecentSections: projectAfterDialogue.filter((command) => command.section === "最近").map((command) => command.section),
               directRecommendedIds: tools.getRecommendedCommandIds({{ hasProject: true, hasSelectedScene: true, selectedBlockType: "dialogue", selectedSceneBlockCount: 2 }}),
               noSceneRecommendedIds: tools.getRecommendedCommandIds({{ hasProject: true, hasSelectedScene: false }}),
               releaseNoProjectDisabled: releaseNoProject.map((command) => command.disabled),
@@ -154,6 +181,11 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
               safetyWithHistory: safetyWithHistory.map((command) => [command.id, command.disabled, command.action]),
               safetySearchIds: safetySearch.map((command) => command.id),
               rollbackSearchIds: rollbackSearch.map((command) => command.id),
+              moodNoSceneDisabled: moodNoScene.map((command) => command.disabled),
+              moodEmptyScene: moodEmptyScene.map((command) => [command.id, command.disabled, command.disabledReason]),
+              moodReady: moodReady.map((command) => [command.id, command.disabled, command.action, command.dataset["recipe-id"]]),
+              moodSearchIds: moodSearch.map((command) => command.id),
+              rainMoodSearchIds: rainMoodSearch.map((command) => command.id),
               playableSearchIds: playableSearch.map((command) => command.id),
               affectionSearchIds: affectionSearch.map((command) => command.id),
               creditsSearchIds: creditsSearch.map((command) => command.id),
@@ -167,6 +199,7 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
 
         self.assertIn("buildReleaseWorkflowCommands", payload["keys"])
         self.assertIn("buildProjectSafetyCommands", payload["keys"])
+        self.assertIn("buildSceneMoodRecipeCommands", payload["keys"])
         self.assertTrue(payload["noProjectStoryDisabled"])
         self.assertFalse(payload["noProjectDemoDisabled"])
         self.assertFalse(payload["exportDisabled"])
@@ -207,6 +240,12 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
         self.assertIn(["safety-restore-previous", False, "restore-previous-version"], payload["safetyWithHistory"])
         self.assertIn("safety-create-checkpoint", payload["safetySearchIds"])
         self.assertIn("safety-restore-previous", payload["rollbackSearchIds"])
+        self.assertTrue(all(payload["moodNoSceneDisabled"]))
+        self.assertIn(["mood-recipe-warm-confession", True, "先写正文再套配方"], payload["moodEmptyScene"])
+        self.assertIn(["mood-recipe-warm-confession", False, "apply-scene-mood-recipe", "warm-confession"], payload["moodReady"])
+        self.assertIn(["mood-recipe-mystery-pressure", False, "apply-scene-mood-recipe", "mystery-pressure"], payload["moodReady"])
+        self.assertIn("mood-recipe-warm-confession", payload["moodSearchIds"])
+        self.assertIn("mood-recipe-rain-memory", payload["rainMoodSearchIds"])
         self.assertIn("template-playable-scene", payload["playableSearchIds"])
         self.assertIn("template-affection-choice", payload["affectionSearchIds"])
         self.assertIn("template-ending-credits", payload["creditsSearchIds"])
@@ -223,6 +262,7 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
             context.globalThis = context;
             vm.createContext(context);
             vm.runInContext(fs.readFileSync({json.dumps(str(STORY_TEMPLATE_MODULE_PATH))}, "utf8"), context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(SCENE_MOOD_MODULE_PATH))}, "utf8"), context);
             vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
             const tools = context.window.CanvasiaEditorCommandPalette;
             const emptyScene = tools.buildCommandPaletteCommands({{
@@ -316,6 +356,7 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
             const context = {{ window: {{}} }};
             context.globalThis = context;
             vm.createContext(context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(SCENE_MOOD_MODULE_PATH))}, "utf8"), context);
             vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
             const tools = context.window.CanvasiaEditorCommandPalette;
             const storage = {{
@@ -368,6 +409,7 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
             const context = {{ window: {{}} }};
             context.globalThis = context;
             vm.createContext(context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(SCENE_MOOD_MODULE_PATH))}, "utf8"), context);
             vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
             const tools = context.window.CanvasiaEditorCommandPalette;
             const html = tools.renderCommandPaletteList([
