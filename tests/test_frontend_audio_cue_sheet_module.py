@@ -72,6 +72,7 @@ class FrontendAudioCueSheetModuleTests(unittest.TestCase):
               ],
             }};
             const sheet = tools.buildAudioCueSheet(data);
+            const autoFixPlan = tools.buildAudioCueAutoFixPlan(data);
             const digest = tools.getAudioCueSheetStatusDigest(sheet);
             const markdown = tools.buildAudioCueSheetMarkdown(sheet, {{
               projectTitle: "Demo Project",
@@ -81,6 +82,7 @@ class FrontendAudioCueSheetModuleTests(unittest.TestCase):
             process.stdout.write(JSON.stringify({{
               keys: Object.keys(tools).sort(),
               sheet,
+              autoFixPlan,
               digest,
               markdown,
               csv,
@@ -102,6 +104,8 @@ class FrontendAudioCueSheetModuleTests(unittest.TestCase):
         self.assertIn("buildVoiceCueRows", payload["keys"])
         self.assertIn("buildAudioCueProductionQueue", payload["keys"])
         self.assertIn("buildAudioCueAuditionChecklist", payload["keys"])
+        self.assertIn("buildAudioCueAutoFixPlan", payload["keys"])
+        self.assertIn("getAudioCueAutoFixDigest", payload["keys"])
         self.assertIn("buildAudioCueSheetMarkdown", payload["keys"])
         self.assertIn("buildAudioCueSheetCsv", payload["keys"])
         self.assertEqual(payload["sheet"]["summary"]["cueCount"], 2)
@@ -116,6 +120,9 @@ class FrontendAudioCueSheetModuleTests(unittest.TestCase):
         self.assertEqual(payload["sheet"]["summary"]["missingSfxAssetCount"], 1)
         self.assertEqual(payload["sheet"]["summary"]["missingVoiceAssetCount"], 1)
         self.assertEqual(payload["sheet"]["summary"]["missingEndBlockCount"], 1)
+        self.assertEqual(payload["sheet"]["summary"]["autoFixSceneCount"], 1)
+        self.assertEqual(payload["sheet"]["summary"]["autoFixBlockCount"], 1)
+        self.assertEqual(payload["sheet"]["summary"]["autoFixOperationCount"], 3)
         self.assertGreaterEqual(payload["sheet"]["summary"]["productionTaskCount"], 6)
         self.assertGreaterEqual(payload["sheet"]["summary"]["auditionChecklistCount"], 5)
         self.assertLess(payload["sheet"]["summary"]["releaseReadinessPercent"], 100)
@@ -127,6 +134,16 @@ class FrontendAudioCueSheetModuleTests(unittest.TestCase):
         self.assertEqual(payload["sheet"]["sfxCues"][1]["status"], "blocker")
         self.assertEqual(payload["sheet"]["voiceCues"][0]["speakerName"], "悠奈")
         self.assertEqual(payload["sheet"]["voiceCues"][1]["status"], "blocker")
+        self.assertTrue(payload["autoFixPlan"]["changed"])
+        self.assertEqual(payload["autoFixPlan"]["changedSceneCount"], 1)
+        self.assertEqual(payload["autoFixPlan"]["changedBlockCount"], 1)
+        self.assertEqual(payload["autoFixPlan"]["operationCount"], 3)
+        fixed_block = payload["autoFixPlan"]["scenePlans"][0]["scene"]["blocks"][0]
+        self.assertEqual(fixed_block["assetId"], "bgm_missing_file")
+        self.assertEqual(fixed_block["fadeInMs"], 700)
+        self.assertEqual(fixed_block["fadeOutMs"], 900)
+        self.assertEqual(fixed_block["endBlockId"], "block_bad_line")
+        self.assertIn("已准备修复 1 个场景", payload["autoFixPlan"]["summary"])
         self.assertEqual(payload["sheet"]["cues"][0]["endLabel"], "第 5 张 · 台词 · 嗯，只待一会儿。")
         self.assertEqual(payload["sheet"]["cues"][0]["handoffType"], "explicit_end")
         self.assertIn("播放到 第 5 张", payload["sheet"]["rangeRows"][0]["handoffLabel"])

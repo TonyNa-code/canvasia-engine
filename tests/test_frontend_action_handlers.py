@@ -4078,21 +4078,27 @@ class FrontendActionHandlerTests(unittest.TestCase):
         click_handler = _extract_function_source(source, "handleClick")
         markdown_block_start = click_handler.index('action === "export-audio-cue-sheet-markdown"')
         csv_block_start = click_handler.index('action === "export-audio-cue-sheet-csv"')
+        autofix_block_start = click_handler.index('action === "apply-audio-cue-autofix"')
         csv_block_end = click_handler.index('action === "export-release-control-report"', csv_block_start)
         markdown_block = click_handler[markdown_block_start:csv_block_start]
-        csv_block = click_handler[csv_block_start:csv_block_end]
+        csv_block = click_handler[csv_block_start:autofix_block_start]
+        autofix_block = click_handler[autofix_block_start:csv_block_end]
 
         self.assertIn("const audioCueSheetTools = window.CanvasiaEditorAudioCueSheet", source)
         self.assertIn("const audioCueSheetPanelTools = window.CanvasiaEditorAudioCueSheetPanel", source)
         self.assertIn('data-action="export-audio-cue-sheet-markdown"', combined_source)
         self.assertIn('data-action="export-audio-cue-sheet-csv"', combined_source)
+        self.assertIn('data-action="apply-audio-cue-autofix"', combined_source)
         self.assertIn("exportAudioCueSheetMarkdown();", markdown_block)
         self.assertIn("exportAudioCueSheetCsv();", csv_block)
+        self.assertIn("void applyAudioCueAutoFix();", autofix_block)
         self.assertIn("function buildAudioCueSheet()", source)
         self.assertIn("function renderAudioCueSheetPanel()", source)
         self.assertIn("audioCueSheetPanelTools.renderAudioCueSheetPanel(buildAudioCueSheet())", source)
         self.assertIn("function exportAudioCueSheetMarkdown()", source)
         self.assertIn("function exportAudioCueSheetCsv()", source)
+        self.assertIn("async function applyAudioCueAutoFix()", source)
+        self.assertIn("audioCueSheetTools.buildAudioCueAutoFixPlan", source)
         self.assertIn("audioCueSheetTools.buildAudioCueSheet", source)
         self.assertIn("audioCueSheetTools.getAudioCueSheetStatusDigest", panel_source)
 

@@ -909,6 +909,7 @@ const state = {
   starterVariablesPromise: null,
   projectCenterRefreshInFlight: false,
   projectPresentationPolishInFlight: false,
+  audioCueAutoFixInFlight: false,
   projectCreateInFlight: false,
   projectOpenInFlightId: "",
   projectRenameInFlightId: "",
@@ -3901,6 +3902,11 @@ async function handleClick(event) {
 
   if (action === "export-audio-cue-sheet-csv") {
     exportAudioCueSheetCsv();
+    return;
+  }
+
+  if (action === "apply-audio-cue-autofix") {
+    void applyAudioCueAutoFix();
     return;
   }
 
@@ -10667,6 +10673,20 @@ function setProjectPresentationPolishInFlight(isInFlight) {
     isBusy: state.projectPresentationPolishInFlight,
     busyLabel: "全项目润色中...",
     idleLabelKey: "projectPresentationPolishIdleLabel",
+  });
+}
+
+function setAudioCueAutoFixInFlight(isInFlight) {
+  state.audioCueAutoFixInFlight = Boolean(isInFlight);
+  if (!state.audioCueAutoFixInFlight && state.currentScreen === "inspection") {
+    renderAll();
+    return;
+  }
+  setActionButtonBusyState({
+    selector: '[data-action="apply-audio-cue-autofix"]',
+    isBusy: state.audioCueAutoFixInFlight,
+    busyLabel: "补齐音频中...",
+    idleLabelKey: "audioCueAutoFixIdleLabel",
   });
 }
 
@@ -30513,6 +30533,56 @@ function exportAudioCueSheetCsv() {
   downloadTextFile(fileName, content, "text/csv;charset=utf-8");
   setSaveStatus(`已导出音频调度 CSV：${fileName}`);
   showToast(`音频调度 CSV 已导出：${fileName}`);
+}
+
+async function applyAudioCueAutoFix() {
+  if (state.audioCueAutoFixInFlight) {
+    showToast("音频基础参数正在补齐中，请稍等");
+    return false;
+  }
+  if (typeof audioCueSheetTools?.buildAudioCueAutoFixPlan !== "function") {
+    showToast("当前版本暂时不能自动补齐音频参数", "error");
+    return false;
+  }
+
+  const plan = audioCueSheetTools.buildAudioCueAutoFixPlan(state.data ?? {});
+  if (!plan.changed) {
+    setSaveStatus("音频基础参数已经比较完整");
+    showToast("音频基础参数已经比较完整");
+    return false;
+  }
+
+  setAudioCueAutoFixInFlight(true);
+  setSaveStatus(`正在补齐 ${plan.changedSceneCount} 个场景的音频基础参数...`);
+
+  try {
+    for (const scenePlan of plan.scenePlans) {
+      const success = await persistScene(scenePlan.scene, {
+        reloadAfterSave: false,
+        selectedSceneId: scenePlan.sceneId,
+        selectedBlockId: scenePlan.firstChangedBlockId,
+        previewSceneId: scenePlan.sceneId,
+        previewBlockIndex: Math.max(scenePlan.firstChangedIndex ?? 0, 0),
+        successMessage: `已补齐音频参数：${scenePlan.sceneName}`,
+      });
+      if (!success) {
+        return false;
+      }
+    }
+
+    await reloadProjectData({
+      ...getCurrentUiState(),
+      selectedSceneId: plan.firstChangedSceneId || state.selectedSceneId,
+      selectedBlockId: plan.firstChangedBlockId || state.selectedBlockId,
+      previewSceneId: plan.firstChangedSceneId || state.previewSceneId,
+      previewBlockIndex: Math.max(plan.firstChangedIndex ?? 0, 0),
+    });
+    setSaveStatus(plan.summary);
+    showToast(plan.summary);
+    return true;
+  } finally {
+    setAudioCueAutoFixInFlight(false);
+  }
 }
 
 function buildStageDirectionSheet() {

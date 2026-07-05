@@ -28,6 +28,11 @@
     scene_end: "覆盖到场景结束",
     after_block: "播放到指定卡片",
   });
+  const AUDIO_CUE_AUTO_FIX_DEFAULTS = Object.freeze({
+    musicFadeInMs: 700,
+    musicFadeOutMs: 900,
+    stopFadeOutMs: 700,
+  });
 
   function toArray(value) {
     return Array.isArray(value) ? value : [];
@@ -100,9 +105,9 @@
   function buildChapterMap(data = {}) {
     return new Map(
       toArray(data.chapters).map((chapter, index) => [
-        String(chapter?.id ?? ""),
+        String(chapter?.id ?? chapter?.chapterId ?? ""),
         {
-          id: String(chapter?.id ?? ""),
+          id: String(chapter?.id ?? chapter?.chapterId ?? ""),
           name: cleanText(chapter?.name ?? chapter?.title, `章节 ${index + 1}`),
           order: index,
         },
@@ -158,7 +163,7 @@
   function getOrderedScenes(data = {}) {
     const chapters = toArray(data.chapters);
     const scenes = toArray(data.scenes);
-    const chapterOrder = new Map(chapters.map((chapter, index) => [String(chapter?.id ?? ""), index]));
+    const chapterOrder = new Map(chapters.map((chapter, index) => [String(chapter?.id ?? chapter?.chapterId ?? ""), index]));
     return scenes
       .map((scene, index) => ({ scene, index }))
       .sort((left, right) => {
@@ -176,6 +181,197 @@
     return ["background", "dialogue", "narration", "character_show", "choice", "video_play", "credits_roll", "wait"].includes(
       block.type
     );
+  }
+
+  function cloneSceneForAudioFix(scene = {}) {
+    return {
+      ...scene,
+      blocks: toArray(scene.blocks).map((block) => ({ ...block })),
+    };
+  }
+
+  function getBlockId(block = {}) {
+    return cleanText(block.id);
+  }
+
+  function getRecommendedAudioRangeEndBlockId(blocks = [], startIndex = 0) {
+    const safeBlocks = toArray(blocks);
+    const nextAudioControlIndex = safeBlocks.findIndex(
+      (candidate, index) => index > startIndex && ["music_play", "music_stop"].includes(candidate?.type)
+    );
+    const lastCandidateIndex = nextAudioControlIndex >= 0 ? nextAudioControlIndex - 1 : safeBlocks.length - 1;
+
+    for (let index = lastCandidateIndex; index >= startIndex; index -= 1) {
+      const block = safeBlocks[index];
+      if (isStoryContentBlock(block) && getBlockId(block)) {
+        return getBlockId(block);
+      }
+    }
+    for (let index = lastCandidateIndex; index >= startIndex; index -= 1) {
+      const blockId = getBlockId(safeBlocks[index]);
+      if (blockId) {
+        return blockId;
+      }
+    }
+    return "";
+  }
+
+  function buildAudioCueAutoFixSummary(scenePlans = []) {
+    const safePlans = toArray(scenePlans);
+    const blockCount = safePlans.reduce((total, plan) => total + (plan.changedBlockCount ?? 0), 0);
+    const operationCount = safePlans.reduce((total, plan) => total + (plan.operationCount ?? 0), 0);
+    if (!safePlans.length) {
+      return "音频基础参数已经比较完整";
+    }
+    return `已准备修复 ${safePlans.length} 个场景、${blockCount} 张音频卡、${operationCount} 个基础参数`;
+  }
+
+  function getAudioAutoFixDefaults(options = {}) {
+    return {
+      musicFadeInMs: Math.round(clampNumber(options.musicFadeInMs, 100, 30000, AUDIO_CUE_AUTO_FIX_DEFAULTS.musicFadeInMs)),
+      musicFadeOutMs: Math.round(clampNumber(options.musicFadeOutMs, 100, 30000, AUDIO_CUE_AUTO_FIX_DEFAULTS.musicFadeOutMs)),
+      stopFadeOutMs: Math.round(clampNumber(options.stopFadeOutMs, 100, 30000, AUDIO_CUE_AUTO_FIX_DEFAULTS.stopFadeOutMs)),
+    };
+  }
+
+  function buildAudioCueAutoFixPlan(data = {}, options = {}) {
+    const defaults = getAudioAutoFixDefaults(options);
+    const chapterMap = buildChapterMap(data);
+    const scenePlans = [];
+
+    getOrderedScenes(data).forEach((scene, sceneIndex) => {
+      const updatedScene = cloneSceneForAudioFix(scene);
+      const operations = [];
+      const changedBlockIds = new Set();
+
+      updatedScene.blocks.forEach((block, blockIndex, blocks) => {
+        if (block?.type === "music_play") {
+          const rawEndMode = block.endMode;
+          let endMode = getSafeMusicEndMode(rawEndMode);
+          if (rawEndMode !== endMode) {
+            block.endMode = endMode;
+            changedBlockIds.add(getBlockId(block) || `block_${blockIndex + 1}`);
+            operations.push({
+              blockId: getBlockId(block),
+              blockIndex,
+              label: "修正 BGM 范围模式",
+              detail: `无法识别的范围模式已改为 ${getMusicEndModeLabel(endMode)}。`,
+            });
+          }
+
+          const fadeInMs = Math.round(clampNumber(block.fadeInMs, 0, 30000, 0));
+          if (fadeInMs <= 0) {
+            block.fadeInMs = defaults.musicFadeInMs;
+            changedBlockIds.add(getBlockId(block) || `block_${blockIndex + 1}`);
+            operations.push({
+              blockId: getBlockId(block),
+              blockIndex,
+              label: "补 BGM 淡入",
+              detail: `淡入已设为 ${defaults.musicFadeInMs}ms。`,
+            });
+          }
+
+          if (endMode === "after_block") {
+            const endBlockId = cleanText(block.endBlockId);
+            const endBlockIndex = blocks.findIndex((candidate) => getBlockId(candidate) === endBlockId);
+            if (!endBlockId || endBlockIndex < blockIndex) {
+              const recommendedEndBlockId = getRecommendedAudioRangeEndBlockId(blocks, blockIndex);
+              if (recommendedEndBlockId) {
+                block.endBlockId = recommendedEndBlockId;
+                changedBlockIds.add(getBlockId(block) || `block_${blockIndex + 1}`);
+                operations.push({
+                  blockId: getBlockId(block),
+                  blockIndex,
+                  label: "补 BGM 结束卡片",
+                  detail: `结束卡片已改为 ${recommendedEndBlockId}。`,
+                });
+              } else {
+                endMode = "scene_end";
+                block.endMode = endMode;
+                block.endBlockId = "";
+                changedBlockIds.add(getBlockId(block) || `block_${blockIndex + 1}`);
+                operations.push({
+                  blockId: getBlockId(block),
+                  blockIndex,
+                  label: "改为覆盖到场景结束",
+                  detail: "当前场景没有可用结束卡片，已改为覆盖到场景结束。",
+                });
+              }
+            }
+          }
+
+          const fadeOutMs = Math.round(clampNumber(block.fadeOutMs, 0, 30000, 0));
+          if (endMode !== "until_next_music" && fadeOutMs <= 0) {
+            block.fadeOutMs = defaults.musicFadeOutMs;
+            changedBlockIds.add(getBlockId(block) || `block_${blockIndex + 1}`);
+            operations.push({
+              blockId: getBlockId(block),
+              blockIndex,
+              label: "补 BGM 范围淡出",
+              detail: `范围淡出已设为 ${defaults.musicFadeOutMs}ms。`,
+            });
+          }
+        }
+
+        if (block?.type === "music_stop") {
+          const fadeOutMs = Math.round(clampNumber(block.fadeOutMs, 0, 30000, 0));
+          if (fadeOutMs <= 0) {
+            block.fadeOutMs = defaults.stopFadeOutMs;
+            changedBlockIds.add(getBlockId(block) || `block_${blockIndex + 1}`);
+            operations.push({
+              blockId: getBlockId(block),
+              blockIndex,
+              label: "补停止音乐淡出",
+              detail: `停止音乐淡出已设为 ${defaults.stopFadeOutMs}ms。`,
+            });
+          }
+        }
+      });
+
+      if (operations.length > 0) {
+        const chapter = chapterMap.get(String(scene?.chapterId ?? "")) ?? {
+          id: String(scene?.chapterId ?? ""),
+          name: "未分章",
+        };
+        scenePlans.push({
+          scene: updatedScene,
+          sceneId: cleanText(scene?.id),
+          sceneName: cleanText(scene?.name ?? scene?.title, `场景 ${sceneIndex + 1}`),
+          chapterId: chapter.id,
+          chapterName: chapter.name,
+          operations,
+          operationCount: operations.length,
+          changedBlockCount: changedBlockIds.size,
+          firstChangedBlockId: operations[0]?.blockId ?? "",
+          firstChangedIndex: operations[0]?.blockIndex ?? 0,
+        });
+      }
+    });
+
+    return {
+      changed: scenePlans.length > 0,
+      scenePlans,
+      changedSceneCount: scenePlans.length,
+      changedBlockCount: scenePlans.reduce((total, plan) => total + (plan.changedBlockCount ?? 0), 0),
+      operationCount: scenePlans.reduce((total, plan) => total + (plan.operationCount ?? 0), 0),
+      firstChangedSceneId: scenePlans[0]?.sceneId ?? "",
+      firstChangedBlockId: scenePlans[0]?.firstChangedBlockId ?? "",
+      firstChangedIndex: scenePlans[0]?.firstChangedIndex ?? 0,
+      summary: buildAudioCueAutoFixSummary(scenePlans),
+    };
+  }
+
+  function getAudioCueAutoFixDigest(data = {}, options = {}) {
+    const plan = buildAudioCueAutoFixPlan(data, options);
+    return {
+      canApply: plan.changed,
+      actionLabel: plan.changed ? `一键补齐 ${plan.operationCount} 个音频参数` : "音频基础参数已完整",
+      badgeLabel: plan.changed ? `${plan.changedSceneCount} 个场景可自动修` : "无需自动修",
+      helperText: plan.changed
+        ? "只会补淡入淡出和坏掉的 BGM 范围，不会替你乱选或删除素材。"
+        : "当前项目的 BGM 淡入淡出、停止淡出和基础范围参数已经比较完整。",
+      plan,
+    };
   }
 
   function summarizeBlock(block = {}, index = 0) {
@@ -1006,11 +1202,16 @@
     summary.productionTaskCount = productionQueue.length;
     summary.auditionChecklistCount = auditionChecklist.length;
     summary.releaseReadinessPercent = getAudioCueReadinessPercent(summary);
+    const autoFixPlan = buildAudioCueAutoFixPlan(data);
+    summary.autoFixSceneCount = autoFixPlan.changedSceneCount;
+    summary.autoFixBlockCount = autoFixPlan.changedBlockCount;
+    summary.autoFixOperationCount = autoFixPlan.operationCount;
 
     return {
       ...sheet,
       productionQueue,
       auditionChecklist,
+      autoFixPlan,
     };
   }
 
@@ -1320,6 +1521,7 @@
   }
 
   global.CanvasiaEditorAudioCueSheet = Object.freeze({
+    AUDIO_CUE_AUTO_FIX_DEFAULTS,
     getSafeMusicEndMode,
     getMusicEndModeLabel,
     buildAudioCueRangeRows,
@@ -1327,6 +1529,9 @@
     buildVoiceCueRows,
     buildAudioCueProductionQueue,
     buildAudioCueAuditionChecklist,
+    buildAudioCueAutoFixSummary,
+    buildAudioCueAutoFixPlan,
+    getAudioCueAutoFixDigest,
     buildAudioCueSheet,
     getAudioCueSheetStatusDigest,
     buildAudioCueSheetMarkdown,

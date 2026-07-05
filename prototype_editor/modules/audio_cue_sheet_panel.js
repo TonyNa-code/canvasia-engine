@@ -164,6 +164,36 @@
     `;
   }
 
+  function getAudioCueAutoFixPlan(sheet = {}) {
+    return sheet.autoFixPlan && typeof sheet.autoFixPlan === "object"
+      ? sheet.autoFixPlan
+      : {
+          changed: false,
+          changedSceneCount: 0,
+          changedBlockCount: 0,
+          operationCount: 0,
+          summary: "音频基础参数已经比较完整",
+        };
+  }
+
+  function renderAudioCueAutoFixButton(sheet = {}) {
+    const plan = getAudioCueAutoFixPlan(sheet);
+    const label = plan.changed ? `一键补齐 ${plan.operationCount ?? 0} 个音频参数` : "音频基础参数已完整";
+    const title = plan.changed
+      ? `会处理 ${plan.changedSceneCount ?? 0} 个场景、${plan.changedBlockCount ?? 0} 张音频卡。`
+      : "当前项目的 BGM 淡入淡出、停止淡出和基础范围参数已经比较完整。";
+    return `
+      <button
+        class="toolbar-button"
+        data-action="apply-audio-cue-autofix"
+        title="${escapeHtml(title)}"
+        ${plan.changed ? "" : 'disabled aria-disabled="true"'}
+      >
+        ${escapeHtml(label)}
+      </button>
+    `;
+  }
+
   function renderAudioCueSheetPreview(sheet = {}) {
     const topIssues = (Array.isArray(sheet.issues) ? sheet.issues : []).slice(0, 4);
     const rangePreview = (Array.isArray(sheet.rangeRows) ? sheet.rangeRows : []).slice(0, 4);
@@ -220,6 +250,7 @@
           <button class="toolbar-button" data-action="export-audio-cue-sheet-csv">
             导出音频 CSV
           </button>
+          ${renderAudioCueAutoFixButton(sheet)}
           <button class="toolbar-button" data-action="switch-screen" data-screen="story">
             去剧情页调整音乐
           </button>
@@ -241,6 +272,8 @@
     renderAudioAuditionChecklistRow,
     renderAudioProductionQueue,
     renderAudioAuditionChecklist,
+    getAudioCueAutoFixPlan,
+    renderAudioCueAutoFixButton,
     renderAudioCueSheetPreview,
     renderAudioCueSheetPanel,
   });
