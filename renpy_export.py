@@ -21,9 +21,7 @@ RENPY_PATH_SUFFIX_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
-COMMENT_ONLY_BLOCK_TYPES = {
-    "particle_effect",
-}
+COMMENT_ONLY_BLOCK_TYPES: set[str] = set()
 CONDITION_OPERATORS = {"==", "!=", ">=", "<=", ">", "<"}
 POSITION_XALIGN = {"left": 0.25, "center": 0.5, "right": 0.75}
 DEFAULT_CHARACTER_STAGE = {
@@ -101,6 +99,23 @@ SCREEN_COLOR_GRADE_LIMITS = {
     "vignette": (0, 100),
 }
 DEPTH_BLUR_PIXELS = {"soft": 2.0, "medium": 4.0, "strong": 6.0}
+PARTICLE_PRESET_DEFAULTS = {
+    "snow": {"symbol": "*", "color": "#ffffff", "density": 40, "size": 12, "yspeed": 70, "spread": 100, "distribution": "linear"},
+    "rain": {"symbol": "|", "color": "#b7dcff", "density": 56, "size": 18, "yspeed": 190, "spread": 100, "distribution": "linear"},
+    "petals": {"symbol": "*", "color": "#ffd6ea", "density": 28, "size": 18, "yspeed": 58, "spread": 100, "distribution": "gaussian"},
+    "dust": {"symbol": ".", "color": "#c4f6ff", "density": 26, "size": 8, "yspeed": 24, "spread": 100, "distribution": "gaussian"},
+    "embers": {"symbol": "*", "color": "#ffb36b", "density": 24, "size": 7, "yspeed": -46, "spread": 100, "distribution": "gaussian"},
+    "sparkles": {"symbol": "*", "color": "#dff8ff", "density": 18, "size": 9, "yspeed": 16, "spread": 100, "distribution": "gaussian"},
+    "bubbles": {"symbol": "o", "color": "#b6f3ff", "density": 20, "size": 18, "yspeed": -72, "spread": 100, "distribution": "gaussian"},
+    "confetti": {"symbol": "*", "color": "#7fe7ff", "density": 34, "size": 10, "yspeed": 120, "spread": 100, "distribution": "linear"},
+    "smoke": {"symbol": ".", "color": "#aebed4", "density": 22, "size": 44, "yspeed": -24, "spread": 72, "distribution": "gaussian"},
+    "flame": {"symbol": "*", "color": "#ff8b3d", "density": 26, "size": 24, "yspeed": -82, "spread": 40, "distribution": "gaussian"},
+    "stardust": {"symbol": "*", "color": "#8edbff", "density": 30, "size": 7, "yspeed": 8, "spread": 100, "distribution": "gaussian"},
+    "glyphs": {"symbol": "*", "color": "#85d4ff", "density": 14, "size": 26, "yspeed": 0, "spread": 34, "distribution": "gaussian"},
+}
+PARTICLE_INTENSITY_MULTIPLIER = {"light": 0.62, "medium": 1.0, "heavy": 1.55}
+PARTICLE_SPEED_MULTIPLIER = {"slow": 0.72, "medium": 1.0, "fast": 1.35}
+PARTICLE_WIND_SPEED = {"left": -55.0, "still": 0.0, "right": 55.0}
 
 
 def as_list(value: Any) -> list:
@@ -413,6 +428,31 @@ def get_safe_depth_blur_focus(value: Any) -> str:
     return focus if focus in {"left", "center", "right", "full"} else "full"
 
 
+def get_safe_particle_action(value: Any) -> str:
+    action = clean_text(value, "start")
+    return action if action in {"start", "stop"} else "start"
+
+
+def get_safe_particle_preset(value: Any) -> str:
+    preset = clean_text(value, "snow")
+    return preset if preset in PARTICLE_PRESET_DEFAULTS else "snow"
+
+
+def get_safe_particle_intensity(value: Any) -> str:
+    intensity = clean_text(value, "medium")
+    return intensity if intensity in PARTICLE_INTENSITY_MULTIPLIER else "medium"
+
+
+def get_safe_particle_speed(value: Any) -> str:
+    speed = clean_text(value, "medium")
+    return speed if speed in PARTICLE_SPEED_MULTIPLIER else "medium"
+
+
+def get_safe_particle_wind(value: Any) -> str:
+    wind = clean_text(value, "still")
+    return wind if wind in PARTICLE_WIND_SPEED else "still"
+
+
 def get_camera_pan_offset(target: Any, strength: Any, resolution: dict[str, int]) -> int:
     safe_target = get_safe_camera_pan_target(target)
     if safe_target == "center":
@@ -563,6 +603,75 @@ def render_depth_blur_block(block: dict, context: dict) -> list[str]:
         )
     state["blur"] = DEPTH_BLUR_PIXELS[strength]
     return render_camera_statement(state)
+
+
+def get_safe_particle_number(value: Any, fallback: float, minimum: float, maximum: float) -> float:
+    try:
+        number = float(value if value not in (None, "") else fallback)
+    except (TypeError, ValueError):
+        number = fallback
+    return clamp_number(number, minimum, maximum)
+
+
+def get_particle_count(block: dict, defaults: dict) -> int:
+    base_density = get_safe_particle_number(block.get("density"), float(defaults.get("density") or 32), 4, 180)
+    intensity = PARTICLE_INTENSITY_MULTIPLIER[get_safe_particle_intensity(block.get("intensity"))]
+    return int(round(clamp_number(base_density * intensity, 4, 220)))
+
+
+def get_particle_size(block: dict, defaults: dict) -> int:
+    fallback = float(defaults.get("size") or 10)
+    size_min = get_safe_particle_number(block.get("sizeMin"), fallback, 1, 160)
+    size_max = get_safe_particle_number(block.get("sizeMax"), fallback, 1, 160)
+    return int(round(clamp_number((min(size_min, size_max) + max(size_min, size_max)) / 2, 1, 160)))
+
+
+def get_speed_tuple(base_value: float, spread_ratio: float = 0.25) -> tuple[float, float]:
+    spread = max(4.0, abs(base_value) * spread_ratio)
+    first = round(base_value - spread, 1)
+    second = round(base_value + spread, 1)
+    return (min(first, second), max(first, second))
+
+
+def render_particle_speed_tuple(values: tuple[float, float]) -> str:
+    return f"({', '.join(format_renpy_float(value, 1) for value in values)})"
+
+
+def render_particle_block(block: dict, context: dict) -> list[str]:
+    if get_safe_particle_action(block.get("action")) == "stop":
+        return ["    hide canvasia_particles onlayer overlay"]
+    preset = get_safe_particle_preset(block.get("preset"))
+    defaults = PARTICLE_PRESET_DEFAULTS[preset]
+    speed_multiplier = PARTICLE_SPEED_MULTIPLIER[get_safe_particle_speed(block.get("speed"))]
+    wind_speed = PARTICLE_WIND_SPEED[get_safe_particle_wind(block.get("wind"))]
+    size = get_particle_size(block, defaults)
+    count = get_particle_count(block, defaults)
+    base_y_speed = get_safe_particle_number(block.get("gravityY"), float(defaults.get("yspeed") or 70), -220, 320) * speed_multiplier
+    spread = get_safe_particle_number(block.get("spreadX"), float(defaults.get("spread") or 100), 4, 100)
+    x_speed = get_speed_tuple(wind_speed, max(0.18, spread / 400))
+    y_speed = get_speed_tuple(base_y_speed, 0.22)
+    color = clean_text(block.get("color"))
+    if not re.match(r"^#[0-9a-f]{6}$", color, re.IGNORECASE):
+        color = str(defaults["color"])
+    advanced_keys = ["assetId", "customComboLayers", "comboPreset", "forceField", "follow", "emitterShape", "emissionMode"]
+    needs_review = False
+    for key in advanced_keys:
+        if key == "customComboLayers":
+            needs_review = needs_review or bool(as_list(block.get(key)))
+            continue
+        value = clean_text(block.get(key))
+        needs_review = needs_review or bool(value and value not in {"none", "line", "continuous"})
+    if needs_review:
+        add_warning(
+            context["warnings"],
+            "renpy_particle_advanced_review",
+            "粒子已按 SnowBlossom 基础层导出；自定义贴图、叠层、力场、跟随目标等高级参数需要在 Ren'Py 中复核。",
+            sceneId=context.get("sceneId"),
+            blockIndex=context.get("blockIndex"),
+        )
+    return [
+        f"    show expression SnowBlossom(Text({quote_renpy(defaults['symbol'])}, color={quote_renpy(color)}, size={size}), count={count}, border=80, xspeed={render_particle_speed_tuple(x_speed)}, yspeed={render_particle_speed_tuple(y_speed)}, start=0.04, fast=True, distribution={quote_renpy(defaults['distribution'])}, animation=True) as canvasia_particles onlayer overlay"
+    ]
 
 
 def get_character_transition_expression(block: dict, context: dict, direction: str = "show") -> str:
@@ -1033,6 +1142,8 @@ def render_story_block(block: dict, context: dict) -> list[str]:
         return render_screen_filter_block(block, context)
     if block_type == "depth_blur":
         return render_depth_blur_block(block, context)
+    if block_type == "particle_effect":
+        return render_particle_block(block, context)
     if block_type in {"dialogue", "narration"}:
         line = render_renpy_text(block)
         output: list[str] = []

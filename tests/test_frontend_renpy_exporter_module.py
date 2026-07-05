@@ -61,6 +61,7 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
                         {{ type: "dialogue", speakerId: "yuna", text: "欢迎回来。", voiceAssetId: "voice_yuna_001", textSpeed: "fast" }},
                         {{ type: "sfx_play", assetId: "sfx_bell", volume: 65 }},
                         {{ type: "narration", text: "风吹过屋顶。", textSpeed: "instant" }},
+                        {{ type: "particle_effect", action: "start", preset: "snow", intensity: "medium", speed: "medium", wind: "still", area: "full" }},
                         {{
                           type: "choice",
                           options: [
@@ -92,6 +93,7 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
                           grade: {{ brightness: 112, contrast: 120, saturation: 85, hue: 12, temperature: 25, vignette: 0 }},
                         }},
                         {{ type: "depth_blur", action: "apply", focus: "full", strength: "strong" }},
+                        {{ type: "particle_effect", action: "stop" }},
                         {{ type: "jump", targetSceneId: "scene_end" }},
                       ],
                     }},
@@ -158,6 +160,9 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
         self.assertIn('play sound "sfx/bell.ogg" volume 0.65', payload["draft"]["script"])
         self.assertIn('"{cps=10000}风吹过屋顶。{/cps}"', payload["draft"]["script"])
         self.assertIn('"{cps=24}风把答案吹散了。{/cps}"', payload["draft"]["script"])
+        self.assertIn('show expression SnowBlossom(Text("*", color="#ffffff", size=12), count=40', payload["draft"]["script"])
+        self.assertIn("as canvasia_particles onlayer overlay", payload["draft"]["script"])
+        self.assertIn("hide canvasia_particles onlayer overlay", payload["draft"]["script"])
         self.assertIn("menu:", payload["draft"]["script"])
         self.assertIn("$ affection += 1", payload["draft"]["script"])
         self.assertIn('$ route = "good"', payload["draft"]["script"])

@@ -2,9 +2,7 @@
   "use strict";
 
   const CHOICE_CONTINUE_TARGET = "__continue__";
-  const BLOCK_TYPES_REQUIRING_COMMENT = Object.freeze([
-    "particle_effect",
-  ]);
+  const BLOCK_TYPES_REQUIRING_COMMENT = Object.freeze([]);
   const POSITION_XALIGN = Object.freeze({ left: 0.25, center: 0.5, right: 0.75 });
   const DEFAULT_CHARACTER_STAGE = Object.freeze({
     offsetX: 0,
@@ -81,6 +79,23 @@
     vignette: Object.freeze([0, 100]),
   });
   const DEPTH_BLUR_PIXELS = Object.freeze({ soft: 2, medium: 4, strong: 6 });
+  const PARTICLE_PRESET_DEFAULTS = Object.freeze({
+    snow: Object.freeze({ symbol: "*", color: "#ffffff", density: 40, size: 12, yspeed: 70, spread: 100, distribution: "linear" }),
+    rain: Object.freeze({ symbol: "|", color: "#b7dcff", density: 56, size: 18, yspeed: 190, spread: 100, distribution: "linear" }),
+    petals: Object.freeze({ symbol: "*", color: "#ffd6ea", density: 28, size: 18, yspeed: 58, spread: 100, distribution: "gaussian" }),
+    dust: Object.freeze({ symbol: ".", color: "#c4f6ff", density: 26, size: 8, yspeed: 24, spread: 100, distribution: "gaussian" }),
+    embers: Object.freeze({ symbol: "*", color: "#ffb36b", density: 24, size: 7, yspeed: -46, spread: 100, distribution: "gaussian" }),
+    sparkles: Object.freeze({ symbol: "*", color: "#dff8ff", density: 18, size: 9, yspeed: 16, spread: 100, distribution: "gaussian" }),
+    bubbles: Object.freeze({ symbol: "o", color: "#b6f3ff", density: 20, size: 18, yspeed: -72, spread: 100, distribution: "gaussian" }),
+    confetti: Object.freeze({ symbol: "*", color: "#7fe7ff", density: 34, size: 10, yspeed: 120, spread: 100, distribution: "linear" }),
+    smoke: Object.freeze({ symbol: ".", color: "#aebed4", density: 22, size: 44, yspeed: -24, spread: 72, distribution: "gaussian" }),
+    flame: Object.freeze({ symbol: "*", color: "#ff8b3d", density: 26, size: 24, yspeed: -82, spread: 40, distribution: "gaussian" }),
+    stardust: Object.freeze({ symbol: "*", color: "#8edbff", density: 30, size: 7, yspeed: 8, spread: 100, distribution: "gaussian" }),
+    glyphs: Object.freeze({ symbol: "*", color: "#85d4ff", density: 14, size: 26, yspeed: 0, spread: 34, distribution: "gaussian" }),
+  });
+  const PARTICLE_INTENSITY_MULTIPLIER = Object.freeze({ light: 0.62, medium: 1, heavy: 1.55 });
+  const PARTICLE_SPEED_MULTIPLIER = Object.freeze({ slow: 0.72, medium: 1, fast: 1.35 });
+  const PARTICLE_WIND_SPEED = Object.freeze({ left: -55, still: 0, right: 55 });
 
   function toArray(value) {
     return Array.isArray(value) ? value : [];
@@ -479,6 +494,31 @@
     return ["left", "center", "right", "full"].includes(safeFocus) ? safeFocus : "full";
   }
 
+  function getSafeParticleAction(action) {
+    const safeAction = cleanText(action, "start");
+    return ["start", "stop"].includes(safeAction) ? safeAction : "start";
+  }
+
+  function getSafeParticlePreset(preset) {
+    const safePreset = cleanText(preset, "snow");
+    return Object.hasOwn(PARTICLE_PRESET_DEFAULTS, safePreset) ? safePreset : "snow";
+  }
+
+  function getSafeParticleIntensity(intensity) {
+    const safeIntensity = cleanText(intensity, "medium");
+    return Object.hasOwn(PARTICLE_INTENSITY_MULTIPLIER, safeIntensity) ? safeIntensity : "medium";
+  }
+
+  function getSafeParticleSpeed(speed) {
+    const safeSpeed = cleanText(speed, "medium");
+    return Object.hasOwn(PARTICLE_SPEED_MULTIPLIER, safeSpeed) ? safeSpeed : "medium";
+  }
+
+  function getSafeParticleWind(wind) {
+    const safeWind = cleanText(wind, "still");
+    return Object.hasOwn(PARTICLE_WIND_SPEED, safeWind) ? safeWind : "still";
+  }
+
   function getCameraPanOffset(target, strength, resolution = DEFAULT_PROJECT_RESOLUTION) {
     const safeTarget = getSafeCameraPanTarget(target);
     if (safeTarget === "center") {
@@ -631,6 +671,64 @@
     }
     state.blur = DEPTH_BLUR_PIXELS[strength] ?? DEPTH_BLUR_PIXELS.medium;
     return renderCameraStatement(state);
+  }
+
+  function getSafeParticleNumber(value, fallback, min, max) {
+    const number = Number(value ?? fallback);
+    return clampNumber(Number.isFinite(number) ? number : fallback, min, max);
+  }
+
+  function getParticleCount(block = {}, defaults = {}) {
+    const baseDensity = getSafeParticleNumber(block.density, defaults.density ?? 32, 4, 180);
+    const intensity = PARTICLE_INTENSITY_MULTIPLIER[getSafeParticleIntensity(block.intensity)] ?? 1;
+    return Math.round(clampNumber(baseDensity * intensity, 4, 220));
+  }
+
+  function getParticleSize(block = {}, defaults = {}) {
+    const sizeMin = getSafeParticleNumber(block.sizeMin, defaults.size ?? 10, 1, 160);
+    const sizeMax = getSafeParticleNumber(block.sizeMax, defaults.size ?? 10, 1, 160);
+    return Math.round(clampNumber((Math.min(sizeMin, sizeMax) + Math.max(sizeMin, sizeMax)) / 2, 1, 160));
+  }
+
+  function getSpeedTuple(baseValue, spreadRatio = 0.25) {
+    const spread = Math.max(4, Math.abs(baseValue) * spreadRatio);
+    const first = Number((baseValue - spread).toFixed(1));
+    const second = Number((baseValue + spread).toFixed(1));
+    return [Math.min(first, second), Math.max(first, second)];
+  }
+
+  function renderParticleSpeedTuple(values) {
+    return `(${values.map((value) => formatRenpyFloat(value, 1)).join(", ")})`;
+  }
+
+  function renderParticleBlock(block = {}, context = {}) {
+    if (getSafeParticleAction(block.action) === "stop") {
+      return ["    hide canvasia_particles onlayer overlay"];
+    }
+    const preset = getSafeParticlePreset(block.preset);
+    const defaults = PARTICLE_PRESET_DEFAULTS[preset];
+    const speedMultiplier = PARTICLE_SPEED_MULTIPLIER[getSafeParticleSpeed(block.speed)] ?? 1;
+    const windSpeed = PARTICLE_WIND_SPEED[getSafeParticleWind(block.wind)] ?? 0;
+    const size = getParticleSize(block, defaults);
+    const count = getParticleCount(block, defaults);
+    const baseYSpeed = getSafeParticleNumber(block.gravityY, defaults.yspeed, -220, 320) * speedMultiplier;
+    const spread = getSafeParticleNumber(block.spreadX, defaults.spread, 4, 100);
+    const xSpeed = getSpeedTuple(windSpeed, Math.max(0.18, spread / 400));
+    const ySpeed = getSpeedTuple(baseYSpeed, 0.22);
+    const color = /^#[0-9a-f]{6}$/i.test(cleanText(block.color)) ? cleanText(block.color) : defaults.color;
+    const advancedKeys = ["assetId", "customComboLayers", "comboPreset", "forceField", "follow", "emitterShape", "emissionMode"];
+    const needsReview = advancedKeys.some((key) => {
+      if (key === "customComboLayers") {
+        return toArray(block[key]).length > 0;
+      }
+      return cleanText(block[key]) && !["none", "line", "continuous"].includes(cleanText(block[key]));
+    });
+    if (needsReview) {
+      pushWarning(context.warnings ?? [], "renpy_particle_advanced_review", "粒子已按 SnowBlossom 基础层导出；自定义贴图、叠层、力场、跟随目标等高级参数需要在 Ren'Py 中复核。", getWarningContext(context));
+    }
+    return [
+      `    show expression SnowBlossom(Text(${quoteRenpy(defaults.symbol)}, color=${quoteRenpy(color)}, size=${size}), count=${count}, border=80, xspeed=${renderParticleSpeedTuple(xSpeed)}, yspeed=${renderParticleSpeedTuple(ySpeed)}, start=0.04, fast=True, distribution=${quoteRenpy(defaults.distribution)}, animation=True) as canvasia_particles onlayer overlay`,
+    ];
   }
 
   function getCharacterTransitionExpression(block = {}, context = {}, direction = "show") {
@@ -1006,6 +1104,9 @@
     }
     if (type === "depth_blur") {
       return renderDepthBlurBlock(block, context);
+    }
+    if (type === "particle_effect") {
+      return renderParticleBlock(block, context);
     }
     if (type === "dialogue") {
       const characterId = cleanText(block.speakerId);

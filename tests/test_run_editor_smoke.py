@@ -716,6 +716,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                     "textSpeed": "fast",
                 },
                 {"id": "sfx", "type": "sfx_play", "assetId": sfx_asset["id"], "volume": 65},
+                {"id": "particles", "type": "particle_effect", "action": "start", "preset": "snow", "intensity": "medium", "speed": "medium", "wind": "still", "area": "full"},
                 {"id": "var", "type": "variable_add", "variableId": "affection", "value": 1},
                 {
                     "id": "condition",
@@ -753,6 +754,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                     "grade": {"brightness": 112, "contrast": 120, "saturation": 85, "hue": 12, "temperature": 25, "vignette": 0},
                 },
                 {"id": "blur", "type": "depth_blur", "action": "apply", "focus": "full", "strength": "strong"},
+                {"id": "particles_stop", "type": "particle_effect", "action": "stop"},
                 {
                     "id": "video",
                     "type": "video_play",
@@ -821,6 +823,9 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertIn('heroine "{cps=72}Welcome back.{/cps}"', script)
         self.assertIn('play sound "assets/sfx/', script)
         self.assertIn("volume 0.65", script)
+        self.assertIn('show expression SnowBlossom(Text("*", color="#ffffff", size=12), count=40', script)
+        self.assertIn("as canvasia_particles onlayer overlay", script)
+        self.assertIn("hide canvasia_particles onlayer overlay", script)
         self.assertIn("$ affection += 1", script)
         self.assertIn("if affection >= 1:", script)
         self.assertIn(f"jump {scene['id']}", script)
@@ -846,6 +851,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue(any(warning["code"] == "renpy_music_scope_review" for warning in renpy_manifest["warnings"]))
         self.assertTrue(any(warning["code"] == "renpy_video_timing_review" for warning in renpy_manifest["warnings"]))
         self.assertFalse(any(warning["code"] == "renpy_review_block" and warning.get("message", "").startswith(("screen_filter", "depth_blur")) for warning in renpy_manifest["warnings"]))
+        self.assertFalse(any(warning["code"] == "renpy_review_block" and warning.get("message", "").startswith("particle_effect") for warning in renpy_manifest["warnings"]))
         quality_report = json.loads(Path(export_result["renpyQualityReportPath"]).read_text(encoding="utf-8"))
         self.assertEqual(quality_report["status"], "review")
         self.assertEqual(quality_report["summary"]["missingAssetReferenceCount"], 0)
