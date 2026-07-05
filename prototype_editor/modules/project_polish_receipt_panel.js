@@ -61,6 +61,8 @@
     const renderAction =
       typeof helpers.renderQuickActionButton === "function" ? helpers.renderQuickActionButton : renderFallbackQuickActionButton;
     const scenePlans = Array.isArray(receipt.scenePlans) ? receipt.scenePlans : [];
+    const projectOperationCount = Math.max(0, Number(receipt.projectOperationCount) || 0);
+    const projectOperations = Array.isArray(receipt.projectOperations) ? receipt.projectOperations.slice(0, 4) : [];
     const visibleScenes = scenePlans.slice(0, 4);
     const hiddenSceneCount = Math.max(0, scenePlans.length - visibleScenes.length);
     const nextActions = Array.isArray(receipt.nextActions)
@@ -91,6 +93,25 @@
           </article>
         `
         : "";
+    const projectOperationMarkup = projectOperations.length
+      ? projectOperations
+          .map(
+            (operation) => `
+              <article class="project-doctor-receipt-item project-one-click-polish-scene">
+                <strong>${html(operation.label || operation.field || "项目设置")}</strong>
+                <span>${html(operation.detail || "已补齐一项发布前安全默认值。")}</span>
+              </article>
+            `
+          )
+          .join("")
+      : projectOperationCount > 0
+        ? `
+          <article class="project-doctor-receipt-item project-one-click-polish-scene">
+            <strong>项目级设置 ${projectOperationCount} 项</strong>
+            <span>导出完整回执可以看到全部项目级补全明细。</span>
+          </article>
+        `
+        : '<div class="empty-note">这次没有项目级设置补全。</div>';
 
     return `
       <section class="panel project-one-click-polish-receipt-panel">
@@ -110,9 +131,10 @@
           }</p>
           <div class="preview-sprint-metrics">
             ${renderMetric("涉及场景", `${receipt.changedSceneCount ?? scenePlans.length} 个`, "本次自动整理范围")}
-            ${renderMetric("总处理项", `${receipt.totalOperationCount ?? 0} 项`, "长文本 / 演出 / 音频")}
+            ${renderMetric("总处理项", `${receipt.totalOperationCount ?? 0} 项`, "长文本 / 演出 / 音频 / 设置")}
             ${renderMetric("长文本", `${receipt.readableSplitCount ?? 0} 处`, `新增 ${receipt.readableAddedBlockCount ?? 0} 张卡片`)}
             ${renderMetric("演出与音频", `${receipt.presentationChangedFieldCount ?? 0} / ${receipt.audioOperationCount ?? 0}`, "演出参数 / 音频参数")}
+            ${renderMetric("项目设置", `${projectOperationCount} 项`, "存档 / 文本框 / UI")}
           </div>
           <div class="preview-sprint-actions project-one-click-polish-actions">
             ${nextActions.map((action, index) => renderAction(action, index === 0)).join("")}
@@ -126,6 +148,12 @@
               <div class="project-doctor-receipt-list">
                 ${sceneListMarkup}
                 ${overflowMarkup}
+              </div>
+            </div>
+            <div>
+              <strong class="project-doctor-receipt-heading">项目级补全</strong>
+              <div class="project-doctor-receipt-list">
+                ${projectOperationMarkup}
               </div>
             </div>
             <div>

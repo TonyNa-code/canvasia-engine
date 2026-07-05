@@ -42657,7 +42657,13 @@ async function runProjectOneClickPolish() {
       statusMessage: "正在保存发布前整理安全检查点...",
     });
     safetySnapshotLabel = checkpoint.currentLabel;
-    setSaveStatus(`安全检查点已保存，正在整理 ${polishPlan.changedSceneCount} 个场景...`);
+    const projectPatch =
+      polishPlan.projectPatch && typeof polishPlan.projectPatch === "object" ? polishPlan.projectPatch : {};
+    const hasProjectPatch = Object.keys(projectPatch).length > 0;
+    const projectOperationCount = Math.max(0, Number(polishPlan.projectOperationCount) || 0);
+    const scenePart = polishPlan.changedSceneCount > 0 ? `${polishPlan.changedSceneCount} 个场景` : "";
+    const projectPart = projectOperationCount > 0 ? `${projectOperationCount} 项项目设置` : "";
+    setSaveStatus(`安全检查点已保存，正在整理 ${[scenePart, projectPart].filter(Boolean).join("和")}...`);
 
     for (const scenePlan of polishPlan.scenePlans) {
       const success = await persistScene(scenePlan.scene, {
@@ -42670,6 +42676,16 @@ async function runProjectOneClickPolish() {
       });
       if (!success) {
         return false;
+      }
+    }
+
+    if (hasProjectPatch) {
+      setSaveStatus("正在保存项目级基础体验设置...");
+      await postJson(API_SAVE_PROJECT_SETTINGS, projectPatch);
+      state.lastExportResult = null;
+      if (projectPatch.dialogBoxConfig) {
+        state.previewPlayback.dialogTheme = "project";
+        persistPreviewPlaybackSettings();
       }
     }
 

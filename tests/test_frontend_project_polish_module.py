@@ -13,6 +13,8 @@ MODULE_PATHS = [
     EDITOR_DIR / "modules" / "script_readability.js",
     EDITOR_DIR / "modules" / "scene_polish.js",
     EDITOR_DIR / "modules" / "audio_cue_sheet.js",
+    EDITOR_DIR / "modules" / "project_settings.js",
+    EDITOR_DIR / "modules" / "dialog_box_readability.js",
     EDITOR_DIR / "modules" / "project_polish.js",
 ]
 
@@ -32,6 +34,23 @@ class FrontendProjectPolishModuleTests(unittest.TestCase):
             const tools = context.window.CanvasiaEditorProjectPolish;
             const longLine = "第一句很短。第二句继续铺垫。第三句把情绪推上去。第四句暂时收束。".repeat(10);
             const data = {{
+              project: {{
+                runtimeSettings: {{ formalSaveSlotCount: 6 }},
+                dialogBoxConfig: {{
+                  backgroundOpacity: 12,
+                  backgroundColor: "#ffffff",
+                  textColor: "#f8fbff",
+                  speakerColor: "#f8fbff",
+                  widthPercent: 60,
+                  minHeight: 96,
+                  paddingX: 8,
+                  paddingY: 6,
+                }},
+                gameUiConfig: {{ preset: "stellar" }},
+              }},
+              assetList: [
+                {{ id: "font_main", type: "font", name: "主字体", fileExists: true }},
+              ],
               chapters: [
                 {{ id: "chapter_1", name: "第一章", sceneOrder: ["scene_intro", "scene_clean"] }},
               ],
@@ -104,6 +123,7 @@ class FrontendProjectPolishModuleTests(unittest.TestCase):
             const splitBlocks = changedScene.blocks.filter((block) => block.type === "dialogue");
             const addedSplitBlock = splitBlocks.find((block) => block.id !== "line_long");
             const backgroundBlock = changedScene.blocks.find((block) => block.id === "bg_room");
+            const projectPatch = plan.projectPatch;
             process.stdout.write(JSON.stringify({{
               keys: Object.keys(tools).sort(),
               plan: {{
@@ -129,6 +149,15 @@ class FrontendProjectPolishModuleTests(unittest.TestCase):
                 musicFadeOutMs: musicBlock?.fadeOutMs,
                 musicVolume: musicBlock?.volume,
                 musicEndBlockId: musicBlock?.endBlockId,
+                projectOperationCount: plan.projectOperationCount,
+                runtimeSettingOperationCount: plan.runtimeSettingOperationCount,
+                dialogBoxOperationCount: plan.dialogBoxOperationCount,
+                gameUiOperationCount: plan.gameUiOperationCount,
+                projectOperationLabels: plan.projectOperations.map((operation) => operation.label),
+                projectPatchSaveSlots: projectPatch.runtimeSettings?.formalSaveSlotCount,
+                projectPatchDialogPreset: projectPatch.dialogBoxConfig?.preset,
+                projectPatchDialogOpacity: projectPatch.dialogBoxConfig?.backgroundOpacity,
+                projectPatchGameUiFontAssetId: projectPatch.gameUiConfig?.fontAssetId,
               }},
               digest: {{
                 canApply: digest.canApply,
@@ -154,6 +183,8 @@ class FrontendProjectPolishModuleTests(unittest.TestCase):
                 safetySnapshotLabel: receipt.safetySnapshotLabel,
                 changedSceneCount: receipt.changedSceneCount,
                 totalOperationCount: receipt.totalOperationCount,
+                projectOperationCount: receipt.projectOperationCount,
+                projectOperationLabels: receipt.projectOperations.map((operation) => operation.label),
                 sceneNames: receipt.scenePlans.map((scenePlan) => scenePlan.sceneName),
                 nextActionCount: receipt.nextActions.length,
                 nextActionLabels: receipt.nextActions.map((action) => action.label),
@@ -208,9 +239,16 @@ class FrontendProjectPolishModuleTests(unittest.TestCase):
         self.assertGreater(payload["plan"]["musicFadeOutMs"], 0)
         self.assertGreater(payload["plan"]["musicVolume"], 0)
         self.assertNotEqual(payload["plan"]["musicEndBlockId"], "missing_block")
+        self.assertGreater(payload["plan"]["projectOperationCount"], 0)
+        self.assertGreater(payload["plan"]["dialogBoxOperationCount"], 0)
+        self.assertGreater(payload["plan"]["gameUiOperationCount"], 0)
+        self.assertIn("绑定项目字体素材", payload["plan"]["projectOperationLabels"])
+        self.assertEqual(payload["plan"]["projectPatchDialogPreset"], "custom")
+        self.assertGreaterEqual(payload["plan"]["projectPatchDialogOpacity"], 72)
+        self.assertEqual(payload["plan"]["projectPatchGameUiFontAssetId"], "font_main")
         self.assertTrue(payload["digest"]["canApply"])
         self.assertIn("一键发布前整理", payload["digest"]["actionLabel"])
-        self.assertIn("1 个场景可整理", payload["digest"]["badgeLabel"])
+        self.assertIn("1 个场景", payload["digest"]["badgeLabel"])
         self.assertIn("开场", payload["digest"]["helperText"])
         self.assertFalse(payload["cleanPlan"]["changed"])
         self.assertEqual(payload["cleanPlan"]["summary"], "项目基础内容已经比较适合发布前检查")
@@ -224,27 +262,131 @@ class FrontendProjectPolishModuleTests(unittest.TestCase):
         self.assertEqual(payload["receipt"]["safetySnapshotLabel"], "发布前整理前自动检查点")
         self.assertEqual(payload["receipt"]["changedSceneCount"], 1)
         self.assertGreater(payload["receipt"]["totalOperationCount"], 0)
+        self.assertGreater(payload["receipt"]["projectOperationCount"], 0)
+        self.assertIn("绑定项目字体素材", payload["receipt"]["projectOperationLabels"])
         self.assertEqual(payload["receipt"]["sceneNames"], ["开场"])
         self.assertGreaterEqual(payload["receipt"]["nextActionCount"], 3)
         self.assertIn("重新巡检确认", payload["receipt"]["nextActionLabels"])
+        self.assertIn("复看项目设置", payload["receipt"]["nextActionLabels"])
         self.assertIn("run-project-inspection", payload["receipt"]["nextActionActions"])
         self.assertIn("export-project-one-click-polish-receipt", payload["receipt"]["nextActionActions"])
+        self.assertIn("project", payload["receipt"]["nextActionScreens"])
         self.assertIn("preview", payload["receipt"]["nextActionScreens"])
         self.assertEqual(payload["receiptFileName"], "demo-project-polish-20260510100000.md")
         self.assertIn("# 发布前整理回执", payload["receiptMarkdown"])
         self.assertIn("| 回执编号 | polish-20260510100000 |", payload["receiptMarkdown"])
         self.assertIn("| 安全检查点 | 发布前整理前自动检查点 |", payload["receiptMarkdown"])
         self.assertIn("| 开场 | scene_intro |", payload["receiptMarkdown"])
+        self.assertIn("## 项目级补全", payload["receiptMarkdown"])
+        self.assertIn("绑定项目字体素材", payload["receiptMarkdown"])
         self.assertIn("重新巡检确认", payload["receiptMarkdown"])
         self.assertIn("导出整理回执", payload["receiptMarkdown"])
         self.assertIn("发布前整理回执：", payload["receiptClipboard"])
         self.assertIn("回执编号：polish-20260510100000", payload["receiptClipboard"])
         self.assertIn("安全检查点：发布前整理前自动检查点", payload["receiptClipboard"])
+        self.assertIn("项目级补全：", payload["receiptClipboard"])
         self.assertIn("下一步：重新巡检确认", payload["receiptClipboard"])
         self.assertEqual(payload["sourceStillUntouched"]["originalBlockCount"], 4)
         self.assertEqual(payload["sourceStillUntouched"]["originalFadeInMs"], 0)
         self.assertEqual(payload["sourceStillUntouched"]["originalEndBlockId"], "missing_block")
         self.assertEqual(payload["sourceStillUntouched"]["originalVoiceAssetId"], "voice_001")
+
+    def test_project_settings_polish_plan_is_merged_into_one_click_polish(self) -> None:
+        script = textwrap.dedent(
+            f"""
+            const fs = require("fs");
+            const vm = require("vm");
+            const context = {{ window: {{}} }};
+            context.globalThis = context;
+            vm.createContext(context);
+            for (const modulePath of {json.dumps([str(path) for path in MODULE_PATHS])}) {{
+              vm.runInContext(fs.readFileSync(modulePath, "utf8"), context);
+            }}
+            const tools = context.window.CanvasiaEditorProjectPolish;
+            const data = {{
+              project: {{
+                title: "Settings Only",
+                runtimeSettings: {{ formalSaveSlotCount: 4 }},
+                dialogBoxConfig: {{
+                  backgroundOpacity: 0,
+                  backgroundColor: "#ffffff",
+                  textColor: "#ffffff",
+                  speakerColor: "#ffffff",
+                  widthPercent: 55,
+                  minHeight: 96,
+                  paddingX: 8,
+                  paddingY: 6,
+                }},
+                gameUiConfig: {{ preset: "stellar" }},
+              }},
+              assetList: [
+                {{ id: "font_story", type: "font", name: "正文", fileExists: true }},
+              ],
+              scenes: Array.from({{ length: 6 }}, (_, index) => ({{
+                id: `scene_${{index + 1}}`,
+                name: `场景 ${{index + 1}}`,
+                blocks: [
+                  {{ id: `bg_${{index + 1}}`, type: "background", transition: "fade", transitionDurationMs: 700 }},
+                  {{ id: `line_${{index + 1}}`, type: "dialogue", text: "这是一句用于检查文本框可读性的台词。" }},
+                  {{ id: `music_${{index + 1}}`, type: "music_play", fadeInMs: 800, fadeOutMs: 800, volume: 80, loop: true, endMode: "until_next_music" }},
+                ],
+              }})),
+            }};
+            const settingsPlan = tools.buildProjectSettingsPolishPlan(data);
+            const oneClickPlan = tools.buildProjectOneClickPolishPlan(data);
+            process.stdout.write(JSON.stringify({{
+              keys: Object.keys(tools).sort(),
+              settingsPlan: {{
+                changed: settingsPlan.changed,
+                operationCount: settingsPlan.operationCount,
+                labels: settingsPlan.operations.map((operation) => operation.label),
+                saveSlots: settingsPlan.projectPatch.runtimeSettings?.formalSaveSlotCount,
+                dialogPreset: settingsPlan.projectPatch.dialogBoxConfig?.preset,
+                dialogOpacity: settingsPlan.projectPatch.dialogBoxConfig?.backgroundOpacity,
+                fontAssetId: settingsPlan.projectPatch.gameUiConfig?.fontAssetId,
+              }},
+              oneClickPlan: {{
+                changed: oneClickPlan.changed,
+                changedSceneCount: oneClickPlan.changedSceneCount,
+                projectOperationCount: oneClickPlan.projectOperationCount,
+                totalOperationCount: oneClickPlan.totalOperationCount,
+                summary: oneClickPlan.summary,
+              }},
+              sourceStillUntouched: {{
+                saveSlots: data.project.runtimeSettings.formalSaveSlotCount,
+                dialogOpacity: data.project.dialogBoxConfig.backgroundOpacity,
+                fontAssetId: data.project.gameUiConfig.fontAssetId || "",
+              }},
+            }}));
+            """
+        )
+        completed = subprocess.run(
+            ["node", "-e", script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        self.assertIn("buildProjectSettingsPolishPlan", payload["keys"])
+        self.assertTrue(payload["settingsPlan"]["changed"])
+        self.assertGreaterEqual(payload["settingsPlan"]["operationCount"], 4)
+        self.assertIn("提高正式存档位数量", payload["settingsPlan"]["labels"])
+        self.assertIn("绑定项目字体素材", payload["settingsPlan"]["labels"])
+        self.assertEqual(payload["settingsPlan"]["saveSlots"], 24)
+        self.assertEqual(payload["settingsPlan"]["dialogPreset"], "custom")
+        self.assertGreaterEqual(payload["settingsPlan"]["dialogOpacity"], 72)
+        self.assertEqual(payload["settingsPlan"]["fontAssetId"], "font_story")
+        self.assertTrue(payload["oneClickPlan"]["changed"])
+        self.assertGreaterEqual(payload["oneClickPlan"]["changedSceneCount"], 0)
+        self.assertGreater(payload["oneClickPlan"]["projectOperationCount"], 0)
+        self.assertGreaterEqual(payload["oneClickPlan"]["totalOperationCount"], payload["oneClickPlan"]["projectOperationCount"])
+        self.assertIn("项目体验设置", payload["oneClickPlan"]["summary"])
+        self.assertEqual(payload["sourceStillUntouched"]["saveSlots"], 4)
+        self.assertEqual(payload["sourceStillUntouched"]["dialogOpacity"], 0)
+        self.assertEqual(payload["sourceStillUntouched"]["fontAssetId"], "")
 
 
 if __name__ == "__main__":

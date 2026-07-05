@@ -2199,9 +2199,11 @@ class FrontendActionHandlerTests(unittest.TestCase):
         script = textwrap.dedent(
             f"""
             const API_CREATE_PROJECT_HISTORY_SNAPSHOT = "/api/create-project-history-snapshot";
+            const API_SAVE_PROJECT_SETTINGS = "/api/save-project-settings";
             const calls = [];
             const state = {{
               data: {{ project: {{ title: "Demo" }} }},
+              previewPlayback: {{ dialogTheme: "warm" }},
               currentScreen: "dashboard",
               projectHistory: null,
               projectOneClickPolishInFlight: false,
@@ -2230,6 +2232,11 @@ class FrontendActionHandlerTests(unittest.TestCase):
                   firstChangedSceneId: "scene_intro",
                   firstChangedBlockId: "line_1",
                   firstChangedIndex: 2,
+                  projectOperationCount: 2,
+                  projectPatch: {{
+                    runtimeSettings: {{ formalSaveSlotCount: 24 }},
+                    dialogBoxConfig: {{ preset: "custom", backgroundOpacity: 86 }},
+                  }},
                   summary: "发布前整理完成：补齐 3 项",
                 }};
               }},
@@ -2248,6 +2255,9 @@ class FrontendActionHandlerTests(unittest.TestCase):
             function showToast(message, tone) {{
               calls.push(["toast", message, tone || ""]);
             }}
+            function persistPreviewPlaybackSettings() {{
+              calls.push(["preview-playback", state.previewPlayback.dialogTheme]);
+            }}
             function getSafeProjectHistory(history) {{
               return {{ currentSnapshot: {{ label: "发布前整理前自动检查点" }} }};
             }}
@@ -2261,8 +2271,16 @@ class FrontendActionHandlerTests(unittest.TestCase):
               calls.push(["history-panel"]);
             }}
             async function postJson(url, payload) {{
-              calls.push(["checkpoint", url, payload.label]);
-              return {{ history: {{ currentSnapshot: {{ label: payload.label }} }} }};
+              if (url === API_CREATE_PROJECT_HISTORY_SNAPSHOT) {{
+                calls.push(["checkpoint", url, payload.label]);
+                return {{ history: {{ currentSnapshot: {{ label: payload.label }} }} }};
+              }}
+              if (url === API_SAVE_PROJECT_SETTINGS) {{
+                calls.push(["settings", url, payload.runtimeSettings?.formalSaveSlotCount, payload.dialogBoxConfig?.backgroundOpacity]);
+                return {{ project: {{ title: "Demo Saved" }} }};
+              }}
+              calls.push(["post", url]);
+              return {{}};
             }}
             async function persistScene(scene, options) {{
               calls.push(["persist", scene.id, options.selectedBlockId, options.previewBlockIndex]);
@@ -2306,12 +2324,15 @@ class FrontendActionHandlerTests(unittest.TestCase):
 
         self.assertTrue(payload["result"])
         self.assertLess(call_names.index("checkpoint"), call_names.index("persist"))
-        self.assertLess(call_names.index("persist"), call_names.index("reload"))
+        self.assertLess(call_names.index("persist"), call_names.index("settings"))
+        self.assertLess(call_names.index("settings"), call_names.index("reload"))
         self.assertLess(call_names.index("reload"), call_names.index("receipt"))
         self.assertLess(call_names.index("receipt"), call_names.index("render-dashboard"))
         self.assertEqual(calls[call_names.index("checkpoint")][1], "/api/create-project-history-snapshot")
         self.assertEqual(calls[call_names.index("checkpoint")][2], "发布前整理前自动检查点")
         self.assertIn(["persist", "scene_intro", "line_1", 2], calls)
+        self.assertIn(["settings", "/api/save-project-settings", 24, 86], calls)
+        self.assertIn(["preview-playback", "project"], calls)
         self.assertIn(["reload", "scene_intro", "line_1", 2], calls)
         self.assertIn(["receipt", "发布前整理前自动检查点", "Demo Reloaded"], calls)
         self.assertIn(["render-dashboard", "polish-demo"], calls)
