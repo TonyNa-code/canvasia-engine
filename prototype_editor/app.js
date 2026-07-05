@@ -908,6 +908,7 @@ const state = {
   storyBlockDrag: null,
   starterVariablesPromise: null,
   projectCenterRefreshInFlight: false,
+  projectPresentationPolishInFlight: false,
   projectCreateInFlight: false,
   projectOpenInFlightId: "",
   projectRenameInFlightId: "",
@@ -4779,6 +4780,11 @@ async function handleClick(event) {
 
   if (action === "polish-scene-presentation") {
     void polishSelectedScenePresentation();
+    return;
+  }
+
+  if (action === "polish-project-presentation") {
+    void polishProjectPresentation();
     return;
   }
 
@@ -10558,9 +10564,35 @@ function renderDashboardPrimaryActions(isBlankProject) {
     `;
   }
 
+  const projectPolishDigest =
+    typeof scenePolishTools !== "undefined" && typeof scenePolishTools?.getProjectPresentationPolishDigest === "function"
+      ? scenePolishTools.getProjectPresentationPolishDigest(state.data)
+      : null;
+  const projectPolishDisabled =
+    state.projectPresentationPolishInFlight || (projectPolishDigest ? !projectPolishDigest.canApply : false);
+  const projectPolishLabel = state.projectPresentationPolishInFlight
+    ? "全项目润色中..."
+    : projectPolishDigest?.actionLabel ?? "润色全项目演出";
+  const safeEscapeHtml =
+    typeof escapeHtml === "function"
+      ? escapeHtml
+      : (value) =>
+          String(value ?? "").replace(/[&<>"']/g, (char) => {
+            const entities = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+            return entities[char] ?? char;
+          });
+
   return `
     <button class="toolbar-button toolbar-button-primary" data-action="switch-screen" data-screen="story">
       进入剧情编辑
+    </button>
+    <button
+      class="toolbar-button"
+      data-action="polish-project-presentation"
+      ${projectPolishDisabled ? 'disabled aria-disabled="true"' : ""}
+      title="${safeEscapeHtml(projectPolishDigest?.helperText ?? "批量补齐全项目基础转场、淡入淡出、音量和文字速度。")}"
+    >
+      ${safeEscapeHtml(projectPolishLabel)}
     </button>
     <button class="toolbar-button" data-action="switch-screen" data-screen="preview">
       查看试玩页
@@ -10621,6 +10653,20 @@ function setProjectCenterRefreshInFlight(isInFlight) {
     isBusy: state.projectCenterRefreshInFlight,
     busyLabel: "刷新中...",
     idleLabelKey: "projectCenterRefreshIdleLabel",
+  });
+}
+
+function setProjectPresentationPolishInFlight(isInFlight) {
+  state.projectPresentationPolishInFlight = Boolean(isInFlight);
+  if (!state.projectPresentationPolishInFlight && state.currentScreen === "dashboard") {
+    renderDashboard();
+    return;
+  }
+  setActionButtonBusyState({
+    selector: '[data-action="polish-project-presentation"]',
+    isBusy: state.projectPresentationPolishInFlight,
+    busyLabel: "全项目润色中...",
+    idleLabelKey: "projectPresentationPolishIdleLabel",
   });
 }
 
@@ -41602,6 +41648,52 @@ async function polishSelectedScenePresentation() {
   }
 
   return success;
+}
+
+async function polishProjectPresentation() {
+  if (state.projectPresentationPolishInFlight) {
+    showToast("全项目演出润色正在进行中，请稍等");
+    return false;
+  }
+
+  const polishPlan = scenePolishTools.buildProjectPresentationPolishPlan(state.data);
+  if (!polishPlan.changed) {
+    setSaveStatus("全项目基础演出参数已经比较完整");
+    showToast("全项目基础演出参数已经比较完整");
+    return false;
+  }
+
+  setProjectPresentationPolishInFlight(true);
+  setSaveStatus(`正在润色 ${polishPlan.changedSceneCount} 个场景...`);
+
+  try {
+    for (const scenePlan of polishPlan.scenePlans) {
+      const success = await persistScene(scenePlan.scene, {
+        reloadAfterSave: false,
+        selectedSceneId: scenePlan.sceneId,
+        selectedBlockId: scenePlan.firstChangedBlockId,
+        previewSceneId: scenePlan.sceneId,
+        previewBlockIndex: Math.max(scenePlan.firstChangedIndex, 0),
+        successMessage: `已润色：${scenePlan.sceneName}`,
+      });
+      if (!success) {
+        return false;
+      }
+    }
+
+    await reloadProjectData({
+      ...getCurrentUiState(),
+      selectedSceneId: polishPlan.firstChangedSceneId || state.selectedSceneId,
+      selectedBlockId: polishPlan.firstChangedBlockId || state.selectedBlockId,
+      previewSceneId: polishPlan.firstChangedSceneId || state.previewSceneId,
+      previewBlockIndex: Math.max(polishPlan.firstChangedIndex, 0),
+    });
+    setSaveStatus(polishPlan.summary);
+    showToast(polishPlan.summary);
+    return true;
+  } finally {
+    setProjectPresentationPolishInFlight(false);
+  }
 }
 
 function readScreenColorGradeControls() {

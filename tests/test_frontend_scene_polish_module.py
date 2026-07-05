@@ -44,6 +44,26 @@ class FrontendScenePolishModuleTests(unittest.TestCase):
             const cleanPlan = tools.buildScenePresentationPolishPlan(cleanScene);
             const digest = tools.getScenePresentationPolishDigest(scene, {{ tagLimit: 3 }});
             const cleanDigest = tools.getScenePresentationPolishDigest(cleanScene);
+            const projectData = {{
+              chapters: [
+                {{ chapterId: "ch1", name: "第一章", sceneOrder: ["clean", "scene_a"] }},
+                {{ chapterId: "ch2", name: "第二章", scenes: [
+                  {{ id: "scene_b", name: "雨夜", blocks: [
+                    {{ id: "bg_b", type: "background", assetId: "bg_rain", transitionDurationMs: 0 }},
+                    {{ id: "music_b", type: "music_play", assetId: "bgm_rain", fadeInMs: 0, fadeOutMs: 0 }},
+                  ] }},
+                ] }},
+              ],
+              scenes: [
+                scene,
+                cleanScene,
+                {{ id: "scene_orphan", name: "额外场景", blocks: [
+                  {{ id: "line_orphan", type: "narration", text: "补完后单独检查" }},
+                ] }},
+              ],
+            }};
+            const projectPlan = tools.buildProjectPresentationPolishPlan(projectData);
+            const projectDigest = tools.getProjectPresentationPolishDigest(projectData, {{ sceneNameLimit: 2 }});
             process.stdout.write(JSON.stringify({{
               defaultTransition: tools.DEFAULTS.transition,
               changed: plan.changed,
@@ -69,6 +89,23 @@ class FrontendScenePolishModuleTests(unittest.TestCase):
                 badgeLabel: cleanDigest.badgeLabel,
                 helperText: cleanDigest.helperText,
                 tags: cleanDigest.tags,
+              }},
+              projectSceneIds: tools.getProjectSceneList(projectData).map((item) => item.id),
+              projectPlan: {{
+                changed: projectPlan.changed,
+                changedSceneCount: projectPlan.changedSceneCount,
+                changedBlockCount: projectPlan.changedBlockCount,
+                changedFieldCount: projectPlan.changedFieldCount,
+                firstChangedSceneId: projectPlan.firstChangedSceneId,
+                firstChangedBlockId: projectPlan.firstChangedBlockId,
+                summary: projectPlan.summary,
+                sceneNames: projectPlan.scenePlans.map((item) => item.sceneName),
+              }},
+              projectDigest: {{
+                canApply: projectDigest.canApply,
+                actionLabel: projectDigest.actionLabel,
+                badgeLabel: projectDigest.badgeLabel,
+                helperText: projectDigest.helperText,
               }},
             }}));
             """
@@ -118,6 +155,19 @@ class FrontendScenePolishModuleTests(unittest.TestCase):
         self.assertFalse(payload["cleanDigest"]["canApply"])
         self.assertEqual(payload["cleanDigest"]["actionLabel"], "演出参数已完整")
         self.assertEqual(payload["cleanDigest"]["tags"], ["基础演出已完整"])
+        self.assertEqual(payload["projectSceneIds"], ["clean", "scene_a", "scene_b", "scene_orphan"])
+        self.assertTrue(payload["projectPlan"]["changed"])
+        self.assertEqual(payload["projectPlan"]["changedSceneCount"], 3)
+        self.assertGreaterEqual(payload["projectPlan"]["changedBlockCount"], 4)
+        self.assertGreaterEqual(payload["projectPlan"]["changedFieldCount"], 12)
+        self.assertEqual(payload["projectPlan"]["firstChangedSceneId"], "scene_a")
+        self.assertEqual(payload["projectPlan"]["firstChangedBlockId"], "line_1")
+        self.assertIn("已润色 3 个场景", payload["projectPlan"]["summary"])
+        self.assertEqual(payload["projectPlan"]["sceneNames"], ["scene_a", "雨夜", "额外场景"])
+        self.assertTrue(payload["projectDigest"]["canApply"])
+        self.assertIn("润色全项目", payload["projectDigest"]["actionLabel"])
+        self.assertIn("3 个场景可润色", payload["projectDigest"]["badgeLabel"])
+        self.assertIn("会处理", payload["projectDigest"]["helperText"])
 
 
 if __name__ == "__main__":

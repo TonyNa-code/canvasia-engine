@@ -24,6 +24,41 @@
     return Array.isArray(sceneOrBlocks?.blocks) ? sceneOrBlocks.blocks : [];
   }
 
+  function toArray(value) {
+    return Array.isArray(value) ? value : [];
+  }
+
+  function getMapValue(collection, key) {
+    if (!key || !collection) {
+      return null;
+    }
+    if (typeof collection.get === "function") {
+      return collection.get(key) ?? null;
+    }
+    return collection[key] ?? null;
+  }
+
+  function addSceneToLookup(lookup, scene, fallbackId = "") {
+    const sceneId = cleanText(scene?.id) || cleanText(fallbackId);
+    if (sceneId && !lookup.has(sceneId)) {
+      lookup.set(sceneId, scene);
+    }
+  }
+
+  function buildSceneLookup(data = {}) {
+    const lookup = new Map();
+    if (data.scenesById && typeof data.scenesById.forEach === "function") {
+      data.scenesById.forEach((scene, id) => addSceneToLookup(lookup, scene, id));
+    } else if (data.scenesById && typeof data.scenesById === "object") {
+      Object.entries(data.scenesById).forEach(([id, scene]) => addSceneToLookup(lookup, scene, id));
+    }
+    toArray(data.scenes).forEach((scene) => addSceneToLookup(lookup, scene));
+    toArray(data.chapters).forEach((chapter) => {
+      toArray(chapter.scenes).forEach((scene) => addSceneToLookup(lookup, scene));
+    });
+    return lookup;
+  }
+
   function cleanText(value) {
     return String(value ?? "").trim();
   }
@@ -174,10 +209,105 @@
     };
   }
 
+  function getProjectSceneList(data = {}) {
+    const sceneLookup = buildSceneLookup(data);
+    const scenes = [];
+    const seen = new Set();
+    const pushScene = (scene, chapter = {}) => {
+      const sceneId = cleanText(scene?.id);
+      if (!sceneId || seen.has(sceneId)) {
+        return;
+      }
+      seen.add(sceneId);
+      scenes.push({
+        ...(scene ?? {}),
+        id: sceneId,
+        chapterId: cleanText(scene?.chapterId) || cleanText(chapter.chapterId),
+        chapterName: cleanText(scene?.chapterName) || cleanText(chapter.name),
+      });
+    };
+
+    toArray(data.chapters).forEach((chapter) => {
+      const sceneIds = toArray(chapter.sceneOrder).map((sceneId) => cleanText(sceneId)).filter(Boolean);
+      if (sceneIds.length) {
+        sceneIds.forEach((sceneId) => pushScene(getMapValue(sceneLookup, sceneId), chapter));
+        return;
+      }
+      toArray(chapter.scenes).forEach((scene) => pushScene(scene, chapter));
+    });
+
+    toArray(data.scenes).forEach((scene) => pushScene(scene));
+    if (data.scenesById && typeof data.scenesById.forEach === "function") {
+      data.scenesById.forEach((scene) => pushScene(scene));
+    }
+
+    return scenes;
+  }
+
+  function buildProjectPresentationPolishSummary(scenePlans = []) {
+    const safePlans = Array.isArray(scenePlans) ? scenePlans : [];
+    const fieldCount = safePlans.reduce((total, plan) => total + (plan.changedFieldCount ?? 0), 0);
+    if (!safePlans.length) {
+      return "全项目基础演出参数已经比较完整";
+    }
+    return `已润色 ${safePlans.length} 个场景，补齐 ${fieldCount} 个演出参数`;
+  }
+
+  function buildProjectPresentationPolishPlan(data = {}, options = {}) {
+    const scenePlans = getProjectSceneList(data)
+      .map((scene) => {
+        const plan = buildScenePresentationPolishPlan(scene, options);
+        return plan.changed
+          ? {
+              ...plan,
+              sceneId: scene.id,
+              sceneName: cleanText(scene.name) || scene.id,
+              chapterId: cleanText(scene.chapterId),
+              chapterName: cleanText(scene.chapterName),
+            }
+          : null;
+      })
+      .filter(Boolean);
+
+    return {
+      changed: scenePlans.length > 0,
+      scenePlans,
+      changedSceneCount: scenePlans.length,
+      changedBlockCount: scenePlans.reduce((total, plan) => total + (plan.changedBlockCount ?? 0), 0),
+      changedFieldCount: scenePlans.reduce((total, plan) => total + (plan.changedFieldCount ?? 0), 0),
+      firstChangedSceneId: scenePlans[0]?.sceneId ?? "",
+      firstChangedBlockId: scenePlans[0]?.firstChangedBlockId ?? "",
+      firstChangedIndex: scenePlans[0]?.firstChangedIndex ?? -1,
+      summary: buildProjectPresentationPolishSummary(scenePlans),
+    };
+  }
+
+  function getProjectPresentationPolishDigest(data = {}, options = {}) {
+    const plan = buildProjectPresentationPolishPlan(data, options);
+    const previewNames = plan.scenePlans
+      .slice(0, Math.max(1, Number(options.sceneNameLimit) || 3))
+      .map((scenePlan) => scenePlan.sceneName)
+      .filter(Boolean);
+
+    return {
+      canApply: plan.changed,
+      actionLabel: plan.changed ? `润色全项目 ${plan.changedFieldCount} 项` : "全项目演出已完整",
+      badgeLabel: plan.changed ? `${plan.changedSceneCount} 个场景可润色` : "无需处理",
+      helperText: plan.changed
+        ? `会处理 ${previewNames.join("、")}${plan.changedSceneCount > previewNames.length ? " 等场景" : ""}。`
+        : "全项目的基础转场、淡入淡出、音量和文字速度已经比较完整。",
+      plan,
+    };
+  }
+
   global.CanvasiaEditorScenePolish = Object.freeze({
     DEFAULTS,
     buildScenePresentationPolishPlan,
     buildScenePresentationPolishSummary,
     getScenePresentationPolishDigest,
+    getProjectSceneList,
+    buildProjectPresentationPolishPlan,
+    buildProjectPresentationPolishSummary,
+    getProjectPresentationPolishDigest,
   });
 })(typeof window !== "undefined" ? window : globalThis);
