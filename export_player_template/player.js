@@ -10,6 +10,10 @@ import {
   stopTrackedAudios,
 } from "./runtime_audio.js";
 import {
+  getRuntimePreloadSummary,
+  startRuntimePreload,
+} from "./runtime_preload.js";
+import {
   DIALOG_THEME_LABELS,
   PLAYBACK_DEFAULTS,
   TEXT_SPEED_LABELS,
@@ -355,6 +359,8 @@ const state = {
   lastLocationArchiveStepKey: null,
   lastNarrationArchiveStepKey: null,
   lastVoiceReplayStepKey: null,
+  runtimePreload: null,
+  runtimePreloadStatus: null,
 };
 
 const activeSfxAudios = new Set();
@@ -1713,12 +1719,26 @@ function init() {
   window.addEventListener("beforeunload", stopVoiceReplayPreview);
   window.addEventListener("beforeunload", stopOneShotAudio);
   window.addEventListener("beforeunload", stopVoicePlayback);
+  startRuntimeAssetPreload();
   renderPlaybackControls();
   scheduleRuntimeUiThemeAutoRefresh();
   renderStartSummary();
   renderBuildInfo();
   renderMissingAssets();
   renderBeforeStart();
+}
+
+function startRuntimeAssetPreload() {
+  state.runtimePreload?.stop?.();
+  state.runtimePreloadStatus = null;
+  state.runtimePreload = startRuntimePreload(data.buildInfo.runtimePreloadManifest, {
+    onProgress: (status) => {
+      state.runtimePreloadStatus = status;
+      renderStartSummary();
+      renderBuildInfo();
+    },
+  });
+  state.runtimePreloadStatus = state.runtimePreload?.getStatus?.() ?? null;
 }
 
 function normalizeGameData(source) {
@@ -1814,6 +1834,34 @@ function collectSceneOutgoingTargets(scene) {
   return Array.from(new Set(targets.filter((target) => typeof target === "string" && target.trim())));
 }
 
+function getRuntimePreloadStatusText() {
+  const summary = getRuntimePreloadSummary(data.buildInfo.runtimePreloadManifest);
+  if (!summary.totalCount) {
+    return "没有需要预热的素材";
+  }
+
+  const status = state.runtimePreloadStatus ?? state.runtimePreload?.getStatus?.() ?? null;
+  const loadedCount = status?.loadedCount ?? 0;
+  const failedCount = status?.failedCount ?? 0;
+  const failureText = failedCount > 0 ? ` · ${failedCount} 个稍后重试` : "";
+  return [
+    `首屏 ${summary.criticalCount} 个`,
+    `全局 ${summary.totalCount} 个`,
+    `图片 ${summary.imageCount}`,
+    `音频 ${summary.audioCount}`,
+    `视频 ${summary.videoCount}`,
+    `已预热 ${loadedCount}/${summary.totalCount}${failureText}`,
+  ].join(" · ");
+}
+
+function getRuntimePreloadMetaText() {
+  const summary = getRuntimePreloadSummary(data.buildInfo.runtimePreloadManifest);
+  if (!summary.totalCount) {
+    return "";
+  }
+  return ` · 预热 ${summary.criticalCount}/${summary.totalCount} 个素材`;
+}
+
 function buildEndingScenePreview(scene) {
   const visualState = createInitialPreviewVisualState();
   const variables = createInitialVariableState();
@@ -1899,6 +1947,7 @@ function buildMetaSummary() {
     voiceReplayEntries.length > 0
       ? ` · 回听 ${state.voiceReplayProgress.size}/${voiceReplayEntries.length} 已收录`
       : "";
+  const preloadSummary = getRuntimePreloadMetaText();
   const characterEntries = getCharacterArchiveEntries();
   const characterSummary =
     characterEntries.length > 0
@@ -1909,7 +1958,7 @@ function buildMetaSummary() {
     endingScenes.length > 0
       ? ` · 结局 ${state.endingProgress.unlocked.size}/${endingScenes.length} 已回收`
       : "";
-  return `${targetLabel}${releaseVersion} · 输出 ${resolution.width} × ${resolution.height}${profileSummary}${achievementSummary}${chapterSummary}${locationSummary}${narrationSummary}${relationSummary}${voiceReplaySummary}${characterSummary}${endingSummary} · 构建时间 ${builtAt} · 已复制 ${copiedAssets} 个素材 · 缺失 ${missingAssets} 个素材`;
+  return `${targetLabel}${releaseVersion} · 输出 ${resolution.width} × ${resolution.height}${profileSummary}${achievementSummary}${chapterSummary}${locationSummary}${narrationSummary}${relationSummary}${voiceReplaySummary}${preloadSummary}${characterSummary}${endingSummary} · 构建时间 ${builtAt} · 已复制 ${copiedAssets} 个素材 · 缺失 ${missingAssets} 个素材`;
 }
 
 function renderStartSummary() {
@@ -1983,6 +2032,7 @@ function renderStartSummary() {
     ],
     ["CG 回想", galleryAssets.length > 0 ? `已解锁 ${state.extraUnlocks.cg.size} / ${galleryAssets.length}` : "当前没有 CG 条目"],
     ["音乐鉴赏", musicAssets.length > 0 ? `已解锁 ${state.extraUnlocks.bgm.size} / ${musicAssets.length}` : "当前没有 BGM 条目"],
+    ["资源预热", getRuntimePreloadStatusText()],
     ["素材状态", `已复制 ${data.buildInfo.copiedAssets ?? 0} 个 / 缺失 ${data.buildInfo.missingAssets?.length ?? 0} 个`],
   ]
     .map(
@@ -2095,6 +2145,7 @@ function renderBuildInfo() {
     ],
     ["CG 回想", galleryAssets.length > 0 ? `${state.extraUnlocks.cg.size} / ${galleryAssets.length} 已解锁` : "未设置"],
     ["音乐鉴赏", musicAssets.length > 0 ? `${state.extraUnlocks.bgm.size} / ${musicAssets.length} 已解锁` : "未设置"],
+    ["资源预热", getRuntimePreloadStatusText()],
     ["导出时间", formatDate(data.buildInfo.builtAt)],
     ["已复制素材", `${data.buildInfo.copiedAssets ?? 0} 个`],
   ]

@@ -69,7 +69,7 @@ Canvasia Engine は、ビジュアルノベル / Galgame 制作者のための s
 - CG 回想、音楽鑑賞、キャラクター図鑑、場所図鑑、ナレーション図鑑、関係図鑑、実績、章回想、エンディング回想、ボイス回想。CG、BGM、ボイス、図鑑、章、エンディング、実績の抜けを確認できる Unlockable Content manifest / CSV も出力可能
 - 高度なパーティクルプリセット、プロジェクト単位のパーティクルライブラリ、カメラ演出、フィルター、フラッシュ、画面揺れ、フェード
 - Live2D / 3D キャラクターと 3D シーン素材のインポート、ネイティブ Runtime での glTF / GLB / VRM 構造レポート
-- Web 試遊パッケージ、デスクトップ書き出し、エディタデスクトップビルド、ネイティブ Runtime preview パッケージ
+- Web 試遊パッケージ、デスクトップ書き出し、エディタデスクトップビルド、ネイティブ Runtime preview パッケージ。Web / desktop Runtime は preload manifest により、最初のシーンと序盤ルートの素材を優先的に準備します。
 - ローカル CI precheck、backend smoke、Playwright browser smoke、ボタン配線チェック、Ren'Py draft export test、条件 / fallback 変数プリセット付き分岐対応 preview regression、release-control report、production backlog queue、Runtime capability matrix と export acceptance checklist、pacing-aware one-click recipe suggestion 付き scene production board、voice production sheet、choice consequence audit、variable influence audit、asset dependency audit、unlockable-content audit、BGM cue sheet audit、character stage-direction audit、presentation timeline audit、テスター引き継ぎワークオーダー、プレイテストフィードバックテンプレートと取り込みサマリー、VN baseline quality audit、ファイル整合性検証
 
 ## 機能ステータス
@@ -112,6 +112,7 @@ Canvasia Engine は、ビジュアルノベル / Galgame 制作者のための s
 - [`export_release_readiness.py`](export_release_readiness.py): 書き出しパッケージ向け release-readiness summary / tester handoff gate 生成器
 - [`export_story_route_map.py`](export_story_route_map.py): 書き出しパッケージ向け story route map / broken-link / unreachable-scene report 生成器
 - [`export_unlockable_manifest.py`](export_unlockable_manifest.py): 書き出し側の unlockable / gallery / replay カバレッジ manifest 生成器
+- [`export_runtime_preload.py`](export_runtime_preload.py): 書き出し Runtime 向け preload manifest / performance report 生成器
 - [`renpy_export.py`](renpy_export.py): Ren'Py Starter Bundle / `.rpy` migration export 生成器
 - [`prototype_editor`](prototype_editor): エディタ frontend
 - [`prototype_editor/modules`](prototype_editor/modules): ルート分析、ストーリーテンプレート、エディタ補助、Assistant、公開前チェックなどを扱う単体テスト可能な frontend 純ロジックモジュール
@@ -200,7 +201,7 @@ Canvasia は初期 i18n フローに対応しています。
 - Linux desktop パッケージ
 - standalone app ビルド用 scaffold を含むネイティブ Runtime preview パッケージ
 
-気軽に共有するなら Web 試遊パッケージが最も簡単です。よりアプリに近いデスクトップ再生フローを検証する場合は、ネイティブ Runtime パッケージを使います。
+気軽に共有するなら Web 試遊パッケージが最も簡単です。Web / desktop Runtime には `runtime_preload_manifest.json` と `RUNTIME_PRELOAD_REPORT.md` も含まれ、最初のシーンや序盤ルートの背景、立ち絵、音声を優先的に準備します。よりアプリに近いデスクトップ再生フローを検証する場合は、ネイティブ Runtime パッケージを使います。
 
 Ren'Py Starter Bundle は `game/script.rpy`、`game/options.rpy`、`game/assets/` にコピーされた素材、migration manifest、カスタム Canvasia 演出の review notes、bundle quality report、label / jump / 参照ファイルを確認する local verifier script を含む zip を生成します。
 

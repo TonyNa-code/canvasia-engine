@@ -40,6 +40,12 @@ from export_release_readiness import (
     EXPORT_RELEASE_READINESS_JSON_NAME,
     EXPORT_RELEASE_READINESS_REPORT_NAME,
 )
+from export_runtime_preload import (
+    RUNTIME_PRELOAD_MANIFEST_FILE_NAME,
+    RUNTIME_PRELOAD_REPORT_FILE_NAME,
+    build_runtime_preload_manifest,
+    write_runtime_preload_files,
+)
 from export_story_route_map import (
     EXPORT_STORY_ROUTE_MAP_JSON_NAME,
     EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
@@ -75,7 +81,13 @@ SAMPLE_PROJECT_ID = "sample_heartbeat"
 DEFAULT_PORT = 8765
 EXPORTS_DIR = ROOT_DIR / "exports"
 EXPORT_TEMPLATE_DIR = ROOT_DIR / "export_player_template"
-EXPORT_PLAYER_SCRIPT_FILES = ("player.js", "runtime_controls.js", "runtime_settings.js", "runtime_audio.js")
+EXPORT_PLAYER_SCRIPT_FILES = (
+    "player.js",
+    "runtime_controls.js",
+    "runtime_settings.js",
+    "runtime_audio.js",
+    "runtime_preload.js",
+)
 NATIVE_RUNTIME_TEMPLATE_DIR = ROOT_DIR / "native_runtime"
 EXPORT_RUNTIME_CACHE_DIR = ROOT_DIR / ".export_runtime_cache"
 SUPPORTED_RESOLUTIONS = {(1280, 720), (1920, 1080)}
@@ -5980,6 +5992,7 @@ def build_export_payload(bundle: dict, assets_doc: dict, copied_assets: int, mis
     default_language = normalize_language_code(project.get("language"), DEFAULT_PROJECT_LANGUAGE)
     supported_languages = normalize_supported_languages(project.get("supportedLanguages"), default_language)
     unlockable_manifest = build_export_unlockable_content_manifest(bundle, assets_doc)
+    runtime_preload_manifest = build_runtime_preload_manifest(bundle, assets_doc)
     return {
         "project": project,
         "i18n": {
@@ -6000,6 +6013,7 @@ def build_export_payload(bundle: dict, assets_doc: dict, copied_assets: int, mis
             "builtAt": now_iso(),
             "copiedAssets": copied_assets,
             "missingAssets": missing_assets,
+            "runtimePreloadManifest": runtime_preload_manifest,
             "engineSignature": dict(EXPORT_ENGINE_SIGNATURE),
             "unlockableContentManifest": unlockable_manifest,
             "protection": {
@@ -8656,6 +8670,9 @@ def write_export_app_files(build_dir: Path, export_payload: dict) -> None:
     shutil.copy2(EXPORT_TEMPLATE_DIR / "player.css", build_dir / "player.css")
     for script_name in EXPORT_PLAYER_SCRIPT_FILES:
         shutil.copy2(EXPORT_TEMPLATE_DIR / script_name, build_dir / script_name)
+    runtime_preload_manifest = (export_payload.get("buildInfo") or {}).get("runtimePreloadManifest")
+    if isinstance(runtime_preload_manifest, dict):
+        write_runtime_preload_files(build_dir, runtime_preload_manifest)
     unlockable_manifest = (export_payload.get("buildInfo") or {}).get("unlockableContentManifest")
     if isinstance(unlockable_manifest, dict):
         write_unlockable_content_manifest_file(build_dir, unlockable_manifest)
@@ -10763,6 +10780,9 @@ def export_web_build() -> dict:
             "playerRuntimeControls": "runtime_controls.js",
             "playerRuntimeSettings": "runtime_settings.js",
             "playerRuntimeAudio": "runtime_audio.js",
+            "playerRuntimePreload": "runtime_preload.js",
+            "runtimePreloadManifest": RUNTIME_PRELOAD_MANIFEST_FILE_NAME,
+            "runtimePreloadReport": RUNTIME_PRELOAD_REPORT_FILE_NAME,
             "playtestGuide": EXPORT_PLAYTEST_GUIDE_FILE_NAME,
             "storyRouteMap": EXPORT_STORY_ROUTE_MAP_JSON_NAME,
             "storyRouteMapReport": EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
@@ -10861,6 +10881,11 @@ def export_web_build() -> dict:
         "unlockableContentManifestPublicUrl": f"/exports/{build_dir.name}/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
         "unlockableContentReportPath": str(build_dir / UNLOCKABLE_CONTENT_REPORT_FILE_NAME),
         "unlockableContentReportPublicUrl": f"/exports/{build_dir.name}/{UNLOCKABLE_CONTENT_REPORT_FILE_NAME}",
+        "runtimePreloadManifestPath": str(build_dir / RUNTIME_PRELOAD_MANIFEST_FILE_NAME),
+        "runtimePreloadManifestPublicUrl": f"/exports/{build_dir.name}/{RUNTIME_PRELOAD_MANIFEST_FILE_NAME}",
+        "runtimePreloadReportPath": str(build_dir / RUNTIME_PRELOAD_REPORT_FILE_NAME),
+        "runtimePreloadReportPublicUrl": f"/exports/{build_dir.name}/{RUNTIME_PRELOAD_REPORT_FILE_NAME}",
+        "runtimePreloadSummary": (export_payload.get("buildInfo") or {}).get("runtimePreloadManifest", {}).get("summary", {}),
         "provenanceName": provenance_file["provenanceName"],
         "provenancePath": provenance_file["provenancePath"],
         "provenancePublicUrl": f"/exports/{build_dir.name}/{provenance_file['provenanceName']}",
@@ -11702,6 +11727,9 @@ def export_windows_nwjs_build() -> dict:
             "appRuntimeControls": "app/runtime_controls.js",
             "appRuntimeSettings": "app/runtime_settings.js",
             "appRuntimeAudio": "app/runtime_audio.js",
+            "appRuntimePreload": "app/runtime_preload.js",
+            "appRuntimePreloadManifest": f"app/{RUNTIME_PRELOAD_MANIFEST_FILE_NAME}",
+            "appRuntimePreloadReport": f"app/{RUNTIME_PRELOAD_REPORT_FILE_NAME}",
             "playtestGuide": EXPORT_PLAYTEST_GUIDE_FILE_NAME,
             "storyRouteMap": EXPORT_STORY_ROUTE_MAP_JSON_NAME,
             "storyRouteMapReport": EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
@@ -11953,6 +11981,9 @@ def export_macos_nwjs_build() -> dict:
             "appRuntimeControls": "app/runtime_controls.js",
             "appRuntimeSettings": "app/runtime_settings.js",
             "appRuntimeAudio": "app/runtime_audio.js",
+            "appRuntimePreload": "app/runtime_preload.js",
+            "appRuntimePreloadManifest": f"app/{RUNTIME_PRELOAD_MANIFEST_FILE_NAME}",
+            "appRuntimePreloadReport": f"app/{RUNTIME_PRELOAD_REPORT_FILE_NAME}",
             "playtestGuide": EXPORT_PLAYTEST_GUIDE_FILE_NAME,
             "storyRouteMap": EXPORT_STORY_ROUTE_MAP_JSON_NAME,
             "storyRouteMapReport": EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
@@ -12215,6 +12246,9 @@ def export_linux_nwjs_build() -> dict:
             "appRuntimeControls": "app/runtime_controls.js",
             "appRuntimeSettings": "app/runtime_settings.js",
             "appRuntimeAudio": "app/runtime_audio.js",
+            "appRuntimePreload": "app/runtime_preload.js",
+            "appRuntimePreloadManifest": f"app/{RUNTIME_PRELOAD_MANIFEST_FILE_NAME}",
+            "appRuntimePreloadReport": f"app/{RUNTIME_PRELOAD_REPORT_FILE_NAME}",
             "playtestGuide": EXPORT_PLAYTEST_GUIDE_FILE_NAME,
             "storyRouteMap": EXPORT_STORY_ROUTE_MAP_JSON_NAME,
             "storyRouteMapReport": EXPORT_STORY_ROUTE_MAP_REPORT_NAME,

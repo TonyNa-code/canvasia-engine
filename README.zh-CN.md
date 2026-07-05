@@ -71,7 +71,7 @@ Canvasia Engine 当前更适合这样理解：
 - EXTRA 回想馆、图鉴馆、成就馆、章节回放、结局回放、语音回听，并可导出可解锁内容清单 / CSV 检查 CG、BGM、语音回听、角色图鉴、地点图鉴、章节、结局和成就是否齐全
 - 高级粒子系统、项目级粒子预设库
 - Live2D / 3D 角色模型与 3D 场景资产导入，原生 Runtime 可输出 glTF 结构、材质贴图槽、动画通道、依赖、引用位置和转换建议清单
-- 网页试玩包、Windows 桌面包、编辑器桌面包、三系统编辑器套装
+- 网页试玩包、Windows 桌面包、编辑器桌面包、三系统编辑器套装，并为网页 / 桌面试玩 Runtime 生成资源预热清单，优先准备首屏背景、立绘、音频和早期路线素材
 - 自动化测试体系（本地 CI 预检 + 按钮动作覆盖扫描 + 未接线按钮运行时兜底 + Ren'Py 草稿导出测试 + 后端 smoke + Playwright 浏览器烟测）
 
 ## 功能状态
@@ -127,6 +127,9 @@ Canvasia Engine 当前更适合这样理解：
 
 - [`export_unlockable_manifest.py`](export_unlockable_manifest.py)
   导出包侧可解锁内容、图鉴、回想、结局和成就覆盖清单生成器
+
+- [`export_runtime_preload.py`](export_runtime_preload.py)
+  导出包侧 Runtime 资源预热清单和性能报告生成器
 
 - [`renpy_export.py`](renpy_export.py)
   Ren'Py Starter Bundle 与 `.rpy` 迁移导出生成器
@@ -251,7 +254,7 @@ python run_editor.py
 
 ### 平台状态
 
-- `网页试玩包`：适合快速预览、网页分发和轻量测试。
+- `网页试玩包`：适合快速预览、网页分发和轻量测试；导出包会附带 `runtime_preload_manifest.json` 与 `RUNTIME_PRELOAD_REPORT.md`，Runtime 会优先预热首屏和早期路线素材，减少第一次切背景、立绘、BGM 时的卡顿。
 - `Ren'Py Starter Bundle`：会导出 zip，内含 `game/script.rpy`、`game/options.rpy`、复制后的 `game/assets/` 素材、迁移 manifest、自定义演出复核备注、包内自检报告和本地校验脚本，适合把项目迁移到 Ren'Py 后继续开发。
 - `Windows / macOS / Linux 桌面包`：当前主要基于 NW.js 桌面 Runtime。
 - `原生 Runtime 包`：Preview 路线，已覆盖标题页主菜单、基础剧情主链、正式存档/读档、系统菜单设置项、语言切换、文本历史、自动播放、已读快进、项目字体、玩家档案/自动续玩、基础粒子与镜头演出、3D 资产结构 / 依赖清单、可选 PyAV/FFmpeg 音画同步内嵌视频播放、OpenCV 画面兜底、系统播放器桥接兜底、第一批资料馆，以及随包生成的发布候选总报告、发布总控报告与三系统验收清单。

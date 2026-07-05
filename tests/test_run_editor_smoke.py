@@ -610,6 +610,19 @@ class RunEditorSmokeTests(unittest.TestCase):
 
         export_result = run_editor.export_web_build()
         self.assertEqual(export_result["missingAssets"], 0)
+        build_dir = Path(export_result["buildPath"])
+        preload_manifest_path = build_dir / run_editor.RUNTIME_PRELOAD_MANIFEST_FILE_NAME
+        preload_report_path = build_dir / run_editor.RUNTIME_PRELOAD_REPORT_FILE_NAME
+        self.assertTrue((build_dir / "runtime_preload.js").is_file())
+        self.assertTrue(preload_manifest_path.is_file())
+        self.assertTrue(preload_report_path.is_file())
+        preload_manifest = json.loads(preload_manifest_path.read_text(encoding="utf-8"))
+        preload_asset_ids = {entry["assetId"] for entry in preload_manifest["entries"]}
+        self.assertGreaterEqual(preload_manifest["summary"]["criticalEntries"], 3)
+        self.assertIn(created_assets_by_type["background"]["id"], preload_asset_ids)
+        self.assertIn(created_assets_by_type["sprite"]["id"], preload_asset_ids)
+        self.assertIn(created_assets_by_type["bgm"]["id"], preload_asset_ids)
+        self.assertEqual(export_result["runtimePreloadSummary"]["totalEntries"], preload_manifest["summary"]["totalEntries"])
 
     def test_export_renpy_draft_build_creates_starter_bundle(self) -> None:
         _, chapter_result = self.create_blank_project_with_chapter()
@@ -2848,6 +2861,9 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / "runtime_controls.js").is_file())
         self.assertTrue((build_dir / "runtime_settings.js").is_file())
         self.assertTrue((build_dir / "runtime_audio.js").is_file())
+        self.assertTrue((build_dir / "runtime_preload.js").is_file())
+        self.assertTrue((build_dir / run_editor.RUNTIME_PRELOAD_MANIFEST_FILE_NAME).is_file())
+        self.assertTrue((build_dir / run_editor.RUNTIME_PRELOAD_REPORT_FILE_NAME).is_file())
         self.assertTrue((build_dir / "player.css").is_file())
         self.assertTrue((build_dir / "launch_splash.svg").is_file())
         self.assertTrue((build_dir / "app_icon.png").is_file())
@@ -2889,6 +2905,9 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["playerRuntimeControls"], "runtime_controls.js")
         self.assertEqual(manifest["files"]["playerRuntimeSettings"], "runtime_settings.js")
         self.assertEqual(manifest["files"]["playerRuntimeAudio"], "runtime_audio.js")
+        self.assertEqual(manifest["files"]["playerRuntimePreload"], "runtime_preload.js")
+        self.assertEqual(manifest["files"]["runtimePreloadManifest"], run_editor.RUNTIME_PRELOAD_MANIFEST_FILE_NAME)
+        self.assertEqual(manifest["files"]["runtimePreloadReport"], run_editor.RUNTIME_PRELOAD_REPORT_FILE_NAME)
         self.assertEqual(manifest["files"]["playtestGuide"], run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME)
         self.assertEqual(manifest["files"]["storyRouteMap"], run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME)
         self.assertEqual(manifest["files"]["storyRouteMapReport"], run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME)
@@ -2916,6 +2935,9 @@ class RunEditorSmokeTests(unittest.TestCase):
                 "runtime_controls.js",
                 "runtime_settings.js",
                 "runtime_audio.js",
+                "runtime_preload.js",
+                run_editor.RUNTIME_PRELOAD_MANIFEST_FILE_NAME,
+                run_editor.RUNTIME_PRELOAD_REPORT_FILE_NAME,
                 "player.css",
             },
         )

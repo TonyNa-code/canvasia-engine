@@ -27,6 +27,7 @@ PYTHON_SYNTAX_FILES = [
     "export_package_guide.py",
     "export_quality_reports.py",
     "export_release_readiness.py",
+    "export_runtime_preload.py",
     "export_story_route_map.py",
     "export_unlockable_manifest.py",
     "run_editor.py",
@@ -128,6 +129,7 @@ def build_node_check_steps() -> list[VerifyStep]:
             "export_player_template/runtime_controls.js",
             "export_player_template/runtime_settings.js",
             "export_player_template/runtime_audio.js",
+            "export_player_template/runtime_preload.js",
         ]
     )
     return [

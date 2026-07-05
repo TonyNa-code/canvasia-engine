@@ -73,7 +73,7 @@ The project already includes a visual editor, export pipeline, native runtime pr
 - Extra galleries: CG replay, music room, character archive, location archive, narration archive, relationship archive, achievements, chapter replay, ending replay, and voice replay
 - Advanced particle presets, project particle libraries, camera effects, screen filters, flashes, shakes, and fade transitions
 - Live2D / 3D character and 3D scene asset import, plus native-runtime 3D inspection reports for glTF / GLB / VRM assets
-- Web playable export, desktop exports, editor desktop builds, and native Runtime preview packages
+- Web playable export and desktop exports with runtime preload manifests for smoother first-scene asset loading, plus editor desktop builds and native Runtime preview packages
 - Automated checks: local CI precheck, backend smoke tests, Playwright browser smoke tests, action wiring scans, branch-aware preview regression with condition / fallback variable presets, release-control reports, Release Candidate manifests, production backlog queues, Runtime capability matrices with export acceptance checklists, scene production boards with pacing-aware one-click recipe suggestions, full screenplay exports, Ren'Py draft exports, director cue sheets, voice production sheets, choice consequence audits, variable influence audits, asset dependency audits, asset rights / credits audits, unlockable-content audits, BGM cue-sheet audits, character stage-direction audits, presentation timeline audits, tester handoff work orders, playtest feedback templates and feedback intake summaries, VN baseline quality audits, and package integrity verification
 
 ## Feature Status
@@ -118,6 +118,7 @@ The project already includes a visual editor, export pipeline, native runtime pr
 - [`export_release_readiness.py`](export_release_readiness.py): exported package release-readiness summary and tester handoff gate builder
 - [`export_story_route_map.py`](export_story_route_map.py): exported package story route map, broken-link, and unreachable-scene report builder
 - [`export_unlockable_manifest.py`](export_unlockable_manifest.py): export-side unlockable / gallery / replay coverage manifest builder
+- [`export_runtime_preload.py`](export_runtime_preload.py): exported Runtime preload manifest and performance report builder
 - [`renpy_export.py`](renpy_export.py): Ren'Py Starter Bundle builder for migration-friendly `.rpy` exports
 - [`prototype_editor`](prototype_editor): visual editor frontend
 - [`prototype_editor/modules`](prototype_editor/modules): frontend pure-logic modules for route analysis, story templates, editor helpers, assistant workflows, release checks, and other testable editor capabilities
@@ -216,7 +217,7 @@ The Web playable package is the easiest option for quick sharing. The native Run
 
 The Ren'Py Starter Bundle exports a zip with `game/script.rpy`, `game/options.rpy`, copied assets under `game/assets/`, a migration manifest, review notes for custom Canvasia effects, a bundle quality report, and a local verifier script for labels, jumps, and referenced files.
 
-Every playable export also includes `README_试玩验收先看这里.md`, `story_route_map.json`, `story_route_map.md`, `localization_audit.json`, `localization_audit.md`, `release_readiness_summary.json`, `release_readiness_summary.md`, `unlockable_content_manifest.json`, and `unlockable_content_report.md`. The README gives testers launch steps and acceptance checks; the story route map catches broken jumps and unreachable scenes; the localization audit flags missing translations in multilingual projects; the release-readiness files summarize whether the package is ready to hand to testers; the unlockable JSON / Markdown pair covers CG galleries, music rooms, voice replay, archive pages, achievements, chapter replay, and endings.
+Every playable export also includes `README_试玩验收先看这里.md`, `story_route_map.json`, `story_route_map.md`, `localization_audit.json`, `localization_audit.md`, `release_readiness_summary.json`, `release_readiness_summary.md`, `unlockable_content_manifest.json`, `unlockable_content_report.md`, `runtime_preload_manifest.json`, and `RUNTIME_PRELOAD_REPORT.md`. The README gives testers launch steps and acceptance checks; the story route map catches broken jumps and unreachable scenes; the localization audit flags missing translations in multilingual projects; the release-readiness files summarize whether the package is ready to hand to testers; the unlockable JSON / Markdown pair covers CG galleries, music rooms, voice replay, archive pages, achievements, chapter replay, and endings; the runtime preload files record first-scene and early-route assets prepared for smoother playback.
 
 ## Release Packages
 
