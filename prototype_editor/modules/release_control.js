@@ -681,8 +681,124 @@
       });
   }
 
+  function getRouteTestingPlanFromContext(context = {}) {
+    return context.routeTestingPlan ?? context.routeOverview?.routeTestingPlan ?? {};
+  }
+
+  function getRoutePlaytestIssueTone(status = "") {
+    return status === "broken" ? "danger" : "warn";
+  }
+
+  function getRoutePlaytestIssueWeight(issue = {}) {
+    const toneWeight = issue.tone === "danger" ? 1000 : 700;
+    const kindWeight = issue.kind === "branch" ? 80 : 60;
+    const depth = Number.isFinite(Number(issue.routeDepth)) ? Number(issue.routeDepth) : 999;
+    return toneWeight + kindWeight - Math.min(depth, 20);
+  }
+
+  function buildRoutePlaytestFixQueue(routeTestingPlan = {}) {
+    const queue = [];
+
+    toArray(routeTestingPlan.decisionPoints).forEach((point, pointIndex) => {
+      toArray(point.routeCases).forEach((routeCase, routeIndex) => {
+        const status = String(routeCase?.status ?? "ready").trim() || "ready";
+        if (status === "ready") {
+          return;
+        }
+        queue.push({
+          id: `route_${point.sceneId || pointIndex}_${routeIndex + 1}`,
+          kind: "branch",
+          tone: getRoutePlaytestIssueTone(status),
+          status,
+          statusLabel: routeCase.statusLabel ?? (status === "broken" ? "坏链" : "目标不可达"),
+          title: status === "broken" ? "修复分支坏链" : "接通不可达分支目标",
+          chapterName: point.chapterName,
+          sceneId: routeCase.sourceSceneId ?? point.sceneId,
+          sceneName: routeCase.sourceSceneName ?? point.sceneName,
+          routeDepth: point.routeDepth,
+          routeLabel: routeCase.label,
+          targetSceneId: routeCase.targetSceneId,
+          targetLabel: routeCase.targetSceneName,
+          blockIndex: Number.isInteger(routeCase.blockIndex) ? routeCase.blockIndex : null,
+          optionIndex: Number.isInteger(routeCase.optionIndex) ? routeCase.optionIndex : null,
+          branchIndex: Number.isInteger(routeCase.branchIndex) ? routeCase.branchIndex : null,
+        });
+      });
+    });
+
+    toArray(routeTestingPlan.endingTestCases).forEach((testCase, index) => {
+      const status = String(testCase?.status ?? "ready").trim() || "ready";
+      if (status === "ready") {
+        return;
+      }
+      queue.push({
+        id: `ending_${testCase.sceneId || index}`,
+        kind: "ending",
+        tone: getRoutePlaytestIssueTone(status),
+        status,
+        statusLabel: testCase.statusLabel ?? (status === "broken" ? "坏链" : "未接通"),
+        title: status === "broken" ? "修复结局路径坏链" : "接通结局入口",
+        chapterName: testCase.chapterName,
+        sceneId: testCase.sceneId,
+        sceneName: testCase.sceneName,
+        routeDepth: testCase.routeDepth,
+        routeLabel: "结局路径",
+        targetSceneId: testCase.sceneId,
+        targetLabel: testCase.sceneName,
+        actionHint: testCase.testingHint,
+      });
+    });
+
+    return queue
+      .sort((left, right) => {
+        const weightDelta = getRoutePlaytestIssueWeight(right) - getRoutePlaytestIssueWeight(left);
+        if (weightDelta !== 0) {
+          return weightDelta;
+        }
+        return String(left.sceneName ?? "").localeCompare(String(right.sceneName ?? ""), "zh-CN");
+      })
+      .map((item, index) => ({ ...item, rank: index + 1 }));
+  }
+
+  function buildRoutePlaytestFixStep(routeTestingPlan = {}) {
+    const queue = buildRoutePlaytestFixQueue(routeTestingPlan);
+    if (!queue.length) {
+      return null;
+    }
+
+    const brokenCount = queue.filter((item) => item.status === "broken").length;
+    const unreachableCount = queue.filter((item) => item.status === "unreachable").length;
+    const otherCount = Math.max(queue.length - brokenCount - unreachableCount, 0);
+    const firstIssue = queue[0];
+    const firstLabel = [firstIssue.sceneName, firstIssue.routeLabel, firstIssue.targetLabel]
+      .filter(Boolean)
+      .join(" / ");
+    const statusParts = [
+      brokenCount > 0 ? `坏链 ${brokenCount} 条` : "",
+      unreachableCount > 0 ? `不可达 ${unreachableCount} 条` : "",
+      otherCount > 0 ? `待确认 ${otherCount} 条` : "",
+    ].filter(Boolean);
+
+    return {
+      tone: brokenCount > 0 ? "danger" : "warn",
+      title: brokenCount > 0 ? "先修路线坏链" : "接通路线试玩入口",
+      statusLabel: statusParts.join(" / ") || `${queue.length} 条路线待确认`,
+      description: firstLabel
+        ? `先处理「${firstLabel}」。修完后重新生成路线试玩手册，再继续正式试玩。`
+        : "路线试玩手册里还有坏链或不可达目标，发布前建议先把这些路线接通。",
+      actions: [
+        firstIssue.sceneId
+          ? { label: "打开第一条路线问题", action: "preview-story-location", sceneId: firstIssue.sceneId }
+          : { label: "去剧情页修路线", action: "switch-screen", screen: "story" },
+        { label: "导出路线试玩手册", action: "export-route-testing-plan-markdown" },
+      ],
+      routeIssueQueue: queue.slice(0, 8),
+    };
+  }
+
   function buildReleaseFixOrder(context = {}) {
     const routeMetrics = context.routeMetrics ?? context.routeOverview?.metrics ?? {};
+    const routeTestingPlan = getRouteTestingPlanFromContext(context);
     const resolution = normalizeResolution(context.resolution);
     const releaseVersion = String(context.releaseVersion ?? DEFAULT_PROJECT_RELEASE_VERSION).trim() || DEFAULT_PROJECT_RELEASE_VERSION;
     const hasStoredReleaseVersion = Boolean(context.hasStoredReleaseVersion);
@@ -719,6 +835,11 @@
             : { label: "去剧情页修", action: "switch-screen", screen: "story" },
         ],
       });
+    }
+
+    const routePlaytestFixStep = buildRoutePlaytestFixStep(routeTestingPlan);
+    if (routePlaytestFixStep) {
+      steps.push(routePlaytestFixStep);
     }
 
     const orphanSceneCount = toCount(routeMetrics.orphanScenes);
@@ -929,6 +1050,8 @@
     buildRuntimePreloadBudgetFixStep,
     buildCreativeQualityAudit,
     buildVnEssentialsReleaseSteps,
+    buildRoutePlaytestFixQueue,
+    buildRoutePlaytestFixStep,
     buildReleaseFixOrder,
   });
 })(typeof window !== "undefined" ? window : globalThis);

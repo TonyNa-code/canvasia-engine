@@ -20,6 +20,7 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
         self.assertIn("function buildReleaseCreativeQualityContext", source)
         self.assertIn("creativeQuality: buildReleaseCreativeQualityContext()", source)
         self.assertIn("runtimeCapabilityMatrix: buildRuntimeCapabilityMatrix()", source)
+        self.assertIn("routeTestingPlan: routeOverview?.routeTestingPlan ?? {}", source)
         self.assertIn("function serializeFinalPublishGate", source)
         self.assertIn("function renderFinalPublishGatePanel", source)
         self.assertIn("最终发表门禁", source)
@@ -443,6 +444,101 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
         self.assertEqual(ready_plan["steps"][0]["tone"], "good")
         self.assertEqual(ready_plan["blockerCount"], 0)
         self.assertEqual(ready_plan["urgentCount"], 0)
+
+    def test_release_fix_order_promotes_route_playtest_blockers(self) -> None:
+        script = textwrap.dedent(
+            f"""
+            const fs = require("fs");
+            const vm = require("vm");
+            const context = {{ window: {{}} }};
+            context.globalThis = context;
+            vm.createContext(context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
+            const tools = context.window.CanvasiaEditorReleaseControl;
+            const routeTestingPlan = {{
+              decisionPoints: [
+                {{
+                  sceneId: "scene_branch",
+                  chapterName: "第1章",
+                  sceneName: "分岔口",
+                  routeDepth: 1,
+                  routeCases: [
+                    {{
+                      label: "选项：留下",
+                      sourceSceneId: "scene_branch",
+                      sourceSceneName: "分岔口",
+                      targetSceneId: "scene_missing",
+                      targetSceneName: "Missing",
+                      status: "broken",
+                      statusLabel: "坏链",
+                    }},
+                    {{
+                      label: "选项：离开",
+                      sourceSceneId: "scene_branch",
+                      sourceSceneName: "分岔口",
+                      targetSceneId: "scene_normal",
+                      targetSceneName: "Normal",
+                      status: "ready",
+                      statusLabel: "可试玩",
+                    }},
+                  ],
+                }},
+              ],
+              endingTestCases: [
+                {{
+                  sceneId: "scene_hidden_end",
+                  chapterName: "第1章",
+                  sceneName: "隐藏结局",
+                  status: "unreachable",
+                  statusLabel: "未接通",
+                  testingHint: "先补上游入口。",
+                }},
+              ],
+            }};
+            const routeQueue = tools.buildRoutePlaytestFixQueue(routeTestingPlan);
+            const routeStep = tools.buildRoutePlaytestFixStep(routeTestingPlan);
+            const plan = tools.buildReleaseFixOrder({{
+              resolution: {{ width: 1920, height: 1080 }},
+              releaseVersion: "1.2.0",
+              hasStoredReleaseVersion: true,
+              errorCount: 0,
+              warningIssues: [],
+              routeTestingPlan,
+              routeMetrics: {{ orphanScenes: 0, unreachableScenes: 0 }},
+              urgentMissingAssetsCount: 0,
+              mediaBudgetReport: {{ count: 0, blockerCount: 0 }},
+              unusedAssetCount: 0,
+              exportResult: {{ target: "windows_nwjs", runtimeMode: "nwjs", missingAssets: 0 }},
+            }});
+            process.stdout.write(JSON.stringify({{
+              keys: Object.keys(tools).sort(),
+              routeQueue,
+              routeStep,
+              plan,
+            }}));
+            """
+        )
+        completed = subprocess.run(
+            ["node", "-e", script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        self.assertIn("buildRoutePlaytestFixQueue", payload["keys"])
+        self.assertIn("buildRoutePlaytestFixStep", payload["keys"])
+        self.assertEqual(len(payload["routeQueue"]), 2)
+        self.assertEqual(payload["routeQueue"][0]["title"], "修复分支坏链")
+        self.assertEqual(payload["routeQueue"][1]["title"], "接通结局入口")
+        self.assertEqual(payload["routeStep"]["title"], "先修路线坏链")
+        self.assertEqual(payload["routeStep"]["actions"][0]["action"], "preview-story-location")
+        self.assertEqual(payload["routeStep"]["actions"][0]["sceneId"], "scene_branch")
+        self.assertEqual(payload["plan"]["steps"][0]["title"], "先修路线坏链")
+        self.assertEqual(payload["plan"]["steps"][0]["tone"], "danger")
+        self.assertEqual(payload["plan"]["blockerCount"], 1)
 
     def test_creative_quality_audit_adds_vn_baseline_polish_steps(self) -> None:
         script = textwrap.dedent(

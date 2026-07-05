@@ -31514,6 +31514,8 @@ function buildReleaseFixOrder(routeOverview) {
       firstErrorAction: validationErrors[0] ? getValidationIssueAction(validationErrors[0]) : null,
       firstVoiceAction: missingVoiceWarnings[0] ? getValidationIssueAction(missingVoiceWarnings[0]) : null,
       firstWarningAction: nonVoiceWarnings[0] ? getValidationIssueAction(nonVoiceWarnings[0]) : null,
+      routeOverview,
+      routeTestingPlan: routeOverview?.routeTestingPlan ?? {},
       routeMetrics: routeOverview?.metrics ?? {},
       urgentMissingAssetsCount: state.data.assetList.filter((asset) => isAssetUrgentMissing(asset)).length,
       mediaBudgetReport: buildAssetMediaBudgetReport(),
