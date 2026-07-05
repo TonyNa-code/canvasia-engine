@@ -276,7 +276,32 @@
       templateId: "ending_credits",
       keywords: ["模板", "ed", "ending", "片尾", "credits"],
     },
+    {
+      id: "template-mystery-clue",
+      title: "套用：悬念线索",
+      subtitle: "冷色滤镜、镜头移动、线索发现和变量记录",
+      templateId: "mystery_clue",
+      keywords: ["模板", "悬念", "线索", "mystery", "clue"],
+    },
+    {
+      id: "template-relationship-reveal",
+      title: "套用：关系揭露",
+      subtitle: "角色居中、镜头推进、关系真相和条件分支",
+      templateId: "relationship_reveal",
+      keywords: ["模板", "关系", "揭露", "真相", "relationship"],
+    },
+    {
+      id: "template-branch-merge",
+      title: "套用：分支汇合",
+      subtitle: "两组选项回到同一汇合点，适合收束分线",
+      templateId: "branch_merge",
+      keywords: ["模板", "分支", "汇合", "merge", "route"],
+    },
   ];
+
+  const TEMPLATE_COMMAND_ID_BY_TEMPLATE_ID = new Map(
+    STORY_TEMPLATE_COMMANDS.map((command) => [command.templateId, command.id])
+  );
 
   function normalizeSearchText(value) {
     return String(value ?? "").trim().toLowerCase();
@@ -372,6 +397,55 @@
     }
   }
 
+  function mergeRecommendedCommandIds(...groups) {
+    const seen = new Set();
+    const result = [];
+    groups.flat().forEach((id) => {
+      const safeId = sanitizeCommandPaletteCommandId(id);
+      if (!safeId || seen.has(safeId)) {
+        return;
+      }
+      seen.add(safeId);
+      result.push(safeId);
+    });
+    return result;
+  }
+
+  function getStoryTemplateTools(context = {}) {
+    return context.storyTemplateTools ?? global.CanvasiaEditorStoryTemplates ?? null;
+  }
+
+  function getStoryTemplateSceneForRecommendations(context = {}) {
+    if (context.selectedScene && typeof context.selectedScene === "object") {
+      return context.selectedScene;
+    }
+
+    return {
+      blocks: Array.isArray(context.selectedSceneBlocks) ? context.selectedSceneBlocks : [],
+    };
+  }
+
+  function getStoryTemplateRecommendationCommandIds(context = {}) {
+    if (!context.hasSelectedScene) {
+      return [];
+    }
+
+    const storyTemplateTools = getStoryTemplateTools(context);
+    if (typeof storyTemplateTools?.getStoryTemplateRecommendedPanelItems !== "function") {
+      return [];
+    }
+
+    const panelItems = storyTemplateTools.getStoryTemplateRecommendedPanelItems(
+      getStoryTemplateSceneForRecommendations(context),
+      { limit: context.storyTemplateRecommendationLimit ?? 4 }
+    );
+
+    return panelItems
+      .filter((item) => item?.isRecommended)
+      .map((item) => TEMPLATE_COMMAND_ID_BY_TEMPLATE_ID.get(item.templateId))
+      .filter(Boolean);
+  }
+
   function getRecommendedCommandIds(context = {}) {
     const hasProject = Boolean(context.hasProject);
     const hasSelectedScene = Boolean(context.hasSelectedScene);
@@ -386,42 +460,86 @@
       return ["create-first-chapter", "create-starter-kit", "screen-story", "open-beginner-tutorial"];
     }
 
+    const templateRecommendationIds = getStoryTemplateRecommendationCommandIds(context);
+
     if (blockCount <= 0) {
-      return ["template-playable-scene", "template-opening-intro", "insert-background", "insert-music-play", "insert-character-show"];
+      return mergeRecommendedCommandIds(
+        templateRecommendationIds,
+        ["template-playable-scene", "template-opening-intro", "insert-background", "insert-music-play", "insert-character-show"]
+      );
     }
 
     if (selectedBlockType === "background") {
-      return ["insert-character-show", "insert-music-play", "insert-narration", "insert-dialogue"];
+      return mergeRecommendedCommandIds(
+        ["insert-character-show", "insert-music-play"],
+        templateRecommendationIds,
+        ["insert-narration", "insert-dialogue"]
+      );
     }
     if (selectedBlockType === "music_play") {
-      return ["insert-character-show", "insert-narration", "insert-dialogue", "insert-choice"];
+      return mergeRecommendedCommandIds(
+        ["insert-character-show", "insert-narration"],
+        templateRecommendationIds,
+        ["insert-dialogue", "insert-choice"]
+      );
     }
     if (selectedBlockType === "character_show") {
-      return ["insert-dialogue", "insert-camera-zoom", "template-emotion-burst", "insert-choice"];
+      return mergeRecommendedCommandIds(
+        ["insert-dialogue", "insert-camera-zoom"],
+        templateRecommendationIds,
+        ["template-emotion-burst", "insert-choice"]
+      );
     }
     if (selectedBlockType === "dialogue") {
-      return ["insert-dialogue", "insert-choice", "template-emotion-burst", "insert-narration"];
+      return mergeRecommendedCommandIds(
+        ["insert-dialogue", "insert-choice"],
+        templateRecommendationIds,
+        ["template-emotion-burst", "insert-narration"]
+      );
     }
     if (selectedBlockType === "narration") {
-      return ["insert-dialogue", "insert-background", "insert-fade", "template-memory-entry"];
+      return mergeRecommendedCommandIds(
+        ["insert-dialogue", "insert-background", "insert-fade"],
+        templateRecommendationIds,
+        ["template-memory-entry"]
+      );
     }
     if (selectedBlockType === "choice") {
-      return ["insert-jump", "insert-condition", "insert-dialogue", "template-branch-choice"];
+      return mergeRecommendedCommandIds(
+        ["insert-jump", "insert-condition"],
+        templateRecommendationIds,
+        ["insert-dialogue", "template-branch-choice"]
+      );
     }
     if (selectedBlockType === "condition") {
-      return ["insert-dialogue", "insert-jump", "insert-variable-set", "screen-preview"];
+      return mergeRecommendedCommandIds(
+        ["insert-dialogue", "insert-jump"],
+        templateRecommendationIds,
+        ["insert-variable-set", "screen-preview"]
+      );
     }
     if (selectedBlockType === "video_play" || selectedBlockType === "credits_roll" || selectedBlockType === "wait") {
-      return ["insert-narration", "insert-music-stop", "screen-preview", "export-web"];
+      return mergeRecommendedCommandIds(
+        ["insert-narration", "insert-music-stop"],
+        templateRecommendationIds,
+        ["screen-preview", "export-web"]
+      );
     }
     if (selectedBlockType === "screen_fade" || selectedBlockType === "screen_filter" || selectedBlockType === "depth_blur") {
-      return ["insert-narration", "insert-dialogue", "insert-character-show", "insert-fade"];
+      return mergeRecommendedCommandIds(
+        ["insert-narration", "insert-dialogue"],
+        templateRecommendationIds,
+        ["insert-character-show", "insert-fade"]
+      );
     }
     if (selectedBlockType === "music_stop" || selectedBlockType === "character_hide" || selectedBlockType === "jump") {
-      return ["template-scene-outro", "screen-preview", "insert-narration", "insert-dialogue"];
+      return mergeRecommendedCommandIds(
+        templateRecommendationIds,
+        ["template-scene-outro", "screen-preview", "insert-narration", "insert-dialogue"]
+      );
     }
 
-    return ["insert-dialogue", "insert-narration", "insert-choice", "screen-preview"];
+    return mergeRecommendedCommandIds(["insert-dialogue", "insert-narration"], templateRecommendationIds, ["insert-choice", "screen-preview"]);
   }
 
   function prioritizeRecommendedCommands(commands = [], context = {}) {
@@ -703,6 +821,7 @@
     clampCommandPaletteIndex,
     renderCommandPaletteList,
     getRecommendedCommandIds,
+    getStoryTemplateRecommendationCommandIds,
     prioritizeRecommendedCommands,
     prioritizeRecentCommands,
     prioritizeCommandPaletteCommands,

@@ -9,6 +9,7 @@ from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "command_palette.js"
+STORY_TEMPLATE_MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "story_templates.js"
 
 
 class FrontendCommandPaletteModuleTests(unittest.TestCase):
@@ -68,6 +69,7 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
             const playableSearch = tools.filterCommandPaletteCommands(projectWithScene, "可试玩");
             const affectionSearch = tools.filterCommandPaletteCommands(projectWithScene, "好感度");
             const creditsSearch = tools.filterCommandPaletteCommands(projectWithScene, "片尾");
+            const branchMergeSearch = tools.filterCommandPaletteCommands(projectWithScene, "汇合");
             const exportCommand = project.find((command) => command.id === "export-web");
             const firstChapterCommand = project.find((command) => command.id === "create-first-chapter");
             const disabledDialogueCommand = project.find((command) => command.id === "insert-dialogue");
@@ -98,6 +100,7 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
               playableSearchIds: playableSearch.map((command) => command.id),
               affectionSearchIds: affectionSearch.map((command) => command.id),
               creditsSearchIds: creditsSearch.map((command) => command.id),
+              branchMergeSearchIds: branchMergeSearch.map((command) => command.id),
               storySearchIds: storySearch.map((command) => command.id),
               clamped: tools.clampCommandPaletteIndex(99, project),
             }}));
@@ -128,8 +131,103 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
         self.assertIn("template-playable-scene", payload["playableSearchIds"])
         self.assertIn("template-affection-choice", payload["affectionSearchIds"])
         self.assertIn("template-ending-credits", payload["creditsSearchIds"])
+        self.assertIn("template-branch-merge", payload["branchMergeSearchIds"])
         self.assertIn("screen-story", payload["storySearchIds"])
         self.assertGreater(payload["clamped"], 0)
+
+    def test_command_palette_reuses_story_template_recommendations_when_available(self) -> None:
+        script = textwrap.dedent(
+            f"""
+            const fs = require("fs");
+            const vm = require("vm");
+            const context = {{ window: {{}} }};
+            context.globalThis = context;
+            vm.createContext(context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(STORY_TEMPLATE_MODULE_PATH))}, "utf8"), context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
+            const tools = context.window.CanvasiaEditorCommandPalette;
+            const emptyScene = tools.buildCommandPaletteCommands({{
+              hasProject: true,
+              hasSelectedScene: true,
+              selectedSceneTitle: "空镜",
+              selectedSceneBlockCount: 0,
+              selectedSceneBlocks: [],
+              chapterCount: 1,
+              sceneCount: 1,
+              needsStarterKit: false,
+              errorCount: 0,
+            }});
+            const dialogueScene = tools.buildCommandPaletteCommands({{
+              hasProject: true,
+              hasSelectedScene: true,
+              selectedSceneTitle: "教室黄昏",
+              selectedSceneBlockCount: 4,
+              selectedBlockType: "dialogue",
+              selectedSceneBlocks: [
+                {{ type: "background" }},
+                {{ type: "character_show" }},
+                {{ type: "dialogue" }},
+                {{ type: "dialogue" }},
+              ],
+              chapterCount: 1,
+              sceneCount: 1,
+              needsStarterKit: false,
+              errorCount: 0,
+            }});
+            const choiceScene = tools.buildCommandPaletteCommands({{
+              hasProject: true,
+              hasSelectedScene: true,
+              selectedSceneTitle: "分岔口",
+              selectedSceneBlockCount: 2,
+              selectedBlockType: "choice",
+              selectedSceneBlocks: [
+                {{ type: "choice" }},
+                {{ type: "condition" }},
+              ],
+              chapterCount: 1,
+              sceneCount: 1,
+              needsStarterKit: false,
+              errorCount: 0,
+            }});
+            const videoScene = tools.buildCommandPaletteCommands({{
+              hasProject: true,
+              hasSelectedScene: true,
+              selectedSceneTitle: "OP",
+              selectedSceneBlockCount: 1,
+              selectedBlockType: "video_play",
+              selectedSceneBlocks: [
+                {{ type: "video_play" }},
+              ],
+              chapterCount: 1,
+              sceneCount: 1,
+              needsStarterKit: false,
+              errorCount: 0,
+            }});
+            process.stdout.write(JSON.stringify({{
+              directEmptyTemplateIds: tools.getStoryTemplateRecommendationCommandIds({{
+                hasSelectedScene: true,
+                selectedSceneBlocks: [],
+              }}),
+              emptySceneRecommendedIds: emptyScene.slice(0, 5).map((command) => command.id),
+              dialogueRecommendedIds: dialogueScene.slice(0, 6).map((command) => command.id),
+              choiceRecommendedIds: choiceScene.slice(0, 5).map((command) => command.id),
+              videoRecommendedIds: videoScene.slice(0, 5).map((command) => command.id),
+            }}));
+            """
+        )
+        payload = self.run_node(script)
+
+        self.assertEqual(payload["directEmptyTemplateIds"][:2], ["template-playable-scene", "template-opening-intro"])
+        self.assertEqual(payload["emptySceneRecommendedIds"][:3], [
+            "template-playable-scene",
+            "template-opening-intro",
+            "template-daily-conversation",
+        ])
+        self.assertEqual(payload["dialogueRecommendedIds"][:2], ["insert-dialogue", "insert-choice"])
+        self.assertIn("template-branch-choice", payload["dialogueRecommendedIds"])
+        self.assertIn("template-affection-choice", payload["dialogueRecommendedIds"])
+        self.assertIn("template-branch-merge", payload["choiceRecommendedIds"])
+        self.assertIn("template-ending-credits", payload["videoRecommendedIds"])
 
     def test_command_palette_recent_ids_are_sanitized_merged_and_persisted(self) -> None:
         script = textwrap.dedent(

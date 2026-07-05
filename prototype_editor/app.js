@@ -2440,6 +2440,8 @@ function getCommandPaletteContext() {
     hasSelectedScene: Boolean(selectedScene),
     projectTitle: state.data?.project?.title ?? getProjectCenterActiveTitle(),
     selectedSceneTitle: selectedScene?.name ?? "",
+    selectedScene,
+    selectedSceneBlocks: selectedScene?.blocks ?? [],
     selectedSceneBlockCount: selectedScene?.blocks?.length ?? 0,
     selectedBlockType: selectedBlock?.type ?? "",
     recentCommandIds: state.commandPaletteRecentIds,
