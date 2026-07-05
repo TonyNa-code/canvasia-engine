@@ -599,6 +599,35 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertEqual(payload["projectInactive"]["attrs"]["aria-pressed"], "false")
         self.assertIn("切换当前项目到新手模式", payload["projectInactive"]["attrs"]["aria-label"])
 
+    def test_dialog_box_readability_safety_net_is_wired(self) -> None:
+        html = INDEX_PATH.read_text(encoding="utf-8")
+        source = APP_PATH.read_text(encoding="utf-8")
+        styles = STYLES_PATH.read_text(encoding="utf-8")
+        handle_click = _extract_function_source(source, "handleClick")
+        render_project_runtime_settings_panel = _extract_function_source(source, "renderProjectRuntimeSettingsPanel")
+        render_dialog_box_readability_card = _extract_function_source(source, "renderDialogBoxReadabilityCard")
+        apply_dialog_box_readability_fix = _extract_function_source(source, "applyDialogBoxReadabilityFix")
+        set_dialog_box_readability_fix_in_flight = _extract_function_source(
+            source,
+            "setDialogBoxReadabilityFixInFlight",
+        )
+
+        self.assertIn("./modules/dialog_box_readability.js", html)
+        self.assertIn("window.CanvasiaEditorDialogBoxReadability", source)
+        self.assertIn("buildDialogBoxReadabilityReport", render_project_runtime_settings_panel)
+        self.assertIn("buildDialogBoxReadabilityAutoFixPlan", render_project_runtime_settings_panel)
+        self.assertIn("getDialogBoxReadabilityDigest", render_project_runtime_settings_panel)
+        self.assertIn('data-action="apply-dialog-box-readability-fix"', render_dialog_box_readability_card)
+        self.assertIn('action === "apply-dialog-box-readability-fix"', handle_click)
+        self.assertIn("void applyDialogBoxReadabilityFix()", handle_click)
+        self.assertIn("dialogBoxConfig: plan.dialogBoxConfig", apply_dialog_box_readability_fix)
+        self.assertIn("state.previewPlayback.dialogTheme = \"project\"", apply_dialog_box_readability_fix)
+        self.assertIn("setDialogBoxReadabilityFixInFlight(true)", apply_dialog_box_readability_fix)
+        self.assertIn("setDialogBoxReadabilityFixInFlight(false)", apply_dialog_box_readability_fix)
+        self.assertIn('[data-action="apply-dialog-box-readability-fix"]', set_dialog_box_readability_fix_in_flight)
+        self.assertIn(".dialog-readability-card", styles)
+        self.assertIn('html[data-ui-theme="light"] .dialog-readability-card', styles)
+
     def test_startup_and_fatal_errors_use_readable_messages(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
         index_source = INDEX_PATH.read_text(encoding="utf-8")

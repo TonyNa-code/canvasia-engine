@@ -67,6 +67,7 @@ jobs:
             tests/test_frontend_choice_consequence_sheet_module.py \
             tests/test_frontend_command_palette_module.py \
             tests/test_frontend_creative_assistant_module.py \
+            tests/test_frontend_dialog_box_readability_module.py \
             tests/test_frontend_director_cue_sheet_module.py \
             tests/test_frontend_openai_asset_generator_module.py \
             tests/test_frontend_particle_effects_module.py \
@@ -148,6 +149,7 @@ jobs:
           node --check prototype_editor/modules/project_milestones.js
           node --check prototype_editor/modules/project_history.js
           node --check prototype_editor/modules/project_settings.js
+          node --check prototype_editor/modules/dialog_box_readability.js
           node --check prototype_editor/modules/openai_asset_generator.js
           node --check prototype_editor/modules/particle_effects.js
           node --check prototype_editor/modules/production_backlog.js
@@ -206,6 +208,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_command_palette_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_editor_common_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_creative_assistant_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_dialog_box_readability_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_director_cue_sheet_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_openai_asset_generator_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_particle_effects_module.py' -v

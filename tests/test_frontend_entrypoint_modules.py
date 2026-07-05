@@ -23,6 +23,7 @@ class FrontendEntrypointModuleTests(unittest.TestCase):
             "./modules/editor_common.js",
             "./modules/variables.js",
             "./modules/project_settings.js",
+            "./modules/dialog_box_readability.js",
             "./modules/system_dialog.js",
             "./modules/ui_theme.js",
             "./modules/preview_save.js",

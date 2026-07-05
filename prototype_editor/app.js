@@ -121,6 +121,7 @@ const escapeHtml = editorCommonTools.escapeHtml;
 const buildTemplateAssetUrl = (relativePath) =>
   editorCommonTools.buildTemplateAssetUrl(relativePath, state.data?.currentProject?.publicRoot ?? "");
 const projectSettingsTools = window.CanvasiaEditorProjectSettings;
+const dialogBoxReadabilityTools = window.CanvasiaEditorDialogBoxReadability;
 const {
   PROJECT_DIALOG_BOX_PRESET_LABELS,
   PROJECT_DIALOG_BOX_SHAPE_LABELS,
@@ -918,6 +919,7 @@ const state = {
   projectReadableSplitInFlight: false,
   audioCueAutoFixInFlight: false,
   stageDirectionAutoFixInFlight: false,
+  dialogBoxReadabilityFixInFlight: false,
   projectCreateInFlight: false,
   projectOpenInFlightId: "",
   projectRenameInFlightId: "",
@@ -4367,6 +4369,11 @@ async function handleClick(event) {
 
   if (action === "save-project-dialog-box-config") {
     void saveProjectDialogBoxConfig();
+    return;
+  }
+
+  if (action === "apply-dialog-box-readability-fix") {
+    void applyDialogBoxReadabilityFix();
     return;
   }
 
@@ -10782,6 +10789,20 @@ function setStageDirectionAutoFixInFlight(isInFlight) {
     isBusy: state.stageDirectionAutoFixInFlight,
     busyLabel: "补齐舞台中...",
     idleLabelKey: "stageDirectionAutoFixIdleLabel",
+  });
+}
+
+function setDialogBoxReadabilityFixInFlight(isInFlight) {
+  state.dialogBoxReadabilityFixInFlight = Boolean(isInFlight);
+  if (!state.dialogBoxReadabilityFixInFlight && state.currentScreen === "preview") {
+    renderPreviewScreen();
+    return;
+  }
+  setActionButtonBusyState({
+    selector: '[data-action="apply-dialog-box-readability-fix"]',
+    isBusy: state.dialogBoxReadabilityFixInFlight,
+    busyLabel: "增强中...",
+    idleLabelKey: "dialogBoxReadabilityFixIdleLabel",
   });
 }
 
@@ -39421,12 +39442,68 @@ function exportProjectVariableAuditReport() {
   showToast(`变量治理报告已导出：${fileName}`);
 }
 
+function renderDialogBoxReadabilityCard(report, plan, digest) {
+  if (!report || !plan || !digest) {
+    return "";
+  }
+
+  const metrics = report.metrics ?? {};
+  const issueItems = report.issues.slice(0, 3);
+  const issueListMarkup = issueItems.length > 0
+    ? `
+      <ul class="dialog-readability-issue-list">
+        ${issueItems
+          .map((issue) => `<li>${escapeHtml(issue.title)}：${escapeHtml(issue.detail)}</li>`)
+          .join("")}
+      </ul>
+    `
+    : `<p class="dialog-readability-ok">当前文本框读起来比较稳，暂时不需要自动修复。</p>`;
+  const operationSummary = plan.changed
+    ? `将调整 ${plan.operations.length} 项：${plan.operations.map((operation) => operation.label).slice(0, 4).join("、")}`
+    : "不会修改你的自定义贴图、锚点、偏移或剧情内容。";
+
+  return `
+    <div class="dialog-readability-card" data-readability-level="${escapeHtml(digest.level)}">
+      <div class="dialog-readability-head">
+        <div>
+          <strong>文本框可读性安全网</strong>
+          <p class="helper-text">${escapeHtml(digest.helperText)}</p>
+        </div>
+        <span class="dialog-readability-badge" data-readability-level="${escapeHtml(digest.level)}">
+          ${escapeHtml(digest.badgeLabel)}
+        </span>
+      </div>
+      <div class="dialog-readability-metrics">
+        <span>正文 ${metrics.textBlockCount ?? 0} 段</span>
+        <span>长文本 ${metrics.longTextCount ?? 0} 段</span>
+        <span>多行 ${metrics.multilineCount ?? 0} 段</span>
+        <span>对比度 ${metrics.textContrastRatio ?? "-"}:1</span>
+      </div>
+      ${issueListMarkup}
+      <div class="dialog-readability-actions">
+        <button
+          class="toolbar-button ${plan.changed ? "toolbar-button-primary" : ""}"
+          type="button"
+          data-action="apply-dialog-box-readability-fix"
+          ${plan.changed && !state.dialogBoxReadabilityFixInFlight ? "" : "disabled"}
+        >
+          ${escapeHtml(state.dialogBoxReadabilityFixInFlight ? "增强中..." : digest.actionLabel)}
+        </button>
+        <span>${escapeHtml(operationSummary)}</span>
+      </div>
+    </div>
+  `;
+}
+
 function renderProjectRuntimeSettingsPanel() {
   const runtimeSettings = getProjectRuntimeSettings();
   const dialogBoxConfig = getProjectDialogBoxConfig();
   const gameUiConfig = getProjectGameUiConfig();
   const projectLanguage = getProjectLanguage();
   const projectSupportedLanguages = getProjectSupportedLanguages();
+  const dialogBoxReadabilityReport = dialogBoxReadabilityTools.buildDialogBoxReadabilityReport(state.data ?? {});
+  const dialogBoxReadabilityPlan = dialogBoxReadabilityTools.buildDialogBoxReadabilityAutoFixPlan(state.data ?? {});
+  const dialogBoxReadabilityDigest = dialogBoxReadabilityTools.getDialogBoxReadabilityDigest(dialogBoxReadabilityReport);
   return `
     <article class="detail-card">
       <strong>成品体验设置</strong>
@@ -39598,10 +39675,11 @@ function renderProjectRuntimeSettingsPanel() {
                     ${escapeHtml(label)}
                   </button>
                 `
-              )
-              .join("")}
-          </div>
-          <div class="playback-setting-grid dialog-config-grid">
+	              )
+	              .join("")}
+	          </div>
+	          ${renderDialogBoxReadabilityCard(dialogBoxReadabilityReport, dialogBoxReadabilityPlan, dialogBoxReadabilityDigest)}
+	          <div class="playback-setting-grid dialog-config-grid">
             <label class="playback-setting">
               <span>当前预设</span>
               <select id="projectDialogBoxPresetSelect">
@@ -40707,6 +40785,37 @@ async function saveProjectDialogBoxConfig() {
     showToast("项目文本框样式已保存");
   } catch (error) {
     await showEditorOperationFailure(error, "保存文本框样式失败", "项目文本框样式没有保存成功");
+  }
+}
+
+async function applyDialogBoxReadabilityFix() {
+  if (state.dialogBoxReadabilityFixInFlight) {
+    return;
+  }
+
+  const plan = dialogBoxReadabilityTools.buildDialogBoxReadabilityAutoFixPlan(state.data ?? {});
+  if (!plan.changed) {
+    setSaveStatus("文本框可读性已经比较稳");
+    showToast("文本框可读性已达标");
+    return;
+  }
+
+  setDialogBoxReadabilityFixInFlight(true);
+  try {
+    setSaveStatus("正在增强文本框可读性...");
+    await postJson(API_SAVE_PROJECT_SETTINGS, {
+      dialogBoxConfig: plan.dialogBoxConfig,
+    });
+    state.previewPlayback.dialogTheme = "project";
+    persistPreviewPlaybackSettings();
+    await reloadProjectData({ ...getCurrentUiState() });
+    renderAll();
+    setSaveStatus(plan.summary);
+    showToast(plan.summary);
+  } catch (error) {
+    await showEditorOperationFailure(error, "增强文本框可读性失败", "文本框可读性设置没有保存成功");
+  } finally {
+    setDialogBoxReadabilityFixInFlight(false);
   }
 }
 

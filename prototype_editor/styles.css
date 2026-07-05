@@ -10065,6 +10065,80 @@ html[data-ui-theme="light"] .ui-theme-mode-button {
   border-color: rgba(232, 81, 109, 0.22);
 }
 
+.dialog-readability-card {
+  display: grid;
+  gap: 12px;
+  margin: 14px 0;
+  padding: 16px;
+  border: 1px solid rgba(121, 220, 255, 0.16);
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 92% 0%, rgba(121, 220, 255, 0.12), transparent 34%),
+    rgba(7, 15, 28, 0.72);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 18px 36px rgba(0, 0, 0, 0.12);
+}
+
+.dialog-readability-head,
+.dialog-readability-actions,
+.dialog-readability-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.dialog-readability-head {
+  justify-content: space-between;
+}
+
+.dialog-readability-head strong {
+  margin-bottom: 4px;
+}
+
+.dialog-readability-badge,
+.dialog-readability-metrics span {
+  border: 1px solid rgba(121, 220, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(121, 220, 255, 0.08);
+  color: rgba(223, 242, 255, 0.92);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 8px 10px;
+}
+
+.dialog-readability-badge[data-readability-level="danger"] {
+  border-color: rgba(255, 115, 143, 0.32);
+  background: rgba(255, 115, 143, 0.12);
+  color: rgba(255, 218, 225, 0.96);
+}
+
+.dialog-readability-badge[data-readability-level="warning"] {
+  border-color: rgba(255, 190, 96, 0.32);
+  background: rgba(255, 190, 96, 0.12);
+  color: rgba(255, 233, 194, 0.96);
+}
+
+.dialog-readability-issue-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 18px;
+  color: rgba(205, 222, 244, 0.82);
+  font-size: 13px;
+  line-height: 1.58;
+}
+
+.dialog-readability-ok,
+.dialog-readability-actions span {
+  margin: 0;
+  color: rgba(186, 204, 228, 0.72);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
 .nav-button-label,
 .story-template-button strong,
 .project-card h3,
@@ -10469,6 +10543,41 @@ html[data-ui-theme="light"] .ui-theme-mode-button:hover {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.92),
     0 12px 24px rgba(42, 83, 140, 0.14);
+}
+
+html[data-ui-theme="light"] .dialog-readability-card {
+  border-color: rgba(89, 130, 190, 0.24);
+  background:
+    radial-gradient(circle at 92% 0%, rgba(64, 145, 255, 0.14), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(238, 247, 255, 0.94));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.88),
+    0 14px 28px rgba(43, 80, 130, 0.1);
+}
+
+html[data-ui-theme="light"] .dialog-readability-badge,
+html[data-ui-theme="light"] .dialog-readability-metrics span {
+  border-color: rgba(70, 139, 220, 0.22);
+  background: rgba(64, 145, 255, 0.1);
+  color: #244568;
+}
+
+html[data-ui-theme="light"] .dialog-readability-badge[data-readability-level="danger"] {
+  border-color: rgba(208, 73, 105, 0.28);
+  background: rgba(255, 82, 122, 0.1);
+  color: #8b2441;
+}
+
+html[data-ui-theme="light"] .dialog-readability-badge[data-readability-level="warning"] {
+  border-color: rgba(188, 122, 36, 0.28);
+  background: rgba(255, 174, 76, 0.12);
+  color: #7a4a14;
+}
+
+html[data-ui-theme="light"] .dialog-readability-issue-list,
+html[data-ui-theme="light"] .dialog-readability-ok,
+html[data-ui-theme="light"] .dialog-readability-actions span {
+  color: #526c91;
 }
 
 html[data-ui-theme="light"] .toolbar-button-primary,
