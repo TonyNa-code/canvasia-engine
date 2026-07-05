@@ -1940,6 +1940,94 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("复制整理回执", payload["activeWithReceiptMarkup"])
         self.assertIn("导出整理回执", payload["activeWithReceiptMarkup"])
 
+    def test_project_one_click_polish_receipt_panel_renders_actionable_next_steps(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        render_dashboard = _extract_function_source(source, "renderDashboard")
+        normalize_next_action = _extract_function_source(source, "normalizeProjectOneClickPolishNextAction")
+        receipt_panel = _extract_function_source(source, "renderProjectOneClickPolishReceiptPanel")
+
+        self.assertIn("renderProjectOneClickPolishReceiptPanel()", render_dashboard)
+
+        script = textwrap.dedent(
+            f"""
+            const state = {{
+              projectOneClickPolishReceipt: {{
+                receiptId: "polish-demo",
+                summary: "发布前整理完成：补齐 8 项",
+                safetySnapshotLabel: "发布前整理前自动检查点",
+                changedSceneCount: 2,
+                totalOperationCount: 8,
+                readableSplitCount: 1,
+                readableAddedBlockCount: 2,
+                presentationChangedFieldCount: 3,
+                audioOperationCount: 2,
+                scenePlans: [
+                  {{
+                    sceneId: "scene_intro",
+                    sceneName: "开场",
+                    readableSplitCount: 1,
+                    readableAddedBlockCount: 2,
+                    presentationChangedFieldCount: 3,
+                    audioOperationCount: 2,
+                  }},
+                ],
+                nextActions: [
+                  {{
+                    label: "重新巡检确认",
+                    action: "run-project-inspection",
+                    detail: "确认一键整理没有新增错误。",
+                  }},
+                  {{
+                    label: "去试玩页确认",
+                    action: "switch-screen",
+                    screen: "preview",
+                    detail: "从第一处整理过的场景开始快速过一遍。",
+                  }},
+                ],
+              }},
+            }};
+            function escapeHtml(value) {{
+              return String(value ?? "");
+            }}
+            function renderRouteMetricCard(label, value, hint) {{
+              return `<article class="route-metric-card"><span>${{label}}</span><strong>${{value}}</strong><small>${{hint}}</small></article>`;
+            }}
+            function renderQuickActionButton(action, emphasized = false) {{
+              return `<button class="${{emphasized ? "toolbar-button-primary" : "toolbar-button"}}" data-action="${{action.action ?? ""}}" data-screen="${{action.screen ?? ""}}">${{action.label ?? ""}}</button>`;
+            }}
+            function normalizeProjectOneClickPolishNextAction(action, index = 0) {normalize_next_action}
+            function renderProjectOneClickPolishReceiptPanel(receipt = state.projectOneClickPolishReceipt) {receipt_panel}
+            const markup = renderProjectOneClickPolishReceiptPanel();
+            state.projectOneClickPolishReceipt = {{
+              receiptId: "legacy-polish",
+              nextActions: ["打开项目巡检，确认没有新增错误。"],
+              scenePlans: [],
+            }};
+            const legacyMarkup = renderProjectOneClickPolishReceiptPanel();
+            process.stdout.write(JSON.stringify({{ markup, legacyMarkup }}));
+            """
+        )
+        completed = subprocess.run(
+            ["node", "-e", script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        self.assertIn("最近发布前整理", payload["markup"])
+        self.assertIn("发布前整理完成：补齐 8 项", payload["markup"])
+        self.assertIn("发布前整理前自动检查点", payload["markup"])
+        self.assertIn("处理过的场景", payload["markup"])
+        self.assertIn("开场", payload["markup"])
+        self.assertIn('data-action="run-project-inspection"', payload["markup"])
+        self.assertIn('data-action="switch-screen"', payload["markup"])
+        self.assertIn('data-screen="preview"', payload["markup"])
+        self.assertIn('data-action="copy-project-one-click-polish-receipt-summary"', payload["markup"])
+        self.assertIn("打开项目巡检，确认没有新增错误。", payload["legacyMarkup"])
+        self.assertIn('data-action="run-project-inspection"', payload["legacyMarkup"])
+
     def test_project_one_click_polish_action_is_wired(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
         click_handler = _extract_function_source(source, "handleClick")
@@ -1957,6 +2045,8 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("void copyProjectOneClickPolishReceiptSummary();", one_click_block)
         self.assertIn("exportProjectOneClickPolishReceipt();", one_click_block)
         self.assertIn("function setProjectOneClickPolishInFlight", source)
+        self.assertIn("function renderProjectOneClickPolishReceiptPanel", source)
+        self.assertIn("function normalizeProjectOneClickPolishNextAction", source)
         self.assertIn("async function runProjectOneClickPolish()", source)
         self.assertIn("async function saveProjectHistoryCheckpoint", source)
         self.assertIn("function exportProjectOneClickPolishReceipt()", source)

@@ -156,6 +156,9 @@ class FrontendProjectPolishModuleTests(unittest.TestCase):
                 totalOperationCount: receipt.totalOperationCount,
                 sceneNames: receipt.scenePlans.map((scenePlan) => scenePlan.sceneName),
                 nextActionCount: receipt.nextActions.length,
+                nextActionLabels: receipt.nextActions.map((action) => action.label),
+                nextActionActions: receipt.nextActions.map((action) => action.action),
+                nextActionScreens: receipt.nextActions.map((action) => action.screen || ""),
               }},
               receiptFileName,
               receiptMarkdown,
@@ -223,14 +226,21 @@ class FrontendProjectPolishModuleTests(unittest.TestCase):
         self.assertGreater(payload["receipt"]["totalOperationCount"], 0)
         self.assertEqual(payload["receipt"]["sceneNames"], ["开场"])
         self.assertGreaterEqual(payload["receipt"]["nextActionCount"], 3)
+        self.assertIn("重新巡检确认", payload["receipt"]["nextActionLabels"])
+        self.assertIn("run-project-inspection", payload["receipt"]["nextActionActions"])
+        self.assertIn("export-project-one-click-polish-receipt", payload["receipt"]["nextActionActions"])
+        self.assertIn("preview", payload["receipt"]["nextActionScreens"])
         self.assertEqual(payload["receiptFileName"], "demo-project-polish-20260510100000.md")
         self.assertIn("# 发布前整理回执", payload["receiptMarkdown"])
         self.assertIn("| 回执编号 | polish-20260510100000 |", payload["receiptMarkdown"])
         self.assertIn("| 安全检查点 | 发布前整理前自动检查点 |", payload["receiptMarkdown"])
         self.assertIn("| 开场 | scene_intro |", payload["receiptMarkdown"])
+        self.assertIn("重新巡检确认", payload["receiptMarkdown"])
+        self.assertIn("导出整理回执", payload["receiptMarkdown"])
         self.assertIn("发布前整理回执：", payload["receiptClipboard"])
         self.assertIn("回执编号：polish-20260510100000", payload["receiptClipboard"])
         self.assertIn("安全检查点：发布前整理前自动检查点", payload["receiptClipboard"])
+        self.assertIn("下一步：重新巡检确认", payload["receiptClipboard"])
         self.assertEqual(payload["sourceStillUntouched"]["originalBlockCount"], 4)
         self.assertEqual(payload["sourceStillUntouched"]["originalFadeInMs"], 0)
         self.assertEqual(payload["sourceStillUntouched"]["originalEndBlockId"], "missing_block")

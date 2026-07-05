@@ -378,12 +378,37 @@
       audioOperationCount: Math.max(0, Number(plan.audioOperationCount) || 0),
       scenePlans,
       nextActions: [
-        "打开项目巡检，确认没有新增错误。",
-        "进入试玩页，从第一处整理过的场景开始快速过一遍。",
-        "如果效果不满意，可在项目历史里恢复到整理前自动检查点。",
+        {
+          label: "重新巡检确认",
+          action: "run-project-inspection",
+          detail: "确认一键整理没有新增错误。",
+        },
+        {
+          label: "去试玩页确认",
+          action: "switch-screen",
+          screen: "preview",
+          detail: "从第一处整理过的场景开始快速过一遍。",
+        },
+        {
+          label: "导出整理回执",
+          action: "export-project-one-click-polish-receipt",
+          detail: "把本次处理内容留给测试或发布记录。",
+        },
       ],
     };
     return receipt;
+  }
+
+  function getReceiptNextActionLabel(action, fallback = "打开项目巡检并重新试玩。") {
+    if (typeof action === "string") {
+      return compactText(action, fallback, 140);
+    }
+    if (!action || typeof action !== "object") {
+      return fallback;
+    }
+    const label = compactText(action.label, "", 80);
+    const detail = compactText(action.detail, "", 120);
+    return [label, detail].filter(Boolean).join("：") || fallback;
   }
 
   function buildProjectOneClickPolishReceiptFileName(receipt = {}) {
@@ -421,7 +446,7 @@
     ]);
     const sceneTable = buildMarkdownTable(["场景", "ID", "长文本 / 新增卡", "演出参数", "音频参数", "首处定位"], sceneRows);
     const nextActions = toArray(receipt.nextActions).length
-      ? receipt.nextActions.map((action, index) => `${index + 1}. ${action}`)
+      ? receipt.nextActions.map((action, index) => `${index + 1}. ${getReceiptNextActionLabel(action)}`)
       : ["1. 打开项目巡检并重新试玩。"];
 
     return [
@@ -472,7 +497,7 @@
       receipt.safetySnapshotLabel ? `安全检查点：${receipt.safetySnapshotLabel}` : "",
       `涉及场景：${receipt.changedSceneCount ?? 0} 个；处理项：${receipt.totalOperationCount ?? 0} 项`,
       ...sceneLines,
-      toArray(receipt.nextActions)[0] ? `下一步：${receipt.nextActions[0]}` : "",
+      toArray(receipt.nextActions)[0] ? `下一步：${getReceiptNextActionLabel(receipt.nextActions[0])}` : "",
     ]
       .filter(Boolean)
       .join("\n");
