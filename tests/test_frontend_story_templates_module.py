@@ -58,6 +58,38 @@ class FrontendStoryTemplatesModuleTests(unittest.TestCase):
               branchMergeSummary: tools.getStoryTemplateSummary("branch_merge", {{
                 getBlockLabel: (type) => type,
               }}),
+              sceneSignals: tools.getStoryTemplateSceneSignals({{
+                blocks: [
+                  {{ type: "dialogue" }},
+                  {{ type: "choice" }},
+                ],
+              }}),
+              emptyRecommendationPlan: tools.getStoryTemplateRecommendationPlan({{ blocks: [] }}),
+              dialogueRecommendationPlan: tools.getStoryTemplateRecommendationPlan({{
+                blocks: [
+                  {{ type: "background" }},
+                  {{ type: "character_show" }},
+                  {{ type: "dialogue" }},
+                  {{ type: "dialogue" }},
+                ],
+              }}),
+              branchRecommendationPlan: tools.getStoryTemplateRecommendationPlan({{
+                blocks: [
+                  {{ type: "choice" }},
+                  {{ type: "condition" }},
+                ],
+              }}),
+              videoRecommendationPlan: tools.getStoryTemplateRecommendationPlan({{
+                blocks: [
+                  {{ type: "video_play" }},
+                ],
+              }}),
+              recommendedPanelItems: tools.getStoryTemplateRecommendedPanelItems({{
+                blocks: [
+                  {{ type: "dialogue" }},
+                  {{ type: "dialogue" }},
+                ],
+              }}).slice(0, 4),
               variableRequirements: {{
                 playable: tools.getStoryTemplateVariableRequirement("playable_scene"),
                 affection: tools.getStoryTemplateVariableRequirement("affection_choice"),
@@ -96,6 +128,9 @@ class FrontendStoryTemplatesModuleTests(unittest.TestCase):
         self.assertIn("getStoryTemplateBlockRecipes", payload["keys"])
         self.assertIn("getStoryTemplateSummary", payload["keys"])
         self.assertIn("getStoryTemplatePanelItems", payload["keys"])
+        self.assertIn("getStoryTemplateSceneSignals", payload["keys"])
+        self.assertIn("getStoryTemplateRecommendationPlan", payload["keys"])
+        self.assertIn("getStoryTemplateRecommendedPanelItems", payload["keys"])
         self.assertIn("getStoryTemplateRegistryHealth", payload["keys"])
         self.assertEqual(payload["presetTitles"], [
             "第一段可试玩",
@@ -173,6 +208,20 @@ class FrontendStoryTemplatesModuleTests(unittest.TestCase):
         self.assertIn("depth_blur x 2", payload["climaxSummary"]["labels"])
         self.assertEqual(payload["branchMergeSummary"]["blockCount"], 5)
         self.assertIn("choice", payload["branchMergeSummary"]["labels"])
+        self.assertEqual(payload["sceneSignals"]["blockCount"], 2)
+        self.assertTrue(payload["sceneSignals"]["hasChoice"])
+        self.assertEqual(payload["sceneSignals"]["textBlockCount"], 1)
+        self.assertEqual(payload["emptyRecommendationPlan"]["recommendations"][0]["templateId"], "playable_scene")
+        self.assertEqual(payload["dialogueRecommendationPlan"]["recommendations"][0]["templateId"], "branch_choice")
+        self.assertIn(
+            "affection_choice",
+            [item["templateId"] for item in payload["dialogueRecommendationPlan"]["recommendations"]],
+        )
+        self.assertEqual(payload["branchRecommendationPlan"]["recommendations"][0]["templateId"], "branch_merge")
+        self.assertEqual(payload["videoRecommendationPlan"]["recommendations"][0]["templateId"], "ending_credits")
+        self.assertTrue(payload["recommendedPanelItems"][0]["isRecommended"])
+        self.assertEqual(payload["recommendedPanelItems"][0]["templateId"], "branch_choice")
+        self.assertIn("推荐", payload["recommendedPanelItems"][0]["badgeLabel"])
         self.assertFalse(payload["variableRequirements"]["playable"]["requiresAny"])
         self.assertTrue(payload["variableRequirements"]["affection"]["requiresAny"])
         self.assertTrue(payload["variableRequirements"]["affection"]["requiresNumber"])

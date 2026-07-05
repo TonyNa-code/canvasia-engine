@@ -9782,12 +9782,24 @@ function renderStoryEditorModeBanner(scene = null) {
 }
 
 function getStoryTemplatePanelItems() {
+  const fallbackItems = Object.keys(STORY_TEMPLATE_PRESETS).map((templateId) => ({ templateId }));
+  const scene = getSelectedScene();
+
+  if (typeof storyTemplateTools.getStoryTemplateRecommendedPanelItems === "function") {
+    return storyTemplateTools.getStoryTemplateRecommendedPanelItems(scene, { limit: 4 });
+  }
+
   return typeof storyTemplateTools.getStoryTemplatePanelItems === "function"
     ? storyTemplateTools.getStoryTemplatePanelItems()
-    : Object.keys(STORY_TEMPLATE_PRESETS).map((templateId) => ({ templateId }));
+    : fallbackItems;
 }
 
 function getStoryTemplateButtonDescription(item, summary) {
+  const recommendationReason = String(item?.recommendationReason ?? "").trim();
+  if (recommendationReason) {
+    return `推荐：${recommendationReason}`;
+  }
+
   const description = String(item?.description ?? "").trim();
   if (description) {
     return description;
@@ -9806,15 +9818,19 @@ function renderStoryTemplateButton(item = {}) {
   const summary = storyTemplateTools.getStoryTemplateSummary(templateId, { getBlockLabel });
   const tone = String(item.tone ?? "").trim();
   const toneClass = tone ? ` is-${escapeHtml(tone)}` : "";
+  const isRecommended = Boolean(item.isRecommended);
+  const recommendedClass = isRecommended ? " is-recommended" : "";
+  const badgeLabel = String(item.badgeLabel ?? "").trim();
   const labels = summary.labels.slice(0, 3);
 
   return `
     <button
-      class="story-template-button${toneClass}"
+      class="story-template-button${toneClass}${recommendedClass}"
       type="button"
       data-action="apply-story-template"
       data-template-id="${escapeHtml(templateId)}"
     >
+      ${isRecommended && badgeLabel ? `<span class="story-template-recommendation-badge">${escapeHtml(badgeLabel)}</span>` : ""}
       <strong>${escapeHtml(summary.title || preset.title)}</strong>
       <span>${escapeHtml(getStoryTemplateButtonDescription(item, summary))}</span>
       <div class="story-template-button-meta">

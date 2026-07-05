@@ -848,6 +848,171 @@
     return Array.from(new Set(toArray(values).filter(Boolean)));
   }
 
+  function getStoryTemplateSceneSignals(scene = {}) {
+    const blocks = toArray(scene?.blocks).filter((block) => block && typeof block === "object");
+    const typeCounts = blocks.reduce((counts, block) => {
+      const type = String(block.type ?? "").trim();
+      if (type) {
+        counts[type] = (counts[type] ?? 0) + 1;
+      }
+      return counts;
+    }, {});
+    const hasAny = (types) => types.some((type) => (typeCounts[type] ?? 0) > 0);
+    const textBlockCount = (typeCounts.dialogue ?? 0) + (typeCounts.narration ?? 0);
+    const visualEffectCount = [
+      "screen_fade",
+      "screen_filter",
+      "screen_flash",
+      "screen_shake",
+      "camera_zoom",
+      "camera_pan",
+      "depth_blur",
+      "particle_effect",
+    ].reduce((total, type) => total + (typeCounts[type] ?? 0), 0);
+    const lastBlock = blocks[blocks.length - 1] ?? null;
+
+    return deepFreeze({
+      blockCount: blocks.length,
+      textBlockCount,
+      visualEffectCount,
+      lastBlockType: String(lastBlock?.type ?? ""),
+      hasBackground: hasAny(["background"]),
+      hasCharacterShow: hasAny(["character_show"]),
+      hasDialogue: hasAny(["dialogue"]),
+      hasNarration: hasAny(["narration"]),
+      hasChoice: hasAny(["choice"]),
+      hasCondition: hasAny(["condition"]),
+      hasJump: hasAny(["jump"]),
+      hasMusic: hasAny(["music_play"]),
+      hasMusicStop: hasAny(["music_stop"]),
+      hasVideo: hasAny(["video_play"]),
+      hasCredits: hasAny(["credits_roll"]),
+      hasEndingCue: hasAny(["credits_roll", "music_stop"]) || hasAny(["jump"]),
+      typeCounts: Object.freeze({ ...typeCounts }),
+    });
+  }
+
+  function pushTemplateRecommendation(recommendations, templateId, score, reason) {
+    if (!STORY_TEMPLATE_PRESETS[templateId] || !Array.isArray(STORY_TEMPLATE_BLOCK_RECIPES[templateId])) {
+      return;
+    }
+    const safeScore = Number.isFinite(score) ? score : 0;
+    const safeReason = String(reason ?? "").trim();
+    const existing = recommendations.get(templateId);
+    if (!existing || safeScore > existing.score) {
+      recommendations.set(templateId, {
+        templateId,
+        score: safeScore,
+        reason: safeReason || "适合补齐当前场景的下一步。",
+      });
+    }
+  }
+
+  function getStoryTemplateRecommendationPlan(scene = {}, options = {}) {
+    const limit = Math.max(1, Number.parseInt(options.limit ?? 4, 10) || 4);
+    const signals = getStoryTemplateSceneSignals(scene);
+    const recommendations = new Map();
+
+    if (signals.blockCount <= 0) {
+      pushTemplateRecommendation(recommendations, "playable_scene", 120, "空场景先生成一段能直接试玩的完整闭环。");
+      pushTemplateRecommendation(recommendations, "opening_intro", 105, "先铺背景、BGM、角色亮相和第一句对白。");
+      pushTemplateRecommendation(recommendations, "daily_conversation", 82, "需要更轻的日常开场时，可以先做对话节奏。");
+    }
+
+    if (signals.blockCount > 0 && !signals.hasBackground) {
+      pushTemplateRecommendation(recommendations, "opening_intro", 88, "当前场景还没有背景锚点，先建立画面入口。");
+    }
+
+    if (signals.hasDialogue && !signals.hasChoice) {
+      pushTemplateRecommendation(recommendations, "branch_choice", 98, "已经有对白但还没有选择项，可以补一个分支入口。");
+      pushTemplateRecommendation(recommendations, "affection_choice", 90, "如果这段会影响关系线，可以直接插入好感度选项。");
+    }
+
+    if (signals.hasChoice || signals.hasCondition) {
+      pushTemplateRecommendation(recommendations, "branch_merge", 94, "场景里已经有分支，适合补一个汇合点避免路线散掉。");
+    }
+
+    if (signals.hasMusic && !signals.hasMusicStop && signals.blockCount >= 3) {
+      pushTemplateRecommendation(recommendations, "scene_outro", 86, "已经播放 BGM，收尾时记得淡出音乐和接下一场。");
+    }
+
+    if (signals.hasVideo && !signals.hasCredits) {
+      pushTemplateRecommendation(recommendations, "ending_credits", 92, "有视频/OP 后，可以补 ED 或片尾字幕形成发布感。");
+    }
+
+    if (signals.hasCharacterShow && signals.textBlockCount >= 2 && signals.visualEffectCount <= 0) {
+      pushTemplateRecommendation(recommendations, "emotion_burst", 78, "角色和对白已经就位，可以加一个轻量情绪演出。");
+    }
+
+    if (signals.textBlockCount >= 6 && signals.visualEffectCount <= 1) {
+      pushTemplateRecommendation(recommendations, "climax_sequence", 72, "文本较多时可以插入镜头/闪屏/景深打出节奏峰值。");
+    }
+
+    if (signals.blockCount >= 8 && !signals.hasEndingCue) {
+      pushTemplateRecommendation(recommendations, "scene_outro", 76, "场景已经较长，建议准备一个明确收束。");
+    }
+
+    if (signals.hasNarration && !signals.hasDialogue && signals.blockCount >= 2) {
+      pushTemplateRecommendation(recommendations, "memory_entry", 70, "旁白较多时适合转入回忆或梦境滤镜。");
+    }
+
+    if (!recommendations.size) {
+      pushTemplateRecommendation(recommendations, "opening_intro", 60, "从基础开场结构继续补画面和声音。");
+      pushTemplateRecommendation(recommendations, "branch_choice", 55, "给当前段落补一个玩家选择点。");
+      pushTemplateRecommendation(recommendations, "scene_outro", 50, "为当前段落准备自然收尾。");
+    }
+
+    const ranked = Array.from(recommendations.values())
+      .sort((left, right) => right.score - left.score || left.templateId.localeCompare(right.templateId))
+      .slice(0, limit)
+      .map((item, index) => Object.freeze({
+        ...item,
+        rank: index + 1,
+        title: STORY_TEMPLATE_PRESETS[item.templateId]?.title ?? item.templateId,
+      }));
+
+    return deepFreeze({
+      signals,
+      recommendations: ranked,
+    });
+  }
+
+  function getStoryTemplateRecommendedPanelItems(scene = {}, options = {}) {
+    const panelItems = getStoryTemplatePanelItems();
+    const plan = getStoryTemplateRecommendationPlan(scene, options);
+    const byTemplateId = new Map(plan.recommendations.map((item) => [item.templateId, item]));
+    const enriched = panelItems.map((item, index) => {
+      const recommendation = byTemplateId.get(item.templateId);
+      if (!recommendation) {
+        return Object.freeze({ ...item, originalIndex: index, isRecommended: false });
+      }
+      return Object.freeze({
+        ...item,
+        originalIndex: index,
+        isRecommended: true,
+        recommendationRank: recommendation.rank,
+        recommendationScore: recommendation.score,
+        recommendationReason: recommendation.reason,
+        badgeLabel: `推荐 ${recommendation.rank}`,
+      });
+    });
+
+    return deepFreeze(
+      [...enriched].sort((left, right) => {
+        if (left.isRecommended && right.isRecommended) {
+          return left.recommendationRank - right.recommendationRank;
+        }
+        if (left.isRecommended) {
+          return -1;
+        }
+        if (right.isRecommended) {
+          return 1;
+        }
+        return left.originalIndex - right.originalIndex;
+      })
+    );
+  }
+
   function getStoryTemplateRegistryHealth() {
     const presetIds = Object.keys(STORY_TEMPLATE_PRESETS);
     const recipeIds = Object.keys(STORY_TEMPLATE_BLOCK_RECIPES);
@@ -893,6 +1058,9 @@
     getStoryTemplateSummary,
     getStoryTemplateVariableRequirement,
     getStoryTemplatePanelItems,
+    getStoryTemplateSceneSignals,
+    getStoryTemplateRecommendationPlan,
+    getStoryTemplateRecommendedPanelItems,
     getStoryTemplateRegistryHealth,
     getTemplateLabel,
   });

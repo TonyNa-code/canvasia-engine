@@ -2982,6 +2982,11 @@ body[data-editor-mode="beginner"] #screen-preview #previewSceneFilterBar {
   background: linear-gradient(180deg, rgba(255, 249, 239, 0.98), rgba(255, 244, 227, 0.95));
 }
 
+.story-template-button.is-recommended {
+  border-color: rgba(60, 119, 255, 0.42);
+  box-shadow: 0 12px 28px rgba(63, 111, 232, 0.12);
+}
+
 .story-template-button:hover {
   transform: translateY(-1px);
   border-color: rgba(204, 110, 67, 0.34);
@@ -2996,6 +3001,18 @@ body[data-editor-mode="beginner"] #screen-preview #previewSceneFilterBar {
   color: var(--muted);
   font-size: 12px;
   line-height: 1.6;
+}
+
+.story-template-recommendation-badge {
+  width: fit-content;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(73, 116, 216, 0.18);
+  background: linear-gradient(135deg, rgba(71, 132, 255, 0.16), rgba(83, 214, 183, 0.14));
+  color: #3154ad;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.2;
 }
 
 .story-template-button-meta {
