@@ -4590,6 +4590,16 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("导出${targetLabel}失败，已列出原因", export_build)
         self.assertIn("${targetLabel}没有导出成功", export_build)
         self.assertIn("copyable: true", export_build)
+        self.assertIn('target === "renpy_draft"', export_build)
+        self.assertIn("Ren'Py Starter Bundle", export_build)
+        self.assertIn("Ren'Py Starter Bundle 已经导出", export_build)
+        self.assertIn('data-export-target="renpy_draft"', source)
+        self.assertIn("renpyScriptPublicUrl", source)
+        self.assertIn("打开 Ren'Py script.rpy", source)
+        self.assertIn("renpyReviewPublicUrl", source)
+        self.assertIn("打开迁移备注", source)
+        self.assertIn("renpyManifestPublicUrl", source)
+        self.assertIn("打开 Ren'Py Manifest", source)
 
     def test_native_export_surface_links_vn_baseline_quality_reports(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")

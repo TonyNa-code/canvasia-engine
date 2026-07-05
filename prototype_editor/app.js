@@ -26852,9 +26852,12 @@ function renderProjectValidationSummary() {
     }
     <article class="detail-card">
       <strong>正式导出</strong>
-      <p>现在已经支持六种导出：网页试玩包适合先试跑，原生 Runtime 包适合验证脱离 HTML 的播放主链并继续打成 App，Windows / macOS / Linux 桌面包适合正式交付，而编辑器桌面包适合把整套创作工具发给别的创作者继续做。</p>
+      <p>现在已经支持多种导出：网页试玩包适合先试跑，Ren'Py Starter Bundle 适合迁移协作，原生 Runtime 包适合验证脱离 HTML 的播放主链并继续打成 App，Windows / macOS / Linux 桌面包适合正式交付，而编辑器桌面包适合把整套创作工具发给别的创作者继续做。</p>
       <div class="detail-actions">
         <button class="toolbar-button" data-action="export-build" data-export-target="web">导出试玩包</button>
+        <button class="toolbar-button" data-action="export-build" data-export-target="renpy_draft">
+          导出 Ren'Py Starter Bundle
+        </button>
         <button class="toolbar-button" data-action="export-build" data-export-target="native_runtime">
           导出原生 Runtime 包
         </button>
@@ -26888,7 +26891,7 @@ function renderProjectValidationSummary() {
             : ""
         }
         ${
-          ["native_runtime", "windows_nwjs", "macos_nwjs", "linux_nwjs"].includes(exportResult?.target) && exportResult?.archivePublicUrl
+          ["renpy_draft", "native_runtime", "windows_nwjs", "macos_nwjs", "linux_nwjs"].includes(exportResult?.target) && exportResult?.archivePublicUrl
             ? `
               <a
                 class="toolbar-button"
@@ -26896,7 +26899,49 @@ function renderProjectValidationSummary() {
                 target="_blank"
                 rel="noreferrer"
               >
-                下载${escapeHtml(exportResult.target === "native_runtime" ? "原生 Runtime 包" : "桌面包")}压缩档
+                下载${escapeHtml(exportResult.target === "renpy_draft" ? "Ren'Py Starter Bundle" : exportResult.target === "native_runtime" ? "原生 Runtime 包" : "桌面包")}压缩档
+              </a>
+            `
+            : ""
+        }
+        ${
+          exportResult?.target === "renpy_draft" && exportResult?.renpyScriptPublicUrl
+            ? `
+              <a
+                class="toolbar-button toolbar-button-primary"
+                href="${escapeHtml(exportResult.renpyScriptPublicUrl)}"
+                target="_blank"
+                rel="noreferrer"
+              >
+                打开 Ren'Py script.rpy
+              </a>
+            `
+            : ""
+        }
+        ${
+          exportResult?.target === "renpy_draft" && exportResult?.renpyReviewPublicUrl
+            ? `
+              <a
+                class="toolbar-button"
+                href="${escapeHtml(exportResult.renpyReviewPublicUrl)}"
+                target="_blank"
+                rel="noreferrer"
+              >
+                打开迁移备注
+              </a>
+            `
+            : ""
+        }
+        ${
+          exportResult?.target === "renpy_draft" && exportResult?.renpyManifestPublicUrl
+            ? `
+              <a
+                class="toolbar-button"
+                href="${escapeHtml(exportResult.renpyManifestPublicUrl)}"
+                target="_blank"
+                rel="noreferrer"
+              >
+                打开 Ren'Py Manifest
               </a>
             `
             : ""
@@ -40932,6 +40977,8 @@ async function exportBuild(target = "web") {
   const exportTarget =
     target === "native_runtime"
       ? "native_runtime"
+      : target === "renpy_draft"
+      ? "renpy_draft"
       : target === "windows_nwjs"
       ? "windows_nwjs"
       : target === "macos_nwjs"
@@ -40946,6 +40993,8 @@ async function exportBuild(target = "web") {
   const targetLabel =
     exportTarget === "native_runtime"
       ? "原生 Runtime 包"
+      : exportTarget === "renpy_draft"
+      ? "Ren'Py Starter Bundle"
       : exportTarget === "windows_nwjs"
       ? "Windows 桌面包"
       : exportTarget === "macos_nwjs"
@@ -40978,6 +41027,12 @@ async function exportBuild(target = "web") {
     if (exportTarget === "native_runtime") {
       setSaveStatus("原生 Runtime 包已经导出，里面已包含继续打成独立 App 的脚本");
       showToast("原生 Runtime 包已经导出");
+      return;
+    }
+
+    if (exportTarget === "renpy_draft") {
+      setSaveStatus("Ren'Py Starter Bundle 已经导出，可下载 zip 或打开迁移备注继续整理");
+      showToast("Ren'Py Starter Bundle 已经导出");
       return;
     }
 

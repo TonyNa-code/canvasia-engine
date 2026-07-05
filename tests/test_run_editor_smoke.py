@@ -13,6 +13,7 @@ import tempfile
 import tarfile
 import unittest
 import wave
+import zipfile
 from unittest import mock
 from pathlib import Path
 
@@ -609,6 +610,134 @@ class RunEditorSmokeTests(unittest.TestCase):
 
         export_result = run_editor.export_web_build()
         self.assertEqual(export_result["missingAssets"], 0)
+
+    def test_export_renpy_draft_build_creates_starter_bundle(self) -> None:
+        _, chapter_result = self.create_blank_project_with_chapter()
+        background_asset = run_editor.import_assets(
+            "background",
+            [build_upload_payload("classroom.png", build_fake_png_bytes())],
+        )["assets"][0]
+        sprite_asset = run_editor.import_assets(
+            "sprite",
+            [build_upload_payload("heroine.png", build_fake_png_bytes())],
+        )["assets"][0]
+        bgm_asset = run_editor.import_assets(
+            "bgm",
+            [build_upload_payload("theme.wav", build_fake_wav_bytes())],
+        )["assets"][0]
+        voice_asset = run_editor.import_assets(
+            "voice",
+            [build_upload_payload("line.wav", build_fake_wav_bytes())],
+        )["assets"][0]
+        run_editor.write_json(
+            run_editor.DATA_DIR / "characters.json",
+            {
+                "formatVersion": run_editor.PROJECT_FORMAT_VERSION,
+                "characters": [
+                    {
+                        "id": "heroine",
+                        "displayName": "Heroine",
+                        "defaultSpriteId": sprite_asset["id"],
+                        "expressions": [
+                            {"id": "expr_default", "name": "Default", "spriteAssetId": sprite_asset["id"]},
+                        ],
+                    }
+                ],
+            },
+        )
+        run_editor.write_json(
+            run_editor.DATA_DIR / "variables.json",
+            {
+                "formatVersion": run_editor.PROJECT_FORMAT_VERSION,
+                "variables": [
+                    {"id": "affection", "name": "Affection", "type": "number", "defaultValue": 0},
+                    {"id": "flag_met", "name": "Met", "type": "boolean", "defaultValue": False},
+                ],
+            },
+        )
+        scene = self.save_scene_with_blocks(
+            chapter_result["chapterId"],
+            chapter_result["scene"],
+            [
+                {"id": "bg", "type": "background", "assetId": background_asset["id"]},
+                {"id": "music", "type": "music_play", "assetId": bgm_asset["id"], "fadeInMs": 800},
+                {
+                    "id": "show",
+                    "type": "character_show",
+                    "characterId": "heroine",
+                    "expressionId": "expr_default",
+                    "position": "center",
+                },
+                {
+                    "id": "line",
+                    "type": "dialogue",
+                    "speakerId": "heroine",
+                    "text": "Welcome back.",
+                    "voiceAssetId": voice_asset["id"],
+                },
+                {"id": "var", "type": "variable_add", "variableId": "affection", "value": 1},
+                {
+                    "id": "choice",
+                    "type": "choice",
+                    "options": [
+                        {
+                            "text": "Stay",
+                            "gotoSceneId": "__continue__",
+                            "effects": [{"type": "variable_set", "variableId": "flag_met", "value": True}],
+                        }
+                    ],
+                },
+                {"id": "flash", "type": "screen_flash"},
+            ],
+        )
+
+        export_result = run_editor.export_project_build(run_editor.EXPORT_TARGET_RENPY_DRAFT)
+        build_dir = Path(export_result["buildPath"])
+        script_path = build_dir / "game" / run_editor.RENPY_SCRIPT_FILE_NAME
+        manifest_path = Path(export_result["manifestPath"])
+        renpy_manifest_path = Path(export_result["renpyManifestPath"])
+        archive_path = Path(export_result["archivePath"])
+
+        self.assertEqual(export_result["target"], run_editor.EXPORT_TARGET_RENPY_DRAFT)
+        self.assertEqual(export_result["renpySceneCount"], 1)
+        self.assertEqual(export_result["renpyCharacterCount"], 1)
+        self.assertEqual(export_result["renpyVariableCount"], 2)
+        self.assertEqual(export_result["missingAssets"], 0)
+        self.assertTrue(script_path.is_file())
+        self.assertTrue((build_dir / "game" / run_editor.RENPY_OPTIONS_FILE_NAME).is_file())
+        self.assertTrue((build_dir / run_editor.RENPY_REVIEW_FILE_NAME).is_file())
+        self.assertTrue((build_dir / run_editor.RENPY_README_FILE_NAME).is_file())
+        self.assertTrue(renpy_manifest_path.is_file())
+        self.assertTrue(archive_path.is_file())
+        self.assertTrue(Path(export_result["archiveChecksumPath"]).is_file())
+        self.assertEqual(hashlib.sha256(archive_path.read_bytes()).hexdigest(), export_result["archiveSha256"])
+
+        script = script_path.read_text(encoding="utf-8")
+        self.assertIn("default affection = 0", script)
+        self.assertIn("default flag_met = False", script)
+        self.assertIn('define heroine = Character("Heroine")', script)
+        self.assertIn(f"image {background_asset['id']}", script)
+        self.assertIn("image heroine expr_default", script)
+        self.assertIn(f"label {scene['id']}:", script)
+        self.assertIn('play music "assets/bgm/', script)
+        self.assertIn('voice "assets/voice/', script)
+        self.assertIn('heroine "Welcome back."', script)
+        self.assertIn("$ affection += 1", script)
+        self.assertIn("$ flag_met = True", script)
+        self.assertIn("# Canvasia review screen_flash", script)
+
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        self.assertEqual(manifest["engine"]["exportTarget"], run_editor.EXPORT_TARGET_RENPY_DRAFT)
+        self.assertEqual(manifest["files"]["renpyScript"], f"game/{run_editor.RENPY_SCRIPT_FILE_NAME}")
+        renpy_manifest = json.loads(renpy_manifest_path.read_text(encoding="utf-8"))
+        self.assertEqual(renpy_manifest["sceneCount"], 1)
+        self.assertGreaterEqual(renpy_manifest["warningCount"], 1)
+
+        with zipfile.ZipFile(archive_path) as archive:
+            names = set(archive.namelist())
+        self.assertIn(f"game/{run_editor.RENPY_SCRIPT_FILE_NAME}", names)
+        self.assertIn(run_editor.RENPY_REVIEW_FILE_NAME, names)
+        self.assertTrue(any(name.startswith("game/assets/background/") for name in names))
 
     def test_starter_kit_rolls_back_when_first_scene_bootstrap_fails(self) -> None:
         self.create_blank_project_with_chapter()

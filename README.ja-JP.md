@@ -112,6 +112,7 @@ Canvasia Engine は、ビジュアルノベル / Galgame 制作者のための s
 - [`export_release_readiness.py`](export_release_readiness.py): 書き出しパッケージ向け release-readiness summary / tester handoff gate 生成器
 - [`export_story_route_map.py`](export_story_route_map.py): 書き出しパッケージ向け story route map / broken-link / unreachable-scene report 生成器
 - [`export_unlockable_manifest.py`](export_unlockable_manifest.py): 書き出し側の unlockable / gallery / replay カバレッジ manifest 生成器
+- [`renpy_export.py`](renpy_export.py): Ren'Py Starter Bundle / `.rpy` migration export 生成器
 - [`prototype_editor`](prototype_editor): エディタ frontend
 - [`prototype_editor/modules`](prototype_editor/modules): ルート分析、ストーリーテンプレート、エディタ補助、Assistant、公開前チェックなどを扱う単体テスト可能な frontend 純ロジックモジュール
 - [`export_player_template`](export_player_template): 書き出し後の Web Runtime テンプレート
@@ -193,12 +194,15 @@ Canvasia は初期 i18n フローに対応しています。
 プロジェクトを開き、プレビュー / 書き出し画面から次のパッケージを生成できます。
 
 - Web 試遊パッケージ
+- Ren'Py Starter Bundle パッケージ
 - Windows desktop パッケージ
 - macOS desktop パッケージ
 - Linux desktop パッケージ
 - standalone app ビルド用 scaffold を含むネイティブ Runtime preview パッケージ
 
 気軽に共有するなら Web 試遊パッケージが最も簡単です。よりアプリに近いデスクトップ再生フローを検証する場合は、ネイティブ Runtime パッケージを使います。
+
+Ren'Py Starter Bundle は `game/script.rpy`、`game/options.rpy`、`game/assets/` にコピーされた素材、migration manifest、カスタム Canvasia 演出の review notes を含む zip を生成します。
 
 すべての playable / runtime 書き出しには `README_试玩验收先看这里.md`、`story_route_map.json`、`story_route_map.md`、`localization_audit.json`、`localization_audit.md`、`release_readiness_summary.json`、`release_readiness_summary.md`、`unlockable_content_manifest.json`、`unlockable_content_report.md` も同梱されます。README は起動手順と受け入れチェック、story route map は broken jumps / unreachable scenes / ending candidates の確認、localization audit は multilingual project の missing translations、release-readiness files はテスターへ渡せる状態かどうかの短い gate、unlockable JSON / Markdown は CG ギャラリー、音楽鑑賞、ボイス回想、キャラクター / 場所 / ナレーション / 関係アーカイブ、章回想、エンディング、実績の収録状況を確認するためのレポートです。
 

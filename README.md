@@ -118,6 +118,7 @@ The project already includes a visual editor, export pipeline, native runtime pr
 - [`export_release_readiness.py`](export_release_readiness.py): exported package release-readiness summary and tester handoff gate builder
 - [`export_story_route_map.py`](export_story_route_map.py): exported package story route map, broken-link, and unreachable-scene report builder
 - [`export_unlockable_manifest.py`](export_unlockable_manifest.py): export-side unlockable / gallery / replay coverage manifest builder
+- [`renpy_export.py`](renpy_export.py): Ren'Py Starter Bundle builder for migration-friendly `.rpy` exports
 - [`prototype_editor`](prototype_editor): visual editor frontend
 - [`prototype_editor/modules`](prototype_editor/modules): frontend pure-logic modules for route analysis, story templates, editor helpers, assistant workflows, release checks, and other testable editor capabilities
 - [`export_player_template`](export_player_template): exported Web Runtime template
@@ -205,12 +206,15 @@ If a translation is missing, the runtime falls back to the default text instead 
 Open a project and go to the preview/export area to generate:
 
 - Web playable package
+- Ren'Py Starter Bundle package
 - Windows desktop package
 - macOS desktop package
 - Linux desktop package
 - Native Runtime package preview with standalone-app build scaffolding
 
 The Web playable package is the easiest option for quick sharing. The native Runtime package is the route for testing a more app-like desktop playback flow.
+
+The Ren'Py Starter Bundle exports a zip with `game/script.rpy`, `game/options.rpy`, copied assets under `game/assets/`, a migration manifest, and review notes for custom Canvasia effects that should be finished inside Ren'Py.
 
 Every playable export also includes `README_试玩验收先看这里.md`, `story_route_map.json`, `story_route_map.md`, `localization_audit.json`, `localization_audit.md`, `release_readiness_summary.json`, `release_readiness_summary.md`, `unlockable_content_manifest.json`, and `unlockable_content_report.md`. The README gives testers launch steps and acceptance checks; the story route map catches broken jumps and unreachable scenes; the localization audit flags missing translations in multilingual projects; the release-readiness files summarize whether the package is ready to hand to testers; the unlockable JSON / Markdown pair covers CG galleries, music rooms, voice replay, archive pages, achievements, chapter replay, and endings.
 

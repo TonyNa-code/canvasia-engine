@@ -51,6 +51,14 @@ from export_unlockable_manifest import (
     write_unlockable_content_manifest_file,
     write_unlockable_content_report_file,
 )
+from renpy_export import (
+    RENPY_MANIFEST_FILE_NAME,
+    RENPY_OPTIONS_FILE_NAME,
+    RENPY_README_FILE_NAME,
+    RENPY_REVIEW_FILE_NAME,
+    RENPY_SCRIPT_FILE_NAME,
+    write_renpy_starter_project,
+)
 from openai_asset_generation import (
     call_openai_asset_generation_model,
     normalize_openai_asset_generation_type,
@@ -308,6 +316,7 @@ EXPORT_TARGET_MACOS_NWJS = "macos_nwjs"
 EXPORT_TARGET_LINUX_NWJS = "linux_nwjs"
 EXPORT_TARGET_EDITOR_DESKTOP = "editor_desktop"
 EXPORT_TARGET_EDITOR_DESKTOP_SUITE = "editor_desktop_suite"
+EXPORT_TARGET_RENPY_DRAFT = "renpy_draft"
 NWJS_RUNTIME_VERSION = "v0.105.0"
 NWJS_GAME_PLATFORM_WINDOWS = "windows"
 NWJS_GAME_PLATFORM_MACOS = "macos"
@@ -10879,6 +10888,90 @@ def export_web_build() -> dict:
     }
 
 
+def export_renpy_draft_build() -> dict:
+    build_dir = create_export_build_dir("renpy_draft_build")
+    bundle = load_project_bundle()
+    game_dir = build_dir / "game"
+    export_assets_doc, copied_assets, missing_assets = copy_assets_for_export(bundle["assets"], game_dir)
+    renpy_files = write_renpy_starter_project(build_dir, bundle, export_assets_doc)
+    manifest = build_export_manifest(
+        bundle,
+        target=EXPORT_TARGET_RENPY_DRAFT,
+        target_label="Ren'Py Starter Bundle",
+        build_id=build_dir.name,
+        copied_assets=copied_assets,
+        missing_assets=missing_assets,
+        extra_files={
+            "renpyScript": renpy_files["scriptName"],
+            "renpyOptions": renpy_files["optionsName"],
+            "renpyManifest": renpy_files["manifestName"],
+            "renpyReviewNotes": renpy_files["reviewName"],
+            "readme": renpy_files["readmeName"],
+        },
+        runtime_info={
+            "mode": "renpy_starter_bundle",
+            "modeLabel": "Ren'Py Starter Bundle",
+            "warning": "这是迁移友好的 Ren'Py 起始包；自定义演出、复杂变量逻辑和 UI 仍需在 Ren'Py 中复核。",
+            "script": renpy_files["scriptName"],
+            "reviewNotes": renpy_files["reviewName"],
+            "reviewItemCount": renpy_files["warningCount"],
+        },
+    )
+    manifest_path = write_export_manifest(build_dir, manifest)
+    provenance_file = write_export_provenance_file(build_dir, bundle, manifest)
+    archive_path = Path(shutil.make_archive(str(build_dir), "zip", root_dir=build_dir))
+    archive_checksum = write_export_archive_checksum_files(archive_path, "Ren'Py Starter Bundle")
+
+    return {
+        "target": EXPORT_TARGET_RENPY_DRAFT,
+        "targetLabel": "Ren'Py Starter Bundle",
+        "buildId": build_dir.name,
+        "buildPath": str(build_dir),
+        "archivePath": str(archive_path),
+        "archiveName": archive_path.name,
+        "archivePublicUrl": f"/exports/{archive_path.name}",
+        "archiveSha256": archive_checksum["archiveSha256"],
+        "archiveSizeBytes": archive_checksum["archiveSizeBytes"],
+        "archiveSizeLabel": archive_checksum["archiveSizeLabel"],
+        "archiveChecksumName": archive_checksum["archiveChecksumName"],
+        "archiveChecksumPath": archive_checksum["archiveChecksumPath"],
+        "archiveChecksumPublicUrl": f"/exports/{archive_checksum['archiveChecksumName']}",
+        "archiveChecksumJsonName": archive_checksum["archiveChecksumJsonName"],
+        "archiveChecksumJsonPath": archive_checksum["archiveChecksumJsonPath"],
+        "archiveChecksumJsonPublicUrl": f"/exports/{archive_checksum['archiveChecksumJsonName']}",
+        "manifestPath": str(manifest_path),
+        "manifestPublicUrl": f"/exports/{build_dir.name}/{manifest_path.name}",
+        "renpyScriptName": renpy_files["scriptName"],
+        "renpyScriptPath": renpy_files["scriptPath"],
+        "renpyScriptPublicUrl": f"/exports/{build_dir.name}/{renpy_files['scriptName']}",
+        "renpyOptionsName": renpy_files["optionsName"],
+        "renpyOptionsPath": renpy_files["optionsPath"],
+        "renpyOptionsPublicUrl": f"/exports/{build_dir.name}/{renpy_files['optionsName']}",
+        "renpyManifestName": renpy_files["manifestName"],
+        "renpyManifestPath": renpy_files["manifestPath"],
+        "renpyManifestPublicUrl": f"/exports/{build_dir.name}/{renpy_files['manifestName']}",
+        "renpyReviewName": renpy_files["reviewName"],
+        "renpyReviewPath": renpy_files["reviewPath"],
+        "renpyReviewPublicUrl": f"/exports/{build_dir.name}/{renpy_files['reviewName']}",
+        "renpyReadmeName": renpy_files["readmeName"],
+        "renpyReadmePath": renpy_files["readmePath"],
+        "renpyReadmePublicUrl": f"/exports/{build_dir.name}/{renpy_files['readmeName']}",
+        "renpyReviewItemCount": renpy_files["warningCount"],
+        "renpySceneCount": renpy_files["sceneCount"],
+        "renpyCharacterCount": renpy_files["characterCount"],
+        "renpyVariableCount": renpy_files["variableCount"],
+        "renpyAssetDefinitionCount": renpy_files["assetDefinitionCount"],
+        "provenanceName": provenance_file["provenanceName"],
+        "provenancePath": provenance_file["provenancePath"],
+        "provenancePublicUrl": f"/exports/{build_dir.name}/{provenance_file['provenanceName']}",
+        "provenanceSeal": provenance_file["provenanceSeal"],
+        "releaseVersion": get_export_release_version(bundle["project"]),
+        "copiedAssets": copied_assets,
+        "missingAssets": len(missing_assets),
+        "missingAssetNames": [asset.get("name") or asset.get("id") or "未命名素材" for asset in missing_assets[:5]],
+    }
+
+
 def ensure_export_runtime_cache_dir() -> Path:
     EXPORT_RUNTIME_CACHE_DIR.mkdir(exist_ok=True)
     return EXPORT_RUNTIME_CACHE_DIR
@@ -12549,6 +12642,8 @@ def export_project_build(target: str = EXPORT_TARGET_WEB) -> dict:
     target_name = str(target or EXPORT_TARGET_WEB).strip() or EXPORT_TARGET_WEB
     if target_name == EXPORT_TARGET_NATIVE_RUNTIME:
         return export_native_runtime_build()
+    if target_name == EXPORT_TARGET_RENPY_DRAFT:
+        return export_renpy_draft_build()
     if target_name == EXPORT_TARGET_WINDOWS_NWJS:
         return export_windows_nwjs_build()
     if target_name == EXPORT_TARGET_MACOS_NWJS:
