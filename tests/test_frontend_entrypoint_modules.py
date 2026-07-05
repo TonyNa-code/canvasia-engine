@@ -64,6 +64,7 @@ class FrontendEntrypointModuleTests(unittest.TestCase):
             "./modules/project_history.js",
             "./modules/asset_catalog.js",
             "./modules/asset_footprint.js",
+            "./modules/runtime_preload_budget.js",
             "./modules/asset_dependency_sheet.js",
             "./modules/asset_rights_sheet.js",
             "./modules/openai_asset_generator.js",

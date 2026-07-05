@@ -59,6 +59,7 @@ jobs:
             tests/test_frontend_action_handlers.py \
             tests/test_frontend_asset_catalog_module.py \
             tests/test_frontend_asset_footprint_module.py \
+            tests/test_frontend_runtime_preload_budget_module.py \
             tests/test_frontend_asset_dependency_sheet_module.py \
             tests/test_frontend_asset_rights_sheet_module.py \
             tests/test_frontend_audio_cue_sheet_module.py \
@@ -127,6 +128,7 @@ jobs:
         run: |
           node --check prototype_editor/modules/asset_catalog.js
           node --check prototype_editor/modules/asset_footprint.js
+          node --check prototype_editor/modules/runtime_preload_budget.js
           node --check prototype_editor/modules/asset_dependency_sheet.js
           node --check prototype_editor/modules/asset_rights_sheet.js
           node --check prototype_editor/modules/audio_cue_sheet.js
@@ -204,6 +206,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_action_handlers.py' -v
           python -m unittest discover -s tests -p 'test_frontend_asset_catalog_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_asset_footprint_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_runtime_preload_budget_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_asset_dependency_sheet_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_asset_rights_sheet_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_audio_cue_sheet_module.py' -v

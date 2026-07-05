@@ -185,6 +185,7 @@ const variableTools = window.CanvasiaEditorVariables;
 const projectHistoryTools = window.CanvasiaEditorProjectHistory;
 const assetCatalogTools = window.CanvasiaEditorAssetCatalog;
 const assetFootprintTools = window.CanvasiaEditorAssetFootprint;
+const runtimePreloadBudgetTools = window.CanvasiaEditorRuntimePreloadBudget;
 const projectDoctorTools = window.CanvasiaEditorProjectDoctor;
 const projectMilestoneTools = window.CanvasiaEditorProjectMilestones ?? window.CanvasiaProjectMilestones;
 const openAiAssetTools = window.CanvasiaEditorOpenAiAssetGenerator;
@@ -3936,23 +3937,33 @@ async function handleClick(event) {
     return;
   }
 
-	  if (action === "export-asset-dependency-csv") {
-	    exportAssetDependencyCsv();
-	    return;
-	  }
+  if (action === "export-asset-dependency-csv") {
+    exportAssetDependencyCsv();
+    return;
+  }
 
-	  if (action === "export-asset-footprint-markdown") {
-	    exportAssetFootprintMarkdown();
-	    return;
-	  }
+  if (action === "export-asset-footprint-markdown") {
+    exportAssetFootprintMarkdown();
+    return;
+  }
 
-	  if (action === "export-asset-footprint-csv") {
-	    exportAssetFootprintCsv();
-	    return;
-	  }
+  if (action === "export-asset-footprint-csv") {
+    exportAssetFootprintCsv();
+    return;
+  }
 
-	  if (action === "export-asset-rights-markdown") {
-	    exportAssetRightsMarkdown();
+  if (action === "export-runtime-preload-budget-markdown") {
+    exportRuntimePreloadBudgetMarkdown();
+    return;
+  }
+
+  if (action === "export-runtime-preload-budget-csv") {
+    exportRuntimePreloadBudgetCsv();
+    return;
+  }
+
+  if (action === "export-asset-rights-markdown") {
+    exportAssetRightsMarkdown();
     return;
   }
 
@@ -25873,14 +25884,16 @@ function buildReleaseChecklistItems() {
   const project = state.data?.project ?? {};
   const resolution = getProjectResolution(project);
   const releaseVersion = getProjectReleaseVersion(project);
-	  const hasStoredReleaseVersion = Boolean(String(project.releaseVersion ?? "").trim());
-	  const urgentMissingAssets = state.data.assetList.filter((asset) => isAssetUrgentMissing(asset)).length;
-	  const mediaBudgetReport = buildAssetMediaBudgetReport();
-	  const assetFootprintReport = buildAssetFootprintReport();
-	  const assetFootprintDigest = assetFootprintTools.getAssetFootprintDigest(assetFootprintReport);
-	  const missingVoiceWarnings = state.validation.warnings.filter(
-	    (issue) => issue.message === "这句台词还没有绑定语音。"
-	  ).length;
+  const hasStoredReleaseVersion = Boolean(String(project.releaseVersion ?? "").trim());
+  const urgentMissingAssets = state.data.assetList.filter((asset) => isAssetUrgentMissing(asset)).length;
+  const mediaBudgetReport = buildAssetMediaBudgetReport();
+  const assetFootprintReport = buildAssetFootprintReport();
+  const assetFootprintDigest = assetFootprintTools.getAssetFootprintDigest(assetFootprintReport);
+  const runtimePreloadBudgetReport = buildRuntimePreloadBudgetReport();
+  const runtimePreloadBudgetDigest = runtimePreloadBudgetTools.getRuntimePreloadBudgetDigest(runtimePreloadBudgetReport);
+  const missingVoiceWarnings = state.validation.warnings.filter(
+    (issue) => issue.message === "这句台词还没有绑定语音。"
+  ).length;
   const exportResult = state.lastExportResult;
   const nativeRcStatus = exportResult?.target === "native_runtime" ? exportResult.releaseCandidateReportStatus : "";
   const nativeRcSummary = exportResult?.releaseCandidateReportSummary ?? {};
@@ -25956,9 +25969,9 @@ function buildReleaseChecklistItems() {
             }
           : null,
     },
-	    {
-	      severity: mediaBudgetReport.blockerCount > 0 ? "blocker" : mediaBudgetReport.count > 0 ? "warn" : "good",
-	      title: "素材性能预算",
+    {
+      severity: mediaBudgetReport.blockerCount > 0 ? "blocker" : mediaBudgetReport.count > 0 ? "warn" : "good",
+      title: "素材性能预算",
       toneClass: mediaBudgetReport.blockerCount > 0 ? "danger-text" : mediaBudgetReport.count > 0 ? "warn-text" : "good-text",
       status:
         mediaBudgetReport.count === 0
@@ -25978,38 +25991,65 @@ function buildReleaseChecklistItems() {
               label: "只看体积风险素材",
               action: "focus-asset-gap",
               dataset: { "asset-filter-mode": "media_budget" },
-	            }
-	          : null,
-	    },
-	    {
-	      severity:
-	        assetFootprintReport.releaseRiskLevel === "danger"
-	          ? "blocker"
-	          : assetFootprintReport.releaseRiskLevel === "warn"
-	            ? "warn"
-	            : "good",
-	      title: "发布包体积",
-	      toneClass: getAssetFootprintToneClass(assetFootprintReport.releaseRiskLevel),
-	      status:
-	        assetFootprintReport.releaseRiskLevel === "ready"
-	          ? "体积健康"
-	          : assetFootprintReport.releaseRiskLevel === "danger"
-	            ? "包体偏重"
-	            : "建议压缩",
-	      description: `${assetFootprintDigest.detail} 当前已记录素材合计 ${
-	        assetFootprintReport.totals?.totalLabel ?? "0 B"
-	      }，未知体积 ${assetFootprintReport.totals?.missingSizeCount ?? 0} 个。`,
-	      action:
-	        assetFootprintReport.releaseRiskLevel === "ready"
-	          ? { label: "导出体积清单", action: "export-asset-footprint-markdown" }
-	          : {
-	              label: "查看体积雷达",
-	              action: "switch-screen",
-	              screen: "inspection",
-	            },
-	    },
-	    {
-	      severity: missingVoiceWarnings === 0 ? "good" : "warn",
+            }
+          : null,
+    },
+    {
+      severity:
+        assetFootprintReport.releaseRiskLevel === "danger"
+          ? "blocker"
+          : assetFootprintReport.releaseRiskLevel === "warn"
+            ? "warn"
+            : "good",
+      title: "发布包体积",
+      toneClass: getAssetFootprintToneClass(assetFootprintReport.releaseRiskLevel),
+      status:
+        assetFootprintReport.releaseRiskLevel === "ready"
+          ? "体积健康"
+          : assetFootprintReport.releaseRiskLevel === "danger"
+            ? "包体偏重"
+            : "建议压缩",
+      description: `${assetFootprintDigest.detail} 当前已记录素材合计 ${
+        assetFootprintReport.totals?.totalLabel ?? "0 B"
+      }，未知体积 ${assetFootprintReport.totals?.missingSizeCount ?? 0} 个。`,
+      action:
+        assetFootprintReport.releaseRiskLevel === "ready"
+          ? { label: "导出体积清单", action: "export-asset-footprint-markdown" }
+          : {
+              label: "查看体积雷达",
+              action: "switch-screen",
+              screen: "inspection",
+            },
+    },
+    {
+      severity:
+        runtimePreloadBudgetReport.releaseRiskLevel === "danger"
+          ? "blocker"
+          : runtimePreloadBudgetReport.releaseRiskLevel === "warn"
+            ? "warn"
+            : "good",
+      title: "首屏加载压力",
+      toneClass: getAssetFootprintToneClass(runtimePreloadBudgetReport.releaseRiskLevel),
+      status:
+        runtimePreloadBudgetReport.releaseRiskLevel === "ready"
+          ? "首屏健康"
+          : runtimePreloadBudgetReport.releaseRiskLevel === "danger"
+            ? "先处理入口压力"
+            : "建议瘦身",
+      description: `${runtimePreloadBudgetDigest.detail} 首屏 ${
+        runtimePreloadBudgetReport.phases?.critical?.bytesLabel ?? "0 B"
+      }，早期路线 ${runtimePreloadBudgetReport.phases?.early?.bytesLabel ?? "0 B"}。`,
+      action:
+        runtimePreloadBudgetReport.releaseRiskLevel === "ready"
+          ? { label: "导出预热清单", action: "export-runtime-preload-budget-markdown" }
+          : {
+              label: "查看加载预算",
+              action: "switch-screen",
+              screen: "inspection",
+            },
+    },
+    {
+      severity: missingVoiceWarnings === 0 ? "good" : "warn",
       title: "语音覆盖",
       toneClass: missingVoiceWarnings === 0 ? "good-text" : "warn-text",
       status: missingVoiceWarnings === 0 ? "当前没有待绑语音提醒" : `还差 ${missingVoiceWarnings} 句`,
@@ -29130,6 +29170,17 @@ function buildAssetFootprintFileName(extension = "md") {
   return `${title}_asset_footprint_${dateStamp}.${extension}`;
 }
 
+function buildRuntimePreloadBudgetFileName(extension = "md") {
+  const date = new Date();
+  const dateStamp = [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("");
+  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
+  return `${title}_runtime_preload_budget_${dateStamp}.${extension}`;
+}
+
 function buildAssetRightsFileName(extension = "md") {
   const date = new Date();
   const dateStamp = [
@@ -30629,6 +30680,30 @@ function exportAssetFootprintCsv() {
   downloadTextFile(fileName, content, "text/csv;charset=utf-8");
   setSaveStatus(`已导出素材体积 CSV：${fileName}`);
   showToast(`素材体积 CSV 已导出：${fileName}`);
+}
+
+function buildRuntimePreloadBudgetReport(data = state.data) {
+  return runtimePreloadBudgetTools.buildRuntimePreloadBudgetReport(data ?? {});
+}
+
+function exportRuntimePreloadBudgetMarkdown() {
+  const fileName = buildRuntimePreloadBudgetFileName("md");
+  const report = buildRuntimePreloadBudgetReport();
+  const content = runtimePreloadBudgetTools.buildRuntimePreloadBudgetMarkdown(report, {
+    projectTitle: state.data?.project?.title || "Canvasia Project",
+    generatedAt: formatDate(new Date().toISOString()),
+  });
+  downloadTextFile(fileName, content, "text/markdown;charset=utf-8");
+  setSaveStatus(`已导出 Runtime 首屏加载预算：${fileName}`);
+  showToast(`Runtime 首屏加载预算已导出：${fileName}`);
+}
+
+function exportRuntimePreloadBudgetCsv() {
+  const fileName = buildRuntimePreloadBudgetFileName("csv");
+  const content = runtimePreloadBudgetTools.buildRuntimePreloadBudgetCsv(buildRuntimePreloadBudgetReport());
+  downloadTextFile(fileName, content, "text/csv;charset=utf-8");
+  setSaveStatus(`已导出 Runtime 首屏加载 CSV：${fileName}`);
+  showToast(`Runtime 首屏加载 CSV 已导出：${fileName}`);
 }
 
 function buildAssetRightsSheet() {
@@ -33290,6 +33365,120 @@ function renderAssetFootprintPanel({ compact = false } = {}) {
   `;
 }
 
+function renderRuntimePreloadBudgetPanel({ compact = false } = {}) {
+  const report = buildRuntimePreloadBudgetReport();
+  const digest = runtimePreloadBudgetTools.getRuntimePreloadBudgetDigest(report);
+  const totals = report.totals ?? {};
+  const critical = report.phases?.critical ?? {};
+  const early = report.phases?.early ?? {};
+  const phaseCards = (report.phaseList ?? []).slice(0, compact ? 2 : 4);
+  const topEntries = (report.topEntries ?? []).slice(0, compact ? 3 : 6);
+  const warnings = (report.warnings ?? []).filter((warning) => warning.severity !== "tip").slice(0, compact ? 2 : 4);
+  const sceneHotspots = (report.scenes ?? []).filter((scene) => scene.count > 0).slice(0, compact ? 2 : 4);
+  const toneClass = getAssetFootprintToneClass(digest.level);
+
+  return `
+    <article class="detail-card preview-sprint-panel runtime-preload-budget-panel">
+      <div class="panel-heading">
+        <h2>Runtime 首屏加载预算</h2>
+        <span class="badge badge-soft ${toneClass}">${escapeHtml(digest.title)}</span>
+      </div>
+      <p class="helper-text">${escapeHtml(digest.detail)} 它会按导出 Runtime 的预热逻辑，提前检查入口场景和早期路线里是否有大图、大音频、视频、缺文件或未知体积。</p>
+      <div class="preview-sprint-metrics">
+        ${renderRouteMetricCard("首屏必备", critical.bytesLabel ?? "0 B", `${critical.count ?? 0} 个素材`)}
+        ${renderRouteMetricCard("早期路线", early.bytesLabel ?? "0 B", `${early.count ?? 0} 个素材`)}
+        ${renderRouteMetricCard("总预热候选", totals.totalLabel ?? "0 B", `${totals.totalEntries ?? 0} 个素材`)}
+        ${renderRouteMetricCard("缺口", `${totals.missingFileCount ?? 0} / ${totals.missingSizeCount ?? 0}`, "缺文件 / 缺体积")}
+      </div>
+      <div class="detail-actions">
+        <button class="toolbar-button toolbar-button-primary" data-action="export-runtime-preload-budget-markdown">
+          ${escapeHtml(digest.actionLabel)}
+        </button>
+        <button class="toolbar-button" data-action="export-runtime-preload-budget-csv">
+          导出 CSV
+        </button>
+        <button class="toolbar-button" data-action="export-asset-footprint-markdown">
+          对照包体积
+        </button>
+      </div>
+      ${
+        phaseCards.length > 0
+          ? `
+            <div class="preview-sprint-grid">
+              ${phaseCards
+                .map(
+                  (phase) => `
+                    <article class="preview-sprint-card is-${phase.overBudget || phase.missingFileCount > 0 ? "warn" : "soft"}">
+                      <div class="preview-sprint-head">
+                        <strong>${escapeHtml(phase.label)}</strong>
+                        <span class="issue-tag ${getAssetFootprintToneClass(phase.overBudget ? "warn" : "ready")}">${escapeHtml(phase.bytesLabel)}</span>
+                      </div>
+                      <p>${escapeHtml(`${phase.count} 个素材 · 建议预算 ${phase.budgetLabel}`)}</p>
+                      <div class="helper-text">${escapeHtml(
+                        phase.missingFileCount > 0
+                          ? `缺文件 ${phase.missingFileCount} 个，先补齐再导出。`
+                          : phase.detail
+                      )}</div>
+                    </article>
+                  `
+                )
+                .join("")}
+            </div>
+          `
+          : renderEmpty("当前还没有可统计的首屏预热素材。写入入口场景并绑定素材后，这里会自动出现预算分析。")
+      }
+      ${
+        !compact && topEntries.length > 0
+          ? `
+            <div class="list-stack compact-stack">
+              ${topEntries
+                .map(
+                  (entry) => `
+                    <article class="asset-dependency-row">
+                      <div>
+                        <b>${escapeHtml(entry.name)}</b>
+                        <span>${escapeHtml(`${entry.typeLabel} · ${entry.reason || "预热候选"}`)}</span>
+                      </div>
+                      <span class="${entry.fileExists ? getAssetFootprintToneClass(entry.phase === "critical" && entry.sizeBytes > 0 ? digest.level : "ready") : "danger-text"}">
+                        ${escapeHtml(entry.fileExists ? entry.sizeLabel : "缺文件")}
+                      </span>
+                    </article>
+                  `
+                )
+                .join("")}
+            </div>
+          `
+          : ""
+      }
+      ${
+        !compact && sceneHotspots.length > 0
+          ? `
+            <div class="story-filter-chip-row">
+              ${sceneHotspots
+                .map(
+                  (scene) =>
+                    `<span class="issue-tag ${scene.overHotspotBudget ? "warn-text" : ""}">${escapeHtml(`${scene.sceneName} · ${scene.earlyLabel}`)}</span>`
+                )
+                .join("")}
+            </div>
+          `
+          : ""
+      }
+      ${
+        warnings.length > 0
+          ? `
+            <div class="story-filter-chip-row">
+              ${warnings
+                .map((warning) => `<span class="issue-tag ${getAssetFootprintToneClass(warning.severity)}">${escapeHtml(warning.title)}</span>`)
+                .join("")}
+            </div>
+          `
+          : `<p class="helper-text">当前没有明显首屏加载风险；如果准备上架，可以导出报告留档。</p>`
+      }
+    </article>
+  `;
+}
+
 function renderAssetDependencyPanel() {
   const sheet = buildAssetDependencySheet();
   const digest = assetDependencySheetTools.getAssetDependencyStatusDigest(sheet);
@@ -33801,12 +33990,13 @@ function renderInspectionScreen() {
   const routeOverview = buildSceneRouteOverview();
   const issueItems = buildPreviewIssueItems();
 
-	  refs.inspectionContent.innerHTML = `
-	    ${renderInspectionOverviewPanel(routeOverview)}
-	    ${renderAssetFootprintPanel()}
-	    ${renderInspectionIssuePanel(issueItems)}
-	  `;
-	}
+		  refs.inspectionContent.innerHTML = `
+		    ${renderInspectionOverviewPanel(routeOverview)}
+		    ${renderAssetFootprintPanel()}
+		    ${renderRuntimePreloadBudgetPanel()}
+		    ${renderInspectionIssuePanel(issueItems)}
+		  `;
+		}
 
 function renderPreviewIssueItemCard(item) {
   return `
