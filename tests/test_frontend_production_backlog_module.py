@@ -27,35 +27,34 @@ class FrontendProductionBacklogModuleTests(unittest.TestCase):
               routeOverview: {{
                 metrics: {{ brokenRoutes: 1, unreachableScenes: 2, orphanScenes: 0 }},
                 routeTestingPlan: {{
-                  executionQueue: [
+                  decisionPoints: [
                     {{
-                      severity: "blocker",
-                      status: "broken",
-                      title: "修复分支坏链",
-                      actionLabel: "重新选择目标场景",
-                      acceptanceCriteria: "确认状态变为可试玩。",
+                      sceneId: "scene_branch",
                       chapterName: "第1章",
                       sceneName: "分岔口",
-                      routeLabel: "选项：留下",
-                      targetLabel: "Missing",
+                      routeCases: [
+                        {{
+                          label: "选项：留下",
+                          targetSceneName: "Missing",
+                          status: "broken",
+                          statusLabel: "坏链",
+                        }},
+                        {{
+                          label: "选项：离开",
+                          targetSceneName: "Normal",
+                          status: "ready",
+                          statusLabel: "可试玩",
+                        }},
+                      ],
                     }},
+                  ],
+                  endingTestCases: [
                     {{
-                      severity: "warn",
+                      sceneId: "scene_hidden_end",
                       status: "unreachable",
-                      title: "接通结局入口",
-                      actionLabel: "检查上游入口",
-                      acceptanceCriteria: "玩家能自然打到该结局。",
                       chapterName: "第1章",
                       sceneName: "隐藏结局",
-                      routeLabel: "结局路径",
-                      targetLabel: "Hidden End",
-                    }},
-                    {{
-                      severity: "test",
-                      status: "ready",
-                      title: "完整跑通结局",
-                      chapterName: "第1章",
-                      sceneName: "Good End",
+                      testingHint: "检查上游入口。",
                     }},
                   ],
                 }},
@@ -185,6 +184,24 @@ class FrontendProductionBacklogModuleTests(unittest.TestCase):
             const csv = tools.buildProductionBacklogCsv(backlog);
             process.stdout.write(JSON.stringify({{
               keys: Object.keys(tools).sort(),
+              routeQueue: tools.buildRouteExecutionQueueFromPlan(
+                backlog ? {{
+                  decisionPoints: [
+                    {{
+                      sceneId: "scene_branch",
+                      chapterName: "第1章",
+                      sceneName: "分岔口",
+                      routeCases: [
+                        {{ label: "选项：留下", targetSceneName: "Missing", status: "broken" }},
+                        {{ label: "选项：离开", targetSceneName: "Normal", status: "ready" }},
+                      ],
+                    }},
+                  ],
+                  endingTestCases: [
+                    {{ sceneId: "scene_hidden_end", status: "unreachable", chapterName: "第1章", sceneName: "隐藏结局" }},
+                  ],
+                }} : {{}}
+              ),
               backlog,
               digest,
               markdown,
@@ -211,11 +228,15 @@ class FrontendProductionBacklogModuleTests(unittest.TestCase):
         self.assertIn("buildProductionBacklogMarkdown", payload["keys"])
         self.assertIn("buildProductionBacklogCsv", payload["keys"])
         self.assertIn("addRouteExecutionTasks", payload["keys"])
+        self.assertIn("buildRouteExecutionQueueFromPlan", payload["keys"])
         self.assertIn("addAudioProductionTasks", payload["keys"])
         self.assertIn("addDirectorCueTasks", payload["keys"])
         self.assertIn("addRuntimePreloadBudgetTasks", payload["keys"])
         self.assertIn("addVnEssentialsTasks", payload["keys"])
         self.assertEqual(payload["backlog"]["projectTitle"], "Backlog Demo")
+        self.assertEqual(len(payload["routeQueue"]), 2)
+        self.assertEqual(payload["routeQueue"][0]["title"], "修复分支坏链")
+        self.assertEqual(payload["routeQueue"][1]["title"], "接通结局入口")
         self.assertEqual(payload["backlog"]["summary"]["taskCount"], 26)
         self.assertEqual(payload["backlog"]["summary"]["blockerCount"], 8)
         self.assertEqual(payload["backlog"]["summary"]["warningCount"], 12)

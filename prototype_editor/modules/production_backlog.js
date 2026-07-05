@@ -189,8 +189,113 @@
       });
   }
 
+  function getRouteExecutionSeverity(status = "") {
+    if (status === "broken") {
+      return "blocker";
+    }
+    if (status === "unreachable") {
+      return "warn";
+    }
+    return "tip";
+  }
+
+  function getRouteExecutionTitle(item = {}) {
+    if (item.title) {
+      return item.title;
+    }
+    if (item.status === "broken") {
+      return "修复分支坏链";
+    }
+    if (item.status === "unreachable") {
+      return item.kind === "ending" ? "接通结局入口" : "接通不可达目标";
+    }
+    return item.kind === "ending" ? "完整跑通结局" : "覆盖分支用例";
+  }
+
+  function getRouteExecutionActionLabel(item = {}) {
+    if (item.actionLabel) {
+      return item.actionLabel;
+    }
+    if (item.status === "broken") {
+      return "重新选择目标场景";
+    }
+    if (item.status === "unreachable") {
+      return "检查上游入口是否接回主路线";
+    }
+    return item.kind === "ending" ? "从入口完整跑到该结局" : "从入口跑到这里并点击该分支";
+  }
+
+  function getRouteExecutionAcceptance(item = {}) {
+    if (item.acceptanceCriteria) {
+      return item.acceptanceCriteria;
+    }
+    if (item.status === "broken") {
+      return "修复后重新生成路线试玩手册，确认状态变为可试玩。";
+    }
+    if (item.status === "unreachable") {
+      return "补齐入口后重新检查，确认玩家能自然进入目标场景。";
+    }
+    return item.kind === "ending"
+      ? "确认结尾、解锁、回想、存档和返回标题都正常。"
+      : "确认文本、演出、存档和变量后果正常。";
+  }
+
+  function buildRouteExecutionQueueFromPlan(routeTestingPlan = {}) {
+    const existingQueue = toArray(routeTestingPlan.executionQueue);
+    if (existingQueue.length) {
+      return existingQueue;
+    }
+
+    const queue = [];
+    toArray(routeTestingPlan.decisionPoints).forEach((point, pointIndex) => {
+      toArray(point.routeCases).forEach((routeCase, routeIndex) => {
+        const status = cleanText(routeCase.status, "ready");
+        if (status === "ready") {
+          return;
+        }
+        const severity = getRouteExecutionSeverity(status);
+        queue.push({
+          id: `route_${point.sceneId || pointIndex}_${routeIndex + 1}`,
+          kind: "branch",
+          severity,
+          status,
+          title: getRouteExecutionTitle({ status, kind: "branch" }),
+          actionLabel: getRouteExecutionActionLabel({ status, kind: "branch" }),
+          acceptanceCriteria: getRouteExecutionAcceptance({ status, kind: "branch" }),
+          chapterName: point.chapterName,
+          sceneName: point.sceneName,
+          routeLabel: routeCase.label,
+          targetLabel: routeCase.targetSceneName,
+        });
+      });
+    });
+
+    toArray(routeTestingPlan.endingTestCases).forEach((testCase, index) => {
+      const status = cleanText(testCase.status, "ready");
+      if (status === "ready") {
+        return;
+      }
+      const severity = getRouteExecutionSeverity(status);
+      queue.push({
+        id: `ending_${testCase.sceneId || index}`,
+        kind: "ending",
+        severity,
+        status,
+        title: getRouteExecutionTitle({ status, kind: "ending" }),
+        actionLabel: testCase.testingHint || getRouteExecutionActionLabel({ status, kind: "ending" }),
+        acceptanceCriteria: getRouteExecutionAcceptance({ status, kind: "ending" }),
+        chapterName: testCase.chapterName,
+        sceneName: testCase.sceneName,
+        routeLabel: "结局路径",
+        targetLabel: testCase.sceneName,
+      });
+    });
+
+    return queue;
+  }
+
   function addRouteExecutionTasks(tasks, routeTestingPlan = {}) {
-    toArray(routeTestingPlan.executionQueue)
+    buildRouteExecutionQueueFromPlan(routeTestingPlan)
       .filter((item) => item && item.status !== "ready")
       .slice(0, 12)
       .forEach((item) => {
@@ -610,6 +715,7 @@
     buildProductionBacklogMarkdown,
     buildProductionBacklogCsv,
     addRouteExecutionTasks,
+    buildRouteExecutionQueueFromPlan,
     addAudioProductionTasks,
     addDirectorCueTasks,
     addRuntimePreloadBudgetTasks,
