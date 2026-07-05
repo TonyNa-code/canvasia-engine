@@ -30,6 +30,7 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
                 {{ id: "sfx_bell", type: "sfx", name: "铃声", path: "sfx/bell.ogg" }},
                 {{ id: "voice_yuna_001", type: "voice", name: "悠奈_001", path: "voice/yuna_001.ogg" }},
                 {{ id: "op_movie", type: "video", name: "Opening", path: "video/op.webm" }},
+                {{ id: "particle_snow", type: "ui", name: "雪花贴图", path: "ui/snowflake.png" }},
               ],
               characters: [
                 {{ id: "yuna", displayName: "悠奈" }},
@@ -61,7 +62,7 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
                         {{ id: "line", type: "dialogue", speakerId: "yuna", text: "欢迎回来。", voiceAssetId: "voice_yuna_001", textSpeed: "fast" }},
                         {{ type: "sfx_play", assetId: "sfx_bell", volume: 65 }},
                         {{ type: "narration", text: "风吹过屋顶。", textSpeed: "instant" }},
-                        {{ type: "particle_effect", action: "start", preset: "snow", intensity: "medium", speed: "medium", wind: "still", area: "full" }},
+                        {{ type: "particle_effect", action: "start", preset: "snow", intensity: "medium", speed: "medium", wind: "still", area: "full", assetId: "particle_snow" }},
                         {{
                           type: "choice",
                           options: [
@@ -162,7 +163,7 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
         self.assertIn('play sound "sfx/bell.ogg" volume 0.65', payload["draft"]["script"])
         self.assertIn('"{cps=10000}风吹过屋顶。{/cps}"', payload["draft"]["script"])
         self.assertIn('"{cps=24}风把答案吹散了。{/cps}"', payload["draft"]["script"])
-        self.assertIn('show expression SnowBlossom(Text("*", color="#ffffff", size=12), count=40', payload["draft"]["script"])
+        self.assertIn('show expression SnowBlossom(Image("ui/snowflake.png"), count=40', payload["draft"]["script"])
         self.assertIn("as canvasia_particles onlayer overlay", payload["draft"]["script"])
         self.assertIn("hide canvasia_particles onlayer overlay", payload["draft"]["script"])
         self.assertIn("menu:", payload["draft"]["script"])

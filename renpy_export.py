@@ -113,6 +113,8 @@ PARTICLE_PRESET_DEFAULTS = {
 PARTICLE_INTENSITY_MULTIPLIER = {"light": 0.62, "medium": 1.0, "heavy": 1.55}
 PARTICLE_SPEED_MULTIPLIER = {"slow": 0.72, "medium": 1.0, "fast": 1.35}
 PARTICLE_WIND_SPEED = {"left": -55.0, "still": 0.0, "right": 55.0}
+PARTICLE_IMAGE_ASSET_TYPES = ["background", "sprite", "cg", "ui"]
+PARTICLE_IMAGE_ASSET_TYPE_SET = set(PARTICLE_IMAGE_ASSET_TYPES)
 
 
 def get_renpy_export_contract() -> dict:
@@ -126,6 +128,7 @@ def get_renpy_export_contract() -> dict:
         "textSpeedCps": dict(TEXT_SPEED_CPS),
         "effectDurationSeconds": dict(EFFECT_DURATION_SECONDS),
         "cameraFocusKeys": sorted(CAMERA_FOCUS_XALIGN),
+        "particleImageAssetTypes": list(PARTICLE_IMAGE_ASSET_TYPES),
         "particlePresetKeys": sorted(PARTICLE_PRESET_DEFAULTS),
         "screenFilterPresetKeys": sorted(SCREEN_FILTER_PRESETS),
     }
@@ -748,6 +751,51 @@ def render_particle_speed_tuple(values: tuple[float, float]) -> str:
     return f"({', '.join(format_renpy_float(value, 1) for value in values)})"
 
 
+def get_particle_texture_path(block: dict, context: dict) -> str:
+    asset_id = clean_text(block.get("assetId"))
+    if not asset_id:
+        return ""
+    asset_map = context.get("assetMap") or {}
+    asset = asset_map.get(asset_id)
+    if not asset:
+        add_warning(
+            context["warnings"],
+            "renpy_missing_particle_asset",
+            f"粒子贴图 {asset_id} 没有找到素材记录，已按预设文字粒子导出。",
+            sceneId=context.get("sceneId"),
+            blockIndex=context.get("blockIndex"),
+        )
+        return ""
+    asset_type = clean_text(asset.get("type")).lower()
+    if asset_type not in PARTICLE_IMAGE_ASSET_TYPE_SET:
+        add_warning(
+            context["warnings"],
+            "renpy_particle_asset_type_review",
+            f"粒子贴图 {asset_id} 不是图片类素材，已按预设文字粒子导出。",
+            sceneId=context.get("sceneId"),
+            blockIndex=context.get("blockIndex"),
+        )
+        return ""
+    path = get_asset_path(asset_map, asset_id)
+    if not path:
+        add_warning(
+            context["warnings"],
+            "renpy_missing_particle_asset",
+            f"粒子贴图 {asset_id} 没有可导出的素材路径，已按预设文字粒子导出。",
+            sceneId=context.get("sceneId"),
+            blockIndex=context.get("blockIndex"),
+        )
+        return ""
+    return path
+
+
+def get_particle_displayable_expression(block: dict, defaults: dict, color: str, size: int, context: dict) -> str:
+    texture_path = get_particle_texture_path(block, context)
+    if texture_path:
+        return f"Image({quote_renpy(texture_path)})"
+    return f"Text({quote_renpy(defaults['symbol'])}, color={quote_renpy(color)}, size={size})"
+
+
 def render_particle_block(block: dict, context: dict) -> list[str]:
     if get_safe_particle_action(block.get("action")) == "stop":
         return ["    hide canvasia_particles onlayer overlay"]
@@ -764,7 +812,8 @@ def render_particle_block(block: dict, context: dict) -> list[str]:
     color = clean_text(block.get("color"))
     if not re.match(r"^#[0-9a-f]{6}$", color, re.IGNORECASE):
         color = str(defaults["color"])
-    advanced_keys = ["assetId", "customComboLayers", "comboPreset", "forceField", "follow", "emitterShape", "emissionMode"]
+    displayable = get_particle_displayable_expression(block, defaults, color, size, context)
+    advanced_keys = ["customComboLayers", "comboPreset", "forceField", "follow", "emitterShape", "emissionMode"]
     needs_review = False
     for key in advanced_keys:
         if key == "customComboLayers":
@@ -776,12 +825,12 @@ def render_particle_block(block: dict, context: dict) -> list[str]:
         add_warning(
             context["warnings"],
             "renpy_particle_advanced_review",
-            "粒子已按 SnowBlossom 基础层导出；自定义贴图、叠层、力场、跟随目标等高级参数需要在 Ren'Py 中复核。",
+            "粒子已按 SnowBlossom 基础层导出；叠层、力场、跟随目标等高级参数需要在 Ren'Py 中复核。",
             sceneId=context.get("sceneId"),
             blockIndex=context.get("blockIndex"),
         )
     return [
-        f"    show expression SnowBlossom(Text({quote_renpy(defaults['symbol'])}, color={quote_renpy(color)}, size={size}), count={count}, border=80, xspeed={render_particle_speed_tuple(x_speed)}, yspeed={render_particle_speed_tuple(y_speed)}, start=0.04, fast=True, distribution={quote_renpy(defaults['distribution'])}, animation=True) as canvasia_particles onlayer overlay"
+        f"    show expression SnowBlossom({displayable}, count={count}, border=80, xspeed={render_particle_speed_tuple(x_speed)}, yspeed={render_particle_speed_tuple(y_speed)}, start=0.04, fast=True, distribution={quote_renpy(defaults['distribution'])}, animation=True) as canvasia_particles onlayer overlay"
     ]
 
 

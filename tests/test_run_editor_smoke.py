@@ -650,6 +650,10 @@ class RunEditorSmokeTests(unittest.TestCase):
             "video",
             [build_upload_payload("opening_movie.mp4", b"fake-video-data")],
         )["assets"][0]
+        particle_asset = run_editor.import_assets(
+            "ui",
+            [build_upload_payload("snowflake.png", build_fake_png_bytes())],
+        )["assets"][0]
         run_editor.write_json(
             run_editor.DATA_DIR / "characters.json",
             {
@@ -717,7 +721,17 @@ class RunEditorSmokeTests(unittest.TestCase):
                     "textSpeed": "fast",
                 },
                 {"id": "sfx", "type": "sfx_play", "assetId": sfx_asset["id"], "volume": 65},
-                {"id": "particles", "type": "particle_effect", "action": "start", "preset": "snow", "intensity": "medium", "speed": "medium", "wind": "still", "area": "full"},
+                {
+                    "id": "particles",
+                    "type": "particle_effect",
+                    "action": "start",
+                    "preset": "snow",
+                    "intensity": "medium",
+                    "speed": "medium",
+                    "wind": "still",
+                    "area": "full",
+                    "assetId": particle_asset["id"],
+                },
                 {"id": "var", "type": "variable_add", "variableId": "affection", "value": 1},
                 {
                     "id": "condition",
@@ -829,7 +843,8 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertIn('heroine "{cps=72}Welcome back.{/cps}"', script)
         self.assertIn('play sound "assets/sfx/', script)
         self.assertIn("volume 0.65", script)
-        self.assertIn('show expression SnowBlossom(Text("*", color="#ffffff", size=12), count=40', script)
+        self.assertIn('show expression SnowBlossom(Image("assets/ui/', script)
+        self.assertIn('snowflake.png"), count=40', script)
         self.assertIn("as canvasia_particles onlayer overlay", script)
         self.assertIn("hide canvasia_particles onlayer overlay", script)
         self.assertIn("$ affection += 1", script)
@@ -884,6 +899,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertIn(run_editor.RENPY_QUALITY_REPORT_FILE_NAME, names)
         self.assertIn(run_editor.RENPY_VERIFY_SCRIPT_FILE_NAME, names)
         self.assertTrue(any(name.startswith("game/assets/background/") for name in names))
+        self.assertTrue(any(name.startswith("game/assets/ui/") for name in names))
 
     def test_starter_kit_rolls_back_when_first_scene_bootstrap_fails(self) -> None:
         self.create_blank_project_with_chapter()

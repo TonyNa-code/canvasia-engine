@@ -93,6 +93,8 @@
   const PARTICLE_INTENSITY_MULTIPLIER = Object.freeze({ light: 0.62, medium: 1, heavy: 1.55 });
   const PARTICLE_SPEED_MULTIPLIER = Object.freeze({ slow: 0.72, medium: 1, fast: 1.35 });
   const PARTICLE_WIND_SPEED = Object.freeze({ left: -55, still: 0, right: 55 });
+  const PARTICLE_IMAGE_ASSET_TYPES = Object.freeze(["background", "sprite", "cg", "ui"]);
+  const PARTICLE_IMAGE_ASSET_TYPE_SET = Object.freeze(new Set(PARTICLE_IMAGE_ASSET_TYPES));
 
   function toArray(value) {
     return Array.isArray(value) ? value : [];
@@ -798,6 +800,38 @@
     return `(${values.map((value) => formatRenpyFloat(value, 1)).join(", ")})`;
   }
 
+  function getParticleTexturePath(block = {}, context = {}) {
+    const assetId = cleanText(block.assetId);
+    if (!assetId) {
+      return "";
+    }
+    const assetMap = context.assetMap ?? new Map();
+    const asset = assetMap.get(assetId);
+    if (!asset) {
+      pushWarning(context.warnings ?? [], "renpy_missing_particle_asset", `粒子贴图 ${assetId} 没有找到素材记录，已按预设文字粒子导出。`, getWarningContext(context));
+      return "";
+    }
+    const assetType = cleanText(asset.type).toLowerCase();
+    if (!PARTICLE_IMAGE_ASSET_TYPE_SET.has(assetType)) {
+      pushWarning(context.warnings ?? [], "renpy_particle_asset_type_review", `粒子贴图 ${assetId} 不是图片类素材，已按预设文字粒子导出。`, getWarningContext(context));
+      return "";
+    }
+    const path = getAssetPath(assetMap, assetId);
+    if (!path) {
+      pushWarning(context.warnings ?? [], "renpy_missing_particle_asset", `粒子贴图 ${assetId} 没有可导出的素材路径，已按预设文字粒子导出。`, getWarningContext(context));
+      return "";
+    }
+    return path;
+  }
+
+  function getParticleDisplayableExpression(block = {}, defaults = {}, color = "#ffffff", size = 12, context = {}) {
+    const texturePath = getParticleTexturePath(block, context);
+    if (texturePath) {
+      return `Image(${quoteRenpy(texturePath)})`;
+    }
+    return `Text(${quoteRenpy(defaults.symbol)}, color=${quoteRenpy(color)}, size=${size})`;
+  }
+
   function renderParticleBlock(block = {}, context = {}) {
     if (getSafeParticleAction(block.action) === "stop") {
       return ["    hide canvasia_particles onlayer overlay"];
@@ -813,7 +847,8 @@
     const xSpeed = getSpeedTuple(windSpeed, Math.max(0.18, spread / 400));
     const ySpeed = getSpeedTuple(baseYSpeed, 0.22);
     const color = /^#[0-9a-f]{6}$/i.test(cleanText(block.color)) ? cleanText(block.color) : defaults.color;
-    const advancedKeys = ["assetId", "customComboLayers", "comboPreset", "forceField", "follow", "emitterShape", "emissionMode"];
+    const displayable = getParticleDisplayableExpression(block, defaults, color, size, context);
+    const advancedKeys = ["customComboLayers", "comboPreset", "forceField", "follow", "emitterShape", "emissionMode"];
     const needsReview = advancedKeys.some((key) => {
       if (key === "customComboLayers") {
         return toArray(block[key]).length > 0;
@@ -821,10 +856,10 @@
       return cleanText(block[key]) && !["none", "line", "continuous"].includes(cleanText(block[key]));
     });
     if (needsReview) {
-      pushWarning(context.warnings ?? [], "renpy_particle_advanced_review", "粒子已按 SnowBlossom 基础层导出；自定义贴图、叠层、力场、跟随目标等高级参数需要在 Ren'Py 中复核。", getWarningContext(context));
+      pushWarning(context.warnings ?? [], "renpy_particle_advanced_review", "粒子已按 SnowBlossom 基础层导出；叠层、力场、跟随目标等高级参数需要在 Ren'Py 中复核。", getWarningContext(context));
     }
     return [
-      `    show expression SnowBlossom(Text(${quoteRenpy(defaults.symbol)}, color=${quoteRenpy(color)}, size=${size}), count=${count}, border=80, xspeed=${renderParticleSpeedTuple(xSpeed)}, yspeed=${renderParticleSpeedTuple(ySpeed)}, start=0.04, fast=True, distribution=${quoteRenpy(defaults.distribution)}, animation=True) as canvasia_particles onlayer overlay`,
+      `    show expression SnowBlossom(${displayable}, count=${count}, border=80, xspeed=${renderParticleSpeedTuple(xSpeed)}, yspeed=${renderParticleSpeedTuple(ySpeed)}, start=0.04, fast=True, distribution=${quoteRenpy(defaults.distribution)}, animation=True) as canvasia_particles onlayer overlay`,
     ];
   }
 
@@ -1354,6 +1389,7 @@
       textSpeedCps: { ...TEXT_SPEED_CPS },
       effectDurationSeconds: { ...EFFECT_DURATION_SECONDS },
       cameraFocusKeys: Object.keys(CAMERA_FOCUS_XALIGN).sort(),
+      particleImageAssetTypes: [...PARTICLE_IMAGE_ASSET_TYPES],
       particlePresetKeys: Object.keys(PARTICLE_PRESET_DEFAULTS).sort(),
       screenFilterPresetKeys: Object.keys(SCREEN_FILTER_PRESETS).sort(),
     };

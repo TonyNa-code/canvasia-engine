@@ -127,6 +127,106 @@ class RenpyExportContractTests(unittest.TestCase):
         self.assertEqual(backend_show_warnings, [])
         self.assertEqual(backend_hide_warnings, [])
 
+    def test_particle_image_asset_exports_to_snowblossom_image_on_both_exporters(self) -> None:
+        frontend = load_frontend_payload(
+            """
+            const warnings = [];
+            const lines = tools.renderBlock({
+              type: "particle_effect",
+              action: "start",
+              preset: "snow",
+              intensity: "light",
+              speed: "slow",
+              wind: "right",
+              area: "full",
+              assetId: "snowflake_ui",
+              sizeMin: 16,
+              sizeMax: 24,
+            }, {
+              warnings,
+              sceneId: "scene_open",
+              blockIndex: 5,
+              assetMap: new Map([
+                ["snowflake_ui", { id: "snowflake_ui", type: "ui", path: "ui/snowflake.png" }],
+              ]),
+            });
+            process.stdout.write(JSON.stringify({ lines, warnings }));
+            """
+        )
+
+        backend_warnings: list[dict] = []
+        backend_lines = renpy_export.render_particle_block(
+            {
+                "type": "particle_effect",
+                "action": "start",
+                "preset": "snow",
+                "intensity": "light",
+                "speed": "slow",
+                "wind": "right",
+                "area": "full",
+                "assetId": "snowflake_ui",
+                "sizeMin": 16,
+                "sizeMax": 24,
+            },
+            {
+                "warnings": backend_warnings,
+                "sceneId": "scene_open",
+                "blockIndex": 5,
+                "assetMap": {
+                    "snowflake_ui": {"id": "snowflake_ui", "type": "ui", "path": "ui/snowflake.png"},
+                },
+            },
+        )
+
+        self.assertIn('SnowBlossom(Image("ui/snowflake.png")', "\n".join(frontend["lines"]))
+        self.assertIn('SnowBlossom(Image("ui/snowflake.png")', "\n".join(backend_lines))
+        self.assertEqual(frontend["warnings"], [])
+        self.assertEqual(backend_warnings, [])
+
+    def test_particle_non_image_asset_falls_back_with_review_warning_on_both_exporters(self) -> None:
+        frontend = load_frontend_payload(
+            """
+            const warnings = [];
+            const lines = tools.renderBlock({
+              type: "particle_effect",
+              action: "start",
+              preset: "snow",
+              assetId: "theme_bgm",
+            }, {
+              warnings,
+              sceneId: "scene_open",
+              blockIndex: 6,
+              assetMap: new Map([
+                ["theme_bgm", { id: "theme_bgm", type: "bgm", path: "audio/theme.ogg" }],
+              ]),
+            });
+            process.stdout.write(JSON.stringify({ lines, warnings }));
+            """
+        )
+
+        backend_warnings: list[dict] = []
+        backend_lines = renpy_export.render_particle_block(
+            {
+                "type": "particle_effect",
+                "action": "start",
+                "preset": "snow",
+                "assetId": "theme_bgm",
+            },
+            {
+                "warnings": backend_warnings,
+                "sceneId": "scene_open",
+                "blockIndex": 6,
+                "assetMap": {
+                    "theme_bgm": {"id": "theme_bgm", "type": "bgm", "path": "audio/theme.ogg"},
+                },
+            },
+        )
+
+        self.assertIn('SnowBlossom(Text("*", color="#ffffff", size=12)', "\n".join(frontend["lines"]))
+        self.assertIn('SnowBlossom(Text("*", color="#ffffff", size=12)', "\n".join(backend_lines))
+        self.assertEqual(frontend["warnings"][0]["code"], "renpy_particle_asset_type_review")
+        self.assertEqual(backend_warnings[0]["code"], "renpy_particle_asset_type_review")
+
 
 if __name__ == "__main__":
     unittest.main()
