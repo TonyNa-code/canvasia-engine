@@ -4610,20 +4610,23 @@ class FrontendActionHandlerTests(unittest.TestCase):
               }},
             }};
             const regressionDiagnosticTools = {{
-              serializeRegressionDiagnostics(caseResult) {{
-                return {{
-                  variableOverrideSummary: caseResult.variableOverrideSummary ?? "",
-                  conditionTraceSummaries: caseResult.conditionTraceSummaries ?? [],
-                  diagnosticLine: [
-                    caseResult.variableOverrideSummary ? `测试预设：${{caseResult.variableOverrideSummary}}` : "",
-                    ...(caseResult.conditionTraceSummaries ?? []),
-                  ].filter(Boolean).join(" / "),
-                  hasDiagnostics: Boolean(caseResult.variableOverrideSummary || caseResult.conditionTraceSummaries?.length),
-                }};
+              buildRegressionDiagnosticClipboardSummary(caseResult, options = {{}}) {{
+                return [
+                  `# 自动回归诊断：${{caseResult.sceneName}}`,
+                  `测试预设：${{caseResult.variableOverrideSummary}}`,
+                  `条件判断：\\n1. ${{caseResult.conditionTraceSummaries[0]}}`,
+                  `建议动作：${{options.recommendation}}`,
+                  `定位：${{caseResult.anchorSceneId}} / ${{caseResult.anchorBlockId}}`,
+                ].join("\\n");
               }},
             }};
             function serializeRegressionDiagnosticsForReport(caseResult, options = {{}}) {{
-              return regressionDiagnosticTools.serializeRegressionDiagnostics(caseResult, options);
+              return {{
+                variableOverrideSummary: caseResult.variableOverrideSummary ?? "",
+                conditionTraceSummaries: caseResult.conditionTraceSummaries ?? [],
+                diagnosticLine: "",
+                hasDiagnostics: Boolean(caseResult.variableOverrideSummary || caseResult.conditionTraceSummaries?.length),
+              }};
             }}
             function getPreviewRegressionFixRecommendation() {{ return "先检查这里前后的 jump / condition / choice 去向。"; }}
             function buildPreviewRegressionFixQueue() {{

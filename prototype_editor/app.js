@@ -26536,18 +26536,23 @@ function findPreviewRegressionCaseById(caseId) {
 }
 
 function buildPreviewRegressionDiagnosticClipboardSummary(caseResult = {}) {
-  const diagnostics = serializeRegressionDiagnosticsForReport(caseResult, {
-    maxItems: 5,
-    maxLength: 800,
-    traceMaxLength: 240,
-  });
+  const recommendation = caseResult.recommendation || (caseResult.reason ? getPreviewRegressionFixRecommendation(caseResult) : "");
+  if (regressionDiagnosticTools?.buildRegressionDiagnosticClipboardSummary) {
+    return regressionDiagnosticTools.buildRegressionDiagnosticClipboardSummary(caseResult, {
+      maxItems: 5,
+      maxLength: 800,
+      traceMaxLength: 240,
+      recommendation,
+    });
+  }
+
+  const diagnostics = serializeRegressionDiagnosticsForReport(caseResult);
   const selectedOptions = Array.isArray(caseResult.selectedOptionTexts)
     ? caseResult.selectedOptionTexts.filter(Boolean).join(" / ")
     : "";
   const conditionLines = (diagnostics.conditionTraceSummaries ?? [])
     .map((item, index) => `${index + 1}. ${item}`)
     .join("\n");
-  const recommendation = caseResult.recommendation || (caseResult.reason ? getPreviewRegressionFixRecommendation(caseResult) : "");
 
   return [
     `# 自动回归诊断：${caseResult.sceneName ?? "未命名路线"}`,

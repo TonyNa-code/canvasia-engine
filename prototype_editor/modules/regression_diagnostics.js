@@ -68,9 +68,51 @@
     };
   }
 
+  function joinRegressionParts(parts = [], separator = " · ") {
+    return toArray(parts).map((part) => cleanText(part)).filter(Boolean).join(separator);
+  }
+
+  function formatRegressionCaseLocation(caseResult = {}) {
+    return joinRegressionParts([
+      caseResult.anchorSceneId || caseResult.seedSceneId,
+      caseResult.anchorBlockId,
+    ], " / ");
+  }
+
+  function buildRegressionDiagnosticClipboardSummary(caseResult = {}, options = {}) {
+    const diagnostics = serializeRegressionDiagnostics(caseResult, {
+      maxItems: options.maxItems ?? 5,
+      maxLength: options.maxLength ?? 800,
+      traceMaxLength: options.traceMaxLength ?? 240,
+    });
+    const selectedOptions = toArray(caseResult.selectedOptionTexts).filter(Boolean).join(" / ");
+    const conditionLines = toArray(diagnostics.conditionTraceSummaries)
+      .map((item, index) => `${index + 1}. ${item}`)
+      .join("\n");
+    const recommendation = cleanText(options.recommendation || caseResult.recommendation);
+    const location = formatRegressionCaseLocation(caseResult);
+    const heading = cleanText(options.heading, "# 自动回归诊断");
+
+    return [
+      `${heading}：${cleanText(caseResult.sceneName, "未命名路线")}`,
+      `状态：${cleanText(caseResult.statusLabel || caseResult.status, "未记录")}`,
+      `来源：${joinRegressionParts([caseResult.chapterName, caseResult.sourceLabel]) || "未记录"}`,
+      cleanText(caseResult.reason) ? `原因：${cleanText(caseResult.reason)}` : "",
+      cleanText(caseResult.detail) ? `细节：${cleanText(caseResult.detail)}` : "",
+      `步数：${caseResult.steps ?? 0} / 到过场景：${caseResult.visitedSceneCount ?? 0} / 选择次数：${caseResult.choiceCount ?? 0}`,
+      diagnostics.variableOverrideSummary ? `测试预设：${diagnostics.variableOverrideSummary}` : "",
+      selectedOptions ? `选择路线：${selectedOptions}` : "",
+      conditionLines ? `条件判断：\n${conditionLines}` : "",
+      recommendation ? `建议动作：${recommendation}` : "",
+      location ? `定位：${location}` : "",
+    ].filter(Boolean).join("\n");
+  }
+
   global.CanvasiaEditorRegressionDiagnostics = Object.freeze({
+    buildRegressionDiagnosticClipboardSummary,
     cleanText,
     compactText,
+    formatRegressionCaseLocation,
     formatRegressionDiagnosticLine,
     getRegressionConditionTraceSummaries,
     getRegressionDiagnosticItems,

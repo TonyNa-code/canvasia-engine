@@ -68,6 +68,51 @@ class FrontendRegressionDiagnosticsModuleTests(unittest.TestCase):
         self.assertEqual(len(payload["serialized"]["conditionTraceSummaries"]), 2)
         self.assertFalse(payload["empty"]["hasDiagnostics"])
 
+    def test_regression_diagnostics_builds_copyable_bug_note(self) -> None:
+        payload = self.run_regression_diagnostics_script(
+            """
+            const note = tools.buildRegressionDiagnosticClipboardSummary({
+              seedSceneId: "scene_01",
+              anchorSceneId: "scene_loop",
+              anchorBlockId: "block_condition",
+              sceneName: "循环测试",
+              chapterName: "第一章",
+              sourceLabel: "章节起点",
+              status: "fail",
+              statusLabel: "疑似死循环",
+              reason: "这条路线反复回到同一个步骤。",
+              detail: "重复命中条件分支。",
+              steps: 20,
+              visitedSceneCount: 3,
+              choiceCount: 1,
+              selectedOptionTexts: ["留下"],
+              variableOverrideSummary: "好感度=3",
+              conditionTraceSummaries: ["条件判断：命中分支 1 -> 循环测试；好感度 当前 3 >= 2：通过"],
+            }, {
+              recommendation: "先检查这里前后的 jump / condition / choice 去向。",
+            });
+            process.stdout.write(JSON.stringify({
+              note,
+              location: tools.formatRegressionCaseLocation({
+                seedSceneId: "scene_01",
+                anchorSceneId: "scene_loop",
+                anchorBlockId: "block_condition",
+              }),
+              seedOnlyLocation: tools.formatRegressionCaseLocation({ seedSceneId: "scene_01" }),
+            }));
+            """
+        )
+
+        self.assertIn("# 自动回归诊断：循环测试", payload["note"])
+        self.assertIn("状态：疑似死循环", payload["note"])
+        self.assertIn("来源：第一章 · 章节起点", payload["note"])
+        self.assertIn("测试预设：好感度=3", payload["note"])
+        self.assertIn("条件判断：\n1. 条件判断：命中分支 1", payload["note"])
+        self.assertIn("建议动作：先检查这里前后的 jump / condition / choice 去向。", payload["note"])
+        self.assertIn("定位：scene_loop / block_condition", payload["note"])
+        self.assertEqual(payload["location"], "scene_loop / block_condition")
+        self.assertEqual(payload["seedOnlyLocation"], "scene_01")
+
 
 if __name__ == "__main__":
     unittest.main()
