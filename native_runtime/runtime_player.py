@@ -21,7 +21,6 @@ from pathlib import Path
 
 try:
     from .runtime_preload import (
-        RUNTIME_PRELOAD_DEFAULT_FRAME_BUDGET,
         RUNTIME_PRELOAD_IMAGE_TYPES,
         RUNTIME_PRELOAD_SOUND_TYPES,
         RUNTIME_PRELOAD_STREAM_TYPES,
@@ -29,6 +28,8 @@ try:
         finalize_runtime_preload_status,
         format_runtime_preload_status_line,
         build_runtime_preload_size_budget,
+        get_project_runtime_preload_performance_profile,
+        get_runtime_preload_frame_budget,
         get_runtime_preload_manifest,
         is_runtime_preload_startup_entry,
         mark_runtime_preload_entry,
@@ -36,7 +37,6 @@ try:
     )
 except ImportError:  # pragma: no cover - exported native packages import from the same directory.
     from runtime_preload import (
-        RUNTIME_PRELOAD_DEFAULT_FRAME_BUDGET,
         RUNTIME_PRELOAD_IMAGE_TYPES,
         RUNTIME_PRELOAD_SOUND_TYPES,
         RUNTIME_PRELOAD_STREAM_TYPES,
@@ -44,6 +44,8 @@ except ImportError:  # pragma: no cover - exported native packages import from t
         finalize_runtime_preload_status,
         format_runtime_preload_status_line,
         build_runtime_preload_size_budget,
+        get_project_runtime_preload_performance_profile,
+        get_runtime_preload_frame_budget,
         get_runtime_preload_manifest,
         is_runtime_preload_startup_entry,
         mark_runtime_preload_entry,
@@ -4911,6 +4913,8 @@ def print_native_video_preview_probe_report(bundle_dir: Path) -> None:
 def build_native_runtime_preload_report(bundle_dir: Path) -> dict:
     data_path = bundle_dir / DEFAULT_GAME_DATA_NAME
     payload = load_game_data(data_path)
+    project = payload.get("project") if isinstance(payload.get("project"), dict) else {}
+    performance_profile = get_project_runtime_preload_performance_profile(project)
     assets = (payload.get("assets") if isinstance(payload.get("assets"), dict) else {}).get("assets") or []
     assets_by_id = {
         str(asset.get("id")): asset
@@ -4919,7 +4923,7 @@ def build_native_runtime_preload_report(bundle_dir: Path) -> dict:
     }
     manifest = get_runtime_preload_manifest(payload.get("buildInfo") if isinstance(payload.get("buildInfo"), dict) else {})
     entries = normalize_runtime_preload_entries(manifest, assets_by_id)
-    queue_status = build_runtime_preload_status(entries)
+    queue_status = build_runtime_preload_status(entries, performance_profile)
     missing_entries: list[dict] = []
     entry_reports: list[dict] = []
     critical_entries = 0
@@ -4930,7 +4934,7 @@ def build_native_runtime_preload_report(bundle_dir: Path) -> dict:
         asset_path = get_asset_runtime_path(bundle_dir, asset)
         declared_path = str((asset or {}).get("exportUrl") or entry.get("url") or "").strip()
         size_bytes = asset_path.stat().st_size if asset_path else 0
-        is_critical = is_runtime_preload_startup_entry(entry)
+        is_critical = is_runtime_preload_startup_entry(entry, performance_profile)
         if is_critical:
             critical_entries += 1
         entry_report = {
@@ -4952,7 +4956,7 @@ def build_native_runtime_preload_report(bundle_dir: Path) -> dict:
             missing_entries.append(entry_report)
         entry_reports.append(entry_report)
 
-    size_budget = build_runtime_preload_size_budget(entry_reports)
+    size_budget = build_runtime_preload_size_budget(entry_reports, performance_profile=performance_profile)
     if not isinstance(manifest, dict) or not manifest:
         status = "missing_manifest"
         recommendation = "导出包没有 Runtime 资源预热清单；请用新版编辑器重新导出。"
@@ -4991,6 +4995,7 @@ def build_native_runtime_preload_report(bundle_dir: Path) -> dict:
     return {
         "formatVersion": 1,
         "status": status,
+        "performanceProfile": performance_profile,
         "checkedAt": now_iso(),
         "bundleDir": str(bundle_dir),
         "gameDataPath": str(data_path),
@@ -5018,6 +5023,7 @@ def render_native_runtime_preload_markdown(report: dict) -> str:
         "",
         f"- 状态：{report.get('status') or 'unknown'}",
         f"- 建议：{report.get('recommendation') or '暂无'}",
+        f"- 性能档位：{summary.get('performanceProfileLabel') or size_budget.get('performanceProfileLabel') or '标准 PC / 网页'}",
         f"- 预热条目：{summary.get('totalEntries', 0)}",
         f"- critical 首屏条目：{summary.get('criticalEntries', 0)}",
         f"- 缺失素材：{summary.get('missingFileEntries', 0)}",
@@ -9763,17 +9769,21 @@ class NativeRuntimePlayer:
     def get_runtime_preload_manifest(self) -> dict:
         return get_runtime_preload_manifest(self.build_info)
 
+    def get_runtime_preload_performance_profile(self) -> str:
+        return get_project_runtime_preload_performance_profile(getattr(self, "project", {}))
+
     def get_runtime_preload_entries(self) -> list[dict]:
         return normalize_runtime_preload_entries(self.runtime_preload_manifest, self.assets_by_id)
 
     def preload_runtime_assets(self) -> dict:
+        performance_profile = self.get_runtime_preload_performance_profile()
         entries = self.get_runtime_preload_entries()
         self.runtime_preload_entries = entries
         self.runtime_preload_pending_entries = []
         self.runtime_preload_finished_asset_ids = set()
-        self.runtime_preload_status = build_runtime_preload_status(entries)
+        self.runtime_preload_status = build_runtime_preload_status(entries, performance_profile)
         for entry in entries:
-            if is_runtime_preload_startup_entry(entry):
+            if is_runtime_preload_startup_entry(entry, performance_profile):
                 self.warm_runtime_preload_entry(entry)
             else:
                 self.runtime_preload_pending_entries.append(entry)
@@ -9805,10 +9815,13 @@ class NativeRuntimePlayer:
         mark_runtime_preload_entry(self.runtime_preload_status, entry, outcome)
         self.runtime_preload_finished_asset_ids.add(asset_id)
 
-    def update_runtime_preload_queue(self, max_entries: int = RUNTIME_PRELOAD_DEFAULT_FRAME_BUDGET) -> None:
+    def update_runtime_preload_queue(self, max_entries: int | None = None) -> None:
         if not self.runtime_preload_pending_entries:
             return
-        budget = max(0, int(max_entries or 0))
+        budget_source = max_entries
+        if budget_source is None:
+            budget_source = get_runtime_preload_frame_budget(self.get_runtime_preload_performance_profile())
+        budget = max(0, int(budget_source or 0))
         if budget <= 0:
             return
         for _index in range(min(budget, len(self.runtime_preload_pending_entries))):

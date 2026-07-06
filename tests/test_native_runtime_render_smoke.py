@@ -440,6 +440,85 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
         self.assertEqual(player.runtime_preload_status["loadedBytes"], 7168)
         self.assertIn("合计 7.0 KB", player.runtime_preload_status["summaryText"])
 
+    def test_runtime_preload_uses_project_performance_profile(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_dir = Path(temp_dir)
+            asset_paths = {
+                "title_ui": bundle_dir / "assets" / "ui" / "title.png",
+                "gallery_ui": bundle_dir / "assets" / "ui" / "gallery.png",
+                "album_ui": bundle_dir / "assets" / "ui" / "album.png",
+                "menu_ui": bundle_dir / "assets" / "ui" / "menu.png",
+                "ending_ui": bundle_dir / "assets" / "ui" / "ending.png",
+            }
+            for path in asset_paths.values():
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(b"asset")
+
+            class FakeMixer:
+                def get_init(self) -> bool:
+                    return True
+
+            class FakePygame:
+                mixer = FakeMixer()
+
+            player = NativeRuntimePlayer.__new__(NativeRuntimePlayer)
+            player.bundle_dir = bundle_dir
+            player.pygame = FakePygame()
+            player.title_screen_active = False
+            player.project = {"runtimeSettings": {"performanceProfile": "high_quality_pc"}}
+            player.assets_by_id = {
+                asset_id: {
+                    "id": asset_id,
+                    "type": "ui",
+                    "exportUrl": path.relative_to(bundle_dir).as_posix(),
+                }
+                for asset_id, path in asset_paths.items()
+            }
+            player.build_info = {
+                "runtimePreloadManifest": {
+                    "entries": [
+                        {"assetId": "title_ui", "type": "ui", "phase": "critical", "priority": 100, "preloadIndex": 1, "sizeBytes": 1024},
+                        {"assetId": "gallery_ui", "type": "ui", "phase": "early", "priority": 80, "preloadIndex": 2, "sizeBytes": 2048},
+                        {"assetId": "album_ui", "type": "ui", "phase": "deferred", "priority": 60, "preloadIndex": 3, "sizeBytes": 4096},
+                        {"assetId": "menu_ui", "type": "ui", "phase": "deferred", "priority": 50, "preloadIndex": 4, "sizeBytes": 8192},
+                        {"assetId": "ending_ui", "type": "ui", "phase": "deferred", "priority": 40, "preloadIndex": 5, "sizeBytes": 16384},
+                    ]
+                }
+            }
+            player.image_cache = {}
+            player.sound_cache = {}
+            player.runtime_preload_manifest = player.get_runtime_preload_manifest()
+            player.runtime_preload_pending_entries = []
+            player.runtime_preload_finished_asset_ids = set()
+
+            def fake_load_image(asset_id: str | None):
+                player.image_cache[asset_id] = f"image:{asset_id}"
+                return player.image_cache[asset_id]
+
+            player._load_image = fake_load_image
+            player._load_sound = lambda asset_id: f"sound:{asset_id}"
+
+            status = player.preload_runtime_assets()
+            self.assertEqual(status["performanceProfile"], "high_quality_pc")
+            self.assertEqual(status["performanceProfileLabel"], "高画质 PC")
+            self.assertEqual(status["frameBudget"], 3)
+            self.assertEqual(status["status"], "warming")
+            self.assertEqual(status["loadedEntries"], 2)
+            self.assertEqual(status["pendingEntries"], 3)
+            self.assertEqual(status["criticalBytes"], 3072)
+            self.assertIn("档位 高画质 PC", status["summaryText"])
+            self.assertIn("gallery_ui", player.image_cache)
+            self.assertNotIn("album_ui", player.image_cache)
+
+            player.update_runtime_preload_queue()
+
+        self.assertEqual(player.runtime_preload_status["status"], "ready")
+        self.assertEqual(player.runtime_preload_status["loadedEntries"], 5)
+        self.assertEqual(player.runtime_preload_status["pendingEntries"], 0)
+        self.assertIn("album_ui", player.image_cache)
+        self.assertIn("menu_ui", player.image_cache)
+        self.assertIn("ending_ui", player.image_cache)
+
     def test_runtime_preload_report_and_doctor_flag_missing_entries(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             bundle_dir = Path(temp_dir)

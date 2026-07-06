@@ -13,6 +13,40 @@ RUNTIME_PRELOAD_STARTUP_PHASES = {"critical"}
 RUNTIME_PRELOAD_DEFAULT_FRAME_BUDGET = 1
 RUNTIME_PRELOAD_CRITICAL_BUDGET_BYTES = 96 * 1024 * 1024
 RUNTIME_PRELOAD_TOTAL_BUDGET_BYTES = 512 * 1024 * 1024
+RUNTIME_PRELOAD_PERFORMANCE_PROFILES = {
+    "standard": {
+        "key": "standard",
+        "label": "标准 PC / 网页",
+        "frameBudget": 1,
+        "startupPhases": {"critical"},
+        "criticalBudgetBytes": 96 * 1024 * 1024,
+        "totalBudgetBytes": 512 * 1024 * 1024,
+    },
+    "web": {
+        "key": "web",
+        "label": "网页轻量",
+        "frameBudget": 1,
+        "startupPhases": {"critical"},
+        "criticalBudgetBytes": 72 * 1024 * 1024,
+        "totalBudgetBytes": 384 * 1024 * 1024,
+    },
+    "mobile_low": {
+        "key": "mobile_low",
+        "label": "低配 / 移动端",
+        "frameBudget": 1,
+        "startupPhases": {"critical"},
+        "criticalBudgetBytes": 48 * 1024 * 1024,
+        "totalBudgetBytes": 256 * 1024 * 1024,
+    },
+    "high_quality_pc": {
+        "key": "high_quality_pc",
+        "label": "高画质 PC",
+        "frameBudget": 3,
+        "startupPhases": {"critical", "early"},
+        "criticalBudgetBytes": 160 * 1024 * 1024,
+        "totalBudgetBytes": 768 * 1024 * 1024,
+    },
+}
 
 
 def format_bytes(size_bytes: object) -> str:
@@ -46,6 +80,39 @@ def normalize_size_bytes(value: object) -> int:
         return max(0, int(value or 0))
     except (TypeError, ValueError):
         return 0
+
+
+def get_safe_runtime_preload_performance_profile(value: object, fallback: str = "standard") -> str:
+    fallback_key = fallback if fallback in RUNTIME_PRELOAD_PERFORMANCE_PROFILES else "standard"
+    key = str(value or fallback_key).strip().lower()
+    return key if key in RUNTIME_PRELOAD_PERFORMANCE_PROFILES else fallback_key
+
+
+def get_project_runtime_preload_performance_profile(project: dict | None = None, fallback: str = "standard") -> str:
+    if not isinstance(project, dict):
+        return get_safe_runtime_preload_performance_profile(None, fallback)
+    runtime_settings = project.get("runtimeSettings") if isinstance(project.get("runtimeSettings"), dict) else {}
+    profile = runtime_settings.get("performanceProfile") if isinstance(runtime_settings, dict) else None
+    return get_safe_runtime_preload_performance_profile(profile or project.get("performanceProfile"), fallback)
+
+
+def get_runtime_preload_profile_config(performance_profile: object = None) -> dict:
+    key = get_safe_runtime_preload_performance_profile(performance_profile)
+    profile = RUNTIME_PRELOAD_PERFORMANCE_PROFILES[key]
+    return {
+        **profile,
+        "startupPhases": set(profile.get("startupPhases") or RUNTIME_PRELOAD_STARTUP_PHASES),
+    }
+
+
+def get_runtime_preload_frame_budget(performance_profile: object = None) -> int:
+    profile = get_runtime_preload_profile_config(performance_profile)
+    return clamp_int(profile.get("frameBudget"), 1, 8, RUNTIME_PRELOAD_DEFAULT_FRAME_BUDGET)
+
+
+def get_runtime_preload_startup_phases(performance_profile: object = None) -> set[str]:
+    profile = get_runtime_preload_profile_config(performance_profile)
+    return set(profile.get("startupPhases") or RUNTIME_PRELOAD_STARTUP_PHASES)
 
 
 def get_runtime_preload_manifest(build_info: dict | None) -> dict:
@@ -99,16 +166,28 @@ def normalize_runtime_preload_entries(manifest: dict | None, assets_by_id: dict)
     )
 
 
-def is_runtime_preload_startup_entry(entry: dict) -> bool:
-    return str(entry.get("phase") or "").strip() in RUNTIME_PRELOAD_STARTUP_PHASES
+def is_runtime_preload_startup_entry(entry: dict, performance_profile: object = None) -> bool:
+    return str(entry.get("phase") or "").strip() in get_runtime_preload_startup_phases(performance_profile)
 
 
 def build_runtime_preload_size_budget(
     entry_reports: list[dict],
     *,
-    critical_budget_bytes: int = RUNTIME_PRELOAD_CRITICAL_BUDGET_BYTES,
-    total_budget_bytes: int = RUNTIME_PRELOAD_TOTAL_BUDGET_BYTES,
+    critical_budget_bytes: int | None = None,
+    total_budget_bytes: int | None = None,
+    performance_profile: object = None,
 ) -> dict:
+    profile = get_runtime_preload_profile_config(performance_profile)
+    critical_budget = (
+        normalize_size_bytes(critical_budget_bytes)
+        if critical_budget_bytes is not None
+        else normalize_size_bytes(profile.get("criticalBudgetBytes"))
+    )
+    total_budget = (
+        normalize_size_bytes(total_budget_bytes)
+        if total_budget_bytes is not None
+        else normalize_size_bytes(profile.get("totalBudgetBytes"))
+    )
     total_bytes = 0
     critical_bytes = 0
     by_type: dict[str, int] = {}
@@ -135,18 +214,20 @@ def build_runtime_preload_size_budget(
                 }
             )
     largest_entries.sort(key=lambda item: int(item.get("sizeBytes") or 0), reverse=True)
-    critical_over_budget = critical_bytes > critical_budget_bytes
-    total_over_budget = total_bytes > total_budget_bytes
+    critical_over_budget = critical_bytes > critical_budget
+    total_over_budget = total_bytes > total_budget
     return {
         "status": "warn" if critical_over_budget or total_over_budget else "ready",
+        "performanceProfile": profile.get("key") or "standard",
+        "performanceProfileLabel": profile.get("label") or "标准 PC / 网页",
         "totalBytes": total_bytes,
         "totalLabel": format_bytes(total_bytes),
         "criticalBytes": critical_bytes,
         "criticalLabel": format_bytes(critical_bytes),
-        "totalBudgetBytes": total_budget_bytes,
-        "totalBudgetLabel": format_bytes(total_budget_bytes),
-        "criticalBudgetBytes": critical_budget_bytes,
-        "criticalBudgetLabel": format_bytes(critical_budget_bytes),
+        "totalBudgetBytes": total_budget,
+        "totalBudgetLabel": format_bytes(total_budget),
+        "criticalBudgetBytes": critical_budget,
+        "criticalBudgetLabel": format_bytes(critical_budget),
         "criticalOverBudget": critical_over_budget,
         "totalOverBudget": total_over_budget,
         "byTypeBytes": by_type,
@@ -155,9 +236,13 @@ def build_runtime_preload_size_budget(
     }
 
 
-def build_empty_runtime_preload_status() -> dict:
+def build_empty_runtime_preload_status(performance_profile: object = None) -> dict:
+    profile = get_runtime_preload_profile_config(performance_profile)
     return {
         "status": "empty",
+        "performanceProfile": profile.get("key") or "standard",
+        "performanceProfileLabel": profile.get("label") or "标准 PC / 网页",
+        "frameBudget": get_runtime_preload_frame_budget(profile.get("key")),
         "totalEntries": 0,
         "loadedEntries": 0,
         "pendingEntries": 0,
@@ -180,15 +265,16 @@ def build_empty_runtime_preload_status() -> dict:
     }
 
 
-def build_runtime_preload_status(entries: list[dict]) -> dict:
-    status = build_empty_runtime_preload_status()
+def build_runtime_preload_status(entries: list[dict], performance_profile: object = None) -> dict:
+    profile_key = get_safe_runtime_preload_performance_profile(performance_profile)
+    status = build_empty_runtime_preload_status(profile_key)
     status["totalEntries"] = len(entries)
     status["pendingEntries"] = len(entries)
     for entry in entries:
         asset_type = str(entry.get("type") or "")
         size_bytes = normalize_size_bytes(entry.get("sizeBytes"))
         status["totalBytes"] += size_bytes
-        if is_runtime_preload_startup_entry(entry):
+        if is_runtime_preload_startup_entry(entry, profile_key):
             status["criticalBytes"] += size_bytes
         if asset_type in RUNTIME_PRELOAD_IMAGE_TYPES:
             status["imageEntries"] += 1
@@ -275,6 +361,9 @@ def format_runtime_preload_status_line(status: dict | None = None) -> str:
             f" · 首屏 {format_bytes(source.get('criticalBytes'))}"
             f" · 合计 {format_bytes(total_bytes)}"
         )
+    profile_label = str(source.get("performanceProfileLabel") or "").strip()
+    if profile_label:
+        detail = f"{detail} · 档位 {profile_label}"
     if pending_entries > 0:
         return f"资源预热：{loaded_entries}/{total_entries} 已准备，后台继续 {pending_entries} 项（{detail}）"
     if issue_count > 0:
