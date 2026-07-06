@@ -29225,12 +29225,18 @@ function serializeRuntimePreloadBudgetForRelease(report, digest) {
   const critical = report?.phases?.critical ?? {};
   const early = report?.phases?.early ?? {};
   const totals = report?.totals ?? {};
+  const profileAdvice = report?.profileAdvice ?? {};
+  const selectedProfileLabel =
+    profileAdvice.selectedProfileLabel ?? report?.performanceProfile?.label ?? report?.budgets?.performanceProfileLabel ?? "标准 PC / 网页";
+  const recommendedProfileLabel = profileAdvice.recommendedProfileLabel ?? selectedProfileLabel;
+  const profileAdviceAction = (profileAdvice.actions ?? [])[0] ?? "保持当前档位并继续复查首屏体积。";
   return {
     releaseRiskLevel: report?.releaseRiskLevel ?? "ready",
     title: digest?.title ?? "首屏加载健康",
     detail: digest?.detail ?? "首屏和早期路线没有明显预热压力。",
     summaryLine: `${digest?.title ?? "首屏加载健康"}，首屏 ${critical.bytesLabel ?? "0 B"} / 早期 ${early.bytesLabel ?? "0 B"}`,
     budgetLine: `${critical.bytesLabel ?? "0 B"} / ${early.bytesLabel ?? "0 B"} / ${totals.totalLabel ?? "0 B"}`,
+    profileAdviceLine: `当前 ${selectedProfileLabel} / 推荐 ${recommendedProfileLabel}`,
     warningCount: (totals.dangerCount ?? 0) + (totals.warnCount ?? 0),
     dangerCount: totals.dangerCount ?? 0,
     warnCount: totals.warnCount ?? 0,
@@ -29243,6 +29249,23 @@ function serializeRuntimePreloadBudgetForRelease(report, digest) {
     earlyBytesLabel: early.bytesLabel ?? "0 B",
     phaseRows: [],
     warningRows: [],
+    profileAdvice: {
+      status: profileAdvice.status ?? "ok",
+      selectedProfileLabel,
+      recommendedProfileLabel,
+      action: profileAdviceAction,
+    },
+    profileAdviceRows: [
+      [
+        profileAdvice.status ?? "ok",
+        selectedProfileLabel,
+        recommendedProfileLabel,
+        profileAdvice.criticalLabel ?? critical.bytesLabel ?? "0 B",
+        profileAdvice.totalLabel ?? totals.totalLabel ?? "0 B",
+        `${profileAdvice.videoEntryCount ?? 0}`,
+        profileAdviceAction,
+      ],
+    ],
     warnings: [],
     topEntries: [],
   };
@@ -30118,6 +30141,10 @@ function buildReleaseControlReportContent() {
     ["阶段", "数量", "体积", "建议预算", "缺文件", "状态"],
     runtimePreloadBudgetRelease.phaseRows
   );
+  const runtimePreloadBudgetProfileAdviceTable = buildMarkdownTable(
+    ["结论", "当前档位", "推荐档位", "首屏体积", "总预热体积", "视频素材", "建议动作"],
+    runtimePreloadBudgetRelease.profileAdviceRows ?? []
+  );
   const native3dIssueTable = buildMarkdownTable(
     ["素材", "类型", "状态", "风险", "引用", "建议"],
     getNativeRuntime3dIssueAssets(native3dDigest)
@@ -30344,6 +30371,9 @@ function buildReleaseControlReportContent() {
     `- 状态：${runtimePreloadBudgetRelease.title}`,
     `- 摘要：${runtimePreloadBudgetRelease.detail}`,
     `- 首屏 / 早期 / 总预热：${runtimePreloadBudgetRelease.budgetLine}`,
+    `- 性能档位：${runtimePreloadBudgetRelease.profileAdviceLine ?? "当前 标准 PC / 网页 / 推荐 标准 PC / 网页"}`,
+    "",
+    runtimePreloadBudgetProfileAdviceTable || "当前性能档位与预热规模基本匹配。",
     "",
     runtimePreloadBudgetPhaseTable || "当前没有可统计的 Runtime 预热阶段。",
     "",
@@ -33604,11 +33634,20 @@ function renderRuntimePreloadBudgetPanel({ compact = false } = {}) {
   const totals = report.totals ?? {};
   const critical = report.phases?.critical ?? {};
   const early = report.phases?.early ?? {};
+  const profileAdvice = report.profileAdvice ?? {};
   const phaseCards = (report.phaseList ?? []).slice(0, compact ? 2 : 4);
   const topEntries = (report.topEntries ?? []).slice(0, compact ? 3 : 6);
   const warnings = (report.warnings ?? []).filter((warning) => warning.severity !== "tip").slice(0, compact ? 2 : 4);
   const sceneHotspots = (report.scenes ?? []).filter((scene) => scene.count > 0).slice(0, compact ? 2 : 4);
   const toneClass = getAssetFootprintToneClass(digest.level);
+  const profileAdviceTone =
+    profileAdvice.status === "needs_optimization" || profileAdvice.status === "should_raise"
+      ? "warn"
+      : profileAdvice.status === "can_lower"
+        ? "soft"
+        : "ready";
+  const profileAdviceAction = (profileAdvice.actions ?? [])[0] ?? "保持当前档位；发布前继续复查首屏体积。";
+  const profileAdviceReason = (profileAdvice.reasons ?? [])[0] ?? "当前预热规模与项目性能档位基本匹配。";
 
   return `
     <article class="detail-card preview-sprint-panel runtime-preload-budget-panel">
@@ -33622,7 +33661,20 @@ function renderRuntimePreloadBudgetPanel({ compact = false } = {}) {
         ${renderRouteMetricCard("早期路线", early.bytesLabel ?? "0 B", `${early.count ?? 0} 个素材`)}
         ${renderRouteMetricCard("总预热候选", totals.totalLabel ?? "0 B", `${totals.totalEntries ?? 0} 个素材`)}
         ${renderRouteMetricCard("缺口", `${totals.missingFileCount ?? 0} / ${totals.missingSizeCount ?? 0}`, "缺文件 / 缺体积")}
+        ${renderRouteMetricCard(
+          "推荐档位",
+          profileAdvice.recommendedProfileLabel ?? "标准 PC / 网页",
+          `当前 ${profileAdvice.selectedProfileLabel ?? report.performanceProfile?.label ?? "标准 PC / 网页"}`
+        )}
       </div>
+      <article class="preview-sprint-card runtime-preload-profile-advice is-${profileAdviceTone}">
+        <div class="preview-sprint-head">
+          <strong>性能档位建议：${escapeHtml(profileAdvice.recommendedProfileLabel ?? "标准 PC / 网页")}</strong>
+          <span class="issue-tag ${getAssetFootprintToneClass(profileAdviceTone)}">${escapeHtml(profileAdvice.status ?? "ok")}</span>
+        </div>
+        <p>${escapeHtml(profileAdviceReason)} ${escapeHtml(profileAdviceAction)}</p>
+        <button class="toolbar-button" data-action="switch-screen" data-screen="preview">调整导出体验</button>
+      </article>
       <div class="detail-actions">
         <button class="toolbar-button toolbar-button-primary" data-action="export-runtime-preload-budget-markdown">
           ${escapeHtml(digest.actionLabel)}

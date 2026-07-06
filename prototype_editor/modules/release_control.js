@@ -515,6 +515,10 @@
     const criticalBytesLabel = critical.bytesLabel ?? "0 B";
     const earlyBytesLabel = early.bytesLabel ?? "0 B";
     const totalLabel = totals.totalLabel ?? "0 B";
+    const profileAdvice = report?.profileAdvice && typeof report.profileAdvice === "object" ? report.profileAdvice : {};
+    const selectedProfileLabel = profileAdvice.selectedProfileLabel ?? report?.performanceProfile?.label ?? report?.budgets?.performanceProfileLabel ?? "标准 PC / 网页";
+    const recommendedProfileLabel = profileAdvice.recommendedProfileLabel ?? selectedProfileLabel;
+    const profileAdviceAction = toArray(profileAdvice.actions)[0] ?? "保持当前档位并继续复查首屏体积。";
 
     return {
       releaseRiskLevel: report?.releaseRiskLevel ?? "ready",
@@ -522,6 +526,7 @@
       detail,
       summaryLine: `${title}，首屏 ${criticalBytesLabel} / 早期 ${earlyBytesLabel}`,
       budgetLine: `${criticalBytesLabel} / ${earlyBytesLabel} / ${totalLabel}`,
+      profileAdviceLine: `当前 ${selectedProfileLabel} / 推荐 ${recommendedProfileLabel}`,
       warningCount,
       dangerCount,
       warnCount,
@@ -547,6 +552,31 @@
         warning?.detail ?? "",
         warning?.actionHint ?? "",
       ]),
+      profileAdvice: {
+        status: profileAdvice.status ?? "ok",
+        severity: profileAdvice.severity ?? "pass",
+        selectedProfile: profileAdvice.selectedProfile ?? "",
+        selectedProfileLabel,
+        recommendedProfile: profileAdvice.recommendedProfile ?? "",
+        recommendedProfileLabel,
+        criticalLabel: profileAdvice.criticalLabel ?? criticalBytesLabel,
+        totalLabel: profileAdvice.totalLabel ?? totalLabel,
+        videoEntryCount: toCount(profileAdvice.videoEntryCount),
+        action: profileAdviceAction,
+        reasons: toArray(profileAdvice.reasons),
+        actions: toArray(profileAdvice.actions),
+      },
+      profileAdviceRows: [
+        [
+          profileAdvice.status ?? "ok",
+          selectedProfileLabel,
+          recommendedProfileLabel,
+          profileAdvice.criticalLabel ?? criticalBytesLabel,
+          profileAdvice.totalLabel ?? totalLabel,
+          `${toCount(profileAdvice.videoEntryCount)}`,
+          profileAdviceAction,
+        ],
+      ],
       warnings: toArray(report?.warnings).slice(0, 20).map((warning) => ({
         code: warning?.code ?? "",
         severity: warning?.severity ?? "",

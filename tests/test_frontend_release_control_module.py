@@ -104,6 +104,8 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
         self.assertIn("## Runtime 首屏加载预算", report_body)
         self.assertIn("runtimePreloadBudgetRelease.phaseRows", report_body)
         self.assertIn("runtimePreloadBudgetRelease.warningRows", report_body)
+        self.assertIn("runtimePreloadBudgetRelease.profileAdviceRows", report_body)
+        self.assertIn("性能档位", report_body)
         self.assertIn("const releaseOverviewRows = buildReleaseControlOverviewRows", report_body)
         self.assertIn('buildMarkdownTable(["指标", "结果"], releaseOverviewRows)', report_body)
         self.assertIn("productionBacklogSummary: productionBacklog.summary", report_body)
@@ -225,6 +227,19 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
                 topEntries: [
                   {{ id: "asset_op", name: "OP", type: "video", typeLabel: "视频", phase: "critical", sizeBytes: 260 * 1024 * 1024, sizeLabel: "260 MB", fileExists: false, sceneId: "scene_1", sceneName: "开场", reason: "开场 / video_play" }},
                 ],
+                profileAdvice: {{
+                  status: "needs_optimization",
+                  severity: "warn",
+                  selectedProfile: "mobile_low",
+                  selectedProfileLabel: "低配 / 移动端",
+                  recommendedProfile: "high_quality_pc",
+                  recommendedProfileLabel: "高画质 PC",
+                  criticalLabel: "180 MB",
+                  totalLabel: "360 MB",
+                  videoEntryCount: 1,
+                  reasons: ["入口视频过重。"],
+                  actions: ["先压缩 OP 或延后播放。"],
+                }},
               }}, {{ title: "首屏压力偏高", detail: "先处理入口压力。" }}),
               overviewRows: tools.buildReleaseControlOverviewRows({{
                 errorCount: 2,
@@ -355,6 +370,9 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
         self.assertEqual(payload["runtimePreloadCounts"], [3, 1, "处理首屏加载压力"])
         self.assertEqual(payload["runtimePreloadRelease"]["summaryLine"], "首屏压力偏高，首屏 180 MB / 早期 180 MB")
         self.assertEqual(payload["runtimePreloadRelease"]["budgetLine"], "180 MB / 180 MB / 360 MB")
+        self.assertEqual(payload["runtimePreloadRelease"]["profileAdviceLine"], "当前 低配 / 移动端 / 推荐 高画质 PC")
+        self.assertEqual(payload["runtimePreloadRelease"]["profileAdvice"]["recommendedProfileLabel"], "高画质 PC")
+        self.assertEqual(payload["runtimePreloadRelease"]["profileAdviceRows"][0][6], "先压缩 OP 或延后播放。")
         self.assertEqual(payload["runtimePreloadRelease"]["warningCount"], 2)
         self.assertEqual(payload["runtimePreloadRelease"]["phaseRows"][0][5], "超过建议预算")
         self.assertEqual(payload["runtimePreloadRelease"]["warningRows"][0][0], "高风险")

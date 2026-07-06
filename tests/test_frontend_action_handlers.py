@@ -3282,6 +3282,16 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("toFixed(1)", byte_formatter)
         self.assertNotIn("formatFileSize(", source)
 
+    def test_runtime_preload_budget_panel_surfaces_profile_advice(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        panel_source = _extract_function_source(source, "renderRuntimePreloadBudgetPanel")
+
+        self.assertIn("profileAdvice", panel_source)
+        self.assertIn("推荐档位", panel_source)
+        self.assertIn("性能档位建议", panel_source)
+        self.assertIn("调整导出体验", panel_source)
+        self.assertIn("runtime-preload-profile-advice", panel_source)
+
     def test_handle_click_ignores_disabled_actions_before_dispatch(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
         click_handler = _extract_function_source(source, "handleClick")
