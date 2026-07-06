@@ -6174,6 +6174,84 @@ html[data-ui-theme="light"] .music-range-timeline em {
   line-height: 1.7;
 }
 
+.preview-condition-trace {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 18px;
+  background: rgba(245, 251, 255, 0.82);
+  border: 1px solid rgba(71, 137, 202, 0.16);
+}
+
+.preview-condition-trace-head,
+.preview-condition-trace-branch-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.preview-condition-trace-head p,
+.preview-condition-trace-branch p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.preview-condition-trace-list {
+  gap: 8px;
+}
+
+.preview-condition-trace-branch {
+  display: grid;
+  gap: 8px;
+  padding: 11px 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(93, 126, 168, 0.14);
+}
+
+.preview-condition-trace-branch.is-matched {
+  background: rgba(239, 255, 247, 0.9);
+  border-color: rgba(55, 154, 105, 0.22);
+}
+
+.preview-condition-trace-branch ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.preview-condition-trace-branch li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.preview-condition-trace-branch li span {
+  min-width: 38px;
+  font-weight: 800;
+}
+
+.preview-condition-trace-branch li.is-pass span {
+  color: var(--good);
+}
+
+.preview-condition-trace-branch li.is-fail span {
+  color: var(--warn);
+}
+
+.preview-condition-trace-branch li strong {
+  color: var(--ink);
+  font-weight: 700;
+}
+
 .preview-debug-actions {
   justify-content: flex-start;
 }

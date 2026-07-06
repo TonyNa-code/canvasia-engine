@@ -21357,6 +21357,7 @@ function buildPreviewSnapshot(sceneId, blockIndex, previousVisualState, previous
     transitionTargetSceneId,
     selectedOptionId: null,
     resolvedBranchId: conditionResult?.branchKey ?? null,
+    conditionTrace: conditionResult?.trace ?? null,
     completed: false,
   };
 }
@@ -21381,6 +21382,7 @@ function createPreviewTerminalSnapshot(scene, visualState, variables, message) {
     transitionTargetSceneId: null,
     selectedOptionId: null,
     resolvedBranchId: null,
+    conditionTrace: null,
     completed: true,
   };
 }
@@ -21882,25 +21884,26 @@ function getConditionBranchKey(branch, index) {
 }
 
 function resolveConditionBranchResult(block, variables) {
-  const matchedBranchIndex = (block.branches ?? []).findIndex((branch) =>
-    (branch.when ?? []).every((rule) => evaluateConditionRule(rule, variables))
-  );
+  const trace = runtimeConditionTools.getConditionBlockTrace(block, variables, getConditionTraceOptions());
+  const matchedBranchIndex = trace.matchedBranchIndex;
 
   if (matchedBranchIndex >= 0) {
     const matchedBranch = block.branches?.[matchedBranchIndex] ?? null;
     return {
-      branchKey: getConditionBranchKey(matchedBranch, matchedBranchIndex),
-      targetSceneId: getSafeSceneId(matchedBranch?.gotoSceneId, matchedBranch?.gotoSceneId),
+      branchKey: trace.matchedBranchKey,
+      targetSceneId: getSafeSceneId(trace.targetSceneId, matchedBranch?.gotoSceneId),
       branch: matchedBranch,
       matched: true,
+      trace,
     };
   }
 
   return {
     branchKey: "else",
-    targetSceneId: getSafeSceneId(block.elseGotoSceneId, block.elseGotoSceneId),
+    targetSceneId: getSafeSceneId(trace.targetSceneId, block.elseGotoSceneId),
     branch: null,
     matched: false,
+    trace,
   };
 }
 
@@ -21909,10 +21912,15 @@ function resolveConditionTargetSceneId(block, variables) {
 }
 
 function evaluateConditionRule(rule, variables) {
-  return runtimeConditionTools.evaluateConditionRule(rule, variables, {
+  return runtimeConditionTools.evaluateConditionRule(rule, variables, getConditionTraceOptions());
+}
+
+function getConditionTraceOptions() {
+  return {
+    getBranchKey: getConditionBranchKey,
     getVariableValue: (variableId, variableValues) => getPreviewVariableValue(variableValues, variableId),
     normalizeVariableValue: (variableId, value) => normalizeVariableValue(variableId, value),
-  });
+  };
 }
 
 function getPreviewHint(snapshot) {
@@ -24233,8 +24241,94 @@ function getPreviewDebugConditionTarget(snapshot, variables) {
     return null;
   }
 
-  const targetSceneId = resolveConditionTargetSceneId(snapshot.block, variables);
+  const trace = getPreviewConditionTrace(snapshot, variables);
+  const targetSceneId = trace?.targetSceneId ?? resolveConditionTargetSceneId(snapshot.block, variables);
   return state.data.scenesById.get(targetSceneId)?.name ?? targetSceneId;
+}
+
+function getPreviewConditionTrace(snapshot, variables = snapshot?.variables) {
+  if (!snapshot || snapshot.blockType !== "condition" || !snapshot.block) {
+    return null;
+  }
+
+  return runtimeConditionTools.getConditionBlockTrace(
+    snapshot.block,
+    variables ?? snapshot.variables ?? {},
+    getConditionTraceOptions()
+  );
+}
+
+function getPreviewConditionRuleTraceLabel(ruleTrace) {
+  const variableName = state.data.variablesById.get(ruleTrace?.variableId)?.name ?? ruleTrace?.variableId ?? "变量";
+  return `${variableName} 当前 ${formatVariableValue(ruleTrace?.variableId, ruleTrace?.leftValue)} ${ruleTrace?.operator ?? "=="} 目标 ${formatVariableValue(ruleTrace?.variableId, ruleTrace?.rightValue)}`;
+}
+
+function renderPreviewConditionTrace(snapshot) {
+  const trace = getPreviewConditionTrace(snapshot, state.previewDebugDraft ?? snapshot?.variables);
+
+  if (!trace) {
+    return "";
+  }
+
+  const targetSceneName = state.data.scenesById.get(trace.targetSceneId)?.name ?? trace.targetSceneId ?? "未设置目标";
+  const branchRows = trace.branches
+    .map((branchTrace) => {
+      const branch = snapshot.block.branches?.[branchTrace.index] ?? null;
+      const targetName = state.data.scenesById.get(branchTrace.gotoSceneId)?.name ?? branchTrace.gotoSceneId ?? "未设置目标";
+      const ruleRows =
+        branchTrace.rules.length > 0
+          ? branchTrace.rules
+              .map(
+                (ruleTrace) => `
+                  <li class="${ruleTrace.matched ? "is-pass" : "is-fail"}">
+                    <span>${ruleTrace.matched ? "通过" : "失败"}</span>
+                    <strong>${escapeHtml(getPreviewConditionRuleTraceLabel(ruleTrace))}</strong>
+                  </li>
+                `
+              )
+              .join("")
+          : '<li class="is-pass"><span>通过</span><strong>没有规则，这条分支会直接命中。</strong></li>';
+
+      return `
+        <article class="preview-condition-trace-branch ${branchTrace.matched ? "is-matched" : ""}">
+          <div class="preview-condition-trace-branch-head">
+            <strong>${escapeHtml(`分支 ${branchTrace.index + 1}`)}</strong>
+            <span class="issue-tag ${branchTrace.matched ? "good-text" : "warn-text"}">
+              ${branchTrace.matched ? "当前命中" : "未命中"}
+            </span>
+          </div>
+          <p>${escapeHtml(`目标：${targetName}${branch?.id ? ` · ID ${branch.id}` : ""}`)}</p>
+          <ul>${ruleRows}</ul>
+        </article>
+      `;
+    })
+    .join("");
+
+  return `
+    <section class="preview-condition-trace">
+      <div class="preview-condition-trace-head">
+        <div>
+          <strong>条件命中解释</strong>
+          <p>按当前调试台变量值计算，下一步会去：${escapeHtml(targetSceneName)}</p>
+        </div>
+        <span class="issue-tag ${trace.elseMatched ? "warn-text" : "good-text"}">
+          ${trace.elseMatched ? "命中否则" : `命中 ${trace.matchedBranchKey}`}
+        </span>
+      </div>
+      <div class="detail-stack preview-condition-trace-list">
+        ${branchRows || '<div class="preview-route-note">这张条件卡还没有分支，会直接走“否则”。</div>'}
+        <article class="preview-condition-trace-branch ${trace.elseMatched ? "is-matched" : ""}">
+          <div class="preview-condition-trace-branch-head">
+            <strong>否则</strong>
+            <span class="issue-tag ${trace.elseMatched ? "good-text" : "warn-text"}">
+              ${trace.elseMatched ? "当前命中" : "未命中"}
+            </span>
+          </div>
+          <p>${escapeHtml(`所有分支都不满足时去：${state.data.scenesById.get(trace.elseGotoSceneId)?.name ?? trace.elseGotoSceneId ?? "未设置目标"}`)}</p>
+        </article>
+      </div>
+    </section>
+  `;
 }
 
 function getPreviewDebugHint(snapshot) {
@@ -24369,6 +24463,7 @@ function renderPreviewDebugPanel(snapshot) {
           })
           .join("")}
       </div>
+      ${renderPreviewConditionTrace(snapshot)}
       <div class="preview-debug-note">${escapeHtml(getPreviewDebugHint(snapshot))}</div>
       <div class="detail-actions preview-debug-actions">
         <button

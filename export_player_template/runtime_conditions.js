@@ -77,6 +77,61 @@
     return evaluateConditionOperator(leftValue, rule?.operator, rightValue);
   }
 
+  function getConditionRuleTrace(rule = {}, variableValues = {}, options = {}) {
+    const variableId = cleanText(rule?.variableId);
+    const operator = normalizeConditionOperator(rule?.operator);
+    const leftValue = normalizeConditionValue(
+      variableId,
+      getConditionVariableValue(variableId, variableValues, options),
+      options
+    );
+    const rightValue = normalizeConditionValue(variableId, rule?.value, options);
+    const matched = evaluateConditionOperator(leftValue, operator, rightValue);
+
+    return {
+      variableId,
+      operator,
+      leftValue,
+      rightValue,
+      matched,
+    };
+  }
+
+  function toArray(value) {
+    return Array.isArray(value) ? value : [];
+  }
+
+  function getConditionBranchKey(branch, index, options = {}) {
+    if (typeof options.getBranchKey === "function") {
+      return cleanText(options.getBranchKey(branch, index), `branch-${index + 1}`);
+    }
+    return cleanText(branch?.id, `branch-${index + 1}`);
+  }
+
+  function getConditionBlockTrace(block = {}, variableValues = {}, options = {}) {
+    const branches = toArray(block?.branches).map((branch, index) => {
+      const rules = toArray(branch?.when).map((rule) => getConditionRuleTrace(rule, variableValues, options));
+      return {
+        index,
+        branchKey: getConditionBranchKey(branch, index, options),
+        gotoSceneId: cleanText(branch?.gotoSceneId),
+        matched: rules.every((ruleTrace) => ruleTrace.matched),
+        rules,
+      };
+    });
+    const matchedBranch = branches.find((branch) => branch.matched) ?? null;
+
+    return {
+      branches,
+      matched: Boolean(matchedBranch),
+      matchedBranchIndex: matchedBranch?.index ?? -1,
+      matchedBranchKey: matchedBranch?.branchKey ?? "else",
+      targetSceneId: matchedBranch?.gotoSceneId ?? cleanText(block?.elseGotoSceneId),
+      elseMatched: !matchedBranch,
+      elseGotoSceneId: cleanText(block?.elseGotoSceneId),
+    };
+  }
+
   global.CanvasiaRuntimeConditions = Object.freeze({
     STRING_CONDITION_OPERATORS,
     NUMERIC_CONDITION_OPERATORS,
@@ -84,5 +139,7 @@
     normalizeConditionOperator,
     evaluateConditionOperator,
     evaluateConditionRule,
+    getConditionRuleTrace,
+    getConditionBlockTrace,
   });
 })(typeof window !== "undefined" ? window : globalThis);

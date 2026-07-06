@@ -60,6 +60,22 @@ class FrontendRuntimeConditionsModuleTests(unittest.TestCase):
                   normalizeVariableValue: (variableId, value) => variableId === "flag" ? value === true || value === "true" : value,
                 }}),
               ],
+              trace: tools.getConditionBlockTrace(
+                {{
+                  branches: [
+                    {{ id: "bad", gotoSceneId: "scene_bad", when: [{{ variableId: "score", operator: "<", value: "5" }}] }},
+                    {{ id: "good", gotoSceneId: "scene_good", when: [
+                      {{ variableId: "score", operator: ">=", value: "5" }},
+                      {{ variableId: "route", operator: "contains", value: "common" }},
+                    ] }},
+                  ],
+                  elseGotoSceneId: "scene_else",
+                }},
+                variables,
+                {{
+                  normalizeVariableValue: (variableId, value) => variableId === "score" ? Number(value) : value,
+                }}
+              ),
             }};
             process.stdout.write(JSON.stringify(result));
             """
@@ -80,6 +96,18 @@ class FrontendRuntimeConditionsModuleTests(unittest.TestCase):
         self.assertEqual(payload["operators"]["equalities"], ["==", "=", "!="])
         self.assertEqual(payload["direct"], [True, False, True, True, True, True, True, "=="])
         self.assertEqual(payload["rules"], [True, True, True, True])
+        self.assertIn("getConditionBlockTrace", payload["keys"])
+        self.assertEqual(payload["trace"]["matchedBranchKey"], "good")
+        self.assertEqual(payload["trace"]["targetSceneId"], "scene_good")
+        self.assertFalse(payload["trace"]["elseMatched"])
+        self.assertEqual(
+            [branch["matched"] for branch in payload["trace"]["branches"]],
+            [False, True],
+        )
+        self.assertEqual(
+            payload["trace"]["branches"][1]["rules"][0],
+            {"variableId": "score", "operator": ">=", "leftValue": 7, "rightValue": 5, "matched": True},
+        )
 
     def test_editor_and_export_player_use_shared_condition_module(self) -> None:
         editor_index = EDITOR_INDEX_PATH.read_text(encoding="utf-8")
@@ -91,6 +119,8 @@ class FrontendRuntimeConditionsModuleTests(unittest.TestCase):
         self.assertIn("./runtime_conditions.js", player_index)
         self.assertIn("const runtimeConditionTools = window.CanvasiaRuntimeConditions;", app_source)
         self.assertIn("return runtimeConditionTools.evaluateConditionRule(rule, variables,", app_source)
+        self.assertIn("runtimeConditionTools.getConditionBlockTrace", app_source)
+        self.assertIn("条件命中解释", app_source)
         self.assertIn("const runtimeConditionTools = window.CanvasiaRuntimeConditions;", player_source)
         self.assertIn("return runtimeConditionTools.evaluateConditionRule(rule, variables,", player_source)
 
