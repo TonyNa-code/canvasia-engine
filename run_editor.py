@@ -11007,7 +11007,7 @@ def export_native_runtime_build() -> dict:
         {"name": audio_cue_sheet_files["audioCueSheetReportName"], "description": "音频调度 Markdown 报告，复查 BGM 范围、淡入淡出、音效、语音缺口和人声混音风险。"},
         {"name": audio_cue_sheet_files["audioCueSheetName"], "description": "机器可读音频调度清单 JSON。"},
         {"name": audio_cue_sheet_files["audioCueSheetCsvName"], "description": "可导入表格的 BGM / Mix / SFX / Voice Cue CSV。"},
-        {"name": stage_direction_files["stageDirectionReportName"], "description": "角色舞台 Markdown 报告，复查背景、立绘、登退场、站位、缩放和透明度。"},
+        {"name": stage_direction_files["stageDirectionReportName"], "description": "角色舞台 Markdown 报告，复查背景、立绘、登退场、站位、缩放、透明度和构图风险。"},
         {"name": stage_direction_files["stageDirectionName"], "description": "机器可读角色舞台调度清单 JSON。"},
         {"name": stage_direction_files["stageDirectionCsvName"], "description": "可导入表格的角色舞台 Cue CSV。"},
         {"name": presentation_timeline_files["presentationTimelineReportName"], "description": "演出时间轴 Markdown 报告，复查正文节奏、视觉锚点、音频锚点和硬切问题。"},

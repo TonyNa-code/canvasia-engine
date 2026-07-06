@@ -38,6 +38,7 @@ VALID_POSITIONS = {"left", "center", "right"}
 VALID_CHARACTER_TRANSITIONS = {"fade", "slide_left", "slide_right", "rise", "pop", "none"}
 STORY_CONTENT_BLOCK_TYPES = {"background", "dialogue", "narration", "character_show", "choice", "video_play", "credits_roll", "wait"}
 ISSUE_WEIGHT = {"blocker": 100, "warn": 60, "tip": 20}
+STAGE_POSITION_X = {"left": -36, "center": 0, "right": 36}
 
 
 def clean_text(value: object, fallback: str = "") -> str:
@@ -259,6 +260,99 @@ def get_stage(block: dict) -> dict:
     }
 
 
+def get_stage_composition_x(item: dict) -> float:
+    stage = item.get("stage") if isinstance(item.get("stage"), dict) else {}
+    return STAGE_POSITION_X.get(clean_text(item.get("position"), "center"), 0) + float(stage.get("offsetX", 0) or 0) * 0.45
+
+
+def get_stage_composition_radius(item: dict) -> float:
+    stage = item.get("stage") if isinstance(item.get("stage"), dict) else {}
+    return max(12.0, float(stage.get("scale", 100) or 100) * 0.18)
+
+
+def build_stage_composition_snapshot(visible_characters: dict[str, dict], context: dict) -> dict:
+    characters = []
+    for item in visible_characters.values():
+        stage = item.get("stage") if isinstance(item.get("stage"), dict) else get_stage({})
+        position = clean_text(item.get("position"), "center")
+        characters.append(
+            {
+                "characterId": clean_text(item.get("characterId")),
+                "characterName": clean_text(item.get("characterName")),
+                "expressionName": clean_text(item.get("expressionName")),
+                "position": position,
+                "positionLabel": get_position_label(position),
+                "stage": stage,
+                "centerX": round(get_stage_composition_x(item)),
+                "radius": round(get_stage_composition_radius(item)),
+            }
+        )
+    return {
+        "chapterName": context.get("chapterName"),
+        "sceneName": context.get("sceneName"),
+        "sceneId": context.get("sceneId"),
+        "blockId": context.get("blockId"),
+        "blockIndex": context.get("blockIndex"),
+        "blockLabel": context.get("blockLabel"),
+        "visibleCount": len(characters),
+        "characters": characters,
+        "characterNames": " / ".join(character["characterName"] for character in characters if character.get("characterName")),
+    }
+
+
+def find_stage_overlap_pairs(characters: list[dict]) -> list[str]:
+    pairs: list[str] = []
+    for left_index, left in enumerate(characters):
+        for right in characters[left_index + 1 :]:
+            distance = abs(float(left.get("centerX", 0)) - float(right.get("centerX", 0)))
+            overlap_threshold = min(34.0, (float(left.get("radius", 0)) + float(right.get("radius", 0))) * 0.72)
+            if distance < overlap_threshold:
+                pairs.append(f"{left.get('characterName') or left.get('characterId')} / {right.get('characterName') or right.get('characterId')}")
+    return pairs
+
+
+def inspect_stage_composition(visible_characters: dict[str, dict], issues: list[dict], context: dict, *, speaker_id: str = "") -> dict:
+    issue_start_index = len(issues)
+    snapshot = build_stage_composition_snapshot(visible_characters, context)
+    risks: list[str] = []
+    position_counts: dict[str, int] = {}
+    layer_counts: dict[int, int] = {}
+    for item in snapshot["characters"]:
+        position_counts[item["position"]] = position_counts.get(item["position"], 0) + 1
+        layer = int((item.get("stage") or {}).get("layer", 0) or 0)
+        layer_counts[layer] = layer_counts.get(layer, 0) + 1
+    if any(count > 1 for count in position_counts.values()):
+        push_issue(issues, "tip", "stage_position_overlap", "角色站位可能重叠", "当前舞台有多个角色使用同一站位，建议确认画面是否拥挤。", context)
+        risks.append("同站位")
+    overlap_pairs = find_stage_overlap_pairs(snapshot["characters"])
+    if overlap_pairs:
+        push_issue(issues, "warn", "stage_geometry_overlap", "立绘可能互相遮挡", f"请复查：{'、'.join(overlap_pairs)} 的站位、偏移或缩放。", context)
+        risks.append("遮挡")
+    if any(count > 1 for count in layer_counts.values()) and snapshot["visibleCount"] > 1:
+        push_issue(issues, "tip", "stage_layer_overlap", "角色图层可能冲突", "同屏多个角色使用相同图层，复杂遮挡时建议显式区分图层。", context)
+        risks.append("图层")
+    if snapshot["visibleCount"] > 3:
+        push_issue(issues, "tip", "stage_too_many_characters", "同屏角色较多", "视觉小说常规画面建议控制在 1-3 人，更多角色建议拆镜头或缩放。", context)
+        risks.append("拥挤")
+    if snapshot["visibleCount"] > 1 and any((item.get("stage") or {}).get("scale", 100) >= 155 for item in snapshot["characters"]):
+        push_issue(issues, "tip", "stage_large_sprite_crowding", "大比例立绘可能压迫画面", "同屏多人时，超过 155% 的立绘建议配合偏移、图层或拆镜头使用。", context)
+        risks.append("大比例")
+    speaker = next((item for item in snapshot["characters"] if clean_text(item.get("characterId")) == clean_text(speaker_id)), None) if clean_text(speaker_id) else None
+    if speaker and (speaker.get("stage") or {}).get("opacity", 100) < 35:
+        push_issue(issues, "warn", "stage_speaker_low_opacity", "说话人透明度过低", "当前说话人的透明度低于 35%，玩家可能看不清是谁在说话。", context)
+        risks.append("说话人过淡")
+    composition_issues = issues[issue_start_index:]
+    if any(issue["severity"] == "blocker" for issue in composition_issues):
+        status = "blocker"
+    elif any(issue["severity"] == "warn" for issue in composition_issues):
+        status = "warn"
+    elif risks:
+        status = "tip"
+    else:
+        status = "good"
+    return {**snapshot, "status": status, "risks": risks, "issues": composition_issues, "riskLabel": " / ".join(risks) if risks else "构图正常"}
+
+
 def get_block_id(block: dict, index: int) -> str:
     return clean_text(block.get("id"), f"block_{index + 1}")
 
@@ -339,6 +433,7 @@ def inspect_scene_stage(scene_record: dict, assets_by_id: dict[str, dict], chara
     scene = scene_record["scene"]
     blocks = [block for block in as_list(scene.get("blocks")) if isinstance(block, dict)]
     events: list[dict] = []
+    composition_rows: list[dict] = []
     scene_issues: list[dict] = []
     visible_characters: dict[str, dict] = {}
     has_background = False
@@ -409,20 +504,12 @@ def inspect_scene_stage(scene_record: dict, assets_by_id: dict[str, dict], chara
                 visible_characters[character_id] = {
                     "characterId": character_id,
                     "position": position,
-                    "layer": stage["layer"],
+                    "stage": stage,
                     "characterName": get_character_name(character, character_id),
+                    "expressionName": get_expression_name(character, block.get("expressionId")),
                 }
-            position_counts: dict[str, int] = {}
-            layer_counts: dict[int, int] = {}
-            for visible in visible_characters.values():
-                position_counts[visible["position"]] = position_counts.get(visible["position"], 0) + 1
-                layer_counts[visible["layer"]] = layer_counts.get(visible["layer"], 0) + 1
-            if any(count > 1 for count in position_counts.values()):
-                push_issue(issues, "tip", "stage_position_overlap", "角色站位可能重叠", "当前舞台有多个角色使用同一站位，建议确认画面是否拥挤。", base_context)
-            if any(count > 1 for count in layer_counts.values()) and len(visible_characters) > 1:
-                push_issue(issues, "tip", "stage_layer_overlap", "角色图层可能冲突", "同屏多个角色使用相同图层，复杂遮挡时建议显式区分。", base_context)
-            if len(visible_characters) > 3:
-                push_issue(issues, "tip", "stage_too_many_characters", "同屏角色较多", "常规视觉小说画面建议控制在 1-3 人，更多角色建议拆镜头或缩放。", base_context)
+            composition = inspect_stage_composition(visible_characters, issues, base_context)
+            composition_rows.append(composition)
             scene_issues.extend(issues)
             events.append(
                 make_event(
@@ -435,6 +522,7 @@ def inspect_scene_stage(scene_record: dict, assets_by_id: dict[str, dict], chara
                     position=position,
                     positionLabel=get_position_label(position),
                     stage=stage,
+                    composition=composition,
                     transition=clean_text(block.get("transition")),
                     transitionDurationMs=as_int(block.get("transitionDurationMs"), 0),
                     assetStatusLabel=f"{visual['label']}：{' / '.join(visual['assetNames'])}".rstrip("："),
@@ -491,15 +579,16 @@ def inspect_scene_stage(scene_record: dict, assets_by_id: dict[str, dict], chara
             if character:
                 inspect_visual_status(issues, visual, base_context)
             if character_id and character:
-                visible_characters.setdefault(
-                    character_id,
-                    {
-                        "characterId": character_id,
-                        "position": clean_text(character.get("defaultPosition"), "center"),
-                        "layer": 0,
-                        "characterName": get_character_name(character, character_id),
-                    },
-                )
+                previous_visible = visible_characters.get(character_id)
+                visible_characters[character_id] = {
+                    "characterId": character_id,
+                    "position": previous_visible.get("position") if previous_visible else get_position_value(character.get("defaultPosition"), "center"),
+                    "stage": previous_visible.get("stage") if previous_visible else get_stage({}),
+                    "characterName": get_character_name(character, character_id),
+                    "expressionName": get_expression_name(character, block.get("expressionId")),
+                }
+            composition = inspect_stage_composition(visible_characters, issues, base_context, speaker_id=character_id)
+            composition_rows.append(composition)
             scene_issues.extend(issues)
             visible = visible_characters.get(character_id, {})
             events.append(
@@ -512,7 +601,8 @@ def inspect_scene_stage(scene_record: dict, assets_by_id: dict[str, dict], chara
                     expressionName=get_expression_name(character, block.get("expressionId")),
                     position=visible.get("position", clean_text((character or {}).get("defaultPosition"), "center")),
                     positionLabel=get_position_label(visible.get("position", clean_text((character or {}).get("defaultPosition"), "center"))),
-                    stage={},
+                    stage=visible.get("stage") or {},
+                    composition=composition,
                     transition="",
                     transitionDurationMs="",
                     assetStatusLabel=f"{visual['label']}：{' / '.join(visual['assetNames'])}".rstrip("："),
@@ -565,6 +655,7 @@ def inspect_scene_stage(scene_record: dict, assets_by_id: dict[str, dict], chara
         "hasBackground": has_background,
         "issues": scene_issues,
         "events": events,
+        "compositionRows": composition_rows,
         "status": event_status(scene_issues),
     }
 
@@ -577,6 +668,7 @@ def build_stage_direction_sheet(bundle: dict, assets_doc: dict) -> dict:
         for scene_record in get_ordered_scene_records(bundle)
     ]
     events = [event for scene in scene_reports for event in scene["events"]]
+    composition_rows = [row for scene in scene_reports for row in scene.get("compositionRows", [])]
     issues = [issue for scene in scene_reports for issue in scene["issues"]]
     issues.sort(key=lambda issue: (-ISSUE_WEIGHT.get(issue["severity"], 0), issue.get("chapterName", ""), issue.get("sceneName", ""), issue.get("blockIndex", 0)))
     blocker_count = sum(1 for issue in issues if issue["severity"] == "blocker")
@@ -594,6 +686,12 @@ def build_stage_direction_sheet(bundle: dict, assets_doc: dict) -> dict:
         "speakerAutoPlaceCount": sum(1 for issue in issues if issue["code"] == "dialogue_speaker_not_visible"),
         "missingVisualCount": sum(1 for issue in issues if "visual" in issue["code"] or "expression" in issue["code"]),
         "transitionGapCount": sum(1 for issue in issues if issue["code"] in {"character_transition_missing", "character_transition_duration_missing"}),
+        "compositionCheckpointCount": len(composition_rows),
+        "compositionRiskCount": sum(1 for row in composition_rows if row.get("status") != "good"),
+        "overlapRiskCount": sum(1 for issue in issues if issue["code"] in {"stage_geometry_overlap", "stage_position_overlap"}),
+        "crowdedStageCount": sum(1 for issue in issues if issue["code"] in {"stage_too_many_characters", "stage_large_sprite_crowding"}),
+        "lowOpacitySpeakerCount": sum(1 for issue in issues if issue["code"] == "stage_speaker_low_opacity"),
+        "layerConflictCount": sum(1 for issue in issues if issue["code"] == "stage_layer_overlap"),
         "blockerCount": blocker_count,
         "warningCount": warning_count,
         "tipCount": tip_count,
@@ -606,6 +704,7 @@ def build_stage_direction_sheet(bundle: dict, assets_doc: dict) -> dict:
         "summary": summary,
         "sceneReports": scene_reports,
         "events": events,
+        "compositionRows": composition_rows,
         "issues": issues,
     }
     sheet["statusDigest"] = get_stage_direction_status_digest(sheet)
@@ -658,6 +757,7 @@ def build_stage_direction_report(sheet: dict) -> str:
             event.get("expressionName"),
             event.get("positionLabel"),
             format_stage(event.get("stage") or {}),
+            (event.get("composition") or {}).get("riskLabel", ""),
             event.get("transition"),
             event.get("transitionDurationMs"),
             event.get("assetStatusLabel"),
@@ -665,6 +765,19 @@ def build_stage_direction_report(sheet: dict) -> str:
         ]
         for event in (sheet.get("events") or [])[:160]
     ]
+    composition_rows = [
+        [
+            "先修" if row.get("status") == "blocker" else "复查" if row.get("status") == "warn" else "润色",
+            row.get("chapterName"),
+            row.get("sceneName"),
+            row.get("blockLabel"),
+            row.get("visibleCount"),
+            row.get("characterNames"),
+            row.get("riskLabel"),
+        ]
+        for row in (sheet.get("compositionRows") or [])
+        if row.get("status") != "good"
+    ][:120]
     issue_rows = [
         [
             "先修" if issue.get("severity") == "blocker" else "复查" if issue.get("severity") == "warn" else "润色",
@@ -686,7 +799,7 @@ def build_stage_direction_report(sheet: dict) -> str:
             "## 总览",
             "",
             markdown_table(
-                ["场景", "舞台事件", "登场", "退场", "说话", "缺背景场景", "未登场说话", "立绘缺口", "转场缺口", "阻塞", "复查", "就绪度"],
+                ["场景", "舞台事件", "登场", "退场", "说话", "缺背景场景", "未登场说话", "立绘缺口", "构图风险", "遮挡", "说话过淡", "转场缺口", "阻塞", "复查", "就绪度"],
                 [
                     [
                         summary.get("sceneCount", 0),
@@ -697,6 +810,9 @@ def build_stage_direction_report(sheet: dict) -> str:
                         summary.get("missingBackgroundSceneCount", 0),
                         summary.get("speakerAutoPlaceCount", 0),
                         summary.get("missingVisualCount", 0),
+                        summary.get("compositionRiskCount", 0),
+                        summary.get("overlapRiskCount", 0),
+                        summary.get("lowOpacitySpeakerCount", 0),
                         summary.get("transitionGapCount", 0),
                         summary.get("blockerCount", 0),
                         summary.get("warningCount", 0),
@@ -711,8 +827,13 @@ def build_stage_direction_report(sheet: dict) -> str:
             "",
             "## 舞台 Cue 列表",
             "",
-            markdown_table(["状态", "章节", "场景", "类型", "角色", "表情", "站位", "舞台参数", "转场", "时长", "素材状态", "卡片"], event_rows)
+            markdown_table(["状态", "章节", "场景", "类型", "角色", "表情", "站位", "舞台参数", "构图", "转场", "时长", "素材状态", "卡片"], event_rows)
             or "当前没有角色舞台 Cue。",
+            "",
+            "## 舞台构图检查",
+            "",
+            markdown_table(["级别", "章节", "场景", "检查点", "同屏人数", "角色", "风险"], composition_rows)
+            or "当前没有明显站位、遮挡、图层或透明度构图风险。",
             "",
             "## 优先问题",
             "",
@@ -749,6 +870,8 @@ def build_stage_direction_csv(sheet: dict) -> str:
             "transition",
             "transitionDurationMs",
             "assetStatus",
+            "visibleCount",
+            "compositionRisk",
             "blockLabel",
             "issues",
         ]
@@ -778,6 +901,8 @@ def build_stage_direction_csv(sheet: dict) -> str:
                 event.get("transition", ""),
                 event.get("transitionDurationMs", ""),
                 event.get("assetStatusLabel", ""),
+                (event.get("composition") or {}).get("visibleCount", ""),
+                (event.get("composition") or {}).get("riskLabel", ""),
                 event.get("blockLabel", ""),
                 " / ".join(issue for issue in issue_map.get(key, []) if issue),
             ]

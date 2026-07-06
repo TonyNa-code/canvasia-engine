@@ -28,6 +28,13 @@ class ExportStageDirectionSheetTests(unittest.TestCase):
                         ],
                     },
                     {"id": "friend", "displayName": "同桌", "defaultPosition": "left", "defaultSpriteId": ""},
+                    {
+                        "id": "rival",
+                        "displayName": "转学生",
+                        "defaultPosition": "right",
+                        "defaultSpriteId": "sprite_rival",
+                        "expressions": [{"id": "smile", "name": "微笑", "spriteAssetId": "sprite_rival"}],
+                    },
                 ]
             },
             "chapters": [
@@ -50,6 +57,17 @@ class ExportStageDirectionSheetTests(unittest.TestCase):
                                     "position": "right",
                                     "stage": {"scale": 210, "opacity": 0, "layer": 0},
                                 },
+                                {
+                                    "id": "show_rival",
+                                    "type": "character_show",
+                                    "characterId": "rival",
+                                    "expressionId": "smile",
+                                    "position": "right",
+                                    "transition": "fade",
+                                    "transitionDurationMs": 500,
+                                    "stage": {"scale": 170, "opacity": 25, "layer": 0},
+                                },
+                                {"id": "rival_line", "type": "dialogue", "speakerId": "rival", "expressionId": "smile", "text": "那我也留下。"},
                                 {"id": "hide", "type": "character_hide", "characterId": "friend"},
                             ],
                         },
@@ -68,6 +86,7 @@ class ExportStageDirectionSheetTests(unittest.TestCase):
             "assets": [
                 {"id": "bg_classroom", "type": "background", "name": "黄昏教室", "path": "bg/classroom.png", "fileExists": True},
                 {"id": "sprite_hero", "type": "sprite", "name": "女主微笑", "path": "char/hero.png", "fileExists": True},
+                {"id": "sprite_rival", "type": "sprite", "name": "转学生", "path": "char/rival.png", "fileExists": True},
                 {"id": "sprite_missing", "type": "sprite", "name": "破损立绘", "path": "char/missing.png", "fileExists": False},
             ]
         }
@@ -77,11 +96,15 @@ class ExportStageDirectionSheetTests(unittest.TestCase):
         self.assertEqual(sheet["formatVersion"], 1)
         self.assertEqual(sheet["projectTitle"], "舞台烟测")
         self.assertEqual(sheet["summary"]["sceneCount"], 2)
-        self.assertEqual(sheet["summary"]["eventCount"], 4)
-        self.assertEqual(sheet["summary"]["characterShowCount"], 1)
+        self.assertEqual(sheet["summary"]["eventCount"], 6)
+        self.assertEqual(sheet["summary"]["characterShowCount"], 2)
         self.assertEqual(sheet["summary"]["speakerAutoPlaceCount"], 1)
         self.assertEqual(sheet["summary"]["missingVisualCount"], 1)
         self.assertEqual(sheet["summary"]["missingBackgroundSceneCount"], 1)
+        self.assertEqual(sheet["summary"]["compositionCheckpointCount"], 4)
+        self.assertGreaterEqual(sheet["summary"]["compositionRiskCount"], 2)
+        self.assertGreaterEqual(sheet["summary"]["overlapRiskCount"], 1)
+        self.assertEqual(sheet["summary"]["lowOpacitySpeakerCount"], 1)
         self.assertEqual(sheet["statusDigest"]["status"], "blocked")
 
         issue_codes = {issue["code"] for issue in sheet["issues"]}
@@ -89,6 +112,8 @@ class ExportStageDirectionSheetTests(unittest.TestCase):
         self.assertIn("character_visual_file_missing", issue_codes)
         self.assertIn("character_opacity_invisible", issue_codes)
         self.assertIn("character_scale_extreme", issue_codes)
+        self.assertIn("stage_geometry_overlap", issue_codes)
+        self.assertIn("stage_speaker_low_opacity", issue_codes)
         self.assertIn("character_hide_not_visible", issue_codes)
         self.assertIn("scene_without_background", issue_codes)
         self.assertIn("scene_content_before_background", issue_codes)
@@ -101,10 +126,12 @@ class ExportStageDirectionSheetTests(unittest.TestCase):
         report = build_stage_direction_report(sheet)
         self.assertIn("# 舞台烟测 角色舞台调度表", report)
         self.assertIn("舞台 Cue 列表", report)
+        self.assertIn("舞台构图检查", report)
         self.assertIn("蓝白女主", report)
 
         csv_text = build_stage_direction_csv(sheet)
         self.assertTrue(csv_text.startswith("\ufeffstatus,type,chapter"))
+        self.assertIn("compositionRisk", csv_text)
         self.assertIn("character_show", csv_text)
         self.assertIn("立绘文件缺失", csv_text)
 

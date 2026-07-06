@@ -33675,6 +33675,8 @@ function renderStageDirectionSheetPanel() {
         ${renderRouteMetricCard("舞台事件", `${summary.eventCount ?? 0} 个`, "背景、登场、退场和说话")}
         ${renderRouteMetricCard("自动补位", `${summary.speakerAutoPlaceCount ?? 0} 句`, "说话人未提前登场")}
         ${renderRouteMetricCard("立绘 / 表情缺口", `${summary.missingVisualCount ?? 0} 个`, "缺立绘、缺文件或坏表情")}
+        ${renderRouteMetricCard("构图风险", `${summary.compositionRiskCount ?? 0} 处`, "遮挡、拥挤、图层或透明度")}
+        ${renderRouteMetricCard("说话人过淡", `${summary.lowOpacitySpeakerCount ?? 0} 处`, "台词角色不够清晰")}
         ${renderRouteMetricCard("无背景场景", `${summary.missingBackgroundSceneCount ?? 0} 个`, "有内容但没有明确背景")}
         ${renderRouteMetricCard("可自动补齐", `${summary.autoFixOperationCount ?? 0} 项`, "硬切、缺时长、缺舞台参数")}
       </div>

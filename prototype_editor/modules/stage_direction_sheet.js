@@ -43,6 +43,7 @@
 
   const VALID_POSITIONS = Object.freeze(["left", "center", "right"]);
   const VALID_CHARACTER_TRANSITIONS = Object.freeze(["fade", "slide_left", "slide_right", "rise", "pop", "none"]);
+  const STAGE_POSITION_X = Object.freeze({ left: -36, center: 0, right: 36 });
 
   function toArray(value) {
     return Array.isArray(value) ? value : [];
@@ -84,6 +85,114 @@
       opacity: Math.round(clampNumber(source.opacity, 0, 100, CHARACTER_STAGE_DEFAULTS.opacity)),
       layer: Math.round(clampNumber(source.layer, -10, 10, CHARACTER_STAGE_DEFAULTS.layer)),
       flipX: Boolean(source.flipX),
+    };
+  }
+
+  function getStageCompositionX(item = {}) {
+    const stage = normalizeCharacterStage(item.stage);
+    return (STAGE_POSITION_X[item.position] ?? STAGE_POSITION_X.center) + stage.offsetX * 0.45;
+  }
+
+  function getStageCompositionRadius(item = {}) {
+    const stage = normalizeCharacterStage(item.stage);
+    return Math.max(12, stage.scale * 0.18);
+  }
+
+  function buildStageCompositionSnapshot(visibleCharacters = new Map(), context = {}) {
+    const characters = [...visibleCharacters.values()].map((item) => {
+      const stage = normalizeCharacterStage(item.stage);
+      return {
+        characterId: item.characterId,
+        characterName: item.characterName,
+        expressionName: item.expressionName,
+        position: item.position,
+        positionLabel: getPositionLabel(item.position),
+        stage,
+        centerX: Math.round(getStageCompositionX(item)),
+        radius: Math.round(getStageCompositionRadius(item)),
+      };
+    });
+    return {
+      chapterName: context.chapterName,
+      sceneName: context.sceneName,
+      sceneId: context.sceneId,
+      blockId: context.blockId,
+      blockIndex: context.blockIndex,
+      blockLabel: context.blockLabel,
+      visibleCount: characters.length,
+      characters,
+      characterNames: characters.map((item) => item.characterName).filter(Boolean).join(" / "),
+    };
+  }
+
+  function findStageOverlapPairs(characters = []) {
+    const pairs = [];
+    for (let leftIndex = 0; leftIndex < characters.length; leftIndex += 1) {
+      for (let rightIndex = leftIndex + 1; rightIndex < characters.length; rightIndex += 1) {
+        const left = characters[leftIndex];
+        const right = characters[rightIndex];
+        const distance = Math.abs(left.centerX - right.centerX);
+        const overlapThreshold = Math.min(34, (left.radius + right.radius) * 0.72);
+        if (distance < overlapThreshold) {
+          pairs.push(`${left.characterName || left.characterId} / ${right.characterName || right.characterId}`);
+        }
+      }
+    }
+    return pairs;
+  }
+
+  function inspectStageComposition(visibleCharacters = new Map(), issues = [], context = {}, options = {}) {
+    const issueStartIndex = issues.length;
+    const snapshot = buildStageCompositionSnapshot(visibleCharacters, context);
+    const risks = [];
+    const positionCounts = new Map();
+    const layerCounts = new Map();
+    snapshot.characters.forEach((item) => {
+      positionCounts.set(item.position, (positionCounts.get(item.position) ?? 0) + 1);
+      layerCounts.set(item.stage.layer, (layerCounts.get(item.stage.layer) ?? 0) + 1);
+    });
+    if ([...positionCounts.values()].some((count) => count > 1)) {
+      pushIssue(issues, "tip", "stage_position_overlap", "角色站位可能重叠", "当前舞台有多个角色使用同一站位，建议确认画面是否拥挤。", context);
+      risks.push("同站位");
+    }
+    const overlapPairs = findStageOverlapPairs(snapshot.characters);
+    if (overlapPairs.length > 0) {
+      pushIssue(issues, "warn", "stage_geometry_overlap", "立绘可能互相遮挡", `请复查：${overlapPairs.join("、")} 的站位、偏移或缩放。`, context);
+      risks.push("遮挡");
+    }
+    if ([...layerCounts.values()].some((count) => count > 1) && snapshot.characters.length > 1) {
+      pushIssue(issues, "tip", "stage_layer_overlap", "角色图层可能冲突", "同屏多个角色使用相同图层，复杂遮挡时建议显式区分图层。", context);
+      risks.push("图层");
+    }
+    if (snapshot.visibleCount > 3) {
+      pushIssue(issues, "tip", "stage_too_many_characters", "同屏角色较多", "视觉小说常规画面建议控制在 1-3 人，更多角色建议拆镜头或缩放。", context);
+      risks.push("拥挤");
+    }
+    if (snapshot.visibleCount > 1 && snapshot.characters.some((item) => item.stage.scale >= 155)) {
+      pushIssue(issues, "tip", "stage_large_sprite_crowding", "大比例立绘可能压迫画面", "同屏多人时，超过 155% 的立绘建议配合偏移、图层或拆镜头使用。", context);
+      risks.push("大比例");
+    }
+    const speaker = cleanText(options.speakerId)
+      ? snapshot.characters.find((item) => item.characterId === cleanText(options.speakerId))
+      : null;
+    if (speaker && speaker.stage.opacity < 35) {
+      pushIssue(issues, "warn", "stage_speaker_low_opacity", "说话人透明度过低", "当前说话人的透明度低于 35%，玩家可能看不清是谁在说话。", context);
+      risks.push("说话人过淡");
+    }
+    const compositionIssues = issues.slice(issueStartIndex);
+    const status = compositionIssues.some((issue) => issue.severity === "blocker")
+      ? "blocker"
+      : compositionIssues.some((issue) => issue.severity === "warn")
+        ? "warn"
+        : risks.length
+          ? "tip"
+          : "good";
+    return {
+      ...snapshot,
+      status,
+      risks,
+      issues: compositionIssues,
+      riskLabel: risks.length ? risks.join(" / ") : "构图正常",
     };
   }
 
@@ -314,6 +423,7 @@
     const sceneName = cleanText(scene.name ?? scene.title, `场景 ${context.sceneIndex + 1}`);
     const chapterName = context.chapter?.name ?? "未分章";
     const events = [];
+    const compositionRows = [];
     const sceneIssues = [];
     const visibleCharacters = new Map();
     let hasBackground = false;
@@ -377,31 +487,28 @@
           pushIssue(issues, "blocker", "character_expression_missing", "角色表情不存在", `表情 ${block.expressionId} 不在角色表情列表中。`, baseContext);
         }
         const visual = character ? inspectCharacterVisual(block, character, context.assetMap, issues, baseContext) : null;
+        const stage = normalizeCharacterStage(block.stage);
+        const position = getSafePositionValue(block.position, cleanText(character?.defaultPosition, "center"));
         if (characterId) {
           visibleCharacters.set(characterId, {
             characterId,
             characterName: getCharacterDisplayName(character, characterId),
             expressionName: character ? getExpressionName(character, block.expressionId) : cleanText(block.expressionId),
-            position: cleanText(block.position, "center"),
+            position,
+            stage,
           });
         }
-        const positionCounts = new Map();
-        visibleCharacters.forEach((item) => {
-          positionCounts.set(item.position, (positionCounts.get(item.position) ?? 0) + 1);
-        });
-        if ([...positionCounts.values()].some((count) => count > 1)) {
-          pushIssue(issues, "tip", "stage_position_overlap", "角色站位可能重叠", "当前舞台有多个角色使用同一站位，建议确认画面是否拥挤。", baseContext);
-        }
-        if (visibleCharacters.size > 3) {
-          pushIssue(issues, "tip", "stage_too_many_characters", "同屏角色较多", "视觉小说常规画面建议控制在 1-3 人，更多角色建议拆镜头或缩放。", baseContext);
-        }
+        const composition = inspectStageComposition(visibleCharacters, issues, baseContext);
+        compositionRows.push(composition);
         sceneIssues.push(...issues);
         addStageEvent(events, {
           type: "character_show",
           typeLabel: "登场",
           characterName: getCharacterDisplayName(character, characterId),
           expressionName: character ? getExpressionName(character, block.expressionId) : cleanText(block.expressionId, "未设置表情"),
-          positionLabel: getPositionLabel(block.position ?? "center"),
+          positionLabel: getPositionLabel(position),
+          stage,
+          composition,
           assetStatusLabel: formatVisualStatusLabel(visual),
           cue: summarizeBlock(block, blockIndex),
           issues,
@@ -460,20 +567,27 @@
         }
         const visual = character ? inspectCharacterVisual(block, character, context.assetMap, issues, baseContext) : null;
         if (characterId && character) {
+          const previousVisible = visibleCharacters.get(characterId);
           visibleCharacters.set(characterId, {
             characterId,
             characterName: getCharacterDisplayName(character, characterId),
             expressionName: getExpressionName(character, block.expressionId),
-            position: visibleCharacters.get(characterId)?.position ?? cleanText(character.defaultPosition, "center"),
+            position: previousVisible?.position ?? getSafePositionValue(character.defaultPosition, "center"),
+            stage: previousVisible?.stage ?? normalizeCharacterStage({}),
           });
         }
+        const composition = inspectStageComposition(visibleCharacters, issues, baseContext, { speakerId: characterId });
+        compositionRows.push(composition);
         sceneIssues.push(...issues);
+        const visibleSpeaker = visibleCharacters.get(characterId);
         addStageEvent(events, {
           type: "dialogue",
           typeLabel: "说话",
           characterName: getCharacterDisplayName(character, characterId),
           expressionName: character ? getExpressionName(character, block.expressionId) : cleanText(block.expressionId, "未设置表情"),
-          positionLabel: getPositionLabel(visibleCharacters.get(characterId)?.position ?? character?.defaultPosition ?? "center"),
+          positionLabel: getPositionLabel(visibleSpeaker?.position ?? character?.defaultPosition ?? "center"),
+          stage: visibleSpeaker?.stage ?? normalizeCharacterStage({}),
+          composition,
           assetStatusLabel: formatVisualStatusLabel(visual),
           cue: summarizeBlock(block, blockIndex),
           issues,
@@ -512,6 +626,7 @@
       hasBackground,
       issues: sceneIssues,
       events,
+      compositionRows,
       status: sceneIssues.some((issue) => issue.severity === "blocker")
         ? "blocker"
         : sceneIssues.some((issue) => issue.severity === "warn")
@@ -536,6 +651,7 @@
       })
     );
     const events = sceneReports.flatMap((scene) => scene.events);
+    const compositionRows = sceneReports.flatMap((scene) => scene.compositionRows ?? []);
     const issues = sceneReports
       .flatMap((scene) => scene.issues)
       .sort((left, right) => getIssueWeight(right) - getIssueWeight(left) || left.sceneName.localeCompare(right.sceneName, "zh-CN"));
@@ -546,6 +662,12 @@
       missingBackgroundSceneCount: sceneReports.filter((scene) => scene.issues.some((issue) => issue.code === "scene_without_background")).length,
       speakerAutoPlaceCount: issues.filter((issue) => issue.code === "dialogue_speaker_not_visible").length,
       missingVisualCount: issues.filter((issue) => issue.code.includes("visual") || issue.code.includes("expression")).length,
+      compositionCheckpointCount: compositionRows.length,
+      compositionRiskCount: compositionRows.filter((row) => row.status !== "good").length,
+      overlapRiskCount: issues.filter((issue) => issue.code === "stage_geometry_overlap" || issue.code === "stage_position_overlap").length,
+      crowdedStageCount: issues.filter((issue) => issue.code === "stage_too_many_characters" || issue.code === "stage_large_sprite_crowding").length,
+      lowOpacitySpeakerCount: issues.filter((issue) => issue.code === "stage_speaker_low_opacity").length,
+      layerConflictCount: issues.filter((issue) => issue.code === "stage_layer_overlap").length,
       blockerCount: issues.filter((issue) => issue.severity === "blocker").length,
       warningCount: issues.filter((issue) => issue.severity === "warn").length,
       tipCount: issues.filter((issue) => issue.severity === "tip").length,
@@ -559,6 +681,7 @@
       projectTitle: cleanText(data.project?.title, "Canvasia Project"),
       sceneReports,
       events,
+      compositionRows,
       issues,
       summary,
       autoFixPlan,
@@ -836,8 +959,22 @@
       event.positionLabel,
       event.assetStatusLabel,
       event.cue,
+      event.composition?.riskLabel ?? "",
       event.status === "blocker" ? "阻塞" : event.status === "warn" ? "复查" : event.status === "tip" ? "润色" : "正常",
     ]);
+    const compositionRows = toArray(sheet.compositionRows)
+      .filter((row) => row.status !== "good")
+      .slice(0, 100)
+      .map((row, index) => [
+        `${index + 1}`,
+        row.status === "blocker" ? "阻塞" : row.status === "warn" ? "复查" : "润色",
+        row.chapterName,
+        row.sceneName,
+        row.blockLabel,
+        `${row.visibleCount ?? 0}`,
+        row.characterNames,
+        row.riskLabel,
+      ]);
     const issueRows = toArray(sheet.issues).slice(0, 140).map((issue, index) => [
       `${index + 1}`,
       issue.severity === "blocker" ? "阻塞" : issue.severity === "warn" ? "提醒" : "润色",
@@ -865,6 +1002,11 @@
           ["无背景内容场景", `${summary.missingBackgroundSceneCount ?? 0}`],
           ["说话人自动补位", `${summary.speakerAutoPlaceCount ?? 0}`],
           ["立绘/表情缺口", `${summary.missingVisualCount ?? 0}`],
+          ["构图检查点", `${summary.compositionCheckpointCount ?? 0}`],
+          ["构图风险", `${summary.compositionRiskCount ?? 0}`],
+          ["遮挡/重叠风险", `${summary.overlapRiskCount ?? 0}`],
+          ["拥挤/大比例风险", `${summary.crowdedStageCount ?? 0}`],
+          ["说话人过淡", `${summary.lowOpacitySpeakerCount ?? 0}`],
           ["可自动补齐场景", `${summary.autoFixSceneCount ?? 0}`],
           ["可自动补齐参数", `${summary.autoFixOperationCount ?? 0}`],
           ["阻塞问题", `${summary.blockerCount ?? 0}`],
@@ -874,8 +1016,13 @@
       "",
       "## 舞台事件列表",
       "",
-      buildMarkdownTable(["序号", "章节", "场景", "类型", "角色", "表情", "站位", "素材", "位置", "状态"], eventRows) ||
+      buildMarkdownTable(["序号", "章节", "场景", "类型", "角色", "表情", "站位", "素材", "位置", "构图", "状态"], eventRows) ||
         "当前没有可列出的舞台事件。",
+      "",
+      "## 舞台构图检查",
+      "",
+      buildMarkdownTable(["序号", "级别", "章节", "场景", "检查点", "同屏人数", "角色", "风险"], compositionRows) ||
+        "当前没有明显站位、遮挡、图层或透明度构图风险。",
       "",
       "## 需要复查的问题",
       "",
@@ -897,11 +1044,13 @@
       event.positionLabel,
       event.assetStatusLabel,
       event.cue,
+      event.composition?.visibleCount ?? "",
+      event.composition?.riskLabel ?? "",
       event.status,
       toArray(event.issues).map((issue) => issue.title).join(" / "),
     ]);
     return `\uFEFF${buildCsv(
-      ["序号", "章节", "场景", "卡片", "类型", "角色", "表情", "站位", "素材状态", "位置", "状态", "问题"],
+      ["序号", "章节", "场景", "卡片", "类型", "角色", "表情", "站位", "素材状态", "位置", "同屏人数", "构图风险", "状态", "问题"],
       rows
     )}\n`;
   }
