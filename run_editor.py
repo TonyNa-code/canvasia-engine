@@ -37,6 +37,12 @@ from export_asset_rights import (
     EXPORT_ASSET_RIGHTS_REPORT_NAME,
     write_export_asset_rights_files,
 )
+from export_voice_production import (
+    EXPORT_VOICE_PRODUCTION_CSV_NAME,
+    EXPORT_VOICE_PRODUCTION_JSON_NAME,
+    EXPORT_VOICE_PRODUCTION_REPORT_NAME,
+    write_export_voice_production_files,
+)
 from export_localization_audit import (
     EXPORT_LOCALIZATION_AUDIT_JSON_NAME,
     EXPORT_LOCALIZATION_AUDIT_REPORT_NAME,
@@ -534,6 +540,7 @@ EDITOR_EXPORT_FILES = [
     "editor_local_security.py",
     "editor_snapshot_cache.py",
     "export_asset_rights.py",
+    "export_voice_production.py",
     "export_localization_audit.py",
     "export_package_guide.py",
     "export_quality_reports.py",
@@ -9675,6 +9682,7 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
             performance_budget_files["performanceBudgetMarkdownName"],
             asset3d_summary_path.name,
             EXPORT_ASSET_RIGHTS_REPORT_NAME,
+            EXPORT_VOICE_PRODUCTION_REPORT_NAME,
             NATIVE_RUNTIME_FILE_INTEGRITY_MARKDOWN_NAME,
             NATIVE_RUNTIME_ACCEPTANCE_REPORT_NAME,
         ],
@@ -10359,6 +10367,9 @@ def export_native_runtime_build() -> dict:
             "assetRights": EXPORT_ASSET_RIGHTS_JSON_NAME,
             "assetRightsReport": EXPORT_ASSET_RIGHTS_REPORT_NAME,
             "assetRightsCsv": EXPORT_ASSET_RIGHTS_CSV_NAME,
+            "voiceProduction": EXPORT_VOICE_PRODUCTION_JSON_NAME,
+            "voiceProductionReport": EXPORT_VOICE_PRODUCTION_REPORT_NAME,
+            "voiceProductionCsv": EXPORT_VOICE_PRODUCTION_CSV_NAME,
             "storyRouteMap": EXPORT_STORY_ROUTE_MAP_JSON_NAME,
             "storyRouteMapReport": EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
             "localizationAudit": EXPORT_LOCALIZATION_AUDIT_JSON_NAME,
@@ -10429,6 +10440,9 @@ def export_native_runtime_build() -> dict:
             "assetRights": EXPORT_ASSET_RIGHTS_JSON_NAME,
             "assetRightsReport": EXPORT_ASSET_RIGHTS_REPORT_NAME,
             "assetRightsCsv": EXPORT_ASSET_RIGHTS_CSV_NAME,
+            "voiceProduction": EXPORT_VOICE_PRODUCTION_JSON_NAME,
+            "voiceProductionReport": EXPORT_VOICE_PRODUCTION_REPORT_NAME,
+            "voiceProductionCsv": EXPORT_VOICE_PRODUCTION_CSV_NAME,
             "storyRouteMap": EXPORT_STORY_ROUTE_MAP_JSON_NAME,
             "storyRouteMapReport": EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
             "localizationAudit": EXPORT_LOCALIZATION_AUDIT_JSON_NAME,
@@ -10486,6 +10500,7 @@ def export_native_runtime_build() -> dict:
     )
     manifest_path = write_export_manifest(build_dir, manifest)
     asset_rights_files = write_export_asset_rights_files(build_dir, bundle=bundle, assets_doc=export_assets_doc)
+    voice_production_files = write_export_voice_production_files(build_dir, bundle=bundle, assets_doc=export_assets_doc)
     quality_reports = write_export_quality_report_bundle(
         build_dir,
         bundle=bundle,
@@ -10510,6 +10525,9 @@ def export_native_runtime_build() -> dict:
             asset_rights_files["assetRightsReportName"],
             asset_rights_files["assetRightsName"],
             asset_rights_files["assetRightsCsvName"],
+            voice_production_files["voiceProductionReportName"],
+            voice_production_files["voiceProductionName"],
+            voice_production_files["voiceProductionCsvName"],
         ],
         platform_notes=[
             "原生 Runtime 是后续 App 化路线的重点包；正式分发前建议至少在目标系统完整跑通一次。",
@@ -10552,6 +10570,7 @@ def export_native_runtime_build() -> dict:
             runtime_files["performanceBudgetMarkdownName"],
             runtime_files["asset3dSummaryName"],
             asset_rights_files["assetRightsReportName"],
+            voice_production_files["voiceProductionReportName"],
             NATIVE_RUNTIME_FILE_INTEGRITY_MARKDOWN_NAME,
             NATIVE_RUNTIME_ACCEPTANCE_REPORT_NAME,
         ],
@@ -10579,6 +10598,9 @@ def export_native_runtime_build() -> dict:
         {"name": asset_rights_files["assetRightsReportName"], "description": "素材授权与署名 Markdown 报告，复查商用状态、来源、AI 生成记录和 Staff 草稿。"},
         {"name": asset_rights_files["assetRightsName"], "description": "机器可读素材授权清单 JSON。"},
         {"name": asset_rights_files["assetRightsCsvName"], "description": "可导入表格的素材授权 CSV。"},
+        {"name": voice_production_files["voiceProductionReportName"], "description": "配音生产 Markdown 清单，记录台词录音表、角色进度和优先补录问题。"},
+        {"name": voice_production_files["voiceProductionName"], "description": "机器可读配音生产清单 JSON。"},
+        {"name": voice_production_files["voiceProductionCsvName"], "description": "可交给配音或表格软件的台词录音 CSV。"},
         {"name": runtime_files["runtimePreloadManifestName"], "description": "Runtime 资源预热清单 JSON，记录首屏和早期路线素材。"},
         {"name": runtime_files["runtimePreloadReportName"], "description": "Runtime 资源预热 Markdown 报告，方便复查卡顿风险。"},
         {"name": runtime_files["runtimePreloadModuleName"], "description": "原生 Runtime 资源预热策略模块。"},
@@ -10680,6 +10702,19 @@ def export_native_runtime_build() -> dict:
         "assetRightsReadinessPercent": asset_rights_files["assetRightsReadinessPercent"],
         "assetRightsBlockerCount": asset_rights_files["assetRightsBlockerCount"],
         "assetRightsWarningCount": asset_rights_files["assetRightsWarningCount"],
+        "voiceProductionName": voice_production_files["voiceProductionName"],
+        "voiceProductionPath": voice_production_files["voiceProductionPath"],
+        "voiceProductionPublicUrl": f"/exports/{build_dir.name}/{voice_production_files['voiceProductionName']}",
+        "voiceProductionReportName": voice_production_files["voiceProductionReportName"],
+        "voiceProductionReportPath": voice_production_files["voiceProductionReportPath"],
+        "voiceProductionReportPublicUrl": f"/exports/{build_dir.name}/{voice_production_files['voiceProductionReportName']}",
+        "voiceProductionCsvName": voice_production_files["voiceProductionCsvName"],
+        "voiceProductionCsvPath": voice_production_files["voiceProductionCsvPath"],
+        "voiceProductionCsvPublicUrl": f"/exports/{build_dir.name}/{voice_production_files['voiceProductionCsvName']}",
+        "voiceProductionReadyPercent": voice_production_files["voiceProductionReadyPercent"],
+        "voiceProductionLineCount": voice_production_files["voiceProductionLineCount"],
+        "voiceProductionBlockerCount": voice_production_files["voiceProductionBlockerCount"],
+        "voiceProductionWarningCount": voice_production_files["voiceProductionWarningCount"],
         "storyRouteMapName": story_route_map["storyRouteMapName"],
         "storyRouteMapPath": story_route_map["storyRouteMapPath"],
         "storyRouteMapPublicUrl": f"/exports/{build_dir.name}/{story_route_map['storyRouteMapName']}",
@@ -10928,6 +10963,9 @@ def export_web_build() -> dict:
             "assetRights": EXPORT_ASSET_RIGHTS_JSON_NAME,
             "assetRightsReport": EXPORT_ASSET_RIGHTS_REPORT_NAME,
             "assetRightsCsv": EXPORT_ASSET_RIGHTS_CSV_NAME,
+            "voiceProduction": EXPORT_VOICE_PRODUCTION_JSON_NAME,
+            "voiceProductionReport": EXPORT_VOICE_PRODUCTION_REPORT_NAME,
+            "voiceProductionCsv": EXPORT_VOICE_PRODUCTION_CSV_NAME,
             "storyRouteMap": EXPORT_STORY_ROUTE_MAP_JSON_NAME,
             "storyRouteMapReport": EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
             "localizationAudit": EXPORT_LOCALIZATION_AUDIT_JSON_NAME,
@@ -10943,6 +10981,7 @@ def export_web_build() -> dict:
     )
     manifest_path = write_export_manifest(build_dir, manifest)
     asset_rights_files = write_export_asset_rights_files(build_dir, bundle=bundle, assets_doc=export_assets_doc)
+    voice_production_files = write_export_voice_production_files(build_dir, bundle=bundle, assets_doc=export_assets_doc)
     playtest_guide_path = write_export_playtest_guide_file(
         build_dir,
         project=bundle["project"],
@@ -10956,6 +10995,7 @@ def export_web_build() -> dict:
         extra_reports=[
             EXPORT_RELEASE_EVIDENCE_PACK_NAME,
             asset_rights_files["assetRightsReportName"],
+            voice_production_files["voiceProductionReportName"],
             EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
             EXPORT_LOCALIZATION_AUDIT_REPORT_NAME,
             EXPORT_RELEASE_READINESS_REPORT_NAME,
@@ -10980,6 +11020,9 @@ def export_web_build() -> dict:
             asset_rights_files["assetRightsReportName"],
             asset_rights_files["assetRightsName"],
             asset_rights_files["assetRightsCsvName"],
+            voice_production_files["voiceProductionReportName"],
+            voice_production_files["voiceProductionName"],
+            voice_production_files["voiceProductionCsvName"],
         ],
         platform_notes=["网页试玩包适合快速传播；如果要正式上架，建议再导出桌面或原生 Runtime 包做目标系统验收。"],
     )
@@ -11001,7 +11044,11 @@ def export_web_build() -> dict:
         unlockable_manifest_name=UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME,
         launch_steps=launch_steps,
         runtime_notes=runtime_notes,
-        extra_reports=[RUNTIME_PRELOAD_REPORT_FILE_NAME, asset_rights_files["assetRightsReportName"]],
+        extra_reports=[
+            RUNTIME_PRELOAD_REPORT_FILE_NAME,
+            asset_rights_files["assetRightsReportName"],
+            voice_production_files["voiceProductionReportName"],
+        ],
         missing_assets=missing_assets,
     )
     provenance_verifiers = write_export_provenance_verifier_files(build_dir)
@@ -11033,6 +11080,19 @@ def export_web_build() -> dict:
         "assetRightsReadinessPercent": asset_rights_files["assetRightsReadinessPercent"],
         "assetRightsBlockerCount": asset_rights_files["assetRightsBlockerCount"],
         "assetRightsWarningCount": asset_rights_files["assetRightsWarningCount"],
+        "voiceProductionName": voice_production_files["voiceProductionName"],
+        "voiceProductionPath": voice_production_files["voiceProductionPath"],
+        "voiceProductionPublicUrl": f"/exports/{build_dir.name}/{voice_production_files['voiceProductionName']}",
+        "voiceProductionReportName": voice_production_files["voiceProductionReportName"],
+        "voiceProductionReportPath": voice_production_files["voiceProductionReportPath"],
+        "voiceProductionReportPublicUrl": f"/exports/{build_dir.name}/{voice_production_files['voiceProductionReportName']}",
+        "voiceProductionCsvName": voice_production_files["voiceProductionCsvName"],
+        "voiceProductionCsvPath": voice_production_files["voiceProductionCsvPath"],
+        "voiceProductionCsvPublicUrl": f"/exports/{build_dir.name}/{voice_production_files['voiceProductionCsvName']}",
+        "voiceProductionReadyPercent": voice_production_files["voiceProductionReadyPercent"],
+        "voiceProductionLineCount": voice_production_files["voiceProductionLineCount"],
+        "voiceProductionBlockerCount": voice_production_files["voiceProductionBlockerCount"],
+        "voiceProductionWarningCount": voice_production_files["voiceProductionWarningCount"],
         "storyRouteMapName": story_route_map["storyRouteMapName"],
         "storyRouteMapPath": story_route_map["storyRouteMapPath"],
         "storyRouteMapPublicUrl": f"/exports/{build_dir.name}/{story_route_map['storyRouteMapName']}",
@@ -11920,6 +11980,9 @@ def export_windows_nwjs_build() -> dict:
             "assetRights": EXPORT_ASSET_RIGHTS_JSON_NAME,
             "assetRightsReport": EXPORT_ASSET_RIGHTS_REPORT_NAME,
             "assetRightsCsv": EXPORT_ASSET_RIGHTS_CSV_NAME,
+            "voiceProduction": EXPORT_VOICE_PRODUCTION_JSON_NAME,
+            "voiceProductionReport": EXPORT_VOICE_PRODUCTION_REPORT_NAME,
+            "voiceProductionCsv": EXPORT_VOICE_PRODUCTION_CSV_NAME,
             "storyRouteMap": EXPORT_STORY_ROUTE_MAP_JSON_NAME,
             "storyRouteMapReport": EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
             "localizationAudit": EXPORT_LOCALIZATION_AUDIT_JSON_NAME,
@@ -11948,6 +12011,7 @@ def export_windows_nwjs_build() -> dict:
     )
     manifest_path = write_export_manifest(build_dir, manifest)
     asset_rights_files = write_export_asset_rights_files(build_dir, bundle=bundle, assets_doc=export_assets_doc)
+    voice_production_files = write_export_voice_production_files(build_dir, bundle=bundle, assets_doc=export_assets_doc)
     readme_path = write_windows_package_readme(
         build_dir,
         executable_name,
@@ -11980,6 +12044,7 @@ def export_windows_nwjs_build() -> dict:
         extra_reports=[
             EXPORT_RELEASE_EVIDENCE_PACK_NAME,
             asset_rights_files["assetRightsReportName"],
+            voice_production_files["voiceProductionReportName"],
             readme_path.name,
             EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
             EXPORT_LOCALIZATION_AUDIT_REPORT_NAME,
@@ -12006,6 +12071,9 @@ def export_windows_nwjs_build() -> dict:
             asset_rights_files["assetRightsReportName"],
             asset_rights_files["assetRightsName"],
             asset_rights_files["assetRightsCsvName"],
+            voice_production_files["voiceProductionReportName"],
+            voice_production_files["voiceProductionName"],
+            voice_production_files["voiceProductionCsvName"],
         ],
         platform_notes=[
             f"当前桌面模式：{runtime_mode_label}。",
@@ -12030,7 +12098,12 @@ def export_windows_nwjs_build() -> dict:
         unlockable_manifest_name=f"app/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
         launch_steps=launch_steps,
         runtime_notes=runtime_notes,
-        extra_reports=[readme_path.name, asset_rights_files["assetRightsReportName"], f"app/{RUNTIME_PRELOAD_REPORT_FILE_NAME}"],
+        extra_reports=[
+            readme_path.name,
+            asset_rights_files["assetRightsReportName"],
+            voice_production_files["voiceProductionReportName"],
+            f"app/{RUNTIME_PRELOAD_REPORT_FILE_NAME}",
+        ],
         missing_assets=missing_assets,
     )
     provenance_verifiers = write_export_provenance_verifier_files(build_dir)
@@ -12043,6 +12116,9 @@ def export_windows_nwjs_build() -> dict:
         Path(asset_rights_files["assetRightsReportPath"]),
         Path(asset_rights_files["assetRightsPath"]),
         Path(asset_rights_files["assetRightsCsvPath"]),
+        Path(voice_production_files["voiceProductionReportPath"]),
+        Path(voice_production_files["voiceProductionPath"]),
+        Path(voice_production_files["voiceProductionCsvPath"]),
         Path(story_route_map["storyRouteMapReportPath"]),
         Path(story_route_map["storyRouteMapPath"]),
         Path(localization_audit["localizationAuditReportPath"]),
@@ -12125,6 +12201,19 @@ def export_windows_nwjs_build() -> dict:
         "assetRightsReadinessPercent": asset_rights_files["assetRightsReadinessPercent"],
         "assetRightsBlockerCount": asset_rights_files["assetRightsBlockerCount"],
         "assetRightsWarningCount": asset_rights_files["assetRightsWarningCount"],
+        "voiceProductionName": voice_production_files["voiceProductionName"],
+        "voiceProductionPath": voice_production_files["voiceProductionPath"],
+        "voiceProductionPublicUrl": f"/exports/{build_dir.name}/{voice_production_files['voiceProductionName']}",
+        "voiceProductionReportName": voice_production_files["voiceProductionReportName"],
+        "voiceProductionReportPath": voice_production_files["voiceProductionReportPath"],
+        "voiceProductionReportPublicUrl": f"/exports/{build_dir.name}/{voice_production_files['voiceProductionReportName']}",
+        "voiceProductionCsvName": voice_production_files["voiceProductionCsvName"],
+        "voiceProductionCsvPath": voice_production_files["voiceProductionCsvPath"],
+        "voiceProductionCsvPublicUrl": f"/exports/{build_dir.name}/{voice_production_files['voiceProductionCsvName']}",
+        "voiceProductionReadyPercent": voice_production_files["voiceProductionReadyPercent"],
+        "voiceProductionLineCount": voice_production_files["voiceProductionLineCount"],
+        "voiceProductionBlockerCount": voice_production_files["voiceProductionBlockerCount"],
+        "voiceProductionWarningCount": voice_production_files["voiceProductionWarningCount"],
         "storyRouteMapName": story_route_map["storyRouteMapName"],
         "storyRouteMapPath": story_route_map["storyRouteMapPath"],
         "storyRouteMapPublicUrl": f"/exports/{build_dir.name}/{story_route_map['storyRouteMapName']}",
@@ -12224,6 +12313,9 @@ def export_macos_nwjs_build() -> dict:
             "assetRights": EXPORT_ASSET_RIGHTS_JSON_NAME,
             "assetRightsReport": EXPORT_ASSET_RIGHTS_REPORT_NAME,
             "assetRightsCsv": EXPORT_ASSET_RIGHTS_CSV_NAME,
+            "voiceProduction": EXPORT_VOICE_PRODUCTION_JSON_NAME,
+            "voiceProductionReport": EXPORT_VOICE_PRODUCTION_REPORT_NAME,
+            "voiceProductionCsv": EXPORT_VOICE_PRODUCTION_CSV_NAME,
             "storyRouteMap": EXPORT_STORY_ROUTE_MAP_JSON_NAME,
             "storyRouteMapReport": EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
             "localizationAudit": EXPORT_LOCALIZATION_AUDIT_JSON_NAME,
@@ -12253,6 +12345,7 @@ def export_macos_nwjs_build() -> dict:
     )
     manifest_path = write_export_manifest(build_dir, manifest)
     asset_rights_files = write_export_asset_rights_files(build_dir, bundle=bundle, assets_doc=export_assets_doc)
+    voice_production_files = write_export_voice_production_files(build_dir, bundle=bundle, assets_doc=export_assets_doc)
     readme_path = write_macos_package_readme(
         build_dir,
         app_bundle_name,
@@ -12284,6 +12377,7 @@ def export_macos_nwjs_build() -> dict:
         extra_reports=[
             EXPORT_RELEASE_EVIDENCE_PACK_NAME,
             asset_rights_files["assetRightsReportName"],
+            voice_production_files["voiceProductionReportName"],
             readme_path.name,
             EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
             EXPORT_LOCALIZATION_AUDIT_REPORT_NAME,
@@ -12310,6 +12404,9 @@ def export_macos_nwjs_build() -> dict:
             asset_rights_files["assetRightsReportName"],
             asset_rights_files["assetRightsName"],
             asset_rights_files["assetRightsCsvName"],
+            voice_production_files["voiceProductionReportName"],
+            voice_production_files["voiceProductionName"],
+            voice_production_files["voiceProductionCsvName"],
         ],
         platform_notes=[
             f"当前运行壳：NW.js {NWJS_RUNTIME_VERSION}。",
@@ -12334,7 +12431,12 @@ def export_macos_nwjs_build() -> dict:
         unlockable_manifest_name=f"app/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
         launch_steps=launch_steps,
         runtime_notes=runtime_notes,
-        extra_reports=[readme_path.name, asset_rights_files["assetRightsReportName"], f"app/{RUNTIME_PRELOAD_REPORT_FILE_NAME}"],
+        extra_reports=[
+            readme_path.name,
+            asset_rights_files["assetRightsReportName"],
+            voice_production_files["voiceProductionReportName"],
+            f"app/{RUNTIME_PRELOAD_REPORT_FILE_NAME}",
+        ],
         missing_assets=missing_assets,
     )
     provenance_verifiers = write_export_provenance_verifier_files(build_dir)
@@ -12351,6 +12453,9 @@ def export_macos_nwjs_build() -> dict:
             Path(asset_rights_files["assetRightsReportPath"]),
             Path(asset_rights_files["assetRightsPath"]),
             Path(asset_rights_files["assetRightsCsvPath"]),
+            Path(voice_production_files["voiceProductionReportPath"]),
+            Path(voice_production_files["voiceProductionPath"]),
+            Path(voice_production_files["voiceProductionCsvPath"]),
             Path(story_route_map["storyRouteMapReportPath"]),
             Path(story_route_map["storyRouteMapPath"]),
             Path(localization_audit["localizationAuditReportPath"]),
@@ -12434,6 +12539,19 @@ def export_macos_nwjs_build() -> dict:
         "assetRightsReadinessPercent": asset_rights_files["assetRightsReadinessPercent"],
         "assetRightsBlockerCount": asset_rights_files["assetRightsBlockerCount"],
         "assetRightsWarningCount": asset_rights_files["assetRightsWarningCount"],
+        "voiceProductionName": voice_production_files["voiceProductionName"],
+        "voiceProductionPath": voice_production_files["voiceProductionPath"],
+        "voiceProductionPublicUrl": f"/exports/{build_dir.name}/{voice_production_files['voiceProductionName']}",
+        "voiceProductionReportName": voice_production_files["voiceProductionReportName"],
+        "voiceProductionReportPath": voice_production_files["voiceProductionReportPath"],
+        "voiceProductionReportPublicUrl": f"/exports/{build_dir.name}/{voice_production_files['voiceProductionReportName']}",
+        "voiceProductionCsvName": voice_production_files["voiceProductionCsvName"],
+        "voiceProductionCsvPath": voice_production_files["voiceProductionCsvPath"],
+        "voiceProductionCsvPublicUrl": f"/exports/{build_dir.name}/{voice_production_files['voiceProductionCsvName']}",
+        "voiceProductionReadyPercent": voice_production_files["voiceProductionReadyPercent"],
+        "voiceProductionLineCount": voice_production_files["voiceProductionLineCount"],
+        "voiceProductionBlockerCount": voice_production_files["voiceProductionBlockerCount"],
+        "voiceProductionWarningCount": voice_production_files["voiceProductionWarningCount"],
         "storyRouteMapName": story_route_map["storyRouteMapName"],
         "storyRouteMapPath": story_route_map["storyRouteMapPath"],
         "storyRouteMapPublicUrl": f"/exports/{build_dir.name}/{story_route_map['storyRouteMapName']}",
@@ -12539,6 +12657,9 @@ def export_linux_nwjs_build() -> dict:
             "assetRights": EXPORT_ASSET_RIGHTS_JSON_NAME,
             "assetRightsReport": EXPORT_ASSET_RIGHTS_REPORT_NAME,
             "assetRightsCsv": EXPORT_ASSET_RIGHTS_CSV_NAME,
+            "voiceProduction": EXPORT_VOICE_PRODUCTION_JSON_NAME,
+            "voiceProductionReport": EXPORT_VOICE_PRODUCTION_REPORT_NAME,
+            "voiceProductionCsv": EXPORT_VOICE_PRODUCTION_CSV_NAME,
             "storyRouteMap": EXPORT_STORY_ROUTE_MAP_JSON_NAME,
             "storyRouteMapReport": EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
             "localizationAudit": EXPORT_LOCALIZATION_AUDIT_JSON_NAME,
@@ -12567,6 +12688,7 @@ def export_linux_nwjs_build() -> dict:
     )
     manifest_path = write_export_manifest(build_dir, manifest)
     asset_rights_files = write_export_asset_rights_files(build_dir, bundle=bundle, assets_doc=export_assets_doc)
+    voice_production_files = write_export_voice_production_files(build_dir, bundle=bundle, assets_doc=export_assets_doc)
     readme_path = write_linux_package_readme(
         build_dir,
         executable_name,
@@ -12596,6 +12718,7 @@ def export_linux_nwjs_build() -> dict:
         extra_reports=[
             EXPORT_RELEASE_EVIDENCE_PACK_NAME,
             asset_rights_files["assetRightsReportName"],
+            voice_production_files["voiceProductionReportName"],
             readme_path.name,
             EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
             EXPORT_LOCALIZATION_AUDIT_REPORT_NAME,
@@ -12622,6 +12745,9 @@ def export_linux_nwjs_build() -> dict:
             asset_rights_files["assetRightsReportName"],
             asset_rights_files["assetRightsName"],
             asset_rights_files["assetRightsCsvName"],
+            voice_production_files["voiceProductionReportName"],
+            voice_production_files["voiceProductionName"],
+            voice_production_files["voiceProductionCsvName"],
         ],
         platform_notes=[
             f"当前运行壳：NW.js {NWJS_RUNTIME_VERSION}。",
@@ -12646,7 +12772,12 @@ def export_linux_nwjs_build() -> dict:
         unlockable_manifest_name=f"app/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
         launch_steps=launch_steps,
         runtime_notes=runtime_notes,
-        extra_reports=[readme_path.name, asset_rights_files["assetRightsReportName"], f"app/{RUNTIME_PRELOAD_REPORT_FILE_NAME}"],
+        extra_reports=[
+            readme_path.name,
+            asset_rights_files["assetRightsReportName"],
+            voice_production_files["voiceProductionReportName"],
+            f"app/{RUNTIME_PRELOAD_REPORT_FILE_NAME}",
+        ],
         missing_assets=missing_assets,
     )
     provenance_verifiers = write_export_provenance_verifier_files(build_dir)
@@ -12660,6 +12791,9 @@ def export_linux_nwjs_build() -> dict:
         Path(asset_rights_files["assetRightsReportPath"]),
         Path(asset_rights_files["assetRightsPath"]),
         Path(asset_rights_files["assetRightsCsvPath"]),
+        Path(voice_production_files["voiceProductionReportPath"]),
+        Path(voice_production_files["voiceProductionPath"]),
+        Path(voice_production_files["voiceProductionCsvPath"]),
         Path(story_route_map["storyRouteMapReportPath"]),
         Path(story_route_map["storyRouteMapPath"]),
         Path(localization_audit["localizationAuditReportPath"]),
@@ -12740,6 +12874,19 @@ def export_linux_nwjs_build() -> dict:
         "assetRightsReadinessPercent": asset_rights_files["assetRightsReadinessPercent"],
         "assetRightsBlockerCount": asset_rights_files["assetRightsBlockerCount"],
         "assetRightsWarningCount": asset_rights_files["assetRightsWarningCount"],
+        "voiceProductionName": voice_production_files["voiceProductionName"],
+        "voiceProductionPath": voice_production_files["voiceProductionPath"],
+        "voiceProductionPublicUrl": f"/exports/{build_dir.name}/{voice_production_files['voiceProductionName']}",
+        "voiceProductionReportName": voice_production_files["voiceProductionReportName"],
+        "voiceProductionReportPath": voice_production_files["voiceProductionReportPath"],
+        "voiceProductionReportPublicUrl": f"/exports/{build_dir.name}/{voice_production_files['voiceProductionReportName']}",
+        "voiceProductionCsvName": voice_production_files["voiceProductionCsvName"],
+        "voiceProductionCsvPath": voice_production_files["voiceProductionCsvPath"],
+        "voiceProductionCsvPublicUrl": f"/exports/{build_dir.name}/{voice_production_files['voiceProductionCsvName']}",
+        "voiceProductionReadyPercent": voice_production_files["voiceProductionReadyPercent"],
+        "voiceProductionLineCount": voice_production_files["voiceProductionLineCount"],
+        "voiceProductionBlockerCount": voice_production_files["voiceProductionBlockerCount"],
+        "voiceProductionWarningCount": voice_production_files["voiceProductionWarningCount"],
         "storyRouteMapName": story_route_map["storyRouteMapName"],
         "storyRouteMapPath": story_route_map["storyRouteMapPath"],
         "storyRouteMapPublicUrl": f"/exports/{build_dir.name}/{story_route_map['storyRouteMapName']}",

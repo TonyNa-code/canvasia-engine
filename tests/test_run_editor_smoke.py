@@ -395,6 +395,22 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertIn("assetId,assetName,type", csv_text)
         return payload
 
+    def assert_export_voice_production_files(self, build_dir: Path) -> dict:
+        manifest_path = build_dir / run_editor.EXPORT_VOICE_PRODUCTION_JSON_NAME
+        report_path = build_dir / run_editor.EXPORT_VOICE_PRODUCTION_REPORT_NAME
+        csv_path = build_dir / run_editor.EXPORT_VOICE_PRODUCTION_CSV_NAME
+        self.assertTrue(manifest_path.is_file())
+        self.assertTrue(report_path.is_file())
+        self.assertTrue(csv_path.is_file())
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+        report = report_path.read_text(encoding="utf-8")
+        csv_text = csv_path.read_text(encoding="utf-8")
+        self.assertEqual(payload["formatVersion"], 1)
+        self.assertIn("readyPercent", payload["summary"])
+        self.assertIn("语音制作清单", report)
+        self.assertIn("lineNumber,status,chapter", csv_text)
+        return payload
+
     def assert_export_release_readiness_files(self, summary_path: Path, report_path: Path) -> dict:
         self.assertTrue(summary_path.is_file())
         self.assertTrue(report_path.is_file())
@@ -3079,6 +3095,9 @@ class RunEditorSmokeTests(unittest.TestCase):
         asset_rights_payload = self.assert_export_asset_rights_files(build_dir)
         self.assertEqual(export_result["assetRightsName"], run_editor.EXPORT_ASSET_RIGHTS_JSON_NAME)
         self.assertEqual(export_result["assetRightsReportName"], run_editor.EXPORT_ASSET_RIGHTS_REPORT_NAME)
+        voice_production_payload = self.assert_export_voice_production_files(build_dir)
+        self.assertEqual(export_result["voiceProductionName"], run_editor.EXPORT_VOICE_PRODUCTION_JSON_NAME)
+        self.assertEqual(export_result["voiceProductionReportName"], run_editor.EXPORT_VOICE_PRODUCTION_REPORT_NAME)
         route_map_payload = self.assert_export_story_route_map_files(
             build_dir / run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME,
             build_dir / run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
@@ -3123,6 +3142,9 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["assetRights"], run_editor.EXPORT_ASSET_RIGHTS_JSON_NAME)
         self.assertEqual(manifest["files"]["assetRightsReport"], run_editor.EXPORT_ASSET_RIGHTS_REPORT_NAME)
         self.assertEqual(manifest["files"]["assetRightsCsv"], run_editor.EXPORT_ASSET_RIGHTS_CSV_NAME)
+        self.assertEqual(manifest["files"]["voiceProduction"], run_editor.EXPORT_VOICE_PRODUCTION_JSON_NAME)
+        self.assertEqual(manifest["files"]["voiceProductionReport"], run_editor.EXPORT_VOICE_PRODUCTION_REPORT_NAME)
+        self.assertEqual(manifest["files"]["voiceProductionCsv"], run_editor.EXPORT_VOICE_PRODUCTION_CSV_NAME)
         self.assertEqual(manifest["files"]["storyRouteMap"], run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME)
         self.assertEqual(manifest["files"]["storyRouteMapReport"], run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME)
         self.assertEqual(manifest["files"]["localizationAudit"], run_editor.EXPORT_LOCALIZATION_AUDIT_JSON_NAME)
@@ -3141,6 +3163,9 @@ class RunEditorSmokeTests(unittest.TestCase):
                 run_editor.EXPORT_ASSET_RIGHTS_JSON_NAME,
                 run_editor.EXPORT_ASSET_RIGHTS_REPORT_NAME,
                 run_editor.EXPORT_ASSET_RIGHTS_CSV_NAME,
+                run_editor.EXPORT_VOICE_PRODUCTION_JSON_NAME,
+                run_editor.EXPORT_VOICE_PRODUCTION_REPORT_NAME,
+                run_editor.EXPORT_VOICE_PRODUCTION_CSV_NAME,
                 run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME,
                 run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
                 run_editor.EXPORT_LOCALIZATION_AUDIT_JSON_NAME,
@@ -3162,6 +3187,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         )
         self.assertEqual(provenance["build"]["target"], run_editor.EXPORT_TARGET_WEB)
         self.assertEqual(asset_rights_payload["summary"]["assetCount"], 0)
+        self.assertGreaterEqual(voice_production_payload["summary"]["lineCount"], 0)
         self.assert_export_provenance_verifier_detects_tamper(export_result, "player.css")
 
     def test_native_runtime_release_check_flags_variable_logic_errors(self) -> None:
@@ -3480,6 +3506,10 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(export_result["assetRightsName"], run_editor.EXPORT_ASSET_RIGHTS_JSON_NAME)
         self.assertEqual(export_result["assetRightsReportName"], run_editor.EXPORT_ASSET_RIGHTS_REPORT_NAME)
         self.assertGreaterEqual(asset_rights_payload["summary"]["assetCount"], 1)
+        voice_production_payload = self.assert_export_voice_production_files(build_dir)
+        self.assertEqual(export_result["voiceProductionName"], run_editor.EXPORT_VOICE_PRODUCTION_JSON_NAME)
+        self.assertEqual(export_result["voiceProductionReportName"], run_editor.EXPORT_VOICE_PRODUCTION_REPORT_NAME)
+        self.assertGreaterEqual(voice_production_payload["summary"]["lineCount"], 1)
         route_map_payload = self.assert_export_story_route_map_files(
             build_dir / run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME,
             build_dir / run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
@@ -3600,6 +3630,9 @@ class RunEditorSmokeTests(unittest.TestCase):
             any(item["name"] == export_result["assetRightsReportName"] for item in release_artifact_payload["insideArchiveReports"])
         )
         self.assertTrue(
+            any(item["name"] == export_result["voiceProductionReportName"] for item in release_artifact_payload["insideArchiveReports"])
+        )
+        self.assertTrue(
             any(
                 item["name"] == export_result["storyRouteMapReportName"]
                 for item in release_artifact_payload["insideArchiveReports"]
@@ -3650,6 +3683,10 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["assetRightsReport"], run_editor.EXPORT_ASSET_RIGHTS_REPORT_NAME)
         self.assertEqual(manifest["files"]["assetRightsCsv"], run_editor.EXPORT_ASSET_RIGHTS_CSV_NAME)
         self.assertEqual(manifest["runtime"]["assetRights"], run_editor.EXPORT_ASSET_RIGHTS_JSON_NAME)
+        self.assertEqual(manifest["files"]["voiceProduction"], run_editor.EXPORT_VOICE_PRODUCTION_JSON_NAME)
+        self.assertEqual(manifest["files"]["voiceProductionReport"], run_editor.EXPORT_VOICE_PRODUCTION_REPORT_NAME)
+        self.assertEqual(manifest["files"]["voiceProductionCsv"], run_editor.EXPORT_VOICE_PRODUCTION_CSV_NAME)
+        self.assertEqual(manifest["runtime"]["voiceProduction"], run_editor.EXPORT_VOICE_PRODUCTION_JSON_NAME)
         self.assertEqual(manifest["files"]["runtimeSettingsModule"], run_editor.NATIVE_RUNTIME_SETTINGS_NAME)
         self.assertEqual(manifest["files"]["runtimeTextEffectsModule"], run_editor.NATIVE_RUNTIME_TEXT_EFFECTS_NAME)
         self.assertEqual(manifest["files"]["runtimeStorageModule"], run_editor.NATIVE_RUNTIME_STORAGE_NAME)
@@ -3670,6 +3707,9 @@ class RunEditorSmokeTests(unittest.TestCase):
                 run_editor.EXPORT_ASSET_RIGHTS_JSON_NAME,
                 run_editor.EXPORT_ASSET_RIGHTS_REPORT_NAME,
                 run_editor.EXPORT_ASSET_RIGHTS_CSV_NAME,
+                run_editor.EXPORT_VOICE_PRODUCTION_JSON_NAME,
+                run_editor.EXPORT_VOICE_PRODUCTION_REPORT_NAME,
+                run_editor.EXPORT_VOICE_PRODUCTION_CSV_NAME,
                 run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME,
                 run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
                 run_editor.EXPORT_LOCALIZATION_AUDIT_JSON_NAME,
@@ -4284,6 +4324,8 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(export_result["releaseEvidencePackName"], run_editor.EXPORT_RELEASE_EVIDENCE_PACK_NAME)
         self.assert_export_asset_rights_files(build_dir)
         self.assertEqual(export_result["assetRightsName"], run_editor.EXPORT_ASSET_RIGHTS_JSON_NAME)
+        self.assert_export_voice_production_files(build_dir)
+        self.assertEqual(export_result["voiceProductionName"], run_editor.EXPORT_VOICE_PRODUCTION_JSON_NAME)
         route_map_payload = self.assert_export_story_route_map_files(
             build_dir / run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME,
             build_dir / run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
@@ -4311,6 +4353,9 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["assetRights"], run_editor.EXPORT_ASSET_RIGHTS_JSON_NAME)
         self.assertEqual(manifest["files"]["assetRightsReport"], run_editor.EXPORT_ASSET_RIGHTS_REPORT_NAME)
         self.assertEqual(manifest["files"]["assetRightsCsv"], run_editor.EXPORT_ASSET_RIGHTS_CSV_NAME)
+        self.assertEqual(manifest["files"]["voiceProduction"], run_editor.EXPORT_VOICE_PRODUCTION_JSON_NAME)
+        self.assertEqual(manifest["files"]["voiceProductionReport"], run_editor.EXPORT_VOICE_PRODUCTION_REPORT_NAME)
+        self.assertEqual(manifest["files"]["voiceProductionCsv"], run_editor.EXPORT_VOICE_PRODUCTION_CSV_NAME)
         self.assertEqual(manifest["files"]["appRuntimeConditions"], "app/runtime_conditions.js")
         self.assertEqual(manifest["files"]["storyRouteMap"], run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME)
         self.assertEqual(manifest["files"]["storyRouteMapReport"], run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME)
@@ -4329,6 +4374,9 @@ class RunEditorSmokeTests(unittest.TestCase):
                 run_editor.EXPORT_ASSET_RIGHTS_JSON_NAME,
                 run_editor.EXPORT_ASSET_RIGHTS_REPORT_NAME,
                 run_editor.EXPORT_ASSET_RIGHTS_CSV_NAME,
+                run_editor.EXPORT_VOICE_PRODUCTION_JSON_NAME,
+                run_editor.EXPORT_VOICE_PRODUCTION_REPORT_NAME,
+                run_editor.EXPORT_VOICE_PRODUCTION_CSV_NAME,
                 run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME,
                 run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
                 run_editor.EXPORT_LOCALIZATION_AUDIT_JSON_NAME,
@@ -4382,6 +4430,8 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(export_result["releaseEvidencePackName"], run_editor.EXPORT_RELEASE_EVIDENCE_PACK_NAME)
         self.assert_export_asset_rights_files(build_dir)
         self.assertEqual(export_result["assetRightsName"], run_editor.EXPORT_ASSET_RIGHTS_JSON_NAME)
+        self.assert_export_voice_production_files(build_dir)
+        self.assertEqual(export_result["voiceProductionName"], run_editor.EXPORT_VOICE_PRODUCTION_JSON_NAME)
         route_map_payload = self.assert_export_story_route_map_files(
             build_dir / run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME,
             build_dir / run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
@@ -4409,6 +4459,9 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["assetRights"], run_editor.EXPORT_ASSET_RIGHTS_JSON_NAME)
         self.assertEqual(manifest["files"]["assetRightsReport"], run_editor.EXPORT_ASSET_RIGHTS_REPORT_NAME)
         self.assertEqual(manifest["files"]["assetRightsCsv"], run_editor.EXPORT_ASSET_RIGHTS_CSV_NAME)
+        self.assertEqual(manifest["files"]["voiceProduction"], run_editor.EXPORT_VOICE_PRODUCTION_JSON_NAME)
+        self.assertEqual(manifest["files"]["voiceProductionReport"], run_editor.EXPORT_VOICE_PRODUCTION_REPORT_NAME)
+        self.assertEqual(manifest["files"]["voiceProductionCsv"], run_editor.EXPORT_VOICE_PRODUCTION_CSV_NAME)
         self.assertEqual(manifest["files"]["appRuntimeConditions"], "app/runtime_conditions.js")
         self.assertEqual(manifest["files"]["storyRouteMap"], run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME)
         self.assertEqual(manifest["files"]["storyRouteMapReport"], run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME)
@@ -4427,6 +4480,9 @@ class RunEditorSmokeTests(unittest.TestCase):
                 run_editor.EXPORT_ASSET_RIGHTS_JSON_NAME,
                 run_editor.EXPORT_ASSET_RIGHTS_REPORT_NAME,
                 run_editor.EXPORT_ASSET_RIGHTS_CSV_NAME,
+                run_editor.EXPORT_VOICE_PRODUCTION_JSON_NAME,
+                run_editor.EXPORT_VOICE_PRODUCTION_REPORT_NAME,
+                run_editor.EXPORT_VOICE_PRODUCTION_CSV_NAME,
                 run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME,
                 run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
                 run_editor.EXPORT_LOCALIZATION_AUDIT_JSON_NAME,
@@ -4555,6 +4611,8 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(export_result["releaseEvidencePackName"], run_editor.EXPORT_RELEASE_EVIDENCE_PACK_NAME)
         self.assert_export_asset_rights_files(build_dir)
         self.assertEqual(export_result["assetRightsName"], run_editor.EXPORT_ASSET_RIGHTS_JSON_NAME)
+        self.assert_export_voice_production_files(build_dir)
+        self.assertEqual(export_result["voiceProductionName"], run_editor.EXPORT_VOICE_PRODUCTION_JSON_NAME)
         route_map_payload = self.assert_export_story_route_map_files(
             build_dir / run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME,
             build_dir / run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
@@ -4582,6 +4640,9 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["assetRights"], run_editor.EXPORT_ASSET_RIGHTS_JSON_NAME)
         self.assertEqual(manifest["files"]["assetRightsReport"], run_editor.EXPORT_ASSET_RIGHTS_REPORT_NAME)
         self.assertEqual(manifest["files"]["assetRightsCsv"], run_editor.EXPORT_ASSET_RIGHTS_CSV_NAME)
+        self.assertEqual(manifest["files"]["voiceProduction"], run_editor.EXPORT_VOICE_PRODUCTION_JSON_NAME)
+        self.assertEqual(manifest["files"]["voiceProductionReport"], run_editor.EXPORT_VOICE_PRODUCTION_REPORT_NAME)
+        self.assertEqual(manifest["files"]["voiceProductionCsv"], run_editor.EXPORT_VOICE_PRODUCTION_CSV_NAME)
         self.assertEqual(manifest["files"]["appRuntimeConditions"], "app/runtime_conditions.js")
         self.assertEqual(manifest["files"]["storyRouteMap"], run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME)
         self.assertEqual(manifest["files"]["storyRouteMapReport"], run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME)
@@ -4600,6 +4661,9 @@ class RunEditorSmokeTests(unittest.TestCase):
                 run_editor.EXPORT_ASSET_RIGHTS_JSON_NAME,
                 run_editor.EXPORT_ASSET_RIGHTS_REPORT_NAME,
                 run_editor.EXPORT_ASSET_RIGHTS_CSV_NAME,
+                run_editor.EXPORT_VOICE_PRODUCTION_JSON_NAME,
+                run_editor.EXPORT_VOICE_PRODUCTION_REPORT_NAME,
+                run_editor.EXPORT_VOICE_PRODUCTION_CSV_NAME,
                 run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME,
                 run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
                 run_editor.EXPORT_LOCALIZATION_AUDIT_JSON_NAME,
