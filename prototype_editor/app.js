@@ -189,6 +189,7 @@ const projectHistoryTools = window.CanvasiaEditorProjectHistory;
 const assetCatalogTools = window.CanvasiaEditorAssetCatalog;
 const assetFootprintTools = window.CanvasiaEditorAssetFootprint;
 const runtimePreloadBudgetTools = window.CanvasiaEditorRuntimePreloadBudget;
+const regressionDiagnosticTools = window.CanvasiaEditorRegressionDiagnostics;
 const projectDoctorTools = window.CanvasiaEditorProjectDoctor;
 const projectMilestoneTools = window.CanvasiaEditorProjectMilestones ?? window.CanvasiaProjectMilestones;
 const openAiAssetTools = window.CanvasiaEditorOpenAiAssetGenerator;
@@ -26416,7 +26417,62 @@ function getPreviewRegressionStatusToneClass(status) {
   return "good-text";
 }
 
+function getRegressionDiagnosticLine(caseResult = {}, options = {}) {
+  if (regressionDiagnosticTools?.formatRegressionDiagnosticLine) {
+    return regressionDiagnosticTools.formatRegressionDiagnosticLine(caseResult, options);
+  }
+
+  const maxItems = Number.isFinite(Number(options.maxItems)) ? Math.max(0, Math.floor(Number(options.maxItems))) : 3;
+  const conditionTraceSummaries = Array.isArray(caseResult?.conditionTraceSummaries)
+    ? caseResult.conditionTraceSummaries.map((item) => compactText(item, options.traceMaxLength ?? 180)).filter(Boolean)
+    : [];
+  const diagnosticItems = [
+    options.includeVariable === false || !caseResult?.variableOverrideSummary
+      ? ""
+      : compactText(`测试预设：${caseResult.variableOverrideSummary}`, options.variableMaxLength ?? 180),
+    ...conditionTraceSummaries.slice(0, maxItems),
+  ].filter(Boolean);
+  return compactText(diagnosticItems.join(options.separator ?? " / "), options.maxLength ?? 260);
+}
+
+function serializeRegressionDiagnosticsForReport(caseResult = {}, options = {}) {
+  if (regressionDiagnosticTools?.serializeRegressionDiagnostics) {
+    return regressionDiagnosticTools.serializeRegressionDiagnostics(caseResult, options);
+  }
+
+  const diagnosticLine = getRegressionDiagnosticLine(caseResult, options);
+  return {
+    variableOverrideSummary: caseResult?.variableOverrideSummary ?? "",
+    conditionTraceSummaries: Array.isArray(caseResult?.conditionTraceSummaries)
+      ? caseResult.conditionTraceSummaries.filter(Boolean)
+      : [],
+    diagnosticLine,
+    hasDiagnostics: Boolean(diagnosticLine),
+  };
+}
+
+function renderRegressionDiagnosticBlock(caseResult = {}, options = {}) {
+  const diagnosticLine = getRegressionDiagnosticLine(caseResult, options);
+  if (!diagnosticLine) {
+    return "";
+  }
+
+  return `
+    <div class="preview-sprint-diagnostic">
+      <strong>${escapeHtml(options.label ?? "条件/变量诊断")}</strong>
+      <span>${escapeHtml(diagnosticLine)}</span>
+    </div>
+  `;
+}
+
 function renderPreviewRegressionCaseCard(caseResult) {
+  const conditionDiagnosticLine = getRegressionDiagnosticLine(caseResult, {
+    includeVariable: false,
+    maxItems: 2,
+    maxLength: 180,
+    traceMaxLength: 120,
+  });
+
   return `
     <article class="preview-sprint-card is-${
       caseResult.status === "fail" ? "danger" : caseResult.status === "warn" ? "warn" : "good"
@@ -26445,10 +26501,8 @@ function renderPreviewRegressionCaseCard(caseResult) {
         }
         ${caseResult.variableOverrideSummary ? `<span class="issue-tag">${escapeHtml(`测试预设：${caseResult.variableOverrideSummary}`)}</span>` : ""}
         ${
-          (caseResult.conditionTraceSummaries ?? []).length > 0
-            ? `<span class="issue-tag">${escapeHtml(`条件诊断：${caseResult.conditionTraceSummaries[0]}`)}${
-                caseResult.conditionTraceSummaries.length > 1 ? "…" : ""
-              }</span>`
+          conditionDiagnosticLine
+            ? `<span class="issue-tag">${escapeHtml(`条件诊断：${conditionDiagnosticLine}`)}</span>`
             : ""
         }
       </div>
@@ -26689,6 +26743,7 @@ function renderPreviewRegressionFixQueuePanel() {
                         </div>
                         <p>${escapeHtml(caseResult.reason)}</p>
                         <div class="helper-text">${escapeHtml(caseResult.recommendation)}</div>
+                        ${renderRegressionDiagnosticBlock(caseResult, { maxItems: 2, maxLength: 220, traceMaxLength: 140 })}
                         <div class="preview-sprint-actions">
                           ${(caseResult.actions ?? []).map((action, actionIndex) => renderQuickActionButton(action, actionIndex === 0)).join("")}
                         </div>
@@ -29418,6 +29473,7 @@ function buildReleaseControlReportPayload() {
         title: step.title,
         meta: step.meta,
         why: step.why,
+        diagnostic: step.diagnostic ?? "",
         recovery: step.recovery,
         doneWhen: step.doneWhen ?? "",
         repairCodes: getProjectDoctorAutoRepairCodes(step),
@@ -29541,35 +29597,45 @@ function buildReleaseControlReportPayload() {
           ranAt: regressionResult.ranAt,
           ranAtLabel: formatDate(regressionResult.ranAt),
           summary: regressionResult.summary,
-          cases: regressionResult.cases.map((caseResult) => ({
-            sceneId: caseResult.sceneId,
-            sceneName: caseResult.sceneName,
-            chapterName: caseResult.chapterName,
-            sourceLabel: caseResult.sourceLabel,
-            status: caseResult.status,
-            statusLabel: caseResult.statusLabel,
-            reason: caseResult.reason,
-            detail: caseResult.detail,
-            steps: caseResult.steps,
-            visitedSceneCount: caseResult.visitedSceneCount,
-            choiceCount: caseResult.choiceCount,
-            variableOverrideSummary: caseResult.variableOverrideSummary ?? "",
-            conditionTraceSummaries: caseResult.conditionTraceSummaries ?? [],
-            expectedTargetReached: Boolean(caseResult.expectedTargetReached),
-            selectedOptionTexts: caseResult.selectedOptionTexts ?? [],
-          })),
-          fixQueue: regressionFixQueue.map((caseResult, index) => ({
-            order: index + 1,
-            sceneId: caseResult.sceneId,
-            sceneName: caseResult.sceneName,
-            chapterName: caseResult.chapterName,
-            sourceLabel: caseResult.sourceLabel,
-            status: caseResult.status,
-            statusLabel: caseResult.statusLabel,
-            priorityScore: caseResult.priorityScore,
-            reason: caseResult.reason,
-            recommendation: caseResult.recommendation,
-          })),
+          cases: regressionResult.cases.map((caseResult) => {
+            const diagnostics = serializeRegressionDiagnosticsForReport(caseResult);
+            return {
+              sceneId: caseResult.sceneId,
+              sceneName: caseResult.sceneName,
+              chapterName: caseResult.chapterName,
+              sourceLabel: caseResult.sourceLabel,
+              status: caseResult.status,
+              statusLabel: caseResult.statusLabel,
+              reason: caseResult.reason,
+              detail: caseResult.detail,
+              steps: caseResult.steps,
+              visitedSceneCount: caseResult.visitedSceneCount,
+              choiceCount: caseResult.choiceCount,
+              variableOverrideSummary: diagnostics.variableOverrideSummary,
+              conditionTraceSummaries: diagnostics.conditionTraceSummaries,
+              diagnosticLine: diagnostics.diagnosticLine,
+              expectedTargetReached: Boolean(caseResult.expectedTargetReached),
+              selectedOptionTexts: caseResult.selectedOptionTexts ?? [],
+            };
+          }),
+          fixQueue: regressionFixQueue.map((caseResult, index) => {
+            const diagnostics = serializeRegressionDiagnosticsForReport(caseResult);
+            return {
+              order: index + 1,
+              sceneId: caseResult.sceneId,
+              sceneName: caseResult.sceneName,
+              chapterName: caseResult.chapterName,
+              sourceLabel: caseResult.sourceLabel,
+              status: caseResult.status,
+              statusLabel: caseResult.statusLabel,
+              priorityScore: caseResult.priorityScore,
+              reason: caseResult.reason,
+              variableOverrideSummary: diagnostics.variableOverrideSummary,
+              conditionTraceSummaries: diagnostics.conditionTraceSummaries,
+              diagnosticLine: diagnostics.diagnosticLine,
+              recommendation: caseResult.recommendation,
+            };
+          }),
         }
       : null,
     nextStep,
@@ -29815,11 +29881,13 @@ function buildInspectionReportContent() {
   lines.push("", "发布前回归修复优先队列：");
   if (regressionFixQueue.length > 0) {
     regressionFixQueue.forEach((caseResult, index) => {
+      const diagnosticLine = getRegressionDiagnosticLine(caseResult);
       lines.push(
         `${index + 1}. ${caseResult.sceneName} / ${caseResult.statusLabel}`,
         `   来源：${caseResult.chapterName} · ${caseResult.sourceLabel}`,
         `   优先分：${caseResult.priorityScore}`,
         `   先修原因：${caseResult.reason}`,
+        diagnosticLine ? `   条件/变量诊断：${diagnosticLine}` : "",
         `   处理动作：${caseResult.recommendation}`,
         ""
       );
@@ -29955,12 +30023,13 @@ function buildReleaseControlReportContent() {
     issueItems.slice(0, 30).map((item) => [item.label, item.title, item.meta])
   );
   const projectDoctorTable = buildMarkdownTable(
-    ["顺序", "类型", "事项", "为什么", "建议怎么修", "修完应该看到", "安全修复"],
+    ["顺序", "类型", "事项", "为什么", "诊断", "建议怎么修", "修完应该看到", "安全修复"],
     projectDoctorQueue.map((step) => [
       `${step.order}`,
       `${step.label} / ${step.badge}`,
       `${step.title} / ${step.meta}`,
       step.why,
+      step.diagnostic ?? "",
       step.recovery,
       step.doneWhen ?? "重新巡检后，这条问题会消失或变成可确认的提醒。",
       formatProjectDoctorRepairCodes(getProjectDoctorAutoRepairCodes(step)),
@@ -29986,23 +30055,25 @@ function buildReleaseControlReportContent() {
   );
   const regressionTable = regressionResult
     ? buildMarkdownTable(
-        ["路线", "状态", "来源", "细节", "步数"],
+        ["路线", "状态", "来源", "细节", "条件/变量诊断", "步数"],
         regressionResult.cases.map((caseResult) => [
           caseResult.sceneName,
           caseResult.statusLabel,
           `${caseResult.chapterName} · ${caseResult.sourceLabel}`,
           caseResult.detail,
+          getRegressionDiagnosticLine(caseResult),
           `${caseResult.steps}`,
         ])
       )
     : "";
   const regressionFixTable = buildMarkdownTable(
-    ["顺序", "路线", "状态", "优先分", "处理建议"],
+    ["顺序", "路线", "状态", "优先分", "条件/变量诊断", "处理建议"],
     regressionFixQueue.map((caseResult, index) => [
       `${index + 1}`,
       caseResult.sceneName,
       caseResult.statusLabel,
       `${caseResult.priorityScore}`,
+      getRegressionDiagnosticLine(caseResult),
       caseResult.recommendation,
     ])
   );
@@ -32094,6 +32165,14 @@ function renderProjectDoctorStepCard(step) {
         <strong>建议怎么修</strong>
         <span>${escapeHtml(step.recovery ?? "点开对应位置，按提示补内容、补引用或调整设置。")}</span>
       </div>
+      ${
+        step.diagnostic
+          ? `<div class="project-doctor-diagnostic">
+              <strong>条件/变量诊断</strong>
+              <span>${escapeHtml(step.diagnostic)}</span>
+            </div>`
+          : ""
+      }
       <div class="project-doctor-done">
         <strong>修完应该看到</strong>
         <span>${escapeHtml(step.doneWhen ?? "重新巡检后，这条问题会消失或变成可确认的提醒。")}</span>

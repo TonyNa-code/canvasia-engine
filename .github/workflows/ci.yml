@@ -88,6 +88,7 @@ jobs:
             tests/test_frontend_project_milestones_module.py \
             tests/test_frontend_project_history_module.py \
             tests/test_frontend_project_polish_module.py \
+            tests/test_frontend_regression_diagnostics_module.py \
             tests/test_frontend_project_settings_module.py \
             tests/test_frontend_recent_workspace_module.py \
             tests/test_frontend_release_control_module.py \
@@ -153,6 +154,7 @@ jobs:
           node --check prototype_editor/modules/playtest_handoff_report.js
           node --check prototype_editor/modules/presentation_timeline.js
           node --check prototype_editor/modules/preview_regression.js
+          node --check prototype_editor/modules/regression_diagnostics.js
           node --check prototype_editor/modules/project_center.js
           node --check prototype_editor/modules/project_doctor.js
           node --check prototype_editor/modules/project_milestones.js
@@ -243,6 +245,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_project_polish_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_project_runtime_settings_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_project_settings_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_regression_diagnostics_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_recent_workspace_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_release_control_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_release_candidate_manifest_module.py' -v

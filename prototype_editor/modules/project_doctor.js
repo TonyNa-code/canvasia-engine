@@ -1,6 +1,8 @@
 (function attachProjectDoctor(global) {
   "use strict";
 
+  const regressionDiagnosticTools = global.CanvasiaEditorRegressionDiagnostics;
+
   const ISSUE_KIND_PRIORITY = Object.freeze({
     errors: 0,
     regression_fail: 6,
@@ -48,6 +50,24 @@
       return text;
     }
     return `${text.slice(0, safeMax - 1).trim()}…`;
+  }
+
+  function formatRegressionDiagnosticLine(caseResult = {}, options = {}) {
+    if (regressionDiagnosticTools?.formatRegressionDiagnosticLine) {
+      return regressionDiagnosticTools.formatRegressionDiagnosticLine(caseResult, options);
+    }
+
+    const maxItems = Number.isFinite(Number(options.maxItems)) ? Math.max(0, Math.floor(Number(options.maxItems))) : 3;
+    const traces = Array.isArray(caseResult?.conditionTraceSummaries)
+      ? caseResult.conditionTraceSummaries.map((item) => compactText(item, options.traceMaxLength ?? 180)).filter(Boolean)
+      : [];
+    const items = [
+      options.includeVariable === false || !cleanText(caseResult?.variableOverrideSummary)
+        ? ""
+        : compactText(`测试预设：${caseResult.variableOverrideSummary}`, options.variableMaxLength ?? 180),
+      ...traces.slice(0, maxItems),
+    ].filter(Boolean);
+    return compactText(items.join(cleanText(options.separator, " / ")), options.maxLength ?? 260);
   }
 
   function getIssueKindPriority(kind) {
@@ -283,6 +303,11 @@
     const status = cleanText(caseResult?.status, "warn");
     const kind = status === "fail" ? "regression_fail" : "regression_warn";
     const title = compactText(caseResult?.reason || caseResult?.statusLabel || "回归路线需要复看", 96);
+    const diagnostic = formatRegressionDiagnosticLine(caseResult, {
+      maxItems: 3,
+      maxLength: 220,
+      traceMaxLength: 140,
+    });
     const meta = compactText(
       `${caseResult?.sceneName ?? "未命名场景"} · ${caseResult?.chapterName ?? "未分章"} · ${
         caseResult?.detail ?? ""
@@ -301,6 +326,7 @@
       title,
       meta,
       why: status === "fail" ? "自动试玩已经跑出了真实路线问题。" : "这条路线没有硬崩，但发布前值得人工复看一次。",
+      diagnostic,
       recovery:
         cleanText(caseResult?.recommendation) ||
         (status === "fail"
@@ -322,7 +348,7 @@
                 }
               : buildFallbackAction(kind),
           ],
-      searchText: cleanText(`${title} ${meta}`),
+      searchText: cleanText(`${title} ${meta} ${diagnostic}`),
     };
   }
 
@@ -557,5 +583,6 @@
     getIssueKindPriority,
     inferIssueDoneWhen,
     inferRepairCodes,
+    formatRegressionDiagnosticLine,
   });
 })(typeof window !== "undefined" ? window : globalThis);

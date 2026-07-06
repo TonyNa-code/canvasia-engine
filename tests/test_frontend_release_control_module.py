@@ -54,6 +54,24 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
         self.assertIn("## 路线试玩手册", report_body)
         self.assertLess(report_body.index("const routeTestingPlan"), report_body.index("const routeTestingTables"))
 
+    def test_release_reports_keep_regression_condition_diagnostics(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        payload_start = source.index("function buildReleaseControlReportPayload()")
+        payload_end = source.index("function buildInspectionReportContent()")
+        payload_body = source[payload_start:payload_end]
+        report_start = source.index("function buildReleaseControlReportContent()")
+        report_end = source.index("function exportReleaseControlReport()")
+        report_body = source[report_start:report_end]
+
+        self.assertIn("const regressionDiagnosticTools = window.CanvasiaEditorRegressionDiagnostics", source)
+        self.assertIn("function serializeRegressionDiagnosticsForReport", source)
+        self.assertIn("diagnostic: step.diagnostic ?? \"\"", payload_body)
+        self.assertIn("diagnosticLine: diagnostics.diagnosticLine", payload_body)
+        self.assertIn("conditionTraceSummaries: diagnostics.conditionTraceSummaries", payload_body)
+        self.assertIn('"诊断"', report_body)
+        self.assertIn('"条件/变量诊断"', report_body)
+        self.assertIn("getRegressionDiagnosticLine(caseResult)", report_body)
+
     def test_release_fix_order_surfaces_route_issue_queue_in_ui_and_reports(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
         payload_start = source.index("function buildReleaseControlReportPayload()")

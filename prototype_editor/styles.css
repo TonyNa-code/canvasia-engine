@@ -6411,7 +6411,9 @@ html[data-ui-theme="light"] .music-range-timeline em {
 }
 
 .project-doctor-recovery,
-.project-doctor-done {
+.project-doctor-diagnostic,
+.project-doctor-done,
+.preview-sprint-diagnostic {
   display: grid;
   gap: 4px;
   padding: 10px 12px;
@@ -6423,11 +6425,20 @@ html[data-ui-theme="light"] .music-range-timeline em {
   font-size: 13px;
 }
 
+.project-doctor-diagnostic,
+.preview-sprint-diagnostic {
+  background:
+    linear-gradient(135deg, rgba(228, 244, 255, 0.82), rgba(244, 248, 255, 0.68));
+  border-color: rgba(82, 154, 255, 0.18);
+}
+
 .project-doctor-done {
   background: rgba(246, 255, 250, 0.72);
 }
 
 .project-doctor-recovery strong,
+.project-doctor-diagnostic strong,
+.preview-sprint-diagnostic strong,
 .project-doctor-done strong {
   color: var(--ink);
   font-size: 13px;

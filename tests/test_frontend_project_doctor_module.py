@@ -79,6 +79,8 @@ class FrontendProjectDoctorModuleTests(unittest.TestCase):
                     detail: "重复命中同一位置",
                     steps: 20,
                     anchorSceneId: "loop_scene",
+                    variableOverrideSummary: "好感度=3",
+                    conditionTraceSummaries: ["条件判断：命中分支 1 -> 循环测试；好感度 当前 3 >= 2：通过"],
                   },
                 ],
               },
@@ -99,6 +101,9 @@ class FrontendProjectDoctorModuleTests(unittest.TestCase):
         self.assertIn("第一幕", queue[0]["doneWhen"])
         self.assertEqual(queue[0]["repairCodes"], ["entry_scene"])
         self.assertEqual(queue[0]["actions"][0]["action"], "set-inspection-filter")
+        self.assertIn("测试预设：好感度=3", queue[1]["diagnostic"])
+        self.assertIn("条件判断：命中分支 1", queue[1]["diagnostic"])
+        self.assertIn("条件判断：命中分支 1", queue[1]["searchText"])
         self.assertEqual(queue[2]["actions"][0]["sceneId"], "s2")
         self.assertIn("坏链数量减少", queue[2]["doneWhen"])
         self.assertEqual(queue[3]["actions"][0]["blockId"], "b3")

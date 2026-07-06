@@ -1,4 +1,6 @@
 (function attachPlaytestHandoffReportTools(global) {
+  const regressionDiagnosticTools = global.CanvasiaEditorRegressionDiagnostics;
+
   function toArray(value) {
     return Array.isArray(value) ? value : [];
   }
@@ -335,6 +337,10 @@
   }
 
   function getRegressionCaseDiagnostic(caseResult = {}) {
+    if (regressionDiagnosticTools?.formatRegressionDiagnosticLine) {
+      return regressionDiagnosticTools.formatRegressionDiagnosticLine(caseResult);
+    }
+
     return [
       caseResult.variableOverrideSummary ? `测试预设：${caseResult.variableOverrideSummary}` : "",
       ...toArray(caseResult.conditionTraceSummaries),
