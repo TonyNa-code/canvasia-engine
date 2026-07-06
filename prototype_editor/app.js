@@ -3642,6 +3642,11 @@ async function handleClick(event) {
     return;
   }
 
+  if (action === "apply-runtime-preload-recommended-profile") {
+    void applyRuntimePreloadRecommendedProfile(actionTarget.dataset.performanceProfile);
+    return;
+  }
+
   if (action === "export-asset-rights-markdown") {
     exportAssetRightsMarkdown();
     return;
@@ -33640,12 +33645,18 @@ function renderRuntimePreloadBudgetPanel({ compact = false } = {}) {
   const warnings = (report.warnings ?? []).filter((warning) => warning.severity !== "tip").slice(0, compact ? 2 : 4);
   const sceneHotspots = (report.scenes ?? []).filter((scene) => scene.count > 0).slice(0, compact ? 2 : 4);
   const toneClass = getAssetFootprintToneClass(digest.level);
+  const currentPerformanceProfile = getProjectRuntimeSettings().performanceProfile;
+  const recommendedPerformanceProfile = runtimePreloadBudgetTools.getSafePerformanceProfileKey(
+    profileAdvice.recommendedProfile ?? currentPerformanceProfile
+  );
   const profileAdviceTone =
     profileAdvice.status === "needs_optimization" || profileAdvice.status === "should_raise"
       ? "warn"
       : profileAdvice.status === "can_lower"
         ? "soft"
         : "ready";
+  const canApplyProfileAdvice =
+    recommendedPerformanceProfile !== currentPerformanceProfile && profileAdvice.status !== "needs_optimization";
   const profileAdviceAction = (profileAdvice.actions ?? [])[0] ?? "保持当前档位；发布前继续复查首屏体积。";
   const profileAdviceReason = (profileAdvice.reasons ?? [])[0] ?? "当前预热规模与项目性能档位基本匹配。";
 
@@ -33673,7 +33684,11 @@ function renderRuntimePreloadBudgetPanel({ compact = false } = {}) {
           <span class="issue-tag ${getAssetFootprintToneClass(profileAdviceTone)}">${escapeHtml(profileAdvice.status ?? "ok")}</span>
         </div>
         <p>${escapeHtml(profileAdviceReason)} ${escapeHtml(profileAdviceAction)}</p>
-        <button class="toolbar-button" data-action="switch-screen" data-screen="preview">调整导出体验</button>
+        ${
+          canApplyProfileAdvice
+            ? `<button class="toolbar-button toolbar-button-primary" data-action="apply-runtime-preload-recommended-profile" data-performance-profile="${escapeHtml(recommendedPerformanceProfile)}">一键应用推荐档位</button>`
+            : `<button class="toolbar-button" data-action="export-runtime-preload-budget-markdown">导出瘦身建议</button>`
+        }
       </article>
       <div class="detail-actions">
         <button class="toolbar-button toolbar-button-primary" data-action="export-runtime-preload-budget-markdown">
@@ -40569,6 +40584,41 @@ async function saveProjectRuntimePlaybackDefaults() {
     showToast("成品默认播放体验已保存");
   } catch (error) {
     await showEditorOperationFailure(error, "保存默认播放体验失败", "成品默认播放体验没有保存成功");
+  }
+}
+
+async function applyRuntimePreloadRecommendedProfile(profileHint = "") {
+  const currentSettings = getProjectRuntimeSettings();
+  const report = buildRuntimePreloadBudgetReport();
+  const recommendedProfile = runtimePreloadBudgetTools.getSafePerformanceProfileKey(
+    profileHint || report.profileAdvice?.recommendedProfile || currentSettings.performanceProfile
+  );
+  const currentProfile = currentSettings.performanceProfile;
+  const recommendedLabel = RUNTIME_PERFORMANCE_PROFILE_LABELS[recommendedProfile] ?? recommendedProfile;
+
+  if (recommendedProfile === currentProfile) {
+    setSaveStatus(`当前性能目标已经是：${recommendedLabel}`);
+    showToast(`当前性能目标已经是：${recommendedLabel}`);
+    return;
+  }
+
+  const nextSettings = getProjectRuntimeSettings({
+    runtimeSettings: {
+      ...currentSettings,
+      performanceProfile: recommendedProfile,
+    },
+  });
+
+  try {
+    setSaveStatus(`正在应用推荐性能目标：${recommendedLabel}...`);
+    await postJson(API_SAVE_PROJECT_SETTINGS, {
+      runtimeSettings: nextSettings,
+    });
+    await reloadProjectData({ ...getCurrentUiState() });
+    setSaveStatus(`性能目标已切换到：${recommendedLabel}`);
+    showToast(`已应用推荐性能目标：${recommendedLabel}`);
+  } catch (error) {
+    await showEditorOperationFailure(error, "应用推荐性能目标失败", "性能目标没有保存成功");
   }
 }
 

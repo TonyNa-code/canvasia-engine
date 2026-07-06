@@ -3289,8 +3289,24 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("profileAdvice", panel_source)
         self.assertIn("推荐档位", panel_source)
         self.assertIn("性能档位建议", panel_source)
-        self.assertIn("调整导出体验", panel_source)
+        self.assertIn("一键应用推荐档位", panel_source)
+        self.assertIn("apply-runtime-preload-recommended-profile", panel_source)
+        self.assertIn("导出瘦身建议", panel_source)
         self.assertIn("runtime-preload-profile-advice", panel_source)
+
+    def test_runtime_preload_profile_advice_can_be_applied_without_touching_other_defaults(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        click_handler = _extract_function_source(source, "handleClick")
+        apply_function = _extract_function_source(source, "applyRuntimePreloadRecommendedProfile")
+
+        self.assertIn('action === "apply-runtime-preload-recommended-profile"', click_handler)
+        self.assertIn("applyRuntimePreloadRecommendedProfile(actionTarget.dataset.performanceProfile)", click_handler)
+        self.assertIn("buildRuntimePreloadBudgetReport()", apply_function)
+        self.assertIn("getSafePerformanceProfileKey", apply_function)
+        self.assertIn("...currentSettings", apply_function)
+        self.assertIn("performanceProfile: recommendedProfile", apply_function)
+        self.assertIn("postJson(API_SAVE_PROJECT_SETTINGS", apply_function)
+        self.assertIn("reloadProjectData({ ...getCurrentUiState() })", apply_function)
 
     def test_handle_click_ignores_disabled_actions_before_dispatch(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
