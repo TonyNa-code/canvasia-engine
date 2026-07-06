@@ -73,6 +73,38 @@ class FrontendScriptReadabilityModuleTests(unittest.TestCase):
             }};
             const projectSplitPlan = tools.buildReadableProjectSplitPlan(projectData, {{ limit: 80 }});
             const projectDigest = tools.getReadableProjectSplitDigest(projectData, {{ limit: 80, sceneNameLimit: 2 }});
+            const qualityData = {{
+              project: {{ title: "台词体检 Demo" }},
+              scenes: [
+                {{
+                  id: "quality_scene",
+                  name: "体检场景",
+                  chapterName: "序章",
+                  blocks: [
+                    {{ id: "empty_line", type: "dialogue", speakerId: "hero", expressionId: "smile", text: "   " }},
+                    {{ id: "line_a", type: "dialogue", speakerId: "hero", text: "今天也留下来吗" }},
+                    {{ id: "line_b", type: "dialogue", speakerId: "hero", expressionId: "smile", text: "今天也留下来吗" }},
+                    {{ id: "long_narration", type: "narration", text: "很".repeat(261) }},
+                    {{
+                      id: "choice_bad",
+                      type: "choice",
+                      options: [
+                        {{ text: "" }},
+                        {{ text: "长".repeat(43) }},
+                      ],
+                    }},
+                  ],
+                }},
+              ],
+            }};
+            const qualitySceneReport = tools.buildScriptQualitySceneReport(qualityData.scenes[0]);
+            const qualityAudit = tools.buildScriptQualityAudit(qualityData);
+            const qualityDigest = tools.getScriptQualityDigest(qualityData);
+            const qualityMarkdown = tools.buildScriptQualityAuditMarkdown(qualityAudit, {{
+              projectTitle: "台词体检 Demo",
+              generatedAt: "2026-05-11 10:00:00",
+            }});
+            const qualityCsv = tools.buildScriptQualityAuditCsv(qualityAudit);
             const unsupportedPlan = tools.buildReadableBlockSplitPlan(
               {{ id: "choice_1", type: "choice", text: splitCandidate }},
               {{ limit: 80 }}
@@ -119,6 +151,21 @@ class FrontendScriptReadabilityModuleTests(unittest.TestCase):
                 tools.isReadableTextBlock(splitScene.blocks[0]),
                 tools.isReadableTextBlock(splitScene.blocks[2]),
               ],
+              scriptQuality: {{
+                sceneStatus: qualitySceneReport.status,
+                sceneSummary: qualitySceneReport.summary,
+                auditStatus: qualityAudit.status,
+                auditSummary: qualityAudit.summary,
+                digest: qualityDigest,
+                issueCodes: qualityAudit.issues.map((issue) => issue.code),
+                markdown: qualityMarkdown,
+                csv: qualityCsv,
+                punctuationChecks: [
+                  tools.hasTerminalPunctuation("已经结束。"),
+                  tools.hasTerminalPunctuation("还没结束"),
+                ],
+                normalized: tools.normalizeScriptQualityText("  Hello\\nWorld  "),
+              }},
               blockSplitPlan: {{
                 canSplit: blockSplitPlan.canSplit,
                 reason: blockSplitPlan.reason,
@@ -196,6 +243,22 @@ class FrontendScriptReadabilityModuleTests(unittest.TestCase):
         self.assertEqual(payload["invalidLimitChunks"], ["短句。"])
         self.assertEqual(payload["emptyChunks"], [])
         self.assertEqual(payload["readableBlockChecks"], [True, False])
+        self.assertEqual(payload["scriptQuality"]["sceneStatus"], "blocked")
+        self.assertEqual(payload["scriptQuality"]["auditStatus"], "blocked")
+        self.assertEqual(payload["scriptQuality"]["sceneSummary"]["emptyTextCount"], 1)
+        self.assertEqual(payload["scriptQuality"]["sceneSummary"]["duplicateTextCount"], 1)
+        self.assertEqual(payload["scriptQuality"]["sceneSummary"]["longTextCount"], 1)
+        self.assertEqual(payload["scriptQuality"]["sceneSummary"]["choiceIssueCount"], 2)
+        self.assertEqual(payload["scriptQuality"]["auditSummary"]["missingExpressionCount"], 1)
+        self.assertIn("script_empty_text", payload["scriptQuality"]["issueCodes"])
+        self.assertIn("script_duplicate_nearby_text", payload["scriptQuality"]["issueCodes"])
+        self.assertIn("script_choice_text_too_long", payload["scriptQuality"]["issueCodes"])
+        self.assertIn("台词体检：", payload["scriptQuality"]["digest"]["headline"])
+        self.assertIn("# 台词体检 Demo 台词质量体检", payload["scriptQuality"]["markdown"])
+        self.assertIn("需要复查的台词", payload["scriptQuality"]["markdown"])
+        self.assertIn('"code"', payload["scriptQuality"]["csv"])
+        self.assertEqual(payload["scriptQuality"]["punctuationChecks"], [True, False])
+        self.assertEqual(payload["scriptQuality"]["normalized"], "helloworld")
         self.assertTrue(payload["blockSplitPlan"]["canSplit"])
         self.assertEqual(payload["blockSplitPlan"]["reason"], "split")
         self.assertEqual(payload["blockSplitPlan"]["firstBlockId"], "block_001")

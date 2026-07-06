@@ -51,6 +51,7 @@ class FrontendScenePacingAdvisorModuleTests(unittest.TestCase):
               blocks: [
                 {{ type: "dialogue", text: {json.dumps(long_text)} }},
                 {{ type: "dialogue", text: "第二句。" }},
+                {{ type: "dialogue", text: "第二句。" }},
                 {{ type: "dialogue", text: "第三句。" }},
                 {{ type: "dialogue", text: "第四句。" }},
                 {{ type: "dialogue", text: "第五句。" }},
@@ -69,7 +70,8 @@ class FrontendScenePacingAdvisorModuleTests(unittest.TestCase):
                   type: "choice",
                   options: [
                     {{ text: "点头", gotoSceneId: "__continue__" }},
-                    {{ text: "沉默", gotoSceneId: "__continue__" }}
+                    {{ text: "沉默", gotoSceneId: "__continue__" }},
+                    {{ text: "长".repeat(43), gotoSceneId: "__continue__" }}
                   ],
                 }},
                 {{ type: "screen_fade", action: "fade_out" }},
@@ -114,8 +116,11 @@ class FrontendScenePacingAdvisorModuleTests(unittest.TestCase):
         self.assertIn("pacing_long_text", rough_codes)
         self.assertIn("pacing_text_run_too_long", rough_codes)
         self.assertIn("pacing_missing_outro", rough_codes)
+        self.assertIn("pacing_script_duplicate_nearby_text", rough_codes)
+        self.assertGreaterEqual(payload["rough"]["metrics"]["scriptQualityIssueCount"], 1)
         fake_choice_codes = [issue["code"] for issue in payload["fakeChoice"]["issues"]]
         self.assertIn("pacing_choice_without_consequence", fake_choice_codes)
+        self.assertIn("pacing_script_choice_text_too_long", fake_choice_codes)
         self.assertEqual(payload["aggregate"]["sceneCount"], 3)
         self.assertGreaterEqual(payload["aggregate"]["roughSceneCount"], 1)
         self.assertEqual(payload["gradeLabels"], ["节奏成熟", "需要打磨"])

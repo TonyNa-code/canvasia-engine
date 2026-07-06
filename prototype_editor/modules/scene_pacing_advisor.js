@@ -26,6 +26,13 @@
   const STORY_TEXT_TYPES = Object.freeze(["dialogue", "narration"]);
   const STORY_CONTENT_TYPES = Object.freeze(["dialogue", "narration", "choice", "condition", "video_play", "credits_roll"]);
   const OUTRO_BLOCK_TYPES = Object.freeze(["jump", "credits_roll", "music_stop", "screen_fade"]);
+  const SCRIPT_QUALITY_PACING_CODES = Object.freeze([
+    "script_empty_text",
+    "script_duplicate_nearby_text",
+    "script_choice_empty_options",
+    "script_choice_empty_text",
+    "script_choice_text_too_long",
+  ]);
 
   function toArray(value) {
     return Array.isArray(value) ? value : [];
@@ -81,6 +88,25 @@
       statusText: isLong ? "建议拆卡" : "长度舒适",
       toneClass: isLong ? "warn-text" : "good-text",
     };
+  }
+
+  function getScriptQualityPacingIssues(sceneOrBlocks) {
+    if (typeof readabilityTools.buildScriptQualitySceneReport !== "function") {
+      return [];
+    }
+    const report = readabilityTools.buildScriptQualitySceneReport(sceneOrBlocks);
+    return toArray(report.issues)
+      .filter((issue) => SCRIPT_QUALITY_PACING_CODES.includes(issue.code))
+      .slice(0, 4)
+      .map((issue) =>
+        buildIssue(
+          issue.severity === "blocker" ? "blocker" : "warn",
+          `pacing_${issue.code}`,
+          issue.title,
+          issue.detail,
+          issue.suggestion || "修台词"
+        )
+      );
   }
 
   function hasVariableEffect(option = {}) {
@@ -164,6 +190,7 @@
     const hasOutroCue = blocks.slice(-4).some((block) => OUTRO_BLOCK_TYPES.includes(block?.type));
     const maxConsecutiveTextBlocks = getMaxConsecutiveTextBlocks(blocks);
     const issues = [];
+    const scriptQualityPacingIssues = getScriptQualityPacingIssues(sceneOrBlocks);
 
     if (!blocks.length) {
       issues.push(buildIssue("blocker", "pacing_empty_scene", "场景没有内容", "玩家进入后不会看到任何剧情卡片。", "插入可试玩段落"));
@@ -198,6 +225,7 @@
     if (hasStoryContent && blocks.length >= 6 && !hasOutroCue) {
       issues.push(buildIssue("tip", "pacing_missing_outro", "收尾提示不足", "接近完整的场景最好补一个跳转、淡出、停 BGM 或片尾卡，方便试玩确认。", "补场景收尾"));
     }
+    issues.push(...scriptQualityPacingIssues);
 
     const baseScore =
       (blocks.length > 0 ? 8 : 0) +
@@ -228,6 +256,7 @@
         longTextBlockCount: longTextBlocks.length,
         manyChoiceBlockCount: manyChoiceBlocks.length,
         missingVoiceCount,
+        scriptQualityIssueCount: scriptQualityPacingIssues.length,
         maxConsecutiveTextBlocks,
         hasStoryContent,
         hasBackground,
