@@ -135,6 +135,72 @@ class FrontendProjectDoctorModuleTests(unittest.TestCase):
         self.assertEqual(payload["summary"]["autoRepairLabel"], "暂无可预览修复项")
         self.assertIn("继续试玩", payload["summary"]["description"])
 
+    def test_project_doctor_promotes_stage_continuity_audit(self) -> None:
+        payload = self.run_project_doctor_script(
+            """
+            const queue = tools.buildProjectDoctorQueue({
+              issueItems: [],
+              routeOverview: { alerts: [] },
+              regressionResult: { cases: [] },
+              stageDirectionSheet: {
+                continuityAudit: {
+                  reviewRows: [
+                    {
+                      status: "tip",
+                      sceneId: "s3",
+                      sceneName: "放学路口",
+                      chapterName: "第一章",
+                      nextAction: "确认是否退场",
+                      reason: "结尾仍有 1 名角色在场",
+                      openingCue: "第 1 张 · 背景",
+                      endingCastLabel: "蓝白女主",
+                    },
+                    {
+                      status: "warn",
+                      sceneId: "s2",
+                      sceneName: "屋顶晚风",
+                      chapterName: "第一章",
+                      nextAction: "补登场卡",
+                      reason: "说话人未登场 / 开头先出现正文",
+                      openingCue: "第 1 张 · 台词 · 你来了",
+                      endingCastLabel: "",
+                    },
+                    {
+                      status: "blocker",
+                      sceneId: "s1",
+                      sceneName: "教室黄昏",
+                      chapterName: "第一章",
+                      nextAction: "修说话人",
+                      reason: "说话人配置异常",
+                      openingCue: "第 1 张 · 台词 · ……",
+                      endingCastLabel: "",
+                    },
+                  ],
+                },
+              },
+              limit: 5,
+            });
+            const summary = tools.buildProjectDoctorSummary(queue);
+            process.stdout.write(JSON.stringify({ queue, summary }));
+            """
+        )
+
+        queue = payload["queue"]
+        self.assertEqual([step["kind"] for step in queue], ["stage_blocker", "stage_continuity", "stage_polish"])
+        self.assertEqual(queue[0]["title"], "修说话人：教室黄昏")
+        self.assertIn("重新选择真实存在的说话角色", queue[0]["recovery"])
+        self.assertEqual(queue[0]["actions"][0]["action"], "open-scene-from-map")
+        self.assertEqual(queue[0]["actions"][0]["sceneId"], "s1")
+        self.assertEqual(queue[1]["title"], "补登场卡：屋顶晚风")
+        self.assertIn("第一句相关台词之前补一张角色登场卡", queue[1]["recovery"])
+        self.assertIn("开场：第 1 张", queue[1]["diagnostic"])
+        self.assertEqual(queue[2]["title"], "确认是否退场：放学路口")
+        self.assertIn("结尾仍在场：蓝白女主", queue[2]["diagnostic"])
+        self.assertEqual(payload["summary"]["status"], "danger")
+        self.assertEqual(payload["summary"]["dangerCount"], 1)
+        self.assertEqual(payload["summary"]["warnCount"], 1)
+        self.assertEqual(payload["summary"]["softCount"], 1)
+
     def test_project_doctor_respects_zero_limit(self) -> None:
         payload = self.run_project_doctor_script(
             """
@@ -238,6 +304,7 @@ class FrontendProjectDoctorModuleTests(unittest.TestCase):
         self.assertIn("canConfirmStepRepair", source)
         self.assertIn("previewedRepairCodes.has", source)
         self.assertIn("确认并执行预览的修复", source)
+        self.assertIn("stageDirectionSheet: buildStageDirectionSheet()", source)
         self.assertIn("预览后可执行修复", source)
         self.assertIn("confirmRepairLabel", source)
         self.assertIn("getCurrentProjectDoctorPreviewRepairCodes", source)

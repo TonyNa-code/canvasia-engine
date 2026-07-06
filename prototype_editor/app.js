@@ -32167,6 +32167,7 @@ function buildProjectDoctorQueue(routeOverview, issueItems) {
         issueItems,
         routeOverview,
         regressionResult: state.inspectionRegressionResult,
+        stageDirectionSheet: buildStageDirectionSheet(),
         limit: isAdvancedEditorMode() ? 10 : 6,
       })
     );

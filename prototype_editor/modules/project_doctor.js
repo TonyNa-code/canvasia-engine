@@ -10,8 +10,11 @@
     export_missing: 12,
     warnings: 24,
     regression_warn: 28,
+    stage_blocker: 30,
+    stage_continuity: 32,
     media_budget: 34,
     route_warn: 42,
+    stage_polish: 58,
     unused_assets: 70,
   });
 
@@ -22,8 +25,11 @@
     export_missing: "缺素材",
     warnings: "补充提醒",
     regression_warn: "回归复看",
+    stage_blocker: "舞台阻塞",
+    stage_continuity: "演出连续性",
     media_budget: "素材预算",
     route_warn: "路线提醒",
+    stage_polish: "舞台收尾",
     unused_assets: "闲置素材",
   });
 
@@ -34,8 +40,11 @@
     export_missing: "补齐",
     warnings: "复看",
     regression_warn: "复看",
+    stage_blocker: "先修",
+    stage_continuity: "复看",
     media_budget: "压缩",
     route_warn: "确认",
+    stage_polish: "确认",
     unused_assets: "整理",
   });
 
@@ -78,10 +87,10 @@
   }
 
   function getDoctorStepTone(kind) {
-    if (["errors", "regression_fail", "route_danger"].includes(kind)) {
+    if (["errors", "regression_fail", "route_danger", "stage_blocker"].includes(kind)) {
       return "danger";
     }
-    if (["export_missing", "warnings", "regression_warn", "media_budget", "route_warn"].includes(kind)) {
+    if (["export_missing", "warnings", "regression_warn", "stage_continuity", "media_budget", "route_warn"].includes(kind)) {
       return "warn";
     }
     return "soft";
@@ -352,6 +361,78 @@
     };
   }
 
+  function getStageContinuityKind(row = {}) {
+    const status = cleanText(row?.status);
+    if (status === "blocker") {
+      return "stage_blocker";
+    }
+    if (status === "warn") {
+      return "stage_continuity";
+    }
+    return "stage_polish";
+  }
+
+  function normalizeStageContinuityStep(row = {}, index = 0) {
+    const kind = getStageContinuityKind(row);
+    const sceneId = cleanText(row?.sceneId);
+    const sceneName = cleanText(row?.sceneName, "未命名场景");
+    const chapterName = cleanText(row?.chapterName, "未分章");
+    const nextAction = cleanText(row?.nextAction, "复查舞台连续性");
+    const reason = cleanText(row?.reason, "开场、登场或退场顺序需要复查");
+    const endingCast = cleanText(row?.endingCastLabel);
+    const openingCue = cleanText(row?.openingCue);
+    const meta = [chapterName, sceneName, openingCue ? `开场：${openingCue}` : "", endingCast ? `结尾在场：${endingCast}` : ""]
+      .filter(Boolean)
+      .join(" · ");
+
+    return {
+      id: `stage-continuity-${sceneId || index}`,
+      source: "stage_continuity",
+      kind,
+      label: getDoctorStepLabel(kind),
+      badge: getDoctorStepBadge(kind),
+      tone: getDoctorStepTone(kind),
+      priority: getIssueKindPriority(kind) + index / 100,
+      title: `${nextAction}：${sceneName}`,
+      meta,
+      why: `这个场景的舞台连续性需要复查：${reason}。`,
+      diagnostic: [openingCue ? `开场：${openingCue}` : "", endingCast ? `结尾仍在场：${endingCast}` : ""]
+        .filter(Boolean)
+        .join(" / "),
+      recovery:
+        nextAction === "先补背景卡"
+          ? "在这个场景开头先放一张背景卡，再接正文或角色登场，避免玩家看到空舞台。"
+          : nextAction === "补登场卡"
+            ? "在第一句相关台词之前补一张角色登场卡，设置站位、表情、缩放和淡入时长。"
+            : nextAction === "修说话人"
+              ? "打开对应台词卡，重新选择真实存在的说话角色和表情。"
+              : nextAction === "确认是否退场"
+                ? "如果这些角色不该延续到下一段，在场景结尾补退场卡；如果是刻意留场，可以保持。"
+                : "打开场景检查背景、角色登场、说话人和退场顺序，确认它们符合正式演出节奏。",
+      doneWhen:
+        nextAction === "确认是否退场"
+          ? "重新巡检后，结尾留场数量符合你的演出设计，或已经补上必要退场卡。"
+          : "重新巡检后，这个场景不再出现在舞台连续性复查列表里。",
+      repairCodes: [],
+      actions: [
+        sceneId
+          ? {
+              label: "打开这个场景",
+              action: "open-scene-from-map",
+              sceneId,
+            }
+          : buildFallbackAction(kind),
+        {
+          label: "去舞台调度表",
+          action: "switch-screen",
+          screen: "inspection",
+          dataset: { "inspection-section": "stage-direction" },
+        },
+      ],
+      searchText: cleanText(`${sceneName} ${chapterName} ${nextAction} ${reason} ${endingCast}`),
+    };
+  }
+
   function dedupeDoctorSteps(steps) {
     const seen = new Set();
     return steps.filter((step) => {
@@ -368,6 +449,7 @@
     issueItems = [],
     routeOverview = null,
     regressionResult = null,
+    stageDirectionSheet = null,
     limit = 8,
   } = {}) {
     const steps = [];
@@ -378,6 +460,9 @@
     (regressionResult?.cases ?? [])
       .filter((caseResult) => cleanText(caseResult?.status) !== "pass")
       .forEach((caseResult, index) => steps.push(normalizeRegressionStep(caseResult, index)));
+    (stageDirectionSheet?.continuityAudit?.reviewRows ?? [])
+      .filter((row) => cleanText(row?.status) !== "good")
+      .forEach((row, index) => steps.push(normalizeStageContinuityStep(row, index)));
 
     const numericLimit = limit == null ? 8 : Number(limit);
     const safeLimit = Number.isFinite(numericLimit) ? Math.max(Math.floor(numericLimit), 0) : 8;
@@ -584,5 +669,6 @@
     inferIssueDoneWhen,
     inferRepairCodes,
     formatRegressionDiagnosticLine,
+    normalizeStageContinuityStep,
   });
 })(typeof window !== "undefined" ? window : globalThis);
