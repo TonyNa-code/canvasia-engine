@@ -417,6 +417,59 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
         self.assertEqual(player.image_cache["title_ui"], "image:title_ui")
         self.assertEqual(player.sound_cache["click_sfx"], "sound:click_sfx")
 
+    def test_runtime_preload_reuses_native_cached_assets_without_reloading(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_dir = Path(temp_dir)
+
+            class FakeMixer:
+                def get_init(self) -> bool:
+                    return True
+
+            class FakePygame:
+                mixer = FakeMixer()
+
+            player = NativeRuntimePlayer.__new__(NativeRuntimePlayer)
+            player.bundle_dir = bundle_dir
+            player.pygame = FakePygame()
+            player.assets_by_id = {
+                "title_ui": {"id": "title_ui", "type": "ui", "exportUrl": "assets/ui/title.png"},
+                "click_sfx": {"id": "click_sfx", "type": "sfx", "exportUrl": "assets/sfx/click.wav"},
+            }
+            player.build_info = {
+                "runtimePreloadManifest": {
+                    "entries": [
+                        {"assetId": "title_ui", "type": "ui", "phase": "critical", "priority": 100, "preloadIndex": 1, "sizeBytes": 1024},
+                        {"assetId": "click_sfx", "type": "sfx", "phase": "critical", "priority": 90, "preloadIndex": 2, "sizeBytes": 2048},
+                    ]
+                }
+            }
+            player.image_cache = {"title_ui": "image:cached"}
+            player.sound_cache = {"click_sfx": "sound:cached"}
+            player.runtime_preload_manifest = player.get_runtime_preload_manifest()
+            player.runtime_scene_prefetched_asset_ids = set()
+            player.current_bgm_asset_id = None
+
+            def fail_load(_asset_id: str | None):
+                raise AssertionError("cached preload entries should not reload assets")
+
+            player._load_image = fail_load
+            player._load_sound = fail_load
+
+            status = player.preload_runtime_assets()
+
+        self.assertEqual(status["status"], "ready")
+        self.assertEqual(status["totalEntries"], 2)
+        self.assertEqual(status["pendingEntries"], 0)
+        self.assertEqual(status["loadedEntries"], 2)
+        self.assertEqual(status["readyEntries"], 2)
+        self.assertEqual(status["cachedEntries"], 2)
+        self.assertEqual(status["loadedImageEntries"], 1)
+        self.assertEqual(status["loadedSoundEntries"], 1)
+        self.assertEqual(status["loadedBytes"], 3072)
+        self.assertEqual(status["cachedAssetIds"], ["title_ui", "click_sfx"])
+        self.assertIn("复用 2", status["summaryText"])
+        self.assertIn("资源预热：2/2", player.get_runtime_preload_status_line())
+
     def test_runtime_preload_manifest_spreads_noncritical_assets(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             bundle_dir = Path(temp_dir)

@@ -369,12 +369,16 @@ def build_empty_runtime_preload_status(performance_profile: object = None) -> di
         "loadedSoundEntries": 0,
         "streamEntries": 0,
         "readyStreamEntries": 0,
+        "cachedEntries": 0,
         "missingEntries": 0,
         "failedEntries": 0,
         "audioUnavailableEntries": 0,
         "totalBytes": 0,
         "criticalBytes": 0,
         "loadedBytes": 0,
+        "readyEntries": 0,
+        "loadedAssetIds": [],
+        "cachedAssetIds": [],
         "missingAssetIds": [],
         "failedAssetIds": [],
         "skippedAssetIds": [],
@@ -404,16 +408,35 @@ def build_runtime_preload_status(entries: list[dict], performance_profile: objec
 
 def mark_runtime_preload_entry(status: dict, entry: dict, outcome: str) -> dict:
     asset_id = str(entry.get("assetId") or "")
+    asset_type = str(entry.get("type") or "")
+    status.setdefault("loadedAssetIds", [])
+    status.setdefault("cachedAssetIds", [])
+    status.setdefault("missingAssetIds", [])
+    status.setdefault("failedAssetIds", [])
+    status.setdefault("skippedAssetIds", [])
+    status.setdefault("cachedEntries", 0)
     if status.get("pendingEntries"):
         status["pendingEntries"] = max(0, int(status.get("pendingEntries") or 0) - 1)
-    if outcome in {"loaded_image", "loaded_sound", "ready_stream"}:
+    if outcome in {"loaded_image", "loaded_sound", "ready_stream", "cached"}:
         status["loadedBytes"] = normalize_size_bytes(status.get("loadedBytes")) + normalize_size_bytes(entry.get("sizeBytes"))
     if outcome == "loaded_image":
         status["loadedImageEntries"] += 1
+        status["loadedAssetIds"].append(asset_id)
     elif outcome == "loaded_sound":
         status["loadedSoundEntries"] += 1
+        status["loadedAssetIds"].append(asset_id)
     elif outcome == "ready_stream":
         status["readyStreamEntries"] += 1
+        status["loadedAssetIds"].append(asset_id)
+    elif outcome == "cached":
+        status["cachedEntries"] += 1
+        status["cachedAssetIds"].append(asset_id)
+        if asset_type in RUNTIME_PRELOAD_IMAGE_TYPES:
+            status["loadedImageEntries"] += 1
+        elif asset_type in RUNTIME_PRELOAD_SOUND_TYPES:
+            status["loadedSoundEntries"] += 1
+        elif asset_type in RUNTIME_PRELOAD_STREAM_TYPES:
+            status["readyStreamEntries"] += 1
     elif outcome == "missing":
         status["missingEntries"] += 1
         status["missingAssetIds"].append(asset_id)
@@ -433,6 +456,7 @@ def finalize_runtime_preload_status(status: dict) -> dict:
         + int(status.get("loadedSoundEntries") or 0)
         + int(status.get("readyStreamEntries") or 0)
     )
+    status["readyEntries"] = status["loadedEntries"]
     issue_count = (
         int(status.get("missingEntries") or 0)
         + int(status.get("failedEntries") or 0)
@@ -458,7 +482,11 @@ def format_runtime_preload_status_line(status: dict | None = None) -> str:
     total_entries = int(source.get("totalEntries") or 0)
     if total_entries <= 0:
         return "资源预热：无待加载素材"
-    loaded_entries = int(source.get("loadedEntries") or 0)
+    ready_entries = int(
+        source.get("readyEntries")
+        if source.get("readyEntries") is not None
+        else source.get("loadedEntries") or 0
+    )
     pending_entries = int(source.get("pendingEntries") or 0)
     issue_count = (
         int(source.get("missingEntries") or 0)
@@ -481,8 +509,11 @@ def format_runtime_preload_status_line(status: dict | None = None) -> str:
     profile_label = str(source.get("performanceProfileLabel") or "").strip()
     if profile_label:
         detail = f"{detail} · 档位 {profile_label}"
+    cached_entries = int(source.get("cachedEntries") or 0)
+    if cached_entries > 0:
+        detail = f"{detail} · 复用 {cached_entries}"
     if pending_entries > 0:
-        return f"资源预热：{loaded_entries}/{total_entries} 已准备，后台继续 {pending_entries} 项（{detail}）"
+        return f"资源预热：{ready_entries}/{total_entries} 已准备，后台继续 {pending_entries} 项（{detail}）"
     if issue_count > 0:
-        return f"资源预热：{loaded_entries}/{total_entries} 已准备，需复查 {issue_count} 项（{detail}）"
-    return f"资源预热：{loaded_entries}/{total_entries} 已准备（{detail}）"
+        return f"资源预热：{ready_entries}/{total_entries} 已准备，需复查 {issue_count} 项（{detail}）"
+    return f"资源预热：{ready_entries}/{total_entries} 已准备（{detail}）"

@@ -10162,21 +10162,23 @@ class NativeRuntimePlayer:
             return
         asset_type = str(entry.get("type") or "")
         asset = self.assets_by_id.get(asset_id)
-        asset_path = get_asset_runtime_path(self.bundle_dir, asset)
-
-        if not asset_path:
-            outcome = "missing"
-        elif asset_type in RUNTIME_PRELOAD_IMAGE_TYPES:
-            outcome = "loaded_image" if self._load_image(asset_id) else "failed"
-        elif asset_type in RUNTIME_PRELOAD_SOUND_TYPES:
-            if not self.pygame.mixer.get_init():
-                outcome = "audio_unavailable"
-            else:
-                outcome = "loaded_sound" if self._load_sound(asset_id) else "failed"
-        elif asset_type in RUNTIME_PRELOAD_STREAM_TYPES:
-            outcome = "ready_stream"
+        if asset_id in self.get_runtime_cached_asset_ids():
+            outcome = "cached"
         else:
-            outcome = "failed"
+            asset_path = get_asset_runtime_path(self.bundle_dir, asset)
+            if not asset_path:
+                outcome = "missing"
+            elif asset_type in RUNTIME_PRELOAD_IMAGE_TYPES:
+                outcome = "loaded_image" if self._load_image(asset_id) else "failed"
+            elif asset_type in RUNTIME_PRELOAD_SOUND_TYPES:
+                if not self.pygame.mixer.get_init():
+                    outcome = "audio_unavailable"
+                else:
+                    outcome = "loaded_sound" if self._load_sound(asset_id) else "failed"
+            elif asset_type in RUNTIME_PRELOAD_STREAM_TYPES:
+                outcome = "ready_stream"
+            else:
+                outcome = "failed"
 
         current_status = getattr(self, status_attr, build_runtime_preload_status([]))
         setattr(self, status_attr, mark_runtime_preload_entry(current_status, entry, outcome))
