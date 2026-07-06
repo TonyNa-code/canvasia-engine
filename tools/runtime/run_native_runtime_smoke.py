@@ -64,7 +64,7 @@ def run_native_smoke(python_path: Path) -> int:
             "-s",
             "tests",
             "-p",
-            "test_native_runtime_render_smoke.py",
+            "test_native_runtime*.py",
             "-v",
         ],
         env=env,

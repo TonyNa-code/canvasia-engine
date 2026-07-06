@@ -474,6 +474,7 @@ EDITOR_SIGNING_CHECK_SCRIPT_SOURCE = ROOT_DIR / "tools" / "release" / "check_edi
 EDITOR_SIGNING_CHECK_COMMAND_SOURCE = ROOT_DIR / "tools" / "release" / "run_signing_readiness.command"
 NATIVE_RUNTIME_PLAYER_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_player.py"
 NATIVE_RUNTIME_PRELOAD_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_preload.py"
+NATIVE_RUNTIME_SCENE_PREFETCH_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_scene_prefetch.py"
 NATIVE_RUNTIME_PERFORMANCE_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_performance.py"
 NATIVE_RUNTIME_SETTINGS_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_player_settings.py"
 NATIVE_RUNTIME_TEXT_EFFECTS_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_text_effects.py"
@@ -486,6 +487,7 @@ NATIVE_RUNTIME_VIDEO_REQUIREMENTS_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "requir
 NATIVE_RUNTIME_BRAND_LOGO_SOURCE = ROOT_DIR / "prototype_editor" / "assets" / "canvasia-brand-logo.png"
 NATIVE_RUNTIME_PLAYER_NAME = "runtime_player.py"
 NATIVE_RUNTIME_PRELOAD_NAME = "runtime_preload.py"
+NATIVE_RUNTIME_SCENE_PREFETCH_NAME = "runtime_scene_prefetch.py"
 NATIVE_RUNTIME_PERFORMANCE_NAME = "runtime_performance.py"
 NATIVE_RUNTIME_SETTINGS_NAME = "runtime_player_settings.py"
 NATIVE_RUNTIME_TEXT_EFFECTS_NAME = "runtime_text_effects.py"
@@ -532,6 +534,7 @@ NATIVE_RUNTIME_WINDOWS_APP_BUILDER_COMMAND_NAME = "build_native_runtime_app.bat"
 NATIVE_RUNTIME_REQUIRED_MODULE_FILES = (
     (NATIVE_RUNTIME_PLAYER_SOURCE, NATIVE_RUNTIME_PLAYER_NAME),
     (NATIVE_RUNTIME_PRELOAD_SOURCE, NATIVE_RUNTIME_PRELOAD_NAME),
+    (NATIVE_RUNTIME_SCENE_PREFETCH_SOURCE, NATIVE_RUNTIME_SCENE_PREFETCH_NAME),
     (NATIVE_RUNTIME_PERFORMANCE_SOURCE, NATIVE_RUNTIME_PERFORMANCE_NAME),
     (NATIVE_RUNTIME_SETTINGS_SOURCE, NATIVE_RUNTIME_SETTINGS_NAME),
     (NATIVE_RUNTIME_TEXT_EFFECTS_SOURCE, NATIVE_RUNTIME_TEXT_EFFECTS_NAME),
@@ -9763,6 +9766,8 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
         "playerPath": str(build_dir / NATIVE_RUNTIME_PLAYER_NAME),
         "runtimePreloadModuleName": NATIVE_RUNTIME_PRELOAD_NAME,
         "runtimePreloadModulePath": str(build_dir / NATIVE_RUNTIME_PRELOAD_NAME),
+        "runtimeScenePrefetchModuleName": NATIVE_RUNTIME_SCENE_PREFETCH_NAME,
+        "runtimeScenePrefetchModulePath": str(build_dir / NATIVE_RUNTIME_SCENE_PREFETCH_NAME),
         "runtimePerformanceModuleName": NATIVE_RUNTIME_PERFORMANCE_NAME,
         "runtimePerformanceModulePath": str(build_dir / NATIVE_RUNTIME_PERFORMANCE_NAME),
         "runtimeSettingsModuleName": NATIVE_RUNTIME_SETTINGS_NAME,
@@ -10450,6 +10455,7 @@ def export_native_runtime_build() -> dict:
             "runtimePreloadReport": runtime_files["runtimePreloadReportName"],
             "playerScript": runtime_files["playerName"],
             "runtimePreloadModule": runtime_files["runtimePreloadModuleName"],
+            "runtimeScenePrefetchModule": runtime_files["runtimeScenePrefetchModuleName"],
             "runtimePerformanceModule": runtime_files["runtimePerformanceModuleName"],
             "runtimeSettingsModule": runtime_files["runtimeSettingsModuleName"],
             "runtimeTextEffectsModule": runtime_files["runtimeTextEffectsModuleName"],
@@ -10541,6 +10547,7 @@ def export_native_runtime_build() -> dict:
             "runtimePreloadReport": runtime_files["runtimePreloadReportName"],
             "runtimePreloadSummary": runtime_files["runtimePreloadSummary"],
             "runtimePreloadModule": runtime_files["runtimePreloadModuleName"],
+            "runtimeScenePrefetchModule": runtime_files["runtimeScenePrefetchModuleName"],
             "runtimePerformanceModule": runtime_files["runtimePerformanceModuleName"],
             "runtimeSettingsModule": runtime_files["runtimeSettingsModuleName"],
             "runtimeTextEffectsModule": runtime_files["runtimeTextEffectsModuleName"],
@@ -10735,6 +10742,7 @@ def export_native_runtime_build() -> dict:
         {"name": runtime_files["runtimePreloadManifestName"], "description": "Runtime 资源预热清单 JSON，记录首屏和早期路线素材。"},
         {"name": runtime_files["runtimePreloadReportName"], "description": "Runtime 资源预热 Markdown 报告，方便复查卡顿风险。"},
         {"name": runtime_files["runtimePreloadModuleName"], "description": "原生 Runtime 资源预热策略模块。"},
+        {"name": runtime_files["runtimeScenePrefetchModuleName"], "description": "原生 Runtime 路线预取策略模块，按当前场景和分支提前准备素材。"},
         {"name": runtime_files["runtimeSettingsModuleName"], "description": "原生 Runtime 系统设置模块。"},
         {"name": runtime_files["runtimeTextEffectsModuleName"], "description": "原生 Runtime 打字机和文本效果模块。"},
         {"name": runtime_files["runtimeStorageModuleName"], "description": "原生 Runtime 存档、自动恢复和崩溃日志模块。"},
@@ -10968,6 +10976,9 @@ def export_native_runtime_build() -> dict:
         "runtimePreloadModuleName": runtime_files["runtimePreloadModuleName"],
         "runtimePreloadModulePath": runtime_files["runtimePreloadModulePath"],
         "runtimePreloadModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimePreloadModuleName']}",
+        "runtimeScenePrefetchModuleName": runtime_files["runtimeScenePrefetchModuleName"],
+        "runtimeScenePrefetchModulePath": runtime_files["runtimeScenePrefetchModulePath"],
+        "runtimeScenePrefetchModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimeScenePrefetchModuleName']}",
         "runtimePerformanceModuleName": runtime_files["runtimePerformanceModuleName"],
         "runtimePerformanceModulePath": runtime_files["runtimePerformanceModulePath"],
         "runtimePerformanceModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimePerformanceModuleName']}",

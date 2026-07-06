@@ -55,6 +55,21 @@ except ImportError:  # pragma: no cover - exported native packages import from t
     )
 
 try:
+    from .runtime_scene_prefetch import (
+        CHOICE_CONTINUE_TARGET as RUNTIME_SCENE_PREFETCH_CONTINUE_TARGET,
+        build_runtime_scene_prefetch_manifest,
+        build_runtime_scene_prefetch_snapshot,
+        get_runtime_scene_prefetch_summary,
+    )
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_scene_prefetch import (
+        CHOICE_CONTINUE_TARGET as RUNTIME_SCENE_PREFETCH_CONTINUE_TARGET,
+        build_runtime_scene_prefetch_manifest,
+        build_runtime_scene_prefetch_snapshot,
+        get_runtime_scene_prefetch_summary,
+    )
+
+try:
     from .runtime_performance import (
         PERFORMANCE_BUDGET_MARKDOWN_NAME,
         PERFORMANCE_BUDGET_REPORT_NAME,
@@ -9627,6 +9642,13 @@ class NativeRuntimePlayer:
         self.runtime_preload_pending_entries: list[dict] = []
         self.runtime_preload_finished_asset_ids: set[str] = set()
         self.runtime_preload_status = build_runtime_preload_status([])
+        self.runtime_scene_prefetch_manifest: dict = {}
+        self.runtime_scene_prefetch_key = ""
+        self.runtime_scene_prefetch_entries: list[dict] = []
+        self.runtime_scene_prefetch_pending_entries: list[dict] = []
+        self.runtime_scene_prefetch_finished_asset_ids: set[str] = set()
+        self.runtime_scene_prefetched_asset_ids: set[str] = set()
+        self.runtime_scene_prefetch_status = build_runtime_preload_status([])
         self.current_bgm_asset_id: str | None = None
         self.current_bgm_volume_percent = 100
         self.current_bgm_scope: dict | None = None
@@ -9800,6 +9822,18 @@ class NativeRuntimePlayer:
     def get_runtime_preload_entries(self) -> list[dict]:
         return normalize_runtime_preload_entries(self.runtime_preload_manifest, self.assets_by_id)
 
+    def get_runtime_cached_asset_ids(self) -> set[str]:
+        cached_ids: set[str] = set()
+        for cache in (getattr(self, "image_cache", {}), getattr(self, "sound_cache", {})):
+            if not isinstance(cache, dict):
+                continue
+            cached_ids.update(str(asset_id) for asset_id, value in cache.items() if asset_id and value is not None)
+        cached_ids.update(getattr(self, "runtime_preload_finished_asset_ids", set()) or set())
+        cached_ids.update(getattr(self, "runtime_scene_prefetched_asset_ids", set()) or set())
+        if getattr(self, "current_bgm_asset_id", None):
+            cached_ids.add(str(self.current_bgm_asset_id))
+        return {asset_id for asset_id in cached_ids if asset_id}
+
     def preload_runtime_assets(self) -> dict:
         performance_profile = self.get_runtime_preload_performance_profile()
         entries = self.get_runtime_preload_entries()
@@ -9815,9 +9849,16 @@ class NativeRuntimePlayer:
         self.runtime_preload_status = finalize_runtime_preload_status(self.runtime_preload_status)
         return self.runtime_preload_status
 
-    def warm_runtime_preload_entry(self, entry: dict) -> None:
+    def warm_runtime_preload_entry(
+        self,
+        entry: dict,
+        *,
+        status_attr: str = "runtime_preload_status",
+        finished_asset_ids: set[str] | None = None,
+    ) -> None:
         asset_id = str(entry.get("assetId") or "")
-        if not asset_id or asset_id in self.runtime_preload_finished_asset_ids:
+        finished_ids = finished_asset_ids if finished_asset_ids is not None else self.runtime_preload_finished_asset_ids
+        if not asset_id or asset_id in finished_ids:
             return
         asset_type = str(entry.get("type") or "")
         asset = self.assets_by_id.get(asset_id)
@@ -9837,8 +9878,9 @@ class NativeRuntimePlayer:
         else:
             outcome = "failed"
 
-        mark_runtime_preload_entry(self.runtime_preload_status, entry, outcome)
-        self.runtime_preload_finished_asset_ids.add(asset_id)
+        current_status = getattr(self, status_attr, build_runtime_preload_status([]))
+        setattr(self, status_attr, mark_runtime_preload_entry(current_status, entry, outcome))
+        finished_ids.add(asset_id)
 
     def update_runtime_preload_queue(self, max_entries: int | None = None) -> None:
         if not self.runtime_preload_pending_entries:
@@ -9858,6 +9900,85 @@ class NativeRuntimePlayer:
 
     def get_runtime_preload_status_line(self) -> str:
         return format_runtime_preload_status_line(getattr(self, "runtime_preload_status", {}))
+
+    def build_runtime_scene_prefetch_snapshot(self) -> dict:
+        return build_runtime_scene_prefetch_snapshot(
+            self.get_current_scene(),
+            self.current_block_index,
+            scene_id=self.current_scene_id,
+            choice_options=self.current_choices or [],
+            completed=bool(self.finished),
+        )
+
+    def get_runtime_scene_prefetch_manifest(self) -> dict:
+        return build_runtime_scene_prefetch_manifest(
+            self.build_runtime_scene_prefetch_snapshot(),
+            {
+                "scenesById": self.scenes_by_id,
+                "assetsById": self.assets_by_id,
+                "charactersById": self.characters_by_id,
+                "excludeAssetIds": self.get_runtime_cached_asset_ids(),
+            },
+            {
+                "choiceContinueTarget": RUNTIME_SCENE_PREFETCH_CONTINUE_TARGET,
+                "blockLookahead": 8,
+                "targetBlockLookahead": 10,
+                "maxEntries": 24,
+            },
+        )
+
+    def reset_runtime_scene_prefetch_queue(self, manifest: dict) -> None:
+        self.runtime_scene_prefetch_manifest = manifest if isinstance(manifest, dict) else {}
+        self.runtime_scene_prefetch_entries = normalize_runtime_preload_entries(
+            self.runtime_scene_prefetch_manifest,
+            self.assets_by_id,
+        )
+        self.runtime_scene_prefetch_pending_entries = list(self.runtime_scene_prefetch_entries)
+        self.runtime_scene_prefetch_finished_asset_ids = set()
+        self.runtime_scene_prefetch_status = build_runtime_preload_status(
+            self.runtime_scene_prefetch_entries,
+            self.get_runtime_preload_performance_profile(),
+        )
+
+    def update_runtime_scene_prefetch_queue(self, max_entries: int | None = None) -> None:
+        if getattr(self, "title_screen_active", False):
+            return
+        manifest = self.get_runtime_scene_prefetch_manifest()
+        prefetch_key = str(manifest.get("prefetchKey") or "")
+        if prefetch_key != self.runtime_scene_prefetch_key:
+            self.runtime_scene_prefetch_key = prefetch_key
+            self.reset_runtime_scene_prefetch_queue(manifest)
+
+        if not self.runtime_scene_prefetch_pending_entries:
+            return
+
+        budget_source = max_entries
+        if budget_source is None:
+            budget_source = min(2, get_runtime_preload_frame_budget(self.get_runtime_preload_performance_profile()))
+        budget = max(0, int(budget_source or 0))
+        if budget <= 0:
+            return
+
+        for _index in range(min(budget, len(self.runtime_scene_prefetch_pending_entries))):
+            entry = self.runtime_scene_prefetch_pending_entries.pop(0)
+            self.warm_runtime_preload_entry(
+                entry,
+                status_attr="runtime_scene_prefetch_status",
+                finished_asset_ids=self.runtime_scene_prefetch_finished_asset_ids,
+            )
+            if entry.get("assetId"):
+                self.runtime_scene_prefetched_asset_ids.add(str(entry.get("assetId")))
+        self.runtime_scene_prefetch_status = finalize_runtime_preload_status(self.runtime_scene_prefetch_status)
+
+    def get_runtime_scene_prefetch_status_line(self) -> str:
+        summary = get_runtime_scene_prefetch_summary(getattr(self, "runtime_scene_prefetch_manifest", {}))
+        total_count = int(summary.get("totalCount") or 0)
+        if total_count <= 0:
+            return "路线预取：当前没有即将使用的新素材"
+        status = getattr(self, "runtime_scene_prefetch_status", {})
+        loaded_entries = int(status.get("loadedEntries") or 0)
+        pending_entries = int(status.get("pendingEntries") or 0)
+        return f"路线预取：已准备 {loaded_entries}/{total_count} 项，后台剩余 {pending_entries} 项"
 
     def get_effective_volume(self, channel_key: str) -> float:
         master = clamp(float(self.runtime_settings.get("masterVolume", 100)) / 100, 0.0, 1.0)
@@ -15546,6 +15667,7 @@ class NativeRuntimePlayer:
             self.update_voice_playback_state()
             self.update_flow_assist()
             self.update_runtime_preload_queue()
+            self.update_runtime_scene_prefetch_queue()
             self.render()
 
         self.record_player_session_end()
