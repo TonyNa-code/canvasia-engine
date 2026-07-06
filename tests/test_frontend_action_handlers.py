@@ -4573,6 +4573,124 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn('state.currentScreen === "dashboard"', regression_block)
         self.assertIn("renderDashboard();", regression_block)
 
+    def test_preview_regression_diagnostics_can_be_copied_as_bug_note(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        build_clipboard_summary = _extract_function_source(source, "buildPreviewRegressionDiagnosticClipboardSummary")
+        find_case = _extract_function_source(source, "findPreviewRegressionCaseById")
+        copy_diagnostic = _extract_function_source(source, "copyPreviewRegressionDiagnostic")
+        script = textwrap.dedent(
+            f"""
+            const statuses = [];
+            const toasts = [];
+            const copiedTexts = [];
+            let copyResult = true;
+            const state = {{
+              inspectionRegressionResult: {{
+                cases: [
+                  {{
+                    id: "scene_01:loop",
+                    seedSceneId: "scene_01",
+                    anchorSceneId: "scene_loop",
+                    anchorBlockId: "block_condition",
+                    sceneName: "循环测试",
+                    chapterName: "第一章",
+                    sourceLabel: "章节起点",
+                    status: "fail",
+                    statusLabel: "疑似死循环",
+                    reason: "这条路线反复回到同一个步骤，已经不像正常的剧情推进了。",
+                    detail: "重复命中条件分支。",
+                    steps: 20,
+                    visitedSceneCount: 3,
+                    choiceCount: 1,
+                    selectedOptionTexts: ["留下"],
+                    variableOverrideSummary: "好感度=3",
+                    conditionTraceSummaries: ["条件判断：命中分支 1 -> 循环测试；好感度 当前 3 >= 2：通过"],
+                  }},
+                ],
+              }},
+            }};
+            const regressionDiagnosticTools = {{
+              serializeRegressionDiagnostics(caseResult) {{
+                return {{
+                  variableOverrideSummary: caseResult.variableOverrideSummary ?? "",
+                  conditionTraceSummaries: caseResult.conditionTraceSummaries ?? [],
+                  diagnosticLine: [
+                    caseResult.variableOverrideSummary ? `测试预设：${{caseResult.variableOverrideSummary}}` : "",
+                    ...(caseResult.conditionTraceSummaries ?? []),
+                  ].filter(Boolean).join(" / "),
+                  hasDiagnostics: Boolean(caseResult.variableOverrideSummary || caseResult.conditionTraceSummaries?.length),
+                }};
+              }},
+            }};
+            function serializeRegressionDiagnosticsForReport(caseResult, options = {{}}) {{
+              return regressionDiagnosticTools.serializeRegressionDiagnostics(caseResult, options);
+            }}
+            function getPreviewRegressionFixRecommendation() {{ return "先检查这里前后的 jump / condition / choice 去向。"; }}
+            function buildPreviewRegressionFixQueue() {{
+              return (state.inspectionRegressionResult?.cases ?? []).map((caseResult) => ({{
+                ...caseResult,
+                recommendation: "先检查这里前后的 jump / condition / choice 去向。",
+              }}));
+            }}
+            function setSaveStatus(message, isError = false) {{ statuses.push({{ message, isError }}); }}
+            function showToast(message, tone = "soft") {{ toasts.push({{ message, tone }}); }}
+            async function copyTextToClipboard(text) {{
+              copiedTexts.push(text);
+              return copyResult;
+            }}
+            function buildPreviewRegressionDiagnosticClipboardSummary(caseResult = {{}}) {build_clipboard_summary}
+            function findPreviewRegressionCaseById(caseId) {find_case}
+            async function copyPreviewRegressionDiagnostic(caseId) {copy_diagnostic}
+
+            const summary = buildPreviewRegressionDiagnosticClipboardSummary(state.inspectionRegressionResult.cases[0]);
+            const missingResult = await copyPreviewRegressionDiagnostic("missing");
+            copyResult = false;
+            const failedResult = await copyPreviewRegressionDiagnostic("scene_01:loop");
+            copyResult = true;
+            const succeededResult = await copyPreviewRegressionDiagnostic("scene_01:loop");
+            process.stdout.write(JSON.stringify({{
+              summary,
+              missingResult,
+              failedResult,
+              succeededResult,
+              copiedTexts,
+              statuses,
+              toasts,
+            }}));
+            """
+        )
+        completed = subprocess.run(
+            ["node", "--input-type=module", "-e", script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        self.assertIn("# 自动回归诊断：循环测试", payload["summary"])
+        self.assertIn("测试预设：好感度=3", payload["summary"])
+        self.assertIn("条件判断：", payload["summary"])
+        self.assertIn("定位：scene_loop / block_condition", payload["summary"])
+        self.assertFalse(payload["missingResult"])
+        self.assertFalse(payload["failedResult"])
+        self.assertTrue(payload["succeededResult"])
+        self.assertEqual(payload["statuses"][0]["message"], "找不到这条回归诊断")
+        self.assertEqual(payload["statuses"][1]["message"], "回归诊断复制失败")
+        self.assertEqual(payload["statuses"][-1]["message"], "已复制回归诊断：循环测试")
+        self.assertIn("条件判断：命中分支 1", payload["copiedTexts"][-1])
+        self.assertEqual(payload["toasts"][-1]["message"], "回归诊断已复制")
+
+    def test_preview_regression_copy_action_is_wired(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        click_handler = _extract_function_source(source, "handleClick")
+
+        self.assertIn('data-action="copy-regression-diagnostic"', source)
+        self.assertIn('data-regression-case-id="${escapeHtml', source)
+        self.assertIn('action === "copy-regression-diagnostic"', click_handler)
+        self.assertIn("await copyPreviewRegressionDiagnostic(actionTarget.dataset.regressionCaseId)", click_handler)
+
     def test_audio_cue_sheet_export_actions_are_wired(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
         panel_source = (ROOT_DIR / "prototype_editor" / "modules" / "audio_cue_sheet_panel.js").read_text(encoding="utf-8")

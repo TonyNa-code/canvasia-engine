@@ -2752,6 +2752,11 @@ async function handleClick(event) {
     return;
   }
 
+  if (action === "copy-regression-diagnostic") {
+    await copyPreviewRegressionDiagnostic(actionTarget.dataset.regressionCaseId);
+    return;
+  }
+
   if (action === "reload-editor-page") {
     reloadEditorPage();
     return;
@@ -26456,23 +26461,25 @@ function renderRegressionDiagnosticBlock(caseResult = {}, options = {}) {
   if (!diagnosticLine) {
     return "";
   }
+  const canCopy = options.copyable !== false && caseResult.id;
+  const copyButton = canCopy
+    ? `<button type="button" class="toolbar-button preview-sprint-diagnostic-copy" data-action="copy-regression-diagnostic" data-regression-case-id="${escapeHtml(
+        caseResult.id
+      )}">复制诊断</button>`
+    : "";
 
   return `
     <div class="preview-sprint-diagnostic">
-      <strong>${escapeHtml(options.label ?? "条件/变量诊断")}</strong>
+      <div class="preview-sprint-diagnostic-head">
+        <strong>${escapeHtml(options.label ?? "条件/变量诊断")}</strong>
+        ${copyButton}
+      </div>
       <span>${escapeHtml(diagnosticLine)}</span>
     </div>
   `;
 }
 
 function renderPreviewRegressionCaseCard(caseResult) {
-  const conditionDiagnosticLine = getRegressionDiagnosticLine(caseResult, {
-    includeVariable: false,
-    maxItems: 2,
-    maxLength: 180,
-    traceMaxLength: 120,
-  });
-
   return `
     <article class="preview-sprint-card is-${
       caseResult.status === "fail" ? "danger" : caseResult.status === "warn" ? "warn" : "good"
@@ -26500,17 +26507,84 @@ function renderPreviewRegressionCaseCard(caseResult) {
             : ""
         }
         ${caseResult.variableOverrideSummary ? `<span class="issue-tag">${escapeHtml(`测试预设：${caseResult.variableOverrideSummary}`)}</span>` : ""}
-        ${
-          conditionDiagnosticLine
-            ? `<span class="issue-tag">${escapeHtml(`条件诊断：${conditionDiagnosticLine}`)}</span>`
-            : ""
-        }
       </div>
+      ${renderRegressionDiagnosticBlock(caseResult, {
+        includeVariable: false,
+        maxItems: 2,
+        maxLength: 180,
+        traceMaxLength: 120,
+      })}
       <div class="preview-sprint-actions">
         ${(caseResult.actions ?? []).map((action, index) => renderQuickActionButton(action, index === 0)).join("")}
       </div>
     </article>
   `;
+}
+
+function findPreviewRegressionCaseById(caseId) {
+  const safeCaseId = String(caseId ?? "").trim();
+  if (!safeCaseId) {
+    return null;
+  }
+
+  const fixQueue = buildPreviewRegressionFixQueue();
+  const candidates = [
+    ...fixQueue,
+    ...(state.inspectionRegressionResult?.cases ?? []),
+  ];
+  return candidates.find((caseResult) => String(caseResult?.id ?? "") === safeCaseId) ?? null;
+}
+
+function buildPreviewRegressionDiagnosticClipboardSummary(caseResult = {}) {
+  const diagnostics = serializeRegressionDiagnosticsForReport(caseResult, {
+    maxItems: 5,
+    maxLength: 800,
+    traceMaxLength: 240,
+  });
+  const selectedOptions = Array.isArray(caseResult.selectedOptionTexts)
+    ? caseResult.selectedOptionTexts.filter(Boolean).join(" / ")
+    : "";
+  const conditionLines = (diagnostics.conditionTraceSummaries ?? [])
+    .map((item, index) => `${index + 1}. ${item}`)
+    .join("\n");
+  const recommendation = caseResult.recommendation || (caseResult.reason ? getPreviewRegressionFixRecommendation(caseResult) : "");
+
+  return [
+    `# 自动回归诊断：${caseResult.sceneName ?? "未命名路线"}`,
+    `状态：${caseResult.statusLabel ?? caseResult.status ?? "未记录"}`,
+    `来源：${[caseResult.chapterName, caseResult.sourceLabel].filter(Boolean).join(" · ") || "未记录"}`,
+    caseResult.reason ? `原因：${caseResult.reason}` : "",
+    caseResult.detail ? `细节：${caseResult.detail}` : "",
+    `步数：${caseResult.steps ?? 0} / 到过场景：${caseResult.visitedSceneCount ?? 0} / 选择次数：${caseResult.choiceCount ?? 0}`,
+    diagnostics.variableOverrideSummary ? `测试预设：${diagnostics.variableOverrideSummary}` : "",
+    selectedOptions ? `选择路线：${selectedOptions}` : "",
+    conditionLines ? `条件判断：\n${conditionLines}` : "",
+    recommendation ? `建议动作：${recommendation}` : "",
+    caseResult.anchorSceneId || caseResult.seedSceneId
+      ? `定位：${caseResult.anchorSceneId || caseResult.seedSceneId}${caseResult.anchorBlockId ? ` / ${caseResult.anchorBlockId}` : ""}`
+      : "",
+  ].filter(Boolean).join("\n");
+}
+
+async function copyPreviewRegressionDiagnostic(caseId) {
+  const caseResult = findPreviewRegressionCaseById(caseId);
+  if (!caseResult) {
+    setSaveStatus("找不到这条回归诊断", true);
+    showToast("找不到这条回归诊断，请先重新跑自动回归", "error");
+    return false;
+  }
+
+  const summary = buildPreviewRegressionDiagnosticClipboardSummary(caseResult);
+  const copied = await copyTextToClipboard(summary);
+  if (!copied) {
+    setSaveStatus("回归诊断复制失败", true);
+    showToast("复制失败，可以改用导出巡检报告", "error");
+    return false;
+  }
+
+  setSaveStatus(`已复制回归诊断：${caseResult.sceneName ?? "未命名路线"}`);
+  showToast("回归诊断已复制");
+  return true;
 }
 
 function renderPreviewRegressionPanel(routeOverview) {

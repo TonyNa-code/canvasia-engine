@@ -6432,6 +6432,21 @@ html[data-ui-theme="light"] .music-range-timeline em {
   border-color: rgba(82, 154, 255, 0.18);
 }
 
+.preview-sprint-diagnostic-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.preview-sprint-diagnostic-copy {
+  min-height: 28px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+
 .project-doctor-done {
   background: rgba(246, 255, 250, 0.72);
 }
