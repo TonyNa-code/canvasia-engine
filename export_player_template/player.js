@@ -1850,10 +1850,13 @@ function getRuntimePreloadStatusText() {
   const failureText = failedCount > 0 ? ` · ${failedCount} 个稍后重试` : "";
   const sizeText = formatRuntimePreloadSize(summary);
   const profileText = status?.performanceProfileLabel ? `档位 ${status.performanceProfileLabel}` : "";
+  const readyPhaseCount = Array.isArray(status?.readyPhases) ? status.readyPhases.length : 0;
+  const stagedText = readyPhaseCount > 0 ? `分阶段预热 ${readyPhaseCount}/4` : "";
   return [
     `首屏 ${summary.criticalCount} 个`,
     `全局 ${summary.totalCount} 个`,
     profileText,
+    stagedText,
     sizeText,
     `图片 ${summary.imageCount}`,
     `音频 ${summary.audioCount}`,

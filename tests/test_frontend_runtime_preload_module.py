@@ -67,6 +67,8 @@ class FrontendRuntimePreloadModuleTests(unittest.TestCase):
               AudioCtor: FakeAudio,
               documentRef: fakeDocument,
               requestIdleCallback(callback) {{ callback(); }},
+              phaseDelayMs: {{ early: 0, deferred: 0, library: 0 }},
+              backgroundBatchDelayMs: 0,
               timeoutMs: 500,
               onProgress(status) {{ events.push(status); }},
             }});
@@ -107,6 +109,7 @@ class FrontendRuntimePreloadModuleTests(unittest.TestCase):
         self.assertEqual(payload["status"]["loadedCount"], 3)
         self.assertEqual(payload["status"]["failedCount"], 0)
         self.assertTrue(payload["status"]["finished"])
+        self.assertEqual(payload["status"]["readyPhases"], ["critical", "early", "deferred"])
         self.assertGreaterEqual(payload["eventCount"], 3)
 
     def test_runtime_preload_limits_concurrency_and_delays_deferred_assets(self) -> None:
@@ -219,6 +222,106 @@ class FrontendRuntimePreloadModuleTests(unittest.TestCase):
         self.assertEqual(payload["finalStatus"]["loadedCount"], 5)
         self.assertTrue(payload["finalStatus"]["finished"])
 
+    def test_runtime_preload_stages_background_phases_and_batches_work(self) -> None:
+        script = textwrap.dedent(
+            f"""
+            import * as tools from {json.dumps(MODULE_PATH.as_uri())};
+
+            const pending = [];
+            const started = [];
+
+            function wait(ms) {{
+              return new Promise((resolve) => setTimeout(resolve, ms));
+            }}
+
+            class SlowImage {{
+              set src(value) {{
+                this._src = value;
+                started.push(value.split("/").pop());
+                pending.push(() => this.onload?.());
+              }}
+              get src() {{
+                return this._src;
+              }}
+            }}
+
+            const manifest = {{
+              formatVersion: 1,
+              entries: [
+                {{ assetId: "critical", type: "background", url: "assets/background/critical.png", phase: "critical", priority: 100 }},
+                {{ assetId: "early_a", type: "background", url: "assets/background/early-a.png", phase: "early", priority: 72 }},
+                {{ assetId: "early_b", type: "background", url: "assets/background/early-b.png", phase: "early", priority: 71 }},
+                {{ assetId: "deferred", type: "background", url: "assets/background/deferred.png", phase: "deferred", priority: 38 }},
+                {{ assetId: "library", type: "background", url: "assets/background/library.png", phase: "library", priority: 18 }},
+              ],
+            }};
+
+            const controller = tools.startRuntimePreload(manifest, {{
+              ImageCtor: SlowImage,
+              maxConcurrent: 4,
+              backgroundBatchSize: 1,
+              backgroundBatchDelayMs: 8,
+              phaseDelayMs: {{ early: 0, deferred: 24, library: 52 }},
+              requestIdleCallback(callback) {{ callback(); }},
+              timeoutMs: 500,
+            }});
+
+            await wait(0);
+            const immediateStarted = [...started];
+            const immediateStatus = controller.getStatus();
+
+            pending.shift()?.();
+            await wait(10);
+            const afterFirstBackgroundBatch = [...started];
+
+            while (pending.length) {{
+              pending.shift()?.();
+              await wait(0);
+            }}
+            await wait(28);
+            const afterDeferredDelay = [...started];
+            const afterDeferredStatus = controller.getStatus();
+
+            while (pending.length) {{
+              pending.shift()?.();
+              await wait(0);
+            }}
+            await wait(36);
+            const afterLibraryDelay = [...started];
+            const afterLibraryStatus = controller.getStatus();
+
+            process.stdout.write(JSON.stringify({{
+              immediateStarted,
+              immediateStatus,
+              afterFirstBackgroundBatch,
+              afterDeferredDelay,
+              afterDeferredStatus,
+              afterLibraryDelay,
+              afterLibraryStatus,
+            }}));
+            """
+        )
+        completed = subprocess.run(
+            ["node", "--input-type=module", "-e", script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        self.assertEqual(payload["immediateStarted"], ["critical.png", "early-a.png"])
+        self.assertEqual(payload["immediateStatus"]["readyPhases"], ["critical", "early"])
+        self.assertNotIn("early-b.png", payload["immediateStarted"])
+        self.assertIn("early-b.png", payload["afterFirstBackgroundBatch"])
+        self.assertNotIn("deferred.png", payload["afterFirstBackgroundBatch"])
+        self.assertIn("deferred.png", payload["afterDeferredDelay"])
+        self.assertEqual(payload["afterDeferredStatus"]["readyPhases"], ["critical", "early", "deferred"])
+        self.assertNotIn("library.png", payload["afterDeferredDelay"])
+        self.assertIn("library.png", payload["afterLibraryDelay"])
+        self.assertEqual(payload["afterLibraryStatus"]["readyPhases"], ["critical", "early", "deferred", "library"])
+
     def test_runtime_preload_applies_project_performance_profiles(self) -> None:
         script = textwrap.dedent(
             f"""
@@ -259,6 +362,10 @@ class FrontendRuntimePreloadModuleTests(unittest.TestCase):
             const fallbackOptions = tools.resolveRuntimePreloadOptions({{
               runtimeSettings: {{ performanceProfile: "bad-profile" }},
             }});
+            const legacyDelayOptions = tools.resolveRuntimePreloadOptions({{
+              runtimeSettings: {{ performanceProfile: "web" }},
+              deferredDelayMs: 777,
+            }});
 
             const controller = tools.startRuntimePreload(manifest, {{
               runtimeSettings: {{ performanceProfile: "mobile_low" }},
@@ -285,6 +392,7 @@ class FrontendRuntimePreloadModuleTests(unittest.TestCase):
               mobileOptions,
               highQualityOptions,
               fallbackOptions,
+              legacyDelayOptions,
               status,
               startedCount: startedBeforeRelease.length,
               started: startedBeforeRelease,
@@ -310,9 +418,15 @@ class FrontendRuntimePreloadModuleTests(unittest.TestCase):
         self.assertEqual(payload["mobileOptions"]["performanceProfile"], "mobile_low")
         self.assertEqual(payload["mobileOptions"]["maxConcurrent"], 2)
         self.assertEqual(payload["mobileOptions"]["deferredDelayMs"], 360)
+        self.assertEqual(payload["mobileOptions"]["backgroundBatchSize"], 1)
+        self.assertEqual(payload["mobileOptions"]["phaseDelayMs"]["library"], 8000)
         self.assertEqual(payload["highQualityOptions"]["performanceProfile"], "high_quality_pc")
         self.assertEqual(payload["highQualityOptions"]["maxConcurrent"], 6)
+        self.assertEqual(payload["highQualityOptions"]["backgroundBatchSize"], 5)
+        self.assertEqual(payload["highQualityOptions"]["phaseDelayMs"]["deferred"], 420)
         self.assertEqual(payload["fallbackOptions"]["performanceProfile"], "standard")
+        self.assertEqual(payload["legacyDelayOptions"]["deferredDelayMs"], 777)
+        self.assertEqual(payload["legacyDelayOptions"]["phaseDelayMs"], {"early": 777, "deferred": 777, "library": 777})
         self.assertEqual(payload["status"]["performanceProfile"], "mobile_low")
         self.assertEqual(payload["status"]["performanceProfileLabel"], "低配 / 移动端")
         self.assertEqual(payload["status"]["maxConcurrent"], 2)

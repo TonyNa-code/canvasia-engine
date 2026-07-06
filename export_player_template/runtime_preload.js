@@ -11,6 +11,13 @@ export const RUNTIME_PRELOAD_PERFORMANCE_PROFILES = Object.freeze({
     idleTimeoutMs: 1800,
     fallbackDelayMs: 120,
     deferredDelayMs: 0,
+    backgroundBatchSize: 3,
+    backgroundBatchDelayMs: 120,
+    phaseDelayMs: Object.freeze({
+      early: 0,
+      deferred: 900,
+      library: 2400,
+    }),
   }),
   web: Object.freeze({
     key: "web",
@@ -20,6 +27,13 @@ export const RUNTIME_PRELOAD_PERFORMANCE_PROFILES = Object.freeze({
     idleTimeoutMs: 2200,
     fallbackDelayMs: 180,
     deferredDelayMs: 120,
+    backgroundBatchSize: 2,
+    backgroundBatchDelayMs: 220,
+    phaseDelayMs: Object.freeze({
+      early: 120,
+      deferred: 1600,
+      library: 4200,
+    }),
   }),
   mobile_low: Object.freeze({
     key: "mobile_low",
@@ -29,6 +43,13 @@ export const RUNTIME_PRELOAD_PERFORMANCE_PROFILES = Object.freeze({
     idleTimeoutMs: 2800,
     fallbackDelayMs: 260,
     deferredDelayMs: 360,
+    backgroundBatchSize: 1,
+    backgroundBatchDelayMs: 420,
+    phaseDelayMs: Object.freeze({
+      early: 360,
+      deferred: 3200,
+      library: 8000,
+    }),
   }),
   high_quality_pc: Object.freeze({
     key: "high_quality_pc",
@@ -38,8 +59,18 @@ export const RUNTIME_PRELOAD_PERFORMANCE_PROFILES = Object.freeze({
     idleTimeoutMs: 1200,
     fallbackDelayMs: 80,
     deferredDelayMs: 0,
+    backgroundBatchSize: 5,
+    backgroundBatchDelayMs: 80,
+    phaseDelayMs: Object.freeze({
+      early: 0,
+      deferred: 420,
+      library: 1200,
+    }),
   }),
 });
+
+const PRELOAD_PHASE_ORDER = Object.freeze(["critical", "early", "deferred", "library"]);
+const BACKGROUND_PRELOAD_PHASES = Object.freeze(["early", "deferred", "library"]);
 
 function toArray(value) {
   return Array.isArray(value) ? value : [];
@@ -84,9 +115,36 @@ function clampOption(value, fallback, minimum, maximum) {
   return Math.max(minimum, Math.min(maximum, Math.floor(numeric)));
 }
 
+function resolvePhaseDelayOptions(options = {}, profile = {}) {
+  const customPhaseDelayMs = options.phaseDelayMs ?? options.phaseDelaysMs ?? {};
+  const profilePhaseDelayMs = profile.phaseDelayMs ?? {};
+  const legacyDeferredDelayMs = Number.isFinite(Number(options.deferredDelayMs)) ? Number(options.deferredDelayMs) : null;
+  return {
+    early: clampOption(
+      customPhaseDelayMs.early,
+      legacyDeferredDelayMs ?? profilePhaseDelayMs.early ?? profile.deferredDelayMs ?? 0,
+      0,
+      60000
+    ),
+    deferred: clampOption(
+      customPhaseDelayMs.deferred,
+      legacyDeferredDelayMs ?? profilePhaseDelayMs.deferred ?? profile.deferredDelayMs ?? 0,
+      0,
+      60000
+    ),
+    library: clampOption(
+      customPhaseDelayMs.library,
+      legacyDeferredDelayMs ?? profilePhaseDelayMs.library ?? profilePhaseDelayMs.deferred ?? profile.deferredDelayMs ?? 0,
+      0,
+      60000
+    ),
+  };
+}
+
 export function resolveRuntimePreloadOptions(options = {}) {
   const profileKey = pickRuntimePreloadPerformanceProfile(options);
   const profile = getRuntimePreloadPerformanceProfileDefinition(profileKey);
+  const phaseDelayMs = resolvePhaseDelayOptions(options, profile);
   return {
     ...options,
     performanceProfile: profile.key,
@@ -95,7 +153,10 @@ export function resolveRuntimePreloadOptions(options = {}) {
     timeoutMs: clampOption(options.timeoutMs, profile.timeoutMs, 2500, 60000),
     idleTimeoutMs: clampOption(options.idleTimeoutMs, profile.idleTimeoutMs, 250, 10000),
     fallbackDelayMs: clampOption(options.fallbackDelayMs, profile.fallbackDelayMs, 0, 5000),
-    deferredDelayMs: clampOption(options.deferredDelayMs, profile.deferredDelayMs, 0, 10000),
+    deferredDelayMs: phaseDelayMs.early,
+    phaseDelayMs,
+    backgroundBatchSize: clampOption(options.backgroundBatchSize, profile.backgroundBatchSize, 1, 16),
+    backgroundBatchDelayMs: clampOption(options.backgroundBatchDelayMs, profile.backgroundBatchDelayMs, 0, 10000),
   };
 }
 
@@ -319,17 +380,27 @@ export function startRuntimePreload(manifest, options = {}) {
   const normalized = normalizeRuntimePreloadManifest(manifest);
   const resolvedOptions = resolveRuntimePreloadOptions(options);
   const maxConcurrent = resolvedOptions.maxConcurrent;
+  const phaseQueues = PRELOAD_PHASE_ORDER.reduce((queues, phase) => {
+    queues[phase] = normalized.entries.filter((entry) => entry.phase === phase);
+    return queues;
+  }, {});
+  const readyPhases = new Set(["critical"]);
+  const scheduledPhases = new Set();
   const status = {
     totalCount: normalized.entries.length,
     queuedCount: normalized.entries.length,
     loadedCount: 0,
     failedCount: 0,
-    criticalCount: normalized.entries.filter((entry) => entry.phase === "critical").length,
+    criticalCount: phaseQueues.critical.length,
     activeCount: 0,
     waitingCount: normalized.entries.length,
+    pendingCount: normalized.entries.length,
     maxConcurrent,
+    backgroundBatchSize: resolvedOptions.backgroundBatchSize,
+    backgroundBatchDelayMs: resolvedOptions.backgroundBatchDelayMs,
     performanceProfile: resolvedOptions.performanceProfile,
     performanceProfileLabel: resolvedOptions.performanceProfileLabel,
+    readyPhases: ["critical"],
     started: normalized.entries.length > 0,
     finished: normalized.entries.length === 0,
   };
@@ -342,16 +413,18 @@ export function startRuntimePreload(manifest, options = {}) {
   };
   const onProgress = typeof resolvedOptions.onProgress === "function" ? resolvedOptions.onProgress : null;
   let stopped = false;
-  let deferredReady = false;
-
-  const criticalQueue = normalized.entries.filter((entry) => entry.phase === "critical");
-  const deferredQueue = normalized.entries.filter((entry) => entry.phase !== "critical");
+  let backgroundPumpScheduled = false;
   const updateWaitingCount = () => {
-    status.waitingCount = criticalQueue.length + (deferredReady ? deferredQueue.length : 0);
+    status.waitingCount = PRELOAD_PHASE_ORDER.reduce(
+      (total, phase) => total + (readyPhases.has(phase) ? phaseQueues[phase].length : 0),
+      0
+    );
+    status.pendingCount = PRELOAD_PHASE_ORDER.reduce((total, phase) => total + phaseQueues[phase].length, 0);
+    status.readyPhases = PRELOAD_PHASE_ORDER.filter((phase) => readyPhases.has(phase));
   };
   const emitProgress = () => onProgress?.({ ...status });
 
-  const mark = (ok) => {
+  const mark = (ok, phase = "deferred") => {
     if (stopped) {
       return;
     }
@@ -364,50 +437,100 @@ export function startRuntimePreload(manifest, options = {}) {
     status.finished = status.loadedCount + status.failedCount >= status.totalCount;
     updateWaitingCount();
     emitProgress();
-    pumpQueue();
+    if (phase === "critical" || phaseQueues.critical.length) {
+      pumpQueue();
+    } else {
+      scheduleBackgroundPump();
+    }
   };
 
   const takeNextEntry = () => {
-    if (criticalQueue.length) {
-      return criticalQueue.shift();
-    }
-    if (deferredReady && deferredQueue.length) {
-      return deferredQueue.shift();
+    for (const phase of PRELOAD_PHASE_ORDER) {
+      if (readyPhases.has(phase) && phaseQueues[phase].length) {
+        return phaseQueues[phase].shift();
+      }
     }
     return null;
   };
+
+  function scheduleBackgroundPump() {
+    if (stopped || backgroundPumpScheduled || status.finished) {
+      return;
+    }
+    backgroundPumpScheduled = true;
+    scheduleIdle(
+      () => {
+        backgroundPumpScheduled = false;
+        pumpQueue();
+      },
+      resolvedOptions.requestIdleCallback,
+      {
+        ...resolvedOptions,
+        deferredDelayMs: resolvedOptions.backgroundBatchDelayMs,
+      }
+    );
+  }
+
+  function schedulePhase(phase) {
+    if (!BACKGROUND_PRELOAD_PHASES.includes(phase) || scheduledPhases.has(phase) || !phaseQueues[phase].length) {
+      return;
+    }
+    scheduledPhases.add(phase);
+    scheduleIdle(
+      () => {
+        if (stopped) {
+          return;
+        }
+        readyPhases.add(phase);
+        updateWaitingCount();
+        emitProgress();
+        pumpQueue();
+      },
+      resolvedOptions.requestIdleCallback,
+      {
+        ...resolvedOptions,
+        deferredDelayMs: resolvedOptions.phaseDelayMs[phase],
+      }
+    );
+  }
 
   function pumpQueue() {
     if (stopped || status.finished) {
       return;
     }
     updateWaitingCount();
+    let backgroundStarted = 0;
     while (status.activeCount < maxConcurrent) {
       const entry = takeNextEntry();
       if (!entry) {
         break;
       }
+      if (entry.phase !== "critical" && backgroundStarted >= resolvedOptions.backgroundBatchSize) {
+        phaseQueues[entry.phase].unshift(entry);
+        scheduleBackgroundPump();
+        break;
+      }
       status.activeCount += 1;
+      if (entry.phase !== "critical") {
+        backgroundStarted += 1;
+      }
       updateWaitingCount();
-      preloadEntry(entry, safeOptions).then(mark).catch(() => mark(false));
+      preloadEntry(entry, safeOptions).then((ok) => mark(ok, entry.phase)).catch(() => mark(false, entry.phase));
     }
   }
 
   pumpQueue();
-  scheduleIdle(() => {
-    if (!stopped) {
-      deferredReady = true;
-      pumpQueue();
-    }
-  }, resolvedOptions.requestIdleCallback, resolvedOptions);
+  BACKGROUND_PRELOAD_PHASES.forEach(schedulePhase);
 
   return {
     stop() {
       stopped = true;
-      criticalQueue.length = 0;
-      deferredQueue.length = 0;
+      PRELOAD_PHASE_ORDER.forEach((phase) => {
+        phaseQueues[phase].length = 0;
+      });
       status.activeCount = 0;
       status.waitingCount = 0;
+      status.pendingCount = 0;
       status.finished = true;
     },
     getStatus() {
