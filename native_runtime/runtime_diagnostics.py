@@ -178,6 +178,64 @@ def build_static_scene_prefetch_status(prefetch_manifest: dict | None) -> dict:
     }
 
 
+def clamp_percent(numerator: int, denominator: int) -> int:
+    if denominator <= 0:
+        return 0
+    return max(0, min(100, int(round(numerator / denominator * 100))))
+
+
+def get_status_ready_entries(status: dict | None) -> int:
+    source = status if isinstance(status, dict) else {}
+    if source.get("readyEntries") is not None:
+        return int(source.get("readyEntries") or 0)
+    return int(source.get("loadedEntries") or 0)
+
+
+def build_runtime_cache_efficiency_summary(context: dict | None) -> dict:
+    safe_context = context if isinstance(context, dict) else {}
+    preload_status = (
+        safe_context.get("runtimePreloadStatus")
+        if isinstance(safe_context.get("runtimePreloadStatus"), dict)
+        else {}
+    )
+    prefetch_status = (
+        safe_context.get("runtimeScenePrefetchStatus")
+        if isinstance(safe_context.get("runtimeScenePrefetchStatus"), dict)
+        else {}
+    )
+    preload_total = int(preload_status.get("totalEntries") or 0)
+    prefetch_total = int(prefetch_status.get("totalEntries") or 0)
+    preload_ready = get_status_ready_entries(preload_status)
+    prefetch_ready = get_status_ready_entries(prefetch_status)
+    preload_cached = int(preload_status.get("cachedEntries") or 0)
+    prefetch_cached = int(prefetch_status.get("cachedEntries") or 0)
+    preload_pending = int(preload_status.get("pendingEntries") or 0)
+    prefetch_pending = int(prefetch_status.get("pendingEntries") or 0)
+    total_entries = preload_total + prefetch_total
+    ready_entries = preload_ready + prefetch_ready
+    cached_entries = preload_cached + prefetch_cached
+    loaded_cache_entries = (
+        get_loaded_cache_count(safe_context.get("imageCache"))
+        + get_loaded_cache_count(safe_context.get("soundCache"))
+        + get_loaded_cache_count(safe_context.get("videoPreviewFrameCache"))
+    )
+    status = "empty"
+    if total_entries > 0:
+        status = "warming" if preload_pending + prefetch_pending > 0 else "ready"
+    return {
+        "status": status,
+        "totalEntries": total_entries,
+        "readyEntries": ready_entries,
+        "pendingEntries": preload_pending + prefetch_pending,
+        "cachedEntries": cached_entries,
+        "loadedCacheEntries": loaded_cache_entries,
+        "preloadCachedEntries": preload_cached,
+        "prefetchCachedEntries": prefetch_cached,
+        "reusePercent": clamp_percent(cached_entries, total_entries),
+        "readyPercent": clamp_percent(ready_entries, total_entries),
+    }
+
+
 def build_export_runtime_diagnostics_context(payload: dict | None, preload_report: dict | None = None) -> dict:
     project = get_project(payload)
     entry_scene = get_entry_scene(payload)
@@ -218,6 +276,11 @@ def get_export_runtime_diagnostics_status(preload_report: dict, diagnostics_repo
 def build_export_runtime_diagnostics_summary(payload: dict, preload_report: dict, diagnostics_report: dict, prefetch_manifest: dict) -> dict:
     preload_summary = preload_report.get("summary") if isinstance(preload_report.get("summary"), dict) else {}
     prefetch_summary = get_runtime_scene_prefetch_summary(prefetch_manifest)
+    cache_efficiency = (
+        diagnostics_report.get("cacheEfficiency")
+        if isinstance(diagnostics_report.get("cacheEfficiency"), dict)
+        else {}
+    )
     return {
         "sceneCount": len(iter_scenes(payload)),
         "preloadStatus": safe_text(preload_report.get("status")) or "unknown",
@@ -229,6 +292,9 @@ def build_export_runtime_diagnostics_summary(payload: dict, preload_report: dict
         "prefetchVideoEntries": int(prefetch_summary.get("videoCount") or 0),
         "diagnosticIssueCount": int(diagnostics_report.get("issueCount") or 0),
         "diagnosticWarningCount": int(diagnostics_report.get("warningCount") or 0),
+        "cacheReadyPercent": int(cache_efficiency.get("readyPercent") or 0),
+        "cacheReusePercent": int(cache_efficiency.get("reusePercent") or 0),
+        "cacheReuseEntries": int(cache_efficiency.get("cachedEntries") or 0),
     }
 
 
@@ -399,11 +465,25 @@ def build_runtime_cache_diagnostic_rows(context: dict | None) -> list[dict]:
     prefetched_count = len(safe_context.get("runtimeScenePrefetchedAssetIds") or [])
     active_bgm = str(safe_context.get("currentBgmAssetId") or "无")
     active_voice = "播放中" if safe_context.get("voicePlaybackActive") else "待机"
+    efficiency = build_runtime_cache_efficiency_summary(safe_context)
+    total_entries = int(efficiency.get("totalEntries") or 0)
+    cached_entries = int(efficiency.get("cachedEntries") or 0)
+    ready_percent = int(efficiency.get("readyPercent") or 0)
+    reuse_percent = int(efficiency.get("reusePercent") or 0)
+    efficiency_tone = "empty"
+    if total_entries > 0:
+        efficiency_tone = "ready" if ready_percent >= 100 else "warming"
     return [
         build_status_row("图片缓存", f"{image_count} 项", "已解码到内存的背景、CG、立绘和 UI 图片。", "ready" if image_count else "empty"),
         build_status_row("音频缓存", f"{sound_count} 项", f"BGM：{active_bgm} / 语音：{active_voice}", "ready" if sound_count else "empty"),
         build_status_row("视频预览缓存", f"{video_preview_count} 项", "内嵌视频卡片的预览帧缓存。", "ready" if video_preview_count else "empty"),
         build_status_row("路线已预取", f"{prefetched_count} 项", "本轮路线预取已经完成过加载尝试的素材。", "ready" if prefetched_count else "empty"),
+        build_status_row(
+            "缓存复用效率",
+            f"{cached_entries}/{total_entries}",
+            f"运行准备率 {ready_percent}% / 复用率 {reuse_percent}% / 内存缓存 {int(efficiency.get('loadedCacheEntries') or 0)} 项。",
+            efficiency_tone,
+        ),
     ]
 
 
@@ -427,6 +507,7 @@ def build_runtime_diagnostics_report(context: dict | None = None) -> dict:
     preload_status = safe_context.get("runtimePreloadStatus") if isinstance(safe_context.get("runtimePreloadStatus"), dict) else {}
     prefetch_status = safe_context.get("runtimeScenePrefetchStatus") if isinstance(safe_context.get("runtimeScenePrefetchStatus"), dict) else {}
     prefetch_manifest = safe_context.get("runtimeScenePrefetchManifest") if isinstance(safe_context.get("runtimeScenePrefetchManifest"), dict) else {}
+    cache_efficiency = build_runtime_cache_efficiency_summary(safe_context)
     sections = [
         {"title": "播放位置", "rows": build_runtime_position_diagnostic_rows(safe_context)},
         {"title": "启动预热", "rows": build_runtime_preload_diagnostic_rows(preload_status)},
@@ -450,6 +531,7 @@ def build_runtime_diagnostics_report(context: dict | None = None) -> dict:
         "headline": headline,
         "issueCount": issue_count,
         "warningCount": warning_count,
+        "cacheEfficiency": cache_efficiency,
         "sections": sections,
     }
 
@@ -495,6 +577,8 @@ def render_export_runtime_diagnostics_markdown(report: dict | None) -> str:
             f"| 预取图片 / 音频 / 视频 | {int(summary.get('prefetchImageEntries') or 0)} / "
             f"{int(summary.get('prefetchAudioEntries') or 0)} / {int(summary.get('prefetchVideoEntries') or 0)} |"
         ),
+        f"| 运行准备率 / 复用率 | {int(summary.get('cacheReadyPercent') or 0)}% / {int(summary.get('cacheReusePercent') or 0)}% |",
+        f"| 缓存复用条目 | {int(summary.get('cacheReuseEntries') or 0)} |",
         f"| 诊断异常 / 观察项 | {int(summary.get('diagnosticIssueCount') or 0)} / {int(summary.get('diagnosticWarningCount') or 0)} |",
         "",
         "## 运行状态面板",
