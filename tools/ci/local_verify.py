@@ -24,6 +24,7 @@ PYTHON_SYNTAX_FILES = [
     "editor_local_security.py",
     "editor_snapshot_cache.py",
     "export_asset_rights.py",
+    "export_audio_cue_sheet.py",
     "export_voice_production.py",
     "export_localization_audit.py",
     "export_package_guide.py",
@@ -52,6 +53,7 @@ PYTHON_SYNTAX_FILES = [
     "tests/test_ci_workflow_coverage.py",
     "tests/test_editor_infrastructure.py",
     "tests/test_export_asset_rights.py",
+    "tests/test_export_audio_cue_sheet.py",
     "tests/test_export_voice_production.py",
     "tests/test_prepare_preview_release.py",
     "tests/test_release_public_surface.py",
@@ -180,6 +182,7 @@ def build_release_tooling_steps(python_executable: str) -> list[VerifyStep]:
         build_unittest_step("Ren'Py export contract", "test_renpy_export_contract.py", "release-tests", python_executable),
         build_unittest_step("Runtime preload export contract", "test_export_runtime_preload.py", "release-tests", python_executable),
         build_unittest_step("Export asset rights contract", "test_export_asset_rights.py", "release-tests", python_executable),
+        build_unittest_step("Export audio cue sheet contract", "test_export_audio_cue_sheet.py", "release-tests", python_executable),
         build_unittest_step("Export voice production contract", "test_export_voice_production.py", "release-tests", python_executable),
         VerifyStep(
             name="Template project health check",

@@ -110,6 +110,7 @@ Canvasia Engine は、ビジュアルノベル / Galgame 制作者のための s
 - [`export_localization_audit.py`](export_localization_audit.py): 書き出しパッケージ向け localization coverage / missing translation audit 生成器
 - [`export_quality_reports.py`](export_quality_reports.py): 書き出し品質レポート bundle の共通オーケストレーション
 - [`export_asset_rights.py`](export_asset_rights.py): 書き出しパッケージ向け asset rights / credits / AI provenance report 生成器
+- [`export_audio_cue_sheet.py`](export_audio_cue_sheet.py): 書き出しパッケージ向け BGM / SFX / voice cue sheet と試聴確認レポート生成器
 - [`export_voice_production.py`](export_voice_production.py): 書き出しパッケージ向け voice recording sheet / delivery report 生成器
 - [`export_release_readiness.py`](export_release_readiness.py): 書き出しパッケージ向け release-readiness summary / tester handoff gate 生成器
 - [`export_story_route_map.py`](export_story_route_map.py): 書き出しパッケージ向け story route map / broken-link / unreachable-scene report 生成器
@@ -207,7 +208,7 @@ Canvasia は初期 i18n フローに対応しています。
 
 Ren'Py Starter Bundle は `game/script.rpy`、`game/options.rpy`、`game/assets/` にコピーされた素材、migration manifest、カスタム Canvasia 演出の review notes、bundle quality report、label / jump / 参照ファイルを確認する local verifier script を含む zip を生成します。
 
-すべての playable / runtime 書き出しには `README_试玩验收先看这里.md`、`story_route_map.json`、`story_route_map.md`、`localization_audit.json`、`localization_audit.md`、`release_readiness_summary.json`、`release_readiness_summary.md`、`unlockable_content_manifest.json`、`unlockable_content_report.md`、`asset-rights-manifest.json`、`asset-rights-report.md`、`asset-rights-table.csv`、`voice-production-sheet.json`、`voice-production-report.md`、`voice-production-lines.csv` も同梱されます。README は起動手順と受け入れチェック、story route map は broken jumps / unreachable scenes / ending candidates の確認、localization audit は multilingual project の missing translations、release-readiness files はテスターへ渡せる状態かどうかの短い gate、unlockable JSON / Markdown は CG ギャラリー、音楽鑑賞、ボイス回想、キャラクター / 場所 / ナレーション / 関係アーカイブ、章回想、エンディング、実績の収録状況を確認するためのレポートです。asset-rights files は商用利用、出典、credit、placeholder、AI provenance の確認に使えます。voice-production files は録音用台詞表、推奨ファイル名、キャラクター別進捗、未バインド音声、長台詞レビューをまとめます。
+すべての playable / runtime 書き出しには `README_试玩验收先看这里.md`、`story_route_map.json`、`story_route_map.md`、`localization_audit.json`、`localization_audit.md`、`release_readiness_summary.json`、`release_readiness_summary.md`、`unlockable_content_manifest.json`、`unlockable_content_report.md`、`asset-rights-manifest.json`、`asset-rights-report.md`、`asset-rights-table.csv`、`audio-cue-sheet.json`、`audio-cue-report.md`、`audio-cue-table.csv`、`voice-production-sheet.json`、`voice-production-report.md`、`voice-production-lines.csv` も同梱されます。README は起動手順と受け入れチェック、story route map は broken jumps / unreachable scenes / ending candidates の確認、localization audit は multilingual project の missing translations、release-readiness files はテスターへ渡せる状態かどうかの短い gate、unlockable JSON / Markdown は CG ギャラリー、音楽鑑賞、ボイス回想、キャラクター / 場所 / ナレーション / 関係アーカイブ、章回想、エンディング、実績の収録状況を確認するためのレポートです。asset-rights files は商用利用、出典、credit、placeholder、AI provenance の確認に使えます。audio-cue files は BGM の対象範囲、フェードイン / フェードアウト、停止位置、欠落した効果音、ボイス cue の準備状況を確認できます。voice-production files は録音用台詞表、推奨ファイル名、キャラクター別進捗、未バインド音声、長台詞レビューをまとめます。
 
 ## Release パッケージ
 
