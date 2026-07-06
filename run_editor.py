@@ -36,6 +36,10 @@ from export_localization_audit import (
     EXPORT_LOCALIZATION_AUDIT_REPORT_NAME,
 )
 from export_quality_reports import write_export_quality_report_bundle
+from export_release_evidence_pack import (
+    EXPORT_RELEASE_EVIDENCE_PACK_NAME,
+    write_export_release_evidence_pack_file,
+)
 from export_release_readiness import (
     EXPORT_RELEASE_READINESS_JSON_NAME,
     EXPORT_RELEASE_READINESS_REPORT_NAME,
@@ -419,6 +423,10 @@ EDITOR_SIGNING_CHECK_COMMAND_SOURCE = ROOT_DIR / "tools" / "release" / "run_sign
 NATIVE_RUNTIME_PLAYER_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_player.py"
 NATIVE_RUNTIME_PRELOAD_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_preload.py"
 NATIVE_RUNTIME_PERFORMANCE_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_performance.py"
+NATIVE_RUNTIME_SETTINGS_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_player_settings.py"
+NATIVE_RUNTIME_TEXT_EFFECTS_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_text_effects.py"
+NATIVE_RUNTIME_STORAGE_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_storage.py"
+NATIVE_RUNTIME_VARIABLES_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_variables.py"
 NATIVE_RUNTIME_README_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "README.md"
 NATIVE_RUNTIME_REQUIREMENTS_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "requirements.txt"
 NATIVE_RUNTIME_BUILD_REQUIREMENTS_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "requirements-build.txt"
@@ -427,6 +435,10 @@ NATIVE_RUNTIME_BRAND_LOGO_SOURCE = ROOT_DIR / "prototype_editor" / "assets" / "c
 NATIVE_RUNTIME_PLAYER_NAME = "runtime_player.py"
 NATIVE_RUNTIME_PRELOAD_NAME = "runtime_preload.py"
 NATIVE_RUNTIME_PERFORMANCE_NAME = "runtime_performance.py"
+NATIVE_RUNTIME_SETTINGS_NAME = "runtime_player_settings.py"
+NATIVE_RUNTIME_TEXT_EFFECTS_NAME = "runtime_text_effects.py"
+NATIVE_RUNTIME_STORAGE_NAME = "runtime_storage.py"
+NATIVE_RUNTIME_VARIABLES_NAME = "runtime_variables.py"
 NATIVE_RUNTIME_README_NAME = "README_原生_Runtime_包先看这里.md"
 NATIVE_RUNTIME_REQUIREMENTS_NAME = "requirements-native-runtime.txt"
 NATIVE_RUNTIME_BUILD_REQUIREMENTS_NAME = "requirements-native-runtime-build.txt"
@@ -465,6 +477,15 @@ NATIVE_RUNTIME_WINDOWS_FILE_INTEGRITY_COMMAND_NAME = "verify_native_runtime_file
 NATIVE_RUNTIME_MAC_APP_BUILDER_COMMAND_NAME = "打包原生Runtime应用.command"
 NATIVE_RUNTIME_LINUX_APP_BUILDER_COMMAND_NAME = "build_native_runtime_app.sh"
 NATIVE_RUNTIME_WINDOWS_APP_BUILDER_COMMAND_NAME = "build_native_runtime_app.bat"
+NATIVE_RUNTIME_REQUIRED_MODULE_FILES = (
+    (NATIVE_RUNTIME_PLAYER_SOURCE, NATIVE_RUNTIME_PLAYER_NAME),
+    (NATIVE_RUNTIME_PRELOAD_SOURCE, NATIVE_RUNTIME_PRELOAD_NAME),
+    (NATIVE_RUNTIME_PERFORMANCE_SOURCE, NATIVE_RUNTIME_PERFORMANCE_NAME),
+    (NATIVE_RUNTIME_SETTINGS_SOURCE, NATIVE_RUNTIME_SETTINGS_NAME),
+    (NATIVE_RUNTIME_TEXT_EFFECTS_SOURCE, NATIVE_RUNTIME_TEXT_EFFECTS_NAME),
+    (NATIVE_RUNTIME_STORAGE_SOURCE, NATIVE_RUNTIME_STORAGE_NAME),
+    (NATIVE_RUNTIME_VARIABLES_SOURCE, NATIVE_RUNTIME_VARIABLES_NAME),
+)
 EDITOR_DISTRIBUTION_CONFIG_NAME = "editor_distribution.json"
 EDITOR_DISTRIBUTION_SNAPSHOT_NAME = "editor_distribution.snapshot.json"
 EDITOR_WINDOWS_INSTALLER_SCRIPT_NAME = "Canvasia Engine Editor Installer.iss"
@@ -504,6 +525,20 @@ EDITOR_PORTABLE_RUNTIME_TARGETS = {
 }
 EDITOR_EXPORT_FILES = [
     "run_editor.py",
+    "editor_local_security.py",
+    "editor_snapshot_cache.py",
+    "export_localization_audit.py",
+    "export_package_guide.py",
+    "export_quality_reports.py",
+    "export_release_control.py",
+    "export_release_evidence_pack.py",
+    "export_release_readiness.py",
+    "export_runtime_preload.py",
+    "export_story_route_map.py",
+    "export_unlockable_manifest.py",
+    "openai_asset_generation.py",
+    "project_runtime_settings.py",
+    "renpy_export.py",
     EDITOR_SIGNING_GUIDE_NAME,
     EDITOR_SIGNING_ENV_EXAMPLE_NAME,
     EDITOR_SIGNING_CHECK_SCRIPT_NAME,
@@ -514,6 +549,7 @@ EDITOR_EXPORT_DIRECTORIES = [
     "export_player_template",
     "template_project",
     "desktop_runtime",
+    "native_runtime",
 ]
 EDITOR_EXPORT_EMPTY_DIRECTORIES = [
     "projects",
@@ -8992,9 +9028,8 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
         runtime_preload_manifest if isinstance(runtime_preload_manifest, dict) else {},
     )
 
-    shutil.copy2(NATIVE_RUNTIME_PLAYER_SOURCE, build_dir / NATIVE_RUNTIME_PLAYER_NAME)
-    shutil.copy2(NATIVE_RUNTIME_PRELOAD_SOURCE, build_dir / NATIVE_RUNTIME_PRELOAD_NAME)
-    shutil.copy2(NATIVE_RUNTIME_PERFORMANCE_SOURCE, build_dir / NATIVE_RUNTIME_PERFORMANCE_NAME)
+    for source_path, target_name in NATIVE_RUNTIME_REQUIRED_MODULE_FILES:
+        shutil.copy2(source_path, build_dir / target_name)
     shutil.copy2(NATIVE_RUNTIME_README_SOURCE, build_dir / NATIVE_RUNTIME_README_NAME)
     shutil.copy2(NATIVE_RUNTIME_REQUIREMENTS_SOURCE, build_dir / NATIVE_RUNTIME_REQUIREMENTS_NAME)
     shutil.copy2(NATIVE_RUNTIME_BUILD_REQUIREMENTS_SOURCE, build_dir / NATIVE_RUNTIME_BUILD_REQUIREMENTS_NAME)
@@ -9664,6 +9699,14 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
         "runtimePreloadModulePath": str(build_dir / NATIVE_RUNTIME_PRELOAD_NAME),
         "runtimePerformanceModuleName": NATIVE_RUNTIME_PERFORMANCE_NAME,
         "runtimePerformanceModulePath": str(build_dir / NATIVE_RUNTIME_PERFORMANCE_NAME),
+        "runtimeSettingsModuleName": NATIVE_RUNTIME_SETTINGS_NAME,
+        "runtimeSettingsModulePath": str(build_dir / NATIVE_RUNTIME_SETTINGS_NAME),
+        "runtimeTextEffectsModuleName": NATIVE_RUNTIME_TEXT_EFFECTS_NAME,
+        "runtimeTextEffectsModulePath": str(build_dir / NATIVE_RUNTIME_TEXT_EFFECTS_NAME),
+        "runtimeStorageModuleName": NATIVE_RUNTIME_STORAGE_NAME,
+        "runtimeStorageModulePath": str(build_dir / NATIVE_RUNTIME_STORAGE_NAME),
+        "runtimeVariablesModuleName": NATIVE_RUNTIME_VARIABLES_NAME,
+        "runtimeVariablesModulePath": str(build_dir / NATIVE_RUNTIME_VARIABLES_NAME),
         "readmeName": NATIVE_RUNTIME_README_NAME,
         "readmePath": str(build_dir / NATIVE_RUNTIME_README_NAME),
         "requirementsName": NATIVE_RUNTIME_REQUIREMENTS_NAME,
@@ -10304,6 +10347,7 @@ def export_native_runtime_build() -> dict:
         extra_files={
             "gameData": runtime_files["gameDataName"],
             "playtestGuide": runtime_files["playtestGuideName"],
+            "releaseEvidencePack": EXPORT_RELEASE_EVIDENCE_PACK_NAME,
             "storyRouteMap": EXPORT_STORY_ROUTE_MAP_JSON_NAME,
             "storyRouteMapReport": EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
             "localizationAudit": EXPORT_LOCALIZATION_AUDIT_JSON_NAME,
@@ -10317,6 +10361,10 @@ def export_native_runtime_build() -> dict:
             "playerScript": runtime_files["playerName"],
             "runtimePreloadModule": runtime_files["runtimePreloadModuleName"],
             "runtimePerformanceModule": runtime_files["runtimePerformanceModuleName"],
+            "runtimeSettingsModule": runtime_files["runtimeSettingsModuleName"],
+            "runtimeTextEffectsModule": runtime_files["runtimeTextEffectsModuleName"],
+            "runtimeStorageModule": runtime_files["runtimeStorageModuleName"],
+            "runtimeVariablesModule": runtime_files["runtimeVariablesModuleName"],
             "readme": runtime_files["readmeName"],
             "requirements": runtime_files["requirementsName"],
             "buildRequirements": runtime_files["buildRequirementsName"],
@@ -10366,6 +10414,7 @@ def export_native_runtime_build() -> dict:
             "canBuildStandaloneApp": True,
             "appBuilder": runtime_files["appBuilderName"],
             "playtestGuide": runtime_files["playtestGuideName"],
+            "releaseEvidencePack": EXPORT_RELEASE_EVIDENCE_PACK_NAME,
             "storyRouteMap": EXPORT_STORY_ROUTE_MAP_JSON_NAME,
             "storyRouteMapReport": EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
             "localizationAudit": EXPORT_LOCALIZATION_AUDIT_JSON_NAME,
@@ -10379,6 +10428,10 @@ def export_native_runtime_build() -> dict:
             "runtimePreloadSummary": runtime_files["runtimePreloadSummary"],
             "runtimePreloadModule": runtime_files["runtimePreloadModuleName"],
             "runtimePerformanceModule": runtime_files["runtimePerformanceModuleName"],
+            "runtimeSettingsModule": runtime_files["runtimeSettingsModuleName"],
+            "runtimeTextEffectsModule": runtime_files["runtimeTextEffectsModuleName"],
+            "runtimeStorageModule": runtime_files["runtimeStorageModuleName"],
+            "runtimeVariablesModule": runtime_files["runtimeVariablesModuleName"],
             "releaseCheck": runtime_files["releaseCheckName"],
             "releaseCandidateReport": runtime_files["releaseCandidateReportName"],
             "releaseControlReport": runtime_files["releaseControlReportName"],
@@ -10448,6 +10501,43 @@ def export_native_runtime_build() -> dict:
     story_route_map = quality_reports
     localization_audit = quality_reports
     release_readiness = quality_reports
+    native_launch_steps = [
+        f"macOS：双击 `{NATIVE_RUNTIME_MAC_COMMAND_NAME}`。",
+        f"Linux：运行 `./{NATIVE_RUNTIME_LINUX_COMMAND_NAME}`。",
+        f"Windows：双击 `{NATIVE_RUNTIME_WINDOWS_COMMAND_NAME}`。",
+        f"如果缺依赖，先执行 `python3 -m pip install -r {NATIVE_RUNTIME_REQUIREMENTS_NAME}`。",
+    ]
+    native_runtime_notes = [
+        "原生 Runtime 仍是 Preview 路线，正式分发前建议在目标系统完整点测。",
+        "内嵌视频播放可选 PyAV / FFmpeg；缺少依赖时会尝试降级兜底。",
+    ]
+    evidence_pack_path = write_export_release_evidence_pack_file(
+        build_dir,
+        project=bundle["project"],
+        target_label="原生 Runtime 包（可打包 App）",
+        release_version=release_version,
+        manifest_name=manifest_path.name,
+        playtest_guide_name=runtime_files["playtestGuideName"],
+        provenance_name=EXPORT_PROVENANCE_FILE_NAME,
+        story_route_map_report_name=story_route_map["storyRouteMapReportName"],
+        localization_audit_report_name=localization_audit["localizationAuditReportName"],
+        release_readiness_report_name=release_readiness["releaseReadinessReportName"],
+        unlockable_report_name=runtime_files["unlockableContentReportName"],
+        unlockable_manifest_name=runtime_files["unlockableContentManifestName"],
+        launch_steps=native_launch_steps,
+        runtime_notes=native_runtime_notes,
+        extra_reports=[
+            runtime_files["runtimePreloadReportName"],
+            runtime_files["releaseCandidateReportName"],
+            runtime_files["releaseControlReportName"],
+            runtime_files["vnBaselineQualityMarkdownName"],
+            runtime_files["performanceBudgetMarkdownName"],
+            runtime_files["asset3dSummaryName"],
+            NATIVE_RUNTIME_FILE_INTEGRITY_MARKDOWN_NAME,
+            NATIVE_RUNTIME_ACCEPTANCE_REPORT_NAME,
+        ],
+        missing_assets=missing_assets,
+    )
     provenance_verifiers = write_export_provenance_verifier_files(build_dir)
     provenance_file = write_export_provenance_file(build_dir, bundle, manifest)
     integrity_files = write_native_runtime_file_integrity_reports(build_dir)
@@ -10458,6 +10548,7 @@ def export_native_runtime_build() -> dict:
     internal_reports = [
         {"name": manifest_path.name, "description": "导出清单，记录目标、版本、素材缺口和 Runtime 信息。"},
         {"name": runtime_files["playtestGuideName"], "description": "试玩与发布验收指南，给测试员快速确认打开方式和验收重点。"},
+        {"name": evidence_pack_path.name, "description": "发布证据包，集中索引试玩指南、路线图、发布总控和验收报告。"},
         {"name": story_route_map["storyRouteMapReportName"], "description": "剧情路线图 Markdown，记录坏跳转、不可达场景和结局候选。"},
         {"name": story_route_map["storyRouteMapName"], "description": "机器可读剧情路线图 JSON。"},
         {"name": localization_audit["localizationAuditReportName"], "description": "本地化覆盖 Markdown 报告，记录多语言漏译位置。"},
@@ -10469,6 +10560,10 @@ def export_native_runtime_build() -> dict:
         {"name": runtime_files["runtimePreloadManifestName"], "description": "Runtime 资源预热清单 JSON，记录首屏和早期路线素材。"},
         {"name": runtime_files["runtimePreloadReportName"], "description": "Runtime 资源预热 Markdown 报告，方便复查卡顿风险。"},
         {"name": runtime_files["runtimePreloadModuleName"], "description": "原生 Runtime 资源预热策略模块。"},
+        {"name": runtime_files["runtimeSettingsModuleName"], "description": "原生 Runtime 系统设置模块。"},
+        {"name": runtime_files["runtimeTextEffectsModuleName"], "description": "原生 Runtime 打字机和文本效果模块。"},
+        {"name": runtime_files["runtimeStorageModuleName"], "description": "原生 Runtime 存档、自动恢复和崩溃日志模块。"},
+        {"name": runtime_files["runtimeVariablesModuleName"], "description": "原生 Runtime 变量和条件判断模块。"},
         {"name": runtime_files["releaseCheckName"], "description": "发布前自检 JSON。"},
         {"name": runtime_files["releaseCandidateReportName"], "description": "原生 Runtime 发布候选总报告。"},
         {"name": runtime_files["releaseControlReportName"], "description": "人工验收用发布总控 Markdown。"},
@@ -10548,6 +10643,9 @@ def export_native_runtime_build() -> dict:
         "playtestGuideName": runtime_files["playtestGuideName"],
         "playtestGuidePath": runtime_files["playtestGuidePath"],
         "playtestGuidePublicUrl": f"/exports/{build_dir.name}/{runtime_files['playtestGuideName']}",
+        "releaseEvidencePackName": evidence_pack_path.name,
+        "releaseEvidencePackPath": str(evidence_pack_path),
+        "releaseEvidencePackPublicUrl": f"/exports/{build_dir.name}/{evidence_pack_path.name}",
         "storyRouteMapName": story_route_map["storyRouteMapName"],
         "storyRouteMapPath": story_route_map["storyRouteMapPath"],
         "storyRouteMapPublicUrl": f"/exports/{build_dir.name}/{story_route_map['storyRouteMapName']}",
@@ -10595,6 +10693,18 @@ def export_native_runtime_build() -> dict:
         "runtimePerformanceModuleName": runtime_files["runtimePerformanceModuleName"],
         "runtimePerformanceModulePath": runtime_files["runtimePerformanceModulePath"],
         "runtimePerformanceModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimePerformanceModuleName']}",
+        "runtimeSettingsModuleName": runtime_files["runtimeSettingsModuleName"],
+        "runtimeSettingsModulePath": runtime_files["runtimeSettingsModulePath"],
+        "runtimeSettingsModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimeSettingsModuleName']}",
+        "runtimeTextEffectsModuleName": runtime_files["runtimeTextEffectsModuleName"],
+        "runtimeTextEffectsModulePath": runtime_files["runtimeTextEffectsModulePath"],
+        "runtimeTextEffectsModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimeTextEffectsModuleName']}",
+        "runtimeStorageModuleName": runtime_files["runtimeStorageModuleName"],
+        "runtimeStorageModulePath": runtime_files["runtimeStorageModulePath"],
+        "runtimeStorageModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimeStorageModuleName']}",
+        "runtimeVariablesModuleName": runtime_files["runtimeVariablesModuleName"],
+        "runtimeVariablesModulePath": runtime_files["runtimeVariablesModulePath"],
+        "runtimeVariablesModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimeVariablesModuleName']}",
         "readmeName": runtime_files["readmeName"],
         "readmePath": runtime_files["readmePath"],
         "readmePublicUrl": f"/exports/{build_dir.name}/{runtime_files['readmeName']}",
@@ -10755,6 +10865,12 @@ def export_web_build() -> dict:
     icon_png_bytes = build_export_icon_png(bundle["project"])
     icon_ico_bytes = build_export_icon_ico(icon_png_bytes)
     icon_files = write_export_icon_files(build_dir, icon_png_bytes, icon_ico_bytes)
+    launch_steps = [
+        "双击或用浏览器打开 `index.html`。",
+        "如果浏览器限制本地文件读取，请回到编辑器导出页使用预览链接，或把整个文件夹放到任意静态服务器。",
+        "对外发送时请压缩整个导出文件夹，不要只发送 `index.html`。",
+    ]
+    runtime_notes = ["网页试玩包适合快速分享和轻量测试；正式发行前仍建议补做目标平台点测。"]
     manifest = build_export_manifest(
         bundle,
         target=EXPORT_TARGET_WEB,
@@ -10774,6 +10890,7 @@ def export_web_build() -> dict:
             "runtimePreloadManifest": RUNTIME_PRELOAD_MANIFEST_FILE_NAME,
             "runtimePreloadReport": RUNTIME_PRELOAD_REPORT_FILE_NAME,
             "playtestGuide": EXPORT_PLAYTEST_GUIDE_FILE_NAME,
+            "releaseEvidencePack": EXPORT_RELEASE_EVIDENCE_PACK_NAME,
             "storyRouteMap": EXPORT_STORY_ROUTE_MAP_JSON_NAME,
             "storyRouteMapReport": EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
             "localizationAudit": EXPORT_LOCALIZATION_AUDIT_JSON_NAME,
@@ -10793,21 +10910,18 @@ def export_web_build() -> dict:
         project=bundle["project"],
         target_label="网页试玩包",
         release_version=release_version,
-        launch_steps=[
-            "双击或用浏览器打开 `index.html`。",
-            "如果浏览器限制本地文件读取，请回到编辑器导出页使用预览链接，或把整个文件夹放到任意静态服务器。",
-            "对外发送时请压缩整个导出文件夹，不要只发送 `index.html`。",
-        ],
+        launch_steps=launch_steps,
         manifest_name=manifest_path.name,
         unlockable_manifest_name=UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME,
         unlockable_report_name=UNLOCKABLE_CONTENT_REPORT_FILE_NAME,
         provenance_name=EXPORT_PROVENANCE_FILE_NAME,
         extra_reports=[
+            EXPORT_RELEASE_EVIDENCE_PACK_NAME,
             EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
             EXPORT_LOCALIZATION_AUDIT_REPORT_NAME,
             EXPORT_RELEASE_READINESS_REPORT_NAME,
         ],
-        runtime_notes=["网页试玩包适合快速分享和轻量测试；正式发行前仍建议补做目标平台点测。"],
+        runtime_notes=runtime_notes,
         missing_assets=missing_assets,
     )
     quality_reports = write_export_quality_report_bundle(
@@ -10830,6 +10944,24 @@ def export_web_build() -> dict:
     story_route_map = quality_reports
     localization_audit = quality_reports
     release_readiness = quality_reports
+    evidence_pack_path = write_export_release_evidence_pack_file(
+        build_dir,
+        project=bundle["project"],
+        target_label="网页试玩包",
+        release_version=release_version,
+        manifest_name=manifest_path.name,
+        playtest_guide_name=playtest_guide_path.name,
+        provenance_name=EXPORT_PROVENANCE_FILE_NAME,
+        story_route_map_report_name=story_route_map["storyRouteMapReportName"],
+        localization_audit_report_name=localization_audit["localizationAuditReportName"],
+        release_readiness_report_name=release_readiness["releaseReadinessReportName"],
+        unlockable_report_name=UNLOCKABLE_CONTENT_REPORT_FILE_NAME,
+        unlockable_manifest_name=UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME,
+        launch_steps=launch_steps,
+        runtime_notes=runtime_notes,
+        extra_reports=[RUNTIME_PRELOAD_REPORT_FILE_NAME],
+        missing_assets=missing_assets,
+    )
     provenance_verifiers = write_export_provenance_verifier_files(build_dir)
     provenance_file = write_export_provenance_file(build_dir, bundle, manifest)
 
@@ -10844,6 +10976,9 @@ def export_web_build() -> dict:
         "manifestPublicUrl": f"/exports/{build_dir.name}/{manifest_path.name}",
         "playtestGuidePath": str(playtest_guide_path),
         "playtestGuidePublicUrl": f"/exports/{build_dir.name}/{playtest_guide_path.name}",
+        "releaseEvidencePackName": evidence_pack_path.name,
+        "releaseEvidencePackPath": str(evidence_pack_path),
+        "releaseEvidencePackPublicUrl": f"/exports/{build_dir.name}/{evidence_pack_path.name}",
         "storyRouteMapName": story_route_map["storyRouteMapName"],
         "storyRouteMapPath": story_route_map["storyRouteMapPath"],
         "storyRouteMapPublicUrl": f"/exports/{build_dir.name}/{story_route_map['storyRouteMapName']}",
@@ -11727,6 +11862,7 @@ def export_windows_nwjs_build() -> dict:
             "appRuntimePreloadManifest": f"app/{RUNTIME_PRELOAD_MANIFEST_FILE_NAME}",
             "appRuntimePreloadReport": f"app/{RUNTIME_PRELOAD_REPORT_FILE_NAME}",
             "playtestGuide": EXPORT_PLAYTEST_GUIDE_FILE_NAME,
+            "releaseEvidencePack": EXPORT_RELEASE_EVIDENCE_PACK_NAME,
             "storyRouteMap": EXPORT_STORY_ROUTE_MAP_JSON_NAME,
             "storyRouteMapReport": EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
             "localizationAudit": EXPORT_LOCALIZATION_AUDIT_JSON_NAME,
@@ -11764,30 +11900,33 @@ def export_windows_nwjs_build() -> dict:
         manifest_path.name,
         manifest["engine"]["releaseVersion"],
     )
+    launch_steps = [
+        "优先双击 `启动游戏.cmd`。",
+        f"也可以直接双击 `{executable_name}`。",
+        "对外发送时请压缩整个导出文件夹，不要只发送单个 exe 或 cmd。",
+    ]
+    runtime_notes = [
+        f"当前桌面模式：{runtime_mode_label}。",
+        f"当前打包方式：{package_mode_label}。",
+    ]
     playtest_guide_path = write_export_playtest_guide_file(
         build_dir,
         project=bundle["project"],
         target_label="Windows 桌面包",
         release_version=release_version,
-        launch_steps=[
-            "优先双击 `启动游戏.cmd`。",
-            f"也可以直接双击 `{executable_name}`。",
-            "对外发送时请压缩整个导出文件夹，不要只发送单个 exe 或 cmd。",
-        ],
+        launch_steps=launch_steps,
         manifest_name=manifest_path.name,
         unlockable_manifest_name=f"app/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
         unlockable_report_name=f"app/{UNLOCKABLE_CONTENT_REPORT_FILE_NAME}",
         provenance_name=EXPORT_PROVENANCE_FILE_NAME,
         extra_reports=[
+            EXPORT_RELEASE_EVIDENCE_PACK_NAME,
             readme_path.name,
             EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
             EXPORT_LOCALIZATION_AUDIT_REPORT_NAME,
             EXPORT_RELEASE_READINESS_REPORT_NAME,
         ],
-        runtime_notes=[
-            f"当前桌面模式：{runtime_mode_label}。",
-            f"当前打包方式：{package_mode_label}。",
-        ],
+        runtime_notes=runtime_notes,
         missing_assets=missing_assets,
     )
     quality_reports = write_export_quality_report_bundle(
@@ -11814,12 +11953,31 @@ def export_windows_nwjs_build() -> dict:
     story_route_map = quality_reports
     localization_audit = quality_reports
     release_readiness = quality_reports
+    evidence_pack_path = write_export_release_evidence_pack_file(
+        build_dir,
+        project=bundle["project"],
+        target_label="Windows 桌面包",
+        release_version=release_version,
+        manifest_name=manifest_path.name,
+        playtest_guide_name=playtest_guide_path.name,
+        provenance_name=EXPORT_PROVENANCE_FILE_NAME,
+        story_route_map_report_name=story_route_map["storyRouteMapReportName"],
+        localization_audit_report_name=localization_audit["localizationAuditReportName"],
+        release_readiness_report_name=release_readiness["releaseReadinessReportName"],
+        unlockable_report_name=f"app/{UNLOCKABLE_CONTENT_REPORT_FILE_NAME}",
+        unlockable_manifest_name=f"app/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
+        launch_steps=launch_steps,
+        runtime_notes=runtime_notes,
+        extra_reports=[readme_path.name, f"app/{RUNTIME_PRELOAD_REPORT_FILE_NAME}"],
+        missing_assets=missing_assets,
+    )
     provenance_verifiers = write_export_provenance_verifier_files(build_dir)
     provenance_roots = [
         app_dir,
         manifest_path,
         readme_path,
         playtest_guide_path,
+        evidence_pack_path,
         Path(story_route_map["storyRouteMapReportPath"]),
         Path(story_route_map["storyRouteMapPath"]),
         Path(localization_audit["localizationAuditReportPath"]),
@@ -11887,6 +12045,9 @@ def export_windows_nwjs_build() -> dict:
         "readmePath": str(readme_path),
         "playtestGuidePath": str(playtest_guide_path),
         "playtestGuidePublicUrl": f"/exports/{build_dir.name}/{playtest_guide_path.name}",
+        "releaseEvidencePackName": evidence_pack_path.name,
+        "releaseEvidencePackPath": str(evidence_pack_path),
+        "releaseEvidencePackPublicUrl": f"/exports/{build_dir.name}/{evidence_pack_path.name}",
         "storyRouteMapName": story_route_map["storyRouteMapName"],
         "storyRouteMapPath": story_route_map["storyRouteMapPath"],
         "storyRouteMapPublicUrl": f"/exports/{build_dir.name}/{story_route_map['storyRouteMapName']}",
@@ -11982,6 +12143,7 @@ def export_macos_nwjs_build() -> dict:
             "appRuntimePreloadManifest": f"app/{RUNTIME_PRELOAD_MANIFEST_FILE_NAME}",
             "appRuntimePreloadReport": f"app/{RUNTIME_PRELOAD_REPORT_FILE_NAME}",
             "playtestGuide": EXPORT_PLAYTEST_GUIDE_FILE_NAME,
+            "releaseEvidencePack": EXPORT_RELEASE_EVIDENCE_PACK_NAME,
             "storyRouteMap": EXPORT_STORY_ROUTE_MAP_JSON_NAME,
             "storyRouteMapReport": EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
             "localizationAudit": EXPORT_LOCALIZATION_AUDIT_JSON_NAME,
@@ -12019,30 +12181,33 @@ def export_macos_nwjs_build() -> dict:
         manifest_path.name,
         release_version,
     )
+    launch_steps = [
+        f"优先双击 `{start_helper_path.name}`。",
+        f"也可以直接打开 `{app_bundle_name}`。",
+        "对外发送时请压缩整个导出文件夹，不要只发送 .app。",
+    ]
+    runtime_notes = [
+        f"当前运行壳：NW.js {NWJS_RUNTIME_VERSION}。",
+        "未签名预览包可能触发 Gatekeeper 提示；正式发布前建议补签名和公证。",
+    ]
     playtest_guide_path = write_export_playtest_guide_file(
         build_dir,
         project=bundle["project"],
         target_label="macOS 桌面包",
         release_version=release_version,
-        launch_steps=[
-            f"优先双击 `{start_helper_path.name}`。",
-            f"也可以直接打开 `{app_bundle_name}`。",
-            "对外发送时请压缩整个导出文件夹，不要只发送 .app。",
-        ],
+        launch_steps=launch_steps,
         manifest_name=manifest_path.name,
         unlockable_manifest_name=f"app/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
         unlockable_report_name=f"app/{UNLOCKABLE_CONTENT_REPORT_FILE_NAME}",
         provenance_name=EXPORT_PROVENANCE_FILE_NAME,
         extra_reports=[
+            EXPORT_RELEASE_EVIDENCE_PACK_NAME,
             readme_path.name,
             EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
             EXPORT_LOCALIZATION_AUDIT_REPORT_NAME,
             EXPORT_RELEASE_READINESS_REPORT_NAME,
         ],
-        runtime_notes=[
-            f"当前运行壳：NW.js {NWJS_RUNTIME_VERSION}。",
-            "未签名预览包可能触发 Gatekeeper 提示；正式发布前建议补签名和公证。",
-        ],
+        runtime_notes=runtime_notes,
         missing_assets=missing_assets,
     )
     quality_reports = write_export_quality_report_bundle(
@@ -12069,6 +12234,24 @@ def export_macos_nwjs_build() -> dict:
     story_route_map = quality_reports
     localization_audit = quality_reports
     release_readiness = quality_reports
+    evidence_pack_path = write_export_release_evidence_pack_file(
+        build_dir,
+        project=bundle["project"],
+        target_label="macOS 桌面包",
+        release_version=release_version,
+        manifest_name=manifest_path.name,
+        playtest_guide_name=playtest_guide_path.name,
+        provenance_name=EXPORT_PROVENANCE_FILE_NAME,
+        story_route_map_report_name=story_route_map["storyRouteMapReportName"],
+        localization_audit_report_name=localization_audit["localizationAuditReportName"],
+        release_readiness_report_name=release_readiness["releaseReadinessReportName"],
+        unlockable_report_name=f"app/{UNLOCKABLE_CONTENT_REPORT_FILE_NAME}",
+        unlockable_manifest_name=f"app/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
+        launch_steps=launch_steps,
+        runtime_notes=runtime_notes,
+        extra_reports=[readme_path.name, f"app/{RUNTIME_PRELOAD_REPORT_FILE_NAME}"],
+        missing_assets=missing_assets,
+    )
     provenance_verifiers = write_export_provenance_verifier_files(build_dir)
     provenance_file = write_export_provenance_file(
         build_dir,
@@ -12079,6 +12262,7 @@ def export_macos_nwjs_build() -> dict:
             manifest_path,
             readme_path,
             playtest_guide_path,
+            evidence_pack_path,
             Path(story_route_map["storyRouteMapReportPath"]),
             Path(story_route_map["storyRouteMapPath"]),
             Path(localization_audit["localizationAuditReportPath"]),
@@ -12147,6 +12331,9 @@ def export_macos_nwjs_build() -> dict:
         "readmePath": str(readme_path),
         "playtestGuidePath": str(playtest_guide_path),
         "playtestGuidePublicUrl": f"/exports/{build_dir.name}/{playtest_guide_path.name}",
+        "releaseEvidencePackName": evidence_pack_path.name,
+        "releaseEvidencePackPath": str(evidence_pack_path),
+        "releaseEvidencePackPublicUrl": f"/exports/{build_dir.name}/{evidence_pack_path.name}",
         "storyRouteMapName": story_route_map["storyRouteMapName"],
         "storyRouteMapPath": story_route_map["storyRouteMapPath"],
         "storyRouteMapPublicUrl": f"/exports/{build_dir.name}/{story_route_map['storyRouteMapName']}",
@@ -12248,6 +12435,7 @@ def export_linux_nwjs_build() -> dict:
             "appRuntimePreloadManifest": f"app/{RUNTIME_PRELOAD_MANIFEST_FILE_NAME}",
             "appRuntimePreloadReport": f"app/{RUNTIME_PRELOAD_REPORT_FILE_NAME}",
             "playtestGuide": EXPORT_PLAYTEST_GUIDE_FILE_NAME,
+            "releaseEvidencePack": EXPORT_RELEASE_EVIDENCE_PACK_NAME,
             "storyRouteMap": EXPORT_STORY_ROUTE_MAP_JSON_NAME,
             "storyRouteMapReport": EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
             "localizationAudit": EXPORT_LOCALIZATION_AUDIT_JSON_NAME,
@@ -12284,28 +12472,31 @@ def export_linux_nwjs_build() -> dict:
         manifest_path.name,
         release_version,
     )
+    launch_steps = [
+        f"优先运行 `./{start_helper_path.name}`。",
+        f"也可以直接运行 `./{executable_name}`。",
+        "如果脚本没有执行权限，先运行 `chmod +x 启动游戏.sh`。",
+        "对外发送时请压缩整个导出文件夹，不要只发送单个可执行文件。",
+    ]
+    runtime_notes = [f"当前运行壳：NW.js {NWJS_RUNTIME_VERSION}。"]
     playtest_guide_path = write_export_playtest_guide_file(
         build_dir,
         project=bundle["project"],
         target_label="Linux 桌面包",
         release_version=release_version,
-        launch_steps=[
-            f"优先运行 `./{start_helper_path.name}`。",
-            f"也可以直接运行 `./{executable_name}`。",
-            "如果脚本没有执行权限，先运行 `chmod +x 启动游戏.sh`。",
-            "对外发送时请压缩整个导出文件夹，不要只发送单个可执行文件。",
-        ],
+        launch_steps=launch_steps,
         manifest_name=manifest_path.name,
         unlockable_manifest_name=f"app/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
         unlockable_report_name=f"app/{UNLOCKABLE_CONTENT_REPORT_FILE_NAME}",
         provenance_name=EXPORT_PROVENANCE_FILE_NAME,
         extra_reports=[
+            EXPORT_RELEASE_EVIDENCE_PACK_NAME,
             readme_path.name,
             EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
             EXPORT_LOCALIZATION_AUDIT_REPORT_NAME,
             EXPORT_RELEASE_READINESS_REPORT_NAME,
         ],
-        runtime_notes=[f"当前运行壳：NW.js {NWJS_RUNTIME_VERSION}。"],
+        runtime_notes=runtime_notes,
         missing_assets=missing_assets,
     )
     quality_reports = write_export_quality_report_bundle(
@@ -12332,6 +12523,24 @@ def export_linux_nwjs_build() -> dict:
     story_route_map = quality_reports
     localization_audit = quality_reports
     release_readiness = quality_reports
+    evidence_pack_path = write_export_release_evidence_pack_file(
+        build_dir,
+        project=bundle["project"],
+        target_label="Linux 桌面包",
+        release_version=release_version,
+        manifest_name=manifest_path.name,
+        playtest_guide_name=playtest_guide_path.name,
+        provenance_name=EXPORT_PROVENANCE_FILE_NAME,
+        story_route_map_report_name=story_route_map["storyRouteMapReportName"],
+        localization_audit_report_name=localization_audit["localizationAuditReportName"],
+        release_readiness_report_name=release_readiness["releaseReadinessReportName"],
+        unlockable_report_name=f"app/{UNLOCKABLE_CONTENT_REPORT_FILE_NAME}",
+        unlockable_manifest_name=f"app/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
+        launch_steps=launch_steps,
+        runtime_notes=runtime_notes,
+        extra_reports=[readme_path.name, f"app/{RUNTIME_PRELOAD_REPORT_FILE_NAME}"],
+        missing_assets=missing_assets,
+    )
     provenance_verifiers = write_export_provenance_verifier_files(build_dir)
     provenance_roots = [
         app_dir,
@@ -12339,6 +12548,7 @@ def export_linux_nwjs_build() -> dict:
         manifest_path,
         readme_path,
         playtest_guide_path,
+        evidence_pack_path,
         Path(story_route_map["storyRouteMapReportPath"]),
         Path(story_route_map["storyRouteMapPath"]),
         Path(localization_audit["localizationAuditReportPath"]),
@@ -12404,6 +12614,9 @@ def export_linux_nwjs_build() -> dict:
         "readmePath": str(readme_path),
         "playtestGuidePath": str(playtest_guide_path),
         "playtestGuidePublicUrl": f"/exports/{build_dir.name}/{playtest_guide_path.name}",
+        "releaseEvidencePackName": evidence_pack_path.name,
+        "releaseEvidencePackPath": str(evidence_pack_path),
+        "releaseEvidencePackPublicUrl": f"/exports/{build_dir.name}/{evidence_pack_path.name}",
         "storyRouteMapName": story_route_map["storyRouteMapName"],
         "storyRouteMapPath": story_route_map["storyRouteMapPath"],
         "storyRouteMapPublicUrl": f"/exports/{build_dir.name}/{story_route_map['storyRouteMapName']}",

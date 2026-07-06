@@ -368,6 +368,17 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertIn(run_editor.UNLOCKABLE_CONTENT_REPORT_FILE_NAME, content)
         return content
 
+    def assert_export_release_evidence_pack_file(self, evidence_path: Path) -> str:
+        self.assertTrue(evidence_path.is_file())
+        content = evidence_path.read_text(encoding="utf-8")
+        self.assertIn("# 发布证据包", content)
+        self.assertIn("## 最短验收顺序", content)
+        self.assertIn(run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME, content)
+        self.assertIn(run_editor.EXPORT_RELEASE_READINESS_REPORT_NAME, content)
+        self.assertIn(run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME, content)
+        self.assertIn(run_editor.EXPORT_LOCALIZATION_AUDIT_REPORT_NAME, content)
+        return content
+
     def assert_export_release_readiness_files(self, summary_path: Path, report_path: Path) -> dict:
         self.assertTrue(summary_path.is_file())
         self.assertTrue(report_path.is_file())
@@ -3046,6 +3057,9 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / "app_icon.ico").is_file())
         self.assertTrue(manifest_path.is_file())
         self.assert_export_playtest_guide_file(build_dir / run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME)
+        self.assert_export_release_evidence_pack_file(build_dir / run_editor.EXPORT_RELEASE_EVIDENCE_PACK_NAME)
+        self.assertEqual(export_result["releaseEvidencePackName"], run_editor.EXPORT_RELEASE_EVIDENCE_PACK_NAME)
+        self.assertTrue(export_result["releaseEvidencePackPublicUrl"].endswith(run_editor.EXPORT_RELEASE_EVIDENCE_PACK_NAME))
         route_map_payload = self.assert_export_story_route_map_files(
             build_dir / run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME,
             build_dir / run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
@@ -3086,6 +3100,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["runtimePreloadManifest"], run_editor.RUNTIME_PRELOAD_MANIFEST_FILE_NAME)
         self.assertEqual(manifest["files"]["runtimePreloadReport"], run_editor.RUNTIME_PRELOAD_REPORT_FILE_NAME)
         self.assertEqual(manifest["files"]["playtestGuide"], run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME)
+        self.assertEqual(manifest["files"]["releaseEvidencePack"], run_editor.EXPORT_RELEASE_EVIDENCE_PACK_NAME)
         self.assertEqual(manifest["files"]["storyRouteMap"], run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME)
         self.assertEqual(manifest["files"]["storyRouteMapReport"], run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME)
         self.assertEqual(manifest["files"]["localizationAudit"], run_editor.EXPORT_LOCALIZATION_AUDIT_JSON_NAME)
@@ -3100,6 +3115,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 "export_manifest.json",
                 "index.html",
                 run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME,
+                run_editor.EXPORT_RELEASE_EVIDENCE_PACK_NAME,
                 run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME,
                 run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
                 run_editor.EXPORT_LOCALIZATION_AUDIT_JSON_NAME,
@@ -3384,6 +3400,10 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / run_editor.RUNTIME_PRELOAD_REPORT_FILE_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_PLAYER_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_PRELOAD_NAME).is_file())
+        self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_SETTINGS_NAME).is_file())
+        self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_TEXT_EFFECTS_NAME).is_file())
+        self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_STORAGE_NAME).is_file())
+        self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_VARIABLES_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_README_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_REQUIREMENTS_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_BUILD_REQUIREMENTS_NAME).is_file())
@@ -3427,6 +3447,9 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue(Path(export_result["releaseNotesPath"]).is_file())
         self.assertTrue(manifest_path.is_file())
         self.assert_export_playtest_guide_file(build_dir / run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME)
+        self.assert_export_release_evidence_pack_file(build_dir / run_editor.EXPORT_RELEASE_EVIDENCE_PACK_NAME)
+        self.assertEqual(export_result["releaseEvidencePackName"], run_editor.EXPORT_RELEASE_EVIDENCE_PACK_NAME)
+        self.assertTrue(export_result["releaseEvidencePackPublicUrl"].endswith(run_editor.EXPORT_RELEASE_EVIDENCE_PACK_NAME))
         route_map_payload = self.assert_export_story_route_map_files(
             build_dir / run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME,
             build_dir / run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
@@ -3539,6 +3562,12 @@ class RunEditorSmokeTests(unittest.TestCase):
         )
         self.assertTrue(
             any(
+                item["name"] == export_result["releaseEvidencePackName"]
+                for item in release_artifact_payload["insideArchiveReports"]
+            )
+        )
+        self.assertTrue(
+            any(
                 item["name"] == export_result["storyRouteMapReportName"]
                 for item in release_artifact_payload["insideArchiveReports"]
             )
@@ -3562,6 +3591,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertIn("# 原生 Runtime 发布附件索引", release_artifact_markdown)
         self.assertIn("运行 .verify.command / .verify.sh / .verify.bat", release_artifact_markdown)
         self.assertIn("Release Notes 摘要", release_artifact_markdown)
+        self.assertIn(run_editor.EXPORT_RELEASE_EVIDENCE_PACK_NAME, release_artifact_markdown)
         release_notes_markdown = Path(export_result["releaseNotesPath"]).read_text(encoding="utf-8")
         self.assertIn("# Canvasia Engine 原生 Runtime Preview", release_notes_markdown)
         self.assertIn("GitHub Release", release_notes_markdown)
@@ -3581,14 +3611,25 @@ class RunEditorSmokeTests(unittest.TestCase):
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         self.assertEqual(manifest["engine"]["exportTarget"], run_editor.EXPORT_TARGET_NATIVE_RUNTIME)
         self.assert_export_manifest_has_subtle_engine_signature(manifest)
+        self.assertEqual(manifest["files"]["releaseEvidencePack"], run_editor.EXPORT_RELEASE_EVIDENCE_PACK_NAME)
+        self.assertEqual(manifest["runtime"]["releaseEvidencePack"], run_editor.EXPORT_RELEASE_EVIDENCE_PACK_NAME)
+        self.assertEqual(manifest["files"]["runtimeSettingsModule"], run_editor.NATIVE_RUNTIME_SETTINGS_NAME)
+        self.assertEqual(manifest["files"]["runtimeTextEffectsModule"], run_editor.NATIVE_RUNTIME_TEXT_EFFECTS_NAME)
+        self.assertEqual(manifest["files"]["runtimeStorageModule"], run_editor.NATIVE_RUNTIME_STORAGE_NAME)
+        self.assertEqual(manifest["files"]["runtimeVariablesModule"], run_editor.NATIVE_RUNTIME_VARIABLES_NAME)
         provenance = self.assert_export_provenance_file(
             export_result,
             {
                 "export_manifest.json",
                 run_editor.NATIVE_RUNTIME_PLAYER_NAME,
                 run_editor.NATIVE_RUNTIME_PRELOAD_NAME,
+                run_editor.NATIVE_RUNTIME_SETTINGS_NAME,
+                run_editor.NATIVE_RUNTIME_TEXT_EFFECTS_NAME,
+                run_editor.NATIVE_RUNTIME_STORAGE_NAME,
+                run_editor.NATIVE_RUNTIME_VARIABLES_NAME,
                 "game_data.json",
                 run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME,
+                run_editor.EXPORT_RELEASE_EVIDENCE_PACK_NAME,
                 run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME,
                 run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
                 run_editor.EXPORT_LOCALIZATION_AUDIT_JSON_NAME,
@@ -4199,6 +4240,8 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / "app" / "runtime_settings.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_audio.js").is_file())
         self.assert_export_playtest_guide_file(build_dir / run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME)
+        self.assert_export_release_evidence_pack_file(build_dir / run_editor.EXPORT_RELEASE_EVIDENCE_PACK_NAME)
+        self.assertEqual(export_result["releaseEvidencePackName"], run_editor.EXPORT_RELEASE_EVIDENCE_PACK_NAME)
         route_map_payload = self.assert_export_story_route_map_files(
             build_dir / run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME,
             build_dir / run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
@@ -4222,6 +4265,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["engine"]["exportTarget"], run_editor.EXPORT_TARGET_WINDOWS_NWJS)
         self.assert_export_manifest_has_subtle_engine_signature(manifest)
         self.assertEqual(manifest["files"]["playtestGuide"], run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME)
+        self.assertEqual(manifest["files"]["releaseEvidencePack"], run_editor.EXPORT_RELEASE_EVIDENCE_PACK_NAME)
         self.assertEqual(manifest["files"]["appRuntimeConditions"], "app/runtime_conditions.js")
         self.assertEqual(manifest["files"]["storyRouteMap"], run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME)
         self.assertEqual(manifest["files"]["storyRouteMapReport"], run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME)
@@ -4236,6 +4280,7 @@ class RunEditorSmokeTests(unittest.TestCase):
             {
                 "export_manifest.json",
                 run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME,
+                run_editor.EXPORT_RELEASE_EVIDENCE_PACK_NAME,
                 run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME,
                 run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
                 run_editor.EXPORT_LOCALIZATION_AUDIT_JSON_NAME,
@@ -4285,6 +4330,8 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / "app" / "runtime_settings.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_audio.js").is_file())
         self.assert_export_playtest_guide_file(build_dir / run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME)
+        self.assert_export_release_evidence_pack_file(build_dir / run_editor.EXPORT_RELEASE_EVIDENCE_PACK_NAME)
+        self.assertEqual(export_result["releaseEvidencePackName"], run_editor.EXPORT_RELEASE_EVIDENCE_PACK_NAME)
         route_map_payload = self.assert_export_story_route_map_files(
             build_dir / run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME,
             build_dir / run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
@@ -4308,6 +4355,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["engine"]["exportTarget"], run_editor.EXPORT_TARGET_MACOS_NWJS)
         self.assert_export_manifest_has_subtle_engine_signature(manifest)
         self.assertEqual(manifest["files"]["playtestGuide"], run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME)
+        self.assertEqual(manifest["files"]["releaseEvidencePack"], run_editor.EXPORT_RELEASE_EVIDENCE_PACK_NAME)
         self.assertEqual(manifest["files"]["appRuntimeConditions"], "app/runtime_conditions.js")
         self.assertEqual(manifest["files"]["storyRouteMap"], run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME)
         self.assertEqual(manifest["files"]["storyRouteMapReport"], run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME)
@@ -4322,6 +4370,7 @@ class RunEditorSmokeTests(unittest.TestCase):
             {
                 "export_manifest.json",
                 run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME,
+                run_editor.EXPORT_RELEASE_EVIDENCE_PACK_NAME,
                 run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME,
                 run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
                 run_editor.EXPORT_LOCALIZATION_AUDIT_JSON_NAME,
@@ -4446,6 +4495,8 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / "app" / "runtime_settings.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_audio.js").is_file())
         self.assert_export_playtest_guide_file(build_dir / run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME)
+        self.assert_export_release_evidence_pack_file(build_dir / run_editor.EXPORT_RELEASE_EVIDENCE_PACK_NAME)
+        self.assertEqual(export_result["releaseEvidencePackName"], run_editor.EXPORT_RELEASE_EVIDENCE_PACK_NAME)
         route_map_payload = self.assert_export_story_route_map_files(
             build_dir / run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME,
             build_dir / run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
@@ -4469,6 +4520,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["engine"]["exportTarget"], run_editor.EXPORT_TARGET_LINUX_NWJS)
         self.assert_export_manifest_has_subtle_engine_signature(manifest)
         self.assertEqual(manifest["files"]["playtestGuide"], run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME)
+        self.assertEqual(manifest["files"]["releaseEvidencePack"], run_editor.EXPORT_RELEASE_EVIDENCE_PACK_NAME)
         self.assertEqual(manifest["files"]["appRuntimeConditions"], "app/runtime_conditions.js")
         self.assertEqual(manifest["files"]["storyRouteMap"], run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME)
         self.assertEqual(manifest["files"]["storyRouteMapReport"], run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME)
@@ -4483,6 +4535,7 @@ class RunEditorSmokeTests(unittest.TestCase):
             {
                 "export_manifest.json",
                 run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME,
+                run_editor.EXPORT_RELEASE_EVIDENCE_PACK_NAME,
                 run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME,
                 run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
                 run_editor.EXPORT_LOCALIZATION_AUDIT_JSON_NAME,
@@ -4513,12 +4566,18 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(export_result["target"], run_editor.EXPORT_TARGET_EDITOR_DESKTOP)
         self.assertTrue(bundle_dir.is_dir())
         self.assertTrue((bundle_dir / "run_editor.py").is_file())
+        for file_name in run_editor.EDITOR_EXPORT_FILES:
+            self.assertTrue((bundle_dir / file_name).is_file(), file_name)
+        for directory_name in run_editor.EDITOR_EXPORT_DIRECTORIES:
+            self.assertTrue((bundle_dir / directory_name).is_dir(), directory_name)
         self.assertTrue((bundle_dir / "prototype_editor" / "index.html").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "player.js").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_conditions.js").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_controls.js").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_settings.js").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_audio.js").is_file())
+        self.assertTrue((bundle_dir / "native_runtime" / run_editor.NATIVE_RUNTIME_PLAYER_NAME).is_file())
+        self.assertTrue((bundle_dir / "native_runtime" / run_editor.NATIVE_RUNTIME_SETTINGS_NAME).is_file())
         self.assertTrue((bundle_dir / "template_project" / "project.json").is_file())
         self.assertTrue((bundle_dir / "projects").is_dir())
         self.assertTrue((bundle_dir / "exports").is_dir())
