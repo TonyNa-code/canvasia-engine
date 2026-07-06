@@ -23,6 +23,7 @@ NATIVE_RUNTIME_SETTINGS_PATH = ROOT_DIR / "native_runtime" / "runtime_player_set
 NATIVE_RUNTIME_TEXT_EFFECTS_PATH = ROOT_DIR / "native_runtime" / "runtime_text_effects.py"
 PROJECT_POLISH_RECEIPT_PANEL_PATH = EDITOR_DIR / "modules" / "project_polish_receipt_panel.js"
 DASHBOARD_PRIMARY_ACTIONS_PATH = EDITOR_DIR / "modules" / "dashboard_primary_actions.js"
+TYPEWRITER_MODULE_PATH = EDITOR_DIR / "modules" / "typewriter.js"
 MODULE_PATHS = tuple(sorted((EDITOR_DIR / "modules").glob("*.js")))
 ACTION_ATTRIBUTE_PATHS = (INDEX_PATH, APP_PATH, *MODULE_PATHS)
 ACTION_CONFIG_PATHS = (APP_PATH, *MODULE_PATHS)
@@ -5800,6 +5801,7 @@ class FrontendActionHandlerTests(unittest.TestCase):
 
     def test_line_text_speed_override_reaches_preview_export_and_native_runtime(self) -> None:
         app_source = APP_PATH.read_text(encoding="utf-8")
+        typewriter_source = TYPEWRITER_MODULE_PATH.read_text(encoding="utf-8")
         collect_edited_block = _extract_function_source(app_source, "collectEditedBlock")
         preview_speed = _extract_function_source(app_source, "getPreviewSnapshotTextSpeed")
         preview_typewriter = _extract_function_source(app_source, "shouldUsePreviewTypewriter")
@@ -5811,8 +5813,10 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("snapshot?.block?.textSpeed ?? state.previewPlayback.textSpeed", preview_speed)
         self.assertIn('getPreviewSnapshotTextSpeed(snapshot) === "instant"', preview_typewriter)
         self.assertIn("getPreviewSnapshotTextSpeed(snapshot)", preview_delay)
-        self.assertIn("function getTypewriterPunctuationPause", app_source)
-        self.assertIn("getTypewriterPunctuationPause(visibleText, fullText)", app_source)
+        self.assertIn("window.CanvasiaEditorTypewriter", app_source)
+        self.assertIn("const getTypewriterStepDelay = typewriterTools.getTypewriterStepDelay", app_source)
+        self.assertIn("function getTypewriterPunctuationPause", typewriter_source)
+        self.assertIn("getTypewriterPunctuationPause(visibleText, fullText)", typewriter_source)
         self.assertIn("state.previewTyping.visibleText", preview_schedule_typewriter)
 
         story_editor_source = (EDITOR_DIR / "modules" / "story_block_editors.js").read_text(encoding="utf-8")
@@ -5953,8 +5957,19 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("updateRuntimeAudioVolumes()", toggle_voice_ducking)
 
     def test_typewriter_index_helpers_keep_unicode_characters_intact(self) -> None:
-        for path in (APP_PATH, PLAYER_PATH):
+        for path in (TYPEWRITER_MODULE_PATH, PLAYER_PATH):
             source = path.read_text(encoding="utf-8")
+            speed_helper_lines = (
+                [
+                    "const TYPEWRITER_STEP_DELAYS = Object.freeze({ slow: 42, normal: 28, fast: 18, instant: 0 });",
+                    f"function getSafeTypewriterTextSpeed(speed) {_extract_function_source(source, 'getSafeTypewriterTextSpeed')}",
+                ]
+                if path == TYPEWRITER_MODULE_PATH
+                else [
+                    "const TEXT_SPEED_LABELS = { slow: '慢速', normal: '标准', fast: '快速', instant: '立刻显示' };",
+                    "function getSafeTextSpeed(speed) { return Object.hasOwn(TEXT_SPEED_LABELS, speed) ? speed : 'normal'; }",
+                ]
+            )
             script = "\n".join(
                 [
                     "const typewriterGraphemeSegmenter = null;",
@@ -5969,10 +5984,9 @@ class FrontendActionHandlerTests(unittest.TestCase):
                     f"function includeTypewriterTrailingClosers(text, index) {_extract_function_source(source, 'includeTypewriterTrailingClosers')}",
                     f"function includeTypewriterLeadingFollower(text, currentIndex, index) {_extract_function_source(source, 'includeTypewriterLeadingFollower')}",
                     f"function getNextTypewriterIndex(text, currentIndex) {_extract_function_source(source, 'getNextTypewriterIndex')}",
-                    "const TEXT_SPEED_LABELS = { slow: '慢速', normal: '标准', fast: '快速', instant: '立刻显示' };",
                     "const TYPEWRITER_TRAILING_CLOSERS = '”’\"\\')）]}】〕〉》」』';",
                     "const TYPEWRITER_PERIOD_ABBREVIATIONS = new Set(['mr', 'mrs', 'ms', 'dr', 'prof', 'sr', 'jr', 'st', 'vs', 'etc', 'e.g', 'i.e', 'u.s', 'u.k', 'no', 'fig', 'vol', 'ch', 'dept', 'inc', 'ltd', 'co']);",
-                    "function getSafeTextSpeed(speed) { return Object.hasOwn(TEXT_SPEED_LABELS, speed) ? speed : 'normal'; }",
+                    *speed_helper_lines,
                     f"function getTypewriterPauseAnchorText(text) {_extract_function_source(source, 'getTypewriterPauseAnchorText')}",
                     f"function getTypewriterPauseAnchorChar(text) {_extract_function_source(source, 'getTypewriterPauseAnchorChar')}",
                     f"function isTypewriterInlinePeriod(anchorText, fullText = '') {_extract_function_source(source, 'isTypewriterInlinePeriod')}",
