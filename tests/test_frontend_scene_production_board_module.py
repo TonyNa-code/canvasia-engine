@@ -44,6 +44,8 @@ class FrontendSceneProductionBoardModuleTests(unittest.TestCase):
                         {{ id: "bg", type: "background", assetId: "bg_classroom" }},
                         {{ id: "music", type: "music_play", assetId: "bgm_theme" }},
                         {{ id: "line_1", type: "dialogue", speakerId: "char_a", text: "你好", voiceAssetId: "voice_001" }},
+                        {{ id: "line_dup", type: "dialogue", speakerId: "char_a", expressionId: "smile", text: "你好", voiceAssetId: "voice_dup" }},
+                        {{ id: "empty_narration", type: "narration", text: "   " }},
                         {{ id: "line_2", type: "dialogue", speakerId: "char_a", text: "还没配音" }},
                         {{ id: "fx", type: "screen_fade" }},
                         {{
@@ -53,6 +55,7 @@ class FrontendSceneProductionBoardModuleTests(unittest.TestCase):
                             {{ id: "a", text: "去屋顶", gotoSceneId: "scene_roof" }},
                             {{ id: "b", text: "这是一个非常非常非常非常非常非常非常长的选项文案，长到按钮区会明显拥挤，甚至需要玩家停下来读完才能理解", gotoSceneId: "scene_missing" }},
                             {{ id: "c", text: "继续听她说", gotoSceneId: "__continue__" }},
+                            {{ id: "d", text: "", gotoSceneId: "__continue__" }},
                           ],
                         }},
                       ],
@@ -170,6 +173,10 @@ class FrontendSceneProductionBoardModuleTests(unittest.TestCase):
         self.assertGreater(payload["board"]["summary"]["missingMusicSceneCount"], 0)
         self.assertEqual(payload["board"]["summary"]["missingVoiceLineCount"], 1)
         self.assertGreater(payload["board"]["summary"]["longTextSceneCount"], 0)
+        self.assertGreater(payload["board"]["summary"]["scriptQualityIssueCount"], 0)
+        self.assertEqual(payload["board"]["summary"]["scriptEmptyTextSceneCount"], 1)
+        self.assertEqual(payload["board"]["summary"]["scriptDuplicateTextSceneCount"], 1)
+        self.assertGreaterEqual(payload["board"]["summary"]["scriptChoiceIssueSceneCount"], 1)
         self.assertIn("averagePacingScore", payload["board"]["summary"])
         self.assertGreater(payload["board"]["summary"]["weakPacingSceneCount"], 0)
         self.assertEqual(payload["digest"]["status"], "blocked")
@@ -182,9 +189,15 @@ class FrontendSceneProductionBoardModuleTests(unittest.TestCase):
         self.assertIn("scene_long_text", issue_codes)
         self.assertIn("scene_many_choices", issue_codes)
         self.assertIn("scene_long_choice_text", issue_codes)
+        self.assertIn("scene_script_empty_text", issue_codes)
+        self.assertIn("scene_script_duplicate_text", issue_codes)
+        self.assertIn("scene_script_choice_empty_text", issue_codes)
         self.assertNotIn("__continue__", json.dumps(payload["board"]["issues"], ensure_ascii=False))
         scenes_by_id = {scene["sceneId"]: scene for scene in payload["board"]["scenes"]}
         self.assertIn("pacingScore", scenes_by_id["scene_start"])
+        self.assertGreater(scenes_by_id["scene_start"]["scriptQualityIssueCount"], 0)
+        self.assertEqual(scenes_by_id["scene_start"]["scriptEmptyTextCount"], 1)
+        self.assertEqual(scenes_by_id["scene_start"]["scriptDuplicateTextCount"], 1)
         self.assertIn("pacingActionSummary", scenes_by_id["scene_roof"])
         self.assertLess(scenes_by_id["scene_roof"]["pacingScore"], scenes_by_id["scene_start"]["pacingScore"])
         self.assertIsNone(scenes_by_id["scene_start"]["recipeSuggestion"])
@@ -196,10 +209,12 @@ class FrontendSceneProductionBoardModuleTests(unittest.TestCase):
         self.assertIn("pacing_branch_without_payoff", scenes_by_id["scene_variable_payoff"]["pacingIssueCodes"])
         self.assertIn("# Demo Project 场景生产看板", payload["markdown"])
         self.assertIn("平均节奏分", payload["markdown"])
+        self.assertIn("台词体检", payload["markdown"])
         self.assertIn("节奏建议", payload["markdown"])
         self.assertIn("教室黄昏", payload["markdown"])
         self.assertIn("补日常对话节奏", payload["markdown"])
         self.assertIn('"节奏分"', payload["csv"])
+        self.assertIn('"台词体检"', payload["csv"])
         self.assertIn('"屋顶"', payload["csv"])
         self.assertIn('"daily_conversation"', payload["csv"])
         self.assertIn('"branch_merge"', payload["csv"])

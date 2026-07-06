@@ -1,6 +1,7 @@
 (function attachSceneProductionBoardTools(global) {
   const storyBlockCatalogTools = global.CanvasiaEditorStoryBlockCatalog || {};
   const scenePacingAdvisorTools = global.CanvasiaEditorScenePacingAdvisor || {};
+  const scriptReadabilityTools = global.CanvasiaEditorScriptReadability || {};
   const storyTemplateTools = global.CanvasiaEditorStoryTemplates || {};
 
   const EFFECT_BLOCK_TYPES = Object.freeze(
@@ -375,6 +376,15 @@
       if (issue.code === "scene_long_text") {
         return "拆长文本";
       }
+      if (issue.code === "scene_script_empty_text") {
+        return "补空台词";
+      }
+      if (issue.code === "scene_script_duplicate_text") {
+        return "查重复文本";
+      }
+      if (issue.code === "scene_script_choice_empty_text") {
+        return "补选项文字";
+      }
       if (issue.code === "scene_flat_presentation") {
         return "补演出";
       }
@@ -391,6 +401,51 @@
 
   function getPacingIssueCodes(report = {}) {
     return new Set(toArray(report.pacingIssueCodes));
+  }
+
+  function getSceneScriptQualityReport(scene = {}) {
+    if (typeof scriptReadabilityTools.buildScriptQualitySceneReport !== "function") {
+      return {
+        status: "ready",
+        summary: {
+          issueCount: 0,
+          blockerCount: 0,
+          warningCount: 0,
+          tipCount: 0,
+          emptyTextCount: 0,
+          longTextCount: 0,
+          duplicateTextCount: 0,
+          missingPunctuationCount: 0,
+          missingSpeakerCount: 0,
+          missingExpressionCount: 0,
+          choiceIssueCount: 0,
+        },
+        issues: [],
+      };
+    }
+    return scriptReadabilityTools.buildScriptQualitySceneReport(scene);
+  }
+
+  function pushScriptQualityProductionIssues(issues, scriptQualityReport = {}, baseContext = {}) {
+    toArray(scriptQualityReport.issues).forEach((issue) => {
+      const context = {
+        ...baseContext,
+        blockId: issue.blockId,
+        blockIndex: issue.blockIndex,
+        blockType: issue.blockType,
+      };
+      if (issue.code === "script_empty_text") {
+        pushIssue(issues, "blocker", "scene_script_empty_text", "有空台词 / 空旁白", "空文本会让试玩像卡住或空跳，发布前必须补正文或删卡。", context);
+        return;
+      }
+      if (issue.code === "script_duplicate_nearby_text") {
+        pushIssue(issues, "warn", "scene_script_duplicate_text", "附近有重复文本", issue.detail || "可能是误复制的台词或旁白。", context);
+        return;
+      }
+      if (issue.code === "script_choice_empty_text") {
+        pushIssue(issues, "warn", "scene_script_choice_empty_text", "有空选项按钮", issue.detail || "选项按钮没有文字，玩家无法理解这个选择。", context);
+      }
+    });
   }
 
   function getSceneRecipeSuggestionByTemplateId(templateId, overrides = {}) {
@@ -602,6 +657,8 @@
         .map((option, optionIndex) => ({ option, optionIndex, block }))
         .filter((item) => isLongChoiceText(item.option?.text))
     );
+    const scriptQualityReport = getSceneScriptQualityReport(scene);
+    const scriptQualitySummary = scriptQualityReport.summary ?? {};
     const routeIssues = getRouteTargetIssues(scene, blocks, sceneMap, baseContext);
     const issues = [...routeIssues];
 
@@ -629,6 +686,7 @@
     if (hasStoryContent && !hasEffects) {
       pushIssue(issues, "tip", "scene_flat_presentation", "演出变化偏少", "可以补一个淡入淡出、镜头、滤镜或粒子，让场景更像正式作品。", baseContext);
     }
+    pushScriptQualityProductionIssues(issues, scriptQualityReport, baseContext);
 
     issues.sort((left, right) => getIssueWeight(right) - getIssueWeight(left) || cleanText(left.title).localeCompare(cleanText(right.title), "zh-CN"));
 
@@ -648,6 +706,17 @@
       longTextBlockCount: longTextBlocks.length,
       manyChoiceBlockCount: manyChoiceBlocks.length,
       longChoiceOptionCount: longChoiceOptions.length,
+      scriptQualityStatus: scriptQualityReport.status ?? "ready",
+      scriptQualityIssueCount: scriptQualitySummary.issueCount ?? 0,
+      scriptQualityBlockerCount: scriptQualitySummary.blockerCount ?? 0,
+      scriptQualityWarningCount: scriptQualitySummary.warningCount ?? 0,
+      scriptQualityTipCount: scriptQualitySummary.tipCount ?? 0,
+      scriptEmptyTextCount: scriptQualitySummary.emptyTextCount ?? 0,
+      scriptDuplicateTextCount: scriptQualitySummary.duplicateTextCount ?? 0,
+      scriptMissingPunctuationCount: scriptQualitySummary.missingPunctuationCount ?? 0,
+      scriptMissingSpeakerCount: scriptQualitySummary.missingSpeakerCount ?? 0,
+      scriptMissingExpressionCount: scriptQualitySummary.missingExpressionCount ?? 0,
+      scriptChoiceIssueCount: scriptQualitySummary.choiceIssueCount ?? 0,
     };
     const issueCounts = {
       blockerCount: issues.filter((issue) => issue.severity === "blocker").length,
@@ -711,6 +780,11 @@
       missingMusicSceneCount: scenes.filter((scene) => scene.hasStoryContent && !scene.hasMusic).length,
       missingVoiceLineCount: scenes.reduce((total, scene) => total + scene.missingVoiceCount, 0),
       longTextSceneCount: scenes.filter((scene) => scene.longTextBlockCount > 0).length,
+      scriptQualityIssueCount: scenes.reduce((total, scene) => total + (scene.scriptQualityIssueCount ?? 0), 0),
+      scriptQualitySceneCount: scenes.filter((scene) => (scene.scriptQualityIssueCount ?? 0) > 0).length,
+      scriptEmptyTextSceneCount: scenes.filter((scene) => (scene.scriptEmptyTextCount ?? 0) > 0).length,
+      scriptDuplicateTextSceneCount: scenes.filter((scene) => (scene.scriptDuplicateTextCount ?? 0) > 0).length,
+      scriptChoiceIssueSceneCount: scenes.filter((scene) => (scene.scriptChoiceIssueCount ?? 0) > 0).length,
       flatSceneCount: scenes.filter((scene) => scene.hasStoryContent && !scene.hasEffects).length,
       blockerCount: issues.filter((issue) => issue.severity === "blocker").length,
       warningCount: issues.filter((issue) => issue.severity === "warn").length,
@@ -767,7 +841,7 @@
       return {
         status: "warn",
         title: `${summary.warningSceneCount} 个场景建议复查`,
-        detail: "项目可继续制作，但建议补背景、拆长文本、整理选项数量和基础演出。",
+        detail: "项目可继续制作，但建议补背景、拆长文本、整理台词质量、选项数量和基础演出。",
       };
     }
     return {
@@ -818,6 +892,10 @@
       `${scene.pacingScore ?? 0}%`,
       scene.pacingGrade ?? "",
       scene.pacingActionSummary ?? "",
+      scene.scriptQualityIssueCount ?? 0,
+      scene.scriptEmptyTextCount ?? 0,
+      scene.scriptDuplicateTextCount ?? 0,
+      scene.scriptChoiceIssueCount ?? 0,
       scene.blockCount,
       scene.dialogueCount,
       scene.missingVoiceCount,
@@ -847,7 +925,7 @@
       "## 总览",
       "",
       buildMarkdownTable(
-        ["场景", "平均完成度", "平均节奏分", "可试玩", "先修场景", "复查场景", "空场景", "缺背景", "缺 BGM", "待绑语音"],
+        ["场景", "平均完成度", "平均节奏分", "可试玩", "先修场景", "复查场景", "空场景", "缺背景", "缺 BGM", "待绑语音", "台词体检问题"],
         [
           [
             summary.sceneCount ?? 0,
@@ -860,13 +938,14 @@
             summary.missingBackgroundSceneCount ?? 0,
             summary.missingMusicSceneCount ?? 0,
             summary.missingVoiceLineCount ?? 0,
+            summary.scriptQualityIssueCount ?? 0,
           ],
         ]
       ),
       "",
       "## 场景任务",
       "",
-      buildMarkdownTable(["状态", "章节", "场景", "完成度", "下一步", "节奏分", "节奏等级", "节奏建议", "卡片", "台词", "待绑语音", "背景", "BGM", "演出", "推荐配方"], sceneRows) || "当前没有可列出的场景。",
+      buildMarkdownTable(["状态", "章节", "场景", "完成度", "下一步", "节奏分", "节奏等级", "节奏建议", "台词体检", "空文本", "重复文本", "选项文案", "卡片", "台词", "待绑语音", "背景", "BGM", "演出", "推荐配方"], sceneRows) || "当前没有可列出的场景。",
       "",
       "## 优先问题",
       "",
@@ -886,6 +965,10 @@
       `${scene.pacingScore ?? 0}%`,
       scene.pacingGrade ?? "",
       scene.pacingActionSummary ?? "",
+      scene.scriptQualityIssueCount ?? 0,
+      scene.scriptEmptyTextCount ?? 0,
+      scene.scriptDuplicateTextCount ?? 0,
+      scene.scriptChoiceIssueCount ?? 0,
       scene.blockCount,
       scene.dialogueCount,
       scene.narrationCount,
@@ -901,7 +984,7 @@
       scene.issues.map((issue) => issue.title).join(" / "),
     ]);
     return `\uFEFF${buildCsv(
-      ["序号", "状态", "章节", "场景", "完成度", "下一步", "节奏分", "节奏等级", "节奏建议", "卡片", "台词", "旁白", "选项", "条件", "待绑语音", "语音完成度", "背景", "BGM", "演出", "推荐配方", "配方 ID", "问题"],
+      ["序号", "状态", "章节", "场景", "完成度", "下一步", "节奏分", "节奏等级", "节奏建议", "台词体检", "空文本", "重复文本", "选项文案", "卡片", "台词", "旁白", "选项", "条件", "待绑语音", "语音完成度", "背景", "BGM", "演出", "推荐配方", "配方 ID", "问题"],
       rows
     )}\n`;
   }
