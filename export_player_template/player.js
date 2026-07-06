@@ -10,8 +10,8 @@ import {
   stopTrackedAudios,
 } from "./runtime_audio.js";
 import {
-  buildRuntimePreloadCacheEfficiencySummary,
-  getRuntimePreloadSummary,
+  buildRuntimePreloadMetaText,
+  buildRuntimePreloadStatusText,
   startRuntimePreload,
 } from "./runtime_preload.js";
 import {
@@ -1889,91 +1889,15 @@ function collectSceneOutgoingTargets(scene) {
 }
 
 function getRuntimePreloadStatusText() {
-  const summary = getRuntimePreloadSummary(data.buildInfo.runtimePreloadManifest);
-  if (!summary.totalCount) {
-    return getRuntimeScenePrefetchStatusText() || "没有需要预热的素材";
-  }
-
-  const status = state.runtimePreloadStatus ?? state.runtimePreload?.getStatus?.() ?? null;
-  const prefetchStatus = state.runtimeScenePrefetchStatus ?? state.runtimeScenePrefetch?.getStatus?.() ?? null;
-  const cacheEfficiency = buildRuntimePreloadCacheEfficiencySummary({
-    preloadStatus: status,
-    prefetchStatus,
+  return buildRuntimePreloadStatusText({
+    manifest: data.buildInfo.runtimePreloadManifest,
+    preloadStatus: state.runtimePreloadStatus ?? state.runtimePreload?.getStatus?.() ?? null,
+    prefetchStatus: state.runtimeScenePrefetchStatus ?? state.runtimeScenePrefetch?.getStatus?.() ?? null,
   });
-  const readyCount = status?.readyCount ?? status?.loadedCount ?? 0;
-  const failedCount = status?.failedCount ?? 0;
-  const failureText = failedCount > 0 ? ` · ${failedCount} 个稍后重试` : "";
-  const skippedText = status?.skippedCount > 0 ? ` · 复用 ${status.skippedCount} 个` : "";
-  const efficiencyText =
-    cacheEfficiency.totalCount > 0
-      ? `准备率 ${cacheEfficiency.readyPercent}% · 复用率 ${cacheEfficiency.reusePercent}%`
-      : "";
-  const sizeText = formatRuntimePreloadSize(summary);
-  const profileText = status?.performanceProfileLabel ? `档位 ${status.performanceProfileLabel}` : "";
-  const readyPhaseCount = Array.isArray(status?.readyPhases) ? status.readyPhases.length : 0;
-  const stagedText = readyPhaseCount > 0 ? `分阶段预热 ${readyPhaseCount}/4` : "";
-  return [
-    `首屏 ${summary.criticalCount} 个`,
-    `全局 ${summary.totalCount} 个`,
-    profileText,
-    stagedText,
-    sizeText,
-    `图片 ${summary.imageCount}`,
-    `音频 ${summary.audioCount}`,
-    `视频 ${summary.videoCount}`,
-    `已准备 ${readyCount}/${summary.totalCount}${skippedText}${failureText}`,
-    efficiencyText,
-    getRuntimeScenePrefetchStatusText(),
-  ].filter(Boolean).join(" · ");
-}
-
-function getRuntimeScenePrefetchStatusText() {
-  const status = state.runtimeScenePrefetchStatus ?? state.runtimeScenePrefetch?.getStatus?.() ?? null;
-  if (!status?.totalCount) {
-    return "";
-  }
-  const readyCount = status.readyCount ?? status.loadedCount ?? 0;
-  const failedCount = status.failedCount ?? 0;
-  const failureText = failedCount > 0 ? `，${failedCount} 个稍后重试` : "";
-  const skippedText = status.skippedCount > 0 ? `，复用 ${status.skippedCount} 个` : "";
-  return `路线预取 ${readyCount}/${status.totalCount}${skippedText}${failureText}`;
 }
 
 function getRuntimePreloadMetaText() {
-  const summary = getRuntimePreloadSummary(data.buildInfo.runtimePreloadManifest);
-  if (!summary.totalCount) {
-    return "";
-  }
-  const sizeText = formatRuntimePreloadSize(summary);
-  return ` · 预热 ${summary.criticalCount}/${summary.totalCount} 个素材${sizeText ? ` · ${sizeText}` : ""}`;
-}
-
-function formatRuntimePreloadSize(summary) {
-  const criticalSizeBytes = Number(summary?.criticalSizeBytes ?? 0);
-  const totalSizeBytes = Number(summary?.totalSizeBytes ?? 0);
-  if (!Number.isFinite(totalSizeBytes) || totalSizeBytes <= 0) {
-    return "";
-  }
-  const criticalLabel = formatRuntimePreloadBytes(Math.max(0, criticalSizeBytes));
-  const totalLabel = formatRuntimePreloadBytes(totalSizeBytes);
-  return `首屏体积 ${criticalLabel} / 预热合计 ${totalLabel}`;
-}
-
-function formatRuntimePreloadBytes(bytes) {
-  const units = ["B", "KB", "MB", "GB"];
-  let value = Number(bytes);
-  if (!Number.isFinite(value) || value <= 0) {
-    return "0 B";
-  }
-  let unitIndex = 0;
-  while (value >= 1024 && unitIndex < units.length - 1) {
-    value /= 1024;
-    unitIndex += 1;
-  }
-  if (unitIndex === 0) {
-    return `${Math.round(value)} B`;
-  }
-  return `${value.toFixed(1)} ${units[unitIndex]}`;
+  return buildRuntimePreloadMetaText(data.buildInfo.runtimePreloadManifest);
 }
 
 function buildEndingScenePreview(scene) {

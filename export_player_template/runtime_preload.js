@@ -198,6 +198,132 @@ export function buildRuntimePreloadCacheEfficiencySummary(statuses = {}) {
   });
 }
 
+function coerceRuntimePreloadSummary(value) {
+  const source = value?.summary ?? value;
+  if (source && typeof source === "object" && Number.isFinite(Number(source.totalCount))) {
+    return source;
+  }
+  return getRuntimePreloadSummary(source);
+}
+
+export function formatRuntimePreloadBytes(bytes) {
+  const units = ["B", "KB", "MB", "GB"];
+  let value = Number(bytes);
+  if (!Number.isFinite(value) || value <= 0) {
+    return "0 B";
+  }
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  if (unitIndex === 0) {
+    return `${Math.round(value)} B`;
+  }
+  return `${value.toFixed(1)} ${units[unitIndex]}`;
+}
+
+export function formatRuntimePreloadSize(summary) {
+  const source = coerceRuntimePreloadSummary(summary);
+  const criticalSizeBytes = Number(source?.criticalSizeBytes ?? 0);
+  const totalSizeBytes = Number(source?.totalSizeBytes ?? 0);
+  if (!Number.isFinite(totalSizeBytes) || totalSizeBytes <= 0) {
+    return "";
+  }
+  const criticalLabel = formatRuntimePreloadBytes(Math.max(0, criticalSizeBytes));
+  const totalLabel = formatRuntimePreloadBytes(totalSizeBytes);
+  return `首屏体积 ${criticalLabel} / 预热合计 ${totalLabel}`;
+}
+
+export function buildRuntimeScenePrefetchStatusText(status) {
+  if (!status?.totalCount) {
+    return "";
+  }
+  const readyCount = getStatusReadyCount(status);
+  const failedCount = Math.max(0, Number(status.failedCount) || 0);
+  const pendingCount = getStatusPendingCount(status);
+  const skippedCount = getStatusSkippedCount(status);
+  const pendingText = pendingCount > 0 ? `，待处理 ${pendingCount} 个` : "";
+  const failureText = failedCount > 0 ? `，${failedCount} 个稍后重试` : "";
+  const skippedText = skippedCount > 0 ? `，复用 ${skippedCount} 个` : "";
+  return `路线预取 ${readyCount}/${status.totalCount}${pendingText}${skippedText}${failureText}`;
+}
+
+export function buildRuntimePreloadStatusDigest(options = {}) {
+  const source = options && typeof options === "object" ? options : {};
+  const summary = coerceRuntimePreloadSummary(source.summary ?? source.manifest ?? source.runtimePreloadManifest);
+  const preloadStatus = source.preloadStatus ?? source.runtimePreloadStatus ?? null;
+  const prefetchStatus = source.prefetchStatus ?? source.runtimeScenePrefetchStatus ?? null;
+  const prefetchText = buildRuntimeScenePrefetchStatusText(prefetchStatus);
+
+  if (!summary.totalCount) {
+    const fallbackText = prefetchText || "没有需要预热的素材";
+    return Object.freeze({
+      status: prefetchText ? "prefetching" : "empty",
+      text: fallbackText,
+      lines: Object.freeze([fallbackText]),
+      sizeText: "",
+      prefetchText,
+      efficiency: buildRuntimePreloadCacheEfficiencySummary({ preloadStatus, prefetchStatus }),
+    });
+  }
+
+  const cacheEfficiency = buildRuntimePreloadCacheEfficiencySummary({
+    preloadStatus,
+    prefetchStatus,
+  });
+  const readyCount = getStatusReadyCount(preloadStatus);
+  const failedCount = Math.max(0, Number(preloadStatus?.failedCount) || 0);
+  const pendingCount = getStatusPendingCount(preloadStatus);
+  const skippedCount = getStatusSkippedCount(preloadStatus);
+  const failureText = failedCount > 0 ? ` · ${failedCount} 个稍后重试` : "";
+  const skippedText = skippedCount > 0 ? ` · 复用 ${skippedCount} 个` : "";
+  const pendingText = pendingCount > 0 ? ` · 待处理 ${pendingCount} 个` : "";
+  const sizeText = formatRuntimePreloadSize(summary);
+  const profileText = preloadStatus?.performanceProfileLabel ? `档位 ${preloadStatus.performanceProfileLabel}` : "";
+  const readyPhaseCount = Array.isArray(preloadStatus?.readyPhases) ? preloadStatus.readyPhases.length : 0;
+  const stagedText = readyPhaseCount > 0 ? `分阶段预热 ${readyPhaseCount}/4` : "";
+  const efficiencyText =
+    cacheEfficiency.totalCount > 0
+      ? `准备率 ${cacheEfficiency.readyPercent}% · 复用率 ${cacheEfficiency.reusePercent}%`
+      : "";
+  const lines = [
+    `首屏 ${summary.criticalCount} 个`,
+    `全局 ${summary.totalCount} 个`,
+    profileText,
+    stagedText,
+    sizeText,
+    `图片 ${summary.imageCount}`,
+    `音频 ${summary.audioCount}`,
+    `视频 ${summary.videoCount}`,
+    `已准备 ${readyCount}/${summary.totalCount}${pendingText}${skippedText}${failureText}`,
+    efficiencyText,
+    prefetchText,
+  ].filter(Boolean);
+  const statusLabel = failedCount > 0 ? "retrying" : pendingCount > 0 || readyCount < summary.totalCount ? "warming" : "ready";
+  return Object.freeze({
+    status: statusLabel,
+    text: lines.join(" · "),
+    lines: Object.freeze(lines),
+    sizeText,
+    prefetchText,
+    efficiency: cacheEfficiency,
+  });
+}
+
+export function buildRuntimePreloadStatusText(options = {}) {
+  return buildRuntimePreloadStatusDigest(options).text;
+}
+
+export function buildRuntimePreloadMetaText(manifestOrSummary) {
+  const summary = coerceRuntimePreloadSummary(manifestOrSummary);
+  if (!summary.totalCount) {
+    return "";
+  }
+  const sizeText = formatRuntimePreloadSize(summary);
+  return ` · 预热 ${summary.criticalCount}/${summary.totalCount} 个素材${sizeText ? ` · ${sizeText}` : ""}`;
+}
+
 function resolvePhaseDelayOptions(options = {}, profile = {}) {
   const customPhaseDelayMs = options.phaseDelayMs ?? options.phaseDelaysMs ?? {};
   const profilePhaseDelayMs = profile.phaseDelayMs ?? {};

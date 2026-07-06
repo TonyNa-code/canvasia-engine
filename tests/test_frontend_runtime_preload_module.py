@@ -339,6 +339,95 @@ class FrontendRuntimePreloadModuleTests(unittest.TestCase):
         self.assertEqual(payload["aliasInput"]["status"], "warming")
         self.assertEqual(payload["aliasInput"]["readyPercent"], 50)
 
+    def test_runtime_preload_status_digest_formats_player_startup_feedback(self) -> None:
+        script = textwrap.dedent(
+            f"""
+            import * as tools from {json.dumps(MODULE_PATH.as_uri())};
+
+            const manifest = {{
+              formatVersion: 1,
+              entries: [
+                {{ assetId: "bg_intro", type: "background", url: "bg.png", phase: "critical", priority: 100, sizeBytes: 2048 }},
+                {{ assetId: "voice_intro", type: "voice", url: "voice.ogg", phase: "early", priority: 80, sizeBytes: 4096 }},
+                {{ assetId: "op_video", type: "video", url: "op.mp4", phase: "deferred", priority: 20, sizeBytes: 4096 }},
+              ],
+            }};
+            const preloadStatus = {{
+              totalCount: 3,
+              readyCount: 2,
+              pendingCount: 1,
+              skippedCount: 1,
+              failedCount: 1,
+              performanceProfileLabel: "网页轻量",
+              readyPhases: ["critical", "early"],
+            }};
+            const prefetchStatus = {{
+              totalCount: 2,
+              readyCount: 1,
+              pendingCount: 1,
+              skippedCount: 1,
+            }};
+
+            const digest = tools.buildRuntimePreloadStatusDigest({{
+              manifest,
+              preloadStatus,
+              prefetchStatus,
+            }});
+            const text = tools.buildRuntimePreloadStatusText({{
+              manifest,
+              preloadStatus,
+              prefetchStatus,
+            }});
+            const meta = tools.buildRuntimePreloadMetaText(manifest);
+            const prefetchOnly = tools.buildRuntimePreloadStatusText({{
+              manifest: {{ formatVersion: 1, entries: [] }},
+              prefetchStatus: {{ totalCount: 1, loadedCount: 1 }},
+            }});
+            const empty = tools.buildRuntimePreloadStatusText({{
+              manifest: {{ formatVersion: 1, entries: [] }},
+            }});
+
+            process.stdout.write(JSON.stringify({{
+              keys: Object.keys(tools).sort(),
+              digest,
+              text,
+              meta,
+              sizeText: tools.formatRuntimePreloadSize(manifest),
+              bytesText: tools.formatRuntimePreloadBytes(1536),
+              prefetchOnly,
+              empty,
+            }}));
+            """
+        )
+        completed = subprocess.run(
+            ["node", "--input-type=module", "-e", script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        self.assertIn("buildRuntimePreloadStatusDigest", payload["keys"])
+        self.assertIn("buildRuntimePreloadStatusText", payload["keys"])
+        self.assertIn("buildRuntimeScenePrefetchStatusText", payload["keys"])
+        self.assertIn("formatRuntimePreloadSize", payload["keys"])
+        self.assertEqual(payload["digest"]["status"], "retrying")
+        self.assertEqual(payload["digest"]["efficiency"]["readyPercent"], 60)
+        self.assertEqual(payload["digest"]["efficiency"]["reusePercent"], 40)
+        self.assertIn("档位 网页轻量", payload["text"])
+        self.assertIn("分阶段预热 2/4", payload["text"])
+        self.assertIn("首屏体积 2.0 KB / 预热合计 10.0 KB", payload["text"])
+        self.assertIn("已准备 2/3 · 待处理 1 个 · 复用 1 个 · 1 个稍后重试", payload["text"])
+        self.assertIn("准备率 60% · 复用率 40%", payload["text"])
+        self.assertIn("路线预取 1/2，待处理 1 个，复用 1 个", payload["text"])
+        self.assertEqual(payload["meta"], " · 预热 1/3 个素材 · 首屏体积 2.0 KB / 预热合计 10.0 KB")
+        self.assertEqual(payload["sizeText"], "首屏体积 2.0 KB / 预热合计 10.0 KB")
+        self.assertEqual(payload["bytesText"], "1.5 KB")
+        self.assertEqual(payload["prefetchOnly"], "路线预取 1/1")
+        self.assertEqual(payload["empty"], "没有需要预热的素材")
+
     def test_runtime_preload_stages_background_phases_and_batches_work(self) -> None:
         script = textwrap.dedent(
             f"""
