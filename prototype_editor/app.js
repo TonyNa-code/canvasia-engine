@@ -29936,36 +29936,12 @@ function buildReleaseControlReportContent() {
       ])
   );
   const fixOrderTable = buildMarkdownTable(
-    ["顺序", "优先级", "事项", "当前状态", "说明", "生产待办明细"],
-    releaseFixOrder.steps.map((step, index) => [
-      `${index + 1}`,
-      getReleaseStepToneLabel(step.tone),
-      step.title,
-      step.statusLabel,
-      step.description,
-      step.productionBacklogTask
-        ? [
-            step.productionBacklogTask.title,
-            step.productionBacklogTask.source,
-            step.productionBacklogTask.detail,
-          ]
-            .filter(Boolean)
-            .join(" / ")
-        : "",
-    ])
+    ["顺序", "优先级", "事项", "当前状态", "说明", "生产待办明细", "建议动作"],
+    releaseControlTools.buildReleaseFixOrderTableRows(releaseFixOrder)
   );
   const routeFixIssueTable = buildMarkdownTable(
     ["顺序", "所属步骤", "路线问题", "位置", "目标", "状态"],
-    releaseFixOrder.steps.flatMap((step, stepIndex) =>
-      (step.routeIssueQueue ?? []).map((issue, issueIndex) => [
-        `${stepIndex + 1}.${issueIndex + 1}`,
-        step.title,
-        issue.title,
-        [issue.chapterName, issue.sceneName, issue.routeLabel].filter(Boolean).join(" / "),
-        issue.targetLabel || issue.targetSceneId || "未标注",
-        issue.statusLabel ?? "待确认",
-      ])
-    )
+    releaseControlTools.buildReleaseRouteIssueTableRows(releaseFixOrder)
   );
   const issueTable = buildMarkdownTable(
     ["类型", "标题", "位置 / 摘要"],

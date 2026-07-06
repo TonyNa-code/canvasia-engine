@@ -697,6 +697,50 @@
     ];
   }
 
+  function formatProductionBacklogTaskDetail(task = null) {
+    const serialized = serializeProductionBacklogTask(task);
+    if (!serialized) {
+      return "";
+    }
+    return [
+      serialized.title,
+      serialized.source,
+      serialized.detail,
+    ]
+      .filter(Boolean)
+      .join(" / ");
+  }
+
+  function getReleaseStepPrimaryActionLabel(step = {}) {
+    const primaryAction = serializeReleaseReportAction(step?.actions?.[0]);
+    return primaryAction?.label ?? "";
+  }
+
+  function buildReleaseFixOrderTableRows(releaseFixOrder = {}) {
+    return toArray(releaseFixOrder?.steps).map((step, index) => [
+      `${index + 1}`,
+      getReleaseStepToneLabel(step?.tone),
+      step?.title ?? "",
+      step?.statusLabel ?? "",
+      step?.description ?? "",
+      formatProductionBacklogTaskDetail(step?.productionBacklogTask),
+      getReleaseStepPrimaryActionLabel(step),
+    ]);
+  }
+
+  function buildReleaseRouteIssueTableRows(releaseFixOrder = {}) {
+    return toArray(releaseFixOrder?.steps).flatMap((step, stepIndex) =>
+      toArray(step?.routeIssueQueue).map((issue, issueIndex) => [
+        `${stepIndex + 1}.${issueIndex + 1}`,
+        step?.title ?? "",
+        issue?.title ?? "",
+        [issue?.chapterName, issue?.sceneName, issue?.routeLabel].filter(Boolean).join(" / "),
+        issue?.targetLabel || issue?.targetSceneId || "未标注",
+        issue?.statusLabel ?? "待确认",
+      ])
+    );
+  }
+
   function buildRuntimePreloadBudgetFixStep(report = {}) {
     const riskCount = getRuntimePreloadBudgetRiskCount(report);
     if (riskCount <= 0) {
@@ -1276,6 +1320,10 @@
     getRuntimePreloadBudgetPrimaryIssue,
     serializeRuntimePreloadBudgetForRelease,
     buildReleaseControlOverviewRows,
+    formatProductionBacklogTaskDetail,
+    getReleaseStepPrimaryActionLabel,
+    buildReleaseFixOrderTableRows,
+    buildReleaseRouteIssueTableRows,
     buildRuntimePreloadBudgetFixStep,
     buildCreativeQualityAudit,
     buildVnEssentialsReleaseSteps,

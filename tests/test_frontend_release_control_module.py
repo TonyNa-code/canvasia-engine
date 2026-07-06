@@ -88,9 +88,11 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
         self.assertIn("${renderReleaseProductionBacklogTask(step.productionBacklogTask)}", source)
         self.assertIn("routeIssueQueue: (step.routeIssueQueue ?? []).map(serializeReleaseRouteIssue)", payload_body)
         self.assertIn("productionBacklogTask: step.productionBacklogTask ?? null", payload_body)
-        self.assertIn("const routeFixIssueTable = buildMarkdownTable", report_body)
+        self.assertIn("const fixOrderTable = buildMarkdownTable", report_body)
+        self.assertIn("releaseControlTools.buildReleaseFixOrderTableRows(releaseFixOrder)", report_body)
+        self.assertIn("releaseControlTools.buildReleaseRouteIssueTableRows(releaseFixOrder)", report_body)
         self.assertIn('"生产待办明细"', report_body)
-        self.assertIn("step.productionBacklogTask.title", report_body)
+        self.assertIn('"建议动作"', report_body)
         self.assertIn("### 具体路线阻塞", report_body)
 
     def test_release_report_includes_runtime_preload_budget_context(self) -> None:
@@ -273,6 +275,47 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
                 projectMilestoneGapDigest: {{ eyebrow: "当前阶段缺口", title: "补齐试玩确认" }},
                 productionBacklogSummary: {{ taskCount: 9, blockerCount: 2, warningCount: 4, tipCount: 3, readinessPercent: 48 }},
               }}),
+              releaseFixOrderRows: tools.buildReleaseFixOrderTableRows({{
+                steps: [
+                  {{
+                    tone: "danger",
+                    title: "处理生产待办先修项",
+                    statusLabel: "先修 1 / 优先 2 / 润色 1",
+                    description: "先补空白场景。",
+                    productionBacklogTask: {{
+                      title: "补齐空白场景内容",
+                      source: "第1章 / 空白场景",
+                      detail: "这个场景只有占位文本。",
+                    }},
+                    actions: [{{ label: "补演出卡", action: "open-scene-from-map", screen: "story", sceneId: "scene_empty" }}],
+                  }},
+                ],
+              }}),
+              routeIssueRows: tools.buildReleaseRouteIssueTableRows({{
+                steps: [
+                  {{
+                    title: "先修路线坏链",
+                    routeIssueQueue: [
+                      {{
+                        title: "修复分支坏链",
+                        chapterName: "第1章",
+                        sceneName: "教室",
+                        routeLabel: "选择留下",
+                        targetLabel: "天台",
+                        statusLabel: "坏链",
+                      }},
+                    ],
+                  }},
+                ],
+              }}),
+              productionBacklogDetail: tools.formatProductionBacklogTaskDetail({{
+                title: "补齐空白场景内容",
+                source: "第1章 / 空白场景",
+                detail: "这个场景只有占位文本。",
+              }}),
+              primaryActionLabel: tools.getReleaseStepPrimaryActionLabel({{
+                actions: [{{ label: "补演出卡", action: "open-scene-from-map" }}],
+              }}),
               nextSteps: [
                 releaseNextStep,
                 milestoneNextStep,
@@ -388,6 +431,13 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
         self.assertEqual(overview_rows["生产待办"], "9 项，先修 2 / 优先 4 / 润色 3，就绪度 48%")
         self.assertEqual(overview_rows["第一条结局路径"], "开场 -> 真结局")
         self.assertEqual(overview_rows["成品目标路线"], "第一版可试玩 Demo（72%）")
+        self.assertEqual(payload["releaseFixOrderRows"][0][0], "1")
+        self.assertEqual(payload["releaseFixOrderRows"][0][1], "先修")
+        self.assertEqual(payload["releaseFixOrderRows"][0][5], "补齐空白场景内容 / 第1章 / 空白场景 / 这个场景只有占位文本。")
+        self.assertEqual(payload["releaseFixOrderRows"][0][6], "补演出卡")
+        self.assertEqual(payload["routeIssueRows"][0], ["1.1", "先修路线坏链", "修复分支坏链", "第1章 / 教室 / 选择留下", "天台", "坏链"])
+        self.assertEqual(payload["productionBacklogDetail"], "补齐空白场景内容 / 第1章 / 空白场景 / 这个场景只有占位文本。")
+        self.assertEqual(payload["primaryActionLabel"], "补演出卡")
         self.assertEqual(payload["nextSteps"][0]["source"], "release_fix_order")
         self.assertEqual(payload["nextSteps"][0]["sourceLabel"], "发布修复顺序")
         self.assertEqual(payload["nextSteps"][0]["action"]["screen"], "inspection")
@@ -593,6 +643,8 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
             process.stdout.write(JSON.stringify({{
               keys: Object.keys(tools).sort(),
               blockerHint: tools.formatProductionBacklogTaskHint(blockerPlan.steps[0].productionBacklogTask),
+              blockerTaskDetail: tools.formatProductionBacklogTaskDetail(blockerPlan.steps[0].productionBacklogTask),
+              blockerRows: tools.buildReleaseFixOrderTableRows(blockerPlan),
               blockerPlan,
               warnPlan,
               softPlan,
@@ -615,6 +667,9 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
 
         self.assertIn("serializeProductionBacklogTask", payload["keys"])
         self.assertIn("formatProductionBacklogTaskHint", payload["keys"])
+        self.assertIn("formatProductionBacklogTaskDetail", payload["keys"])
+        self.assertIn("buildReleaseFixOrderTableRows", payload["keys"])
+        self.assertIn("buildReleaseRouteIssueTableRows", payload["keys"])
         self.assertEqual(blocker_step["tone"], "danger")
         self.assertEqual(blocker_step["title"], "处理生产待办先修项")
         self.assertEqual(blocker_step["statusLabel"], "先修 1 / 优先 2 / 润色 1")
@@ -623,6 +678,9 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
         self.assertEqual(blocker_step["productionBacklogTask"]["source"], "第1章 / 空白场景")
         self.assertEqual(blocker_step["productionBacklogTask"]["action"]["sceneId"], "scene_empty")
         self.assertIn("这个场景只有占位文本", payload["blockerHint"])
+        self.assertEqual(payload["blockerTaskDetail"], "补齐空白场景内容 / 第1章 / 空白场景 / 这个场景只有占位文本。")
+        self.assertEqual(payload["blockerRows"][0][5], "补齐空白场景内容 / 第1章 / 空白场景 / 这个场景只有占位文本。")
+        self.assertEqual(payload["blockerRows"][0][6], "补演出卡")
         self.assertEqual(blocker_step["actions"][0]["screen"], "story")
         self.assertEqual(blocker_step["actions"][0]["sceneId"], "scene_empty")
         self.assertEqual(blocker_step["actions"][1]["action"], "export-production-backlog-markdown")
