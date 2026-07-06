@@ -121,6 +121,7 @@ const clamp = editorCommonTools.clamp;
 const escapeHtml = editorCommonTools.escapeHtml;
 const buildTemplateAssetUrl = (relativePath) =>
   editorCommonTools.buildTemplateAssetUrl(relativePath, state.data?.currentProject?.publicRoot ?? "");
+const projectRuntimeSettingsTools = window.CanvasiaEditorProjectRuntimeSettings;
 const projectSettingsTools = window.CanvasiaEditorProjectSettings;
 const dialogBoxReadabilityTools = window.CanvasiaEditorDialogBoxReadability;
 const validationCacheTools = window.CanvasiaEditorValidationCache;
@@ -331,28 +332,46 @@ const getTextSpeedLabel = visualEffectTools.getTextSpeedLabel;
 const getSafeDialogTheme = visualEffectTools.getSafeDialogTheme;
 const getDialogThemeLabel = visualEffectTools.getDialogThemeLabel;
 
-const PROJECT_SAVE_SLOT_COUNT_LIMITS = {
-  min: 3,
-  max: 120,
-};
-
-const DEFAULT_PROJECT_RUNTIME_SETTINGS = {
-  formalSaveSlotCount: 24,
-  defaultTextSpeed: "normal",
-  defaultDialogTheme: "project",
-  defaultUiThemeMode: "auto",
-  defaultBgmVolume: 72,
-  defaultSfxVolume: 85,
-  defaultVoiceVolume: 92,
-  defaultVoiceEnabled: true,
-  defaultVoiceDuckingEnabled: true,
-};
+const PROJECT_SAVE_SLOT_COUNT_LIMITS = projectRuntimeSettingsTools.DEFAULT_SAVE_SLOT_COUNT_LIMITS;
+const DEFAULT_PROJECT_RUNTIME_SETTINGS = projectRuntimeSettingsTools.DEFAULT_RUNTIME_SETTINGS;
 
 const UI_THEME_MODE_LABELS = uiThemeTools?.UI_THEME_MODE_LABELS ?? {
   auto: "自动切换",
   light: "浅色模式",
   dark: "深色模式",
 };
+
+const PROJECT_SETTINGS_OPTIONS = Object.freeze({
+  defaultResolution: projectSettingsTools.DEFAULT_RESOLUTION,
+  supportedResolutions: projectSettingsTools.SUPPORTED_RESOLUTIONS,
+  screenLabels: projectSettingsTools.SCREEN_LABELS,
+  saveSlotCountLimits: PROJECT_SAVE_SLOT_COUNT_LIMITS,
+  defaultRuntimeSettings: DEFAULT_PROJECT_RUNTIME_SETTINGS,
+  runtimeTextSpeedLabels: TEXT_SPEED_LABELS,
+  runtimeDialogThemeLabels: DIALOG_THEME_LABELS,
+  runtimeUiThemeModeLabels: UI_THEME_MODE_LABELS,
+  dialogBoxPresetLabels: PROJECT_DIALOG_BOX_PRESET_LABELS,
+  dialogBoxShapeLabels: PROJECT_DIALOG_BOX_SHAPE_LABELS,
+  dialogBoxAnchorLabels: PROJECT_DIALOG_BOX_ANCHOR_LABELS,
+  defaultDialogBoxConfig: DEFAULT_PROJECT_DIALOG_BOX_CONFIG,
+  dialogBoxPresets: PROJECT_DIALOG_BOX_PRESETS,
+  gameUiPresetLabels: PROJECT_GAME_UI_PRESET_LABELS,
+  gameUiLayoutLabels: PROJECT_GAME_UI_LAYOUT_LABELS,
+  gameUiTitleLayoutLabels: PROJECT_GAME_UI_TITLE_LAYOUT_LABELS,
+  gameUiFontLabels: PROJECT_GAME_UI_FONT_LABELS,
+  gameUiSurfaceLabels: PROJECT_GAME_UI_SURFACE_LABELS,
+  gameUiBrandLabels: PROJECT_GAME_UI_BRAND_LABELS,
+  gameUiSidePanelLabels: PROJECT_GAME_UI_SIDE_PANEL_LABELS,
+  gameUiSidePositionLabels: PROJECT_GAME_UI_SIDE_POSITION_LABELS,
+  gameUiTopbarPositionLabels: PROJECT_GAME_UI_TOPBAR_POSITION_LABELS,
+  gameUiHudPositionLabels: PROJECT_GAME_UI_HUD_POSITION_LABELS,
+  gameUiTitleCardAnchorLabels: PROJECT_GAME_UI_TITLE_CARD_ANCHOR_LABELS,
+  defaultGameUiConfig: DEFAULT_PROJECT_GAME_UI_CONFIG,
+  gameUiPresets: PROJECT_GAME_UI_PRESETS,
+  clamp,
+  getSafeNumber,
+  getSafeColor: getSafeParticleColor,
+});
 
 const {
   DASHBOARD_SEARCH_MODE_LABELS,
@@ -9249,37 +9268,7 @@ function getProjectResolution(project = state.data?.project) {
 }
 
 function getProjectSettingsOptions() {
-  return {
-    defaultResolution: projectSettingsTools.DEFAULT_RESOLUTION,
-    supportedResolutions: projectSettingsTools.SUPPORTED_RESOLUTIONS,
-    screenLabels: projectSettingsTools.SCREEN_LABELS,
-    saveSlotCountLimits: PROJECT_SAVE_SLOT_COUNT_LIMITS,
-    defaultRuntimeSettings: DEFAULT_PROJECT_RUNTIME_SETTINGS,
-    runtimeTextSpeedLabels: TEXT_SPEED_LABELS,
-    runtimeDialogThemeLabels: DIALOG_THEME_LABELS,
-    runtimeUiThemeModeLabels: UI_THEME_MODE_LABELS,
-    dialogBoxPresetLabels: PROJECT_DIALOG_BOX_PRESET_LABELS,
-    dialogBoxShapeLabels: PROJECT_DIALOG_BOX_SHAPE_LABELS,
-    dialogBoxAnchorLabels: PROJECT_DIALOG_BOX_ANCHOR_LABELS,
-    defaultDialogBoxConfig: DEFAULT_PROJECT_DIALOG_BOX_CONFIG,
-    dialogBoxPresets: PROJECT_DIALOG_BOX_PRESETS,
-    gameUiPresetLabels: PROJECT_GAME_UI_PRESET_LABELS,
-    gameUiLayoutLabels: PROJECT_GAME_UI_LAYOUT_LABELS,
-    gameUiTitleLayoutLabels: PROJECT_GAME_UI_TITLE_LAYOUT_LABELS,
-    gameUiFontLabels: PROJECT_GAME_UI_FONT_LABELS,
-    gameUiSurfaceLabels: PROJECT_GAME_UI_SURFACE_LABELS,
-    gameUiBrandLabels: PROJECT_GAME_UI_BRAND_LABELS,
-    gameUiSidePanelLabels: PROJECT_GAME_UI_SIDE_PANEL_LABELS,
-    gameUiSidePositionLabels: PROJECT_GAME_UI_SIDE_POSITION_LABELS,
-    gameUiTopbarPositionLabels: PROJECT_GAME_UI_TOPBAR_POSITION_LABELS,
-    gameUiHudPositionLabels: PROJECT_GAME_UI_HUD_POSITION_LABELS,
-    gameUiTitleCardAnchorLabels: PROJECT_GAME_UI_TITLE_CARD_ANCHOR_LABELS,
-    defaultGameUiConfig: DEFAULT_PROJECT_GAME_UI_CONFIG,
-    gameUiPresets: PROJECT_GAME_UI_PRESETS,
-    clamp,
-    getSafeNumber,
-    getSafeColor: getSafeParticleColor,
-  };
+  return PROJECT_SETTINGS_OPTIONS;
 }
 
 function getSafeProjectFormalSaveSlotCount(value) {

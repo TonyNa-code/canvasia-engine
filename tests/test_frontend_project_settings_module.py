@@ -10,6 +10,7 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "project_settings.js"
 RUNTIME_SETTINGS_MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "project_runtime_settings.js"
+APP_PATH = ROOT_DIR / "prototype_editor" / "app.js"
 
 
 class FrontendProjectSettingsModuleTests(unittest.TestCase):
@@ -382,6 +383,17 @@ class FrontendProjectSettingsModuleTests(unittest.TestCase):
         self.assertEqual(payload["defaultGameUiConfig"]["hudPosition"], "bottom-left")
         self.assertEqual(payload["defaultGameUiConfig"]["sidePanelWidth"], 460)
         self.assertEqual(payload["defaultGameUiConfig"]["panelFrameSlice"], {"top": 0, "right": 12, "bottom": 14, "left": 16})
+
+    def test_editor_app_reuses_project_settings_options(self) -> None:
+        app_source = APP_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("const projectRuntimeSettingsTools = window.CanvasiaEditorProjectRuntimeSettings;", app_source)
+        self.assertIn("const PROJECT_SETTINGS_OPTIONS = Object.freeze({", app_source)
+        self.assertIn("return PROJECT_SETTINGS_OPTIONS;", app_source)
+        self.assertIn("projectRuntimeSettingsTools.DEFAULT_SAVE_SLOT_COUNT_LIMITS", app_source)
+        self.assertIn("projectRuntimeSettingsTools.DEFAULT_RUNTIME_SETTINGS", app_source)
+        self.assertNotIn("const PROJECT_SAVE_SLOT_COUNT_LIMITS = {\n  min: 3,", app_source)
+        self.assertNotIn("const DEFAULT_PROJECT_RUNTIME_SETTINGS = {\n  formalSaveSlotCount: 24,", app_source)
 
 
 if __name__ == "__main__":
