@@ -10,6 +10,7 @@ import {
   stopTrackedAudios,
 } from "./runtime_audio.js";
 import {
+  buildRuntimePreloadCacheEfficiencySummary,
   getRuntimePreloadSummary,
   startRuntimePreload,
 } from "./runtime_preload.js";
@@ -1894,10 +1895,19 @@ function getRuntimePreloadStatusText() {
   }
 
   const status = state.runtimePreloadStatus ?? state.runtimePreload?.getStatus?.() ?? null;
+  const prefetchStatus = state.runtimeScenePrefetchStatus ?? state.runtimeScenePrefetch?.getStatus?.() ?? null;
+  const cacheEfficiency = buildRuntimePreloadCacheEfficiencySummary({
+    preloadStatus: status,
+    prefetchStatus,
+  });
   const readyCount = status?.readyCount ?? status?.loadedCount ?? 0;
   const failedCount = status?.failedCount ?? 0;
   const failureText = failedCount > 0 ? ` · ${failedCount} 个稍后重试` : "";
   const skippedText = status?.skippedCount > 0 ? ` · 复用 ${status.skippedCount} 个` : "";
+  const efficiencyText =
+    cacheEfficiency.totalCount > 0
+      ? `准备率 ${cacheEfficiency.readyPercent}% · 复用率 ${cacheEfficiency.reusePercent}%`
+      : "";
   const sizeText = formatRuntimePreloadSize(summary);
   const profileText = status?.performanceProfileLabel ? `档位 ${status.performanceProfileLabel}` : "";
   const readyPhaseCount = Array.isArray(status?.readyPhases) ? status.readyPhases.length : 0;
@@ -1912,6 +1922,7 @@ function getRuntimePreloadStatusText() {
     `音频 ${summary.audioCount}`,
     `视频 ${summary.videoCount}`,
     `已准备 ${readyCount}/${summary.totalCount}${skippedText}${failureText}`,
+    efficiencyText,
     getRuntimeScenePrefetchStatusText(),
   ].filter(Boolean).join(" · ");
 }

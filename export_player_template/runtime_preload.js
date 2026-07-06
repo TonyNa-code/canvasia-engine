@@ -130,6 +130,74 @@ function clampOption(value, fallback, minimum, maximum) {
   return Math.max(minimum, Math.min(maximum, Math.floor(numeric)));
 }
 
+function clampPercent(numerator, denominator) {
+  const safeNumerator = Number(numerator);
+  const safeDenominator = Number(denominator);
+  if (!Number.isFinite(safeNumerator) || !Number.isFinite(safeDenominator) || safeDenominator <= 0) {
+    return 0;
+  }
+  return Math.max(0, Math.min(100, Math.round((safeNumerator / safeDenominator) * 100)));
+}
+
+function getStatusReadyCount(status) {
+  if (!status || typeof status !== "object") {
+    return 0;
+  }
+  if (Number.isFinite(Number(status.readyCount))) {
+    return Math.max(0, Number(status.readyCount));
+  }
+  return Math.max(0, Number(status.loadedCount) || 0);
+}
+
+function getStatusTotalCount(status) {
+  if (!status || typeof status !== "object") {
+    return 0;
+  }
+  return Math.max(0, Number(status.totalCount) || 0);
+}
+
+function getStatusSkippedCount(status) {
+  if (!status || typeof status !== "object") {
+    return 0;
+  }
+  return Math.max(0, Number(status.skippedCount) || 0);
+}
+
+function getStatusPendingCount(status) {
+  if (!status || typeof status !== "object") {
+    return 0;
+  }
+  return Math.max(0, Number(status.pendingCount) || 0);
+}
+
+export function buildRuntimePreloadCacheEfficiencySummary(statuses = {}) {
+  const source = statuses && typeof statuses === "object" ? statuses : {};
+  const preloadStatus = source.preloadStatus ?? source.runtimePreloadStatus ?? null;
+  const prefetchStatus = source.prefetchStatus ?? source.runtimeScenePrefetchStatus ?? null;
+  const preloadTotal = getStatusTotalCount(preloadStatus);
+  const prefetchTotal = getStatusTotalCount(prefetchStatus);
+  const preloadReady = getStatusReadyCount(preloadStatus);
+  const prefetchReady = getStatusReadyCount(prefetchStatus);
+  const preloadSkipped = getStatusSkippedCount(preloadStatus);
+  const prefetchSkipped = getStatusSkippedCount(prefetchStatus);
+  const preloadPending = getStatusPendingCount(preloadStatus);
+  const prefetchPending = getStatusPendingCount(prefetchStatus);
+  const totalCount = preloadTotal + prefetchTotal;
+  const readyCount = preloadReady + prefetchReady;
+  const skippedCount = preloadSkipped + prefetchSkipped;
+  return Object.freeze({
+    status: totalCount <= 0 ? "empty" : preloadPending + prefetchPending > 0 ? "warming" : "ready",
+    totalCount,
+    readyCount,
+    pendingCount: preloadPending + prefetchPending,
+    skippedCount,
+    preloadSkippedCount: preloadSkipped,
+    prefetchSkippedCount: prefetchSkipped,
+    readyPercent: clampPercent(readyCount, totalCount),
+    reusePercent: clampPercent(skippedCount, totalCount),
+  });
+}
+
 function resolvePhaseDelayOptions(options = {}, profile = {}) {
   const customPhaseDelayMs = options.phaseDelayMs ?? options.phaseDelaysMs ?? {};
   const profilePhaseDelayMs = profile.phaseDelayMs ?? {};

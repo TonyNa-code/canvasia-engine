@@ -282,6 +282,63 @@ class FrontendRuntimePreloadModuleTests(unittest.TestCase):
         self.assertEqual(payload["status"]["skippedAssetIds"], ["bg_cached"])
         self.assertTrue(payload["status"]["finished"])
 
+    def test_runtime_preload_cache_efficiency_summary_combines_preload_and_prefetch_status(self) -> None:
+        script = textwrap.dedent(
+            f"""
+            import * as tools from {json.dumps(MODULE_PATH.as_uri())};
+
+            const empty = tools.buildRuntimePreloadCacheEfficiencySummary(null);
+            const mixed = tools.buildRuntimePreloadCacheEfficiencySummary({{
+              preloadStatus: {{
+                totalCount: 3,
+                readyCount: 2,
+                pendingCount: 1,
+                skippedCount: 1,
+              }},
+              prefetchStatus: {{
+                totalCount: 2,
+                loadedCount: 2,
+                pendingCount: 0,
+                skippedCount: 1,
+              }},
+            }});
+            const aliasInput = tools.buildRuntimePreloadCacheEfficiencySummary({{
+              runtimePreloadStatus: {{ totalCount: 1, loadedCount: 1, skippedCount: 0 }},
+              runtimeScenePrefetchStatus: {{ totalCount: 1, readyCount: 0, pendingCount: 1, skippedCount: 0 }},
+            }});
+
+            process.stdout.write(JSON.stringify({{
+              keys: Object.keys(tools).sort(),
+              empty,
+              mixed,
+              aliasInput,
+            }}));
+            """
+        )
+        completed = subprocess.run(
+            ["node", "--input-type=module", "-e", script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        self.assertIn("buildRuntimePreloadCacheEfficiencySummary", payload["keys"])
+        self.assertEqual(payload["empty"]["status"], "empty")
+        self.assertEqual(payload["mixed"]["status"], "warming")
+        self.assertEqual(payload["mixed"]["totalCount"], 5)
+        self.assertEqual(payload["mixed"]["readyCount"], 4)
+        self.assertEqual(payload["mixed"]["pendingCount"], 1)
+        self.assertEqual(payload["mixed"]["skippedCount"], 2)
+        self.assertEqual(payload["mixed"]["readyPercent"], 80)
+        self.assertEqual(payload["mixed"]["reusePercent"], 40)
+        self.assertEqual(payload["mixed"]["preloadSkippedCount"], 1)
+        self.assertEqual(payload["mixed"]["prefetchSkippedCount"], 1)
+        self.assertEqual(payload["aliasInput"]["status"], "warming")
+        self.assertEqual(payload["aliasInput"]["readyPercent"], 50)
+
     def test_runtime_preload_stages_background_phases_and_batches_work(self) -> None:
         script = textwrap.dedent(
             f"""

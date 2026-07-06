@@ -3279,6 +3279,10 @@ class FrontendActionHandlerTests(unittest.TestCase):
         byte_formatter = _extract_function_source(source, "formatRuntimePreloadBytes")
 
         self.assertIn("formatRuntimePreloadSize(summary)", status_text)
+        self.assertIn("buildRuntimePreloadCacheEfficiencySummary", source)
+        self.assertIn("const cacheEfficiency = buildRuntimePreloadCacheEfficiencySummary", status_text)
+        self.assertIn("准备率", status_text)
+        self.assertIn("复用率", status_text)
         self.assertIn("readyCount", status_text)
         self.assertIn("skippedCount", status_text)
         self.assertIn("rememberRuntimePreloadAssets(status, state.runtimePreloadedAssetIds)", start_preload)
