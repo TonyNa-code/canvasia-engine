@@ -84,8 +84,13 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
         self.assertIn("function serializeReleaseRouteIssue", source)
         self.assertIn("function renderReleaseRouteIssueQueue", source)
         self.assertIn("${renderReleaseRouteIssueQueue(step.routeIssueQueue)}", source)
+        self.assertIn("function renderReleaseProductionBacklogTask", source)
+        self.assertIn("${renderReleaseProductionBacklogTask(step.productionBacklogTask)}", source)
         self.assertIn("routeIssueQueue: (step.routeIssueQueue ?? []).map(serializeReleaseRouteIssue)", payload_body)
+        self.assertIn("productionBacklogTask: step.productionBacklogTask ?? null", payload_body)
         self.assertIn("const routeFixIssueTable = buildMarkdownTable", report_body)
+        self.assertIn('"生产待办明细"', report_body)
+        self.assertIn("step.productionBacklogTask.title", report_body)
         self.assertIn("### 具体路线阻塞", report_body)
 
     def test_release_report_includes_runtime_preload_budget_context(self) -> None:
@@ -562,7 +567,11 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
               productionBacklogSummary: {{ taskCount: 4, blockerCount: 1, warningCount: 2, tipCount: 1 }},
               productionBacklogNextTask: {{
                 title: "补齐空白场景内容",
-                action: {{ label: "补演出卡", action: "switch-screen", screen: "story" }},
+                source: "第1章 / 空白场景",
+                detail: "这个场景只有占位文本。",
+                areaLabel: "场景制作",
+                severityLabel: "先修",
+                action: {{ label: "补演出卡", action: "open-scene-from-map", screen: "story", sceneId: "scene_empty" }},
               }},
             }});
             const warnPlan = tools.buildReleaseFixOrder({{
@@ -582,6 +591,8 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
               }},
             }});
             process.stdout.write(JSON.stringify({{
+              keys: Object.keys(tools).sort(),
+              blockerHint: tools.formatProductionBacklogTaskHint(blockerPlan.steps[0].productionBacklogTask),
               blockerPlan,
               warnPlan,
               softPlan,
@@ -602,10 +613,18 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
         warn_step = payload["warnPlan"]["steps"][0]
         soft_step = payload["softPlan"]["steps"][0]
 
+        self.assertIn("serializeProductionBacklogTask", payload["keys"])
+        self.assertIn("formatProductionBacklogTaskHint", payload["keys"])
         self.assertEqual(blocker_step["tone"], "danger")
         self.assertEqual(blocker_step["title"], "处理生产待办先修项")
         self.assertEqual(blocker_step["statusLabel"], "先修 1 / 优先 2 / 润色 1")
+        self.assertIn("位置：第1章 / 空白场景", blocker_step["description"])
+        self.assertEqual(blocker_step["productionBacklogTask"]["title"], "补齐空白场景内容")
+        self.assertEqual(blocker_step["productionBacklogTask"]["source"], "第1章 / 空白场景")
+        self.assertEqual(blocker_step["productionBacklogTask"]["action"]["sceneId"], "scene_empty")
+        self.assertIn("这个场景只有占位文本", payload["blockerHint"])
         self.assertEqual(blocker_step["actions"][0]["screen"], "story")
+        self.assertEqual(blocker_step["actions"][0]["sceneId"], "scene_empty")
         self.assertEqual(blocker_step["actions"][1]["action"], "export-production-backlog-markdown")
         self.assertEqual(payload["blockerPlan"]["blockerCount"], 1)
         self.assertEqual(warn_step["tone"], "warn")

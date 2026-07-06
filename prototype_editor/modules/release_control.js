@@ -180,6 +180,30 @@
     return { label: "打开项目巡检", action: "switch-screen", screen: "inspection" };
   }
 
+  function serializeProductionBacklogTask(task = null) {
+    if (!task || typeof task !== "object") {
+      return null;
+    }
+    return {
+      title: task.title ?? "",
+      source: task.source ?? "",
+      detail: task.detail ?? "",
+      areaLabel: task.areaLabel ?? "",
+      severityLabel: task.severityLabel ?? "",
+      action: serializeReleaseReportAction(task.action),
+    };
+  }
+
+  function formatProductionBacklogTaskHint(task = null) {
+    const serialized = serializeProductionBacklogTask(task);
+    if (!serialized) {
+      return "";
+    }
+    const source = serialized.source ? `位置：${serialized.source}。` : "";
+    const detail = serialized.detail ? `说明：${serialized.detail}` : "";
+    return [source, detail].filter(Boolean).join(" ");
+  }
+
   function buildProductionBacklogGateItems(signal = {}, status = "blocked") {
     if (!signal.available) {
       return [];
@@ -220,13 +244,16 @@
     ];
     const statusLabel = `先修 ${signal.blockerCount} / 优先 ${signal.warningCount} / 润色 ${signal.tipCount}`;
     const nextTaskLabel = signal.nextTask?.title ? `下一项：${signal.nextTask.title}。` : "";
+    const nextTaskHint = formatProductionBacklogTaskHint(signal.nextTask);
+    const productionBacklogTask = serializeProductionBacklogTask(signal.nextTask);
 
     if (signal.blockerCount > 0) {
       return {
         tone: "danger",
         title: "处理生产待办先修项",
         statusLabel,
-        description: `${nextTaskLabel}这些先修项来自跨模块制作队列，可能包含缺文件、坏引用、授权、节奏或 Runtime 交付风险。`,
+        description: `${nextTaskLabel}${nextTaskHint ? `${nextTaskHint} ` : ""}这些先修项来自跨模块制作队列，可能包含缺文件、坏引用、授权、节奏或 Runtime 交付风险。`,
+        productionBacklogTask,
         actions,
       };
     }
@@ -235,7 +262,8 @@
         tone: "warn",
         title: "确认生产待办优先项",
         statusLabel,
-        description: `${nextTaskLabel}当前没有生产先修项，但这些优先项会影响 Preview 的完成度和观感。`,
+        description: `${nextTaskLabel}${nextTaskHint ? `${nextTaskHint} ` : ""}当前没有生产先修项，但这些优先项会影响 Preview 的完成度和观感。`,
+        productionBacklogTask,
         actions,
       };
     }
@@ -244,7 +272,8 @@
         tone: "soft",
         title: "收尾生产待办润色项",
         statusLabel,
-        description: `${nextTaskLabel}剩余多为润色项，适合在正式发布前做最后一轮体验打磨。`,
+        description: `${nextTaskLabel}${nextTaskHint ? `${nextTaskHint} ` : ""}剩余多为润色项，适合在正式发布前做最后一轮体验打磨。`,
+        productionBacklogTask,
         actions,
       };
     }
@@ -1238,6 +1267,8 @@
     buildReleaseReportNextStep,
     formatReleaseReportNextStepActionHint,
     formatReleaseReportNextStepAdvice,
+    serializeProductionBacklogTask,
+    formatProductionBacklogTaskHint,
     splitReleaseWarnings,
     isDesktopExportReady,
     getRuntimePreloadBudgetRiskCount,

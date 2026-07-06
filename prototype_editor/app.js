@@ -29376,6 +29376,7 @@ function buildReleaseControlReportPayload() {
         description: step.description,
         actions: (step.actions ?? []).map(serializeReleaseReportAction).filter(Boolean),
         routeIssueQueue: (step.routeIssueQueue ?? []).map(serializeReleaseRouteIssue),
+        productionBacklogTask: step.productionBacklogTask ?? null,
       })),
     },
     projectDoctor: {
@@ -29758,6 +29759,15 @@ function buildInspectionReportContent() {
         `   当前状态：${step.statusLabel}`,
         ""
       );
+      if (step.productionBacklogTask) {
+        lines.push(
+          `   生产待办：${step.productionBacklogTask.title ?? "待处理项"}`,
+          step.productionBacklogTask.source ? `   位置：${step.productionBacklogTask.source}` : "",
+          step.productionBacklogTask.detail ? `   细节：${step.productionBacklogTask.detail}` : "",
+          step.productionBacklogTask.action?.label ? `   建议动作：${step.productionBacklogTask.action.label}` : "",
+          ""
+        );
+      }
       (step.routeIssueQueue ?? []).slice(0, 6).forEach((issue, issueIndex) => {
         const issueLabel = [issue.sceneName, issue.routeLabel, issue.targetLabel].filter(Boolean).join(" / ");
         lines.push(
@@ -29926,13 +29936,22 @@ function buildReleaseControlReportContent() {
       ])
   );
   const fixOrderTable = buildMarkdownTable(
-    ["顺序", "优先级", "事项", "当前状态", "说明"],
+    ["顺序", "优先级", "事项", "当前状态", "说明", "生产待办明细"],
     releaseFixOrder.steps.map((step, index) => [
       `${index + 1}`,
       getReleaseStepToneLabel(step.tone),
       step.title,
       step.statusLabel,
       step.description,
+      step.productionBacklogTask
+        ? [
+            step.productionBacklogTask.title,
+            step.productionBacklogTask.source,
+            step.productionBacklogTask.detail,
+          ]
+            .filter(Boolean)
+            .join(" / ")
+        : "",
     ])
   );
   const routeFixIssueTable = buildMarkdownTable(
@@ -31583,6 +31602,25 @@ function renderReleaseRouteIssueQueue(routeIssueQueue = []) {
   `;
 }
 
+function renderReleaseProductionBacklogTask(task = null) {
+  if (!task) {
+    return "";
+  }
+  const meta = [task.areaLabel, task.source, task.severityLabel].filter(Boolean).join(" · ");
+  const actionLabel = task.action?.label ? `建议动作：${task.action.label}` : "";
+  return `
+    <div class="project-doctor-recovery">
+      <strong>生产待办下一项</strong>
+      <span>
+        ${escapeHtml(task.title ?? "生产待办")}
+        ${meta ? `<br>${escapeHtml(meta)}` : ""}
+        ${task.detail ? `<br>${escapeHtml(task.detail)}` : ""}
+        ${actionLabel ? `<br>${escapeHtml(actionLabel)}` : ""}
+      </span>
+    </div>
+  `;
+}
+
 function renderReleaseFixOrderStep(step, index) {
   return `
     <article class="preview-sprint-card is-${step.tone}">
@@ -31592,6 +31630,7 @@ function renderReleaseFixOrderStep(step, index) {
       </div>
       <p>${escapeHtml(step.description)}</p>
       ${renderReleaseRouteIssueQueue(step.routeIssueQueue)}
+      ${renderReleaseProductionBacklogTask(step.productionBacklogTask)}
       <div class="preview-sprint-actions">
         ${(step.actions ?? []).map((action, actionIndex) => renderQuickActionButton(action, actionIndex === 0)).join("")}
       </div>
