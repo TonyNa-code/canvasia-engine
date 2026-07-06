@@ -19,6 +19,11 @@ from export_release_readiness import (
     EXPORT_RELEASE_READINESS_JSON_NAME,
     EXPORT_RELEASE_READINESS_REPORT_NAME,
 )
+from export_route_playtest_workbook import (
+    EXPORT_ROUTE_PLAYTEST_WORKBOOK_CSV_NAME,
+    EXPORT_ROUTE_PLAYTEST_WORKBOOK_JSON_NAME,
+    EXPORT_ROUTE_PLAYTEST_WORKBOOK_REPORT_NAME,
+)
 from export_story_route_map import (
     EXPORT_STORY_ROUTE_MAP_JSON_NAME,
     EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
@@ -110,6 +115,9 @@ class ExportQualityReportsTests(unittest.TestCase):
             for file_name in (
                 EXPORT_STORY_ROUTE_MAP_JSON_NAME,
                 EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
+                EXPORT_ROUTE_PLAYTEST_WORKBOOK_JSON_NAME,
+                EXPORT_ROUTE_PLAYTEST_WORKBOOK_REPORT_NAME,
+                EXPORT_ROUTE_PLAYTEST_WORKBOOK_CSV_NAME,
                 EXPORT_CHOICE_CONSEQUENCE_JSON_NAME,
                 EXPORT_CHOICE_CONSEQUENCE_REPORT_NAME,
                 EXPORT_CHOICE_CONSEQUENCE_CSV_NAME,
@@ -131,6 +139,9 @@ class ExportQualityReportsTests(unittest.TestCase):
                 [
                     "export_manifest.json",
                     EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
+                    EXPORT_ROUTE_PLAYTEST_WORKBOOK_REPORT_NAME,
+                    EXPORT_ROUTE_PLAYTEST_WORKBOOK_JSON_NAME,
+                    EXPORT_ROUTE_PLAYTEST_WORKBOOK_CSV_NAME,
                     EXPORT_CHOICE_CONSEQUENCE_REPORT_NAME,
                     EXPORT_CHOICE_CONSEQUENCE_JSON_NAME,
                     EXPORT_CHOICE_CONSEQUENCE_CSV_NAME,
@@ -143,6 +154,7 @@ class ExportQualityReportsTests(unittest.TestCase):
             )
 
             readiness_payload = json.loads((target_dir / EXPORT_RELEASE_READINESS_JSON_NAME).read_text(encoding="utf-8"))
+            self.assertIn(EXPORT_ROUTE_PLAYTEST_WORKBOOK_REPORT_NAME, readiness_payload["reportFiles"])
             self.assertIn(EXPORT_CHOICE_CONSEQUENCE_REPORT_NAME, readiness_payload["reportFiles"])
             self.assertIn(EXPORT_VARIABLE_INFLUENCE_REPORT_NAME, readiness_payload["reportFiles"])
             self.assertIn(EXPORT_LOCALIZATION_AUDIT_REPORT_NAME, readiness_payload["reportFiles"])

@@ -5,6 +5,7 @@ from pathlib import Path
 from export_choice_consequence_sheet import write_export_choice_consequence_files
 from export_localization_audit import write_export_localization_audit_files
 from export_release_readiness import write_export_release_readiness_files
+from export_route_playtest_workbook import write_export_route_playtest_workbook_files
 from export_story_route_map import write_export_story_route_map_files
 from export_variable_influence_sheet import write_export_variable_influence_files
 
@@ -31,6 +32,7 @@ def write_export_quality_report_bundle(
     platform_notes: list[str] | None = None,
 ) -> dict:
     story_route_map = write_export_story_route_map_files(target_dir, bundle)
+    route_playtest = write_export_route_playtest_workbook_files(target_dir, bundle=bundle)
     choice_consequence = write_export_choice_consequence_files(target_dir, bundle=bundle)
     variable_influence = write_export_variable_influence_files(target_dir, bundle=bundle)
     localization_audit = write_export_localization_audit_files(target_dir, bundle)
@@ -38,6 +40,9 @@ def write_export_quality_report_bundle(
         [
             *(base_report_files or []),
             story_route_map["storyRouteMapReportName"],
+            route_playtest["routePlaytestWorkbookReportName"],
+            route_playtest["routePlaytestWorkbookName"],
+            route_playtest["routePlaytestWorkbookCsvName"],
             choice_consequence["choiceConsequenceReportName"],
             choice_consequence["choiceConsequenceName"],
             choice_consequence["choiceConsequenceCsvName"],
@@ -61,6 +66,7 @@ def write_export_quality_report_bundle(
     )
     return {
         **story_route_map,
+        **route_playtest,
         **choice_consequence,
         **variable_influence,
         **localization_audit,
