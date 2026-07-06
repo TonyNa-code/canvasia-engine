@@ -1,11 +1,304 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 try:
     from .runtime_preload import format_bytes, format_runtime_preload_status_line, normalize_size_bytes
-    from .runtime_scene_prefetch import get_runtime_scene_prefetch_summary
+    from .runtime_scene_prefetch import (
+        build_runtime_scene_prefetch_manifest,
+        build_runtime_scene_prefetch_snapshot,
+        get_runtime_scene_prefetch_summary,
+    )
 except ImportError:  # pragma: no cover - exported native packages import from the same directory.
     from runtime_preload import format_bytes, format_runtime_preload_status_line, normalize_size_bytes
-    from runtime_scene_prefetch import get_runtime_scene_prefetch_summary
+    from runtime_scene_prefetch import (
+        build_runtime_scene_prefetch_manifest,
+        build_runtime_scene_prefetch_snapshot,
+        get_runtime_scene_prefetch_summary,
+    )
+
+
+DIAGNOSTICS_REPORT_NAME = "native-runtime-diagnostics.json"
+DIAGNOSTICS_MARKDOWN_NAME = "native-runtime-diagnostics.md"
+DIAGNOSTICS_FORMAT_VERSION = 1
+
+
+def now_iso() -> str:
+    return datetime.now().replace(microsecond=0).isoformat()
+
+
+def safe_text(value: object) -> str:
+    return str(value or "").strip()
+
+
+def markdown_value(value: object, fallback: str = "-") -> str:
+    text = safe_text(value)
+    if not text:
+        return fallback
+    return text.replace("|", "\\|").replace("\n", " ")
+
+
+def to_list(value: object) -> list:
+    return value if isinstance(value, list) else []
+
+
+def get_project(payload: dict | None) -> dict:
+    source = payload if isinstance(payload, dict) else {}
+    project = source.get("project")
+    return project if isinstance(project, dict) else {}
+
+
+def get_assets(payload: dict | None) -> list[dict]:
+    source = payload if isinstance(payload, dict) else {}
+    assets_doc = source.get("assets") if isinstance(source.get("assets"), dict) else {}
+    assets = assets_doc.get("assets")
+    if not isinstance(assets, list) and isinstance(source.get("assets"), list):
+        assets = source.get("assets")
+    return [asset for asset in to_list(assets) if isinstance(asset, dict)]
+
+
+def get_characters(payload: dict | None) -> list[dict]:
+    source = payload if isinstance(payload, dict) else {}
+    characters_doc = source.get("characters") if isinstance(source.get("characters"), dict) else {}
+    characters = characters_doc.get("characters")
+    if not isinstance(characters, list) and isinstance(source.get("characters"), list):
+        characters = source.get("characters")
+    return [character for character in to_list(characters) if isinstance(character, dict)]
+
+
+def index_by_id(items: list[dict]) -> dict[str, dict]:
+    indexed: dict[str, dict] = {}
+    for item in items:
+        item_id = safe_text(item.get("id"))
+        if item_id:
+            indexed[item_id] = item
+    return indexed
+
+
+def iter_scenes(payload: dict | None) -> list[dict]:
+    source = payload if isinstance(payload, dict) else {}
+    scenes: list[dict] = []
+    for chapter in to_list(source.get("chapters")):
+        if not isinstance(chapter, dict):
+            continue
+        scenes.extend(scene for scene in to_list(chapter.get("scenes")) if isinstance(scene, dict))
+    return scenes
+
+
+def get_scene_blocks(scene: dict | None) -> list[dict]:
+    return [block for block in to_list((scene or {}).get("blocks")) if isinstance(block, dict)]
+
+
+def get_entry_scene(payload: dict | None) -> dict:
+    project = get_project(payload)
+    scenes = iter_scenes(payload)
+    scenes_by_id = index_by_id(scenes)
+    entry_scene_id = safe_text(project.get("entrySceneId"))
+    if entry_scene_id and entry_scene_id in scenes_by_id:
+        return scenes_by_id[entry_scene_id]
+    return scenes[0] if scenes else {}
+
+
+def get_block_choice_options(block: dict | None) -> list[dict]:
+    source = block if isinstance(block, dict) else {}
+    for key in ("options", "choices", "choiceOptions"):
+        options = source.get(key)
+        if isinstance(options, list):
+            return [option for option in options if isinstance(option, dict)]
+    return []
+
+
+def build_static_runtime_preload_status(preload_report: dict | None) -> dict:
+    report = preload_report if isinstance(preload_report, dict) else {}
+    summary = dict(report.get("summary") if isinstance(report.get("summary"), dict) else {})
+    total_entries = int(summary.get("totalEntries") or len(report.get("entries") or []))
+    missing_entries = int(summary.get("missingFileEntries") or summary.get("missingEntries") or 0)
+    report_status = safe_text(report.get("status"))
+    if total_entries <= 0:
+        summary.update(
+            {
+                "status": "empty",
+                "totalEntries": 0,
+                "loadedEntries": 0,
+                "pendingEntries": 0,
+            }
+        )
+        return summary
+    if report_status in {"needs_fix", "missing_manifest"} or missing_entries:
+        summary["status"] = "blocked"
+        summary["loadedEntries"] = 0
+        summary["pendingEntries"] = 0
+        summary["missingEntries"] = max(missing_entries, int(summary.get("missingEntries") or 0))
+        return summary
+    summary["status"] = "ready" if report_status == "ready" else "warming"
+    summary["loadedEntries"] = total_entries
+    summary["pendingEntries"] = 0
+    summary["loadedImageEntries"] = int(summary.get("imageEntries") or 0)
+    summary["loadedSoundEntries"] = int(summary.get("soundEntries") or 0)
+    summary["readyStreamEntries"] = int(summary.get("streamEntries") or 0)
+    return summary
+
+
+def build_static_scene_prefetch_manifest(payload: dict | None) -> dict:
+    entry_scene = get_entry_scene(payload)
+    if not entry_scene:
+        return build_runtime_scene_prefetch_manifest({}, {"scenesById": {}, "assetsById": {}})
+    scenes = iter_scenes(payload)
+    scenes_by_id = index_by_id(scenes)
+    assets_by_id = index_by_id(get_assets(payload))
+    characters_by_id = index_by_id(get_characters(payload))
+    blocks = get_scene_blocks(entry_scene)
+    first_block = blocks[0] if blocks else {}
+    snapshot = build_runtime_scene_prefetch_snapshot(
+        entry_scene,
+        0,
+        scene_id=safe_text(entry_scene.get("id")),
+        choice_options=get_block_choice_options(first_block),
+        completed=not bool(blocks),
+    )
+    return build_runtime_scene_prefetch_manifest(
+        snapshot,
+        {
+            "scenesById": scenes_by_id,
+            "assetsById": assets_by_id,
+            "charactersById": characters_by_id,
+        },
+        {"blockLookahead": 10, "targetBlockLookahead": 10, "maxEntries": 32},
+    )
+
+
+def build_static_scene_prefetch_status(prefetch_manifest: dict | None) -> dict:
+    summary = get_runtime_scene_prefetch_summary(prefetch_manifest)
+    total_entries = int(summary.get("totalCount") or 0)
+    return {
+        "status": "ready" if total_entries else "empty",
+        "totalEntries": total_entries,
+        "loadedEntries": total_entries,
+        "pendingEntries": 0,
+    }
+
+
+def build_export_runtime_diagnostics_context(payload: dict | None, preload_report: dict | None = None) -> dict:
+    project = get_project(payload)
+    entry_scene = get_entry_scene(payload)
+    blocks = get_scene_blocks(entry_scene)
+    first_block = blocks[0] if blocks else {}
+    prefetch_manifest = build_static_scene_prefetch_manifest(payload)
+    return {
+        "sceneId": safe_text(entry_scene.get("id")) or safe_text(project.get("entrySceneId")),
+        "sceneName": safe_text(entry_scene.get("name")) or safe_text(entry_scene.get("title")) or "入口场景",
+        "blockIndex": 0,
+        "lineType": safe_text(first_block.get("type")) or "入口预检",
+        "choiceCount": len(get_block_choice_options(first_block)),
+        "statusMessage": "导出包静态诊断：用于发布前检查预热、路线预取和缓存入口。",
+        "runtimePreloadStatus": build_static_runtime_preload_status(preload_report),
+        "runtimeScenePrefetchStatus": build_static_scene_prefetch_status(prefetch_manifest),
+        "runtimeScenePrefetchManifest": prefetch_manifest,
+        "imageCache": {},
+        "soundCache": {},
+        "videoPreviewFrameCache": {},
+        "runtimeScenePrefetchedAssetIds": {
+            safe_text(entry.get("assetId"))
+            for entry in to_list(prefetch_manifest.get("entries"))
+            if isinstance(entry, dict) and safe_text(entry.get("assetId"))
+        },
+    }
+
+
+def get_export_runtime_diagnostics_status(preload_report: dict, diagnostics_report: dict) -> str:
+    preload_status = safe_text(preload_report.get("status"))
+    diagnostics_status = safe_text(diagnostics_report.get("status"))
+    if preload_status in {"needs_fix", "missing_manifest"} or diagnostics_status == "blocked":
+        return "blocked"
+    if preload_status in {"needs_review"} or diagnostics_status == "warming":
+        return "needs_review"
+    return "ready"
+
+
+def build_export_runtime_diagnostics_summary(payload: dict, preload_report: dict, diagnostics_report: dict, prefetch_manifest: dict) -> dict:
+    preload_summary = preload_report.get("summary") if isinstance(preload_report.get("summary"), dict) else {}
+    prefetch_summary = get_runtime_scene_prefetch_summary(prefetch_manifest)
+    return {
+        "sceneCount": len(iter_scenes(payload)),
+        "preloadStatus": safe_text(preload_report.get("status")) or "unknown",
+        "preloadEntries": int(preload_summary.get("totalEntries") or 0),
+        "preloadMissingEntries": int(preload_summary.get("missingFileEntries") or preload_summary.get("missingEntries") or 0),
+        "prefetchEntries": int(prefetch_summary.get("totalCount") or 0),
+        "prefetchImageEntries": int(prefetch_summary.get("imageCount") or 0),
+        "prefetchAudioEntries": int(prefetch_summary.get("audioCount") or 0),
+        "prefetchVideoEntries": int(prefetch_summary.get("videoCount") or 0),
+        "diagnosticIssueCount": int(diagnostics_report.get("issueCount") or 0),
+        "diagnosticWarningCount": int(diagnostics_report.get("warningCount") or 0),
+    }
+
+
+def build_export_runtime_diagnostics_report(
+    payload: dict | None,
+    preload_report: dict | None = None,
+    *,
+    bundle_dir: object = "",
+    generated_at: object = "",
+) -> dict:
+    safe_payload = payload if isinstance(payload, dict) else {}
+    safe_preload_report = preload_report if isinstance(preload_report, dict) else {}
+    project = get_project(safe_payload)
+    context = build_export_runtime_diagnostics_context(safe_payload, safe_preload_report)
+    diagnostics_report = build_runtime_diagnostics_report(context)
+    prefetch_manifest = context.get("runtimeScenePrefetchManifest")
+    prefetch_manifest = prefetch_manifest if isinstance(prefetch_manifest, dict) else {}
+    status = get_export_runtime_diagnostics_status(safe_preload_report, diagnostics_report)
+    status_label = {
+        "ready": "可发布前复核",
+        "needs_review": "需要复核",
+        "blocked": "需要先修复",
+    }.get(status, status)
+    headline = diagnostics_report.get("headline") or "运行诊断已生成。"
+    if status == "blocked":
+        headline = "运行诊断发现阻塞项；请先修复缺失资源或导出包结构。"
+    elif status == "needs_review":
+        headline = "运行诊断可用，但仍有启动预热或路线预取观察项需要复核。"
+    return {
+        "formatVersion": DIAGNOSTICS_FORMAT_VERSION,
+        "generatedAt": safe_text(generated_at) or now_iso(),
+        "bundleDir": safe_text(bundle_dir),
+        "status": status,
+        "statusLabel": status_label,
+        "headline": headline,
+        "project": {
+            "projectId": project.get("projectId"),
+            "title": project.get("title") or project.get("name") or "未命名项目",
+            "language": project.get("language") or "zh-CN",
+            "entrySceneId": project.get("entrySceneId"),
+        },
+        "entry": {
+            "sceneId": context.get("sceneId"),
+            "sceneName": context.get("sceneName"),
+            "blockIndex": context.get("blockIndex"),
+            "lineType": context.get("lineType"),
+            "choiceCount": context.get("choiceCount"),
+        },
+        "summary": build_export_runtime_diagnostics_summary(
+            safe_payload,
+            safe_preload_report,
+            diagnostics_report,
+            prefetch_manifest,
+        ),
+        "runtimeDiagnostics": diagnostics_report,
+        "runtimePreload": {
+            "status": safe_preload_report.get("status"),
+            "recommendation": safe_preload_report.get("recommendation"),
+            "summary": safe_preload_report.get("summary") or {},
+        },
+        "runtimeScenePrefetch": {
+            "summary": get_runtime_scene_prefetch_summary(prefetch_manifest),
+            "targetSceneIds": prefetch_manifest.get("targetSceneIds") or [],
+            "entries": prefetch_manifest.get("entries") or [],
+        },
+        "recommendedCommands": [
+            "python3 runtime_player.py --runtime-diagnostics-report .",
+            "python3 runtime_player.py --write-runtime-diagnostics-reports .",
+        ],
+    }
 
 
 def get_loaded_cache_count(cache: object) -> int:
@@ -159,3 +452,104 @@ def build_runtime_diagnostics_report(context: dict | None = None) -> dict:
         "warningCount": warning_count,
         "sections": sections,
     }
+
+
+def render_export_runtime_diagnostics_markdown(report: dict | None) -> str:
+    safe_report = report if isinstance(report, dict) else {}
+    project = safe_report.get("project") if isinstance(safe_report.get("project"), dict) else {}
+    entry = safe_report.get("entry") if isinstance(safe_report.get("entry"), dict) else {}
+    summary = safe_report.get("summary") if isinstance(safe_report.get("summary"), dict) else {}
+    diagnostics = (
+        safe_report.get("runtimeDiagnostics")
+        if isinstance(safe_report.get("runtimeDiagnostics"), dict)
+        else {}
+    )
+    runtime_preload = (
+        safe_report.get("runtimePreload")
+        if isinstance(safe_report.get("runtimePreload"), dict)
+        else {}
+    )
+    runtime_prefetch = (
+        safe_report.get("runtimeScenePrefetch")
+        if isinstance(safe_report.get("runtimeScenePrefetch"), dict)
+        else {}
+    )
+    lines = [
+        "# 原生 Runtime 运行诊断报告",
+        "",
+        f"- 项目：{markdown_value(project.get('title'), '未命名项目')}",
+        f"- 状态：{markdown_value(safe_report.get('statusLabel') or safe_report.get('status'))}",
+        f"- 生成时间：{markdown_value(safe_report.get('generatedAt'))}",
+        f"- 入口场景：{markdown_value(entry.get('sceneName') or entry.get('sceneId'), '未找到入口场景')}",
+        f"- 结论：{markdown_value(safe_report.get('headline'), '运行诊断已生成。')}",
+        "",
+        "## 快速指标",
+        "",
+        "| 项目 | 值 |",
+        "| --- | --- |",
+        f"| 场景数 | {int(summary.get('sceneCount') or 0)} |",
+        f"| 预热状态 | {markdown_value(summary.get('preloadStatus'), 'unknown')} |",
+        f"| 预热条目 / 缺失 | {int(summary.get('preloadEntries') or 0)} / {int(summary.get('preloadMissingEntries') or 0)} |",
+        f"| 路线预取条目 | {int(summary.get('prefetchEntries') or 0)} |",
+        (
+            f"| 预取图片 / 音频 / 视频 | {int(summary.get('prefetchImageEntries') or 0)} / "
+            f"{int(summary.get('prefetchAudioEntries') or 0)} / {int(summary.get('prefetchVideoEntries') or 0)} |"
+        ),
+        f"| 诊断异常 / 观察项 | {int(summary.get('diagnosticIssueCount') or 0)} / {int(summary.get('diagnosticWarningCount') or 0)} |",
+        "",
+        "## 运行状态面板",
+        "",
+    ]
+    sections = diagnostics.get("sections") if isinstance(diagnostics.get("sections"), list) else []
+    for section in sections:
+        if not isinstance(section, dict):
+            continue
+        lines.extend([f"### {markdown_value(section.get('title'), '诊断')}", "", "| 项目 | 状态 | 说明 |", "| --- | --- | --- |"])
+        for row in section.get("rows") or []:
+            if not isinstance(row, dict):
+                continue
+            lines.append(
+                f"| {markdown_value(row.get('label'))} | {markdown_value(row.get('value'))} | "
+                f"{markdown_value(row.get('detail'))} |"
+            )
+        lines.append("")
+    lines.extend(["## 资源预热", ""])
+    lines.append(f"- 状态：{markdown_value(runtime_preload.get('status'), 'unknown')}")
+    lines.append(f"- 建议：{markdown_value(runtime_preload.get('recommendation'), '暂无')}")
+    preload_summary = runtime_preload.get("summary") if isinstance(runtime_preload.get("summary"), dict) else {}
+    size_budget = preload_summary.get("sizeBudget") if isinstance(preload_summary.get("sizeBudget"), dict) else {}
+    if size_budget:
+        lines.append(
+            "- critical 首屏体积："
+            f"{markdown_value(size_budget.get('criticalLabel'), '0 B')} / 建议 {markdown_value(size_budget.get('criticalBudgetLabel'), '0 B')}"
+        )
+        lines.append(
+            "- 预热队列总体积："
+            f"{markdown_value(size_budget.get('totalLabel'), '0 B')} / 建议 {markdown_value(size_budget.get('totalBudgetLabel'), '0 B')}"
+        )
+    lines.extend(["", "## 路线预取", ""])
+    prefetch_summary = runtime_prefetch.get("summary") if isinstance(runtime_prefetch.get("summary"), dict) else {}
+    target_scene_ids = runtime_prefetch.get("targetSceneIds") if isinstance(runtime_prefetch.get("targetSceneIds"), list) else []
+    entries = runtime_prefetch.get("entries") if isinstance(runtime_prefetch.get("entries"), list) else []
+    lines.append(f"- 目标场景：{len(target_scene_ids)} 个")
+    lines.append(f"- 预取条目：{int(prefetch_summary.get('totalCount') or 0)} 个")
+    if entries:
+        lines.extend(["", "| 素材 | 类型 | 阶段 | 用途 |", "| --- | --- | --- | --- |"])
+        for entry_item in entries[:20]:
+            if not isinstance(entry_item, dict):
+                continue
+            lines.append(
+                f"| {markdown_value(entry_item.get('name') or entry_item.get('assetId'), '未命名')} | "
+                f"{markdown_value(entry_item.get('type'))} | {markdown_value(entry_item.get('phase'))} | "
+                f"{markdown_value(entry_item.get('reason'), '路线预取')} |"
+            )
+        if len(entries) > 20:
+            lines.append(f"| 其余素材 | - | - | 还有 {len(entries) - 20} 项 |")
+    else:
+        lines.append("- 当前入口附近没有可预取素材。")
+    commands = safe_report.get("recommendedCommands") if isinstance(safe_report.get("recommendedCommands"), list) else []
+    if commands:
+        lines.extend(["", "## 可重新生成", "", "```bash"])
+        lines.extend(safe_text(command) for command in commands if safe_text(command))
+        lines.extend(["```", ""])
+    return "\n".join(lines).rstrip() + "\n"

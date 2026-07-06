@@ -3964,6 +3964,8 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["runtimeVariablesModule"], run_editor.NATIVE_RUNTIME_VARIABLES_NAME)
         self.assertEqual(manifest["files"]["runtimeScenePrefetchModule"], run_editor.NATIVE_RUNTIME_SCENE_PREFETCH_NAME)
         self.assertEqual(manifest["files"]["runtimeDiagnosticsModule"], run_editor.NATIVE_RUNTIME_DIAGNOSTICS_NAME)
+        self.assertEqual(manifest["files"]["runtimeDiagnosticsReport"], run_editor.NATIVE_RUNTIME_DIAGNOSTICS_REPORT_NAME)
+        self.assertEqual(manifest["files"]["runtimeDiagnosticsMarkdown"], run_editor.NATIVE_RUNTIME_DIAGNOSTICS_MARKDOWN_NAME)
         provenance = self.assert_export_provenance_file(
             export_result,
             {
@@ -4004,6 +4006,8 @@ class RunEditorSmokeTests(unittest.TestCase):
                 run_editor.UNLOCKABLE_CONTENT_REPORT_FILE_NAME,
                 run_editor.RUNTIME_PRELOAD_MANIFEST_FILE_NAME,
                 run_editor.RUNTIME_PRELOAD_REPORT_FILE_NAME,
+                run_editor.NATIVE_RUNTIME_DIAGNOSTICS_REPORT_NAME,
+                run_editor.NATIVE_RUNTIME_DIAGNOSTICS_MARKDOWN_NAME,
             },
         )
         self.assertEqual(provenance["build"]["target"], run_editor.EXPORT_TARGET_NATIVE_RUNTIME)
@@ -4021,6 +4025,8 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["runtimePreloadModule"], run_editor.NATIVE_RUNTIME_PRELOAD_NAME)
         self.assertEqual(manifest["files"]["runtimeScenePrefetchModule"], run_editor.NATIVE_RUNTIME_SCENE_PREFETCH_NAME)
         self.assertEqual(manifest["files"]["runtimeDiagnosticsModule"], run_editor.NATIVE_RUNTIME_DIAGNOSTICS_NAME)
+        self.assertEqual(manifest["files"]["runtimeDiagnosticsReport"], run_editor.NATIVE_RUNTIME_DIAGNOSTICS_REPORT_NAME)
+        self.assertEqual(manifest["files"]["runtimeDiagnosticsMarkdown"], run_editor.NATIVE_RUNTIME_DIAGNOSTICS_MARKDOWN_NAME)
         self.assertEqual(manifest["files"]["runtimePerformanceModule"], run_editor.NATIVE_RUNTIME_PERFORMANCE_NAME)
         self.assertEqual(manifest["files"]["performanceBudgetReport"], run_editor.NATIVE_RUNTIME_PERFORMANCE_BUDGET_REPORT_NAME)
         self.assertEqual(manifest["files"]["performanceBudgetMarkdown"], run_editor.NATIVE_RUNTIME_PERFORMANCE_BUDGET_MARKDOWN_NAME)
@@ -4040,6 +4046,9 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["runtime"]["runtimePreloadModule"], run_editor.NATIVE_RUNTIME_PRELOAD_NAME)
         self.assertEqual(manifest["runtime"]["runtimeScenePrefetchModule"], run_editor.NATIVE_RUNTIME_SCENE_PREFETCH_NAME)
         self.assertEqual(manifest["runtime"]["runtimeDiagnosticsModule"], run_editor.NATIVE_RUNTIME_DIAGNOSTICS_NAME)
+        self.assertEqual(manifest["runtime"]["runtimeDiagnosticsReport"], run_editor.NATIVE_RUNTIME_DIAGNOSTICS_REPORT_NAME)
+        self.assertEqual(manifest["runtime"]["runtimeDiagnosticsMarkdown"], run_editor.NATIVE_RUNTIME_DIAGNOSTICS_MARKDOWN_NAME)
+        self.assertIn(manifest["runtime"]["runtimeDiagnosticsStatus"], {"ready", "needs_review", "blocked", "unavailable"})
         self.assertEqual(manifest["runtime"]["runtimePerformanceModule"], run_editor.NATIVE_RUNTIME_PERFORMANCE_NAME)
         self.assertEqual(
             manifest["runtime"]["runtimePreloadSummary"]["totalEntries"],
@@ -4076,6 +4085,8 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["vnBaselineQualityMarkdown"], run_editor.NATIVE_RUNTIME_VN_BASELINE_QUALITY_MARKDOWN_NAME)
         self.assertEqual(manifest["files"]["performanceBudgetReport"], run_editor.NATIVE_RUNTIME_PERFORMANCE_BUDGET_REPORT_NAME)
         self.assertEqual(manifest["files"]["performanceBudgetMarkdown"], run_editor.NATIVE_RUNTIME_PERFORMANCE_BUDGET_MARKDOWN_NAME)
+        self.assertEqual(manifest["files"]["runtimeDiagnosticsReport"], run_editor.NATIVE_RUNTIME_DIAGNOSTICS_REPORT_NAME)
+        self.assertEqual(manifest["files"]["runtimeDiagnosticsMarkdown"], run_editor.NATIVE_RUNTIME_DIAGNOSTICS_MARKDOWN_NAME)
         self.assertEqual(manifest["files"]["macReleaseControlReporter"], run_editor.NATIVE_RUNTIME_MAC_RELEASE_CONTROL_COMMAND_NAME)
         self.assertEqual(manifest["files"]["linuxReleaseControlReporter"], run_editor.NATIVE_RUNTIME_LINUX_RELEASE_CONTROL_COMMAND_NAME)
         self.assertEqual(manifest["files"]["windowsReleaseControlReporter"], run_editor.NATIVE_RUNTIME_WINDOWS_RELEASE_CONTROL_COMMAND_NAME)
@@ -4114,12 +4125,19 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(export_result["performanceBudgetStatus"], performance_budget_payload["status"])
         self.assertGreaterEqual(performance_budget_payload["summary"]["assetCount"], 1)
 
+        diagnostics_payload = json.loads((build_dir / run_editor.NATIVE_RUNTIME_DIAGNOSTICS_REPORT_NAME).read_text(encoding="utf-8"))
+        self.assertEqual(diagnostics_payload["formatVersion"], 1)
+        self.assertIn(diagnostics_payload["status"], {"ready", "needs_review", "blocked"})
+        self.assertEqual(export_result["runtimeDiagnosticsStatus"], diagnostics_payload["status"])
+        self.assertEqual(export_result["runtimeDiagnosticsSummary"]["preloadEntries"], diagnostics_payload["summary"]["preloadEntries"])
+
         release_control_payload = json.loads((build_dir / run_editor.NATIVE_RUNTIME_RELEASE_CONTROL_JSON_NAME).read_text(encoding="utf-8"))
         self.assertEqual(release_control_payload["formatVersion"], 1)
         self.assertEqual(release_control_payload["project"]["title"], "自动化测试项目")
         self.assertIn(release_control_payload["qualityGate"]["status"], {"ready", "needs_review"})
         self.assertEqual(release_control_payload["vnBaselineQuality"]["status"], "ready")
         self.assertIn(release_control_payload["performanceBudget"]["status"], {"ready", "needs_review"})
+        self.assertIn(release_control_payload["runtimeDiagnostics"]["status"], {"ready", "needs_review", "blocked"})
         self.assertEqual(
             release_control_payload["performanceBudget"]["summary"]["assetCount"],
             performance_budget_payload["summary"]["assetCount"],
@@ -4132,6 +4150,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertIn("# 原生 Runtime 发布总控报告", release_control_markdown)
         self.assertIn("## 核心指标", release_control_markdown)
         self.assertIn("## 性能预算", release_control_markdown)
+        self.assertIn("## Runtime 运行诊断", release_control_markdown)
         self.assertTrue(export_result["releaseControlReportPublicUrl"].endswith(run_editor.NATIVE_RUNTIME_RELEASE_CONTROL_REPORT_NAME))
         self.assertTrue(export_result["releaseControlJsonPublicUrl"].endswith(run_editor.NATIVE_RUNTIME_RELEASE_CONTROL_JSON_NAME))
         self.assertEqual(export_result["vnBaselineQualityStatus"], "ready")
@@ -4139,7 +4158,11 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue(export_result["vnBaselineQualityMarkdownPublicUrl"].endswith(run_editor.NATIVE_RUNTIME_VN_BASELINE_QUALITY_MARKDOWN_NAME))
         performance_budget_markdown = (build_dir / run_editor.NATIVE_RUNTIME_PERFORMANCE_BUDGET_MARKDOWN_NAME).read_text(encoding="utf-8")
         self.assertIn("# 原生 Runtime 性能预算报告", performance_budget_markdown)
+        diagnostics_markdown = (build_dir / run_editor.NATIVE_RUNTIME_DIAGNOSTICS_MARKDOWN_NAME).read_text(encoding="utf-8")
+        self.assertIn("# 原生 Runtime 运行诊断报告", diagnostics_markdown)
         self.assertTrue(export_result["runtimePerformanceModulePublicUrl"].endswith(run_editor.NATIVE_RUNTIME_PERFORMANCE_NAME))
+        self.assertTrue(export_result["runtimeDiagnosticsReportPublicUrl"].endswith(run_editor.NATIVE_RUNTIME_DIAGNOSTICS_REPORT_NAME))
+        self.assertTrue(export_result["runtimeDiagnosticsMarkdownPublicUrl"].endswith(run_editor.NATIVE_RUNTIME_DIAGNOSTICS_MARKDOWN_NAME))
         self.assertTrue(export_result["performanceBudgetReportPublicUrl"].endswith(run_editor.NATIVE_RUNTIME_PERFORMANCE_BUDGET_REPORT_NAME))
         self.assertTrue(export_result["performanceBudgetMarkdownPublicUrl"].endswith(run_editor.NATIVE_RUNTIME_PERFORMANCE_BUDGET_MARKDOWN_NAME))
         self.assertTrue(export_result["macReleaseControlReporterPublicUrl"].endswith(run_editor.NATIVE_RUNTIME_MAC_RELEASE_CONTROL_COMMAND_NAME))
@@ -4205,6 +4228,20 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(performance_budget_cli.returncode, 0, performance_budget_cli.stdout + performance_budget_cli.stderr)
         self.assertIn("# 原生 Runtime 性能预算报告", performance_budget_cli.stdout)
 
+        diagnostics_cli = subprocess.run(
+            [
+                sys.executable,
+                str(build_dir / run_editor.NATIVE_RUNTIME_PLAYER_NAME),
+                "--runtime-diagnostics-report",
+                str(build_dir),
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(diagnostics_cli.returncode, 0, diagnostics_cli.stdout + diagnostics_cli.stderr)
+        self.assertIn("# 原生 Runtime 运行诊断报告", diagnostics_cli.stdout)
+
         integrity_payload = json.loads((build_dir / run_editor.NATIVE_RUNTIME_FILE_INTEGRITY_REPORT_NAME).read_text(encoding="utf-8"))
         self.assertEqual(integrity_payload["formatVersion"], 1)
         self.assertEqual(integrity_payload["algorithm"], "sha256")
@@ -4232,7 +4269,9 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue(acceptance_payload["recommendedCommands"])
         self.assertIn("vn_baseline_quality", {check["id"] for check in acceptance_payload["automatedChecks"]})
         self.assertIn("performance_budget", {check["id"] for check in acceptance_payload["automatedChecks"]})
+        self.assertIn("runtime_diagnostics", {check["id"] for check in acceptance_payload["automatedChecks"]})
         self.assertIn(run_editor.NATIVE_RUNTIME_PERFORMANCE_BUDGET_MARKDOWN_NAME, acceptance_payload["includedReports"].values())
+        self.assertIn(run_editor.NATIVE_RUNTIME_DIAGNOSTICS_MARKDOWN_NAME, acceptance_payload["includedReports"].values())
         acceptance_markdown = (build_dir / run_editor.NATIVE_RUNTIME_ACCEPTANCE_REPORT_NAME).read_text(encoding="utf-8")
         self.assertIn("# 原生 Runtime 发布验收清单", acceptance_markdown)
         self.assertIn("## 人工逐项点测", acceptance_markdown)

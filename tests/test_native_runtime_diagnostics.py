@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import unittest
 
-from native_runtime.runtime_diagnostics import build_runtime_diagnostics_report
+from native_runtime.runtime_diagnostics import (
+    build_export_runtime_diagnostics_report,
+    build_runtime_diagnostics_report,
+    render_export_runtime_diagnostics_markdown,
+)
 
 
 class NativeRuntimeDiagnosticsTests(unittest.TestCase):
@@ -92,6 +96,67 @@ class NativeRuntimeDiagnosticsTests(unittest.TestCase):
         self.assertEqual(report["status"], "blocked")
         self.assertGreaterEqual(report["issueCount"], 1)
         self.assertIn("运行时异常", report["headline"])
+
+    def test_export_runtime_diagnostics_report_renders_static_release_evidence(self) -> None:
+        payload = {
+            "project": {
+                "projectId": "proj_demo",
+                "title": "Release Demo",
+                "language": "zh-CN",
+                "entrySceneId": "scene_opening",
+            },
+            "assets": {
+                "assets": [
+                    {
+                        "id": "bg_school",
+                        "name": "School Gate",
+                        "type": "background",
+                        "exportUrl": "assets/bg_school.png",
+                        "fileSizeBytes": 2048,
+                    }
+                ]
+            },
+            "characters": {"characters": []},
+            "chapters": [
+                {
+                    "id": "ch1",
+                    "scenes": [
+                        {
+                            "id": "scene_opening",
+                            "name": "Opening",
+                            "blocks": [
+                                {"id": "b1", "type": "narration", "text": "Morning."},
+                                {"id": "b2", "type": "background", "assetId": "bg_school"},
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+        preload_report = {
+            "status": "ready",
+            "recommendation": "资源预热清单和包内素材路径可用。",
+            "summary": {
+                "status": "ready",
+                "totalEntries": 1,
+                "imageEntries": 1,
+                "soundEntries": 0,
+                "streamEntries": 0,
+                "missingFileEntries": 0,
+            },
+        }
+
+        report = build_export_runtime_diagnostics_report(payload, preload_report, bundle_dir="/tmp/demo")
+        markdown = render_export_runtime_diagnostics_markdown(report)
+
+        self.assertEqual(report["status"], "ready")
+        self.assertEqual(report["project"]["title"], "Release Demo")
+        self.assertEqual(report["entry"]["sceneName"], "Opening")
+        self.assertEqual(report["summary"]["preloadEntries"], 1)
+        self.assertEqual(report["summary"]["prefetchEntries"], 1)
+        self.assertIn("runtime-diagnostics-report", " ".join(report["recommendedCommands"]))
+        self.assertIn("# 原生 Runtime 运行诊断报告", markdown)
+        self.assertIn("School Gate", markdown)
 
 
 if __name__ == "__main__":

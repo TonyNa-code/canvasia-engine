@@ -70,9 +70,21 @@ except ImportError:  # pragma: no cover - exported native packages import from t
     )
 
 try:
-    from .runtime_diagnostics import build_runtime_diagnostics_report
+    from .runtime_diagnostics import (
+        DIAGNOSTICS_MARKDOWN_NAME,
+        DIAGNOSTICS_REPORT_NAME,
+        build_export_runtime_diagnostics_report,
+        build_runtime_diagnostics_report,
+        render_export_runtime_diagnostics_markdown,
+    )
 except ImportError:  # pragma: no cover - exported native packages import from the same directory.
-    from runtime_diagnostics import build_runtime_diagnostics_report
+    from runtime_diagnostics import (
+        DIAGNOSTICS_MARKDOWN_NAME,
+        DIAGNOSTICS_REPORT_NAME,
+        build_export_runtime_diagnostics_report,
+        build_runtime_diagnostics_report,
+        render_export_runtime_diagnostics_markdown,
+    )
 
 try:
     from .runtime_performance import (
@@ -237,6 +249,8 @@ FILE_INTEGRITY_EXCLUDED_FILE_NAMES = {
     VN_BASELINE_QUALITY_MARKDOWN_NAME,
     PERFORMANCE_BUDGET_REPORT_NAME,
     PERFORMANCE_BUDGET_MARKDOWN_NAME,
+    DIAGNOSTICS_REPORT_NAME,
+    DIAGNOSTICS_MARKDOWN_NAME,
 }
 FILE_INTEGRITY_EXCLUDED_PREFIXES = {
     "__pycache__",
@@ -5136,6 +5150,42 @@ def print_native_runtime_preload_markdown_report(bundle_dir: Path) -> dict:
     return report
 
 
+def build_native_runtime_diagnostics_report(bundle_dir: Path) -> dict:
+    payload = load_game_data(bundle_dir / DEFAULT_GAME_DATA_NAME)
+    preload_report = build_native_runtime_preload_report(bundle_dir)
+    return build_export_runtime_diagnostics_report(
+        payload,
+        preload_report,
+        bundle_dir=str(bundle_dir),
+        generated_at=now_iso(),
+    )
+
+
+def print_native_runtime_diagnostics_json_report(bundle_dir: Path) -> dict:
+    report = build_native_runtime_diagnostics_report(bundle_dir)
+    print(json.dumps(report, ensure_ascii=False, indent=2))
+    return report
+
+
+def print_native_runtime_diagnostics_markdown_report(bundle_dir: Path) -> dict:
+    report = build_native_runtime_diagnostics_report(bundle_dir)
+    print(render_export_runtime_diagnostics_markdown(report), end="")
+    return report
+
+
+def write_native_runtime_diagnostics_reports(bundle_dir: Path) -> dict:
+    report = build_native_runtime_diagnostics_report(bundle_dir)
+    (bundle_dir / DIAGNOSTICS_REPORT_NAME).write_text(
+        json.dumps(report, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    (bundle_dir / DIAGNOSTICS_MARKDOWN_NAME).write_text(
+        render_export_runtime_diagnostics_markdown(report),
+        encoding="utf-8",
+    )
+    return report
+
+
 def get_doctor_status(checks: list[dict]) -> str:
     if any(check.get("status") == "fail" for check in checks):
         return "fail"
@@ -5406,6 +5456,7 @@ def build_native_runtime_doctor_report(bundle_dir: Path) -> dict:
     checks.append(build_release_check_doctor_check(bundle_dir))
     checks.append(build_vn_baseline_quality_doctor_check(bundle_dir))
     checks.append(build_runtime_preload_doctor_check(bundle_dir))
+    checks.append(build_report_doctor_check("runtime_diagnostics", "Runtime 运行诊断", build_native_runtime_diagnostics_report, bundle_dir))
     checks.append(
         run_doctor_with_temporary_home(
             lambda: build_report_doctor_check("title_screen", "标题页摘要", build_native_title_screen_report, bundle_dir)
@@ -7622,6 +7673,7 @@ def get_native_runtime_release_control_status(
     asset3d_digest: dict,
     vn_baseline_quality: dict | None = None,
     performance_budget: dict | None = None,
+    runtime_diagnostics: dict | None = None,
 ) -> dict:
     release_summary = release_check.get("summary") if isinstance(release_check.get("summary"), dict) else {}
     rc_summary = release_candidate.get("summary") if isinstance(release_candidate.get("summary"), dict) else {}
@@ -7639,6 +7691,7 @@ def get_native_runtime_release_control_status(
         release_check.get("status") == "fail"
         or release_candidate.get("status") == "blocked"
         or (isinstance(performance_budget, dict) and performance_budget.get("status") == "needs_fix")
+        or (isinstance(runtime_diagnostics, dict) and runtime_diagnostics.get("status") == "blocked")
         or int(release_summary.get("errors") or 0)
         or int(rc_summary.get("blockers") or 0)
         or int(vn_summary.get("warnCount") or 0)
@@ -7656,6 +7709,7 @@ def get_native_runtime_release_control_status(
         or bool(asset3d_digest.get("topIssues"))
         or int(vn_summary.get("softCount") or 0)
         or (isinstance(performance_budget, dict) and performance_budget.get("status") == "needs_review")
+        or (isinstance(runtime_diagnostics, dict) and runtime_diagnostics.get("status") == "needs_review")
         or int(performance_summary.get("warnCount") or 0)
         or int(performance_summary.get("softCount") or 0)
     ):
@@ -7727,12 +7781,14 @@ def build_native_runtime_release_control_payload(bundle_dir: Path) -> dict:
     asset3d_digest = build_native_runtime_3d_risk_digest(asset3d_report)
     vn_baseline_quality = build_native_runtime_vn_baseline_quality_report(bundle_dir)
     performance_budget = build_native_runtime_performance_budget_report(bundle_dir)
+    runtime_diagnostics = build_native_runtime_diagnostics_report(bundle_dir)
     quality_gate = get_native_runtime_release_control_status(
         release_check,
         release_candidate,
         asset3d_digest,
         vn_baseline_quality,
         performance_budget,
+        runtime_diagnostics,
     )
     return {
         "formatVersion": 1,
@@ -7784,6 +7840,14 @@ def build_native_runtime_release_control_payload(bundle_dir: Path) -> dict:
             "markdown": PERFORMANCE_BUDGET_MARKDOWN_NAME,
             "json": PERFORMANCE_BUDGET_REPORT_NAME,
         },
+        "runtimeDiagnostics": {
+            "status": runtime_diagnostics.get("status"),
+            "statusLabel": runtime_diagnostics.get("statusLabel"),
+            "headline": runtime_diagnostics.get("headline"),
+            "summary": runtime_diagnostics.get("summary") or {},
+            "markdown": DIAGNOSTICS_MARKDOWN_NAME,
+            "json": DIAGNOSTICS_REPORT_NAME,
+        },
         "nextSteps": build_native_runtime_release_control_next_steps(
             release_check,
             release_candidate,
@@ -7806,6 +7870,8 @@ def build_native_runtime_release_control_payload(bundle_dir: Path) -> dict:
             "vnBaselineQualityJson": VN_BASELINE_QUALITY_REPORT_NAME,
             "performanceBudgetMarkdown": PERFORMANCE_BUDGET_MARKDOWN_NAME,
             "performanceBudgetJson": PERFORMANCE_BUDGET_REPORT_NAME,
+            "runtimeDiagnosticsMarkdown": DIAGNOSTICS_MARKDOWN_NAME,
+            "runtimeDiagnosticsJson": DIAGNOSTICS_REPORT_NAME,
         },
     }
 
@@ -7819,12 +7885,16 @@ def render_native_runtime_release_control_markdown(payload: dict) -> str:
     asset3d = payload.get("asset3d") if isinstance(payload.get("asset3d"), dict) else {}
     vn_baseline = payload.get("vnBaselineQuality") if isinstance(payload.get("vnBaselineQuality"), dict) else {}
     performance_budget = payload.get("performanceBudget") if isinstance(payload.get("performanceBudget"), dict) else {}
+    runtime_diagnostics = payload.get("runtimeDiagnostics") if isinstance(payload.get("runtimeDiagnostics"), dict) else {}
     release_summary = release_check.get("summary") if isinstance(release_check.get("summary"), dict) else {}
     rc_summary = release_candidate.get("summary") if isinstance(release_candidate.get("summary"), dict) else {}
     readiness = release_candidate.get("readinessEstimate") if isinstance(release_candidate.get("readinessEstimate"), dict) else {}
     vn_summary = vn_baseline.get("summary") if isinstance(vn_baseline.get("summary"), dict) else {}
     vn_metrics = vn_baseline.get("metrics") if isinstance(vn_baseline.get("metrics"), dict) else {}
     performance_summary = performance_budget.get("summary") if isinstance(performance_budget.get("summary"), dict) else {}
+    diagnostics_summary = (
+        runtime_diagnostics.get("summary") if isinstance(runtime_diagnostics.get("summary"), dict) else {}
+    )
     performance_asset_groups = (
         performance_budget.get("assetGroups") if isinstance(performance_budget.get("assetGroups"), dict) else {}
     )
@@ -7853,6 +7923,7 @@ def render_native_runtime_release_control_markdown(payload: dict) -> str:
         f"| 3D 摘要 | {format_markdown_value(asset3d.get('summaryLine'), '未生成')} |",
         f"| VN 基础质感 | {format_markdown_value(vn_summary.get('statusLabel'), vn_baseline.get('status') or '未生成')} |",
         f"| 性能预算 | {format_markdown_value(performance_summary.get('statusLabel'), performance_budget.get('status') or '未生成')} |",
+        f"| Runtime 运行诊断 | {format_markdown_value(runtime_diagnostics.get('statusLabel'), runtime_diagnostics.get('status') or '未生成')} |",
         "",
     ]
     if vn_baseline:
@@ -7955,6 +8026,17 @@ def render_native_runtime_release_control_markdown(payload: dict) -> str:
                         f"{format_markdown_value(issue.get('suggestion') or issue.get('detail'), '需要复核')}"
                     )
         lines.append("")
+    if runtime_diagnostics:
+        lines.extend(["## Runtime 运行诊断", "", "| 指标 | 值 |", "| --- | --- |"])
+        for label, value in [
+            ("状态", runtime_diagnostics.get("statusLabel") or runtime_diagnostics.get("status")),
+            ("结论", runtime_diagnostics.get("headline")),
+            ("预热条目 / 缺失", f"{int(diagnostics_summary.get('preloadEntries') or 0)} / {int(diagnostics_summary.get('preloadMissingEntries') or 0)}"),
+            ("路线预取条目", diagnostics_summary.get("prefetchEntries")),
+            ("异常 / 观察项", f"{int(diagnostics_summary.get('diagnosticIssueCount') or 0)} / {int(diagnostics_summary.get('diagnosticWarningCount') or 0)}"),
+        ]:
+            lines.append(f"| {label} | {format_markdown_value(value, '0')} |")
+        lines.append("")
     metrics = asset3d.get("metrics") if isinstance(asset3d.get("metrics"), list) else []
     if metrics:
         lines.extend(["## 3D 风险快照", "", "| 指标 | 值 |", "| --- | --- |"])
@@ -7993,6 +8075,7 @@ def write_native_runtime_release_control_reports(bundle_dir: Path) -> dict:
     payload = build_native_runtime_release_control_payload(bundle_dir)
     write_native_runtime_vn_baseline_quality_reports(bundle_dir)
     write_native_runtime_performance_budget_reports(bundle_dir)
+    write_native_runtime_diagnostics_reports(bundle_dir)
     (bundle_dir / "native-runtime-release-control-report.json").write_text(
         json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
@@ -8027,6 +8110,9 @@ def build_acceptance_automated_checks(release_control: dict, integrity_verificat
     )
     performance_budget = (
         release_control.get("performanceBudget") if isinstance(release_control.get("performanceBudget"), dict) else {}
+    )
+    runtime_diagnostics = (
+        release_control.get("runtimeDiagnostics") if isinstance(release_control.get("runtimeDiagnostics"), dict) else {}
     )
     return [
         {
@@ -8063,6 +8149,13 @@ def build_acceptance_automated_checks(release_control: dict, integrity_verificat
             "status": str(performance_budget.get("status") or "unavailable"),
             "summary": performance_budget.get("summary") or {},
             "command": "python3 runtime_player.py --performance-budget-report .",
+        },
+        {
+            "id": "runtime_diagnostics",
+            "label": "Runtime 运行诊断",
+            "status": str(runtime_diagnostics.get("status") or "unavailable"),
+            "summary": runtime_diagnostics.get("summary") or {},
+            "command": "python3 runtime_player.py --runtime-diagnostics-report .",
         },
         {
             "id": "file_integrity",
@@ -8239,6 +8332,7 @@ def build_native_runtime_acceptance_payload(bundle_dir: Path) -> dict:
         "recommendedCommands": [
             "python3 runtime_player.py --doctor .",
             "python3 runtime_player.py --verify-file-integrity .",
+            "python3 runtime_player.py --runtime-diagnostics-report .",
             "python3 runtime_player.py --performance-budget-report .",
             "python3 runtime_player.py --release-control-report .",
             "python3 runtime_player.py --acceptance-report .",
@@ -8252,6 +8346,8 @@ def build_native_runtime_acceptance_payload(bundle_dir: Path) -> dict:
             "fileIntegrityMarkdown": FILE_INTEGRITY_MARKDOWN_NAME,
             "performanceBudgetJson": PERFORMANCE_BUDGET_REPORT_NAME,
             "performanceBudgetMarkdown": PERFORMANCE_BUDGET_MARKDOWN_NAME,
+            "runtimeDiagnosticsJson": DIAGNOSTICS_REPORT_NAME,
+            "runtimeDiagnosticsMarkdown": DIAGNOSTICS_MARKDOWN_NAME,
         },
     }
 
@@ -15850,6 +15946,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--performance-budget-json", "--performance-budget", dest="performance_budget_json", help="输出原生 Runtime 性能预算 JSON 报告，不启动窗口")
     parser.add_argument("--performance-budget-report", "--performance-budget-md", dest="performance_budget_report", help="输出原生 Runtime 性能预算 Markdown 报告，不启动窗口")
     parser.add_argument("--write-performance-budget-reports", dest="write_performance_budget_reports", help="写入原生 Runtime 性能预算 Markdown / JSON 报告，不启动窗口")
+    parser.add_argument("--runtime-diagnostics-json", "--runtime-diagnostics", dest="runtime_diagnostics_json", help="输出原生 Runtime 运行诊断 JSON 报告，不启动窗口")
+    parser.add_argument("--runtime-diagnostics-report", "--runtime-diagnostics-md", dest="runtime_diagnostics_report", help="输出原生 Runtime 运行诊断 Markdown 报告，不启动窗口")
+    parser.add_argument("--write-runtime-diagnostics-reports", dest="write_runtime_diagnostics_reports", help="写入原生 Runtime 运行诊断 Markdown / JSON 报告，不启动窗口")
     parser.add_argument("--exercise-save-load", dest="exercise_save_load", help="检查存档文件能否写入和读回")
     parser.add_argument("--exercise-settings", dest="exercise_settings", help="检查原生 Runtime 设置能否写入和读回")
     parser.add_argument("--exercise-archives", dest="exercise_archives", help="检查原生 Runtime 资料馆进度能否写入和读回")
@@ -16090,6 +16189,42 @@ def main(argv: list[str] | None = None) -> int:
             return 1 if payload.get("status") == "needs_fix" else 0
         except (NativeRuntimeError, OSError, json.JSONDecodeError) as error:
             print(f"Native runtime performance budget report write failed: {error}")
+            return 1
+
+    if args.runtime_diagnostics_json:
+        try:
+            report = print_native_runtime_diagnostics_json_report(Path(args.runtime_diagnostics_json).resolve())
+            return 1 if report.get("status") == "blocked" else 0
+        except (NativeRuntimeError, OSError, json.JSONDecodeError) as error:
+            print(f"Native runtime diagnostics report failed: {error}")
+            return 1
+
+    if args.runtime_diagnostics_report:
+        try:
+            report = print_native_runtime_diagnostics_markdown_report(Path(args.runtime_diagnostics_report).resolve())
+            return 1 if report.get("status") == "blocked" else 0
+        except (NativeRuntimeError, OSError, json.JSONDecodeError) as error:
+            print(f"Native runtime diagnostics markdown failed: {error}")
+            return 1
+
+    if args.write_runtime_diagnostics_reports:
+        try:
+            payload = write_native_runtime_diagnostics_reports(Path(args.write_runtime_diagnostics_reports).resolve())
+            print(
+                json.dumps(
+                    {
+                        "status": payload.get("status"),
+                        "label": payload.get("statusLabel"),
+                        "markdown": DIAGNOSTICS_MARKDOWN_NAME,
+                        "json": DIAGNOSTICS_REPORT_NAME,
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
+            return 1 if payload.get("status") == "blocked" else 0
+        except (NativeRuntimeError, OSError, json.JSONDecodeError) as error:
+            print(f"Native runtime diagnostics report write failed: {error}")
             return 1
 
     if args.exercise_save_load:

@@ -111,6 +111,10 @@ from native_runtime.runtime_performance import (
     PERFORMANCE_BUDGET_MARKDOWN_NAME as NATIVE_RUNTIME_PERFORMANCE_BUDGET_MARKDOWN_NAME,
     PERFORMANCE_BUDGET_REPORT_NAME as NATIVE_RUNTIME_PERFORMANCE_BUDGET_REPORT_NAME,
 )
+from native_runtime.runtime_diagnostics import (
+    DIAGNOSTICS_MARKDOWN_NAME as NATIVE_RUNTIME_DIAGNOSTICS_MARKDOWN_FILE_NAME,
+    DIAGNOSTICS_REPORT_NAME as NATIVE_RUNTIME_DIAGNOSTICS_REPORT_FILE_NAME,
+)
 from export_story_route_map import (
     EXPORT_STORY_ROUTE_MAP_JSON_NAME,
     EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
@@ -512,6 +516,8 @@ NATIVE_RUNTIME_VN_BASELINE_QUALITY_REPORT_NAME = "native-runtime-vn-baseline-qua
 NATIVE_RUNTIME_VN_BASELINE_QUALITY_MARKDOWN_NAME = "native-runtime-vn-baseline-quality.md"
 NATIVE_RUNTIME_FILE_INTEGRITY_REPORT_NAME = "native-runtime-file-integrity.json"
 NATIVE_RUNTIME_FILE_INTEGRITY_MARKDOWN_NAME = "native-runtime-file-integrity.md"
+NATIVE_RUNTIME_DIAGNOSTICS_REPORT_NAME = NATIVE_RUNTIME_DIAGNOSTICS_REPORT_FILE_NAME
+NATIVE_RUNTIME_DIAGNOSTICS_MARKDOWN_NAME = NATIVE_RUNTIME_DIAGNOSTICS_MARKDOWN_FILE_NAME
 NATIVE_RUNTIME_3D_ASSET_REPORT_NAME = "native-runtime-3d-asset-report.json"
 NATIVE_RUNTIME_3D_ASSET_SUMMARY_NAME = "native-runtime-3d-asset-summary.md"
 NATIVE_RUNTIME_3D_ASSET_DIGEST_NAME = "native-runtime-3d-risk-digest.json"
@@ -9077,6 +9083,71 @@ def write_native_runtime_performance_budget_reports(build_dir: Path) -> dict:
     }
 
 
+def write_native_runtime_diagnostics_reports(build_dir: Path) -> dict:
+    report_path = build_dir / NATIVE_RUNTIME_DIAGNOSTICS_REPORT_NAME
+    markdown_path = build_dir / NATIVE_RUNTIME_DIAGNOSTICS_MARKDOWN_NAME
+    diagnostics = subprocess.run(
+        [
+            sys.executable,
+            str(build_dir / NATIVE_RUNTIME_PLAYER_NAME),
+            "--write-runtime-diagnostics-reports",
+            str(build_dir),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    payload = None
+    if report_path.is_file():
+        try:
+            payload = json.loads(report_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            payload = None
+    if not isinstance(payload, dict):
+        message = diagnostics.stderr.strip() or diagnostics.stdout.strip() or "运行诊断报告生成失败。"
+        payload = {
+            "formatVersion": 1,
+            "generatedAt": now_iso(),
+            "status": "unavailable",
+            "statusLabel": "报告未生成",
+            "headline": message,
+            "summary": {
+                "diagnosticIssueCount": 1,
+                "diagnosticWarningCount": 0,
+            },
+            "recommendedCommands": ["python3 runtime_player.py --write-runtime-diagnostics-reports ."],
+        }
+        report_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        markdown_path.write_text(
+            "\n".join(
+                [
+                    "# 原生 Runtime 运行诊断报告",
+                    "",
+                    "- 状态：报告未生成",
+                    f"- 原因：{message}",
+                    "",
+                    "可手动运行：",
+                    "",
+                    "```bash",
+                    "python3 runtime_player.py --write-runtime-diagnostics-reports .",
+                    "```",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+    summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
+    return {
+        "runtimeDiagnosticsStatus": str(payload.get("status") or "unavailable"),
+        "runtimeDiagnosticsSummary": summary,
+        "runtimeDiagnosticsPayload": payload,
+        "runtimeDiagnosticsReportName": report_path.name,
+        "runtimeDiagnosticsReportPath": str(report_path),
+        "runtimeDiagnosticsMarkdownName": markdown_path.name,
+        "runtimeDiagnosticsMarkdownPath": str(markdown_path),
+    }
+
+
 def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
     game_data_path = build_dir / "game_data.json"
     game_data_path.write_text(json.dumps(export_payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -9111,6 +9182,7 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
     # Render the public preload report through the copied runtime so it stays aligned with player diagnostics.
     refresh_native_runtime_preload_report(build_dir, Path(runtime_preload_files["runtimePreloadReportPath"]))
     performance_budget_files = write_native_runtime_performance_budget_reports(build_dir)
+    runtime_diagnostics_files = write_native_runtime_diagnostics_reports(build_dir)
 
     mac_launcher_path = build_dir / NATIVE_RUNTIME_MAC_COMMAND_NAME
     linux_launcher_path = build_dir / NATIVE_RUNTIME_LINUX_COMMAND_NAME
@@ -9741,6 +9813,7 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
             EXPORT_VOICE_PRODUCTION_REPORT_NAME,
             NATIVE_RUNTIME_FILE_INTEGRITY_MARKDOWN_NAME,
             NATIVE_RUNTIME_ACCEPTANCE_REPORT_NAME,
+            runtime_diagnostics_files["runtimeDiagnosticsMarkdownName"],
         ],
         runtime_notes=[
             "原生 Runtime 仍是 Preview 路线，正式分发前建议在目标系统完整点测。",
@@ -9773,6 +9846,12 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
         "runtimeScenePrefetchModulePath": str(build_dir / NATIVE_RUNTIME_SCENE_PREFETCH_NAME),
         "runtimeDiagnosticsModuleName": NATIVE_RUNTIME_DIAGNOSTICS_NAME,
         "runtimeDiagnosticsModulePath": str(build_dir / NATIVE_RUNTIME_DIAGNOSTICS_NAME),
+        "runtimeDiagnosticsReportName": runtime_diagnostics_files["runtimeDiagnosticsReportName"],
+        "runtimeDiagnosticsReportPath": runtime_diagnostics_files["runtimeDiagnosticsReportPath"],
+        "runtimeDiagnosticsMarkdownName": runtime_diagnostics_files["runtimeDiagnosticsMarkdownName"],
+        "runtimeDiagnosticsMarkdownPath": runtime_diagnostics_files["runtimeDiagnosticsMarkdownPath"],
+        "runtimeDiagnosticsStatus": runtime_diagnostics_files["runtimeDiagnosticsStatus"],
+        "runtimeDiagnosticsSummary": runtime_diagnostics_files["runtimeDiagnosticsSummary"],
         "runtimePerformanceModuleName": NATIVE_RUNTIME_PERFORMANCE_NAME,
         "runtimePerformanceModulePath": str(build_dir / NATIVE_RUNTIME_PERFORMANCE_NAME),
         "runtimeSettingsModuleName": NATIVE_RUNTIME_SETTINGS_NAME,
@@ -10462,6 +10541,8 @@ def export_native_runtime_build() -> dict:
             "runtimePreloadModule": runtime_files["runtimePreloadModuleName"],
             "runtimeScenePrefetchModule": runtime_files["runtimeScenePrefetchModuleName"],
             "runtimeDiagnosticsModule": runtime_files["runtimeDiagnosticsModuleName"],
+            "runtimeDiagnosticsReport": runtime_files["runtimeDiagnosticsReportName"],
+            "runtimeDiagnosticsMarkdown": runtime_files["runtimeDiagnosticsMarkdownName"],
             "runtimePerformanceModule": runtime_files["runtimePerformanceModuleName"],
             "runtimeSettingsModule": runtime_files["runtimeSettingsModuleName"],
             "runtimeTextEffectsModule": runtime_files["runtimeTextEffectsModuleName"],
@@ -10555,6 +10636,10 @@ def export_native_runtime_build() -> dict:
             "runtimePreloadModule": runtime_files["runtimePreloadModuleName"],
             "runtimeScenePrefetchModule": runtime_files["runtimeScenePrefetchModuleName"],
             "runtimeDiagnosticsModule": runtime_files["runtimeDiagnosticsModuleName"],
+            "runtimeDiagnosticsReport": runtime_files["runtimeDiagnosticsReportName"],
+            "runtimeDiagnosticsMarkdown": runtime_files["runtimeDiagnosticsMarkdownName"],
+            "runtimeDiagnosticsStatus": runtime_files["runtimeDiagnosticsStatus"],
+            "runtimeDiagnosticsSummary": runtime_files["runtimeDiagnosticsSummary"],
             "runtimePerformanceModule": runtime_files["runtimePerformanceModuleName"],
             "runtimeSettingsModule": runtime_files["runtimeSettingsModuleName"],
             "runtimeTextEffectsModule": runtime_files["runtimeTextEffectsModuleName"],
@@ -10685,6 +10770,7 @@ def export_native_runtime_build() -> dict:
         runtime_notes=native_runtime_notes,
         extra_reports=[
             runtime_files["runtimePreloadReportName"],
+            runtime_files["runtimeDiagnosticsMarkdownName"],
             runtime_files["releaseCandidateReportName"],
             runtime_files["releaseControlReportName"],
             runtime_files["vnBaselineQualityMarkdownName"],
@@ -10751,6 +10837,8 @@ def export_native_runtime_build() -> dict:
         {"name": runtime_files["runtimePreloadModuleName"], "description": "原生 Runtime 资源预热策略模块。"},
         {"name": runtime_files["runtimeScenePrefetchModuleName"], "description": "原生 Runtime 路线预取策略模块，按当前场景和分支提前准备素材。"},
         {"name": runtime_files["runtimeDiagnosticsModuleName"], "description": "原生 Runtime 性能诊断模块，汇总预热、路线预取和缓存状态。"},
+        {"name": runtime_files["runtimeDiagnosticsMarkdownName"], "description": "原生 Runtime 运行诊断 Markdown，复查入口场景、预热、路线预取和缓存状态。"},
+        {"name": runtime_files["runtimeDiagnosticsReportName"], "description": "机器可读原生 Runtime 运行诊断 JSON。"},
         {"name": runtime_files["runtimeSettingsModuleName"], "description": "原生 Runtime 系统设置模块。"},
         {"name": runtime_files["runtimeTextEffectsModuleName"], "description": "原生 Runtime 打字机和文本效果模块。"},
         {"name": runtime_files["runtimeStorageModuleName"], "description": "原生 Runtime 存档、自动恢复和崩溃日志模块。"},
@@ -10990,6 +11078,14 @@ def export_native_runtime_build() -> dict:
         "runtimeDiagnosticsModuleName": runtime_files["runtimeDiagnosticsModuleName"],
         "runtimeDiagnosticsModulePath": runtime_files["runtimeDiagnosticsModulePath"],
         "runtimeDiagnosticsModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimeDiagnosticsModuleName']}",
+        "runtimeDiagnosticsReportName": runtime_files["runtimeDiagnosticsReportName"],
+        "runtimeDiagnosticsReportPath": runtime_files["runtimeDiagnosticsReportPath"],
+        "runtimeDiagnosticsReportPublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimeDiagnosticsReportName']}",
+        "runtimeDiagnosticsMarkdownName": runtime_files["runtimeDiagnosticsMarkdownName"],
+        "runtimeDiagnosticsMarkdownPath": runtime_files["runtimeDiagnosticsMarkdownPath"],
+        "runtimeDiagnosticsMarkdownPublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimeDiagnosticsMarkdownName']}",
+        "runtimeDiagnosticsStatus": runtime_files["runtimeDiagnosticsStatus"],
+        "runtimeDiagnosticsSummary": runtime_files["runtimeDiagnosticsSummary"],
         "runtimePerformanceModuleName": runtime_files["runtimePerformanceModuleName"],
         "runtimePerformanceModulePath": runtime_files["runtimePerformanceModulePath"],
         "runtimePerformanceModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimePerformanceModuleName']}",
