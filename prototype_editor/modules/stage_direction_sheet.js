@@ -386,6 +386,19 @@
     return 20;
   }
 
+  function getStageIssueToneLabel(status = "") {
+    if (status === "blocker") {
+      return "阻塞";
+    }
+    if (status === "warn") {
+      return "复查";
+    }
+    if (status === "tip") {
+      return "润色";
+    }
+    return "正常";
+  }
+
   function addStageEvent(events, event) {
     events.push({
       status: event.issues?.some((issue) => issue.severity === "blocker")
@@ -429,6 +442,10 @@
     let hasBackground = false;
     let hasStoryContent = false;
     let firstStoryBlockHadBackground = true;
+    let firstStageBlock = null;
+    let firstDialogueLikeBlock = null;
+    let firstBackgroundBlockIndex = -1;
+    let firstCharacterShowBlockIndex = -1;
 
     blocks.forEach((block, blockIndex) => {
       const baseContext = {
@@ -439,6 +456,31 @@
         blockIndex,
         blockLabel: summarizeBlock(block, blockIndex),
       };
+
+      if (isStoryContentBlock(block) && !firstStageBlock) {
+        firstStageBlock = {
+          type: cleanText(block.type),
+          typeLabel: getBlockLabel(block.type),
+          blockId: baseContext.blockId,
+          blockIndex,
+          blockLabel: baseContext.blockLabel,
+        };
+      }
+      if (["dialogue", "narration", "choice"].includes(block.type) && !firstDialogueLikeBlock) {
+        firstDialogueLikeBlock = {
+          type: cleanText(block.type),
+          typeLabel: getBlockLabel(block.type),
+          blockId: baseContext.blockId,
+          blockIndex,
+          blockLabel: baseContext.blockLabel,
+        };
+      }
+      if (block.type === "background" && firstBackgroundBlockIndex < 0) {
+        firstBackgroundBlockIndex = blockIndex;
+      }
+      if (block.type === "character_show" && firstCharacterShowBlockIndex < 0) {
+        firstCharacterShowBlockIndex = blockIndex;
+      }
 
       if (isStoryContentBlock(block) && block.type !== "background") {
         hasStoryContent = true;
@@ -616,14 +658,41 @@
       });
     }
 
+    const visibleCharactersAtEnd = [...visibleCharacters.values()].map((item) => {
+      const stage = normalizeCharacterStage(item.stage);
+      return {
+        characterId: item.characterId,
+        characterName: item.characterName,
+        expressionName: item.expressionName,
+        position: item.position,
+        positionLabel: getPositionLabel(item.position),
+        stage,
+      };
+    });
+    const openingProfile = {
+      firstStageBlock,
+      firstDialogueLikeBlock,
+      firstBackgroundBlockIndex,
+      firstCharacterShowBlockIndex,
+      dialogueBeforeBackground: Boolean(
+        firstDialogueLikeBlock && (firstBackgroundBlockIndex < 0 || firstDialogueLikeBlock.blockIndex < firstBackgroundBlockIndex)
+      ),
+      dialogueBeforeCharacterShow: Boolean(
+        firstDialogueLikeBlock && (firstCharacterShowBlockIndex < 0 || firstDialogueLikeBlock.blockIndex < firstCharacterShowBlockIndex)
+      ),
+    };
+
     return {
       sceneId: cleanText(scene.id),
       sceneName,
       chapterName,
       eventCount: events.length,
       visibleCharacterCountAtEnd: visibleCharacters.size,
+      visibleCharactersAtEnd,
+      endingCastLabel: visibleCharactersAtEnd.map((item) => item.characterName || item.characterId).filter(Boolean).join(" / "),
       hasStoryContent,
       hasBackground,
+      openingProfile,
       issues: sceneIssues,
       events,
       compositionRows,
@@ -633,7 +702,122 @@
           ? "warn"
           : sceneIssues.length
             ? "tip"
-            : "good",
+          : "good",
+    };
+  }
+
+  const STAGE_CONTINUITY_OPENING_CODES = Object.freeze([
+    "scene_without_background",
+    "scene_content_before_background",
+    "dialogue_speaker_not_visible",
+    "dialogue_missing_speaker",
+    "dialogue_unknown_speaker",
+  ]);
+
+  function getStageContinuityStatus(row = {}) {
+    if (row.blockerCount > 0) {
+      return "blocker";
+    }
+    if (row.openingIssueCount > 0 || row.dialogueBeforeStage || row.speakerAutoPlaceCount > 0) {
+      return "warn";
+    }
+    if (row.endingCastCount > 0) {
+      return "tip";
+    }
+    return "good";
+  }
+
+  function getStageContinuityNextAction(row = {}) {
+    if (row.openingIssueCodes?.includes("scene_without_background")) {
+      return "先补背景卡";
+    }
+    if (row.openingIssueCodes?.includes("dialogue_missing_speaker") || row.openingIssueCodes?.includes("dialogue_unknown_speaker")) {
+      return "修说话人";
+    }
+    if (row.openingIssueCodes?.includes("dialogue_speaker_not_visible") || row.dialogueBeforeStage) {
+      return "补登场卡";
+    }
+    if (row.openingIssueCodes?.includes("scene_content_before_background")) {
+      return "调整开场顺序";
+    }
+    if (row.endingCastCount > 0) {
+      return "确认是否退场";
+    }
+    return row.hasStoryContent ? "可继续制作" : "继续补正文";
+  }
+
+  function buildStageContinuityReasons(row = {}) {
+    const reasons = [];
+    if (row.openingIssueCodes?.includes("scene_without_background")) {
+      reasons.push("缺开场背景");
+    }
+    if (row.openingIssueCodes?.includes("scene_content_before_background")) {
+      reasons.push("正文早于背景");
+    }
+    if (row.openingIssueCodes?.includes("dialogue_speaker_not_visible")) {
+      reasons.push("说话人未登场");
+    }
+    if (row.openingIssueCodes?.some((code) => code === "dialogue_missing_speaker" || code === "dialogue_unknown_speaker")) {
+      reasons.push("说话人配置异常");
+    }
+    if (row.dialogueBeforeStage && !reasons.includes("正文早于背景")) {
+      reasons.push("开头先出现正文");
+    }
+    if (row.endingCastCount > 0) {
+      reasons.push(`结尾仍有 ${row.endingCastCount} 名角色在场`);
+    }
+    return reasons.length ? reasons.join(" / ") : "连续性清晰";
+  }
+
+  function buildStageContinuityAudit(sheet = {}) {
+    const sceneReports = toArray(sheet.sceneReports);
+    const rows = sceneReports.map((scene, index) => {
+      const openingIssues = toArray(scene.issues).filter((issue) => STAGE_CONTINUITY_OPENING_CODES.includes(issue.code));
+      const openingIssueCodes = Array.from(new Set(openingIssues.map((issue) => issue.code)));
+      const blockerCount = openingIssues.filter((issue) => issue.severity === "blocker").length;
+      const speakerAutoPlaceCount = openingIssues.filter((issue) => issue.code === "dialogue_speaker_not_visible").length;
+      const openingProfile = scene.openingProfile ?? {};
+      const dialogueBeforeStage = Boolean(openingProfile.dialogueBeforeBackground || openingProfile.dialogueBeforeCharacterShow);
+      const endingCast = toArray(scene.visibleCharactersAtEnd);
+      const row = {
+        sceneId: scene.sceneId,
+        sceneName: scene.sceneName,
+        chapterName: scene.chapterName,
+        sceneIndex: index,
+        hasStoryContent: Boolean(scene.hasStoryContent),
+        openingCue: openingProfile.firstStageBlock?.blockLabel ?? "未开始演出",
+        firstDialogueCue: openingProfile.firstDialogueLikeBlock?.blockLabel ?? "",
+        openingIssueCount: openingIssues.length,
+        openingIssueCodes,
+        blockerCount,
+        speakerAutoPlaceCount,
+        dialogueBeforeStage,
+        endingCastCount: endingCast.length,
+        endingCast,
+        endingCastLabel: endingCast.map((item) => item.characterName || item.characterId).filter(Boolean).join(" / "),
+      };
+      row.status = getStageContinuityStatus(row);
+      row.statusLabel = getStageIssueToneLabel(row.status);
+      row.reason = buildStageContinuityReasons(row);
+      row.nextAction = getStageContinuityNextAction(row);
+      return row;
+    });
+    const reviewRows = rows.filter((row) => row.status !== "good");
+    return {
+      rows,
+      reviewRows,
+      summary: {
+        sceneCount: rows.length,
+        reviewSceneCount: reviewRows.length,
+        blockedSceneCount: rows.filter((row) => row.status === "blocker").length,
+        warningSceneCount: rows.filter((row) => row.status === "warn").length,
+        tipSceneCount: rows.filter((row) => row.status === "tip").length,
+        openingRiskSceneCount: rows.filter((row) => row.openingIssueCount > 0 || row.dialogueBeforeStage).length,
+        dialogueBeforeStageSceneCount: rows.filter((row) => row.dialogueBeforeStage).length,
+        speakerAutoPlaceSceneCount: rows.filter((row) => row.speakerAutoPlaceCount > 0).length,
+        endingCastSceneCount: rows.filter((row) => row.endingCastCount > 0).length,
+        endingCastCharacterCount: rows.reduce((total, row) => total + row.endingCastCount, 0),
+      },
     };
   }
 
@@ -676,6 +860,11 @@
     summary.autoFixSceneCount = autoFixPlan.changedSceneCount;
     summary.autoFixBlockCount = autoFixPlan.changedBlockCount;
     summary.autoFixOperationCount = autoFixPlan.operationCount;
+    const continuityAudit = buildStageContinuityAudit({ sceneReports, events, compositionRows, issues, summary });
+    summary.continuityReviewSceneCount = continuityAudit.summary.reviewSceneCount;
+    summary.continuityOpeningRiskSceneCount = continuityAudit.summary.openingRiskSceneCount;
+    summary.continuityEndingCastSceneCount = continuityAudit.summary.endingCastSceneCount;
+    summary.continuityEndingCastCharacterCount = continuityAudit.summary.endingCastCharacterCount;
 
     return {
       projectTitle: cleanText(data.project?.title, "Canvasia Project"),
@@ -685,6 +874,7 @@
       issues,
       summary,
       autoFixPlan,
+      continuityAudit,
     };
   }
 
@@ -947,6 +1137,7 @@
   function buildStageDirectionSheetMarkdown(sheet = {}, context = {}) {
     const digest = getStageDirectionStatusDigest(sheet);
     const summary = sheet.summary ?? {};
+    const continuityAudit = sheet.continuityAudit ?? buildStageContinuityAudit(sheet);
     const projectTitle = context.projectTitle || sheet.projectTitle || "Canvasia Project";
     const generatedAt = context.generatedAt || new Date().toISOString();
     const eventRows = toArray(sheet.events).slice(0, 140).map((event, index) => [
@@ -974,6 +1165,18 @@
         `${row.visibleCount ?? 0}`,
         row.characterNames,
         row.riskLabel,
+      ]);
+    const continuityRows = toArray(continuityAudit.reviewRows)
+      .slice(0, 100)
+      .map((row, index) => [
+        `${index + 1}`,
+        row.statusLabel,
+        row.chapterName,
+        row.sceneName,
+        row.openingCue,
+        row.endingCastLabel || "无",
+        row.reason,
+        row.nextAction,
       ]);
     const issueRows = toArray(sheet.issues).slice(0, 140).map((issue, index) => [
       `${index + 1}`,
@@ -1007,6 +1210,9 @@
           ["遮挡/重叠风险", `${summary.overlapRiskCount ?? 0}`],
           ["拥挤/大比例风险", `${summary.crowdedStageCount ?? 0}`],
           ["说话人过淡", `${summary.lowOpacitySpeakerCount ?? 0}`],
+          ["连续性复查场景", `${summary.continuityReviewSceneCount ?? 0}`],
+          ["开场调度风险", `${summary.continuityOpeningRiskSceneCount ?? 0}`],
+          ["结尾仍有角色", `${summary.continuityEndingCastSceneCount ?? 0}`],
           ["可自动补齐场景", `${summary.autoFixSceneCount ?? 0}`],
           ["可自动补齐参数", `${summary.autoFixOperationCount ?? 0}`],
           ["阻塞问题", `${summary.blockerCount ?? 0}`],
@@ -1024,6 +1230,11 @@
       buildMarkdownTable(["序号", "级别", "章节", "场景", "检查点", "同屏人数", "角色", "风险"], compositionRows) ||
         "当前没有明显站位、遮挡、图层或透明度构图风险。",
       "",
+      "## 场景连续性审计",
+      "",
+      buildMarkdownTable(["序号", "级别", "章节", "场景", "开场", "结尾在场", "原因", "下一步"], continuityRows) ||
+        "当前没有明显开场调度或结尾留场风险。",
+      "",
       "## 需要复查的问题",
       "",
       buildMarkdownTable(["序号", "级别", "章节", "场景", "问题", "说明"], issueRows) ||
@@ -1033,6 +1244,7 @@
   }
 
   function buildStageDirectionSheetCsv(sheet = {}) {
+    const continuityBySceneId = new Map(toArray(sheet.continuityAudit?.rows).map((row) => [row.sceneId, row]));
     const rows = toArray(sheet.events).map((event, index) => [
       `${index + 1}`,
       event.chapterName,
@@ -1046,11 +1258,32 @@
       event.cue,
       event.composition?.visibleCount ?? "",
       event.composition?.riskLabel ?? "",
+      continuityBySceneId.get(event.sceneId)?.statusLabel ?? "",
+      continuityBySceneId.get(event.sceneId)?.endingCastLabel ?? "",
+      continuityBySceneId.get(event.sceneId)?.nextAction ?? "",
       event.status,
       toArray(event.issues).map((issue) => issue.title).join(" / "),
     ]);
     return `\uFEFF${buildCsv(
-      ["序号", "章节", "场景", "卡片", "类型", "角色", "表情", "站位", "素材状态", "位置", "同屏人数", "构图风险", "状态", "问题"],
+      [
+        "序号",
+        "章节",
+        "场景",
+        "卡片",
+        "类型",
+        "角色",
+        "表情",
+        "站位",
+        "素材状态",
+        "位置",
+        "同屏人数",
+        "构图风险",
+        "连续性状态",
+        "结尾在场",
+        "连续性下一步",
+        "状态",
+        "问题",
+      ],
       rows
     )}\n`;
   }
@@ -1060,6 +1293,7 @@
     buildStageDirectionSheet,
     buildStageDirectionAutoFixPlan,
     buildStageDirectionAutoFixSummary,
+    buildStageContinuityAudit,
     getStageDirectionStatusDigest,
     buildStageDirectionSheetMarkdown,
     buildStageDirectionSheetCsv,

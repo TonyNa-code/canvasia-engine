@@ -33661,6 +33661,11 @@ function renderStageDirectionSheetPanel() {
   const autoFixPlan = sheet.autoFixPlan && typeof sheet.autoFixPlan === "object"
     ? sheet.autoFixPlan
     : { changed: false, operationCount: 0, changedSceneCount: 0, changedBlockCount: 0 };
+  const continuityAudit = sheet.continuityAudit && typeof sheet.continuityAudit === "object"
+    ? sheet.continuityAudit
+    : stageDirectionSheetTools.buildStageContinuityAudit?.(sheet) ?? { summary: {}, reviewRows: [] };
+  const continuitySummary = continuityAudit.summary ?? {};
+  const continuityPreview = (continuityAudit.reviewRows ?? []).slice(0, 3);
   const topIssues = (sheet.issues ?? []).slice(0, 4);
   const eventPreview = (sheet.events ?? []).slice(0, 4);
 
@@ -33676,6 +33681,8 @@ function renderStageDirectionSheetPanel() {
         ${renderRouteMetricCard("自动补位", `${summary.speakerAutoPlaceCount ?? 0} 句`, "说话人未提前登场")}
         ${renderRouteMetricCard("立绘 / 表情缺口", `${summary.missingVisualCount ?? 0} 个`, "缺立绘、缺文件或坏表情")}
         ${renderRouteMetricCard("构图风险", `${summary.compositionRiskCount ?? 0} 处`, "遮挡、拥挤、图层或透明度")}
+        ${renderRouteMetricCard("连续性复查", `${summary.continuityReviewSceneCount ?? 0} 场`, "开场调度和结尾留场")}
+        ${renderRouteMetricCard("结尾仍在场", `${continuitySummary.endingCastSceneCount ?? 0} 场`, "确认是否需要退场或转场")}
         ${renderRouteMetricCard("说话人过淡", `${summary.lowOpacitySpeakerCount ?? 0} 处`, "台词角色不够清晰")}
         ${renderRouteMetricCard("无背景场景", `${summary.missingBackgroundSceneCount ?? 0} 个`, "有内容但没有明确背景")}
         ${renderRouteMetricCard("可自动补齐", `${summary.autoFixOperationCount ?? 0} 项`, "硬切、缺时长、缺舞台参数")}
@@ -33699,6 +33706,27 @@ function renderStageDirectionSheetPanel() {
           去剧情页调整登场
         </button>
       </div>
+      ${
+        continuityPreview.length > 0
+          ? `
+            <div class="list-stack compact-stack">
+              ${continuityPreview
+                .map(
+                  (row) => `
+                    <div class="route-testing-item">
+                      <div>
+                        <b>${escapeHtml(`${row.sceneName} · ${row.nextAction}`)}</b>
+                        <span>${escapeHtml(`${row.chapterName} · ${row.reason}`)}</span>
+                      </div>
+                      <span>${escapeHtml(row.endingCastLabel ? `结尾在场：${row.endingCastLabel}` : row.openingCue)}</span>
+                    </div>
+                  `
+                )
+                .join("")}
+            </div>
+          `
+          : ""
+      }
       ${
         topIssues.length > 0
           ? `
