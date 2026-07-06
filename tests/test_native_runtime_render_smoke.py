@@ -566,6 +566,7 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
         self.assertEqual(report["summary"]["criticalEntries"], 1)
         self.assertEqual(report["summary"]["missingFileEntries"], 1)
         self.assertEqual(report["summary"]["sizeBudget"]["totalBytes"], 5)
+        self.assertEqual(report["summary"]["profileAdvice"]["selectedProfile"], "standard")
         self.assertEqual(report["entries"][0]["sizeBytes"], 5)
         self.assertEqual(report["missingEntries"][0]["assetId"], "missing_sfx")
         self.assertEqual(doctor_check["id"], "runtime_preload")
@@ -574,6 +575,7 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
         self.assertEqual(cli_payload["missingEntries"][0]["assetId"], "missing_sfx")
         self.assertIn("Runtime 资源预热报告", markdown)
         self.assertIn("体积预算", markdown)
+        self.assertIn("档位建议", markdown)
         self.assertIn("missing_sfx", markdown)
         self.assertIn("Runtime 资源预热报告", markdown_stdout.getvalue())
         self.assertIn("missing_sfx", markdown_stdout.getvalue())
@@ -613,10 +615,13 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             doctor_check = build_runtime_preload_doctor_check(bundle_dir)
 
         size_budget = report["summary"]["sizeBudget"]
+        profile_advice = report["summary"]["profileAdvice"]
         self.assertEqual(report["status"], "needs_review")
         self.assertTrue(size_budget["criticalOverBudget"])
         self.assertEqual(size_budget["criticalBytes"], 100 * 1024 * 1024)
         self.assertEqual(size_budget["largestEntries"][0]["assetId"], "oversized_title")
+        self.assertEqual(profile_advice["status"], "should_raise")
+        self.assertEqual(profile_advice["recommendedProfile"], "high_quality_pc")
         self.assertEqual(doctor_check["status"], "warn")
         self.assertIn("critical", doctor_check["message"])
 

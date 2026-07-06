@@ -27,6 +27,7 @@ try:
         build_runtime_preload_status,
         finalize_runtime_preload_status,
         format_runtime_preload_status_line,
+        build_runtime_preload_profile_advice,
         build_runtime_preload_size_budget,
         get_project_runtime_preload_performance_profile,
         get_runtime_preload_frame_budget,
@@ -43,6 +44,7 @@ except ImportError:  # pragma: no cover - exported native packages import from t
         build_runtime_preload_status,
         finalize_runtime_preload_status,
         format_runtime_preload_status_line,
+        build_runtime_preload_profile_advice,
         build_runtime_preload_size_budget,
         get_project_runtime_preload_performance_profile,
         get_runtime_preload_frame_budget,
@@ -4957,6 +4959,7 @@ def build_native_runtime_preload_report(bundle_dir: Path) -> dict:
         entry_reports.append(entry_report)
 
     size_budget = build_runtime_preload_size_budget(entry_reports, performance_profile=performance_profile)
+    profile_advice = build_runtime_preload_profile_advice(entry_reports, performance_profile)
     if not isinstance(manifest, dict) or not manifest:
         status = "missing_manifest"
         recommendation = "导出包没有 Runtime 资源预热清单；请用新版编辑器重新导出。"
@@ -4991,6 +4994,7 @@ def build_native_runtime_preload_report(bundle_dir: Path) -> dict:
         "missingFileEntries": len(missing_entries),
         "manifestPresent": bool(manifest),
         "sizeBudget": size_budget,
+        "profileAdvice": profile_advice,
     }
     return {
         "formatVersion": 1,
@@ -5015,6 +5019,7 @@ def print_native_runtime_preload_report(bundle_dir: Path) -> dict:
 def render_native_runtime_preload_markdown(report: dict) -> str:
     summary = report.get("summary") if isinstance(report.get("summary"), dict) else {}
     size_budget = summary.get("sizeBudget") if isinstance(summary.get("sizeBudget"), dict) else {}
+    profile_advice = summary.get("profileAdvice") if isinstance(summary.get("profileAdvice"), dict) else {}
     entries = report.get("entries") if isinstance(report.get("entries"), list) else []
     missing_entries = report.get("missingEntries") if isinstance(report.get("missingEntries"), list) else []
     largest_entries = size_budget.get("largestEntries") if isinstance(size_budget.get("largestEntries"), list) else []
@@ -5024,6 +5029,7 @@ def render_native_runtime_preload_markdown(report: dict) -> str:
         f"- 状态：{report.get('status') or 'unknown'}",
         f"- 建议：{report.get('recommendation') or '暂无'}",
         f"- 性能档位：{summary.get('performanceProfileLabel') or size_budget.get('performanceProfileLabel') or '标准 PC / 网页'}",
+        f"- 推荐档位：{profile_advice.get('recommendedProfileLabel') or '标准 PC / 网页'}",
         f"- 预热条目：{summary.get('totalEntries', 0)}",
         f"- critical 首屏条目：{summary.get('criticalEntries', 0)}",
         f"- 缺失素材：{summary.get('missingFileEntries', 0)}",
@@ -5043,9 +5049,28 @@ def render_native_runtime_preload_markdown(report: dict) -> str:
             f"{size_budget.get('totalLabel', '0 B')} | {size_budget.get('totalBudgetLabel', '0 B')} |"
         ),
         "",
-        "## 最大素材",
+        "## 档位建议",
         "",
     ]
+    if profile_advice:
+        lines.extend(
+            [
+                f"- 结论：{profile_advice.get('status') or 'unknown'}",
+                f"- 当前档位：{profile_advice.get('selectedProfileLabel') or '-'}",
+                f"- 推荐档位：{profile_advice.get('recommendedProfileLabel') or '-'}",
+            ]
+        )
+        for reason in profile_advice.get("reasons") or []:
+            lines.append(f"- 原因：{reason}")
+        for action in profile_advice.get("actions") or []:
+            lines.append(f"- 建议：{action}")
+    else:
+        lines.append("- 当前没有可用的档位建议。")
+    lines.extend([
+        "",
+        "## 最大素材",
+        "",
+    ])
     if largest_entries:
         lines.extend(["| 素材 | 类型 | 阶段 | 体积 |", "| --- | --- | --- | --- |"])
         for entry in largest_entries:

@@ -13,6 +13,12 @@ RUNTIME_PRELOAD_STARTUP_PHASES = {"critical"}
 RUNTIME_PRELOAD_DEFAULT_FRAME_BUDGET = 1
 RUNTIME_PRELOAD_CRITICAL_BUDGET_BYTES = 96 * 1024 * 1024
 RUNTIME_PRELOAD_TOTAL_BUDGET_BYTES = 512 * 1024 * 1024
+RUNTIME_PRELOAD_PROFILE_RANKS = {
+    "mobile_low": 0,
+    "web": 1,
+    "standard": 2,
+    "high_quality_pc": 3,
+}
 RUNTIME_PRELOAD_PERFORMANCE_PROFILES = {
     "standard": {
         "key": "standard",
@@ -233,6 +239,117 @@ def build_runtime_preload_size_budget(
         "byTypeBytes": by_type,
         "byTypeLabels": {asset_type: format_bytes(size) for asset_type, size in sorted(by_type.items())},
         "largestEntries": largest_entries[:8],
+    }
+
+
+def get_runtime_preload_profile_label(performance_profile: object = None) -> str:
+    profile = get_runtime_preload_profile_config(performance_profile)
+    return str(profile.get("label") or "标准 PC / 网页")
+
+
+def build_runtime_preload_profile_metrics(entry_reports: list[dict]) -> dict:
+    total_bytes = 0
+    critical_bytes = 0
+    entry_count = 0
+    stream_count = 0
+    for entry in entry_reports:
+        if not isinstance(entry, dict):
+            continue
+        entry_count += 1
+        size_bytes = normalize_size_bytes(entry.get("sizeBytes"))
+        total_bytes += size_bytes
+        if entry.get("startup"):
+            critical_bytes += size_bytes
+        if str(entry.get("type") or "") in RUNTIME_PRELOAD_STREAM_TYPES:
+            stream_count += 1
+
+    return {
+        "entryCount": entry_count,
+        "streamEntryCount": stream_count,
+        "totalBytes": total_bytes,
+        "totalLabel": format_bytes(total_bytes),
+        "criticalBytes": critical_bytes,
+        "criticalLabel": format_bytes(critical_bytes),
+    }
+
+
+def get_runtime_preload_recommended_profile(entry_reports: list[dict]) -> str:
+    metrics = build_runtime_preload_profile_metrics(entry_reports)
+    total_bytes = int(metrics.get("totalBytes") or 0)
+    critical_bytes = int(metrics.get("criticalBytes") or 0)
+    entry_count = int(metrics.get("entryCount") or 0)
+    stream_count = int(metrics.get("streamEntryCount") or 0)
+
+    if (
+        critical_bytes > RUNTIME_PRELOAD_CRITICAL_BUDGET_BYTES
+        or total_bytes > RUNTIME_PRELOAD_TOTAL_BUDGET_BYTES
+        or stream_count >= 2
+        or entry_count >= 32
+    ):
+        return "high_quality_pc"
+    if critical_bytes > 64 * 1024 * 1024 or total_bytes > 256 * 1024 * 1024 or stream_count >= 1 or entry_count >= 20:
+        return "standard"
+    if critical_bytes > 32 * 1024 * 1024 or total_bytes > 128 * 1024 * 1024 or entry_count >= 10:
+        return "web"
+    return "mobile_low"
+
+
+def build_runtime_preload_profile_advice(
+    entry_reports: list[dict],
+    selected_profile: object = None,
+) -> dict:
+    selected_key = get_safe_runtime_preload_performance_profile(selected_profile)
+    recommended_key = get_runtime_preload_recommended_profile(entry_reports)
+    selected_rank = RUNTIME_PRELOAD_PROFILE_RANKS.get(selected_key, RUNTIME_PRELOAD_PROFILE_RANKS["standard"])
+    recommended_rank = RUNTIME_PRELOAD_PROFILE_RANKS.get(recommended_key, RUNTIME_PRELOAD_PROFILE_RANKS["standard"])
+    max_profile = get_runtime_preload_profile_config("high_quality_pc")
+    metrics = build_runtime_preload_profile_metrics(entry_reports)
+    total_bytes = int(metrics.get("totalBytes") or 0)
+    critical_bytes = int(metrics.get("criticalBytes") or 0)
+
+    over_max_budget = (
+        critical_bytes > normalize_size_bytes(max_profile.get("criticalBudgetBytes"))
+        or total_bytes > normalize_size_bytes(max_profile.get("totalBudgetBytes"))
+    )
+    reasons: list[str] = []
+    actions: list[str] = []
+    if over_max_budget:
+        status = "needs_optimization"
+        severity = "warn"
+        reasons.append("当前首屏或整体预热体积已经超过高画质 PC 档位建议预算。")
+        actions.append("优先压缩首屏背景、UI、开场视频和大体积音频，或把非首屏资源降为 deferred。")
+    elif selected_rank < recommended_rank:
+        status = "should_raise"
+        severity = "warn"
+        reasons.append(
+            f"当前素材规模更接近「{get_runtime_preload_profile_label(recommended_key)}」，"
+            f"继续使用「{get_runtime_preload_profile_label(selected_key)}」可能让后台预热偏慢。"
+        )
+        actions.append(f"如果目标设备允许，建议把项目性能档位切换到「{get_runtime_preload_profile_label(recommended_key)}」。")
+    elif selected_rank > recommended_rank:
+        status = "can_lower"
+        severity = "info"
+        reasons.append(
+            f"当前素材规模较轻，使用「{get_runtime_preload_profile_label(selected_key)}」可以运行，"
+            f"但「{get_runtime_preload_profile_label(recommended_key)}」也足够。"
+        )
+        actions.append("如果更重视低配设备体验，可以降低档位并重新导出测试。")
+    else:
+        status = "ok"
+        severity = "pass"
+        reasons.append(f"当前预热规模与「{get_runtime_preload_profile_label(selected_key)}」匹配。")
+        actions.append("保持当前档位；发布前继续用 Runtime 预热报告复查首屏体积和缺失素材。")
+
+    return {
+        "status": status,
+        "severity": severity,
+        "selectedProfile": selected_key,
+        "selectedProfileLabel": get_runtime_preload_profile_label(selected_key),
+        "recommendedProfile": recommended_key,
+        "recommendedProfileLabel": get_runtime_preload_profile_label(recommended_key),
+        **metrics,
+        "reasons": reasons,
+        "actions": actions,
     }
 
 
