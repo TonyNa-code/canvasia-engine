@@ -157,6 +157,7 @@ try:
         get_project_save_file_path,
         get_project_settings_file_path,
         get_runtime_screenshot_dir,
+        build_runtime_crash_feedback_report,
         load_project_archive_progress,
         load_project_auto_resume,
         load_project_player_profile,
@@ -183,6 +184,7 @@ except ImportError:  # pragma: no cover - exported native packages import from t
         get_project_save_file_path,
         get_project_settings_file_path,
         get_runtime_screenshot_dir,
+        build_runtime_crash_feedback_report,
         load_project_archive_progress,
         load_project_auto_resume,
         load_project_player_profile,
@@ -239,6 +241,8 @@ FILE_INTEGRITY_REPORT_NAME = "native-runtime-file-integrity.json"
 FILE_INTEGRITY_MARKDOWN_NAME = "native-runtime-file-integrity.md"
 DOCTOR_REPORT_NAME = "native-runtime-doctor-report.json"
 DOCTOR_MARKDOWN_NAME = "native-runtime-doctor-report.md"
+CRASH_FEEDBACK_REPORT_NAME = "native-runtime-crash-feedback.md"
+CRASH_FEEDBACK_JSON_NAME = "native-runtime-crash-feedback.json"
 ACCEPTANCE_REPORT_NAME = "native-runtime-release-acceptance.md"
 ACCEPTANCE_JSON_NAME = "native-runtime-release-acceptance.json"
 VN_BASELINE_QUALITY_REPORT_NAME = "native-runtime-vn-baseline-quality.json"
@@ -248,6 +252,8 @@ FILE_INTEGRITY_EXCLUDED_FILE_NAMES = {
     FILE_INTEGRITY_MARKDOWN_NAME,
     DOCTOR_REPORT_NAME,
     DOCTOR_MARKDOWN_NAME,
+    CRASH_FEEDBACK_REPORT_NAME,
+    CRASH_FEEDBACK_JSON_NAME,
     "native_app_package_manifest.json",
     VN_BASELINE_QUALITY_REPORT_NAME,
     VN_BASELINE_QUALITY_MARKDOWN_NAME,
@@ -7960,6 +7966,8 @@ def build_native_runtime_release_control_payload(bundle_dir: Path) -> dict:
             "runtimeDiagnosticsJson": DIAGNOSTICS_REPORT_NAME,
             "doctorMarkdown": DOCTOR_MARKDOWN_NAME,
             "doctorJson": DOCTOR_REPORT_NAME,
+            "crashFeedbackMarkdown": CRASH_FEEDBACK_REPORT_NAME,
+            "crashFeedbackJson": CRASH_FEEDBACK_JSON_NAME,
         },
     }
 
@@ -8420,6 +8428,7 @@ def build_native_runtime_acceptance_payload(bundle_dir: Path) -> dict:
         "recommendedCommands": [
             "python3 runtime_player.py --doctor .",
             "python3 runtime_player.py --doctor-report .",
+            "python3 runtime_player.py --crash-feedback-report .",
             "python3 runtime_player.py --verify-file-integrity .",
             "python3 runtime_player.py --runtime-diagnostics-report .",
             "python3 runtime_player.py --performance-budget-report .",
@@ -8439,6 +8448,8 @@ def build_native_runtime_acceptance_payload(bundle_dir: Path) -> dict:
             "runtimeDiagnosticsMarkdown": DIAGNOSTICS_MARKDOWN_NAME,
             "doctorJson": DOCTOR_REPORT_NAME,
             "doctorMarkdown": DOCTOR_MARKDOWN_NAME,
+            "crashFeedbackJson": CRASH_FEEDBACK_JSON_NAME,
+            "crashFeedbackMarkdown": CRASH_FEEDBACK_REPORT_NAME,
         },
     }
 
@@ -8572,6 +8583,92 @@ def write_native_runtime_doctor_reports(bundle_dir: Path) -> dict:
     )
     (bundle_dir / DOCTOR_MARKDOWN_NAME).write_text(
         render_native_runtime_doctor_markdown(report),
+        encoding="utf-8",
+    )
+    return report
+
+
+def resolve_crash_feedback_game_data_path(value: str) -> Path:
+    target = Path(value).resolve()
+    if target.is_dir():
+        return target / DEFAULT_GAME_DATA_NAME
+    return target
+
+
+def render_native_runtime_crash_feedback_markdown(report: dict) -> str:
+    summary = report.get("summary") if isinstance(report.get("summary"), dict) else {}
+    logs = [log for log in report.get("logs") or [] if isinstance(log, dict)]
+    lines = [
+        "# 原生 Runtime 崩溃反馈报告",
+        "",
+        f"- 状态：{format_markdown_value(report.get('headline'))}",
+        f"- 生成时间：{format_markdown_value(report.get('generatedAt'))}",
+        f"- 游戏数据：{format_markdown_value(report.get('gameData'), '未指定')}",
+        f"- 日志目录：`{format_markdown_value(report.get('logDir'))}`",
+        f"- 已包含本机日志摘要：{'是' if summary.get('includesLocalLogs') else '否'}",
+        "",
+        "## 最近崩溃摘要",
+        "",
+    ]
+    if logs:
+        lines.extend(
+            [
+                "| 时间 | 上下文 | 错误 | 日志 |",
+                "| --- | --- | --- | --- |",
+            ]
+        )
+        for log in logs:
+            lines.append(
+                f"| {format_markdown_value(log.get('time'), '未知')} | "
+                f"{format_markdown_value(log.get('context'), '未知')} | "
+                f"{format_markdown_value(log.get('error'), '未记录')} | "
+                f"`{format_markdown_value(log.get('path'), '-')}` |"
+            )
+    else:
+        lines.append("当前报告没有包含本机崩溃日志摘要。")
+    lines.extend(["", "## 建议反馈方式", ""])
+    for recommendation in report.get("recommendations") or []:
+        lines.append(f"- {format_markdown_value(recommendation)}")
+    lines.extend(
+        [
+            "",
+            "## 生成本机反馈报告",
+            "",
+            "如果你是在自己的电脑上遇到 Runtime 打不开或闪退，可以在解压后的原生 Runtime 包目录运行：",
+            "",
+            "```bash",
+            "python3 runtime_player.py --write-crash-feedback-reports .",
+            "```",
+            "",
+            "然后把 `native-runtime-crash-feedback.md` 发给维护者；只有需要深度排查时，再额外发送日志目录里的原始 `.log` 文件。",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def print_native_runtime_crash_feedback_json_report(game_data_path: Path, *, include_logs: bool = True) -> dict:
+    report = build_runtime_crash_feedback_report(game_data_path, include_logs=include_logs)
+    print(json.dumps(report, ensure_ascii=False, indent=2))
+    return report
+
+
+def print_native_runtime_crash_feedback_markdown_report(game_data_path: Path, *, include_logs: bool = True) -> dict:
+    report = build_runtime_crash_feedback_report(game_data_path, include_logs=include_logs)
+    print(render_native_runtime_crash_feedback_markdown(report), end="")
+    return report
+
+
+def write_native_runtime_crash_feedback_reports(bundle_dir: Path, *, include_logs: bool = True) -> dict:
+    game_data_path = bundle_dir / DEFAULT_GAME_DATA_NAME if bundle_dir.is_dir() else bundle_dir
+    report = build_runtime_crash_feedback_report(game_data_path, include_logs=include_logs)
+    target_dir = game_data_path.parent
+    (target_dir / CRASH_FEEDBACK_JSON_NAME).write_text(
+        json.dumps(report, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    (target_dir / CRASH_FEEDBACK_REPORT_NAME).write_text(
+        render_native_runtime_crash_feedback_markdown(report),
         encoding="utf-8",
     )
     return report
@@ -16061,6 +16158,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--runtime-diagnostics-json", "--runtime-diagnostics", dest="runtime_diagnostics_json", help="输出原生 Runtime 运行诊断 JSON 报告，不启动窗口")
     parser.add_argument("--runtime-diagnostics-report", "--runtime-diagnostics-md", dest="runtime_diagnostics_report", help="输出原生 Runtime 运行诊断 Markdown 报告，不启动窗口")
     parser.add_argument("--write-runtime-diagnostics-reports", dest="write_runtime_diagnostics_reports", help="写入原生 Runtime 运行诊断 Markdown / JSON 报告，不启动窗口")
+    parser.add_argument("--crash-feedback-json", dest="crash_feedback_json", help="输出本机原生 Runtime 崩溃反馈 JSON，不启动窗口")
+    parser.add_argument("--crash-feedback-report", "--crash-feedback-md", dest="crash_feedback_report", help="输出本机原生 Runtime 崩溃反馈 Markdown，不启动窗口")
+    parser.add_argument("--write-crash-feedback-reports", dest="write_crash_feedback_reports", help="写入本机原生 Runtime 崩溃反馈 Markdown / JSON，不启动窗口")
+    parser.add_argument("--write-crash-feedback-template", dest="write_crash_feedback_template", help="写入不包含本机日志的原生 Runtime 崩溃反馈模板，不启动窗口")
     parser.add_argument("--exercise-save-load", dest="exercise_save_load", help="检查存档文件能否写入和读回")
     parser.add_argument("--exercise-settings", dest="exercise_settings", help="检查原生 Runtime 设置能否写入和读回")
     parser.add_argument("--exercise-archives", dest="exercise_archives", help="检查原生 Runtime 资料馆进度能否写入和读回")
@@ -16365,6 +16466,72 @@ def main(argv: list[str] | None = None) -> int:
             return 1 if payload.get("status") == "blocked" else 0
         except (NativeRuntimeError, OSError, json.JSONDecodeError) as error:
             print(f"Native runtime diagnostics report write failed: {error}")
+            return 1
+
+    if args.crash_feedback_json:
+        try:
+            print_native_runtime_crash_feedback_json_report(
+                resolve_crash_feedback_game_data_path(args.crash_feedback_json),
+                include_logs=True,
+            )
+            return 0
+        except (OSError, json.JSONDecodeError) as error:
+            print(f"Native runtime crash feedback JSON failed: {error}")
+            return 1
+
+    if args.crash_feedback_report:
+        try:
+            print_native_runtime_crash_feedback_markdown_report(
+                resolve_crash_feedback_game_data_path(args.crash_feedback_report),
+                include_logs=True,
+            )
+            return 0
+        except (OSError, json.JSONDecodeError) as error:
+            print(f"Native runtime crash feedback report failed: {error}")
+            return 1
+
+    if args.write_crash_feedback_reports:
+        try:
+            report = write_native_runtime_crash_feedback_reports(
+                Path(args.write_crash_feedback_reports).resolve(),
+                include_logs=True,
+            )
+            print(
+                json.dumps(
+                    {
+                        "status": report.get("status"),
+                        "markdown": CRASH_FEEDBACK_REPORT_NAME,
+                        "json": CRASH_FEEDBACK_JSON_NAME,
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
+            return 0
+        except (OSError, json.JSONDecodeError) as error:
+            print(f"Native runtime crash feedback report write failed: {error}")
+            return 1
+
+    if args.write_crash_feedback_template:
+        try:
+            report = write_native_runtime_crash_feedback_reports(
+                Path(args.write_crash_feedback_template).resolve(),
+                include_logs=False,
+            )
+            print(
+                json.dumps(
+                    {
+                        "status": report.get("status"),
+                        "markdown": CRASH_FEEDBACK_REPORT_NAME,
+                        "json": CRASH_FEEDBACK_JSON_NAME,
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
+            return 0
+        except (OSError, json.JSONDecodeError) as error:
+            print(f"Native runtime crash feedback template write failed: {error}")
             return 1
 
     if args.exercise_save_load:

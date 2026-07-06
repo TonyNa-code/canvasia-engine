@@ -374,6 +374,14 @@ Runtime 启动失败时，会在用户目录写入错误日志：
 ~/.canvasia-engine/native-runtime-logs/
 ```
 
+随包会提供 `native-runtime-crash-feedback.md` 模板。玩家或测试者遇到打不开、闪退、黑屏时，可以在解压后的原生 Runtime 包目录运行：
+
+```bash
+python3 runtime_player.py --write-crash-feedback-reports .
+```
+
+这会把最近的本机崩溃日志整理成 `native-runtime-crash-feedback.md` / `.json`。默认报告只包含摘要和已脱敏路径；需要深度排查时，再单独附上日志目录里的原始 `.log` 文件。
+
 打包脚本不会替你做平台签名、公证或杀毒误报处理；正式公开发布前，仍建议在对应系统上做一次完整人工点测。
 
 ## 第一版存档 / 读档

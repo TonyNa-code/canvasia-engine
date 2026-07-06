@@ -518,6 +518,8 @@ NATIVE_RUNTIME_FILE_INTEGRITY_REPORT_NAME = "native-runtime-file-integrity.json"
 NATIVE_RUNTIME_FILE_INTEGRITY_MARKDOWN_NAME = "native-runtime-file-integrity.md"
 NATIVE_RUNTIME_DOCTOR_REPORT_NAME = "native-runtime-doctor-report.json"
 NATIVE_RUNTIME_DOCTOR_MARKDOWN_NAME = "native-runtime-doctor-report.md"
+NATIVE_RUNTIME_CRASH_FEEDBACK_REPORT_NAME = "native-runtime-crash-feedback.md"
+NATIVE_RUNTIME_CRASH_FEEDBACK_JSON_NAME = "native-runtime-crash-feedback.json"
 NATIVE_RUNTIME_DIAGNOSTICS_REPORT_NAME = NATIVE_RUNTIME_DIAGNOSTICS_REPORT_FILE_NAME
 NATIVE_RUNTIME_DIAGNOSTICS_MARKDOWN_NAME = NATIVE_RUNTIME_DIAGNOSTICS_MARKDOWN_FILE_NAME
 NATIVE_RUNTIME_3D_ASSET_REPORT_NAME = "native-runtime-3d-asset-report.json"
@@ -9233,6 +9235,67 @@ def write_native_runtime_doctor_reports(build_dir: Path) -> dict:
     }
 
 
+def write_native_runtime_crash_feedback_reports(build_dir: Path) -> dict:
+    report_path = build_dir / NATIVE_RUNTIME_CRASH_FEEDBACK_JSON_NAME
+    markdown_path = build_dir / NATIVE_RUNTIME_CRASH_FEEDBACK_REPORT_NAME
+    feedback = subprocess.run(
+        [
+            sys.executable,
+            str(build_dir / NATIVE_RUNTIME_PLAYER_NAME),
+            "--write-crash-feedback-template",
+            str(build_dir),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    payload = None
+    if report_path.is_file():
+        try:
+            payload = json.loads(report_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            payload = None
+    if not isinstance(payload, dict):
+        message = feedback.stderr.strip() or feedback.stdout.strip() or "崩溃反馈模板生成失败。"
+        payload = {
+            "formatVersion": 1,
+            "generatedAt": now_iso(),
+            "status": "template_unavailable",
+            "headline": message,
+            "summary": {"logCount": 0, "includesLocalLogs": False},
+            "logs": [],
+            "recommendations": ["遇到 Runtime 打不开时，请保留终端输出或错误截图并联系维护者。"],
+        }
+        report_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        markdown_path.write_text(
+            "\n".join(
+                [
+                    "# 原生 Runtime 崩溃反馈报告",
+                    "",
+                    "- 状态：模板未生成",
+                    f"- 原因：{message}",
+                    "",
+                    "可在玩家机器上手动运行：",
+                    "",
+                    "```bash",
+                    "python3 runtime_player.py --write-crash-feedback-reports .",
+                    "```",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+    summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
+    return {
+        "crashFeedbackReportName": markdown_path.name,
+        "crashFeedbackReportPath": str(markdown_path),
+        "crashFeedbackJsonName": report_path.name,
+        "crashFeedbackJsonPath": str(report_path),
+        "crashFeedbackStatus": str(payload.get("status") or "template_unavailable"),
+        "crashFeedbackSummary": summary,
+    }
+
+
 def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
     game_data_path = build_dir / "game_data.json"
     game_data_path.write_text(json.dumps(export_payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -9269,6 +9332,7 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
     performance_budget_files = write_native_runtime_performance_budget_reports(build_dir)
     runtime_diagnostics_files = write_native_runtime_diagnostics_reports(build_dir)
     doctor_files = write_native_runtime_doctor_reports(build_dir)
+    crash_feedback_files = write_native_runtime_crash_feedback_reports(build_dir)
 
     mac_launcher_path = build_dir / NATIVE_RUNTIME_MAC_COMMAND_NAME
     linux_launcher_path = build_dir / NATIVE_RUNTIME_LINUX_COMMAND_NAME
@@ -9890,6 +9954,7 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
             runtime_preload_files["runtimePreloadReportName"],
             release_check_path.name,
             doctor_files["doctorMarkdownName"],
+            crash_feedback_files["crashFeedbackReportName"],
             rc_report_path.name,
             release_control_report_path.name,
             vn_baseline_markdown_path.name,
@@ -9947,6 +10012,12 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
         "doctorMarkdownPath": doctor_files["doctorMarkdownPath"],
         "doctorStatus": doctor_files["doctorStatus"],
         "doctorSummary": doctor_files["doctorSummary"],
+        "crashFeedbackReportName": crash_feedback_files["crashFeedbackReportName"],
+        "crashFeedbackReportPath": crash_feedback_files["crashFeedbackReportPath"],
+        "crashFeedbackJsonName": crash_feedback_files["crashFeedbackJsonName"],
+        "crashFeedbackJsonPath": crash_feedback_files["crashFeedbackJsonPath"],
+        "crashFeedbackStatus": crash_feedback_files["crashFeedbackStatus"],
+        "crashFeedbackSummary": crash_feedback_files["crashFeedbackSummary"],
         "runtimePerformanceModuleName": NATIVE_RUNTIME_PERFORMANCE_NAME,
         "runtimePerformanceModulePath": str(build_dir / NATIVE_RUNTIME_PERFORMANCE_NAME),
         "runtimeSettingsModuleName": NATIVE_RUNTIME_SETTINGS_NAME,
@@ -10651,6 +10722,8 @@ def export_native_runtime_build() -> dict:
             "releaseCheck": runtime_files["releaseCheckName"],
             "doctorReport": runtime_files["doctorReportName"],
             "doctorMarkdown": runtime_files["doctorMarkdownName"],
+            "crashFeedbackReport": runtime_files["crashFeedbackReportName"],
+            "crashFeedbackJson": runtime_files["crashFeedbackJsonName"],
             "releaseCandidateReport": runtime_files["releaseCandidateReportName"],
             "releaseControlReport": runtime_files["releaseControlReportName"],
             "releaseControlJson": runtime_files["releaseControlJsonName"],
@@ -10747,6 +10820,10 @@ def export_native_runtime_build() -> dict:
             "doctorMarkdown": runtime_files["doctorMarkdownName"],
             "doctorStatus": runtime_files["doctorStatus"],
             "doctorSummary": runtime_files["doctorSummary"],
+            "crashFeedbackReport": runtime_files["crashFeedbackReportName"],
+            "crashFeedbackJson": runtime_files["crashFeedbackJsonName"],
+            "crashFeedbackStatus": runtime_files["crashFeedbackStatus"],
+            "crashFeedbackSummary": runtime_files["crashFeedbackSummary"],
             "releaseCandidateReport": runtime_files["releaseCandidateReportName"],
             "releaseControlReport": runtime_files["releaseControlReportName"],
             "releaseControlJson": runtime_files["releaseControlJsonName"],
@@ -10808,6 +10885,8 @@ def export_native_runtime_build() -> dict:
             runtime_files["runtimePreloadManifestName"],
             runtime_files["doctorMarkdownName"],
             runtime_files["doctorReportName"],
+            runtime_files["crashFeedbackReportName"],
+            runtime_files["crashFeedbackJsonName"],
             runtime_files["releaseCandidateReportName"],
             runtime_files["releaseControlReportName"],
             runtime_files["vnBaselineQualityMarkdownName"],
@@ -10875,6 +10954,7 @@ def export_native_runtime_build() -> dict:
             runtime_files["runtimePreloadReportName"],
             runtime_files["runtimeDiagnosticsMarkdownName"],
             runtime_files["doctorMarkdownName"],
+            runtime_files["crashFeedbackReportName"],
             runtime_files["releaseCandidateReportName"],
             runtime_files["releaseControlReportName"],
             runtime_files["vnBaselineQualityMarkdownName"],
@@ -10945,6 +11025,8 @@ def export_native_runtime_build() -> dict:
         {"name": runtime_files["runtimeDiagnosticsReportName"], "description": "机器可读原生 Runtime 运行诊断 JSON。"},
         {"name": runtime_files["doctorMarkdownName"], "description": "原生 Runtime 一键体检 Markdown，汇总结构、存档、设置、资料馆、演出、3D 和视频基础链路。"},
         {"name": runtime_files["doctorReportName"], "description": "机器可读原生 Runtime 一键体检 JSON。"},
+        {"name": runtime_files["crashFeedbackReportName"], "description": "原生 Runtime 崩溃反馈 Markdown 模板；玩家机器上可重新生成带本机日志摘要的反馈报告。"},
+        {"name": runtime_files["crashFeedbackJsonName"], "description": "机器可读原生 Runtime 崩溃反馈 JSON 模板。"},
         {"name": runtime_files["runtimeSettingsModuleName"], "description": "原生 Runtime 系统设置模块。"},
         {"name": runtime_files["runtimeTextEffectsModuleName"], "description": "原生 Runtime 打字机和文本效果模块。"},
         {"name": runtime_files["runtimeStorageModuleName"], "description": "原生 Runtime 存档、自动恢复和崩溃日志模块。"},
@@ -11200,6 +11282,14 @@ def export_native_runtime_build() -> dict:
         "doctorMarkdownPublicUrl": f"/exports/{build_dir.name}/{runtime_files['doctorMarkdownName']}",
         "doctorStatus": runtime_files["doctorStatus"],
         "doctorSummary": runtime_files["doctorSummary"],
+        "crashFeedbackReportName": runtime_files["crashFeedbackReportName"],
+        "crashFeedbackReportPath": runtime_files["crashFeedbackReportPath"],
+        "crashFeedbackReportPublicUrl": f"/exports/{build_dir.name}/{runtime_files['crashFeedbackReportName']}",
+        "crashFeedbackJsonName": runtime_files["crashFeedbackJsonName"],
+        "crashFeedbackJsonPath": runtime_files["crashFeedbackJsonPath"],
+        "crashFeedbackJsonPublicUrl": f"/exports/{build_dir.name}/{runtime_files['crashFeedbackJsonName']}",
+        "crashFeedbackStatus": runtime_files["crashFeedbackStatus"],
+        "crashFeedbackSummary": runtime_files["crashFeedbackSummary"],
         "runtimePerformanceModuleName": runtime_files["runtimePerformanceModuleName"],
         "runtimePerformanceModulePath": runtime_files["runtimePerformanceModulePath"],
         "runtimePerformanceModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimePerformanceModuleName']}",

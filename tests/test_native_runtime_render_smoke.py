@@ -20,6 +20,8 @@ except ModuleNotFoundError:  # pragma: no cover - CI installs pygame-ce for this
     pygame = None
 
 from native_runtime.runtime_player import (
+    CRASH_FEEDBACK_JSON_NAME,
+    CRASH_FEEDBACK_REPORT_NAME,
     NATIVE_VIDEO_EMBEDDED_BACKEND_ID,
     NATIVE_VIDEO_SYNC_BACKEND_ID,
     SYSTEM_MENU_ITEMS,
@@ -48,7 +50,9 @@ from native_runtime.runtime_player import (
     load_opencv_video_frame_surface,
     main as runtime_player_main,
     render_native_runtime_preload_markdown,
+    render_native_runtime_crash_feedback_markdown,
     render_native_runtime_vn_baseline_quality_markdown,
+    write_native_runtime_crash_feedback_reports,
     write_native_runtime_vn_baseline_quality_reports,
     write_project_auto_resume,
     wrap_text,
@@ -63,7 +67,11 @@ from native_runtime.runtime_player_settings import (
     DEFAULT_RUNTIME_PLAYER_SETTINGS,
     sanitize_runtime_player_settings,
 )
-from native_runtime.runtime_storage import sanitize_archive_progress
+from native_runtime.runtime_storage import (
+    build_runtime_crash_feedback_report,
+    sanitize_archive_progress,
+    write_runtime_crash_log,
+)
 from native_runtime.runtime_variables import (
     condition_operator_matches_variable_type,
     evaluate_runtime_operator,
@@ -175,6 +183,48 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
         self.assertEqual(progress["readTextKeys"], ["read_1", "read_2"])
         self.assertEqual(progress["endingCompletionCount"], 0)
         self.assertEqual(progress["endingLastCompletedAt"], "2026-04-24T00:00:00+08:00")
+
+    def test_native_runtime_crash_feedback_report_redacts_home_path(self) -> None:
+        original_home = os.environ.get("HOME")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            home_dir = Path(temp_dir) / "home"
+            bundle_dir = Path(temp_dir) / "bundle"
+            home_dir.mkdir(parents=True)
+            bundle_dir.mkdir(parents=True)
+            os.environ["HOME"] = str(home_dir)
+            game_data_path = bundle_dir / "game_data.json"
+            try:
+                try:
+                    raise RuntimeError(f"simulated crash at {home_dir / 'secret' / 'asset.png'}")
+                except RuntimeError as error:
+                    write_runtime_crash_log(game_data_path, error, "unit_test")
+
+                report = build_runtime_crash_feedback_report(game_data_path, include_logs=True)
+                report_json = json.dumps(report, ensure_ascii=False)
+                self.assertEqual(report["status"], "has_recent_crashes")
+                self.assertEqual(report["summary"]["logCount"], 1)
+                self.assertIn("RuntimeError", report["summary"]["latestError"])
+                self.assertNotIn(str(home_dir), report_json)
+                self.assertIn("~", report_json)
+
+                markdown = render_native_runtime_crash_feedback_markdown(report)
+                self.assertIn("# 原生 Runtime 崩溃反馈报告", markdown)
+                self.assertIn("unit_test", markdown)
+                self.assertNotIn(str(home_dir), markdown)
+
+                template_payload = write_native_runtime_crash_feedback_reports(bundle_dir, include_logs=False)
+                self.assertEqual(template_payload["status"], "template")
+                self.assertFalse(template_payload["summary"]["includesLocalLogs"])
+                self.assertTrue((bundle_dir / CRASH_FEEDBACK_REPORT_NAME).is_file())
+                self.assertTrue((bundle_dir / CRASH_FEEDBACK_JSON_NAME).is_file())
+                template_markdown = (bundle_dir / CRASH_FEEDBACK_REPORT_NAME).read_text(encoding="utf-8")
+                self.assertIn("不包含作者本机日志", template_markdown)
+                self.assertNotIn(str(bundle_dir), template_markdown)
+            finally:
+                if original_home is None:
+                    os.environ.pop("HOME", None)
+                else:
+                    os.environ["HOME"] = original_home
 
     def test_native_runtime_variable_module_supports_string_condition_operators(self) -> None:
         self.assertTrue(condition_operator_matches_variable_type("string", "contains"))

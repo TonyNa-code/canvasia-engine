@@ -29,6 +29,8 @@ LOG_SUBDIR_NAME = "native-runtime-logs"
 SCREENSHOT_SUBDIR_NAME = "native-runtime-screenshots"
 READ_TEXT_KEY_LIMIT = 20000
 SNAPSHOT_TEXT_HISTORY_LIMIT = 120
+CRASH_LOG_FILE_PREFIX = "runtime-crash-"
+CRASH_FEEDBACK_LOG_LIMIT = 8
 DEFAULT_PLAYER_PROFILE = {
     "firstPlayedAt": None,
     "lastPlayedAt": None,
@@ -95,6 +97,118 @@ def write_runtime_crash_log(game_data_path: Path, error: BaseException, context:
     ]
     log_path.write_text("\n".join(lines), encoding="utf-8")
     return log_path
+
+
+def redact_local_home_path(value: object) -> str:
+    text = str(value or "").strip()
+    home_path = str(Path.home())
+    if home_path and home_path != "/":
+        text = text.replace(home_path, "~")
+    return text
+
+
+def list_runtime_crash_logs(limit: int = CRASH_FEEDBACK_LOG_LIMIT) -> list[Path]:
+    log_dir = get_runtime_log_dir()
+    if not log_dir.is_dir():
+        return []
+    logs = [path for path in log_dir.glob(f"{CRASH_LOG_FILE_PREFIX}*.log") if path.is_file()]
+    logs.sort(key=lambda path: path.stat().st_mtime, reverse=True)
+    return logs[: max(0, int(limit or 0))]
+
+
+def read_runtime_crash_log_summary(log_path: Path) -> dict:
+    try:
+        text = log_path.read_text(encoding="utf-8", errors="replace")
+    except Exception as error:
+        return {
+            "path": redact_local_home_path(log_path),
+            "status": "unreadable",
+            "message": f"日志无法读取：{type(error).__name__}: {error}",
+        }
+    lines = text.splitlines()
+
+    def get_prefixed(prefix: str) -> str:
+        for line in lines:
+            if line.startswith(prefix):
+                return redact_local_home_path(line[len(prefix) :].strip())
+        return ""
+
+    error_line = ""
+    for index, line in enumerate(lines):
+        if line.strip() == "Error:":
+            for candidate in lines[index + 1 :]:
+                candidate = candidate.strip()
+                if candidate:
+                    error_line = redact_local_home_path(candidate)
+                    break
+            break
+    try:
+        stat = log_path.stat()
+        size_bytes = stat.st_size
+        modified_at = datetime.fromtimestamp(stat.st_mtime).astimezone().isoformat(timespec="seconds")
+    except OSError:
+        size_bytes = 0
+        modified_at = ""
+    return {
+        "path": redact_local_home_path(log_path),
+        "status": "readable",
+        "time": get_prefixed("Time:"),
+        "context": get_prefixed("Context:"),
+        "gameData": get_prefixed("Game data:"),
+        "python": get_prefixed("Python:"),
+        "platform": get_prefixed("Platform:"),
+        "frozen": get_prefixed("Frozen:"),
+        "error": error_line,
+        "sizeBytes": size_bytes,
+        "modifiedAt": modified_at,
+    }
+
+
+def build_runtime_crash_feedback_report(
+    game_data_path: Path | None = None,
+    *,
+    include_logs: bool = True,
+    limit: int = CRASH_FEEDBACK_LOG_LIMIT,
+) -> dict:
+    if game_data_path is not None and include_logs:
+        target_game_data = redact_local_home_path(game_data_path)
+    elif game_data_path is not None:
+        target_game_data = Path(game_data_path).name
+    else:
+        target_game_data = ""
+    logs = [read_runtime_crash_log_summary(path) for path in list_runtime_crash_logs(limit) if include_logs]
+    latest_log = logs[0] if logs else None
+    if include_logs and logs:
+        status = "has_recent_crashes"
+        headline = "检测到本机最近的原生 Runtime 崩溃日志。"
+    elif include_logs:
+        status = "no_crash_logs"
+        headline = "本机还没有记录到原生 Runtime 崩溃日志。"
+    else:
+        status = "template"
+        headline = "这是随导出包提供的崩溃反馈模板，不包含作者本机日志。"
+    recommendations = [
+        "如果 Runtime 打不开，先把这个反馈报告发给作者或维护者。",
+        "默认反馈报告只包含摘要；需要深度排查时，再从日志目录中选择对应原始 .log 文件发送。",
+        "分享原始日志前建议确认其中没有不想公开的本机路径或环境信息。",
+    ]
+    return {
+        "formatVersion": 1,
+        "generatedAt": now_iso(),
+        "status": status,
+        "headline": headline,
+        "gameData": target_game_data,
+        "logDir": redact_local_home_path(get_runtime_log_dir()),
+        "summary": {
+            "logCount": len(logs),
+            "latestTime": latest_log.get("time") if isinstance(latest_log, dict) else "",
+            "latestContext": latest_log.get("context") if isinstance(latest_log, dict) else "",
+            "latestError": latest_log.get("error") if isinstance(latest_log, dict) else "",
+            "includesLocalLogs": bool(include_logs),
+        },
+        "logs": logs,
+        "recommendations": recommendations,
+    }
 
 
 def make_project_save_filename(project_id: str) -> str:
