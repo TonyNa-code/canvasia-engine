@@ -30,6 +30,11 @@ from urllib.request import Request, urlopen
 
 from editor_local_security import is_local_editor_host, is_local_editor_origin
 from editor_snapshot_cache import SnapshotCache, build_file_cache_signature
+from editor_static_cache import (
+    build_editor_static_cache_headers,
+    is_editor_static_cache_candidate,
+    request_etag_matches,
+)
 from export_package_guide import EXPORT_PLAYTEST_GUIDE_FILE_NAME, write_export_playtest_guide_file
 from export_asset_rights import (
     EXPORT_ASSET_RIGHTS_CSV_NAME,
@@ -557,6 +562,7 @@ EDITOR_EXPORT_FILES = [
     "run_editor.py",
     "editor_local_security.py",
     "editor_snapshot_cache.py",
+    "editor_static_cache.py",
     "export_asset_rights.py",
     "export_audio_cue_sheet.py",
     "export_stage_direction_sheet.py",
@@ -14009,6 +14015,7 @@ def delete_chapter(chapter_id: str) -> dict:
 
 class EditorRequestHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
+        self._static_cache_headers: dict[str, str] | None = None
         super().__init__(*args, directory=str(ROOT_DIR), **kwargs)
 
     def is_allowed_api_request(self, *, require_origin: bool = False) -> bool:
@@ -14025,6 +14032,30 @@ class EditorRequestHandler(SimpleHTTPRequestHandler):
                 return False
 
         return True
+
+    def send_head(self):  # noqa: ANN201, N802
+        self._static_cache_headers = None
+        parsed = urlparse(self.path)
+        file_path = Path(self.translate_path(parsed.path))
+        if is_editor_static_cache_candidate(parsed.path, file_path):
+            cache_headers = build_editor_static_cache_headers(file_path)
+            if request_etag_matches(self.headers.get("If-None-Match"), cache_headers["ETag"]):
+                self.send_response(HTTPStatus.NOT_MODIFIED)
+                self.send_header("Cache-Control", cache_headers["Cache-Control"])
+                self.send_header("ETag", cache_headers["ETag"])
+                self.send_header("Last-Modified", cache_headers["Last-Modified"])
+                self.end_headers()
+                return None
+            self._static_cache_headers = cache_headers
+        return super().send_head()
+
+    def end_headers(self) -> None:
+        cache_headers = self._static_cache_headers
+        if cache_headers:
+            self.send_header("Cache-Control", cache_headers["Cache-Control"])
+            self.send_header("ETag", cache_headers["ETag"])
+        super().end_headers()
+        self._static_cache_headers = None
 
     def reject_non_local_api_request(self) -> None:
         self.send_json(

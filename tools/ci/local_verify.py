@@ -23,6 +23,7 @@ SCRIPT_SRC_PATTERN = re.compile(r"<script\b[^>]*\bsrc=[\"']([^\"']+)[\"'][^>]*>"
 PYTHON_SYNTAX_FILES = [
     "editor_local_security.py",
     "editor_snapshot_cache.py",
+    "editor_static_cache.py",
     "export_asset_rights.py",
     "export_audio_cue_sheet.py",
     "export_stage_direction_sheet.py",

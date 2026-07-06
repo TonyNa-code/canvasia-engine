@@ -11,11 +11,14 @@ import subprocess
 import sys
 import tempfile
 import tarfile
+import threading
 import unittest
 import wave
 import zipfile
 from unittest import mock
 from pathlib import Path
+from urllib.error import HTTPError
+from urllib.request import Request, urlopen
 
 import openai_asset_generation
 import run_editor
@@ -326,6 +329,36 @@ class RunEditorSmokeTests(unittest.TestCase):
 
         refreshed_bundle = run_editor.load_project_bundle()
         self.assertEqual(refreshed_bundle["project"]["title"], "缓存失效后的更长项目标题")
+
+    def test_editor_static_files_use_etag_revalidation_without_caching_api_payloads(self) -> None:
+        server = run_editor.ThreadingHTTPServer(("127.0.0.1", 0), run_editor.EditorRequestHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        port = server.server_address[1]
+        try:
+            static_url = f"http://127.0.0.1:{port}/prototype_editor/app.js"
+            with urlopen(static_url) as response:
+                self.assertEqual(response.status, 200)
+                etag = response.headers.get("ETag")
+                self.assertTrue(etag)
+                self.assertEqual(response.headers.get("Cache-Control"), "private, max-age=0, must-revalidate")
+                self.assertGreater(len(response.read()), 0)
+
+            with self.assertRaises(HTTPError) as error_context:
+                urlopen(Request(static_url, headers={"If-None-Match": etag or ""}))
+            self.assertEqual(error_context.exception.code, 304)
+            self.assertEqual(error_context.exception.headers.get("ETag"), etag)
+            self.assertEqual(error_context.exception.headers.get("Cache-Control"), "private, max-age=0, must-revalidate")
+
+            with urlopen(f"http://127.0.0.1:{port}/api/project-data") as response:
+                self.assertEqual(response.status, 200)
+                self.assertIsNone(response.headers.get("ETag"))
+                self.assertIsNone(response.headers.get("Cache-Control"))
+                self.assertGreater(len(response.read()), 0)
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
 
     def assert_export_manifest_has_subtle_engine_signature(self, manifest: dict) -> None:
         self.assertEqual(manifest["engine"]["signature"], run_editor.EXPORT_ENGINE_SIGNATURE)

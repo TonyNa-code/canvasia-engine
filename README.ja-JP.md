@@ -106,6 +106,7 @@ Canvasia Engine は、ビジュアルノベル / Galgame 制作者のための s
 ## リポジトリ構成
 
 - [`run_editor.py`](run_editor.py): ローカルエディタサーバー、プロジェクト管理、書き出し、パッケージング入口
+- [`editor_static_cache.py`](editor_static_cache.py): ローカルエディタ静的ファイルの ETag / 304 revalidation helper
 - [`export_package_guide.py`](export_package_guide.py): 書き出しパッケージ向け playtest / acceptance guide 生成器
 - [`export_localization_audit.py`](export_localization_audit.py): 書き出しパッケージ向け localization coverage / missing translation audit 生成器
 - [`export_quality_reports.py`](export_quality_reports.py): 書き出し品質レポート bundle の共通オーケストレーション

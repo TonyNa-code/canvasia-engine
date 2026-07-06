@@ -111,6 +111,9 @@ Canvasia Engine 当前更适合这样理解：
 - [`run_editor.py`](run_editor.py)
   本地编辑器服务、导出链、项目管理、打包链的主入口
 
+- [`editor_static_cache.py`](editor_static_cache.py)
+  本地编辑器静态文件 ETag / 304 复用辅助模块，用于减少刷新时重复传输前端模块和素材预览文件
+
 - [`export_package_guide.py`](export_package_guide.py)
   导出包侧试玩 / 发布验收说明生成器
 

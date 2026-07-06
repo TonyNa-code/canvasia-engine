@@ -113,6 +113,7 @@ The project already includes a visual editor, export pipeline, native runtime pr
 - [`run_editor.py`](run_editor.py): local editor server, project management, export pipeline, and packaging entry point
 - [`editor_local_security.py`](editor_local_security.py): loopback-only API request guard helpers
 - [`editor_snapshot_cache.py`](editor_snapshot_cache.py): reusable file-signature snapshot cache for read-heavy editor payloads
+- [`editor_static_cache.py`](editor_static_cache.py): local editor static-file ETag / 304 revalidation helpers for faster refreshes
 - [`export_package_guide.py`](export_package_guide.py): exported package playtest / acceptance guide builder
 - [`export_localization_audit.py`](export_localization_audit.py): exported package localization coverage audit for multilingual releases
 - [`export_quality_reports.py`](export_quality_reports.py): shared exported quality-report bundle orchestration
