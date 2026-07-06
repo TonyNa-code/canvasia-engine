@@ -74,6 +74,12 @@
       }),
     }),
   });
+  const PERFORMANCE_PROFILE_RANKS = Object.freeze({
+    mobile_low: 0,
+    web: 1,
+    standard: 2,
+    high_quality_pc: 3,
+  });
 
   const PHASE_DEFINITIONS = Object.freeze({
     critical: Object.freeze({
@@ -347,6 +353,10 @@
     return PERFORMANCE_PROFILE_DEFINITIONS[getSafePerformanceProfileKey(value)] ?? PERFORMANCE_PROFILE_DEFINITIONS.standard;
   }
 
+  function getPerformanceProfileLabel(value) {
+    return getPerformanceProfileDefinition(value).label;
+  }
+
   function getRuntimePreloadPerformanceProfile(data = {}, options = {}) {
     const project = data.project && typeof data.project === "object" ? data.project : {};
     const runtimeSettings = project.runtimeSettings && typeof project.runtimeSettings === "object" ? project.runtimeSettings : {};
@@ -428,6 +438,98 @@
       sceneId: warning.sceneId ?? "",
       sceneName: warning.sceneName ?? "",
     });
+  }
+
+  function buildRuntimePreloadProfileMetrics(entries = []) {
+    const entryList = toArray(entries);
+    const criticalEntries = entryList.filter((entry) => entry?.phase === "critical");
+    const totalBytes = entryList.reduce((sum, entry) => sum + toFiniteBytes(entry?.sizeBytes), 0);
+    const criticalBytes = criticalEntries.reduce((sum, entry) => sum + toFiniteBytes(entry?.sizeBytes), 0);
+    const videoEntryCount = entryList.filter((entry) => VIDEO_ASSET_TYPES.includes(cleanText(entry?.type))).length;
+    return {
+      entryCount: entryList.length,
+      criticalEntryCount: criticalEntries.length,
+      videoEntryCount,
+      totalBytes,
+      totalLabel: formatBytes(totalBytes),
+      criticalBytes,
+      criticalLabel: formatBytes(criticalBytes),
+    };
+  }
+
+  function getRecommendedRuntimePreloadProfile(entries = []) {
+    const metrics = buildRuntimePreloadProfileMetrics(entries);
+    if (
+      metrics.criticalBytes > DEFAULT_BUDGETS.criticalBudgetBytes ||
+      metrics.totalBytes > DEFAULT_BUDGETS.totalPreloadBudgetBytes ||
+      metrics.videoEntryCount >= 2 ||
+      metrics.entryCount >= 32
+    ) {
+      return "high_quality_pc";
+    }
+    if (
+      metrics.criticalBytes > 64 * MIB ||
+      metrics.totalBytes > 256 * MIB ||
+      metrics.videoEntryCount >= 1 ||
+      metrics.entryCount >= 20
+    ) {
+      return "standard";
+    }
+    if (metrics.criticalBytes > 32 * MIB || metrics.totalBytes > 128 * MIB || metrics.entryCount >= 10) {
+      return "web";
+    }
+    return "mobile_low";
+  }
+
+  function buildRuntimePreloadProfileAdvice(entries = [], selectedProfile = "standard") {
+    const selectedKey = getSafePerformanceProfileKey(selectedProfile);
+    const recommendedKey = getRecommendedRuntimePreloadProfile(entries);
+    const selectedRank = PERFORMANCE_PROFILE_RANKS[selectedKey] ?? PERFORMANCE_PROFILE_RANKS.standard;
+    const recommendedRank = PERFORMANCE_PROFILE_RANKS[recommendedKey] ?? PERFORMANCE_PROFILE_RANKS.standard;
+    const metrics = buildRuntimePreloadProfileMetrics(entries);
+    const highQualityBudgets = {
+      ...DEFAULT_BUDGETS,
+      ...(PERFORMANCE_PROFILE_DEFINITIONS.high_quality_pc.budgets ?? {}),
+    };
+    const overMaxBudget =
+      metrics.criticalBytes > highQualityBudgets.criticalBudgetBytes ||
+      metrics.totalBytes > highQualityBudgets.totalPreloadBudgetBytes;
+    const reasons = [];
+    const actions = [];
+    let status = "ok";
+    let severity = "pass";
+
+    if (overMaxBudget) {
+      status = "needs_optimization";
+      severity = "warn";
+      reasons.push("当前首屏或整体预热体积已经超过高画质 PC 档位建议预算。");
+      actions.push("先压缩入口背景、UI、开场视频和大体积音频，再重新生成预热预算。");
+    } else if (selectedRank < recommendedRank) {
+      status = "should_raise";
+      severity = "warn";
+      reasons.push(`当前素材规模更接近「${getPerformanceProfileLabel(recommendedKey)}」。`);
+      actions.push(`如果目标设备允许，建议把项目性能档位切换到「${getPerformanceProfileLabel(recommendedKey)}」。`);
+    } else if (selectedRank > recommendedRank) {
+      status = "can_lower";
+      severity = "info";
+      reasons.push(`当前素材规模较轻，「${getPerformanceProfileLabel(recommendedKey)}」也足够。`);
+      actions.push("如果更重视低配设备体验，可以降低档位并重新导出测试。");
+    } else {
+      reasons.push(`当前预热规模与「${getPerformanceProfileLabel(selectedKey)}」匹配。`);
+      actions.push("保持当前档位；发布前继续复查首屏体积、缺失素材和场景热点。");
+    }
+
+    return {
+      status,
+      severity,
+      selectedProfile: selectedKey,
+      selectedProfileLabel: getPerformanceProfileLabel(selectedKey),
+      recommendedProfile: recommendedKey,
+      recommendedProfileLabel: getPerformanceProfileLabel(recommendedKey),
+      ...metrics,
+      reasons,
+      actions,
+    };
   }
 
   function buildRuntimePreloadBudgetReport(data = {}, options = {}) {
@@ -730,6 +832,7 @@
     const dangerCount = warnings.filter((warning) => warning.severity === "danger").length;
     const warnCount = warnings.filter((warning) => warning.severity === "warn").length;
     const releaseRiskLevel = dangerCount > 0 ? "danger" : warnCount > 0 ? "warn" : "ready";
+    const profileAdvice = buildRuntimePreloadProfileAdvice(entries, profile.key);
 
     return {
       budgets: {
@@ -752,6 +855,7 @@
       phaseList: phaseOrder.map((phase) => phases[phase]),
       scenes,
       warnings,
+      profileAdvice,
       totals: {
         totalEntries: entries.length,
         totalBytes: totalPreloadBytes,
@@ -773,6 +877,7 @@
     const critical = report.phases?.critical ?? {};
     const early = report.phases?.early ?? {};
     const profile = report.performanceProfile ?? {};
+    const profileAdvice = report.profileAdvice ?? {};
     const level = report.releaseRiskLevel ?? "ready";
     const title =
       level === "danger"
@@ -796,6 +901,7 @@
         `首屏 ${critical.bytesLabel ?? "0 B"}`,
         `早期 ${early.bytesLabel ?? "0 B"}`,
         profile.label ? `档位 ${profile.label}` : "标准档位",
+        profileAdvice.recommendedProfileLabel ? `建议 ${profileAdvice.recommendedProfileLabel}` : "建议标准档",
         `${totals.totalEntries ?? 0} 个候选素材`,
         (totals.missingFileCount ?? 0) > 0 ? `缺文件 ${totals.missingFileCount} 个` : "无首屏缺文件",
       ],
@@ -820,6 +926,7 @@
     const digest = getRuntimePreloadBudgetDigest(report);
     const totals = report.totals ?? {};
     const profile = report.performanceProfile ?? {};
+    const profileAdvice = report.profileAdvice ?? {};
     const phaseRows = toArray(report.phaseList).map((phase) => [
       phase.label,
       phase.count,
@@ -867,9 +974,10 @@
       "## 总览",
       "",
       buildMarkdownTable(
-        ["性能档位", "预热素材", "首屏+早期体积", "总预热体积", "缺文件", "缺体积记录", "提醒数"],
+        ["性能档位", "推荐档位", "预热素材", "首屏+早期体积", "总预热体积", "缺文件", "缺体积记录", "提醒数"],
         [[
           profile.label ?? report.budgets?.performanceProfileLabel ?? "标准 PC / 网页",
+          profileAdvice.recommendedProfileLabel ?? "标准 PC / 网页",
           totals.totalEntries ?? 0,
           totals.criticalAndEarlyLabel ?? "0 B",
           totals.totalLabel ?? "0 B",
@@ -878,6 +986,23 @@
           (totals.dangerCount ?? 0) + (totals.warnCount ?? 0),
         ]]
       ),
+      "",
+      "## 性能档位建议",
+      "",
+      buildMarkdownTable(
+        ["结论", "当前档位", "推荐档位", "首屏体积", "总预热体积", "视频素材", "建议动作"],
+        [[
+          profileAdvice.status ?? "unknown",
+          profileAdvice.selectedProfileLabel ?? profile.label ?? "标准 PC / 网页",
+          profileAdvice.recommendedProfileLabel ?? "标准 PC / 网页",
+          profileAdvice.criticalLabel ?? "0 B",
+          profileAdvice.totalLabel ?? "0 B",
+          profileAdvice.videoEntryCount ?? 0,
+          toArray(profileAdvice.actions)[0] ?? "保持当前档位并继续复查首屏体积。",
+        ]]
+      ),
+      "",
+      toArray(profileAdvice.reasons).map((reason) => `- ${reason}`).join("\n"),
       "",
       "## 阶段预算",
       "",
@@ -949,6 +1074,9 @@
     getSafePerformanceProfileKey,
     getPerformanceProfileDefinition,
     getRuntimePreloadPerformanceProfile,
+    buildRuntimePreloadProfileMetrics,
+    getRecommendedRuntimePreloadProfile,
+    buildRuntimePreloadProfileAdvice,
     resolveRuntimePreloadBudgets,
     getCharacterSpriteAssetId,
     normalizeAssetSizeBytes,

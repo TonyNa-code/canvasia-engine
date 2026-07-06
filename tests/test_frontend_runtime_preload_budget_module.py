@@ -90,6 +90,7 @@ class FrontendRuntimePreloadBudgetModuleTests(unittest.TestCase):
             console.log(JSON.stringify({{
               releaseRiskLevel: report.releaseRiskLevel,
               performanceProfile: report.performanceProfile,
+              profileAdvice: report.profileAdvice,
               performanceBudgetLabel: report.budgets.performanceProfileLabel,
               warningCodes: report.warnings.map((warning) => warning.code),
               criticalBytes: report.phases.critical.bytes,
@@ -101,6 +102,8 @@ class FrontendRuntimePreloadBudgetModuleTests(unittest.TestCase):
               markdownHasSections: [
                 markdown.includes("# 心跳时差 Runtime 首屏加载预算"),
                 markdown.includes("低配 / 移动端"),
+                markdown.includes("高画质 PC"),
+                markdown.includes("## 性能档位建议"),
                 markdown.includes("## 阶段预算"),
                 markdown.includes("开场 OP"),
               ],
@@ -115,6 +118,9 @@ class FrontendRuntimePreloadBudgetModuleTests(unittest.TestCase):
                 tools.getPreloadPhase(3, 0, "later", "scene_opening"),
                 tools.getRuntimePreloadPerformanceProfile(data),
                 tools.getSafePerformanceProfileKey("bad-profile"),
+                tools.getRecommendedRuntimePreloadProfile(report.entries),
+                tools.buildRuntimePreloadProfileMetrics(report.entries).videoEntryCount,
+                tools.buildRuntimePreloadProfileAdvice(report.entries, "mobile_low").status,
                 tools.formatBytes(1536),
                 tools.normalizeAssetSizeBytes({{ size: "1.5 MB" }}),
               ],
@@ -131,6 +137,9 @@ class FrontendRuntimePreloadBudgetModuleTests(unittest.TestCase):
 
         self.assertEqual(payload["releaseRiskLevel"], "danger")
         self.assertEqual(payload["performanceProfile"]["key"], "mobile_low")
+        self.assertEqual(payload["profileAdvice"]["status"], "needs_optimization")
+        self.assertEqual(payload["profileAdvice"]["recommendedProfile"], "high_quality_pc")
+        self.assertEqual(payload["profileAdvice"]["recommendedProfileLabel"], "高画质 PC")
         self.assertEqual(payload["performanceBudgetLabel"], "低配 / 移动端")
         self.assertIn("critical_over_budget", payload["warningCodes"])
         self.assertIn("critical_missing_assets", payload["warningCodes"])
@@ -145,7 +154,10 @@ class FrontendRuntimePreloadBudgetModuleTests(unittest.TestCase):
         self.assertEqual(payload["digest"]["title"], "首屏压力偏高")
         self.assertTrue(all(payload["markdownHasSections"]))
         self.assertTrue(all(payload["csvHasRows"]))
-        self.assertEqual(payload["helperValues"], ["critical", "early", "deferred", "mobile_low", "standard", "1.5 KB", 1572864])
+        self.assertEqual(
+            payload["helperValues"],
+            ["critical", "early", "deferred", "mobile_low", "standard", "high_quality_pc", 1, "needs_optimization", "1.5 KB", 1572864],
+        )
 
 
 if __name__ == "__main__":
