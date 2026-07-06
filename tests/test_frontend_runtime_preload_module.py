@@ -222,6 +222,66 @@ class FrontendRuntimePreloadModuleTests(unittest.TestCase):
         self.assertEqual(payload["finalStatus"]["loadedCount"], 5)
         self.assertTrue(payload["finalStatus"]["finished"])
 
+    def test_runtime_preload_reuses_cached_asset_ids_without_starting_requests(self) -> None:
+        script = textwrap.dedent(
+            f"""
+            import * as tools from {json.dumps(MODULE_PATH.as_uri())};
+
+            const started = [];
+            class FakeImage {{
+              set src(value) {{
+                this._src = value;
+                started.push(value.split("/").pop());
+                queueMicrotask(() => this.onload?.());
+              }}
+              get src() {{
+                return this._src;
+              }}
+            }}
+
+            const manifest = {{
+              formatVersion: 1,
+              entries: [
+                {{ assetId: "bg_cached", type: "background", url: "assets/background/cached.png", phase: "critical", priority: 100 }},
+                {{ assetId: "bg_new", type: "background", url: "assets/background/new.png", phase: "critical", priority: 99 }},
+              ],
+            }};
+
+            const controller = tools.startRuntimePreload(manifest, {{
+              ImageCtor: FakeImage,
+              skipAssetIds: new Set(["bg_cached"]),
+              timeoutMs: 500,
+            }});
+
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            await new Promise((resolve) => setTimeout(resolve, 0));
+
+            process.stdout.write(JSON.stringify({{
+              started,
+              status: controller.getStatus(),
+            }}));
+            """
+        )
+        completed = subprocess.run(
+            ["node", "--input-type=module", "-e", script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        self.assertEqual(payload["started"], ["new.png"])
+        self.assertEqual(payload["status"]["totalCount"], 2)
+        self.assertEqual(payload["status"]["queuedCount"], 1)
+        self.assertEqual(payload["status"]["loadedCount"], 1)
+        self.assertEqual(payload["status"]["skippedCount"], 1)
+        self.assertEqual(payload["status"]["readyCount"], 2)
+        self.assertEqual(payload["status"]["loadedAssetIds"], ["bg_new"])
+        self.assertEqual(payload["status"]["skippedAssetIds"], ["bg_cached"])
+        self.assertTrue(payload["status"]["finished"])
+
     def test_runtime_preload_stages_background_phases_and_batches_work(self) -> None:
         script = textwrap.dedent(
             f"""

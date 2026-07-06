@@ -89,6 +89,21 @@ function normalizePreloadPhase(value) {
   return ["critical", "early", "deferred", "library"].includes(value) ? value : "deferred";
 }
 
+function normalizeAssetIdSet(value) {
+  if (!value) {
+    return new Set();
+  }
+  const source =
+    value instanceof Set
+      ? Array.from(value)
+      : Array.isArray(value)
+        ? value
+        : typeof value?.[Symbol.iterator] === "function"
+          ? Array.from(value)
+          : [];
+  return new Set(source.map(safeText).filter(Boolean));
+}
+
 export function getSafeRuntimePreloadPerformanceProfile(value, fallback = "standard") {
   const key = safeText(value || fallback).toLowerCase();
   return Object.hasOwn(RUNTIME_PRELOAD_PERFORMANCE_PROFILES, key) ? key : fallback;
@@ -380,21 +395,27 @@ export function startRuntimePreload(manifest, options = {}) {
   const normalized = normalizeRuntimePreloadManifest(manifest);
   const resolvedOptions = resolveRuntimePreloadOptions(options);
   const maxConcurrent = resolvedOptions.maxConcurrent;
+  const skipAssetIds = normalizeAssetIdSet(resolvedOptions.skipAssetIds ?? resolvedOptions.cachedAssetIds);
+  const skippedEntries = normalized.entries.filter((entry) => skipAssetIds.has(entry.assetId));
+  const entriesToLoad = normalized.entries.filter((entry) => !skipAssetIds.has(entry.assetId));
   const phaseQueues = PRELOAD_PHASE_ORDER.reduce((queues, phase) => {
-    queues[phase] = normalized.entries.filter((entry) => entry.phase === phase);
+    queues[phase] = entriesToLoad.filter((entry) => entry.phase === phase);
     return queues;
   }, {});
   const readyPhases = new Set(["critical"]);
   const scheduledPhases = new Set();
+  const skippedAssetIds = skippedEntries.map((entry) => entry.assetId);
   const status = {
     totalCount: normalized.entries.length,
-    queuedCount: normalized.entries.length,
+    queuedCount: entriesToLoad.length,
     loadedCount: 0,
     failedCount: 0,
+    skippedCount: skippedEntries.length,
+    readyCount: skippedEntries.length,
     criticalCount: phaseQueues.critical.length,
     activeCount: 0,
-    waitingCount: normalized.entries.length,
-    pendingCount: normalized.entries.length,
+    waitingCount: entriesToLoad.length,
+    pendingCount: entriesToLoad.length,
     maxConcurrent,
     backgroundBatchSize: resolvedOptions.backgroundBatchSize,
     backgroundBatchDelayMs: resolvedOptions.backgroundBatchDelayMs,
@@ -402,7 +423,10 @@ export function startRuntimePreload(manifest, options = {}) {
     performanceProfileLabel: resolvedOptions.performanceProfileLabel,
     readyPhases: ["critical"],
     started: normalized.entries.length > 0,
-    finished: normalized.entries.length === 0,
+    finished: entriesToLoad.length === 0,
+    loadedAssetIds: [],
+    failedAssetIds: [],
+    skippedAssetIds,
   };
   const safeOptions = {
     timeoutMs: resolvedOptions.timeoutMs,
@@ -414,6 +438,12 @@ export function startRuntimePreload(manifest, options = {}) {
   const onProgress = typeof resolvedOptions.onProgress === "function" ? resolvedOptions.onProgress : null;
   let stopped = false;
   let backgroundPumpScheduled = false;
+  const getStatusSnapshot = () => ({
+    ...status,
+    loadedAssetIds: [...status.loadedAssetIds],
+    failedAssetIds: [...status.failedAssetIds],
+    skippedAssetIds: [...status.skippedAssetIds],
+  });
   const updateWaitingCount = () => {
     status.waitingCount = PRELOAD_PHASE_ORDER.reduce(
       (total, phase) => total + (readyPhases.has(phase) ? phaseQueues[phase].length : 0),
@@ -421,20 +451,28 @@ export function startRuntimePreload(manifest, options = {}) {
     );
     status.pendingCount = PRELOAD_PHASE_ORDER.reduce((total, phase) => total + phaseQueues[phase].length, 0);
     status.readyPhases = PRELOAD_PHASE_ORDER.filter((phase) => readyPhases.has(phase));
+    status.readyCount = status.loadedCount + status.skippedCount;
   };
-  const emitProgress = () => onProgress?.({ ...status });
+  const emitProgress = () => onProgress?.(getStatusSnapshot());
 
-  const mark = (ok, phase = "deferred") => {
+  const mark = (ok, phase = "deferred", entry = null) => {
     if (stopped) {
       return;
     }
     status.activeCount = Math.max(0, status.activeCount - 1);
     if (ok) {
       status.loadedCount += 1;
+      if (entry?.assetId) {
+        status.loadedAssetIds.push(entry.assetId);
+      }
     } else {
       status.failedCount += 1;
+      if (entry?.assetId) {
+        status.failedAssetIds.push(entry.assetId);
+      }
     }
-    status.finished = status.loadedCount + status.failedCount >= status.totalCount;
+    status.readyCount = status.loadedCount + status.skippedCount;
+    status.finished = status.readyCount + status.failedCount >= status.totalCount;
     updateWaitingCount();
     emitProgress();
     if (phase === "critical" || phaseQueues.critical.length) {
@@ -515,7 +553,7 @@ export function startRuntimePreload(manifest, options = {}) {
         backgroundStarted += 1;
       }
       updateWaitingCount();
-      preloadEntry(entry, safeOptions).then((ok) => mark(ok, entry.phase)).catch(() => mark(false, entry.phase));
+      preloadEntry(entry, safeOptions).then((ok) => mark(ok, entry.phase, entry)).catch(() => mark(false, entry.phase, entry));
     }
   }
 
@@ -534,7 +572,7 @@ export function startRuntimePreload(manifest, options = {}) {
       status.finished = true;
     },
     getStatus() {
-      return { ...status };
+      return getStatusSnapshot();
     },
   };
 }

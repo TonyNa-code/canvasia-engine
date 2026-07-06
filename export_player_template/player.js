@@ -348,6 +348,7 @@ const state = {
   lastVoiceReplayStepKey: null,
   runtimePreload: null,
   runtimePreloadStatus: null,
+  runtimePreloadedAssetIds: new Set(),
   runtimeScenePrefetch: null,
   runtimeScenePrefetchKey: "",
   runtimeScenePrefetchStatus: null,
@@ -1692,16 +1693,19 @@ function init() {
 function startRuntimeAssetPreload() {
   state.runtimePreload?.stop?.();
   state.runtimePreloadStatus = null;
+  state.runtimePreloadedAssetIds = new Set();
   const runtimeSettings = getProjectRuntimeSettings(data.project);
   state.runtimePreload = startRuntimePreload(data.buildInfo.runtimePreloadManifest, {
     runtimeSettings,
     onProgress: (status) => {
       state.runtimePreloadStatus = status;
+      rememberRuntimePreloadAssets(status, state.runtimePreloadedAssetIds);
       renderStartSummary();
       renderBuildInfo();
     },
   });
   state.runtimePreloadStatus = state.runtimePreload?.getStatus?.() ?? null;
+  rememberRuntimePreloadAssets(state.runtimePreloadStatus, state.runtimePreloadedAssetIds);
 }
 
 function resetRuntimeScenePrefetchState() {
@@ -1712,19 +1716,39 @@ function resetRuntimeScenePrefetchState() {
   state.runtimeScenePrefetchedAssetIds = new Set();
 }
 
+function rememberRuntimePreloadAssets(status, targetSet) {
+  if (!status || !(targetSet instanceof Set)) {
+    return;
+  }
+  [...(status.loadedAssetIds ?? []), ...(status.skippedAssetIds ?? [])].forEach((assetId) => {
+    const normalizedAssetId = String(assetId ?? "").trim();
+    if (normalizedAssetId) {
+      targetSet.add(normalizedAssetId);
+    }
+  });
+}
+
+function getRuntimeCachedAssetIds() {
+  return new Set([
+    ...state.runtimePreloadedAssetIds,
+    ...state.runtimeScenePrefetchedAssetIds,
+  ]);
+}
+
 function startRuntimeScenePrefetch(snapshot) {
   if (!snapshot || snapshot.completed) {
     return;
   }
 
   const runtimeSettings = getProjectRuntimeSettings(data.project);
+  const cachedAssetIds = getRuntimeCachedAssetIds();
   const manifest = buildRuntimeScenePrefetchManifest(
     snapshot,
     {
       scenesById: data.scenesById,
       assetsById: data.assetsById,
       charactersById: data.charactersById,
-      excludeAssetIds: state.runtimeScenePrefetchedAssetIds,
+      excludeAssetIds: cachedAssetIds,
     },
     {
       choiceContinueTarget: CHOICE_CONTINUE_TARGET,
@@ -1752,6 +1776,7 @@ function startRuntimeScenePrefetch(snapshot) {
 
   state.runtimeScenePrefetch = startRuntimePreload(manifest, {
     runtimeSettings,
+    skipAssetIds: cachedAssetIds,
     maxConcurrent: 1,
     backgroundBatchSize: 1,
     backgroundBatchDelayMs: 240,
@@ -1762,6 +1787,7 @@ function startRuntimeScenePrefetch(snapshot) {
     },
     onProgress: (status) => {
       state.runtimeScenePrefetchStatus = status;
+      rememberRuntimePreloadAssets(status, state.runtimeScenePrefetchedAssetIds);
       if (status.finished) {
         prefetchAssetIds.forEach((assetId) => state.runtimeScenePrefetchedAssetIds.add(assetId));
       }
@@ -1868,9 +1894,10 @@ function getRuntimePreloadStatusText() {
   }
 
   const status = state.runtimePreloadStatus ?? state.runtimePreload?.getStatus?.() ?? null;
-  const loadedCount = status?.loadedCount ?? 0;
+  const readyCount = status?.readyCount ?? status?.loadedCount ?? 0;
   const failedCount = status?.failedCount ?? 0;
   const failureText = failedCount > 0 ? ` · ${failedCount} 个稍后重试` : "";
+  const skippedText = status?.skippedCount > 0 ? ` · 复用 ${status.skippedCount} 个` : "";
   const sizeText = formatRuntimePreloadSize(summary);
   const profileText = status?.performanceProfileLabel ? `档位 ${status.performanceProfileLabel}` : "";
   const readyPhaseCount = Array.isArray(status?.readyPhases) ? status.readyPhases.length : 0;
@@ -1884,7 +1911,7 @@ function getRuntimePreloadStatusText() {
     `图片 ${summary.imageCount}`,
     `音频 ${summary.audioCount}`,
     `视频 ${summary.videoCount}`,
-    `已预热 ${loadedCount}/${summary.totalCount}${failureText}`,
+    `已准备 ${readyCount}/${summary.totalCount}${skippedText}${failureText}`,
     getRuntimeScenePrefetchStatusText(),
   ].filter(Boolean).join(" · ");
 }
@@ -1894,10 +1921,11 @@ function getRuntimeScenePrefetchStatusText() {
   if (!status?.totalCount) {
     return "";
   }
-  const loadedCount = status.loadedCount ?? 0;
+  const readyCount = status.readyCount ?? status.loadedCount ?? 0;
   const failedCount = status.failedCount ?? 0;
   const failureText = failedCount > 0 ? `，${failedCount} 个稍后重试` : "";
-  return `路线预取 ${loadedCount}/${status.totalCount}${failureText}`;
+  const skippedText = status.skippedCount > 0 ? `，复用 ${status.skippedCount} 个` : "";
+  return `路线预取 ${readyCount}/${status.totalCount}${skippedText}${failureText}`;
 }
 
 function getRuntimePreloadMetaText() {
