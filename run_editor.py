@@ -31,6 +31,12 @@ from urllib.request import Request, urlopen
 from editor_local_security import is_local_editor_host, is_local_editor_origin
 from editor_snapshot_cache import SnapshotCache, build_file_cache_signature
 from export_package_guide import EXPORT_PLAYTEST_GUIDE_FILE_NAME, write_export_playtest_guide_file
+from export_asset_rights import (
+    EXPORT_ASSET_RIGHTS_CSV_NAME,
+    EXPORT_ASSET_RIGHTS_JSON_NAME,
+    EXPORT_ASSET_RIGHTS_REPORT_NAME,
+    write_export_asset_rights_files,
+)
 from export_localization_audit import (
     EXPORT_LOCALIZATION_AUDIT_JSON_NAME,
     EXPORT_LOCALIZATION_AUDIT_REPORT_NAME,
@@ -527,6 +533,7 @@ EDITOR_EXPORT_FILES = [
     "run_editor.py",
     "editor_local_security.py",
     "editor_snapshot_cache.py",
+    "export_asset_rights.py",
     "export_localization_audit.py",
     "export_package_guide.py",
     "export_quality_reports.py",
@@ -9667,6 +9674,7 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
             vn_baseline_markdown_path.name,
             performance_budget_files["performanceBudgetMarkdownName"],
             asset3d_summary_path.name,
+            EXPORT_ASSET_RIGHTS_REPORT_NAME,
             NATIVE_RUNTIME_FILE_INTEGRITY_MARKDOWN_NAME,
             NATIVE_RUNTIME_ACCEPTANCE_REPORT_NAME,
         ],
@@ -10348,6 +10356,9 @@ def export_native_runtime_build() -> dict:
             "gameData": runtime_files["gameDataName"],
             "playtestGuide": runtime_files["playtestGuideName"],
             "releaseEvidencePack": EXPORT_RELEASE_EVIDENCE_PACK_NAME,
+            "assetRights": EXPORT_ASSET_RIGHTS_JSON_NAME,
+            "assetRightsReport": EXPORT_ASSET_RIGHTS_REPORT_NAME,
+            "assetRightsCsv": EXPORT_ASSET_RIGHTS_CSV_NAME,
             "storyRouteMap": EXPORT_STORY_ROUTE_MAP_JSON_NAME,
             "storyRouteMapReport": EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
             "localizationAudit": EXPORT_LOCALIZATION_AUDIT_JSON_NAME,
@@ -10415,6 +10426,9 @@ def export_native_runtime_build() -> dict:
             "appBuilder": runtime_files["appBuilderName"],
             "playtestGuide": runtime_files["playtestGuideName"],
             "releaseEvidencePack": EXPORT_RELEASE_EVIDENCE_PACK_NAME,
+            "assetRights": EXPORT_ASSET_RIGHTS_JSON_NAME,
+            "assetRightsReport": EXPORT_ASSET_RIGHTS_REPORT_NAME,
+            "assetRightsCsv": EXPORT_ASSET_RIGHTS_CSV_NAME,
             "storyRouteMap": EXPORT_STORY_ROUTE_MAP_JSON_NAME,
             "storyRouteMapReport": EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
             "localizationAudit": EXPORT_LOCALIZATION_AUDIT_JSON_NAME,
@@ -10471,6 +10485,7 @@ def export_native_runtime_build() -> dict:
         },
     )
     manifest_path = write_export_manifest(build_dir, manifest)
+    asset_rights_files = write_export_asset_rights_files(build_dir, bundle=bundle, assets_doc=export_assets_doc)
     quality_reports = write_export_quality_report_bundle(
         build_dir,
         bundle=bundle,
@@ -10492,6 +10507,9 @@ def export_native_runtime_build() -> dict:
             runtime_files["vnBaselineQualityMarkdownName"],
             runtime_files["performanceBudgetMarkdownName"],
             runtime_files["asset3dSummaryName"],
+            asset_rights_files["assetRightsReportName"],
+            asset_rights_files["assetRightsName"],
+            asset_rights_files["assetRightsCsvName"],
         ],
         platform_notes=[
             "原生 Runtime 是后续 App 化路线的重点包；正式分发前建议至少在目标系统完整跑通一次。",
@@ -10533,6 +10551,7 @@ def export_native_runtime_build() -> dict:
             runtime_files["vnBaselineQualityMarkdownName"],
             runtime_files["performanceBudgetMarkdownName"],
             runtime_files["asset3dSummaryName"],
+            asset_rights_files["assetRightsReportName"],
             NATIVE_RUNTIME_FILE_INTEGRITY_MARKDOWN_NAME,
             NATIVE_RUNTIME_ACCEPTANCE_REPORT_NAME,
         ],
@@ -10557,6 +10576,9 @@ def export_native_runtime_build() -> dict:
         {"name": release_readiness["releaseReadinessSummaryName"], "description": "机器可读发布试玩就绪摘要 JSON。"},
         {"name": runtime_files["unlockableContentManifestName"], "description": "可解锁内容清单 JSON，记录图鉴、回想、成就和结局覆盖。"},
         {"name": runtime_files["unlockableContentReportName"], "description": "可解锁内容 Markdown 报告，方便测试员直接复查 EXTRA / 回想覆盖。"},
+        {"name": asset_rights_files["assetRightsReportName"], "description": "素材授权与署名 Markdown 报告，复查商用状态、来源、AI 生成记录和 Staff 草稿。"},
+        {"name": asset_rights_files["assetRightsName"], "description": "机器可读素材授权清单 JSON。"},
+        {"name": asset_rights_files["assetRightsCsvName"], "description": "可导入表格的素材授权 CSV。"},
         {"name": runtime_files["runtimePreloadManifestName"], "description": "Runtime 资源预热清单 JSON，记录首屏和早期路线素材。"},
         {"name": runtime_files["runtimePreloadReportName"], "description": "Runtime 资源预热 Markdown 报告，方便复查卡顿风险。"},
         {"name": runtime_files["runtimePreloadModuleName"], "description": "原生 Runtime 资源预热策略模块。"},
@@ -10646,6 +10668,18 @@ def export_native_runtime_build() -> dict:
         "releaseEvidencePackName": evidence_pack_path.name,
         "releaseEvidencePackPath": str(evidence_pack_path),
         "releaseEvidencePackPublicUrl": f"/exports/{build_dir.name}/{evidence_pack_path.name}",
+        "assetRightsName": asset_rights_files["assetRightsName"],
+        "assetRightsPath": asset_rights_files["assetRightsPath"],
+        "assetRightsPublicUrl": f"/exports/{build_dir.name}/{asset_rights_files['assetRightsName']}",
+        "assetRightsReportName": asset_rights_files["assetRightsReportName"],
+        "assetRightsReportPath": asset_rights_files["assetRightsReportPath"],
+        "assetRightsReportPublicUrl": f"/exports/{build_dir.name}/{asset_rights_files['assetRightsReportName']}",
+        "assetRightsCsvName": asset_rights_files["assetRightsCsvName"],
+        "assetRightsCsvPath": asset_rights_files["assetRightsCsvPath"],
+        "assetRightsCsvPublicUrl": f"/exports/{build_dir.name}/{asset_rights_files['assetRightsCsvName']}",
+        "assetRightsReadinessPercent": asset_rights_files["assetRightsReadinessPercent"],
+        "assetRightsBlockerCount": asset_rights_files["assetRightsBlockerCount"],
+        "assetRightsWarningCount": asset_rights_files["assetRightsWarningCount"],
         "storyRouteMapName": story_route_map["storyRouteMapName"],
         "storyRouteMapPath": story_route_map["storyRouteMapPath"],
         "storyRouteMapPublicUrl": f"/exports/{build_dir.name}/{story_route_map['storyRouteMapName']}",
@@ -10891,6 +10925,9 @@ def export_web_build() -> dict:
             "runtimePreloadReport": RUNTIME_PRELOAD_REPORT_FILE_NAME,
             "playtestGuide": EXPORT_PLAYTEST_GUIDE_FILE_NAME,
             "releaseEvidencePack": EXPORT_RELEASE_EVIDENCE_PACK_NAME,
+            "assetRights": EXPORT_ASSET_RIGHTS_JSON_NAME,
+            "assetRightsReport": EXPORT_ASSET_RIGHTS_REPORT_NAME,
+            "assetRightsCsv": EXPORT_ASSET_RIGHTS_CSV_NAME,
             "storyRouteMap": EXPORT_STORY_ROUTE_MAP_JSON_NAME,
             "storyRouteMapReport": EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
             "localizationAudit": EXPORT_LOCALIZATION_AUDIT_JSON_NAME,
@@ -10905,6 +10942,7 @@ def export_web_build() -> dict:
         },
     )
     manifest_path = write_export_manifest(build_dir, manifest)
+    asset_rights_files = write_export_asset_rights_files(build_dir, bundle=bundle, assets_doc=export_assets_doc)
     playtest_guide_path = write_export_playtest_guide_file(
         build_dir,
         project=bundle["project"],
@@ -10917,6 +10955,7 @@ def export_web_build() -> dict:
         provenance_name=EXPORT_PROVENANCE_FILE_NAME,
         extra_reports=[
             EXPORT_RELEASE_EVIDENCE_PACK_NAME,
+            asset_rights_files["assetRightsReportName"],
             EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
             EXPORT_LOCALIZATION_AUDIT_REPORT_NAME,
             EXPORT_RELEASE_READINESS_REPORT_NAME,
@@ -10938,6 +10977,9 @@ def export_web_build() -> dict:
         extra_report_files=[
             UNLOCKABLE_CONTENT_REPORT_FILE_NAME,
             UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME,
+            asset_rights_files["assetRightsReportName"],
+            asset_rights_files["assetRightsName"],
+            asset_rights_files["assetRightsCsvName"],
         ],
         platform_notes=["网页试玩包适合快速传播；如果要正式上架，建议再导出桌面或原生 Runtime 包做目标系统验收。"],
     )
@@ -10959,7 +11001,7 @@ def export_web_build() -> dict:
         unlockable_manifest_name=UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME,
         launch_steps=launch_steps,
         runtime_notes=runtime_notes,
-        extra_reports=[RUNTIME_PRELOAD_REPORT_FILE_NAME],
+        extra_reports=[RUNTIME_PRELOAD_REPORT_FILE_NAME, asset_rights_files["assetRightsReportName"]],
         missing_assets=missing_assets,
     )
     provenance_verifiers = write_export_provenance_verifier_files(build_dir)
@@ -10979,6 +11021,18 @@ def export_web_build() -> dict:
         "releaseEvidencePackName": evidence_pack_path.name,
         "releaseEvidencePackPath": str(evidence_pack_path),
         "releaseEvidencePackPublicUrl": f"/exports/{build_dir.name}/{evidence_pack_path.name}",
+        "assetRightsName": asset_rights_files["assetRightsName"],
+        "assetRightsPath": asset_rights_files["assetRightsPath"],
+        "assetRightsPublicUrl": f"/exports/{build_dir.name}/{asset_rights_files['assetRightsName']}",
+        "assetRightsReportName": asset_rights_files["assetRightsReportName"],
+        "assetRightsReportPath": asset_rights_files["assetRightsReportPath"],
+        "assetRightsReportPublicUrl": f"/exports/{build_dir.name}/{asset_rights_files['assetRightsReportName']}",
+        "assetRightsCsvName": asset_rights_files["assetRightsCsvName"],
+        "assetRightsCsvPath": asset_rights_files["assetRightsCsvPath"],
+        "assetRightsCsvPublicUrl": f"/exports/{build_dir.name}/{asset_rights_files['assetRightsCsvName']}",
+        "assetRightsReadinessPercent": asset_rights_files["assetRightsReadinessPercent"],
+        "assetRightsBlockerCount": asset_rights_files["assetRightsBlockerCount"],
+        "assetRightsWarningCount": asset_rights_files["assetRightsWarningCount"],
         "storyRouteMapName": story_route_map["storyRouteMapName"],
         "storyRouteMapPath": story_route_map["storyRouteMapPath"],
         "storyRouteMapPublicUrl": f"/exports/{build_dir.name}/{story_route_map['storyRouteMapName']}",
@@ -11863,6 +11917,9 @@ def export_windows_nwjs_build() -> dict:
             "appRuntimePreloadReport": f"app/{RUNTIME_PRELOAD_REPORT_FILE_NAME}",
             "playtestGuide": EXPORT_PLAYTEST_GUIDE_FILE_NAME,
             "releaseEvidencePack": EXPORT_RELEASE_EVIDENCE_PACK_NAME,
+            "assetRights": EXPORT_ASSET_RIGHTS_JSON_NAME,
+            "assetRightsReport": EXPORT_ASSET_RIGHTS_REPORT_NAME,
+            "assetRightsCsv": EXPORT_ASSET_RIGHTS_CSV_NAME,
             "storyRouteMap": EXPORT_STORY_ROUTE_MAP_JSON_NAME,
             "storyRouteMapReport": EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
             "localizationAudit": EXPORT_LOCALIZATION_AUDIT_JSON_NAME,
@@ -11890,6 +11947,7 @@ def export_windows_nwjs_build() -> dict:
         },
     )
     manifest_path = write_export_manifest(build_dir, manifest)
+    asset_rights_files = write_export_asset_rights_files(build_dir, bundle=bundle, assets_doc=export_assets_doc)
     readme_path = write_windows_package_readme(
         build_dir,
         executable_name,
@@ -11921,6 +11979,7 @@ def export_windows_nwjs_build() -> dict:
         provenance_name=EXPORT_PROVENANCE_FILE_NAME,
         extra_reports=[
             EXPORT_RELEASE_EVIDENCE_PACK_NAME,
+            asset_rights_files["assetRightsReportName"],
             readme_path.name,
             EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
             EXPORT_LOCALIZATION_AUDIT_REPORT_NAME,
@@ -11944,6 +12003,9 @@ def export_windows_nwjs_build() -> dict:
         extra_report_files=[
             f"app/{UNLOCKABLE_CONTENT_REPORT_FILE_NAME}",
             f"app/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
+            asset_rights_files["assetRightsReportName"],
+            asset_rights_files["assetRightsName"],
+            asset_rights_files["assetRightsCsvName"],
         ],
         platform_notes=[
             f"当前桌面模式：{runtime_mode_label}。",
@@ -11968,7 +12030,7 @@ def export_windows_nwjs_build() -> dict:
         unlockable_manifest_name=f"app/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
         launch_steps=launch_steps,
         runtime_notes=runtime_notes,
-        extra_reports=[readme_path.name, f"app/{RUNTIME_PRELOAD_REPORT_FILE_NAME}"],
+        extra_reports=[readme_path.name, asset_rights_files["assetRightsReportName"], f"app/{RUNTIME_PRELOAD_REPORT_FILE_NAME}"],
         missing_assets=missing_assets,
     )
     provenance_verifiers = write_export_provenance_verifier_files(build_dir)
@@ -11978,6 +12040,9 @@ def export_windows_nwjs_build() -> dict:
         readme_path,
         playtest_guide_path,
         evidence_pack_path,
+        Path(asset_rights_files["assetRightsReportPath"]),
+        Path(asset_rights_files["assetRightsPath"]),
+        Path(asset_rights_files["assetRightsCsvPath"]),
         Path(story_route_map["storyRouteMapReportPath"]),
         Path(story_route_map["storyRouteMapPath"]),
         Path(localization_audit["localizationAuditReportPath"]),
@@ -12048,6 +12113,18 @@ def export_windows_nwjs_build() -> dict:
         "releaseEvidencePackName": evidence_pack_path.name,
         "releaseEvidencePackPath": str(evidence_pack_path),
         "releaseEvidencePackPublicUrl": f"/exports/{build_dir.name}/{evidence_pack_path.name}",
+        "assetRightsName": asset_rights_files["assetRightsName"],
+        "assetRightsPath": asset_rights_files["assetRightsPath"],
+        "assetRightsPublicUrl": f"/exports/{build_dir.name}/{asset_rights_files['assetRightsName']}",
+        "assetRightsReportName": asset_rights_files["assetRightsReportName"],
+        "assetRightsReportPath": asset_rights_files["assetRightsReportPath"],
+        "assetRightsReportPublicUrl": f"/exports/{build_dir.name}/{asset_rights_files['assetRightsReportName']}",
+        "assetRightsCsvName": asset_rights_files["assetRightsCsvName"],
+        "assetRightsCsvPath": asset_rights_files["assetRightsCsvPath"],
+        "assetRightsCsvPublicUrl": f"/exports/{build_dir.name}/{asset_rights_files['assetRightsCsvName']}",
+        "assetRightsReadinessPercent": asset_rights_files["assetRightsReadinessPercent"],
+        "assetRightsBlockerCount": asset_rights_files["assetRightsBlockerCount"],
+        "assetRightsWarningCount": asset_rights_files["assetRightsWarningCount"],
         "storyRouteMapName": story_route_map["storyRouteMapName"],
         "storyRouteMapPath": story_route_map["storyRouteMapPath"],
         "storyRouteMapPublicUrl": f"/exports/{build_dir.name}/{story_route_map['storyRouteMapName']}",
@@ -12144,6 +12221,9 @@ def export_macos_nwjs_build() -> dict:
             "appRuntimePreloadReport": f"app/{RUNTIME_PRELOAD_REPORT_FILE_NAME}",
             "playtestGuide": EXPORT_PLAYTEST_GUIDE_FILE_NAME,
             "releaseEvidencePack": EXPORT_RELEASE_EVIDENCE_PACK_NAME,
+            "assetRights": EXPORT_ASSET_RIGHTS_JSON_NAME,
+            "assetRightsReport": EXPORT_ASSET_RIGHTS_REPORT_NAME,
+            "assetRightsCsv": EXPORT_ASSET_RIGHTS_CSV_NAME,
             "storyRouteMap": EXPORT_STORY_ROUTE_MAP_JSON_NAME,
             "storyRouteMapReport": EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
             "localizationAudit": EXPORT_LOCALIZATION_AUDIT_JSON_NAME,
@@ -12172,6 +12252,7 @@ def export_macos_nwjs_build() -> dict:
         },
     )
     manifest_path = write_export_manifest(build_dir, manifest)
+    asset_rights_files = write_export_asset_rights_files(build_dir, bundle=bundle, assets_doc=export_assets_doc)
     readme_path = write_macos_package_readme(
         build_dir,
         app_bundle_name,
@@ -12202,6 +12283,7 @@ def export_macos_nwjs_build() -> dict:
         provenance_name=EXPORT_PROVENANCE_FILE_NAME,
         extra_reports=[
             EXPORT_RELEASE_EVIDENCE_PACK_NAME,
+            asset_rights_files["assetRightsReportName"],
             readme_path.name,
             EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
             EXPORT_LOCALIZATION_AUDIT_REPORT_NAME,
@@ -12225,6 +12307,9 @@ def export_macos_nwjs_build() -> dict:
         extra_report_files=[
             f"app/{UNLOCKABLE_CONTENT_REPORT_FILE_NAME}",
             f"app/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
+            asset_rights_files["assetRightsReportName"],
+            asset_rights_files["assetRightsName"],
+            asset_rights_files["assetRightsCsvName"],
         ],
         platform_notes=[
             f"当前运行壳：NW.js {NWJS_RUNTIME_VERSION}。",
@@ -12249,7 +12334,7 @@ def export_macos_nwjs_build() -> dict:
         unlockable_manifest_name=f"app/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
         launch_steps=launch_steps,
         runtime_notes=runtime_notes,
-        extra_reports=[readme_path.name, f"app/{RUNTIME_PRELOAD_REPORT_FILE_NAME}"],
+        extra_reports=[readme_path.name, asset_rights_files["assetRightsReportName"], f"app/{RUNTIME_PRELOAD_REPORT_FILE_NAME}"],
         missing_assets=missing_assets,
     )
     provenance_verifiers = write_export_provenance_verifier_files(build_dir)
@@ -12263,6 +12348,9 @@ def export_macos_nwjs_build() -> dict:
             readme_path,
             playtest_guide_path,
             evidence_pack_path,
+            Path(asset_rights_files["assetRightsReportPath"]),
+            Path(asset_rights_files["assetRightsPath"]),
+            Path(asset_rights_files["assetRightsCsvPath"]),
             Path(story_route_map["storyRouteMapReportPath"]),
             Path(story_route_map["storyRouteMapPath"]),
             Path(localization_audit["localizationAuditReportPath"]),
@@ -12334,6 +12422,18 @@ def export_macos_nwjs_build() -> dict:
         "releaseEvidencePackName": evidence_pack_path.name,
         "releaseEvidencePackPath": str(evidence_pack_path),
         "releaseEvidencePackPublicUrl": f"/exports/{build_dir.name}/{evidence_pack_path.name}",
+        "assetRightsName": asset_rights_files["assetRightsName"],
+        "assetRightsPath": asset_rights_files["assetRightsPath"],
+        "assetRightsPublicUrl": f"/exports/{build_dir.name}/{asset_rights_files['assetRightsName']}",
+        "assetRightsReportName": asset_rights_files["assetRightsReportName"],
+        "assetRightsReportPath": asset_rights_files["assetRightsReportPath"],
+        "assetRightsReportPublicUrl": f"/exports/{build_dir.name}/{asset_rights_files['assetRightsReportName']}",
+        "assetRightsCsvName": asset_rights_files["assetRightsCsvName"],
+        "assetRightsCsvPath": asset_rights_files["assetRightsCsvPath"],
+        "assetRightsCsvPublicUrl": f"/exports/{build_dir.name}/{asset_rights_files['assetRightsCsvName']}",
+        "assetRightsReadinessPercent": asset_rights_files["assetRightsReadinessPercent"],
+        "assetRightsBlockerCount": asset_rights_files["assetRightsBlockerCount"],
+        "assetRightsWarningCount": asset_rights_files["assetRightsWarningCount"],
         "storyRouteMapName": story_route_map["storyRouteMapName"],
         "storyRouteMapPath": story_route_map["storyRouteMapPath"],
         "storyRouteMapPublicUrl": f"/exports/{build_dir.name}/{story_route_map['storyRouteMapName']}",
@@ -12436,6 +12536,9 @@ def export_linux_nwjs_build() -> dict:
             "appRuntimePreloadReport": f"app/{RUNTIME_PRELOAD_REPORT_FILE_NAME}",
             "playtestGuide": EXPORT_PLAYTEST_GUIDE_FILE_NAME,
             "releaseEvidencePack": EXPORT_RELEASE_EVIDENCE_PACK_NAME,
+            "assetRights": EXPORT_ASSET_RIGHTS_JSON_NAME,
+            "assetRightsReport": EXPORT_ASSET_RIGHTS_REPORT_NAME,
+            "assetRightsCsv": EXPORT_ASSET_RIGHTS_CSV_NAME,
             "storyRouteMap": EXPORT_STORY_ROUTE_MAP_JSON_NAME,
             "storyRouteMapReport": EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
             "localizationAudit": EXPORT_LOCALIZATION_AUDIT_JSON_NAME,
@@ -12463,6 +12566,7 @@ def export_linux_nwjs_build() -> dict:
         },
     )
     manifest_path = write_export_manifest(build_dir, manifest)
+    asset_rights_files = write_export_asset_rights_files(build_dir, bundle=bundle, assets_doc=export_assets_doc)
     readme_path = write_linux_package_readme(
         build_dir,
         executable_name,
@@ -12491,6 +12595,7 @@ def export_linux_nwjs_build() -> dict:
         provenance_name=EXPORT_PROVENANCE_FILE_NAME,
         extra_reports=[
             EXPORT_RELEASE_EVIDENCE_PACK_NAME,
+            asset_rights_files["assetRightsReportName"],
             readme_path.name,
             EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
             EXPORT_LOCALIZATION_AUDIT_REPORT_NAME,
@@ -12514,6 +12619,9 @@ def export_linux_nwjs_build() -> dict:
         extra_report_files=[
             f"app/{UNLOCKABLE_CONTENT_REPORT_FILE_NAME}",
             f"app/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
+            asset_rights_files["assetRightsReportName"],
+            asset_rights_files["assetRightsName"],
+            asset_rights_files["assetRightsCsvName"],
         ],
         platform_notes=[
             f"当前运行壳：NW.js {NWJS_RUNTIME_VERSION}。",
@@ -12538,7 +12646,7 @@ def export_linux_nwjs_build() -> dict:
         unlockable_manifest_name=f"app/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
         launch_steps=launch_steps,
         runtime_notes=runtime_notes,
-        extra_reports=[readme_path.name, f"app/{RUNTIME_PRELOAD_REPORT_FILE_NAME}"],
+        extra_reports=[readme_path.name, asset_rights_files["assetRightsReportName"], f"app/{RUNTIME_PRELOAD_REPORT_FILE_NAME}"],
         missing_assets=missing_assets,
     )
     provenance_verifiers = write_export_provenance_verifier_files(build_dir)
@@ -12549,6 +12657,9 @@ def export_linux_nwjs_build() -> dict:
         readme_path,
         playtest_guide_path,
         evidence_pack_path,
+        Path(asset_rights_files["assetRightsReportPath"]),
+        Path(asset_rights_files["assetRightsPath"]),
+        Path(asset_rights_files["assetRightsCsvPath"]),
         Path(story_route_map["storyRouteMapReportPath"]),
         Path(story_route_map["storyRouteMapPath"]),
         Path(localization_audit["localizationAuditReportPath"]),
@@ -12617,6 +12728,18 @@ def export_linux_nwjs_build() -> dict:
         "releaseEvidencePackName": evidence_pack_path.name,
         "releaseEvidencePackPath": str(evidence_pack_path),
         "releaseEvidencePackPublicUrl": f"/exports/{build_dir.name}/{evidence_pack_path.name}",
+        "assetRightsName": asset_rights_files["assetRightsName"],
+        "assetRightsPath": asset_rights_files["assetRightsPath"],
+        "assetRightsPublicUrl": f"/exports/{build_dir.name}/{asset_rights_files['assetRightsName']}",
+        "assetRightsReportName": asset_rights_files["assetRightsReportName"],
+        "assetRightsReportPath": asset_rights_files["assetRightsReportPath"],
+        "assetRightsReportPublicUrl": f"/exports/{build_dir.name}/{asset_rights_files['assetRightsReportName']}",
+        "assetRightsCsvName": asset_rights_files["assetRightsCsvName"],
+        "assetRightsCsvPath": asset_rights_files["assetRightsCsvPath"],
+        "assetRightsCsvPublicUrl": f"/exports/{build_dir.name}/{asset_rights_files['assetRightsCsvName']}",
+        "assetRightsReadinessPercent": asset_rights_files["assetRightsReadinessPercent"],
+        "assetRightsBlockerCount": asset_rights_files["assetRightsBlockerCount"],
+        "assetRightsWarningCount": asset_rights_files["assetRightsWarningCount"],
         "storyRouteMapName": story_route_map["storyRouteMapName"],
         "storyRouteMapPath": story_route_map["storyRouteMapPath"],
         "storyRouteMapPublicUrl": f"/exports/{build_dir.name}/{story_route_map['storyRouteMapName']}",

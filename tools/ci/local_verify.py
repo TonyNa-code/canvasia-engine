@@ -23,6 +23,7 @@ SCRIPT_SRC_PATTERN = re.compile(r"<script\b[^>]*\bsrc=[\"']([^\"']+)[\"'][^>]*>"
 PYTHON_SYNTAX_FILES = [
     "editor_local_security.py",
     "editor_snapshot_cache.py",
+    "export_asset_rights.py",
     "export_localization_audit.py",
     "export_package_guide.py",
     "export_quality_reports.py",
@@ -49,6 +50,7 @@ PYTHON_SYNTAX_FILES = [
     "tools/ci/project_health.py",
     "tests/test_ci_workflow_coverage.py",
     "tests/test_editor_infrastructure.py",
+    "tests/test_export_asset_rights.py",
     "tests/test_prepare_preview_release.py",
     "tests/test_release_public_surface.py",
     "tests/test_frontend_action_handlers.py",
@@ -175,6 +177,7 @@ def build_release_tooling_steps(python_executable: str) -> list[VerifyStep]:
         build_unittest_step("Project health tooling", "test_project_health_tool.py", "release-tests", python_executable),
         build_unittest_step("Ren'Py export contract", "test_renpy_export_contract.py", "release-tests", python_executable),
         build_unittest_step("Runtime preload export contract", "test_export_runtime_preload.py", "release-tests", python_executable),
+        build_unittest_step("Export asset rights contract", "test_export_asset_rights.py", "release-tests", python_executable),
         VerifyStep(
             name="Template project health check",
             category="release-tests",
