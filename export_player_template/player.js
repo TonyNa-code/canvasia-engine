@@ -21,6 +21,13 @@ import {
   getTypewriterStepDelay,
 } from "./runtime_text_effects.js";
 import {
+  DEFAULT_RUNTIME_LANGUAGE,
+  RUNTIME_LANGUAGE_LABELS,
+  buildRuntimeLanguageLabels,
+  normalizeLanguageCode,
+  normalizeSupportedLanguages,
+} from "./runtime_i18n.js";
+import {
   DIALOG_THEME_LABELS,
   PLAYBACK_DEFAULTS,
   TEXT_SPEED_LABELS,
@@ -40,39 +47,7 @@ import {
   sanitizePlaybackSettings as sanitizePlaybackSettingsBase,
 } from "./runtime_settings.js";
 
-const DEFAULT_RUNTIME_LANGUAGE = "zh-CN";
 const CHOICE_CONTINUE_TARGET = "__continue__";
-const RUNTIME_LANGUAGE_LABELS = {
-  "zh-CN": "简体中文",
-  "ja-JP": "日本語",
-  "en-US": "English",
-};
-
-function normalizeLanguageCode(value, fallback = DEFAULT_RUNTIME_LANGUAGE) {
-  const rawValue = String(value ?? "").trim();
-  if (!rawValue || !/^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8}){0,2}$/.test(rawValue)) {
-    return fallback;
-  }
-  const parts = rawValue.split("-");
-  return [
-    parts[0].toLowerCase(),
-    ...parts.slice(1).map((part, index) => (index === 0 && [2, 3].includes(part.length) ? part.toUpperCase() : part)),
-  ].join("-");
-}
-
-function normalizeSupportedLanguages(rawLanguages, defaultLanguage = DEFAULT_RUNTIME_LANGUAGE) {
-  const languages = [];
-  (Array.isArray(rawLanguages) ? rawLanguages : []).forEach((rawLanguage) => {
-    const language = normalizeLanguageCode(rawLanguage, "");
-    if (language && !languages.includes(language)) {
-      languages.push(language);
-    }
-  });
-  if (!languages.includes(defaultLanguage)) {
-    languages.unshift(defaultLanguage);
-  }
-  return languages.length ? languages : [DEFAULT_RUNTIME_LANGUAGE];
-}
 
 const rawData = window.LIGHTWHISPER_GAME_DATA ?? {};
 const runtimeConditionTools = window.CanvasiaRuntimeConditions;
@@ -1806,10 +1781,7 @@ function normalizeGameData(source) {
     defaultLanguage,
     fallbackLanguage: normalizeLanguageCode(source.i18n?.fallbackLanguage, defaultLanguage),
     supportedLanguages,
-    languageLabels: {
-      ...RUNTIME_LANGUAGE_LABELS,
-      ...(source.i18n?.languageLabels && typeof source.i18n.languageLabels === "object" ? source.i18n.languageLabels : {}),
-    },
+    languageLabels: buildRuntimeLanguageLabels(source.i18n?.languageLabels),
   };
   const assets = source.assets?.assets ?? [];
   const characters = source.characters?.characters ?? [];

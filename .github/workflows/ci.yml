@@ -101,6 +101,7 @@ jobs:
             tests/test_frontend_route_testing_report_module.py \
             tests/test_frontend_runtime_conditions_module.py \
             tests/test_frontend_runtime_audio_module.py \
+            tests/test_frontend_runtime_i18n_module.py \
             tests/test_frontend_runtime_preload_module.py \
             tests/test_frontend_runtime_scene_prefetch_module.py \
             tests/test_frontend_runtime_capability_matrix_module.py \
@@ -205,6 +206,7 @@ jobs:
           node --check export_player_template/player.js
           node --check export_player_template/runtime_controls.js
           node --check export_player_template/runtime_settings.js
+          node --check export_player_template/runtime_i18n.js
           node --check export_player_template/runtime_audio.js
           node --check export_player_template/runtime_preload.js
           node --check export_player_template/runtime_scene_prefetch.js
@@ -266,6 +268,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_route_testing_report_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_conditions_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_audio_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_runtime_i18n_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_preload_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_scene_prefetch_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_typewriter_parity.py' -v

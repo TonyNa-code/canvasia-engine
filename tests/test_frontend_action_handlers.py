@@ -18,6 +18,7 @@ PLAYER_PATH = ROOT_DIR / "export_player_template" / "player.js"
 RUNTIME_CONTROLS_PATH = ROOT_DIR / "export_player_template" / "runtime_controls.js"
 RUNTIME_SETTINGS_PATH = ROOT_DIR / "export_player_template" / "runtime_settings.js"
 RUNTIME_AUDIO_PATH = ROOT_DIR / "export_player_template" / "runtime_audio.js"
+RUNTIME_I18N_PATH = ROOT_DIR / "export_player_template" / "runtime_i18n.js"
 RUNTIME_TEXT_EFFECTS_PATH = ROOT_DIR / "export_player_template" / "runtime_text_effects.js"
 NATIVE_RUNTIME_PATH = ROOT_DIR / "native_runtime" / "runtime_player.py"
 NATIVE_RUNTIME_SETTINGS_PATH = ROOT_DIR / "native_runtime" / "runtime_player_settings.py"
@@ -5826,12 +5827,17 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("editorTextSpeed", story_editor_source)
 
         player_source = PLAYER_PATH.read_text(encoding="utf-8")
+        runtime_i18n_source = RUNTIME_I18N_PATH.read_text(encoding="utf-8")
         runtime_text_effects_source = RUNTIME_TEXT_EFFECTS_PATH.read_text(encoding="utf-8")
         runtime_speed = _extract_function_source(player_source, "getSnapshotTextSpeed")
         runtime_typewriter = _extract_function_source(player_source, "shouldUseRuntimeTypewriter")
         runtime_delay = _extract_function_source(player_source, "getAutoAdvanceDelay")
         runtime_schedule_typewriter = _extract_function_source(player_source, "scheduleRuntimeTypewriterTick")
+        self.assertIn('from "./runtime_i18n.js"', player_source)
         self.assertIn('from "./runtime_text_effects.js"', player_source)
+        self.assertIn("export function normalizeLanguageCode", runtime_i18n_source)
+        self.assertIn("export function normalizeSupportedLanguages", runtime_i18n_source)
+        self.assertIn("export function buildRuntimeLanguageLabels", runtime_i18n_source)
         self.assertIn("snapshot?.block?.textSpeed ?? state.playback.textSpeed", runtime_speed)
         self.assertIn('getSnapshotTextSpeed(snapshot) === "instant"', runtime_typewriter)
         self.assertIn("getSnapshotTextSpeed(snapshot)", runtime_delay)
