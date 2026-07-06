@@ -362,6 +362,10 @@
     return [
       ["==", "等于"],
       ["!=", "不等于"],
+      ["contains", "包含"],
+      ["not_contains", "不包含"],
+      ["starts_with", "以此开头"],
+      ["ends_with", "以此结尾"],
     ];
   }
 

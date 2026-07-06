@@ -83,6 +83,7 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
             const conditionBlocks = tools.parseScriptDraftToBlocks(`
               if affection >= 2 -> good_ending else -> normal_ending
               if met == true and route = "good" -> true_end
+              if route contains good -> route_good
             `);
             const variableBlocks = tools.parseScriptDraftToBlocks(`
               set route = common
@@ -103,6 +104,7 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
               variableInlineAddLine: tools.parseVariableActionLine("affection += 2"),
               variableChineseSetLine: tools.parseVariableActionLine("设置 好感 为 3"),
               conditionRule: tools.parseConditionRuleClause("affection >= 2"),
+              stringConditionRule: tools.parseConditionRuleClause("route contains good"),
               conditionLine: tools.parseConditionLine("if affection >= 2 -> good_ending else -> normal_ending"),
               dialogueLine: tools.parseDialogueLine("悠奈：你终于来了。"),
               quotedDialogueLine: tools.parseQuotedDialogueLine('悠奈 "你终于来了。"'),
@@ -216,6 +218,11 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
             "variableHint": "affection",
             "operator": ">=",
             "value": 2,
+        })
+        self.assertEqual(payload["stringConditionRule"], {
+            "variableHint": "route",
+            "operator": "contains",
+            "value": "good",
         })
         self.assertEqual(payload["conditionLine"], {
             "type": "condition",
@@ -505,19 +512,22 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
         }])
         self.assertIn("affection +1", payload["choiceEffectPreview"][0])
         self.assertIn("met=true", payload["choiceEffectPreview"][0])
-        self.assertEqual([block["type"] for block in payload["conditionBlocks"]], ["condition", "condition"])
+        self.assertEqual([block["type"] for block in payload["conditionBlocks"]], ["condition", "condition", "condition"])
         self.assertEqual(payload["conditionBlocks"][1]["branches"][0]["when"], [
             {"variableHint": "met", "operator": "==", "value": True},
             {"variableHint": "route", "operator": "==", "value": "good"},
+        ])
+        self.assertEqual(payload["conditionBlocks"][2]["branches"][0]["when"], [
+            {"variableHint": "route", "operator": "contains", "value": "good"},
         ])
         self.assertEqual(payload["conditionSummary"], {
             "dialogue": 0,
             "narration": 0,
             "choice": 0,
             "stage": 0,
-            "route": 2,
+            "route": 3,
             "logic": 0,
-            "total": 2,
+            "total": 3,
         })
         self.assertIn("条件：affection >= 2 -> good_ending", payload["conditionPreview"][0])
         self.assertIn("否则：normal_ending", payload["conditionPreview"][0])

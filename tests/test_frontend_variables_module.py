@@ -81,7 +81,7 @@ class FrontendVariablesModuleTests(unittest.TestCase):
                 tools.getConditionOperators("score", options).map(([value]) => value),
                 tools.getConditionOperators("route", options).map(([value]) => value),
                 tools.getSafeConditionOperator("score", "???", options),
-                tools.getSafeConditionOperator("route", "!=", options),
+                tools.getSafeConditionOperator("route", "contains", options),
               ],
               choiceEffects: [
                 tools.isEditableChoiceEffect({{ type: "variable_add" }}),
@@ -126,7 +126,15 @@ class FrontendVariablesModuleTests(unittest.TestCase):
         self.assertEqual(payload["variableLookup"][0], ["score"])
         self.assertEqual(payload["variableLookup"][1:], [True, False, "score", "flag", "boolean", "开关"])
         self.assertEqual(payload["values"], [7.5, 12, 10, False, "是", "common", "branch-a"])
-        self.assertEqual(payload["conditions"], [[">=", ">", "<=", "<", "==", "!="], ["==", "!="], ">=", "!="])
+        self.assertEqual(
+            payload["conditions"],
+            [
+                [">=", ">", "<=", "<", "==", "!="],
+                ["==", "!=", "contains", "not_contains", "starts_with", "ends_with"],
+                ">=",
+                "contains",
+            ],
+        )
         self.assertEqual(payload["choiceEffects"][0:4], [True, 1, "variable_set", "score"])
         self.assertEqual(
             payload["choiceEffects"][4],

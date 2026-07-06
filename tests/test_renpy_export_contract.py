@@ -58,7 +58,7 @@ class RenpyExportContractTests(unittest.TestCase):
             const lines = tools.renderBlock({
               type: "condition",
               branches: [{
-                when: [{ variableId: "affection", operator: "contains", value: 2 }],
+                when: [{ variableId: "affection", operator: "roughly", value: 2 }],
                 gotoSceneId: "scene_good",
               }],
               elseGotoSceneId: "scene_bad",
@@ -77,7 +77,7 @@ class RenpyExportContractTests(unittest.TestCase):
 
         backend_warnings: list[dict] = []
         backend_expression = renpy_export.render_condition_rule_expression(
-            {"variableId": "affection", "operator": "contains", "value": 2},
+            {"variableId": "affection", "operator": "roughly", "value": 2},
             {"warnings": backend_warnings, "sceneId": "scene_open", "blockIndex": 4},
         )
 
@@ -85,6 +85,52 @@ class RenpyExportContractTests(unittest.TestCase):
         self.assertEqual(backend_expression, "affection == 2")
         self.assertEqual(frontend["warnings"][0]["code"], "renpy_condition_operator_review")
         self.assertEqual(backend_warnings[0]["code"], "renpy_condition_operator_review")
+
+    def test_string_condition_operators_export_to_renpy_python_expressions(self) -> None:
+        frontend = load_frontend_payload(
+            """
+            const warnings = [];
+            const expressions = [
+              tools.renderConditionRuleExpression({ variableId: "route", operator: "contains", value: "good" }, { warnings }),
+              tools.renderConditionRuleExpression({ variableId: "route", operator: "not_contains", value: "bad" }, { warnings }),
+              tools.renderConditionRuleExpression({ variableId: "route", operator: "starts_with", value: "good" }, { warnings }),
+              tools.renderConditionRuleExpression({ variableId: "route", operator: "ends_with", value: "end" }, { warnings }),
+            ];
+            process.stdout.write(JSON.stringify({ expressions, warnings, contract: tools.getRenpyExportContract() }));
+            """
+        )
+
+        backend_warnings: list[dict] = []
+        backend_expressions = [
+            renpy_export.render_condition_rule_expression(
+                {"variableId": "route", "operator": "contains", "value": "good"},
+                {"warnings": backend_warnings},
+            ),
+            renpy_export.render_condition_rule_expression(
+                {"variableId": "route", "operator": "not_contains", "value": "bad"},
+                {"warnings": backend_warnings},
+            ),
+            renpy_export.render_condition_rule_expression(
+                {"variableId": "route", "operator": "starts_with", "value": "good"},
+                {"warnings": backend_warnings},
+            ),
+            renpy_export.render_condition_rule_expression(
+                {"variableId": "route", "operator": "ends_with", "value": "end"},
+                {"warnings": backend_warnings},
+            ),
+        ]
+
+        expected = [
+            '"good" in str(route)',
+            '"bad" not in str(route)',
+            'str(route).startswith("good")',
+            'str(route).endswith("end")',
+        ]
+        self.assertEqual(frontend["expressions"], expected)
+        self.assertEqual(backend_expressions, expected)
+        self.assertEqual(frontend["warnings"], [])
+        self.assertEqual(backend_warnings, [])
+        self.assertIn("contains", frontend["contract"]["conditionOperators"])
 
     def test_pop_character_transition_uses_native_renpy_zoom_transitions(self) -> None:
         frontend = load_frontend_payload(

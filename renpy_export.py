@@ -33,8 +33,9 @@ RENPY_PATH_SUFFIX_PATTERN = re.compile(
 RENPY_PLAYBACK_SPEC_PREFIX_PATTERN = re.compile(r"^<[^>]+>")
 
 COMMENT_ONLY_BLOCK_TYPES: set[str] = set()
-CONDITION_OPERATOR_ORDER = ["==", "!=", ">=", "<=", ">", "<"]
+CONDITION_OPERATOR_ORDER = ["==", "!=", ">=", "<=", ">", "<", "contains", "not_contains", "starts_with", "ends_with"]
 CONDITION_OPERATORS = set(CONDITION_OPERATOR_ORDER)
+STRING_CONDITION_OPERATORS = {"contains", "not_contains", "starts_with", "ends_with"}
 POSITION_XALIGN = {"left": 0.25, "center": 0.5, "right": 0.75}
 DEFAULT_CHARACTER_STAGE = {
     "offsetX": 0,
@@ -1138,7 +1139,17 @@ def render_condition_rule_expression(rule: dict, context: dict) -> str:
         return "True"
     variable_name = normalize_identifier(variable_id, "var")
     operator = normalize_condition_operator(rule.get("operator"), warnings, scene_id, block_index)
-    return f"{variable_name} {operator} {value_to_renpy(rule.get('value'))}"
+    right_value = value_to_renpy(rule.get("value"))
+    if operator in STRING_CONDITION_OPERATORS:
+        if operator == "contains":
+            return f"{right_value} in str({variable_name})"
+        if operator == "not_contains":
+            return f"{right_value} not in str({variable_name})"
+        if operator == "starts_with":
+            return f"str({variable_name}).startswith({right_value})"
+        if operator == "ends_with":
+            return f"str({variable_name}).endswith({right_value})"
+    return f"{variable_name} {operator} {right_value}"
 
 
 def render_condition_target_lines(target_scene_id: Any, context: dict, indent: str = "        ") -> list[str]:

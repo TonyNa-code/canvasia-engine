@@ -63,6 +63,10 @@ from native_runtime.runtime_player_settings import (
     sanitize_runtime_player_settings,
 )
 from native_runtime.runtime_storage import sanitize_archive_progress
+from native_runtime.runtime_variables import (
+    condition_operator_matches_variable_type,
+    evaluate_runtime_operator,
+)
 
 
 UI_ASSET_IDS = [
@@ -170,6 +174,15 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
         self.assertEqual(progress["readTextKeys"], ["read_1", "read_2"])
         self.assertEqual(progress["endingCompletionCount"], 0)
         self.assertEqual(progress["endingLastCompletedAt"], "2026-04-24T00:00:00+08:00")
+
+    def test_native_runtime_variable_module_supports_string_condition_operators(self) -> None:
+        self.assertTrue(condition_operator_matches_variable_type("string", "contains"))
+        self.assertFalse(condition_operator_matches_variable_type("number", "contains"))
+        self.assertTrue(evaluate_runtime_operator("good_common_end", "contains", "common"))
+        self.assertTrue(evaluate_runtime_operator("good_common_end", "not_contains", "bad"))
+        self.assertTrue(evaluate_runtime_operator("good_common_end", "starts_with", "good"))
+        self.assertTrue(evaluate_runtime_operator("good_common_end", "ends_with", "end"))
+        self.assertFalse(evaluate_runtime_operator("good_common_end", "contains", "bad"))
 
     def test_native_runtime_performance_budget_reports_missing_and_heavy_assets(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -3195,6 +3208,10 @@ class NativeRuntimeRenderSmokeTests(unittest.TestCase):
         self.assertTrue(player.evaluate_when([{"variableId": "var_score", "operator": ">=", "value": "10"}]))
         self.assertTrue(player.evaluate_when([{"variableId": "var_flag", "operator": "==", "value": "false"}]))
         self.assertTrue(player.evaluate_when([{"variableId": "var_route", "operator": "==", "value": 100}]))
+        self.assertTrue(player.evaluate_when([{"variableId": "var_route", "operator": "contains", "value": "10"}]))
+        self.assertTrue(player.evaluate_when([{"variableId": "var_route", "operator": "not_contains", "value": "bad"}]))
+        self.assertTrue(player.evaluate_when([{"variableId": "var_route", "operator": "starts_with", "value": "1"}]))
+        self.assertTrue(player.evaluate_when([{"variableId": "var_route", "operator": "ends_with", "value": "00"}]))
         snapshot = player.build_save_snapshot("formal")
         self.assertIn("Score:10", snapshot["variableSummaryText"])
         self.assertIn("Flag:关", snapshot["variableSummaryText"])

@@ -127,7 +127,13 @@
       return operator === "!=" ? !Boolean(right) : Boolean(right);
     }
 
-    if (operator === "!=") {
+    if (operator === "contains" || operator === "starts_with") {
+      return `${String(right ?? "")}__canvasia_route_test__`;
+    }
+    if (operator === "ends_with") {
+      return `__canvasia_route_test__${String(right ?? "")}`;
+    }
+    if (operator === "not_contains" || operator === "!=") {
       const text = String(right ?? "");
       return text === "__canvasia_route_test__" ? "__canvasia_route_test_alt__" : "__canvasia_route_test__";
     }
@@ -167,7 +173,11 @@
       return operator === "!=" ? Boolean(right) : !Boolean(right);
     }
 
-    if (operator === "!=") {
+    if (operator === "contains" || operator === "starts_with" || operator === "ends_with") {
+      const text = String(right ?? "");
+      return text ? "__canvasia_route_test_alt__" : undefined;
+    }
+    if (operator === "not_contains" || operator === "!=") {
       return String(right ?? "");
     }
     return `${String(right ?? "")}__canvasia_route_test_alt__`;
@@ -196,6 +206,14 @@
         return left <= right;
       case "!=":
         return left !== right;
+      case "contains":
+        return String(left ?? "").includes(String(right ?? ""));
+      case "not_contains":
+        return !String(left ?? "").includes(String(right ?? ""));
+      case "starts_with":
+        return String(left ?? "").startsWith(String(right ?? ""));
+      case "ends_with":
+        return String(left ?? "").endsWith(String(right ?? ""));
       case "==":
       default:
         return left === right;

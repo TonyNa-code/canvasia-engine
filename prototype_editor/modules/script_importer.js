@@ -530,13 +530,16 @@
 
   function parseConditionRuleClause(clause) {
     const text = trimImportedText(clause, 180);
-    const match = text.match(/^([0-9A-Za-z_\-\u4e00-\u9fff]{1,64})\s*(>=|<=|==|!=|>|<|=)\s*(.+)$/u);
+    const match = text.match(
+      /^([0-9A-Za-z_\-\u4e00-\u9fff]{1,64})\s*(>=|<=|==|!=|>|<|=|not[_\s-]?contains|contains|starts[_\s-]?with|ends[_\s-]?with)\s*(.+)$/iu
+    );
     if (!match) {
       return null;
     }
+    const operator = match[2].toLowerCase().replace(/[\s-]+/g, "_");
     return {
       variableHint: match[1],
-      operator: match[2] === "=" ? "==" : match[2],
+      operator: operator === "=" ? "==" : operator,
       value: parseChoiceEffectValue(match[3]),
     };
   }

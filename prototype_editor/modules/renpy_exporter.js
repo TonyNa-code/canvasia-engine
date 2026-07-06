@@ -4,7 +4,19 @@
   const runtimeSettingsTools = global.CanvasiaEditorProjectRuntimeSettings;
   const CHOICE_CONTINUE_TARGET = "__continue__";
   const BLOCK_TYPES_REQUIRING_COMMENT = Object.freeze([]);
-  const CONDITION_OPERATORS = Object.freeze(["==", "!=", ">=", "<=", ">", "<"]);
+  const CONDITION_OPERATORS = Object.freeze([
+    "==",
+    "!=",
+    ">=",
+    "<=",
+    ">",
+    "<",
+    "contains",
+    "not_contains",
+    "starts_with",
+    "ends_with",
+  ]);
+  const STRING_CONDITION_OPERATORS = Object.freeze(new Set(["contains", "not_contains", "starts_with", "ends_with"]));
   const CONDITION_OPERATOR_SET = Object.freeze(new Set(CONDITION_OPERATORS));
   const POSITION_XALIGN = Object.freeze({ left: 0.25, center: 0.5, right: 0.75 });
   const DEFAULT_CHARACTER_STAGE = Object.freeze({
@@ -1101,7 +1113,24 @@
       pushWarning(context.warnings ?? [], "renpy_condition_missing_variable", "条件判断缺少变量 ID，已按 True 导出。", getWarningContext(context));
       return "True";
     }
-    return `${getVariableIdentifier(variableId)} ${normalizeConditionOperator(rule.operator, context)} ${renderRenpyLiteral(rule.value)}`;
+    const variableName = getVariableIdentifier(variableId);
+    const operator = normalizeConditionOperator(rule.operator, context);
+    const rightValue = renderRenpyLiteral(rule.value);
+    if (STRING_CONDITION_OPERATORS.has(operator)) {
+      if (operator === "contains") {
+        return `${rightValue} in str(${variableName})`;
+      }
+      if (operator === "not_contains") {
+        return `${rightValue} not in str(${variableName})`;
+      }
+      if (operator === "starts_with") {
+        return `str(${variableName}).startswith(${rightValue})`;
+      }
+      if (operator === "ends_with") {
+        return `str(${variableName}).endswith(${rightValue})`;
+      }
+    }
+    return `${variableName} ${operator} ${rightValue}`;
   }
 
   function renderConditionTargetLines(targetSceneId, context = {}, indent = "        ") {
@@ -1426,6 +1455,7 @@
     getRenpyDraftStatusDigest,
     buildRenpyDraftManifest,
     getRenpyExportContract,
+    renderConditionRuleExpression,
     renderBlock,
     sanitizeProjectRuntimeSettings,
   });

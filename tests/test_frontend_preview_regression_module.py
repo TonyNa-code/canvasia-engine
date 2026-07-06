@@ -41,6 +41,10 @@ class FrontendPreviewRegressionModuleTests(unittest.TestCase):
                         gotoSceneId: "scene_bad",
                         when: [{{ variableId: "flag", operator: "==", value: true }}],
                       }},
+                      {{
+                        gotoSceneId: "scene_good",
+                        when: [{{ variableId: "route", operator: "contains", value: "good" }}],
+                      }},
                     ],
                     elseGotoSceneId: "scene_bad",
                   }},
@@ -52,6 +56,7 @@ class FrontendPreviewRegressionModuleTests(unittest.TestCase):
             const variablesById = new Map([
               ["score", {{ id: "score", type: "number", defaultValue: 7 }}],
               ["flag", {{ id: "flag", type: "boolean", defaultValue: true }}],
+              ["route", {{ id: "route", type: "string", defaultValue: "common" }}],
             ]);
             const routeOverview = {{
               chapters: [
@@ -157,6 +162,19 @@ class FrontendPreviewRegressionModuleTests(unittest.TestCase):
                 getVariableType: (variableId) => variablesById.get(variableId)?.type ?? "string",
               }}
             );
+            const stringOverrides = tools.buildConditionVariableOverrides(
+              {{
+                routeKind: "condition",
+                sourceSceneId: "scene_start",
+                blockIndex: 1,
+                branchIndex: 2,
+              }},
+              {{
+                scenesById,
+                variablesById,
+                getVariableType: (variableId) => variablesById.get(variableId)?.type ?? "string",
+              }}
+            );
             process.stdout.write(JSON.stringify({{
               keys: Object.keys(tools).sort(),
               seedIds: seeds.map((seed) => seed.seedId),
@@ -166,6 +184,7 @@ class FrontendPreviewRegressionModuleTests(unittest.TestCase):
               conditionOverrides,
               booleanOverrides,
               fallbackOverrides,
+              stringOverrides,
             }}));
             """
         )
@@ -193,6 +212,7 @@ class FrontendPreviewRegressionModuleTests(unittest.TestCase):
         self.assertEqual(payload["conditionOverrides"], {"score": 5})
         self.assertEqual(payload["booleanOverrides"], {"score": 4, "flag": True})
         self.assertEqual(payload["fallbackOverrides"], {"score": 4, "flag": False})
+        self.assertEqual(payload["stringOverrides"], {"route": "good__canvasia_route_test__", "score": 4, "flag": False})
 
 
 if __name__ == "__main__":
