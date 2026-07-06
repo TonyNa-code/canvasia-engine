@@ -22,7 +22,9 @@ from pathlib import Path
 try:
     from .runtime_i18n import (
         DEFAULT_PROJECT_LANGUAGE,
+        build_runtime_localization_fallback_report,
         build_runtime_language_labels,
+        format_runtime_localization_fallback_summary,
         normalize_language_code,
         normalize_supported_languages,
         resolve_localized_runtime_value,
@@ -30,7 +32,9 @@ try:
 except ImportError:  # pragma: no cover - exported native packages import from the same directory.
     from runtime_i18n import (
         DEFAULT_PROJECT_LANGUAGE,
+        build_runtime_localization_fallback_report,
         build_runtime_language_labels,
+        format_runtime_localization_fallback_summary,
         normalize_language_code,
         normalize_supported_languages,
         resolve_localized_runtime_value,
@@ -10360,13 +10364,10 @@ class NativeRuntimePlayer:
             self.localization_fallbacks.pop(oldest_key, None)
 
     def get_runtime_localization_fallback_summary(self) -> str:
-        events = list(self.localization_fallbacks.values())
-        if not events:
-            return "当前游玩路径暂未发现缺译回退"
-        latest = events[-1]
-        used_text = f"，已回退到 {latest.get('usedLanguage')}" if latest.get("usedLanguage") else "，已使用原文"
-        target_text = f"{latest.get('key')}:{latest.get('sourceId')}" if latest.get("sourceId") else str(latest.get("key"))
-        return f"{len(events)} 处{used_text} · 最近 {target_text}"
+        return format_runtime_localization_fallback_summary(list(self.localization_fallbacks.values()))
+
+    def get_runtime_localization_fallback_report(self) -> dict:
+        return build_runtime_localization_fallback_report(list(self.localization_fallbacks.values()))
 
     def localize_value(self, source: dict | None, key: str, fallback: str = "") -> str:
         result = resolve_localized_runtime_value(

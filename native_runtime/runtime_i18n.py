@@ -127,3 +127,58 @@ def get_localized_runtime_value(
             fallback=fallback,
         ).get("value", "")
     )
+
+
+def _normalize_fallback_event(event: object = None) -> dict:
+    source = event if isinstance(event, dict) else {}
+    fallback_chain = [
+        language
+        for language in (normalize_language_code(raw_language, "") for raw_language in source.get("fallbackChain", []))
+        if language
+    ] if isinstance(source.get("fallbackChain"), list) else []
+    return {
+        "key": str(source.get("key") or "text").strip() or "text",
+        "sourceId": str(source.get("sourceId") or "").strip(),
+        "requestedLanguage": normalize_language_code(source.get("requestedLanguage"), ""),
+        "usedLanguage": normalize_language_code(source.get("usedLanguage"), ""),
+        "fallbackChain": fallback_chain,
+        "valuePreview": str(source.get("valuePreview") or "").strip()[:80],
+        "recordedAt": str(source.get("recordedAt") or "").strip(),
+    }
+
+
+def _count_by(events: list[dict], key: str) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for event in events:
+        value = str(event.get(key) or "unknown").strip() or "unknown"
+        counts[value] = counts.get(value, 0) + 1
+    return counts
+
+
+def build_runtime_localization_fallback_report(events: object = None) -> dict:
+    raw_events = events if isinstance(events, list) else []
+    normalized_events = [
+        event
+        for event in (_normalize_fallback_event(raw_event) for raw_event in raw_events)
+        if event.get("requestedLanguage") or event.get("usedLanguage") or event.get("sourceId") or event.get("valuePreview")
+    ]
+    return {
+        "count": len(normalized_events),
+        "latest": normalized_events[-1] if normalized_events else None,
+        "byRequestedLanguage": _count_by(normalized_events, "requestedLanguage"),
+        "byUsedLanguage": _count_by(normalized_events, "usedLanguage"),
+        "byKey": _count_by(normalized_events, "key"),
+        "events": normalized_events,
+    }
+
+
+def format_runtime_localization_fallback_summary(events: object = None) -> str:
+    report = build_runtime_localization_fallback_report(events)
+    if not report["count"]:
+        return "当前游玩路径暂未发现缺译回退"
+    latest = report["latest"] or {}
+    used_language = str(latest.get("usedLanguage") or "")
+    used_text = f"，已回退到 {used_language}" if used_language else "，已使用原文"
+    source_id = str(latest.get("sourceId") or "")
+    target_text = f"{latest.get('key')}:{source_id}" if source_id else str(latest.get("key") or "text")
+    return f"{report['count']} 处{used_text} · 最近 {target_text}"

@@ -24,6 +24,8 @@ import {
   DEFAULT_RUNTIME_LANGUAGE,
   RUNTIME_LANGUAGE_LABELS,
   buildRuntimeLanguageLabels,
+  buildRuntimeLocalizationFallbackReport,
+  formatRuntimeLocalizationFallbackSummary,
   normalizeLanguageCode,
   normalizeSupportedLanguages,
   resolveLocalizedRuntimeValue,
@@ -5473,14 +5475,11 @@ function recordRuntimeLocalizationFallback(result, source, key) {
 }
 
 function getRuntimeLocalizationFallbackSummary() {
-  const events = [...state.localizationFallbacks.values()];
-  if (!events.length) {
-    return "当前游玩路径暂未发现缺译回退";
-  }
-  const latest = events[events.length - 1];
-  const usedText = latest.usedLanguage ? `，已回退到 ${latest.usedLanguage}` : "，已使用原文";
-  const targetText = latest.sourceId ? `${latest.key}:${latest.sourceId}` : latest.key;
-  return `${events.length} 处${usedText} · 最近 ${targetText}`;
+  return formatRuntimeLocalizationFallbackSummary([...state.localizationFallbacks.values()]);
+}
+
+function getRuntimeLocalizationFallbackReport() {
+  return buildRuntimeLocalizationFallbackReport([...state.localizationFallbacks.values()]);
 }
 
 function getLocalizedValue(source, key, fallback = "") {

@@ -80,6 +80,32 @@ class FrontendRuntimeI18nModuleTests(unittest.TestCase):
               runtimeI18n.getLocalizedRuntimeValue({{ text: "Keep me" }}, "text", {{ language: "en-US" }}),
               "Keep me"
             );
+            const report = runtimeI18n.buildRuntimeLocalizationFallbackReport([
+              {{
+                key: "text",
+                sourceId: "line_1",
+                requestedLanguage: "en-us",
+                usedLanguage: "ja-jp",
+                fallbackChain: ["en-us", "ja-jp", "zh-CN"],
+                valuePreview: "こんにちは",
+              }},
+              {{
+                key: "name",
+                sourceId: "scene_1",
+                requestedLanguage: "en-us",
+                usedLanguage: "",
+                valuePreview: "教室",
+              }},
+            ]);
+            assertEqual("report count", report.count, 2);
+            assertEqual("report requested language", report.byRequestedLanguage["en-US"], 2);
+            assertEqual("report key text", report.byKey.text, 1);
+            assertEqual("report latest source", report.latest.sourceId, "scene_1");
+            assertEqual(
+              "report summary",
+              runtimeI18n.formatRuntimeLocalizationFallbackSummary(report.events),
+              "2 处，已使用原文 · 最近 name:scene_1"
+            );
             """
         )
         subprocess.run(

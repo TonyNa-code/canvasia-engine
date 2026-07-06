@@ -100,3 +100,53 @@ export function resolveLocalizedRuntimeValue(source, key, {
 export function getLocalizedRuntimeValue(source, key, options = {}) {
   return resolveLocalizedRuntimeValue(source, key, options).value;
 }
+
+function normalizeFallbackEvent(event = {}) {
+  const requestedLanguage = normalizeLanguageCode(event.requestedLanguage, "");
+  const usedLanguage = normalizeLanguageCode(event.usedLanguage, "");
+  const key = String(event.key ?? "").trim() || "text";
+  return {
+    key,
+    sourceId: String(event.sourceId ?? "").trim(),
+    requestedLanguage,
+    usedLanguage,
+    fallbackChain: Array.isArray(event.fallbackChain)
+      ? event.fallbackChain.map((language) => normalizeLanguageCode(language, "")).filter(Boolean)
+      : [],
+    valuePreview: String(event.valuePreview ?? "").trim().slice(0, 80),
+    recordedAt: String(event.recordedAt ?? "").trim(),
+  };
+}
+
+function countBy(events, key) {
+  return events.reduce((counts, event) => {
+    const value = String(event[key] ?? "").trim() || "unknown";
+    counts[value] = (counts[value] ?? 0) + 1;
+    return counts;
+  }, {});
+}
+
+export function buildRuntimeLocalizationFallbackReport(events = []) {
+  const normalizedEvents = (Array.isArray(events) ? events : [])
+    .map((event) => normalizeFallbackEvent(event))
+    .filter((event) => event.requestedLanguage || event.usedLanguage || event.sourceId || event.valuePreview);
+  return Object.freeze({
+    count: normalizedEvents.length,
+    latest: normalizedEvents.at(-1) ?? null,
+    byRequestedLanguage: countBy(normalizedEvents, "requestedLanguage"),
+    byUsedLanguage: countBy(normalizedEvents, "usedLanguage"),
+    byKey: countBy(normalizedEvents, "key"),
+    events: Object.freeze(normalizedEvents),
+  });
+}
+
+export function formatRuntimeLocalizationFallbackSummary(events = []) {
+  const report = buildRuntimeLocalizationFallbackReport(events);
+  if (!report.count) {
+    return "当前游玩路径暂未发现缺译回退";
+  }
+  const latest = report.latest;
+  const usedText = latest.usedLanguage ? `，已回退到 ${latest.usedLanguage}` : "，已使用原文";
+  const targetText = latest.sourceId ? `${latest.key}:${latest.sourceId}` : latest.key;
+  return `${report.count} 处${usedText} · 最近 ${targetText}`;
+}

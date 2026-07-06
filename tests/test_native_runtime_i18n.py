@@ -4,8 +4,10 @@ import unittest
 
 from native_runtime.runtime_i18n import (
     DEFAULT_PROJECT_LANGUAGE,
+    build_runtime_localization_fallback_report,
     build_runtime_language_fallback_chain,
     build_runtime_language_labels,
+    format_runtime_localization_fallback_summary,
     get_localized_runtime_value,
     normalize_language_code,
     normalize_supported_languages,
@@ -77,6 +79,30 @@ class NativeRuntimeI18nTests(unittest.TestCase):
             get_localized_runtime_value({"text": " Keep me "}, "text", language="en-US"),
             "Keep me",
         )
+        report = build_runtime_localization_fallback_report(
+            [
+                {
+                    "key": "text",
+                    "sourceId": "line_1",
+                    "requestedLanguage": "en-us",
+                    "usedLanguage": "ja-jp",
+                    "fallbackChain": ["en-us", "ja-jp", "zh-CN"],
+                    "valuePreview": "こんにちは",
+                },
+                {
+                    "key": "name",
+                    "sourceId": "scene_1",
+                    "requestedLanguage": "en-us",
+                    "usedLanguage": "",
+                    "valuePreview": "教室",
+                },
+            ]
+        )
+        self.assertEqual(report["count"], 2)
+        self.assertEqual(report["byRequestedLanguage"]["en-US"], 2)
+        self.assertEqual(report["byKey"]["text"], 1)
+        self.assertEqual(report["latest"]["sourceId"], "scene_1")
+        self.assertEqual(format_runtime_localization_fallback_summary(report["events"]), "2 处，已使用原文 · 最近 name:scene_1")
 
     def test_native_runtime_player_tracks_localization_fallbacks_without_pygame(self) -> None:
         player = object.__new__(NativeRuntimePlayer)
@@ -92,6 +118,7 @@ class NativeRuntimeI18nTests(unittest.TestCase):
         player.record_runtime_localization_fallback(result, {"id": "line_1"}, "text")
 
         self.assertEqual(len(player.localization_fallbacks), 1)
+        self.assertEqual(player.get_runtime_localization_fallback_report()["count"], 1)
         summary = player.get_runtime_localization_fallback_summary()
         self.assertIn("1 处", summary)
         self.assertIn("text:line_1", summary)
