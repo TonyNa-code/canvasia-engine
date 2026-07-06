@@ -239,53 +239,17 @@ const ASSET_REPLACE_FORMAT_LABELS = {
 
 const creativeAssistantTools = window.CanvasiaEditorCreativeAssistant;
 
-const CREATIVE_ASSISTANT_MODES = creativeAssistantTools?.CREATIVE_ASSISTANT_MODES ?? {
-  starter_demo: "试玩 Demo",
-  script: "剧情片段",
-  advice: "创作建议",
-  polish: "场景润色",
-};
-
-const CREATIVE_ASSISTANT_PROVIDERS = creativeAssistantTools?.CREATIVE_ASSISTANT_PROVIDERS ?? {
-  local: "本地模板",
-  openai: "OpenAI",
-  deepseek: "DeepSeek",
-  qwen: "通义千问",
-  kimi: "Kimi",
-  zhipu: "智谱 GLM",
-  custom: "自定义兼容接口",
-};
-const CREATIVE_ASSISTANT_PROVIDER_CONFIGS = creativeAssistantTools?.CREATIVE_ASSISTANT_PROVIDER_CONFIGS ?? {};
-
-const CREATIVE_ASSISTANT_PROVIDER_STORAGE_KEY =
-  creativeAssistantTools?.CREATIVE_ASSISTANT_PROVIDER_STORAGE_KEY ?? "canvasia-engine:creative-assistant-provider";
-const CREATIVE_ASSISTANT_API_KEY_STORAGE_KEY =
-  creativeAssistantTools?.CREATIVE_ASSISTANT_API_KEY_STORAGE_KEY ?? "canvasia-engine:creative-assistant-api-key";
-const CREATIVE_ASSISTANT_OPENAI_KEY_STORAGE_KEY =
-  creativeAssistantTools?.CREATIVE_ASSISTANT_OPENAI_KEY_STORAGE_KEY ?? "canvasia-engine:creative-assistant-openai-key";
-const CREATIVE_ASSISTANT_OPENAI_MODEL_STORAGE_KEY =
-  creativeAssistantTools?.CREATIVE_ASSISTANT_OPENAI_MODEL_STORAGE_KEY ?? "canvasia-engine:creative-assistant-openai-model";
-const CREATIVE_ASSISTANT_BASE_URL_STORAGE_KEY =
-  creativeAssistantTools?.CREATIVE_ASSISTANT_BASE_URL_STORAGE_KEY ?? "canvasia-engine:creative-assistant-base-url";
-const CREATIVE_ASSISTANT_REMEMBER_KEY_STORAGE_KEY =
-  creativeAssistantTools?.CREATIVE_ASSISTANT_REMEMBER_KEY_STORAGE_KEY ?? "canvasia-engine:creative-assistant-remember-key";
-const CREATIVE_ASSISTANT_HISTORY_STORAGE_KEY =
-  creativeAssistantTools?.CREATIVE_ASSISTANT_HISTORY_STORAGE_KEY ?? "canvasia-engine:creative-assistant-history";
-const CREATIVE_ASSISTANT_HISTORY_RECOVERY_STORAGE_KEY =
-  creativeAssistantTools?.CREATIVE_ASSISTANT_HISTORY_RECOVERY_STORAGE_KEY ?? "canvasia-engine:creative-assistant-history-recovery";
-const CREATIVE_ASSISTANT_DEFAULT_OPENAI_MODEL =
-  creativeAssistantTools?.CREATIVE_ASSISTANT_DEFAULT_OPENAI_MODEL ?? "gpt-5.5";
-const CREATIVE_ASSISTANT_MAX_HISTORY = creativeAssistantTools?.CREATIVE_ASSISTANT_MAX_HISTORY ?? 8;
+const {
+  CREATIVE_ASSISTANT_MODES,
+  CREATIVE_ASSISTANT_PROVIDERS,
+  CREATIVE_ASSISTANT_DEFAULT_OPENAI_MODEL,
+  CREATIVE_ASSISTANT_MAX_HISTORY,
+  CREATIVE_ASSISTANT_PROMPT_SAMPLES,
+} = creativeAssistantTools;
 const editorModeTools = window.CanvasiaEditorMode;
 const releaseVersionTools = window.CanvasiaEditorReleaseVersion;
 const releaseControlTools = window.CanvasiaEditorReleaseControl;
 const DEFAULT_PROJECT_RELEASE_VERSION = releaseVersionTools?.DEFAULT_PROJECT_RELEASE_VERSION ?? "1.0.0-preview";
-
-const CREATIVE_ASSISTANT_PROMPT_SAMPLES = creativeAssistantTools?.CREATIVE_ASSISTANT_PROMPT_SAMPLES ?? [
-  "雨夜校园悬疑恋爱，女主知道一个不能说的秘密",
-  "近未来城市里，AI 少女第一次学会撒谎",
-  "黄昏天台，青梅竹马终于谈起三年前的误会",
-];
 
 const {
   SHAKE_INTENSITY_LABELS,
@@ -35318,78 +35282,32 @@ function renderChoiceOptionEditorRow(option, index, optionCount = 1) {
 }
 
 function getSafeCreativeAssistantMode(mode) {
-  return creativeAssistantTools?.getSafeCreativeAssistantMode?.(mode) ?? (
-    Object.prototype.hasOwnProperty.call(CREATIVE_ASSISTANT_MODES, String(mode ?? "").trim())
-      ? String(mode ?? "").trim()
-      : "starter_demo"
-  );
+  return creativeAssistantTools.getSafeCreativeAssistantMode(mode);
 }
 
 function getSafeCreativeAssistantProvider(provider) {
-  return creativeAssistantTools?.getSafeCreativeAssistantProvider?.(provider) ?? (
-    Object.prototype.hasOwnProperty.call(CREATIVE_ASSISTANT_PROVIDERS, String(provider ?? "").trim())
-      ? String(provider ?? "").trim()
-      : "local"
-  );
+  return creativeAssistantTools.getSafeCreativeAssistantProvider(provider);
 }
 
 function getCreativeAssistantProviderConfig(provider) {
-  return creativeAssistantTools?.getCreativeAssistantProviderConfig?.(provider) ?? (
-    CREATIVE_ASSISTANT_PROVIDER_CONFIGS[getSafeCreativeAssistantProvider(provider)] ?? {
-      label: CREATIVE_ASSISTANT_PROVIDERS[getSafeCreativeAssistantProvider(provider)] ?? "兼容模型",
-      defaultModel: CREATIVE_ASSISTANT_DEFAULT_OPENAI_MODEL,
-      keyPlaceholder: "API Key",
-      modelPlaceholder: CREATIVE_ASSISTANT_DEFAULT_OPENAI_MODEL,
-      endpointNote: "使用兼容接口调用真模型。",
-    }
-  );
+  return creativeAssistantTools.getCreativeAssistantProviderConfig(provider);
 }
 
 function getSafeCreativeAssistantModel(model, provider = "openai") {
-  return creativeAssistantTools?.getSafeCreativeAssistantModel?.(model, provider) ?? (
-    String(model ?? "").trim() || getCreativeAssistantProviderConfig(provider).defaultModel || CREATIVE_ASSISTANT_DEFAULT_OPENAI_MODEL
-  );
+  return creativeAssistantTools.getSafeCreativeAssistantModel(model, provider);
 }
 
 function getSafeCreativeAssistantBaseUrl(value) {
-  return creativeAssistantTools?.getSafeCreativeAssistantBaseUrl?.(value) ?? (
-    String(value ?? "").trim().slice(0, 240)
-  );
+  return creativeAssistantTools.getSafeCreativeAssistantBaseUrl(value);
 }
 
 function getDefaultCreativeAssistantSettings() {
-  return creativeAssistantTools?.getDefaultCreativeAssistantSettings?.() ?? {
-    provider: "local",
-    rememberKey: false,
-    apiKey: "",
-    openAiKey: "",
-    model: CREATIVE_ASSISTANT_DEFAULT_OPENAI_MODEL,
-    baseUrl: "",
-  };
+  return creativeAssistantTools.getDefaultCreativeAssistantSettings();
 }
 
 function loadStoredCreativeAssistantSettings() {
   try {
-    if (creativeAssistantTools?.loadCreativeAssistantSettings) {
-      return creativeAssistantTools.loadCreativeAssistantSettings(localStorage);
-    }
-  } catch (error) {
-    return getDefaultCreativeAssistantSettings();
-  }
-  try {
-    const provider = getSafeCreativeAssistantProvider(localStorage.getItem(CREATIVE_ASSISTANT_PROVIDER_STORAGE_KEY));
-    const apiKey =
-      localStorage.getItem(CREATIVE_ASSISTANT_API_KEY_STORAGE_KEY) ??
-      localStorage.getItem(CREATIVE_ASSISTANT_OPENAI_KEY_STORAGE_KEY) ??
-      "";
-    return {
-      provider,
-      rememberKey: localStorage.getItem(CREATIVE_ASSISTANT_REMEMBER_KEY_STORAGE_KEY) === "true",
-      apiKey,
-      openAiKey: apiKey,
-      model: getSafeCreativeAssistantModel(localStorage.getItem(CREATIVE_ASSISTANT_OPENAI_MODEL_STORAGE_KEY), provider),
-      baseUrl: getSafeCreativeAssistantBaseUrl(localStorage.getItem(CREATIVE_ASSISTANT_BASE_URL_STORAGE_KEY)),
-    };
+    return creativeAssistantTools.loadCreativeAssistantSettings(localStorage);
   } catch (error) {
     return getDefaultCreativeAssistantSettings();
   }
@@ -35397,40 +35315,21 @@ function loadStoredCreativeAssistantSettings() {
 
 function persistCreativeAssistantSettings() {
   try {
-    if (creativeAssistantTools?.persistCreativeAssistantSettings) {
-      creativeAssistantTools.persistCreativeAssistantSettings(localStorage, {
-        provider: state.creativeAssistantProvider,
-        model: state.creativeAssistantModel,
-        rememberKey: state.creativeAssistantRememberKey,
-        apiKey: state.creativeAssistantOpenAiKey,
-        openAiKey: state.creativeAssistantOpenAiKey,
-        baseUrl: state.creativeAssistantBaseUrl,
-      });
-      return;
-    }
-  } catch (error) {
-    return;
-  }
-  try {
-    const provider = getSafeCreativeAssistantProvider(state.creativeAssistantProvider);
-    localStorage.setItem(CREATIVE_ASSISTANT_PROVIDER_STORAGE_KEY, provider);
-    localStorage.setItem(CREATIVE_ASSISTANT_OPENAI_MODEL_STORAGE_KEY, getSafeCreativeAssistantModel(state.creativeAssistantModel, provider));
-    localStorage.setItem(CREATIVE_ASSISTANT_BASE_URL_STORAGE_KEY, getSafeCreativeAssistantBaseUrl(state.creativeAssistantBaseUrl));
-    localStorage.setItem(CREATIVE_ASSISTANT_REMEMBER_KEY_STORAGE_KEY, state.creativeAssistantRememberKey ? "true" : "false");
-    if (state.creativeAssistantRememberKey && state.creativeAssistantOpenAiKey) {
-      localStorage.setItem(CREATIVE_ASSISTANT_API_KEY_STORAGE_KEY, state.creativeAssistantOpenAiKey);
-      localStorage.removeItem(CREATIVE_ASSISTANT_OPENAI_KEY_STORAGE_KEY);
-    } else {
-      localStorage.removeItem(CREATIVE_ASSISTANT_API_KEY_STORAGE_KEY);
-      localStorage.removeItem(CREATIVE_ASSISTANT_OPENAI_KEY_STORAGE_KEY);
-    }
+    creativeAssistantTools.persistCreativeAssistantSettings(localStorage, {
+      provider: state.creativeAssistantProvider,
+      model: state.creativeAssistantModel,
+      rememberKey: state.creativeAssistantRememberKey,
+      apiKey: state.creativeAssistantOpenAiKey,
+      openAiKey: state.creativeAssistantOpenAiKey,
+      baseUrl: state.creativeAssistantBaseUrl,
+    });
   } catch (error) {
     return;
   }
 }
 
 function trimCreativeAssistantText(value, maxLength = 600) {
-  return creativeAssistantTools?.trimCreativeAssistantText?.(value, maxLength) ?? String(value ?? "").trim().slice(0, maxLength);
+  return creativeAssistantTools.trimCreativeAssistantText(value, maxLength);
 }
 
 function createCreativeAssistantHistoryId() {
@@ -35438,183 +35337,38 @@ function createCreativeAssistantHistoryId() {
 }
 
 function cloneCreativeAssistantBlocksForHistory(blocks) {
-  if (creativeAssistantTools?.cloneCreativeAssistantBlocksForHistory) {
-    return creativeAssistantTools.cloneCreativeAssistantBlocksForHistory(blocks);
-  }
-  if (!Array.isArray(blocks)) {
-    return [];
-  }
-  return blocks.slice(0, 12).map((block) => {
-    const blockType = ["dialogue", "narration", "choice"].includes(block?.type) ? block.type : "narration";
-    if (blockType === "choice") {
-      return {
-        type: "choice",
-        options: (Array.isArray(block.options) ? block.options : []).slice(0, 4).map((option, index) => ({
-          text: trimCreativeAssistantText(option?.text || `选项 ${index + 1}`, 120),
-          gotoSceneId: trimCreativeAssistantText(option?.gotoSceneId, 120),
-          effects: [],
-        })),
-      };
-    }
-    const clonedBlock = {
-      type: blockType,
-      text: trimCreativeAssistantText(block?.text, 800),
-    };
-    if (blockType === "dialogue") {
-      clonedBlock.speakerId = trimCreativeAssistantText(block?.speakerId, 120);
-      clonedBlock.expressionId = trimCreativeAssistantText(block?.expressionId, 120);
-    }
-    return clonedBlock;
-  });
+  return creativeAssistantTools.cloneCreativeAssistantBlocksForHistory(blocks);
 }
 
 function sanitizeCreativeAssistantHistoryResult(result) {
-  if (creativeAssistantTools?.sanitizeCreativeAssistantHistoryResult) {
-    return creativeAssistantTools.sanitizeCreativeAssistantHistoryResult(result);
-  }
-  if (!result || typeof result !== "object") {
-    return null;
-  }
-  const blocks = cloneCreativeAssistantBlocksForHistory(result.blocks);
-  const provider = result.provider && typeof result.provider === "object" ? result.provider : {};
-  return {
-    mode: getSafeCreativeAssistantMode(result.mode),
-    modeLabel: trimCreativeAssistantText(result.modeLabel || CREATIVE_ASSISTANT_MODES[getSafeCreativeAssistantMode(result.mode)], 80),
-    title: trimCreativeAssistantText(result.title || "未命名灵感", 120),
-    summary: trimCreativeAssistantText(result.summary, 700),
-    guidance: (Array.isArray(result.guidance) ? result.guidance : [])
-      .map((item) => trimCreativeAssistantText(item, 280))
-      .filter(Boolean)
-      .slice(0, 8),
-    assetPrompts: (Array.isArray(result.assetPrompts) ? result.assetPrompts : [])
-      .map((item) => trimCreativeAssistantText(item, 280))
-      .filter(Boolean)
-      .slice(0, 6),
-    blocks,
-    insertable: Boolean(blocks.length),
-    blockCount: blocks.length,
-    provider: {
-      mode: getSafeCreativeAssistantProvider(provider.mode),
-      label: trimCreativeAssistantText(
-        provider.label || CREATIVE_ASSISTANT_PROVIDERS[getSafeCreativeAssistantProvider(provider.mode)],
-        80
-      ),
-      status: trimCreativeAssistantText(provider.status, 60),
-      model: trimCreativeAssistantText(provider.model, 80),
-      fallback: Boolean(provider.fallback),
-    },
-    privacy: {
-      mode: trimCreativeAssistantText(result.privacy?.mode, 80),
-      sentToExternalService: Boolean(result.privacy?.sentToExternalService),
-      message: trimCreativeAssistantText(result.privacy?.message, 260),
-    },
-    fallbackReason: trimCreativeAssistantText(result.fallbackReason, 260),
-  };
+  return creativeAssistantTools.sanitizeCreativeAssistantHistoryResult(result);
 }
 
 function sanitizeCreativeAssistantGenerationResponse(response) {
-  if (creativeAssistantTools?.sanitizeCreativeAssistantGenerationResponse) {
-    return creativeAssistantTools.sanitizeCreativeAssistantGenerationResponse(response);
-  }
-  const rawResult =
-    response && typeof response === "object" && Object.prototype.hasOwnProperty.call(response, "result")
-      ? response.result
-      : response;
-  return sanitizeCreativeAssistantHistoryResult(rawResult);
+  return creativeAssistantTools.sanitizeCreativeAssistantGenerationResponse(response);
 }
 
 function sanitizeCreativeAssistantHistoryRecord(record) {
-  if (creativeAssistantTools?.sanitizeCreativeAssistantHistoryRecord) {
-    return creativeAssistantTools.sanitizeCreativeAssistantHistoryRecord(record, {
-      createId: createCreativeAssistantHistoryId,
-      nowIso: () => new Date().toISOString(),
-    });
-  }
-  if (!record || typeof record !== "object") {
-    return null;
-  }
-  const result = sanitizeCreativeAssistantHistoryResult(record.result);
-  if (!result) {
-    return null;
-  }
-  return {
-    id: trimCreativeAssistantText(record.id, 80) || createCreativeAssistantHistoryId(),
-    createdAt: trimCreativeAssistantText(record.createdAt, 40) || new Date().toISOString(),
-    prompt: trimCreativeAssistantText(record.prompt, 800),
-    sceneId: trimCreativeAssistantText(record.sceneId, 160),
-    sceneName: trimCreativeAssistantText(record.sceneName || "当前场景", 160),
-    favorite: Boolean(record.favorite),
-    result,
-  };
+  return creativeAssistantTools.sanitizeCreativeAssistantHistoryRecord(record, {
+    createId: createCreativeAssistantHistoryId,
+    nowIso: () => new Date().toISOString(),
+  });
 }
 
 function capCreativeAssistantHistoryRecords(records, limit = CREATIVE_ASSISTANT_MAX_HISTORY) {
-  if (creativeAssistantTools?.capCreativeAssistantHistoryRecords) {
-    return creativeAssistantTools.capCreativeAssistantHistoryRecords(records, limit);
-  }
-  const numericLimit = Number(limit);
-  const safeLimit = Math.max(0, Number.isFinite(numericLimit) ? numericLimit : CREATIVE_ASSISTANT_MAX_HISTORY);
-  const sourceRecords = (Array.isArray(records) ? records : []).filter(Boolean);
-  if (safeLimit <= 0) {
-    return [];
-  }
-  if (sourceRecords.length <= safeLimit) {
-    return sourceRecords.slice(0, safeLimit);
-  }
-  const selected = [];
-  const selectedRecords = new Set();
-  sourceRecords.forEach((record, index) => {
-    if (record?.favorite && selected.length < safeLimit) {
-      selected.push({ index, record });
-      selectedRecords.add(record);
-    }
-  });
-  sourceRecords.forEach((record, index) => {
-    if (!selectedRecords.has(record) && selected.length < safeLimit) {
-      selected.push({ index, record });
-      selectedRecords.add(record);
-    }
-  });
-  return selected.sort((left, right) => left.index - right.index).map((item) => item.record);
+  return creativeAssistantTools.capCreativeAssistantHistoryRecords(records, limit);
 }
 
 function mergeCreativeAssistantHistoryRecord(records, record, limit = CREATIVE_ASSISTANT_MAX_HISTORY) {
-  if (creativeAssistantTools?.mergeCreativeAssistantHistoryRecord) {
-    return creativeAssistantTools.mergeCreativeAssistantHistoryRecord(records, record, limit);
-  }
-  const sourceRecords = Array.isArray(records) ? records : [];
-  if (!record) {
-    return capCreativeAssistantHistoryRecords(sourceRecords, limit);
-  }
-  const recordSignature = `${record.result?.title ?? ""}|${record.prompt ?? ""}`;
-  const duplicateRecord = sourceRecords.find(
-    (item) => item.id === record.id || `${item.result?.title ?? ""}|${item.prompt ?? ""}` === recordSignature
-  );
-  const mergedRecord = duplicateRecord?.favorite && !record.favorite ? { ...record, favorite: true } : record;
-  return capCreativeAssistantHistoryRecords([
-    mergedRecord,
-    ...sourceRecords.filter(
-      (item) => item.id !== record.id && `${item.result?.title ?? ""}|${item.prompt ?? ""}` !== recordSignature
-    ),
-  ], limit);
+  return creativeAssistantTools.mergeCreativeAssistantHistoryRecord(records, record, limit);
 }
 
 function loadStoredCreativeAssistantHistory() {
   try {
-    if (creativeAssistantTools?.loadCreativeAssistantHistory) {
-      return creativeAssistantTools.loadCreativeAssistantHistory(localStorage, {
-        createId: createCreativeAssistantHistoryId,
-        nowIso: () => new Date().toISOString(),
-      });
-    }
-  } catch (error) {
-    return [];
-  }
-  try {
-    const parsed = JSON.parse(localStorage.getItem(CREATIVE_ASSISTANT_HISTORY_STORAGE_KEY) || "[]");
-    return capCreativeAssistantHistoryRecords((Array.isArray(parsed) ? parsed : [])
-      .map((record) => sanitizeCreativeAssistantHistoryRecord(record))
-      .filter(Boolean), CREATIVE_ASSISTANT_MAX_HISTORY);
+    return creativeAssistantTools.loadCreativeAssistantHistory(localStorage, {
+      createId: createCreativeAssistantHistoryId,
+      nowIso: () => new Date().toISOString(),
+    });
   } catch (error) {
     return [];
   }
@@ -35622,21 +35376,10 @@ function loadStoredCreativeAssistantHistory() {
 
 function persistCreativeAssistantHistory() {
   try {
-    if (creativeAssistantTools?.persistCreativeAssistantHistory) {
-      creativeAssistantTools.persistCreativeAssistantHistory(
-        localStorage,
-        state.creativeAssistantHistory,
-        CREATIVE_ASSISTANT_MAX_HISTORY
-      );
-      return;
-    }
-  } catch (error) {
-    return;
-  }
-  try {
-    localStorage.setItem(
-      CREATIVE_ASSISTANT_HISTORY_STORAGE_KEY,
-      JSON.stringify(capCreativeAssistantHistoryRecords(state.creativeAssistantHistory, CREATIVE_ASSISTANT_MAX_HISTORY))
+    creativeAssistantTools.persistCreativeAssistantHistory(
+      localStorage,
+      state.creativeAssistantHistory,
+      CREATIVE_ASSISTANT_MAX_HISTORY
     );
   } catch (error) {
     return;
@@ -35648,63 +35391,22 @@ function buildCreativeAssistantHistoryRecoverySnapshot(reason) {
   if (!records.length) {
     return null;
   }
-  if (creativeAssistantTools?.buildCreativeAssistantHistoryRecoverySnapshot) {
-    return creativeAssistantTools.buildCreativeAssistantHistoryRecoverySnapshot(records, {
-      createdAt: new Date().toISOString(),
-      reason,
-      limit: CREATIVE_ASSISTANT_MAX_HISTORY,
-      createId: createCreativeAssistantHistoryId,
-      nowIso: () => new Date().toISOString(),
-    });
-  }
-  return {
-    engine: "Canvasia Engine",
-    kind: "creative_assistant_history_recovery",
-    formatVersion: 1,
+  return creativeAssistantTools.buildCreativeAssistantHistoryRecoverySnapshot(records, {
     createdAt: new Date().toISOString(),
     reason,
-    recordCount: records.length,
-    records,
-    privacy: {
-      containsApiKey: false,
-      storage: "browser_localStorage",
-    },
-  };
+    limit: CREATIVE_ASSISTANT_MAX_HISTORY,
+    createId: createCreativeAssistantHistoryId,
+    nowIso: () => new Date().toISOString(),
+  });
 }
 
 function loadStoredCreativeAssistantHistoryRecovery() {
   try {
-    if (creativeAssistantTools?.loadCreativeAssistantHistoryRecovery) {
-      return creativeAssistantTools.loadCreativeAssistantHistoryRecovery(localStorage, {
-        createId: createCreativeAssistantHistoryId,
-        nowIso: () => new Date().toISOString(),
-        limit: CREATIVE_ASSISTANT_MAX_HISTORY,
-      });
-    }
-  } catch (error) {
-    return null;
-  }
-  try {
-    const snapshot = JSON.parse(localStorage.getItem(CREATIVE_ASSISTANT_HISTORY_RECOVERY_STORAGE_KEY) || "null");
-    const records = capCreativeAssistantHistoryRecords((Array.isArray(snapshot?.records) ? snapshot.records : [])
-      .map((record) => sanitizeCreativeAssistantHistoryRecord(record))
-      .filter(Boolean), CREATIVE_ASSISTANT_MAX_HISTORY);
-    if (!records.length) {
-      return null;
-    }
-    return {
-      engine: "Canvasia Engine",
-      kind: "creative_assistant_history_recovery",
-      formatVersion: 1,
-      createdAt: trimCreativeAssistantText(snapshot.createdAt, 40) || new Date().toISOString(),
-      reason: trimCreativeAssistantText(snapshot.reason || "history_cleanup", 80),
-      recordCount: records.length,
-      records,
-      privacy: {
-        containsApiKey: false,
-        storage: "browser_localStorage",
-      },
-    };
+    return creativeAssistantTools.loadCreativeAssistantHistoryRecovery(localStorage, {
+      createId: createCreativeAssistantHistoryId,
+      nowIso: () => new Date().toISOString(),
+      limit: CREATIVE_ASSISTANT_MAX_HISTORY,
+    });
   } catch (error) {
     return null;
   }
@@ -35713,22 +35415,10 @@ function loadStoredCreativeAssistantHistoryRecovery() {
 function persistCreativeAssistantHistoryRecovery(snapshot) {
   state.creativeAssistantHistoryRecovery = snapshot ?? null;
   try {
-    if (creativeAssistantTools?.persistCreativeAssistantHistoryRecovery) {
-      if (snapshot) {
-        creativeAssistantTools.persistCreativeAssistantHistoryRecovery(localStorage, snapshot);
-      } else {
-        creativeAssistantTools.clearCreativeAssistantHistoryRecovery?.(localStorage);
-      }
-      return;
-    }
-  } catch (error) {
-    return;
-  }
-  try {
     if (snapshot) {
-      localStorage.setItem(CREATIVE_ASSISTANT_HISTORY_RECOVERY_STORAGE_KEY, JSON.stringify(snapshot));
+      creativeAssistantTools.persistCreativeAssistantHistoryRecovery(localStorage, snapshot);
     } else {
-      localStorage.removeItem(CREATIVE_ASSISTANT_HISTORY_RECOVERY_STORAGE_KEY);
+      creativeAssistantTools.clearCreativeAssistantHistoryRecovery(localStorage);
     }
   } catch (error) {
     return;
@@ -35756,30 +35446,7 @@ function filterCreativeAssistantHistoryRecords(records = state.creativeAssistant
     query: state.creativeAssistantHistoryQuery,
     favoritesOnly: state.creativeAssistantHistoryFavoritesOnly,
   };
-  if (creativeAssistantTools?.filterCreativeAssistantHistoryRecords) {
-    return creativeAssistantTools.filterCreativeAssistantHistoryRecords(records, options);
-  }
-  const query = trimCreativeAssistantText(options.query, 160).toLowerCase();
-  return (Array.isArray(records) ? records : []).filter((record) => {
-    if (options.favoritesOnly && !record?.favorite) {
-      return false;
-    }
-    if (!query) {
-      return true;
-    }
-    return [
-      record?.prompt,
-      record?.sceneName,
-      record?.result?.title,
-      record?.result?.summary,
-      ...(Array.isArray(record?.result?.guidance) ? record.result.guidance : []),
-      ...(Array.isArray(record?.result?.assetPrompts) ? record.result.assetPrompts : []),
-    ]
-      .filter(Boolean)
-      .join(" ")
-      .toLowerCase()
-      .includes(query);
-  });
+  return creativeAssistantTools.filterCreativeAssistantHistoryRecords(records, options);
 }
 
 function rememberCreativeAssistantResult(result) {
@@ -35951,21 +35618,7 @@ function buildCreativeAssistantHistoryBlocksText(record) {
     return "";
   }
   const indexes = getDefaultCreativeAssistantBlockSelection(record.result);
-  if (creativeAssistantTools?.buildCreativeAssistantBlocksText) {
-    return creativeAssistantTools.buildCreativeAssistantBlocksText(record.result, indexes);
-  }
-  const blocks = getCreativeAssistantResultBlocks(record.result);
-  if (!blocks.length) {
-    return "";
-  }
-  return [
-    record.result.title ? `《${record.result.title}》` : "Canvasia Assistant 剧情卡片",
-    record.result.summary ?? "",
-    "",
-    ...blocks.map((block, index) => getCreativeAssistantBlockPreviewText(block, index)),
-  ]
-    .filter((line) => line !== null && line !== undefined)
-    .join("\n\n");
+  return creativeAssistantTools.buildCreativeAssistantBlocksText(record.result, indexes);
 }
 
 async function copyCreativeAssistantHistoryBlocks(recordId) {
@@ -35988,22 +35641,7 @@ async function copyCreativeAssistantHistoryBlocks(recordId) {
 }
 
 function buildCreativeAssistantHistoryRecordMarkdown(record) {
-  if (creativeAssistantTools?.buildCreativeAssistantRecordMarkdown) {
-    return creativeAssistantTools.buildCreativeAssistantRecordMarkdown(record, 0);
-  }
-  if (!record?.result) {
-    return "";
-  }
-  return [
-    `## ${record.result.title}${record.favorite ? " ★" : ""}`,
-    "",
-    record.prompt ? `- 提示词：${record.prompt}` : "",
-    record.sceneName ? `- 场景：${record.sceneName}` : "",
-    record.result.summary ?? "",
-    buildCreativeAssistantHistoryBlocksText(record),
-  ]
-    .filter(Boolean)
-    .join("\n\n");
+  return creativeAssistantTools.buildCreativeAssistantRecordMarkdown(record, 0);
 }
 
 async function copyCreativeAssistantHistoryRecordMarkdown(recordId) {
@@ -36030,29 +35668,7 @@ function buildCreativeAssistantHistoryMarkdown() {
     favoritesOnly: state.creativeAssistantHistoryFavoritesOnly,
     limit: CREATIVE_ASSISTANT_MAX_HISTORY,
   };
-  if (creativeAssistantTools?.buildCreativeAssistantHistoryMarkdown) {
-    return creativeAssistantTools.buildCreativeAssistantHistoryMarkdown(records, options);
-  }
-  const visibleRecords = filterCreativeAssistantHistoryRecords(records).slice(0, CREATIVE_ASSISTANT_MAX_HISTORY);
-  return [
-    `# ${options.projectTitle} · Canvasia Assistant 灵感档案`,
-    "",
-    `- 导出时间：${options.exportedAt}`,
-    `- 记录数量：${visibleRecords.length}`,
-    "- 隐私说明：此 Markdown 不包含 API Key，仅包含提示词和生成内容。",
-    "",
-    visibleRecords.length
-      ? visibleRecords
-        .map((record, index) => [
-          `## ${index + 1}. ${record.result.title}${record.favorite ? " ★" : ""}`,
-          "",
-          record.prompt ? `- 提示词：${record.prompt}` : "",
-          record.result.summary ?? "",
-          buildCreativeAssistantHistoryBlocksText(record),
-        ].filter(Boolean).join("\n\n"))
-        .join("\n\n---\n\n")
-      : "_当前筛选下没有可导出的灵感。_",
-  ].join("\n");
+  return creativeAssistantTools.buildCreativeAssistantHistoryMarkdown(records, options);
 }
 
 async function copyCreativeAssistantHistoryMarkdown() {
@@ -36099,24 +35715,11 @@ function exportCreativeAssistantHistoryArchive() {
     showToast("灵感盒还没有可导出的内容", "error");
     return;
   }
-  const archive = creativeAssistantTools?.buildCreativeAssistantHistoryArchive?.(records, {
+  const archive = creativeAssistantTools.buildCreativeAssistantHistoryArchive(records, {
     projectTitle: state.data?.project?.title ?? "",
     exportedAt: new Date().toISOString(),
     limit: CREATIVE_ASSISTANT_MAX_HISTORY,
-  }) ?? {
-    engine: "Canvasia Engine",
-    kind: "creative_assistant_history_archive",
-    formatVersion: 1,
-    exportedAt: new Date().toISOString(),
-    projectTitle: state.data?.project?.title ?? "",
-    recordCount: records.length,
-    records,
-    privacy: {
-      containsApiKey: false,
-      storage: "browser_localStorage",
-      note: "Archive contains prompts and generated ideas only; API keys are never included.",
-    },
-  };
+  });
   const projectSlug = makeParticleCustomPresetId(state.data?.project?.title ?? "canvasia_project");
   downloadJsonFile(`${projectSlug}.canvasia-idea-vault.json`, archive);
   setSaveStatus(`已归档灵感盒：${archive.recordCount ?? records.length} 条`);
@@ -36130,24 +35733,11 @@ function exportCreativeAssistantHistoryViewArchive() {
     showToast("当前视图没有可导出的灵感", "error");
     return;
   }
-  const archive = creativeAssistantTools?.buildCreativeAssistantHistoryArchive?.(records, {
+  const archive = creativeAssistantTools.buildCreativeAssistantHistoryArchive(records, {
     projectTitle: state.data?.project?.title ?? "",
     exportedAt: new Date().toISOString(),
     limit: CREATIVE_ASSISTANT_MAX_HISTORY,
-  }) ?? {
-    engine: "Canvasia Engine",
-    kind: "creative_assistant_history_archive",
-    formatVersion: 1,
-    exportedAt: new Date().toISOString(),
-    projectTitle: state.data?.project?.title ?? "",
-    recordCount: records.length,
-    records,
-    privacy: {
-      containsApiKey: false,
-      storage: "browser_localStorage",
-      note: "Archive contains prompts and generated ideas only; API keys are never included.",
-    },
-  };
+  });
   const projectSlug = makeParticleCustomPresetId(state.data?.project?.title ?? "canvasia_project");
   const scope = state.creativeAssistantHistoryFavoritesOnly ? "_favorites" : state.creativeAssistantHistoryQuery.trim() ? "_filtered" : "_view";
   downloadJsonFile(`${projectSlug}.canvasia-idea-vault${scope}.json`, archive);
@@ -36187,18 +35777,9 @@ async function importCreativeAssistantHistoryArchive(file) {
   }
   try {
     const payload = parseJsonImportText(await readFileAsText(file), "助手灵感包");
-    const importedRecords = creativeAssistantTools?.getCreativeAssistantHistoryArchiveRecords?.(payload, {
+    const importedRecords = creativeAssistantTools.getCreativeAssistantHistoryArchiveRecords(payload, {
       limit: CREATIVE_ASSISTANT_MAX_HISTORY,
-    }) ?? (
-      Array.isArray(payload?.records)
-        ? payload.records
-        : payload?.record
-          ? [payload.record]
-          : []
-    )
-      .map((record) => sanitizeCreativeAssistantHistoryRecord(record))
-      .filter(Boolean)
-      .slice(0, CREATIVE_ASSISTANT_MAX_HISTORY);
+    });
 
     if (!importedRecords.length) {
       throw new Error("这个文件里没有可识别的灵感记录");
@@ -36308,24 +35889,17 @@ async function clearCreativeAssistantNonFavoriteHistory() {
 
 async function restoreCreativeAssistantHistoryRecovery() {
   const snapshot = state.creativeAssistantHistoryRecovery;
-  const recoveryPlan = creativeAssistantTools?.buildCreativeAssistantHistoryRecoverySwap
-    ? creativeAssistantTools.buildCreativeAssistantHistoryRecoverySwap(
-        state.creativeAssistantHistory,
-        snapshot,
-        {
-          createdAt: new Date().toISOString(),
-          reason: "before_restore",
-          limit: CREATIVE_ASSISTANT_MAX_HISTORY,
-          createId: createCreativeAssistantHistoryId,
-          nowIso: () => new Date().toISOString(),
-        }
-      )
-    : {
-        canRestore: Boolean(capCreativeAssistantHistoryRecords(snapshot?.records, CREATIVE_ASSISTANT_MAX_HISTORY).length),
-        currentRecordCount: capCreativeAssistantHistoryRecords(state.creativeAssistantHistory, CREATIVE_ASSISTANT_MAX_HISTORY).length,
-        restoredRecords: capCreativeAssistantHistoryRecords(snapshot?.records, CREATIVE_ASSISTANT_MAX_HISTORY),
-        nextRecoverySnapshot: buildCreativeAssistantHistoryRecoverySnapshot("before_restore"),
-      };
+  const recoveryPlan = creativeAssistantTools.buildCreativeAssistantHistoryRecoverySwap(
+    state.creativeAssistantHistory,
+    snapshot,
+    {
+      createdAt: new Date().toISOString(),
+      reason: "before_restore",
+      limit: CREATIVE_ASSISTANT_MAX_HISTORY,
+      createId: createCreativeAssistantHistoryId,
+      nowIso: () => new Date().toISOString(),
+    }
+  );
   const records = recoveryPlan.restoredRecords ?? [];
   if (!recoveryPlan.canRestore || !records.length) {
     showToast("没有可恢复的灵感备份", "error");
@@ -36414,92 +35988,40 @@ function renderCreativeAssistantModeButtons() {
 }
 
 function getCreativeAssistantBlockTypeLabel(blockType) {
-  return creativeAssistantTools?.getCreativeAssistantBlockTypeLabel?.(blockType) ?? (
-    {
-      dialogue: "台词",
-      narration: "旁白",
-      choice: "选项",
-    }[blockType] ?? "剧情"
-  );
+  return creativeAssistantTools.getCreativeAssistantBlockTypeLabel(blockType);
 }
 
 function getCreativeAssistantBlockPreviewText(block, index) {
-  if (creativeAssistantTools?.getCreativeAssistantBlockPreviewText) {
-    return creativeAssistantTools.getCreativeAssistantBlockPreviewText(block, index);
-  }
-  const blockType = ["dialogue", "narration", "choice"].includes(block?.type) ? block.type : "narration";
-  if (blockType === "choice") {
-    const options = Array.isArray(block.options) ? block.options : [];
-    const optionText = options
-      .map((option, optionIndex) => `${optionIndex + 1}. ${trimCreativeAssistantText(option?.text || `选项 ${optionIndex + 1}`, 120)}`)
-      .join("\n");
-    return `#${index + 1} ${getCreativeAssistantBlockTypeLabel(blockType)}\n${optionText || "1. 继续"}`;
-  }
-  const speaker = blockType === "dialogue" && block?.speakerId ? `【${block.speakerId}】` : "";
-  return `#${index + 1} ${getCreativeAssistantBlockTypeLabel(blockType)}\n${speaker}${trimCreativeAssistantText(block?.text, 900)}`;
+  return creativeAssistantTools.getCreativeAssistantBlockPreviewText(block, index);
 }
 
 function buildCreativeAssistantBlocksText(result) {
-  return creativeAssistantTools?.buildCreativeAssistantBlocksText?.(
+  return creativeAssistantTools.buildCreativeAssistantBlocksText(
     result,
     state.creativeAssistantSelectedBlockIndexes
-  ) ?? (() => {
-    const blocks = getSelectedCreativeAssistantBlocks(result);
-    if (!blocks.length) {
-      return "";
-    }
-    return [
-    result?.title ? `《${result.title}》` : "Canvasia Assistant 剧情卡片",
-    result?.summary ?? "",
-    "",
-    ...blocks.map((block, index) => getCreativeAssistantBlockPreviewText(block, index)),
-    ]
-      .filter((line) => line !== null && line !== undefined)
-      .join("\n\n");
-  })();
+  );
 }
 
 function getCreativeAssistantResultBlocks(result = state.creativeAssistantResult) {
-  return creativeAssistantTools?.getCreativeAssistantResultBlocks?.(result) ?? (
-    Array.isArray(result?.blocks) ? result.blocks : []
-  );
+  return creativeAssistantTools.getCreativeAssistantResultBlocks(result);
 }
 
 function getDefaultCreativeAssistantBlockSelection(result = state.creativeAssistantResult) {
-  return creativeAssistantTools?.getDefaultCreativeAssistantBlockSelection?.(result) ?? (
-    getCreativeAssistantResultBlocks(result).map((_block, index) => index)
-  );
+  return creativeAssistantTools.getDefaultCreativeAssistantBlockSelection(result);
 }
 
 function getActiveCreativeAssistantBlockIndexes(result = state.creativeAssistantResult) {
-  if (creativeAssistantTools?.getActiveCreativeAssistantBlockIndexes) {
-    return creativeAssistantTools.getActiveCreativeAssistantBlockIndexes(
-      result,
-      state.creativeAssistantSelectedBlockIndexes
-    );
-  }
-  const blocks = getCreativeAssistantResultBlocks(result);
-  if (!blocks.length) {
-    return [];
-  }
-  const validIndexes = new Set(blocks.map((_block, index) => index));
-  if (!Array.isArray(state.creativeAssistantSelectedBlockIndexes)) {
-    return getDefaultCreativeAssistantBlockSelection(result);
-  }
-  const selected = state.creativeAssistantSelectedBlockIndexes.filter((index) => validIndexes.has(Number(index))).map(Number);
-  return [...new Set(selected)].sort((left, right) => left - right);
+  return creativeAssistantTools.getActiveCreativeAssistantBlockIndexes(
+    result,
+    state.creativeAssistantSelectedBlockIndexes
+  );
 }
 
 function getSelectedCreativeAssistantBlocks(result = state.creativeAssistantResult) {
-  if (creativeAssistantTools?.getSelectedCreativeAssistantBlocks) {
-    return creativeAssistantTools.getSelectedCreativeAssistantBlocks(
-      result,
-      state.creativeAssistantSelectedBlockIndexes
-    );
-  }
-  const blocks = getCreativeAssistantResultBlocks(result);
-  const selectedIndexes = getActiveCreativeAssistantBlockIndexes(result);
-  return selectedIndexes.map((index) => blocks[index]).filter(Boolean);
+  return creativeAssistantTools.getSelectedCreativeAssistantBlocks(
+    result,
+    state.creativeAssistantSelectedBlockIndexes
+  );
 }
 
 function toggleCreativeAssistantBlockSelection(indexValue) {

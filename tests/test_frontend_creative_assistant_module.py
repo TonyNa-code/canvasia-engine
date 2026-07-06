@@ -9,6 +9,7 @@ from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "creative_assistant.js"
+APP_PATH = ROOT_DIR / "prototype_editor" / "app.js"
 
 
 class FrontendCreativeAssistantModuleTests(unittest.TestCase):
@@ -348,6 +349,19 @@ class FrontendCreativeAssistantModuleTests(unittest.TestCase):
         self.assertEqual(payload["rememberedSettings"]["apiKey"], "secret-key")
         self.assertEqual(payload["savedHistoryLength"], 1)
         self.assertEqual(payload["savedHistoryFirstId"], "a")
+
+    def test_editor_app_delegates_creative_assistant_privacy_logic_to_module(self) -> None:
+        app_source = APP_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("} = creativeAssistantTools;", app_source)
+        self.assertNotIn("const CREATIVE_ASSISTANT_MODES = creativeAssistantTools?.CREATIVE_ASSISTANT_MODES", app_source)
+        self.assertNotIn("CREATIVE_ASSISTANT_API_KEY_STORAGE_KEY", app_source)
+        self.assertNotIn("creativeAssistantTools?.sanitizeCreativeAssistantHistoryResult", app_source)
+        self.assertNotIn("creativeAssistantTools?.buildCreativeAssistantHistoryArchive", app_source)
+        self.assertIn("return creativeAssistantTools.sanitizeCreativeAssistantHistoryResult(result);", app_source)
+        self.assertIn("creativeAssistantTools.persistCreativeAssistantSettings(localStorage, {", app_source)
+        self.assertIn("return creativeAssistantTools.filterCreativeAssistantHistoryRecords(records, options);", app_source)
+        self.assertIn("const recoveryPlan = creativeAssistantTools.buildCreativeAssistantHistoryRecoverySwap(", app_source)
 
 
 if __name__ == "__main__":
