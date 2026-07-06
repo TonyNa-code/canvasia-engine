@@ -26155,12 +26155,42 @@ function buildPreviewRegressionCaseActions(caseResult) {
   return actions;
 }
 
+function buildPreviewRegressionConditionRuleSummary(ruleTrace) {
+  const variableName = state.data.variablesById.get(ruleTrace?.variableId)?.name ?? ruleTrace?.variableId ?? "变量";
+  const left = formatVariableValue(ruleTrace?.variableId, ruleTrace?.leftValue);
+  const right = formatVariableValue(ruleTrace?.variableId, ruleTrace?.rightValue);
+  return `${variableName} 当前 ${left} ${ruleTrace?.operator ?? "=="} ${right}：${ruleTrace?.matched ? "通过" : "失败"}`;
+}
+
+function buildPreviewRegressionConditionTraceSummary(snapshot) {
+  const trace = snapshot?.conditionTrace ?? getPreviewConditionTrace(snapshot, snapshot?.variables);
+  if (!trace) {
+    return "";
+  }
+
+  const targetSceneName = state.data.scenesById.get(trace.targetSceneId)?.name ?? trace.targetSceneId ?? "未设置目标";
+  const matchedLabel = trace.elseMatched ? "否则" : `分支 ${Number(trace.matchedBranchIndex) + 1}`;
+  const matchedBranch = (trace.branches ?? []).find((branchTrace) => branchTrace.branchKey === trace.matchedBranchKey);
+  const ruleTraces = trace.elseMatched
+    ? (trace.branches ?? [])
+        .map((branchTrace) => (branchTrace.rules ?? []).find((ruleTrace) => !ruleTrace.matched))
+        .filter(Boolean)
+        .slice(0, 3)
+    : (matchedBranch?.rules ?? []).slice(0, 3);
+  const ruleSummary = ruleTraces.map((ruleTrace) => buildPreviewRegressionConditionRuleSummary(ruleTrace)).join("；");
+  return truncateText(
+    `条件判断：命中${matchedLabel} -> ${targetSceneName}${ruleSummary ? `；${ruleSummary}` : ""}`,
+    180
+  );
+}
+
 function runPreviewRegressionCase(seed) {
   const variableOverrides = getPreviewRegressionVariableOverrides(seed);
   const session = createPreviewRegressionSession(seed.sceneId, variableOverrides);
   const visitedStepCounts = new Map();
   const visitedSceneIds = new Set();
   const selectedOptionTexts = [];
+  const conditionTraceSummaries = [];
   const variableOverrideSummary = formatPreviewRegressionVariableOverrides(variableOverrides);
   const expectedTargetSceneId = String(seed.targetSceneId ?? "").trim();
   let expectedTargetReached = !expectedTargetSceneId;
@@ -26185,6 +26215,7 @@ function runPreviewRegressionCase(seed) {
     result.expectedTargetReached = expectedTargetReached;
     result.variableOverrides = variableOverrides;
     result.variableOverrideSummary = variableOverrideSummary;
+    result.conditionTraceSummaries = conditionTraceSummaries.slice(0, 5);
     result.actions = buildPreviewRegressionCaseActions(result);
     return result;
   }
@@ -26294,6 +26325,13 @@ function runPreviewRegressionCase(seed) {
       choosePreviewRegressionOption(session, selectedOption.id);
       steps += 1;
       continue;
+    }
+
+    if (snapshot.blockType === "condition") {
+      const traceSummary = buildPreviewRegressionConditionTraceSummary(snapshot);
+      if (traceSummary && !conditionTraceSummaries.includes(traceSummary)) {
+        conditionTraceSummaries.push(traceSummary);
+      }
     }
 
     previousSnapshot = snapshot;
@@ -26406,6 +26444,13 @@ function renderPreviewRegressionCaseCard(caseResult) {
             : ""
         }
         ${caseResult.variableOverrideSummary ? `<span class="issue-tag">${escapeHtml(`测试预设：${caseResult.variableOverrideSummary}`)}</span>` : ""}
+        ${
+          (caseResult.conditionTraceSummaries ?? []).length > 0
+            ? `<span class="issue-tag">${escapeHtml(`条件诊断：${caseResult.conditionTraceSummaries[0]}`)}${
+                caseResult.conditionTraceSummaries.length > 1 ? "…" : ""
+              }</span>`
+            : ""
+        }
       </div>
       <div class="preview-sprint-actions">
         ${(caseResult.actions ?? []).map((action, index) => renderQuickActionButton(action, index === 0)).join("")}
@@ -29509,6 +29554,7 @@ function buildReleaseControlReportPayload() {
             visitedSceneCount: caseResult.visitedSceneCount,
             choiceCount: caseResult.choiceCount,
             variableOverrideSummary: caseResult.variableOverrideSummary ?? "",
+            conditionTraceSummaries: caseResult.conditionTraceSummaries ?? [],
             expectedTargetReached: Boolean(caseResult.expectedTargetReached),
             selectedOptionTexts: caseResult.selectedOptionTexts ?? [],
           })),
@@ -29753,6 +29799,9 @@ function buildInspectionReportContent() {
         `   细节：${caseResult.detail}`,
         `   步数：${caseResult.steps} / 访问场景：${caseResult.visitedSceneCount} / 选择次数：${caseResult.choiceCount}`,
         caseResult.variableOverrideSummary ? `   测试预设：${caseResult.variableOverrideSummary}` : "",
+        (caseResult.conditionTraceSummaries ?? []).length > 0
+          ? `   条件诊断：${caseResult.conditionTraceSummaries.join(" / ")}`
+          : "",
         caseResult.selectedOptionTexts.length > 0
           ? `   选择路线：${caseResult.selectedOptionTexts.join(" / ")}`
           : "",

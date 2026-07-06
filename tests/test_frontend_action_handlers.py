@@ -4565,6 +4565,8 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("previewRegressionTools.chooseRegressionOption", source)
         self.assertIn("createPreviewRegressionSession(seed.sceneId, variableOverrides)", source)
         self.assertIn("variableOverrideSummary", source)
+        self.assertIn("conditionTraceSummaries", source)
+        self.assertIn("buildPreviewRegressionConditionTraceSummary", source)
         self.assertIn("state.inspectionRegressionResult = runPreviewRegressionSmokeTest", regression_block)
         self.assertIn('state.currentScreen === "preview"', regression_block)
         self.assertIn("renderPreviewScreen();", regression_block)

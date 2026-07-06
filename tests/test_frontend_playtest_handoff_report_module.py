@@ -80,6 +80,8 @@ class FrontendPlaytestHandoffReportModuleTests(unittest.TestCase):
                   visitedSceneCount: 2,
                   choiceCount: 1,
                   selectedOptionTexts: ["留下"],
+                  variableOverrideSummary: "好感度=3",
+                  conditionTraceSummaries: ["条件判断：命中分支 1 -> 教室；好感度 当前 3 >= 2：通过"],
                 }},
                 {{
                   sceneId: "scene_missing",
@@ -94,6 +96,7 @@ class FrontendPlaytestHandoffReportModuleTests(unittest.TestCase):
                   visitedSceneCount: 1,
                   choiceCount: 1,
                   selectedOptionTexts: ["离开"],
+                  conditionTraceSummaries: ["条件判断：命中否则 -> Missing；路线 当前 common contains good：失败"],
                 }},
               ],
             }};
@@ -167,9 +170,15 @@ class FrontendPlaytestHandoffReportModuleTests(unittest.TestCase):
         self.assertEqual(payload["summary"]["blockedRouteCaseCount"], 1)
         self.assertEqual(payload["digest"]["status"], "blocked")
         self.assertEqual(payload["regression"]["summary"]["failCount"], 1)
+        self.assertEqual(payload["regression"]["cases"][0]["variableOverrideSummary"], "好感度=3")
+        self.assertIn("条件判断：命中分支 1", payload["regression"]["cases"][0]["conditionTraceSummaries"][0])
         self.assertIn("# Demo 测试员试玩工单", payload["markdown"])
         self.assertIn("## 重点修复 / 复看路线", payload["markdown"])
+        self.assertIn("条件/变量诊断", payload["markdown"])
+        self.assertIn("好感度 当前 3", payload["markdown"])
         self.assertIn("先修复目标场景缺失", payload["markdown"])
+        self.assertIn('"条件/变量诊断"', payload["csv"])
+        self.assertIn('"条件判断：命中否则 -> Missing；路线 当前 common contains good：失败"', payload["csv"])
         self.assertIn('"优先复看"', payload["csv"])
         self.assertIn('"分支路线"', payload["csv"])
         self.assertIn('"结局路径"', payload["csv"])

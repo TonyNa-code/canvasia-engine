@@ -327,9 +327,18 @@
       visitedSceneCount: toCount(caseResult.visitedSceneCount),
       choiceCount: toCount(caseResult.choiceCount),
       selectedOptionTexts: toArray(caseResult.selectedOptionTexts).filter(Boolean),
+      variableOverrideSummary: caseResult.variableOverrideSummary ?? "",
+      conditionTraceSummaries: toArray(caseResult.conditionTraceSummaries).filter(Boolean),
       priorityScore: toCount(caseResult.priorityScore),
       recommendation: caseResult.recommendation ?? "",
     };
+  }
+
+  function getRegressionCaseDiagnostic(caseResult = {}) {
+    return [
+      caseResult.variableOverrideSummary ? `测试预设：${caseResult.variableOverrideSummary}` : "",
+      ...toArray(caseResult.conditionTraceSummaries),
+    ].filter(Boolean).join(" / ");
   }
 
   function serializeRegressionResult(regressionResult = null, fixQueue = []) {
@@ -455,7 +464,7 @@
     );
     const regressionTable = regression
       ? buildMarkdownTable(
-          ["顺序", "路线", "状态", "来源", "步数", "默认选择", "说明"],
+          ["顺序", "路线", "状态", "来源", "步数", "默认选择", "条件/变量诊断", "说明"],
           regression.cases.map((caseResult) => [
             `${caseResult.order}`,
             caseResult.sceneName,
@@ -463,18 +472,20 @@
             `${caseResult.chapterName} · ${caseResult.sourceLabel}`,
             `${caseResult.steps}`,
             caseResult.selectedOptionTexts.join(" / "),
+            getRegressionCaseDiagnostic(caseResult),
             caseResult.detail || caseResult.reason,
           ])
         )
       : "";
     const fixQueueTable = regression?.fixQueue?.length
       ? buildMarkdownTable(
-          ["优先级", "路线", "状态", "分数", "建议"],
+          ["优先级", "路线", "状态", "分数", "条件/变量诊断", "建议"],
           regression.fixQueue.map((caseResult, index) => [
             `${index + 1}`,
             caseResult.sceneName,
             caseResult.statusLabel,
             `${caseResult.priorityScore}`,
+            getRegressionCaseDiagnostic(caseResult),
             caseResult.recommendation || caseResult.reason,
           ])
         )
@@ -527,7 +538,7 @@
     const routeRows = flattenRouteTestingCases(context.routeTestingPlan);
     const regression = serializeRegressionResult(context.regressionResult, context.regressionFixQueue);
     const rows = [
-      ["项目", "", projectTitle, "", "", "", "", ""],
+      ["项目", "", projectTitle, "", "", "", "", "", ""],
       ...toArray(regression?.fixQueue).map((caseResult, index) => [
         "优先复看",
         `${index + 1}`,
@@ -536,6 +547,7 @@
         caseResult.sourceLabel,
         caseResult.reason,
         caseResult.statusLabel,
+        getRegressionCaseDiagnostic(caseResult),
         caseResult.recommendation || caseResult.detail,
       ]),
       ...routeRows.map((row) => [
@@ -546,11 +558,12 @@
         row.pathLabel,
         row.targetLabel,
         row.statusLabel,
+        "",
         row.testingHint,
       ]),
     ];
 
-    return `\uFEFF${buildCsv(["类型", "序号", "章节", "场景", "入口/路径", "路线/目标", "状态", "测试提示"], rows)}\n`;
+    return `\uFEFF${buildCsv(["类型", "序号", "章节", "场景", "入口/路径", "路线/目标", "状态", "条件/变量诊断", "测试提示"], rows)}\n`;
   }
 
   function buildPlaytestFeedbackRows(context = {}) {
