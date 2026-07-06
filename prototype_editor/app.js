@@ -110,6 +110,7 @@ function getMusicEndModeLabel(mode) {
 }
 
 const editorCommonTools = window.CanvasiaEditorCommon;
+const exportFileNameTools = window.CanvasiaEditorExportFileNames;
 const sanitizeFileName = editorCommonTools.sanitizeFileName;
 const formatCsvCell = editorCommonTools.formatCsvCell;
 const truncateText = editorCommonTools.truncateText;
@@ -252,6 +253,7 @@ const {
 const editorModeTools = window.CanvasiaEditorMode;
 const releaseVersionTools = window.CanvasiaEditorReleaseVersion;
 const releaseControlTools = window.CanvasiaEditorReleaseControl;
+const releaseEvidencePackTools = window.CanvasiaEditorReleaseEvidencePack;
 const DEFAULT_PROJECT_RELEASE_VERSION = releaseVersionTools?.DEFAULT_PROJECT_RELEASE_VERSION ?? "1.0.0-preview";
 
 const {
@@ -3766,6 +3768,18 @@ async function handleClick(event) {
   if (action === "export-release-control-json") {
     refreshCurrentValidation();
     exportReleaseControlJsonReport();
+    if (state.currentScreen === "inspection") {
+      renderInspectionScreen();
+    }
+    if (state.currentScreen === "preview") {
+      renderPreviewScreen();
+    }
+    return;
+  }
+
+  if (action === "export-release-evidence-pack") {
+    refreshCurrentValidation();
+    exportReleaseEvidencePackMarkdown();
     if (state.currentScreen === "inspection") {
       renderInspectionScreen();
     }
@@ -26053,6 +26067,9 @@ function renderReleaseChecklistPanel() {
         <button class="toolbar-button toolbar-button-primary" data-action="export-release-control-report">
           导出发布总控报告
         </button>
+        <button class="toolbar-button toolbar-button-primary" data-action="export-release-evidence-pack">
+          导出发布证据包
+        </button>
         <button class="toolbar-button" data-action="export-release-control-json">
           导出 JSON 数据
         </button>
@@ -28853,6 +28870,10 @@ function renderEndingCollectionOverviewPanel(routeOverview = buildSceneRouteOver
 }
 
 function buildFileNameDateStamp(dateValue = new Date()) {
+  if (exportFileNameTools?.buildFileNameDateStamp) {
+    return exportFileNameTools.buildFileNameDateStamp(dateValue);
+  }
+
   const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
   const safeDate = Number.isNaN(date.getTime()) ? new Date() : date;
   return [
@@ -28863,10 +28884,25 @@ function buildFileNameDateStamp(dateValue = new Date()) {
 }
 
 function getProjectFileNameBase(fallback = "canvasia-engine") {
+  if (exportFileNameTools?.getProjectFileNameBase) {
+    return exportFileNameTools.getProjectFileNameBase({
+      projectTitle: state.data?.project?.title,
+      fallback,
+      sanitizeFileName,
+    });
+  }
+
   return sanitizeFileName(state.data?.project?.title || fallback) || fallback;
 }
 
 function buildDatedProjectFileName(slug, extension = "md") {
+  if (exportFileNameTools?.buildDatedProjectFileName) {
+    return exportFileNameTools.buildDatedProjectFileName(slug, extension, {
+      projectTitle: state.data?.project?.title,
+      sanitizeFileName,
+    });
+  }
+
   const safeSlug = sanitizeFileName(slug) || "export";
   const safeExtension = String(extension ?? "md").replace(/^\.+/, "").trim() || "md";
   return `${getProjectFileNameBase()}_${safeSlug}_${buildFileNameDateStamp()}.${safeExtension}`;
@@ -28980,8 +29016,12 @@ function buildPreviewRegressionDiagnosticBundleFileName(extension = "md") {
   return buildDatedProjectFileName("preview_regression_diagnostics", extension);
 }
 
+function buildReleaseEvidencePackFileName(extension = "md") {
+  return buildDatedProjectFileName("release_evidence_pack", extension);
+}
+
 function buildProjectDoctorRepairReceiptFileName(receipt = state.projectDoctorRepairReceipt) {
-  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
+  const title = getProjectFileNameBase();
   const status = sanitizeFileName(receipt?.status || "receipt");
   const receiptId = sanitizeFileName(getProjectDoctorRepairReceiptDisplayId(receipt));
   return `${title}_project_doctor_${status || "receipt"}_${receiptId || "receipt"}.md`;
@@ -30286,6 +30326,132 @@ function exportReleaseControlJsonReport() {
   showToast(`发布总控 JSON 已导出：${fileName}`);
 }
 
+function buildReleaseEvidenceExportSummary() {
+  const exportResult = state.lastExportResult;
+  if (!exportResult) {
+    return { label: "还没有记录最近一次导出" };
+  }
+
+  const targetLabel =
+    exportResult.target === "native_runtime"
+      ? "原生 Runtime 包"
+      : exportResult.target === "renpy_draft"
+        ? "Ren'Py Starter Bundle"
+        : "Web 试玩包";
+  return {
+    label: [targetLabel, exportResult.archiveName || exportResult.appBundleName || ""].filter(Boolean).join(" · "),
+    target: exportResult.target ?? "",
+    archiveName: exportResult.archiveName ?? "",
+  };
+}
+
+function buildReleaseEvidencePackContext() {
+  const generatedAt = formatDate(new Date().toISOString());
+  const routeOverview = buildSceneRouteOverview();
+  const releaseCandidateManifest = buildReleaseCandidateManifest(routeOverview);
+  const runtimeCapabilityMatrix = buildRuntimeCapabilityMatrix();
+  const localizationCoverage = buildLocalizationCoverage();
+  const productionBacklog = buildProductionBacklog(routeOverview);
+  const playtestContext = buildPlaytestHandoffContext();
+  const releaseCandidateMarkdown = releaseCandidateManifestTools.buildReleaseCandidateMarkdown(releaseCandidateManifest, {
+    projectTitle: state.data?.project?.title || "Canvasia Project",
+    generatedAt,
+  });
+  const runtimeCapabilityMarkdown = runtimeCapabilityMatrixTools.buildRuntimeCapabilityMarkdown(runtimeCapabilityMatrix, {
+    projectTitle: state.data?.project?.title || "Canvasia Project",
+    generatedAt,
+  });
+  const localizationCoverageMarkdown = localizationCoverageTools.buildLocalizationCoverageMarkdown(localizationCoverage, {
+    projectTitle: state.data?.project?.title || "Canvasia Project",
+    generatedAt,
+  });
+  const productionBacklogMarkdown = productionBacklogTools.buildProductionBacklogMarkdown(productionBacklog, {
+    projectTitle: state.data?.project?.title || "Canvasia Project",
+    generatedAt,
+  });
+  const regressionDiagnosticMarkdown = buildPreviewRegressionDiagnosticBundleMarkdown();
+  const playtestHandoffMarkdown = playtestHandoffReportTools.buildPlaytestHandoffMarkdown(playtestContext);
+
+  return {
+    projectTitle: state.data?.project?.title || "Canvasia Project",
+    generatedAt,
+    releaseVersion: getProjectReleaseVersion(),
+    editorModeLabel: getEditorModeLabel(getProjectEditorMode()),
+    validation: {
+      errorCount: state.validation?.errors?.length ?? 0,
+      warningCount: state.validation?.warnings?.length ?? 0,
+    },
+    regressionSummary: state.inspectionRegressionResult?.summary ?? {
+      total: 0,
+      passCount: 0,
+      warnCount: 0,
+      failCount: 0,
+    },
+    exportSummary: buildReleaseEvidenceExportSummary(),
+    sections: [
+      {
+        id: "release_control",
+        title: "发布总控报告",
+        fileName: buildReleaseControlReportFileName(),
+        description: "当前发布状态、阻塞项、修复顺序和下一步建议。",
+        content: buildReleaseControlReportContent(),
+      },
+      {
+        id: "release_candidate_manifest",
+        title: "Release Candidate Manifest",
+        fileName: buildReleaseCandidateManifestFileName("md"),
+        description: "把当前项目状态整理成测试、翻译、Runtime 和公开预览交接清单。",
+        content: releaseCandidateMarkdown,
+      },
+      {
+        id: "runtime_capability",
+        title: "Runtime 覆盖与验收矩阵",
+        fileName: buildRuntimeCapabilityFileName("md"),
+        description: "确认各类剧情块、演出、音画和导出能力是否被 Runtime 覆盖。",
+        content: runtimeCapabilityMarkdown,
+      },
+      {
+        id: "localization_coverage",
+        title: "多语言覆盖报告",
+        fileName: buildLocalizationCoverageFileName("md"),
+        description: "检查中日英等文本覆盖、缺翻译和可导入翻译范围。",
+        content: localizationCoverageMarkdown,
+      },
+      {
+        id: "production_backlog",
+        title: "生产待办队列",
+        fileName: buildProductionBacklogFileName("md"),
+        description: "把脚本、素材、语音、演出和发布缺口排成可执行待办。",
+        content: productionBacklogMarkdown,
+      },
+      {
+        id: "regression_diagnostics",
+        title: "自动回归诊断包",
+        fileName: buildPreviewRegressionDiagnosticBundleFileName("md"),
+        description: "失败路线、条件判断、变量预设和优先修复建议。",
+        content: regressionDiagnosticMarkdown,
+        emptyMessage: "还没有执行自动回归试玩路线测试。先在预览导出页跑一次自动回归，再导出证据包会更完整。",
+      },
+      {
+        id: "playtest_handoff",
+        title: "测试员工单",
+        fileName: buildPlaytestHandoffFileName("md"),
+        description: "可直接发给测试员或群友的试玩任务与反馈说明。",
+        content: playtestHandoffMarkdown,
+      },
+    ],
+  };
+}
+
+function exportReleaseEvidencePackMarkdown() {
+  const fileName = buildReleaseEvidencePackFileName("md");
+  const content = releaseEvidencePackTools.buildReleaseEvidencePackMarkdown(buildReleaseEvidencePackContext());
+  downloadTextFile(fileName, content, "text/markdown;charset=utf-8");
+  setSaveStatus(`已导出发布证据包：${fileName}`);
+  showToast(`发布证据包已导出：${fileName}`);
+  return true;
+}
+
 function exportRouteTestingPlanMarkdown() {
   const fileName = buildRouteTestingPlanFileName("md");
   const routeOverview = buildSceneRouteOverview();
@@ -31554,6 +31720,9 @@ function renderReleaseFixOrderPanel(routeOverview) {
         </button>
         <button class="toolbar-button" data-action="export-release-control-report">
           导出发布总控报告
+        </button>
+        <button class="toolbar-button toolbar-button-primary" data-action="export-release-evidence-pack">
+          导出发布证据包
         </button>
         <button class="toolbar-button" data-action="export-release-control-json">
           导出 JSON 数据

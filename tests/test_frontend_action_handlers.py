@@ -4809,6 +4809,7 @@ class FrontendActionHandlerTests(unittest.TestCase):
             }}
             function setSaveStatus(message, isError = false) {{ statuses.push({{ message, isError }}); }}
             function showToast(message, tone = "soft") {{ toasts.push({{ message, tone }}); }}
+            const exportFileNameTools = null;
             function buildFileNameDateStamp(dateValue = new Date()) {build_date_stamp}
             function getProjectFileNameBase(fallback = "canvasia-engine") {get_file_base}
             function buildDatedProjectFileName(slug, extension = "md") {build_dated_file}
@@ -5300,6 +5301,68 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("unlockableContentManifest: buildUnlockableContentManifest(currentRouteOverview)", source)
         self.assertIn("Release Candidate Manifest", combined_source)
         self.assertIn("Manual signoff checklist", module_source)
+
+    def test_release_evidence_pack_export_action_is_wired_and_reports_result(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        module_source = (EDITOR_DIR / "modules" / "release_evidence_pack.js").read_text(encoding="utf-8")
+        combined_source = f"{source}\n{module_source}"
+        click_handler = _extract_function_source(source, "handleClick")
+        action_block_start = click_handler.index('action === "export-release-evidence-pack"')
+        action_block_end = click_handler.index('action === "export-route-testing-plan-markdown"', action_block_start)
+        action_block = click_handler[action_block_start:action_block_end]
+        export_pack = _extract_function_source(source, "exportReleaseEvidencePackMarkdown")
+        script = textwrap.dedent(
+            f"""
+            const calls = [];
+            const statuses = [];
+            const toasts = [];
+            const releaseEvidencePackTools = {{
+              buildReleaseEvidencePackMarkdown(context) {{
+                calls.push({{ type: "build", sectionCount: context.sections.length }});
+                return `# ${{context.projectTitle}} 发布证据包`;
+              }},
+            }};
+            function buildReleaseEvidencePackFileName() {{ return "demo_release_evidence_pack_20260706.md"; }}
+            function buildReleaseEvidencePackContext() {{
+              return {{
+                projectTitle: "Demo",
+                sections: [{{ title: "发布总控报告", content: "# 发布总控" }}],
+              }};
+            }}
+            function downloadTextFile(fileName, content, mimeType) {{
+              calls.push({{ type: "download", fileName, content, mimeType }});
+            }}
+            function setSaveStatus(message, isError = false) {{ statuses.push({{ message, isError }}); }}
+            function showToast(message, tone = "soft") {{ toasts.push({{ message, tone }}); }}
+            function exportReleaseEvidencePackMarkdown() {export_pack}
+            const exportedResult = exportReleaseEvidencePackMarkdown();
+            process.stdout.write(JSON.stringify({{ exportedResult, calls, statuses, toasts }}));
+            """
+        )
+        completed = subprocess.run(
+            ["node", "--input-type=module", "-e", script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        self.assertIn("const releaseEvidencePackTools = window.CanvasiaEditorReleaseEvidencePack", source)
+        self.assertIn('data-action="export-release-evidence-pack"', combined_source)
+        self.assertIn("exportReleaseEvidencePackMarkdown();", action_block)
+        self.assertIn("function buildReleaseEvidencePackContext()", source)
+        self.assertIn("buildReleaseControlReportContent()", source)
+        self.assertIn("buildPreviewRegressionDiagnosticBundleMarkdown()", source)
+        self.assertIn("playtestHandoffReportTools.buildPlaytestHandoffMarkdown", source)
+        self.assertIn("releaseEvidencePackTools.buildReleaseEvidencePackMarkdown", source)
+        self.assertTrue(payload["exportedResult"])
+        self.assertEqual(payload["calls"][0], {"type": "build", "sectionCount": 1})
+        self.assertEqual(payload["calls"][1]["fileName"], "demo_release_evidence_pack_20260706.md")
+        self.assertEqual(payload["calls"][1]["mimeType"], "text/markdown;charset=utf-8")
+        self.assertEqual(payload["statuses"][-1]["message"], "已导出发布证据包：demo_release_evidence_pack_20260706.md")
+        self.assertEqual(payload["toasts"][-1]["message"], "发布证据包已导出：demo_release_evidence_pack_20260706.md")
 
     def test_scene_save_payload_preserves_scene_name_translations(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
