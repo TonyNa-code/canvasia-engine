@@ -113,6 +113,63 @@ class FrontendRegressionDiagnosticsModuleTests(unittest.TestCase):
         self.assertEqual(payload["location"], "scene_loop / block_condition")
         self.assertEqual(payload["seedOnlyLocation"], "scene_01")
 
+    def test_regression_diagnostics_builds_bundle_markdown_for_fix_queue(self) -> None:
+        payload = self.run_regression_diagnostics_script(
+            """
+            const regressionResult = {
+              summary: { total: 3, passCount: 1, warnCount: 1, failCount: 1 },
+              cases: [
+                { id: "pass", sceneName: "开场", status: "pass", statusLabel: "已走通" },
+                {
+                  id: "fail",
+                  sceneName: "循环测试",
+                  chapterName: "第一章",
+                  sourceLabel: "章节起点",
+                  status: "fail",
+                  statusLabel: "疑似死循环",
+                  reason: "这条路线反复回到同一个步骤。",
+                  detail: "重复命中条件分支。",
+                  steps: 20,
+                  visitedSceneCount: 3,
+                  choiceCount: 1,
+                  variableOverrideSummary: "好感度=3",
+                  conditionTraceSummaries: ["条件判断：命中分支 1 -> 循环测试；好感度 当前 3 >= 2：通过"],
+                  recommendation: "先修循环条件。",
+                },
+                {
+                  id: "warn",
+                  sceneName: "过短结尾",
+                  chapterName: "第一章",
+                  sourceLabel: "章节起点",
+                  status: "warn",
+                  statusLabel: "需要复看",
+                  reason: "结束得太快。",
+                  steps: 1,
+                  visitedSceneCount: 1,
+                  choiceCount: 0,
+                },
+              ],
+            };
+            const markdown = tools.buildRegressionDiagnosticBundleMarkdown({
+              projectTitle: "Demo",
+              generatedAt: "2026-07-06T10:00:00+08:00",
+              regressionResult,
+              fixQueue: regressionResult.cases.filter((item) => item.status !== "pass"),
+            });
+            process.stdout.write(JSON.stringify({ markdown }));
+            """
+        )
+
+        self.assertIn("# Demo 自动回归诊断包", payload["markdown"])
+        self.assertIn("- 已测试：3 条", payload["markdown"])
+        self.assertIn("- 通过：1 条", payload["markdown"])
+        self.assertIn("- 需要复看：1 条", payload["markdown"])
+        self.assertIn("- 失败：1 条", payload["markdown"])
+        self.assertIn("## 1. 优先修复：循环测试", payload["markdown"])
+        self.assertIn("建议动作：先修循环条件。", payload["markdown"])
+        self.assertIn("## 2. 发布前复看：过短结尾", payload["markdown"])
+        self.assertNotIn("## 3.", payload["markdown"])
+
 
 if __name__ == "__main__":
     unittest.main()

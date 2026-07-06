@@ -2757,6 +2757,11 @@ async function handleClick(event) {
     return;
   }
 
+  if (action === "copy-regression-diagnostic-bundle") {
+    await copyPreviewRegressionDiagnosticBundle();
+    return;
+  }
+
   if (action === "reload-editor-page") {
     reloadEditorPage();
     return;
@@ -26592,6 +26597,55 @@ async function copyPreviewRegressionDiagnostic(caseId) {
   return true;
 }
 
+function buildPreviewRegressionDiagnosticBundleMarkdown() {
+  const regressionResult = state.inspectionRegressionResult;
+  if (!regressionResult) {
+    return "";
+  }
+
+  const fixQueue = buildPreviewRegressionFixQueue();
+  if (regressionDiagnosticTools?.buildRegressionDiagnosticBundleMarkdown) {
+    return regressionDiagnosticTools.buildRegressionDiagnosticBundleMarkdown({
+      projectTitle: state.data?.project?.title ?? "Canvasia Project",
+      generatedAt: new Date().toISOString(),
+      regressionResult,
+      fixQueue,
+    });
+  }
+
+  return [
+    `# ${state.data?.project?.title ?? "Canvasia Project"} 自动回归诊断包`,
+    "",
+    `- 已测试：${regressionResult.summary?.total ?? regressionResult.cases?.length ?? 0} 条`,
+    `- 失败：${regressionResult.summary?.failCount ?? 0} 条`,
+    `- 需要复看：${regressionResult.summary?.warnCount ?? 0} 条`,
+    "",
+    ...(fixQueue.length
+      ? fixQueue.map((caseResult) => buildPreviewRegressionDiagnosticClipboardSummary(caseResult))
+      : ["当前没有失败或需要复看的回归路线。"]),
+  ].join("\n");
+}
+
+async function copyPreviewRegressionDiagnosticBundle() {
+  const markdown = buildPreviewRegressionDiagnosticBundleMarkdown();
+  if (!markdown) {
+    setSaveStatus("还没有可复制的回归诊断包", true);
+    showToast("先跑一次自动回归，再复制诊断包", "error");
+    return false;
+  }
+
+  const copied = await copyTextToClipboard(markdown);
+  if (!copied) {
+    setSaveStatus("回归诊断包复制失败", true);
+    showToast("复制失败，可以改用导出测试员工单", "error");
+    return false;
+  }
+
+  setSaveStatus("已复制整轮回归诊断包");
+  showToast("回归诊断包已复制");
+  return true;
+}
+
 function renderPreviewRegressionPanel(routeOverview) {
   const result = state.inspectionRegressionResult;
   const focusSceneNames = (result?.seeds ?? buildPreviewRegressionSeeds(routeOverview))
@@ -26612,6 +26666,9 @@ function renderPreviewRegressionPanel(routeOverview) {
         </button>
         <button class="toolbar-button" data-action="export-inspection-report">
           导出带回归结果的巡检报告
+        </button>
+        <button class="toolbar-button" data-action="copy-regression-diagnostic-bundle" ${result ? "" : "disabled"}>
+          复制诊断包
         </button>
         <button class="toolbar-button" data-action="export-playtest-handoff-markdown">
           导出测试员工单

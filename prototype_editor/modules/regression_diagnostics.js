@@ -108,7 +108,62 @@
     ].filter(Boolean).join("\n");
   }
 
+  function getRegressionSummary(regressionResult = {}) {
+    return regressionResult.summary && typeof regressionResult.summary === "object"
+      ? regressionResult.summary
+      : {
+          total: toArray(regressionResult.cases).length,
+          passCount: toArray(regressionResult.cases).filter((caseResult) => caseResult?.status === "pass").length,
+          warnCount: toArray(regressionResult.cases).filter((caseResult) => caseResult?.status === "warn").length,
+          failCount: toArray(regressionResult.cases).filter((caseResult) => caseResult?.status === "fail").length,
+        };
+  }
+
+  function buildRegressionDiagnosticBundleMarkdown({
+    projectTitle = "Canvasia Project",
+    generatedAt = new Date().toISOString(),
+    regressionResult = null,
+    fixQueue = [],
+  } = {}) {
+    const cases = toArray(regressionResult?.cases);
+    const queue = toArray(fixQueue);
+    const summary = getRegressionSummary(regressionResult ?? { cases });
+    const queueCases = queue.length ? queue : cases.filter((caseResult) => caseResult?.status && caseResult.status !== "pass");
+    const caseSections = queueCases.map((caseResult, index) =>
+      buildRegressionDiagnosticClipboardSummary(caseResult, {
+        heading: `## ${index + 1}. ${caseResult?.status === "fail" ? "优先修复" : "发布前复看"}`,
+        recommendation: caseResult?.recommendation,
+      })
+    );
+
+    return [
+      `# ${cleanText(projectTitle, "Canvasia Project")} 自动回归诊断包`,
+      "",
+      `生成时间：${cleanText(generatedAt)}`,
+      "",
+      "## 总览",
+      "",
+      `- 已测试：${summary.total ?? cases.length} 条`,
+      `- 通过：${summary.passCount ?? 0} 条`,
+      `- 需要复看：${summary.warnCount ?? 0} 条`,
+      `- 失败：${summary.failCount ?? 0} 条`,
+      `- 优先修复 / 复看队列：${queueCases.length} 条`,
+      "",
+      "## 使用建议",
+      "",
+      "1. 先处理“优先修复”里的失败路线，再处理“发布前复看”。",
+      "2. 每修完一条后重新跑自动回归，确认同一路线不再出现。",
+      "3. 如果条件判断里出现变量预设，优先检查变量默认值、选项效果和条件分支。",
+      "",
+      "## 优先路线诊断",
+      "",
+      caseSections.length ? caseSections.join("\n\n") : "当前没有失败或需要复看的回归路线。",
+      "",
+    ].join("\n");
+  }
+
   global.CanvasiaEditorRegressionDiagnostics = Object.freeze({
+    buildRegressionDiagnosticBundleMarkdown,
     buildRegressionDiagnosticClipboardSummary,
     cleanText,
     compactText,

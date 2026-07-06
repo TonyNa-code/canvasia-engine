@@ -4690,9 +4690,86 @@ class FrontendActionHandlerTests(unittest.TestCase):
         click_handler = _extract_function_source(source, "handleClick")
 
         self.assertIn('data-action="copy-regression-diagnostic"', source)
+        self.assertIn('data-action="copy-regression-diagnostic-bundle"', source)
         self.assertIn('data-regression-case-id="${escapeHtml', source)
         self.assertIn('action === "copy-regression-diagnostic"', click_handler)
+        self.assertIn('action === "copy-regression-diagnostic-bundle"', click_handler)
         self.assertIn("await copyPreviewRegressionDiagnostic(actionTarget.dataset.regressionCaseId)", click_handler)
+        self.assertIn("await copyPreviewRegressionDiagnosticBundle()", click_handler)
+
+    def test_preview_regression_diagnostic_bundle_copy_reports_result(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        build_bundle = _extract_function_source(source, "buildPreviewRegressionDiagnosticBundleMarkdown")
+        copy_bundle = _extract_function_source(source, "copyPreviewRegressionDiagnosticBundle")
+        script = textwrap.dedent(
+            f"""
+            const statuses = [];
+            const toasts = [];
+            const copiedTexts = [];
+            let copyResult = true;
+            const state = {{
+              data: {{ project: {{ title: "Demo" }} }},
+              inspectionRegressionResult: null,
+            }};
+            const regressionDiagnosticTools = {{
+              buildRegressionDiagnosticBundleMarkdown(context) {{
+                return `BUNDLE:${{context.projectTitle}}:${{context.fixQueue.length}}`;
+              }},
+            }};
+            function buildPreviewRegressionFixQueue() {{
+              return state.inspectionRegressionResult
+                ? state.inspectionRegressionResult.cases.filter((caseResult) => caseResult.status !== "pass")
+                : [];
+            }}
+            function setSaveStatus(message, isError = false) {{ statuses.push({{ message, isError }}); }}
+            function showToast(message, tone = "soft") {{ toasts.push({{ message, tone }}); }}
+            async function copyTextToClipboard(text) {{
+              copiedTexts.push(text);
+              return copyResult;
+            }}
+            function buildPreviewRegressionDiagnosticBundleMarkdown() {build_bundle}
+            async function copyPreviewRegressionDiagnosticBundle() {copy_bundle}
+
+            const missingResult = await copyPreviewRegressionDiagnosticBundle();
+            state.inspectionRegressionResult = {{
+              summary: {{ total: 2, passCount: 1, warnCount: 0, failCount: 1 }},
+              cases: [
+                {{ id: "pass", status: "pass", sceneName: "开场" }},
+                {{ id: "fail", status: "fail", sceneName: "坏链" }},
+              ],
+            }};
+            copyResult = false;
+            const failedResult = await copyPreviewRegressionDiagnosticBundle();
+            copyResult = true;
+            const succeededResult = await copyPreviewRegressionDiagnosticBundle();
+            process.stdout.write(JSON.stringify({{
+              missingResult,
+              failedResult,
+              succeededResult,
+              copiedTexts,
+              statuses,
+              toasts,
+            }}));
+            """
+        )
+        completed = subprocess.run(
+            ["node", "--input-type=module", "-e", script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        self.assertFalse(payload["missingResult"])
+        self.assertFalse(payload["failedResult"])
+        self.assertTrue(payload["succeededResult"])
+        self.assertEqual(payload["statuses"][0]["message"], "还没有可复制的回归诊断包")
+        self.assertEqual(payload["statuses"][1]["message"], "回归诊断包复制失败")
+        self.assertEqual(payload["statuses"][-1]["message"], "已复制整轮回归诊断包")
+        self.assertEqual(payload["copiedTexts"], ["BUNDLE:Demo:1", "BUNDLE:Demo:1"])
+        self.assertEqual(payload["toasts"][-1]["message"], "回归诊断包已复制")
 
     def test_audio_cue_sheet_export_actions_are_wired(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
