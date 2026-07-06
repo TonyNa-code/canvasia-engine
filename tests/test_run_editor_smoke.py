@@ -411,6 +411,22 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertIn("cueType,status,chapter", csv_text)
         return payload
 
+    def assert_export_stage_direction_files(self, build_dir: Path) -> dict:
+        manifest_path = build_dir / run_editor.EXPORT_STAGE_DIRECTION_JSON_NAME
+        report_path = build_dir / run_editor.EXPORT_STAGE_DIRECTION_REPORT_NAME
+        csv_path = build_dir / run_editor.EXPORT_STAGE_DIRECTION_CSV_NAME
+        self.assertTrue(manifest_path.is_file())
+        self.assertTrue(report_path.is_file())
+        self.assertTrue(csv_path.is_file())
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+        report = report_path.read_text(encoding="utf-8")
+        csv_text = csv_path.read_text(encoding="utf-8")
+        self.assertEqual(payload["formatVersion"], 1)
+        self.assertIn("releaseReadinessPercent", payload["summary"])
+        self.assertIn("角色舞台调度表", report)
+        self.assertIn("status,type,chapter", csv_text)
+        return payload
+
     def assert_export_voice_production_files(self, build_dir: Path) -> dict:
         manifest_path = build_dir / run_editor.EXPORT_VOICE_PRODUCTION_JSON_NAME
         report_path = build_dir / run_editor.EXPORT_VOICE_PRODUCTION_REPORT_NAME
@@ -3114,6 +3130,9 @@ class RunEditorSmokeTests(unittest.TestCase):
         audio_cue_payload = self.assert_export_audio_cue_sheet_files(build_dir)
         self.assertEqual(export_result["audioCueSheetName"], run_editor.EXPORT_AUDIO_CUE_SHEET_JSON_NAME)
         self.assertEqual(export_result["audioCueSheetReportName"], run_editor.EXPORT_AUDIO_CUE_SHEET_REPORT_NAME)
+        stage_direction_payload = self.assert_export_stage_direction_files(build_dir)
+        self.assertEqual(export_result["stageDirectionName"], run_editor.EXPORT_STAGE_DIRECTION_JSON_NAME)
+        self.assertEqual(export_result["stageDirectionReportName"], run_editor.EXPORT_STAGE_DIRECTION_REPORT_NAME)
         voice_production_payload = self.assert_export_voice_production_files(build_dir)
         self.assertEqual(export_result["voiceProductionName"], run_editor.EXPORT_VOICE_PRODUCTION_JSON_NAME)
         self.assertEqual(export_result["voiceProductionReportName"], run_editor.EXPORT_VOICE_PRODUCTION_REPORT_NAME)
@@ -3164,6 +3183,9 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["audioCueSheet"], run_editor.EXPORT_AUDIO_CUE_SHEET_JSON_NAME)
         self.assertEqual(manifest["files"]["audioCueSheetReport"], run_editor.EXPORT_AUDIO_CUE_SHEET_REPORT_NAME)
         self.assertEqual(manifest["files"]["audioCueSheetCsv"], run_editor.EXPORT_AUDIO_CUE_SHEET_CSV_NAME)
+        self.assertEqual(manifest["files"]["stageDirection"], run_editor.EXPORT_STAGE_DIRECTION_JSON_NAME)
+        self.assertEqual(manifest["files"]["stageDirectionReport"], run_editor.EXPORT_STAGE_DIRECTION_REPORT_NAME)
+        self.assertEqual(manifest["files"]["stageDirectionCsv"], run_editor.EXPORT_STAGE_DIRECTION_CSV_NAME)
         self.assertEqual(manifest["files"]["voiceProduction"], run_editor.EXPORT_VOICE_PRODUCTION_JSON_NAME)
         self.assertEqual(manifest["files"]["voiceProductionReport"], run_editor.EXPORT_VOICE_PRODUCTION_REPORT_NAME)
         self.assertEqual(manifest["files"]["voiceProductionCsv"], run_editor.EXPORT_VOICE_PRODUCTION_CSV_NAME)
@@ -3188,6 +3210,9 @@ class RunEditorSmokeTests(unittest.TestCase):
                 run_editor.EXPORT_AUDIO_CUE_SHEET_JSON_NAME,
                 run_editor.EXPORT_AUDIO_CUE_SHEET_REPORT_NAME,
                 run_editor.EXPORT_AUDIO_CUE_SHEET_CSV_NAME,
+                run_editor.EXPORT_STAGE_DIRECTION_JSON_NAME,
+                run_editor.EXPORT_STAGE_DIRECTION_REPORT_NAME,
+                run_editor.EXPORT_STAGE_DIRECTION_CSV_NAME,
                 run_editor.EXPORT_VOICE_PRODUCTION_JSON_NAME,
                 run_editor.EXPORT_VOICE_PRODUCTION_REPORT_NAME,
                 run_editor.EXPORT_VOICE_PRODUCTION_CSV_NAME,
@@ -3213,6 +3238,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(provenance["build"]["target"], run_editor.EXPORT_TARGET_WEB)
         self.assertEqual(asset_rights_payload["summary"]["assetCount"], 0)
         self.assertGreaterEqual(audio_cue_payload["summary"]["cueCount"], 0)
+        self.assertGreaterEqual(stage_direction_payload["summary"]["eventCount"], 0)
         self.assertGreaterEqual(voice_production_payload["summary"]["lineCount"], 0)
         self.assert_export_provenance_verifier_detects_tamper(export_result, "player.css")
 
@@ -3536,6 +3562,10 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(export_result["audioCueSheetName"], run_editor.EXPORT_AUDIO_CUE_SHEET_JSON_NAME)
         self.assertEqual(export_result["audioCueSheetReportName"], run_editor.EXPORT_AUDIO_CUE_SHEET_REPORT_NAME)
         self.assertGreaterEqual(audio_cue_payload["summary"]["cueCount"], 1)
+        stage_direction_payload = self.assert_export_stage_direction_files(build_dir)
+        self.assertEqual(export_result["stageDirectionName"], run_editor.EXPORT_STAGE_DIRECTION_JSON_NAME)
+        self.assertEqual(export_result["stageDirectionReportName"], run_editor.EXPORT_STAGE_DIRECTION_REPORT_NAME)
+        self.assertGreaterEqual(stage_direction_payload["summary"]["eventCount"], 1)
         voice_production_payload = self.assert_export_voice_production_files(build_dir)
         self.assertEqual(export_result["voiceProductionName"], run_editor.EXPORT_VOICE_PRODUCTION_JSON_NAME)
         self.assertEqual(export_result["voiceProductionReportName"], run_editor.EXPORT_VOICE_PRODUCTION_REPORT_NAME)
@@ -3663,6 +3693,9 @@ class RunEditorSmokeTests(unittest.TestCase):
             any(item["name"] == export_result["audioCueSheetReportName"] for item in release_artifact_payload["insideArchiveReports"])
         )
         self.assertTrue(
+            any(item["name"] == export_result["stageDirectionReportName"] for item in release_artifact_payload["insideArchiveReports"])
+        )
+        self.assertTrue(
             any(item["name"] == export_result["voiceProductionReportName"] for item in release_artifact_payload["insideArchiveReports"])
         )
         self.assertTrue(
@@ -3720,6 +3753,10 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["audioCueSheetReport"], run_editor.EXPORT_AUDIO_CUE_SHEET_REPORT_NAME)
         self.assertEqual(manifest["files"]["audioCueSheetCsv"], run_editor.EXPORT_AUDIO_CUE_SHEET_CSV_NAME)
         self.assertEqual(manifest["runtime"]["audioCueSheet"], run_editor.EXPORT_AUDIO_CUE_SHEET_JSON_NAME)
+        self.assertEqual(manifest["files"]["stageDirection"], run_editor.EXPORT_STAGE_DIRECTION_JSON_NAME)
+        self.assertEqual(manifest["files"]["stageDirectionReport"], run_editor.EXPORT_STAGE_DIRECTION_REPORT_NAME)
+        self.assertEqual(manifest["files"]["stageDirectionCsv"], run_editor.EXPORT_STAGE_DIRECTION_CSV_NAME)
+        self.assertEqual(manifest["runtime"]["stageDirection"], run_editor.EXPORT_STAGE_DIRECTION_JSON_NAME)
         self.assertEqual(manifest["files"]["voiceProduction"], run_editor.EXPORT_VOICE_PRODUCTION_JSON_NAME)
         self.assertEqual(manifest["files"]["voiceProductionReport"], run_editor.EXPORT_VOICE_PRODUCTION_REPORT_NAME)
         self.assertEqual(manifest["files"]["voiceProductionCsv"], run_editor.EXPORT_VOICE_PRODUCTION_CSV_NAME)
@@ -3747,6 +3784,9 @@ class RunEditorSmokeTests(unittest.TestCase):
                 run_editor.EXPORT_AUDIO_CUE_SHEET_JSON_NAME,
                 run_editor.EXPORT_AUDIO_CUE_SHEET_REPORT_NAME,
                 run_editor.EXPORT_AUDIO_CUE_SHEET_CSV_NAME,
+                run_editor.EXPORT_STAGE_DIRECTION_JSON_NAME,
+                run_editor.EXPORT_STAGE_DIRECTION_REPORT_NAME,
+                run_editor.EXPORT_STAGE_DIRECTION_CSV_NAME,
                 run_editor.EXPORT_VOICE_PRODUCTION_JSON_NAME,
                 run_editor.EXPORT_VOICE_PRODUCTION_REPORT_NAME,
                 run_editor.EXPORT_VOICE_PRODUCTION_CSV_NAME,
@@ -4366,6 +4406,8 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(export_result["assetRightsName"], run_editor.EXPORT_ASSET_RIGHTS_JSON_NAME)
         self.assert_export_audio_cue_sheet_files(build_dir)
         self.assertEqual(export_result["audioCueSheetName"], run_editor.EXPORT_AUDIO_CUE_SHEET_JSON_NAME)
+        self.assert_export_stage_direction_files(build_dir)
+        self.assertEqual(export_result["stageDirectionName"], run_editor.EXPORT_STAGE_DIRECTION_JSON_NAME)
         self.assert_export_voice_production_files(build_dir)
         self.assertEqual(export_result["voiceProductionName"], run_editor.EXPORT_VOICE_PRODUCTION_JSON_NAME)
         route_map_payload = self.assert_export_story_route_map_files(
@@ -4398,6 +4440,9 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["audioCueSheet"], run_editor.EXPORT_AUDIO_CUE_SHEET_JSON_NAME)
         self.assertEqual(manifest["files"]["audioCueSheetReport"], run_editor.EXPORT_AUDIO_CUE_SHEET_REPORT_NAME)
         self.assertEqual(manifest["files"]["audioCueSheetCsv"], run_editor.EXPORT_AUDIO_CUE_SHEET_CSV_NAME)
+        self.assertEqual(manifest["files"]["stageDirection"], run_editor.EXPORT_STAGE_DIRECTION_JSON_NAME)
+        self.assertEqual(manifest["files"]["stageDirectionReport"], run_editor.EXPORT_STAGE_DIRECTION_REPORT_NAME)
+        self.assertEqual(manifest["files"]["stageDirectionCsv"], run_editor.EXPORT_STAGE_DIRECTION_CSV_NAME)
         self.assertEqual(manifest["files"]["voiceProduction"], run_editor.EXPORT_VOICE_PRODUCTION_JSON_NAME)
         self.assertEqual(manifest["files"]["voiceProductionReport"], run_editor.EXPORT_VOICE_PRODUCTION_REPORT_NAME)
         self.assertEqual(manifest["files"]["voiceProductionCsv"], run_editor.EXPORT_VOICE_PRODUCTION_CSV_NAME)
@@ -4422,6 +4467,9 @@ class RunEditorSmokeTests(unittest.TestCase):
                 run_editor.EXPORT_AUDIO_CUE_SHEET_JSON_NAME,
                 run_editor.EXPORT_AUDIO_CUE_SHEET_REPORT_NAME,
                 run_editor.EXPORT_AUDIO_CUE_SHEET_CSV_NAME,
+                run_editor.EXPORT_STAGE_DIRECTION_JSON_NAME,
+                run_editor.EXPORT_STAGE_DIRECTION_REPORT_NAME,
+                run_editor.EXPORT_STAGE_DIRECTION_CSV_NAME,
                 run_editor.EXPORT_VOICE_PRODUCTION_JSON_NAME,
                 run_editor.EXPORT_VOICE_PRODUCTION_REPORT_NAME,
                 run_editor.EXPORT_VOICE_PRODUCTION_CSV_NAME,
@@ -4480,6 +4528,8 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(export_result["assetRightsName"], run_editor.EXPORT_ASSET_RIGHTS_JSON_NAME)
         self.assert_export_audio_cue_sheet_files(build_dir)
         self.assertEqual(export_result["audioCueSheetName"], run_editor.EXPORT_AUDIO_CUE_SHEET_JSON_NAME)
+        self.assert_export_stage_direction_files(build_dir)
+        self.assertEqual(export_result["stageDirectionName"], run_editor.EXPORT_STAGE_DIRECTION_JSON_NAME)
         self.assert_export_voice_production_files(build_dir)
         self.assertEqual(export_result["voiceProductionName"], run_editor.EXPORT_VOICE_PRODUCTION_JSON_NAME)
         route_map_payload = self.assert_export_story_route_map_files(
@@ -4512,6 +4562,9 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["audioCueSheet"], run_editor.EXPORT_AUDIO_CUE_SHEET_JSON_NAME)
         self.assertEqual(manifest["files"]["audioCueSheetReport"], run_editor.EXPORT_AUDIO_CUE_SHEET_REPORT_NAME)
         self.assertEqual(manifest["files"]["audioCueSheetCsv"], run_editor.EXPORT_AUDIO_CUE_SHEET_CSV_NAME)
+        self.assertEqual(manifest["files"]["stageDirection"], run_editor.EXPORT_STAGE_DIRECTION_JSON_NAME)
+        self.assertEqual(manifest["files"]["stageDirectionReport"], run_editor.EXPORT_STAGE_DIRECTION_REPORT_NAME)
+        self.assertEqual(manifest["files"]["stageDirectionCsv"], run_editor.EXPORT_STAGE_DIRECTION_CSV_NAME)
         self.assertEqual(manifest["files"]["voiceProduction"], run_editor.EXPORT_VOICE_PRODUCTION_JSON_NAME)
         self.assertEqual(manifest["files"]["voiceProductionReport"], run_editor.EXPORT_VOICE_PRODUCTION_REPORT_NAME)
         self.assertEqual(manifest["files"]["voiceProductionCsv"], run_editor.EXPORT_VOICE_PRODUCTION_CSV_NAME)
@@ -4536,6 +4589,9 @@ class RunEditorSmokeTests(unittest.TestCase):
                 run_editor.EXPORT_AUDIO_CUE_SHEET_JSON_NAME,
                 run_editor.EXPORT_AUDIO_CUE_SHEET_REPORT_NAME,
                 run_editor.EXPORT_AUDIO_CUE_SHEET_CSV_NAME,
+                run_editor.EXPORT_STAGE_DIRECTION_JSON_NAME,
+                run_editor.EXPORT_STAGE_DIRECTION_REPORT_NAME,
+                run_editor.EXPORT_STAGE_DIRECTION_CSV_NAME,
                 run_editor.EXPORT_VOICE_PRODUCTION_JSON_NAME,
                 run_editor.EXPORT_VOICE_PRODUCTION_REPORT_NAME,
                 run_editor.EXPORT_VOICE_PRODUCTION_CSV_NAME,
@@ -4669,6 +4725,8 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(export_result["assetRightsName"], run_editor.EXPORT_ASSET_RIGHTS_JSON_NAME)
         self.assert_export_audio_cue_sheet_files(build_dir)
         self.assertEqual(export_result["audioCueSheetName"], run_editor.EXPORT_AUDIO_CUE_SHEET_JSON_NAME)
+        self.assert_export_stage_direction_files(build_dir)
+        self.assertEqual(export_result["stageDirectionName"], run_editor.EXPORT_STAGE_DIRECTION_JSON_NAME)
         self.assert_export_voice_production_files(build_dir)
         self.assertEqual(export_result["voiceProductionName"], run_editor.EXPORT_VOICE_PRODUCTION_JSON_NAME)
         route_map_payload = self.assert_export_story_route_map_files(
@@ -4701,6 +4759,9 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["audioCueSheet"], run_editor.EXPORT_AUDIO_CUE_SHEET_JSON_NAME)
         self.assertEqual(manifest["files"]["audioCueSheetReport"], run_editor.EXPORT_AUDIO_CUE_SHEET_REPORT_NAME)
         self.assertEqual(manifest["files"]["audioCueSheetCsv"], run_editor.EXPORT_AUDIO_CUE_SHEET_CSV_NAME)
+        self.assertEqual(manifest["files"]["stageDirection"], run_editor.EXPORT_STAGE_DIRECTION_JSON_NAME)
+        self.assertEqual(manifest["files"]["stageDirectionReport"], run_editor.EXPORT_STAGE_DIRECTION_REPORT_NAME)
+        self.assertEqual(manifest["files"]["stageDirectionCsv"], run_editor.EXPORT_STAGE_DIRECTION_CSV_NAME)
         self.assertEqual(manifest["files"]["voiceProduction"], run_editor.EXPORT_VOICE_PRODUCTION_JSON_NAME)
         self.assertEqual(manifest["files"]["voiceProductionReport"], run_editor.EXPORT_VOICE_PRODUCTION_REPORT_NAME)
         self.assertEqual(manifest["files"]["voiceProductionCsv"], run_editor.EXPORT_VOICE_PRODUCTION_CSV_NAME)
@@ -4725,6 +4786,9 @@ class RunEditorSmokeTests(unittest.TestCase):
                 run_editor.EXPORT_AUDIO_CUE_SHEET_JSON_NAME,
                 run_editor.EXPORT_AUDIO_CUE_SHEET_REPORT_NAME,
                 run_editor.EXPORT_AUDIO_CUE_SHEET_CSV_NAME,
+                run_editor.EXPORT_STAGE_DIRECTION_JSON_NAME,
+                run_editor.EXPORT_STAGE_DIRECTION_REPORT_NAME,
+                run_editor.EXPORT_STAGE_DIRECTION_CSV_NAME,
                 run_editor.EXPORT_VOICE_PRODUCTION_JSON_NAME,
                 run_editor.EXPORT_VOICE_PRODUCTION_REPORT_NAME,
                 run_editor.EXPORT_VOICE_PRODUCTION_CSV_NAME,
