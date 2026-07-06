@@ -50,9 +50,12 @@
       defaultBgmVolume: 72,
       defaultSfxVolume: 85,
       defaultVoiceVolume: 92,
+      defaultVoiceDuckingRatio: 45,
       defaultVoiceEnabled: true,
       defaultVoiceDuckingEnabled: true,
     });
+  const DEFAULT_VOICE_DUCKING_RATIO_LIMITS =
+    runtimeSettingsTools?.DEFAULT_VOICE_DUCKING_RATIO_LIMITS ?? Object.freeze({ min: 15, max: 100 });
   const DEFAULT_FRAME_SLICE = Object.freeze({ top: 18, right: 18, bottom: 18, left: 18 });
   const PROJECT_DIALOG_BOX_PRESET_LABELS = Object.freeze({
     moonlight: "夜色玻璃",
@@ -598,6 +601,18 @@
     return clamp(Math.round(getSafeNumber(value, fallback, options)), 0, 100, options);
   }
 
+  function getSafeProjectRuntimeVoiceDuckingRatio(value, fallback = DEFAULT_RUNTIME_SETTINGS.defaultVoiceDuckingRatio, options = {}) {
+    if (runtimeSettingsTools?.getSafeProjectRuntimeVoiceDuckingRatio) {
+      return runtimeSettingsTools.getSafeProjectRuntimeVoiceDuckingRatio(value, fallback, options);
+    }
+    return clamp(
+      Math.round(getSafeNumber(value, fallback, options)),
+      DEFAULT_VOICE_DUCKING_RATIO_LIMITS.min,
+      DEFAULT_VOICE_DUCKING_RATIO_LIMITS.max,
+      options
+    );
+  }
+
   function getProjectRuntimeSettings(project, options = {}) {
     if (runtimeSettingsTools?.getProjectRuntimeSettings) {
       return runtimeSettingsTools.getProjectRuntimeSettings(project, options);
@@ -615,6 +630,11 @@
       defaultVoiceVolume: getSafeProjectRuntimeVolume(
         runtimeSettings.defaultVoiceVolume,
         defaults.defaultVoiceVolume,
+        options
+      ),
+      defaultVoiceDuckingRatio: getSafeProjectRuntimeVoiceDuckingRatio(
+        runtimeSettings.defaultVoiceDuckingRatio,
+        defaults.defaultVoiceDuckingRatio,
         options
       ),
       defaultVoiceEnabled: runtimeSettings.defaultVoiceEnabled !== false,
@@ -933,6 +953,7 @@
     getSafeProjectRuntimeUiThemeMode,
     getSafeProjectRuntimePerformanceProfile,
     getSafeProjectRuntimeVolume,
+    getSafeProjectRuntimeVoiceDuckingRatio,
     getProjectRuntimeSettings,
     getProjectFormalSaveSlotCount,
     getSafeProjectDialogBoxPreset,

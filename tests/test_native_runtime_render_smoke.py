@@ -123,6 +123,7 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
                     "defaultBgmVolume": 64,
                     "defaultSfxVolume": 77,
                     "defaultVoiceVolume": 88,
+                    "defaultVoiceDuckingRatio": 35,
                     "defaultVoiceEnabled": False,
                     "defaultVoiceDuckingEnabled": False,
                 }
@@ -135,6 +136,7 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
         self.assertEqual(defaults["sfxVolume"], 77)
         self.assertEqual(defaults["voiceVolume"], 0)
         self.assertEqual(defaults["voiceDuckingEnabled"], "off")
+        self.assertEqual(defaults["voiceDuckingRatio"], 35)
 
     def test_native_runtime_settings_module_sanitizes_player_preferences(self) -> None:
         settings = sanitize_runtime_player_settings(
@@ -152,6 +154,7 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
                 "bgmVolume": -5,
                 "sfxVolume": 66.4,
                 "voiceVolume": "40",
+                "voiceDuckingRatio": 5,
             }
         )
 
@@ -168,6 +171,7 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
         self.assertEqual(settings["bgmVolume"], 0)
         self.assertEqual(settings["sfxVolume"], 66)
         self.assertEqual(settings["voiceVolume"], 40)
+        self.assertEqual(settings["voiceDuckingRatio"], 15)
 
     def test_native_runtime_storage_sanitizes_corrupted_archive_progress(self) -> None:
         progress = sanitize_archive_progress(
@@ -761,6 +765,7 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             "masterVolume": 100,
             "bgmVolume": 80,
             "voiceDuckingEnabled": "on",
+            "voiceDuckingRatio": 30,
         }
         player.current_bgm_volume_percent = 100
         player.current_voice_volume_percent = 100
@@ -768,7 +773,7 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
         player.voice_playback_active = False
 
         player.update_voice_playback_state()
-        self.assertAlmostEqual(player.pygame.mixer.music.volume, 0.36)
+        self.assertAlmostEqual(player.pygame.mixer.music.volume, 0.24)
         self.assertTrue(player.voice_playback_active)
 
         player.current_voice_channel.busy = False

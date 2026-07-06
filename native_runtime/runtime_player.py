@@ -135,6 +135,7 @@ try:
         TEXT_SCALE_PRESETS,
         TEXT_SPEED_LABELS,
         TEXT_SPEED_PRESETS,
+        VOICE_DUCKING_RATIO_PRESETS,
         build_project_default_runtime_player_settings,
         get_safe_text_speed,
         sanitize_runtime_player_settings,
@@ -150,6 +151,7 @@ except ImportError:  # pragma: no cover - exported native packages import from t
         TEXT_SCALE_PRESETS,
         TEXT_SPEED_LABELS,
         TEXT_SPEED_PRESETS,
+        VOICE_DUCKING_RATIO_PRESETS,
         build_project_default_runtime_player_settings,
         get_safe_text_speed,
         sanitize_runtime_player_settings,
@@ -562,6 +564,7 @@ SETTINGS_MENU_ITEMS = [
     ("autoPlayDelayMs", "自动播放间隔"),
     ("autoPlayWaitForVoice", "自动播放等语音"),
     ("voiceDuckingEnabled", "语音焦点"),
+    ("voiceDuckingRatio", "BGM 保留"),
     ("masterVolume", "总音量"),
     ("bgmVolume", "BGM 音量"),
     ("sfxVolume", "音效音量"),
@@ -10301,7 +10304,7 @@ class NativeRuntimePlayer:
             else get_safe_volume_percent(volume_percent, 100)
         )
         voice_ducking_ratio = (
-            0.45
+            clamp(float(self.runtime_settings.get("voiceDuckingRatio", 45)) / 100, 0.15, 1.0)
             if self.runtime_settings.get("voiceDuckingEnabled") == "on" and self.is_voice_playing()
             else 1.0
         )
@@ -11971,6 +11974,11 @@ class NativeRuntimePlayer:
             options = list(RUNTIME_TOGGLE_MODES)
             current_index = options.index(current) if current in options else 0
             self.runtime_settings[setting_key] = options[(current_index + direction) % len(options)]
+        elif setting_key == "voiceDuckingRatio":
+            current = int(self.runtime_settings.get("voiceDuckingRatio") or DEFAULT_RUNTIME_PLAYER_SETTINGS["voiceDuckingRatio"])
+            options = list(VOICE_DUCKING_RATIO_PRESETS)
+            current_index = min(range(len(options)), key=lambda index: abs(options[index] - current))
+            self.runtime_settings["voiceDuckingRatio"] = options[(current_index + direction) % len(options)]
         elif setting_key in {"masterVolume", "bgmVolume", "sfxVolume", "voiceVolume"}:
             current_value = int(self.runtime_settings.get(setting_key) or DEFAULT_RUNTIME_PLAYER_SETTINGS[setting_key])
             self.runtime_settings[setting_key] = clamp_int(current_value + direction * 5, 0, 100, current_value)
@@ -12008,6 +12016,8 @@ class NativeRuntimePlayer:
             return "开启" if self.runtime_settings.get("autoPlayWaitForVoice") == "on" else "关闭"
         if setting_key == "voiceDuckingEnabled":
             return "开启" if self.runtime_settings.get("voiceDuckingEnabled") == "on" else "关闭"
+        if setting_key == "voiceDuckingRatio":
+            return f"{int(self.runtime_settings.get('voiceDuckingRatio') or DEFAULT_RUNTIME_PLAYER_SETTINGS['voiceDuckingRatio'])}%"
         return f"{int(self.runtime_settings.get(setting_key) or 0)}%"
 
     def activate_archive_entry(self, entry: dict | None) -> bool:

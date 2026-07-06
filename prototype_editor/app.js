@@ -39680,6 +39680,11 @@ function renderProjectRuntimeSettingsPanel() {
               <input id="projectRuntimeDefaultVoiceVolumeInput" type="range" min="0" max="100" step="1" value="${runtimeSettings.defaultVoiceVolume}" />
               <strong class="playback-volume-value">${runtimeSettings.defaultVoiceVolume}%</strong>
             </label>
+            <label class="playback-setting">
+              <span>语音时 BGM 保留</span>
+              <input id="projectRuntimeDefaultVoiceDuckingRatioInput" type="range" min="15" max="100" step="1" value="${runtimeSettings.defaultVoiceDuckingRatio}" />
+              <strong class="playback-volume-value">${runtimeSettings.defaultVoiceDuckingRatio}%</strong>
+            </label>
           </div>
           <div class="detail-actions">
             <button class="toolbar-button toolbar-button-primary" data-action="save-project-runtime-playback-defaults">
@@ -39690,7 +39695,7 @@ function renderProjectRuntimeSettingsPanel() {
             DIALOG_THEME_LABELS[runtimeSettings.defaultDialogTheme] ?? runtimeSettings.defaultDialogTheme
           )} · ${escapeHtml(UI_THEME_MODE_LABELS[runtimeSettings.defaultUiThemeMode] ?? runtimeSettings.defaultUiThemeMode)} · ${escapeHtml(
             RUNTIME_PERFORMANCE_PROFILE_LABELS[runtimeSettings.performanceProfile] ?? runtimeSettings.performanceProfile
-          )} · BGM ${runtimeSettings.defaultBgmVolume}% / 音效 ${runtimeSettings.defaultSfxVolume}% / 语音 ${runtimeSettings.defaultVoiceVolume}% · 语音焦点${runtimeSettings.defaultVoiceDuckingEnabled ? "开" : "关"}</div>
+          )} · BGM ${runtimeSettings.defaultBgmVolume}% / 音效 ${runtimeSettings.defaultSfxVolume}% / 语音 ${runtimeSettings.defaultVoiceVolume}% · 语音焦点${runtimeSettings.defaultVoiceDuckingEnabled ? "开" : "关"} / BGM 保留 ${runtimeSettings.defaultVoiceDuckingRatio}%</div>
         </section>
         <div id="projectVariableLibraryPanelHost">
           ${renderProjectVariableLibraryPanel()}
@@ -40325,6 +40330,7 @@ function readProjectRuntimePlaybackDefaultsFromInputs() {
       defaultBgmVolume: document.getElementById("projectRuntimeDefaultBgmVolumeInput")?.value,
       defaultSfxVolume: document.getElementById("projectRuntimeDefaultSfxVolumeInput")?.value,
       defaultVoiceVolume: document.getElementById("projectRuntimeDefaultVoiceVolumeInput")?.value,
+      defaultVoiceDuckingRatio: document.getElementById("projectRuntimeDefaultVoiceDuckingRatioInput")?.value,
       defaultVoiceEnabled: document.getElementById("projectRuntimeDefaultVoiceEnabledInput")?.checked !== false,
       defaultVoiceDuckingEnabled:
         document.getElementById("projectRuntimeDefaultVoiceDuckingEnabledInput")?.checked !== false,

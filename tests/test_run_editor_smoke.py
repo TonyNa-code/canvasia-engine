@@ -1227,6 +1227,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 "defaultBgmVolume": 64,
                 "defaultSfxVolume": 77,
                 "defaultVoiceVolume": 88,
+                "defaultVoiceDuckingRatio": 35,
                 "defaultVoiceEnabled": False,
                 "defaultVoiceDuckingEnabled": False,
             },
@@ -1341,6 +1342,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(saved_project["runtimeSettings"]["defaultBgmVolume"], 64)
         self.assertEqual(saved_project["runtimeSettings"]["defaultSfxVolume"], 77)
         self.assertEqual(saved_project["runtimeSettings"]["defaultVoiceVolume"], 88)
+        self.assertEqual(saved_project["runtimeSettings"]["defaultVoiceDuckingRatio"], 35)
         self.assertFalse(saved_project["runtimeSettings"]["defaultVoiceEnabled"])
         self.assertFalse(saved_project["runtimeSettings"]["defaultVoiceDuckingEnabled"])
         self.assertEqual(saved_project["dialogBoxConfig"]["preset"], "transparent")
@@ -1397,6 +1399,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(merged_runtime_settings["defaultBgmVolume"], 64)
         self.assertEqual(merged_runtime_settings["defaultSfxVolume"], 77)
         self.assertEqual(merged_runtime_settings["defaultVoiceVolume"], 88)
+        self.assertEqual(merged_runtime_settings["defaultVoiceDuckingRatio"], 35)
         self.assertFalse(merged_runtime_settings["defaultVoiceEnabled"])
         self.assertFalse(merged_runtime_settings["defaultVoiceDuckingEnabled"])
 

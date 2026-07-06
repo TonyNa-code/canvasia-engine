@@ -73,6 +73,13 @@ class FrontendRuntimeAudioModuleTests(unittest.TestCase):
                 {{ visualState: {{ musicVolume: 50 }} }},
                 {{ voiceActive: true }}
               ),
+              customDuckedMusicVolume: tools.getRuntimeMusicTargetVolume(
+                {{ bgmVolume: 80, voiceDuckingEnabled: true, voiceDuckingRatio: 30 }},
+                {{ visualState: {{ musicVolume: 50 }} }},
+                {{ voiceActive: true }}
+              ),
+              duckingRatio: tools.getRuntimeVoiceDuckingRatio({{ voiceDuckingRatio: 30 }}),
+              clampedDuckingRatio: tools.getRuntimeVoiceDuckingRatio({{ voiceDuckingRatio: -5 }}),
               sfxVolume: tools.getRuntimeSfxTargetVolume({{ sfxVolume: 80 }}, 25),
               voiceVolume: tools.getRuntimeVoiceTargetVolume(
                 {{ voiceVolume: 90 }},
@@ -104,11 +111,15 @@ class FrontendRuntimeAudioModuleTests(unittest.TestCase):
         self.assertIn("getRuntimeMusicTargetVolume", payload["keys"])
         self.assertIn("getRuntimeSfxTargetVolume", payload["keys"])
         self.assertIn("getRuntimeVoiceTargetVolume", payload["keys"])
+        self.assertIn("getRuntimeVoiceDuckingRatio", payload["keys"])
         self.assertIn("fadeAudioVolume", payload["keys"])
         self.assertAlmostEqual(payload["musicVolume"], 0.3)
         self.assertAlmostEqual(payload["musicBlockFallbackVolume"], 0.2)
         self.assertAlmostEqual(payload["duckedMusicVolume"], 0.18)
         self.assertAlmostEqual(payload["duckingDisabledVolume"], 0.4)
+        self.assertAlmostEqual(payload["customDuckedMusicVolume"], 0.12)
+        self.assertAlmostEqual(payload["duckingRatio"], 0.3)
+        self.assertAlmostEqual(payload["clampedDuckingRatio"], 0.15)
         self.assertAlmostEqual(payload["sfxVolume"], 0.2)
         self.assertAlmostEqual(payload["voiceVolume"], 0.45)
         self.assertEqual(payload["safeFade"], 900)

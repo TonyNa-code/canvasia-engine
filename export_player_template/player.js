@@ -44,6 +44,7 @@ import {
   getSafeDialogTheme,
   getSafeTextSpeed,
   getSafeUiThemeMode,
+  getSafeVoiceDuckingRatioPercent,
   getSafeVolumePercent,
   getTextSpeedLabel,
   getUiThemeModeLabel,
@@ -121,6 +122,8 @@ const refs = {
   sfxVolumeValue: document.getElementById("sfxVolumeValue"),
   voiceVolumeRange: document.getElementById("voiceVolumeRange"),
   voiceVolumeValue: document.getElementById("voiceVolumeValue"),
+  voiceDuckingRatioRange: document.getElementById("voiceDuckingRatioRange"),
+  voiceDuckingRatioValue: document.getElementById("voiceDuckingRatioValue"),
   previousHistoryButton: document.getElementById("previousHistoryButton"),
   nextHistoryButton: document.getElementById("nextHistoryButton"),
   autoPlayToggleButton: document.getElementById("autoPlayToggleButton"),
@@ -173,6 +176,8 @@ const refs = {
   menuSfxVolumeValue: document.getElementById("menuSfxVolumeValue"),
   menuVoiceVolumeRange: document.getElementById("menuVoiceVolumeRange"),
   menuVoiceVolumeValue: document.getElementById("menuVoiceVolumeValue"),
+  menuVoiceDuckingRatioRange: document.getElementById("menuVoiceDuckingRatioRange"),
+  menuVoiceDuckingRatioValue: document.getElementById("menuVoiceDuckingRatioValue"),
   menuVoiceDuckingToggleButton: document.getElementById("menuVoiceDuckingToggleButton"),
   achievementDialog: document.getElementById("achievementDialog"),
   achievementDialogSummary: document.getElementById("achievementDialogSummary"),
@@ -1609,6 +1614,7 @@ function init() {
   refs.bgmVolumeRange?.addEventListener("input", handleBgmVolumeChange);
   refs.sfxVolumeRange?.addEventListener("input", handleSfxVolumeChange);
   refs.voiceVolumeRange?.addEventListener("input", handleVoiceVolumeChange);
+  refs.voiceDuckingRatioRange?.addEventListener("input", handleVoiceDuckingRatioChange);
   refs.previousHistoryButton?.addEventListener("click", () => stepRuntimeHistory(-1));
   refs.nextHistoryButton?.addEventListener("click", () => stepRuntimeHistory(1));
   refs.autoPlayToggleButton?.addEventListener("click", toggleAutoPlay);
@@ -1674,6 +1680,7 @@ function init() {
   refs.menuBgmVolumeRange?.addEventListener("input", handleBgmVolumeChange);
   refs.menuSfxVolumeRange?.addEventListener("input", handleSfxVolumeChange);
   refs.menuVoiceVolumeRange?.addEventListener("input", handleVoiceVolumeChange);
+  refs.menuVoiceDuckingRatioRange?.addEventListener("input", handleVoiceDuckingRatioChange);
   refs.menuVoiceDuckingToggleButton?.addEventListener("click", toggleVoiceDuckingEnabled);
   document.addEventListener("keydown", handleGlobalKeydown);
   window.addEventListener("beforeunload", finalizePlayerSession);
@@ -7302,12 +7309,28 @@ function renderPlaybackControls(snapshot = getCurrentSnapshot()) {
     refs.voiceVolumeValue.textContent = formatVolumePercent(state.playback.voiceVolume, 92);
   }
 
+  if (refs.voiceDuckingRatioRange) {
+    refs.voiceDuckingRatioRange.value = String(getSafeVoiceDuckingRatioPercent(state.playback.voiceDuckingRatio, 45));
+  }
+
+  if (refs.voiceDuckingRatioValue) {
+    refs.voiceDuckingRatioValue.textContent = `${getSafeVoiceDuckingRatioPercent(state.playback.voiceDuckingRatio, 45)}%`;
+  }
+
   if (refs.menuVoiceVolumeRange) {
     refs.menuVoiceVolumeRange.value = String(getSafeVolumePercent(state.playback.voiceVolume, 92));
   }
 
   if (refs.menuVoiceVolumeValue) {
     refs.menuVoiceVolumeValue.textContent = formatVolumePercent(state.playback.voiceVolume, 92);
+  }
+
+  if (refs.menuVoiceDuckingRatioRange) {
+    refs.menuVoiceDuckingRatioRange.value = String(getSafeVoiceDuckingRatioPercent(state.playback.voiceDuckingRatio, 45));
+  }
+
+  if (refs.menuVoiceDuckingRatioValue) {
+    refs.menuVoiceDuckingRatioValue.textContent = `${getSafeVoiceDuckingRatioPercent(state.playback.voiceDuckingRatio, 45)}%`;
   }
 
   if (refs.previousHistoryButton) {
@@ -7444,6 +7467,13 @@ function handleSfxVolumeChange(event) {
 
 function handleVoiceVolumeChange(event) {
   state.playback.voiceVolume = getSafeVolumePercent(event.target.value, 92);
+  persistPlaybackSettings();
+  updateRuntimeAudioVolumes();
+  renderPlaybackControls();
+}
+
+function handleVoiceDuckingRatioChange(event) {
+  state.playback.voiceDuckingRatio = getSafeVoiceDuckingRatioPercent(event.target.value, 45);
   persistPlaybackSettings();
   updateRuntimeAudioVolumes();
   renderPlaybackControls();

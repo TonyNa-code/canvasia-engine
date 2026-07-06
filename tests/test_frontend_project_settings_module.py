@@ -35,6 +35,7 @@ class FrontendProjectSettingsModuleTests(unittest.TestCase):
                 defaultBgmVolume: 72,
                 defaultSfxVolume: 85,
                 defaultVoiceVolume: 92,
+                defaultVoiceDuckingRatio: 45,
                 defaultVoiceEnabled: true,
                 defaultVoiceDuckingEnabled: true,
               }},
@@ -150,6 +151,7 @@ class FrontendProjectSettingsModuleTests(unittest.TestCase):
                 defaultBgmVolume: "150",
                 defaultSfxVolume: "bad",
                 defaultVoiceVolume: "-5",
+                defaultVoiceDuckingRatio: "130",
                 defaultVoiceEnabled: false,
                 defaultVoiceDuckingEnabled: false,
               }},
@@ -238,6 +240,8 @@ class FrontendProjectSettingsModuleTests(unittest.TestCase):
                 tools.getSafeProjectRuntimeUiThemeMode("bad", options),
                 tools.getSafeProjectRuntimeVolume("bad", 64, options),
                 tools.getSafeProjectRuntimeVolume(120, 64, options),
+                tools.getSafeProjectRuntimeVoiceDuckingRatio("bad", 35, options),
+                tools.getSafeProjectRuntimeVoiceDuckingRatio(5, 45, options),
               ],
               runtimeConfig: tools.getProjectRuntimeSettings(project, options),
               safeDialogValues: [
@@ -309,7 +313,7 @@ class FrontendProjectSettingsModuleTests(unittest.TestCase):
         self.assertIn('data-width="1920"', payload["resolutionButtons"])
         self.assertIn("toolbar-button-primary", payload["resolutionButtons"])
         self.assertEqual(payload["slots"], [3, 3, 120, 120])
-        self.assertEqual(payload["safeRuntimeValues"], ["normal", "paper", "auto", 64, 100])
+        self.assertEqual(payload["safeRuntimeValues"], ["normal", "paper", "auto", 64, 100, 35, 15])
         self.assertEqual(
             payload["runtimeConfig"],
             {
@@ -321,6 +325,7 @@ class FrontendProjectSettingsModuleTests(unittest.TestCase):
                 "defaultBgmVolume": 100,
                 "defaultSfxVolume": 85,
                 "defaultVoiceVolume": 0,
+                "defaultVoiceDuckingRatio": 100,
                 "defaultVoiceEnabled": False,
                 "defaultVoiceDuckingEnabled": False,
             },

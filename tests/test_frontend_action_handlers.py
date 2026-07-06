@@ -5964,12 +5964,14 @@ class FrontendActionHandlerTests(unittest.TestCase):
             "defaultBgmVolume",
             "defaultSfxVolume",
             "defaultVoiceVolume",
+            "defaultVoiceDuckingRatio",
             "defaultVoiceEnabled",
             "defaultVoiceDuckingEnabled",
         ):
             self.assertIn(key, project_runtime_settings)
             self.assertIn(key, module_playback_defaults)
         self.assertIn("voiceDuckingEnabled", module_playback_defaults)
+        self.assertIn("voiceDuckingRatio", module_playback_defaults)
         self.assertIn("getProjectRuntimeSettings,", player_source)
         self.assertIn("const runtimeSettings = getProjectRuntimeSettings(data.project)", runtime_asset_preload)
         self.assertIn("runtimeSettings,", runtime_asset_preload)
@@ -5983,8 +5985,16 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("state.playback = getProjectPlaybackDefaults()", reset_playback_settings)
         self.assertIn('id="voiceDuckingToggleButton"', player_html := (ROOT_DIR / "export_player_template" / "index.html").read_text(encoding="utf-8"))
         self.assertIn('id="menuVoiceDuckingToggleButton"', player_html)
+        self.assertIn('id="voiceDuckingRatioRange"', player_html)
+        self.assertIn('id="menuVoiceDuckingRatioRange"', player_html)
         self.assertIn("refs.voiceDuckingToggleButton", render_playback_controls)
         self.assertIn("refs.menuVoiceDuckingToggleButton", render_playback_controls)
+        self.assertIn("refs.voiceDuckingRatioRange", render_playback_controls)
+        self.assertIn("refs.menuVoiceDuckingRatioRange", render_playback_controls)
+        self.assertIn("getSafeVoiceDuckingRatioPercent", player_source)
+        self.assertIn("handleVoiceDuckingRatioChange", player_source)
+        self.assertIn('id="projectRuntimeDefaultVoiceDuckingRatioInput"', APP_PATH.read_text(encoding="utf-8"))
+        self.assertIn("defaultVoiceDuckingRatio: document.getElementById", APP_PATH.read_text(encoding="utf-8"))
         self.assertIn("updateRuntimeAudioVolumes()", toggle_voice_ducking)
 
     def test_typewriter_index_helpers_keep_unicode_characters_intact(self) -> None:

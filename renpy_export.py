@@ -1480,6 +1480,7 @@ def build_renpy_runtime_preference_lines(runtime_settings: dict | None) -> list[
         f"define canvasia_default_voice_volume = {runtime_summary['defaultVoiceVolume']:g}",
         f"define canvasia_voice_enabled = {value_to_renpy(runtime_summary['defaultVoiceEnabled'])}",
         f"define canvasia_voice_ducking_enabled = {value_to_renpy(runtime_summary['defaultVoiceDuckingEnabled'])}",
+        f"define canvasia_voice_ducking_ratio = {runtime_summary['defaultVoiceDuckingRatio'] / 100:g}",
         f"define canvasia_formal_save_slot_count = {runtime_summary['formalSaveSlotCount']}",
         "",
         "# Ren'Py Preferences defaults applied when the player starts this project for the first time.",

@@ -6,6 +6,9 @@ from typing import Any
 DEFAULT_FORMAL_SAVE_SLOT_COUNT = 24
 MIN_FORMAL_SAVE_SLOT_COUNT = 3
 MAX_FORMAL_SAVE_SLOT_COUNT = 120
+DEFAULT_VOICE_DUCKING_RATIO = 45
+MIN_VOICE_DUCKING_RATIO = 15
+MAX_VOICE_DUCKING_RATIO = 100
 PROJECT_RUNTIME_TEXT_SPEED_CPS = {
     "slow": 24,
     "normal": 42,
@@ -41,6 +44,7 @@ def build_default_project_runtime_settings() -> dict:
         "defaultBgmVolume": 72,
         "defaultSfxVolume": 85,
         "defaultVoiceVolume": 92,
+        "defaultVoiceDuckingRatio": DEFAULT_VOICE_DUCKING_RATIO,
         "defaultVoiceEnabled": True,
         "defaultVoiceDuckingEnabled": True,
     }
@@ -71,6 +75,12 @@ def sanitize_project_runtime_settings(value: Any) -> dict:
         "defaultBgmVolume": clamp_int(source.get("defaultBgmVolume"), defaults["defaultBgmVolume"], 0, 100),
         "defaultSfxVolume": clamp_int(source.get("defaultSfxVolume"), defaults["defaultSfxVolume"], 0, 100),
         "defaultVoiceVolume": clamp_int(source.get("defaultVoiceVolume"), defaults["defaultVoiceVolume"], 0, 100),
+        "defaultVoiceDuckingRatio": clamp_int(
+            source.get("defaultVoiceDuckingRatio"),
+            defaults["defaultVoiceDuckingRatio"],
+            MIN_VOICE_DUCKING_RATIO,
+            MAX_VOICE_DUCKING_RATIO,
+        ),
         "defaultVoiceEnabled": source.get("defaultVoiceEnabled") is not False,
         "defaultVoiceDuckingEnabled": source.get("defaultVoiceDuckingEnabled") is not False,
     }
@@ -118,6 +128,7 @@ def get_renpy_runtime_summary(runtime_settings: dict | None) -> dict:
         "defaultSfxVolume": get_runtime_volume_ratio(settings, "defaultSfxVolume"),
         "defaultVoiceVolume": get_runtime_volume_ratio(settings, "defaultVoiceVolume"),
         "effectiveVoiceVolume": voice_volume,
+        "defaultVoiceDuckingRatio": settings["defaultVoiceDuckingRatio"],
         "defaultVoiceEnabled": bool(settings["defaultVoiceEnabled"]),
         "defaultVoiceDuckingEnabled": bool(settings["defaultVoiceDuckingEnabled"]),
         "formalSaveSlotCount": settings["formalSaveSlotCount"],

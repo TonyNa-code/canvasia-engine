@@ -397,6 +397,7 @@ class RenpyExportContractTests(unittest.TestCase):
                     "defaultBgmVolume": 64,
                     "defaultSfxVolume": 77,
                     "defaultVoiceVolume": 88,
+                    "defaultVoiceDuckingRatio": 35,
                     "defaultVoiceEnabled": False,
                     "formalSaveSlotCount": 60,
                 },
@@ -435,6 +436,7 @@ class RenpyExportContractTests(unittest.TestCase):
 
         self.assertEqual(frontend["runtimeSettings"]["defaultTextSpeed"], "fast")
         self.assertEqual(backend["runtimeSettings"]["defaultBgmVolume"], 64)
+        self.assertEqual(backend["runtimeSettings"]["defaultVoiceDuckingRatio"], 35)
         self.assertIn('define canvasia_default_text_speed = "fast"', options)
         self.assertIn("define canvasia_default_text_cps = 72", options)
         self.assertIn("define canvasia_default_music_volume = 0.64", options)
@@ -442,6 +444,7 @@ class RenpyExportContractTests(unittest.TestCase):
         self.assertIn("define canvasia_default_voice_volume = 0.88", options)
         self.assertIn("define canvasia_voice_enabled = False", options)
         self.assertIn("define canvasia_voice_ducking_enabled = True", options)
+        self.assertIn("define canvasia_voice_ducking_ratio = 0.35", options)
         self.assertIn("define canvasia_formal_save_slot_count = 60", options)
         self.assertIn("default preferences.text_cps = 72", options)
         self.assertIn("default preferences.volume.music = 0.64", options)

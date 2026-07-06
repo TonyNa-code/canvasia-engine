@@ -17,6 +17,7 @@ DEFAULT_RUNTIME_PLAYER_SETTINGS = {
     "sfxVolume": 90,
     "voiceVolume": 100,
     "voiceDuckingEnabled": "on",
+    "voiceDuckingRatio": 45,
 }
 RUNTIME_THEME_MODES = ("auto", "light", "dark")
 RUNTIME_DISPLAY_MODES = ("windowed", "fullscreen")
@@ -36,6 +37,7 @@ TEXT_SPEED_LABELS = {
 AUTO_PLAY_DELAY_PRESETS = (900, 1400, 1800, 2400, 3200)
 TEXT_SCALE_PRESETS = (90, 100, 110, 125)
 DIALOG_BOX_OPACITY_PRESETS = (0, 35, 60, 80, 100)
+VOICE_DUCKING_RATIO_PRESETS = (15, 30, 45, 60, 80, 100)
 
 
 def _clamp_int(value: object, minimum: int, maximum: int, fallback: int) -> int:
@@ -118,6 +120,12 @@ def sanitize_runtime_player_settings(value: dict | None) -> dict:
         "voiceVolume": _get_safe_volume_percent(
             source.get("voiceVolume"), DEFAULT_RUNTIME_PLAYER_SETTINGS["voiceVolume"]
         ),
+        "voiceDuckingRatio": _clamp_int(
+            source.get("voiceDuckingRatio"),
+            min(VOICE_DUCKING_RATIO_PRESETS),
+            max(VOICE_DUCKING_RATIO_PRESETS),
+            DEFAULT_RUNTIME_PLAYER_SETTINGS["voiceDuckingRatio"],
+        ),
     }
 
 
@@ -139,4 +147,10 @@ def build_project_default_runtime_player_settings(project: dict | None = None) -
         else 0
     )
     defaults["voiceDuckingEnabled"] = "on" if runtime_settings.get("defaultVoiceDuckingEnabled") is not False else "off"
+    defaults["voiceDuckingRatio"] = _clamp_int(
+        runtime_settings.get("defaultVoiceDuckingRatio"),
+        min(VOICE_DUCKING_RATIO_PRESETS),
+        max(VOICE_DUCKING_RATIO_PRESETS),
+        defaults["voiceDuckingRatio"],
+    )
     return sanitize_runtime_player_settings(defaults)

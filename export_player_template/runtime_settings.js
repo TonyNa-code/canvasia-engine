@@ -31,12 +31,14 @@ export const PLAYBACK_DEFAULTS = Object.freeze({
   bgmVolume: 72,
   sfxVolume: 85,
   voiceVolume: 92,
+  voiceDuckingRatio: 45,
 });
 
 const DEFAULT_PROJECT_RUNTIME_SETTINGS = Object.freeze({
   formalSaveSlotCount: 24,
   performanceProfile: "standard",
 });
+const VOICE_DUCKING_RATIO_LIMITS = Object.freeze({ min: 15, max: 100 });
 
 export const RUNTIME_PERFORMANCE_PROFILE_LABELS = Object.freeze({
   standard: "标准 PC / 网页",
@@ -101,6 +103,15 @@ export function getVolumeRatio(value, fallback = 100) {
   return getSafeVolumePercent(value, fallback) / 100;
 }
 
+export function getSafeVoiceDuckingRatioPercent(value, fallback = PLAYBACK_DEFAULTS.voiceDuckingRatio) {
+  const numeric = Number(value);
+  const fallbackValue = getSafeVolumePercent(fallback, PLAYBACK_DEFAULTS.voiceDuckingRatio);
+  if (!Number.isFinite(numeric)) {
+    return Math.min(VOICE_DUCKING_RATIO_LIMITS.max, Math.max(VOICE_DUCKING_RATIO_LIMITS.min, fallbackValue));
+  }
+  return Math.min(VOICE_DUCKING_RATIO_LIMITS.max, Math.max(VOICE_DUCKING_RATIO_LIMITS.min, Math.round(numeric)));
+}
+
 export function formatVolumePercent(value, fallback = 100) {
   return `${getSafeVolumePercent(value, fallback)}%`;
 }
@@ -129,6 +140,10 @@ export function getProjectRuntimeSettings(project = {}) {
     defaultBgmVolume: getSafeVolumePercent(runtimeSettings.defaultBgmVolume, PLAYBACK_DEFAULTS.bgmVolume),
     defaultSfxVolume: getSafeVolumePercent(runtimeSettings.defaultSfxVolume, PLAYBACK_DEFAULTS.sfxVolume),
     defaultVoiceVolume: getSafeVolumePercent(runtimeSettings.defaultVoiceVolume, PLAYBACK_DEFAULTS.voiceVolume),
+    defaultVoiceDuckingRatio: getSafeVoiceDuckingRatioPercent(
+      runtimeSettings.defaultVoiceDuckingRatio,
+      PLAYBACK_DEFAULTS.voiceDuckingRatio
+    ),
     defaultVoiceEnabled: runtimeSettings.defaultVoiceEnabled !== false,
     defaultVoiceDuckingEnabled: runtimeSettings.defaultVoiceDuckingEnabled !== false,
   };
@@ -151,6 +166,7 @@ export function sanitizePlaybackSettings(source = {}, options = {}) {
     bgmVolume: getSafeVolumePercent(source.bgmVolume, PLAYBACK_DEFAULTS.bgmVolume),
     sfxVolume: getSafeVolumePercent(source.sfxVolume, PLAYBACK_DEFAULTS.sfxVolume),
     voiceVolume: getSafeVolumePercent(source.voiceVolume, PLAYBACK_DEFAULTS.voiceVolume),
+    voiceDuckingRatio: getSafeVoiceDuckingRatioPercent(source.voiceDuckingRatio, PLAYBACK_DEFAULTS.voiceDuckingRatio),
   };
 }
 
@@ -168,6 +184,7 @@ export function buildProjectPlaybackDefaults(project = {}, defaultLanguage = "",
       bgmVolume: runtimeSettings.defaultBgmVolume,
       sfxVolume: runtimeSettings.defaultSfxVolume,
       voiceVolume: runtimeSettings.defaultVoiceVolume,
+      voiceDuckingRatio: runtimeSettings.defaultVoiceDuckingRatio,
     },
     options
   );

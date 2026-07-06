@@ -11,9 +11,11 @@
     defaultBgmVolume: 72,
     defaultSfxVolume: 85,
     defaultVoiceVolume: 92,
+    defaultVoiceDuckingRatio: 45,
     defaultVoiceEnabled: true,
     defaultVoiceDuckingEnabled: true,
   });
+  const DEFAULT_VOICE_DUCKING_RATIO_LIMITS = Object.freeze({ min: 15, max: 100 });
   const RUNTIME_PERFORMANCE_PROFILE_LABELS = Object.freeze({
     standard: "标准 PC / 网页",
     web: "网页轻量",
@@ -97,6 +99,14 @@
     return clamp(Math.round(getSafeNumber(value, fallback)), 0, 100);
   }
 
+  function getSafeProjectRuntimeVoiceDuckingRatio(value, fallback = DEFAULT_RUNTIME_SETTINGS.defaultVoiceDuckingRatio) {
+    return clamp(
+      Math.round(getSafeNumber(value, fallback)),
+      DEFAULT_VOICE_DUCKING_RATIO_LIMITS.min,
+      DEFAULT_VOICE_DUCKING_RATIO_LIMITS.max
+    );
+  }
+
   function getProjectRuntimeSettings(project = {}, options = {}) {
     const runtimeSettings = project?.runtimeSettings ?? {};
     const defaults = getRuntimeDefaults(options);
@@ -109,6 +119,10 @@
       defaultBgmVolume: getSafeProjectRuntimeVolume(runtimeSettings.defaultBgmVolume, defaults.defaultBgmVolume),
       defaultSfxVolume: getSafeProjectRuntimeVolume(runtimeSettings.defaultSfxVolume, defaults.defaultSfxVolume),
       defaultVoiceVolume: getSafeProjectRuntimeVolume(runtimeSettings.defaultVoiceVolume, defaults.defaultVoiceVolume),
+      defaultVoiceDuckingRatio: getSafeProjectRuntimeVoiceDuckingRatio(
+        runtimeSettings.defaultVoiceDuckingRatio,
+        defaults.defaultVoiceDuckingRatio
+      ),
       defaultVoiceEnabled: runtimeSettings.defaultVoiceEnabled !== false,
       defaultVoiceDuckingEnabled: runtimeSettings.defaultVoiceDuckingEnabled !== false,
     };
@@ -155,6 +169,7 @@
       defaultSfxVolume: getRuntimeVolumeRatio(settings, "defaultSfxVolume", options),
       defaultVoiceVolume: getRuntimeVolumeRatio(settings, "defaultVoiceVolume", options),
       effectiveVoiceVolume: voiceVolume,
+      defaultVoiceDuckingRatio: settings.defaultVoiceDuckingRatio,
       defaultVoiceEnabled: settings.defaultVoiceEnabled,
       defaultVoiceDuckingEnabled: settings.defaultVoiceDuckingEnabled,
       formalSaveSlotCount: settings.formalSaveSlotCount,
@@ -168,12 +183,14 @@
     TEXT_SPEED_CPS,
     RUNTIME_DIALOG_THEMES,
     RUNTIME_UI_THEME_MODES,
+    DEFAULT_VOICE_DUCKING_RATIO_LIMITS,
     getSafeProjectFormalSaveSlotCount,
     getSafeProjectRuntimeTextSpeed,
     getSafeProjectRuntimeDialogTheme,
     getSafeProjectRuntimeUiThemeMode,
     getSafeProjectRuntimePerformanceProfile,
     getSafeProjectRuntimeVolume,
+    getSafeProjectRuntimeVoiceDuckingRatio,
     getProjectRuntimeSettings,
     getProjectFormalSaveSlotCount,
     getEffectiveTextSpeed,
