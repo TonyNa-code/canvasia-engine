@@ -39,3 +39,39 @@ export function buildRuntimeLanguageLabels(customLabels = {}) {
     ...(customLabels && typeof customLabels === "object" ? customLabels : {}),
   });
 }
+
+export function buildRuntimeLanguageFallbackChain({
+  language = "",
+  fallbackLanguage = "",
+  defaultLanguage = DEFAULT_RUNTIME_LANGUAGE,
+  defaultRuntimeLanguage = DEFAULT_RUNTIME_LANGUAGE,
+} = {}) {
+  const chain = [];
+  [language, fallbackLanguage, defaultLanguage, defaultRuntimeLanguage].forEach((candidate) => {
+    const safeLanguage = normalizeLanguageCode(candidate, "");
+    if (safeLanguage && !chain.includes(safeLanguage)) {
+      chain.push(safeLanguage);
+    }
+  });
+  return chain.length ? chain : [DEFAULT_RUNTIME_LANGUAGE];
+}
+
+export function getLocalizedRuntimeValue(source, key, {
+  language = "",
+  fallbackLanguage = "",
+  defaultLanguage = DEFAULT_RUNTIME_LANGUAGE,
+  fallback = "",
+} = {}) {
+  const safeSource = source && typeof source === "object" ? source : {};
+  const translations = safeSource[`${key}Translations`];
+  if (translations && typeof translations === "object") {
+    const fallbackChain = buildRuntimeLanguageFallbackChain({ language, fallbackLanguage, defaultLanguage });
+    for (const candidate of fallbackChain) {
+      const text = String(translations[candidate] ?? "").trim();
+      if (text) {
+        return text;
+      }
+    }
+  }
+  return String(safeSource[key] ?? fallback ?? "");
+}

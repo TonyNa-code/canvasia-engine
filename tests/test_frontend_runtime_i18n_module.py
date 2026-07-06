@@ -32,11 +32,38 @@ class FrontendRuntimeI18nModuleTests(unittest.TestCase):
               runtimeI18n.normalizeSupportedLanguages(["en-us", "ja-jp", "en-US"], "zh-CN"),
               ["zh-CN", "en-US", "ja-JP"]
             );
+            assertEqual(
+              "fallback chain",
+              runtimeI18n.buildRuntimeLanguageFallbackChain({{
+                language: "ko-kr",
+                fallbackLanguage: "ja-jp",
+                defaultLanguage: "en-us",
+              }}),
+              ["ko-KR", "ja-JP", "en-US", "zh-CN"]
+            );
 
             const labels = runtimeI18n.buildRuntimeLanguageLabels({{ "ko-KR": "한국어" }});
             assertEqual("built-in label", labels["en-US"], "English");
             assertEqual("custom label", labels["ko-KR"], "한국어");
             assertEqual("immutable labels", Object.isFrozen(labels), true);
+
+            const localized = runtimeI18n.getLocalizedRuntimeValue(
+              {{
+                text: "原文",
+                textTranslations: {{
+                  "ja-JP": "  こんにちは  ",
+                  "en-US": "Hello",
+                }},
+              }},
+              "text",
+              {{ language: "ko-KR", fallbackLanguage: "ja-JP", defaultLanguage: "en-US" }}
+            );
+            assertEqual("localized fallback text", localized, "こんにちは");
+            assertEqual(
+              "base text fallback",
+              runtimeI18n.getLocalizedRuntimeValue({{ text: "Keep me" }}, "text", {{ language: "en-US" }}),
+              "Keep me"
+            );
             """
         )
         subprocess.run(

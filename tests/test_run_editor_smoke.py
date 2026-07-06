@@ -3668,6 +3668,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / run_editor.RUNTIME_PRELOAD_REPORT_FILE_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_PLAYER_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_PRELOAD_NAME).is_file())
+        self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_I18N_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_SETTINGS_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_TEXT_EFFECTS_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_STORAGE_NAME).is_file())
@@ -3968,6 +3969,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["voiceProductionReport"], run_editor.EXPORT_VOICE_PRODUCTION_REPORT_NAME)
         self.assertEqual(manifest["files"]["voiceProductionCsv"], run_editor.EXPORT_VOICE_PRODUCTION_CSV_NAME)
         self.assertEqual(manifest["runtime"]["voiceProduction"], run_editor.EXPORT_VOICE_PRODUCTION_JSON_NAME)
+        self.assertEqual(manifest["files"]["runtimeI18nModule"], run_editor.NATIVE_RUNTIME_I18N_NAME)
         self.assertEqual(manifest["files"]["runtimeSettingsModule"], run_editor.NATIVE_RUNTIME_SETTINGS_NAME)
         self.assertEqual(manifest["files"]["runtimeTextEffectsModule"], run_editor.NATIVE_RUNTIME_TEXT_EFFECTS_NAME)
         self.assertEqual(manifest["files"]["runtimeStorageModule"], run_editor.NATIVE_RUNTIME_STORAGE_NAME)
@@ -3988,6 +3990,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 run_editor.NATIVE_RUNTIME_PRELOAD_NAME,
                 run_editor.NATIVE_RUNTIME_SCENE_PREFETCH_NAME,
                 run_editor.NATIVE_RUNTIME_DIAGNOSTICS_NAME,
+                run_editor.NATIVE_RUNTIME_I18N_NAME,
                 run_editor.NATIVE_RUNTIME_SETTINGS_NAME,
                 run_editor.NATIVE_RUNTIME_TEXT_EFFECTS_NAME,
                 run_editor.NATIVE_RUNTIME_STORAGE_NAME,

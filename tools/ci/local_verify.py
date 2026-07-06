@@ -44,6 +44,7 @@ PYTHON_SYNTAX_FILES = [
     "renpy_export.py",
     "run_editor.py",
     "native_runtime/runtime_player.py",
+    "native_runtime/runtime_i18n.py",
     "native_runtime/runtime_player_settings.py",
     "native_runtime/runtime_text_effects.py",
     "native_runtime/runtime_storage.py",
@@ -202,6 +203,7 @@ def build_release_tooling_steps(python_executable: str) -> list[VerifyStep]:
         build_unittest_step("Export stage direction contract", "test_export_stage_direction_sheet.py", "release-tests", python_executable),
         build_unittest_step("Export presentation timeline contract", "test_export_presentation_timeline.py", "release-tests", python_executable),
         build_unittest_step("Export voice production contract", "test_export_voice_production.py", "release-tests", python_executable),
+        build_unittest_step("Native runtime i18n contract", "test_native_runtime_i18n.py", "release-tests", python_executable),
         VerifyStep(
             name="Template project health check",
             category="release-tests",

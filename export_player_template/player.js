@@ -24,6 +24,7 @@ import {
   DEFAULT_RUNTIME_LANGUAGE,
   RUNTIME_LANGUAGE_LABELS,
   buildRuntimeLanguageLabels,
+  getLocalizedRuntimeValue,
   normalizeLanguageCode,
   normalizeSupportedLanguages,
 } from "./runtime_i18n.js";
@@ -5433,18 +5434,12 @@ function getCurrentRuntimeLanguage() {
 }
 
 function getLocalizedValue(source, key, fallback = "") {
-  const safeSource = source && typeof source === "object" ? source : {};
-  const translations = safeSource[`${key}Translations`];
-  const language = getCurrentRuntimeLanguage();
-  if (translations && typeof translations === "object") {
-    for (const candidate of [language, data.i18n?.fallbackLanguage, data.i18n?.defaultLanguage, DEFAULT_RUNTIME_LANGUAGE]) {
-      const text = String(translations[candidate] ?? "").trim();
-      if (text) {
-        return text;
-      }
-    }
-  }
-  return String(safeSource[key] ?? fallback ?? "");
+  return getLocalizedRuntimeValue(source, key, {
+    language: getCurrentRuntimeLanguage(),
+    fallbackLanguage: data.i18n?.fallbackLanguage,
+    defaultLanguage: data.i18n?.defaultLanguage,
+    fallback,
+  });
 }
 
 function getBlockText(block) {

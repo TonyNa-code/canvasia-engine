@@ -42,6 +42,7 @@ jobs:
             export_release_control.py \
             run_editor.py \
             native_runtime/runtime_player.py \
+            native_runtime/runtime_i18n.py \
             native_runtime/build_native_runtime_app.py \
             tools/release/check_editor_signing_readiness.py \
             tools/release/prepare_preview_release.py \
@@ -102,6 +103,7 @@ jobs:
             tests/test_frontend_runtime_conditions_module.py \
             tests/test_frontend_runtime_audio_module.py \
             tests/test_frontend_runtime_i18n_module.py \
+            tests/test_native_runtime_i18n.py \
             tests/test_frontend_runtime_preload_module.py \
             tests/test_frontend_runtime_scene_prefetch_module.py \
             tests/test_frontend_runtime_capability_matrix_module.py \
@@ -269,6 +271,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_runtime_conditions_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_audio_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_i18n_module.py' -v
+          python -m unittest discover -s tests -p 'test_native_runtime_i18n.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_preload_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_scene_prefetch_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_typewriter_parity.py' -v

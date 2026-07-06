@@ -21,6 +21,7 @@ RUNTIME_AUDIO_PATH = ROOT_DIR / "export_player_template" / "runtime_audio.js"
 RUNTIME_I18N_PATH = ROOT_DIR / "export_player_template" / "runtime_i18n.js"
 RUNTIME_TEXT_EFFECTS_PATH = ROOT_DIR / "export_player_template" / "runtime_text_effects.js"
 NATIVE_RUNTIME_PATH = ROOT_DIR / "native_runtime" / "runtime_player.py"
+NATIVE_RUNTIME_I18N_PATH = ROOT_DIR / "native_runtime" / "runtime_i18n.py"
 NATIVE_RUNTIME_SETTINGS_PATH = ROOT_DIR / "native_runtime" / "runtime_player_settings.py"
 NATIVE_RUNTIME_TEXT_EFFECTS_PATH = ROOT_DIR / "native_runtime" / "runtime_text_effects.py"
 PROJECT_POLISH_RECEIPT_PANEL_PATH = EDITOR_DIR / "modules" / "project_polish_receipt_panel.js"
@@ -5846,10 +5847,14 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("state.typingVisibleText", runtime_schedule_typewriter)
 
         native_source = NATIVE_RUNTIME_PATH.read_text(encoding="utf-8")
+        native_i18n_source = NATIVE_RUNTIME_I18N_PATH.read_text(encoding="utf-8")
         native_settings_source = NATIVE_RUNTIME_SETTINGS_PATH.read_text(encoding="utf-8")
         native_text_effects_source = NATIVE_RUNTIME_TEXT_EFFECTS_PATH.read_text(encoding="utf-8")
+        self.assertIn("runtime_i18n import", native_source)
         self.assertIn("runtime_player_settings import", native_source)
         self.assertIn("runtime_text_effects import", native_source)
+        self.assertIn("def get_localized_runtime_value", native_i18n_source)
+        self.assertIn("def build_runtime_language_fallback_chain", native_i18n_source)
         self.assertIn("def get_safe_text_speed", native_settings_source)
         self.assertIn("def get_next_typewriter_index", native_text_effects_source)
         self.assertIn("def get_typewriter_punctuation_pause_ms", native_text_effects_source)

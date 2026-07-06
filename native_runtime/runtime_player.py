@@ -20,6 +20,23 @@ from datetime import datetime
 from pathlib import Path
 
 try:
+    from .runtime_i18n import (
+        DEFAULT_PROJECT_LANGUAGE,
+        build_runtime_language_labels,
+        get_localized_runtime_value,
+        normalize_language_code,
+        normalize_supported_languages,
+    )
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_i18n import (
+        DEFAULT_PROJECT_LANGUAGE,
+        build_runtime_language_labels,
+        get_localized_runtime_value,
+        normalize_language_code,
+        normalize_supported_languages,
+    )
+
+try:
     from .runtime_preload import (
         RUNTIME_PRELOAD_IMAGE_TYPES,
         RUNTIME_PRELOAD_SOUND_TYPES,
@@ -224,7 +241,6 @@ except ImportError:  # pragma: no cover - exported native packages import from t
 
 ASSET_TYPE_IMAGE = {"background", "sprite", "cg", "ui"}
 ASSET_TYPE_FONT = {"font"}
-DEFAULT_PROJECT_LANGUAGE = "zh-CN"
 DEFAULT_GAME_DATA_NAME = "game_data.json"
 CHOICE_CONTINUE_TARGET = "__continue__"
 ENGINE_BRAND_LOGO_RELATIVE_PATH = "assets/canvasia-brand-logo.png"
@@ -507,11 +523,6 @@ DIALOG_BOX_PRESETS = {
         "panelAssetOpacity": 0,
         "panelAssetFit": "cover",
     },
-}
-RUNTIME_LANGUAGE_LABELS = {
-    "zh-CN": "简体中文",
-    "ja-JP": "日本語",
-    "en-US": "English",
 }
 SYSTEM_MENU_ITEMS = [
     ("continue", "继续"),
@@ -869,28 +880,6 @@ def load_game_data(game_data_path: Path) -> dict:
     if not game_data_path.is_file():
         raise NativeRuntimeError(f"没有找到游戏数据文件：{game_data_path}")
     return json.loads(game_data_path.read_text(encoding="utf-8"))
-
-
-def normalize_language_code(value: object, fallback: str = DEFAULT_PROJECT_LANGUAGE) -> str:
-    raw_value = str(value or "").strip()
-    if not raw_value or not re.fullmatch(r"[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8}){0,2}", raw_value):
-        return fallback
-    parts = raw_value.split("-")
-    normalized = [parts[0].lower()]
-    for index, part in enumerate(parts[1:], start=1):
-        normalized.append(part.upper() if index == 1 and len(part) in {2, 3} else part)
-    return "-".join(normalized)
-
-
-def normalize_supported_languages(value: object, default_language: str = DEFAULT_PROJECT_LANGUAGE) -> list[str]:
-    languages: list[str] = []
-    for raw_language in value if isinstance(value, list) else []:
-        language = normalize_language_code(raw_language, "")
-        if language and language not in languages:
-            languages.append(language)
-    if default_language and default_language not in languages:
-        languages.insert(0, default_language)
-    return languages or [DEFAULT_PROJECT_LANGUAGE]
 
 
 def looks_like_live2d_file_reference(value: object) -> bool:
@@ -9906,10 +9895,7 @@ class NativeRuntimePlayer:
             self.i18n.get("supportedLanguages") or self.project.get("supportedLanguages"),
             self.default_language,
         )
-        self.language_labels = {
-            **RUNTIME_LANGUAGE_LABELS,
-            **(self.i18n.get("languageLabels") if isinstance(self.i18n.get("languageLabels"), dict) else {}),
-        }
+        self.language_labels = build_runtime_language_labels(self.i18n.get("languageLabels"))
         self.current_language = self.default_language
         self.dialog_box_config = get_project_dialog_box_config(self.project)
         self.game_ui_config = get_project_game_ui_config(self.project)
@@ -10339,20 +10325,14 @@ class NativeRuntimePlayer:
         self.runtime_settings["language"] = self.current_language
 
     def localize_value(self, source: dict | None, key: str, fallback: str = "") -> str:
-        source = source if isinstance(source, dict) else {}
-        translations = source.get(f"{key}Translations") if isinstance(source.get(f"{key}Translations"), dict) else {}
-        candidates = [
-            self.current_language,
-            self.fallback_language,
-            self.default_language,
-            DEFAULT_PROJECT_LANGUAGE,
-        ]
-        for candidate in candidates:
-            language = normalize_language_code(candidate, "")
-            text = str(translations.get(language) or "").strip() if language else ""
-            if text:
-                return text
-        return str(source.get(key) or fallback or "").strip()
+        return get_localized_runtime_value(
+            source,
+            key,
+            language=self.current_language,
+            fallback_language=self.fallback_language,
+            default_language=self.default_language,
+            fallback=fallback,
+        )
 
     def is_voice_playing(self) -> bool:
         if not self.current_voice_channel:
