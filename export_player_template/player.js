@@ -67,6 +67,7 @@ function normalizeSupportedLanguages(rawLanguages, defaultLanguage = DEFAULT_RUN
 }
 
 const rawData = window.LIGHTWHISPER_GAME_DATA ?? {};
+const runtimeConditionTools = window.CanvasiaRuntimeConditions;
 const data = normalizeGameData(rawData);
 
 function isChoiceContinueTarget(value) {
@@ -9965,32 +9966,10 @@ function resolveConditionTargetSceneId(block, variables) {
 }
 
 function evaluateConditionRule(rule, variables) {
-  const left = getPreviewVariableValue(variables, rule.variableId);
-  const right = normalizeVariableValue(rule.variableId, rule.value);
-
-  switch (rule.operator) {
-    case ">":
-      return left > right;
-    case ">=":
-      return left >= right;
-    case "<":
-      return left < right;
-    case "<=":
-      return left <= right;
-    case "!=":
-      return left !== right;
-    case "contains":
-      return String(left ?? "").includes(String(right ?? ""));
-    case "not_contains":
-      return !String(left ?? "").includes(String(right ?? ""));
-    case "starts_with":
-      return String(left ?? "").startsWith(String(right ?? ""));
-    case "ends_with":
-      return String(left ?? "").endsWith(String(right ?? ""));
-    case "==":
-    default:
-      return left === right;
-  }
+  return runtimeConditionTools.evaluateConditionRule(rule, variables, {
+    getVariableValue: (variableId, variableValues) => getPreviewVariableValue(variableValues, variableId),
+    normalizeVariableValue: (variableId, value) => normalizeVariableValue(variableId, value),
+  });
 }
 
 function renderRuntime() {

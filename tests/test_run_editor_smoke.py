@@ -613,6 +613,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         build_dir = Path(export_result["buildPath"])
         preload_manifest_path = build_dir / run_editor.RUNTIME_PRELOAD_MANIFEST_FILE_NAME
         preload_report_path = build_dir / run_editor.RUNTIME_PRELOAD_REPORT_FILE_NAME
+        self.assertTrue((build_dir / "runtime_conditions.js").is_file())
         self.assertTrue((build_dir / "runtime_preload.js").is_file())
         self.assertTrue(preload_manifest_path.is_file())
         self.assertTrue(preload_report_path.is_file())
@@ -3032,6 +3033,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(export_result["target"], run_editor.EXPORT_TARGET_WEB)
         self.assertTrue((build_dir / "index.html").is_file())
         self.assertTrue((build_dir / "player.js").is_file())
+        self.assertTrue((build_dir / "runtime_conditions.js").is_file())
         self.assertTrue((build_dir / "runtime_controls.js").is_file())
         self.assertTrue((build_dir / "runtime_settings.js").is_file())
         self.assertTrue((build_dir / "runtime_audio.js").is_file())
@@ -3077,6 +3079,7 @@ class RunEditorSmokeTests(unittest.TestCase):
             run_editor.DEFAULT_EXPORT_RELEASE_VERSION,
         )
         self.assertEqual(manifest["files"]["playerRuntimeControls"], "runtime_controls.js")
+        self.assertEqual(manifest["files"]["playerRuntimeConditions"], "runtime_conditions.js")
         self.assertEqual(manifest["files"]["playerRuntimeSettings"], "runtime_settings.js")
         self.assertEqual(manifest["files"]["playerRuntimeAudio"], "runtime_audio.js")
         self.assertEqual(manifest["files"]["playerRuntimePreload"], "runtime_preload.js")
@@ -3106,6 +3109,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 run_editor.UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME,
                 run_editor.UNLOCKABLE_CONTENT_REPORT_FILE_NAME,
                 "player.js",
+                "runtime_conditions.js",
                 "runtime_controls.js",
                 "runtime_settings.js",
                 "runtime_audio.js",
@@ -4190,6 +4194,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue(Path(export_result["launcherPath"]).is_file())
         self.assertTrue(Path(export_result["startHelperPath"]).is_file())
         self.assertTrue(Path(export_result["archivePath"]).is_file())
+        self.assertTrue((build_dir / "app" / "runtime_conditions.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_controls.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_settings.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_audio.js").is_file())
@@ -4217,6 +4222,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["engine"]["exportTarget"], run_editor.EXPORT_TARGET_WINDOWS_NWJS)
         self.assert_export_manifest_has_subtle_engine_signature(manifest)
         self.assertEqual(manifest["files"]["playtestGuide"], run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME)
+        self.assertEqual(manifest["files"]["appRuntimeConditions"], "app/runtime_conditions.js")
         self.assertEqual(manifest["files"]["storyRouteMap"], run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME)
         self.assertEqual(manifest["files"]["storyRouteMapReport"], run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME)
         self.assertEqual(manifest["files"]["localizationAudit"], run_editor.EXPORT_LOCALIZATION_AUDIT_JSON_NAME)
@@ -4240,6 +4246,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 f"app/{run_editor.UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
                 f"app/{run_editor.UNLOCKABLE_CONTENT_REPORT_FILE_NAME}",
                 "app/player.js",
+                "app/runtime_conditions.js",
                 "app/runtime_controls.js",
                 "app/runtime_settings.js",
                 "app/runtime_audio.js",
@@ -4273,6 +4280,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue(Path(export_result["appBundlePath"]).is_dir())
         self.assertTrue(Path(export_result["startHelperPath"]).is_file())
         self.assertTrue(Path(export_result["archivePath"]).is_file())
+        self.assertTrue((build_dir / "app" / "runtime_conditions.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_controls.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_settings.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_audio.js").is_file())
@@ -4300,6 +4308,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["engine"]["exportTarget"], run_editor.EXPORT_TARGET_MACOS_NWJS)
         self.assert_export_manifest_has_subtle_engine_signature(manifest)
         self.assertEqual(manifest["files"]["playtestGuide"], run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME)
+        self.assertEqual(manifest["files"]["appRuntimeConditions"], "app/runtime_conditions.js")
         self.assertEqual(manifest["files"]["storyRouteMap"], run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME)
         self.assertEqual(manifest["files"]["storyRouteMapReport"], run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME)
         self.assertEqual(manifest["files"]["localizationAudit"], run_editor.EXPORT_LOCALIZATION_AUDIT_JSON_NAME)
@@ -4323,6 +4332,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 f"app/{run_editor.UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
                 f"app/{run_editor.UNLOCKABLE_CONTENT_REPORT_FILE_NAME}",
                 "app/player.js",
+                "app/runtime_conditions.js",
                 "app/runtime_controls.js",
                 "app/runtime_settings.js",
                 "app/runtime_audio.js",
@@ -4431,6 +4441,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue(Path(export_result["startHelperPath"]).is_file())
         self.assertTrue(Path(export_result["archivePath"]).is_file())
         self.assertTrue((build_dir / "package.nw").is_file())
+        self.assertTrue((build_dir / "app" / "runtime_conditions.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_controls.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_settings.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_audio.js").is_file())
@@ -4458,6 +4469,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["engine"]["exportTarget"], run_editor.EXPORT_TARGET_LINUX_NWJS)
         self.assert_export_manifest_has_subtle_engine_signature(manifest)
         self.assertEqual(manifest["files"]["playtestGuide"], run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME)
+        self.assertEqual(manifest["files"]["appRuntimeConditions"], "app/runtime_conditions.js")
         self.assertEqual(manifest["files"]["storyRouteMap"], run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME)
         self.assertEqual(manifest["files"]["storyRouteMapReport"], run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME)
         self.assertEqual(manifest["files"]["localizationAudit"], run_editor.EXPORT_LOCALIZATION_AUDIT_JSON_NAME)
@@ -4481,6 +4493,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 f"app/{run_editor.UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
                 f"app/{run_editor.UNLOCKABLE_CONTENT_REPORT_FILE_NAME}",
                 "app/player.js",
+                "app/runtime_conditions.js",
                 "app/runtime_controls.js",
                 "app/runtime_settings.js",
                 "app/runtime_audio.js",
@@ -4502,6 +4515,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((bundle_dir / "run_editor.py").is_file())
         self.assertTrue((bundle_dir / "prototype_editor" / "index.html").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "player.js").is_file())
+        self.assertTrue((bundle_dir / "export_player_template" / "runtime_conditions.js").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_controls.js").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_settings.js").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_audio.js").is_file())

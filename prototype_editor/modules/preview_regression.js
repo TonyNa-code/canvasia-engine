@@ -1,6 +1,7 @@
 (function attachPreviewRegressionTools(global) {
   "use strict";
 
+  const runtimeConditionTools = global.CanvasiaRuntimeConditions || {};
   const DEFAULT_MAX_CASES = 12;
   const DEFAULT_BRANCHING_SEED_LIMIT = 4;
   const DEFAULT_ROUTE_CASE_SEED_LIMIT = 8;
@@ -191,33 +192,11 @@
   }
 
   function evaluateConditionRule(rule = {}, overrides = {}, options = {}) {
-    const variableId = cleanText(rule.variableId);
-    const left = getVariableTestValue(variableId, overrides, options);
-    const right = normalizeVariableValue(variableId, rule.value, options);
-
-    switch (cleanText(rule.operator, "==")) {
-      case ">":
-        return left > right;
-      case ">=":
-        return left >= right;
-      case "<":
-        return left < right;
-      case "<=":
-        return left <= right;
-      case "!=":
-        return left !== right;
-      case "contains":
-        return String(left ?? "").includes(String(right ?? ""));
-      case "not_contains":
-        return !String(left ?? "").includes(String(right ?? ""));
-      case "starts_with":
-        return String(left ?? "").startsWith(String(right ?? ""));
-      case "ends_with":
-        return String(left ?? "").endsWith(String(right ?? ""));
-      case "==":
-      default:
-        return left === right;
-    }
+    return runtimeConditionTools.evaluateConditionRule(rule, overrides, {
+      ...options,
+      getVariableValue: getVariableTestValue,
+      normalizeVariableValue,
+    });
   }
 
   function conditionBranchMatches(branch = {}, overrides = {}, options = {}) {

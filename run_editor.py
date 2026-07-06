@@ -97,6 +97,7 @@ DEFAULT_PORT = 8765
 EXPORTS_DIR = ROOT_DIR / "exports"
 EXPORT_TEMPLATE_DIR = ROOT_DIR / "export_player_template"
 EXPORT_PLAYER_SCRIPT_FILES = (
+    "runtime_conditions.js",
     "player.js",
     "runtime_controls.js",
     "runtime_settings.js",
@@ -10765,6 +10766,7 @@ def export_web_build() -> dict:
             "entryHtml": "index.html",
             "playerCss": "player.css",
             "playerJs": "player.js",
+            "playerRuntimeConditions": "runtime_conditions.js",
             "playerRuntimeControls": "runtime_controls.js",
             "playerRuntimeSettings": "runtime_settings.js",
             "playerRuntimeAudio": "runtime_audio.js",
@@ -11717,6 +11719,7 @@ def export_windows_nwjs_build() -> dict:
             "archive": f"{build_dir.name}.zip",
             "appEntry": "app/index.html",
             "appPlayerJs": "app/player.js",
+            "appRuntimeConditions": "app/runtime_conditions.js",
             "appRuntimeControls": "app/runtime_controls.js",
             "appRuntimeSettings": "app/runtime_settings.js",
             "appRuntimeAudio": "app/runtime_audio.js",
@@ -11971,6 +11974,7 @@ def export_macos_nwjs_build() -> dict:
             "archive": f"{build_dir.name}.zip",
             "appEntry": "app/index.html",
             "appPlayerJs": "app/player.js",
+            "appRuntimeConditions": "app/runtime_conditions.js",
             "appRuntimeControls": "app/runtime_controls.js",
             "appRuntimeSettings": "app/runtime_settings.js",
             "appRuntimeAudio": "app/runtime_audio.js",
@@ -12236,6 +12240,7 @@ def export_linux_nwjs_build() -> dict:
             "archive": f"{build_dir.name}.tar.gz",
             "appEntry": "app/index.html",
             "appPlayerJs": "app/player.js",
+            "appRuntimeConditions": "app/runtime_conditions.js",
             "appRuntimeControls": "app/runtime_controls.js",
             "appRuntimeSettings": "app/runtime_settings.js",
             "appRuntimeAudio": "app/runtime_audio.js",

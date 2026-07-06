@@ -127,6 +127,7 @@ def build_node_check_steps() -> list[VerifyStep]:
     script_paths.extend(
         [
             "prototype_editor/app.js",
+            "export_player_template/runtime_conditions.js",
             "export_player_template/player.js",
             "export_player_template/runtime_controls.js",
             "export_player_template/runtime_settings.js",

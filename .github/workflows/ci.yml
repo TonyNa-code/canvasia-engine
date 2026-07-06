@@ -96,6 +96,7 @@ jobs:
             tests/test_frontend_renpy_exporter_module.py \
             tests/test_frontend_route_analyzer_module.py \
             tests/test_frontend_route_testing_report_module.py \
+            tests/test_frontend_runtime_conditions_module.py \
             tests/test_frontend_runtime_audio_module.py \
             tests/test_frontend_runtime_preload_module.py \
             tests/test_frontend_runtime_capability_matrix_module.py \
@@ -192,6 +193,7 @@ jobs:
           node --check prototype_editor/modules/visual_effects.js
           node --check prototype_editor/modules/voice_production_sheet.js
           node --check prototype_editor/app.js
+          node --check export_player_template/runtime_conditions.js
           node --check export_player_template/player.js
           node --check export_player_template/runtime_controls.js
           node --check export_player_template/runtime_settings.js
@@ -248,6 +250,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_renpy_exporter_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_route_analyzer_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_route_testing_report_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_runtime_conditions_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_audio_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_preload_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_capability_matrix_module.py' -v
