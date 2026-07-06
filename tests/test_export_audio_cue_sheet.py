@@ -73,6 +73,8 @@ class ExportAudioCueSheetTests(unittest.TestCase):
         self.assertEqual(sheet["summary"]["cueCount"], 1)
         self.assertEqual(sheet["summary"]["sfxCueCount"], 1)
         self.assertEqual(sheet["summary"]["voiceCueCount"], 1)
+        self.assertEqual(sheet["summary"]["voiceMusicSegmentCount"], 1)
+        self.assertEqual(sheet["summary"]["voiceMixWarningCount"], 0)
         self.assertEqual(sheet["summary"]["rangeSuggestionCount"], 1)
         self.assertEqual(sheet["summary"]["scenesWithoutMusicCount"], 1)
         self.assertEqual(sheet["statusDigest"]["status"], "blocked")
@@ -89,18 +91,91 @@ class ExportAudioCueSheetTests(unittest.TestCase):
         self.assertEqual(cue["resolvedEndBlockId"], "line_2")
         self.assertIn("约", cue["durationLabel"])
         self.assertEqual(sheet["rangeSuggestions"][0]["recommendedEndBlockId"], "line_2")
+        self.assertEqual(sheet["voiceMixRows"][0]["risk"], "good")
+        self.assertEqual(sheet["voiceMixRows"][0]["effectiveBgmVolume"], 29)
 
         report = build_audio_cue_sheet_report(sheet)
         self.assertIn("# 音频烟测 音频调度表", report)
         self.assertIn("BGM Cue 列表", report)
         self.assertIn("BGM 文本范围建议", report)
+        self.assertIn("人声混音检查", report)
         self.assertIn("缺文件音效", report)
 
         csv_text = build_audio_cue_sheet_csv(sheet)
         self.assertTrue(csv_text.startswith("\ufeffcueType,status,chapter"))
         self.assertIn("BGM", csv_text)
+        self.assertIn("Mix", csv_text)
         self.assertIn("SFX", csv_text)
         self.assertIn("Voice", csv_text)
+
+    def test_audio_cue_sheet_exports_voice_mix_risk(self) -> None:
+        bundle = {
+            "project": {
+                "title": "混音风险烟测",
+                "chapterOrder": ["chapter_intro"],
+                "runtimeSettings": {"defaultVoiceDuckingEnabled": True, "defaultVoiceDuckingRatio": 90},
+            },
+            "characters": {"characters": [{"id": "heroine", "displayName": "悠奈"}]},
+            "chapters": [
+                {
+                    "chapterId": "chapter_intro",
+                    "name": "序章",
+                    "sceneOrder": ["scene_mix"],
+                    "scenes": [
+                        {
+                            "id": "scene_mix",
+                            "name": "告白前",
+                            "blocks": [
+                                {
+                                    "id": "music",
+                                    "type": "music_play",
+                                    "assetId": "bgm_loud",
+                                    "endMode": "after_block",
+                                    "endBlockId": "line_2",
+                                    "fadeInMs": 600,
+                                    "fadeOutMs": 700,
+                                    "volume": 95,
+                                },
+                                {
+                                    "id": "line_1",
+                                    "type": "dialogue",
+                                    "speakerId": "heroine",
+                                    "text": "我想告诉你一件事。",
+                                    "voiceAssetId": "voice_soft",
+                                    "voiceVolume": 70,
+                                },
+                                {
+                                    "id": "line_2",
+                                    "type": "dialogue",
+                                    "speakerId": "heroine",
+                                    "text": "请你认真听我说。",
+                                    "voiceAssetId": "voice_soft",
+                                    "voiceVolume": 72,
+                                },
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+        assets_doc = {
+            "assets": [
+                {"id": "bgm_loud", "type": "bgm", "name": "强烈主旋律", "path": "bgm/loud.ogg", "fileExists": True},
+                {"id": "voice_soft", "type": "voice", "name": "轻声台词", "path": "voice/soft.ogg", "fileExists": True},
+            ]
+        }
+
+        sheet = build_audio_cue_sheet(bundle, assets_doc)
+
+        self.assertEqual(sheet["summary"]["voiceMusicSegmentCount"], 1)
+        self.assertEqual(sheet["summary"]["voiceMixWarningCount"], 1)
+        self.assertEqual(sheet["summary"]["warningCount"], 1)
+        self.assertEqual(sheet["voiceMixRows"][0]["risk"], "warn")
+        self.assertEqual(sheet["voiceMixRows"][0]["effectiveBgmVolume"], 86)
+        self.assertIn("BGM 可能盖过语音", sheet["voiceMixRows"][0]["title"])
+        self.assertIn("voice_mix_bgm_may_mask_voice", {issue["code"] for issue in sheet["issues"]})
+        self.assertIn("BGM 可能盖过语音", build_audio_cue_sheet_report(sheet))
+        self.assertIn("BGM 可能盖过语音", build_audio_cue_sheet_csv(sheet))
 
     def test_audio_cue_sheet_file_names_are_package_safe(self) -> None:
         self.assertEqual(EXPORT_AUDIO_CUE_SHEET_JSON_NAME, "audio-cue-sheet.json")

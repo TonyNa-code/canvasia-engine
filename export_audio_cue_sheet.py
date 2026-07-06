@@ -36,6 +36,13 @@ BLOCK_LABELS = {
 }
 STORY_CONTENT_BLOCK_TYPES = {"background", "dialogue", "narration", "character_show", "choice", "video_play", "credits_roll", "wait"}
 ISSUE_WEIGHT = {"blocker": 100, "warn": 60, "tip": 20}
+VOICE_MIX_DEFAULTS = {
+    "duckingRatio": 45,
+    "minimumDuckingRatio": 15,
+    "maximumDuckingRatio": 100,
+    "safeEffectiveBgmVolume": 55,
+    "voiceMaskingMargin": 8,
+}
 
 
 def clean_text(value: object, fallback: str = "") -> str:
@@ -63,6 +70,28 @@ def clamp_int(value: object, minimum: int, maximum: int, fallback: int) -> int:
 def get_project_title(bundle: dict) -> str:
     project = bundle.get("project") if isinstance(bundle.get("project"), dict) else {}
     return clean_text(project.get("title"), "Canvasia Project")
+
+
+def get_project_runtime_settings(bundle: dict) -> dict:
+    project = bundle.get("project") if isinstance(bundle.get("project"), dict) else {}
+    runtime_settings = project.get("runtimeSettings") if isinstance(project.get("runtimeSettings"), dict) else {}
+    return runtime_settings
+
+
+def get_voice_ducking_profile(bundle: dict) -> dict:
+    runtime_settings = get_project_runtime_settings(bundle)
+    enabled = runtime_settings.get("defaultVoiceDuckingEnabled") is not False
+    ratio = clamp_int(
+        runtime_settings.get("defaultVoiceDuckingRatio"),
+        VOICE_MIX_DEFAULTS["minimumDuckingRatio"],
+        VOICE_MIX_DEFAULTS["maximumDuckingRatio"],
+        VOICE_MIX_DEFAULTS["duckingRatio"],
+    )
+    return {
+        "enabled": enabled,
+        "ratio": ratio,
+        "label": f"语音时 BGM 保留 {ratio}%" if enabled else "语音焦点关闭",
+    }
 
 
 def get_chapter_id(chapter: dict) -> str:
@@ -265,9 +294,115 @@ def push_issue(issues: list[dict], severity: str, code: str, title: str, detail:
     issues.append({"severity": severity, "code": code, "title": title, "detail": detail, **context})
 
 
+def get_voice_cues_covered_by_music_cue(music_cue: dict, voice_cues: list[dict]) -> list[dict]:
+    return [
+        cue
+        for cue in voice_cues
+        if cue.get("sceneId") == music_cue.get("sceneId")
+        and as_int(cue.get("blockIndex"), -1) >= as_int(music_cue.get("blockIndex"), 0)
+        and as_int(cue.get("blockIndex"), -1) <= as_int(music_cue.get("endBlockIndex"), as_int(music_cue.get("blockIndex"), 0))
+    ]
+
+
+def average_cue_volume(cues: list[dict]) -> int:
+    volumes = [as_int(cue.get("volume"), 100) for cue in cues]
+    return round(sum(volumes) / len(volumes)) if volumes else 100
+
+
+def get_voice_mix_risk_label(risk: str) -> str:
+    if risk == "warn":
+        return "建议先调"
+    if risk == "tip":
+        return "建议试听"
+    return "安全"
+
+
+def build_voice_mix_row(music_cue: dict, covered_voice_cues: list[dict], profile: dict) -> dict:
+    average_voice_volume = average_cue_volume(covered_voice_cues)
+    bgm_volume = as_int(music_cue.get("volume"), 80)
+    effective_bgm_volume = round(bgm_volume * as_int(profile.get("ratio"), VOICE_MIX_DEFAULTS["duckingRatio"]) / 100) if profile.get("enabled") else bgm_volume
+    risk = "good"
+    code = "voice_mix_safe"
+    title = "人声混音安全"
+    detail = f"语音时 BGM 约 {effective_bgm_volume}%，平均语音 {average_voice_volume}%，当前不容易盖住台词。"
+    review_hint = "发布前抽查这一段的人声清晰度即可。"
+
+    if not profile.get("enabled") and bgm_volume >= 65:
+        risk = "warn"
+        code = "voice_mix_ducking_disabled"
+        title = "语音焦点关闭且 BGM 偏高"
+        detail = f"这段有 {len(covered_voice_cues)} 句语音，但语音焦点关闭，BGM 原始音量 {bgm_volume}% 可能盖过台词。"
+        review_hint = "建议开启语音焦点，或把这段 BGM 音量降到 55-65% 后试听。"
+    elif (
+        effective_bgm_volume >= VOICE_MIX_DEFAULTS["safeEffectiveBgmVolume"]
+        and effective_bgm_volume >= average_voice_volume - VOICE_MIX_DEFAULTS["voiceMaskingMargin"]
+    ):
+        risk = "warn"
+        code = "voice_mix_bgm_may_mask_voice"
+        title = "BGM 可能盖过语音"
+        detail = f"语音时 BGM 约 {effective_bgm_volume}%，平均语音 {average_voice_volume}%，对白清晰度可能不足。"
+        review_hint = "建议降低 BGM 音量或语音时 BGM 保留比例，再从第一句语音开始试听。"
+    elif profile.get("enabled") and as_int(profile.get("ratio"), VOICE_MIX_DEFAULTS["duckingRatio"]) >= 75 and len(covered_voice_cues) >= 2:
+        risk = "tip"
+        code = "voice_mix_high_ducking_ratio"
+        title = "语音时 BGM 保留比例偏高"
+        detail = f"这段有 {len(covered_voice_cues)} 句语音，当前语音时 BGM 仍保留 {profile.get('ratio')}%。"
+        review_hint = "如果对白不够清楚，可以把语音时 BGM 保留降到 35-55%。"
+    elif bgm_volume >= 92 and len(covered_voice_cues) >= 2:
+        risk = "tip"
+        code = "voice_mix_loud_music_source"
+        title = "BGM 原始音量接近满格"
+        detail = f"这段 BGM 原始音量 {bgm_volume}%，虽然有语音压低，仍建议确认切入和对白开头。"
+        review_hint = "重点试听第一句语音开头，确认音乐没有突然顶上来。"
+
+    speaker_names = " / ".join(sorted({clean_text(cue.get("speakerName"), "旁白") for cue in covered_voice_cues}))
+    return {
+        "cueType": "Mix",
+        "cueId": music_cue.get("blockId"),
+        "sceneId": music_cue.get("sceneId"),
+        "sceneName": music_cue.get("sceneName"),
+        "chapterName": music_cue.get("chapterName"),
+        "blockId": music_cue.get("blockId"),
+        "blockIndex": music_cue.get("blockIndex"),
+        "assetName": music_cue.get("assetName"),
+        "assetId": music_cue.get("assetId"),
+        "startLabel": music_cue.get("startLabel") or music_cue.get("blockId"),
+        "endLabel": music_cue.get("resolvedEndLabel"),
+        "voiceCount": len(covered_voice_cues),
+        "speakerNames": speaker_names,
+        "bgmVolume": bgm_volume,
+        "averageVoiceVolume": average_voice_volume,
+        "effectiveBgmVolume": effective_bgm_volume,
+        "duckingLabel": profile.get("label"),
+        "risk": risk,
+        "riskLabel": get_voice_mix_risk_label(risk),
+        "code": code,
+        "title": title,
+        "detail": detail,
+        "reviewHint": review_hint,
+    }
+
+
+def build_voice_mix_rows(music_cues: list[dict], voice_cues: list[dict], profile: dict, issues: list[dict]) -> list[dict]:
+    rows: list[dict] = []
+    for cue in music_cues:
+        covered_voice_cues = get_voice_cues_covered_by_music_cue(cue, voice_cues)
+        if not covered_voice_cues:
+            continue
+        row = build_voice_mix_row(cue, covered_voice_cues, profile)
+        rows.append(row)
+        if row["risk"] != "good":
+            severity = "warn" if row["risk"] == "warn" else "tip"
+            push_issue(issues, severity, row["code"], row["title"], row["detail"], row)
+            if cue.get("status") == "ready":
+                cue["status"] = "warn" if severity == "warn" else "tip"
+    return rows
+
+
 def build_audio_cue_sheet(bundle: dict, assets_doc: dict) -> dict:
     assets_by_id = get_assets_by_id(assets_doc)
     characters_by_id = get_characters_by_id(bundle)
+    voice_mix_profile = get_voice_ducking_profile(bundle)
     music_cues: list[dict] = []
     sfx_cues: list[dict] = []
     voice_cues: list[dict] = []
@@ -358,6 +493,7 @@ def build_audio_cue_sheet(bundle: dict, assets_doc: dict) -> dict:
                         "assetId": asset_id,
                         "assetName": get_asset_name(asset, asset_id or "未绑定 BGM"),
                         "assetPath": get_asset_path(asset),
+                        "startLabel": get_block_label(block, block_index),
                         "volume": clamp_int(block.get("volume"), 0, 100, 80),
                         "loop": bool(block.get("loop", True)),
                         "fadeInMs": fade_in_ms,
@@ -366,6 +502,7 @@ def build_audio_cue_sheet(bundle: dict, assets_doc: dict) -> dict:
                         "endLabel": MUSIC_END_MODE_LABELS[end_mode],
                         "endBlockId": end_block_id,
                         "resolvedEndBlockId": get_block_id(blocks[end_block_index], end_block_index) if blocks else "",
+                        "endBlockIndex": end_block_index,
                         "resolvedEndLabel": get_block_label(blocks[end_block_index], end_block_index) if blocks else "",
                         "handoffType": "explicit_end" if end_mode == "after_block" else end_mode,
                         "durationLabel": timing["durationLabel"],
@@ -433,6 +570,7 @@ def build_audio_cue_sheet(bundle: dict, assets_doc: dict) -> dict:
                     }
                 )
 
+    voice_mix_rows = build_voice_mix_rows(music_cues, voice_cues, voice_mix_profile, issues)
     issues.sort(key=lambda issue: (-ISSUE_WEIGHT.get(issue["severity"], 0), issue.get("chapterName", ""), issue.get("sceneName", "")))
     blocker_count = sum(1 for issue in issues if issue["severity"] == "blocker")
     warning_count = sum(1 for issue in issues if issue["severity"] == "warn")
@@ -455,6 +593,9 @@ def build_audio_cue_sheet(bundle: dict, assets_doc: dict) -> dict:
             "missingAssetCount": sum(1 for cue in music_cues if cue["status"] == "blocker"),
             "missingSfxAssetCount": sum(1 for cue in sfx_cues if cue["status"] == "blocker"),
             "missingVoiceAssetCount": sum(1 for cue in voice_cues if cue["status"] == "blocker"),
+            "voiceMusicSegmentCount": len(voice_mix_rows),
+            "voiceMixWarningCount": sum(1 for row in voice_mix_rows if row["risk"] == "warn"),
+            "voiceMixTipCount": sum(1 for row in voice_mix_rows if row["risk"] == "tip"),
             "blockerCount": blocker_count,
             "warningCount": warning_count,
             "tipCount": tip_count,
@@ -463,6 +604,8 @@ def build_audio_cue_sheet(bundle: dict, assets_doc: dict) -> dict:
         "musicCues": music_cues,
         "sfxCues": sfx_cues,
         "voiceCues": voice_cues,
+        "voiceMixRows": voice_mix_rows,
+        "voiceMixProfile": voice_mix_profile,
         "rangeSuggestions": range_suggestions,
         "scenesWithoutMusic": scenes_without_music,
         "issues": issues,
@@ -525,6 +668,21 @@ def build_audio_cue_sheet_report(sheet: dict) -> str:
         [cue.get("status"), cue.get("chapterName"), cue.get("sceneName"), cue.get("speakerName"), cue.get("assetName"), cue.get("text")[:48]]
         for cue in (sheet.get("voiceCues") or [])[:80]
     ]
+    voice_mix_rows = [
+        [
+            row.get("riskLabel"),
+            row.get("chapterName"),
+            row.get("sceneName"),
+            row.get("assetName"),
+            row.get("voiceCount"),
+            row.get("speakerNames"),
+            f"{row.get('bgmVolume')}% / {row.get('effectiveBgmVolume')}%",
+            f"{row.get('averageVoiceVolume')}%",
+            row.get("duckingLabel"),
+            row.get("reviewHint"),
+        ]
+        for row in (sheet.get("voiceMixRows") or [])[:80]
+    ]
     issue_rows = [
         [
             "先修" if issue.get("severity") == "blocker" else "复查" if issue.get("severity") == "warn" else "润色",
@@ -551,12 +709,13 @@ def build_audio_cue_sheet_report(sheet: dict) -> str:
             "## 总览",
             "",
             markdown_table(
-                ["BGM", "SFX", "Voice", "缺音乐场景", "范围建议", "阻塞", "复查", "就绪度"],
+                ["BGM", "SFX", "Voice", "混音段/风险", "缺音乐场景", "范围建议", "阻塞", "复查", "就绪度"],
                 [
                     [
                         summary.get("cueCount", 0),
                         summary.get("sfxCueCount", 0),
                         summary.get("voiceCueCount", 0),
+                        f"{summary.get('voiceMusicSegmentCount', 0)} / {summary.get('voiceMixWarningCount', 0)}",
                         summary.get("scenesWithoutMusicCount", 0),
                         summary.get("rangeSuggestionCount", 0),
                         summary.get("blockerCount", 0),
@@ -574,6 +733,11 @@ def build_audio_cue_sheet_report(sheet: dict) -> str:
             "## BGM 文本范围建议",
             "",
             markdown_table(["章节", "场景", "BGM", "建议结束卡", "说明"], suggestion_rows) or "当前没有明显的 BGM 范围建议。",
+            "",
+            "## 人声混音检查",
+            "",
+            markdown_table(["状态", "章节", "场景", "BGM", "语音数", "角色", "BGM 原始/语音时", "平均语音", "语音焦点", "试听建议"], voice_mix_rows)
+            or "当前没有 BGM 与语音重叠的段落。",
             "",
             "## 音效 Cue 列表",
             "",
@@ -622,7 +786,33 @@ def build_audio_cue_sheet_csv(sheet: dict) -> str:
     for issue in sheet.get("issues") or []:
         key = f"{issue.get('sceneId')}:{issue.get('blockId')}"
         issue_map.setdefault(key, []).append(issue.get("title", ""))
-    for cue in [*(sheet.get("musicCues") or []), *(sheet.get("sfxCues") or []), *(sheet.get("voiceCues") or [])]:
+    mix_cues = [
+        {
+            "cueType": "Mix",
+            "status": row.get("risk"),
+            "chapterName": row.get("chapterName"),
+            "sceneName": row.get("sceneName"),
+            "blockIndex": row.get("blockIndex"),
+            "assetId": row.get("assetId"),
+            "assetName": row.get("assetName"),
+            "assetPath": "",
+            "volume": row.get("effectiveBgmVolume"),
+            "fadeInMs": "",
+            "fadeOutMs": "",
+            "endMode": row.get("duckingLabel"),
+            "resolvedEndBlockId": "",
+            "durationLabel": "",
+            "estimatedSeconds": "",
+            "readableCharacterCount": "",
+            "speakerName": row.get("speakerNames"),
+            "text": row.get("reviewHint"),
+            "timingHint": f"{row.get('voiceCount')} 句语音 / 平均语音 {row.get('averageVoiceVolume')}%",
+            "sceneId": row.get("sceneId"),
+            "blockId": row.get("blockId"),
+        }
+        for row in (sheet.get("voiceMixRows") or [])
+    ]
+    for cue in [*(sheet.get("musicCues") or []), *mix_cues, *(sheet.get("sfxCues") or []), *(sheet.get("voiceCues") or [])]:
         key = f"{cue.get('sceneId')}:{cue.get('blockId')}"
         writer.writerow(
             [

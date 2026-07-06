@@ -4934,6 +4934,9 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("audioCueSheetTools.buildAudioCueAutoFixPlan", source)
         self.assertIn("audioCueSheetTools.buildAudioCueSheet", source)
         self.assertIn("audioCueSheetTools.getAudioCueSheetStatusDigest", panel_source)
+        self.assertIn("function renderVoiceMixSection", panel_source)
+        self.assertIn("人声混音检查", panel_source)
+        self.assertIn("voiceMixRows", panel_source)
 
     def test_scene_production_board_export_actions_are_wired(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")

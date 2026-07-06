@@ -113,6 +113,9 @@ class FrontendAudioCueSheetModuleTests(unittest.TestCase):
         self.assertIn("buildAudioCueSheet", payload["keys"])
         self.assertIn("buildAudioCueRangeRows", payload["keys"])
         self.assertIn("buildVoiceCueRows", payload["keys"])
+        self.assertIn("buildVoiceMusicMixRow", payload["keys"])
+        self.assertIn("auditVoiceMusicMix", payload["keys"])
+        self.assertIn("getProjectVoiceDuckingProfile", payload["keys"])
         self.assertIn("buildAudioCueProductionQueue", payload["keys"])
         self.assertIn("buildAudioCueAuditionChecklist", payload["keys"])
         self.assertIn("buildAudioRangeSuggestion", payload["keys"])
@@ -137,6 +140,9 @@ class FrontendAudioCueSheetModuleTests(unittest.TestCase):
         self.assertEqual(payload["sheet"]["summary"]["missingAssetCount"], 1)
         self.assertEqual(payload["sheet"]["summary"]["missingSfxAssetCount"], 1)
         self.assertEqual(payload["sheet"]["summary"]["missingVoiceAssetCount"], 1)
+        self.assertEqual(payload["sheet"]["summary"]["voiceMusicSegmentCount"], 2)
+        self.assertEqual(payload["sheet"]["summary"]["voiceMixWarningCount"], 0)
+        self.assertEqual(payload["sheet"]["summary"]["voiceMixTipCount"], 0)
         self.assertEqual(payload["sheet"]["summary"]["missingEndBlockCount"], 1)
         self.assertEqual(payload["sheet"]["summary"]["rangeSuggestionCount"], 1)
         self.assertEqual(payload["sheet"]["summary"]["autoFixSceneCount"], 1)
@@ -159,6 +165,9 @@ class FrontendAudioCueSheetModuleTests(unittest.TestCase):
         self.assertEqual(payload["sheet"]["sfxCues"][1]["status"], "blocker")
         self.assertEqual(payload["sheet"]["voiceCues"][0]["speakerName"], "悠奈")
         self.assertEqual(payload["sheet"]["voiceCues"][1]["status"], "blocker")
+        self.assertEqual(payload["sheet"]["voiceMixRows"][0]["effectiveBgmVolume"], 29)
+        self.assertEqual(payload["sheet"]["voiceMixRows"][0]["risk"], "good")
+        self.assertIn("语音时 BGM 保留 45%", payload["sheet"]["voiceMixRows"][0]["duckingLabel"])
         self.assertEqual(payload["sheet"]["cues"][0]["durationLabel"], "约 4 秒")
         self.assertEqual(payload["sheet"]["cues"][0]["readableCharacterCount"], 16)
         self.assertEqual(payload["sheet"]["cues"][0]["textBlockCount"], 2)
@@ -185,6 +194,7 @@ class FrontendAudioCueSheetModuleTests(unittest.TestCase):
         self.assertIn("发布前试听清单", payload["markdown"])
         self.assertIn("BGM 预计总时长", payload["markdown"])
         self.assertIn("BGM 覆盖范围速览", payload["markdown"])
+        self.assertIn("人声混音检查", payload["markdown"])
         self.assertIn("预计时长", payload["markdown"])
         self.assertIn("正文量", payload["markdown"])
         self.assertIn("BGM 文本范围建议", payload["markdown"])
@@ -202,6 +212,7 @@ class FrontendAudioCueSheetModuleTests(unittest.TestCase):
         self.assertIn('"BGM"', payload["csv"])
         self.assertIn('"SFX"', payload["csv"])
         self.assertIn('"Voice"', payload["csv"])
+        self.assertIn('"Mix"', payload["csv"])
         self.assertIn('"放课后钢琴"', payload["csv"])
         self.assertIn('"门铃"', payload["csv"])
         self.assertIn('"悠奈_001"', payload["csv"])
@@ -209,7 +220,74 @@ class FrontendAudioCueSheetModuleTests(unittest.TestCase):
         self.assertTrue(csv_rows)
         self.assertTrue(all(len(row) == len(csv_rows[0]) for row in csv_rows))
         self.assertEqual(len(csv_rows[0]), 20)
-        self.assertEqual([row[0] for row in csv_rows[1:]], ["BGM", "BGM", "SFX", "SFX", "Voice", "Voice"])
+        self.assertEqual([row[0] for row in csv_rows[1:]], ["BGM", "BGM", "Mix", "Mix", "SFX", "SFX", "Voice", "Voice"])
+
+    def test_audio_cue_sheet_flags_voice_mix_masking_risks(self) -> None:
+        script = textwrap.dedent(
+            f"""
+            const fs = require("fs");
+            const vm = require("vm");
+            const context = {{ window: {{}} }};
+            context.globalThis = context;
+            vm.createContext(context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(TIMING_MODULE_PATH))}, "utf8"), context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
+            const tools = context.window.CanvasiaEditorAudioCueSheet;
+            const data = {{
+              project: {{
+                title: "Mix Demo",
+                runtimeSettings: {{
+                  defaultVoiceDuckingEnabled: true,
+                  defaultVoiceDuckingRatio: 90,
+                }},
+              }},
+              chapters: [{{ id: "chapter_1", name: "第1章" }}],
+              assetList: [
+                {{ id: "bgm_loud", type: "bgm", name: "强烈主旋律", fileExists: true }},
+                {{ id: "voice_soft", type: "voice", name: "轻声台词", fileExists: true }},
+              ],
+              characters: [{{ id: "char_yuina", displayName: "悠奈" }}],
+              scenes: [
+                {{
+                  id: "scene_mix",
+                  chapterId: "chapter_1",
+                  name: "告白前",
+                  blocks: [
+                    {{ id: "music", type: "music_play", assetId: "bgm_loud", endMode: "after_block", endBlockId: "line_2", fadeInMs: 600, fadeOutMs: 700, volume: 95 }},
+                    {{ id: "line_1", type: "dialogue", speakerId: "char_yuina", text: "我想告诉你一件事。", voiceAssetId: "voice_soft", voiceVolume: 70 }},
+                    {{ id: "line_2", type: "dialogue", speakerId: "char_yuina", text: "请你认真听我说。", voiceAssetId: "voice_soft", voiceVolume: 72 }},
+                  ],
+                }},
+              ],
+            }};
+            const sheet = tools.buildAudioCueSheet(data);
+            const markdown = tools.buildAudioCueSheetMarkdown(sheet, {{ projectTitle: "Mix Demo", generatedAt: "2026-05-11 09:00:00" }});
+            const csv = tools.buildAudioCueSheetCsv(sheet);
+            process.stdout.write(JSON.stringify({{ sheet, markdown, csv }}));
+            """
+        )
+        completed = subprocess.run(
+            ["node", "-e", script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        sheet = payload["sheet"]
+        self.assertEqual(sheet["summary"]["voiceMusicSegmentCount"], 1)
+        self.assertEqual(sheet["summary"]["voiceMixWarningCount"], 1)
+        self.assertEqual(sheet["summary"]["warningCount"], 1)
+        self.assertEqual(sheet["voiceMixRows"][0]["risk"], "warn")
+        self.assertEqual(sheet["voiceMixRows"][0]["effectiveBgmVolume"], 86)
+        self.assertIn("BGM 可能盖过语音", sheet["voiceMixRows"][0]["title"])
+        self.assertIn("voice_mix_bgm_may_mask_voice", [issue["code"] for issue in sheet["issues"]])
+        self.assertIn("调整 BGM 音量或语音焦点", [task["actionLabel"] for task in sheet["productionQueue"]])
+        self.assertIn("Mix", [row["type"] for row in sheet["auditionChecklist"]])
+        self.assertIn("人声混音检查", payload["markdown"])
+        self.assertIn("BGM 可能盖过语音", payload["csv"])
 
 
 if __name__ == "__main__":

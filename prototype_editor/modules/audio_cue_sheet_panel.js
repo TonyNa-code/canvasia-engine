@@ -113,6 +113,19 @@
     `;
   }
 
+  function renderVoiceMixRow(row = {}) {
+    const toneClass = row.risk === "warn" ? "warn-text" : row.risk === "tip" ? "soft-text" : "good-text";
+    return `
+      <div class="route-testing-item">
+        <div>
+          <b>${escapeHtml(`${row.assetName ?? "BGM"} · ${row.riskLabel ?? "安全"}`)}</b>
+          <span>${escapeHtml(`${row.chapterName ?? "未分章"} · ${row.sceneName ?? "未命名场景"} · ${row.voiceCount ?? 0} 句语音`)}</span>
+        </div>
+        <span class="${toneClass}">${escapeHtml(`${row.duckingLabel ?? "语音焦点"} · BGM ${row.bgmVolume ?? 100}% -> ${row.effectiveBgmVolume ?? 45}% · ${row.reviewHint ?? "发布前试听人声清晰度。"}`)}</span>
+      </div>
+    `;
+  }
+
   function renderAudioProductionTaskCard(task = {}) {
     const severityClass = task.severity === "blocker" ? "danger" : task.severity === "warn" ? "warn" : "soft";
     const toneClass = task.severity === "blocker" ? "danger-text" : task.severity === "warn" ? "warn-text" : "";
@@ -222,6 +235,24 @@
     `;
   }
 
+  function renderVoiceMixSection(rows = []) {
+    const previewRows = Array.isArray(rows) ? rows.slice(0, 6) : [];
+    if (!previewRows.length) {
+      return "";
+    }
+    return `
+      <section class="preview-sprint-section">
+        <div class="panel-heading panel-heading-compact">
+          <h3>人声混音检查</h3>
+          <span class="badge badge-soft">${escapeHtml(`${rows.length} 段 BGM 覆盖语音`)}</span>
+        </div>
+        <div class="list-stack compact-stack">
+          ${previewRows.map(renderVoiceMixRow).join("")}
+        </div>
+      </section>
+    `;
+  }
+
   function getAudioCueAutoFixPlan(sheet = {}) {
     return sheet.autoFixPlan && typeof sheet.autoFixPlan === "object"
       ? sheet.autoFixPlan
@@ -301,6 +332,7 @@
           ${renderRouteMetricCard("BGM 预计", formatAudioSegmentDuration(summary.totalEstimatedMusicSeconds ?? 0), "按正文、等待和媒体卡粗略估算")}
           ${renderRouteMetricCard("范围建议", `${summary.rangeSuggestionCount ?? 0} 条`, "可一键绑定到具体文本段落")}
           ${renderRouteMetricCard("短/长/空段", `${summary.shortMusicSegmentCount ?? 0}/${summary.longMusicSegmentCount ?? 0}/${summary.silentMusicSegmentCount ?? 0}`, "帮助定位需要试听的 BGM 段")}
+          ${renderRouteMetricCard("人声混音", `${summary.voiceMusicSegmentCount ?? 0} / ${summary.voiceMixWarningCount ?? 0}`, "BGM 覆盖语音段 / 可能盖过台词")}
           ${renderRouteMetricCard("阻塞 / 提醒", `${summary.blockerCount ?? 0} / ${summary.warningCount ?? 0}`, "缺素材、坏范围或提前接管")}
           ${renderRouteMetricCard("就绪度", `${summary.releaseReadinessPercent ?? 0}%`, "按阻塞、提醒和缺 BGM 场景估算")}
           ${renderRouteMetricCard("制作任务", `${summary.productionTaskCount ?? 0} 项`, "按发布优先级自动排序")}
@@ -319,6 +351,7 @@
           </button>
         </div>
         ${renderAudioCueSheetPreview(sheet)}
+        ${renderVoiceMixSection(sheet.voiceMixRows)}
         ${renderAudioRangeSuggestions(sheet.rangeSuggestions)}
         ${renderAudioProductionQueue(sheet.productionQueue)}
         ${renderAudioAuditionChecklist(sheet.auditionChecklist)}
@@ -332,12 +365,14 @@
     renderAudioCueRangeRow,
     renderSfxCueRow,
     renderVoiceCueRow,
+    renderVoiceMixRow,
     renderAudioProductionTaskCard,
     renderAudioRangeSuggestionCard,
     renderAudioRangeSuggestions,
     renderAudioAuditionChecklistRow,
     renderAudioProductionQueue,
     renderAudioAuditionChecklist,
+    renderVoiceMixSection,
     getAudioCueAutoFixPlan,
     renderAudioCueAutoFixButton,
     renderAudioCueSheetPreview,

@@ -34,6 +34,13 @@
     musicFadeOutMs: 900,
     stopFadeOutMs: 700,
   });
+  const VOICE_MIX_DEFAULTS = Object.freeze({
+    duckingRatio: 45,
+    minimumDuckingRatio: 15,
+    maximumDuckingRatio: 100,
+    safeEffectiveBgmVolume: 55,
+    voiceMaskingMargin: 8,
+  });
 
   function toArray(value) {
     return Array.isArray(value) ? value : [];
@@ -50,6 +57,34 @@
       return fallback;
     }
     return Math.min(Math.max(number, minimum), maximum);
+  }
+
+  function getProjectRuntimeSettings(data = {}) {
+    if (data.project?.runtimeSettings && typeof data.project.runtimeSettings === "object") {
+      return data.project.runtimeSettings;
+    }
+    if (data.runtimeSettings && typeof data.runtimeSettings === "object") {
+      return data.runtimeSettings;
+    }
+    return {};
+  }
+
+  function getProjectVoiceDuckingProfile(data = {}) {
+    const runtimeSettings = getProjectRuntimeSettings(data);
+    const enabled = runtimeSettings.defaultVoiceDuckingEnabled !== false;
+    const ratio = Math.round(
+      clampNumber(
+        runtimeSettings.defaultVoiceDuckingRatio,
+        VOICE_MIX_DEFAULTS.minimumDuckingRatio,
+        VOICE_MIX_DEFAULTS.maximumDuckingRatio,
+        VOICE_MIX_DEFAULTS.duckingRatio
+      )
+    );
+    return {
+      enabled,
+      ratio,
+      label: enabled ? `语音时 BGM 保留 ${ratio}%` : "语音焦点关闭",
+    };
   }
 
   function getSafeMusicEndMode(mode) {
@@ -726,6 +761,114 @@
     });
   }
 
+  function getVoiceCuesCoveredByMusicCue(cue = {}, voiceCues = []) {
+    return toArray(voiceCues).filter(
+      (voiceCue) =>
+        voiceCue.sceneId === cue.sceneId &&
+        (voiceCue.blockIndex ?? -1) >= (cue.blockIndex ?? 0) &&
+        (voiceCue.blockIndex ?? -1) <= (cue.endBlockIndex ?? cue.blockIndex ?? 0)
+    );
+  }
+
+  function getAverageCueVolume(cues = []) {
+    const volumes = toArray(cues)
+      .map((cue) => Number(cue.volume))
+      .filter((volume) => Number.isFinite(volume));
+    if (!volumes.length) {
+      return 100;
+    }
+    return Math.round(volumes.reduce((total, volume) => total + volume, 0) / volumes.length);
+  }
+
+  function getVoiceMixRiskLabel(risk = "") {
+    if (risk === "warn") {
+      return "建议先调";
+    }
+    if (risk === "tip") {
+      return "建议试听";
+    }
+    return "安全";
+  }
+
+  function buildVoiceMusicMixRow(cue = {}, coveredVoices = [], profile = getProjectVoiceDuckingProfile()) {
+    const averageVoiceVolume = getAverageCueVolume(coveredVoices);
+    const effectiveBgmVolume = profile.enabled ? Math.round((cue.volume ?? 100) * profile.ratio / 100) : cue.volume ?? 100;
+    let risk = "good";
+    let code = "voice_mix_safe";
+    let title = "人声混音安全";
+    let detail = `语音时 BGM 约 ${effectiveBgmVolume}%，平均语音 ${averageVoiceVolume}%，当前不容易盖住台词。`;
+    let reviewHint = "发布前抽查这一段的人声清晰度即可。";
+
+    if (!profile.enabled && (cue.volume ?? 100) >= 65) {
+      risk = "warn";
+      code = "voice_mix_ducking_disabled";
+      title = "语音焦点关闭且 BGM 偏高";
+      detail = `这段有 ${coveredVoices.length} 句语音，但语音焦点关闭，BGM 原始音量 ${cue.volume}% 可能盖过台词。`;
+      reviewHint = "建议开启语音焦点，或把这段 BGM 音量降到 55-65% 后试听。";
+    } else if (
+      effectiveBgmVolume >= VOICE_MIX_DEFAULTS.safeEffectiveBgmVolume &&
+      effectiveBgmVolume >= averageVoiceVolume - VOICE_MIX_DEFAULTS.voiceMaskingMargin
+    ) {
+      risk = "warn";
+      code = "voice_mix_bgm_may_mask_voice";
+      title = "BGM 可能盖过语音";
+      detail = `语音时 BGM 约 ${effectiveBgmVolume}%，平均语音 ${averageVoiceVolume}%，对白清晰度可能不足。`;
+      reviewHint = "建议降低 BGM 音量或语音时 BGM 保留比例，再从第一句语音开始试听。";
+    } else if (profile.enabled && profile.ratio >= 75 && coveredVoices.length >= 2) {
+      risk = "tip";
+      code = "voice_mix_high_ducking_ratio";
+      title = "语音时 BGM 保留比例偏高";
+      detail = `这段有 ${coveredVoices.length} 句语音，当前语音时 BGM 仍保留 ${profile.ratio}%。`;
+      reviewHint = "如果对白不够清楚，可以把语音时 BGM 保留降到 35-55%。";
+    } else if ((cue.volume ?? 100) >= 92 && coveredVoices.length >= 2) {
+      risk = "tip";
+      code = "voice_mix_loud_music_source";
+      title = "BGM 原始音量接近满格";
+      detail = `这段 BGM 原始音量 ${cue.volume}%，虽然有语音压低，仍建议确认切入和对白开头。`;
+      reviewHint = "重点试听第一句语音开头，确认音乐没有突然顶上来。";
+    }
+
+    return {
+      id: `voice_mix_${cue.id}`,
+      cueId: cue.id,
+      sceneId: cue.sceneId,
+      sceneName: cue.sceneName,
+      chapterName: cue.chapterName,
+      assetName: cue.assetName,
+      assetId: cue.assetId,
+      startLabel: cue.startLabel,
+      endLabel: cue.endLabel,
+      voiceCount: coveredVoices.length,
+      speakerNames: Array.from(new Set(coveredVoices.map((voiceCue) => voiceCue.speakerName).filter(Boolean))).join(" / "),
+      bgmVolume: cue.volume,
+      averageVoiceVolume,
+      effectiveBgmVolume,
+      duckingLabel: profile.label,
+      risk,
+      riskLabel: getVoiceMixRiskLabel(risk),
+      code,
+      title,
+      detail,
+      reviewHint,
+    };
+  }
+
+  function auditVoiceMusicMix(cues = [], voiceCues = [], profile = getProjectVoiceDuckingProfile()) {
+    return toArray(cues)
+      .map((cue) => {
+        const coveredVoices = getVoiceCuesCoveredByMusicCue(cue, voiceCues);
+        if (!coveredVoices.length) {
+          return null;
+        }
+        const row = buildVoiceMusicMixRow(cue, coveredVoices, profile);
+        if (row.risk !== "good") {
+          addIssueToCue(cue, row.risk === "warn" ? "warn" : "tip", row.code, row.title, row.detail);
+        }
+        return row;
+      })
+      .filter(Boolean);
+  }
+
   function buildAudioCueRangeRows(cues = []) {
     return toArray(cues).map((cue, index) => ({
       id: cue.id,
@@ -1048,6 +1191,9 @@
 
   function getAudioIssueActionLabel(issue = {}) {
     const code = String(issue.code ?? "");
+    if (code.includes("voice_mix") || code.includes("ducking")) {
+      return "调整 BGM 音量或语音焦点";
+    }
     if (code.includes("asset") || code.includes("file_missing")) {
       return "补齐或重新绑定素材";
     }
@@ -1083,7 +1229,9 @@
         ? 80
         : code.includes("end_block") || code.includes("range")
           ? 70
-          : code.includes("handoff") || code.includes("taken_over")
+          : code.includes("voice_mix") || code.includes("ducking")
+            ? 55
+            : code.includes("handoff") || code.includes("taken_over")
             ? 45
             : code.includes("scene_without_music")
               ? 25
@@ -1187,6 +1335,21 @@
         });
       });
 
+    toArray(sheet.voiceMixRows)
+      .filter((row) => row.risk !== "good")
+      .forEach((row, index) => {
+        rows.push({
+          id: `mix_${row.id || index}`,
+          type: "Mix",
+          priority: row.risk === "warn" ? "重点试听" : "抽查",
+          targetLabel: `${row.chapterName} · ${row.sceneName}`,
+          assetName: row.assetName,
+          cueLabel: `${row.startLabel} -> ${row.endLabel}`,
+          actionLabel: row.reviewHint,
+          statusLabel: row.riskLabel,
+        });
+      });
+
     toArray(sheet.sfxCues)
       .filter((cue, index) => cue.status !== "good" || index < 12)
       .forEach((cue, index) => {
@@ -1247,6 +1410,7 @@
     const stops = [];
     const rangeSuggestions = [];
     const scenesWithoutMusic = [];
+    const voiceMixProfile = getProjectVoiceDuckingProfile(data);
 
     scenes.forEach((scene, sceneIndex) => {
       const blocks = toArray(scene?.blocks);
@@ -1304,6 +1468,7 @@
     });
 
     auditAudioCueContinuity(cues);
+    const voiceMixRows = auditVoiceMusicMix(cues, voiceCues, voiceMixProfile);
     const rangeRows = buildAudioCueRangeRows(cues);
     const sfxRows = buildSfxCueRows(sfxCues);
     const voiceRows = buildVoiceCueRows(voiceCues);
@@ -1375,6 +1540,9 @@
         cue.issues.some((issue) => ["missing_end_block", "invalid_end_block", "end_block_before_start"].includes(issue.code))
       ).length,
       noFadeCount: cues.filter((cue) => cue.issues.some((issue) => ["no_fade_in", "no_fade_out"].includes(issue.code))).length,
+      voiceMusicSegmentCount: voiceMixRows.length,
+      voiceMixWarningCount: voiceMixRows.filter((row) => row.risk === "warn").length,
+      voiceMixTipCount: voiceMixRows.filter((row) => row.risk === "tip").length,
       stopCount: stops.length,
       scenesWithoutMusicCount: scenesWithoutMusic.length,
       blockerCount: issues.filter((issue) => issue.severity === "blocker").length,
@@ -1390,6 +1558,8 @@
       sfxRows,
       voiceCues,
       voiceRows,
+      voiceMixRows,
+      voiceMixProfile,
       stops,
       scenesWithoutMusic,
       rangeSuggestions,
@@ -1537,6 +1707,19 @@
       row.reviewHint,
       row.statusLabel,
     ]);
+    const voiceMixRows = toArray(sheet.voiceMixRows).slice(0, 120).map((row, index) => [
+      `${index + 1}`,
+      row.riskLabel,
+      `${row.chapterName} / ${row.sceneName}`,
+      row.assetName,
+      `${row.startLabel} -> ${row.endLabel}`,
+      `${row.voiceCount} 句`,
+      row.speakerNames || "旁白",
+      `${row.bgmVolume}% / ${row.effectiveBgmVolume}%`,
+      `${row.averageVoiceVolume}%`,
+      row.duckingLabel,
+      row.reviewHint,
+    ]);
     const issueRows = toArray(sheet.issues).slice(0, 120).map((issue, index) => [
       `${index + 1}`,
       issue.cueType === "voice" ? "语音" : issue.cueType === "sfx" ? "音效" : "BGM",
@@ -1600,6 +1783,7 @@
           ["复查提醒", `${summary.warningCount ?? 0}`],
           ["音效缺失", `${summary.missingSfxAssetCount ?? 0}`],
           ["语音缺失", `${summary.missingVoiceAssetCount ?? 0}`],
+          ["人声混音段 / 风险", `${summary.voiceMusicSegmentCount ?? 0} / ${summary.voiceMixWarningCount ?? 0}`],
           ["无 BGM 内容场景", `${summary.scenesWithoutMusicCount ?? 0}`],
           ["制作任务", `${summary.productionTaskCount ?? 0}`],
           ["试听清单", `${summary.auditionChecklistCount ?? 0}`],
@@ -1621,6 +1805,13 @@
       "",
       buildMarkdownTable(["序号", "章节 / 场景", "BGM", "覆盖范围", "预计时长", "正文量", "接管方式", "试听提示", "状态"], rangeRows) ||
         "当前没有可展示的 BGM 覆盖范围。",
+      "",
+      "## 人声混音检查",
+      "",
+      buildMarkdownTable(
+        ["序号", "状态", "章节 / 场景", "BGM", "覆盖范围", "语音数", "角色", "BGM 原始/语音时", "平均语音", "语音焦点", "试听建议"],
+        voiceMixRows
+      ) || "当前没有 BGM 与语音重叠的段落。",
       "",
       "## BGM 文本范围建议",
       "",
@@ -1720,7 +1911,29 @@
       cue.statusLabel,
       cue.issues.map((issue) => issue.title).join(" / "),
     ]);
-    const rows = [...musicRows, ...sfxRows, ...voiceRows];
+    const mixRows = toArray(sheet.voiceMixRows).map((row, index) => [
+      "Mix",
+      `${index + 1}`,
+      row.chapterName,
+      row.sceneName,
+      "",
+      row.assetName,
+      row.assetId,
+      row.duckingLabel,
+      "",
+      "",
+      `${row.startLabel} -> ${row.endLabel}`,
+      `${row.voiceCount} 句语音 / ${row.speakerNames || "旁白"}`,
+      "",
+      row.effectiveBgmVolume,
+      "",
+      "",
+      "",
+      row.reviewHint,
+      row.riskLabel,
+      row.risk === "good" ? "" : row.title,
+    ]);
+    const rows = [...musicRows, ...mixRows, ...sfxRows, ...voiceRows];
     return `\uFEFF${buildCsv(
       [
         "类型",
@@ -1755,6 +1968,9 @@
     buildAudioCueRangeRows,
     buildSfxCueRows,
     buildVoiceCueRows,
+    getProjectVoiceDuckingProfile,
+    buildVoiceMusicMixRow,
+    auditVoiceMusicMix,
     buildAudioRangeSuggestion,
     applyAudioRangeSuggestionToScene,
     buildAudioCueProductionQueue,
