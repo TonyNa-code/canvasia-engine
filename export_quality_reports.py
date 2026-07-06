@@ -6,6 +6,7 @@ from export_choice_consequence_sheet import write_export_choice_consequence_file
 from export_localization_audit import write_export_localization_audit_files
 from export_release_readiness import write_export_release_readiness_files
 from export_story_route_map import write_export_story_route_map_files
+from export_variable_influence_sheet import write_export_variable_influence_files
 
 
 def normalize_report_file_names(values: list[str] | None) -> list[str]:
@@ -31,6 +32,7 @@ def write_export_quality_report_bundle(
 ) -> dict:
     story_route_map = write_export_story_route_map_files(target_dir, bundle)
     choice_consequence = write_export_choice_consequence_files(target_dir, bundle=bundle)
+    variable_influence = write_export_variable_influence_files(target_dir, bundle=bundle)
     localization_audit = write_export_localization_audit_files(target_dir, bundle)
     report_files = normalize_report_file_names(
         [
@@ -39,6 +41,9 @@ def write_export_quality_report_bundle(
             choice_consequence["choiceConsequenceReportName"],
             choice_consequence["choiceConsequenceName"],
             choice_consequence["choiceConsequenceCsvName"],
+            variable_influence["variableInfluenceReportName"],
+            variable_influence["variableInfluenceName"],
+            variable_influence["variableInfluenceCsvName"],
             localization_audit["localizationAuditReportName"],
             *(extra_report_files or []),
         ]
@@ -57,6 +62,7 @@ def write_export_quality_report_bundle(
     return {
         **story_route_map,
         **choice_consequence,
+        **variable_influence,
         **localization_audit,
         **release_readiness,
         "qualityReportFiles": report_files,

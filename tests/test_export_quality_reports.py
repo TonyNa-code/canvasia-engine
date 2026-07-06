@@ -23,6 +23,11 @@ from export_story_route_map import (
     EXPORT_STORY_ROUTE_MAP_JSON_NAME,
     EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
 )
+from export_variable_influence_sheet import (
+    EXPORT_VARIABLE_INFLUENCE_CSV_NAME,
+    EXPORT_VARIABLE_INFLUENCE_JSON_NAME,
+    EXPORT_VARIABLE_INFLUENCE_REPORT_NAME,
+)
 
 
 def make_bundle() -> dict:
@@ -108,6 +113,9 @@ class ExportQualityReportsTests(unittest.TestCase):
                 EXPORT_CHOICE_CONSEQUENCE_JSON_NAME,
                 EXPORT_CHOICE_CONSEQUENCE_REPORT_NAME,
                 EXPORT_CHOICE_CONSEQUENCE_CSV_NAME,
+                EXPORT_VARIABLE_INFLUENCE_JSON_NAME,
+                EXPORT_VARIABLE_INFLUENCE_REPORT_NAME,
+                EXPORT_VARIABLE_INFLUENCE_CSV_NAME,
                 EXPORT_LOCALIZATION_AUDIT_JSON_NAME,
                 EXPORT_LOCALIZATION_AUDIT_REPORT_NAME,
                 EXPORT_RELEASE_READINESS_JSON_NAME,
@@ -126,6 +134,9 @@ class ExportQualityReportsTests(unittest.TestCase):
                     EXPORT_CHOICE_CONSEQUENCE_REPORT_NAME,
                     EXPORT_CHOICE_CONSEQUENCE_JSON_NAME,
                     EXPORT_CHOICE_CONSEQUENCE_CSV_NAME,
+                    EXPORT_VARIABLE_INFLUENCE_REPORT_NAME,
+                    EXPORT_VARIABLE_INFLUENCE_JSON_NAME,
+                    EXPORT_VARIABLE_INFLUENCE_CSV_NAME,
                     EXPORT_LOCALIZATION_AUDIT_REPORT_NAME,
                     "unlockable_content_report.md",
                 ],
@@ -133,6 +144,7 @@ class ExportQualityReportsTests(unittest.TestCase):
 
             readiness_payload = json.loads((target_dir / EXPORT_RELEASE_READINESS_JSON_NAME).read_text(encoding="utf-8"))
             self.assertIn(EXPORT_CHOICE_CONSEQUENCE_REPORT_NAME, readiness_payload["reportFiles"])
+            self.assertIn(EXPORT_VARIABLE_INFLUENCE_REPORT_NAME, readiness_payload["reportFiles"])
             self.assertIn(EXPORT_LOCALIZATION_AUDIT_REPORT_NAME, readiness_payload["reportFiles"])
             self.assertIn("localization_missing_translations", {issue["code"] for issue in readiness_payload["issues"]})
 

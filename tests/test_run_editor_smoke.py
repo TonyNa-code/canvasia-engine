@@ -410,6 +410,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertIn(run_editor.EXPORT_RELEASE_READINESS_REPORT_NAME, content)
         self.assertIn(run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME, content)
         self.assertIn(run_editor.EXPORT_CHOICE_CONSEQUENCE_REPORT_NAME, content)
+        self.assertIn(run_editor.EXPORT_VARIABLE_INFLUENCE_REPORT_NAME, content)
         self.assertIn(run_editor.EXPORT_LOCALIZATION_AUDIT_REPORT_NAME, content)
         return content
 
@@ -491,6 +492,22 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertIn("releaseReadinessPercent", payload["summary"])
         self.assertIn("选项后果表", report)
         self.assertIn("序号,章节,场景", csv_text)
+        return payload
+
+    def assert_export_variable_influence_files(self, build_dir: Path) -> dict:
+        manifest_path = build_dir / run_editor.EXPORT_VARIABLE_INFLUENCE_JSON_NAME
+        report_path = build_dir / run_editor.EXPORT_VARIABLE_INFLUENCE_REPORT_NAME
+        csv_path = build_dir / run_editor.EXPORT_VARIABLE_INFLUENCE_CSV_NAME
+        self.assertTrue(manifest_path.is_file())
+        self.assertTrue(report_path.is_file())
+        self.assertTrue(csv_path.is_file())
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+        report = report_path.read_text(encoding="utf-8")
+        csv_text = csv_path.read_text(encoding="utf-8")
+        self.assertEqual(payload["formatVersion"], 1)
+        self.assertIn("releaseReadinessPercent", payload["summary"])
+        self.assertIn("变量影响表", report)
+        self.assertIn("序号,变量,ID", csv_text)
         return payload
 
     def assert_export_voice_production_files(self, build_dir: Path) -> dict:
@@ -3206,6 +3223,10 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(export_result["choiceConsequenceName"], run_editor.EXPORT_CHOICE_CONSEQUENCE_JSON_NAME)
         self.assertEqual(export_result["choiceConsequenceReportName"], run_editor.EXPORT_CHOICE_CONSEQUENCE_REPORT_NAME)
         self.assertEqual(choice_consequence_payload["summary"]["choiceBlockCount"], 0)
+        variable_influence_payload = self.assert_export_variable_influence_files(build_dir)
+        self.assertEqual(export_result["variableInfluenceName"], run_editor.EXPORT_VARIABLE_INFLUENCE_JSON_NAME)
+        self.assertEqual(export_result["variableInfluenceReportName"], run_editor.EXPORT_VARIABLE_INFLUENCE_REPORT_NAME)
+        self.assertEqual(variable_influence_payload["summary"]["variableCount"], 0)
         voice_production_payload = self.assert_export_voice_production_files(build_dir)
         self.assertEqual(export_result["voiceProductionName"], run_editor.EXPORT_VOICE_PRODUCTION_JSON_NAME)
         self.assertEqual(export_result["voiceProductionReportName"], run_editor.EXPORT_VOICE_PRODUCTION_REPORT_NAME)
@@ -3265,6 +3286,9 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["choiceConsequence"], run_editor.EXPORT_CHOICE_CONSEQUENCE_JSON_NAME)
         self.assertEqual(manifest["files"]["choiceConsequenceReport"], run_editor.EXPORT_CHOICE_CONSEQUENCE_REPORT_NAME)
         self.assertEqual(manifest["files"]["choiceConsequenceCsv"], run_editor.EXPORT_CHOICE_CONSEQUENCE_CSV_NAME)
+        self.assertEqual(manifest["files"]["variableInfluence"], run_editor.EXPORT_VARIABLE_INFLUENCE_JSON_NAME)
+        self.assertEqual(manifest["files"]["variableInfluenceReport"], run_editor.EXPORT_VARIABLE_INFLUENCE_REPORT_NAME)
+        self.assertEqual(manifest["files"]["variableInfluenceCsv"], run_editor.EXPORT_VARIABLE_INFLUENCE_CSV_NAME)
         self.assertEqual(manifest["files"]["voiceProduction"], run_editor.EXPORT_VOICE_PRODUCTION_JSON_NAME)
         self.assertEqual(manifest["files"]["voiceProductionReport"], run_editor.EXPORT_VOICE_PRODUCTION_REPORT_NAME)
         self.assertEqual(manifest["files"]["voiceProductionCsv"], run_editor.EXPORT_VOICE_PRODUCTION_CSV_NAME)
@@ -3657,6 +3681,10 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(export_result["choiceConsequenceName"], run_editor.EXPORT_CHOICE_CONSEQUENCE_JSON_NAME)
         self.assertEqual(export_result["choiceConsequenceReportName"], run_editor.EXPORT_CHOICE_CONSEQUENCE_REPORT_NAME)
         self.assertGreaterEqual(choice_consequence_payload["summary"]["optionCount"], 0)
+        variable_influence_payload = self.assert_export_variable_influence_files(build_dir)
+        self.assertEqual(export_result["variableInfluenceName"], run_editor.EXPORT_VARIABLE_INFLUENCE_JSON_NAME)
+        self.assertEqual(export_result["variableInfluenceReportName"], run_editor.EXPORT_VARIABLE_INFLUENCE_REPORT_NAME)
+        self.assertGreaterEqual(variable_influence_payload["summary"]["variableCount"], 0)
         voice_production_payload = self.assert_export_voice_production_files(build_dir)
         self.assertEqual(export_result["voiceProductionName"], run_editor.EXPORT_VOICE_PRODUCTION_JSON_NAME)
         self.assertEqual(export_result["voiceProductionReportName"], run_editor.EXPORT_VOICE_PRODUCTION_REPORT_NAME)
@@ -3790,6 +3818,9 @@ class RunEditorSmokeTests(unittest.TestCase):
             any(item["name"] == export_result["presentationTimelineReportName"] for item in release_artifact_payload["insideArchiveReports"])
         )
         self.assertTrue(
+            any(item["name"] == export_result["variableInfluenceReportName"] for item in release_artifact_payload["insideArchiveReports"])
+        )
+        self.assertTrue(
             any(item["name"] == export_result["voiceProductionReportName"] for item in release_artifact_payload["insideArchiveReports"])
         )
         self.assertTrue(
@@ -3857,6 +3888,9 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["choiceConsequence"], run_editor.EXPORT_CHOICE_CONSEQUENCE_JSON_NAME)
         self.assertEqual(manifest["files"]["choiceConsequenceReport"], run_editor.EXPORT_CHOICE_CONSEQUENCE_REPORT_NAME)
         self.assertEqual(manifest["files"]["choiceConsequenceCsv"], run_editor.EXPORT_CHOICE_CONSEQUENCE_CSV_NAME)
+        self.assertEqual(manifest["files"]["variableInfluence"], run_editor.EXPORT_VARIABLE_INFLUENCE_JSON_NAME)
+        self.assertEqual(manifest["files"]["variableInfluenceReport"], run_editor.EXPORT_VARIABLE_INFLUENCE_REPORT_NAME)
+        self.assertEqual(manifest["files"]["variableInfluenceCsv"], run_editor.EXPORT_VARIABLE_INFLUENCE_CSV_NAME)
         self.assertEqual(manifest["runtime"]["presentationTimeline"], run_editor.EXPORT_PRESENTATION_TIMELINE_JSON_NAME)
         self.assertEqual(manifest["files"]["voiceProduction"], run_editor.EXPORT_VOICE_PRODUCTION_JSON_NAME)
         self.assertEqual(manifest["files"]["voiceProductionReport"], run_editor.EXPORT_VOICE_PRODUCTION_REPORT_NAME)
@@ -4516,6 +4550,8 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(export_result["presentationTimelineName"], run_editor.EXPORT_PRESENTATION_TIMELINE_JSON_NAME)
         self.assert_export_choice_consequence_files(build_dir)
         self.assertEqual(export_result["choiceConsequenceName"], run_editor.EXPORT_CHOICE_CONSEQUENCE_JSON_NAME)
+        self.assert_export_variable_influence_files(build_dir)
+        self.assertEqual(export_result["variableInfluenceName"], run_editor.EXPORT_VARIABLE_INFLUENCE_JSON_NAME)
         self.assert_export_voice_production_files(build_dir)
         self.assertEqual(export_result["voiceProductionName"], run_editor.EXPORT_VOICE_PRODUCTION_JSON_NAME)
         route_map_payload = self.assert_export_story_route_map_files(
@@ -4557,6 +4593,9 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["choiceConsequence"], run_editor.EXPORT_CHOICE_CONSEQUENCE_JSON_NAME)
         self.assertEqual(manifest["files"]["choiceConsequenceReport"], run_editor.EXPORT_CHOICE_CONSEQUENCE_REPORT_NAME)
         self.assertEqual(manifest["files"]["choiceConsequenceCsv"], run_editor.EXPORT_CHOICE_CONSEQUENCE_CSV_NAME)
+        self.assertEqual(manifest["files"]["variableInfluence"], run_editor.EXPORT_VARIABLE_INFLUENCE_JSON_NAME)
+        self.assertEqual(manifest["files"]["variableInfluenceReport"], run_editor.EXPORT_VARIABLE_INFLUENCE_REPORT_NAME)
+        self.assertEqual(manifest["files"]["variableInfluenceCsv"], run_editor.EXPORT_VARIABLE_INFLUENCE_CSV_NAME)
         self.assertEqual(manifest["files"]["voiceProduction"], run_editor.EXPORT_VOICE_PRODUCTION_JSON_NAME)
         self.assertEqual(manifest["files"]["voiceProductionReport"], run_editor.EXPORT_VOICE_PRODUCTION_REPORT_NAME)
         self.assertEqual(manifest["files"]["voiceProductionCsv"], run_editor.EXPORT_VOICE_PRODUCTION_CSV_NAME)
@@ -4651,6 +4690,8 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(export_result["presentationTimelineName"], run_editor.EXPORT_PRESENTATION_TIMELINE_JSON_NAME)
         self.assert_export_choice_consequence_files(build_dir)
         self.assertEqual(export_result["choiceConsequenceName"], run_editor.EXPORT_CHOICE_CONSEQUENCE_JSON_NAME)
+        self.assert_export_variable_influence_files(build_dir)
+        self.assertEqual(export_result["variableInfluenceName"], run_editor.EXPORT_VARIABLE_INFLUENCE_JSON_NAME)
         self.assert_export_voice_production_files(build_dir)
         self.assertEqual(export_result["voiceProductionName"], run_editor.EXPORT_VOICE_PRODUCTION_JSON_NAME)
         route_map_payload = self.assert_export_story_route_map_files(
@@ -4692,6 +4733,9 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["choiceConsequence"], run_editor.EXPORT_CHOICE_CONSEQUENCE_JSON_NAME)
         self.assertEqual(manifest["files"]["choiceConsequenceReport"], run_editor.EXPORT_CHOICE_CONSEQUENCE_REPORT_NAME)
         self.assertEqual(manifest["files"]["choiceConsequenceCsv"], run_editor.EXPORT_CHOICE_CONSEQUENCE_CSV_NAME)
+        self.assertEqual(manifest["files"]["variableInfluence"], run_editor.EXPORT_VARIABLE_INFLUENCE_JSON_NAME)
+        self.assertEqual(manifest["files"]["variableInfluenceReport"], run_editor.EXPORT_VARIABLE_INFLUENCE_REPORT_NAME)
+        self.assertEqual(manifest["files"]["variableInfluenceCsv"], run_editor.EXPORT_VARIABLE_INFLUENCE_CSV_NAME)
         self.assertEqual(manifest["files"]["voiceProduction"], run_editor.EXPORT_VOICE_PRODUCTION_JSON_NAME)
         self.assertEqual(manifest["files"]["voiceProductionReport"], run_editor.EXPORT_VOICE_PRODUCTION_REPORT_NAME)
         self.assertEqual(manifest["files"]["voiceProductionCsv"], run_editor.EXPORT_VOICE_PRODUCTION_CSV_NAME)
@@ -4861,6 +4905,8 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(export_result["presentationTimelineName"], run_editor.EXPORT_PRESENTATION_TIMELINE_JSON_NAME)
         self.assert_export_choice_consequence_files(build_dir)
         self.assertEqual(export_result["choiceConsequenceName"], run_editor.EXPORT_CHOICE_CONSEQUENCE_JSON_NAME)
+        self.assert_export_variable_influence_files(build_dir)
+        self.assertEqual(export_result["variableInfluenceName"], run_editor.EXPORT_VARIABLE_INFLUENCE_JSON_NAME)
         self.assert_export_voice_production_files(build_dir)
         self.assertEqual(export_result["voiceProductionName"], run_editor.EXPORT_VOICE_PRODUCTION_JSON_NAME)
         route_map_payload = self.assert_export_story_route_map_files(
@@ -4902,6 +4948,9 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["choiceConsequence"], run_editor.EXPORT_CHOICE_CONSEQUENCE_JSON_NAME)
         self.assertEqual(manifest["files"]["choiceConsequenceReport"], run_editor.EXPORT_CHOICE_CONSEQUENCE_REPORT_NAME)
         self.assertEqual(manifest["files"]["choiceConsequenceCsv"], run_editor.EXPORT_CHOICE_CONSEQUENCE_CSV_NAME)
+        self.assertEqual(manifest["files"]["variableInfluence"], run_editor.EXPORT_VARIABLE_INFLUENCE_JSON_NAME)
+        self.assertEqual(manifest["files"]["variableInfluenceReport"], run_editor.EXPORT_VARIABLE_INFLUENCE_REPORT_NAME)
+        self.assertEqual(manifest["files"]["variableInfluenceCsv"], run_editor.EXPORT_VARIABLE_INFLUENCE_CSV_NAME)
         self.assertEqual(manifest["files"]["voiceProduction"], run_editor.EXPORT_VOICE_PRODUCTION_JSON_NAME)
         self.assertEqual(manifest["files"]["voiceProductionReport"], run_editor.EXPORT_VOICE_PRODUCTION_REPORT_NAME)
         self.assertEqual(manifest["files"]["voiceProductionCsv"], run_editor.EXPORT_VOICE_PRODUCTION_CSV_NAME)
