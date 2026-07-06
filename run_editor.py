@@ -516,6 +516,8 @@ NATIVE_RUNTIME_VN_BASELINE_QUALITY_REPORT_NAME = "native-runtime-vn-baseline-qua
 NATIVE_RUNTIME_VN_BASELINE_QUALITY_MARKDOWN_NAME = "native-runtime-vn-baseline-quality.md"
 NATIVE_RUNTIME_FILE_INTEGRITY_REPORT_NAME = "native-runtime-file-integrity.json"
 NATIVE_RUNTIME_FILE_INTEGRITY_MARKDOWN_NAME = "native-runtime-file-integrity.md"
+NATIVE_RUNTIME_DOCTOR_REPORT_NAME = "native-runtime-doctor-report.json"
+NATIVE_RUNTIME_DOCTOR_MARKDOWN_NAME = "native-runtime-doctor-report.md"
 NATIVE_RUNTIME_DIAGNOSTICS_REPORT_NAME = NATIVE_RUNTIME_DIAGNOSTICS_REPORT_FILE_NAME
 NATIVE_RUNTIME_DIAGNOSTICS_MARKDOWN_NAME = NATIVE_RUNTIME_DIAGNOSTICS_MARKDOWN_FILE_NAME
 NATIVE_RUNTIME_3D_ASSET_REPORT_NAME = "native-runtime-3d-asset-report.json"
@@ -9156,6 +9158,81 @@ def write_native_runtime_diagnostics_reports(build_dir: Path) -> dict:
     }
 
 
+def write_native_runtime_doctor_reports(build_dir: Path) -> dict:
+    report_path = build_dir / NATIVE_RUNTIME_DOCTOR_REPORT_NAME
+    markdown_path = build_dir / NATIVE_RUNTIME_DOCTOR_MARKDOWN_NAME
+    doctor = subprocess.run(
+        [
+            sys.executable,
+            str(build_dir / NATIVE_RUNTIME_PLAYER_NAME),
+            "--write-doctor-reports",
+            str(build_dir),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    payload = None
+    if report_path.is_file():
+        try:
+            payload = json.loads(report_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            payload = None
+    if not isinstance(payload, dict):
+        message = doctor.stderr.strip() or doctor.stdout.strip() or "原生 Runtime 一键体检报告生成失败。"
+        payload = {
+            "status": "unavailable",
+            "checkedAt": now_iso(),
+            "bundleDir": str(build_dir),
+            "summary": {
+                "checks": 1,
+                "passed": 0,
+                "warnings": 0,
+                "failed": 1,
+                "skipped": 0,
+            },
+            "checks": [
+                {
+                    "id": "doctor_report_generation",
+                    "label": "一键体检报告生成",
+                    "status": "fail",
+                    "message": message,
+                    "details": {},
+                    "output": "",
+                }
+            ],
+        }
+        report_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        markdown_path.write_text(
+            "\n".join(
+                [
+                    "# 原生 Runtime 一键体检报告",
+                    "",
+                    "- 状态：报告未生成",
+                    f"- 原因：{message}",
+                    "",
+                    "可手动运行：",
+                    "",
+                    "```bash",
+                    "python3 runtime_player.py --write-doctor-reports .",
+                    "```",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+    summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
+    return {
+        "doctorReportName": report_path.name,
+        "doctorReportPath": str(report_path),
+        "doctorMarkdownName": markdown_path.name,
+        "doctorMarkdownPath": str(markdown_path),
+        "doctorStatus": str(payload.get("status") or "unavailable"),
+        "doctorSummary": summary,
+        "doctorPayload": payload,
+    }
+
+
 def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
     game_data_path = build_dir / "game_data.json"
     game_data_path.write_text(json.dumps(export_payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -9191,6 +9268,7 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
     refresh_native_runtime_preload_report(build_dir, Path(runtime_preload_files["runtimePreloadReportPath"]))
     performance_budget_files = write_native_runtime_performance_budget_reports(build_dir)
     runtime_diagnostics_files = write_native_runtime_diagnostics_reports(build_dir)
+    doctor_files = write_native_runtime_doctor_reports(build_dir)
 
     mac_launcher_path = build_dir / NATIVE_RUNTIME_MAC_COMMAND_NAME
     linux_launcher_path = build_dir / NATIVE_RUNTIME_LINUX_COMMAND_NAME
@@ -9811,6 +9889,7 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
         extra_reports=[
             runtime_preload_files["runtimePreloadReportName"],
             release_check_path.name,
+            doctor_files["doctorMarkdownName"],
             rc_report_path.name,
             release_control_report_path.name,
             vn_baseline_markdown_path.name,
@@ -9862,6 +9941,12 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
         "runtimeDiagnosticsMarkdownPath": runtime_diagnostics_files["runtimeDiagnosticsMarkdownPath"],
         "runtimeDiagnosticsStatus": runtime_diagnostics_files["runtimeDiagnosticsStatus"],
         "runtimeDiagnosticsSummary": runtime_diagnostics_files["runtimeDiagnosticsSummary"],
+        "doctorReportName": doctor_files["doctorReportName"],
+        "doctorReportPath": doctor_files["doctorReportPath"],
+        "doctorMarkdownName": doctor_files["doctorMarkdownName"],
+        "doctorMarkdownPath": doctor_files["doctorMarkdownPath"],
+        "doctorStatus": doctor_files["doctorStatus"],
+        "doctorSummary": doctor_files["doctorSummary"],
         "runtimePerformanceModuleName": NATIVE_RUNTIME_PERFORMANCE_NAME,
         "runtimePerformanceModulePath": str(build_dir / NATIVE_RUNTIME_PERFORMANCE_NAME),
         "runtimeSettingsModuleName": NATIVE_RUNTIME_SETTINGS_NAME,
@@ -10564,6 +10649,8 @@ def export_native_runtime_build() -> dict:
             "videoRequirements": runtime_files["videoRequirementsName"],
             "appBuilder": runtime_files["appBuilderName"],
             "releaseCheck": runtime_files["releaseCheckName"],
+            "doctorReport": runtime_files["doctorReportName"],
+            "doctorMarkdown": runtime_files["doctorMarkdownName"],
             "releaseCandidateReport": runtime_files["releaseCandidateReportName"],
             "releaseControlReport": runtime_files["releaseControlReportName"],
             "releaseControlJson": runtime_files["releaseControlJsonName"],
@@ -10656,6 +10743,10 @@ def export_native_runtime_build() -> dict:
             "runtimeStorageModule": runtime_files["runtimeStorageModuleName"],
             "runtimeVariablesModule": runtime_files["runtimeVariablesModuleName"],
             "releaseCheck": runtime_files["releaseCheckName"],
+            "doctorReport": runtime_files["doctorReportName"],
+            "doctorMarkdown": runtime_files["doctorMarkdownName"],
+            "doctorStatus": runtime_files["doctorStatus"],
+            "doctorSummary": runtime_files["doctorSummary"],
             "releaseCandidateReport": runtime_files["releaseCandidateReportName"],
             "releaseControlReport": runtime_files["releaseControlReportName"],
             "releaseControlJson": runtime_files["releaseControlJsonName"],
@@ -10715,6 +10806,8 @@ def export_native_runtime_build() -> dict:
             runtime_files["unlockableContentManifestName"],
             runtime_files["runtimePreloadReportName"],
             runtime_files["runtimePreloadManifestName"],
+            runtime_files["doctorMarkdownName"],
+            runtime_files["doctorReportName"],
             runtime_files["releaseCandidateReportName"],
             runtime_files["releaseControlReportName"],
             runtime_files["vnBaselineQualityMarkdownName"],
@@ -10781,6 +10874,7 @@ def export_native_runtime_build() -> dict:
         extra_reports=[
             runtime_files["runtimePreloadReportName"],
             runtime_files["runtimeDiagnosticsMarkdownName"],
+            runtime_files["doctorMarkdownName"],
             runtime_files["releaseCandidateReportName"],
             runtime_files["releaseControlReportName"],
             runtime_files["vnBaselineQualityMarkdownName"],
@@ -10849,6 +10943,8 @@ def export_native_runtime_build() -> dict:
         {"name": runtime_files["runtimeDiagnosticsModuleName"], "description": "原生 Runtime 性能诊断模块，汇总预热、路线预取和缓存状态。"},
         {"name": runtime_files["runtimeDiagnosticsMarkdownName"], "description": "原生 Runtime 运行诊断 Markdown，复查入口场景、预热、路线预取和缓存状态。"},
         {"name": runtime_files["runtimeDiagnosticsReportName"], "description": "机器可读原生 Runtime 运行诊断 JSON。"},
+        {"name": runtime_files["doctorMarkdownName"], "description": "原生 Runtime 一键体检 Markdown，汇总结构、存档、设置、资料馆、演出、3D 和视频基础链路。"},
+        {"name": runtime_files["doctorReportName"], "description": "机器可读原生 Runtime 一键体检 JSON。"},
         {"name": runtime_files["runtimeSettingsModuleName"], "description": "原生 Runtime 系统设置模块。"},
         {"name": runtime_files["runtimeTextEffectsModuleName"], "description": "原生 Runtime 打字机和文本效果模块。"},
         {"name": runtime_files["runtimeStorageModuleName"], "description": "原生 Runtime 存档、自动恢复和崩溃日志模块。"},
@@ -11096,6 +11192,14 @@ def export_native_runtime_build() -> dict:
         "runtimeDiagnosticsMarkdownPublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimeDiagnosticsMarkdownName']}",
         "runtimeDiagnosticsStatus": runtime_files["runtimeDiagnosticsStatus"],
         "runtimeDiagnosticsSummary": runtime_files["runtimeDiagnosticsSummary"],
+        "doctorReportName": runtime_files["doctorReportName"],
+        "doctorReportPath": runtime_files["doctorReportPath"],
+        "doctorReportPublicUrl": f"/exports/{build_dir.name}/{runtime_files['doctorReportName']}",
+        "doctorMarkdownName": runtime_files["doctorMarkdownName"],
+        "doctorMarkdownPath": runtime_files["doctorMarkdownPath"],
+        "doctorMarkdownPublicUrl": f"/exports/{build_dir.name}/{runtime_files['doctorMarkdownName']}",
+        "doctorStatus": runtime_files["doctorStatus"],
+        "doctorSummary": runtime_files["doctorSummary"],
         "runtimePerformanceModuleName": runtime_files["runtimePerformanceModuleName"],
         "runtimePerformanceModulePath": runtime_files["runtimePerformanceModulePath"],
         "runtimePerformanceModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimePerformanceModuleName']}",

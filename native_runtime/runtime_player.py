@@ -237,6 +237,8 @@ NATIVE_BASIC_TRANSITIONS = {"fade", "none"}
 NATIVE_CHARACTER_TRANSITIONS = {"fade", "slide_left", "slide_right", "rise", "pop", "none"}
 FILE_INTEGRITY_REPORT_NAME = "native-runtime-file-integrity.json"
 FILE_INTEGRITY_MARKDOWN_NAME = "native-runtime-file-integrity.md"
+DOCTOR_REPORT_NAME = "native-runtime-doctor-report.json"
+DOCTOR_MARKDOWN_NAME = "native-runtime-doctor-report.md"
 ACCEPTANCE_REPORT_NAME = "native-runtime-release-acceptance.md"
 ACCEPTANCE_JSON_NAME = "native-runtime-release-acceptance.json"
 VN_BASELINE_QUALITY_REPORT_NAME = "native-runtime-vn-baseline-quality.json"
@@ -244,6 +246,8 @@ VN_BASELINE_QUALITY_MARKDOWN_NAME = "native-runtime-vn-baseline-quality.md"
 FILE_INTEGRITY_EXCLUDED_FILE_NAMES = {
     FILE_INTEGRITY_REPORT_NAME,
     FILE_INTEGRITY_MARKDOWN_NAME,
+    DOCTOR_REPORT_NAME,
+    DOCTOR_MARKDOWN_NAME,
     "native_app_package_manifest.json",
     VN_BASELINE_QUALITY_REPORT_NAME,
     VN_BASELINE_QUALITY_MARKDOWN_NAME,
@@ -5204,6 +5208,15 @@ def build_doctor_summary(checks: list[dict]) -> dict:
     }
 
 
+def get_doctor_status_label(status: object) -> str:
+    return {
+        "pass": "通过",
+        "warn": "需要复核",
+        "fail": "阻塞发布",
+        "skipped": "已跳过",
+    }.get(str(status or "").strip().lower(), "未知")
+
+
 def build_doctor_check(
     check_id: str,
     label: str,
@@ -5494,6 +5507,79 @@ def build_native_runtime_doctor_report(bundle_dir: Path) -> dict:
         "summary": build_doctor_summary(checks),
         "checks": checks,
     }
+
+
+def render_native_runtime_doctor_markdown(report: dict) -> str:
+    summary = report.get("summary") if isinstance(report.get("summary"), dict) else {}
+    checks = [check for check in report.get("checks") or [] if isinstance(check, dict)]
+    blocked_checks = [check for check in checks if check.get("status") == "fail"]
+    warning_checks = [check for check in checks if check.get("status") == "warn"]
+    status = str(report.get("status") or "unknown")
+    lines = [
+        "# 原生 Runtime 一键体检报告",
+        "",
+        f"- 状态：{format_markdown_value(get_doctor_status_label(status))}",
+        f"- 检查时间：{format_markdown_value(report.get('checkedAt'))}",
+        f"- 导出包：{format_markdown_value(report.get('bundleDir'))}",
+        "",
+        "## 总览",
+        "",
+        "| 指标 | 数量 |",
+        "| --- | ---: |",
+        f"| 检查项 | {int(summary.get('checks') or 0)} |",
+        f"| 通过 | {int(summary.get('passed') or 0)} |",
+        f"| 需要复核 | {int(summary.get('warnings') or 0)} |",
+        f"| 阻塞 | {int(summary.get('failed') or 0)} |",
+        f"| 跳过 | {int(summary.get('skipped') or 0)} |",
+        "",
+        "## 检查明细",
+        "",
+        "| ID | 检查 | 状态 | 说明 |",
+        "| --- | --- | --- | --- |",
+    ]
+    for check in checks:
+        lines.append(
+            f"| `{format_markdown_value(check.get('id'), '-')}` | "
+            f"{format_markdown_value(check.get('label'), '检查')} | "
+            f"{format_markdown_value(get_doctor_status_label(check.get('status')))} | "
+            f"{format_markdown_value(check.get('message'), '无说明')} |"
+        )
+    lines.extend(["", "## 优先处理", ""])
+    if blocked_checks:
+        lines.append("### 阻塞项")
+        lines.append("")
+        for check in blocked_checks:
+            lines.append(
+                f"- `{format_markdown_value(check.get('id'), '-')}` "
+                f"{format_markdown_value(check.get('label'), '检查')}："
+                f"{format_markdown_value(check.get('message'), '需要修复')}"
+            )
+        lines.append("")
+    if warning_checks:
+        lines.append("### 复核项")
+        lines.append("")
+        for check in warning_checks:
+            lines.append(
+                f"- `{format_markdown_value(check.get('id'), '-')}` "
+                f"{format_markdown_value(check.get('label'), '检查')}："
+                f"{format_markdown_value(check.get('message'), '需要复核')}"
+            )
+        lines.append("")
+    if not blocked_checks and not warning_checks:
+        lines.extend(["没有发现阻塞项或复核项，可以继续进入目标系统点测。", ""])
+    lines.extend(
+        [
+            "## 常用命令",
+            "",
+            "```bash",
+            "python3 runtime_player.py --doctor .",
+            "python3 runtime_player.py --doctor-report .",
+            "python3 runtime_player.py --write-doctor-reports .",
+            "```",
+            "",
+        ]
+    )
+    return "\n".join(lines)
 
 
 def get_release_candidate_platform_tag() -> str:
@@ -7872,6 +7958,8 @@ def build_native_runtime_release_control_payload(bundle_dir: Path) -> dict:
             "performanceBudgetJson": PERFORMANCE_BUDGET_REPORT_NAME,
             "runtimeDiagnosticsMarkdown": DIAGNOSTICS_MARKDOWN_NAME,
             "runtimeDiagnosticsJson": DIAGNOSTICS_REPORT_NAME,
+            "doctorMarkdown": DOCTOR_MARKDOWN_NAME,
+            "doctorJson": DOCTOR_REPORT_NAME,
         },
     }
 
@@ -8331,6 +8419,7 @@ def build_native_runtime_acceptance_payload(bundle_dir: Path) -> dict:
         },
         "recommendedCommands": [
             "python3 runtime_player.py --doctor .",
+            "python3 runtime_player.py --doctor-report .",
             "python3 runtime_player.py --verify-file-integrity .",
             "python3 runtime_player.py --runtime-diagnostics-report .",
             "python3 runtime_player.py --performance-budget-report .",
@@ -8348,6 +8437,8 @@ def build_native_runtime_acceptance_payload(bundle_dir: Path) -> dict:
             "performanceBudgetMarkdown": PERFORMANCE_BUDGET_MARKDOWN_NAME,
             "runtimeDiagnosticsJson": DIAGNOSTICS_REPORT_NAME,
             "runtimeDiagnosticsMarkdown": DIAGNOSTICS_MARKDOWN_NAME,
+            "doctorJson": DOCTOR_REPORT_NAME,
+            "doctorMarkdown": DOCTOR_MARKDOWN_NAME,
         },
     }
 
@@ -8464,6 +8555,25 @@ def build_save_dialog_page_data_for_doctor(bundle_dir: Path) -> dict:
 def print_native_runtime_doctor_report(bundle_dir: Path) -> dict:
     report = build_native_runtime_doctor_report(bundle_dir)
     print(json.dumps(report, ensure_ascii=False, indent=2))
+    return report
+
+
+def print_native_runtime_doctor_markdown_report(bundle_dir: Path) -> dict:
+    report = build_native_runtime_doctor_report(bundle_dir)
+    print(render_native_runtime_doctor_markdown(report), end="")
+    return report
+
+
+def write_native_runtime_doctor_reports(bundle_dir: Path) -> dict:
+    report = build_native_runtime_doctor_report(bundle_dir)
+    (bundle_dir / DOCTOR_REPORT_NAME).write_text(
+        json.dumps(report, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    (bundle_dir / DOCTOR_MARKDOWN_NAME).write_text(
+        render_native_runtime_doctor_markdown(report),
+        encoding="utf-8",
+    )
     return report
 
 
@@ -15929,6 +16039,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--validate-bundle", dest="validate_bundle", help="只检查导出包结构，不启动窗口")
     parser.add_argument("--release-check", dest="release_check", help="输出发布前自检报告 JSON，不启动窗口")
     parser.add_argument("--doctor", "--release-doctor", dest="doctor", help="一键运行原生 Runtime 发布体检报告 JSON，不启动窗口")
+    parser.add_argument("--doctor-report", "--doctor-md", dest="doctor_report", help="输出原生 Runtime 一键体检 Markdown 报告，不启动窗口")
+    parser.add_argument("--write-doctor-reports", dest="write_doctor_reports", help="写入原生 Runtime 一键体检 Markdown / JSON 报告，不启动窗口")
     parser.add_argument("--release-candidate-report", "--rc-report", dest="release_candidate_report", help="输出原生 Runtime 发布候选总报告 JSON，不启动窗口")
     parser.add_argument("--release-control-json", dest="release_control_json", help="输出原生 Runtime 发布总控报告 JSON，不启动窗口")
     parser.add_argument("--release-control-report", "--release-control-md", dest="release_control_report", help="输出原生 Runtime 发布总控 Markdown 报告，不启动窗口")
@@ -15993,6 +16105,34 @@ def main(argv: list[str] | None = None) -> int:
             return 1 if report.get("status") == "fail" else 0
         except NativeRuntimeError as error:
             print(f"Native runtime doctor failed: {error}")
+            return 1
+
+    if args.doctor_report:
+        try:
+            report = print_native_runtime_doctor_markdown_report(Path(args.doctor_report).resolve())
+            return 1 if report.get("status") == "fail" else 0
+        except NativeRuntimeError as error:
+            print(f"Native runtime doctor report failed: {error}")
+            return 1
+
+    if args.write_doctor_reports:
+        try:
+            report = write_native_runtime_doctor_reports(Path(args.write_doctor_reports).resolve())
+            print(
+                json.dumps(
+                    {
+                        "status": report.get("status"),
+                        "label": get_doctor_status_label(report.get("status")),
+                        "markdown": DOCTOR_MARKDOWN_NAME,
+                        "json": DOCTOR_REPORT_NAME,
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
+            return 1 if report.get("status") == "fail" else 0
+        except NativeRuntimeError as error:
+            print(f"Native runtime doctor report write failed: {error}")
             return 1
 
     if args.release_candidate_report:

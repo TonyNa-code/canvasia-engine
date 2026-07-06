@@ -255,6 +255,7 @@ python run_editor.py
 
 | 文件 | 用途 |
 | --- | --- |
+| `native-runtime-doctor-report.md` | 一键体检总览，先看它能快速知道包结构、存档、设置、演出、3D 和视频基础链路是否正常 |
 | `native-runtime-release-control-report.md` | 发布总控，告诉你当前包大体是否适合继续发布 |
 | `native-runtime-release-acceptance.md` | 发布前人工验收清单，照着勾就行 |
 | `native-runtime-file-integrity.md` | 文件完整性报告，确认导出包核心文件没坏 |

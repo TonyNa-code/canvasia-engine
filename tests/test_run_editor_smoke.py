@@ -3673,6 +3673,8 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_APP_BUILDER_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_BRAND_LOGO_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_RELEASE_CHECK_NAME).is_file())
+        self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_DOCTOR_REPORT_NAME).is_file())
+        self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_DOCTOR_MARKDOWN_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_RC_REPORT_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_RELEASE_CONTROL_REPORT_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_RELEASE_CONTROL_JSON_NAME).is_file())
@@ -3966,6 +3968,8 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["runtimeDiagnosticsModule"], run_editor.NATIVE_RUNTIME_DIAGNOSTICS_NAME)
         self.assertEqual(manifest["files"]["runtimeDiagnosticsReport"], run_editor.NATIVE_RUNTIME_DIAGNOSTICS_REPORT_NAME)
         self.assertEqual(manifest["files"]["runtimeDiagnosticsMarkdown"], run_editor.NATIVE_RUNTIME_DIAGNOSTICS_MARKDOWN_NAME)
+        self.assertEqual(manifest["files"]["doctorReport"], run_editor.NATIVE_RUNTIME_DOCTOR_REPORT_NAME)
+        self.assertEqual(manifest["files"]["doctorMarkdown"], run_editor.NATIVE_RUNTIME_DOCTOR_MARKDOWN_NAME)
         provenance = self.assert_export_provenance_file(
             export_result,
             {
@@ -4008,6 +4012,8 @@ class RunEditorSmokeTests(unittest.TestCase):
                 run_editor.RUNTIME_PRELOAD_REPORT_FILE_NAME,
                 run_editor.NATIVE_RUNTIME_DIAGNOSTICS_REPORT_NAME,
                 run_editor.NATIVE_RUNTIME_DIAGNOSTICS_MARKDOWN_NAME,
+                run_editor.NATIVE_RUNTIME_DOCTOR_REPORT_NAME,
+                run_editor.NATIVE_RUNTIME_DOCTOR_MARKDOWN_NAME,
             },
         )
         self.assertEqual(provenance["build"]["target"], run_editor.EXPORT_TARGET_NATIVE_RUNTIME)
@@ -4027,6 +4033,8 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["runtimeDiagnosticsModule"], run_editor.NATIVE_RUNTIME_DIAGNOSTICS_NAME)
         self.assertEqual(manifest["files"]["runtimeDiagnosticsReport"], run_editor.NATIVE_RUNTIME_DIAGNOSTICS_REPORT_NAME)
         self.assertEqual(manifest["files"]["runtimeDiagnosticsMarkdown"], run_editor.NATIVE_RUNTIME_DIAGNOSTICS_MARKDOWN_NAME)
+        self.assertEqual(manifest["files"]["doctorReport"], run_editor.NATIVE_RUNTIME_DOCTOR_REPORT_NAME)
+        self.assertEqual(manifest["files"]["doctorMarkdown"], run_editor.NATIVE_RUNTIME_DOCTOR_MARKDOWN_NAME)
         self.assertEqual(manifest["files"]["runtimePerformanceModule"], run_editor.NATIVE_RUNTIME_PERFORMANCE_NAME)
         self.assertEqual(manifest["files"]["performanceBudgetReport"], run_editor.NATIVE_RUNTIME_PERFORMANCE_BUDGET_REPORT_NAME)
         self.assertEqual(manifest["files"]["performanceBudgetMarkdown"], run_editor.NATIVE_RUNTIME_PERFORMANCE_BUDGET_MARKDOWN_NAME)
@@ -4049,6 +4057,9 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["runtime"]["runtimeDiagnosticsReport"], run_editor.NATIVE_RUNTIME_DIAGNOSTICS_REPORT_NAME)
         self.assertEqual(manifest["runtime"]["runtimeDiagnosticsMarkdown"], run_editor.NATIVE_RUNTIME_DIAGNOSTICS_MARKDOWN_NAME)
         self.assertIn(manifest["runtime"]["runtimeDiagnosticsStatus"], {"ready", "needs_review", "blocked", "unavailable"})
+        self.assertEqual(manifest["runtime"]["doctorReport"], run_editor.NATIVE_RUNTIME_DOCTOR_REPORT_NAME)
+        self.assertEqual(manifest["runtime"]["doctorMarkdown"], run_editor.NATIVE_RUNTIME_DOCTOR_MARKDOWN_NAME)
+        self.assertIn(manifest["runtime"]["doctorStatus"], {"pass", "warn", "fail", "unavailable"})
         self.assertEqual(manifest["runtime"]["runtimePerformanceModule"], run_editor.NATIVE_RUNTIME_PERFORMANCE_NAME)
         self.assertEqual(
             manifest["runtime"]["runtimePreloadSummary"]["totalEntries"],
@@ -4087,6 +4098,8 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["performanceBudgetMarkdown"], run_editor.NATIVE_RUNTIME_PERFORMANCE_BUDGET_MARKDOWN_NAME)
         self.assertEqual(manifest["files"]["runtimeDiagnosticsReport"], run_editor.NATIVE_RUNTIME_DIAGNOSTICS_REPORT_NAME)
         self.assertEqual(manifest["files"]["runtimeDiagnosticsMarkdown"], run_editor.NATIVE_RUNTIME_DIAGNOSTICS_MARKDOWN_NAME)
+        self.assertEqual(manifest["files"]["doctorReport"], run_editor.NATIVE_RUNTIME_DOCTOR_REPORT_NAME)
+        self.assertEqual(manifest["files"]["doctorMarkdown"], run_editor.NATIVE_RUNTIME_DOCTOR_MARKDOWN_NAME)
         self.assertEqual(manifest["files"]["macReleaseControlReporter"], run_editor.NATIVE_RUNTIME_MAC_RELEASE_CONTROL_COMMAND_NAME)
         self.assertEqual(manifest["files"]["linuxReleaseControlReporter"], run_editor.NATIVE_RUNTIME_LINUX_RELEASE_CONTROL_COMMAND_NAME)
         self.assertEqual(manifest["files"]["windowsReleaseControlReporter"], run_editor.NATIVE_RUNTIME_WINDOWS_RELEASE_CONTROL_COMMAND_NAME)
@@ -4130,6 +4143,11 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertIn(diagnostics_payload["status"], {"ready", "needs_review", "blocked"})
         self.assertEqual(export_result["runtimeDiagnosticsStatus"], diagnostics_payload["status"])
         self.assertEqual(export_result["runtimeDiagnosticsSummary"]["preloadEntries"], diagnostics_payload["summary"]["preloadEntries"])
+        exported_doctor_payload = json.loads((build_dir / run_editor.NATIVE_RUNTIME_DOCTOR_REPORT_NAME).read_text(encoding="utf-8"))
+        self.assertEqual(exported_doctor_payload["status"], "pass")
+        self.assertEqual(exported_doctor_payload["summary"]["failed"], 0)
+        self.assertEqual(export_result["doctorStatus"], exported_doctor_payload["status"])
+        self.assertEqual(export_result["doctorSummary"]["checks"], exported_doctor_payload["summary"]["checks"])
 
         release_control_payload = json.loads((build_dir / run_editor.NATIVE_RUNTIME_RELEASE_CONTROL_JSON_NAME).read_text(encoding="utf-8"))
         self.assertEqual(release_control_payload["formatVersion"], 1)
@@ -4160,9 +4178,14 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertIn("# 原生 Runtime 性能预算报告", performance_budget_markdown)
         diagnostics_markdown = (build_dir / run_editor.NATIVE_RUNTIME_DIAGNOSTICS_MARKDOWN_NAME).read_text(encoding="utf-8")
         self.assertIn("# 原生 Runtime 运行诊断报告", diagnostics_markdown)
+        doctor_markdown = (build_dir / run_editor.NATIVE_RUNTIME_DOCTOR_MARKDOWN_NAME).read_text(encoding="utf-8")
+        self.assertIn("# 原生 Runtime 一键体检报告", doctor_markdown)
+        self.assertIn("## 检查明细", doctor_markdown)
         self.assertTrue(export_result["runtimePerformanceModulePublicUrl"].endswith(run_editor.NATIVE_RUNTIME_PERFORMANCE_NAME))
         self.assertTrue(export_result["runtimeDiagnosticsReportPublicUrl"].endswith(run_editor.NATIVE_RUNTIME_DIAGNOSTICS_REPORT_NAME))
         self.assertTrue(export_result["runtimeDiagnosticsMarkdownPublicUrl"].endswith(run_editor.NATIVE_RUNTIME_DIAGNOSTICS_MARKDOWN_NAME))
+        self.assertTrue(export_result["doctorReportPublicUrl"].endswith(run_editor.NATIVE_RUNTIME_DOCTOR_REPORT_NAME))
+        self.assertTrue(export_result["doctorMarkdownPublicUrl"].endswith(run_editor.NATIVE_RUNTIME_DOCTOR_MARKDOWN_NAME))
         self.assertTrue(export_result["performanceBudgetReportPublicUrl"].endswith(run_editor.NATIVE_RUNTIME_PERFORMANCE_BUDGET_REPORT_NAME))
         self.assertTrue(export_result["performanceBudgetMarkdownPublicUrl"].endswith(run_editor.NATIVE_RUNTIME_PERFORMANCE_BUDGET_MARKDOWN_NAME))
         self.assertTrue(export_result["macReleaseControlReporterPublicUrl"].endswith(run_editor.NATIVE_RUNTIME_MAC_RELEASE_CONTROL_COMMAND_NAME))
@@ -4270,8 +4293,11 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertIn("vn_baseline_quality", {check["id"] for check in acceptance_payload["automatedChecks"]})
         self.assertIn("performance_budget", {check["id"] for check in acceptance_payload["automatedChecks"]})
         self.assertIn("runtime_diagnostics", {check["id"] for check in acceptance_payload["automatedChecks"]})
+        self.assertIn("python3 runtime_player.py --doctor-report .", acceptance_payload["recommendedCommands"])
         self.assertIn(run_editor.NATIVE_RUNTIME_PERFORMANCE_BUDGET_MARKDOWN_NAME, acceptance_payload["includedReports"].values())
         self.assertIn(run_editor.NATIVE_RUNTIME_DIAGNOSTICS_MARKDOWN_NAME, acceptance_payload["includedReports"].values())
+        self.assertIn(run_editor.NATIVE_RUNTIME_DOCTOR_MARKDOWN_NAME, acceptance_payload["includedReports"].values())
+        self.assertIn(run_editor.NATIVE_RUNTIME_DOCTOR_REPORT_NAME, acceptance_payload["includedReports"].values())
         acceptance_markdown = (build_dir / run_editor.NATIVE_RUNTIME_ACCEPTANCE_REPORT_NAME).read_text(encoding="utf-8")
         self.assertIn("# 原生 Runtime 发布验收清单", acceptance_markdown)
         self.assertIn("## 人工逐项点测", acceptance_markdown)
@@ -4379,6 +4405,35 @@ class RunEditorSmokeTests(unittest.TestCase):
             }
             <= {check["id"] for check in doctor_payload["checks"]}
         )
+        doctor_markdown_cli = subprocess.run(
+            [
+                sys.executable,
+                str(build_dir / run_editor.NATIVE_RUNTIME_PLAYER_NAME),
+                "--doctor-report",
+                str(build_dir),
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(doctor_markdown_cli.returncode, 0, doctor_markdown_cli.stdout + doctor_markdown_cli.stderr)
+        self.assertIn("# 原生 Runtime 一键体检报告", doctor_markdown_cli.stdout)
+
+        doctor_write_cli = subprocess.run(
+            [
+                sys.executable,
+                str(build_dir / run_editor.NATIVE_RUNTIME_PLAYER_NAME),
+                "--write-doctor-reports",
+                str(build_dir),
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(doctor_write_cli.returncode, 0, doctor_write_cli.stdout + doctor_write_cli.stderr)
+        doctor_write_payload = json.loads(doctor_write_cli.stdout)
+        self.assertEqual(doctor_write_payload["markdown"], run_editor.NATIVE_RUNTIME_DOCTOR_MARKDOWN_NAME)
+        self.assertEqual(doctor_write_payload["json"], run_editor.NATIVE_RUNTIME_DOCTOR_REPORT_NAME)
 
         rc_description = subprocess.run(
             [
