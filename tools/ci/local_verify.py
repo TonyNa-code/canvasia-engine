@@ -157,6 +157,7 @@ def build_node_check_steps() -> list[VerifyStep]:
             "export_player_template/runtime_audio.js",
             "export_player_template/runtime_preload.js",
             "export_player_template/runtime_scene_prefetch.js",
+            "export_player_template/runtime_text_effects.js",
         ]
     )
     return [

@@ -18,6 +18,7 @@ PLAYER_PATH = ROOT_DIR / "export_player_template" / "player.js"
 RUNTIME_CONTROLS_PATH = ROOT_DIR / "export_player_template" / "runtime_controls.js"
 RUNTIME_SETTINGS_PATH = ROOT_DIR / "export_player_template" / "runtime_settings.js"
 RUNTIME_AUDIO_PATH = ROOT_DIR / "export_player_template" / "runtime_audio.js"
+RUNTIME_TEXT_EFFECTS_PATH = ROOT_DIR / "export_player_template" / "runtime_text_effects.js"
 NATIVE_RUNTIME_PATH = ROOT_DIR / "native_runtime" / "runtime_player.py"
 NATIVE_RUNTIME_SETTINGS_PATH = ROOT_DIR / "native_runtime" / "runtime_player_settings.py"
 NATIVE_RUNTIME_TEXT_EFFECTS_PATH = ROOT_DIR / "native_runtime" / "runtime_text_effects.py"
@@ -5825,15 +5826,17 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("editorTextSpeed", story_editor_source)
 
         player_source = PLAYER_PATH.read_text(encoding="utf-8")
+        runtime_text_effects_source = RUNTIME_TEXT_EFFECTS_PATH.read_text(encoding="utf-8")
         runtime_speed = _extract_function_source(player_source, "getSnapshotTextSpeed")
         runtime_typewriter = _extract_function_source(player_source, "shouldUseRuntimeTypewriter")
         runtime_delay = _extract_function_source(player_source, "getAutoAdvanceDelay")
         runtime_schedule_typewriter = _extract_function_source(player_source, "scheduleRuntimeTypewriterTick")
+        self.assertIn('from "./runtime_text_effects.js"', player_source)
         self.assertIn("snapshot?.block?.textSpeed ?? state.playback.textSpeed", runtime_speed)
         self.assertIn('getSnapshotTextSpeed(snapshot) === "instant"', runtime_typewriter)
         self.assertIn("getSnapshotTextSpeed(snapshot)", runtime_delay)
-        self.assertIn("function getTypewriterPunctuationPause", player_source)
-        self.assertIn("getTypewriterPunctuationPause(visibleText, fullText)", player_source)
+        self.assertIn("export function getTypewriterPunctuationPause", runtime_text_effects_source)
+        self.assertIn("getTypewriterPunctuationPause(visibleText, fullText)", runtime_text_effects_source)
         self.assertIn("state.typingVisibleText", runtime_schedule_typewriter)
 
         native_source = NATIVE_RUNTIME_PATH.read_text(encoding="utf-8")
@@ -5957,7 +5960,7 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("updateRuntimeAudioVolumes()", toggle_voice_ducking)
 
     def test_typewriter_index_helpers_keep_unicode_characters_intact(self) -> None:
-        for path in (TYPEWRITER_MODULE_PATH, PLAYER_PATH):
+        for path in (TYPEWRITER_MODULE_PATH, RUNTIME_TEXT_EFFECTS_PATH):
             source = path.read_text(encoding="utf-8")
             speed_helper_lines = (
                 [
@@ -5966,8 +5969,8 @@ class FrontendActionHandlerTests(unittest.TestCase):
                 ]
                 if path == TYPEWRITER_MODULE_PATH
                 else [
-                    "const TEXT_SPEED_LABELS = { slow: '慢速', normal: '标准', fast: '快速', instant: '立刻显示' };",
-                    "function getSafeTextSpeed(speed) { return Object.hasOwn(TEXT_SPEED_LABELS, speed) ? speed : 'normal'; }",
+                    "const TYPEWRITER_STEP_DELAYS = Object.freeze({ slow: 42, normal: 28, fast: 18, instant: 0 });",
+                    f"function getSafeRuntimeTextSpeed(speed) {_extract_function_source(source, 'getSafeRuntimeTextSpeed')}",
                 ]
             )
             script = "\n".join(

@@ -208,6 +208,7 @@ jobs:
           node --check export_player_template/runtime_audio.js
           node --check export_player_template/runtime_preload.js
           node --check export_player_template/runtime_scene_prefetch.js
+          node --check export_player_template/runtime_text_effects.js
 
       - name: Release tooling tests
         run: |
