@@ -12109,6 +12109,91 @@ function buildSceneRouteOverview() {
   return routeAnalyzerTools.buildSceneRouteOverview(state.data, state.validation, getRouteAnalyzerOptions());
 }
 
+const PLAYABLE_EXPORT_RESULT_TARGETS = Object.freeze(["web", "native_runtime", "windows_nwjs", "macos_nwjs", "linux_nwjs"]);
+
+const PLAYABLE_EXPORT_REPORT_LINKS = Object.freeze([
+  { urlKey: "playtestGuidePublicUrl", label: "试玩验收 README", primary: true },
+  { urlKey: "releaseEvidencePackPublicUrl", label: "发布证据包", primary: true },
+  { urlKey: "releaseReadinessReportPublicUrl", label: "发布就绪报告", primary: true },
+  { urlKey: "routePlaytestWorkbookReportPublicUrl", label: "路线试玩工作簿", primary: true },
+  { urlKey: "routePlaytestWorkbookCsvPublicUrl", label: "路线试玩 CSV" },
+  { urlKey: "storyRouteMapReportPublicUrl", label: "剧情路线图" },
+  { urlKey: "choiceConsequenceReportPublicUrl", label: "选项后果表" },
+  { urlKey: "variableInfluenceReportPublicUrl", label: "变量影响表" },
+  { urlKey: "presentationTimelineReportPublicUrl", label: "演出时间轴" },
+  { urlKey: "audioCueSheetReportPublicUrl", label: "音频调度表" },
+  { urlKey: "stageDirectionReportPublicUrl", label: "角色舞台调度" },
+  { urlKey: "assetRightsReportPublicUrl", label: "素材授权报告" },
+  { urlKey: "voiceProductionReportPublicUrl", label: "语音制作清单" },
+  { urlKey: "localizationAuditReportPublicUrl", label: "多语言覆盖报告" },
+  { urlKey: "runtimePreloadReportPublicUrl", label: "Runtime 预热报告" },
+]);
+
+function isPlayableExportResult(exportResult) {
+  return PLAYABLE_EXPORT_RESULT_TARGETS.includes(exportResult?.target);
+}
+
+function getLatestExportReportLinks(exportResult) {
+  if (!isPlayableExportResult(exportResult)) {
+    return [];
+  }
+  return PLAYABLE_EXPORT_REPORT_LINKS.filter((item) => exportResult?.[item.urlKey]).map((item) => ({
+    ...item,
+    href: exportResult[item.urlKey],
+  }));
+}
+
+function renderExportReportLink(link) {
+  return `
+    <a
+      class="toolbar-button${link.primary ? " toolbar-button-primary" : ""}"
+      href="${escapeHtml(link.href)}"
+      target="_blank"
+      rel="noreferrer"
+    >
+      ${escapeHtml(link.label)}
+    </a>
+  `;
+}
+
+function renderLatestExportReportPanel(exportResult) {
+  const links = getLatestExportReportLinks(exportResult);
+  if (!links.length) {
+    return "";
+  }
+  const routeReadiness =
+    Number.isFinite(Number(exportResult.routePlaytestReadinessPercent))
+      ? `${Math.max(0, Math.min(100, Number(exportResult.routePlaytestReadinessPercent)))}%`
+      : "未记录";
+  const routeCaseLine = [
+    `${Number(exportResult.routePlaytestRouteCaseCount ?? 0)} 条分支`,
+    `${Number(exportResult.routePlaytestEndingCaseCount ?? 0)} 个结局`,
+    `${Number(exportResult.routePlaytestBlockedCaseCount ?? 0)} 个阻塞`,
+  ].join(" / ");
+  const releaseReadinessLine = [
+    exportResult.releaseReadinessStatus || "未记录",
+    Number.isFinite(Number(exportResult.releaseReadinessScore)) ? `${Number(exportResult.releaseReadinessScore)} 分` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  return `
+    <article class="detail-card">
+      <strong>最近导出的验收报告</strong>
+      <p class="helper-text">导出成功后，先打开这些报告就能按路线、素材、音频、演出和发布门禁逐项验收，不用再去导出文件夹里翻文件。</p>
+      ${renderDetailRows([
+        ["导出目标", exportResult.targetLabel ?? exportResult.target ?? "未记录"],
+        ["路线试玩就绪度", routeReadiness],
+        ["路线用例", routeCaseLine],
+        ["发布就绪", releaseReadinessLine || "未记录"],
+      ])}
+      <div class="detail-actions">
+        ${links.map((link) => renderExportReportLink(link)).join("")}
+      </div>
+    </article>
+  `;
+}
+
 function buildRouteValidationSceneIndex() {
   return routeAnalyzerTools.buildRouteValidationSceneIndex(state.validation);
 }
@@ -28030,6 +28115,7 @@ function renderProjectValidationSummary() {
         }
       </div>
     </article>
+    ${renderLatestExportReportPanel(exportResult)}
     ${
       isAdvancedMode
         ? `

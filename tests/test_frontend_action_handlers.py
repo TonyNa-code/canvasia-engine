@@ -5498,6 +5498,25 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("打开 Ren'Py 校验脚本", source)
         self.assertIn("自检发现阻断项", export_build)
 
+    def test_preview_export_surface_links_playable_package_reports(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        report_panel = _extract_function_source(source, "renderLatestExportReportPanel")
+        report_links = _extract_function_source(source, "getLatestExportReportLinks")
+        preview_summary = _extract_function_source(source, "renderProjectValidationSummary")
+
+        self.assertIn("PLAYABLE_EXPORT_RESULT_TARGETS", source)
+        self.assertIn("PLAYABLE_EXPORT_REPORT_LINKS", source)
+        self.assertIn('"routePlaytestWorkbookReportPublicUrl"', source)
+        self.assertIn('"routePlaytestWorkbookCsvPublicUrl"', source)
+        self.assertIn("路线试玩工作簿", source)
+        self.assertIn("路线试玩 CSV", source)
+        self.assertIn("renderLatestExportReportPanel(exportResult)", preview_summary)
+        self.assertIn("getLatestExportReportLinks(exportResult)", report_panel)
+        self.assertIn("isPlayableExportResult(exportResult)", report_links)
+        self.assertIn("routePlaytestReadinessPercent", report_panel)
+        self.assertIn("routePlaytestBlockedCaseCount", report_panel)
+        self.assertIn("导出成功后，先打开这些报告", report_panel)
+
     def test_native_export_surface_links_vn_baseline_quality_reports(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
 
