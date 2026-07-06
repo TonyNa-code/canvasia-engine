@@ -16,7 +16,6 @@ import subprocess
 import sys
 import tempfile
 import traceback
-import unicodedata
 from contextlib import redirect_stdout
 from datetime import datetime
 from pathlib import Path
@@ -67,6 +66,50 @@ except ImportError:  # pragma: no cover - exported native packages import from t
         build_native_runtime_performance_budget_report,
         render_native_runtime_performance_budget_markdown,
         write_native_runtime_performance_budget_reports,
+    )
+
+try:
+    from .runtime_player_settings import (
+        AUTO_PLAY_DELAY_PRESETS,
+        DEFAULT_RUNTIME_PLAYER_SETTINGS,
+        DIALOG_BOX_OPACITY_PRESETS,
+        RUNTIME_DISPLAY_MODES,
+        RUNTIME_THEME_MODES,
+        RUNTIME_TOGGLE_MODES,
+        TEXT_SCALE_PRESETS,
+        TEXT_SPEED_LABELS,
+        TEXT_SPEED_PRESETS,
+        build_project_default_runtime_player_settings,
+        get_safe_text_speed,
+        sanitize_runtime_player_settings,
+    )
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_player_settings import (
+        AUTO_PLAY_DELAY_PRESETS,
+        DEFAULT_RUNTIME_PLAYER_SETTINGS,
+        DIALOG_BOX_OPACITY_PRESETS,
+        RUNTIME_DISPLAY_MODES,
+        RUNTIME_THEME_MODES,
+        RUNTIME_TOGGLE_MODES,
+        TEXT_SCALE_PRESETS,
+        TEXT_SPEED_LABELS,
+        TEXT_SPEED_PRESETS,
+        build_project_default_runtime_player_settings,
+        get_safe_text_speed,
+        sanitize_runtime_player_settings,
+    )
+
+try:
+    from .runtime_text_effects import (
+        get_native_typewriter_step_delay_ms,
+        get_next_typewriter_index,
+        get_typewriter_punctuation_pause_ms,
+    )
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_text_effects import (
+        get_native_typewriter_step_delay_ms,
+        get_next_typewriter_index,
+        get_typewriter_punctuation_pause_ms,
     )
 
 
@@ -357,21 +400,6 @@ PROFILE_SUBDIR_NAME = "native-runtime-profiles"
 AUTO_RESUME_SUBDIR_NAME = "native-runtime-autoresume"
 LOG_SUBDIR_NAME = "native-runtime-logs"
 SCREENSHOT_SUBDIR_NAME = "native-runtime-screenshots"
-DEFAULT_RUNTIME_PLAYER_SETTINGS = {
-    "themeMode": "auto",
-    "displayMode": "windowed",
-    "textSpeed": "normal",
-    "language": "",
-    "textScalePercent": 100,
-    "dialogBoxOpacityPercent": 100,
-    "autoPlayDelayMs": 1800,
-    "autoPlayWaitForVoice": "off",
-    "masterVolume": 100,
-    "bgmVolume": 85,
-    "sfxVolume": 90,
-    "voiceVolume": 100,
-    "voiceDuckingEnabled": "on",
-}
 READ_TEXT_KEY_LIMIT = 20000
 SNAPSHOT_TEXT_HISTORY_LIMIT = 120
 DEFAULT_PLAYER_PROFILE = {
@@ -383,58 +411,11 @@ DEFAULT_PLAYER_PROFILE = {
     "resumedCount": 0,
     "returnToTitleCount": 0,
 }
-RUNTIME_THEME_MODES = ("auto", "light", "dark")
-RUNTIME_DISPLAY_MODES = ("windowed", "fullscreen")
-TEXT_SPEED_PRESETS = {
-    "slow": 24,
-    "normal": 42,
-    "fast": 72,
-    "instant": 10000,
-}
-TEXT_SPEED_LABELS = {
-    "slow": "慢",
-    "normal": "标准",
-    "fast": "快",
-    "instant": "瞬时",
-}
-TYPEWRITER_SENTENCE_PAUSE_MS = 260
-TYPEWRITER_CLAUSE_PAUSE_MS = 140
-TYPEWRITER_ELLIPSIS_PAUSE_MS = 220
-TYPEWRITER_LEADING_OPENERS = "“‘\"'（([{【〔〈《「『"
-TYPEWRITER_TRAILING_CLOSERS = "”’\"'）)]}】〕〉》」』"
-TYPEWRITER_PERIOD_ABBREVIATIONS = {
-    "mr",
-    "mrs",
-    "ms",
-    "dr",
-    "prof",
-    "sr",
-    "jr",
-    "st",
-    "vs",
-    "etc",
-    "e.g",
-    "i.e",
-    "u.s",
-    "u.k",
-    "no",
-    "fig",
-    "vol",
-    "ch",
-    "dept",
-    "inc",
-    "ltd",
-    "co",
-}
 RUNTIME_LANGUAGE_LABELS = {
     "zh-CN": "简体中文",
     "ja-JP": "日本語",
     "en-US": "English",
 }
-AUTO_PLAY_DELAY_PRESETS = (900, 1400, 1800, 2400, 3200)
-TEXT_SCALE_PRESETS = (90, 100, 110, 125)
-DIALOG_BOX_OPACITY_PRESETS = (0, 35, 60, 80, 100)
-RUNTIME_TOGGLE_MODES = ("off", "on")
 SYSTEM_MENU_ITEMS = [
     ("continue", "继续"),
     ("help", "操作帮助"),
@@ -9587,240 +9568,6 @@ def write_project_archive_progress(project_id: str, progress: dict) -> Path:
     safe_payload = sanitize_archive_progress(progress)
     progress_path.write_text(json.dumps(safe_payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return progress_path
-
-
-def sanitize_runtime_player_settings(value: dict | None) -> dict:
-    source = value or {}
-    theme_mode = str(source.get("themeMode") or DEFAULT_RUNTIME_PLAYER_SETTINGS["themeMode"]).strip().lower()
-    if theme_mode not in RUNTIME_THEME_MODES:
-        theme_mode = DEFAULT_RUNTIME_PLAYER_SETTINGS["themeMode"]
-    display_mode = str(source.get("displayMode") or DEFAULT_RUNTIME_PLAYER_SETTINGS["displayMode"]).strip().lower()
-    if display_mode not in RUNTIME_DISPLAY_MODES:
-        display_mode = DEFAULT_RUNTIME_PLAYER_SETTINGS["displayMode"]
-    text_speed = get_safe_text_speed(source.get("textSpeed"), DEFAULT_RUNTIME_PLAYER_SETTINGS["textSpeed"])
-    language = normalize_language_code(source.get("language"), "")
-    auto_play_wait_for_voice = str(
-        source.get("autoPlayWaitForVoice") or DEFAULT_RUNTIME_PLAYER_SETTINGS["autoPlayWaitForVoice"]
-    ).strip().lower()
-    if auto_play_wait_for_voice not in RUNTIME_TOGGLE_MODES:
-        auto_play_wait_for_voice = DEFAULT_RUNTIME_PLAYER_SETTINGS["autoPlayWaitForVoice"]
-    voice_ducking_enabled = str(
-        source.get("voiceDuckingEnabled") or DEFAULT_RUNTIME_PLAYER_SETTINGS["voiceDuckingEnabled"]
-    ).strip().lower()
-    if voice_ducking_enabled not in RUNTIME_TOGGLE_MODES:
-        voice_ducking_enabled = DEFAULT_RUNTIME_PLAYER_SETTINGS["voiceDuckingEnabled"]
-    return {
-        "themeMode": theme_mode,
-        "displayMode": display_mode,
-        "textSpeed": text_speed,
-        "language": language,
-        "textScalePercent": clamp_int(
-            source.get("textScalePercent"),
-            min(TEXT_SCALE_PRESETS),
-            max(TEXT_SCALE_PRESETS),
-            DEFAULT_RUNTIME_PLAYER_SETTINGS["textScalePercent"],
-        ),
-        "dialogBoxOpacityPercent": clamp_int(
-            source.get("dialogBoxOpacityPercent"),
-            min(DIALOG_BOX_OPACITY_PRESETS),
-            max(DIALOG_BOX_OPACITY_PRESETS),
-            DEFAULT_RUNTIME_PLAYER_SETTINGS["dialogBoxOpacityPercent"],
-        ),
-        "autoPlayDelayMs": clamp_int(
-            source.get("autoPlayDelayMs"),
-            min(AUTO_PLAY_DELAY_PRESETS),
-            max(AUTO_PLAY_DELAY_PRESETS),
-            DEFAULT_RUNTIME_PLAYER_SETTINGS["autoPlayDelayMs"],
-        ),
-        "autoPlayWaitForVoice": auto_play_wait_for_voice,
-        "voiceDuckingEnabled": voice_ducking_enabled,
-        "masterVolume": clamp_int(source.get("masterVolume"), 0, 100, DEFAULT_RUNTIME_PLAYER_SETTINGS["masterVolume"]),
-        "bgmVolume": clamp_int(source.get("bgmVolume"), 0, 100, DEFAULT_RUNTIME_PLAYER_SETTINGS["bgmVolume"]),
-        "sfxVolume": clamp_int(source.get("sfxVolume"), 0, 100, DEFAULT_RUNTIME_PLAYER_SETTINGS["sfxVolume"]),
-        "voiceVolume": clamp_int(source.get("voiceVolume"), 0, 100, DEFAULT_RUNTIME_PLAYER_SETTINGS["voiceVolume"]),
-    }
-
-
-def get_safe_text_speed(value: object, fallback: str = "normal") -> str:
-    safe_fallback = fallback if fallback in TEXT_SPEED_PRESETS else DEFAULT_RUNTIME_PLAYER_SETTINGS["textSpeed"]
-    text_speed = str(value or safe_fallback).strip().lower()
-    return text_speed if text_speed in TEXT_SPEED_PRESETS else safe_fallback
-
-
-def build_project_default_runtime_player_settings(project: dict | None = None) -> dict:
-    defaults = dict(DEFAULT_RUNTIME_PLAYER_SETTINGS)
-    runtime_settings = project.get("runtimeSettings") if isinstance(project, dict) else {}
-    if not isinstance(runtime_settings, dict):
-        return defaults
-
-    theme_mode = str(runtime_settings.get("defaultUiThemeMode") or defaults["themeMode"]).strip().lower()
-    if theme_mode in RUNTIME_THEME_MODES:
-        defaults["themeMode"] = theme_mode
-    defaults["textSpeed"] = get_safe_text_speed(runtime_settings.get("defaultTextSpeed"), defaults["textSpeed"])
-    defaults["bgmVolume"] = get_safe_volume_percent(runtime_settings.get("defaultBgmVolume"), defaults["bgmVolume"])
-    defaults["sfxVolume"] = get_safe_volume_percent(runtime_settings.get("defaultSfxVolume"), defaults["sfxVolume"])
-    defaults["voiceVolume"] = (
-        get_safe_volume_percent(runtime_settings.get("defaultVoiceVolume"), defaults["voiceVolume"])
-        if runtime_settings.get("defaultVoiceEnabled") is not False
-        else 0
-    )
-    defaults["voiceDuckingEnabled"] = "on" if runtime_settings.get("defaultVoiceDuckingEnabled") is not False else "off"
-    return sanitize_runtime_player_settings(defaults)
-
-
-def is_regional_indicator_symbol(char: str) -> bool:
-    if not char:
-        return False
-    return 0x1F1E6 <= ord(char[0]) <= 0x1F1FF
-
-
-def is_typewriter_grapheme_extension(char: str) -> bool:
-    if not char:
-        return False
-    code_point = ord(char[0])
-    return (
-        unicodedata.category(char[0]) in {"Mn", "Mc", "Me"}
-        or 0xFE00 <= code_point <= 0xFE0F
-        or 0xE0100 <= code_point <= 0xE01EF
-        or 0x1F3FB <= code_point <= 0x1F3FF
-    )
-
-
-def get_next_typewriter_cluster_index(text: str, current_index: int) -> int:
-    safe_text = str(text or "")
-    safe_index = max(0, min(len(safe_text), int(current_index or 0)))
-    if safe_index >= len(safe_text):
-        return len(safe_text)
-
-    next_index = safe_index + 1
-
-    if (
-        is_regional_indicator_symbol(safe_text[safe_index])
-        and next_index < len(safe_text)
-        and is_regional_indicator_symbol(safe_text[next_index])
-    ):
-        return next_index + 1
-
-    while next_index < len(safe_text):
-        current_char = safe_text[next_index]
-        previous_char = safe_text[next_index - 1] if next_index > 0 else ""
-
-        if is_typewriter_grapheme_extension(current_char):
-            next_index += 1
-            continue
-        if previous_char == "\u200d":
-            next_index += 1
-            continue
-        if current_char == "\u200d":
-            next_index = min(len(safe_text), next_index + 2)
-            continue
-        break
-
-    return next_index
-
-
-def get_next_typewriter_index(text: str, current_index: int) -> int:
-    safe_text = str(text or "")
-    safe_index = max(0, min(len(safe_text), int(current_index or 0)))
-    if safe_index >= len(safe_text):
-        return len(safe_text)
-
-    next_index = get_next_typewriter_cluster_index(safe_text, safe_index)
-    current_char = safe_text[safe_index]
-    next_index = include_typewriter_leading_follower(safe_text, safe_index, next_index)
-
-    if re.match(r"[A-Za-z0-9]", current_char):
-        grouped = 1
-        while (
-            next_index < len(safe_text)
-            and grouped < 3
-            and re.match(r"[A-Za-z0-9]", safe_text[next_index])
-        ):
-            next_index = get_next_typewriter_cluster_index(safe_text, next_index)
-            grouped += 1
-
-    next_index = include_typewriter_trailing_closers(safe_text, next_index)
-
-    while next_index < len(safe_text) and safe_text[next_index].isspace():
-        next_index = get_next_typewriter_cluster_index(safe_text, next_index)
-    return next_index
-
-
-def include_typewriter_leading_follower(text: str, current_index: int, index: int) -> int:
-    safe_text = str(text or "")
-    safe_current_index = max(0, min(len(safe_text), int(current_index or 0)))
-    next_index = max(0, min(len(safe_text), int(index or 0)))
-    if safe_current_index >= len(safe_text) or safe_text[safe_current_index] not in TYPEWRITER_LEADING_OPENERS:
-        return next_index
-
-    while next_index < len(safe_text) and safe_text[next_index] in TYPEWRITER_LEADING_OPENERS:
-        next_index = get_next_typewriter_cluster_index(safe_text, next_index)
-
-    return get_next_typewriter_cluster_index(safe_text, next_index) if next_index < len(safe_text) else next_index
-
-
-def include_typewriter_trailing_closers(text: str, index: int) -> int:
-    safe_text = str(text or "")
-    next_index = max(0, min(len(safe_text), int(index or 0)))
-    while next_index < len(safe_text) and safe_text[next_index] in TYPEWRITER_TRAILING_CLOSERS:
-        next_index += 1
-    return next_index
-
-
-def get_typewriter_punctuation_pause_ms(text: str, full_text: str = "") -> int:
-    anchor_text = get_typewriter_pause_anchor_text(text)
-    anchor_char = get_typewriter_pause_anchor_char(text)
-    if re.search(r"(?:\.{3,}|…+)$", anchor_text):
-        return TYPEWRITER_ELLIPSIS_PAUSE_MS
-    if anchor_char == "." and is_typewriter_inline_period(anchor_text, full_text):
-        return 0
-    if anchor_char == "." and is_typewriter_abbreviation_period(anchor_text, full_text):
-        return 0
-    if anchor_char in "。！？!?.":
-        return TYPEWRITER_SENTENCE_PAUSE_MS
-    if anchor_char in "…—-":
-        return TYPEWRITER_ELLIPSIS_PAUSE_MS
-    if anchor_char in "，、；;：:,":
-        return TYPEWRITER_CLAUSE_PAUSE_MS
-    return 0
-
-
-def get_typewriter_pause_anchor_text(text: str) -> str:
-    chars = list(str(text or "").rstrip())
-    while len(chars) > 1 and chars[-1] in TYPEWRITER_TRAILING_CLOSERS:
-        chars.pop()
-    return "".join(chars)
-
-
-def get_typewriter_pause_anchor_char(text: str) -> str:
-    chars = list(get_typewriter_pause_anchor_text(text))
-    return chars[-1] if chars else ""
-
-
-def is_typewriter_inline_period(anchor_text: str, full_text: str = "") -> bool:
-    safe_anchor_text = str(anchor_text or "")
-    safe_full_text = str(full_text or "")
-    previous_char = safe_anchor_text[-2] if len(safe_anchor_text) >= 2 else ""
-    next_char = safe_full_text[len(safe_anchor_text) : len(safe_anchor_text) + 1]
-    return bool(re.match(r"[A-Za-z0-9]", previous_char) and re.match(r"[A-Za-z0-9]", next_char))
-
-
-def is_typewriter_abbreviation_period(anchor_text: str, full_text: str = "") -> bool:
-    safe_anchor_text = str(anchor_text or "")
-    safe_full_text = str(full_text or "")
-    token_match = re.search(r"([A-Za-z](?:[A-Za-z]|\.)*)\.$", safe_anchor_text)
-    token = token_match.group(1).lower() if token_match else ""
-    next_char = safe_full_text[len(safe_anchor_text) : len(safe_anchor_text) + 1]
-    return token in TYPEWRITER_PERIOD_ABBREVIATIONS and bool(next_char and next_char.isspace())
-
-
-def get_native_typewriter_step_delay_ms(speed: str, visible_text: str = "", full_text: str = "") -> int:
-    safe_speed = get_safe_text_speed(speed)
-    chars_per_second = TEXT_SPEED_PRESETS.get(safe_speed, TEXT_SPEED_PRESETS["normal"])
-    if chars_per_second >= TEXT_SPEED_PRESETS["instant"]:
-        return 0
-    base_delay = max(1, int(round(1000 / max(1, chars_per_second))))
-    return base_delay + get_typewriter_punctuation_pause_ms(visible_text, full_text)
 
 
 def load_project_runtime_settings(project_id: str, project: dict | None = None) -> dict:

@@ -19,6 +19,8 @@ RUNTIME_CONTROLS_PATH = ROOT_DIR / "export_player_template" / "runtime_controls.
 RUNTIME_SETTINGS_PATH = ROOT_DIR / "export_player_template" / "runtime_settings.js"
 RUNTIME_AUDIO_PATH = ROOT_DIR / "export_player_template" / "runtime_audio.js"
 NATIVE_RUNTIME_PATH = ROOT_DIR / "native_runtime" / "runtime_player.py"
+NATIVE_RUNTIME_SETTINGS_PATH = ROOT_DIR / "native_runtime" / "runtime_player_settings.py"
+NATIVE_RUNTIME_TEXT_EFFECTS_PATH = ROOT_DIR / "native_runtime" / "runtime_text_effects.py"
 PROJECT_POLISH_RECEIPT_PANEL_PATH = EDITOR_DIR / "modules" / "project_polish_receipt_panel.js"
 DASHBOARD_PRIMARY_ACTIONS_PATH = EDITOR_DIR / "modules" / "dashboard_primary_actions.js"
 MODULE_PATHS = tuple(sorted((EDITOR_DIR / "modules").glob("*.js")))
@@ -5420,9 +5422,13 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("state.typingVisibleText", runtime_schedule_typewriter)
 
         native_source = NATIVE_RUNTIME_PATH.read_text(encoding="utf-8")
-        self.assertIn("def get_safe_text_speed", native_source)
-        self.assertIn("def get_next_typewriter_index", native_source)
-        self.assertIn("def get_typewriter_punctuation_pause_ms", native_source)
+        native_settings_source = NATIVE_RUNTIME_SETTINGS_PATH.read_text(encoding="utf-8")
+        native_text_effects_source = NATIVE_RUNTIME_TEXT_EFFECTS_PATH.read_text(encoding="utf-8")
+        self.assertIn("runtime_player_settings import", native_source)
+        self.assertIn("runtime_text_effects import", native_source)
+        self.assertIn("def get_safe_text_speed", native_settings_source)
+        self.assertIn("def get_next_typewriter_index", native_text_effects_source)
+        self.assertIn("def get_typewriter_punctuation_pause_ms", native_text_effects_source)
         self.assertIn("def get_current_line_text_speed", native_source)
         self.assertIn('"textSpeed": block.get("textSpeed")', native_source)
         self.assertIn("self.get_current_line_text_speed() == \"instant\"", native_source)

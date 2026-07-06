@@ -58,6 +58,10 @@ from native_runtime.runtime_performance import (
     build_native_runtime_performance_budget_report,
     render_native_runtime_performance_budget_markdown,
 )
+from native_runtime.runtime_player_settings import (
+    DEFAULT_RUNTIME_PLAYER_SETTINGS,
+    sanitize_runtime_player_settings,
+)
 
 
 UI_ASSET_IDS = [
@@ -117,6 +121,39 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
         self.assertEqual(defaults["sfxVolume"], 77)
         self.assertEqual(defaults["voiceVolume"], 0)
         self.assertEqual(defaults["voiceDuckingEnabled"], "off")
+
+    def test_native_runtime_settings_module_sanitizes_player_preferences(self) -> None:
+        settings = sanitize_runtime_player_settings(
+            {
+                "themeMode": "mystery",
+                "displayMode": "cinema",
+                "textSpeed": "FAST",
+                "language": "ja-jp",
+                "textScalePercent": 999,
+                "dialogBoxOpacityPercent": -20,
+                "autoPlayDelayMs": "bad",
+                "autoPlayWaitForVoice": "yes",
+                "voiceDuckingEnabled": "off",
+                "masterVolume": 120,
+                "bgmVolume": -5,
+                "sfxVolume": 66.4,
+                "voiceVolume": "40",
+            }
+        )
+
+        self.assertEqual(settings["themeMode"], DEFAULT_RUNTIME_PLAYER_SETTINGS["themeMode"])
+        self.assertEqual(settings["displayMode"], DEFAULT_RUNTIME_PLAYER_SETTINGS["displayMode"])
+        self.assertEqual(settings["textSpeed"], "fast")
+        self.assertEqual(settings["language"], "ja-JP")
+        self.assertEqual(settings["textScalePercent"], 125)
+        self.assertEqual(settings["dialogBoxOpacityPercent"], 0)
+        self.assertEqual(settings["autoPlayDelayMs"], DEFAULT_RUNTIME_PLAYER_SETTINGS["autoPlayDelayMs"])
+        self.assertEqual(settings["autoPlayWaitForVoice"], DEFAULT_RUNTIME_PLAYER_SETTINGS["autoPlayWaitForVoice"])
+        self.assertEqual(settings["voiceDuckingEnabled"], "off")
+        self.assertEqual(settings["masterVolume"], 100)
+        self.assertEqual(settings["bgmVolume"], 0)
+        self.assertEqual(settings["sfxVolume"], 66)
+        self.assertEqual(settings["voiceVolume"], 40)
 
     def test_native_runtime_performance_budget_reports_missing_and_heavy_assets(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
