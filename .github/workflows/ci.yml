@@ -268,6 +268,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_runtime_audio_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_preload_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_scene_prefetch_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_typewriter_parity.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_capability_matrix_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_scene_mood_recipes_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_scene_pacing_advisor_module.py' -v
