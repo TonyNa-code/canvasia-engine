@@ -3963,6 +3963,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["runtimeStorageModule"], run_editor.NATIVE_RUNTIME_STORAGE_NAME)
         self.assertEqual(manifest["files"]["runtimeVariablesModule"], run_editor.NATIVE_RUNTIME_VARIABLES_NAME)
         self.assertEqual(manifest["files"]["runtimeScenePrefetchModule"], run_editor.NATIVE_RUNTIME_SCENE_PREFETCH_NAME)
+        self.assertEqual(manifest["files"]["runtimeDiagnosticsModule"], run_editor.NATIVE_RUNTIME_DIAGNOSTICS_NAME)
         provenance = self.assert_export_provenance_file(
             export_result,
             {
@@ -3970,6 +3971,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 run_editor.NATIVE_RUNTIME_PLAYER_NAME,
                 run_editor.NATIVE_RUNTIME_PRELOAD_NAME,
                 run_editor.NATIVE_RUNTIME_SCENE_PREFETCH_NAME,
+                run_editor.NATIVE_RUNTIME_DIAGNOSTICS_NAME,
                 run_editor.NATIVE_RUNTIME_SETTINGS_NAME,
                 run_editor.NATIVE_RUNTIME_TEXT_EFFECTS_NAME,
                 run_editor.NATIVE_RUNTIME_STORAGE_NAME,
@@ -4018,6 +4020,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["runtimePreloadReport"], run_editor.RUNTIME_PRELOAD_REPORT_FILE_NAME)
         self.assertEqual(manifest["files"]["runtimePreloadModule"], run_editor.NATIVE_RUNTIME_PRELOAD_NAME)
         self.assertEqual(manifest["files"]["runtimeScenePrefetchModule"], run_editor.NATIVE_RUNTIME_SCENE_PREFETCH_NAME)
+        self.assertEqual(manifest["files"]["runtimeDiagnosticsModule"], run_editor.NATIVE_RUNTIME_DIAGNOSTICS_NAME)
         self.assertEqual(manifest["files"]["runtimePerformanceModule"], run_editor.NATIVE_RUNTIME_PERFORMANCE_NAME)
         self.assertEqual(manifest["files"]["performanceBudgetReport"], run_editor.NATIVE_RUNTIME_PERFORMANCE_BUDGET_REPORT_NAME)
         self.assertEqual(manifest["files"]["performanceBudgetMarkdown"], run_editor.NATIVE_RUNTIME_PERFORMANCE_BUDGET_MARKDOWN_NAME)
@@ -4036,6 +4039,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["runtime"]["runtimePreloadReport"], run_editor.RUNTIME_PRELOAD_REPORT_FILE_NAME)
         self.assertEqual(manifest["runtime"]["runtimePreloadModule"], run_editor.NATIVE_RUNTIME_PRELOAD_NAME)
         self.assertEqual(manifest["runtime"]["runtimeScenePrefetchModule"], run_editor.NATIVE_RUNTIME_SCENE_PREFETCH_NAME)
+        self.assertEqual(manifest["runtime"]["runtimeDiagnosticsModule"], run_editor.NATIVE_RUNTIME_DIAGNOSTICS_NAME)
         self.assertEqual(manifest["runtime"]["runtimePerformanceModule"], run_editor.NATIVE_RUNTIME_PERFORMANCE_NAME)
         self.assertEqual(
             manifest["runtime"]["runtimePreloadSummary"]["totalEntries"],
@@ -5114,6 +5118,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_scene_prefetch.js").is_file())
         self.assertTrue((bundle_dir / "native_runtime" / run_editor.NATIVE_RUNTIME_PLAYER_NAME).is_file())
         self.assertTrue((bundle_dir / "native_runtime" / run_editor.NATIVE_RUNTIME_SCENE_PREFETCH_NAME).is_file())
+        self.assertTrue((bundle_dir / "native_runtime" / run_editor.NATIVE_RUNTIME_DIAGNOSTICS_NAME).is_file())
         self.assertTrue((bundle_dir / "native_runtime" / run_editor.NATIVE_RUNTIME_SETTINGS_NAME).is_file())
         self.assertTrue((bundle_dir / "template_project" / "project.json").is_file())
         self.assertTrue((bundle_dir / "projects").is_dir())

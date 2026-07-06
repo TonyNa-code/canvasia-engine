@@ -70,6 +70,11 @@ except ImportError:  # pragma: no cover - exported native packages import from t
     )
 
 try:
+    from .runtime_diagnostics import build_runtime_diagnostics_report
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_diagnostics import build_runtime_diagnostics_report
+
+try:
     from .runtime_performance import (
         PERFORMANCE_BUDGET_MARKDOWN_NAME,
         PERFORMANCE_BUDGET_REPORT_NAME,
@@ -491,6 +496,7 @@ SYSTEM_MENU_ITEMS = [
     ("archives", "资料馆"),
     ("profile", "玩家档案"),
     ("auto-resume", "续玩记录"),
+    ("diagnostics", "性能诊断"),
     ("save", "正式存档"),
     ("load", "读取存档"),
     ("settings", "体验设置"),
@@ -11423,6 +11429,10 @@ class NativeRuntimePlayer:
         self.overlay_mode = "auto-resume"
         self.status_message = "续玩记录已打开。"
 
+    def open_diagnostics_overlay(self) -> None:
+        self.overlay_mode = "diagnostics"
+        self.status_message = "性能诊断已打开。"
+
     def close_overlay(self, preserve_status: bool = False) -> None:
         closing_mode = self.overlay_mode
         self.overlay_hotspots = []
@@ -11483,6 +11493,9 @@ class NativeRuntimePlayer:
             return True
         if item_key == "auto-resume":
             self.open_auto_resume_overlay()
+            return True
+        if item_key == "diagnostics":
+            self.open_diagnostics_overlay()
             return True
         if item_key == "save":
             self.open_save_dialog("save")
@@ -14067,6 +14080,8 @@ class NativeRuntimePlayer:
             self.render_profile_overlay()
         elif self.overlay_mode == "auto-resume":
             self.render_auto_resume_overlay()
+        elif self.overlay_mode == "diagnostics":
+            self.render_diagnostics_overlay()
         elif self.overlay_mode == "settings":
             self.render_settings_overlay()
         elif self.overlay_mode == "archives":
@@ -14424,6 +14439,8 @@ class NativeRuntimePlayer:
         if item_key == "auto-resume":
             state = "已有续玩记录" if self.auto_resume_snapshot else "暂无续玩记录"
             return f"管理自动续玩快照；当前：{state}。"
+        if item_key == "diagnostics":
+            return "查看当前位置、资源预热、路线预取和运行缓存，方便定位卡顿或缺素材。"
         if item_key == "save":
             return f"打开正式存档面板；{self.build_save_summary_line()}。"
         if item_key == "load":
@@ -14439,6 +14456,90 @@ class NativeRuntimePlayer:
         if item_key == "exit":
             return "关闭原生 Runtime 预览窗口。"
         return "执行当前系统操作。"
+
+    def get_runtime_diagnostics_context(self) -> dict:
+        current_scene = self.get_current_scene() or {}
+        current_line = self.current_line or {}
+        return {
+            "sceneId": self.current_scene_id,
+            "sceneName": self.localize_value(current_scene, "name", self.current_scene_id or "未命名场景"),
+            "blockIndex": self.current_block_index,
+            "lineType": current_line.get("blockLabel") or current_line.get("type"),
+            "choiceCount": len(self.current_choices or []),
+            "statusMessage": self.status_message,
+            "runtimePreloadStatus": getattr(self, "runtime_preload_status", {}),
+            "runtimeScenePrefetchStatus": getattr(self, "runtime_scene_prefetch_status", {}),
+            "runtimeScenePrefetchManifest": getattr(self, "runtime_scene_prefetch_manifest", {}),
+            "imageCache": getattr(self, "image_cache", {}),
+            "soundCache": getattr(self, "sound_cache", {}),
+            "videoPreviewFrameCache": getattr(self, "video_preview_frame_cache", {}),
+            "runtimeScenePrefetchedAssetIds": getattr(self, "runtime_scene_prefetched_asset_ids", set()),
+            "currentBgmAssetId": getattr(self, "current_bgm_asset_id", None),
+            "voicePlaybackActive": bool(getattr(self, "voice_playback_active", False)),
+        }
+
+    def get_runtime_diagnostics_report(self) -> dict:
+        return build_runtime_diagnostics_report(self.get_runtime_diagnostics_context())
+
+    def get_diagnostic_tone_color(self, tone: str, palette: dict) -> tuple[int, int, int]:
+        if tone == "danger":
+            return (255, 137, 137)
+        if tone == "warn":
+            return (255, 203, 117)
+        if tone == "ready":
+            return palette["accent"]
+        return palette["muted"]
+
+    def render_diagnostics_overlay(self) -> None:
+        palette = self.get_active_palette()
+        report = self.get_runtime_diagnostics_report()
+        panel = self.pygame.Rect(0, 0, min(self.width - 72, 1040), min(self.height - 76, 650))
+        panel.center = (self.width // 2, self.height // 2)
+        self.pygame.draw.rect(self.screen, (*palette["panel"], 246), panel, border_radius=30)
+        self.pygame.draw.rect(self.screen, with_alpha(palette["panelBorder"], 76), panel, 2, border_radius=30)
+        self.draw_game_ui_panel_frame(panel, "system")
+
+        self.screen.blit(self.font_title.render("性能诊断", True, palette["text"]), (panel.left + 28, panel.top + 24))
+        headline_color = self.get_diagnostic_tone_color(str(report.get("status") or ""), palette)
+        self.screen.blit(
+            self.font_ui.render(str(report.get("headline") or "运行时诊断已打开。"), True, headline_color),
+            (panel.left + 28, panel.top + 62),
+        )
+
+        sections = report.get("sections") if isinstance(report.get("sections"), list) else []
+        grid_left = panel.left + 28
+        grid_top = panel.top + 104
+        grid_gap = 16
+        card_width = max(320, (panel.width - 56 - grid_gap) // 2)
+        card_height = max(206, (panel.height - 166 - grid_gap) // 2)
+        for index, section in enumerate(sections[:4]):
+            col = index % 2
+            row = index // 2
+            card = self.pygame.Rect(
+                grid_left + col * (card_width + grid_gap),
+                grid_top + row * (card_height + grid_gap),
+                card_width,
+                card_height,
+            )
+            self.pygame.draw.rect(self.screen, with_alpha(palette["accent"], 12), card, border_radius=22)
+            self.pygame.draw.rect(self.screen, with_alpha(palette["panelBorder"], 42), card, 1, border_radius=22)
+            self.screen.blit(self.font_body.render(str(section.get("title") or "诊断"), True, palette["accent"]), (card.left + 18, card.top + 16))
+            y = card.top + 58
+            for item in (section.get("rows") or [])[:4]:
+                label = str(item.get("label") or "")
+                value = str(item.get("value") or "")
+                detail = str(item.get("detail") or "")
+                tone_color = self.get_diagnostic_tone_color(str(item.get("tone") or ""), palette)
+                label_surface = self.font_ui.render(label, True, palette["muted"])
+                value_surface = self.font_ui.render(value[:30], True, tone_color)
+                self.screen.blit(label_surface, (card.left + 18, y))
+                self.screen.blit(value_surface, (card.right - value_surface.get_width() - 18, y))
+                detail_rect = self.pygame.Rect(card.left + 18, y + 24, card.width - 36, 38)
+                self.blit_wrapped_text(self.font_ui, detail, detail_rect, palette["text"], line_gap=3, max_lines=2)
+                y += 62
+
+        hint = "Enter / Esc / 点击关闭 · 该面板用于试玩时定位卡顿、缺素材和预取状态"
+        self.screen.blit(self.font_ui.render(hint, True, palette["muted"]), (panel.left + 28, panel.bottom - 42))
 
     def render_system_menu_overlay(self) -> None:
         palette = self.get_active_palette()
@@ -15319,6 +15420,8 @@ class NativeRuntimePlayer:
             return self.handle_profile_overlay_event(event)
         if self.overlay_mode == "auto-resume":
             return self.handle_auto_resume_overlay_event(event)
+        if self.overlay_mode == "diagnostics":
+            return self.handle_diagnostics_overlay_event(event)
         if self.overlay_mode == "settings":
             return self.handle_settings_overlay_event(event)
         if self.overlay_mode == "archives":
@@ -15502,6 +15605,16 @@ class NativeRuntimePlayer:
                 if target.get("kind") == "close" and target["rect"].collidepoint(event.pos):
                     self.close_overlay()
                     return True
+        return True
+
+    def handle_diagnostics_overlay_event(self, event) -> bool:
+        pygame = self.pygame
+        if event.type == pygame.KEYDOWN and event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            self.close_overlay()
+            return True
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            self.close_overlay()
+            return True
         return True
 
     def handle_auto_resume_overlay_event(self, event) -> bool:

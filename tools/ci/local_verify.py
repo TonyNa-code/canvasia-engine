@@ -51,6 +51,7 @@ PYTHON_SYNTAX_FILES = [
     "native_runtime/runtime_performance.py",
     "native_runtime/runtime_preload.py",
     "native_runtime/runtime_scene_prefetch.py",
+    "native_runtime/runtime_diagnostics.py",
     "native_runtime/build_native_runtime_app.py",
     "tools/release/check_editor_signing_readiness.py",
     "tools/release/prepare_preview_release.py",

@@ -22,6 +22,7 @@ except ModuleNotFoundError:  # pragma: no cover - CI installs pygame-ce for this
 from native_runtime.runtime_player import (
     NATIVE_VIDEO_EMBEDDED_BACKEND_ID,
     NATIVE_VIDEO_SYNC_BACKEND_ID,
+    SYSTEM_MENU_ITEMS,
     VN_BASELINE_QUALITY_MARKDOWN_NAME,
     VN_BASELINE_QUALITY_REPORT_NAME,
     NativeRuntimePlayer,
@@ -3384,6 +3385,7 @@ class NativeRuntimeRenderSmokeTests(unittest.TestCase):
 
         self.assertIn("主题", player.get_system_menu_item_description("settings"))
         self.assertIn("正式存档", player.get_system_menu_item_description("load"))
+        self.assertIn("路线预取", player.get_system_menu_item_description("diagnostics"))
         self.assertEqual(player.get_character_presentation_mode_label(player.characters_by_id["heroine"]), "3D 模型")
         self.assertEqual(player.get_character_model_asset_label(player.characters_by_id["heroine"]), "Heroine 3D Model")
         self.assertIn(
@@ -3404,6 +3406,7 @@ class NativeRuntimeRenderSmokeTests(unittest.TestCase):
             lambda: (player.open_settings_overlay(), player.render()),
             lambda: (player.open_profile_overlay(), player.render()),
             lambda: (player.open_auto_resume_overlay(), player.render()),
+            lambda: (player.open_diagnostics_overlay(), player.render()),
             lambda: (player.open_archive_overlay("chapters"), player.render()),
         ]
         for render_step in render_steps:
@@ -3437,6 +3440,16 @@ class NativeRuntimeRenderSmokeTests(unittest.TestCase):
         player.handle_event(pygame.event.Event(pygame.KEYDOWN, {"key": pygame.K_s}))
         self.assertEqual(player.overlay_mode, "settings")
         player.close_overlay(preserve_status=True)
+        player.open_system_menu()
+        player.system_menu_index = next(index for index, item in enumerate(SYSTEM_MENU_ITEMS) if item[0] == "diagnostics")
+        player.handle_event(pygame.event.Event(pygame.KEYDOWN, {"key": pygame.K_RETURN}))
+        self.assertEqual(player.overlay_mode, "diagnostics")
+        diagnostics_report = player.get_runtime_diagnostics_report()
+        self.assertIn("路线预取", [section["title"] for section in diagnostics_report["sections"]])
+        player.render()
+        self.assert_screen_has_pixels(player)
+        player.handle_event(pygame.event.Event(pygame.KEYDOWN, {"key": pygame.K_RETURN}))
+        self.assertIsNone(player.overlay_mode)
         player.open_help_overlay()
         player.handle_event(pygame.event.Event(pygame.KEYDOWN, {"key": pygame.K_RETURN}))
         self.assertIsNone(player.overlay_mode)
