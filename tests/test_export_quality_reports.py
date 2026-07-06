@@ -5,6 +5,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from export_choice_consequence_sheet import (
+    EXPORT_CHOICE_CONSEQUENCE_CSV_NAME,
+    EXPORT_CHOICE_CONSEQUENCE_JSON_NAME,
+    EXPORT_CHOICE_CONSEQUENCE_REPORT_NAME,
+)
 from export_localization_audit import (
     EXPORT_LOCALIZATION_AUDIT_JSON_NAME,
     EXPORT_LOCALIZATION_AUDIT_REPORT_NAME,
@@ -100,6 +105,9 @@ class ExportQualityReportsTests(unittest.TestCase):
             for file_name in (
                 EXPORT_STORY_ROUTE_MAP_JSON_NAME,
                 EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
+                EXPORT_CHOICE_CONSEQUENCE_JSON_NAME,
+                EXPORT_CHOICE_CONSEQUENCE_REPORT_NAME,
+                EXPORT_CHOICE_CONSEQUENCE_CSV_NAME,
                 EXPORT_LOCALIZATION_AUDIT_JSON_NAME,
                 EXPORT_LOCALIZATION_AUDIT_REPORT_NAME,
                 EXPORT_RELEASE_READINESS_JSON_NAME,
@@ -115,12 +123,16 @@ class ExportQualityReportsTests(unittest.TestCase):
                 [
                     "export_manifest.json",
                     EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
+                    EXPORT_CHOICE_CONSEQUENCE_REPORT_NAME,
+                    EXPORT_CHOICE_CONSEQUENCE_JSON_NAME,
+                    EXPORT_CHOICE_CONSEQUENCE_CSV_NAME,
                     EXPORT_LOCALIZATION_AUDIT_REPORT_NAME,
                     "unlockable_content_report.md",
                 ],
             )
 
             readiness_payload = json.loads((target_dir / EXPORT_RELEASE_READINESS_JSON_NAME).read_text(encoding="utf-8"))
+            self.assertIn(EXPORT_CHOICE_CONSEQUENCE_REPORT_NAME, readiness_payload["reportFiles"])
             self.assertIn(EXPORT_LOCALIZATION_AUDIT_REPORT_NAME, readiness_payload["reportFiles"])
             self.assertIn("localization_missing_translations", {issue["code"] for issue in readiness_payload["issues"]})
 

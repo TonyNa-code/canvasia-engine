@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from export_choice_consequence_sheet import write_export_choice_consequence_files
 from export_localization_audit import write_export_localization_audit_files
 from export_release_readiness import write_export_release_readiness_files
 from export_story_route_map import write_export_story_route_map_files
@@ -29,11 +30,15 @@ def write_export_quality_report_bundle(
     platform_notes: list[str] | None = None,
 ) -> dict:
     story_route_map = write_export_story_route_map_files(target_dir, bundle)
+    choice_consequence = write_export_choice_consequence_files(target_dir, bundle=bundle)
     localization_audit = write_export_localization_audit_files(target_dir, bundle)
     report_files = normalize_report_file_names(
         [
             *(base_report_files or []),
             story_route_map["storyRouteMapReportName"],
+            choice_consequence["choiceConsequenceReportName"],
+            choice_consequence["choiceConsequenceName"],
+            choice_consequence["choiceConsequenceCsvName"],
             localization_audit["localizationAuditReportName"],
             *(extra_report_files or []),
         ]
@@ -51,6 +56,7 @@ def write_export_quality_report_bundle(
     )
     return {
         **story_route_map,
+        **choice_consequence,
         **localization_audit,
         **release_readiness,
         "qualityReportFiles": report_files,
