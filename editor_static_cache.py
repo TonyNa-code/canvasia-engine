@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from email.utils import formatdate
+from datetime import timezone
+from email.utils import formatdate, parsedate_to_datetime
 from pathlib import Path
 
 
@@ -88,6 +89,24 @@ def request_etag_matches(if_none_match_header: str | None, etag: str) -> bool:
     return any(item == etag or normalize_etag(item) == normalized_etag for item in request_etags)
 
 
+def request_modified_since_matches(if_modified_since_header: str | None, file_path: Path) -> bool:
+    if not if_modified_since_header:
+        return False
+    try:
+        request_datetime = parsedate_to_datetime(if_modified_since_header)
+    except (IndexError, OverflowError, TypeError, ValueError):
+        return False
+    if request_datetime is None:
+        return False
+    if request_datetime.tzinfo is None:
+        request_datetime = request_datetime.replace(tzinfo=timezone.utc)
+    try:
+        modified_at_seconds = int(file_path.stat().st_mtime)
+    except OSError:
+        return False
+    return modified_at_seconds <= int(request_datetime.timestamp())
+
+
 __all__ = [
     "EDITOR_STATIC_CACHE_CONTROL",
     "build_editor_static_cache_headers",
@@ -95,4 +114,5 @@ __all__ = [
     "is_editor_static_cache_candidate",
     "normalize_request_path",
     "request_etag_matches",
+    "request_modified_since_matches",
 ]

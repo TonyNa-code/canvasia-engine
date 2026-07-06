@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+from email.utils import formatdate
 from pathlib import Path
 
 from editor_local_security import extract_host_from_header, is_local_editor_host, is_local_editor_origin
@@ -11,6 +12,7 @@ from editor_static_cache import (
     is_editor_static_cache_candidate,
     normalize_request_path,
     request_etag_matches,
+    request_modified_since_matches,
 )
 
 
@@ -85,13 +87,15 @@ class EditorInfrastructureTests(unittest.TestCase):
             path.write_text("export const ok = true;", encoding="utf-8")
 
             headers = build_editor_static_cache_headers(path)
-
-        self.assertEqual(headers["Cache-Control"], "private, max-age=0, must-revalidate")
-        self.assertTrue(headers["ETag"].startswith('W/"canvasia-'))
-        self.assertTrue(request_etag_matches(headers["ETag"], headers["ETag"]))
-        self.assertTrue(request_etag_matches(headers["ETag"].removeprefix("W/"), headers["ETag"]))
-        self.assertTrue(request_etag_matches("*, \"other\"", headers["ETag"]))
-        self.assertFalse(request_etag_matches('"other"', headers["ETag"]))
+            self.assertEqual(headers["Cache-Control"], "private, max-age=0, must-revalidate")
+            self.assertTrue(headers["ETag"].startswith('W/"canvasia-'))
+            self.assertTrue(request_etag_matches(headers["ETag"], headers["ETag"]))
+            self.assertTrue(request_etag_matches(headers["ETag"].removeprefix("W/"), headers["ETag"]))
+            self.assertTrue(request_etag_matches("*, \"other\"", headers["ETag"]))
+            self.assertFalse(request_etag_matches('"other"', headers["ETag"]))
+            self.assertTrue(request_modified_since_matches(headers["Last-Modified"], path))
+            self.assertFalse(request_modified_since_matches(formatdate(0, usegmt=True), path))
+            self.assertFalse(request_modified_since_matches("not-a-http-date", path))
 
 
 if __name__ == "__main__":

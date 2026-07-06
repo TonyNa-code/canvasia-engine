@@ -25,6 +25,7 @@ class FrontendProjectRuntimeSettingsModuleTests(unittest.TestCase):
             const project = {{
               runtimeSettings: {{
                 formalSaveSlotCount: 999,
+                performanceProfile: "mobile_low",
                 defaultTextSpeed: "fast",
                 defaultDialogTheme: "paper",
                 defaultUiThemeMode: "dark",
@@ -63,6 +64,7 @@ class FrontendProjectRuntimeSettingsModuleTests(unittest.TestCase):
             payload["settings"],
             {
                 "formalSaveSlotCount": 120,
+                "performanceProfile": "mobile_low",
                 "defaultTextSpeed": "fast",
                 "defaultDialogTheme": "paper",
                 "defaultUiThemeMode": "dark",

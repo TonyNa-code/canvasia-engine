@@ -34,6 +34,7 @@ from editor_static_cache import (
     build_editor_static_cache_headers,
     is_editor_static_cache_candidate,
     request_etag_matches,
+    request_modified_since_matches,
 )
 from export_choice_consequence_sheet import (
     EXPORT_CHOICE_CONSEQUENCE_CSV_NAME,
@@ -14406,7 +14407,14 @@ class EditorRequestHandler(SimpleHTTPRequestHandler):
         file_path = Path(self.translate_path(parsed.path))
         if is_editor_static_cache_candidate(parsed.path, file_path):
             cache_headers = build_editor_static_cache_headers(file_path)
-            if request_etag_matches(self.headers.get("If-None-Match"), cache_headers["ETag"]):
+            if_none_match_header = self.headers.get("If-None-Match")
+            if if_none_match_header is not None:
+                is_not_modified = request_etag_matches(if_none_match_header, cache_headers["ETag"])
+                if not is_not_modified and self.headers.get("If-Modified-Since"):
+                    del self.headers["If-Modified-Since"]
+            else:
+                is_not_modified = request_modified_since_matches(self.headers.get("If-Modified-Since"), file_path)
+            if is_not_modified:
                 self.send_response(HTTPStatus.NOT_MODIFIED)
                 self.send_header("Cache-Control", cache_headers["Cache-Control"])
                 self.send_header("ETag", cache_headers["ETag"])

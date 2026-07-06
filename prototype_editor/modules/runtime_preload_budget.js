@@ -18,6 +18,63 @@
     singleVideoWarnBytes: 240 * MIB,
   });
 
+  const PERFORMANCE_PROFILE_DEFINITIONS = Object.freeze({
+    standard: Object.freeze({
+      key: "standard",
+      label: "标准 PC / 网页",
+      detail: "适合大多数桌面试玩包和普通网页发布。",
+      budgets: Object.freeze({}),
+    }),
+    web: Object.freeze({
+      key: "web",
+      label: "网页轻量",
+      detail: "更适合直接放在 GitHub Pages、itch.io 或网页预览的轻量包。",
+      budgets: Object.freeze({
+        criticalBudgetBytes: 72 * MIB,
+        earlyBudgetBytes: 192 * MIB,
+        totalPreloadBudgetBytes: 384 * MIB,
+        sceneHotspotBudgetBytes: 96 * MIB,
+        maxCriticalEntries: 14,
+        maxEarlyEntries: 36,
+        singleImageWarnBytes: 12 * MIB,
+        singleAudioWarnBytes: 24 * MIB,
+        singleVideoWarnBytes: 180 * MIB,
+      }),
+    }),
+    mobile_low: Object.freeze({
+      key: "mobile_low",
+      label: "低配 / 移动端",
+      detail: "更严格地控制入口素材，适合低配电脑、安卓壳或未来移动端适配。",
+      budgets: Object.freeze({
+        criticalBudgetBytes: 48 * MIB,
+        earlyBudgetBytes: 128 * MIB,
+        totalPreloadBudgetBytes: 256 * MIB,
+        sceneHotspotBudgetBytes: 64 * MIB,
+        maxCriticalEntries: 10,
+        maxEarlyEntries: 28,
+        singleImageWarnBytes: 8 * MIB,
+        singleAudioWarnBytes: 16 * MIB,
+        singleVideoWarnBytes: 120 * MIB,
+      }),
+    }),
+    high_quality_pc: Object.freeze({
+      key: "high_quality_pc",
+      label: "高画质 PC",
+      detail: "允许更大的素材和更长预热，适合主要面向桌面客户端的高清作品。",
+      budgets: Object.freeze({
+        criticalBudgetBytes: 160 * MIB,
+        earlyBudgetBytes: 384 * MIB,
+        totalPreloadBudgetBytes: 768 * MIB,
+        sceneHotspotBudgetBytes: 192 * MIB,
+        maxCriticalEntries: 24,
+        maxEarlyEntries: 72,
+        singleImageWarnBytes: 32 * MIB,
+        singleAudioWarnBytes: 48 * MIB,
+        singleVideoWarnBytes: 320 * MIB,
+      }),
+    }),
+  });
+
   const PHASE_DEFINITIONS = Object.freeze({
     critical: Object.freeze({
       label: "首屏必备",
@@ -281,6 +338,48 @@
     return PHASE_DEFINITIONS[phase]?.priority ?? 10;
   }
 
+  function getSafePerformanceProfileKey(value, fallback = "standard") {
+    const key = cleanText(value, fallback).toLowerCase();
+    return PERFORMANCE_PROFILE_DEFINITIONS[key] ? key : fallback;
+  }
+
+  function getPerformanceProfileDefinition(value) {
+    return PERFORMANCE_PROFILE_DEFINITIONS[getSafePerformanceProfileKey(value)] ?? PERFORMANCE_PROFILE_DEFINITIONS.standard;
+  }
+
+  function getRuntimePreloadPerformanceProfile(data = {}, options = {}) {
+    const project = data.project && typeof data.project === "object" ? data.project : {};
+    const runtimeSettings = project.runtimeSettings && typeof project.runtimeSettings === "object" ? project.runtimeSettings : {};
+    return getSafePerformanceProfileKey(
+      options.performanceProfile ??
+        options.profile ??
+        runtimeSettings.performanceProfile ??
+        project.performanceProfile ??
+        project.targetPerformanceProfile
+    );
+  }
+
+  function getRuntimePreloadBudgetOverrides(options = {}) {
+    return Object.fromEntries(
+      Object.keys(DEFAULT_BUDGETS)
+        .filter((key) => Object.prototype.hasOwnProperty.call(options, key))
+        .map((key) => [key, options[key]])
+    );
+  }
+
+  function resolveRuntimePreloadBudgets(data = {}, options = {}) {
+    const profileKey = getRuntimePreloadPerformanceProfile(data, options);
+    const profile = getPerformanceProfileDefinition(profileKey);
+    return {
+      profile,
+      budgets: {
+        ...DEFAULT_BUDGETS,
+        ...(profile.budgets ?? {}),
+        ...getRuntimePreloadBudgetOverrides(options),
+      },
+    };
+  }
+
   function getCharacterSpriteAssetId(charactersById, characterId, expressionId) {
     const character = charactersById.get(cleanText(characterId));
     if (!character || typeof character !== "object") {
@@ -332,7 +431,7 @@
   }
 
   function buildRuntimePreloadBudgetReport(data = {}, options = {}) {
-    const budgets = { ...DEFAULT_BUDGETS, ...options };
+    const { profile, budgets } = resolveRuntimePreloadBudgets(data, options);
     const assetsById = getAssetMap(data);
     const charactersById = getCharactersById(data);
     const orderedScenes = getOrderedScenes(data);
@@ -635,9 +734,16 @@
     return {
       budgets: {
         ...budgets,
+        performanceProfile: profile.key,
+        performanceProfileLabel: profile.label,
         criticalBudgetLabel: formatBytes(budgets.criticalBudgetBytes),
         earlyBudgetLabel: formatBytes(budgets.earlyBudgetBytes),
         totalPreloadBudgetLabel: formatBytes(budgets.totalPreloadBudgetBytes),
+      },
+      performanceProfile: {
+        key: profile.key,
+        label: profile.label,
+        detail: profile.detail,
       },
       entrySceneId,
       entries,
@@ -666,6 +772,7 @@
     const totals = report.totals ?? {};
     const critical = report.phases?.critical ?? {};
     const early = report.phases?.early ?? {};
+    const profile = report.performanceProfile ?? {};
     const level = report.releaseRiskLevel ?? "ready";
     const title =
       level === "danger"
@@ -688,6 +795,7 @@
       badges: [
         `首屏 ${critical.bytesLabel ?? "0 B"}`,
         `早期 ${early.bytesLabel ?? "0 B"}`,
+        profile.label ? `档位 ${profile.label}` : "标准档位",
         `${totals.totalEntries ?? 0} 个候选素材`,
         (totals.missingFileCount ?? 0) > 0 ? `缺文件 ${totals.missingFileCount} 个` : "无首屏缺文件",
       ],
@@ -711,6 +819,7 @@
     const generatedAt = cleanText(options.generatedAt);
     const digest = getRuntimePreloadBudgetDigest(report);
     const totals = report.totals ?? {};
+    const profile = report.performanceProfile ?? {};
     const phaseRows = toArray(report.phaseList).map((phase) => [
       phase.label,
       phase.count,
@@ -758,8 +867,9 @@
       "## 总览",
       "",
       buildMarkdownTable(
-        ["预热素材", "首屏+早期体积", "总预热体积", "缺文件", "缺体积记录", "提醒数"],
+        ["性能档位", "预热素材", "首屏+早期体积", "总预热体积", "缺文件", "缺体积记录", "提醒数"],
         [[
+          profile.label ?? report.budgets?.performanceProfileLabel ?? "标准 PC / 网页",
           totals.totalEntries ?? 0,
           totals.criticalAndEarlyLabel ?? "0 B",
           totals.totalLabel ?? "0 B",
@@ -823,6 +933,7 @@
 
   global.CanvasiaEditorRuntimePreloadBudget = Object.freeze({
     DEFAULT_BUDGETS,
+    PERFORMANCE_PROFILE_DEFINITIONS,
     PHASE_DEFINITIONS,
     IMAGE_ASSET_TYPES,
     AUDIO_ASSET_TYPES,
@@ -835,6 +946,10 @@
     getEntrySceneId,
     getPreloadPhase,
     getPhasePriority,
+    getSafePerformanceProfileKey,
+    getPerformanceProfileDefinition,
+    getRuntimePreloadPerformanceProfile,
+    resolveRuntimePreloadBudgets,
     getCharacterSpriteAssetId,
     normalizeAssetSizeBytes,
     formatBytes,

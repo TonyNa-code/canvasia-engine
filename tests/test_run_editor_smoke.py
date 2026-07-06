@@ -340,7 +340,9 @@ class RunEditorSmokeTests(unittest.TestCase):
             with urlopen(static_url) as response:
                 self.assertEqual(response.status, 200)
                 etag = response.headers.get("ETag")
+                last_modified = response.headers.get("Last-Modified")
                 self.assertTrue(etag)
+                self.assertTrue(last_modified)
                 self.assertEqual(response.headers.get("Cache-Control"), "private, max-age=0, must-revalidate")
                 self.assertGreater(len(response.read()), 0)
 
@@ -349,6 +351,28 @@ class RunEditorSmokeTests(unittest.TestCase):
             self.assertEqual(error_context.exception.code, 304)
             self.assertEqual(error_context.exception.headers.get("ETag"), etag)
             self.assertEqual(error_context.exception.headers.get("Cache-Control"), "private, max-age=0, must-revalidate")
+            self.assertEqual(error_context.exception.headers.get("Last-Modified"), last_modified)
+
+            with self.assertRaises(HTTPError) as error_context:
+                urlopen(Request(static_url, headers={"If-Modified-Since": last_modified or ""}))
+            self.assertEqual(error_context.exception.code, 304)
+            self.assertEqual(error_context.exception.headers.get("ETag"), etag)
+            self.assertEqual(error_context.exception.headers.get("Cache-Control"), "private, max-age=0, must-revalidate")
+            self.assertEqual(error_context.exception.headers.get("Last-Modified"), last_modified)
+
+            with urlopen(
+                Request(
+                    static_url,
+                    headers={
+                        "If-None-Match": '"different-version"',
+                        "If-Modified-Since": last_modified or "",
+                    },
+                )
+            ) as response:
+                self.assertEqual(response.status, 200)
+                self.assertEqual(response.headers.get("ETag"), etag)
+                self.assertEqual(response.headers.get("Cache-Control"), "private, max-age=0, must-revalidate")
+                self.assertGreater(len(response.read()), 0)
 
             with urlopen(f"http://127.0.0.1:{port}/api/project-data") as response:
                 self.assertEqual(response.status, 200)

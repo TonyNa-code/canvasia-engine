@@ -143,6 +143,7 @@ class FrontendProjectSettingsModuleTests(unittest.TestCase):
               resolution: {{ width: "1920", height: "bad" }},
               runtimeSettings: {{
                 formalSaveSlotCount: "999",
+                performanceProfile: "bad-profile",
                 defaultTextSpeed: "instant",
                 defaultDialogTheme: "paper",
                 defaultUiThemeMode: "dark",
@@ -313,6 +314,7 @@ class FrontendProjectSettingsModuleTests(unittest.TestCase):
             payload["runtimeConfig"],
             {
                 "formalSaveSlotCount": 120,
+                "performanceProfile": "standard",
                 "defaultTextSpeed": "instant",
                 "defaultDialogTheme": "paper",
                 "defaultUiThemeMode": "dark",

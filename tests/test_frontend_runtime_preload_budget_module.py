@@ -28,6 +28,7 @@ class FrontendRuntimePreloadBudgetModuleTests(unittest.TestCase):
                 title: "心跳时差",
                 entrySceneId: "scene_opening",
                 chapterOrder: ["chapter_01"],
+                runtimeSettings: {{ performanceProfile: "mobile_low" }},
               }},
               assetList: [
                 {{ id: "bg_start", type: "background", name: "教室清晨", fileExists: true, fileSizeBytes: 24 * mb, path: "bg/start.png" }},
@@ -88,6 +89,8 @@ class FrontendRuntimePreloadBudgetModuleTests(unittest.TestCase):
             const csv = tools.buildRuntimePreloadBudgetCsv(report);
             console.log(JSON.stringify({{
               releaseRiskLevel: report.releaseRiskLevel,
+              performanceProfile: report.performanceProfile,
+              performanceBudgetLabel: report.budgets.performanceProfileLabel,
               warningCodes: report.warnings.map((warning) => warning.code),
               criticalBytes: report.phases.critical.bytes,
               criticalCount: report.phases.critical.count,
@@ -97,6 +100,7 @@ class FrontendRuntimePreloadBudgetModuleTests(unittest.TestCase):
               digest,
               markdownHasSections: [
                 markdown.includes("# 心跳时差 Runtime 首屏加载预算"),
+                markdown.includes("低配 / 移动端"),
                 markdown.includes("## 阶段预算"),
                 markdown.includes("开场 OP"),
               ],
@@ -109,6 +113,8 @@ class FrontendRuntimePreloadBudgetModuleTests(unittest.TestCase):
                 tools.getPreloadPhase(0, 12, "scene_opening", "scene_opening"),
                 tools.getPreloadPhase(0, 13, "scene_opening", "scene_opening"),
                 tools.getPreloadPhase(3, 0, "later", "scene_opening"),
+                tools.getRuntimePreloadPerformanceProfile(data),
+                tools.getSafePerformanceProfileKey("bad-profile"),
                 tools.formatBytes(1536),
                 tools.normalizeAssetSizeBytes({{ size: "1.5 MB" }}),
               ],
@@ -124,6 +130,8 @@ class FrontendRuntimePreloadBudgetModuleTests(unittest.TestCase):
         payload = json.loads(result.stdout)
 
         self.assertEqual(payload["releaseRiskLevel"], "danger")
+        self.assertEqual(payload["performanceProfile"]["key"], "mobile_low")
+        self.assertEqual(payload["performanceBudgetLabel"], "低配 / 移动端")
         self.assertIn("critical_over_budget", payload["warningCodes"])
         self.assertIn("critical_missing_assets", payload["warningCodes"])
         self.assertIn("single_asset_over_budget", payload["warningCodes"])
@@ -137,7 +145,7 @@ class FrontendRuntimePreloadBudgetModuleTests(unittest.TestCase):
         self.assertEqual(payload["digest"]["title"], "首屏压力偏高")
         self.assertTrue(all(payload["markdownHasSections"]))
         self.assertTrue(all(payload["csvHasRows"]))
-        self.assertEqual(payload["helperValues"], ["critical", "early", "deferred", "1.5 KB", 1572864])
+        self.assertEqual(payload["helperValues"], ["critical", "early", "deferred", "mobile_low", "standard", "1.5 KB", 1572864])
 
 
 if __name__ == "__main__":

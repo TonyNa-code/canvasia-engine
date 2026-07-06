@@ -33,10 +33,17 @@
     light: "浅色模式",
     dark: "深色模式",
   });
+  const DEFAULT_RUNTIME_PERFORMANCE_PROFILE_LABELS = Object.freeze({
+    standard: "标准 PC / 网页",
+    web: "网页轻量",
+    mobile_low: "低配 / 移动端",
+    high_quality_pc: "高画质 PC",
+  });
   const DEFAULT_RUNTIME_SETTINGS =
     runtimeSettingsTools?.DEFAULT_RUNTIME_SETTINGS ??
     Object.freeze({
       formalSaveSlotCount: 24,
+      performanceProfile: "standard",
       defaultTextSpeed: "normal",
       defaultDialogTheme: "project",
       defaultUiThemeMode: "auto",
@@ -575,6 +582,15 @@
     return getSafeLabelKey(labels, value, defaults.defaultUiThemeMode);
   }
 
+  function getSafeProjectRuntimePerformanceProfile(value, options = {}) {
+    if (runtimeSettingsTools?.getSafeProjectRuntimePerformanceProfile) {
+      return runtimeSettingsTools.getSafeProjectRuntimePerformanceProfile(value, options);
+    }
+    const labels = options.runtimePerformanceProfileLabels || DEFAULT_RUNTIME_PERFORMANCE_PROFILE_LABELS;
+    const defaults = options.defaultRuntimeSettings || DEFAULT_RUNTIME_SETTINGS;
+    return getSafeLabelKey(labels, value, defaults.performanceProfile ?? DEFAULT_RUNTIME_SETTINGS.performanceProfile);
+  }
+
   function getSafeProjectRuntimeVolume(value, fallback = 100, options = {}) {
     if (runtimeSettingsTools?.getSafeProjectRuntimeVolume) {
       return runtimeSettingsTools.getSafeProjectRuntimeVolume(value, fallback, options);
@@ -590,6 +606,7 @@
     const defaults = options.defaultRuntimeSettings || DEFAULT_RUNTIME_SETTINGS;
     return {
       formalSaveSlotCount: getSafeProjectFormalSaveSlotCount(runtimeSettings.formalSaveSlotCount, options),
+      performanceProfile: getSafeProjectRuntimePerformanceProfile(runtimeSettings.performanceProfile, options),
       defaultTextSpeed: getSafeProjectRuntimeTextSpeed(runtimeSettings.defaultTextSpeed, options),
       defaultDialogTheme: getSafeProjectRuntimeDialogTheme(runtimeSettings.defaultDialogTheme, options),
       defaultUiThemeMode: getSafeProjectRuntimeUiThemeMode(runtimeSettings.defaultUiThemeMode, options),
@@ -914,6 +931,7 @@
     getSafeProjectRuntimeTextSpeed,
     getSafeProjectRuntimeDialogTheme,
     getSafeProjectRuntimeUiThemeMode,
+    getSafeProjectRuntimePerformanceProfile,
     getSafeProjectRuntimeVolume,
     getProjectRuntimeSettings,
     getProjectFormalSaveSlotCount,

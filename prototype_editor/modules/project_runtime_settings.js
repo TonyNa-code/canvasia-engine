@@ -4,6 +4,7 @@
   const DEFAULT_SAVE_SLOT_COUNT_LIMITS = Object.freeze({ min: 3, max: 120 });
   const DEFAULT_RUNTIME_SETTINGS = Object.freeze({
     formalSaveSlotCount: 24,
+    performanceProfile: "standard",
     defaultTextSpeed: "normal",
     defaultDialogTheme: "project",
     defaultUiThemeMode: "auto",
@@ -12,6 +13,12 @@
     defaultVoiceVolume: 92,
     defaultVoiceEnabled: true,
     defaultVoiceDuckingEnabled: true,
+  });
+  const RUNTIME_PERFORMANCE_PROFILE_LABELS = Object.freeze({
+    standard: "标准 PC / 网页",
+    web: "网页轻量",
+    mobile_low: "低配 / 移动端",
+    high_quality_pc: "高画质 PC",
   });
   const TEXT_SPEED_CPS = Object.freeze({
     slow: 24,
@@ -77,6 +84,15 @@
     return getSafeKey(options.runtimeUiThemeModeLabels || RUNTIME_UI_THEME_MODES, value, defaults.defaultUiThemeMode);
   }
 
+  function getSafeProjectRuntimePerformanceProfile(value, options = {}) {
+    const defaults = getRuntimeDefaults(options);
+    return getSafeKey(
+      options.runtimePerformanceProfileLabels || RUNTIME_PERFORMANCE_PROFILE_LABELS,
+      value,
+      defaults.performanceProfile
+    );
+  }
+
   function getSafeProjectRuntimeVolume(value, fallback = 100) {
     return clamp(Math.round(getSafeNumber(value, fallback)), 0, 100);
   }
@@ -86,6 +102,7 @@
     const defaults = getRuntimeDefaults(options);
     return {
       formalSaveSlotCount: getSafeProjectFormalSaveSlotCount(runtimeSettings.formalSaveSlotCount, options),
+      performanceProfile: getSafeProjectRuntimePerformanceProfile(runtimeSettings.performanceProfile, options),
       defaultTextSpeed: getSafeProjectRuntimeTextSpeed(runtimeSettings.defaultTextSpeed, options),
       defaultDialogTheme: getSafeProjectRuntimeDialogTheme(runtimeSettings.defaultDialogTheme, options),
       defaultUiThemeMode: getSafeProjectRuntimeUiThemeMode(runtimeSettings.defaultUiThemeMode, options),
@@ -147,6 +164,7 @@
   global.CanvasiaEditorProjectRuntimeSettings = Object.freeze({
     DEFAULT_SAVE_SLOT_COUNT_LIMITS,
     DEFAULT_RUNTIME_SETTINGS,
+    RUNTIME_PERFORMANCE_PROFILE_LABELS,
     TEXT_SPEED_CPS,
     RUNTIME_DIALOG_THEMES,
     RUNTIME_UI_THEME_MODES,
@@ -154,6 +172,7 @@
     getSafeProjectRuntimeTextSpeed,
     getSafeProjectRuntimeDialogTheme,
     getSafeProjectRuntimeUiThemeMode,
+    getSafeProjectRuntimePerformanceProfile,
     getSafeProjectRuntimeVolume,
     getProjectRuntimeSettings,
     getProjectFormalSaveSlotCount,

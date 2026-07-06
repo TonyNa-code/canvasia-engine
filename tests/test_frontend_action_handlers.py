@@ -5517,6 +5517,22 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("routePlaytestBlockedCaseCount", report_panel)
         self.assertIn("导出成功后，先打开这些报告", report_panel)
 
+    def test_project_runtime_settings_surface_performance_profile_budget(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        runtime_panel = _extract_function_source(source, "renderProjectRuntimeSettingsPanel")
+        runtime_reader = _extract_function_source(source, "readProjectRuntimePlaybackDefaultsFromInputs")
+        budget_report = _extract_function_source(source, "buildRuntimePreloadBudgetReport")
+
+        self.assertIn("RUNTIME_PERFORMANCE_PROFILE_LABELS", source)
+        self.assertIn("runtimePerformanceProfileLabels", source)
+        self.assertIn('id="projectRuntimePerformanceProfileSelect"', runtime_panel)
+        self.assertIn("性能目标", runtime_panel)
+        self.assertIn("runtimeSettings.performanceProfile", runtime_panel)
+        self.assertIn("projectRuntimePerformanceProfileSelect", runtime_reader)
+        self.assertIn("performanceProfile", runtime_reader)
+        self.assertIn("getProjectRuntimeSettings(data?.project)", budget_report)
+        self.assertIn("performanceProfile: runtimeSettings.performanceProfile", budget_report)
+
     def test_native_export_surface_links_vn_baseline_quality_reports(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
 

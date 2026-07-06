@@ -338,6 +338,14 @@ const getDialogThemeLabel = visualEffectTools.getDialogThemeLabel;
 
 const PROJECT_SAVE_SLOT_COUNT_LIMITS = projectRuntimeSettingsTools.DEFAULT_SAVE_SLOT_COUNT_LIMITS;
 const DEFAULT_PROJECT_RUNTIME_SETTINGS = projectRuntimeSettingsTools.DEFAULT_RUNTIME_SETTINGS;
+const RUNTIME_PERFORMANCE_PROFILE_LABELS =
+  projectRuntimeSettingsTools.RUNTIME_PERFORMANCE_PROFILE_LABELS ??
+  Object.fromEntries(
+    Object.entries(runtimePreloadBudgetTools.PERFORMANCE_PROFILE_DEFINITIONS ?? {}).map(([key, profile]) => [
+      key,
+      profile.label ?? key,
+    ])
+  );
 
 const UI_THEME_MODE_LABELS = uiThemeTools?.UI_THEME_MODE_LABELS ?? {
   auto: "自动切换",
@@ -354,6 +362,7 @@ const PROJECT_SETTINGS_OPTIONS = Object.freeze({
   runtimeTextSpeedLabels: TEXT_SPEED_LABELS,
   runtimeDialogThemeLabels: DIALOG_THEME_LABELS,
   runtimeUiThemeModeLabels: UI_THEME_MODE_LABELS,
+  runtimePerformanceProfileLabels: RUNTIME_PERFORMANCE_PROFILE_LABELS,
   dialogBoxPresetLabels: PROJECT_DIALOG_BOX_PRESET_LABELS,
   dialogBoxShapeLabels: PROJECT_DIALOG_BOX_SHAPE_LABELS,
   dialogBoxAnchorLabels: PROJECT_DIALOG_BOX_ANCHOR_LABELS,
@@ -30778,7 +30787,10 @@ function exportAssetFootprintCsv() {
 }
 
 function buildRuntimePreloadBudgetReport(data = state.data) {
-  return runtimePreloadBudgetTools.buildRuntimePreloadBudgetReport(data ?? {});
+  const runtimeSettings = getProjectRuntimeSettings(data?.project);
+  return runtimePreloadBudgetTools.buildRuntimePreloadBudgetReport(data ?? {}, {
+    performanceProfile: runtimeSettings.performanceProfile,
+  });
 }
 
 function exportRuntimePreloadBudgetMarkdown() {
@@ -39795,6 +39807,17 @@ function renderProjectRuntimeSettingsPanel() {
                   .join("")}
               </select>
             </label>
+            <label class="playback-setting">
+              <span>性能目标</span>
+              <select id="projectRuntimePerformanceProfileSelect">
+                ${Object.entries(RUNTIME_PERFORMANCE_PROFILE_LABELS)
+                  .map(
+                    ([profile, label]) =>
+                      `<option value="${profile}" ${runtimeSettings.performanceProfile === profile ? "selected" : ""}>${escapeHtml(label)}</option>`
+                  )
+                  .join("")}
+              </select>
+            </label>
             <label class="toolbar-button playback-setting-inline">
               <input
                 id="projectRuntimeDefaultVoiceEnabledInput"
@@ -39836,7 +39859,9 @@ function renderProjectRuntimeSettingsPanel() {
           </div>
           <div class="detail-meta">当前默认：${escapeHtml(TEXT_SPEED_LABELS[runtimeSettings.defaultTextSpeed] ?? runtimeSettings.defaultTextSpeed)} · ${escapeHtml(
             DIALOG_THEME_LABELS[runtimeSettings.defaultDialogTheme] ?? runtimeSettings.defaultDialogTheme
-          )} · ${escapeHtml(UI_THEME_MODE_LABELS[runtimeSettings.defaultUiThemeMode] ?? runtimeSettings.defaultUiThemeMode)} · BGM ${runtimeSettings.defaultBgmVolume}% / 音效 ${runtimeSettings.defaultSfxVolume}% / 语音 ${runtimeSettings.defaultVoiceVolume}% · 语音焦点${runtimeSettings.defaultVoiceDuckingEnabled ? "开" : "关"}</div>
+          )} · ${escapeHtml(UI_THEME_MODE_LABELS[runtimeSettings.defaultUiThemeMode] ?? runtimeSettings.defaultUiThemeMode)} · ${escapeHtml(
+            RUNTIME_PERFORMANCE_PROFILE_LABELS[runtimeSettings.performanceProfile] ?? runtimeSettings.performanceProfile
+          )} · BGM ${runtimeSettings.defaultBgmVolume}% / 音效 ${runtimeSettings.defaultSfxVolume}% / 语音 ${runtimeSettings.defaultVoiceVolume}% · 语音焦点${runtimeSettings.defaultVoiceDuckingEnabled ? "开" : "关"}</div>
         </section>
         <div id="projectVariableLibraryPanelHost">
           ${renderProjectVariableLibraryPanel()}
@@ -40467,6 +40492,7 @@ function readProjectRuntimePlaybackDefaultsFromInputs() {
       defaultTextSpeed: document.getElementById("projectRuntimeDefaultTextSpeedSelect")?.value,
       defaultDialogTheme: document.getElementById("projectRuntimeDefaultDialogThemeSelect")?.value,
       defaultUiThemeMode: document.getElementById("projectRuntimeDefaultUiThemeModeSelect")?.value,
+      performanceProfile: document.getElementById("projectRuntimePerformanceProfileSelect")?.value,
       defaultBgmVolume: document.getElementById("projectRuntimeDefaultBgmVolumeInput")?.value,
       defaultSfxVolume: document.getElementById("projectRuntimeDefaultSfxVolumeInput")?.value,
       defaultVoiceVolume: document.getElementById("projectRuntimeDefaultVoiceVolumeInput")?.value,
