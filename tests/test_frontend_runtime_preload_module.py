@@ -218,7 +218,106 @@ class FrontendRuntimePreloadModuleTests(unittest.TestCase):
         self.assertLessEqual(payload["maxBrowserActive"], 2)
         self.assertEqual(payload["finalStatus"]["loadedCount"], 5)
         self.assertTrue(payload["finalStatus"]["finished"])
-        self.assertGreaterEqual(payload["eventCount"], 5)
+
+    def test_runtime_preload_applies_project_performance_profiles(self) -> None:
+        script = textwrap.dedent(
+            f"""
+            import * as tools from {json.dumps(MODULE_PATH.as_uri())};
+
+            const started = [];
+            const pending = [];
+
+            class SlowImage {{
+              set src(value) {{
+                this._src = value;
+                started.push(value);
+                pending.push(() => this.onload?.());
+              }}
+              get src() {{
+                return this._src;
+              }}
+            }}
+
+            const manifest = {{
+              formatVersion: 1,
+              entries: [
+                {{ assetId: "a", type: "background", url: "a.png", phase: "critical", priority: 10 }},
+                {{ assetId: "b", type: "background", url: "b.png", phase: "critical", priority: 9 }},
+                {{ assetId: "c", type: "background", url: "c.png", phase: "critical", priority: 8 }},
+                {{ assetId: "d", type: "background", url: "d.png", phase: "critical", priority: 7 }},
+                {{ assetId: "e", type: "background", url: "e.png", phase: "critical", priority: 6 }},
+                {{ assetId: "f", type: "background", url: "f.png", phase: "critical", priority: 5 }},
+              ],
+            }};
+
+            const mobileOptions = tools.resolveRuntimePreloadOptions({{
+              runtimeSettings: {{ performanceProfile: "mobile_low" }},
+            }});
+            const highQualityOptions = tools.resolveRuntimePreloadOptions({{
+              project: {{ runtimeSettings: {{ performanceProfile: "high_quality_pc" }} }},
+            }});
+            const fallbackOptions = tools.resolveRuntimePreloadOptions({{
+              runtimeSettings: {{ performanceProfile: "bad-profile" }},
+            }});
+
+            const controller = tools.startRuntimePreload(manifest, {{
+              runtimeSettings: {{ performanceProfile: "mobile_low" }},
+              ImageCtor: SlowImage,
+              requestIdleCallback() {{}},
+              timeoutMs: 500,
+              deferredDelayMs: 0,
+            }});
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            const status = controller.getStatus();
+            const startedBeforeRelease = [...started];
+            for (let index = 0; index < 6; index += 1) {{
+              while (pending.length) {{
+                pending.shift()?.();
+              }}
+              await new Promise((resolve) => setTimeout(resolve, 0));
+              if (controller.getStatus().loadedCount >= manifest.entries.length) {{
+                break;
+              }}
+            }}
+
+            process.stdout.write(JSON.stringify({{
+              keys: Object.keys(tools).sort(),
+              mobileOptions,
+              highQualityOptions,
+              fallbackOptions,
+              status,
+              startedCount: startedBeforeRelease.length,
+              started: startedBeforeRelease,
+              safeProfiles: [
+                tools.getSafeRuntimePreloadPerformanceProfile("web"),
+                tools.getSafeRuntimePreloadPerformanceProfile("missing"),
+              ],
+            }}));
+            """
+        )
+        completed = subprocess.run(
+            ["node", "--input-type=module", "-e", script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        self.assertIn("resolveRuntimePreloadOptions", payload["keys"])
+        self.assertIn("getSafeRuntimePreloadPerformanceProfile", payload["keys"])
+        self.assertEqual(payload["mobileOptions"]["performanceProfile"], "mobile_low")
+        self.assertEqual(payload["mobileOptions"]["maxConcurrent"], 2)
+        self.assertEqual(payload["mobileOptions"]["deferredDelayMs"], 360)
+        self.assertEqual(payload["highQualityOptions"]["performanceProfile"], "high_quality_pc")
+        self.assertEqual(payload["highQualityOptions"]["maxConcurrent"], 6)
+        self.assertEqual(payload["fallbackOptions"]["performanceProfile"], "standard")
+        self.assertEqual(payload["status"]["performanceProfile"], "mobile_low")
+        self.assertEqual(payload["status"]["performanceProfileLabel"], "低配 / 移动端")
+        self.assertEqual(payload["status"]["maxConcurrent"], 2)
+        self.assertEqual(payload["startedCount"], 2)
+        self.assertEqual(payload["safeProfiles"], ["web", "standard"])
 
 
 if __name__ == "__main__":

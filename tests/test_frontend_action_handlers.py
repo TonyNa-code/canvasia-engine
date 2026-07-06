@@ -3272,6 +3272,8 @@ class FrontendActionHandlerTests(unittest.TestCase):
 
         self.assertIn("formatRuntimePreloadSize(summary)", status_text)
         self.assertIn("formatRuntimePreloadSize(summary)", meta_text)
+        self.assertIn("performanceProfileLabel", status_text)
+        self.assertIn("档位", status_text)
         self.assertIn("首屏体积", size_formatter)
         self.assertIn("预热合计", size_formatter)
         self.assertIn("criticalSizeBytes", size_formatter)
@@ -5880,6 +5882,7 @@ class FrontendActionHandlerTests(unittest.TestCase):
         module_playback_defaults = _extract_function_source(runtime_settings_source, "buildProjectPlaybackDefaults")
         project_playback_defaults = _extract_function_source(player_source, "getProjectPlaybackDefaults")
         project_formal_save_slots = _extract_function_source(player_source, "getProjectFormalSaveSlotCount")
+        runtime_asset_preload = _extract_function_source(player_source, "startRuntimeAssetPreload")
         load_playback_settings = _extract_function_source(player_source, "loadStoredPlaybackSettings")
         reset_playback_settings = _extract_function_source(player_source, "resetPlaybackSettings")
         render_playback_controls = _extract_function_source(player_source, "renderPlaybackControls")
@@ -5891,6 +5894,7 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("export function getRuntimeMusicTargetVolume", runtime_audio_source)
         self.assertIn("export function getRuntimeSfxTargetVolume", runtime_audio_source)
         self.assertIn("export function getRuntimeVoiceTargetVolume", runtime_audio_source)
+        self.assertIn("performanceProfile", project_runtime_settings)
         for key in (
             "defaultTextSpeed",
             "defaultDialogTheme",
@@ -5904,6 +5908,9 @@ class FrontendActionHandlerTests(unittest.TestCase):
             self.assertIn(key, project_runtime_settings)
             self.assertIn(key, module_playback_defaults)
         self.assertIn("voiceDuckingEnabled", module_playback_defaults)
+        self.assertIn("getProjectRuntimeSettings,", player_source)
+        self.assertIn("const runtimeSettings = getProjectRuntimeSettings(data.project)", runtime_asset_preload)
+        self.assertIn("runtimeSettings,", runtime_asset_preload)
         self.assertIn("buildProjectPlaybackDefaults(project, getDefaultRuntimeLanguage()", project_playback_defaults)
         self.assertIn("getSafeLanguage: getSafeRuntimeLanguage", project_playback_defaults)
         self.assertIn("function getProjectFormalSaveSlotCount(project = data.project)", player_source)

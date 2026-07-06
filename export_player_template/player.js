@@ -20,6 +20,7 @@ import {
   UI_THEME_MODE_LABELS,
   buildProjectPlaybackDefaults,
   formatVolumePercent,
+  getProjectRuntimeSettings,
   getDialogThemeLabel,
   getProjectFormalSaveSlotCount as getProjectFormalSaveSlotCountBase,
   getSafeDialogTheme,
@@ -1732,7 +1733,9 @@ function init() {
 function startRuntimeAssetPreload() {
   state.runtimePreload?.stop?.();
   state.runtimePreloadStatus = null;
+  const runtimeSettings = getProjectRuntimeSettings(data.project);
   state.runtimePreload = startRuntimePreload(data.buildInfo.runtimePreloadManifest, {
+    runtimeSettings,
     onProgress: (status) => {
       state.runtimePreloadStatus = status;
       renderStartSummary();
@@ -1846,9 +1849,11 @@ function getRuntimePreloadStatusText() {
   const failedCount = status?.failedCount ?? 0;
   const failureText = failedCount > 0 ? ` · ${failedCount} 个稍后重试` : "";
   const sizeText = formatRuntimePreloadSize(summary);
+  const profileText = status?.performanceProfileLabel ? `档位 ${status.performanceProfileLabel}` : "";
   return [
     `首屏 ${summary.criticalCount} 个`,
     `全局 ${summary.totalCount} 个`,
+    profileText,
     sizeText,
     `图片 ${summary.imageCount}`,
     `音频 ${summary.audioCount}`,

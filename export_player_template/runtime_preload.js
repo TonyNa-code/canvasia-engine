@@ -2,6 +2,45 @@ const IMAGE_TYPES = new Set(["background", "sprite", "cg", "ui"]);
 const AUDIO_TYPES = new Set(["bgm", "sfx", "voice"]);
 const VIDEO_TYPES = new Set(["video"]);
 
+export const RUNTIME_PRELOAD_PERFORMANCE_PROFILES = Object.freeze({
+  standard: Object.freeze({
+    key: "standard",
+    label: "标准 PC / 网页",
+    maxConcurrent: 4,
+    timeoutMs: 12000,
+    idleTimeoutMs: 1800,
+    fallbackDelayMs: 120,
+    deferredDelayMs: 0,
+  }),
+  web: Object.freeze({
+    key: "web",
+    label: "网页轻量",
+    maxConcurrent: 3,
+    timeoutMs: 10000,
+    idleTimeoutMs: 2200,
+    fallbackDelayMs: 180,
+    deferredDelayMs: 120,
+  }),
+  mobile_low: Object.freeze({
+    key: "mobile_low",
+    label: "低配 / 移动端",
+    maxConcurrent: 2,
+    timeoutMs: 9000,
+    idleTimeoutMs: 2800,
+    fallbackDelayMs: 260,
+    deferredDelayMs: 360,
+  }),
+  high_quality_pc: Object.freeze({
+    key: "high_quality_pc",
+    label: "高画质 PC",
+    maxConcurrent: 6,
+    timeoutMs: 15000,
+    idleTimeoutMs: 1200,
+    fallbackDelayMs: 80,
+    deferredDelayMs: 0,
+  }),
+});
+
 function toArray(value) {
   return Array.isArray(value) ? value : [];
 }
@@ -17,6 +56,47 @@ function normalizeSizeBytes(value) {
 
 function normalizePreloadPhase(value) {
   return ["critical", "early", "deferred", "library"].includes(value) ? value : "deferred";
+}
+
+export function getSafeRuntimePreloadPerformanceProfile(value, fallback = "standard") {
+  const key = safeText(value || fallback).toLowerCase();
+  return Object.hasOwn(RUNTIME_PRELOAD_PERFORMANCE_PROFILES, key) ? key : fallback;
+}
+
+export function getRuntimePreloadPerformanceProfileDefinition(value) {
+  return RUNTIME_PRELOAD_PERFORMANCE_PROFILES[getSafeRuntimePreloadPerformanceProfile(value)];
+}
+
+function pickRuntimePreloadPerformanceProfile(options = {}) {
+  return getSafeRuntimePreloadPerformanceProfile(
+    options.performanceProfile ??
+      options.runtimeSettings?.performanceProfile ??
+      options.project?.runtimeSettings?.performanceProfile ??
+      options.project?.performanceProfile
+  );
+}
+
+function clampOption(value, fallback, minimum, maximum) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return fallback;
+  }
+  return Math.max(minimum, Math.min(maximum, Math.floor(numeric)));
+}
+
+export function resolveRuntimePreloadOptions(options = {}) {
+  const profileKey = pickRuntimePreloadPerformanceProfile(options);
+  const profile = getRuntimePreloadPerformanceProfileDefinition(profileKey);
+  return {
+    ...options,
+    performanceProfile: profile.key,
+    performanceProfileLabel: profile.label,
+    maxConcurrent: clampOption(options.maxConcurrent, profile.maxConcurrent, 1, 8),
+    timeoutMs: clampOption(options.timeoutMs, profile.timeoutMs, 2500, 60000),
+    idleTimeoutMs: clampOption(options.idleTimeoutMs, profile.idleTimeoutMs, 250, 10000),
+    fallbackDelayMs: clampOption(options.fallbackDelayMs, profile.fallbackDelayMs, 0, 5000),
+    deferredDelayMs: clampOption(options.deferredDelayMs, profile.deferredDelayMs, 0, 10000),
+  };
 }
 
 function normalizePreloadEntry(entry, index = 0) {
@@ -215,17 +295,30 @@ function preloadEntry(entry, options) {
   return Promise.resolve(false);
 }
 
-function scheduleIdle(callback, idleScheduler = globalThis.requestIdleCallback) {
-  if (typeof idleScheduler === "function") {
-    idleScheduler(callback, { timeout: 1800 });
+function scheduleIdle(callback, idleScheduler = globalThis.requestIdleCallback, options = {}) {
+  const runIdle = () => {
+    if (typeof idleScheduler === "function") {
+      idleScheduler(callback, { timeout: options.idleTimeoutMs ?? 1800 });
+      return;
+    }
+    globalThis.setTimeout(callback, options.fallbackDelayMs ?? 120);
+  };
+  const deferredDelayMs = Number(options.deferredDelayMs);
+  if (Number.isFinite(deferredDelayMs) && deferredDelayMs > 0) {
+    globalThis.setTimeout(runIdle, deferredDelayMs);
     return;
   }
-  globalThis.setTimeout(callback, 120);
+  if (typeof idleScheduler === "function") {
+    idleScheduler(callback, { timeout: options.idleTimeoutMs ?? 1800 });
+    return;
+  }
+  globalThis.setTimeout(callback, options.fallbackDelayMs ?? 120);
 }
 
 export function startRuntimePreload(manifest, options = {}) {
   const normalized = normalizeRuntimePreloadManifest(manifest);
-  const maxConcurrent = Math.max(1, Math.min(8, Math.floor(Number(options.maxConcurrent)) || 4));
+  const resolvedOptions = resolveRuntimePreloadOptions(options);
+  const maxConcurrent = resolvedOptions.maxConcurrent;
   const status = {
     totalCount: normalized.entries.length,
     queuedCount: normalized.entries.length,
@@ -235,17 +328,19 @@ export function startRuntimePreload(manifest, options = {}) {
     activeCount: 0,
     waitingCount: normalized.entries.length,
     maxConcurrent,
+    performanceProfile: resolvedOptions.performanceProfile,
+    performanceProfileLabel: resolvedOptions.performanceProfileLabel,
     started: normalized.entries.length > 0,
     finished: normalized.entries.length === 0,
   };
   const safeOptions = {
-    timeoutMs: Number.isFinite(Number(options.timeoutMs)) ? Number(options.timeoutMs) : 12000,
-    baseUrl: options.baseUrl,
-    ImageCtor: options.ImageCtor,
-    AudioCtor: options.AudioCtor,
-    documentRef: options.documentRef,
+    timeoutMs: resolvedOptions.timeoutMs,
+    baseUrl: resolvedOptions.baseUrl,
+    ImageCtor: resolvedOptions.ImageCtor,
+    AudioCtor: resolvedOptions.AudioCtor,
+    documentRef: resolvedOptions.documentRef,
   };
-  const onProgress = typeof options.onProgress === "function" ? options.onProgress : null;
+  const onProgress = typeof resolvedOptions.onProgress === "function" ? resolvedOptions.onProgress : null;
   let stopped = false;
   let deferredReady = false;
 
@@ -304,7 +399,7 @@ export function startRuntimePreload(manifest, options = {}) {
       deferredReady = true;
       pumpQueue();
     }
-  }, options.requestIdleCallback);
+  }, resolvedOptions.requestIdleCallback, resolvedOptions);
 
   return {
     stop() {

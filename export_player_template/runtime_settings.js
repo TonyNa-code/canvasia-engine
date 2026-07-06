@@ -35,6 +35,14 @@ export const PLAYBACK_DEFAULTS = Object.freeze({
 
 const DEFAULT_PROJECT_RUNTIME_SETTINGS = Object.freeze({
   formalSaveSlotCount: 24,
+  performanceProfile: "standard",
+});
+
+export const RUNTIME_PERFORMANCE_PROFILE_LABELS = Object.freeze({
+  standard: "标准 PC / 网页",
+  web: "网页轻量",
+  mobile_low: "低配 / 移动端",
+  high_quality_pc: "高画质 PC",
 });
 
 function clamp(value, min, max) {
@@ -105,10 +113,16 @@ export function getSafeProjectFormalSaveSlotCount(value) {
   );
 }
 
+export function getSafeProjectRuntimePerformanceProfile(value) {
+  const key = String(value ?? DEFAULT_PROJECT_RUNTIME_SETTINGS.performanceProfile).trim().toLowerCase();
+  return Object.hasOwn(RUNTIME_PERFORMANCE_PROFILE_LABELS, key) ? key : DEFAULT_PROJECT_RUNTIME_SETTINGS.performanceProfile;
+}
+
 export function getProjectRuntimeSettings(project = {}) {
   const runtimeSettings = project?.runtimeSettings ?? {};
   return {
     formalSaveSlotCount: getSafeProjectFormalSaveSlotCount(runtimeSettings.formalSaveSlotCount),
+    performanceProfile: getSafeProjectRuntimePerformanceProfile(runtimeSettings.performanceProfile),
     defaultTextSpeed: getSafeTextSpeed(runtimeSettings.defaultTextSpeed ?? PLAYBACK_DEFAULTS.textSpeed),
     defaultDialogTheme: getSafeDialogTheme(runtimeSettings.defaultDialogTheme ?? PLAYBACK_DEFAULTS.dialogTheme),
     defaultUiThemeMode: getSafeUiThemeMode(runtimeSettings.defaultUiThemeMode ?? PLAYBACK_DEFAULTS.uiThemeMode),
