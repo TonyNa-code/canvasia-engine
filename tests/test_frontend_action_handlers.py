@@ -5916,6 +5916,7 @@ class FrontendActionHandlerTests(unittest.TestCase):
 
         self.assertIn('from "./runtime_settings.js"', player_source)
         self.assertIn('from "./runtime_audio.js"', player_source)
+        self.assertIn('from "./runtime_scene_prefetch.js"', player_source)
         self.assertIn("sanitizePlaybackSettings as sanitizePlaybackSettingsBase", player_source)
         self.assertIn("export function getRuntimeMusicTargetVolume", runtime_audio_source)
         self.assertIn("export function getRuntimeSfxTargetVolume", runtime_audio_source)

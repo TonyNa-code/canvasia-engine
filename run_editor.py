@@ -158,6 +158,7 @@ EXPORT_PLAYER_SCRIPT_FILES = (
     "runtime_settings.js",
     "runtime_audio.js",
     "runtime_preload.js",
+    "runtime_scene_prefetch.js",
 )
 NATIVE_RUNTIME_TEMPLATE_DIR = ROOT_DIR / "native_runtime"
 EXPORT_RUNTIME_CACHE_DIR = ROOT_DIR / ".export_runtime_cache"
@@ -11164,6 +11165,7 @@ def export_web_build() -> dict:
             "playerRuntimeSettings": "runtime_settings.js",
             "playerRuntimeAudio": "runtime_audio.js",
             "playerRuntimePreload": "runtime_preload.js",
+            "playerRuntimeScenePrefetch": "runtime_scene_prefetch.js",
             "runtimePreloadManifest": RUNTIME_PRELOAD_MANIFEST_FILE_NAME,
             "runtimePreloadReport": RUNTIME_PRELOAD_REPORT_FILE_NAME,
             "playtestGuide": EXPORT_PLAYTEST_GUIDE_FILE_NAME,
@@ -12309,6 +12311,7 @@ def export_windows_nwjs_build() -> dict:
             "appRuntimeSettings": "app/runtime_settings.js",
             "appRuntimeAudio": "app/runtime_audio.js",
             "appRuntimePreload": "app/runtime_preload.js",
+            "appRuntimeScenePrefetch": "app/runtime_scene_prefetch.js",
             "appRuntimePreloadManifest": f"app/{RUNTIME_PRELOAD_MANIFEST_FILE_NAME}",
             "appRuntimePreloadReport": f"app/{RUNTIME_PRELOAD_REPORT_FILE_NAME}",
             "playtestGuide": EXPORT_PLAYTEST_GUIDE_FILE_NAME,
@@ -12788,6 +12791,7 @@ def export_macos_nwjs_build() -> dict:
             "appRuntimeSettings": "app/runtime_settings.js",
             "appRuntimeAudio": "app/runtime_audio.js",
             "appRuntimePreload": "app/runtime_preload.js",
+            "appRuntimeScenePrefetch": "app/runtime_scene_prefetch.js",
             "appRuntimePreloadManifest": f"app/{RUNTIME_PRELOAD_MANIFEST_FILE_NAME}",
             "appRuntimePreloadReport": f"app/{RUNTIME_PRELOAD_REPORT_FILE_NAME}",
             "playtestGuide": EXPORT_PLAYTEST_GUIDE_FILE_NAME,
@@ -13274,6 +13278,7 @@ def export_linux_nwjs_build() -> dict:
             "appRuntimeSettings": "app/runtime_settings.js",
             "appRuntimeAudio": "app/runtime_audio.js",
             "appRuntimePreload": "app/runtime_preload.js",
+            "appRuntimeScenePrefetch": "app/runtime_scene_prefetch.js",
             "appRuntimePreloadManifest": f"app/{RUNTIME_PRELOAD_MANIFEST_FILE_NAME}",
             "appRuntimePreloadReport": f"app/{RUNTIME_PRELOAD_REPORT_FILE_NAME}",
             "playtestGuide": EXPORT_PLAYTEST_GUIDE_FILE_NAME,

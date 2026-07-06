@@ -14,6 +14,9 @@ import {
   startRuntimePreload,
 } from "./runtime_preload.js";
 import {
+  buildRuntimeScenePrefetchManifest,
+} from "./runtime_scene_prefetch.js";
+import {
   DIALOG_THEME_LABELS,
   PLAYBACK_DEFAULTS,
   TEXT_SPEED_LABELS,
@@ -363,6 +366,10 @@ const state = {
   lastVoiceReplayStepKey: null,
   runtimePreload: null,
   runtimePreloadStatus: null,
+  runtimeScenePrefetch: null,
+  runtimeScenePrefetchKey: "",
+  runtimeScenePrefetchStatus: null,
+  runtimeScenePrefetchedAssetIds: new Set(),
 };
 
 const activeSfxAudios = new Set();
@@ -1745,6 +1752,73 @@ function startRuntimeAssetPreload() {
   state.runtimePreloadStatus = state.runtimePreload?.getStatus?.() ?? null;
 }
 
+function resetRuntimeScenePrefetchState() {
+  state.runtimeScenePrefetch?.stop?.();
+  state.runtimeScenePrefetch = null;
+  state.runtimeScenePrefetchKey = "";
+  state.runtimeScenePrefetchStatus = null;
+  state.runtimeScenePrefetchedAssetIds = new Set();
+}
+
+function startRuntimeScenePrefetch(snapshot) {
+  if (!snapshot || snapshot.completed) {
+    return;
+  }
+
+  const runtimeSettings = getProjectRuntimeSettings(data.project);
+  const manifest = buildRuntimeScenePrefetchManifest(
+    snapshot,
+    {
+      scenesById: data.scenesById,
+      assetsById: data.assetsById,
+      charactersById: data.charactersById,
+      excludeAssetIds: state.runtimeScenePrefetchedAssetIds,
+    },
+    {
+      choiceContinueTarget: CHOICE_CONTINUE_TARGET,
+      blockLookahead: 8,
+      targetBlockLookahead: 10,
+      maxEntries: 24,
+    }
+  );
+
+  const prefetchKey = manifest.prefetchKey ?? "";
+  if (prefetchKey && prefetchKey === state.runtimeScenePrefetchKey) {
+    return;
+  }
+
+  state.runtimeScenePrefetch?.stop?.();
+  state.runtimeScenePrefetchKey = prefetchKey;
+  state.runtimeScenePrefetchStatus = null;
+
+  if (!manifest.entries.length) {
+    state.runtimeScenePrefetch = null;
+    return;
+  }
+
+  const prefetchAssetIds = manifest.entries.map((entry) => entry.assetId);
+
+  state.runtimeScenePrefetch = startRuntimePreload(manifest, {
+    runtimeSettings,
+    maxConcurrent: 1,
+    backgroundBatchSize: 1,
+    backgroundBatchDelayMs: 240,
+    phaseDelayMs: {
+      early: 120,
+      deferred: 900,
+      library: 1800,
+    },
+    onProgress: (status) => {
+      state.runtimeScenePrefetchStatus = status;
+      if (status.finished) {
+        prefetchAssetIds.forEach((assetId) => state.runtimeScenePrefetchedAssetIds.add(assetId));
+      }
+      renderBuildInfo();
+    },
+  });
+  state.runtimeScenePrefetchStatus = state.runtimeScenePrefetch?.getStatus?.() ?? null;
+}
+
 function normalizeGameData(source) {
   const project = source.project ?? {};
   const defaultLanguage = normalizeLanguageCode(
@@ -1841,7 +1915,7 @@ function collectSceneOutgoingTargets(scene) {
 function getRuntimePreloadStatusText() {
   const summary = getRuntimePreloadSummary(data.buildInfo.runtimePreloadManifest);
   if (!summary.totalCount) {
-    return "没有需要预热的素材";
+    return getRuntimeScenePrefetchStatusText() || "没有需要预热的素材";
   }
 
   const status = state.runtimePreloadStatus ?? state.runtimePreload?.getStatus?.() ?? null;
@@ -1862,7 +1936,19 @@ function getRuntimePreloadStatusText() {
     `音频 ${summary.audioCount}`,
     `视频 ${summary.videoCount}`,
     `已预热 ${loadedCount}/${summary.totalCount}${failureText}`,
+    getRuntimeScenePrefetchStatusText(),
   ].filter(Boolean).join(" · ");
+}
+
+function getRuntimeScenePrefetchStatusText() {
+  const status = state.runtimeScenePrefetchStatus ?? state.runtimeScenePrefetch?.getStatus?.() ?? null;
+  if (!status?.totalCount) {
+    return "";
+  }
+  const loadedCount = status.loadedCount ?? 0;
+  const failedCount = status.failedCount ?? 0;
+  const failureText = failedCount > 0 ? `，${failedCount} 个稍后重试` : "";
+  return `路线预取 ${loadedCount}/${status.totalCount}${failureText}`;
 }
 
 function getRuntimePreloadMetaText() {
@@ -2249,6 +2335,7 @@ function renderBeforeStart() {
   stopVoiceReplayPreview({ rerender: false });
   stopVideoPlayback();
   stopCreditsPlayback();
+  resetRuntimeScenePrefetchState();
   state.dialogHidden = false;
   state.saveDialogPage = 0;
   state.systemMenuOpen = false;
@@ -2320,6 +2407,7 @@ function startGameFromScene(sceneId = getEntrySceneId()) {
   stopVoiceReplayPreview({ rerender: false });
   stopVideoPlayback();
   stopCreditsPlayback();
+  resetRuntimeScenePrefetchState();
   state.dialogHidden = false;
   state.saveDialogOpen = false;
   state.saveDialogPage = 0;
@@ -10029,6 +10117,7 @@ function renderRuntime() {
   syncOneShotAudio(snapshot);
   syncVideoPlayback(snapshot);
   syncCreditsPlayback(snapshot);
+  startRuntimeScenePrefetch(snapshot);
   scheduleRuntimeAutoAdvance(snapshot);
 }
 
