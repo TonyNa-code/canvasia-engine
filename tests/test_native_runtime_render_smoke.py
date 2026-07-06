@@ -62,6 +62,7 @@ from native_runtime.runtime_player_settings import (
     DEFAULT_RUNTIME_PLAYER_SETTINGS,
     sanitize_runtime_player_settings,
 )
+from native_runtime.runtime_storage import sanitize_archive_progress
 
 
 UI_ASSET_IDS = [
@@ -154,6 +155,21 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
         self.assertEqual(settings["bgmVolume"], 0)
         self.assertEqual(settings["sfxVolume"], 66)
         self.assertEqual(settings["voiceVolume"], 40)
+
+    def test_native_runtime_storage_sanitizes_corrupted_archive_progress(self) -> None:
+        progress = sanitize_archive_progress(
+            {
+                "chapterReplayUnlocked": ["chapter_a", "", "chapter_a", "chapter_b"],
+                "readTextKeys": ["read_1", "read_1", None, "read_2"],
+                "endingCompletionCount": "not-a-number",
+                "endingLastCompletedAt": " 2026-04-24T00:00:00+08:00 ",
+            }
+        )
+
+        self.assertEqual(progress["chapterReplayUnlocked"], ["chapter_a", "chapter_b"])
+        self.assertEqual(progress["readTextKeys"], ["read_1", "read_2"])
+        self.assertEqual(progress["endingCompletionCount"], 0)
+        self.assertEqual(progress["endingLastCompletedAt"], "2026-04-24T00:00:00+08:00")
 
     def test_native_runtime_performance_budget_reports_missing_and_heavy_assets(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
