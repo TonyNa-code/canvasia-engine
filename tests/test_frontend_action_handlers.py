@@ -3945,6 +3945,9 @@ class FrontendActionHandlerTests(unittest.TestCase):
             function getProjectDoctorRepairCodeLabel(code) {get_code_label}
             function getProjectDoctorRepairReceiptRequestedCodes(receipt = {{}}) {get_requested_codes}
             function formatProjectDoctorRepairReceiptScope(receipt = {{}}) {format_scope}
+            function getProjectFileNameBase(fallback = "canvasia-engine") {{
+              return sanitizeFileName(state.data?.project?.title || fallback) || fallback;
+            }}
             function buildProjectDoctorRepairReceiptFileName(receipt = state.projectDoctorRepairReceipt) {build_receipt_file_name}
             function getProjectDoctorRepairReceiptWriteStatus(receipt = {{}}) {get_write_status}
             function formatProjectDoctorRepairReceiptIdStamp(value) {format_receipt_id_stamp}
@@ -4691,11 +4694,14 @@ class FrontendActionHandlerTests(unittest.TestCase):
 
         self.assertIn('data-action="copy-regression-diagnostic"', source)
         self.assertIn('data-action="copy-regression-diagnostic-bundle"', source)
+        self.assertIn('data-action="export-regression-diagnostic-bundle"', source)
         self.assertIn('data-regression-case-id="${escapeHtml', source)
         self.assertIn('action === "copy-regression-diagnostic"', click_handler)
         self.assertIn('action === "copy-regression-diagnostic-bundle"', click_handler)
+        self.assertIn('action === "export-regression-diagnostic-bundle"', click_handler)
         self.assertIn("await copyPreviewRegressionDiagnostic(actionTarget.dataset.regressionCaseId)", click_handler)
         self.assertIn("await copyPreviewRegressionDiagnosticBundle()", click_handler)
+        self.assertIn("exportPreviewRegressionDiagnosticBundle();", click_handler)
 
     def test_preview_regression_diagnostic_bundle_copy_reports_result(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
@@ -4770,6 +4776,85 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertEqual(payload["statuses"][-1]["message"], "已复制整轮回归诊断包")
         self.assertEqual(payload["copiedTexts"], ["BUNDLE:Demo:1", "BUNDLE:Demo:1"])
         self.assertEqual(payload["toasts"][-1]["message"], "回归诊断包已复制")
+
+    def test_preview_regression_diagnostic_bundle_export_reports_result(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        build_date_stamp = _extract_function_source(source, "buildFileNameDateStamp")
+        get_file_base = _extract_function_source(source, "getProjectFileNameBase")
+        build_dated_file = _extract_function_source(source, "buildDatedProjectFileName")
+        build_bundle_file = _extract_function_source(source, "buildPreviewRegressionDiagnosticBundleFileName")
+        export_bundle = _extract_function_source(source, "exportPreviewRegressionDiagnosticBundle")
+        script = textwrap.dedent(
+            f"""
+            const calls = [];
+            const statuses = [];
+            const toasts = [];
+            const state = {{
+              data: {{ project: {{ title: "Demo Game" }} }},
+              inspectionRegressionResult: null,
+            }};
+            function sanitizeFileName(value) {{
+              return String(value ?? "")
+                .trim()
+                .replace(/[\\\\/:*?"<>|]/g, "_")
+                .replace(/\\s+/g, "_")
+                .replace(/_+/g, "_")
+                .replace(/^_+|_+$/g, "");
+            }}
+            function buildPreviewRegressionDiagnosticBundleMarkdown() {{
+              return state.inspectionRegressionResult ? "# Demo regression bundle" : "";
+            }}
+            function downloadTextFile(fileName, content, mimeType) {{
+              calls.push({{ fileName, content, mimeType }});
+            }}
+            function setSaveStatus(message, isError = false) {{ statuses.push({{ message, isError }}); }}
+            function showToast(message, tone = "soft") {{ toasts.push({{ message, tone }}); }}
+            function buildFileNameDateStamp(dateValue = new Date()) {build_date_stamp}
+            function getProjectFileNameBase(fallback = "canvasia-engine") {get_file_base}
+            function buildDatedProjectFileName(slug, extension = "md") {build_dated_file}
+            function buildPreviewRegressionDiagnosticBundleFileName(extension = "md") {build_bundle_file}
+            function exportPreviewRegressionDiagnosticBundle() {export_bundle}
+
+            const missingResult = exportPreviewRegressionDiagnosticBundle();
+            state.inspectionRegressionResult = {{
+              summary: {{ total: 1, passCount: 0, warnCount: 0, failCount: 1 }},
+              cases: [{{ id: "fail", status: "fail", sceneName: "坏链" }}],
+            }};
+            const exportedResult = exportPreviewRegressionDiagnosticBundle();
+            process.stdout.write(JSON.stringify({{
+              missingResult,
+              exportedResult,
+              calls,
+              statuses,
+              toasts,
+            }}));
+            """
+        )
+        completed = subprocess.run(
+            ["node", "--input-type=module", "-e", script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        self.assertFalse(payload["missingResult"])
+        self.assertTrue(payload["exportedResult"])
+        self.assertEqual(len(payload["calls"]), 1)
+        self.assertRegex(
+            payload["calls"][0]["fileName"],
+            r"^Demo_Game_preview_regression_diagnostics_\d{8}\.md$",
+        )
+        self.assertEqual(payload["calls"][0]["content"], "# Demo regression bundle")
+        self.assertEqual(payload["calls"][0]["mimeType"], "text/markdown;charset=utf-8")
+        self.assertEqual(payload["statuses"][0]["message"], "还没有可导出的回归诊断包")
+        self.assertTrue(payload["statuses"][0]["isError"])
+        self.assertIn("已导出回归诊断包：", payload["statuses"][-1]["message"])
+        self.assertEqual(payload["toasts"][0]["message"], "先跑一次自动回归，再导出诊断包")
+        self.assertEqual(payload["toasts"][0]["tone"], "error")
+        self.assertEqual(payload["toasts"][-1]["message"], "回归诊断包已导出")
 
     def test_audio_cue_sheet_export_actions_are_wired(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")

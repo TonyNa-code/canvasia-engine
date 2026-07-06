@@ -2762,6 +2762,11 @@ async function handleClick(event) {
     return;
   }
 
+  if (action === "export-regression-diagnostic-bundle") {
+    exportPreviewRegressionDiagnosticBundle();
+    return;
+  }
+
   if (action === "reload-editor-page") {
     reloadEditorPage();
     return;
@@ -26646,6 +26651,21 @@ async function copyPreviewRegressionDiagnosticBundle() {
   return true;
 }
 
+function exportPreviewRegressionDiagnosticBundle() {
+  const markdown = buildPreviewRegressionDiagnosticBundleMarkdown();
+  if (!markdown) {
+    setSaveStatus("还没有可导出的回归诊断包", true);
+    showToast("先跑一次自动回归，再导出诊断包", "error");
+    return false;
+  }
+
+  const fileName = buildPreviewRegressionDiagnosticBundleFileName("md");
+  downloadTextFile(fileName, markdown, "text/markdown;charset=utf-8");
+  setSaveStatus(`已导出回归诊断包：${fileName}`);
+  showToast("回归诊断包已导出");
+  return true;
+}
+
 function renderPreviewRegressionPanel(routeOverview) {
   const result = state.inspectionRegressionResult;
   const focusSceneNames = (result?.seeds ?? buildPreviewRegressionSeeds(routeOverview))
@@ -26669,6 +26689,9 @@ function renderPreviewRegressionPanel(routeOverview) {
         </button>
         <button class="toolbar-button" data-action="copy-regression-diagnostic-bundle" ${result ? "" : "disabled"}>
           复制诊断包
+        </button>
+        <button class="toolbar-button" data-action="export-regression-diagnostic-bundle" ${result ? "" : "disabled"}>
+          导出诊断包
         </button>
         <button class="toolbar-button" data-action="export-playtest-handoff-markdown">
           导出测试员工单
@@ -28829,290 +28852,132 @@ function renderEndingCollectionOverviewPanel(routeOverview = buildSceneRouteOver
   `;
 }
 
-function buildInspectionReportFileName() {
-  const date = new Date();
-  const dateStamp = [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
+function buildFileNameDateStamp(dateValue = new Date()) {
+  const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
+  const safeDate = Number.isNaN(date.getTime()) ? new Date() : date;
+  return [
+    safeDate.getFullYear(),
+    String(safeDate.getMonth() + 1).padStart(2, "0"),
+    String(safeDate.getDate()).padStart(2, "0"),
   ].join("");
-  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
-  return `${title}_inspection_report_${dateStamp}.txt`;
+}
+
+function getProjectFileNameBase(fallback = "canvasia-engine") {
+  return sanitizeFileName(state.data?.project?.title || fallback) || fallback;
+}
+
+function buildDatedProjectFileName(slug, extension = "md") {
+  const safeSlug = sanitizeFileName(slug) || "export";
+  const safeExtension = String(extension ?? "md").replace(/^\.+/, "").trim() || "md";
+  return `${getProjectFileNameBase()}_${safeSlug}_${buildFileNameDateStamp()}.${safeExtension}`;
+}
+
+function buildInspectionReportFileName() {
+  return buildDatedProjectFileName("inspection_report", "txt");
 }
 
 function buildReleaseControlReportFileName() {
-  const date = new Date();
-  const dateStamp = [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
-  ].join("");
-  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
-  return `${title}_release_control_report_${dateStamp}.md`;
+  return buildDatedProjectFileName("release_control_report", "md");
 }
 
 function buildReleaseControlJsonReportFileName() {
-  const date = new Date();
-  const dateStamp = [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
-  ].join("");
-  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
-  return `${title}_release_control_report_${dateStamp}.json`;
+  return buildDatedProjectFileName("release_control_report", "json");
 }
 
 function buildRouteTestingPlanFileName(extension = "md") {
-  const date = new Date();
-  const dateStamp = [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
-  ].join("");
-  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
-  return `${title}_route_testing_plan_${dateStamp}.${extension}`;
+  return buildDatedProjectFileName("route_testing_plan", extension);
 }
 
 function buildSceneProductionBoardFileName(extension = "md") {
-  const date = new Date();
-  const dateStamp = [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
-  ].join("");
-  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
-  return `${title}_scene_production_board_${dateStamp}.${extension}`;
+  return buildDatedProjectFileName("scene_production_board", extension);
 }
 
 function buildVoiceProductionFileName(extension = "md") {
-  const date = new Date();
-  const dateStamp = [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
-  ].join("");
-  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
-  return `${title}_voice_production_sheet_${dateStamp}.${extension}`;
+  return buildDatedProjectFileName("voice_production_sheet", extension);
 }
 
 function buildScreenplayFileName(extension = "md") {
-  const date = new Date();
-  const dateStamp = [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
-  ].join("");
-  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
-  return `${title}_screenplay_${dateStamp}.${extension}`;
+  return buildDatedProjectFileName("screenplay", extension);
 }
 
 function buildRenpyDraftFileName(extension = "rpy") {
-  const date = new Date();
-  const dateStamp = [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
-  ].join("");
-  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
-  return `${title}_renpy_draft_${dateStamp}.${extension}`;
+  return buildDatedProjectFileName("renpy_draft", extension);
 }
 
 function buildDirectorCueSheetFileName(extension = "md") {
-  const date = new Date();
-  const dateStamp = [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
-  ].join("");
-  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
-  return `${title}_director_cue_sheet_${dateStamp}.${extension}`;
+  return buildDatedProjectFileName("director_cue_sheet", extension);
 }
 
 function buildChoiceConsequenceFileName(extension = "md") {
-  const date = new Date();
-  const dateStamp = [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
-  ].join("");
-  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
-  return `${title}_choice_consequence_sheet_${dateStamp}.${extension}`;
+  return buildDatedProjectFileName("choice_consequence_sheet", extension);
 }
 
 function buildVariableInfluenceFileName(extension = "md") {
-  const date = new Date();
-  const dateStamp = [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
-  ].join("");
-  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
-  return `${title}_variable_influence_sheet_${dateStamp}.${extension}`;
+  return buildDatedProjectFileName("variable_influence_sheet", extension);
 }
 
 function buildAssetDependencyFileName(extension = "md") {
-  const date = new Date();
-  const dateStamp = [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
-  ].join("");
-  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
-  return `${title}_asset_dependency_sheet_${dateStamp}.${extension}`;
+  return buildDatedProjectFileName("asset_dependency_sheet", extension);
 }
 
 function buildAssetFootprintFileName(extension = "md") {
-  const date = new Date();
-  const dateStamp = [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
-  ].join("");
-  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
-  return `${title}_asset_footprint_${dateStamp}.${extension}`;
+  return buildDatedProjectFileName("asset_footprint", extension);
 }
 
 function buildRuntimePreloadBudgetFileName(extension = "md") {
-  const date = new Date();
-  const dateStamp = [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
-  ].join("");
-  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
-  return `${title}_runtime_preload_budget_${dateStamp}.${extension}`;
+  return buildDatedProjectFileName("runtime_preload_budget", extension);
 }
 
 function buildAssetRightsFileName(extension = "md") {
-  const date = new Date();
-  const dateStamp = [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
-  ].join("");
-  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
-  return `${title}_asset_rights_sheet_${dateStamp}.${extension}`;
+  return buildDatedProjectFileName("asset_rights_sheet", extension);
 }
 
 function buildUnlockableContentManifestFileName(extension = "md") {
-  const date = new Date();
-  const dateStamp = [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
-  ].join("");
-  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
-  return `${title}_unlockable_content_manifest_${dateStamp}.${extension}`;
+  return buildDatedProjectFileName("unlockable_content_manifest", extension);
 }
 
 function buildAudioCueSheetFileName(extension = "md") {
-  const date = new Date();
-  const dateStamp = [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
-  ].join("");
-  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
-  return `${title}_audio_cue_sheet_${dateStamp}.${extension}`;
+  return buildDatedProjectFileName("audio_cue_sheet", extension);
 }
 
 function buildStageDirectionSheetFileName(extension = "md") {
-  const date = new Date();
-  const dateStamp = [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
-  ].join("");
-  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
-  return `${title}_stage_direction_sheet_${dateStamp}.${extension}`;
+  return buildDatedProjectFileName("stage_direction_sheet", extension);
 }
 
 function buildPresentationTimelineFileName(extension = "md") {
-  const date = new Date();
-  const dateStamp = [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
-  ].join("");
-  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
-  return `${title}_presentation_timeline_${dateStamp}.${extension}`;
+  return buildDatedProjectFileName("presentation_timeline", extension);
 }
 
 function buildLocalizationCoverageFileName(extension = "md") {
-  const date = new Date();
-  const dateStamp = [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
-  ].join("");
-  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
-  return `${title}_localization_coverage_${dateStamp}.${extension}`;
+  return buildDatedProjectFileName("localization_coverage", extension);
 }
 
 function buildRuntimeCapabilityFileName(extension = "md") {
-  const date = new Date();
-  const dateStamp = [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
-  ].join("");
-  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
-  return `${title}_runtime_capability_matrix_${dateStamp}.${extension}`;
+  return buildDatedProjectFileName("runtime_capability_matrix", extension);
 }
 
 function buildProductionBacklogFileName(extension = "md") {
-  const date = new Date();
-  const dateStamp = [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
-  ].join("");
-  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
-  return `${title}_production_backlog_${dateStamp}.${extension}`;
+  return buildDatedProjectFileName("production_backlog", extension);
 }
 
 function buildReleaseCandidateManifestFileName(extension = "md") {
-  const date = new Date();
-  const dateStamp = [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
-  ].join("");
-  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
-  return `${title}_release_candidate_manifest_${dateStamp}.${extension}`;
+  return buildDatedProjectFileName("release_candidate_manifest", extension);
 }
 
 function buildPlaytestHandoffFileName(extension = "md") {
-  const date = new Date();
-  const dateStamp = [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
-  ].join("");
-  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
-  return `${title}_playtest_handoff_${dateStamp}.${extension}`;
+  return buildDatedProjectFileName("playtest_handoff", extension);
 }
 
 function buildPlaytestFeedbackTemplateFileName(extension = "md") {
-  const date = new Date();
-  const dateStamp = [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
-  ].join("");
-  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
-  return `${title}_playtest_feedback_template_${dateStamp}.${extension}`;
+  return buildDatedProjectFileName("playtest_feedback_template", extension);
 }
 
 function buildPlaytestFeedbackIntakeFileName(extension = "md") {
-  const date = new Date();
-  const dateStamp = [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
-  ].join("");
-  const title = sanitizeFileName(state.data?.project?.title || "canvasia-engine");
-  return `${title}_playtest_feedback_intake_${dateStamp}.${extension}`;
+  return buildDatedProjectFileName("playtest_feedback_intake", extension);
+}
+
+function buildPreviewRegressionDiagnosticBundleFileName(extension = "md") {
+  return buildDatedProjectFileName("preview_regression_diagnostics", extension);
 }
 
 function buildProjectDoctorRepairReceiptFileName(receipt = state.projectDoctorRepairReceipt) {
