@@ -59,6 +59,22 @@ class FrontendRuntimeI18nModuleTests(unittest.TestCase):
               {{ language: "ko-KR", fallbackLanguage: "ja-JP", defaultLanguage: "en-US" }}
             );
             assertEqual("localized fallback text", localized, "こんにちは");
+            const resolved = runtimeI18n.resolveLocalizedRuntimeValue(
+              {{
+                text: "原文",
+                textTranslations: {{
+                  "ja-JP": "  こんにちは  ",
+                  "en-US": "Hello",
+                }},
+              }},
+              "text",
+              {{ language: "ko-KR", fallbackLanguage: "ja-JP", defaultLanguage: "en-US" }}
+            );
+            assertEqual("resolved value", resolved.value, "こんにちは");
+            assertEqual("resolved requested language", resolved.requestedLanguage, "ko-KR");
+            assertEqual("resolved used language", resolved.usedLanguage, "ja-JP");
+            assertEqual("resolved fallback flag", resolved.fallbackUsed, true);
+            assertEqual("resolved missing requested language", resolved.missingRequestedLanguage, true);
             assertEqual(
               "base text fallback",
               runtimeI18n.getLocalizedRuntimeValue({{ text: "Keep me" }}, "text", {{ language: "en-US" }}),

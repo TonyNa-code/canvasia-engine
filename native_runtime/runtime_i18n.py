@@ -61,6 +61,53 @@ def build_runtime_language_fallback_chain(
     return chain or [DEFAULT_PROJECT_LANGUAGE]
 
 
+def resolve_localized_runtime_value(
+    source: dict | None,
+    key: str,
+    *,
+    language: object = "",
+    fallback_language: object = "",
+    default_language: object = DEFAULT_PROJECT_LANGUAGE,
+    fallback: object = "",
+) -> dict:
+    safe_source = source if isinstance(source, dict) else {}
+    translations = safe_source.get(f"{key}Translations")
+    fallback_chain = build_runtime_language_fallback_chain(
+        language=language,
+        fallback_language=fallback_language,
+        default_language=default_language,
+    )
+    requested_language = normalize_language_code(language, "")
+    safe_default_language = normalize_language_code(default_language, DEFAULT_PROJECT_LANGUAGE)
+
+    if isinstance(translations, dict):
+        for candidate in fallback_chain:
+            text = str(translations.get(candidate) or "").strip()
+            if text:
+                return {
+                    "value": text,
+                    "requestedLanguage": requested_language,
+                    "usedLanguage": candidate,
+                    "fallbackChain": fallback_chain,
+                    "fallbackUsed": bool(requested_language and candidate != requested_language),
+                    "missingRequestedLanguage": bool(
+                        requested_language
+                        and requested_language != safe_default_language
+                        and not str(translations.get(requested_language) or "").strip()
+                    ),
+                }
+
+    value = str(safe_source.get(key) or fallback or "").strip()
+    return {
+        "value": value,
+        "requestedLanguage": requested_language,
+        "usedLanguage": "",
+        "fallbackChain": fallback_chain,
+        "fallbackUsed": bool(requested_language and requested_language != safe_default_language),
+        "missingRequestedLanguage": bool(requested_language and requested_language != safe_default_language),
+    }
+
+
 def get_localized_runtime_value(
     source: dict | None,
     key: str,
@@ -70,16 +117,13 @@ def get_localized_runtime_value(
     default_language: object = DEFAULT_PROJECT_LANGUAGE,
     fallback: object = "",
 ) -> str:
-    safe_source = source if isinstance(source, dict) else {}
-    translations = safe_source.get(f"{key}Translations")
-    if isinstance(translations, dict):
-        fallback_chain = build_runtime_language_fallback_chain(
+    return str(
+        resolve_localized_runtime_value(
+            source,
+            key,
             language=language,
             fallback_language=fallback_language,
             default_language=default_language,
-        )
-        for candidate in fallback_chain:
-            text = str(translations.get(candidate) or "").strip()
-            if text:
-                return text
-    return str(safe_source.get(key) or fallback or "").strip()
+            fallback=fallback,
+        ).get("value", "")
+    )

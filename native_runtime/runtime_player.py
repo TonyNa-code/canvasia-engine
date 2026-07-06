@@ -23,17 +23,17 @@ try:
     from .runtime_i18n import (
         DEFAULT_PROJECT_LANGUAGE,
         build_runtime_language_labels,
-        get_localized_runtime_value,
         normalize_language_code,
         normalize_supported_languages,
+        resolve_localized_runtime_value,
     )
 except ImportError:  # pragma: no cover - exported native packages import from the same directory.
     from runtime_i18n import (
         DEFAULT_PROJECT_LANGUAGE,
         build_runtime_language_labels,
-        get_localized_runtime_value,
         normalize_language_code,
         normalize_supported_languages,
+        resolve_localized_runtime_value,
     )
 
 try:
@@ -9897,6 +9897,7 @@ class NativeRuntimePlayer:
         )
         self.language_labels = build_runtime_language_labels(self.i18n.get("languageLabels"))
         self.current_language = self.default_language
+        self.localization_fallbacks: dict[str, dict] = {}
         self.dialog_box_config = get_project_dialog_box_config(self.project)
         self.game_ui_config = get_project_game_ui_config(self.project)
 
@@ -10324,8 +10325,51 @@ class NativeRuntimePlayer:
         self.current_language = self.get_safe_runtime_language(self.runtime_settings.get("language"))
         self.runtime_settings["language"] = self.current_language
 
+    def get_runtime_localization_source_id(self, source: dict | None) -> str:
+        safe_source = source if isinstance(source, dict) else {}
+        for key in ("id", "blockId", "sceneId", "chapterId", "characterId", "assetId"):
+            value = str(safe_source.get(key) or "").strip()
+            if value:
+                return value
+        return ""
+
+    def record_runtime_localization_fallback(self, result: dict, source: dict | None, key: str) -> None:
+        if not result.get("missingRequestedLanguage") or not result.get("requestedLanguage"):
+            return
+        source_id = self.get_runtime_localization_source_id(source)
+        fallback_key = "::".join(
+            [
+                str(result.get("requestedLanguage") or ""),
+                key,
+                source_id or str(result.get("value") or ""),
+            ]
+        )
+        if fallback_key in self.localization_fallbacks:
+            return
+        self.localization_fallbacks[fallback_key] = {
+            "key": key,
+            "sourceId": source_id,
+            "requestedLanguage": result.get("requestedLanguage"),
+            "usedLanguage": result.get("usedLanguage"),
+            "fallbackChain": result.get("fallbackChain") or [],
+            "valuePreview": str(result.get("value") or "")[:48],
+            "recordedAt": datetime.now().isoformat(timespec="seconds"),
+        }
+        while len(self.localization_fallbacks) > 80:
+            oldest_key = next(iter(self.localization_fallbacks))
+            self.localization_fallbacks.pop(oldest_key, None)
+
+    def get_runtime_localization_fallback_summary(self) -> str:
+        events = list(self.localization_fallbacks.values())
+        if not events:
+            return "当前游玩路径暂未发现缺译回退"
+        latest = events[-1]
+        used_text = f"，已回退到 {latest.get('usedLanguage')}" if latest.get("usedLanguage") else "，已使用原文"
+        target_text = f"{latest.get('key')}:{latest.get('sourceId')}" if latest.get("sourceId") else str(latest.get("key"))
+        return f"{len(events)} 处{used_text} · 最近 {target_text}"
+
     def localize_value(self, source: dict | None, key: str, fallback: str = "") -> str:
-        return get_localized_runtime_value(
+        result = resolve_localized_runtime_value(
             source,
             key,
             language=self.current_language,
@@ -10333,6 +10377,8 @@ class NativeRuntimePlayer:
             default_language=self.default_language,
             fallback=fallback,
         )
+        self.record_runtime_localization_fallback(result, source, key)
+        return str(result.get("value") or "")
 
     def is_voice_playing(self) -> bool:
         if not self.current_voice_channel:

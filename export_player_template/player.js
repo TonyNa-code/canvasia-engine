@@ -24,9 +24,9 @@ import {
   DEFAULT_RUNTIME_LANGUAGE,
   RUNTIME_LANGUAGE_LABELS,
   buildRuntimeLanguageLabels,
-  getLocalizedRuntimeValue,
   normalizeLanguageCode,
   normalizeSupportedLanguages,
+  resolveLocalizedRuntimeValue,
 } from "./runtime_i18n.js";
 import {
   DIALOG_THEME_LABELS,
@@ -350,6 +350,7 @@ const state = {
   runtimeScenePrefetchKey: "",
   runtimeScenePrefetchStatus: null,
   runtimeScenePrefetchedAssetIds: new Set(),
+  localizationFallbacks: new Map(),
 };
 
 const activeSfxAudios = new Set();
@@ -2218,6 +2219,7 @@ function renderBuildInfo() {
     ["CG 回想", galleryAssets.length > 0 ? `${state.extraUnlocks.cg.size} / ${galleryAssets.length} 已解锁` : "未设置"],
     ["音乐鉴赏", musicAssets.length > 0 ? `${state.extraUnlocks.bgm.size} / ${musicAssets.length} 已解锁` : "未设置"],
     ["资源预热", getRuntimePreloadStatusText()],
+    ["多语言回退", getRuntimeLocalizationFallbackSummary()],
     ["导出时间", formatDate(data.buildInfo.builtAt)],
     ["已复制素材", `${data.buildInfo.copiedAssets ?? 0} 个`],
   ]
@@ -5433,13 +5435,63 @@ function getCurrentRuntimeLanguage() {
   return getSafeRuntimeLanguage(state.playback?.language || getDefaultRuntimeLanguage());
 }
 
+function getRuntimeLocalizationSourceId(source) {
+  const safeSource = source && typeof source === "object" ? source : {};
+  return String(
+    safeSource.id ??
+      safeSource.blockId ??
+      safeSource.sceneId ??
+      safeSource.chapterId ??
+      safeSource.characterId ??
+      safeSource.assetId ??
+      ""
+  ).trim();
+}
+
+function recordRuntimeLocalizationFallback(result, source, key) {
+  if (!result?.missingRequestedLanguage || !result.requestedLanguage) {
+    return;
+  }
+  const sourceId = getRuntimeLocalizationSourceId(source);
+  const fallbackKey = [result.requestedLanguage, key, sourceId || result.value].join("::");
+  if (state.localizationFallbacks.has(fallbackKey)) {
+    return;
+  }
+  state.localizationFallbacks.set(fallbackKey, {
+    key,
+    sourceId,
+    requestedLanguage: result.requestedLanguage,
+    usedLanguage: result.usedLanguage,
+    fallbackChain: result.fallbackChain,
+    valuePreview: String(result.value ?? "").slice(0, 48),
+    recordedAt: new Date().toISOString(),
+  });
+  if (state.localizationFallbacks.size > 80) {
+    const oldestKey = state.localizationFallbacks.keys().next().value;
+    state.localizationFallbacks.delete(oldestKey);
+  }
+}
+
+function getRuntimeLocalizationFallbackSummary() {
+  const events = [...state.localizationFallbacks.values()];
+  if (!events.length) {
+    return "当前游玩路径暂未发现缺译回退";
+  }
+  const latest = events[events.length - 1];
+  const usedText = latest.usedLanguage ? `，已回退到 ${latest.usedLanguage}` : "，已使用原文";
+  const targetText = latest.sourceId ? `${latest.key}:${latest.sourceId}` : latest.key;
+  return `${events.length} 处${usedText} · 最近 ${targetText}`;
+}
+
 function getLocalizedValue(source, key, fallback = "") {
-  return getLocalizedRuntimeValue(source, key, {
+  const result = resolveLocalizedRuntimeValue(source, key, {
     language: getCurrentRuntimeLanguage(),
     fallbackLanguage: data.i18n?.fallbackLanguage,
     defaultLanguage: data.i18n?.defaultLanguage,
     fallback,
   });
+  recordRuntimeLocalizationFallback(result, source, key);
+  return result.value;
 }
 
 function getBlockText(block) {

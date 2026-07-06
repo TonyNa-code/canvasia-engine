@@ -56,7 +56,7 @@ export function buildRuntimeLanguageFallbackChain({
   return chain.length ? chain : [DEFAULT_RUNTIME_LANGUAGE];
 }
 
-export function getLocalizedRuntimeValue(source, key, {
+export function resolveLocalizedRuntimeValue(source, key, {
   language = "",
   fallbackLanguage = "",
   defaultLanguage = DEFAULT_RUNTIME_LANGUAGE,
@@ -64,14 +64,39 @@ export function getLocalizedRuntimeValue(source, key, {
 } = {}) {
   const safeSource = source && typeof source === "object" ? source : {};
   const translations = safeSource[`${key}Translations`];
+  const fallbackChain = buildRuntimeLanguageFallbackChain({ language, fallbackLanguage, defaultLanguage });
+  const requestedLanguage = normalizeLanguageCode(language, "");
+  const safeDefaultLanguage = normalizeLanguageCode(defaultLanguage, DEFAULT_RUNTIME_LANGUAGE);
+
   if (translations && typeof translations === "object") {
-    const fallbackChain = buildRuntimeLanguageFallbackChain({ language, fallbackLanguage, defaultLanguage });
     for (const candidate of fallbackChain) {
       const text = String(translations[candidate] ?? "").trim();
       if (text) {
-        return text;
+        return {
+          value: text,
+          requestedLanguage,
+          usedLanguage: candidate,
+          fallbackChain,
+          fallbackUsed: Boolean(requestedLanguage && candidate !== requestedLanguage),
+          missingRequestedLanguage: Boolean(
+            requestedLanguage && requestedLanguage !== safeDefaultLanguage && !String(translations[requestedLanguage] ?? "").trim()
+          ),
+        };
       }
     }
   }
-  return String(safeSource[key] ?? fallback ?? "");
+
+  const value = String(safeSource[key] ?? fallback ?? "");
+  return {
+    value,
+    requestedLanguage,
+    usedLanguage: "",
+    fallbackChain,
+    fallbackUsed: Boolean(requestedLanguage && requestedLanguage !== safeDefaultLanguage),
+    missingRequestedLanguage: Boolean(requestedLanguage && requestedLanguage !== safeDefaultLanguage),
+  };
+}
+
+export function getLocalizedRuntimeValue(source, key, options = {}) {
+  return resolveLocalizedRuntimeValue(source, key, options).value;
 }

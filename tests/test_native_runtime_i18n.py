@@ -9,7 +9,9 @@ from native_runtime.runtime_i18n import (
     get_localized_runtime_value,
     normalize_language_code,
     normalize_supported_languages,
+    resolve_localized_runtime_value,
 )
+from native_runtime.runtime_player import NativeRuntimePlayer
 
 
 class NativeRuntimeI18nTests(unittest.TestCase):
@@ -53,10 +55,46 @@ class NativeRuntimeI18nTests(unittest.TestCase):
             ),
             "こんにちは",
         )
+        resolved = resolve_localized_runtime_value(
+            {
+                "text": "原文",
+                "textTranslations": {
+                    "ja-JP": "  こんにちは  ",
+                    "en-US": "Hello",
+                },
+            },
+            "text",
+            language="ko-KR",
+            fallback_language="ja-JP",
+            default_language="en-US",
+        )
+        self.assertEqual(resolved["value"], "こんにちは")
+        self.assertEqual(resolved["requestedLanguage"], "ko-KR")
+        self.assertEqual(resolved["usedLanguage"], "ja-JP")
+        self.assertTrue(resolved["fallbackUsed"])
+        self.assertTrue(resolved["missingRequestedLanguage"])
         self.assertEqual(
             get_localized_runtime_value({"text": " Keep me "}, "text", language="en-US"),
             "Keep me",
         )
+
+    def test_native_runtime_player_tracks_localization_fallbacks_without_pygame(self) -> None:
+        player = object.__new__(NativeRuntimePlayer)
+        player.localization_fallbacks = {}
+        result = resolve_localized_runtime_value(
+            {"id": "line_1", "text": "原文", "textTranslations": {"ja-JP": "こんにちは"}},
+            "text",
+            language="en-US",
+            fallback_language="ja-JP",
+            default_language="zh-CN",
+        )
+
+        player.record_runtime_localization_fallback(result, {"id": "line_1"}, "text")
+
+        self.assertEqual(len(player.localization_fallbacks), 1)
+        summary = player.get_runtime_localization_fallback_summary()
+        self.assertIn("1 处", summary)
+        self.assertIn("text:line_1", summary)
 
 
 if __name__ == "__main__":
