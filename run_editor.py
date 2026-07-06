@@ -8929,6 +8929,8 @@ def get_native_runtime_release_control_report_names() -> dict:
         "vnBaselineQualityJson": NATIVE_RUNTIME_VN_BASELINE_QUALITY_REPORT_NAME,
         "performanceBudgetMarkdown": NATIVE_RUNTIME_PERFORMANCE_BUDGET_MARKDOWN_NAME,
         "performanceBudgetJson": NATIVE_RUNTIME_PERFORMANCE_BUDGET_REPORT_NAME,
+        "runtimeDiagnosticsMarkdown": NATIVE_RUNTIME_DIAGNOSTICS_MARKDOWN_NAME,
+        "runtimeDiagnosticsJson": NATIVE_RUNTIME_DIAGNOSTICS_REPORT_NAME,
     }
 
 
@@ -8938,6 +8940,7 @@ def get_native_runtime_release_control_status(
     asset3d_digest: dict | None,
     performance_budget_payload: dict | None = None,
     vn_baseline_quality_payload: dict | None = None,
+    runtime_diagnostics_payload: dict | None = None,
 ) -> dict:
     return get_release_control_status(
         release_check_payload,
@@ -8945,6 +8948,7 @@ def get_native_runtime_release_control_status(
         asset3d_digest,
         performance_budget_payload,
         vn_baseline_quality_payload,
+        runtime_diagnostics_payload,
     )
 
 
@@ -8954,6 +8958,7 @@ def build_native_runtime_release_control_next_steps(
     asset3d_digest: dict | None,
     performance_budget_payload: dict | None,
     vn_baseline_quality_payload: dict | None,
+    runtime_diagnostics_payload: dict | None,
     quality_gate: dict,
 ) -> list[str]:
     return build_release_control_next_steps(
@@ -8962,6 +8967,7 @@ def build_native_runtime_release_control_next_steps(
         asset3d_digest,
         performance_budget_payload,
         vn_baseline_quality_payload,
+        runtime_diagnostics_payload,
         quality_gate,
     )
 
@@ -8973,6 +8979,7 @@ def build_native_runtime_release_control_payload(
     asset3d_digest: dict | None,
     performance_budget_payload: dict | None = None,
     vn_baseline_quality_payload: dict | None = None,
+    runtime_diagnostics_payload: dict | None = None,
 ) -> dict:
     return build_release_control_payload(
         export_payload,
@@ -8981,6 +8988,7 @@ def build_native_runtime_release_control_payload(
         asset3d_digest,
         performance_budget_payload,
         vn_baseline_quality_payload,
+        runtime_diagnostics_payload,
         report_names=get_native_runtime_release_control_report_names(),
         export_target=EXPORT_TARGET_NATIVE_RUNTIME,
         default_release_version=DEFAULT_EXPORT_RELEASE_VERSION,
@@ -9734,6 +9742,8 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
             rc_report_payload if isinstance(rc_report_payload, dict) else None,
             asset3d_report_digest,
             performance_budget_files.get("performanceBudgetPayload"),
+            None,
+            runtime_diagnostics_files.get("runtimeDiagnosticsPayload"),
         )
         release_control_json_path.write_text(
             json.dumps(release_control_payload, ensure_ascii=False, indent=2) + "\n",

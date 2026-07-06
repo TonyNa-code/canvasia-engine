@@ -38,6 +38,19 @@ class ExportReleaseControlTests(unittest.TestCase):
         self.assertEqual(status["status"], "blocked")
         self.assertIn("性能预算", status["summary"])
 
+    def test_release_gate_blocks_on_runtime_diagnostics_issue(self) -> None:
+        status = get_native_runtime_release_control_status(
+            {"status": "pass", "summary": {"errors": 0, "warnings": 0}},
+            {"status": "preview_ready", "summary": {"blockers": 0, "optionalFailures": 0, "warnings": 0}},
+            {"status": "ready", "topIssues": []},
+            {"status": "ready", "summary": {"hardCount": 0, "warnCount": 0, "softCount": 0}},
+            {"status": "ready", "summary": {"warnCount": 0, "softCount": 0}},
+            {"status": "blocked", "summary": {"diagnosticIssueCount": 1}},
+        )
+
+        self.assertEqual(status["status"], "blocked")
+        self.assertIn("Runtime", status["summary"])
+
     def test_payload_and_markdown_include_vn_and_performance_sections(self) -> None:
         payload = build_native_runtime_release_control_payload(
             make_export_payload(),
@@ -66,20 +79,37 @@ class ExportReleaseControlTests(unittest.TestCase):
                 "metrics": {"storySceneCount": 2, "dialogueCount": 4, "choiceCount": 1},
                 "issues": [],
             },
+            {
+                "status": "needs_review",
+                "statusLabel": "需要复核",
+                "headline": "运行诊断可用，但入口预取仍需复核。",
+                "summary": {
+                    "preloadEntries": 2,
+                    "preloadMissingEntries": 0,
+                    "prefetchEntries": 1,
+                    "diagnosticIssueCount": 0,
+                    "diagnosticWarningCount": 1,
+                },
+            },
             generated_at="2026-01-02T03:04:05+08:00",
         )
 
         self.assertEqual(payload["qualityGate"]["status"], "needs_review")
         self.assertEqual(payload["project"]["title"], "Release Control Demo")
         self.assertEqual(payload["performanceBudget"]["summary"]["assetCount"], 3)
+        self.assertEqual(payload["runtimeDiagnostics"]["status"], "needs_review")
         self.assertIn("performanceBudgetMarkdown", payload["includedReports"])
+        self.assertIn("runtimeDiagnosticsMarkdown", payload["includedReports"])
         self.assertTrue(any("图片偏大" in step for step in payload["nextSteps"]))
+        self.assertTrue(any("Runtime 运行诊断" in step for step in payload["nextSteps"]))
 
         markdown = build_native_runtime_release_control_markdown(payload)
         self.assertIn("# 原生 Runtime 发布总控报告", markdown)
         self.assertIn("## VN 基础质感", markdown)
         self.assertIn("## 性能预算", markdown)
+        self.assertIn("## Runtime 运行诊断", markdown)
         self.assertIn("native-runtime-performance-budget.md", markdown)
+        self.assertIn("native-runtime-diagnostics.md", markdown)
 
 
 if __name__ == "__main__":

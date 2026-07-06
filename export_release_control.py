@@ -18,6 +18,8 @@ DEFAULT_REPORT_NAMES = {
     "vnBaselineQualityJson": "native-runtime-vn-baseline-quality.json",
     "performanceBudgetMarkdown": "native-runtime-performance-budget.md",
     "performanceBudgetJson": "native-runtime-performance-budget.json",
+    "runtimeDiagnosticsMarkdown": "native-runtime-diagnostics.md",
+    "runtimeDiagnosticsJson": "native-runtime-diagnostics.json",
 }
 
 
@@ -70,6 +72,7 @@ def get_native_runtime_release_control_status(
     asset3d_digest: dict | None,
     performance_budget_payload: dict | None = None,
     vn_baseline_quality_payload: dict | None = None,
+    runtime_diagnostics_payload: dict | None = None,
 ) -> dict:
     release_summary = as_dict(as_dict(release_check_payload).get("summary"))
     rc_summary = as_dict(as_dict(rc_report_payload).get("summary"))
@@ -80,6 +83,7 @@ def get_native_runtime_release_control_status(
     performance_summary = as_dict(as_dict(performance_budget_payload).get("summary"))
     vn_status = str(as_dict(vn_baseline_quality_payload).get("status") or "unavailable")
     vn_summary = as_dict(as_dict(vn_baseline_quality_payload).get("summary"))
+    diagnostics_status = str(as_dict(runtime_diagnostics_payload).get("status") or "unavailable")
 
     release_errors = as_int(release_summary.get("errors"))
     blockers = as_int(rc_summary.get("blockers"))
@@ -91,6 +95,7 @@ def get_native_runtime_release_control_status(
         release_status == "fail"
         or rc_status == "blocked"
         or performance_status == "needs_fix"
+        or diagnostics_status == "blocked"
         or release_errors
         or blockers
         or as_int(vn_summary.get("warnCount"))
@@ -99,7 +104,7 @@ def get_native_runtime_release_control_status(
         return {
             "status": "blocked",
             "label": "阻塞发布",
-            "summary": "存在发布阻塞项、VN 基础体验缺口或性能预算硬问题，应先修复再进入三系统打包或分发。",
+            "summary": "存在发布阻塞项、VN 基础体验缺口、性能预算硬问题或 Runtime 运行诊断阻塞项，应先修复再进入三系统打包或分发。",
         }
     if (
         release_status == "unavailable"
@@ -107,6 +112,7 @@ def get_native_runtime_release_control_status(
         or asset_status == "unavailable"
         or vn_status == "unavailable"
         or performance_status in {"unavailable", "needs_review"}
+        or diagnostics_status in {"unavailable", "needs_review"}
         or optional_failures
         or warnings
         or has_3d_issues
@@ -117,7 +123,7 @@ def get_native_runtime_release_control_status(
         return {
             "status": "needs_review",
             "label": "需要复核",
-            "summary": "主链没有阻塞项，但仍有警告、可选能力失败、资产风险、VN 润色项或性能预算风险需要发布前确认。",
+            "summary": "主链没有阻塞项，但仍有警告、可选能力失败、资产风险、VN 润色项、性能预算风险或 Runtime 运行诊断观察项需要发布前确认。",
         }
     return {
         "status": "ready",
@@ -132,6 +138,7 @@ def build_native_runtime_release_control_next_steps(
     asset3d_digest: dict | None,
     performance_budget_payload: dict | None,
     vn_baseline_quality_payload: dict | None,
+    runtime_diagnostics_payload: dict | None,
     quality_gate: dict,
 ) -> list[str]:
     steps: list[str] = []
@@ -176,6 +183,13 @@ def build_native_runtime_release_control_next_steps(
             suggestion = issue.get("suggestion") or issue.get("detail") or "复核素材体积、包体和剧情规模。"
             add_step(f"处理性能预算「{title}」：{suggestion}")
 
+    diagnostics = as_dict(runtime_diagnostics_payload)
+    diagnostics_status = str(diagnostics.get("status") or "")
+    if diagnostics_status == "blocked":
+        add_step("处理 Runtime 运行诊断里的阻塞项，再重新生成发布总控报告。")
+    elif diagnostics_status == "needs_review":
+        add_step("复核 Runtime 运行诊断报告，确认入口场景、预热和路线预取状态。")
+
     return steps[:10]
 
 
@@ -186,6 +200,7 @@ def build_native_runtime_release_control_payload(
     asset3d_digest: dict | None,
     performance_budget_payload: dict | None = None,
     vn_baseline_quality_payload: dict | None = None,
+    runtime_diagnostics_payload: dict | None = None,
     *,
     report_names: dict | None = None,
     export_target: str = DEFAULT_EXPORT_TARGET_NATIVE_RUNTIME,
@@ -201,6 +216,7 @@ def build_native_runtime_release_control_payload(
     rc_summary = as_dict(as_dict(rc_report_payload).get("summary"))
     readiness = as_dict(as_dict(rc_report_payload).get("readinessEstimate"))
     performance_summary = as_dict(as_dict(performance_budget_payload).get("summary"))
+    diagnostics_summary = as_dict(as_dict(runtime_diagnostics_payload).get("summary"))
     vn_baseline_summary = as_dict(as_dict(vn_baseline_quality_payload).get("summary")) or {
         "statusLabel": "未生成",
         "issueCount": 1,
@@ -214,6 +230,7 @@ def build_native_runtime_release_control_payload(
         asset3d_digest,
         performance_budget_payload,
         vn_baseline_quality_payload,
+        runtime_diagnostics_payload,
     )
     next_steps = build_native_runtime_release_control_next_steps(
         release_check_payload,
@@ -221,6 +238,7 @@ def build_native_runtime_release_control_payload(
         asset3d_digest,
         performance_budget_payload,
         vn_baseline_quality_payload,
+        runtime_diagnostics_payload,
         quality_gate,
     )
 
@@ -272,6 +290,14 @@ def build_native_runtime_release_control_payload(
             "markdown": names["performanceBudgetMarkdown"],
             "json": names["performanceBudgetJson"],
         },
+        "runtimeDiagnostics": {
+            "status": as_dict(runtime_diagnostics_payload).get("status") or "unavailable",
+            "statusLabel": as_dict(runtime_diagnostics_payload).get("statusLabel") or "未生成",
+            "headline": as_dict(runtime_diagnostics_payload).get("headline") or "",
+            "summary": diagnostics_summary,
+            "markdown": names["runtimeDiagnosticsMarkdown"],
+            "json": names["runtimeDiagnosticsJson"],
+        },
         "nextSteps": next_steps,
         "includedReports": names,
     }
@@ -291,6 +317,7 @@ def build_native_runtime_release_control_markdown(
     asset3d = as_dict(payload.get("asset3d"))
     vn_baseline = as_dict(payload.get("vnBaselineQuality"))
     performance_budget = as_dict(payload.get("performanceBudget"))
+    runtime_diagnostics = as_dict(payload.get("runtimeDiagnostics"))
     readiness = as_dict(release_candidate.get("readinessEstimate"))
     release_summary = as_dict(release_check.get("summary"))
     rc_summary = as_dict(release_candidate.get("summary"))
@@ -299,6 +326,7 @@ def build_native_runtime_release_control_markdown(
     vn_metrics = as_dict(vn_baseline.get("metrics"))
     performance_summary = as_dict(performance_budget.get("summary"))
     performance_asset_groups = as_dict(performance_budget.get("assetGroups"))
+    diagnostics_summary = as_dict(runtime_diagnostics.get("summary"))
     next_steps = as_list(payload.get("nextSteps"))
     included_reports = normalize_report_names(as_dict(payload.get("includedReports")))
 
@@ -327,6 +355,7 @@ def build_native_runtime_release_control_markdown(
         f"| 3D 摘要 | {asset3d.get('summaryLine') or '未生成'} |",
         f"| VN 基础质感 | {vn_summary.get('statusLabel') or vn_baseline.get('status') or '未生成'} |",
         f"| 性能预算 | {performance_summary.get('statusLabel') or performance_budget.get('status') or '未生成'} |",
+        f"| Runtime 运行诊断 | {runtime_diagnostics.get('statusLabel') or runtime_diagnostics.get('status') or '未生成'} |",
         "",
     ]
 
@@ -371,6 +400,18 @@ def build_native_runtime_release_control_markdown(
                     lines.append(f"- {issue.get('title') or '性能预算'}：{issue.get('suggestion') or issue.get('detail') or '需要复核'}")
         lines.append("")
 
+    if runtime_diagnostics:
+        lines.extend(["## Runtime 运行诊断", "", "| 指标 | 值 |", "| --- | --- |"])
+        for label, value in [
+            ("状态", runtime_diagnostics.get("statusLabel") or runtime_diagnostics.get("status")),
+            ("结论", runtime_diagnostics.get("headline")),
+            ("预热条目 / 缺失", f"{as_int(diagnostics_summary.get('preloadEntries'))} / {as_int(diagnostics_summary.get('preloadMissingEntries'))}"),
+            ("路线预取条目", diagnostics_summary.get("prefetchEntries")),
+            ("异常 / 观察项", f"{as_int(diagnostics_summary.get('diagnosticIssueCount'))} / {as_int(diagnostics_summary.get('diagnosticWarningCount'))}"),
+        ]:
+            lines.append(f"| {label} | {value or '0'} |")
+        lines.append("")
+
     if asset_metrics:
         lines.extend(["## 3D 风险快照", "", "| 指标 | 值 |", "| --- | --- |"])
         for metric in asset_metrics:
@@ -399,6 +440,7 @@ def build_native_runtime_release_control_markdown(
         "asset3dDigest",
         "vnBaselineQualityMarkdown",
         "performanceBudgetMarkdown",
+        "runtimeDiagnosticsMarkdown",
         "releaseControlJson",
     ):
         lines.append(f"- `{included_reports[key]}`")
