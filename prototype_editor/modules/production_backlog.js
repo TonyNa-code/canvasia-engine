@@ -109,6 +109,10 @@
       label: cleanText(action.label, "去处理"),
       action: cleanText(action.action, "switch-screen"),
       screen: cleanText(action.screen),
+      sceneId: cleanText(action.sceneId),
+      blockId: cleanText(action.blockId),
+      assetId: cleanText(action.assetId),
+      chapterId: cleanText(action.chapterId),
       dataset: action.dataset && typeof action.dataset === "object" ? action.dataset : {},
     };
   }
@@ -185,6 +189,59 @@
           source: getTaskSource(issue, options.fallbackSource),
           action,
           priorityBoost: options.priorityBoost,
+        });
+      });
+  }
+
+  function getStageContinuitySeverity(row = {}) {
+    const status = cleanText(row?.status);
+    if (status === "blocker") {
+      return "blocker";
+    }
+    if (status === "warn") {
+      return "warn";
+    }
+    return "tip";
+  }
+
+  function getStageContinuityTaskTitle(row = {}) {
+    const nextAction = cleanText(row?.nextAction, "复查舞台连续性");
+    const sceneName = cleanText(row?.sceneName);
+    return sceneName ? `${nextAction}：${sceneName}` : nextAction;
+  }
+
+  function getStageContinuityTaskSource(row = {}) {
+    return [
+      row.chapterName,
+      row.sceneName,
+      row.openingCue ? `开场：${row.openingCue}` : "",
+      row.endingCastLabel ? `结尾在场：${row.endingCastLabel}` : "",
+    ]
+      .map((item) => cleanText(item))
+      .filter(Boolean)
+      .join(" / ") || "角色舞台调度表";
+  }
+
+  function addStageContinuityTasks(tasks, stageDirectionSheet = {}) {
+    toArray(stageDirectionSheet?.continuityAudit?.reviewRows)
+      .filter((row) => cleanText(row?.status) !== "good")
+      .slice(0, 10)
+      .forEach((row, index) => {
+        const actionLabel = cleanText(row?.nextAction, "复查舞台连续性");
+        addTask(tasks, {
+          area: "stage",
+          severity: getStageContinuitySeverity(row),
+          title: getStageContinuityTaskTitle(row),
+          detail: cleanText(row?.reason, "开场、登场或退场顺序需要复查。"),
+          source: getStageContinuityTaskSource(row),
+          action: {
+            label: cleanText(row?.sceneId) ? "打开这个场景" : actionLabel,
+            action: cleanText(row?.sceneId) ? "open-scene-from-map" : "switch-screen",
+            screen: "story",
+            sceneId: cleanText(row?.sceneId),
+            dataset: { "inspection-section": "stage-direction" },
+          },
+          priorityBoost: 12 - Math.min(index, 8),
         });
       });
   }
@@ -628,6 +685,7 @@
     addAudioProductionTasks(tasks, context.audioCueSheet);
     addIssueTasks(tasks, "audio", context.audioCueSheet?.issues, { fallbackTitle: "处理音频调度问题", fallbackSource: "音频调度表" });
     addIssueTasks(tasks, "stage", context.stageDirectionSheet?.issues, { fallbackTitle: "处理角色调度问题", fallbackSource: "角色舞台调度表" });
+    addStageContinuityTasks(tasks, context.stageDirectionSheet);
     addIssueTasks(tasks, "presentation", context.presentationTimeline?.issues, { fallbackTitle: "处理演出节奏问题", fallbackSource: "演出时间轴" });
     addIssueTasks(tasks, "localization", context.localizationCoverage?.issues, { fallbackTitle: "处理翻译覆盖问题", fallbackSource: "多语言覆盖报告", maxItems: 8 });
     addIssueTasks(tasks, "runtime", context.runtimeCapabilityMatrix?.issues, { fallbackTitle: "处理 Runtime 覆盖风险", fallbackSource: "Runtime 覆盖矩阵", maxItems: 8, priorityBoost: 16 });
@@ -815,6 +873,7 @@
     addAudioProductionTasks,
     addDirectorCueTasks,
     addDirectorTimingTasks,
+    addStageContinuityTasks,
     addRuntimePreloadBudgetTasks,
     addVnEssentialsTasks,
     getSeverityLabel,

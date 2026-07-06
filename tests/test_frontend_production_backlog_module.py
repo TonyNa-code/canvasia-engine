@@ -165,6 +165,30 @@ class FrontendProductionBacklogModuleTests(unittest.TestCase):
                 issues: [
                   {{ severity: "tip", title: "角色退场待补", detail: "老师持续留在舞台上。", sceneName: "放学后" }},
                 ],
+                continuityAudit: {{
+                  reviewRows: [
+                    {{
+                      status: "warn",
+                      sceneId: "scene_roof",
+                      chapterName: "第1章",
+                      sceneName: "屋顶晚风",
+                      nextAction: "补登场卡",
+                      reason: "说话人未登场 / 开头先出现正文",
+                      openingCue: "第 1 张 · 台词 · 你来了",
+                      endingCastLabel: "",
+                    }},
+                    {{
+                      status: "tip",
+                      sceneId: "scene_crossroad",
+                      chapterName: "第1章",
+                      sceneName: "放学路口",
+                      nextAction: "确认是否退场",
+                      reason: "结尾仍有 1 名角色在场",
+                      openingCue: "第 1 张 · 背景",
+                      endingCastLabel: "蓝白女主",
+                    }},
+                  ],
+                }},
               }},
               presentationTimeline: {{
                 issues: [
@@ -271,10 +295,10 @@ class FrontendProductionBacklogModuleTests(unittest.TestCase):
         self.assertEqual(len(payload["routeQueue"]), 2)
         self.assertEqual(payload["routeQueue"][0]["title"], "修复分支坏链")
         self.assertEqual(payload["routeQueue"][1]["title"], "接通结局入口")
-        self.assertEqual(payload["backlog"]["summary"]["taskCount"], 29)
+        self.assertEqual(payload["backlog"]["summary"]["taskCount"], 31)
         self.assertEqual(payload["backlog"]["summary"]["blockerCount"], 8)
-        self.assertEqual(payload["backlog"]["summary"]["warningCount"], 14)
-        self.assertEqual(payload["backlog"]["summary"]["tipCount"], 7)
+        self.assertEqual(payload["backlog"]["summary"]["warningCount"], 15)
+        self.assertEqual(payload["backlog"]["summary"]["tipCount"], 8)
         self.assertGreaterEqual(payload["backlog"]["summary"]["areaCount"], 12)
         self.assertEqual(payload["digest"]["status"], "blocked")
         self.assertEqual(payload["backlog"]["tasks"][0]["severity"], "blocker")
@@ -284,6 +308,10 @@ class FrontendProductionBacklogModuleTests(unittest.TestCase):
         self.assertTrue(any(task["area"] == "presentation" and task["title"] == "补齐空白场景内容" for task in payload["backlog"]["tasks"]))
         self.assertTrue(any(task["area"] == "presentation" and task["title"] == "拆分过长场景节奏" for task in payload["backlog"]["tasks"]))
         self.assertTrue(any(task["area"] == "presentation" and task["title"] == "复查过短场景节奏" for task in payload["backlog"]["tasks"]))
+        self.assertTrue(any(task["area"] == "stage" and task["title"] == "补登场卡：屋顶晚风" for task in payload["backlog"]["tasks"]))
+        stage_continuity_task = next(task for task in payload["backlog"]["tasks"] if task["title"] == "确认是否退场：放学路口")
+        self.assertEqual(stage_continuity_task["action"]["action"], "open-scene-from-map")
+        self.assertEqual(stage_continuity_task["action"]["sceneId"], "scene_crossroad")
         self.assertTrue(any(task["area"] == "loading" and task["title"] == "首屏必备素材过重" for task in payload["backlog"]["tasks"]))
         self.assertTrue(any(task["area"] == "audio" and task["title"] == "多首 BGM 缺少明确播放范围" for task in payload["backlog"]["tasks"]))
         self.assertTrue(any(task["area"] == "runtime" and task["title"] == "游戏 UI 仍接近默认皮肤" for task in payload["backlog"]["tasks"]))
@@ -296,6 +324,8 @@ class FrontendProductionBacklogModuleTests(unittest.TestCase):
         self.assertIn("补齐空白场景内容", payload["markdown"])
         self.assertIn("拆分过长场景节奏", payload["markdown"])
         self.assertIn("复查过短场景节奏", payload["markdown"])
+        self.assertIn("补登场卡：屋顶晚风", payload["markdown"])
+        self.assertIn("确认是否退场：放学路口", payload["markdown"])
         self.assertIn("素材授权", payload["markdown"])
         self.assertIn("已使用素材不可商用", payload["markdown"])
         self.assertIn("首屏加载", payload["markdown"])
