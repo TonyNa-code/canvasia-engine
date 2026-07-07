@@ -631,6 +631,7 @@ EDITOR_EXPORT_FILES = [
     "export_release_control.py",
     "export_release_evidence_pack.py",
     "export_release_readiness.py",
+    "export_runtime_capability.py",
     "export_runtime_preload.py",
     "export_story_route_map.py",
     "export_unlockable_manifest.py",

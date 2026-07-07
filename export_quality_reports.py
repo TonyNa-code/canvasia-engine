@@ -6,6 +6,7 @@ from export_choice_consequence_sheet import write_export_choice_consequence_file
 from export_localization_audit import write_export_localization_audit_files
 from export_release_readiness import write_export_release_readiness_files
 from export_route_playtest_workbook import write_export_route_playtest_workbook_files
+from export_runtime_capability import write_export_runtime_capability_files
 from export_story_route_map import write_export_story_route_map_files
 from export_variable_influence_sheet import write_export_variable_influence_files
 
@@ -35,6 +36,7 @@ def write_export_quality_report_bundle(
     route_playtest = write_export_route_playtest_workbook_files(target_dir, bundle=bundle)
     choice_consequence = write_export_choice_consequence_files(target_dir, bundle=bundle)
     variable_influence = write_export_variable_influence_files(target_dir, bundle=bundle)
+    runtime_capability = write_export_runtime_capability_files(target_dir, bundle=bundle)
     localization_audit = write_export_localization_audit_files(target_dir, bundle)
     report_files = normalize_report_file_names(
         [
@@ -49,6 +51,9 @@ def write_export_quality_report_bundle(
             variable_influence["variableInfluenceReportName"],
             variable_influence["variableInfluenceName"],
             variable_influence["variableInfluenceCsvName"],
+            runtime_capability["runtimeCapabilityReportName"],
+            runtime_capability["runtimeCapabilityMatrixName"],
+            runtime_capability["runtimeCapabilityCsvName"],
             localization_audit["localizationAuditReportName"],
             *(extra_report_files or []),
         ]
@@ -61,6 +66,7 @@ def write_export_quality_report_bundle(
         unlockable_manifest=unlockable_manifest,
         story_route_map=story_route_map["storyRouteMap"],
         localization_audit=localization_audit["localizationAudit"],
+        runtime_capability_matrix=runtime_capability["runtimeCapabilityMatrix"],
         report_files=report_files,
         platform_notes=platform_notes,
     )
@@ -69,6 +75,7 @@ def write_export_quality_report_bundle(
         **route_playtest,
         **choice_consequence,
         **variable_influence,
+        **runtime_capability,
         **localization_audit,
         **release_readiness,
         "qualityReportFiles": report_files,

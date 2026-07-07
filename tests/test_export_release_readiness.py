@@ -135,6 +135,42 @@ class ExportReleaseReadinessTests(unittest.TestCase):
         self.assertIn("本地化覆盖率", markdown)
         self.assertIn("localization_audit.md", markdown)
 
+    def test_runtime_capability_issues_affect_release_gate(self) -> None:
+        summary = build_export_release_readiness_summary(
+            project={"title": "Runtime Gate Demo"},
+            manifest=make_manifest(),
+            runtime_capability_matrix={
+                "summary": {
+                    "usedTypeCount": 5,
+                    "issueCount": 2,
+                    "unknownUsedTypeCount": 1,
+                    "unsupportedUsedTypeCount": 0,
+                    "nativePartialCount": 1,
+                },
+                "essentials": {
+                    "summary": {
+                        "score": 72,
+                        "attentionAreaCount": 3,
+                        "warnCount": 1,
+                        "softCount": 2,
+                        "issueCount": 3,
+                    }
+                },
+            },
+            report_files=["runtime-capability-matrix.md"],
+        )
+
+        self.assertEqual(summary["qualityGate"]["status"], "blocked")
+        self.assertEqual(summary["metrics"]["runtimeUnknownTypes"], 1)
+        self.assertEqual(summary["metrics"]["vnEssentialsScore"], 72)
+        issue_codes = {issue["code"] for issue in summary["issues"]}
+        self.assertIn("runtime_capability_unknown_cards", issue_codes)
+        self.assertIn("vn_essentials_need_review", issue_codes)
+        markdown = build_export_release_readiness_markdown(summary)
+        self.assertIn("Runtime 覆盖复核项", markdown)
+        self.assertIn("VN 基础能力分", markdown)
+        self.assertIn("runtime-capability-matrix.md", markdown)
+
     def test_write_export_release_readiness_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             result = write_export_release_readiness_files(

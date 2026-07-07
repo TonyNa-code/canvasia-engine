@@ -19,6 +19,11 @@ from export_release_readiness import (
     EXPORT_RELEASE_READINESS_JSON_NAME,
     EXPORT_RELEASE_READINESS_REPORT_NAME,
 )
+from export_runtime_capability import (
+    EXPORT_RUNTIME_CAPABILITY_CSV_NAME,
+    EXPORT_RUNTIME_CAPABILITY_JSON_NAME,
+    EXPORT_RUNTIME_CAPABILITY_REPORT_NAME,
+)
 from export_route_playtest_workbook import (
     EXPORT_ROUTE_PLAYTEST_WORKBOOK_CSV_NAME,
     EXPORT_ROUTE_PLAYTEST_WORKBOOK_JSON_NAME,
@@ -124,6 +129,9 @@ class ExportQualityReportsTests(unittest.TestCase):
                 EXPORT_VARIABLE_INFLUENCE_JSON_NAME,
                 EXPORT_VARIABLE_INFLUENCE_REPORT_NAME,
                 EXPORT_VARIABLE_INFLUENCE_CSV_NAME,
+                EXPORT_RUNTIME_CAPABILITY_JSON_NAME,
+                EXPORT_RUNTIME_CAPABILITY_REPORT_NAME,
+                EXPORT_RUNTIME_CAPABILITY_CSV_NAME,
                 EXPORT_LOCALIZATION_AUDIT_JSON_NAME,
                 EXPORT_LOCALIZATION_AUDIT_REPORT_NAME,
                 EXPORT_RELEASE_READINESS_JSON_NAME,
@@ -148,6 +156,9 @@ class ExportQualityReportsTests(unittest.TestCase):
                     EXPORT_VARIABLE_INFLUENCE_REPORT_NAME,
                     EXPORT_VARIABLE_INFLUENCE_JSON_NAME,
                     EXPORT_VARIABLE_INFLUENCE_CSV_NAME,
+                    EXPORT_RUNTIME_CAPABILITY_REPORT_NAME,
+                    EXPORT_RUNTIME_CAPABILITY_JSON_NAME,
+                    EXPORT_RUNTIME_CAPABILITY_CSV_NAME,
                     EXPORT_LOCALIZATION_AUDIT_REPORT_NAME,
                     "unlockable_content_report.md",
                 ],
@@ -157,8 +168,11 @@ class ExportQualityReportsTests(unittest.TestCase):
             self.assertIn(EXPORT_ROUTE_PLAYTEST_WORKBOOK_REPORT_NAME, readiness_payload["reportFiles"])
             self.assertIn(EXPORT_CHOICE_CONSEQUENCE_REPORT_NAME, readiness_payload["reportFiles"])
             self.assertIn(EXPORT_VARIABLE_INFLUENCE_REPORT_NAME, readiness_payload["reportFiles"])
+            self.assertIn(EXPORT_RUNTIME_CAPABILITY_REPORT_NAME, readiness_payload["reportFiles"])
             self.assertIn(EXPORT_LOCALIZATION_AUDIT_REPORT_NAME, readiness_payload["reportFiles"])
             self.assertIn("localization_missing_translations", {issue["code"] for issue in readiness_payload["issues"]})
+            self.assertIn("vn_essentials_need_review", {issue["code"] for issue in readiness_payload["issues"]})
+            self.assertIn("Runtime 覆盖矩阵", (target_dir / EXPORT_RUNTIME_CAPABILITY_REPORT_NAME).read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

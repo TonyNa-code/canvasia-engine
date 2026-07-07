@@ -76,18 +76,38 @@ def get_localization_summary(localization_audit: dict | None) -> dict:
     return summary if isinstance(summary, dict) else {}
 
 
+def get_runtime_capability_summary(runtime_capability_matrix: dict | None) -> dict:
+    if not isinstance(runtime_capability_matrix, dict):
+        return {}
+    summary = runtime_capability_matrix.get("summary")
+    return summary if isinstance(summary, dict) else {}
+
+
+def get_runtime_essentials_summary(runtime_capability_matrix: dict | None) -> dict:
+    if not isinstance(runtime_capability_matrix, dict):
+        return {}
+    essentials = runtime_capability_matrix.get("essentials")
+    if not isinstance(essentials, dict):
+        return {}
+    summary = essentials.get("summary")
+    return summary if isinstance(summary, dict) else {}
+
+
 def build_release_readiness_issues(
     manifest: dict,
     unlockable_manifest: dict | None,
     missing_assets: list[dict],
     story_route_map: dict | None = None,
     localization_audit: dict | None = None,
+    runtime_capability_matrix: dict | None = None,
 ) -> list[dict]:
     project = get_manifest_project(manifest)
     runtime = get_manifest_runtime(manifest)
     unlockable_summary = get_unlockable_summary(unlockable_manifest)
     story_route_summary = get_story_route_summary(story_route_map)
     localization_summary = get_localization_summary(localization_audit)
+    runtime_capability_summary = get_runtime_capability_summary(runtime_capability_matrix)
+    runtime_essentials_summary = get_runtime_essentials_summary(runtime_capability_matrix)
     issues: list[dict] = []
 
     scene_count = as_int(project.get("sceneCount"))
@@ -216,6 +236,45 @@ def build_release_readiness_issues(
             )
         )
 
+    unknown_runtime_types = as_int(runtime_capability_summary.get("unknownUsedTypeCount"))
+    unsupported_runtime_types = as_int(runtime_capability_summary.get("unsupportedUsedTypeCount"))
+    runtime_issue_count = as_int(runtime_capability_summary.get("issueCount"))
+    if unknown_runtime_types or unsupported_runtime_types:
+        issues.append(
+            make_readiness_issue(
+                "blocker",
+                "runtime_capability_unknown_cards",
+                "存在未确认 Runtime 支持的剧情卡片",
+                f"Runtime 覆盖矩阵记录到 {unknown_runtime_types} 类未知卡片、{unsupported_runtime_types} 类未支持或规划中卡片。",
+                "打开 runtime-capability-matrix.md，先替换为已支持卡片或补齐对应 Runtime 播放支持，再重新导出。",
+            )
+        )
+    elif runtime_issue_count:
+        issues.append(
+            make_readiness_issue(
+                "warning",
+                "runtime_capability_review_needed",
+                "Runtime 覆盖需要重点验收",
+                f"Runtime 覆盖矩阵记录到 {runtime_issue_count} 项需要目标平台复核的卡片能力。",
+                "打开 runtime-capability-matrix.md，按随包 Runtime 验收清单完成 Web / 原生重点点测。",
+            )
+        )
+
+    vn_essentials_score = as_int(runtime_essentials_summary.get("score"), 100)
+    vn_essentials_warn_count = as_int(runtime_essentials_summary.get("warnCount"))
+    vn_essentials_soft_count = as_int(runtime_essentials_summary.get("softCount"))
+    vn_essentials_attention = as_int(runtime_essentials_summary.get("attentionAreaCount"))
+    if vn_essentials_warn_count or vn_essentials_soft_count:
+        issues.append(
+            make_readiness_issue(
+                "warning",
+                "vn_essentials_need_review",
+                "视觉小说基础体验需要复看",
+                f"VN 基础能力分为 {vn_essentials_score}/100，仍有 {vn_essentials_attention} 个基础领域需要关注。",
+                "打开 runtime-capability-matrix.md，优先处理背景覆盖、立绘登退场、BGM 范围、选项后果和文本体验等基础项。",
+            )
+        )
+
     return issues
 
 
@@ -225,12 +284,15 @@ def calculate_release_readiness_score(
     unlockable_manifest: dict | None,
     story_route_map: dict | None = None,
     localization_audit: dict | None = None,
+    runtime_capability_matrix: dict | None = None,
 ) -> int:
     project = get_manifest_project(manifest)
     assets = get_manifest_assets(manifest)
     unlockable_summary = get_unlockable_summary(unlockable_manifest)
     story_route_summary = get_story_route_summary(story_route_map)
     localization_summary = get_localization_summary(localization_audit)
+    runtime_capability_summary = get_runtime_capability_summary(runtime_capability_matrix)
+    runtime_essentials_summary = get_runtime_essentials_summary(runtime_capability_matrix)
     score = 100
     score -= 34 * sum(1 for issue in issues if issue.get("severity") == "blocker")
     score -= 9 * sum(1 for issue in issues if issue.get("severity") == "warning")
@@ -248,6 +310,12 @@ def calculate_release_readiness_score(
     localization_completion = as_int(localization_summary.get("completionPercent"), 100)
     if language_count > 1 and localization_completion < 100:
         score -= min(12, max(2, round((100 - localization_completion) / 7)))
+    runtime_issue_count = as_int(runtime_capability_summary.get("issueCount"))
+    if runtime_issue_count:
+        score -= min(14, max(3, runtime_issue_count * 4))
+    vn_essentials_score = as_int(runtime_essentials_summary.get("score"), 100)
+    if vn_essentials_score < 100:
+        score -= min(14, max(2, round((100 - vn_essentials_score) / 6)))
     return clamp_score(score)
 
 
@@ -281,6 +349,7 @@ def build_export_release_readiness_summary(
     unlockable_manifest: dict | None = None,
     story_route_map: dict | None = None,
     localization_audit: dict | None = None,
+    runtime_capability_matrix: dict | None = None,
     report_files: list[str] | None = None,
     platform_notes: list[str] | None = None,
 ) -> dict:
@@ -291,6 +360,7 @@ def build_export_release_readiness_summary(
         missing_assets,
         story_route_map,
         localization_audit,
+        runtime_capability_matrix,
     )
     score = calculate_release_readiness_score(
         issues,
@@ -298,12 +368,15 @@ def build_export_release_readiness_summary(
         unlockable_manifest,
         story_route_map,
         localization_audit,
+        runtime_capability_matrix,
     )
     gate = get_release_readiness_gate(score, issues)
     manifest_project = get_manifest_project(manifest)
     manifest_assets = get_manifest_assets(manifest)
     unlockable_summary = get_unlockable_summary(unlockable_manifest)
     localization_summary = get_localization_summary(localization_audit)
+    runtime_capability_summary = get_runtime_capability_summary(runtime_capability_matrix)
+    runtime_essentials_summary = get_runtime_essentials_summary(runtime_capability_matrix)
 
     return {
         "formatVersion": 1,
@@ -340,6 +413,13 @@ def build_export_release_readiness_summary(
             "localizationCompletionPercent": as_int(localization_summary.get("completionPercent"), 100),
             "missingTranslations": as_int(localization_summary.get("missingTranslationCount")),
             "localizationLanguageCount": as_int(localization_summary.get("languageCount"), 1),
+            "runtimeUsedTypes": as_int(runtime_capability_summary.get("usedTypeCount")),
+            "runtimeIssues": as_int(runtime_capability_summary.get("issueCount")),
+            "runtimeUnknownTypes": as_int(runtime_capability_summary.get("unknownUsedTypeCount")),
+            "runtimeNativeRisks": as_int(runtime_capability_summary.get("nativePartialCount")),
+            "vnEssentialsScore": as_int(runtime_essentials_summary.get("score"), 100),
+            "vnEssentialsAttentionAreas": as_int(runtime_essentials_summary.get("attentionAreaCount")),
+            "vnEssentialsIssues": as_int(runtime_essentials_summary.get("issueCount")),
         },
         "issues": issues,
         "reportFiles": [clean_release_text(item) for item in (report_files or []) if clean_release_text(item)],
@@ -398,6 +478,10 @@ def build_export_release_readiness_markdown(summary: dict) -> str:
         f"| 可达结局 | {markdown_cell(metrics.get('reachableEndings'))}/{markdown_cell(metrics.get('totalEndings'))} |",
         f"| 本地化覆盖率 | {markdown_cell(metrics.get('localizationCompletionPercent'))}% |",
         f"| 缺失译文 | {markdown_cell(metrics.get('missingTranslations'))} |",
+        f"| Runtime 已用卡片类型 | {markdown_cell(metrics.get('runtimeUsedTypes'))} |",
+        f"| Runtime 覆盖复核项 | {markdown_cell(metrics.get('runtimeIssues'))} |",
+        f"| VN 基础能力分 | {markdown_cell(metrics.get('vnEssentialsScore'))}/100 |",
+        f"| VN 基础关注领域 | {markdown_cell(metrics.get('vnEssentialsAttentionAreas'))} |",
         "",
         "## 优先处理",
         "",
@@ -438,6 +522,7 @@ def write_export_release_readiness_files(
     unlockable_manifest: dict | None = None,
     story_route_map: dict | None = None,
     localization_audit: dict | None = None,
+    runtime_capability_matrix: dict | None = None,
     report_files: list[str] | None = None,
     platform_notes: list[str] | None = None,
 ) -> dict:
@@ -448,6 +533,7 @@ def write_export_release_readiness_files(
         unlockable_manifest=unlockable_manifest,
         story_route_map=story_route_map,
         localization_audit=localization_audit,
+        runtime_capability_matrix=runtime_capability_matrix,
         report_files=report_files,
         platform_notes=platform_notes,
     )
