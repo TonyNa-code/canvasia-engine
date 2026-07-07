@@ -129,6 +129,7 @@ const escapeHtml = editorCommonTools.escapeHtml;
 const buildTemplateAssetUrl = (relativePath) =>
   editorCommonTools.buildTemplateAssetUrl(relativePath, state.data?.currentProject?.publicRoot ?? "");
 const projectRuntimeSettingsTools = window.CanvasiaEditorProjectRuntimeSettings;
+const projectRuntimeSettingsPanelTools = window.CanvasiaEditorProjectRuntimeSettingsPanel;
 const projectSettingsTools = window.CanvasiaEditorProjectSettings;
 const dialogBoxReadabilityTools = window.CanvasiaEditorDialogBoxReadability;
 const validationCacheTools = window.CanvasiaEditorValidationCache;
@@ -31965,148 +31966,20 @@ function renderAssetFootprintPanel({ compact = false } = {}) {
 
 function renderRuntimePreloadBudgetPanel({ compact = false } = {}) {
   const report = buildRuntimePreloadBudgetReport();
-  const digest = runtimePreloadBudgetTools.getRuntimePreloadBudgetDigest(report);
-  const totals = report.totals ?? {};
-  const critical = report.phases?.critical ?? {};
-  const early = report.phases?.early ?? {};
-  const profileAdvice = report.profileAdvice ?? {};
-  const phaseCards = (report.phaseList ?? []).slice(0, compact ? 2 : 4);
-  const topEntries = (report.topEntries ?? []).slice(0, compact ? 3 : 6);
-  const warnings = (report.warnings ?? []).filter((warning) => warning.severity !== "tip").slice(0, compact ? 2 : 4);
-  const sceneHotspots = (report.scenes ?? []).filter((scene) => scene.count > 0).slice(0, compact ? 2 : 4);
-  const toneClass = getAssetFootprintToneClass(digest.level);
-  const currentPerformanceProfile = getProjectRuntimeSettings().performanceProfile;
-  const recommendedPerformanceProfile = runtimePreloadBudgetTools.getSafePerformanceProfileKey(
-    profileAdvice.recommendedProfile ?? currentPerformanceProfile
+  return runtimePreloadBudgetTools.renderRuntimePreloadBudgetPanel(
+    {
+      report,
+      digest: runtimePreloadBudgetTools.getRuntimePreloadBudgetDigest(report),
+      compact,
+      currentPerformanceProfile: getProjectRuntimeSettings().performanceProfile,
+    },
+    {
+      escapeHtml,
+      renderRouteMetricCard,
+      renderEmpty,
+      getToneClass: getAssetFootprintToneClass,
+    }
   );
-  const profileAdviceTone =
-    profileAdvice.status === "needs_optimization" || profileAdvice.status === "should_raise"
-      ? "warn"
-      : profileAdvice.status === "can_lower"
-        ? "soft"
-        : "ready";
-  const canApplyProfileAdvice =
-    recommendedPerformanceProfile !== currentPerformanceProfile && profileAdvice.status !== "needs_optimization";
-  const profileAdviceAction = (profileAdvice.actions ?? [])[0] ?? "保持当前档位；发布前继续复查首屏体积。";
-  const profileAdviceReason = (profileAdvice.reasons ?? [])[0] ?? "当前预热规模与项目性能档位基本匹配。";
-
-  return `
-    <article class="detail-card preview-sprint-panel runtime-preload-budget-panel">
-      <div class="panel-heading">
-        <h2>Runtime 首屏加载预算</h2>
-        <span class="badge badge-soft ${toneClass}">${escapeHtml(digest.title)}</span>
-      </div>
-      <p class="helper-text">${escapeHtml(digest.detail)} 它会按导出 Runtime 的预热逻辑，提前检查入口场景和早期路线里是否有大图、大音频、视频、缺文件或未知体积。</p>
-      <div class="preview-sprint-metrics">
-        ${renderRouteMetricCard("首屏必备", critical.bytesLabel ?? "0 B", `${critical.count ?? 0} 个素材`)}
-        ${renderRouteMetricCard("早期路线", early.bytesLabel ?? "0 B", `${early.count ?? 0} 个素材`)}
-        ${renderRouteMetricCard("总预热候选", totals.totalLabel ?? "0 B", `${totals.totalEntries ?? 0} 个素材`)}
-        ${renderRouteMetricCard("缺口", `${totals.missingFileCount ?? 0} / ${totals.missingSizeCount ?? 0}`, "缺文件 / 缺体积")}
-        ${renderRouteMetricCard(
-          "推荐档位",
-          profileAdvice.recommendedProfileLabel ?? "标准 PC / 网页",
-          `当前 ${profileAdvice.selectedProfileLabel ?? report.performanceProfile?.label ?? "标准 PC / 网页"}`
-        )}
-      </div>
-      <article class="preview-sprint-card runtime-preload-profile-advice is-${profileAdviceTone}">
-        <div class="preview-sprint-head">
-          <strong>性能档位建议：${escapeHtml(profileAdvice.recommendedProfileLabel ?? "标准 PC / 网页")}</strong>
-          <span class="issue-tag ${getAssetFootprintToneClass(profileAdviceTone)}">${escapeHtml(profileAdvice.status ?? "ok")}</span>
-        </div>
-        <p>${escapeHtml(profileAdviceReason)} ${escapeHtml(profileAdviceAction)}</p>
-        ${
-          canApplyProfileAdvice
-            ? `<button class="toolbar-button toolbar-button-primary" data-action="apply-runtime-preload-recommended-profile" data-performance-profile="${escapeHtml(recommendedPerformanceProfile)}">一键应用推荐档位</button>`
-            : `<button class="toolbar-button" data-action="export-runtime-preload-budget-markdown">导出瘦身建议</button>`
-        }
-      </article>
-      <div class="detail-actions">
-        <button class="toolbar-button toolbar-button-primary" data-action="export-runtime-preload-budget-markdown">
-          ${escapeHtml(digest.actionLabel)}
-        </button>
-        <button class="toolbar-button" data-action="export-runtime-preload-budget-csv">
-          导出 CSV
-        </button>
-        <button class="toolbar-button" data-action="export-asset-footprint-markdown">
-          对照包体积
-        </button>
-      </div>
-      ${
-        phaseCards.length > 0
-          ? `
-            <div class="preview-sprint-grid">
-              ${phaseCards
-                .map(
-                  (phase) => `
-                    <article class="preview-sprint-card is-${phase.overBudget || phase.missingFileCount > 0 ? "warn" : "soft"}">
-                      <div class="preview-sprint-head">
-                        <strong>${escapeHtml(phase.label)}</strong>
-                        <span class="issue-tag ${getAssetFootprintToneClass(phase.overBudget ? "warn" : "ready")}">${escapeHtml(phase.bytesLabel)}</span>
-                      </div>
-                      <p>${escapeHtml(`${phase.count} 个素材 · 建议预算 ${phase.budgetLabel}`)}</p>
-                      <div class="helper-text">${escapeHtml(
-                        phase.missingFileCount > 0
-                          ? `缺文件 ${phase.missingFileCount} 个，先补齐再导出。`
-                          : phase.detail
-                      )}</div>
-                    </article>
-                  `
-                )
-                .join("")}
-            </div>
-          `
-          : renderEmpty("当前还没有可统计的首屏预热素材。写入入口场景并绑定素材后，这里会自动出现预算分析。")
-      }
-      ${
-        !compact && topEntries.length > 0
-          ? `
-            <div class="list-stack compact-stack">
-              ${topEntries
-                .map(
-                  (entry) => `
-                    <article class="asset-dependency-row">
-                      <div>
-                        <b>${escapeHtml(entry.name)}</b>
-                        <span>${escapeHtml(`${entry.typeLabel} · ${entry.reason || "预热候选"}`)}</span>
-                      </div>
-                      <span class="${entry.fileExists ? getAssetFootprintToneClass(entry.phase === "critical" && entry.sizeBytes > 0 ? digest.level : "ready") : "danger-text"}">
-                        ${escapeHtml(entry.fileExists ? entry.sizeLabel : "缺文件")}
-                      </span>
-                    </article>
-                  `
-                )
-                .join("")}
-            </div>
-          `
-          : ""
-      }
-      ${
-        !compact && sceneHotspots.length > 0
-          ? `
-            <div class="story-filter-chip-row">
-              ${sceneHotspots
-                .map(
-                  (scene) =>
-                    `<span class="issue-tag ${scene.overHotspotBudget ? "warn-text" : ""}">${escapeHtml(`${scene.sceneName} · ${scene.earlyLabel}`)}</span>`
-                )
-                .join("")}
-            </div>
-          `
-          : ""
-      }
-      ${
-        warnings.length > 0
-          ? `
-            <div class="story-filter-chip-row">
-              ${warnings
-                .map((warning) => `<span class="issue-tag ${getAssetFootprintToneClass(warning.severity)}">${escapeHtml(warning.title)}</span>`)
-                .join("")}
-            </div>
-          `
-          : `<p class="helper-text">当前没有明显首屏加载风险；如果准备上架，可以导出报告留档。</p>`
-      }
-    </article>
-  `;
 }
 
 function renderAssetDependencyPanel() {
@@ -36571,84 +36444,18 @@ function applyReleaseVersionPreset(preset) {
   showToast(`已套用版本预设：${nextReleaseVersion}`);
 }
 
-function buildDialogBoxAssetSelectOptions(selectedAssetId = "") {
-  const uiAssets = state.data.assetList.filter((asset) => asset.type === "ui");
-  if (!uiAssets.length) {
-    return `<option value="">当前还没有可用的 UI 素材</option>`;
-  }
-  return [
-    `<option value="" ${!selectedAssetId ? "selected" : ""}>不叠图片图层</option>`,
-    ...uiAssets.map(
-      (asset) =>
-        `<option value="${escapeHtml(asset.id)}" ${selectedAssetId === asset.id ? "selected" : ""}>${escapeHtml(
-          asset.fileExists ? `${asset.name} · ${asset.path.split("/").pop()}` : `${asset.name} · 文件未导入`
-        )}</option>`
-    ),
-  ].join("");
-}
-
 function buildGameUiAssetSelectOptions(selectedAssetId = "", allowedTypes = ["ui"], emptyLabel = "不绑定素材") {
-  const allowedSet = new Set(allowedTypes);
-  const assets = state.data.assetList.filter((asset) => allowedSet.has(asset.type));
-  const selectedAsset = selectedAssetId ? state.data.assetsById?.get(selectedAssetId) : null;
-  const options = [`<option value="" ${!selectedAssetId ? "selected" : ""}>${escapeHtml(emptyLabel)}</option>`];
-
-  if (selectedAssetId && selectedAsset && !allowedSet.has(selectedAsset.type)) {
-    options.push(
-      `<option value="${escapeHtml(selectedAsset.id)}" selected>${escapeHtml(`${selectedAsset.name} · 当前绑定`)}</option>`
-    );
-  }
-
-  if (!assets.length) {
-    const typeHint = allowedTypes.map((type) => getAssetTypeLabel(type)).join(" / ") || "素材";
-    options.push(`<option value="" disabled>当前还没有可用${escapeHtml(typeHint)}，可先去素材库导入</option>`);
-    return options.join("");
-  }
-
-  options.push(
-    ...assets.map(
-      (asset) =>
-        `<option value="${escapeHtml(asset.id)}" ${selectedAssetId === asset.id ? "selected" : ""}>${escapeHtml(
-          asset.fileExists ? `${asset.name} · ${asset.path.split("/").pop()}` : `${asset.name} · 文件未导入`
-        )}</option>`
-    )
+  return projectRuntimeSettingsPanelTools.buildGameUiAssetSelectOptions(
+    {
+      assetList: state.data?.assetList ?? [],
+      assetsById: state.data?.assetsById,
+      getAssetTypeLabel,
+    },
+    selectedAssetId,
+    allowedTypes,
+    emptyLabel,
+    { escapeHtml }
   );
-
-  return options.join("");
-}
-
-function renderGameUiFrameSliceControls(idPrefix, title, slice) {
-  const fields = [
-    ["top", "上"],
-    ["right", "右"],
-    ["bottom", "下"],
-    ["left", "左"],
-  ];
-  return `
-    <div class="detail-card ui-frame-slice-card">
-      <strong>${escapeHtml(title)}</strong>
-      <p class="helper-text">九宫格边距会决定 UI 贴图四角不被拉伸，中间区域自动延展；适合按钮框、科幻边框、纸张卷轴等资源。</p>
-      <div class="playback-setting-grid dialog-config-grid">
-        ${fields
-          .map(
-            ([key, label]) => `
-              <label class="playback-setting">
-                <span>${label}边距</span>
-                <input
-                  id="${idPrefix}${key[0].toUpperCase()}${key.slice(1)}Input"
-                  type="number"
-                  min="0"
-                  max="96"
-                  step="1"
-                  value="${slice[key]}"
-                />
-              </label>
-            `
-          )
-          .join("")}
-      </div>
-    </div>
-  `;
 }
 
 function getSafeProjectVariableType(type) {
@@ -37584,828 +37391,80 @@ function exportProjectVariableAuditReport() {
   showToast(`变量治理报告已导出：${fileName}`);
 }
 
-function renderDialogBoxReadabilityCard(report, plan, digest) {
-  if (!report || !plan || !digest) {
-    return "";
-  }
+function buildProjectRuntimeSettingsPanelLabels() {
+  return {
+    languageLabels: PROJECT_LANGUAGE_LABELS,
+    textSpeedLabels: TEXT_SPEED_LABELS,
+    dialogThemeLabels: DIALOG_THEME_LABELS,
+    uiThemeModeLabels: UI_THEME_MODE_LABELS,
+    performanceProfileLabels: RUNTIME_PERFORMANCE_PROFILE_LABELS,
+    dialogBoxPresetLabels: PROJECT_DIALOG_BOX_PRESET_LABELS,
+    dialogBoxShapeLabels: PROJECT_DIALOG_BOX_SHAPE_LABELS,
+    dialogBoxAnchorLabels: PROJECT_DIALOG_BOX_ANCHOR_LABELS,
+    gameUiPresetLabels: PROJECT_GAME_UI_PRESET_LABELS,
+    gameUiLayoutLabels: PROJECT_GAME_UI_LAYOUT_LABELS,
+    gameUiTitleLayoutLabels: PROJECT_GAME_UI_TITLE_LAYOUT_LABELS,
+    gameUiFontLabels: PROJECT_GAME_UI_FONT_LABELS,
+    gameUiSurfaceLabels: PROJECT_GAME_UI_SURFACE_LABELS,
+    gameUiBrandLabels: PROJECT_GAME_UI_BRAND_LABELS,
+    gameUiSidePanelLabels: PROJECT_GAME_UI_SIDE_PANEL_LABELS,
+    gameUiSidePositionLabels: PROJECT_GAME_UI_SIDE_POSITION_LABELS,
+    gameUiTopbarPositionLabels: PROJECT_GAME_UI_TOPBAR_POSITION_LABELS,
+    gameUiHudPositionLabels: PROJECT_GAME_UI_HUD_POSITION_LABELS,
+    gameUiTitleCardAnchorLabels: PROJECT_GAME_UI_TITLE_CARD_ANCHOR_LABELS,
+  };
+}
 
-  const metrics = report.metrics ?? {};
-  const issueItems = report.issues.slice(0, 3);
-  const issueListMarkup = issueItems.length > 0
-    ? `
-      <ul class="dialog-readability-issue-list">
-        ${issueItems
-          .map((issue) => `<li>${escapeHtml(issue.title)}：${escapeHtml(issue.detail)}</li>`)
-          .join("")}
-      </ul>
-    `
-    : `<p class="dialog-readability-ok">当前文本框读起来比较稳，暂时不需要自动修复。</p>`;
-  const operationSummary = plan.changed
-    ? `将调整 ${plan.operations.length} 项：${plan.operations.map((operation) => operation.label).slice(0, 4).join("、")}`
-    : "不会修改你的自定义贴图、锚点、偏移或剧情内容。";
-
-  return `
-    <div class="dialog-readability-card" data-readability-level="${escapeHtml(digest.level)}">
-      <div class="dialog-readability-head">
-        <div>
-          <strong>文本框可读性安全网</strong>
-          <p class="helper-text">${escapeHtml(digest.helperText)}</p>
-        </div>
-        <span class="dialog-readability-badge" data-readability-level="${escapeHtml(digest.level)}">
-          ${escapeHtml(digest.badgeLabel)}
-        </span>
-      </div>
-      <div class="dialog-readability-metrics">
-        <span>正文 ${metrics.textBlockCount ?? 0} 段</span>
-        <span>长文本 ${metrics.longTextCount ?? 0} 段</span>
-        <span>多行 ${metrics.multilineCount ?? 0} 段</span>
-        <span>对比度 ${metrics.textContrastRatio ?? "-"}:1</span>
-      </div>
-      ${issueListMarkup}
-      <div class="dialog-readability-actions">
-        <button
-          class="toolbar-button ${plan.changed ? "toolbar-button-primary" : ""}"
-          type="button"
-          data-action="apply-dialog-box-readability-fix"
-          ${plan.changed && !state.dialogBoxReadabilityFixInFlight ? "" : "disabled"}
-        >
-          ${escapeHtml(state.dialogBoxReadabilityFixInFlight ? "增强中..." : digest.actionLabel)}
-        </button>
-        <span>${escapeHtml(operationSummary)}</span>
-      </div>
-    </div>
-  `;
+function getProjectRuntimeSettingsPanelAssetContext() {
+  return {
+    assetList: state.data?.assetList ?? [],
+    assetsById: state.data?.assetsById,
+    getAssetTypeLabel,
+  };
 }
 
 function renderProjectRuntimeSettingsPanel() {
-  const runtimeSettings = getProjectRuntimeSettings();
-  const dialogBoxConfig = getProjectDialogBoxConfig();
-  const gameUiConfig = getProjectGameUiConfig();
-  const projectLanguage = getProjectLanguage();
-  const projectSupportedLanguages = getProjectSupportedLanguages();
   const dialogBoxReadabilityReport = dialogBoxReadabilityTools.buildDialogBoxReadabilityReport(state.data ?? {});
   const dialogBoxReadabilityPlan = dialogBoxReadabilityTools.buildDialogBoxReadabilityAutoFixPlan(state.data ?? {});
   const dialogBoxReadabilityDigest = dialogBoxReadabilityTools.getDialogBoxReadabilityDigest(dialogBoxReadabilityReport);
-  return `
-    <article class="detail-card">
-      <strong>成品体验设置</strong>
-      <p class="helper-text">这里会直接写进项目文件，网页试玩包和桌面版都会吃这套配置。适合先把“存档规模”“对话框风格”和“成品 UI 皮肤”定下来。</p>
-      <div class="detail-stack">
-        <section class="detail-card dialog-config-card">
-          <strong>多语言与国际化</strong>
-          <p class="helper-text">先选择默认语言，再勾选成品包里允许玩家切换的语言。剧情卡片可逐步补充 textTranslations / displayNameTranslations，缺失翻译会自动回退到默认文本。</p>
-          <div class="playback-setting-grid dialog-config-grid">
-            <label class="playback-setting">
-              <span>默认语言</span>
-              <select id="projectDefaultLanguageSelect">
-                ${Object.entries(PROJECT_LANGUAGE_LABELS)
-                  .map(
-                    ([language, label]) =>
-                      `<option value="${language}" ${projectLanguage === language ? "selected" : ""}>${escapeHtml(label)}</option>`
-                  )
-                  .join("")}
-              </select>
-            </label>
-            <div class="playback-setting">
-              <span>成品可切换语言</span>
-              <div class="detail-actions">
-                ${Object.entries(PROJECT_LANGUAGE_LABELS)
-                  .map(
-                    ([language, label]) => `
-                      <label class="toolbar-button">
-                        <input
-                          type="checkbox"
-                          data-project-supported-language
-                          value="${language}"
-                          ${projectSupportedLanguages.includes(language) ? "checked" : ""}
-                        />
-                        ${escapeHtml(label)}
-                      </label>
-                    `
-                  )
-                  .join("")}
-              </div>
-            </div>
-          </div>
-          <div class="detail-actions">
-            <button class="toolbar-button toolbar-button-primary" data-action="save-project-localization">
-              保存多语言设置
-            </button>
-          </div>
-          <div class="detail-meta">当前默认语言：${escapeHtml(
-            PROJECT_LANGUAGE_LABELS[projectLanguage] ?? projectLanguage
-          )}；导出 Runtime 会提供 ${projectSupportedLanguages.length} 种语言。</div>
-        </section>
-        <section class="detail-card dialog-config-card">
-          <strong>正式存档位数量</strong>
-          <p class="helper-text">手动存档位不再固定。大项目可直接扩到 50、100 或更多，读档分页会自动跟着变化。</p>
-          <div class="asset-search-row story-tree-filter-row">
-            <label class="asset-search-field">
-              <span class="sr-only">正式存档位数量</span>
-              <input
-                id="projectFormalSaveSlotCountInput"
-                type="number"
-                min="${PROJECT_SAVE_SLOT_COUNT_LIMITS.min}"
-                max="${PROJECT_SAVE_SLOT_COUNT_LIMITS.max}"
-                step="1"
-                value="${runtimeSettings.formalSaveSlotCount}"
-              />
-            </label>
-            <button class="toolbar-button toolbar-button-primary" data-action="save-project-save-slot-count">
-              保存存档位
-            </button>
-          </div>
-          <div class="detail-meta">当前项目已配置 ${runtimeSettings.formalSaveSlotCount} 个正式存档位，正式读档会自动分页展示。</div>
-        </section>
-        <section class="detail-card dialog-config-card">
-          <strong>成品默认播放体验</strong>
-          <p class="helper-text">这里控制玩家第一次打开导出游戏时的阅读节奏、主题和音量。玩家在游戏里手动调整后，会优先使用玩家自己的本地设置。</p>
-          <div class="playback-setting-grid dialog-config-grid">
-            <label class="playback-setting">
-              <span>默认文字速度</span>
-              <select id="projectRuntimeDefaultTextSpeedSelect">
-                ${Object.entries(TEXT_SPEED_LABELS)
-                  .map(
-                    ([speed, label]) =>
-                      `<option value="${speed}" ${runtimeSettings.defaultTextSpeed === speed ? "selected" : ""}>${escapeHtml(label)}</option>`
-                  )
-                  .join("")}
-              </select>
-            </label>
-            <label class="playback-setting">
-              <span>默认对话框主题</span>
-              <select id="projectRuntimeDefaultDialogThemeSelect">
-                ${Object.entries(DIALOG_THEME_LABELS)
-                  .map(
-                    ([theme, label]) =>
-                      `<option value="${theme}" ${runtimeSettings.defaultDialogTheme === theme ? "selected" : ""}>${escapeHtml(label)}</option>`
-                  )
-                  .join("")}
-              </select>
-            </label>
-            <label class="playback-setting">
-              <span>默认界面深浅</span>
-              <select id="projectRuntimeDefaultUiThemeModeSelect">
-                ${Object.entries(UI_THEME_MODE_LABELS)
-                  .map(
-                    ([mode, label]) =>
-                      `<option value="${mode}" ${runtimeSettings.defaultUiThemeMode === mode ? "selected" : ""}>${escapeHtml(label)}</option>`
-                  )
-                  .join("")}
-              </select>
-            </label>
-            <label class="playback-setting">
-              <span>性能目标</span>
-              <select id="projectRuntimePerformanceProfileSelect">
-                ${Object.entries(RUNTIME_PERFORMANCE_PROFILE_LABELS)
-                  .map(
-                    ([profile, label]) =>
-                      `<option value="${profile}" ${runtimeSettings.performanceProfile === profile ? "selected" : ""}>${escapeHtml(label)}</option>`
-                  )
-                  .join("")}
-              </select>
-            </label>
-            <label class="toolbar-button playback-setting-inline">
-              <input
-                id="projectRuntimeDefaultVoiceEnabledInput"
-                type="checkbox"
-                ${runtimeSettings.defaultVoiceEnabled ? "checked" : ""}
-              />
-              默认开启语音
-            </label>
-            <label class="toolbar-button playback-setting-inline">
-              <input
-                id="projectRuntimeDefaultVoiceDuckingEnabledInput"
-                type="checkbox"
-                ${runtimeSettings.defaultVoiceDuckingEnabled ? "checked" : ""}
-              />
-              语音时压低 BGM
-            </label>
-          </div>
-          <div class="playback-volume-grid dialog-config-ranges">
-            <label class="playback-setting">
-              <span>默认 BGM 音量</span>
-              <input id="projectRuntimeDefaultBgmVolumeInput" type="range" min="0" max="100" step="1" value="${runtimeSettings.defaultBgmVolume}" />
-              <strong class="playback-volume-value">${runtimeSettings.defaultBgmVolume}%</strong>
-            </label>
-            <label class="playback-setting">
-              <span>默认音效音量</span>
-              <input id="projectRuntimeDefaultSfxVolumeInput" type="range" min="0" max="100" step="1" value="${runtimeSettings.defaultSfxVolume}" />
-              <strong class="playback-volume-value">${runtimeSettings.defaultSfxVolume}%</strong>
-            </label>
-            <label class="playback-setting">
-              <span>默认语音音量</span>
-              <input id="projectRuntimeDefaultVoiceVolumeInput" type="range" min="0" max="100" step="1" value="${runtimeSettings.defaultVoiceVolume}" />
-              <strong class="playback-volume-value">${runtimeSettings.defaultVoiceVolume}%</strong>
-            </label>
-            <label class="playback-setting">
-              <span>语音时 BGM 保留</span>
-              <input id="projectRuntimeDefaultVoiceDuckingRatioInput" type="range" min="15" max="100" step="1" value="${runtimeSettings.defaultVoiceDuckingRatio}" />
-              <strong class="playback-volume-value">${runtimeSettings.defaultVoiceDuckingRatio}%</strong>
-            </label>
-          </div>
-          <div class="detail-actions">
-            <button class="toolbar-button toolbar-button-primary" data-action="save-project-runtime-playback-defaults">
-              保存默认播放体验
-            </button>
-          </div>
-          <div class="detail-meta">当前默认：${escapeHtml(TEXT_SPEED_LABELS[runtimeSettings.defaultTextSpeed] ?? runtimeSettings.defaultTextSpeed)} · ${escapeHtml(
-            DIALOG_THEME_LABELS[runtimeSettings.defaultDialogTheme] ?? runtimeSettings.defaultDialogTheme
-          )} · ${escapeHtml(UI_THEME_MODE_LABELS[runtimeSettings.defaultUiThemeMode] ?? runtimeSettings.defaultUiThemeMode)} · ${escapeHtml(
-            RUNTIME_PERFORMANCE_PROFILE_LABELS[runtimeSettings.performanceProfile] ?? runtimeSettings.performanceProfile
-          )} · BGM ${runtimeSettings.defaultBgmVolume}% / 音效 ${runtimeSettings.defaultSfxVolume}% / 语音 ${runtimeSettings.defaultVoiceVolume}% · 语音焦点${runtimeSettings.defaultVoiceDuckingEnabled ? "开" : "关"} / BGM 保留 ${runtimeSettings.defaultVoiceDuckingRatio}%</div>
-        </section>
-        <div id="projectVariableLibraryPanelHost">
-          ${renderProjectVariableLibraryPanel()}
-        </div>
-        <section class="detail-card dialog-config-card">
-          <strong>对话文本框样式</strong>
-          <p class="helper-text">先选一个基础预设，再用颜色、透明度、尺寸和 UI 图层继续微调。没有特殊需求时也可以直接用透明无框。</p>
-          <div class="detail-actions">
-            ${Object.entries(PROJECT_DIALOG_BOX_PRESET_LABELS)
-              .filter(([preset]) => preset !== "custom")
-              .map(
-                ([preset, label]) => `
-                  <button
-                    class="toolbar-button ${dialogBoxConfig.preset === preset ? "toolbar-button-primary" : ""}"
-                    type="button"
-                    data-action="apply-project-dialog-box-preset"
-                    data-dialog-preset="${preset}"
-                  >
-                    ${escapeHtml(label)}
-                  </button>
-                `
-	              )
-	              .join("")}
-	          </div>
-	          ${renderDialogBoxReadabilityCard(dialogBoxReadabilityReport, dialogBoxReadabilityPlan, dialogBoxReadabilityDigest)}
-	          <div class="playback-setting-grid dialog-config-grid">
-            <label class="playback-setting">
-              <span>当前预设</span>
-              <select id="projectDialogBoxPresetSelect">
-                ${Object.entries(PROJECT_DIALOG_BOX_PRESET_LABELS)
-                  .map(
-                    ([preset, label]) =>
-                      `<option value="${preset}" ${dialogBoxConfig.preset === preset ? "selected" : ""}>${escapeHtml(label)}</option>`
-                  )
-                  .join("")}
-              </select>
-            </label>
-            <label class="playback-setting">
-              <span>框体形状</span>
-              <select id="projectDialogBoxShapeSelect">
-                ${Object.entries(PROJECT_DIALOG_BOX_SHAPE_LABELS)
-                  .map(
-                    ([shape, label]) =>
-                      `<option value="${shape}" ${dialogBoxConfig.shape === shape ? "selected" : ""}>${escapeHtml(label)}</option>`
-                  )
-                  .join("")}
-              </select>
-            </label>
-            <label class="playback-setting">
-              <span>文本框位置</span>
-              <select id="projectDialogBoxAnchorSelect">
-                ${Object.entries(PROJECT_DIALOG_BOX_ANCHOR_LABELS)
-                  .map(
-                    ([anchor, label]) =>
-                      `<option value="${anchor}" ${dialogBoxConfig.anchor === anchor ? "selected" : ""}>${escapeHtml(label)}</option>`
-                  )
-                  .join("")}
-              </select>
-            </label>
-            <label class="playback-setting">
-              <span>图片图层</span>
-              <select id="projectDialogBoxAssetSelect">
-                ${buildDialogBoxAssetSelectOptions(dialogBoxConfig.panelAssetId)}
-              </select>
-            </label>
-            <label class="playback-setting">
-              <span>图层铺法</span>
-              <select id="projectDialogBoxAssetFitSelect">
-                <option value="cover" ${dialogBoxConfig.panelAssetFit === "cover" ? "selected" : ""}>铺满裁切</option>
-                <option value="contain" ${dialogBoxConfig.panelAssetFit === "contain" ? "selected" : ""}>完整显示</option>
-              </select>
-            </label>
-          </div>
-          <div class="playback-setting-grid dialog-config-grid dialog-config-colors">
-            <label class="playback-setting">
-              <span>底色</span>
-              <input id="projectDialogBoxBackgroundColorInput" type="color" value="${dialogBoxConfig.backgroundColor}" />
-            </label>
-            <label class="playback-setting">
-              <span>边框色</span>
-              <input id="projectDialogBoxBorderColorInput" type="color" value="${dialogBoxConfig.borderColor}" />
-            </label>
-            <label class="playback-setting">
-              <span>正文色</span>
-              <input id="projectDialogBoxTextColorInput" type="color" value="${dialogBoxConfig.textColor}" />
-            </label>
-            <label class="playback-setting">
-              <span>名字色</span>
-              <input id="projectDialogBoxSpeakerColorInput" type="color" value="${dialogBoxConfig.speakerColor}" />
-            </label>
-          </div>
-          <div class="playback-volume-grid dialog-config-ranges">
-            <label class="playback-setting">
-              <span>底色透明度</span>
-              <input id="projectDialogBoxBackgroundOpacityInput" type="range" min="0" max="100" step="1" value="${dialogBoxConfig.backgroundOpacity}" />
-              <strong class="playback-volume-value">${dialogBoxConfig.backgroundOpacity}%</strong>
-            </label>
-            <label class="playback-setting">
-              <span>边框透明度</span>
-              <input id="projectDialogBoxBorderOpacityInput" type="range" min="0" max="100" step="1" value="${dialogBoxConfig.borderOpacity}" />
-              <strong class="playback-volume-value">${dialogBoxConfig.borderOpacity}%</strong>
-            </label>
-            <label class="playback-setting">
-              <span>图层透明度</span>
-              <input id="projectDialogBoxAssetOpacityInput" type="range" min="0" max="100" step="1" value="${dialogBoxConfig.panelAssetOpacity}" />
-              <strong class="playback-volume-value">${dialogBoxConfig.panelAssetOpacity}%</strong>
-            </label>
-            <label class="playback-setting">
-              <span>模糊</span>
-              <input id="projectDialogBoxBlurInput" type="range" min="0" max="24" step="1" value="${dialogBoxConfig.blurStrength}" />
-              <strong class="playback-volume-value">${dialogBoxConfig.blurStrength}px</strong>
-            </label>
-            <label class="playback-setting">
-              <span>宽度</span>
-              <input id="projectDialogBoxWidthInput" type="range" min="55" max="100" step="1" value="${dialogBoxConfig.widthPercent}" />
-              <strong class="playback-volume-value">${dialogBoxConfig.widthPercent}%</strong>
-            </label>
-            <label class="playback-setting">
-              <span>高度</span>
-              <input id="projectDialogBoxHeightInput" type="range" min="96" max="320" step="4" value="${dialogBoxConfig.minHeight}" />
-              <strong class="playback-volume-value">${dialogBoxConfig.minHeight}px</strong>
-            </label>
-            <label class="playback-setting">
-              <span>水平偏移</span>
-              <input id="projectDialogBoxOffsetXInput" type="range" min="-35" max="35" step="1" value="${dialogBoxConfig.offsetXPercent}" />
-              <strong class="playback-volume-value">${dialogBoxConfig.offsetXPercent}%</strong>
-            </label>
-            <label class="playback-setting">
-              <span>垂直偏移</span>
-              <input id="projectDialogBoxOffsetYInput" type="range" min="-35" max="35" step="1" value="${dialogBoxConfig.offsetYPercent}" />
-              <strong class="playback-volume-value">${dialogBoxConfig.offsetYPercent}%</strong>
-            </label>
-          </div>
-          <div class="detail-actions">
-            <button class="toolbar-button toolbar-button-primary" data-action="save-project-dialog-box-config">
-              保存文本框样式
-            </button>
-            <button class="toolbar-button" data-action="set-preview-dialog-theme-project">
-              试玩里切到项目样式
-            </button>
-          </div>
-          <div class="detail-meta">当前支持预设、透明无框、自定义颜色/尺寸，以及叠加一张 UI 素材图层；复杂版式可以先通过 UI 素材图层完成。</div>
-        </section>
-        <section class="detail-card dialog-config-card">
-          <strong>成品 UI 皮肤</strong>
-          <p class="helper-text">这一层控制玩家真正看到的标题页、顶部栏、按钮、系统菜单、存档/图鉴弹窗和侧栏外观；文本框仍然由上面的“对话文本框样式”单独控制。</p>
-          <div class="detail-actions">
-            ${Object.entries(PROJECT_GAME_UI_PRESET_LABELS)
-              .filter(([preset]) => preset !== "custom")
-              .map(
-                ([preset, label]) => `
-                  <button
-                    class="toolbar-button ${gameUiConfig.preset === preset ? "toolbar-button-primary" : ""}"
-                    type="button"
-                    data-action="apply-project-game-ui-preset"
-                    data-game-ui-preset="${preset}"
-                  >
-                    ${escapeHtml(label)}
-                  </button>
-                `
-              )
-              .join("")}
-          </div>
-          <div class="playback-setting-grid dialog-config-grid">
-            <label class="playback-setting">
-              <span>皮肤预设</span>
-              <select id="projectGameUiPresetSelect">
-                ${Object.entries(PROJECT_GAME_UI_PRESET_LABELS)
-                  .map(
-                    ([preset, label]) =>
-                      `<option value="${preset}" ${gameUiConfig.preset === preset ? "selected" : ""}>${escapeHtml(label)}</option>`
-                  )
-                  .join("")}
-              </select>
-            </label>
-            <label class="playback-setting">
-              <span>运行时布局</span>
-              <select id="projectGameUiLayoutPresetSelect">
-                ${Object.entries(PROJECT_GAME_UI_LAYOUT_LABELS)
-                  .map(
-                    ([layout, label]) =>
-                      `<option value="${layout}" ${gameUiConfig.layoutPreset === layout ? "selected" : ""}>${escapeHtml(label)}</option>`
-                  )
-                  .join("")}
-              </select>
-            </label>
-            <label class="playback-setting">
-              <span>标题页布局</span>
-              <select id="projectGameUiTitleLayoutSelect">
-                ${Object.entries(PROJECT_GAME_UI_TITLE_LAYOUT_LABELS)
-                  .map(
-                    ([layout, label]) =>
-                      `<option value="${layout}" ${gameUiConfig.titleLayout === layout ? "selected" : ""}>${escapeHtml(label)}</option>`
-                  )
-                  .join("")}
-              </select>
-            </label>
-            <label class="playback-setting">
-              <span>字体气质</span>
-              <select id="projectGameUiFontStyleSelect">
-                ${Object.entries(PROJECT_GAME_UI_FONT_LABELS)
-                  .map(
-                    ([style, label]) =>
-                      `<option value="${style}" ${gameUiConfig.fontStyle === style ? "selected" : ""}>${escapeHtml(label)}</option>`
-                  )
-                  .join("")}
-              </select>
-            </label>
-            <label class="playback-setting">
-              <span>系统字体族</span>
-              <input
-                id="projectGameUiFontFamilyInput"
-                type="text"
-                maxlength="80"
-                placeholder="例如 Noto Serif CJK SC"
-                value="${escapeHtml(gameUiConfig.fontFamily)}"
-              />
-            </label>
-            <label class="playback-setting">
-              <span>字体素材</span>
-              <select id="projectGameUiFontAssetSelect">
-                ${buildGameUiAssetSelectOptions(gameUiConfig.fontAssetId, ["font"], "使用系统字体族 / 默认字体")}
-              </select>
-            </label>
-            <label class="playback-setting">
-              <span>面板质感</span>
-              <select id="projectGameUiSurfaceStyleSelect">
-                ${Object.entries(PROJECT_GAME_UI_SURFACE_LABELS)
-                  .map(
-                    ([style, label]) =>
-                      `<option value="${style}" ${gameUiConfig.surfaceStyle === style ? "selected" : ""}>${escapeHtml(label)}</option>`
-                  )
-                  .join("")}
-              </select>
-            </label>
-            <label class="playback-setting">
-              <span>品牌露出</span>
-              <select id="projectGameUiBrandModeSelect">
-                ${Object.entries(PROJECT_GAME_UI_BRAND_LABELS)
-                  .map(
-                    ([mode, label]) =>
-                      `<option value="${mode}" ${gameUiConfig.brandMode === mode ? "selected" : ""}>${escapeHtml(label)}</option>`
-                  )
-                  .join("")}
-              </select>
-            </label>
-            <label class="playback-setting">
-              <span>侧栏显示</span>
-              <select id="projectGameUiSidePanelModeSelect">
-                ${Object.entries(PROJECT_GAME_UI_SIDE_PANEL_LABELS)
-                  .map(
-                    ([mode, label]) =>
-                      `<option value="${mode}" ${gameUiConfig.sidePanelMode === mode ? "selected" : ""}>${escapeHtml(label)}</option>`
-                  )
-                  .join("")}
-              </select>
-            </label>
-            <label class="playback-setting">
-              <span>侧栏位置</span>
-              <select id="projectGameUiSidePanelPositionSelect">
-                ${Object.entries(PROJECT_GAME_UI_SIDE_POSITION_LABELS)
-                  .map(
-                    ([position, label]) =>
-                      `<option value="${position}" ${gameUiConfig.sidePanelPosition === position ? "selected" : ""}>${escapeHtml(label)}</option>`
-                  )
-                  .join("")}
-              </select>
-            </label>
-            <label class="playback-setting">
-              <span>顶部栏位置</span>
-              <select id="projectGameUiTopbarPositionSelect">
-                ${Object.entries(PROJECT_GAME_UI_TOPBAR_POSITION_LABELS)
-                  .map(
-                    ([position, label]) =>
-                      `<option value="${position}" ${gameUiConfig.topbarPosition === position ? "selected" : ""}>${escapeHtml(label)}</option>`
-                  )
-                  .join("")}
-              </select>
-            </label>
-            <label class="playback-setting">
-              <span>舞台 HUD</span>
-              <select id="projectGameUiHudPositionSelect">
-                ${Object.entries(PROJECT_GAME_UI_HUD_POSITION_LABELS)
-                  .map(
-                    ([position, label]) =>
-                      `<option value="${position}" ${gameUiConfig.hudPosition === position ? "selected" : ""}>${escapeHtml(label)}</option>`
-                  )
-                  .join("")}
-              </select>
-            </label>
-            <label class="playback-setting">
-              <span>标题卡片位置</span>
-              <select id="projectGameUiTitleCardAnchorSelect">
-                ${Object.entries(PROJECT_GAME_UI_TITLE_CARD_ANCHOR_LABELS)
-                  .map(
-                    ([anchor, label]) =>
-                      `<option value="${anchor}" ${gameUiConfig.titleCardAnchor === anchor ? "selected" : ""}>${escapeHtml(label)}</option>`
-                  )
-                  .join("")}
-              </select>
-            </label>
-            <label class="playback-setting">
-              <span>标题背景铺法</span>
-              <select id="projectGameUiTitleBackgroundFitSelect">
-                <option value="cover" ${gameUiConfig.titleBackgroundFit === "cover" ? "selected" : ""}>铺满裁切</option>
-                <option value="contain" ${gameUiConfig.titleBackgroundFit === "contain" ? "selected" : ""}>完整显示</option>
-              </select>
-            </label>
-          </div>
-          <div class="playback-setting-grid dialog-config-grid">
-            <label class="playback-setting">
-              <span>标题背景图</span>
-              <select id="projectGameUiTitleBackgroundAssetSelect">
-                ${buildGameUiAssetSelectOptions(gameUiConfig.titleBackgroundAssetId, ["background", "cg", "ui"], "不使用标题背景图")}
-              </select>
-            </label>
-            <label class="playback-setting">
-              <span>标题 Logo 图</span>
-              <select id="projectGameUiTitleLogoAssetSelect">
-                ${buildGameUiAssetSelectOptions(gameUiConfig.titleLogoAssetId, ["ui", "sprite", "cg"], "使用默认 Logo")}
-              </select>
-            </label>
-            <label class="playback-setting">
-              <span>通用面板贴图</span>
-              <select id="projectGameUiPanelFrameAssetSelect">
-                ${buildGameUiAssetSelectOptions(gameUiConfig.panelFrameAssetId, ["ui"], "不使用面板贴图")}
-              </select>
-            </label>
-            <label class="playback-setting">
-              <span>按钮默认贴图</span>
-              <select id="projectGameUiButtonFrameAssetSelect">
-                ${buildGameUiAssetSelectOptions(gameUiConfig.buttonFrameAssetId, ["ui"], "不使用按钮贴图")}
-              </select>
-            </label>
-            <label class="playback-setting">
-              <span>按钮悬停贴图</span>
-              <select id="projectGameUiButtonHoverFrameAssetSelect">
-                ${buildGameUiAssetSelectOptions(gameUiConfig.buttonHoverFrameAssetId, ["ui"], "沿用默认按钮贴图")}
-              </select>
-            </label>
-            <label class="playback-setting">
-              <span>按钮按下贴图</span>
-              <select id="projectGameUiButtonPressedFrameAssetSelect">
-                ${buildGameUiAssetSelectOptions(gameUiConfig.buttonPressedFrameAssetId, ["ui"], "沿用默认按钮贴图")}
-              </select>
-            </label>
-            <label class="playback-setting">
-              <span>按钮禁用贴图</span>
-              <select id="projectGameUiButtonDisabledFrameAssetSelect">
-                ${buildGameUiAssetSelectOptions(gameUiConfig.buttonDisabledFrameAssetId, ["ui"], "沿用默认按钮贴图")}
-              </select>
-            </label>
-            <label class="playback-setting">
-              <span>存档卡片贴图</span>
-              <select id="projectGameUiSaveSlotFrameAssetSelect">
-                ${buildGameUiAssetSelectOptions(gameUiConfig.saveSlotFrameAssetId, ["ui"], "不使用存档贴图")}
-              </select>
-            </label>
-            <label class="playback-setting">
-              <span>系统弹窗贴图</span>
-              <select id="projectGameUiSystemPanelFrameAssetSelect">
-                ${buildGameUiAssetSelectOptions(gameUiConfig.systemPanelFrameAssetId, ["ui"], "沿用通用面板")}
-              </select>
-            </label>
-            <label class="playback-setting">
-              <span>全局叠层纹理</span>
-              <select id="projectGameUiOverlayAssetSelect">
-                ${buildGameUiAssetSelectOptions(gameUiConfig.uiOverlayAssetId, ["ui"], "不使用叠层纹理")}
-              </select>
-            </label>
-          </div>
-          ${renderGameUiFrameSliceControls("projectGameUiPanelFrameSlice", "面板 / 存档 / 弹窗九宫格", gameUiConfig.panelFrameSlice)}
-          ${renderGameUiFrameSliceControls("projectGameUiButtonFrameSlice", "按钮九宫格", gameUiConfig.buttonFrameSlice)}
-          <div class="playback-setting-grid dialog-config-grid dialog-config-colors">
-            <label class="playback-setting">
-              <span>背景色</span>
-              <input id="projectGameUiBackgroundColorInput" type="color" value="${gameUiConfig.backgroundColor}" />
-            </label>
-            <label class="playback-setting">
-              <span>氛围色</span>
-              <input id="projectGameUiBackgroundAccentColorInput" type="color" value="${gameUiConfig.backgroundAccentColor}" />
-            </label>
-            <label class="playback-setting">
-              <span>面板色</span>
-              <input id="projectGameUiPanelColorInput" type="color" value="${gameUiConfig.panelColor}" />
-            </label>
-            <label class="playback-setting">
-              <span>正文色</span>
-              <input id="projectGameUiTextColorInput" type="color" value="${gameUiConfig.textColor}" />
-            </label>
-            <label class="playback-setting">
-              <span>弱文字</span>
-              <input id="projectGameUiMutedTextColorInput" type="color" value="${gameUiConfig.mutedTextColor}" />
-            </label>
-            <label class="playback-setting">
-              <span>主强调</span>
-              <input id="projectGameUiAccentColorInput" type="color" value="${gameUiConfig.accentColor}" />
-            </label>
-            <label class="playback-setting">
-              <span>副强调</span>
-              <input id="projectGameUiAccentAltColorInput" type="color" value="${gameUiConfig.accentAltColor}" />
-            </label>
-            <label class="playback-setting">
-              <span>按钮文字</span>
-              <input id="projectGameUiButtonTextColorInput" type="color" value="${gameUiConfig.buttonTextColor}" />
-            </label>
-            <label class="playback-setting">
-              <span>描边色</span>
-              <input id="projectGameUiBorderColorInput" type="color" value="${gameUiConfig.borderColor}" />
-            </label>
-          </div>
-          <div class="playback-volume-grid dialog-config-ranges">
-            <label class="playback-setting">
-              <span>面板透明度</span>
-              <input id="projectGameUiPanelOpacityInput" type="range" min="35" max="100" step="1" value="${gameUiConfig.panelOpacity}" />
-              <strong class="playback-volume-value">${gameUiConfig.panelOpacity}%</strong>
-            </label>
-            <label class="playback-setting">
-              <span>描边透明度</span>
-              <input id="projectGameUiBorderOpacityInput" type="range" min="0" max="100" step="1" value="${gameUiConfig.borderOpacity}" />
-              <strong class="playback-volume-value">${gameUiConfig.borderOpacity}%</strong>
-            </label>
-            <label class="playback-setting">
-              <span>圆角</span>
-              <input id="projectGameUiCornerRadiusInput" type="range" min="4" max="42" step="1" value="${gameUiConfig.cornerRadius}" />
-              <strong class="playback-volume-value">${gameUiConfig.cornerRadius}px</strong>
-            </label>
-            <label class="playback-setting">
-              <span>背景模糊</span>
-              <input id="projectGameUiBackdropBlurInput" type="range" min="0" max="28" step="1" value="${gameUiConfig.backdropBlur}" />
-              <strong class="playback-volume-value">${gameUiConfig.backdropBlur}px</strong>
-            </label>
-            <label class="playback-setting">
-              <span>舞台暗角</span>
-              <input id="projectGameUiStageVignetteInput" type="range" min="0" max="80" step="1" value="${gameUiConfig.stageVignette}" />
-              <strong class="playback-volume-value">${gameUiConfig.stageVignette}%</strong>
-            </label>
-            <label class="playback-setting">
-              <span>动态强度</span>
-              <input id="projectGameUiMotionIntensityInput" type="range" min="0" max="100" step="1" value="${gameUiConfig.motionIntensity}" />
-              <strong class="playback-volume-value">${gameUiConfig.motionIntensity}%</strong>
-            </label>
-            <label class="playback-setting">
-              <span>标题背景透明度</span>
-              <input id="projectGameUiTitleBackgroundOpacityInput" type="range" min="0" max="100" step="1" value="${gameUiConfig.titleBackgroundOpacity}" />
-              <strong class="playback-volume-value">${gameUiConfig.titleBackgroundOpacity}%</strong>
-            </label>
-            <label class="playback-setting">
-              <span>面板贴图透明度</span>
-              <input id="projectGameUiPanelFrameOpacityInput" type="range" min="0" max="100" step="1" value="${gameUiConfig.panelFrameOpacity}" />
-              <strong class="playback-volume-value">${gameUiConfig.panelFrameOpacity}%</strong>
-            </label>
-            <label class="playback-setting">
-              <span>按钮贴图透明度</span>
-              <input id="projectGameUiButtonFrameOpacityInput" type="range" min="0" max="100" step="1" value="${gameUiConfig.buttonFrameOpacity}" />
-              <strong class="playback-volume-value">${gameUiConfig.buttonFrameOpacity}%</strong>
-            </label>
-            <label class="playback-setting">
-              <span>全局纹理透明度</span>
-              <input id="projectGameUiOverlayOpacityInput" type="range" min="0" max="100" step="1" value="${gameUiConfig.uiOverlayOpacity}" />
-              <strong class="playback-volume-value">${gameUiConfig.uiOverlayOpacity}%</strong>
-            </label>
-            <label class="playback-setting">
-              <span>标题水平偏移</span>
-              <input id="projectGameUiTitleCardOffsetXInput" type="range" min="-35" max="35" step="1" value="${gameUiConfig.titleCardOffsetXPercent}" />
-              <strong class="playback-volume-value">${gameUiConfig.titleCardOffsetXPercent}%</strong>
-            </label>
-            <label class="playback-setting">
-              <span>标题垂直偏移</span>
-              <input id="projectGameUiTitleCardOffsetYInput" type="range" min="-35" max="35" step="1" value="${gameUiConfig.titleCardOffsetYPercent}" />
-              <strong class="playback-volume-value">${gameUiConfig.titleCardOffsetYPercent}%</strong>
-            </label>
-            <label class="playback-setting">
-              <span>主布局间距</span>
-              <input id="projectGameUiLayoutGapInput" type="range" min="8" max="48" step="1" value="${gameUiConfig.layoutGap}" />
-              <strong class="playback-volume-value">${gameUiConfig.layoutGap}px</strong>
-            </label>
-            <label class="playback-setting">
-              <span>侧栏宽度</span>
-              <input id="projectGameUiSidePanelWidthInput" type="range" min="240" max="460" step="4" value="${gameUiConfig.sidePanelWidth}" />
-              <strong class="playback-volume-value">${gameUiConfig.sidePanelWidth}px</strong>
-            </label>
-          </div>
-          <div class="detail-actions">
-            <button class="toolbar-button toolbar-button-primary" data-action="save-project-game-ui-config">
-              保存成品 UI 皮肤
-            </button>
-            <button class="toolbar-button" data-action="export-build" data-export-target="web">
-              导出网页包检查外观
-            </button>
-          </div>
-          <div class="detail-meta">当前覆盖标题页、系统菜单、存档/读档、EXTRA/图鉴弹窗、侧栏、按钮、HUD、布局位置、UI 贴图绑定、九宫格拉伸和按钮多状态贴图。</div>
-        </section>
-      </div>
-    </article>
-  `;
+
+  return projectRuntimeSettingsPanelTools.renderProjectRuntimeSettingsPanel(
+    {
+      labels: buildProjectRuntimeSettingsPanelLabels(),
+      runtimeSettings: getProjectRuntimeSettings(),
+      saveSlotLimits: PROJECT_SAVE_SLOT_COUNT_LIMITS,
+      dialogBoxConfig: getProjectDialogBoxConfig(),
+      gameUiConfig: getProjectGameUiConfig(),
+      projectLanguage: getProjectLanguage(),
+      projectSupportedLanguages: getProjectSupportedLanguages(),
+      assetContext: getProjectRuntimeSettingsPanelAssetContext(),
+      variableLibraryPanelHtml: renderProjectVariableLibraryPanel(),
+      dialogBoxReadabilityReport,
+      dialogBoxReadabilityPlan,
+      dialogBoxReadabilityDigest,
+    },
+    {
+      escapeHtml,
+      dialogBoxReadabilityFixInFlight: state.dialogBoxReadabilityFixInFlight,
+    }
+  );
 }
 
 function readProjectDialogBoxConfigFromInputs() {
-  const currentConfig = getProjectDialogBoxConfig();
-  return getProjectDialogBoxConfig({
-    dialogBoxConfig: {
-      ...currentConfig,
-      preset: document.getElementById("projectDialogBoxPresetSelect")?.value,
-      shape: document.getElementById("projectDialogBoxShapeSelect")?.value,
-      anchor: document.getElementById("projectDialogBoxAnchorSelect")?.value,
-      widthPercent: document.getElementById("projectDialogBoxWidthInput")?.value,
-      minHeight: document.getElementById("projectDialogBoxHeightInput")?.value,
-      offsetXPercent: document.getElementById("projectDialogBoxOffsetXInput")?.value,
-      offsetYPercent: document.getElementById("projectDialogBoxOffsetYInput")?.value,
-      backgroundColor: document.getElementById("projectDialogBoxBackgroundColorInput")?.value,
-      backgroundOpacity: document.getElementById("projectDialogBoxBackgroundOpacityInput")?.value,
-      borderColor: document.getElementById("projectDialogBoxBorderColorInput")?.value,
-      borderOpacity: document.getElementById("projectDialogBoxBorderOpacityInput")?.value,
-      textColor: document.getElementById("projectDialogBoxTextColorInput")?.value,
-      speakerColor: document.getElementById("projectDialogBoxSpeakerColorInput")?.value,
-      blurStrength: document.getElementById("projectDialogBoxBlurInput")?.value,
-      panelAssetId: document.getElementById("projectDialogBoxAssetSelect")?.value,
-      panelAssetOpacity: document.getElementById("projectDialogBoxAssetOpacityInput")?.value,
-      panelAssetFit: document.getElementById("projectDialogBoxAssetFitSelect")?.value,
-    },
-  });
-}
-
-function readGameUiFrameSliceFromInputs(idPrefix, fallbackSlice) {
-  return getSafeGameUiFrameSlice(
-    {
-      top: document.getElementById(`${idPrefix}TopInput`)?.value,
-      right: document.getElementById(`${idPrefix}RightInput`)?.value,
-      bottom: document.getElementById(`${idPrefix}BottomInput`)?.value,
-      left: document.getElementById(`${idPrefix}LeftInput`)?.value,
-    },
-    fallbackSlice
+  return projectRuntimeSettingsPanelTools.readProjectDialogBoxConfigFromDocument(
+    getProjectDialogBoxConfig(),
+    document,
+    getProjectDialogBoxConfig
   );
 }
 
 function readProjectGameUiConfigFromInputs() {
-  const currentConfig = getProjectGameUiConfig();
-  return getProjectGameUiConfig({
-    gameUiConfig: {
-      ...currentConfig,
-      preset: document.getElementById("projectGameUiPresetSelect")?.value,
-      layoutPreset: document.getElementById("projectGameUiLayoutPresetSelect")?.value,
-      titleLayout: document.getElementById("projectGameUiTitleLayoutSelect")?.value,
-      fontStyle: document.getElementById("projectGameUiFontStyleSelect")?.value,
-      fontFamily: document.getElementById("projectGameUiFontFamilyInput")?.value,
-      fontAssetId: document.getElementById("projectGameUiFontAssetSelect")?.value,
-      surfaceStyle: document.getElementById("projectGameUiSurfaceStyleSelect")?.value,
-      brandMode: document.getElementById("projectGameUiBrandModeSelect")?.value,
-      sidePanelMode: document.getElementById("projectGameUiSidePanelModeSelect")?.value,
-      sidePanelPosition: document.getElementById("projectGameUiSidePanelPositionSelect")?.value,
-      topbarPosition: document.getElementById("projectGameUiTopbarPositionSelect")?.value,
-      hudPosition: document.getElementById("projectGameUiHudPositionSelect")?.value,
-      titleCardAnchor: document.getElementById("projectGameUiTitleCardAnchorSelect")?.value,
-      titleCardOffsetXPercent: document.getElementById("projectGameUiTitleCardOffsetXInput")?.value,
-      titleCardOffsetYPercent: document.getElementById("projectGameUiTitleCardOffsetYInput")?.value,
-      layoutGap: document.getElementById("projectGameUiLayoutGapInput")?.value,
-      sidePanelWidth: document.getElementById("projectGameUiSidePanelWidthInput")?.value,
-      titleBackgroundAssetId: document.getElementById("projectGameUiTitleBackgroundAssetSelect")?.value,
-      titleBackgroundFit: document.getElementById("projectGameUiTitleBackgroundFitSelect")?.value,
-      titleBackgroundOpacity: document.getElementById("projectGameUiTitleBackgroundOpacityInput")?.value,
-      titleLogoAssetId: document.getElementById("projectGameUiTitleLogoAssetSelect")?.value,
-      panelFrameAssetId: document.getElementById("projectGameUiPanelFrameAssetSelect")?.value,
-      panelFrameOpacity: document.getElementById("projectGameUiPanelFrameOpacityInput")?.value,
-      panelFrameSlice: readGameUiFrameSliceFromInputs("projectGameUiPanelFrameSlice", currentConfig.panelFrameSlice),
-      buttonFrameAssetId: document.getElementById("projectGameUiButtonFrameAssetSelect")?.value,
-      buttonHoverFrameAssetId: document.getElementById("projectGameUiButtonHoverFrameAssetSelect")?.value,
-      buttonPressedFrameAssetId: document.getElementById("projectGameUiButtonPressedFrameAssetSelect")?.value,
-      buttonDisabledFrameAssetId: document.getElementById("projectGameUiButtonDisabledFrameAssetSelect")?.value,
-      buttonFrameOpacity: document.getElementById("projectGameUiButtonFrameOpacityInput")?.value,
-      buttonFrameSlice: readGameUiFrameSliceFromInputs("projectGameUiButtonFrameSlice", currentConfig.buttonFrameSlice),
-      saveSlotFrameAssetId: document.getElementById("projectGameUiSaveSlotFrameAssetSelect")?.value,
-      systemPanelFrameAssetId: document.getElementById("projectGameUiSystemPanelFrameAssetSelect")?.value,
-      uiOverlayAssetId: document.getElementById("projectGameUiOverlayAssetSelect")?.value,
-      uiOverlayOpacity: document.getElementById("projectGameUiOverlayOpacityInput")?.value,
-      backgroundColor: document.getElementById("projectGameUiBackgroundColorInput")?.value,
-      backgroundAccentColor: document.getElementById("projectGameUiBackgroundAccentColorInput")?.value,
-      panelColor: document.getElementById("projectGameUiPanelColorInput")?.value,
-      panelOpacity: document.getElementById("projectGameUiPanelOpacityInput")?.value,
-      textColor: document.getElementById("projectGameUiTextColorInput")?.value,
-      mutedTextColor: document.getElementById("projectGameUiMutedTextColorInput")?.value,
-      accentColor: document.getElementById("projectGameUiAccentColorInput")?.value,
-      accentAltColor: document.getElementById("projectGameUiAccentAltColorInput")?.value,
-      buttonTextColor: document.getElementById("projectGameUiButtonTextColorInput")?.value,
-      borderColor: document.getElementById("projectGameUiBorderColorInput")?.value,
-      borderOpacity: document.getElementById("projectGameUiBorderOpacityInput")?.value,
-      cornerRadius: document.getElementById("projectGameUiCornerRadiusInput")?.value,
-      backdropBlur: document.getElementById("projectGameUiBackdropBlurInput")?.value,
-      stageVignette: document.getElementById("projectGameUiStageVignetteInput")?.value,
-      motionIntensity: document.getElementById("projectGameUiMotionIntensityInput")?.value,
-    },
-  });
+  return projectRuntimeSettingsPanelTools.readProjectGameUiConfigFromDocument(
+    getProjectGameUiConfig(),
+    document,
+    getProjectGameUiConfig,
+    getSafeGameUiFrameSlice
+  );
 }
 
 async function saveProjectFormalSaveSlotCount() {
@@ -38437,23 +37496,11 @@ async function saveProjectFormalSaveSlotCount() {
 }
 
 function readProjectRuntimePlaybackDefaultsFromInputs() {
-  const currentSettings = getProjectRuntimeSettings();
-  return getProjectRuntimeSettings({
-    runtimeSettings: {
-      ...currentSettings,
-      defaultTextSpeed: document.getElementById("projectRuntimeDefaultTextSpeedSelect")?.value,
-      defaultDialogTheme: document.getElementById("projectRuntimeDefaultDialogThemeSelect")?.value,
-      defaultUiThemeMode: document.getElementById("projectRuntimeDefaultUiThemeModeSelect")?.value,
-      performanceProfile: document.getElementById("projectRuntimePerformanceProfileSelect")?.value,
-      defaultBgmVolume: document.getElementById("projectRuntimeDefaultBgmVolumeInput")?.value,
-      defaultSfxVolume: document.getElementById("projectRuntimeDefaultSfxVolumeInput")?.value,
-      defaultVoiceVolume: document.getElementById("projectRuntimeDefaultVoiceVolumeInput")?.value,
-      defaultVoiceDuckingRatio: document.getElementById("projectRuntimeDefaultVoiceDuckingRatioInput")?.value,
-      defaultVoiceEnabled: document.getElementById("projectRuntimeDefaultVoiceEnabledInput")?.checked !== false,
-      defaultVoiceDuckingEnabled:
-        document.getElementById("projectRuntimeDefaultVoiceDuckingEnabledInput")?.checked !== false,
-    },
-  });
+  return projectRuntimeSettingsPanelTools.readProjectRuntimePlaybackDefaultsFromDocument(
+    getProjectRuntimeSettings(),
+    document,
+    getProjectRuntimeSettings
+  );
 }
 
 async function saveProjectRuntimePlaybackDefaults() {

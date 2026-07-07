@@ -640,7 +640,6 @@ class FrontendActionHandlerTests(unittest.TestCase):
         styles = STYLES_PATH.read_text(encoding="utf-8")
         handle_click = _extract_function_source(source, "handleClick")
         render_project_runtime_settings_panel = _extract_function_source(source, "renderProjectRuntimeSettingsPanel")
-        render_dialog_box_readability_card = _extract_function_source(source, "renderDialogBoxReadabilityCard")
         apply_dialog_box_readability_fix = _extract_function_source(source, "applyDialogBoxReadabilityFix")
         set_dialog_box_readability_fix_in_flight = _extract_function_source(
             source,
@@ -648,11 +647,15 @@ class FrontendActionHandlerTests(unittest.TestCase):
         )
 
         self.assertIn("./modules/dialog_box_readability.js", html)
+        self.assertIn("./modules/project_runtime_settings_panel.js", html)
         self.assertIn("window.CanvasiaEditorDialogBoxReadability", source)
+        self.assertIn("window.CanvasiaEditorProjectRuntimeSettingsPanel", source)
         self.assertIn("buildDialogBoxReadabilityReport", render_project_runtime_settings_panel)
         self.assertIn("buildDialogBoxReadabilityAutoFixPlan", render_project_runtime_settings_panel)
         self.assertIn("getDialogBoxReadabilityDigest", render_project_runtime_settings_panel)
-        self.assertIn('data-action="apply-dialog-box-readability-fix"', render_dialog_box_readability_card)
+        self.assertIn("dialogBoxReadabilityReport", render_project_runtime_settings_panel)
+        self.assertIn("dialogBoxReadabilityPlan", render_project_runtime_settings_panel)
+        self.assertIn("dialogBoxReadabilityDigest", render_project_runtime_settings_panel)
         self.assertIn('action === "apply-dialog-box-readability-fix"', handle_click)
         self.assertIn("void applyDialogBoxReadabilityFix()", handle_click)
         self.assertIn("dialogBoxConfig: plan.dialogBoxConfig", apply_dialog_box_readability_fix)
@@ -3326,8 +3329,11 @@ class FrontendActionHandlerTests(unittest.TestCase):
 
     def test_runtime_preload_budget_panel_surfaces_profile_advice(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
-        panel_source = _extract_function_source(source, "renderRuntimePreloadBudgetPanel")
+        runtime_budget_source = (EDITOR_DIR / "modules" / "runtime_preload_budget.js").read_text(encoding="utf-8")
+        panel_source = _extract_function_source(runtime_budget_source, "renderRuntimePreloadBudgetPanel")
+        app_panel_source = _extract_function_source(source, "renderRuntimePreloadBudgetPanel")
 
+        self.assertIn("renderRuntimePreloadBudgetPanel", app_panel_source)
         self.assertIn("profileAdvice", panel_source)
         self.assertIn("推荐档位", panel_source)
         self.assertIn("性能档位建议", panel_source)
@@ -5607,17 +5613,17 @@ class FrontendActionHandlerTests(unittest.TestCase):
 
     def test_project_runtime_settings_surface_performance_profile_budget(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
-        runtime_panel = _extract_function_source(source, "renderProjectRuntimeSettingsPanel")
+        runtime_panel_source = (EDITOR_DIR / "modules" / "project_runtime_settings_panel.js").read_text(encoding="utf-8")
         runtime_reader = _extract_function_source(source, "readProjectRuntimePlaybackDefaultsFromInputs")
         budget_report = _extract_function_source(source, "buildRuntimePreloadBudgetReport")
 
+        self.assertIn("window.CanvasiaEditorProjectRuntimeSettingsPanel", source)
         self.assertIn("RUNTIME_PERFORMANCE_PROFILE_LABELS", source)
         self.assertIn("runtimePerformanceProfileLabels", source)
-        self.assertIn('id="projectRuntimePerformanceProfileSelect"', runtime_panel)
-        self.assertIn("性能目标", runtime_panel)
-        self.assertIn("runtimeSettings.performanceProfile", runtime_panel)
-        self.assertIn("projectRuntimePerformanceProfileSelect", runtime_reader)
-        self.assertIn("performanceProfile", runtime_reader)
+        self.assertIn('id: "projectRuntimePerformanceProfileSelect"', runtime_panel_source)
+        self.assertIn("性能目标", runtime_panel_source)
+        self.assertIn("runtimeSettings.performanceProfile", runtime_panel_source)
+        self.assertIn("readProjectRuntimePlaybackDefaultsFromDocument", runtime_reader)
         self.assertIn("getProjectRuntimeSettings(data?.project)", budget_report)
         self.assertIn("performanceProfile: runtimeSettings.performanceProfile", budget_report)
 
@@ -6040,8 +6046,11 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("refs.menuVoiceDuckingRatioRange", render_playback_controls)
         self.assertIn("getSafeVoiceDuckingRatioPercent", player_source)
         self.assertIn("handleVoiceDuckingRatioChange", player_source)
-        self.assertIn('id="projectRuntimeDefaultVoiceDuckingRatioInput"', APP_PATH.read_text(encoding="utf-8"))
-        self.assertIn("defaultVoiceDuckingRatio: document.getElementById", APP_PATH.read_text(encoding="utf-8"))
+        runtime_settings_panel_source = (EDITOR_DIR / "modules" / "project_runtime_settings_panel.js").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('id: "projectRuntimeDefaultVoiceDuckingRatioInput"', runtime_settings_panel_source)
+        self.assertIn('defaultVoiceDuckingRatio: readInputValue(doc, "projectRuntimeDefaultVoiceDuckingRatioInput")', runtime_settings_panel_source)
         self.assertIn("updateRuntimeAudioVolumes()", toggle_voice_ducking)
 
     def test_typewriter_index_helpers_keep_unicode_characters_intact(self) -> None:

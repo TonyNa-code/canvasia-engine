@@ -1056,6 +1056,184 @@
     )}\n`;
   }
 
+  function defaultEscapeHtml(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  function getRenderHelper(helpers, name, fallback) {
+    return typeof helpers?.[name] === "function" ? helpers[name] : fallback;
+  }
+
+  function renderRuntimePreloadBudgetPanel(model = {}, helpers = {}) {
+    const escapeHtml = getRenderHelper(helpers, "escapeHtml", defaultEscapeHtml);
+    const renderRouteMetricCard = getRenderHelper(
+      helpers,
+      "renderRouteMetricCard",
+      (label, value, helperText) => `
+        <article class="metric-card">
+          <span>${escapeHtml(label)}</span>
+          <strong>${escapeHtml(value)}</strong>
+          <small>${escapeHtml(helperText)}</small>
+        </article>
+      `
+    );
+    const renderEmpty = getRenderHelper(helpers, "renderEmpty", (message) => `<p class="helper-text">${escapeHtml(message)}</p>`);
+    const getToneClass = getRenderHelper(helpers, "getToneClass", (tone) => tone);
+    const report = model.report ?? {};
+    const digest = model.digest ?? getRuntimePreloadBudgetDigest(report);
+    const compact = model.compact === true;
+    const totals = report.totals ?? {};
+    const critical = report.phases?.critical ?? {};
+    const early = report.phases?.early ?? {};
+    const profileAdvice = report.profileAdvice ?? {};
+    const phaseCards = toArray(report.phaseList).slice(0, compact ? 2 : 4);
+    const topEntries = toArray(report.topEntries).slice(0, compact ? 3 : 6);
+    const warnings = toArray(report.warnings)
+      .filter((warning) => warning.severity !== "tip")
+      .slice(0, compact ? 2 : 4);
+    const sceneHotspots = toArray(report.scenes)
+      .filter((scene) => scene.count > 0)
+      .slice(0, compact ? 2 : 4);
+    const toneClass = getToneClass(digest.level);
+    const currentPerformanceProfile = model.currentPerformanceProfile ?? report.performanceProfile?.key ?? "standard";
+    const recommendedPerformanceProfile = getSafePerformanceProfileKey(
+      profileAdvice.recommendedProfile ?? currentPerformanceProfile
+    );
+    const profileAdviceTone =
+      profileAdvice.status === "needs_optimization" || profileAdvice.status === "should_raise"
+        ? "warn"
+        : profileAdvice.status === "can_lower"
+          ? "soft"
+          : "ready";
+    const canApplyProfileAdvice =
+      recommendedPerformanceProfile !== currentPerformanceProfile && profileAdvice.status !== "needs_optimization";
+    const profileAdviceAction = toArray(profileAdvice.actions)[0] ?? "保持当前档位；发布前继续复查首屏体积。";
+    const profileAdviceReason = toArray(profileAdvice.reasons)[0] ?? "当前预热规模与项目性能档位基本匹配。";
+
+    return `
+      <article class="detail-card preview-sprint-panel runtime-preload-budget-panel">
+        <div class="panel-heading">
+          <h2>Runtime 首屏加载预算</h2>
+          <span class="badge badge-soft ${toneClass}">${escapeHtml(digest.title)}</span>
+        </div>
+        <p class="helper-text">${escapeHtml(digest.detail)} 它会按导出 Runtime 的预热逻辑，提前检查入口场景和早期路线里是否有大图、大音频、视频、缺文件或未知体积。</p>
+        <div class="preview-sprint-metrics">
+          ${renderRouteMetricCard("首屏必备", critical.bytesLabel ?? "0 B", `${critical.count ?? 0} 个素材`)}
+          ${renderRouteMetricCard("早期路线", early.bytesLabel ?? "0 B", `${early.count ?? 0} 个素材`)}
+          ${renderRouteMetricCard("总预热候选", totals.totalLabel ?? "0 B", `${totals.totalEntries ?? 0} 个素材`)}
+          ${renderRouteMetricCard("缺口", `${totals.missingFileCount ?? 0} / ${totals.missingSizeCount ?? 0}`, "缺文件 / 缺体积")}
+          ${renderRouteMetricCard(
+            "推荐档位",
+            profileAdvice.recommendedProfileLabel ?? "标准 PC / 网页",
+            `当前 ${profileAdvice.selectedProfileLabel ?? report.performanceProfile?.label ?? "标准 PC / 网页"}`
+          )}
+        </div>
+        <article class="preview-sprint-card runtime-preload-profile-advice is-${profileAdviceTone}">
+          <div class="preview-sprint-head">
+            <strong>性能档位建议：${escapeHtml(profileAdvice.recommendedProfileLabel ?? "标准 PC / 网页")}</strong>
+            <span class="issue-tag ${getToneClass(profileAdviceTone)}">${escapeHtml(profileAdvice.status ?? "ok")}</span>
+          </div>
+          <p>${escapeHtml(profileAdviceReason)} ${escapeHtml(profileAdviceAction)}</p>
+          ${
+            canApplyProfileAdvice
+              ? `<button class="toolbar-button toolbar-button-primary" data-action="apply-runtime-preload-recommended-profile" data-performance-profile="${escapeHtml(recommendedPerformanceProfile)}">一键应用推荐档位</button>`
+              : `<button class="toolbar-button" data-action="export-runtime-preload-budget-markdown">导出瘦身建议</button>`
+          }
+        </article>
+        <div class="detail-actions">
+          <button class="toolbar-button toolbar-button-primary" data-action="export-runtime-preload-budget-markdown">
+            ${escapeHtml(digest.actionLabel)}
+          </button>
+          <button class="toolbar-button" data-action="export-runtime-preload-budget-csv">
+            导出 CSV
+          </button>
+          <button class="toolbar-button" data-action="export-asset-footprint-markdown">
+            对照包体积
+          </button>
+        </div>
+        ${
+          phaseCards.length > 0
+            ? `
+              <div class="preview-sprint-grid">
+                ${phaseCards
+                  .map(
+                    (phase) => `
+                      <article class="preview-sprint-card is-${phase.overBudget || phase.missingFileCount > 0 ? "warn" : "soft"}">
+                        <div class="preview-sprint-head">
+                          <strong>${escapeHtml(phase.label)}</strong>
+                          <span class="issue-tag ${getToneClass(phase.overBudget ? "warn" : "ready")}">${escapeHtml(phase.bytesLabel)}</span>
+                        </div>
+                        <p>${escapeHtml(`${phase.count} 个素材 · 建议预算 ${phase.budgetLabel}`)}</p>
+                        <div class="helper-text">${escapeHtml(
+                          phase.missingFileCount > 0
+                            ? `缺文件 ${phase.missingFileCount} 个，先补齐再导出。`
+                            : phase.detail
+                        )}</div>
+                      </article>
+                    `
+                  )
+                  .join("")}
+              </div>
+            `
+            : renderEmpty("当前还没有可统计的首屏预热素材。写入入口场景并绑定素材后，这里会自动出现预算分析。")
+        }
+        ${
+          !compact && topEntries.length > 0
+            ? `
+              <div class="list-stack compact-stack">
+                ${topEntries
+                  .map(
+                    (entry) => `
+                      <article class="asset-dependency-row">
+                        <div>
+                          <b>${escapeHtml(entry.name)}</b>
+                          <span>${escapeHtml(`${entry.typeLabel} · ${entry.reason || "预热候选"}`)}</span>
+                        </div>
+                        <span class="${entry.fileExists ? getToneClass(entry.phase === "critical" && entry.sizeBytes > 0 ? digest.level : "ready") : "danger-text"}">
+                          ${escapeHtml(entry.fileExists ? entry.sizeLabel : "缺文件")}
+                        </span>
+                      </article>
+                    `
+                  )
+                  .join("")}
+              </div>
+            `
+            : ""
+        }
+        ${
+          !compact && sceneHotspots.length > 0
+            ? `
+              <div class="story-filter-chip-row">
+                ${sceneHotspots
+                  .map(
+                    (scene) =>
+                      `<span class="issue-tag ${scene.overHotspotBudget ? "warn-text" : ""}">${escapeHtml(`${scene.sceneName} · ${scene.earlyLabel}`)}</span>`
+                  )
+                  .join("")}
+              </div>
+            `
+            : ""
+        }
+        ${
+          warnings.length > 0
+            ? `
+              <div class="story-filter-chip-row">
+                ${warnings
+                  .map((warning) => `<span class="issue-tag ${getToneClass(warning.severity)}">${escapeHtml(warning.title)}</span>`)
+                  .join("")}
+              </div>
+            `
+            : `<p class="helper-text">当前没有明显首屏加载风险；如果准备上架，可以导出报告留档。</p>`
+        }
+      </article>
+    `;
+  }
+
   global.CanvasiaEditorRuntimePreloadBudget = Object.freeze({
     DEFAULT_BUDGETS,
     PERFORMANCE_PROFILE_DEFINITIONS,
@@ -1085,5 +1263,6 @@
     getRuntimePreloadBudgetDigest,
     buildRuntimePreloadBudgetMarkdown,
     buildRuntimePreloadBudgetCsv,
+    renderRuntimePreloadBudgetPanel,
   });
 })(typeof window !== "undefined" ? window : globalThis);
