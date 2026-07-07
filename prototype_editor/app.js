@@ -1,47 +1,49 @@
-const API_PROJECT_DATA = "/api/project-data";
-const API_PROJECT_CENTER = "/api/project-center";
-const API_CREATE_PROJECT = "/api/create-project";
-const API_OPEN_PROJECT = "/api/open-project";
-const API_UNDO_PROJECT_HISTORY = "/api/undo-project-history";
-const API_REDO_PROJECT_HISTORY = "/api/redo-project-history";
-const API_RESTORE_PROJECT_HISTORY = "/api/restore-project-history";
-const API_CREATE_PROJECT_HISTORY_SNAPSHOT = "/api/create-project-history-snapshot";
-const API_PREVIEW_PROJECT_HISTORY_RESTORE = "/api/preview-project-history-restore";
-const API_UPDATE_PROJECT_HISTORY_SNAPSHOT = "/api/update-project-history-snapshot";
-const API_ACKNOWLEDGE_PROJECT_RECOVERY_NOTICE = "/api/acknowledge-project-recovery-notice";
-const API_RENAME_PROJECT = "/api/rename-project";
-const API_DUPLICATE_PROJECT = "/api/duplicate-project";
-const API_DELETE_PROJECT = "/api/delete-project";
-const API_SAVE_SCENE = "/api/save-scene";
-const API_CREATE_SCENE = "/api/create-scene";
-const API_EXPORT_BUILD = "/api/export-build";
-const API_IMPORT_ASSETS = "/api/import-assets";
-const API_GENERATE_OPENAI_ASSET =
-  window.CanvasiaEditorOpenAiAssetGenerator?.API_GENERATE_OPENAI_ASSET ?? "/api/generate-openai-asset";
-const API_CREATE_VOICE_PLACEHOLDER = "/api/create-voice-placeholder";
-const API_CREATE_VOICE_PLACEHOLDERS = "/api/create-voice-placeholders";
-const API_MATCH_VOICE_FILES = "/api/match-voice-files";
-const API_SAVE_PROJECT_SETTINGS = "/api/save-project-settings";
-const API_IMPORT_LOCALIZATION_PATCHES = "/api/import-localization-patches";
-const API_REPAIR_PROJECT_DOCTOR = "/api/repair-project-doctor";
-const API_RENAME_VARIABLE = "/api/rename-variable";
-const API_CREATE_CHAPTER = "/api/create-chapter";
-const API_CREATE_STARTER_KIT = "/api/create-starter-kit";
-const API_DUPLICATE_CHAPTER = "/api/duplicate-chapter";
-const API_RENAME_SCENE = "/api/rename-scene";
-const API_RENAME_CHAPTER = "/api/rename-chapter";
-const API_DELETE_SCENE = "/api/delete-scene";
-const API_MOVE_SCENE = "/api/move-scene";
-const API_MOVE_CHAPTER = "/api/move-chapter";
-const API_DELETE_CHAPTER = "/api/delete-chapter";
-const API_DUPLICATE_SCENE = "/api/duplicate-scene";
-const API_REPLACE_ASSET = "/api/replace-asset";
-const API_DELETE_ASSET = "/api/delete-asset";
-const API_UPDATE_ASSET_META = "/api/update-asset-meta";
-const API_UPDATE_CHARACTER_PRESENTATION = "/api/update-character-presentation";
-const API_BULK_UPDATE_ASSET_TAGS = "/api/bulk-update-asset-tags";
-const API_BULK_DELETE_ASSETS = "/api/bulk-delete-assets";
-const API_CREATIVE_ASSISTANT = "/api/creative-assistant";
+const editorApiEndpointTools = window.CanvasiaEditorApiEndpoints;
+const {
+  API_PROJECT_DATA,
+  API_PROJECT_CENTER,
+  API_CREATE_PROJECT,
+  API_OPEN_PROJECT,
+  API_UNDO_PROJECT_HISTORY,
+  API_REDO_PROJECT_HISTORY,
+  API_RESTORE_PROJECT_HISTORY,
+  API_CREATE_PROJECT_HISTORY_SNAPSHOT,
+  API_PREVIEW_PROJECT_HISTORY_RESTORE,
+  API_UPDATE_PROJECT_HISTORY_SNAPSHOT,
+  API_ACKNOWLEDGE_PROJECT_RECOVERY_NOTICE,
+  API_RENAME_PROJECT,
+  API_DUPLICATE_PROJECT,
+  API_DELETE_PROJECT,
+  API_SAVE_SCENE,
+  API_CREATE_SCENE,
+  API_EXPORT_BUILD,
+  API_IMPORT_ASSETS,
+  API_GENERATE_OPENAI_ASSET,
+  API_CREATE_VOICE_PLACEHOLDER,
+  API_CREATE_VOICE_PLACEHOLDERS,
+  API_MATCH_VOICE_FILES,
+  API_SAVE_PROJECT_SETTINGS,
+  API_IMPORT_LOCALIZATION_PATCHES,
+  API_REPAIR_PROJECT_DOCTOR,
+  API_RENAME_VARIABLE,
+  API_CREATE_CHAPTER,
+  API_CREATE_STARTER_KIT,
+  API_DUPLICATE_CHAPTER,
+  API_RENAME_SCENE,
+  API_RENAME_CHAPTER,
+  API_DELETE_SCENE,
+  API_MOVE_SCENE,
+  API_MOVE_CHAPTER,
+  API_DELETE_CHAPTER,
+  API_DUPLICATE_SCENE,
+  API_REPLACE_ASSET,
+  API_DELETE_ASSET,
+  API_UPDATE_ASSET_META,
+  API_UPDATE_CHARACTER_PRESENTATION,
+  API_BULK_UPDATE_ASSET_TAGS,
+  API_BULK_DELETE_ASSETS,
+  API_CREATIVE_ASSISTANT,
+} = editorApiEndpointTools;
 
 const storyBlockCatalogTools = window.CanvasiaEditorStoryBlockCatalog;
 const { BLOCK_LABELS, MUSIC_END_MODE_LABELS, CHOICE_CONTINUE_TARGET } = storyBlockCatalogTools;

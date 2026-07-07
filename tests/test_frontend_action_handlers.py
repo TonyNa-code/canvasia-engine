@@ -28,6 +28,7 @@ PROJECT_POLISH_RECEIPT_PANEL_PATH = EDITOR_DIR / "modules" / "project_polish_rec
 DASHBOARD_PRIMARY_ACTIONS_PATH = EDITOR_DIR / "modules" / "dashboard_primary_actions.js"
 TYPEWRITER_MODULE_PATH = EDITOR_DIR / "modules" / "typewriter.js"
 ASSET_IMPORT_RULES_PATH = EDITOR_DIR / "modules" / "asset_import_rules.js"
+API_ENDPOINTS_PATH = EDITOR_DIR / "modules" / "api_endpoints.js"
 MODULE_PATHS = tuple(sorted((EDITOR_DIR / "modules").glob("*.js")))
 ACTION_ATTRIBUTE_PATHS = (INDEX_PATH, APP_PATH, *MODULE_PATHS)
 ACTION_CONFIG_PATHS = (APP_PATH, *MODULE_PATHS)
@@ -5271,6 +5272,7 @@ class FrontendActionHandlerTests(unittest.TestCase):
 
     def test_localization_coverage_export_actions_are_wired(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
+        endpoint_source = API_ENDPOINTS_PATH.read_text(encoding="utf-8")
         click_handler = _extract_function_source(source, "handleClick")
         markdown_block_start = click_handler.index('action === "export-localization-coverage-markdown"')
         csv_block_start = click_handler.index('action === "export-localization-coverage-csv"')
@@ -5294,7 +5296,8 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("function exportLocalizationCoverageMarkdown()", source)
         self.assertIn("function exportLocalizationCoverageCsv()", source)
         self.assertIn("function importLocalizationCoverageCsv(file)", source)
-        self.assertIn('const API_IMPORT_LOCALIZATION_PATCHES = "/api/import-localization-patches"', source)
+        self.assertIn("const editorApiEndpointTools = window.CanvasiaEditorApiEndpoints;", source)
+        self.assertIn('importLocalizationPatches: "/api/import-localization-patches"', endpoint_source)
         self.assertIn("postJson(API_IMPORT_LOCALIZATION_PATCHES", source)
         self.assertIn("localizationCoverageTools.buildLocalizationCoverage", source)
         self.assertIn("localizationCoverageTools.getLocalizationCoverageStatusDigest", source)

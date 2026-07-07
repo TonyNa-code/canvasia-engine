@@ -71,6 +71,7 @@ jobs:
             tests/test_export_release_control.py \
             tests/test_release_public_surface.py \
             tests/test_frontend_action_handlers.py \
+            tests/test_frontend_api_endpoints_module.py \
             tests/test_frontend_asset_catalog_module.py \
             tests/test_frontend_asset_import_rules_module.py \
             tests/test_frontend_asset_footprint_module.py \
@@ -169,6 +170,7 @@ jobs:
 
       - name: Frontend syntax check
         run: |
+          node --check prototype_editor/modules/api_endpoints.js
           node --check prototype_editor/modules/asset_catalog.js
           node --check prototype_editor/modules/asset_import_rules.js
           node --check prototype_editor/modules/asset_footprint.js
@@ -284,6 +286,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_export_release_control.py' -v
           python -m unittest discover -s tests -p 'test_release_public_surface.py' -v
           python -m unittest discover -s tests -p 'test_frontend_action_handlers.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_api_endpoints_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_asset_catalog_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_asset_import_rules_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_asset_footprint_module.py' -v
