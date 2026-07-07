@@ -13,9 +13,25 @@ from typing import Sequence
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 EDITOR_INDEX_PATH = ROOT_DIR / "prototype_editor" / "index.html"
+EDITOR_APP_PATH = ROOT_DIR / "prototype_editor" / "app.js"
 EDITOR_MODULES_DIR = ROOT_DIR / "prototype_editor" / "modules"
+MODULE_GUARD_PATH = EDITOR_MODULES_DIR / "module_guard.js"
 TESTS_DIR = ROOT_DIR / "tests"
 SCRIPT_SRC_PATTERN = re.compile(r"<script\b[^>]*\bsrc=[\"']([^\"']+)[\"'][^>]*>", re.IGNORECASE)
+MODULE_GUARD_REQUIREMENT_PATTERN = re.compile(
+    r"\{\s*globalName:\s*\"([^\"]+)\"\s*,\s*script:\s*\"([^\"]+)\"\s*,\s*label:\s*\"([^\"]+)\"\s*\}",
+    re.MULTILINE,
+)
+APP_WINDOW_GLOBAL_PATTERN = re.compile(r"window\.(Canvasia[A-Za-z0-9_]+)")
+MODULE_GUARD_SCRIPT = "./modules/module_guard.js"
+EDITOR_APP_SCRIPT = "./app.js"
+ALLOWED_UNGUARDED_APP_GLOBALS = frozenset(
+    {
+        "CanvasiaEditorModuleGuard",
+        # Legacy alias exported by project_milestones.js for older panels.
+        "CanvasiaProjectMilestones",
+    }
+)
 
 KNOWN_MODULE_TEST_DEBT = frozenset()
 
@@ -75,13 +91,34 @@ def discover_module_files() -> list[str]:
     return sorted(path.stem for path in EDITOR_MODULES_DIR.glob("*.js"))
 
 
-def discover_entrypoint_modules() -> list[str]:
+def discover_entrypoint_scripts() -> list[str]:
     html = EDITOR_INDEX_PATH.read_text(encoding="utf-8")
+    return SCRIPT_SRC_PATTERN.findall(html)
+
+
+def discover_entrypoint_modules() -> list[str]:
     modules = []
-    for script in SCRIPT_SRC_PATTERN.findall(html):
+    for script in discover_entrypoint_scripts():
         if script.startswith("./modules/"):
             modules.append(Path(script.removeprefix("./modules/")).stem)
     return sorted(dict.fromkeys(modules))
+
+
+def discover_module_guard_requirements() -> list[dict[str, str]]:
+    if not MODULE_GUARD_PATH.exists():
+        return []
+    source = MODULE_GUARD_PATH.read_text(encoding="utf-8")
+    return [
+        {"globalName": global_name, "script": script, "label": label}
+        for global_name, script, label in MODULE_GUARD_REQUIREMENT_PATTERN.findall(source)
+    ]
+
+
+def discover_app_window_globals() -> list[str]:
+    if not EDITOR_APP_PATH.exists():
+        return []
+    source = EDITOR_APP_PATH.read_text(encoding="utf-8")
+    return sorted(set(APP_WINDOW_GLOBAL_PATTERN.findall(source)))
 
 
 def discover_frontend_module_tests() -> set[str]:
@@ -125,6 +162,16 @@ def evaluate_file_budgets() -> list[dict[str, object]]:
     return results
 
 
+def find_duplicates(values: Sequence[str]) -> list[str]:
+    seen: set[str] = set()
+    duplicates: set[str] = set()
+    for value in values:
+        if value in seen:
+            duplicates.add(value)
+        seen.add(value)
+    return sorted(duplicates)
+
+
 def evaluate_modules() -> dict[str, object]:
     module_files = discover_module_files()
     entrypoint_modules = discover_entrypoint_modules()
@@ -150,15 +197,112 @@ def evaluate_modules() -> dict[str, object]:
     }
 
 
+def evaluate_module_guard() -> dict[str, object]:
+    entrypoint_scripts = discover_entrypoint_scripts()
+    requirements = discover_module_guard_requirements()
+    requirement_scripts = [requirement["script"] for requirement in requirements]
+    requirement_globals = [requirement["globalName"] for requirement in requirements]
+    requirement_global_set = set(requirement_globals)
+    app_window_globals = discover_app_window_globals()
+    guarded_app_globals = [
+        global_name
+        for global_name in app_window_globals
+        if global_name not in ALLOWED_UNGUARDED_APP_GLOBALS
+    ]
+    app_globals_missing_from_guard = sorted(set(guarded_app_globals) - requirement_global_set)
+    guard_globals_not_used_by_app = sorted(requirement_global_set - set(app_window_globals))
+    startup_order_issues: list[str] = []
+
+    guard_index = entrypoint_scripts.index(MODULE_GUARD_SCRIPT) if MODULE_GUARD_SCRIPT in entrypoint_scripts else None
+    app_index = entrypoint_scripts.index(EDITOR_APP_SCRIPT) if EDITOR_APP_SCRIPT in entrypoint_scripts else None
+
+    if guard_index is None:
+        startup_order_issues.append(f"{MODULE_GUARD_SCRIPT} is missing from the editor entrypoint.")
+    if app_index is None:
+        startup_order_issues.append(f"{EDITOR_APP_SCRIPT} is missing from the editor entrypoint.")
+    if guard_index is not None and app_index is not None:
+        if guard_index > app_index:
+            startup_order_issues.append(f"{MODULE_GUARD_SCRIPT} must run before {EDITOR_APP_SCRIPT}.")
+        elif app_index != guard_index + 1:
+            startup_order_issues.append(f"{MODULE_GUARD_SCRIPT} should run immediately before {EDITOR_APP_SCRIPT}.")
+
+    if guard_index is not None:
+        expected_guard_scripts = entrypoint_scripts[:guard_index]
+    else:
+        expected_guard_scripts = [
+            script
+            for script in entrypoint_scripts
+            if script not in {MODULE_GUARD_SCRIPT, EDITOR_APP_SCRIPT}
+        ]
+
+    missing_from_guard = [script for script in expected_guard_scripts if script not in requirement_scripts]
+    stale_guard_scripts = [script for script in requirement_scripts if script not in expected_guard_scripts]
+    order_matches = requirement_scripts == expected_guard_scripts
+    duplicate_globals = find_duplicates(requirement_globals)
+    duplicate_scripts = find_duplicates(requirement_scripts)
+    order_mismatch_preview = []
+    if not order_matches:
+        max_preview = min(max(len(expected_guard_scripts), len(requirement_scripts)), 6)
+        for index in range(max_preview):
+            expected = expected_guard_scripts[index] if index < len(expected_guard_scripts) else "<missing>"
+            actual = requirement_scripts[index] if index < len(requirement_scripts) else "<missing>"
+            if expected != actual:
+                order_mismatch_preview.append(
+                    {
+                        "index": index,
+                        "expected": expected,
+                        "actual": actual,
+                    }
+                )
+            if len(order_mismatch_preview) >= 4:
+                break
+
+    status = "passed"
+    if (
+        not MODULE_GUARD_PATH.exists()
+        or not requirements
+        or startup_order_issues
+        or missing_from_guard
+        or stale_guard_scripts
+        or not order_matches
+        or duplicate_globals
+        or duplicate_scripts
+        or app_globals_missing_from_guard
+    ):
+        status = "failed"
+
+    return {
+        "status": status,
+        "requirementCount": len(requirements),
+        "entrypointGuardedScriptCount": len(expected_guard_scripts),
+        "missingFromGuard": missing_from_guard,
+        "staleGuardScripts": stale_guard_scripts,
+        "orderMatches": order_matches,
+        "orderMismatchPreview": order_mismatch_preview,
+        "duplicateGlobals": duplicate_globals,
+        "duplicateScripts": duplicate_scripts,
+        "startupOrderIssues": startup_order_issues,
+        "appWindowGlobalCount": len(app_window_globals),
+        "guardedAppGlobalCount": len(guarded_app_globals),
+        "allowedUnguardedAppGlobals": sorted(ALLOWED_UNGUARDED_APP_GLOBALS & set(app_window_globals)),
+        "appGlobalsMissingFromGuard": app_globals_missing_from_guard,
+        "guardGlobalsNotUsedByApp": guard_globals_not_used_by_app,
+        "firstRequirement": requirements[0] if requirements else None,
+        "lastRequirement": requirements[-1] if requirements else None,
+    }
+
+
 def build_report() -> dict[str, object]:
     file_budgets = evaluate_file_budgets()
     modules = evaluate_modules()
+    module_guard = evaluate_module_guard()
     failed_files = [item for item in file_budgets if item["status"] == "failed"]
     warning_files = [item for item in file_budgets if item["status"] == "warning"]
     hard_module_failures = (
         modules["missingEntrypoint"]
         or modules["staleEntrypoint"]
         or modules["newMissingTests"]
+        or module_guard["status"] != "passed"
     )
     status = "failed" if failed_files or hard_module_failures else "passed"
 
@@ -173,9 +317,12 @@ def build_report() -> dict[str, object]:
             "testedModuleCount": modules["testedModuleCount"],
             "knownTestDebtCount": modules["knownTestDebtCount"],
             "newMissingTestCount": len(modules["newMissingTests"]),
+            "moduleGuardStatus": module_guard["status"],
+            "moduleGuardRequirementCount": module_guard["requirementCount"],
         },
         "fileBudgets": file_budgets,
         "modules": modules,
+        "moduleGuard": module_guard,
     }
 
 
@@ -226,6 +373,31 @@ def write_markdown_report(path: Path, report: dict[str, object]) -> None:
                 ", ".join(f"`{name}`" for name in modules.get("newMissingTests", [])),
             ]
         )
+    module_guard = report.get("moduleGuard")
+    if isinstance(module_guard, dict):
+        lines.extend(
+            [
+                "",
+                "## Startup Guard Consistency",
+                "",
+                f"- Status: `{module_guard.get('status', 'unknown')}`",
+                f"- Guarded scripts: `{module_guard.get('entrypointGuardedScriptCount', 0)}`",
+                f"- Guard requirements: `{module_guard.get('requirementCount', 0)}`",
+                f"- Order matches entrypoint: `{module_guard.get('orderMatches', False)}`",
+                f"- App globals covered: `{module_guard.get('guardedAppGlobalCount', 0)}`",
+            ]
+        )
+        for key, title in (
+            ("startupOrderIssues", "Startup order issues"),
+            ("missingFromGuard", "Missing from guard"),
+            ("staleGuardScripts", "Stale guard scripts"),
+            ("duplicateGlobals", "Duplicate globals"),
+            ("duplicateScripts", "Duplicate scripts"),
+            ("appGlobalsMissingFromGuard", "App globals missing from guard"),
+        ):
+            values = module_guard.get(key)
+            if values:
+                lines.extend(["", f"### {title}", "", ", ".join(f"`{value}`" for value in values)])
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -244,9 +416,26 @@ def format_terminal_report(report: dict[str, object]) -> str:
             f"{summary.get('testedModuleCount', 0)} directly tested, "
             f"{summary.get('knownTestDebtCount', 0)} known debt"
         ),
+        (
+            f"Startup guard: {summary.get('moduleGuardStatus', 'unknown')} "
+            f"({summary.get('moduleGuardRequirementCount', 0)} required globals)"
+        ),
     ]
     if modules.get("newMissingTests"):
         lines.append("New modules missing tests: " + ", ".join(modules["newMissingTests"]))
+    module_guard = report.get("moduleGuard")
+    if isinstance(module_guard, dict) and module_guard.get("status") != "passed":
+        for key in ("startupOrderIssues", "missingFromGuard", "staleGuardScripts", "duplicateGlobals", "duplicateScripts"):
+            values = module_guard.get(key)
+            if values:
+                lines.append(f"Startup guard {key}: " + ", ".join(values))
+        if module_guard.get("appGlobalsMissingFromGuard"):
+            lines.append(
+                "App globals missing from startup guard: "
+                + ", ".join(module_guard["appGlobalsMissingFromGuard"])
+            )
+        if not module_guard.get("orderMatches", True):
+            lines.append("Startup guard order does not match the editor entrypoint.")
     for item in report.get("fileBudgets", []):
         if isinstance(item, dict) and item.get("status") != "passed":
             lines.append(f"- {item.get('path')}: {item.get('lines')} lines, {item.get('note')}")
