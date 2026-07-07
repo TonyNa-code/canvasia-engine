@@ -162,6 +162,7 @@ const {
   VN_CHOICE_MANY_OPTIONS,
 } = scriptReadabilityTools;
 const scriptVoiceTools = window.CanvasiaEditorScriptVoice;
+const voiceMatchReviewPanelTools = window.CanvasiaEditorVoiceMatchReviewPanel;
 const visualEffectTools = window.CanvasiaEditorVisualEffects;
 const particleEffectTools = window.CanvasiaEditorParticleEffects;
 const {
@@ -8003,59 +8004,11 @@ function getDefaultVoiceMatchTargetId(item, availableTargets) {
 }
 
 function renderVoiceMatchReviewItem(item, reviewKind, reviewIndex, availableTargets) {
-  const defaultTargetId = getDefaultVoiceMatchTargetId(item, availableTargets);
-  const selectId = getVoiceMatchReviewSelectId(reviewKind, reviewIndex);
-
-  return `
-    <article class="asset-usage-item voice-match-review-item">
-      <div class="asset-usage-copy">
-        <strong>${escapeHtml(item.fileName)}</strong>
-        <div class="detail-meta">${escapeHtml(item.reason || "这份文件仍需手动指定一个语音条目。")}</div>
-        ${
-          item.candidates?.length
-            ? `<div class="scene-card-tags">${item.candidates
-                .map(
-                  (candidate) =>
-                    `<span class="issue-tag warn-text">${escapeHtml(candidate.assetName)}</span>`
-                )
-                .join("")}</div>`
-            : ""
-        }
-      </div>
-      <div class="voice-match-review-controls">
-        <label class="detail-row voice-match-review-picker" for="${selectId}">
-          <span>手动绑到</span>
-          <select id="${selectId}" class="voice-match-review-select">
-            ${
-              availableTargets.length > 0
-                ? availableTargets
-                    .map(
-                      (asset) => `
-                        <option value="${escapeHtml(asset.id)}" ${asset.id === defaultTargetId ? "selected" : ""}>
-                          ${escapeHtml(asset.name)} · ${escapeHtml(asset.path)}
-                        </option>
-                      `
-                    )
-                    .join("")
-                : `<option value="">当前没有待导入语音条目</option>`
-            }
-          </select>
-        </label>
-        <div class="script-entry-actions">
-          <button
-            type="button"
-            class="toolbar-button toolbar-button-primary"
-            data-action="bind-voice-match-review-file"
-            data-review-kind="${escapeHtml(reviewKind)}"
-            data-review-index="${reviewIndex}"
-            ${availableTargets.length > 0 ? "" : "disabled"}
-          >
-            绑定到所选条目
-          </button>
-        </div>
-      </div>
-    </article>
-  `;
+  return voiceMatchReviewPanelTools.renderVoiceMatchReviewItem(item, reviewKind, reviewIndex, availableTargets, {
+    escapeHtml,
+    getDefaultVoiceMatchTargetId,
+    getVoiceMatchReviewSelectId,
+  });
 }
 
 function renderVoiceMatchReviewPanel() {
@@ -8065,53 +8018,11 @@ function renderVoiceMatchReviewPanel() {
   }
 
   const availableTargets = getAvailableManualVoiceMatchTargets();
-  const unresolvedCount =
-    Number(review.unmatchedFiles?.length ?? 0) + Number(review.ambiguousFiles?.length ?? 0);
-
-  if (unresolvedCount === 0) {
-    return "";
-  }
-
-  return `
-    <article class="detail-card voice-match-review-panel">
-      <div class="panel-heading">
-        <div>
-          <h3>这批语音还有 ${unresolvedCount} 个待补最后一步</h3>
-          <span class="panel-note">自动匹配已处理可识别部分，下面这些可直接手动指定到对应语音占位条目。</span>
-        </div>
-        <span class="badge badge-soft">本次自动匹配成功 ${Number(review.matchedCount ?? 0)} 个</span>
-      </div>
-      <div class="detail-actions">
-        <button class="toolbar-button" type="button" data-action="dismiss-voice-match-review">
-          收起这次匹配结果
-        </button>
-      </div>
-      ${
-        review.ambiguousFiles?.length
-          ? `
-            <div class="asset-usage-list">
-              <strong>多个候选太像，系统先没敢乱绑</strong>
-              ${review.ambiguousFiles
-                .map((item, index) => renderVoiceMatchReviewItem(item, "ambiguous", index, availableTargets))
-                .join("")}
-            </div>
-          `
-          : ""
-      }
-      ${
-        review.unmatchedFiles?.length
-          ? `
-            <div class="asset-usage-list">
-              <strong>没找到足够像的占位条目</strong>
-              ${review.unmatchedFiles
-                .map((item, index) => renderVoiceMatchReviewItem(item, "unmatched", index, availableTargets))
-                .join("")}
-            </div>
-          `
-          : ""
-      }
-    </article>
-  `;
+  return voiceMatchReviewPanelTools.renderVoiceMatchReviewPanel(review, availableTargets, {
+    escapeHtml,
+    getDefaultVoiceMatchTargetId,
+    getVoiceMatchReviewSelectId,
+  });
 }
 
 async function matchVoiceFilesToPlaceholders(files) {
