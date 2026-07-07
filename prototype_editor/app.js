@@ -48,6 +48,7 @@ const { BLOCK_LABELS, MUSIC_END_MODE_LABELS, CHOICE_CONTINUE_TARGET } = storyBlo
 const storyBlockEditorTools = window.CanvasiaEditorStoryBlockEditors;
 const musicRangeScopeTools = window.CanvasiaEditorMusicRangeScope;
 const storyTemplateTools = window.CanvasiaEditorStoryTemplates;
+const storyTemplateApplicationTools = window.CanvasiaEditorStoryTemplateApplication;
 const { STORY_TEMPLATE_PRESETS } = storyTemplateTools;
 const scriptImporterTools = window.CanvasiaEditorScriptImporter;
 const scriptImportMappingTools = window.CanvasiaEditorScriptImportMapping;
@@ -35802,199 +35803,93 @@ function getStoryTemplateVariableRequirement(templateId) {
 }
 
 function cloneStoryTemplateFields(fields) {
-  if (!fields || typeof fields !== "object") {
-    return {};
-  }
-
-  return JSON.parse(JSON.stringify(fields));
+  return storyTemplateApplicationTools.cloneStoryTemplateFields(fields);
 }
 
 function buildStoryTemplateChoiceEffect(effectPlan = {}) {
-  const type = String(effectPlan.type ?? "").trim();
-  if (type === "variable_add") {
-    const variableId = getSafeVariableId(effectPlan.variableId, "number");
-    if (!variableId) {
-      return null;
-    }
-    const value = Number(effectPlan.value ?? 1);
-    return {
-      type: "variable_add",
-      variableId,
-      value: Number.isFinite(value) ? value : 1,
-    };
-  }
-
-  if (type === "variable_set") {
-    const variableId = getSafeVariableId(effectPlan.variableId);
-    if (!variableId) {
-      return null;
-    }
-    const value = Object.prototype.hasOwnProperty.call(effectPlan, "value")
-      ? effectPlan.value
-      : getVariableDefaultValue(variableId);
-    return {
-      type: "variable_set",
-      variableId,
-      value: normalizeVariableValue(variableId, value),
-    };
-  }
-
-  return null;
+  return storyTemplateApplicationTools.buildStoryTemplateChoiceEffect(effectPlan, {
+    getSafeVariableId,
+    getVariableDefaultValue,
+    normalizeVariableValue,
+  });
 }
 
 function applyStoryTemplateSpeaker(block, speakerId) {
-  if (!block || !speakerId) {
-    return;
-  }
-
-  if (block.type === "dialogue") {
-    block.speakerId = speakerId;
-    block.expressionId = getSafeExpressionId(speakerId, null);
-  }
-
-  if (block.type === "character_show") {
-    block.characterId = speakerId;
-    block.expressionId = getSafeExpressionId(speakerId, null);
-    if (!String(block.position ?? "").trim()) {
-      block.position = getDefaultCharacterPosition(speakerId);
-    }
-  }
-
-  if (block.type === "character_hide") {
-    block.characterId = speakerId;
-  }
+  return storyTemplateApplicationTools.applyStoryTemplateSpeaker(block, speakerId, {
+    getDefaultCharacterPosition,
+    getSafeExpressionId,
+  });
 }
 
 function applyStoryTemplateChoiceTexts(block, choiceTexts) {
-  if (!Array.isArray(choiceTexts) || !Array.isArray(block?.options)) {
-    return;
-  }
-
-  block.options = block.options.map((option, index) => ({
-    ...option,
-    text: choiceTexts[index] ?? option.text,
-  }));
+  return storyTemplateApplicationTools.applyStoryTemplateChoiceTexts(block, choiceTexts);
 }
 
 function applyStoryTemplateChoiceOptions(block, recipe, context) {
-  const optionPlans = Array.isArray(recipe.choiceOptions) ? recipe.choiceOptions : [];
-  if (!optionPlans.length || !Array.isArray(block?.options)) {
-    applyStoryTemplateChoiceTexts(block, recipe.choiceTexts);
-    return;
-  }
-
-  block.options = optionPlans.map((optionPlan, index) => {
-    const baseOption = block.options[index] ?? {};
-    const text = String(optionPlan?.text ?? recipe.choiceTexts?.[index] ?? baseOption.text ?? `选项 ${index + 1}`).trim();
-    const effects = (Array.isArray(optionPlan?.effects) ? optionPlan.effects : [])
-      .map((effectPlan) => buildStoryTemplateChoiceEffect(effectPlan))
-      .filter(Boolean);
-    return {
-      id: baseOption.id ?? createChoiceOptionId(block.id, index),
-      text: text || `选项 ${index + 1}`,
-      gotoSceneId: String(optionPlan?.gotoSceneId ?? baseOption.gotoSceneId ?? context.scene?.id ?? ""),
-      effects,
-    };
+  return storyTemplateApplicationTools.applyStoryTemplateChoiceOptions(block, recipe, context, {
+    createChoiceOptionId,
+    getSafeVariableId,
+    getVariableDefaultValue,
+    normalizeVariableValue,
   });
 }
 
 function applyStoryTemplateNumberCondition(block, recipe, context) {
-  if (block?.type !== "condition" || !recipe.numberVariableCondition) {
-    return;
-  }
-
-  const variableId = getSafeVariableId(recipe.numberVariableCondition.variableId, "number");
-  if (!variableId) {
-    return;
-  }
-
-  const value = Number(recipe.numberVariableCondition.value ?? 1);
-  const rule = {
-    variableId,
-    operator: recipe.numberVariableCondition.operator ?? ">=",
-    value: Number.isFinite(value) ? value : 1,
-  };
-  block.branches =
-    Array.isArray(block.branches) && block.branches.length
-      ? block.branches
-      : createDefaultConditionBranches(block.id, context.scene?.id);
-  block.branches[0] = {
-    ...block.branches[0],
-    when: [rule],
-  };
+  return storyTemplateApplicationTools.applyStoryTemplateNumberCondition(block, recipe, context, {
+    createDefaultConditionBranches,
+    getSafeVariableId,
+  });
 }
 
 function applyStoryTemplateRecipe(block, recipe, context) {
-  Object.assign(block, cloneStoryTemplateFields(recipe.fields));
-
-  if (recipe.speaker) {
-    applyStoryTemplateSpeaker(block, context.speakerId);
-  }
-
-  applyStoryTemplateChoiceOptions(block, recipe, context);
-  applyStoryTemplateNumberCondition(block, recipe, context);
-
-  if (recipe.defaultJumpTarget && block.type === "jump") {
-    block.targetSceneId = getDefaultJumpTargetSceneId(context.scene?.id);
-  }
+  return storyTemplateApplicationTools.applyStoryTemplateRecipe(block, recipe, context, {
+    createChoiceOptionId,
+    createDefaultConditionBranches,
+    getDefaultCharacterPosition,
+    getDefaultJumpTargetSceneId,
+    getSafeExpressionId,
+    getSafeVariableId,
+    getVariableDefaultValue,
+    normalizeVariableValue,
+  });
 }
 
 function finalizeStoryTemplateBlocks(blocks, recipes) {
-  blocks.forEach((block, index) => {
-    const recipe = recipes[index];
-    if (block?.type !== "music_play" || !Number.isInteger(recipe?.endAfterRecipeIndex)) {
-      return;
-    }
-    const endBlock = blocks[recipe.endAfterRecipeIndex];
-    if (!endBlock?.id) {
-      return;
-    }
-    block.endMode = "after_block";
-    block.endBlockId = endBlock.id;
-  });
+  return storyTemplateApplicationTools.finalizeStoryTemplateBlocks(blocks, recipes);
 }
 
 function createTemplateBlock(sceneDraft, recipe, context) {
-  if (!recipe?.type) {
-    return null;
-  }
-
-  const block = createDefaultBlock(sceneDraft, recipe.type);
-  applyStoryTemplateRecipe(block, recipe, context);
-  sceneDraft.blocks.push(block);
-  return block;
+  return storyTemplateApplicationTools.createTemplateBlock(sceneDraft, recipe, context, {
+    createChoiceOptionId,
+    createDefaultBlock,
+    createDefaultConditionBranches,
+    getDefaultCharacterPosition,
+    getDefaultJumpTargetSceneId,
+    getSafeExpressionId,
+    getSafeVariableId,
+    getVariableDefaultValue,
+    normalizeVariableValue,
+  });
 }
 
 function buildStoryTemplateBlocks(scene, templateId) {
-  const preset = getStoryTemplatePreset(templateId);
-
-  if (!scene || !preset) {
-    return [];
-  }
-
-  const recipes = getStoryTemplateBlockRecipes(templateId);
-  if (!recipes.length) {
-    return [];
-  }
-
-  const sceneDraft = cloneScene(scene);
-  sceneDraft.blocks = [...(scene.blocks ?? [])];
-  const blocks = [];
-  const speakerId = getSafeCharacterId(state.selectedCharacterId ?? state.data.characters[0]?.id);
-  const context = {
-    scene,
-    speakerId,
-  };
-
-  recipes.forEach((recipe) => {
-    const block = createTemplateBlock(sceneDraft, recipe, context);
-    if (block) {
-      blocks.push(block);
-    }
+  return storyTemplateApplicationTools.buildStoryTemplateBlocks(scene, templateId, {
+    cloneScene,
+    createChoiceOptionId,
+    createDefaultBlock,
+    createDefaultConditionBranches,
+    firstCharacterId: state.data.characters[0]?.id,
+    getDefaultCharacterPosition,
+    getDefaultJumpTargetSceneId,
+    getSafeCharacterId,
+    getSafeExpressionId,
+    getSafeVariableId,
+    getStoryTemplateBlockRecipes,
+    getStoryTemplatePreset,
+    getVariableDefaultValue,
+    normalizeVariableValue,
+    selectedCharacterId: state.selectedCharacterId,
   });
-
-  finalizeStoryTemplateBlocks(blocks, recipes);
-  return blocks;
 }
 
 async function applyStoryTemplate(templateId) {
@@ -36038,6 +35933,9 @@ async function applyStoryTemplate(templateId) {
     return;
   }
 
+  const templateSummary = storyTemplateApplicationTools.buildStoryTemplateApplicationSummary(preset, newBlocks, {
+    getBlockLabel,
+  });
   updatedScene.blocks.splice(insertIndex, 0, ...newBlocks);
 
   const success = await persistScene(updatedScene, {
@@ -36045,14 +35943,14 @@ async function applyStoryTemplate(templateId) {
     selectedBlockId: newBlocks[0]?.id ?? null,
     previewSceneId: updatedScene.id,
     previewBlockIndex: insertIndex,
-    successMessage: `已插入模板：${preset.title}`,
+    successMessage: templateSummary.message,
   });
 
   if (success) {
     if (state.currentScreen !== "story") {
       switchScreen("story");
     }
-    showToast(`已插入模板：${preset.title}`);
+    showToast(templateSummary.message);
   }
 }
 

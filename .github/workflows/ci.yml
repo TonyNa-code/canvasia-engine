@@ -131,6 +131,7 @@ jobs:
             tests/test_frontend_story_block_catalog_module.py \
             tests/test_frontend_story_block_editors_module.py \
             tests/test_frontend_story_block_registry_integration.py \
+            tests/test_frontend_story_template_application_module.py \
             tests/test_frontend_story_templates_module.py \
             tests/test_frontend_system_dialog_module.py \
             tests/test_frontend_ui_theme_module.py \
@@ -216,6 +217,7 @@ jobs:
           node --check prototype_editor/modules/stage_direction_sheet.js
           node --check prototype_editor/modules/story_block_catalog.js
           node --check prototype_editor/modules/story_block_editors.js
+          node --check prototype_editor/modules/story_template_application.js
           node --check prototype_editor/modules/story_templates.js
           node --check prototype_editor/modules/system_dialog.js
           node --check prototype_editor/modules/ui_theme.js
@@ -322,6 +324,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_story_block_catalog_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_story_block_editors_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_story_block_registry_integration.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_story_template_application_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_story_templates_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_system_dialog_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_ui_theme_module.py' -v
