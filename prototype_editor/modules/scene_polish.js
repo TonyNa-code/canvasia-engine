@@ -1,6 +1,8 @@
 (function attachScenePolishTools(global) {
   "use strict";
 
+  const scenePacingAdvisorTools = global.CanvasiaEditorScenePacingAdvisor || {};
+
   const DEFAULTS = Object.freeze({
     transition: "fade",
     transitionDurationMs: 700,
@@ -185,6 +187,97 @@
     return `已润色 ${safeOperations.length} 张卡片，补齐 ${fieldCount} 个演出参数`;
   }
 
+  function getScenePacingAnalysis(scene, options = {}) {
+    if (typeof scenePacingAdvisorTools.analyzeScenePacing !== "function") {
+      return null;
+    }
+    return scenePacingAdvisorTools.analyzeScenePacing(scene, options.pacing ?? {});
+  }
+
+  function getScenePacingDigest(analysis = null) {
+    if (!analysis) {
+      return null;
+    }
+    if (typeof scenePacingAdvisorTools.buildScenePacingDigest === "function") {
+      return scenePacingAdvisorTools.buildScenePacingDigest(analysis);
+    }
+    return {
+      score: analysis.score ?? 0,
+      gradeId: analysis.grade?.id ?? "rough",
+      gradeLabel: analysis.grade?.label ?? "待打磨",
+      headline: analysis.headline ?? "这一场还需要试玩确认。",
+      issueSummary: "暂无节奏摘要",
+      actionSummary: toArray(analysis.actions).join(" / ") || "试玩确认",
+      metricSummary: "",
+    };
+  }
+
+  function getSceneDirectorPolishPriority(analysis = null) {
+    const gradeId = cleanText(analysis?.grade?.id);
+    if (gradeId === "rough") {
+      return "danger";
+    }
+    if (gradeId === "needs_polish") {
+      return "warn";
+    }
+    if (gradeId === "solid") {
+      return "good";
+    }
+    return "soft";
+  }
+
+  function mergeUniqueLabels(...groups) {
+    const labels = [];
+    groups.flat().forEach((label) => {
+      const safeLabel = cleanText(label);
+      if (safeLabel && !labels.includes(safeLabel)) {
+        labels.push(safeLabel);
+      }
+    });
+    return labels;
+  }
+
+  function buildSceneDirectorPolishBrief(scene, plan = null, options = {}) {
+    const polishPlan = plan ?? buildScenePresentationPolishPlan(scene, options);
+    const pacingAnalysis = getScenePacingAnalysis(polishPlan.scene ?? scene, options);
+    const pacingDigest = getScenePacingDigest(pacingAnalysis);
+    const changeLabels = [];
+    polishPlan.operations?.forEach((operation) => {
+      operation.fields?.forEach((field) => {
+        changeLabels.push(field.label);
+      });
+    });
+    const pacingActions = toArray(pacingAnalysis?.actions);
+    const issueTitles = toArray(pacingAnalysis?.issues)
+      .slice(0, 3)
+      .map((issue) => issue.title);
+    const tagLimit = Math.max(1, Number(options.tagLimit) || 4);
+    const tags = mergeUniqueLabels(changeLabels, pacingActions, issueTitles).slice(0, tagLimit);
+    const gradeLabel = pacingDigest?.gradeLabel ?? "待试玩确认";
+    const actionSummary = pacingDigest?.actionSummary ?? "";
+
+    let helperText = polishPlan.changed
+      ? `会补齐 ${mergeUniqueLabels(changeLabels).slice(0, tagLimit).join("、") || "基础演出参数"}。`
+      : "本场的文字速度、转场、淡入淡出和音量已经比较完整。";
+    if (pacingDigest) {
+      helperText = polishPlan.changed
+        ? `${helperText} 节奏体检：${gradeLabel}，建议 ${actionSummary || "试玩确认"}。`
+        : `节奏体检：${gradeLabel}，${pacingDigest.issueSummary}；建议 ${actionSummary || "试玩确认"}。`;
+    }
+
+    return {
+      changed: polishPlan.changed,
+      priority: getSceneDirectorPolishPriority(pacingAnalysis),
+      tags: tags.length ? tags : polishPlan.changed ? ["基础演出待补齐"] : ["基础演出已完整"],
+      helperText,
+      pacingAnalysis,
+      pacingDigest,
+      pacingIssueCount: toArray(pacingAnalysis?.issues).length,
+      pacingScore: pacingAnalysis?.score ?? null,
+      pacingGradeLabel: pacingDigest?.gradeLabel ?? "",
+    };
+  }
+
   function getScenePresentationPolishDigest(scene, options = {}) {
     const plan = buildScenePresentationPolishPlan(scene, options);
     const tagLimit = Math.max(1, Number(options.tagLimit) || 4);
@@ -196,15 +289,22 @@
         }
       });
     });
+    const directorBrief = buildSceneDirectorPolishBrief(scene, plan, { ...options, tagLimit });
 
     return {
       canApply: plan.changed,
       actionLabel: plan.changed ? `润色 ${plan.changedFieldCount} 个演出参数` : "演出参数已完整",
       badgeLabel: plan.changed ? `${plan.changedBlockCount} 张卡片可润色` : "无需处理",
-      helperText: plan.changed
-        ? `会补齐 ${changeLabels.slice(0, tagLimit).join("、") || "基础演出参数"}。`
-        : "本场的文字速度、转场、淡入淡出和音量已经比较完整。",
-      tags: plan.changed ? changeLabels.slice(0, tagLimit) : ["基础演出已完整"],
+      helperText: directorBrief.helperText,
+      tags: directorBrief.tags.length
+        ? directorBrief.tags
+        : plan.changed
+          ? changeLabels.slice(0, tagLimit)
+          : ["基础演出已完整"],
+      pacing: directorBrief.pacingDigest,
+      pacingIssueCount: directorBrief.pacingIssueCount,
+      pacingScore: directorBrief.pacingScore,
+      priority: directorBrief.priority,
       plan,
     };
   }
@@ -284,6 +384,14 @@
 
   function getProjectPresentationPolishDigest(data = {}, options = {}) {
     const plan = buildProjectPresentationPolishPlan(data, options);
+    const pacingAnalyses =
+      typeof scenePacingAdvisorTools.analyzeScenePacing === "function"
+        ? getProjectSceneList(data).map((scene) => scenePacingAdvisorTools.analyzeScenePacing(scene, options.pacing ?? {}))
+        : [];
+    const pacingAggregate =
+      pacingAnalyses.length && typeof scenePacingAdvisorTools.aggregateScenePacingAnalyses === "function"
+        ? scenePacingAdvisorTools.aggregateScenePacingAnalyses(pacingAnalyses)
+        : null;
     const previewNames = plan.scenePlans
       .slice(0, Math.max(1, Number(options.sceneNameLimit) || 3))
       .map((scenePlan) => scenePlan.sceneName)
@@ -295,7 +403,10 @@
       badgeLabel: plan.changed ? `${plan.changedSceneCount} 个场景可润色` : "无需处理",
       helperText: plan.changed
         ? `会处理 ${previewNames.join("、")}${plan.changedSceneCount > previewNames.length ? " 等场景" : ""}。`
-        : "全项目的基础转场、淡入淡出、音量和文字速度已经比较完整。",
+        : pacingAggregate?.roughSceneCount
+          ? `全项目基础参数已完整，但还有 ${pacingAggregate.roughSceneCount} 个场景节奏需要打磨。`
+          : "全项目的基础转场、淡入淡出、音量和文字速度已经比较完整。",
+      pacing: pacingAggregate,
       plan,
     };
   }
@@ -304,6 +415,7 @@
     DEFAULTS,
     buildScenePresentationPolishPlan,
     buildScenePresentationPolishSummary,
+    buildSceneDirectorPolishBrief,
     getScenePresentationPolishDigest,
     getProjectSceneList,
     buildProjectPresentationPolishPlan,

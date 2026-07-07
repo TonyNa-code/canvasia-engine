@@ -293,7 +293,9 @@
     pushCard({
       tone: effectActions.length > 0 ? "good" : "soft",
       title: "把记忆点做出来",
-      description: "正文已经能读的时候，先补镜头、粒子或闪屏，会比单纯继续堆字更容易出感觉。",
+      description:
+        polishDigest?.helperText ||
+        "正文已经能读的时候，先补镜头、粒子或闪屏，会比单纯继续堆字更容易出感觉。",
       tags: effectTags,
       actions: effectActions,
     });

@@ -86,7 +86,12 @@ class FrontendStorySceneStructurePanelModuleTests(unittest.TestCase):
             }});
             const optimizer = tools.renderStorySceneOptimizerSection(scene, overview, {{
               ...helpers,
-              polishDigest: {{ actionLabel: "演出已经比较稳", canApply: false, tags: ["已经有演出"] }},
+              polishDigest: {{
+                actionLabel: "演出已经比较稳",
+                canApply: false,
+                tags: ["已经有演出"],
+                helperText: "节奏体检：可以试玩，建议补 BGM 范围。",
+              }},
             }});
             const playableGate = tools.buildStoryScenePlayableGate(overview);
             const brokenGate = tools.buildStoryScenePlayableGate({{
@@ -133,6 +138,7 @@ class FrontendStorySceneStructurePanelModuleTests(unittest.TestCase):
         self.assertIn("场景优化助手", optimizer)
         self.assertIn("只看待绑语音（1）", optimizer)
         self.assertIn("演出已经比较稳", optimizer)
+        self.assertIn("节奏体检：可以试玩，建议补 BGM 范围。", optimizer)
         self.assertIn("disabled", optimizer)
 
 

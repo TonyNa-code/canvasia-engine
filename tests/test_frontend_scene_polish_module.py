@@ -8,6 +8,9 @@ from pathlib import Path
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
+CATALOG_MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "story_block_catalog.js"
+READABILITY_MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "script_readability.js"
+PACING_MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "scene_pacing_advisor.js"
 MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "scene_polish.js"
 
 
@@ -168,6 +171,97 @@ class FrontendScenePolishModuleTests(unittest.TestCase):
         self.assertIn("润色全项目", payload["projectDigest"]["actionLabel"])
         self.assertIn("3 个场景可润色", payload["projectDigest"]["badgeLabel"])
         self.assertIn("会处理", payload["projectDigest"]["helperText"])
+
+    def test_scene_polish_builds_director_brief_from_pacing_advisor(self) -> None:
+        long_scene_text = "这里已经连续读了很久，但画面还是没有变化。" * 8
+        script = textwrap.dedent(
+            f"""
+            const fs = require("fs");
+            const vm = require("vm");
+            const context = {{ window: {{}} }};
+            context.globalThis = context;
+            vm.createContext(context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(CATALOG_MODULE_PATH))}, "utf8"), context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(READABILITY_MODULE_PATH))}, "utf8"), context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(PACING_MODULE_PATH))}, "utf8"), context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
+            const tools = context.window.CanvasiaEditorScenePolish;
+            const roughScene = {{
+              id: "rough",
+              name: "长走廊独白",
+              blocks: [
+                {{ id: "line_1", type: "dialogue", text: {json.dumps(long_scene_text)} }},
+                {{ id: "line_2", type: "dialogue", text: "第二句。" }},
+                {{ id: "line_3", type: "dialogue", text: "第三句。" }},
+                {{ id: "line_4", type: "narration", text: "第四句。" }},
+                {{ id: "line_5", type: "dialogue", text: "第五句。" }},
+                {{ id: "line_6", type: "dialogue", text: "第六句。" }},
+                {{ id: "show_1", type: "character_show", characterId: "hero", transition: "none" }},
+              ],
+            }};
+            const readyScene = {{
+              id: "ready",
+              name: "黄昏教室",
+              blocks: [
+                {{ id: "bg", type: "background", assetId: "bg", transition: "fade", transitionDurationMs: 700 }},
+                {{ id: "music", type: "music_play", assetId: "bgm", fadeInMs: 900, fadeOutMs: 900, volume: 80, loop: true, endMode: "until_next_music" }},
+                {{ id: "line", type: "dialogue", text: "今天也辛苦了。", textSpeed: "normal", voiceAssetId: "voice_1" }},
+                {{ id: "wait", type: "wait", durationSeconds: 0.4 }},
+                {{ id: "fade", type: "screen_fade", action: "fade_out" }},
+              ],
+            }};
+            const digest = tools.getScenePresentationPolishDigest(roughScene, {{ tagLimit: 8 }});
+            const brief = tools.buildSceneDirectorPolishBrief(roughScene, digest.plan, {{ tagLimit: 8 }});
+            const readyDigest = tools.getScenePresentationPolishDigest(readyScene, {{ tagLimit: 5 }});
+            const projectDigest = tools.getProjectPresentationPolishDigest({{ scenes: [roughScene, readyScene] }});
+            process.stdout.write(JSON.stringify({{
+              keys: Object.keys(tools).sort(),
+              digest,
+              brief: {{
+                changed: brief.changed,
+                priority: brief.priority,
+                tags: brief.tags,
+                helperText: brief.helperText,
+                pacingIssueCount: brief.pacingIssueCount,
+                pacingScore: brief.pacingScore,
+                pacingGradeLabel: brief.pacingGradeLabel,
+              }},
+              readyDigest,
+              projectDigest: {{
+                helperText: projectDigest.helperText,
+                pacing: projectDigest.pacing,
+              }},
+            }}));
+            """
+        )
+        completed = subprocess.run(
+            ["node", "-e", script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        self.assertIn("buildSceneDirectorPolishBrief", payload["keys"])
+        self.assertTrue(payload["digest"]["canApply"])
+        self.assertIn("节奏体检", payload["digest"]["helperText"])
+        self.assertIn(payload["digest"]["priority"], ["danger", "warn"])
+        self.assertGreaterEqual(payload["digest"]["pacingIssueCount"], 3)
+        self.assertLess(payload["digest"]["pacingScore"], 72)
+        self.assertIn("补文字速度", payload["digest"]["tags"])
+        self.assertIn("补背景", payload["digest"]["tags"])
+        self.assertIn("补 BGM 范围", payload["digest"]["tags"])
+        self.assertTrue(payload["brief"]["changed"])
+        self.assertIn("节奏体检", payload["brief"]["helperText"])
+        self.assertGreaterEqual(payload["brief"]["pacingIssueCount"], 3)
+        self.assertIn(payload["brief"]["priority"], ["danger", "warn"])
+        self.assertFalse(payload["readyDigest"]["canApply"])
+        self.assertEqual(payload["readyDigest"]["pacingIssueCount"], 0)
+        self.assertEqual(payload["readyDigest"]["priority"], "soft")
+        self.assertEqual(payload["projectDigest"]["pacing"]["sceneCount"], 2)
+        self.assertGreaterEqual(payload["projectDigest"]["pacing"]["roughSceneCount"], 1)
 
 
 if __name__ == "__main__":
