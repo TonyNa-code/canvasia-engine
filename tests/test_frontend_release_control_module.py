@@ -10,6 +10,7 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "release_control.js"
 APP_PATH = ROOT_DIR / "prototype_editor" / "app.js"
+PANEL_MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "release_control_panel.js"
 
 
 class FrontendReleaseControlModuleTests(unittest.TestCase):
@@ -74,6 +75,7 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
 
     def test_release_fix_order_surfaces_route_issue_queue_in_ui_and_reports(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
+        panel_source = PANEL_MODULE_PATH.read_text(encoding="utf-8")
         payload_start = source.index("function buildReleaseControlReportPayload()")
         payload_end = source.index("function buildInspectionReportContent()")
         payload_body = source[payload_start:payload_end]
@@ -82,10 +84,11 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
         report_body = source[report_start:report_end]
 
         self.assertIn("function serializeReleaseRouteIssue", source)
-        self.assertIn("function renderReleaseRouteIssueQueue", source)
-        self.assertIn("${renderReleaseRouteIssueQueue(step.routeIssueQueue)}", source)
-        self.assertIn("function renderReleaseProductionBacklogTask", source)
-        self.assertIn("${renderReleaseProductionBacklogTask(step.productionBacklogTask)}", source)
+        self.assertIn("function renderReleaseRouteIssueQueue", panel_source)
+        self.assertIn("${renderReleaseRouteIssueQueue(step?.routeIssueQueue, helpers)}", panel_source)
+        self.assertIn("function renderReleaseProductionBacklogTask", panel_source)
+        self.assertIn("${renderReleaseProductionBacklogTask(step?.productionBacklogTask, helpers)}", panel_source)
+        self.assertIn("releaseControlPanelTools.renderReleaseFixOrderPanel(routeOverview", source)
         self.assertIn("routeIssueQueue: (step.routeIssueQueue ?? []).map(serializeReleaseRouteIssue)", payload_body)
         self.assertIn("productionBacklogTask: step.productionBacklogTask ?? null", payload_body)
         self.assertIn("const fixOrderTable = buildMarkdownTable", report_body)
@@ -122,6 +125,7 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
 
     def test_release_next_step_advice_is_module_backed(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
+        panel_source = PANEL_MODULE_PATH.read_text(encoding="utf-8")
         payload_start = source.index("function buildReleaseControlReportPayload()")
         payload_end = source.index("function buildInspectionReportContent()")
         payload_body = source[payload_start:payload_end]
@@ -136,8 +140,10 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
         self.assertIn("releaseControlTools?.buildReleaseNextActionCard", source)
         self.assertIn("releaseControlTools?.formatReleaseReportNextStepActionHint", source)
         self.assertIn("releaseControlTools?.formatReleaseReportNextStepAdvice", source)
-        self.assertIn("function renderReleaseNextActionCard", source)
-        self.assertIn("${renderReleaseNextActionCard(nextActionCard)}", source)
+        self.assertIn("const releaseControlPanelTools = window.CanvasiaEditorReleaseControlPanel", source)
+        self.assertIn("releaseControlPanelTools.renderReleaseFixOrderPanel(routeOverview", source)
+        self.assertIn("function renderReleaseNextActionCard", panel_source)
+        self.assertIn("${renderReleaseNextActionCard(nextActionCard, helpers)}", panel_source)
         self.assertIn("nextActionCard,", payload_body)
         self.assertIn("lines.push(`- ${formatReleaseReportNextStepAdvice(nextStep)}`);", inspection_body)
         self.assertIn("下一步行动卡", inspection_body)

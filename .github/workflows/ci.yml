@@ -94,6 +94,7 @@ jobs:
             tests/test_frontend_project_settings_module.py \
             tests/test_frontend_recent_workspace_module.py \
             tests/test_frontend_release_control_module.py \
+            tests/test_frontend_release_control_panel_module.py \
             tests/test_frontend_release_version_module.py \
             tests/test_frontend_release_candidate_manifest_module.py \
             tests/test_frontend_release_evidence_pack_module.py \
@@ -174,6 +175,7 @@ jobs:
           node --check prototype_editor/modules/production_backlog.js
           node --check prototype_editor/modules/recent_workspace.js
           node --check prototype_editor/modules/release_control.js
+          node --check prototype_editor/modules/release_control_panel.js
           node --check prototype_editor/modules/release_candidate_manifest.js
           node --check prototype_editor/modules/release_evidence_pack.js
           node --check prototype_editor/modules/release_version.js
@@ -262,6 +264,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_regression_diagnostics_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_recent_workspace_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_release_control_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_release_control_panel_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_release_candidate_manifest_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_release_evidence_pack_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_release_version_module.py' -v
