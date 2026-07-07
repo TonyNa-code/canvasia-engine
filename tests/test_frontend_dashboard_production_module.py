@@ -1,0 +1,190 @@
+from __future__ import annotations
+
+import json
+import subprocess
+import textwrap
+import unittest
+from pathlib import Path
+
+
+ROOT_DIR = Path(__file__).resolve().parents[1]
+MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "dashboard_production.js"
+
+
+class FrontendDashboardProductionModuleTests(unittest.TestCase):
+    def test_dashboard_production_rules_prioritize_next_steps_without_dom(self) -> None:
+        script = textwrap.dedent(
+            f"""
+            const fs = require("fs");
+            const vm = require("vm");
+            const context = {{ window: {{}} }};
+            context.globalThis = context;
+            vm.createContext(context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
+            const tools = context.window.CanvasiaEditorDashboardProduction;
+            const helpers = {{
+              getSafeScenePriority(value) {{
+                return ["parked", "normal", "focus", "rush"].includes(value) ? value : "normal";
+              }},
+              getSafeSceneStatus(value) {{
+                return ["outline", "drafting", "polishing", "ready"].includes(value) ? value : "outline";
+              }},
+              getScenePriorityLabel(value) {{
+                return {{ parked: "先放一放", normal: "正常推进", focus: "优先处理", rush: "马上处理" }}[value] || "正常推进";
+              }},
+              getSceneStatusLabel(value) {{
+                return {{ outline: "待开写", drafting: "写作中", polishing: "润色中", ready: "可试玩" }}[value] || "待开写";
+              }},
+              buildRouteSceneProductionNotes(scene) {{
+                return scene.productionNotes || [];
+              }},
+            }};
+            const routeOverview = {{
+              metrics: {{ brokenRoutes: 1, unreachableScenes: 2 }},
+              alerts: [
+                {{ tone: "danger", label: "坏链", sceneName: "屋顶", sceneId: "scene_roof", meta: "jump missing" }},
+                {{ tone: "warn", label: "不可达", sceneName: "尾声", sceneId: "scene_ending", meta: "入口走不到" }},
+              ],
+              nodes: [
+                {{
+                  id: "scene_rush",
+                  name: "告白",
+                  chapterName: "第1章",
+                  priority: "rush",
+                  status: "polishing",
+                  dialogueCount: 3,
+                  narrationCount: 1,
+                  choiceCount: 1,
+                  completionScore: 66,
+                  hasStoryContent: true,
+                  hasBackground: true,
+                  hasMusic: false,
+                  hasEffects: true,
+                  missingVoiceCount: 2,
+                  notes: "今天先搞定",
+                }},
+                {{
+                  id: "scene_ready",
+                  name: "尾声",
+                  chapterName: "第1章",
+                  priority: "normal",
+                  status: "ready",
+                  dialogueCount: 1,
+                  narrationCount: 0,
+                  choiceCount: 0,
+                  completionScore: 90,
+                  hasStoryContent: true,
+                  hasBackground: true,
+                  hasMusic: true,
+                  hasEffects: true,
+                  missingVoiceCount: 0,
+                  productionNotes: ["可以做最终试玩"],
+                }},
+                {{
+                  id: "scene_parked",
+                  name: "支线",
+                  chapterName: "第1章",
+                  priority: "parked",
+                  status: "drafting",
+                  dialogueCount: 0,
+                  narrationCount: 0,
+                  choiceCount: 0,
+                  completionScore: 5,
+                  hasStoryContent: false,
+                  hasBackground: false,
+                  hasMusic: false,
+                  hasEffects: false,
+                }},
+              ],
+            }};
+            const overview = {{
+              plannedScenes: tools.buildDashboardScenePlanningQueue(routeOverview, helpers),
+              emptyScenes: [{{ id: "scene_empty", name: "空教室" }}],
+              scenesMissingBackground: [{{ id: "scene_no_bg", name: "走廊" }}],
+              scenesMissingMusic: [{{ id: "scene_no_bgm", name: "天台" }}],
+              flatScenes: [{{ id: "scene_flat", name: "普通告别" }}],
+              missingVoiceCount: 4,
+              voiceProgress: 60,
+              issueEntryCount: 3,
+              issueEntries: [
+                {{ title: "占位台词", sceneId: "scene_rush", blockId: "line_1", issues: ["placeholder"] }},
+                {{ title: "长台词", sceneId: "scene_ready", blockId: "line_2", issues: ["too_long"] }},
+              ],
+              unusedAssets: [{{ id: "asset_unused", name: "备用 BGM" }}],
+              directionIdeaCount: 2,
+            }};
+            const tasks = tools.buildDashboardProductionTasks(routeOverview, overview, {{
+              helpers,
+              validationErrors: [
+                {{ message: "角色引用不存在", location: "scene_rush / line_1" }},
+              ],
+            }});
+            const columns = tools.buildDashboardSceneStatusColumns(routeOverview, helpers);
+            process.stdout.write(JSON.stringify({{
+              keys: Object.keys(tools).sort(),
+              progress: [
+                tools.getDashboardProgressPercent(1, 4),
+                tools.getDashboardProgressPercent(0, 0),
+              ],
+              summaries: [
+                tools.buildDashboardProductionSummary({{ readinessScore: 80, routeOverview: {{ metrics: {{ brokenRoutes: 1 }} }} }}),
+                tools.buildDashboardProductionSummary({{ readinessScore: 80, routeOverview: {{ metrics: {{}} }}, issueEntryCount: 0, missingVoiceCount: 0, directionIdeaCount: 0 }}),
+              ],
+              queue: overview.plannedScenes.map((scene) => ({{
+                id: scene.id,
+                tone: scene.tone,
+                summary: scene.summary,
+                nextStep: scene.nextStep,
+              }})),
+              tasks: tasks.map((task) => ({{
+                title: task.title,
+                priority: task.priority,
+                tone: task.tone,
+                badge: task.badge,
+                action: task.actions?.[0]?.action,
+              }})),
+              columns: columns.map((column) => ({{
+                status: column.status,
+                count: column.scenes.length,
+                firstId: column.scenes[0]?.id || "",
+              }})),
+              toneClasses: [
+                tools.getDashboardTaskToneClass("danger"),
+                tools.getDashboardTaskToneClass("warn"),
+                tools.getDashboardTaskToneClass("good"),
+                tools.getDashboardTaskToneClass("soft"),
+              ],
+            }}));
+            """
+        )
+        completed = subprocess.run(
+            ["node", "-e", script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+
+        self.assertIn("buildDashboardProductionTasks", payload["keys"])
+        self.assertEqual(payload["progress"], [25, 100])
+        self.assertIn("路线断线", payload["summaries"][0])
+        self.assertIn("成品味道", payload["summaries"][1])
+        self.assertEqual(payload["queue"][0]["id"], "scene_rush")
+        self.assertEqual(payload["queue"][0]["tone"], "danger")
+        self.assertIn("润色中", payload["queue"][0]["summary"])
+        self.assertNotIn("scene_parked", [scene["id"] for scene in payload["queue"]])
+        self.assertEqual(payload["tasks"][0]["title"], "先修路线断线")
+        self.assertEqual(payload["tasks"][1]["title"], "先处理结构问题")
+        self.assertIn("跟进你手动标记的重点场景", [task["title"] for task in payload["tasks"]])
+        self.assertIn("清一轮无用素材", [task["title"] for task in payload["tasks"]])
+        self.assertEqual(payload["columns"][2]["status"], "polishing")
+        self.assertEqual(payload["columns"][2]["firstId"], "scene_rush")
+        self.assertEqual(payload["columns"][3]["firstId"], "scene_ready")
+        self.assertEqual(payload["toneClasses"], ["danger-text", "warn-text", "good-text", ""])
+
+
+if __name__ == "__main__":
+    unittest.main()

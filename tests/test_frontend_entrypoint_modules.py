@@ -37,6 +37,7 @@ class FrontendEntrypointModuleTests(unittest.TestCase):
             "./modules/editor_filters.js",
             "./modules/dashboard_search_panel.js",
             "./modules/dashboard_primary_actions.js",
+            "./modules/dashboard_production.js",
             "./modules/script_readability.js",
             "./modules/scene_pacing_advisor.js",
             "./modules/scene_polish.js",
