@@ -87,9 +87,11 @@ jobs:
             tests/test_frontend_production_backlog_module.py \
             tests/test_frontend_project_center_module.py \
             tests/test_frontend_project_doctor_module.py \
+            tests/test_frontend_project_doctor_panel_module.py \
             tests/test_frontend_project_milestones_module.py \
             tests/test_frontend_project_milestones_panel_module.py \
             tests/test_frontend_project_history_module.py \
+            tests/test_frontend_project_history_panel_module.py \
             tests/test_frontend_project_polish_module.py \
             tests/test_frontend_regression_diagnostics_module.py \
             tests/test_frontend_project_settings_module.py \
@@ -166,9 +168,11 @@ jobs:
           node --check prototype_editor/modules/regression_diagnostics.js
           node --check prototype_editor/modules/project_center.js
           node --check prototype_editor/modules/project_doctor.js
+          node --check prototype_editor/modules/project_doctor_panel.js
           node --check prototype_editor/modules/project_milestones.js
           node --check prototype_editor/modules/project_milestones_panel.js
           node --check prototype_editor/modules/project_history.js
+          node --check prototype_editor/modules/project_history_panel.js
           node --check prototype_editor/modules/project_runtime_settings.js
           node --check prototype_editor/modules/project_settings.js
           node --check prototype_editor/modules/dialog_box_readability.js
@@ -258,9 +262,11 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_production_backlog_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_project_center_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_project_doctor_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_project_doctor_panel_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_project_milestones_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_project_milestones_panel_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_project_history_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_project_history_panel_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_project_polish_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_project_runtime_settings_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_project_settings_module.py' -v

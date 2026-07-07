@@ -283,6 +283,10 @@ class FrontendProjectDoctorModuleTests(unittest.TestCase):
 
     def test_editor_validation_surfaces_safe_order_repairs(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
+        panel_source = (ROOT_DIR / "prototype_editor" / "modules" / "project_doctor_panel.js").read_text(
+            encoding="utf-8"
+        )
+        combined_source = f"{source}\n{panel_source}"
 
         self.assertIn('"章节排序重复。"', source)
         self.assertIn('"章节排序里引用了不存在的章节。"', source)
@@ -296,23 +300,23 @@ class FrontendProjectDoctorModuleTests(unittest.TestCase):
         self.assertIn("系统会清理无效或重复章节排序", source)
         self.assertIn("系统会清理无效或重复场景排序", source)
         self.assertIn("autoRepairableCount", source)
-        self.assertIn("可安全修复", source)
-        self.assertIn("先预览再确认", source)
-        self.assertIn('data-action="preview-project-doctor-repair"', source)
+        self.assertIn("可安全修复", combined_source)
+        self.assertIn("先预览再确认", combined_source)
+        self.assertIn('data-action="preview-project-doctor-repair"', combined_source)
         self.assertIn("确认执行这项修复", source)
         self.assertIn("预览后可执行这项", source)
         self.assertIn("canConfirmStepRepair", source)
         self.assertIn("previewedRepairCodes.has", source)
-        self.assertIn("确认并执行预览的修复", source)
+        self.assertIn("确认并执行预览的修复", combined_source)
         self.assertIn("stageDirectionSheet: buildStageDirectionSheet()", source)
-        self.assertIn("预览后可执行修复", source)
-        self.assertIn("confirmRepairLabel", source)
+        self.assertIn("预览后可执行修复", combined_source)
+        self.assertIn("confirmRepairLabel", combined_source)
         self.assertIn("getCurrentProjectDoctorPreviewRepairCodes", source)
         self.assertIn("matchesPreview", source)
         self.assertIn("项目医生预览已变化，请先重新预览安全修复", source)
         self.assertIn("请先点“先预览安全修复”，确认后再执行", source)
-        self.assertIn('disabled aria-disabled="true"', source)
-        self.assertIn("previewRepairCodes.join", source)
+        self.assertIn('disabled aria-disabled="true"', combined_source)
+        self.assertIn("previewRepairCodes.join", combined_source)
         self.assertIn("项目医生正在预览安全修复", source)
         self.assertIn("dryRun: true", source)
         self.assertIn("if (!dryRun) {\n      state.lastExportResult = null;", source)
