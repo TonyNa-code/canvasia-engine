@@ -190,6 +190,7 @@ const runtimeConditionTools = window.CanvasiaRuntimeConditions;
 const projectHistoryTools = window.CanvasiaEditorProjectHistory;
 const projectHistoryPanelTools = window.CanvasiaEditorProjectHistoryPanel;
 const assetCatalogTools = window.CanvasiaEditorAssetCatalog;
+const beginnerAssetsGuideTools = window.CanvasiaEditorBeginnerAssetsGuide;
 const assetFootprintTools = window.CanvasiaEditorAssetFootprint;
 const runtimePreloadBudgetTools = window.CanvasiaEditorRuntimePreloadBudget;
 const regressionDiagnosticTools = window.CanvasiaEditorRegressionDiagnostics;
@@ -1870,75 +1871,24 @@ function renderBeginnerAssetsGuide(selectedAsset, duplicateOverview = buildAsset
   const selectedTypeLabel = getAssetTypeLabel(state.selectedAssetType);
   const selectedAssetName = selectedAsset?.name ?? `当前${selectedTypeLabel}`;
   const voiceMatchTargets = getVoicePlaceholderTargetAssets();
+  const currentTypeSummaryText = currentTypeSummary
+    ? getAssetTypeGapSummaryText(state.selectedAssetType, null, state.data, duplicateOverview)
+    : "这一类暂时还没有素材";
+  const model = beginnerAssetsGuideTools.buildBeginnerAssetsGuideModel({
+    overview,
+    selectedAsset,
+    selectedAssetType: state.selectedAssetType,
+    selectedTypeLabel,
+    selectedAssetName,
+    voiceMatchTargetCount: voiceMatchTargets.length,
+    currentTypeSummaryText,
+  });
 
-  let title = "导入第一批素材";
-  let description = "新手模式下，素材页优先处理导入、补齐和替换；标签整理、批量清理和重复分析可后续再处理。";
-  let actions = [
-    { label: "上传素材", action: "pick-assets" },
-    { label: "去剧情页继续写", action: "switch-screen", dataset: { screen: "story" } },
-  ];
-
-  if (state.selectedAssetType === "voice" && voiceMatchTargets.length > 0) {
-    title = "匹配待导入语音条目";
-    description = `当前已选中 ${voiceMatchTargets.length} 个待导入语音条目，可直接执行批量文件匹配。`;
-    actions = [
-      { label: "批量匹配语音文件", action: "pick-voice-placeholder-files" },
-      { label: "只看待导入", action: "focus-asset-gap", dataset: { "asset-filter-mode": "missing_file", "asset-type": "voice" } },
-    ];
-  } else if (selectedAsset && !selectedAsset.fileExists) {
-    title = `补齐“${selectedAssetName}”的真实文件`;
-    description = `当前选中的${selectedTypeLabel}条目还没有真实文件，补齐后预览和导出才会生效。`;
-    actions = [
-      { label: "补/替换文件", action: "replace-asset-file" },
-      { label: "只看这类待导入", action: "focus-asset-gap", dataset: { "asset-filter-mode": "missing_file", "asset-type": state.selectedAssetType } },
-    ];
-  } else if (overview.urgentMissingCount > 0) {
-    title = "补齐已被引用的缺口素材";
-    description = `当前有 ${overview.urgentMissingCount} 个素材已被剧情或角色引用，但尚未提供真实文件。`;
-    actions = [
-      { label: "只看已引用缺口", action: "focus-asset-gap", dataset: { "asset-filter-mode": "urgent_missing" } },
-      { label: "上传素材", action: "pick-assets" },
-    ];
-  } else if (overview.missingCount > 0) {
-    title = "继续补齐待导入素材";
-    description = `当前还有 ${overview.missingCount} 个素材条目缺少真实文件，可优先补当前剧情会使用到的分类。`;
-    actions = [
-      { label: "只看待导入", action: "focus-asset-gap", dataset: { "asset-filter-mode": "missing_file" } },
-      { label: "上传素材", action: "pick-assets" },
-    ];
-  } else if (overview.readyCount > 0) {
-    title = "素材基础已具备";
-    description = `当前已有 ${overview.readyCount} 个素材具备真实文件，可返回剧情页继续搭建内容。`;
-    actions = [
-      { label: "去剧情页继续写", action: "switch-screen", dataset: { screen: "story" } },
-      { label: "去试玩页看看", action: "switch-screen", dataset: { screen: "preview" } },
-    ];
-  }
-
-  return `
-    <section class="detail-card beginner-guide-panel">
-      <div class="panel-heading">
-        <div>
-          <h3>新手素材顺序</h3>
-          <span class="panel-note">优先处理当前内容已经使用到的素材</span>
-        </div>
-        <span class="badge badge-soft">${escapeHtml(selectedTypeLabel)}</span>
-      </div>
-      <article class="beginner-guide-card beginner-guide-focus-card">
-        <strong>${escapeHtml(title)}</strong>
-        <p>${escapeHtml(description)}</p>
-        <div class="detail-actions">
-          ${actions.map((action, index) => renderQuickActionButton(action, index === 0)).join("")}
-        </div>
-      </article>
-      <div class="route-summary-strip beginner-guide-metrics">
-        ${renderRouteMetricCard("已就绪", overview.readyCount, "已经能直接预览和导出的素材")}
-        ${renderRouteMetricCard("待导入", overview.missingCount, "还没有真实文件的素材条目")}
-        ${renderRouteMetricCard("已引用缺口", overview.urgentMissingCount, "当前优先处理的缺口")}
-        ${renderRouteMetricCard("当前分类", selectedTypeLabel, currentTypeSummary ? getAssetTypeGapSummaryText(state.selectedAssetType, null, state.data, duplicateOverview) : "这一类暂时还没有素材")}
-      </div>
-    </section>
-  `;
+  return beginnerAssetsGuideTools.renderBeginnerAssetsGuidePanel(model, {
+    escapeHtml,
+    renderQuickActionButton,
+    renderRouteMetricCard,
+  });
 }
 
 function renderBeginnerCharacterSummary(rosterOverview, character, stats) {
