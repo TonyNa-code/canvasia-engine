@@ -488,6 +488,7 @@ NATIVE_RUNTIME_SETTINGS_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_player_s
 NATIVE_RUNTIME_TEXT_EFFECTS_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_text_effects.py"
 NATIVE_RUNTIME_STORAGE_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_storage.py"
 NATIVE_RUNTIME_VARIABLES_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_variables.py"
+NATIVE_RUNTIME_VN_QUALITY_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_vn_quality.py"
 NATIVE_RUNTIME_README_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "README.md"
 NATIVE_RUNTIME_REQUIREMENTS_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "requirements.txt"
 NATIVE_RUNTIME_BUILD_REQUIREMENTS_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "requirements-build.txt"
@@ -503,6 +504,7 @@ NATIVE_RUNTIME_SETTINGS_NAME = "runtime_player_settings.py"
 NATIVE_RUNTIME_TEXT_EFFECTS_NAME = "runtime_text_effects.py"
 NATIVE_RUNTIME_STORAGE_NAME = "runtime_storage.py"
 NATIVE_RUNTIME_VARIABLES_NAME = "runtime_variables.py"
+NATIVE_RUNTIME_VN_QUALITY_NAME = "runtime_vn_quality.py"
 NATIVE_RUNTIME_README_NAME = "README_原生_Runtime_包先看这里.md"
 NATIVE_RUNTIME_REQUIREMENTS_NAME = "requirements-native-runtime.txt"
 NATIVE_RUNTIME_BUILD_REQUIREMENTS_NAME = "requirements-native-runtime-build.txt"
@@ -558,6 +560,7 @@ NATIVE_RUNTIME_REQUIRED_MODULE_FILES = (
     (NATIVE_RUNTIME_TEXT_EFFECTS_SOURCE, NATIVE_RUNTIME_TEXT_EFFECTS_NAME),
     (NATIVE_RUNTIME_STORAGE_SOURCE, NATIVE_RUNTIME_STORAGE_NAME),
     (NATIVE_RUNTIME_VARIABLES_SOURCE, NATIVE_RUNTIME_VARIABLES_NAME),
+    (NATIVE_RUNTIME_VN_QUALITY_SOURCE, NATIVE_RUNTIME_VN_QUALITY_NAME),
 )
 EDITOR_DISTRIBUTION_CONFIG_NAME = "editor_distribution.json"
 EDITOR_DISTRIBUTION_SNAPSHOT_NAME = "editor_distribution.snapshot.json"
@@ -10035,6 +10038,8 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
         "runtimeStorageModulePath": str(build_dir / NATIVE_RUNTIME_STORAGE_NAME),
         "runtimeVariablesModuleName": NATIVE_RUNTIME_VARIABLES_NAME,
         "runtimeVariablesModulePath": str(build_dir / NATIVE_RUNTIME_VARIABLES_NAME),
+        "runtimeVnQualityModuleName": NATIVE_RUNTIME_VN_QUALITY_NAME,
+        "runtimeVnQualityModulePath": str(build_dir / NATIVE_RUNTIME_VN_QUALITY_NAME),
         "readmeName": NATIVE_RUNTIME_README_NAME,
         "readmePath": str(build_dir / NATIVE_RUNTIME_README_NAME),
         "requirementsName": NATIVE_RUNTIME_REQUIREMENTS_NAME,
@@ -10722,6 +10727,7 @@ def export_native_runtime_build() -> dict:
             "runtimeTextEffectsModule": runtime_files["runtimeTextEffectsModuleName"],
             "runtimeStorageModule": runtime_files["runtimeStorageModuleName"],
             "runtimeVariablesModule": runtime_files["runtimeVariablesModuleName"],
+            "runtimeVnQualityModule": runtime_files["runtimeVnQualityModuleName"],
             "readme": runtime_files["readmeName"],
             "requirements": runtime_files["requirementsName"],
             "buildRequirements": runtime_files["buildRequirementsName"],
@@ -10824,6 +10830,7 @@ def export_native_runtime_build() -> dict:
             "runtimeTextEffectsModule": runtime_files["runtimeTextEffectsModuleName"],
             "runtimeStorageModule": runtime_files["runtimeStorageModuleName"],
             "runtimeVariablesModule": runtime_files["runtimeVariablesModuleName"],
+            "runtimeVnQualityModule": runtime_files["runtimeVnQualityModuleName"],
             "releaseCheck": runtime_files["releaseCheckName"],
             "doctorReport": runtime_files["doctorReportName"],
             "doctorMarkdown": runtime_files["doctorMarkdownName"],
@@ -11041,6 +11048,7 @@ def export_native_runtime_build() -> dict:
         {"name": runtime_files["runtimeTextEffectsModuleName"], "description": "原生 Runtime 打字机和文本效果模块。"},
         {"name": runtime_files["runtimeStorageModuleName"], "description": "原生 Runtime 存档、自动恢复和崩溃日志模块。"},
         {"name": runtime_files["runtimeVariablesModuleName"], "description": "原生 Runtime 变量和条件判断模块。"},
+        {"name": runtime_files["runtimeVnQualityModuleName"], "description": "原生 Runtime 视觉小说基础质感分析模块。"},
         {"name": runtime_files["releaseCheckName"], "description": "发布前自检 JSON。"},
         {"name": runtime_files["releaseCandidateReportName"], "description": "原生 Runtime 发布候选总报告。"},
         {"name": runtime_files["releaseControlReportName"], "description": "人工验收用发布总控 Markdown。"},
@@ -11318,6 +11326,9 @@ def export_native_runtime_build() -> dict:
         "runtimeVariablesModuleName": runtime_files["runtimeVariablesModuleName"],
         "runtimeVariablesModulePath": runtime_files["runtimeVariablesModulePath"],
         "runtimeVariablesModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimeVariablesModuleName']}",
+        "runtimeVnQualityModuleName": runtime_files["runtimeVnQualityModuleName"],
+        "runtimeVnQualityModulePath": runtime_files["runtimeVnQualityModulePath"],
+        "runtimeVnQualityModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimeVnQualityModuleName']}",
         "readmeName": runtime_files["readmeName"],
         "readmePath": runtime_files["readmePath"],
         "readmePublicUrl": f"/exports/{build_dir.name}/{runtime_files['readmeName']}",

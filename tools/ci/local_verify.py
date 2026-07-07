@@ -49,6 +49,7 @@ PYTHON_SYNTAX_FILES = [
     "native_runtime/runtime_text_effects.py",
     "native_runtime/runtime_storage.py",
     "native_runtime/runtime_variables.py",
+    "native_runtime/runtime_vn_quality.py",
     "native_runtime/runtime_performance.py",
     "native_runtime/runtime_preload.py",
     "native_runtime/runtime_scene_prefetch.py",

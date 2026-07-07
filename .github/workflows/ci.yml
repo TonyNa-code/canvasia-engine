@@ -43,6 +43,7 @@ jobs:
             run_editor.py \
             native_runtime/runtime_player.py \
             native_runtime/runtime_i18n.py \
+            native_runtime/runtime_vn_quality.py \
             native_runtime/build_native_runtime_app.py \
             tools/release/check_editor_signing_readiness.py \
             tools/release/prepare_preview_release.py \
