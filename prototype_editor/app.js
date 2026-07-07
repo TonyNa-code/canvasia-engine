@@ -54,6 +54,7 @@ const scriptImportMappingTools = window.CanvasiaEditorScriptImportMapping;
 const routeAnalyzerTools = window.CanvasiaEditorRouteAnalyzer;
 const routeTestingReportTools = window.CanvasiaEditorRouteTestingReport;
 const sceneProductionBoardTools = window.CanvasiaEditorSceneProductionBoard;
+const storySceneStructurePanelTools = window.CanvasiaEditorStorySceneStructurePanel;
 const voiceProductionSheetTools = window.CanvasiaEditorVoiceProductionSheet;
 const screenplayExporterTools = window.CanvasiaEditorScreenplayExporter;
 const renpyExporterTools = window.CanvasiaEditorRenpyExporter;
@@ -33699,224 +33700,28 @@ function buildStorySceneStructureOverview(scene, routeNode = null) {
 }
 
 function renderStorySceneOptimizerButton(button) {
-  const className = button.primary ? "toolbar-button toolbar-button-primary" : "toolbar-button";
-  const dataset = Object.entries(button.dataset ?? {})
-    .map(([key, value]) => ` data-${key}="${escapeHtml(String(value))}"`)
-    .join("");
-  const disabled = button.disabled ? " disabled" : "";
-  return `
-    <button type="button" class="${className}" data-action="${escapeHtml(button.action)}"${dataset}${disabled}>
-      ${escapeHtml(button.label)}
-    </button>
-  `;
+  return storySceneStructurePanelTools.renderStorySceneOptimizerButton(button, { escapeHtml });
 }
 
 function buildStorySceneOptimizerCards(scene, overview) {
-  const cards = [];
-  const pushCard = (card) => {
-    if (card && (card.actions?.length ?? 0) > 0) {
-      cards.push(card);
-    }
-  };
-
-  if (!overview.hasStoryContent) {
-    pushCard({
-      tone: "warn",
-      title: "先把这一场写起来",
-      description: "这一场现在还是空壳，先补 1 到 2 张正文卡片，马上就能进到可试玩状态。",
-      tags: ["正文还没开始", "先补骨架最划算"],
-      actions: [
-        { label: "加一张台词", action: "add-dialogue", primary: true },
-        { label: "加一张旁白", action: "add-narration" },
-        { label: "从这里试玩", action: "preview-scene-from-map", dataset: { "scene-id": scene.id } },
-      ],
-    });
-  }
-
-  const foundationActions = [];
-  const foundationTags = [];
-  if (!overview.hasBackground) {
-    foundationActions.push({ label: "补背景卡", action: "add-background", primary: true });
-    foundationTags.push("还没放背景");
-  }
-  if (!overview.hasMusic) {
-    foundationActions.push({ label: "补 BGM 卡", action: "add-music-play", primary: foundationActions.length === 0 });
-    foundationTags.push("还没播 BGM");
-  }
-  if (overview.issueCounts.missing_asset > 0) {
-    foundationActions.push({
-      label: `只看待补素材（${overview.issueCounts.missing_asset}）`,
-      action: "focus-story-block-filters",
-      dataset: { "story-block-issue": "missing_asset" },
-    });
-    foundationTags.push(`待补素材 ${overview.issueCounts.missing_asset} 张`);
-  }
-  pushCard({
-    tone: foundationActions.length > 1 ? "warn" : "soft",
-    title: "先补基础氛围",
-    description: "把背景、BGM 和缺文件素材补起来，这一场的画面和气氛会立刻完整很多。",
-    tags: foundationTags,
-    actions: foundationActions,
-  });
-
-  const repairActions = [];
-  const repairTags = [];
-  if (overview.issueCounts.missing_voice > 0) {
-    repairActions.push({
-      label: `只看待绑语音（${overview.issueCounts.missing_voice}）`,
-      action: "focus-story-block-filters",
-      primary: true,
-      dataset: { "story-block-type": "dialogue", "story-block-issue": "missing_voice" },
-    });
-    repairTags.push(`缺语音 ${overview.issueCounts.missing_voice} 张`);
-  }
-  if (overview.issueCounts.too_long > 0) {
-    repairActions.push({
-      label: `只看偏长正文（${overview.issueCounts.too_long}）`,
-      action: "focus-story-block-filters",
-      dataset: { "story-block-issue": "too_long" },
-    });
-    repairTags.push(`偏长文本 ${overview.issueCounts.too_long} 张`);
-  }
-  if (overview.issueCounts.any > 0) {
-    repairActions.push({
-      label: `只看有问题卡片（${overview.issueCounts.any}）`,
-      action: "focus-story-block-filters",
-      dataset: { "story-block-issue": "any" },
-    });
-  }
-  pushCard({
-    tone: overview.issueCounts.broken_target > 0 ? "danger" : "warn",
-    title: "先把正文和问题修稳",
-    description: "先把缺语音、偏长文本和问题卡片筛出来处理，后面继续写会更稳。",
-    tags: repairTags,
-    actions: repairActions,
-  });
-
-  const logicActions = [];
-  const logicTags = [];
-  if (overview.issueCounts.broken_target > 0) {
-    logicActions.push({
-      label: `只看跳转待修（${overview.issueCounts.broken_target}）`,
-      action: "focus-story-block-filters",
-      primary: true,
-      dataset: { "story-block-type": "logic", "story-block-issue": "broken_target" },
-    });
-    logicTags.push(`坏链 ${overview.issueCounts.broken_target} 处`);
-  }
-  if ((overview.routes ?? []).length === 0 && overview.storyCount > 0) {
-    logicActions.push({ label: "加一张跳转卡", action: "add-jump", primary: logicActions.length === 0 });
-    logicActions.push({ label: "加一个选项", action: "add-choice" });
-    logicTags.push("后续去向还没接上");
-  } else if (overview.choiceCount + overview.conditionCount === 0 && overview.storyCount >= 4) {
-    logicActions.push({ label: "加一个选项", action: "add-choice", primary: logicActions.length === 0 });
-    logicActions.push({ label: "加条件判断", action: "add-condition" });
-    logicTags.push("这场还没有分支口");
-  }
-  if (logicActions.length > 0) {
-    logicActions.push({
-      label: "只看逻辑卡片",
-      action: "focus-story-block-filters",
-      dataset: { "story-block-type": "logic" },
-    });
-  }
-  pushCard({
-    tone: overview.issueCounts.broken_target > 0 ? "danger" : "soft",
-    title: "把分支和去向接起来",
-    description: "路线入口、条件判断和跳转都在这里补，会比读完整场以后再回头找更省事。",
-    tags: logicTags,
-    actions: logicActions,
-  });
-
-  const effectActions = [];
-  const effectTags = [];
   const polishDigest =
     typeof scenePolishTools?.getScenePresentationPolishDigest === "function"
       ? scenePolishTools.getScenePresentationPolishDigest(scene)
       : null;
-  if (overview.hasStoryContent) {
-    effectActions.push({
-      label: polishDigest?.actionLabel ?? "一键润色本场演出",
-      action: "polish-scene-presentation",
-      primary: true,
-      disabled: polishDigest ? !polishDigest.canApply : false,
-    });
-    effectTags.push(...(polishDigest?.tags?.length ? polishDigest.tags : ["自动补基础转场和淡入淡出"]));
-  }
-  if (overview.hasStoryContent && !overview.hasEffects) {
-    effectActions.push({ label: "加粒子特效", action: "add-particle-effect" });
-    effectActions.push({ label: "加镜头推近", action: "add-camera-zoom" });
-    effectTags.push("演出还没开始点缀");
-  } else if (overview.effectCount > 0 && overview.effectCount < 2 && overview.storyCount >= 3) {
-    effectActions.push({ label: "再补一张镜头卡", action: "add-camera-pan" });
-    effectActions.push({ label: "加闪屏或震动", action: "add-screen-flash" });
-    effectTags.push("演出还可以再抬一点");
-  }
-  if (overview.storyCount >= 2) {
-    effectActions.push({
-      label: "只看演出卡片",
-      action: "focus-story-block-filters",
-      dataset: { "story-block-type": "effect" },
-    });
-  }
-  pushCard({
-    tone: effectActions.length > 0 ? "good" : "soft",
-    title: "把记忆点做出来",
-    description: "正文已经能读的时候，先补镜头、粒子或闪屏，会比单纯继续堆字更容易出感觉。",
-    tags: effectTags,
-    actions: effectActions,
-  });
-
-  return cards.slice(0, 4);
+  return storySceneStructurePanelTools.buildStorySceneOptimizerCards(scene, overview, { polishDigest });
 }
 
 function renderStorySceneOptimizerSection(scene, overview) {
-  const cards = buildStorySceneOptimizerCards(scene, overview);
-  const toneLabels = {
-    danger: "优先修",
-    warn: "先处理",
-    good: "值得做",
-    soft: "顺手补",
-  };
-
-  return `
-    <article class="production-task-card story-structure-section story-optimizer-panel">
-      <div class="production-task-top">
-        <strong>场景优化助手</strong>
-        <span class="issue-tag good-text">看见缺口就直接动手</span>
-      </div>
-      <p class="helper-text">这里会把这一场当前最值得做的动作，直接整理成能点的按钮。你不用先记问题，再回工具栏里找。</p>
-      ${
-        cards.length > 0
-          ? `<div class="story-optimizer-grid">
-              ${cards
-                .map(
-                  (card) => `
-                    <article class="story-optimizer-card is-${card.tone}">
-                      <div class="story-optimizer-head">
-                        <strong>${escapeHtml(card.title)}</strong>
-                        <span class="issue-tag ${getDashboardTaskToneClass(card.tone)}">${escapeHtml(toneLabels[card.tone] ?? "可处理")}</span>
-                      </div>
-                      <p>${escapeHtml(card.description)}</p>
-                      ${
-                        card.tags?.length
-                          ? `<div class="story-optimizer-tag-row">
-                              ${card.tags.map((tag) => `<span class="issue-tag">${escapeHtml(tag)}</span>`).join("")}
-                            </div>`
-                          : ""
-                      }
-                      <div class="story-optimizer-action-row">
-                        ${card.actions.map((button) => renderStorySceneOptimizerButton(button)).join("")}
-                      </div>
-                    </article>
-                  `
-                )
-                .join("")}
-            </div>`
-          : renderEmpty("这一场的基础骨架已经比较完整了。可先从这里试玩一遍，确认节奏和演出手感。")
-      }
-    </article>
-  `;
+  const polishDigest =
+    typeof scenePolishTools?.getScenePresentationPolishDigest === "function"
+      ? scenePolishTools.getScenePresentationPolishDigest(scene)
+      : null;
+  return storySceneStructurePanelTools.renderStorySceneOptimizerSection(scene, overview, {
+    escapeHtml,
+    getDashboardTaskToneClass,
+    polishDigest,
+    renderEmpty,
+  });
 }
 
 function renderSceneMoodRecipePanel(scene, overview) {
@@ -33939,112 +33744,16 @@ function renderStorySceneStructurePanel(scene, routeNode = null) {
   const overview = buildStorySceneStructureOverview(scene, routeNode);
   const tone = getScenePlanningTone(overview);
 
-  return `
-    <article class="editor-card story-structure-card">
-      <div class="story-structure-head">
-        <div>
-          <h3>场景结构总览</h3>
-          <p>这里会汇总这场的骨架、分支口、演出密度和当前最值得先补的部分。</p>
-        </div>
-        <span class="issue-tag ${getDashboardTaskToneClass(tone)}">完成度 ${overview.completionScore}%</span>
-      </div>
-      <div class="route-summary-strip story-structure-metrics">
-        ${renderRouteMetricCard("正文", overview.storyCount, `台词 ${overview.dialogueCount} · 旁白 ${overview.narrationCount} · 选项 ${overview.choiceCount}`)}
-        ${renderRouteMetricCard("演出", overview.effectCount, overview.effectCount > 0 ? "画面和听觉已经开始发力" : "还没开始点缀镜头和气氛")}
-        ${renderRouteMetricCard(
-          "逻辑",
-          overview.logicCount,
-          overview.choiceCount + overview.conditionCount > 0
-            ? `分支 ${overview.choiceCount + overview.conditionCount} 处 · 去向 ${overview.branchTargetCount || 1} 条`
-            : "当前还是单线推进"
-        )}
-        ${renderRouteMetricCard("问题卡片", overview.issueBlockCount, overview.issueBlockCount > 0 ? "先修这里会更稳" : "这一场目前比较干净")}
-      </div>
-      <div class="story-scene-planner-tags">
-        <span class="issue-tag good-text">${escapeHtml(overview.phaseLabel)}</span>
-        ${overview.productionNotes
-          .map((note) => {
-            const toneClass =
-              /错误|坏链/.test(note) ? "danger-text" : /缺|提醒|偏素/.test(note) ? "warn-text" : "good-text";
-            return `<span class="issue-tag ${toneClass}">${escapeHtml(note)}</span>`;
-          })
-          .join("")}
-      </div>
-      <div class="story-structure-grid">
-        <article class="production-task-card story-structure-section is-${tone}">
-          <div class="production-task-top">
-            <strong>这场现在像什么</strong>
-            <span class="issue-tag ${getDashboardTaskToneClass(tone)}">${escapeHtml(
-              `${getSceneStatusLabel(scene.status)} / ${getScenePriorityLabel(scene.priority)}`
-            )}</span>
-          </div>
-          <p>${escapeHtml(overview.sceneSummary)}</p>
-          <div class="story-structure-note-list">
-            ${overview.structureNotes
-              .map(
-                (note) => `
-                  <article class="story-structure-note">
-                    <strong>${escapeHtml(note)}</strong>
-                  </article>
-                `
-              )
-              .join("")}
-          </div>
-        </article>
-        <article class="production-task-card story-structure-section">
-          <div class="production-task-top">
-            <strong>高光和分支口</strong>
-            <span class="issue-tag">${overview.highlightCandidates.length > 0 ? `优先看 ${overview.highlightCandidates.length} 处` : "自动分析中"}</span>
-          </div>
-          ${
-            overview.highlightCandidates.length > 0
-              ? `<div class="story-structure-highlight-list">
-                  ${overview.highlightCandidates
-                    .map(
-                      (item) => `
-                        <article class="story-structure-highlight-card is-${item.tone}">
-                          <div class="story-structure-highlight-top">
-                            <span class="issue-tag ${getDashboardTaskToneClass(item.tone)}">${escapeHtml(item.blockLabel)}</span>
-                            <span class="panel-note">第 ${item.index + 1} 张</span>
-                          </div>
-                          <strong>${escapeHtml(item.title)}</strong>
-                          <p>${escapeHtml(item.reason)}</p>
-                          <div class="detail-meta">${escapeHtml(item.meta)}</div>
-                          <div class="detail-actions">
-                            <button type="button" class="toolbar-button toolbar-button-primary" data-action="select-block" data-block-id="${item.blockId}">
-                              定位这张卡片
-                            </button>
-                          </div>
-                        </article>
-                      `
-                    )
-                    .join("")}
-                </div>`
-              : renderEmpty("这场还没出现特别明显的高光点。可先补正文，再用镜头或粒子强化重点。")
-          }
-        </article>
-      </div>
-      ${renderStorySceneOptimizerSection(scene, overview)}
-      ${renderSceneMoodRecipePanel(scene, overview)}
-      <article class="production-task-card story-structure-section story-structure-next-card is-good">
-        <div class="production-task-top">
-          <strong>下一步最值钱的优化</strong>
-          <span class="issue-tag good-text">先做这几件最划算</span>
-        </div>
-        <div class="story-structure-step-list">
-          ${overview.nextSteps
-            .map(
-              (step) => `
-                <article class="story-structure-step">
-                  <strong>${escapeHtml(step)}</strong>
-                </article>
-              `
-            )
-            .join("")}
-        </div>
-      </article>
-    </article>
-  `;
+  return storySceneStructurePanelTools.renderStorySceneStructurePanel(scene, overview, {
+    escapeHtml,
+    getDashboardTaskToneClass,
+    moodRecipePanelHtml: renderSceneMoodRecipePanel(scene, overview),
+    renderEmpty,
+    renderRouteMetricCard,
+    scenePriorityLabel: getScenePriorityLabel(scene.priority),
+    sceneStatusLabel: getSceneStatusLabel(scene.status),
+    tone,
+  });
 }
 
 function renderStoryScenePlanner(scene, routeNode = null) {

@@ -47,7 +47,6 @@ DYNAMIC_DATA_ACTION_MARKERS = Counter(
         'data-action="${escapeHtml(action.action ?? "")}"': 1,
         'data-action="${button.action}"': 1,
         'data-action="${action.action}"${': 1,
-        'data-action="${escapeHtml(button.action)}"': 1,
     }
 )
 
