@@ -80,6 +80,7 @@ class FrontendEntrypointModuleTests(unittest.TestCase):
             "./modules/release_version.js",
             "./modules/project_doctor.js",
             "./modules/project_milestones.js",
+            "./modules/project_milestones_panel.js",
             "./modules/release_control.js",
             "./modules/release_control_panel.js",
             "./modules/typewriter.js",

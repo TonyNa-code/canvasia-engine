@@ -193,6 +193,7 @@ const runtimePreloadBudgetTools = window.CanvasiaEditorRuntimePreloadBudget;
 const regressionDiagnosticTools = window.CanvasiaEditorRegressionDiagnostics;
 const projectDoctorTools = window.CanvasiaEditorProjectDoctor;
 const projectMilestoneTools = window.CanvasiaEditorProjectMilestones ?? window.CanvasiaProjectMilestones;
+const projectMilestonePanelTools = window.CanvasiaEditorProjectMilestonePanel;
 const openAiAssetTools = window.CanvasiaEditorOpenAiAssetGenerator;
 const beginnerTutorialTools = window.CanvasiaEditorBeginnerTutorial;
 const projectCenterTools = window.CanvasiaEditorProjectCenter;
@@ -11069,86 +11070,29 @@ function buildProjectMilestoneActionBrief(plan) {
 }
 
 function getProjectMilestoneToneClass(tone) {
-  if (tone === "danger") {
-    return "danger-text";
-  }
-  if (tone === "warn") {
-    return "warn-text";
-  }
-  if (tone === "good") {
-    return "good-text";
-  }
-  return "soft-text";
+  return projectMilestonePanelTools.getProjectMilestoneToneClass(tone);
 }
 
 function getProjectMilestoneGapToneClass(status) {
-  if (status === "ready") {
-    return "good-text";
-  }
-  if (status === "close") {
-    return "warn-text";
-  }
-  return "danger-text";
+  return projectMilestonePanelTools.getProjectMilestoneGapToneClass(status);
 }
 
 function renderDashboardActionBriefChecklist(items = []) {
-  if (!items.length) {
-    return `
-      <div class="creator-focus-checklist">
-        <article class="creator-focus-check is-done">
-          <strong>当前没有明显缺口</strong>
-          <span>可以继续试玩、导出或进入人工验收。</span>
-        </article>
-      </div>
-    `;
-  }
-
-  return `
-    <div class="creator-focus-checklist">
-      ${items
-        .map(
-          (item) => `
-            <article class="creator-focus-check ${item.done ? "is-done" : ""}">
-              <strong>${escapeHtml(item.label ?? "待处理项")}</strong>
-              <span>${escapeHtml(item.detail ?? "继续补齐这个条件。")}</span>
-            </article>
-          `
-        )
-        .join("")}
-    </div>
-  `;
+  return projectMilestonePanelTools.renderDashboardActionBriefChecklist(items, {
+    escapeHtml,
+  });
 }
 
 function renderDashboardActionBrief(routeOverview) {
-  const overview = buildDashboardProductionOverview(routeOverview);
-  const plan = buildProjectMilestonePlan(routeOverview, overview);
-  const brief = buildProjectMilestoneActionBrief(plan);
-  const actions = [brief.primaryAction, ...(brief.secondaryActions ?? [])].filter(Boolean).slice(0, 3);
-  const metrics = Array.isArray(brief.metrics) ? brief.metrics : [];
-
-  return `
-    <section class="panel creator-focus-panel is-${escapeHtml(brief.tone ?? brief.status ?? "soft")}">
-      <div class="creator-focus-layout">
-        <article class="creator-focus-main">
-          <div class="creator-focus-head">
-            <span class="eyebrow">${escapeHtml(brief.eyebrow ?? "今日工作台")}</span>
-            <span class="badge badge-soft ${getProjectMilestoneToneClass(brief.tone)}">${escapeHtml(brief.badge ?? "下一步")}</span>
-          </div>
-          <h2>${escapeHtml(brief.title ?? "继续推进当前项目")}</h2>
-          <p>${escapeHtml(brief.description ?? "按当前项目状态选择最短路径，做完后再回到巡检和试玩确认。")}</p>
-          <div class="script-entry-actions">
-            ${renderProjectMilestoneActions(actions)}
-          </div>
-        </article>
-        <div class="creator-focus-side">
-          <div class="route-summary-strip creator-focus-metrics">
-            ${metrics.map((metric) => renderRouteMetricCard(metric.label, metric.value, metric.hint)).join("")}
-          </div>
-          ${renderDashboardActionBriefChecklist(brief.checklist)}
-        </div>
-      </div>
-    </section>
-  `;
+  return projectMilestonePanelTools.renderDashboardActionBrief(routeOverview, {
+    escapeHtml,
+    renderQuickActionButton,
+    renderRouteMetricCard,
+    renderProjectMilestoneActions,
+    buildDashboardProductionOverview,
+    buildProjectMilestonePlan,
+    buildProjectMilestoneActionBrief,
+  });
 }
 
 function renderProjectMilestoneGapList(gaps = []) {
@@ -11164,150 +11108,48 @@ function renderProjectMilestoneActions(actions = []) {
 }
 
 function renderProjectMilestoneGapDigest(digest) {
-  const action = digest.nextAction ?? { label: "去试玩确认", action: "switch-screen", screen: "preview" };
-  const actions = [
-    action,
-    { label: "打开项目巡检", action: "switch-screen", screen: "inspection" },
-  ];
-
-  return `
-    <article class="project-milestone-gap-digest is-${escapeHtml(digest.status)}">
-      <div class="project-milestone-gap-head">
-        <div>
-          <span class="eyebrow">${escapeHtml(digest.eyebrow ?? "发布候选差距")}</span>
-          <strong>${escapeHtml(digest.title)}</strong>
-        </div>
-        <span class="issue-tag ${getProjectMilestoneGapToneClass(digest.status)}">${
-          digest.status === "ready" ? "可人工验收" : `${digest.activePercent ?? digest.releasePercent}%`
-        }</span>
-      </div>
-      <p>${escapeHtml(digest.description)}</p>
-      <div class="route-summary-strip project-milestone-gap-metrics">
-        ${renderRouteMetricCard("总进度", `${digest.overallScore}%`, `${digest.completedCount}/${digest.totalCount} 个阶段达标`)}
-        ${renderRouteMetricCard(digest.gapMetricLabel ?? "候选缺口", `${digest.activeBlockerCount ?? digest.releaseBlockerCount} 项`, digest.gapMetricHint ?? "发布前建议清零")}
-        ${renderRouteMetricCard("当前阶段", digest.nextMilestoneTitle, "先做当前阶段的第一步")}
-      </div>
-      ${renderProjectMilestoneGapList(digest.topGaps)}
-      <div class="script-entry-actions">
-        ${renderProjectMilestoneActions(actions)}
-      </div>
-    </article>
-  `;
+  return projectMilestonePanelTools.renderProjectMilestoneGapDigest(digest, {
+    escapeHtml,
+    renderQuickActionButton,
+    renderRouteMetricCard,
+    renderProjectMilestoneActions,
+    renderProjectMilestoneGapList,
+  });
 }
 
 function renderProjectMilestoneCard(milestone, options = {}) {
-  const isFocus = options.focus === true;
-  const toneClass = getProjectMilestoneToneClass(milestone.tone);
-  const phaseLabel = options.index ? `阶段 ${options.index}` : milestone.label;
-
-  return `
-    <article class="project-milestone-card ${isFocus ? "is-focus" : ""} is-${escapeHtml(milestone.tone)}">
-      <div class="project-milestone-card-head">
-        <div>
-          <span class="project-milestone-phase">${escapeHtml(phaseLabel)}</span>
-          <strong>${escapeHtml(milestone.title)}</strong>
-          <small>${escapeHtml(milestone.label)}</small>
-        </div>
-        <span class="issue-tag ${toneClass}">${milestone.done ? "已达标" : `${milestone.percent}%`}</span>
-      </div>
-      <p>${escapeHtml(milestone.summary)}</p>
-      <div class="project-milestone-progress-head">
-        <span>目标完成度</span>
-        <strong>${milestone.percent}%</strong>
-      </div>
-      <div class="project-milestone-progress" aria-label="${escapeHtml(milestone.title)}完成度">
-        <span style="width:${milestone.percent}%;"></span>
-      </div>
-      ${renderProjectMilestoneChecklist(milestone.checks)}
-      <div class="script-entry-actions">
-        ${renderProjectMilestoneActions(milestone.actions)}
-      </div>
-    </article>
-  `;
+  return projectMilestonePanelTools.renderProjectMilestoneCard(milestone, options, {
+    escapeHtml,
+    renderQuickActionButton,
+    renderProjectMilestoneActions,
+    renderProjectMilestoneChecklist,
+  });
 }
 
 function renderProjectMilestonePanel(routeOverview) {
-  const overview = buildDashboardProductionOverview(routeOverview);
-  const plan = buildProjectMilestonePlan(routeOverview, overview);
-  const focusMilestone = plan.nextMilestone ?? plan.milestones?.[0] ?? null;
-  const secondaryMilestones = (plan.milestones ?? []).filter((milestone) => milestone.id !== focusMilestone?.id);
-
-  if (!focusMilestone) {
-    return "";
-  }
-
-  return `
-    <section class="panel project-milestone-panel">
-      <div class="panel-heading">
-        <div>
-          <h2>成品目标路线</h2>
-          <span class="panel-note">把“下一步做什么”按 Demo、体验版、发布候选拆成可执行目标</span>
-        </div>
-        <span class="badge badge-soft">总进度 ${plan.overallScore}% · ${plan.completedCount}/${plan.totalCount}</span>
-      </div>
-      <div class="route-summary-strip">
-        ${renderRouteMetricCard("当前目标", focusMilestone.title, plan.headline)}
-        ${renderRouteMetricCard("下一步缺口", focusMilestone.blockers?.[0]?.missing ?? "进入试玩确认手感", focusMilestone.summary)}
-        ${renderRouteMetricCard("已完成目标", `${plan.completedCount}/${plan.totalCount}`, "完成的阶段越多，越接近可公开发布")}
-      </div>
-      <div class="project-milestone-grid">
-        ${renderProjectMilestoneCard(focusMilestone, { focus: true, index: (plan.milestones ?? []).findIndex((milestone) => milestone.id === focusMilestone.id) + 1 })}
-        <div class="project-milestone-stack">
-          ${secondaryMilestones
-            .map((milestone) =>
-              renderProjectMilestoneCard(milestone, {
-                index: (plan.milestones ?? []).findIndex((item) => item.id === milestone.id) + 1,
-              })
-            )
-            .join("")}
-        </div>
-      </div>
-    </section>
-  `;
+  return projectMilestonePanelTools.renderProjectMilestonePanel(routeOverview, {
+    escapeHtml,
+    renderQuickActionButton,
+    renderRouteMetricCard,
+    renderProjectMilestoneActions,
+    renderProjectMilestoneChecklist,
+    buildDashboardProductionOverview,
+    buildProjectMilestonePlan,
+  });
 }
 
 function renderCompactProjectMilestonePanel(routeOverview) {
-  const overview = buildDashboardProductionOverview(routeOverview);
-  const plan = buildProjectMilestonePlan(routeOverview, overview);
-  const focusMilestone = plan.nextMilestone ?? plan.milestones?.[0] ?? null;
-  const gapDigest = buildProjectMilestoneGapDigest(plan);
-
-  if (!focusMilestone) {
-    return "";
-  }
-
-  const milestoneActions = (focusMilestone.actions ?? []).length
-    ? focusMilestone.actions
-    : [{ label: "去试玩确认", action: "switch-screen", screen: "preview" }];
-  const actions = [
-    ...milestoneActions,
-    { label: "回首页看完整路线", action: "switch-screen", screen: "dashboard" },
-  ].slice(0, 3);
-  const primaryBlocker = formatProjectMilestonePrimaryBlocker(focusMilestone);
-
-  return `
-    <article class="detail-card preview-sprint-panel project-milestone-compact-panel">
-      <div class="preview-sprint-head">
-        <div>
-          <span class="eyebrow">成品目标路线</span>
-          <strong>${escapeHtml(focusMilestone.title)}</strong>
-        </div>
-        <span class="issue-tag ${getProjectMilestoneToneClass(focusMilestone.tone)}">${
-          focusMilestone.done ? "已达标" : `${focusMilestone.percent}%`
-        }</span>
-      </div>
-      <p>${escapeHtml(plan.headline)}</p>
-      <div class="preview-sprint-metrics">
-        ${renderRouteMetricCard("下一步缺口", primaryBlocker, focusMilestone.summary)}
-        ${renderRouteMetricCard("总进度", `${plan.overallScore}%`, `${plan.completedCount}/${plan.totalCount} 个阶段已达标`)}
-        ${renderRouteMetricCard("当前阶段", focusMilestone.label, "按按钮继续推进，不需要手写配置")}
-      </div>
-      ${renderProjectMilestoneGapDigest(gapDigest)}
-      <div class="script-entry-actions">
-        ${renderProjectMilestoneActions(actions)}
-      </div>
-    </article>
-  `;
+  return projectMilestonePanelTools.renderCompactProjectMilestonePanel(routeOverview, {
+    escapeHtml,
+    renderQuickActionButton,
+    renderRouteMetricCard,
+    renderProjectMilestoneActions,
+    renderProjectMilestoneGapList,
+    buildDashboardProductionOverview,
+    buildProjectMilestonePlan,
+    buildProjectMilestoneGapDigest,
+    formatProjectMilestonePrimaryBlocker,
+  });
 }
 
 function buildDashboardProductionOverview(routeOverview) {

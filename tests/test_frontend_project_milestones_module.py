@@ -588,23 +588,29 @@ class FrontendProjectMilestonesModuleTests(unittest.TestCase):
 
     def test_project_milestones_are_visible_from_inspection_overview(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
+        milestone_source = MODULE_PATH.read_text(encoding="utf-8")
+        panel_source = (ROOT_DIR / "prototype_editor" / "modules" / "project_milestones_panel.js").read_text(
+            encoding="utf-8"
+        )
 
         self.assertIn("function renderDashboardActionBrief", source)
+        self.assertIn("projectMilestonePanelTools.renderDashboardActionBrief(routeOverview", source)
         self.assertIn("${renderDashboardActionBrief(routeOverview)}", source)
-        self.assertIn("creator-focus-panel", source)
-        self.assertIn("今日工作台", source)
+        self.assertIn("creator-focus-panel", panel_source)
+        self.assertIn("今日工作台", panel_source)
         self.assertIn("function dedupeDashboardActionBriefActions", source)
         self.assertIn('label: "重新导出网页包", action: "export-build", dataset: { "export-target": "web" }', source)
         self.assertIn("secondaryActions: secondaryActions.slice(0, 2)", source)
         self.assertIn("人工长流程试玩", source)
         self.assertIn("function renderCompactProjectMilestonePanel", source)
-        self.assertIn("project-milestone-compact-panel", source)
-        self.assertIn("function renderProjectMilestoneGapDigest", source)
-        self.assertIn("project-milestone-gap-digest", source)
-        self.assertIn("当前阶段缺口", source)
-        self.assertIn("发布候选差距", source)
-        self.assertIn('label: "去试玩确认", action: "switch-screen", screen: "preview"', source)
-        self.assertIn("回首页看完整路线", source)
+        self.assertIn("projectMilestonePanelTools.renderCompactProjectMilestonePanel(routeOverview", source)
+        self.assertIn("project-milestone-compact-panel", panel_source)
+        self.assertIn("function renderProjectMilestoneGapDigest", panel_source)
+        self.assertIn("project-milestone-gap-digest", panel_source)
+        self.assertIn("当前阶段缺口", milestone_source)
+        self.assertIn("发布候选差距", panel_source)
+        self.assertIn('label: "去试玩确认", action: "switch-screen", screen: "preview"', panel_source)
+        self.assertIn("回首页看完整路线", panel_source)
         self.assertIn("${renderCompactProjectMilestonePanel(routeOverview)}", source)
 
     def test_project_milestone_cards_follow_theme_surface_rules(self) -> None:
