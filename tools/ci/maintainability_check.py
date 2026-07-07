@@ -17,14 +17,7 @@ EDITOR_MODULES_DIR = ROOT_DIR / "prototype_editor" / "modules"
 TESTS_DIR = ROOT_DIR / "tests"
 SCRIPT_SRC_PATTERN = re.compile(r"<script\b[^>]*\bsrc=[\"']([^\"']+)[\"'][^>]*>", re.IGNORECASE)
 
-KNOWN_MODULE_TEST_DEBT = frozenset(
-    {
-        "audio_timing_estimator",
-        "dashboard_primary_actions",
-        "project_polish_receipt_panel",
-        "typewriter",
-    }
-)
+KNOWN_MODULE_TEST_DEBT = frozenset()
 
 
 @dataclass(frozen=True)

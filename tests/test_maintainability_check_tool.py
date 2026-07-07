@@ -27,10 +27,11 @@ class MaintainabilityCheckToolTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.maintainability = load_maintainability_module()
 
-    def test_report_tracks_file_budgets_and_module_test_debt(self) -> None:
+    def test_report_tracks_file_budgets_and_direct_module_test_coverage(self) -> None:
         report = self.maintainability.build_report()
         file_paths = {item["path"] for item in report["fileBudgets"]}
         modules = report["modules"]
+        summary = report["summary"]
 
         self.assertEqual(report["status"], "passed")
         self.assertIn("prototype_editor/app.js", file_paths)
@@ -41,8 +42,10 @@ class MaintainabilityCheckToolTests(unittest.TestCase):
         self.assertEqual(modules["missingEntrypoint"], [])
         self.assertEqual(modules["staleEntrypoint"], [])
         self.assertEqual(modules["newMissingTests"], [])
-        self.assertIn("typewriter", modules["knownTestDebt"])
-        self.assertIn("project_polish_receipt_panel", modules["knownTestDebt"])
+        self.assertEqual(modules["missingTests"], [])
+        self.assertEqual(modules["knownTestDebt"], [])
+        self.assertEqual(summary["moduleCount"], summary["testedModuleCount"])
+        self.assertEqual(summary["knownTestDebtCount"], 0)
 
     def test_cli_writes_json_and_markdown_reports(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

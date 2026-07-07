@@ -68,6 +68,7 @@ jobs:
             tests/test_frontend_asset_rights_sheet_module.py \
             tests/test_frontend_audio_cue_sheet_module.py \
             tests/test_frontend_audio_cue_sheet_panel_module.py \
+            tests/test_frontend_audio_timing_estimator_module.py \
             tests/test_frontend_editor_common_module.py \
             tests/test_frontend_beginner_assets_guide_module.py \
             tests/test_frontend_beginner_character_guide_module.py \
@@ -77,6 +78,7 @@ jobs:
             tests/test_frontend_choice_consequence_sheet_module.py \
             tests/test_frontend_command_palette_module.py \
             tests/test_frontend_creative_assistant_module.py \
+            tests/test_frontend_dashboard_primary_actions_module.py \
             tests/test_frontend_dashboard_search_panel_module.py \
             tests/test_frontend_dialog_box_readability_module.py \
             tests/test_frontend_director_cue_sheet_module.py \
@@ -100,6 +102,7 @@ jobs:
             tests/test_frontend_project_history_module.py \
             tests/test_frontend_project_history_panel_module.py \
             tests/test_frontend_project_polish_module.py \
+            tests/test_frontend_project_polish_receipt_panel_module.py \
             tests/test_frontend_regression_diagnostics_module.py \
             tests/test_frontend_project_settings_module.py \
             tests/test_frontend_recent_workspace_module.py \
@@ -138,6 +141,7 @@ jobs:
             tests/test_frontend_story_template_panel_module.py \
             tests/test_frontend_story_templates_module.py \
             tests/test_frontend_system_dialog_module.py \
+            tests/test_frontend_typewriter_module.py \
             tests/test_frontend_ui_theme_module.py \
             tests/test_frontend_unlockable_content_manifest_module.py \
             tests/test_frontend_validation_cache_module.py \
@@ -265,6 +269,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_asset_rights_sheet_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_audio_cue_sheet_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_audio_cue_sheet_panel_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_audio_timing_estimator_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_beginner_assets_guide_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_beginner_character_guide_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_character_presentation_panel_module.py' -v
@@ -274,6 +279,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_command_palette_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_editor_common_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_creative_assistant_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_dashboard_primary_actions_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_dashboard_search_panel_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_dialog_box_readability_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_director_cue_sheet_module.py' -v
@@ -297,6 +303,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_project_history_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_project_history_panel_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_project_polish_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_project_polish_receipt_panel_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_project_runtime_settings_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_project_settings_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_regression_diagnostics_module.py' -v
@@ -337,6 +344,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_story_template_panel_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_story_templates_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_system_dialog_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_typewriter_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_ui_theme_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_unlockable_content_manifest_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_validation_cache_module.py' -v
