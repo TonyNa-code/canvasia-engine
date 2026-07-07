@@ -49,6 +49,7 @@ const storyBlockEditorTools = window.CanvasiaEditorStoryBlockEditors;
 const musicRangeScopeTools = window.CanvasiaEditorMusicRangeScope;
 const storyTemplateTools = window.CanvasiaEditorStoryTemplates;
 const storyTemplateApplicationTools = window.CanvasiaEditorStoryTemplateApplication;
+const storyTemplatePanelTools = window.CanvasiaEditorStoryTemplatePanel;
 const { STORY_TEMPLATE_PRESETS } = storyTemplateTools;
 const scriptImporterTools = window.CanvasiaEditorScriptImporter;
 const scriptImportMappingTools = window.CanvasiaEditorScriptImportMapping;
@@ -9378,67 +9379,37 @@ function renderStoryEditorModeBanner(scene = null) {
 }
 
 function getStoryTemplatePanelItems() {
-  const fallbackItems = Object.keys(STORY_TEMPLATE_PRESETS).map((templateId) => ({ templateId }));
-  const scene = getSelectedScene();
-
-  if (typeof storyTemplateTools.getStoryTemplateRecommendedPanelItems === "function") {
-    return storyTemplateTools.getStoryTemplateRecommendedPanelItems(scene, { limit: 4 });
-  }
-
-  return typeof storyTemplateTools.getStoryTemplatePanelItems === "function"
-    ? storyTemplateTools.getStoryTemplatePanelItems()
-    : fallbackItems;
+  return storyTemplatePanelTools.getStoryTemplatePanelItems(getSelectedScene(), {
+    fallbackTemplateIds: Object.keys(STORY_TEMPLATE_PRESETS),
+    storyTemplateTools,
+  });
 }
 
 function getStoryTemplateButtonDescription(item, summary) {
-  const recommendationReason = String(item?.recommendationReason ?? "").trim();
-  if (recommendationReason) {
-    return `推荐：${recommendationReason}`;
-  }
-
-  const description = String(item?.description ?? "").trim();
-  if (description) {
-    return description;
-  }
-
-  return summary.labels.slice(0, 4).join(" + ") || "插入一组剧情卡片";
+  return storyTemplatePanelTools.getStoryTemplateButtonDescription(item, summary);
 }
 
 function renderStoryTemplateButton(item = {}) {
-  const templateId = String(item.templateId ?? "").trim();
-  const preset = getStoryTemplatePreset(templateId);
-  if (!templateId || !preset) {
-    return "";
-  }
-
-  const summary = storyTemplateTools.getStoryTemplateSummary(templateId, { getBlockLabel });
-  const tone = String(item.tone ?? "").trim();
-  const toneClass = tone ? ` is-${escapeHtml(tone)}` : "";
-  const isRecommended = Boolean(item.isRecommended);
-  const recommendedClass = isRecommended ? " is-recommended" : "";
-  const badgeLabel = String(item.badgeLabel ?? "").trim();
-  const labels = summary.labels.slice(0, 3);
-
-  return `
-    <button
-      class="story-template-button${toneClass}${recommendedClass}"
-      type="button"
-      data-action="apply-story-template"
-      data-template-id="${escapeHtml(templateId)}"
-    >
-      ${isRecommended && badgeLabel ? `<span class="story-template-recommendation-badge">${escapeHtml(badgeLabel)}</span>` : ""}
-      <strong>${escapeHtml(summary.title || preset.title)}</strong>
-      <span>${escapeHtml(getStoryTemplateButtonDescription(item, summary))}</span>
-      <div class="story-template-button-meta">
-        <span>${summary.blockCount} 张卡片</span>
-        ${labels.map((label) => `<span>${escapeHtml(label)}</span>`).join("")}
-      </div>
-    </button>
-  `;
+  return storyTemplatePanelTools.renderStoryTemplateButton(item, {
+    escapeHtml,
+    getBlockLabel,
+    getStoryTemplatePreset,
+    getStoryTemplateSummary: storyTemplateTools.getStoryTemplateSummary,
+    getStoryTemplateVariableRequirement,
+    storyTemplateTools,
+  });
 }
 
 function renderStoryTemplateGrid() {
-  return getStoryTemplatePanelItems().map((item) => renderStoryTemplateButton(item)).join("");
+  return storyTemplatePanelTools.renderStoryTemplateGrid(getSelectedScene(), {
+    escapeHtml,
+    fallbackTemplateIds: Object.keys(STORY_TEMPLATE_PRESETS),
+    getBlockLabel,
+    getStoryTemplatePreset,
+    getStoryTemplateSummary: storyTemplateTools.getStoryTemplateSummary,
+    getStoryTemplateVariableRequirement,
+    storyTemplateTools,
+  });
 }
 
 function getScriptImporterDraftFromDom() {

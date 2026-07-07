@@ -22,6 +22,7 @@ class FrontendEntrypointModuleTests(unittest.TestCase):
             "./modules/music_range_scope.js",
             "./modules/story_templates.js",
             "./modules/story_template_application.js",
+            "./modules/story_template_panel.js",
             "./modules/editor_common.js",
             "./modules/export_file_names.js",
             "./modules/variables.js",
