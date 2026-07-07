@@ -25734,70 +25734,28 @@ function buildFinalPublishGate(items = buildReleaseChecklistItems(), releaseFixO
 }
 
 function renderFinalPublishGateChecklist(items = []) {
-  if (!items.length) {
-    return `
-      <div class="project-milestone-gap-list final-publish-gate-list">
-        <article class="project-milestone-gap-item is-done">
-          <strong>关键发布门槛已达标</strong>
-          <span>可以进入附件整理、发布说明和最后人工验收。</span>
-        </article>
-      </div>
-    `;
-  }
-
-  return `
-    <div class="project-milestone-gap-list final-publish-gate-list">
-      ${items
-        .map(
-          (item) => `
-            <article class="project-milestone-gap-item ${item.done ? "is-done" : ""}">
-              <strong>${escapeHtml(item.label ?? "发布前待处理项")}</strong>
-              <span>${escapeHtml(item.detail ?? "继续补齐这个发布门槛。")}</span>
-            </article>
-          `
-        )
-        .join("")}
-    </div>
-  `;
+  return releaseControlPanelTools.renderFinalPublishGateChecklist(items, {
+    escapeHtml,
+  });
 }
 
 function renderFinalPublishGatePanel(routeOverview) {
-  const releaseItems = buildReleaseChecklistItems();
-  const releaseFixOrder = buildReleaseFixOrder(routeOverview);
-  const gate = buildFinalPublishGate(releaseItems, releaseFixOrder, routeOverview);
-  const actions = [gate.primaryAction, ...(gate.secondaryActions ?? [])].filter(Boolean).slice(0, 3);
-  const toneClass = gate.tone === "danger" ? "danger-text" : gate.tone === "warn" ? "warn-text" : "good-text";
-
-  return `
-    <article class="detail-card preview-sprint-panel final-publish-gate is-${escapeHtml(gate.tone ?? "soft")}">
-      <div class="preview-sprint-head">
-        <div>
-          <span class="eyebrow">最终发表门禁</span>
-          <strong>${escapeHtml(gate.title ?? "发布前最终确认")}</strong>
-        </div>
-        <span class="issue-tag ${toneClass}">${escapeHtml(gate.badge ?? "待确认")}</span>
-      </div>
-      <p>${escapeHtml(gate.description ?? "按这里的结论完成最后发布前确认。")}</p>
-      <div class="preview-sprint-metrics">
-        ${(gate.metrics ?? []).map((metric) => renderRouteMetricCard(metric.label, metric.value, metric.hint)).join("")}
-      </div>
-      ${renderFinalPublishGateChecklist(gate.checklist)}
-      <div class="script-entry-actions">
-        ${renderProjectMilestoneActions(actions)}
-      </div>
-    </article>
-  `;
+  return releaseControlPanelTools.renderFinalPublishGatePanel(routeOverview, {
+    escapeHtml,
+    renderQuickActionButton,
+    renderRouteMetricCard,
+    renderProjectMilestoneActions,
+    buildReleaseChecklistItems,
+    buildReleaseFixOrder,
+    buildFinalPublishGate,
+  });
 }
 
 function renderReleaseChecklistCard(item) {
-  return `
-    <article class="issue-card">
-      <span class="issue-tag ${item.toneClass}">${escapeHtml(item.status)}</span>
-      <strong>${escapeHtml(item.title)}</strong>
-      <div class="issue-meta">${escapeHtml(item.description)}</div>
-      ${item.action ? `<div class="issue-card-footer">${renderQuickActionButton(item.action, true)}</div>` : ""}
-    </article>
-  `;
+  return releaseControlPanelTools.renderReleaseChecklistCard(item, {
+    escapeHtml,
+    renderQuickActionButton,
+  });
 }
 
 function getNativeRuntimeRcStatusLabel(status) {
@@ -25916,51 +25874,12 @@ function renderReleaseSettingsPanel() {
 }
 
 function renderReleaseChecklistPanel() {
-  const items = buildReleaseChecklistItems();
-  const summary = buildReleaseChecklistSummary(items);
-  return `
-    <article class="detail-card preview-sprint-panel">
-      <div class="panel-heading">
-        <h2>发布检查清单</h2>
-        <span class="badge badge-soft">导出前最后看一眼</span>
-      </div>
-      <p class="helper-text">这里会把最容易影响正式交付的检查项集中列出来，每一项都尽量给你一个马上可点的动作。</p>
-      <div class="detail-actions">
-        <button class="toolbar-button toolbar-button-primary" data-action="export-release-control-report">
-          导出发布总控报告
-        </button>
-        <button class="toolbar-button toolbar-button-primary" data-action="export-release-evidence-pack">
-          导出发布证据包
-        </button>
-        <button class="toolbar-button" data-action="export-release-control-json">
-          导出 JSON 数据
-        </button>
-        <button class="toolbar-button" data-action="export-inspection-report">
-          导出巡检报告
-        </button>
-      </div>
-      <article class="preview-sprint-card is-soft">
-        <div class="preview-sprint-head">
-          <strong>${escapeHtml(summary.title)}</strong>
-          <span class="issue-tag ${summary.toneClass}">${escapeHtml(summary.badge)}</span>
-        </div>
-        <p>${escapeHtml(summary.description)}</p>
-        <div class="preview-sprint-metrics">
-          ${summary.metrics
-            .map(
-              ([label, value]) => `
-                <article class="preview-sprint-metric">
-                  <span>${escapeHtml(label)}</span>
-                  <strong>${escapeHtml(value)}</strong>
-                </article>
-              `
-            )
-            .join("")}
-        </div>
-      </article>
-      <div class="preview-sprint-grid">${items.map((item) => renderReleaseChecklistCard(item)).join("")}</div>
-    </article>
-  `;
+  return releaseControlPanelTools.renderReleaseChecklistPanel({
+    escapeHtml,
+    renderQuickActionButton,
+    buildReleaseChecklistItems,
+    buildReleaseChecklistSummary,
+  });
 }
 
 function buildPreviewRegressionSeeds(routeOverview) {

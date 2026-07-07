@@ -5349,7 +5349,8 @@ class FrontendActionHandlerTests(unittest.TestCase):
     def test_release_evidence_pack_export_action_is_wired_and_reports_result(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
         module_source = (EDITOR_DIR / "modules" / "release_evidence_pack.js").read_text(encoding="utf-8")
-        combined_source = f"{source}\n{module_source}"
+        panel_source = (EDITOR_DIR / "modules" / "release_control_panel.js").read_text(encoding="utf-8")
+        combined_source = f"{source}\n{module_source}\n{panel_source}"
         click_handler = _extract_function_source(source, "handleClick")
         action_block_start = click_handler.index('action === "export-release-evidence-pack"')
         action_block_end = click_handler.index('action === "export-route-testing-plan-markdown"', action_block_start)

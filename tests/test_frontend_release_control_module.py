@@ -16,6 +16,7 @@ PANEL_MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "release_control
 class FrontendReleaseControlModuleTests(unittest.TestCase):
     def test_final_publish_gate_is_visible_before_release_checklist(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
+        panel_source = PANEL_MODULE_PATH.read_text(encoding="utf-8")
 
         self.assertIn("function buildFinalPublishGate", source)
         self.assertIn("function buildReleaseCreativeQualityContext", source)
@@ -25,10 +26,13 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
         self.assertIn("productionBacklogSummary: productionBacklog?.summary ?? null", source)
         self.assertIn("productionBacklogNextTask: productionBacklog?.nextTask ?? null", source)
         self.assertIn("function buildReleaseFixOrder(routeOverview)", source)
-        self.assertIn("buildFinalPublishGate(releaseItems, releaseFixOrder, routeOverview)", source)
+        self.assertIn("releaseControlPanelTools.renderFinalPublishGatePanel(routeOverview", source)
+        self.assertIn("buildFinalPublishGate,", source)
         self.assertIn("function serializeFinalPublishGate", source)
         self.assertIn("function renderFinalPublishGatePanel", source)
-        self.assertIn("最终发表门禁", source)
+        self.assertIn("function renderFinalPublishGatePanel", panel_source)
+        self.assertIn("最终发表门禁", panel_source)
+        self.assertIn("function renderReleaseChecklistPanel", panel_source)
         self.assertIn("finalPublishGate: serializeFinalPublishGate(finalPublishGate)", source)
         self.assertIn("## 最终发表门禁", source)
         self.assertIn("${renderFinalPublishGatePanel(routeOverview)}", source)
