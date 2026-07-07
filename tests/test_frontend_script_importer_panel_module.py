@@ -50,6 +50,8 @@ class FrontendScriptImporterPanelModuleTests(unittest.TestCase):
             const sample = tools.getScriptImporterSampleDraft("悠奈");
             const emptySummary = tools.getScriptImportSummaryText([], {{ scriptImporterTools }});
             const summary = tools.getScriptImportSummaryText(blocks, {{ scriptImporterTools }});
+            const insertedSummary = tools.getScriptImportInsertedSummaryText(blocks, {{ scriptImporterTools }});
+            const emptyInsertedSummary = tools.getScriptImportInsertedSummaryText([], {{ scriptImporterTools }});
             const capabilityGrid = tools.renderScriptImporterCapabilityGrid();
             const html = tools.renderScriptImporterPanel({{ id: "scene_1" }}, null, {{
               blocks,
@@ -69,6 +71,8 @@ class FrontendScriptImporterPanelModuleTests(unittest.TestCase):
               sample,
               emptySummary,
               summary,
+              insertedSummary,
+              emptyInsertedSummary,
               capabilityGroups: tools.getScriptImporterCapabilityGroups(),
               capabilityGrid,
               html,
@@ -90,10 +94,13 @@ class FrontendScriptImporterPanelModuleTests(unittest.TestCase):
         html = payload["html"]
 
         self.assertIn("renderScriptImporterPanel", payload["keys"])
+        self.assertIn("getScriptImportInsertedSummaryText", payload["keys"])
         self.assertIn("getScriptImporterSampleDraft", payload["keys"])
         self.assertIn("show 悠奈 smile at center", payload["sample"])
         self.assertEqual(payload["emptySummary"], "还没有预览结果")
         self.assertEqual(payload["summary"], "将插入 7 张卡片：台词 1 / 旁白 1 / 选项 1 / 演出 2 / 逻辑 1 / 跳转 1")
+        self.assertEqual(payload["insertedSummary"], "已插入 7 张剧情卡片：台词 1 / 旁白 1 / 选项 1 / 演出 2 / 逻辑 1 / 跳转 1")
+        self.assertEqual(payload["emptyInsertedSummary"], "没有可插入的剧情卡片")
         self.assertEqual(payload["capabilityGroups"][0]["title"], "正文")
         self.assertIn("script-importer-capability-grid", payload["capabilityGrid"])
         self.assertIn("Text To Cards", html)

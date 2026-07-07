@@ -110,6 +110,20 @@ class CiWorkflowCoverageTests(unittest.TestCase):
             workflow,
         )
 
+    def test_maintainability_check_tool_is_run_in_ci(self) -> None:
+        workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("tools/ci/maintainability_check.py", workflow)
+        self.assertIn("tests/test_maintainability_check_tool.py", workflow)
+        self.assertIn(
+            "python -m unittest discover -s tests -p 'test_maintainability_check_tool.py' -v",
+            workflow,
+        )
+        self.assertIn(
+            "python tools/ci/maintainability_check.py --json-report verification_reports/maintainability.json --markdown-report verification_reports/maintainability.md",
+            workflow,
+        )
+
     def test_public_release_surface_guard_is_run_in_ci(self) -> None:
         workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
 

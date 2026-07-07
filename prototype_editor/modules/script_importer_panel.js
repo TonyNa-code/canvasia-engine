@@ -57,7 +57,7 @@
     ].join("\n");
   }
 
-  function getScriptImportSummaryText(blocks = [], options = {}) {
+  function buildScriptImportSummaryParts(blocks = [], options = {}) {
     const scriptImporterTools = getScriptImporterTools(options);
     const summary =
       typeof scriptImporterTools.summarizeScriptDraftBlocks === "function"
@@ -65,15 +65,28 @@
         : { total: 0 };
 
     if (!summary.total) {
-      return "还没有预览结果";
+      return { total: 0, detail: "" };
     }
 
     const stagePart = summary.stage ? ` / 演出 ${summary.stage}` : "";
     const logicPart = summary.logic ? ` / 逻辑 ${summary.logic}` : "";
     const routePart = summary.route ? ` / 跳转 ${summary.route}` : "";
-    return `将插入 ${summary.total} 张卡片：台词 ${summary.dialogue ?? 0} / 旁白 ${summary.narration ?? 0} / 选项 ${
-      summary.choice ?? 0
-    }${stagePart}${logicPart}${routePart}`;
+    return {
+      total: summary.total,
+      detail: `台词 ${summary.dialogue ?? 0} / 旁白 ${summary.narration ?? 0} / 选项 ${
+        summary.choice ?? 0
+      }${stagePart}${logicPart}${routePart}`,
+    };
+  }
+
+  function getScriptImportSummaryText(blocks = [], options = {}) {
+    const summary = buildScriptImportSummaryParts(blocks, options);
+    return summary.total ? `将插入 ${summary.total} 张卡片：${summary.detail}` : "还没有预览结果";
+  }
+
+  function getScriptImportInsertedSummaryText(blocks = [], options = {}) {
+    const summary = buildScriptImportSummaryParts(blocks, options);
+    return summary.total ? `已插入 ${summary.total} 张剧情卡片：${summary.detail}` : "没有可插入的剧情卡片";
   }
 
   function getScriptImporterCapabilityGroups() {
@@ -164,6 +177,7 @@
   }
 
   global.CanvasiaEditorScriptImporterPanel = Object.freeze({
+    getScriptImportInsertedSummaryText,
     getScriptImportSummaryText,
     getScriptImporterCapabilityGroups,
     getScriptImporterSampleDraft,

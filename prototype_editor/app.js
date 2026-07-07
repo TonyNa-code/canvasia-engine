@@ -9530,6 +9530,10 @@ function getScriptImportSummaryText(blocks = state.scriptImporterBlocks) {
   return scriptImporterPanelTools.getScriptImportSummaryText(blocks, { scriptImporterTools });
 }
 
+function getScriptImportInsertedSummaryText(blocks = state.scriptImporterBlocks) {
+  return scriptImporterPanelTools.getScriptImportInsertedSummaryText(blocks, { scriptImporterTools });
+}
+
 function renderScriptImporterPanel(scene, selectedBlock) {
   if (!scene) {
     return "";
@@ -9590,20 +9594,21 @@ async function insertScriptImportBlocks() {
     return;
   }
 
+  const insertedSummary = getScriptImportInsertedSummaryText(draftBlocks);
   updatedScene.blocks.splice(insertIndex, 0, ...newBlocks);
   const success = await persistScene(updatedScene, {
     selectedSceneId: updatedScene.id,
     selectedBlockId: newBlocks[0]?.id ?? null,
     previewSceneId: updatedScene.id,
     previewBlockIndex: insertIndex,
-    successMessage: `已从手写文本插入 ${newBlocks.length} 张剧情卡片`,
+    successMessage: insertedSummary,
   });
 
   if (success) {
     state.scriptImporterBlocks = [];
     state.scriptImporterError = "";
     renderStoryScreen();
-    showToast(`已插入 ${newBlocks.length} 张文本卡片`);
+    showToast(insertedSummary);
   }
 }
 

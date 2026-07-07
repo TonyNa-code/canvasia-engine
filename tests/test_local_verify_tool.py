@@ -117,6 +117,8 @@ class LocalVerifyToolTests(unittest.TestCase):
         self.assertTrue(any("test_release_public_surface.py" in command for command in commands))
         self.assertTrue(any("renpy_export.py" in command for command in commands))
         self.assertTrue(any("tools/ci/project_health.py template_project" in command for command in commands))
+        self.assertTrue(any("test_maintainability_check_tool.py" in command for command in commands))
+        self.assertTrue(any("tools/ci/maintainability_check.py" in command for command in commands))
         self.assertTrue(any("test_browser_playwright_smoke.py" in command for command in commands))
 
     def test_dry_run_writes_json_report_without_running_checks(self) -> None:
@@ -146,7 +148,11 @@ class LocalVerifyToolTests(unittest.TestCase):
             self.assertEqual(payload["summary"]["status"], "planned")
             self.assertGreater(payload["summary"]["planned"], 10)
             self.assertIn("frontend-syntax", payload["summary"]["categories"])
+            self.assertIn("release-tests", payload["summary"]["categories"])
             self.assertGreater(payload["summary"]["categories"]["frontend-tests"]["planned"], 10)
+            self.assertTrue(
+                any("tools/ci/maintainability_check.py" in " ".join(step["command"]) for step in payload["steps"])
+            )
             self.assertEqual(payload["summary"]["failedCategories"], [])
             self.assertIsNone(payload["summary"]["firstFailedStep"])
             self.assertTrue(
