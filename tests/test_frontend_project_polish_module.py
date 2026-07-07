@@ -17,6 +17,7 @@ MODULE_PATHS = [
     EDITOR_DIR / "modules" / "audio_cue_sheet.js",
     EDITOR_DIR / "modules" / "project_settings.js",
     EDITOR_DIR / "modules" / "dialog_box_readability.js",
+    EDITOR_DIR / "modules" / "runtime_capability_matrix.js",
     EDITOR_DIR / "modules" / "project_polish.js",
 ]
 
@@ -165,6 +166,12 @@ class FrontendProjectPolishModuleTests(unittest.TestCase):
                 pacingReadySceneCount: plan.pacingReadySceneCount,
                 pacingTopIssueCount: plan.pacingSnapshot?.topIssues?.length ?? 0,
                 pacingHighlightCount: plan.pacingSnapshot?.sceneHighlights?.length ?? 0,
+                runtimeReadinessScore: plan.runtimeReadinessScore,
+                runtimeReadinessStatus: plan.runtimeReadinessStatus,
+                runtimeReadinessIssueCount: plan.runtimeReadinessIssueCount,
+                runtimeReadinessAttentionAreaCount: plan.runtimeReadinessAttentionAreaCount,
+                runtimeReadinessHighlightCount: plan.runtimeReadinessSnapshot?.essentialIssues?.length ?? 0,
+                runtimeAcceptanceWarningCount: plan.runtimeAcceptanceWarningCount,
               }},
               digest: {{
                 canApply: digest.canApply,
@@ -196,6 +203,11 @@ class FrontendProjectPolishModuleTests(unittest.TestCase):
                 pacingRoughSceneCount: receipt.pacingRoughSceneCount,
                 pacingReadySceneCount: receipt.pacingReadySceneCount,
                 pacingHighlightCount: receipt.pacingSnapshot?.sceneHighlights?.length ?? 0,
+                runtimeReadinessScore: receipt.runtimeReadinessScore,
+                runtimeReadinessStatusLabel: receipt.runtimeReadinessStatusLabel,
+                runtimeReadinessIssueCount: receipt.runtimeReadinessIssueCount,
+                runtimeReadinessAttentionAreaCount: receipt.runtimeReadinessAttentionAreaCount,
+                runtimeReadinessHighlightCount: receipt.runtimeReadinessSnapshot?.essentialIssues?.length ?? 0,
                 projectOperationLabels: receipt.projectOperations.map((operation) => operation.label),
                 sceneNames: receipt.scenePlans.map((scenePlan) => scenePlan.sceneName),
                 nextActionCount: receipt.nextActions.length,
@@ -261,6 +273,10 @@ class FrontendProjectPolishModuleTests(unittest.TestCase):
         self.assertIsInstance(payload["plan"]["pacingAverageScore"], int)
         self.assertGreaterEqual(payload["plan"]["pacingTopIssueCount"], 1)
         self.assertGreaterEqual(payload["plan"]["pacingHighlightCount"], 1)
+        self.assertIsInstance(payload["plan"]["runtimeReadinessScore"], int)
+        self.assertGreaterEqual(payload["plan"]["runtimeReadinessIssueCount"], 1)
+        self.assertGreaterEqual(payload["plan"]["runtimeReadinessAttentionAreaCount"], 1)
+        self.assertGreaterEqual(payload["plan"]["runtimeReadinessHighlightCount"], 1)
         self.assertTrue(payload["digest"]["canApply"])
         self.assertIn("一键发布前整理", payload["digest"]["actionLabel"])
         self.assertIn("1 个场景", payload["digest"]["badgeLabel"])
@@ -282,6 +298,10 @@ class FrontendProjectPolishModuleTests(unittest.TestCase):
         self.assertGreater(payload["receipt"]["projectOperationCount"], 0)
         self.assertIsInstance(payload["receipt"]["pacingAverageScore"], int)
         self.assertGreaterEqual(payload["receipt"]["pacingHighlightCount"], 1)
+        self.assertIsInstance(payload["receipt"]["runtimeReadinessScore"], int)
+        self.assertGreaterEqual(payload["receipt"]["runtimeReadinessIssueCount"], 1)
+        self.assertGreaterEqual(payload["receipt"]["runtimeReadinessAttentionAreaCount"], 1)
+        self.assertGreaterEqual(payload["receipt"]["runtimeReadinessHighlightCount"], 1)
         self.assertIn("绑定项目字体素材", payload["receipt"]["projectOperationLabels"])
         self.assertEqual(payload["receipt"]["sceneNames"], ["开场"])
         self.assertGreaterEqual(payload["receipt"]["nextActionCount"], 3)
@@ -300,6 +320,8 @@ class FrontendProjectPolishModuleTests(unittest.TestCase):
         self.assertIn("绑定项目字体素材", payload["receiptMarkdown"])
         self.assertIn("## 节奏体检", payload["receiptMarkdown"])
         self.assertIn("平均节奏分", payload["receiptMarkdown"])
+        self.assertIn("## VN 基础能力", payload["receiptMarkdown"])
+        self.assertIn("基础能力：", payload["receiptMarkdown"])
         self.assertIn("重新巡检确认", payload["receiptMarkdown"])
         self.assertIn("导出整理回执", payload["receiptMarkdown"])
         self.assertIn("发布前整理回执：", payload["receiptClipboard"])
@@ -308,6 +330,8 @@ class FrontendProjectPolishModuleTests(unittest.TestCase):
         self.assertIn("项目级补全：", payload["receiptClipboard"])
         self.assertIn("节奏体检：平均", payload["receiptClipboard"])
         self.assertIn("节奏复看：", payload["receiptClipboard"])
+        self.assertIn("VN 基础能力：", payload["receiptClipboard"])
+        self.assertIn("VN 基础：", payload["receiptClipboard"])
         self.assertIn("下一步：重新巡检确认", payload["receiptClipboard"])
         self.assertEqual(payload["sourceStillUntouched"]["originalBlockCount"], 4)
         self.assertEqual(payload["sourceStillUntouched"]["originalFadeInMs"], 0)
@@ -376,6 +400,8 @@ class FrontendProjectPolishModuleTests(unittest.TestCase):
                 summary: oneClickPlan.summary,
                 pacingAverageScore: oneClickPlan.pacingAverageScore,
                 pacingRoughSceneCount: oneClickPlan.pacingRoughSceneCount,
+                runtimeReadinessScore: oneClickPlan.runtimeReadinessScore,
+                runtimeReadinessIssueCount: oneClickPlan.runtimeReadinessIssueCount,
               }},
               sourceStillUntouched: {{
                 saveSlots: data.project.runtimeSettings.formalSaveSlotCount,
@@ -410,6 +436,8 @@ class FrontendProjectPolishModuleTests(unittest.TestCase):
         self.assertGreaterEqual(payload["oneClickPlan"]["totalOperationCount"], payload["oneClickPlan"]["projectOperationCount"])
         self.assertIn("项目体验设置", payload["oneClickPlan"]["summary"])
         self.assertIsInstance(payload["oneClickPlan"]["pacingAverageScore"], int)
+        self.assertIsInstance(payload["oneClickPlan"]["runtimeReadinessScore"], int)
+        self.assertGreaterEqual(payload["oneClickPlan"]["runtimeReadinessIssueCount"], 0)
         self.assertEqual(payload["sourceStillUntouched"]["saveSlots"], 4)
         self.assertEqual(payload["sourceStillUntouched"]["dialogOpacity"], 0)
         self.assertEqual(payload["sourceStillUntouched"]["fontAssetId"], "")

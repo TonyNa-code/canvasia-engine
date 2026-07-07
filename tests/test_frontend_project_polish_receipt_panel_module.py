@@ -33,6 +33,19 @@ class FrontendProjectPolishReceiptPanelModuleTests(unittest.TestCase):
               presentationChangedFieldCount: 3,
               audioOperationCount: 2,
               projectOperationCount: 1,
+              runtimeReadinessScore: 72,
+              runtimeReadinessStatusLabel: "建议打磨",
+              runtimeReadinessIssueCount: 2,
+              runtimeReadinessAttentionAreaCount: 3,
+              runtimeReadinessSnapshot: {{
+                essentialIssues: [
+                  {{ title: "人物登场演出偏弱", severityLabel: "体验打磨", suggestion: "给主要角色补显示/隐藏、位置、缩放和淡入淡出。" }},
+                  {{ title: "多首 BGM 缺少明确播放范围", severityLabel: "基础缺口", suggestion: "给每首关键曲目设置结束范围。" }},
+                ],
+                areaHighlights: [
+                  {{ label: "人物舞台", statusLabel: "建议打磨", detail: "检查立绘显示、隐藏、站位、缩放和转场。" }},
+                ],
+              }},
               pacingAverageScore: 63,
               pacingRoughSceneCount: 2,
               pacingReadySceneCount: 3,
@@ -94,6 +107,12 @@ class FrontendProjectPolishReceiptPanelModuleTests(unittest.TestCase):
         self.assertIn("已先创建安全检查点「自动检查点 &lt;1&gt;」", html)
         self.assertIn("涉及场景", html)
         self.assertIn("总处理项", html)
+        self.assertIn("VN 基础能力", html)
+        self.assertIn("72/100", html)
+        self.assertIn("建议打磨 · 关注 3", html)
+        self.assertIn("VN 底盘复看", html)
+        self.assertIn("人物登场演出偏弱", html)
+        self.assertIn("给每首关键曲目设置结束范围。", html)
         self.assertIn("节奏体检", html)
         self.assertIn("63 分", html)
         self.assertIn("待打磨 2 / 可试玩 3", html)

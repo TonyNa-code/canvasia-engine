@@ -7,6 +7,7 @@
   const audioCueSheetTools = global.CanvasiaEditorAudioCueSheet || {};
   const projectSettingsTools = global.CanvasiaEditorProjectSettings || {};
   const dialogBoxReadabilityTools = global.CanvasiaEditorDialogBoxReadability || {};
+  const runtimeCapabilityMatrixTools = global.CanvasiaEditorRuntimeCapabilityMatrix || {};
 
   const PROJECT_POLISH_SAVE_SLOT_TARGETS = Object.freeze({
     medium: 24,
@@ -327,6 +328,104 @@
     };
   }
 
+  function buildProjectRuntimeReadinessSnapshot(data = {}, options = {}) {
+    if (typeof runtimeCapabilityMatrixTools.buildRuntimeCapabilityMatrix !== "function") {
+      return null;
+    }
+
+    const matrix = runtimeCapabilityMatrixTools.buildRuntimeCapabilityMatrix(data);
+    const digest =
+      typeof runtimeCapabilityMatrixTools.getRuntimeCapabilityStatusDigest === "function"
+        ? runtimeCapabilityMatrixTools.getRuntimeCapabilityStatusDigest(matrix)
+        : {
+            status: matrix.summary?.issueCount > 0 ? "warn" : "ready",
+            title: matrix.summary?.issueCount > 0 ? "Runtime 需要验收" : "Runtime 覆盖稳定",
+            detail: "发布前建议至少跑一次目标 Runtime。",
+          };
+    const essentials = matrix.essentials ?? {};
+    const essentialsSummary = essentials.summary ?? {};
+    const acceptanceSummary = matrix.acceptance?.summary ?? {};
+    const issueLimit = Math.max(1, Number(options.issueLimit) || 5);
+    const areaLimit = Math.max(1, Number(options.areaLimit) || 4);
+    const acceptanceLimit = Math.max(1, Number(options.acceptanceLimit) || 4);
+    const coverageLimit = Math.max(1, Number(options.coverageLimit) || 3);
+    const severityRank = { warn: 0, blocker: 0, soft: 1, check: 2 };
+    const essentialIssues = toArray(essentials.issues)
+      .map((issue) => ({
+        severity: cleanText(issue.severity, "soft"),
+        severityLabel: compactText(issue.severityLabel, "体验打磨", 80),
+        code: cleanText(issue.code),
+        area: cleanText(issue.area, "story"),
+        title: compactText(issue.title, "基础能力提示", 140),
+        detail: compactText(issue.detail, "当前项目还有可打磨的基础项。", 180),
+        suggestion: compactText(issue.suggestion, "按提示补齐后，再导出试玩包验证一次。", 180),
+      }))
+      .sort((left, right) => (severityRank[left.severity] ?? 9) - (severityRank[right.severity] ?? 9))
+      .slice(0, issueLimit);
+    const areaHighlights = toArray(essentials.areas)
+      .filter((area) => cleanText(area.status, "ready") !== "ready")
+      .slice(0, areaLimit)
+      .map((area) => ({
+        id: cleanText(area.id),
+        label: compactText(area.label, "基础领域", 80),
+        status: cleanText(area.status, "needs_polish"),
+        statusLabel: compactText(area.statusLabel, "建议打磨", 80),
+        issueCount: Math.max(0, Number(area.issueCount) || 0),
+        warnCount: Math.max(0, Number(area.warnCount) || 0),
+        softCount: Math.max(0, Number(area.softCount) || 0),
+        summary: compactText(area.summary, "当前情况待确认", 140),
+        detail: compactText(area.detail, "这一块建议发布前复看。", 180),
+      }));
+    const acceptanceItems = toArray(matrix.acceptance?.items);
+    const priorityAcceptanceItems = acceptanceItems.filter((item) => ["blocker", "warn"].includes(item.severity));
+    const acceptanceHighlights = (priorityAcceptanceItems.length ? priorityAcceptanceItems : acceptanceItems)
+      .slice(0, acceptanceLimit)
+      .map((item) => ({
+        id: cleanText(item.id),
+        target: cleanText(item.target, "cross"),
+        targetLabel: compactText(item.targetLabel, "Web / 原生", 80),
+        severity: cleanText(item.severity, "check"),
+        severityLabel: compactText(item.severityLabel, "点测", 80),
+        title: compactText(item.title, "Runtime 验收项", 140),
+        detail: compactText(item.detail, "导出后按目标平台实际跑一遍。", 180),
+      }));
+    const coverageIssues = toArray(matrix.issues)
+      .slice(0, coverageLimit)
+      .map((issue) => ({
+        severity: cleanText(issue.severity, "warn"),
+        title: compactText(issue.title, "Runtime 覆盖提示", 140),
+        detail: compactText(issue.detail, "发布前建议重点验收。", 180),
+        blockType: cleanText(issue.blockType),
+        usedCount: Math.max(0, Number(issue.usedCount) || 0),
+      }));
+
+    return {
+      status: cleanText(digest.status, cleanText(essentials.status, "unknown")),
+      title: compactText(digest.title, compactText(essentials.statusLabel, "VN 基础能力检查", 120), 140),
+      detail: compactText(digest.detail, essentialsSummary.recommendation, 200),
+      vnStatus: cleanText(essentials.status, "unknown"),
+      vnStatusLabel: compactText(essentials.statusLabel, "待检查", 80),
+      score:
+        typeof essentialsSummary.score === "undefined" || essentialsSummary.score === null
+          ? null
+          : Math.max(0, Number(essentialsSummary.score) || 0),
+      readyAreaCount: Math.max(0, Number(essentialsSummary.readyAreaCount) || 0),
+      attentionAreaCount: Math.max(0, Number(essentialsSummary.attentionAreaCount) || 0),
+      warnCount: Math.max(0, Number(essentialsSummary.warnCount) || 0),
+      softCount: Math.max(0, Number(essentialsSummary.softCount) || 0),
+      issueCount: Math.max(0, Number(essentialsSummary.issueCount) || essentialIssues.length),
+      recommendation: compactText(essentialsSummary.recommendation, "发布前跑一遍项目巡检和目标 Runtime。", 180),
+      runtimeIssueCount: Math.max(0, Number(matrix.summary?.issueCount) || coverageIssues.length),
+      acceptanceItemCount: Math.max(0, Number(acceptanceSummary.itemCount) || acceptanceItems.length),
+      acceptanceBlockerCount: Math.max(0, Number(acceptanceSummary.blockerCount) || 0),
+      acceptanceWarningCount: Math.max(0, Number(acceptanceSummary.warningCount) || 0),
+      areaHighlights,
+      essentialIssues,
+      acceptanceHighlights,
+      coverageIssues,
+    };
+  }
+
   function getProjectRuntimeSettings(project = {}) {
     if (typeof projectSettingsTools.getProjectRuntimeSettings === "function") {
       return projectSettingsTools.getProjectRuntimeSettings(project);
@@ -569,6 +668,10 @@
       buildDataWithScenes(data, sceneStore, sceneOrder),
       options.pacing ?? {}
     );
+    const runtimeReadinessSnapshot = buildProjectRuntimeReadinessSnapshot(
+      buildDataWithScenes(data, sceneStore, sceneOrder),
+      options.runtimeReadiness ?? options.runtime ?? {}
+    );
 
     const orderedSceneIds = sceneOrder.filter((sceneId) => sceneEdits.has(sceneId));
     sceneEdits.forEach((_edit, sceneId) => {
@@ -608,6 +711,14 @@
       pacingAverageScore: pacingSnapshot?.averageScore ?? null,
       pacingRoughSceneCount: pacingSnapshot?.roughSceneCount ?? 0,
       pacingReadySceneCount: pacingSnapshot?.readySceneCount ?? 0,
+      runtimeReadinessSnapshot,
+      runtimeReadinessScore: runtimeReadinessSnapshot?.score ?? null,
+      runtimeReadinessStatus: runtimeReadinessSnapshot?.vnStatus ?? runtimeReadinessSnapshot?.status ?? "",
+      runtimeReadinessStatusLabel: runtimeReadinessSnapshot?.vnStatusLabel ?? runtimeReadinessSnapshot?.title ?? "",
+      runtimeReadinessIssueCount: runtimeReadinessSnapshot?.issueCount ?? 0,
+      runtimeReadinessAttentionAreaCount: runtimeReadinessSnapshot?.attentionAreaCount ?? 0,
+      runtimeAcceptanceWarningCount:
+        (runtimeReadinessSnapshot?.acceptanceBlockerCount ?? 0) + (runtimeReadinessSnapshot?.acceptanceWarningCount ?? 0),
       runtimeSettingOperationCount: projectSettingsPlan.runtimeOperationCount,
       dialogBoxOperationCount: projectSettingsPlan.dialogBoxOperationCount,
       gameUiOperationCount: projectSettingsPlan.gameUiOperationCount,
@@ -620,6 +731,7 @@
         audio: audioPlan,
         projectSettings: projectSettingsPlan,
         pacing: pacingSnapshot,
+        runtimeReadiness: runtimeReadinessSnapshot,
       },
     };
     plan.totalOperationCount =
@@ -648,6 +760,28 @@
       toValue: operation.toValue,
     }));
     const projectOperationCount = Math.max(0, Number(plan.projectOperationCount) || projectOperations.length);
+    const runtimeReadinessSnapshot =
+      plan.runtimeReadinessSnapshot && typeof plan.runtimeReadinessSnapshot === "object"
+        ? plan.runtimeReadinessSnapshot
+        : null;
+    const runtimeReadinessScore =
+      plan.runtimeReadinessScore === null || typeof plan.runtimeReadinessScore === "undefined"
+        ? runtimeReadinessSnapshot?.score ?? null
+        : Math.max(0, Number(plan.runtimeReadinessScore) || 0);
+    const runtimeReadinessIssueCount = Math.max(
+      0,
+      Number(plan.runtimeReadinessIssueCount) || Number(runtimeReadinessSnapshot?.issueCount) || 0
+    );
+    const runtimeReadinessAttentionAreaCount = Math.max(
+      0,
+      Number(plan.runtimeReadinessAttentionAreaCount) || Number(runtimeReadinessSnapshot?.attentionAreaCount) || 0
+    );
+    const runtimeAcceptanceWarningCount = Math.max(
+      0,
+      Number(plan.runtimeAcceptanceWarningCount) ||
+        Number(runtimeReadinessSnapshot?.acceptanceBlockerCount) + Number(runtimeReadinessSnapshot?.acceptanceWarningCount) ||
+        0
+    );
     const nextActions = [
       {
         label: "重新巡检确认",
@@ -676,6 +810,26 @@
         detail: "把本次处理内容留给测试或发布记录。",
       },
     ];
+    const suggestedNextActions = [...nextActions];
+    if (runtimeReadinessSnapshot && (runtimeReadinessIssueCount > 0 || runtimeReadinessAttentionAreaCount > 0)) {
+      suggestedNextActions.splice(Math.min(2, suggestedNextActions.length), 0, {
+        label: runtimeReadinessIssueCount > 0 ? "补齐 VN 基础能力" : "复看 VN 基础能力",
+        action: "switch-screen",
+        screen: "inspection",
+        detail:
+          runtimeReadinessScore === null || typeof runtimeReadinessScore === "undefined"
+            ? `还有 ${runtimeReadinessAttentionAreaCount} 个基础领域建议复看。`
+            : `基础能力 ${runtimeReadinessScore}/100；${runtimeReadinessAttentionAreaCount} 个领域需要关注。`,
+      });
+    }
+    if (Math.max(0, Number(plan.pacingRoughSceneCount) || 0) > 0) {
+      suggestedNextActions.splice(Math.min(3, suggestedNextActions.length), 0, {
+        label: "复看节奏问题",
+        action: "switch-screen",
+        screen: "preview",
+        detail: `还有 ${Math.max(0, Number(plan.pacingRoughSceneCount) || 0)} 个场景建议试玩复看。`,
+      });
+    }
     const receipt = {
       receiptId: cleanText(context.receiptId, buildReceiptId(generatedAt)),
       generatedAt,
@@ -699,21 +853,20 @@
           : Math.max(0, Number(plan.pacingAverageScore) || 0),
       pacingRoughSceneCount: Math.max(0, Number(plan.pacingRoughSceneCount) || 0),
       pacingReadySceneCount: Math.max(0, Number(plan.pacingReadySceneCount) || 0),
+      runtimeReadinessSnapshot,
+      runtimeReadinessScore,
+      runtimeReadinessStatus: cleanText(plan.runtimeReadinessStatus, runtimeReadinessSnapshot?.vnStatus ?? ""),
+      runtimeReadinessStatusLabel: compactText(
+        plan.runtimeReadinessStatusLabel,
+        runtimeReadinessSnapshot?.vnStatusLabel ?? "待检查",
+        80
+      ),
+      runtimeReadinessIssueCount,
+      runtimeReadinessAttentionAreaCount,
+      runtimeAcceptanceWarningCount,
       scenePlans,
       projectOperations,
-      nextActions:
-        Math.max(0, Number(plan.pacingRoughSceneCount) || 0) > 0
-          ? [
-              ...nextActions.slice(0, 2),
-              {
-                label: "复看节奏问题",
-                action: "switch-screen",
-                screen: "preview",
-                detail: `还有 ${Math.max(0, Number(plan.pacingRoughSceneCount) || 0)} 个场景建议试玩复看。`,
-              },
-              ...nextActions.slice(2),
-            ]
-          : nextActions,
+      nextActions: suggestedNextActions,
     };
     return receipt;
   }
@@ -762,6 +915,14 @@
                 receipt.pacingReadySceneCount ?? 0
               } 个`,
         ],
+        [
+          "VN 基础能力",
+          receipt.runtimeReadinessScore === null || typeof receipt.runtimeReadinessScore === "undefined"
+            ? "未启用"
+            : `${receipt.runtimeReadinessScore}/100；${receipt.runtimeReadinessStatusLabel || "待检查"}；关注 ${
+                receipt.runtimeReadinessAttentionAreaCount ?? 0
+              } 个领域`,
+        ],
       ]
     );
     const sceneRows = toArray(receipt.scenePlans).map((scenePlan) => [
@@ -794,6 +955,37 @@
     ]);
     const pacingTable = buildMarkdownTable(["场景", "分数", "阶段", "主要问题", "建议动作"], pacingRows);
     const pacingIssueTable = buildMarkdownTable(["高频节奏问题", "出现次数"], pacingIssueRows);
+    const runtimeReadinessSnapshot =
+      receipt.runtimeReadinessSnapshot && typeof receipt.runtimeReadinessSnapshot === "object"
+        ? receipt.runtimeReadinessSnapshot
+        : null;
+    const runtimeAreaRows = toArray(runtimeReadinessSnapshot?.areaHighlights).map((area) => [
+      area.label || area.id || "基础领域",
+      area.statusLabel || "建议打磨",
+      area.summary || "-",
+      area.detail || "-",
+    ]);
+    const runtimeIssueRows = toArray(runtimeReadinessSnapshot?.essentialIssues).map((issue) => [
+      issue.severityLabel || "体验打磨",
+      issue.title || issue.code || "基础能力提示",
+      issue.detail || "-",
+      issue.suggestion || "-",
+    ]);
+    const runtimeAcceptanceRows = toArray(runtimeReadinessSnapshot?.acceptanceHighlights).map((item) => [
+      item.targetLabel || "Web / 原生",
+      item.severityLabel || "点测",
+      item.title || "Runtime 验收项",
+      item.detail || "-",
+    ]);
+    const runtimeCoverageRows = toArray(runtimeReadinessSnapshot?.coverageIssues).map((issue) => [
+      issue.title || issue.blockType || "Runtime 覆盖提示",
+      issue.usedCount ?? 0,
+      issue.detail || "-",
+    ]);
+    const runtimeAreaTable = buildMarkdownTable(["领域", "状态", "当前情况", "处理提示"], runtimeAreaRows);
+    const runtimeIssueTable = buildMarkdownTable(["级别", "基础缺口", "说明", "建议"], runtimeIssueRows);
+    const runtimeAcceptanceTable = buildMarkdownTable(["目标", "级别", "验收项", "说明"], runtimeAcceptanceRows);
+    const runtimeCoverageTable = buildMarkdownTable(["Runtime 覆盖提示", "使用次数", "说明"], runtimeCoverageRows);
     const nextActions = toArray(receipt.nextActions).length
       ? receipt.nextActions.map((action, index) => `${index + 1}. ${getReceiptNextActionLabel(action)}`)
       : ["1. 打开项目巡检并重新试玩。"];
@@ -828,6 +1020,24 @@
       pacingTable || "没有需要优先复看的节奏场景。",
       "",
       pacingIssueTable || "没有明显高频节奏问题。",
+      "",
+      "## VN 基础能力",
+      "",
+      receipt.runtimeReadinessScore === null || typeof receipt.runtimeReadinessScore === "undefined"
+        ? "本次没有启用 VN 基础能力检查。"
+        : `基础能力：${receipt.runtimeReadinessScore}/100；状态：${receipt.runtimeReadinessStatusLabel || "待检查"}；需关注领域：${
+            receipt.runtimeReadinessAttentionAreaCount ?? 0
+          }；基础提示：${receipt.runtimeReadinessIssueCount ?? 0}。`,
+      "",
+      runtimeReadinessSnapshot?.recommendation || "",
+      "",
+      runtimeAreaTable || "没有需要优先处理的基础领域。",
+      "",
+      runtimeIssueTable || "当前没有明显 VN 基础能力缺口。",
+      "",
+      runtimeAcceptanceTable || "当前没有额外 Runtime 验收项。",
+      "",
+      runtimeCoverageTable || "当前没有 Runtime 覆盖风险。",
       "",
       "## 后续建议",
       "",
@@ -867,10 +1077,18 @@
         : `节奏体检：平均 ${receipt.pacingAverageScore} 分，待打磨 ${receipt.pacingRoughSceneCount ?? 0} 个，可试玩 ${
             receipt.pacingReadySceneCount ?? 0
           } 个`,
+      receipt.runtimeReadinessScore === null || typeof receipt.runtimeReadinessScore === "undefined"
+        ? ""
+        : `VN 基础能力：${receipt.runtimeReadinessScore}/100，${receipt.runtimeReadinessStatusLabel || "待检查"}，关注 ${
+            receipt.runtimeReadinessAttentionAreaCount ?? 0
+          } 个领域`,
       ...sceneLines,
       ...toArray(receipt.pacingSnapshot?.sceneHighlights)
         .slice(0, 3)
         .map((scene) => `- 节奏复看：${scene.sceneName || scene.sceneId}：${scene.issueSummary || scene.headline || "试玩确认"}`),
+      ...toArray(receipt.runtimeReadinessSnapshot?.essentialIssues)
+        .slice(0, 3)
+        .map((issue) => `- VN 基础：${issue.title || issue.code}：${issue.suggestion || issue.detail || "发布前复看"}`),
       ...toArray(receipt.projectOperations)
         .slice(0, 4)
         .map((operation) => `- ${operation.label || "项目设置"}：${operation.detail || "已补齐安全默认值。"}`),
@@ -891,11 +1109,15 @@
       canApply: plan.changed,
       actionLabel: plan.changed
         ? `一键发布前整理 ${plan.totalOperationCount} 项`
+        : plan.runtimeReadinessIssueCount > 0 || plan.runtimeReadinessAttentionAreaCount > 0
+          ? "发布前整理已完成，建议补齐 VN 基础能力"
         : plan.pacingRoughSceneCount > 0
           ? "发布前整理已完成，建议复看节奏"
           : "发布前整理已完成",
       badgeLabel: plan.changed
         ? `${plan.changedSceneCount} 个场景 / ${plan.projectOperationCount} 项设置`
+        : plan.runtimeReadinessIssueCount > 0 || plan.runtimeReadinessAttentionAreaCount > 0
+          ? `${plan.runtimeReadinessScore ?? 0}/100 基础能力`
         : plan.pacingRoughSceneCount > 0
           ? `${plan.pacingRoughSceneCount} 个场景待试玩`
         : "无需处理",
@@ -903,6 +1125,10 @@
         ? `会依次处理长文本、基础演出、音频范围和项目级基础体验；涉及 ${
             previewNames.length ? previewNames.join("、") : "项目设置"
           }${plan.changedSceneCount > previewNames.length ? " 等场景" : ""}。`
+        : plan.runtimeReadinessIssueCount > 0 || plan.runtimeReadinessAttentionAreaCount > 0
+          ? `自动整理项已完成；VN 基础能力 ${plan.runtimeReadinessScore ?? 0}/100，还有 ${
+              plan.runtimeReadinessAttentionAreaCount ?? 0
+            } 个领域建议发布前复看。`
         : plan.pacingRoughSceneCount > 0
           ? `自动整理项已完成；节奏体检平均 ${plan.pacingAverageScore} 分，还有 ${plan.pacingRoughSceneCount} 个场景建议试玩复看。`
         : "全项目长文本、基础演出、音频范围和项目级基础体验已经比较适合发布前检查。",
@@ -913,6 +1139,7 @@
   global.CanvasiaEditorProjectPolish = Object.freeze({
     buildProjectSettingsPolishPlan,
     buildProjectPacingSnapshot,
+    buildProjectRuntimeReadinessSnapshot,
     buildProjectOneClickPolishPlan,
     buildProjectOneClickPolishSummary,
     getProjectOneClickPolishDigest,

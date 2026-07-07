@@ -65,6 +65,16 @@
     const projectOperations = Array.isArray(receipt.projectOperations) ? receipt.projectOperations.slice(0, 4) : [];
     const pacingSnapshot = receipt.pacingSnapshot && typeof receipt.pacingSnapshot === "object" ? receipt.pacingSnapshot : null;
     const pacingHighlights = Array.isArray(pacingSnapshot?.sceneHighlights) ? pacingSnapshot.sceneHighlights.slice(0, 3) : [];
+    const runtimeReadinessSnapshot =
+      receipt.runtimeReadinessSnapshot && typeof receipt.runtimeReadinessSnapshot === "object"
+        ? receipt.runtimeReadinessSnapshot
+        : null;
+    const runtimeReadinessAreas = Array.isArray(runtimeReadinessSnapshot?.areaHighlights)
+      ? runtimeReadinessSnapshot.areaHighlights.slice(0, 3)
+      : [];
+    const runtimeReadinessIssues = Array.isArray(runtimeReadinessSnapshot?.essentialIssues)
+      ? runtimeReadinessSnapshot.essentialIssues.slice(0, 3)
+      : [];
     const visibleScenes = scenePlans.slice(0, 4);
     const hiddenSceneCount = Math.max(0, scenePlans.length - visibleScenes.length);
     const nextActions = Array.isArray(receipt.nextActions)
@@ -128,6 +138,29 @@
       : pacingSnapshot
         ? '<div class="empty-note">节奏体检没有发现需要优先复看的场景。</div>'
         : '<div class="empty-note">本次没有启用节奏体检。</div>';
+    const runtimeReadinessMarkup =
+      runtimeReadinessIssues.length || runtimeReadinessAreas.length
+        ? [
+            ...runtimeReadinessIssues.map(
+              (issue) => `
+                <article class="project-doctor-receipt-item project-one-click-polish-scene">
+                  <strong>${html(issue.title || issue.code || "基础能力提示")} · ${html(issue.severityLabel || "体验打磨")}</strong>
+                  <span>${html(issue.suggestion || issue.detail || "发布前建议复看。")}</span>
+                </article>
+              `
+            ),
+            ...runtimeReadinessAreas.map(
+              (area) => `
+                <article class="project-doctor-receipt-item project-one-click-polish-scene">
+                  <strong>${html(area.label || area.id || "基础领域")} · ${html(area.statusLabel || "建议打磨")}</strong>
+                  <span>${html(area.detail || area.summary || "这一块建议发布前复看。")}</span>
+                </article>
+              `
+            ),
+          ].join("")
+        : runtimeReadinessSnapshot
+          ? '<div class="empty-note">VN 基础能力没有发现明显短板。</div>'
+          : '<div class="empty-note">本次没有启用 VN 基础能力检查。</div>';
 
     return `
       <section class="panel project-one-click-polish-receipt-panel">
@@ -151,6 +184,17 @@
             ${renderMetric("长文本", `${receipt.readableSplitCount ?? 0} 处`, `新增 ${receipt.readableAddedBlockCount ?? 0} 张卡片`)}
             ${renderMetric("演出与音频", `${receipt.presentationChangedFieldCount ?? 0} / ${receipt.audioOperationCount ?? 0}`, "演出参数 / 音频参数")}
             ${renderMetric("项目设置", `${projectOperationCount} 项`, "存档 / 文本框 / UI")}
+            ${renderMetric(
+              "VN 基础能力",
+              receipt.runtimeReadinessScore === null || typeof receipt.runtimeReadinessScore === "undefined"
+                ? "未启用"
+                : `${receipt.runtimeReadinessScore}/100`,
+              runtimeReadinessSnapshot
+                ? `${receipt.runtimeReadinessStatusLabel || runtimeReadinessSnapshot.vnStatusLabel || "待检查"} · 关注 ${
+                    receipt.runtimeReadinessAttentionAreaCount ?? runtimeReadinessSnapshot.attentionAreaCount ?? 0
+                  }`
+                : "可在完整打磨中启用"
+            )}
             ${renderMetric(
               "节奏体检",
               receipt.pacingAverageScore === null || typeof receipt.pacingAverageScore === "undefined"
@@ -198,6 +242,12 @@
                         .join("")
                     : '<div class="empty-note">打开项目巡检并重新试玩一遍。</div>'
                 }
+              </div>
+            </div>
+            <div>
+              <strong class="project-doctor-receipt-heading">VN 底盘复看</strong>
+              <div class="project-doctor-receipt-list">
+                ${runtimeReadinessMarkup}
               </div>
             </div>
             <div>
