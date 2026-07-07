@@ -29221,6 +29221,30 @@ function buildReleaseReportNextStep(releaseFixOrder, projectMilestoneGapDigest) 
   };
 }
 
+function buildReleaseNextActionCard(nextStep) {
+  if (releaseControlTools?.buildReleaseNextActionCard) {
+    return releaseControlTools.buildReleaseNextActionCard(nextStep);
+  }
+
+  const action = serializeReleaseReportAction(nextStep?.action);
+  const isReady = nextStep?.source === "release_ready";
+  return {
+    source: nextStep?.source ?? "release_ready",
+    sourceLabel: nextStep?.sourceLabel ?? "最终确认",
+    tone: nextStep?.tone ?? (isReady ? "good" : "warn"),
+    badge: isReady ? "可以进入最终确认" : nextStep?.statusLabel || nextStep?.sourceLabel || "下一步",
+    title: isReady ? "现在可以做最终试玩和正式导出" : `现在先做：${nextStep?.title ?? "发布前收尾"}`,
+    description: nextStep?.description ?? "继续完成这一步，再回到发布总控复查。",
+    statusLabel: nextStep?.statusLabel ?? "",
+    advice: formatReleaseReportNextStepAdvice(nextStep),
+    action,
+    actionLabel: action?.label ?? "",
+    verification: isReady
+      ? "先做最终人工试玩，再导出 Web / 原生 Runtime / 桌面包并整理发布附件。"
+      : "做完后重新生成发布前修复顺序，并重新导出发布总控报告确认阻塞是否下降。",
+  };
+}
+
 function formatReleaseReportNextStepActionHint(nextStep) {
   if (releaseControlTools?.formatReleaseReportNextStepActionHint) {
     return releaseControlTools.formatReleaseReportNextStepActionHint(nextStep);
@@ -29272,6 +29296,7 @@ function buildReleaseControlReportPayload() {
   const urgentMissingAssets = state.data.assetList.filter((asset) => isAssetUrgentMissing(asset));
   const unusedAssets = getUnusedAssets();
   const nextStep = buildReleaseReportNextStep(releaseFixOrder, projectMilestoneGapDigest);
+  const nextActionCard = buildReleaseNextActionCard(nextStep);
   const projectDoctorRepairReceiptReport = buildProjectDoctorRepairReceiptReportSummary(state.projectDoctorRepairReceipt);
 
   return {
@@ -29566,6 +29591,7 @@ function buildReleaseControlReportPayload() {
         }
       : null,
     nextStep,
+    nextActionCard,
   };
 }
 
@@ -29581,6 +29607,7 @@ function buildInspectionReportContent() {
   const projectMilestonePlan = buildProjectMilestonePlan(routeOverview);
   const projectMilestoneGapDigest = buildProjectMilestoneGapDigest(projectMilestonePlan);
   const nextStep = buildReleaseReportNextStep(releaseFixOrder, projectMilestoneGapDigest);
+  const nextActionCard = buildReleaseNextActionCard(nextStep);
   const regressionResult = state.inspectionRegressionResult;
   const regressionFixQueue = buildPreviewRegressionFixQueue();
   const exportResult = state.lastExportResult;
@@ -29684,6 +29711,11 @@ function buildInspectionReportContent() {
 
   lines.push("处理动作：");
   lines.push(`- ${formatReleaseReportNextStepAdvice(nextStep)}`);
+  lines.push(`- 下一步行动卡：${nextActionCard.title}`);
+  if (nextActionCard.actionLabel) {
+    lines.push(`- 建议按钮：${nextActionCard.actionLabel}`);
+  }
+  lines.push(`- 完成后验证：${nextActionCard.verification}`);
 
   lines.push("", "项目医生修复队列：");
   lines.push(`- ${projectDoctorSummary.badge}：${projectDoctorSummary.title}`);
@@ -29852,6 +29884,7 @@ function buildReleaseControlReportContent() {
   const projectMilestonePlan = buildProjectMilestonePlan(routeOverview);
   const projectMilestoneGapDigest = buildProjectMilestoneGapDigest(projectMilestonePlan);
   const nextStep = buildReleaseReportNextStep(releaseFixOrder, projectMilestoneGapDigest);
+  const nextActionCard = buildReleaseNextActionCard(nextStep);
   const mediaBudgetReport = buildAssetMediaBudgetReport();
   const runtimePreloadBudgetReport = buildRuntimePreloadBudgetReport();
   const runtimePreloadBudgetDigest = runtimePreloadBudgetTools.getRuntimePreloadBudgetDigest(runtimePreloadBudgetReport);
@@ -29938,6 +29971,18 @@ function buildReleaseControlReportContent() {
   const fixOrderTable = buildMarkdownTable(
     ["顺序", "优先级", "事项", "当前状态", "说明", "生产待办明细", "建议动作"],
     releaseControlTools.buildReleaseFixOrderTableRows(releaseFixOrder)
+  );
+  const nextActionTable = buildMarkdownTable(
+    ["来源", "当前动作", "状态", "建议按钮", "完成后验证"],
+    [
+      [
+        nextActionCard.sourceLabel,
+        nextActionCard.title,
+        nextActionCard.badge,
+        nextActionCard.actionLabel || "手动确认",
+        nextActionCard.verification,
+      ],
+    ]
   );
   const routeFixIssueTable = buildMarkdownTable(
     ["顺序", "所属步骤", "路线问题", "位置", "目标", "状态"],
@@ -30110,6 +30155,15 @@ function buildReleaseControlReportContent() {
     ""
   );
 
+  lines.push(
+    "## 当前下一步行动",
+    "",
+    nextActionCard.advice,
+    "",
+    nextActionTable,
+    ""
+  );
+
   lines.push("## 发布前修复顺序", "", fixOrderTable || formatReleaseReportNextStepAdvice(nextStep), "");
   if (routeFixIssueTable) {
     lines.push("### 具体路线阻塞", "", routeFixIssueTable, "");
@@ -30182,7 +30236,9 @@ function buildReleaseControlReportContent() {
   lines.push(
     "## 下一步建议",
     "",
-    formatReleaseReportNextStepAdvice(nextStep),
+    nextActionCard.advice,
+    "",
+    `完成后验证：${nextActionCard.verification}`,
     ""
   );
 
@@ -31597,6 +31653,32 @@ function renderReleaseProductionBacklogTask(task = null) {
   `;
 }
 
+function renderReleaseNextActionCard(card = {}) {
+  const tone = card.tone ?? "soft";
+  const actions = card.action ? [card.action] : [];
+  return `
+    <article class="preview-sprint-card is-${escapeHtml(tone)}">
+      <div class="preview-sprint-head">
+        <div>
+          <span class="eyebrow">${escapeHtml(card.sourceLabel ?? "当前下一步")}</span>
+          <strong>${escapeHtml(card.title ?? "继续发布前收尾")}</strong>
+        </div>
+        <span class="issue-tag ${getDashboardTaskToneClass(tone)}">${escapeHtml(card.badge ?? "下一步")}</span>
+      </div>
+      <p>${escapeHtml(card.description ?? "完成这一步后，再回到发布总控复查。")}</p>
+      <div class="project-doctor-recovery">
+        <strong>完成后验证</strong>
+        <span>${escapeHtml(card.verification ?? "重新巡检、试玩并导出发布总控报告。")}</span>
+      </div>
+      ${
+        actions.length
+          ? `<div class="preview-sprint-actions">${actions.map((action, index) => renderQuickActionButton(action, index === 0)).join("")}</div>`
+          : ""
+      }
+    </article>
+  `;
+}
+
 function renderReleaseFixOrderStep(step, index) {
   return `
     <article class="preview-sprint-card is-${step.tone}">
@@ -31616,6 +31698,10 @@ function renderReleaseFixOrderStep(step, index) {
 
 function renderReleaseFixOrderPanel(routeOverview) {
   const plan = buildReleaseFixOrder(routeOverview);
+  const projectMilestonePlan = buildProjectMilestonePlan(routeOverview);
+  const projectMilestoneGapDigest = buildProjectMilestoneGapDigest(projectMilestonePlan);
+  const nextStep = buildReleaseReportNextStep(plan, projectMilestoneGapDigest);
+  const nextActionCard = buildReleaseNextActionCard(nextStep);
 
   return `
     <article class="detail-card preview-sprint-panel">
@@ -31641,11 +31727,11 @@ function renderReleaseFixOrderPanel(routeOverview) {
           导出带修复顺序的巡检报告
         </button>
       </div>
-      ${
-        plan.steps.length > 0
-          ? `<div class="preview-sprint-grid">${plan.steps.map((step, index) => renderReleaseFixOrderStep(step, index)).join("")}</div>`
-          : renderEmpty("当前没有明显阻塞，已经接近可以直接做最终试玩和正式导出。")
-      }
+      <div class="preview-sprint-grid">
+        ${renderReleaseNextActionCard(nextActionCard)}
+        ${plan.steps.map((step, index) => renderReleaseFixOrderStep(step, index)).join("")}
+      </div>
+      ${plan.steps.length > 0 ? "" : `<p class="helper-text">当前没有明显阻塞，已经接近可以直接做最终试玩和正式导出。</p>`}
     </article>
   `;
 }

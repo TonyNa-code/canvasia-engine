@@ -456,6 +456,38 @@
     });
   }
 
+  function getReleaseActionCardVerification(nextStep = {}) {
+    if (nextStep?.source === "release_fix_order") {
+      return "做完后重新生成发布前修复顺序，并重新导出发布总控报告确认阻塞是否下降。";
+    }
+    if (nextStep?.source === "project_milestone_gap") {
+      return "做完后重新巡检和试玩当前阶段，再回到成品目标路线确认进度。";
+    }
+    return "先做最终人工试玩，再导出 Web / 原生 Runtime / 桌面包并整理发布附件。";
+  }
+
+  function buildReleaseNextActionCard(nextStep = null) {
+    const normalized =
+      nextStep && typeof nextStep === "object"
+        ? completeReleaseReportNextStep(nextStep)
+        : buildReleaseReportNextStep({ steps: [] }, { status: "ready" });
+    const action = serializeReleaseReportAction(normalized.action);
+    const isReady = normalized.source === "release_ready";
+    return {
+      source: normalized.source ?? "release_ready",
+      sourceLabel: normalized.sourceLabel ?? "最终确认",
+      tone: normalized.tone ?? (isReady ? "good" : "warn"),
+      badge: isReady ? "可以进入最终确认" : normalized.statusLabel || normalized.sourceLabel || "下一步",
+      title: isReady ? "现在可以做最终试玩和正式导出" : `现在先做：${normalized.title ?? "发布前收尾"}`,
+      description: normalized.description ?? "继续完成这一步，再回到发布总控复查。",
+      statusLabel: normalized.statusLabel ?? "",
+      advice: normalized.advice ?? formatReleaseReportNextStepAdvice(normalized),
+      action,
+      actionLabel: action?.label ?? "",
+      verification: getReleaseActionCardVerification(normalized),
+    };
+  }
+
   function splitReleaseWarnings(warningIssues = []) {
     const safeWarnings = Array.isArray(warningIssues) ? warningIssues : [];
     return {
@@ -1309,6 +1341,7 @@
     buildReleaseChecklistSummary,
     buildFinalPublishGate,
     buildReleaseReportNextStep,
+    buildReleaseNextActionCard,
     formatReleaseReportNextStepActionHint,
     formatReleaseReportNextStepAdvice,
     serializeProductionBacklogTask,

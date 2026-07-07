@@ -122,14 +122,28 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
 
     def test_release_next_step_advice_is_module_backed(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
+        payload_start = source.index("function buildReleaseControlReportPayload()")
+        payload_end = source.index("function buildInspectionReportContent()")
+        payload_body = source[payload_start:payload_end]
         inspection_start = source.index("function buildInspectionReportContent()")
         inspection_end = source.index("function buildReleaseControlReportContent()")
         inspection_body = source[inspection_start:inspection_end]
+        report_start = source.index("function buildReleaseControlReportContent()")
+        report_end = source.index("function exportReleaseControlReport()")
+        report_body = source[report_start:report_end]
 
         self.assertIn("releaseControlTools?.buildReleaseReportNextStep", source)
+        self.assertIn("releaseControlTools?.buildReleaseNextActionCard", source)
         self.assertIn("releaseControlTools?.formatReleaseReportNextStepActionHint", source)
         self.assertIn("releaseControlTools?.formatReleaseReportNextStepAdvice", source)
+        self.assertIn("function renderReleaseNextActionCard", source)
+        self.assertIn("${renderReleaseNextActionCard(nextActionCard)}", source)
+        self.assertIn("nextActionCard,", payload_body)
         self.assertIn("lines.push(`- ${formatReleaseReportNextStepAdvice(nextStep)}`);", inspection_body)
+        self.assertIn("下一步行动卡", inspection_body)
+        self.assertIn("const nextActionTable = buildMarkdownTable", report_body)
+        self.assertIn("## 当前下一步行动", report_body)
+        self.assertIn("完成后验证", report_body)
         self.assertNotIn("先清结构错误，再继续试玩和正式导出。", inspection_body)
 
     def test_release_control_helpers_work_without_browser_dom(self) -> None:
@@ -326,6 +340,11 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
                 tools.formatReleaseReportNextStepAdvice(milestoneNextStep),
                 tools.formatReleaseReportNextStepAdvice(readyNextStep),
               ],
+              actionCards: [
+                tools.buildReleaseNextActionCard(releaseNextStep),
+                tools.buildReleaseNextActionCard(milestoneNextStep),
+                tools.buildReleaseNextActionCard(readyNextStep),
+              ],
               desktopReady: [
                 tools.isDesktopExportReady({{ target: "windows_nwjs", runtimeMode: "nwjs", missingAssets: 0 }}),
                 tools.isDesktopExportReady({{ target: "windows_nwjs", runtimeMode: "fallback", missingAssets: 0 }}),
@@ -447,6 +466,12 @@ class FrontendReleaseControlModuleTests(unittest.TestCase):
         self.assertIn("补试玩确认", payload["nextStepAdvice"][1])
         self.assertEqual(payload["nextSteps"][2]["tone"], "good")
         self.assertEqual(payload["nextStepAdvice"][2], "当前没有明显阻塞，可以直接做最终试玩和正式导出。")
+        self.assertEqual(payload["actionCards"][0]["title"], "现在先做：处理首屏加载压力")
+        self.assertEqual(payload["actionCards"][0]["actionLabel"], "查看首屏预算")
+        self.assertIn("重新生成发布前修复顺序", payload["actionCards"][0]["verification"])
+        self.assertEqual(payload["actionCards"][1]["sourceLabel"], "成品目标路线")
+        self.assertEqual(payload["actionCards"][2]["tone"], "good")
+        self.assertEqual(payload["actionCards"][2]["title"], "现在可以做最终试玩和正式导出")
         self.assertEqual(payload["desktopReady"], [True, False, False, False])
         self.assertEqual(payload["blockedGate"]["status"], "blocked")
         self.assertEqual(payload["blockedGate"]["badge"], "暂缓发布")
