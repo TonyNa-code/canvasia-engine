@@ -40,8 +40,12 @@ jobs:
         run: |
           python -m py_compile \
             export_release_control.py \
+            export_icon.py \
+            export_provenance_verifier.py \
+            export_release_artifacts.py \
             run_editor.py \
             native_runtime_export_commands.py \
+            native_runtime_export_digest.py \
             native_runtime/runtime_player.py \
             native_runtime/runtime_i18n.py \
             native_runtime/runtime_vn_quality.py \
@@ -57,9 +61,13 @@ jobs:
             tests/test_github_status_tool.py \
             tests/test_local_verify_tool.py \
             tests/test_native_runtime_export_commands.py \
+            tests/test_native_runtime_export_digest.py \
             tests/test_maintainability_check_tool.py \
             tests/test_project_health_tool.py \
             tests/test_prepare_preview_release.py \
+            tests/test_export_icon.py \
+            tests/test_export_provenance_verifier.py \
+            tests/test_export_release_artifacts.py \
             tests/test_export_release_control.py \
             tests/test_release_public_surface.py \
             tests/test_frontend_action_handlers.py \
@@ -260,11 +268,15 @@ jobs:
           python -m unittest discover -s tests -p 'test_github_status_tool.py' -v
           python -m unittest discover -s tests -p 'test_local_verify_tool.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_export_commands.py' -v
+          python -m unittest discover -s tests -p 'test_native_runtime_export_digest.py' -v
           python -m unittest discover -s tests -p 'test_maintainability_check_tool.py' -v
           python tools/ci/maintainability_check.py --json-report verification_reports/maintainability.json --markdown-report verification_reports/maintainability.md
           python -m unittest discover -s tests -p 'test_project_health_tool.py' -v
           python tools/ci/project_health.py template_project --json-report verification_reports/project-health-template.json --markdown-report verification_reports/project-health-template.md
           python -m unittest discover -s tests -p 'test_prepare_preview_release.py' -v
+          python -m unittest discover -s tests -p 'test_export_icon.py' -v
+          python -m unittest discover -s tests -p 'test_export_provenance_verifier.py' -v
+          python -m unittest discover -s tests -p 'test_export_release_artifacts.py' -v
           python -m unittest discover -s tests -p 'test_export_release_control.py' -v
           python -m unittest discover -s tests -p 'test_release_public_surface.py' -v
           python -m unittest discover -s tests -p 'test_frontend_action_handlers.py' -v
