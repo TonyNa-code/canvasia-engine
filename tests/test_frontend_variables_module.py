@@ -94,6 +94,45 @@ class FrontendVariablesModuleTests(unittest.TestCase):
                 tools.normalizeChoiceEffect({{ type: "variable_add", variableId: "route", value: "2.5" }}, options),
                 tools.normalizeChoiceEffect({{ type: "variable_set", variableId: "flag", value: "false" }}, options),
               ],
+              projectVariableRules: {{
+                filterKeys: Object.keys(tools.PROJECT_VARIABLE_FILTER_LABELS),
+                statusKeys: Object.keys(tools.PROJECT_VARIABLE_STATUS_LABELS),
+                safeTypes: [
+                  tools.getSafeProjectVariableType("number"),
+                  tools.getSafeProjectVariableType("bad"),
+                ],
+                safeFilters: [
+                  tools.getSafeProjectVariableFilterMode("risky"),
+                  tools.getSafeProjectVariableFilterMode("bad"),
+                ],
+                safeStatuses: [
+                  tools.getSafeProjectVariableStatus("deprecated"),
+                  tools.getSafeProjectVariableStatus("bad"),
+                ],
+                ids: [
+                  tools.makeProjectVariableId("好感度", ["var_好感度"]),
+                  tools.makeProjectVariableId("var_route", ["var_route", "var_route_02"]),
+                ],
+                idSafety: [
+                  tools.isSafeProjectVariableId("var_好感度_02"),
+                  tools.isSafeProjectVariableId("bad/slash"),
+                ],
+                idIssues: [
+                  tools.getProjectVariableIdIssue("", "", options),
+                  tools.getProjectVariableIdIssue("bad/slash", "", options),
+                  tools.getProjectVariableIdIssue("score", "", options),
+                  tools.getProjectVariableIdIssue("score", "score", options),
+                ],
+                defaults: [
+                  tools.buildDefaultProjectVariable("number", variables),
+                  tools.buildDefaultProjectVariable("boolean", variables),
+                  tools.buildDefaultProjectVariable("bad", variables),
+                ],
+                renderedOptions: [
+                  tools.renderProjectVariableTypeOptions("boolean", escapedOptions),
+                  tools.renderProjectVariableStatusOptions("reserved", escapedOptions),
+                ],
+              }},
               render: [
                 tools.renderVariableOptions("score", null, escapedOptions),
                 tools.renderVariableOptions("", null, {{ variables: [] }}),
@@ -144,6 +183,27 @@ class FrontendVariablesModuleTests(unittest.TestCase):
             payload["choiceEffects"][5],
             {"type": "variable_set", "variableId": "flag", "value": False},
         )
+        self.assertIn("draft", payload["projectVariableRules"]["filterKeys"])
+        self.assertEqual(payload["projectVariableRules"]["statusKeys"], ["active", "reserved", "deprecated"])
+        self.assertEqual(payload["projectVariableRules"]["safeTypes"], ["number", "string"])
+        self.assertEqual(payload["projectVariableRules"]["safeFilters"], ["risky", "all"])
+        self.assertEqual(payload["projectVariableRules"]["safeStatuses"], ["deprecated", "active"])
+        self.assertEqual(payload["projectVariableRules"]["ids"], ["var_好感度_02", "var_route_03"])
+        self.assertEqual(payload["projectVariableRules"]["idSafety"], [True, False])
+        self.assertEqual(
+            payload["projectVariableRules"]["idIssues"],
+            ["逻辑 ID 不能为空", "逻辑 ID 含有不可用于发布的字符", "逻辑 ID 已被其他变量使用", ""],
+        )
+        self.assertEqual(
+            [item["type"] for item in payload["projectVariableRules"]["defaults"]],
+            ["number", "boolean", "string"],
+        )
+        self.assertEqual(payload["projectVariableRules"]["defaults"][0]["id"], "var_新数字变量")
+        self.assertEqual(payload["projectVariableRules"]["defaults"][0]["max"], 100)
+        self.assertFalse(payload["projectVariableRules"]["defaults"][1]["defaultValue"])
+        self.assertEqual(payload["projectVariableRules"]["defaults"][2]["defaultValue"], "common")
+        self.assertIn('<option value="boolean" selected>', payload["projectVariableRules"]["renderedOptions"][0])
+        self.assertIn('<option value="reserved" selected>', payload["projectVariableRules"]["renderedOptions"][1])
         self.assertIn("分数&lt;危险&gt;", payload["render"][0])
         self.assertIn("当前没有可用变量", payload["render"][1])
         self.assertIn('<option value="false" selected>否</option>', payload["render"][2])
@@ -158,6 +218,10 @@ class FrontendVariablesModuleTests(unittest.TestCase):
         self.assertNotIn("const STARTER_VARIABLE_PRESETS =", app_source)
         self.assertIn("return variableTools.buildStarterVariableLibrary(existingVariables, options);", app_source)
         self.assertIn("return variableTools.normalizeChoiceEffect(effect, getVariableToolOptions());", app_source)
+        self.assertNotIn("const PROJECT_VARIABLE_FILTER_LABELS = {", app_source)
+        self.assertIn("PROJECT_VARIABLE_FILTER_LABELS,", app_source)
+        self.assertIn("return variableTools.buildDefaultProjectVariable(type, state.data?.variables ?? []);", app_source)
+        self.assertIn("return variableTools.getProjectVariableIdIssue(variableId, currentVariableId,", app_source)
 
 
 if __name__ == "__main__":

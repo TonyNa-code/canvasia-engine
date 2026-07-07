@@ -78,6 +78,7 @@ class FrontendEntrypointModuleTests(unittest.TestCase):
             "./modules/project_history_panel.js",
             "./modules/asset_usage_map.js",
             "./modules/asset_catalog.js",
+            "./modules/asset_import_rules.js",
             "./modules/beginner_assets_guide.js",
             "./modules/beginner_character_guide.js",
             "./modules/character_presentation_panel.js",

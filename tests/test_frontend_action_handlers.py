@@ -27,6 +27,7 @@ NATIVE_RUNTIME_TEXT_EFFECTS_PATH = ROOT_DIR / "native_runtime" / "runtime_text_e
 PROJECT_POLISH_RECEIPT_PANEL_PATH = EDITOR_DIR / "modules" / "project_polish_receipt_panel.js"
 DASHBOARD_PRIMARY_ACTIONS_PATH = EDITOR_DIR / "modules" / "dashboard_primary_actions.js"
 TYPEWRITER_MODULE_PATH = EDITOR_DIR / "modules" / "typewriter.js"
+ASSET_IMPORT_RULES_PATH = EDITOR_DIR / "modules" / "asset_import_rules.js"
 MODULE_PATHS = tuple(sorted((EDITOR_DIR / "modules").glob("*.js")))
 ACTION_ATTRIBUTE_PATHS = (INDEX_PATH, APP_PATH, *MODULE_PATHS)
 ACTION_CONFIG_PATHS = (APP_PATH, *MODULE_PATHS)
@@ -5640,6 +5641,7 @@ class FrontendActionHandlerTests(unittest.TestCase):
 
     def test_asset_delete_confirmations_preview_exact_targets(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
+        asset_import_rules_source = ASSET_IMPORT_RULES_PATH.read_text(encoding="utf-8")
         render_assets = _extract_function_source(source, "renderAssetsScreen")
         render_asset_details = _extract_function_source(source, "renderAssetDetails")
         import_accept = _extract_function_source(source, "getAssetImportAccept")
@@ -5689,9 +5691,10 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn('return asset.fileExists ? "替换当前文件" : "补这个文件"', replace_button_label)
         self.assertIn("补完后会自动跳到下一个缺文件素材", replace_button_title)
         self.assertIn("素材引用关系会保留", replace_button_title)
-        self.assertIn("const ASSET_SMART_IMPORT_ACCEPT = Array.from", source)
-        self.assertIn('live2d: "application/json,.model3.json', source)
-        self.assertIn('video: "video/*,.mp4,.webm,.mov,.m4v"', source)
+        self.assertIn("window.CanvasiaEditorAssetImportRules", source)
+        self.assertIn("const ASSET_SMART_IMPORT_ACCEPT = Array.from", asset_import_rules_source)
+        self.assertIn('live2d: "application/json,.model3.json', asset_import_rules_source)
+        self.assertIn('video: "video/*,.mp4,.webm,.mov,.m4v"', asset_import_rules_source)
         self.assertIn("const shouldAdvanceAfterReplace = shouldAdvanceAssetSelectionAfterReplace(asset)", replace_asset)
         self.assertIn("if (!isFileAcceptedByAccept(file, accept))", replace_asset)
         self.assertIn("替换素材失败：文件格式不匹配", replace_asset)

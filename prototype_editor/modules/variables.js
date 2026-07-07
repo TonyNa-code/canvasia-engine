@@ -22,6 +22,34 @@
     }),
   ]);
 
+  const PROJECT_VARIABLE_TYPES = Object.freeze(["number", "boolean", "string"]);
+
+  const PROJECT_VARIABLE_FILTER_LABELS = Object.freeze({
+    all: "全部",
+    referenced: "已引用",
+    unused: "未引用",
+    risky: "有风险",
+    number: "数字",
+    boolean: "开关",
+    string: "文本",
+    active: "使用中",
+    reserved: "预留",
+    deprecated: "废弃",
+    draft: "有草稿",
+  });
+
+  const PROJECT_VARIABLE_STATUS_LABELS = Object.freeze({
+    active: "使用中",
+    reserved: "预留",
+    deprecated: "废弃",
+  });
+
+  const PROJECT_VARIABLE_TYPE_DEFAULT_NAMES = Object.freeze({
+    number: "新数字变量",
+    boolean: "新开关变量",
+    string: "新文本变量",
+  });
+
   function cloneValue(value) {
     return JSON.parse(JSON.stringify(value));
   }
@@ -189,6 +217,115 @@
     if (type === "number") return "数字";
     if (type === "boolean") return "开关";
     return "文本";
+  }
+
+  function getSafeProjectVariableType(type) {
+    return PROJECT_VARIABLE_TYPES.includes(type) ? type : "string";
+  }
+
+  function getSafeProjectVariableFilterMode(mode) {
+    return Object.prototype.hasOwnProperty.call(PROJECT_VARIABLE_FILTER_LABELS, mode) ? mode : "all";
+  }
+
+  function getSafeProjectVariableStatus(status) {
+    return Object.prototype.hasOwnProperty.call(PROJECT_VARIABLE_STATUS_LABELS, status) ? status : "active";
+  }
+
+  function renderProjectVariableTypeOptions(selectedType, options = {}) {
+    const escape = getEscaper(options);
+    const safeType = getSafeProjectVariableType(selectedType);
+    return PROJECT_VARIABLE_TYPES.map(
+      (type) => `
+        <option value="${type}" ${type === safeType ? "selected" : ""}>
+          ${escape(getVariableTypeLabel(type))}
+        </option>
+      `
+    ).join("");
+  }
+
+  function renderProjectVariableStatusOptions(selectedStatus, options = {}) {
+    const escape = getEscaper(options);
+    const safeStatus = getSafeProjectVariableStatus(selectedStatus);
+    return Object.entries(PROJECT_VARIABLE_STATUS_LABELS)
+      .map(
+        ([status, label]) => `
+        <option value="${status}" ${status === safeStatus ? "selected" : ""}>
+          ${escape(label)}
+        </option>
+      `
+      )
+      .join("");
+  }
+
+  function makeProjectVariableId(name, existingIds = []) {
+    const base =
+      String(name ?? "")
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9\u4e00-\u9fff]+/g, "_")
+        .replace(/^_+|_+$/g, "") || "custom";
+    const prefix = base.startsWith("var_") ? "" : "var_";
+    const used = new Set(existingIds);
+    let candidate = `${prefix}${base}`;
+    let suffix = 2;
+    while (used.has(candidate)) {
+      candidate = `${prefix}${base}_${String(suffix).padStart(2, "0")}`;
+      suffix += 1;
+    }
+    return candidate;
+  }
+
+  function isSafeProjectVariableId(variableId) {
+    return /^[0-9A-Za-z_\-\u4e00-\u9fff]{1,64}$/.test(String(variableId ?? "").trim());
+  }
+
+  function getProjectVariableIdIssue(variableId, currentVariableId = "", options = {}) {
+    const safeVariableId = String(variableId ?? "").trim();
+    if (!safeVariableId) {
+      return "逻辑 ID 不能为空";
+    }
+    if (!isSafeProjectVariableId(safeVariableId)) {
+      return "逻辑 ID 含有不可用于发布的字符";
+    }
+    if (getVariableList(options).some((item) => item.id === safeVariableId && item.id !== currentVariableId)) {
+      return "逻辑 ID 已被其他变量使用";
+    }
+    return "";
+  }
+
+  function buildDefaultProjectVariable(type = "number", existingVariables = []) {
+    const safeType = getSafeProjectVariableType(type);
+    const name = PROJECT_VARIABLE_TYPE_DEFAULT_NAMES[safeType];
+    const existingIds = getVariableList({ variables: existingVariables }).map((variable) => variable.id);
+    const base = {
+      id: makeProjectVariableId(name, existingIds),
+      name,
+      type: safeType,
+      group: "默认",
+      status: "active",
+      description: "",
+    };
+
+    if (safeType === "number") {
+      return {
+        ...base,
+        defaultValue: 0,
+        min: 0,
+        max: 100,
+      };
+    }
+
+    if (safeType === "boolean") {
+      return {
+        ...base,
+        defaultValue: false,
+      };
+    }
+
+    return {
+      ...base,
+      defaultValue: "common",
+    };
   }
 
   function normalizeVariableValue(variableId, value, options = {}) {
@@ -502,6 +639,10 @@
 
   global.CanvasiaEditorVariables = Object.freeze({
     STARTER_VARIABLE_PRESETS,
+    PROJECT_VARIABLE_TYPES,
+    PROJECT_VARIABLE_FILTER_LABELS,
+    PROJECT_VARIABLE_STATUS_LABELS,
+    PROJECT_VARIABLE_TYPE_DEFAULT_NAMES,
     parseVariableNumberBound,
     getVariableNumberBounds,
     clampVariableNumber,
@@ -512,6 +653,15 @@
     getSafeVariableId,
     getVariableType,
     getVariableTypeLabel,
+    getSafeProjectVariableType,
+    getSafeProjectVariableFilterMode,
+    getSafeProjectVariableStatus,
+    renderProjectVariableTypeOptions,
+    renderProjectVariableStatusOptions,
+    makeProjectVariableId,
+    isSafeProjectVariableId,
+    getProjectVariableIdIssue,
+    buildDefaultProjectVariable,
     normalizeVariableValue,
     formatVariableValue,
     getVariableDefaultValue,

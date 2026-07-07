@@ -195,6 +195,15 @@ const {
   PARTICLE_IMAGE_ASSET_TYPES,
 } = particleEffectTools;
 const variableTools = window.CanvasiaEditorVariables;
+const {
+  PROJECT_VARIABLE_FILTER_LABELS,
+  PROJECT_VARIABLE_STATUS_LABELS,
+  getSafeProjectVariableType,
+  getSafeProjectVariableFilterMode,
+  getSafeProjectVariableStatus,
+  makeProjectVariableId,
+  isSafeProjectVariableId,
+} = variableTools;
 const runtimeConditionTools = window.CanvasiaRuntimeConditions;
 const projectHistoryTools = window.CanvasiaEditorProjectHistory;
 const projectHistoryPanelTools = window.CanvasiaEditorProjectHistoryPanel;
@@ -217,44 +226,12 @@ const {
   ASSET_TYPE_LABELS,
   CHARACTER_PRESENTATION_MODE_LABELS,
 } = assetCatalogTools;
-
-const ASSET_REPLACE_ACCEPTS = {
-  background: "image/*,.png,.jpg,.jpeg,.webp,.gif,.avif",
-  sprite: "image/*,.png,.jpg,.jpeg,.webp,.gif,.avif",
-  cg: "image/*,.png,.jpg,.jpeg,.webp,.gif,.avif",
-  ui: "image/*,.png,.jpg,.jpeg,.webp,.gif,.avif",
-  bgm: "audio/*,.mp3,.ogg,.wav,.m4a,.aac,.flac",
-  sfx: "audio/*,.mp3,.ogg,.wav,.m4a,.aac,.flac",
-  voice: "audio/*,.mp3,.ogg,.wav,.m4a,.aac,.flac",
-  video: "video/*,.mp4,.webm,.mov,.m4v",
-  font: ".ttf,.otf,.ttc",
-  live2d: "application/json,.model3.json,.moc3,.motion3.json,.physics3.json,.cdi3.json,.pose3.json,.exp3.json,.userdata3.json",
-  model3d: ".glb,.gltf,.vrm,.fbx,.obj",
-  scene3d: ".glb,.gltf,.vrm,.fbx,.obj",
-};
-const ASSET_SMART_IMPORT_ACCEPT = Array.from(
-  new Set(
-    Object.values(ASSET_REPLACE_ACCEPTS)
-      .flatMap((accept) => accept.split(","))
-      .map((item) => item.trim())
-      .filter(Boolean)
-  )
-).join(",");
-
-const ASSET_REPLACE_FORMAT_LABELS = {
-  background: "PNG / JPG / WebP / GIF / AVIF",
-  sprite: "PNG / JPG / WebP / GIF / AVIF",
-  cg: "PNG / JPG / WebP / GIF / AVIF",
-  ui: "PNG / JPG / WebP / GIF / AVIF",
-  bgm: "MP3 / OGG / WAV / M4A / AAC / FLAC",
-  sfx: "MP3 / OGG / WAV / M4A / AAC / FLAC",
-  voice: "MP3 / OGG / WAV / M4A / AAC / FLAC",
-  video: "MP4 / WebM / MOV / M4V",
-  font: "TTF / OTF / TTC",
-  live2d: "model3.json / moc3 / motion3.json / physics3.json / exp3.json",
-  model3d: "GLB / GLTF / VRM / FBX / OBJ",
-  scene3d: "GLB / GLTF / VRM / FBX / OBJ",
-};
+const assetImportRuleTools = window.CanvasiaEditorAssetImportRules;
+const {
+  ASSET_REPLACE_ACCEPTS,
+  ASSET_SMART_IMPORT_ACCEPT,
+  ASSET_REPLACE_FORMAT_LABELS,
+} = assetImportRuleTools;
 
 const creativeAssistantTools = window.CanvasiaEditorCreativeAssistant;
 
@@ -36458,138 +36435,22 @@ function buildGameUiAssetSelectOptions(selectedAssetId = "", allowedTypes = ["ui
   );
 }
 
-function getSafeProjectVariableType(type) {
-  return ["number", "boolean", "string"].includes(type) ? type : "string";
-}
-
 function renderProjectVariableTypeOptions(selectedType) {
-  const safeType = getSafeProjectVariableType(selectedType);
-  return ["number", "boolean", "string"]
-    .map(
-      (type) => `
-        <option value="${type}" ${type === safeType ? "selected" : ""}>
-          ${escapeHtml(getVariableTypeLabel(type))}
-        </option>
-      `
-    )
-    .join("");
-}
-
-const PROJECT_VARIABLE_FILTER_LABELS = {
-  all: "全部",
-  referenced: "已引用",
-  unused: "未引用",
-  risky: "有风险",
-  number: "数字",
-  boolean: "开关",
-  string: "文本",
-  active: "使用中",
-  reserved: "预留",
-  deprecated: "废弃",
-  draft: "有草稿",
-};
-
-function getSafeProjectVariableFilterMode(mode) {
-  return Object.prototype.hasOwnProperty.call(PROJECT_VARIABLE_FILTER_LABELS, mode) ? mode : "all";
-}
-
-const PROJECT_VARIABLE_STATUS_LABELS = {
-  active: "使用中",
-  reserved: "预留",
-  deprecated: "废弃",
-};
-
-function getSafeProjectVariableStatus(status) {
-  return Object.prototype.hasOwnProperty.call(PROJECT_VARIABLE_STATUS_LABELS, status) ? status : "active";
+  return variableTools.renderProjectVariableTypeOptions(selectedType, { escapeHtml });
 }
 
 function renderProjectVariableStatusOptions(selectedStatus) {
-  const safeStatus = getSafeProjectVariableStatus(selectedStatus);
-  return Object.entries(PROJECT_VARIABLE_STATUS_LABELS)
-    .map(
-      ([status, label]) => `
-        <option value="${status}" ${status === safeStatus ? "selected" : ""}>
-          ${escapeHtml(label)}
-        </option>
-      `
-    )
-    .join("");
-}
-
-function makeProjectVariableId(name, existingIds = []) {
-  const base =
-    String(name ?? "")
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9\u4e00-\u9fff]+/g, "_")
-      .replace(/^_+|_+$/g, "") || "custom";
-  const prefix = base.startsWith("var_") ? "" : "var_";
-  const used = new Set(existingIds);
-  let candidate = `${prefix}${base}`;
-  let suffix = 2;
-  while (used.has(candidate)) {
-    candidate = `${prefix}${base}_${String(suffix).padStart(2, "0")}`;
-    suffix += 1;
-  }
-  return candidate;
-}
-
-function isSafeProjectVariableId(variableId) {
-  return /^[0-9A-Za-z_\-\u4e00-\u9fff]{1,64}$/.test(String(variableId ?? "").trim());
+  return variableTools.renderProjectVariableStatusOptions(selectedStatus, { escapeHtml });
 }
 
 function getProjectVariableIdIssue(variableId, currentVariableId = "") {
-  const safeVariableId = String(variableId ?? "").trim();
-  if (!safeVariableId) {
-    return "逻辑 ID 不能为空";
-  }
-  if (!isSafeProjectVariableId(safeVariableId)) {
-    return "逻辑 ID 含有不可用于发布的字符";
-  }
-  if (state.data.variables.some((item) => item.id === safeVariableId && item.id !== currentVariableId)) {
-    return "逻辑 ID 已被其他变量使用";
-  }
-  return "";
+  return variableTools.getProjectVariableIdIssue(variableId, currentVariableId, {
+    variables: state.data?.variables ?? [],
+  });
 }
 
 function buildDefaultProjectVariable(type = "number") {
-  const safeType = getSafeProjectVariableType(type);
-  const labels = {
-    number: "新数字变量",
-    boolean: "新开关变量",
-    string: "新文本变量",
-  };
-  const existingIds = state.data.variables.map((variable) => variable.id);
-  const id = makeProjectVariableId(labels[safeType], existingIds);
-  const base = {
-    id,
-    name: labels[safeType],
-    type: safeType,
-    group: "默认",
-    status: "active",
-    description: "",
-  };
-
-  if (safeType === "number") {
-    return {
-      ...base,
-      defaultValue: 0,
-      min: 0,
-      max: 100,
-    };
-  }
-
-  if (safeType === "boolean") {
-    return {
-      ...base,
-      defaultValue: false,
-    };
-  }
-
-  return {
-    ...base,
-    defaultValue: "common",
-  };
+  return variableTools.buildDefaultProjectVariable(type, state.data?.variables ?? []);
 }
 
 function getProjectVariableDefaultInputValue(variable) {
