@@ -39,6 +39,7 @@ PYTHON_SYNTAX_FILES = [
     "export_release_evidence_pack.py",
     "export_release_readiness.py",
     "export_runtime_preload.py",
+    "native_runtime_export_commands.py",
     "export_story_route_map.py",
     "export_unlockable_manifest.py",
     "renpy_export.py",
@@ -71,6 +72,7 @@ PYTHON_SYNTAX_FILES = [
     "tests/test_prepare_preview_release.py",
     "tests/test_release_public_surface.py",
     "tests/test_maintainability_check_tool.py",
+    "tests/test_native_runtime_export_commands.py",
     "tests/test_frontend_action_handlers.py",
     "tests/test_run_editor_smoke.py",
     "tests/test_native_runtime_render_smoke.py",
@@ -195,6 +197,7 @@ def build_release_tooling_steps(python_executable: str) -> list[VerifyStep]:
         build_unittest_step("CI workflow coverage", "test_ci_workflow_coverage.py", "release-tests", python_executable),
         build_unittest_step("GitHub status tooling", "test_github_status_tool.py", "release-tests", python_executable),
         build_unittest_step("Local verify tooling", "test_local_verify_tool.py", "release-tests", python_executable),
+        build_unittest_step("Native runtime export command writer", "test_native_runtime_export_commands.py", "release-tests", python_executable),
         build_unittest_step("Maintainability tooling", "test_maintainability_check_tool.py", "release-tests", python_executable),
         VerifyStep(
             name="Maintainability guardrails",

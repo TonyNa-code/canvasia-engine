@@ -115,6 +115,7 @@ from native_runtime.runtime_diagnostics import (
     DIAGNOSTICS_MARKDOWN_NAME as NATIVE_RUNTIME_DIAGNOSTICS_MARKDOWN_FILE_NAME,
     DIAGNOSTICS_REPORT_NAME as NATIVE_RUNTIME_DIAGNOSTICS_REPORT_FILE_NAME,
 )
+from native_runtime_export_commands import write_native_runtime_command_files
 from export_story_route_map import (
     EXPORT_STORY_ROUTE_MAP_JSON_NAME,
     EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
@@ -9342,24 +9343,50 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
     doctor_files = write_native_runtime_doctor_reports(build_dir)
     crash_feedback_files = write_native_runtime_crash_feedback_reports(build_dir)
 
-    mac_launcher_path = build_dir / NATIVE_RUNTIME_MAC_COMMAND_NAME
-    linux_launcher_path = build_dir / NATIVE_RUNTIME_LINUX_COMMAND_NAME
-    windows_launcher_path = build_dir / NATIVE_RUNTIME_WINDOWS_COMMAND_NAME
-    mac_rc_path = build_dir / NATIVE_RUNTIME_MAC_RC_COMMAND_NAME
-    linux_rc_path = build_dir / NATIVE_RUNTIME_LINUX_RC_COMMAND_NAME
-    windows_rc_path = build_dir / NATIVE_RUNTIME_WINDOWS_RC_COMMAND_NAME
-    mac_release_control_path = build_dir / NATIVE_RUNTIME_MAC_RELEASE_CONTROL_COMMAND_NAME
-    linux_release_control_path = build_dir / NATIVE_RUNTIME_LINUX_RELEASE_CONTROL_COMMAND_NAME
-    windows_release_control_path = build_dir / NATIVE_RUNTIME_WINDOWS_RELEASE_CONTROL_COMMAND_NAME
-    mac_acceptance_path = build_dir / NATIVE_RUNTIME_MAC_ACCEPTANCE_COMMAND_NAME
-    linux_acceptance_path = build_dir / NATIVE_RUNTIME_LINUX_ACCEPTANCE_COMMAND_NAME
-    windows_acceptance_path = build_dir / NATIVE_RUNTIME_WINDOWS_ACCEPTANCE_COMMAND_NAME
-    mac_file_integrity_path = build_dir / NATIVE_RUNTIME_MAC_FILE_INTEGRITY_COMMAND_NAME
-    linux_file_integrity_path = build_dir / NATIVE_RUNTIME_LINUX_FILE_INTEGRITY_COMMAND_NAME
-    windows_file_integrity_path = build_dir / NATIVE_RUNTIME_WINDOWS_FILE_INTEGRITY_COMMAND_NAME
-    mac_app_builder_path = build_dir / NATIVE_RUNTIME_MAC_APP_BUILDER_COMMAND_NAME
-    linux_app_builder_path = build_dir / NATIVE_RUNTIME_LINUX_APP_BUILDER_COMMAND_NAME
-    windows_app_builder_path = build_dir / NATIVE_RUNTIME_WINDOWS_APP_BUILDER_COMMAND_NAME
+    command_paths = write_native_runtime_command_files(
+        build_dir,
+        command_names={
+            "mac_launcher": NATIVE_RUNTIME_MAC_COMMAND_NAME,
+            "linux_launcher": NATIVE_RUNTIME_LINUX_COMMAND_NAME,
+            "windows_launcher": NATIVE_RUNTIME_WINDOWS_COMMAND_NAME,
+            "mac_release_candidate": NATIVE_RUNTIME_MAC_RC_COMMAND_NAME,
+            "linux_release_candidate": NATIVE_RUNTIME_LINUX_RC_COMMAND_NAME,
+            "windows_release_candidate": NATIVE_RUNTIME_WINDOWS_RC_COMMAND_NAME,
+            "mac_release_control": NATIVE_RUNTIME_MAC_RELEASE_CONTROL_COMMAND_NAME,
+            "linux_release_control": NATIVE_RUNTIME_LINUX_RELEASE_CONTROL_COMMAND_NAME,
+            "windows_release_control": NATIVE_RUNTIME_WINDOWS_RELEASE_CONTROL_COMMAND_NAME,
+            "mac_acceptance": NATIVE_RUNTIME_MAC_ACCEPTANCE_COMMAND_NAME,
+            "linux_acceptance": NATIVE_RUNTIME_LINUX_ACCEPTANCE_COMMAND_NAME,
+            "windows_acceptance": NATIVE_RUNTIME_WINDOWS_ACCEPTANCE_COMMAND_NAME,
+            "mac_file_integrity": NATIVE_RUNTIME_MAC_FILE_INTEGRITY_COMMAND_NAME,
+            "linux_file_integrity": NATIVE_RUNTIME_LINUX_FILE_INTEGRITY_COMMAND_NAME,
+            "windows_file_integrity": NATIVE_RUNTIME_WINDOWS_FILE_INTEGRITY_COMMAND_NAME,
+            "mac_app_builder": NATIVE_RUNTIME_MAC_APP_BUILDER_COMMAND_NAME,
+            "linux_app_builder": NATIVE_RUNTIME_LINUX_APP_BUILDER_COMMAND_NAME,
+            "windows_app_builder": NATIVE_RUNTIME_WINDOWS_APP_BUILDER_COMMAND_NAME,
+        },
+        runtime_player_name=NATIVE_RUNTIME_PLAYER_NAME,
+        requirements_name=NATIVE_RUNTIME_REQUIREMENTS_NAME,
+        build_requirements_name=NATIVE_RUNTIME_BUILD_REQUIREMENTS_NAME,
+    )
+    mac_launcher_path = command_paths["mac_launcher"]
+    linux_launcher_path = command_paths["linux_launcher"]
+    windows_launcher_path = command_paths["windows_launcher"]
+    mac_rc_path = command_paths["mac_release_candidate"]
+    linux_rc_path = command_paths["linux_release_candidate"]
+    windows_rc_path = command_paths["windows_release_candidate"]
+    mac_release_control_path = command_paths["mac_release_control"]
+    linux_release_control_path = command_paths["linux_release_control"]
+    windows_release_control_path = command_paths["windows_release_control"]
+    mac_acceptance_path = command_paths["mac_acceptance"]
+    linux_acceptance_path = command_paths["linux_acceptance"]
+    windows_acceptance_path = command_paths["windows_acceptance"]
+    mac_file_integrity_path = command_paths["mac_file_integrity"]
+    linux_file_integrity_path = command_paths["linux_file_integrity"]
+    windows_file_integrity_path = command_paths["windows_file_integrity"]
+    mac_app_builder_path = command_paths["mac_app_builder"]
+    linux_app_builder_path = command_paths["linux_app_builder"]
+    windows_app_builder_path = command_paths["windows_app_builder"]
     release_check_path = build_dir / NATIVE_RUNTIME_RELEASE_CHECK_NAME
     rc_report_path = build_dir / NATIVE_RUNTIME_RC_REPORT_NAME
     release_control_report_path = build_dir / NATIVE_RUNTIME_RELEASE_CONTROL_REPORT_NAME
@@ -9369,359 +9396,6 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
     asset3d_report_path = build_dir / NATIVE_RUNTIME_3D_ASSET_REPORT_NAME
     asset3d_summary_path = build_dir / NATIVE_RUNTIME_3D_ASSET_SUMMARY_NAME
     asset3d_digest_path = build_dir / NATIVE_RUNTIME_3D_ASSET_DIGEST_NAME
-
-    mac_launcher_path.write_text(
-        "\n".join(
-            [
-                "#!/bin/bash",
-                'set -e',
-                'SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"',
-                'cd "$SCRIPT_DIR"',
-                'python3 runtime_player.py game_data.json || {',
-                '  echo ""',
-                '  echo "原生 Runtime 包没有启动成功。请先确认 Python 3 和 pygame-ce 已安装。"',
-                '  echo "安装命令：python3 -m pip install -r requirements-native-runtime.txt"',
-                '  echo ""',
-                '  read -r -p "按回车关闭..." _',
-                '  exit 1',
-                '}',
-                "",
-            ]
-        ),
-        encoding="utf-8",
-    )
-    linux_launcher_path.write_text(
-        "\n".join(
-            [
-                "#!/bin/bash",
-                'set -e',
-                'SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"',
-                'cd "$SCRIPT_DIR"',
-                'python3 runtime_player.py game_data.json',
-                "",
-            ]
-        ),
-        encoding="utf-8",
-    )
-    windows_launcher_path.write_text(
-        "\r\n".join(
-            [
-                "@echo off",
-                "cd /d %~dp0",
-                "python runtime_player.py game_data.json",
-                "if errorlevel 1 (",
-                "  echo.",
-                "  echo 原生 Runtime 包没有启动成功，请先确认 Python 3 和 pygame-ce 已安装。",
-                "  echo 安装命令：python -m pip install -r requirements-native-runtime.txt",
-                "  pause",
-                ")",
-                "",
-            ]
-        ),
-        encoding="utf-8",
-    )
-    mac_rc_path.write_text(
-        "\n".join(
-            [
-                "#!/bin/bash",
-                "set -e",
-                "set -o pipefail",
-                'SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"',
-                'cd "$SCRIPT_DIR"',
-                'python3 runtime_player.py --release-candidate-report . | tee native-runtime-release-candidate-report.json || {',
-                '  echo ""',
-                '  echo "发布候选检查发现阻塞项，报告已写入 native-runtime-release-candidate-report.json。"',
-                '  echo "请先按报告修复，再继续打包或分发。"',
-                '  echo ""',
-                '  read -r -p "按回车关闭..." _',
-                '  exit 1',
-                '}',
-                'echo ""',
-                'echo "发布候选检查完成，报告已写入 native-runtime-release-candidate-report.json。"',
-                'read -r -p "按回车关闭..." _',
-                "",
-            ]
-        ),
-        encoding="utf-8",
-    )
-    linux_rc_path.write_text(
-        "\n".join(
-            [
-                "#!/bin/bash",
-                "set -e",
-                "set -o pipefail",
-                'SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"',
-                'cd "$SCRIPT_DIR"',
-                'python3 runtime_player.py --release-candidate-report . | tee native-runtime-release-candidate-report.json',
-                "",
-            ]
-        ),
-        encoding="utf-8",
-    )
-    windows_rc_path.write_text(
-        "\r\n".join(
-            [
-                "@echo off",
-                "cd /d %~dp0",
-                "python runtime_player.py --release-candidate-report . > native-runtime-release-candidate-report.json",
-                "if errorlevel 1 (",
-                "  echo.",
-                "  echo 发布候选检查发现阻塞项，报告已写入 native-runtime-release-candidate-report.json。",
-                "  echo 请先按报告修复，再继续打包或分发。",
-                "  pause",
-                "  exit /b 1",
-                ")",
-                "echo.",
-                "echo 发布候选检查完成，报告已写入 native-runtime-release-candidate-report.json。",
-                "pause",
-                "",
-            ]
-        ),
-        encoding="utf-8",
-    )
-    mac_release_control_path.write_text(
-        "\n".join(
-            [
-                "#!/bin/bash",
-                "set -e",
-                'SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"',
-                'cd "$SCRIPT_DIR"',
-                'python3 runtime_player.py --write-release-control-reports . || {',
-                '  echo ""',
-                '  echo "发布总控报告没有生成成功。请先确认 Python 3 和 pygame-ce 已安装。"',
-                '  echo "安装命令：python3 -m pip install -r requirements-native-runtime.txt"',
-                '  echo ""',
-                '  read -r -p "按回车关闭..." _',
-                '  exit 1',
-                '}',
-                'echo ""',
-                'echo "发布总控报告已生成：native-runtime-release-control-report.md / .json"',
-                'read -r -p "按回车关闭..." _',
-                "",
-            ]
-        ),
-        encoding="utf-8",
-    )
-    linux_release_control_path.write_text(
-        "\n".join(
-            [
-                "#!/bin/bash",
-                "set -e",
-                'SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"',
-                'cd "$SCRIPT_DIR"',
-                'python3 runtime_player.py --write-release-control-reports .',
-                "",
-            ]
-        ),
-        encoding="utf-8",
-    )
-    windows_release_control_path.write_text(
-        "\r\n".join(
-            [
-                "@echo off",
-                "cd /d %~dp0",
-                "python runtime_player.py --write-release-control-reports .",
-                "if errorlevel 1 (",
-                "  echo.",
-                "  echo 发布总控报告没有生成成功，请先确认 Python 3 和 pygame-ce 已安装。",
-                "  echo 安装命令：python -m pip install -r requirements-native-runtime.txt",
-                "  pause",
-                "  exit /b 1",
-                ")",
-                "echo.",
-                "echo 发布总控报告已生成：native-runtime-release-control-report.md / .json",
-                "pause",
-                "",
-            ]
-        ),
-        encoding="utf-8",
-    )
-    mac_acceptance_path.write_text(
-        "\n".join(
-            [
-                "#!/bin/bash",
-                "set -e",
-                'SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"',
-                'cd "$SCRIPT_DIR"',
-                'python3 runtime_player.py --write-acceptance-reports . || {',
-                '  echo ""',
-                '  echo "发布验收清单没有生成成功。请先运行发布总控报告和文件完整性校验。"',
-                '  echo "可手动执行：python3 runtime_player.py --write-acceptance-reports ."',
-                '  echo ""',
-                '  read -r -p "按回车关闭..." _',
-                '  exit 1',
-                '}',
-                'echo ""',
-                'echo "发布验收清单已生成：native-runtime-release-acceptance.md / .json"',
-                'read -r -p "按回车关闭..." _',
-                "",
-            ]
-        ),
-        encoding="utf-8",
-    )
-    linux_acceptance_path.write_text(
-        "\n".join(
-            [
-                "#!/bin/bash",
-                "set -e",
-                'SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"',
-                'cd "$SCRIPT_DIR"',
-                'python3 runtime_player.py --write-acceptance-reports .',
-                "",
-            ]
-        ),
-        encoding="utf-8",
-    )
-    windows_acceptance_path.write_text(
-        "\r\n".join(
-            [
-                "@echo off",
-                "cd /d %~dp0",
-                "python runtime_player.py --write-acceptance-reports .",
-                "if errorlevel 1 (",
-                "  echo.",
-                "  echo 发布验收清单没有生成成功，请先运行发布总控报告和文件完整性校验。",
-                "  echo 可手动执行：python runtime_player.py --write-acceptance-reports .",
-                "  pause",
-                "  exit /b 1",
-                ")",
-                "echo.",
-                "echo 发布验收清单已生成：native-runtime-release-acceptance.md / .json",
-                "pause",
-                "",
-            ]
-        ),
-        encoding="utf-8",
-    )
-    mac_file_integrity_path.write_text(
-        "\n".join(
-            [
-                "#!/bin/bash",
-                "set -e",
-                'SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"',
-                'cd "$SCRIPT_DIR"',
-                'python3 runtime_player.py --verify-file-integrity . || {',
-                '  echo ""',
-                '  echo "文件完整性校验未通过。请重新下载或重新导出原生 Runtime 包。"',
-                '  echo ""',
-                '  read -r -p "按回车关闭..." _',
-                '  exit 1',
-                '}',
-                'echo ""',
-                'echo "文件完整性校验通过。"',
-                'read -r -p "按回车关闭..." _',
-                "",
-            ]
-        ),
-        encoding="utf-8",
-    )
-    linux_file_integrity_path.write_text(
-        "\n".join(
-            [
-                "#!/bin/bash",
-                "set -e",
-                'SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"',
-                'cd "$SCRIPT_DIR"',
-                'python3 runtime_player.py --verify-file-integrity .',
-                "",
-            ]
-        ),
-        encoding="utf-8",
-    )
-    windows_file_integrity_path.write_text(
-        "\r\n".join(
-            [
-                "@echo off",
-                "cd /d %~dp0",
-                "python runtime_player.py --verify-file-integrity .",
-                "if errorlevel 1 (",
-                "  echo.",
-                "  echo 文件完整性校验未通过，请重新下载或重新导出原生 Runtime 包。",
-                "  pause",
-                "  exit /b 1",
-                ")",
-                "echo.",
-                "echo 文件完整性校验通过。",
-                "pause",
-                "",
-            ]
-        ),
-        encoding="utf-8",
-    )
-    mac_app_builder_path.write_text(
-        "\n".join(
-            [
-                "#!/bin/bash",
-                "set -e",
-                'SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"',
-                'cd "$SCRIPT_DIR"',
-                'python3 -m pip install -r requirements-native-runtime.txt -r requirements-native-runtime-build.txt',
-                'python3 build_native_runtime_app.py --mode onedir . || {',
-                '  echo ""',
-                '  echo "原生 Runtime 应用打包没有完成。请确认 Python 3、pygame-ce 和 PyInstaller 已安装。"',
-                '  echo "可手动执行：python3 build_native_runtime_app.py --mode onedir ."',
-                '  echo ""',
-                '  read -r -p "按回车关闭..." _',
-                '  exit 1',
-                '}',
-                'echo ""',
-                'echo "打包完成，输出目录：native_app_dist/"',
-                'echo "同时会生成 native_app_package_manifest.json 和平台 Preview zip。"',
-                'read -r -p "按回车关闭..." _',
-                "",
-            ]
-        ),
-        encoding="utf-8",
-    )
-    linux_app_builder_path.write_text(
-        "\n".join(
-            [
-                "#!/bin/bash",
-                "set -e",
-                'SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"',
-                'cd "$SCRIPT_DIR"',
-                'python3 -m pip install -r requirements-native-runtime.txt -r requirements-native-runtime-build.txt',
-                'python3 build_native_runtime_app.py --mode onedir .',
-                "",
-            ]
-        ),
-        encoding="utf-8",
-    )
-    windows_app_builder_path.write_text(
-        "\r\n".join(
-            [
-                "@echo off",
-                "cd /d %~dp0",
-                "python -m pip install -r requirements-native-runtime.txt -r requirements-native-runtime-build.txt",
-                "python build_native_runtime_app.py --mode onedir .",
-                "if errorlevel 1 (",
-                "  echo.",
-                "  echo 原生 Runtime 应用打包没有完成，请确认 Python 3、pygame-ce 和 PyInstaller 已安装。",
-                "  echo 可手动执行：python build_native_runtime_app.py --mode onedir .",
-                "  pause",
-                "  exit /b 1",
-                ")",
-                "echo.",
-                "echo 打包完成，输出目录：native_app_dist\\",
-                "echo 同时会生成 native_app_package_manifest.json 和平台 Preview zip。",
-                "pause",
-                "",
-            ]
-        ),
-        encoding="utf-8",
-    )
-    mac_launcher_path.chmod(0o755)
-    linux_launcher_path.chmod(0o755)
-    mac_rc_path.chmod(0o755)
-    linux_rc_path.chmod(0o755)
-    mac_release_control_path.chmod(0o755)
-    linux_release_control_path.chmod(0o755)
-    mac_acceptance_path.chmod(0o755)
-    linux_acceptance_path.chmod(0o755)
-    mac_file_integrity_path.chmod(0o755)
-    linux_file_integrity_path.chmod(0o755)
-    mac_app_builder_path.chmod(0o755)
-    linux_app_builder_path.chmod(0o755)
 
     release_check = subprocess.run(
         [
