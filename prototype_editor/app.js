@@ -163,6 +163,7 @@ const {
 } = scriptReadabilityTools;
 const scriptVoiceTools = window.CanvasiaEditorScriptVoice;
 const voiceMatchReviewPanelTools = window.CanvasiaEditorVoiceMatchReviewPanel;
+const characterPresentationPanelTools = window.CanvasiaEditorCharacterPresentationPanel;
 const visualEffectTools = window.CanvasiaEditorVisualEffects;
 const particleEffectTools = window.CanvasiaEditorParticleEffects;
 const {
@@ -17920,209 +17921,38 @@ function renderCharacterPresentationPanel(character) {
     .map((assetId) => state.data.assetsById.get(assetId)?.name ?? assetId)
     .join(" / ");
 
-  return `
-    <article class="detail-card character-presentation-panel">
-      <div class="character-scene-panel-head">
-        <div>
-          <strong>高级角色表现</strong>
-          <p class="helper-text">这里统一管理普通立绘、差分立绘、Live2D 和 3D 模型。现在先保存配置和兜底关系，后续渲染层会直接读取这套结构。</p>
-        </div>
-        <div class="scene-card-tags">
-          <span class="issue-tag ${status.tone}">${escapeHtml(status.label)}</span>
-          <span class="issue-tag">${escapeHtml(getCharacterPresentationModeLabel(character))}</span>
-        </div>
-      </div>
-      <div class="playback-setting-grid dialog-config-grid">
-        <label class="playback-setting">
-          <span>表现类型</span>
-          <select id="characterPresentationModeSelect">
-            ${Object.entries(CHARACTER_PRESENTATION_MODE_LABELS)
-              .map(
-                ([mode, label]) => `
-                  <option value="${mode}" ${presentation.mode === mode ? "selected" : ""}>${escapeHtml(label)}</option>
-                `
-              )
-              .join("")}
-          </select>
-        </label>
-        <label class="playback-setting">
-          <span>兜底立绘</span>
-          <select id="characterPresentationFallbackSpriteSelect">
-            ${buildGameUiAssetSelectOptions(presentation.fallbackSpriteAssetId, ["sprite", "cg", "ui"], "沿用角色默认立绘")}
-          </select>
-        </label>
-        <label class="playback-setting">
-          <span>Live2D 模型入口</span>
-          <select id="characterPresentationLive2dAssetSelect">
-            ${buildGameUiAssetSelectOptions(presentation.live2d.modelAssetId, ["live2d"], "暂不绑定 Live2D")}
-          </select>
-        </label>
-        <label class="playback-setting">
-          <span>3D 模型入口</span>
-          <select id="characterPresentationModel3dAssetSelect">
-            ${buildGameUiAssetSelectOptions(presentation.model3d.modelAssetId, ["model3d"], "暂不绑定 3D 模型")}
-          </select>
-        </label>
-        <label class="playback-setting">
-          <span>Live2D 待机动作</span>
-          <input id="characterPresentationLive2dIdleInput" type="text" value="${escapeHtml(presentation.live2d.idleMotion)}" placeholder="Idle / idle_01" />
-        </label>
-        <label class="playback-setting">
-          <span>3D 待机动画</span>
-          <input id="characterPresentationModel3dIdleInput" type="text" value="${escapeHtml(presentation.model3d.idleAnimation)}" placeholder="Idle / Stand / Breathing" />
-        </label>
-      </div>
-      <div class="scene-card-tags">
-        <label class="issue-tag">
-          <input id="characterPresentationLive2dBlinkInput" type="checkbox" ${presentation.live2d.blink ? "checked" : ""} />
-          自动眨眼
-        </label>
-        <label class="issue-tag">
-          <input id="characterPresentationLive2dBreathInput" type="checkbox" ${presentation.live2d.breath ? "checked" : ""} />
-          呼吸
-        </label>
-        <label class="issue-tag">
-          <input id="characterPresentationLive2dLipSyncInput" type="checkbox" ${presentation.live2d.lipSync ? "checked" : ""} />
-          口型同步
-        </label>
-        <label class="issue-tag">
-          <input id="characterPresentationLive2dCursorInput" type="checkbox" ${presentation.live2d.cursorTracking ? "checked" : ""} />
-          视线跟随
-        </label>
-      </div>
-      <p class="helper-text">${escapeHtml(status.detail)}</p>
-      <p class="helper-text">已纳入引用保护：${boundAssetNames ? escapeHtml(boundAssetNames) : "当前还没有额外模型素材绑定"}。</p>
-      ${renderCharacterPresentationReadinessPanel(character, readiness)}
-      ${renderCharacterExpressionBindingPanel(character)}
-      <div class="detail-actions">
-        <button
-          type="button"
-          class="toolbar-button toolbar-button-primary"
-          data-action="save-character-presentation"
-          data-character-id="${character.id}"
-        >
-          保存角色表现配置
-        </button>
-        <button type="button" class="toolbar-button" data-action="focus-asset-gap" data-asset-filter-mode="all" data-asset-type="live2d">
-          去导入 Live2D
-        </button>
-        <button type="button" class="toolbar-button" data-action="focus-asset-gap" data-asset-filter-mode="all" data-asset-type="model3d">
-          去导入 3D 模型
-        </button>
-      </div>
-    </article>
-  `;
+  return characterPresentationPanelTools.renderCharacterPresentationPanel(
+    {
+      character,
+      presentation,
+      status,
+      readiness,
+      boundAssetNames,
+      modeLabels: CHARACTER_PRESENTATION_MODE_LABELS,
+    },
+    {
+      escapeHtml,
+      buildGameUiAssetSelectOptions,
+      getCharacterPresentationModeLabel,
+      renderStatCard,
+      getCharacterExpressionBindingStatus,
+    }
+  );
 }
 
 function renderCharacterPresentationReadinessPanel(character, readiness = buildCharacterPresentationReadiness(character)) {
-  const issueItems = readiness.issues.length
-    ? readiness.issues
-    : [
-        {
-          tone: "good-text",
-          title: "角色表现链路已经比较稳",
-          detail: "模型入口、兜底素材和表情映射都已经达到当前阶段的可迁移标准。",
-        },
-      ];
-  return `
-    <div class="character-presentation-readiness">
-      <div class="character-progress-card">
-        <div class="character-progress-head">
-          <strong>角色表现体检 ${readiness.score}%</strong>
-          <span class="${readiness.tone}">${escapeHtml(getCharacterPresentationModeLabel(character))}</span>
-        </div>
-        <div class="character-progress-track">
-          <span class="character-progress-fill" style="width:${readiness.score}%;"></span>
-        </div>
-        <div class="character-progress-meta">
-          <span>主素材：${escapeHtml(readiness.primaryHealth.label)}</span>
-          <span>兜底：${escapeHtml(readiness.fallbackHealth.label)}</span>
-          <span>映射：${readiness.mappedExpressionCount}/${readiness.expressionCount || 0}</span>
-        </div>
-      </div>
-      <div class="summary-grid character-summary-grid">
-        ${renderStatCard("体检分", `${readiness.score}%`)}
-        ${renderStatCard("主素材", readiness.primaryHealth.ok ? "可用" : readiness.primaryHealth.asset ? "待补文件" : "未绑定")}
-        ${renderStatCard("兜底素材", readiness.fallbackHealth.ok ? "安全" : readiness.fallbackHealth.asset ? "待补文件" : "未绑定")}
-        ${renderStatCard("表情映射", `${readiness.mappedExpressionCount}/${readiness.expressionCount || 0}`)}
-      </div>
-      <div class="character-presentation-issue-list">
-        ${issueItems
-          .map(
-            (issue) => `
-              <article class="character-presentation-issue">
-                <span class="issue-tag ${issue.tone}">${escapeHtml(issue.title)}</span>
-                <p class="helper-text">${escapeHtml(issue.detail)}</p>
-              </article>
-            `
-          )
-          .join("")}
-      </div>
-    </div>
-  `;
+  return characterPresentationPanelTools.renderCharacterPresentationReadinessPanel(character, readiness, {
+    escapeHtml,
+    getCharacterPresentationModeLabel,
+    renderStatCard,
+  });
 }
 
 function renderCharacterExpressionBindingPanel(character) {
-  const expressions = character?.expressions ?? [];
-  if (!expressions.length) {
-    return `
-      <div class="character-expression-binding-shell">
-        <strong>表情映射</strong>
-        <p class="helper-text">这个角色还没有表情条目。先保留兜底立绘配置，后续补表情后可以逐个绑定 Live2D 表情、动作或 3D 动画。</p>
-      </div>
-    `;
-  }
-
-  return `
-    <div class="character-expression-binding-shell">
-      <div class="character-expression-binding-head">
-        <strong>表情级映射</strong>
-        <span class="helper-text">可选项：不给新手增加负担，但高级项目可以逐个表情绑定 Live2D/3D 动作。</span>
-      </div>
-      <div class="character-expression-binding-grid">
-        ${expressions
-          .map((expression) => {
-            const bindingStatus = getCharacterExpressionBindingStatus(expression);
-            return `
-              <article class="character-expression-binding-card" data-expression-id="${escapeHtml(expression.id)}">
-                <div class="character-expression-binding-title">
-                  <strong>${escapeHtml(expression.name || expression.id)}</strong>
-                  <span class="issue-tag ${bindingStatus.tone}">${escapeHtml(bindingStatus.label)}</span>
-                </div>
-                <label class="playback-setting">
-                  <span>差分图层素材 ID</span>
-                  <input
-                    class="characterExpressionLayerAssetsInput"
-                    type="text"
-                    value="${escapeHtml((expression.layerAssetIds ?? []).join(", "))}"
-                    placeholder="sprite_hair, sprite_eye, sprite_mouth"
-                  />
-                </label>
-                <div class="character-expression-binding-fields">
-                  <label class="playback-setting">
-                    <span>Live2D 表情</span>
-                    <input class="characterExpressionLive2dExpressionInput" type="text" value="${escapeHtml(expression.live2dExpression ?? "")}" placeholder="smile.exp3.json / smile" />
-                  </label>
-                  <label class="playback-setting">
-                    <span>Live2D 动作</span>
-                    <input class="characterExpressionLive2dMotionInput" type="text" value="${escapeHtml(expression.live2dMotion ?? "")}" placeholder="tap_body.motion3.json / idle_01" />
-                  </label>
-                  <label class="playback-setting">
-                    <span>3D 表情</span>
-                    <input class="characterExpressionModel3dExpressionInput" type="text" value="${escapeHtml(expression.model3dExpression ?? "")}" placeholder="joy / blink / aa" />
-                  </label>
-                  <label class="playback-setting">
-                    <span>3D 动画</span>
-                    <input class="characterExpressionModel3dAnimationInput" type="text" value="${escapeHtml(expression.model3dAnimation ?? "")}" placeholder="Wave / IdleHappy / Talk" />
-                  </label>
-                </div>
-              </article>
-            `;
-          })
-          .join("")}
-      </div>
-    </div>
-  `;
+  return characterPresentationPanelTools.renderCharacterExpressionBindingPanel(character, {
+    escapeHtml,
+    getCharacterExpressionBindingStatus,
+  });
 }
 
 function renderCharacterOverview(character, stats) {

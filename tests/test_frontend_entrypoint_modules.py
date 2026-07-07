@@ -73,6 +73,7 @@ class FrontendEntrypointModuleTests(unittest.TestCase):
             "./modules/asset_catalog.js",
             "./modules/beginner_assets_guide.js",
             "./modules/beginner_character_guide.js",
+            "./modules/character_presentation_panel.js",
             "./modules/asset_footprint.js",
             "./modules/runtime_preload_budget.js",
             "./modules/asset_dependency_sheet.js",
