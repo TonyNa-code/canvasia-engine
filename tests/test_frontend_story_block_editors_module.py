@@ -388,6 +388,13 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
                   endLabel: "第 9 张",
                   countLabel: "覆盖 8 张",
                 }}),
+                getMusicRangeDiagnostics: () => ({{
+                  tone: "good",
+                  label: "自定义范围有效",
+                  hint: "会覆盖 8 张卡片，结束后按设置淡出。",
+                  spanCount: 8,
+                }}),
+                renderMusicRangeHealthChips: (diagnostics) => `<section data-range-health="${{diagnostics.tone}}">${{diagnostics.label}} / ${{diagnostics.hint}}</section>`,
                 renderMusicEndModeOptions: (selected) => `<option value="${{selected}}" selected>${{selected}}</option>`,
                 renderMusicRangeEndBlockOptions: (block) => `<option value="${{block.endBlockId}}" selected>结束卡片</option>`,
               }}
@@ -601,9 +608,13 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
         self.assertIn("当前覆盖范围", payload["musicMarkup"])
         self.assertIn("music-range-timeline", payload["musicMarkup"])
         self.assertIn("data-music-range-start", payload["musicMarkup"])
+        self.assertIn("data-music-range-summary", payload["musicMarkup"])
         self.assertIn("第 2 张", payload["musicMarkup"])
         self.assertIn("覆盖 8 张", payload["musicMarkup"])
         self.assertIn("范围到：block_9", payload["musicMarkup"])
+        self.assertIn('data-range-health="good"', payload["musicMarkup"])
+        self.assertIn("自定义范围有效", payload["musicMarkup"])
+        self.assertIn("会覆盖 8 张卡片，结束后按设置淡出。", payload["musicMarkup"])
         self.assertIn("editorMusicVolume", payload["musicMarkup"])
         self.assertIn('value="45"', payload["musicMarkup"])
         self.assertIn('value="1200"', payload["musicMarkup"])

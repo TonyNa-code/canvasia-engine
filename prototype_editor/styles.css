@@ -4618,6 +4618,37 @@ button.asset-gap-stat-card:hover {
   line-height: 1.55;
 }
 
+.music-range-health {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 2px;
+}
+
+.music-range-health .issue-tag {
+  border-color: rgba(121, 220, 255, 0.22);
+  background: rgba(9, 18, 32, 0.58);
+  color: var(--muted);
+}
+
+.music-range-health.is-good .issue-tag {
+  border-color: rgba(74, 222, 128, 0.26);
+  background: rgba(34, 197, 94, 0.12);
+  color: var(--success);
+}
+
+.music-range-health.is-warn .issue-tag {
+  border-color: rgba(251, 191, 36, 0.28);
+  background: rgba(251, 191, 36, 0.12);
+  color: var(--warning);
+}
+
+.music-range-health.is-danger .issue-tag {
+  border-color: rgba(248, 113, 113, 0.28);
+  background: rgba(248, 113, 113, 0.12);
+  color: var(--danger);
+}
+
 @media (max-width: 720px) {
   .music-range-timeline {
     grid-template-columns: 1fr;
@@ -4650,6 +4681,30 @@ html[data-ui-theme="light"] .music-range-timeline em {
 html[data-ui-theme="light"] .music-range-timeline em {
   color: #2563eb;
   background: rgba(219, 234, 254, 0.72);
+}
+
+html[data-ui-theme="light"] .music-range-health .issue-tag {
+  border-color: rgba(83, 144, 255, 0.16);
+  background: rgba(239, 246, 255, 0.78);
+  color: #365f91;
+}
+
+html[data-ui-theme="light"] .music-range-health.is-good .issue-tag {
+  border-color: rgba(22, 163, 74, 0.18);
+  background: rgba(220, 252, 231, 0.82);
+  color: #15803d;
+}
+
+html[data-ui-theme="light"] .music-range-health.is-warn .issue-tag {
+  border-color: rgba(217, 119, 6, 0.2);
+  background: rgba(254, 243, 199, 0.82);
+  color: #a16207;
+}
+
+html[data-ui-theme="light"] .music-range-health.is-danger .issue-tag {
+  border-color: rgba(220, 38, 38, 0.2);
+  background: rgba(254, 226, 226, 0.84);
+  color: #b91c1c;
 }
 
 .stage-preset-grid {

@@ -19,6 +19,7 @@ class FrontendEntrypointModuleTests(unittest.TestCase):
         required_scripts = [
             "./modules/story_block_catalog.js",
             "./modules/story_block_editors.js",
+            "./modules/music_range_scope.js",
             "./modules/story_templates.js",
             "./modules/editor_common.js",
             "./modules/export_file_names.js",

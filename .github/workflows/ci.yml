@@ -70,6 +70,7 @@ jobs:
             tests/test_frontend_beginner_assets_guide_module.py \
             tests/test_frontend_beginner_character_guide_module.py \
             tests/test_frontend_character_presentation_panel_module.py \
+            tests/test_frontend_music_range_scope_module.py \
             tests/test_frontend_beginner_tutorial_module.py \
             tests/test_frontend_choice_consequence_sheet_module.py \
             tests/test_frontend_command_palette_module.py \
@@ -158,6 +159,7 @@ jobs:
           node --check prototype_editor/modules/beginner_assets_guide.js
           node --check prototype_editor/modules/beginner_character_guide.js
           node --check prototype_editor/modules/character_presentation_panel.js
+          node --check prototype_editor/modules/music_range_scope.js
           node --check prototype_editor/modules/beginner_tutorial.js
           node --check prototype_editor/modules/choice_consequence_sheet.js
           node --check prototype_editor/modules/command_palette.js
@@ -254,6 +256,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_beginner_assets_guide_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_beginner_character_guide_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_character_presentation_panel_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_music_range_scope_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_beginner_tutorial_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_choice_consequence_sheet_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_command_palette_module.py' -v

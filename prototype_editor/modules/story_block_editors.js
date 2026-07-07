@@ -820,6 +820,8 @@
       endLabel: "后续剧情",
       countLabel: "按设置覆盖",
     }));
+    const getMusicRangeDiagnostics = getRenderer(options, "getMusicRangeDiagnostics", () => null);
+    const renderMusicRangeHealthChips = getRenderer(options, "renderMusicRangeHealthChips", () => "");
     const renderMusicEndModeOptions = getRenderer(options, "renderMusicEndModeOptions");
     const renderMusicRangeEndBlockOptions = getRenderer(options, "renderMusicRangeEndBlockOptions");
     const assetId = getSafeAssetIdByType("bgm", block?.assetId);
@@ -827,6 +829,7 @@
     const hasRangeCandidates = Boolean(options.hasRangeCandidates);
     const isCustomRange = endMode === "after_block";
     const rangeTimeline = getMusicRangeTimeline(block);
+    const rangeDiagnostics = getMusicRangeDiagnostics(block);
 
     return `
     <article class="editor-card">
@@ -880,8 +883,9 @@
           <span data-music-range-end>${escape(rangeTimeline.endLabel)}</span>
           <em data-music-range-count>${escape(rangeTimeline.countLabel)}</em>
         </div>
-        <span>${escape(getMusicRangeSummary(block))}</span>
+        <span data-music-range-summary>${escape(getMusicRangeSummary(block))}</span>
       </div>
+      ${renderMusicRangeHealthChips(rangeDiagnostics)}
       <div class="detail-row">
         <label for="editorFadeInMs">淡入时间（毫秒）</label>
         <input id="editorFadeInMs" type="number" min="0" step="100" value="${escape(
