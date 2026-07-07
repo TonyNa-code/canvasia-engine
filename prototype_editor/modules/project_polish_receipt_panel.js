@@ -63,6 +63,8 @@
     const scenePlans = Array.isArray(receipt.scenePlans) ? receipt.scenePlans : [];
     const projectOperationCount = Math.max(0, Number(receipt.projectOperationCount) || 0);
     const projectOperations = Array.isArray(receipt.projectOperations) ? receipt.projectOperations.slice(0, 4) : [];
+    const pacingSnapshot = receipt.pacingSnapshot && typeof receipt.pacingSnapshot === "object" ? receipt.pacingSnapshot : null;
+    const pacingHighlights = Array.isArray(pacingSnapshot?.sceneHighlights) ? pacingSnapshot.sceneHighlights.slice(0, 3) : [];
     const visibleScenes = scenePlans.slice(0, 4);
     const hiddenSceneCount = Math.max(0, scenePlans.length - visibleScenes.length);
     const nextActions = Array.isArray(receipt.nextActions)
@@ -112,6 +114,20 @@
           </article>
         `
         : '<div class="empty-note">这次没有项目级设置补全。</div>';
+    const pacingMarkup = pacingHighlights.length
+      ? pacingHighlights
+          .map(
+            (scene) => `
+              <article class="project-doctor-receipt-item project-one-click-polish-scene">
+                <strong>${html(scene.sceneName || scene.sceneId || "未命名场景")} · ${html(scene.gradeLabel || "待打磨")}</strong>
+                <span>${html(scene.issueSummary || scene.headline || scene.actionSummary || "建议试玩复看。")}</span>
+              </article>
+            `
+          )
+          .join("")
+      : pacingSnapshot
+        ? '<div class="empty-note">节奏体检没有发现需要优先复看的场景。</div>'
+        : '<div class="empty-note">本次没有启用节奏体检。</div>';
 
     return `
       <section class="panel project-one-click-polish-receipt-panel">
@@ -135,6 +151,15 @@
             ${renderMetric("长文本", `${receipt.readableSplitCount ?? 0} 处`, `新增 ${receipt.readableAddedBlockCount ?? 0} 张卡片`)}
             ${renderMetric("演出与音频", `${receipt.presentationChangedFieldCount ?? 0} / ${receipt.audioOperationCount ?? 0}`, "演出参数 / 音频参数")}
             ${renderMetric("项目设置", `${projectOperationCount} 项`, "存档 / 文本框 / UI")}
+            ${renderMetric(
+              "节奏体检",
+              receipt.pacingAverageScore === null || typeof receipt.pacingAverageScore === "undefined"
+                ? "未启用"
+                : `${receipt.pacingAverageScore} 分`,
+              pacingSnapshot
+                ? `待打磨 ${receipt.pacingRoughSceneCount ?? 0} / 可试玩 ${receipt.pacingReadySceneCount ?? 0}`
+                : "可在完整打磨中启用"
+            )}
           </div>
           <div class="preview-sprint-actions project-one-click-polish-actions">
             ${nextActions.map((action, index) => renderAction(action, index === 0)).join("")}
@@ -173,6 +198,12 @@
                         .join("")
                     : '<div class="empty-note">打开项目巡检并重新试玩一遍。</div>'
                 }
+              </div>
+            </div>
+            <div>
+              <strong class="project-doctor-receipt-heading">节奏复看</strong>
+              <div class="project-doctor-receipt-list">
+                ${pacingMarkup}
               </div>
             </div>
           </div>

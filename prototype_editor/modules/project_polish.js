@@ -3,6 +3,7 @@
 
   const scriptReadabilityTools = global.CanvasiaEditorScriptReadability || {};
   const scenePolishTools = global.CanvasiaEditorScenePolish || {};
+  const scenePacingAdvisorTools = global.CanvasiaEditorScenePacingAdvisor || {};
   const audioCueSheetTools = global.CanvasiaEditorAudioCueSheet || {};
   const projectSettingsTools = global.CanvasiaEditorProjectSettings || {};
   const dialogBoxReadabilityTools = global.CanvasiaEditorDialogBoxReadability || {};
@@ -273,6 +274,59 @@
     return `发布前整理完成：${parts.join("；")}`;
   }
 
+  function buildProjectPacingSnapshot(data = {}, options = {}) {
+    if (
+      typeof scenePacingAdvisorTools.analyzeScenePacing !== "function" ||
+      typeof scenePacingAdvisorTools.aggregateScenePacingAnalyses !== "function"
+    ) {
+      return null;
+    }
+
+    const analyses = getSceneList(data).map((scene, index) => {
+      const analysis = scenePacingAdvisorTools.analyzeScenePacing(scene, options);
+      return {
+        ...analysis,
+        sceneId: getSceneId(scene, `scene_${index + 1}`),
+        sceneName: getSceneName(scene, `场景 ${index + 1}`),
+        chapterName: cleanText(scene.chapterName),
+      };
+    });
+    const aggregate = scenePacingAdvisorTools.aggregateScenePacingAnalyses(analyses);
+    const sceneHighlights = analyses
+      .filter((analysis) => ["rough", "needs_polish"].includes(analysis.grade?.id))
+      .sort((left, right) => (left.score ?? 0) - (right.score ?? 0))
+      .slice(0, Math.max(1, Number(options.sceneLimit) || 4))
+      .map((analysis) => ({
+        sceneId: analysis.sceneId,
+        sceneName: compactText(analysis.sceneName, analysis.sceneId, 120),
+        chapterName: compactText(analysis.chapterName, "", 120),
+        score: Math.max(0, Number(analysis.score) || 0),
+        gradeLabel: cleanText(analysis.grade?.label, "待打磨"),
+        headline: compactText(analysis.headline, "这一场建议试玩复看。", 160),
+        issueSummary: toArray(analysis.issues)
+          .slice(0, 3)
+          .map((issue) => cleanText(issue.title))
+          .filter(Boolean)
+          .join(" / "),
+        actionSummary: toArray(analysis.actions).slice(0, 3).join(" / ") || "试玩确认",
+      }));
+
+    return {
+      sceneCount: aggregate.sceneCount,
+      averageScore: aggregate.averageScore,
+      roughSceneCount: aggregate.roughSceneCount,
+      readySceneCount: aggregate.readySceneCount,
+      topIssues: toArray(aggregate.topIssues)
+        .slice(0, Math.max(1, Number(options.issueLimit) || 4))
+        .map((issue) => ({
+          code: cleanText(issue.code),
+          title: compactText(issue.title, "节奏问题", 120),
+          count: Math.max(0, Number(issue.count) || 0),
+        })),
+      sceneHighlights,
+    };
+  }
+
   function getProjectRuntimeSettings(project = {}) {
     if (typeof projectSettingsTools.getProjectRuntimeSettings === "function") {
       return projectSettingsTools.getProjectRuntimeSettings(project);
@@ -511,6 +565,10 @@
       buildDataWithScenes(data, sceneStore, sceneOrder),
       projectSettingsOptions
     );
+    const pacingSnapshot = buildProjectPacingSnapshot(
+      buildDataWithScenes(data, sceneStore, sceneOrder),
+      options.pacing ?? {}
+    );
 
     const orderedSceneIds = sceneOrder.filter((sceneId) => sceneEdits.has(sceneId));
     sceneEdits.forEach((_edit, sceneId) => {
@@ -546,6 +604,10 @@
       projectOperationCount: projectSettingsPlan.operationCount,
       projectOperations: projectSettingsPlan.operations,
       projectPatch: projectSettingsPlan.projectPatch,
+      pacingSnapshot,
+      pacingAverageScore: pacingSnapshot?.averageScore ?? null,
+      pacingRoughSceneCount: pacingSnapshot?.roughSceneCount ?? 0,
+      pacingReadySceneCount: pacingSnapshot?.readySceneCount ?? 0,
       runtimeSettingOperationCount: projectSettingsPlan.runtimeOperationCount,
       dialogBoxOperationCount: projectSettingsPlan.dialogBoxOperationCount,
       gameUiOperationCount: projectSettingsPlan.gameUiOperationCount,
@@ -557,6 +619,7 @@
         presentation: presentationPlan,
         audio: audioPlan,
         projectSettings: projectSettingsPlan,
+        pacing: pacingSnapshot,
       },
     };
     plan.totalOperationCount =
@@ -629,9 +692,28 @@
       runtimeSettingOperationCount: Math.max(0, Number(plan.runtimeSettingOperationCount) || 0),
       dialogBoxOperationCount: Math.max(0, Number(plan.dialogBoxOperationCount) || 0),
       gameUiOperationCount: Math.max(0, Number(plan.gameUiOperationCount) || 0),
+      pacingSnapshot: plan.pacingSnapshot ?? null,
+      pacingAverageScore:
+        plan.pacingAverageScore === null || typeof plan.pacingAverageScore === "undefined"
+          ? null
+          : Math.max(0, Number(plan.pacingAverageScore) || 0),
+      pacingRoughSceneCount: Math.max(0, Number(plan.pacingRoughSceneCount) || 0),
+      pacingReadySceneCount: Math.max(0, Number(plan.pacingReadySceneCount) || 0),
       scenePlans,
       projectOperations,
-      nextActions,
+      nextActions:
+        Math.max(0, Number(plan.pacingRoughSceneCount) || 0) > 0
+          ? [
+              ...nextActions.slice(0, 2),
+              {
+                label: "复看节奏问题",
+                action: "switch-screen",
+                screen: "preview",
+                detail: `还有 ${Math.max(0, Number(plan.pacingRoughSceneCount) || 0)} 个场景建议试玩复看。`,
+              },
+              ...nextActions.slice(2),
+            ]
+          : nextActions,
     };
     return receipt;
   }
@@ -672,6 +754,14 @@
         ["演出参数", `${receipt.presentationChangedFieldCount ?? 0} 项`],
         ["音频参数", `${receipt.audioOperationCount ?? 0} 项`],
         ["项目级设置", `${receipt.projectOperationCount ?? 0} 项`],
+        [
+          "节奏体检",
+          receipt.pacingAverageScore === null || typeof receipt.pacingAverageScore === "undefined"
+            ? "未启用"
+            : `平均 ${receipt.pacingAverageScore} 分；待打磨 ${receipt.pacingRoughSceneCount ?? 0} 个；可试玩 ${
+                receipt.pacingReadySceneCount ?? 0
+              } 个`,
+        ],
       ]
     );
     const sceneRows = toArray(receipt.scenePlans).map((scenePlan) => [
@@ -690,6 +780,20 @@
       operation.detail || "-",
     ]);
     const projectTable = buildMarkdownTable(["项目级补全", "领域", "字段", "说明"], projectRows);
+    const pacingSnapshot = receipt.pacingSnapshot && typeof receipt.pacingSnapshot === "object" ? receipt.pacingSnapshot : null;
+    const pacingRows = toArray(pacingSnapshot?.sceneHighlights).map((scene) => [
+      scene.sceneName || scene.sceneId || "未命名场景",
+      scene.score ?? 0,
+      scene.gradeLabel || "待打磨",
+      scene.issueSummary || scene.headline || "-",
+      scene.actionSummary || "试玩确认",
+    ]);
+    const pacingIssueRows = toArray(pacingSnapshot?.topIssues).map((issue) => [
+      issue.title || issue.code || "节奏问题",
+      issue.count ?? 0,
+    ]);
+    const pacingTable = buildMarkdownTable(["场景", "分数", "阶段", "主要问题", "建议动作"], pacingRows);
+    const pacingIssueTable = buildMarkdownTable(["高频节奏问题", "出现次数"], pacingIssueRows);
     const nextActions = toArray(receipt.nextActions).length
       ? receipt.nextActions.map((action, index) => `${index + 1}. ${getReceiptNextActionLabel(action)}`)
       : ["1. 打开项目巡检并重新试玩。"];
@@ -712,6 +816,18 @@
       "## 项目级补全",
       "",
       projectTable || "本次没有项目级设置补全。",
+      "",
+      "## 节奏体检",
+      "",
+      receipt.pacingAverageScore === null || typeof receipt.pacingAverageScore === "undefined"
+        ? "本次没有启用节奏体检。"
+        : `平均节奏分：${receipt.pacingAverageScore}；待打磨场景：${receipt.pacingRoughSceneCount ?? 0}；可试玩场景：${
+            receipt.pacingReadySceneCount ?? 0
+          }。`,
+      "",
+      pacingTable || "没有需要优先复看的节奏场景。",
+      "",
+      pacingIssueTable || "没有明显高频节奏问题。",
       "",
       "## 后续建议",
       "",
@@ -746,7 +862,15 @@
       receipt.safetySnapshotLabel ? `安全检查点：${receipt.safetySnapshotLabel}` : "",
       `涉及场景：${receipt.changedSceneCount ?? 0} 个；处理项：${receipt.totalOperationCount ?? 0} 项`,
       (receipt.projectOperationCount ?? 0) > 0 ? `项目级补全：${receipt.projectOperationCount} 项` : "",
+      receipt.pacingAverageScore === null || typeof receipt.pacingAverageScore === "undefined"
+        ? ""
+        : `节奏体检：平均 ${receipt.pacingAverageScore} 分，待打磨 ${receipt.pacingRoughSceneCount ?? 0} 个，可试玩 ${
+            receipt.pacingReadySceneCount ?? 0
+          } 个`,
       ...sceneLines,
+      ...toArray(receipt.pacingSnapshot?.sceneHighlights)
+        .slice(0, 3)
+        .map((scene) => `- 节奏复看：${scene.sceneName || scene.sceneId}：${scene.issueSummary || scene.headline || "试玩确认"}`),
       ...toArray(receipt.projectOperations)
         .slice(0, 4)
         .map((operation) => `- ${operation.label || "项目设置"}：${operation.detail || "已补齐安全默认值。"}`),
@@ -765,14 +889,22 @@
 
     return {
       canApply: plan.changed,
-      actionLabel: plan.changed ? `一键发布前整理 ${plan.totalOperationCount} 项` : "发布前整理已完成",
+      actionLabel: plan.changed
+        ? `一键发布前整理 ${plan.totalOperationCount} 项`
+        : plan.pacingRoughSceneCount > 0
+          ? "发布前整理已完成，建议复看节奏"
+          : "发布前整理已完成",
       badgeLabel: plan.changed
         ? `${plan.changedSceneCount} 个场景 / ${plan.projectOperationCount} 项设置`
+        : plan.pacingRoughSceneCount > 0
+          ? `${plan.pacingRoughSceneCount} 个场景待试玩`
         : "无需处理",
       helperText: plan.changed
         ? `会依次处理长文本、基础演出、音频范围和项目级基础体验；涉及 ${
             previewNames.length ? previewNames.join("、") : "项目设置"
           }${plan.changedSceneCount > previewNames.length ? " 等场景" : ""}。`
+        : plan.pacingRoughSceneCount > 0
+          ? `自动整理项已完成；节奏体检平均 ${plan.pacingAverageScore} 分，还有 ${plan.pacingRoughSceneCount} 个场景建议试玩复看。`
         : "全项目长文本、基础演出、音频范围和项目级基础体验已经比较适合发布前检查。",
       plan,
     };
@@ -780,6 +912,7 @@
 
   global.CanvasiaEditorProjectPolish = Object.freeze({
     buildProjectSettingsPolishPlan,
+    buildProjectPacingSnapshot,
     buildProjectOneClickPolishPlan,
     buildProjectOneClickPolishSummary,
     getProjectOneClickPolishDigest,

@@ -33,6 +33,15 @@ class FrontendProjectPolishReceiptPanelModuleTests(unittest.TestCase):
               presentationChangedFieldCount: 3,
               audioOperationCount: 2,
               projectOperationCount: 1,
+              pacingAverageScore: 63,
+              pacingRoughSceneCount: 2,
+              pacingReadySceneCount: 3,
+              pacingSnapshot: {{
+                sceneHighlights: [
+                  {{ sceneName: "走廊", gradeLabel: "需要打磨", issueSummary: "缺少视觉锚点 / 连续文本过长" }},
+                  {{ sceneName: "屋顶", gradeLabel: "还像草稿", issueSummary: "缺少 BGM" }},
+                ],
+              }},
               scenePlans: [
                 {{ sceneName: "开场 <A>", readableSplitCount: 1, readableAddedBlockCount: 2, presentationChangedFieldCount: 1, audioOperationCount: 1 }},
                 {{ sceneName: "走廊", readableSplitCount: 0, readableAddedBlockCount: 0, presentationChangedFieldCount: 1, audioOperationCount: 0 }},
@@ -85,7 +94,11 @@ class FrontendProjectPolishReceiptPanelModuleTests(unittest.TestCase):
         self.assertIn("已先创建安全检查点「自动检查点 &lt;1&gt;」", html)
         self.assertIn("涉及场景", html)
         self.assertIn("总处理项", html)
+        self.assertIn("节奏体检", html)
+        self.assertIn("63 分", html)
+        self.assertIn("待打磨 2 / 可试玩 3", html)
         self.assertIn("开场 &lt;A&gt;", html)
+        self.assertIn("缺少视觉锚点 / 连续文本过长", html)
         self.assertIn("还有 1 个场景", html)
         self.assertIn("补到 50 个", html)
         self.assertIn('data-action="copy-project-one-click-polish-receipt-summary"', html)

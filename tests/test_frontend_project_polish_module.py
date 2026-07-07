@@ -10,7 +10,9 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parents[1]
 EDITOR_DIR = ROOT_DIR / "prototype_editor"
 MODULE_PATHS = [
+    EDITOR_DIR / "modules" / "story_block_catalog.js",
     EDITOR_DIR / "modules" / "script_readability.js",
+    EDITOR_DIR / "modules" / "scene_pacing_advisor.js",
     EDITOR_DIR / "modules" / "scene_polish.js",
     EDITOR_DIR / "modules" / "audio_cue_sheet.js",
     EDITOR_DIR / "modules" / "project_settings.js",
@@ -158,6 +160,11 @@ class FrontendProjectPolishModuleTests(unittest.TestCase):
                 projectPatchDialogPreset: projectPatch.dialogBoxConfig?.preset,
                 projectPatchDialogOpacity: projectPatch.dialogBoxConfig?.backgroundOpacity,
                 projectPatchGameUiFontAssetId: projectPatch.gameUiConfig?.fontAssetId,
+                pacingAverageScore: plan.pacingAverageScore,
+                pacingRoughSceneCount: plan.pacingRoughSceneCount,
+                pacingReadySceneCount: plan.pacingReadySceneCount,
+                pacingTopIssueCount: plan.pacingSnapshot?.topIssues?.length ?? 0,
+                pacingHighlightCount: plan.pacingSnapshot?.sceneHighlights?.length ?? 0,
               }},
               digest: {{
                 canApply: digest.canApply,
@@ -175,6 +182,7 @@ class FrontendProjectPolishModuleTests(unittest.TestCase):
                 actionLabel: cleanDigest.actionLabel,
                 badgeLabel: cleanDigest.badgeLabel,
                 helperText: cleanDigest.helperText,
+                pacingRoughSceneCount: cleanDigest.plan.pacingRoughSceneCount,
               }},
               receipt: {{
                 receiptId: receipt.receiptId,
@@ -184,6 +192,10 @@ class FrontendProjectPolishModuleTests(unittest.TestCase):
                 changedSceneCount: receipt.changedSceneCount,
                 totalOperationCount: receipt.totalOperationCount,
                 projectOperationCount: receipt.projectOperationCount,
+                pacingAverageScore: receipt.pacingAverageScore,
+                pacingRoughSceneCount: receipt.pacingRoughSceneCount,
+                pacingReadySceneCount: receipt.pacingReadySceneCount,
+                pacingHighlightCount: receipt.pacingSnapshot?.sceneHighlights?.length ?? 0,
                 projectOperationLabels: receipt.projectOperations.map((operation) => operation.label),
                 sceneNames: receipt.scenePlans.map((scenePlan) => scenePlan.sceneName),
                 nextActionCount: receipt.nextActions.length,
@@ -246,6 +258,9 @@ class FrontendProjectPolishModuleTests(unittest.TestCase):
         self.assertEqual(payload["plan"]["projectPatchDialogPreset"], "custom")
         self.assertGreaterEqual(payload["plan"]["projectPatchDialogOpacity"], 72)
         self.assertEqual(payload["plan"]["projectPatchGameUiFontAssetId"], "font_main")
+        self.assertIsInstance(payload["plan"]["pacingAverageScore"], int)
+        self.assertGreaterEqual(payload["plan"]["pacingTopIssueCount"], 1)
+        self.assertGreaterEqual(payload["plan"]["pacingHighlightCount"], 1)
         self.assertTrue(payload["digest"]["canApply"])
         self.assertIn("一键发布前整理", payload["digest"]["actionLabel"])
         self.assertIn("1 个场景", payload["digest"]["badgeLabel"])
@@ -254,8 +269,10 @@ class FrontendProjectPolishModuleTests(unittest.TestCase):
         self.assertEqual(payload["cleanPlan"]["summary"], "项目基础内容已经比较适合发布前检查")
         self.assertEqual(payload["cleanPlan"]["totalOperationCount"], 0)
         self.assertFalse(payload["cleanDigest"]["canApply"])
-        self.assertEqual(payload["cleanDigest"]["actionLabel"], "发布前整理已完成")
-        self.assertEqual(payload["cleanDigest"]["badgeLabel"], "无需处理")
+        self.assertEqual(payload["cleanDigest"]["actionLabel"], "发布前整理已完成，建议复看节奏")
+        self.assertIn("个场景待试玩", payload["cleanDigest"]["badgeLabel"])
+        self.assertGreaterEqual(payload["cleanDigest"]["pacingRoughSceneCount"], 1)
+        self.assertIn("建议试玩复看", payload["cleanDigest"]["helperText"])
         self.assertEqual(payload["receipt"]["receiptId"], "polish-20260510100000")
         self.assertEqual(payload["receipt"]["generatedAt"], "2026-05-10T10:00:00.000Z")
         self.assertEqual(payload["receipt"]["projectTitle"], "Demo Project")
@@ -263,6 +280,8 @@ class FrontendProjectPolishModuleTests(unittest.TestCase):
         self.assertEqual(payload["receipt"]["changedSceneCount"], 1)
         self.assertGreater(payload["receipt"]["totalOperationCount"], 0)
         self.assertGreater(payload["receipt"]["projectOperationCount"], 0)
+        self.assertIsInstance(payload["receipt"]["pacingAverageScore"], int)
+        self.assertGreaterEqual(payload["receipt"]["pacingHighlightCount"], 1)
         self.assertIn("绑定项目字体素材", payload["receipt"]["projectOperationLabels"])
         self.assertEqual(payload["receipt"]["sceneNames"], ["开场"])
         self.assertGreaterEqual(payload["receipt"]["nextActionCount"], 3)
@@ -279,12 +298,16 @@ class FrontendProjectPolishModuleTests(unittest.TestCase):
         self.assertIn("| 开场 | scene_intro |", payload["receiptMarkdown"])
         self.assertIn("## 项目级补全", payload["receiptMarkdown"])
         self.assertIn("绑定项目字体素材", payload["receiptMarkdown"])
+        self.assertIn("## 节奏体检", payload["receiptMarkdown"])
+        self.assertIn("平均节奏分", payload["receiptMarkdown"])
         self.assertIn("重新巡检确认", payload["receiptMarkdown"])
         self.assertIn("导出整理回执", payload["receiptMarkdown"])
         self.assertIn("发布前整理回执：", payload["receiptClipboard"])
         self.assertIn("回执编号：polish-20260510100000", payload["receiptClipboard"])
         self.assertIn("安全检查点：发布前整理前自动检查点", payload["receiptClipboard"])
         self.assertIn("项目级补全：", payload["receiptClipboard"])
+        self.assertIn("节奏体检：平均", payload["receiptClipboard"])
+        self.assertIn("节奏复看：", payload["receiptClipboard"])
         self.assertIn("下一步：重新巡检确认", payload["receiptClipboard"])
         self.assertEqual(payload["sourceStillUntouched"]["originalBlockCount"], 4)
         self.assertEqual(payload["sourceStillUntouched"]["originalFadeInMs"], 0)
@@ -351,6 +374,8 @@ class FrontendProjectPolishModuleTests(unittest.TestCase):
                 projectOperationCount: oneClickPlan.projectOperationCount,
                 totalOperationCount: oneClickPlan.totalOperationCount,
                 summary: oneClickPlan.summary,
+                pacingAverageScore: oneClickPlan.pacingAverageScore,
+                pacingRoughSceneCount: oneClickPlan.pacingRoughSceneCount,
               }},
               sourceStillUntouched: {{
                 saveSlots: data.project.runtimeSettings.formalSaveSlotCount,
@@ -384,6 +409,7 @@ class FrontendProjectPolishModuleTests(unittest.TestCase):
         self.assertGreater(payload["oneClickPlan"]["projectOperationCount"], 0)
         self.assertGreaterEqual(payload["oneClickPlan"]["totalOperationCount"], payload["oneClickPlan"]["projectOperationCount"])
         self.assertIn("项目体验设置", payload["oneClickPlan"]["summary"])
+        self.assertIsInstance(payload["oneClickPlan"]["pacingAverageScore"], int)
         self.assertEqual(payload["sourceStillUntouched"]["saveSlots"], 4)
         self.assertEqual(payload["sourceStillUntouched"]["dialogOpacity"], 0)
         self.assertEqual(payload["sourceStillUntouched"]["fontAssetId"], "")
