@@ -71,6 +71,7 @@ jobs:
             tests/test_frontend_choice_consequence_sheet_module.py \
             tests/test_frontend_command_palette_module.py \
             tests/test_frontend_creative_assistant_module.py \
+            tests/test_frontend_dashboard_search_panel_module.py \
             tests/test_frontend_dialog_box_readability_module.py \
             tests/test_frontend_director_cue_sheet_module.py \
             tests/test_frontend_export_file_names_module.py \
@@ -154,6 +155,7 @@ jobs:
           node --check prototype_editor/modules/choice_consequence_sheet.js
           node --check prototype_editor/modules/command_palette.js
           node --check prototype_editor/modules/dashboard_primary_actions.js
+          node --check prototype_editor/modules/dashboard_search_panel.js
           node --check prototype_editor/modules/editor_common.js
           node --check prototype_editor/modules/export_file_names.js
           node --check prototype_editor/modules/creative_assistant.js
@@ -246,6 +248,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_command_palette_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_editor_common_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_creative_assistant_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_dashboard_search_panel_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_dialog_box_readability_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_director_cue_sheet_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_export_file_names_module.py' -v
