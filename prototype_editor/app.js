@@ -52,6 +52,7 @@ const storyTemplateApplicationTools = window.CanvasiaEditorStoryTemplateApplicat
 const storyTemplatePanelTools = window.CanvasiaEditorStoryTemplatePanel;
 const { STORY_TEMPLATE_PRESETS } = storyTemplateTools;
 const scriptImporterTools = window.CanvasiaEditorScriptImporter;
+const scriptImporterPanelTools = window.CanvasiaEditorScriptImporterPanel;
 const scriptImportMappingTools = window.CanvasiaEditorScriptImportMapping;
 const routeAnalyzerTools = window.CanvasiaEditorRouteAnalyzer;
 const routeTestingReportTools = window.CanvasiaEditorRouteTestingReport;
@@ -9421,22 +9422,7 @@ function getScriptImporterSampleDraft() {
     state.data?.charactersById?.get(state.selectedCharacterId)?.displayName ??
     state.data?.characters?.[0]?.displayName ??
     "女主角";
-  return [
-    "scene classroom with fade",
-    "play music school_theme fadein 1.2",
-    `show ${characterName} smile at center with dissolve`,
-    "play sound door_knock",
-    "voice yuina_001",
-    "wait 0.8",
-    `${characterName} "你终于来了。"`,
-    "旁白：雨声贴着窗沿落下。",
-    "set route = common",
-    "add affection +1",
-    "我把伞往她那边递过去。",
-    "- 问她为什么在这里",
-    "- 先沉默陪她一会儿",
-    "hide " + characterName + " with fade",
-  ].join("\n");
+  return scriptImporterPanelTools.getScriptImporterSampleDraft(characterName);
 }
 
 function getImportedSpeakerCharacterId(speakerName) {
@@ -9541,15 +9527,7 @@ function parseCurrentScriptImportDraft() {
 }
 
 function getScriptImportSummaryText(blocks = state.scriptImporterBlocks) {
-  const summary = scriptImporterTools.summarizeScriptDraftBlocks(blocks);
-  if (!summary.total) {
-    return "还没有预览结果";
-  }
-
-  const stagePart = summary.stage ? ` / 演出 ${summary.stage}` : "";
-  const logicPart = summary.logic ? ` / 逻辑 ${summary.logic}` : "";
-  const routePart = summary.route ? ` / 跳转 ${summary.route}` : "";
-  return `将插入 ${summary.total} 张卡片：台词 ${summary.dialogue} / 旁白 ${summary.narration} / 选项 ${summary.choice}${stagePart}${logicPart}${routePart}`;
+  return scriptImporterPanelTools.getScriptImportSummaryText(blocks, { scriptImporterTools });
 }
 
 function renderScriptImporterPanel(scene, selectedBlock) {
@@ -9559,44 +9537,16 @@ function renderScriptImporterPanel(scene, selectedBlock) {
 
   const draft = state.scriptImporterDraft ?? "";
   const blocks = state.scriptImporterBlocks ?? [];
-  const previewLines = scriptImporterTools.buildScriptDraftPreviewLines(blocks, 5);
-  const hasBlocks = blocks.length > 0;
   const insertionTarget = selectedBlock ? `当前会插入到「${getBlockSummary(selectedBlock, scene).title}」后面` : "当前会插入到场景末尾";
 
-  return `
-    <div class="script-importer-shell">
-      <div class="script-importer-copy">
-        <span class="eyebrow">Text To Cards</span>
-        <strong>手写剧本转剧情卡片</strong>
-        <p>从文档或备忘录粘贴文本：<code>角色：台词</code>、<code>角色 "台词"</code>、普通旁白、连续 <code>- 选项 [变量 +1]</code>，以及 <code>scene / show / hide / play music / play sound / play video / speed / set / add / if / wait / pause / shake / flash / zoom / pan / filter / blur / particle / credits / voice / jump</code> 演出、文字速度、变量后果、变量卡、条件分支、音频、视频、镜头、氛围和路线指令都会先预览成可编辑卡片。</p>
-        <span class="helper-text">${escapeHtml(insertionTarget)}</span>
-      </div>
-      <div class="script-importer-workbench">
-        <textarea
-          id="scriptImporterDraft"
-          class="script-importer-textarea"
-          spellcheck="false"
-          placeholder="scene classroom with fade\nplay video opening_movie title &quot;Opening&quot; volume 80 from 0 to 18 cover\nplay music school_theme fadein 1.2\nshow 悠奈 smile at center with dissolve\nfilter memory soft\nblur right strong\nparticle snow heavy fast\nshake heavy short\nflash white soft short\nzoom in medium center\nplay sound door_knock\nvoice yuina_001\nspeed fast\nwait 0.8\n悠奈 &quot;你终于来了。&quot;\nset route = common\nadd affection +1\n- 问她为什么在这里 -> rooftop [affection +1]\n- 先沉默陪她一会儿 [affection -1]\nif affection >= 2 -> rooftop else -> ending\njump ending"
-        >${escapeHtml(draft)}</textarea>
-        <div class="script-importer-actions">
-          <button type="button" class="toolbar-button" data-action="apply-script-import-sample">填入示例</button>
-          <button type="button" class="toolbar-button" data-action="preview-script-import">预览识别</button>
-          <button type="button" class="toolbar-button toolbar-button-primary" data-action="insert-script-import-blocks" ${hasBlocks ? "" : "disabled"}>
-            插入识别结果
-          </button>
-        </div>
-      </div>
-      <div class="script-importer-preview">
-        <span class="issue-tag ${hasBlocks ? "good-text" : "warn-text"}">${escapeHtml(getScriptImportSummaryText(blocks))}</span>
-        ${state.scriptImporterError ? `<p class="helper-text warn-text">${escapeHtml(state.scriptImporterError)}</p>` : ""}
-        ${
-          previewLines.length
-            ? `<div class="script-importer-preview-lines">${previewLines.map((line) => `<code>${escapeHtml(line)}</code>`).join("")}</div>`
-            : `<p class="helper-text">先粘贴一小段文本并点击“预览识别”。</p>`
-        }
-      </div>
-    </div>
-  `;
+  return scriptImporterPanelTools.renderScriptImporterPanel(scene, selectedBlock, {
+    blocks,
+    draft,
+    error: state.scriptImporterError,
+    escapeHtml,
+    insertionTarget,
+    scriptImporterTools,
+  });
 }
 
 function applyScriptImportSample() {

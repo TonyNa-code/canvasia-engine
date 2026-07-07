@@ -3094,6 +3094,32 @@ body[data-editor-mode="beginner"] #screen-preview #previewSceneFilterBar {
   line-height: 1.7;
 }
 
+.script-importer-capability-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.script-importer-capability-card {
+  display: grid;
+  gap: 4px;
+  padding: 8px 9px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(73, 116, 216, 0.12);
+}
+
+.script-importer-capability-card strong {
+  font-size: 11px;
+}
+
+.script-importer-capability-card span {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.35;
+}
+
 .script-importer-textarea {
   min-height: 132px;
   width: 100%;

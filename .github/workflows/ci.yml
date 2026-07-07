@@ -124,6 +124,7 @@ jobs:
             tests/test_frontend_screenplay_exporter_module.py \
             tests/test_frontend_script_import_mapping_module.py \
             tests/test_frontend_script_importer_module.py \
+            tests/test_frontend_script_importer_panel_module.py \
             tests/test_frontend_script_readability_module.py \
             tests/test_frontend_script_voice_module.py \
             tests/test_frontend_voice_match_review_panel_module.py \
@@ -212,6 +213,7 @@ jobs:
           node --check prototype_editor/modules/screenplay_exporter.js
           node --check prototype_editor/modules/script_import_mapping.js
           node --check prototype_editor/modules/script_importer.js
+          node --check prototype_editor/modules/script_importer_panel.js
           node --check prototype_editor/modules/script_readability.js
           node --check prototype_editor/modules/script_voice.js
           node --check prototype_editor/modules/voice_match_review_panel.js
@@ -319,6 +321,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_screenplay_exporter_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_script_import_mapping_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_script_importer_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_script_importer_panel_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_script_readability_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_script_voice_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_voice_match_review_panel_module.py' -v

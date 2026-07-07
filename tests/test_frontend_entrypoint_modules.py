@@ -50,6 +50,7 @@ class FrontendEntrypointModuleTests(unittest.TestCase):
             "./modules/audio_timing_estimator.js",
             "./modules/director_cue_sheet.js",
             "./modules/script_importer.js",
+            "./modules/script_importer_panel.js",
             "./modules/route_analyzer.js",
             "./modules/route_testing_report.js",
             "./modules/scene_production_board.js",
