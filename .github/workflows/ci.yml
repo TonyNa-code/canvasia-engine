@@ -90,6 +90,7 @@ jobs:
             tests/test_frontend_beginner_tutorial_module.py \
             tests/test_frontend_choice_consequence_sheet_module.py \
             tests/test_frontend_command_palette_module.py \
+            tests/test_frontend_module_guard_module.py \
             tests/test_frontend_creative_assistant_module.py \
             tests/test_frontend_dashboard_primary_actions_module.py \
             tests/test_frontend_dashboard_production_module.py \
@@ -190,6 +191,7 @@ jobs:
           node --check prototype_editor/modules/beginner_tutorial.js
           node --check prototype_editor/modules/choice_consequence_sheet.js
           node --check prototype_editor/modules/command_palette.js
+          node --check prototype_editor/modules/module_guard.js
           node --check prototype_editor/modules/dashboard_primary_actions.js
           node --check prototype_editor/modules/dashboard_production.js
           node --check prototype_editor/modules/dashboard_search_panel.js
@@ -304,6 +306,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_beginner_tutorial_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_choice_consequence_sheet_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_command_palette_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_module_guard_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_editor_common_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_creative_assistant_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_dashboard_primary_actions_module.py' -v

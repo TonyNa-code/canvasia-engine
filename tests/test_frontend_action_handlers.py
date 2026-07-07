@@ -729,6 +729,8 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn('role="alert"', index_source)
         self.assertIn('aria-live="assertive"', index_source)
         self.assertIn('aria-atomic="true"', index_source)
+        self.assertIn("./modules/module_guard.js", index_source)
+        self.assertIn("window.CanvasiaEditorModuleGuard?.assertRequiredModulesReady?.();", source)
         self.assertIn('class="error-message-copy"', index_source)
         self.assertIn('aria-label="复制当前载入失败的反馈信息"', index_source)
         self.assertIn(".state-card .error-message-copy", style_source)

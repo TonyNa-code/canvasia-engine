@@ -101,6 +101,7 @@ class FrontendEntrypointModuleTests(unittest.TestCase):
             "./modules/release_control_panel.js",
             "./modules/typewriter.js",
             "./modules/command_palette.js",
+            "./modules/module_guard.js",
             "./app.js",
         ]
         for script in required_scripts:

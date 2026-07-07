@@ -1,3 +1,5 @@
+window.CanvasiaEditorModuleGuard?.assertRequiredModulesReady?.();
+
 const editorApiEndpointTools = window.CanvasiaEditorApiEndpoints;
 const {
   API_PROJECT_DATA,
