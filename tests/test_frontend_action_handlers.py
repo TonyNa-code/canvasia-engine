@@ -5249,6 +5249,8 @@ class FrontendActionHandlerTests(unittest.TestCase):
 
     def test_stage_direction_sheet_export_actions_are_wired(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
+        panel_source = (ROOT_DIR / "prototype_editor" / "modules" / "stage_direction_sheet_panel.js").read_text(encoding="utf-8")
+        combined_source = f"{source}\n{panel_source}"
         click_handler = _extract_function_source(source, "handleClick")
         markdown_block_start = click_handler.index('action === "export-stage-direction-sheet-markdown"')
         csv_block_start = click_handler.index('action === "export-stage-direction-sheet-csv"')
@@ -5259,20 +5261,24 @@ class FrontendActionHandlerTests(unittest.TestCase):
         autofix_block = click_handler[autofix_block_start:csv_block_end]
 
         self.assertIn("const stageDirectionSheetTools = window.CanvasiaEditorStageDirectionSheet", source)
-        self.assertIn('data-action="export-stage-direction-sheet-markdown"', source)
-        self.assertIn('data-action="export-stage-direction-sheet-csv"', source)
-        self.assertIn('data-action="apply-stage-direction-autofix"', source)
+        self.assertIn("const stageDirectionSheetPanelTools = window.CanvasiaEditorStageDirectionSheetPanel", source)
+        self.assertIn('data-action="export-stage-direction-sheet-markdown"', combined_source)
+        self.assertIn('data-action="export-stage-direction-sheet-csv"', combined_source)
+        self.assertIn('data-action="apply-stage-direction-autofix"', combined_source)
         self.assertIn("exportStageDirectionSheetMarkdown();", markdown_block)
         self.assertIn("exportStageDirectionSheetCsv();", csv_block)
         self.assertIn("void applyStageDirectionAutoFix();", autofix_block)
         self.assertIn("function buildStageDirectionSheet()", source)
         self.assertIn("function renderStageDirectionSheetPanel()", source)
+        self.assertIn("stageDirectionSheetPanelTools.renderStageDirectionSheetPanel(sheet)", source)
         self.assertIn("function exportStageDirectionSheetMarkdown()", source)
         self.assertIn("function exportStageDirectionSheetCsv()", source)
         self.assertIn("async function applyStageDirectionAutoFix()", source)
         self.assertIn("stageDirectionSheetTools.buildStageDirectionSheet", source)
         self.assertIn("stageDirectionSheetTools.buildStageDirectionAutoFixPlan", source)
-        self.assertIn("stageDirectionSheetTools.getStageDirectionStatusDigest", source)
+        self.assertIn("stageDirectionSheetTools.getStageDirectionStatusDigest", panel_source)
+        self.assertIn("function renderStageDirectionAutoFixPreview", panel_source)
+        self.assertIn("自动补齐预览", panel_source)
 
     def test_presentation_timeline_export_actions_are_wired(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")

@@ -77,6 +77,7 @@ const assetRightsSheetTools = window.CanvasiaEditorAssetRightsSheet;
 const audioCueSheetTools = window.CanvasiaEditorAudioCueSheet;
 const audioCueSheetPanelTools = window.CanvasiaEditorAudioCueSheetPanel;
 const stageDirectionSheetTools = window.CanvasiaEditorStageDirectionSheet;
+const stageDirectionSheetPanelTools = window.CanvasiaEditorStageDirectionSheetPanel;
 const presentationTimelineTools = window.CanvasiaEditorPresentationTimeline;
 const scenePolishTools = window.CanvasiaEditorScenePolish;
 const sceneMoodRecipeTools = window.CanvasiaEditorSceneMoodRecipes;
@@ -32083,136 +32084,9 @@ function renderAudioCueSheetPanel() {
   return audioCueSheetPanelTools.renderAudioCueSheetPanel(buildAudioCueSheet());
 }
 
-function getStageDirectionSheetToneClass(status) {
-  if (status === "blocked") {
-    return "danger-text";
-  }
-  if (status === "warn") {
-    return "warn-text";
-  }
-  if (status === "ready") {
-    return "good-text";
-  }
-  return "";
-}
-
 function renderStageDirectionSheetPanel() {
   const sheet = buildStageDirectionSheet();
-  const digest = stageDirectionSheetTools.getStageDirectionStatusDigest(sheet);
-  const summary = sheet.summary ?? {};
-  const autoFixPlan = sheet.autoFixPlan && typeof sheet.autoFixPlan === "object"
-    ? sheet.autoFixPlan
-    : { changed: false, operationCount: 0, changedSceneCount: 0, changedBlockCount: 0 };
-  const continuityAudit = sheet.continuityAudit && typeof sheet.continuityAudit === "object"
-    ? sheet.continuityAudit
-    : stageDirectionSheetTools.buildStageContinuityAudit?.(sheet) ?? { summary: {}, reviewRows: [] };
-  const continuitySummary = continuityAudit.summary ?? {};
-  const continuityPreview = (continuityAudit.reviewRows ?? []).slice(0, 3);
-  const topIssues = (sheet.issues ?? []).slice(0, 4);
-  const eventPreview = (sheet.events ?? []).slice(0, 4);
-
-  return `
-    <article class="detail-card preview-sprint-panel">
-      <div class="panel-heading">
-        <h2>角色舞台调度表</h2>
-        <span class="badge badge-soft ${getStageDirectionSheetToneClass(digest.status)}">${escapeHtml(digest.title)}</span>
-      </div>
-      <p class="helper-text">${escapeHtml(digest.detail)} 它会检查背景、角色登场 / 退场、说话人是否提前上场、表情和立绘是否可用。</p>
-      <div class="preview-sprint-metrics">
-        ${renderRouteMetricCard("舞台事件", `${summary.eventCount ?? 0} 个`, "背景、登场、退场和说话")}
-        ${renderRouteMetricCard("自动补位", `${summary.speakerAutoPlaceCount ?? 0} 句`, "说话人未提前登场")}
-        ${renderRouteMetricCard("立绘 / 表情缺口", `${summary.missingVisualCount ?? 0} 个`, "缺立绘、缺文件或坏表情")}
-        ${renderRouteMetricCard("构图风险", `${summary.compositionRiskCount ?? 0} 处`, "遮挡、拥挤、图层或透明度")}
-        ${renderRouteMetricCard("连续性复查", `${summary.continuityReviewSceneCount ?? 0} 场`, "开场调度和结尾留场")}
-        ${renderRouteMetricCard("结尾仍在场", `${continuitySummary.endingCastSceneCount ?? 0} 场`, "确认是否需要退场或转场")}
-        ${renderRouteMetricCard("说话人过淡", `${summary.lowOpacitySpeakerCount ?? 0} 处`, "台词角色不够清晰")}
-        ${renderRouteMetricCard("无背景场景", `${summary.missingBackgroundSceneCount ?? 0} 个`, "有内容但没有明确背景")}
-        ${renderRouteMetricCard("可自动补齐", `${summary.autoFixOperationCount ?? 0} 项`, "硬切、缺时长、缺舞台参数")}
-      </div>
-      <div class="detail-actions">
-        <button class="toolbar-button toolbar-button-primary" data-action="export-stage-direction-sheet-markdown">
-          导出角色舞台调度表
-        </button>
-        <button class="toolbar-button" data-action="export-stage-direction-sheet-csv">
-          导出舞台调度 CSV
-        </button>
-        <button
-          class="toolbar-button"
-          data-action="apply-stage-direction-autofix"
-          title="${escapeHtml(autoFixPlan.changed ? `会处理 ${autoFixPlan.changedSceneCount ?? 0} 个场景、${autoFixPlan.changedBlockCount ?? 0} 张角色卡。` : "角色登场/退场的基础舞台参数已经比较完整。")}"
-          ${autoFixPlan.changed ? "" : 'disabled aria-disabled="true"'}
-        >
-          ${escapeHtml(autoFixPlan.changed ? `补齐 ${autoFixPlan.operationCount ?? 0} 个舞台参数` : "舞台基础参数已完整")}
-        </button>
-        <button class="toolbar-button" data-action="switch-screen" data-screen="story">
-          去剧情页调整登场
-        </button>
-      </div>
-      ${
-        continuityPreview.length > 0
-          ? `
-            <div class="list-stack compact-stack">
-              ${continuityPreview
-                .map(
-                  (row) => `
-                    <div class="route-testing-item">
-                      <div>
-                        <b>${escapeHtml(`${row.sceneName} · ${row.nextAction}`)}</b>
-                        <span>${escapeHtml(`${row.chapterName} · ${row.reason}`)}</span>
-                      </div>
-                      <span>${escapeHtml(row.endingCastLabel ? `结尾在场：${row.endingCastLabel}` : row.openingCue)}</span>
-                    </div>
-                  `
-                )
-                .join("")}
-            </div>
-          `
-          : ""
-      }
-      ${
-        topIssues.length > 0
-          ? `
-            <div class="preview-sprint-grid">
-              ${topIssues
-                .map(
-                  (issue) => `
-                    <article class="preview-sprint-card is-${issue.severity === "blocker" ? "danger" : issue.severity === "warn" ? "warn" : "soft"}">
-                      <div class="preview-sprint-head">
-                        <strong>${escapeHtml(issue.title)}</strong>
-                        <span class="issue-tag ${issue.severity === "blocker" ? "danger-text" : issue.severity === "warn" ? "warn-text" : ""}">
-                          ${escapeHtml(issue.severity === "blocker" ? "先修" : issue.severity === "warn" ? "复查" : "润色")}
-                        </span>
-                      </div>
-                      <p>${escapeHtml(`${issue.chapterName} · ${issue.sceneName}`)}</p>
-                      <div class="helper-text">${escapeHtml(issue.detail)}</div>
-                    </article>
-                  `
-                )
-                .join("")}
-            </div>
-          `
-          : eventPreview.length > 0
-            ? `
-              <div class="list-stack compact-stack">
-                ${eventPreview
-                  .map(
-                    (event) => `
-                      <div class="route-testing-item">
-                        <div>
-                          <b>${escapeHtml(`${event.typeLabel}${event.characterName ? ` · ${event.characterName}` : ""}`)}</b>
-                          <span>${escapeHtml(`${event.chapterName} · ${event.sceneName} · ${event.positionLabel || event.assetStatusLabel}`)}</span>
-                        </div>
-                        <span>${escapeHtml(event.cue)}</span>
-                      </div>
-                    `
-                  )
-                  .join("")}
-              </div>
-            `
-            : renderEmpty("当前项目还没有可列出的角色舞台事件。可以先在剧情页添加背景、角色登场和台词。")
-      }
-    </article>
-  `;
+  return stageDirectionSheetPanelTools.renderStageDirectionSheetPanel(sheet);
 }
 
 function getPresentationTimelineToneClass(status) {

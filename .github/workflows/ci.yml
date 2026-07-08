@@ -154,6 +154,7 @@ jobs:
             tests/test_frontend_script_voice_module.py \
             tests/test_frontend_voice_match_review_panel_module.py \
             tests/test_frontend_stage_direction_sheet_module.py \
+            tests/test_frontend_stage_direction_sheet_panel_module.py \
             tests/test_frontend_story_block_actions_module.py \
             tests/test_frontend_story_block_catalog_module.py \
             tests/test_frontend_story_block_editors_module.py \
@@ -252,6 +253,7 @@ jobs:
           node --check prototype_editor/modules/script_voice.js
           node --check prototype_editor/modules/voice_match_review_panel.js
           node --check prototype_editor/modules/stage_direction_sheet.js
+          node --check prototype_editor/modules/stage_direction_sheet_panel.js
           node --check prototype_editor/modules/story_block_actions.js
           node --check prototype_editor/modules/story_block_catalog.js
           node --check prototype_editor/modules/story_block_editors.js
@@ -381,6 +383,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_script_voice_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_voice_match_review_panel_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_stage_direction_sheet_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_stage_direction_sheet_panel_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_story_block_actions_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_story_block_catalog_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_story_block_editors_module.py' -v

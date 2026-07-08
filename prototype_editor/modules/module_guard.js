@@ -55,6 +55,7 @@
     { globalName: "CanvasiaEditorProjectPolishReceiptPanel", script: "./modules/project_polish_receipt_panel.js", label: "打磨回执面板" },
     { globalName: "CanvasiaEditorAudioCueSheetPanel", script: "./modules/audio_cue_sheet_panel.js", label: "音频调度面板" },
     { globalName: "CanvasiaEditorStageDirectionSheet", script: "./modules/stage_direction_sheet.js", label: "舞台调度表" },
+    { globalName: "CanvasiaEditorStageDirectionSheetPanel", script: "./modules/stage_direction_sheet_panel.js", label: "舞台调度面板" },
     { globalName: "CanvasiaEditorPresentationTimeline", script: "./modules/presentation_timeline.js", label: "演出时间轴" },
     { globalName: "CanvasiaEditorLocalizationCoverage", script: "./modules/localization_coverage.js", label: "多语言覆盖" },
     { globalName: "CanvasiaEditorProductionBacklog", script: "./modules/production_backlog.js", label: "制作待办" },

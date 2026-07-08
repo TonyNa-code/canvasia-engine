@@ -65,6 +65,7 @@ class FrontendEntrypointModuleTests(unittest.TestCase):
             "./modules/project_polish_receipt_panel.js",
             "./modules/audio_cue_sheet_panel.js",
             "./modules/stage_direction_sheet.js",
+            "./modules/stage_direction_sheet_panel.js",
             "./modules/presentation_timeline.js",
             "./modules/localization_coverage.js",
             "./modules/runtime_capability_matrix.js",
