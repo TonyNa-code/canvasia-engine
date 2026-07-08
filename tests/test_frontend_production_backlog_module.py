@@ -234,6 +234,7 @@ class FrontendProductionBacklogModuleTests(unittest.TestCase):
               }},
             }});
             const digest = tools.getProductionBacklogStatusDigest(backlog);
+            const sprintPlan = tools.buildProductionSprintPlan(backlog, {{ maxTasks: 2 }});
             const markdown = tools.buildProductionBacklogMarkdown(backlog, {{
               projectTitle: "Backlog Demo",
               generatedAt: "2026-07-04 03:00:00",
@@ -261,6 +262,7 @@ class FrontendProductionBacklogModuleTests(unittest.TestCase):
               ),
               backlog,
               digest,
+              sprintPlan,
               markdown,
               csv,
               labels: [
@@ -284,6 +286,7 @@ class FrontendProductionBacklogModuleTests(unittest.TestCase):
         self.assertIn("buildProductionBacklog", payload["keys"])
         self.assertIn("buildProductionBacklogMarkdown", payload["keys"])
         self.assertIn("buildProductionBacklogCsv", payload["keys"])
+        self.assertIn("buildProductionSprintPlan", payload["keys"])
         self.assertIn("addRouteExecutionTasks", payload["keys"])
         self.assertIn("buildRouteExecutionQueueFromPlan", payload["keys"])
         self.assertIn("addAudioProductionTasks", payload["keys"])
@@ -300,6 +303,14 @@ class FrontendProductionBacklogModuleTests(unittest.TestCase):
         self.assertEqual(payload["backlog"]["summary"]["warningCount"], 15)
         self.assertEqual(payload["backlog"]["summary"]["tipCount"], 8)
         self.assertGreaterEqual(payload["backlog"]["summary"]["areaCount"], 12)
+        self.assertEqual(payload["backlog"]["sprintPlan"]["activePhaseId"], "unblock")
+        self.assertEqual(payload["sprintPlan"]["totalTaskCount"], 31)
+        self.assertEqual(payload["sprintPlan"]["phases"][0]["title"], "第一步：先让项目能跑")
+        self.assertEqual(payload["sprintPlan"]["phases"][0]["visibleTaskCount"], 2)
+        self.assertGreater(payload["sprintPlan"]["phases"][0]["overflowCount"], 0)
+        self.assertIn("先处理", payload["sprintPlan"]["phases"][0]["summary"])
+        self.assertEqual(payload["sprintPlan"]["phases"][1]["title"], "第二步：做到可以试玩")
+        self.assertEqual(payload["sprintPlan"]["phases"][2]["title"], "第三步：打磨成品味")
         self.assertEqual(payload["digest"]["status"], "blocked")
         self.assertEqual(payload["backlog"]["tasks"][0]["severity"], "blocker")
         self.assertTrue(any(task["title"] == "修复分支坏链" for task in payload["backlog"]["tasks"]))
@@ -316,6 +327,10 @@ class FrontendProductionBacklogModuleTests(unittest.TestCase):
         self.assertTrue(any(task["area"] == "audio" and task["title"] == "多首 BGM 缺少明确播放范围" for task in payload["backlog"]["tasks"]))
         self.assertTrue(any(task["area"] == "runtime" and task["title"] == "游戏 UI 仍接近默认皮肤" for task in payload["backlog"]["tasks"]))
         self.assertIn("生产待办队列", payload["markdown"])
+        self.assertIn("下一步制作 Sprint", payload["markdown"])
+        self.assertIn("第一步：先让项目能跑", payload["markdown"])
+        self.assertIn("第二步：做到可以试玩", payload["markdown"])
+        self.assertIn("第三步：打磨成品味", payload["markdown"])
         self.assertIn("修复分支坏链", payload["markdown"])
         self.assertIn("BGM 文件缺失", payload["markdown"])
         self.assertIn("语音文件缺失", payload["markdown"])

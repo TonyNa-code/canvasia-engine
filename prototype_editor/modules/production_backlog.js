@@ -47,6 +47,33 @@
     media: "runtime",
   });
 
+  const SPRINT_PHASES = Object.freeze([
+    Object.freeze({
+      id: "unblock",
+      severity: "blocker",
+      title: "第一步：先让项目能跑",
+      goal: "优先处理会断线、缺文件、坏引用或阻塞试玩的任务。",
+      emptySummary: "没有阻塞项，项目已经可以进入下一阶段。",
+      doneLabel: "主流程不再卡死",
+    }),
+    Object.freeze({
+      id: "playable",
+      severity: "warn",
+      title: "第二步：做到可以试玩",
+      goal: "补齐会明显影响完成度的剧情、演出、音频、翻译和 Runtime 覆盖。",
+      emptySummary: "没有优先项，可以把当前版本交给测试员试跑。",
+      doneLabel: "Demo 可以交给别人试",
+    }),
+    Object.freeze({
+      id: "polish",
+      severity: "tip",
+      title: "第三步：打磨成品味",
+      goal: "处理润色、整理和发布体验，让作品更像正式版本。",
+      emptySummary: "没有润色项，可以考虑导出发布候选版本。",
+      doneLabel: "发布体验更完整",
+    }),
+  ]);
+
   function toArray(value) {
     return Array.isArray(value) ? value : [];
   }
@@ -670,6 +697,54 @@
     });
   }
 
+  function buildProductionSprintPhase(phase, tasks = [], options = {}) {
+    const maxTasks = Math.max(1, toCount(options.maxTasks, 3));
+    const phaseTasks = toArray(tasks).filter((task) => task.severity === phase.severity);
+    const topTasks = phaseTasks.slice(0, maxTasks);
+    const overflowCount = Math.max(0, phaseTasks.length - topTasks.length);
+    const firstTask = topTasks[0] ?? null;
+    return {
+      id: phase.id,
+      title: phase.title,
+      goal: phase.goal,
+      severity: phase.severity,
+      severityLabel: getSeverityLabel(phase.severity),
+      status: phaseTasks.length > 0 ? "todo" : "done",
+      taskCount: phaseTasks.length,
+      visibleTaskCount: topTasks.length,
+      overflowCount,
+      summary:
+        phaseTasks.length > 0
+          ? `先处理 ${topTasks.map((task) => task.title).join(" / ")}${overflowCount > 0 ? `，另有 ${overflowCount} 项排队` : ""}。`
+          : phase.emptySummary,
+      doneLabel: phase.doneLabel,
+      firstTask,
+      tasks: topTasks,
+    };
+  }
+
+  function buildProductionSprintPlan(backlog = {}, options = {}) {
+    const tasks = toArray(backlog.tasks);
+    const phases = SPRINT_PHASES.map((phase) => buildProductionSprintPhase(phase, tasks, options));
+    const activePhase = phases.find((phase) => phase.taskCount > 0) ?? phases[phases.length - 1];
+    const completedPhaseCount = phases.filter((phase) => phase.status === "done").length;
+    const totalTaskCount = phases.reduce((total, phase) => total + phase.taskCount, 0);
+    return {
+      status: totalTaskCount > 0 ? "active" : "ready",
+      title: totalTaskCount > 0 ? activePhase.title : "制作 Sprint 已清空",
+      summary:
+        totalTaskCount > 0
+          ? `${activePhase.goal} 当前还有 ${totalTaskCount} 项待推进。`
+          : "当前生产待办没有可执行项，可以继续写新内容、跑试玩或导出发布候选。",
+      completedPhaseCount,
+      phaseCount: phases.length,
+      totalTaskCount,
+      activePhaseId: activePhase?.id ?? "",
+      nextTask: activePhase?.firstTask ?? null,
+      phases,
+    };
+  }
+
   function buildProductionBacklog(context = {}) {
     const tasks = [];
     addRouteTasks(tasks, context.routeOverview);
@@ -729,6 +804,7 @@
         topAreaTaskCount: areaSummaries[0]?.taskCount ?? 0,
       },
       nextTask: tasks[0] ?? null,
+      sprintPlan: buildProductionSprintPlan({ tasks }),
     };
   }
 
@@ -811,6 +887,12 @@
       task.detail,
       task.action?.label,
     ]);
+    const sprintRows = toArray((backlog.sprintPlan ?? buildProductionSprintPlan(backlog)).phases).map((phase) => [
+      phase.title,
+      phase.taskCount > 0 ? `${phase.taskCount} 项` : "完成",
+      phase.summary,
+      phase.doneLabel,
+    ]);
 
     return [
       `# ${projectTitle} 生产待办队列`,
@@ -837,6 +919,10 @@
           ],
         ]
       ),
+      "",
+      "## 下一步制作 Sprint",
+      "",
+      buildMarkdownTable(["阶段", "状态", "先做什么", "完成标志"], sprintRows) || "当前没有制作 Sprint。",
       "",
       "## 模块分布",
       "",
@@ -868,6 +954,7 @@
     getProductionBacklogStatusDigest,
     buildProductionBacklogMarkdown,
     buildProductionBacklogCsv,
+    buildProductionSprintPlan,
     addRouteExecutionTasks,
     buildRouteExecutionQueueFromPlan,
     addAudioProductionTasks,

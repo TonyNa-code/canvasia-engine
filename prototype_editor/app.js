@@ -31148,24 +31148,39 @@ function getReleaseCandidateManifestToneClass(status) {
 
 function renderProductionTaskAction(task) {
   const action = task?.action ?? {};
-  const screenAttribute = action.screen ? ` data-screen="${escapeHtml(action.screen)}"` : "";
-  if (action.action === "run-project-inspection") {
-    return `
-      <button class="toolbar-button" data-action="run-project-inspection">
-        ${escapeHtml(action.label || "重新巡检")}
-      </button>
-    `;
-  }
+  return editorCommonTools.renderQuickActionButton(action.label ? action : { label: "去处理", action: "switch-screen", screen: "story" });
+}
+
+function renderProductionSprintPhase(phase) {
+  const tone =
+    phase.severity === "blocker"
+      ? "danger"
+      : phase.severity === "warn"
+        ? "warn"
+        : phase.status === "done"
+          ? "good"
+          : "soft";
   return `
-    <button class="toolbar-button" data-action="switch-screen"${screenAttribute}>
-      ${escapeHtml(action.label || "去处理")}
-    </button>
+    <article class="preview-sprint-card is-${tone}">
+      <div class="preview-sprint-head">
+        <strong>${escapeHtml(phase.title)}</strong>
+        <span class="issue-tag ${phase.status === "done" ? "good-text" : phase.severity === "blocker" ? "danger-text" : phase.severity === "warn" ? "warn-text" : ""}">
+          ${escapeHtml(phase.taskCount > 0 ? `${phase.severityLabel} · ${phase.taskCount} 项` : "完成")}
+        </span>
+      </div>
+      <p>${escapeHtml(phase.goal)}</p>
+      <div class="helper-text">${escapeHtml(phase.summary)}</div>
+      <div class="detail-actions compact-actions">
+        ${phase.firstTask ? renderProductionTaskAction(phase.firstTask) : `<span class="badge badge-soft good-text">${escapeHtml(phase.doneLabel)}</span>`}
+      </div>
+    </article>
   `;
 }
 
 function renderProductionBacklogPanel(routeOverview) {
   const backlog = buildProductionBacklog(routeOverview);
   const digest = productionBacklogTools.getProductionBacklogStatusDigest(backlog);
+  const sprintPlan = productionBacklogTools.buildProductionSprintPlan(backlog);
   const summary = backlog.summary ?? {};
   const topTasks = (backlog.tasks ?? []).slice(0, 6);
   const areaSummaries = (backlog.areaSummaries ?? []).slice(0, 4);
@@ -31194,6 +31209,15 @@ function renderProductionBacklogPanel(routeOverview) {
           重新巡检刷新队列
         </button>
       </div>
+      <section class="production-scene-panel">
+        <div class="production-scene-panel-head">
+          <strong>下一步制作 Sprint</strong>
+          <span>${escapeHtml(sprintPlan.summary)}</span>
+        </div>
+        <div class="preview-sprint-grid">
+          ${sprintPlan.phases.map((phase) => renderProductionSprintPhase(phase)).join("")}
+        </div>
+      </section>
       ${
         topTasks.length > 0
           ? `
