@@ -2653,6 +2653,19 @@ body[data-editor-mode="beginner"] #screen-preview #previewSceneFilterBar {
   color: var(--muted);
 }
 
+.scene-playable-checklist button.issue-tag {
+  cursor: pointer;
+  font: inherit;
+}
+
+.scene-playable-checklist button.issue-tag:hover,
+.scene-playable-checklist button.issue-tag:focus-visible {
+  border-color: rgba(61, 119, 204, 0.34);
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--text);
+  transform: translateY(-1px);
+}
+
 .scene-playable-checklist .issue-tag.good-text {
   border-color: rgba(74, 175, 128, 0.2);
   background: rgba(229, 248, 238, 0.7);

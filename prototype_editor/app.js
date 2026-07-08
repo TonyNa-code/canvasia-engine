@@ -11026,16 +11026,32 @@ function renderDashboardScenePlayableChecklist(scene) {
       `可试玩清单：${checklist.readyCount}/${checklist.totalCount} · ${checklist.label}`
     )}">
       ${checklist.items
-        .map(
-          (item) => `
-            <span class="issue-tag ${item.status === "ready" ? "good-text" : item.essential ? "warn-text" : ""}">
-              ${escapeHtml(item.label)}：${escapeHtml(item.status === "ready" ? "OK" : item.text)}
-            </span>
-          `
-        )
+        .map((item) => renderDashboardScenePlayableChecklistItem(item))
         .join("")}
     </div>
   `;
+}
+
+function renderDashboardScenePlayableChecklistItem(item) {
+  const toneClass = item.status === "ready" ? "good-text" : item.essential ? "warn-text" : "";
+  const label = `${item.label}：${item.status === "ready" ? "OK" : item.text}`;
+  const className = `issue-tag ${toneClass}`.trim();
+
+  if (item.action?.action === "open-scene-from-map" && item.action?.sceneId && item.status !== "ready") {
+    return `
+      <button
+        type="button"
+        class="${className} scene-playable-checklist-action"
+        data-action="open-scene-from-map"
+        data-scene-id="${escapeHtml(item.action.sceneId)}"
+        title="${escapeHtml(item.action.label ?? "打开场景")}"
+      >
+        ${escapeHtml(label)}
+      </button>
+    `;
+  }
+
+  return `<span class="${className}">${escapeHtml(label)}</span>`;
 }
 
 function buildDashboardSceneStatusColumns(routeOverview) {

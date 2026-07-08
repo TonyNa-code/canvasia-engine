@@ -5574,6 +5574,7 @@ class FrontendActionHandlerTests(unittest.TestCase):
         planning_card = _extract_function_source(source, "renderDashboardScenePlanningCard")
         status_card = _extract_function_source(source, "renderDashboardSceneStatusCard")
         checklist_renderer = _extract_function_source(source, "renderDashboardScenePlayableChecklist")
+        checklist_item_renderer = _extract_function_source(source, "renderDashboardScenePlayableChecklistItem")
 
         self.assertIn("function buildDashboardScenePlayableChecklist(", source)
         self.assertIn("dashboardProductionTools.buildDashboardScenePlayableChecklist", source)
@@ -5581,8 +5582,14 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("renderDashboardScenePlayableChecklist(scene)", status_card)
         self.assertIn("可试玩清单", checklist_renderer)
         self.assertIn("scene-playable-checklist", checklist_renderer)
+        self.assertIn("renderDashboardScenePlayableChecklistItem(item)", checklist_renderer)
+        self.assertIn('item.action?.action === "open-scene-from-map"', checklist_item_renderer)
+        self.assertIn('data-action="open-scene-from-map"', checklist_item_renderer)
+        self.assertIn('data-scene-id="${escapeHtml(item.action.sceneId)}"', checklist_item_renderer)
+        self.assertIn("scene-playable-checklist-action", checklist_item_renderer)
         self.assertIn("checklist.readyCount", checklist_renderer)
         self.assertIn(".scene-playable-checklist", styles)
+        self.assertIn(".scene-playable-checklist button.issue-tag", styles)
         self.assertIn(".scene-playable-checklist .issue-tag.good-text", styles)
         self.assertIn(".scene-playable-checklist .issue-tag.warn-text", styles)
 
