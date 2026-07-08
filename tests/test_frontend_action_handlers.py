@@ -317,7 +317,10 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn('action === "close-command-palette"', handle_click)
         self.assertIn('action === "run-command-palette-command"', handle_click)
         self.assertIn('data-action="add-wait"', html)
-        self.assertIn('"add-wait": Object.freeze({ blockType: "wait" })', story_block_actions_source)
+        self.assertIn('"add-wait": Object.freeze({', story_block_actions_source)
+        self.assertIn('blockType: "wait"', story_block_actions_source)
+        self.assertIn('group: "performance"', story_block_actions_source)
+        self.assertIn("插入节奏停顿", story_block_actions_source)
         self.assertIn("storyBlockActionTools.getAddBlockActionConfig(action)", handle_click)
         self.assertIn('action === "apply-scene-mood-recipe"', handle_click)
         self.assertIn("sceneMoodRecipeTools.applySceneMoodRecipe", apply_scene_mood_recipe)
@@ -5674,6 +5677,25 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn('state.currentScreen === "story"', complete_focus)
         self.assertIn("renderStoryScreen();", complete_focus)
         self.assertIn("setSaveStatus(feedback.statusMessage)", complete_focus)
+
+    def test_story_add_block_toolbar_uses_action_catalog_metadata(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        story_block_actions_source = STORY_BLOCK_ACTIONS_PATH.read_text(encoding="utf-8")
+        hydrate_buttons = _extract_function_source(source, "hydrateStoryAddBlockActionButtons")
+        apply_editor_mode = _extract_function_source(source, "applyEditorModeUi")
+
+        self.assertIn("storyPrimaryToolbar: document.getElementById(\"storyPrimaryToolbar\")", source)
+        self.assertIn("storyBlockActionTools.getAddBlockActionConfig(button.dataset.action)", hydrate_buttons)
+        self.assertIn("storyBlockActionTools.buildButtonTitle(config)", hydrate_buttons)
+        self.assertIn("button.dataset.blockType = config.blockType", hydrate_buttons)
+        self.assertIn("button.dataset.blockGroup = config.group ?? \"\"", hydrate_buttons)
+        self.assertIn("button.dataset.blockGroupLabel = config.groupLabel ?? \"\"", hydrate_buttons)
+        self.assertIn("button.setAttribute(\"aria-label\", ariaLabel)", hydrate_buttons)
+        self.assertIn("button.title = title", hydrate_buttons)
+        self.assertIn("hydrateStoryAddBlockActionButtons();", apply_editor_mode)
+        self.assertIn("GROUP_LABELS", story_block_actions_source)
+        self.assertIn("角色对白", story_block_actions_source)
+        self.assertIn("路线与逻辑", story_block_actions_source)
 
     def test_export_build_refreshes_current_progress_surface(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")

@@ -29,11 +29,14 @@ class FrontendStoryBlockActionsModuleTests(unittest.TestCase):
             mutableConfig.variableRequirement.reason = "mutated";
             process.stdout.write(JSON.stringify({{
               keys: Object.keys(tools).sort(),
+              groupLabels: tools.GROUP_LABELS,
               entries: tools.getAddBlockActionEntries(),
               dialogueConfig,
               missingConfig,
               variableAddConfig,
               stableVariableAddConfig: tools.getAddBlockActionConfig("add-variable-add"),
+              dialogueTitle: tools.buildButtonTitle(dialogueConfig),
+              flowLabel: tools.getGroupLabel("flow"),
             }}));
             """
         )
@@ -52,9 +55,22 @@ class FrontendStoryBlockActionsModuleTests(unittest.TestCase):
 
         self.assertEqual(
             payload["keys"],
-            ["ADD_BLOCK_ACTIONS", "getAddBlockActionConfig", "getAddBlockActionEntries"],
+            [
+                "ADD_BLOCK_ACTIONS",
+                "GROUP_LABELS",
+                "buildButtonTitle",
+                "getAddBlockActionConfig",
+                "getAddBlockActionEntries",
+                "getGroupLabel",
+            ],
         )
-        self.assertEqual(payload["dialogueConfig"], {"blockType": "dialogue", "variableRequirement": None})
+        self.assertEqual(payload["groupLabels"]["story"], "剧情文本")
+        self.assertEqual(payload["dialogueConfig"]["blockType"], "dialogue")
+        self.assertEqual(payload["dialogueConfig"]["label"], "台词")
+        self.assertEqual(payload["dialogueConfig"]["group"], "story")
+        self.assertEqual(payload["dialogueConfig"]["groupLabel"], "剧情文本")
+        self.assertIn("角色对白", payload["dialogueConfig"]["description"])
+        self.assertIsNone(payload["dialogueConfig"]["variableRequirement"])
         self.assertIsNone(payload["missingConfig"])
         self.assertEqual(action_to_block["add-dialogue"], "dialogue")
         self.assertEqual(action_to_block["add-background"], "background")
@@ -65,8 +81,12 @@ class FrontendStoryBlockActionsModuleTests(unittest.TestCase):
         self.assertEqual(action_to_block["add-condition"], "condition")
         self.assertEqual(len(entries), 24)
         self.assertTrue(payload["variableAddConfig"]["variableRequirement"]["requireNumber"])
+        self.assertEqual(payload["variableAddConfig"]["groupLabel"], "路线与逻辑")
         self.assertIn("数字变量变化卡片", payload["variableAddConfig"]["variableRequirement"]["reason"])
         self.assertIn("数字变量变化卡片", payload["stableVariableAddConfig"]["variableRequirement"]["reason"])
+        self.assertIn("台词", payload["dialogueTitle"])
+        self.assertIn("分类：剧情文本", payload["dialogueTitle"])
+        self.assertEqual(payload["flowLabel"], "路线与逻辑")
 
 
 if __name__ == "__main__":

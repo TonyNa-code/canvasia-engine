@@ -680,6 +680,7 @@ const refs = {
   storyBlockClearButton: document.getElementById("storyBlockClearButton"),
   storyBlockFilterSummary: document.getElementById("storyBlockFilterSummary"),
   storyEditorModeHint: document.getElementById("storyEditorModeHint"),
+  storyPrimaryToolbar: document.getElementById("storyPrimaryToolbar"),
   storyTemplatePanel: document.getElementById("storyTemplatePanel"),
   storyTemplateGrid: document.getElementById("storyTemplateGrid"),
   scriptImporterPanel: document.getElementById("scriptImporterPanel"),
@@ -9290,6 +9291,24 @@ function renderStoryEditorModeBanner(scene = null) {
   });
 }
 
+function hydrateStoryAddBlockActionButtons() {
+  const buttons = Array.from(refs.storyPrimaryToolbar?.querySelectorAll("[data-action]") ?? []);
+  buttons.forEach((button) => {
+    const config = storyBlockActionTools.getAddBlockActionConfig(button.dataset.action);
+    if (!config) {
+      return;
+    }
+
+    const title = storyBlockActionTools.buildButtonTitle(config);
+    const ariaLabel = config.description ? `添加${config.label}卡片：${config.description}` : `添加${config.label}卡片`;
+    button.dataset.blockType = config.blockType;
+    button.dataset.blockGroup = config.group ?? "";
+    button.dataset.blockGroupLabel = config.groupLabel ?? "";
+    button.title = title;
+    button.setAttribute("aria-label", ariaLabel);
+  });
+}
+
 function getStoryTemplatePanelItems() {
   return storyTemplatePanelTools.getStoryTemplatePanelItems(getSelectedScene(), {
     fallbackTemplateIds: Object.keys(STORY_TEMPLATE_PRESETS),
@@ -9527,6 +9546,7 @@ function applyEditorModeUi() {
   const hasProject = Boolean(state.data?.project);
   const mode = hasProject ? getProjectEditorMode() : getSafeEditorMode(state.projectCenterEditorMode);
   document.body.dataset.editorMode = hasProject ? mode : "project-center";
+  hydrateStoryAddBlockActionButtons();
 
   syncEditorModeButton(refs.editorModeBeginnerButton, "beginner", mode, hasProject);
   syncEditorModeButton(refs.editorModeAdvancedButton, "advanced", mode, hasProject);
