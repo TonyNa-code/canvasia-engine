@@ -128,6 +128,7 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
             const storySearch = tools.filterCommandPaletteCommands(project, "剧情");
             const dialogueSearch = tools.filterCommandPaletteCommands(projectWithScene, "台词");
             const playableSearch = tools.filterCommandPaletteCommands(projectWithScene, "可试玩");
+            const beginnerCardSearch = tools.filterCommandPaletteCommands(projectWithScene, "新手常用");
             const affectionSearch = tools.filterCommandPaletteCommands(projectWithScene, "好感度");
             const creditsSearch = tools.filterCommandPaletteCommands(projectWithScene, "片尾");
             const waitSearch = tools.filterCommandPaletteCommands(projectWithScene, "等待");
@@ -195,6 +196,7 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
               moodSearchIds: moodSearch.map((command) => command.id),
               rainMoodSearchIds: rainMoodSearch.map((command) => command.id),
               playableSearchIds: playableSearch.map((command) => command.id),
+              beginnerCardSearchIds: beginnerCardSearch.map((command) => command.id),
               affectionSearchIds: affectionSearch.map((command) => command.id),
               creditsSearchIds: creditsSearch.map((command) => command.id),
               waitSearchIds: waitSearch.map((command) => command.id),
@@ -260,6 +262,9 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
         self.assertIn("mood-recipe-warm-confession", payload["moodSearchIds"])
         self.assertIn("mood-recipe-rain-memory", payload["rainMoodSearchIds"])
         self.assertIn("template-playable-scene", payload["playableSearchIds"])
+        self.assertIn("insert-dialogue", payload["beginnerCardSearchIds"])
+        self.assertIn("insert-wait", payload["beginnerCardSearchIds"])
+        self.assertNotIn("insert-condition", payload["beginnerCardSearchIds"])
         self.assertIn("template-affection-choice", payload["affectionSearchIds"])
         self.assertIn("template-ending-credits", payload["creditsSearchIds"])
         self.assertIn("insert-wait", payload["waitSearchIds"])

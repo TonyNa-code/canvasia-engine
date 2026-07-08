@@ -13,30 +13,35 @@
       blockType: "dialogue",
       label: "台词",
       group: "story",
+      beginnerVisible: true,
       description: "插入一条角色对白，可设置说话人、表情、语音和打字速度。",
     }),
     "add-narration": Object.freeze({
       blockType: "narration",
       label: "旁白",
       group: "story",
+      beginnerVisible: true,
       description: "插入一段无说话人的叙述文字，适合心理描写、环境铺垫或转场。",
     }),
     "add-choice": Object.freeze({
       blockType: "choice",
       label: "选项",
       group: "flow",
+      beginnerVisible: true,
       description: "插入玩家选择，可连接分支场景或附加变量影响。",
     }),
     "add-background": Object.freeze({
       blockType: "background",
       label: "切背景",
       group: "stage",
+      beginnerVisible: true,
       description: "切换背景、CG 或 3D 场景，让当前段落先有画面落点。",
     }),
     "add-character-show": Object.freeze({
       blockType: "character_show",
       label: "显示角色",
       group: "stage",
+      beginnerVisible: true,
       description: "让角色立绘出场，可控制位置、大小、透明度和进场方式。",
     }),
     "add-character-hide": Object.freeze({
@@ -49,6 +54,7 @@
       blockType: "music_play",
       label: "播放音乐",
       group: "audio",
+      beginnerVisible: true,
       description: "播放 BGM，可配合淡入、音量和范围卡控制场景氛围。",
     }),
     "add-music-stop": Object.freeze({
@@ -67,6 +73,7 @@
       blockType: "video_play",
       label: "播放视频",
       group: "media",
+      beginnerVisible: true,
       description: "插入 OP、ED、PV 或过场视频，可控制适配方式和音量。",
     }),
     "add-credits-roll": Object.freeze({
@@ -79,6 +86,7 @@
       blockType: "wait",
       label: "等待停顿",
       group: "performance",
+      beginnerVisible: true,
       description: "插入节奏停顿，让演出、音乐或角色反应有呼吸感。",
     }),
     "add-particle-effect": Object.freeze({
@@ -133,6 +141,7 @@
       blockType: "jump",
       label: "跳场景",
       group: "flow",
+      beginnerVisible: true,
       description: "跳转到另一个场景，用于路线推进、分支合流或章节切换。",
     }),
     "add-variable-set": Object.freeze({
@@ -170,6 +179,7 @@
       ? {
           ...config,
           groupLabel: getGroupLabel(config.group),
+          beginnerVisible: Boolean(config.beginnerVisible),
           variableRequirement: config.variableRequirement ? { ...config.variableRequirement } : null,
         }
       : null;
@@ -184,6 +194,14 @@
       action,
       ...cloneActionConfig(config),
     }));
+  }
+
+  function getBeginnerAddBlockActionEntries() {
+    return getAddBlockActionEntries().filter((entry) => entry.beginnerVisible);
+  }
+
+  function getBeginnerAddBlockActions() {
+    return getBeginnerAddBlockActionEntries().map((entry) => entry.action);
   }
 
   function buildButtonTitle(config) {
@@ -201,6 +219,8 @@
     buildButtonTitle,
     getAddBlockActionConfig,
     getAddBlockActionEntries,
+    getBeginnerAddBlockActionEntries,
+    getBeginnerAddBlockActions,
     getGroupLabel,
   });
 })(typeof window !== "undefined" ? window : globalThis);

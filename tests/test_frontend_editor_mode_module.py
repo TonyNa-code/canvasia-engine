@@ -9,6 +9,7 @@ from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "editor_mode.js"
+STORY_BLOCK_ACTIONS_MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "story_block_actions.js"
 STORY_TEMPLATE_MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "story_templates.js"
 
 
@@ -21,8 +22,10 @@ class FrontendEditorModeModuleTests(unittest.TestCase):
             const context = {{ window: {{}} }};
             context.globalThis = context;
             vm.createContext(context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(STORY_BLOCK_ACTIONS_MODULE_PATH))}, "utf8"), context);
             vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
             const tools = context.window.CanvasiaEditorMode;
+            const actionTools = context.window.CanvasiaEditorStoryBlockActions;
             const quickRenderer = (action, primary) =>
               `<button data-action="${{action.action}}" data-primary="${{primary}}" data-template-id="${{action.dataset?.["template-id"] ?? ""}}">${{action.label}}</button>`;
             const playableTemplateSummary = {{
@@ -43,7 +46,13 @@ class FrontendEditorModeModuleTests(unittest.TestCase):
               storyDescription: tools.getEditorModeDescription("beginner", "story"),
               inspectionDescription: tools.getEditorModeDescription("advanced", "inspection"),
               storyToolbarHasDialogue: tools.BEGINNER_STORY_TOOLBAR_ACTIONS.has("add-dialogue"),
+              storyToolbarHasVideo: tools.BEGINNER_STORY_TOOLBAR_ACTIONS.has("add-video-play"),
+              storyToolbarHasWait: tools.BEGINNER_STORY_TOOLBAR_ACTIONS.has("add-wait"),
               storyToolbarHidesCondition: tools.BEGINNER_STORY_TOOLBAR_ACTIONS.has("add-condition"),
+              storyToolbarUsesActionCatalog: actionTools.getBeginnerAddBlockActions().every((action) =>
+                tools.BEGINNER_STORY_TOOLBAR_ACTIONS.has(action)
+              ),
+              beginnerStoryStructureActions: tools.BEGINNER_STORY_STRUCTURE_ACTIONS,
               assetToolbarHasPick: tools.BEGINNER_ASSET_TOOLBAR_ACTIONS.has("pick-assets"),
               emptyWorkflow: tools.buildBeginnerStoryWorkflow(null),
               blankWorkflow: tools.buildBeginnerStoryWorkflow({{ id: "scene_1", blocks: [] }}),
@@ -112,7 +121,11 @@ class FrontendEditorModeModuleTests(unittest.TestCase):
         self.assertIn("常用剧情骨架按钮", payload["storyDescription"])
         self.assertIn("集中 QA", payload["inspectionDescription"])
         self.assertTrue(payload["storyToolbarHasDialogue"])
+        self.assertTrue(payload["storyToolbarHasVideo"])
+        self.assertTrue(payload["storyToolbarHasWait"])
         self.assertFalse(payload["storyToolbarHidesCondition"])
+        self.assertTrue(payload["storyToolbarUsesActionCatalog"])
+        self.assertEqual(payload["beginnerStoryStructureActions"], ["create-scene", "create-chapter", "rename-scene"])
         self.assertTrue(payload["assetToolbarHasPick"])
         self.assertIsNone(payload["emptyWorkflow"])
         self.assertEqual(payload["blankWorkflow"]["nextStep"]["step"], "第一步")

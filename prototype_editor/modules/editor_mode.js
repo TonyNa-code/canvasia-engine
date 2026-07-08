@@ -1,5 +1,6 @@
 (function attachEditorModeTools(global) {
   const storyTemplateTools = global.CanvasiaEditorStoryTemplates || {};
+  const storyBlockActionTools = global.CanvasiaEditorStoryBlockActions || {};
 
   const EDITOR_MODE_LABELS = Object.freeze({
     beginner: "新手模式",
@@ -37,19 +38,16 @@
     }),
   });
 
-  const BEGINNER_STORY_TOOLBAR_ACTIONS = new Set([
+  const BEGINNER_STORY_STRUCTURE_ACTIONS = Object.freeze([
     "create-scene",
     "create-chapter",
     "rename-scene",
-    "add-dialogue",
-    "add-narration",
-    "add-choice",
-    "add-background",
-    "add-character-show",
-    "add-music-play",
-    "add-video-play",
-    "add-wait",
-    "add-jump",
+  ]);
+  const BEGINNER_STORY_TOOLBAR_ACTIONS = new Set([
+    ...BEGINNER_STORY_STRUCTURE_ACTIONS,
+    ...(typeof storyBlockActionTools.getBeginnerAddBlockActions === "function"
+      ? storyBlockActionTools.getBeginnerAddBlockActions()
+      : []),
   ]);
 
   const BEGINNER_ASSET_TOOLBAR_ACTIONS = new Set(["pick-assets", "replace-asset-file"]);
@@ -455,6 +453,7 @@
   global.CanvasiaEditorMode = Object.freeze({
     EDITOR_MODE_LABELS,
     NAV_SCREEN_LABELS,
+    BEGINNER_STORY_STRUCTURE_ACTIONS,
     BEGINNER_STORY_TOOLBAR_ACTIONS,
     BEGINNER_ASSET_TOOLBAR_ACTIONS,
     STORY_CONTENT_BLOCK_TYPES,

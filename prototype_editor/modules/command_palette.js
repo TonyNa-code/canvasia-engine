@@ -393,6 +393,7 @@
         entry.label,
         entry.groupLabel,
         entry.description,
+        entry.beginnerVisible ? "新手常用" : "高级卡片",
       ]
         .map((keyword) => String(keyword ?? "").trim())
         .filter(Boolean);

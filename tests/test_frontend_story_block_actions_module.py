@@ -31,6 +31,8 @@ class FrontendStoryBlockActionsModuleTests(unittest.TestCase):
               keys: Object.keys(tools).sort(),
               groupLabels: tools.GROUP_LABELS,
               entries: tools.getAddBlockActionEntries(),
+              beginnerEntries: tools.getBeginnerAddBlockActionEntries(),
+              beginnerActions: tools.getBeginnerAddBlockActions(),
               dialogueConfig,
               missingConfig,
               variableAddConfig,
@@ -61,6 +63,8 @@ class FrontendStoryBlockActionsModuleTests(unittest.TestCase):
                 "buildButtonTitle",
                 "getAddBlockActionConfig",
                 "getAddBlockActionEntries",
+                "getBeginnerAddBlockActionEntries",
+                "getBeginnerAddBlockActions",
                 "getGroupLabel",
             ],
         )
@@ -69,6 +73,7 @@ class FrontendStoryBlockActionsModuleTests(unittest.TestCase):
         self.assertEqual(payload["dialogueConfig"]["label"], "台词")
         self.assertEqual(payload["dialogueConfig"]["group"], "story")
         self.assertEqual(payload["dialogueConfig"]["groupLabel"], "剧情文本")
+        self.assertTrue(payload["dialogueConfig"]["beginnerVisible"])
         self.assertIn("角色对白", payload["dialogueConfig"]["description"])
         self.assertIsNone(payload["dialogueConfig"]["variableRequirement"])
         self.assertIsNone(payload["missingConfig"])
@@ -80,6 +85,22 @@ class FrontendStoryBlockActionsModuleTests(unittest.TestCase):
         self.assertEqual(action_to_block["add-variable-add"], "variable_add")
         self.assertEqual(action_to_block["add-condition"], "condition")
         self.assertEqual(len(entries), 24)
+        self.assertEqual(
+            payload["beginnerActions"],
+            [
+                "add-dialogue",
+                "add-narration",
+                "add-choice",
+                "add-background",
+                "add-character-show",
+                "add-music-play",
+                "add-video-play",
+                "add-wait",
+                "add-jump",
+            ],
+        )
+        self.assertEqual(len(payload["beginnerEntries"]), len(payload["beginnerActions"]))
+        self.assertNotIn("add-condition", payload["beginnerActions"])
         self.assertTrue(payload["variableAddConfig"]["variableRequirement"]["requireNumber"])
         self.assertEqual(payload["variableAddConfig"]["groupLabel"], "路线与逻辑")
         self.assertIn("数字变量变化卡片", payload["variableAddConfig"]["variableRequirement"]["reason"])
