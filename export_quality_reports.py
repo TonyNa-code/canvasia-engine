@@ -4,6 +4,12 @@ from pathlib import Path
 
 from export_choice_consequence_sheet import write_export_choice_consequence_files
 from export_localization_audit import write_export_localization_audit_files
+from export_release_fix_order import (
+    EXPORT_RELEASE_FIX_ORDER_CSV_NAME,
+    EXPORT_RELEASE_FIX_ORDER_JSON_NAME,
+    EXPORT_RELEASE_FIX_ORDER_REPORT_NAME,
+    write_export_release_fix_order_files,
+)
 from export_release_readiness import write_export_release_readiness_files
 from export_route_playtest_workbook import write_export_route_playtest_workbook_files
 from export_runtime_capability import write_export_runtime_capability_files
@@ -55,6 +61,9 @@ def write_export_quality_report_bundle(
             runtime_capability["runtimeCapabilityMatrixName"],
             runtime_capability["runtimeCapabilityCsvName"],
             localization_audit["localizationAuditReportName"],
+            EXPORT_RELEASE_FIX_ORDER_REPORT_NAME,
+            EXPORT_RELEASE_FIX_ORDER_JSON_NAME,
+            EXPORT_RELEASE_FIX_ORDER_CSV_NAME,
             *(extra_report_files or []),
         ]
     )
@@ -70,6 +79,17 @@ def write_export_quality_report_bundle(
         report_files=report_files,
         platform_notes=platform_notes,
     )
+    release_fix_order = write_export_release_fix_order_files(
+        target_dir,
+        project=project,
+        release_readiness_summary=release_readiness["releaseReadinessSummary"],
+        route_playtest_workbook=route_playtest["routePlaytestWorkbook"],
+        choice_consequence_sheet=choice_consequence["choiceConsequenceSheet"],
+        variable_influence_sheet=variable_influence["variableInfluenceSheet"],
+        runtime_capability_matrix=runtime_capability["runtimeCapabilityMatrix"],
+        localization_audit=localization_audit["localizationAudit"],
+        report_files=report_files,
+    )
     return {
         **story_route_map,
         **route_playtest,
@@ -78,6 +98,7 @@ def write_export_quality_report_bundle(
         **runtime_capability,
         **localization_audit,
         **release_readiness,
+        **release_fix_order,
         "qualityReportFiles": report_files,
     }
 

@@ -15,6 +15,11 @@ from export_localization_audit import (
     EXPORT_LOCALIZATION_AUDIT_REPORT_NAME,
 )
 from export_quality_reports import normalize_report_file_names, write_export_quality_report_bundle
+from export_release_fix_order import (
+    EXPORT_RELEASE_FIX_ORDER_CSV_NAME,
+    EXPORT_RELEASE_FIX_ORDER_JSON_NAME,
+    EXPORT_RELEASE_FIX_ORDER_REPORT_NAME,
+)
 from export_release_readiness import (
     EXPORT_RELEASE_READINESS_JSON_NAME,
     EXPORT_RELEASE_READINESS_REPORT_NAME,
@@ -134,6 +139,9 @@ class ExportQualityReportsTests(unittest.TestCase):
                 EXPORT_RUNTIME_CAPABILITY_CSV_NAME,
                 EXPORT_LOCALIZATION_AUDIT_JSON_NAME,
                 EXPORT_LOCALIZATION_AUDIT_REPORT_NAME,
+                EXPORT_RELEASE_FIX_ORDER_JSON_NAME,
+                EXPORT_RELEASE_FIX_ORDER_REPORT_NAME,
+                EXPORT_RELEASE_FIX_ORDER_CSV_NAME,
                 EXPORT_RELEASE_READINESS_JSON_NAME,
                 EXPORT_RELEASE_READINESS_REPORT_NAME,
             ):
@@ -160,6 +168,9 @@ class ExportQualityReportsTests(unittest.TestCase):
                     EXPORT_RUNTIME_CAPABILITY_JSON_NAME,
                     EXPORT_RUNTIME_CAPABILITY_CSV_NAME,
                     EXPORT_LOCALIZATION_AUDIT_REPORT_NAME,
+                    EXPORT_RELEASE_FIX_ORDER_REPORT_NAME,
+                    EXPORT_RELEASE_FIX_ORDER_JSON_NAME,
+                    EXPORT_RELEASE_FIX_ORDER_CSV_NAME,
                     "unlockable_content_report.md",
                 ],
             )
@@ -170,9 +181,13 @@ class ExportQualityReportsTests(unittest.TestCase):
             self.assertIn(EXPORT_VARIABLE_INFLUENCE_REPORT_NAME, readiness_payload["reportFiles"])
             self.assertIn(EXPORT_RUNTIME_CAPABILITY_REPORT_NAME, readiness_payload["reportFiles"])
             self.assertIn(EXPORT_LOCALIZATION_AUDIT_REPORT_NAME, readiness_payload["reportFiles"])
+            self.assertIn(EXPORT_RELEASE_FIX_ORDER_REPORT_NAME, readiness_payload["reportFiles"])
             self.assertIn("localization_missing_translations", {issue["code"] for issue in readiness_payload["issues"]})
             self.assertIn("vn_essentials_need_review", {issue["code"] for issue in readiness_payload["issues"]})
             self.assertIn("Runtime 覆盖矩阵", (target_dir / EXPORT_RUNTIME_CAPABILITY_REPORT_NAME).read_text(encoding="utf-8"))
+            fix_order_payload = json.loads((target_dir / EXPORT_RELEASE_FIX_ORDER_JSON_NAME).read_text(encoding="utf-8"))
+            self.assertGreaterEqual(fix_order_payload["summary"]["taskCount"], 1)
+            self.assertIn("发布前修复顺序", (target_dir / EXPORT_RELEASE_FIX_ORDER_REPORT_NAME).read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

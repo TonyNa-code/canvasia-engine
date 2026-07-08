@@ -95,6 +95,7 @@ from export_release_readiness import (
     EXPORT_RELEASE_READINESS_JSON_NAME,
     EXPORT_RELEASE_READINESS_REPORT_NAME,
 )
+from export_release_fix_order import EXPORT_RELEASE_FIX_ORDER_REPORT_NAME
 from export_release_artifacts import write_export_release_artifact_index
 from export_release_control import (
     build_native_runtime_release_control_markdown as build_release_control_markdown_payload,
@@ -630,6 +631,7 @@ EDITOR_EXPORT_FILES = [
     "export_quality_reports.py",
     "export_release_control.py",
     "export_release_evidence_pack.py",
+    "export_release_fix_order.py",
     "export_release_readiness.py",
     "export_runtime_capability.py",
     "export_runtime_preload.py",
@@ -7927,6 +7929,22 @@ def write_editor_suite_manifest(build_dir: Path, manifest: dict) -> Path:
     return manifest_path
 
 
+def build_release_fix_order_export_fields(release_readiness: dict, build_dir: Path) -> dict:
+    return {
+        "releaseFixOrderName": release_readiness["releaseFixOrderName"],
+        "releaseFixOrderPath": release_readiness["releaseFixOrderPath"],
+        "releaseFixOrderPublicUrl": f"/exports/{build_dir.name}/{release_readiness['releaseFixOrderName']}",
+        "releaseFixOrderReportName": release_readiness["releaseFixOrderReportName"],
+        "releaseFixOrderReportPath": release_readiness["releaseFixOrderReportPath"],
+        "releaseFixOrderReportPublicUrl": f"/exports/{build_dir.name}/{release_readiness['releaseFixOrderReportName']}",
+        "releaseFixOrderCsvName": release_readiness["releaseFixOrderCsvName"],
+        "releaseFixOrderCsvPath": release_readiness["releaseFixOrderCsvPath"],
+        "releaseFixOrderCsvPublicUrl": f"/exports/{build_dir.name}/{release_readiness['releaseFixOrderCsvName']}",
+        "releaseFixOrderStatus": release_readiness["releaseFixOrderStatus"],
+        "releaseFixOrderTaskCount": release_readiness["releaseFixOrderTaskCount"],
+    }
+
+
 def build_editor_platform_archive(build_dir: Path, platform_key: str) -> Path:
     target = EDITOR_PORTABLE_RUNTIME_TARGETS[platform_key]
     base_name = str(build_dir)
@@ -9472,6 +9490,7 @@ def export_native_runtime_build() -> dict:
             "localizationAuditReport": EXPORT_LOCALIZATION_AUDIT_REPORT_NAME,
             "releaseReadinessSummary": EXPORT_RELEASE_READINESS_JSON_NAME,
             "releaseReadinessReport": EXPORT_RELEASE_READINESS_REPORT_NAME,
+            "releaseFixOrderReport": EXPORT_RELEASE_FIX_ORDER_REPORT_NAME,
             "unlockableContentManifest": runtime_files["unlockableContentManifestName"],
             "unlockableContentReport": runtime_files["unlockableContentReportName"],
             "runtimePreloadManifest": runtime_files["runtimePreloadManifestName"],
@@ -9573,6 +9592,7 @@ def export_native_runtime_build() -> dict:
             "localizationAuditReport": EXPORT_LOCALIZATION_AUDIT_REPORT_NAME,
             "releaseReadinessSummary": EXPORT_RELEASE_READINESS_JSON_NAME,
             "releaseReadinessReport": EXPORT_RELEASE_READINESS_REPORT_NAME,
+            "releaseFixOrderReport": EXPORT_RELEASE_FIX_ORDER_REPORT_NAME,
             "unlockableContentManifest": runtime_files["unlockableContentManifestName"],
             "unlockableContentReport": runtime_files["unlockableContentReportName"],
             "runtimePreloadManifest": runtime_files["runtimePreloadManifestName"],
@@ -9744,6 +9764,7 @@ def export_native_runtime_build() -> dict:
             EXPORT_ROUTE_PLAYTEST_WORKBOOK_REPORT_NAME,
             EXPORT_CHOICE_CONSEQUENCE_REPORT_NAME,
             EXPORT_VARIABLE_INFLUENCE_REPORT_NAME,
+            EXPORT_RELEASE_FIX_ORDER_REPORT_NAME,
             voice_production_files["voiceProductionReportName"],
             NATIVE_RUNTIME_FILE_INTEGRITY_MARKDOWN_NAME,
             NATIVE_RUNTIME_ACCEPTANCE_REPORT_NAME,
@@ -9767,6 +9788,9 @@ def export_native_runtime_build() -> dict:
         {"name": localization_audit["localizationAuditName"], "description": "机器可读本地化覆盖 JSON。"},
         {"name": release_readiness["releaseReadinessReportName"], "description": "发布试玩就绪摘要，快速判断是否适合发给测试员。"},
         {"name": release_readiness["releaseReadinessSummaryName"], "description": "机器可读发布试玩就绪摘要 JSON。"},
+        {"name": release_readiness["releaseFixOrderReportName"], "description": "发布前修复顺序 Markdown，按优先级告诉作者先修什么、怎么验收。"},
+        {"name": release_readiness["releaseFixOrderName"], "description": "机器可读发布前修复顺序 JSON。"},
+        {"name": release_readiness["releaseFixOrderCsvName"], "description": "可导入表格的发布前修复顺序 CSV。"},
         {"name": runtime_files["unlockableContentManifestName"], "description": "可解锁内容清单 JSON，记录图鉴、回想、成就和结局覆盖。"},
         {"name": runtime_files["unlockableContentReportName"], "description": "可解锁内容 Markdown 报告，方便测试员直接复查 EXTRA / 回想覆盖。"},
         {"name": asset_rights_files["assetRightsReportName"], "description": "素材授权与署名 Markdown 报告，复查商用状态、来源、AI 生成记录和 Staff 草稿。"},
@@ -10018,6 +10042,7 @@ def export_native_runtime_build() -> dict:
         "releaseReadinessReportPublicUrl": f"/exports/{build_dir.name}/{release_readiness['releaseReadinessReportName']}",
         "releaseReadinessStatus": release_readiness["releaseReadinessStatus"],
         "releaseReadinessScore": release_readiness["releaseReadinessScore"],
+        **build_release_fix_order_export_fields(release_readiness, build_dir),
         "gameDataPath": runtime_files["gameDataPath"],
         "gameDataPublicUrl": f"/exports/{build_dir.name}/{runtime_files['gameDataName']}",
         "unlockableContentManifestName": runtime_files["unlockableContentManifestName"],
@@ -10310,6 +10335,7 @@ def export_web_build() -> dict:
             "localizationAuditReport": EXPORT_LOCALIZATION_AUDIT_REPORT_NAME,
             "releaseReadinessSummary": EXPORT_RELEASE_READINESS_JSON_NAME,
             "releaseReadinessReport": EXPORT_RELEASE_READINESS_REPORT_NAME,
+            "releaseFixOrderReport": EXPORT_RELEASE_FIX_ORDER_REPORT_NAME,
             "unlockableContentManifest": UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME,
             "unlockableContentReport": UNLOCKABLE_CONTENT_REPORT_FILE_NAME,
             "iconPng": icon_files["pngFileName"],
@@ -10345,6 +10371,7 @@ def export_web_build() -> dict:
             EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
             EXPORT_LOCALIZATION_AUDIT_REPORT_NAME,
             EXPORT_RELEASE_READINESS_REPORT_NAME,
+            EXPORT_RELEASE_FIX_ORDER_REPORT_NAME,
         ],
         runtime_notes=runtime_notes,
         missing_assets=missing_assets,
@@ -10564,6 +10591,7 @@ def export_web_build() -> dict:
         "releaseReadinessReportPublicUrl": f"/exports/{build_dir.name}/{release_readiness['releaseReadinessReportName']}",
         "releaseReadinessStatus": release_readiness["releaseReadinessStatus"],
         "releaseReadinessScore": release_readiness["releaseReadinessScore"],
+        **build_release_fix_order_export_fields(release_readiness, build_dir),
         "unlockableContentManifestPath": str(build_dir / UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME),
         "unlockableContentManifestPublicUrl": f"/exports/{build_dir.name}/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
         "unlockableContentReportPath": str(build_dir / UNLOCKABLE_CONTENT_REPORT_FILE_NAME),
@@ -11459,6 +11487,7 @@ def export_windows_nwjs_build() -> dict:
             "localizationAuditReport": EXPORT_LOCALIZATION_AUDIT_REPORT_NAME,
             "releaseReadinessSummary": EXPORT_RELEASE_READINESS_JSON_NAME,
             "releaseReadinessReport": EXPORT_RELEASE_READINESS_REPORT_NAME,
+            "releaseFixOrderReport": EXPORT_RELEASE_FIX_ORDER_REPORT_NAME,
             "unlockableContentManifest": f"app/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
             "unlockableContentReport": f"app/{UNLOCKABLE_CONTENT_REPORT_FILE_NAME}",
             "appPackage": "app/package.json",
@@ -11527,6 +11556,7 @@ def export_windows_nwjs_build() -> dict:
             EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
             EXPORT_LOCALIZATION_AUDIT_REPORT_NAME,
             EXPORT_RELEASE_READINESS_REPORT_NAME,
+            EXPORT_RELEASE_FIX_ORDER_REPORT_NAME,
         ],
         runtime_notes=runtime_notes,
         missing_assets=missing_assets,
@@ -11835,6 +11865,7 @@ def export_windows_nwjs_build() -> dict:
         "releaseReadinessReportPublicUrl": f"/exports/{build_dir.name}/{release_readiness['releaseReadinessReportName']}",
         "releaseReadinessStatus": release_readiness["releaseReadinessStatus"],
         "releaseReadinessScore": release_readiness["releaseReadinessScore"],
+        **build_release_fix_order_export_fields(release_readiness, build_dir),
         "copiedAssets": copied_assets,
         "missingAssets": len(missing_assets),
         "missingAssetNames": [asset.get("name") or asset.get("id") or "未命名素材" for asset in missing_assets[:5]],
@@ -11942,6 +11973,7 @@ def export_macos_nwjs_build() -> dict:
             "localizationAuditReport": EXPORT_LOCALIZATION_AUDIT_REPORT_NAME,
             "releaseReadinessSummary": EXPORT_RELEASE_READINESS_JSON_NAME,
             "releaseReadinessReport": EXPORT_RELEASE_READINESS_REPORT_NAME,
+            "releaseFixOrderReport": EXPORT_RELEASE_FIX_ORDER_REPORT_NAME,
             "unlockableContentManifest": f"app/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
             "unlockableContentReport": f"app/{UNLOCKABLE_CONTENT_REPORT_FILE_NAME}",
             "appPackage": "app/package.json",
@@ -12007,6 +12039,7 @@ def export_macos_nwjs_build() -> dict:
             EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
             EXPORT_LOCALIZATION_AUDIT_REPORT_NAME,
             EXPORT_RELEASE_READINESS_REPORT_NAME,
+            EXPORT_RELEASE_FIX_ORDER_REPORT_NAME,
         ],
         runtime_notes=runtime_notes,
         missing_assets=missing_assets,
@@ -12319,6 +12352,7 @@ def export_macos_nwjs_build() -> dict:
         "releaseReadinessReportPublicUrl": f"/exports/{build_dir.name}/{release_readiness['releaseReadinessReportName']}",
         "releaseReadinessStatus": release_readiness["releaseReadinessStatus"],
         "releaseReadinessScore": release_readiness["releaseReadinessScore"],
+        **build_release_fix_order_export_fields(release_readiness, build_dir),
         "copiedAssets": copied_assets,
         "missingAssets": len(missing_assets),
         "missingAssetNames": [asset.get("name") or asset.get("id") or "未命名素材" for asset in missing_assets[:5]],
@@ -12432,6 +12466,7 @@ def export_linux_nwjs_build() -> dict:
             "localizationAuditReport": EXPORT_LOCALIZATION_AUDIT_REPORT_NAME,
             "releaseReadinessSummary": EXPORT_RELEASE_READINESS_JSON_NAME,
             "releaseReadinessReport": EXPORT_RELEASE_READINESS_REPORT_NAME,
+            "releaseFixOrderReport": EXPORT_RELEASE_FIX_ORDER_REPORT_NAME,
             "unlockableContentManifest": f"app/{UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME}",
             "unlockableContentReport": f"app/{UNLOCKABLE_CONTENT_REPORT_FILE_NAME}",
             "appPackage": "app/package.json",
@@ -12494,6 +12529,7 @@ def export_linux_nwjs_build() -> dict:
             EXPORT_STORY_ROUTE_MAP_REPORT_NAME,
             EXPORT_LOCALIZATION_AUDIT_REPORT_NAME,
             EXPORT_RELEASE_READINESS_REPORT_NAME,
+            EXPORT_RELEASE_FIX_ORDER_REPORT_NAME,
         ],
         runtime_notes=runtime_notes,
         missing_assets=missing_assets,
@@ -12800,6 +12836,7 @@ def export_linux_nwjs_build() -> dict:
         "releaseReadinessReportPublicUrl": f"/exports/{build_dir.name}/{release_readiness['releaseReadinessReportName']}",
         "releaseReadinessStatus": release_readiness["releaseReadinessStatus"],
         "releaseReadinessScore": release_readiness["releaseReadinessScore"],
+        **build_release_fix_order_export_fields(release_readiness, build_dir),
         "copiedAssets": copied_assets,
         "missingAssets": len(missing_assets),
         "missingAssetNames": [asset.get("name") or asset.get("id") or "未命名素材" for asset in missing_assets[:5]],

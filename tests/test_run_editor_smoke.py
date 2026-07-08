@@ -22,6 +22,11 @@ from urllib.request import Request, urlopen
 
 import openai_asset_generation
 import run_editor
+from export_release_fix_order import (
+    EXPORT_RELEASE_FIX_ORDER_CSV_NAME,
+    EXPORT_RELEASE_FIX_ORDER_JSON_NAME,
+    EXPORT_RELEASE_FIX_ORDER_REPORT_NAME,
+)
 
 
 def build_upload_payload(name: str, raw: bytes) -> dict:
@@ -578,6 +583,20 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertIn("# 发布试玩就绪摘要", report)
         self.assertIn("## 核心指标", report)
         self.assertIn("## 建议下一步", report)
+        return payload
+
+    def assert_export_release_fix_order_files(self, json_path: Path, report_path: Path, csv_path: Path) -> dict:
+        self.assertTrue(json_path.is_file())
+        self.assertTrue(report_path.is_file())
+        self.assertTrue(csv_path.is_file())
+        payload = json.loads(json_path.read_text(encoding="utf-8"))
+        report = report_path.read_text(encoding="utf-8")
+        csv_text = csv_path.read_text(encoding="utf-8")
+        self.assertEqual(payload["formatVersion"], 1)
+        self.assertIn(payload["summary"]["status"], {"ready", "needs_polish", "needs_review", "blocked"})
+        self.assertIn("#", report)
+        self.assertIn("发布前修复顺序", report)
+        self.assertIn("序号", csv_text)
         return payload
 
     def assert_export_story_route_map_files(self, map_path: Path, report_path: Path) -> dict:
@@ -3297,6 +3316,14 @@ class RunEditorSmokeTests(unittest.TestCase):
             build_dir / run_editor.EXPORT_RELEASE_READINESS_REPORT_NAME,
         )
         self.assertNotEqual(readiness_payload["qualityGate"]["status"], "blocked")
+        fix_order_payload = self.assert_export_release_fix_order_files(
+            build_dir / EXPORT_RELEASE_FIX_ORDER_JSON_NAME,
+            build_dir / EXPORT_RELEASE_FIX_ORDER_REPORT_NAME,
+            build_dir / EXPORT_RELEASE_FIX_ORDER_CSV_NAME,
+        )
+        self.assertEqual(export_result["releaseFixOrderName"], EXPORT_RELEASE_FIX_ORDER_JSON_NAME)
+        self.assertEqual(export_result["releaseFixOrderReportName"], EXPORT_RELEASE_FIX_ORDER_REPORT_NAME)
+        self.assertGreaterEqual(fix_order_payload["summary"]["taskCount"], 0)
         unlockable_manifest = self.assert_unlockable_content_manifest_file(
             build_dir / run_editor.UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME
         )
@@ -3357,6 +3384,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["localizationAuditReport"], run_editor.EXPORT_LOCALIZATION_AUDIT_REPORT_NAME)
         self.assertEqual(manifest["files"]["releaseReadinessSummary"], run_editor.EXPORT_RELEASE_READINESS_JSON_NAME)
         self.assertEqual(manifest["files"]["releaseReadinessReport"], run_editor.EXPORT_RELEASE_READINESS_REPORT_NAME)
+        self.assertEqual(manifest["files"]["releaseFixOrderReport"], EXPORT_RELEASE_FIX_ORDER_REPORT_NAME)
         self.assertEqual(manifest["files"]["unlockableContentManifest"], run_editor.UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME)
         self.assertEqual(manifest["files"]["unlockableContentReport"], run_editor.UNLOCKABLE_CONTENT_REPORT_FILE_NAME)
         provenance = self.assert_export_provenance_file(

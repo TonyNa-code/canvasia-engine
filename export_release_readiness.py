@@ -542,6 +542,7 @@ def write_export_release_readiness_files(
     json_path.write_text(json.dumps(summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     markdown_path.write_text(build_export_release_readiness_markdown(summary), encoding="utf-8")
     return {
+        "releaseReadinessSummary": summary,
         "releaseReadinessSummaryName": json_path.name,
         "releaseReadinessSummaryPath": str(json_path),
         "releaseReadinessReportName": markdown_path.name,
