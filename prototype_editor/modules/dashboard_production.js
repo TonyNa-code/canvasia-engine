@@ -193,22 +193,49 @@
         description: "先加一两张对白、旁白或选项卡，让这个场景至少能从头读到尾。",
         toast: "先补正文，让这段先跑起来",
         actions: [
-          { label: "加台词卡", action: "add-dialogue", primary: true },
-          { label: "加旁白卡", action: "add-narration" },
-          { label: "加选项卡", action: "add-choice" },
+          {
+            label: "加台词卡",
+            action: "add-dialogue",
+            primary: true,
+            dataset: { "scene-checklist-complete": "story" },
+          },
+          {
+            label: "加旁白卡",
+            action: "add-narration",
+            dataset: { "scene-checklist-complete": "story" },
+          },
+          {
+            label: "加选项卡",
+            action: "add-choice",
+            dataset: { "scene-checklist-complete": "story" },
+          },
         ],
       },
       background: {
         title: "补背景",
         description: "先给这段切一张背景图，再继续补台词，画面完成感会立刻上来。",
         toast: "先补背景，画面会更完整",
-        actions: [{ label: "加背景卡", action: "add-background", primary: true }],
+        actions: [
+          {
+            label: "加背景卡",
+            action: "add-background",
+            primary: true,
+            dataset: { "scene-checklist-complete": "background" },
+          },
+        ],
       },
       music: {
         title: "补 BGM",
         description: "给这一段加一张 BGM 或音乐范围卡，先把氛围托住，再继续细修台词。",
         toast: "先补 BGM，把氛围托起来",
-        actions: [{ label: "加 BGM 卡", action: "add-music-play", primary: true }],
+        actions: [
+          {
+            label: "加 BGM 卡",
+            action: "add-music-play",
+            primary: true,
+            dataset: { "scene-checklist-complete": "music" },
+          },
+        ],
       },
       voice: {
         title: "补语音",
@@ -228,9 +255,22 @@
         description: "给关键句补淡入淡出、镜头、粒子或滤镜，让这一段更像正式演出。",
         toast: "先加演出，让这段更有完成度",
         actions: [
-          { label: "加镜头缩放", action: "add-camera-zoom", primary: true },
-          { label: "加粒子特效", action: "add-particle-effect" },
-          { label: "加淡入淡出", action: "add-screen-fade" },
+          {
+            label: "加镜头缩放",
+            action: "add-camera-zoom",
+            primary: true,
+            dataset: { "scene-checklist-complete": "presentation" },
+          },
+          {
+            label: "加粒子特效",
+            action: "add-particle-effect",
+            dataset: { "scene-checklist-complete": "presentation" },
+          },
+          {
+            label: "加淡入淡出",
+            action: "add-screen-fade",
+            dataset: { "scene-checklist-complete": "presentation" },
+          },
         ],
       },
     };

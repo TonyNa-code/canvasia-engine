@@ -81,6 +81,7 @@ class FrontendStoryBlockRegistryIntegrationTests(unittest.TestCase):
         payload = _load_story_block_catalog_payload()
         source = APP_PATH.read_text(encoding="utf-8")
         handle_click = _extract_function_source(source, "handleClick")
+        queue_add = _extract_function_source(source, "queueAddBlockFromAction")
         add_block = _extract_function_source(source, "addBlock")
         create_default_block = _extract_function_source(source, "createDefaultBlock")
 
@@ -88,13 +89,16 @@ class FrontendStoryBlockRegistryIntegrationTests(unittest.TestCase):
         label_types = set(payload["labelTypes"])
         runtime_types = set(payload["runtimeTypes"])
         created_types = set(re.findall(r'\bif\s*\(\s*blockType\s*===\s*"([^"]+)"\s*\)', create_default_block))
-        add_action_types = set(re.findall(r'\baddBlock\("([^"]+)"\)', handle_click))
+        add_action_types = set(
+            re.findall(r'\bqueueAddBlockFromAction\(actionTarget,\s*"([^"]+)"\)', handle_click)
+        )
 
         self.assertGreaterEqual(len(known_types), 20)
         self.assertEqual(known_types, label_types)
         self.assertEqual(known_types, runtime_types)
         self.assertEqual(known_types, created_types)
         self.assertEqual(known_types, add_action_types)
+        self.assertIn("addBlock(blockType, getSceneChecklistAddBlockOptions(actionTarget))", queue_add)
         self.assertIn("isKnownStoryBlockType(safeBlockType)", add_block)
         self.assertIn("未知剧情卡片类型", add_block)
 

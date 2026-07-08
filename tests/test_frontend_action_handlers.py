@@ -26,6 +26,7 @@ NATIVE_RUNTIME_SETTINGS_PATH = ROOT_DIR / "native_runtime" / "runtime_player_set
 NATIVE_RUNTIME_TEXT_EFFECTS_PATH = ROOT_DIR / "native_runtime" / "runtime_text_effects.py"
 PROJECT_POLISH_RECEIPT_PANEL_PATH = EDITOR_DIR / "modules" / "project_polish_receipt_panel.js"
 DASHBOARD_PRIMARY_ACTIONS_PATH = EDITOR_DIR / "modules" / "dashboard_primary_actions.js"
+SCENE_CHECKLIST_FOCUS_PATH = EDITOR_DIR / "modules" / "scene_checklist_focus.js"
 TYPEWRITER_MODULE_PATH = EDITOR_DIR / "modules" / "typewriter.js"
 ASSET_IMPORT_RULES_PATH = EDITOR_DIR / "modules" / "asset_import_rules.js"
 API_ENDPOINTS_PATH = EDITOR_DIR / "modules" / "api_endpoints.js"
@@ -458,7 +459,9 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("recordCommandPaletteCommand(command.id)", run_command)
         self.assertIn("state.commandPaletteRecentIds = loadStoredCommandPaletteRecentIds(data.project)", hydrate_project_runtime)
         self.assertIn("state.commandPaletteRecentIds = loadStoredCommandPaletteRecentIds(null)", clear_loaded_project_state)
-        self.assertIn('success && state.currentScreen !== "story"', add_block)
+        self.assertIn("if (success)", add_block)
+        self.assertIn("completeSceneChecklistFocus(options.checklistCompleteItem", add_block)
+        self.assertIn('if (state.currentScreen !== "story")', add_block)
         self.assertIn('switchScreen("story")', add_block)
         self.assertIn('state.currentScreen !== "story"', apply_story_template)
         self.assertIn('switchScreen("story")', apply_story_template)
@@ -5626,6 +5629,38 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("renderStorySceneChecklistFocusHint(scene)", story_planner)
         self.assertIn(".story-scene-checklist-focus", styles)
         self.assertIn(".story-scene-checklist-actions", styles)
+
+    def test_scene_checklist_add_actions_clear_completed_focus_after_save(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        dashboard_production_source = (EDITOR_DIR / "modules" / "dashboard_production.js").read_text(encoding="utf-8")
+        scene_checklist_focus_source = SCENE_CHECKLIST_FOCUS_PATH.read_text(encoding="utf-8")
+        handle_click = _extract_function_source(source, "handleClick")
+        add_options = _extract_function_source(source, "getSceneChecklistAddBlockOptions")
+        queue_add = _extract_function_source(source, "queueAddBlockFromAction")
+        add_block = _extract_function_source(source, "addBlock")
+        complete_focus = _extract_function_source(source, "completeSceneChecklistFocus")
+
+        self.assertIn('"scene-checklist-complete": "story"', dashboard_production_source)
+        self.assertIn('"scene-checklist-complete": "background"', dashboard_production_source)
+        self.assertIn('"scene-checklist-complete": "music"', dashboard_production_source)
+        self.assertIn('"scene-checklist-complete": "presentation"', dashboard_production_source)
+        self.assertIn('"story-block-issue": "missing_voice"', dashboard_production_source)
+        self.assertIn("const sceneChecklistFocusTools = window.CanvasiaEditorSceneChecklistFocus", source)
+        self.assertIn("sceneChecklistComplete", scene_checklist_focus_source)
+        self.assertIn("checklistCompleteItem", scene_checklist_focus_source)
+        self.assertIn("sceneChecklistFocusTools.getAddBlockOptionsFromDataset", add_options)
+        self.assertIn("addBlock(blockType, getSceneChecklistAddBlockOptions(actionTarget))", queue_add)
+        self.assertIn('queueAddBlockFromAction(actionTarget, "dialogue")', handle_click)
+        self.assertIn('queueAddBlockFromAction(actionTarget, "music_play")', handle_click)
+        self.assertIn('queueAddBlockFromAction(actionTarget, "camera_zoom")', handle_click)
+        self.assertIn("async function addBlock(blockType, options = {})", source)
+        self.assertIn("completeSceneChecklistFocus(options.checklistCompleteItem", add_block)
+        self.assertIn("sceneChecklistFocusTools.shouldCompleteFocus(focus, checklistItem)", complete_focus)
+        self.assertIn("sceneChecklistFocusTools.buildCompletionFeedback(focus, blockLabel)", complete_focus)
+        self.assertIn("state.sceneChecklistFocus = null", complete_focus)
+        self.assertIn('state.currentScreen === "story"', complete_focus)
+        self.assertIn("renderStoryScreen();", complete_focus)
+        self.assertIn("setSaveStatus(feedback.statusMessage)", complete_focus)
 
     def test_export_build_refreshes_current_progress_surface(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")

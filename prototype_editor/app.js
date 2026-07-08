@@ -80,6 +80,7 @@ const presentationTimelineTools = window.CanvasiaEditorPresentationTimeline;
 const scenePolishTools = window.CanvasiaEditorScenePolish;
 const sceneMoodRecipeTools = window.CanvasiaEditorSceneMoodRecipes;
 const dashboardProductionTools = window.CanvasiaEditorDashboardProduction;
+const sceneChecklistFocusTools = window.CanvasiaEditorSceneChecklistFocus;
 const projectPolishTools = window.CanvasiaEditorProjectPolish;
 const projectPolishReceiptPanelTools = window.CanvasiaEditorProjectPolishReceiptPanel;
 const localizationCoverageTools = window.CanvasiaEditorLocalizationCoverage;
@@ -4018,127 +4019,127 @@ async function handleClick(event) {
   }
 
   if (action === "add-dialogue") {
-    void addBlock("dialogue");
+    queueAddBlockFromAction(actionTarget, "dialogue");
     return;
   }
 
   if (action === "add-narration") {
-    void addBlock("narration");
+    queueAddBlockFromAction(actionTarget, "narration");
     return;
   }
 
   if (action === "add-choice") {
-    void addBlock("choice");
+    queueAddBlockFromAction(actionTarget, "choice");
     return;
   }
 
   if (action === "add-background") {
-    void addBlock("background");
+    queueAddBlockFromAction(actionTarget, "background");
     return;
   }
 
   if (action === "add-character-show") {
-    void addBlock("character_show");
+    queueAddBlockFromAction(actionTarget, "character_show");
     return;
   }
 
   if (action === "add-character-hide") {
-    void addBlock("character_hide");
+    queueAddBlockFromAction(actionTarget, "character_hide");
     return;
   }
 
   if (action === "add-music-play") {
-    void addBlock("music_play");
+    queueAddBlockFromAction(actionTarget, "music_play");
     return;
   }
 
   if (action === "add-music-stop") {
-    void addBlock("music_stop");
+    queueAddBlockFromAction(actionTarget, "music_stop");
     return;
   }
 
   if (action === "add-sfx-play") {
-    void addBlock("sfx_play");
+    queueAddBlockFromAction(actionTarget, "sfx_play");
     return;
   }
 
   if (action === "add-video-play") {
-    void addBlock("video_play");
+    queueAddBlockFromAction(actionTarget, "video_play");
     return;
   }
 
   if (action === "add-credits-roll") {
-    void addBlock("credits_roll");
+    queueAddBlockFromAction(actionTarget, "credits_roll");
     return;
   }
 
   if (action === "add-wait") {
-    void addBlock("wait");
+    queueAddBlockFromAction(actionTarget, "wait");
     return;
   }
 
   if (action === "add-particle-effect") {
-    void addBlock("particle_effect");
+    queueAddBlockFromAction(actionTarget, "particle_effect");
     return;
   }
 
   if (action === "add-screen-shake") {
-    void addBlock("screen_shake");
+    queueAddBlockFromAction(actionTarget, "screen_shake");
     return;
   }
 
   if (action === "add-screen-flash") {
-    void addBlock("screen_flash");
+    queueAddBlockFromAction(actionTarget, "screen_flash");
     return;
   }
 
   if (action === "add-screen-fade") {
-    void addBlock("screen_fade");
+    queueAddBlockFromAction(actionTarget, "screen_fade");
     return;
   }
 
   if (action === "add-camera-zoom") {
-    void addBlock("camera_zoom");
+    queueAddBlockFromAction(actionTarget, "camera_zoom");
     return;
   }
 
   if (action === "add-camera-pan") {
-    void addBlock("camera_pan");
+    queueAddBlockFromAction(actionTarget, "camera_pan");
     return;
   }
 
   if (action === "add-screen-filter") {
-    void addBlock("screen_filter");
+    queueAddBlockFromAction(actionTarget, "screen_filter");
     return;
   }
 
   if (action === "add-depth-blur") {
-    void addBlock("depth_blur");
+    queueAddBlockFromAction(actionTarget, "depth_blur");
     return;
   }
 
   if (action === "add-jump") {
-    void addBlock("jump");
+    queueAddBlockFromAction(actionTarget, "jump");
     return;
   }
 
   if (action === "add-variable-set") {
     if (await ensureStarterVariables({ reason: "变量设置卡片需要先有变量。" })) {
-      void addBlock("variable_set");
+      queueAddBlockFromAction(actionTarget, "variable_set");
     }
     return;
   }
 
   if (action === "add-variable-add") {
     if (await ensureStarterVariables({ requireNumber: true, reason: "数字变量变化卡片需要先有数字变量。" })) {
-      void addBlock("variable_add");
+      queueAddBlockFromAction(actionTarget, "variable_add");
     }
     return;
   }
 
   if (action === "add-condition") {
     if (await ensureStarterVariables({ reason: "条件判断需要先有变量。" })) {
-      void addBlock("condition");
+      queueAddBlockFromAction(actionTarget, "condition");
     }
     return;
   }
@@ -7375,6 +7376,27 @@ function getActiveSceneChecklistFocus(scene) {
     return null;
   }
   return state.sceneChecklistFocus;
+}
+
+function getSceneChecklistAddBlockOptions(actionTarget) {
+  return sceneChecklistFocusTools.getAddBlockOptionsFromDataset(actionTarget?.dataset);
+}
+
+function completeSceneChecklistFocus(checklistItem, blockLabel) {
+  const focus = state.sceneChecklistFocus;
+  if (!sceneChecklistFocusTools.shouldCompleteFocus(focus, checklistItem)) {
+    return;
+  }
+
+  const feedback = sceneChecklistFocusTools.buildCompletionFeedback(focus, blockLabel);
+  state.sceneChecklistFocus = null;
+
+  if (state.currentScreen === "story") {
+    renderStoryScreen();
+  }
+
+  setSaveStatus(feedback.statusMessage);
+  showToast(feedback.toastMessage);
 }
 
 function openSceneFromRouteMap(sceneId, mode = "story", options = {}) {
@@ -35198,7 +35220,11 @@ async function copyCreativeAssistantBlocks() {
   }
 }
 
-async function addBlock(blockType) {
+function queueAddBlockFromAction(actionTarget, blockType) {
+  void addBlock(blockType, getSceneChecklistAddBlockOptions(actionTarget));
+}
+
+async function addBlock(blockType, options = {}) {
   const scene = getSelectedScene();
   if (!scene) {
     return;
@@ -35225,8 +35251,11 @@ async function addBlock(blockType) {
     successMessage: `已新增${getBlockLabel(safeBlockType)}`,
   });
 
-  if (success && state.currentScreen !== "story") {
-    switchScreen("story");
+  if (success) {
+    completeSceneChecklistFocus(options.checklistCompleteItem, getBlockLabel(safeBlockType));
+    if (state.currentScreen !== "story") {
+      switchScreen("story");
+    }
   }
 }
 

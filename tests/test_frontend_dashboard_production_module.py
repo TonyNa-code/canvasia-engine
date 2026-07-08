@@ -199,11 +199,19 @@ class FrontendDashboardProductionModuleTests(unittest.TestCase):
         self.assertIn("音乐范围卡", payload["musicFocusHint"]["description"])
         self.assertEqual(payload["musicFocusHint"]["actions"][0]["action"], "add-music-play")
         self.assertTrue(payload["musicFocusHint"]["actions"][0]["primary"])
+        self.assertEqual(payload["musicFocusHint"]["actions"][0]["dataset"]["scene-checklist-complete"], "music")
         self.assertEqual(payload["voiceFocusHint"]["actions"][0]["action"], "focus-story-block-filters")
         self.assertEqual(payload["voiceFocusHint"]["actions"][0]["dataset"]["story-block-issue"], "missing_voice")
+        self.assertNotIn("scene-checklist-complete", payload["voiceFocusHint"]["actions"][0]["dataset"])
         self.assertEqual(
             [action["action"] for action in payload["presentationFocusHint"]["actions"]],
             ["add-camera-zoom", "add-particle-effect", "add-screen-fade"],
+        )
+        self.assertTrue(
+            all(
+                action["dataset"]["scene-checklist-complete"] == "presentation"
+                for action in payload["presentationFocusHint"]["actions"]
+            )
         )
         self.assertEqual(payload["customFocusHint"]["title"], "补自定义")
         self.assertEqual(payload["customFocusHint"]["actions"], [])

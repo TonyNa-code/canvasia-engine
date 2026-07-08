@@ -24,6 +24,7 @@
     { globalName: "CanvasiaEditorDashboardSearchPanel", script: "./modules/dashboard_search_panel.js", label: "首页搜索面板" },
     { globalName: "CanvasiaEditorDashboardPrimaryActions", script: "./modules/dashboard_primary_actions.js", label: "首页主操作" },
     { globalName: "CanvasiaEditorDashboardProduction", script: "./modules/dashboard_production.js", label: "制作看板" },
+    { globalName: "CanvasiaEditorSceneChecklistFocus", script: "./modules/scene_checklist_focus.js", label: "可试玩清单焦点" },
     { globalName: "CanvasiaEditorScriptReadability", script: "./modules/script_readability.js", label: "台词可读性" },
     { globalName: "CanvasiaEditorScenePacingAdvisor", script: "./modules/scene_pacing_advisor.js", label: "场景节奏建议" },
     { globalName: "CanvasiaEditorScenePolish", script: "./modules/scene_polish.js", label: "场景润色" },

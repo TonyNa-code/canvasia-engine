@@ -97,6 +97,7 @@ jobs:
             tests/test_frontend_dashboard_primary_actions_module.py \
             tests/test_frontend_dashboard_production_module.py \
             tests/test_frontend_dashboard_search_panel_module.py \
+            tests/test_frontend_scene_checklist_focus_module.py \
             tests/test_frontend_dialog_box_readability_module.py \
             tests/test_frontend_director_cue_sheet_module.py \
             tests/test_frontend_export_file_names_module.py \
@@ -198,6 +199,7 @@ jobs:
           node --check prototype_editor/modules/dashboard_primary_actions.js
           node --check prototype_editor/modules/dashboard_production.js
           node --check prototype_editor/modules/dashboard_search_panel.js
+          node --check prototype_editor/modules/scene_checklist_focus.js
           node --check prototype_editor/modules/editor_common.js
           node --check prototype_editor/modules/export_file_names.js
           node --check prototype_editor/modules/export_report_descriptions.js
@@ -317,6 +319,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_dashboard_primary_actions_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_dashboard_production_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_dashboard_search_panel_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_scene_checklist_focus_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_dialog_box_readability_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_director_cue_sheet_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_export_file_names_module.py' -v
