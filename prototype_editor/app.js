@@ -33212,12 +33212,20 @@ function renderStorySceneChecklistFocusHint(scene) {
   if (!focus) {
     return "";
   }
+  const actions = Array.isArray(focus.actions) ? focus.actions.slice(0, 3) : [];
 
   return `
     <div class="story-scene-checklist-focus">
       <span class="issue-tag good-text">来自可试玩清单</span>
       <strong>${escapeHtml(focus.title)}</strong>
       <p>${escapeHtml(focus.description)}</p>
+      ${
+        actions.length > 0
+          ? `<div class="story-scene-checklist-actions">${actions
+              .map((action, index) => renderQuickActionButton(action, Boolean(action.primary) || index === 0))
+              .join("")}</div>`
+          : ""
+      }
     </div>
   `;
 }

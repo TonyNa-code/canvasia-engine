@@ -139,6 +139,8 @@ class FrontendDashboardProductionModuleTests(unittest.TestCase):
               }})),
               emptyChecklist: tools.buildDashboardScenePlayableChecklist(routeOverview.nodes[2]),
               musicFocusHint: tools.getSceneChecklistFocusHint("music", "补 BGM"),
+              voiceFocusHint: tools.getSceneChecklistFocusHint("voice", "补语音"),
+              presentationFocusHint: tools.getSceneChecklistFocusHint("presentation", "加镜头 / 特效"),
               customFocusHint: tools.getSceneChecklistFocusHint("custom_gap", "补自定义"),
               emptyFocusHint: tools.getSceneChecklistFocusHint("custom_gap", ""),
               tasks: tasks.map((task) => ({{
@@ -195,7 +197,16 @@ class FrontendDashboardProductionModuleTests(unittest.TestCase):
         self.assertIn("先补正文", payload["emptyChecklist"]["nextStep"])
         self.assertEqual(payload["musicFocusHint"]["title"], "补 BGM")
         self.assertIn("音乐范围卡", payload["musicFocusHint"]["description"])
+        self.assertEqual(payload["musicFocusHint"]["actions"][0]["action"], "add-music-play")
+        self.assertTrue(payload["musicFocusHint"]["actions"][0]["primary"])
+        self.assertEqual(payload["voiceFocusHint"]["actions"][0]["action"], "focus-story-block-filters")
+        self.assertEqual(payload["voiceFocusHint"]["actions"][0]["dataset"]["story-block-issue"], "missing_voice")
+        self.assertEqual(
+            [action["action"] for action in payload["presentationFocusHint"]["actions"]],
+            ["add-camera-zoom", "add-particle-effect", "add-screen-fade"],
+        )
         self.assertEqual(payload["customFocusHint"]["title"], "补自定义")
+        self.assertEqual(payload["customFocusHint"]["actions"], [])
         self.assertIsNone(payload["emptyFocusHint"])
         self.assertNotIn("scene_parked", [scene["id"] for scene in payload["queue"]])
         self.assertEqual(payload["tasks"][0]["title"], "先修路线断线")

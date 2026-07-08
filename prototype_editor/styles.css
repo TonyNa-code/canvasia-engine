@@ -3836,6 +3836,13 @@ body[data-editor-mode="beginner"] #screen-preview #previewSceneFilterBar {
   line-height: 1.7;
 }
 
+.story-scene-checklist-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
 .story-structure-card {
   display: grid;
   gap: 14px;

@@ -192,26 +192,46 @@
         title: "先补正文",
         description: "先加一两张对白、旁白或选项卡，让这个场景至少能从头读到尾。",
         toast: "先补正文，让这段先跑起来",
+        actions: [
+          { label: "加台词卡", action: "add-dialogue", primary: true },
+          { label: "加旁白卡", action: "add-narration" },
+          { label: "加选项卡", action: "add-choice" },
+        ],
       },
       background: {
         title: "补背景",
         description: "先给这段切一张背景图，再继续补台词，画面完成感会立刻上来。",
         toast: "先补背景，画面会更完整",
+        actions: [{ label: "加背景卡", action: "add-background", primary: true }],
       },
       music: {
         title: "补 BGM",
         description: "给这一段加一张 BGM 或音乐范围卡，先把氛围托住，再继续细修台词。",
         toast: "先补 BGM，把氛围托起来",
+        actions: [{ label: "加 BGM 卡", action: "add-music-play", primary: true }],
       },
       voice: {
         title: "补语音",
         description: "优先给主要角色台词绑定语音或占位语音，之后试玩时更容易检查节奏。",
         toast: "先补语音，检查台词节奏",
+        actions: [
+          {
+            label: "只看待绑语音",
+            action: "focus-story-block-filters",
+            primary: true,
+            dataset: { "story-block-type": "dialogue", "story-block-issue": "missing_voice" },
+          },
+        ],
       },
       presentation: {
         title: "加镜头 / 特效",
         description: "给关键句补淡入淡出、镜头、粒子或滤镜，让这一段更像正式演出。",
         toast: "先加演出，让这段更有完成度",
+        actions: [
+          { label: "加镜头缩放", action: "add-camera-zoom", primary: true },
+          { label: "加粒子特效", action: "add-particle-effect" },
+          { label: "加淡入淡出", action: "add-screen-fade" },
+        ],
       },
     };
     const hint = hints[safeItem];
@@ -227,6 +247,7 @@
       title: safeLabel,
       description: "已打开对应场景，可以先按这个缺口继续补内容。",
       toast: safeLabel,
+      actions: [],
     };
   }
 

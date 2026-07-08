@@ -5620,8 +5620,12 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("补 BGM", dashboard_production_source)
         self.assertIn("state.sceneChecklistFocus?.sceneId !== scene.id", focus_getter)
         self.assertIn("来自可试玩清单", focus_renderer)
+        self.assertIn("focus.actions", focus_renderer)
+        self.assertIn("renderQuickActionButton(action", focus_renderer)
+        self.assertIn("story-scene-checklist-actions", focus_renderer)
         self.assertIn("renderStorySceneChecklistFocusHint(scene)", story_planner)
         self.assertIn(".story-scene-checklist-focus", styles)
+        self.assertIn(".story-scene-checklist-actions", styles)
 
     def test_export_build_refreshes_current_progress_surface(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
