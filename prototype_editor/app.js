@@ -448,6 +448,7 @@ const state = {
   projectCenterEditorMode: loadStoredProjectCenterEditorMode(),
   selectedSceneId: null,
   selectedBlockId: null,
+  sceneChecklistFocus: null,
   selectedAssetType: "background",
   selectedAssetId: null,
   assetFilterMode: "all",
@@ -4392,7 +4393,10 @@ async function handleClick(event) {
   }
 
   if (action === "open-scene-from-map") {
-    openSceneFromRouteMap(actionTarget.dataset.sceneId, "story");
+    openSceneFromRouteMap(actionTarget.dataset.sceneId, "story", {
+      checklistItem: actionTarget.dataset.sceneChecklistItem,
+      checklistLabel: actionTarget.dataset.sceneChecklistLabel,
+    });
     return;
   }
 
@@ -7344,10 +7348,13 @@ function switchScreen(screenName) {
   scrollEditorViewportToTop();
 }
 
-function selectScene(sceneId) {
+function selectScene(sceneId, options = {}) {
   const scene = state.data.scenesById.get(sceneId);
   state.selectedSceneId = sceneId;
   state.selectedBlockId = scene?.blocks?.[0]?.id ?? null;
+  if (!options.keepChecklistFocus) {
+    state.sceneChecklistFocus = null;
+  }
   state.creativeAssistantResult = null;
   state.creativeAssistantSelectedBlockIndexes = null;
   state.creativeAssistantError = "";
@@ -7359,9 +7366,22 @@ function selectScene(sceneId) {
   renderPreviewScreen();
 }
 
-function openSceneFromRouteMap(sceneId, mode = "story") {
+function getSceneChecklistFocusHint(checklistItem, checklistLabel = "") {
+  return dashboardProductionTools.getSceneChecklistFocusHint(checklistItem, checklistLabel);
+}
+
+function getActiveSceneChecklistFocus(scene) {
+  if (!scene || state.sceneChecklistFocus?.sceneId !== scene.id) {
+    return null;
+  }
+  return state.sceneChecklistFocus;
+}
+
+function openSceneFromRouteMap(sceneId, mode = "story", options = {}) {
   const safeSceneId = getSafeSceneId(sceneId);
   const scene = state.data.scenesById.get(safeSceneId);
+  const focusHint =
+    mode === "story" ? getSceneChecklistFocusHint(options.checklistItem, options.checklistLabel) : null;
 
   if (!scene) {
     setSaveStatus("这条路线指向的场景不存在", true);
@@ -7369,7 +7389,8 @@ function openSceneFromRouteMap(sceneId, mode = "story") {
     return;
   }
 
-  selectScene(safeSceneId);
+  selectScene(safeSceneId, { keepChecklistFocus: Boolean(focusHint) });
+  state.sceneChecklistFocus = focusHint ? { ...focusHint, sceneId: safeSceneId } : null;
   rememberRecentScene(safeSceneId);
 
   if (mode === "preview") {
@@ -7381,8 +7402,8 @@ function openSceneFromRouteMap(sceneId, mode = "story") {
   }
 
   switchScreen("story");
-  setSaveStatus(`已从路线图打开场景：${scene.name}`);
-  showToast(`继续编辑：${scene.name}`);
+  setSaveStatus(focusHint ? `已打开场景：${scene.name} · ${focusHint.title}` : `已从路线图打开场景：${scene.name}`);
+  showToast(focusHint ? `${scene.name}：${focusHint.toast}` : `继续编辑：${scene.name}`);
 }
 
 function openStoryLocation(sceneId, blockId = null) {
@@ -11044,6 +11065,8 @@ function renderDashboardScenePlayableChecklistItem(item) {
         class="${className} scene-playable-checklist-action"
         data-action="open-scene-from-map"
         data-scene-id="${escapeHtml(item.action.sceneId)}"
+        data-scene-checklist-item="${escapeHtml(item.id)}"
+        data-scene-checklist-label="${escapeHtml(item.action.label ?? item.text)}"
         title="${escapeHtml(item.action.label ?? "打开场景")}"
       >
         ${escapeHtml(label)}
@@ -33184,6 +33207,21 @@ function renderStorySceneStructurePanel(scene, routeNode = null) {
   });
 }
 
+function renderStorySceneChecklistFocusHint(scene) {
+  const focus = getActiveSceneChecklistFocus(scene);
+  if (!focus) {
+    return "";
+  }
+
+  return `
+    <div class="story-scene-checklist-focus">
+      <span class="issue-tag good-text">来自可试玩清单</span>
+      <strong>${escapeHtml(focus.title)}</strong>
+      <p>${escapeHtml(focus.description)}</p>
+    </div>
+  `;
+}
+
 function renderStoryScenePlanner(scene, routeNode = null) {
   const storyContentCount = (scene.blocks ?? []).filter((block) =>
     ["dialogue", "narration", "choice"].includes(block.type)
@@ -33196,6 +33234,7 @@ function renderStoryScenePlanner(scene, routeNode = null) {
     <article class="editor-card story-scene-planner-card">
       <h3>场景规划</h3>
       <p>先给这一段写一句制作便签，再标一下状态和优先级，首页路线图和左侧场景树都会一起显示。</p>
+      ${renderStorySceneChecklistFocusHint(scene)}
       ${renderDetailRows([
         ["所属章节", scene.chapterName ?? "未分组"],
         ["场景进度", `${scene.blocks.length} 张卡片 · 正文 ${storyContentCount} · 演出 ${effectCount} · 逻辑 ${logicCount}`],

@@ -138,6 +138,9 @@ class FrontendDashboardProductionModuleTests(unittest.TestCase):
                 checklist: scene.playableChecklist,
               }})),
               emptyChecklist: tools.buildDashboardScenePlayableChecklist(routeOverview.nodes[2]),
+              musicFocusHint: tools.getSceneChecklistFocusHint("music", "补 BGM"),
+              customFocusHint: tools.getSceneChecklistFocusHint("custom_gap", "补自定义"),
+              emptyFocusHint: tools.getSceneChecklistFocusHint("custom_gap", ""),
               tasks: tasks.map((task) => ({{
                 title: task.title,
                 priority: task.priority,
@@ -172,6 +175,7 @@ class FrontendDashboardProductionModuleTests(unittest.TestCase):
 
         self.assertIn("buildDashboardProductionTasks", payload["keys"])
         self.assertIn("buildDashboardScenePlayableChecklist", payload["keys"])
+        self.assertIn("getSceneChecklistFocusHint", payload["keys"])
         self.assertEqual(payload["progress"], [25, 100])
         self.assertIn("路线断线", payload["summaries"][0])
         self.assertIn("成品味道", payload["summaries"][1])
@@ -189,6 +193,10 @@ class FrontendDashboardProductionModuleTests(unittest.TestCase):
         self.assertIsNone(payload["queue"][1]["checklist"]["items"][2]["action"])
         self.assertEqual(payload["emptyChecklist"]["status"], "needs_core")
         self.assertIn("先补正文", payload["emptyChecklist"]["nextStep"])
+        self.assertEqual(payload["musicFocusHint"]["title"], "补 BGM")
+        self.assertIn("音乐范围卡", payload["musicFocusHint"]["description"])
+        self.assertEqual(payload["customFocusHint"]["title"], "补自定义")
+        self.assertIsNone(payload["emptyFocusHint"])
         self.assertNotIn("scene_parked", [scene["id"] for scene in payload["queue"]])
         self.assertEqual(payload["tasks"][0]["title"], "先修路线断线")
         self.assertEqual(payload["tasks"][1]["title"], "先处理结构问题")
