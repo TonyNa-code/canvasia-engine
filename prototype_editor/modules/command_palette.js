@@ -1,5 +1,6 @@
 (function attachCommandPaletteTools(global) {
   const COMMAND_PALETTE_RECENT_LIMIT = 6;
+  const storyBlockActionTools = global.CanvasiaEditorStoryBlockActions || {};
   const sceneMoodRecipeTools = global.CanvasiaEditorSceneMoodRecipes || {};
 
   const SCREEN_COMMANDS = [
@@ -12,192 +13,59 @@
     { id: "screen-preview", title: "试玩与导出", screen: "preview", section: "发布", keywords: ["预览", "导出", "试玩"] },
   ];
 
-  const STORY_BLOCK_COMMANDS = [
-    {
-      id: "insert-dialogue",
-      title: "插入台词卡",
-      subtitle: "在当前选中卡片后加一句角色对白",
-      action: "add-dialogue",
-      section: "插卡",
-      keywords: ["台词", "对白", "dialogue", "角色"],
-    },
-    {
-      id: "insert-narration",
-      title: "插入旁白卡",
-      subtitle: "补叙述、心理描写或场景说明",
-      action: "add-narration",
-      section: "插卡",
-      keywords: ["旁白", "叙述", "narration", "文字"],
-    },
-    {
-      id: "insert-choice",
-      title: "插入选项卡",
-      subtitle: "创建可跳转分支的选择项",
-      action: "add-choice",
-      section: "分支",
-      keywords: ["选项", "分支", "choice", "路线"],
-    },
-    {
-      id: "insert-background",
-      title: "插入切背景卡",
-      subtitle: "切换背景或 3D 场景预览",
-      action: "add-background",
-      section: "演出",
-      keywords: ["背景", "场景", "background", "bg"],
-    },
-    {
-      id: "insert-character-show",
-      title: "插入显示角色卡",
-      subtitle: "让立绘淡入、定位并调整大小姿态",
-      action: "add-character-show",
-      section: "演出",
-      keywords: ["立绘", "角色", "显示", "show", "淡入"],
-    },
-    {
-      id: "insert-character-hide",
-      title: "插入隐藏角色卡",
-      subtitle: "让角色退场或淡出",
-      action: "add-character-hide",
-      section: "演出",
-      keywords: ["立绘", "角色", "隐藏", "hide", "淡出"],
-    },
-    {
-      id: "insert-music-play",
-      title: "插入播放 BGM 卡",
-      subtitle: "指定音乐、循环、音量和淡入淡出",
-      action: "add-music-play",
-      section: "音频",
-      keywords: ["bgm", "音乐", "播放", "music", "淡入"],
-    },
-    {
-      id: "insert-music-stop",
-      title: "插入停止 BGM 卡",
-      subtitle: "在剧情节点淡出当前音乐",
-      action: "add-music-stop",
-      section: "音频",
-      keywords: ["bgm", "音乐", "停止", "stop", "淡出"],
-    },
-    {
-      id: "insert-sfx",
-      title: "插入音效卡",
-      subtitle: "播放按钮音、环境音或演出音效",
-      action: "add-sfx-play",
-      section: "音频",
-      keywords: ["音效", "sfx", "sound", "效果音"],
-    },
-    {
-      id: "insert-video",
-      title: "插入视频 / OP 卡",
-      subtitle: "用于 OP、ED、过场动画或片段播放",
-      action: "add-video-play",
-      section: "视频",
-      keywords: ["视频", "op", "ed", "movie", "video"],
-    },
-    {
-      id: "insert-credits",
-      title: "插入片尾字幕卡",
-      subtitle: "快速生成 STAFF 滚动字幕",
-      action: "add-credits-roll",
-      section: "视频",
-      keywords: ["片尾", "字幕", "staff", "credits", "ed"],
-    },
-    {
-      id: "insert-particle",
-      title: "插入粒子特效卡",
-      subtitle: "添加雪、雨、花瓣或项目粒子预设",
-      action: "add-particle-effect",
-      section: "演出",
-      keywords: ["粒子", "下雪", "下雨", "particle", "特效"],
-    },
-    {
-      id: "insert-shake",
-      title: "插入屏幕震动卡",
-      subtitle: "表现冲击、惊吓或爆点",
-      action: "add-screen-shake",
-      section: "镜头",
-      keywords: ["震动", "shake", "冲击", "镜头"],
-    },
-    {
-      id: "insert-flash",
-      title: "插入闪屏卡",
-      subtitle: "白闪、红闪或冲击瞬间",
-      action: "add-screen-flash",
-      section: "镜头",
-      keywords: ["闪屏", "flash", "白闪", "红闪"],
-    },
-    {
-      id: "insert-fade",
-      title: "插入黑场淡入淡出卡",
-      subtitle: "转场、回忆进入或段落收束",
-      action: "add-screen-fade",
-      section: "镜头",
-      keywords: ["黑场", "淡入", "淡出", "fade", "转场"],
-    },
-    {
-      id: "insert-camera-zoom",
-      title: "插入镜头推近 / 拉远卡",
-      subtitle: "把注意力压到角色或关键画面上",
-      action: "add-camera-zoom",
-      section: "镜头",
-      keywords: ["镜头", "推近", "拉远", "zoom", "camera"],
-    },
-    {
-      id: "insert-camera-pan",
-      title: "插入镜头平移卡",
-      subtitle: "做视线移动、场景巡视或慢镜头",
-      action: "add-camera-pan",
-      section: "镜头",
-      keywords: ["镜头", "平移", "pan", "camera"],
-    },
-    {
-      id: "insert-filter",
-      title: "插入回忆滤镜卡",
-      subtitle: "快速进入回忆、梦境或特殊氛围",
-      action: "add-screen-filter",
-      section: "调色",
-      keywords: ["滤镜", "回忆", "调色", "filter", "color"],
-    },
-    {
-      id: "insert-depth-blur",
-      title: "插入景深模糊卡",
-      subtitle: "突出主体或制造朦胧感",
-      action: "add-depth-blur",
-      section: "调色",
-      keywords: ["景深", "模糊", "blur", "焦点"],
-    },
-    {
-      id: "insert-jump",
-      title: "插入跳转场景卡",
-      subtitle: "把剧情接到另一个场景",
-      action: "add-jump",
-      section: "分支",
-      keywords: ["跳转", "场景", "jump", "goto"],
-    },
-    {
-      id: "insert-variable-set",
-      title: "插入设变量卡",
-      subtitle: "记录好感度、Flag 或章节状态",
-      action: "add-variable-set",
-      section: "逻辑",
-      keywords: ["变量", "flag", "好感度", "set"],
-    },
-    {
-      id: "insert-variable-add",
-      title: "插入数值变化卡",
-      subtitle: "给数值变量加减分",
-      action: "add-variable-add",
-      section: "逻辑",
-      keywords: ["变量", "数值", "加分", "add"],
-    },
-    {
-      id: "insert-condition",
-      title: "插入条件判断卡",
-      subtitle: "按变量决定下一段剧情",
-      action: "add-condition",
-      section: "逻辑",
-      keywords: ["条件", "判断", "if", "condition", "分支"],
-    },
-  ];
+  const STORY_BLOCK_COMMAND_ID_BY_ACTION = Object.freeze({
+    "add-dialogue": "insert-dialogue",
+    "add-narration": "insert-narration",
+    "add-choice": "insert-choice",
+    "add-background": "insert-background",
+    "add-character-show": "insert-character-show",
+    "add-character-hide": "insert-character-hide",
+    "add-music-play": "insert-music-play",
+    "add-music-stop": "insert-music-stop",
+    "add-sfx-play": "insert-sfx",
+    "add-video-play": "insert-video",
+    "add-credits-roll": "insert-credits",
+    "add-wait": "insert-wait",
+    "add-particle-effect": "insert-particle",
+    "add-screen-shake": "insert-shake",
+    "add-screen-flash": "insert-flash",
+    "add-screen-fade": "insert-fade",
+    "add-camera-zoom": "insert-camera-zoom",
+    "add-camera-pan": "insert-camera-pan",
+    "add-screen-filter": "insert-filter",
+    "add-depth-blur": "insert-depth-blur",
+    "add-jump": "insert-jump",
+    "add-variable-set": "insert-variable-set",
+    "add-variable-add": "insert-variable-add",
+    "add-condition": "insert-condition",
+  });
+
+  const STORY_BLOCK_COMMAND_KEYWORDS = Object.freeze({
+    "add-dialogue": Object.freeze(["台词", "对白", "dialogue", "角色"]),
+    "add-narration": Object.freeze(["旁白", "叙述", "narration", "文字"]),
+    "add-choice": Object.freeze(["选项", "分支", "choice", "路线"]),
+    "add-background": Object.freeze(["背景", "场景", "background", "bg", "cg", "3d"]),
+    "add-character-show": Object.freeze(["立绘", "角色", "显示", "show", "淡入", "位置", "大小"]),
+    "add-character-hide": Object.freeze(["立绘", "角色", "隐藏", "hide", "淡出"]),
+    "add-music-play": Object.freeze(["bgm", "音乐", "播放", "music", "淡入", "范围"]),
+    "add-music-stop": Object.freeze(["bgm", "音乐", "停止", "stop", "淡出"]),
+    "add-sfx-play": Object.freeze(["音效", "sfx", "sound", "效果音"]),
+    "add-video-play": Object.freeze(["视频", "op", "ed", "movie", "video"]),
+    "add-credits-roll": Object.freeze(["片尾", "字幕", "staff", "credits", "ed"]),
+    "add-wait": Object.freeze(["等待", "停顿", "节奏", "wait", "pause"]),
+    "add-particle-effect": Object.freeze(["粒子", "下雪", "下雨", "particle", "特效"]),
+    "add-screen-shake": Object.freeze(["震动", "shake", "冲击", "镜头"]),
+    "add-screen-flash": Object.freeze(["闪屏", "flash", "白闪", "红闪"]),
+    "add-screen-fade": Object.freeze(["黑场", "淡入", "淡出", "fade", "转场"]),
+    "add-camera-zoom": Object.freeze(["镜头", "推近", "拉远", "zoom", "camera"]),
+    "add-camera-pan": Object.freeze(["镜头", "平移", "pan", "camera"]),
+    "add-screen-filter": Object.freeze(["滤镜", "回忆", "调色", "filter", "color"]),
+    "add-depth-blur": Object.freeze(["景深", "模糊", "blur", "焦点"]),
+    "add-jump": Object.freeze(["跳转", "场景", "jump", "goto"]),
+    "add-variable-set": Object.freeze(["变量", "flag", "好感度", "set"]),
+    "add-variable-add": Object.freeze(["变量", "数值", "加分", "add"]),
+    "add-condition": Object.freeze(["条件", "判断", "if", "condition", "分支"]),
+  });
 
   const STORY_TEMPLATE_COMMANDS = [
     {
@@ -484,6 +352,62 @@
       result.push(safeId);
     });
     return result;
+  }
+
+  function getStoryBlockActionTools(context = {}) {
+    return context.storyBlockActionTools ?? global.CanvasiaEditorStoryBlockActions ?? storyBlockActionTools ?? null;
+  }
+
+  function getStoryBlockCommandId(action) {
+    const safeAction = String(action ?? "").trim();
+    if (!safeAction) {
+      return "";
+    }
+    return STORY_BLOCK_COMMAND_ID_BY_ACTION[safeAction] ?? sanitizeCommandPaletteCommandId(`insert-${safeAction.replace(/^add-/, "")}`);
+  }
+
+  function getStoryBlockCommandEntries(context = {}) {
+    const actionSource = getStoryBlockActionTools(context);
+    if (typeof actionSource?.getAddBlockActionEntries !== "function") {
+      return [];
+    }
+
+    return actionSource
+      .getAddBlockActionEntries()
+      .map((entry) => ({
+        ...entry,
+        id: getStoryBlockCommandId(entry.action),
+      }))
+      .filter((entry) => entry.id && entry.action && entry.blockType);
+  }
+
+  function buildStoryBlockCommands(context = {}) {
+    return getStoryBlockCommandEntries(context).map((entry) => {
+      const label = String(entry.label ?? entry.blockType ?? "剧情卡片").trim() || "剧情卡片";
+      const groupLabel = String(entry.groupLabel ?? entry.group ?? "插卡").trim() || "插卡";
+      const description = String(entry.description ?? "").trim() || `插入一张${label}剧情卡片。`;
+      const keywords = [
+        ...(STORY_BLOCK_COMMAND_KEYWORDS[entry.action] ?? []),
+        entry.action,
+        entry.blockType,
+        entry.label,
+        entry.groupLabel,
+        entry.description,
+      ]
+        .map((keyword) => String(keyword ?? "").trim())
+        .filter(Boolean);
+
+      return {
+        id: entry.id,
+        title: `插入${label}卡`,
+        subtitle: description,
+        action: entry.action,
+        section: groupLabel,
+        blockType: entry.blockType,
+        blockGroup: entry.group ?? "",
+        keywords,
+      };
+    });
   }
 
   function getStoryTemplateTools(context = {}) {
@@ -894,7 +818,7 @@
         disabled: !hasProject,
         disabledReason: hasProject ? "" : disabledProjectTitle,
       })),
-      ...STORY_BLOCK_COMMANDS.map((command) => ({
+      ...buildStoryBlockCommands(context).map((command) => ({
         ...command,
         subtitle: hasSelectedScene ? `${command.subtitle} · ${sceneSubtitle}` : disabledSceneTitle,
         disabled: !hasSelectedScene,
@@ -1013,7 +937,12 @@
 
   global.CanvasiaEditorCommandPalette = {
     COMMAND_PALETTE_RECENT_LIMIT,
+    STORY_BLOCK_COMMAND_ID_BY_ACTION,
+    STORY_BLOCK_COMMAND_KEYWORDS,
     buildCommandPaletteCommands,
+    buildStoryBlockCommands,
+    getStoryBlockCommandId,
+    getStoryBlockCommandEntries,
     filterCommandPaletteCommands,
     clampCommandPaletteIndex,
     renderCommandPaletteList,

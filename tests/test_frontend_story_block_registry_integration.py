@@ -13,6 +13,7 @@ EDITOR_DIR = ROOT_DIR / "prototype_editor"
 APP_PATH = EDITOR_DIR / "app.js"
 CATALOG_MODULE_PATH = EDITOR_DIR / "modules" / "story_block_catalog.js"
 ACTION_MODULE_PATH = EDITOR_DIR / "modules" / "story_block_actions.js"
+COMMAND_PALETTE_MODULE_PATH = EDITOR_DIR / "modules" / "command_palette.js"
 
 
 def _extract_function_source(source: str, function_name: str) -> str:
@@ -58,13 +59,17 @@ def _load_story_block_registry_payload() -> dict:
         vm.createContext(context);
         vm.runInContext(fs.readFileSync({json.dumps(str(CATALOG_MODULE_PATH))}, "utf8"), context);
         vm.runInContext(fs.readFileSync({json.dumps(str(ACTION_MODULE_PATH))}, "utf8"), context);
+        vm.runInContext(fs.readFileSync({json.dumps(str(COMMAND_PALETTE_MODULE_PATH))}, "utf8"), context);
         const catalogTools = context.window.CanvasiaEditorStoryBlockCatalog;
         const actionTools = context.window.CanvasiaEditorStoryBlockActions;
+        const commandPaletteTools = context.window.CanvasiaEditorCommandPalette;
         process.stdout.write(JSON.stringify({{
           knownTypes: catalogTools.getKnownBlockTypes(),
           labelTypes: Object.keys(catalogTools.BLOCK_LABELS),
           runtimeTypes: catalogTools.getRuntimeCapabilityRows().map((row) => row.type),
           addActionTypes: actionTools.getAddBlockActionEntries().map((entry) => entry.blockType),
+          commandTypes: commandPaletteTools.buildStoryBlockCommands().map((command) => command.blockType),
+          commandIds: commandPaletteTools.buildStoryBlockCommands().map((command) => command.id),
         }}));
         """
     )
@@ -94,12 +99,15 @@ class FrontendStoryBlockRegistryIntegrationTests(unittest.TestCase):
         runtime_types = set(payload["runtimeTypes"])
         created_types = set(re.findall(r'\bif\s*\(\s*blockType\s*===\s*"([^"]+)"\s*\)', create_default_block))
         add_action_types = set(payload["addActionTypes"])
+        command_types = set(payload["commandTypes"])
 
         self.assertGreaterEqual(len(known_types), 20)
         self.assertEqual(known_types, label_types)
         self.assertEqual(known_types, runtime_types)
         self.assertEqual(known_types, created_types)
         self.assertEqual(known_types, add_action_types)
+        self.assertEqual(known_types, command_types)
+        self.assertIn("insert-wait", payload["commandIds"])
         self.assertIn("storyBlockActionTools.getAddBlockActionConfig(action)", handle_click)
         self.assertIn("addBlock(blockType, getSceneChecklistAddBlockOptions(actionTarget))", queue_add)
         self.assertIn("isKnownStoryBlockType(safeBlockType)", add_block)

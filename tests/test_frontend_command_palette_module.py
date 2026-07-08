@@ -9,6 +9,7 @@ from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "command_palette.js"
+STORY_BLOCK_ACTIONS_MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "story_block_actions.js"
 STORY_TEMPLATE_MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "story_templates.js"
 SCENE_MOOD_MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "scene_mood_recipes.js"
 
@@ -34,6 +35,7 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
             context.globalThis = context;
             vm.createContext(context);
             vm.runInContext(fs.readFileSync({json.dumps(str(SCENE_MOOD_MODULE_PATH))}, "utf8"), context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(STORY_BLOCK_ACTIONS_MODULE_PATH))}, "utf8"), context);
             vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
             const tools = context.window.CanvasiaEditorCommandPalette;
             const noProject = tools.buildCommandPaletteCommands({{ hasProject: false }});
@@ -128,6 +130,7 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
             const playableSearch = tools.filterCommandPaletteCommands(projectWithScene, "可试玩");
             const affectionSearch = tools.filterCommandPaletteCommands(projectWithScene, "好感度");
             const creditsSearch = tools.filterCommandPaletteCommands(projectWithScene, "片尾");
+            const waitSearch = tools.filterCommandPaletteCommands(projectWithScene, "等待");
             const branchMergeSearch = tools.filterCommandPaletteCommands(projectWithScene, "汇合");
             const moodSearch = tools.filterCommandPaletteCommands(projectAfterDialogue, "心动");
             const rainMoodSearch = tools.filterCommandPaletteCommands(projectAfterDialogue, "雨夜");
@@ -138,6 +141,7 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
             const firstChapterCommand = project.find((command) => command.id === "create-first-chapter");
             const disabledDialogueCommand = project.find((command) => command.id === "insert-dialogue");
             const enabledDialogueCommand = projectWithScene.find((command) => command.id === "insert-dialogue");
+            const waitCommand = projectWithScene.find((command) => command.id === "insert-wait");
             const templateCommand = projectWithScene.find((command) => command.id === "template-opening-intro");
             const playableTemplateCommand = projectWithScene.find((command) => command.id === "template-playable-scene");
             const releaseOneClickCommand = projectReleaseReady.find((command) => command.id === "release-one-click-polish");
@@ -145,6 +149,7 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
             const releaseExportCommand = projectReleaseReady.find((command) => command.id === "release-export-polish-receipt");
             process.stdout.write(JSON.stringify({{
               keys: Object.keys(tools).sort(),
+              emptyStoryBlockCommandId: tools.getStoryBlockCommandId(""),
               noProjectStoryDisabled: noProject.find((command) => command.id === "screen-story").disabled,
               noProjectDemoDisabled: noProject.find((command) => command.id === "create-playable-demo").disabled,
               exportDisabled: exportCommand.disabled,
@@ -154,6 +159,9 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
               enabledDialogueDisabled: enabledDialogueCommand.disabled,
               enabledDialogueSubtitle: enabledDialogueCommand.subtitle,
               enabledDialogueAction: enabledDialogueCommand.action,
+              storyBlockCommandCount: tools.buildStoryBlockCommands({{}}).length,
+              waitCommand: [waitCommand.id, waitCommand.action, waitCommand.blockType, waitCommand.section, waitCommand.disabled],
+              waitCommandSubtitle: waitCommand.subtitle,
               dialogueSearchIds: dialogueSearch.map((command) => command.id),
               templateAction: templateCommand.action,
               templateId: templateCommand.dataset["template-id"],
@@ -189,6 +197,7 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
               playableSearchIds: playableSearch.map((command) => command.id),
               affectionSearchIds: affectionSearch.map((command) => command.id),
               creditsSearchIds: creditsSearch.map((command) => command.id),
+              waitSearchIds: waitSearch.map((command) => command.id),
               branchMergeSearchIds: branchMergeSearch.map((command) => command.id),
               storySearchIds: storySearch.map((command) => command.id),
               clamped: tools.clampCommandPaletteIndex(99, project),
@@ -200,6 +209,7 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
         self.assertIn("buildReleaseWorkflowCommands", payload["keys"])
         self.assertIn("buildProjectSafetyCommands", payload["keys"])
         self.assertIn("buildSceneMoodRecipeCommands", payload["keys"])
+        self.assertEqual(payload["emptyStoryBlockCommandId"], "")
         self.assertTrue(payload["noProjectStoryDisabled"])
         self.assertFalse(payload["noProjectDemoDisabled"])
         self.assertFalse(payload["exportDisabled"])
@@ -209,6 +219,9 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
         self.assertFalse(payload["enabledDialogueDisabled"])
         self.assertEqual(payload["enabledDialogueAction"], "add-dialogue")
         self.assertIn("雨夜教室", payload["enabledDialogueSubtitle"])
+        self.assertGreaterEqual(payload["storyBlockCommandCount"], 24)
+        self.assertEqual(payload["waitCommand"], ["insert-wait", "add-wait", "wait", "镜头与演出", False])
+        self.assertIn("呼吸感", payload["waitCommandSubtitle"])
         self.assertIn("insert-dialogue", payload["dialogueSearchIds"])
         self.assertEqual(payload["templateAction"], "apply-story-template")
         self.assertEqual(payload["templateId"], "opening_intro")
@@ -249,6 +262,7 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
         self.assertIn("template-playable-scene", payload["playableSearchIds"])
         self.assertIn("template-affection-choice", payload["affectionSearchIds"])
         self.assertIn("template-ending-credits", payload["creditsSearchIds"])
+        self.assertIn("insert-wait", payload["waitSearchIds"])
         self.assertIn("template-branch-merge", payload["branchMergeSearchIds"])
         self.assertIn("screen-story", payload["storySearchIds"])
         self.assertGreater(payload["clamped"], 0)
@@ -263,6 +277,7 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
             vm.createContext(context);
             vm.runInContext(fs.readFileSync({json.dumps(str(STORY_TEMPLATE_MODULE_PATH))}, "utf8"), context);
             vm.runInContext(fs.readFileSync({json.dumps(str(SCENE_MOOD_MODULE_PATH))}, "utf8"), context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(STORY_BLOCK_ACTIONS_MODULE_PATH))}, "utf8"), context);
             vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
             const tools = context.window.CanvasiaEditorCommandPalette;
             const emptyScene = tools.buildCommandPaletteCommands({{
@@ -357,6 +372,7 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
             context.globalThis = context;
             vm.createContext(context);
             vm.runInContext(fs.readFileSync({json.dumps(str(SCENE_MOOD_MODULE_PATH))}, "utf8"), context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(STORY_BLOCK_ACTIONS_MODULE_PATH))}, "utf8"), context);
             vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
             const tools = context.window.CanvasiaEditorCommandPalette;
             const storage = {{
@@ -410,6 +426,7 @@ class FrontendCommandPaletteModuleTests(unittest.TestCase):
             context.globalThis = context;
             vm.createContext(context);
             vm.runInContext(fs.readFileSync({json.dumps(str(SCENE_MOOD_MODULE_PATH))}, "utf8"), context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(STORY_BLOCK_ACTIONS_MODULE_PATH))}, "utf8"), context);
             vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
             const tools = context.window.CanvasiaEditorCommandPalette;
             const html = tools.renderCommandPaletteList([
