@@ -5568,6 +5568,24 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("getBeginnerWorkflowStepStatusLabel(step)", beginner_tutorial_source)
         self.assertIn("getBeginnerWorkflowStepToneClass(step)", beginner_tutorial_source)
 
+    def test_dashboard_scene_playable_checklist_is_rendered(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        styles = STYLES_PATH.read_text(encoding="utf-8")
+        planning_card = _extract_function_source(source, "renderDashboardScenePlanningCard")
+        status_card = _extract_function_source(source, "renderDashboardSceneStatusCard")
+        checklist_renderer = _extract_function_source(source, "renderDashboardScenePlayableChecklist")
+
+        self.assertIn("function buildDashboardScenePlayableChecklist(", source)
+        self.assertIn("dashboardProductionTools.buildDashboardScenePlayableChecklist", source)
+        self.assertIn("renderDashboardScenePlayableChecklist(scene)", planning_card)
+        self.assertIn("renderDashboardScenePlayableChecklist(scene)", status_card)
+        self.assertIn("可试玩清单", checklist_renderer)
+        self.assertIn("scene-playable-checklist", checklist_renderer)
+        self.assertIn("checklist.readyCount", checklist_renderer)
+        self.assertIn(".scene-playable-checklist", styles)
+        self.assertIn(".scene-playable-checklist .issue-tag.good-text", styles)
+        self.assertIn(".scene-playable-checklist .issue-tag.warn-text", styles)
+
     def test_export_build_refreshes_current_progress_surface(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
         export_build = _extract_function_source(source, "exportBuild")

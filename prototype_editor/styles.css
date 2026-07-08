@@ -2638,6 +2638,31 @@ body[data-editor-mode="beginner"] #screen-preview #previewSceneFilterBar {
   margin-top: 10px;
 }
 
+.scene-playable-checklist {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid rgba(114, 161, 220, 0.16);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.56);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.58);
+}
+
+.scene-playable-checklist .issue-tag {
+  border-color: rgba(78, 132, 208, 0.16);
+  background: rgba(246, 250, 255, 0.82);
+  color: var(--muted);
+}
+
+.scene-playable-checklist .issue-tag.good-text {
+  border-color: rgba(74, 175, 128, 0.2);
+  background: rgba(229, 248, 238, 0.7);
+}
+
+.scene-playable-checklist .issue-tag.warn-text {
+  border-color: rgba(225, 142, 85, 0.22);
+  background: rgba(255, 241, 226, 0.74);
+}
+
 .scene-planning-quick-row {
   display: flex;
   flex-wrap: wrap;

@@ -135,7 +135,9 @@ class FrontendDashboardProductionModuleTests(unittest.TestCase):
                 tone: scene.tone,
                 summary: scene.summary,
                 nextStep: scene.nextStep,
+                checklist: scene.playableChecklist,
               }})),
+              emptyChecklist: tools.buildDashboardScenePlayableChecklist(routeOverview.nodes[2]),
               tasks: tasks.map((task) => ({{
                 title: task.title,
                 priority: task.priority,
@@ -169,12 +171,20 @@ class FrontendDashboardProductionModuleTests(unittest.TestCase):
         payload = json.loads(completed.stdout)
 
         self.assertIn("buildDashboardProductionTasks", payload["keys"])
+        self.assertIn("buildDashboardScenePlayableChecklist", payload["keys"])
         self.assertEqual(payload["progress"], [25, 100])
         self.assertIn("路线断线", payload["summaries"][0])
         self.assertIn("成品味道", payload["summaries"][1])
         self.assertEqual(payload["queue"][0]["id"], "scene_rush")
         self.assertEqual(payload["queue"][0]["tone"], "danger")
         self.assertIn("润色中", payload["queue"][0]["summary"])
+        self.assertEqual(payload["queue"][0]["checklist"]["status"], "needs_core")
+        self.assertEqual(payload["queue"][0]["checklist"]["score"], 60)
+        self.assertIn("补 BGM", payload["queue"][0]["checklist"]["nextStep"])
+        self.assertEqual(payload["queue"][1]["checklist"]["status"], "ready")
+        self.assertEqual(payload["queue"][1]["checklist"]["score"], 100)
+        self.assertEqual(payload["emptyChecklist"]["status"], "needs_core")
+        self.assertIn("先补正文", payload["emptyChecklist"]["nextStep"])
         self.assertNotIn("scene_parked", [scene["id"] for scene in payload["queue"]])
         self.assertEqual(payload["tasks"][0]["title"], "先修路线断线")
         self.assertEqual(payload["tasks"][1]["title"], "先处理结构问题")

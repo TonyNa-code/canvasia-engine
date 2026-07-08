@@ -17,6 +17,19 @@
     return Array.isArray(value) ? value : [];
   }
 
+  function cleanText(value, fallback = "") {
+    const text = String(value ?? "").replace(/\s+/g, " ").trim();
+    return text || fallback;
+  }
+
+  function toCount(value, fallback = 0) {
+    const numberValue = Number(value);
+    if (!Number.isFinite(numberValue)) {
+      return fallback;
+    }
+    return Math.max(0, Math.round(numberValue));
+  }
+
   function getMetrics(routeOverview = {}) {
     return routeOverview.metrics ?? {};
   }
@@ -168,27 +181,115 @@
   }
 
   function buildDashboardScenePlanningNextStep(scene = {}) {
-    if (!scene.hasStoryContent) {
-      return "先补一两句正文，让这段先能玩起来。";
-    }
+    return buildDashboardScenePlayableChecklist(scene).nextStep;
+  }
 
-    if (!scene.hasBackground) {
-      return "先切一个背景，画面完成感会立刻好很多。";
-    }
+  function makeSceneChecklistAction(scene, label) {
+    return {
+      label,
+      action: "open-scene-from-map",
+      sceneId: cleanText(scene.id),
+    };
+  }
 
-    if (!scene.hasMusic) {
-      return "补一张 BGM 卡片，会比继续堆文字更快提升氛围。";
-    }
+  function makeSceneChecklistItem({ id, label, ready, pending = false, essential = false, readyText, missingText, pendingText, action }) {
+    const status = ready ? "ready" : pending ? "pending" : "missing";
+    return {
+      id,
+      label,
+      essential,
+      status,
+      tone: status === "ready" ? "good" : essential ? "warn" : "soft",
+      text: status === "ready" ? readyText : status === "pending" ? pendingText : missingText,
+      action: status === "ready" ? null : action,
+    };
+  }
 
-    if ((scene.missingVoiceCount ?? 0) > 0) {
-      return `这段还差 ${scene.missingVoiceCount} 句语音，补上后试玩会更像正式作品。`;
-    }
-
-    if (!scene.hasEffects) {
-      return "这段正文已经站住了，最适合加镜头、粒子或滤镜。";
-    }
-
-    return "这段已经有试玩味道了，可以回去跑一遍手感。";
+  function buildDashboardScenePlayableChecklist(scene = {}) {
+    const dialogueCount = toCount(scene.dialogueCount);
+    const narrationCount = toCount(scene.narrationCount);
+    const choiceCount = toCount(scene.choiceCount);
+    const textBlockCount = dialogueCount + narrationCount + choiceCount;
+    const hasStoryContent = Boolean(scene.hasStoryContent) || textBlockCount > 0;
+    const hasBackground = Boolean(scene.hasBackground);
+    const hasMusic = Boolean(scene.hasMusic);
+    const hasEffects = Boolean(scene.hasEffects);
+    const missingVoiceCount = toCount(scene.missingVoiceCount);
+    const checklist = [
+      makeSceneChecklistItem({
+        id: "story",
+        label: "正文",
+        essential: true,
+        ready: hasStoryContent,
+        readyText: textBlockCount > 0 ? `正文 ${textBlockCount} 张` : "已有正文骨架",
+        missingText: "先补正文",
+        action: makeSceneChecklistAction(scene, "补正文"),
+      }),
+      makeSceneChecklistItem({
+        id: "background",
+        label: "背景",
+        essential: true,
+        ready: hasBackground,
+        pending: !hasStoryContent,
+        readyText: "已有背景",
+        missingText: "补背景",
+        pendingText: "等正文后补背景",
+        action: makeSceneChecklistAction(scene, "补背景"),
+      }),
+      makeSceneChecklistItem({
+        id: "music",
+        label: "BGM",
+        essential: true,
+        ready: hasMusic,
+        pending: !hasStoryContent,
+        readyText: "已有 BGM",
+        missingText: "补 BGM",
+        pendingText: "等正文后配 BGM",
+        action: makeSceneChecklistAction(scene, "补 BGM"),
+      }),
+      makeSceneChecklistItem({
+        id: "voice",
+        label: "语音",
+        ready: missingVoiceCount === 0,
+        pending: !hasStoryContent,
+        readyText: "语音已齐",
+        missingText: `缺语音 ${missingVoiceCount} 句`,
+        pendingText: "等台词后配语音",
+        action: makeSceneChecklistAction(scene, "补语音"),
+      }),
+      makeSceneChecklistItem({
+        id: "presentation",
+        label: "演出",
+        ready: hasEffects,
+        pending: !hasStoryContent,
+        readyText: "已有演出",
+        missingText: "加镜头 / 特效",
+        pendingText: "等正文后补演出",
+        action: makeSceneChecklistAction(scene, "补演出"),
+      }),
+    ];
+    const readyCount = checklist.filter((item) => item.status === "ready").length;
+    const missingItems = checklist.filter((item) => item.status !== "ready");
+    const essentialMissingCount = checklist.filter((item) => item.essential && item.status !== "ready").length;
+    const firstMissing = missingItems.find((item) => item.status === "missing") ?? missingItems[0] ?? null;
+    const score = getDashboardProgressPercent(readyCount, checklist.length);
+    const status = essentialMissingCount > 0 ? "needs_core" : missingItems.length > 0 ? "needs_polish" : "ready";
+    return {
+      status,
+      score,
+      readyCount,
+      totalCount: checklist.length,
+      missingCount: missingItems.length,
+      essentialMissingCount,
+      label: status === "ready" ? "可试玩" : status === "needs_polish" ? "可试玩，待打磨" : "还差基础项",
+      nextStep: firstMissing
+        ? firstMissing.status === "pending"
+          ? firstMissing.text
+          : `${firstMissing.text}，让这段更接近可试玩。`
+        : "这段已经有试玩味道了，可以回去跑一遍手感。",
+      firstMissing,
+      items: checklist,
+    };
   }
 
   function buildDashboardScenePlanningQueue(routeOverview = {}, helpers = {}) {
@@ -202,6 +303,7 @@
         ...scene,
         tone: getScenePlanningTone(scene, helpers),
         summary: buildDashboardScenePlanningSummary(scene, helpers),
+        playableChecklist: buildDashboardScenePlayableChecklist(scene),
         nextStep: buildDashboardScenePlanningNextStep(scene),
         planningScore:
           getScenePlanningPriorityRank(scene.priority, helpers) * 100 +
@@ -518,6 +620,7 @@
           ...scene,
           tone: getScenePlanningTone(scene, helpers),
           summary: buildDashboardScenePlanningSummary(scene, helpers),
+          playableChecklist: buildDashboardScenePlayableChecklist(scene),
           nextStep: buildDashboardScenePlanningNextStep(scene),
         }))
         .sort((left, right) => {
@@ -556,6 +659,7 @@
     buildDashboardScenePlanningQueue,
     buildDashboardScenePlanningSummary,
     buildDashboardSceneStatusColumns,
+    buildDashboardScenePlayableChecklist,
     getDashboardProgressPercent,
     getDashboardTaskToneClass,
     getScenePlanningPriorityRank,

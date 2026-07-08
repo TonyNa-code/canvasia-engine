@@ -10928,6 +10928,10 @@ function buildDashboardScenePlanningNextStep(scene) {
   return dashboardProductionTools.buildDashboardScenePlanningNextStep(scene);
 }
 
+function buildDashboardScenePlayableChecklist(scene) {
+  return dashboardProductionTools.buildDashboardScenePlayableChecklist(scene);
+}
+
 function buildDashboardScenePlanningQueue(routeOverview) {
   return dashboardProductionTools.buildDashboardScenePlanningQueue(routeOverview, getDashboardProductionHelpers());
 }
@@ -10993,6 +10997,7 @@ function renderDashboardScenePlanningCard(scene) {
       </div>
       <strong>${escapeHtml(scene.name)}</strong>
       <p>${escapeHtml(scene.summary)}</p>
+      ${renderDashboardScenePlayableChecklist(scene)}
       <div class="story-scene-planner-tags">${renderScenePlanningBadges(scene)}</div>
       ${renderScenePlanningQuickButtons(scene)}
       <div class="detail-meta">${escapeHtml(scene.notes || scene.nextStep)}</div>
@@ -11011,6 +11016,25 @@ function renderDashboardScenePlanningCard(scene) {
         ])}
       </div>
     </article>
+  `;
+}
+
+function renderDashboardScenePlayableChecklist(scene) {
+  const checklist = scene.playableChecklist ?? buildDashboardScenePlayableChecklist(scene);
+  return `
+    <div class="story-scene-planner-tags scene-playable-checklist" title="${escapeHtml(
+      `可试玩清单：${checklist.readyCount}/${checklist.totalCount} · ${checklist.label}`
+    )}">
+      ${checklist.items
+        .map(
+          (item) => `
+            <span class="issue-tag ${item.status === "ready" ? "good-text" : item.essential ? "warn-text" : ""}">
+              ${escapeHtml(item.label)}：${escapeHtml(item.status === "ready" ? "OK" : item.text)}
+            </span>
+          `
+        )
+        .join("")}
+    </div>
   `;
 }
 
@@ -11072,6 +11096,7 @@ function renderDashboardSceneStatusCard(scene) {
       <strong>${escapeHtml(scene.name)}</strong>
       <p>${escapeHtml(scene.summary)}</p>
       <div class="scene-status-drag-hint">拖到别的列，就会改成那个制作状态</div>
+      ${renderDashboardScenePlayableChecklist(scene)}
       <div class="story-scene-planner-tags">${renderScenePlanningBadges(scene)}</div>
       ${renderScenePlanningQuickButtons(scene)}
       <div class="detail-meta">${escapeHtml(scene.notes || scene.nextStep)}</div>
