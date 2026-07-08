@@ -26,6 +26,7 @@ NATIVE_RUNTIME_SETTINGS_PATH = ROOT_DIR / "native_runtime" / "runtime_player_set
 NATIVE_RUNTIME_TEXT_EFFECTS_PATH = ROOT_DIR / "native_runtime" / "runtime_text_effects.py"
 PROJECT_POLISH_RECEIPT_PANEL_PATH = EDITOR_DIR / "modules" / "project_polish_receipt_panel.js"
 DASHBOARD_PRIMARY_ACTIONS_PATH = EDITOR_DIR / "modules" / "dashboard_primary_actions.js"
+STORY_BLOCK_ACTIONS_PATH = EDITOR_DIR / "modules" / "story_block_actions.js"
 SCENE_CHECKLIST_FOCUS_PATH = EDITOR_DIR / "modules" / "scene_checklist_focus.js"
 TYPEWRITER_MODULE_PATH = EDITOR_DIR / "modules" / "typewriter.js"
 ASSET_IMPORT_RULES_PATH = EDITOR_DIR / "modules" / "asset_import_rules.js"
@@ -40,6 +41,7 @@ ACTION_ATTRIBUTE_PATTERN = re.compile(
 ACTION_HANDLER_PATTERN = re.compile(r"\baction\s*===\s*([\"'])([^\"']+)\1")
 ACTION_CASE_HANDLER_PATTERN = re.compile(r"\bcase\s+([\"'])([^\"']+)\1\s*:")
 ACTION_CONFIG_VALUE_PATTERN = re.compile(r"\baction\s*:\s*([\"'])([^\"']+)\1")
+ADD_BLOCK_ACTION_KEY_PATTERN = re.compile(r"^\s*\"([^\"]+)\":\s*Object\.freeze\(\{", re.MULTILINE)
 
 DYNAMIC_DATA_ACTION_MARKERS = Counter(
     {
@@ -79,6 +81,10 @@ def _get_handled_actions() -> set[str]:
         match.group(2)
         for match in ACTION_CASE_HANDLER_PATTERN.finditer(click_handler)
     )
+    if "storyBlockActionTools.getAddBlockActionConfig(action)" in click_handler:
+        handled_actions.update(
+            ADD_BLOCK_ACTION_KEY_PATTERN.findall(STORY_BLOCK_ACTIONS_PATH.read_text(encoding="utf-8"))
+        )
     return handled_actions
 
 
@@ -241,6 +247,7 @@ class FrontendActionHandlerTests(unittest.TestCase):
         html = INDEX_PATH.read_text(encoding="utf-8")
         app_source = APP_PATH.read_text(encoding="utf-8")
         command_palette_source = (EDITOR_DIR / "modules" / "command_palette.js").read_text(encoding="utf-8")
+        story_block_actions_source = STORY_BLOCK_ACTIONS_PATH.read_text(encoding="utf-8")
         editor_mode_source = (EDITOR_DIR / "modules" / "editor_mode.js").read_text(encoding="utf-8")
         story_templates_source = (EDITOR_DIR / "modules" / "story_templates.js").read_text(encoding="utf-8")
         story_template_application_source = (EDITOR_DIR / "modules" / "story_template_application.js").read_text(
@@ -310,7 +317,8 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn('action === "close-command-palette"', handle_click)
         self.assertIn('action === "run-command-palette-command"', handle_click)
         self.assertIn('data-action="add-wait"', html)
-        self.assertIn('action === "add-wait"', handle_click)
+        self.assertIn('"add-wait": Object.freeze({ blockType: "wait" })', story_block_actions_source)
+        self.assertIn("storyBlockActionTools.getAddBlockActionConfig(action)", handle_click)
         self.assertIn('action === "apply-scene-mood-recipe"', handle_click)
         self.assertIn("sceneMoodRecipeTools.applySceneMoodRecipe", apply_scene_mood_recipe)
         self.assertIn("getSafeAssetIdByType(\"bgm\")", apply_scene_mood_recipe)
@@ -5633,6 +5641,7 @@ class FrontendActionHandlerTests(unittest.TestCase):
     def test_scene_checklist_add_actions_clear_completed_focus_after_save(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
         dashboard_production_source = (EDITOR_DIR / "modules" / "dashboard_production.js").read_text(encoding="utf-8")
+        story_block_actions_source = STORY_BLOCK_ACTIONS_PATH.read_text(encoding="utf-8")
         scene_checklist_focus_source = SCENE_CHECKLIST_FOCUS_PATH.read_text(encoding="utf-8")
         handle_click = _extract_function_source(source, "handleClick")
         add_options = _extract_function_source(source, "getSceneChecklistAddBlockOptions")
@@ -5645,14 +5654,18 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn('"scene-checklist-complete": "music"', dashboard_production_source)
         self.assertIn('"scene-checklist-complete": "presentation"', dashboard_production_source)
         self.assertIn('"story-block-issue": "missing_voice"', dashboard_production_source)
+        self.assertIn("const storyBlockActionTools = window.CanvasiaEditorStoryBlockActions", source)
         self.assertIn("const sceneChecklistFocusTools = window.CanvasiaEditorSceneChecklistFocus", source)
+        self.assertIn('"add-dialogue"', story_block_actions_source)
+        self.assertIn('"add-music-play"', story_block_actions_source)
+        self.assertIn('"add-camera-zoom"', story_block_actions_source)
         self.assertIn("sceneChecklistComplete", scene_checklist_focus_source)
         self.assertIn("checklistCompleteItem", scene_checklist_focus_source)
+        self.assertIn("storyBlockActionTools.getAddBlockActionConfig(action)", handle_click)
+        self.assertIn("ensureStarterVariables(requirement)", handle_click)
+        self.assertIn("queueAddBlockFromAction(actionTarget, addBlockActionConfig.blockType)", handle_click)
         self.assertIn("sceneChecklistFocusTools.getAddBlockOptionsFromDataset", add_options)
         self.assertIn("addBlock(blockType, getSceneChecklistAddBlockOptions(actionTarget))", queue_add)
-        self.assertIn('queueAddBlockFromAction(actionTarget, "dialogue")', handle_click)
-        self.assertIn('queueAddBlockFromAction(actionTarget, "music_play")', handle_click)
-        self.assertIn('queueAddBlockFromAction(actionTarget, "camera_zoom")', handle_click)
         self.assertIn("async function addBlock(blockType, options = {})", source)
         self.assertIn("completeSceneChecklistFocus(options.checklistCompleteItem", add_block)
         self.assertIn("sceneChecklistFocusTools.shouldCompleteFocus(focus, checklistItem)", complete_focus)

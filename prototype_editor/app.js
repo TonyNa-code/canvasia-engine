@@ -49,6 +49,7 @@ const {
 
 const storyBlockCatalogTools = window.CanvasiaEditorStoryBlockCatalog;
 const { BLOCK_LABELS, MUSIC_END_MODE_LABELS, CHOICE_CONTINUE_TARGET } = storyBlockCatalogTools;
+const storyBlockActionTools = window.CanvasiaEditorStoryBlockActions;
 const storyBlockEditorTools = window.CanvasiaEditorStoryBlockEditors;
 const musicRangeScopeTools = window.CanvasiaEditorMusicRangeScope;
 const storyTemplateTools = window.CanvasiaEditorStoryTemplates;
@@ -4018,128 +4019,11 @@ async function handleClick(event) {
     return;
   }
 
-  if (action === "add-dialogue") {
-    queueAddBlockFromAction(actionTarget, "dialogue");
-    return;
-  }
-
-  if (action === "add-narration") {
-    queueAddBlockFromAction(actionTarget, "narration");
-    return;
-  }
-
-  if (action === "add-choice") {
-    queueAddBlockFromAction(actionTarget, "choice");
-    return;
-  }
-
-  if (action === "add-background") {
-    queueAddBlockFromAction(actionTarget, "background");
-    return;
-  }
-
-  if (action === "add-character-show") {
-    queueAddBlockFromAction(actionTarget, "character_show");
-    return;
-  }
-
-  if (action === "add-character-hide") {
-    queueAddBlockFromAction(actionTarget, "character_hide");
-    return;
-  }
-
-  if (action === "add-music-play") {
-    queueAddBlockFromAction(actionTarget, "music_play");
-    return;
-  }
-
-  if (action === "add-music-stop") {
-    queueAddBlockFromAction(actionTarget, "music_stop");
-    return;
-  }
-
-  if (action === "add-sfx-play") {
-    queueAddBlockFromAction(actionTarget, "sfx_play");
-    return;
-  }
-
-  if (action === "add-video-play") {
-    queueAddBlockFromAction(actionTarget, "video_play");
-    return;
-  }
-
-  if (action === "add-credits-roll") {
-    queueAddBlockFromAction(actionTarget, "credits_roll");
-    return;
-  }
-
-  if (action === "add-wait") {
-    queueAddBlockFromAction(actionTarget, "wait");
-    return;
-  }
-
-  if (action === "add-particle-effect") {
-    queueAddBlockFromAction(actionTarget, "particle_effect");
-    return;
-  }
-
-  if (action === "add-screen-shake") {
-    queueAddBlockFromAction(actionTarget, "screen_shake");
-    return;
-  }
-
-  if (action === "add-screen-flash") {
-    queueAddBlockFromAction(actionTarget, "screen_flash");
-    return;
-  }
-
-  if (action === "add-screen-fade") {
-    queueAddBlockFromAction(actionTarget, "screen_fade");
-    return;
-  }
-
-  if (action === "add-camera-zoom") {
-    queueAddBlockFromAction(actionTarget, "camera_zoom");
-    return;
-  }
-
-  if (action === "add-camera-pan") {
-    queueAddBlockFromAction(actionTarget, "camera_pan");
-    return;
-  }
-
-  if (action === "add-screen-filter") {
-    queueAddBlockFromAction(actionTarget, "screen_filter");
-    return;
-  }
-
-  if (action === "add-depth-blur") {
-    queueAddBlockFromAction(actionTarget, "depth_blur");
-    return;
-  }
-
-  if (action === "add-jump") {
-    queueAddBlockFromAction(actionTarget, "jump");
-    return;
-  }
-
-  if (action === "add-variable-set") {
-    if (await ensureStarterVariables({ reason: "变量设置卡片需要先有变量。" })) {
-      queueAddBlockFromAction(actionTarget, "variable_set");
-    }
-    return;
-  }
-
-  if (action === "add-variable-add") {
-    if (await ensureStarterVariables({ requireNumber: true, reason: "数字变量变化卡片需要先有数字变量。" })) {
-      queueAddBlockFromAction(actionTarget, "variable_add");
-    }
-    return;
-  }
-
-  if (action === "add-condition") {
-    if (await ensureStarterVariables({ reason: "条件判断需要先有变量。" })) {
-      queueAddBlockFromAction(actionTarget, "condition");
+  const addBlockActionConfig = storyBlockActionTools.getAddBlockActionConfig(action);
+  if (addBlockActionConfig) {
+    const requirement = addBlockActionConfig.variableRequirement;
+    if (!requirement || (await ensureStarterVariables(requirement))) {
+      queueAddBlockFromAction(actionTarget, addBlockActionConfig.blockType);
     }
     return;
   }

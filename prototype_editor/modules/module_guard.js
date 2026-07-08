@@ -2,6 +2,7 @@
   const REQUIRED_EDITOR_MODULES = Object.freeze([
     { globalName: "CanvasiaRuntimeConditions", script: "../export_player_template/runtime_conditions.js", label: "运行条件系统" },
     { globalName: "CanvasiaEditorStoryBlockCatalog", script: "./modules/story_block_catalog.js", label: "剧情卡片目录" },
+    { globalName: "CanvasiaEditorStoryBlockActions", script: "./modules/story_block_actions.js", label: "剧情卡片动作" },
     { globalName: "CanvasiaEditorStoryBlockEditors", script: "./modules/story_block_editors.js", label: "剧情卡片编辑器" },
     { globalName: "CanvasiaEditorMusicRangeScope", script: "./modules/music_range_scope.js", label: "音乐范围系统" },
     { globalName: "CanvasiaEditorStoryTemplates", script: "./modules/story_templates.js", label: "剧情模板" },
