@@ -39,6 +39,7 @@ jobs:
       - name: Python syntax check
         run: |
           python -m py_compile \
+            export_report_descriptions.py \
             export_release_control.py \
             export_icon.py \
             export_provenance_verifier.py \
@@ -67,6 +68,7 @@ jobs:
             tests/test_prepare_preview_release.py \
             tests/test_export_icon.py \
             tests/test_export_provenance_verifier.py \
+            tests/test_export_report_description_parity.py \
             tests/test_export_release_artifacts.py \
             tests/test_export_release_control.py \
             tests/test_release_public_surface.py \
@@ -286,6 +288,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_prepare_preview_release.py' -v
           python -m unittest discover -s tests -p 'test_export_icon.py' -v
           python -m unittest discover -s tests -p 'test_export_provenance_verifier.py' -v
+          python -m unittest discover -s tests -p 'test_export_report_description_parity.py' -v
           python -m unittest discover -s tests -p 'test_export_release_artifacts.py' -v
           python -m unittest discover -s tests -p 'test_export_release_control.py' -v
           python -m unittest discover -s tests -p 'test_release_public_surface.py' -v

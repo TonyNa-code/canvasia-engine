@@ -3,7 +3,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 
-from export_package_guide import clean_guide_text, describe_export_report_file, normalize_guide_items
+from export_package_guide import clean_guide_text, normalize_guide_items
+from export_report_descriptions import describe_export_report_file
 
 
 EXPORT_RELEASE_EVIDENCE_PACK_NAME = "release-evidence-pack.md"
