@@ -7270,7 +7270,7 @@ function getSceneChecklistAddBlockOptions(actionTarget) {
 function completeSceneChecklistFocus(checklistItem, blockLabel) {
   const focus = state.sceneChecklistFocus;
   if (!sceneChecklistFocusTools.shouldCompleteFocus(focus, checklistItem)) {
-    return;
+    return false;
   }
 
   const feedback = sceneChecklistFocusTools.buildCompletionFeedback(focus, blockLabel);
@@ -7282,6 +7282,7 @@ function completeSceneChecklistFocus(checklistItem, blockLabel) {
 
   setSaveStatus(feedback.statusMessage);
   showToast(feedback.toastMessage);
+  return true;
 }
 
 function openSceneFromRouteMap(sceneId, mode = "story", options = {}) {
@@ -35144,6 +35145,9 @@ async function addBlock(blockType, options = {}) {
   const newBlock = createDefaultBlock(updatedScene, safeBlockType);
   const selectedIndex = updatedScene.blocks.findIndex((block) => block.id === state.selectedBlockId);
   const insertIndex = selectedIndex >= 0 ? selectedIndex + 1 : updatedScene.blocks.length;
+  const feedback = storyBlockActionTools.buildAddBlockSuccessFeedback(
+    storyBlockActionTools.getAddBlockActionConfigByBlockType(safeBlockType) ?? { label: getBlockLabel(safeBlockType) }
+  );
 
   updatedScene.blocks.splice(insertIndex, 0, newBlock);
 
@@ -35152,11 +35156,14 @@ async function addBlock(blockType, options = {}) {
     selectedBlockId: newBlock.id,
     previewSceneId: updatedScene.id,
     previewBlockIndex: insertIndex,
-    successMessage: `已新增${getBlockLabel(safeBlockType)}`,
+    successMessage: feedback.statusMessage,
   });
 
   if (success) {
-    completeSceneChecklistFocus(options.checklistCompleteItem, getBlockLabel(safeBlockType));
+    const completedChecklist = completeSceneChecklistFocus(options.checklistCompleteItem, getBlockLabel(safeBlockType));
+    if (!completedChecklist) {
+      showToast(feedback.toastMessage);
+    }
     if (state.currentScreen !== "story") {
       switchScreen("story");
     }

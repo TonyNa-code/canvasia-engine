@@ -189,6 +189,16 @@
     return cloneActionConfig(ADD_BLOCK_ACTIONS[String(action ?? "").trim()]);
   }
 
+  function getAddBlockActionConfigByBlockType(blockType) {
+    const safeBlockType = String(blockType ?? "").trim();
+    if (!safeBlockType) {
+      return null;
+    }
+
+    const match = Object.values(ADD_BLOCK_ACTIONS).find((config) => config.blockType === safeBlockType);
+    return cloneActionConfig(match);
+  }
+
   function getAddBlockActionEntries() {
     return Object.entries(ADD_BLOCK_ACTIONS).map(([action, config]) => ({
       action,
@@ -213,11 +223,24 @@
       .join("｜");
   }
 
+  function buildAddBlockSuccessFeedback(config) {
+    const label = String(config?.label ?? "").trim() || "剧情卡片";
+    const description = String(config?.description ?? "").trim();
+    const statusMessage = description ? `已新增${label}：${description}` : `已新增${label}`;
+    return {
+      label,
+      statusMessage,
+      toastMessage: `已新增${label}`,
+    };
+  }
+
   global.CanvasiaEditorStoryBlockActions = Object.freeze({
     ADD_BLOCK_ACTIONS,
     GROUP_LABELS,
+    buildAddBlockSuccessFeedback,
     buildButtonTitle,
     getAddBlockActionConfig,
+    getAddBlockActionConfigByBlockType,
     getAddBlockActionEntries,
     getBeginnerAddBlockActionEntries,
     getBeginnerAddBlockActions,

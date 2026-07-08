@@ -38,6 +38,10 @@ class FrontendStoryBlockActionsModuleTests(unittest.TestCase):
               variableAddConfig,
               stableVariableAddConfig: tools.getAddBlockActionConfig("add-variable-add"),
               dialogueTitle: tools.buildButtonTitle(dialogueConfig),
+              dialogueFeedback: tools.buildAddBlockSuccessFeedback(dialogueConfig),
+              fallbackFeedback: tools.buildAddBlockSuccessFeedback(null),
+              dialogueByType: tools.getAddBlockActionConfigByBlockType("dialogue"),
+              missingByType: tools.getAddBlockActionConfigByBlockType("missing"),
               flowLabel: tools.getGroupLabel("flow"),
             }}));
             """
@@ -60,8 +64,10 @@ class FrontendStoryBlockActionsModuleTests(unittest.TestCase):
             [
                 "ADD_BLOCK_ACTIONS",
                 "GROUP_LABELS",
+                "buildAddBlockSuccessFeedback",
                 "buildButtonTitle",
                 "getAddBlockActionConfig",
+                "getAddBlockActionConfigByBlockType",
                 "getAddBlockActionEntries",
                 "getBeginnerAddBlockActionEntries",
                 "getBeginnerAddBlockActions",
@@ -107,6 +113,16 @@ class FrontendStoryBlockActionsModuleTests(unittest.TestCase):
         self.assertIn("数字变量变化卡片", payload["stableVariableAddConfig"]["variableRequirement"]["reason"])
         self.assertIn("台词", payload["dialogueTitle"])
         self.assertIn("分类：剧情文本", payload["dialogueTitle"])
+        self.assertEqual(payload["dialogueFeedback"]["toastMessage"], "已新增台词")
+        self.assertIn("已新增台词：", payload["dialogueFeedback"]["statusMessage"])
+        self.assertIn("角色对白", payload["dialogueFeedback"]["statusMessage"])
+        self.assertEqual(payload["fallbackFeedback"], {
+            "label": "剧情卡片",
+            "statusMessage": "已新增剧情卡片",
+            "toastMessage": "已新增剧情卡片",
+        })
+        self.assertEqual(payload["dialogueByType"]["label"], "台词")
+        self.assertIsNone(payload["missingByType"])
         self.assertEqual(payload["flowLabel"], "路线与逻辑")
 
 
