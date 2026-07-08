@@ -110,6 +110,7 @@ jobs:
             tests/test_frontend_localization_coverage_module.py \
             tests/test_frontend_playtest_handoff_report_module.py \
             tests/test_frontend_presentation_timeline_module.py \
+            tests/test_frontend_presentation_timeline_panel_module.py \
             tests/test_frontend_preview_regression_module.py \
             tests/test_frontend_preview_save_module.py \
             tests/test_frontend_production_backlog_module.py \
@@ -213,6 +214,7 @@ jobs:
           node --check prototype_editor/modules/preview_save.js
           node --check prototype_editor/modules/playtest_handoff_report.js
           node --check prototype_editor/modules/presentation_timeline.js
+          node --check prototype_editor/modules/presentation_timeline_panel.js
           node --check prototype_editor/modules/preview_regression.js
           node --check prototype_editor/modules/regression_diagnostics.js
           node --check prototype_editor/modules/project_center.js
@@ -336,6 +338,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_localization_coverage_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_playtest_handoff_report_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_presentation_timeline_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_presentation_timeline_panel_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_preview_regression_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_preview_save_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_production_backlog_module.py' -v

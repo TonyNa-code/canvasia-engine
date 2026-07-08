@@ -79,6 +79,7 @@ const audioCueSheetPanelTools = window.CanvasiaEditorAudioCueSheetPanel;
 const stageDirectionSheetTools = window.CanvasiaEditorStageDirectionSheet;
 const stageDirectionSheetPanelTools = window.CanvasiaEditorStageDirectionSheetPanel;
 const presentationTimelineTools = window.CanvasiaEditorPresentationTimeline;
+const presentationTimelinePanelTools = window.CanvasiaEditorPresentationTimelinePanel;
 const scenePolishTools = window.CanvasiaEditorScenePolish;
 const sceneMoodRecipeTools = window.CanvasiaEditorSceneMoodRecipes;
 const dashboardProductionTools = window.CanvasiaEditorDashboardProduction;
@@ -32089,94 +32090,9 @@ function renderStageDirectionSheetPanel() {
   return stageDirectionSheetPanelTools.renderStageDirectionSheetPanel(sheet);
 }
 
-function getPresentationTimelineToneClass(status) {
-  if (status === "blocked") {
-    return "danger-text";
-  }
-  if (status === "warn") {
-    return "warn-text";
-  }
-  if (status === "ready") {
-    return "good-text";
-  }
-  return "";
-}
-
 function renderPresentationTimelinePanel() {
   const timeline = buildPresentationTimeline();
-  const digest = presentationTimelineTools.getPresentationTimelineStatusDigest(timeline);
-  const summary = timeline.summary ?? {};
-  const topIssues = (timeline.issues ?? []).slice(0, 4);
-  const scenePreview = (timeline.sceneReports ?? []).filter((scene) => scene.eventCount > 0).slice(0, 4);
-
-  return `
-    <article class="detail-card preview-sprint-panel">
-      <div class="panel-heading">
-        <h2>演出时间轴</h2>
-        <span class="badge badge-soft ${getPresentationTimelineToneClass(digest.status)}">${escapeHtml(digest.title)}</span>
-      </div>
-      <p class="helper-text">${escapeHtml(digest.detail)} 它会把正文、背景、立绘、BGM、视频和镜头效果按场景整理，帮助发布前检查节奏是不是像正式作品。</p>
-      <div class="preview-sprint-metrics">
-        ${renderRouteMetricCard("演出事件", `${summary.eventCount ?? 0} 个`, "正文、画面、音频和镜头卡")}
-        ${renderRouteMetricCard("预计时长", summary.estimatedDurationLabel ?? "0 秒", "按文字速度和演出卡估算")}
-        ${renderRouteMetricCard("长静态段", `${summary.longStaticTextRunCount ?? 0} 段`, "连续文本缺少画面变化")}
-        ${renderRouteMetricCard("硬切音频", `${summary.abruptAudioCount ?? 0} 处`, "BGM 淡入淡出不足")}
-      </div>
-      <div class="detail-actions">
-        <button class="toolbar-button toolbar-button-primary" data-action="export-presentation-timeline-markdown">
-          导出演出时间轴
-        </button>
-        <button class="toolbar-button" data-action="export-presentation-timeline-csv">
-          导出时间轴 CSV
-        </button>
-        <button class="toolbar-button" data-action="switch-screen" data-screen="story">
-          去剧情页调整演出
-        </button>
-      </div>
-      ${
-        topIssues.length > 0
-          ? `
-            <div class="preview-sprint-grid">
-              ${topIssues
-                .map(
-                  (issue) => `
-                    <article class="preview-sprint-card is-${issue.severity === "blocker" ? "danger" : issue.severity === "warn" ? "warn" : "soft"}">
-                      <div class="preview-sprint-head">
-                        <strong>${escapeHtml(issue.title)}</strong>
-                        <span class="issue-tag ${issue.severity === "blocker" ? "danger-text" : issue.severity === "warn" ? "warn-text" : ""}">
-                          ${escapeHtml(issue.severity === "blocker" ? "先修" : issue.severity === "warn" ? "复查" : "润色")}
-                        </span>
-                      </div>
-                      <p>${escapeHtml([issue.chapterName, issue.sceneName, issue.blockLabel].filter(Boolean).join(" · "))}</p>
-                      <div class="helper-text">${escapeHtml(issue.detail)}</div>
-                    </article>
-                  `
-                )
-                .join("")}
-            </div>
-          `
-          : scenePreview.length > 0
-            ? `
-              <div class="list-stack compact-stack">
-                ${scenePreview
-                  .map(
-                    (scene) => `
-                      <div class="route-testing-item">
-                        <div>
-                          <b>${escapeHtml(scene.sceneName)}</b>
-                          <span>${escapeHtml(`${scene.chapterName} · ${scene.eventCount} 个演出事件`)}</span>
-                        </div>
-                        <span>${escapeHtml(`${scene.estimatedDurationLabel} · ${scene.statusLabel}`)}</span>
-                      </div>
-                    `
-                  )
-                  .join("")}
-              </div>
-            `
-            : renderEmpty("当前项目还没有可列出的演出时间轴。可以先在剧情页添加背景、角色、正文或 BGM。")
-      }
-    </article>
-  `;
+  return presentationTimelinePanelTools.renderPresentationTimelinePanel(timeline);
 }
 
 function getLocalizationCoverageToneClass(status) {

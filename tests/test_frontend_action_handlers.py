@@ -5282,6 +5282,8 @@ class FrontendActionHandlerTests(unittest.TestCase):
 
     def test_presentation_timeline_export_actions_are_wired(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
+        panel_source = (ROOT_DIR / "prototype_editor" / "modules" / "presentation_timeline_panel.js").read_text(encoding="utf-8")
+        combined_source = f"{source}\n{panel_source}"
         click_handler = _extract_function_source(source, "handleClick")
         markdown_block_start = click_handler.index('action === "export-presentation-timeline-markdown"')
         csv_block_start = click_handler.index('action === "export-presentation-timeline-csv"')
@@ -5290,16 +5292,20 @@ class FrontendActionHandlerTests(unittest.TestCase):
         csv_block = click_handler[csv_block_start:csv_block_end]
 
         self.assertIn("const presentationTimelineTools = window.CanvasiaEditorPresentationTimeline", source)
-        self.assertIn('data-action="export-presentation-timeline-markdown"', source)
-        self.assertIn('data-action="export-presentation-timeline-csv"', source)
+        self.assertIn("const presentationTimelinePanelTools = window.CanvasiaEditorPresentationTimelinePanel", source)
+        self.assertIn('data-action="export-presentation-timeline-markdown"', combined_source)
+        self.assertIn('data-action="export-presentation-timeline-csv"', combined_source)
         self.assertIn("exportPresentationTimelineMarkdown();", markdown_block)
         self.assertIn("exportPresentationTimelineCsv();", csv_block)
         self.assertIn("function buildPresentationTimeline()", source)
         self.assertIn("function renderPresentationTimelinePanel()", source)
+        self.assertIn("presentationTimelinePanelTools.renderPresentationTimelinePanel(timeline)", source)
         self.assertIn("function exportPresentationTimelineMarkdown()", source)
         self.assertIn("function exportPresentationTimelineCsv()", source)
         self.assertIn("presentationTimelineTools.buildPresentationTimeline", source)
-        self.assertIn("presentationTimelineTools.getPresentationTimelineStatusDigest", source)
+        self.assertIn("presentationTimelineTools.getPresentationTimelineStatusDigest", panel_source)
+        self.assertIn("function renderPresentationRehearsalQueue", panel_source)
+        self.assertIn("排练优先队列", panel_source)
 
     def test_localization_coverage_export_actions_are_wired(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
