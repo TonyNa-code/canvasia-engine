@@ -228,6 +228,7 @@ def build_release_tooling_steps(python_executable: str) -> list[VerifyStep]:
         build_unittest_step("Export icon contract", "test_export_icon.py", "release-tests", python_executable),
         build_unittest_step("Export provenance verifier contract", "test_export_provenance_verifier.py", "release-tests", python_executable),
         build_unittest_step("Export release artifacts contract", "test_export_release_artifacts.py", "release-tests", python_executable),
+        build_unittest_step("Export release evidence pack contract", "test_export_release_evidence_pack.py", "release-tests", python_executable),
         build_unittest_step("Export route playtest workbook contract", "test_export_route_playtest_workbook.py", "release-tests", python_executable),
         build_unittest_step("Export choice consequence contract", "test_export_choice_consequence_sheet.py", "release-tests", python_executable),
         build_unittest_step("Export variable influence contract", "test_export_variable_influence_sheet.py", "release-tests", python_executable),

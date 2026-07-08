@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 
-from export_package_guide import clean_guide_text, normalize_guide_items
+from export_package_guide import clean_guide_text, describe_export_report_file, normalize_guide_items
 
 
 EXPORT_RELEASE_EVIDENCE_PACK_NAME = "release-evidence-pack.md"
@@ -87,7 +87,7 @@ def build_export_release_evidence_pack(
         if report_name in seen_report_names:
             continue
         seen_report_names.add(report_name)
-        lines.append(f"- `{report_name}`：补充检查报告。")
+        lines.append(f"- `{report_name}`：{describe_export_report_file(report_name)}")
 
     lines.extend(["", "## 当前素材缺口", ""])
     if missing_assets:

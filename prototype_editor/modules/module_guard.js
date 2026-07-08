@@ -9,6 +9,7 @@
     { globalName: "CanvasiaEditorStoryTemplatePanel", script: "./modules/story_template_panel.js", label: "剧情模板面板" },
     { globalName: "CanvasiaEditorCommon", script: "./modules/editor_common.js", label: "编辑器通用工具" },
     { globalName: "CanvasiaEditorExportFileNames", script: "./modules/export_file_names.js", label: "导出文件命名" },
+    { globalName: "CanvasiaEditorExportReportDescriptions", script: "./modules/export_report_descriptions.js", label: "导出报告说明" },
     { globalName: "CanvasiaEditorVariables", script: "./modules/variables.js", label: "变量系统" },
     { globalName: "CanvasiaEditorProjectRuntimeSettings", script: "./modules/project_runtime_settings.js", label: "运行设置" },
     { globalName: "CanvasiaEditorProjectRuntimeSettingsPanel", script: "./modules/project_runtime_settings_panel.js", label: "运行设置面板" },

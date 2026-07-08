@@ -7,6 +7,7 @@ from pathlib import Path
 from export_package_guide import (
     EXPORT_PLAYTEST_GUIDE_FILE_NAME,
     build_export_playtest_guide,
+    describe_export_report_file,
     write_export_playtest_guide_file,
 )
 
@@ -22,7 +23,7 @@ class ExportPackageGuideTests(unittest.TestCase):
             unlockable_manifest_name="unlockable_content_manifest.json",
             unlockable_report_name="unlockable_content_report.md",
             provenance_name="tony-na-provenance.json",
-            extra_reports=["native-runtime-release-check.json"],
+            extra_reports=["performance-budget.md", "release-fix-order.md", "native-runtime-release-check.json"],
             runtime_notes=["未签名预览包可能触发系统提示。"],
             missing_assets=[{"id": "bg_missing", "name": "Missing Background", "type": "background"}],
         )
@@ -32,8 +33,18 @@ class ExportPackageGuideTests(unittest.TestCase):
         self.assertIn("打开 `index.html`", markdown)
         self.assertIn("## 先验这几项", markdown)
         self.assertIn("unlockable_content_report.md", markdown)
+        self.assertIn("复查包体、已引用素材、首屏预加载", markdown)
+        self.assertIn("按优先级排好", markdown)
+        self.assertIn("机器可读补充检查报告", markdown)
         self.assertIn("Missing Background", markdown)
         self.assertIn("未签名预览包可能触发系统提示。", markdown)
+
+    def test_describe_export_report_file_uses_specific_fallbacks(self) -> None:
+        self.assertIn("发布性能预算", describe_export_report_file("app/performance-budget.md"))
+        self.assertIn("发布前修复顺序", describe_export_report_file("release-fix-order.csv"))
+        self.assertIn("机器可读", describe_export_report_file("custom-report.json"))
+        self.assertIn("表格", describe_export_report_file("custom-report.csv"))
+        self.assertIn("补充发布检查报告", describe_export_report_file("custom-report.md"))
 
     def test_write_export_playtest_guide_file(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

@@ -121,6 +121,7 @@ function getMusicEndModeLabel(mode) {
 
 const editorCommonTools = window.CanvasiaEditorCommon;
 const exportFileNameTools = window.CanvasiaEditorExportFileNames;
+const exportReportDescriptionTools = window.CanvasiaEditorExportReportDescriptions;
 const sanitizeFileName = editorCommonTools.sanitizeFileName;
 const formatCsvCell = editorCommonTools.formatCsvCell;
 const truncateText = editorCommonTools.truncateText;
@@ -11155,21 +11156,21 @@ function buildSceneRouteOverview() {
 const PLAYABLE_EXPORT_RESULT_TARGETS = Object.freeze(["web", "native_runtime", "windows_nwjs", "macos_nwjs", "linux_nwjs"]);
 
 const PLAYABLE_EXPORT_REPORT_LINKS = Object.freeze([
-  { urlKey: "playtestGuidePublicUrl", label: "试玩验收 README", primary: true },
-  { urlKey: "releaseEvidencePackPublicUrl", label: "发布证据包", primary: true },
-  { urlKey: "releaseReadinessReportPublicUrl", label: "发布就绪报告", primary: true },
-  { urlKey: "routePlaytestWorkbookReportPublicUrl", label: "路线试玩工作簿", primary: true },
-  { urlKey: "routePlaytestWorkbookCsvPublicUrl", label: "路线试玩 CSV" },
-  { urlKey: "storyRouteMapReportPublicUrl", label: "剧情路线图" },
-  { urlKey: "choiceConsequenceReportPublicUrl", label: "选项后果表" },
-  { urlKey: "variableInfluenceReportPublicUrl", label: "变量影响表" },
-  { urlKey: "presentationTimelineReportPublicUrl", label: "演出时间轴" },
-  { urlKey: "audioCueSheetReportPublicUrl", label: "音频调度表" },
-  { urlKey: "stageDirectionReportPublicUrl", label: "角色舞台调度" },
-  { urlKey: "assetRightsReportPublicUrl", label: "素材授权报告" },
-  { urlKey: "voiceProductionReportPublicUrl", label: "语音制作清单" },
-  { urlKey: "localizationAuditReportPublicUrl", label: "多语言覆盖报告" },
-  { urlKey: "runtimePreloadReportPublicUrl", label: "Runtime 预热报告" },
+  { urlKey: "playtestGuidePublicUrl", label: "试玩验收 README", reportName: "README_试玩验收先看这里.md", primary: true },
+  { urlKey: "releaseEvidencePackPublicUrl", label: "发布证据包", reportName: "release-evidence-pack.md", primary: true },
+  { urlKey: "releaseReadinessReportPublicUrl", label: "发布就绪报告", reportName: "release_readiness_summary.md", primary: true },
+  { urlKey: "routePlaytestWorkbookReportPublicUrl", label: "路线试玩工作簿", reportName: "route-playtest-workbook.md", primary: true },
+  { urlKey: "routePlaytestWorkbookCsvPublicUrl", label: "路线试玩 CSV", reportName: "route-playtest-workbook.csv" },
+  { urlKey: "storyRouteMapReportPublicUrl", label: "剧情路线图", reportName: "story_route_map.md" },
+  { urlKey: "choiceConsequenceReportPublicUrl", label: "选项后果表", reportName: "choice-consequence-report.md" },
+  { urlKey: "variableInfluenceReportPublicUrl", label: "变量影响表", reportName: "variable-influence-report.md" },
+  { urlKey: "presentationTimelineReportPublicUrl", label: "演出时间轴", reportName: "presentation-timeline-report.md" },
+  { urlKey: "audioCueSheetReportPublicUrl", label: "音频调度表", reportName: "audio-cue-report.md" },
+  { urlKey: "stageDirectionReportPublicUrl", label: "角色舞台调度", reportName: "stage-direction-report.md" },
+  { urlKey: "assetRightsReportPublicUrl", label: "素材授权报告", reportName: "asset-rights-report.md" },
+  { urlKey: "voiceProductionReportPublicUrl", label: "语音制作清单", reportName: "voice-production-report.md" },
+  { urlKey: "localizationAuditReportPublicUrl", label: "多语言覆盖报告", reportName: "localization_audit.md" },
+  { urlKey: "runtimePreloadReportPublicUrl", label: "Runtime 预热报告", reportName: "RUNTIME_PRELOAD_REPORT.md" },
 ]);
 
 function isPlayableExportResult(exportResult) {
@@ -11183,16 +11184,20 @@ function getLatestExportReportLinks(exportResult) {
   return PLAYABLE_EXPORT_REPORT_LINKS.filter((item) => exportResult?.[item.urlKey]).map((item) => ({
     ...item,
     href: exportResult[item.urlKey],
+    description: exportReportDescriptionTools.describeExportReportFile(item.reportName),
   }));
 }
 
 function renderExportReportLink(link) {
+  const description = link.description || "导出报告";
   return `
     <a
       class="toolbar-button${link.primary ? " toolbar-button-primary" : ""}"
       href="${escapeHtml(link.href)}"
       target="_blank"
       rel="noreferrer"
+      title="${escapeHtml(description)}"
+      aria-label="${escapeHtml(`${link.label}：${description}`)}"
     >
       ${escapeHtml(link.label)}
     </a>
