@@ -4,6 +4,12 @@ from pathlib import Path
 
 from export_choice_consequence_sheet import write_export_choice_consequence_files
 from export_localization_audit import write_export_localization_audit_files
+from export_performance_budget import (
+    EXPORT_PERFORMANCE_BUDGET_CSV_NAME,
+    EXPORT_PERFORMANCE_BUDGET_JSON_NAME,
+    EXPORT_PERFORMANCE_BUDGET_REPORT_NAME,
+    write_export_performance_budget_files,
+)
 from export_release_fix_order import (
     EXPORT_RELEASE_FIX_ORDER_CSV_NAME,
     EXPORT_RELEASE_FIX_ORDER_JSON_NAME,
@@ -30,6 +36,7 @@ def write_export_quality_report_bundle(
     target_dir: Path,
     *,
     bundle: dict,
+    assets_doc: dict | None = None,
     project: dict,
     manifest: dict,
     missing_assets: list[dict] | None = None,
@@ -44,6 +51,7 @@ def write_export_quality_report_bundle(
     variable_influence = write_export_variable_influence_files(target_dir, bundle=bundle)
     runtime_capability = write_export_runtime_capability_files(target_dir, bundle=bundle)
     localization_audit = write_export_localization_audit_files(target_dir, bundle)
+    performance_budget = write_export_performance_budget_files(target_dir, bundle=bundle, assets_doc=assets_doc)
     report_files = normalize_report_file_names(
         [
             *(base_report_files or []),
@@ -61,6 +69,9 @@ def write_export_quality_report_bundle(
             runtime_capability["runtimeCapabilityMatrixName"],
             runtime_capability["runtimeCapabilityCsvName"],
             localization_audit["localizationAuditReportName"],
+            performance_budget["exportPerformanceBudgetReportName"],
+            performance_budget["exportPerformanceBudgetName"],
+            performance_budget["exportPerformanceBudgetCsvName"],
             EXPORT_RELEASE_FIX_ORDER_REPORT_NAME,
             EXPORT_RELEASE_FIX_ORDER_JSON_NAME,
             EXPORT_RELEASE_FIX_ORDER_CSV_NAME,
@@ -76,6 +87,7 @@ def write_export_quality_report_bundle(
         story_route_map=story_route_map["storyRouteMap"],
         localization_audit=localization_audit["localizationAudit"],
         runtime_capability_matrix=runtime_capability["runtimeCapabilityMatrix"],
+        performance_budget_report=performance_budget["exportPerformanceBudget"],
         report_files=report_files,
         platform_notes=platform_notes,
     )
@@ -88,6 +100,7 @@ def write_export_quality_report_bundle(
         variable_influence_sheet=variable_influence["variableInfluenceSheet"],
         runtime_capability_matrix=runtime_capability["runtimeCapabilityMatrix"],
         localization_audit=localization_audit["localizationAudit"],
+        performance_budget_report=performance_budget["exportPerformanceBudget"],
         report_files=report_files,
     )
     return {
@@ -97,6 +110,7 @@ def write_export_quality_report_bundle(
         **variable_influence,
         **runtime_capability,
         **localization_audit,
+        **performance_budget,
         **release_readiness,
         **release_fix_order,
         "qualityReportFiles": report_files,

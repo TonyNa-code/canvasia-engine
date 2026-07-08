@@ -46,6 +46,7 @@ AREA_LABELS = {
     "audio": "音频",
     "branch": "分支",
     "polish": "打磨",
+    "performance": "性能预算",
 }
 
 AREA_WEIGHTS = {
@@ -61,6 +62,7 @@ AREA_WEIGHTS = {
     "character": 72,
     "audio": 70,
     "branch": 68,
+    "performance": 66,
     "localization": 58,
     "unlockable": 54,
     "polish": 40,
@@ -82,6 +84,7 @@ REPORT_BY_AREA = {
     "audio": "audio-cue-report.md",
     "branch": "route-playtest-workbook.md",
     "polish": "release_readiness_summary.md",
+    "performance": "performance-budget.md",
 }
 
 
@@ -113,6 +116,8 @@ def normalize_severity(value: object) -> str:
     severity = clean_text(value, "tip").lower()
     if severity == "error":
         return "blocker"
+    if severity == "hard":
+        return "blocker"
     if severity == "warn":
         return "warning"
     return severity if severity in SEVERITY_LABELS else "tip"
@@ -130,6 +135,8 @@ def infer_area(code: str, fallback: str = "release") -> str:
         return "variable"
     if "runtime" in safe_code or "video" in safe_code:
         return "runtime"
+    if "performance" in safe_code or "budget" in safe_code or "preload" in safe_code or "size" in safe_code:
+        return "performance"
     if "localization" in safe_code or "translation" in safe_code:
         return "localization"
     if "unlockable" in safe_code or "gallery" in safe_code:
@@ -365,6 +372,39 @@ def build_localization_task(audit: dict | None) -> list[dict]:
     ]
 
 
+def build_performance_budget_tasks(performance_budget_report: dict | None) -> list[dict]:
+    report = as_dict(performance_budget_report)
+    tasks: list[dict] = []
+    for index, issue in enumerate(as_list(report.get("issues"))[:20]):
+        code = clean_text(issue.get("code"), f"performance_issue_{index + 1}")
+        asset_id = clean_text(issue.get("assetId"))
+        context = " · ".join(
+            part
+            for part in [
+                clean_text(issue.get("context")),
+                f"素材：{asset_id}" if asset_id else "",
+            ]
+            if part
+        )
+        tasks.append(
+            make_task(
+                source="performance_budget",
+                source_label="发布性能预算",
+                source_report="performance-budget.md",
+                severity=issue.get("severity"),
+                area="performance",
+                code=code,
+                title=issue.get("title"),
+                detail=issue.get("detail"),
+                action=issue.get("suggestion"),
+                acceptance=f"重新导出后 `{code}` 不再出现在 performance-budget.json，或已确认该体积是刻意保留。",
+                context=context,
+                order=index,
+            )
+        )
+    return tasks
+
+
 def summarize_tasks(tasks: list[dict], release_readiness_summary: dict) -> dict:
     blocker_count = sum(1 for task in tasks if task.get("severity") == "blocker")
     warning_count = sum(1 for task in tasks if task.get("severity") == "warning")
@@ -406,6 +446,7 @@ def build_export_release_fix_order(
     variable_influence_sheet: dict | None = None,
     runtime_capability_matrix: dict | None = None,
     localization_audit: dict | None = None,
+    performance_budget_report: dict | None = None,
     report_files: list[str] | None = None,
 ) -> dict:
     tasks: list[dict] = []
@@ -429,6 +470,7 @@ def build_export_release_fix_order(
         ),
         build_runtime_tasks(runtime_capability_matrix),
         build_localization_task(localization_audit),
+        build_performance_budget_tasks(performance_budget_report),
     ]
     for group in task_groups:
         for task in group:
@@ -562,6 +604,7 @@ def write_export_release_fix_order_files(
     variable_influence_sheet: dict | None = None,
     runtime_capability_matrix: dict | None = None,
     localization_audit: dict | None = None,
+    performance_budget_report: dict | None = None,
     report_files: list[str] | None = None,
 ) -> dict:
     payload = build_export_release_fix_order(
@@ -572,6 +615,7 @@ def write_export_release_fix_order_files(
         variable_influence_sheet=variable_influence_sheet,
         runtime_capability_matrix=runtime_capability_matrix,
         localization_audit=localization_audit,
+        performance_budget_report=performance_budget_report,
         report_files=report_files,
     )
     json_path = target_dir / EXPORT_RELEASE_FIX_ORDER_JSON_NAME

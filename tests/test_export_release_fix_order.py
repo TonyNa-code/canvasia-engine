@@ -108,7 +108,19 @@ class ExportReleaseFixOrderTests(unittest.TestCase):
                 "project": {"targetLanguages": ["en-US", "ja-JP"]},
                 "summary": {"missingTranslationCount": 6},
             },
-            report_files=["release_readiness_summary.md", "runtime-capability-matrix.md"],
+            performance_budget_report={
+                "issues": [
+                    {
+                        "severity": "warning",
+                        "code": "criticalPreload_over_budget",
+                        "title": "首屏关键预加载超过建议预算",
+                        "detail": "首屏关键预加载当前 120.0 MB。",
+                        "suggestion": "压缩首屏背景或把非首屏角色延后加载。",
+                        "assetId": "bg_open",
+                    }
+                ]
+            },
+            report_files=["release_readiness_summary.md", "runtime-capability-matrix.md", "performance-budget.md"],
         )
         markdown = build_export_release_fix_order_markdown(payload)
         csv_text = build_export_release_fix_order_csv(payload)
@@ -119,9 +131,11 @@ class ExportReleaseFixOrderTests(unittest.TestCase):
         self.assertEqual(payload["tasks"][0]["sourceReport"], "export_manifest.json")
         self.assertTrue(any(task["source"] == "route_playtest" for task in payload["tasks"]))
         self.assertTrue(any(task["source"] == "localization" for task in payload["tasks"]))
+        self.assertTrue(any(task["source"] == "performance_budget" for task in payload["tasks"]))
         self.assertIn("# Fix Order Demo 发布前修复顺序", markdown)
         self.assertIn("逐项执行队列", markdown)
         self.assertIn("live2d_pose", markdown)
+        self.assertIn("首屏关键预加载", markdown)
         self.assertIn("missing_export_assets", csv_text)
 
     def test_write_release_fix_order_files(self) -> None:

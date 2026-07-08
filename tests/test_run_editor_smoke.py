@@ -22,6 +22,11 @@ from urllib.request import Request, urlopen
 
 import openai_asset_generation
 import run_editor
+from export_performance_budget import (
+    EXPORT_PERFORMANCE_BUDGET_CSV_NAME,
+    EXPORT_PERFORMANCE_BUDGET_JSON_NAME,
+    EXPORT_PERFORMANCE_BUDGET_REPORT_NAME,
+)
 from export_release_fix_order import (
     EXPORT_RELEASE_FIX_ORDER_CSV_NAME,
     EXPORT_RELEASE_FIX_ORDER_JSON_NAME,
@@ -583,6 +588,20 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertIn("# 发布试玩就绪摘要", report)
         self.assertIn("## 核心指标", report)
         self.assertIn("## 建议下一步", report)
+        return payload
+
+    def assert_export_performance_budget_files(self, json_path: Path, report_path: Path, csv_path: Path) -> dict:
+        self.assertTrue(json_path.is_file())
+        self.assertTrue(report_path.is_file())
+        self.assertTrue(csv_path.is_file())
+        payload = json.loads(json_path.read_text(encoding="utf-8"))
+        report = report_path.read_text(encoding="utf-8")
+        csv_text = csv_path.read_text(encoding="utf-8")
+        self.assertEqual(payload["formatVersion"], 1)
+        self.assertIn(payload["summary"]["status"], {"ready", "needs_measurement", "needs_optimization", "blocked"})
+        self.assertIn("score", payload["summary"])
+        self.assertIn("发布性能预算", report)
+        self.assertIn("类型", csv_text)
         return payload
 
     def assert_export_release_fix_order_files(self, json_path: Path, report_path: Path, csv_path: Path) -> dict:
@@ -3316,6 +3335,14 @@ class RunEditorSmokeTests(unittest.TestCase):
             build_dir / run_editor.EXPORT_RELEASE_READINESS_REPORT_NAME,
         )
         self.assertNotEqual(readiness_payload["qualityGate"]["status"], "blocked")
+        performance_budget_payload = self.assert_export_performance_budget_files(
+            build_dir / EXPORT_PERFORMANCE_BUDGET_JSON_NAME,
+            build_dir / EXPORT_PERFORMANCE_BUDGET_REPORT_NAME,
+            build_dir / EXPORT_PERFORMANCE_BUDGET_CSV_NAME,
+        )
+        self.assertEqual(export_result["exportPerformanceBudgetName"], EXPORT_PERFORMANCE_BUDGET_JSON_NAME)
+        self.assertEqual(export_result["exportPerformanceBudgetReportName"], EXPORT_PERFORMANCE_BUDGET_REPORT_NAME)
+        self.assertEqual(export_result["exportPerformanceBudgetStatus"], performance_budget_payload["summary"]["status"])
         fix_order_payload = self.assert_export_release_fix_order_files(
             build_dir / EXPORT_RELEASE_FIX_ORDER_JSON_NAME,
             build_dir / EXPORT_RELEASE_FIX_ORDER_REPORT_NAME,
@@ -3384,6 +3411,9 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["localizationAuditReport"], run_editor.EXPORT_LOCALIZATION_AUDIT_REPORT_NAME)
         self.assertEqual(manifest["files"]["releaseReadinessSummary"], run_editor.EXPORT_RELEASE_READINESS_JSON_NAME)
         self.assertEqual(manifest["files"]["releaseReadinessReport"], run_editor.EXPORT_RELEASE_READINESS_REPORT_NAME)
+        self.assertEqual(manifest["files"]["exportPerformanceBudget"], EXPORT_PERFORMANCE_BUDGET_JSON_NAME)
+        self.assertEqual(manifest["files"]["exportPerformanceBudgetReport"], EXPORT_PERFORMANCE_BUDGET_REPORT_NAME)
+        self.assertEqual(manifest["files"]["exportPerformanceBudgetCsv"], EXPORT_PERFORMANCE_BUDGET_CSV_NAME)
         self.assertEqual(manifest["files"]["releaseFixOrderReport"], EXPORT_RELEASE_FIX_ORDER_REPORT_NAME)
         self.assertEqual(manifest["files"]["unlockableContentManifest"], run_editor.UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME)
         self.assertEqual(manifest["files"]["unlockableContentReport"], run_editor.UNLOCKABLE_CONTENT_REPORT_FILE_NAME)

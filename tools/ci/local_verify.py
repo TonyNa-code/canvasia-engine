@@ -224,6 +224,7 @@ def build_release_tooling_steps(python_executable: str) -> list[VerifyStep]:
         build_unittest_step("Project health tooling", "test_project_health_tool.py", "release-tests", python_executable),
         build_unittest_step("Ren'Py export contract", "test_renpy_export_contract.py", "release-tests", python_executable),
         build_unittest_step("Runtime preload export contract", "test_export_runtime_preload.py", "release-tests", python_executable),
+        build_unittest_step("Export performance budget contract", "test_export_performance_budget.py", "release-tests", python_executable),
         build_unittest_step("Export icon contract", "test_export_icon.py", "release-tests", python_executable),
         build_unittest_step("Export provenance verifier contract", "test_export_provenance_verifier.py", "release-tests", python_executable),
         build_unittest_step("Export release artifacts contract", "test_export_release_artifacts.py", "release-tests", python_executable),

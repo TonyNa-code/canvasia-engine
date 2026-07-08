@@ -93,6 +93,13 @@ def get_runtime_essentials_summary(runtime_capability_matrix: dict | None) -> di
     return summary if isinstance(summary, dict) else {}
 
 
+def get_performance_budget_summary(performance_budget_report: dict | None) -> dict:
+    if not isinstance(performance_budget_report, dict):
+        return {}
+    summary = performance_budget_report.get("summary")
+    return summary if isinstance(summary, dict) else {}
+
+
 def build_release_readiness_issues(
     manifest: dict,
     unlockable_manifest: dict | None,
@@ -100,6 +107,7 @@ def build_release_readiness_issues(
     story_route_map: dict | None = None,
     localization_audit: dict | None = None,
     runtime_capability_matrix: dict | None = None,
+    performance_budget_report: dict | None = None,
 ) -> list[dict]:
     project = get_manifest_project(manifest)
     runtime = get_manifest_runtime(manifest)
@@ -108,6 +116,7 @@ def build_release_readiness_issues(
     localization_summary = get_localization_summary(localization_audit)
     runtime_capability_summary = get_runtime_capability_summary(runtime_capability_matrix)
     runtime_essentials_summary = get_runtime_essentials_summary(runtime_capability_matrix)
+    performance_summary = get_performance_budget_summary(performance_budget_report)
     issues: list[dict] = []
 
     scene_count = as_int(project.get("sceneCount"))
@@ -275,6 +284,20 @@ def build_release_readiness_issues(
             )
         )
 
+    performance_status = clean_release_text(performance_summary.get("status"))
+    performance_issue_count = as_int(performance_summary.get("issueCount"))
+    if performance_status in {"blocked", "needs_optimization", "needs_measurement"} or performance_issue_count:
+        severity = "blocker" if performance_status == "blocked" or as_int(performance_summary.get("blockerCount")) else "warning"
+        issues.append(
+            make_readiness_issue(
+                severity,
+                "performance_budget_needs_attention",
+                "导出性能预算需要处理",
+                f"性能预算报告记录到 {performance_issue_count} 个问题；首屏预加载约 {clean_release_text(performance_summary.get('criticalPreloadLabel'), '0 B')}，已引用素材约 {clean_release_text(performance_summary.get('referencedLabel'), '0 B')}。",
+                "打开 performance-budget.md，优先压缩超大素材、降低首屏预加载压力，再重新导出。",
+            )
+        )
+
     return issues
 
 
@@ -350,6 +373,7 @@ def build_export_release_readiness_summary(
     story_route_map: dict | None = None,
     localization_audit: dict | None = None,
     runtime_capability_matrix: dict | None = None,
+    performance_budget_report: dict | None = None,
     report_files: list[str] | None = None,
     platform_notes: list[str] | None = None,
 ) -> dict:
@@ -361,6 +385,7 @@ def build_export_release_readiness_summary(
         story_route_map,
         localization_audit,
         runtime_capability_matrix,
+        performance_budget_report,
     )
     score = calculate_release_readiness_score(
         issues,
@@ -377,6 +402,7 @@ def build_export_release_readiness_summary(
     localization_summary = get_localization_summary(localization_audit)
     runtime_capability_summary = get_runtime_capability_summary(runtime_capability_matrix)
     runtime_essentials_summary = get_runtime_essentials_summary(runtime_capability_matrix)
+    performance_summary = get_performance_budget_summary(performance_budget_report)
 
     return {
         "formatVersion": 1,
@@ -420,6 +446,11 @@ def build_export_release_readiness_summary(
             "vnEssentialsScore": as_int(runtime_essentials_summary.get("score"), 100),
             "vnEssentialsAttentionAreas": as_int(runtime_essentials_summary.get("attentionAreaCount")),
             "vnEssentialsIssues": as_int(runtime_essentials_summary.get("issueCount")),
+            "performanceBudgetScore": as_int(performance_summary.get("score"), 100),
+            "performanceBudgetIssues": as_int(performance_summary.get("issueCount")),
+            "performanceBudgetWarnings": as_int(performance_summary.get("warningCount")),
+            "performanceBudgetCriticalPreload": clean_release_text(performance_summary.get("criticalPreloadLabel"), "0 B"),
+            "performanceBudgetReferencedAssets": clean_release_text(performance_summary.get("referencedLabel"), "0 B"),
         },
         "issues": issues,
         "reportFiles": [clean_release_text(item) for item in (report_files or []) if clean_release_text(item)],
@@ -482,6 +513,10 @@ def build_export_release_readiness_markdown(summary: dict) -> str:
         f"| Runtime 覆盖复核项 | {markdown_cell(metrics.get('runtimeIssues'))} |",
         f"| VN 基础能力分 | {markdown_cell(metrics.get('vnEssentialsScore'))}/100 |",
         f"| VN 基础关注领域 | {markdown_cell(metrics.get('vnEssentialsAttentionAreas'))} |",
+        f"| 性能预算分 | {markdown_cell(metrics.get('performanceBudgetScore'))}/100 |",
+        f"| 性能预算问题 | {markdown_cell(metrics.get('performanceBudgetIssues'))} |",
+        f"| 首屏关键预加载 | {markdown_cell(metrics.get('performanceBudgetCriticalPreload'))} |",
+        f"| 已引用素材体积 | {markdown_cell(metrics.get('performanceBudgetReferencedAssets'))} |",
         "",
         "## 优先处理",
         "",
@@ -523,6 +558,7 @@ def write_export_release_readiness_files(
     story_route_map: dict | None = None,
     localization_audit: dict | None = None,
     runtime_capability_matrix: dict | None = None,
+    performance_budget_report: dict | None = None,
     report_files: list[str] | None = None,
     platform_notes: list[str] | None = None,
 ) -> dict:
@@ -534,6 +570,7 @@ def write_export_release_readiness_files(
         story_route_map=story_route_map,
         localization_audit=localization_audit,
         runtime_capability_matrix=runtime_capability_matrix,
+        performance_budget_report=performance_budget_report,
         report_files=report_files,
         platform_notes=platform_notes,
     )
