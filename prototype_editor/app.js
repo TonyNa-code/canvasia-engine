@@ -93,6 +93,16 @@ const productionBacklogTools = window.CanvasiaEditorProductionBacklog;
 const releaseCandidateManifestTools = window.CanvasiaEditorReleaseCandidateManifest;
 const unlockableContentManifestTools = window.CanvasiaEditorUnlockableContentManifest;
 
+const INSPECTION_SECTION_LABELS = Object.freeze({
+  "choice-consequence": "选项后果表",
+  "stage-direction": "角色舞台调度表",
+  "production-backlog": "制作待办总表",
+  "runtime-capability": "Runtime 基础成熟度",
+  "release-candidate": "候选发布清单",
+  "release-control": "发布总控",
+  "asset-footprint": "首屏素材预算",
+});
+
 function getBlockLabel(type) {
   return storyBlockCatalogTools.getBlockLabel(type) ?? BLOCK_LABELS[type] ?? type ?? "步骤";
 }
@@ -2945,8 +2955,13 @@ async function handleClick(event) {
       await flushPendingStoryChanges();
     }
     switchScreen(screenName);
-    setSaveStatus(`已切换到${getScreenLabel(screenName)}`);
-    showToast(`已切换到${getScreenLabel(screenName)}`);
+    const focusedSectionLabel =
+      screenName === "inspection" ? focusInspectionSection(actionTarget.dataset.inspectionSection) : "";
+    const statusMessage = focusedSectionLabel
+      ? `已切换到${getScreenLabel(screenName)}：${focusedSectionLabel}`
+      : `已切换到${getScreenLabel(screenName)}`;
+    setSaveStatus(statusMessage);
+    showToast(statusMessage);
     return;
   }
 
@@ -7179,6 +7194,32 @@ function switchScreen(screenName) {
   }
 
   scrollEditorViewportToTop();
+}
+
+function getInspectionSectionLabel(sectionId) {
+  const safeSectionId = String(sectionId ?? "").trim();
+  return INSPECTION_SECTION_LABELS[safeSectionId] ?? safeSectionId;
+}
+
+function focusInspectionSection(sectionId) {
+  const safeSectionId = String(sectionId ?? "").trim();
+  if (!safeSectionId || !refs.inspectionContent) {
+    return "";
+  }
+
+  const target = [...refs.inspectionContent.querySelectorAll("[data-inspection-section]")].find(
+    (section) => section.dataset.inspectionSection === safeSectionId
+  );
+  if (!target) {
+    return "";
+  }
+
+  target.classList.remove("inspection-section-focus");
+  void target.offsetWidth;
+  target.classList.add("inspection-section-focus");
+  target.scrollIntoView?.({ block: "start", behavior: "smooth" });
+  window.setTimeout(() => target.classList.remove("inspection-section-focus"), 1800);
+  return getInspectionSectionLabel(safeSectionId);
 }
 
 function selectScene(sceneId, options = {}) {
@@ -31675,7 +31716,7 @@ function renderChoiceConsequencePanel() {
   const optionPreview = (sheet.options ?? []).slice(0, 4);
 
   return `
-    <article class="detail-card preview-sprint-panel">
+    <article class="detail-card preview-sprint-panel" data-inspection-section="choice-consequence">
       <div class="panel-heading">
         <h2>选项后果表</h2>
         <span class="badge badge-soft ${getChoiceConsequenceToneClass(digest.status)}">${escapeHtml(digest.title)}</span>

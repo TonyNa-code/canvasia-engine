@@ -6610,6 +6610,26 @@ html[data-ui-theme="light"] .music-range-health.is-danger .issue-tag {
   gap: 14px;
 }
 
+@keyframes inspectionSectionFocusPulse {
+  0% {
+    border-color: rgba(69, 132, 255, 0.78);
+    box-shadow:
+      0 0 0 1px rgba(69, 132, 255, 0.28),
+      0 0 34px rgba(69, 132, 255, 0.2);
+    transform: translateY(-2px);
+  }
+
+  100% {
+    border-color: inherit;
+    box-shadow: inherit;
+    transform: translateY(0);
+  }
+}
+
+.inspection-section-focus {
+  animation: inspectionSectionFocusPulse 1.8s ease;
+}
+
 .preview-sprint-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

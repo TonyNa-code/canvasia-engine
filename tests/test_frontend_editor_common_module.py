@@ -84,7 +84,7 @@ class FrontendEditorCommonModuleTests(unittest.TestCase):
               quickButtonMarkup: tools.renderQuickActionButton({{
                 label: "切到 <剧情>",
                 action: "switch-screen",
-                dataset: {{ screen: "story" }},
+                dataset: {{ screen: "story", "inspection-section": "choice-consequence" }},
               }}, true),
               disabledQuickButtonMarkup: tools.renderQuickActionButton({{
                 label: "确认 <执行>",
@@ -158,6 +158,7 @@ class FrontendEditorCommonModuleTests(unittest.TestCase):
         self.assertEqual(payload["emptyMarkup"], '<div class="empty-note">还没有 &lt;内容&gt; &amp; 数据</div>')
         self.assertIn('data-action="switch-screen"', payload["quickButtonMarkup"])
         self.assertIn('data-screen="story"', payload["quickButtonMarkup"])
+        self.assertIn('data-inspection-section="choice-consequence"', payload["quickButtonMarkup"])
         self.assertIn("切到 &lt;剧情&gt;", payload["quickButtonMarkup"])
         self.assertIn("toolbar-button-primary", payload["quickButtonMarkup"])
         self.assertIn('data-action="repair-project-doctor"', payload["disabledQuickButtonMarkup"])

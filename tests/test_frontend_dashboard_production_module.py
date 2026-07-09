@@ -278,6 +278,10 @@ class FrontendDashboardProductionModuleTests(unittest.TestCase):
         self.assertEqual(task_by_title["补真实选项后果"]["badge"], "弱选项 3 个")
         self.assertEqual(task_by_title["补真实选项后果"]["actions"][0]["action"], "switch-screen")
         self.assertEqual(task_by_title["补真实选项后果"]["actions"][0]["screen"], "inspection")
+        self.assertEqual(
+            task_by_title["补真实选项后果"]["actions"][0]["dataset"]["inspection-section"],
+            "choice-consequence",
+        )
         self.assertEqual(task_by_title["补真实选项后果"]["actions"][1]["action"], "open-scene-from-map")
         self.assertEqual(task_by_title["补真实选项后果"]["actions"][1]["sceneId"], "scene_choice")
         self.assertEqual(payload["columns"][2]["status"], "polishing")

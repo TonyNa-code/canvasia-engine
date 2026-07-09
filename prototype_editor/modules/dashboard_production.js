@@ -748,6 +748,7 @@
             label: "查看选项后果表",
             action: "switch-screen",
             screen: "inspection",
+            dataset: { "inspection-section": "choice-consequence" },
           },
           choiceConsequenceProduction.firstSceneId
             ? {

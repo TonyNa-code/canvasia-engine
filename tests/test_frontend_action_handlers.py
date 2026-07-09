@@ -3798,11 +3798,15 @@ class FrontendActionHandlerTests(unittest.TestCase):
 
     def test_quick_switch_screen_actions_keep_dataset_screen(self) -> None:
         editor_common_source = (EDITOR_DIR / "modules" / "editor_common.js").read_text(encoding="utf-8")
+        app_source = APP_PATH.read_text(encoding="utf-8")
         quick_action_button = _extract_function_source(editor_common_source, "renderQuickActionButton")
 
         self.assertIn('action.action === "switch-screen"', quick_action_button)
         self.assertIn('action.dataset?.screen', quick_action_button)
         self.assertIn('data-screen="${escapeHtml(screen)}"', quick_action_button)
+        self.assertIn("${datasetMarkup}", quick_action_button)
+        self.assertIn("function focusInspectionSection", app_source)
+        self.assertIn("focusInspectionSection(actionTarget.dataset.inspectionSection)", app_source)
 
     def test_preview_thumbnail_block_label_helper_is_defined(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")

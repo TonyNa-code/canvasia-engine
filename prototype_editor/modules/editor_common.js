@@ -118,6 +118,7 @@
     const disabledMarkup = action.disabled ? ' disabled aria-disabled="true"' : "";
     const titleMarkup = action.title ? ` title="${escapeHtml(action.title)}"` : "";
     const datasetMarkup = Object.entries(action.dataset ?? {})
+      .filter(([key]) => !(action.action === "switch-screen" && key === "screen"))
       .map(([key, value]) => ` data-${key}="${escapeHtml(String(value ?? ""))}"`)
       .join("");
 
@@ -225,6 +226,7 @@
         class="${className}"
         data-action="switch-screen"
         data-screen="${escapeHtml(screen)}"
+        ${datasetMarkup}
       >
         ${label}
       </button>

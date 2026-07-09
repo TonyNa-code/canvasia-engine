@@ -84,6 +84,7 @@ class FrontendStageDirectionSheetPanelModuleTests(unittest.TestCase):
         self.assertIn("getStageAutoFixOperationRows", payload["keys"])
         self.assertGreaterEqual(len(payload["operationRows"]), 1)
         self.assertIn("教室黄昏", payload["panelHtml"])
+        self.assertIn('data-inspection-section="stage-direction"', payload["panelHtml"])
         self.assertIn("自动补齐预览", payload["panelHtml"])
         self.assertIn("补登场转场", payload["panelHtml"])
         self.assertIn("补立绘舞台参数", payload["panelHtml"])

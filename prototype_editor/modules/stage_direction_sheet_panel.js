@@ -220,7 +220,7 @@
     const continuitySummary = continuityAudit.summary ?? {};
 
     return `
-      <article class="detail-card preview-sprint-panel">
+      <article class="detail-card preview-sprint-panel" data-inspection-section="stage-direction">
         <div class="panel-heading">
           <h2>角色舞台调度表</h2>
           <span class="badge badge-soft ${getStageDirectionSheetToneClass(digest.status)}">${escapeHtml(digest.title)}</span>
