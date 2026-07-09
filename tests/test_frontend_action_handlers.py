@@ -3810,11 +3810,18 @@ class FrontendActionHandlerTests(unittest.TestCase):
 
     def test_major_inspection_sections_have_focus_anchors(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
+        styles = (ROOT_DIR / "prototype_editor" / "styles.css").read_text(encoding="utf-8")
         release_candidate_source = (EDITOR_DIR / "modules" / "release_candidate_manifest.js").read_text(encoding="utf-8")
         release_control_source = (EDITOR_DIR / "modules" / "release_control_panel.js").read_text(encoding="utf-8")
         stage_direction_source = (EDITOR_DIR / "modules" / "stage_direction_sheet_panel.js").read_text(encoding="utf-8")
         combined_source = "\n".join([source, release_candidate_source, release_control_source, stage_direction_source])
 
+        self.assertIn("const INSPECTION_SECTION_SHORTCUTS", source)
+        self.assertIn("function renderInspectionSectionShortcutRail", source)
+        self.assertIn("${renderInspectionSectionShortcutRail()}", source)
+        self.assertIn("巡检快速导航", source)
+        self.assertIn(".inspection-shortcut-panel", styles)
+        self.assertIn('"inspection-section": shortcut.id', source)
         for section_id in [
             "choice-consequence",
             "stage-direction",

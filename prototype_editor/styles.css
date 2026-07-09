@@ -6630,6 +6630,17 @@ html[data-ui-theme="light"] .music-range-health.is-danger .issue-tag {
   animation: inspectionSectionFocusPulse 1.8s ease;
 }
 
+.inspection-shortcut-panel {
+  background:
+    linear-gradient(135deg, rgba(247, 251, 255, 0.96), rgba(255, 255, 255, 0.92)),
+    radial-gradient(circle at 12% 0%, rgba(98, 160, 255, 0.18), transparent 34%);
+}
+
+.inspection-shortcut-actions .toolbar-button {
+  min-width: 118px;
+  justify-content: center;
+}
+
 .preview-sprint-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

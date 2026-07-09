@@ -103,6 +103,16 @@ const INSPECTION_SECTION_LABELS = Object.freeze({
   "asset-footprint": "首屏素材预算",
 });
 
+const INSPECTION_SECTION_SHORTCUTS = Object.freeze([
+  { id: "release-control", label: "发布总控", hint: "先看发布前修复顺序" },
+  { id: "production-backlog", label: "生产待办", hint: "跨模块汇总下一步要做什么" },
+  { id: "runtime-capability", label: "Runtime 覆盖", hint: "确认导出运行时支持情况" },
+  { id: "release-candidate", label: "RC 清单", hint: "整理给测试和发布的候选包信息" },
+  { id: "choice-consequence", label: "选项后果", hint: "检查假选项、坏跳转和变量效果" },
+  { id: "stage-direction", label: "舞台调度", hint: "检查登场、退场、立绘和构图" },
+  { id: "asset-footprint", label: "素材体积", hint: "发布前看图片、音频、视频和模型包体" },
+]);
+
 function getBlockLabel(type) {
   return storyBlockCatalogTools.getBlockLabel(type) ?? BLOCK_LABELS[type] ?? type ?? "步骤";
 }
@@ -32128,6 +32138,32 @@ function renderLocalizationCoveragePanel() {
   return localizationCoveragePanelTools.renderLocalizationCoveragePanel(coverage);
 }
 
+function renderInspectionSectionShortcutRail() {
+  return `
+    <article class="detail-card preview-sprint-panel inspection-shortcut-panel">
+      <div class="preview-sprint-head">
+        <strong>巡检快速导航</strong>
+        <span class="panel-note">页面很长时，先跳到你要处理的功能区</span>
+      </div>
+      <p class="helper-text">这些入口会直接定位到对应报告面板；适合发布前按“总控、待办、Runtime、RC、选项、舞台、体积”的顺序快速扫一遍。</p>
+      <div class="detail-actions inspection-shortcut-actions">
+        ${INSPECTION_SECTION_SHORTCUTS.map((shortcut, index) =>
+          renderQuickActionButton(
+            {
+              label: shortcut.label,
+              title: shortcut.hint,
+              action: "switch-screen",
+              screen: "inspection",
+              dataset: { "inspection-section": shortcut.id },
+            },
+            index === 0
+          )
+        ).join("")}
+      </div>
+    </article>
+  `;
+}
+
 function renderInspectionOverviewPanel(routeOverview) {
   const urgentMissingAssets = state.data.assetList.filter((asset) => isAssetUrgentMissing(asset)).length;
   const missingVoiceWarnings = state.validation.warnings.filter(
@@ -32143,6 +32179,7 @@ function renderInspectionOverviewPanel(routeOverview) {
         <span class="badge badge-soft">集中看全项目问题</span>
       </div>
       ${renderEditorModeGuideCard("inspection")}
+      ${renderInspectionSectionShortcutRail()}
       <article class="detail-card preview-sprint-panel">
         <div class="preview-sprint-head">
           <strong>${escapeHtml(releaseSummary.title)}</strong>
