@@ -29,7 +29,27 @@
     };
   }
 
+  function buildDismissAction(focus) {
+    const title = getFocusTitle(focus);
+    return {
+      label: "先不处理",
+      action: "dismiss-scene-checklist-focus",
+      title: `关闭“${title}”提示，不会修改场景内容。`,
+    };
+  }
+
+  function buildDismissFeedback(focus) {
+    const title = getFocusTitle(focus);
+    return {
+      title,
+      statusMessage: `已关闭“${title}”提示；场景内容没有改变。`,
+      toastMessage: "已关闭可试玩清单提示",
+    };
+  }
+
   global.CanvasiaEditorSceneChecklistFocus = Object.freeze({
+    buildDismissAction,
+    buildDismissFeedback,
     getAddBlockOptionsFromDataset,
     shouldCompleteFocus,
     buildCompletionFeedback,

@@ -4228,6 +4228,11 @@ async function handleClick(event) {
     return;
   }
 
+  if (action === "dismiss-scene-checklist-focus") {
+    dismissSceneChecklistFocus();
+    return;
+  }
+
   if (action === "preview-scene-from-map") {
     openSceneFromRouteMap(actionTarget.dataset.sceneId, "preview");
     return;
@@ -7222,6 +7227,23 @@ function completeSceneChecklistFocus(checklistItem, blockLabel) {
     renderStoryScreen();
   }
 
+  setSaveStatus(feedback.statusMessage);
+  showToast(feedback.toastMessage);
+  return true;
+}
+
+function dismissSceneChecklistFocus() {
+  const focus = state.sceneChecklistFocus;
+  if (!focus) {
+    showToast("当前没有可关闭的可试玩清单提示");
+    return false;
+  }
+
+  const feedback = sceneChecklistFocusTools.buildDismissFeedback(focus);
+  state.sceneChecklistFocus = null;
+  if (state.currentScreen === "story") {
+    renderStoryScreen();
+  }
   setSaveStatus(feedback.statusMessage);
   showToast(feedback.toastMessage);
   return true;
@@ -32804,7 +32826,10 @@ function renderStorySceneChecklistFocusHint(scene) {
   if (!focus) {
     return "";
   }
-  const actions = Array.isArray(focus.actions) ? focus.actions.slice(0, 3) : [];
+  const actions = [
+    ...(Array.isArray(focus.actions) ? focus.actions.slice(0, 3) : []),
+    sceneChecklistFocusTools.buildDismissAction(focus),
+  ];
 
   return `
     <div class="story-scene-checklist-focus">

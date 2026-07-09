@@ -32,6 +32,8 @@ class FrontendSceneChecklistFocusModuleTests(unittest.TestCase):
               shouldIgnoreEmpty: tools.shouldCompleteFocus({{ item: "music" }}, ""),
               feedback: tools.buildCompletionFeedback({{ title: "补 BGM" }}, "播放音乐"),
               fallbackFeedback: tools.buildCompletionFeedback({{ label: "补背景" }}, ""),
+              dismissAction: tools.buildDismissAction({{ title: "补 BGM" }}),
+              dismissFeedback: tools.buildDismissFeedback({{ title: "补 BGM" }}),
             }}));
             """
         )
@@ -48,7 +50,13 @@ class FrontendSceneChecklistFocusModuleTests(unittest.TestCase):
 
         self.assertEqual(
             payload["keys"],
-            ["buildCompletionFeedback", "getAddBlockOptionsFromDataset", "shouldCompleteFocus"],
+            [
+                "buildCompletionFeedback",
+                "buildDismissAction",
+                "buildDismissFeedback",
+                "getAddBlockOptionsFromDataset",
+                "shouldCompleteFocus",
+            ],
         )
         self.assertEqual(payload["emptyOptions"], {"checklistCompleteItem": ""})
         self.assertEqual(payload["musicOptions"], {"checklistCompleteItem": "music"})
@@ -62,6 +70,11 @@ class FrontendSceneChecklistFocusModuleTests(unittest.TestCase):
         self.assertIn("可试玩清单会重新计算", payload["feedback"]["statusMessage"])
         self.assertEqual(payload["fallbackFeedback"]["title"], "补背景")
         self.assertIn("已新增剧情卡片", payload["fallbackFeedback"]["statusMessage"])
+        self.assertEqual(payload["dismissAction"]["action"], "dismiss-scene-checklist-focus")
+        self.assertEqual(payload["dismissAction"]["label"], "先不处理")
+        self.assertIn("不会修改场景内容", payload["dismissAction"]["title"])
+        self.assertEqual(payload["dismissFeedback"]["toastMessage"], "已关闭可试玩清单提示")
+        self.assertIn("场景内容没有改变", payload["dismissFeedback"]["statusMessage"])
 
 
 if __name__ == "__main__":
