@@ -807,6 +807,12 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("项目没有载入成功", project_load_message)
         self.assertIn("自动快照", project_load_message)
         self.assertNotIn("error?.message", fatal_project_load)
+        self.assertIn("const projectHistoryTools = window.CanvasiaEditorProjectHistory", source)
+        self.assertIn("projectHistoryTools.getSafeProjectSessionRecovery(recovery)", source)
+        self.assertIn("projectHistoryTools.getSafeProjectHistory(history)", source)
+        self.assertIn("projectHistoryTools.getHistorySnapshotByIndex(targetIndex, history)", source)
+        self.assertIn("projectHistoryTools.getFilteredHistorySnapshots(history, {", source)
+        self.assertIn("projectHistoryTools.formatHistoryRestorePreview(preview)", source)
 
         self.assertIn("options.stageLabel", load_error_stage_label)
         self.assertIn("editor_startup", load_error_stage_label)

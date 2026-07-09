@@ -998,174 +998,42 @@ function setProjectChromeEnabled(enabled) {
 }
 
 function getSafeProjectSessionRecovery(recovery = state.projectSessionRecovery) {
-  if (projectHistoryTools?.getSafeProjectSessionRecovery) {
-    return projectHistoryTools.getSafeProjectSessionRecovery(recovery);
-  }
-
-  if (!recovery || typeof recovery !== "object") {
-    return {
-      noticeActive: false,
-      lastUnexpectedExitAt: "",
-      lastUnexpectedExitStartedAt: "",
-      lastEndedReason: "",
-      message: "",
-    };
-  }
-
-  return {
-    noticeActive: Boolean(recovery.noticeActive),
-    lastUnexpectedExitAt: String(recovery.lastUnexpectedExitAt ?? "").trim(),
-    lastUnexpectedExitStartedAt: String(recovery.lastUnexpectedExitStartedAt ?? "").trim(),
-    lastEndedReason: String(recovery.lastEndedReason ?? "").trim(),
-    message: String(recovery.message ?? "").trim(),
-  };
+  return projectHistoryTools.getSafeProjectSessionRecovery(recovery);
 }
 
 function getSafeProjectHistory(history = state.projectHistory) {
-  if (projectHistoryTools?.getSafeProjectHistory) {
-    return projectHistoryTools.getSafeProjectHistory(history);
-  }
-
-  if (!history || typeof history !== "object") {
-    return {
-      totalSnapshots: 0,
-      currentIndex: -1,
-      canUndo: false,
-      canRedo: false,
-      currentSnapshot: null,
-      previousSnapshot: null,
-      nextSnapshot: null,
-      recentSnapshots: [],
-      timelineSnapshots: [],
-    };
-  }
-
-  return {
-    totalSnapshots: Number(history.totalSnapshots ?? 0),
-    currentIndex: Number(history.currentIndex ?? -1),
-    canUndo: Boolean(history.canUndo),
-    canRedo: Boolean(history.canRedo),
-    currentSnapshot: history.currentSnapshot ?? null,
-    previousSnapshot: history.previousSnapshot ?? null,
-    nextSnapshot: history.nextSnapshot ?? null,
-    recentSnapshots: Array.isArray(history.recentSnapshots) ? history.recentSnapshots : [],
-    timelineSnapshots: Array.isArray(history.timelineSnapshots) ? history.timelineSnapshots : [],
-  };
+  return projectHistoryTools.getSafeProjectHistory(history);
 }
 
 function getHistorySnapshotByIndex(targetIndex, history = state.projectHistory) {
-  if (projectHistoryTools?.getHistorySnapshotByIndex) {
-    return projectHistoryTools.getHistorySnapshotByIndex(targetIndex, history);
-  }
-
-  const safeHistory = getSafeProjectHistory(history);
-  const numericIndex = Number(targetIndex);
-  if (Number.isNaN(numericIndex)) {
-    return null;
-  }
-  return safeHistory.timelineSnapshots.find((snapshot) => Number(snapshot.index) === numericIndex) ?? null;
+  return projectHistoryTools.getHistorySnapshotByIndex(targetIndex, history);
 }
 
 function getHistoryKindLabel(kind) {
-  if (projectHistoryTools?.getHistoryKindLabel) {
-    return projectHistoryTools.getHistoryKindLabel(kind);
-  }
-
-  if (kind === "manual") {
-    return "手动检查点";
-  }
-  if (kind === "baseline") {
-    return "项目基线";
-  }
-  return "自动快照";
+  return projectHistoryTools.getHistoryKindLabel(kind);
 }
 
 function getHistoryKindTone(kind) {
-  if (projectHistoryTools?.getHistoryKindTone) {
-    return projectHistoryTools.getHistoryKindTone(kind);
-  }
-
-  if (kind === "manual") {
-    return "good";
-  }
-  if (kind === "baseline") {
-    return "soft";
-  }
-  return "warn";
+  return projectHistoryTools.getHistoryKindTone(kind);
 }
 
 function getSafeHistoryFilterMode(value) {
-  if (projectHistoryTools?.getSafeHistoryFilterMode) {
-    return projectHistoryTools.getSafeHistoryFilterMode(value);
-  }
-
-  return ["all", "manual", "auto", "baseline", "current"].includes(value) ? value : "all";
+  return projectHistoryTools.getSafeHistoryFilterMode(value);
 }
 
 function getHistoryFilterLabel(value) {
-  if (projectHistoryTools?.getHistoryFilterLabel) {
-    return projectHistoryTools.getHistoryFilterLabel(value);
-  }
-
-  const labels = {
-    all: "全部版本",
-    manual: "只看检查点",
-    auto: "只看自动快照",
-    baseline: "只看基线",
-    current: "只看当前版本",
-  };
-  return labels[getSafeHistoryFilterMode(value)] ?? labels.all;
+  return projectHistoryTools.getHistoryFilterLabel(value);
 }
 
 function getHistoryChangeKindLabel(kind) {
-  if (projectHistoryTools?.getHistoryChangeKindLabel) {
-    return projectHistoryTools.getHistoryChangeKindLabel(kind);
-  }
-
-  if (kind === "created") {
-    return "新增";
-  }
-  if (kind === "removed") {
-    return "移除";
-  }
-  return "改动";
+  return projectHistoryTools.getHistoryChangeKindLabel(kind);
 }
 
 function getFilteredHistorySnapshots(history = state.projectHistory) {
-  if (projectHistoryTools?.getFilteredHistorySnapshots) {
-    return projectHistoryTools.getFilteredHistorySnapshots(history, {
-      searchQuery: state.historySearchQuery,
-      filterMode: state.historyFilterMode,
-      formatDate,
-    });
-  }
-
-  const safeHistory = getSafeProjectHistory(history);
-  const query = String(state.historySearchQuery ?? "").trim().toLowerCase();
-  const filterMode = getSafeHistoryFilterMode(state.historyFilterMode);
-
-  return (safeHistory.timelineSnapshots ?? []).filter((snapshot) => {
-    if (filterMode === "manual" && snapshot.kind !== "manual") {
-      return false;
-    }
-    if (filterMode === "auto" && snapshot.kind !== "auto") {
-      return false;
-    }
-    if (filterMode === "baseline" && snapshot.kind !== "baseline") {
-      return false;
-    }
-    if (filterMode === "current" && !snapshot.isCurrent) {
-      return false;
-    }
-    if (!query) {
-      return true;
-    }
-
-    const haystack = [snapshot.label, getHistoryKindLabel(snapshot.kind), formatDate(snapshot.createdAt)]
-      .filter(Boolean)
-      .join(" ")
-      .toLowerCase();
-    return haystack.includes(query);
+  return projectHistoryTools.getFilteredHistorySnapshots(history, {
+    searchQuery: state.historySearchQuery,
+    filterMode: state.historyFilterMode,
+    formatDate,
   });
 }
 
@@ -1188,32 +1056,7 @@ function renderHistoryTimeline(history = state.projectHistory, options = {}) {
 }
 
 function formatHistoryRestorePreview(preview) {
-  if (projectHistoryTools?.formatHistoryRestorePreview) {
-    return projectHistoryTools.formatHistoryRestorePreview(preview);
-  }
-
-  if (!preview || typeof preview !== "object") {
-    return "恢复后会把项目回到你选中的那个时间点。";
-  }
-
-  const changedFileCount = Number(preview.changedFileCount ?? 0);
-  if (changedFileCount <= 0) {
-    return "当前版本和目标版本没有差异。";
-  }
-
-  const changedItems = Array.isArray(preview.changedItems) ? preview.changedItems : [];
-  const detailLines = changedItems
-    .slice(0, 6)
-    .map((item) => `- ${item.label ?? item.path ?? "未知内容"}（${getHistoryChangeKindLabel(item.kind)}）`);
-  const hiddenCount = Math.max(changedItems.length - detailLines.length, 0);
-  return [
-    `恢复后会影响 ${changedFileCount} 处内容。`,
-    detailLines.length > 0 ? "" : null,
-    ...detailLines,
-    hiddenCount > 0 ? `- 另外还有 ${hiddenCount} 处变化` : null,
-  ]
-    .filter(Boolean)
-    .join("\n");
+  return projectHistoryTools.formatHistoryRestorePreview(preview);
 }
 
 function updateErrorRecoveryState(history = state.projectHistory) {
