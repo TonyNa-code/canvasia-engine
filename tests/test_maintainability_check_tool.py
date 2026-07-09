@@ -33,6 +33,7 @@ class MaintainabilityCheckToolTests(unittest.TestCase):
         modules = report["modules"]
         module_guard = report["moduleGuard"]
         summary = report["summary"]
+        maintenance_plan = report["maintenancePlan"]
 
         self.assertEqual(report["status"], "passed")
         self.assertIn("prototype_editor/app.js", file_paths)
@@ -66,6 +67,18 @@ class MaintainabilityCheckToolTests(unittest.TestCase):
         self.assertEqual(module_guard["lastRequirement"]["script"], "./modules/command_palette.js")
         self.assertEqual(summary["moduleGuardStatus"], "passed")
         self.assertEqual(summary["moduleGuardRequirementCount"], module_guard["requirementCount"])
+        self.assertGreaterEqual(summary["maintenanceActionCount"], 1)
+        self.assertEqual(summary["maintenanceActionCount"], len(maintenance_plan))
+        self.assertEqual(summary["topMaintenancePriority"], maintenance_plan[0]["priority"])
+        self.assertTrue(
+            any(action["area"] == "prototype_editor/app.js" for action in maintenance_plan),
+            "The largest editor file should stay visible in the preventive maintenance roadmap.",
+        )
+        for action in maintenance_plan:
+            self.assertIn(action["priority"], {"P0", "P1", "P2", "P3"})
+            self.assertTrue(action["title"])
+            self.assertTrue(action["evidence"])
+            self.assertTrue(action["nextStep"])
 
     def test_cli_writes_json_and_markdown_reports(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -95,10 +108,15 @@ class MaintainabilityCheckToolTests(unittest.TestCase):
             self.assertEqual(payload["moduleGuard"]["status"], "passed")
             self.assertEqual(payload["moduleGuard"]["appGlobalsMissingFromGuard"], [])
             self.assertIn("knownTestDebtCount", payload["summary"])
+            self.assertIn("maintenancePlan", payload)
+            self.assertGreaterEqual(payload["summary"]["maintenanceActionCount"], 1)
             self.assertIn("# Canvasia Engine Maintainability Report", markdown)
             self.assertIn("## File Budgets", markdown)
+            self.assertIn("## Maintenance Roadmap", markdown)
             self.assertIn("## Startup Guard Consistency", markdown)
             self.assertIn("App globals covered", markdown)
+            self.assertIn("Maintenance roadmap:", completed.stdout)
+            self.assertIn("Next maintenance actions:", completed.stdout)
 
 
 if __name__ == "__main__":

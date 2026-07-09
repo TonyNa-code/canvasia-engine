@@ -122,9 +122,12 @@ Use these checks before larger changes:
 
 ```bash
 python3 tools/ci/local_verify.py --profile syntax
+python3 tools/ci/maintainability_check.py --json-report verification_reports/maintainability.json --markdown-report verification_reports/maintainability.md
 python3 -m unittest tests.test_editor_infrastructure tests.test_local_verify_tool -v
 python3 -m unittest tests.test_run_editor_smoke -v
 python3 -m unittest tests.test_release_public_surface -v
 ```
 
 For frontend-only changes, also run the relevant `tests/test_frontend_*` module and `node --check` on the touched script.
+
+The maintainability report is not just a pass/fail gate. Its `maintenancePlan` section ranks the next safe refactor targets by priority, evidence, and recommended next step. Before adding a large feature, check that roadmap first; if the target file is already near its warning budget, extract a focused helper module before landing more UI or runtime logic there.

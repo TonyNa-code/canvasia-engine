@@ -292,10 +292,123 @@ def evaluate_module_guard() -> dict[str, object]:
     }
 
 
+def priority_rank(priority: str) -> int:
+    ranks = {"P0": 0, "P1": 1, "P2": 2, "P3": 3}
+    return ranks.get(priority, 9)
+
+
+def build_maintenance_action(
+    priority: str,
+    area: str,
+    title: str,
+    detail: str,
+    evidence: str,
+    next_step: str,
+) -> dict[str, str]:
+    return {
+        "priority": priority,
+        "area": area,
+        "title": title,
+        "detail": detail,
+        "evidence": evidence,
+        "nextStep": next_step,
+    }
+
+
+def build_maintenance_plan(
+    file_budgets: Sequence[dict[str, object]],
+    modules: dict[str, object],
+    module_guard: dict[str, object],
+) -> list[dict[str, str]]:
+    actions: list[dict[str, str]] = []
+
+    if modules.get("missingEntrypoint") or modules.get("staleEntrypoint"):
+        actions.append(
+            build_maintenance_action(
+                "P0",
+                "frontend modules",
+                "Sync editor module entrypoints",
+                "A module exists without being loaded, or the entrypoint references a stale module.",
+                (
+                    f"missing={len(modules.get('missingEntrypoint') or [])}; "
+                    f"stale={len(modules.get('staleEntrypoint') or [])}"
+                ),
+                "Update prototype_editor/index.html and the module guard in the same change.",
+            )
+        )
+
+    if modules.get("newMissingTests"):
+        missing_tests = ", ".join(str(name) for name in modules.get("newMissingTests", []))
+        actions.append(
+            build_maintenance_action(
+                "P0",
+                "frontend tests",
+                "Add direct tests for new editor modules",
+                "Every new frontend module should have a small focused Python contract test.",
+                f"newMissingTests={missing_tests}",
+                "Add tests/test_frontend_<module>_module.py before expanding the module surface.",
+            )
+        )
+
+    if module_guard.get("status") != "passed":
+        actions.append(
+            build_maintenance_action(
+                "P0",
+                "startup guard",
+                "Repair startup guard drift",
+                "The editor startup guard no longer matches the actual module order or exported globals.",
+                f"status={module_guard.get('status', 'unknown')}",
+                "Regenerate or update prototype_editor/modules/module_guard.js alongside index.html.",
+            )
+        )
+
+    for item in file_budgets:
+        path = str(item.get("path", ""))
+        lines = int(item.get("lines") or 0)
+        warning_lines = int(item.get("warningLines") or 0)
+        max_lines = int(item.get("maxLines") or 0)
+        status = str(item.get("status", "unknown"))
+        next_action = str(item.get("nextAction", "Split cohesive pure helpers into owned modules."))
+        pressure = (lines / warning_lines) if warning_lines else 0.0
+
+        if status == "failed":
+            priority = "P0"
+            title = "Reduce file size below the hard maintainability budget"
+            detail = "This file is over the hard line-count limit and should be split before adding features."
+        elif status == "warning":
+            priority = "P1"
+            title = "Bring file size back under the warning budget"
+            detail = "This file is already large enough to slow future feature work."
+        elif pressure >= 0.9:
+            priority = "P2"
+            title = "Extract the next cohesive module before this file crosses the warning budget"
+            detail = "The file still passes, but it is close enough to the warning budget that new features should not land here by default."
+        elif pressure >= 0.75:
+            priority = "P3"
+            title = "Plan the next extraction candidate"
+            detail = "The file is healthy today, but it is a known growth area."
+        else:
+            continue
+
+        actions.append(
+            build_maintenance_action(
+                priority,
+                path,
+                title,
+                detail,
+                f"{lines}/{warning_lines} warning lines, {max_lines} max lines",
+                next_action,
+            )
+        )
+
+    return sorted(actions, key=lambda action: (priority_rank(action["priority"]), action["area"], action["title"]))
+
+
 def build_report() -> dict[str, object]:
     file_budgets = evaluate_file_budgets()
     modules = evaluate_modules()
     module_guard = evaluate_module_guard()
+    maintenance_plan = build_maintenance_plan(file_budgets, modules, module_guard)
     failed_files = [item for item in file_budgets if item["status"] == "failed"]
     warning_files = [item for item in file_budgets if item["status"] == "warning"]
     hard_module_failures = (
@@ -319,10 +432,13 @@ def build_report() -> dict[str, object]:
             "newMissingTestCount": len(modules["newMissingTests"]),
             "moduleGuardStatus": module_guard["status"],
             "moduleGuardRequirementCount": module_guard["requirementCount"],
+            "maintenanceActionCount": len(maintenance_plan),
+            "topMaintenancePriority": maintenance_plan[0]["priority"] if maintenance_plan else "",
         },
         "fileBudgets": file_budgets,
         "modules": modules,
         "moduleGuard": module_guard,
+        "maintenancePlan": maintenance_plan,
     }
 
 
@@ -373,6 +489,24 @@ def write_markdown_report(path: Path, report: dict[str, object]) -> None:
                 ", ".join(f"`{name}`" for name in modules.get("newMissingTests", [])),
             ]
         )
+    maintenance_plan = report.get("maintenancePlan")
+    if isinstance(maintenance_plan, list) and maintenance_plan:
+        lines.extend(
+            [
+                "",
+                "## Maintenance Roadmap",
+                "",
+                "| Priority | Area | Action | Evidence | Next step |",
+                "| --- | --- | --- | --- | --- |",
+            ]
+        )
+        for action in maintenance_plan[:8]:
+            if not isinstance(action, dict):
+                continue
+            lines.append(
+                f"| `{action.get('priority', '')}` | `{action.get('area', '')}` | "
+                f"{action.get('title', '')} | {action.get('evidence', '')} | {action.get('nextStep', '')} |"
+            )
     module_guard = report.get("moduleGuard")
     if isinstance(module_guard, dict):
         lines.extend(
@@ -420,6 +554,10 @@ def format_terminal_report(report: dict[str, object]) -> str:
             f"Startup guard: {summary.get('moduleGuardStatus', 'unknown')} "
             f"({summary.get('moduleGuardRequirementCount', 0)} required globals)"
         ),
+        (
+            f"Maintenance roadmap: {summary.get('maintenanceActionCount', 0)} action(s), "
+            f"top priority {summary.get('topMaintenancePriority', 'none') or 'none'}"
+        ),
     ]
     if modules.get("newMissingTests"):
         lines.append("New modules missing tests: " + ", ".join(modules["newMissingTests"]))
@@ -439,6 +577,15 @@ def format_terminal_report(report: dict[str, object]) -> str:
     for item in report.get("fileBudgets", []):
         if isinstance(item, dict) and item.get("status") != "passed":
             lines.append(f"- {item.get('path')}: {item.get('lines')} lines, {item.get('note')}")
+    maintenance_plan = report.get("maintenancePlan")
+    if isinstance(maintenance_plan, list) and maintenance_plan:
+        lines.append("Next maintenance actions:")
+        for action in maintenance_plan[:3]:
+            if isinstance(action, dict):
+                lines.append(
+                    f"- {action.get('priority')} {action.get('area')}: "
+                    f"{action.get('title')} ({action.get('evidence')})"
+                )
     return "\n".join(lines)
 
 
