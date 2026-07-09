@@ -103,9 +103,68 @@
     };
   }
 
+  function buildStoryScenePlayableActionPlan(scene = {}, overview = {}) {
+    const issueCounts = overview.issueCounts ?? {};
+    const routes = Array.isArray(overview.routes) ? overview.routes : [];
+    const actions = [];
+    const pushAction = (action) => {
+      if (action) {
+        actions.push(action);
+      }
+    };
+
+    if ((issueCounts.broken_target ?? 0) > 0 || (overview.brokenRouteCount ?? 0) > 0) {
+      pushAction({
+        label: "先定位跳转坏链",
+        action: "focus-story-block-filters",
+        primary: true,
+        dataset: { "story-block-type": "logic", "story-block-issue": "broken_target" },
+      });
+      return actions;
+    }
+
+    if (!overview.hasStoryContent) {
+      pushAction({
+        label: "生成可试玩段落",
+        action: "apply-story-template",
+        primary: true,
+        dataset: { "template-id": "playable_scene" },
+      });
+      pushAction({ label: "加一张台词", action: "add-dialogue" });
+      pushAction({ label: "加一张旁白", action: "add-narration" });
+      return actions;
+    }
+
+    if (!overview.hasBackground) {
+      pushAction({ label: "补背景卡", action: "add-background", primary: true });
+    }
+
+    if (!overview.hasMusic) {
+      pushAction({ label: "补 BGM 卡", action: "add-music-play", primary: actions.length === 0 });
+    }
+
+    if (routes.length === 0 && overview.storyCount > 0) {
+      pushAction({ label: "接一张跳转卡", action: "add-jump", primary: actions.length === 0 });
+      pushAction({ label: "做一个选项分支", action: "add-choice" });
+    }
+
+    if (scene?.id && actions.length < 3) {
+      pushAction({
+        label: "从这里试玩",
+        action: "preview-scene-from-map",
+        primary: actions.length === 0,
+        dataset: { "scene-id": scene.id },
+      });
+    }
+
+    return actions.slice(0, 4);
+  }
+
   function renderStoryScenePlayableGate(overview = {}, options = {}) {
     const escape = getEscapeHtml(options);
     const gate = buildStoryScenePlayableGate(overview);
+    const scene = options.scene ?? {};
+    const actionPlan = buildStoryScenePlayableActionPlan(scene, overview);
 
     return `
       <article class="production-task-card story-structure-section story-playable-gate is-${escape(gate.tone)}">
@@ -125,6 +184,18 @@
             )
             .join("")}
         </div>
+        ${
+          actionPlan.length > 0
+            ? `
+              <div class="story-playable-action-plan">
+                <span class="panel-note">推荐顺序</span>
+                <div class="story-optimizer-action-row">
+                  ${actionPlan.map((button) => renderStorySceneOptimizerButton(button, options)).join("")}
+                </div>
+              </div>
+            `
+            : ""
+        }
       </article>
     `;
   }
@@ -400,7 +471,7 @@
             overview.issueBlockCount > 0 ? "先修这里会更稳" : "这一场目前比较干净"
           )}
         </div>
-        ${renderStoryScenePlayableGate(overview, options)}
+        ${renderStoryScenePlayableGate(overview, { ...options, scene })}
         <div class="story-scene-planner-tags">
           <span class="issue-tag good-text">${escape(overview.phaseLabel ?? "短桥段")}</span>
           ${(overview.productionNotes ?? [])
@@ -490,6 +561,7 @@
 
   global.CanvasiaEditorStorySceneStructurePanel = Object.freeze({
     buildStorySceneOptimizerCards,
+    buildStoryScenePlayableActionPlan,
     buildStoryScenePlayableGate,
     renderStorySceneOptimizerButton,
     renderStorySceneOptimizerSection,

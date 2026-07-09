@@ -99,12 +99,30 @@ class FrontendStorySceneStructurePanelModuleTests(unittest.TestCase):
               issueCounts: {{ ...overview.issueCounts, broken_target: 1 }},
               brokenRouteCount: 1,
             }});
+            const noContentPlan = tools.buildStoryScenePlayableActionPlan(scene, {{
+              ...overview,
+              storyCount: 0,
+              hasStoryContent: false,
+              hasBackground: false,
+              hasMusic: false,
+              routes: [],
+              issueCounts: {{}},
+            }});
+            const playablePlan = tools.buildStoryScenePlayableActionPlan(scene, overview);
+            const brokenPlan = tools.buildStoryScenePlayableActionPlan(scene, {{
+              ...overview,
+              issueCounts: {{ ...overview.issueCounts, broken_target: 1 }},
+              brokenRouteCount: 1,
+            }});
             process.stdout.write(JSON.stringify({{
               keys: Object.keys(tools).sort(),
               html,
               optimizer,
               playableGate,
               brokenGate,
+              noContentPlan,
+              playablePlan,
+              brokenPlan,
             }}));
             """
         )
@@ -122,12 +140,24 @@ class FrontendStorySceneStructurePanelModuleTests(unittest.TestCase):
         optimizer = payload["optimizer"]
 
         self.assertIn("buildStoryScenePlayableGate", payload["keys"])
+        self.assertIn("buildStoryScenePlayableActionPlan", payload["keys"])
         self.assertIn("renderStorySceneStructurePanel", payload["keys"])
         self.assertIn("场景结构总览", html)
         self.assertIn("可试玩闸门", html)
+        self.assertIn("推荐顺序", html)
         self.assertEqual(payload["playableGate"]["label"], "已可试玩，建议补 BGM")
         self.assertEqual(payload["brokenGate"]["tone"], "danger")
+        self.assertEqual(payload["noContentPlan"][0]["action"], "apply-story-template")
+        self.assertEqual(payload["noContentPlan"][0]["dataset"]["template-id"], "playable_scene")
+        self.assertEqual(payload["brokenPlan"][0]["action"], "focus-story-block-filters")
+        self.assertEqual(payload["brokenPlan"][0]["dataset"]["story-block-issue"], "broken_target")
+        self.assertEqual(payload["playablePlan"][0]["action"], "add-music-play")
+        self.assertEqual(payload["playablePlan"][1]["action"], "preview-scene-from-map")
+        self.assertEqual(payload["playablePlan"][1]["dataset"]["scene-id"], "scene_1")
         self.assertIn("BGM：建议补一段 BGM", html)
+        self.assertIn('data-action="add-music-play"', html)
+        self.assertIn('data-action="preview-scene-from-map"', html)
+        self.assertIn('data-scene-id="scene_1"', html)
         self.assertIn("写作中 / 高优先级", html)
         self.assertIn("铺垫后分线", html)
         self.assertIn("缺 BGM 规划", html)

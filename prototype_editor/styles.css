@@ -3950,6 +3950,12 @@ body[data-editor-mode="beginner"] #screen-preview #previewSceneFilterBar {
   align-content: start;
 }
 
+.story-playable-action-plan {
+  display: grid;
+  gap: 8px;
+  padding-top: 4px;
+}
+
 .story-structure-note-list,
 .story-structure-step-list,
 .story-structure-highlight-list {
