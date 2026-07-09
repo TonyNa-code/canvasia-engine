@@ -154,6 +154,13 @@ class FrontendDashboardProductionModuleTests(unittest.TestCase):
                 tone: task.tone,
                 badge: task.badge,
                 action: task.actions?.[0]?.action,
+                actions: (task.actions || []).map((action) => ({{
+                  label: action.label,
+                  action: action.action,
+                  sceneId: action.sceneId || "",
+                  screen: action.screen || "",
+                  dataset: action.dataset || {{}},
+                }})),
               }})),
               columns: columns.map((column) => ({{
                 status: column.status,
@@ -236,6 +243,18 @@ class FrontendDashboardProductionModuleTests(unittest.TestCase):
         self.assertEqual(payload["tasks"][1]["title"], "先处理结构问题")
         self.assertIn("跟进你手动标记的重点场景", [task["title"] for task in payload["tasks"]])
         self.assertIn("清一轮无用素材", [task["title"] for task in payload["tasks"]])
+        task_by_title = {task["title"]: task for task in payload["tasks"]}
+        self.assertEqual(task_by_title["补可试玩正文"]["actions"][0]["action"], "apply-story-template-to-scene")
+        self.assertEqual(task_by_title["补可试玩正文"]["actions"][0]["dataset"]["template-id"], "playable_scene")
+        self.assertEqual(task_by_title["补可试玩正文"]["actions"][0]["dataset"]["scene-id"], "scene_empty")
+        self.assertEqual(task_by_title["补可试玩正文"]["actions"][1]["action"], "open-scene-from-map")
+        self.assertEqual(task_by_title["补可试玩正文"]["actions"][1]["dataset"]["scene-checklist-item"], "story")
+        self.assertEqual(task_by_title["给场景补舞台感"]["actions"][0]["label"], "打开并补背景")
+        self.assertEqual(task_by_title["给场景补舞台感"]["actions"][0]["sceneId"], "scene_no_bg")
+        self.assertEqual(task_by_title["给场景补舞台感"]["actions"][0]["dataset"]["scene-checklist-item"], "background")
+        self.assertEqual(task_by_title["给关键场景补 BGM"]["actions"][0]["label"], "打开并补 BGM")
+        self.assertEqual(task_by_title["给关键场景补 BGM"]["actions"][0]["sceneId"], "scene_no_bgm")
+        self.assertEqual(task_by_title["给关键场景补 BGM"]["actions"][0]["dataset"]["scene-checklist-item"], "music")
         self.assertEqual(payload["columns"][2]["status"], "polishing")
         self.assertEqual(payload["columns"][2]["firstId"], "scene_rush")
         self.assertEqual(payload["columns"][3]["firstId"], "scene_ready")

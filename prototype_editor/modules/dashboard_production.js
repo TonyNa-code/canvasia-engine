@@ -599,6 +599,7 @@
     }
 
     if (emptyScene) {
+      const emptySceneActions = buildDashboardScenePlayableActionPlan(emptyScene);
       pushTask({
         priority: 100,
         tone: "warn",
@@ -606,13 +607,15 @@
         title: "补可试玩正文",
         description: `还有 ${toArray(overview.emptyScenes).length} 个场景几乎还没有正文内容，补出基础台词、旁白或选项后，试玩链会更完整。`,
         meta: `${emptyScene.name} 目前还没有可试玩内容`,
-        actions: [
-          {
-            label: "打开这个空场景",
-            action: "open-scene-from-map",
-            sceneId: emptyScene.id,
-          },
-        ],
+        actions: emptySceneActions.length
+          ? emptySceneActions
+          : [
+              {
+                label: "打开这个空场景",
+                action: "open-scene-from-map",
+                sceneId: emptyScene.id,
+              },
+            ],
       });
     }
 
@@ -625,17 +628,21 @@
         description: `还有 ${toArray(overview.scenesMissingBackground).length} 个有正文的场景没切背景，补上背景后，画面完成度会明显提升。`,
         meta: `${missingBackgroundScene.name} 现在还没放背景卡片`,
         actions: [
-          {
-            label: "打开这个场景",
-            action: "open-scene-from-map",
-            sceneId: missingBackgroundScene.id,
-          },
+          buildSceneOpenFocusAction(
+            missingBackgroundScene,
+            {
+              id: "background",
+              text: "补背景",
+              action: { label: "补背景" },
+            },
+            { label: "打开并补背景" }
+          ),
           {
             label: "去素材页找背景",
             action: "switch-screen",
             screen: "assets",
           },
-        ],
+        ].filter(Boolean),
       });
     }
 
@@ -703,17 +710,21 @@
         description: `还有 ${toArray(overview.scenesMissingMusic).length} 个有正文的场景没有背景音乐，补上后氛围会更完整。`,
         meta: `${missingMusicScene.name} 现在还没放音乐卡片`,
         actions: [
-          {
-            label: "打开这个场景",
-            action: "open-scene-from-map",
-            sceneId: missingMusicScene.id,
-          },
+          buildSceneOpenFocusAction(
+            missingMusicScene,
+            {
+              id: "music",
+              text: "补 BGM",
+              action: { label: "补 BGM" },
+            },
+            { label: "打开并补 BGM" }
+          ),
           {
             label: "去素材页找 BGM",
             action: "switch-screen",
             screen: "assets",
           },
-        ],
+        ].filter(Boolean),
       });
     }
 
