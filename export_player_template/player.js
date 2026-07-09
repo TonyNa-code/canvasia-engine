@@ -27,6 +27,12 @@ import {
   getTypewriterStepDelay,
 } from "./runtime_text_effects.js";
 import {
+  buildRuntimeStorageKeys,
+  readRuntimeStorageJson,
+  removeRuntimeStorageItem,
+  writeRuntimeStorageJson,
+} from "./runtime_storage.js";
+import {
   DEFAULT_RUNTIME_LANGUAGE,
   RUNTIME_LANGUAGE_LABELS,
   buildRuntimeLocalizationFallbackReport,
@@ -75,6 +81,7 @@ import {
 const rawData = window.LIGHTWHISPER_GAME_DATA ?? {};
 const runtimeConditionTools = window.CanvasiaRuntimeConditions;
 const data = normalizeGameData(rawData);
+const storageKeys = buildRuntimeStorageKeys(data.project);
 
 const refs = {
   stageFrame: document.getElementById("stageFrame"),
@@ -4073,29 +4080,6 @@ function buildDialogBoxPresentation(theme, project = data.project) {
   };
 }
 
-function getBrowserStorage() {
-  try {
-    return window.localStorage;
-  } catch (error) {
-    return null;
-  }
-}
-
-function getProjectStorageScope() {
-  const title = String(data.project.title ?? "canvasia-project")
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9\u4e00-\u9fa5_-]+/g, "-")
-    .replace(/-+/g, "-")
-    .slice(0, 72);
-
-  return title || "project";
-}
-
-function getPlaybackStorageKey() {
-  return `canvasia-engine:player-preview:${getProjectStorageScope()}`;
-}
-
 function sanitizePlaybackSettings(source = {}) {
   return sanitizePlaybackSettingsBase(source, {
     getSafeLanguage: getSafeRuntimeLanguage,
@@ -4208,85 +4192,21 @@ function getSceneChapterName(scene) {
 }
 
 function loadStoredPlaybackSettings() {
-  const storage = getBrowserStorage();
   const projectDefaults = getProjectPlaybackDefaults();
+  const storedSettings = readRuntimeStorageJson(storageKeys.playback, null);
 
-  if (!storage) {
+  if (!storedSettings) {
     return projectDefaults;
   }
 
-  try {
-    const raw = storage.getItem(getPlaybackStorageKey());
-
-    if (!raw) {
-      return projectDefaults;
-    }
-
-    return sanitizePlaybackSettings({
-      ...projectDefaults,
-      ...JSON.parse(raw),
-    });
-  } catch (error) {
-    return projectDefaults;
-  }
+  return sanitizePlaybackSettings({
+    ...projectDefaults,
+    ...storedSettings,
+  });
 }
 
 function persistPlaybackSettings() {
-  const storage = getBrowserStorage();
-
-  if (!storage) {
-    return;
-  }
-
-  try {
-    storage.setItem(getPlaybackStorageKey(), JSON.stringify(sanitizePlaybackSettings(state.playback)));
-  } catch (error) {
-    // Ignore storage write failures so the exported player still works in stricter browsers.
-  }
-}
-
-function getAutoResumeStorageKey() {
-  return `canvasia-engine:player-autoresume:${getProjectStorageScope()}`;
-}
-
-function getReadHistoryStorageKey() {
-  return `canvasia-engine:player-read:${getProjectStorageScope()}`;
-}
-
-function getSaveSlotStorageKey() {
-  return `canvasia-engine:player-saves:${getProjectStorageScope()}`;
-}
-
-function getQuickSaveStorageKey() {
-  return `canvasia-engine:player-quicksave:${getProjectStorageScope()}`;
-}
-
-function getPlayerProfileStorageKey() {
-  return `canvasia-engine:player-profile:${getProjectStorageScope()}`;
-}
-
-function getAchievementProgressStorageKey() {
-  return `canvasia-engine:player-achievements:${getProjectStorageScope()}`;
-}
-
-function getChapterReplayStorageKey() {
-  return `canvasia-engine:player-chapters:${getProjectStorageScope()}`;
-}
-
-function getLocationArchiveStorageKey() {
-  return `canvasia-engine:player-locations:${getProjectStorageScope()}`;
-}
-
-function getNarrationArchiveStorageKey() {
-  return `canvasia-engine:player-narrations:${getProjectStorageScope()}`;
-}
-
-function getRelationArchiveStorageKey() {
-  return `canvasia-engine:player-relations:${getProjectStorageScope()}`;
-}
-
-function getVoiceReplayStorageKey() {
-  return `canvasia-engine:player-voice-replay:${getProjectStorageScope()}`;
+  writeRuntimeStorageJson(storageKeys.playback, sanitizePlaybackSettings(state.playback));
 }
 
 function buildVoiceReplayEntryId(sceneId, blockId, blockIndex) {
@@ -4764,225 +4684,57 @@ function sanitizeChapterReplayProgressMap(source) {
 }
 
 function loadStoredAchievementProgress() {
-  const storage = getBrowserStorage();
-
-  if (!storage) {
-    return new Map();
-  }
-
-  try {
-    const raw = storage.getItem(getAchievementProgressStorageKey());
-
-    if (!raw) {
-      return new Map();
-    }
-
-    return sanitizeAchievementProgressMap(JSON.parse(raw));
-  } catch (error) {
-    return new Map();
-  }
+  const payload = readRuntimeStorageJson(storageKeys.achievements, null);
+  return payload ? sanitizeAchievementProgressMap(payload) : new Map();
 }
 
 function loadStoredChapterReplayProgress() {
-  const storage = getBrowserStorage();
-
-  if (!storage) {
-    return new Map();
-  }
-
-  try {
-    const raw = storage.getItem(getChapterReplayStorageKey());
-
-    if (!raw) {
-      return new Map();
-    }
-
-    return sanitizeChapterReplayProgressMap(JSON.parse(raw));
-  } catch (error) {
-    return new Map();
-  }
+  const payload = readRuntimeStorageJson(storageKeys.chapters, null);
+  return payload ? sanitizeChapterReplayProgressMap(payload) : new Map();
 }
 
 function persistAchievementProgress() {
-  const storage = getBrowserStorage();
-
-  if (!storage) {
-    return;
-  }
-
-  try {
-    storage.setItem(
-      getAchievementProgressStorageKey(),
-      JSON.stringify(Object.fromEntries(state.achievementProgress))
-    );
-  } catch (error) {
-    // Ignore storage write failures so achievement collection remains optional.
-  }
+  writeRuntimeStorageJson(storageKeys.achievements, Object.fromEntries(state.achievementProgress));
 }
 
 function persistChapterReplayProgress() {
-  const storage = getBrowserStorage();
-
-  if (!storage) {
-    return;
-  }
-
-  try {
-    storage.setItem(
-      getChapterReplayStorageKey(),
-      JSON.stringify(Object.fromEntries(state.chapterReplayProgress))
-    );
-  } catch (error) {
-    // Ignore storage write failures so chapter replay remains optional.
-  }
+  writeRuntimeStorageJson(storageKeys.chapters, Object.fromEntries(state.chapterReplayProgress));
 }
 
 function loadStoredLocationArchiveProgress() {
-  const storage = getBrowserStorage();
-
-  if (!storage) {
-    return new Map();
-  }
-
-  try {
-    const raw = storage.getItem(getLocationArchiveStorageKey());
-
-    if (!raw) {
-      return new Map();
-    }
-
-    return sanitizeLocationArchiveProgressMap(JSON.parse(raw));
-  } catch (error) {
-    return new Map();
-  }
+  const payload = readRuntimeStorageJson(storageKeys.locations, null);
+  return payload ? sanitizeLocationArchiveProgressMap(payload) : new Map();
 }
 
 function persistLocationArchiveProgress() {
-  const storage = getBrowserStorage();
-
-  if (!storage) {
-    return;
-  }
-
-  try {
-    storage.setItem(
-      getLocationArchiveStorageKey(),
-      JSON.stringify(Object.fromEntries(state.locationArchiveProgress))
-    );
-  } catch (error) {
-    // Ignore storage write failures so location archive remains optional.
-  }
+  writeRuntimeStorageJson(storageKeys.locations, Object.fromEntries(state.locationArchiveProgress));
 }
 
 function loadStoredNarrationArchiveProgress() {
-  const storage = getBrowserStorage();
-
-  if (!storage) {
-    return new Map();
-  }
-
-  try {
-    const raw = storage.getItem(getNarrationArchiveStorageKey());
-
-    if (!raw) {
-      return new Map();
-    }
-
-    return sanitizeNarrationArchiveProgressMap(JSON.parse(raw));
-  } catch (error) {
-    return new Map();
-  }
+  const payload = readRuntimeStorageJson(storageKeys.narrations, null);
+  return payload ? sanitizeNarrationArchiveProgressMap(payload) : new Map();
 }
 
 function persistNarrationArchiveProgress() {
-  const storage = getBrowserStorage();
-
-  if (!storage) {
-    return;
-  }
-
-  try {
-    storage.setItem(
-      getNarrationArchiveStorageKey(),
-      JSON.stringify(Object.fromEntries(state.narrationArchiveProgress))
-    );
-  } catch (error) {
-    // Ignore storage write failures so narration archive remains optional.
-  }
+  writeRuntimeStorageJson(storageKeys.narrations, Object.fromEntries(state.narrationArchiveProgress));
 }
 
 function loadStoredRelationArchiveProgress() {
-  const storage = getBrowserStorage();
-
-  if (!storage) {
-    return new Map();
-  }
-
-  try {
-    const raw = storage.getItem(getRelationArchiveStorageKey());
-
-    if (!raw) {
-      return new Map();
-    }
-
-    return sanitizeRelationArchiveProgressMap(JSON.parse(raw));
-  } catch (error) {
-    return new Map();
-  }
+  const payload = readRuntimeStorageJson(storageKeys.relations, null);
+  return payload ? sanitizeRelationArchiveProgressMap(payload) : new Map();
 }
 
 function persistRelationArchiveProgress() {
-  const storage = getBrowserStorage();
-
-  if (!storage) {
-    return;
-  }
-
-  try {
-    storage.setItem(
-      getRelationArchiveStorageKey(),
-      JSON.stringify(Object.fromEntries(state.relationArchiveProgress))
-    );
-  } catch (error) {
-    // Ignore storage write failures so relation archive remains optional.
-  }
+  writeRuntimeStorageJson(storageKeys.relations, Object.fromEntries(state.relationArchiveProgress));
 }
 
 function loadStoredVoiceReplayProgress() {
-  const storage = getBrowserStorage();
-
-  if (!storage) {
-    return new Map();
-  }
-
-  try {
-    const raw = storage.getItem(getVoiceReplayStorageKey());
-
-    if (!raw) {
-      return new Map();
-    }
-
-    return sanitizeVoiceReplayProgressMap(JSON.parse(raw));
-  } catch (error) {
-    return new Map();
-  }
+  const payload = readRuntimeStorageJson(storageKeys.voiceReplay, null);
+  return payload ? sanitizeVoiceReplayProgressMap(payload) : new Map();
 }
 
 function persistVoiceReplayProgress() {
-  const storage = getBrowserStorage();
-
-  if (!storage) {
-    return;
-  }
-
-  try {
-    storage.setItem(
-      getVoiceReplayStorageKey(),
-      JSON.stringify(Object.fromEntries(state.voiceReplayProgress))
-    );
-  } catch (error) {
-    // Ignore storage write failures so voice replay collection remains optional.
-  }
+  writeRuntimeStorageJson(storageKeys.voiceReplay, Object.fromEntries(state.voiceReplayProgress));
 }
 
 function unlockAchievement(achievementId, { silent = false } = {}) {
@@ -5055,18 +4807,6 @@ function syncAchievementProgressFromState() {
   return changed;
 }
 
-function getCharacterArchiveStorageKey() {
-  return `canvasia-engine:player-characters:${getProjectStorageScope()}`;
-}
-
-function getExtraUnlockStorageKey() {
-  return `canvasia-engine:player-extra:${getProjectStorageScope()}`;
-}
-
-function getEndingProgressStorageKey() {
-  return `canvasia-engine:player-endings:${getProjectStorageScope()}`;
-}
-
 function getEndingScenes() {
   return data.endingScenes ?? [];
 }
@@ -5087,49 +4827,25 @@ function sanitizeEndingUnlockMap(source) {
 }
 
 function loadStoredEndingProgress() {
-  const storage = getBrowserStorage();
+  const parsed = readRuntimeStorageJson(storageKeys.endings, null);
 
-  if (!storage) {
+  if (!parsed) {
     return { unlocked: new Map(), completionCount: 0, lastCompletedAt: null };
   }
 
-  try {
-    const raw = storage.getItem(getEndingProgressStorageKey());
-
-    if (!raw) {
-      return { unlocked: new Map(), completionCount: 0, lastCompletedAt: null };
-    }
-
-    const parsed = JSON.parse(raw);
-    return {
-      unlocked: sanitizeEndingUnlockMap(parsed?.unlocked),
-      completionCount: Math.max(0, Math.round(Number(parsed?.completionCount) || 0)),
-      lastCompletedAt: typeof parsed?.lastCompletedAt === "string" ? parsed.lastCompletedAt : null,
-    };
-  } catch (error) {
-    return { unlocked: new Map(), completionCount: 0, lastCompletedAt: null };
-  }
+  return {
+    unlocked: sanitizeEndingUnlockMap(parsed?.unlocked),
+    completionCount: Math.max(0, Math.round(Number(parsed?.completionCount) || 0)),
+    lastCompletedAt: typeof parsed?.lastCompletedAt === "string" ? parsed.lastCompletedAt : null,
+  };
 }
 
 function persistEndingProgress() {
-  const storage = getBrowserStorage();
-
-  if (!storage) {
-    return;
-  }
-
-  try {
-    storage.setItem(
-      getEndingProgressStorageKey(),
-      JSON.stringify({
-        unlocked: Object.fromEntries(state.endingProgress.unlocked),
-        completionCount: state.endingProgress.completionCount,
-        lastCompletedAt: state.endingProgress.lastCompletedAt,
-      })
-    );
-  } catch (error) {
-    // Ignore storage write failures so ending collection remains optional.
-  }
+  writeRuntimeStorageJson(storageKeys.endings, {
+    unlocked: Object.fromEntries(state.endingProgress.unlocked),
+    completionCount: state.endingProgress.completionCount,
+    lastCompletedAt: state.endingProgress.lastCompletedAt,
+  });
 }
 
 function getGalleryAssets() {
@@ -5155,37 +4871,11 @@ function sanitizeCharacterArchiveSet(source) {
 }
 
 function loadStoredCharacterArchive() {
-  const storage = getBrowserStorage();
-
-  if (!storage) {
-    return new Set();
-  }
-
-  try {
-    const raw = storage.getItem(getCharacterArchiveStorageKey());
-
-    if (!raw) {
-      return new Set();
-    }
-
-    return sanitizeCharacterArchiveSet(JSON.parse(raw));
-  } catch (error) {
-    return new Set();
-  }
+  return sanitizeCharacterArchiveSet(readRuntimeStorageJson(storageKeys.characters, []));
 }
 
 function persistCharacterArchive() {
-  const storage = getBrowserStorage();
-
-  if (!storage) {
-    return;
-  }
-
-  try {
-    storage.setItem(getCharacterArchiveStorageKey(), JSON.stringify(Array.from(state.characterArchive)));
-  } catch (error) {
-    // Ignore storage write failures so archive mode remains optional.
-  }
+  writeRuntimeStorageJson(storageKeys.characters, Array.from(state.characterArchive));
 }
 
 function sanitizeExtraUnlockSet(source, assetType) {
@@ -5203,47 +4893,23 @@ function sanitizeExtraUnlockSet(source, assetType) {
 }
 
 function loadStoredExtraUnlocks() {
-  const storage = getBrowserStorage();
+  const parsed = readRuntimeStorageJson(storageKeys.extraUnlocks, null);
 
-  if (!storage) {
+  if (!parsed) {
     return { cg: new Set(), bgm: new Set() };
   }
 
-  try {
-    const raw = storage.getItem(getExtraUnlockStorageKey());
-
-    if (!raw) {
-      return { cg: new Set(), bgm: new Set() };
-    }
-
-    const parsed = JSON.parse(raw);
-    return {
-      cg: sanitizeExtraUnlockSet(parsed?.cg, "cg"),
-      bgm: sanitizeExtraUnlockSet(parsed?.bgm, "bgm"),
-    };
-  } catch (error) {
-    return { cg: new Set(), bgm: new Set() };
-  }
+  return {
+    cg: sanitizeExtraUnlockSet(parsed?.cg, "cg"),
+    bgm: sanitizeExtraUnlockSet(parsed?.bgm, "bgm"),
+  };
 }
 
 function persistExtraUnlocks() {
-  const storage = getBrowserStorage();
-
-  if (!storage) {
-    return;
-  }
-
-  try {
-    storage.setItem(
-      getExtraUnlockStorageKey(),
-      JSON.stringify({
-        cg: Array.from(state.extraUnlocks.cg),
-        bgm: Array.from(state.extraUnlocks.bgm),
-      })
-    );
-  } catch (error) {
-    // Ignore storage write failures so extra mode remains optional.
-  }
+  writeRuntimeStorageJson(storageKeys.extraUnlocks, {
+    cg: Array.from(state.extraUnlocks.cg),
+    bgm: Array.from(state.extraUnlocks.bgm),
+  });
 }
 
 function unlockExtraAsset(type, assetId) {
@@ -5378,96 +5044,30 @@ function sanitizeStoredSaveSlot(source) {
 }
 
 function loadStoredAutoResume() {
-  const storage = getBrowserStorage();
-
-  if (!storage) {
-    return null;
-  }
-
-  try {
-    const raw = storage.getItem(getAutoResumeStorageKey());
-
-    if (!raw) {
-      return null;
-    }
-
-    return sanitizeStoredSaveSlot(JSON.parse(raw));
-  } catch (error) {
-    return null;
-  }
+  return sanitizeStoredSaveSlot(readRuntimeStorageJson(storageKeys.autoResume, null));
 }
 
 function loadStoredSaveSlots() {
-  const storage = getBrowserStorage();
   const slotCount = getProjectFormalSaveSlotCount();
+  const parsed = readRuntimeStorageJson(storageKeys.saveSlots, null);
 
-  if (!storage) {
+  if (!parsed) {
     return createEmptySaveSlots();
   }
 
-  try {
-    const raw = storage.getItem(getSaveSlotStorageKey());
-
-    if (!raw) {
-      return createEmptySaveSlots();
-    }
-
-    const parsed = JSON.parse(raw);
-    const sourceSlots = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.slots) ? parsed.slots : [];
-
-    return Array.from({ length: slotCount }, (_, index) => sanitizeStoredSaveSlot(sourceSlots[index]));
-  } catch (error) {
-    return createEmptySaveSlots();
-  }
+  const sourceSlots = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.slots) ? parsed.slots : [];
+  return Array.from({ length: slotCount }, (_, index) => sanitizeStoredSaveSlot(sourceSlots[index]));
 }
 
 function loadStoredQuickSave() {
-  const storage = getBrowserStorage();
-
-  if (!storage) {
-    return null;
-  }
-
-  try {
-    const raw = storage.getItem(getQuickSaveStorageKey());
-
-    if (!raw) {
-      return null;
-    }
-
-    return sanitizeStoredSaveSlot(JSON.parse(raw));
-  } catch (error) {
-    return null;
-  }
+  return sanitizeStoredSaveSlot(readRuntimeStorageJson(storageKeys.quickSave, null));
 }
 
 function loadStoredPlayerProfile() {
-  const storage = getBrowserStorage();
-
-  if (!storage) {
-    return sanitizePlayerProfile(null);
-  }
-
-  try {
-    const raw = storage.getItem(getPlayerProfileStorageKey());
-
-    if (!raw) {
-      return sanitizePlayerProfile(null);
-    }
-
-    return sanitizePlayerProfile(JSON.parse(raw));
-  } catch (error) {
-    return sanitizePlayerProfile(null);
-  }
+  return sanitizePlayerProfile(readRuntimeStorageJson(storageKeys.playerProfile, null));
 }
 
 function persistAutoResume() {
-  const storage = getBrowserStorage();
-
-  if (!storage) {
-    return;
-  }
-
   const session = sanitizeStoredSession(state.session);
 
   if (!session) {
@@ -5480,25 +5080,15 @@ function persistAutoResume() {
     thumbnailDataUrl: buildSaveThumbnailDataUrl(getCurrentSnapshot()),
   };
 
-  try {
-    storage.setItem(getAutoResumeStorageKey(), JSON.stringify(state.autoResume));
-  } catch (error) {
-    // Ignore storage write failures so auto resume remains optional.
-  }
+  writeRuntimeStorageJson(storageKeys.autoResume, state.autoResume);
 }
 
 function persistPlayerProfile() {
-  const storage = getBrowserStorage();
-
-  if (!storage || !state.playerProfile) {
+  if (!state.playerProfile) {
     return;
   }
 
-  try {
-    storage.setItem(getPlayerProfileStorageKey(), JSON.stringify(state.playerProfile));
-  } catch (error) {
-    // Ignore storage write failures so player profile remains optional.
-  }
+  writeRuntimeStorageJson(storageKeys.playerProfile, state.playerProfile);
 }
 
 function refreshPlayerProfileUi() {
@@ -5560,133 +5150,55 @@ function finalizePlayerSession({ silent = false } = {}) {
 }
 
 function persistSaveSlots() {
-  const storage = getBrowserStorage();
+  const payload = state.saveSlots.map((slot) =>
+    slot
+      ? {
+          savedAt: slot.savedAt,
+          session: deepCloneRuntimeData(slot.session),
+          thumbnailDataUrl: slot.thumbnailDataUrl ?? "",
+        }
+      : null
+  );
 
-  if (!storage) {
-    return;
-  }
-
-  try {
-    const payload = state.saveSlots.map((slot) =>
-      slot
-        ? {
-            savedAt: slot.savedAt,
-            session: deepCloneRuntimeData(slot.session),
-            thumbnailDataUrl: slot.thumbnailDataUrl ?? "",
-          }
-        : null
-    );
-
-    storage.setItem(getSaveSlotStorageKey(), JSON.stringify(payload));
-  } catch (error) {
-    // Ignore storage write failures so local save slots stay optional.
-  }
+  writeRuntimeStorageJson(storageKeys.saveSlots, payload);
 }
 
 function persistQuickSave() {
-  const storage = getBrowserStorage();
-
-  if (!storage) {
-    return;
-  }
-
-  try {
-    storage.setItem(
-      getQuickSaveStorageKey(),
-      JSON.stringify(
-        state.quickSave
-          ? {
-              savedAt: state.quickSave.savedAt,
-              session: deepCloneRuntimeData(state.quickSave.session),
-              thumbnailDataUrl: state.quickSave.thumbnailDataUrl ?? "",
-            }
-          : null
-      )
-    );
-  } catch (error) {
-    // Ignore storage write failures so quick save stays optional.
-  }
+  writeRuntimeStorageJson(
+    storageKeys.quickSave,
+    state.quickSave
+      ? {
+          savedAt: state.quickSave.savedAt,
+          session: deepCloneRuntimeData(state.quickSave.session),
+          thumbnailDataUrl: state.quickSave.thumbnailDataUrl ?? "",
+        }
+      : null
+  );
 }
 
 function clearStoredAutoResume() {
-  const storage = getBrowserStorage();
   state.autoResume = null;
-
-  if (!storage) {
-    return;
-  }
-
-  try {
-    storage.removeItem(getAutoResumeStorageKey());
-  } catch (error) {
-    // Ignore storage cleanup failures.
-  }
+  removeRuntimeStorageItem(storageKeys.autoResume);
 }
 
 function clearStoredQuickSave() {
-  const storage = getBrowserStorage();
   state.quickSave = null;
-
-  if (!storage) {
-    return;
-  }
-
-  try {
-    storage.removeItem(getQuickSaveStorageKey());
-  } catch (error) {
-    // Ignore storage cleanup failures.
-  }
+  removeRuntimeStorageItem(storageKeys.quickSave);
 }
 
 function clearStoredCharacterArchive() {
-  const storage = getBrowserStorage();
   state.characterArchive = new Set();
-
-  if (!storage) {
-    return;
-  }
-
-  try {
-    storage.removeItem(getCharacterArchiveStorageKey());
-  } catch (error) {
-    // Ignore storage cleanup failures.
-  }
+  removeRuntimeStorageItem(storageKeys.characters);
 }
 
 function loadStoredReadHistory() {
-  const storage = getBrowserStorage();
-
-  if (!storage) {
-    return new Set();
-  }
-
-  try {
-    const raw = storage.getItem(getReadHistoryStorageKey());
-
-    if (!raw) {
-      return new Set();
-    }
-
-    const parsed = JSON.parse(raw);
-    const values = Array.isArray(parsed) ? parsed : [];
-    return new Set(values.filter((value) => typeof value === "string" && value.trim()));
-  } catch (error) {
-    return new Set();
-  }
+  const parsed = readRuntimeStorageJson(storageKeys.readHistory, []);
+  const values = Array.isArray(parsed) ? parsed : [];
+  return new Set(values.filter((value) => typeof value === "string" && value.trim()));
 }
 
 function persistReadHistory() {
-  const storage = getBrowserStorage();
-
-  if (!storage) {
-    return;
-  }
-
-  try {
-    storage.setItem(getReadHistoryStorageKey(), JSON.stringify(Array.from(state.readHistory)));
-  } catch (error) {
-    // Ignore storage write failures so read history remains optional.
-  }
+  writeRuntimeStorageJson(storageKeys.readHistory, Array.from(state.readHistory));
 }
 
 function getCurrentStepKey(snapshot) {

@@ -3274,6 +3274,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / "index.html").is_file())
         self.assertTrue((build_dir / "player.js").is_file())
         self.assertTrue((build_dir / "runtime_data.js").is_file())
+        self.assertTrue((build_dir / "runtime_storage.js").is_file())
         self.assertTrue((build_dir / "runtime_visual_constants.js").is_file())
         self.assertTrue((build_dir / "runtime_conditions.js").is_file())
         self.assertTrue((build_dir / "runtime_controls.js").is_file())
@@ -3370,6 +3371,7 @@ class RunEditorSmokeTests(unittest.TestCase):
             run_editor.DEFAULT_EXPORT_RELEASE_VERSION,
         )
         self.assertEqual(manifest["files"]["playerRuntimeData"], "runtime_data.js")
+        self.assertEqual(manifest["files"]["playerRuntimeStorage"], "runtime_storage.js")
         self.assertEqual(manifest["files"]["playerRuntimeVisualConstants"], "runtime_visual_constants.js")
         self.assertEqual(manifest["files"]["playerRuntimeControls"], "runtime_controls.js")
         self.assertEqual(manifest["files"]["playerRuntimeConditions"], "runtime_conditions.js")
@@ -3451,6 +3453,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 run_editor.UNLOCKABLE_CONTENT_REPORT_FILE_NAME,
                 "player.js",
                 "runtime_data.js",
+                "runtime_storage.js",
                 "runtime_conditions.js",
                 "runtime_controls.js",
                 "runtime_settings.js",
@@ -4838,6 +4841,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue(Path(export_result["startHelperPath"]).is_file())
         self.assertTrue(Path(export_result["archivePath"]).is_file())
         self.assertTrue((build_dir / "app" / "runtime_data.js").is_file())
+        self.assertTrue((build_dir / "app" / "runtime_storage.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_visual_constants.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_conditions.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_controls.js").is_file())
@@ -4914,6 +4918,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["voiceProductionReport"], run_editor.EXPORT_VOICE_PRODUCTION_REPORT_NAME)
         self.assertEqual(manifest["files"]["voiceProductionCsv"], run_editor.EXPORT_VOICE_PRODUCTION_CSV_NAME)
         self.assertEqual(manifest["files"]["appRuntimeData"], "app/runtime_data.js")
+        self.assertEqual(manifest["files"]["appRuntimeStorage"], "app/runtime_storage.js")
         self.assertEqual(manifest["files"]["appRuntimeVisualConstants"], "app/runtime_visual_constants.js")
         self.assertEqual(manifest["files"]["appRuntimeConditions"], "app/runtime_conditions.js")
         self.assertEqual(manifest["files"]["appRuntimeI18n"], "app/runtime_i18n.js")
@@ -4958,6 +4963,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 f"app/{run_editor.UNLOCKABLE_CONTENT_REPORT_FILE_NAME}",
                 "app/player.js",
                 "app/runtime_data.js",
+                "app/runtime_storage.js",
                 "app/runtime_conditions.js",
                 "app/runtime_controls.js",
                 "app/runtime_settings.js",
@@ -4996,6 +5002,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue(Path(export_result["startHelperPath"]).is_file())
         self.assertTrue(Path(export_result["archivePath"]).is_file())
         self.assertTrue((build_dir / "app" / "runtime_data.js").is_file())
+        self.assertTrue((build_dir / "app" / "runtime_storage.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_visual_constants.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_conditions.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_controls.js").is_file())
@@ -5070,6 +5077,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["voiceProductionReport"], run_editor.EXPORT_VOICE_PRODUCTION_REPORT_NAME)
         self.assertEqual(manifest["files"]["voiceProductionCsv"], run_editor.EXPORT_VOICE_PRODUCTION_CSV_NAME)
         self.assertEqual(manifest["files"]["appRuntimeData"], "app/runtime_data.js")
+        self.assertEqual(manifest["files"]["appRuntimeStorage"], "app/runtime_storage.js")
         self.assertEqual(manifest["files"]["appRuntimeVisualConstants"], "app/runtime_visual_constants.js")
         self.assertEqual(manifest["files"]["appRuntimeConditions"], "app/runtime_conditions.js")
         self.assertEqual(manifest["files"]["appRuntimeI18n"], "app/runtime_i18n.js")
@@ -5114,6 +5122,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 f"app/{run_editor.UNLOCKABLE_CONTENT_REPORT_FILE_NAME}",
                 "app/player.js",
                 "app/runtime_data.js",
+                "app/runtime_storage.js",
                 "app/runtime_conditions.js",
                 "app/runtime_controls.js",
                 "app/runtime_settings.js",
@@ -5227,6 +5236,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue(Path(export_result["archivePath"]).is_file())
         self.assertTrue((build_dir / "package.nw").is_file())
         self.assertTrue((build_dir / "app" / "runtime_data.js").is_file())
+        self.assertTrue((build_dir / "app" / "runtime_storage.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_visual_constants.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_conditions.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_controls.js").is_file())
@@ -5303,6 +5313,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["voiceProductionReport"], run_editor.EXPORT_VOICE_PRODUCTION_REPORT_NAME)
         self.assertEqual(manifest["files"]["voiceProductionCsv"], run_editor.EXPORT_VOICE_PRODUCTION_CSV_NAME)
         self.assertEqual(manifest["files"]["appRuntimeData"], "app/runtime_data.js")
+        self.assertEqual(manifest["files"]["appRuntimeStorage"], "app/runtime_storage.js")
         self.assertEqual(manifest["files"]["appRuntimeVisualConstants"], "app/runtime_visual_constants.js")
         self.assertEqual(manifest["files"]["appRuntimeConditions"], "app/runtime_conditions.js")
         self.assertEqual(manifest["files"]["appRuntimeI18n"], "app/runtime_i18n.js")
@@ -5347,6 +5358,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 f"app/{run_editor.UNLOCKABLE_CONTENT_REPORT_FILE_NAME}",
                 "app/player.js",
                 "app/runtime_data.js",
+                "app/runtime_storage.js",
                 "app/runtime_conditions.js",
                 "app/runtime_controls.js",
                 "app/runtime_settings.js",
@@ -5377,6 +5389,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((bundle_dir / "prototype_editor" / "index.html").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "player.js").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_data.js").is_file())
+        self.assertTrue((bundle_dir / "export_player_template" / "runtime_storage.js").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_visual_constants.js").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_conditions.js").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_controls.js").is_file())

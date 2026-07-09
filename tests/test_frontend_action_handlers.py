@@ -19,6 +19,7 @@ RUNTIME_CONTROLS_PATH = ROOT_DIR / "export_player_template" / "runtime_controls.
 RUNTIME_SETTINGS_PATH = ROOT_DIR / "export_player_template" / "runtime_settings.js"
 RUNTIME_AUDIO_PATH = ROOT_DIR / "export_player_template" / "runtime_audio.js"
 RUNTIME_DATA_PATH = ROOT_DIR / "export_player_template" / "runtime_data.js"
+RUNTIME_STORAGE_PATH = ROOT_DIR / "export_player_template" / "runtime_storage.js"
 RUNTIME_I18N_PATH = ROOT_DIR / "export_player_template" / "runtime_i18n.js"
 RUNTIME_TEXT_EFFECTS_PATH = ROOT_DIR / "export_player_template" / "runtime_text_effects.js"
 NATIVE_RUNTIME_PATH = ROOT_DIR / "native_runtime" / "runtime_player.py"
@@ -265,6 +266,7 @@ class FrontendActionHandlerTests(unittest.TestCase):
         script_import_mapping_source = (EDITOR_DIR / "modules" / "script_import_mapping.js").read_text(encoding="utf-8")
         route_analyzer_source = (EDITOR_DIR / "modules" / "route_analyzer.js").read_text(encoding="utf-8")
         player_source = PLAYER_PATH.read_text(encoding="utf-8")
+        runtime_storage_source = RUNTIME_STORAGE_PATH.read_text(encoding="utf-8")
         runtime_data_source = RUNTIME_DATA_PATH.read_text(encoding="utf-8")
         native_runtime_source = NATIVE_RUNTIME_PATH.read_text(encoding="utf-8")
         styles = STYLES_PATH.read_text(encoding="utf-8")
@@ -546,6 +548,15 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("affection_choice", story_templates_source)
         self.assertIn("认真回应她", story_templates_source)
         self.assertIn('from "./runtime_data.js"', player_source)
+        self.assertIn('from "./runtime_storage.js"', player_source)
+        self.assertIn("buildRuntimeStorageKeys(data.project)", player_source)
+        self.assertIn("readRuntimeStorageJson(storageKeys.quickSave", player_source)
+        self.assertIn("writeRuntimeStorageJson(storageKeys.saveSlots", player_source)
+        self.assertIn("removeRuntimeStorageItem(storageKeys.autoResume", player_source)
+        self.assertIn("export function buildRuntimeStorageKeys", runtime_storage_source)
+        self.assertIn("export function readRuntimeStorageJson", runtime_storage_source)
+        self.assertIn("export function writeRuntimeStorageJson", runtime_storage_source)
+        self.assertIn("export function removeRuntimeStorageItem", runtime_storage_source)
         self.assertIn('export const CHOICE_CONTINUE_TARGET = "__continue__";', runtime_data_source)
         self.assertIn("export function isChoiceContinueTarget", runtime_data_source)
         self.assertIn("export function normalizeGameData", runtime_data_source)
@@ -6255,8 +6266,10 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("function getProjectFormalSaveSlotCount(project = data.project)", player_source)
         self.assertIn("getProjectFormalSaveSlotCountBase(project)", project_formal_save_slots)
         self.assertIn("const projectDefaults = getProjectPlaybackDefaults()", load_playback_settings)
+        self.assertIn("readRuntimeStorageJson(storageKeys.playback, null)", load_playback_settings)
+        self.assertIn("if (!storedSettings)", load_playback_settings)
         self.assertIn("...projectDefaults", load_playback_settings)
-        self.assertIn("...JSON.parse(raw)", load_playback_settings)
+        self.assertIn("...storedSettings", load_playback_settings)
         self.assertIn("state.playback = getProjectPlaybackDefaults()", reset_playback_settings)
         self.assertIn('id="voiceDuckingToggleButton"', player_html := (ROOT_DIR / "export_player_template" / "index.html").read_text(encoding="utf-8"))
         self.assertIn('id="menuVoiceDuckingToggleButton"', player_html)
