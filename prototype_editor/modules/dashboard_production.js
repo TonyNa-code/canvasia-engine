@@ -34,6 +34,29 @@
     return routeOverview.metrics ?? {};
   }
 
+  function buildChoiceConsequenceProductionSummary(sheet = {}) {
+    const summary = sheet.summary ?? {};
+    const weakIssueCodes = new Set(["choice_option_no_consequence", "choice_same_consequence"]);
+    const weakIssues = toArray(sheet.issues).filter((issue) => weakIssueCodes.has(issue.code));
+    const fallbackNoConsequenceCount = weakIssues.filter((issue) => issue.code === "choice_option_no_consequence").length;
+    const fallbackSameConsequenceCount = weakIssues.filter((issue) => issue.code === "choice_same_consequence").length;
+    const noConsequenceCount = toCount(summary.noConsequenceCount, fallbackNoConsequenceCount);
+    const sameConsequenceCount = toCount(summary.sameConsequenceCount, fallbackSameConsequenceCount);
+    const firstIssue = weakIssues[0] ?? null;
+    const firstSceneId = cleanText(firstIssue?.sceneId);
+    const firstSceneName = cleanText(firstIssue?.sceneName);
+
+    return {
+      weakChoiceCount: noConsequenceCount + sameConsequenceCount,
+      noConsequenceCount,
+      sameConsequenceCount,
+      firstSceneId,
+      firstSceneName,
+      firstOptionText: cleanText(firstIssue?.optionText),
+      firstBlockId: cleanText(firstIssue?.blockId),
+    };
+  }
+
   function getSafeScenePriority(priority, helpers = {}) {
     if (typeof helpers.getSafeScenePriority === "function") {
       return helpers.getSafeScenePriority(priority);
@@ -76,6 +99,7 @@
     routeOverview = {},
     issueEntryCount,
     missingVoiceCount,
+    weakChoiceCount,
     directionIdeaCount,
   }) {
     const metrics = getMetrics(routeOverview);
@@ -89,6 +113,10 @@
 
     if (issueEntryCount > 0) {
       return `台本里还有 ${issueEntryCount} 条需要体检的正文，先补这些会让后面统稿轻松很多。`;
+    }
+
+    if (weakChoiceCount > 0) {
+      return `还有 ${weakChoiceCount} 个选项缺少真实后果，先补变量变化或路线差异，会更像玩家真的在做选择。`;
     }
 
     if (missingVoiceCount > 0) {
@@ -508,6 +536,8 @@
     const missingMusicScene = toArray(overview.scenesMissingMusic)[0] ?? null;
     const flatScene = toArray(overview.flatScenes)[0] ?? null;
     const topIssueEntry = toArray(overview.issueEntries)[0] ?? null;
+    const choiceConsequenceProduction =
+      overview.choiceConsequenceProduction ?? buildChoiceConsequenceProductionSummary(overview.choiceConsequenceSheet);
 
     if (primaryDangerAlert) {
       pushTask({
@@ -701,6 +731,39 @@
       });
     }
 
+    if ((choiceConsequenceProduction.weakChoiceCount ?? 0) > 0) {
+      const sceneName = choiceConsequenceProduction.firstSceneName || "第一个选项场景";
+      const optionText = choiceConsequenceProduction.firstOptionText
+        ? `“${choiceConsequenceProduction.firstOptionText}”`
+        : "第一个弱选项";
+      pushTask({
+        priority: 78,
+        tone: "warn",
+        badge: `弱选项 ${choiceConsequenceProduction.weakChoiceCount} 个`,
+        title: "补真实选项后果",
+        description: `检测到 ${choiceConsequenceProduction.weakChoiceCount} 个选项缺少变量变化、路线差异或独立后果，玩家容易觉得像假按钮。`,
+        meta: `${sceneName} / ${optionText} 优先确认`,
+        actions: [
+          {
+            label: "查看选项后果表",
+            action: "switch-screen",
+            screen: "inspection",
+          },
+          choiceConsequenceProduction.firstSceneId
+            ? {
+                label: "打开第一个选项",
+                action: "open-scene-from-map",
+                sceneId: choiceConsequenceProduction.firstSceneId,
+              }
+            : {
+                label: "去剧情页补分支",
+                action: "switch-screen",
+                screen: "story",
+              },
+        ],
+      });
+    }
+
     if (missingMusicScene) {
       pushTask({
         priority: 70,
@@ -843,6 +906,7 @@
   }
 
   global.CanvasiaEditorDashboardProduction = Object.freeze({
+    buildChoiceConsequenceProductionSummary,
     buildDashboardProductionSummary,
     buildDashboardProductionTasks,
     buildDashboardScenePlanningNextStep,

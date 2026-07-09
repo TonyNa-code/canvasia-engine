@@ -111,6 +111,21 @@ class FrontendDashboardProductionModuleTests(unittest.TestCase):
                 {{ title: "长台词", sceneId: "scene_ready", blockId: "line_2", issues: ["too_long"] }},
               ],
               unusedAssets: [{{ id: "asset_unused", name: "备用 BGM" }}],
+              choiceConsequenceProduction: tools.buildChoiceConsequenceProductionSummary({{
+                summary: {{
+                  noConsequenceCount: 2,
+                  sameConsequenceCount: 1,
+                }},
+                issues: [
+                  {{
+                    code: "choice_option_no_consequence",
+                    sceneId: "scene_choice",
+                    sceneName: "分岔口",
+                    optionText: "先答应她",
+                    blockId: "choice_1",
+                  }},
+                ],
+              }}),
               directionIdeaCount: 2,
             }};
             const tasks = tools.buildDashboardProductionTasks(routeOverview, overview, {{
@@ -129,6 +144,7 @@ class FrontendDashboardProductionModuleTests(unittest.TestCase):
               summaries: [
                 tools.buildDashboardProductionSummary({{ readinessScore: 80, routeOverview: {{ metrics: {{ brokenRoutes: 1 }} }} }}),
                 tools.buildDashboardProductionSummary({{ readinessScore: 80, routeOverview: {{ metrics: {{}} }}, issueEntryCount: 0, missingVoiceCount: 0, directionIdeaCount: 0 }}),
+                tools.buildDashboardProductionSummary({{ readinessScore: 80, routeOverview: {{ metrics: {{}} }}, issueEntryCount: 0, weakChoiceCount: 2, missingVoiceCount: 0, directionIdeaCount: 0 }}),
               ],
               queue: overview.plannedScenes.map((scene) => ({{
                 id: scene.id,
@@ -188,12 +204,14 @@ class FrontendDashboardProductionModuleTests(unittest.TestCase):
         payload = json.loads(completed.stdout)
 
         self.assertIn("buildDashboardProductionTasks", payload["keys"])
+        self.assertIn("buildChoiceConsequenceProductionSummary", payload["keys"])
         self.assertIn("buildDashboardScenePlayableActionPlan", payload["keys"])
         self.assertIn("buildDashboardScenePlayableChecklist", payload["keys"])
         self.assertIn("getSceneChecklistFocusHint", payload["keys"])
         self.assertEqual(payload["progress"], [25, 100])
         self.assertIn("路线断线", payload["summaries"][0])
         self.assertIn("成品味道", payload["summaries"][1])
+        self.assertIn("缺少真实后果", payload["summaries"][2])
         self.assertEqual(payload["queue"][0]["id"], "scene_rush")
         self.assertEqual(payload["queue"][0]["tone"], "danger")
         self.assertIn("润色中", payload["queue"][0]["summary"])
@@ -243,6 +261,7 @@ class FrontendDashboardProductionModuleTests(unittest.TestCase):
         self.assertEqual(payload["tasks"][1]["title"], "先处理结构问题")
         self.assertIn("跟进你手动标记的重点场景", [task["title"] for task in payload["tasks"]])
         self.assertIn("清一轮无用素材", [task["title"] for task in payload["tasks"]])
+        self.assertIn("补真实选项后果", [task["title"] for task in payload["tasks"]])
         task_by_title = {task["title"]: task for task in payload["tasks"]}
         self.assertEqual(task_by_title["补可试玩正文"]["actions"][0]["action"], "apply-story-template-to-scene")
         self.assertEqual(task_by_title["补可试玩正文"]["actions"][0]["dataset"]["template-id"], "playable_scene")
@@ -255,6 +274,12 @@ class FrontendDashboardProductionModuleTests(unittest.TestCase):
         self.assertEqual(task_by_title["给关键场景补 BGM"]["actions"][0]["label"], "打开并补 BGM")
         self.assertEqual(task_by_title["给关键场景补 BGM"]["actions"][0]["sceneId"], "scene_no_bgm")
         self.assertEqual(task_by_title["给关键场景补 BGM"]["actions"][0]["dataset"]["scene-checklist-item"], "music")
+        self.assertEqual(task_by_title["补真实选项后果"]["priority"], 78)
+        self.assertEqual(task_by_title["补真实选项后果"]["badge"], "弱选项 3 个")
+        self.assertEqual(task_by_title["补真实选项后果"]["actions"][0]["action"], "switch-screen")
+        self.assertEqual(task_by_title["补真实选项后果"]["actions"][0]["screen"], "inspection")
+        self.assertEqual(task_by_title["补真实选项后果"]["actions"][1]["action"], "open-scene-from-map")
+        self.assertEqual(task_by_title["补真实选项后果"]["actions"][1]["sceneId"], "scene_choice")
         self.assertEqual(payload["columns"][2]["status"], "polishing")
         self.assertEqual(payload["columns"][2]["firstId"], "scene_rush")
         self.assertEqual(payload["columns"][3]["firstId"], "scene_ready")

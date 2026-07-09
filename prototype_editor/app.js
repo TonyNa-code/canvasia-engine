@@ -10743,6 +10743,9 @@ function buildDashboardProductionOverview(routeOverview) {
   ).length;
   const placeholderScriptCount = issueEntries.filter((entry) => (entry.issues ?? []).includes("placeholder")).length;
   const unusedAssets = getUnusedAssets();
+  const choiceConsequenceProduction = dashboardProductionTools.buildChoiceConsequenceProductionSummary(
+    buildChoiceConsequenceSheet()
+  );
   const directionIdeaCount = buildScriptDirectionIdeas(scriptEntries).length;
   const storyProgress = getDashboardProgressPercent(scenesWithContent.length, scenes.length);
   const stageProgress = getDashboardProgressPercent(scenesWithBackground.length, scenes.length);
@@ -10792,11 +10795,13 @@ function buildDashboardProductionOverview(routeOverview) {
     polishingSceneCount,
     issueEntries,
     unusedAssets,
+    choiceConsequenceProduction,
     summary: buildDashboardProductionSummary({
       readinessScore,
       routeOverview,
       issueEntryCount: issueEntries.length,
       missingVoiceCount: dialogueEntries.length - voicedDialogueCount,
+      weakChoiceCount: choiceConsequenceProduction.weakChoiceCount,
       directionIdeaCount,
     }),
   };
