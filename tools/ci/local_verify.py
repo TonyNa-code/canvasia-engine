@@ -167,6 +167,7 @@ def build_node_check_steps() -> list[VerifyStep]:
             "prototype_editor/app.js",
             "export_player_template/runtime_conditions.js",
             "export_player_template/player.js",
+            "export_player_template/runtime_data.js",
             "export_player_template/runtime_visual_constants.js",
             "export_player_template/runtime_controls.js",
             "export_player_template/runtime_settings.js",

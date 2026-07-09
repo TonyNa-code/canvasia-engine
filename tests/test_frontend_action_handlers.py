@@ -18,6 +18,7 @@ PLAYER_PATH = ROOT_DIR / "export_player_template" / "player.js"
 RUNTIME_CONTROLS_PATH = ROOT_DIR / "export_player_template" / "runtime_controls.js"
 RUNTIME_SETTINGS_PATH = ROOT_DIR / "export_player_template" / "runtime_settings.js"
 RUNTIME_AUDIO_PATH = ROOT_DIR / "export_player_template" / "runtime_audio.js"
+RUNTIME_DATA_PATH = ROOT_DIR / "export_player_template" / "runtime_data.js"
 RUNTIME_I18N_PATH = ROOT_DIR / "export_player_template" / "runtime_i18n.js"
 RUNTIME_TEXT_EFFECTS_PATH = ROOT_DIR / "export_player_template" / "runtime_text_effects.js"
 NATIVE_RUNTIME_PATH = ROOT_DIR / "native_runtime" / "runtime_player.py"
@@ -264,6 +265,7 @@ class FrontendActionHandlerTests(unittest.TestCase):
         script_import_mapping_source = (EDITOR_DIR / "modules" / "script_import_mapping.js").read_text(encoding="utf-8")
         route_analyzer_source = (EDITOR_DIR / "modules" / "route_analyzer.js").read_text(encoding="utf-8")
         player_source = PLAYER_PATH.read_text(encoding="utf-8")
+        runtime_data_source = RUNTIME_DATA_PATH.read_text(encoding="utf-8")
         native_runtime_source = NATIVE_RUNTIME_PATH.read_text(encoding="utf-8")
         styles = STYLES_PATH.read_text(encoding="utf-8")
         handle_click = _extract_function_source(app_source, "handleClick")
@@ -543,7 +545,10 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("playable_scene", story_templates_source)
         self.assertIn("affection_choice", story_templates_source)
         self.assertIn("认真回应她", story_templates_source)
-        self.assertIn('const CHOICE_CONTINUE_TARGET = "__continue__";', player_source)
+        self.assertIn('from "./runtime_data.js"', player_source)
+        self.assertIn('export const CHOICE_CONTINUE_TARGET = "__continue__";', runtime_data_source)
+        self.assertIn("export function isChoiceContinueTarget", runtime_data_source)
+        self.assertIn("export function normalizeGameData", runtime_data_source)
         self.assertIn("function buildChoiceOptionNextSnapshot", player_source)
         self.assertIn("getSafeWaitDurationMs(snapshot.block?.durationSeconds)", player_source)
         self.assertIn('case "wait"', player_source)
