@@ -204,6 +204,7 @@ class FrontendReleaseCandidateManifestModuleTests(unittest.TestCase):
         self.assertIn('"timing","estimated_runtime"', payload["csv"])
         self.assertIn('"signoff"', payload["csv"])
         self.assertIn('data-action="export-release-candidate-manifest-markdown"', payload["panel"])
+        self.assertIn('data-inspection-section="release-candidate"', payload["panel"])
         self.assertIn("Estimated Runtime", payload["panel"])
         self.assertIn("about 2m 6s", payload["panel"])
         self.assertIn("Manual signoff checklist", payload["panel"])

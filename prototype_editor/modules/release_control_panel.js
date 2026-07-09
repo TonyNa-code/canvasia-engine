@@ -231,7 +231,7 @@
     const nextActionCard = resolved.buildReleaseNextActionCard(nextStep);
 
     return `
-      <article class="detail-card preview-sprint-panel">
+      <article class="detail-card preview-sprint-panel" data-inspection-section="release-control">
         <div class="panel-heading">
           <h2>发布前修复顺序</h2>
           <span class="badge badge-soft">按这个顺序做最省力</span>

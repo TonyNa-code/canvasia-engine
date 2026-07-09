@@ -108,6 +108,7 @@ class FrontendReleaseControlPanelModuleTests(unittest.TestCase):
         self.assertIn("修复分支坏链：教室 / 留下 / 天台", payload["html"])
         self.assertIn("生产待办下一项", payload["html"])
         self.assertIn("补齐空白场景内容", payload["html"])
+        self.assertIn('data-inspection-section="release-control"', payload["html"])
         self.assertIn('data-action="generate-release-fix-order"', payload["html"])
         self.assertIn('data-action="export-release-control-report"', payload["html"])
         self.assertIn('data-action="open-scene-from-map"', payload["html"])

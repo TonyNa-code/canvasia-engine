@@ -31207,7 +31207,7 @@ function renderProductionBacklogPanel(routeOverview) {
   const areaSummaries = (backlog.areaSummaries ?? []).slice(0, 4);
 
   return `
-    <article class="detail-card preview-sprint-panel">
+    <article class="detail-card preview-sprint-panel" data-inspection-section="production-backlog">
       <div class="panel-heading">
         <h2>生产待办队列</h2>
         <span class="badge badge-soft ${getProductionBacklogToneClass(digest.status)}">${escapeHtml(digest.title)}</span>
@@ -31311,7 +31311,7 @@ function renderRuntimeCapabilityMatrixPanel() {
   const essentialIssues = Array.isArray(essentials.issues) ? essentials.issues.slice(0, 4) : [];
 
   return `
-    <article class="detail-card preview-sprint-panel">
+    <article class="detail-card preview-sprint-panel" data-inspection-section="runtime-capability">
       <div class="panel-heading">
         <h2>Runtime 覆盖矩阵</h2>
         <span class="badge badge-soft ${getRuntimeCapabilityToneClass(digest.status)}">${escapeHtml(digest.title)}</span>
@@ -31910,7 +31910,7 @@ function renderAssetFootprintPanel({ compact = false } = {}) {
   const toneClass = getAssetFootprintToneClass(digest.level);
 
   return `
-    <article class="detail-card preview-sprint-panel asset-footprint-panel">
+    <article class="detail-card preview-sprint-panel asset-footprint-panel" data-inspection-section="asset-footprint">
       <div class="panel-heading">
         <h2>素材体积雷达</h2>
         <span class="badge badge-soft ${toneClass}">${escapeHtml(digest.title)}</span>

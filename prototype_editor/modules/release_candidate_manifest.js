@@ -1218,7 +1218,7 @@
     const signoffItems = toArray(manifest.signoffChecklist).filter((item) => item.required).slice(0, 5);
 
     return `
-      <article class="detail-card preview-sprint-panel">
+      <article class="detail-card preview-sprint-panel" data-inspection-section="release-candidate">
         <div class="panel-heading">
           <h2>Release Candidate Manifest</h2>
           <span class="badge badge-soft ${getToneClass(digest.status)}">${escapeHtml(digest.title)}</span>
