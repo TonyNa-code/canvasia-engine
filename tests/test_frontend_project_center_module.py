@@ -145,6 +145,62 @@ class FrontendProjectCenterModuleTests(unittest.TestCase):
                 sceneCount: 6,
               }},
             ], "project-<1>", helpers);
+            const emptySummary = tools.buildProjectCenterSummary([], "", {{
+              projectCenterMode: "beginner",
+              projectCenterModeLabel: "新手模式",
+            }});
+            const blankSummary = tools.buildProjectCenterSummary([
+              {{
+                projectId: "blank-1",
+                title: "空白企划",
+                sceneCount: 0,
+              }},
+            ], "", {{
+              projectCenterMode: "advanced",
+              projectCenterModeLabel: "高级模式",
+            }});
+            const activePlayableSummary = tools.buildProjectCenterSummary([
+              {{
+                projectId: "project-<1>",
+                title: "我的 <企划>",
+                sceneCount: 3,
+              }},
+              {{
+                projectId: "sample-1",
+                title: "示例项目",
+                isSample: true,
+                sceneCount: 6,
+              }},
+            ], "project-<1>", {{
+              projectCenterMode: "beginner",
+              projectCenterModeLabel: "新手模式",
+            }});
+            const emptyNextStep = tools.getProjectCenterNextStep(emptySummary);
+            const blankNextStep = tools.getProjectCenterNextStep(blankSummary);
+            const activeNextStep = tools.getProjectCenterNextStep(activePlayableSummary);
+            const emptyNextStepHtml = tools.renderProjectCenterNextStep(emptySummary, {{ escapeHtml }});
+            const blankNextStepHtml = tools.renderProjectCenterNextStep(blankSummary, {{ escapeHtml }});
+            const activeNextStepHtml = tools.renderProjectCenterNextStep(activePlayableSummary, {{
+              escapeHtml,
+              projectOpenInFlightId: "project-<1>",
+            }});
+            const shellHtml = tools.renderProjectCenterShell([
+              {{
+                projectId: "project-<1>",
+                title: "我的 <企划>",
+                template: "school",
+                sceneCount: 3,
+              }},
+              {{
+                projectId: "sample-1",
+                title: "示例项目",
+                isSample: true,
+                sceneCount: 6,
+              }},
+            ], "project-<1>", {{
+              projectCenterMode: "advanced",
+              projectCenterModeLabel: "高级模式",
+            }}, helpers);
             process.stdout.write(JSON.stringify({{
               keys: Object.keys(tools).sort(),
               formalHtml,
@@ -163,6 +219,16 @@ class FrontendProjectCenterModuleTests(unittest.TestCase):
               busyEmptyListHtml,
               lockedEmptyListHtml,
               listHtml,
+              emptySummary,
+              blankSummary,
+              activePlayableSummary,
+              emptyNextStep,
+              blankNextStep,
+              activeNextStep,
+              emptyNextStepHtml,
+              blankNextStepHtml,
+              activeNextStepHtml,
+              shellHtml,
             }}));
             """
         )
@@ -178,6 +244,10 @@ class FrontendProjectCenterModuleTests(unittest.TestCase):
         payload = json.loads(completed.stdout)
 
         self.assertIn("renderProjectCenterCard", payload["keys"])
+        self.assertIn("buildProjectCenterSummary", payload["keys"])
+        self.assertIn("getProjectCenterNextStep", payload["keys"])
+        self.assertIn("renderProjectCenterNextStep", payload["keys"])
+        self.assertIn("renderProjectCenterShell", payload["keys"])
         self.assertIn("我的 &lt;企划&gt;", payload["formalHtml"])
         self.assertIn("校园恋爱 &lt;模板&gt;", payload["formalHtml"])
         self.assertIn("data-project-id=\"project-&lt;1&gt;\"", payload["formalHtml"])
@@ -273,6 +343,31 @@ class FrontendProjectCenterModuleTests(unittest.TestCase):
         self.assertEqual(payload["listHtml"].count("project-card "), 2)
         self.assertIn("我的 &lt;企划&gt;", payload["listHtml"])
         self.assertIn("复制成正式项目", payload["listHtml"])
+        self.assertEqual(payload["emptySummary"]["localProjectCount"], 0)
+        self.assertFalse(payload["emptySummary"]["hasLocalProjects"])
+        self.assertEqual(payload["blankSummary"]["blankProjectCount"], 1)
+        self.assertEqual(payload["blankSummary"]["projectCenterMode"], "advanced")
+        self.assertEqual(payload["activePlayableSummary"]["localProjectCount"], 1)
+        self.assertEqual(payload["activePlayableSummary"]["playableProjectCount"], 1)
+        self.assertEqual(payload["activePlayableSummary"]["sampleProjectCount"], 1)
+        self.assertEqual(payload["activePlayableSummary"]["totalSceneCount"], 3)
+        self.assertEqual(payload["emptyNextStep"]["intent"], "create-playable-demo-project")
+        self.assertEqual(payload["blankNextStep"]["intent"], "project-list-hint")
+        self.assertEqual(payload["activeNextStep"]["intent"], "open-active-project")
+        self.assertIn("推荐下一步", payload["emptyNextStepHtml"])
+        self.assertIn("建议先生成可试玩 Demo", payload["emptyNextStepHtml"])
+        self.assertIn('data-action="create-playable-demo-project"', payload["emptyNextStepHtml"])
+        self.assertIn("从下方打开空白项目", payload["blankNextStepHtml"])
+        self.assertNotIn("<button", payload["blankNextStepHtml"])
+        self.assertIn("继续上次项目", payload["activeNextStepHtml"])
+        self.assertIn('data-action="open-project"', payload["activeNextStepHtml"])
+        self.assertIn('data-project-id="project-&lt;1&gt;"', payload["activeNextStepHtml"])
+        self.assertIn("处理中...", payload["activeNextStepHtml"])
+        self.assertIn('aria-busy="true"', payload["activeNextStepHtml"])
+        self.assertIn("project-center-shell", payload["shellHtml"])
+        self.assertIn("推荐下一步", payload["shellHtml"])
+        self.assertIn("项目列表", payload["shellHtml"])
+        self.assertIn("我的 &lt;企划&gt;", payload["shellHtml"])
 
 
 if __name__ == "__main__":

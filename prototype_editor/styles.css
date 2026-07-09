@@ -509,6 +509,26 @@ textarea {
   gap: 16px;
 }
 
+.project-center-next-step {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 20px;
+  border: 1px solid rgba(74, 156, 255, 0.16);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(74, 156, 255, 0.14), transparent 42%),
+    rgba(255, 255, 255, 0.64);
+}
+
+.project-center-next-step h3,
+.project-center-next-step p {
+  margin: 0;
+}
+
+.project-center-next-step p {
+  line-height: 1.7;
+}
+
 .project-center-actions,
 .project-card-actions {
   display: flex;

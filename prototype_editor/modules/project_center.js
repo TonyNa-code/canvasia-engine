@@ -31,6 +31,126 @@
     return value ? String(value) : "刚创建";
   }
 
+  function toProjectList(projects) {
+    return Array.isArray(projects) ? projects : [];
+  }
+
+  function buildProjectCenterSummary(projects = [], activeProjectId = "", options = {}) {
+    const projectList = toProjectList(projects);
+    const localProjects = projectList.filter((project) => !project.isSample);
+    const sampleProjects = projectList.filter((project) => project.isSample);
+    const projectCenterMode = getFallbackEditorMode(options.projectCenterMode);
+    const projectCenterModeLabel =
+      options.projectCenterModeLabel ?? getFallbackEditorModeLabel(projectCenterMode);
+    const playableProjects = localProjects.filter((project) => Number(project.sceneCount ?? 0) > 0);
+    const blankProjects = localProjects.filter((project) => Number(project.sceneCount ?? 0) <= 0);
+    const activeProject = projectList.find((project) => project.projectId === activeProjectId) ?? null;
+    const totalSceneCount = localProjects.reduce(
+      (total, project) => total + Math.max(Number(project.sceneCount ?? 0) || 0, 0),
+      0
+    );
+
+    return {
+      activeProject,
+      activeProjectId,
+      blankProjectCount: blankProjects.length,
+      hasActiveProject: Boolean(activeProject),
+      hasBlankProjects: blankProjects.length > 0,
+      hasLocalProjects: localProjects.length > 0,
+      hasPlayableProject: playableProjects.length > 0,
+      hasSampleProject: sampleProjects.length > 0,
+      localProjectCount: localProjects.length,
+      playableProjectCount: playableProjects.length,
+      projectCenterMode,
+      projectCenterModeLabel,
+      sampleProjectCount: sampleProjects.length,
+      sampleProject: sampleProjects[0] ?? null,
+      totalProjectCount: projectList.length,
+      totalSceneCount,
+    };
+  }
+
+  function getProjectCenterNextStep(summary = {}) {
+    if (!summary.hasLocalProjects) {
+      return {
+        title: "建议先生成可试玩 Demo",
+        detail: "它会自动带上首章、场景、基础素材和可试玩链路，适合第一次确认整个引擎能跑通。",
+        actionLabel: "新建可试玩 Demo",
+        intent: "create-playable-demo-project",
+      };
+    }
+    if (summary.hasBlankProjects && !summary.hasPlayableProject) {
+      return {
+        title: "先给空白项目补第一章",
+        detail: summary.hasActiveProject
+          ? "当前已有项目还没有可试玩场景。打开项目后创建第一章，再加入背景、立绘、BGM 和第一句台词。"
+          : "当前已有项目还没有可试玩场景。请从下方项目列表打开一个项目，再创建第一章和第一段内容。",
+        actionLabel: summary.hasActiveProject ? "打开项目继续编辑" : "从下方打开空白项目",
+        intent: summary.hasActiveProject ? "open-active-project" : "project-list-hint",
+      };
+    }
+    if (summary.hasActiveProject) {
+      return {
+        title: "继续上次项目",
+        detail: "已经有可编辑项目记录。可以直接回到上次项目，继续补剧情、素材和发布前检查。",
+        actionLabel: "继续编辑上次项目",
+        intent: "open-active-project",
+      };
+    }
+    return {
+      title: "选择一个项目继续",
+      detail: "项目列表里已有可试玩内容。先打开一个项目，再进入剧情编辑、试玩和导出流程。",
+      actionLabel: "从下方项目打开",
+      intent: "project-list-hint",
+    };
+  }
+
+  function renderProjectCenterNextStep(summary = {}, helpers = {}) {
+    const escape = getEscapeHtml(helpers);
+    const nextStep = getProjectCenterNextStep(summary);
+    const operationInFlightMessage = String(helpers.projectCenterOperationInFlightMessage ?? "").trim();
+    const isCreatingProject = Boolean(helpers.projectCreateInFlight);
+    const isOpeningProject = Boolean(helpers.projectOpenInFlightId);
+    const isBusy =
+      (nextStep.intent === "create-playable-demo-project" && isCreatingProject) ||
+      (nextStep.intent === "open-active-project" && isOpeningProject);
+    const isLocked = Boolean(operationInFlightMessage) && !isBusy;
+    const isClickable = nextStep.intent !== "project-list-hint";
+    const dataAttrs =
+      nextStep.intent === "open-active-project"
+        ? `data-action="open-project" data-project-id="${escape(summary.activeProjectId ?? "")}"`
+        : nextStep.intent === "create-playable-demo-project"
+          ? 'data-action="create-playable-demo-project"'
+          : "";
+    const stateAttrs = isBusy
+      ? 'disabled aria-disabled="true" aria-busy="true"'
+      : isLocked
+        ? `disabled aria-disabled="true" title="${escape(operationInFlightMessage)}"`
+        : "";
+
+    return `
+      <div class="project-center-next-step">
+        <span class="eyebrow">推荐下一步</span>
+        <h3>${escape(nextStep.title)}</h3>
+        <p>${escape(nextStep.detail)}</p>
+        ${
+          isClickable
+            ? `
+              <button
+                type="button"
+                class="toolbar-button toolbar-button-primary ${isBusy ? "is-busy" : ""} ${isLocked ? "is-locked" : ""}"
+                ${dataAttrs}
+                ${stateAttrs}
+              >
+                ${escape(isBusy ? "处理中..." : nextStep.actionLabel)}
+              </button>
+            `
+            : `<span class="project-center-pill">${escape(nextStep.actionLabel)}</span>`
+        }
+      </div>
+    `;
+  }
+
   function renderProjectCenterCard(project = {}, activeProjectId = "", helpers = {}) {
     const escape = getEscapeHtml(helpers);
     const formatDate = typeof helpers.formatDate === "function" ? helpers.formatDate : getFallbackDateLabel;
@@ -264,6 +384,7 @@
             <span class="project-center-pill">${hasSampleProject ? "示例项目可选打开" : "当前没有示例项目"}</span>
             <span class="project-center-pill">${hasActiveProject ? "已经记录过上次打开的项目" : "还没有打开过项目"}</span>
           </div>
+          ${renderProjectCenterNextStep(summary, helpers)}
         </aside>
       </section>
     `;
@@ -329,9 +450,23 @@
     `;
   }
 
+  function renderProjectCenterShell(projects = [], activeProjectId = "", options = {}, helpers = {}) {
+    const summary = buildProjectCenterSummary(projects, activeProjectId, options);
+    return `
+      <div class="project-center-shell">
+        ${renderProjectCenterHero(summary, helpers)}
+        ${renderProjectCenterProjectList(projects, activeProjectId, helpers)}
+      </div>
+    `;
+  }
+
   global.CanvasiaEditorProjectCenter = Object.freeze({
+    buildProjectCenterSummary,
+    getProjectCenterNextStep,
     renderProjectCenterCard,
     renderProjectCenterHero,
+    renderProjectCenterNextStep,
     renderProjectCenterProjectList,
+    renderProjectCenterShell,
   });
 })(typeof window !== "undefined" ? window : globalThis);

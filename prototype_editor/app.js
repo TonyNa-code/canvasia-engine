@@ -2309,110 +2309,49 @@ function renderProjectCenter() {
 
   const projects = state.projectCenter?.projects ?? [];
   const activeProjectId = state.projectCenter?.activeProjectId ?? null;
-  const localProjects = projects.filter((project) => !project.isSample);
-  const sampleProject = projects.find((project) => project.isSample) ?? null;
   const projectCenterMode = getSafeEditorMode(state.projectCenterEditorMode);
   const projectCenterModeLabel = getEditorModeLabel(projectCenterMode);
+  const renderedProjectCenter = projectCenterTools?.renderProjectCenterShell?.(
+    projects,
+    activeProjectId,
+    {
+      projectCenterMode,
+      projectCenterModeLabel,
+    },
+    getProjectCenterRenderHelpers()
+  );
 
-  refs.projectCenterContent.innerHTML = `
-    <div class="project-center-shell">
-      ${renderProjectCenterHero({
-        activeProjectId,
-        hasSampleProject: Boolean(sampleProject),
-        localProjectCount: localProjects.length,
-        projectCenterMode,
-        projectCenterModeLabel,
-      })}
-      ${renderProjectCenterProjectList(projects, activeProjectId)}
-    </div>
-  `;
+  refs.projectCenterContent.innerHTML =
+    renderedProjectCenter ||
+    `
+      <div class="project-center-shell">
+        <section class="panel">
+          <div class="panel-heading">
+            <h2>项目中心</h2>
+            <span class="badge badge-soft">安全模式</span>
+          </div>
+          <p class="helper-text">项目中心正在安全加载，请刷新页面后再打开项目。</p>
+        </section>
+      </div>
+    `;
   renderBeginnerTutorialDialog();
 }
 
-function renderProjectCenterHero(summary = {}) {
-  return projectCenterTools?.renderProjectCenterHero?.(summary, {
+function getProjectCenterRenderHelpers() {
+  return {
     escapeHtml,
+    formatDate,
+    getTemplateLabel,
+    getSafeEditorMode,
+    getEditorModeLabel,
     projectCreateInFlight: state.projectCreateInFlight,
     projectCenterRefreshInFlight: state.projectCenterRefreshInFlight,
-    projectCenterOperationInFlightMessage: getProjectCenterOperationInFlightMessage(),
-  }) ?? "";
-}
-
-function renderProjectCenterProjectList(projects, activeProjectId) {
-  const renderedList = projectCenterTools?.renderProjectCenterProjectList?.(projects, activeProjectId, {
-    escapeHtml,
-    formatDate,
-    getTemplateLabel,
-    getSafeEditorMode,
-    getEditorModeLabel,
     projectOpenInFlightId: state.projectOpenInFlightId,
     projectRenameInFlightId: state.projectRenameInFlightId,
     projectDuplicateInFlightId: state.projectDuplicateInFlightId,
     projectDeleteInFlightId: state.projectDeleteInFlightId,
     projectCenterOperationInFlightMessage: getProjectCenterOperationInFlightMessage(),
-  });
-
-  if (renderedList) {
-    return renderedList;
-  }
-
-  return `
-    <section class="panel">
-      <div class="panel-heading">
-        <h2>项目列表</h2>
-        <span class="badge badge-soft">从这里打开</span>
-      </div>
-      <div class="project-card-grid">
-        ${(projects ?? []).map((project) => renderProjectCenterCard(project, activeProjectId)).join("")}
-      </div>
-    </section>
-  `;
-}
-
-function renderProjectCenterCard(project, activeProjectId) {
-  const renderedCard = projectCenterTools?.renderProjectCenterCard?.(project, activeProjectId, {
-    escapeHtml,
-    formatDate,
-    getTemplateLabel,
-    getSafeEditorMode,
-    getEditorModeLabel,
-    projectOpenInFlightId: state.projectOpenInFlightId,
-    projectRenameInFlightId: state.projectRenameInFlightId,
-    projectDuplicateInFlightId: state.projectDuplicateInFlightId,
-    projectDeleteInFlightId: state.projectDeleteInFlightId,
-    projectCenterOperationInFlightMessage: getProjectCenterOperationInFlightMessage(),
-  });
-
-  if (renderedCard) {
-    return renderedCard;
-  }
-
-  const isActive = project?.projectId === activeProjectId;
-  return `
-    <article class="project-card ${isActive ? "is-active" : ""}">
-      <div class="project-card-head">
-        <div class="text-stack">
-          <h3>${escapeHtml(project?.title ?? "未命名项目")}</h3>
-          <p>正在使用项目中心简化视图，仍可打开项目继续编辑。</p>
-        </div>
-      </div>
-      <div class="project-card-actions">
-        <button
-          type="button"
-          class="toolbar-button toolbar-button-primary"
-          data-action="open-project"
-          data-project-id="${escapeHtml(project?.projectId ?? "")}"
-          ${
-            state.projectOpenInFlightId === project?.projectId
-              ? 'disabled aria-disabled="true" aria-busy="true"'
-              : ""
-          }
-        >
-          ${state.projectOpenInFlightId === project?.projectId ? "打开中..." : isActive ? "继续编辑这个项目" : "打开这个项目"}
-        </button>
-      </div>
-    </article>
-  `;
+  };
 }
 
 function openProjectCenter(options = {}) {
