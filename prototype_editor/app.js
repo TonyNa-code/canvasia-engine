@@ -87,6 +87,7 @@ const sceneChecklistFocusTools = window.CanvasiaEditorSceneChecklistFocus;
 const projectPolishTools = window.CanvasiaEditorProjectPolish;
 const projectPolishReceiptPanelTools = window.CanvasiaEditorProjectPolishReceiptPanel;
 const localizationCoverageTools = window.CanvasiaEditorLocalizationCoverage;
+const localizationCoveragePanelTools = window.CanvasiaEditorLocalizationCoveragePanel;
 const runtimeCapabilityMatrixTools = window.CanvasiaEditorRuntimeCapabilityMatrix;
 const productionBacklogTools = window.CanvasiaEditorProductionBacklog;
 const releaseCandidateManifestTools = window.CanvasiaEditorReleaseCandidateManifest;
@@ -32095,94 +32096,9 @@ function renderPresentationTimelinePanel() {
   return presentationTimelinePanelTools.renderPresentationTimelinePanel(timeline);
 }
 
-function getLocalizationCoverageToneClass(status) {
-  if (status === "warn") {
-    return "warn-text";
-  }
-  if (status === "ready") {
-    return "good-text";
-  }
-  return "";
-}
-
 function renderLocalizationCoveragePanel() {
   const coverage = buildLocalizationCoverage();
-  const digest = localizationCoverageTools.getLocalizationCoverageStatusDigest(coverage);
-  const summary = coverage.summary ?? {};
-  const topIssues = (coverage.issues ?? []).slice(0, 4);
-  const languageBreakdown = (coverage.languageBreakdown ?? []).slice(0, 4);
-
-  return `
-    <article class="detail-card preview-sprint-panel">
-      <div class="panel-heading">
-        <h2>多语言覆盖检查</h2>
-        <span class="badge badge-soft ${getLocalizationCoverageToneClass(digest.status)}">${escapeHtml(digest.title)}</span>
-      </div>
-      <p class="helper-text">${escapeHtml(digest.detail)} 它会检查章节名、场景名、角色名、台词、旁白、选项和标题文本，适合发给翻译或校对人员。</p>
-      <div class="preview-sprint-metrics">
-        ${renderRouteMetricCard("目标语言", `${summary.targetLanguageCount ?? 0} 种`, "默认语言之外")}
-        ${renderRouteMetricCard("可翻译文本", `${summary.sourceTextCount ?? 0} 条`, "章节、场景、角色和正文")}
-        ${renderRouteMetricCard("缺翻译 / 疑似占位", `${summary.missingCount ?? 0} / ${summary.sameAsSourceCount ?? 0}`, "发布前建议复核")}
-        ${renderRouteMetricCard("覆盖率", `${summary.completionPercent ?? 0}%`, "只统计真正完成的译文")}
-      </div>
-      <div class="detail-actions">
-        <button class="toolbar-button toolbar-button-primary" data-action="export-localization-coverage-markdown">
-          导出多语言报告
-        </button>
-        <button class="toolbar-button" data-action="export-localization-coverage-csv">
-          导出翻译 CSV
-        </button>
-        <button class="toolbar-button" data-action="import-localization-coverage-csv">
-          导入翻译 CSV
-        </button>
-        <button class="toolbar-button" data-action="switch-screen" data-screen="preview">
-          去预览切语言
-        </button>
-      </div>
-      ${
-        topIssues.length > 0
-          ? `
-            <div class="preview-sprint-grid">
-              ${topIssues
-                .map(
-                  (issue) => `
-                    <article class="preview-sprint-card is-${issue.status === "missing" ? "warn" : "soft"}">
-                      <div class="preview-sprint-head">
-                        <strong>${escapeHtml(issue.statusLabel)}</strong>
-                        <span class="issue-tag ${issue.status === "missing" ? "warn-text" : ""}">
-                          ${escapeHtml(issue.languageLabel)}
-                        </span>
-                      </div>
-                      <p>${escapeHtml([issue.chapterName, issue.sceneName, issue.locationLabel].filter(Boolean).join(" · "))}</p>
-                      <div class="helper-text">${escapeHtml(`${issue.fieldLabel}：${issue.sourceText}`)}</div>
-                    </article>
-                  `
-                )
-                .join("")}
-            </div>
-          `
-          : languageBreakdown.length > 0
-            ? `
-              <div class="list-stack compact-stack">
-                ${languageBreakdown
-                  .map(
-                    (item) => `
-                      <div class="route-testing-item">
-                        <div>
-                          <b>${escapeHtml(item.languageLabel)}</b>
-                          <span>${escapeHtml(`${item.language} · 完成 ${item.readyCount}/${item.totalCount}`)}</span>
-                        </div>
-                        <span>${escapeHtml(`${item.completionPercent}%`)}</span>
-                      </div>
-                    `
-                  )
-                  .join("")}
-              </div>
-            `
-            : renderEmpty("当前项目仍是单语言流程。需要国际化时，先到项目设置里勾选目标语言。")
-      }
-    </article>
-  `;
+  return localizationCoveragePanelTools.renderLocalizationCoveragePanel(coverage);
 }
 
 function renderInspectionOverviewPanel(routeOverview) {

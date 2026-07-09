@@ -69,6 +69,7 @@ class FrontendEntrypointModuleTests(unittest.TestCase):
             "./modules/presentation_timeline.js",
             "./modules/presentation_timeline_panel.js",
             "./modules/localization_coverage.js",
+            "./modules/localization_coverage_panel.js",
             "./modules/runtime_capability_matrix.js",
             "./modules/production_backlog.js",
             "./modules/release_candidate_manifest.js",

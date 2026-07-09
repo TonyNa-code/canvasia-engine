@@ -59,6 +59,7 @@
     { globalName: "CanvasiaEditorPresentationTimeline", script: "./modules/presentation_timeline.js", label: "演出时间轴" },
     { globalName: "CanvasiaEditorPresentationTimelinePanel", script: "./modules/presentation_timeline_panel.js", label: "演出时间轴面板" },
     { globalName: "CanvasiaEditorLocalizationCoverage", script: "./modules/localization_coverage.js", label: "多语言覆盖" },
+    { globalName: "CanvasiaEditorLocalizationCoveragePanel", script: "./modules/localization_coverage_panel.js", label: "多语言覆盖面板" },
     { globalName: "CanvasiaEditorProductionBacklog", script: "./modules/production_backlog.js", label: "制作待办" },
     { globalName: "CanvasiaEditorReleaseCandidateManifest", script: "./modules/release_candidate_manifest.js", label: "候选发布清单" },
     { globalName: "CanvasiaEditorReleaseEvidencePack", script: "./modules/release_evidence_pack.js", label: "发布证据包" },

@@ -5309,6 +5309,8 @@ class FrontendActionHandlerTests(unittest.TestCase):
 
     def test_localization_coverage_export_actions_are_wired(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
+        panel_source = (ROOT_DIR / "prototype_editor" / "modules" / "localization_coverage_panel.js").read_text(encoding="utf-8")
+        combined_source = f"{source}\n{panel_source}"
         endpoint_source = API_ENDPOINTS_PATH.read_text(encoding="utf-8")
         click_handler = _extract_function_source(source, "handleClick")
         markdown_block_start = click_handler.index('action === "export-localization-coverage-markdown"')
@@ -5321,15 +5323,17 @@ class FrontendActionHandlerTests(unittest.TestCase):
         import_block = click_handler[import_block_start:import_block_end]
 
         self.assertIn("const localizationCoverageTools = window.CanvasiaEditorLocalizationCoverage", source)
-        self.assertIn('data-action="export-localization-coverage-markdown"', source)
-        self.assertIn('data-action="export-localization-coverage-csv"', source)
-        self.assertIn('data-action="import-localization-coverage-csv"', source)
+        self.assertIn("const localizationCoveragePanelTools = window.CanvasiaEditorLocalizationCoveragePanel", source)
+        self.assertIn('data-action="export-localization-coverage-markdown"', combined_source)
+        self.assertIn('data-action="export-localization-coverage-csv"', combined_source)
+        self.assertIn('data-action="import-localization-coverage-csv"', combined_source)
         self.assertIn('id="localizationCoverageImportInput"', INDEX_PATH.read_text(encoding="utf-8"))
         self.assertIn("exportLocalizationCoverageMarkdown();", markdown_block)
         self.assertIn("exportLocalizationCoverageCsv();", csv_block)
         self.assertIn('document.getElementById("localizationCoverageImportInput")?.click();', import_block)
         self.assertIn("function buildLocalizationCoverage()", source)
         self.assertIn("function renderLocalizationCoveragePanel()", source)
+        self.assertIn("localizationCoveragePanelTools.renderLocalizationCoveragePanel(coverage)", source)
         self.assertIn("function exportLocalizationCoverageMarkdown()", source)
         self.assertIn("function exportLocalizationCoverageCsv()", source)
         self.assertIn("function importLocalizationCoverageCsv(file)", source)
@@ -5337,8 +5341,10 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn('importLocalizationPatches: "/api/import-localization-patches"', endpoint_source)
         self.assertIn("postJson(API_IMPORT_LOCALIZATION_PATCHES", source)
         self.assertIn("localizationCoverageTools.buildLocalizationCoverage", source)
-        self.assertIn("localizationCoverageTools.getLocalizationCoverageStatusDigest", source)
+        self.assertIn("localizationCoverageTools.getLocalizationCoverageStatusDigest", panel_source)
         self.assertIn("localizationCoverageTools.buildLocalizationImportPlan", source)
+        self.assertIn("function renderTranslationPriorityQueue", panel_source)
+        self.assertIn("翻译优先队列", panel_source)
 
     def test_runtime_capability_matrix_export_actions_are_wired(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
