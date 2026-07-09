@@ -1077,6 +1077,56 @@ textarea {
   line-height: 1.7;
 }
 
+.playable-path-card {
+  border-style: dashed;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(121, 220, 255, 0.12), transparent 34%),
+    rgba(255, 255, 255, 0.7);
+}
+
+.playable-path-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.playable-path-list li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid rgba(115, 86, 67, 0.08);
+}
+
+.playable-path-list li > span {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--brand), var(--brand-deep));
+  box-shadow: 0 8px 16px rgba(217, 111, 67, 0.16);
+}
+
+.playable-path-list strong,
+.playable-path-list small {
+  display: block;
+}
+
+.playable-path-list small {
+  margin-top: 3px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
 .recent-work-card {
   display: grid;
   gap: 10px;

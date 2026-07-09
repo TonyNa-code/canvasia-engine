@@ -470,6 +470,64 @@
       .replaceAll("'", "&#39;");
   }
 
+  function renderShortestPlayablePathCard(mode = "blank", helpers = {}) {
+    const escape = helpers.escapeHtml ?? escapeHtml;
+    const isStarterKitStage = mode === "starter-kit";
+    const title = isStarterKitStage ? "三步变成可试玩" : "四步跑起第一段";
+    const subtitle = isStarterKitStage
+      ? "这里已经有章节和场景，补齐骨架后就可以立刻进入试玩确认节奏。"
+      : "不用先想完整系统，先把第一段内容跑起来，再慢慢扩写。";
+    const steps = isStarterKitStage
+      ? [
+          ["生成起步骨架", "补角色、背景和 BGM 占位，让首场景有基本演出。"],
+          ["写第一句台词", "去剧情页补旁白或台词，让预览不是空场景。"],
+          ["进入试玩页", "先跑一次阅读节奏，再回来替换正式素材。"],
+        ]
+      : [
+          ["创建第一章", "让章节树和第一场景出现，剧情卡片才有挂载位置。"],
+          ["写第一句台词", "先完成一句能读的正文，不要一开始就追求完整系统。"],
+          ["补角色和素材", "使用起步骨架或自己导入背景、立绘、BGM。"],
+          ["试玩并保存", "跑通一小段后再继续扩展分支、UI 和发布设置。"],
+        ];
+
+    return `
+      <article class="${isStarterKitStage ? "starter-kit-card" : "blank-project-card"} playable-path-card">
+        <span class="eyebrow">最短可试玩路径</span>
+        <h3>${escape(title)}</h3>
+        <p>${escape(subtitle)}</p>
+        <ol class="playable-path-list">
+          ${steps
+            .map(
+              ([label, detail], index) => `
+                <li>
+                  <span>${index + 1}</span>
+                  <div>
+                    <strong>${escape(label)}</strong>
+                    <small>${escape(detail)}</small>
+                  </div>
+                </li>
+              `
+            )
+            .join("")}
+        </ol>
+        ${
+          isStarterKitStage
+            ? `
+              <div class="action-row">
+                <button class="toolbar-button toolbar-button-primary" type="button" data-action="create-starter-kit">
+                  先补起步骨架
+                </button>
+                <button class="toolbar-button" type="button" data-action="switch-screen" data-screen="story">
+                  去写第一段
+                </button>
+              </div>
+            `
+            : `<div class="detail-meta">先做出一小段能玩的内容，比一次性补完所有设定更稳。</div>`
+        }
+      </article>
+    `;
+  }
+
   function renderBeginnerDashboardWorkflow(workflow, helpers = {}) {
     const escape = helpers.escapeHtml ?? escapeHtml;
     const renderQuickActionButton = helpers.renderQuickActionButton ?? (() => "");
@@ -602,6 +660,7 @@
             </button>
           </div>
         </article>
+        ${renderShortestPlayablePathCard("starter-kit", { escapeHtml: escape })}
         <article class="starter-kit-card">
           <span class="eyebrow">生成内容</span>
           <ul class="blank-project-step-list">
@@ -666,6 +725,7 @@
             </button>
           </div>
         </article>
+        ${renderShortestPlayablePathCard("blank", { escapeHtml: escape })}
       </div>
     </section>
   `;
@@ -705,6 +765,7 @@
     getBeginnerWorkflowStepToneClass,
     renderBeginnerDashboardWorkflow,
     renderBeginnerAdvancedToolsPanel,
+    renderShortestPlayablePathCard,
     renderStarterKitPanel,
     renderBlankProjectStarterPanel,
     renderBlankStoryWorkspacePanel,

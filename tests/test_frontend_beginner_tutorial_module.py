@@ -101,6 +101,8 @@ class FrontendBeginnerTutorialModuleTests(unittest.TestCase):
             const advancedMarkup = tools.renderBeginnerAdvancedToolsPanel({{
               renderQuickActionButton: quickRenderer,
             }});
+            const blankPathMarkup = tools.renderShortestPlayablePathCard("blank");
+            const starterPathMarkup = tools.renderShortestPlayablePathCard("starter-kit");
             const starterKitMarkup = tools.renderStarterKitPanel({{
               needsStarterKit: true,
               missingLabels: ["角色 <A>", "BGM"],
@@ -150,6 +152,8 @@ class FrontendBeginnerTutorialModuleTests(unittest.TestCase):
               workflowMarkup,
               fallbackWorkflowMarkup,
               advancedMarkup,
+              blankPathMarkup,
+              starterPathMarkup,
               starterKitMarkup,
               starterKitHiddenMarkup,
               blankProjectMarkup,
@@ -164,6 +168,7 @@ class FrontendBeginnerTutorialModuleTests(unittest.TestCase):
         self.assertIn("renderBeginnerDashboardWorkflow", result["keys"])
         self.assertIn("buildBeginnerDashboardWorkflow", result["keys"])
         self.assertIn("renderBeginnerAdvancedToolsPanel", result["keys"])
+        self.assertIn("renderShortestPlayablePathCard", result["keys"])
         self.assertIn("renderStarterKitPanel", result["keys"])
         self.assertIn("renderBlankProjectStarterPanel", result["keys"])
         self.assertIn("renderBlankStoryWorkspacePanel", result["keys"])
@@ -200,15 +205,26 @@ class FrontendBeginnerTutorialModuleTests(unittest.TestCase):
         self.assertIn("第一次建议从项目中心新建可试玩 Demo", result["fallbackWorkflowMarkup"])
         self.assertIn("更多高级工具", result["advancedMarkup"])
         self.assertIn('data-action="set-editor-mode"', result["advancedMarkup"])
+        self.assertIn("四步跑起第一段", result["blankPathMarkup"])
+        self.assertIn("创建第一章", result["blankPathMarkup"])
+        self.assertIn("试玩并保存", result["blankPathMarkup"])
+        self.assertIn("三步变成可试玩", result["starterPathMarkup"])
+        self.assertIn("生成起步骨架", result["starterPathMarkup"])
+        self.assertIn('data-action="create-starter-kit"', result["starterPathMarkup"])
+        self.assertIn('data-action="switch-screen"', result["starterPathMarkup"])
         self.assertIn("第二步起步骨架", result["starterKitMarkup"])
         self.assertIn("角色 &lt;A&gt;", result["starterKitMarkup"])
         self.assertIn("女主 &lt;默认&gt;", result["starterKitMarkup"])
         self.assertIn("雨夜 &amp; 教室", result["starterKitMarkup"])
+        self.assertIn("最短可试玩路径", result["starterKitMarkup"])
+        self.assertIn("三步变成可试玩", result["starterKitMarkup"])
         self.assertIn('data-action="create-starter-kit"', result["starterKitMarkup"])
         self.assertEqual(result["starterKitHiddenMarkup"], "")
         self.assertIn("空白项目首次引导", result["blankProjectMarkup"])
         self.assertIn("第一章 &lt;起点&gt;", result["blankProjectMarkup"])
         self.assertIn("教室 &amp; 黄昏", result["blankProjectMarkup"])
+        self.assertIn("最短可试玩路径", result["blankProjectMarkup"])
+        self.assertIn("四步跑起第一段", result["blankProjectMarkup"])
         self.assertIn('data-action="create-first-chapter"', result["blankProjectMarkup"])
         self.assertIn('data-screen="assets"', result["blankProjectMarkup"])
         self.assertIn("剧情工作台还没有章节和场景", result["blankStoryMarkup"])
