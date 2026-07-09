@@ -136,8 +136,13 @@ class FrontendDashboardProductionModuleTests(unittest.TestCase):
                 summary: scene.summary,
                 nextStep: scene.nextStep,
                 checklist: scene.playableChecklist,
+                actionPlan: scene.playableActionPlan,
               }})),
               emptyChecklist: tools.buildDashboardScenePlayableChecklist(routeOverview.nodes[2]),
+              emptyActionPlan: tools.buildDashboardScenePlayableActionPlan(
+                routeOverview.nodes[2],
+                tools.buildDashboardScenePlayableChecklist(routeOverview.nodes[2])
+              ),
               musicFocusHint: tools.getSceneChecklistFocusHint("music", "补 BGM"),
               voiceFocusHint: tools.getSceneChecklistFocusHint("voice", "补语音"),
               presentationFocusHint: tools.getSceneChecklistFocusHint("presentation", "加镜头 / 特效"),
@@ -176,6 +181,7 @@ class FrontendDashboardProductionModuleTests(unittest.TestCase):
         payload = json.loads(completed.stdout)
 
         self.assertIn("buildDashboardProductionTasks", payload["keys"])
+        self.assertIn("buildDashboardScenePlayableActionPlan", payload["keys"])
         self.assertIn("buildDashboardScenePlayableChecklist", payload["keys"])
         self.assertIn("getSceneChecklistFocusHint", payload["keys"])
         self.assertEqual(payload["progress"], [25, 100])
@@ -190,11 +196,20 @@ class FrontendDashboardProductionModuleTests(unittest.TestCase):
         self.assertEqual(payload["queue"][0]["checklist"]["items"][2]["action"]["action"], "open-scene-from-map")
         self.assertEqual(payload["queue"][0]["checklist"]["items"][2]["action"]["sceneId"], "scene_rush")
         self.assertEqual(payload["queue"][0]["checklist"]["items"][2]["action"]["label"], "补 BGM")
+        self.assertEqual(payload["queue"][0]["actionPlan"][0]["action"], "open-scene-from-map")
+        self.assertEqual(payload["queue"][0]["actionPlan"][0]["sceneId"], "scene_rush")
+        self.assertEqual(payload["queue"][0]["actionPlan"][0]["dataset"]["scene-checklist-item"], "music")
+        self.assertEqual(payload["queue"][0]["actionPlan"][0]["dataset"]["scene-checklist-label"], "补 BGM")
         self.assertEqual(payload["queue"][1]["checklist"]["status"], "ready")
         self.assertEqual(payload["queue"][1]["checklist"]["score"], 100)
         self.assertIsNone(payload["queue"][1]["checklist"]["items"][2]["action"])
+        self.assertEqual(payload["queue"][1]["actionPlan"][0]["action"], "preview-scene-from-map")
+        self.assertEqual(payload["queue"][1]["actionPlan"][0]["sceneId"], "scene_ready")
         self.assertEqual(payload["emptyChecklist"]["status"], "needs_core")
         self.assertIn("先补正文", payload["emptyChecklist"]["nextStep"])
+        self.assertEqual(payload["emptyActionPlan"][0]["action"], "apply-story-template-to-scene")
+        self.assertEqual(payload["emptyActionPlan"][0]["dataset"]["template-id"], "playable_scene")
+        self.assertEqual(payload["emptyActionPlan"][0]["dataset"]["scene-id"], "scene_parked")
         self.assertEqual(payload["musicFocusHint"]["title"], "补 BGM")
         self.assertIn("音乐范围卡", payload["musicFocusHint"]["description"])
         self.assertEqual(payload["musicFocusHint"]["actions"][0]["action"], "add-music-play")

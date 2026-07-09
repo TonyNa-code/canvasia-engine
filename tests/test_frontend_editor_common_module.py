@@ -93,6 +93,16 @@ class FrontendEditorCommonModuleTests(unittest.TestCase):
                 title: "先点“预览”再执行",
                 dataset: {{ "repair-codes": "entry_scene,scene_order" }},
               }}),
+              openSceneButtonMarkup: tools.renderQuickActionButton({{
+                label: "打开 <场景>",
+                action: "open-scene-from-map",
+                sceneId: "scene_1",
+                title: "补 <BGM>",
+                dataset: {{
+                  "scene-checklist-item": "music",
+                  "scene-checklist-label": "补 BGM",
+                }},
+              }}),
               dashboardActionsMarkup: tools.renderDashboardTaskActions([
                 {{ label: "第一步", action: "switch-screen", screen: "story" }},
                 {{ label: "第二步", action: "open-scene-from-map", sceneId: "scene_1" }},
@@ -154,6 +164,11 @@ class FrontendEditorCommonModuleTests(unittest.TestCase):
         self.assertIn('data-repair-codes="entry_scene,scene_order"', payload["disabledQuickButtonMarkup"])
         self.assertIn('disabled aria-disabled="true"', payload["disabledQuickButtonMarkup"])
         self.assertIn('title="先点“预览”再执行"', payload["disabledQuickButtonMarkup"])
+        self.assertIn('data-action="open-scene-from-map"', payload["openSceneButtonMarkup"])
+        self.assertIn('data-scene-id="scene_1"', payload["openSceneButtonMarkup"])
+        self.assertIn('data-scene-checklist-item="music"', payload["openSceneButtonMarkup"])
+        self.assertIn('data-scene-checklist-label="补 BGM"', payload["openSceneButtonMarkup"])
+        self.assertIn('title="补 &lt;BGM&gt;"', payload["openSceneButtonMarkup"])
         self.assertIn('data-action="open-scene-from-map"', payload["dashboardActionsMarkup"])
         self.assertNotIn("ignored-action", payload["dashboardActionsMarkup"])
         self.assertIn("<span>路线 &lt;数&gt;</span>", payload["routeMetricMarkup"])

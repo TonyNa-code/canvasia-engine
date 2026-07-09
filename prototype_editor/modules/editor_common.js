@@ -141,6 +141,9 @@
         class="${className}"
         data-action="${action.action}"
         data-scene-id="${escapeHtml(action.sceneId ?? "")}"
+        ${titleMarkup}
+        ${disabledMarkup}
+        ${datasetMarkup}
       >
         ${label}
       </button>

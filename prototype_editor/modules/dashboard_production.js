@@ -399,6 +399,70 @@
     };
   }
 
+  function buildSceneOpenFocusAction(scene = {}, item = {}, options = {}) {
+    const sceneId = cleanText(scene.id);
+    if (!sceneId) {
+      return null;
+    }
+    const label = cleanText(options.label, item.action?.label ?? item.text ?? "打开场景");
+    return {
+      label,
+      action: "open-scene-from-map",
+      sceneId,
+      dataset: {
+        "scene-checklist-item": cleanText(item.id, "custom"),
+        "scene-checklist-label": label,
+      },
+    };
+  }
+
+  function buildDashboardScenePlayableActionPlan(scene = {}, checklist = null) {
+    const sceneId = cleanText(scene.id);
+    if (!sceneId) {
+      return [];
+    }
+
+    const safeChecklist = checklist ?? buildDashboardScenePlayableChecklist(scene);
+    const firstMissing = safeChecklist.firstMissing;
+    if (!firstMissing) {
+      return [
+        {
+          label: "从这里试玩",
+          action: "preview-scene-from-map",
+          sceneId,
+        },
+      ];
+    }
+
+    const actions = [];
+    if (firstMissing.id === "story" && firstMissing.status === "missing") {
+      actions.push({
+        label: "生成可试玩段落",
+        action: "apply-story-template-to-scene",
+        dataset: {
+          "scene-id": sceneId,
+          "template-id": "playable_scene",
+          "scene-checklist-complete": "story",
+        },
+      });
+      actions.push(buildSceneOpenFocusAction(scene, firstMissing, { label: "打开这里继续写" }));
+      return actions.filter(Boolean);
+    }
+
+    const focusHint = getSceneChecklistFocusHint(firstMissing.id, firstMissing.action?.label ?? firstMissing.text);
+    actions.push(buildSceneOpenFocusAction(scene, firstMissing, { label: focusHint?.title ?? firstMissing.action?.label }));
+
+    if (safeChecklist.status !== "needs_core") {
+      actions.push({
+        label: "试玩这一段",
+        action: "preview-scene-from-map",
+        sceneId,
+      });
+    }
+
+    return actions.filter(Boolean).slice(0, 2);
+  }
+
   function buildDashboardScenePlanningQueue(routeOverview = {}, helpers = {}) {
     return toArray(routeOverview.nodes)
       .filter((scene) => {
@@ -406,17 +470,21 @@
         const safeStatus = getSafeSceneStatus(scene.status, helpers);
         return safePriority !== "parked" && (safePriority !== "normal" || safeStatus !== "drafting" || Boolean(scene.notes));
       })
-      .map((scene) => ({
-        ...scene,
-        tone: getScenePlanningTone(scene, helpers),
-        summary: buildDashboardScenePlanningSummary(scene, helpers),
-        playableChecklist: buildDashboardScenePlayableChecklist(scene),
-        nextStep: buildDashboardScenePlanningNextStep(scene),
-        planningScore:
-          getScenePlanningPriorityRank(scene.priority, helpers) * 100 +
-          getScenePlanningStatusRank(scene.status, helpers) * 20 +
-          (scene.completionScore ?? 0),
-      }))
+      .map((scene) => {
+        const playableChecklist = buildDashboardScenePlayableChecklist(scene);
+        return {
+          ...scene,
+          tone: getScenePlanningTone(scene, helpers),
+          summary: buildDashboardScenePlanningSummary(scene, helpers),
+          playableChecklist,
+          playableActionPlan: buildDashboardScenePlayableActionPlan(scene, playableChecklist),
+          nextStep: buildDashboardScenePlanningNextStep(scene),
+          planningScore:
+            getScenePlanningPriorityRank(scene.priority, helpers) * 100 +
+            getScenePlanningStatusRank(scene.status, helpers) * 20 +
+            (scene.completionScore ?? 0),
+        };
+      })
       .sort((left, right) => right.planningScore - left.planningScore);
   }
 
@@ -723,13 +791,17 @@
     return columns.map((column) => {
       const scenes = toArray(routeOverview.nodes)
         .filter((scene) => getSafeSceneStatus(scene.status, helpers) === column.status)
-        .map((scene) => ({
-          ...scene,
-          tone: getScenePlanningTone(scene, helpers),
-          summary: buildDashboardScenePlanningSummary(scene, helpers),
-          playableChecklist: buildDashboardScenePlayableChecklist(scene),
-          nextStep: buildDashboardScenePlanningNextStep(scene),
-        }))
+        .map((scene) => {
+          const playableChecklist = buildDashboardScenePlayableChecklist(scene);
+          return {
+            ...scene,
+            tone: getScenePlanningTone(scene, helpers),
+            summary: buildDashboardScenePlanningSummary(scene, helpers),
+            playableChecklist,
+            playableActionPlan: buildDashboardScenePlayableActionPlan(scene, playableChecklist),
+            nextStep: buildDashboardScenePlanningNextStep(scene),
+          };
+        })
         .sort((left, right) => {
           const priorityDiff =
             getScenePlanningPriorityRank(right.priority, helpers) - getScenePlanningPriorityRank(left.priority, helpers);
@@ -766,6 +838,7 @@
     buildDashboardScenePlanningQueue,
     buildDashboardScenePlanningSummary,
     buildDashboardSceneStatusColumns,
+    buildDashboardScenePlayableActionPlan,
     buildDashboardScenePlayableChecklist,
     getSceneChecklistFocusHint,
     getDashboardProgressPercent,

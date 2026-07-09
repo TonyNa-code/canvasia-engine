@@ -10888,6 +10888,7 @@ function renderDashboardScenePlanningCard(scene) {
       <strong>${escapeHtml(scene.name)}</strong>
       <p>${escapeHtml(scene.summary)}</p>
       ${renderDashboardScenePlayableChecklist(scene)}
+      ${renderDashboardScenePlayableActionPlan(scene)}
       <div class="story-scene-planner-tags">${renderScenePlanningBadges(scene)}</div>
       ${renderScenePlanningQuickButtons(scene)}
       <div class="detail-meta">${escapeHtml(scene.notes || scene.nextStep)}</div>
@@ -10906,6 +10907,24 @@ function renderDashboardScenePlanningCard(scene) {
         ])}
       </div>
     </article>
+  `;
+}
+
+function renderDashboardScenePlayableActionPlan(scene) {
+  const actions =
+    scene.playableActionPlan ??
+    dashboardProductionTools.buildDashboardScenePlayableActionPlan(scene, scene.playableChecklist);
+  if (!actions.length) {
+    return "";
+  }
+
+  return `
+    <div class="scene-playable-action-plan">
+      <span class="panel-note">推荐下一步</span>
+      <div class="script-entry-actions">
+        ${renderDashboardTaskActions(actions)}
+      </div>
+    </div>
   `;
 }
 
@@ -11005,6 +11024,7 @@ function renderDashboardSceneStatusCard(scene) {
       <p>${escapeHtml(scene.summary)}</p>
       <div class="scene-status-drag-hint">拖到别的列，就会改成那个制作状态</div>
       ${renderDashboardScenePlayableChecklist(scene)}
+      ${renderDashboardScenePlayableActionPlan(scene)}
       <div class="story-scene-planner-tags">${renderScenePlanningBadges(scene)}</div>
       ${renderScenePlanningQuickButtons(scene)}
       <div class="detail-meta">${escapeHtml(scene.notes || scene.nextStep)}</div>

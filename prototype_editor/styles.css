@@ -2717,6 +2717,20 @@ body[data-editor-mode="beginner"] #screen-preview #previewSceneFilterBar {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.58);
 }
 
+.scene-playable-action-plan {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid rgba(95, 151, 224, 0.16);
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(239, 247, 255, 0.78), rgba(255, 255, 255, 0.58));
+}
+
+.scene-playable-action-plan .panel-note {
+  font-weight: 800;
+}
+
 .scene-playable-checklist .issue-tag {
   border-color: rgba(78, 132, 208, 0.16);
   background: rgba(246, 250, 255, 0.82);
