@@ -698,7 +698,7 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
         if advanced_button.is_visible():
             advanced_button.click()
 
-        self.page.locator("#screen-story").get_by_role("button", name="条件判断").click()
+        self.page.locator('#screen-story [data-action="add-condition"]').click()
         branches = self.page.locator("[data-condition-branch]")
         branches.first.wait_for(timeout=15000)
         self.page.locator('[data-field="condition-variable"] option[value="var_affection"]').first.wait_for(
