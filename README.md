@@ -92,7 +92,7 @@ The project already includes a visual editor, export pipeline, native runtime pr
 | Particles and Presentation | Available | Particle presets, custom particle settings, scene mood recipes, camera, filters, flashes, shakes, fades, character presentation effects, and independently animated prop / foreground / cut-in stage-image layers. |
 | Live2D / 3D Assets | Preview | Live2D, 3D character models, and 3D scene assets can be imported; native Runtime exports 3D structure and risk reports. |
 | Web / Desktop Exports | Preview | Web playable packages and desktop packages are available; signing and notarization depend on release notes. |
-| Native Runtime | Preview | Covers the core playback path, settings, saves, history, autoplay, video fallback, 3D reports, first archive systems, and editor-side Runtime capability matrices with Web / native acceptance checklists plus VN essentials maturity summaries. |
+| Native Runtime | Preview | Covers the core playback path, settings, saves, history, autoplay, state-safe story rollback, video fallback, 3D reports, first archive systems, and editor-side Runtime capability matrices with Web / native acceptance checklists plus VN essentials maturity summaries. |
 | Mobile Runtime | Experimental planning | Touch, audio policy, and layout adaptation are still being explored. |
 
 ## Screenshots

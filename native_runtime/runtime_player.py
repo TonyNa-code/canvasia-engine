@@ -274,6 +274,21 @@ except ImportError:  # pragma: no cover - exported native packages import from t
     )
 
 try:
+    from .runtime_rollback import (
+        DEFAULT_ROLLBACK_LIMIT,
+        append_rollback_checkpoint,
+        build_rollback_status,
+        take_rollback_step,
+    )
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_rollback import (
+        DEFAULT_ROLLBACK_LIMIT,
+        append_rollback_checkpoint,
+        build_rollback_status,
+        take_rollback_step,
+    )
+
+try:
     from .runtime_vn_quality import (
         build_native_runtime_vn_baseline_quality_report as _build_native_runtime_vn_baseline_quality_report,
     )
@@ -616,6 +631,11 @@ NATIVE_RUNTIME_CONTROL_GROUPS = (
                 "detail": "只跳过本机已读文本，遇到未读内容、选项或视频会停下。",
             },
             {
+                "keys": ("PageUp",),
+                "label": "剧情回退",
+                "detail": "回到上一个剧情停顿点，并恢复当时的变量、背景、立绘、BGM 和视觉效果。",
+            },
+            {
                 "keys": ("H", "滚轮上"),
                 "label": "文本历史",
                 "detail": "打开已经显示过的文本记录；历史内可用 PageUp / PageDown 快速滚动。",
@@ -703,6 +723,7 @@ NATIVE_RUNTIME_CONTROL_GROUPS = (
     },
 )
 NATIVE_RUNTIME_HELP_QUICK_ACTIONS = (
+    {"key": "rollback", "label": "剧情回退", "shortcut": "PageUp", "pygameKey": "K_PAGEUP"},
     {"key": "settings", "label": "体验设置", "shortcut": "S", "pygameKey": "K_s"},
     {"key": "save", "label": "正式存档", "shortcut": "F6", "pygameKey": "K_F6"},
     {"key": "load", "label": "读取存档", "shortcut": "F7 / L", "pygameKeys": ("K_F7", "K_l")},
@@ -6819,7 +6840,8 @@ def build_acceptance_manual_check_groups() -> list[dict]:
             "label": "阅读主链",
             "items": [
                 "台词、旁白、选项、跳转、条件分支和变量变化符合网页预览。",
-                "文字速度、自动播放、已读快进、清屏、历史文本和语音回听可用。",
+                "文字速度、自动播放、已读快进、逐步剧情回退、清屏、历史文本和语音回听可用。",
+                "从变量变化、立绘移动或滤镜之后回退，确认变量、舞台、BGM 和视觉效果一起恢复。",
                 "鼠标、键盘快捷键和右键菜单不会卡死在覆盖层。",
             ],
         },
@@ -7911,6 +7933,8 @@ class NativeRuntimePlayer:
         self.camera_pan_effect: dict | None = None
         self.screen_filter_effect: dict | None = None
         self.depth_blur_effect: dict | None = None
+        self.rollback_timeline: list[dict] = []
+        self.rollback_limit = DEFAULT_ROLLBACK_LIMIT
 
         self.variable_state = self.build_initial_variable_state()
         self.stage_background_asset_id: str | None = None
@@ -9629,6 +9653,7 @@ class NativeRuntimePlayer:
         self.current_bgm_volume_percent = 100
         self.current_bgm_scope = None
         self.variable_state = self.build_initial_variable_state()
+        self.reset_rollback_timeline()
         self.current_scene_id = self.project.get("entrySceneId") or self.scene_order[0]
         if self.current_scene_id not in self.scenes_by_id:
             self.current_scene_id = self.scene_order[0]
@@ -10089,6 +10114,35 @@ class NativeRuntimePlayer:
             if isinstance(image_state, dict)
         }
 
+    def get_rollback_status(self) -> dict:
+        return build_rollback_status(getattr(self, "rollback_timeline", []))
+
+    def reset_rollback_timeline(self) -> None:
+        self.rollback_timeline = []
+
+    def record_rollback_checkpoint(self) -> None:
+        if self.title_screen_active or self.overlay_mode == "title":
+            return
+        self.rollback_timeline = append_rollback_checkpoint(
+            self.rollback_timeline,
+            self.build_save_snapshot("rollback"),
+            limit=self.rollback_limit,
+        )
+
+    def rollback_story(self) -> bool:
+        timeline, checkpoint = take_rollback_step(self.rollback_timeline)
+        if checkpoint is None:
+            self.status_message = "当前还没有可以回退的上一句。"
+            return False
+        self.stop_flow_assist()
+        self.rollback_timeline = timeline
+        self.restore_from_snapshot(checkpoint, reset_rollback=False)
+        if self.current_line:
+            self.reveal_current_line_immediately()
+        scene_name = str(checkpoint.get("sceneName") or self.get_current_scene_name())
+        self.status_message = f"已回退到上一句：{scene_name}"
+        return True
+
     def build_save_snapshot(self, kind: str) -> dict:
         return {
             "kind": kind,
@@ -10159,7 +10213,9 @@ class NativeRuntimePlayer:
         self.persist_auto_resume_snapshot()
         self.status_message = f"已读入正式存档 {slot_index + 1}：{snapshot.get('sceneName') or '未命名场景'}"
 
-    def restore_from_snapshot(self, snapshot: dict) -> None:
+    def restore_from_snapshot(self, snapshot: dict, *, reset_rollback: bool = True) -> None:
+        if reset_rollback:
+            self.reset_rollback_timeline()
         self.stop_embedded_video_playback()
         self.ui_hidden = False
         self.title_screen_active = False
@@ -10210,9 +10266,13 @@ class NativeRuntimePlayer:
         self.depth_blur_effect = visual_effects.get("depthBlur")
 
         if self.finished:
+            if reset_rollback:
+                self.record_rollback_checkpoint()
             self.persist_auto_resume_snapshot()
             return
         self.hydrate_pause_from_current_block()
+        if reset_rollback:
+            self.record_rollback_checkpoint()
         self.persist_auto_resume_snapshot()
 
     def set_scene(self, scene_id: str | None) -> None:
@@ -10519,6 +10579,10 @@ class NativeRuntimePlayer:
         self.advance_until_pause()
 
     def advance_until_pause(self) -> None:
+        self._advance_until_pause()
+        self.record_rollback_checkpoint()
+
+    def _advance_until_pause(self) -> None:
         self.current_line = None
         self.current_choices = None
 
@@ -12896,6 +12960,7 @@ class NativeRuntimePlayer:
             "runtimeScenePrefetchedAssetIds": getattr(self, "runtime_scene_prefetched_asset_ids", set()),
             "currentBgmAssetId": getattr(self, "current_bgm_asset_id", None),
             "voicePlaybackActive": bool(getattr(self, "voice_playback_active", False)),
+            "rollbackStatus": self.get_rollback_status(),
         }
 
     def get_runtime_diagnostics_report(self) -> dict:
@@ -13074,12 +13139,13 @@ class NativeRuntimePlayer:
             f"UI：{'隐藏' if self.ui_hidden else '显示'}",
         ]
         video_state = "播放中" if self.embedded_video_playback and self.embedded_video_playback.status in {"playing", "paused"} else "待机"
+        rollback_steps = int(self.get_rollback_status().get("availableSteps") or 0)
         return [
             {
                 "title": "当前状态",
                 "lines": [
                     f"场景：{scene_label}",
-                    f"阅读：{reading_state} · 历史 {len(self.text_history)} 条",
+                    f"阅读：{reading_state} · 历史 {len(self.text_history)} 条 · 可回退 {rollback_steps} 步",
                     " · ".join(flow_labels),
                     f"视频：{video_state} · 字体：{self.font_source_status}",
                 ],
@@ -13108,7 +13174,10 @@ class NativeRuntimePlayer:
         return get_native_runtime_help_quick_actions()
 
     def activate_help_action(self, action_key: str) -> bool:
-        if action_key == "settings":
+        if action_key == "rollback":
+            self.close_overlay(preserve_status=True)
+            self.rollback_story()
+        elif action_key == "settings":
             self.open_settings_overlay()
         elif action_key == "save":
             self.open_save_dialog("save")
@@ -13737,6 +13806,9 @@ class NativeRuntimePlayer:
                 return True
             if self.overlay_mode:
                 return self.handle_overlay_event(event)
+            if event.key == self.pygame.K_PAGEUP:
+                self.rollback_story()
+                return True
             if not self.current_choices and self.handle_scene3d_preview_key(event):
                 return True
             if event.key == self.pygame.K_u:

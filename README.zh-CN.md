@@ -90,7 +90,7 @@ Canvasia Engine 当前更适合这样理解：
 | 粒子与演出 | 可用 | 支持高级粒子预设、项目级自定义粒子、场景演出配方、镜头、滤镜、闪屏、震动，以及可独立显示 / 移动 / 隐藏的道具、前景和 Cut-in 舞台贴图层。 |
 | Live2D / 3D 资产 | Preview | 支持 Live2D、3D 角色模型和 3D 场景素材导入；原生 Runtime 会生成 3D 资产结构、材质贴图槽、动画通道和依赖清单，并可把风险定位回编辑器素材库。 |
 | 网页 / 桌面导出 | Preview | 网页试玩包与三平台桌面包可用；签名、公证和安装器状态以 Release notes 为准。 |
-| 原生 Runtime | Preview | 已覆盖核心播放链、存档、设置、历史文本、自动播放、视频兜底、3D 资产清单与第一批资料馆；编辑器巡检会生成 Web / 原生 Runtime 覆盖矩阵、导出验收清单和 VN 基础能力成熟度摘要，帮助确认当前项目使用的卡片是否都能在导出包中播放、BGM 范围 / 淡入淡出、文本框可读性、存档位、UI 皮肤和字体绑定等基础项是否需要发布前补齐。 |
+| 原生 Runtime | Preview | 已覆盖核心播放链、存档、设置、历史文本、自动播放、可恢复变量 / 舞台 / 音乐 / 视觉效果的逐步剧情回退、视频兜底、3D 资产清单与第一批资料馆；编辑器巡检会生成 Web / 原生 Runtime 覆盖矩阵、导出验收清单和 VN 基础能力成熟度摘要，帮助确认当前项目使用的卡片是否都能在导出包中播放、BGM 范围 / 淡入淡出、文本框可读性、存档位、UI 皮肤和字体绑定等基础项是否需要发布前补齐。 |
 | 手机端 Runtime | 实验规划 | 当前处于触控、音频策略和界面适配验证阶段。 |
 
 ## 界面预览
@@ -286,7 +286,7 @@ python run_editor.py
 - `网页试玩包`：适合快速预览、网页分发和轻量测试；导出包会附带 `runtime_preload_manifest.json` 与 `RUNTIME_PRELOAD_REPORT.md`，Runtime 会优先预热首屏和早期路线素材，减少第一次切背景、立绘、BGM 时的卡顿。编辑器“项目巡检”页也可在导出前生成 Runtime 首屏加载预算报告，提前发现入口场景大素材、缺文件和场景热点。
 - `Ren'Py Starter Bundle`：会导出 zip，内含 `game/script.rpy`、`game/options.rpy`、复制后的 `game/assets/` 素材、迁移 manifest、自定义演出复核备注、包内自检报告和本地校验脚本，适合把项目迁移到 Ren'Py 后继续开发。
 - `Windows / macOS / Linux 桌面包`：当前主要基于 NW.js 桌面 Runtime。
-- `原生 Runtime 包`：Preview 路线，已覆盖标题页主菜单、基础剧情主链、正式存档/读档、系统菜单设置项、语言切换、文本历史、自动播放、已读快进、项目字体、资源预热清单读取、玩家档案/自动续玩、基础粒子与镜头演出、3D 资产结构 / 依赖清单、可选 PyAV/FFmpeg 音画同步内嵌视频播放、OpenCV 画面兜底、系统播放器桥接兜底、第一批资料馆，以及随包生成的发布候选总报告、发布总控报告与三系统验收清单；启动时会优先缓存关键图片和短音频，后续素材则以小步后台队列继续预热，并确认 BGM / 视频这类流媒体路径是否就绪。
+- `原生 Runtime 包`：Preview 路线，已覆盖标题页主菜单、基础剧情主链、正式存档/读档、系统菜单设置项、语言切换、文本历史、自动播放、已读快进、逐步剧情回退、项目字体、资源预热清单读取、玩家档案/自动续玩、基础粒子与镜头演出、3D 资产结构 / 依赖清单、可选 PyAV/FFmpeg 音画同步内嵌视频播放、OpenCV 画面兜底、系统播放器桥接兜底、第一批资料馆，以及随包生成的发布候选总报告、发布总控报告与三系统验收清单；启动时会优先缓存关键图片和短音频，后续素材则以小步后台队列继续预热，并确认 BGM / 视频这类流媒体路径是否就绪。
 - `手机端 Runtime`：实验规划阶段，当前重点是触控、音频策略和界面适配验证。
 
 所有可试玩 / 可运行导出包都会随包生成 `README_试玩验收先看这里.md`、`story_route_map.json`、`story_route_map.md`、`route-playtest-workbook.json`、`route-playtest-workbook.md`、`route-playtest-workbook.csv`、`localization_audit.json`、`localization_audit.md`、`release_readiness_summary.json`、`release_readiness_summary.md`、`unlockable_content_manifest.json`、`unlockable_content_report.md`、`asset-rights-manifest.json`、`asset-rights-report.md`、`asset-rights-table.csv`、`audio-cue-sheet.json`、`audio-cue-report.md`、`audio-cue-table.csv`、`stage-direction-sheet.json`、`stage-direction-report.md`、`stage-direction-table.csv`、`presentation-timeline.json`、`presentation-timeline-report.md`、`presentation-timeline-table.csv`、`choice-consequence-sheet.json`、`choice-consequence-report.md`、`choice-consequence-table.csv`、`variable-influence-sheet.json`、`variable-influence-report.md`、`variable-influence-table.csv`、`voice-production-sheet.json`、`voice-production-report.md` 和 `voice-production-lines.csv`。README 负责告诉测试员怎么打开、先验哪些基础功能；剧情路线图负责检查坏跳转、入口不可达场景和结局候选；路线试玩工作簿会把分支、结局、坏链、入口不可达项拆成可执行优先队列、变量提示、人工验收步骤和可导入表格的 QA 行；本地化审计负责检查多语言项目的漏译位置；发布就绪摘要负责快速判断这包能不能交给别人试玩；可解锁内容 JSON / Markdown 报告适合直接查看 CG 图鉴、音乐回想、语音回听、角色 / 地点 / 旁白 / 关系图鉴、章节回放、结局收集和成就覆盖情况；素材授权报告会检查商用状态、来源、署名、占位素材和 AI 生成记录；音频调度表会检查 BGM 文本范围、淡入淡出、停止点、缺文件音效、语音 Cue 和 BGM 盖过对白的混音风险；角色舞台调度表会检查背景、立绘、表情、站位、缩放、透明度、图层、登退场转场，以及立绘遮挡、画面拥挤、图层冲突、说话人过淡等构图风险；演出时间轴会检查预计阅读 / 演出时长、长静态对白、视觉 / 音频锚点、硬切音乐、空选项和不可用媒体；选项后果表会检查选项文字、分支目标、变量效果、坏跳转、重复选项、没有后果的按钮和会阻塞发布的选项问题；变量影响表会检查变量定义、读写位置、条件读取、未知引用、类型不匹配、未引用变量，以及写入后从未读取的路线旗标；语音制作清单会给出配音录制表、建议文件名、角色进度、缺绑定语音和长句复查项。

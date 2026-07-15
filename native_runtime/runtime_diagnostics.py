@@ -494,10 +494,18 @@ def build_runtime_position_diagnostic_rows(context: dict | None) -> list[dict]:
     choice_count = int(safe_context.get("choiceCount") or 0)
     line_type = str(safe_context.get("lineType") or ("选项" if choice_count else "待推进"))
     status_message = str(safe_context.get("statusMessage") or "")
+    rollback_status = safe_context.get("rollbackStatus") if isinstance(safe_context.get("rollbackStatus"), dict) else {}
+    rollback_steps = max(0, int(rollback_status.get("availableSteps") or 0))
     return [
         build_status_row("当前位置", scene_label, f"场景 ID：{safe_context.get('sceneId') or 'title'}", "ready"),
         build_status_row("剧情块", f"第 {block_index + 1} 块", f"当前状态：{line_type}", "ready"),
         build_status_row("选项数量", f"{choice_count} 个", "当前停在选项时会把分支目标纳入预取窗口。", "ready" if choice_count else "empty"),
+        build_status_row(
+            "剧情回退",
+            f"{rollback_steps} 步",
+            "PageUp 会恢复上一停顿点的变量、舞台、音乐和视觉效果。",
+            "ready" if rollback_steps else "empty",
+        ),
         build_status_row("状态提示", status_message or "无", "来自原生 Runtime 顶部状态栏。", "neutral"),
     ]
 

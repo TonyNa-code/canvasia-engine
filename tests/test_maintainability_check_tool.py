@@ -7,6 +7,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
@@ -32,6 +33,7 @@ class MaintainabilityCheckToolTests(unittest.TestCase):
         file_paths = {item["path"] for item in report["fileBudgets"]}
         modules = report["modules"]
         module_guard = report["moduleGuard"]
+        native_runtime_bundle = report["nativeRuntimeBundle"]
         summary = report["summary"]
         maintenance_plan = report["maintenancePlan"]
 
@@ -67,6 +69,19 @@ class MaintainabilityCheckToolTests(unittest.TestCase):
         self.assertEqual(module_guard["lastRequirement"]["script"], "./modules/command_palette.js")
         self.assertEqual(summary["moduleGuardStatus"], "passed")
         self.assertEqual(summary["moduleGuardRequirementCount"], module_guard["requirementCount"])
+        self.assertEqual(native_runtime_bundle["status"], "passed")
+        self.assertGreaterEqual(native_runtime_bundle["moduleCount"], 16)
+        self.assertEqual(native_runtime_bundle["moduleCount"], native_runtime_bundle["bundledModuleCount"])
+        self.assertEqual(native_runtime_bundle["missingSourceConstants"], [])
+        self.assertEqual(native_runtime_bundle["staleSourceConstants"], [])
+        self.assertEqual(native_runtime_bundle["missingFromBundle"], [])
+        self.assertEqual(native_runtime_bundle["staleBundleFiles"], [])
+        self.assertEqual(native_runtime_bundle["missingImportFiles"], [])
+        self.assertEqual(native_runtime_bundle["importedNotBundled"], [])
+        self.assertEqual(native_runtime_bundle["duplicateRequiredConstants"], [])
+        self.assertEqual(summary["nativeRuntimeBundleStatus"], "passed")
+        self.assertEqual(summary["nativeRuntimeModuleCount"], native_runtime_bundle["moduleCount"])
+        self.assertEqual(summary["nativeRuntimeBundledModuleCount"], native_runtime_bundle["bundledModuleCount"])
         self.assertGreaterEqual(summary["maintenanceActionCount"], 1)
         self.assertEqual(summary["maintenanceActionCount"], len(maintenance_plan))
         self.assertEqual(summary["topMaintenancePriority"], maintenance_plan[0]["priority"])
@@ -102,11 +117,13 @@ class MaintainabilityCheckToolTests(unittest.TestCase):
             self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
             self.assertIn("Canvasia maintainability: passed", completed.stdout)
             self.assertIn("Startup guard: passed", completed.stdout)
+            self.assertIn("Native Runtime bundle: passed", completed.stdout)
             payload = json.loads(json_report.read_text(encoding="utf-8"))
             markdown = markdown_report.read_text(encoding="utf-8")
             self.assertEqual(payload["status"], "passed")
             self.assertEqual(payload["moduleGuard"]["status"], "passed")
             self.assertEqual(payload["moduleGuard"]["appGlobalsMissingFromGuard"], [])
+            self.assertEqual(payload["nativeRuntimeBundle"]["status"], "passed")
             self.assertIn("knownTestDebtCount", payload["summary"])
             self.assertIn("maintenancePlan", payload)
             self.assertGreaterEqual(payload["summary"]["maintenanceActionCount"], 1)
@@ -114,9 +131,45 @@ class MaintainabilityCheckToolTests(unittest.TestCase):
             self.assertIn("## File Budgets", markdown)
             self.assertIn("## Maintenance Roadmap", markdown)
             self.assertIn("## Startup Guard Consistency", markdown)
+            self.assertIn("## Native Runtime Bundle Parity", markdown)
             self.assertIn("App globals covered", markdown)
             self.assertIn("Maintenance roadmap:", completed.stdout)
             self.assertIn("Next maintenance actions:", completed.stdout)
+
+    def test_native_runtime_bundle_guard_flags_imported_helper_missing_from_export_tuple(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            native_dir = root / "native_runtime"
+            native_dir.mkdir()
+            player_path = native_dir / "runtime_player.py"
+            helper_path = native_dir / "runtime_helper.py"
+            run_editor_path = root / "run_editor.py"
+            player_path.write_text("from .runtime_helper import helper\n", encoding="utf-8")
+            helper_path.write_text("def helper():\n    return True\n", encoding="utf-8")
+            run_editor_path.write_text(
+                "\n".join(
+                    [
+                        'NATIVE_RUNTIME_PLAYER_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_player.py"',
+                        'NATIVE_RUNTIME_HELPER_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_helper.py"',
+                        'NATIVE_RUNTIME_REQUIRED_MODULE_FILES = (',
+                        '    (NATIVE_RUNTIME_PLAYER_SOURCE, NATIVE_RUNTIME_PLAYER_NAME),',
+                        ')',
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            with (
+                mock.patch.object(self.maintainability, "NATIVE_RUNTIME_DIR", native_dir),
+                mock.patch.object(self.maintainability, "NATIVE_RUNTIME_PLAYER_PATH", player_path),
+                mock.patch.object(self.maintainability, "RUN_EDITOR_PATH", run_editor_path),
+            ):
+                result = self.maintainability.evaluate_native_runtime_bundle()
+
+            self.assertEqual(result["status"], "failed")
+            self.assertEqual(result["missingFromBundle"], ["runtime_helper.py"])
+            self.assertEqual(result["importedNotBundled"], ["runtime_helper.py"])
 
 
 if __name__ == "__main__":

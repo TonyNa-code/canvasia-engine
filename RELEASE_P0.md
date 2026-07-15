@@ -66,7 +66,7 @@ Run at least once before calling the release ready:
 
 ## Known Preview Limits To Disclose
 
-- Native Runtime video uses a system-player bridge, not embedded decoding.
+- Native Runtime embedded video uses the optional PyAV/FFmpeg path and still requires target-device codec testing; the system-player bridge remains the compatibility fallback.
 - Mobile Runtime export is planning / experimental only.
 - macOS unsigned apps may be blocked by Gatekeeper.
 - Windows unsigned apps may trigger SmartScreen.

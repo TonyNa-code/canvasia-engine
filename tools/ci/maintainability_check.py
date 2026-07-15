@@ -16,6 +16,9 @@ EDITOR_INDEX_PATH = ROOT_DIR / "prototype_editor" / "index.html"
 EDITOR_APP_PATH = ROOT_DIR / "prototype_editor" / "app.js"
 EDITOR_MODULES_DIR = ROOT_DIR / "prototype_editor" / "modules"
 MODULE_GUARD_PATH = EDITOR_MODULES_DIR / "module_guard.js"
+NATIVE_RUNTIME_DIR = ROOT_DIR / "native_runtime"
+NATIVE_RUNTIME_PLAYER_PATH = NATIVE_RUNTIME_DIR / "runtime_player.py"
+RUN_EDITOR_PATH = ROOT_DIR / "run_editor.py"
 TESTS_DIR = ROOT_DIR / "tests"
 SCRIPT_SRC_PATTERN = re.compile(r"<script\b[^>]*\bsrc=[\"']([^\"']+)[\"'][^>]*>", re.IGNORECASE)
 MODULE_GUARD_REQUIREMENT_PATTERN = re.compile(
@@ -23,6 +26,16 @@ MODULE_GUARD_REQUIREMENT_PATTERN = re.compile(
     re.MULTILINE,
 )
 APP_WINDOW_GLOBAL_PATTERN = re.compile(r"window\.(Canvasia[A-Za-z0-9_]+)")
+NATIVE_RUNTIME_SOURCE_PATTERN = re.compile(
+    r'^(NATIVE_RUNTIME_[A-Z0-9_]+_SOURCE)\s*=\s*NATIVE_RUNTIME_TEMPLATE_DIR\s*/\s*"(runtime_[^"]+\.py)"',
+    re.MULTILINE,
+)
+NATIVE_RUNTIME_REQUIRED_TUPLE_PATTERN = re.compile(
+    r"NATIVE_RUNTIME_REQUIRED_MODULE_FILES\s*=\s*\((.*?)\n\)",
+    re.DOTALL,
+)
+NATIVE_RUNTIME_REQUIRED_SOURCE_PATTERN = re.compile(r"\((NATIVE_RUNTIME_[A-Z0-9_]+_SOURCE)\s*,")
+NATIVE_RUNTIME_IMPORT_PATTERN = re.compile(r"from\s+\.?(runtime_[A-Za-z0-9_]+)\s+import")
 MODULE_GUARD_SCRIPT = "./modules/module_guard.js"
 EDITOR_APP_SCRIPT = "./app.js"
 ALLOWED_UNGUARDED_APP_GLOBALS = frozenset(
@@ -292,6 +305,70 @@ def evaluate_module_guard() -> dict[str, object]:
     }
 
 
+def evaluate_native_runtime_bundle() -> dict[str, object]:
+    module_files = sorted(path.name for path in NATIVE_RUNTIME_DIR.glob("runtime_*.py"))
+    run_editor_source = RUN_EDITOR_PATH.read_text(encoding="utf-8") if RUN_EDITOR_PATH.exists() else ""
+    player_source = NATIVE_RUNTIME_PLAYER_PATH.read_text(encoding="utf-8") if NATIVE_RUNTIME_PLAYER_PATH.exists() else ""
+    source_constants = {
+        constant_name: file_name
+        for constant_name, file_name in NATIVE_RUNTIME_SOURCE_PATTERN.findall(run_editor_source)
+    }
+    required_match = NATIVE_RUNTIME_REQUIRED_TUPLE_PATTERN.search(run_editor_source)
+    required_constants = (
+        NATIVE_RUNTIME_REQUIRED_SOURCE_PATTERN.findall(required_match.group(1))
+        if required_match
+        else []
+    )
+    bundled_files = sorted(
+        source_constants[constant_name]
+        for constant_name in required_constants
+        if constant_name in source_constants
+    )
+    imported_modules = sorted(set(NATIVE_RUNTIME_IMPORT_PATTERN.findall(player_source)))
+    imported_files = [f"{module_name}.py" for module_name in imported_modules]
+    module_file_set = set(module_files)
+    bundled_file_set = set(bundled_files)
+    declared_file_set = set(source_constants.values())
+    missing_source_constants = sorted(module_file_set - declared_file_set)
+    stale_source_constants = sorted(declared_file_set - module_file_set)
+    missing_from_bundle = sorted(module_file_set - bundled_file_set)
+    stale_bundle_files = sorted(bundled_file_set - module_file_set)
+    missing_import_files = sorted(set(imported_files) - module_file_set)
+    imported_not_bundled = sorted(set(imported_files) - bundled_file_set)
+    duplicate_required_constants = find_duplicates(required_constants)
+    status = "passed"
+    if (
+        not NATIVE_RUNTIME_PLAYER_PATH.exists()
+        or not RUN_EDITOR_PATH.exists()
+        or not required_match
+        or missing_source_constants
+        or stale_source_constants
+        or missing_from_bundle
+        or stale_bundle_files
+        or missing_import_files
+        or imported_not_bundled
+        or duplicate_required_constants
+    ):
+        status = "failed"
+    return {
+        "status": status,
+        "moduleCount": len(module_files),
+        "sourceConstantCount": len(source_constants),
+        "bundledModuleCount": len(bundled_files),
+        "importedHelperCount": len(imported_modules),
+        "moduleFiles": module_files,
+        "bundledFiles": bundled_files,
+        "importedModules": imported_modules,
+        "missingSourceConstants": missing_source_constants,
+        "staleSourceConstants": stale_source_constants,
+        "missingFromBundle": missing_from_bundle,
+        "staleBundleFiles": stale_bundle_files,
+        "missingImportFiles": missing_import_files,
+        "importedNotBundled": imported_not_bundled,
+        "duplicateRequiredConstants": duplicate_required_constants,
+    }
+
+
 def priority_rank(priority: str) -> int:
     ranks = {"P0": 0, "P1": 1, "P2": 2, "P3": 3}
     return ranks.get(priority, 9)
@@ -319,6 +396,7 @@ def build_maintenance_plan(
     file_budgets: Sequence[dict[str, object]],
     modules: dict[str, object],
     module_guard: dict[str, object],
+    native_runtime_bundle: dict[str, object],
 ) -> list[dict[str, str]]:
     actions: list[dict[str, str]] = []
 
@@ -359,6 +437,21 @@ def build_maintenance_plan(
                 "The editor startup guard no longer matches the actual module order or exported globals.",
                 f"status={module_guard.get('status', 'unknown')}",
                 "Regenerate or update prototype_editor/modules/module_guard.js alongside index.html.",
+            )
+        )
+
+    if native_runtime_bundle.get("status") != "passed":
+        actions.append(
+            build_maintenance_action(
+                "P0",
+                "native runtime bundle",
+                "Repair native helper export parity",
+                "A native Runtime helper is missing, stale, or imported without being copied into exported packages.",
+                (
+                    f"missing={len(native_runtime_bundle.get('missingFromBundle') or [])}; "
+                    f"importedNotBundled={len(native_runtime_bundle.get('importedNotBundled') or [])}"
+                ),
+                "Update run_editor.py source constants and NATIVE_RUNTIME_REQUIRED_MODULE_FILES together.",
             )
         )
 
@@ -408,7 +501,8 @@ def build_report() -> dict[str, object]:
     file_budgets = evaluate_file_budgets()
     modules = evaluate_modules()
     module_guard = evaluate_module_guard()
-    maintenance_plan = build_maintenance_plan(file_budgets, modules, module_guard)
+    native_runtime_bundle = evaluate_native_runtime_bundle()
+    maintenance_plan = build_maintenance_plan(file_budgets, modules, module_guard, native_runtime_bundle)
     failed_files = [item for item in file_budgets if item["status"] == "failed"]
     warning_files = [item for item in file_budgets if item["status"] == "warning"]
     hard_module_failures = (
@@ -416,6 +510,7 @@ def build_report() -> dict[str, object]:
         or modules["staleEntrypoint"]
         or modules["newMissingTests"]
         or module_guard["status"] != "passed"
+        or native_runtime_bundle["status"] != "passed"
     )
     status = "failed" if failed_files or hard_module_failures else "passed"
 
@@ -432,12 +527,16 @@ def build_report() -> dict[str, object]:
             "newMissingTestCount": len(modules["newMissingTests"]),
             "moduleGuardStatus": module_guard["status"],
             "moduleGuardRequirementCount": module_guard["requirementCount"],
+            "nativeRuntimeBundleStatus": native_runtime_bundle["status"],
+            "nativeRuntimeModuleCount": native_runtime_bundle["moduleCount"],
+            "nativeRuntimeBundledModuleCount": native_runtime_bundle["bundledModuleCount"],
             "maintenanceActionCount": len(maintenance_plan),
             "topMaintenancePriority": maintenance_plan[0]["priority"] if maintenance_plan else "",
         },
         "fileBudgets": file_budgets,
         "modules": modules,
         "moduleGuard": module_guard,
+        "nativeRuntimeBundle": native_runtime_bundle,
         "maintenancePlan": maintenance_plan,
     }
 
@@ -458,6 +557,8 @@ def write_markdown_report(path: Path, report: dict[str, object]) -> None:
         f"- Modules loaded by editor: `{summary.get('entrypointModuleCount', 0)}`",
         f"- Modules with direct tests: `{summary.get('testedModuleCount', 0)}`",
         f"- Known module test debt: `{summary.get('knownTestDebtCount', 0)}`",
+        f"- Native Runtime bundle parity: `{summary.get('nativeRuntimeBundleStatus', 'unknown')}` "
+        f"({summary.get('nativeRuntimeBundledModuleCount', 0)}/{summary.get('nativeRuntimeModuleCount', 0)})",
         "",
         "## File Budgets",
         "",
@@ -532,6 +633,31 @@ def write_markdown_report(path: Path, report: dict[str, object]) -> None:
             values = module_guard.get(key)
             if values:
                 lines.extend(["", f"### {title}", "", ", ".join(f"`{value}`" for value in values)])
+    native_runtime_bundle = report.get("nativeRuntimeBundle")
+    if isinstance(native_runtime_bundle, dict):
+        lines.extend(
+            [
+                "",
+                "## Native Runtime Bundle Parity",
+                "",
+                f"- Status: `{native_runtime_bundle.get('status', 'unknown')}`",
+                f"- Runtime modules: `{native_runtime_bundle.get('moduleCount', 0)}`",
+                f"- Bundled modules: `{native_runtime_bundle.get('bundledModuleCount', 0)}`",
+                f"- Imported helpers: `{native_runtime_bundle.get('importedHelperCount', 0)}`",
+            ]
+        )
+        for key, title in (
+            ("missingSourceConstants", "Missing source constants"),
+            ("staleSourceConstants", "Stale source constants"),
+            ("missingFromBundle", "Missing from bundle"),
+            ("staleBundleFiles", "Stale bundle files"),
+            ("missingImportFiles", "Missing imported files"),
+            ("importedNotBundled", "Imported but not bundled"),
+            ("duplicateRequiredConstants", "Duplicate required constants"),
+        ):
+            values = native_runtime_bundle.get(key)
+            if values:
+                lines.extend(["", f"### {title}", "", ", ".join(f"`{value}`" for value in values)])
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -555,6 +681,10 @@ def format_terminal_report(report: dict[str, object]) -> str:
             f"({summary.get('moduleGuardRequirementCount', 0)} required globals)"
         ),
         (
+            f"Native Runtime bundle: {summary.get('nativeRuntimeBundleStatus', 'unknown')} "
+            f"({summary.get('nativeRuntimeBundledModuleCount', 0)}/{summary.get('nativeRuntimeModuleCount', 0)} modules)"
+        ),
+        (
             f"Maintenance roadmap: {summary.get('maintenanceActionCount', 0)} action(s), "
             f"top priority {summary.get('topMaintenancePriority', 'none') or 'none'}"
         ),
@@ -574,6 +704,20 @@ def format_terminal_report(report: dict[str, object]) -> str:
             )
         if not module_guard.get("orderMatches", True):
             lines.append("Startup guard order does not match the editor entrypoint.")
+    native_runtime_bundle = report.get("nativeRuntimeBundle")
+    if isinstance(native_runtime_bundle, dict) and native_runtime_bundle.get("status") != "passed":
+        for key in (
+            "missingSourceConstants",
+            "staleSourceConstants",
+            "missingFromBundle",
+            "staleBundleFiles",
+            "missingImportFiles",
+            "importedNotBundled",
+            "duplicateRequiredConstants",
+        ):
+            values = native_runtime_bundle.get(key)
+            if values:
+                lines.append(f"Native Runtime bundle {key}: " + ", ".join(values))
     for item in report.get("fileBudgets", []):
         if isinstance(item, dict) and item.get("status") != "passed":
             lines.append(f"- {item.get('path')}: {item.get('lines')} lines, {item.get('note')}")

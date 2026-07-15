@@ -87,7 +87,7 @@ Canvasia Engine は、ビジュアルノベル / Galgame 制作者のための s
 | パーティクル / 演出 | Available | パーティクル、カメラ、フィルター、フラッシュ、画面揺れ、フェード、キャラクター演出、独立した小道具 / 前景 / Cut-in stage-image レイヤー。 |
 | Live2D / 3D 素材 | Preview | Live2D、3D キャラクター、3D シーン素材をインポート可能。ネイティブ Runtime は 3D 構造とリスクレポートを出力。 |
 | Web / Desktop 書き出し | Preview | Web 試遊パッケージとデスクトップパッケージに対応。署名と公証は Release notes に従います。 |
-| ネイティブ Runtime | Preview | コア再生、設定、セーブ、履歴、自動再生、動画フォールバック、3D レポート、初期図鑑システム、Web / native Runtime coverage checks をカバー。 |
+| ネイティブ Runtime | Preview | コア再生、設定、セーブ、履歴、自動再生、変数・舞台・音楽・画面効果を復元する段階的ロールバック、動画フォールバック、3D レポート、初期図鑑システム、Web / native Runtime coverage checks をカバー。 |
 | Mobile Runtime | Experimental planning | タッチ操作、音声ポリシー、レイアウト適応を検証中。 |
 
 ## スクリーンショット

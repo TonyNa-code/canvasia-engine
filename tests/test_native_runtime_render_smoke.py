@@ -104,8 +104,10 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
         reading = next(group for group in guide["groups"] if group["key"] == "reading")
         system = next(group for group in guide["groups"] if group["key"] == "system")
         self.assertTrue(any("Enter" in control["keys"] and "Space" in control["keys"] for control in reading["controls"]))
+        self.assertTrue(any("PageUp" in control["keys"] and control["label"] == "剧情回退" for control in reading["controls"]))
         self.assertTrue(any("F6" in control["keys"] and "F7" in control["keys"] for control in system["controls"]))
         self.assertIn("settings", [action["key"] for action in get_native_runtime_help_quick_actions()])
+        self.assertIn("rollback", [action["key"] for action in get_native_runtime_help_quick_actions()])
 
         stdout = io.StringIO()
         with redirect_stdout(stdout):
@@ -3202,6 +3204,61 @@ class NativeRuntimeRenderSmokeTests(unittest.TestCase):
         self.assertIn("panel_frame", player.image_cache)
         self.assertIn("资源预热：3/3", player.get_runtime_preload_status_line())
         self.assertIn("资源预热：3/3", player.status_message)
+
+    def test_pageup_rollback_restores_story_variables_and_stage_state(self) -> None:
+        data_path = self.write_game_data()
+        game_data = json.loads(data_path.read_text(encoding="utf-8"))
+        game_data["variables"] = {
+            "variables": [
+                {"id": "affection", "name": "Affection", "type": "number", "defaultValue": 0}
+            ]
+        }
+        blocks = game_data["chapters"][0]["scenes"][0]["blocks"]
+        blocks[2:2] = [
+            {"id": "block_var", "type": "variable_set", "variableId": "affection", "value": 9},
+            {
+                "id": "block_move",
+                "type": "character_move",
+                "characterId": "heroine",
+                "position": "right",
+                "durationMs": 0,
+            },
+            {
+                "id": "block_filter",
+                "type": "screen_filter",
+                "action": "apply",
+                "preset": "memory",
+                "strength": "soft",
+            },
+        ]
+        data_path.write_text(json.dumps(game_data, ensure_ascii=False), encoding="utf-8")
+        player = NativeRuntimePlayer(pygame, data_path)
+
+        player.start_story_from_title()
+        self.assertEqual(player.current_block_index, 1)
+        self.assertEqual(player.variable_state["affection"], 0)
+        self.assertEqual(player.visible_characters["heroine"]["position"], "center")
+        self.assertEqual(player.get_rollback_status()["availableSteps"], 0)
+
+        player.reveal_current_line_immediately()
+        player.advance_dialogue()
+        self.assertEqual(player.current_block_index, 5)
+        self.assertIsNotNone(player.current_choices)
+        self.assertEqual(player.variable_state["affection"], 9)
+        self.assertEqual(player.visible_characters["heroine"]["position"], "right")
+        self.assertIsNotNone(player.screen_filter_effect)
+        self.assertEqual(player.get_rollback_status()["availableSteps"], 1)
+
+        handled = player.handle_event(pygame.event.Event(pygame.KEYDOWN, {"key": pygame.K_PAGEUP}))
+        self.assertTrue(handled)
+        self.assertEqual(player.current_block_index, 1)
+        self.assertIsNone(player.current_choices)
+        self.assertEqual(player.current_line["text"], "Native Runtime render smoke.")
+        self.assertEqual(player.variable_state["affection"], 0)
+        self.assertEqual(player.visible_characters["heroine"]["position"], "center")
+        self.assertIsNone(player.screen_filter_effect)
+        self.assertEqual(player.get_rollback_status()["availableSteps"], 0)
+        self.assertIn("已回退到上一句", player.status_message)
 
     def test_native_runtime_renders_stage_image_layer_to_canvas(self) -> None:
         data_path = self.write_game_data()
