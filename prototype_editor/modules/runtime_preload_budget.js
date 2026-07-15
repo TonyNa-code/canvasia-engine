@@ -604,7 +604,7 @@
         const bonus = phase === "critical" ? Math.max(0, 12 - blockIndex) : Math.max(0, 4 - sceneIndex);
         const sceneLabel = cleanText(scene.name || scene.title || sceneId);
 
-        if (["background", "music_play", "sfx_play", "video_play"].includes(blockType)) {
+        if (["background", "stage_image", "music_play", "sfx_play", "video_play"].includes(blockType)) {
           addAsset(block.assetId, {
             phase,
             reason: `${sceneLabel} / ${blockType}`,

@@ -3,6 +3,7 @@
 
   const FALLBACK_BLOCK_LABELS = Object.freeze({
     background: "背景",
+    stage_image: "道具 / 前景",
     dialogue: "台词",
     narration: "旁白",
     character_show: "角色登场",
@@ -49,6 +50,7 @@
       ? storyBlockCatalogTools.getTimelineVisualBeatBlockTypes()
       : [
           "background",
+          "stage_image",
           "character_show",
           "character_move",
           "character_hide",
@@ -236,6 +238,9 @@
     if (block.type === "character_move") {
       return Math.round(clampNumber(block.durationMs, 0, 10000, 600));
     }
+    if (block.type === "stage_image") {
+      return Math.round(clampNumber(block.durationMs, 0, 10000, 520));
+    }
     if (["background", "character_show", "character_hide"].includes(block.type)) {
       return getTransitionDurationMs(block);
     }
@@ -334,6 +339,27 @@
       }
       if (cleanText(block.transition, "fade") === "none") {
         pushIssue(issues, "tip", "background_hard_cut", "背景是硬切", "如果不是故意制造突兀感，建议给背景切换加淡入淡出。", baseContext);
+      }
+    }
+
+    if (type === "stage_image") {
+      const action = ["show", "update", "hide"].includes(cleanText(block.action)) ? cleanText(block.action) : "show";
+      const asset = getAssetStatus(block.assetId, context.assetMap);
+      const layerId = cleanText(block.layerId, "layer_main");
+      const transform = block.transform && typeof block.transform === "object" ? block.transform : {};
+      const width = Math.round(clampNumber(transform.width, 4, 180, 34));
+      const opacity = Math.round(clampNumber(transform.opacity, 0, 100, 100));
+      detail = [layerId, action === "hide" ? "隐藏" : asset.name || asset.label].filter(Boolean).join(" / ");
+      if (action === "show" && !cleanText(block.assetId)) {
+        pushIssue(issues, "blocker", "stage_image_missing_asset", "舞台贴图未选择素材", "显示新贴图时必须绑定图片素材。", baseContext);
+      } else if (cleanText(block.assetId) && !asset.ready) {
+        pushIssue(issues, "blocker", "stage_image_asset_not_ready", "舞台贴图素材不可用", asset.label, baseContext);
+      }
+      if (action !== "hide" && (width <= 6 || width >= 165)) {
+        pushIssue(issues, "tip", "stage_image_width_extreme", "舞台贴图尺寸较极端", `当前宽度约 ${width}%，建议确认没有意外出画或遮挡文本。`, baseContext);
+      }
+      if (action !== "hide" && opacity < 20) {
+        pushIssue(issues, "warn", "stage_image_opacity_too_low", "舞台贴图几乎不可见", `当前透明度约 ${opacity}%，如果不是氛围叠层，建议提高可见度。`, baseContext);
       }
     }
 

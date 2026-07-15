@@ -602,6 +602,85 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
 
         self.assertGreater(block_cards.count(), initial_count)
 
+    def test_story_editor_stage_image_card_persists_and_reaches_preview(self) -> None:
+        self.open_project_by_title("心跳时差")
+        self.page.get_by_role("button", name="写剧情", exact=True).click()
+        add_button = self.page.get_by_role("button", name="道具 / 前景贴图").first
+        add_button.wait_for(timeout=15000)
+        add_button.click()
+
+        layer_input = self.page.locator("#editorStageImageLayerId")
+        asset_select = self.page.locator("#editorStageImageAssetId")
+        layer_input.wait_for(timeout=15000)
+        self.assertGreater(asset_select.locator("option").count(), 1)
+        layer_input.fill("smoke_note")
+        asset_select.select_option(index=1)
+        self.page.locator("#editorStageImagePlane").select_option("front")
+        self.page.locator("#editorStageImagePosition").select_option("right")
+        self.page.locator("#editorStageImageOffsetX").fill("-6")
+        self.page.locator("#editorStageImageWidth").fill("62")
+        self.page.locator("#editorStageImageOpacity").fill("91")
+        self.page.locator("#editorStageImageRotation").fill("8")
+        self.page.locator("#editorStageImageLayer").fill("4")
+        self.page.locator("#editorStageImageEasing").select_option("ease_in_out")
+        self.page.locator("#editorStageImageDurationMs").fill("650")
+        self.page.get_by_role("button", name="保存这张卡片").click()
+
+        self.page.wait_for_function(
+            """async () => {
+                const response = await fetch('/api/project-data');
+                const bundle = await response.json();
+                return (bundle.chapters || []).some((chapter) =>
+                    (chapter.scenes || []).some((scene) =>
+                        (scene.blocks || []).some((block) =>
+                            block.type === 'stage_image'
+                            && block.layerId === 'smoke_note'
+                            && block.plane === 'front'
+                            && block.position === 'right'
+                            && block.transform?.offsetX === -6
+                            && block.transform?.width === 62
+                            && block.transform?.opacity === 91
+                            && block.transform?.rotation === 8
+                            && block.transform?.layer === 4
+                            && block.durationMs === 650
+                            && block.easing === 'ease_in_out'
+                        )
+                    )
+                );
+            }""",
+            timeout=15000,
+        )
+
+        self.page.get_by_role("button", name="试玩收尾").click()
+        stage_image = self.page.locator('#previewStage [data-layer-id="smoke_note"]')
+        self.page.locator("#previewStage").wait_for(state="visible", timeout=15000)
+        for _ in range(12):
+            if stage_image.count() and stage_image.is_visible():
+                break
+            visible_choice = self.page.locator("#previewChoices button:visible").first
+            if visible_choice.count():
+                visible_choice.click()
+            else:
+                next_button = self.page.locator("#previewNextButton")
+                if next_button.is_disabled():
+                    break
+                next_button.click()
+            self.page.wait_for_timeout(120)
+        stage_image.wait_for(state="visible", timeout=15000)
+        style_values = stage_image.evaluate(
+            """(element) => {
+                const style = getComputedStyle(element);
+                return {
+                    width: style.getPropertyValue('--stage-image-width').trim(),
+                    opacity: style.getPropertyValue('--stage-image-opacity').trim(),
+                    rotation: style.getPropertyValue('--stage-image-rotation').trim(),
+                };
+            }"""
+        )
+        self.assertEqual(style_values["width"], "62%")
+        self.assertEqual(style_values["opacity"], "0.91")
+        self.assertEqual(style_values["rotation"], "8deg")
+
     def test_story_editor_can_split_long_dialogue_into_multiple_cards(self) -> None:
         self.create_blank_project("浏览器烟测项目_Split")
         self.create_first_chapter()

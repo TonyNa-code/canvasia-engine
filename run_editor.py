@@ -180,6 +180,7 @@ EXPORT_PLAYER_SCRIPT_FILES = (
     "runtime_data.js",
     "runtime_storage.js",
     "runtime_character_motion.js",
+    "runtime_stage_images.js",
     "runtime_visual_constants.js",
     "runtime_controls.js",
     "runtime_settings.js",
@@ -485,6 +486,7 @@ NATIVE_RUNTIME_I18N_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_i18n.py"
 NATIVE_RUNTIME_SETTINGS_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_player_settings.py"
 NATIVE_RUNTIME_VIEW_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_player_view.py"
 NATIVE_RUNTIME_CHARACTER_MOTION_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_character_motion.py"
+NATIVE_RUNTIME_STAGE_IMAGES_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_stage_images.py"
 NATIVE_RUNTIME_TEXT_EFFECTS_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_text_effects.py"
 NATIVE_RUNTIME_STORAGE_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_storage.py"
 NATIVE_RUNTIME_VARIABLES_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_variables.py"
@@ -503,6 +505,7 @@ NATIVE_RUNTIME_I18N_NAME = "runtime_i18n.py"
 NATIVE_RUNTIME_SETTINGS_NAME = "runtime_player_settings.py"
 NATIVE_RUNTIME_VIEW_NAME = "runtime_player_view.py"
 NATIVE_RUNTIME_CHARACTER_MOTION_NAME = "runtime_character_motion.py"
+NATIVE_RUNTIME_STAGE_IMAGES_NAME = "runtime_stage_images.py"
 NATIVE_RUNTIME_TEXT_EFFECTS_NAME = "runtime_text_effects.py"
 NATIVE_RUNTIME_STORAGE_NAME = "runtime_storage.py"
 NATIVE_RUNTIME_VARIABLES_NAME = "runtime_variables.py"
@@ -561,6 +564,7 @@ NATIVE_RUNTIME_REQUIRED_MODULE_FILES = (
     (NATIVE_RUNTIME_SETTINGS_SOURCE, NATIVE_RUNTIME_SETTINGS_NAME),
     (NATIVE_RUNTIME_VIEW_SOURCE, NATIVE_RUNTIME_VIEW_NAME),
     (NATIVE_RUNTIME_CHARACTER_MOTION_SOURCE, NATIVE_RUNTIME_CHARACTER_MOTION_NAME),
+    (NATIVE_RUNTIME_STAGE_IMAGES_SOURCE, NATIVE_RUNTIME_STAGE_IMAGES_NAME),
     (NATIVE_RUNTIME_TEXT_EFFECTS_SOURCE, NATIVE_RUNTIME_TEXT_EFFECTS_NAME),
     (NATIVE_RUNTIME_STORAGE_SOURCE, NATIVE_RUNTIME_STORAGE_NAME),
     (NATIVE_RUNTIME_VARIABLES_SOURCE, NATIVE_RUNTIME_VARIABLES_NAME),
@@ -8969,6 +8973,8 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
         "runtimeViewModulePath": str(build_dir / NATIVE_RUNTIME_VIEW_NAME),
         "runtimeCharacterMotionModuleName": NATIVE_RUNTIME_CHARACTER_MOTION_NAME,
         "runtimeCharacterMotionModulePath": str(build_dir / NATIVE_RUNTIME_CHARACTER_MOTION_NAME),
+        "runtimeStageImagesModuleName": NATIVE_RUNTIME_STAGE_IMAGES_NAME,
+        "runtimeStageImagesModulePath": str(build_dir / NATIVE_RUNTIME_STAGE_IMAGES_NAME),
         "runtimeTextEffectsModuleName": NATIVE_RUNTIME_TEXT_EFFECTS_NAME,
         "runtimeTextEffectsModulePath": str(build_dir / NATIVE_RUNTIME_TEXT_EFFECTS_NAME),
         "runtimeStorageModuleName": NATIVE_RUNTIME_STORAGE_NAME,
@@ -9481,6 +9487,7 @@ def export_native_runtime_build() -> dict:
             "runtimeSettingsModule": runtime_files["runtimeSettingsModuleName"],
             "runtimeViewModule": runtime_files["runtimeViewModuleName"],
             "runtimeCharacterMotionModule": runtime_files["runtimeCharacterMotionModuleName"],
+            "runtimeStageImagesModule": runtime_files["runtimeStageImagesModuleName"],
             "runtimeTextEffectsModule": runtime_files["runtimeTextEffectsModuleName"],
             "runtimeStorageModule": runtime_files["runtimeStorageModuleName"],
             "runtimeVariablesModule": runtime_files["runtimeVariablesModuleName"],
@@ -9557,6 +9564,7 @@ def export_native_runtime_build() -> dict:
             "runtimeSettingsModule": runtime_files["runtimeSettingsModuleName"],
             "runtimeViewModule": runtime_files["runtimeViewModuleName"],
             "runtimeCharacterMotionModule": runtime_files["runtimeCharacterMotionModuleName"],
+            "runtimeStageImagesModule": runtime_files["runtimeStageImagesModuleName"],
             "runtimeTextEffectsModule": runtime_files["runtimeTextEffectsModuleName"],
             "runtimeStorageModule": runtime_files["runtimeStorageModuleName"],
             "runtimeVariablesModule": runtime_files["runtimeVariablesModuleName"],
@@ -9786,6 +9794,7 @@ def export_native_runtime_build() -> dict:
         {"name": runtime_files["runtimeSettingsModuleName"], "description": "原生 Runtime 系统设置模块。"},
         {"name": runtime_files["runtimeViewModuleName"], "description": "原生 Runtime 可见层配置、转场安全值和文本排版模块。"},
         {"name": runtime_files["runtimeCharacterMotionModuleName"], "description": "原生 Runtime 角色走位、缩放、透明度、翻转和缓动插值模块。"},
+        {"name": runtime_files["runtimeStageImagesModuleName"], "description": "原生 Runtime 道具、Cut-in、前景装饰和氛围叠图模块。"},
         {"name": runtime_files["runtimeTextEffectsModuleName"], "description": "原生 Runtime 打字机和文本效果模块。"},
         {"name": runtime_files["runtimeStorageModuleName"], "description": "原生 Runtime 存档、自动恢复和崩溃日志模块。"},
         {"name": runtime_files["runtimeVariablesModuleName"], "description": "原生 Runtime 变量和条件判断模块。"},
@@ -10066,6 +10075,9 @@ def export_native_runtime_build() -> dict:
         "runtimeCharacterMotionModuleName": runtime_files["runtimeCharacterMotionModuleName"],
         "runtimeCharacterMotionModulePath": runtime_files["runtimeCharacterMotionModulePath"],
         "runtimeCharacterMotionModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimeCharacterMotionModuleName']}",
+        "runtimeStageImagesModuleName": runtime_files["runtimeStageImagesModuleName"],
+        "runtimeStageImagesModulePath": runtime_files["runtimeStageImagesModulePath"],
+        "runtimeStageImagesModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimeStageImagesModuleName']}",
         "runtimeTextEffectsModuleName": runtime_files["runtimeTextEffectsModuleName"],
         "runtimeTextEffectsModulePath": runtime_files["runtimeTextEffectsModulePath"],
         "runtimeTextEffectsModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimeTextEffectsModuleName']}",
@@ -10258,6 +10270,7 @@ def export_web_build() -> dict:
             "playerRuntimeData": "runtime_data.js",
             "playerRuntimeStorage": "runtime_storage.js",
             "playerRuntimeCharacterMotion": "runtime_character_motion.js",
+            "playerRuntimeStageImages": "runtime_stage_images.js",
             "playerRuntimeVisualConstants": "runtime_visual_constants.js",
             "playerRuntimeConditions": "runtime_conditions.js",
             "playerRuntimeControls": "runtime_controls.js",
@@ -11386,6 +11399,7 @@ def export_windows_nwjs_build() -> dict:
             "appRuntimeData": "app/runtime_data.js",
             "appRuntimeStorage": "app/runtime_storage.js",
             "appRuntimeCharacterMotion": "app/runtime_character_motion.js",
+            "appRuntimeStageImages": "app/runtime_stage_images.js",
             "appRuntimeVisualConstants": "app/runtime_visual_constants.js",
             "appRuntimeConditions": "app/runtime_conditions.js",
             "appRuntimeControls": "app/runtime_controls.js",
@@ -11848,6 +11862,7 @@ def export_macos_nwjs_build() -> dict:
             "appRuntimeData": "app/runtime_data.js",
             "appRuntimeStorage": "app/runtime_storage.js",
             "appRuntimeCharacterMotion": "app/runtime_character_motion.js",
+            "appRuntimeStageImages": "app/runtime_stage_images.js",
             "appRuntimeVisualConstants": "app/runtime_visual_constants.js",
             "appRuntimeConditions": "app/runtime_conditions.js",
             "appRuntimeControls": "app/runtime_controls.js",
@@ -12317,6 +12332,7 @@ def export_linux_nwjs_build() -> dict:
             "appRuntimeData": "app/runtime_data.js",
             "appRuntimeStorage": "app/runtime_storage.js",
             "appRuntimeCharacterMotion": "app/runtime_character_motion.js",
+            "appRuntimeStageImages": "app/runtime_stage_images.js",
             "appRuntimeVisualConstants": "app/runtime_visual_constants.js",
             "appRuntimeConditions": "app/runtime_conditions.js",
             "appRuntimeControls": "app/runtime_controls.js",

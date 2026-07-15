@@ -55,6 +55,7 @@ PYTHON_SYNTAX_FILES = [
     "native_runtime/runtime_player_settings.py",
     "native_runtime/runtime_player_view.py",
     "native_runtime/runtime_character_motion.py",
+    "native_runtime/runtime_stage_images.py",
     "native_runtime/runtime_text_effects.py",
     "native_runtime/runtime_storage.py",
     "native_runtime/runtime_variables.py",
@@ -181,6 +182,7 @@ def build_node_check_steps() -> list[VerifyStep]:
             "export_player_template/runtime_preload.js",
             "export_player_template/runtime_scene_prefetch.js",
             "export_player_template/runtime_character_motion.js",
+            "export_player_template/runtime_stage_images.js",
             "export_player_template/runtime_text_effects.js",
         ]
     )
@@ -219,6 +221,8 @@ def build_release_tooling_steps(python_executable: str) -> list[VerifyStep]:
         build_unittest_step("Native runtime player view helpers", "test_native_runtime_player_view.py", "release-tests", python_executable),
         build_unittest_step("Native character motion helpers", "test_native_runtime_character_motion.py", "release-tests", python_executable),
         build_unittest_step("Character motion cross-runtime contract", "test_character_motion_contract.py", "release-tests", python_executable),
+        build_unittest_step("Native stage image helpers", "test_native_runtime_stage_images.py", "release-tests", python_executable),
+        build_unittest_step("Stage image cross-runtime contract", "test_stage_image_contract.py", "release-tests", python_executable),
         build_unittest_step("Editor asset usage helpers", "test_editor_asset_usage.py", "release-tests", python_executable),
         build_unittest_step("Maintainability tooling", "test_maintainability_check_tool.py", "release-tests", python_executable),
         VerifyStep(

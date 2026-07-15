@@ -42,6 +42,66 @@ def load_frontend_payload(script_body: str) -> dict:
 
 
 class RenpyExportContractTests(unittest.TestCase):
+    def test_stage_images_export_as_native_renpy_layers_on_both_exporters(self) -> None:
+        blocks = [
+            {
+                "type": "stage_image",
+                "action": "show",
+                "layerId": "letter",
+                "assetId": "letter_png",
+                "plane": "front",
+                "position": "center",
+                "transform": {"offsetX": -4, "offsetY": 8, "width": 58, "opacity": 90, "rotation": 3, "layer": 2},
+                "durationMs": 700,
+                "easing": "ease_out",
+            },
+            {
+                "type": "stage_image",
+                "action": "update",
+                "layerId": "letter",
+                "plane": "front",
+                "position": "right",
+                "transform": {"width": 44, "opacity": 76, "layer": 1, "flipX": True},
+                "durationMs": 900,
+                "easing": "ease_in_out",
+            },
+            {"type": "stage_image", "action": "hide", "layerId": "letter", "durationMs": 300},
+        ]
+        frontend = load_frontend_payload(
+            f"""
+            const warnings = [];
+            const renderContext = {{
+              warnings,
+              sceneId: "scene_open",
+              assetMap: new Map([["letter_png", {{ id: "letter_png", type: "cg", path: "assets/letter.png" }}]]),
+              stageImageAssets: new Map(),
+              projectResolution: {{ width: 1920, height: 1080 }},
+            }};
+            const lines = {json.dumps(blocks)}.flatMap((block, blockIndex) => tools.renderBlock(block, {{ ...renderContext, blockIndex }}));
+            process.stdout.write(JSON.stringify({{ lines, warnings }}));
+            """
+        )
+
+        backend_warnings: list[dict] = []
+        backend_context = {
+            "warnings": backend_warnings,
+            "sceneId": "scene_open",
+            "assetMap": {"letter_png": {"id": "letter_png", "type": "cg", "path": "assets/letter.png"}},
+            "stageImageAssets": {},
+            "projectResolution": {"width": 1920, "height": 1080},
+        }
+        backend_lines: list[str] = []
+        for block_index, block in enumerate(blocks):
+            backend_lines.extend(renpy_export.render_stage_image_block(block, {**backend_context, "blockIndex": block_index}))
+
+        self.assertEqual(frontend["lines"], backend_lines)
+        self.assertIn("show letter_png as canvasia_stage_image_letter at Transform", backend_lines[0])
+        self.assertIn("zorder 42 with Dissolve(0.7)", backend_lines[0])
+        self.assertIn("with MoveTransition(0.9, time_warp=_warper.ease)", backend_lines[1])
+        self.assertEqual(backend_lines[2], "    hide canvasia_stage_image_letter with Dissolve(0.3)")
+        self.assertEqual(frontend["warnings"], [])
+        self.assertEqual(backend_warnings, [])
+
     def test_frontend_and_backend_export_contracts_stay_in_sync(self) -> None:
         frontend = load_frontend_payload(
             """

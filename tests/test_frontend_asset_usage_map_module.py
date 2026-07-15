@@ -67,6 +67,7 @@ class FrontendAssetUsageMapModuleTests(unittest.TestCase):
                         {{ id: "music", type: "music_play", assetId: "bgm_theme" }},
                         {{ id: "line", type: "dialogue", speakerId: "char_a", expressionId: "smile", text: "你好", voiceAssetId: "voice_001" }},
                         {{ id: "particle", type: "particle_effect", assetId: "ui_snowflake" }},
+                        {{ id: "prop", type: "stage_image", action: "show", layerId: "letter", assetId: "prop_letter" }},
                       ],
                     }},
                   ],
@@ -87,6 +88,7 @@ class FrontendAssetUsageMapModuleTests(unittest.TestCase):
               voice: usage.get("voice_001"),
               bgm: usage.get("bgm_theme"),
               particle: usage.get("ui_snowflake"),
+              stageImage: usage.get("prop_letter"),
               countVoice: tools.getAssetUsageCount("voice_001", {{ assetUsage: usage }}),
               missingCount: tools.getAssetUsageCount("missing_asset", {{ assetUsage: usage }}),
             }};
@@ -119,6 +121,7 @@ class FrontendAssetUsageMapModuleTests(unittest.TestCase):
         self.assertEqual(payload["voice"][0]["sceneId"], "scene_start")
         self.assertIn("播放音乐", payload["bgm"][0]["label"])
         self.assertIn("粒子特效", payload["particle"][0]["label"])
+        self.assertIn("舞台贴图", payload["stageImage"][0]["label"])
         self.assertEqual(payload["countVoice"], 1)
         self.assertEqual(payload["missingCount"], 0)
 

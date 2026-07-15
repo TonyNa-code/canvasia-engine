@@ -12,6 +12,34 @@ MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "stage_direction_sheet
 
 
 class FrontendStageDirectionSheetModuleTests(unittest.TestCase):
+    def test_stage_image_layers_are_tracked_and_invalid_actions_are_reported(self) -> None:
+        script = textwrap.dedent(
+            f"""
+            const fs = require("fs");
+            const vm = require("vm");
+            const context = {{ window: {{}} }};
+            context.globalThis = context;
+            vm.createContext(context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
+            const sheet = context.window.CanvasiaEditorStageDirectionSheet.buildStageDirectionSheet({{
+              assetList: [{{ id: "letter", type: "cg", name: "信件", fileExists: true }}],
+              scenes: [{{ id: "scene", name: "Scene", blocks: [
+                {{ id: "show", type: "stage_image", action: "show", layerId: "letter", assetId: "letter" }},
+                {{ id: "move", type: "stage_image", action: "update", layerId: "letter", position: "right" }},
+                {{ id: "hide", type: "stage_image", action: "hide", layerId: "letter" }},
+                {{ id: "bad_hide", type: "stage_image", action: "hide", layerId: "unknown" }},
+              ] }}],
+            }});
+            process.stdout.write(JSON.stringify(sheet));
+            """
+        )
+        result = subprocess.run(["node", "-e", script], cwd=ROOT_DIR, capture_output=True, text=True, check=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        sheet = json.loads(result.stdout)
+        self.assertEqual(sheet["summary"]["stageImageCount"], 4)
+        self.assertEqual([event["typeLabel"] for event in sheet["events"][:3]], ["显示贴图", "调整贴图", "隐藏贴图"])
+        self.assertIn("stage_image_hide_missing_layer", {issue["code"] for issue in sheet["issues"]})
+
     def test_character_move_updates_stage_composition_and_reports_missing_entry(self) -> None:
         script = textwrap.dedent(
             f"""

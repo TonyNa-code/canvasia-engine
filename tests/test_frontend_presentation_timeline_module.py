@@ -12,6 +12,34 @@ MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "presentation_timeline
 
 
 class FrontendPresentationTimelineModuleTests(unittest.TestCase):
+    def test_stage_image_beats_validate_assets_and_duration(self) -> None:
+        script = textwrap.dedent(
+            f"""
+            const fs = require("fs");
+            const vm = require("vm");
+            const context = {{ window: {{}} }};
+            context.globalThis = context;
+            vm.createContext(context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
+            const timeline = context.window.CanvasiaEditorPresentationTimeline.buildPresentationTimeline({{
+              assetList: [{{ id: "letter", type: "cg", name: "信件", fileExists: true }}],
+              scenes: [{{ id: "scene", name: "Scene", blocks: [
+                {{ id: "show", type: "stage_image", action: "show", layerId: "letter", assetId: "letter", durationMs: 740 }},
+                {{ id: "bad", type: "stage_image", action: "show", layerId: "missing", transform: {{ opacity: 5 }} }},
+              ] }}],
+            }});
+            process.stdout.write(JSON.stringify(timeline));
+            """
+        )
+        result = subprocess.run(["node", "-e", script], cwd=ROOT_DIR, capture_output=True, text=True, check=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        timeline = json.loads(result.stdout)
+        self.assertEqual(timeline["summary"]["eventCount"], 2)
+        self.assertEqual(timeline["sceneReports"][0]["events"][0]["durationMs"], 740)
+        issue_codes = {issue["code"] for issue in timeline["issues"]}
+        self.assertIn("stage_image_missing_asset", issue_codes)
+        self.assertIn("stage_image_opacity_too_low", issue_codes)
+
     def test_presentation_timeline_helpers_export_markdown_and_csv(self) -> None:
         script = textwrap.dedent(
             f"""

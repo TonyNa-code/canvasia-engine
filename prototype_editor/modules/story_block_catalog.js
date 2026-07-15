@@ -19,6 +19,16 @@
         tags: ["timelineVisualBeat", "storyContent"],
       },
       {
+        type: "stage_image",
+        label: "舞台贴图",
+        compactLabel: "道具 / 前景",
+        group: "画面",
+        webStatus: "full",
+        nativeStatus: "full",
+        note: "支持道具、前景、Cut-in 和光影叠层的多图层显示、调整、隐藏与转场。",
+        tags: ["timelineVisualBeat", "storyContent", "runtimeVisualEffect", "effect"],
+      },
+      {
         type: "character_show",
         label: "显示角色",
         compactLabel: "角色登场",

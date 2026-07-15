@@ -45,6 +45,18 @@ DEFAULT_CHARACTER_STAGE = {
     "layer": 0,
     "flipX": False,
 }
+DEFAULT_STAGE_IMAGE_TRANSFORM = {
+    "offsetX": 0,
+    "offsetY": 0,
+    "width": 34,
+    "opacity": 100,
+    "rotation": 0,
+    "layer": 0,
+    "flipX": False,
+}
+STAGE_IMAGE_PLANES = {"back", "front"}
+STAGE_IMAGE_ACTIONS = {"show", "update", "hide"}
+STAGE_IMAGE_EASINGS = {"linear", "ease_in", "ease_out", "ease_in_out", "spring"}
 CHARACTER_MOVE_TRANSFORMS = {
     "slide_left": "offscreenleft",
     "slide_right": "offscreenright",
@@ -155,6 +167,9 @@ def get_renpy_export_contract() -> dict:
         "conditionOperators": list(CONDITION_OPERATOR_ORDER),
         "characterMoveTransforms": dict(CHARACTER_MOVE_TRANSFORMS),
         "characterPopTransitions": dict(CHARACTER_POP_TRANSITIONS),
+        "stageImagePlanes": sorted(STAGE_IMAGE_PLANES),
+        "stageImageActions": sorted(STAGE_IMAGE_ACTIONS),
+        "stageImageEasings": sorted(STAGE_IMAGE_EASINGS),
         "textSpeedCps": dict(TEXT_SPEED_CPS),
         "runtimeDefaults": sanitize_project_runtime_settings({}),
         "effectDurationSeconds": dict(EFFECT_DURATION_SECONDS),
@@ -467,6 +482,107 @@ def get_safe_character_stage(source: Any) -> dict:
 def has_custom_character_stage(source: Any) -> bool:
     stage = get_safe_character_stage(source)
     return any(stage[key] != value for key, value in DEFAULT_CHARACTER_STAGE.items())
+
+
+def get_safe_stage_image_transform(source: Any) -> dict:
+    raw = source if isinstance(source, dict) else {}
+    return {
+        "offsetX": round(get_safe_stage_number(raw, "offsetX", 0, -80, 80)),
+        "offsetY": round(get_safe_stage_number(raw, "offsetY", 0, -70, 70)),
+        "width": round(get_safe_stage_number(raw, "width", 34, 4, 180)),
+        "opacity": round(get_safe_stage_number(raw, "opacity", 100, 0, 100)),
+        "rotation": round(get_safe_stage_number(raw, "rotation", 0, -180, 180)),
+        "layer": round(get_safe_stage_number(raw, "layer", 0, -20, 20)),
+        "flipX": get_safe_stage_bool(raw, "flipX"),
+    }
+
+
+def get_safe_stage_image_action(value: Any) -> str:
+    action = clean_text(value, "show")
+    return action if action in STAGE_IMAGE_ACTIONS else "show"
+
+
+def get_safe_stage_image_plane(value: Any) -> str:
+    plane = clean_text(value, "front")
+    return plane if plane in STAGE_IMAGE_PLANES else "front"
+
+
+def get_stage_image_tag(layer_id: Any) -> str:
+    return normalize_identifier(f"canvasia_stage_image_{clean_text(layer_id, 'layer_main')}", "canvasia_stage_image")
+
+
+def get_stage_image_transition(block: dict, context: dict, is_update: bool) -> str:
+    try:
+        duration_ms = float(block.get("durationMs", 520))
+    except (TypeError, ValueError):
+        duration_ms = 520
+    duration = clamp_number(duration_ms, 0, 10000) / 1000
+    if duration <= 0:
+        return ""
+    if not is_update:
+        return f"Dissolve({format_renpy_seconds(duration)})"
+    easing = clean_text(block.get("easing"), "ease_out")
+    warp = {
+        "linear": "_warper.linear",
+        "ease_in": "_warper.easein",
+        "ease_out": "_warper.easeout",
+        "ease_in_out": "_warper.ease",
+        "spring": "_warper.easeout",
+    }.get(easing, "_warper.easeout")
+    if easing == "spring":
+        add_warning(
+            context["warnings"],
+            "renpy_stage_image_spring_fallback",
+            "舞台贴图的轻微弹性在 Ren'Py 中已按自然收住导出。",
+            sceneId=context.get("sceneId"),
+            blockIndex=context.get("blockIndex"),
+        )
+    return f"MoveTransition({format_renpy_seconds(duration)}, time_warp={warp})"
+
+
+def render_stage_image_block(block: dict, context: dict) -> list[str]:
+    action = get_safe_stage_image_action(block.get("action"))
+    layer_id = clean_text(block.get("layerId"), "layer_main")
+    tag = get_stage_image_tag(layer_id)
+    stage_images = context.setdefault("stageImageAssets", {})
+    previous_asset_id = clean_text(stage_images.get(layer_id))
+    if action == "hide":
+        stage_images.pop(layer_id, None)
+        transition = get_stage_image_transition(block, context, False)
+        return [f"    hide {tag}{f' with {transition}' if transition else ''}"]
+
+    asset_id = clean_text(block.get("assetId"), previous_asset_id)
+    if not asset_id:
+        add_warning(
+            context["warnings"],
+            "renpy_stage_image_missing_asset",
+            f"舞台贴图图层 {layer_id} 没有可导出的素材。",
+            sceneId=context.get("sceneId"),
+            blockIndex=context.get("blockIndex"),
+        )
+        return [f"    # Canvasia review stage_image missing asset: {quote_renpy(layer_id)}"]
+
+    stage_images[layer_id] = asset_id
+    transform = get_safe_stage_image_transform(block.get("transform"))
+    position = get_safe_position(block.get("position"))
+    resolution = context.get("projectResolution") or DEFAULT_PROJECT_RESOLUTION
+    xalign = clamp_number(POSITION_XALIGN[position] + transform["offsetX"] / 100, -0.3, 1.3)
+    yalign = clamp_number(0.5 + transform["offsetY"] / 100, -0.3, 1.3)
+    width = round(float(resolution.get("width") or DEFAULT_PROJECT_RESOLUTION["width"]) * transform["width"] / 100)
+    transform_parts = [
+        f"xalign={format_renpy_float(xalign)}",
+        f"yalign={format_renpy_float(yalign)}",
+        f"xsize={max(1, width)}",
+        f"alpha={format_renpy_float(transform['opacity'] / 100, 2)}",
+        f"rotate={format_renpy_float(transform['rotation'], 1)}",
+    ]
+    if transform["flipX"]:
+        transform_parts.append("xzoom=-1.0")
+    zorder = (10 if get_safe_stage_image_plane(block.get("plane")) == "back" else 40) + transform["layer"]
+    transition = get_stage_image_transition(block, context, bool(previous_asset_id))
+    return [
+        f"    show {normalize_identifier(asset_id, 'asset')} as {tag} at Transform({', '.join(transform_parts)}) zorder {zorder}{f' with {transition}' if transition else ''}"
+    ]
 
 
 def format_renpy_float(value: float, digits: int = 3) -> str:
@@ -998,7 +1114,7 @@ def build_variable_definitions(variable_map: dict[str, dict]) -> list[str]:
 def build_asset_image_definitions(asset_map: dict[str, dict]) -> list[str]:
     lines: list[str] = []
     for asset_id, asset in sorted(asset_map.items()):
-        if clean_text(asset.get("type")).lower() not in {"background", "cg", "image"}:
+        if clean_text(asset.get("type")).lower() not in {"background", "cg", "image", "sprite", "ui"}:
             continue
         asset_path = get_asset_path(asset_map, asset_id)
         if not asset_path:
@@ -1346,6 +1462,8 @@ def render_story_block(block: dict, context: dict) -> list[str]:
 
     if block_type == "background":
         return render_background_block(block, context)
+    if block_type == "stage_image":
+        return render_stage_image_block(block, context)
     if block_type == "character_show":
         return render_character_show_block(block, context)
     if block_type == "character_move":
@@ -1453,6 +1571,7 @@ def build_renpy_draft_export(bundle: dict, assets_doc: dict | None = None) -> di
         lines.append(f"label {record['sceneLabel']}:")
         blocks = as_list(scene.get("blocks"))
         camera_state = get_default_camera_state()
+        stage_image_assets: dict[str, str] = {}
         music_scope_stop_plan = build_music_scope_stop_plan(blocks, {"warnings": warnings, "sceneId": scene_id})
         if not blocks:
             add_warning(warnings, "renpy_empty_scene", "空场景已导出 pass。", sceneId=scene_id)
@@ -1469,6 +1588,7 @@ def build_renpy_draft_export(bundle: dict, assets_doc: dict | None = None) -> di
                 "sceneId": scene_id,
                 "blockIndex": block_index,
                 "cameraState": camera_state,
+                "stageImageAssets": stage_image_assets,
                 "projectResolution": project_resolution,
                 "runtimeSettings": runtime_settings,
             }

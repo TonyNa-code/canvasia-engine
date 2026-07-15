@@ -9,6 +9,7 @@
 
   const FALLBACK_BLOCK_LABELS = Object.freeze({
     background: "背景",
+    stage_image: "道具 / 前景",
     dialogue: "台词",
     narration: "旁白",
     character_show: "角色登场",
@@ -368,7 +369,7 @@
   }
 
   function isStoryContentBlock(block = {}) {
-    return ["background", "dialogue", "narration", "character_show", "character_move", "choice", "video_play", "credits_roll", "wait"].includes(
+    return ["background", "stage_image", "dialogue", "narration", "character_show", "character_move", "choice", "video_play", "credits_roll", "wait"].includes(
       block.type
     );
   }
@@ -440,6 +441,7 @@
     const compositionRows = [];
     const sceneIssues = [];
     const visibleCharacters = new Map();
+    const visibleStageImages = new Map();
     let hasBackground = false;
     let hasStoryContent = false;
     let firstStoryBlockHadBackground = true;
@@ -510,6 +512,45 @@
           expressionName: "",
           positionLabel: "",
           assetStatusLabel: asset ? cleanText(asset.name, assetId) : assetId || "未选择背景",
+          cue: summarizeBlock(block, blockIndex),
+          issues,
+          ...baseContext,
+        });
+        return;
+      }
+
+      if (block.type === "stage_image") {
+        const action = ["show", "update", "hide"].includes(cleanText(block.action)) ? cleanText(block.action) : "show";
+        const layerId = cleanText(block.layerId, "layer_main");
+        const previous = visibleStageImages.get(layerId);
+        const assetId = cleanText(block.assetId, previous?.assetId ?? "");
+        const asset = context.assetMap.get(assetId);
+        const issues = [];
+        if (action === "show" && !assetId) {
+          pushIssue(issues, "blocker", "stage_image_missing_asset", "舞台贴图未选择素材", "显示新贴图时必须绑定图片素材。", baseContext);
+        } else if (action === "update" && !previous && !assetId) {
+          pushIssue(issues, "blocker", "stage_image_update_missing_layer", "要调整的舞台贴图不存在", `图层 ${layerId} 尚未显示，也没有提供替代素材。`, baseContext);
+        } else if (action !== "hide" && assetId && !asset) {
+          pushIssue(issues, "blocker", "stage_image_unknown_asset", "舞台贴图素材不存在", `素材 ${assetId} 不在当前素材库中。`, baseContext);
+        } else if (action !== "hide" && asset?.fileExists === false) {
+          pushIssue(issues, "blocker", "stage_image_file_missing", "舞台贴图文件缺失", "素材条目存在，但真实图片文件暂时不可用。", baseContext);
+        }
+        if (action === "hide") {
+          if (!previous) {
+            pushIssue(issues, "tip", "stage_image_hide_missing_layer", "隐藏了尚未显示的贴图", `图层 ${layerId} 当前不在舞台上，请确认卡片顺序。`, baseContext);
+          }
+          visibleStageImages.delete(layerId);
+        } else if (assetId) {
+          visibleStageImages.set(layerId, { assetId, layerId });
+        }
+        sceneIssues.push(...issues);
+        addStageEvent(events, {
+          type: "stage_image",
+          typeLabel: action === "hide" ? "隐藏贴图" : action === "update" ? "调整贴图" : "显示贴图",
+          characterName: "",
+          expressionName: "",
+          positionLabel: getPositionLabel(block.position),
+          assetStatusLabel: action === "hide" ? layerId : asset ? cleanText(asset.name, assetId) : assetId || "未选择素材",
           cue: summarizeBlock(block, blockIndex),
           issues,
           ...baseContext,
@@ -904,6 +945,7 @@
       characterShowCount: events.filter((event) => event.type === "character_show").length,
       characterMoveCount: events.filter((event) => event.type === "character_move").length,
       characterHideCount: events.filter((event) => event.type === "character_hide").length,
+      stageImageCount: events.filter((event) => event.type === "stage_image").length,
       missingBackgroundSceneCount: sceneReports.filter((scene) => scene.issues.some((issue) => issue.code === "scene_without_background")).length,
       speakerAutoPlaceCount: issues.filter((issue) => issue.code === "dialogue_speaker_not_visible").length,
       missingVisualCount: issues.filter((issue) => issue.code.includes("visual") || issue.code.includes("expression")).length,

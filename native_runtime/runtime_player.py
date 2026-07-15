@@ -399,6 +399,27 @@ except ImportError:  # pragma: no cover - exported native packages import from t
         is_native_character_motion_complete,
     )
 
+try:
+    from .runtime_stage_images import (
+        apply_native_stage_image_block,
+        clone_stage_image_state,
+        get_native_stage_image_render_pose,
+        get_safe_stage_image_plane,
+        get_safe_stage_image_transform,
+        is_native_stage_image_motion_complete,
+        normalize_stage_image_state,
+    )
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_stage_images import (
+        apply_native_stage_image_block,
+        clone_stage_image_state,
+        get_native_stage_image_render_pose,
+        get_safe_stage_image_plane,
+        get_safe_stage_image_transform,
+        is_native_stage_image_motion_complete,
+        normalize_stage_image_state,
+    )
+
 
 ASSET_TYPE_IMAGE = {"background", "sprite", "cg", "ui"}
 ASSET_TYPE_FONT = {"font"}
@@ -7870,6 +7891,9 @@ class NativeRuntimePlayer:
         self.stage_background_asset_id: str | None = None
         self.visible_characters: dict[str, dict] = {}
         self.character_motions: dict[str, dict] = {}
+        self.visible_stage_images: dict[str, dict] = {}
+        self.stage_image_motions: dict[str, dict] = {}
+        self.leaving_stage_images: dict[str, dict] = {}
         self.background_transition: dict | None = None
         self.leaving_characters: dict[str, dict] = {}
         self.current_scene_id = self.project.get("entrySceneId") or self.scene_order[0]
@@ -9548,6 +9572,9 @@ class NativeRuntimePlayer:
         self.background_transition = None
         self.leaving_characters = {}
         self.character_motions = {}
+        self.visible_stage_images = {}
+        self.stage_image_motions = {}
+        self.leaving_stage_images = {}
         self.status_message = f"标题页：选择开始、续玩、读档或设置。 · {self.get_runtime_preload_status_line()}"
 
     def start_story_from_title(self) -> None:
@@ -9568,6 +9595,9 @@ class NativeRuntimePlayer:
         self.stage_background_asset_id = None
         self.visible_characters = {}
         self.character_motions = {}
+        self.visible_stage_images = {}
+        self.stage_image_motions = {}
+        self.leaving_stage_images = {}
         self.background_transition = None
         self.leaving_characters = {}
         self.current_bgm_asset_id = None
@@ -10026,6 +10056,14 @@ class NativeRuntimePlayer:
             snapshot_characters[character_id] = safe_state
         return snapshot_characters
 
+    def get_snapshot_visible_stage_images(self, source: dict | None = None) -> dict:
+        images = source if isinstance(source, dict) else self.visible_stage_images
+        return {
+            str(layer_id): clone_stage_image_state(image_state)
+            for layer_id, image_state in images.items()
+            if isinstance(image_state, dict)
+        }
+
     def build_save_snapshot(self, kind: str) -> dict:
         return {
             "kind": kind,
@@ -10042,6 +10080,7 @@ class NativeRuntimePlayer:
                 "interactionEnabled": bool(self.scene3d_preview_interaction_enabled),
             },
             "visibleCharacters": self.get_snapshot_visible_characters(),
+            "visibleStageImages": self.get_snapshot_visible_stage_images(),
             "currentBgmAssetId": self.current_bgm_asset_id,
             "currentBgmVolume": self.current_bgm_volume_percent,
             "currentBgmScope": dict(self.current_bgm_scope) if isinstance(self.current_bgm_scope, dict) else None,
@@ -10117,6 +10156,9 @@ class NativeRuntimePlayer:
         self.apply_scene3d_preview_config(snapshot.get("scene3dPreview") if isinstance(snapshot.get("scene3dPreview"), dict) else None)
         self.visible_characters = self.get_snapshot_visible_characters(snapshot.get("visibleCharacters") or {})
         self.character_motions = {}
+        self.visible_stage_images = self.get_snapshot_visible_stage_images(snapshot.get("visibleStageImages") or {})
+        self.stage_image_motions = {}
+        self.leaving_stage_images = {}
         self.background_transition = None
         self.leaving_characters = {}
         self.current_bgm_asset_id = None
@@ -10278,6 +10320,11 @@ class NativeRuntimePlayer:
         for character_id in list(self.character_motions):
             if is_native_character_motion_complete(self.character_motions.get(character_id), now_ms):
                 self.character_motions.pop(character_id, None)
+
+        for layer_id in list(self.stage_image_motions):
+            if is_native_stage_image_motion_complete(self.stage_image_motions.get(layer_id), now_ms):
+                self.stage_image_motions.pop(layer_id, None)
+                self.leaving_stage_images.pop(layer_id, None)
 
     def set_particle_effect(self, effect: dict | None) -> None:
         config = normalize_native_particle_effect_config(effect)
@@ -10480,6 +10527,27 @@ class NativeRuntimePlayer:
                     self.unlock_archive_entry("cgUnlocked", self.stage_background_asset_id)
                 elif background_asset.get("type") in {"background", "scene3d"}:
                     self.unlock_archive_entry("locationUnlocked", self.stage_background_asset_id)
+                self.current_block_index += 1
+                continue
+
+            if block_type == "stage_image":
+                result = apply_native_stage_image_block(
+                    self.visible_stage_images,
+                    block,
+                    self.get_runtime_ticks_ms(),
+                )
+                self.visible_stage_images = result["visibleImages"]
+                layer_id = str((result.get("motion") or {}).get("layerId") or "").strip()
+                if layer_id:
+                    motion = result.get("motion")
+                    if motion and int(motion.get("durationMs") or 0) > 0:
+                        self.stage_image_motions[layer_id] = motion
+                    else:
+                        self.stage_image_motions.pop(layer_id, None)
+                    if result.get("leavingState"):
+                        self.leaving_stage_images[layer_id] = result["leavingState"]
+                    else:
+                        self.leaving_stage_images.pop(layer_id, None)
                 self.current_block_index += 1
                 continue
 
@@ -11667,7 +11735,9 @@ class NativeRuntimePlayer:
         self.screen.fill(self.get_active_palette()["bgBottom"])
         stage_surface = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
         self.render_background(stage_surface)
+        self.render_stage_images(stage_surface, "back")
         self.render_characters(stage_surface)
+        self.render_stage_images(stage_surface, "front")
         self.render_particle_effect(stage_surface)
         self.render_stage_surface(stage_surface)
         self.render_stage_effect_overlays()
@@ -11841,6 +11911,54 @@ class NativeRuntimePlayer:
             leaving_state["__leaving"] = True
             items.append((character_id, leaving_state))
         return items
+
+    def get_renderable_stage_image_items(self, plane: str) -> list[tuple[str, dict]]:
+        safe_plane = get_safe_stage_image_plane(plane)
+        now_ms = self.get_runtime_ticks_ms()
+        items: list[tuple[str, dict]] = []
+        for layer_id, state in self.visible_stage_images.items():
+            if get_safe_stage_image_plane(state.get("plane")) != safe_plane:
+                continue
+            items.append((layer_id, get_native_stage_image_render_pose(state, self.stage_image_motions.get(layer_id), now_ms)))
+        for layer_id, state in self.leaving_stage_images.items():
+            if get_safe_stage_image_plane(state.get("plane")) != safe_plane:
+                continue
+            items.append((layer_id, get_native_stage_image_render_pose(state, self.stage_image_motions.get(layer_id), now_ms)))
+        return sorted(items, key=lambda item: (get_safe_stage_image_transform(item[1].get("transform"))["layer"], item[0]))
+
+    def render_stage_images(self, target, plane: str) -> None:
+        palette = self.get_active_palette()
+        for layer_id, state in self.get_renderable_stage_image_items(plane):
+            transform = get_safe_stage_image_transform(state.get("transform"))
+            image = self._load_image(state.get("assetId"))
+            position_ratio = float(state.get("positionRatio") or 0.5)
+            center_x = int(self.width * position_ratio + self.width * transform["offsetX"] / 100)
+            center_y = int(self.height * 0.5 + self.height * transform["offsetY"] / 100)
+            target_width = max(1, int(self.width * transform["width"] / 100))
+            if image:
+                source_width, source_height = image.get_size()
+                target_height = max(1, int(source_height * target_width / max(source_width, 1)))
+                scaled = self.pygame.transform.smoothscale(image, (target_width, target_height))
+                if transform["flipX"]:
+                    scaled = self.pygame.transform.flip(scaled, True, False)
+                if transform["rotation"]:
+                    scaled = self.pygame.transform.rotate(scaled, -float(transform["rotation"]))
+                if transform["opacity"] < 100:
+                    scaled = scaled.copy()
+                    scaled.set_alpha(int(255 * transform["opacity"] / 100))
+                target.blit(scaled, scaled.get_rect(center=(center_x, center_y)))
+                continue
+
+            placeholder_width = min(target_width, max(120, int(self.width * 0.34)))
+            placeholder_height = max(72, int(placeholder_width * 0.38))
+            placeholder = self.pygame.Surface((placeholder_width, placeholder_height), self.pygame.SRCALPHA)
+            alpha = int(180 * transform["opacity"] / 100)
+            self.pygame.draw.rect(placeholder, (*palette["panel"], alpha), placeholder.get_rect(), border_radius=18)
+            self.pygame.draw.rect(placeholder, (*palette["panelBorder"], alpha), placeholder.get_rect(), 2, border_radius=18)
+            label = ellipsize_text(self.font_ui, str(layer_id or "舞台贴图"), placeholder_width - 24)
+            label_surface = self.font_ui.render(label, True, palette["muted"])
+            placeholder.blit(label_surface, label_surface.get_rect(center=placeholder.get_rect().center))
+            target.blit(placeholder, placeholder.get_rect(center=(center_x, center_y)))
 
     def render_characters(self, target=None) -> None:
         target = target or self.screen

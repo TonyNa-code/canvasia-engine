@@ -85,12 +85,13 @@ class FrontendStoryBlockActionsModuleTests(unittest.TestCase):
         self.assertIsNone(payload["missingConfig"])
         self.assertEqual(action_to_block["add-dialogue"], "dialogue")
         self.assertEqual(action_to_block["add-background"], "background")
+        self.assertEqual(action_to_block["add-stage-image"], "stage_image")
         self.assertEqual(action_to_block["add-music-play"], "music_play")
         self.assertEqual(action_to_block["add-camera-zoom"], "camera_zoom")
         self.assertEqual(action_to_block["add-variable-set"], "variable_set")
         self.assertEqual(action_to_block["add-variable-add"], "variable_add")
         self.assertEqual(action_to_block["add-condition"], "condition")
-        self.assertEqual(len(entries), 25)
+        self.assertEqual(len(entries), 26)
         self.assertEqual(
             payload["beginnerActions"],
             [
@@ -98,6 +99,7 @@ class FrontendStoryBlockActionsModuleTests(unittest.TestCase):
                 "add-narration",
                 "add-choice",
                 "add-background",
+                "add-stage-image",
                 "add-character-show",
                 "add-character-move",
                 "add-music-play",

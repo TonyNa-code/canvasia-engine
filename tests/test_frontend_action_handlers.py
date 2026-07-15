@@ -35,6 +35,7 @@ SCENE_CHECKLIST_FOCUS_PATH = EDITOR_DIR / "modules" / "scene_checklist_focus.js"
 TYPEWRITER_MODULE_PATH = EDITOR_DIR / "modules" / "typewriter.js"
 ASSET_IMPORT_RULES_PATH = EDITOR_DIR / "modules" / "asset_import_rules.js"
 API_ENDPOINTS_PATH = EDITOR_DIR / "modules" / "api_endpoints.js"
+EXPORT_REPORT_DESCRIPTIONS_PATH = EDITOR_DIR / "modules" / "export_report_descriptions.js"
 MODULE_PATHS = tuple(sorted((EDITOR_DIR / "modules").glob("*.js")))
 ACTION_ATTRIBUTE_PATHS = (INDEX_PATH, APP_PATH, *MODULE_PATHS)
 ACTION_CONFIG_PATHS = (APP_PATH, *MODULE_PATHS)
@@ -66,6 +67,9 @@ NON_CLICK_ACTION_VALUES = {
     "fade_out",
     "start",
     "stop",
+    "show",
+    "update",
+    "hide",
     "zoom_in",
 }
 
@@ -5833,25 +5837,28 @@ class FrontendActionHandlerTests(unittest.TestCase):
 
     def test_preview_export_surface_links_playable_package_reports(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
+        report_source = EXPORT_REPORT_DESCRIPTIONS_PATH.read_text(encoding="utf-8")
         report_panel = _extract_function_source(source, "renderLatestExportReportPanel")
-        report_links = _extract_function_source(source, "getLatestExportReportLinks")
+        report_module_panel = _extract_function_source(report_source, "renderLatestExportReportPanel")
+        report_links = _extract_function_source(report_source, "getLatestExportReportLinks")
         preview_summary = _extract_function_source(source, "renderProjectValidationSummary")
 
-        self.assertIn("PLAYABLE_EXPORT_RESULT_TARGETS", source)
-        self.assertIn("PLAYABLE_EXPORT_REPORT_LINKS", source)
+        self.assertIn("PLAYABLE_EXPORT_RESULT_TARGETS", report_source)
+        self.assertIn("PLAYABLE_EXPORT_REPORT_LINKS", report_source)
         self.assertIn("CanvasiaEditorExportReportDescriptions", source)
-        self.assertIn('"routePlaytestWorkbookReportPublicUrl"', source)
-        self.assertIn('"routePlaytestWorkbookCsvPublicUrl"', source)
-        self.assertIn('"route-playtest-workbook.md"', source)
-        self.assertIn("路线试玩工作簿", source)
-        self.assertIn("路线试玩 CSV", source)
+        self.assertIn('"routePlaytestWorkbookReportPublicUrl"', report_source)
+        self.assertIn('"routePlaytestWorkbookCsvPublicUrl"', report_source)
+        self.assertIn('"route-playtest-workbook.md"', report_source)
+        self.assertIn("路线试玩工作簿", report_source)
+        self.assertIn("路线试玩 CSV", report_source)
         self.assertIn("renderLatestExportReportPanel(exportResult)", preview_summary)
-        self.assertIn("getLatestExportReportLinks(exportResult)", report_panel)
+        self.assertIn("exportReportDescriptionTools.renderLatestExportReportPanel", report_panel)
+        self.assertIn("getLatestExportReportLinks(exportResult)", report_module_panel)
         self.assertIn("isPlayableExportResult(exportResult)", report_links)
         self.assertIn("describeExportReportFile", report_links)
-        self.assertIn("routePlaytestReadinessPercent", report_panel)
-        self.assertIn("routePlaytestBlockedCaseCount", report_panel)
-        self.assertIn("导出成功后，先打开这些报告", report_panel)
+        self.assertIn("routePlaytestReadinessPercent", report_module_panel)
+        self.assertIn("routePlaytestBlockedCaseCount", report_module_panel)
+        self.assertIn("导出成功后，先打开这些报告", report_module_panel)
 
     def test_project_runtime_settings_surface_performance_profile_budget(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")

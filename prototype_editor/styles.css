@@ -5412,7 +5412,7 @@ html[data-ui-theme="light"] .music-range-health.is-danger .issue-tag {
   inset: 0;
   overflow: hidden;
   pointer-events: none;
-  z-index: 1;
+  z-index: 4;
   transition:
     transform 280ms ease,
     filter 280ms ease,
@@ -5427,7 +5427,7 @@ html[data-ui-theme="light"] .music-range-health.is-danger .issue-tag {
   min-height: 100%;
   height: 100%;
   padding: 16px;
-  z-index: 4;
+  z-index: 5;
 }
 
 .stage-particle-item {
@@ -5662,6 +5662,98 @@ html[data-ui-theme="light"] .music-range-health.is-danger .issue-tag {
   position: absolute;
   inset: 58px 12px 102px;
   padding: 0 10px;
+  z-index: 2;
+}
+
+.stage-image-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.stage-image-layer-back {
+  z-index: 1;
+}
+
+.stage-image-layer-front {
+  z-index: 3;
+}
+
+.stage-image-card {
+  position: absolute;
+  left: calc(var(--stage-image-position-x, 50%) + var(--stage-image-offset-x, 0%));
+  top: calc(50% + var(--stage-image-offset-y, 0%));
+  width: var(--stage-image-width, 34%);
+  z-index: calc(20 + var(--stage-image-layer, 0));
+  opacity: var(--stage-image-opacity, 1);
+  transform: translate(-50%, -50%) rotate(var(--stage-image-rotation, 0deg)) scaleX(var(--stage-image-flip, 1));
+  transform-origin: center;
+  will-change: transform, opacity, left, top, width;
+}
+
+.stage-image-card img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 18px 26px rgba(1, 8, 20, 0.22));
+  user-select: none;
+}
+
+.stage-image-placeholder {
+  display: grid;
+  gap: 4px;
+  min-height: 72px;
+  padding: 16px;
+  place-content: center;
+  color: rgba(225, 240, 255, 0.82);
+  text-align: center;
+  border: 1px dashed rgba(139, 200, 255, 0.42);
+  border-radius: 16px;
+  background: rgba(12, 28, 48, 0.66);
+}
+
+.stage-image-placeholder span {
+  color: rgba(187, 210, 236, 0.68);
+  font-size: 0.76rem;
+}
+
+.stage-image-card.is-entering {
+  animation: stage-image-enter var(--stage-image-motion-ms, 520ms) var(--stage-image-motion-easing, ease-out) both;
+}
+
+.stage-image-card.is-moving {
+  animation: stage-image-move var(--stage-image-motion-ms, 520ms) var(--stage-image-motion-easing, ease-out) both;
+}
+
+.stage-image-card.is-leaving {
+  animation: stage-image-leave var(--stage-image-motion-ms, 520ms) var(--stage-image-motion-easing, ease-out) both;
+}
+
+@keyframes stage-image-enter {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -46%) rotate(var(--stage-image-rotation, 0deg)) scale(0.96) scaleX(var(--stage-image-flip, 1));
+  }
+}
+
+@keyframes stage-image-move {
+  from {
+    left: calc(var(--stage-image-from-position-x, 50%) + var(--stage-image-from-offset-x, 0%));
+    top: calc(50% + var(--stage-image-from-offset-y, 0%));
+    width: var(--stage-image-from-width, var(--stage-image-width, 34%));
+    opacity: var(--stage-image-from-opacity, 1);
+    transform: translate(-50%, -50%) rotate(var(--stage-image-from-rotation, 0deg)) scaleX(var(--stage-image-from-flip, 1));
+  }
+}
+
+@keyframes stage-image-leave {
+  to {
+    opacity: 0;
+    transform: translate(-50%, -54%) rotate(var(--stage-image-rotation, 0deg)) scale(0.96) scaleX(var(--stage-image-flip, 1));
+  }
 }
 
 .sprite-card {
@@ -11335,7 +11427,10 @@ html[data-ui-theme="light"] select {
   .sprite-card.is-entering,
   .sprite-card.is-leaving,
   .sprite-card.is-moving,
-  .sprite-card.is-entering .sprite-card-inner {
+  .sprite-card.is-entering .sprite-card-inner,
+  .stage-image-card.is-entering,
+  .stage-image-card.is-moving,
+  .stage-image-card.is-leaving {
     animation: none !important;
   }
 }

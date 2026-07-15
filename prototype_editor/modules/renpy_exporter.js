@@ -27,6 +27,18 @@
     layer: 0,
     flipX: false,
   });
+  const DEFAULT_STAGE_IMAGE_TRANSFORM = Object.freeze({
+    offsetX: 0,
+    offsetY: 0,
+    width: 34,
+    opacity: 100,
+    rotation: 0,
+    layer: 0,
+    flipX: false,
+  });
+  const STAGE_IMAGE_PLANES = Object.freeze(["back", "front"]);
+  const STAGE_IMAGE_ACTIONS = Object.freeze(["show", "update", "hide"]);
+  const STAGE_IMAGE_EASINGS = Object.freeze(["linear", "ease_in", "ease_out", "ease_in_out", "spring"]);
   const CHARACTER_MOVE_TRANSFORMS = Object.freeze({
     slide_left: "offscreenleft",
     slide_right: "offscreenright",
@@ -507,6 +519,91 @@
   function hasCustomCharacterStage(stageSource = {}) {
     const stage = getSafeCharacterStage(stageSource);
     return Object.entries(DEFAULT_CHARACTER_STAGE).some(([key, value]) => stage[key] !== value);
+  }
+
+  function getSafeStageImageTransform(source = {}) {
+    const raw = source && typeof source === "object" ? source : {};
+    return {
+      offsetX: Math.round(getSafeStageNumber(raw.offsetX, 0, -80, 80)),
+      offsetY: Math.round(getSafeStageNumber(raw.offsetY, 0, -70, 70)),
+      width: Math.round(getSafeStageNumber(raw.width, 34, 4, 180)),
+      opacity: Math.round(getSafeStageNumber(raw.opacity, 100, 0, 100)),
+      rotation: Math.round(getSafeStageNumber(raw.rotation, 0, -180, 180)),
+      layer: Math.round(getSafeStageNumber(raw.layer, 0, -20, 20)),
+      flipX: getSafeStageBoolean(raw.flipX, false),
+    };
+  }
+
+  function getSafeStageImageAction(value) {
+    const action = cleanText(value, "show");
+    return STAGE_IMAGE_ACTIONS.includes(action) ? action : "show";
+  }
+
+  function getSafeStageImagePlane(value) {
+    const plane = cleanText(value, "front");
+    return STAGE_IMAGE_PLANES.includes(plane) ? plane : "front";
+  }
+
+  function getStageImageTag(layerId) {
+    return normalizeIdentifier(`canvasia_stage_image_${cleanText(layerId, "layer_main")}`, "canvasia_stage_image");
+  }
+
+  function getStageImageTransition(block = {}, context = {}, isUpdate = false) {
+    const durationValue = Number(block.durationMs ?? 520);
+    const duration = clampNumber(Number.isFinite(durationValue) ? durationValue : 520, 0, 10000) / 1000;
+    if (duration <= 0) return "";
+    if (!isUpdate) return `Dissolve(${formatRenpySeconds(duration)})`;
+    const easing = cleanText(block.easing, "ease_out");
+    const warp = {
+      linear: "_warper.linear",
+      ease_in: "_warper.easein",
+      ease_out: "_warper.easeout",
+      ease_in_out: "_warper.ease",
+      spring: "_warper.easeout",
+    }[easing] ?? "_warper.easeout";
+    if (easing === "spring") {
+      pushWarning(context.warnings ?? [], "renpy_stage_image_spring_fallback", "舞台贴图的轻微弹性在 Ren'Py 中已按自然收住导出。", getWarningContext(context));
+    }
+    return `MoveTransition(${formatRenpySeconds(duration)}, time_warp=${warp})`;
+  }
+
+  function renderStageImageBlock(block = {}, context = {}) {
+    const action = getSafeStageImageAction(block.action);
+    const layerId = cleanText(block.layerId, "layer_main");
+    const tag = getStageImageTag(layerId);
+    const stageImages = context.stageImageAssets && typeof context.stageImageAssets.get === "function" && typeof context.stageImageAssets.set === "function"
+      ? context.stageImageAssets
+      : new Map();
+    context.stageImageAssets = stageImages;
+    const previousAssetId = cleanText(stageImages.get(layerId));
+    if (action === "hide") {
+      stageImages.delete(layerId);
+      const transition = getStageImageTransition(block, context, false);
+      return [`    hide ${tag}${transition ? ` with ${transition}` : ""}`];
+    }
+    const assetId = cleanText(block.assetId, previousAssetId);
+    if (!assetId) {
+      pushWarning(context.warnings ?? [], "renpy_stage_image_missing_asset", `舞台贴图图层 ${layerId} 没有可导出的素材。`, getWarningContext(context));
+      return [`    # Canvasia review stage_image missing asset: ${quoteRenpy(layerId)}`];
+    }
+    stageImages.set(layerId, assetId);
+    const transform = getSafeStageImageTransform(block.transform);
+    const position = getSafePosition(block.position);
+    const resolution = context.projectResolution ?? DEFAULT_PROJECT_RESOLUTION;
+    const xalign = clampNumber(POSITION_XALIGN[position] + transform.offsetX / 100, -0.3, 1.3);
+    const yalign = clampNumber(0.5 + transform.offsetY / 100, -0.3, 1.3);
+    const width = Math.max(1, Math.round(Number(resolution.width || DEFAULT_PROJECT_RESOLUTION.width) * transform.width / 100));
+    const transformParts = [
+      `xalign=${formatRenpyFloat(xalign)}`,
+      `yalign=${formatRenpyFloat(yalign)}`,
+      `xsize=${width}`,
+      `alpha=${formatRenpyFloat(transform.opacity / 100, 2)}`,
+      `rotate=${formatRenpyFloat(transform.rotation, 1)}`,
+    ];
+    if (transform.flipX) transformParts.push("xzoom=-1.0");
+    const zorder = (getSafeStageImagePlane(block.plane) === "back" ? 10 : 40) + transform.layer;
+    const transition = getStageImageTransition(block, context, Boolean(previousAssetId));
+    return [`    show ${normalizeIdentifier(assetId, "asset")} as ${tag} at Transform(${transformParts.join(", ")}) zorder ${zorder}${transition ? ` with ${transition}` : ""}`];
   }
 
   function formatRenpyFloat(value, digits = 3) {
@@ -1066,7 +1163,7 @@
 
   function buildImageDefinitions(assetMap = new Map()) {
     return Array.from(assetMap.entries())
-      .filter(([, asset]) => ["background", "cg", "sprite", "character", "image"].includes(cleanText(asset?.type).toLowerCase()))
+      .filter(([, asset]) => ["background", "cg", "sprite", "character", "image", "ui"].includes(cleanText(asset?.type).toLowerCase()))
       .map(([assetId, asset]) => {
         const imageName = normalizeIdentifier(assetId, "asset");
         const assetPath = cleanText(asset?.path ?? asset?.filePath ?? asset?.src ?? asset?.name, assetId);
@@ -1273,6 +1370,9 @@
     if (type === "background") {
       return renderBackgroundBlock(block, context);
     }
+    if (type === "stage_image") {
+      return renderStageImageBlock(block, context);
+    }
     if (type === "character_show") {
       return renderCharacterShowBlock(block, context);
     }
@@ -1394,6 +1494,7 @@
       const scene = record.scene ?? {};
       const sceneId = cleanText(scene.id, `scene_${sceneIndex + 1}`);
       const cameraState = getDefaultCameraState();
+      const stageImageAssets = new Map();
       lines.push(`# ${record.chapterName} / ${cleanText(scene.name ?? scene.title, sceneId)}`);
       lines.push(`label ${getSceneLabel(sceneId, sceneMap)}:`);
       const blocks = toArray(scene.blocks);
@@ -1404,7 +1505,7 @@
         const musicScopeStopPlan = buildMusicScopeStopPlan(blocks, { warnings, sceneId });
         blocks.forEach((block, blockIndex) => {
           (musicScopeStopPlan.before.get(blockIndex) ?? []).forEach((line) => lines.push(line));
-          renderBlock(block, { assetMap, characterMap, sceneMap, warnings, sceneId, blockIndex, cameraState, projectResolution, runtimeSettings }).forEach((line) => lines.push(line));
+          renderBlock(block, { assetMap, characterMap, sceneMap, warnings, sceneId, blockIndex, cameraState, stageImageAssets, projectResolution, runtimeSettings }).forEach((line) => lines.push(line));
           (musicScopeStopPlan.after.get(blockIndex) ?? []).forEach((line) => lines.push(line));
         });
       }
@@ -1481,6 +1582,9 @@
       conditionOperators: [...CONDITION_OPERATORS],
       characterMoveTransforms: { ...CHARACTER_MOVE_TRANSFORMS },
       characterPopTransitions: { ...CHARACTER_POP_TRANSITIONS },
+      stageImagePlanes: [...STAGE_IMAGE_PLANES].sort(),
+      stageImageActions: [...STAGE_IMAGE_ACTIONS].sort(),
+      stageImageEasings: [...STAGE_IMAGE_EASINGS].sort(),
       textSpeedCps: { ...TEXT_SPEED_CPS },
       runtimeDefaults: sanitizeProjectRuntimeSettings({}),
       effectDurationSeconds: { ...EFFECT_DURATION_SECONDS },

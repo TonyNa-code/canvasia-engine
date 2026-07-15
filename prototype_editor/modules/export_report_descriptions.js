@@ -31,6 +31,26 @@
     "native-runtime-release-control-report.md": "原生 Runtime 发布总控：汇总发布候选、性能、文件完整性和验收状态。",
   });
 
+  const PLAYABLE_EXPORT_RESULT_TARGETS = Object.freeze(["web", "native_runtime", "windows_nwjs", "macos_nwjs", "linux_nwjs"]);
+
+  const PLAYABLE_EXPORT_REPORT_LINKS = Object.freeze([
+    Object.freeze({ urlKey: "playtestGuidePublicUrl", label: "试玩验收 README", reportName: "README_试玩验收先看这里.md", primary: true }),
+    Object.freeze({ urlKey: "releaseEvidencePackPublicUrl", label: "发布证据包", reportName: "release-evidence-pack.md", primary: true }),
+    Object.freeze({ urlKey: "releaseReadinessReportPublicUrl", label: "发布就绪报告", reportName: "release_readiness_summary.md", primary: true }),
+    Object.freeze({ urlKey: "routePlaytestWorkbookReportPublicUrl", label: "路线试玩工作簿", reportName: "route-playtest-workbook.md", primary: true }),
+    Object.freeze({ urlKey: "routePlaytestWorkbookCsvPublicUrl", label: "路线试玩 CSV", reportName: "route-playtest-workbook.csv" }),
+    Object.freeze({ urlKey: "storyRouteMapReportPublicUrl", label: "剧情路线图", reportName: "story_route_map.md" }),
+    Object.freeze({ urlKey: "choiceConsequenceReportPublicUrl", label: "选项后果表", reportName: "choice-consequence-report.md" }),
+    Object.freeze({ urlKey: "variableInfluenceReportPublicUrl", label: "变量影响表", reportName: "variable-influence-report.md" }),
+    Object.freeze({ urlKey: "presentationTimelineReportPublicUrl", label: "演出时间轴", reportName: "presentation-timeline-report.md" }),
+    Object.freeze({ urlKey: "audioCueSheetReportPublicUrl", label: "音频调度表", reportName: "audio-cue-report.md" }),
+    Object.freeze({ urlKey: "stageDirectionReportPublicUrl", label: "角色舞台调度", reportName: "stage-direction-report.md" }),
+    Object.freeze({ urlKey: "assetRightsReportPublicUrl", label: "素材授权报告", reportName: "asset-rights-report.md" }),
+    Object.freeze({ urlKey: "voiceProductionReportPublicUrl", label: "语音制作清单", reportName: "voice-production-report.md" }),
+    Object.freeze({ urlKey: "localizationAuditReportPublicUrl", label: "多语言覆盖报告", reportName: "localization_audit.md" }),
+    Object.freeze({ urlKey: "runtimePreloadReportPublicUrl", label: "Runtime 预热报告", reportName: "RUNTIME_PRELOAD_REPORT.md" }),
+  ]);
+
   function cleanText(value, fallback = "") {
     return String(value ?? fallback).replace(/\s+/g, " ").trim();
   }
@@ -54,9 +74,97 @@
     return "补充发布检查报告。";
   }
 
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  function renderDetailRowsFallback(rows = []) {
+    return `<div class="detail-rows">${rows
+      .map(([label, value]) => `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`)
+      .join("")}</div>`;
+  }
+
+  function isPlayableExportResult(exportResult) {
+    return PLAYABLE_EXPORT_RESULT_TARGETS.includes(exportResult?.target);
+  }
+
+  function getLatestExportReportLinks(exportResult) {
+    if (!isPlayableExportResult(exportResult)) {
+      return [];
+    }
+    return PLAYABLE_EXPORT_REPORT_LINKS.filter((item) => exportResult?.[item.urlKey]).map((item) => ({
+      ...item,
+      href: exportResult[item.urlKey],
+      description: describeExportReportFile(item.reportName),
+    }));
+  }
+
+  function renderExportReportLink(link, options = {}) {
+    const escape = typeof options.escapeHtml === "function" ? options.escapeHtml : escapeHtml;
+    const description = link.description || "导出报告";
+    return `
+      <a
+        class="toolbar-button${link.primary ? " toolbar-button-primary" : ""}"
+        href="${escape(link.href)}"
+        target="_blank"
+        rel="noreferrer"
+        title="${escape(description)}"
+        aria-label="${escape(`${link.label}：${description}`)}"
+      >
+        ${escape(link.label)}
+      </a>
+    `;
+  }
+
+  function renderLatestExportReportPanel(exportResult, options = {}) {
+    const links = getLatestExportReportLinks(exportResult);
+    if (!links.length) {
+      return "";
+    }
+    const renderRows = typeof options.renderDetailRows === "function" ? options.renderDetailRows : renderDetailRowsFallback;
+    const routeReadiness = Number.isFinite(Number(exportResult.routePlaytestReadinessPercent))
+      ? `${Math.max(0, Math.min(100, Number(exportResult.routePlaytestReadinessPercent)))}%`
+      : "未记录";
+    const routeCaseLine = [
+      `${Number(exportResult.routePlaytestRouteCaseCount ?? 0)} 条分支`,
+      `${Number(exportResult.routePlaytestEndingCaseCount ?? 0)} 个结局`,
+      `${Number(exportResult.routePlaytestBlockedCaseCount ?? 0)} 个阻塞`,
+    ].join(" / ");
+    const releaseReadinessLine = [
+      exportResult.releaseReadinessStatus || "未记录",
+      Number.isFinite(Number(exportResult.releaseReadinessScore)) ? `${Number(exportResult.releaseReadinessScore)} 分` : "",
+    ].filter(Boolean).join(" · ");
+
+    return `
+      <article class="detail-card">
+        <strong>最近导出的验收报告</strong>
+        <p class="helper-text">导出成功后，先打开这些报告就能按路线、素材、音频、演出和发布门禁逐项验收，不用再去导出文件夹里翻文件。</p>
+        ${renderRows([
+          ["导出目标", exportResult.targetLabel ?? exportResult.target ?? "未记录"],
+          ["路线试玩就绪度", routeReadiness],
+          ["路线用例", routeCaseLine],
+          ["发布就绪", releaseReadinessLine || "未记录"],
+        ])}
+        <div class="detail-actions">
+          ${links.map((link) => renderExportReportLink(link, options)).join("")}
+        </div>
+      </article>
+    `;
+  }
+
   global.CanvasiaEditorExportReportDescriptions = Object.freeze({
     REPORT_DESCRIPTION_BY_NAME,
+    PLAYABLE_EXPORT_RESULT_TARGETS,
+    PLAYABLE_EXPORT_REPORT_LINKS,
     describeExportReportFile,
+    isPlayableExportResult,
+    getLatestExportReportLinks,
+    renderLatestExportReportPanel,
     normalizeReportLookupName,
   });
 })(typeof window !== "undefined" ? window : globalThis);

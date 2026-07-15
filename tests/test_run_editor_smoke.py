@@ -4051,6 +4051,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["runtimeVnQualityModule"], run_editor.NATIVE_RUNTIME_VN_QUALITY_NAME)
         self.assertEqual(manifest["files"]["runtimeScenePrefetchModule"], run_editor.NATIVE_RUNTIME_SCENE_PREFETCH_NAME)
         self.assertEqual(manifest["files"]["runtimeCharacterMotionModule"], run_editor.NATIVE_RUNTIME_CHARACTER_MOTION_NAME)
+        self.assertEqual(manifest["files"]["runtimeStageImagesModule"], run_editor.NATIVE_RUNTIME_STAGE_IMAGES_NAME)
         self.assertEqual(manifest["files"]["runtimeDiagnosticsModule"], run_editor.NATIVE_RUNTIME_DIAGNOSTICS_NAME)
         self.assertEqual(manifest["files"]["runtimeDiagnosticsReport"], run_editor.NATIVE_RUNTIME_DIAGNOSTICS_REPORT_NAME)
         self.assertEqual(manifest["files"]["runtimeDiagnosticsMarkdown"], run_editor.NATIVE_RUNTIME_DIAGNOSTICS_MARKDOWN_NAME)
@@ -4066,6 +4067,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 run_editor.NATIVE_RUNTIME_PRELOAD_NAME,
                 run_editor.NATIVE_RUNTIME_SCENE_PREFETCH_NAME,
                 run_editor.NATIVE_RUNTIME_CHARACTER_MOTION_NAME,
+                run_editor.NATIVE_RUNTIME_STAGE_IMAGES_NAME,
                 run_editor.NATIVE_RUNTIME_DIAGNOSTICS_NAME,
                 run_editor.NATIVE_RUNTIME_I18N_NAME,
                 run_editor.NATIVE_RUNTIME_SETTINGS_NAME,
@@ -4123,6 +4125,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["runtimePreloadModule"], run_editor.NATIVE_RUNTIME_PRELOAD_NAME)
         self.assertEqual(manifest["files"]["runtimeScenePrefetchModule"], run_editor.NATIVE_RUNTIME_SCENE_PREFETCH_NAME)
         self.assertEqual(manifest["files"]["runtimeCharacterMotionModule"], run_editor.NATIVE_RUNTIME_CHARACTER_MOTION_NAME)
+        self.assertEqual(manifest["files"]["runtimeStageImagesModule"], run_editor.NATIVE_RUNTIME_STAGE_IMAGES_NAME)
         self.assertEqual(manifest["files"]["runtimeDiagnosticsModule"], run_editor.NATIVE_RUNTIME_DIAGNOSTICS_NAME)
         self.assertEqual(manifest["files"]["runtimeDiagnosticsReport"], run_editor.NATIVE_RUNTIME_DIAGNOSTICS_REPORT_NAME)
         self.assertEqual(manifest["files"]["runtimeDiagnosticsMarkdown"], run_editor.NATIVE_RUNTIME_DIAGNOSTICS_MARKDOWN_NAME)
@@ -4149,6 +4152,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["runtime"]["runtimePreloadModule"], run_editor.NATIVE_RUNTIME_PRELOAD_NAME)
         self.assertEqual(manifest["runtime"]["runtimeScenePrefetchModule"], run_editor.NATIVE_RUNTIME_SCENE_PREFETCH_NAME)
         self.assertEqual(manifest["runtime"]["runtimeCharacterMotionModule"], run_editor.NATIVE_RUNTIME_CHARACTER_MOTION_NAME)
+        self.assertEqual(manifest["runtime"]["runtimeStageImagesModule"], run_editor.NATIVE_RUNTIME_STAGE_IMAGES_NAME)
         self.assertEqual(manifest["runtime"]["runtimeDiagnosticsModule"], run_editor.NATIVE_RUNTIME_DIAGNOSTICS_NAME)
         self.assertEqual(manifest["runtime"]["runtimeViewModule"], run_editor.NATIVE_RUNTIME_VIEW_NAME)
         self.assertEqual(manifest["runtime"]["runtimeVnQualityModule"], run_editor.NATIVE_RUNTIME_VN_QUALITY_NAME)

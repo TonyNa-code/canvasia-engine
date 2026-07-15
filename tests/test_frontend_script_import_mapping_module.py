@@ -12,6 +12,47 @@ MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "script_import_mapping
 
 
 class FrontendScriptImportMappingModuleTests(unittest.TestCase):
+    def test_stage_image_drafts_resolve_assets_and_safe_values(self) -> None:
+        script = textwrap.dedent(
+            f"""
+            const fs = require("fs");
+            const vm = require("vm");
+            const context = {{ window: {{}} }};
+            context.globalThis = context;
+            vm.createContext(context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
+            const tools = context.window.CanvasiaEditorScriptImportMapping;
+            const data = {{ assetList: [{{ id: "letter_png", type: "cg", name: "letter" }}] }};
+            const resolvers = {{
+              findAssetIdByHint: (hint, types) => tools.findImportedAssetIdByHint(data, hint, types),
+              getSafeStageImageAction: (value) => ["show", "update", "hide"].includes(value) ? value : "show",
+              getSafeStageImagePlane: (value) => value === "back" ? "back" : "front",
+              getSafeStageImagePosition: (value) => ["left", "center", "right"].includes(value) ? value : "center",
+              getSafeStageImageLayerId: (value) => String(value || "layer_main").trim(),
+              getSafeStageImageTransform: (value) => ({{ width: Math.min(180, Math.max(4, Number(value?.width) || 34)), opacity: 100 }}),
+              getSafeStageImageDurationMs: (value) => Math.min(10000, Math.max(0, Number(value) || 520)),
+              getSafeStageImageEasing: (value) => ["linear", "ease_out"].includes(value) ? value : "ease_out",
+            }};
+            const shown = tools.normalizeImportedDraftBlockForScene({{
+              type: "stage_image", action: "show", layerId: "note", assetHint: "letter",
+              plane: "front", position: "right", transform: {{ width: 999 }}, durationMs: 700, easing: "linear",
+            }}, null, resolvers);
+            const hidden = tools.normalizeImportedDraftBlockForScene({{
+              type: "stage_image", action: "hide", layerId: "note", durationMs: 300,
+            }}, null, resolvers);
+            process.stdout.write(JSON.stringify({{ shown, hidden }}));
+            """
+        )
+        result = subprocess.run(["node", "-e", script], cwd=ROOT_DIR, capture_output=True, text=True, check=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["shown"]["assetId"], "letter_png")
+        self.assertEqual(payload["shown"]["layerId"], "note")
+        self.assertEqual(payload["shown"]["transform"]["width"], 180)
+        self.assertEqual(payload["shown"]["position"], "right")
+        self.assertEqual(payload["hidden"]["action"], "hide")
+        self.assertEqual(payload["hidden"]["assetId"], "")
+
     def test_script_import_mapping_matches_project_assets_and_characters(self) -> None:
         script = textwrap.dedent(
             f"""

@@ -64,6 +64,7 @@
     { globalName: "CanvasiaEditorReleaseCandidateManifest", script: "./modules/release_candidate_manifest.js", label: "候选发布清单" },
     { globalName: "CanvasiaEditorReleaseEvidencePack", script: "./modules/release_evidence_pack.js", label: "发布证据包" },
     { globalName: "CanvasiaEditorUnlockableContentManifest", script: "./modules/unlockable_content_manifest.js", label: "解锁内容清单" },
+    { globalName: "CanvasiaEditorStageImages", script: "./modules/stage_images.js", label: "舞台贴图图层" },
     { globalName: "CanvasiaEditorVisualEffects", script: "./modules/visual_effects.js", label: "视觉演出" },
     { globalName: "CanvasiaEditorParticleEffects", script: "./modules/particle_effects.js", label: "粒子系统" },
     { globalName: "CanvasiaEditorProjectHistory", script: "./modules/project_history.js", label: "项目历史" },

@@ -166,6 +166,7 @@ button {
 }
 
 .background-layer,
+.stage-image-layer,
 .particle-layer,
 .filter-layer,
 .fade-layer,
@@ -189,6 +190,7 @@ button {
 }
 
 .background-layer,
+.stage-image-layer,
 .particle-layer,
 .sprite-layer {
   transition:
@@ -201,6 +203,95 @@ button {
   overflow: hidden;
   pointer-events: none;
   z-index: 3;
+}
+
+.stage-image-layer {
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.stage-image-layer-back {
+  z-index: 1;
+}
+
+.stage-image-layer-front {
+  z-index: 2;
+}
+
+.stage-image-card {
+  position: absolute;
+  left: calc(var(--stage-image-position-x, 50%) + var(--stage-image-offset-x, 0%));
+  top: calc(50% + var(--stage-image-offset-y, 0%));
+  width: var(--stage-image-width, 34%);
+  z-index: calc(20 + var(--stage-image-layer, 0));
+  opacity: var(--stage-image-opacity, 1);
+  transform: translate(-50%, -50%) rotate(var(--stage-image-rotation, 0deg)) scaleX(var(--stage-image-flip, 1));
+  transform-origin: center;
+  will-change: transform, opacity, left, top, width;
+}
+
+.stage-image-card img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 18px 30px rgba(10, 18, 34, 0.24));
+  user-select: none;
+}
+
+.stage-image-placeholder {
+  display: grid;
+  gap: 4px;
+  min-height: 80px;
+  padding: 18px;
+  place-content: center;
+  color: rgba(239, 247, 255, 0.9);
+  text-align: center;
+  border: 1px dashed rgba(163, 210, 255, 0.5);
+  border-radius: 18px;
+  background: rgba(15, 31, 54, 0.7);
+}
+
+.stage-image-placeholder span {
+  color: rgba(205, 224, 243, 0.7);
+  font-size: 0.76rem;
+}
+
+.stage-image-card.is-entering {
+  animation: player-stage-image-enter var(--stage-image-motion-ms, 520ms) var(--stage-image-motion-easing, ease-out) both;
+}
+
+.stage-image-card.is-moving {
+  animation: player-stage-image-move var(--stage-image-motion-ms, 520ms) var(--stage-image-motion-easing, ease-out) both;
+}
+
+.stage-image-card.is-leaving {
+  animation: player-stage-image-leave var(--stage-image-motion-ms, 520ms) var(--stage-image-motion-easing, ease-out) both;
+}
+
+@keyframes player-stage-image-enter {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -46%) rotate(var(--stage-image-rotation, 0deg)) scale(0.96) scaleX(var(--stage-image-flip, 1));
+  }
+}
+
+@keyframes player-stage-image-move {
+  from {
+    left: calc(var(--stage-image-from-position-x, 50%) + var(--stage-image-from-offset-x, 0%));
+    top: calc(50% + var(--stage-image-from-offset-y, 0%));
+    width: var(--stage-image-from-width, var(--stage-image-width, 34%));
+    opacity: var(--stage-image-from-opacity, 1);
+    transform: translate(-50%, -50%) rotate(var(--stage-image-from-rotation, 0deg)) scaleX(var(--stage-image-from-flip, 1));
+  }
+}
+
+@keyframes player-stage-image-leave {
+  to {
+    opacity: 0;
+    transform: translate(-50%, -54%) rotate(var(--stage-image-rotation, 0deg)) scale(0.96) scaleX(var(--stage-image-flip, 1));
+  }
 }
 
 .filter-layer {
@@ -5123,7 +5214,10 @@ html[data-game-ui-title-anchor="free"] .start-overlay {
   .sprite-card.is-entering,
   .sprite-card.is-leaving,
   .sprite-card.is-moving,
-  .sprite-card.is-entering .sprite-card-inner {
+  .sprite-card.is-entering .sprite-card-inner,
+  .stage-image-card.is-entering,
+  .stage-image-card.is-moving,
+  .stage-image-card.is-leaving {
     animation: none !important;
   }
 }
@@ -5132,6 +5226,9 @@ html[data-game-ui-motion="low"] .background-layer.is-transitioning,
 html[data-game-ui-motion="low"] .sprite-card.is-entering,
 html[data-game-ui-motion="low"] .sprite-card.is-leaving,
 html[data-game-ui-motion="low"] .sprite-card.is-moving,
-html[data-game-ui-motion="low"] .sprite-card.is-entering .sprite-card-inner {
+html[data-game-ui-motion="low"] .sprite-card.is-entering .sprite-card-inner,
+html[data-game-ui-motion="low"] .stage-image-card.is-entering,
+html[data-game-ui-motion="low"] .stage-image-card.is-moving,
+html[data-game-ui-motion="low"] .stage-image-card.is-leaving {
   animation: none !important;
 }

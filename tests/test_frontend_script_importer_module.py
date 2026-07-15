@@ -12,6 +12,42 @@ MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "script_importer.js"
 
 
 class FrontendScriptImporterModuleTests(unittest.TestCase):
+    def test_script_importer_parses_stage_image_commands(self) -> None:
+        script = textwrap.dedent(
+            f"""
+            const fs = require("fs");
+            const vm = require("vm");
+            const context = {{ window: {{}} }};
+            context.globalThis = context;
+            vm.createContext(context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
+            const tools = context.window.CanvasiaEditorScriptImporter;
+            const blocks = tools.parseScriptDraftToBlocks(`
+              stage image show letter layer note at center front width 58 opacity 92 rotate 4 duration 0.7 easing ease_in_out
+              stage image update note at right x -8 duration 0.5
+              stage image hide note duration 0.3
+            `);
+            process.stdout.write(JSON.stringify({{
+              blocks,
+              summary: tools.summarizeScriptDraftBlocks(blocks),
+              preview: tools.buildScriptDraftPreviewLines(blocks, 4),
+            }}));
+            """
+        )
+        result = subprocess.run(["node", "-e", script], cwd=ROOT_DIR, capture_output=True, text=True, check=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual([block["action"] for block in payload["blocks"]], ["show", "update", "hide"])
+        self.assertEqual(payload["blocks"][0]["assetHint"], "letter")
+        self.assertEqual(payload["blocks"][0]["layerId"], "note")
+        self.assertEqual(payload["blocks"][0]["transform"]["width"], 58)
+        self.assertEqual(payload["blocks"][0]["transform"]["rotation"], 4)
+        self.assertEqual(payload["blocks"][1]["position"], "right")
+        self.assertEqual(payload["blocks"][1]["transform"]["offsetX"], -8)
+        self.assertEqual(payload["summary"]["stage"], 3)
+        self.assertIn("显示舞台贴图", payload["preview"][0])
+        self.assertIn("隐藏舞台贴图", payload["preview"][2])
+
     def test_script_importer_parses_plain_text_into_story_blocks(self) -> None:
         script = textwrap.dedent(
             f"""

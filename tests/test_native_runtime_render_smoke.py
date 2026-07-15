@@ -3106,6 +3106,38 @@ class NativeRuntimeRenderSmokeTests(unittest.TestCase):
         self.assertIn("资源预热：3/3", player.get_runtime_preload_status_line())
         self.assertIn("资源预热：3/3", player.status_message)
 
+    def test_native_runtime_renders_stage_image_layer_to_canvas(self) -> None:
+        data_path = self.write_game_data()
+        player = NativeRuntimePlayer(pygame, data_path)
+        canvas = pygame.Surface((player.width, player.height), pygame.SRCALPHA)
+        canvas.fill((0, 0, 0, 0))
+        player.visible_stage_images = {
+            "smoke_note": {
+                "layerId": "smoke_note",
+                "assetId": "title_logo",
+                "plane": "front",
+                "position": "right",
+                "transform": {
+                    "offsetX": -6,
+                    "offsetY": 4,
+                    "width": 38,
+                    "opacity": 91,
+                    "rotation": 8,
+                    "layer": 4,
+                    "flipX": True,
+                },
+            }
+        }
+
+        self.assertEqual(player.get_renderable_stage_image_items("back"), [])
+        front_items = player.get_renderable_stage_image_items("front")
+        self.assertEqual([item[0] for item in front_items], ["smoke_note"])
+        player.render_stage_images(canvas, "front")
+
+        alpha_values = pygame.surfarray.array_alpha(canvas)
+        self.assertGreater(int(alpha_values.max()), 0)
+        self.assertGreater(int((alpha_values > 0).sum()), 100)
+
     def test_text_wrapping_preserves_words_newlines_and_ellipsis(self) -> None:
         font = pygame.font.Font(None, 24)
         lines = wrap_text(font, "Hello world from Canvasia Engine\n第二行中文EnglishMix测试", 128)

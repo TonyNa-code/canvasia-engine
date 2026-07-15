@@ -41,6 +41,11 @@ import {
   getSafeCharacterStage,
 } from "./runtime_character_motion.js";
 import {
+  applyStageImageBlock,
+  buildStageImageRenderItems,
+  cloneStageImageState,
+} from "./runtime_stage_images.js";
+import {
   DEFAULT_RUNTIME_LANGUAGE,
   RUNTIME_LANGUAGE_LABELS,
   buildRuntimeLocalizationFallbackReport,
@@ -97,6 +102,8 @@ const refs = {
   gameTitle: document.getElementById("gameTitle"),
   gameMeta: document.getElementById("gameMeta"),
   backgroundLayer: document.getElementById("backgroundLayer"),
+  stageImageBackLayer: document.getElementById("stageImageBackLayer"),
+  stageImageFrontLayer: document.getElementById("stageImageFrontLayer"),
   particleLayer: document.getElementById("particleLayer"),
   filterLayer: document.getElementById("filterLayer"),
   fadeLayer: document.getElementById("fadeLayer"),
@@ -7422,6 +7429,8 @@ function createInitialPreviewVisualState() {
     characterTransitionEvent: null,
     characterEmphasisEvent: null,
     visibleCharacters: [],
+    visibleStageImages: [],
+    stageImageEvent: null,
     speakerName: "Canvasia Engine",
     dialogueText: "点击“继续”后，这里会按导出时的剧情顺序推进。",
   };
@@ -7506,6 +7515,12 @@ function clonePreviewVisualState(visualState) {
     visibleCharacters: (visualState?.visibleCharacters ?? []).map((characterState) => ({
       ...characterState,
     })),
+    visibleStageImages: (visualState?.visibleStageImages ?? []).map((imageState) =>
+      cloneStageImageState(imageState)
+    ),
+    stageImageEvent: visualState?.stageImageEvent
+      ? JSON.parse(JSON.stringify(visualState.stageImageEvent))
+      : null,
   };
 }
 
@@ -7517,6 +7532,7 @@ function clearTransientStageEffects(visualState) {
   visualState.screenShake = null;
   visualState.screenFlash = null;
   visualState.backgroundTransitionEvent = null;
+  visualState.stageImageEvent = null;
   visualState.activeCharacterId = null;
   visualState.characterTransitionEvent = null;
   visualState.characterEmphasisEvent = null;
@@ -7708,6 +7724,17 @@ function applyBlockToPreviewState(block, visualState, variables, sceneId = "") {
             };
       visualState.speakerName = "画面";
       visualState.dialogueText = `背景切换到：${asset?.name ?? block.assetId}`;
+      return null;
+    }
+    case "stage_image": {
+      const result = applyStageImageBlock(visualState.visibleStageImages, block);
+      visualState.visibleStageImages = result.visibleImages;
+      visualState.stageImageEvent = result.event;
+      const asset = data.assetsById.get(block.assetId);
+      visualState.speakerName = "舞台贴图";
+      visualState.dialogueText = result.event?.mode === "hide"
+        ? `隐藏舞台图层：${result.event.layerId}`
+        : `调整舞台图层：${asset?.name ?? block.assetId ?? block.layerId}`;
       return null;
     }
     case "music_play": {
@@ -8257,6 +8284,8 @@ function renderStageVisual(snapshot) {
     refs.backgroundLayer.classList.add("is-transitioning", `transition-${getSafeTransition(backgroundTransition.transition)}`);
   }
   refs.particleLayer.innerHTML = renderParticleEffectLayer(visualState.particleEffect, visualState);
+  refs.stageImageBackLayer.innerHTML = renderStageImageCards(visualState, "back");
+  refs.stageImageFrontLayer.innerHTML = renderStageImageCards(visualState, "front");
   applyStageWorldPresentation(visualState);
   applyStageScreenEffects(visualState, snapshot.block);
 
@@ -8265,6 +8294,27 @@ function renderStageVisual(snapshot) {
   refs.choiceList.querySelectorAll("[data-option-id]").forEach((button) => {
     button.addEventListener("click", () => choosePreviewOption(button.dataset.optionId));
   });
+}
+
+function renderStageImageCards(visualState, plane) {
+  return buildStageImageRenderItems(
+    visualState.visibleStageImages,
+    visualState.stageImageEvent,
+    plane
+  )
+    .map((imageState) => {
+      const asset = data.assetsById.get(imageState.assetId);
+      const assetUrl = getAssetUrl(imageState.assetId);
+      const classes = ["stage-image-card"];
+      if (imageState.eventMode === "show") classes.push("is-entering");
+      if (imageState.eventMode === "move") classes.push("is-moving");
+      if (imageState.ghostMode === "hide") classes.push("is-leaving");
+      const content = assetUrl
+        ? `<img src="${escapeHtml(encodeURI(assetUrl))}" alt="${escapeHtml(asset?.name ?? imageState.layerId)}" draggable="false" />`
+        : `<div class="stage-image-placeholder"><strong>${escapeHtml(asset?.name ?? imageState.assetId ?? "未选择图片")}</strong><span>${escapeHtml(imageState.layerId)}</span></div>`;
+      return `<div class="${classes.join(" ")}" data-layer-id="${escapeHtml(imageState.layerId)}" style="${imageState.style}">${content}</div>`;
+    })
+    .join("");
 }
 
 function renderSpriteCards(visualState) {
@@ -10208,14 +10258,20 @@ function applyStageWorldPresentation(visualState) {
     : "";
 
   refs.backgroundLayer.style.transform = `translate3d(${panOffset.toFixed(2)}%, 0, 0) scale(${(zoomScale * 1.02).toFixed(3)})`;
+  refs.stageImageBackLayer.style.transform = `translate3d(${panOffset.toFixed(2)}%, 0, 0) scale(${zoomScale.toFixed(3)})`;
+  refs.stageImageFrontLayer.style.transform = `translate3d(${panOffset.toFixed(2)}%, 0, 0) scale(${zoomScale.toFixed(3)})`;
   refs.particleLayer.style.transform = `translate3d(${panOffset.toFixed(2)}%, 0, 0) scale(${zoomScale.toFixed(3)})`;
   refs.spriteLayer.style.transform = `translate3d(${panOffset.toFixed(2)}%, 0, 0) scale(${zoomScale.toFixed(3)})`;
 
   refs.backgroundLayer.style.transformOrigin = zoomOrigin;
+  refs.stageImageBackLayer.style.transformOrigin = zoomOrigin;
+  refs.stageImageFrontLayer.style.transformOrigin = zoomOrigin;
   refs.particleLayer.style.transformOrigin = zoomOrigin;
   refs.spriteLayer.style.transformOrigin = zoomOrigin;
 
   refs.backgroundLayer.style.filter = combineFilterCss(depthBackdropFilter, filterCss) || "none";
+  refs.stageImageBackLayer.style.filter = combineFilterCss(depthBackdropFilter, filterCss) || "none";
+  refs.stageImageFrontLayer.style.filter = filterCss || "none";
   refs.particleLayer.style.filter = combineFilterCss(depthParticleFilter, filterCss) || "none";
   refs.spriteLayer.style.filter = filterCss || "none";
   refs.particleLayer.style.opacity = visualState.depthBlur

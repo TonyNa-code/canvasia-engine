@@ -22,6 +22,18 @@ class FrontendExportReportDescriptionsModuleTests(unittest.TestCase):
             vm.createContext(context);
             vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
             const tools = context.window.CanvasiaEditorExportReportDescriptions;
+            const exportResult = {{
+              target: "native_runtime",
+              targetLabel: "原生 Runtime",
+              routePlaytestReadinessPercent: 87,
+              routePlaytestRouteCaseCount: 6,
+              routePlaytestEndingCaseCount: 2,
+              routePlaytestBlockedCaseCount: 1,
+              releaseReadinessStatus: "needs_review",
+              releaseReadinessScore: 82,
+              playtestGuidePublicUrl: "/exports/demo/README.md?x=<unsafe>",
+              releaseReadinessReportPublicUrl: "/exports/demo/readiness.md",
+            }};
             process.stdout.write(JSON.stringify({{
               keys: Object.keys(tools).sort(),
               knownMarkdown: tools.describeExportReportFile("reports/performance-budget.md"),
@@ -31,9 +43,15 @@ class FrontendExportReportDescriptionsModuleTests(unittest.TestCase):
               unknownCsv: tools.describeExportReportFile("extra/custom-report.csv"),
               unknownMarkdown: tools.describeExportReportFile("extra/custom-report.md"),
               normalized: tools.normalizeReportLookupName(String.raw`nested\\path/report.md`),
+              playable: tools.isPlayableExportResult(exportResult),
+              nonPlayable: tools.isPlayableExportResult({{ target: "renpy" }}),
+              links: tools.getLatestExportReportLinks(exportResult),
+              panel: tools.renderLatestExportReportPanel(exportResult),
+              emptyPanel: tools.renderLatestExportReportPanel({{ target: "renpy" }}),
               frozen: [
                 Object.isFrozen(tools),
                 Object.isFrozen(tools.REPORT_DESCRIPTION_BY_NAME),
+                Object.isFrozen(tools.PLAYABLE_EXPORT_REPORT_LINKS),
               ],
             }}));
             """
@@ -56,7 +74,16 @@ class FrontendExportReportDescriptionsModuleTests(unittest.TestCase):
         self.assertIn("表格", payload["unknownCsv"])
         self.assertIn("补充发布检查报告", payload["unknownMarkdown"])
         self.assertEqual(payload["normalized"], "report.md")
-        self.assertEqual(payload["frozen"], [True, True])
+        self.assertTrue(payload["playable"])
+        self.assertFalse(payload["nonPlayable"])
+        self.assertEqual(len(payload["links"]), 2)
+        self.assertTrue(payload["links"][0]["primary"])
+        self.assertIn("最近导出的验收报告", payload["panel"])
+        self.assertIn("87%", payload["panel"])
+        self.assertIn("needs_review · 82 分", payload["panel"])
+        self.assertIn("&lt;unsafe&gt;", payload["panel"])
+        self.assertEqual(payload["emptyPanel"], "")
+        self.assertEqual(payload["frozen"], [True, True, True])
 
 
 if __name__ == "__main__":

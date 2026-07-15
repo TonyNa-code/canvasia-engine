@@ -11,6 +11,7 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parents[1]
 EDITOR_DIR = ROOT_DIR / "prototype_editor"
 APP_PATH = EDITOR_DIR / "app.js"
+INDEX_PATH = EDITOR_DIR / "index.html"
 CATALOG_MODULE_PATH = EDITOR_DIR / "modules" / "story_block_catalog.js"
 ACTION_MODULE_PATH = EDITOR_DIR / "modules" / "story_block_actions.js"
 COMMAND_PALETTE_MODULE_PATH = EDITOR_DIR / "modules" / "command_palette.js"
@@ -67,6 +68,7 @@ def _load_story_block_registry_payload() -> dict:
           knownTypes: catalogTools.getKnownBlockTypes(),
           labelTypes: Object.keys(catalogTools.BLOCK_LABELS),
           runtimeTypes: catalogTools.getRuntimeCapabilityRows().map((row) => row.type),
+          addActions: actionTools.getAddBlockActionEntries().map((entry) => entry.action),
           addActionTypes: actionTools.getAddBlockActionEntries().map((entry) => entry.blockType),
           commandTypes: commandPaletteTools.buildStoryBlockCommands().map((command) => command.blockType),
           commandIds: commandPaletteTools.buildStoryBlockCommands().map((command) => command.id),
@@ -89,6 +91,7 @@ class FrontendStoryBlockRegistryIntegrationTests(unittest.TestCase):
     def test_registered_story_blocks_have_editor_entrypoints_and_runtime_rows(self) -> None:
         payload = _load_story_block_registry_payload()
         source = APP_PATH.read_text(encoding="utf-8")
+        index_source = INDEX_PATH.read_text(encoding="utf-8")
         handle_click = _extract_function_source(source, "handleClick")
         queue_add = _extract_function_source(source, "queueAddBlockFromAction")
         add_block = _extract_function_source(source, "addBlock")
@@ -99,6 +102,7 @@ class FrontendStoryBlockRegistryIntegrationTests(unittest.TestCase):
         runtime_types = set(payload["runtimeTypes"])
         created_types = set(re.findall(r'\bif\s*\(\s*blockType\s*===\s*"([^"]+)"\s*\)', create_default_block))
         add_action_types = set(payload["addActionTypes"])
+        toolbar_actions = set(re.findall(r'data-action="([^"]+)"', index_source))
         command_types = set(payload["commandTypes"])
 
         self.assertGreaterEqual(len(known_types), 20)
@@ -107,6 +111,7 @@ class FrontendStoryBlockRegistryIntegrationTests(unittest.TestCase):
         self.assertEqual(known_types, created_types)
         self.assertEqual(known_types, add_action_types)
         self.assertEqual(known_types, command_types)
+        self.assertTrue(set(payload["addActions"]).issubset(toolbar_actions))
         self.assertIn("insert-wait", payload["commandIds"])
         self.assertIn("storyBlockActionTools.getAddBlockActionConfig(action)", handle_click)
         self.assertIn("addBlock(blockType, getSceneChecklistAddBlockOptions(actionTarget))", queue_add)

@@ -182,6 +182,20 @@
       };
       return callScriptImportResolver(resolvers, "getSafeCharacterStage", [mergedStage], mergedStage);
     };
+    const getStageImageAction = (value) =>
+      callScriptImportResolver(resolvers, "getSafeStageImageAction", [value], ["show", "update", "hide"].includes(value) ? value : "show");
+    const getStageImagePlane = (value) =>
+      callScriptImportResolver(resolvers, "getSafeStageImagePlane", [value], value === "back" ? "back" : "front");
+    const getStageImagePosition = (value) =>
+      callScriptImportResolver(resolvers, "getSafeStageImagePosition", [value], ["left", "center", "right"].includes(value) ? value : "center");
+    const getStageImageLayerId = (value) =>
+      callScriptImportResolver(resolvers, "getSafeStageImageLayerId", [value], String(value || "layer_main").trim() || "layer_main");
+    const getStageImageTransform = (value) =>
+      callScriptImportResolver(resolvers, "getSafeStageImageTransform", [value], value && typeof value === "object" ? { ...value } : {});
+    const getStageImageDurationMs = (value) =>
+      callScriptImportResolver(resolvers, "getSafeStageImageDurationMs", [value], Math.max(0, Math.min(10000, Number(value) || 520)));
+    const getStageImageEasing = (value) =>
+      callScriptImportResolver(resolvers, "getSafeStageImageEasing", [value], value || "ease_out");
     const getCreditsDuration = (value) => callScriptImportResolver(resolvers, "getSafeCreditsDuration", [value], 18);
     const getCreditsBackground = (value) =>
       callScriptImportResolver(resolvers, "getSafeCreditsBackground", [value], value || "dark");
@@ -331,6 +345,21 @@
         assetId: getAssetId(draftBlock.assetHint, ["background", "cg"]),
         transition: getTransition(draftBlock.transition ?? "fade"),
         transitionDurationMs: getTransitionDurationMs(draftBlock.transitionDurationMs, 600),
+      };
+    }
+
+    if (draftBlock.type === "stage_image") {
+      const action = getStageImageAction(draftBlock.action);
+      return {
+        type: "stage_image",
+        action,
+        layerId: getStageImageLayerId(draftBlock.layerId),
+        assetId: action === "show" ? getAssetId(draftBlock.assetHint, ["background", "sprite", "cg", "ui"]) : "",
+        plane: getStageImagePlane(draftBlock.plane),
+        position: getStageImagePosition(draftBlock.position),
+        transform: getStageImageTransform(draftBlock.transform),
+        durationMs: getStageImageDurationMs(draftBlock.durationMs),
+        easing: getStageImageEasing(draftBlock.easing),
       };
     }
 

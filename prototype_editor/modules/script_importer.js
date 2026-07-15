@@ -4,6 +4,7 @@
   const SCRIPT_IMPORT_MAX_OPTIONS = 6;
   const STAGE_DRAFT_TYPES = Object.freeze([
     "background",
+    "stage_image",
     "character_show",
     "character_move",
     "character_hide",
@@ -391,6 +392,75 @@
     return Object.keys(stage).length ? stage : null;
   }
 
+  function parseInlineStageImageTransform(text) {
+    const characterStage = parseInlineCharacterStage(text) ?? {};
+    const transform = { ...characterStage };
+    if (Object.prototype.hasOwnProperty.call(transform, "scale")) {
+      transform.width = transform.scale;
+      delete transform.scale;
+    }
+    const width = parseInlineStageNumber(text, ["width", "宽度"]);
+    if (width !== null) {
+      transform.width = width;
+    }
+    const rotation = parseInlineStageNumber(text, ["rotation", "rotate", "angle", "旋转", "角度"]);
+    if (rotation !== null) {
+      transform.rotation = rotation;
+    }
+    return Object.keys(transform).length ? transform : null;
+  }
+
+  function parseInlineStageImageLayerId(text, fallback = "layer_main") {
+    const match = String(text ?? "").match(/(?:^|\s)(?:layer|layerid|layer_id|图层|层)\s*[:=]?\s*([0-9A-Za-z_\-\u4e00-\u9fff]{1,48})/iu);
+    return trimImportedText(match?.[1] ?? fallback, 48).replace(/\s+/g, "_") || fallback;
+  }
+
+  function parseInlineStageImagePlane(text, fallback = "front") {
+    const match = String(text ?? "").match(/(?:^|\s)(front|back|foreground|background|前景|后景|角色前|角色后)(?:\s|$)/iu);
+    const token = normalizeDirectiveToken(match?.[1] ?? fallback);
+    return ["back", "background", "后景", "角色后"].includes(token) ? "back" : "front";
+  }
+
+  function parseStageImageDirectionLine(line) {
+    const text = trimImportedText(line, 320);
+    const canonical = text.match(/^(?:stage[_ ]?image|prop|overlay|cutin|舞台贴图|贴图)\s+(show|update|hide|显示|调整|隐藏)\s+(.+)$/iu);
+    const natural = text.match(/^(show|display|move|update|hide|显示|调整|移动|隐藏)\s+(?:stage[_ ]?image|prop|overlay|cutin|舞台贴图|贴图|道具|前景)\s+(.+)$/iu);
+    const match = canonical ?? natural;
+    if (!match) {
+      return null;
+    }
+    const actionToken = normalizeDirectiveToken(match[1]);
+    const action = ["hide", "隐藏"].includes(actionToken)
+      ? "hide"
+      : ["update", "move", "调整", "移动"].includes(actionToken)
+        ? "update"
+        : "show";
+    const body = trimImportedText(match[2], 260);
+    const leading = readLeadingArgument(body);
+    const layerId = parseInlineStageImageLayerId(body, action === "show" ? leading.argument : leading.argument || "layer_main");
+    if (action === "hide") {
+      return {
+        type: "stage_image",
+        action,
+        layerId,
+        durationMs: parseInlineTimeMs(body, "duration", 420),
+        easing: parseInlineCharacterMotionEasing(body),
+      };
+    }
+    const transform = parseInlineStageImageTransform(body);
+    return {
+      type: "stage_image",
+      action,
+      layerId,
+      ...(action === "show" ? { assetHint: stripWrappingQuotes(leading.argument) } : {}),
+      plane: parseInlineStageImagePlane(body),
+      position: parseDirectivePosition(body, "center"),
+      ...(transform ? { transform } : {}),
+      durationMs: parseInlineTimeMs(body, "duration", 520),
+      easing: parseInlineCharacterMotionEasing(body),
+    };
+  }
+
   function parseInlineCharacterMotionEasing(text, fallback = "ease_out") {
     const match = String(text ?? "").match(
       /\b(?:easing|ease|warp)\s+([a-z_-]+)\b/iu
@@ -695,6 +765,11 @@
     const text = trimImportedText(line, 320);
     if (!text) {
       return null;
+    }
+
+    const stageImage = parseStageImageDirectionLine(text);
+    if (stageImage) {
+      return stageImage;
     }
 
     const backgroundMatch = text.match(/^(?:scene|bg|background)\s+(.+)$/i);
@@ -1176,6 +1251,17 @@
     if (block?.type === "background") {
       return `切背景：${block.assetHint || "待选择背景"}`;
     }
+    if (block?.type === "stage_image") {
+      if (block.action === "hide") {
+        return `隐藏舞台贴图：${block.layerId || "layer_main"}`;
+      }
+      return `${block.action === "update" ? "调整" : "显示"}舞台贴图：${[
+        block.assetHint,
+        `#${block.layerId || "layer_main"}`,
+        block.position ? `@${block.position}` : "",
+        block.plane,
+      ].filter(Boolean).join(" ")}`;
+    }
     if (block?.type === "character_show") {
       return `显示角色：${[block.characterHint, block.expressionHint, block.position ? `@${block.position}` : ""]
         .filter(Boolean)
@@ -1331,6 +1417,7 @@
     parseVariableActionLine,
     parseDialogueLine,
     parseQuotedDialogueLine,
+    parseStageImageDirectionLine,
     parseStageDirectionLine,
     parseWaitLine,
     parseVoiceLine,

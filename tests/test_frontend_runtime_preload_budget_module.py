@@ -12,6 +12,33 @@ MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "runtime_preload_budge
 
 
 class FrontendRuntimePreloadBudgetModuleTests(unittest.TestCase):
+    def test_stage_images_are_included_in_first_screen_preload(self) -> None:
+        script = textwrap.dedent(
+            f"""
+            const fs = require("fs");
+            const vm = require("vm");
+            const context = {{ window: {{}} }};
+            context.globalThis = context;
+            vm.createContext(context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
+            const report = context.window.CanvasiaEditorRuntimePreloadBudget.buildRuntimePreloadBudgetReport({{
+              project: {{ entrySceneId: "scene_start", chapterOrder: ["chapter_1"] }},
+              assetList: [{{ id: "letter", type: "cg", name: "信件特写", fileExists: true, fileSizeBytes: 2048 }}],
+              chapters: [{{ chapterId: "chapter_1", scenes: [{{ id: "scene_start", blocks: [
+                {{ id: "prop", type: "stage_image", action: "show", assetId: "letter" }},
+              ] }}] }}],
+            }});
+            process.stdout.write(JSON.stringify(report.entries));
+            """
+        )
+        result = subprocess.run(["node", "-e", script], cwd=ROOT_DIR, capture_output=True, text=True, check=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        entries = json.loads(result.stdout)
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(entries[0]["id"], "letter")
+        self.assertEqual(entries[0]["phase"], "critical")
+        self.assertEqual(entries[0]["occurrences"][0]["blockType"], "stage_image")
+
     def test_runtime_preload_budget_report_flags_first_screen_pressure(self) -> None:
         script = textwrap.dedent(
             f"""

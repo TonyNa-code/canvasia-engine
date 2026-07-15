@@ -2,6 +2,7 @@
   const DEFAULT_SCRIPT_IMPORTER_TOOLS = global.CanvasiaEditorScriptImporter || {};
   const SCRIPT_IMPORT_PLACEHOLDER = [
     "scene classroom with fade",
+    "stage image show letter layer note at center front width 58 opacity 92 duration 0.7",
     'play video opening_movie title "Opening" volume 80 from 0 to 18 cover',
     "play music school_theme fadein 1.2",
     "show 悠奈 smile at center with dissolve",
@@ -42,6 +43,7 @@
     const safeCharacterName = String(characterName ?? "").trim() || "女主角";
     return [
       "scene classroom with fade",
+      "stage image show letter layer note at center front width 58 opacity 92 duration 0.7",
       "play music school_theme fadein 1.2",
       `show ${safeCharacterName} smile at center with dissolve`,
       "play sound door_knock",
@@ -94,7 +96,7 @@
     return Object.freeze([
       Object.freeze({ title: "正文", items: Object.freeze(["角色：台词", '角色 "台词"', "旁白"]) }),
       Object.freeze({ title: "分支", items: Object.freeze(["- 选项", "-> 场景", "[变量 +1]"]) }),
-      Object.freeze({ title: "演出", items: Object.freeze(["scene / show / move / hide", "music / sound / video", "shake / flash / camera"]) }),
+      Object.freeze({ title: "演出", items: Object.freeze(["scene / show / move / hide", "stage image / prop / cut-in", "music / sound / video", "shake / flash / camera"]) }),
       Object.freeze({ title: "逻辑", items: Object.freeze(["set / add", "if 条件", "jump"]) }),
     ]);
   }

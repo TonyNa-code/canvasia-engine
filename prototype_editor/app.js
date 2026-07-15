@@ -92,6 +92,15 @@ const runtimeCapabilityMatrixTools = window.CanvasiaEditorRuntimeCapabilityMatri
 const productionBacklogTools = window.CanvasiaEditorProductionBacklog;
 const releaseCandidateManifestTools = window.CanvasiaEditorReleaseCandidateManifest;
 const unlockableContentManifestTools = window.CanvasiaEditorUnlockableContentManifest;
+const stageImageTools = window.CanvasiaEditorStageImages;
+const {
+  DEFAULT_STAGE_IMAGE_TRANSFORM,
+  getSafeStageImageAction,
+  getSafeStageImageDurationMs,
+  getSafeStageImageEasing,
+  normalizeStageImageState,
+  applyStageImageBlock,
+} = stageImageTools;
 
 const INSPECTION_SECTION_LABELS = Object.freeze({
   "choice-consequence": "选项后果表",
@@ -337,6 +346,78 @@ const getSafeTextSpeed = visualEffectTools.getSafeTextSpeed;
 const getTextSpeedLabel = visualEffectTools.getTextSpeedLabel;
 const getSafeDialogTheme = visualEffectTools.getSafeDialogTheme;
 const getDialogThemeLabel = visualEffectTools.getDialogThemeLabel;
+const {
+  getSafeShakeIntensity,
+  getShakeIntensityLabel,
+  getSafeEffectDuration,
+  getEffectDurationLabel,
+  getShakeDistance,
+  getEffectDurationSeconds,
+  getSafeFlashColor,
+  getFlashColorLabel,
+  getSafeFlashIntensity,
+  getFlashIntensityLabel,
+  getFlashOpacity,
+  getFlashColorRgb,
+  getSafeFadeAction,
+  getFadeActionLabel,
+  getSafeFadeColor,
+  getFadeColorLabel,
+  getFadeColorRgb,
+  getSafeCameraZoomAction,
+  getCameraZoomActionLabel,
+  getSafeCameraZoomStrength,
+  getCameraZoomStrengthLabel,
+  getSafeCameraZoomFocus,
+  getCameraZoomFocusLabel,
+  getCameraZoomScale,
+  getCameraZoomOrigin,
+  getSafeCameraPanTarget,
+  getCameraPanTargetLabel,
+  getSafeCameraPanStrength,
+  getCameraPanStrengthLabel,
+  getCameraPanOffset,
+  getSafeScreenFilterAction,
+  getScreenFilterActionLabel,
+  getSafeScreenFilterPreset,
+  getScreenFilterPresetLabel,
+  getSafeScreenFilterStrength,
+  getScreenFilterStrengthLabel,
+  getSafeScreenColorGrade,
+  getScreenColorGradeCss,
+  getScreenColorGradeSummary,
+  getScreenFilterVignette,
+  getScreenFilterCss,
+  getScreenFilterWash,
+  getSafeDepthBlurAction,
+  getDepthBlurActionLabel,
+  getSafeDepthBlurFocus,
+  getDepthBlurFocusLabel,
+  getSafeDepthBlurStrength,
+  getDepthBlurStrengthLabel,
+  getDepthBlurBackdropPx,
+  getDepthBlurParticlePx,
+  getDepthBlurSpritePx,
+  getDepthBlurSpriteOpacity,
+} = visualEffectTools;
+const {
+  getSafeParticleSpeed,
+  getParticleSpeedLabel,
+  getSafeParticleWind,
+  getParticleWindLabel,
+  getSafeParticleArea,
+  getParticleAreaLabel,
+  getParticleSpeedMultiplier,
+  getParticleWindBias,
+  getParticleAreaLayout,
+  getParticlePresetDensityMultiplier,
+  getParticleMotionProfile,
+  getParticleRandom,
+  mixParticleColors,
+  formatParticleNumber,
+  getParticleAnchorPercent,
+  getParticleCameraAnchorPercent,
+} = particleEffectTools;
 
 const PROJECT_SAVE_SLOT_COUNT_LIMITS = projectRuntimeSettingsTools.DEFAULT_SAVE_SLOT_COUNT_LIMITS;
 const DEFAULT_PROJECT_RUNTIME_SETTINGS = projectRuntimeSettingsTools.DEFAULT_RUNTIME_SETTINGS;
@@ -4133,6 +4214,11 @@ async function handleClick(event) {
 
   if (action === "apply-character-stage-preset") {
     applyCharacterStagePresetToEditor(actionTarget.dataset.characterStagePreset);
+    return;
+  }
+
+  if (action === "apply-stage-image-preset") {
+    applyStageImagePresetToEditor();
     return;
   }
 
@@ -8555,6 +8641,7 @@ function shouldFlushPendingStoryChanges(action) {
     "save-block",
     "apply-character-stage-preset",
     "adjust-character-stage",
+    "apply-stage-image-preset",
     "add-choice-option",
     "remove-choice-option",
     "move-choice-option-up",
@@ -9271,6 +9358,13 @@ function normalizeScriptImportBlockForScene(draftBlock, scene = getSelectedScene
     getDefaultCharacterPosition,
     getSafePosition,
     getSafeCharacterStage,
+    getSafeStageImageAction,
+    getSafeStageImagePlane: stageImageTools.getSafeStageImagePlane,
+    getSafeStageImagePosition: stageImageTools.getSafeStageImagePosition,
+    getSafeStageImageLayerId: stageImageTools.getSafeStageImageLayerId,
+    getSafeStageImageTransform: stageImageTools.getSafeStageImageTransform,
+    getSafeStageImageDurationMs,
+    getSafeStageImageEasing,
     getSafeTextSpeed,
     getSafeTransition,
     getSafeTransitionDurationMs,
@@ -11035,93 +11129,8 @@ function buildSceneRouteOverview() {
   return routeAnalyzerTools.buildSceneRouteOverview(state.data, state.validation, getRouteAnalyzerOptions());
 }
 
-const PLAYABLE_EXPORT_RESULT_TARGETS = Object.freeze(["web", "native_runtime", "windows_nwjs", "macos_nwjs", "linux_nwjs"]);
-
-const PLAYABLE_EXPORT_REPORT_LINKS = Object.freeze([
-  { urlKey: "playtestGuidePublicUrl", label: "试玩验收 README", reportName: "README_试玩验收先看这里.md", primary: true },
-  { urlKey: "releaseEvidencePackPublicUrl", label: "发布证据包", reportName: "release-evidence-pack.md", primary: true },
-  { urlKey: "releaseReadinessReportPublicUrl", label: "发布就绪报告", reportName: "release_readiness_summary.md", primary: true },
-  { urlKey: "routePlaytestWorkbookReportPublicUrl", label: "路线试玩工作簿", reportName: "route-playtest-workbook.md", primary: true },
-  { urlKey: "routePlaytestWorkbookCsvPublicUrl", label: "路线试玩 CSV", reportName: "route-playtest-workbook.csv" },
-  { urlKey: "storyRouteMapReportPublicUrl", label: "剧情路线图", reportName: "story_route_map.md" },
-  { urlKey: "choiceConsequenceReportPublicUrl", label: "选项后果表", reportName: "choice-consequence-report.md" },
-  { urlKey: "variableInfluenceReportPublicUrl", label: "变量影响表", reportName: "variable-influence-report.md" },
-  { urlKey: "presentationTimelineReportPublicUrl", label: "演出时间轴", reportName: "presentation-timeline-report.md" },
-  { urlKey: "audioCueSheetReportPublicUrl", label: "音频调度表", reportName: "audio-cue-report.md" },
-  { urlKey: "stageDirectionReportPublicUrl", label: "角色舞台调度", reportName: "stage-direction-report.md" },
-  { urlKey: "assetRightsReportPublicUrl", label: "素材授权报告", reportName: "asset-rights-report.md" },
-  { urlKey: "voiceProductionReportPublicUrl", label: "语音制作清单", reportName: "voice-production-report.md" },
-  { urlKey: "localizationAuditReportPublicUrl", label: "多语言覆盖报告", reportName: "localization_audit.md" },
-  { urlKey: "runtimePreloadReportPublicUrl", label: "Runtime 预热报告", reportName: "RUNTIME_PRELOAD_REPORT.md" },
-]);
-
-function isPlayableExportResult(exportResult) {
-  return PLAYABLE_EXPORT_RESULT_TARGETS.includes(exportResult?.target);
-}
-
-function getLatestExportReportLinks(exportResult) {
-  if (!isPlayableExportResult(exportResult)) {
-    return [];
-  }
-  return PLAYABLE_EXPORT_REPORT_LINKS.filter((item) => exportResult?.[item.urlKey]).map((item) => ({
-    ...item,
-    href: exportResult[item.urlKey],
-    description: exportReportDescriptionTools.describeExportReportFile(item.reportName),
-  }));
-}
-
-function renderExportReportLink(link) {
-  const description = link.description || "导出报告";
-  return `
-    <a
-      class="toolbar-button${link.primary ? " toolbar-button-primary" : ""}"
-      href="${escapeHtml(link.href)}"
-      target="_blank"
-      rel="noreferrer"
-      title="${escapeHtml(description)}"
-      aria-label="${escapeHtml(`${link.label}：${description}`)}"
-    >
-      ${escapeHtml(link.label)}
-    </a>
-  `;
-}
-
 function renderLatestExportReportPanel(exportResult) {
-  const links = getLatestExportReportLinks(exportResult);
-  if (!links.length) {
-    return "";
-  }
-  const routeReadiness =
-    Number.isFinite(Number(exportResult.routePlaytestReadinessPercent))
-      ? `${Math.max(0, Math.min(100, Number(exportResult.routePlaytestReadinessPercent)))}%`
-      : "未记录";
-  const routeCaseLine = [
-    `${Number(exportResult.routePlaytestRouteCaseCount ?? 0)} 条分支`,
-    `${Number(exportResult.routePlaytestEndingCaseCount ?? 0)} 个结局`,
-    `${Number(exportResult.routePlaytestBlockedCaseCount ?? 0)} 个阻塞`,
-  ].join(" / ");
-  const releaseReadinessLine = [
-    exportResult.releaseReadinessStatus || "未记录",
-    Number.isFinite(Number(exportResult.releaseReadinessScore)) ? `${Number(exportResult.releaseReadinessScore)} 分` : "",
-  ]
-    .filter(Boolean)
-    .join(" · ");
-
-  return `
-    <article class="detail-card">
-      <strong>最近导出的验收报告</strong>
-      <p class="helper-text">导出成功后，先打开这些报告就能按路线、素材、音频、演出和发布门禁逐项验收，不用再去导出文件夹里翻文件。</p>
-      ${renderDetailRows([
-        ["导出目标", exportResult.targetLabel ?? exportResult.target ?? "未记录"],
-        ["路线试玩就绪度", routeReadiness],
-        ["路线用例", routeCaseLine],
-        ["发布就绪", releaseReadinessLine || "未记录"],
-      ])}
-      <div class="detail-actions">
-        ${links.map((link) => renderExportReportLink(link)).join("")}
-      </div>
-    </article>
-  `;
+  return exportReportDescriptionTools.renderLatestExportReportPanel(exportResult, { escapeHtml, renderDetailRows });
 }
 
 function buildRouteValidationSceneIndex() {
@@ -19631,6 +19640,10 @@ function createInitialPreviewVisualState() {
     characterTransitionEvent: null,
     characterEmphasisEvent: null,
     visibleCharacters: [],
+    visibleStageImages: [],
+    stageImageEvent: null,
+    visibleStageImages: [],
+    stageImageEvent: null,
     speakerName: "预览面板",
     dialogueText: "点“下一句”以后，这里会按真实分支逻辑推进。",
   };
@@ -19716,6 +19729,12 @@ function clonePreviewVisualState(visualState) {
     visibleCharacters: (visualState?.visibleCharacters ?? []).map((characterState) => ({
       ...characterState,
     })),
+    visibleStageImages: (visualState?.visibleStageImages ?? []).map((imageState) =>
+      stageImageTools.cloneStageImageState(imageState)
+    ),
+    stageImageEvent: visualState?.stageImageEvent
+      ? JSON.parse(JSON.stringify(visualState.stageImageEvent))
+      : null,
   };
 }
 
@@ -19727,6 +19746,7 @@ function clearTransientStageEffects(visualState) {
   visualState.screenShake = null;
   visualState.screenFlash = null;
   visualState.backgroundTransitionEvent = null;
+  visualState.stageImageEvent = null;
   visualState.activeCharacterId = null;
   visualState.characterTransitionEvent = null;
   visualState.characterEmphasisEvent = null;
@@ -20018,6 +20038,17 @@ function applyBlockToPreviewState(block, visualState, variables, sceneId = "") {
         asset?.type === "scene3d"
           ? `进入 3D 场景：${asset?.name ?? block.assetId} / yaw ${visualState.scene3dPreview.yaw} / pitch ${visualState.scene3dPreview.pitch} / zoom ${visualState.scene3dPreview.zoom}`
           : `背景切换到：${asset?.name ?? block.assetId}`;
+      return null;
+    }
+    case "stage_image": {
+      const result = applyStageImageBlock(visualState.visibleStageImages, block);
+      visualState.visibleStageImages = result.visibleImages;
+      visualState.stageImageEvent = result.event;
+      visualState.speakerName = "舞台贴图";
+      visualState.dialogueText = stageImageTools.getStageImageSummary(
+        block,
+        state.data.assetsById.get(block.assetId)?.name
+      );
       return null;
     }
     case "music_play": {
@@ -21964,6 +21995,8 @@ function renderStage(visualState, large, options = {}) {
     visualState.depthBlur,
     visualState
   );
+  const stageImageBackMarkup = renderStageImageLayer(visualState, "back");
+  const stageImageFrontMarkup = renderStageImageLayer(visualState, "front");
   const filterMarkup = renderStageFilterLayer(visualState.screenFilter);
   const flashMarkup = renderScreenFlashLayer(visualState.screenFlash);
   const fadeMarkup = renderStageFadeLayer(visualState.screenFade);
@@ -22043,8 +22076,10 @@ function renderStage(visualState, large, options = {}) {
           data-transition="${escapeHtml(getSafeTransition(backgroundTransition?.transition ?? "none"))}"
           style="${backdrop}; ${backgroundTransitionStyle}"
         ></div>
+        ${stageImageBackMarkup}
         ${particleMarkup}
         <div class="stage-cast stage-cast-world">${castMarkup}</div>
+        ${stageImageFrontMarkup}
       </div>
       ${filterMarkup}
       ${fadeMarkup}
@@ -22077,6 +22112,14 @@ function renderStage(visualState, large, options = {}) {
       ${flashMarkup}
     </div>
   `;
+}
+
+function renderStageImageLayer(visualState, plane) {
+  return stageImageTools.renderStageImageLayer(visualState, plane, {
+    escapeHtml,
+    getAsset: (assetId) => state.data.assetsById.get(assetId),
+    getAssetUrl: getAssetPublicUrl,
+  });
 }
 
 function renderStageCastMarkup(
@@ -32401,6 +32444,8 @@ function renderBlockPanel(block, scene, selectedIndex) {
     editorMarkup = renderChoiceEditor(block);
   } else if (block.type === "background") {
     editorMarkup = renderBackgroundEditor(block);
+  } else if (block.type === "stage_image") {
+    editorMarkup = renderStageImageEditor(block);
   } else if (block.type === "character_show") {
     editorMarkup = renderCharacterShowEditor(block);
   } else if (block.type === "character_move") {
@@ -32538,6 +32583,11 @@ function getStorySceneHighlightCandidate(block, scene, index, blocks) {
     pushReason("这里会控制试玩节奏和情绪留白", 12);
   } else if (block.type === "background") {
     pushReason("这里会切换画面空间", 11);
+  } else if (block.type === "stage_image") {
+    pushReason(
+      getSafeStageImageAction(block.action) === "hide" ? "这里会收掉一层舞台贴图" : "这里会增加道具、前景或 Cut-in 构图",
+      getSafeStageImageAction(block.action) === "hide" ? 10 : 15
+    );
   } else if (["music_play", "music_stop", "sfx_play"].includes(block.type)) {
     pushReason("这里会明显影响听觉节奏", 12);
   } else if (["character_show", "character_move", "character_hide"].includes(block.type)) {
@@ -32936,6 +32986,39 @@ function renderBackgroundEditor(block) {
     getSafeScene3dPreviewConfig,
     renderTransitionOptions,
   });
+}
+
+function getStageImageAssets() {
+  return stageImageTools.getStageImageAssets(state.data.assetList);
+}
+
+function getSafeStageImageAssetId(assetId, fallback = "") {
+  return stageImageTools.getSafeStageImageAssetId(state.data.assetList, assetId, fallback);
+}
+
+function renderStageImageEditor(block) {
+  return stageImageTools.renderStageImageEditor(block, {
+    escapeHtml,
+    assets: getStageImageAssets(),
+  });
+}
+
+function readStageImageEditorBlock(block = {}) {
+  return stageImageTools.readStageImageEditorBlock(block, {
+    document,
+    assets: state.data.assetList,
+  });
+}
+
+function applyStageImagePresetToEditor() {
+  const selectedBlock = getSelectedBlock();
+  if (!selectedBlock || selectedBlock.type !== "stage_image") return;
+  const result = stageImageTools.applyStageImagePresetToEditor(selectedBlock, {
+    document,
+    assets: state.data.assetList,
+  });
+  scheduleAutoSave(350);
+  setSaveStatus(`已套用舞台贴图预设：${result.preset?.label ?? "默认构图"}`);
 }
 
 function renderCharacterShowEditor(block) {
@@ -34438,6 +34521,7 @@ function normalizeAssistantDraftBlockForScene(sceneDraft, draftBlock) {
 
   const blockType = [
     "background",
+    "stage_image",
     "dialogue",
     "narration",
     "choice",
@@ -34515,6 +34599,20 @@ function normalizeAssistantDraftBlockForScene(sceneDraft, draftBlock) {
     block.assetId = getSafeAssetIdByType("background", block.assetId);
     block.transition = getSafeTransition(block.transition);
     block.transitionDurationMs = getSafeTransitionDurationMs(block.transitionDurationMs, 600);
+    delete block.assetHint;
+  } else if (blockType === "stage_image") {
+    const normalized = normalizeStageImageState({
+      ...block,
+      assetId: getSafeStageImageAssetId(block.assetId),
+    });
+    block.action = getSafeStageImageAction(block.action);
+    block.layerId = normalized.layerId;
+    block.assetId = normalized.assetId;
+    block.plane = normalized.plane;
+    block.position = normalized.position;
+    block.transform = normalized.transform;
+    block.durationMs = getSafeStageImageDurationMs(block.durationMs);
+    block.easing = getSafeStageImageEasing(block.easing);
     delete block.assetHint;
   } else if (blockType === "character_show") {
     block.characterId = getSafeCharacterId(block.characterId ?? state.selectedCharacterId ?? state.data.characters[0]?.id);
@@ -39320,6 +39418,10 @@ function collectEditedBlock(block) {
     };
   }
 
+  if (block.type === "stage_image") {
+    return readStageImageEditorBlock(block);
+  }
+
   if (block.type === "character_show") {
     const characterId = getSafeCharacterId(document.getElementById("editorCharacterId")?.value);
 
@@ -40948,6 +41050,22 @@ function createDefaultBlock(scene, blockType) {
     };
   }
 
+  if (blockType === "stage_image") {
+    const existingCount = (scene.blocks ?? []).filter((block) => block.type === "stage_image").length;
+    return {
+      id: blockId,
+      type: "stage_image",
+      action: "show",
+      layerId: `layer_${existingCount + 1}`,
+      assetId: getSafeStageImageAssetId(""),
+      plane: "front",
+      position: "center",
+      transform: { ...DEFAULT_STAGE_IMAGE_TRANSFORM },
+      durationMs: 520,
+      easing: "ease_out",
+    };
+  }
+
   if (blockType === "character_show") {
     const characterId = state.selectedCharacterId ?? state.data.characters[0]?.id ?? "";
     return {
@@ -42492,70 +42610,6 @@ function getParticleImageStyle(assetId) {
   return `--particle-image:url("${escapeHtml(previewUrl)}");`;
 }
 
-function getSafeParticleSpeed(speed) {
-  return particleEffectTools.getSafeParticleSpeed(speed);
-}
-
-function getParticleSpeedLabel(speed) {
-  return particleEffectTools.getParticleSpeedLabel(speed);
-}
-
-function getSafeParticleWind(wind) {
-  return particleEffectTools.getSafeParticleWind(wind);
-}
-
-function getParticleWindLabel(wind) {
-  return particleEffectTools.getParticleWindLabel(wind);
-}
-
-function getSafeParticleArea(area) {
-  return particleEffectTools.getSafeParticleArea(area);
-}
-
-function getParticleAreaLabel(area) {
-  return particleEffectTools.getParticleAreaLabel(area);
-}
-
-function getParticleSpeedMultiplier(speed) {
-  return particleEffectTools.getParticleSpeedMultiplier(speed);
-}
-
-function getParticleWindBias(wind, preset) {
-  return particleEffectTools.getParticleWindBias(wind, preset);
-}
-
-function getParticleAreaLayout(area, spreadX = 100) {
-  return particleEffectTools.getParticleAreaLayout(area, spreadX);
-}
-
-function getParticlePresetDensityMultiplier(preset) {
-  return particleEffectTools.getParticlePresetDensityMultiplier(preset);
-}
-
-function getParticleMotionProfile(preset) {
-  return particleEffectTools.getParticleMotionProfile(preset);
-}
-
-function getParticleRandom(index, salt = 1) {
-  return particleEffectTools.getParticleRandom(index, salt);
-}
-
-function mixParticleColors(colorA, colorB, ratio) {
-  return particleEffectTools.mixParticleColors(colorA, colorB, ratio);
-}
-
-function formatParticleNumber(value, fractionDigits = 0) {
-  return particleEffectTools.formatParticleNumber(value, fractionDigits);
-}
-
-function getParticleAnchorPercent(position) {
-  return particleEffectTools.getParticleAnchorPercent(position);
-}
-
-function getParticleCameraAnchorPercent(stageContext = null) {
-  return particleEffectTools.getParticleCameraAnchorPercent(stageContext);
-}
-
 function getParticleEmitterAnchor(particleEffect, stageContext = null) {
   return particleEffectTools.getParticleEmitterAnchor(normalizeParticleEffectConfig(particleEffect), stageContext);
 }
@@ -42578,496 +42632,12 @@ function buildParticleComboVariants(particleEffect) {
   });
 }
 
-function getSafeShakeIntensity(intensity) {
-  return visualEffectTools?.getSafeShakeIntensity?.(intensity) ?? (
-    Object.hasOwn(SHAKE_INTENSITY_LABELS, intensity) ? intensity : "medium"
-  );
-}
-
-function getShakeIntensityLabel(intensity) {
-  return visualEffectTools?.getShakeIntensityLabel?.(intensity) ?? SHAKE_INTENSITY_LABELS[getSafeShakeIntensity(intensity)];
-}
-
-function getSafeEffectDuration(duration) {
-  return visualEffectTools?.getSafeEffectDuration?.(duration) ?? (
-    Object.hasOwn(EFFECT_DURATION_LABELS, duration) ? duration : "medium"
-  );
-}
-
 function getSafeWaitDurationSeconds(value) {
   const parsed = Number.parseFloat(value ?? "");
   if (!Number.isFinite(parsed)) {
     return 1;
   }
   return Math.round(Math.min(Math.max(parsed, 0.1), 30) * 10) / 10;
-}
-
-function getEffectDurationLabel(duration) {
-  return visualEffectTools?.getEffectDurationLabel?.(duration) ?? EFFECT_DURATION_LABELS[getSafeEffectDuration(duration)];
-}
-
-function getShakeDistance(intensity) {
-  if (visualEffectTools?.getShakeDistance) {
-    return visualEffectTools.getShakeDistance(intensity);
-  }
-
-  return {
-    light: 5,
-    medium: 10,
-    heavy: 16,
-  }[getSafeShakeIntensity(intensity)];
-}
-
-function getEffectDurationSeconds(duration) {
-  if (visualEffectTools?.getEffectDurationSeconds) {
-    return visualEffectTools.getEffectDurationSeconds(duration);
-  }
-
-  return {
-    short: 0.42,
-    medium: 0.78,
-    long: 1.2,
-  }[getSafeEffectDuration(duration)];
-}
-
-function getSafeFlashColor(color) {
-  return visualEffectTools?.getSafeFlashColor?.(color) ?? (
-    Object.hasOwn(FLASH_COLOR_LABELS, color) ? color : "white"
-  );
-}
-
-function getFlashColorLabel(color) {
-  return visualEffectTools?.getFlashColorLabel?.(color) ?? FLASH_COLOR_LABELS[getSafeFlashColor(color)];
-}
-
-function getSafeFlashIntensity(intensity) {
-  return visualEffectTools?.getSafeFlashIntensity?.(intensity) ?? (
-    Object.hasOwn(FLASH_INTENSITY_LABELS, intensity) ? intensity : "medium"
-  );
-}
-
-function getFlashIntensityLabel(intensity) {
-  return visualEffectTools?.getFlashIntensityLabel?.(intensity) ?? FLASH_INTENSITY_LABELS[getSafeFlashIntensity(intensity)];
-}
-
-function getFlashOpacity(intensity) {
-  if (visualEffectTools?.getFlashOpacity) {
-    return visualEffectTools.getFlashOpacity(intensity);
-  }
-
-  return {
-    soft: 0.36,
-    medium: 0.54,
-    strong: 0.72,
-  }[getSafeFlashIntensity(intensity)];
-}
-
-function getFlashColorRgb(color) {
-  if (visualEffectTools?.getFlashColorRgb) {
-    return visualEffectTools.getFlashColorRgb(color);
-  }
-
-  return {
-    white: "255, 255, 255",
-    warm: "255, 236, 204",
-    red: "255, 120, 120",
-    black: "32, 24, 22",
-  }[getSafeFlashColor(color)];
-}
-
-function getSafeFadeAction(action) {
-  return visualEffectTools?.getSafeFadeAction?.(action) ?? (
-    Object.hasOwn(FADE_ACTION_LABELS, action) ? action : "fade_out"
-  );
-}
-
-function getFadeActionLabel(action) {
-  return visualEffectTools?.getFadeActionLabel?.(action) ?? FADE_ACTION_LABELS[getSafeFadeAction(action)];
-}
-
-function getSafeFadeColor(color) {
-  return visualEffectTools?.getSafeFadeColor?.(color) ?? (
-    Object.hasOwn(FADE_COLOR_LABELS, color) ? color : "black"
-  );
-}
-
-function getFadeColorLabel(color) {
-  return visualEffectTools?.getFadeColorLabel?.(color) ?? FADE_COLOR_LABELS[getSafeFadeColor(color)];
-}
-
-function getFadeColorRgb(color) {
-  if (visualEffectTools?.getFadeColorRgb) {
-    return visualEffectTools.getFadeColorRgb(color);
-  }
-
-  return {
-    black: "18, 14, 12",
-    white: "255, 252, 247",
-  }[getSafeFadeColor(color)];
-}
-
-function getSafeCameraZoomAction(action) {
-  return visualEffectTools?.getSafeCameraZoomAction?.(action) ?? (
-    Object.hasOwn(CAMERA_ZOOM_ACTION_LABELS, action) ? action : "zoom_in"
-  );
-}
-
-function getCameraZoomActionLabel(action) {
-  return visualEffectTools?.getCameraZoomActionLabel?.(action) ?? CAMERA_ZOOM_ACTION_LABELS[getSafeCameraZoomAction(action)];
-}
-
-function getSafeCameraZoomStrength(strength) {
-  return visualEffectTools?.getSafeCameraZoomStrength?.(strength) ?? (
-    Object.hasOwn(CAMERA_ZOOM_STRENGTH_LABELS, strength) ? strength : "medium"
-  );
-}
-
-function getCameraZoomStrengthLabel(strength) {
-  return visualEffectTools?.getCameraZoomStrengthLabel?.(strength) ?? CAMERA_ZOOM_STRENGTH_LABELS[getSafeCameraZoomStrength(strength)];
-}
-
-function getSafeCameraZoomFocus(focus) {
-  return visualEffectTools?.getSafeCameraZoomFocus?.(focus) ?? (
-    Object.hasOwn(CAMERA_ZOOM_FOCUS_LABELS, focus) ? focus : "center"
-  );
-}
-
-function getCameraZoomFocusLabel(focus) {
-  return visualEffectTools?.getCameraZoomFocusLabel?.(focus) ?? CAMERA_ZOOM_FOCUS_LABELS[getSafeCameraZoomFocus(focus)];
-}
-
-function getCameraZoomScale(action, strength) {
-  if (visualEffectTools?.getCameraZoomScale) {
-    return visualEffectTools.getCameraZoomScale(action, strength);
-  }
-
-  const safeAction = getSafeCameraZoomAction(action);
-  const safeStrength = getSafeCameraZoomStrength(strength);
-
-  if (safeAction === "reset") {
-    return 1;
-  }
-
-  const zoomInScale = {
-    light: 1.08,
-    medium: 1.16,
-    heavy: 1.26,
-  };
-
-  const zoomOutScale = {
-    light: 0.96,
-    medium: 0.92,
-    heavy: 0.88,
-  };
-
-  return safeAction === "zoom_out" ? zoomOutScale[safeStrength] : zoomInScale[safeStrength];
-}
-
-function getCameraZoomOrigin(focus) {
-  if (visualEffectTools?.getCameraZoomOrigin) {
-    return visualEffectTools.getCameraZoomOrigin(focus);
-  }
-
-  return {
-    left: "28% 52%",
-    center: "50% 52%",
-    right: "72% 52%",
-  }[getSafeCameraZoomFocus(focus)];
-}
-
-function getSafeCameraPanTarget(target) {
-  return visualEffectTools?.getSafeCameraPanTarget?.(target) ?? (
-    Object.hasOwn(CAMERA_PAN_TARGET_LABELS, target) ? target : "center"
-  );
-}
-
-function getCameraPanTargetLabel(target) {
-  return visualEffectTools?.getCameraPanTargetLabel?.(target) ?? CAMERA_PAN_TARGET_LABELS[getSafeCameraPanTarget(target)];
-}
-
-function getSafeCameraPanStrength(strength) {
-  return visualEffectTools?.getSafeCameraPanStrength?.(strength) ?? (
-    Object.hasOwn(CAMERA_PAN_STRENGTH_LABELS, strength) ? strength : "medium"
-  );
-}
-
-function getCameraPanStrengthLabel(strength) {
-  return visualEffectTools?.getCameraPanStrengthLabel?.(strength) ?? CAMERA_PAN_STRENGTH_LABELS[getSafeCameraPanStrength(strength)];
-}
-
-function getCameraPanOffset(target, strength) {
-  if (visualEffectTools?.getCameraPanOffset) {
-    return visualEffectTools.getCameraPanOffset(target, strength);
-  }
-
-  const safeTarget = getSafeCameraPanTarget(target);
-  if (safeTarget === "center") {
-    return 0;
-  }
-
-  const amount = {
-    light: 4,
-    medium: 8,
-    heavy: 12,
-  }[getSafeCameraPanStrength(strength)];
-
-  return safeTarget === "left" ? amount : -amount;
-}
-
-function getSafeScreenFilterAction(action) {
-  return visualEffectTools?.getSafeScreenFilterAction?.(action) ?? (
-    Object.hasOwn(SCREEN_FILTER_ACTION_LABELS, action) ? action : "apply"
-  );
-}
-
-function getScreenFilterActionLabel(action) {
-  return visualEffectTools?.getScreenFilterActionLabel?.(action) ?? SCREEN_FILTER_ACTION_LABELS[getSafeScreenFilterAction(action)];
-}
-
-function getSafeScreenFilterPreset(preset) {
-  return visualEffectTools?.getSafeScreenFilterPreset?.(preset) ?? (
-    Object.hasOwn(SCREEN_FILTER_PRESET_LABELS, preset) ? preset : "memory"
-  );
-}
-
-function getScreenFilterPresetLabel(preset) {
-  return visualEffectTools?.getScreenFilterPresetLabel?.(preset) ?? SCREEN_FILTER_PRESET_LABELS[getSafeScreenFilterPreset(preset)];
-}
-
-function getSafeScreenFilterStrength(strength) {
-  return visualEffectTools?.getSafeScreenFilterStrength?.(strength) ?? (
-    Object.hasOwn(SCREEN_FILTER_STRENGTH_LABELS, strength) ? strength : "medium"
-  );
-}
-
-function getScreenFilterStrengthLabel(strength) {
-  return visualEffectTools?.getScreenFilterStrengthLabel?.(strength) ?? SCREEN_FILTER_STRENGTH_LABELS[getSafeScreenFilterStrength(strength)];
-}
-
-function getSafeScreenColorGrade(source) {
-  if (visualEffectTools?.getSafeScreenColorGrade) {
-    return visualEffectTools.getSafeScreenColorGrade(source);
-  }
-
-  const grade = source && typeof source === "object" ? source : {};
-  return Object.fromEntries(
-    Object.entries(SCREEN_COLOR_GRADE_DEFAULTS).map(([key, fallback]) => {
-      const [minimum, maximum] = SCREEN_COLOR_GRADE_LIMITS[key];
-      const value = Number(grade[key]);
-      const safeValue = Number.isFinite(value) ? value : fallback;
-      return [key, Math.round(clamp(safeValue, minimum, maximum))];
-    })
-  );
-}
-
-function getScreenColorGradeCss(source) {
-  if (visualEffectTools?.getScreenColorGradeCss) {
-    return visualEffectTools.getScreenColorGradeCss(source);
-  }
-
-  const grade = getSafeScreenColorGrade(source);
-  const hue = grade.hue - grade.temperature * 0.08;
-  return [
-    `brightness(${(grade.brightness / 100).toFixed(3)})`,
-    `contrast(${(grade.contrast / 100).toFixed(3)})`,
-    `saturate(${(grade.saturation / 100).toFixed(3)})`,
-    `hue-rotate(${hue.toFixed(2)}deg)`,
-  ].join(" ");
-}
-
-function getScreenColorGradeSummary(source) {
-  if (visualEffectTools?.getScreenColorGradeSummary) {
-    return visualEffectTools.getScreenColorGradeSummary(source);
-  }
-
-  const grade = getSafeScreenColorGrade(source);
-  const parts = [];
-  if (grade.brightness !== SCREEN_COLOR_GRADE_DEFAULTS.brightness) {
-    parts.push(`亮度 ${grade.brightness}`);
-  }
-  if (grade.contrast !== SCREEN_COLOR_GRADE_DEFAULTS.contrast) {
-    parts.push(`对比 ${grade.contrast}`);
-  }
-  if (grade.saturation !== SCREEN_COLOR_GRADE_DEFAULTS.saturation) {
-    parts.push(`饱和 ${grade.saturation}`);
-  }
-  if (grade.hue !== SCREEN_COLOR_GRADE_DEFAULTS.hue) {
-    parts.push(`色相 ${grade.hue}`);
-  }
-  if (grade.temperature !== SCREEN_COLOR_GRADE_DEFAULTS.temperature) {
-    parts.push(`冷暖 ${grade.temperature}`);
-  }
-  if (grade.vignette !== SCREEN_COLOR_GRADE_DEFAULTS.vignette) {
-    parts.push(`暗角 ${grade.vignette}`);
-  }
-  return parts.length ? parts.join(" / ") : "默认色彩";
-}
-
-function getScreenFilterVignette(screenFilter) {
-  if (visualEffectTools?.getScreenFilterVignette) {
-    return visualEffectTools.getScreenFilterVignette(screenFilter);
-  }
-
-  if (!screenFilter) {
-    return 0;
-  }
-  const grade = getSafeScreenColorGrade(screenFilter.grade);
-  return Number((grade.vignette / 100 * 0.68).toFixed(3));
-}
-
-function getScreenFilterCss(screenFilter) {
-  if (visualEffectTools?.getScreenFilterCss) {
-    return visualEffectTools.getScreenFilterCss(screenFilter);
-  }
-
-  if (!screenFilter) {
-    return "";
-  }
-
-  const preset = getSafeScreenFilterPreset(screenFilter.preset);
-  const strength = getSafeScreenFilterStrength(screenFilter.strength);
-
-  const recipes = {
-    memory: {
-      soft: "sepia(0.18) saturate(1.02) brightness(1.03) contrast(0.96)",
-      medium: "sepia(0.34) saturate(1.05) brightness(1.05) contrast(0.93)",
-      strong: "sepia(0.5) saturate(1.08) brightness(1.07) contrast(0.9)",
-    },
-    mono: {
-      soft: "grayscale(0.45) brightness(1.03) contrast(0.98)",
-      medium: "grayscale(0.72) brightness(1.04) contrast(1)",
-      strong: "grayscale(1) brightness(1.06) contrast(1.03)",
-    },
-    dream: {
-      soft: "saturate(0.94) brightness(1.06) contrast(0.94)",
-      medium: "saturate(0.88) brightness(1.1) contrast(0.9)",
-      strong: "saturate(0.8) brightness(1.14) contrast(0.86)",
-    },
-    cold: {
-      soft: "saturate(0.88) hue-rotate(168deg) brightness(1.01) contrast(0.97)",
-      medium: "saturate(0.8) hue-rotate(180deg) brightness(1.02) contrast(0.95)",
-      strong: "saturate(0.72) hue-rotate(192deg) brightness(1.03) contrast(0.93)",
-    },
-  };
-
-  return [recipes[preset][strength], getScreenColorGradeCss(screenFilter.grade)].filter(Boolean).join(" ");
-}
-
-function getScreenFilterWash(screenFilter) {
-  if (visualEffectTools?.getScreenFilterWash) {
-    return visualEffectTools.getScreenFilterWash(screenFilter);
-  }
-
-  if (!screenFilter) {
-    return {
-      background: "transparent",
-      opacity: 0,
-    };
-  }
-
-  const preset = getSafeScreenFilterPreset(screenFilter.preset);
-  const strength = getSafeScreenFilterStrength(screenFilter.strength);
-  const grade = getSafeScreenColorGrade(screenFilter.grade);
-  const baseOpacity = {
-    soft: 0.12,
-    medium: 0.2,
-    strong: 0.28,
-  }[strength];
-
-  const backgrounds = {
-    memory: "linear-gradient(180deg, rgba(255, 233, 204, 0.85), rgba(255, 208, 154, 0.62))",
-    mono: "linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(90, 90, 90, 0.34))",
-    dream: "linear-gradient(180deg, rgba(255, 241, 250, 0.82), rgba(214, 230, 255, 0.48))",
-    cold: "linear-gradient(180deg, rgba(204, 232, 255, 0.72), rgba(136, 176, 222, 0.44))",
-  };
-  const temperatureWash =
-    grade.temperature > 0
-      ? "linear-gradient(180deg, rgba(255, 220, 166, 0.76), rgba(255, 150, 92, 0.34))"
-      : "linear-gradient(180deg, rgba(178, 221, 255, 0.72), rgba(86, 126, 255, 0.3))";
-  const temperatureOpacity = Math.abs(grade.temperature) / 100 * 0.16;
-
-  return {
-    background: temperatureOpacity > 0.001 ? `${temperatureWash}, ${backgrounds[preset]}` : backgrounds[preset],
-    opacity: Number(clamp(baseOpacity + temperatureOpacity, 0, 0.46).toFixed(3)),
-  };
-}
-
-function getSafeDepthBlurAction(action) {
-  return visualEffectTools?.getSafeDepthBlurAction?.(action) ?? (
-    Object.hasOwn(DEPTH_BLUR_ACTION_LABELS, action) ? action : "apply"
-  );
-}
-
-function getDepthBlurActionLabel(action) {
-  return visualEffectTools?.getDepthBlurActionLabel?.(action) ?? DEPTH_BLUR_ACTION_LABELS[getSafeDepthBlurAction(action)];
-}
-
-function getSafeDepthBlurFocus(focus) {
-  return visualEffectTools?.getSafeDepthBlurFocus?.(focus) ?? (
-    Object.hasOwn(DEPTH_BLUR_FOCUS_LABELS, focus) ? focus : "center"
-  );
-}
-
-function getDepthBlurFocusLabel(focus) {
-  return visualEffectTools?.getDepthBlurFocusLabel?.(focus) ?? DEPTH_BLUR_FOCUS_LABELS[getSafeDepthBlurFocus(focus)];
-}
-
-function getSafeDepthBlurStrength(strength) {
-  return visualEffectTools?.getSafeDepthBlurStrength?.(strength) ?? (
-    Object.hasOwn(DEPTH_BLUR_STRENGTH_LABELS, strength) ? strength : "medium"
-  );
-}
-
-function getDepthBlurStrengthLabel(strength) {
-  return visualEffectTools?.getDepthBlurStrengthLabel?.(strength) ?? DEPTH_BLUR_STRENGTH_LABELS[getSafeDepthBlurStrength(strength)];
-}
-
-function getDepthBlurBackdropPx(strength) {
-  if (visualEffectTools?.getDepthBlurBackdropPx) {
-    return visualEffectTools.getDepthBlurBackdropPx(strength);
-  }
-
-  return {
-    soft: 4,
-    medium: 7,
-    strong: 10,
-  }[getSafeDepthBlurStrength(strength)];
-}
-
-function getDepthBlurParticlePx(strength) {
-  if (visualEffectTools?.getDepthBlurParticlePx) {
-    return visualEffectTools.getDepthBlurParticlePx(strength);
-  }
-
-  return {
-    soft: 1.5,
-    medium: 2.4,
-    strong: 3.2,
-  }[getSafeDepthBlurStrength(strength)];
-}
-
-function getDepthBlurSpritePx(strength) {
-  if (visualEffectTools?.getDepthBlurSpritePx) {
-    return visualEffectTools.getDepthBlurSpritePx(strength);
-  }
-
-  return {
-    soft: 1.8,
-    medium: 2.8,
-    strong: 3.8,
-  }[getSafeDepthBlurStrength(strength)];
-}
-
-function getDepthBlurSpriteOpacity(strength) {
-  if (visualEffectTools?.getDepthBlurSpriteOpacity) {
-    return visualEffectTools.getDepthBlurSpriteOpacity(strength);
-  }
-
-  return {
-    soft: 0.72,
-    medium: 0.58,
-    strong: 0.46,
-  }[getSafeDepthBlurStrength(strength)];
 }
 
 function describeParticleEffect(particleEffect) {
@@ -43089,6 +42659,20 @@ function buildBlockDetails(block) {
       rows.push(["转场效果", getTransitionLabel(block.transition)]);
       rows.push(["转场时长", `${getSafeTransitionDurationMs(block.transitionDurationMs)} ms`]);
       break;
+    case "stage_image": {
+      const imageState = normalizeStageImageState(block);
+      rows.push(["动作", stageImageTools.getStageImageActionLabel(block.action)]);
+      rows.push(["图层名称", imageState.layerId]);
+      rows.push(["图片素材", state.data.assetsById.get(imageState.assetId)?.name ?? imageState.assetId ?? "未选择"]);
+      rows.push(["前后关系", stageImageTools.getStageImagePlaneLabel(imageState.plane)]);
+      rows.push(["基础位置", stageImageTools.getStageImagePositionLabel(imageState.position)]);
+      rows.push([
+        "位置与外观",
+        `偏移 ${imageState.transform.offsetX}/${imageState.transform.offsetY}% · 宽 ${imageState.transform.width}% · 透明度 ${imageState.transform.opacity}% · 旋转 ${imageState.transform.rotation}° · 层 ${imageState.transform.layer}${imageState.transform.flipX ? " · 已翻转" : ""}`,
+      ]);
+      rows.push(["动作节奏", `${stageImageTools.getStageImageEasingLabel(block.easing)} · ${getSafeStageImageDurationMs(block.durationMs)} ms`]);
+      break;
+    }
     case "dialogue":
       rows.push([
         "说话角色",
@@ -43311,6 +42895,16 @@ function getBlockSummary(block, scene) {
         title: state.data.assetsById.get(block.assetId)?.name ?? block.assetId,
         meta: `切到新背景，${getTransitionDurationSummary(block)}`,
       };
+    case "stage_image": {
+      const imageState = normalizeStageImageState(block);
+      const assetName = state.data.assetsById.get(imageState.assetId)?.name ?? imageState.assetId;
+      return {
+        title: stageImageTools.getStageImageSummary(block, assetName),
+        meta: `${imageState.layerId} · 宽 ${imageState.transform.width}% · ${stageImageTools.getStageImageEasingLabel(
+          block.easing
+        )} ${getSafeStageImageDurationMs(block.durationMs)} ms`,
+      };
+    }
     case "dialogue":
       return {
         title: `${state.data.charactersById.get(block.speakerId)?.displayName ?? block.speakerId}：${
@@ -43547,6 +43141,17 @@ function computeVisualState(scene, blockIndex) {
               };
         visual.scene3dPreview =
           asset?.type === "scene3d" ? getSafeScene3dPreviewConfig(block.scene3dPreview) : null;
+        break;
+      }
+      case "stage_image": {
+        const result = applyStageImageBlock(visual.visibleStageImages, block);
+        visual.visibleStageImages = result.visibleImages;
+        visual.stageImageEvent = result.event;
+        visual.speakerName = "舞台贴图";
+        visual.dialogueText = stageImageTools.getStageImageSummary(
+          block,
+          state.data.assetsById.get(block.assetId)?.name
+        );
         break;
       }
       case "music_play": {

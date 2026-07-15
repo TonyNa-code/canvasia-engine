@@ -37,6 +37,13 @@
       beginnerVisible: true,
       description: "切换背景、CG 或 3D 场景，让当前段落先有画面落点。",
     }),
+    "add-stage-image": Object.freeze({
+      blockType: "stage_image",
+      label: "道具 / 前景贴图",
+      group: "stage",
+      beginnerVisible: true,
+      description: "放入道具、窗框、Cut-in 或光影图层，可自由调整位置、大小、透明度和前后关系。",
+    }),
     "add-character-show": Object.freeze({
       blockType: "character_show",
       label: "显示角色",
