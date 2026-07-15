@@ -257,7 +257,7 @@ def build_runtime_preload_manifest(
                     bonus=scene_bonus,
                 )
 
-            if block_type in {"character_show", "dialogue"}:
+            if block_type in {"character_show", "character_move", "dialogue"}:
                 sprite_asset_id = get_character_sprite_asset_id(
                     characters_by_id,
                     block.get("characterId") or block.get("speakerId"),

@@ -361,6 +361,22 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
                 renderCharacterStageControls: (stage, stageOptions) => `<section data-stage-x="${{stage.x}}" data-stage-scale="${{stage.scale}}" data-stage-position="${{stageOptions.position}}">stage controls</section>`,
               }}
             );
+            const characterMoveMarkup = tools.renderCharacterMoveEditor(
+              {{ characterId: "char_a", expressionId: "smile", position: "left", durationMs: 950, easing: "ease_in_out" }},
+              {{
+                getSafeCharacterId: (value) => value || "char_a",
+                getSafeExpressionId: (_characterId, value) => value || "default",
+                getSafePosition: (value) => value || "center",
+                getSafeCharacterMotionEasing: (value) => value || "ease_out",
+                getSafeCharacterMotionDurationMs: (value) => Number(value ?? 600),
+                getCharacterStageFromBlock: () => ({{ x: -8, scale: 1.08 }}),
+                renderCharacterOptions: (selected) => `<option value="${{selected}}" selected>角色 ${{selected}}</option>`,
+                renderExpressionOptions: (characterId, expressionId) => `<option value="${{expressionId}}" selected>${{characterId}}:${{expressionId}}</option>`,
+                renderPositionOptions: (selected) => `<option value="${{selected}}" selected>${{selected}}</option>`,
+                renderCharacterMotionEasingOptions: (selected) => `<option value="${{selected}}" selected>${{selected}}</option>`,
+                renderCharacterStageControls: (stage, stageOptions) => `<section data-stage-x="${{stage.x}}" data-stage-position="${{stageOptions.position}}">motion stage</section>`,
+              }}
+            );
             const characterHideMarkup = tools.renderCharacterHideEditor(
               {{ characterId: "char_a", transition: "fade", transitionDurationMs: 640 }},
               {{
@@ -460,6 +476,7 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
               narrationMarkup,
               backgroundMarkup,
               characterShowMarkup,
+              characterMoveMarkup,
               characterHideMarkup,
               musicMarkup,
               musicStopMarkup,
@@ -485,6 +502,7 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
             "renderCameraPanEditor",
             "renderCameraZoomEditor",
             "renderCharacterHideEditor",
+            "renderCharacterMoveEditor",
             "renderCharacterShowEditor",
             "renderChoiceCountQualityTools",
             "renderChoiceEditor",
@@ -595,6 +613,10 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
         self.assertIn('value="720"', payload["characterShowMarkup"])
         self.assertIn('data-stage-x="12"', payload["characterShowMarkup"])
         self.assertIn('data-stage-position="right"', payload["characterShowMarkup"])
+        self.assertIn("编辑角色舞台动作", payload["characterMoveMarkup"])
+        self.assertIn('id="editorCharacterMotionEasing"', payload["characterMoveMarkup"])
+        self.assertIn('value="950"', payload["characterMoveMarkup"])
+        self.assertIn('data-stage-position="left"', payload["characterMoveMarkup"])
         self.assertIn("编辑角色退场", payload["characterHideMarkup"])
         self.assertIn("隐藏哪个角色", payload["characterHideMarkup"])
         self.assertIn('value="fade" selected', payload["characterHideMarkup"])

@@ -305,6 +305,7 @@ const {
   POSITION_LABELS,
   CHARACTER_TRANSITION_LABELS,
   BASIC_TRANSITION_LABELS,
+  CHARACTER_MOTION_EASING_LABELS,
   DEFAULT_CHARACTER_STAGE,
   TEXT_SPEED_LABELS,
   DIALOG_THEME_LABELS,
@@ -318,6 +319,11 @@ const getSafePosition = visualEffectTools.getSafePosition;
 const getSafeTransition = visualEffectTools.getSafeTransition;
 const getTransitionLabel = visualEffectTools.getTransitionLabel;
 const getSafeTransitionDurationMs = visualEffectTools.getSafeTransitionDurationMs;
+const getSafeCharacterMotionEasing = visualEffectTools.getSafeCharacterMotionEasing;
+const getCharacterMotionEasingLabel = visualEffectTools.getCharacterMotionEasingLabel;
+const getSafeCharacterMotionDurationMs = visualEffectTools.getSafeCharacterMotionDurationMs;
+const buildCharacterMotionEvent = visualEffectTools.buildCharacterMotionEvent;
+const getCharacterMotionStyle = visualEffectTools.getCharacterMotionStyle;
 const getSafeCharacterStage = visualEffectTools.getSafeCharacterStage;
 const getCharacterStagePreset = visualEffectTools.getCharacterStagePreset;
 const getCharacterStagePresetEntries = visualEffectTools.getCharacterStagePresetEntries;
@@ -9268,6 +9274,8 @@ function normalizeScriptImportBlockForScene(draftBlock, scene = getSelectedScene
     getSafeTextSpeed,
     getSafeTransition,
     getSafeTransitionDurationMs,
+    getSafeCharacterMotionDurationMs,
+    getSafeCharacterMotionEasing,
     getSafeNonNegativeNumber,
     getSafeVolumePercent,
     getSafeVideoFit,
@@ -11887,7 +11895,7 @@ function getStoryBlockGroupLabel(type) {
 }
 
 function getBlockExpressionAssetId(block) {
-  if (block.type !== "dialogue" && block.type !== "character_show") {
+  if (!["dialogue", "character_show", "character_move"].includes(block.type)) {
     return "";
   }
 
@@ -20189,6 +20197,30 @@ function applyBlockToPreviewState(block, visualState, variables, sceneId = "") {
         state.data.charactersById.get(block.characterId)?.displayName ?? block.characterId
       } 出现在画面里。`;
       return null;
+    case "character_move": {
+      const previousState =
+        getPreviewCharacterState(visualState, block.characterId) ??
+        createFallbackPreviewCharacterState(block.characterId);
+      const targetState = {
+        characterId: block.characterId,
+        position: getSafePosition(block.position ?? previousState.position),
+        expressionId: getSafeExpressionId(block.characterId, block.expressionId ?? previousState.expressionId),
+        expressionName: getExpressionName(
+          block.characterId,
+          block.expressionId ?? previousState.expressionId
+        ),
+        stage: getCharacterStageFromBlock(block),
+      };
+      upsertPreviewCharacter(visualState, targetState);
+      visualState.characterTransitionEvent = buildCharacterMotionEvent(previousState, targetState, block);
+      visualState.speakerName = "角色舞台动作";
+      visualState.dialogueText = `${
+        state.data.charactersById.get(block.characterId)?.displayName ?? block.characterId
+      } 会移动到${getPositionLabel(targetState.position)}，动作手感为${getCharacterMotionEasingLabel(
+        block.easing
+      )}。`;
+      return null;
+    }
     case "character_hide": {
       const previousState =
         getPreviewCharacterState(visualState, block.characterId) ??
@@ -22098,7 +22130,12 @@ function renderStageSpriteCard(
   const transitionDurationMs = characterTransitionEvent
     ? getSafeTransitionDurationMs(characterTransitionEvent.durationMs)
     : getSafeTransitionDurationMs();
-  const stageStyle = `${getCharacterStageStyle(characterState.stage)}--sprite-transition-ms:${transitionDurationMs}ms;`;
+  const isMoving =
+    characterTransitionEvent?.mode === "move" &&
+    characterTransitionEvent.characterId === characterState.characterId;
+  const stageStyle = `${getCharacterStageStyle(characterState.stage, characterState.position)}${
+    isMoving ? getCharacterMotionStyle(characterTransitionEvent) : ""
+  }--sprite-transition-ms:${transitionDurationMs}ms;`;
 
   if (shouldBlurStageCharacter(characterState.position, depthBlur)) {
     classes.push("is-depth-muted");
@@ -22109,6 +22146,10 @@ function renderStageSpriteCard(
 
   if (characterTransitionEvent?.mode === "show" && characterTransitionEvent.characterId === characterState.characterId) {
     classes.push("is-entering");
+  }
+
+  if (isMoving) {
+    classes.push("is-moving");
   }
 
   if (isGhostHide) {
@@ -29820,6 +29861,7 @@ function buildReleaseCreativeQualityContext() {
       return Boolean(assetId && (!asset || asset.fileExists));
     }).length,
     characterShowCount: storySceneBlocks.filter((block) => block.type === "character_show" && block.characterId).length,
+    characterMoveCount: storySceneBlocks.filter((block) => block.type === "character_move" && block.characterId).length,
     characterHideCount: storySceneBlocks.filter((block) => block.type === "character_hide" && block.characterId).length,
     scenesWithBackground: storyScenes.filter((scene) =>
       (scene.blocks ?? []).some((block) => block.type === "background" && block.assetId)
@@ -32361,6 +32403,8 @@ function renderBlockPanel(block, scene, selectedIndex) {
     editorMarkup = renderBackgroundEditor(block);
   } else if (block.type === "character_show") {
     editorMarkup = renderCharacterShowEditor(block);
+  } else if (block.type === "character_move") {
+    editorMarkup = renderCharacterMoveEditor(block);
   } else if (block.type === "character_hide") {
     editorMarkup = renderCharacterHideEditor(block);
   } else if (block.type === "music_play") {
@@ -32496,7 +32540,7 @@ function getStorySceneHighlightCandidate(block, scene, index, blocks) {
     pushReason("这里会切换画面空间", 11);
   } else if (["music_play", "music_stop", "sfx_play"].includes(block.type)) {
     pushReason("这里会明显影响听觉节奏", 12);
-  } else if (["character_show", "character_hide"].includes(block.type)) {
+  } else if (["character_show", "character_move", "character_hide"].includes(block.type)) {
     pushReason("这里会改变画面上的人物关系", 10);
   }
 
@@ -32906,6 +32950,30 @@ function renderCharacterShowEditor(block) {
     renderExpressionOptions,
     renderPositionOptions,
     renderTransitionOptions,
+    renderCharacterStageControls,
+  });
+}
+
+function renderCharacterMotionEasingOptions(selectedEasing) {
+  const safeEasing = getSafeCharacterMotionEasing(selectedEasing);
+  return Object.entries(CHARACTER_MOTION_EASING_LABELS)
+    .map(([value, label]) => `<option value="${value}" ${value === safeEasing ? "selected" : ""}>${escapeHtml(label)}</option>`)
+    .join("");
+}
+
+function renderCharacterMoveEditor(block) {
+  return storyBlockEditorTools.renderCharacterMoveEditor(block, {
+    escapeHtml,
+    getSafeCharacterId,
+    getSafeExpressionId,
+    getSafePosition,
+    getSafeCharacterMotionEasing,
+    getSafeCharacterMotionDurationMs,
+    getCharacterStageFromBlock,
+    renderCharacterOptions,
+    renderExpressionOptions,
+    renderPositionOptions,
+    renderCharacterMotionEasingOptions,
     renderCharacterStageControls,
   });
 }
@@ -34374,6 +34442,7 @@ function normalizeAssistantDraftBlockForScene(sceneDraft, draftBlock) {
     "narration",
     "choice",
     "character_show",
+    "character_move",
     "character_hide",
     "music_play",
     "music_stop",
@@ -34453,6 +34522,18 @@ function normalizeAssistantDraftBlockForScene(sceneDraft, draftBlock) {
     block.position = getSafePosition(block.position ?? getDefaultCharacterPosition(block.characterId));
     block.transition = getSafeTransition(block.transition);
     block.transitionDurationMs = getSafeTransitionDurationMs(block.transitionDurationMs, 600);
+    block.stage = getSafeCharacterStage({
+      ...DEFAULT_CHARACTER_STAGE,
+      ...(block.stage && typeof block.stage === "object" ? block.stage : {}),
+    });
+    delete block.characterHint;
+    delete block.expressionHint;
+  } else if (blockType === "character_move") {
+    block.characterId = getSafeCharacterId(block.characterId ?? state.selectedCharacterId ?? state.data.characters[0]?.id);
+    block.expressionId = getSafeExpressionId(block.characterId, block.expressionId);
+    block.position = getSafePosition(block.position ?? getDefaultCharacterPosition(block.characterId));
+    block.durationMs = getSafeCharacterMotionDurationMs(block.durationMs);
+    block.easing = getSafeCharacterMotionEasing(block.easing);
     block.stage = getSafeCharacterStage({
       ...DEFAULT_CHARACTER_STAGE,
       ...(block.stage && typeof block.stage === "object" ? block.stage : {}),
@@ -39258,6 +39339,19 @@ function collectEditedBlock(block) {
     };
   }
 
+  if (block.type === "character_move") {
+    const characterId = getSafeCharacterId(document.getElementById("editorCharacterId")?.value);
+    return {
+      ...block,
+      characterId,
+      expressionId: getSafeExpressionId(characterId, document.getElementById("editorExpressionId")?.value),
+      position: getSafePosition(document.getElementById("editorCharacterPosition")?.value),
+      durationMs: getSafeCharacterMotionDurationMs(document.getElementById("editorCharacterMotionDurationMs")?.value),
+      easing: getSafeCharacterMotionEasing(document.getElementById("editorCharacterMotionEasing")?.value),
+      stage: readCharacterStageControls(),
+    };
+  }
+
   if (block.type === "character_hide") {
     return {
       ...block,
@@ -40863,6 +40957,20 @@ function createDefaultBlock(scene, blockType) {
       expressionId: getSafeExpressionId(characterId, null),
       position: getDefaultCharacterPosition(characterId),
       transition: "fade",
+      stage: { ...DEFAULT_CHARACTER_STAGE },
+    };
+  }
+
+  if (blockType === "character_move") {
+    const characterId = state.selectedCharacterId ?? state.data.characters[0]?.id ?? "";
+    return {
+      id: blockId,
+      type: "character_move",
+      characterId,
+      expressionId: getSafeExpressionId(characterId, null),
+      position: getDefaultCharacterPosition(characterId),
+      durationMs: 600,
+      easing: "ease_out",
       stage: { ...DEFAULT_CHARACTER_STAGE },
     };
   }
@@ -43033,6 +43141,17 @@ function buildBlockDetails(block) {
       rows.push(["转场效果", getTransitionLabel(block.transition)]);
       rows.push(["转场时长", `${getSafeTransitionDurationMs(block.transitionDurationMs)} ms`]);
       break;
+    case "character_move":
+      rows.push([
+        "动作角色",
+        state.data.charactersById.get(block.characterId)?.displayName ?? block.characterId,
+      ]);
+      rows.push(["目标表情", getExpressionName(block.characterId, block.expressionId)]);
+      rows.push(["目标位置", getPositionLabel(block.position)]);
+      rows.push(["舞台微调", getCharacterStageSummary(getCharacterStageFromBlock(block))]);
+      rows.push(["动作手感", getCharacterMotionEasingLabel(block.easing)]);
+      rows.push(["动作时长", `${getSafeCharacterMotionDurationMs(block.durationMs)} ms`]);
+      break;
     case "character_hide":
       rows.push([
         "隐藏角色",
@@ -43212,6 +43331,15 @@ function getBlockSummary(block, scene) {
           block.position
         )}`,
         meta: `角色会出现在画面里，${getTransitionDurationSummary(block)}`,
+      };
+    case "character_move":
+      return {
+        title: `${
+          state.data.charactersById.get(block.characterId)?.displayName ?? block.characterId
+        } → ${getPositionLabel(block.position)} / ${getExpressionName(block.characterId, block.expressionId)}`,
+        meta: `${getCharacterMotionEasingLabel(block.easing)} · ${getSafeCharacterMotionDurationMs(
+          block.durationMs
+        )} ms · ${getCharacterStageSummary(getCharacterStageFromBlock(block))}`,
       };
     case "character_hide":
       return {
@@ -43588,6 +43716,27 @@ function computeVisualState(scene, blockIndex) {
           };
         }
         break;
+      case "character_move": {
+        const previousState =
+          visibleMap.get(block.characterId) ?? createFallbackPreviewCharacterState(block.characterId);
+        const targetState = {
+          characterId: block.characterId,
+          position: getSafePosition(block.position ?? previousState.position),
+          expressionId: getSafeExpressionId(block.characterId, block.expressionId ?? previousState.expressionId),
+          expressionName: getExpressionName(
+            block.characterId,
+            block.expressionId ?? previousState.expressionId
+          ),
+          stage: getCharacterStageFromBlock(block),
+        };
+        visibleMap.set(block.characterId, targetState);
+        visual.characterTransitionEvent = buildCharacterMotionEvent(previousState, targetState, block);
+        visual.speakerName = "角色舞台动作";
+        visual.dialogueText = `${
+          state.data.charactersById.get(block.characterId)?.displayName ?? block.characterId
+        } 会移动到${getPositionLabel(targetState.position)}。`;
+        break;
+      }
       case "character_hide": {
         const previousState =
           visibleMap.get(block.characterId) ?? createFallbackPreviewCharacterState(block.characterId);
@@ -44288,6 +44437,15 @@ function validateBlock(block, scene, data, pushIssue) {
         break;
       case "character_show":
         requireCharacterExpression(block.characterId, block.expressionId);
+        break;
+      case "character_move":
+        requireCharacterExpression(block.characterId, block.expressionId);
+        if (getSafeCharacterMotionEasing(block.easing) !== (block.easing ?? "ease_out")) {
+          pushIssue("warning", "角色动作缓动不认识，播放时会回退成自然收住。", location, blockContext);
+        }
+        if (getSafeCharacterMotionDurationMs(block.durationMs) !== Number(block.durationMs ?? 600)) {
+          pushIssue("warning", "角色动作时长超出范围，播放时会自动限制在 0-10000 毫秒。", location, blockContext);
+        }
         break;
       case "character_hide":
         if (!data.charactersById.has(block.characterId)) {

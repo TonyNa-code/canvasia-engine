@@ -90,7 +90,7 @@ class FrontendStoryBlockActionsModuleTests(unittest.TestCase):
         self.assertEqual(action_to_block["add-variable-set"], "variable_set")
         self.assertEqual(action_to_block["add-variable-add"], "variable_add")
         self.assertEqual(action_to_block["add-condition"], "condition")
-        self.assertEqual(len(entries), 24)
+        self.assertEqual(len(entries), 25)
         self.assertEqual(
             payload["beginnerActions"],
             [
@@ -99,6 +99,7 @@ class FrontendStoryBlockActionsModuleTests(unittest.TestCase):
                 "add-choice",
                 "add-background",
                 "add-character-show",
+                "add-character-move",
                 "add-music-play",
                 "add-video-play",
                 "add-wait",

@@ -225,9 +225,9 @@
           <h2>角色舞台调度表</h2>
           <span class="badge badge-soft ${getStageDirectionSheetToneClass(digest.status)}">${escapeHtml(digest.title)}</span>
         </div>
-        <p class="helper-text">${escapeHtml(digest.detail)} 它会检查背景、角色登场 / 退场、说话人是否提前上场、表情和立绘是否可用。</p>
+        <p class="helper-text">${escapeHtml(digest.detail)} 它会检查背景、角色登场 / 动作 / 退场、说话人是否提前上场、表情和立绘是否可用。</p>
         <div class="preview-sprint-metrics">
-          ${renderRouteMetricCard("舞台事件", `${summary.eventCount ?? 0} 个`, "背景、登场、退场和说话")}
+          ${renderRouteMetricCard("舞台事件", `${summary.eventCount ?? 0} 个`, "登场 " + (summary.characterShowCount ?? 0) + " / 动作 " + (summary.characterMoveCount ?? 0) + " / 退场 " + (summary.characterHideCount ?? 0))}
           ${renderRouteMetricCard("自动补位", `${summary.speakerAutoPlaceCount ?? 0} 句`, "说话人未提前登场")}
           ${renderRouteMetricCard("立绘 / 表情缺口", `${summary.missingVisualCount ?? 0} 个`, "缺立绘、缺文件或坏表情")}
           ${renderRouteMetricCard("构图风险", `${summary.compositionRiskCount ?? 0} 处`, "遮挡、拥挤、图层或透明度")}

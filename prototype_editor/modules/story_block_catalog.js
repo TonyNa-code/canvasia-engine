@@ -29,6 +29,16 @@
         tags: ["timelineVisualBeat", "storyContent"],
       },
       {
+        type: "character_move",
+        label: "角色舞台动作",
+        compactLabel: "角色动作",
+        group: "角色",
+        webStatus: "full",
+        nativeStatus: "full",
+        note: "让已登场角色平滑移动、换表情、缩放、翻转或调整透明度与图层。",
+        tags: ["timelineVisualBeat", "storyContent", "runtimeVisualEffect", "effect"],
+      },
+      {
         type: "character_hide",
         label: "隐藏角色",
         compactLabel: "角色退场",

@@ -15,6 +15,7 @@ EXPORT_RUNTIME_CAPABILITY_CSV_NAME = "runtime-capability-matrix.csv"
 CAPABILITY_ROWS = [
     ("background", "画面", "full", "full", "背景 / CG 可播放；3D 场景建议重点验收原生 Runtime。"),
     ("character_show", "角色", "full", "full", "支持角色登场、表情、站位、舞台参数和基础转场。"),
+    ("character_move", "角色", "full", "full", "支持角色平滑走位、换表情、缩放、透明度、翻转、图层与缓动。"),
     ("character_hide", "角色", "full", "full", "支持角色离场和基础转场。"),
     ("dialogue", "文本", "full", "full", "支持说话人、表情同步、打字机、语音和文本历史。"),
     ("narration", "文本", "full", "full", "支持旁白文本、打字机、语音和文本历史。"),
@@ -303,7 +304,7 @@ def build_runtime_acceptance_checklist(rows: list[dict], summary: dict) -> dict:
                 "relatedBlockTypes": ["music_play", "music_stop", "sfx_play"],
             }
         )
-    if {"character_show", "character_hide"} & used_types:
+    if {"character_show", "character_move", "character_hide"} & used_types:
         add_item(
             {
                 "id": "runtime-character-stage",
@@ -311,9 +312,9 @@ def build_runtime_acceptance_checklist(rows: list[dict], summary: dict) -> dict:
                 "targetLabel": "Web / 原生",
                 "severity": "check",
                 "severityLabel": "点测",
-                "title": "立绘登退场要验位置、大小、透明度和转场",
-                "detail": "确认自定义位置、缩放、淡入淡出、隐藏和多角色同屏不会错位或残影。",
-                "relatedBlockTypes": ["character_show", "character_hide"],
+                "title": "立绘登退场与舞台动作要验位置、大小和缓动",
+                "detail": "确认自定义位置、缩放、透明度、走位缓动、隐藏和多角色同屏不会错位或残影。",
+                "relatedBlockTypes": ["character_show", "character_move", "character_hide"],
             }
         )
     if used_types & VISUAL_EFFECT_TYPES:
@@ -362,6 +363,7 @@ def build_vn_essentials_audit(bundle: dict) -> dict:
         "jumpCount": 0,
         "backgroundBlockCount": 0,
         "characterShowCount": 0,
+        "characterMoveCount": 0,
         "characterHideCount": 0,
         "musicPlayCount": 0,
         "musicStopCount": 0,
@@ -389,6 +391,9 @@ def build_vn_essentials_audit(bundle: dict) -> dict:
             scenes_with_background.add(record["sceneId"])
         elif block_type == "character_show":
             metrics["characterShowCount"] += 1
+            character_positions.add(clean_text(block.get("position"), "center"))
+        elif block_type == "character_move":
+            metrics["characterMoveCount"] += 1
             character_positions.add(clean_text(block.get("position"), "center"))
         elif block_type == "character_hide":
             metrics["characterHideCount"] += 1
@@ -449,7 +454,7 @@ def build_vn_essentials_audit(bundle: dict) -> dict:
     area_specs = [
         ("story", "剧情文本", ["story_text_missing"], f"{metrics['textBlockCount']} 个文本/选项块"),
         ("visual", "画面背景", ["background_coverage"], f"{metrics['scenesWithBackground']}/{scene_count} 个场景有背景"),
-        ("character", "人物舞台", ["character_stage_missing"], f"{metrics['characterShowCount']} 次登场"),
+        ("character", "人物舞台", ["character_stage_missing"], f"{metrics['characterShowCount']} 次登场 / {metrics['characterMoveCount']} 次动作"),
         ("audio", "音频调度", ["bgm_plan_missing", "bgm_scope_missing", "bgm_fade_in_missing", "sfx_plan_missing"], f"{metrics['musicPlayCount']} 个 BGM / {metrics['sfxPlayCount']} 个音效"),
         ("branch", "分支变量", ["choice_node_missing"], f"{metrics['choiceCount']} 个选项 / {metrics['conditionCount']} 个条件"),
     ]

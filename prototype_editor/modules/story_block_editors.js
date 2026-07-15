@@ -773,6 +773,59 @@
   `;
   }
 
+  function renderCharacterMoveEditor(block, options = {}) {
+    const escape = getEscapeHtml(options);
+    const getSafeCharacterId = getRenderer(options, "getSafeCharacterId", (characterId) => characterId ?? "");
+    const getSafeExpressionId = getRenderer(options, "getSafeExpressionId", (_characterId, expressionId) => expressionId ?? "");
+    const getSafePosition = getRenderer(options, "getSafePosition", (position) => position ?? "center");
+    const getSafeCharacterMotionEasing = getRenderer(options, "getSafeCharacterMotionEasing", (value) => value ?? "ease_out");
+    const getSafeCharacterMotionDurationMs = getRenderer(options, "getSafeCharacterMotionDurationMs", (value) => Number(value) || 600);
+    const getCharacterStageFromBlock = getRenderer(options, "getCharacterStageFromBlock", () => ({}));
+    const renderCharacterOptions = getRenderer(options, "renderCharacterOptions");
+    const renderExpressionOptions = getRenderer(options, "renderExpressionOptions");
+    const renderPositionOptions = getRenderer(options, "renderPositionOptions");
+    const renderCharacterMotionEasingOptions = getRenderer(options, "renderCharacterMotionEasingOptions");
+    const renderCharacterStageControls = getRenderer(options, "renderCharacterStageControls");
+    const characterId = getSafeCharacterId(block?.characterId);
+    const expressionId = getSafeExpressionId(characterId, block?.expressionId);
+    const position = getSafePosition(block?.position);
+    const easing = getSafeCharacterMotionEasing(block?.easing);
+    const durationMs = getSafeCharacterMotionDurationMs(block?.durationMs);
+    const stage = getCharacterStageFromBlock(block);
+
+    return `
+    <article class="editor-card">
+      <h3>编辑角色舞台动作</h3>
+      <p>让已经在画面里的角色自然走位、换表情或推近拉远。新手只需选择目标位置和动作速度，高级参数可继续控制透明度、翻转与图层。</p>
+    </article>
+    <div class="field-grid">
+      <div class="detail-row">
+        <label for="editorCharacterId">移动哪个角色</label>
+        <select id="editorCharacterId">${renderCharacterOptions(characterId)}</select>
+      </div>
+      <div class="detail-row">
+        <label for="editorExpressionId">动作结束时的表情</label>
+        <select id="editorExpressionId">${renderExpressionOptions(characterId, expressionId)}</select>
+      </div>
+      <div class="detail-row">
+        <label for="editorCharacterPosition">目标位置</label>
+        <select id="editorCharacterPosition">${renderPositionOptions(position)}</select>
+      </div>
+      <div class="detail-row">
+        <label for="editorCharacterMotionEasing">动作手感</label>
+        <select id="editorCharacterMotionEasing">${renderCharacterMotionEasingOptions(easing)}</select>
+      </div>
+      <div class="detail-row">
+        <label for="editorCharacterMotionDurationMs">动作时长（毫秒）</label>
+        <input id="editorCharacterMotionDurationMs" type="number" min="0" max="10000" step="50" value="${escape(String(durationMs))}" />
+        <p class="helper-text">0 表示立即到位；日常走位建议 450-800，情绪特写建议 700-1200。</p>
+      </div>
+      ${renderCharacterStageControls(stage, { position })}
+    </div>
+    ${renderSaveBlockActions()}
+  `;
+  }
+
   function renderCharacterHideEditor(block, options = {}) {
     const getSafeCharacterId = getRenderer(options, "getSafeCharacterId", (characterId) => characterId ?? "");
     const getSafeTransition = getRenderer(options, "getSafeTransition", (transition) => transition ?? "fade");
@@ -1488,6 +1541,7 @@
     renderChoiceCountQualityTools,
     renderBackgroundEditor,
     renderCharacterShowEditor,
+    renderCharacterMoveEditor,
     renderCharacterHideEditor,
     renderMusicPlayEditor,
     renderMusicStopEditor,

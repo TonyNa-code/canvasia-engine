@@ -624,7 +624,7 @@
           });
         }
 
-        if (["character_show", "dialogue"].includes(blockType)) {
+        if (["character_show", "character_move", "dialogue"].includes(blockType)) {
           addAsset(getCharacterSpriteAssetId(charactersById, block.characterId || block.speakerId, block.expressionId), {
             phase,
             reason: `${sceneLabel} / sprite`,

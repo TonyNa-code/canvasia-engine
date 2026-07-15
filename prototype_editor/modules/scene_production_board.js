@@ -31,6 +31,7 @@
     dialogue: "台词",
     narration: "旁白",
     character_show: "显示角色",
+    character_move: "角色动作",
     character_hide: "隐藏角色",
     music_play: "播放音乐",
     music_stop: "停止音乐",

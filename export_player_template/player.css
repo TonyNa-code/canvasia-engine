@@ -4871,6 +4871,10 @@ html[data-game-ui-title-anchor="free"] .start-overlay {
 }
 
 /* === Character Stage Direction Controls === */
+.sprite-layer {
+  display: block;
+}
+
 .sprite-card {
   --sprite-base-y: 0px;
   --sprite-offset-x: 0%;
@@ -4878,10 +4882,12 @@ html[data-game-ui-title-anchor="free"] .start-overlay {
   --sprite-scale: 1;
   --sprite-opacity: 1;
   --sprite-flip-x: 1;
-  position: relative;
+  position: absolute;
+  left: var(--sprite-position-x, 50%);
+  bottom: 0;
   opacity: var(--sprite-opacity);
   transform:
-    translate(var(--sprite-offset-x), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
+    translate(calc(-50% + var(--sprite-offset-x)), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
     scale(var(--sprite-scale));
   transform-origin: 50% 100%;
 }
@@ -4942,6 +4948,27 @@ html[data-game-ui-title-anchor="free"] .start-overlay {
   animation: player-sprite-pop-out var(--sprite-transition-ms, 260ms) ease both;
 }
 
+.sprite-card.is-moving {
+  animation: player-sprite-stage-move var(--sprite-motion-ms, 600ms) var(--sprite-motion-easing, ease-out) both;
+}
+
+@keyframes player-sprite-stage-move {
+  from {
+    left: var(--sprite-from-position-x, 50%);
+    opacity: var(--sprite-from-opacity, 1);
+    transform:
+      translate(calc(-50% + var(--sprite-from-offset-x, 0%)), calc(var(--sprite-base-y) + var(--sprite-from-offset-y, 0%)))
+      scale(var(--sprite-from-scale, 1));
+  }
+  to {
+    left: var(--sprite-position-x, 50%);
+    opacity: var(--sprite-opacity, 1);
+    transform:
+      translate(calc(-50% + var(--sprite-offset-x)), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
+      scale(var(--sprite-scale));
+  }
+}
+
 @keyframes player-background-fade-in {
   from {
     opacity: 0;
@@ -4957,13 +4984,13 @@ html[data-game-ui-title-anchor="free"] .start-overlay {
   from {
     opacity: 0;
     transform:
-      translate(calc(var(--sprite-offset-x) - 34%), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
+      translate(calc(-50% + var(--sprite-offset-x) - 34%), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
       scale(var(--sprite-scale));
   }
   to {
     opacity: var(--sprite-opacity);
     transform:
-      translate(var(--sprite-offset-x), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
+      translate(calc(-50% + var(--sprite-offset-x)), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
       scale(var(--sprite-scale));
   }
 }
@@ -4972,13 +4999,13 @@ html[data-game-ui-title-anchor="free"] .start-overlay {
   from {
     opacity: var(--sprite-opacity);
     transform:
-      translate(var(--sprite-offset-x), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
+      translate(calc(-50% + var(--sprite-offset-x)), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
       scale(var(--sprite-scale));
   }
   to {
     opacity: 0;
     transform:
-      translate(calc(var(--sprite-offset-x) - 28%), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
+      translate(calc(-50% + var(--sprite-offset-x) - 28%), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
       scale(var(--sprite-scale));
   }
 }
@@ -4987,13 +5014,13 @@ html[data-game-ui-title-anchor="free"] .start-overlay {
   from {
     opacity: 0;
     transform:
-      translate(calc(var(--sprite-offset-x) + 34%), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
+      translate(calc(-50% + var(--sprite-offset-x) + 34%), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
       scale(var(--sprite-scale));
   }
   to {
     opacity: var(--sprite-opacity);
     transform:
-      translate(var(--sprite-offset-x), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
+      translate(calc(-50% + var(--sprite-offset-x)), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
       scale(var(--sprite-scale));
   }
 }
@@ -5002,13 +5029,13 @@ html[data-game-ui-title-anchor="free"] .start-overlay {
   from {
     opacity: var(--sprite-opacity);
     transform:
-      translate(var(--sprite-offset-x), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
+      translate(calc(-50% + var(--sprite-offset-x)), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
       scale(var(--sprite-scale));
   }
   to {
     opacity: 0;
     transform:
-      translate(calc(var(--sprite-offset-x) + 28%), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
+      translate(calc(-50% + var(--sprite-offset-x) + 28%), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
       scale(var(--sprite-scale));
   }
 }
@@ -5017,13 +5044,13 @@ html[data-game-ui-title-anchor="free"] .start-overlay {
   from {
     opacity: 0;
     transform:
-      translate(var(--sprite-offset-x), calc(var(--sprite-base-y) + var(--sprite-offset-y) + 22px))
+      translate(calc(-50% + var(--sprite-offset-x)), calc(var(--sprite-base-y) + var(--sprite-offset-y) + 22px))
       scale(var(--sprite-scale));
   }
   to {
     opacity: var(--sprite-opacity);
     transform:
-      translate(var(--sprite-offset-x), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
+      translate(calc(-50% + var(--sprite-offset-x)), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
       scale(var(--sprite-scale));
   }
 }
@@ -5032,13 +5059,13 @@ html[data-game-ui-title-anchor="free"] .start-overlay {
   from {
     opacity: var(--sprite-opacity);
     transform:
-      translate(var(--sprite-offset-x), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
+      translate(calc(-50% + var(--sprite-offset-x)), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
       scale(var(--sprite-scale));
   }
   to {
     opacity: 0;
     transform:
-      translate(var(--sprite-offset-x), calc(var(--sprite-base-y) + var(--sprite-offset-y) + 18px))
+      translate(calc(-50% + var(--sprite-offset-x)), calc(var(--sprite-base-y) + var(--sprite-offset-y) + 18px))
       scale(var(--sprite-scale));
   }
 }
@@ -5047,19 +5074,19 @@ html[data-game-ui-title-anchor="free"] .start-overlay {
   from {
     opacity: 0;
     transform:
-      translate(var(--sprite-offset-x), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
+      translate(calc(-50% + var(--sprite-offset-x)), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
       scale(var(--sprite-scale));
   }
   68% {
     opacity: var(--sprite-opacity);
     transform:
-      translate(var(--sprite-offset-x), calc(var(--sprite-base-y) + var(--sprite-offset-y) - 4px))
+      translate(calc(-50% + var(--sprite-offset-x)), calc(var(--sprite-base-y) + var(--sprite-offset-y) - 4px))
       scale(var(--sprite-scale));
   }
   to {
     opacity: var(--sprite-opacity);
     transform:
-      translate(var(--sprite-offset-x), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
+      translate(calc(-50% + var(--sprite-offset-x)), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
       scale(var(--sprite-scale));
   }
 }
@@ -5080,13 +5107,13 @@ html[data-game-ui-title-anchor="free"] .start-overlay {
   from {
     opacity: var(--sprite-opacity);
     transform:
-      translate(var(--sprite-offset-x), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
+      translate(calc(-50% + var(--sprite-offset-x)), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
       scale(var(--sprite-scale));
   }
   to {
     opacity: 0;
     transform:
-      translate(var(--sprite-offset-x), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
+      translate(calc(-50% + var(--sprite-offset-x)), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
       scale(var(--sprite-scale));
   }
 }
@@ -5095,6 +5122,7 @@ html[data-game-ui-title-anchor="free"] .start-overlay {
   .background-layer.is-transitioning,
   .sprite-card.is-entering,
   .sprite-card.is-leaving,
+  .sprite-card.is-moving,
   .sprite-card.is-entering .sprite-card-inner {
     animation: none !important;
   }
@@ -5103,6 +5131,7 @@ html[data-game-ui-title-anchor="free"] .start-overlay {
 html[data-game-ui-motion="low"] .background-layer.is-transitioning,
 html[data-game-ui-motion="low"] .sprite-card.is-entering,
 html[data-game-ui-motion="low"] .sprite-card.is-leaving,
+html[data-game-ui-motion="low"] .sprite-card.is-moving,
 html[data-game-ui-motion="low"] .sprite-card.is-entering .sprite-card-inner {
   animation: none !important;
 }

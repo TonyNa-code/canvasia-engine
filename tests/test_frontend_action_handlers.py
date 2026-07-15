@@ -18,6 +18,7 @@ PLAYER_PATH = ROOT_DIR / "export_player_template" / "player.js"
 RUNTIME_CONTROLS_PATH = ROOT_DIR / "export_player_template" / "runtime_controls.js"
 RUNTIME_SETTINGS_PATH = ROOT_DIR / "export_player_template" / "runtime_settings.js"
 RUNTIME_AUDIO_PATH = ROOT_DIR / "export_player_template" / "runtime_audio.js"
+RUNTIME_CHARACTER_MOTION_PATH = ROOT_DIR / "export_player_template" / "runtime_character_motion.js"
 RUNTIME_DATA_PATH = ROOT_DIR / "export_player_template" / "runtime_data.js"
 RUNTIME_STORAGE_PATH = ROOT_DIR / "export_player_template" / "runtime_storage.js"
 RUNTIME_I18N_PATH = ROOT_DIR / "export_player_template" / "runtime_i18n.js"
@@ -6053,10 +6054,10 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn('"adjust-character-stage"', app_source)
         self.assertIn('target.id === "editorCharacterPosition"', app_source)
 
-        player_source = PLAYER_PATH.read_text(encoding="utf-8")
-        player_stage = _extract_function_source(player_source, "getSafeCharacterStage")
-        player_style = _extract_function_source(player_source, "getCharacterStageStyle")
-        self.assertIn("flipX: getSafeBoolean(raw.flipX, false)", player_stage)
+        player_motion_source = RUNTIME_CHARACTER_MOTION_PATH.read_text(encoding="utf-8")
+        player_stage = _extract_function_source(player_motion_source, "getSafeCharacterStage")
+        player_style = _extract_function_source(player_motion_source, "getCharacterStageStyle")
+        self.assertIn("flipX: safeBoolean(raw.flipX, DEFAULT_CHARACTER_STAGE.flipX)", player_stage)
         self.assertIn("--sprite-flip-x", player_style)
         player_css = (ROOT_DIR / "export_player_template" / "player.css").read_text(encoding="utf-8")
         self.assertIn(".sprite-visual-frame", player_css)

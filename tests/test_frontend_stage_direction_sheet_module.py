@@ -12,6 +12,55 @@ MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "stage_direction_sheet
 
 
 class FrontendStageDirectionSheetModuleTests(unittest.TestCase):
+    def test_character_move_updates_stage_composition_and_reports_missing_entry(self) -> None:
+        script = textwrap.dedent(
+            f"""
+            const fs = require("fs");
+            const vm = require("vm");
+            const context = {{ window: {{}} }};
+            context.globalThis = context;
+            vm.createContext(context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
+            const tools = context.window.CanvasiaEditorStageDirectionSheet;
+            const base = {{
+              project: {{ title: "Motion Sheet" }},
+              assetList: [{{ id: "sprite_hero", type: "sprite", name: "Hero", fileExists: true }}],
+              characters: [{{
+                id: "hero",
+                displayName: "Hero",
+                defaultPosition: "left",
+                defaultSpriteId: "sprite_hero",
+                expressions: [{{ id: "smile", name: "Smile", spriteAssetId: "sprite_hero" }}],
+              }}],
+            }};
+            const sheet = tools.buildStageDirectionSheet({{
+              ...base,
+              scenes: [{{ id: "scene", name: "Scene", blocks: [
+                {{ id: "show", type: "character_show", characterId: "hero", expressionId: "smile", position: "left" }},
+                {{ id: "move", type: "character_move", characterId: "hero", expressionId: "smile", position: "right", durationMs: 900, easing: "spring", stage: {{ scale: 118, offsetX: -6 }} }},
+              ] }}],
+            }});
+            const missingEntry = tools.buildStageDirectionSheet({{
+              ...base,
+              scenes: [{{ id: "scene", name: "Scene", blocks: [
+                {{ id: "move", type: "character_move", characterId: "hero", position: "center" }},
+              ] }}],
+            }});
+            process.stdout.write(JSON.stringify({{ sheet, missingEntry }}));
+            """
+        )
+        completed = subprocess.run(["node", "-e", script], cwd=ROOT_DIR, capture_output=True, text=True, check=False)
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        self.assertEqual(payload["sheet"]["summary"]["characterMoveCount"], 1)
+        move_event = next(event for event in payload["sheet"]["events"] if event["type"] == "character_move")
+        self.assertEqual(move_event["positionLabel"], "右侧")
+        self.assertEqual(move_event["motionDurationMs"], 900)
+        self.assertEqual(move_event["motionEasing"], "spring")
+        self.assertEqual(move_event["stage"]["scale"], 118)
+        self.assertNotIn("character_move_not_visible", {issue["code"] for issue in payload["sheet"]["issues"]})
+        self.assertIn("character_move_not_visible", {issue["code"] for issue in payload["missingEntry"]["issues"]})
+
     def test_stage_direction_sheet_helpers_export_markdown_and_csv(self) -> None:
         script = textwrap.dedent(
             f"""

@@ -176,6 +176,45 @@ class RenpyExportContractTests(unittest.TestCase):
         self.assertEqual(backend_show_warnings, [])
         self.assertEqual(backend_hide_warnings, [])
 
+    def test_character_move_exports_the_same_stage_transition_on_both_exporters(self) -> None:
+        block = {
+            "type": "character_move",
+            "characterId": "heroine",
+            "expressionId": "smile",
+            "position": "right",
+            "durationMs": 900,
+            "easing": "ease_in_out",
+            "stage": {"offsetX": -6, "scale": 118, "layer": 2},
+        }
+        frontend = load_frontend_payload(
+            f"""
+            const warnings = [];
+            const lines = tools.renderBlock({json.dumps(block)}, {{
+              warnings,
+              sceneId: "scene_open",
+              blockIndex: 3,
+              sceneMap: new Map([["scene_open", {{ id: "scene_open" }}]]),
+            }});
+            process.stdout.write(JSON.stringify({{ lines, warnings }}));
+            """
+        )
+        backend_warnings: list[dict] = []
+        backend_lines = renpy_export.render_character_move_block(
+            block,
+            {
+                "warnings": backend_warnings,
+                "sceneId": "scene_open",
+                "blockIndex": 3,
+                "sceneLabelMap": {"scene_open": "scene_open"},
+            },
+        )
+
+        expected = "    show heroine smile at canvasia_stage_scene_open_4 zorder 22 with MoveTransition(0.9, time_warp=_warper.ease)"
+        self.assertEqual(frontend["lines"], [expected])
+        self.assertEqual(backend_lines, [expected])
+        self.assertEqual(frontend["warnings"], [])
+        self.assertEqual(backend_warnings, [])
+
     def test_particle_image_asset_exports_to_snowblossom_image_on_both_exporters(self) -> None:
         frontend = load_frontend_payload(
             """

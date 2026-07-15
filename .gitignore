@@ -19,6 +19,7 @@ playwright-report/
 test-results/
 release_preview/
 verification_reports/
+build/
 
 *.log
 *.tmp

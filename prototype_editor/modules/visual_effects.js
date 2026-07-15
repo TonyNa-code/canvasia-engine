@@ -158,9 +158,20 @@
     none: "直接切换",
   });
 
+  const CHARACTER_MOTION_EASING_LABELS = Object.freeze({
+    linear: "匀速移动",
+    ease_in: "缓慢起步",
+    ease_out: "自然收住",
+    ease_in_out: "两端柔和",
+    spring: "轻微弹性",
+  });
+
   const TRANSITION_DURATION_DEFAULT_MS = 360;
   const TRANSITION_DURATION_MIN_MS = 0;
   const TRANSITION_DURATION_MAX_MS = 5000;
+  const CHARACTER_MOTION_DURATION_DEFAULT_MS = 600;
+  const CHARACTER_MOTION_DURATION_MIN_MS = 0;
+  const CHARACTER_MOTION_DURATION_MAX_MS = 10000;
 
   const DEFAULT_CHARACTER_STAGE = Object.freeze({
     offsetX: 0,
@@ -752,6 +763,39 @@
     return Math.round(clamp(Number.isFinite(number) ? number : safeFallback, TRANSITION_DURATION_MIN_MS, TRANSITION_DURATION_MAX_MS));
   }
 
+  function getSafeCharacterMotionEasing(value) {
+    return getSafeLabelKey(CHARACTER_MOTION_EASING_LABELS, value, "ease_out");
+  }
+
+  function getCharacterMotionEasingLabel(value) {
+    return CHARACTER_MOTION_EASING_LABELS[getSafeCharacterMotionEasing(value)];
+  }
+
+  function getSafeCharacterMotionDurationMs(value, fallback = CHARACTER_MOTION_DURATION_DEFAULT_MS) {
+    const number = Number.parseFloat(value ?? "");
+    const fallbackNumber = Number.parseFloat(fallback ?? "");
+    const safeFallback = Number.isFinite(fallbackNumber)
+      ? clamp(fallbackNumber, CHARACTER_MOTION_DURATION_MIN_MS, CHARACTER_MOTION_DURATION_MAX_MS)
+      : CHARACTER_MOTION_DURATION_DEFAULT_MS;
+    return Math.round(
+      clamp(
+        Number.isFinite(number) ? number : safeFallback,
+        CHARACTER_MOTION_DURATION_MIN_MS,
+        CHARACTER_MOTION_DURATION_MAX_MS
+      )
+    );
+  }
+
+  function getCharacterMotionCssTimingFunction(value) {
+    return {
+      linear: "linear",
+      ease_in: "cubic-bezier(0.42, 0, 1, 1)",
+      ease_out: "cubic-bezier(0.16, 1, 0.3, 1)",
+      ease_in_out: "cubic-bezier(0.65, 0, 0.35, 1)",
+      spring: "cubic-bezier(0.34, 1.56, 0.64, 1)",
+    }[getSafeCharacterMotionEasing(value)];
+  }
+
   function getSafeStageNumber(value, fallback, min, max) {
     const number = Number.parseFloat(value ?? "");
     return Number.isFinite(number) ? clamp(number, min, max) : fallback;
@@ -884,9 +928,14 @@
     return applyCharacterStageDelta(stage, adjustment.delta);
   }
 
-  function getCharacterStageStyle(stageSource = {}) {
+  function getCharacterPositionPercent(positionSource = "center") {
+    return { left: 24, center: 50, right: 76 }[getSafePosition(positionSource)];
+  }
+
+  function getCharacterStageStyle(stageSource = {}, positionSource = "center") {
     const stage = getSafeCharacterStage(stageSource);
     return [
+      `--sprite-position-x:${getCharacterPositionPercent(positionSource)}%;`,
       `--sprite-offset-x:${stage.offsetX}%;`,
       `--sprite-offset-y:${stage.offsetY}%;`,
       `--sprite-scale:${(stage.scale / 100).toFixed(3)};`,
@@ -894,6 +943,39 @@
       `--sprite-layer:${stage.layer};`,
       `--sprite-flip-x:${stage.flipX ? -1 : 1};`,
       `z-index:${20 + stage.layer};`,
+    ].join("");
+  }
+
+  function buildCharacterMotionEvent(previousState = {}, targetState = {}, block = {}) {
+    const previous = previousState && typeof previousState === "object" ? previousState : {};
+    const target = targetState && typeof targetState === "object" ? targetState : {};
+    return {
+      mode: "move",
+      characterId: String(target.characterId ?? block.characterId ?? previous.characterId ?? "").trim(),
+      previousState: {
+        ...previous,
+        position: getSafePosition(previous.position),
+        stage: getSafeCharacterStage(previous.stage),
+      },
+      durationMs: getSafeCharacterMotionDurationMs(block.durationMs),
+      easing: getSafeCharacterMotionEasing(block.easing),
+    };
+  }
+
+  function getCharacterMotionStyle(event = null) {
+    if (!event || event.mode !== "move") {
+      return "";
+    }
+    const previous = event.previousState ?? {};
+    const stage = getSafeCharacterStage(previous.stage);
+    return [
+      `--sprite-from-position-x:${getCharacterPositionPercent(previous.position)}%;`,
+      `--sprite-from-offset-x:${stage.offsetX}%;`,
+      `--sprite-from-offset-y:${stage.offsetY}%;`,
+      `--sprite-from-scale:${(stage.scale / 100).toFixed(3)};`,
+      `--sprite-from-opacity:${(stage.opacity / 100).toFixed(2)};`,
+      `--sprite-motion-ms:${getSafeCharacterMotionDurationMs(event.durationMs)}ms;`,
+      `--sprite-motion-easing:${getCharacterMotionCssTimingFunction(event.easing)};`,
     ].join("");
   }
 
@@ -946,9 +1028,13 @@
     POSITION_LABELS,
     CHARACTER_TRANSITION_LABELS,
     BASIC_TRANSITION_LABELS,
+    CHARACTER_MOTION_EASING_LABELS,
     TRANSITION_DURATION_DEFAULT_MS,
     TRANSITION_DURATION_MIN_MS,
     TRANSITION_DURATION_MAX_MS,
+    CHARACTER_MOTION_DURATION_DEFAULT_MS,
+    CHARACTER_MOTION_DURATION_MIN_MS,
+    CHARACTER_MOTION_DURATION_MAX_MS,
     DEFAULT_CHARACTER_STAGE,
     CHARACTER_STAGE_PRESETS,
     CHARACTER_STAGE_ADJUSTMENTS,
@@ -1020,6 +1106,10 @@
     getSafeTransition,
     getTransitionLabel,
     getSafeTransitionDurationMs,
+    getSafeCharacterMotionEasing,
+    getCharacterMotionEasingLabel,
+    getSafeCharacterMotionDurationMs,
+    getCharacterMotionCssTimingFunction,
     getSafeCharacterStage,
     getCharacterStagePreset,
     getCharacterStagePresetEntries,
@@ -1029,6 +1119,8 @@
     applyCharacterStageDelta,
     applyCharacterStageAdjustment,
     getCharacterStageStyle,
+    buildCharacterMotionEvent,
+    getCharacterMotionStyle,
     getCharacterStageSummary,
     getSafeTextSpeed,
     getTextSpeedLabel,

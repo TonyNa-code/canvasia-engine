@@ -23,6 +23,7 @@ BLOCK_LABELS = {
     "dialogue": "台词",
     "narration": "旁白",
     "character_show": "角色登场",
+    "character_move": "角色动作",
     "character_hide": "角色退场",
     "music_play": "播放 BGM",
     "music_stop": "停止 BGM",
@@ -36,7 +37,7 @@ BLOCK_LABELS = {
 }
 VALID_POSITIONS = {"left", "center", "right"}
 VALID_CHARACTER_TRANSITIONS = {"fade", "slide_left", "slide_right", "rise", "pop", "none"}
-STORY_CONTENT_BLOCK_TYPES = {"background", "dialogue", "narration", "character_show", "choice", "video_play", "credits_roll", "wait"}
+STORY_CONTENT_BLOCK_TYPES = {"background", "dialogue", "narration", "character_show", "character_move", "choice", "video_play", "credits_roll", "wait"}
 ISSUE_WEIGHT = {"blocker": 100, "warn": 60, "tip": 20}
 STAGE_POSITION_X = {"left": -36, "center": 0, "right": 36}
 
@@ -506,6 +507,7 @@ def inspect_scene_stage(scene_record: dict, assets_by_id: dict[str, dict], chara
                     "position": position,
                     "stage": stage,
                     "characterName": get_character_name(character, character_id),
+                    "expressionId": clean_text(block.get("expressionId")),
                     "expressionName": get_expression_name(character, block.get("expressionId")),
                 }
             composition = inspect_stage_composition(visible_characters, issues, base_context)
@@ -525,6 +527,66 @@ def inspect_scene_stage(scene_record: dict, assets_by_id: dict[str, dict], chara
                     composition=composition,
                     transition=clean_text(block.get("transition")),
                     transitionDurationMs=as_int(block.get("transitionDurationMs"), 0),
+                    assetStatusLabel=f"{visual['label']}：{' / '.join(visual['assetNames'])}".rstrip("："),
+                    assetIds=visual["assetIds"],
+                )
+            )
+            continue
+
+        if block_type == "character_move":
+            issues = []
+            character_id = clean_text(block.get("characterId"))
+            character = characters_by_id.get(character_id)
+            previous_visible = visible_characters.get(character_id)
+            if not character_id:
+                push_issue(issues, "blocker", "character_move_missing_character", "角色动作卡未选择角色", "这张角色动作卡没有绑定角色。", base_context)
+            elif not character:
+                push_issue(issues, "blocker", "character_move_unknown_character", "动作角色不存在", f"角色 {character_id} 不在当前角色表中。", base_context)
+            elif not previous_visible:
+                push_issue(issues, "warn", "character_move_not_visible", "动作角色尚未登场", "Runtime 会从角色默认状态补位，但正式演出建议先放一张角色登场卡。", base_context)
+            expression_id = clean_text(block.get("expressionId") or (previous_visible or {}).get("expressionId"))
+            if character and expression_id and not get_expression(character, expression_id):
+                push_issue(issues, "blocker", "character_move_expression_missing", "动作表情不存在", f"表情 {expression_id} 不在角色表情列表中。", base_context)
+            visual = get_character_visual_status(character, expression_id, assets_by_id)
+            if character:
+                inspect_visual_status(issues, visual, base_context)
+            stage = get_stage(block) if isinstance(block.get("stage"), dict) else get_stage({"stage": (previous_visible or {}).get("stage") or {}})
+            position = get_position_value(
+                block.get("position"),
+                clean_text((previous_visible or {}).get("position") or (character or {}).get("defaultPosition"), "center"),
+            )
+            if clean_text(block.get("position")) and clean_text(block.get("position")) not in VALID_POSITIONS:
+                push_issue(issues, "warn", "character_move_position_unknown", "角色动作站位无法识别", "建议使用 left、center 或 right，避免 Runtime 回退位置。", base_context)
+            duration_ms = clamp_int(block.get("durationMs"), 0, 10000, 600)
+            easing = clean_text(block.get("easing"), "ease_out")
+            if character_id:
+                visible_characters[character_id] = {
+                    "characterId": character_id,
+                    "position": position,
+                    "stage": stage,
+                    "characterName": get_character_name(character, character_id),
+                    "expressionId": expression_id,
+                    "expressionName": get_expression_name(character, expression_id),
+                }
+            composition = inspect_stage_composition(visible_characters, issues, base_context)
+            composition_rows.append(composition)
+            scene_issues.extend(issues)
+            events.append(
+                make_event(
+                    "character_move",
+                    "动作",
+                    base_context,
+                    issues,
+                    characterName=get_character_name(character, character_id),
+                    expressionName=get_expression_name(character, expression_id),
+                    position=position,
+                    positionLabel=get_position_label(position),
+                    stage=stage,
+                    composition=composition,
+                    motionDurationMs=duration_ms,
+                    motionEasing=easing,
+                    transition="",
+                    transitionDurationMs="",
                     assetStatusLabel=f"{visual['label']}：{' / '.join(visual['assetNames'])}".rstrip("："),
                     assetIds=visual["assetIds"],
                 )
@@ -585,6 +647,7 @@ def inspect_scene_stage(scene_record: dict, assets_by_id: dict[str, dict], chara
                     "position": previous_visible.get("position") if previous_visible else get_position_value(character.get("defaultPosition"), "center"),
                     "stage": previous_visible.get("stage") if previous_visible else get_stage({}),
                     "characterName": get_character_name(character, character_id),
+                    "expressionId": clean_text(block.get("expressionId") or (previous_visible or {}).get("expressionId")),
                     "expressionName": get_expression_name(character, block.get("expressionId")),
                 }
             composition = inspect_stage_composition(visible_characters, issues, base_context, speaker_id=character_id)
@@ -680,6 +743,7 @@ def build_stage_direction_sheet(bundle: dict, assets_doc: dict) -> dict:
         "eventCount": len(events),
         "stagedSceneCount": sum(1 for scene in scene_reports if scene["eventCount"] > 0),
         "characterShowCount": sum(1 for event in events if event["type"] == "character_show"),
+        "characterMoveCount": sum(1 for event in events if event["type"] == "character_move"),
         "characterHideCount": sum(1 for event in events if event["type"] == "character_hide"),
         "dialogueEventCount": sum(1 for event in events if event["type"] == "dialogue"),
         "missingBackgroundSceneCount": sum(1 for scene in scene_reports if any(issue["code"] == "scene_without_background" for issue in scene["issues"])),
@@ -799,12 +863,13 @@ def build_stage_direction_report(sheet: dict) -> str:
             "## 总览",
             "",
             markdown_table(
-                ["场景", "舞台事件", "登场", "退场", "说话", "缺背景场景", "未登场说话", "立绘缺口", "构图风险", "遮挡", "说话过淡", "转场缺口", "阻塞", "复查", "就绪度"],
+                ["场景", "舞台事件", "登场", "动作", "退场", "说话", "缺背景场景", "未登场说话", "立绘缺口", "构图风险", "遮挡", "说话过淡", "转场缺口", "阻塞", "复查", "就绪度"],
                 [
                     [
                         summary.get("sceneCount", 0),
                         summary.get("eventCount", 0),
                         summary.get("characterShowCount", 0),
+                        summary.get("characterMoveCount", 0),
                         summary.get("characterHideCount", 0),
                         summary.get("dialogueEventCount", 0),
                         summary.get("missingBackgroundSceneCount", 0),

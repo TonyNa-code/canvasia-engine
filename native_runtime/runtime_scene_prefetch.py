@@ -73,6 +73,8 @@ def get_preload_reason(block: dict | None, fallback: str = "路线预取") -> st
         return "即将切换背景"
     if block_type == "character_show":
         return "即将显示立绘"
+    if block_type == "character_move":
+        return "即将切换角色表情或舞台动作"
     if block_type == "dialogue":
         return "即将显示角色或播放语音"
     if block_type == "narration":
@@ -124,7 +126,7 @@ def collect_block_asset_candidates(block: dict | None, context: dict | None = No
         add_asset_candidate(candidates, block.get("assetId"), get_preload_reason(block))
     if block_type in {"dialogue", "narration"}:
         add_asset_candidate(candidates, block.get("voiceAssetId"), get_preload_reason(block))
-    if block_type in {"character_show", "dialogue"}:
+    if block_type in {"character_show", "character_move", "dialogue"}:
         collect_character_sprite_asset_ids(block, safe_context, candidates)
     return candidates
 

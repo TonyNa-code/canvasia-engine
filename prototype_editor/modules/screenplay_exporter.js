@@ -5,6 +5,7 @@
     "background",
     "character",
     "character_show",
+    "character_move",
     "character_hide",
     "music_play",
     "music_stop",
@@ -269,6 +270,17 @@
         block.position ? `位置 ${block.position}` : "",
         block.scale ? `缩放 ${block.scale}` : "",
         block.transition ? `转场 ${block.transition}` : "",
+      ]);
+    }
+    if (type === "character_move") {
+      const stage = block.stage ?? {};
+      return joinParts([
+        `移动立绘：${getCharacterName(characterMap, block.characterId, "未选择角色")}`,
+        block.expressionId ? `表情 ${block.expressionId}` : "",
+        block.position ? `目标 ${block.position}` : "",
+        stage.scale ? `缩放 ${stage.scale}%` : "",
+        formatMs(block.durationMs),
+        block.easing ? `缓动 ${block.easing}` : "",
       ]);
     }
     if (type === "character_hide") {

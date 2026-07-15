@@ -18,6 +18,7 @@ BLOCK_LABELS = {
     "dialogue": "台词",
     "narration": "旁白",
     "character_show": "角色登场",
+    "character_move": "角色舞台动作",
     "character_hide": "角色退场",
     "music_play": "播放 BGM",
     "music_stop": "停止 BGM",
@@ -42,6 +43,7 @@ STORY_TEXT_TYPES = {"dialogue", "narration", "choice"}
 VISUAL_BEAT_TYPES = {
     "background",
     "character_show",
+    "character_move",
     "character_hide",
     "particle_effect",
     "wait",
@@ -257,6 +259,8 @@ def get_event_duration_ms(block: dict) -> int:
     block_type = clean_text(block.get("type"))
     if block_type in STORY_TEXT_TYPES:
         return estimate_text_duration_ms(block)
+    if block_type == "character_move":
+        return clamp_int(block.get("durationMs"), 0, 10000, 600)
     if block_type in {"background", "character_show", "character_hide"}:
         return get_transition_duration_ms(block)
     if block_type in {"screen_shake", "screen_flash", "screen_fade", "camera_zoom", "camera_pan", "screen_filter", "depth_blur"}:
@@ -365,14 +369,14 @@ def inspect_block(block: dict, context: dict) -> dict:
         elif clean_text(block.get("assetId")) and not asset["ready"]:
             push_issue(issues, "blocker", "video_asset_not_ready", "视频素材不可用", asset["label"], base_context)
 
-    if block_type == "character_show":
+    if block_type in {"character_show", "character_move"}:
         detail = get_character_name(context["charactersById"], block.get("characterId"))
         stage = block.get("stage") if isinstance(block.get("stage"), dict) else block.get("characterStage") if isinstance(block.get("characterStage"), dict) else {}
         scale = clamp_int(stage.get("scale"), 45, 220, 100)
         opacity = clamp_int(stage.get("opacity"), 0, 100, 100)
         if not clean_text(block.get("characterId")):
             push_issue(issues, "blocker", "character_show_missing_character", "角色登场卡未选择角色", "这张卡没有绑定角色。", base_context)
-        if clean_text(block.get("transition"), "fade") == "none":
+        if block_type == "character_show" and clean_text(block.get("transition"), "fade") == "none":
             push_issue(issues, "tip", "character_show_hard_cut", "角色登场是硬切", "建议用淡入、滑入或弹出，让立绘出现更像正式演出。", base_context)
         if scale <= 55 or scale >= 185:
             push_issue(issues, "tip", "character_scale_extreme", "立绘缩放较极端", f"当前缩放约 {scale}%，建议确认构图没有遮挡文本框或出画。", base_context)

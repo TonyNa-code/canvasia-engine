@@ -11196,13 +11196,13 @@ html[data-ui-theme="light"] select {
   from {
     opacity: 0;
     transform:
-      translate(calc(var(--sprite-offset-x) - 34%), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
+      translate(calc(-50% + var(--sprite-offset-x) - 34%), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
       scale(var(--sprite-scale));
   }
   to {
     opacity: var(--sprite-opacity);
     transform:
-      translate(var(--sprite-offset-x), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
+      translate(calc(-50% + var(--sprite-offset-x)), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
       scale(var(--sprite-scale));
   }
 }
@@ -11211,13 +11211,13 @@ html[data-ui-theme="light"] select {
   from {
     opacity: var(--sprite-opacity);
     transform:
-      translate(var(--sprite-offset-x), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
+      translate(calc(-50% + var(--sprite-offset-x)), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
       scale(var(--sprite-scale));
   }
   to {
     opacity: 0;
     transform:
-      translate(calc(var(--sprite-offset-x) - 28%), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
+      translate(calc(-50% + var(--sprite-offset-x) - 28%), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
       scale(var(--sprite-scale));
   }
 }
@@ -11226,13 +11226,13 @@ html[data-ui-theme="light"] select {
   from {
     opacity: 0;
     transform:
-      translate(calc(var(--sprite-offset-x) + 34%), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
+      translate(calc(-50% + var(--sprite-offset-x) + 34%), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
       scale(var(--sprite-scale));
   }
   to {
     opacity: var(--sprite-opacity);
     transform:
-      translate(var(--sprite-offset-x), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
+      translate(calc(-50% + var(--sprite-offset-x)), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
       scale(var(--sprite-scale));
   }
 }
@@ -11241,13 +11241,13 @@ html[data-ui-theme="light"] select {
   from {
     opacity: var(--sprite-opacity);
     transform:
-      translate(var(--sprite-offset-x), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
+      translate(calc(-50% + var(--sprite-offset-x)), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
       scale(var(--sprite-scale));
   }
   to {
     opacity: 0;
     transform:
-      translate(calc(var(--sprite-offset-x) + 28%), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
+      translate(calc(-50% + var(--sprite-offset-x) + 28%), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
       scale(var(--sprite-scale));
   }
 }
@@ -11256,13 +11256,13 @@ html[data-ui-theme="light"] select {
   from {
     opacity: 0;
     transform:
-      translate(var(--sprite-offset-x), calc(var(--sprite-base-y) + var(--sprite-offset-y) + 22px))
+      translate(calc(-50% + var(--sprite-offset-x)), calc(var(--sprite-base-y) + var(--sprite-offset-y) + 22px))
       scale(var(--sprite-scale));
   }
   to {
     opacity: var(--sprite-opacity);
     transform:
-      translate(var(--sprite-offset-x), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
+      translate(calc(-50% + var(--sprite-offset-x)), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
       scale(var(--sprite-scale));
   }
 }
@@ -11271,13 +11271,13 @@ html[data-ui-theme="light"] select {
   from {
     opacity: var(--sprite-opacity);
     transform:
-      translate(var(--sprite-offset-x), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
+      translate(calc(-50% + var(--sprite-offset-x)), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
       scale(var(--sprite-scale));
   }
   to {
     opacity: 0;
     transform:
-      translate(var(--sprite-offset-x), calc(var(--sprite-base-y) + var(--sprite-offset-y) + 18px))
+      translate(calc(-50% + var(--sprite-offset-x)), calc(var(--sprite-base-y) + var(--sprite-offset-y) + 18px))
       scale(var(--sprite-scale));
   }
 }
@@ -11286,19 +11286,19 @@ html[data-ui-theme="light"] select {
   from {
     opacity: 0;
     transform:
-      translate(var(--sprite-offset-x), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
+      translate(calc(-50% + var(--sprite-offset-x)), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
       scale(var(--sprite-scale));
   }
   68% {
     opacity: var(--sprite-opacity);
     transform:
-      translate(var(--sprite-offset-x), calc(var(--sprite-base-y) + var(--sprite-offset-y) - 4px))
+      translate(calc(-50% + var(--sprite-offset-x)), calc(var(--sprite-base-y) + var(--sprite-offset-y) - 4px))
       scale(var(--sprite-scale));
   }
   to {
     opacity: var(--sprite-opacity);
     transform:
-      translate(var(--sprite-offset-x), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
+      translate(calc(-50% + var(--sprite-offset-x)), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
       scale(var(--sprite-scale));
   }
 }
@@ -11319,13 +11319,13 @@ html[data-ui-theme="light"] select {
   from {
     opacity: var(--sprite-opacity);
     transform:
-      translate(var(--sprite-offset-x), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
+      translate(calc(-50% + var(--sprite-offset-x)), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
       scale(var(--sprite-scale));
   }
   to {
     opacity: 0;
     transform:
-      translate(var(--sprite-offset-x), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
+      translate(calc(-50% + var(--sprite-offset-x)), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
       scale(var(--sprite-scale));
   }
 }
@@ -11334,8 +11334,45 @@ html[data-ui-theme="light"] select {
   .stage-backdrop.is-transitioning,
   .sprite-card.is-entering,
   .sprite-card.is-leaving,
+  .sprite-card.is-moving,
   .sprite-card.is-entering .sprite-card-inner {
     animation: none !important;
+  }
+}
+
+/* Stable anchored cast layout allows character cards to animate between stage positions. */
+.stage-cast-world {
+  display: block;
+}
+
+.stage-cast-world .sprite-card {
+  position: absolute;
+  left: var(--sprite-position-x, 50%);
+  bottom: 0;
+  width: min(30%, 260px);
+  transform:
+    translate(calc(-50% + var(--sprite-offset-x)), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
+    scale(var(--sprite-scale));
+}
+
+.stage-cast-world .sprite-card.is-moving {
+  animation: stage-sprite-move var(--sprite-motion-ms, 600ms) var(--sprite-motion-easing, ease-out) both;
+}
+
+@keyframes stage-sprite-move {
+  from {
+    left: var(--sprite-from-position-x, 50%);
+    opacity: var(--sprite-from-opacity, 1);
+    transform:
+      translate(calc(-50% + var(--sprite-from-offset-x, 0%)), calc(var(--sprite-base-y) + var(--sprite-from-offset-y, 0%)))
+      scale(var(--sprite-from-scale, 1));
+  }
+  to {
+    left: var(--sprite-position-x, 50%);
+    opacity: var(--sprite-opacity, 1);
+    transform:
+      translate(calc(-50% + var(--sprite-offset-x)), calc(var(--sprite-base-y) + var(--sprite-offset-y)))
+      scale(var(--sprite-scale));
   }
 }
 

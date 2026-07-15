@@ -11,6 +11,43 @@ from export_stage_direction_sheet import (
 
 
 class ExportStageDirectionSheetTests(unittest.TestCase):
+    def test_character_move_updates_stage_composition_and_reports_missing_entry(self) -> None:
+        bundle = {
+            "project": {"title": "Motion Sheet"},
+            "characters": {"characters": [{
+                "id": "hero",
+                "displayName": "Hero",
+                "defaultPosition": "left",
+                "defaultSpriteId": "sprite_hero",
+                "expressions": [{"id": "smile", "name": "Smile", "spriteAssetId": "sprite_hero"}],
+            }]},
+            "chapters": [{
+                "chapterId": "chapter",
+                "name": "Chapter",
+                "scenes": [{
+                    "id": "scene",
+                    "name": "Scene",
+                    "blocks": [
+                        {"id": "show", "type": "character_show", "characterId": "hero", "expressionId": "smile", "position": "left", "transition": "fade", "transitionDurationMs": 400},
+                        {"id": "move", "type": "character_move", "characterId": "hero", "expressionId": "smile", "position": "right", "durationMs": 900, "easing": "spring", "stage": {"scale": 118, "offsetX": -6}},
+                    ],
+                }],
+            }],
+        }
+        assets = {"assets": [{"id": "sprite_hero", "type": "sprite", "name": "Hero", "path": "hero.png", "fileExists": True}]}
+        sheet = build_stage_direction_sheet(bundle, assets)
+        self.assertEqual(sheet["summary"]["characterMoveCount"], 1)
+        move_event = next(event for event in sheet["events"] if event["type"] == "character_move")
+        self.assertEqual(move_event["positionLabel"], "右侧")
+        self.assertEqual(move_event["motionDurationMs"], 900)
+        self.assertEqual(move_event["motionEasing"], "spring")
+        self.assertEqual(move_event["stage"]["scale"], 118)
+        self.assertNotIn("character_move_not_visible", {issue["code"] for issue in sheet["issues"]})
+
+        bundle["chapters"][0]["scenes"][0]["blocks"] = [bundle["chapters"][0]["scenes"][0]["blocks"][1]]
+        missing_entry = build_stage_direction_sheet(bundle, assets)
+        self.assertIn("character_move_not_visible", {issue["code"] for issue in missing_entry["issues"]})
+
     def build_bundle(self) -> dict:
         return {
             "project": {"title": "舞台烟测", "chapterOrder": ["chapter_intro"]},

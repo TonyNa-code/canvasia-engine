@@ -19,6 +19,7 @@
     condition: "条件分支",
     jump: "跳转",
     character_show: "角色登场",
+    character_move: "角色动作",
     character_hide: "角色退场",
     music_play: "播放 BGM",
     music_stop: "停止 BGM",
@@ -464,6 +465,29 @@
         block,
         blockIndex,
         `显示立绘：${characterName}${block.expressionId ? ` / 表情 ${block.expressionId}` : ""}${block.position ? ` / ${block.position}` : ""}`,
+        { characterName }
+      );
+      return;
+    }
+
+    if (type === "character_move") {
+      const characterId = cleanText(block.characterId);
+      const characterName = getCharacterName(characterMap, characterId, "未选择角色");
+      if (!characterId) {
+        pushIssue(sheetIssues, sceneCue, "warn", "director_character_move_unset", "角色动作未选择角色", "角色动作卡还没有绑定角色。", { blockIndex });
+      } else {
+        if (!sceneCue.visibleCharacterIds.has(characterId)) {
+          pushIssue(sheetIssues, sceneCue, "warn", "director_character_move_before_show", "角色动作早于登场", "建议先安排角色登场，再设置场内移动和镜头调度。", { blockIndex });
+        }
+        sceneCue.visibleCharacterIds.add(characterId);
+        sceneCue.stagedCharacterIds.add(characterId);
+      }
+      addCue(
+        sceneCue,
+        "visual",
+        block,
+        blockIndex,
+        `移动立绘：${characterName}${block.position ? ` → ${block.position}` : ""}${block.expressionId ? ` / 表情 ${block.expressionId}` : ""} / ${Number(block.durationMs) || 600}ms / ${cleanText(block.easing, "ease_out")}`,
         { characterName }
       );
       return;

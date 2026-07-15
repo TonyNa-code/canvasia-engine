@@ -70,6 +70,7 @@
     condition: "Condition",
     jump: "Jump",
     character_show: "Character show",
+    character_move: "Character motion",
     character_hide: "Character hide",
     music_play: "BGM",
     music_stop: "BGM stop",
@@ -342,7 +343,7 @@
       topBlockTypes,
       hasAudio: ["music_play", "sfx_play"].some((type) => blockCounts.has(type)),
       hasVideo: blockCounts.has("video_play"),
-      hasCharacterStaging: ["character_show", "character_hide"].some((type) => blockCounts.has(type)),
+      hasCharacterStaging: ["character_show", "character_move", "character_hide"].some((type) => blockCounts.has(type)),
       hasParticlesOrEffects: ["particle_effect", "screen_shake", "screen_flash", "screen_fade", "camera_zoom", "camera_pan"].some((type) =>
         blockCounts.has(type)
       ),

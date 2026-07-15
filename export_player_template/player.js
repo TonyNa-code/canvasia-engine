@@ -33,6 +33,14 @@ import {
   writeRuntimeStorageJson,
 } from "./runtime_storage.js";
 import {
+  buildCharacterMotionEvent,
+  getCharacterMotionStyle,
+  getCharacterStageFromBlock,
+  getCharacterStageStyle,
+  getPositionOrder,
+  getSafeCharacterStage,
+} from "./runtime_character_motion.js";
+import {
   DEFAULT_RUNTIME_LANGUAGE,
   RUNTIME_LANGUAGE_LABELS,
   buildRuntimeLocalizationFallbackReport,
@@ -7891,6 +7899,26 @@ function applyBlockToPreviewState(block, visualState, variables, sceneId = "") {
       visualState.speakerName = "角色演出";
       visualState.dialogueText = `${getCharacterName(block.characterId)} 出现在画面里。`;
       return null;
+    case "character_move": {
+      const previousState =
+        getPreviewCharacterState(visualState, block.characterId) ??
+        createFallbackPreviewCharacterState(block.characterId);
+      const targetState = {
+        characterId: block.characterId,
+        position: block.position ?? previousState.position ?? getDefaultCharacterPosition(block.characterId),
+        expressionId: block.expressionId ?? previousState.expressionId,
+        expressionName: getExpressionName(
+          block.characterId,
+          block.expressionId ?? previousState.expressionId
+        ),
+        stage: getCharacterStageFromBlock(block),
+      };
+      upsertPreviewCharacter(visualState, targetState);
+      visualState.characterTransitionEvent = buildCharacterMotionEvent(previousState, targetState, block);
+      visualState.speakerName = "角色舞台动作";
+      visualState.dialogueText = `${getCharacterName(block.characterId)} 调整了站位与演出状态。`;
+      return null;
+    }
     case "character_hide": {
       const previousState =
         getPreviewCharacterState(visualState, block.characterId) ??
@@ -8279,7 +8307,12 @@ function renderSpriteCard(
   const transitionDurationMs = characterTransitionEvent
     ? getSafeTransitionDurationMs(characterTransitionEvent.durationMs)
     : getSafeTransitionDurationMs();
-  const stageStyle = `${getCharacterStageStyle(characterState.stage)}--sprite-transition-ms:${transitionDurationMs}ms;`;
+  const isMoving =
+    characterTransitionEvent?.mode === "move" &&
+    characterTransitionEvent.characterId === characterState.characterId;
+  const stageStyle = `${getCharacterStageStyle(characterState.stage, characterState.position)}${
+    isMoving ? getCharacterMotionStyle(characterTransitionEvent) : ""
+  }--sprite-transition-ms:${transitionDurationMs}ms;`;
 
   if (shouldBlurPlayerCharacter(characterState.position, depthBlur)) {
     classes.push("is-depth-muted");
@@ -8290,6 +8323,10 @@ function renderSpriteCard(
 
   if (characterTransitionEvent?.mode === "show" && characterTransitionEvent.characterId === characterState.characterId) {
     classes.push("is-entering");
+  }
+
+  if (isMoving) {
+    classes.push("is-moving");
   }
 
   if (isGhostHide) {
@@ -8752,42 +8789,6 @@ function getSafeTransitionDurationMs(value, fallback = TRANSITION_DURATION_DEFAU
   );
 }
 
-function getSafeCharacterStage(source = {}) {
-  const raw = source && typeof source === "object" ? source : {};
-  return {
-    offsetX: Math.round(clamp(getSafeNumber(raw.offsetX, 0), -60, 60)),
-    offsetY: Math.round(clamp(getSafeNumber(raw.offsetY, 0), -45, 45)),
-    scale: Math.round(clamp(getSafeNumber(raw.scale, 100), 45, 220)),
-    opacity: Math.round(clamp(getSafeNumber(raw.opacity, 100), 0, 100)),
-    layer: Math.round(clamp(getSafeNumber(raw.layer, 0), -10, 10)),
-    flipX: getSafeBoolean(raw.flipX, false),
-  };
-}
-
-function getCharacterStageFromBlock(block = {}) {
-  return getSafeCharacterStage(block.stage ?? block.characterStage ?? {});
-}
-
-function getCharacterStageStyle(stageSource = {}) {
-  const stage = getSafeCharacterStage(stageSource);
-  return [
-    `--sprite-offset-x:${stage.offsetX}%;`,
-    `--sprite-offset-y:${stage.offsetY}%;`,
-    `--sprite-scale:${(stage.scale / 100).toFixed(3)};`,
-    `--sprite-opacity:${(stage.opacity / 100).toFixed(2)};`,
-    `--sprite-layer:${stage.layer};`,
-    `--sprite-flip-x:${stage.flipX ? -1 : 1};`,
-    `z-index:${20 + stage.layer};`,
-  ].join("");
-}
-
-function getPositionOrder(position) {
-  if (position === "left") return 0;
-  if (position === "center") return 1;
-  if (position === "right") return 2;
-  return 3;
-}
-
 function getAssetUrl(assetId) {
   const asset = data.assetsById.get(assetId);
   return asset?.isMissing ? null : asset?.exportUrl ?? null;
@@ -8814,6 +8815,7 @@ function getBlockLabel(type) {
     dialogue: "台词",
     narration: "旁白",
     character_show: "显示角色",
+    character_move: "角色舞台动作",
     character_hide: "隐藏角色",
     music_play: "播放音乐",
     music_stop: "停止音乐",

@@ -44,6 +44,13 @@
       beginnerVisible: true,
       description: "让角色立绘出场，可控制位置、大小、透明度和进场方式。",
     }),
+    "add-character-move": Object.freeze({
+      blockType: "character_move",
+      label: "角色动作",
+      group: "stage",
+      beginnerVisible: true,
+      description: "让已登场角色平滑移动、换表情或调整大小，适合走位和情绪特写。",
+    }),
     "add-character-hide": Object.freeze({
       blockType: "character_hide",
       label: "隐藏角色",

@@ -29,6 +29,7 @@ from urllib.parse import quote, urlparse
 from urllib.request import Request, urlopen
 
 from editor_local_security import is_local_editor_host, is_local_editor_origin
+from editor_asset_usage import collect_asset_usages_from_bundle
 from editor_snapshot_cache import SnapshotCache, build_file_cache_signature
 from editor_static_cache import (
     build_editor_static_cache_headers,
@@ -178,6 +179,7 @@ EXPORT_PLAYER_SCRIPT_FILES = (
     "player.js",
     "runtime_data.js",
     "runtime_storage.js",
+    "runtime_character_motion.js",
     "runtime_visual_constants.js",
     "runtime_controls.js",
     "runtime_settings.js",
@@ -350,31 +352,6 @@ ASSET_COMMERCIAL_USE_LABELS = {
     "allowed": "可商用",
     "forbidden": "不可商用",
 }
-BLOCK_LABELS = {
-    "background": "切换背景",
-    "dialogue": "台词",
-    "narration": "旁白",
-    "character_show": "显示角色",
-    "character_hide": "隐藏角色",
-    "music_play": "播放音乐",
-    "music_stop": "停止音乐",
-    "sfx_play": "播放音效",
-    "video_play": "播放视频",
-    "credits_roll": "片尾字幕",
-    "particle_effect": "粒子特效",
-    "screen_shake": "屏幕震动",
-    "screen_flash": "闪屏",
-    "screen_fade": "黑场淡入淡出",
-    "camera_zoom": "镜头推近拉远",
-    "camera_pan": "镜头平移",
-    "screen_filter": "回忆滤镜",
-    "depth_blur": "景深模糊",
-    "jump": "跳转",
-    "variable_set": "设置变量",
-    "variable_add": "修改变量",
-    "choice": "选项",
-    "condition": "条件判断",
-}
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".avif"}
 AUDIO_EXTENSIONS = {".mp3", ".ogg", ".wav", ".m4a", ".aac", ".flac"}
 VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov", ".m4v"}
@@ -507,6 +484,7 @@ NATIVE_RUNTIME_PERFORMANCE_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_perfo
 NATIVE_RUNTIME_I18N_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_i18n.py"
 NATIVE_RUNTIME_SETTINGS_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_player_settings.py"
 NATIVE_RUNTIME_VIEW_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_player_view.py"
+NATIVE_RUNTIME_CHARACTER_MOTION_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_character_motion.py"
 NATIVE_RUNTIME_TEXT_EFFECTS_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_text_effects.py"
 NATIVE_RUNTIME_STORAGE_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_storage.py"
 NATIVE_RUNTIME_VARIABLES_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_variables.py"
@@ -524,6 +502,7 @@ NATIVE_RUNTIME_PERFORMANCE_NAME = "runtime_performance.py"
 NATIVE_RUNTIME_I18N_NAME = "runtime_i18n.py"
 NATIVE_RUNTIME_SETTINGS_NAME = "runtime_player_settings.py"
 NATIVE_RUNTIME_VIEW_NAME = "runtime_player_view.py"
+NATIVE_RUNTIME_CHARACTER_MOTION_NAME = "runtime_character_motion.py"
 NATIVE_RUNTIME_TEXT_EFFECTS_NAME = "runtime_text_effects.py"
 NATIVE_RUNTIME_STORAGE_NAME = "runtime_storage.py"
 NATIVE_RUNTIME_VARIABLES_NAME = "runtime_variables.py"
@@ -581,6 +560,7 @@ NATIVE_RUNTIME_REQUIRED_MODULE_FILES = (
     (NATIVE_RUNTIME_I18N_SOURCE, NATIVE_RUNTIME_I18N_NAME),
     (NATIVE_RUNTIME_SETTINGS_SOURCE, NATIVE_RUNTIME_SETTINGS_NAME),
     (NATIVE_RUNTIME_VIEW_SOURCE, NATIVE_RUNTIME_VIEW_NAME),
+    (NATIVE_RUNTIME_CHARACTER_MOTION_SOURCE, NATIVE_RUNTIME_CHARACTER_MOTION_NAME),
     (NATIVE_RUNTIME_TEXT_EFFECTS_SOURCE, NATIVE_RUNTIME_TEXT_EFFECTS_NAME),
     (NATIVE_RUNTIME_STORAGE_SOURCE, NATIVE_RUNTIME_STORAGE_NAME),
     (NATIVE_RUNTIME_VARIABLES_SOURCE, NATIVE_RUNTIME_VARIABLES_NAME),
@@ -625,6 +605,7 @@ EDITOR_PORTABLE_RUNTIME_TARGETS = {
 }
 EDITOR_EXPORT_FILES = [
     "run_editor.py",
+    "editor_asset_usage.py",
     "editor_local_security.py",
     "editor_snapshot_cache.py",
     "editor_static_cache.py",
@@ -4807,55 +4788,11 @@ def delete_asset_file_if_unused(relative_path: str, assets: list[dict], skip_ass
 
 
 def collect_asset_usages(asset_id: str) -> list[str]:
-    bundle = load_project_bundle()
-    characters = bundle.get("characters", {}).get("characters", [])
-    characters_by_id = {character.get("id"): character for character in characters}
-    usages: list[str] = []
-
-    def add_usage(candidate_asset_id: str | None, label: str) -> None:
-        if candidate_asset_id == asset_id:
-            usages.append(label)
-
-    for character in characters:
-        add_usage(character.get("defaultSpriteId"), f"角色默认立绘：{character.get('displayName')}")
-        for presentation_asset_id, label in collect_character_presentation_asset_ids(character):
-            if label.startswith("差分图层："):
-                expression_name = label.split("：", 1)[1]
-                add_usage(presentation_asset_id, f"角色差分图层：{character.get('displayName')} / {expression_name}")
-            else:
-                add_usage(presentation_asset_id, f"角色{label}：{character.get('displayName')}")
-        for expression in character.get("expressions", []):
-            add_usage(
-                expression.get("spriteAssetId"),
-                f"角色表情：{character.get('displayName')} / {expression.get('name')}",
-            )
-
-    for chapter in bundle.get("chapters", []):
-        for scene in chapter.get("scenes", []):
-            for block in scene.get("blocks", []):
-                add_usage(
-                    block.get("assetId"),
-                    f"场景：{scene.get('name')} / {BLOCK_LABELS.get(block.get('type'), block.get('type'))}",
-                )
-                add_usage(block.get("voiceAssetId"), f"场景：{scene.get('name')} / 台词语音")
-                if block.get("type") in {"dialogue", "character_show"}:
-                    character_id = block.get("speakerId") or block.get("characterId")
-                    expression_id = block.get("expressionId")
-                    character = characters_by_id.get(character_id)
-                    expression = next(
-                        (
-                            item
-                            for item in character.get("expressions", [])
-                            if item.get("id") == expression_id
-                        ),
-                        None,
-                    ) if character else None
-                    add_usage(
-                        expression.get("spriteAssetId") if expression else None,
-                        f"场景：{scene.get('name')} / {character.get('displayName') if character else character_id} {expression.get('name') if expression else ''}".strip(),
-                    )
-
-    return usages
+    return collect_asset_usages_from_bundle(
+        asset_id,
+        load_project_bundle(),
+        collect_character_presentation_asset_ids,
+    )
 
 
 def import_assets(asset_type: str, files: list[dict], fallback_asset_type: str | None = None) -> dict:
@@ -9030,6 +8967,8 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
         "runtimeSettingsModulePath": str(build_dir / NATIVE_RUNTIME_SETTINGS_NAME),
         "runtimeViewModuleName": NATIVE_RUNTIME_VIEW_NAME,
         "runtimeViewModulePath": str(build_dir / NATIVE_RUNTIME_VIEW_NAME),
+        "runtimeCharacterMotionModuleName": NATIVE_RUNTIME_CHARACTER_MOTION_NAME,
+        "runtimeCharacterMotionModulePath": str(build_dir / NATIVE_RUNTIME_CHARACTER_MOTION_NAME),
         "runtimeTextEffectsModuleName": NATIVE_RUNTIME_TEXT_EFFECTS_NAME,
         "runtimeTextEffectsModulePath": str(build_dir / NATIVE_RUNTIME_TEXT_EFFECTS_NAME),
         "runtimeStorageModuleName": NATIVE_RUNTIME_STORAGE_NAME,
@@ -9541,6 +9480,7 @@ def export_native_runtime_build() -> dict:
             "runtimeI18nModule": runtime_files["runtimeI18nModuleName"],
             "runtimeSettingsModule": runtime_files["runtimeSettingsModuleName"],
             "runtimeViewModule": runtime_files["runtimeViewModuleName"],
+            "runtimeCharacterMotionModule": runtime_files["runtimeCharacterMotionModuleName"],
             "runtimeTextEffectsModule": runtime_files["runtimeTextEffectsModuleName"],
             "runtimeStorageModule": runtime_files["runtimeStorageModuleName"],
             "runtimeVariablesModule": runtime_files["runtimeVariablesModuleName"],
@@ -9616,6 +9556,7 @@ def export_native_runtime_build() -> dict:
             "runtimeI18nModule": runtime_files["runtimeI18nModuleName"],
             "runtimeSettingsModule": runtime_files["runtimeSettingsModuleName"],
             "runtimeViewModule": runtime_files["runtimeViewModuleName"],
+            "runtimeCharacterMotionModule": runtime_files["runtimeCharacterMotionModuleName"],
             "runtimeTextEffectsModule": runtime_files["runtimeTextEffectsModuleName"],
             "runtimeStorageModule": runtime_files["runtimeStorageModuleName"],
             "runtimeVariablesModule": runtime_files["runtimeVariablesModuleName"],
@@ -9844,6 +9785,7 @@ def export_native_runtime_build() -> dict:
         {"name": runtime_files["runtimeI18nModuleName"], "description": "原生 Runtime 多语言和文本回退模块。"},
         {"name": runtime_files["runtimeSettingsModuleName"], "description": "原生 Runtime 系统设置模块。"},
         {"name": runtime_files["runtimeViewModuleName"], "description": "原生 Runtime 可见层配置、转场安全值和文本排版模块。"},
+        {"name": runtime_files["runtimeCharacterMotionModuleName"], "description": "原生 Runtime 角色走位、缩放、透明度、翻转和缓动插值模块。"},
         {"name": runtime_files["runtimeTextEffectsModuleName"], "description": "原生 Runtime 打字机和文本效果模块。"},
         {"name": runtime_files["runtimeStorageModuleName"], "description": "原生 Runtime 存档、自动恢复和崩溃日志模块。"},
         {"name": runtime_files["runtimeVariablesModuleName"], "description": "原生 Runtime 变量和条件判断模块。"},
@@ -10121,6 +10063,9 @@ def export_native_runtime_build() -> dict:
         "runtimeViewModuleName": runtime_files["runtimeViewModuleName"],
         "runtimeViewModulePath": runtime_files["runtimeViewModulePath"],
         "runtimeViewModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimeViewModuleName']}",
+        "runtimeCharacterMotionModuleName": runtime_files["runtimeCharacterMotionModuleName"],
+        "runtimeCharacterMotionModulePath": runtime_files["runtimeCharacterMotionModulePath"],
+        "runtimeCharacterMotionModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimeCharacterMotionModuleName']}",
         "runtimeTextEffectsModuleName": runtime_files["runtimeTextEffectsModuleName"],
         "runtimeTextEffectsModulePath": runtime_files["runtimeTextEffectsModulePath"],
         "runtimeTextEffectsModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimeTextEffectsModuleName']}",
@@ -10312,6 +10257,7 @@ def export_web_build() -> dict:
             "playerJs": "player.js",
             "playerRuntimeData": "runtime_data.js",
             "playerRuntimeStorage": "runtime_storage.js",
+            "playerRuntimeCharacterMotion": "runtime_character_motion.js",
             "playerRuntimeVisualConstants": "runtime_visual_constants.js",
             "playerRuntimeConditions": "runtime_conditions.js",
             "playerRuntimeControls": "runtime_controls.js",
@@ -11439,6 +11385,7 @@ def export_windows_nwjs_build() -> dict:
             "appPlayerJs": "app/player.js",
             "appRuntimeData": "app/runtime_data.js",
             "appRuntimeStorage": "app/runtime_storage.js",
+            "appRuntimeCharacterMotion": "app/runtime_character_motion.js",
             "appRuntimeVisualConstants": "app/runtime_visual_constants.js",
             "appRuntimeConditions": "app/runtime_conditions.js",
             "appRuntimeControls": "app/runtime_controls.js",
@@ -11900,6 +11847,7 @@ def export_macos_nwjs_build() -> dict:
             "appPlayerJs": "app/player.js",
             "appRuntimeData": "app/runtime_data.js",
             "appRuntimeStorage": "app/runtime_storage.js",
+            "appRuntimeCharacterMotion": "app/runtime_character_motion.js",
             "appRuntimeVisualConstants": "app/runtime_visual_constants.js",
             "appRuntimeConditions": "app/runtime_conditions.js",
             "appRuntimeControls": "app/runtime_controls.js",
@@ -12368,6 +12316,7 @@ def export_linux_nwjs_build() -> dict:
             "appPlayerJs": "app/player.js",
             "appRuntimeData": "app/runtime_data.js",
             "appRuntimeStorage": "app/runtime_storage.js",
+            "appRuntimeCharacterMotion": "app/runtime_character_motion.js",
             "appRuntimeVisualConstants": "app/runtime_visual_constants.js",
             "appRuntimeConditions": "app/runtime_conditions.js",
             "appRuntimeControls": "app/runtime_controls.js",

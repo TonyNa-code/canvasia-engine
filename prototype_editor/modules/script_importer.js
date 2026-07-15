@@ -5,6 +5,7 @@
   const STAGE_DRAFT_TYPES = Object.freeze([
     "background",
     "character_show",
+    "character_move",
     "character_hide",
     "music_play",
     "music_stop",
@@ -390,6 +391,24 @@
     return Object.keys(stage).length ? stage : null;
   }
 
+  function parseInlineCharacterMotionEasing(text, fallback = "ease_out") {
+    const match = String(text ?? "").match(
+      /\b(?:easing|ease|warp)\s+([a-z_-]+)\b/iu
+    );
+    const token = normalizeDirectiveToken(match?.[1] ?? fallback);
+    const aliases = {
+      easein: "ease_in",
+      easeout: "ease_out",
+      easeinout: "ease_in_out",
+      smooth: "ease_in_out",
+      bounce: "spring",
+    };
+    const easing = aliases[token] ?? token;
+    return ["linear", "ease_in", "ease_out", "ease_in_out", "spring"].includes(easing)
+      ? easing
+      : fallback;
+  }
+
   function parseDirectiveTransition(text, fallback = "fade") {
     const match = String(text ?? "").match(/\bwith\s+([a-zA-Z_-]+)/u);
     const raw = normalizeDirectiveToken(match?.[1] ?? fallback).replace(/_+$/g, "");
@@ -425,6 +444,13 @@
     }
 
     return trimImportedText(cleaned.replace(/\s+/g, " "), 240);
+  }
+
+  function removeCharacterMotionClauses(text) {
+    return trimImportedText(
+      removeDirectiveClauses(text).replace(/\b(?:easing|ease|warp)\s+[a-z_-]+\b/giu, " ").replace(/\s+/g, " "),
+      240
+    );
   }
 
   function isIgnoredScriptLine(line) {
@@ -698,6 +724,25 @@
             position: parseDirectivePosition(showText, "center"),
             transition: parseDirectiveTransition(showText, "fade"),
             transitionDurationMs: parseInlineTimeMs(showText, "duration", 600),
+            ...(stage ? { stage } : {}),
+          }
+        : null;
+    }
+
+    const moveMatch = text.match(/^(?:move|animate|移动角色|移动)\s+(.+)$/iu);
+    if (moveMatch) {
+      const moveText = moveMatch[1];
+      const leading = readLeadingArgument(moveText);
+      const expressionHint = stripWrappingQuotes(removeCharacterMotionClauses(leading.rest));
+      const stage = parseInlineCharacterStage(moveText);
+      return leading.argument
+        ? {
+            type: "character_move",
+            characterHint: leading.argument,
+            expressionHint,
+            position: parseDirectivePosition(moveText, "center"),
+            durationMs: parseInlineTimeMs(moveText, "duration", 600),
+            easing: parseInlineCharacterMotionEasing(moveText),
             ...(stage ? { stage } : {}),
           }
         : null;
@@ -1133,6 +1178,17 @@
     }
     if (block?.type === "character_show") {
       return `显示角色：${[block.characterHint, block.expressionHint, block.position ? `@${block.position}` : ""]
+        .filter(Boolean)
+        .join(" ")}`;
+    }
+    if (block?.type === "character_move") {
+      return `角色动作：${[
+        block.characterHint,
+        block.expressionHint,
+        block.position ? `→${block.position}` : "",
+        `${block.durationMs ?? 600}ms`,
+        block.easing,
+      ]
         .filter(Boolean)
         .join(" ")}`;
     }

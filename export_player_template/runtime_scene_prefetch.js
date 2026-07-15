@@ -57,6 +57,7 @@ function getPreloadReason(block, fallback = "路线预取") {
   const type = cleanText(block?.type);
   if (type === "background") return "即将切换背景";
   if (type === "character_show") return "即将显示立绘";
+  if (type === "character_move") return "即将切换角色表情或舞台动作";
   if (type === "dialogue") return "即将显示角色或播放语音";
   if (type === "narration") return "即将播放旁白语音";
   if (type === "music_play") return "即将切换 BGM";
@@ -106,7 +107,7 @@ function collectBlockAssetCandidates(block, context) {
     addAssetId(candidates, block.voiceAssetId, getPreloadReason(block));
   }
 
-  if (block.type === "character_show" || block.type === "dialogue") {
+  if (["character_show", "character_move", "dialogue"].includes(block.type)) {
     collectCharacterSpriteAssetIds(block, context, candidates);
   }
 

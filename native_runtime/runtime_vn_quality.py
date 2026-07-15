@@ -200,6 +200,7 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path, deps: dict
     logic_non_number_add_count = 0
     logic_operator_mismatch_count = 0
     character_show_count = 0
+    character_move_count = 0
     character_hide_count = 0
     character_transition_count = 0
     character_position_values: set[str] = set()
@@ -470,6 +471,27 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path, deps: dict
                 character_position_values.add(str(block.get("position") or "center").strip() or "center")
                 if get_safe_character_transition(block.get("transition")) != "none" and get_safe_transition_duration_ms(block.get("transitionDurationMs"), 600) > 0:
                     character_transition_count += 1
+                stage = get_safe_character_stage(block.get("stage") if isinstance(block.get("stage"), dict) else None)
+                if (
+                    stage.get("offsetX") != 0
+                    or stage.get("offsetY") != 0
+                    or stage.get("scale") != 100
+                    or stage.get("opacity") != 100
+                    or stage.get("layer") != 0
+                    or stage.get("flipX")
+                ):
+                    character_stage_adjustment_count += 1
+            elif block_type == "character_move":
+                character_move_count += 1
+                character_id = str(block.get("characterId") or "").strip()
+                expression_id = str(block.get("expressionId") or "").strip()
+                if character_id and character_id not in characters_by_id:
+                    missing_character_ref_count += 1
+                    missing_character_ref_names.append(str(block.get("id") or character_id))
+                elif character_id and expression_id and expression_id not in character_expression_ids_by_id.get(character_id, set()):
+                    missing_expression_ref_count += 1
+                    missing_expression_ref_names.append(str(block.get("id") or f"{character_id}:{expression_id}"))
+                character_position_values.add(str(block.get("position") or "center").strip() or "center")
                 stage = get_safe_character_stage(block.get("stage") if isinstance(block.get("stage"), dict) else None)
                 if (
                     stage.get("offsetX") != 0
@@ -1338,16 +1360,17 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path, deps: dict
             f"检测到 {character_show_count} 次角色登场，但没有淡入、滑入、上浮或弹出转场。",
             "给主要角色登场/退场设置轻量转场，不需要每张卡都动，但关键情绪点应避免硬切。",
         )
-    if character_show_count >= 3 and len(character_position_values) <= 1:
+    character_stage_cue_count = character_show_count + character_move_count
+    if character_stage_cue_count >= 3 and len(character_position_values) <= 1:
         add_vn_baseline_issue(
             issues,
             "soft",
             "character_position_static",
             "人物站位过于固定",
-            f"检测到 {character_show_count} 次角色登场，但只使用了 {len(character_position_values)} 种站位。",
-            "为对话双方或重点角色使用 left / center / right 等站位变化，减少所有立绘都堆在同一位置的观感。",
+            f"检测到 {character_stage_cue_count} 次角色登场/动作，但只使用了 {len(character_position_values)} 种站位。",
+            "为对话双方或重点角色使用 left / center / right，并用角色动作卡完成场内调度。",
         )
-    if character_show_count >= 4 and character_stage_adjustment_count == 0:
+    if character_stage_cue_count >= 4 and character_stage_adjustment_count == 0:
         add_vn_baseline_issue(
             issues,
             "soft",
@@ -1458,6 +1481,7 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path, deps: dict
             "characterCount": len(characters),
             "charactersWithSpriteCount": characters_with_sprite,
             "characterShowCount": character_show_count,
+            "characterMoveCount": character_move_count,
             "characterHideCount": character_hide_count,
             "characterTransitionCount": character_transition_count,
             "characterPositionVariantCount": len(character_position_values),

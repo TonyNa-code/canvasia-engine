@@ -234,7 +234,7 @@ class FrontendVisualEffectsModuleTests(unittest.TestCase):
         self.assertEqual(payload["characterStage"][16], ["flip_toggle", "reset"])
         self.assertEqual(
             payload["characterStage"][17],
-            "--sprite-offset-x:12%;--sprite-offset-y:-8%;--sprite-scale:1.250;--sprite-opacity:0.70;--sprite-layer:3;--sprite-flip-x:-1;z-index:23;",
+            "--sprite-position-x:50%;--sprite-offset-x:12%;--sprite-offset-y:-8%;--sprite-scale:1.250;--sprite-opacity:0.70;--sprite-layer:3;--sprite-flip-x:-1;z-index:23;",
         )
         self.assertEqual(payload["characterStage"][18], "X 12% / Y -8% / 125% / 透明 70% / 层级 3 / 镜像")
 

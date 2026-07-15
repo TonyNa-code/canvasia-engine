@@ -2167,6 +2167,89 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             self.assertIn("人物转场 / 登场", markdown)
             self.assertIn("人物舞台参数没有变化", markdown)
 
+    def test_vn_baseline_quality_report_counts_character_stage_motion(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_dir = Path(temp_dir) / "bundle"
+            bundle_dir.mkdir(parents=True)
+            game_data = {
+                "project": {
+                    "projectId": "native_character_motion_quality_smoke",
+                    "title": "Native Character Motion Quality Smoke",
+                    "entrySceneId": "scene_motion",
+                },
+                "assets": {"assets": []},
+                "characters": {
+                    "characters": [
+                        {
+                            "id": "heroine",
+                            "displayName": "Heroine",
+                            "expressions": [
+                                {"id": "default", "spriteAssetId": ""},
+                                {"id": "smile", "spriteAssetId": ""},
+                            ],
+                        }
+                    ]
+                },
+                "chapters": [
+                    {
+                        "id": "chapter_1",
+                        "name": "Chapter 1",
+                        "scenes": [
+                            {
+                                "id": "scene_motion",
+                                "name": "Motion",
+                                "blocks": [
+                                    {
+                                        "id": "show_heroine",
+                                        "type": "character_show",
+                                        "characterId": "heroine",
+                                        "expressionId": "default",
+                                        "position": "left",
+                                    },
+                                    {
+                                        "id": "move_heroine",
+                                        "type": "character_move",
+                                        "characterId": "heroine",
+                                        "expressionId": "smile",
+                                        "position": "right",
+                                        "durationMs": 900,
+                                        "easing": "ease_in_out",
+                                        "stage": {"offsetX": 24, "scale": 108, "layer": 2},
+                                    },
+                                    {
+                                        "id": "move_missing_expression",
+                                        "type": "character_move",
+                                        "characterId": "heroine",
+                                        "expressionId": "missing",
+                                        "position": "center",
+                                    },
+                                ],
+                            }
+                        ],
+                    }
+                ],
+            }
+            (bundle_dir / "game_data.json").write_text(
+                json.dumps(game_data, ensure_ascii=False),
+                encoding="utf-8",
+            )
+
+            report = build_native_runtime_vn_baseline_quality_report(bundle_dir)
+
+            self.assertEqual(report["metrics"]["characterShowCount"], 1)
+            self.assertEqual(report["metrics"]["characterMoveCount"], 2)
+            self.assertEqual(report["metrics"]["characterPositionVariantCount"], 3)
+            self.assertEqual(report["metrics"]["characterStageAdjustmentCount"], 1)
+            self.assertEqual(report["metrics"]["missingExpressionReferenceCount"], 1)
+            self.assertNotIn(
+                "character_position_static",
+                {issue["code"] for issue in report["issues"]},
+            )
+
+            markdown = render_native_runtime_vn_baseline_quality_markdown(report)
+            self.assertIn("人物转场 / 登场 / 动作", markdown)
+            self.assertIn("1 / 1 / 2", markdown)
+
     def test_vn_baseline_quality_report_flags_background_asset_and_transition_gaps(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             bundle_dir = Path(temp_dir) / "bundle"

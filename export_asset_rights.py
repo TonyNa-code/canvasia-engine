@@ -31,6 +31,7 @@ BLOCK_LABELS = {
     "dialogue": "台词",
     "narration": "旁白",
     "character_show": "显示角色",
+    "character_move": "角色舞台动作",
     "character_hide": "隐藏角色",
     "music_play": "播放音乐",
     "music_stop": "停止音乐",
@@ -170,7 +171,7 @@ def build_asset_usage_index(bundle: dict) -> dict[str, list[str]]:
                 block_type = clean_text(block.get("type"), "剧情卡片")
                 add_usage(block.get("assetId"), f"场景：{scene_name} / {BLOCK_LABELS.get(block_type, block_type)}")
                 add_usage(block.get("voiceAssetId"), f"场景：{scene_name} / 台词语音")
-                if block_type in {"dialogue", "character_show"}:
+                if block_type in {"dialogue", "character_show", "character_move"}:
                     character_id = clean_text(block.get("speakerId") or block.get("characterId"))
                     expression_id = clean_text(block.get("expressionId"))
                     character = characters_by_id.get(character_id)

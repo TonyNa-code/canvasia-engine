@@ -6,6 +6,7 @@
   const FALLBACK_CAPABILITY_ROWS = Object.freeze([
     ["background", "画面", "full", "full", "背景 / CG 在 Web 与原生 Runtime 中播放；3D 场景会走原生结构检查与预览兜底。"],
     ["character_show", "角色", "full", "full", "支持角色登场、表情、站位、舞台参数和基础转场。"],
+    ["character_move", "角色", "full", "full", "支持角色平滑走位、换表情、缩放、透明度、翻转、图层与缓动。"],
     ["character_hide", "角色", "full", "full", "支持角色离场和基础转场。"],
     ["dialogue", "文本", "full", "full", "支持说话人、表情同步、打字机、语音和文本历史。"],
     ["narration", "文本", "full", "full", "支持旁白文本、打字机、语音和文本历史。"],
@@ -398,14 +399,14 @@
       });
     }
 
-    if (["character_show", "character_hide"].some((type) => hasUsedType(usedTypeMap, type))) {
+    if (["character_show", "character_move", "character_hide"].some((type) => hasUsedType(usedTypeMap, type))) {
       addItem({
         id: "runtime-character-stage",
         target: "cross",
         severity: "check",
-        title: "立绘登退场要验位置、大小、透明度和转场",
-        detail: "确认角色自定义位置、缩放、淡入淡出、隐藏和多角色同屏不会被不同 Runtime 解释成错位或残影。",
-        relatedBlockTypes: ["character_show", "character_hide"],
+        title: "立绘登退场与舞台动作要验位置、大小和缓动",
+        detail: "确认角色自定义位置、缩放、透明度、走位缓动、隐藏和多角色同屏不会被不同 Runtime 解释成错位或残影。",
+        relatedBlockTypes: ["character_show", "character_move", "character_hide"],
         source: "角色舞台",
       });
     }
@@ -644,6 +645,7 @@
       backgroundTransitionCount: 0,
       scenesWithBackground: 0,
       characterShowCount: 0,
+      characterMoveCount: 0,
       characterHideCount: 0,
       characterTransitionCount: 0,
       characterPositionVariantCount: 0,
@@ -708,6 +710,12 @@
         if (hasCharacterStageAdjustment(block)) {
           metrics.characterStageAdjustmentCount += 1;
         }
+      } else if (type === "character_move") {
+        metrics.characterMoveCount += 1;
+        characterPositions.add(cleanText(block.position, "center"));
+        if (hasCharacterStageAdjustment(block)) {
+          metrics.characterStageAdjustmentCount += 1;
+        }
       } else if (type === "character_hide") {
         metrics.characterHideCount += 1;
         if (hasMeaningfulTransition(block)) {
@@ -768,11 +776,12 @@
     if (metrics.characterShowCount >= 3 && metrics.characterTransitionCount === 0) {
       issues.push(buildVnEssentialIssue("soft", "character_transition_missing", "人物登场缺少基础转场", `${metrics.characterShowCount} 次角色登场没有使用淡入、滑入、上浮或弹出。`, "关键情绪点给角色登退场加轻量转场，减少硬切。", "character"));
     }
-    if (metrics.characterShowCount >= 3 && metrics.characterPositionVariantCount <= 1) {
-      issues.push(buildVnEssentialIssue("soft", "character_position_static", "人物站位过于固定", `角色登场只使用了 ${metrics.characterPositionVariantCount} 种站位。`, "对话双方或重点角色建议使用 left / center / right 等站位变化。", "character"));
+    const characterStageCueCount = metrics.characterShowCount + metrics.characterMoveCount;
+    if (characterStageCueCount >= 3 && metrics.characterPositionVariantCount <= 1) {
+      issues.push(buildVnEssentialIssue("soft", "character_position_static", "人物站位过于固定", `${characterStageCueCount} 次登场/动作只使用了 ${metrics.characterPositionVariantCount} 种站位。`, "对话双方或重点角色建议使用 left / center / right，并用角色动作卡完成场内调度。", "character"));
     }
-    if (metrics.characterShowCount >= 4 && metrics.characterStageAdjustmentCount === 0) {
-      issues.push(buildVnEssentialIssue("soft", "character_stage_static", "人物舞台参数没有变化", "多次角色登场没有检测到缩放、透明度、偏移、翻转或层级调整。", "近景、回忆或压迫感段落可以适当使用缩放/透明度/偏移。", "character"));
+    if (characterStageCueCount >= 4 && metrics.characterStageAdjustmentCount === 0) {
+      issues.push(buildVnEssentialIssue("soft", "character_stage_static", "人物舞台参数没有变化", "多次角色登场/动作没有检测到缩放、透明度、偏移、翻转或层级调整。", "近景、回忆或压迫感段落可以适当使用缩放/透明度/偏移。", "character"));
     }
     if (sceneCount >= 2 && metrics.musicPlayCount === 0) {
       issues.push(buildVnEssentialIssue("soft", "bgm_plan_missing", "缺少 BGM 进入点", "多场景项目没有检测到播放 BGM 卡片。", "为章节开头、转场或情绪段落设置 BGM，并确认导出包里能按范围切换。", "audio"));
@@ -848,7 +857,7 @@
         "人物舞台",
         ["character_stage_missing", "character_hide_missing", "character_transition_missing", "character_position_static", "character_stage_static"],
         issues,
-        `${metrics.characterShowCount} 次登场 / ${metrics.characterPositionVariantCount} 种站位`,
+        `${metrics.characterShowCount} 次登场 / ${metrics.characterMoveCount} 次动作 / ${metrics.characterPositionVariantCount} 种站位`,
         "检查立绘显示、隐藏、站位、缩放和转场。"
       ),
       buildVnEssentialArea(

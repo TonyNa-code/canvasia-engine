@@ -502,7 +502,10 @@ def build_character_stage_transform_definitions(scene_records: list[dict], scene
         scene = record["scene"]
         scene_id = record["sceneId"]
         for block_index, block in enumerate(as_list(scene.get("blocks"))):
-            if clean_text(block.get("type")) != "character_show" or not has_custom_character_stage(block.get("stage")):
+            block_type = clean_text(block.get("type"))
+            if block_type not in {"character_show", "character_move"} or (
+                block_type == "character_show" and not has_custom_character_stage(block.get("stage"))
+            ):
                 continue
             lines.extend(
                 render_character_stage_transform_definition(
@@ -1251,6 +1254,46 @@ def render_character_show_block(block: dict, context: dict) -> list[str]:
     return [f"    show {normalize_identifier(character_id, 'character')}{expression} at {at_target}{zorder}{transition_suffix}"]
 
 
+def get_character_motion_transition_expression(block: dict, context: dict) -> str:
+    try:
+        duration_ms = clamp_number(float(block.get("durationMs", 600)), 0, 10000)
+    except (TypeError, ValueError):
+        duration_ms = 600
+    if duration_ms <= 0:
+        return ""
+    easing = clean_text(block.get("easing"), "ease_out")
+    warp = {
+        "linear": "_warper.linear",
+        "ease_in": "_warper.easein",
+        "ease_out": "_warper.easeout",
+        "ease_in_out": "_warper.ease",
+        "spring": "_warper.easeout",
+    }.get(easing, "_warper.easeout")
+    if easing == "spring":
+        add_warning(
+            context["warnings"],
+            "renpy_character_motion_spring_fallback",
+            "角色动作的轻微弹性在 Ren'Py 中已按自然收住导出。",
+            sceneId=context.get("sceneId"),
+            blockIndex=context.get("blockIndex"),
+        )
+    return f"MoveTransition({format_renpy_seconds(duration_ms / 1000)}, time_warp={warp})"
+
+
+def render_character_move_block(block: dict, context: dict) -> list[str]:
+    character_id = clean_text(block.get("characterId"), "character")
+    expression_id = clean_text(block.get("expressionId"))
+    stage = get_safe_character_stage(block.get("stage"))
+    at_target = get_character_stage_transform_name(
+        context["sceneLabelMap"], context.get("sceneId"), context.get("blockIndex")
+    )
+    transition = get_character_motion_transition_expression(block, context)
+    expression = f" {normalize_identifier(expression_id, 'expr')}" if expression_id else ""
+    zorder = f" zorder {20 + stage['layer']}" if stage["layer"] else ""
+    transition_suffix = f" with {transition}" if transition else ""
+    return [f"    show {normalize_identifier(character_id, 'character')}{expression} at {at_target}{zorder}{transition_suffix}"]
+
+
 def render_character_hide_block(block: dict, context: dict) -> list[str]:
     transition = get_character_transition_expression(block, context, "hide")
     transition_suffix = f" with {transition}" if transition else ""
@@ -1305,6 +1348,8 @@ def render_story_block(block: dict, context: dict) -> list[str]:
         return render_background_block(block, context)
     if block_type == "character_show":
         return render_character_show_block(block, context)
+    if block_type == "character_move":
+        return render_character_move_block(block, context)
     if block_type == "character_hide":
         return render_character_hide_block(block, context)
     if block_type == "music_play":

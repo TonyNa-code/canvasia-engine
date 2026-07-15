@@ -147,6 +147,10 @@
     const getTransition = (value) => callScriptImportResolver(resolvers, "getSafeTransition", [value], value || "fade");
     const getTransitionDurationMs = (value, fallback) =>
       callScriptImportResolver(resolvers, "getSafeTransitionDurationMs", [value, fallback], fallback ?? 600);
+    const getCharacterMotionDurationMs = (value, fallback) =>
+      callScriptImportResolver(resolvers, "getSafeCharacterMotionDurationMs", [value, fallback], fallback ?? 600);
+    const getCharacterMotionEasing = (value) =>
+      callScriptImportResolver(resolvers, "getSafeCharacterMotionEasing", [value], value || "ease_out");
     const getNonNegativeNumber = (value, fallback) =>
       callScriptImportResolver(resolvers, "getSafeNonNegativeNumber", [value, fallback], fallback ?? 0);
     const getVolumePercent = (value, fallback) =>
@@ -355,6 +359,35 @@
         ),
         transition: getTransition(draftBlock.transition ?? "fade"),
         transitionDurationMs: getTransitionDurationMs(draftBlock.transitionDurationMs, 600),
+        stage: getCharacterStage(draftBlock.stage),
+      };
+    }
+
+    if (draftBlock.type === "character_move") {
+      const characterId = callScriptImportResolver(resolvers, "findCharacterIdByHint", [draftBlock.characterHint], "");
+      const defaultPosition = callScriptImportResolver(
+        resolvers,
+        "getDefaultCharacterPosition",
+        [characterId],
+        "center"
+      );
+      return {
+        type: "character_move",
+        characterId,
+        expressionId: callScriptImportResolver(
+          resolvers,
+          "findExpressionIdByHint",
+          [characterId, draftBlock.expressionHint],
+          ""
+        ),
+        position: callScriptImportResolver(
+          resolvers,
+          "getSafePosition",
+          [draftBlock.position ?? defaultPosition],
+          draftBlock.position ?? defaultPosition
+        ),
+        durationMs: getCharacterMotionDurationMs(draftBlock.durationMs, 600),
+        easing: getCharacterMotionEasing(draftBlock.easing),
         stage: getCharacterStage(draftBlock.stage),
       };
     }

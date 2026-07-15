@@ -541,7 +541,11 @@
       const scene = record.scene ?? {};
       const sceneId = cleanText(scene.id, `scene_${sceneIndex + 1}`);
       toArray(scene.blocks).forEach((block, blockIndex) => {
-        if (cleanText(block?.type) !== "character_show" || !hasCustomCharacterStage(block?.stage)) {
+        const blockType = cleanText(block?.type);
+        if (
+          !["character_show", "character_move"].includes(blockType) ||
+          (blockType === "character_show" && !hasCustomCharacterStage(block?.stage))
+        ) {
           return;
         }
         definitions.push(...getCharacterStageTransformDefinition(block, { sceneId, sceneMap, blockIndex }), "");
@@ -939,6 +943,43 @@
     ];
   }
 
+  function getCharacterMotionTransitionExpression(block = {}, context = {}) {
+    const durationMs = clampNumber(Number(block.durationMs ?? 600) || 0, 0, 10000);
+    if (durationMs <= 0) {
+      return "";
+    }
+    const easing = cleanText(block.easing, "ease_out");
+    const warp = {
+      linear: "_warper.linear",
+      ease_in: "_warper.easein",
+      ease_out: "_warper.easeout",
+      ease_in_out: "_warper.ease",
+      spring: "_warper.easeout",
+    }[easing] ?? "_warper.easeout";
+    if (easing === "spring") {
+      pushWarning(
+        context.warnings ?? [],
+        "renpy_character_motion_spring_fallback",
+        "角色动作的轻微弹性在 Ren'Py 中已按自然收住导出。",
+        getWarningContext(context)
+      );
+    }
+    return `MoveTransition(${formatRenpySeconds(durationMs / 1000)}, time_warp=${warp})`;
+  }
+
+  function renderCharacterMoveBlock(block = {}, context = {}) {
+    const characterId = cleanText(block.characterId, "character");
+    const expression = cleanText(block.expressionId);
+    const stage = getSafeCharacterStage(block.stage);
+    const atTarget = getCharacterStageTransformName(context.sceneId, context.sceneMap, context.blockIndex);
+    const transition = getCharacterMotionTransitionExpression(block, context);
+    const expressionSuffix = expression ? ` ${normalizeIdentifier(expression, "expr")}` : "";
+    const zorderSuffix = stage.layer ? ` zorder ${20 + stage.layer}` : "";
+    return [
+      `    show ${normalizeIdentifier(characterId, "character")}${expressionSuffix} at ${atTarget}${zorderSuffix}${transition ? ` with ${transition}` : ""}`,
+    ];
+  }
+
   function renderCharacterHideBlock(block = {}, context = {}) {
     const transition = getCharacterTransitionExpression(block, context, "hide");
     return [`    hide ${normalizeIdentifier(block.characterId, "character")}${transition ? ` with ${transition}` : ""}`];
@@ -1234,6 +1275,9 @@
     }
     if (type === "character_show") {
       return renderCharacterShowBlock(block, context);
+    }
+    if (type === "character_move") {
+      return renderCharacterMoveBlock(block, context);
     }
     if (type === "character_hide") {
       return renderCharacterHideBlock(block, context);

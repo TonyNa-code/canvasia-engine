@@ -39,6 +39,7 @@ jobs:
       - name: Python syntax check
         run: |
           python -m py_compile \
+            editor_asset_usage.py \
             export_report_descriptions.py \
             export_release_control.py \
             export_icon.py \
@@ -49,6 +50,7 @@ jobs:
             native_runtime_export_digest.py \
             native_runtime/runtime_player.py \
             native_runtime/runtime_player_view.py \
+            native_runtime/runtime_character_motion.py \
             native_runtime/runtime_i18n.py \
             native_runtime/runtime_vn_quality.py \
             native_runtime/build_native_runtime_app.py \
@@ -65,6 +67,8 @@ jobs:
             tests/test_native_runtime_export_commands.py \
             tests/test_native_runtime_export_digest.py \
             tests/test_native_runtime_player_view.py \
+            tests/test_native_runtime_character_motion.py \
+            tests/test_character_motion_contract.py \
             tests/test_maintainability_check_tool.py \
             tests/test_project_health_tool.py \
             tests/test_prepare_preview_release.py \
@@ -145,6 +149,7 @@ jobs:
             tests/test_native_runtime_i18n.py \
             tests/test_frontend_runtime_preload_module.py \
             tests/test_frontend_runtime_scene_prefetch_module.py \
+            tests/test_frontend_runtime_character_motion_module.py \
             tests/test_frontend_runtime_visual_constants_module.py \
             tests/test_frontend_runtime_capability_matrix_module.py \
             tests/test_frontend_scene_mood_recipes_module.py \
@@ -288,6 +293,7 @@ jobs:
           node --check export_player_template/runtime_audio.js
           node --check export_player_template/runtime_preload.js
           node --check export_player_template/runtime_scene_prefetch.js
+          node --check export_player_template/runtime_character_motion.js
           node --check export_player_template/runtime_text_effects.js
 
       - name: Release tooling tests
@@ -298,6 +304,9 @@ jobs:
           python -m unittest discover -s tests -p 'test_native_runtime_export_commands.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_export_digest.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_player_view.py' -v
+          python -m unittest discover -s tests -p 'test_native_runtime_character_motion.py' -v
+          python -m unittest discover -s tests -p 'test_character_motion_contract.py' -v
+          python -m unittest discover -s tests -p 'test_editor_asset_usage.py' -v
           python -m unittest discover -s tests -p 'test_maintainability_check_tool.py' -v
           python tools/ci/maintainability_check.py --json-report verification_reports/maintainability.json --markdown-report verification_reports/maintainability.md
           python -m unittest discover -s tests -p 'test_project_health_tool.py' -v
@@ -382,6 +391,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_native_runtime_i18n.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_preload_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_scene_prefetch_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_runtime_character_motion_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_visual_constants_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_typewriter_parity.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_capability_matrix_module.py' -v

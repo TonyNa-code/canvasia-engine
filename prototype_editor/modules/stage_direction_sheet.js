@@ -12,6 +12,7 @@
     dialogue: "台词",
     narration: "旁白",
     character_show: "角色登场",
+    character_move: "角色动作",
     character_hide: "角色退场",
     video_play: "视频",
     credits_roll: "片尾字幕",
@@ -367,7 +368,7 @@
   }
 
   function isStoryContentBlock(block = {}) {
-    return ["background", "dialogue", "narration", "character_show", "choice", "video_play", "credits_roll", "wait"].includes(
+    return ["background", "dialogue", "narration", "character_show", "character_move", "choice", "video_play", "credits_roll", "wait"].includes(
       block.type
     );
   }
@@ -535,6 +536,7 @@
           visibleCharacters.set(characterId, {
             characterId,
             characterName: getCharacterDisplayName(character, characterId),
+            expressionId: cleanText(block.expressionId),
             expressionName: character ? getExpressionName(character, block.expressionId) : cleanText(block.expressionId),
             position,
             stage,
@@ -551,6 +553,61 @@
           positionLabel: getPositionLabel(position),
           stage,
           composition,
+          assetStatusLabel: formatVisualStatusLabel(visual),
+          cue: summarizeBlock(block, blockIndex),
+          issues,
+          ...baseContext,
+        });
+        return;
+      }
+
+      if (block.type === "character_move") {
+        const characterId = cleanText(block.characterId);
+        const character = context.characterMap.get(characterId);
+        const previousVisible = visibleCharacters.get(characterId);
+        const issues = [];
+        if (!characterId) {
+          pushIssue(issues, "blocker", "character_move_missing_character", "角色动作卡未选择角色", "这张角色动作卡没有绑定角色。", baseContext);
+        } else if (!character) {
+          pushIssue(issues, "blocker", "character_move_unknown_character", "动作角色不存在", `角色 ${characterId} 不在当前角色表中。`, baseContext);
+        } else if (!previousVisible) {
+          pushIssue(issues, "warn", "character_move_not_visible", "动作角色尚未登场", "Runtime 会从角色默认状态补位，但正式演出建议先放一张角色登场卡。", baseContext);
+        }
+        if (character && block.expressionId && !getExpression(character, block.expressionId)) {
+          pushIssue(issues, "blocker", "character_move_expression_missing", "动作表情不存在", `表情 ${block.expressionId} 不在角色表情列表中。`, baseContext);
+        }
+        const visual = character ? inspectCharacterVisual(block, character, context.assetMap, issues, baseContext) : null;
+        const stage = normalizeCharacterStage(block.stage ?? previousVisible?.stage);
+        const position = getSafePositionValue(
+          block.position,
+          previousVisible?.position ?? cleanText(character?.defaultPosition, "center")
+        );
+        const expressionName = character
+          ? getExpressionName(character, block.expressionId || previousVisible?.expressionId)
+          : cleanText(block.expressionId, previousVisible?.expressionName ?? "未设置表情");
+        if (characterId) {
+          visibleCharacters.set(characterId, {
+            characterId,
+            characterName: getCharacterDisplayName(character, characterId),
+            expressionId: cleanText(block.expressionId) || previousVisible?.expressionId || "",
+            expressionName,
+            position,
+            stage,
+          });
+        }
+        const composition = inspectStageComposition(visibleCharacters, issues, baseContext);
+        compositionRows.push(composition);
+        sceneIssues.push(...issues);
+        addStageEvent(events, {
+          type: "character_move",
+          typeLabel: "动作",
+          characterName: getCharacterDisplayName(character, characterId),
+          expressionName,
+          positionLabel: getPositionLabel(position),
+          stage,
+          composition,
+          motionDurationMs: Math.round(clampNumber(block.durationMs, 0, 10000, 600)),
+          motionEasing: cleanText(block.easing, "ease_out"),
           assetStatusLabel: formatVisualStatusLabel(visual),
           cue: summarizeBlock(block, blockIndex),
           issues,
@@ -613,6 +670,7 @@
           visibleCharacters.set(characterId, {
             characterId,
             characterName: getCharacterDisplayName(character, characterId),
+            expressionId: cleanText(block.expressionId) || previousVisible?.expressionId || "",
             expressionName: getExpressionName(character, block.expressionId),
             position: previousVisible?.position ?? getSafePositionValue(character.defaultPosition, "center"),
             stage: previousVisible?.stage ?? normalizeCharacterStage({}),
@@ -843,6 +901,9 @@
       sceneCount: sceneReports.length,
       eventCount: events.length,
       stagedSceneCount: sceneReports.filter((scene) => scene.eventCount > 0).length,
+      characterShowCount: events.filter((event) => event.type === "character_show").length,
+      characterMoveCount: events.filter((event) => event.type === "character_move").length,
+      characterHideCount: events.filter((event) => event.type === "character_hide").length,
       missingBackgroundSceneCount: sceneReports.filter((scene) => scene.issues.some((issue) => issue.code === "scene_without_background")).length,
       speakerAutoPlaceCount: issues.filter((issue) => issue.code === "dialogue_speaker_not_visible").length,
       missingVisualCount: issues.filter((issue) => issue.code.includes("visual") || issue.code.includes("expression")).length,
@@ -1201,6 +1262,7 @@
         [
           ["场景", `${summary.sceneCount ?? 0}`],
           ["舞台事件", `${summary.eventCount ?? 0}`],
+          ["角色登场 / 动作 / 退场", `${summary.characterShowCount ?? 0} / ${summary.characterMoveCount ?? 0} / ${summary.characterHideCount ?? 0}`],
           ["有调度场景", `${summary.stagedSceneCount ?? 0}`],
           ["无背景内容场景", `${summary.missingBackgroundSceneCount ?? 0}`],
           ["说话人自动补位", `${summary.speakerAutoPlaceCount ?? 0}`],

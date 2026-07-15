@@ -6,6 +6,7 @@
     dialogue: "台词",
     narration: "旁白",
     character_show: "角色登场",
+    character_move: "角色舞台动作",
     character_hide: "角色退场",
     music_play: "播放 BGM",
     music_stop: "停止 BGM",
@@ -49,6 +50,7 @@
       : [
           "background",
           "character_show",
+          "character_move",
           "character_hide",
           "particle_effect",
           "wait",
@@ -231,6 +233,9 @@
     if (STORY_TEXT_TYPES.has(block.type)) {
       return estimateTextDurationMs(block);
     }
+    if (block.type === "character_move") {
+      return Math.round(clampNumber(block.durationMs, 0, 10000, 600));
+    }
     if (["background", "character_show", "character_hide"].includes(block.type)) {
       return getTransitionDurationMs(block);
     }
@@ -374,7 +379,7 @@
       }
     }
 
-    if (type === "character_show") {
+    if (["character_show", "character_move"].includes(type)) {
       detail = getCharacterName(context.characterMap, block.characterId);
       const stage = block.stage ?? block.characterStage ?? {};
       const scale = Math.round(clampNumber(stage.scale, 45, 220, 100));
@@ -382,7 +387,7 @@
       if (!cleanText(block.characterId)) {
         pushIssue(issues, "blocker", "character_show_missing_character", "角色登场卡未选择角色", "这张卡没有绑定角色。", baseContext);
       }
-      if (cleanText(block.transition, "fade") === "none") {
+      if (type === "character_show" && cleanText(block.transition, "fade") === "none") {
         pushIssue(issues, "tip", "character_show_hard_cut", "角色登场是硬切", "建议用淡入、滑入或弹出，让立绘出现更像正式演出。", baseContext);
       }
       if (scale <= 55 || scale >= 185) {

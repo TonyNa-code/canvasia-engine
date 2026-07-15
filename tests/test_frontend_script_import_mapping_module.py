@@ -105,6 +105,8 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
                 return String(value ?? "");
               }},
               getEffectDuration: (value) => tools.getImportedEffectDuration(value),
+              getSafeCharacterMotionDurationMs: (value, fallback = 600) => Math.max(0, Math.min(10000, Math.round(Number(value) || fallback))),
+              getSafeCharacterMotionEasing: (value) => ["linear", "ease_in", "ease_out", "ease_in_out", "spring"].includes(value) ? value : "ease_out",
               getDefaultJumpTargetSceneId: () => "scene_end",
               defaultCharacterStage: {{ scale: 1, opacity: 1 }},
               choiceContinueTarget: "__continue__",
@@ -178,6 +180,11 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
               ),
               normalizedCharacterShowWithStage: tools.normalizeImportedDraftBlockForScene(
                 {{ type: "character_show", characterHint: "Yuina", expressionHint: "微笑", position: "right", stage: {{ offsetX: -8, offsetY: 3, scale: 118, opacity: 90, layer: 2, flipX: true }} }},
+                null,
+                resolvers
+              ),
+              normalizedCharacterMove: tools.normalizeImportedDraftBlockForScene(
+                {{ type: "character_move", characterHint: "Yuina", expressionHint: "微笑", position: "left", durationMs: "900", easing: "spring", stage: {{ offsetX: -4, offsetY: 2, scale: 112, opacity: 88, layer: 3, flipX: true }} }},
                 null,
                 resolvers
               ),
@@ -365,6 +372,22 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
             "offsetY": 3,
             "layer": 2,
             "flipX": True,
+        })
+        self.assertEqual(payload["normalizedCharacterMove"], {
+            "type": "character_move",
+            "characterId": "char_yuina",
+            "expressionId": "expr_smile",
+            "position": "left",
+            "durationMs": 900,
+            "easing": "spring",
+            "stage": {
+                "offsetX": -4,
+                "offsetY": 2,
+                "scale": 112,
+                "opacity": 88,
+                "layer": 3,
+                "flipX": True,
+            },
         })
         self.assertEqual(payload["normalizedSfx"], {"type": "sfx_play", "assetId": "sfx_door", "volume": 80})
         self.assertEqual(

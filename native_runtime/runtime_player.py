@@ -382,6 +382,19 @@ except ImportError:  # pragma: no cover - exported native packages import from t
         wrap_text,
     )
 
+try:
+    from .runtime_character_motion import (
+        build_native_character_motion_state,
+        get_native_character_render_pose,
+        is_native_character_motion_complete,
+    )
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_character_motion import (
+        build_native_character_motion_state,
+        get_native_character_render_pose,
+        is_native_character_motion_complete,
+    )
+
 
 ASSET_TYPE_IMAGE = {"background", "sprite", "cg", "ui"}
 ASSET_TYPE_FONT = {"font"}
@@ -6086,7 +6099,10 @@ def render_native_runtime_vn_baseline_quality_markdown(report: dict) -> str:
         ("空片尾 / 过短片尾", f"{int(metrics.get('emptyCreditsRollCount') or 0)} / {int(metrics.get('shortCreditsRollCount') or 0)}"),
         ("角色立绘覆盖", f"{int(metrics.get('charactersWithSpriteCount') or 0)} / {int(metrics.get('characterCount') or 0)}"),
         ("缺失角色 / 表情引用", f"{int(metrics.get('missingCharacterReferenceCount') or 0)} / {int(metrics.get('missingExpressionReferenceCount') or 0)}"),
-        ("人物转场 / 登场", f"{int(metrics.get('characterTransitionCount') or 0)} / {int(metrics.get('characterShowCount') or 0)}"),
+        (
+            "人物转场 / 登场 / 动作",
+            f"{int(metrics.get('characterTransitionCount') or 0)} / {int(metrics.get('characterShowCount') or 0)} / {int(metrics.get('characterMoveCount') or 0)}",
+        ),
         ("人物站位变化", metrics.get("characterPositionVariantCount")),
         ("人物舞台调整", metrics.get("characterStageAdjustmentCount")),
         ("背景覆盖", f"{int(metrics.get('scenesWithBackground') or 0)} / {int(metrics.get('storySceneCount') or 0)}"),
@@ -7849,6 +7865,7 @@ class NativeRuntimePlayer:
         self.variable_state = self.build_initial_variable_state()
         self.stage_background_asset_id: str | None = None
         self.visible_characters: dict[str, dict] = {}
+        self.character_motions: dict[str, dict] = {}
         self.background_transition: dict | None = None
         self.leaving_characters: dict[str, dict] = {}
         self.current_scene_id = self.project.get("entrySceneId") or self.scene_order[0]
@@ -9526,6 +9543,7 @@ class NativeRuntimePlayer:
         self.stage_background_asset_id = self.get_title_preview_background_asset_id() or None
         self.background_transition = None
         self.leaving_characters = {}
+        self.character_motions = {}
         self.status_message = f"标题页：选择开始、续玩、读档或设置。 · {self.get_runtime_preload_status_line()}"
 
     def start_story_from_title(self) -> None:
@@ -9545,6 +9563,7 @@ class NativeRuntimePlayer:
         self.finished_message = ""
         self.stage_background_asset_id = None
         self.visible_characters = {}
+        self.character_motions = {}
         self.background_transition = None
         self.leaving_characters = {}
         self.current_bgm_asset_id = None
@@ -10093,6 +10112,7 @@ class NativeRuntimePlayer:
         self.stage_background_asset_id = snapshot.get("stageBackgroundAssetId")
         self.apply_scene3d_preview_config(snapshot.get("scene3dPreview") if isinstance(snapshot.get("scene3dPreview"), dict) else None)
         self.visible_characters = self.get_snapshot_visible_characters(snapshot.get("visibleCharacters") or {})
+        self.character_motions = {}
         self.background_transition = None
         self.leaving_characters = {}
         self.current_bgm_asset_id = None
@@ -10250,6 +10270,10 @@ class NativeRuntimePlayer:
             transition = state.get("transition")
             if transition and get_native_transition_progress(transition, now_ms) >= 1.0:
                 state.pop("transition", None)
+
+        for character_id in list(self.character_motions):
+            if is_native_character_motion_complete(self.character_motions.get(character_id), now_ms):
+                self.character_motions.pop(character_id, None)
 
     def set_particle_effect(self, effect: dict | None) -> None:
         config = normalize_native_particle_effect_config(effect)
@@ -10465,7 +10489,36 @@ class NativeRuntimePlayer:
                         "stage": get_safe_character_stage(block.get("stage")),
                         "transition": self.get_character_transition_state(block, "in"),
                     }
+                    self.character_motions.pop(character_id, None)
                     self.leaving_characters.pop(character_id, None)
+                self.current_block_index += 1
+                continue
+
+            if block_type == "character_move":
+                character_id = str(block.get("characterId") or "").strip()
+                if character_id:
+                    self.unlock_archive_entry("characterUnlocked", character_id)
+                    character = self.characters_by_id.get(character_id) or {}
+                    previous_state = self.visible_characters.get(character_id) or {
+                        "characterId": character_id,
+                        "expressionId": block.get("expressionId") or "expr_default",
+                        "position": character.get("defaultPosition") or "center",
+                        "stage": get_safe_character_stage(),
+                    }
+                    motion = build_native_character_motion_state(
+                        {"characterId": character_id, **previous_state},
+                        block,
+                        self.get_runtime_ticks_ms(),
+                    )
+                    self.visible_characters[character_id] = {
+                        **motion["targetState"],
+                        "transition": None,
+                    }
+                    self.leaving_characters.pop(character_id, None)
+                    if motion["durationMs"] > 0:
+                        self.character_motions[character_id] = motion
+                    else:
+                        self.character_motions.pop(character_id, None)
                 self.current_block_index += 1
                 continue
 
@@ -10473,6 +10526,7 @@ class NativeRuntimePlayer:
                 character_id = block.get("characterId")
                 if character_id:
                     previous_state = self.visible_characters.pop(character_id, None)
+                    self.character_motions.pop(character_id, None)
                     transition = self.get_character_transition_state(block, "out")
                     if previous_state and transition:
                         previous_state["transition"] = transition
@@ -10649,6 +10703,9 @@ class NativeRuntimePlayer:
             "stage": get_safe_character_stage(existing.get("stage")),
             "transition": existing.get("transition"),
         }
+        motion = self.character_motions.get(speaker_id)
+        if isinstance(motion, dict) and isinstance(motion.get("targetState"), dict):
+            motion["targetState"]["expressionId"] = self.visible_characters[speaker_id]["expressionId"]
 
     def play_bgm(
         self,
@@ -11763,8 +11820,18 @@ class NativeRuntimePlayer:
 
     def get_renderable_character_items(self) -> list[tuple[str, dict]]:
         items: list[tuple[str, dict]] = []
+        now_ms = self.get_runtime_ticks_ms()
         for character_id, state in self.visible_characters.items():
-            items.append((character_id, dict(state or {})))
+            items.append(
+                (
+                    character_id,
+                    get_native_character_render_pose(
+                        dict(state or {}),
+                        self.character_motions.get(character_id),
+                        now_ms,
+                    ),
+                )
+            )
         for character_id, state in self.leaving_characters.items():
             leaving_state = dict(state or {})
             leaving_state["__leaving"] = True
@@ -11784,14 +11851,19 @@ class NativeRuntimePlayer:
             stage = get_safe_character_stage(character_state.get("stage"))
             return (
                 stage["layer"],
-                position_x.get(character_state.get("position") or "center", 0),
+                float(character_state.get("positionRatio") or 0),
             )
 
         for character_id, state in sorted(self.get_renderable_character_items(), key=character_sort_key):
             stage = get_safe_character_stage(state.get("stage"))
             sprite_asset_id = self.get_character_sprite_asset_id(character_id, state.get("expressionId"))
             sprite = self._load_image(sprite_asset_id)
-            x = position_x.get(state.get("position") or "center", self.width // 2) + int(self.width * stage["offsetX"] / 100)
+            position_ratio = state.get("positionRatio")
+            x = (
+                int(self.width * float(position_ratio))
+                if isinstance(position_ratio, (int, float))
+                else position_x.get(state.get("position") or "center", self.width // 2)
+            ) + int(self.width * stage["offsetX"] / 100)
             bottom_y = int(self.height * 0.88) + int(self.height * stage["offsetY"] / 100)
             is_leaving = bool(state.get("__leaving"))
             if sprite:

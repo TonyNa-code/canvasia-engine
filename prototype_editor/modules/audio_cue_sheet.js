@@ -7,6 +7,7 @@
     dialogue: "台词",
     narration: "旁白",
     character_show: "角色登场",
+    character_move: "角色动作",
     character_hide: "角色退场",
     music_play: "播放 BGM",
     music_stop: "停止 BGM",
@@ -214,7 +215,7 @@
   }
 
   function isStoryContentBlock(block = {}) {
-    return ["background", "dialogue", "narration", "character_show", "choice", "video_play", "credits_roll", "wait"].includes(
+    return ["background", "dialogue", "narration", "character_show", "character_move", "choice", "video_play", "credits_roll", "wait"].includes(
       block.type
     );
   }

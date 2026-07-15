@@ -115,6 +115,7 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
               speedLine: tools.parseTextSpeedLine("speed instant"),
               stageLine: tools.parseStageDirectionLine("show yuina smile at right with dissolve"),
               stageLineWithStage: tools.parseStageDirectionLine("show yuina smile at right with dissolve scale 118 x -8 y 3 opacity 90 layer 2 flip"),
+              characterMoveLine: tools.parseStageDirectionLine("move yuina smile at left duration 900ms easing spring scale 112 x -4 y 2 opacity 88 layer 3 flip"),
               sfxLine: tools.parseStageDirectionLine("play sound door_knock"),
               videoLine: tools.parseStageDirectionLine('play video opening_movie title "Opening Movie" volume 80 from 2 to 12 cover no-skip'),
               shakeLine: tools.parseStageDirectionLine("shake heavy short"),
@@ -284,6 +285,22 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
                 "scale": 118,
                 "opacity": 90,
                 "layer": 2,
+                "flipX": True,
+            },
+        })
+        self.assertEqual(payload["characterMoveLine"], {
+            "type": "character_move",
+            "characterHint": "yuina",
+            "expressionHint": "smile",
+            "position": "left",
+            "durationMs": 900,
+            "easing": "spring",
+            "stage": {
+                "offsetX": -4,
+                "offsetY": 2,
+                "scale": 112,
+                "opacity": 88,
+                "layer": 3,
                 "flipX": True,
             },
         })
