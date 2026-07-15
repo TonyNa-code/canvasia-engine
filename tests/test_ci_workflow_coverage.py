@@ -36,13 +36,16 @@ class CiWorkflowCoverageTests(unittest.TestCase):
     def test_ci_hardening_keys_are_top_level(self) -> None:
         blocks = _get_workflow_top_level_blocks()
 
-        for key in ("on", "env", "permissions", "concurrency", "jobs"):
+        for key in ("on", "permissions", "concurrency", "jobs"):
             self.assertIn(key, blocks)
 
-    def test_ci_opts_into_node_24_actions_runtime(self) -> None:
-        blocks = _get_workflow_top_level_blocks()
+    def test_ci_uses_node_24_compatible_action_versions(self) -> None:
+        workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
 
-        self.assertIn("FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true", blocks["env"])
+        self.assertIn("actions/checkout@v7", workflow)
+        self.assertIn("actions/setup-python@v6", workflow)
+        self.assertIn("actions/setup-node@v7", workflow)
+        self.assertNotIn("FORCE_JAVASCRIPT_ACTIONS_TO_NODE24", workflow)
 
     def test_ci_uses_least_privilege_permissions(self) -> None:
         blocks = _get_workflow_top_level_blocks()
