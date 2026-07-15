@@ -925,9 +925,24 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
         panel.locator("#creativeAssistantHistorySearchInput").fill("找不到的灵感关键词")
         panel.get_by_text("没有匹配的灵感").wait_for(timeout=10000)
         panel.locator("#creativeAssistantHistorySearchInput").fill("")
+        self.page.wait_for_function(
+            """() => {
+                const panel = document.querySelector('#creativeAssistantPanel');
+                const input = panel?.querySelector('#creativeAssistantHistorySearchInput');
+                return input?.value === '' && Boolean(panel?.querySelector('.creative-history-card.is-favorite'));
+            }""",
+            timeout=20000,
+        )
         panel.get_by_role("button", name="只看收藏").click()
-        panel.get_by_role("button", name="显示全部").wait_for(timeout=10000)
-        panel.locator(".creative-history-card").first.wait_for(timeout=10000)
+        self.page.wait_for_function(
+            """() => {
+                const panel = document.querySelector('#creativeAssistantPanel');
+                const toggle = panel?.querySelector('[data-action="toggle-creative-assistant-history-favorites"]');
+                return toggle?.textContent?.includes('显示全部')
+                  && Boolean(panel?.querySelector('.creative-history-card.is-favorite'));
+            }""",
+            timeout=20000,
+        )
         history_meta = panel.locator(".creative-history-meta").first
         history_meta.wait_for(timeout=10000)
         self.assertRegex(history_meta.inner_text(), r"(张卡片|仅建议)")
