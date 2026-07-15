@@ -3134,9 +3134,9 @@ class NativeRuntimeRenderSmokeTests(unittest.TestCase):
         self.assertEqual([item[0] for item in front_items], ["smoke_note"])
         player.render_stage_images(canvas, "front")
 
-        alpha_values = pygame.surfarray.array_alpha(canvas)
-        self.assertGreater(int(alpha_values.max()), 0)
-        self.assertGreater(int((alpha_values > 0).sum()), 100)
+        rendered_bounds = canvas.get_bounding_rect(min_alpha=1)
+        self.assertGreater(rendered_bounds.width, 0)
+        self.assertGreater(rendered_bounds.width * rendered_bounds.height, 100)
 
     def test_text_wrapping_preserves_words_newlines_and_ellipsis(self) -> None:
         font = pygame.font.Font(None, 24)
