@@ -3556,6 +3556,7 @@ class NativeRuntimeRenderSmokeTests(unittest.TestCase):
             warnings.filterwarnings("ignore", message="The system font .*", category=UserWarning)
             player = NativeRuntimePlayer(pygame, data_path)
 
+        player.start_story_from_title()
         self.assertEqual(player.get_current_scene()["id"], "scene_start")
         self.assertEqual(player.current_block_index, 0)
         self.assertEqual(player.current_choices[0]["gotoSceneId"], "__continue__")
