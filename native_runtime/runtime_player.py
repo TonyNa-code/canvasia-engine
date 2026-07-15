@@ -251,6 +251,29 @@ except ImportError:  # pragma: no cover - exported native packages import from t
     )
 
 try:
+    from .runtime_choice_availability import (
+        CHOICE_AVAILABILITY_ALWAYS,
+        CHOICE_AVAILABILITY_DISABLE,
+        CHOICE_CONTINUE_TARGET,
+        find_selectable_choice_index,
+        get_choice_availability_rules,
+        is_choice_option_selectable,
+        normalize_choice_availability_mode,
+        resolve_runtime_choice_options,
+    )
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_choice_availability import (
+        CHOICE_AVAILABILITY_ALWAYS,
+        CHOICE_AVAILABILITY_DISABLE,
+        CHOICE_CONTINUE_TARGET,
+        find_selectable_choice_index,
+        get_choice_availability_rules,
+        is_choice_option_selectable,
+        normalize_choice_availability_mode,
+        resolve_runtime_choice_options,
+    )
+
+try:
     from .runtime_vn_quality import (
         build_native_runtime_vn_baseline_quality_report as _build_native_runtime_vn_baseline_quality_report,
     )
@@ -424,7 +447,6 @@ except ImportError:  # pragma: no cover - exported native packages import from t
 ASSET_TYPE_IMAGE = {"background", "sprite", "cg", "ui"}
 ASSET_TYPE_FONT = {"font"}
 DEFAULT_GAME_DATA_NAME = "game_data.json"
-CHOICE_CONTINUE_TARGET = "__continue__"
 ENGINE_BRAND_LOGO_RELATIVE_PATH = "assets/canvasia-brand-logo.png"
 NATIVE_VIDEO_OPTIONAL_REQUIREMENTS_NAME = "requirements-native-runtime-video.txt"
 NATIVE_VIDEO_OPTIONAL_REQUIREMENTS_CANDIDATES = (NATIVE_VIDEO_OPTIONAL_REQUIREMENTS_NAME, "requirements-video.txt")
@@ -6112,6 +6134,9 @@ def render_native_runtime_vn_baseline_quality_markdown(report: dict) -> str:
         ("逻辑缺失变量 / 非数字加减 / 条件符号不匹配", f"{int(metrics.get('logicMissingVariableCount') or 0)} / {int(metrics.get('logicNonNumberAddCount') or 0)} / {int(metrics.get('logicOperatorMismatchCount') or 0)}"),
         ("空路线目标 / 条件隐式结束", f"{int(metrics.get('missingNavigationTargetCount') or 0)} / {int(metrics.get('implicitConditionFallbackEndCount') or 0)}"),
         ("选项按钮总数", metrics.get("choiceOptionCount")),
+        ("条件门控选项 / 判断规则", f"{int(metrics.get('choiceGatedOptionCount') or 0)} / {int(metrics.get('choiceAvailabilityRuleCount') or 0)}"),
+        ("门控缺规则 / 缺变量 / 类型不匹配", f"{int(metrics.get('choiceGateWithoutRulesCount') or 0)} / {int(metrics.get('choiceGateMissingVariableCount') or 0)} / {int(metrics.get('choiceGateOperatorMismatchCount') or 0)}"),
+        ("锁定无提示 / 无保底选项卡", f"{int(metrics.get('choiceLockedReasonMissingCount') or 0)} / {int(metrics.get('choiceBlockWithoutAlwaysCount') or 0)}"),
         ("空白 / 超长 / 重复选项", f"{int(metrics.get('emptyChoiceOptionCount') or 0)} / {int(metrics.get('longChoiceOptionCount') or 0)} / {int(metrics.get('duplicateChoiceOptionCount') or 0)}"),
         ("无动作选项", metrics.get("noActionChoiceOptionCount")),
         ("同目标假分支", metrics.get("sameTargetChoiceCount")),
@@ -10465,9 +10490,7 @@ class NativeRuntimePlayer:
         block = blocks[self.current_block_index]
         block_type = str(block.get("type") or "").strip()
         if block_type == "choice":
-            self.current_choices = block.get("options", []) or []
-            self.current_choice_index = 0
-            self.stop_flow_assist()
+            self.pause_on_choice_block(block)
             return
         if block_type == "wait":
             self.pause_on_wait_block(block, scene)
@@ -10728,11 +10751,7 @@ class NativeRuntimePlayer:
                 continue
 
             if block_type == "choice":
-                options = block.get("options", []) or []
-                self.current_choices = options
-                self.current_choice_index = 0
-                self.stop_flow_assist()
-                self.status_message = f"当前为选项卡：{len(options)} 个分支"
+                self.pause_on_choice_block(block)
                 return
 
             if block_type in {"dialogue", "narration"}:
@@ -11165,6 +11184,24 @@ class NativeRuntimePlayer:
                 return False
         return True
 
+    def pause_on_choice_block(self, block: dict) -> None:
+        resolution = resolve_runtime_choice_options(
+            block.get("options", []) or [],
+            self.evaluate_when,
+        )
+        self.current_choices = resolution["runtimeOptions"]
+        self.current_choice_index = find_selectable_choice_index(self.current_choices, 0)
+        if self.current_choice_index < 0:
+            self.current_choice_index = 0
+        self.stop_flow_assist()
+        if resolution["safetyOption"]:
+            self.status_message = "选项条件没有留下可选路线，已启用安全继续；请让作者修复门控规则。"
+        else:
+            self.status_message = (
+                f"当前为选项卡：{len(self.current_choices)} 个可见分支"
+                f"（隐藏 {resolution['hiddenCount']}，锁定 {resolution['lockedCount']}）"
+            )
+
     def resolve_condition(self, block: dict) -> None:
         for branch in block.get("branches", []) or []:
             if self.evaluate_when(branch.get("when", []) or []):
@@ -11182,7 +11219,12 @@ class NativeRuntimePlayer:
     def choose_current_option(self, option_index: int) -> None:
         if not self.current_choices:
             return
+        if option_index < 0 or option_index >= len(self.current_choices):
+            return
         option = self.current_choices[option_index]
+        if not is_choice_option_selectable(option):
+            self.status_message = str(option.get("choiceLockedReason") or "这个选项的条件尚未满足。")
+            return
         for effect in option.get("effects", []) or []:
             self.apply_choice_effect(effect)
         self.current_block_index += 1
@@ -12402,7 +12444,8 @@ class NativeRuntimePlayer:
 
         for index, option in enumerate(self.current_choices or []):
             row_rect = self.pygame.Rect(button_left, button_top + index * 52, button_width, 40)
-            is_active = index == self.current_choice_index
+            is_enabled = is_choice_option_selectable(option)
+            is_active = is_enabled and index == self.current_choice_index
             fill = active_fill if is_active else idle_fill
             border = with_alpha(self.dialog_box_config.get("speakerColor", COLOR_ACCENT_ALT), 88) if is_active else border_color
             self.pygame.draw.rect(self.screen, fill, row_rect, border_radius=16)
@@ -12410,8 +12453,19 @@ class NativeRuntimePlayer:
             self.draw_game_ui_button_frame(row_rect, self.get_game_ui_button_state(row_rect, active=is_active))
             label = str(option.get("text") or f"选项 {index + 1}")
             label = self.localize_value(option, "text", label)
+            if not is_enabled:
+                locked_reason = self.localize_value(
+                    option,
+                    "choiceLockedReason",
+                    str(option.get("choiceLockedReason") or "条件尚未满足"),
+                )
+                label = f"{label}  ·  未解锁：{locked_reason}"
             self.screen.blit(
-                self.font_body.render(label, True, self.dialog_box_config.get("textColor", COLOR_TEXT)),
+                self.font_body.render(
+                    label,
+                    True,
+                    self.dialog_box_config.get("textColor", COLOR_TEXT) if is_enabled else self.dialog_box_config.get("hintColor", COLOR_TEXT_MUTED),
+                ),
                 (row_rect.left + 18, row_rect.top + 5),
             )
 
@@ -14113,9 +14167,13 @@ class NativeRuntimePlayer:
             return True
         if event.type == self.pygame.KEYDOWN:
             if event.key == self.pygame.K_UP:
-                self.current_choice_index = (self.current_choice_index - 1) % len(self.current_choices)
+                next_index = find_selectable_choice_index(self.current_choices, self.current_choice_index - 1, -1)
+                if next_index >= 0:
+                    self.current_choice_index = next_index
             elif event.key == self.pygame.K_DOWN:
-                self.current_choice_index = (self.current_choice_index + 1) % len(self.current_choices)
+                next_index = find_selectable_choice_index(self.current_choices, self.current_choice_index + 1, 1)
+                if next_index >= 0:
+                    self.current_choice_index = next_index
             elif event.key in (self.pygame.K_RETURN, self.pygame.K_SPACE):
                 self.choose_current_option(self.current_choice_index)
         elif event.type == self.pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -14127,8 +14185,13 @@ class NativeRuntimePlayer:
             for index, _option in enumerate(self.current_choices):
                 row_rect = self.pygame.Rect(panel.left + padding_x, button_top + index * 52, button_width, 40)
                 if row_rect.collidepoint(event.pos):
-                    self.current_choice_index = index
-                    self.choose_current_option(index)
+                    if is_choice_option_selectable(self.current_choices[index]):
+                        self.current_choice_index = index
+                        self.choose_current_option(index)
+                    else:
+                        self.status_message = str(
+                            self.current_choices[index].get("choiceLockedReason") or "这个选项的条件尚未满足。"
+                        )
                     break
         return True
 

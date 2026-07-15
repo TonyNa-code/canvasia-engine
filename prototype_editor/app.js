@@ -49,6 +49,8 @@ const {
 
 const storyBlockCatalogTools = window.CanvasiaEditorStoryBlockCatalog;
 const { BLOCK_LABELS, MUSIC_END_MODE_LABELS, CHOICE_CONTINUE_TARGET } = storyBlockCatalogTools;
+const runtimeChoiceAvailabilityTools = window.CanvasiaRuntimeChoiceAvailability;
+const choiceAvailabilityEditorTools = window.CanvasiaEditorChoiceAvailability;
 const storyBlockActionTools = window.CanvasiaEditorStoryBlockActions;
 const storyBlockEditorTools = window.CanvasiaEditorStoryBlockEditors;
 const musicRangeScopeTools = window.CanvasiaEditorMusicRangeScope;
@@ -4398,6 +4400,36 @@ async function handleClick(event) {
     return;
   }
 
+  if (action === "add-choice-availability-rule") {
+    const optionEditor = actionTarget.closest("[data-choice-option]");
+    if (
+      choiceAvailabilityEditorTools.appendChoiceAvailabilityRule(optionEditor, {
+        createDefaultConditionRule,
+        renderChoiceAvailabilityRuleEditorRow,
+      })
+    ) {
+      scheduleAutoSave(300);
+    }
+    return;
+  }
+
+  if (action === "remove-choice-availability-rule") {
+    if (choiceAvailabilityEditorTools.removeChoiceAvailabilityRule(actionTarget)) {
+      scheduleAutoSave(300);
+    } else {
+      showToast("条件门控至少保留一个判断", "error");
+    }
+    return;
+  }
+
+  if (action === "move-choice-availability-rule-up" || action === "move-choice-availability-rule-down") {
+    const direction = action === "move-choice-availability-rule-up" ? -1 : 1;
+    if (choiceAvailabilityEditorTools.moveChoiceAvailabilityRule(actionTarget, direction)) {
+      scheduleAutoSave(300);
+    }
+    return;
+  }
+
   if (action === "add-choice-effect") {
     if (await ensureStarterVariables({ reason: "选项附加效果需要先有变量。" })) {
       appendChoiceEffectEditor(actionTarget.dataset.optionId);
@@ -5146,8 +5178,19 @@ function handleChange(event) {
     return;
   }
 
+  if (target.matches('[data-field="choice-availability-mode"]')) {
+    choiceAvailabilityEditorTools.updateChoiceAvailabilityModePanels(
+      target.closest("[data-choice-availability]")
+    );
+    scheduleAutoSave();
+    return;
+  }
+
   if (target.matches('[data-field="condition-variable"]')) {
-    updateConditionRuleEditor(target.closest("[data-condition-rule]"), target.value);
+    updateConditionRuleEditor(
+      target.closest("[data-condition-rule], [data-choice-availability-rule]"),
+      target.value
+    );
     scheduleAutoSave();
     return;
   }
@@ -8646,6 +8689,10 @@ function shouldFlushPendingStoryChanges(action) {
     "remove-choice-option",
     "move-choice-option-up",
     "move-choice-option-down",
+    "add-choice-availability-rule",
+    "remove-choice-availability-rule",
+    "move-choice-availability-rule-up",
+    "move-choice-availability-rule-down",
     "add-choice-effect",
     "remove-choice-effect",
     "move-choice-effect-up",
@@ -11938,6 +11985,9 @@ function isConditionOperatorAllowedForVariable(variable, operator) {
   if ([">", ">=", "<", "<="].includes(safeOperator)) {
     return variable?.type === "number";
   }
+  if (["contains", "not_contains", "starts_with", "ends_with"].includes(safeOperator)) {
+    return variable?.type === "string";
+  }
   return false;
 }
 
@@ -11982,8 +12032,22 @@ function blockHasVariableLogicIssue(block) {
   }
 
   if (block.type === "choice") {
-    return (block.options ?? []).some((option) =>
-      (option.effects ?? []).some((effect) => {
+    return (block.options ?? []).some((option) => {
+      const availabilityMode = runtimeChoiceAvailabilityTools.normalizeChoiceAvailabilityMode(
+        option.choiceAvailabilityMode
+      );
+      const availabilityRules = runtimeChoiceAvailabilityTools.getChoiceAvailabilityRules(option);
+      const hasAvailabilityIssue =
+        availabilityMode !== "always" &&
+        (availabilityRules.length === 0 ||
+          availabilityRules.some((rule) =>
+            hasVariableReferenceIssue(rule.variableId, {
+              value: rule.value,
+              validateValue: true,
+              operator: rule.operator,
+            })
+          ));
+      const hasEffectIssue = (option.effects ?? []).some((effect) => {
         if (effect.type === "variable_add") {
           return hasVariableReferenceIssue(effect.variableId, {
             expectedType: "number",
@@ -11998,8 +12062,9 @@ function blockHasVariableLogicIssue(block) {
           });
         }
         return true;
-      })
-    );
+      });
+      return hasAvailabilityIssue || hasEffectIssue;
+    });
   }
 
   if (block.type === "condition") {
@@ -17959,7 +18024,7 @@ function choosePreviewOption(optionId) {
 
   const option = current.choiceOptions.find((item) => item.id === optionId);
 
-  if (!option) {
+  if (!option || !runtimeChoiceAvailabilityTools.isChoiceOptionSelectable(option)) {
     return;
   }
 
@@ -19864,7 +19929,12 @@ function buildPreviewSnapshot(sceneId, blockIndex, previousVisualState, previous
     block,
     visualState: nextVisualState,
     variables: nextVariables,
-    choiceOptions: block.type === "choice" ? (block.options ?? []).map((option) => ({ ...option })) : [],
+    choiceOptions:
+      block.type === "choice"
+        ? runtimeChoiceAvailabilityTools.resolveChoiceOptions(block.options, nextVariables, {
+            evaluateRule: evaluateConditionRule,
+          }).runtimeOptions
+        : [],
     transitionTargetSceneId,
     selectedOptionId: null,
     resolvedBranchId: conditionResult?.branchKey ?? null,
@@ -22021,10 +22091,17 @@ function renderStage(visualState, large, options = {}) {
           ${options.choiceOptions
             .map(
               (option) => `
-                <button class="preview-choice-button" data-action="preview-choice" data-option-id="${option.id}">
+                <button
+                  class="preview-choice-button ${option.choiceEnabled === false ? "is-locked" : ""}"
+                  data-action="preview-choice"
+                  data-option-id="${escapeHtml(option.id)}"
+                  ${option.choiceEnabled === false ? "disabled aria-disabled=\"true\"" : ""}
+                >
                   <strong>${escapeHtml(option.text)}</strong>
-                  <span>进入 ${escapeHtml(
-                    getChoiceTargetLabel(option.gotoSceneId)
+                  <span>${escapeHtml(
+                    option.choiceEnabled === false
+                      ? option.choiceLockedReason || "条件尚未满足"
+                      : `进入 ${getChoiceTargetLabel(option.gotoSceneId)}`
                   )}</span>
                 </button>
               `
@@ -33458,8 +33535,28 @@ function renderChoiceOptionEditorRow(option, index, optionCount = 1) {
     escapeHtml,
     getEditableChoiceEffects,
     renderChoiceTextQualityTools,
+    renderChoiceAvailabilityEditor,
     renderChoiceEffectEditorRow,
     renderChoiceEffectEmptyState,
+  });
+}
+
+function renderChoiceAvailabilityRuleEditorRow(rule, index, ruleCount = 1) {
+  return choiceAvailabilityEditorTools.renderChoiceAvailabilityRuleEditorRow(rule, index, ruleCount, {
+    getSafeVariableId,
+    getSafeConditionOperator,
+    renderVariableOptions,
+    renderConditionOperatorOptions,
+    renderConditionValueFields,
+  });
+}
+
+function renderChoiceAvailabilityEditor(option) {
+  return choiceAvailabilityEditorTools.renderChoiceAvailabilityEditor(option, {
+    escapeHtml,
+    createDefaultConditionRule,
+    renderChoiceAvailabilityRuleEditorRow,
+    hasVariables: state.data.variables.length > 0,
   });
 }
 
@@ -39383,12 +39480,19 @@ function collectEditedBlock(block) {
       const preservedEffects = (existing?.effects ?? []).filter(
         (effect) => !isEditableChoiceEffect(effect)
       );
+      const availability = choiceAvailabilityEditorTools.readChoiceAvailabilityEditor(editor, {
+        getSafeVariableId,
+        getSafeConditionOperator,
+        readConditionRuleValue,
+      });
 
       return {
+        ...(existing ?? {}),
         id: optionId,
         text,
         gotoSceneId,
         effects: [...editableEffects, ...preservedEffects],
+        ...availability,
       };
     });
 
@@ -40148,6 +40252,8 @@ function appendChoiceOptionEditor() {
     text: `新选项 ${nextIndex + 1}`,
     gotoSceneId: state.selectedSceneId,
     effects: [],
+    choiceAvailabilityMode: "always",
+    choiceAvailabilityWhen: [],
   };
 
   container.insertAdjacentHTML("beforeend", renderChoiceOptionEditorRow(nextOption, nextIndex, nextIndex + 1));

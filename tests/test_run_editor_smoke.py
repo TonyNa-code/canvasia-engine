@@ -851,6 +851,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         preload_manifest_path = build_dir / run_editor.RUNTIME_PRELOAD_MANIFEST_FILE_NAME
         preload_report_path = build_dir / run_editor.RUNTIME_PRELOAD_REPORT_FILE_NAME
         self.assertTrue((build_dir / "runtime_conditions.js").is_file())
+        self.assertTrue((build_dir / "runtime_choice_availability.js").is_file())
         self.assertTrue((build_dir / "runtime_preload.js").is_file())
         self.assertTrue(preload_manifest_path.is_file())
         self.assertTrue(preload_report_path.is_file())
@@ -3277,6 +3278,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / "runtime_storage.js").is_file())
         self.assertTrue((build_dir / "runtime_visual_constants.js").is_file())
         self.assertTrue((build_dir / "runtime_conditions.js").is_file())
+        self.assertTrue((build_dir / "runtime_choice_availability.js").is_file())
         self.assertTrue((build_dir / "runtime_controls.js").is_file())
         self.assertTrue((build_dir / "runtime_settings.js").is_file())
         self.assertTrue((build_dir / "runtime_i18n.js").is_file())
@@ -3376,6 +3378,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["playerRuntimeVisualConstants"], "runtime_visual_constants.js")
         self.assertEqual(manifest["files"]["playerRuntimeControls"], "runtime_controls.js")
         self.assertEqual(manifest["files"]["playerRuntimeConditions"], "runtime_conditions.js")
+        self.assertEqual(manifest["files"]["playerRuntimeChoiceAvailability"], "runtime_choice_availability.js")
         self.assertEqual(manifest["files"]["playerRuntimeSettings"], "runtime_settings.js")
         self.assertEqual(manifest["files"]["playerRuntimeI18n"], "runtime_i18n.js")
         self.assertEqual(manifest["files"]["playerRuntimeAudio"], "runtime_audio.js")
@@ -4052,6 +4055,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["runtimeScenePrefetchModule"], run_editor.NATIVE_RUNTIME_SCENE_PREFETCH_NAME)
         self.assertEqual(manifest["files"]["runtimeCharacterMotionModule"], run_editor.NATIVE_RUNTIME_CHARACTER_MOTION_NAME)
         self.assertEqual(manifest["files"]["runtimeStageImagesModule"], run_editor.NATIVE_RUNTIME_STAGE_IMAGES_NAME)
+        self.assertEqual(manifest["files"]["runtimeChoiceAvailabilityModule"], run_editor.NATIVE_RUNTIME_CHOICE_AVAILABILITY_NAME)
         self.assertEqual(manifest["files"]["runtimeDiagnosticsModule"], run_editor.NATIVE_RUNTIME_DIAGNOSTICS_NAME)
         self.assertEqual(manifest["files"]["runtimeDiagnosticsReport"], run_editor.NATIVE_RUNTIME_DIAGNOSTICS_REPORT_NAME)
         self.assertEqual(manifest["files"]["runtimeDiagnosticsMarkdown"], run_editor.NATIVE_RUNTIME_DIAGNOSTICS_MARKDOWN_NAME)
@@ -4068,6 +4072,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 run_editor.NATIVE_RUNTIME_SCENE_PREFETCH_NAME,
                 run_editor.NATIVE_RUNTIME_CHARACTER_MOTION_NAME,
                 run_editor.NATIVE_RUNTIME_STAGE_IMAGES_NAME,
+                run_editor.NATIVE_RUNTIME_CHOICE_AVAILABILITY_NAME,
                 run_editor.NATIVE_RUNTIME_DIAGNOSTICS_NAME,
                 run_editor.NATIVE_RUNTIME_I18N_NAME,
                 run_editor.NATIVE_RUNTIME_SETTINGS_NAME,
@@ -4126,6 +4131,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["runtimeScenePrefetchModule"], run_editor.NATIVE_RUNTIME_SCENE_PREFETCH_NAME)
         self.assertEqual(manifest["files"]["runtimeCharacterMotionModule"], run_editor.NATIVE_RUNTIME_CHARACTER_MOTION_NAME)
         self.assertEqual(manifest["files"]["runtimeStageImagesModule"], run_editor.NATIVE_RUNTIME_STAGE_IMAGES_NAME)
+        self.assertEqual(manifest["files"]["runtimeChoiceAvailabilityModule"], run_editor.NATIVE_RUNTIME_CHOICE_AVAILABILITY_NAME)
         self.assertEqual(manifest["files"]["runtimeDiagnosticsModule"], run_editor.NATIVE_RUNTIME_DIAGNOSTICS_NAME)
         self.assertEqual(manifest["files"]["runtimeDiagnosticsReport"], run_editor.NATIVE_RUNTIME_DIAGNOSTICS_REPORT_NAME)
         self.assertEqual(manifest["files"]["runtimeDiagnosticsMarkdown"], run_editor.NATIVE_RUNTIME_DIAGNOSTICS_MARKDOWN_NAME)
@@ -4153,6 +4159,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["runtime"]["runtimeScenePrefetchModule"], run_editor.NATIVE_RUNTIME_SCENE_PREFETCH_NAME)
         self.assertEqual(manifest["runtime"]["runtimeCharacterMotionModule"], run_editor.NATIVE_RUNTIME_CHARACTER_MOTION_NAME)
         self.assertEqual(manifest["runtime"]["runtimeStageImagesModule"], run_editor.NATIVE_RUNTIME_STAGE_IMAGES_NAME)
+        self.assertEqual(manifest["runtime"]["runtimeChoiceAvailabilityModule"], run_editor.NATIVE_RUNTIME_CHOICE_AVAILABILITY_NAME)
         self.assertEqual(manifest["runtime"]["runtimeDiagnosticsModule"], run_editor.NATIVE_RUNTIME_DIAGNOSTICS_NAME)
         self.assertEqual(manifest["runtime"]["runtimeViewModule"], run_editor.NATIVE_RUNTIME_VIEW_NAME)
         self.assertEqual(manifest["runtime"]["runtimeVnQualityModule"], run_editor.NATIVE_RUNTIME_VN_QUALITY_NAME)
@@ -4859,6 +4866,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / "app" / "runtime_storage.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_visual_constants.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_conditions.js").is_file())
+        self.assertTrue((build_dir / "app" / "runtime_choice_availability.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_controls.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_settings.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_i18n.js").is_file())
@@ -4937,6 +4945,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["appRuntimeStorage"], "app/runtime_storage.js")
         self.assertEqual(manifest["files"]["appRuntimeVisualConstants"], "app/runtime_visual_constants.js")
         self.assertEqual(manifest["files"]["appRuntimeConditions"], "app/runtime_conditions.js")
+        self.assertEqual(manifest["files"]["appRuntimeChoiceAvailability"], "app/runtime_choice_availability.js")
         self.assertEqual(manifest["files"]["appRuntimeI18n"], "app/runtime_i18n.js")
         self.assertEqual(manifest["files"]["appRuntimeCharacterMotion"], "app/runtime_character_motion.js")
         self.assertEqual(manifest["files"]["appRuntimeTextEffects"], "app/runtime_text_effects.js")

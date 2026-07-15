@@ -2376,6 +2376,103 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             self.assertIn("存在空白选项按钮", markdown)
             self.assertIn("空白 / 超长 / 重复选项", markdown)
 
+    def test_vn_baseline_quality_report_flags_choice_availability_gaps(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_dir = Path(temp_dir) / "bundle"
+            bundle_dir.mkdir(parents=True)
+            game_data = {
+                "project": {
+                    "projectId": "native_choice_gate_quality_smoke",
+                    "title": "Native Choice Gate Quality Smoke",
+                    "entrySceneId": "scene_choice",
+                },
+                "assets": {"assets": []},
+                "characters": {"characters": []},
+                "variables": {
+                    "variables": [
+                        {"id": "affection", "name": "Affection", "type": "number", "defaultValue": 0},
+                        {"id": "route_name", "name": "Route", "type": "string", "defaultValue": ""},
+                    ]
+                },
+                "chapters": [
+                    {
+                        "id": "chapter_1",
+                        "name": "Chapter 1",
+                        "scenes": [
+                            {
+                                "id": "scene_choice",
+                                "name": "Choice",
+                                "blocks": [
+                                    {
+                                        "id": "choice_gate",
+                                        "type": "choice",
+                                        "options": [
+                                            {
+                                                "id": "hidden",
+                                                "text": "Hidden route",
+                                                "gotoSceneId": "scene_after",
+                                                "choiceAvailabilityMode": "hide_when_false",
+                                                "choiceAvailabilityWhen": [
+                                                    {"variableId": "affection", "operator": ">=", "value": 5}
+                                                ],
+                                            },
+                                            {
+                                                "id": "locked",
+                                                "text": "Locked route",
+                                                "gotoSceneId": "scene_after",
+                                                "choiceAvailabilityMode": "disable_when_false",
+                                                "choiceAvailabilityWhen": [],
+                                            },
+                                            {
+                                                "id": "broken",
+                                                "text": "Broken route",
+                                                "gotoSceneId": "scene_after",
+                                                "choiceAvailabilityMode": "hide_when_false",
+                                                "choiceAvailabilityWhen": [
+                                                    {"variableId": "missing_flag", "operator": "==", "value": True},
+                                                    {"variableId": "route_name", "operator": ">", "value": "B"},
+                                                ],
+                                            },
+                                        ],
+                                    }
+                                ],
+                            },
+                            {
+                                "id": "scene_after",
+                                "name": "After",
+                                "blocks": [{"id": "line_after", "type": "narration", "text": "After choice."}],
+                            },
+                        ],
+                    }
+                ],
+            }
+            (bundle_dir / "game_data.json").write_text(
+                json.dumps(game_data, ensure_ascii=False),
+                encoding="utf-8",
+            )
+
+            report = build_native_runtime_vn_baseline_quality_report(bundle_dir)
+
+            metrics = report["metrics"]
+            self.assertEqual(metrics["choiceGatedOptionCount"], 3)
+            self.assertEqual(metrics["choiceAvailabilityRuleCount"], 3)
+            self.assertEqual(metrics["choiceGateWithoutRulesCount"], 1)
+            self.assertEqual(metrics["choiceGateMissingVariableCount"], 1)
+            self.assertEqual(metrics["choiceGateOperatorMismatchCount"], 1)
+            self.assertEqual(metrics["choiceLockedReasonMissingCount"], 1)
+            self.assertEqual(metrics["choiceBlockWithoutAlwaysCount"], 1)
+            self.assertEqual(metrics["conditionReadVariableCount"], 2)
+            issue_codes = {issue["code"] for issue in report["issues"]}
+            self.assertIn("choice_gate_without_rules", issue_codes)
+            self.assertIn("choice_gate_missing_variable", issue_codes)
+            self.assertIn("choice_gate_operator_mismatch", issue_codes)
+            self.assertIn("choice_locked_reason_missing", issue_codes)
+            self.assertIn("choice_block_without_always_option", issue_codes)
+
+            markdown = render_native_runtime_vn_baseline_quality_markdown(report)
+            self.assertIn("条件门控选项 / 判断规则", markdown)
+            self.assertIn("条件选项缺少判断规则", markdown)
+
     def test_vn_baseline_quality_report_flags_no_action_choice_options(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             bundle_dir = Path(temp_dir) / "bundle"
@@ -3600,6 +3697,53 @@ class NativeRuntimeRenderSmokeTests(unittest.TestCase):
         self.assertIsNone(player.current_choices)
         self.assertEqual(player.variable_state["var_score"], 2)
         self.assertEqual(player.current_line["text"], "选择后的下一句。")
+
+    def test_choice_availability_hides_locks_and_keeps_runtime_recoverable(self) -> None:
+        data_path = self.write_game_data()
+        payload = json.loads(data_path.read_text(encoding="utf-8"))
+        payload["variables"] = {
+            "variables": [
+                {"id": "affection", "name": "Affection", "type": "number", "defaultValue": 1},
+                {"id": "has_key", "name": "Key", "type": "boolean", "defaultValue": False},
+            ]
+        }
+        payload["chapters"][0]["scenes"][0]["blocks"] = [
+            {
+                "id": "choice_gate",
+                "type": "choice",
+                "options": [
+                    {
+                        "id": "secret",
+                        "text": "秘密路线",
+                        "choiceAvailabilityMode": "hide_when_false",
+                        "choiceAvailabilityWhen": [{"variableId": "affection", "operator": ">=", "value": 5}],
+                    },
+                    {
+                        "id": "locked",
+                        "text": "打开门",
+                        "choiceAvailabilityMode": "disable_when_false",
+                        "choiceLockedReason": "需要钥匙",
+                        "choiceAvailabilityWhen": [{"variableId": "has_key", "operator": "==", "value": True}],
+                    },
+                ],
+            },
+            {"id": "after_gate", "type": "narration", "text": "安全继续后的下一句。"},
+        ]
+        data_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="The system font .*", category=UserWarning)
+            player = NativeRuntimePlayer(pygame, data_path)
+
+        player.start_story_from_title()
+        self.assertEqual([option["id"] for option in player.current_choices], ["locked", "__canvasia_choice_safety_continue__"])
+        self.assertEqual(player.current_choice_index, 1)
+        player.choose_current_option(0)
+        self.assertEqual(player.current_block_index, 0)
+        self.assertEqual(player.status_message, "需要钥匙")
+        player.choose_current_option(1)
+        self.assertEqual(player.current_block_index, 1)
+        self.assertEqual(player.current_line["text"], "安全继续后的下一句。")
 
     def test_native_runtime_renders_ui_skin_overlays_headlessly(self) -> None:
         data_path = self.write_game_data()

@@ -204,6 +204,9 @@
       return "角色名";
     }
     if (kind === "choice_option") {
+      if (key === "choiceLockedReason") {
+        return index === null ? "选项锁定提示" : `选项 ${index + 1} 锁定提示`;
+      }
       return index === null ? "选项文本" : `选项 ${index + 1}`;
     }
     if (key === "title") {
@@ -301,6 +304,27 @@
           },
           context
         );
+        if (
+          option.choiceAvailabilityMode === "disable_when_false" ||
+          cleanText(option.choiceLockedReason) ||
+          Object.keys(getTranslationMap(option, "choiceLockedReason")).length
+        ) {
+          addCoverageEntries(
+            entries,
+            option,
+            {
+              id: `${baseDescriptor.id}:option_${optionIndex + 1}:locked_reason`,
+              targetId: baseDescriptor.id,
+              kind: "choice_option",
+              key: "choiceLockedReason",
+              optionIndex,
+              chapterName: context.chapterName,
+              sceneName: context.sceneName,
+              locationLabel: `${blockLabel} · 选项 ${optionIndex + 1} 锁定提示`,
+            },
+            context
+          );
+        }
       });
     }
   }
@@ -874,8 +898,8 @@
         pushImportSkip(skipped, row, "找不到目标选项。");
         return;
       }
-      if (key !== "text") {
-        pushImportSkip(skipped, row, "选项翻译只支持 text 字段。");
+      if (!["text", "choiceLockedReason"].includes(key)) {
+        pushImportSkip(skipped, row, "选项翻译只支持 text 或 choiceLockedReason 字段。");
         return;
       }
       if (getCurrentTranslation(option, key, language) === text) {

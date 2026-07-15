@@ -192,6 +192,56 @@ class RenpyExportContractTests(unittest.TestCase):
         self.assertEqual(backend_warnings, [])
         self.assertIn("contains", frontend["contract"]["conditionOperators"])
 
+    def test_choice_availability_exports_with_conditional_safety_parity(self) -> None:
+        block = {
+            "type": "choice",
+            "options": [
+                {
+                    "text": "秘密路线",
+                    "gotoSceneId": "scene_secret",
+                    "choiceAvailabilityMode": "hide_when_false",
+                    "choiceAvailabilityWhen": [{"variableId": "affection", "operator": ">=", "value": 5}],
+                },
+                {
+                    "text": "钥匙门",
+                    "gotoSceneId": "__continue__",
+                    "choiceAvailabilityMode": "disable_when_false",
+                    "choiceLockedReason": "需要钥匙",
+                    "choiceAvailabilityWhen": [{"variableId": "has_key", "operator": "==", "value": True}],
+                },
+            ],
+        }
+        frontend = load_frontend_payload(
+            f"""
+            const warnings = [];
+            const lines = tools.renderBlock({json.dumps(block)}, {{
+              warnings,
+              sceneId: "scene_open",
+              blockIndex: 3,
+              sceneMap: new Map([["scene_secret", {{ id: "scene_secret" }}]]),
+            }});
+            process.stdout.write(JSON.stringify({{ lines, warnings }}));
+            """
+        )
+        backend_warnings: list[dict] = []
+        backend_lines = renpy_export.render_choice_block(
+            block,
+            {
+                "warnings": backend_warnings,
+                "variableMap": {"affection": {}, "has_key": {}},
+                "sceneLabelMap": {"scene_secret": "scene_secret"},
+                "sceneId": "scene_open",
+                "blockIndex": 3,
+            },
+        )
+
+        self.assertEqual(frontend["lines"], backend_lines)
+        self.assertIn('        "秘密路线" if affection >= 5:', backend_lines)
+        self.assertIn('        "钥匙门" if has_key == True:', backend_lines)
+        self.assertIn('        "Continue (safety fallback)" if not ((affection >= 5) or (has_key == True)):', backend_lines)
+        self.assertEqual([warning["code"] for warning in frontend["warnings"]], ["renpy_choice_lock_degraded", "renpy_choice_safety_fallback"])
+        self.assertEqual(frontend["warnings"], backend_warnings)
+
     def test_pop_character_transition_uses_native_renpy_zoom_transitions(self) -> None:
         frontend = load_frontend_payload(
             """

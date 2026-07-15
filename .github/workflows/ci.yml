@@ -49,6 +49,7 @@ jobs:
             native_runtime/runtime_player_view.py \
             native_runtime/runtime_character_motion.py \
             native_runtime/runtime_stage_images.py \
+            native_runtime/runtime_choice_availability.py \
             native_runtime/runtime_i18n.py \
             native_runtime/runtime_vn_quality.py \
             native_runtime/build_native_runtime_app.py \
@@ -68,6 +69,7 @@ jobs:
             tests/test_native_runtime_character_motion.py \
             tests/test_character_motion_contract.py \
             tests/test_native_runtime_stage_images.py \
+            tests/test_native_runtime_choice_availability.py \
             tests/test_stage_image_contract.py \
             tests/test_maintainability_check_tool.py \
             tests/test_project_health_tool.py \
@@ -209,6 +211,7 @@ jobs:
           node --check prototype_editor/modules/music_range_scope.js
           node --check prototype_editor/modules/beginner_tutorial.js
           node --check prototype_editor/modules/choice_consequence_sheet.js
+          node --check prototype_editor/modules/choice_availability_editor.js
           node --check prototype_editor/modules/command_palette.js
           node --check prototype_editor/modules/module_guard.js
           node --check prototype_editor/modules/dashboard_primary_actions.js
@@ -286,6 +289,7 @@ jobs:
           node --check prototype_editor/modules/voice_production_sheet.js
           node --check prototype_editor/app.js
           node --check export_player_template/runtime_conditions.js
+          node --check export_player_template/runtime_choice_availability.js
           node --check export_player_template/player.js
           node --check export_player_template/runtime_data.js
           node --check export_player_template/runtime_storage.js
@@ -311,6 +315,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_native_runtime_character_motion.py' -v
           python -m unittest discover -s tests -p 'test_character_motion_contract.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_stage_images.py' -v
+          python -m unittest discover -s tests -p 'test_native_runtime_choice_availability.py' -v
           python -m unittest discover -s tests -p 'test_stage_image_contract.py' -v
           python -m unittest discover -s tests -p 'test_editor_asset_usage.py' -v
           python -m unittest discover -s tests -p 'test_maintainability_check_tool.py' -v
@@ -390,6 +395,8 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_route_analyzer_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_route_testing_report_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_conditions_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_runtime_choice_availability_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_choice_availability_editor_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_audio_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_data_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_storage_module.py' -v

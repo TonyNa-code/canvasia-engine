@@ -1,8 +1,10 @@
 (function attachEditorModuleGuard(global) {
   const REQUIRED_EDITOR_MODULES = Object.freeze([
     { globalName: "CanvasiaRuntimeConditions", script: "../export_player_template/runtime_conditions.js", label: "运行条件系统" },
+    { globalName: "CanvasiaRuntimeChoiceAvailability", script: "../export_player_template/runtime_choice_availability.js", label: "选项门控系统" },
     { globalName: "CanvasiaEditorStoryBlockCatalog", script: "./modules/story_block_catalog.js", label: "剧情卡片目录" },
     { globalName: "CanvasiaEditorStoryBlockActions", script: "./modules/story_block_actions.js", label: "剧情卡片动作" },
+    { globalName: "CanvasiaEditorChoiceAvailability", script: "./modules/choice_availability_editor.js", label: "选项门控编辑器" },
     { globalName: "CanvasiaEditorStoryBlockEditors", script: "./modules/story_block_editors.js", label: "剧情卡片编辑器" },
     { globalName: "CanvasiaEditorMusicRangeScope", script: "./modules/music_range_scope.js", label: "音乐范围系统" },
     { globalName: "CanvasiaEditorStoryTemplates", script: "./modules/story_templates.js", label: "剧情模板" },

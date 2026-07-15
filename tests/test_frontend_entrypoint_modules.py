@@ -17,7 +17,10 @@ class FrontendEntrypointModuleTests(unittest.TestCase):
         scripts = SCRIPT_SRC_PATTERN.findall(html)
 
         required_scripts = [
+            "../export_player_template/runtime_conditions.js",
+            "../export_player_template/runtime_choice_availability.js",
             "./modules/story_block_catalog.js",
+            "./modules/choice_availability_editor.js",
             "./modules/story_block_editors.js",
             "./modules/music_range_scope.js",
             "./modules/story_templates.js",

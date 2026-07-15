@@ -1343,11 +1343,34 @@
       lines.push("        pass");
       return lines;
     }
+    const gatedExpressions = [];
+    let hasAlwaysOption = false;
     options.forEach((option, optionIndex) => {
       const optionText = cleanText(option?.text ?? option?.label, `Option ${optionIndex + 1}`);
       const targetSceneId = getChoiceTarget(option);
       const effectCount = toArray(option.effects).length;
-      lines.push(`        ${quoteRenpy(optionText)}:`);
+      const rawMode = cleanText(option.choiceAvailabilityMode ?? option.availabilityMode, "always");
+      const mode = ["hide_when_false", "disable_when_false"].includes(rawMode) ? rawMode : "always";
+      const rules = toArray(option.choiceAvailabilityWhen ?? option.availabilityWhen);
+      const expression = rules.length
+        ? rules.map((rule) => renderConditionRuleExpression(rule, context)).join(" and ")
+        : "False";
+      let conditionClause = "";
+      if (mode === "always") {
+        hasAlwaysOption = true;
+      } else {
+        gatedExpressions.push(expression);
+        conditionClause = ` if ${expression}`;
+        if (mode === "disable_when_false") {
+          pushWarning(
+            warnings,
+            "renpy_choice_lock_degraded",
+            `锁定选项“${optionText}”在 Ren'Py 草稿中会按条件隐藏；如需灰色锁定按钮，请在 Ren'Py 自定义 choice screen。`,
+            { ...getWarningContext(context), optionIndex }
+          );
+        }
+      }
+      lines.push(`        ${quoteRenpy(optionText)}${conditionClause}:`);
       if (effectCount > 0) {
         toArray(option.effects).forEach((effect) => {
           renderVariableEffect(effect, { ...context, optionIndex }, "            ").forEach((line) => lines.push(line));
@@ -1359,6 +1382,17 @@
         lines.push("            pass");
       }
     });
+    if (!hasAlwaysOption && gatedExpressions.length) {
+      const allUnavailableExpression = `not (${gatedExpressions.map((expression) => `(${expression})`).join(" or ")})`;
+      lines.push(`        ${quoteRenpy("Continue (safety fallback)")} if ${allUnavailableExpression}:`);
+      lines.push("            pass");
+      pushWarning(
+        warnings,
+        "renpy_choice_safety_fallback",
+        "这组选项没有始终可选的保底项；Ren'Py 草稿已加入只在全部条件不满足时出现的安全继续。",
+        getWarningContext(context)
+      );
+    }
     return lines;
   }
 

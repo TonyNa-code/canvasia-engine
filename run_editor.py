@@ -176,6 +176,7 @@ EXPORTS_DIR = ROOT_DIR / "exports"
 EXPORT_TEMPLATE_DIR = ROOT_DIR / "export_player_template"
 EXPORT_PLAYER_SCRIPT_FILES = (
     "runtime_conditions.js",
+    "runtime_choice_availability.js",
     "player.js",
     "runtime_data.js",
     "runtime_storage.js",
@@ -487,6 +488,7 @@ NATIVE_RUNTIME_SETTINGS_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_player_s
 NATIVE_RUNTIME_VIEW_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_player_view.py"
 NATIVE_RUNTIME_CHARACTER_MOTION_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_character_motion.py"
 NATIVE_RUNTIME_STAGE_IMAGES_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_stage_images.py"
+NATIVE_RUNTIME_CHOICE_AVAILABILITY_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_choice_availability.py"
 NATIVE_RUNTIME_TEXT_EFFECTS_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_text_effects.py"
 NATIVE_RUNTIME_STORAGE_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_storage.py"
 NATIVE_RUNTIME_VARIABLES_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_variables.py"
@@ -506,6 +508,7 @@ NATIVE_RUNTIME_SETTINGS_NAME = "runtime_player_settings.py"
 NATIVE_RUNTIME_VIEW_NAME = "runtime_player_view.py"
 NATIVE_RUNTIME_CHARACTER_MOTION_NAME = "runtime_character_motion.py"
 NATIVE_RUNTIME_STAGE_IMAGES_NAME = "runtime_stage_images.py"
+NATIVE_RUNTIME_CHOICE_AVAILABILITY_NAME = "runtime_choice_availability.py"
 NATIVE_RUNTIME_TEXT_EFFECTS_NAME = "runtime_text_effects.py"
 NATIVE_RUNTIME_STORAGE_NAME = "runtime_storage.py"
 NATIVE_RUNTIME_VARIABLES_NAME = "runtime_variables.py"
@@ -565,6 +568,7 @@ NATIVE_RUNTIME_REQUIRED_MODULE_FILES = (
     (NATIVE_RUNTIME_VIEW_SOURCE, NATIVE_RUNTIME_VIEW_NAME),
     (NATIVE_RUNTIME_CHARACTER_MOTION_SOURCE, NATIVE_RUNTIME_CHARACTER_MOTION_NAME),
     (NATIVE_RUNTIME_STAGE_IMAGES_SOURCE, NATIVE_RUNTIME_STAGE_IMAGES_NAME),
+    (NATIVE_RUNTIME_CHOICE_AVAILABILITY_SOURCE, NATIVE_RUNTIME_CHOICE_AVAILABILITY_NAME),
     (NATIVE_RUNTIME_TEXT_EFFECTS_SOURCE, NATIVE_RUNTIME_TEXT_EFFECTS_NAME),
     (NATIVE_RUNTIME_STORAGE_SOURCE, NATIVE_RUNTIME_STORAGE_NAME),
     (NATIVE_RUNTIME_VARIABLES_SOURCE, NATIVE_RUNTIME_VARIABLES_NAME),
@@ -1250,6 +1254,11 @@ def normalize_scene_block(block: object, index: int, existing_ids: set[str]) -> 
                 )
                 if not normalized_option["textTranslations"]:
                     normalized_option.pop("textTranslations", None)
+                normalized_option["choiceLockedReasonTranslations"] = normalize_translation_map(
+                    normalized_option.get("choiceLockedReasonTranslations")
+                )
+                if not normalized_option["choiceLockedReasonTranslations"]:
+                    normalized_option.pop("choiceLockedReasonTranslations", None)
                 normalized_options.append(normalized_option)
         normalized["options"] = normalized_options
     if normalized["type"] == "condition":
@@ -2915,8 +2924,8 @@ def import_localization_patches(patches: object) -> dict:
             continue
 
         if kind == "choice_option":
-            if key != "text":
-                add_localization_skip(skipped, raw_patch, "选项翻译只支持 text 字段。", index)
+            if key not in {"text", "choiceLockedReason"}:
+                add_localization_skip(skipped, raw_patch, "选项翻译只支持 text 或 choiceLockedReason 字段。", index)
                 continue
             option_index = raw_patch.get("optionIndex")
             if not isinstance(option_index, int):
@@ -8975,6 +8984,8 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
         "runtimeCharacterMotionModulePath": str(build_dir / NATIVE_RUNTIME_CHARACTER_MOTION_NAME),
         "runtimeStageImagesModuleName": NATIVE_RUNTIME_STAGE_IMAGES_NAME,
         "runtimeStageImagesModulePath": str(build_dir / NATIVE_RUNTIME_STAGE_IMAGES_NAME),
+        "runtimeChoiceAvailabilityModuleName": NATIVE_RUNTIME_CHOICE_AVAILABILITY_NAME,
+        "runtimeChoiceAvailabilityModulePath": str(build_dir / NATIVE_RUNTIME_CHOICE_AVAILABILITY_NAME),
         "runtimeTextEffectsModuleName": NATIVE_RUNTIME_TEXT_EFFECTS_NAME,
         "runtimeTextEffectsModulePath": str(build_dir / NATIVE_RUNTIME_TEXT_EFFECTS_NAME),
         "runtimeStorageModuleName": NATIVE_RUNTIME_STORAGE_NAME,
@@ -9488,6 +9499,7 @@ def export_native_runtime_build() -> dict:
             "runtimeViewModule": runtime_files["runtimeViewModuleName"],
             "runtimeCharacterMotionModule": runtime_files["runtimeCharacterMotionModuleName"],
             "runtimeStageImagesModule": runtime_files["runtimeStageImagesModuleName"],
+            "runtimeChoiceAvailabilityModule": runtime_files["runtimeChoiceAvailabilityModuleName"],
             "runtimeTextEffectsModule": runtime_files["runtimeTextEffectsModuleName"],
             "runtimeStorageModule": runtime_files["runtimeStorageModuleName"],
             "runtimeVariablesModule": runtime_files["runtimeVariablesModuleName"],
@@ -9565,6 +9577,7 @@ def export_native_runtime_build() -> dict:
             "runtimeViewModule": runtime_files["runtimeViewModuleName"],
             "runtimeCharacterMotionModule": runtime_files["runtimeCharacterMotionModuleName"],
             "runtimeStageImagesModule": runtime_files["runtimeStageImagesModuleName"],
+            "runtimeChoiceAvailabilityModule": runtime_files["runtimeChoiceAvailabilityModuleName"],
             "runtimeTextEffectsModule": runtime_files["runtimeTextEffectsModuleName"],
             "runtimeStorageModule": runtime_files["runtimeStorageModuleName"],
             "runtimeVariablesModule": runtime_files["runtimeVariablesModuleName"],
@@ -9795,6 +9808,7 @@ def export_native_runtime_build() -> dict:
         {"name": runtime_files["runtimeViewModuleName"], "description": "原生 Runtime 可见层配置、转场安全值和文本排版模块。"},
         {"name": runtime_files["runtimeCharacterMotionModuleName"], "description": "原生 Runtime 角色走位、缩放、透明度、翻转和缓动插值模块。"},
         {"name": runtime_files["runtimeStageImagesModuleName"], "description": "原生 Runtime 道具、Cut-in、前景装饰和氛围叠图模块。"},
+        {"name": runtime_files["runtimeChoiceAvailabilityModuleName"], "description": "原生 Runtime 条件选项隐藏、锁定提示和死路安全保护模块。"},
         {"name": runtime_files["runtimeTextEffectsModuleName"], "description": "原生 Runtime 打字机和文本效果模块。"},
         {"name": runtime_files["runtimeStorageModuleName"], "description": "原生 Runtime 存档、自动恢复和崩溃日志模块。"},
         {"name": runtime_files["runtimeVariablesModuleName"], "description": "原生 Runtime 变量和条件判断模块。"},
@@ -10078,6 +10092,9 @@ def export_native_runtime_build() -> dict:
         "runtimeStageImagesModuleName": runtime_files["runtimeStageImagesModuleName"],
         "runtimeStageImagesModulePath": runtime_files["runtimeStageImagesModulePath"],
         "runtimeStageImagesModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimeStageImagesModuleName']}",
+        "runtimeChoiceAvailabilityModuleName": runtime_files["runtimeChoiceAvailabilityModuleName"],
+        "runtimeChoiceAvailabilityModulePath": runtime_files["runtimeChoiceAvailabilityModulePath"],
+        "runtimeChoiceAvailabilityModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimeChoiceAvailabilityModuleName']}",
         "runtimeTextEffectsModuleName": runtime_files["runtimeTextEffectsModuleName"],
         "runtimeTextEffectsModulePath": runtime_files["runtimeTextEffectsModulePath"],
         "runtimeTextEffectsModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimeTextEffectsModuleName']}",
@@ -10273,6 +10290,7 @@ def export_web_build() -> dict:
             "playerRuntimeStageImages": "runtime_stage_images.js",
             "playerRuntimeVisualConstants": "runtime_visual_constants.js",
             "playerRuntimeConditions": "runtime_conditions.js",
+            "playerRuntimeChoiceAvailability": "runtime_choice_availability.js",
             "playerRuntimeControls": "runtime_controls.js",
             "playerRuntimeSettings": "runtime_settings.js",
             "playerRuntimeI18n": "runtime_i18n.js",
@@ -11402,6 +11420,7 @@ def export_windows_nwjs_build() -> dict:
             "appRuntimeStageImages": "app/runtime_stage_images.js",
             "appRuntimeVisualConstants": "app/runtime_visual_constants.js",
             "appRuntimeConditions": "app/runtime_conditions.js",
+            "appRuntimeChoiceAvailability": "app/runtime_choice_availability.js",
             "appRuntimeControls": "app/runtime_controls.js",
             "appRuntimeSettings": "app/runtime_settings.js",
             "appRuntimeI18n": "app/runtime_i18n.js",
@@ -11865,6 +11884,7 @@ def export_macos_nwjs_build() -> dict:
             "appRuntimeStageImages": "app/runtime_stage_images.js",
             "appRuntimeVisualConstants": "app/runtime_visual_constants.js",
             "appRuntimeConditions": "app/runtime_conditions.js",
+            "appRuntimeChoiceAvailability": "app/runtime_choice_availability.js",
             "appRuntimeControls": "app/runtime_controls.js",
             "appRuntimeSettings": "app/runtime_settings.js",
             "appRuntimeI18n": "app/runtime_i18n.js",
@@ -12335,6 +12355,7 @@ def export_linux_nwjs_build() -> dict:
             "appRuntimeStageImages": "app/runtime_stage_images.js",
             "appRuntimeVisualConstants": "app/runtime_visual_constants.js",
             "appRuntimeConditions": "app/runtime_conditions.js",
+            "appRuntimeChoiceAvailability": "app/runtime_choice_availability.js",
             "appRuntimeControls": "app/runtime_controls.js",
             "appRuntimeSettings": "app/runtime_settings.js",
             "appRuntimeI18n": "app/runtime_i18n.js",

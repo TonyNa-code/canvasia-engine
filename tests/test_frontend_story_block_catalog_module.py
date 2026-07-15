@@ -138,8 +138,22 @@ class FrontendStoryBlockCatalogModuleTests(unittest.TestCase):
         self.assertIn("&#25773;到下一首或停止卡", payload["escapedMarkup"])
         self.assertEqual(payload["ids"], ["block_001_option_1", "block_001_option_2", "block_001_branch_1"])
         self.assertEqual(payload["defaultChoiceOptions"], [
-            {"id": "block_001_option_1", "text": "第一个选项", "gotoSceneId": "scene_a", "effects": []},
-            {"id": "block_001_option_2", "text": "第二个选项", "gotoSceneId": "scene_a", "effects": []},
+            {
+                "id": "block_001_option_1",
+                "text": "第一个选项",
+                "gotoSceneId": "scene_a",
+                "effects": [],
+                "choiceAvailabilityMode": "always",
+                "choiceAvailabilityWhen": [],
+            },
+            {
+                "id": "block_001_option_2",
+                "text": "第二个选项",
+                "gotoSceneId": "scene_a",
+                "effects": [],
+                "choiceAvailabilityMode": "always",
+                "choiceAvailabilityWhen": [],
+            },
         ])
         self.assertEqual(payload["defaultChoiceEffects"], [
             {"type": "variable_add", "variableId": "var_affection", "value": 1},

@@ -4,6 +4,8 @@ from pathlib import Path
 
 
 def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path, deps: dict[str, object]) -> dict:
+    CHOICE_AVAILABILITY_ALWAYS = deps['CHOICE_AVAILABILITY_ALWAYS']
+    CHOICE_AVAILABILITY_DISABLE = deps['CHOICE_AVAILABILITY_DISABLE']
     DEFAULT_FORMAL_SAVE_SLOT_COUNT = deps['DEFAULT_FORMAL_SAVE_SLOT_COUNT']
     DEFAULT_GAME_DATA_NAME = deps['DEFAULT_GAME_DATA_NAME']
     DEFAULT_PROJECT_LANGUAGE = deps['DEFAULT_PROJECT_LANGUAGE']
@@ -19,6 +21,7 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path, deps: dict
     condition_operator_matches_variable_type = deps['condition_operator_matches_variable_type']
     count_i18n_translations = deps['count_i18n_translations']
     get_asset_runtime_path = deps['get_asset_runtime_path']
+    get_choice_availability_rules = deps['get_choice_availability_rules']
     get_export_variable_map = deps['get_export_variable_map']
     get_project_dialog_box_config = deps['get_project_dialog_box_config']
     get_project_formal_save_slot_count = deps['get_project_formal_save_slot_count']
@@ -39,6 +42,7 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path, deps: dict
     math = deps['math']
     normalize_language_code = deps['normalize_language_code']
     normalize_supported_languages = deps['normalize_supported_languages']
+    normalize_choice_availability_mode = deps['normalize_choice_availability_mode']
     normalize_variable_type = deps['normalize_variable_type']
     now_iso = deps['now_iso']
 
@@ -219,6 +223,13 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path, deps: dict
     scenes_with_music = 0
     scenes_with_effects = 0
     choice_option_count = 0
+    choice_gated_option_count = 0
+    choice_availability_rule_count = 0
+    choice_gate_without_rules_count = 0
+    choice_gate_missing_variable_count = 0
+    choice_gate_operator_mismatch_count = 0
+    choice_locked_reason_missing_count = 0
+    choice_block_without_always_count = 0
     empty_choice_option_count = 0
     long_choice_option_count = 0
     duplicate_choice_option_count = 0
@@ -357,6 +368,7 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path, deps: dict
                     crowded_choice_block_count += 1
                 seen_choice_texts: set[str] = set()
                 plain_target_options: list[str] = []
+                has_always_available_option = False
                 for option in options:
                     if not isinstance(option, dict):
                         continue
@@ -366,6 +378,28 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path, deps: dict
                         i18n_expected_translation_count += expected
                         i18n_present_translation_count += present
                     option_text = str(option.get("text") or "").strip()
+                    availability_mode = normalize_choice_availability_mode(option.get("choiceAvailabilityMode"))
+                    availability_rules = get_choice_availability_rules(option)
+                    if availability_mode == CHOICE_AVAILABILITY_ALWAYS:
+                        has_always_available_option = True
+                    else:
+                        choice_gated_option_count += 1
+                        choice_availability_rule_count += len(availability_rules)
+                        if not availability_rules:
+                            choice_gate_without_rules_count += 1
+                        if availability_mode == CHOICE_AVAILABILITY_DISABLE and not str(option.get("choiceLockedReason") or "").strip():
+                            choice_locked_reason_missing_count += 1
+                        for rule in availability_rules:
+                            variable_id = str(rule.get("variableId") or "").strip()
+                            variable = variables_by_id.get(variable_id)
+                            if not variable:
+                                choice_gate_missing_variable_count += 1
+                                logic_missing_variable_count += 1
+                            else:
+                                condition_read_variable_ids.add(variable_id)
+                                if not condition_operator_matches_variable_type(normalize_variable_type(variable.get("type")), rule.get("operator")):
+                                    choice_gate_operator_mismatch_count += 1
+                                    logic_operator_mismatch_count += 1
                     normalized_option_text = option_text.lower()
                     if not option_text:
                         empty_choice_option_count += 1
@@ -400,6 +434,8 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path, deps: dict
                 if len(plain_target_options) >= 2 and len(set(plain_target_options)) == 1:
                     same_target_choice_count += 1
                     same_target_choice_names.append(str(block.get("id") or "choice"))
+                if options and not has_always_available_option:
+                    choice_block_without_always_count += 1
             elif block_type == "variable_set":
                 variable_set_count += 1
                 variable_id = str(block.get("variableId") or "").strip()
@@ -926,6 +962,51 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path, deps: dict
             "存在空白选项按钮",
             f"检测到 {empty_choice_option_count} 个选项按钮没有文案。",
             "补齐选项文案或删除空选项，避免玩家在原生 Runtime 里看到空白按钮。",
+        )
+    if choice_gate_without_rules_count:
+        add_vn_baseline_issue(
+            issues,
+            "warn",
+            "choice_gate_without_rules",
+            "条件选项缺少判断规则",
+            f"检测到 {choice_gate_without_rules_count} 个隐藏或锁定选项没有判断规则，运行时会一直不可用。",
+            "为这些选项添加变量条件，或改回“始终可选”；不要依赖安全继续掩盖未完成的路线配置。",
+        )
+    if choice_gate_missing_variable_count:
+        add_vn_baseline_issue(
+            issues,
+            "warn",
+            "choice_gate_missing_variable",
+            "选项门控引用了缺失变量",
+            f"检测到 {choice_gate_missing_variable_count} 条选项可用条件没有变量或引用了已删除变量。",
+            "在变量库中恢复对应变量，或重新选择门控变量；否则隐藏路线无法按设计解锁。",
+        )
+    if choice_gate_operator_mismatch_count:
+        add_vn_baseline_issue(
+            issues,
+            "warn",
+            "choice_gate_operator_mismatch",
+            "选项门控比较符与变量类型不匹配",
+            f"检测到 {choice_gate_operator_mismatch_count} 条选项可用条件使用了不适合当前变量类型的比较符。",
+            "数字可使用大小比较；文本和开关建议使用等于或不等于，修正后再试玩路线解锁。",
+        )
+    if choice_locked_reason_missing_count:
+        add_vn_baseline_issue(
+            issues,
+            "soft",
+            "choice_locked_reason_missing",
+            "锁定选项没有解锁提示",
+            f"检测到 {choice_locked_reason_missing_count} 个锁定选项没有说明解锁条件。",
+            "补一句简短提示，例如“好感度达到 5”或“需要先获得钥匙”，让玩家理解按钮不是失效。",
+        )
+    if choice_block_without_always_count:
+        add_vn_baseline_issue(
+            issues,
+            "soft",
+            "choice_block_without_always_option",
+            "整组选项没有始终可选的保底项",
+            f"检测到 {choice_block_without_always_count} 个选项卡的所有按钮都受条件控制。",
+            "Runtime 会在全部条件不满足时显示安全继续；建议确认这是有意设计，或增加一个始终可选的普通路线。",
         )
     if no_action_choice_option_count:
         add_vn_baseline_issue(
@@ -1499,6 +1580,13 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path, deps: dict
             "scenesWithMusic": scenes_with_music,
             "scenesWithEffects": scenes_with_effects,
             "choiceOptionCount": choice_option_count,
+            "choiceGatedOptionCount": choice_gated_option_count,
+            "choiceAvailabilityRuleCount": choice_availability_rule_count,
+            "choiceGateWithoutRulesCount": choice_gate_without_rules_count,
+            "choiceGateMissingVariableCount": choice_gate_missing_variable_count,
+            "choiceGateOperatorMismatchCount": choice_gate_operator_mismatch_count,
+            "choiceLockedReasonMissingCount": choice_locked_reason_missing_count,
+            "choiceBlockWithoutAlwaysCount": choice_block_without_always_count,
             "emptyChoiceOptionCount": empty_choice_option_count,
             "longChoiceOptionCount": long_choice_option_count,
             "duplicateChoiceOptionCount": duplicate_choice_option_count,

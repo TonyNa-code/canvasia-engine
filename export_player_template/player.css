@@ -5232,3 +5232,15 @@ html[data-game-ui-motion="low"] .stage-image-card.is-moving,
 html[data-game-ui-motion="low"] .stage-image-card.is-leaving {
   animation: none !important;
 }
+
+.choice-button.is-locked,
+.choice-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.68;
+  filter: saturate(0.48);
+  transform: none !important;
+}
+
+.choice-button.is-locked span {
+  color: color-mix(in srgb, var(--runtime-danger, #d58989) 70%, var(--runtime-muted, #9aa9bd));
+}

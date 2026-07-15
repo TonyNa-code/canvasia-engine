@@ -93,6 +93,7 @@ import {
 
 const rawData = window.LIGHTWHISPER_GAME_DATA ?? {};
 const runtimeConditionTools = window.CanvasiaRuntimeConditions;
+const runtimeChoiceAvailabilityTools = window.CanvasiaRuntimeChoiceAvailability;
 const data = normalizeGameData(rawData);
 const storageKeys = buildRuntimeStorageKeys(data.project);
 
@@ -3499,11 +3500,13 @@ function choosePreviewOption(optionId) {
   }
 
   const option = current.choiceOptions.find((item) => item.id === optionId);
-  if (!option) {
+  if (!option || !runtimeChoiceAvailabilityTools.isChoiceOptionSelectable(option)) {
     return;
   }
 
-  unlockAchievement("first_choice");
+  if (!option.isChoiceSafetyFallback) {
+    unlockAchievement("first_choice");
+  }
   const nextVariables = clonePreviewVariables(current.variables);
   applyChoiceEffectsToPreviewVariables(nextVariables, option.effects ?? []);
   const nextSnapshot = buildChoiceOptionNextSnapshot(current, option, nextVariables);
@@ -4191,6 +4194,10 @@ function getBlockText(block) {
 
 function getChoiceText(option) {
   return getLocalizedValue(option, "text", "未命名选项");
+}
+
+function getChoiceLockedReasonText(option) {
+  return getLocalizedValue(option, "choiceLockedReason", option?.choiceLockedReason || "条件尚未满足");
 }
 
 function getSceneName(scene, fallback = "") {
@@ -7651,7 +7658,12 @@ function buildPreviewSnapshot(sceneId, blockIndex, previousVisualState, previous
     block,
     visualState: nextVisualState,
     variables: nextVariables,
-    choiceOptions: block.type === "choice" ? (block.options ?? []).map((option) => ({ ...option })) : [],
+    choiceOptions:
+      block.type === "choice"
+        ? runtimeChoiceAvailabilityTools.resolveChoiceOptions(block.options, nextVariables, {
+            evaluateRule: evaluateConditionRule,
+          }).runtimeOptions
+        : [],
     transitionTargetSceneId,
     completed: false,
   };
@@ -8255,9 +8267,20 @@ function renderChoiceButtons(snapshot) {
   return snapshot.choiceOptions
     .map(
       (option) => `
-        <button class="choice-button" type="button" data-option-id="${escapeHtml(option.id)}">
+        <button
+          class="choice-button ${option.choiceEnabled === false ? "is-locked" : ""}"
+          type="button"
+          data-option-id="${escapeHtml(option.id)}"
+          ${option.choiceEnabled === false ? "disabled aria-disabled=\"true\"" : ""}
+        >
           <strong>${escapeHtml(getChoiceText(option))}</strong>
-          <span>${escapeHtml(isChoiceContinueTarget(option.gotoSceneId) ? "继续下一张卡" : `进入 ${getSceneName(data.scenesById.get(option.gotoSceneId), option.gotoSceneId)}`)}</span>
+          <span>${escapeHtml(
+            option.choiceEnabled === false
+              ? getChoiceLockedReasonText(option)
+              : isChoiceContinueTarget(option.gotoSceneId)
+                ? "继续下一张卡"
+                : `进入 ${getSceneName(data.scenesById.get(option.gotoSceneId), option.gotoSceneId)}`
+          )}</span>
         </button>
       `
     )

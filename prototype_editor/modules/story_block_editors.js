@@ -1439,6 +1439,7 @@
     const choiceContinueTarget = String(options.choiceContinueTarget ?? "__continue__");
     const choiceContinueLabel = String(options.choiceContinueLabel ?? "继续当前场景下一张卡");
     const renderChoiceTextQualityTools = getRenderer(options, "renderChoiceTextQualityTools");
+    const renderChoiceAvailabilityEditor = getRenderer(options, "renderChoiceAvailabilityEditor");
     const renderEffectRow = getRenderer(options, "renderChoiceEffectEditorRow", renderChoiceEffectEditorRow);
     const renderEmptyState = getRenderer(options, "renderChoiceEffectEmptyState", renderChoiceEffectEmptyState);
     const editableEffects = getEditableChoiceEffects(safeOption.effects, options);
@@ -1479,6 +1480,7 @@
               .join("")}
           </select>
         </div>
+        ${renderChoiceAvailabilityEditor(safeOption)}
         <div class="detail-row">
           <label>这个选项触发时还要做什么</label>
           <div class="value">当前共有 ${effectCount} 条附加效果</div>

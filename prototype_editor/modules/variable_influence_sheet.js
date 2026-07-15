@@ -10,6 +10,7 @@
     add: "数值增减",
     choice: "选项后果",
     condition: "条件读取",
+    choice_gate: "选项门控",
   });
 
   function toArray(value) {
@@ -302,7 +303,7 @@
       record.locations.push(base.label);
     }
 
-    if (reference.kind === "condition") {
+    if (reference.kind === "condition" || reference.kind === "choice_gate") {
       record.readCount += 1;
       record.conditionCount += 1;
       if (!isValueMatchingType(variable, reference.value)) {
@@ -482,6 +483,17 @@
         }
         if (block?.type === "choice") {
           toArray(block.options).forEach((option, optionIndex) => {
+            toArray(option.choiceAvailabilityWhen).forEach((rule, ruleIndex) => {
+              recordReference(records, unknownReferences, variableMap, {
+                ...base,
+                kind: "choice_gate",
+                variableId: rule.variableId,
+                value: rule.value,
+                optionText: cleanText(option.text, `选项 ${optionIndex + 1}`),
+                optionIndex,
+                ruleIndex,
+              });
+            });
             toArray(option.effects).forEach((effect, effectIndex) => {
               recordReference(records, unknownReferences, variableMap, {
                 ...base,

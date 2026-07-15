@@ -1200,16 +1200,51 @@ def render_choice_block(block: dict, context: dict) -> list[str]:
     if not options:
         add_warning(warnings, "renpy_empty_choice", "选项卡没有选项，已导出 pass。", sceneId=scene_id, blockIndex=block_index)
         return [*lines, "        pass"]
+    gated_expressions: list[str] = []
+    has_always_option = False
     for option_index, option in enumerate(options):
         option_text = clean_text(option.get("text") or option.get("label"), f"Option {option_index + 1}")
         target_scene_id = clean_text(option.get("gotoSceneId") or option.get("targetSceneId") or option.get("target"))
-        lines.append(f"        {quote_renpy(option_text)}:")
+        mode = clean_text(option.get("choiceAvailabilityMode") or option.get("availabilityMode"), "always")
+        if mode not in {"hide_when_false", "disable_when_false"}:
+            mode = "always"
+        rules = as_list(option.get("choiceAvailabilityWhen") or option.get("availabilityWhen"))
+        expression = " and ".join(
+            render_condition_rule_expression(rule, context) for rule in rules
+        ) if rules else "False"
+        condition_clause = ""
+        if mode == "always":
+            has_always_option = True
+        else:
+            gated_expressions.append(expression)
+            condition_clause = f" if {expression}"
+            if mode == "disable_when_false":
+                add_warning(
+                    warnings,
+                    "renpy_choice_lock_degraded",
+                    f"锁定选项“{option_text}”在 Ren'Py 草稿中会按条件隐藏；如需灰色锁定按钮，请在 Ren'Py 自定义 choice screen。",
+                    sceneId=scene_id,
+                    blockIndex=block_index,
+                    optionIndex=option_index,
+                )
+        lines.append(f"        {quote_renpy(option_text)}{condition_clause}:")
         for effect in as_list(option.get("effects")):
             lines.extend(render_variable_effect(effect, variable_map, warnings, "            "))
         if target_scene_id and target_scene_id != CHOICE_CONTINUE_TARGET:
             lines.append(f"            jump {get_scene_label(scene_label_map, target_scene_id)}")
         else:
             lines.append("            pass")
+    if not has_always_option and gated_expressions:
+        all_unavailable_expression = " not (" + " or ".join(f"({expression})" for expression in gated_expressions) + ")"
+        lines.append(f"        {quote_renpy('Continue (safety fallback)')} if{all_unavailable_expression}:")
+        lines.append("            pass")
+        add_warning(
+            warnings,
+            "renpy_choice_safety_fallback",
+            "这组选项没有始终可选的保底项；Ren'Py 草稿已加入只在全部条件不满足时出现的安全继续。",
+            sceneId=scene_id,
+            blockIndex=block_index,
+        )
     return lines
 
 

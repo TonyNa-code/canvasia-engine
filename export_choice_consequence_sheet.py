@@ -7,6 +7,14 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
+from native_runtime.runtime_choice_availability import (
+    CHOICE_AVAILABILITY_ALWAYS,
+    CHOICE_AVAILABILITY_DISABLE,
+    CHOICE_AVAILABILITY_HIDE,
+    get_choice_availability_rules,
+    normalize_choice_availability_mode,
+)
+
 
 EXPORT_CHOICE_CONSEQUENCE_JSON_NAME = "choice-consequence-sheet.json"
 EXPORT_CHOICE_CONSEQUENCE_REPORT_NAME = "choice-consequence-report.md"
@@ -202,7 +210,27 @@ def get_effect_key(effect: dict) -> str:
 
 def get_option_outcome_key(option: dict) -> str:
     effect_key = "|".join(sorted(get_effect_key(effect) for effect in as_list(option.get("effects")) if isinstance(effect, dict)))
-    return f"{clean_text(option.get('gotoSceneId') or option.get('targetSceneId') or option.get('sceneId'))}=>{effect_key}"
+    availability_mode = normalize_choice_availability_mode(option.get("choiceAvailabilityMode"))
+    availability_key = "|".join(
+        sorted(
+            ":".join(
+                [
+                    clean_text(rule.get("variableId")),
+                    clean_text(rule.get("operator"), "=="),
+                    format_effect_value(rule.get("value")),
+                ]
+            )
+            for rule in get_choice_availability_rules(option)
+        )
+    )
+    return "=>".join(
+        [
+            clean_text(option.get("gotoSceneId") or option.get("targetSceneId") or option.get("sceneId")),
+            effect_key,
+            availability_mode,
+            availability_key,
+        ]
+    )
 
 
 def inspect_choice_effect(effect: dict, *, variables_by_id: dict[str, dict], context: dict) -> list[dict]:
@@ -234,6 +262,8 @@ def build_choice_option_entry(option: dict, *, context: dict) -> dict:
     target_scene_id = clean_text(option.get("gotoSceneId") or option.get("targetSceneId") or option.get("sceneId"))
     continues_current_scene = is_continue_target(target_scene_id)
     effects = [effect for effect in as_list(option.get("effects")) if isinstance(effect, dict)]
+    availability_mode = normalize_choice_availability_mode(option.get("choiceAvailabilityMode"))
+    availability_rules = get_choice_availability_rules(option)
     base_context = {
         "chapterName": context["chapterName"],
         "sceneName": context["sceneName"],
@@ -251,6 +281,44 @@ def build_choice_option_entry(option: dict, *, context: dict) -> dict:
         push_issue(issues, "blocker", "choice_option_unknown_target", "选项目标场景不存在", f"目标场景 {target_scene_id} 已经找不到。", base_context)
     if not target_scene_id and not effects:
         push_issue(issues, "warn", "choice_option_no_consequence", "选项没有路线或变量后果", "这个选项既不跳转，也不修改变量，玩家容易觉得是假按钮。", base_context)
+    if availability_mode != CHOICE_AVAILABILITY_ALWAYS and not availability_rules:
+        push_issue(
+            issues,
+            "blocker",
+            "choice_availability_without_rules",
+            "条件选项没有判断规则",
+            "这个选项设置了隐藏或锁定，但没有任何判断条件；运行时会一直不可用。",
+            base_context,
+        )
+    for rule_index, rule in enumerate(availability_rules):
+        variable_id = clean_text(rule.get("variableId"))
+        if not variable_id:
+            push_issue(
+                issues,
+                "blocker",
+                "choice_availability_missing_variable",
+                "选项门控缺少变量",
+                f"可用条件 {rule_index + 1} 没有选择变量。",
+                base_context,
+            )
+        elif variable_id not in context["variablesById"]:
+            push_issue(
+                issues,
+                "blocker",
+                "choice_availability_unknown_variable",
+                "选项门控变量不存在",
+                f"变量 {variable_id} 不在当前变量库里。",
+                base_context,
+            )
+    if availability_mode == CHOICE_AVAILABILITY_DISABLE and not clean_text(option.get("choiceLockedReason")):
+        push_issue(
+            issues,
+            "warn",
+            "choice_availability_missing_locked_reason",
+            "锁定选项没有提示",
+            "玩家会只看到“条件尚未满足”；建议说明还缺少什么。",
+            base_context,
+        )
 
     for effect in effects:
         issues.extend(inspect_choice_effect(effect, variables_by_id=context["variablesById"], context=base_context))
@@ -265,6 +333,15 @@ def build_choice_option_entry(option: dict, *, context: dict) -> dict:
         "continuesCurrentScene": continues_current_scene,
         "effectCount": len(effects),
         "effectSummary": " / ".join(summarize_choice_effect(effect, context["variablesById"]) for effect in effects) if effects else "无变量后果",
+        "availabilityMode": availability_mode,
+        "availabilityRuleCount": len(availability_rules),
+        "availabilityLabel": (
+            f"条件隐藏（{len(availability_rules)} 条）"
+            if availability_mode == CHOICE_AVAILABILITY_HIDE
+            else f"条件锁定（{len(availability_rules)} 条）"
+            if availability_mode == CHOICE_AVAILABILITY_DISABLE
+            else "始终可选"
+        ),
         "outcomeKey": get_option_outcome_key(option),
         "status": status,
         "statusLabel": get_status_label(status),
@@ -310,6 +387,15 @@ def inspect_choice_block(block: dict, *, context: dict) -> dict:
         )
         for option_index, option in enumerate(options)
     ]
+    if option_entries and all(option.get("availabilityMode") != CHOICE_AVAILABILITY_ALWAYS for option in option_entries):
+        push_issue(
+            issues,
+            "warn",
+            "choice_block_without_always_option",
+            "整组选项没有始终可选的保底项",
+            "若所有门控条件同时不满足，Runtime 会启用安全继续。建议确认这是有意设计，或补一个始终可选项。",
+            block_context,
+        )
 
     text_groups: dict[str, list[dict]] = {}
     for option in option_entries:
@@ -385,10 +471,22 @@ def build_choice_consequence_sheet(bundle: dict) -> dict:
         "optionCount": len(options),
         "actionableOptionCount": sum(1 for option in options if option.get("hasTarget") or option.get("effectCount", 0) > 0),
         "variableEffectCount": sum(int(option.get("effectCount") or 0) for option in options),
+        "gatedOptionCount": sum(1 for option in options if option.get("availabilityMode") != CHOICE_AVAILABILITY_ALWAYS),
         "noConsequenceCount": sum(1 for issue in issues if issue.get("code") == "choice_option_no_consequence"),
         "sameConsequenceCount": sum(1 for issue in issues if issue.get("code") == "choice_same_consequence"),
         "brokenTargetCount": sum(1 for issue in issues if issue.get("code") == "choice_option_unknown_target"),
-        "brokenVariableCount": sum(1 for issue in issues if issue.get("code") in {"choice_effect_missing_variable", "choice_effect_unknown_variable", "choice_effect_add_non_number"}),
+        "brokenVariableCount": sum(
+            1
+            for issue in issues
+            if issue.get("code")
+            in {
+                "choice_effect_missing_variable",
+                "choice_effect_unknown_variable",
+                "choice_effect_add_non_number",
+                "choice_availability_missing_variable",
+                "choice_availability_unknown_variable",
+            }
+        ),
         "blockerCount": blocker_count,
         "warningCount": warning_count,
         "tipCount": tip_count,
@@ -438,7 +536,7 @@ def build_choice_consequence_report(sheet: dict) -> str:
     summary = sheet.get("summary") or {}
     digest = sheet.get("statusDigest") or get_choice_consequence_status_digest(sheet)
     option_rows = [
-        [index + 1, option.get("chapterName"), option.get("sceneName"), int(option.get("blockIndex") or 0) + 1, option.get("optionText"), option.get("targetSceneName"), option.get("effectSummary"), option.get("statusLabel")]
+        [index + 1, option.get("chapterName"), option.get("sceneName"), int(option.get("blockIndex") or 0) + 1, option.get("optionText"), option.get("targetSceneName"), option.get("availabilityLabel"), option.get("effectSummary"), option.get("statusLabel")]
         for index, option in enumerate((sheet.get("options") or [])[:180])
     ]
     issue_rows = [
@@ -470,6 +568,7 @@ def build_choice_consequence_report(sheet: dict) -> str:
                     ["选项按钮", summary.get("optionCount", 0)],
                     ["有路线或变量后果", summary.get("actionableOptionCount", 0)],
                     ["变量效果", summary.get("variableEffectCount", 0)],
+                    ["条件门控选项", summary.get("gatedOptionCount", 0)],
                     ["无后果选项", summary.get("noConsequenceCount", 0)],
                     ["同后果提醒", summary.get("sameConsequenceCount", 0)],
                     ["坏跳转", summary.get("brokenTargetCount", 0)],
@@ -482,7 +581,7 @@ def build_choice_consequence_report(sheet: dict) -> str:
             "",
             "## 选项后果",
             "",
-            markdown_table(["序号", "章节", "场景", "卡片", "选项", "目标场景", "变量效果", "状态"], option_rows) or "当前没有可列出的选项。",
+            markdown_table(["序号", "章节", "场景", "卡片", "选项", "目标场景", "可用条件", "变量效果", "状态"], option_rows) or "当前没有可列出的选项。",
             "",
             "## 需要复查的问题",
             "",
@@ -495,7 +594,7 @@ def build_choice_consequence_report(sheet: dict) -> str:
 def build_choice_consequence_csv(sheet: dict) -> str:
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["序号", "章节", "场景", "卡片", "选项序号", "选项文案", "目标场景ID", "目标场景", "变量效果数", "变量效果", "状态", "问题"])
+    writer.writerow(["序号", "章节", "场景", "卡片", "选项序号", "选项文案", "目标场景ID", "目标场景", "可用条件", "变量效果数", "变量效果", "状态", "问题"])
     for index, option in enumerate(sheet.get("options") or []):
         writer.writerow(
             [
@@ -507,6 +606,7 @@ def build_choice_consequence_csv(sheet: dict) -> str:
                 option.get("optionText"),
                 option.get("targetSceneId"),
                 option.get("targetSceneName"),
+                option.get("availabilityLabel"),
                 option.get("effectCount"),
                 option.get("effectSummary"),
                 option.get("statusLabel"),

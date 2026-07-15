@@ -47,6 +47,8 @@ class FrontendVariableInfluenceSheetModuleTests(unittest.TestCase):
                         {{
                           id: "go_roof",
                           text: "去天台",
+                          choiceAvailabilityMode: "hide_when_false",
+                          choiceAvailabilityWhen: [{{ variableId: "flag", operator: "==", value: true }}],
                           effects: [{{ type: "variable_add", variableId: "score", value: 1 }}],
                         }},
                         {{
@@ -89,6 +91,7 @@ class FrontendVariableInfluenceSheetModuleTests(unittest.TestCase):
               csv,
               booleanLabel: tools.getVariableTypeLabel("boolean"),
               conditionLabel: tools.getUsageLabel("condition"),
+              choiceGateLabel: tools.getUsageLabel("choice_gate"),
             }}));
             """
         )
@@ -127,6 +130,9 @@ class FrontendVariableInfluenceSheetModuleTests(unittest.TestCase):
         self.assertIn('"分数"', payload["csv"])
         self.assertEqual(payload["booleanLabel"], "开关")
         self.assertEqual(payload["conditionLabel"], "条件读取")
+        self.assertEqual(payload["choiceGateLabel"], "选项门控")
+        flag_record = next(record for record in payload["sheet"]["variables"] if record["variableId"] == "flag")
+        self.assertEqual(flag_record["readCount"], 2)
 
 
 if __name__ == "__main__":

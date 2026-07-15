@@ -24,6 +24,7 @@ RUNTIME_STORAGE_PATH = ROOT_DIR / "export_player_template" / "runtime_storage.js
 RUNTIME_I18N_PATH = ROOT_DIR / "export_player_template" / "runtime_i18n.js"
 RUNTIME_TEXT_EFFECTS_PATH = ROOT_DIR / "export_player_template" / "runtime_text_effects.js"
 NATIVE_RUNTIME_PATH = ROOT_DIR / "native_runtime" / "runtime_player.py"
+NATIVE_RUNTIME_CHOICE_AVAILABILITY_PATH = ROOT_DIR / "native_runtime" / "runtime_choice_availability.py"
 NATIVE_RUNTIME_I18N_PATH = ROOT_DIR / "native_runtime" / "runtime_i18n.py"
 NATIVE_RUNTIME_SETTINGS_PATH = ROOT_DIR / "native_runtime" / "runtime_player_settings.py"
 NATIVE_RUNTIME_VIEW_PATH = ROOT_DIR / "native_runtime" / "runtime_player_view.py"
@@ -275,6 +276,7 @@ class FrontendActionHandlerTests(unittest.TestCase):
         runtime_storage_source = RUNTIME_STORAGE_PATH.read_text(encoding="utf-8")
         runtime_data_source = RUNTIME_DATA_PATH.read_text(encoding="utf-8")
         native_runtime_source = NATIVE_RUNTIME_PATH.read_text(encoding="utf-8")
+        native_runtime_choice_availability_source = NATIVE_RUNTIME_CHOICE_AVAILABILITY_PATH.read_text(encoding="utf-8")
         styles = STYLES_PATH.read_text(encoding="utf-8")
         handle_click = _extract_function_source(app_source, "handleClick")
         handle_global_keydown = _extract_function_source(app_source, "handleGlobalKeydown")
@@ -571,7 +573,8 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn('case "wait"', player_source)
         self.assertIn("isChoiceContinueTarget(targetSceneId)", player_source)
         self.assertIn("current.blockIndex + 1", player_source)
-        self.assertIn('CHOICE_CONTINUE_TARGET = "__continue__"', native_runtime_source)
+        self.assertIn('CHOICE_CONTINUE_TARGET = "__continue__"', native_runtime_choice_availability_source)
+        self.assertIn("from .runtime_choice_availability import (", native_runtime_source)
         self.assertIn("def pause_on_wait_block", native_runtime_source)
         self.assertIn("get_safe_wait_duration_ms", native_runtime_source)
         self.assertIn("target_scene_id == CHOICE_CONTINUE_TARGET", native_runtime_source)

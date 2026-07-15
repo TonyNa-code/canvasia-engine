@@ -263,6 +263,23 @@ def build_export_localization_audit(bundle: dict) -> dict:
                         block_index=block_index,
                         option_index=option_index,
                     )
+                    if (
+                        str(option.get("choiceAvailabilityMode") or "") == "disable_when_false"
+                        or str(option.get("choiceLockedReason") or "").strip()
+                        or isinstance(option.get("choiceLockedReasonTranslations"), dict)
+                    ):
+                        collect(
+                            source=option,
+                            kind="choice_option_locked_reason",
+                            key="choiceLockedReason",
+                            chapter=chapter,
+                            scene=scene,
+                            block=block,
+                            chapter_index=chapter_index,
+                            scene_index=scene_index,
+                            block_index=block_index,
+                            option_index=option_index,
+                        )
 
     present_translation_count = max(0, required_translation_count - missing_translation_count)
     completion_percent = (

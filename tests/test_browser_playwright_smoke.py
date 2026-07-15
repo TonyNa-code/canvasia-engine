@@ -712,8 +712,26 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
         self.assertGreater(block_cards.count(), initial_count)
 
     def test_story_editor_choice_quality_and_delete_option(self) -> None:
-        self.create_blank_project("浏览器烟测项目_Choice")
+        project_title = "浏览器烟测项目_Choice"
+        self.create_blank_project(project_title)
         self.create_first_chapter()
+        self.page.evaluate(
+            """async () => {
+                await fetch('/api/save-project-settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        variables: {
+                            variables: [
+                                { id: 'var_choice_gate', name: '选项解锁值', type: 'number', defaultValue: 0, min: 0, max: 10 },
+                            ],
+                        },
+                    }),
+                });
+            }"""
+        )
+        self.open_project_by_title(project_title)
+        self.page.get_by_role("button", name="写剧情", exact=True).click()
 
         self.page.locator("#screen-story").get_by_role("button", name="加选项").first.click()
         option_editors = self.page.locator("[data-choice-option]")
@@ -734,6 +752,30 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
         )
 
         first_option = self.page.locator("[data-choice-option]").first
+        availability_editor = first_option.locator("[data-choice-availability]")
+        availability_mode = availability_editor.locator('[data-field="choice-availability-mode"]')
+        availability_mode.select_option("disable_when_false")
+        availability_editor.locator("[data-choice-availability-conditions]").wait_for(state="visible", timeout=10000)
+        availability_editor.locator("[data-choice-locked-reason]").wait_for(state="visible", timeout=10000)
+        availability_rule = availability_editor.locator("[data-choice-availability-rule]").first
+        variable_select = availability_rule.locator('[data-field="condition-variable"]')
+        variable_select.locator('option[value="var_choice_gate"]').wait_for(state="attached", timeout=10000)
+        gate_variable_id = "var_choice_gate"
+        variable_select.select_option(gate_variable_id)
+        availability_rule.locator('[data-field="condition-operator"]').select_option(">=")
+        availability_rule.locator('[data-field="condition-value-number"]').fill("3")
+        availability_editor.locator('[data-field="choice-locked-reason"]').fill("好感度达到 3 后解锁")
+        availability_editor.get_by_role("button", name="再加一个条件").click()
+        self.page.wait_for_function(
+            """() => document.querySelectorAll('[data-choice-option]:first-child [data-choice-availability-rule]').length === 2""",
+            timeout=10000,
+        )
+        availability_editor.locator("[data-choice-availability-rule]").last.get_by_role("button", name="删除条件").click()
+        self.page.wait_for_function(
+            """() => document.querySelectorAll('[data-choice-option]:first-child [data-choice-availability-rule]').length === 1""",
+            timeout=10000,
+        )
+
         first_option.get_by_role("button", name="给这个选项加效果").click()
         first_option.get_by_role("button", name="给这个选项加效果").click()
         effects = first_option.locator("[data-choice-effect]")
@@ -764,6 +806,29 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
         self.page.wait_for_function(
             """([selector, expected]) => document.querySelectorAll(selector).length === expected""",
             arg=["[data-choice-option]", initial_count],
+            timeout=15000,
+        )
+
+        self.page.wait_for_function(
+            """async (gateVariableId) => {
+                const response = await fetch('/api/project-data');
+                const bundle = await response.json();
+                return (bundle.chapters || []).some((chapter) =>
+                    (chapter.scenes || []).some((scene) =>
+                        (scene.blocks || []).some((block) =>
+                            block.type === 'choice'
+                            && (block.options || []).some((option) =>
+                                option.choiceAvailabilityMode === 'disable_when_false'
+                                && option.choiceLockedReason === '好感度达到 3 后解锁'
+                                && option.choiceAvailabilityWhen?.[0]?.variableId === gateVariableId
+                                && option.choiceAvailabilityWhen?.[0]?.operator === '>='
+                                && option.choiceAvailabilityWhen?.[0]?.value === 3
+                            )
+                        )
+                    )
+                );
+            }""",
+            arg=gate_variable_id,
             timeout=15000,
         )
 

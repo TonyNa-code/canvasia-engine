@@ -155,7 +155,12 @@
 
   function getOptionOutcomeKey(option = {}) {
     const effects = toArray(option.effects).map(getEffectKey).sort().join("|");
-    return [cleanText(option.gotoSceneId), effects].join("=>");
+    const availabilityMode = cleanText(option.choiceAvailabilityMode, "always");
+    const availabilityRules = toArray(option.choiceAvailabilityWhen)
+      .map((rule) => [cleanText(rule.variableId), cleanText(rule.operator, "=="), formatEffectValue(rule.value)].join(":"))
+      .sort()
+      .join("|");
+    return [cleanText(option.gotoSceneId), effects, availabilityMode, availabilityRules].join("=>");
   }
 
   function pushIssue(issues, severity, code, title, detail, context = {}) {
@@ -242,6 +247,10 @@
     const targetSceneId = cleanText(option.gotoSceneId);
     const continuesCurrentScene = isChoiceContinueTarget(targetSceneId);
     const effects = toArray(option.effects);
+    const availabilityMode = ["hide_when_false", "disable_when_false"].includes(option.choiceAvailabilityMode)
+      ? option.choiceAvailabilityMode
+      : "always";
+    const availabilityRules = toArray(option.choiceAvailabilityWhen);
     const baseContext = {
       chapterName: context.chapterName,
       sceneName: context.sceneName,
@@ -269,6 +278,48 @@
         baseContext
       );
     }
+    if (availabilityMode !== "always" && availabilityRules.length === 0) {
+      pushIssue(
+        issues,
+        "blocker",
+        "choice_availability_without_rules",
+        "条件选项没有判断规则",
+        "这个选项设置了隐藏或锁定，但没有任何判断条件；运行时会一直不可用。",
+        baseContext
+      );
+    }
+    availabilityRules.forEach((rule, ruleIndex) => {
+      const variableId = cleanText(rule.variableId);
+      if (!variableId) {
+        pushIssue(
+          issues,
+          "blocker",
+          "choice_availability_missing_variable",
+          "选项门控缺少变量",
+          `可用条件 ${ruleIndex + 1} 没有选择变量。`,
+          baseContext
+        );
+      } else if (!context.variableMap.has(variableId)) {
+        pushIssue(
+          issues,
+          "blocker",
+          "choice_availability_unknown_variable",
+          "选项门控变量不存在",
+          `变量 ${variableId} 不在当前变量库里。`,
+          baseContext
+        );
+      }
+    });
+    if (availabilityMode === "disable_when_false" && !cleanText(option.choiceLockedReason)) {
+      pushIssue(
+        issues,
+        "warn",
+        "choice_availability_missing_locked_reason",
+        "锁定选项没有提示",
+        "玩家会只看到“条件尚未满足”；建议说明还缺少什么。",
+        baseContext
+      );
+    }
 
     effects.forEach((effect) => {
       issues.push(...inspectChoiceEffect(effect, { variableMap: context.variableMap, baseContext }));
@@ -286,6 +337,14 @@
       effectSummary: effects.length
         ? effects.map((effect) => summarizeChoiceEffect(effect, context.variableMap)).join(" / ")
         : "无变量后果",
+      availabilityMode,
+      availabilityRuleCount: availabilityRules.length,
+      availabilityLabel:
+        availabilityMode === "hide_when_false"
+          ? `条件隐藏（${availabilityRules.length} 条）`
+          : availabilityMode === "disable_when_false"
+            ? `条件锁定（${availabilityRules.length} 条）`
+            : "始终可选",
       outcomeKey: getOptionOutcomeKey(option),
       status,
       statusLabel: getStatusLabel(status),
@@ -317,6 +376,16 @@
         optionIndex,
       })
     );
+    if (optionEntries.length > 0 && optionEntries.every((option) => option.availabilityMode !== "always")) {
+      pushIssue(
+        issues,
+        "warn",
+        "choice_block_without_always_option",
+        "整组选项没有始终可选的保底项",
+        "若所有门控条件同时不满足，Runtime 会启用安全继续。建议确认这是有意设计，或补一个始终可选项。",
+        blockContext
+      );
+    }
 
     const textGroups = new Map();
     optionEntries.forEach((option) => {
@@ -416,11 +485,18 @@
       optionCount: options.length,
       actionableOptionCount: options.filter((option) => option.hasTarget || option.effectCount > 0).length,
       variableEffectCount: options.reduce((total, option) => total + option.effectCount, 0),
+      gatedOptionCount: options.filter((option) => option.availabilityMode !== "always").length,
       noConsequenceCount: issues.filter((issue) => issue.code === "choice_option_no_consequence").length,
       sameConsequenceCount: issues.filter((issue) => issue.code === "choice_same_consequence").length,
       brokenTargetCount: issues.filter((issue) => issue.code === "choice_option_unknown_target").length,
       brokenVariableCount: issues.filter((issue) =>
-        ["choice_effect_missing_variable", "choice_effect_unknown_variable", "choice_effect_add_non_number"].includes(issue.code)
+        [
+          "choice_effect_missing_variable",
+          "choice_effect_unknown_variable",
+          "choice_effect_add_non_number",
+          "choice_availability_missing_variable",
+          "choice_availability_unknown_variable",
+        ].includes(issue.code)
       ).length,
       blockerCount: issues.filter((issue) => issue.severity === "blocker").length,
       warningCount: issues.filter((issue) => issue.severity === "warn").length,
@@ -513,6 +589,7 @@
       option.blockIndex + 1,
       option.optionText,
       option.targetSceneName,
+      option.availabilityLabel,
       option.effectSummary,
       option.statusLabel,
     ]);
@@ -542,6 +619,7 @@
           ["选项按钮", `${summary.optionCount ?? 0}`],
           ["有路线或变量后果", `${summary.actionableOptionCount ?? 0}`],
           ["变量效果", `${summary.variableEffectCount ?? 0}`],
+          ["条件门控选项", `${summary.gatedOptionCount ?? 0}`],
           ["无后果选项", `${summary.noConsequenceCount ?? 0}`],
           ["同后果提醒", `${summary.sameConsequenceCount ?? 0}`],
           ["阻塞问题", `${summary.blockerCount ?? 0}`],
@@ -551,7 +629,7 @@
       "",
       "## 选项后果",
       "",
-      buildMarkdownTable(["序号", "章节", "场景", "卡片", "选项", "目标场景", "变量效果", "状态"], optionRows) ||
+      buildMarkdownTable(["序号", "章节", "场景", "卡片", "选项", "目标场景", "可用条件", "变量效果", "状态"], optionRows) ||
         "当前没有可列出的选项。",
       "",
       "## 需要复查的问题",
@@ -571,13 +649,14 @@
       option.optionText,
       option.targetSceneId,
       option.targetSceneName,
+      option.availabilityLabel,
       option.effectCount,
       option.effectSummary,
       option.statusLabel,
       toArray(option.issues).map((issue) => issue.title).join(" / "),
     ]);
     return `\uFEFF${buildCsv(
-      ["序号", "章节", "场景", "卡片", "选项序号", "选项文案", "目标场景ID", "目标场景", "变量效果数", "变量效果", "状态", "问题"],
+      ["序号", "章节", "场景", "卡片", "选项序号", "选项文案", "目标场景ID", "目标场景", "可用条件", "变量效果数", "变量效果", "状态", "问题"],
       rows
     )}\n`;
   }

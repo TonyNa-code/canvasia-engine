@@ -85,7 +85,7 @@
         group: "分支",
         webStatus: "full",
         nativeStatus: "full",
-        note: "支持玩家选项、变量效果和目标场景跳转。",
+        note: "支持玩家选项、变量效果、目标场景跳转，以及按变量条件隐藏或锁定选项。",
         tags: ["timelineText", "storyContent", "branch", "localizable"],
       },
       {
@@ -420,12 +420,16 @@
         text: "第一个选项",
         gotoSceneId: targetSceneId,
         effects: [],
+        choiceAvailabilityMode: "always",
+        choiceAvailabilityWhen: [],
       },
       {
         id: createChoiceOptionId(blockId, 1),
         text: "第二个选项",
         gotoSceneId: targetSceneId,
         effects: [],
+        choiceAvailabilityMode: "always",
+        choiceAvailabilityWhen: [],
       },
     ];
   }

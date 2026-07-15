@@ -57,7 +57,12 @@ class FrontendChoiceConsequenceSheetModuleTests(unittest.TestCase):
                           gotoSceneId: "__continue__",
                           effects: [{{ type: "variable_add", variableId: "affection", value: 1 }}],
                         }},
-                        {{ id: "noop", text: "沉默" }},
+                        {{
+                          id: "noop",
+                          text: "沉默",
+                          choiceAvailabilityMode: "disable_when_false",
+                          choiceAvailabilityWhen: [],
+                        }},
                       ],
                     }},
                     {{
@@ -115,6 +120,7 @@ class FrontendChoiceConsequenceSheetModuleTests(unittest.TestCase):
         self.assertEqual(payload["sheet"]["summary"]["choiceBlockCount"], 3)
         self.assertEqual(payload["sheet"]["summary"]["optionCount"], 8)
         self.assertEqual(payload["sheet"]["summary"]["variableEffectCount"], 5)
+        self.assertEqual(payload["sheet"]["summary"]["gatedOptionCount"], 1)
         self.assertEqual(payload["sheet"]["summary"]["noConsequenceCount"], 1)
         self.assertEqual(payload["sheet"]["summary"]["sameConsequenceCount"], 2)
         self.assertEqual(payload["sheet"]["summary"]["brokenTargetCount"], 1)
@@ -128,6 +134,8 @@ class FrontendChoiceConsequenceSheetModuleTests(unittest.TestCase):
         self.assertIn("choice_effect_add_non_number", issue_codes)
         self.assertIn("choice_effect_unknown_variable", issue_codes)
         self.assertIn("choice_option_empty_text", issue_codes)
+        self.assertIn("choice_availability_without_rules", issue_codes)
+        self.assertIn("choice_availability_missing_locked_reason", issue_codes)
         continue_options = [
             option
             for block in payload["sheet"]["choiceBlocks"]
@@ -142,6 +150,7 @@ class FrontendChoiceConsequenceSheetModuleTests(unittest.TestCase):
         self.assertIn("留在教室", payload["markdown"])
         self.assertIn('"继续下一张卡"', payload["csv"])
         self.assertIn('"好感度 + 1"', payload["csv"])
+        self.assertIn("条件锁定", payload["markdown"])
         self.assertEqual(payload["effectLabel"], "变量增加")
         self.assertEqual(payload["effectSummary"], "路线 = good")
 

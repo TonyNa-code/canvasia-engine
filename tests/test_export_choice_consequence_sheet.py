@@ -101,6 +101,60 @@ class ExportChoiceConsequenceSheetTests(unittest.TestCase):
         self.assertIn("一起回家吧", csv_text)
         self.assertIn("missing_scene", csv_text)
 
+    def test_choice_consequence_sheet_audits_option_availability_gates(self) -> None:
+        bundle = self.build_bundle()
+        options = bundle["chapters"][0]["scenes"][0]["blocks"][0]["options"]
+        options[:] = [
+            {
+                "id": "hidden_route",
+                "text": "秘密路线",
+                "gotoSceneId": "scene_good",
+                "choiceAvailabilityMode": "hide_when_false",
+                "choiceAvailabilityWhen": [
+                    {"variableId": "affection", "operator": ">=", "value": 5}
+                ],
+            },
+            {
+                "id": "locked_route",
+                "text": "锁定路线",
+                "gotoSceneId": "scene_good",
+                "choiceAvailabilityMode": "disable_when_false",
+                "choiceAvailabilityWhen": [],
+            },
+            {
+                "id": "broken_route",
+                "text": "失效路线",
+                "gotoSceneId": "scene_good",
+                "choiceAvailabilityMode": "hide_when_false",
+                "choiceAvailabilityWhen": [
+                    {"variableId": "deleted_flag", "operator": "==", "value": True}
+                ],
+            },
+        ]
+
+        sheet = build_choice_consequence_sheet(bundle)
+
+        self.assertEqual(sheet["summary"]["gatedOptionCount"], 3)
+        self.assertEqual(sheet["summary"]["brokenVariableCount"], 1)
+        issue_codes = {issue["code"] for issue in sheet["issues"]}
+        self.assertIn("choice_availability_without_rules", issue_codes)
+        self.assertIn("choice_availability_unknown_variable", issue_codes)
+        self.assertIn("choice_availability_missing_locked_reason", issue_codes)
+        self.assertIn("choice_block_without_always_option", issue_codes)
+
+        hidden_option = next(option for option in sheet["options"] if option["optionId"] == "hidden_route")
+        locked_option = next(option for option in sheet["options"] if option["optionId"] == "locked_route")
+        self.assertEqual(hidden_option["availabilityLabel"], "条件隐藏（1 条）")
+        self.assertEqual(locked_option["availabilityLabel"], "条件锁定（0 条）")
+        self.assertNotEqual(hidden_option["outcomeKey"], locked_option["outcomeKey"])
+
+        report = build_choice_consequence_report(sheet)
+        self.assertIn("条件门控选项", report)
+        self.assertIn("可用条件", report)
+        csv_text = build_choice_consequence_csv(sheet)
+        self.assertIn("可用条件", csv_text.splitlines()[0])
+        self.assertIn("条件隐藏（1 条）", csv_text)
+
     def test_choice_consequence_file_names_are_package_safe(self) -> None:
         self.assertEqual(EXPORT_CHOICE_CONSEQUENCE_JSON_NAME, "choice-consequence-sheet.json")
         self.assertEqual(EXPORT_CHOICE_CONSEQUENCE_REPORT_NAME, "choice-consequence-report.md")
