@@ -506,6 +506,7 @@ NATIVE_RUNTIME_DIAGNOSTICS_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_diagn
 NATIVE_RUNTIME_PERFORMANCE_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_performance.py"
 NATIVE_RUNTIME_I18N_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_i18n.py"
 NATIVE_RUNTIME_SETTINGS_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_player_settings.py"
+NATIVE_RUNTIME_VIEW_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_player_view.py"
 NATIVE_RUNTIME_TEXT_EFFECTS_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_text_effects.py"
 NATIVE_RUNTIME_STORAGE_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_storage.py"
 NATIVE_RUNTIME_VARIABLES_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_variables.py"
@@ -522,6 +523,7 @@ NATIVE_RUNTIME_DIAGNOSTICS_NAME = "runtime_diagnostics.py"
 NATIVE_RUNTIME_PERFORMANCE_NAME = "runtime_performance.py"
 NATIVE_RUNTIME_I18N_NAME = "runtime_i18n.py"
 NATIVE_RUNTIME_SETTINGS_NAME = "runtime_player_settings.py"
+NATIVE_RUNTIME_VIEW_NAME = "runtime_player_view.py"
 NATIVE_RUNTIME_TEXT_EFFECTS_NAME = "runtime_text_effects.py"
 NATIVE_RUNTIME_STORAGE_NAME = "runtime_storage.py"
 NATIVE_RUNTIME_VARIABLES_NAME = "runtime_variables.py"
@@ -578,6 +580,7 @@ NATIVE_RUNTIME_REQUIRED_MODULE_FILES = (
     (NATIVE_RUNTIME_PERFORMANCE_SOURCE, NATIVE_RUNTIME_PERFORMANCE_NAME),
     (NATIVE_RUNTIME_I18N_SOURCE, NATIVE_RUNTIME_I18N_NAME),
     (NATIVE_RUNTIME_SETTINGS_SOURCE, NATIVE_RUNTIME_SETTINGS_NAME),
+    (NATIVE_RUNTIME_VIEW_SOURCE, NATIVE_RUNTIME_VIEW_NAME),
     (NATIVE_RUNTIME_TEXT_EFFECTS_SOURCE, NATIVE_RUNTIME_TEXT_EFFECTS_NAME),
     (NATIVE_RUNTIME_STORAGE_SOURCE, NATIVE_RUNTIME_STORAGE_NAME),
     (NATIVE_RUNTIME_VARIABLES_SOURCE, NATIVE_RUNTIME_VARIABLES_NAME),
@@ -9025,6 +9028,8 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
         "runtimeI18nModulePath": str(build_dir / NATIVE_RUNTIME_I18N_NAME),
         "runtimeSettingsModuleName": NATIVE_RUNTIME_SETTINGS_NAME,
         "runtimeSettingsModulePath": str(build_dir / NATIVE_RUNTIME_SETTINGS_NAME),
+        "runtimeViewModuleName": NATIVE_RUNTIME_VIEW_NAME,
+        "runtimeViewModulePath": str(build_dir / NATIVE_RUNTIME_VIEW_NAME),
         "runtimeTextEffectsModuleName": NATIVE_RUNTIME_TEXT_EFFECTS_NAME,
         "runtimeTextEffectsModulePath": str(build_dir / NATIVE_RUNTIME_TEXT_EFFECTS_NAME),
         "runtimeStorageModuleName": NATIVE_RUNTIME_STORAGE_NAME,
@@ -9535,6 +9540,7 @@ def export_native_runtime_build() -> dict:
             "runtimePerformanceModule": runtime_files["runtimePerformanceModuleName"],
             "runtimeI18nModule": runtime_files["runtimeI18nModuleName"],
             "runtimeSettingsModule": runtime_files["runtimeSettingsModuleName"],
+            "runtimeViewModule": runtime_files["runtimeViewModuleName"],
             "runtimeTextEffectsModule": runtime_files["runtimeTextEffectsModuleName"],
             "runtimeStorageModule": runtime_files["runtimeStorageModuleName"],
             "runtimeVariablesModule": runtime_files["runtimeVariablesModuleName"],
@@ -9609,6 +9615,7 @@ def export_native_runtime_build() -> dict:
             "runtimePerformanceModule": runtime_files["runtimePerformanceModuleName"],
             "runtimeI18nModule": runtime_files["runtimeI18nModuleName"],
             "runtimeSettingsModule": runtime_files["runtimeSettingsModuleName"],
+            "runtimeViewModule": runtime_files["runtimeViewModuleName"],
             "runtimeTextEffectsModule": runtime_files["runtimeTextEffectsModuleName"],
             "runtimeStorageModule": runtime_files["runtimeStorageModuleName"],
             "runtimeVariablesModule": runtime_files["runtimeVariablesModuleName"],
@@ -9836,6 +9843,7 @@ def export_native_runtime_build() -> dict:
         {"name": runtime_files["crashFeedbackJsonName"], "description": "机器可读原生 Runtime 崩溃反馈 JSON 模板。"},
         {"name": runtime_files["runtimeI18nModuleName"], "description": "原生 Runtime 多语言和文本回退模块。"},
         {"name": runtime_files["runtimeSettingsModuleName"], "description": "原生 Runtime 系统设置模块。"},
+        {"name": runtime_files["runtimeViewModuleName"], "description": "原生 Runtime 可见层配置、转场安全值和文本排版模块。"},
         {"name": runtime_files["runtimeTextEffectsModuleName"], "description": "原生 Runtime 打字机和文本效果模块。"},
         {"name": runtime_files["runtimeStorageModuleName"], "description": "原生 Runtime 存档、自动恢复和崩溃日志模块。"},
         {"name": runtime_files["runtimeVariablesModuleName"], "description": "原生 Runtime 变量和条件判断模块。"},
@@ -10110,6 +10118,9 @@ def export_native_runtime_build() -> dict:
         "runtimeSettingsModuleName": runtime_files["runtimeSettingsModuleName"],
         "runtimeSettingsModulePath": runtime_files["runtimeSettingsModulePath"],
         "runtimeSettingsModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimeSettingsModuleName']}",
+        "runtimeViewModuleName": runtime_files["runtimeViewModuleName"],
+        "runtimeViewModulePath": runtime_files["runtimeViewModulePath"],
+        "runtimeViewModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimeViewModuleName']}",
         "runtimeTextEffectsModuleName": runtime_files["runtimeTextEffectsModuleName"],
         "runtimeTextEffectsModulePath": runtime_files["runtimeTextEffectsModulePath"],
         "runtimeTextEffectsModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimeTextEffectsModuleName']}",

@@ -52,6 +52,7 @@ PYTHON_SYNTAX_FILES = [
     "native_runtime/runtime_player.py",
     "native_runtime/runtime_i18n.py",
     "native_runtime/runtime_player_settings.py",
+    "native_runtime/runtime_player_view.py",
     "native_runtime/runtime_text_effects.py",
     "native_runtime/runtime_storage.py",
     "native_runtime/runtime_variables.py",
@@ -82,6 +83,7 @@ PYTHON_SYNTAX_FILES = [
     "tests/test_maintainability_check_tool.py",
     "tests/test_native_runtime_export_commands.py",
     "tests/test_native_runtime_export_digest.py",
+    "tests/test_native_runtime_player_view.py",
     "tests/test_frontend_action_handlers.py",
     "tests/test_run_editor_smoke.py",
     "tests/test_native_runtime_render_smoke.py",
@@ -211,6 +213,7 @@ def build_release_tooling_steps(python_executable: str) -> list[VerifyStep]:
         build_unittest_step("Local verify tooling", "test_local_verify_tool.py", "release-tests", python_executable),
         build_unittest_step("Native runtime export command writer", "test_native_runtime_export_commands.py", "release-tests", python_executable),
         build_unittest_step("Native runtime export digest", "test_native_runtime_export_digest.py", "release-tests", python_executable),
+        build_unittest_step("Native runtime player view helpers", "test_native_runtime_player_view.py", "release-tests", python_executable),
         build_unittest_step("Maintainability tooling", "test_maintainability_check_tool.py", "release-tests", python_executable),
         VerifyStep(
             name="Maintainability guardrails",

@@ -25,6 +25,7 @@ RUNTIME_TEXT_EFFECTS_PATH = ROOT_DIR / "export_player_template" / "runtime_text_
 NATIVE_RUNTIME_PATH = ROOT_DIR / "native_runtime" / "runtime_player.py"
 NATIVE_RUNTIME_I18N_PATH = ROOT_DIR / "native_runtime" / "runtime_i18n.py"
 NATIVE_RUNTIME_SETTINGS_PATH = ROOT_DIR / "native_runtime" / "runtime_player_settings.py"
+NATIVE_RUNTIME_VIEW_PATH = ROOT_DIR / "native_runtime" / "runtime_player_view.py"
 NATIVE_RUNTIME_TEXT_EFFECTS_PATH = ROOT_DIR / "native_runtime" / "runtime_text_effects.py"
 PROJECT_POLISH_RECEIPT_PANEL_PATH = EDITOR_DIR / "modules" / "project_polish_receipt_panel.js"
 DASHBOARD_PRIMARY_ACTIONS_PATH = EDITOR_DIR / "modules" / "dashboard_primary_actions.js"
@@ -3987,9 +3988,11 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("fadeOutPreviousMusic(fadeOutMs)", stop_music)
 
         native_source = NATIVE_RUNTIME_PATH.read_text(encoding="utf-8")
-        self.assertIn("def get_safe_audio_fade_ms", native_source)
-        self.assertIn("def get_safe_volume_percent", native_source)
-        self.assertIn("def get_music_scope_from_block", native_source)
+        native_view_source = NATIVE_RUNTIME_VIEW_PATH.read_text(encoding="utf-8")
+        self.assertIn("def get_safe_audio_fade_ms", native_view_source)
+        self.assertIn("def get_safe_volume_percent", native_view_source)
+        self.assertIn("runtime_player_view import", native_source)
+        self.assertIn("def get_music_scope_from_block", native_view_source)
         self.assertIn("self.current_bgm_scope = get_music_scope_from_block(block, self.current_scene_id)", native_source)
         self.assertIn("def apply_bgm_scope_before_block", native_source)
         self.assertIn('fade_in_ms=get_safe_audio_fade_ms(block.get("fadeInMs"), 600)', native_source)
@@ -4051,8 +4054,9 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("--filter-vignette-opacity", (ROOT_DIR / "export_player_template" / "player.css").read_text(encoding="utf-8"))
 
         native_source = NATIVE_RUNTIME_PATH.read_text(encoding="utf-8")
-        self.assertIn("SCREEN_COLOR_GRADE_DEFAULTS", native_source)
-        self.assertIn("def get_safe_screen_color_grade", native_source)
+        native_view_source = NATIVE_RUNTIME_VIEW_PATH.read_text(encoding="utf-8")
+        self.assertIn("SCREEN_COLOR_GRADE_DEFAULTS", native_view_source)
+        self.assertIn("def get_safe_screen_color_grade", native_view_source)
         self.assertIn('"grade": get_safe_screen_color_grade(block.get("grade"))', native_source)
         self.assertIn("temperature = int(grade.get(\"temperature\") or 0)", native_source)
         self.assertIn("vignette = int(grade.get(\"vignette\") or 0)", native_source)
@@ -6059,7 +6063,9 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("scaleX(var(--sprite-flip-x, 1))", player_css)
 
         native_source = NATIVE_RUNTIME_PATH.read_text(encoding="utf-8")
-        self.assertIn('"flipX": read_bool("flipX")', native_source)
+        native_view_source = NATIVE_RUNTIME_VIEW_PATH.read_text(encoding="utf-8")
+        self.assertIn('"flipX": read_bool("flipX")', native_view_source)
+        self.assertIn("get_safe_character_stage", native_source)
         self.assertIn("self.pygame.transform.flip(scaled, True, False)", native_source)
 
     def test_transition_duration_reaches_editor_preview_and_export_runtime(self) -> None:
@@ -6096,7 +6102,9 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("player-background-fade-in var(--background-transition-ms", player_css)
         self.assertIn("var(--sprite-transition-ms", editor_css)
         self.assertIn("var(--sprite-transition-ms", player_css)
-        self.assertIn("def get_safe_transition_duration_ms", native_source)
+        native_view_source = NATIVE_RUNTIME_VIEW_PATH.read_text(encoding="utf-8")
+        self.assertIn("def get_safe_transition_duration_ms", native_view_source)
+        self.assertIn("runtime_player_view import", native_source)
         self.assertIn("self.start_background_transition(previous_background_asset_id, block)", native_source)
         self.assertIn('"transition": self.get_character_transition_state(block, "in")', native_source)
         self.assertIn('transition = self.get_character_transition_state(block, "out")', native_source)
@@ -6158,6 +6166,7 @@ class FrontendActionHandlerTests(unittest.TestCase):
         native_text_effects_source = NATIVE_RUNTIME_TEXT_EFFECTS_PATH.read_text(encoding="utf-8")
         self.assertIn("runtime_i18n import", native_source)
         self.assertIn("runtime_player_settings import", native_source)
+        self.assertIn("runtime_player_view import", native_source)
         self.assertIn("runtime_text_effects import", native_source)
         self.assertIn("def resolve_localized_runtime_value", native_i18n_source)
         self.assertIn("def build_runtime_localization_fallback_report", native_i18n_source)
