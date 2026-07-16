@@ -105,6 +105,7 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
         group_keys = [group["key"] for group in guide["groups"]]
         self.assertIn("reading", group_keys)
         self.assertIn("system", group_keys)
+        self.assertIn("controller", group_keys)
         reading = next(group for group in guide["groups"] if group["key"] == "reading")
         system = next(group for group in guide["groups"] if group["key"] == "system")
         self.assertTrue(any("Enter" in control["keys"] and "Space" in control["keys"] for control in reading["controls"]))
@@ -3271,6 +3272,48 @@ class NativeRuntimeRenderSmokeTests(unittest.TestCase):
         )
         self.assertIsNotNone(player._load_image_file(quick_path))
         self.assertIsNotNone(player._load_image_file(formal_path))
+
+    def test_controller_events_drive_title_reading_and_system_flows(self) -> None:
+        data_path = self.write_game_data()
+        player = NativeRuntimePlayer(pygame, data_path)
+
+        self.assertEqual(player.overlay_mode, "title")
+        self.assertEqual(player.title_menu_index, 0)
+        self.assertTrue(player.handle_event(pygame.event.Event(pygame.JOYHATMOTION, hat=0, value=(0, -1))))
+        self.assertEqual(player.title_menu_index, 1)
+        self.assertTrue(player.handle_event(pygame.event.Event(pygame.JOYHATMOTION, hat=0, value=(0, -1))))
+        self.assertEqual(player.title_menu_index, 1)
+        player.handle_event(pygame.event.Event(pygame.JOYHATMOTION, hat=0, value=(0, 0)))
+        player.handle_event(pygame.event.Event(pygame.JOYHATMOTION, hat=0, value=(0, -1)))
+        self.assertEqual(player.title_menu_index, 2)
+        player.handle_event(pygame.event.Event(pygame.JOYBUTTONDOWN, button=0))
+        self.assertEqual(player.overlay_mode, "load")
+        player.handle_event(pygame.event.Event(pygame.JOYBUTTONDOWN, button=1))
+        self.assertEqual(player.overlay_mode, "title")
+
+        player.start_story_from_title()
+        player.handle_event(pygame.event.Event(pygame.JOYBUTTONDOWN, button=3))
+        self.assertEqual(player.overlay_mode, "system")
+        player.handle_event(pygame.event.Event(pygame.JOYBUTTONDOWN, button=1))
+        self.assertIsNone(player.overlay_mode)
+        player.handle_event(pygame.event.Event(pygame.JOYBUTTONDOWN, button=2))
+        self.assertEqual(player.overlay_mode, "history")
+        player.handle_event(pygame.event.Event(pygame.JOYBUTTONDOWN, button=2))
+        self.assertIsNone(player.overlay_mode)
+
+        player.handle_event(pygame.event.Event(pygame.JOYBUTTONDOWN, button=5))
+        self.assertTrue(player.auto_play_enabled)
+        player.handle_event(pygame.event.Event(pygame.JOYBUTTONDOWN, button=6))
+        self.assertTrue(player.skip_read_enabled)
+        player.handle_event(pygame.event.Event(pygame.JOYBUTTONDOWN, button=0))
+        player.handle_event(pygame.event.Event(pygame.JOYBUTTONDOWN, button=0))
+        self.assertIsNotNone(player.current_choices)
+        player.handle_event(pygame.event.Event(pygame.JOYHATMOTION, hat=0, value=(0, 0)))
+        player.handle_event(pygame.event.Event(pygame.JOYHATMOTION, hat=0, value=(0, -1)))
+        self.assertEqual(player.current_choice_index, 1)
+        diagnostic_rows = player.get_runtime_diagnostics_report()["sections"][0]["rows"]
+        controller_row = next(row for row in diagnostic_rows if row["label"] == "手柄输入")
+        self.assertEqual(controller_row["value"], "未连接")
 
     def test_pageup_rollback_restores_story_variables_and_stage_state(self) -> None:
         data_path = self.write_game_data()

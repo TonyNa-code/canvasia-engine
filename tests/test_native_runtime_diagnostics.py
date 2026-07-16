@@ -60,6 +60,12 @@ class NativeRuntimeDiagnosticsTests(unittest.TestCase):
                 "runtimeScenePrefetchedAssetIds": {"bg_branch", "voice_branch"},
                 "currentBgmAssetId": "bgm_theme",
                 "voicePlaybackActive": True,
+                "controllerStatus": {
+                    "connectedCount": 1,
+                    "connected": True,
+                    "names": ["Wireless Controller"],
+                    "label": "1 个 · Wireless Controller",
+                },
             }
         )
 
@@ -77,6 +83,8 @@ class NativeRuntimeDiagnosticsTests(unittest.TestCase):
         by_label = {row["label"]: row for row in rows}
         self.assertEqual(by_label["当前位置"]["value"], "Opening")
         self.assertEqual(by_label["剧情块"]["value"], "第 3 块")
+        self.assertEqual(by_label["手柄输入"]["value"], "1 个 · Wireless Controller")
+        self.assertEqual(by_label["手柄输入"]["tone"], "ready")
         self.assertEqual(by_label["全局资源预热"]["value"], "3/5")
         self.assertEqual(by_label["后台剩余"]["value"], "2 项")
         self.assertEqual(by_label["路线预取"]["value"], "2/2")

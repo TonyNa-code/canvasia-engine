@@ -51,6 +51,7 @@ jobs:
             native_runtime/runtime_stage_images.py \
             native_runtime/runtime_choice_availability.py \
             native_runtime/runtime_rollback.py \
+            native_runtime/runtime_input.py \
             native_runtime/runtime_save_thumbnails.py \
             native_runtime/runtime_i18n.py \
             native_runtime/runtime_vn_quality.py \
@@ -73,6 +74,7 @@ jobs:
             tests/test_native_runtime_stage_images.py \
             tests/test_native_runtime_choice_availability.py \
             tests/test_native_runtime_rollback.py \
+            tests/test_native_runtime_input.py \
             tests/test_native_runtime_save_thumbnails.py \
             tests/test_stage_image_contract.py \
             tests/test_maintainability_check_tool.py \
@@ -321,6 +323,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_native_runtime_stage_images.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_choice_availability.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_rollback.py' -v
+          python -m unittest discover -s tests -p 'test_native_runtime_input.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_save_thumbnails.py' -v
           python -m unittest discover -s tests -p 'test_stage_image_contract.py' -v
           python -m unittest discover -s tests -p 'test_editor_asset_usage.py' -v

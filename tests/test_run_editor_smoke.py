@@ -3743,6 +3743,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / run_editor.RUNTIME_PRELOAD_REPORT_FILE_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_PLAYER_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_PRELOAD_NAME).is_file())
+        self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_INPUT_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_I18N_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_SETTINGS_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_VIEW_NAME).is_file())
@@ -4076,6 +4077,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 run_editor.NATIVE_RUNTIME_STAGE_IMAGES_NAME,
                 run_editor.NATIVE_RUNTIME_CHOICE_AVAILABILITY_NAME,
                 run_editor.NATIVE_RUNTIME_DIAGNOSTICS_NAME,
+                run_editor.NATIVE_RUNTIME_INPUT_NAME,
                 run_editor.NATIVE_RUNTIME_I18N_NAME,
                 run_editor.NATIVE_RUNTIME_SETTINGS_NAME,
                 run_editor.NATIVE_RUNTIME_TEXT_EFFECTS_NAME,
@@ -5438,6 +5440,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((bundle_dir / "native_runtime" / run_editor.NATIVE_RUNTIME_SCENE_PREFETCH_NAME).is_file())
         self.assertTrue((bundle_dir / "native_runtime" / run_editor.NATIVE_RUNTIME_CHARACTER_MOTION_NAME).is_file())
         self.assertTrue((bundle_dir / "native_runtime" / run_editor.NATIVE_RUNTIME_DIAGNOSTICS_NAME).is_file())
+        self.assertTrue((bundle_dir / "native_runtime" / run_editor.NATIVE_RUNTIME_INPUT_NAME).is_file())
         self.assertTrue((bundle_dir / "native_runtime" / run_editor.NATIVE_RUNTIME_SETTINGS_NAME).is_file())
         self.assertTrue((bundle_dir / "native_runtime" / run_editor.NATIVE_RUNTIME_ROLLBACK_NAME).is_file())
         self.assertTrue((bundle_dir / "native_runtime" / run_editor.NATIVE_RUNTIME_SAVE_THUMBNAILS_NAME).is_file())

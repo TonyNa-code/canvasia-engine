@@ -504,6 +504,13 @@ def build_runtime_position_diagnostic_rows(context: dict | None) -> list[dict]:
     thumbnail_available = max(0, int(thumbnail_status.get("availableCount") or 0))
     thumbnail_referenced = max(0, int(thumbnail_status.get("referencedCount") or 0))
     thumbnail_missing = max(0, int(thumbnail_status.get("missingCount") or 0))
+    controller_status = (
+        safe_context.get("controllerStatus")
+        if isinstance(safe_context.get("controllerStatus"), dict)
+        else {}
+    )
+    controller_count = max(0, int(controller_status.get("connectedCount") or 0))
+    controller_label = str(controller_status.get("label") or "未连接")
     return [
         build_status_row("当前位置", scene_label, f"场景 ID：{safe_context.get('sceneId') or 'title'}", "ready"),
         build_status_row("剧情块", f"第 {block_index + 1} 块", f"当前状态：{line_type}", "ready"),
@@ -519,6 +526,12 @@ def build_runtime_position_diagnostic_rows(context: dict | None) -> list[dict]:
             f"{thumbnail_available}/{thumbnail_referenced}",
             f"正式存档和快速存档的可视化画面；缺失 {thumbnail_missing} 张。",
             "ready" if thumbnail_referenced and not thumbnail_missing else ("warn" if thumbnail_missing else "empty"),
+        ),
+        build_status_row(
+            "手柄输入",
+            controller_label,
+            "支持摇杆 / 十字键导航、确认返回、历史、系统菜单、剧情回退、自动播放和已读快进。",
+            "ready" if controller_count else "empty",
         ),
         build_status_row("状态提示", status_message or "无", "来自原生 Runtime 顶部状态栏。", "neutral"),
     ]

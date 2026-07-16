@@ -308,6 +308,23 @@ except ImportError:  # pragma: no cover - exported native packages import from t
     )
 
 try:
+    from .runtime_input import (
+        build_controller_control_group,
+        build_controller_input_state,
+        build_controller_status,
+        get_controller_action_key_attr,
+        translate_controller_input,
+    )
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_input import (
+        build_controller_control_group,
+        build_controller_input_state,
+        build_controller_status,
+        get_controller_action_key_attr,
+        translate_controller_input,
+    )
+
+try:
     from .runtime_vn_quality import (
         build_native_runtime_vn_baseline_quality_report as _build_native_runtime_vn_baseline_quality_report,
     )
@@ -742,7 +759,7 @@ NATIVE_RUNTIME_CONTROL_GROUPS = (
             },
         ),
     },
-)
+) + (build_controller_control_group(),)
 NATIVE_RUNTIME_HELP_QUICK_ACTIONS = (
     {"key": "rollback", "label": "剧情回退", "shortcut": "PageUp", "pygameKey": "K_PAGEUP"},
     {"key": "settings", "label": "体验设置", "shortcut": "S", "pygameKey": "K_s"},
@@ -6838,6 +6855,7 @@ def build_acceptance_platform_matrix(release_control: dict) -> list[dict]:
                     "启动包或 App，确认标题页、开始游戏、读档、设置和退出都能响应。",
                     "完成一轮正式存档、读档、快存、退出重开自动续玩，并确认缩略图来自未被菜单遮挡的游戏画面。",
                     "试玩至少一条包含选项、跳转、音频、资料馆入口和视频/3D 兜底提示的路线。",
+                    "如目标平台支持手柄，连接后确认标题页、选项、存档、历史、设置和返回操作都可完成。",
                     "记录系统安全提示、杀毒/SmartScreen/Gatekeeper 提示和玩家可理解程度。",
                 ],
             }
@@ -6864,6 +6882,7 @@ def build_acceptance_manual_check_groups() -> list[dict]:
                 "文字速度、自动播放、已读快进、逐步剧情回退、清屏、历史文本和语音回听可用。",
                 "从变量变化、立绘移动或滤镜之后回退，确认变量、舞台、BGM 和视觉效果一起恢复。",
                 "鼠标、键盘快捷键和右键菜单不会卡死在覆盖层。",
+                "手柄摇杆 / 十字键、确认返回、历史、系统菜单、回退、自动播放和已读快进都能响应。",
             ],
         },
         {
@@ -7959,6 +7978,8 @@ class NativeRuntimePlayer:
         self.depth_blur_effect: dict | None = None
         self.rollback_timeline: list[dict] = []
         self.rollback_limit = DEFAULT_ROLLBACK_LIMIT
+        self.controller_input_state = build_controller_input_state()
+        self.connected_controllers: dict[int, object] = {}
 
         self.variable_state = self.build_initial_variable_state()
         self.stage_background_asset_id: str | None = None
@@ -7983,6 +8004,7 @@ class NativeRuntimePlayer:
         self.status_message = "正在初始化原生 Runtime…"
 
         self._initialize_audio()
+        self.refresh_connected_controllers()
         self.apply_runtime_settings()
         self.runtime_preload_status = self.preload_runtime_assets()
         self.record_player_session_start()
@@ -9652,7 +9674,10 @@ class NativeRuntimePlayer:
         self.visible_stage_images = {}
         self.stage_image_motions = {}
         self.leaving_stage_images = {}
-        self.status_message = f"标题页：选择开始、续玩、读档或设置。 · {self.get_runtime_preload_status_line()}"
+        self.status_message = (
+            f"标题页：选择开始、续玩、读档或设置。 · {self.get_runtime_preload_status_line()} · "
+            f"{self.get_controller_status_line()}"
+        )
 
     def start_story_from_title(self) -> None:
         self.stop_embedded_video_playback()
@@ -13096,6 +13121,7 @@ class NativeRuntimePlayer:
             "voicePlaybackActive": bool(getattr(self, "voice_playback_active", False)),
             "rollbackStatus": self.get_rollback_status(),
             "saveThumbnailStatus": build_save_thumbnail_status(self.save_store, self.project_id),
+            "controllerStatus": self.get_controller_status(),
         }
 
     def get_runtime_diagnostics_report(self) -> dict:
@@ -13282,7 +13308,7 @@ class NativeRuntimePlayer:
                     f"场景：{scene_label}",
                     f"阅读：{reading_state} · 历史 {len(self.text_history)} 条 · 可回退 {rollback_steps} 步",
                     " · ".join(flow_labels),
-                    f"视频：{video_state} · 字体：{self.font_source_status}",
+                    f"视频：{video_state} · {self.get_controller_status_line()}",
                 ],
             },
             {
@@ -13877,6 +13903,133 @@ class NativeRuntimePlayer:
         self.status_message = f"截图已保存：{screenshot_path.name}"
         return screenshot_path
 
+    def refresh_connected_controllers(self, announce: bool = False) -> dict:
+        controllers: dict[int, object] = {}
+        joystick_module = getattr(self.pygame, "joystick", None)
+        if joystick_module is not None:
+            try:
+                joystick_module.init()
+                for device_index in range(max(0, int(joystick_module.get_count()))):
+                    controller = joystick_module.Joystick(device_index)
+                    controller.init()
+                    instance_getter = getattr(controller, "get_instance_id", None)
+                    instance_id = int(instance_getter()) if callable(instance_getter) else device_index
+                    controllers[instance_id] = controller
+            except Exception:
+                controllers = {}
+        self.connected_controllers = controllers
+        status = self.get_controller_status()
+        if announce:
+            if status["connected"]:
+                self.status_message = f"手柄已就绪：{status['label']}。"
+            else:
+                self.status_message = "手柄已断开，键盘和鼠标操作仍可继续。"
+        return status
+
+    def get_controller_status(self) -> dict:
+        names = []
+        for controller in self.connected_controllers.values():
+            try:
+                names.append(controller.get_name())
+            except Exception:
+                names.append("Game Controller")
+        return build_controller_status(names)
+
+    def get_controller_status_line(self) -> str:
+        return f"手柄：{self.get_controller_status()['label']}"
+
+    def handle_controller_action(self, action: str) -> bool:
+        safe_action = str(action or "").strip().lower()
+        if not safe_action:
+            return True
+        if safe_action == "back":
+            if self.ui_hidden:
+                self.restore_ui_hidden()
+                return True
+            if not self.overlay_mode:
+                self.open_system_menu()
+                return True
+            key_attr = "K_ESCAPE"
+        elif safe_action == "system":
+            if self.overlay_mode and self.overlay_mode != "title":
+                self.close_overlay()
+            else:
+                self.open_system_menu()
+            return True
+        elif safe_action == "history":
+            if self.title_screen_active:
+                return True
+            if self.overlay_mode == "history":
+                self.close_overlay()
+            else:
+                self.open_text_history_overlay()
+            return True
+        elif safe_action == "rollback":
+            if self.title_screen_active:
+                return True
+            if self.overlay_mode:
+                self.close_overlay(preserve_status=True)
+            self.rollback_story()
+            return True
+        elif safe_action == "auto":
+            if not self.title_screen_active and not self.overlay_mode:
+                self.toggle_auto_play()
+            return True
+        elif safe_action == "skip":
+            if not self.title_screen_active and not self.overlay_mode:
+                self.toggle_skip_read()
+            return True
+        else:
+            key_attr = get_controller_action_key_attr(safe_action)
+        if not key_attr:
+            return True
+        key_value = getattr(self.pygame, key_attr, None)
+        if key_value is None:
+            return True
+        keyboard_event = self.pygame.event.Event(
+            self.pygame.KEYDOWN,
+            key=int(key_value),
+            unicode="",
+            mod=0,
+        )
+        return self.handle_event(keyboard_event)
+
+    def handle_controller_event(self, event) -> bool | None:
+        pygame = self.pygame
+        device_added = getattr(pygame, "JOYDEVICEADDED", None)
+        device_removed = getattr(pygame, "JOYDEVICEREMOVED", None)
+        if event.type in {value for value in (device_added, device_removed) if value is not None}:
+            self.controller_input_state = build_controller_input_state()
+            self.refresh_connected_controllers(announce=True)
+            return True
+
+        event_kind = ""
+        payload = {}
+        if event.type == getattr(pygame, "JOYBUTTONDOWN", None):
+            event_kind = "button_down"
+            payload["button"] = getattr(event, "button", None)
+        elif event.type == getattr(pygame, "JOYHATMOTION", None):
+            event_kind = "hat_motion"
+            payload["hat"] = getattr(event, "hat", 0)
+            payload["hat_value"] = getattr(event, "value", (0, 0))
+        elif event.type == getattr(pygame, "JOYAXISMOTION", None):
+            event_kind = "axis_motion"
+            payload["axis"] = getattr(event, "axis", None)
+            payload["axis_value"] = getattr(event, "value", 0.0)
+        else:
+            return None
+
+        translated = translate_controller_input(
+            event_kind,
+            state=self.controller_input_state,
+            **payload,
+        )
+        self.controller_input_state = translated["state"]
+        for action in translated["actions"]:
+            if not self.handle_controller_action(action):
+                return False
+        return True
+
     def is_help_shortcut_event(self, event) -> bool:
         if event.type != self.pygame.KEYDOWN:
             return False
@@ -13893,6 +14046,9 @@ class NativeRuntimePlayer:
     def handle_event(self, event) -> bool:
         if event.type == self.pygame.QUIT:
             return False
+        controller_result = self.handle_controller_event(event)
+        if controller_result is not None:
+            return controller_result
         if event.type == self.pygame.KEYDOWN and event.key == self.pygame.K_ESCAPE:
             if self.overlay_mode:
                 if self.overlay_mode == "title":
