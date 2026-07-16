@@ -26,10 +26,96 @@ COLOR_ACCENT = (106, 154, 255)
 COLOR_ACCENT_ALT = (173, 115, 255)
 COLOR_WARNING = (255, 161, 110)
 
-SAVE_DIALOG_PAGE_SIZE = 6
+SAVE_DIALOG_PAGE_SIZE = 4
 DEFAULT_FORMAL_SAVE_SLOT_COUNT = 24
 MIN_FORMAL_SAVE_SLOT_COUNT = 3
 MAX_FORMAL_SAVE_SLOT_COUNT = 120
+
+
+def build_save_dialog_layout(width: int, height: int, visible_slot_count: int) -> dict:
+    """Return responsive save-dialog geometry without depending on Pygame."""
+    safe_width = max(1, int(width or 0))
+    safe_height = max(1, int(height or 0))
+    panel_width = max(1, min(max(1, safe_width - 32), 1040))
+    panel_height = max(1, min(max(1, safe_height - 24), 620))
+    panel_left = (safe_width - panel_width) // 2
+    panel_top = (safe_height - panel_height) // 2
+    panel_bottom = panel_top + panel_height
+    compact = panel_height < 520
+
+    horizontal_padding = 24 if compact else 28
+    quick_top = panel_top + (72 if compact else 92)
+    quick_height = 68 if compact else 72
+    quick_rect = {
+        "x": panel_left + horizontal_padding,
+        "y": quick_top,
+        "width": max(1, panel_width - horizontal_padding * 2),
+        "height": quick_height,
+    }
+
+    visible_count = max(0, int(visible_slot_count or 0))
+    column_count = 1 if panel_width < 560 else 2
+    row_count = max(1, math.ceil(visible_count / column_count))
+    card_gap_x = 10 if compact else 16
+    card_gap_y = 10 if compact else 14
+    cards_top = quick_top + quick_height + (10 if compact else 18)
+    cards_bottom = panel_bottom - (68 if compact else 102)
+    available_cards_height = max(1, cards_bottom - cards_top)
+    card_height = max(
+        54,
+        min(126, (available_cards_height - card_gap_y * (row_count - 1)) // row_count),
+    )
+    card_width = max(
+        1,
+        (panel_width - horizontal_padding * 2 - card_gap_x * (column_count - 1)) // column_count,
+    )
+    cards = []
+    for index in range(visible_count):
+        row = index // column_count
+        column = index % column_count
+        cards.append(
+            {
+                "x": panel_left + horizontal_padding + column * (card_width + card_gap_x),
+                "y": cards_top + row * (card_height + card_gap_y),
+                "width": card_width,
+                "height": card_height,
+            }
+        )
+
+    button_height = 28 if compact else 34
+    button_y = panel_bottom - (40 if compact else 58)
+    controls_left = panel_left + horizontal_padding
+    controls_width = max(1, panel_width - horizontal_padding * 2)
+    preferred_widths = [96, 96, 116, 96]
+    control_gap = 10 if sum(preferred_widths) + 30 <= controls_width else 6
+    if sum(preferred_widths) + control_gap * 3 > controls_width:
+        unit_width = max(40, int((controls_width - control_gap * 3) / 4.2))
+        control_widths = [unit_width, unit_width, int(unit_width * 1.2), unit_width]
+    else:
+        control_widths = preferred_widths
+    controls = []
+    control_x = controls_left
+    for control_width in control_widths:
+        controls.append(
+            {
+                "x": control_x,
+                "y": button_y,
+                "width": control_width,
+                "height": button_height,
+            }
+        )
+        control_x += control_width + control_gap
+
+    return {
+        "compact": compact,
+        "panel": {"x": panel_left, "y": panel_top, "width": panel_width, "height": panel_height},
+        "titlePosition": (panel_left + horizontal_padding, panel_top + (14 if compact else 24)),
+        "subtitlePosition": (panel_left + horizontal_padding, panel_top + (48 if compact else 58)),
+        "quick": quick_rect,
+        "cards": cards,
+        "hintPosition": (panel_left + horizontal_padding, panel_bottom - (64 if compact else 88)),
+        "controls": controls,
+    }
 
 DEFAULT_DIALOG_BOX_CONFIG = {
     "preset": "moonlight",
@@ -648,6 +734,9 @@ def build_save_dialog_page_data(
                 "variableSummaryText": variable_summary_text,
                 "savedAt": saved_at,
                 "finished": bool(snapshot.get("finished")) if snapshot else False,
+                "thumbnailKey": str(snapshot.get("thumbnailKey") or "") if snapshot else "",
+                "thumbnailWidth": clamp_int(snapshot.get("thumbnailWidth"), 0, 10000, 0) if snapshot else 0,
+                "thumbnailHeight": clamp_int(snapshot.get("thumbnailHeight"), 0, 10000, 0) if snapshot else 0,
             }
         )
 
@@ -664,6 +753,9 @@ def build_save_dialog_page_data(
         "summaryText": str((quick_save or {}).get("summaryText") or "").strip() or ("空" if quick_save is None else "当前没有摘要。"),
         "variableSummaryText": quick_variable_summary,
         "savedAt": format_snapshot_saved_at((quick_save or {}).get("savedAt")),
+        "thumbnailKey": str((quick_save or {}).get("thumbnailKey") or ""),
+        "thumbnailWidth": clamp_int((quick_save or {}).get("thumbnailWidth"), 0, 10000, 0),
+        "thumbnailHeight": clamp_int((quick_save or {}).get("thumbnailHeight"), 0, 10000, 0),
     }
     return {
         "slotCount": slot_count,

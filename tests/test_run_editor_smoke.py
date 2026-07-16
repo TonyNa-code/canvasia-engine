@@ -3747,6 +3747,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_SETTINGS_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_VIEW_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_ROLLBACK_NAME).is_file())
+        self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_SAVE_THUMBNAILS_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_TEXT_EFFECTS_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_STORAGE_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_VARIABLES_NAME).is_file())
@@ -4834,9 +4835,9 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(save_dialog_description.returncode, 0, save_dialog_description.stdout + save_dialog_description.stderr)
         dialog_payload = json.loads(save_dialog_description.stdout)
         self.assertEqual(dialog_payload["slotCount"], 60)
-        self.assertEqual(dialog_payload["pageCount"], 10)
+        self.assertEqual(dialog_payload["pageCount"], 15)
         self.assertEqual(dialog_payload["page"], 1)
-        self.assertEqual(dialog_payload["visibleSlots"][0]["slotIndex"], 6)
+        self.assertEqual(dialog_payload["visibleSlots"][0]["slotIndex"], 4)
 
     def test_windows_nwjs_build_smoke(self) -> None:
         _, chapter_result = self.create_blank_project_with_chapter()
@@ -5439,6 +5440,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((bundle_dir / "native_runtime" / run_editor.NATIVE_RUNTIME_DIAGNOSTICS_NAME).is_file())
         self.assertTrue((bundle_dir / "native_runtime" / run_editor.NATIVE_RUNTIME_SETTINGS_NAME).is_file())
         self.assertTrue((bundle_dir / "native_runtime" / run_editor.NATIVE_RUNTIME_ROLLBACK_NAME).is_file())
+        self.assertTrue((bundle_dir / "native_runtime" / run_editor.NATIVE_RUNTIME_SAVE_THUMBNAILS_NAME).is_file())
         self.assertTrue((bundle_dir / "native_runtime" / run_editor.NATIVE_RUNTIME_VN_QUALITY_NAME).is_file())
         self.assertTrue((bundle_dir / "template_project" / "project.json").is_file())
         self.assertTrue((bundle_dir / "projects").is_dir())

@@ -63,7 +63,7 @@ The project already includes a visual editor, export pipeline, native runtime pr
 - Localization coverage checks with Markdown / CSV exports and safe CSV re-import for character, chapter, scene, and story-card translations
 - Canvasia Assistant with local template mode and optional creator-provided OpenAI, DeepSeek, Qwen, Kimi, Zhipu GLM, or compatible API providers
 - Optional OpenAI Image asset generation for backgrounds, sprites, CGs, and UI materials, with style-hint presets, sprite-to-character expression binding, prompt/model validation, and local-only API key handling
-- Formal save/load, quick save/load, system menu, text history, autoplay, skip-read, and voice replay
+- Formal save/load and quick save/load with scene thumbnails in the native Runtime, plus system menu, text history, autoplay, skip-read, and voice replay
 - Entry reachability route analysis for broken links, orphan scenes, unreachable scenes, branch depth, ending candidates, playable ending path previews, exportable route QA checklists, and a pre-release route playtest workbook with branch / ending execution lanes
 - Scene pacing advisor for playable-scene rhythm, long text, flat presentation, fake choices, missing outro cues, and next-action guidance in production boards
 - Full screenplay / production-script exports for proofreading, voice recording, translation handoff, archival review, and Ren'Py draft migration notes
@@ -92,7 +92,7 @@ The project already includes a visual editor, export pipeline, native runtime pr
 | Particles and Presentation | Available | Particle presets, custom particle settings, scene mood recipes, camera, filters, flashes, shakes, fades, character presentation effects, and independently animated prop / foreground / cut-in stage-image layers. |
 | Live2D / 3D Assets | Preview | Live2D, 3D character models, and 3D scene assets can be imported; native Runtime exports 3D structure and risk reports. |
 | Web / Desktop Exports | Preview | Web playable packages and desktop packages are available; signing and notarization depend on release notes. |
-| Native Runtime | Preview | Covers the core playback path, settings, saves, history, autoplay, state-safe story rollback, video fallback, 3D reports, first archive systems, and editor-side Runtime capability matrices with Web / native acceptance checklists plus VN essentials maturity summaries. |
+| Native Runtime | Preview | Covers the core playback path, settings, visual save slots with locally stored scene thumbnails, history, autoplay, state-safe story rollback, video fallback, 3D reports, first archive systems, and editor-side Runtime capability matrices with Web / native acceptance checklists plus VN essentials maturity summaries. |
 | Mobile Runtime | Experimental planning | Touch, audio policy, and layout adaptation are still being explored. |
 
 ## Screenshots

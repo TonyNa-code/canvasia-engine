@@ -4,6 +4,7 @@ import unittest
 
 from native_runtime.runtime_player_view import (
     MAX_FORMAL_SAVE_SLOT_COUNT,
+    build_save_dialog_layout,
     build_save_dialog_page_data,
     build_video_clip_label,
     format_video_timestamp,
@@ -25,6 +26,23 @@ class DummyFont:
 
 
 class NativeRuntimePlayerViewTests(unittest.TestCase):
+    def test_save_dialog_layout_keeps_cards_clear_of_controls(self) -> None:
+        compact = build_save_dialog_layout(720, 405, 2)
+        desktop = build_save_dialog_layout(1920, 1080, 4)
+
+        self.assertTrue(compact["compact"])
+        self.assertEqual(len(compact["cards"]), 2)
+        self.assertLess(
+            max(card["y"] + card["height"] for card in compact["cards"]),
+            min(control["y"] for control in compact["controls"]),
+        )
+        self.assertFalse(desktop["compact"])
+        self.assertEqual(len(desktop["cards"]), 4)
+        self.assertLess(
+            max(card["y"] + card["height"] for card in desktop["cards"]),
+            min(control["y"] for control in desktop["controls"]),
+        )
+
     def test_project_view_config_is_safely_sanitized(self) -> None:
         project = {
             "runtimeSettings": {"formalSaveSlotCount": 999},
@@ -70,6 +88,9 @@ class NativeRuntimePlayerViewTests(unittest.TestCase):
                 "savedAt": "2026-07-15T09:10:11",
                 "summaryText": "刚刚进入教室。",
                 "variableState": {"affection": 2.0, "flag": True},
+                "thumbnailKey": "quick",
+                "thumbnailWidth": 320,
+                "thumbnailHeight": 180,
             },
             "formalSlots": [
                 None,
@@ -78,6 +99,9 @@ class NativeRuntimePlayerViewTests(unittest.TestCase):
                     "savedAt": "2026-07-15T10:20:30",
                     "summaryText": "",
                     "variableState": {"affection": 3.0, "flag": False},
+                    "thumbnailKey": "formal-0002",
+                    "thumbnailWidth": "bad",
+                    "thumbnailHeight": 180,
                 },
             ],
         }
@@ -92,10 +116,14 @@ class NativeRuntimePlayerViewTests(unittest.TestCase):
         self.assertEqual(page_data["pageCount"], 2)
         self.assertEqual(page_data["quickSave"]["savedAt"], "07-15 09:10")
         self.assertEqual(page_data["quickSave"]["variableSummaryText"], "好感:2 / 约定:开")
+        self.assertEqual(page_data["quickSave"]["thumbnailKey"], "quick")
+        self.assertEqual(page_data["quickSave"]["thumbnailWidth"], 320)
         self.assertTrue(page_data["visibleSlots"][0]["isEmpty"])
         self.assertEqual(page_data["visibleSlots"][1]["sceneName"], "屋顶")
         self.assertEqual(page_data["visibleSlots"][1]["summaryText"], "当前没有摘要。")
         self.assertEqual(page_data["visibleSlots"][1]["variableSummaryText"], "好感:3 / 约定:关")
+        self.assertEqual(page_data["visibleSlots"][1]["thumbnailKey"], "formal-0002")
+        self.assertEqual(page_data["visibleSlots"][1]["thumbnailWidth"], 0)
 
     def test_timing_stage_and_text_helpers_have_safe_bounds(self) -> None:
         self.assertEqual(get_safe_audio_fade_ms(-50, 600), 0)

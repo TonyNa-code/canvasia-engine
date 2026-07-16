@@ -67,6 +67,10 @@ from native_runtime.runtime_player_settings import (
     DEFAULT_RUNTIME_PLAYER_SETTINGS,
     sanitize_runtime_player_settings,
 )
+from native_runtime.runtime_save_thumbnails import (
+    build_save_thumbnail_status,
+    get_save_thumbnail_path,
+)
 from native_runtime.runtime_storage import (
     build_runtime_crash_feedback_report,
     sanitize_archive_progress,
@@ -3204,6 +3208,69 @@ class NativeRuntimeRenderSmokeTests(unittest.TestCase):
         self.assertIn("panel_frame", player.image_cache)
         self.assertIn("资源预热：3/3", player.get_runtime_preload_status_line())
         self.assertIn("资源预热：3/3", player.status_message)
+
+    def test_visual_save_slots_capture_persist_and_render_scene_thumbnails(self) -> None:
+        data_path = self.write_game_data()
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="The system font .*", category=UserWarning)
+            player = NativeRuntimePlayer(pygame, data_path)
+
+        player.start_story_from_title()
+        player.render()
+        player.save_quick()
+        player.save_formal_slot(0)
+
+        quick_snapshot = player.save_store["quickSave"]
+        formal_snapshot = player.save_store["formalSlots"][0]
+        self.assertRegex(quick_snapshot["thumbnailKey"], r"^quick-[0-9a-f]{12}$")
+        self.assertRegex(formal_snapshot["thumbnailKey"], r"^formal-0001-[0-9a-f]{12}$")
+        quick_path = get_save_thumbnail_path(player.project_id, quick_snapshot["thumbnailKey"])
+        formal_path = get_save_thumbnail_path(player.project_id, formal_snapshot["thumbnailKey"])
+        self.assertTrue(quick_path.is_file())
+        self.assertTrue(formal_path.is_file())
+        self.assertGreater(quick_path.stat().st_size, 0)
+        self.assertGreater(formal_path.stat().st_size, 0)
+
+        status = build_save_thumbnail_status(player.save_store, player.project_id)
+        self.assertEqual(status["availableCount"], 2)
+        self.assertEqual(status["missingCount"], 0)
+        self.assertIn("缩略图：2/2", player.build_save_summary_line())
+        diagnostic_rows = player.get_runtime_diagnostics_report()["sections"][0]["rows"]
+        thumbnail_row = next(row for row in diagnostic_rows if row["label"] == "存档缩略图")
+        self.assertEqual(thumbnail_row["value"], "2/2")
+        self.assertEqual(thumbnail_row["tone"], "ready")
+
+        original_quick_key = quick_snapshot["thumbnailKey"]
+        original_persist = player.persist_save_store
+
+        def fail_persist() -> None:
+            raise OSError("simulated full disk")
+
+        player.persist_save_store = fail_persist
+        player.save_quick()
+        player.persist_save_store = original_persist
+        self.assertEqual(player.save_store["quickSave"]["thumbnailKey"], original_quick_key)
+        self.assertIn("原存档仍然保留", player.status_message)
+        quick_files = list(quick_path.parent.glob("quick-*.png"))
+        self.assertEqual([path.name for path in quick_files], [quick_path.name])
+
+        player.open_save_dialog("load")
+        player.render()
+        self.assert_screen_has_pixels(player)
+        slot_hotspots = [hotspot for hotspot in player.overlay_hotspots if hotspot.get("kind") == "slot"]
+        footer_hotspots = [
+            hotspot
+            for hotspot in player.overlay_hotspots
+            if hotspot.get("kind") in {"prev", "next", "switch", "close"}
+        ]
+        self.assertEqual(len(slot_hotspots), 2)
+        self.assertEqual(len(footer_hotspots), 4)
+        self.assertLess(
+            max(hotspot["rect"].bottom for hotspot in slot_hotspots),
+            min(hotspot["rect"].top for hotspot in footer_hotspots),
+        )
+        self.assertIsNotNone(player._load_image_file(quick_path))
+        self.assertIsNotNone(player._load_image_file(formal_path))
 
     def test_pageup_rollback_restores_story_variables_and_stage_state(self) -> None:
         data_path = self.write_game_data()
