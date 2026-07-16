@@ -911,7 +911,8 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
         history_cards.first.wait_for(timeout=15000)
         history_cards.first.get_by_role("button", name="收藏", exact=True).click()
         history_cards.first.get_by_role("button", name="已收藏", exact=True).wait_for(timeout=10000)
-        panel.locator("#creativeAssistantHistorySearchInput").fill(search_query)
+        history_search_input = panel.locator("#creativeAssistantHistorySearchInput")
+        history_search_input.fill(search_query)
         self.page.wait_for_function(
             """(query) => {
                 const panel = document.querySelector("#creativeAssistantPanel");
@@ -922,17 +923,11 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
             arg=search_query,
             timeout=15000,
         )
-        panel.locator("#creativeAssistantHistorySearchInput").fill("找不到的灵感关键词")
+        history_search_input.fill("找不到的灵感关键词")
         panel.get_by_text("没有匹配的灵感").wait_for(timeout=10000)
-        panel.locator("#creativeAssistantHistorySearchInput").fill("")
-        self.page.wait_for_function(
-            """() => {
-                const panel = document.querySelector('#creativeAssistantPanel');
-                const input = panel?.querySelector('#creativeAssistantHistorySearchInput');
-                return input?.value === '' && Boolean(panel?.querySelector('.creative-history-card.is-favorite'));
-            }""",
-            timeout=20000,
-        )
+        history_search_input.fill("")
+        self.assertEqual(history_search_input.input_value(), "")
+        panel.locator(".creative-history-card.is-favorite").first.wait_for(timeout=20000)
         panel.get_by_role("button", name="只看收藏").click()
         self.page.wait_for_function(
             """() => {

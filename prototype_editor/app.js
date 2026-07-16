@@ -5295,14 +5295,7 @@ function handleInput(event) {
 
   if (event.target.id === "creativeAssistantHistorySearchInput") {
     state.creativeAssistantHistoryQuery = event.target.value ?? "";
-    renderStoryScreen();
-    requestAnimationFrame(() => {
-      const searchInput = document.getElementById("creativeAssistantHistorySearchInput");
-      if (searchInput) {
-        searchInput.focus();
-        searchInput.setSelectionRange(state.creativeAssistantHistoryQuery.length, state.creativeAssistantHistoryQuery.length);
-      }
-    });
+    refreshCreativeAssistantPanel({ focusHistorySearch: true });
     return;
   }
 
@@ -12828,11 +12821,7 @@ function renderStoryScreen() {
     refs.scriptImporterPanel.classList.toggle("is-hidden", isBlankProject || !scene);
   }
 
-  if (refs.creativeAssistantPanel) {
-    refs.creativeAssistantPanel.innerHTML = isBlankProject
-      ? renderCreativeAssistantBlankPanel()
-      : renderCreativeAssistantPanel(scene, selectedBlock);
-  }
+  refreshCreativeAssistantPanel({ scene, selectedBlock, isBlankProject });
 
   if (refs.storySceneTreeFilterBar) {
     refs.storySceneTreeFilterBar.innerHTML = renderStorySceneTreeFilterBar(routeOverview);
@@ -33859,6 +33848,31 @@ function renderCreativeAssistantHistory() {
       <p class="creative-history-note">灵感盒最多保留 ${CREATIVE_ASSISTANT_MAX_HISTORY} 条，收藏会优先保留；内容只保存在当前浏览器 localStorage，不写入项目文件，也不会保存 API Key。</p>
     </div>
   `;
+}
+
+function refreshCreativeAssistantPanel(options = {}) {
+  if (!refs.creativeAssistantPanel) {
+    return;
+  }
+  const scene = options.scene ?? getSelectedScene();
+  const selectedBlock = options.selectedBlock ?? getSelectedBlock();
+  const isBlankProject = options.isBlankProject ?? isCurrentProjectBlank();
+  refs.creativeAssistantPanel.innerHTML = isBlankProject
+    ? renderCreativeAssistantBlankPanel()
+    : renderCreativeAssistantPanel(scene, selectedBlock);
+
+  if (!options.focusHistorySearch) {
+    return;
+  }
+  const focusQuery = state.creativeAssistantHistoryQuery ?? "";
+  requestAnimationFrame(() => {
+    const searchInput = refs.creativeAssistantPanel?.querySelector("#creativeAssistantHistorySearchInput");
+    if (!searchInput || searchInput.value !== focusQuery) {
+      return;
+    }
+    searchInput.focus({ preventScroll: true });
+    searchInput.setSelectionRange(focusQuery.length, focusQuery.length);
+  });
 }
 
 function restoreCreativeAssistantHistoryRecord(recordId) {

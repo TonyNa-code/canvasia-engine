@@ -2972,6 +2972,18 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertNotIn("state.openAiAssetError = error.message", operation_sources)
         self.assertNotRegex(source, r"showEngineAlert\(`[^`]*\$\{error\.message\}")
 
+    def test_creative_assistant_history_search_refreshes_only_its_panel(self) -> None:
+        source = APP_PATH.read_text(encoding="utf-8")
+        handle_input = _extract_function_source(source, "handleInput")
+        refresh_panel = _extract_function_source(source, "refreshCreativeAssistantPanel")
+        render_story = _extract_function_source(source, "renderStoryScreen")
+
+        self.assertIn("refreshCreativeAssistantPanel({ focusHistorySearch: true });", handle_input)
+        self.assertIn("refs.creativeAssistantPanel.innerHTML", refresh_panel)
+        self.assertIn('querySelector("#creativeAssistantHistorySearchInput")', refresh_panel)
+        self.assertIn("searchInput.value !== focusQuery", refresh_panel)
+        self.assertIn("refreshCreativeAssistantPanel({ scene, selectedBlock, isBlankProject });", render_story)
+
     def test_openai_asset_generation_has_busy_guard(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
         handle_click = _extract_function_source(source, "handleClick")
