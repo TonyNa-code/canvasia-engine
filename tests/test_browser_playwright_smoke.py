@@ -1722,6 +1722,31 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
             )
             player_page.wait_for_timeout(90)
 
+        def hold_gamepad_button(button_index: int, hold_ms: int = 680) -> None:
+            player_page.evaluate(
+                """(index) => {
+                  const button = window.__canvasiaTestGamepad.buttons[index];
+                  button.pressed = true;
+                  button.touched = true;
+                  button.value = 1;
+                  window.__canvasiaTestGamepad.timestamp += 1;
+                  window.dispatchEvent(new Event("gamepadconnected"));
+                }""",
+                button_index,
+            )
+            player_page.wait_for_timeout(hold_ms)
+            player_page.evaluate(
+                """(index) => {
+                  const button = window.__canvasiaTestGamepad.buttons[index];
+                  button.pressed = false;
+                  button.touched = false;
+                  button.value = 0;
+                  window.__canvasiaTestGamepad.timestamp += 1;
+                }""",
+                button_index,
+            )
+            player_page.wait_for_timeout(140)
+
         try:
             player_page.goto(player_url, wait_until="domcontentloaded")
             player_page.locator("#startOverlay").wait_for(state="visible", timeout=20000)
@@ -1747,6 +1772,20 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
                 player_page.evaluate("document.documentElement.dataset.runtimeInput"),
                 "gamepad",
             )
+
+            player_page.evaluate(
+                """() => {
+                  window.__canvasiaFocusTrail = [];
+                  document.addEventListener("focusin", (event) => {
+                    if (document.querySelector("#systemMenu")?.contains(event.target)) {
+                      window.__canvasiaFocusTrail.push(event.target.id || event.target.tagName);
+                    }
+                  });
+                }"""
+            )
+            hold_gamepad_button(13)
+            focus_trail = player_page.evaluate("window.__canvasiaFocusTrail || []")
+            self.assertGreaterEqual(len(set(focus_trail)), 2)
 
             press_gamepad_button(1)
             player_page.locator("#systemMenu").wait_for(state="hidden", timeout=10000)

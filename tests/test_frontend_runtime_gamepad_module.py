@@ -94,6 +94,54 @@ class FrontendRuntimeGamepadModuleTests(unittest.TestCase):
 
         self.assertEqual(payload["actions"], ["right"])
 
+    def test_direction_hold_repeats_after_delay_without_repeating_other_actions(self) -> None:
+        payload = run_node_module(
+            """
+            const button = (pressed = false) => ({ pressed, value: pressed ? 1 : 0 });
+            const pad = {
+              id: "Standard Pad",
+              index: 0,
+              connected: true,
+              buttons: Array.from({ length: 16 }, () => button()),
+              axes: [0, 0],
+            };
+            pad.buttons[0] = button(true);
+            pad.buttons[15] = button(true);
+            const first = tools.translateRuntimeGamepads([pad], undefined, { nowMs: 0 });
+            const beforeDelay = tools.translateRuntimeGamepads([pad], first.state, { nowMs: 419 });
+            const firstRepeat = tools.translateRuntimeGamepads([pad], beforeDelay.state, { nowMs: 420 });
+            const tooSoon = tools.translateRuntimeGamepads([pad], firstRepeat.state, { nowMs: 500 });
+            const secondRepeat = tools.translateRuntimeGamepads([pad], tooSoon.state, { nowMs: 515 });
+            pad.buttons[0] = button(false);
+            pad.buttons[15] = button(false);
+            const released = tools.translateRuntimeGamepads([pad], secondRepeat.state, { nowMs: 600 });
+            pad.buttons[15] = button(true);
+            const pressedAgain = tools.translateRuntimeGamepads([pad], released.state, { nowMs: 601 });
+            process.stdout.write(JSON.stringify({
+              first: first.actions,
+              beforeDelay: beforeDelay.actions,
+              firstRepeat: firstRepeat.actions,
+              tooSoon: tooSoon.actions,
+              secondRepeat: secondRepeat.actions,
+              released: released.actions,
+              pressedAgain: pressedAgain.actions,
+              timing: {
+                delay: tools.RUNTIME_GAMEPAD_REPEAT_DELAY_MS,
+                interval: tools.RUNTIME_GAMEPAD_REPEAT_INTERVAL_MS,
+              },
+            }));
+            """
+        )
+
+        self.assertEqual(payload["first"], ["confirm", "right"])
+        self.assertEqual(payload["beforeDelay"], [])
+        self.assertEqual(payload["firstRepeat"], ["right"])
+        self.assertEqual(payload["tooSoon"], [])
+        self.assertEqual(payload["secondRepeat"], ["right"])
+        self.assertEqual(payload["released"], [])
+        self.assertEqual(payload["pressedAgain"], ["right"])
+        self.assertEqual(payload["timing"], {"delay": 420, "interval": 95})
+
     def test_directional_focus_prefers_geometric_neighbor_and_wraps(self) -> None:
         payload = run_node_module(
             """
@@ -281,6 +329,7 @@ class FrontendRuntimeGamepadModuleTests(unittest.TestCase):
 
         self.assertTrue(payload["status"]["connected"])
         self.assertIn("已连接", payload["group"]["description"])
+        self.assertIn("按住可连续移动", payload["group"]["shortcuts"][0]["detail"])
         self.assertEqual(len(payload["group"]["shortcuts"]), 4)
 
 

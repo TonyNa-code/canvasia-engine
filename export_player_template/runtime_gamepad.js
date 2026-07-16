@@ -1,6 +1,8 @@
 export const RUNTIME_GAMEPAD_AXIS_DEAD_ZONE = 0.62;
 export const RUNTIME_GAMEPAD_CONNECTED_POLL_INTERVAL_MS = 32;
 export const RUNTIME_GAMEPAD_IDLE_POLL_INTERVAL_MS = 500;
+export const RUNTIME_GAMEPAD_REPEAT_DELAY_MS = 420;
+export const RUNTIME_GAMEPAD_REPEAT_INTERVAL_MS = 95;
 
 export const RUNTIME_GAMEPAD_BUTTON_ACTIONS = Object.freeze({
   0: "confirm",
@@ -25,6 +27,9 @@ const RUNTIME_FOCUSABLE_SELECTOR = [
   "textarea:not([disabled])",
   "[tabindex]:not([tabindex='-1'])",
 ].join(",");
+
+const RUNTIME_GAMEPAD_DIRECTION_ACTIONS = Object.freeze(["up", "down", "left", "right"]);
+const RUNTIME_GAMEPAD_DIRECTION_ACTION_SET = new Set(RUNTIME_GAMEPAD_DIRECTION_ACTIONS);
 
 function getAxisDirection(value, deadZone = RUNTIME_GAMEPAD_AXIS_DEAD_ZONE) {
   const numericValue = Number(value);
@@ -73,6 +78,50 @@ export function buildRuntimeGamepadStatus(gamepads = []) {
   };
 }
 
+function getSafeGamepadTiming(value, fallback, minimum) {
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? Math.max(minimum, numericValue) : fallback;
+}
+
+export function updateRuntimeGamepadDirectionRepeat(activeDirections, previousRepeat = {}, options = {}) {
+  const nowMs = getSafeGamepadTiming(options.nowMs, Date.now(), 0);
+  const repeatDelayMs = getSafeGamepadTiming(
+    options.repeatDelayMs,
+    RUNTIME_GAMEPAD_REPEAT_DELAY_MS,
+    100
+  );
+  const repeatIntervalMs = getSafeGamepadTiming(
+    options.repeatIntervalMs,
+    RUNTIME_GAMEPAD_REPEAT_INTERVAL_MS,
+    40
+  );
+  const active = [...new Set(Array.from(activeDirections ?? []))]
+    .filter((action) => RUNTIME_GAMEPAD_DIRECTION_ACTION_SET.has(action));
+  const repeat = {};
+  const actions = [];
+
+  active.forEach((action) => {
+    const previousEntry = previousRepeat?.[action];
+    if (!previousEntry || typeof previousEntry !== "object") {
+      repeat[action] = { startedAt: nowMs, lastAt: nowMs };
+      actions.push(action);
+      return;
+    }
+    const startedAt = getSafeGamepadTiming(previousEntry.startedAt, nowMs, 0);
+    const lastAt = getSafeGamepadTiming(previousEntry.lastAt, startedAt, 0);
+    const shouldRepeat = nowMs - startedAt >= repeatDelayMs && nowMs - lastAt >= repeatIntervalMs;
+    repeat[action] = {
+      startedAt,
+      lastAt: shouldRepeat ? nowMs : lastAt,
+    };
+    if (shouldRepeat) {
+      actions.push(action);
+    }
+  });
+
+  return { actions, repeat };
+}
+
 export function translateRuntimeGamepads(gamepads, previousState = buildRuntimeGamepadState(), options = {}) {
   const deadZone = options.deadZone ?? RUNTIME_GAMEPAD_AXIS_DEAD_ZONE;
   const previousPads = previousState?.pads && typeof previousState.pads === "object" ? previousState.pads : {};
@@ -85,9 +134,16 @@ export function translateRuntimeGamepads(gamepads, previousState = buildRuntimeG
     const previousPad = previousPads[gamepadKey] ?? { buttons: [], axes: [0, 0] };
     const nextButtons = Array.from(gamepad.buttons ?? [], isButtonPressed);
     const emittedActions = new Set();
+    const activeDirections = new Set();
 
     Object.entries(RUNTIME_GAMEPAD_BUTTON_ACTIONS).forEach(([buttonIndex, action]) => {
       const index = Number(buttonIndex);
+      if (RUNTIME_GAMEPAD_DIRECTION_ACTION_SET.has(action)) {
+        if (nextButtons[index]) {
+          activeDirections.add(action);
+        }
+        return;
+      }
       if (nextButtons[index] && !previousPad.buttons?.[index] && !emittedActions.has(action)) {
         actions.push(action);
         emittedActions.add(action);
@@ -99,12 +155,21 @@ export function translateRuntimeGamepads(gamepads, previousState = buildRuntimeG
       getAxisDirection(gamepad.axes?.[1], deadZone),
     ];
     nextAxes.forEach((direction, axisIndex) => {
-      if (!direction || direction === Number(previousPad.axes?.[axisIndex] || 0)) {
+      if (!direction) {
         return;
       }
       const action = axisIndex === 0
         ? (direction < 0 ? "left" : "right")
         : (direction < 0 ? "up" : "down");
+      activeDirections.add(action);
+    });
+
+    const directionResult = updateRuntimeGamepadDirectionRepeat(
+      activeDirections,
+      previousPad.directionRepeat,
+      options
+    );
+    directionResult.actions.forEach((action) => {
       if (!emittedActions.has(action)) {
         actions.push(action);
         emittedActions.add(action);
@@ -114,6 +179,7 @@ export function translateRuntimeGamepads(gamepads, previousState = buildRuntimeG
     nextState.pads[gamepadKey] = {
       buttons: nextButtons,
       axes: nextAxes,
+      directionRepeat: directionResult.repeat,
     };
   });
 
@@ -131,7 +197,7 @@ export function buildRuntimeGamepadControlGroup(status = buildRuntimeGamepadStat
       ? `已连接：${status.label}。当前页面可以直接用手柄操作。`
       : "支持标准布局手柄；连接后按任意键即可开始操作。",
     shortcuts: [
-      { keys: ["左摇杆 / 十字键"], label: "移动焦点", detail: "按屏幕方向操作标题页、选项、存档、设置与回想馆。" },
+      { keys: ["左摇杆 / 十字键"], label: "移动焦点", detail: "按住可连续移动，适合快速浏览选项、存档、设置与回想馆长列表。" },
       { keys: ["A / ×", "B / ○"], label: "确认 / 返回", detail: "确认当前按钮；返回键关闭面板，阅读中则打开系统菜单。" },
       { keys: ["X / □", "LB / L1"], label: "回看上一句", detail: "回到已经经过的上一条剧情文本。" },
       { keys: ["Y / △ / Menu", "RB / R1", "View"], label: "菜单 / 自动 / 已读快进", detail: "覆盖长篇视觉小说常用的阅读辅助动作。" },
@@ -316,7 +382,10 @@ export function createRuntimeGamepadController(options = {}) {
       return status;
     }
     lastPollAt = Number(timestamp);
-    const result = translateRuntimeGamepads(getGamepads(), inputState, options);
+    const result = translateRuntimeGamepads(getGamepads(), inputState, {
+      ...options,
+      nowMs: Number(timestamp),
+    });
     inputState = result.state;
     if (result.status.signature !== status.signature) {
       status = result.status;

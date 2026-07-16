@@ -3283,8 +3283,11 @@ class NativeRuntimeRenderSmokeTests(unittest.TestCase):
         self.assertEqual(player.title_menu_index, 1)
         self.assertTrue(player.handle_event(pygame.event.Event(pygame.JOYHATMOTION, hat=0, value=(0, -1))))
         self.assertEqual(player.title_menu_index, 1)
+        repeat_started_at = player.controller_input_state["repeat"]["down"]["startedAt"]
+        self.assertTrue(player.handle_controller_repeat(now_ms=repeat_started_at + 420))
+        self.assertEqual(player.title_menu_index, 2)
         player.handle_event(pygame.event.Event(pygame.JOYHATMOTION, hat=0, value=(0, 0)))
-        player.handle_event(pygame.event.Event(pygame.JOYHATMOTION, hat=0, value=(0, -1)))
+        self.assertTrue(player.handle_controller_repeat())
         self.assertEqual(player.title_menu_index, 2)
         player.handle_event(pygame.event.Event(pygame.JOYBUTTONDOWN, button=0))
         self.assertEqual(player.overlay_mode, "load")

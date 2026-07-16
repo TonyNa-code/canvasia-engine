@@ -312,6 +312,7 @@ try:
         build_controller_control_group,
         build_controller_input_state,
         build_controller_status,
+        get_controller_repeat_actions,
         get_controller_action_key_attr,
         translate_controller_input,
     )
@@ -320,6 +321,7 @@ except ImportError:  # pragma: no cover - exported native packages import from t
         build_controller_control_group,
         build_controller_input_state,
         build_controller_status,
+        get_controller_repeat_actions,
         get_controller_action_key_attr,
         translate_controller_input,
     )
@@ -14008,6 +14010,9 @@ class NativeRuntimePlayer:
         if event.type == getattr(pygame, "JOYBUTTONDOWN", None):
             event_kind = "button_down"
             payload["button"] = getattr(event, "button", None)
+        elif event.type == getattr(pygame, "JOYBUTTONUP", None):
+            event_kind = "button_up"
+            payload["button"] = getattr(event, "button", None)
         elif event.type == getattr(pygame, "JOYHATMOTION", None):
             event_kind = "hat_motion"
             payload["hat"] = getattr(event, "hat", 0)
@@ -14022,10 +14027,23 @@ class NativeRuntimePlayer:
         translated = translate_controller_input(
             event_kind,
             state=self.controller_input_state,
+            now_ms=self.pygame.time.get_ticks(),
             **payload,
         )
         self.controller_input_state = translated["state"]
         for action in translated["actions"]:
+            if not self.handle_controller_action(action):
+                return False
+        return True
+
+    def handle_controller_repeat(self, now_ms: object | None = None) -> bool:
+        timestamp = self.pygame.time.get_ticks() if now_ms is None else now_ms
+        repeated = get_controller_repeat_actions(
+            self.controller_input_state,
+            now_ms=timestamp,
+        )
+        self.controller_input_state = repeated["state"]
+        for action in repeated["actions"]:
             if not self.handle_controller_action(action):
                 return False
         return True
@@ -14572,6 +14590,8 @@ class NativeRuntimePlayer:
                 running = self.handle_event(event)
                 if not running:
                     break
+            if running:
+                running = self.handle_controller_repeat()
             self.update_stage_visual_effects(dt_seconds)
             self.update_particle_effect(dt_seconds)
             self.update_voice_playback_state()

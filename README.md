@@ -63,7 +63,7 @@ The project already includes a visual editor, export pipeline, native runtime pr
 - Localization coverage checks with Markdown / CSV exports and safe CSV re-import for character, chapter, scene, and story-card translations
 - Canvasia Assistant with local template mode and optional creator-provided OpenAI, DeepSeek, Qwen, Kimi, Zhipu GLM, or compatible API providers
 - Optional OpenAI Image asset generation for backgrounds, sprites, CGs, and UI materials, with style-hint presets, sprite-to-character expression binding, prompt/model validation, and local-only API key handling
-- Formal save/load and quick save/load with scene thumbnails in the native Runtime, plus system menu, text history, autoplay, skip-read, voice replay, and controller-first navigation across Web and native Runtime title screens, choices, saves, settings, history, and archives
+- Formal save/load and quick save/load with scene thumbnails in the native Runtime, plus system menu, text history, autoplay, skip-read, voice replay, and controller-first navigation with directional hold-repeat across Web and native Runtime title screens, choices, saves, settings, history, and archives
 - Entry reachability route analysis for broken links, orphan scenes, unreachable scenes, branch depth, ending candidates, playable ending path previews, exportable route QA checklists, and a pre-release route playtest workbook with branch / ending execution lanes
 - Scene pacing advisor for playable-scene rhythm, long text, flat presentation, fake choices, missing outro cues, and next-action guidance in production boards
 - Full screenplay / production-script exports for proofreading, voice recording, translation handoff, archival review, and Ren'Py draft migration notes

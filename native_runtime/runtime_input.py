@@ -4,6 +4,8 @@ from collections.abc import Iterable
 
 
 CONTROLLER_AXIS_DEAD_ZONE = 0.62
+CONTROLLER_REPEAT_DELAY_MS = 420
+CONTROLLER_REPEAT_INTERVAL_MS = 95
 CONTROLLER_BUTTON_ACTIONS = {
     0: "confirm",
     1: "back",
@@ -13,7 +15,13 @@ CONTROLLER_BUTTON_ACTIONS = {
     5: "auto",
     6: "skip",
     7: "system",
+    12: "up",
+    13: "down",
+    14: "left",
+    15: "right",
 }
+CONTROLLER_DIRECTION_ACTIONS = ("up", "down", "left", "right")
+CONTROLLER_DIRECTION_ACTION_SET = frozenset(CONTROLLER_DIRECTION_ACTIONS)
 CONTROLLER_ACTION_KEY_ATTRS = {
     "up": "K_UP",
     "down": "K_DOWN",
@@ -28,7 +36,7 @@ CONTROLLER_ACTION_KEY_ATTRS = {
 
 
 def build_controller_input_state() -> dict:
-    return {"axes": {}, "hats": {}}
+    return {"axes": {}, "hats": {}, "buttons": {}, "repeat": {}}
 
 
 def _clone_controller_input_state(state: dict | None) -> dict:
@@ -36,6 +44,12 @@ def _clone_controller_input_state(state: dict | None) -> dict:
     return {
         "axes": dict(source.get("axes") or {}),
         "hats": dict(source.get("hats") or {}),
+        "buttons": dict(source.get("buttons") or {}),
+        "repeat": {
+            str(action): dict(entry)
+            for action, entry in dict(source.get("repeat") or {}).items()
+            if isinstance(entry, dict)
+        },
     }
 
 
@@ -58,6 +72,76 @@ def _normalize_hat(value: object) -> tuple[int, int]:
     return (_axis_direction(value[0], 0.5), _axis_direction(value[1], 0.5))
 
 
+def _safe_input_timing(value: object, fallback: int, minimum: int = 0) -> int:
+    try:
+        numeric_value = int(float(value))
+    except (TypeError, ValueError, OverflowError):
+        numeric_value = int(fallback)
+    return max(int(minimum), numeric_value)
+
+
+def _get_active_controller_directions(state: dict) -> list[str]:
+    directions: list[str] = []
+
+    def append_direction(action: str) -> None:
+        if action in CONTROLLER_DIRECTION_ACTION_SET and action not in directions:
+            directions.append(action)
+
+    for button_index in sorted(dict(state.get("buttons") or {})):
+        if state["buttons"].get(button_index):
+            append_direction(CONTROLLER_BUTTON_ACTIONS.get(button_index, ""))
+
+    axes = dict(state.get("axes") or {})
+    horizontal = int(axes.get(0) or 0)
+    vertical = int(axes.get(1) or 0)
+    if horizontal:
+        append_direction("left" if horizontal < 0 else "right")
+    if vertical:
+        append_direction("up" if vertical < 0 else "down")
+
+    for hat_index in sorted(dict(state.get("hats") or {})):
+        horizontal, vertical = _normalize_hat(state["hats"].get(hat_index))
+        if horizontal:
+            append_direction("left" if horizontal < 0 else "right")
+        if vertical:
+            append_direction("up" if vertical > 0 else "down")
+    return directions
+
+
+def get_controller_repeat_actions(
+    state: dict | None,
+    *,
+    now_ms: object,
+    repeat_delay_ms: object = CONTROLLER_REPEAT_DELAY_MS,
+    repeat_interval_ms: object = CONTROLLER_REPEAT_INTERVAL_MS,
+) -> dict:
+    next_state = _clone_controller_input_state(state)
+    timestamp = _safe_input_timing(now_ms, 0)
+    delay = _safe_input_timing(repeat_delay_ms, CONTROLLER_REPEAT_DELAY_MS, 100)
+    interval = _safe_input_timing(repeat_interval_ms, CONTROLLER_REPEAT_INTERVAL_MS, 40)
+    active_directions = _get_active_controller_directions(next_state)
+    next_repeat: dict[str, dict[str, int]] = {}
+    actions: list[str] = []
+
+    for action in active_directions:
+        previous_entry = next_state["repeat"].get(action)
+        if not isinstance(previous_entry, dict):
+            next_repeat[action] = {"startedAt": timestamp, "lastAt": timestamp}
+            continue
+        started_at = _safe_input_timing(previous_entry.get("startedAt"), timestamp)
+        last_at = _safe_input_timing(previous_entry.get("lastAt"), started_at)
+        should_repeat = timestamp - started_at >= delay and timestamp - last_at >= interval
+        next_repeat[action] = {
+            "startedAt": started_at,
+            "lastAt": timestamp if should_repeat else last_at,
+        }
+        if should_repeat:
+            actions.append(action)
+
+    next_state["repeat"] = next_repeat
+    return {"actions": actions, "state": next_state}
+
+
 def translate_controller_input(
     event_kind: str,
     *,
@@ -68,44 +152,52 @@ def translate_controller_input(
     axis_value: object = None,
     state: dict | None = None,
     dead_zone: float = CONTROLLER_AXIS_DEAD_ZONE,
+    now_ms: object = 0,
 ) -> dict:
     next_state = _clone_controller_input_state(state)
     actions: list[str] = []
     safe_kind = str(event_kind or "").strip().lower()
+    previous_directions = set(_get_active_controller_directions(next_state))
 
-    if safe_kind == "button_down":
+    if safe_kind in {"button_down", "button_up"}:
         try:
-            action = CONTROLLER_BUTTON_ACTIONS.get(int(button))
+            button_index = int(button)
+            action = CONTROLLER_BUTTON_ACTIONS.get(button_index)
         except (TypeError, ValueError):
+            button_index = -1
             action = None
-        if action:
+        if action in CONTROLLER_DIRECTION_ACTION_SET:
+            next_state["buttons"][button_index] = safe_kind == "button_down"
+        elif action and safe_kind == "button_down":
             actions.append(action)
     elif safe_kind == "hat_motion":
         try:
             hat_index = int(hat or 0)
         except (TypeError, ValueError):
             hat_index = 0
-        previous = _normalize_hat(next_state["hats"].get(hat_index))
         current = _normalize_hat(hat_value)
         next_state["hats"][hat_index] = current
-        if current[0] and current[0] != previous[0]:
-            actions.append("left" if current[0] < 0 else "right")
-        if current[1] and current[1] != previous[1]:
-            actions.append("up" if current[1] > 0 else "down")
     elif safe_kind == "axis_motion":
         try:
             axis_index = int(axis)
         except (TypeError, ValueError):
             axis_index = -1
         if axis_index in {0, 1}:
-            previous_direction = int(next_state["axes"].get(axis_index) or 0)
             current_direction = _axis_direction(axis_value, dead_zone)
             next_state["axes"][axis_index] = current_direction
-            if current_direction and current_direction != previous_direction:
-                if axis_index == 0:
-                    actions.append("left" if current_direction < 0 else "right")
-                else:
-                    actions.append("up" if current_direction < 0 else "down")
+
+    current_directions = _get_active_controller_directions(next_state)
+    new_directions = [action for action in current_directions if action not in previous_directions]
+    actions.extend(new_directions)
+    timestamp = _safe_input_timing(now_ms, 0)
+    next_state["repeat"] = {
+        action: (
+            {"startedAt": timestamp, "lastAt": timestamp}
+            if action in new_directions or not isinstance(next_state["repeat"].get(action), dict)
+            else dict(next_state["repeat"][action])
+        )
+        for action in current_directions
+    }
 
     return {"actions": actions, "state": next_state}
 
@@ -144,7 +236,7 @@ def build_controller_control_group() -> dict:
             {
                 "keys": ("左摇杆 / 十字键",),
                 "label": "移动选择",
-                "detail": "可操作标题页、选项、系统菜单、存档、设置、历史和资料馆。",
+                "detail": "按住可连续移动，可快速浏览标题页、选项、存档、设置、历史和资料馆长列表。",
             },
             {
                 "keys": ("A / ×", "B / ○"),
