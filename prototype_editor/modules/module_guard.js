@@ -86,6 +86,7 @@
     { globalName: "CanvasiaEditorBeginnerTutorial", script: "./modules/beginner_tutorial.js", label: "新手教程" },
     { globalName: "CanvasiaEditorProjectCenter", script: "./modules/project_center.js", label: "项目中心" },
     { globalName: "CanvasiaEditorCreativeAssistant", script: "./modules/creative_assistant.js", label: "创作助手" },
+    { globalName: "CanvasiaEditorCreativeAssistantPanel", script: "./modules/creative_assistant_panel.js", label: "创作助手面板" },
     { globalName: "CanvasiaEditorMode", script: "./modules/editor_mode.js", label: "编辑器模式" },
     { globalName: "CanvasiaEditorReleaseVersion", script: "./modules/release_version.js", label: "发布版本" },
     { globalName: "CanvasiaEditorProjectDoctor", script: "./modules/project_doctor.js", label: "项目医生" },

@@ -97,6 +97,7 @@ class FrontendEntrypointModuleTests(unittest.TestCase):
             "./modules/beginner_tutorial.js",
             "./modules/project_center.js",
             "./modules/creative_assistant.js",
+            "./modules/creative_assistant_panel.js",
             "./modules/editor_mode.js",
             "./modules/release_version.js",
             "./modules/project_doctor.js",

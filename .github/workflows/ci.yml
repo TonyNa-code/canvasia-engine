@@ -108,6 +108,7 @@ jobs:
             tests/test_frontend_command_palette_module.py \
             tests/test_frontend_module_guard_module.py \
             tests/test_frontend_creative_assistant_module.py \
+            tests/test_frontend_creative_assistant_panel_module.py \
             tests/test_frontend_dashboard_primary_actions_module.py \
             tests/test_frontend_dashboard_production_module.py \
             tests/test_frontend_dashboard_search_panel_module.py \
@@ -230,6 +231,7 @@ jobs:
           node --check prototype_editor/modules/export_file_names.js
           node --check prototype_editor/modules/export_report_descriptions.js
           node --check prototype_editor/modules/creative_assistant.js
+          node --check prototype_editor/modules/creative_assistant_panel.js
           node --check prototype_editor/modules/director_cue_sheet.js
           node --check prototype_editor/modules/editor_filters.js
           node --check prototype_editor/modules/editor_mode.js
@@ -363,6 +365,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_module_guard_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_editor_common_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_creative_assistant_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_creative_assistant_panel_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_dashboard_primary_actions_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_dashboard_production_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_dashboard_search_panel_module.py' -v
