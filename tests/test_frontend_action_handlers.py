@@ -16,6 +16,7 @@ APP_PATH = EDITOR_DIR / "app.js"
 STYLES_PATH = EDITOR_DIR / "styles.css"
 PLAYER_PATH = ROOT_DIR / "export_player_template" / "player.js"
 RUNTIME_CONTROLS_PATH = ROOT_DIR / "export_player_template" / "runtime_controls.js"
+RUNTIME_GAMEPAD_PATH = ROOT_DIR / "export_player_template" / "runtime_gamepad.js"
 RUNTIME_SETTINGS_PATH = ROOT_DIR / "export_player_template" / "runtime_settings.js"
 RUNTIME_AUDIO_PATH = ROOT_DIR / "export_player_template" / "runtime_audio.js"
 RUNTIME_CHARACTER_MOTION_PATH = ROOT_DIR / "export_player_template" / "runtime_character_motion.js"
@@ -6231,7 +6232,7 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn('id="systemMenuOperationGuideButton"', player_html)
         self.assertIn('id="operationGuideDialog"', player_html)
         self.assertIn('id="operationGuideList"', player_html)
-        self.assertIn('import { renderOperationGuideGroups } from "./runtime_controls.js";', player_source)
+        self.assertIn('from "./runtime_controls.js"', player_source)
         self.assertIn("export const RUNTIME_SHORTCUT_GROUPS = Object.freeze", runtime_controls_source)
         self.assertIn("export function renderOperationGuideGroups", runtime_controls_source)
         self.assertIn("operationGuideOpen: false", player_source)
@@ -6240,12 +6241,38 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn('systemMenuOperationGuideButton: document.getElementById("systemMenuOperationGuideButton")', refs_block)
         self.assertIn("openOperationGuideDialog", init_block)
         self.assertIn("stopRuntimeAutoAdvance()", open_operation_guide)
-        self.assertIn("renderOperationGuideGroups()", render_operation_guide)
+        self.assertIn("renderOperationGuideGroups([", render_operation_guide)
+        self.assertIn("buildRuntimeGamepadControlGroup", render_operation_guide)
         self.assertIn('event.code === "F1"', handle_keydown)
         self.assertIn('event.shiftKey && event.code === "Slash"', handle_keydown)
-        self.assertIn("closeOperationGuideDialog()", handle_keydown)
+        self.assertIn("handleRuntimeModalKeydown", handle_keydown)
+        self.assertIn("close: closeOperationGuideDialog", handle_keydown)
+        self.assertIn("export function handleRuntimeModalKeydown", runtime_controls_source)
         self.assertIn(".operation-guide-list", player_css)
         self.assertIn(".operation-shortcut-keys kbd", player_css)
+
+    def test_web_runtime_gamepad_is_low_overhead_exported_and_product_wired(self) -> None:
+        player_html = (ROOT_DIR / "export_player_template" / "index.html").read_text(encoding="utf-8")
+        player_source = PLAYER_PATH.read_text(encoding="utf-8")
+        runtime_gamepad_source = RUNTIME_GAMEPAD_PATH.read_text(encoding="utf-8")
+        player_css = (ROOT_DIR / "export_player_template" / "player.css").read_text(encoding="utf-8")
+        init_block = _extract_function_source(player_source, "init")
+        action_block = _extract_function_source(player_source, "handleRuntimeGamepadAction")
+        focus_root_block = _extract_function_source(player_source, "getRuntimeGamepadFocusRoot")
+
+        self.assertIn('from "./runtime_gamepad.js"', player_source)
+        self.assertIn('id="gamepadChip"', player_html)
+        self.assertIn("startRuntimeGamepadInput()", init_block)
+        self.assertIn("moveRuntimeGamepadFocus", action_block)
+        self.assertIn("toggleAutoPlay()", action_block)
+        self.assertIn("toggleSkipRead()", action_block)
+        self.assertIn("refs.startOverlay", focus_root_block)
+        self.assertIn("refs.choiceList", focus_root_block)
+        self.assertIn("RUNTIME_GAMEPAD_IDLE_POLL_INTERVAL_MS = 500", runtime_gamepad_source)
+        self.assertIn("RUNTIME_GAMEPAD_CONNECTED_POLL_INTERVAL_MS = 32", runtime_gamepad_source)
+        self.assertIn("translateRuntimeGamepads", runtime_gamepad_source)
+        self.assertIn("chooseDirectionalFocusTarget", runtime_gamepad_source)
+        self.assertIn('html[data-runtime-input="gamepad"]', player_css)
 
     def test_web_runtime_applies_project_playback_defaults_before_player_overrides(self) -> None:
         player_source = PLAYER_PATH.read_text(encoding="utf-8")

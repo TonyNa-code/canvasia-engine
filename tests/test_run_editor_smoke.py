@@ -3280,6 +3280,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / "runtime_conditions.js").is_file())
         self.assertTrue((build_dir / "runtime_choice_availability.js").is_file())
         self.assertTrue((build_dir / "runtime_controls.js").is_file())
+        self.assertTrue((build_dir / "runtime_gamepad.js").is_file())
         self.assertTrue((build_dir / "runtime_settings.js").is_file())
         self.assertTrue((build_dir / "runtime_i18n.js").is_file())
         self.assertTrue((build_dir / "runtime_audio.js").is_file())
@@ -3377,6 +3378,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["playerRuntimeStorage"], "runtime_storage.js")
         self.assertEqual(manifest["files"]["playerRuntimeVisualConstants"], "runtime_visual_constants.js")
         self.assertEqual(manifest["files"]["playerRuntimeControls"], "runtime_controls.js")
+        self.assertEqual(manifest["files"]["playerRuntimeGamepad"], "runtime_gamepad.js")
         self.assertEqual(manifest["files"]["playerRuntimeConditions"], "runtime_conditions.js")
         self.assertEqual(manifest["files"]["playerRuntimeChoiceAvailability"], "runtime_choice_availability.js")
         self.assertEqual(manifest["files"]["playerRuntimeSettings"], "runtime_settings.js")
@@ -3461,6 +3463,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 "runtime_storage.js",
                 "runtime_conditions.js",
                 "runtime_controls.js",
+                "runtime_gamepad.js",
                 "runtime_settings.js",
                 "runtime_i18n.js",
                 "runtime_audio.js",
@@ -4872,6 +4875,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / "app" / "runtime_conditions.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_choice_availability.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_controls.js").is_file())
+        self.assertTrue((build_dir / "app" / "runtime_gamepad.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_settings.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_i18n.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_audio.js").is_file())
@@ -4996,6 +5000,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 "app/runtime_storage.js",
                 "app/runtime_conditions.js",
                 "app/runtime_controls.js",
+                "app/runtime_gamepad.js",
                 "app/runtime_settings.js",
                 "app/runtime_i18n.js",
                 "app/runtime_audio.js",
@@ -5037,6 +5042,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / "app" / "runtime_visual_constants.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_conditions.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_controls.js").is_file())
+        self.assertTrue((build_dir / "app" / "runtime_gamepad.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_settings.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_i18n.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_audio.js").is_file())
@@ -5157,6 +5163,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 "app/runtime_storage.js",
                 "app/runtime_conditions.js",
                 "app/runtime_controls.js",
+                "app/runtime_gamepad.js",
                 "app/runtime_settings.js",
                 "app/runtime_i18n.js",
                 "app/runtime_audio.js",
@@ -5273,6 +5280,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / "app" / "runtime_visual_constants.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_conditions.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_controls.js").is_file())
+        self.assertTrue((build_dir / "app" / "runtime_gamepad.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_settings.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_i18n.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_audio.js").is_file())
@@ -5396,6 +5404,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 "app/runtime_storage.js",
                 "app/runtime_conditions.js",
                 "app/runtime_controls.js",
+                "app/runtime_gamepad.js",
                 "app/runtime_settings.js",
                 "app/runtime_i18n.js",
                 "app/runtime_audio.js",
@@ -5430,6 +5439,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_visual_constants.js").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_conditions.js").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_controls.js").is_file())
+        self.assertTrue((bundle_dir / "export_player_template" / "runtime_gamepad.js").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_settings.js").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_i18n.js").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_audio.js").is_file())
@@ -5472,14 +5482,25 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["editorPackage"]["bundleDirName"], run_editor.EDITOR_BUNDLE_DIR_NAME)
         self.assertIn("embeddedRuntime", manifest["editorPackage"])
         self.assertIn("commercialRelease", manifest["editorPackage"])
-        self.assertIn(export_result["embeddedRuntimeMode"], {run_editor.EDITOR_RUNTIME_SOURCE_CONDA_PACK, run_editor.EDITOR_RUNTIME_SOURCE_SYSTEM})
+        self.assertEqual(export_result["embeddedRuntimeMode"], run_editor.EDITOR_RUNTIME_SOURCE_PYTHON_BUILD_STANDALONE)
         if export_result["embeddedRuntimeIncluded"]:
-            self.assertTrue((bundle_dir / run_editor.EDITOR_RUNTIME_DIR_NAME / "bin" / "python3").is_file())
+            embedded_python_path = Path(export_result["embeddedRuntimePythonPath"])
+            self.assertTrue(embedded_python_path.is_file())
+            self.assertTrue(embedded_python_path.is_relative_to(bundle_dir / run_editor.EDITOR_RUNTIME_DIR_NAME))
+
+        with zipfile.ZipFile(export_result["archivePath"], "r") as archive:
+            archive_names = set(archive.namelist())
+        self.assertIn(f"{build_dir.name}/{manifest_path.name}", archive_names)
 
         if run_editor.should_build_editor_macos_app():
             self.assertTrue((build_dir / run_editor.EDITOR_MAC_APP_NAME).is_dir())
             self.assertTrue((build_dir / run_editor.EDITOR_MAC_APP_NAME / "Contents" / "Resources" / run_editor.EDITOR_BUNDLE_DIR_NAME / "run_editor.py").is_file())
             self.assertTrue((build_dir / run_editor.EDITOR_MAC_INSTALLER_NAME).is_file())
+            self.assertFalse((build_dir / ".editor_pkg_root").exists())
+            mac_launcher = (
+                build_dir / run_editor.EDITOR_MAC_APP_NAME / "Contents" / "MacOS" / run_editor.EDITOR_MAC_APP_EXECUTABLE
+            ).read_text(encoding="utf-8")
+            self.assertIn(f"{run_editor.EDITOR_RUNTIME_DIR_NAME}/python/bin/python3", mac_launcher)
 
     def test_editor_desktop_suite_build_smoke(self) -> None:
         export_result = run_editor.export_editor_desktop_suite_build()

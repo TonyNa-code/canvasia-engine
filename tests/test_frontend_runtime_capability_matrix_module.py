@@ -111,6 +111,7 @@ class FrontendRuntimeCapabilityMatrixModuleTests(unittest.TestCase):
         self.assertTrue(any("视频播放" in title for title in acceptance_titles))
         self.assertTrue(any("3D 场景背景" in title for title in acceptance_titles))
         self.assertTrue(any("live2d_pose" in title for title in acceptance_titles))
+        self.assertTrue(any("键鼠、手柄与断连回退" in title for title in acceptance_titles))
         self.assertEqual(payload["digest"]["status"], "blocked")
         issue_titles = [issue["title"] for issue in payload["matrix"]["issues"]]
         self.assertTrue(any("live2d_pose" in title for title in issue_titles))

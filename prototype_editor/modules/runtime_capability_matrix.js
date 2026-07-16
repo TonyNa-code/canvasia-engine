@@ -327,6 +327,15 @@
       relatedBlockTypes: usedRows.slice(0, 8).map((row) => row.type),
       source: "基础播放链",
     });
+    addItem({
+      id: "runtime-input-navigation",
+      target: "cross",
+      severity: "check",
+      title: "输入导航要验键鼠、手柄与断连回退",
+      detail: "在 Web / 桌面包和原生包各验证一次方向焦点、确认、返回、系统菜单、自动播放和历史文本；手柄断连后键盘与鼠标仍应立即可用。",
+      relatedBlockTypes: usedRows.slice(0, 8).map((row) => row.type),
+      source: "输入与无障碍",
+    });
 
     usedRows.forEach((row) => {
       if (row.overallStatus === "unknown" || row.overallStatus === "unsupported") {

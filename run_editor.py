@@ -184,6 +184,7 @@ EXPORT_PLAYER_SCRIPT_FILES = (
     "runtime_stage_images.js",
     "runtime_visual_constants.js",
     "runtime_controls.js",
+    "runtime_gamepad.js",
     "runtime_settings.js",
     "runtime_i18n.js",
     "runtime_audio.js",
@@ -6486,6 +6487,14 @@ def should_build_editor_macos_app() -> bool:
     return sys.platform == "darwin"
 
 
+def get_current_editor_platform_key() -> str:
+    if sys.platform == "darwin":
+        return EDITOR_PLATFORM_MACOS
+    if os.name == "nt":
+        return EDITOR_PLATFORM_WINDOWS
+    return EDITOR_PLATFORM_LINUX
+
+
 def get_editor_runtime_cache_root() -> Path:
     if sys.platform == "darwin":
         return Path.home() / "Library" / "Caches" / "CanvasiaEngine" / "editor_runtime"
@@ -6641,19 +6650,23 @@ def prepare_editor_embedded_runtime(bundle_dir: Path) -> dict:
     runtime_dir = bundle_dir / EDITOR_RUNTIME_DIR_NAME
 
     try:
-        archive_path, source_label = ensure_editor_runtime_archive_from_conda_pack()
-        python_path = extract_editor_runtime_archive(archive_path, runtime_dir)
-        return {
-            "included": True,
-            "mode": EDITOR_RUNTIME_SOURCE_CONDA_PACK,
-            "modeLabel": "内嵌 Python 运行时",
-            "pythonPath": str(python_path),
-            "runtimeDirPath": str(runtime_dir),
-            "sourceLabel": source_label,
-            "sourcePath": str(archive_path),
-            "warning": "",
-        }
-    except Exception as error:
+        return prepare_editor_portable_runtime(bundle_dir, get_current_editor_platform_key())
+    except Exception as portable_error:
+        try:
+            archive_path, source_label = ensure_editor_runtime_archive_from_conda_pack()
+            python_path = extract_editor_runtime_archive(archive_path, runtime_dir)
+            return {
+                "included": True,
+                "mode": EDITOR_RUNTIME_SOURCE_CONDA_PACK,
+                "modeLabel": "内嵌 Python 运行时",
+                "pythonPath": str(python_path),
+                "runtimeDirPath": str(runtime_dir),
+                "sourceLabel": source_label,
+                "sourcePath": str(archive_path),
+                "warning": f"预编译运行时不可用，已回退到 conda-pack：{portable_error}",
+            }
+        except Exception as conda_error:
+            error = f"预编译运行时不可用：{portable_error}；conda-pack 回退也不可用：{conda_error}"
         if runtime_dir.exists():
             shutil.rmtree(runtime_dir, ignore_errors=True)
         return {
@@ -7779,7 +7792,6 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 APP_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 BUNDLE_DIR="$APP_ROOT/Resources/{EDITOR_BUNDLE_DIR_NAME}"
-EMBEDDED_PYTHON="$BUNDLE_DIR/{EDITOR_RUNTIME_DIR_NAME}/bin/python3"
 
 if [ ! -d "$BUNDLE_DIR" ]; then
   /usr/bin/osascript <<'APPLESCRIPT'
@@ -7788,10 +7800,17 @@ APPLESCRIPT
   exit 1
 fi
 
-if [ -x "$EMBEDDED_PYTHON" ]; then
-  cd "$BUNDLE_DIR"
-  exec "$EMBEDDED_PYTHON" run_editor.py
-fi
+for EMBEDDED_PYTHON in \
+  "$BUNDLE_DIR/{EDITOR_RUNTIME_DIR_NAME}/bin/python3" \
+  "$BUNDLE_DIR/{EDITOR_RUNTIME_DIR_NAME}/bin/python" \
+  "$BUNDLE_DIR/{EDITOR_RUNTIME_DIR_NAME}/python/bin/python3" \
+  "$BUNDLE_DIR/{EDITOR_RUNTIME_DIR_NAME}/python/bin/python"
+do
+  if [ -x "$EMBEDDED_PYTHON" ]; then
+    cd "$BUNDLE_DIR"
+    exec "$EMBEDDED_PYTHON" run_editor.py
+  fi
+done
 
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 if ! command -v python3 >/dev/null 2>&1; then
@@ -7819,33 +7838,30 @@ def build_macos_editor_installer(build_dir: Path, app_dir: Path, distribution_co
     if not pkgbuild_path:
         return None
 
-    installer_root = build_dir / ".editor_pkg_root"
-    applications_dir = installer_root / "Applications"
-    applications_dir.mkdir(parents=True, exist_ok=True)
-    staged_app_dir = applications_dir / app_dir.name
-    if staged_app_dir.exists():
-        shutil.rmtree(staged_app_dir, ignore_errors=True)
-    shutil.copytree(app_dir, staged_app_dir, symlinks=False)
-
     package_path = build_dir / EDITOR_MAC_INSTALLER_NAME
-    subprocess.run(
-        [
-            pkgbuild_path,
-            "--root",
-            str(installer_root),
-            "--identifier",
-            f"{distribution_config.get('bundleIdentifier') or 'com.canvasia.engine.editor'}.installer",
-            "--version",
-            EDITOR_PACKAGE_VERSION,
-            "--install-location",
-            "/",
-            str(package_path),
-        ],
-        check=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-    )
+    with tempfile.TemporaryDirectory(prefix="canvasia-editor-pkg-") as installer_temp_dir:
+        installer_root = Path(installer_temp_dir) / "root"
+        applications_dir = installer_root / "Applications"
+        applications_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(app_dir, applications_dir / app_dir.name, symlinks=False)
+        subprocess.run(
+            [
+                pkgbuild_path,
+                "--root",
+                str(installer_root),
+                "--identifier",
+                f"{distribution_config.get('bundleIdentifier') or 'com.canvasia.engine.editor'}.installer",
+                "--version",
+                EDITOR_PACKAGE_VERSION,
+                "--install-location",
+                "/",
+                str(package_path),
+            ],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
     return package_path
 
 
@@ -10301,6 +10317,7 @@ def export_web_build() -> dict:
             "playerRuntimeConditions": "runtime_conditions.js",
             "playerRuntimeChoiceAvailability": "runtime_choice_availability.js",
             "playerRuntimeControls": "runtime_controls.js",
+            "playerRuntimeGamepad": "runtime_gamepad.js",
             "playerRuntimeSettings": "runtime_settings.js",
             "playerRuntimeI18n": "runtime_i18n.js",
             "playerRuntimeAudio": "runtime_audio.js",
@@ -11431,6 +11448,7 @@ def export_windows_nwjs_build() -> dict:
             "appRuntimeConditions": "app/runtime_conditions.js",
             "appRuntimeChoiceAvailability": "app/runtime_choice_availability.js",
             "appRuntimeControls": "app/runtime_controls.js",
+            "appRuntimeGamepad": "app/runtime_gamepad.js",
             "appRuntimeSettings": "app/runtime_settings.js",
             "appRuntimeI18n": "app/runtime_i18n.js",
             "appRuntimeAudio": "app/runtime_audio.js",
@@ -11895,6 +11913,7 @@ def export_macos_nwjs_build() -> dict:
             "appRuntimeConditions": "app/runtime_conditions.js",
             "appRuntimeChoiceAvailability": "app/runtime_choice_availability.js",
             "appRuntimeControls": "app/runtime_controls.js",
+            "appRuntimeGamepad": "app/runtime_gamepad.js",
             "appRuntimeSettings": "app/runtime_settings.js",
             "appRuntimeI18n": "app/runtime_i18n.js",
             "appRuntimeAudio": "app/runtime_audio.js",
@@ -12366,6 +12385,7 @@ def export_linux_nwjs_build() -> dict:
             "appRuntimeConditions": "app/runtime_conditions.js",
             "appRuntimeChoiceAvailability": "app/runtime_choice_availability.js",
             "appRuntimeControls": "app/runtime_controls.js",
+            "appRuntimeGamepad": "app/runtime_gamepad.js",
             "appRuntimeSettings": "app/runtime_settings.js",
             "appRuntimeI18n": "app/runtime_i18n.js",
             "appRuntimeAudio": "app/runtime_audio.js",
@@ -12868,11 +12888,11 @@ def export_editor_desktop_build() -> dict:
         extra_notes=extra_notes,
     )
 
-    archive_path = Path(shutil.make_archive(str(build_dir), "zip", root_dir=build_dir.parent, base_dir=build_dir.name))
+    archive_name = f"{build_dir.name}.zip"
     manifest = build_editor_package_manifest(
         build_id=build_dir.name,
         target_label=target_label,
-        archive_name=archive_path.name,
+        archive_name=archive_name,
         includes_macos_app=bool(mac_app_path),
         includes_macos_installer=bool(mac_installer_path),
         runtime_info=embedded_runtime,
@@ -12881,6 +12901,7 @@ def export_editor_desktop_build() -> dict:
         windows_installer_result=windows_installer_result,
     )
     manifest_path = write_editor_package_manifest(build_dir, manifest)
+    archive_path = Path(shutil.make_archive(str(build_dir), "zip", root_dir=build_dir.parent, base_dir=build_dir.name))
 
     return {
         "target": EXPORT_TARGET_EDITOR_DESKTOP,

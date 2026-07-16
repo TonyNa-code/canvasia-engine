@@ -60,7 +60,9 @@ class ExportRuntimeCapabilityTests(unittest.TestCase):
         self.assertEqual(matrix["summary"]["unknownUsedTypeCount"], 1)
         self.assertGreaterEqual(matrix["summary"]["nativePartialCount"], 2)
         self.assertGreaterEqual(matrix["acceptance"]["summary"]["itemCount"], 4)
-        self.assertIn("runtime-video-sync", {item["id"] for item in matrix["acceptance"]["items"]})
+        acceptance_ids = {item["id"] for item in matrix["acceptance"]["items"]}
+        self.assertIn("runtime-video-sync", acceptance_ids)
+        self.assertIn("runtime-input-navigation", acceptance_ids)
         self.assertIn("character_stage_missing", {issue["code"] for issue in matrix["essentials"]["issues"]})
         self.assertIn("bgm_scope_missing", {issue["code"] for issue in matrix["essentials"]["issues"]})
         self.assertIn("# Runtime Export Demo Runtime 覆盖矩阵", markdown)

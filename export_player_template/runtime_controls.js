@@ -74,3 +74,22 @@ export function renderOperationGuideGroup(group) {
 export function renderOperationGuideGroups(groups = RUNTIME_SHORTCUT_GROUPS) {
   return groups.map(renderOperationGuideGroup).join("");
 }
+
+export function handleRuntimeModalKeydown(event, modalEntries, isTypingTarget = () => false) {
+  const activeEntry = (Array.isArray(modalEntries) ? modalEntries : []).find((entry) => {
+    const isOpen = typeof entry?.isOpen === "function" ? entry.isOpen() : entry?.isOpen;
+    return Boolean(isOpen);
+  });
+  if (!activeEntry) {
+    return false;
+  }
+  if (event?.code === "Escape") {
+    event.preventDefault?.();
+    activeEntry.close?.();
+    return true;
+  }
+  if (!isTypingTarget(event?.target)) {
+    event?.preventDefault?.();
+  }
+  return true;
+}

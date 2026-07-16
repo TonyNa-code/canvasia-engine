@@ -1,4 +1,18 @@
-import { renderOperationGuideGroups } from "./runtime_controls.js";
+import {
+  RUNTIME_SHORTCUT_GROUPS,
+  handleRuntimeModalKeydown,
+  renderOperationGuideGroups,
+} from "./runtime_controls.js";
+import {
+  buildRuntimeGamepadControlGroup,
+  buildRuntimeGamepadKeyboardEvent,
+  buildRuntimeGamepadStatus,
+  chooseRuntimeGamepadConfirmTarget,
+  createRuntimeGamepadController,
+  adjustRuntimeGamepadControl,
+  getRuntimeFocusableElements,
+  moveRuntimeGamepadFocus,
+} from "./runtime_gamepad.js";
 import {
   cancelAudioFade,
   disposeAudio,
@@ -119,6 +133,7 @@ const refs = {
   creditsSkipButton: document.getElementById("creditsSkipButton"),
   sceneChip: document.getElementById("sceneChip"),
   musicChip: document.getElementById("musicChip"),
+  gamepadChip: document.getElementById("gamepadChip"),
   backgroundLabel: document.getElementById("backgroundLabel"),
   dialogHiddenHint: document.getElementById("dialogHiddenHint"),
   speakerName: document.getElementById("speakerName"),
@@ -397,6 +412,8 @@ const state = {
   runtimeScenePrefetchStatus: null,
   runtimeScenePrefetchedAssetIds: new Set(),
   localizationFallbacks: new Map(),
+  runtimeGamepad: null,
+  runtimeGamepadStatus: buildRuntimeGamepadStatus(),
 };
 
 const activeSfxAudios = new Set();
@@ -531,12 +548,15 @@ function init() {
   refs.menuVoiceDuckingRatioRange?.addEventListener("input", handleVoiceDuckingRatioChange);
   refs.menuVoiceDuckingToggleButton?.addEventListener("click", toggleVoiceDuckingEnabled);
   document.addEventListener("keydown", handleGlobalKeydown);
+  document.addEventListener("pointerdown", () => setRuntimeInputMode("pointer"), { passive: true });
+  startRuntimeGamepadInput();
   window.addEventListener("beforeunload", finalizePlayerSession);
   window.addEventListener("beforeunload", stopMusic);
   window.addEventListener("beforeunload", stopMusicRoomPreview);
   window.addEventListener("beforeunload", stopVoiceReplayPreview);
   window.addEventListener("beforeunload", stopOneShotAudio);
   window.addEventListener("beforeunload", stopVoicePlayback);
+  window.addEventListener("beforeunload", stopRuntimeGamepadInput);
   startRuntimeAssetPreload();
   renderPlaybackControls();
   scheduleRuntimeUiThemeAutoRefresh();
@@ -1943,10 +1963,16 @@ function renderOperationGuideDialog() {
 
   refs.operationGuideDialog.hidden = !state.operationGuideOpen;
   refs.operationGuideDialog.classList.toggle("is-visible", state.operationGuideOpen);
+  const gamepadSummary = state.runtimeGamepadStatus.connected
+    ? ` 手柄已连接：${state.runtimeGamepadStatus.label}。`
+    : " 也可连接标准布局手柄操作。";
   refs.operationGuideDialogSummary.textContent = state.started
-    ? "这些操作会直接作用于当前试玩进度；打开本页时自动播放会先暂停，避免错过剧情。"
-    : "开始试玩前可以先看一眼操作方式。导出包可以直接用鼠标，也支持常见视觉小说快捷键。";
-  refs.operationGuideList.innerHTML = renderOperationGuideGroups();
+    ? `这些操作会直接作用于当前试玩进度；打开本页时自动播放会先暂停，避免错过剧情。${gamepadSummary}`
+    : `开始试玩前可以先看一眼操作方式。导出包支持鼠标、键盘和标准布局手柄。${gamepadSummary}`;
+  refs.operationGuideList.innerHTML = renderOperationGuideGroups([
+    ...RUNTIME_SHORTCUT_GROUPS,
+    buildRuntimeGamepadControlGroup(state.runtimeGamepadStatus),
+  ]);
 }
 
 function handleCharacterDialogClick(event) {
@@ -5833,232 +5859,174 @@ function resetPlaybackSettings() {
   }
 }
 
+function setRuntimeInputMode(mode) {
+  document.documentElement.dataset.runtimeInput = String(mode || "pointer");
+}
+
+function getRuntimeGamepadOverlayRoot() {
+  const overlayEntries = [
+    [state.saveConfirmOpen, refs.saveConfirmDialog],
+    [state.returnTitleConfirmOpen, refs.returnTitleDialog],
+    [state.operationGuideOpen, refs.operationGuideDialog],
+    [state.systemMenuOpen, refs.systemMenu],
+    [state.saveDialogOpen, refs.saveDialog],
+    [state.profileDialogOpen, refs.profileDialog],
+    [state.voiceReplayDialogOpen, refs.voiceReplayDialog],
+    [state.achievementDialogOpen, refs.achievementDialog],
+    [state.chapterDialogOpen, refs.chapterDialog],
+    [state.locationDialogOpen, refs.locationDialog],
+    [state.narrationDialogOpen, refs.narrationDialog],
+    [state.relationDialogOpen, refs.relationDialog],
+    [state.characterDialogOpen, refs.characterDialog],
+    [state.endingDialogOpen, refs.endingDialog],
+    [state.galleryDialogOpen, refs.galleryDialog],
+    [state.musicRoomDialogOpen, refs.musicRoomDialog],
+  ];
+  return overlayEntries.find(([isOpen, root]) => isOpen && root)?.[1] ?? null;
+}
+
+function getRuntimeGamepadFocusRoot() {
+  const overlayRoot = getRuntimeGamepadOverlayRoot();
+  if (overlayRoot) {
+    return overlayRoot;
+  }
+  if (!state.started || !refs.startOverlay?.hidden) {
+    return refs.startOverlay;
+  }
+  if (refs.choiceList?.querySelector("button:not([disabled])")) {
+    return refs.choiceList;
+  }
+  return refs.stageFrame ?? document.body;
+}
+
+function getRuntimeGamepadDefaultElement(root) {
+  const preferredElements = [];
+  if (root === refs.startOverlay) {
+    preferredElements.push(refs.startContinueButton, refs.startButton);
+  }
+  if (root === refs.choiceList) {
+    preferredElements.push(refs.choiceList?.querySelector("button:not([disabled])"));
+  }
+  return chooseRuntimeGamepadConfirmTarget(root, preferredElements, { documentRef: document });
+}
+
+function handleRuntimeGamepadAction(action) {
+  setRuntimeInputMode("gamepad");
+  if (["up", "down", "left", "right"].includes(action)) {
+    const focusRoot = getRuntimeGamepadFocusRoot();
+    if (!adjustRuntimeGamepadControl(action, focusRoot, { documentRef: document })) {
+      moveRuntimeGamepadFocus(focusRoot, action, { documentRef: document });
+    }
+    return;
+  }
+  if (action === "confirm") {
+    if (state.dialogHidden && state.started) {
+      showDialogPanel();
+      return;
+    }
+    const root = getRuntimeGamepadFocusRoot();
+    const target = getRuntimeGamepadDefaultElement(root);
+    if (target && !target.disabled) {
+      target.focus?.({ preventScroll: true });
+      target.click?.();
+    } else if (state.started) {
+      handleContinue();
+    }
+    return;
+  }
+  if (action === "back") {
+    if (getRuntimeGamepadOverlayRoot()) {
+      handleGlobalKeydown(buildRuntimeGamepadKeyboardEvent("Escape", document.activeElement ?? document.body));
+    } else if (state.started) {
+      openSystemMenu();
+    }
+    return;
+  }
+  if (action === "system") {
+    if (state.systemMenuOpen) {
+      closeSystemMenu();
+    } else if (state.started) {
+      openSystemMenu();
+    } else {
+      openOperationGuideDialog();
+    }
+    return;
+  }
+  if (action === "history") {
+    if (state.started && canStepRuntimeHistory(-1)) {
+      stepRuntimeHistory(-1);
+    }
+    return;
+  }
+  if (action === "auto") {
+    if (state.started) {
+      toggleAutoPlay();
+    }
+    return;
+  }
+  if (action === "skip" && state.started) {
+    toggleSkipRead();
+  }
+}
+
+function renderRuntimeGamepadStatus() {
+  if (refs.gamepadChip) {
+    refs.gamepadChip.hidden = !state.runtimeGamepadStatus.connected;
+    refs.gamepadChip.textContent = state.runtimeGamepadStatus.connected
+      ? `手柄 · ${state.runtimeGamepadStatus.names[0] ?? "已连接"}`
+      : "手柄：未连接";
+    refs.gamepadChip.title = state.runtimeGamepadStatus.label;
+  }
+  if (state.operationGuideOpen) {
+    renderOperationGuideDialog();
+  }
+}
+
+function startRuntimeGamepadInput() {
+  state.runtimeGamepad?.stop?.();
+  state.runtimeGamepad = createRuntimeGamepadController({
+    isActive: () => !document.hidden,
+    onAction: handleRuntimeGamepadAction,
+    onStatusChange(status) {
+      state.runtimeGamepadStatus = status;
+      renderRuntimeGamepadStatus();
+    },
+  });
+  state.runtimeGamepadStatus = state.runtimeGamepad.start();
+  renderRuntimeGamepadStatus();
+}
+
+function stopRuntimeGamepadInput() {
+  state.runtimeGamepad?.stop?.();
+  state.runtimeGamepad = null;
+}
+
 function handleGlobalKeydown(event) {
+  if (!event.runtimeGamepad) {
+    setRuntimeInputMode("keyboard");
+  }
   if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) {
     return;
   }
 
-  if (state.operationGuideOpen && event.code === "Escape") {
-    event.preventDefault();
-    closeOperationGuideDialog();
-    return;
-  }
-
-  if (state.operationGuideOpen) {
-    if (isKeyboardTypingTarget(event.target)) {
-      return;
-    }
-    event.preventDefault();
-    return;
-  }
-
-  if (state.profileDialogOpen && event.code === "Escape") {
-    event.preventDefault();
-    closeProfileDialog();
-    return;
-  }
-
-  if (state.profileDialogOpen) {
-    if (isKeyboardTypingTarget(event.target)) {
-      return;
-    }
-    event.preventDefault();
-    return;
-  }
-
-  if (state.voiceReplayDialogOpen && event.code === "Escape") {
-    event.preventDefault();
-    closeVoiceReplayDialog();
-    return;
-  }
-
-  if (state.voiceReplayDialogOpen) {
-    if (isKeyboardTypingTarget(event.target)) {
-      return;
-    }
-    event.preventDefault();
-    return;
-  }
-
-  if (state.achievementDialogOpen && event.code === "Escape") {
-    event.preventDefault();
-    closeAchievementDialog();
-    return;
-  }
-
-  if (state.achievementDialogOpen) {
-    if (isKeyboardTypingTarget(event.target)) {
-      return;
-    }
-    event.preventDefault();
-    return;
-  }
-
-  if (state.chapterDialogOpen && event.code === "Escape") {
-    event.preventDefault();
-    closeChapterDialog();
-    return;
-  }
-
-  if (state.chapterDialogOpen) {
-    if (isKeyboardTypingTarget(event.target)) {
-      return;
-    }
-    event.preventDefault();
-    return;
-  }
-
-  if (state.locationDialogOpen && event.code === "Escape") {
-    event.preventDefault();
-    closeLocationDialog();
-    return;
-  }
-
-  if (state.locationDialogOpen) {
-    if (isKeyboardTypingTarget(event.target)) {
-      return;
-    }
-    event.preventDefault();
-    return;
-  }
-
-  if (state.narrationDialogOpen && event.code === "Escape") {
-    event.preventDefault();
-    closeNarrationDialog();
-    return;
-  }
-
-  if (state.narrationDialogOpen) {
-    if (isKeyboardTypingTarget(event.target)) {
-      return;
-    }
-    event.preventDefault();
-    return;
-  }
-
-  if (state.relationDialogOpen && event.code === "Escape") {
-    event.preventDefault();
-    closeRelationDialog();
-    return;
-  }
-
-  if (state.relationDialogOpen) {
-    if (isKeyboardTypingTarget(event.target)) {
-      return;
-    }
-    event.preventDefault();
-    return;
-  }
-
-  if (state.characterDialogOpen && event.code === "Escape") {
-    event.preventDefault();
-    closeCharacterDialog();
-    return;
-  }
-
-  if (state.characterDialogOpen) {
-    if (isKeyboardTypingTarget(event.target)) {
-      return;
-    }
-    event.preventDefault();
-    return;
-  }
-
-  if (state.galleryDialogOpen && event.code === "Escape") {
-    event.preventDefault();
-    closeGalleryDialog();
-    return;
-  }
-
-  if (state.galleryDialogOpen) {
-    if (isKeyboardTypingTarget(event.target)) {
-      return;
-    }
-    event.preventDefault();
-    return;
-  }
-
-  if (state.musicRoomDialogOpen && event.code === "Escape") {
-    event.preventDefault();
-    closeMusicRoomDialog();
-    return;
-  }
-
-  if (state.musicRoomDialogOpen) {
-    if (isKeyboardTypingTarget(event.target)) {
-      return;
-    }
-    event.preventDefault();
-    return;
-  }
-
-  if (state.endingDialogOpen && event.code === "Escape") {
-    event.preventDefault();
-    closeEndingDialog();
-    return;
-  }
-
-  if (state.endingDialogOpen) {
-    if (isKeyboardTypingTarget(event.target)) {
-      return;
-    }
-    event.preventDefault();
-    return;
-  }
-
-  if (state.saveConfirmOpen && event.code === "Escape") {
-    event.preventDefault();
-    closeSaveConfirmDialog();
-    return;
-  }
-
-  if (state.saveConfirmOpen) {
-    if (isKeyboardTypingTarget(event.target)) {
-      return;
-    }
-    event.preventDefault();
-    return;
-  }
-
-  if (state.returnTitleConfirmOpen && event.code === "Escape") {
-    event.preventDefault();
-    closeReturnTitleDialog();
-    return;
-  }
-
-  if (state.returnTitleConfirmOpen) {
-    if (isKeyboardTypingTarget(event.target)) {
-      return;
-    }
-    event.preventDefault();
-    return;
-  }
-
-  if (state.systemMenuOpen && event.code === "Escape") {
-    event.preventDefault();
-    closeSystemMenu();
-    return;
-  }
-
-  if (state.systemMenuOpen) {
-    if (isKeyboardTypingTarget(event.target)) {
-      return;
-    }
-    event.preventDefault();
-    return;
-  }
-
-  if (state.saveDialogOpen && event.code === "Escape") {
-    event.preventDefault();
-    closeSaveDialog();
-    return;
-  }
-
-  if (state.saveDialogOpen) {
-    if (isKeyboardTypingTarget(event.target)) {
-      return;
-    }
-    event.preventDefault();
+  if (handleRuntimeModalKeydown(event, [
+    { isOpen: state.operationGuideOpen, close: closeOperationGuideDialog },
+    { isOpen: state.profileDialogOpen, close: closeProfileDialog },
+    { isOpen: state.voiceReplayDialogOpen, close: closeVoiceReplayDialog },
+    { isOpen: state.achievementDialogOpen, close: closeAchievementDialog },
+    { isOpen: state.chapterDialogOpen, close: closeChapterDialog },
+    { isOpen: state.locationDialogOpen, close: closeLocationDialog },
+    { isOpen: state.narrationDialogOpen, close: closeNarrationDialog },
+    { isOpen: state.relationDialogOpen, close: closeRelationDialog },
+    { isOpen: state.characterDialogOpen, close: closeCharacterDialog },
+    { isOpen: state.galleryDialogOpen, close: closeGalleryDialog },
+    { isOpen: state.musicRoomDialogOpen, close: closeMusicRoomDialog },
+    { isOpen: state.endingDialogOpen, close: closeEndingDialog },
+    { isOpen: state.saveConfirmOpen, close: closeSaveConfirmDialog },
+    { isOpen: state.returnTitleConfirmOpen, close: closeReturnTitleDialog },
+    { isOpen: state.systemMenuOpen, close: closeSystemMenu },
+    { isOpen: state.saveDialogOpen, close: closeSaveDialog },
+  ], isKeyboardTypingTarget)) {
     return;
   }
 

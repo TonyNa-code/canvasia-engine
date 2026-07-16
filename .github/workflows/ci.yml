@@ -150,6 +150,8 @@ jobs:
             tests/test_frontend_route_analyzer_module.py \
             tests/test_frontend_route_testing_report_module.py \
             tests/test_frontend_runtime_conditions_module.py \
+            tests/test_frontend_runtime_controls_module.py \
+            tests/test_frontend_runtime_gamepad_module.py \
             tests/test_frontend_runtime_audio_module.py \
             tests/test_frontend_runtime_data_module.py \
             tests/test_frontend_runtime_storage_module.py \
@@ -301,6 +303,7 @@ jobs:
           node --check export_player_template/runtime_storage.js
           node --check export_player_template/runtime_visual_constants.js
           node --check export_player_template/runtime_controls.js
+          node --check export_player_template/runtime_gamepad.js
           node --check export_player_template/runtime_settings.js
           node --check export_player_template/runtime_i18n.js
           node --check export_player_template/runtime_audio.js
@@ -404,6 +407,8 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_route_analyzer_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_route_testing_report_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_conditions_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_runtime_controls_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_runtime_gamepad_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_choice_availability_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_choice_availability_editor_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_audio_module.py' -v

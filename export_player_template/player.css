@@ -5244,3 +5244,18 @@ html[data-game-ui-motion="low"] .stage-image-card.is-leaving {
 .choice-button.is-locked span {
   color: color-mix(in srgb, var(--runtime-danger, #d58989) 70%, var(--runtime-muted, #9aa9bd));
 }
+
+.runtime-gamepad-chip {
+  max-width: min(38vw, 320px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html[data-runtime-input="gamepad"] :is(button, [href], input, select, textarea, [tabindex]):focus {
+  outline: 3px solid color-mix(in srgb, var(--runtime-accent, #67a4ff) 84%, white);
+  outline-offset: 3px;
+  box-shadow:
+    0 0 0 6px color-mix(in srgb, var(--runtime-accent, #67a4ff) 20%, transparent),
+    0 10px 28px color-mix(in srgb, var(--runtime-accent, #67a4ff) 22%, transparent);
+}

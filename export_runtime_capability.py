@@ -248,6 +248,18 @@ def build_runtime_acceptance_checklist(rows: list[dict], summary: dict) -> dict:
             "relatedBlockTypes": [row["type"] for row in used_rows[:8]],
         }
     )
+    add_item(
+        {
+            "id": "runtime-input-navigation",
+            "target": "cross",
+            "targetLabel": "Web / 原生",
+            "severity": "check",
+            "severityLabel": "点测",
+            "title": "输入导航要验键鼠、手柄与断连回退",
+            "detail": "在 Web / 桌面包和原生包各验证方向焦点、确认、返回、系统菜单、自动播放和历史文本；手柄断连后键盘与鼠标仍应立即可用。",
+            "relatedBlockTypes": [row["type"] for row in used_rows[:8]],
+        }
+    )
 
     used_types = {row["type"] for row in used_rows}
     for row in used_rows:

@@ -1680,6 +1680,84 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
         finally:
             player_page.close()
 
+    def test_exported_player_gamepad_can_start_navigate_and_close_system_menu(self) -> None:
+        self.open_project_by_title("心跳时差")
+        player_url = self.export_web_build()
+        player_page = self.context.new_page()
+        player_page.add_init_script(
+            """
+            window.__canvasiaTestGamepad = {
+              id: "Canvasia Test Controller",
+              index: 0,
+              connected: true,
+              mapping: "standard",
+              axes: [0, 0, 0, 0],
+              buttons: Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 })),
+              timestamp: 0,
+            };
+            Object.defineProperty(navigator, "getGamepads", {
+              configurable: true,
+              value: () => [window.__canvasiaTestGamepad],
+            });
+            """
+        )
+
+        def press_gamepad_button(button_index: int) -> None:
+            player_page.evaluate(
+                """(index) => {
+                  const button = window.__canvasiaTestGamepad.buttons[index];
+                  button.pressed = true;
+                  button.touched = true;
+                  button.value = 1;
+                  window.__canvasiaTestGamepad.timestamp += 1;
+                  window.dispatchEvent(new Event("gamepadconnected"));
+                }""",
+                button_index,
+            )
+            player_page.wait_for_timeout(90)
+            player_page.evaluate(
+                """(index) => {
+                  const button = window.__canvasiaTestGamepad.buttons[index];
+                  button.pressed = false;
+                  button.touched = false;
+                  button.value = 0;
+                  window.__canvasiaTestGamepad.timestamp += 1;
+                }""",
+                button_index,
+            )
+            player_page.wait_for_timeout(90)
+
+        try:
+            player_page.goto(player_url, wait_until="domcontentloaded")
+            player_page.locator("#startOverlay").wait_for(state="visible", timeout=20000)
+            player_page.locator("#gamepadChip").wait_for(state="visible", timeout=5000)
+            self.assertIn("Canvasia Test Controller", player_page.locator("#gamepadChip").inner_text())
+
+            press_gamepad_button(0)
+            player_page.locator("#startOverlay").wait_for(state="hidden", timeout=10000)
+
+            press_gamepad_button(0)
+            self.assertEqual(player_page.evaluate("document.activeElement?.id || ''"), "continueButton")
+
+            press_gamepad_button(7)
+            player_page.locator("#systemMenu").wait_for(state="visible", timeout=10000)
+
+            press_gamepad_button(13)
+            focused_id = player_page.evaluate("document.activeElement?.id || ''")
+            self.assertTrue(focused_id)
+            self.assertTrue(
+                player_page.evaluate("document.querySelector('#systemMenu')?.contains(document.activeElement)")
+            )
+            self.assertEqual(
+                player_page.evaluate("document.documentElement.dataset.runtimeInput"),
+                "gamepad",
+            )
+
+            press_gamepad_button(1)
+            player_page.locator("#systemMenu").wait_for(state="hidden", timeout=10000)
+        finally:
+            player_page.close()
+
     def test_exported_player_sample_project_can_open_archive_dialogs(self) -> None:
         self.open_project_by_title("心跳时差")
         player_url = self.export_web_build()
