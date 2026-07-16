@@ -1722,7 +1722,11 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
             )
             player_page.wait_for_timeout(90)
 
-        def hold_gamepad_button(button_index: int, hold_ms: int = 680) -> None:
+        def hold_gamepad_button_until(
+            button_index: int,
+            condition: str,
+            timeout_ms: int = 5000,
+        ) -> None:
             player_page.evaluate(
                 """(index) => {
                   const button = window.__canvasiaTestGamepad.buttons[index];
@@ -1734,18 +1738,20 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
                 }""",
                 button_index,
             )
-            player_page.wait_for_timeout(hold_ms)
-            player_page.evaluate(
-                """(index) => {
-                  const button = window.__canvasiaTestGamepad.buttons[index];
-                  button.pressed = false;
-                  button.touched = false;
-                  button.value = 0;
-                  window.__canvasiaTestGamepad.timestamp += 1;
-                }""",
-                button_index,
-            )
-            player_page.wait_for_timeout(140)
+            try:
+                player_page.wait_for_function(condition, timeout=timeout_ms)
+            finally:
+                player_page.evaluate(
+                    """(index) => {
+                      const button = window.__canvasiaTestGamepad.buttons[index];
+                      button.pressed = false;
+                      button.touched = false;
+                      button.value = 0;
+                      window.__canvasiaTestGamepad.timestamp += 1;
+                    }""",
+                    button_index,
+                )
+                player_page.wait_for_timeout(140)
 
         try:
             player_page.goto(player_url, wait_until="domcontentloaded")
@@ -1783,7 +1789,10 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
                   });
                 }"""
             )
-            hold_gamepad_button(13)
+            hold_gamepad_button_until(
+                13,
+                "() => new Set(window.__canvasiaFocusTrail || []).size >= 2",
+            )
             focus_trail = player_page.evaluate("window.__canvasiaFocusTrail || []")
             self.assertGreaterEqual(len(set(focus_trail)), 2)
 
