@@ -158,6 +158,28 @@ except ImportError:  # pragma: no cover - exported native packages import from t
     )
 
 try:
+    from .runtime_visual_comfort import (
+        VISUAL_COMFORT_MODES,
+        get_visual_comfort_label,
+        scale_visual_flash,
+        scale_visual_motion,
+        scale_visual_transition_ms,
+    )
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_visual_comfort import (
+        VISUAL_COMFORT_MODES,
+        get_visual_comfort_label,
+        scale_visual_flash,
+        scale_visual_motion,
+        scale_visual_transition_ms,
+    )
+
+try:
+    from .runtime_settings_overlay import render_runtime_settings_overlay as render_runtime_settings_overlay_panel
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_settings_overlay import render_runtime_settings_overlay as render_runtime_settings_overlay_panel
+
+try:
     from .runtime_voice_mixer import (
         collect_voice_mixer_entries,
         get_safe_voice_profile_id,
@@ -686,6 +708,7 @@ TITLE_MENU_ITEMS = [
 SETTINGS_MENU_ITEMS = [
     ("themeMode", "界面主题"),
     ("displayMode", "显示模式"),
+    ("visualComfort", "视觉舒适度"),
     ("textSpeed", "文字速度"),
     ("language", "语言"),
     ("textScalePercent", "文字大小"),
@@ -10138,6 +10161,11 @@ class NativeRuntimePlayer:
             options = list(RUNTIME_DISPLAY_MODES)
             current_index = options.index(current) if current in options else 0
             self.runtime_settings["displayMode"] = options[(current_index + direction) % len(options)]
+        elif setting_key == "visualComfort":
+            current = str(self.runtime_settings.get("visualComfort") or "standard")
+            options = list(VISUAL_COMFORT_MODES)
+            current_index = options.index(current) if current in options else 0
+            self.runtime_settings["visualComfort"] = options[(current_index + direction) % len(options)]
         elif setting_key == "textSpeed":
             current = str(self.runtime_settings.get("textSpeed") or "normal")
             options = list(TEXT_SPEED_PRESETS.keys())
@@ -10202,6 +10230,8 @@ class NativeRuntimePlayer:
             label_map = {"windowed": "窗口", "fullscreen": "全屏"}
             selected = str(self.runtime_settings.get("displayMode") or "windowed")
             return label_map.get(selected, selected)
+        if setting_key == "visualComfort":
+            return get_visual_comfort_label(self.runtime_settings.get("visualComfort"))
         if setting_key == "textSpeed":
             speed_key = str(self.runtime_settings.get("textSpeed") or "normal")
             return TEXT_SPEED_LABELS.get(speed_key, speed_key)
@@ -10687,7 +10717,10 @@ class NativeRuntimePlayer:
         previous_id = str(previous_asset_id or "").strip()
         next_id = str(self.stage_background_asset_id or "").strip()
         transition = get_safe_basic_transition(block.get("transition"))
-        duration_ms = get_safe_transition_duration_ms(block.get("transitionDurationMs"))
+        duration_ms = scale_visual_transition_ms(
+            get_safe_transition_duration_ms(block.get("transitionDurationMs")),
+            self.runtime_settings.get("visualComfort"),
+        )
         if not previous_id or previous_id == next_id or transition == "none" or duration_ms <= 0:
             self.background_transition = None
             return
@@ -10700,12 +10733,21 @@ class NativeRuntimePlayer:
         }
 
     def get_character_transition_state(self, block: dict, direction: str = "in") -> dict | None:
-        return build_native_transition_state(
+        transition = build_native_transition_state(
             block.get("transition"),
             block.get("transitionDurationMs"),
             self.get_runtime_ticks_ms(),
             direction,
         )
+        if not transition:
+            return None
+        duration_ms = scale_visual_transition_ms(
+            transition.get("durationMs"),
+            self.runtime_settings.get("visualComfort"),
+        )
+        if duration_ms <= 0:
+            return None
+        return {**transition, "durationMs": duration_ms}
 
     def prune_finished_native_transitions(self) -> None:
         now_ms = self.get_runtime_ticks_ms()
@@ -10953,6 +10995,14 @@ class NativeRuntimePlayer:
                 layer_id = str((result.get("motion") or {}).get("layerId") or "").strip()
                 if layer_id:
                     motion = result.get("motion")
+                    if motion:
+                        motion = {
+                            **motion,
+                            "durationMs": scale_visual_transition_ms(
+                                motion.get("durationMs"),
+                                self.runtime_settings.get("visualComfort"),
+                            ),
+                        }
                     if motion and int(motion.get("durationMs") or 0) > 0:
                         self.stage_image_motions[layer_id] = motion
                     else:
@@ -10995,6 +11045,13 @@ class NativeRuntimePlayer:
                         block,
                         self.get_runtime_ticks_ms(),
                     )
+                    motion = {
+                        **motion,
+                        "durationMs": scale_visual_transition_ms(
+                            motion.get("durationMs"),
+                            self.runtime_settings.get("visualComfort"),
+                        ),
+                    }
                     self.visible_characters[character_id] = {
                         **motion["targetState"],
                         "transition": None,
@@ -12005,7 +12062,10 @@ class NativeRuntimePlayer:
         if not self.screen_shake_effect:
             return (0, 0)
         intensity = str(self.screen_shake_effect.get("intensity") or "medium")
-        distance = SHAKE_DISTANCE.get(intensity, SHAKE_DISTANCE["medium"])
+        distance = scale_visual_motion(
+            SHAKE_DISTANCE.get(intensity, SHAKE_DISTANCE["medium"]),
+            self.runtime_settings.get("visualComfort"),
+        )
         phase = self.runtime_elapsed_seconds * 74.0
         return (int(math.sin(phase) * distance), int(math.cos(phase * 1.31) * distance * 0.55))
 
@@ -12170,7 +12230,13 @@ class NativeRuntimePlayer:
             intensity = str(self.screen_flash_effect.get("intensity") or "medium")
             remaining = float(self.screen_flash_effect.get("remaining") or 0.0)
             duration = max(0.001, float(self.screen_flash_effect.get("durationSeconds") or 0.72))
-            alpha = int(FLASH_ALPHA.get(intensity, FLASH_ALPHA["medium"]) * clamp(remaining / duration, 0.0, 1.0))
+            alpha = int(
+                scale_visual_flash(
+                    FLASH_ALPHA.get(intensity, FLASH_ALPHA["medium"]),
+                    self.runtime_settings.get("visualComfort"),
+                )
+                * clamp(remaining / duration, 0.0, 1.0)
+            )
             flash_surface = self.pygame.Surface((self.width, self.height), self.pygame.SRCALPHA)
             flash_surface.fill((*color, max(0, min(255, alpha))))
             self.screen.blit(flash_surface, (0, 0))
@@ -13554,6 +13620,7 @@ class NativeRuntimePlayer:
                 "title": "体验设置",
                 "lines": [
                     f"主题：{self.get_setting_value_label('themeMode')} · 显示：{self.get_setting_value_label('displayMode')}",
+                    f"视觉舒适度：{self.get_setting_value_label('visualComfort')}",
                     f"语言：{self.get_setting_value_label('language')} · 文字：{self.get_setting_value_label('textSpeed')}",
                     f"大小：{self.get_setting_value_label('textScalePercent')} · 自动：{self.get_setting_value_label('autoPlayDelayMs')}",
                     f"文本框：{self.get_setting_value_label('dialogBoxOpacityPercent')} · 等语音：{self.get_setting_value_label('autoPlayWaitForVoice')}",
@@ -13708,64 +13775,7 @@ class NativeRuntimePlayer:
         self.screen.blit(self.font_ui.render(hint, True, palette["muted"]), (panel.left + 28, panel.bottom - 44))
 
     def render_settings_overlay(self) -> None:
-        palette = self.get_active_palette()
-        panel = self.pygame.Rect(0, 0, min(self.width - 72, 600), min(self.height - 48, 500))
-        panel.center = (self.width // 2, self.height // 2)
-        self.pygame.draw.rect(self.screen, (*palette["panel"], 246), panel, border_radius=28)
-        self.pygame.draw.rect(
-            self.screen,
-            with_alpha(palette["panelBorder"], 72),
-            panel,
-            2,
-            border_radius=28,
-        )
-        self.draw_game_ui_panel_frame(panel, "system")
-        self.screen.blit(self.font_title.render("体验设置", True, palette["text"]), (panel.left + 28, panel.top + 24))
-        self.screen.blit(
-            self.font_ui.render("主题 / 显示 / 语言 / 阅读辅助 / 文本框 / 自动播放 / 音量与语音焦点", True, palette["muted"]),
-            (panel.left + 28, panel.top + 58),
-        )
-
-        button_top = panel.top + 96
-        row_height = 44
-        available_height = max(row_height, panel.bottom - 70 - button_top)
-        visible_count = max(1, min(len(SETTINGS_MENU_ITEMS), available_height // row_height))
-        max_start = max(0, len(SETTINGS_MENU_ITEMS) - visible_count)
-        visible_start = max(0, min(max_start, self.settings_menu_index - visible_count + 1))
-        visible_items = SETTINGS_MENU_ITEMS[visible_start : visible_start + visible_count]
-        for offset, (setting_key, setting_label) in enumerate(visible_items):
-            index = visible_start + offset
-            row_rect = self.pygame.Rect(panel.left + 24, button_top + offset * row_height, panel.width - 48, 36)
-            is_active = index == self.settings_menu_index
-            self.pygame.draw.rect(
-                self.screen,
-                with_alpha(palette["accent"] if is_active else palette["panel"], 70 if is_active else 34),
-                row_rect,
-                border_radius=16,
-            )
-            self.pygame.draw.rect(
-                self.screen,
-                with_alpha(palette["accentAlt"] if is_active else palette["panelBorder"], 82 if is_active else 22),
-                row_rect,
-                1,
-                border_radius=16,
-            )
-            self.draw_game_ui_button_frame(row_rect, self.get_game_ui_button_state(row_rect, active=is_active))
-            self.screen.blit(self.font_ui.render(setting_label, True, palette["text"]), (row_rect.left + 14, row_rect.top + 10))
-            value_label = self.get_setting_value_label(setting_key)
-            value_surface = self.font_ui.render(value_label, True, palette["muted"])
-            self.screen.blit(value_surface, (row_rect.right - value_surface.get_width() - 48, row_rect.top + 10))
-            if setting_key in {"voiceMixer", "keyBindings"}:
-                self.screen.blit(self.font_ui.render("↵", True, palette["text"]), (row_rect.right - 28, row_rect.top + 9))
-            else:
-                self.screen.blit(self.font_ui.render("◀", True, palette["text"]), (row_rect.right - 32, row_rect.top + 9))
-                self.screen.blit(self.font_ui.render("▶", True, palette["text"]), (row_rect.right - 16, row_rect.top + 9))
-            self.overlay_hotspots.append({"kind": "settings-item", "value": setting_key, "index": index, "rect": row_rect})
-
-        range_label = f"{visible_start + 1}-{visible_start + len(visible_items)}/{len(SETTINGS_MENU_ITEMS)}"
-        self.screen.blit(self.font_ui.render(range_label, True, palette["muted"]), (panel.right - 96, panel.top + 62))
-        hint = "↑↓ 切换 · ←→ 调整 · Enter 切换 · Esc 返回"
-        self.screen.blit(self.font_ui.render(hint, True, palette["muted"]), (panel.left + 28, panel.bottom - 44))
+        render_runtime_settings_overlay_panel(self, SETTINGS_MENU_ITEMS, with_alpha)
 
     def render_voice_mixer_overlay(self) -> None:
         render_voice_mixer_overlay_panel(self)

@@ -92,6 +92,13 @@ import {
   sanitizePlaybackSettings as sanitizePlaybackSettingsBase,
 } from "./runtime_settings.js";
 import {
+  getSafeVisualComfortMode,
+  getVisualComfortLabel,
+  scaleVisualFlash,
+  scaleVisualMotion,
+  scaleVisualTransitionMs,
+} from "./runtime_visual_comfort.js";
+import {
   collectVoiceMixerEntries,
   createVoiceMixerController,
   getVoiceMixVolumeRatio,
@@ -182,6 +189,7 @@ const refs = {
   languageSelect: document.getElementById("languageSelect"),
   dialogThemeSelect: document.getElementById("dialogThemeSelect"),
   uiThemeSelect: document.getElementById("uiThemeSelect"),
+  visualComfortSelect: document.getElementById("visualComfortSelect"),
   bgmVolumeRange: document.getElementById("bgmVolumeRange"),
   bgmVolumeValue: document.getElementById("bgmVolumeValue"),
   sfxVolumeRange: document.getElementById("sfxVolumeRange"),
@@ -236,6 +244,7 @@ const refs = {
   menuLanguageSelect: document.getElementById("menuLanguageSelect"),
   menuDialogThemeSelect: document.getElementById("menuDialogThemeSelect"),
   menuUiThemeSelect: document.getElementById("menuUiThemeSelect"),
+  menuVisualComfortSelect: document.getElementById("menuVisualComfortSelect"),
   menuBgmVolumeRange: document.getElementById("menuBgmVolumeRange"),
   menuBgmVolumeValue: document.getElementById("menuBgmVolumeValue"),
   menuSfxVolumeRange: document.getElementById("menuSfxVolumeRange"),
@@ -499,6 +508,7 @@ function init() {
   refs.languageSelect?.addEventListener("change", handleLanguageChange);
   refs.dialogThemeSelect?.addEventListener("change", handleDialogThemeChange);
   refs.uiThemeSelect?.addEventListener("change", handleUiThemeModeChange);
+  refs.visualComfortSelect?.addEventListener("change", handleVisualComfortChange);
   refs.bgmVolumeRange?.addEventListener("input", handleBgmVolumeChange);
   refs.sfxVolumeRange?.addEventListener("input", handleSfxVolumeChange);
   refs.voiceVolumeRange?.addEventListener("input", handleVoiceVolumeChange);
@@ -565,6 +575,7 @@ function init() {
   refs.menuLanguageSelect?.addEventListener("change", handleLanguageChange);
   refs.menuDialogThemeSelect?.addEventListener("change", handleDialogThemeChange);
   refs.menuUiThemeSelect?.addEventListener("change", handleUiThemeModeChange);
+  refs.menuVisualComfortSelect?.addEventListener("change", handleVisualComfortChange);
   refs.menuBgmVolumeRange?.addEventListener("input", handleBgmVolumeChange);
   refs.menuSfxVolumeRange?.addEventListener("input", handleSfxVolumeChange);
   refs.menuVoiceVolumeRange?.addEventListener("input", handleVoiceVolumeChange);
@@ -5191,6 +5202,10 @@ function renderPlaybackControls(snapshot = getCurrentSnapshot()) {
     refs.uiThemeSelect.value = getSafeUiThemeMode(state.playback.uiThemeMode);
   }
 
+  if (refs.visualComfortSelect) {
+    refs.visualComfortSelect.value = getSafeVisualComfortMode(state.playback.visualComfort);
+  }
+
   if (refs.menuTextSpeedSelect) {
     refs.menuTextSpeedSelect.value = getSafeTextSpeed(state.playback.textSpeed);
   }
@@ -5203,6 +5218,10 @@ function renderPlaybackControls(snapshot = getCurrentSnapshot()) {
 
   if (refs.menuUiThemeSelect) {
     refs.menuUiThemeSelect.value = getSafeUiThemeMode(state.playback.uiThemeMode);
+  }
+
+  if (refs.menuVisualComfortSelect) {
+    refs.menuVisualComfortSelect.value = getSafeVisualComfortMode(state.playback.visualComfort);
   }
 
   if (refs.bgmVolumeRange) {
@@ -5312,6 +5331,7 @@ function renderPlaybackControls(snapshot = getCurrentSnapshot()) {
   keyBindingController?.render();
 
   applyRuntimeUiTheme(state.playback.uiThemeMode);
+  document.documentElement.dataset.visualComfort = getSafeVisualComfortMode(state.playback.visualComfort);
   renderRuntimeUiThemeButtons();
 
   if (refs.systemMenuButton) {
@@ -5389,6 +5409,17 @@ function handleUiThemeModeChange(event) {
   persistPlaybackSettings();
   applyRuntimeUiTheme(state.playback.uiThemeMode);
   renderPlaybackControls();
+}
+
+function handleVisualComfortChange(event) {
+  state.playback.visualComfort = getSafeVisualComfortMode(event.target.value);
+  persistPlaybackSettings();
+  document.documentElement.dataset.visualComfort = state.playback.visualComfort;
+  if (state.started && state.session) {
+    renderRuntime();
+  } else {
+    renderPlaybackControls();
+  }
 }
 
 function handleBgmVolumeChange(event) {
@@ -6449,14 +6480,14 @@ function getSystemMenuSummary() {
   const snapshot = getCurrentSnapshot();
 
   if (snapshot) {
-    return `当前停在：${getSaveSlotSummary({ session: state.session })}`;
+    return `当前停在：${getSaveSlotSummary({ session: state.session })} · ${getVisualComfortLabel(state.playback.visualComfort)}`;
   }
 
   if (state.autoResume) {
     return `当前还没进入试玩，上次停留位置：${getSaveSlotSummary(state.autoResume)}`;
   }
 
-  return "这里统一管理正式存档、快速存档、设置，以及返回标题页。";
+  return `这里统一管理存档与设置。视觉舒适度：${getVisualComfortLabel(state.playback.visualComfort)}。`;
 }
 
 function openSystemMenu() {
@@ -7936,6 +7967,7 @@ function renderChoiceButtons(snapshot) {
 
 function renderStageVisual(snapshot) {
   const visualState = snapshot.visualState;
+  const visualComfortMode = getSafeVisualComfortMode(state.playback.visualComfort);
   const backgroundAsset = data.assetsById.get(visualState.backgroundAssetId);
   const backgroundUrl = getAssetUrl(backgroundAsset?.id);
 
@@ -7945,12 +7977,16 @@ function renderStageVisual(snapshot) {
   const backgroundTransition = visualState.backgroundTransitionEvent;
   refs.backgroundLayer.style.setProperty(
     "--background-transition-ms",
-    `${getSafeTransitionDurationMs(backgroundTransition?.durationMs)}ms`
+    `${scaleVisualTransitionMs(getSafeTransitionDurationMs(backgroundTransition?.durationMs), visualComfortMode)}ms`
   );
   refs.backgroundLayer.dataset.transition = getSafeTransition(backgroundTransition?.transition ?? "none");
   refs.backgroundLayer.classList.remove("is-transitioning", "transition-fade");
   void refs.backgroundLayer.offsetWidth;
-  if (backgroundTransition && getSafeTransition(backgroundTransition.transition) !== "none") {
+  if (
+    backgroundTransition &&
+    scaleVisualTransitionMs(getSafeTransitionDurationMs(backgroundTransition.durationMs), visualComfortMode) > 0 &&
+    getSafeTransition(backgroundTransition.transition) !== "none"
+  ) {
     refs.backgroundLayer.classList.add("is-transitioning", `transition-${getSafeTransition(backgroundTransition.transition)}`);
   }
   refs.particleLayer.innerHTML = renderParticleEffectLayer(visualState.particleEffect, visualState);
@@ -8025,8 +8061,11 @@ function renderSpriteCard(
   const isGhostHide = characterState.__ghostMode === "hide";
   const transition = characterTransitionEvent ? getSafeTransition(characterTransitionEvent.transition) : "none";
   const transitionDurationMs = characterTransitionEvent
-    ? getSafeTransitionDurationMs(characterTransitionEvent.durationMs)
-    : getSafeTransitionDurationMs();
+    ? scaleVisualTransitionMs(
+        getSafeTransitionDurationMs(characterTransitionEvent.durationMs),
+        state.playback.visualComfort
+      )
+    : scaleVisualTransitionMs(getSafeTransitionDurationMs(), state.playback.visualComfort);
   const isMoving =
     characterTransitionEvent?.mode === "move" &&
     characterTransitionEvent.characterId === characterState.characterId;
@@ -9958,27 +9997,40 @@ function combineFilterCss(...parts) {
 }
 
 function applyStageScreenEffects(visualState, currentBlock = null) {
-  refs.stageFrame.classList.toggle("is-shaking", Boolean(visualState.screenShake));
+  const visualComfortMode = getSafeVisualComfortMode(state.playback.visualComfort);
+  const shakeDistance = visualState.screenShake
+    ? scaleVisualMotion(getShakeDistance(visualState.screenShake.intensity), visualComfortMode)
+    : 0;
+  refs.stageFrame.classList.toggle("is-shaking", Boolean(visualState.screenShake) && shakeDistance > 0);
 
-  if (visualState.screenShake) {
-    refs.stageFrame.style.setProperty("--shake-distance", `${getShakeDistance(visualState.screenShake.intensity)}px`);
+  if (visualState.screenShake && shakeDistance > 0) {
+    refs.stageFrame.style.setProperty("--shake-distance", `${shakeDistance}px`);
     refs.stageFrame.style.setProperty(
       "--shake-duration",
-      `${getEffectDurationSeconds(visualState.screenShake.duration)}s`
+      `${scaleVisualTransitionMs(
+        getEffectDurationSeconds(visualState.screenShake.duration) * 1000,
+        visualComfortMode
+      ) / 1000}s`
     );
   } else {
     refs.stageFrame.style.removeProperty("--shake-distance");
     refs.stageFrame.style.removeProperty("--shake-duration");
   }
 
-  if (visualState.screenFlash) {
+  const flashOpacity = visualState.screenFlash
+    ? scaleVisualFlash(getFlashOpacity(visualState.screenFlash.intensity), visualComfortMode)
+    : 0;
+  if (visualState.screenFlash && flashOpacity > 0) {
     refs.flashLayer.hidden = false;
     refs.flashLayer.classList.add("is-active");
     refs.flashLayer.style.setProperty("--flash-rgb", getFlashColorRgb(visualState.screenFlash.color));
-    refs.flashLayer.style.setProperty("--flash-opacity", String(getFlashOpacity(visualState.screenFlash.intensity)));
+    refs.flashLayer.style.setProperty("--flash-opacity", String(flashOpacity));
     refs.flashLayer.style.setProperty(
       "--flash-duration",
-      `${getEffectDurationSeconds(visualState.screenFlash.duration)}s`
+      `${scaleVisualTransitionMs(
+        getEffectDurationSeconds(visualState.screenFlash.duration) * 1000,
+        visualComfortMode
+      ) / 1000}s`
     );
   } else {
     refs.flashLayer.hidden = true;
@@ -9993,7 +10045,13 @@ function applyStageScreenEffects(visualState, currentBlock = null) {
   const fadeDuration = fadeBlock ? getSafeEffectDuration(fadeBlock.duration) : visualState.screenFade?.duration;
 
   refs.fadeLayer.style.setProperty("--fade-rgb", getFadeColorRgb(fadeColor ?? "black"));
-  refs.fadeLayer.style.setProperty("--fade-duration", `${getEffectDurationSeconds(fadeDuration ?? "medium")}s`);
+  refs.fadeLayer.style.setProperty(
+    "--fade-duration",
+    `${scaleVisualTransitionMs(
+      getEffectDurationSeconds(fadeDuration ?? "medium") * 1000,
+      visualComfortMode
+    ) / 1000}s`
+  );
   refs.fadeLayer.classList.toggle("is-visible", Boolean(visualState.screenFade));
 }
 

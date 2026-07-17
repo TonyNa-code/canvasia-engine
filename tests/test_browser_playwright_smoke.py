@@ -1675,6 +1675,40 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
         finally:
             player_page.close()
 
+    def test_exported_player_visual_comfort_persists_and_syncs_system_menu(self) -> None:
+        self.create_blank_project("浏览器烟测项目_VisualComfort")
+        self.create_first_chapter()
+        player_url = self.export_web_build()
+
+        player_page = self.context.new_page()
+        try:
+            player_page.goto(player_url, wait_until="domcontentloaded")
+            player_page.locator("#visualComfortSelect").select_option("static")
+            player_page.wait_for_function(
+                "() => document.documentElement.dataset.visualComfort === 'static'"
+            )
+
+            player_page.reload(wait_until="domcontentloaded")
+            player_page.locator("#visualComfortSelect").wait_for(timeout=20000)
+            self.assertEqual(player_page.locator("#visualComfortSelect").input_value(), "static")
+            self.assertEqual(
+                player_page.evaluate("document.documentElement.dataset.visualComfort"),
+                "static",
+            )
+
+            player_page.locator("#startButton").click()
+            player_page.locator("#startOverlay").wait_for(state="hidden", timeout=15000)
+            player_page.locator("#systemMenuButton").click()
+            player_page.locator("#systemMenu").wait_for(state="visible", timeout=10000)
+            player_page.locator("#menuVisualComfortSelect").select_option("gentle")
+            player_page.wait_for_function(
+                "() => document.documentElement.dataset.visualComfort === 'gentle'"
+            )
+            self.assertEqual(player_page.locator("#visualComfortSelect").input_value(), "gentle")
+            self.assertEqual(player_page.locator("#menuVisualComfortSelect").input_value(), "gentle")
+        finally:
+            player_page.close()
+
     def test_exported_player_voice_mixer_persists_character_volume_and_mute(self) -> None:
         self.open_project_by_title("心跳时差")
         player_url = self.export_web_build()

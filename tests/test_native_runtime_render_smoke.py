@@ -151,6 +151,7 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
             {
                 "themeMode": "mystery",
                 "displayMode": "cinema",
+                "visualComfort": "strobe",
                 "textSpeed": "FAST",
                 "language": "ja-jp",
                 "textScalePercent": 999,
@@ -169,6 +170,7 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
 
         self.assertEqual(settings["themeMode"], DEFAULT_RUNTIME_PLAYER_SETTINGS["themeMode"])
         self.assertEqual(settings["displayMode"], DEFAULT_RUNTIME_PLAYER_SETTINGS["displayMode"])
+        self.assertEqual(settings["visualComfort"], DEFAULT_RUNTIME_PLAYER_SETTINGS["visualComfort"])
         self.assertEqual(settings["textSpeed"], "fast")
         self.assertEqual(settings["language"], "ja-JP")
         self.assertEqual(settings["textScalePercent"], 125)
@@ -4014,6 +4016,9 @@ class NativeRuntimeRenderSmokeTests(unittest.TestCase):
         self.assertEqual(player.runtime_settings["dialogBoxOpacityPercent"], 80)
         player.adjust_runtime_setting("autoPlayWaitForVoice", 1)
         self.assertEqual(player.runtime_settings["autoPlayWaitForVoice"], "on")
+        player.adjust_runtime_setting("visualComfort", 1)
+        self.assertEqual(player.runtime_settings["visualComfort"], "gentle")
+        self.assertEqual(player.get_setting_value_label("visualComfort"), "柔和模式")
         voice_mixer_entries = player.get_voice_mixer_entries()
         self.assertGreaterEqual(len(voice_mixer_entries), 1)
         player.open_voice_mixer_overlay()
@@ -4228,6 +4233,33 @@ class NativeRuntimeRenderSmokeTests(unittest.TestCase):
         self.assertIsNone(player.background_transition)
         self.assertEqual(player.leaving_characters, {})
         self.assertNotIn("transition", player.visible_characters["heroine"])
+
+        player.runtime_settings["visualComfort"] = "gentle"
+        player.start_background_transition(
+            "title_background",
+            {"transition": "fade", "transitionDurationMs": 420},
+        )
+        self.assertEqual(player.background_transition["durationMs"], 231)
+        gentle_transition = player.get_character_transition_state(
+            {"transition": "slide_left", "transitionDurationMs": 420},
+            "in",
+        )
+        self.assertEqual(gentle_transition["durationMs"], 231)
+
+        player.runtime_settings["visualComfort"] = "static"
+        player.start_background_transition(
+            "title_background",
+            {"transition": "fade", "transitionDurationMs": 420},
+        )
+        self.assertIsNone(player.background_transition)
+        self.assertIsNone(
+            player.get_character_transition_state(
+                {"transition": "slide_left", "transitionDurationMs": 420},
+                "in",
+            )
+        )
+        player.screen_shake_effect = {"intensity": "heavy"}
+        self.assertEqual(player.get_stage_shake_offset(), (0, 0))
 
     def test_long_dialogue_expands_panel_and_marks_overflow(self) -> None:
         data_path = self.write_game_data()

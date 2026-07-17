@@ -186,6 +186,7 @@ EXPORT_PLAYER_SCRIPT_FILES = (
     "runtime_controls.js",
     "runtime_gamepad.js",
     "runtime_settings.js",
+    "runtime_visual_comfort.js",
     "runtime_voice_mixer.js",
     "runtime_ui_skin.js",
     "runtime_i18n.js",
@@ -490,6 +491,8 @@ NATIVE_RUNTIME_INPUT_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_input.py"
 NATIVE_RUNTIME_KEY_BINDINGS_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_key_bindings.py"
 NATIVE_RUNTIME_I18N_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_i18n.py"
 NATIVE_RUNTIME_SETTINGS_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_player_settings.py"
+NATIVE_RUNTIME_SETTINGS_OVERLAY_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_settings_overlay.py"
+NATIVE_RUNTIME_VISUAL_COMFORT_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_visual_comfort.py"
 NATIVE_RUNTIME_VOICE_MIXER_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_voice_mixer.py"
 NATIVE_RUNTIME_VIEW_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_player_view.py"
 NATIVE_RUNTIME_CHARACTER_MOTION_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_character_motion.py"
@@ -515,6 +518,8 @@ NATIVE_RUNTIME_INPUT_NAME = "runtime_input.py"
 NATIVE_RUNTIME_KEY_BINDINGS_NAME = "runtime_key_bindings.py"
 NATIVE_RUNTIME_I18N_NAME = "runtime_i18n.py"
 NATIVE_RUNTIME_SETTINGS_NAME = "runtime_player_settings.py"
+NATIVE_RUNTIME_SETTINGS_OVERLAY_NAME = "runtime_settings_overlay.py"
+NATIVE_RUNTIME_VISUAL_COMFORT_NAME = "runtime_visual_comfort.py"
 NATIVE_RUNTIME_VOICE_MIXER_NAME = "runtime_voice_mixer.py"
 NATIVE_RUNTIME_VIEW_NAME = "runtime_player_view.py"
 NATIVE_RUNTIME_CHARACTER_MOTION_NAME = "runtime_character_motion.py"
@@ -580,6 +585,8 @@ NATIVE_RUNTIME_REQUIRED_MODULE_FILES = (
     (NATIVE_RUNTIME_KEY_BINDINGS_SOURCE, NATIVE_RUNTIME_KEY_BINDINGS_NAME),
     (NATIVE_RUNTIME_I18N_SOURCE, NATIVE_RUNTIME_I18N_NAME),
     (NATIVE_RUNTIME_SETTINGS_SOURCE, NATIVE_RUNTIME_SETTINGS_NAME),
+    (NATIVE_RUNTIME_SETTINGS_OVERLAY_SOURCE, NATIVE_RUNTIME_SETTINGS_OVERLAY_NAME),
+    (NATIVE_RUNTIME_VISUAL_COMFORT_SOURCE, NATIVE_RUNTIME_VISUAL_COMFORT_NAME),
     (NATIVE_RUNTIME_VOICE_MIXER_SOURCE, NATIVE_RUNTIME_VOICE_MIXER_NAME),
     (NATIVE_RUNTIME_VIEW_SOURCE, NATIVE_RUNTIME_VIEW_NAME),
     (NATIVE_RUNTIME_CHARACTER_MOTION_SOURCE, NATIVE_RUNTIME_CHARACTER_MOTION_NAME),
@@ -10335,6 +10342,7 @@ def export_web_build() -> dict:
             "playerRuntimeControls": "runtime_controls.js",
             "playerRuntimeGamepad": "runtime_gamepad.js",
             "playerRuntimeSettings": "runtime_settings.js",
+            "playerRuntimeVisualComfort": "runtime_visual_comfort.js",
             "playerRuntimeVoiceMixer": "runtime_voice_mixer.js",
             "playerRuntimeUiSkin": "runtime_ui_skin.js",
             "playerRuntimeI18n": "runtime_i18n.js",
@@ -11468,6 +11476,7 @@ def export_windows_nwjs_build() -> dict:
             "appRuntimeControls": "app/runtime_controls.js",
             "appRuntimeGamepad": "app/runtime_gamepad.js",
             "appRuntimeSettings": "app/runtime_settings.js",
+            "appRuntimeVisualComfort": "app/runtime_visual_comfort.js",
             "appRuntimeVoiceMixer": "app/runtime_voice_mixer.js",
             "appRuntimeUiSkin": "app/runtime_ui_skin.js",
             "appRuntimeI18n": "app/runtime_i18n.js",
@@ -11935,6 +11944,7 @@ def export_macos_nwjs_build() -> dict:
             "appRuntimeControls": "app/runtime_controls.js",
             "appRuntimeGamepad": "app/runtime_gamepad.js",
             "appRuntimeSettings": "app/runtime_settings.js",
+            "appRuntimeVisualComfort": "app/runtime_visual_comfort.js",
             "appRuntimeVoiceMixer": "app/runtime_voice_mixer.js",
             "appRuntimeUiSkin": "app/runtime_ui_skin.js",
             "appRuntimeI18n": "app/runtime_i18n.js",
@@ -12409,6 +12419,7 @@ def export_linux_nwjs_build() -> dict:
             "appRuntimeControls": "app/runtime_controls.js",
             "appRuntimeGamepad": "app/runtime_gamepad.js",
             "appRuntimeSettings": "app/runtime_settings.js",
+            "appRuntimeVisualComfort": "app/runtime_visual_comfort.js",
             "appRuntimeVoiceMixer": "app/runtime_voice_mixer.js",
             "appRuntimeUiSkin": "app/runtime_ui_skin.js",
             "appRuntimeI18n": "app/runtime_i18n.js",

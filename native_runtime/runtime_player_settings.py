@@ -12,10 +12,16 @@ try:
 except ImportError:  # pragma: no cover - exported native packages import from the same directory.
     from runtime_key_bindings import DEFAULT_RUNTIME_KEY_BINDINGS, sanitize_runtime_key_bindings
 
+try:
+    from .runtime_visual_comfort import get_safe_visual_comfort_mode
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_visual_comfort import get_safe_visual_comfort_mode
+
 
 DEFAULT_RUNTIME_PLAYER_SETTINGS = {
     "themeMode": "auto",
     "displayMode": "windowed",
+    "visualComfort": "standard",
     "textSpeed": "normal",
     "language": "",
     "textScalePercent": 100,
@@ -102,6 +108,7 @@ def sanitize_runtime_player_settings(value: dict | None) -> dict:
     return {
         "themeMode": theme_mode,
         "displayMode": display_mode,
+        "visualComfort": get_safe_visual_comfort_mode(source.get("visualComfort")),
         "textSpeed": get_safe_text_speed(source.get("textSpeed"), DEFAULT_RUNTIME_PLAYER_SETTINGS["textSpeed"]),
         "language": _normalize_language_code(source.get("language"), ""),
         "textScalePercent": _clamp_int(

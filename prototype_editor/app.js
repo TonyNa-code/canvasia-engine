@@ -213,6 +213,14 @@ const scriptVoiceTools = window.CanvasiaEditorScriptVoice;
 const voiceMatchReviewPanelTools = window.CanvasiaEditorVoiceMatchReviewPanel;
 const characterPresentationPanelTools = window.CanvasiaEditorCharacterPresentationPanel;
 const visualEffectTools = window.CanvasiaEditorVisualEffects;
+const runtimeVisualComfortTools = window.CanvasiaRuntimeVisualComfort;
+const {
+  getSafeVisualComfortMode,
+  getVisualComfortLabel,
+  scaleVisualFlash,
+  scaleVisualMotion,
+  scaleVisualTransitionMs,
+} = runtimeVisualComfortTools;
 const particleEffectTools = window.CanvasiaEditorParticleEffects;
 const {
   PARTICLE_PRESET_LABELS,
@@ -507,6 +515,7 @@ const PREVIEW_PLAYBACK_DEFAULTS = {
   textSpeed: "normal",
   dialogTheme: "project",
   uiThemeMode: "auto",
+  visualComfort: "standard",
   autoPlay: false,
   skipRead: false,
   voiceEnabled: true,
@@ -877,6 +886,7 @@ const refs = {
   previewMenuTextSpeedSelect: document.getElementById("previewMenuTextSpeedSelect"),
   previewMenuDialogThemeSelect: document.getElementById("previewMenuDialogThemeSelect"),
   previewMenuUiThemeSelect: document.getElementById("previewMenuUiThemeSelect"),
+  previewMenuVisualComfortSelect: document.getElementById("previewMenuVisualComfortSelect"),
   previewMenuBgmVolumeRange: document.getElementById("previewMenuBgmVolumeRange"),
   previewMenuBgmVolumeValue: document.getElementById("previewMenuBgmVolumeValue"),
   previewMenuSfxVolumeRange: document.getElementById("previewMenuSfxVolumeRange"),
@@ -5101,6 +5111,15 @@ function handleChange(event) {
     return;
   }
 
+  if (target.id === "previewMenuVisualComfortSelect") {
+    state.previewPlayback.visualComfort = getSafeVisualComfortMode(target.value);
+    persistPreviewPlaybackSettings();
+    renderPreviewScreen();
+    renderPreviewSystemMenu();
+    setSaveStatus(`试玩视觉舒适度已切到：${getVisualComfortLabel(state.previewPlayback.visualComfort)}`);
+    return;
+  }
+
   if (target.id === "creativeAssistantRememberKey") {
     state.creativeAssistantRememberKey = Boolean(target.checked);
     persistCreativeAssistantSettings();
@@ -6279,12 +6298,12 @@ function getPreviewSystemMenuSummary() {
   const snapshot = getCurrentPreviewSnapshot();
 
   if (!snapshot) {
-    return "当前还没有正在试玩的内容。开始试玩后，这里会统一管理存档、设置和返回起点。";
+    return `当前还没有正在试玩的内容。视觉舒适度：${getVisualComfortLabel(state.previewPlayback.visualComfort)}。`;
   }
 
   return `当前停在：${getPreviewSaveSlotSummary({
     session: ensurePreviewSession(),
-  })}`;
+  })} · ${getVisualComfortLabel(state.previewPlayback.visualComfort)}`;
 }
 
 function openPreviewSystemMenu() {
@@ -6573,6 +6592,10 @@ function renderPreviewSystemMenu() {
 
   if (refs.previewMenuUiThemeSelect) {
     refs.previewMenuUiThemeSelect.value = getSafeUiThemeMode(state.previewPlayback.uiThemeMode);
+  }
+
+  if (refs.previewMenuVisualComfortSelect) {
+    refs.previewMenuVisualComfortSelect.value = getSafeVisualComfortMode(state.previewPlayback.visualComfort);
   }
 
   if (refs.previewMenuBgmVolumeRange) {
@@ -18482,6 +18505,7 @@ function sanitizePreviewPlaybackSettings(source = {}) {
     textSpeed: getSafeTextSpeed(source.textSpeed ?? PREVIEW_PLAYBACK_DEFAULTS.textSpeed),
     dialogTheme: getSafeDialogTheme(source.dialogTheme ?? PREVIEW_PLAYBACK_DEFAULTS.dialogTheme),
     uiThemeMode: getSafeUiThemeMode(source.uiThemeMode ?? PREVIEW_PLAYBACK_DEFAULTS.uiThemeMode),
+    visualComfort: getSafeVisualComfortMode(source.visualComfort ?? PREVIEW_PLAYBACK_DEFAULTS.visualComfort),
     autoPlay: Boolean(source.autoPlay ?? PREVIEW_PLAYBACK_DEFAULTS.autoPlay),
     skipRead: Boolean(source.skipRead ?? PREVIEW_PLAYBACK_DEFAULTS.skipRead),
     voiceEnabled: source.voiceEnabled !== false,
@@ -22040,13 +22064,19 @@ function renderMiniStage(scene, blockIndex) {
 
 function renderStage(visualState, large, options = {}) {
   const backdrop = `${getBackdropStyle(visualState.backgroundAssetId, visualState.scene3dPreview)}; ${getDepthBlurBackdropStyle(visualState.depthBlur)}`;
+  const visualComfortMode = large
+    ? getSafeVisualComfortMode(state.previewPlayback.visualComfort)
+    : "standard";
   const backgroundTransition = visualState.backgroundTransitionEvent;
+  const backgroundTransitionDurationMs = backgroundTransition
+    ? scaleVisualTransitionMs(getSafeTransitionDurationMs(backgroundTransition.durationMs), visualComfortMode)
+    : 0;
   const backgroundTransitionClass =
-    backgroundTransition && getSafeTransition(backgroundTransition.transition) !== "none"
+    backgroundTransition && backgroundTransitionDurationMs > 0 && getSafeTransition(backgroundTransition.transition) !== "none"
       ? ` is-transitioning transition-${getSafeTransition(backgroundTransition.transition)}`
       : "";
   const backgroundTransitionStyle = backgroundTransition
-    ? `--background-transition-ms:${getSafeTransitionDurationMs(backgroundTransition.durationMs)}ms;`
+    ? `--background-transition-ms:${backgroundTransitionDurationMs}ms;`
     : "";
   const dialogPresentation = buildDialogBoxPresentation(options.dialogTheme, state.data?.project, state.data?.assetsById);
   const particleMarkup = renderParticleEffectLayer(
@@ -22058,9 +22088,9 @@ function renderStage(visualState, large, options = {}) {
   const stageImageBackMarkup = renderStageImageLayer(visualState, "back");
   const stageImageFrontMarkup = renderStageImageLayer(visualState, "front");
   const filterMarkup = renderStageFilterLayer(visualState.screenFilter);
-  const flashMarkup = renderScreenFlashLayer(visualState.screenFlash);
+  const flashMarkup = renderScreenFlashLayer(visualState.screenFlash, visualComfortMode);
   const fadeMarkup = renderStageFadeLayer(visualState.screenFade);
-  const shakePresentation = getScreenShakePresentation(visualState.screenShake);
+  const shakePresentation = getScreenShakePresentation(visualState.screenShake, visualComfortMode);
   const worldPresentation = getStageWorldPresentation(
     visualState.cameraZoom,
     visualState.cameraPan,
@@ -22071,7 +22101,8 @@ function renderStage(visualState, large, options = {}) {
     visualState.depthBlur,
     visualState.characterTransitionEvent,
     visualState.activeCharacterId,
-    visualState.characterEmphasisEvent
+    visualState.characterEmphasisEvent,
+    visualComfortMode
   );
   const dialogueText = options.dialogueTextOverride ?? visualState.dialogueText;
   const choiceMarkup =
@@ -22136,7 +22167,7 @@ function renderStage(visualState, large, options = {}) {
     .join("");
 
   return `
-    <div class="stage-scene ${shakePresentation.className}" ${shakePresentation.style ? `style="${shakePresentation.style}"` : ""}>
+    <div class="stage-scene ${shakePresentation.className}" data-visual-comfort="${visualComfortMode}" ${shakePresentation.style ? `style="${shakePresentation.style}"` : ""}>
       <div class="stage-world" ${worldPresentation.style ? `style="${worldPresentation.style}"` : ""}>
         <div
           class="stage-backdrop${backgroundTransitionClass}"
@@ -22194,7 +22225,8 @@ function renderStageCastMarkup(
   depthBlur,
   characterTransitionEvent,
   activeCharacterId,
-  characterEmphasisEvent
+  characterEmphasisEvent,
+  visualComfortMode = "standard"
 ) {
   const cards = [...(visibleCharacters ?? [])];
 
@@ -22217,7 +22249,8 @@ function renderStageCastMarkup(
         depthBlur,
         characterTransitionEvent,
         activeCharacterId,
-        characterEmphasisEvent
+        characterEmphasisEvent,
+        visualComfortMode
       )
     )
     .join("");
@@ -22228,7 +22261,8 @@ function renderStageSpriteCard(
   depthBlur,
   characterTransitionEvent,
   activeCharacterId,
-  characterEmphasisEvent
+  characterEmphasisEvent,
+  visualComfortMode = "standard"
 ) {
   const character = state.data.charactersById.get(characterState.characterId);
   const classes = ["sprite-card"];
@@ -22238,8 +22272,8 @@ function renderStageSpriteCard(
   const expressionBindingStatus = getCharacterExpressionBindingStatus(expression);
   const transition = characterTransitionEvent ? getSafeTransition(characterTransitionEvent.transition) : "none";
   const transitionDurationMs = characterTransitionEvent
-    ? getSafeTransitionDurationMs(characterTransitionEvent.durationMs)
-    : getSafeTransitionDurationMs();
+    ? scaleVisualTransitionMs(getSafeTransitionDurationMs(characterTransitionEvent.durationMs), visualComfortMode)
+    : scaleVisualTransitionMs(getSafeTransitionDurationMs(), visualComfortMode);
   const isMoving =
     characterTransitionEvent?.mode === "move" &&
     characterTransitionEvent.characterId === characterState.characterId;
@@ -22520,18 +22554,26 @@ function getParticleItemCount(particleEffect, large = false) {
   return clamp(large ? count + 8 : Math.max(count - 4, 6), 6, large ? 220 : 180);
 }
 
-function renderScreenFlashLayer(screenFlash) {
-  if (!screenFlash) {
+function renderScreenFlashLayer(screenFlash, visualComfortMode = "standard") {
+  const opacity = screenFlash
+    ? scaleVisualFlash(getFlashOpacity(screenFlash.intensity), visualComfortMode)
+    : 0;
+  if (!screenFlash || opacity <= 0) {
     return "";
   }
+
+  const durationMs = scaleVisualTransitionMs(
+    getEffectDurationSeconds(screenFlash.duration) * 1000,
+    visualComfortMode
+  );
 
   return `
     <div
       class="stage-flash-layer is-active"
       style="
         --flash-rgb:${getFlashColorRgb(screenFlash.color)};
-        --flash-opacity:${getFlashOpacity(screenFlash.intensity)};
-        --flash-duration:${getEffectDurationSeconds(screenFlash.duration)}s;
+        --flash-opacity:${opacity};
+        --flash-duration:${durationMs / 1000}s;
       "
       aria-hidden="true"
     ></div>
@@ -22608,8 +22650,11 @@ function getDepthBlurParticleStyle(depthBlur) {
   )};`;
 }
 
-function getScreenShakePresentation(screenShake) {
-  if (!screenShake) {
+function getScreenShakePresentation(screenShake, visualComfortMode = "standard") {
+  const distance = screenShake
+    ? scaleVisualMotion(getShakeDistance(screenShake.intensity), visualComfortMode)
+    : 0;
+  if (!screenShake || distance <= 0) {
     return {
       className: "",
       style: "",
@@ -22618,9 +22663,10 @@ function getScreenShakePresentation(screenShake) {
 
   return {
     className: "is-shaking",
-    style: `--shake-distance:${getShakeDistance(screenShake.intensity)}px; --shake-duration:${getEffectDurationSeconds(
-      screenShake.duration
-    )}s;`,
+    style: `--shake-distance:${distance}px; --shake-duration:${scaleVisualTransitionMs(
+      getEffectDurationSeconds(screenShake.duration) * 1000,
+      visualComfortMode
+    ) / 1000}s;`,
   };
 }
 

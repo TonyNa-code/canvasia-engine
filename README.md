@@ -74,6 +74,7 @@ The project already includes a visual editor, export pipeline, native runtime pr
 - Unlockable Content manifests with Markdown / CSV exports for CG gallery, music room, voice replay, character archive, location archive, narration archive, relationship archive, chapter replay, ending collection, and achievement coverage
 - Custom game UI skins, UI Kit binding, nine-slice textures, button states, layout controls, bound font assets with safe system-font fallback across Web / desktop playback, and visual novel textbox design
 - Persistent player-customizable keyboard controls across Web and native Runtime, with safe reserved shortcuts, automatic conflict swapping, reset-to-default controls, and live help labels
+- Persistent visual-comfort controls across editor preview, Web Runtime, and native Runtime: players can keep the authored presentation, soften motion / flashes / transition timing, or use a static mode that suppresses transient shake, flash, particle, breathing, and transition animation without rewriting project data
 - Extra galleries: CG replay, music room, character archive, location archive, narration archive, relationship archive, achievements, chapter replay, ending replay, and voice replay
 - Advanced particle presets, project particle libraries, camera effects, screen filters, flashes, shakes, and fade transitions
 - Live2D / 3D character and 3D scene asset import, plus native-runtime 3D inspection reports for glTF / GLB / VRM assets

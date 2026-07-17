@@ -92,7 +92,7 @@ class FrontendModuleGuardModuleTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 0, completed.stderr)
         payload = json.loads(completed.stdout)
         self.assertGreaterEqual(payload["keyCount"], 80)
-        self.assertEqual(payload["first"]["globalName"], "CanvasiaRuntimeConditions")
+        self.assertEqual(payload["first"]["globalName"], "CanvasiaRuntimeVisualComfort")
         self.assertEqual(payload["last"]["globalName"], "CanvasiaEditorCommandPalette")
         self.assertEqual(payload["missingFromEmpty"], payload["keyCount"])
         self.assertTrue(payload["complete"])

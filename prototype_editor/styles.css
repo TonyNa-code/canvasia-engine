@@ -5442,6 +5442,27 @@ html[data-ui-theme="light"] .music-range-health.is-danger .issue-tag {
   will-change: transform, opacity;
 }
 
+.stage-scene[data-visual-comfort="gentle"] .stage-particle-item {
+  animation-duration: calc(var(--particle-duration) * 1.65);
+}
+
+.stage-scene[data-visual-comfort="static"] .stage-particle-item,
+.stage-scene[data-visual-comfort="static"] .sprite-card.is-breathing .sprite-card-inner,
+.stage-scene[data-visual-comfort="static"] .sprite-card.is-speaking .sprite-card-inner {
+  animation-play-state: paused !important;
+}
+
+.stage-scene[data-visual-comfort="static"] .stage-backdrop.is-transitioning,
+.stage-scene[data-visual-comfort="static"] .sprite-card.is-entering,
+.stage-scene[data-visual-comfort="static"] .sprite-card.is-leaving,
+.stage-scene[data-visual-comfort="static"] .sprite-card.is-moving,
+.stage-scene[data-visual-comfort="static"] .stage-image-card.is-entering,
+.stage-scene[data-visual-comfort="static"] .stage-image-card.is-moving,
+.stage-scene[data-visual-comfort="static"] .stage-image-card.is-leaving {
+  animation: none !important;
+  transition: none !important;
+}
+
 .stage-particle-item.has-custom-image {
   background: transparent var(--particle-image) center / contain no-repeat !important;
   border-radius: 0 !important;

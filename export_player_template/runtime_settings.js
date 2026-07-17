@@ -3,6 +3,7 @@ import {
   DEFAULT_RUNTIME_KEY_BINDINGS,
   sanitizeRuntimeKeyBindings,
 } from "./runtime_controls.js";
+import { getSafeVisualComfortMode } from "./runtime_visual_comfort.js";
 
 export const TEXT_SPEED_LABELS = Object.freeze({
   slow: "慢一点",
@@ -30,6 +31,7 @@ export const PLAYBACK_DEFAULTS = Object.freeze({
   language: "",
   dialogTheme: "project",
   uiThemeMode: "auto",
+  visualComfort: "standard",
   autoPlay: false,
   skipRead: false,
   voiceEnabled: true,
@@ -167,6 +169,7 @@ export function sanitizePlaybackSettings(source = {}, options = {}) {
     language: normalizePlaybackLanguage(source.language, PLAYBACK_DEFAULTS.language, options),
     dialogTheme: getSafeDialogTheme(source.dialogTheme ?? PLAYBACK_DEFAULTS.dialogTheme),
     uiThemeMode: getSafeUiThemeMode(source.uiThemeMode ?? PLAYBACK_DEFAULTS.uiThemeMode),
+    visualComfort: getSafeVisualComfortMode(source.visualComfort ?? PLAYBACK_DEFAULTS.visualComfort),
     autoPlay: Boolean(source.autoPlay ?? PLAYBACK_DEFAULTS.autoPlay),
     skipRead: Boolean(source.skipRead ?? PLAYBACK_DEFAULTS.skipRead),
     voiceEnabled: source.voiceEnabled !== false,

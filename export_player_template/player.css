@@ -562,6 +562,16 @@ button {
   will-change: transform, opacity;
 }
 
+html[data-visual-comfort="gentle"] .particle-item {
+  animation-duration: calc(var(--particle-duration) * 1.65);
+}
+
+html[data-visual-comfort="static"] .particle-item,
+html[data-visual-comfort="static"] .sprite-card.is-breathing .sprite-card-inner,
+html[data-visual-comfort="static"] .sprite-card.is-speaking .sprite-card-inner {
+  animation-play-state: paused !important;
+}
+
 .particle-item.has-custom-image {
   background: transparent var(--particle-image) center / contain no-repeat !important;
   border-radius: 0 !important;
@@ -3407,6 +3417,18 @@ body::after {
   .start-brand-orbit::after {
     animation: none !important;
   }
+}
+
+html[data-visual-comfort="static"] .background-layer.is-transitioning,
+html[data-visual-comfort="static"] .sprite-card.is-entering,
+html[data-visual-comfort="static"] .sprite-card.is-leaving,
+html[data-visual-comfort="static"] .sprite-card.is-moving,
+html[data-visual-comfort="static"] .sprite-card.is-entering .sprite-card-inner,
+html[data-visual-comfort="static"] .stage-image-card.is-entering,
+html[data-visual-comfort="static"] .stage-image-card.is-moving,
+html[data-visual-comfort="static"] .stage-image-card.is-leaving {
+  animation: none !important;
+  transition: none !important;
 }
 
 /* === Brand Finish Pass === */

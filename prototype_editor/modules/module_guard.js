@@ -1,5 +1,6 @@
 (function attachEditorModuleGuard(global) {
   const REQUIRED_EDITOR_MODULES = Object.freeze([
+    { globalName: "CanvasiaRuntimeVisualComfort", script: "../export_player_template/runtime_visual_comfort.js", label: "视觉舒适度系统" },
     { globalName: "CanvasiaRuntimeConditions", script: "../export_player_template/runtime_conditions.js", label: "运行条件系统" },
     { globalName: "CanvasiaRuntimeChoiceAvailability", script: "../export_player_template/runtime_choice_availability.js", label: "选项门控系统" },
     { globalName: "CanvasiaEditorStoryBlockCatalog", script: "./modules/story_block_catalog.js", label: "剧情卡片目录" },
