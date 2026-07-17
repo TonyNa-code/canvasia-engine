@@ -13,12 +13,49 @@ from native_runtime.runtime_input import (
     get_controller_repeat_actions,
     translate_controller_input,
 )
+from native_runtime.runtime_key_bindings import (
+    DEFAULT_RUNTIME_KEY_BINDINGS,
+    assign_runtime_key_binding,
+    build_runtime_key_binding_control_lines,
+    get_runtime_action_for_code,
+    get_runtime_keyboard_code,
+    sanitize_runtime_key_bindings,
+)
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 
 
 class NativeRuntimeInputTests(unittest.TestCase):
+    def test_keyboard_bindings_reject_reserved_codes_and_swap_conflicts(self) -> None:
+        sanitized = sanitize_runtime_key_bindings(
+            {"advance": "Escape", "system": "KeyB", "rollback": "invalid", "auto": "Digit7"}
+        )
+        swapped = assign_runtime_key_binding(sanitized, "hide", "Digit7")
+
+        self.assertEqual(sanitized["advance"], "Space")
+        self.assertEqual(sanitized["system"], "KeyB")
+        self.assertEqual(sanitized["rollback"], "PageUp")
+        self.assertEqual(swapped["displacedAction"], "auto")
+        self.assertEqual(get_runtime_action_for_code(swapped["bindings"], "Digit7"), "hide")
+        self.assertEqual(get_runtime_action_for_code(swapped["bindings"], "KeyU"), "auto")
+
+    def test_keyboard_code_adapter_and_help_lines_share_current_bindings(self) -> None:
+        class FakePygame:
+            K_SPACE = 1
+            K_b = 2
+            K_F1 = 3
+
+        class Event:
+            key = FakePygame.K_b
+
+        bindings = {**DEFAULT_RUNTIME_KEY_BINDINGS, "advance": "KeyB"}
+        lines = build_runtime_key_binding_control_lines(bindings)
+
+        self.assertEqual(get_runtime_keyboard_code(FakePygame, Event()), "KeyB")
+        self.assertIn("B：推进剧情", lines)
+        self.assertEqual(len(lines), 8)
+
     def test_buttons_map_to_mature_visual_novel_actions(self) -> None:
         expected = {
             0: "confirm",
@@ -126,6 +163,8 @@ class NativeRuntimeInputTests(unittest.TestCase):
         self.assertIn('event_kind = "button_up"', source)
         self.assertIn("def handle_controller_repeat(self, now_ms: object | None = None) -> bool:", source)
         self.assertIn("running = self.handle_controller_repeat()", source)
+        self.assertIn("get_runtime_action_for_code(", source)
+        self.assertIn("def handle_runtime_keyboard_action(self, action: str) -> bool:", source)
 
 
 if __name__ == "__main__":

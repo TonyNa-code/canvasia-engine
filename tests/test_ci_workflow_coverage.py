@@ -151,6 +151,7 @@ class CiWorkflowCoverageTests(unittest.TestCase):
         workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
 
         self.assertIn("native_runtime/runtime_input.py", workflow)
+        self.assertIn("native_runtime/runtime_key_bindings.py", workflow)
         self.assertIn("tests/test_native_runtime_input.py", workflow)
         self.assertIn(
             "python -m unittest discover -s tests -p 'test_native_runtime_input.py' -v",

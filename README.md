@@ -73,6 +73,7 @@ The project already includes a visual editor, export pipeline, native runtime pr
 - Release Candidate manifests that bundle project inventory, deliverable status, release risks, unlockable-content readiness, and manual signoff checks for testers and public preview handoff
 - Unlockable Content manifests with Markdown / CSV exports for CG gallery, music room, voice replay, character archive, location archive, narration archive, relationship archive, chapter replay, ending collection, and achievement coverage
 - Custom game UI skins, UI Kit binding, nine-slice textures, button states, layout controls, bound font assets with safe system-font fallback across Web / desktop playback, and visual novel textbox design
+- Persistent player-customizable keyboard controls across Web and native Runtime, with safe reserved shortcuts, automatic conflict swapping, reset-to-default controls, and live help labels
 - Extra galleries: CG replay, music room, character archive, location archive, narration archive, relationship archive, achievements, chapter replay, ending replay, and voice replay
 - Advanced particle presets, project particle libraries, camera effects, screen filters, flashes, shakes, and fade transitions
 - Live2D / 3D character and 3D scene asset import, plus native-runtime 3D inspection reports for glTF / GLB / VRM assets
@@ -92,8 +93,8 @@ The project already includes a visual editor, export pipeline, native runtime pr
 | Extras / Replay Systems | Available | CG, music, character, location, narration, relationship, achievement, chapter, ending, and voice replay systems, plus exportable Unlockable Content manifests that catch missing gallery files, voice replay gaps, character archive visuals, and unreachable endings. |
 | Particles and Presentation | Available | Particle presets, custom particle settings, scene mood recipes, camera, filters, flashes, shakes, fades, character presentation effects, and independently animated prop / foreground / cut-in stage-image layers. |
 | Live2D / 3D Assets | Preview | Live2D, 3D character models, and 3D scene assets can be imported; native Runtime exports 3D structure and risk reports. |
-| Web / Desktop Exports | Preview | Web playable and desktop packages include adaptive low-overhead gamepad polling, directional focus navigation, and keyboard / mouse controls; signing and notarization depend on release notes. |
-| Native Runtime | Preview | Covers the core playback path, settings, persistent per-character / narrator voice mixing, visual save slots with locally stored scene thumbnails, controller navigation and reading shortcuts, history, autoplay, state-safe story rollback, video fallback, 3D reports, first archive systems, and editor-side Runtime capability matrices with Web / native acceptance checklists plus VN essentials maturity summaries. |
+| Web / Desktop Exports | Preview | Web playable and desktop packages include adaptive low-overhead gamepad polling, directional focus navigation, persistent custom keyboard mappings with conflict-safe rebinding, and mouse controls; signing and notarization depend on release notes. |
+| Native Runtime | Preview | Covers the core playback path, settings, persistent custom keyboard mappings, persistent per-character / narrator voice mixing, visual save slots with locally stored scene thumbnails, controller navigation and reading shortcuts, history, autoplay, state-safe story rollback, video fallback, 3D reports, first archive systems, and editor-side Runtime capability matrices with Web / native acceptance checklists plus VN essentials maturity summaries. |
 | Mobile Runtime | Experimental planning | Touch, audio policy, and layout adaptation are still being explored. |
 
 ## Screenshots

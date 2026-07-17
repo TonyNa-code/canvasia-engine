@@ -60,6 +60,7 @@ PYTHON_SYNTAX_FILES = [
     "native_runtime/runtime_choice_availability.py",
     "native_runtime/runtime_rollback.py",
     "native_runtime/runtime_input.py",
+    "native_runtime/runtime_key_bindings.py",
     "native_runtime/runtime_save_thumbnails.py",
     "native_runtime/runtime_text_effects.py",
     "native_runtime/runtime_storage.py",

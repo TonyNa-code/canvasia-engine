@@ -67,6 +67,7 @@ from native_runtime.runtime_player_settings import (
     DEFAULT_RUNTIME_PLAYER_SETTINGS,
     sanitize_runtime_player_settings,
 )
+from native_runtime.runtime_key_bindings import RUNTIME_KEY_BINDING_ACTIONS
 from native_runtime.runtime_save_thumbnails import (
     build_save_thumbnail_status,
     get_save_thumbnail_path,
@@ -162,6 +163,7 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
                 "sfxVolume": 66.4,
                 "voiceVolume": "40",
                 "voiceDuckingRatio": 5,
+                "keyBindings": {"advance": "KeyB", "system": "Escape"},
             }
         )
 
@@ -179,6 +181,8 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
         self.assertEqual(settings["sfxVolume"], 66)
         self.assertEqual(settings["voiceVolume"], 40)
         self.assertEqual(settings["voiceDuckingRatio"], 15)
+        self.assertEqual(settings["keyBindings"]["advance"], "KeyB")
+        self.assertEqual(settings["keyBindings"]["system"], "Tab")
 
     def test_native_runtime_storage_sanitizes_corrupted_archive_progress(self) -> None:
         progress = sanitize_archive_progress(
@@ -4024,6 +4028,27 @@ class NativeRuntimeRenderSmokeTests(unittest.TestCase):
         self.assertNotIn(selected_voice_profile_id, player.runtime_settings["voiceMix"])
         player.close_overlay(preserve_status=True)
         self.assertEqual(player.overlay_mode, "settings")
+        player.open_key_bindings_overlay()
+        player.key_binding_index = next(
+            index for index, action in enumerate(RUNTIME_KEY_BINDING_ACTIONS) if action["id"] == "hide"
+        )
+        player.render()
+        self.assert_screen_has_pixels(player)
+        player.begin_selected_key_binding_capture()
+        player.handle_event(pygame.event.Event(pygame.KEYDOWN, {"key": pygame.K_b, "mod": 0}))
+        self.assertEqual(player.runtime_settings["keyBindings"]["hide"], "KeyB")
+        self.assertFalse(player.key_binding_capture_action)
+        player.close_overlay(preserve_status=True)
+        self.assertEqual(player.overlay_mode, "settings")
+        player.close_overlay(preserve_status=True)
+        player.handle_event(pygame.event.Event(pygame.KEYDOWN, {"key": pygame.K_b, "mod": 0}))
+        self.assertTrue(player.ui_hidden)
+        player.handle_event(pygame.event.Event(pygame.KEYDOWN, {"key": pygame.K_b, "mod": 0}))
+        self.assertFalse(player.ui_hidden)
+        player.open_key_bindings_overlay()
+        player.handle_event(pygame.event.Event(pygame.KEYDOWN, {"key": pygame.K_r, "mod": 0}))
+        self.assertEqual(player.runtime_settings["keyBindings"]["hide"], "KeyU")
+        player.close_overlay(preserve_status=True)
         player.close_overlay(preserve_status=True)
         if player.current_line:
             class BusyVoiceChannel:

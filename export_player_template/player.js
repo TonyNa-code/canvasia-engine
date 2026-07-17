@@ -1,5 +1,8 @@
 import {
-  RUNTIME_SHORTCUT_GROUPS,
+  buildRuntimeShortcutGroups,
+  createRuntimeKeyBindingController,
+  getRuntimeActionForCode,
+  getRuntimeKeyLabel,
   handleRuntimeModalKeydown,
   renderOperationGuideGroups,
 } from "./runtime_controls.js";
@@ -245,6 +248,10 @@ const refs = {
   voiceMixerSummary: document.getElementById("voiceMixerSummary"),
   voiceMixerList: document.getElementById("voiceMixerList"),
   resetVoiceMixerButton: document.getElementById("resetVoiceMixerButton"),
+  keyBindingSummary: document.getElementById("keyBindingSummary"),
+  keyBindingStatus: document.getElementById("keyBindingStatus"),
+  keyBindingList: document.getElementById("keyBindingList"),
+  resetKeyBindingsButton: document.getElementById("resetKeyBindingsButton"),
   achievementDialog: document.getElementById("achievementDialog"),
   achievementDialogSummary: document.getElementById("achievementDialogSummary"),
   achievementDialogHero: document.getElementById("achievementDialogHero"),
@@ -436,6 +443,7 @@ let musicRoomAudio = null;
 let voiceReplayAudio = null;
 let runtimeUiThemeAutoRefreshTimer = null;
 let voiceMixerController = null;
+let keyBindingController = null;
 
 init();
 
@@ -578,6 +586,22 @@ function init() {
     escapeHtml,
   });
   voiceMixerController.attach();
+  keyBindingController = createRuntimeKeyBindingController({
+    refs: {
+      summary: refs.keyBindingSummary,
+      status: refs.keyBindingStatus,
+      list: refs.keyBindingList,
+      resetButton: refs.resetKeyBindingsButton,
+    },
+    getBindings: () => state.playback.keyBindings,
+    setBindings: (bindings) => {
+      state.playback.keyBindings = bindings;
+    },
+    persist: persistPlaybackSettings,
+    onChanged: renderOperationGuideDialog,
+    escapeHtml,
+  });
+  keyBindingController.attach();
   document.addEventListener("keydown", handleGlobalKeydown);
   document.addEventListener("pointerdown", () => setRuntimeInputMode("pointer"), { passive: true });
   startRuntimeGamepadInput();
@@ -2001,7 +2025,7 @@ function renderOperationGuideDialog() {
     ? `这些操作会直接作用于当前试玩进度；打开本页时自动播放会先暂停，避免错过剧情。${gamepadSummary}`
     : `开始试玩前可以先看一眼操作方式。导出包支持鼠标、键盘和标准布局手柄。${gamepadSummary}`;
   refs.operationGuideList.innerHTML = renderOperationGuideGroups([
-    ...RUNTIME_SHORTCUT_GROUPS,
+    ...buildRuntimeShortcutGroups(state.playback.keyBindings),
     buildRuntimeGamepadControlGroup(state.runtimeGamepadStatus),
   ]);
 }
@@ -5248,6 +5272,7 @@ function renderPlaybackControls(snapshot = getCurrentSnapshot()) {
   if (refs.previousHistoryButton) {
     refs.previousHistoryButton.disabled = !canStepRuntimeHistory(-1);
     refs.previousHistoryButton.textContent = "上一句";
+    refs.previousHistoryButton.title = getRuntimeKeyLabel(state.playback.keyBindings?.rollback);
   }
 
   if (refs.nextHistoryButton) {
@@ -5284,6 +5309,7 @@ function renderPlaybackControls(snapshot = getCurrentSnapshot()) {
   }
 
   voiceMixerController?.render();
+  keyBindingController?.render();
 
   applyRuntimeUiTheme(state.playback.uiThemeMode);
   renderRuntimeUiThemeButtons();
@@ -5677,33 +5703,9 @@ function handleGlobalKeydown(event) {
     return;
   }
 
-  if (event.code === "KeyS") {
-    event.preventDefault();
-    toggleSkipRead();
-    return;
-  }
-
-  if (event.code === "KeyQ") {
-    event.preventDefault();
-    quickSaveCurrent();
-    return;
-  }
-
-  if (event.code === "KeyL") {
-    event.preventDefault();
-    quickLoadCurrent();
-    return;
-  }
-
   if (event.code === "KeyH") {
     event.preventDefault();
     toggleDialogVisibility();
-    return;
-  }
-
-  if (event.code === "PageUp" && canStepRuntimeHistory(-1)) {
-    event.preventDefault();
-    stepRuntimeHistory(-1);
     return;
   }
 
@@ -5713,9 +5715,55 @@ function handleGlobalKeydown(event) {
     return;
   }
 
-  if (event.code === "Space" || event.code === "Enter" || event.code === "ArrowRight") {
+  if (event.code === "Enter" || event.code === "ArrowRight") {
     event.preventDefault();
     handleContinue();
+    return;
+  }
+
+  const runtimeAction = getRuntimeActionForCode(state.playback.keyBindings, event.code);
+  if (!runtimeAction) {
+    return;
+  }
+
+  event.preventDefault();
+  if (runtimeAction === "advance") {
+    handleContinue();
+    return;
+  }
+  if (runtimeAction === "system") {
+    if (state.started) {
+      openSystemMenu();
+    } else {
+      openOperationGuideDialog();
+    }
+    return;
+  }
+  if (runtimeAction === "rollback") {
+    if (canStepRuntimeHistory(-1)) {
+      stepRuntimeHistory(-1);
+    }
+    return;
+  }
+  if (runtimeAction === "auto") {
+    toggleAutoPlay();
+    return;
+  }
+  if (runtimeAction === "skip") {
+    toggleSkipRead();
+    return;
+  }
+  if (runtimeAction === "hide") {
+    event.preventDefault();
+    toggleDialogVisibility();
+    return;
+  }
+  if (runtimeAction === "quickSave") {
+    quickSaveCurrent();
+    return;
+  }
+  if (runtimeAction === "quickLoad") {
+    quickLoadCurrent();
   }
 }
 
@@ -5724,7 +5772,7 @@ function isKeyboardTypingTarget(target) {
     return false;
   }
 
-  return Boolean(target.closest("input, textarea, select, button, [contenteditable='true']"));
+  return Boolean(target.closest("input, textarea, select, [contenteditable='true']"));
 }
 
 function handleStageFrameClick(event) {

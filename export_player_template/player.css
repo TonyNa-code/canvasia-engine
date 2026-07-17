@@ -1143,6 +1143,86 @@ button {
   text-align: center;
 }
 
+.key-binding-panel {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--panel) 84%, transparent);
+}
+
+.key-binding-head,
+.key-binding-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.key-binding-head h3,
+.key-binding-head p,
+.key-binding-status {
+  margin: 0;
+}
+
+.key-binding-head h3 {
+  font-size: 15px;
+}
+
+.key-binding-head p,
+.key-binding-copy span,
+.key-binding-status {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.key-binding-status {
+  padding: 9px 11px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.key-binding-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.key-binding-row {
+  min-width: 0;
+  padding: 10px 11px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--panel-strong) 76%, transparent);
+  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.key-binding-row.is-capturing {
+  border-color: color-mix(in srgb, var(--accent) 72%, var(--line));
+  background: color-mix(in srgb, var(--accent) 12%, var(--panel-strong));
+  transform: translateY(-1px);
+}
+
+.key-binding-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.key-binding-copy strong,
+.key-binding-copy span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.key-binding-button {
+  min-width: 92px;
+  font-variant-numeric: tabular-nums;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
@@ -4325,7 +4405,9 @@ html[data-ui-theme="light"] .player-theme-button {
   }
 
   .voice-mixer-head,
-  .voice-mixer-row {
+  .voice-mixer-row,
+  .key-binding-head,
+  .key-binding-row {
     align-items: stretch;
   }
 
@@ -4335,6 +4417,14 @@ html[data-ui-theme="light"] .player-theme-button {
 
   .voice-mixer-head {
     display: grid;
+  }
+
+  .key-binding-head {
+    display: grid;
+  }
+
+  .key-binding-list {
+    grid-template-columns: 1fr;
   }
 }
 

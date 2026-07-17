@@ -350,6 +350,33 @@ except ImportError:  # pragma: no cover - exported native packages import from t
     )
 
 try:
+    from .runtime_key_bindings import (
+        DEFAULT_RUNTIME_KEY_BINDINGS,
+        RUNTIME_KEY_BINDING_ACTIONS,
+        assign_runtime_key_binding,
+        build_runtime_key_binding_control_lines,
+        get_runtime_action_for_code,
+        get_runtime_keyboard_code,
+        get_runtime_key_binding_summary,
+        get_runtime_key_label,
+        is_runtime_key_code_allowed,
+        render_runtime_key_bindings_overlay as render_runtime_key_bindings_overlay_panel,
+    )
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_key_bindings import (
+        DEFAULT_RUNTIME_KEY_BINDINGS,
+        RUNTIME_KEY_BINDING_ACTIONS,
+        assign_runtime_key_binding,
+        build_runtime_key_binding_control_lines,
+        get_runtime_action_for_code,
+        get_runtime_keyboard_code,
+        get_runtime_key_binding_summary,
+        get_runtime_key_label,
+        is_runtime_key_code_allowed,
+        render_runtime_key_bindings_overlay as render_runtime_key_bindings_overlay_panel,
+    )
+
+try:
     from .runtime_vn_quality import (
         build_native_runtime_vn_baseline_quality_report as _build_native_runtime_vn_baseline_quality_report,
     )
@@ -672,6 +699,7 @@ SETTINGS_MENU_ITEMS = [
     ("sfxVolume", "音效音量"),
     ("voiceVolume", "语音音量"),
     ("voiceMixer", "角色语音混音"),
+    ("keyBindings", "自定义按键"),
 ]
 NATIVE_RUNTIME_CONTROL_GROUPS = (
     {
@@ -7982,6 +8010,8 @@ class NativeRuntimePlayer:
         self.title_menu_index = 0
         self.settings_menu_index = 0
         self.voice_mixer_index = 0
+        self.key_binding_index = 0
+        self.key_binding_capture_action = ""
         self.archive_selection_index = 0
         self.current_archive_key = "chapters"
         self.archive_detail_key: str | None = None
@@ -9800,8 +9830,9 @@ class NativeRuntimePlayer:
         self.overlay_hotspots = []
         self.archive_detail_entry = None
         self.archive_detail_key = None
-        if closing_mode == "voice-mixer":
+        if closing_mode in {"voice-mixer", "key-bindings"}:
             self.overlay_mode = "settings"
+            self.key_binding_capture_action = ""
             if not preserve_status:
                 self.status_message = "已返回体验设置。"
             return
@@ -10042,6 +10073,49 @@ class NativeRuntimePlayer:
         self.apply_runtime_settings()
         self.status_message = "全部角色已恢复为跟随总语音音量。"
 
+    def get_selected_key_binding_action(self) -> dict:
+        self.key_binding_index = max(0, min(len(RUNTIME_KEY_BINDING_ACTIONS) - 1, self.key_binding_index))
+        return dict(RUNTIME_KEY_BINDING_ACTIONS[self.key_binding_index])
+
+    def open_key_bindings_overlay(self) -> None:
+        self.overlay_mode = "key-bindings"
+        self.key_binding_index = 0
+        self.key_binding_capture_action = ""
+        self.status_message = "自定义按键已打开。"
+
+    def begin_selected_key_binding_capture(self) -> None:
+        action = self.get_selected_key_binding_action()
+        self.key_binding_capture_action = str(action.get("id") or "")
+        self.status_message = f"请按下“{action.get('label') or '当前操作'}”的新按键。"
+
+    def apply_captured_key_binding(self, code: str) -> None:
+        action_id = str(self.key_binding_capture_action or "")
+        action = next((item for item in RUNTIME_KEY_BINDING_ACTIONS if item["id"] == action_id), None)
+        if not action:
+            self.key_binding_capture_action = ""
+            return
+        if not is_runtime_key_code_allowed(code):
+            self.status_message = "这个按键由关闭、帮助、截图或存档保底操作占用，请换一个按键。"
+            return
+        result = assign_runtime_key_binding(self.runtime_settings.get("keyBindings"), action_id, code)
+        self.runtime_settings["keyBindings"] = result["bindings"]
+        self.runtime_settings = sanitize_runtime_player_settings(self.runtime_settings)
+        self.persist_runtime_settings()
+        self.key_binding_capture_action = ""
+        displaced_action = next(
+            (item for item in RUNTIME_KEY_BINDING_ACTIONS if item["id"] == result["displacedAction"]),
+            None,
+        )
+        suffix = f"；“{displaced_action['label']}”已自动换到原按键" if displaced_action else ""
+        self.status_message = f"“{action['label']}”已改为 {get_runtime_key_label(code)}{suffix}。"
+
+    def reset_all_key_bindings(self) -> None:
+        self.runtime_settings["keyBindings"] = dict(DEFAULT_RUNTIME_KEY_BINDINGS)
+        self.runtime_settings = sanitize_runtime_player_settings(self.runtime_settings)
+        self.persist_runtime_settings()
+        self.key_binding_capture_action = ""
+        self.status_message = "已恢复推荐键位。"
+
     def open_settings_overlay(self) -> None:
         self.overlay_mode = "settings"
         self.settings_menu_index = 0
@@ -10050,6 +10124,9 @@ class NativeRuntimePlayer:
     def adjust_runtime_setting(self, setting_key: str, direction: int) -> None:
         if setting_key == "voiceMixer":
             self.open_voice_mixer_overlay()
+            return
+        if setting_key == "keyBindings":
+            self.open_key_bindings_overlay()
             return
         if setting_key == "themeMode":
             current = str(self.runtime_settings.get("themeMode") or "auto")
@@ -10113,6 +10190,9 @@ class NativeRuntimePlayer:
         if setting_key == "voiceMixer":
             summary = get_voice_mixer_summary(self.get_voice_mixer_entries(), self.runtime_settings.get("voiceMix"))
             return f"{summary['characterCount']} 个通道 · 已调 {summary['customizedCount']}"
+        if setting_key == "keyBindings":
+            summary = get_runtime_key_binding_summary(self.runtime_settings.get("keyBindings"))
+            return f"已自定义 {summary['customizedCount']} 项" if summary["customizedCount"] else "推荐键位"
         if setting_key == "themeMode":
             label_map = {"auto": "自动", "light": "浅色", "dark": "深色"}
             selected = str(self.runtime_settings.get("themeMode") or "auto")
@@ -12831,6 +12911,8 @@ class NativeRuntimePlayer:
             self.render_settings_overlay()
         elif self.overlay_mode == "voice-mixer":
             self.render_voice_mixer_overlay()
+        elif self.overlay_mode == "key-bindings":
+            self.render_key_bindings_overlay()
         elif self.overlay_mode == "archives":
             self.render_archive_overlay()
         elif self.overlay_mode == "archive-detail":
@@ -13480,7 +13562,7 @@ class NativeRuntimePlayer:
             },
             {
                 "title": "阅读推进",
-                "lines": format_native_runtime_control_lines("reading"),
+                "lines": build_runtime_key_binding_control_lines(self.runtime_settings.get("keyBindings")),
             },
             {
                 "title": "系统与存档",
@@ -13673,7 +13755,7 @@ class NativeRuntimePlayer:
             value_label = self.get_setting_value_label(setting_key)
             value_surface = self.font_ui.render(value_label, True, palette["muted"])
             self.screen.blit(value_surface, (row_rect.right - value_surface.get_width() - 48, row_rect.top + 10))
-            if setting_key == "voiceMixer":
+            if setting_key in {"voiceMixer", "keyBindings"}:
                 self.screen.blit(self.font_ui.render("↵", True, palette["text"]), (row_rect.right - 28, row_rect.top + 9))
             else:
                 self.screen.blit(self.font_ui.render("◀", True, palette["text"]), (row_rect.right - 32, row_rect.top + 9))
@@ -13687,6 +13769,9 @@ class NativeRuntimePlayer:
 
     def render_voice_mixer_overlay(self) -> None:
         render_voice_mixer_overlay_panel(self)
+
+    def render_key_bindings_overlay(self) -> None:
+        render_runtime_key_bindings_overlay_panel(self)
 
     def render_archive_overlay(self) -> None:
         palette = self.get_active_palette()
@@ -14222,6 +14307,31 @@ class NativeRuntimePlayer:
         event_mod = int(getattr(event, "mod", 0) or 0)
         return bool(event_mod & self.pygame.KMOD_SHIFT)
 
+    def handle_runtime_keyboard_action(self, action: str) -> bool:
+        if action == "advance":
+            if self.current_choices:
+                self.choose_current_option(self.current_choice_index)
+            elif self.finished:
+                return False
+            elif self.current_line:
+                self.advance_current_line_if_allowed()
+            return True
+        if action == "system":
+            self.open_system_menu()
+        elif action == "rollback":
+            self.rollback_story()
+        elif action == "auto":
+            self.toggle_auto_play()
+        elif action == "skip":
+            self.toggle_skip_read()
+        elif action == "hide":
+            self.toggle_ui_hidden()
+        elif action == "quickSave":
+            self.save_quick()
+        elif action == "quickLoad":
+            self.load_quick()
+        return True
+
     def handle_event(self, event) -> bool:
         if event.type == self.pygame.QUIT:
             return False
@@ -14268,7 +14378,7 @@ class NativeRuntimePlayer:
                 return True
             if self.overlay_mode == "title":
                 return self.handle_overlay_event(event)
-            if event.key in (self.pygame.K_F1, self.pygame.K_TAB):
+            if event.key == self.pygame.K_F1:
                 self.open_system_menu()
                 return True
             if event.key == self.pygame.K_F6:
@@ -14281,23 +14391,17 @@ class NativeRuntimePlayer:
                 return True
             if self.overlay_mode:
                 return self.handle_overlay_event(event)
-            if event.key == self.pygame.K_PAGEUP:
-                self.rollback_story()
-                return True
             if not self.current_choices and self.handle_scene3d_preview_key(event):
-                return True
-            if event.key == self.pygame.K_u:
-                self.toggle_ui_hidden()
                 return True
             if event.key == self.pygame.K_h:
                 self.open_text_history_overlay()
                 return True
-            if event.key == self.pygame.K_a:
-                self.toggle_auto_play()
-                return True
-            if event.key == self.pygame.K_s:
-                self.toggle_skip_read()
-                return True
+            runtime_action = get_runtime_action_for_code(
+                self.runtime_settings.get("keyBindings"),
+                get_runtime_keyboard_code(self.pygame, event),
+            )
+            if runtime_action:
+                return self.handle_runtime_keyboard_action(runtime_action)
 
         if event.type == self.pygame.MOUSEWHEEL:
             if self.ui_hidden:
@@ -14393,6 +14497,8 @@ class NativeRuntimePlayer:
             return self.handle_settings_overlay_event(event)
         if self.overlay_mode == "voice-mixer":
             return self.handle_voice_mixer_overlay_event(event)
+        if self.overlay_mode == "key-bindings":
+            return self.handle_key_bindings_overlay_event(event)
         if self.overlay_mode == "archives":
             return self.handle_archive_overlay_event(event)
         if self.overlay_mode == "archive-detail":
@@ -14684,6 +14790,46 @@ class NativeRuntimePlayer:
                     self.toggle_selected_voice_mixer_mute()
                     return True
                 if kind == "voice-mixer-select":
+                    return True
+        return True
+
+    def handle_key_bindings_overlay_event(self, event) -> bool:
+        pygame = self.pygame
+        if event.type == pygame.KEYDOWN:
+            if self.key_binding_capture_action:
+                event_mod = int(getattr(event, "mod", 0) or 0)
+                blocked_modifiers = pygame.KMOD_ALT | pygame.KMOD_CTRL | pygame.KMOD_META
+                if event_mod & blocked_modifiers:
+                    self.status_message = "组合键暂不支持，请直接按一个字母、数字或导航键。"
+                    return True
+                self.apply_captured_key_binding(get_runtime_keyboard_code(pygame, event))
+                return True
+            if event.key == pygame.K_UP:
+                self.key_binding_index = (self.key_binding_index - 1) % len(RUNTIME_KEY_BINDING_ACTIONS)
+                return True
+            if event.key == pygame.K_DOWN:
+                self.key_binding_index = (self.key_binding_index + 1) % len(RUNTIME_KEY_BINDING_ACTIONS)
+                return True
+            if event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                self.begin_selected_key_binding_capture()
+                return True
+            if event.key == pygame.K_r:
+                self.reset_all_key_bindings()
+                return True
+        elif event.type == pygame.MOUSEWHEEL:
+            direction = -1 if event.y > 0 else 1
+            self.key_binding_index = (self.key_binding_index + direction) % len(RUNTIME_KEY_BINDING_ACTIONS)
+            return True
+        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            for target in self.overlay_hotspots:
+                if not target["rect"].collidepoint(event.pos):
+                    continue
+                if target.get("kind") == "key-binding-reset-all":
+                    self.reset_all_key_bindings()
+                    return True
+                if target.get("kind") == "key-binding-item":
+                    self.key_binding_index = int(target.get("index") or 0)
+                    self.begin_selected_key_binding_capture()
                     return True
         return True
 

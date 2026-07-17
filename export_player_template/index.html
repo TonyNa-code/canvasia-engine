@@ -488,6 +488,19 @@
               </div>
               <div id="voiceMixerList" class="voice-mixer-list"></div>
             </section>
+            <section class="key-binding-panel" aria-labelledby="keyBindingTitle">
+              <div class="key-binding-head">
+                <div>
+                  <h3 id="keyBindingTitle">自定义按键</h3>
+                  <p id="keyBindingSummary">当前使用推荐键位，可按习惯逐项修改。</p>
+                </div>
+                <button id="resetKeyBindingsButton" class="pill-button is-secondary" type="button">恢复推荐键位</button>
+              </div>
+              <p id="keyBindingStatus" class="key-binding-status" aria-live="polite">
+                点击一项后直接按下新按键；如与其他操作冲突，两项会自动交换。
+              </p>
+              <div id="keyBindingList" class="key-binding-list"></div>
+            </section>
           </div>
         </div>
       </section>

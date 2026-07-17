@@ -6214,6 +6214,7 @@ class FrontendActionHandlerTests(unittest.TestCase):
     def test_web_runtime_exposes_explicit_history_step_controls(self) -> None:
         player_html = (ROOT_DIR / "export_player_template" / "index.html").read_text(encoding="utf-8")
         player_source = PLAYER_PATH.read_text(encoding="utf-8")
+        runtime_controls_source = RUNTIME_CONTROLS_PATH.read_text(encoding="utf-8")
         refs_block = player_source[player_source.index("const refs = {") : player_source.index("};", player_source.index("const refs = {"))]
         init_block = _extract_function_source(player_source, "init")
         render_playback_controls = _extract_function_source(player_source, "renderPlaybackControls")
@@ -6230,7 +6231,8 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("stepRuntimeHistory(1)", init_block)
         self.assertIn("refs.previousHistoryButton.disabled = !canStepRuntimeHistory(-1)", render_playback_controls)
         self.assertIn("refs.nextHistoryButton.disabled = !canStepRuntimeHistory(1)", render_playback_controls)
-        self.assertIn('event.code === "PageUp"', handle_keydown)
+        self.assertIn('defaultCode: "PageUp"', runtime_controls_source)
+        self.assertIn("getRuntimeActionForCode", handle_keydown)
         self.assertIn('event.code === "PageDown"', handle_keydown)
         self.assertIn("jumpToHistory(nextIndex)", step_history)
 

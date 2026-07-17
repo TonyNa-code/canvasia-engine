@@ -121,6 +121,7 @@ class LocalVerifyToolTests(unittest.TestCase):
         self.assertTrue(any("native_runtime/runtime_player_view.py" in command for command in commands))
         self.assertTrue(any("native_runtime/runtime_rollback.py" in command for command in commands))
         self.assertTrue(any("native_runtime/runtime_input.py" in command for command in commands))
+        self.assertTrue(any("native_runtime/runtime_key_bindings.py" in command for command in commands))
         self.assertTrue(any("native_runtime/runtime_save_thumbnails.py" in command for command in commands))
         self.assertTrue(any("native_runtime/runtime_vn_quality.py" in command for command in commands))
         self.assertTrue(any("test_editor_infrastructure.py" in command for command in commands))

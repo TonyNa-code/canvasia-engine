@@ -1743,6 +1743,56 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
         finally:
             player_page.close()
 
+    def test_exported_player_custom_key_binding_executes_persists_and_resets(self) -> None:
+        self.open_project_by_title("心跳时差")
+        player_url = self.export_web_build()
+        storage_key = "canvasia-engine:player-preview:心跳时差"
+
+        player_page = self.context.new_page()
+        try:
+            player_page.goto(player_url, wait_until="domcontentloaded")
+            player_page.locator("#startButton").wait_for(timeout=20000)
+            player_page.locator("#startButton").click()
+            player_page.locator("#startOverlay").wait_for(state="hidden", timeout=15000)
+            player_page.locator("#systemMenuButton").click()
+            player_page.locator("#systemMenu").wait_for(state="visible", timeout=10000)
+
+            hide_binding = player_page.locator("[data-runtime-key-binding='hide']")
+            hide_binding.wait_for(state="visible", timeout=10000)
+            hide_binding.click()
+            player_page.keyboard.press("b")
+            player_page.wait_for_function(
+                '''(key) => JSON.parse(localStorage.getItem(key) || "{}").keyBindings?.hide === "KeyB"''',
+                arg=storage_key,
+                timeout=10000,
+            )
+            self.assertIn("已自定义 1 项", player_page.locator("#keyBindingSummary").text_content() or "")
+
+            player_page.locator("#closeSystemMenuButton").click()
+            player_page.keyboard.press("b")
+            self.assertIn("is-hidden", player_page.locator(".dialog-panel").get_attribute("class") or "")
+            player_page.keyboard.press("b")
+            self.assertNotIn("is-hidden", player_page.locator(".dialog-panel").get_attribute("class") or "")
+
+            player_page.reload(wait_until="domcontentloaded")
+            player_page.locator("#startButton").wait_for(timeout=20000)
+            player_page.locator("#startButton").click()
+            player_page.locator("#startOverlay").wait_for(state="hidden", timeout=15000)
+            player_page.keyboard.press("b")
+            self.assertIn("is-hidden", player_page.locator(".dialog-panel").get_attribute("class") or "")
+            player_page.keyboard.press("b")
+
+            player_page.locator("#systemMenuButton").click()
+            player_page.locator("#resetKeyBindingsButton").click()
+            player_page.wait_for_function(
+                '''(key) => JSON.parse(localStorage.getItem(key) || "{}").keyBindings?.hide === "KeyU"''',
+                arg=storage_key,
+                timeout=10000,
+            )
+            self.assertIn("推荐键位", player_page.locator("#keyBindingSummary").text_content() or "")
+        finally:
+            player_page.close()
+
     def test_exported_player_gamepad_can_start_navigate_and_close_system_menu(self) -> None:
         self.open_project_by_title("心跳时差")
         player_url = self.export_web_build()

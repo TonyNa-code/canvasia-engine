@@ -1,4 +1,8 @@
 import { sanitizeVoiceMixProfiles } from "./runtime_voice_mixer.js";
+import {
+  DEFAULT_RUNTIME_KEY_BINDINGS,
+  sanitizeRuntimeKeyBindings,
+} from "./runtime_controls.js";
 
 export const TEXT_SPEED_LABELS = Object.freeze({
   slow: "慢一点",
@@ -35,6 +39,7 @@ export const PLAYBACK_DEFAULTS = Object.freeze({
   voiceVolume: 92,
   voiceDuckingRatio: 45,
   voiceMix: Object.freeze({}),
+  keyBindings: DEFAULT_RUNTIME_KEY_BINDINGS,
 });
 
 const DEFAULT_PROJECT_RUNTIME_SETTINGS = Object.freeze({
@@ -171,6 +176,7 @@ export function sanitizePlaybackSettings(source = {}, options = {}) {
     voiceVolume: getSafeVolumePercent(source.voiceVolume, PLAYBACK_DEFAULTS.voiceVolume),
     voiceDuckingRatio: getSafeVoiceDuckingRatioPercent(source.voiceDuckingRatio, PLAYBACK_DEFAULTS.voiceDuckingRatio),
     voiceMix: sanitizeVoiceMixProfiles(source.voiceMix ?? PLAYBACK_DEFAULTS.voiceMix),
+    keyBindings: sanitizeRuntimeKeyBindings(source.keyBindings ?? PLAYBACK_DEFAULTS.keyBindings),
   };
 }
 

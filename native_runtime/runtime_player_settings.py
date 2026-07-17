@@ -7,6 +7,11 @@ try:
 except ImportError:  # pragma: no cover - exported native packages import from the same directory.
     from runtime_voice_mixer import sanitize_voice_mix_profiles
 
+try:
+    from .runtime_key_bindings import DEFAULT_RUNTIME_KEY_BINDINGS, sanitize_runtime_key_bindings
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_key_bindings import DEFAULT_RUNTIME_KEY_BINDINGS, sanitize_runtime_key_bindings
+
 
 DEFAULT_RUNTIME_PLAYER_SETTINGS = {
     "themeMode": "auto",
@@ -24,6 +29,7 @@ DEFAULT_RUNTIME_PLAYER_SETTINGS = {
     "voiceDuckingEnabled": "on",
     "voiceDuckingRatio": 45,
     "voiceMix": {},
+    "keyBindings": dict(DEFAULT_RUNTIME_KEY_BINDINGS),
 }
 RUNTIME_THEME_MODES = ("auto", "light", "dark")
 RUNTIME_DISPLAY_MODES = ("windowed", "fullscreen")
@@ -133,11 +139,13 @@ def sanitize_runtime_player_settings(value: dict | None) -> dict:
             DEFAULT_RUNTIME_PLAYER_SETTINGS["voiceDuckingRatio"],
         ),
         "voiceMix": sanitize_voice_mix_profiles(source.get("voiceMix")),
+        "keyBindings": sanitize_runtime_key_bindings(source.get("keyBindings")),
     }
 
 
 def build_project_default_runtime_player_settings(project: dict | None = None) -> dict:
     defaults = dict(DEFAULT_RUNTIME_PLAYER_SETTINGS)
+    defaults["keyBindings"] = dict(DEFAULT_RUNTIME_KEY_BINDINGS)
     runtime_settings = project.get("runtimeSettings") if isinstance(project, dict) else {}
     if not isinstance(runtime_settings, dict):
         return defaults
