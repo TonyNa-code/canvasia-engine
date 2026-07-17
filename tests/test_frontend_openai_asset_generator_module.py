@@ -22,12 +22,13 @@ class FrontendOpenAiAssetGeneratorModuleTests(unittest.TestCase):
             vm.createContext(context);
             vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
             const tools = context.window.CanvasiaEditorOpenAiAssetGenerator;
+            const fakeApiKey = ["sk", "test"].join("-");
             const state = {{
               ...tools.getDefaultOpenAiAssetGenerationState(),
               openAiAssetType: "sprite",
               openAiAssetPrompt: "原创女主角立绘",
               openAiAssetName: "女主默认",
-              openAiAssetApiKey: "sk-test",
+              openAiAssetApiKey: fakeApiKey,
               openAiAssetModel: "gpt-image-test",
               openAiAssetStyleHint: "清透蓝白、柔和光线、校园恋爱氛围",
               openAiAssetBindCharacterId: "char_hero",

@@ -1675,6 +1675,74 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
         finally:
             player_page.close()
 
+    def test_exported_player_voice_mixer_persists_character_volume_and_mute(self) -> None:
+        self.open_project_by_title("心跳时差")
+        player_url = self.export_web_build()
+
+        player_page = self.context.new_page()
+        try:
+            player_page.goto(player_url, wait_until="domcontentloaded")
+            player_page.locator("#startButton").wait_for(timeout=20000)
+            player_page.locator("#startButton").click()
+            player_page.locator("#startOverlay").wait_for(state="hidden", timeout=15000)
+            player_page.locator("#systemMenuButton").click()
+            player_page.locator("#systemMenu").wait_for(state="visible", timeout=10000)
+
+            first_row = player_page.locator("#voiceMixerList [data-voice-mixer-row]").first
+            first_row.wait_for(state="visible", timeout=10000)
+            slider = first_row.locator("[data-voice-mixer-volume]")
+            profile_id = slider.get_attribute("data-voice-mixer-volume")
+            self.assertTrue(profile_id)
+            slider.evaluate(
+                """(element) => {
+                    element.value = "64";
+                    element.dispatchEvent(new Event("input", { bubbles: true }));
+                }"""
+            )
+            first_row.get_by_text("64%", exact=True).wait_for(timeout=10000)
+            first_row.locator("[data-voice-mixer-mute]").click()
+            self.assertIn("is-muted", first_row.get_attribute("class") or "")
+
+            player_page.wait_for_function(
+                """({ key, profileId }) => {
+                    const settings = JSON.parse(localStorage.getItem(key) || "{}");
+                    const profile = settings.voiceMix?.[profileId];
+                    return profile?.volume === 64 && profile?.muted === true;
+                }""",
+                arg={
+                    "key": "canvasia-engine:player-preview:心跳时差",
+                    "profileId": profile_id,
+                },
+                timeout=10000,
+            )
+
+            player_page.reload(wait_until="domcontentloaded")
+            player_page.locator("#startButton").wait_for(timeout=20000)
+            player_page.locator("#startButton").click()
+            player_page.locator("#startOverlay").wait_for(state="hidden", timeout=15000)
+            player_page.locator("#systemMenuButton").click()
+            player_page.locator("#systemMenu").wait_for(state="visible", timeout=10000)
+            restored_row = player_page.locator("#voiceMixerList [data-voice-mixer-row]").first
+            restored_row.wait_for(state="visible", timeout=10000)
+            self.assertEqual(restored_row.locator("[data-voice-mixer-volume]").input_value(), "64")
+            self.assertIn("is-muted", restored_row.get_attribute("class") or "")
+            restored_row.get_by_role("button", name="恢复").wait_for(timeout=10000)
+
+            player_page.locator("#resetVoiceMixerButton").click()
+            player_page.wait_for_function(
+                """({ key, profileId }) => {
+                    const settings = JSON.parse(localStorage.getItem(key) || "{}");
+                    return !settings.voiceMix?.[profileId];
+                }""",
+                arg={
+                    "key": "canvasia-engine:player-preview:心跳时差",
+                    "profileId": profile_id,
+                },
+                timeout=10000,
+            )
+        finally:
+            player_page.close()
+
     def test_exported_player_gamepad_can_start_navigate_and_close_system_menu(self) -> None:
         self.open_project_by_title("心跳时差")
         player_url = self.export_web_build()

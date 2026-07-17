@@ -478,6 +478,16 @@
             <div class="playback-toggle-group">
               <button id="menuVoiceDuckingToggleButton" class="pill-button is-secondary" type="button">语音焦点：开</button>
             </div>
+            <section class="voice-mixer-panel" aria-labelledby="voiceMixerTitle">
+              <div class="voice-mixer-head">
+                <div>
+                  <h3 id="voiceMixerTitle">角色语音混音</h3>
+                  <p id="voiceMixerSummary">按角色调整音量，不影响其他人物和单句演出音量。</p>
+                </div>
+                <button id="resetVoiceMixerButton" class="pill-button is-secondary" type="button">全部跟随总音量</button>
+              </div>
+              <div id="voiceMixerList" class="voice-mixer-list"></div>
+            </section>
           </div>
         </div>
       </section>

@@ -15,6 +15,7 @@ INDEX_PATH = EDITOR_DIR / "index.html"
 APP_PATH = EDITOR_DIR / "app.js"
 STYLES_PATH = EDITOR_DIR / "styles.css"
 PLAYER_PATH = ROOT_DIR / "export_player_template" / "player.js"
+PLAYER_HTML_PATH = ROOT_DIR / "export_player_template" / "index.html"
 RUNTIME_CONTROLS_PATH = ROOT_DIR / "export_player_template" / "runtime_controls.js"
 RUNTIME_GAMEPAD_PATH = ROOT_DIR / "export_player_template" / "runtime_gamepad.js"
 RUNTIME_SETTINGS_PATH = ROOT_DIR / "export_player_template" / "runtime_settings.js"
@@ -6524,6 +6525,7 @@ class FrontendActionHandlerTests(unittest.TestCase):
         story_editor_source = (EDITOR_DIR / "modules" / "story_block_editors.js").read_text(encoding="utf-8")
         player_source = PLAYER_PATH.read_text(encoding="utf-8")
         runtime_audio_source = RUNTIME_AUDIO_PATH.read_text(encoding="utf-8")
+        runtime_voice_mixer_source = (ROOT_DIR / "export_player_template" / "runtime_voice_mixer.js").read_text(encoding="utf-8")
         native_source = NATIVE_RUNTIME_PATH.read_text(encoding="utf-8")
 
         dialogue_editor_template = _extract_function_source(story_editor_source, "renderDialogueEditor")
@@ -6552,12 +6554,15 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn('snapshot.blockType !== "dialogue" && snapshot.blockType !== "narration"', runtime_voice_asset)
         self.assertIn("getRuntimeVoiceTargetVolume(snapshot)", runtime_voice)
         self.assertIn("snapshot?.block?.voiceVolume", runtime_voice_volume)
+        self.assertIn("getVoiceMixVolumeRatio", player_source)
+        self.assertIn("collectVoiceMixerEntries", runtime_voice_mixer_source)
+        self.assertIn('id="voiceMixerList"', PLAYER_HTML_PATH.read_text(encoding="utf-8"))
         self.assertIn("state.voiceAudio.volume = getRuntimeVoiceTargetVolume(getCurrentSnapshot())", runtime_audio_update)
         self.assertIn("def get_effective_voice_volume", native_source)
         self.assertIn('voiceVolume": block.get("voiceVolume")', native_source)
         self.assertIn('if block.get("voiceAssetId"):', native_source)
-        self.assertIn('self.play_voice(block.get("voiceAssetId"), volume_percent=block.get("voiceVolume"))', native_source)
-        self.assertIn("def play_voice(self, asset_id: str | None, volume_percent: object | None = None)", native_source)
+        self.assertIn("voice_profile_id=get_voice_profile_id_from_block(block)", native_source)
+        self.assertIn("voice_profile_id: object | None = None", native_source)
 
 
 if __name__ == "__main__":

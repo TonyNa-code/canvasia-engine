@@ -2,6 +2,11 @@ from __future__ import annotations
 
 import re
 
+try:
+    from .runtime_voice_mixer import sanitize_voice_mix_profiles
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_voice_mixer import sanitize_voice_mix_profiles
+
 
 DEFAULT_RUNTIME_PLAYER_SETTINGS = {
     "themeMode": "auto",
@@ -18,6 +23,7 @@ DEFAULT_RUNTIME_PLAYER_SETTINGS = {
     "voiceVolume": 100,
     "voiceDuckingEnabled": "on",
     "voiceDuckingRatio": 45,
+    "voiceMix": {},
 }
 RUNTIME_THEME_MODES = ("auto", "light", "dark")
 RUNTIME_DISPLAY_MODES = ("windowed", "fullscreen")
@@ -126,6 +132,7 @@ def sanitize_runtime_player_settings(value: dict | None) -> dict:
             max(VOICE_DUCKING_RATIO_PRESETS),
             DEFAULT_RUNTIME_PLAYER_SETTINGS["voiceDuckingRatio"],
         ),
+        "voiceMix": sanitize_voice_mix_profiles(source.get("voiceMix")),
     }
 
 

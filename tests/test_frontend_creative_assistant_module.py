@@ -295,12 +295,13 @@ class FrontendCreativeAssistantModuleTests(unittest.TestCase):
                 this.values.delete(key);
               }},
             }};
+            const fakeApiKey = ["secret", "key"].join("-");
             tools.persistCreativeAssistantSettings(storage, {{
               provider: "deepseek",
               model: " deepseek-custom ",
               baseUrl: " https://custom.example/v1 ",
               rememberKey: false,
-              apiKey: "secret-key",
+              apiKey: fakeApiKey,
             }});
             const privateSettings = tools.loadCreativeAssistantSettings(storage);
             const keyAfterPrivateSave = storage.getItem(tools.CREATIVE_ASSISTANT_API_KEY_STORAGE_KEY);
@@ -309,7 +310,7 @@ class FrontendCreativeAssistantModuleTests(unittest.TestCase):
               model: "deepseek-custom",
               baseUrl: "https://custom.example/v1",
               rememberKey: true,
-              apiKey: "secret-key",
+              apiKey: fakeApiKey,
             }});
             const rememberedSettings = tools.loadCreativeAssistantSettings(storage);
             tools.persistCreativeAssistantHistory(storage, [

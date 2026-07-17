@@ -156,9 +156,11 @@ jobs:
             tests/test_frontend_runtime_audio_module.py \
             tests/test_frontend_runtime_data_module.py \
             tests/test_frontend_runtime_storage_module.py \
+            tests/test_frontend_runtime_voice_mixer_module.py \
             tests/test_frontend_runtime_ui_skin_module.py \
             tests/test_frontend_runtime_i18n_module.py \
             tests/test_native_runtime_i18n.py \
+            tests/test_native_runtime_voice_mixer.py \
             tests/test_frontend_runtime_preload_module.py \
             tests/test_frontend_runtime_scene_prefetch_module.py \
             tests/test_frontend_runtime_character_motion_module.py \
@@ -418,9 +420,11 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_runtime_audio_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_data_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_storage_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_runtime_voice_mixer_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_ui_skin_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_i18n_module.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_i18n.py' -v
+          python -m unittest discover -s tests -p 'test_native_runtime_voice_mixer.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_preload_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_scene_prefetch_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_character_motion_module.py' -v

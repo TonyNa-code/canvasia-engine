@@ -1,3 +1,5 @@
+import { sanitizeVoiceMixProfiles } from "./runtime_voice_mixer.js";
+
 export const TEXT_SPEED_LABELS = Object.freeze({
   slow: "慢一点",
   normal: "正常",
@@ -32,6 +34,7 @@ export const PLAYBACK_DEFAULTS = Object.freeze({
   sfxVolume: 85,
   voiceVolume: 92,
   voiceDuckingRatio: 45,
+  voiceMix: Object.freeze({}),
 });
 
 const DEFAULT_PROJECT_RUNTIME_SETTINGS = Object.freeze({
@@ -167,6 +170,7 @@ export function sanitizePlaybackSettings(source = {}, options = {}) {
     sfxVolume: getSafeVolumePercent(source.sfxVolume, PLAYBACK_DEFAULTS.sfxVolume),
     voiceVolume: getSafeVolumePercent(source.voiceVolume, PLAYBACK_DEFAULTS.voiceVolume),
     voiceDuckingRatio: getSafeVoiceDuckingRatioPercent(source.voiceDuckingRatio, PLAYBACK_DEFAULTS.voiceDuckingRatio),
+    voiceMix: sanitizeVoiceMixProfiles(source.voiceMix ?? PLAYBACK_DEFAULTS.voiceMix),
   };
 }
 

@@ -186,6 +186,7 @@ EXPORT_PLAYER_SCRIPT_FILES = (
     "runtime_controls.js",
     "runtime_gamepad.js",
     "runtime_settings.js",
+    "runtime_voice_mixer.js",
     "runtime_ui_skin.js",
     "runtime_i18n.js",
     "runtime_audio.js",
@@ -488,6 +489,7 @@ NATIVE_RUNTIME_PERFORMANCE_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_perfo
 NATIVE_RUNTIME_INPUT_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_input.py"
 NATIVE_RUNTIME_I18N_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_i18n.py"
 NATIVE_RUNTIME_SETTINGS_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_player_settings.py"
+NATIVE_RUNTIME_VOICE_MIXER_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_voice_mixer.py"
 NATIVE_RUNTIME_VIEW_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_player_view.py"
 NATIVE_RUNTIME_CHARACTER_MOTION_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_character_motion.py"
 NATIVE_RUNTIME_STAGE_IMAGES_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_stage_images.py"
@@ -511,6 +513,7 @@ NATIVE_RUNTIME_PERFORMANCE_NAME = "runtime_performance.py"
 NATIVE_RUNTIME_INPUT_NAME = "runtime_input.py"
 NATIVE_RUNTIME_I18N_NAME = "runtime_i18n.py"
 NATIVE_RUNTIME_SETTINGS_NAME = "runtime_player_settings.py"
+NATIVE_RUNTIME_VOICE_MIXER_NAME = "runtime_voice_mixer.py"
 NATIVE_RUNTIME_VIEW_NAME = "runtime_player_view.py"
 NATIVE_RUNTIME_CHARACTER_MOTION_NAME = "runtime_character_motion.py"
 NATIVE_RUNTIME_STAGE_IMAGES_NAME = "runtime_stage_images.py"
@@ -574,6 +577,7 @@ NATIVE_RUNTIME_REQUIRED_MODULE_FILES = (
     (NATIVE_RUNTIME_INPUT_SOURCE, NATIVE_RUNTIME_INPUT_NAME),
     (NATIVE_RUNTIME_I18N_SOURCE, NATIVE_RUNTIME_I18N_NAME),
     (NATIVE_RUNTIME_SETTINGS_SOURCE, NATIVE_RUNTIME_SETTINGS_NAME),
+    (NATIVE_RUNTIME_VOICE_MIXER_SOURCE, NATIVE_RUNTIME_VOICE_MIXER_NAME),
     (NATIVE_RUNTIME_VIEW_SOURCE, NATIVE_RUNTIME_VIEW_NAME),
     (NATIVE_RUNTIME_CHARACTER_MOTION_SOURCE, NATIVE_RUNTIME_CHARACTER_MOTION_NAME),
     (NATIVE_RUNTIME_STAGE_IMAGES_SOURCE, NATIVE_RUNTIME_STAGE_IMAGES_NAME),
@@ -9004,6 +9008,8 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
         "runtimeI18nModulePath": str(build_dir / NATIVE_RUNTIME_I18N_NAME),
         "runtimeSettingsModuleName": NATIVE_RUNTIME_SETTINGS_NAME,
         "runtimeSettingsModulePath": str(build_dir / NATIVE_RUNTIME_SETTINGS_NAME),
+        "runtimeVoiceMixerModuleName": NATIVE_RUNTIME_VOICE_MIXER_NAME,
+        "runtimeVoiceMixerModulePath": str(build_dir / NATIVE_RUNTIME_VOICE_MIXER_NAME),
         "runtimeViewModuleName": NATIVE_RUNTIME_VIEW_NAME,
         "runtimeViewModulePath": str(build_dir / NATIVE_RUNTIME_VIEW_NAME),
         "runtimeCharacterMotionModuleName": NATIVE_RUNTIME_CHARACTER_MOTION_NAME,
@@ -9522,6 +9528,7 @@ def export_native_runtime_build() -> dict:
             "runtimePerformanceModule": runtime_files["runtimePerformanceModuleName"],
             "runtimeI18nModule": runtime_files["runtimeI18nModuleName"],
             "runtimeSettingsModule": runtime_files["runtimeSettingsModuleName"],
+            "runtimeVoiceMixerModule": runtime_files["runtimeVoiceMixerModuleName"],
             "runtimeViewModule": runtime_files["runtimeViewModuleName"],
             "runtimeCharacterMotionModule": runtime_files["runtimeCharacterMotionModuleName"],
             "runtimeStageImagesModule": runtime_files["runtimeStageImagesModuleName"],
@@ -9600,6 +9607,7 @@ def export_native_runtime_build() -> dict:
             "runtimePerformanceModule": runtime_files["runtimePerformanceModuleName"],
             "runtimeI18nModule": runtime_files["runtimeI18nModuleName"],
             "runtimeSettingsModule": runtime_files["runtimeSettingsModuleName"],
+            "runtimeVoiceMixerModule": runtime_files["runtimeVoiceMixerModuleName"],
             "runtimeViewModule": runtime_files["runtimeViewModuleName"],
             "runtimeCharacterMotionModule": runtime_files["runtimeCharacterMotionModuleName"],
             "runtimeStageImagesModule": runtime_files["runtimeStageImagesModuleName"],
@@ -9831,6 +9839,7 @@ def export_native_runtime_build() -> dict:
         {"name": runtime_files["crashFeedbackJsonName"], "description": "机器可读原生 Runtime 崩溃反馈 JSON 模板。"},
         {"name": runtime_files["runtimeI18nModuleName"], "description": "原生 Runtime 多语言和文本回退模块。"},
         {"name": runtime_files["runtimeSettingsModuleName"], "description": "原生 Runtime 系统设置模块。"},
+        {"name": runtime_files["runtimeVoiceMixerModuleName"], "description": "原生 Runtime 角色语音混音与持久化规则模块。"},
         {"name": runtime_files["runtimeViewModuleName"], "description": "原生 Runtime 可见层配置、转场安全值和文本排版模块。"},
         {"name": runtime_files["runtimeCharacterMotionModuleName"], "description": "原生 Runtime 角色走位、缩放、透明度、翻转和缓动插值模块。"},
         {"name": runtime_files["runtimeStageImagesModuleName"], "description": "原生 Runtime 道具、Cut-in、前景装饰和氛围叠图模块。"},
@@ -10109,6 +10118,9 @@ def export_native_runtime_build() -> dict:
         "runtimeSettingsModuleName": runtime_files["runtimeSettingsModuleName"],
         "runtimeSettingsModulePath": runtime_files["runtimeSettingsModulePath"],
         "runtimeSettingsModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimeSettingsModuleName']}",
+        "runtimeVoiceMixerModuleName": runtime_files["runtimeVoiceMixerModuleName"],
+        "runtimeVoiceMixerModulePath": runtime_files["runtimeVoiceMixerModulePath"],
+        "runtimeVoiceMixerModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimeVoiceMixerModuleName']}",
         "runtimeViewModuleName": runtime_files["runtimeViewModuleName"],
         "runtimeViewModulePath": runtime_files["runtimeViewModulePath"],
         "runtimeViewModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimeViewModuleName']}",
@@ -10320,6 +10332,7 @@ def export_web_build() -> dict:
             "playerRuntimeControls": "runtime_controls.js",
             "playerRuntimeGamepad": "runtime_gamepad.js",
             "playerRuntimeSettings": "runtime_settings.js",
+            "playerRuntimeVoiceMixer": "runtime_voice_mixer.js",
             "playerRuntimeUiSkin": "runtime_ui_skin.js",
             "playerRuntimeI18n": "runtime_i18n.js",
             "playerRuntimeAudio": "runtime_audio.js",
@@ -11452,6 +11465,7 @@ def export_windows_nwjs_build() -> dict:
             "appRuntimeControls": "app/runtime_controls.js",
             "appRuntimeGamepad": "app/runtime_gamepad.js",
             "appRuntimeSettings": "app/runtime_settings.js",
+            "appRuntimeVoiceMixer": "app/runtime_voice_mixer.js",
             "appRuntimeUiSkin": "app/runtime_ui_skin.js",
             "appRuntimeI18n": "app/runtime_i18n.js",
             "appRuntimeAudio": "app/runtime_audio.js",
@@ -11918,6 +11932,7 @@ def export_macos_nwjs_build() -> dict:
             "appRuntimeControls": "app/runtime_controls.js",
             "appRuntimeGamepad": "app/runtime_gamepad.js",
             "appRuntimeSettings": "app/runtime_settings.js",
+            "appRuntimeVoiceMixer": "app/runtime_voice_mixer.js",
             "appRuntimeUiSkin": "app/runtime_ui_skin.js",
             "appRuntimeI18n": "app/runtime_i18n.js",
             "appRuntimeAudio": "app/runtime_audio.js",
@@ -12391,6 +12406,7 @@ def export_linux_nwjs_build() -> dict:
             "appRuntimeControls": "app/runtime_controls.js",
             "appRuntimeGamepad": "app/runtime_gamepad.js",
             "appRuntimeSettings": "app/runtime_settings.js",
+            "appRuntimeVoiceMixer": "app/runtime_voice_mixer.js",
             "appRuntimeUiSkin": "app/runtime_ui_skin.js",
             "appRuntimeI18n": "app/runtime_i18n.js",
             "appRuntimeAudio": "app/runtime_audio.js",

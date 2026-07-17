@@ -158,6 +158,29 @@ except ImportError:  # pragma: no cover - exported native packages import from t
     )
 
 try:
+    from .runtime_voice_mixer import (
+        collect_voice_mixer_entries,
+        get_safe_voice_profile_id,
+        get_voice_mix_profile,
+        get_voice_mix_volume_ratio,
+        get_voice_mixer_summary,
+        get_voice_profile_id_from_block,
+        render_voice_mixer_overlay as render_voice_mixer_overlay_panel,
+        update_voice_mix_profile,
+    )
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_voice_mixer import (
+        collect_voice_mixer_entries,
+        get_safe_voice_profile_id,
+        get_voice_mix_profile,
+        get_voice_mix_volume_ratio,
+        get_voice_mixer_summary,
+        get_voice_profile_id_from_block,
+        render_voice_mixer_overlay as render_voice_mixer_overlay_panel,
+        update_voice_mix_profile,
+    )
+
+try:
     from .runtime_text_effects import (
         get_native_typewriter_step_delay_ms,
         get_next_typewriter_index,
@@ -648,6 +671,7 @@ SETTINGS_MENU_ITEMS = [
     ("bgmVolume", "BGM 音量"),
     ("sfxVolume", "音效音量"),
     ("voiceVolume", "语音音量"),
+    ("voiceMixer", "角色语音混音"),
 ]
 NATIVE_RUNTIME_CONTROL_GROUPS = (
     {
@@ -7919,6 +7943,7 @@ class NativeRuntimePlayer:
         self.current_bgm_scope: dict | None = None
         self.current_voice_channel = None
         self.current_voice_volume_percent = 100
+        self.current_voice_profile_id = ""
         self.voice_playback_active = False
         self.project_id = str(self.project.get("projectId") or "untitled_project")
         self.save_store = load_project_save_store(self.project_id, self.formal_save_slot_count)
@@ -7956,6 +7981,7 @@ class NativeRuntimePlayer:
         self.system_menu_index = 0
         self.title_menu_index = 0
         self.settings_menu_index = 0
+        self.voice_mixer_index = 0
         self.archive_selection_index = 0
         self.current_archive_key = "chapters"
         self.archive_detail_key: str | None = None
@@ -8288,7 +8314,11 @@ class NativeRuntimePlayer:
             if volume_percent is None
             else get_safe_volume_percent(volume_percent, 100)
         )
-        return self.get_effective_volume("voiceVolume") * (safe_volume_percent / 100)
+        profile_ratio = get_voice_mix_volume_ratio(
+            self.runtime_settings.get("voiceMix"),
+            self.current_voice_profile_id,
+        )
+        return self.get_effective_volume("voiceVolume") * (safe_volume_percent / 100) * profile_ratio
 
     def get_safe_runtime_language(self, language: object) -> str:
         normalized = normalize_language_code(language, "")
@@ -8374,6 +8404,7 @@ class NativeRuntimePlayer:
         if not voice_active:
             self.current_voice_channel = None
             self.current_voice_volume_percent = 100
+            self.current_voice_profile_id = ""
         self.apply_bgm_runtime_volume()
 
     def apply_runtime_settings(self) -> None:
@@ -8847,6 +8878,7 @@ class NativeRuntimePlayer:
                             "actionEnabled": entry_id in unlocked_ids,
                             "voiceAssetId": str(block.get("voiceAssetId") or ""),
                             "voiceVolume": get_safe_volume_percent(block.get("voiceVolume"), 100),
+                            "voiceProfileId": get_voice_profile_id_from_block(block),
                             "previewAssetId": current_background_asset_id,
                             "previewSpeakerName": speaker_name,
                             "previewText": text,
@@ -9132,6 +9164,7 @@ class NativeRuntimePlayer:
                 "blockType": block_type,
                 "voiceAssetId": str(line.get("voiceAssetId") or "").strip(),
                 "voiceVolume": get_safe_volume_percent(line.get("voiceVolume"), 100),
+                "voiceProfileId": get_voice_profile_id_from_block(line),
             }
         )
         self.text_history = self.text_history[-120:]
@@ -9153,7 +9186,11 @@ class NativeRuntimePlayer:
         if not voice_asset_id:
             self.status_message = "这条历史文本没有绑定语音。"
             return True
-        if self.play_voice(voice_asset_id, volume_percent=item.get("voiceVolume")):
+        if self.play_voice(
+            voice_asset_id,
+            volume_percent=item.get("voiceVolume"),
+            voice_profile_id=item.get("voiceProfileId"),
+        ):
             self.status_message = f"正在回听：{item.get('speakerName') or '历史语音'}"
         else:
             self.status_message = "这条历史文本的语音素材不可用。"
@@ -9763,6 +9800,11 @@ class NativeRuntimePlayer:
         self.overlay_hotspots = []
         self.archive_detail_entry = None
         self.archive_detail_key = None
+        if closing_mode == "voice-mixer":
+            self.overlay_mode = "settings"
+            if not preserve_status:
+                self.status_message = "已返回体验设置。"
+            return
         if self.title_screen_active and closing_mode != "title":
             self.overlay_mode = "title"
             if not preserve_status:
@@ -9916,12 +9958,99 @@ class NativeRuntimePlayer:
                 break
         self.status_message = f"{ARCHIVE_MENU_ITEMS.get(safe_key, '资料馆')} 已打开。"
 
+    def get_voice_mixer_entries(self) -> list[dict]:
+        return collect_voice_mixer_entries(
+            self.chapters,
+            self.characters_by_id,
+            get_character_name=lambda character_id, character: self.localize_value(
+                character,
+                "displayName",
+                character_id,
+            ),
+            narrator_label="旁白",
+        )
+
+    def get_selected_voice_mixer_entry(self) -> dict | None:
+        entries = self.get_voice_mixer_entries()
+        if not entries:
+            self.voice_mixer_index = 0
+            return None
+        self.voice_mixer_index = max(0, min(len(entries) - 1, self.voice_mixer_index))
+        return entries[self.voice_mixer_index]
+
+    def open_voice_mixer_overlay(self) -> None:
+        self.overlay_mode = "voice-mixer"
+        self.voice_mixer_index = 0
+        self.status_message = "角色语音混音已打开。"
+
+    def adjust_voice_mixer_profile(self, direction: int) -> None:
+        entry = self.get_selected_voice_mixer_entry()
+        if not entry:
+            self.status_message = "项目中还没有绑定语音的角色或旁白。"
+            return
+        profile_id = str(entry.get("id") or "")
+        profile = get_voice_mix_profile(self.runtime_settings.get("voiceMix"), profile_id)
+        self.runtime_settings["voiceMix"] = update_voice_mix_profile(
+            self.runtime_settings.get("voiceMix"),
+            profile_id,
+            volume=int(profile["volume"]) + int(direction) * 5,
+        )
+        self.runtime_settings = sanitize_runtime_player_settings(self.runtime_settings)
+        self.persist_runtime_settings()
+        self.apply_runtime_settings()
+        next_profile = get_voice_mix_profile(self.runtime_settings.get("voiceMix"), profile_id)
+        self.status_message = f"{entry.get('label') or profile_id}音量：{next_profile['volume']}%。"
+
+    def toggle_selected_voice_mixer_mute(self) -> None:
+        entry = self.get_selected_voice_mixer_entry()
+        if not entry:
+            self.status_message = "项目中还没有绑定语音的角色或旁白。"
+            return
+        profile_id = str(entry.get("id") or "")
+        profile = get_voice_mix_profile(self.runtime_settings.get("voiceMix"), profile_id)
+        self.runtime_settings["voiceMix"] = update_voice_mix_profile(
+            self.runtime_settings.get("voiceMix"),
+            profile_id,
+            muted=not bool(profile["muted"]),
+        )
+        self.runtime_settings = sanitize_runtime_player_settings(self.runtime_settings)
+        self.persist_runtime_settings()
+        self.apply_runtime_settings()
+        state_label = "已静音" if not profile["muted"] else "已恢复"
+        self.status_message = f"{entry.get('label') or profile_id}{state_label}。"
+
+    def reset_selected_voice_mixer_profile(self) -> None:
+        entry = self.get_selected_voice_mixer_entry()
+        if not entry:
+            return
+        profile_id = str(entry.get("id") or "")
+        self.runtime_settings["voiceMix"] = update_voice_mix_profile(
+            self.runtime_settings.get("voiceMix"),
+            profile_id,
+            volume=100,
+            muted=False,
+        )
+        self.runtime_settings = sanitize_runtime_player_settings(self.runtime_settings)
+        self.persist_runtime_settings()
+        self.apply_runtime_settings()
+        self.status_message = f"{entry.get('label') or profile_id}已恢复为跟随总语音音量。"
+
+    def reset_all_voice_mixer_profiles(self) -> None:
+        self.runtime_settings["voiceMix"] = {}
+        self.runtime_settings = sanitize_runtime_player_settings(self.runtime_settings)
+        self.persist_runtime_settings()
+        self.apply_runtime_settings()
+        self.status_message = "全部角色已恢复为跟随总语音音量。"
+
     def open_settings_overlay(self) -> None:
         self.overlay_mode = "settings"
         self.settings_menu_index = 0
         self.status_message = "体验设置已打开。"
 
     def adjust_runtime_setting(self, setting_key: str, direction: int) -> None:
+        if setting_key == "voiceMixer":
+            self.open_voice_mixer_overlay()
+            return
         if setting_key == "themeMode":
             current = str(self.runtime_settings.get("themeMode") or "auto")
             options = list(RUNTIME_THEME_MODES)
@@ -9981,6 +10110,9 @@ class NativeRuntimePlayer:
         self.status_message = "体验设置已更新。"
 
     def get_setting_value_label(self, setting_key: str) -> str:
+        if setting_key == "voiceMixer":
+            summary = get_voice_mixer_summary(self.get_voice_mixer_entries(), self.runtime_settings.get("voiceMix"))
+            return f"{summary['characterCount']} 个通道 · 已调 {summary['customizedCount']}"
         if setting_key == "themeMode":
             label_map = {"auto": "自动", "light": "浅色", "dark": "深色"}
             selected = str(self.runtime_settings.get("themeMode") or "auto")
@@ -10056,7 +10188,11 @@ class NativeRuntimePlayer:
         if self.current_archive_key == "voices":
             voice_asset_id = str(entry.get("voiceAssetId") or "")
             if voice_asset_id:
-                self.play_voice(voice_asset_id, volume_percent=entry.get("voiceVolume"))
+                self.play_voice(
+                    voice_asset_id,
+                    volume_percent=entry.get("voiceVolume"),
+                    voice_profile_id=entry.get("voiceProfileId"),
+                )
                 self.status_message = f"正在回放语音：{entry.get('name') or '未命名条目'}"
             else:
                 self.status_message = "这个条目当前没有可回放语音。"
@@ -10678,7 +10814,11 @@ class NativeRuntimePlayer:
             if block_type == "dialogue":
                 self.sync_expression_for_dialogue(block)
             if block.get("voiceAssetId"):
-                self.play_voice(block.get("voiceAssetId"), volume_percent=block.get("voiceVolume"))
+                self.play_voice(
+                    block.get("voiceAssetId"),
+                    volume_percent=block.get("voiceVolume"),
+                    voice_profile_id=get_voice_profile_id_from_block(block),
+                )
             else:
                 self.stop_voice()
             return
@@ -10941,7 +11081,11 @@ class NativeRuntimePlayer:
                 if block_type == "dialogue":
                     self.sync_expression_for_dialogue(block)
                 if block.get("voiceAssetId"):
-                    self.play_voice(block.get("voiceAssetId"), volume_percent=block.get("voiceVolume"))
+                    self.play_voice(
+                        block.get("voiceAssetId"),
+                        volume_percent=block.get("voiceVolume"),
+                        voice_profile_id=get_voice_profile_id_from_block(block),
+                    )
                 else:
                     self.stop_voice()
                 self.status_message = f"当前卡片：{get_block_label(block_type)}"
@@ -11027,18 +11171,25 @@ class NativeRuntimePlayer:
             except Exception:
                 return
 
-    def play_voice(self, asset_id: str | None, volume_percent: object | None = None) -> bool:
+    def play_voice(
+        self,
+        asset_id: str | None,
+        volume_percent: object | None = None,
+        voice_profile_id: object | None = None,
+    ) -> bool:
         self.stop_voice()
         sound = self._load_sound(asset_id)
         if not sound:
             return False
         try:
             self.current_voice_volume_percent = get_safe_volume_percent(volume_percent, 100)
+            self.current_voice_profile_id = get_safe_voice_profile_id(voice_profile_id)
             sound.set_volume(self.get_effective_voice_volume())
             channel = sound.play()
             if not channel:
                 self.current_voice_channel = None
                 self.current_voice_volume_percent = 100
+                self.current_voice_profile_id = ""
                 self.update_voice_playback_state(force=True)
                 return False
             self.current_voice_channel = channel
@@ -11047,6 +11198,7 @@ class NativeRuntimePlayer:
         except Exception:
             self.current_voice_channel = None
             self.current_voice_volume_percent = 100
+            self.current_voice_profile_id = ""
             self.update_voice_playback_state(force=True)
             return False
 
@@ -11058,6 +11210,7 @@ class NativeRuntimePlayer:
                 pass
         self.current_voice_channel = None
         self.current_voice_volume_percent = 100
+        self.current_voice_profile_id = ""
         self.update_voice_playback_state(force=True)
 
     def stop_embedded_video_playback(self) -> None:
@@ -12676,6 +12829,8 @@ class NativeRuntimePlayer:
             self.render_diagnostics_overlay()
         elif self.overlay_mode == "settings":
             self.render_settings_overlay()
+        elif self.overlay_mode == "voice-mixer":
+            self.render_voice_mixer_overlay()
         elif self.overlay_mode == "archives":
             self.render_archive_overlay()
         elif self.overlay_mode == "archive-detail":
@@ -13518,14 +13673,20 @@ class NativeRuntimePlayer:
             value_label = self.get_setting_value_label(setting_key)
             value_surface = self.font_ui.render(value_label, True, palette["muted"])
             self.screen.blit(value_surface, (row_rect.right - value_surface.get_width() - 48, row_rect.top + 10))
-            self.screen.blit(self.font_ui.render("◀", True, palette["text"]), (row_rect.right - 32, row_rect.top + 9))
-            self.screen.blit(self.font_ui.render("▶", True, palette["text"]), (row_rect.right - 16, row_rect.top + 9))
+            if setting_key == "voiceMixer":
+                self.screen.blit(self.font_ui.render("↵", True, palette["text"]), (row_rect.right - 28, row_rect.top + 9))
+            else:
+                self.screen.blit(self.font_ui.render("◀", True, palette["text"]), (row_rect.right - 32, row_rect.top + 9))
+                self.screen.blit(self.font_ui.render("▶", True, palette["text"]), (row_rect.right - 16, row_rect.top + 9))
             self.overlay_hotspots.append({"kind": "settings-item", "value": setting_key, "index": index, "rect": row_rect})
 
         range_label = f"{visible_start + 1}-{visible_start + len(visible_items)}/{len(SETTINGS_MENU_ITEMS)}"
         self.screen.blit(self.font_ui.render(range_label, True, palette["muted"]), (panel.right - 96, panel.top + 62))
         hint = "↑↓ 切换 · ←→ 调整 · Enter 切换 · Esc 返回"
         self.screen.blit(self.font_ui.render(hint, True, palette["muted"]), (panel.left + 28, panel.bottom - 44))
+
+    def render_voice_mixer_overlay(self) -> None:
+        render_voice_mixer_overlay_panel(self)
 
     def render_archive_overlay(self) -> None:
         palette = self.get_active_palette()
@@ -14230,6 +14391,8 @@ class NativeRuntimePlayer:
             return self.handle_diagnostics_overlay_event(event)
         if self.overlay_mode == "settings":
             return self.handle_settings_overlay_event(event)
+        if self.overlay_mode == "voice-mixer":
+            return self.handle_voice_mixer_overlay_event(event)
         if self.overlay_mode == "archives":
             return self.handle_archive_overlay_event(event)
         if self.overlay_mode == "archive-detail":
@@ -14472,6 +14635,55 @@ class NativeRuntimePlayer:
                     self.settings_menu_index = int(target.get("index", index))
                     midpoint = target["rect"].centerx
                     self.adjust_runtime_setting(str(target["value"]), -1 if event.pos[0] < midpoint else 1)
+                    return True
+        return True
+
+    def handle_voice_mixer_overlay_event(self, event) -> bool:
+        pygame = self.pygame
+        entries = self.get_voice_mixer_entries()
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_UP and entries:
+                self.voice_mixer_index = (self.voice_mixer_index - 1) % len(entries)
+                return True
+            if event.key == pygame.K_DOWN and entries:
+                self.voice_mixer_index = (self.voice_mixer_index + 1) % len(entries)
+                return True
+            if event.key == pygame.K_LEFT:
+                self.adjust_voice_mixer_profile(-1)
+                return True
+            if event.key == pygame.K_RIGHT:
+                self.adjust_voice_mixer_profile(1)
+                return True
+            if event.key in (pygame.K_RETURN, pygame.K_SPACE, pygame.K_m):
+                self.toggle_selected_voice_mixer_mute()
+                return True
+            if event.key == pygame.K_r:
+                self.reset_selected_voice_mixer_profile()
+                return True
+        elif event.type == pygame.MOUSEWHEEL and entries:
+            direction = -1 if event.y > 0 else 1
+            self.voice_mixer_index = (self.voice_mixer_index + direction) % len(entries)
+            return True
+        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            for target in self.overlay_hotspots:
+                if not target["rect"].collidepoint(event.pos):
+                    continue
+                kind = str(target.get("kind") or "")
+                if kind == "voice-mixer-reset-all":
+                    self.reset_all_voice_mixer_profiles()
+                    return True
+                if kind.startswith("voice-mixer-") and "index" in target:
+                    self.voice_mixer_index = int(target.get("index") or 0)
+                if kind == "voice-mixer-dec":
+                    self.adjust_voice_mixer_profile(-1)
+                    return True
+                if kind == "voice-mixer-inc":
+                    self.adjust_voice_mixer_profile(1)
+                    return True
+                if kind == "voice-mixer-mute":
+                    self.toggle_selected_voice_mixer_mute()
+                    return True
+                if kind == "voice-mixer-select":
                     return True
         return True
 

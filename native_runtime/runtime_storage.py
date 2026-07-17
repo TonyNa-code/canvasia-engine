@@ -18,6 +18,11 @@ except ImportError:  # pragma: no cover - exported native packages import from t
         sanitize_runtime_player_settings,
     )
 
+try:
+    from .runtime_voice_mixer import get_safe_voice_profile_id
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_voice_mixer import get_safe_voice_profile_id
+
 
 SAVE_ROOT_DIR_NAME = ".canvasia-engine"
 SAVE_SUBDIR_NAME = "native-runtime-saves"
@@ -320,6 +325,10 @@ def sanitize_text_history_entries(value: object, limit: int = SNAPSHOT_TEXT_HIST
         text = str(item.get("text") or "").strip()
         if not text:
             continue
+        try:
+            voice_volume = max(0, min(100, int(round(float(item.get("voiceVolume", 100))))))
+        except Exception:
+            voice_volume = 100
         key = str(item.get("key") or "").strip()[:180]
         result.append(
             {
@@ -329,6 +338,8 @@ def sanitize_text_history_entries(value: object, limit: int = SNAPSHOT_TEXT_HIST
                 "text": text[:2000],
                 "blockType": str(item.get("blockType") or "").strip()[:40],
                 "voiceAssetId": str(item.get("voiceAssetId") or "").strip()[:120],
+                "voiceVolume": voice_volume,
+                "voiceProfileId": get_safe_voice_profile_id(item.get("voiceProfileId")),
             }
         )
     return result

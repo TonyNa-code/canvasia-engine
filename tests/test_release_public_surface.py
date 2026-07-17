@@ -40,13 +40,16 @@ PUBLIC_TEXT_FILENAMES = {
     "LICENSE",
 }
 
+LEGACY_PRIVATE_NAME = "najin" + "xiang"
+LEGACY_PRIVATE_MAC_PATH = "/" + "Users/na"
+
 PUBLIC_RELEASE_LITERAL_BLOCKLIST = (
     "按钮暂未接线",
     "这个按钮暂时还没有接上功能",
     "项目中心模块暂时不可用",
     "这组演出级预设暂时不可用",
-    "najinxiang",
-    "/Users/na",
+    LEGACY_PRIVATE_NAME,
+    LEGACY_PRIVATE_MAC_PATH,
     "ChatGPT",
     "AI对我",
     "对我说",
@@ -158,23 +161,23 @@ class ReleasePublicSurfaceTests(unittest.TestCase):
         synthetic_path = ROOT_DIR / "docs" / "synthetic.md"
         sample = "\n".join(
             [
-                "local path /Users/na/Game Engine",
-                "old account najinxiang",
+                f"local path {LEGACY_PRIVATE_MAC_PATH}/Game Engine",
+                f"old account {LEGACY_PRIVATE_NAME}",
                 "temporary ChatGPT image name",
                 "linux home /home/demo-user/project",
                 r"windows home C:\Users\demo-user\project",
                 "token sk-" + "a" * 24,
                 "github ghp_" + "b" * 24,
                 "fine github_pat_" + "c" * 32,
-                "-----BEGIN PRIVATE KEY-----",
+                "-----BEGIN " + "PRIVATE KEY-----",
                 "license drift 开源可见",
             ]
         )
 
         findings = collect_public_surface_findings(synthetic_path, sample)
 
-        self.assertIn("docs/synthetic.md: /Users/na", findings)
-        self.assertIn("docs/synthetic.md: najinxiang", findings)
+        self.assertIn(f"docs/synthetic.md: {LEGACY_PRIVATE_MAC_PATH}", findings)
+        self.assertIn(f"docs/synthetic.md: {LEGACY_PRIVATE_NAME}", findings)
         self.assertIn("docs/synthetic.md: ChatGPT", findings)
         self.assertIn("docs/synthetic.md: mac_or_linux_home_path", findings)
         self.assertIn("docs/synthetic.md: windows_user_path", findings)

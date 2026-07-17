@@ -89,6 +89,12 @@ import {
   sanitizePlaybackSettings as sanitizePlaybackSettingsBase,
 } from "./runtime_settings.js";
 import {
+  collectVoiceMixerEntries,
+  createVoiceMixerController,
+  getVoiceMixVolumeRatio,
+  getVoiceProfileIdFromSnapshot,
+} from "./runtime_voice_mixer.js";
+import {
   applyProjectGameUiSkin as applyProjectGameUiSkinBase,
   buildDialogBoxPresentation as buildDialogBoxPresentationBase,
   getProjectDialogBoxConfig,
@@ -236,6 +242,9 @@ const refs = {
   menuVoiceDuckingRatioRange: document.getElementById("menuVoiceDuckingRatioRange"),
   menuVoiceDuckingRatioValue: document.getElementById("menuVoiceDuckingRatioValue"),
   menuVoiceDuckingToggleButton: document.getElementById("menuVoiceDuckingToggleButton"),
+  voiceMixerSummary: document.getElementById("voiceMixerSummary"),
+  voiceMixerList: document.getElementById("voiceMixerList"),
+  resetVoiceMixerButton: document.getElementById("resetVoiceMixerButton"),
   achievementDialog: document.getElementById("achievementDialog"),
   achievementDialogSummary: document.getElementById("achievementDialogSummary"),
   achievementDialogHero: document.getElementById("achievementDialogHero"),
@@ -426,6 +435,7 @@ const activeSfxAudios = new Set();
 let musicRoomAudio = null;
 let voiceReplayAudio = null;
 let runtimeUiThemeAutoRefreshTimer = null;
+let voiceMixerController = null;
 
 init();
 
@@ -552,6 +562,22 @@ function init() {
   refs.menuVoiceVolumeRange?.addEventListener("input", handleVoiceVolumeChange);
   refs.menuVoiceDuckingRatioRange?.addEventListener("input", handleVoiceDuckingRatioChange);
   refs.menuVoiceDuckingToggleButton?.addEventListener("click", toggleVoiceDuckingEnabled);
+  voiceMixerController = createVoiceMixerController({
+    refs: {
+      summary: refs.voiceMixerSummary,
+      list: refs.voiceMixerList,
+      resetButton: refs.resetVoiceMixerButton,
+    },
+    getEntries: getRuntimeVoiceMixerEntries,
+    getProfiles: () => state.playback.voiceMix,
+    setProfiles: (profiles) => {
+      state.playback.voiceMix = profiles;
+    },
+    persist: persistPlaybackSettings,
+    updateAudio: updateRuntimeAudioVolumes,
+    escapeHtml,
+  });
+  voiceMixerController.attach();
   document.addEventListener("keydown", handleGlobalKeydown);
   document.addEventListener("pointerdown", () => setRuntimeInputMode("pointer"), { passive: true });
   startRuntimeGamepadInput();
@@ -2757,7 +2783,10 @@ async function playVoiceReplayPreview(entryId) {
   stopVoiceReplayPreview({ rerender: false });
 
   const audio = new Audio(entry.voiceUrl);
-  audio.volume = getVolumeRatio(state.playback.voiceVolume, 92) * getVolumeRatio(entry.voiceVolume, 100);
+  audio.volume =
+    getVolumeRatio(state.playback.voiceVolume, 92) *
+    getVolumeRatio(entry.voiceVolume, 100) *
+    getVoiceMixVolumeRatio(state.playback.voiceMix, entry.voiceProfileId);
   audio.addEventListener("ended", () => {
     stopVoiceReplayPreview();
   });
@@ -3877,6 +3906,7 @@ function getVoiceReplayEntries() {
         blockType: block.type,
         text: getBlockText(block).trim(),
         speakerName: block.type === "dialogue" ? getCharacterName(block.speakerId) : "旁白",
+        voiceProfileId: getVoiceProfileIdFromSnapshot({ block }),
         voiceAssetId: block.voiceAssetId,
         voiceVolume: getSafeVolumePercent(block.voiceVolume, 100),
         voiceName: voiceAsset.name || block.voiceAssetId,
@@ -5107,7 +5137,19 @@ function syncVoice(snapshot) {
 }
 
 function getRuntimeVoiceTargetVolume(snapshot) {
-  return getRuntimeVoiceTargetVolumeBase(state.playback, snapshot);
+  return (
+    getRuntimeVoiceTargetVolumeBase(state.playback, snapshot) *
+    getVoiceMixVolumeRatio(state.playback.voiceMix, getVoiceProfileIdFromSnapshot(snapshot))
+  );
+}
+
+function getRuntimeVoiceMixerEntries() {
+  return collectVoiceMixerEntries({
+    scenes: data.scenes,
+    charactersById: data.charactersById,
+    getCharacterName: (characterId) => getCharacterName(characterId),
+    narratorLabel: "旁白",
+  });
 }
 
 function renderPlaybackControls(snapshot = getCurrentSnapshot()) {
@@ -5240,6 +5282,8 @@ function renderPlaybackControls(snapshot = getCurrentSnapshot()) {
   if (refs.replayVoiceButton) {
     refs.replayVoiceButton.disabled = !getVoiceAssetId(snapshot);
   }
+
+  voiceMixerController?.render();
 
   applyRuntimeUiTheme(state.playback.uiThemeMode);
   renderRuntimeUiThemeButtons();

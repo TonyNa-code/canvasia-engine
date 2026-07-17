@@ -61,6 +61,7 @@ The project already includes a visual editor, export pipeline, native runtime pr
 - Multi-language project settings for default language and player-selectable languages
 - Localized runtime text for scene names, chapter names, dialogue, choices, and character names, with safe fallback when a translation is missing
 - Localization coverage checks with Markdown / CSV exports and safe CSV re-import for character, chapter, scene, and story-card translations
+- Per-character voice mixing in Web and native Runtime: combine global voice, character / narrator, and per-line levels; mute individual channels; persist preferences; and apply the same mix to playback, history replay, and the voice archive
 - Canvasia Assistant with local template mode and optional creator-provided OpenAI, DeepSeek, Qwen, Kimi, Zhipu GLM, or compatible API providers
 - Optional OpenAI Image asset generation for backgrounds, sprites, CGs, and UI materials, with style-hint presets, sprite-to-character expression binding, prompt/model validation, and local-only API key handling
 - Formal save/load and quick save/load with scene thumbnails in the native Runtime, plus system menu, text history, autoplay, skip-read, voice replay, and controller-first navigation with directional hold-repeat across Web and native Runtime title screens, choices, saves, settings, history, and archives
@@ -92,7 +93,7 @@ The project already includes a visual editor, export pipeline, native runtime pr
 | Particles and Presentation | Available | Particle presets, custom particle settings, scene mood recipes, camera, filters, flashes, shakes, fades, character presentation effects, and independently animated prop / foreground / cut-in stage-image layers. |
 | Live2D / 3D Assets | Preview | Live2D, 3D character models, and 3D scene assets can be imported; native Runtime exports 3D structure and risk reports. |
 | Web / Desktop Exports | Preview | Web playable and desktop packages include adaptive low-overhead gamepad polling, directional focus navigation, and keyboard / mouse controls; signing and notarization depend on release notes. |
-| Native Runtime | Preview | Covers the core playback path, settings, visual save slots with locally stored scene thumbnails, controller navigation and reading shortcuts, history, autoplay, state-safe story rollback, video fallback, 3D reports, first archive systems, and editor-side Runtime capability matrices with Web / native acceptance checklists plus VN essentials maturity summaries. |
+| Native Runtime | Preview | Covers the core playback path, settings, persistent per-character / narrator voice mixing, visual save slots with locally stored scene thumbnails, controller navigation and reading shortcuts, history, autoplay, state-safe story rollback, video fallback, 3D reports, first archive systems, and editor-side Runtime capability matrices with Web / native acceptance checklists plus VN essentials maturity summaries. |
 | Mobile Runtime | Experimental planning | Touch, audio policy, and layout adaptation are still being explored. |
 
 ## Screenshots
