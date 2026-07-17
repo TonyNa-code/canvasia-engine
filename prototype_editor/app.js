@@ -5296,7 +5296,7 @@ function handleInput(event) {
 
   if (event.target.id === "creativeAssistantHistorySearchInput") {
     state.creativeAssistantHistoryQuery = event.target.value ?? "";
-    refreshCreativeAssistantPanel({ focusHistorySearch: true });
+    scheduleCreativeAssistantHistoryRefresh();
     return;
   }
 
@@ -33773,6 +33773,19 @@ function renderCreativeAssistantPanel(scene, selectedBlock) {
     buildCreativeAssistantPanelOptions(scene, selectedBlock)
   );
 }
+
+let creativeAssistantHistoryRefreshFrame = 0;
+
+function scheduleCreativeAssistantHistoryRefresh() {
+  if (creativeAssistantHistoryRefreshFrame) {
+    return;
+  }
+  creativeAssistantHistoryRefreshFrame = requestAnimationFrame(() => {
+    creativeAssistantHistoryRefreshFrame = 0;
+    refreshCreativeAssistantPanel({ focusHistorySearch: true });
+  });
+}
+
 function refreshCreativeAssistantPanel(options = {}) {
   if (!refs.creativeAssistantPanel) {
     return;

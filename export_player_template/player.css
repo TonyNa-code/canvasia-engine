@@ -22,7 +22,7 @@
 body {
   margin: 0;
   min-height: 100vh;
-  font-family: "Helvetica Neue", "PingFang SC", "Hiragino Sans GB", sans-serif;
+  font-family: var(--game-ui-font-family, "Helvetica Neue", "PingFang SC", "Hiragino Sans GB", sans-serif);
   color: var(--ink);
   background:
     radial-gradient(circle at top, rgba(255, 218, 191, 0.78), transparent 42%),
@@ -58,7 +58,7 @@ button {
 .player-topbar h1,
 .start-card h2 {
   margin: 8px 0 0;
-  font-family: "Georgia", "Times New Roman", serif;
+  font-family: var(--game-ui-heading-font-family, "Georgia", "Times New Roman", serif);
   font-weight: 600;
 }
 
@@ -1338,7 +1338,7 @@ button {
 .save-dialog-head h2 {
   margin: 6px 0 0;
   font-size: 28px;
-  font-family: "Georgia", "Times New Roman", serif;
+  font-family: var(--game-ui-heading-font-family, "Georgia", "Times New Roman", serif);
 }
 
 .save-dialog-summary {
@@ -2177,8 +2177,10 @@ body::after {
 .player-topbar h1,
 .start-card h2,
 .save-dialog-head h2 {
-  font-family: "SF Pro Display", "Avenir Next", "PingFang SC",
-    "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  font-family: var(
+    --game-ui-heading-font-family,
+    "SF Pro Display", "Avenir Next", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif
+  );
   font-weight: 700;
   letter-spacing: 0.04em;
 }
@@ -4527,12 +4529,12 @@ body {
 
 html[data-game-ui-font="serif"] body,
 html[data-game-ui-font="serif"] button {
-  font-family: "Songti SC", "STSong", "Noto Serif CJK SC", "Georgia", serif;
+  font-family: var(--game-ui-font-family, "Songti SC", "STSong", "Noto Serif CJK SC", "Georgia", serif);
 }
 
 html[data-game-ui-font="rounded"] body,
 html[data-game-ui-font="rounded"] button {
-  font-family: "Avenir Next Rounded", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-family: var(--game-ui-font-family, "Avenir Next Rounded", "PingFang SC", "Microsoft YaHei", sans-serif);
 }
 
 html[data-game-ui-surface="solid"] .stage-frame,

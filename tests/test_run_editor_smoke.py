@@ -3282,6 +3282,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / "runtime_controls.js").is_file())
         self.assertTrue((build_dir / "runtime_gamepad.js").is_file())
         self.assertTrue((build_dir / "runtime_settings.js").is_file())
+        self.assertTrue((build_dir / "runtime_ui_skin.js").is_file())
         self.assertTrue((build_dir / "runtime_i18n.js").is_file())
         self.assertTrue((build_dir / "runtime_audio.js").is_file())
         self.assertTrue((build_dir / "runtime_preload.js").is_file())
@@ -3382,6 +3383,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["playerRuntimeConditions"], "runtime_conditions.js")
         self.assertEqual(manifest["files"]["playerRuntimeChoiceAvailability"], "runtime_choice_availability.js")
         self.assertEqual(manifest["files"]["playerRuntimeSettings"], "runtime_settings.js")
+        self.assertEqual(manifest["files"]["playerRuntimeUiSkin"], "runtime_ui_skin.js")
         self.assertEqual(manifest["files"]["playerRuntimeI18n"], "runtime_i18n.js")
         self.assertEqual(manifest["files"]["playerRuntimeAudio"], "runtime_audio.js")
         self.assertEqual(manifest["files"]["playerRuntimePreload"], "runtime_preload.js")
@@ -3465,6 +3467,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 "runtime_controls.js",
                 "runtime_gamepad.js",
                 "runtime_settings.js",
+                "runtime_ui_skin.js",
                 "runtime_i18n.js",
                 "runtime_audio.js",
                 "runtime_preload.js",
@@ -4877,6 +4880,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / "app" / "runtime_controls.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_gamepad.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_settings.js").is_file())
+        self.assertTrue((build_dir / "app" / "runtime_ui_skin.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_i18n.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_audio.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_scene_prefetch.js").is_file())
@@ -4955,6 +4959,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["appRuntimeConditions"], "app/runtime_conditions.js")
         self.assertEqual(manifest["files"]["appRuntimeChoiceAvailability"], "app/runtime_choice_availability.js")
         self.assertEqual(manifest["files"]["appRuntimeI18n"], "app/runtime_i18n.js")
+        self.assertEqual(manifest["files"]["appRuntimeUiSkin"], "app/runtime_ui_skin.js")
         self.assertEqual(manifest["files"]["appRuntimeCharacterMotion"], "app/runtime_character_motion.js")
         self.assertEqual(manifest["files"]["appRuntimeTextEffects"], "app/runtime_text_effects.js")
         self.assertEqual(manifest["files"]["storyRouteMap"], run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME)
@@ -5002,6 +5007,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 "app/runtime_controls.js",
                 "app/runtime_gamepad.js",
                 "app/runtime_settings.js",
+                "app/runtime_ui_skin.js",
                 "app/runtime_i18n.js",
                 "app/runtime_audio.js",
                 "app/runtime_scene_prefetch.js",
@@ -5044,6 +5050,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / "app" / "runtime_controls.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_gamepad.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_settings.js").is_file())
+        self.assertTrue((build_dir / "app" / "runtime_ui_skin.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_i18n.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_audio.js").is_file())
         self.assert_export_playtest_guide_file(build_dir / run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME)
@@ -5118,6 +5125,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["appRuntimeVisualConstants"], "app/runtime_visual_constants.js")
         self.assertEqual(manifest["files"]["appRuntimeConditions"], "app/runtime_conditions.js")
         self.assertEqual(manifest["files"]["appRuntimeI18n"], "app/runtime_i18n.js")
+        self.assertEqual(manifest["files"]["appRuntimeUiSkin"], "app/runtime_ui_skin.js")
         self.assertEqual(manifest["files"]["appRuntimeCharacterMotion"], "app/runtime_character_motion.js")
         self.assertEqual(manifest["files"]["appRuntimeTextEffects"], "app/runtime_text_effects.js")
         self.assertEqual(manifest["files"]["storyRouteMap"], run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME)
@@ -5165,6 +5173,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 "app/runtime_controls.js",
                 "app/runtime_gamepad.js",
                 "app/runtime_settings.js",
+                "app/runtime_ui_skin.js",
                 "app/runtime_i18n.js",
                 "app/runtime_audio.js",
                 "app/runtime_scene_prefetch.js",
@@ -5282,6 +5291,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / "app" / "runtime_controls.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_gamepad.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_settings.js").is_file())
+        self.assertTrue((build_dir / "app" / "runtime_ui_skin.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_i18n.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_audio.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_scene_prefetch.js").is_file())
@@ -5359,6 +5369,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["appRuntimeVisualConstants"], "app/runtime_visual_constants.js")
         self.assertEqual(manifest["files"]["appRuntimeConditions"], "app/runtime_conditions.js")
         self.assertEqual(manifest["files"]["appRuntimeI18n"], "app/runtime_i18n.js")
+        self.assertEqual(manifest["files"]["appRuntimeUiSkin"], "app/runtime_ui_skin.js")
         self.assertEqual(manifest["files"]["appRuntimeCharacterMotion"], "app/runtime_character_motion.js")
         self.assertEqual(manifest["files"]["appRuntimeTextEffects"], "app/runtime_text_effects.js")
         self.assertEqual(manifest["files"]["storyRouteMap"], run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME)
@@ -5406,6 +5417,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 "app/runtime_controls.js",
                 "app/runtime_gamepad.js",
                 "app/runtime_settings.js",
+                "app/runtime_ui_skin.js",
                 "app/runtime_i18n.js",
                 "app/runtime_audio.js",
                 "app/runtime_scene_prefetch.js",
@@ -5441,6 +5453,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_controls.js").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_gamepad.js").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_settings.js").is_file())
+        self.assertTrue((bundle_dir / "export_player_template" / "runtime_ui_skin.js").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_i18n.js").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_audio.js").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_scene_prefetch.js").is_file())

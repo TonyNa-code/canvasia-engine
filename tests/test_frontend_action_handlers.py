@@ -18,6 +18,7 @@ PLAYER_PATH = ROOT_DIR / "export_player_template" / "player.js"
 RUNTIME_CONTROLS_PATH = ROOT_DIR / "export_player_template" / "runtime_controls.js"
 RUNTIME_GAMEPAD_PATH = ROOT_DIR / "export_player_template" / "runtime_gamepad.js"
 RUNTIME_SETTINGS_PATH = ROOT_DIR / "export_player_template" / "runtime_settings.js"
+RUNTIME_UI_SKIN_PATH = ROOT_DIR / "export_player_template" / "runtime_ui_skin.js"
 RUNTIME_AUDIO_PATH = ROOT_DIR / "export_player_template" / "runtime_audio.js"
 RUNTIME_CHARACTER_MOTION_PATH = ROOT_DIR / "export_player_template" / "runtime_character_motion.js"
 RUNTIME_DATA_PATH = ROOT_DIR / "export_player_template" / "runtime_data.js"
@@ -2975,10 +2976,14 @@ class FrontendActionHandlerTests(unittest.TestCase):
     def test_creative_assistant_history_search_refreshes_only_its_panel(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
         handle_input = _extract_function_source(source, "handleInput")
+        schedule_refresh = _extract_function_source(source, "scheduleCreativeAssistantHistoryRefresh")
         refresh_panel = _extract_function_source(source, "refreshCreativeAssistantPanel")
         render_story = _extract_function_source(source, "renderStoryScreen")
 
-        self.assertIn("refreshCreativeAssistantPanel({ focusHistorySearch: true });", handle_input)
+        self.assertIn("scheduleCreativeAssistantHistoryRefresh();", handle_input)
+        self.assertIn("creativeAssistantHistoryRefreshFrame", schedule_refresh)
+        self.assertIn("requestAnimationFrame", schedule_refresh)
+        self.assertIn("refreshCreativeAssistantPanel({ focusHistorySearch: true });", schedule_refresh)
         self.assertIn("refs.creativeAssistantPanel.innerHTML", refresh_panel)
         self.assertIn('querySelector("#creativeAssistantHistorySearchInput")', refresh_panel)
         self.assertIn("searchInput.value !== focusQuery", refresh_panel)
@@ -6285,6 +6290,27 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("translateRuntimeGamepads", runtime_gamepad_source)
         self.assertIn("chooseDirectionalFocusTarget", runtime_gamepad_source)
         self.assertIn('html[data-runtime-input="gamepad"]', player_css)
+
+    def test_web_runtime_ui_skin_is_modular_and_supports_project_font_assets(self) -> None:
+        player_source = PLAYER_PATH.read_text(encoding="utf-8")
+        runtime_ui_skin_source = RUNTIME_UI_SKIN_PATH.read_text(encoding="utf-8")
+        player_css = (ROOT_DIR / "export_player_template" / "player.css").read_text(encoding="utf-8")
+        apply_skin = _extract_function_source(player_source, "applyProjectGameUiSkin")
+        build_dialog = _extract_function_source(player_source, "buildDialogBoxPresentation")
+
+        self.assertIn('from "./runtime_ui_skin.js"', player_source)
+        self.assertIn("applyProjectGameUiSkinBase(project, {", apply_skin)
+        self.assertIn("documentRef: document", apply_skin)
+        self.assertIn("getAssetUrl", apply_skin)
+        self.assertIn("buildDialogBoxPresentationBase(theme, project, {", build_dialog)
+        self.assertIn("getAssetUrl", build_dialog)
+        self.assertIn("export function getProjectDialogBoxConfig", runtime_ui_skin_source)
+        self.assertIn("export function getProjectGameUiConfig", runtime_ui_skin_source)
+        self.assertIn("export async function applyProjectGameUiFont", runtime_ui_skin_source)
+        self.assertIn("new FontFaceCtor", runtime_ui_skin_source)
+        self.assertIn('root.dataset.gameUiCustomFont = "fallback"', runtime_ui_skin_source)
+        self.assertIn("var(--game-ui-font-family", player_css)
+        self.assertIn("var(--game-ui-heading-font-family", player_css)
 
     def test_web_runtime_applies_project_playback_defaults_before_player_overrides(self) -> None:
         player_source = PLAYER_PATH.read_text(encoding="utf-8")

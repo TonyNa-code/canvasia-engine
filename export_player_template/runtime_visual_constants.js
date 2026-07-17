@@ -938,6 +938,8 @@ export const DEFAULT_PROJECT_GAME_UI_CONFIG = {
   layoutPreset: "balanced",
   titleLayout: "center",
   fontStyle: "modern",
+  fontFamily: "",
+  fontAssetId: "",
   surfaceStyle: "glass",
   brandMode: "project",
   sidePanelMode: "full",

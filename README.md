@@ -71,7 +71,7 @@ The project already includes a visual editor, export pipeline, native runtime pr
 - Director cue-sheet exports that turn each scene into story, visual, audio, route, and effect production beats
 - Release Candidate manifests that bundle project inventory, deliverable status, release risks, unlockable-content readiness, and manual signoff checks for testers and public preview handoff
 - Unlockable Content manifests with Markdown / CSV exports for CG gallery, music room, voice replay, character archive, location archive, narration archive, relationship archive, chapter replay, ending collection, and achievement coverage
-- Custom game UI skins, UI Kit binding, nine-slice textures, button states, layout controls, and visual novel textbox design
+- Custom game UI skins, UI Kit binding, nine-slice textures, button states, layout controls, bound font assets with safe system-font fallback across Web / desktop playback, and visual novel textbox design
 - Extra galleries: CG replay, music room, character archive, location archive, narration archive, relationship archive, achievements, chapter replay, ending replay, and voice replay
 - Advanced particle presets, project particle libraries, camera effects, screen filters, flashes, shakes, and fade transitions
 - Live2D / 3D character and 3D scene asset import, plus native-runtime 3D inspection reports for glTF / GLB / VRM assets
@@ -87,7 +87,7 @@ The project already includes a visual editor, export pipeline, native runtime pr
 | Multi-language / i18n | Preview | Project language settings, localization coverage reports, safe CSV re-import for character, chapter, scene, and story-card translations, export metadata, Web Runtime language switching, native Runtime language switching, and fallback behavior. |
 | Canvasia Assistant | Available | Local template mode plus optional creator-owned API keys for major compatible providers. |
 | Project Safety Net | Available | Snapshots, restore, crash recovery, project doctor, repair queue, cross-module production backlog queues, release gates, release-control reports, Release Candidate manifests, one-click release-safe polish with a safety checkpoint and receipt, VN baseline quality checks, and VN essentials maturity checks for foundational issues such as BGM scope / fades, textbox readability, save-slot count, default UI skin, font binding, and media readiness. |
-| Game UI Customization | Available | Project UI skins, button states, nine-slice images, layout tuning, and textbox styling. |
+| Game UI Customization | Available | Project UI skins, button states, nine-slice images, layout tuning, bound font assets with safe fallback, and textbox styling. |
 | Extras / Replay Systems | Available | CG, music, character, location, narration, relationship, achievement, chapter, ending, and voice replay systems, plus exportable Unlockable Content manifests that catch missing gallery files, voice replay gaps, character archive visuals, and unreachable endings. |
 | Particles and Presentation | Available | Particle presets, custom particle settings, scene mood recipes, camera, filters, flashes, shakes, fades, character presentation effects, and independently animated prop / foreground / cut-in stage-image layers. |
 | Live2D / 3D Assets | Preview | Live2D, 3D character models, and 3D scene assets can be imported; native Runtime exports 3D structure and risk reports. |

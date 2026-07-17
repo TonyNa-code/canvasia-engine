@@ -41,6 +41,8 @@ class FrontendRuntimeVisualConstantsModuleTests(unittest.TestCase):
                 savePageSize: constants.SAVE_DIALOG_PAGE_SIZE,
                 dialogPreset: constants.DEFAULT_PROJECT_DIALOG_BOX_CONFIG.preset,
                 gameUiPreset: constants.DEFAULT_PROJECT_GAME_UI_CONFIG.preset,
+                gameUiFontFamily: constants.DEFAULT_PROJECT_GAME_UI_CONFIG.fontFamily,
+                gameUiFontAssetId: constants.DEFAULT_PROJECT_GAME_UI_CONFIG.fontAssetId,
                 gameUiPresets: Object.keys(constants.PROJECT_GAME_UI_PRESETS).sort(),
                 dialogPresets: Object.keys(constants.PROJECT_DIALOG_BOX_PRESETS).sort(),
               }},
@@ -68,6 +70,8 @@ class FrontendRuntimeVisualConstantsModuleTests(unittest.TestCase):
         self.assertEqual(payload["uiDefaults"]["savePageSize"], 6)
         self.assertEqual(payload["uiDefaults"]["dialogPreset"], "moonlight")
         self.assertEqual(payload["uiDefaults"]["gameUiPreset"], "stellar")
+        self.assertEqual(payload["uiDefaults"]["gameUiFontFamily"], "")
+        self.assertEqual(payload["uiDefaults"]["gameUiFontAssetId"], "")
         self.assertIn("minimal", payload["uiDefaults"]["gameUiPresets"])
         self.assertIn("transparent", payload["uiDefaults"]["dialogPresets"])
 
