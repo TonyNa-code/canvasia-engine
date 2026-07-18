@@ -22,7 +22,7 @@ def render_runtime_settings_overlay(
     player.draw_game_ui_panel_frame(panel, "system")
     player.screen.blit(player.font_title.render("体验设置", True, palette["text"]), (panel.left + 28, panel.top + 24))
     player.screen.blit(
-        player.font_ui.render("主题 / 显示 / 视觉舒适度 / 阅读辅助 / 文本框 / 自动播放 / 音量", True, palette["muted"]),
+        player.font_ui.render("主题 / 显示 / 一键阅读方案 / 细节微调 / 自动播放 / 音量", True, palette["muted"]),
         (panel.left + 28, panel.top + 58),
     )
 

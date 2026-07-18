@@ -65,7 +65,7 @@ class MaintainabilityCheckToolTests(unittest.TestCase):
         self.assertEqual(module_guard["appGlobalsMissingFromGuard"], [])
         self.assertEqual(module_guard["allowedUnguardedAppGlobals"], ["CanvasiaEditorModuleGuard", "CanvasiaProjectMilestones"])
         self.assertIn("CanvasiaEditorAudioTimingEstimator", module_guard["guardGlobalsNotUsedByApp"])
-        self.assertEqual(module_guard["firstRequirement"]["script"], "../export_player_template/runtime_visual_comfort.js")
+        self.assertEqual(module_guard["firstRequirement"]["script"], "../export_player_template/runtime_reading_profiles.js")
         self.assertEqual(module_guard["lastRequirement"]["script"], "./modules/command_palette.js")
         self.assertEqual(summary["moduleGuardStatus"], "passed")
         self.assertEqual(summary["moduleGuardRequirementCount"], module_guard["requirementCount"])

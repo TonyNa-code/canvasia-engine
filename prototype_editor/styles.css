@@ -11199,15 +11199,26 @@ html[data-ui-theme="light"] select {
 
 .preview-stage .dialog-box .dialog-speaker {
   color: var(--dialog-box-speaker, inherit);
+  font-size: var(--runtime-speaker-font-size, 18px);
 }
 
 .preview-stage .dialog-box .dialog-text {
   color: var(--dialog-box-text, inherit);
+  font-size: var(--runtime-message-font-size, 16px);
 }
 
 .preview-stage .dialog-box .preview-hint,
 .preview-stage .dialog-box .preview-choice-button span {
   color: var(--dialog-box-hint, inherit);
+}
+
+.preview-stage .dialog-box .preview-hint,
+.preview-stage .dialog-box .preview-choice-button span {
+  font-size: var(--runtime-meta-font-size, 13px);
+}
+
+.preview-stage .dialog-box .preview-choice-button strong {
+  font-size: var(--runtime-choice-font-size, 15px);
 }
 
 .preview-stage .dialog-box .preview-choice-button {

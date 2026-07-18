@@ -426,6 +426,29 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
         ]
         self.assertFalse(runtime_errors, "\n".join(runtime_errors))
 
+    def test_editor_preview_reading_profile_updates_typography_and_custom_state(self) -> None:
+        self.open_project_by_title("心跳时差")
+        self.open_preview_screen()
+        self.page.locator("#previewSystemMenuButton").click()
+        self.page.locator("#previewSystemMenu").wait_for(state="visible", timeout=10000)
+        self.page.locator("#previewMenuReadingProfileSelect").select_option("large")
+        self.page.wait_for_function(
+            """() => {
+                const stage = document.querySelector('#previewStage .stage-scene');
+                const message = document.querySelector('#previewStage .dialog-text');
+                return document.querySelector('#previewMenuTextScaleSelect')?.value === '125'
+                  && document.querySelector('#previewMenuVisualComfortSelect')?.value === 'gentle'
+                  && stage?.dataset.visualComfort === 'gentle'
+                  && Boolean(message)
+                  && getComputedStyle(message).fontSize === '20px';
+            }""",
+            timeout=10000,
+        )
+        self.assertEqual(self.page.locator("#previewMenuReadingProfileSelect").input_value(), "large")
+
+        self.page.locator("#previewMenuDialogOpacitySelect").select_option("60")
+        self.assertEqual(self.page.locator("#previewMenuReadingProfileSelect").input_value(), "custom")
+
     def export_web_build(self) -> str:
         self.open_preview_screen()
         self.page.get_by_role("button", name="导出试玩包").first.click()
@@ -1706,6 +1729,22 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
             )
             self.assertEqual(player_page.locator("#visualComfortSelect").input_value(), "gentle")
             self.assertEqual(player_page.locator("#menuVisualComfortSelect").input_value(), "gentle")
+
+            player_page.locator("#menuReadingProfileSelect").select_option("large")
+            player_page.wait_for_function(
+                """() => document.documentElement.style.getPropertyValue('--runtime-message-font-size') === '20.00px'
+                  && document.documentElement.dataset.visualComfort === 'gentle'"""
+            )
+            self.assertEqual(player_page.locator("#readingProfileSelect").input_value(), "large")
+            self.assertEqual(player_page.locator("#menuTextScaleSelect").input_value(), "125")
+            self.assertEqual(player_page.locator("#menuDialogOpacitySelect").input_value(), "100")
+
+            player_page.locator("#menuDialogOpacitySelect").select_option("60")
+            self.assertEqual(player_page.locator("#menuReadingProfileSelect").input_value(), "custom")
+            player_page.reload(wait_until="domcontentloaded")
+            self.assertEqual(player_page.locator("#readingProfileSelect").input_value(), "custom")
+            self.assertEqual(player_page.locator("#textScaleSelect").input_value(), "125")
+            self.assertEqual(player_page.locator("#dialogOpacitySelect").input_value(), "60")
         finally:
             player_page.close()
 

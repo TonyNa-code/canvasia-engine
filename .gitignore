@@ -16,6 +16,7 @@ projects/
 
 .pytest_cache/
 playwright-report/
+.playwright-cli/
 test-results/
 release_preview/
 verification_reports/

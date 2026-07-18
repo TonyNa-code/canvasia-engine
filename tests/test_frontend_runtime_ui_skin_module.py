@@ -64,11 +64,26 @@ class FrontendRuntimeUiSkinModuleTests(unittest.TestCase):
             }, {
               getAssetUrl: (id) => `assets/${id}\"\n.png`,
             });
+            const softenedPresentation = tools.buildDialogBoxPresentation("project", {
+              dialogBoxConfig: {
+                preset: "custom",
+                backgroundColor: "#102030",
+                backgroundOpacity: 80,
+                borderColor: "#405060",
+                borderOpacity: 40,
+                panelAssetId: "panel",
+                panelAssetOpacity: 60,
+              },
+            }, {
+              getAssetUrl: (id) => `assets/${id}.png`,
+              dialogBoxOpacityPercent: 50,
+            });
             process.stdout.write(JSON.stringify({
               dialog,
               gameUi,
               rgba: tools.toRgbaString("#102030", 25),
               presentation,
+              softenedPresentation,
             }));
             """
         )
@@ -89,6 +104,9 @@ class FrontendRuntimeUiSkinModuleTests(unittest.TestCase):
         self.assertEqual(payload["rgba"], "rgba(16, 32, 48, 0.25)")
         self.assertNotIn("\n", payload["presentation"]["style"])
         self.assertIn("%22", payload["presentation"]["style"])
+        self.assertIn("rgba(16, 32, 48, 0.40)", payload["softenedPresentation"]["style"])
+        self.assertIn("rgba(64, 80, 96, 0.20)", payload["softenedPresentation"]["style"])
+        self.assertIn("--dialog-box-art-opacity: 0.30", payload["softenedPresentation"]["style"])
 
     def test_editor_and_runtime_share_the_same_safe_ui_configuration(self) -> None:
         script = textwrap.dedent(

@@ -1,4 +1,5 @@
 import { getSafeDialogTheme } from "./runtime_settings.js";
+import { getSafeDialogBoxOpacityPercent } from "./runtime_reading_profiles.js";
 import {
   DEFAULT_PROJECT_DIALOG_BOX_CONFIG,
   DEFAULT_PROJECT_GAME_UI_CONFIG,
@@ -529,6 +530,8 @@ export function applyProjectGameUiSkin(project = {}, options = {}) {
 
 export function buildDialogBoxPresentation(theme, project = {}, options = {}) {
   const safeTheme = getSafeDialogTheme(theme);
+  const opacityScale = getSafeDialogBoxOpacityPercent(options.dialogBoxOpacityPercent, 100) / 100;
+  const scaleOpacity = (value) => clamp(getSafeNumber(value, 0) * opacityScale, 0, 100);
   if (safeTheme !== "project") {
     const base = getDialogThemeBaseColors(safeTheme);
     const blurStrength = safeTheme === "paper" ? 4 : safeTheme === "transparent" ? 0 : 10;
@@ -543,8 +546,8 @@ export function buildDialogBoxPresentation(theme, project = {}, options = {}) {
         "--dialog-box-padding-x: 18px;",
         "--dialog-box-padding-y: 14px;",
         `--dialog-box-radius: ${getDialogShapeRadius("rounded", 18)}px;`,
-        `--dialog-box-bg: ${toRgbaString(base.backgroundColor, base.backgroundOpacity)};`,
-        `--dialog-box-border: ${toRgbaString(base.borderColor, base.borderOpacity)};`,
+        `--dialog-box-bg: ${toRgbaString(base.backgroundColor, scaleOpacity(base.backgroundOpacity))};`,
+        `--dialog-box-border: ${toRgbaString(base.borderColor, scaleOpacity(base.borderOpacity))};`,
         `--dialog-box-border-width: ${borderWidth}px;`,
         `--dialog-box-text: ${base.textColor};`,
         `--dialog-box-speaker: ${base.speakerColor};`,
@@ -571,15 +574,15 @@ export function buildDialogBoxPresentation(theme, project = {}, options = {}) {
       `--dialog-box-padding-x: ${config.paddingX}px;`,
       `--dialog-box-padding-y: ${config.paddingY}px;`,
       `--dialog-box-radius: ${getDialogShapeRadius(config.shape, config.shape === "rounded" ? 22 : 18)}px;`,
-      `--dialog-box-bg: ${toRgbaString(config.backgroundColor, config.backgroundOpacity)};`,
-      `--dialog-box-border: ${toRgbaString(config.borderColor, config.borderOpacity)};`,
+      `--dialog-box-bg: ${toRgbaString(config.backgroundColor, scaleOpacity(config.backgroundOpacity))};`,
+      `--dialog-box-border: ${toRgbaString(config.borderColor, scaleOpacity(config.borderOpacity))};`,
       `--dialog-box-border-width: ${config.borderWidth}px;`,
       `--dialog-box-text: ${config.textColor};`,
       `--dialog-box-speaker: ${config.speakerColor};`,
       `--dialog-box-hint: ${config.hintColor};`,
       `--dialog-box-blur: ${config.blurStrength}px;`,
       `--dialog-box-shadow-strength: ${config.shadowStrength};`,
-      `--dialog-box-art-opacity: ${(config.panelAssetOpacity / 100).toFixed(2)};`,
+      `--dialog-box-art-opacity: ${(scaleOpacity(config.panelAssetOpacity) / 100).toFixed(2)};`,
       `--dialog-box-art-fit: ${config.panelAssetFit};`,
       `--dialog-box-offset-x: ${config.offsetXPercent}%;`,
       `--dialog-box-offset-y: ${config.offsetYPercent}%;`,

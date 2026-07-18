@@ -175,6 +175,21 @@ except ImportError:  # pragma: no cover - exported native packages import from t
     )
 
 try:
+    from .runtime_reading_profiles import (
+        READING_PROFILE_IDS,
+        apply_reading_profile,
+        detect_reading_profile,
+        get_reading_profile_label,
+    )
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_reading_profiles import (
+        READING_PROFILE_IDS,
+        apply_reading_profile,
+        detect_reading_profile,
+        get_reading_profile_label,
+    )
+
+try:
     from .runtime_settings_overlay import render_runtime_settings_overlay as render_runtime_settings_overlay_panel
 except ImportError:  # pragma: no cover - exported native packages import from the same directory.
     from runtime_settings_overlay import render_runtime_settings_overlay as render_runtime_settings_overlay_panel
@@ -708,6 +723,7 @@ TITLE_MENU_ITEMS = [
 SETTINGS_MENU_ITEMS = [
     ("themeMode", "界面主题"),
     ("displayMode", "显示模式"),
+    ("readingProfile", "一键阅读方案"),
     ("visualComfort", "视觉舒适度"),
     ("textSpeed", "文字速度"),
     ("language", "语言"),
@@ -10161,6 +10177,14 @@ class NativeRuntimePlayer:
             options = list(RUNTIME_DISPLAY_MODES)
             current_index = options.index(current) if current in options else 0
             self.runtime_settings["displayMode"] = options[(current_index + direction) % len(options)]
+        elif setting_key == "readingProfile":
+            current = detect_reading_profile(self.runtime_settings)
+            options = list(READING_PROFILE_IDS)
+            if current in options:
+                target_profile = options[(options.index(current) + direction) % len(options)]
+            else:
+                target_profile = options[0] if direction >= 0 else options[-1]
+            self.runtime_settings = apply_reading_profile(self.runtime_settings, target_profile)
         elif setting_key == "visualComfort":
             current = str(self.runtime_settings.get("visualComfort") or "standard")
             options = list(VISUAL_COMFORT_MODES)
@@ -10171,8 +10195,6 @@ class NativeRuntimePlayer:
             options = list(TEXT_SPEED_PRESETS.keys())
             current_index = options.index(current) if current in options else 0
             self.runtime_settings["textSpeed"] = options[(current_index + direction) % len(options)]
-            if self.current_line and not self.is_current_line_fully_visible():
-                self.start_current_line_display(self.current_line_full_text)
         elif setting_key == "language":
             options = self.supported_languages or [DEFAULT_PROJECT_LANGUAGE]
             current = self.get_safe_runtime_language(self.runtime_settings.get("language"))
@@ -10207,12 +10229,17 @@ class NativeRuntimePlayer:
             current_value = int(self.runtime_settings.get(setting_key) or DEFAULT_RUNTIME_PLAYER_SETTINGS[setting_key])
             self.runtime_settings[setting_key] = clamp_int(current_value + direction * 5, 0, 100, current_value)
         self.runtime_settings = sanitize_runtime_player_settings(self.runtime_settings)
+        if setting_key in {"readingProfile", "textSpeed"} and self.current_line and not self.is_current_line_fully_visible():
+            self.start_current_line_display(self.current_line_full_text)
         self.apply_runtime_language_setting()
         if setting_key == "language":
             self.refresh_current_localized_pause()
         self.persist_runtime_settings()
         self.apply_runtime_settings()
-        self.status_message = "体验设置已更新。"
+        if setting_key == "readingProfile":
+            self.status_message = f"阅读方案已切到：{self.get_setting_value_label('readingProfile')}。"
+        else:
+            self.status_message = "体验设置已更新。"
 
     def get_setting_value_label(self, setting_key: str) -> str:
         if setting_key == "voiceMixer":
@@ -10230,6 +10257,8 @@ class NativeRuntimePlayer:
             label_map = {"windowed": "窗口", "fullscreen": "全屏"}
             selected = str(self.runtime_settings.get("displayMode") or "windowed")
             return label_map.get(selected, selected)
+        if setting_key == "readingProfile":
+            return get_reading_profile_label(detect_reading_profile(self.runtime_settings))
         if setting_key == "visualComfort":
             return get_visual_comfort_label(self.runtime_settings.get("visualComfort"))
         if setting_key == "textSpeed":
@@ -13566,7 +13595,7 @@ class NativeRuntimePlayer:
         status_lines = [
             f"主题：{self.get_setting_value_label('themeMode')}",
             f"显示：{self.get_setting_value_label('displayMode')}",
-            f"语言：{self.get_setting_value_label('language')}",
+            f"阅读方案：{self.get_setting_value_label('readingProfile')}",
             f"文本：{self.get_setting_value_label('textSpeed')} / {self.get_setting_value_label('textScalePercent')}",
         ]
         status_top = detail_rect.bottom - 94
@@ -13620,7 +13649,7 @@ class NativeRuntimePlayer:
                 "title": "体验设置",
                 "lines": [
                     f"主题：{self.get_setting_value_label('themeMode')} · 显示：{self.get_setting_value_label('displayMode')}",
-                    f"视觉舒适度：{self.get_setting_value_label('visualComfort')}",
+                    f"阅读方案：{self.get_setting_value_label('readingProfile')} · 视觉：{self.get_setting_value_label('visualComfort')}",
                     f"语言：{self.get_setting_value_label('language')} · 文字：{self.get_setting_value_label('textSpeed')}",
                     f"大小：{self.get_setting_value_label('textScalePercent')} · 自动：{self.get_setting_value_label('autoPlayDelayMs')}",
                     f"文本框：{self.get_setting_value_label('dialogBoxOpacityPercent')} · 等语音：{self.get_setting_value_label('autoPlayWaitForVoice')}",

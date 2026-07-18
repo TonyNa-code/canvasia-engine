@@ -93,11 +93,17 @@ import {
 } from "./runtime_settings.js";
 import {
   getSafeVisualComfortMode,
-  getVisualComfortLabel,
   scaleVisualFlash,
   scaleVisualMotion,
   scaleVisualTransitionMs,
 } from "./runtime_visual_comfort.js";
+import {
+  applyReadingProfile,
+  detectReadingProfile,
+  getReadingProfileLabel,
+  getSafeDialogBoxOpacityPercent,
+  getSafeReadingTextScalePercent,
+} from "./runtime_reading_profiles.js";
 import {
   collectVoiceMixerEntries,
   createVoiceMixerController,
@@ -185,11 +191,14 @@ const refs = {
   runtimeThemeButtons: Array.from(document.querySelectorAll(".player-theme-button")),
   startSummary: document.getElementById("startSummary"),
   startResumeSummary: document.getElementById("startResumeSummary"),
+  readingProfileSelect: document.getElementById("readingProfileSelect"),
   textSpeedSelect: document.getElementById("textSpeedSelect"),
   languageSelect: document.getElementById("languageSelect"),
   dialogThemeSelect: document.getElementById("dialogThemeSelect"),
   uiThemeSelect: document.getElementById("uiThemeSelect"),
   visualComfortSelect: document.getElementById("visualComfortSelect"),
+  textScaleSelect: document.getElementById("textScaleSelect"),
+  dialogOpacitySelect: document.getElementById("dialogOpacitySelect"),
   bgmVolumeRange: document.getElementById("bgmVolumeRange"),
   bgmVolumeValue: document.getElementById("bgmVolumeValue"),
   sfxVolumeRange: document.getElementById("sfxVolumeRange"),
@@ -240,11 +249,14 @@ const refs = {
   systemMenuQuickLoadButton: document.getElementById("systemMenuQuickLoadButton"),
   systemMenuOperationGuideButton: document.getElementById("systemMenuOperationGuideButton"),
   systemMenuReturnTitleButton: document.getElementById("systemMenuReturnTitleButton"),
+  menuReadingProfileSelect: document.getElementById("menuReadingProfileSelect"),
   menuTextSpeedSelect: document.getElementById("menuTextSpeedSelect"),
   menuLanguageSelect: document.getElementById("menuLanguageSelect"),
   menuDialogThemeSelect: document.getElementById("menuDialogThemeSelect"),
   menuUiThemeSelect: document.getElementById("menuUiThemeSelect"),
   menuVisualComfortSelect: document.getElementById("menuVisualComfortSelect"),
+  menuTextScaleSelect: document.getElementById("menuTextScaleSelect"),
+  menuDialogOpacitySelect: document.getElementById("menuDialogOpacitySelect"),
   menuBgmVolumeRange: document.getElementById("menuBgmVolumeRange"),
   menuBgmVolumeValue: document.getElementById("menuBgmVolumeValue"),
   menuSfxVolumeRange: document.getElementById("menuSfxVolumeRange"),
@@ -504,11 +516,14 @@ function init() {
       setRuntimeUiThemeMode(button.dataset.uiThemeMode);
     });
   });
+  refs.readingProfileSelect?.addEventListener("change", handleReadingProfileChange);
   refs.textSpeedSelect?.addEventListener("change", handleTextSpeedChange);
   refs.languageSelect?.addEventListener("change", handleLanguageChange);
   refs.dialogThemeSelect?.addEventListener("change", handleDialogThemeChange);
   refs.uiThemeSelect?.addEventListener("change", handleUiThemeModeChange);
   refs.visualComfortSelect?.addEventListener("change", handleVisualComfortChange);
+  refs.textScaleSelect?.addEventListener("change", handleTextScaleChange);
+  refs.dialogOpacitySelect?.addEventListener("change", handleDialogOpacityChange);
   refs.bgmVolumeRange?.addEventListener("input", handleBgmVolumeChange);
   refs.sfxVolumeRange?.addEventListener("input", handleSfxVolumeChange);
   refs.voiceVolumeRange?.addEventListener("input", handleVoiceVolumeChange);
@@ -571,11 +586,14 @@ function init() {
   refs.confirmReturnTitleButton?.addEventListener("click", confirmReturnToTitle);
   refs.cancelSaveConfirmButton?.addEventListener("click", closeSaveConfirmDialog);
   refs.confirmSaveConfirmButton?.addEventListener("click", confirmSaveIntent);
+  refs.menuReadingProfileSelect?.addEventListener("change", handleReadingProfileChange);
   refs.menuTextSpeedSelect?.addEventListener("change", handleTextSpeedChange);
   refs.menuLanguageSelect?.addEventListener("change", handleLanguageChange);
   refs.menuDialogThemeSelect?.addEventListener("change", handleDialogThemeChange);
   refs.menuUiThemeSelect?.addEventListener("change", handleUiThemeModeChange);
   refs.menuVisualComfortSelect?.addEventListener("change", handleVisualComfortChange);
+  refs.menuTextScaleSelect?.addEventListener("change", handleTextScaleChange);
+  refs.menuDialogOpacitySelect?.addEventListener("change", handleDialogOpacityChange);
   refs.menuBgmVolumeRange?.addEventListener("input", handleBgmVolumeChange);
   refs.menuSfxVolumeRange?.addEventListener("input", handleSfxVolumeChange);
   refs.menuVoiceVolumeRange?.addEventListener("input", handleVoiceVolumeChange);
@@ -3772,6 +3790,7 @@ function applyProjectGameUiSkin(project = data.project) {
 function buildDialogBoxPresentation(theme, project = data.project) {
   return buildDialogBoxPresentationBase(theme, project, {
     getAssetUrl,
+    dialogBoxOpacityPercent: state.playback.dialogBoxOpacityPercent,
   });
 }
 
@@ -5188,6 +5207,12 @@ function getRuntimeVoiceMixerEntries() {
 }
 
 function renderPlaybackControls(snapshot = getCurrentSnapshot()) {
+  const readingProfileId = detectReadingProfile(state.playback);
+  if (refs.readingProfileSelect) {
+    refs.readingProfileSelect.value = readingProfileId;
+    refs.readingProfileSelect.title = getReadingProfileLabel(readingProfileId);
+  }
+
   if (refs.textSpeedSelect) {
     refs.textSpeedSelect.value = getSafeTextSpeed(state.playback.textSpeed);
   }
@@ -5206,6 +5231,21 @@ function renderPlaybackControls(snapshot = getCurrentSnapshot()) {
     refs.visualComfortSelect.value = getSafeVisualComfortMode(state.playback.visualComfort);
   }
 
+  if (refs.textScaleSelect) {
+    refs.textScaleSelect.value = String(getSafeReadingTextScalePercent(state.playback.textScalePercent));
+  }
+
+  if (refs.dialogOpacitySelect) {
+    refs.dialogOpacitySelect.value = String(
+      getSafeDialogBoxOpacityPercent(state.playback.dialogBoxOpacityPercent)
+    );
+  }
+
+  if (refs.menuReadingProfileSelect) {
+    refs.menuReadingProfileSelect.value = readingProfileId;
+    refs.menuReadingProfileSelect.title = getReadingProfileLabel(readingProfileId);
+  }
+
   if (refs.menuTextSpeedSelect) {
     refs.menuTextSpeedSelect.value = getSafeTextSpeed(state.playback.textSpeed);
   }
@@ -5222,6 +5262,16 @@ function renderPlaybackControls(snapshot = getCurrentSnapshot()) {
 
   if (refs.menuVisualComfortSelect) {
     refs.menuVisualComfortSelect.value = getSafeVisualComfortMode(state.playback.visualComfort);
+  }
+
+  if (refs.menuTextScaleSelect) {
+    refs.menuTextScaleSelect.value = String(getSafeReadingTextScalePercent(state.playback.textScalePercent));
+  }
+
+  if (refs.menuDialogOpacitySelect) {
+    refs.menuDialogOpacitySelect.value = String(
+      getSafeDialogBoxOpacityPercent(state.playback.dialogBoxOpacityPercent)
+    );
   }
 
   if (refs.bgmVolumeRange) {
@@ -5332,6 +5382,7 @@ function renderPlaybackControls(snapshot = getCurrentSnapshot()) {
 
   applyRuntimeUiTheme(state.playback.uiThemeMode);
   document.documentElement.dataset.visualComfort = getSafeVisualComfortMode(state.playback.visualComfort);
+  applyRuntimeReadingPresentation();
   renderRuntimeUiThemeButtons();
 
   if (refs.systemMenuButton) {
@@ -5346,6 +5397,14 @@ function renderPlaybackControls(snapshot = getCurrentSnapshot()) {
   renderSaveConfirmDialog();
   renderSaveDialog();
   renderOperationGuideDialog();
+}
+
+function applyRuntimeReadingPresentation() {
+  const scale = getSafeReadingTextScalePercent(state.playback.textScalePercent) / 100;
+  document.documentElement.style.setProperty("--runtime-speaker-font-size", `${(18 * scale).toFixed(2)}px`);
+  document.documentElement.style.setProperty("--runtime-message-font-size", `${(16 * scale).toFixed(2)}px`);
+  document.documentElement.style.setProperty("--runtime-meta-font-size", `${(13 * scale).toFixed(2)}px`);
+  document.documentElement.style.setProperty("--runtime-choice-font-size", `${(15 * scale).toFixed(2)}px`);
 }
 
 function renderRuntimeLanguageSelect(select) {
@@ -5373,6 +5432,18 @@ function setRuntimeUiThemeMode(mode) {
   persistPlaybackSettings();
   applyRuntimeUiTheme(state.playback.uiThemeMode);
   renderPlaybackControls();
+}
+
+function handleReadingProfileChange(event) {
+  state.playback = sanitizePlaybackSettings(applyReadingProfile(state.playback, event.target.value));
+  persistPlaybackSettings();
+  stopRuntimeTypewriter();
+  stopRuntimeAutoAdvance();
+  if (state.started && state.session) {
+    renderRuntime();
+  } else {
+    renderBeforeStart();
+  }
 }
 
 function handleTextSpeedChange(event) {
@@ -5415,6 +5486,26 @@ function handleVisualComfortChange(event) {
   state.playback.visualComfort = getSafeVisualComfortMode(event.target.value);
   persistPlaybackSettings();
   document.documentElement.dataset.visualComfort = state.playback.visualComfort;
+  if (state.started && state.session) {
+    renderRuntime();
+  } else {
+    renderPlaybackControls();
+  }
+}
+
+function handleTextScaleChange(event) {
+  state.playback.textScalePercent = getSafeReadingTextScalePercent(event.target.value);
+  persistPlaybackSettings();
+  if (state.started && state.session) {
+    renderRuntime();
+  } else {
+    renderPlaybackControls();
+  }
+}
+
+function handleDialogOpacityChange(event) {
+  state.playback.dialogBoxOpacityPercent = getSafeDialogBoxOpacityPercent(event.target.value);
+  persistPlaybackSettings();
   if (state.started && state.session) {
     renderRuntime();
   } else {
@@ -6478,16 +6569,17 @@ function clearQuickSave() {
 
 function getSystemMenuSummary() {
   const snapshot = getCurrentSnapshot();
+  const readingProfileLabel = getReadingProfileLabel(detectReadingProfile(state.playback));
 
   if (snapshot) {
-    return `当前停在：${getSaveSlotSummary({ session: state.session })} · ${getVisualComfortLabel(state.playback.visualComfort)}`;
+    return `当前停在：${getSaveSlotSummary({ session: state.session })} · ${readingProfileLabel}`;
   }
 
   if (state.autoResume) {
     return `当前还没进入试玩，上次停留位置：${getSaveSlotSummary(state.autoResume)}`;
   }
 
-  return `这里统一管理存档与设置。视觉舒适度：${getVisualComfortLabel(state.playback.visualComfort)}。`;
+  return `这里统一管理存档与设置。当前阅读方案：${readingProfileLabel}。`;
 }
 
 function openSystemMenu() {

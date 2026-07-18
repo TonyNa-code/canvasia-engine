@@ -17,6 +17,17 @@ try:
 except ImportError:  # pragma: no cover - exported native packages import from the same directory.
     from runtime_visual_comfort import get_safe_visual_comfort_mode
 
+try:
+    from .runtime_reading_profiles import (
+        get_safe_dialog_box_opacity_percent,
+        get_safe_reading_text_scale_percent,
+    )
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_reading_profiles import (
+        get_safe_dialog_box_opacity_percent,
+        get_safe_reading_text_scale_percent,
+    )
+
 
 DEFAULT_RUNTIME_PLAYER_SETTINGS = {
     "themeMode": "auto",
@@ -111,17 +122,11 @@ def sanitize_runtime_player_settings(value: dict | None) -> dict:
         "visualComfort": get_safe_visual_comfort_mode(source.get("visualComfort")),
         "textSpeed": get_safe_text_speed(source.get("textSpeed"), DEFAULT_RUNTIME_PLAYER_SETTINGS["textSpeed"]),
         "language": _normalize_language_code(source.get("language"), ""),
-        "textScalePercent": _clamp_int(
-            source.get("textScalePercent"),
-            min(TEXT_SCALE_PRESETS),
-            max(TEXT_SCALE_PRESETS),
-            DEFAULT_RUNTIME_PLAYER_SETTINGS["textScalePercent"],
+        "textScalePercent": get_safe_reading_text_scale_percent(
+            source.get("textScalePercent"), DEFAULT_RUNTIME_PLAYER_SETTINGS["textScalePercent"]
         ),
-        "dialogBoxOpacityPercent": _clamp_int(
-            source.get("dialogBoxOpacityPercent"),
-            min(DIALOG_BOX_OPACITY_PRESETS),
-            max(DIALOG_BOX_OPACITY_PRESETS),
-            DEFAULT_RUNTIME_PLAYER_SETTINGS["dialogBoxOpacityPercent"],
+        "dialogBoxOpacityPercent": get_safe_dialog_box_opacity_percent(
+            source.get("dialogBoxOpacityPercent"), DEFAULT_RUNTIME_PLAYER_SETTINGS["dialogBoxOpacityPercent"]
         ),
         "autoPlayDelayMs": _clamp_int(
             source.get("autoPlayDelayMs"),

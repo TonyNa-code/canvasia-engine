@@ -4629,16 +4629,28 @@ html[data-ui-theme="light"] .player-theme-button {
 
 .dialog-panel .speaker-name {
   color: var(--dialog-box-speaker, inherit);
+  font-size: var(--runtime-speaker-font-size, 18px);
 }
 
 .dialog-panel .message-text {
   color: var(--dialog-box-text, inherit);
+  font-size: var(--runtime-message-font-size, 16px);
 }
 
 .dialog-panel .hint-text,
 .dialog-panel .choice-button span,
 .dialog-panel .line-type-tag {
   color: var(--dialog-box-hint, inherit);
+}
+
+.dialog-panel .hint-text,
+.dialog-panel .choice-button span,
+.dialog-panel .line-type-tag {
+  font-size: var(--runtime-meta-font-size, 13px);
+}
+
+.dialog-panel .choice-button strong {
+  font-size: var(--runtime-choice-font-size, 15px);
 }
 
 .dialog-panel .choice-button {

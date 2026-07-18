@@ -213,6 +213,14 @@ const scriptVoiceTools = window.CanvasiaEditorScriptVoice;
 const voiceMatchReviewPanelTools = window.CanvasiaEditorVoiceMatchReviewPanel;
 const characterPresentationPanelTools = window.CanvasiaEditorCharacterPresentationPanel;
 const visualEffectTools = window.CanvasiaEditorVisualEffects;
+const runtimeReadingProfileTools = window.CanvasiaRuntimeReadingProfiles;
+const {
+  applyReadingProfile,
+  detectReadingProfile,
+  getReadingProfileLabel,
+  getSafeDialogBoxOpacityPercent,
+  getSafeReadingTextScalePercent,
+} = runtimeReadingProfileTools;
 const runtimeVisualComfortTools = window.CanvasiaRuntimeVisualComfort;
 const {
   getSafeVisualComfortMode,
@@ -516,6 +524,8 @@ const PREVIEW_PLAYBACK_DEFAULTS = {
   dialogTheme: "project",
   uiThemeMode: "auto",
   visualComfort: "standard",
+  textScalePercent: 100,
+  dialogBoxOpacityPercent: 100,
   autoPlay: false,
   skipRead: false,
   voiceEnabled: true,
@@ -884,9 +894,12 @@ const refs = {
   previewSystemMenu: document.getElementById("previewSystemMenu"),
   previewSystemMenuSummary: document.getElementById("previewSystemMenuSummary"),
   previewMenuTextSpeedSelect: document.getElementById("previewMenuTextSpeedSelect"),
+  previewMenuReadingProfileSelect: document.getElementById("previewMenuReadingProfileSelect"),
   previewMenuDialogThemeSelect: document.getElementById("previewMenuDialogThemeSelect"),
   previewMenuUiThemeSelect: document.getElementById("previewMenuUiThemeSelect"),
   previewMenuVisualComfortSelect: document.getElementById("previewMenuVisualComfortSelect"),
+  previewMenuTextScaleSelect: document.getElementById("previewMenuTextScaleSelect"),
+  previewMenuDialogOpacitySelect: document.getElementById("previewMenuDialogOpacitySelect"),
   previewMenuBgmVolumeRange: document.getElementById("previewMenuBgmVolumeRange"),
   previewMenuBgmVolumeValue: document.getElementById("previewMenuBgmVolumeValue"),
   previewMenuSfxVolumeRange: document.getElementById("previewMenuSfxVolumeRange"),
@@ -5093,6 +5106,19 @@ function handleChange(event) {
     return;
   }
 
+  if (target.id === "previewMenuReadingProfileSelect") {
+    state.previewPlayback = sanitizePreviewPlaybackSettings(
+      applyReadingProfile(state.previewPlayback, target.value)
+    );
+    persistPreviewPlaybackSettings();
+    stopPreviewTypewriter();
+    stopPreviewAutoAdvance();
+    renderPreviewScreen();
+    renderPreviewSystemMenu();
+    setSaveStatus(`试玩阅读方案已切到：${getReadingProfileLabel(detectReadingProfile(state.previewPlayback))}`);
+    return;
+  }
+
   if (target.id === "previewDialogThemeSelect" || target.id === "previewMenuDialogThemeSelect") {
     state.previewPlayback.dialogTheme = getSafeDialogTheme(target.value);
     persistPreviewPlaybackSettings();
@@ -5117,6 +5143,24 @@ function handleChange(event) {
     renderPreviewScreen();
     renderPreviewSystemMenu();
     setSaveStatus(`试玩视觉舒适度已切到：${getVisualComfortLabel(state.previewPlayback.visualComfort)}`);
+    return;
+  }
+
+  if (target.id === "previewMenuTextScaleSelect") {
+    state.previewPlayback.textScalePercent = getSafeReadingTextScalePercent(target.value);
+    persistPreviewPlaybackSettings();
+    renderPreviewScreen();
+    renderPreviewSystemMenu();
+    setSaveStatus(`试玩文字大小已切到：${state.previewPlayback.textScalePercent}%`);
+    return;
+  }
+
+  if (target.id === "previewMenuDialogOpacitySelect") {
+    state.previewPlayback.dialogBoxOpacityPercent = getSafeDialogBoxOpacityPercent(target.value);
+    persistPreviewPlaybackSettings();
+    renderPreviewScreen();
+    renderPreviewSystemMenu();
+    setSaveStatus(`试玩文本框可见度已切到：${state.previewPlayback.dialogBoxOpacityPercent}%`);
     return;
   }
 
@@ -6296,14 +6340,15 @@ function quickSavePreview() {
 
 function getPreviewSystemMenuSummary() {
   const snapshot = getCurrentPreviewSnapshot();
+  const readingProfileLabel = getReadingProfileLabel(detectReadingProfile(state.previewPlayback));
 
   if (!snapshot) {
-    return `当前还没有正在试玩的内容。视觉舒适度：${getVisualComfortLabel(state.previewPlayback.visualComfort)}。`;
+    return `当前还没有正在试玩的内容。阅读方案：${readingProfileLabel}。`;
   }
 
   return `当前停在：${getPreviewSaveSlotSummary({
     session: ensurePreviewSession(),
-  })} · ${getVisualComfortLabel(state.previewPlayback.visualComfort)}`;
+  })} · ${readingProfileLabel}`;
 }
 
 function openPreviewSystemMenu() {
@@ -6582,6 +6627,10 @@ function renderPreviewSystemMenu() {
   refs.previewSystemMenu.classList.toggle("is-visible", state.previewSystemMenuOpen);
   refs.previewSystemMenuSummary.textContent = getPreviewSystemMenuSummary();
 
+  if (refs.previewMenuReadingProfileSelect) {
+    refs.previewMenuReadingProfileSelect.value = detectReadingProfile(state.previewPlayback);
+  }
+
   if (refs.previewMenuTextSpeedSelect) {
     refs.previewMenuTextSpeedSelect.value = getSafeTextSpeed(state.previewPlayback.textSpeed);
   }
@@ -6596,6 +6645,18 @@ function renderPreviewSystemMenu() {
 
   if (refs.previewMenuVisualComfortSelect) {
     refs.previewMenuVisualComfortSelect.value = getSafeVisualComfortMode(state.previewPlayback.visualComfort);
+  }
+
+  if (refs.previewMenuTextScaleSelect) {
+    refs.previewMenuTextScaleSelect.value = String(
+      getSafeReadingTextScalePercent(state.previewPlayback.textScalePercent)
+    );
+  }
+
+  if (refs.previewMenuDialogOpacitySelect) {
+    refs.previewMenuDialogOpacitySelect.value = String(
+      getSafeDialogBoxOpacityPercent(state.previewPlayback.dialogBoxOpacityPercent)
+    );
   }
 
   if (refs.previewMenuBgmVolumeRange) {
@@ -9187,8 +9248,15 @@ function getDialogPanelAssetUrl(assetId, assetMap = state.data?.assetsById) {
   return asset?.fileExists && publicUrl ? publicUrl : "";
 }
 
-function buildDialogBoxPresentation(theme, project = state.data?.project, assetMap = state.data?.assetsById) {
+function buildDialogBoxPresentation(
+  theme,
+  project = state.data?.project,
+  assetMap = state.data?.assetsById,
+  dialogBoxOpacityPercent = 100
+) {
   const safeTheme = getSafeDialogTheme(theme);
+  const opacityScale = getSafeDialogBoxOpacityPercent(dialogBoxOpacityPercent) / 100;
+  const scaleDialogOpacity = (value) => clamp(Number(value) * opacityScale, 0, 100);
   if (safeTheme !== "project") {
     const base = getDialogThemeBaseColors(safeTheme);
     const blurStrength = safeTheme === "paper" ? 4 : safeTheme === "transparent" ? 0 : 10;
@@ -9204,8 +9272,8 @@ function buildDialogBoxPresentation(theme, project = state.data?.project, assetM
         `--dialog-box-padding-x: 18px;`,
         `--dialog-box-padding-y: 14px;`,
         `--dialog-box-radius: ${getDialogShapeRadius("rounded", 18)}px;`,
-        `--dialog-box-bg: ${toRgbaString(base.backgroundColor, base.backgroundOpacity)};`,
-        `--dialog-box-border: ${toRgbaString(base.borderColor, base.borderOpacity)};`,
+        `--dialog-box-bg: ${toRgbaString(base.backgroundColor, scaleDialogOpacity(base.backgroundOpacity))};`,
+        `--dialog-box-border: ${toRgbaString(base.borderColor, scaleDialogOpacity(base.borderOpacity))};`,
         `--dialog-box-border-width: ${borderWidth}px;`,
         `--dialog-box-text: ${base.textColor};`,
         `--dialog-box-speaker: ${base.speakerColor};`,
@@ -9232,15 +9300,15 @@ function buildDialogBoxPresentation(theme, project = state.data?.project, assetM
       `--dialog-box-padding-x: ${config.paddingX}px;`,
       `--dialog-box-padding-y: ${config.paddingY}px;`,
       `--dialog-box-radius: ${getDialogShapeRadius(config.shape, config.shape === "rounded" ? 22 : 18)}px;`,
-      `--dialog-box-bg: ${toRgbaString(config.backgroundColor, config.backgroundOpacity)};`,
-      `--dialog-box-border: ${toRgbaString(config.borderColor, config.borderOpacity)};`,
+      `--dialog-box-bg: ${toRgbaString(config.backgroundColor, scaleDialogOpacity(config.backgroundOpacity))};`,
+      `--dialog-box-border: ${toRgbaString(config.borderColor, scaleDialogOpacity(config.borderOpacity))};`,
       `--dialog-box-border-width: ${config.borderWidth}px;`,
       `--dialog-box-text: ${config.textColor};`,
       `--dialog-box-speaker: ${config.speakerColor};`,
       `--dialog-box-hint: ${config.hintColor};`,
       `--dialog-box-blur: ${config.blurStrength}px;`,
       `--dialog-box-shadow-strength: ${config.shadowStrength};`,
-      `--dialog-box-art-opacity: ${(config.panelAssetOpacity / 100).toFixed(2)};`,
+      `--dialog-box-art-opacity: ${(scaleDialogOpacity(config.panelAssetOpacity) / 100).toFixed(2)};`,
       `--dialog-box-art-fit: ${config.panelAssetFit};`,
       `--dialog-box-offset-x: ${config.offsetXPercent}%;`,
       `--dialog-box-offset-y: ${config.offsetYPercent}%;`,
@@ -18506,6 +18574,14 @@ function sanitizePreviewPlaybackSettings(source = {}) {
     dialogTheme: getSafeDialogTheme(source.dialogTheme ?? PREVIEW_PLAYBACK_DEFAULTS.dialogTheme),
     uiThemeMode: getSafeUiThemeMode(source.uiThemeMode ?? PREVIEW_PLAYBACK_DEFAULTS.uiThemeMode),
     visualComfort: getSafeVisualComfortMode(source.visualComfort ?? PREVIEW_PLAYBACK_DEFAULTS.visualComfort),
+    textScalePercent: getSafeReadingTextScalePercent(
+      source.textScalePercent,
+      PREVIEW_PLAYBACK_DEFAULTS.textScalePercent
+    ),
+    dialogBoxOpacityPercent: getSafeDialogBoxOpacityPercent(
+      source.dialogBoxOpacityPercent,
+      PREVIEW_PLAYBACK_DEFAULTS.dialogBoxOpacityPercent
+    ),
     autoPlay: Boolean(source.autoPlay ?? PREVIEW_PLAYBACK_DEFAULTS.autoPlay),
     skipRead: Boolean(source.skipRead ?? PREVIEW_PLAYBACK_DEFAULTS.skipRead),
     voiceEnabled: source.voiceEnabled !== false,
@@ -22062,6 +22138,16 @@ function renderMiniStage(scene, blockIndex) {
   `;
 }
 
+function getPreviewReadingTypographyStyle(textScalePercent) {
+  const scale = getSafeReadingTextScalePercent(textScalePercent) / 100;
+  return [
+    `--runtime-speaker-font-size:${(18 * scale).toFixed(2)}px;`,
+    `--runtime-message-font-size:${(16 * scale).toFixed(2)}px;`,
+    `--runtime-meta-font-size:${(13 * scale).toFixed(2)}px;`,
+    `--runtime-choice-font-size:${(15 * scale).toFixed(2)}px;`,
+  ].join(" ");
+}
+
 function renderStage(visualState, large, options = {}) {
   const backdrop = `${getBackdropStyle(visualState.backgroundAssetId, visualState.scene3dPreview)}; ${getDepthBlurBackdropStyle(visualState.depthBlur)}`;
   const visualComfortMode = large
@@ -22078,7 +22164,18 @@ function renderStage(visualState, large, options = {}) {
   const backgroundTransitionStyle = backgroundTransition
     ? `--background-transition-ms:${backgroundTransitionDurationMs}ms;`
     : "";
-  const dialogPresentation = buildDialogBoxPresentation(options.dialogTheme, state.data?.project, state.data?.assetsById);
+  const textScalePercent = large
+    ? getSafeReadingTextScalePercent(state.previewPlayback.textScalePercent)
+    : 100;
+  const dialogBoxOpacityPercent = large
+    ? getSafeDialogBoxOpacityPercent(state.previewPlayback.dialogBoxOpacityPercent)
+    : 100;
+  const dialogPresentation = buildDialogBoxPresentation(
+    options.dialogTheme,
+    state.data?.project,
+    state.data?.assetsById,
+    dialogBoxOpacityPercent
+  );
   const particleMarkup = renderParticleEffectLayer(
     visualState.particleEffect,
     large,
@@ -22091,6 +22188,12 @@ function renderStage(visualState, large, options = {}) {
   const flashMarkup = renderScreenFlashLayer(visualState.screenFlash, visualComfortMode);
   const fadeMarkup = renderStageFadeLayer(visualState.screenFade);
   const shakePresentation = getScreenShakePresentation(visualState.screenShake, visualComfortMode);
+  const stagePresentationStyle = [
+    shakePresentation.style,
+    getPreviewReadingTypographyStyle(textScalePercent),
+  ]
+    .filter(Boolean)
+    .join(" ");
   const worldPresentation = getStageWorldPresentation(
     visualState.cameraZoom,
     visualState.cameraPan,
@@ -22167,7 +22270,7 @@ function renderStage(visualState, large, options = {}) {
     .join("");
 
   return `
-    <div class="stage-scene ${shakePresentation.className}" data-visual-comfort="${visualComfortMode}" ${shakePresentation.style ? `style="${shakePresentation.style}"` : ""}>
+    <div class="stage-scene ${shakePresentation.className}" data-visual-comfort="${visualComfortMode}" style="${stagePresentationStyle}">
       <div class="stage-world" ${worldPresentation.style ? `style="${worldPresentation.style}"` : ""}>
         <div
           class="stage-backdrop${backgroundTransitionClass}"
