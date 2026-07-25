@@ -137,6 +137,17 @@ class CiWorkflowCoverageTests(unittest.TestCase):
             workflow,
         )
 
+    def test_persistent_variable_contract_is_checked_in_ci(self) -> None:
+        workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("native_runtime/runtime_persistent_variables.py", workflow)
+        self.assertIn("export_player_template/runtime_persistent_variables.js", workflow)
+        self.assertIn("tests/test_persistent_variables_contract.py", workflow)
+        self.assertIn(
+            "python -m unittest discover -s tests -p 'test_persistent_variables_contract.py' -v",
+            workflow,
+        )
+
     def test_native_runtime_save_thumbnail_module_is_checked_in_ci(self) -> None:
         workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
 

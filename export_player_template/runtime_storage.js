@@ -16,6 +16,7 @@ export const RUNTIME_STORAGE_KEY_SUFFIXES = Object.freeze({
   characters: "player-characters",
   extraUnlocks: "player-extra",
   endings: "player-endings",
+  persistentVariables: "player-persistent-variables",
 });
 
 export function getBrowserStorage(windowRef = globalThis.window) {

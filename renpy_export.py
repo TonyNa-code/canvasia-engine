@@ -227,10 +227,10 @@ def quote_renpy(value: Any) -> str:
     return f'"{text}"'
 
 
-def convert_runtime_text_variables(value: Any) -> str:
+def convert_runtime_text_variables(value: Any, variable_map: dict[str, dict] | None = None) -> str:
     return re.sub(
         r"\{\{\s*([0-9A-Za-z_\-\u3400-\u9fff]{1,64})\s*\}\}",
-        lambda match: f"[{normalize_identifier(match.group(1), 'var')}]",
+        lambda match: f"[{get_variable_reference(match.group(1), variable_map or {})}]",
         str(value or ""),
     )
 
@@ -473,7 +473,8 @@ def get_safe_position(value: Any) -> str:
 
 def render_renpy_text(block: dict, context: dict | None = None) -> str:
     line = convert_runtime_text_variables(
-        clean_text(block.get("text") or (block.get("fields") or {}).get("text"), " ")
+        clean_text(block.get("text") or (block.get("fields") or {}).get("text"), " "),
+        (context or {}).get("variableMap") or {},
     )
     cps = get_effective_text_cps(block, (context or {}).get("runtimeSettings"))
     return f"{{cps={cps}}}{line}{{/cps}}" if cps else line
@@ -1110,6 +1111,17 @@ def build_variable_map(bundle: dict) -> dict[str, dict]:
     }
 
 
+def get_variable_reference(variable_id: Any, variable_map: dict[str, dict] | None = None) -> str:
+    safe_variable_id = clean_text(variable_id)
+    identifier = normalize_identifier(safe_variable_id, "var")
+    variable = (variable_map or {}).get(safe_variable_id) or {}
+    return (
+        f"persistent.{identifier}"
+        if clean_text(variable.get("scope"), "save").lower() == "persistent"
+        else identifier
+    )
+
+
 def build_scene_records(bundle: dict) -> list[dict]:
     records: list[dict] = []
     for chapter_index, chapter in enumerate(as_list(bundle.get("chapters"))):
@@ -1156,7 +1168,7 @@ def add_warning(warnings: list[dict], code: str, message: str, **context: Any) -
 def build_variable_definitions(variable_map: dict[str, dict]) -> list[str]:
     lines: list[str] = []
     for variable_id, variable in sorted(variable_map.items()):
-        renpy_name = normalize_identifier(variable_id, "var")
+        renpy_name = get_variable_reference(variable_id, variable_map)
         lines.append(f"default {renpy_name} = {value_to_renpy(variable.get('defaultValue'))}")
     return lines
 
@@ -1223,7 +1235,7 @@ def build_sprite_definitions(
 def render_variable_effect(effect: dict, variable_map: dict[str, dict], warnings: list[dict], indent: str) -> list[str]:
     effect_type = clean_text(effect.get("type"))
     variable_id = clean_text(effect.get("variableId") or effect.get("variableHint"))
-    variable_name = normalize_identifier(variable_id, "var")
+    variable_name = get_variable_reference(variable_id, variable_map)
     if not variable_id:
         add_warning(warnings, "renpy_missing_variable_id", "变量效果缺少变量 ID，已保留为复核注释。")
         return [f"{indent}# Canvasia review variable effect: missing variable id"]
@@ -1254,7 +1266,8 @@ def render_choice_block(block: dict, context: dict) -> list[str]:
     has_always_option = False
     for option_index, option in enumerate(options):
         option_text = convert_runtime_text_variables(
-            clean_text(option.get("text") or option.get("label"), f"Option {option_index + 1}")
+            clean_text(option.get("text") or option.get("label"), f"Option {option_index + 1}"),
+            variable_map,
         )
         target_scene_id = clean_text(option.get("gotoSceneId") or option.get("targetSceneId") or option.get("target"))
         mode = clean_text(option.get("choiceAvailabilityMode") or option.get("availabilityMode"), "always")
@@ -1323,7 +1336,10 @@ def render_text_input_block(block: dict, context: dict) -> list[str]:
             blockIndex=context.get("blockIndex"),
         )
         return ["    pass"]
-    prompt = convert_runtime_text_variables(clean_text(block.get("prompt"), "Please enter a value"))
+    prompt = convert_runtime_text_variables(
+        clean_text(block.get("prompt"), "Please enter a value"),
+        context["variableMap"],
+    )
     try:
         max_length = round(float(block.get("maxLength") or 32))
     except (TypeError, ValueError):
@@ -1333,7 +1349,7 @@ def render_text_input_block(block: dict, context: dict) -> list[str]:
     if default_value is None:
         default_value = variable.get("defaultValue", "")
     default_text = "" if default_value is None else str(default_value)
-    target = normalize_identifier(variable_id, "var")
+    target = get_variable_reference(variable_id, context["variableMap"])
     lines = [
         "    while True:",
         f"        $ _canvasia_input = renpy.input({quote_renpy(prompt)}, default={quote_renpy(default_text)}, length={max_length}).strip()",
@@ -1397,7 +1413,7 @@ def render_condition_rule_expression(rule: dict, context: dict) -> str:
             blockIndex=block_index,
         )
         return "True"
-    variable_name = normalize_identifier(variable_id, "var")
+    variable_name = get_variable_reference(variable_id, context.get("variableMap") or {})
     operator = normalize_condition_operator(rule.get("operator"), warnings, scene_id, block_index)
     right_value = value_to_renpy(rule.get("value"))
     if operator in STRING_CONDITION_OPERATORS:

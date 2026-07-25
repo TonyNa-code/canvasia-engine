@@ -29,6 +29,7 @@ SAVE_SUBDIR_NAME = "native-runtime-saves"
 SETTINGS_SUBDIR_NAME = "native-runtime-settings"
 PROGRESS_SUBDIR_NAME = "native-runtime-progress"
 PROFILE_SUBDIR_NAME = "native-runtime-profiles"
+PERSISTENT_VARIABLES_SUBDIR_NAME = "native-runtime-persistent-variables"
 AUTO_RESUME_SUBDIR_NAME = "native-runtime-autoresume"
 LOG_SUBDIR_NAME = "native-runtime-logs"
 SCREENSHOT_SUBDIR_NAME = "native-runtime-screenshots"
@@ -65,6 +66,10 @@ def get_runtime_progress_dir() -> Path:
 
 def get_runtime_profile_dir() -> Path:
     return Path.home() / SAVE_ROOT_DIR_NAME / PROFILE_SUBDIR_NAME
+
+
+def get_runtime_persistent_variables_dir() -> Path:
+    return Path.home() / SAVE_ROOT_DIR_NAME / PERSISTENT_VARIABLES_SUBDIR_NAME
 
 
 def get_runtime_auto_resume_dir() -> Path:
@@ -238,6 +243,10 @@ def get_project_profile_file_path(project_id: str) -> Path:
     return get_runtime_profile_dir() / make_project_save_filename(project_id)
 
 
+def get_project_persistent_variables_file_path(project_id: str) -> Path:
+    return get_runtime_persistent_variables_dir() / make_project_save_filename(project_id)
+
+
 def get_project_auto_resume_file_path(project_id: str) -> Path:
     return get_runtime_auto_resume_dir() / make_project_save_filename(project_id)
 
@@ -313,6 +322,26 @@ def write_project_player_profile(project_id: str, profile: dict) -> Path:
     safe_profile = sanitize_player_profile(profile)
     profile_path.write_text(json.dumps(safe_profile, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return profile_path
+
+
+def load_project_persistent_variables(project_id: str) -> dict:
+    persistent_path = get_project_persistent_variables_file_path(project_id)
+    if not persistent_path.is_file():
+        return {}
+    try:
+        payload = json.loads(persistent_path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def write_project_persistent_variables(project_id: str, payload: dict) -> Path:
+    persistent_dir = get_runtime_persistent_variables_dir()
+    persistent_dir.mkdir(parents=True, exist_ok=True)
+    persistent_path = get_project_persistent_variables_file_path(project_id)
+    safe_payload = payload if isinstance(payload, dict) else {}
+    persistent_path.write_text(json.dumps(safe_payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return persistent_path
 
 
 def sanitize_text_history_entries(value: object, limit: int = SNAPSHOT_TEXT_HISTORY_LIMIT) -> list[dict]:

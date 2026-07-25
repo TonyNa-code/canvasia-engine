@@ -256,6 +256,7 @@ try:
         get_project_auto_resume_file_path,
         get_project_progress_file_path,
         get_project_profile_file_path,
+        get_project_persistent_variables_file_path,
         get_project_save_file_path,
         get_project_settings_file_path,
         get_runtime_screenshot_dir,
@@ -263,6 +264,7 @@ try:
         load_project_archive_progress,
         load_project_auto_resume,
         load_project_player_profile,
+        load_project_persistent_variables,
         load_project_runtime_settings,
         load_project_save_store,
         make_project_save_filename,
@@ -274,6 +276,7 @@ try:
         write_project_archive_progress,
         write_project_auto_resume,
         write_project_player_profile,
+        write_project_persistent_variables,
         write_project_runtime_settings,
         write_project_save_store,
         write_runtime_crash_log,
@@ -285,6 +288,7 @@ except ImportError:  # pragma: no cover - exported native packages import from t
         get_project_auto_resume_file_path,
         get_project_progress_file_path,
         get_project_profile_file_path,
+        get_project_persistent_variables_file_path,
         get_project_save_file_path,
         get_project_settings_file_path,
         get_runtime_screenshot_dir,
@@ -292,6 +296,7 @@ except ImportError:  # pragma: no cover - exported native packages import from t
         load_project_archive_progress,
         load_project_auto_resume,
         load_project_player_profile,
+        load_project_persistent_variables,
         load_project_runtime_settings,
         load_project_save_store,
         make_project_save_filename,
@@ -303,6 +308,7 @@ except ImportError:  # pragma: no cover - exported native packages import from t
         write_project_archive_progress,
         write_project_auto_resume,
         write_project_player_profile,
+        write_project_persistent_variables,
         write_project_runtime_settings,
         write_project_save_store,
         write_runtime_crash_log,
@@ -327,6 +333,27 @@ except ImportError:  # pragma: no cover - exported native packages import from t
         normalize_variable_type,
         parse_variable_number_bound,
         variable_value_matches_type,
+    )
+
+try:
+    from .runtime_persistent_variables import (
+        build_persistent_runtime_variable_store,
+        collect_persistent_runtime_variable_state,
+        get_safe_runtime_variable_scope,
+        get_persistent_runtime_variable_summary,
+        is_persistent_runtime_variable,
+        merge_persistent_runtime_variable_state,
+        sanitize_persistent_runtime_variable_state,
+    )
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_persistent_variables import (
+        build_persistent_runtime_variable_store,
+        collect_persistent_runtime_variable_state,
+        get_safe_runtime_variable_scope,
+        get_persistent_runtime_variable_summary,
+        is_persistent_runtime_variable,
+        merge_persistent_runtime_variable_state,
+        sanitize_persistent_runtime_variable_state,
     )
 
 try:
@@ -756,6 +783,7 @@ SYSTEM_MENU_ITEMS = [
     ("settings", "体验设置"),
     ("quick-save", "快速存档"),
     ("quick-load", "快速读档"),
+    ("persistent-memory", "跨周目记忆"),
     ("restart", "回到开头"),
     ("exit", "退出预览"),
 ]
@@ -3176,6 +3204,7 @@ def get_export_logic_issue_count(issues: list[dict]) -> int:
     logic_codes = {
         "logic_target_missing",
         "logic_variable_missing",
+        "logic_variable_scope_invalid",
         "logic_variable_type_mismatch",
         "logic_variable_default_type_mismatch",
         "logic_variable_range_invalid",
@@ -3335,6 +3364,16 @@ def build_release_check_report(bundle_dir: Path) -> dict:
         variable_id = str(variable.get("id") or "").strip()
         if not variable_id:
             continue
+        raw_scope = str(variable.get("scope") or "").strip().lower()
+        if raw_scope and raw_scope != get_safe_runtime_variable_scope(raw_scope):
+            add_release_check_issue(
+                issues,
+                "error",
+                "logic_variable_scope_invalid",
+                f"变量作用域无效：{variable.get('name') or variable_id}",
+                "把变量作用域改成“跟随存档”或“跨周目记忆”；旧项目不填写时会安全按跟随存档处理。",
+                f"variables.{variable_id}.scope",
+            )
         variable_type = normalize_variable_type(variable.get("type"))
         if not variable_value_matches_type(variable_type, variable.get("defaultValue")):
             add_release_check_issue(
@@ -8149,6 +8188,11 @@ class NativeRuntimePlayer:
         self.current_voice_profile_id = ""
         self.voice_playback_active = False
         self.project_id = str(self.project.get("projectId") or "untitled_project")
+        self.persistent_variable_state = sanitize_persistent_runtime_variable_state(
+            load_project_persistent_variables(self.project_id),
+            self.variables,
+        )
+        self.persistent_variables_file_path = get_project_persistent_variables_file_path(self.project_id)
         self.save_store = load_project_save_store(self.project_id, self.formal_save_slot_count)
         prune_orphaned_save_thumbnails(self.save_store, self.project_id)
         self.save_file_path = get_project_save_file_path(self.project_id)
@@ -8183,6 +8227,7 @@ class NativeRuntimePlayer:
         self.skip_deadline_ms = 0
         self.ui_hidden = False
         self.system_menu_index = 0
+        self.persistent_memory_reset_armed_until_ms = 0
         self.title_menu_index = 0
         self.settings_menu_index = 0
         self.voice_mixer_index = 0
@@ -10017,6 +10062,7 @@ class NativeRuntimePlayer:
 
     def close_overlay(self, preserve_status: bool = False) -> None:
         closing_mode = self.overlay_mode
+        self.persistent_memory_reset_armed_until_ms = 0
         self.overlay_hotspots = []
         self.archive_detail_entry = None
         self.archive_detail_key = None
@@ -10101,6 +10147,19 @@ class NativeRuntimePlayer:
         if item_key == "quick-load":
             self.load_quick()
             self.close_overlay(preserve_status=True)
+            return True
+        if item_key == "persistent-memory":
+            summary = get_persistent_runtime_variable_summary(self.persistent_variable_state, self.variables)
+            if int(summary.get("count") or 0) == 0:
+                self.status_message = "当前项目没有使用跨周目记忆。"
+                return True
+            now_ms = self.pygame.time.get_ticks()
+            if now_ms <= self.persistent_memory_reset_armed_until_ms:
+                self.reset_persistent_variable_state()
+                self.close_overlay(preserve_status=True)
+                return True
+            self.persistent_memory_reset_armed_until_ms = now_ms + 5000
+            self.status_message = "再次选择“跨周目记忆”即可确认重置；5 秒后自动取消。"
             return True
         if item_key == "restart":
             self.restart_story()
@@ -11179,6 +11238,8 @@ class NativeRuntimePlayer:
             state["error"] = str(result.get("error") or "输入内容无效。")
             return
         self.variable_state[variable_id] = result.get("value")
+        if is_persistent_runtime_variable(variable):
+            self.sync_persistent_variable_state()
         variable_name = str(variable.get("name") or variable_id)
         self.close_runtime_text_input()
         self.current_line = None
@@ -11897,10 +11958,61 @@ class NativeRuntimePlayer:
         return True
 
     def build_initial_variable_state(self) -> dict:
-        return {
+        initial_state = {
             variable_id: coerce_runtime_variable_value(variable, variable.get("defaultValue"))
             for variable_id, variable in self.variables_by_id.items()
         }
+        return merge_persistent_runtime_variable_state(
+            initial_state,
+            self.variables,
+            self.persistent_variable_state,
+        )
+
+    def persist_persistent_variable_state(self) -> bool:
+        summary = get_persistent_runtime_variable_summary(self.variable_state, self.variables)
+        self.persistent_variable_state = dict(summary.get("values") or {})
+        if int(summary.get("count") or 0) == 0:
+            return False
+        write_project_persistent_variables(
+            self.project_id,
+            build_persistent_runtime_variable_store(
+                self.persistent_variable_state,
+                self.variables,
+                updated_at=now_iso(),
+            ),
+        )
+        return True
+
+    def sync_persistent_variable_state(self) -> bool:
+        self.persistent_variable_state = collect_persistent_runtime_variable_state(
+            self.variable_state,
+            self.variables,
+        )
+        return self.persist_persistent_variable_state()
+
+    def reset_persistent_variable_state(self) -> bool:
+        summary = get_persistent_runtime_variable_summary({}, self.variables)
+        if int(summary.get("count") or 0) == 0:
+            self.status_message = "当前项目没有使用跨周目记忆。"
+            return False
+        self.persistent_variable_state = dict(summary.get("values") or {})
+        self.variable_state = merge_persistent_runtime_variable_state(
+            self.variable_state,
+            self.variables,
+            self.persistent_variable_state,
+        )
+        write_project_persistent_variables(
+            self.project_id,
+            build_persistent_runtime_variable_store(
+                self.persistent_variable_state,
+                self.variables,
+                updated_at=now_iso(),
+            ),
+        )
+        self.persistent_memory_reset_armed_until_ms = 0
+        self.persist_auto_resume_snapshot()
+        self.status_message = "跨周目记忆已恢复为作者设定的默认值；正式存档仍然保留。"
+        return True
 
     def normalize_runtime_variable_value(self, variable_id: str | None, value: object) -> object:
         variable = self.variables_by_id.get(str(variable_id or ""))
@@ -11916,7 +12028,11 @@ class NativeRuntimePlayer:
             safe_variable_id = str(variable_id or "")
             if safe_variable_id in self.variables_by_id:
                 merged_state[safe_variable_id] = self.normalize_runtime_variable_value(safe_variable_id, value)
-        return merged_state
+        return merge_persistent_runtime_variable_state(
+            merged_state,
+            self.variables,
+            self.persistent_variable_state,
+        )
 
     def get_runtime_variable_value(self, variable_id: str | None) -> object:
         safe_variable_id = str(variable_id or "")
@@ -11929,13 +12045,15 @@ class NativeRuntimePlayer:
             )
         return self.variable_state.get(safe_variable_id)
 
-    def apply_variable_set(self, block: dict) -> None:
+    def apply_variable_set(self, block: dict, *, persist: bool = True) -> None:
         variable_id = str(block.get("variableId") or "")
         if variable_id not in self.variables_by_id:
             return
         self.variable_state[variable_id] = self.normalize_runtime_variable_value(variable_id, block.get("value"))
+        if persist and is_persistent_runtime_variable(self.variables_by_id.get(variable_id)):
+            self.sync_persistent_variable_state()
 
-    def apply_variable_add(self, block: dict) -> None:
+    def apply_variable_add(self, block: dict, *, persist: bool = True) -> None:
         variable_id = str(block.get("variableId") or "")
         variable = self.variables_by_id.get(variable_id)
         if normalize_variable_type((variable or {}).get("type")) != "number":
@@ -11953,6 +12071,8 @@ class NativeRuntimePlayer:
         if int(next_value) == next_value:
             next_value = int(next_value)
         self.variable_state[variable_id] = self.normalize_runtime_variable_value(variable_id, next_value)
+        if persist and is_persistent_runtime_variable(variable):
+            self.sync_persistent_variable_state()
 
     def evaluate_operator(self, current_value, operator: str, target_value) -> bool:
         return evaluate_runtime_operator(current_value, operator, target_value)
@@ -11994,12 +12114,12 @@ class NativeRuntimePlayer:
                 return
         self.set_scene(block.get("elseGotoSceneId"))
 
-    def apply_choice_effect(self, effect: dict) -> None:
+    def apply_choice_effect(self, effect: dict, *, persist: bool = True) -> None:
         effect_type = effect.get("type")
         if effect_type == "variable_set":
-            self.apply_variable_set(effect)
+            self.apply_variable_set(effect, persist=persist)
         elif effect_type == "variable_add":
-            self.apply_variable_add(effect)
+            self.apply_variable_add(effect, persist=persist)
 
     def choose_current_option(self, option_index: int) -> None:
         if not self.current_choices:
@@ -12014,8 +12134,15 @@ class NativeRuntimePlayer:
                 str(option.get("choiceLockedReason") or "这个选项的条件尚未满足。"),
             )
             return
-        for effect in option.get("effects", []) or []:
-            self.apply_choice_effect(effect)
+        effects = option.get("effects", []) or []
+        for effect in effects:
+            self.apply_choice_effect(effect, persist=False)
+        if any(
+            is_persistent_runtime_variable(self.variables_by_id.get(str(effect.get("variableId") or "")))
+            for effect in effects
+            if isinstance(effect, dict)
+        ):
+            self.sync_persistent_variable_state()
         self.current_block_index += 1
         target_scene_id = option.get("gotoSceneId") or option.get("targetSceneId")
         self.current_choices = None
@@ -13680,6 +13807,12 @@ class NativeRuntimePlayer:
             return "立即覆盖快速存档，适合临时保留当前进度。"
         if item_key == "quick-load":
             return "立即读入快速存档；若没有快存会给出提示。"
+        if item_key == "persistent-memory":
+            summary = get_persistent_runtime_variable_summary(self.persistent_variable_state, self.variables)
+            return (
+                f"管理作者定义的跨周目变量；当前 {summary.get('changedCount', 0)} / "
+                f"{summary.get('count', 0)} 项已偏离默认值。连续确认两次才会重置，正式存档不会删除。"
+            )
         if item_key == "restart":
             return "回到入口场景重新开始，并记录一次返回开头。"
         if item_key == "exit":
@@ -13796,8 +13929,10 @@ class NativeRuntimePlayer:
 
         button_top = panel.top + 96
         list_width = min(310, max(260, panel.width // 2 - 52))
+        row_step = max(30, min(38, (panel.height - 174) // max(1, len(SYSTEM_MENU_ITEMS))))
+        row_height = max(26, min(32, row_step - 4))
         for index, (item_key, item_label) in enumerate(SYSTEM_MENU_ITEMS):
-            row_rect = self.pygame.Rect(panel.left + 26, button_top + index * 38, list_width, 32)
+            row_rect = self.pygame.Rect(panel.left + 26, button_top + index * row_step, list_width, row_height)
             is_active = index == self.system_menu_index
             self.pygame.draw.rect(
                 self.screen,

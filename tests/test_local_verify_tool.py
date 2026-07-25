@@ -167,6 +167,7 @@ class LocalVerifyToolTests(unittest.TestCase):
         self.assertTrue(any("export_player_template/runtime_conditions.js" in command for command in commands))
         self.assertTrue(any("export_player_template/runtime_data.js" in command for command in commands))
         self.assertTrue(any("export_player_template/runtime_storage.js" in command for command in commands))
+        self.assertTrue(any("export_player_template/runtime_persistent_variables.js" in command for command in commands))
         self.assertTrue(any("export_player_template/runtime_story_flow.js" in command for command in commands))
         self.assertTrue(any("export_player_template/runtime_ui_skin.js" in command for command in commands))
         self.assertTrue(any("export_player_template/runtime_visual_constants.js" in command for command in commands))
@@ -178,6 +179,7 @@ class LocalVerifyToolTests(unittest.TestCase):
         self.assertTrue(any("test_maintainability_check_tool.py" in command for command in commands))
         self.assertTrue(any("test_native_runtime_story_flow.py" in command for command in commands))
         self.assertTrue(any("test_story_flow_contract.py" in command for command in commands))
+        self.assertTrue(any("test_persistent_variables_contract.py" in command for command in commands))
         self.assertTrue(any("tools/ci/maintainability_check.py" in command for command in commands))
         self.assertTrue(any("test_browser_playwright_smoke.py" in command for command in commands))
 

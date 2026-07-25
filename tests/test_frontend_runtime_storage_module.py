@@ -90,6 +90,7 @@ class FrontendRuntimeStorageModuleTests(unittest.TestCase):
         self.assertIn("removeRuntimeStorageItem", payload["exportedKeys"])
         self.assertIn("quickSave", payload["suffixKeys"])
         self.assertIn("readHistory", payload["suffixKeys"])
+        self.assertIn("persistentVariables", payload["suffixKeys"])
         self.assertTrue(payload["scope"].startswith("my-vn"))
         self.assertIn("夏", payload["scope"])
         self.assertNotIn(" ", payload["scope"])

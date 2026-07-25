@@ -4,6 +4,7 @@
       id: "var_affection",
       name: "好感度",
       type: "number",
+      scope: "save",
       defaultValue: 0,
       min: -100,
       max: 100,
@@ -12,17 +13,20 @@
       id: "var_route",
       name: "路线标记",
       type: "string",
+      scope: "save",
       defaultValue: "common",
     }),
     Object.freeze({
       id: "var_flag",
       name: "剧情开关",
       type: "boolean",
+      scope: "save",
       defaultValue: false,
     }),
   ]);
 
   const PROJECT_VARIABLE_TYPES = Object.freeze(["number", "boolean", "string"]);
+  const PROJECT_VARIABLE_SCOPES = Object.freeze(["save", "persistent"]);
 
   const PROJECT_VARIABLE_FILTER_LABELS = Object.freeze({
     all: "全部",
@@ -32,6 +36,8 @@
     number: "数字",
     boolean: "开关",
     string: "文本",
+    save: "本周目",
+    persistent: "跨周目",
     active: "使用中",
     reserved: "预留",
     deprecated: "废弃",
@@ -42,6 +48,16 @@
     active: "使用中",
     reserved: "预留",
     deprecated: "废弃",
+  });
+
+  const PROJECT_VARIABLE_SCOPE_LABELS = Object.freeze({
+    save: "本周目变量",
+    persistent: "跨周目记忆",
+  });
+
+  const PROJECT_VARIABLE_SCOPE_DESCRIPTIONS = Object.freeze({
+    save: "跟随每个存档保存；新游戏会恢复默认值，读档和回退会恢复当时状态。",
+    persistent: "独立保存在本机；新游戏会继承最新值，读旧档和回退也不会让它倒退。",
   });
 
   const PROJECT_VARIABLE_TYPE_DEFAULT_NAMES = Object.freeze({
@@ -239,6 +255,15 @@
     return Object.prototype.hasOwnProperty.call(PROJECT_VARIABLE_STATUS_LABELS, status) ? status : "active";
   }
 
+  function getSafeProjectVariableScope(scope) {
+    const normalized = String(scope ?? "").trim().toLowerCase();
+    return PROJECT_VARIABLE_SCOPES.includes(normalized) ? normalized : "save";
+  }
+
+  function isPersistentProjectVariable(variable) {
+    return getSafeProjectVariableScope(variable?.scope) === "persistent";
+  }
+
   function renderProjectVariableTypeOptions(selectedType, options = {}) {
     const escape = getEscaper(options);
     const safeType = getSafeProjectVariableType(selectedType);
@@ -263,6 +288,18 @@
       `
       )
       .join("");
+  }
+
+  function renderProjectVariableScopeOptions(selectedScope, options = {}) {
+    const escape = getEscaper(options);
+    const safeScope = getSafeProjectVariableScope(selectedScope);
+    return PROJECT_VARIABLE_SCOPES.map(
+      (scope) => `
+        <option value="${scope}" ${scope === safeScope ? "selected" : ""}>
+          ${escape(PROJECT_VARIABLE_SCOPE_LABELS[scope])}
+        </option>
+      `
+    ).join("");
   }
 
   function makeProjectVariableId(name, existingIds = []) {
@@ -309,6 +346,7 @@
       id: makeProjectVariableId(name, existingIds),
       name,
       type: safeType,
+      scope: "save",
       group: "默认",
       status: "active",
       description: "",
@@ -648,8 +686,11 @@
   global.CanvasiaEditorVariables = Object.freeze({
     STARTER_VARIABLE_PRESETS,
     PROJECT_VARIABLE_TYPES,
+    PROJECT_VARIABLE_SCOPES,
     PROJECT_VARIABLE_FILTER_LABELS,
     PROJECT_VARIABLE_STATUS_LABELS,
+    PROJECT_VARIABLE_SCOPE_LABELS,
+    PROJECT_VARIABLE_SCOPE_DESCRIPTIONS,
     PROJECT_VARIABLE_TYPE_DEFAULT_NAMES,
     parseVariableNumberBound,
     getVariableNumberBounds,
@@ -664,8 +705,11 @@
     getSafeProjectVariableType,
     getSafeProjectVariableFilterMode,
     getSafeProjectVariableStatus,
+    getSafeProjectVariableScope,
+    isPersistentProjectVariable,
     renderProjectVariableTypeOptions,
     renderProjectVariableStatusOptions,
+    renderProjectVariableScopeOptions,
     makeProjectVariableId,
     isSafeProjectVariableId,
     getProjectVariableIdIssue,

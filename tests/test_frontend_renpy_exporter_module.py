@@ -38,9 +38,9 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
                 {{ id: "yuna", displayName: "悠奈" }},
               ],
               variables: [
-                {{ id: "affection", name: "好感度", type: "number", defaultValue: 0 }},
+                {{ id: "affection", name: "好感度", type: "number", scope: "persistent", defaultValue: 0 }},
                 {{ id: "route", name: "路线", type: "string", defaultValue: "common" }},
-                {{ id: "player_name", name: "玩家姓名", type: "string", defaultValue: "旅人" }},
+                {{ id: "player_name", name: "玩家姓名", type: "string", scope: "persistent", defaultValue: "旅人" }},
               ],
               chapters: [
                 {{
@@ -158,7 +158,7 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
         self.assertEqual(payload["digest"]["status"], "ready")
         self.assertIn('define yuna = Character("悠奈")', payload["draft"]["script"])
         self.assertIn("define canvasia_nvl = Character(None, kind=nvl)", payload["draft"]["script"])
-        self.assertIn("default affection = 0", payload["draft"]["script"])
+        self.assertIn("default persistent.affection = 0", payload["draft"]["script"])
         self.assertIn('default route = "common"', payload["draft"]["script"])
         self.assertIn('image bg_rooftop = "bg/rooftop.png"', payload["draft"]["script"])
         self.assertIn("label scene_open:", payload["draft"]["script"])
@@ -176,9 +176,9 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
         self.assertIn('voice "voice/yuna_001.ogg"', payload["draft"]["script"])
         self.assertIn("def canvasia_parse_number_input(value):", payload["draft"]["script"])
         self.assertIn('$ _canvasia_input = renpy.input("请告诉我你的名字", default="旅人", length=24).strip()', payload["draft"]["script"])
-        self.assertIn('$ player_name = _canvasia_input', payload["draft"]["script"])
-        self.assertIn('yuna "{cps=72}欢迎回来，[player_name]。{/cps}"', payload["draft"]["script"])
-        self.assertIn('"[player_name]，追上去":', payload["draft"]["script"])
+        self.assertIn('$ persistent.player_name = _canvasia_input', payload["draft"]["script"])
+        self.assertIn('yuna "{cps=72}欢迎回来，[persistent.player_name]。{/cps}"', payload["draft"]["script"])
+        self.assertIn('"[persistent.player_name]，追上去":', payload["draft"]["script"])
         self.assertIn('play sound "sfx/bell.ogg" volume 0.65', payload["draft"]["script"])
         self.assertIn('nvl clear\n    canvasia_nvl "{cps=10000}风吹过屋顶。{/cps}"', payload["draft"]["script"])
         self.assertIn('centered "悠奈\\n天空正在变暗。"', payload["draft"]["script"])
@@ -187,10 +187,10 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
         self.assertIn("as canvasia_particles onlayer overlay", payload["draft"]["script"])
         self.assertIn("hide canvasia_particles onlayer overlay", payload["draft"]["script"])
         self.assertIn("menu:", payload["draft"]["script"])
-        self.assertIn("$ affection += 1", payload["draft"]["script"])
+        self.assertIn("$ persistent.affection += 1", payload["draft"]["script"])
         self.assertIn('$ route = "good"', payload["draft"]["script"])
-        self.assertIn("$ affection += 2", payload["draft"]["script"])
-        self.assertIn("if affection >= 2:", payload["draft"]["script"])
+        self.assertIn("$ persistent.affection += 2", payload["draft"]["script"])
+        self.assertIn("if persistent.affection >= 2:", payload["draft"]["script"])
         self.assertIn('$ renpy.movie_cutscene("<from 1.5 to 12 volume 0.8>video/op.webm", delay=10.5)', payload["draft"]["script"])
         self.assertIn("jump scene_end", payload["draft"]["script"])
         self.assertIn("call scene_common", payload["draft"]["script"])

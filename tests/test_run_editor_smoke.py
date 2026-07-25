@@ -936,7 +936,13 @@ class RunEditorSmokeTests(unittest.TestCase):
             {
                 "formatVersion": run_editor.PROJECT_FORMAT_VERSION,
                 "variables": [
-                    {"id": "affection", "name": "Affection", "type": "number", "defaultValue": 0},
+                    {
+                        "id": "affection",
+                        "name": "Affection",
+                        "type": "number",
+                        "scope": "persistent",
+                        "defaultValue": 0,
+                    },
                     {"id": "flag_met", "name": "Met", "type": "boolean", "defaultValue": False},
                 ],
             },
@@ -1082,7 +1088,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(export_result["renpyScreensName"], f"game/{run_editor.RENPY_SCREENS_FILE_NAME}")
 
         script = script_path.read_text(encoding="utf-8")
-        self.assertIn("default affection = 0", script)
+        self.assertIn("default persistent.affection = 0", script)
         self.assertIn("default flag_met = False", script)
         self.assertIn('define heroine = Character("Heroine")', script)
         self.assertIn(f"image {background_asset['id']}", script)
@@ -1111,8 +1117,8 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertIn('snowflake.png"), count=40', script)
         self.assertIn("as canvasia_particles onlayer overlay", script)
         self.assertIn("hide canvasia_particles onlayer overlay", script)
-        self.assertIn("$ affection += 1", script)
-        self.assertIn("if affection >= 1:", script)
+        self.assertIn("$ persistent.affection += 1", script)
+        self.assertIn("if persistent.affection >= 1:", script)
         self.assertIn(f"jump {scene['id']}", script)
         self.assertIn("$ flag_met = True", script)
         self.assertIn('with Fade(0.24, 0.14, 0.82, color="#ffeccc")', script)
@@ -1353,6 +1359,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                         "id": "var_affection",
                         "name": "好感度",
                         "type": "number",
+                        "scope": "persistent",
                         "defaultValue": 0,
                     },
                     {
@@ -1427,6 +1434,8 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(saved_project["gameUiConfig"]["uiOverlayOpacity"], 9)
         self.assertEqual(saved_project["particleCustomPresets"][0]["name"], "暴雪测试")
         self.assertEqual(bundle["variables"]["variables"][0]["id"], "var_affection")
+        self.assertEqual(bundle["variables"]["variables"][0]["scope"], "persistent")
+        self.assertEqual(bundle["variables"]["variables"][1]["scope"], "save")
         self.assertEqual(bundle["variables"]["variables"][1]["defaultValue"], "common")
 
         run_editor.save_project_settings(runtime_settings={"formalSaveSlotCount": 12})
@@ -3292,6 +3301,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / "player.js").is_file())
         self.assertTrue((build_dir / "runtime_data.js").is_file())
         self.assertTrue((build_dir / "runtime_storage.js").is_file())
+        self.assertTrue((build_dir / "runtime_persistent_variables.js").is_file())
         self.assertTrue((build_dir / "runtime_visual_constants.js").is_file())
         self.assertTrue((build_dir / "runtime_conditions.js").is_file())
         self.assertTrue((build_dir / "runtime_choice_availability.js").is_file())
@@ -3399,6 +3409,10 @@ class RunEditorSmokeTests(unittest.TestCase):
         )
         self.assertEqual(manifest["files"]["playerRuntimeData"], "runtime_data.js")
         self.assertEqual(manifest["files"]["playerRuntimeStorage"], "runtime_storage.js")
+        self.assertEqual(
+            manifest["files"]["playerRuntimePersistentVariables"],
+            "runtime_persistent_variables.js",
+        )
         self.assertEqual(manifest["files"]["playerRuntimeVisualConstants"], "runtime_visual_constants.js")
         self.assertEqual(manifest["files"]["playerRuntimeControls"], "runtime_controls.js")
         self.assertEqual(manifest["files"]["playerRuntimeGamepad"], "runtime_gamepad.js")
@@ -3491,6 +3505,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 "player.js",
                 "runtime_data.js",
                 "runtime_storage.js",
+                "runtime_persistent_variables.js",
                 "runtime_conditions.js",
                 "runtime_controls.js",
                 "runtime_gamepad.js",
@@ -3791,6 +3806,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_TEXT_EFFECTS_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_STORAGE_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_VARIABLES_NAME).is_file())
+        self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_PERSISTENT_VARIABLES_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_README_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_REQUIREMENTS_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_BUILD_REQUIREMENTS_NAME).is_file())
@@ -4094,6 +4110,10 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["runtimeTextEffectsModule"], run_editor.NATIVE_RUNTIME_TEXT_EFFECTS_NAME)
         self.assertEqual(manifest["files"]["runtimeStorageModule"], run_editor.NATIVE_RUNTIME_STORAGE_NAME)
         self.assertEqual(manifest["files"]["runtimeVariablesModule"], run_editor.NATIVE_RUNTIME_VARIABLES_NAME)
+        self.assertEqual(
+            manifest["files"]["runtimePersistentVariablesModule"],
+            run_editor.NATIVE_RUNTIME_PERSISTENT_VARIABLES_NAME,
+        )
         self.assertEqual(manifest["files"]["runtimeVnQualityModule"], run_editor.NATIVE_RUNTIME_VN_QUALITY_NAME)
         self.assertEqual(manifest["files"]["runtimeScenePrefetchModule"], run_editor.NATIVE_RUNTIME_SCENE_PREFETCH_NAME)
         self.assertEqual(manifest["files"]["runtimeStoryFlowModule"], run_editor.NATIVE_RUNTIME_STORY_FLOW_NAME)
@@ -4126,6 +4146,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 run_editor.NATIVE_RUNTIME_TEXT_EFFECTS_NAME,
                 run_editor.NATIVE_RUNTIME_STORAGE_NAME,
                 run_editor.NATIVE_RUNTIME_VARIABLES_NAME,
+                run_editor.NATIVE_RUNTIME_PERSISTENT_VARIABLES_NAME,
                 "game_data.json",
                 run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME,
                 run_editor.EXPORT_RELEASE_EVIDENCE_PACK_NAME,
@@ -4913,6 +4934,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue(Path(export_result["archivePath"]).is_file())
         self.assertTrue((build_dir / "app" / "runtime_data.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_storage.js").is_file())
+        self.assertTrue((build_dir / "app" / "runtime_persistent_variables.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_visual_constants.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_conditions.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_choice_availability.js").is_file())
@@ -4997,6 +5019,10 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["voiceProductionCsv"], run_editor.EXPORT_VOICE_PRODUCTION_CSV_NAME)
         self.assertEqual(manifest["files"]["appRuntimeData"], "app/runtime_data.js")
         self.assertEqual(manifest["files"]["appRuntimeStorage"], "app/runtime_storage.js")
+        self.assertEqual(
+            manifest["files"]["appRuntimePersistentVariables"],
+            "app/runtime_persistent_variables.js",
+        )
         self.assertEqual(manifest["files"]["appRuntimeVisualConstants"], "app/runtime_visual_constants.js")
         self.assertEqual(manifest["files"]["appRuntimeConditions"], "app/runtime_conditions.js")
         self.assertEqual(manifest["files"]["appRuntimeStoryFlow"], "app/runtime_story_flow.js")
@@ -5048,6 +5074,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 "app/player.js",
                 "app/runtime_data.js",
                 "app/runtime_storage.js",
+                "app/runtime_persistent_variables.js",
                 "app/runtime_conditions.js",
                 "app/runtime_controls.js",
                 "app/runtime_gamepad.js",
@@ -5093,6 +5120,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue(Path(export_result["archivePath"]).is_file())
         self.assertTrue((build_dir / "app" / "runtime_data.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_storage.js").is_file())
+        self.assertTrue((build_dir / "app" / "runtime_persistent_variables.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_visual_constants.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_conditions.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_controls.js").is_file())
@@ -5171,6 +5199,10 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["voiceProductionCsv"], run_editor.EXPORT_VOICE_PRODUCTION_CSV_NAME)
         self.assertEqual(manifest["files"]["appRuntimeData"], "app/runtime_data.js")
         self.assertEqual(manifest["files"]["appRuntimeStorage"], "app/runtime_storage.js")
+        self.assertEqual(
+            manifest["files"]["appRuntimePersistentVariables"],
+            "app/runtime_persistent_variables.js",
+        )
         self.assertEqual(manifest["files"]["appRuntimeVisualConstants"], "app/runtime_visual_constants.js")
         self.assertEqual(manifest["files"]["appRuntimeConditions"], "app/runtime_conditions.js")
         self.assertEqual(manifest["files"]["appRuntimeI18n"], "app/runtime_i18n.js")
@@ -5220,6 +5252,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 "app/player.js",
                 "app/runtime_data.js",
                 "app/runtime_storage.js",
+                "app/runtime_persistent_variables.js",
                 "app/runtime_conditions.js",
                 "app/runtime_controls.js",
                 "app/runtime_gamepad.js",
@@ -5340,6 +5373,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / "package.nw").is_file())
         self.assertTrue((build_dir / "app" / "runtime_data.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_storage.js").is_file())
+        self.assertTrue((build_dir / "app" / "runtime_persistent_variables.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_visual_constants.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_conditions.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_controls.js").is_file())
@@ -5423,6 +5457,10 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["voiceProductionCsv"], run_editor.EXPORT_VOICE_PRODUCTION_CSV_NAME)
         self.assertEqual(manifest["files"]["appRuntimeData"], "app/runtime_data.js")
         self.assertEqual(manifest["files"]["appRuntimeStorage"], "app/runtime_storage.js")
+        self.assertEqual(
+            manifest["files"]["appRuntimePersistentVariables"],
+            "app/runtime_persistent_variables.js",
+        )
         self.assertEqual(manifest["files"]["appRuntimeVisualConstants"], "app/runtime_visual_constants.js")
         self.assertEqual(manifest["files"]["appRuntimeConditions"], "app/runtime_conditions.js")
         self.assertEqual(manifest["files"]["appRuntimeI18n"], "app/runtime_i18n.js")
@@ -5472,6 +5510,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 "app/player.js",
                 "app/runtime_data.js",
                 "app/runtime_storage.js",
+                "app/runtime_persistent_variables.js",
                 "app/runtime_conditions.js",
                 "app/runtime_controls.js",
                 "app/runtime_gamepad.js",
@@ -5510,6 +5549,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((bundle_dir / "export_player_template" / "player.js").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_data.js").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_storage.js").is_file())
+        self.assertTrue((bundle_dir / "export_player_template" / "runtime_persistent_variables.js").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_visual_constants.js").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_conditions.js").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_controls.js").is_file())

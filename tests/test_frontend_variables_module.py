@@ -25,7 +25,7 @@ class FrontendVariablesModuleTests(unittest.TestCase):
             const tools = context.window.CanvasiaEditorVariables;
             const variables = [
               {{ id: "score", name: "分数<危险>", type: "number", defaultValue: 12, min: 0, max: 10 }},
-              {{ id: "route", name: "路线", type: "string", defaultValue: "common" }},
+              {{ id: "route", name: "路线", type: "string", scope: "persistent", defaultValue: "common" }},
               {{ id: "flag", name: "开关", type: "boolean", defaultValue: true }},
             ];
             const options = {{
@@ -98,6 +98,7 @@ class FrontendVariablesModuleTests(unittest.TestCase):
               projectVariableRules: {{
                 filterKeys: Object.keys(tools.PROJECT_VARIABLE_FILTER_LABELS),
                 statusKeys: Object.keys(tools.PROJECT_VARIABLE_STATUS_LABELS),
+                scopeKeys: Object.keys(tools.PROJECT_VARIABLE_SCOPE_LABELS),
                 safeTypes: [
                   tools.getSafeProjectVariableType("number"),
                   tools.getSafeProjectVariableType("bad"),
@@ -109,6 +110,12 @@ class FrontendVariablesModuleTests(unittest.TestCase):
                 safeStatuses: [
                   tools.getSafeProjectVariableStatus("deprecated"),
                   tools.getSafeProjectVariableStatus("bad"),
+                ],
+                safeScopes: [
+                  tools.getSafeProjectVariableScope("persistent"),
+                  tools.getSafeProjectVariableScope("bad"),
+                  tools.isPersistentProjectVariable(variables[1]),
+                  tools.isPersistentProjectVariable(variables[0]),
                 ],
                 ids: [
                   tools.makeProjectVariableId("好感度", ["var_好感度"]),
@@ -132,6 +139,7 @@ class FrontendVariablesModuleTests(unittest.TestCase):
                 renderedOptions: [
                   tools.renderProjectVariableTypeOptions("boolean", escapedOptions),
                   tools.renderProjectVariableStatusOptions("reserved", escapedOptions),
+                  tools.renderProjectVariableScopeOptions("persistent", escapedOptions),
                 ],
               }},
               render: [
@@ -187,9 +195,11 @@ class FrontendVariablesModuleTests(unittest.TestCase):
         )
         self.assertIn("draft", payload["projectVariableRules"]["filterKeys"])
         self.assertEqual(payload["projectVariableRules"]["statusKeys"], ["active", "reserved", "deprecated"])
+        self.assertEqual(payload["projectVariableRules"]["scopeKeys"], ["save", "persistent"])
         self.assertEqual(payload["projectVariableRules"]["safeTypes"], ["number", "string"])
         self.assertEqual(payload["projectVariableRules"]["safeFilters"], ["risky", "all"])
         self.assertEqual(payload["projectVariableRules"]["safeStatuses"], ["deprecated", "active"])
+        self.assertEqual(payload["projectVariableRules"]["safeScopes"], ["persistent", "save", True, False])
         self.assertEqual(payload["projectVariableRules"]["ids"], ["var_好感度_02", "var_route_03"])
         self.assertEqual(payload["projectVariableRules"]["idSafety"], [True, False])
         self.assertEqual(
@@ -202,10 +212,12 @@ class FrontendVariablesModuleTests(unittest.TestCase):
         )
         self.assertEqual(payload["projectVariableRules"]["defaults"][0]["id"], "var_新数字变量")
         self.assertEqual(payload["projectVariableRules"]["defaults"][0]["max"], 100)
+        self.assertEqual(payload["projectVariableRules"]["defaults"][0]["scope"], "save")
         self.assertFalse(payload["projectVariableRules"]["defaults"][1]["defaultValue"])
         self.assertEqual(payload["projectVariableRules"]["defaults"][2]["defaultValue"], "common")
         self.assertIn('<option value="boolean" selected>', payload["projectVariableRules"]["renderedOptions"][0])
         self.assertIn('<option value="reserved" selected>', payload["projectVariableRules"]["renderedOptions"][1])
+        self.assertIn('<option value="persistent" selected>', payload["projectVariableRules"]["renderedOptions"][2])
         self.assertIn("分数&lt;危险&gt;", payload["render"][0])
         self.assertIn("当前没有可用变量", payload["render"][1])
         self.assertIn('<option value="false" selected>否</option>', payload["render"][2])

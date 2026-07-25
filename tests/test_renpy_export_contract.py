@@ -92,7 +92,13 @@ class RenpyExportContractTests(unittest.TestCase):
 
     def test_player_input_and_text_variables_match_on_both_exporters(self) -> None:
         variables = {
-            "player_name": {"id": "player_name", "name": "玩家姓名", "type": "string", "defaultValue": "旅人"},
+            "player_name": {
+                "id": "player_name",
+                "name": "玩家姓名",
+                "type": "string",
+                "scope": "persistent",
+                "defaultValue": "旅人",
+            },
         }
         blocks = [
             {
@@ -145,8 +151,9 @@ class RenpyExportContractTests(unittest.TestCase):
             '        $ _canvasia_input = renpy.input("请告诉我你的名字", default="旅人", length=24).strip()',
             backend_lines,
         )
-        self.assertIn('    "欢迎，[player_name]。"', backend_lines)
-        self.assertIn('        "[player_name]，继续":', backend_lines)
+        self.assertIn("            $ persistent.player_name = _canvasia_input", backend_lines)
+        self.assertIn('    "欢迎，[persistent.player_name]。"', backend_lines)
+        self.assertIn('        "[persistent.player_name]，继续":', backend_lines)
         self.assertEqual(frontend["warnings"], [])
         self.assertEqual(backend_warnings, [])
 

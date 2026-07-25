@@ -145,10 +145,10 @@
     return `"${String(value ?? "").replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\r?\n/g, "\\n")}"`;
   }
 
-  function convertRuntimeTextVariables(value) {
+  function convertRuntimeTextVariables(value, variableMap = new Map()) {
     return String(value ?? "").replace(
       /\{\{\s*([0-9A-Za-z_\-\u3400-\u9fff]{1,64})\s*\}\}/g,
-      (_match, variableId) => `[${getVariableIdentifier(variableId)}]`
+      (_match, variableId) => `[${getVariableReference(variableId, variableMap)}]`
     );
   }
 
@@ -1119,7 +1119,7 @@
   }
 
   function renderRenpyText(block = {}, context = {}) {
-    const line = convertRuntimeTextVariables(getBlockText(block) || " ");
+    const line = convertRuntimeTextVariables(getBlockText(block) || " ", context.variableMap ?? new Map());
     const textSpeed = getEffectiveTextSpeed(block, context.runtimeSettings);
     if (!textSpeed) {
       return line;
@@ -1159,6 +1159,16 @@
     return normalizeIdentifier(value, fallback);
   }
 
+  function getVariableReference(variableId, variableMap = new Map()) {
+    const safeVariableId = cleanText(variableId);
+    const identifier = getVariableIdentifier(safeVariableId);
+    const variable =
+      typeof variableMap?.get === "function" ? variableMap.get(safeVariableId) : variableMap?.[safeVariableId];
+    return cleanText(variable?.scope, "save").toLowerCase() === "persistent"
+      ? `persistent.${identifier}`
+      : identifier;
+  }
+
   function buildCharacterDefinitions(characterMap = new Map()) {
     return Array.from(characterMap.entries())
       .map(([characterId, character]) => {
@@ -1181,9 +1191,10 @@
   }
 
   function buildVariableDefinitions(data = {}) {
+    const variableMap = buildVariableMap(data);
     return getVariableList(data)
       .filter((variable) => cleanText(variable?.id))
-      .map((variable) => `default ${getVariableIdentifier(variable.id)} = ${renderRenpyLiteral(variable.defaultValue)}`)
+      .map((variable) => `default ${getVariableReference(variable.id, variableMap)} = ${renderRenpyLiteral(variable.defaultValue)}`)
       .sort();
   }
 
@@ -1208,11 +1219,14 @@
       pushWarning(warnings, "renpy_text_input_variable_type", "玩家输入卡只支持文本或数字变量，已导出 pass。", getWarningContext(context));
       return ["    pass"];
     }
-    const prompt = convertRuntimeTextVariables(cleanText(block.prompt, "Please enter a value"));
+    const prompt = convertRuntimeTextVariables(
+      cleanText(block.prompt, "Please enter a value"),
+      context.variableMap ?? new Map()
+    );
     const maxLength = Math.max(1, Math.min(200, Math.round(Number(block.maxLength) || 32)));
     const rawDefault = block.defaultValue ?? variable.defaultValue ?? "";
     const defaultValue = String(rawDefault ?? "");
-    const target = getVariableIdentifier(variableId);
+    const target = getVariableReference(variableId, context.variableMap ?? new Map());
     const lines = [
       "    while True:",
       `        $ _canvasia_input = renpy.input(${quoteRenpy(prompt)}, default=${quoteRenpy(defaultValue)}, length=${maxLength}).strip()`,
@@ -1311,10 +1325,18 @@
       if (!Number.isFinite(delta)) {
         pushWarning(warnings, "renpy_variable_add_value_review", `变量 ${variableId} 的增减值不是数字，已按 0 导出。`, getWarningContext(context));
       }
-      return [`${indent}$ ${getVariableIdentifier(variableId)} += ${Number.isFinite(delta) ? delta : 0}`];
+      return [
+        `${indent}$ ${getVariableReference(variableId, context.variableMap ?? new Map())} += ${
+          Number.isFinite(delta) ? delta : 0
+        }`,
+      ];
     }
 
-    return [`${indent}$ ${getVariableIdentifier(variableId)} = ${renderRenpyLiteral(effect.value)}`];
+    return [
+      `${indent}$ ${getVariableReference(variableId, context.variableMap ?? new Map())} = ${renderRenpyLiteral(
+        effect.value
+      )}`,
+    ];
   }
 
   function normalizeConditionOperator(operator, context = {}) {
@@ -1335,7 +1357,7 @@
       pushWarning(context.warnings ?? [], "renpy_condition_missing_variable", "条件判断缺少变量 ID，已按 True 导出。", getWarningContext(context));
       return "True";
     }
-    const variableName = getVariableIdentifier(variableId);
+    const variableName = getVariableReference(variableId, context.variableMap ?? new Map());
     const operator = normalizeConditionOperator(rule.operator, context);
     const rightValue = renderRenpyLiteral(rule.value);
     if (STRING_CONDITION_OPERATORS.has(operator)) {
@@ -1430,7 +1452,10 @@
     const gatedExpressions = [];
     let hasAlwaysOption = false;
     options.forEach((option, optionIndex) => {
-      const optionText = convertRuntimeTextVariables(cleanText(option?.text ?? option?.label, `Option ${optionIndex + 1}`));
+      const optionText = convertRuntimeTextVariables(
+        cleanText(option?.text ?? option?.label, `Option ${optionIndex + 1}`),
+        context.variableMap ?? new Map()
+      );
       const targetSceneId = getChoiceTarget(option);
       const effectCount = toArray(option.effects).length;
       const rawMode = cleanText(option.choiceAvailabilityMode ?? option.availabilityMode, "always");
@@ -1734,6 +1759,7 @@
     normalizeIdentifier,
     quoteRenpy,
     convertRuntimeTextVariables,
+    getVariableReference,
     buildRenpyDraftExport,
     getRenpyDraftStatusDigest,
     buildRenpyDraftManifest,

@@ -1090,6 +1090,7 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
 
         variable_row = self.page.locator("[data-project-variable-row]").filter(has_text="新数字变量").last
         variable_row.locator('[data-field="project-variable-name"]').fill("压力值")
+        variable_row.locator('[data-field="project-variable-scope"]').select_option("persistent")
         variable_row.locator('[data-field="project-variable-group"]').fill("数值组")
         variable_row.locator('[data-field="project-variable-description"]').fill("测试变量说明")
         variable_row.locator('[data-field="project-variable-default"]').fill("140")
@@ -1103,7 +1104,9 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
                     const defaultValue = row.querySelector('[data-field="project-variable-default"]')?.value;
                     const minValue = row.querySelector('[data-field="project-variable-min"]')?.value;
                     const maxValue = row.querySelector('[data-field="project-variable-max"]')?.value;
-                    return name === '压力值' && defaultValue === '120' && minValue === '0' && maxValue === '120';
+                    const scope = row.querySelector('[data-field="project-variable-scope"]')?.value;
+                    return name === '压力值' && defaultValue === '120' && minValue === '0' && maxValue === '120'
+                        && scope === 'persistent';
                 });
             }""",
             timeout=15000,
@@ -1113,8 +1116,17 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
         self.assertEqual(saved_row.locator('[data-field="project-variable-default"]').input_value(), "120")
         self.assertEqual(saved_row.locator('[data-field="project-variable-min"]').input_value(), "0")
         self.assertEqual(saved_row.locator('[data-field="project-variable-max"]').input_value(), "120")
+        self.assertEqual(saved_row.locator('[data-field="project-variable-scope"]').input_value(), "persistent")
         self.assertEqual(saved_row.locator('[data-field="project-variable-group"]').input_value(), "数值组")
         self.assertEqual(saved_row.locator('[data-field="project-variable-description"]').input_value(), "测试变量说明")
+        persisted_scope = self.page.evaluate(
+            """async () => {
+                const response = await fetch('/api/project-data');
+                const bundle = await response.json();
+                return bundle.variables.variables.find((variable) => variable.name === '压力值')?.scope;
+            }"""
+        )
+        self.assertEqual(persisted_scope, "persistent")
 
     def test_preview_variable_library_can_rename_id_and_jump_to_reference(self) -> None:
         project_title = "浏览器烟测项目_VariableRename"

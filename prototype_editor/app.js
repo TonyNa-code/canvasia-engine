@@ -269,10 +269,14 @@ const {
 const variableTools = window.CanvasiaEditorVariables;
 const {
   PROJECT_VARIABLE_FILTER_LABELS,
+  PROJECT_VARIABLE_SCOPE_DESCRIPTIONS,
+  PROJECT_VARIABLE_SCOPE_LABELS,
   PROJECT_VARIABLE_STATUS_LABELS,
   getSafeProjectVariableType,
   getSafeProjectVariableFilterMode,
+  getSafeProjectVariableScope,
   getSafeProjectVariableStatus,
+  isPersistentProjectVariable,
   makeProjectVariableId,
   isSafeProjectVariableId,
 } = variableTools;
@@ -36334,6 +36338,10 @@ function renderProjectVariableStatusOptions(selectedStatus) {
   return variableTools.renderProjectVariableStatusOptions(selectedStatus, { escapeHtml });
 }
 
+function renderProjectVariableScopeOptions(selectedScope) {
+  return variableTools.renderProjectVariableScopeOptions(selectedScope, { escapeHtml });
+}
+
 function getProjectVariableIdIssue(variableId, currentVariableId = "") {
   return variableTools.getProjectVariableIdIssue(variableId, currentVariableId, {
     variables: state.data?.variables ?? [],
@@ -36529,6 +36537,7 @@ function getProjectVariableDraftSeed(variableId) {
     idText: variable.id ?? "",
     name: variable.name ?? "",
     group: variable.group ?? "",
+    scope: getSafeProjectVariableScope(variable.scope),
     status: getSafeProjectVariableStatus(variable.status),
     description: variable.description ?? "",
     defaultText: getProjectVariableDefaultInputValue(variable),
@@ -36586,6 +36595,8 @@ function captureProjectVariableDraftField(target) {
     draft.idText = target.value ?? "";
   } else if (fieldName === "project-variable-group") {
     draft.group = target.value ?? "";
+  } else if (fieldName === "project-variable-scope") {
+    draft.scope = getSafeProjectVariableScope(target.value);
   } else if (fieldName === "project-variable-status") {
     draft.status = getSafeProjectVariableStatus(target.value);
   } else if (fieldName === "project-variable-description") {
@@ -36619,6 +36630,7 @@ function buildProjectVariableDraftModel(variable) {
     type,
     name: draft.name ?? variable.name,
     group: draft.group ?? variable.group ?? "",
+    scope: getSafeProjectVariableScope(draft.scope ?? variable.scope),
     status: getSafeProjectVariableStatus(draft.status ?? variable.status),
     description: draft.description ?? variable.description ?? "",
     defaultValue: draft.defaultText ?? getProjectVariableDefaultInputValue(variable),
@@ -36655,7 +36667,13 @@ function renderProjectVariableRiskTags(variable, usage, currentVariableId = vari
   const tags = [];
   const idIssue = getProjectVariableIdIssue(variable.id, currentVariableId);
   const status = getSafeProjectVariableStatus(variable.status);
+  const scope = getSafeProjectVariableScope(variable.scope);
   tags.push(`<span class="issue-tag">${escapeHtml(PROJECT_VARIABLE_STATUS_LABELS[status])}</span>`);
+  tags.push(
+    `<span class="issue-tag ${scope === "persistent" ? "good-text" : ""}">${escapeHtml(
+      PROJECT_VARIABLE_SCOPE_LABELS[scope]
+    )}</span>`
+  );
   if (usage.total > 0) {
     tags.push(`<span class="issue-tag good-text">被引用 ${usage.total} 次</span>`);
   } else {
@@ -36747,6 +36765,12 @@ function renderProjectVariableEditorRow(variable, usage) {
             ${renderProjectVariableStatusOptions(draft?.status ?? variable.status)}
           </select>
         </label>
+        <label class="playback-setting" for="${escapeHtml(`${inputIdBase}-scope`)}">
+          <span>保存范围</span>
+          <select id="${escapeHtml(`${inputIdBase}-scope`)}" data-field="project-variable-scope">
+            ${renderProjectVariableScopeOptions(draft?.scope ?? variable.scope)}
+          </select>
+        </label>
         <label class="playback-setting" for="${escapeHtml(`${inputIdBase}-type`)}">
           <span>变量类型</span>
           <select id="${escapeHtml(`${inputIdBase}-type`)}" data-field="project-variable-type">
@@ -36779,6 +36803,9 @@ function renderProjectVariableEditorRow(variable, usage) {
         <textarea id="${escapeHtml(`${inputIdBase}-description`)}" data-field="project-variable-description" rows="2" maxlength="220" placeholder="写清楚这个变量控制什么、什么时候可以删除。">${escapeHtml(draft?.description ?? variable.description ?? "")}</textarea>
       </label>
       <div class="detail-meta">${escapeHtml(rangeHint)}</div>
+      <div class="detail-meta">${escapeHtml(
+        PROJECT_VARIABLE_SCOPE_DESCRIPTIONS[getSafeProjectVariableScope(renderVariable.scope)]
+      )}</div>
       <div class="detail-stack">
         ${locationPreview}
         ${hiddenReferenceCount > 0 ? `<div class="detail-meta">另有 ${hiddenReferenceCount} 处引用，搜索变量名或打开巡检可继续定位。</div>` : ""}
@@ -36846,6 +36873,9 @@ function isProjectVariableMatchingFilter(item, filterMode) {
   if (["number", "boolean", "string"].includes(filterMode)) {
     return item.renderVariable.type === filterMode;
   }
+  if (["save", "persistent"].includes(filterMode)) {
+    return getSafeProjectVariableScope(item.renderVariable.scope) === filterMode;
+  }
   return true;
 }
 
@@ -36868,6 +36898,7 @@ function renderProjectVariableGovernancePanel(items) {
   const draftCount = items.filter((item) => item.hasDraft).length;
   const reservedCount = items.filter((item) => item.status === "reserved").length;
   const deprecatedCount = items.filter((item) => item.status === "deprecated").length;
+  const persistentCount = items.filter((item) => isPersistentProjectVariable(item.renderVariable)).length;
   const score = getProjectVariableGovernanceScore(items);
   const hotItems = items
     .filter((item) => item.usage.total > 0)
@@ -36892,6 +36923,7 @@ function renderProjectVariableGovernancePanel(items) {
         ${renderRouteMetricCard("未引用", unusedCount, "可清理，也可能是预留变量")}
         ${renderRouteMetricCard("风险变量", riskItems.length, "ID、范围或默认值需要处理")}
         ${renderRouteMetricCard("草稿中", draftCount, "已修改但还没保存")}
+        ${renderRouteMetricCard("跨周目", persistentCount, "新游戏、旧存档和回退都不会让它倒退")}
         ${renderRouteMetricCard("预留 / 废弃", `${reservedCount} / ${deprecatedCount}`, "预留不会被自动清理；废弃仍引用会报风险")}
       </div>
       <div class="playback-setting-grid dialog-config-grid">
@@ -36999,6 +37031,7 @@ function renderProjectVariableLibraryPanel() {
       variable.id,
       variable.name,
       getVariableTypeLabel(renderVariable.type),
+      PROJECT_VARIABLE_SCOPE_LABELS[getSafeProjectVariableScope(renderVariable.scope)],
       PROJECT_VARIABLE_STATUS_LABELS[getSafeProjectVariableStatus(renderVariable.status)],
     ]
       .some((value) => String(value ?? "").toLowerCase().includes(query));
@@ -37006,6 +37039,7 @@ function renderProjectVariableLibraryPanel() {
   const referencedCount = variables.filter((variable) => (usageMap.get(variable.id)?.total ?? 0) > 0).length;
   const unusedCount = Math.max(variables.length - referencedCount, 0);
   const riskCount = variables.filter((variable) => getProjectVariableRangeIssues(variable).length > 0).length;
+  const persistentCount = variables.filter((variable) => isPersistentProjectVariable(variable)).length;
   const typeCount = (type) => variables.filter((variable) => variable.type === type).length;
 
   return `
@@ -37020,6 +37054,7 @@ function renderProjectVariableLibraryPanel() {
       <div class="route-summary-strip beginner-guide-metrics">
         ${renderRouteMetricCard("变量总数", variables.length, "项目可用的逻辑状态")}
         ${renderRouteMetricCard("数字变量", typeCount("number"), "好感度、分数和进度")}
+        ${renderRouteMetricCard("跨周目记忆", persistentCount, "通关标记、周目继承和隐藏路线")}
         ${renderRouteMetricCard("已引用", referencedCount, "被剧情卡片实际使用")}
         ${renderRouteMetricCard("未引用", unusedCount, "可能是废弃变量或预留变量")}
         ${renderRouteMetricCard("待整理", riskCount, "范围或默认值需要注意")}
@@ -37098,6 +37133,7 @@ function buildProjectVariableAuditReportContent(items) {
   const unusedItems = items.filter((item) => item.usage.total === 0);
   const riskItems = items.filter((item) => item.issues.length > 0);
   const draftItems = items.filter((item) => item.hasDraft);
+  const persistentItems = items.filter((item) => isPersistentProjectVariable(item.renderVariable));
   const hotItems = [...items]
     .filter((item) => item.usage.total > 0)
     .sort((a, b) => b.usage.total - a.usage.total);
@@ -37113,6 +37149,7 @@ function buildProjectVariableAuditReportContent(items) {
     `- 未引用变量：${unusedItems.length}`,
     `- 风险变量：${riskItems.length}`,
     `- 草稿变量：${draftItems.length}`,
+    `- 跨周目记忆：${persistentItems.length}`,
     "",
     "二、热点变量",
   ];
@@ -37155,6 +37192,7 @@ function buildProjectVariableAuditReportContent(items) {
       `${index + 1}. ${item.renderVariable.name || item.variable.id}`,
       `   ID：${item.variable.id}`,
       `   类型：${getVariableTypeLabel(item.renderVariable.type)}`,
+      `   保存范围：${PROJECT_VARIABLE_SCOPE_LABELS[getSafeProjectVariableScope(item.renderVariable.scope)]}`,
       `   分组：${item.renderVariable.group || "未分组"}`,
       `   状态：${PROJECT_VARIABLE_STATUS_LABELS[item.status]}`,
       `   说明：${item.renderVariable.description || "未填写"}`,
@@ -37417,6 +37455,9 @@ function readProjectVariableDraft(variableId) {
   const group = String(
     draft?.group ?? row.querySelector('[data-field="project-variable-group"]')?.value ?? ""
   ).trim();
+  const scope = getSafeProjectVariableScope(
+    draft?.scope ?? row.querySelector('[data-field="project-variable-scope"]')?.value
+  );
   const status = getSafeProjectVariableStatus(
     draft?.status ?? row.querySelector('[data-field="project-variable-status"]')?.value
   );
@@ -37454,6 +37495,7 @@ function readProjectVariableDraft(variableId) {
     id: nextId || original.id,
     name: name || original.name || original.id,
     type,
+    scope,
     group,
     status,
     description,
@@ -37565,6 +37607,24 @@ async function saveProjectVariable(variableId) {
     }
   }
 
+  if (
+    original &&
+    getSafeProjectVariableScope(original.scope) !== getSafeProjectVariableScope(variable.scope) &&
+    usage.total > 0
+  ) {
+    const nextScope = getSafeProjectVariableScope(variable.scope);
+    const shouldChangeScope = await showEngineConfirm({
+      title: "修改变量保存范围？",
+      message: `变量「${original.name}」已经被引用 ${usage.total} 次。改为「${PROJECT_VARIABLE_SCOPE_LABELS[nextScope]}」后，${PROJECT_VARIABLE_SCOPE_DESCRIPTIONS[nextScope]}确认继续吗？`,
+      tone: "warning",
+      confirmLabel: "修改保存范围",
+      cancelLabel: "先不修改",
+    });
+    if (!shouldChangeScope) {
+      return;
+    }
+  }
+
   try {
     setSaveStatus("正在保存变量...");
     if (original && variable.id !== variableId) {
@@ -37623,6 +37683,7 @@ function suggestProjectVariableId(variableId) {
     ...(getProjectVariableDraft(variableId) ?? {}),
     name: row.querySelector('[data-field="project-variable-name"]')?.value ?? seed.name,
     group: row.querySelector('[data-field="project-variable-group"]')?.value ?? seed.group,
+    scope: row.querySelector('[data-field="project-variable-scope"]')?.value ?? seed.scope,
     status: row.querySelector('[data-field="project-variable-status"]')?.value ?? seed.status,
     description: row.querySelector('[data-field="project-variable-description"]')?.value ?? seed.description,
     type: row.querySelector('[data-field="project-variable-type"]')?.value ?? seed.type,

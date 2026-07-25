@@ -56,6 +56,13 @@ import {
   writeRuntimeStorageJson,
 } from "./runtime_storage.js";
 import {
+  buildPersistentRuntimeVariableStore,
+  collectPersistentRuntimeVariableState,
+  getPersistentRuntimeVariableSummary,
+  mergePersistentRuntimeVariableState,
+  sanitizePersistentRuntimeVariableState,
+} from "./runtime_persistent_variables.js";
+import {
   buildCharacterMotionEvent,
   getCharacterMotionStyle,
   getCharacterStageFromBlock,
@@ -260,6 +267,7 @@ const refs = {
   systemMenuQuickSaveButton: document.getElementById("systemMenuQuickSaveButton"),
   systemMenuQuickLoadButton: document.getElementById("systemMenuQuickLoadButton"),
   systemMenuOperationGuideButton: document.getElementById("systemMenuOperationGuideButton"),
+  systemMenuPersistentResetButton: document.getElementById("systemMenuPersistentResetButton"),
   systemMenuReturnTitleButton: document.getElementById("systemMenuReturnTitleButton"),
   menuReadingProfileSelect: document.getElementById("menuReadingProfileSelect"),
   menuTextSpeedSelect: document.getElementById("menuTextSpeedSelect"),
@@ -413,6 +421,7 @@ const state = {
   autoAdvanceStepKey: null,
   dialogHidden: false,
   playback: {},
+  persistentVariables: {},
   autoResume: null,
   readHistory: new Set(),
   saveSlots: [],
@@ -497,6 +506,7 @@ function init() {
   state.playback = loadStoredPlaybackSettings();
   applyRuntimeUiTheme(state.playback.uiThemeMode);
   applyProjectGameUiSkin();
+  state.persistentVariables = loadStoredPersistentVariables();
   state.autoResume = loadStoredAutoResume();
   state.readHistory = loadStoredReadHistory();
   state.saveSlots = loadStoredSaveSlots();
@@ -583,6 +593,7 @@ function init() {
   refs.systemMenuQuickSaveButton?.addEventListener("click", quickSaveCurrent);
   refs.systemMenuQuickLoadButton?.addEventListener("click", quickLoadCurrent);
   refs.systemMenuOperationGuideButton?.addEventListener("click", openOperationGuideDialog);
+  refs.systemMenuPersistentResetButton?.addEventListener("click", requestPersistentVariablesReset);
   refs.systemMenuReturnTitleButton?.addEventListener("click", openReturnTitleDialog);
   refs.closeProfileDialogButton?.addEventListener("click", closeProfileDialog);
   refs.closeVoiceReplayDialogButton?.addEventListener("click", closeVoiceReplayDialog);
@@ -1461,6 +1472,7 @@ function submitRuntimeTextInput(event) {
   }
 
   snapshot.variables[config.variableId] = result.value;
+  persistPersistentVariables(snapshot.variables);
   snapshot.visualState.speakerName = "玩家输入";
   snapshot.visualState.dialogueText = `${data.variablesById.get(config.variableId)?.name ?? config.variableId} 已保存。`;
   closeRuntimeTextInput();
@@ -3516,6 +3528,7 @@ function createPreviewSession(startSceneId) {
   const initialVisualState = createInitialPreviewVisualState();
   const initialVariables = createInitialVariableState();
   const firstSnapshot = buildPreviewSnapshot(safeStartSceneId, 0, initialVisualState, initialVariables);
+  persistPersistentVariables(firstSnapshot.variables, { syncSession: false });
 
   return {
     startSceneId: safeStartSceneId,
@@ -3732,6 +3745,7 @@ function movePreviewForward() {
   const nextSnapshot = createNextPreviewSnapshot(current);
   session.timeline.push(nextSnapshot);
   session.position = session.timeline.length - 1;
+  persistPersistentVariables(nextSnapshot.variables);
   if (nextSnapshot.completed) {
     recordEndingCompletion(nextSnapshot.sceneId);
   }
@@ -3775,6 +3789,7 @@ function choosePreviewOption(optionId) {
   session.timeline = session.timeline.slice(0, session.position + 1);
   session.timeline.push(nextSnapshot);
   session.position = session.timeline.length - 1;
+  persistPersistentVariables(nextSnapshot.variables);
   persistAutoResume();
   renderRuntime();
 }
@@ -4955,6 +4970,67 @@ function relocalizeRuntimeSession() {
   state.session.timeline.forEach((snapshot) => relocalizeRuntimeSnapshot(snapshot));
 }
 
+function loadStoredPersistentVariables() {
+  return sanitizePersistentRuntimeVariableState(
+    readRuntimeStorageJson(storageKeys.persistentVariables, null),
+    data.variables
+  );
+}
+
+function applyPersistentVariablesToSession(session) {
+  if (!session || !Array.isArray(session.timeline)) {
+    return session;
+  }
+  session.timeline.forEach((snapshot) => {
+    if (snapshot && typeof snapshot === "object") {
+      snapshot.variables = mergePersistentRuntimeVariableState(
+        snapshot.variables,
+        data.variables,
+        state.persistentVariables
+      );
+    }
+  });
+  return session;
+}
+
+function persistPersistentVariables(variableState, options = {}) {
+  const summary = getPersistentRuntimeVariableSummary(variableState, data.variables);
+  const hasChanged = JSON.stringify(summary.values) !== JSON.stringify(state.persistentVariables);
+  state.persistentVariables = summary.values;
+  if (summary.count === 0) {
+    removeRuntimeStorageItem(storageKeys.persistentVariables);
+    return false;
+  }
+  if (hasChanged) {
+    writeRuntimeStorageJson(
+      storageKeys.persistentVariables,
+      buildPersistentRuntimeVariableStore(state.persistentVariables, data.variables)
+    );
+  }
+  if (options.syncSession !== false) {
+    applyPersistentVariablesToSession(state.session);
+  }
+  return true;
+}
+
+function resetPersistentVariables() {
+  state.persistentVariables = sanitizePersistentRuntimeVariableState(null, data.variables);
+  if (Object.keys(state.persistentVariables).length > 0) {
+    writeRuntimeStorageJson(
+      storageKeys.persistentVariables,
+      buildPersistentRuntimeVariableStore(state.persistentVariables, data.variables)
+    );
+  } else {
+    removeRuntimeStorageItem(storageKeys.persistentVariables);
+  }
+  applyPersistentVariablesToSession(state.session);
+  persistAutoResume();
+  renderStartResumeSummary();
+  renderPlaybackControls(getCurrentSnapshot());
+  renderSystemMenu();
+  return true;
+}
+
 function sanitizeStoredSession(source) {
   if (!source || typeof source !== "object") {
     return null;
@@ -4971,11 +5047,11 @@ function sanitizeStoredSession(source) {
     return null;
   }
 
-  return {
+  return applyPersistentVariablesToSession({
     startSceneId: getSafeSceneId(source.startSceneId ?? timeline[0]?.sceneId ?? fallbackSceneId),
     timeline,
     position: Math.min(Math.max(Math.round(Number(source.position) || 0), 0), timeline.length - 1),
-  };
+  });
 }
 
 function sanitizeStoredSaveSlot(source) {
@@ -6680,6 +6756,16 @@ function requestAutoResumeClear() {
   });
 }
 
+function requestPersistentVariablesReset() {
+  const summary = getPersistentRuntimeVariableSummary(state.persistentVariables, data.variables);
+  if (summary.count === 0) {
+    return false;
+  }
+  return openSaveConfirmDialog({
+    type: "clear-persistent-variables",
+  });
+}
+
 function getSaveConfirmContent(intent = state.saveConfirmIntent) {
   if (!intent) {
     return {
@@ -6725,6 +6811,14 @@ function getSaveConfirmContent(intent = state.saveConfirmIntent) {
       summary: `当前自动续玩会回到：${getSaveSlotSummary(
         state.autoResume
       )}。确认后，下次就不能直接从这里继续试玩了。`,
+    };
+  }
+
+  if (intent.type === "clear-persistent-variables") {
+    const summary = getPersistentRuntimeVariableSummary(state.persistentVariables, data.variables);
+    return {
+      title: "确认重置跨周目记忆",
+      summary: `将把 ${summary.count} 个跨周目变量恢复为作者设定的默认值。正式存档不会删除，但再次读取旧档也不会恢复这些永久进度。`,
     };
   }
 
@@ -6786,6 +6880,10 @@ function confirmSaveIntent() {
     renderStartResumeSummary();
     renderPlaybackControls(getCurrentSnapshot());
     return true;
+  }
+
+  if (intent.type === "clear-persistent-variables") {
+    return resetPersistentVariables();
   }
 
   return false;
@@ -7321,6 +7419,7 @@ function renderSystemMenu() {
 
   const snapshot = getCurrentSnapshot();
   const hasLoadSource = Boolean(state.autoResume || state.saveSlots.some(Boolean) || state.quickSave);
+  const persistentSummary = getPersistentRuntimeVariableSummary(state.persistentVariables, data.variables);
   refs.systemMenu.hidden = !state.systemMenuOpen;
   refs.systemMenu.classList.toggle("is-visible", state.systemMenuOpen);
   refs.systemMenuSummary.textContent = getSystemMenuSummary();
@@ -7339,6 +7438,14 @@ function renderSystemMenu() {
 
   if (refs.systemMenuQuickLoadButton) {
     refs.systemMenuQuickLoadButton.disabled = !state.quickSave;
+  }
+
+  if (refs.systemMenuPersistentResetButton) {
+    refs.systemMenuPersistentResetButton.disabled = persistentSummary.count === 0;
+    refs.systemMenuPersistentResetButton.textContent =
+      persistentSummary.count > 0
+        ? `重置跨周目记忆 · ${persistentSummary.changedCount}/${persistentSummary.count}`
+        : "未使用跨周目记忆";
   }
 
   if (refs.systemMenuReturnTitleButton) {
@@ -7609,10 +7716,11 @@ function applyMusicScopeForTerminal(visualState) {
 }
 
 function createInitialVariableState() {
-  return data.variables.reduce((result, variable) => {
+  const initialState = data.variables.reduce((result, variable) => {
     result[variable.id] = getVariableDefaultValue(variable.id);
     return result;
   }, {});
+  return mergePersistentRuntimeVariableState(initialState, data.variables, state.persistentVariables);
 }
 
 function clonePreviewVariables(variables) {

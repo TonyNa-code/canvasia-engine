@@ -182,6 +182,7 @@ EXPORT_PLAYER_SCRIPT_FILES = (
     "player.js",
     "runtime_data.js",
     "runtime_storage.js",
+    "runtime_persistent_variables.js",
     "runtime_character_motion.js",
     "runtime_stage_images.js",
     "runtime_visual_constants.js",
@@ -512,6 +513,7 @@ NATIVE_RUNTIME_TEXT_EFFECTS_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_text
 NATIVE_RUNTIME_TEXT_INPUT_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_text_input.py"
 NATIVE_RUNTIME_STORAGE_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_storage.py"
 NATIVE_RUNTIME_VARIABLES_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_variables.py"
+NATIVE_RUNTIME_PERSISTENT_VARIABLES_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_persistent_variables.py"
 NATIVE_RUNTIME_VN_QUALITY_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_vn_quality.py"
 NATIVE_RUNTIME_README_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "README.md"
 NATIVE_RUNTIME_REQUIREMENTS_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "requirements.txt"
@@ -543,6 +545,7 @@ NATIVE_RUNTIME_TEXT_EFFECTS_NAME = "runtime_text_effects.py"
 NATIVE_RUNTIME_TEXT_INPUT_NAME = "runtime_text_input.py"
 NATIVE_RUNTIME_STORAGE_NAME = "runtime_storage.py"
 NATIVE_RUNTIME_VARIABLES_NAME = "runtime_variables.py"
+NATIVE_RUNTIME_PERSISTENT_VARIABLES_NAME = "runtime_persistent_variables.py"
 NATIVE_RUNTIME_VN_QUALITY_NAME = "runtime_vn_quality.py"
 NATIVE_RUNTIME_README_NAME = "README_原生_Runtime_包先看这里.md"
 NATIVE_RUNTIME_REQUIREMENTS_NAME = "requirements-native-runtime.txt"
@@ -614,6 +617,7 @@ NATIVE_RUNTIME_REQUIRED_MODULE_FILES = (
     (NATIVE_RUNTIME_TEXT_INPUT_SOURCE, NATIVE_RUNTIME_TEXT_INPUT_NAME),
     (NATIVE_RUNTIME_STORAGE_SOURCE, NATIVE_RUNTIME_STORAGE_NAME),
     (NATIVE_RUNTIME_VARIABLES_SOURCE, NATIVE_RUNTIME_VARIABLES_NAME),
+    (NATIVE_RUNTIME_PERSISTENT_VARIABLES_SOURCE, NATIVE_RUNTIME_PERSISTENT_VARIABLES_NAME),
     (NATIVE_RUNTIME_VN_QUALITY_SOURCE, NATIVE_RUNTIME_VN_QUALITY_NAME),
 )
 EDITOR_DISTRIBUTION_CONFIG_NAME = "editor_distribution.json"
@@ -1554,6 +1558,7 @@ def normalize_variables_document(payload: object) -> dict:
         if variable_type not in {"number", "boolean", "string"}:
             variable_type = "string"
         variable["type"] = variable_type
+        variable["scope"] = "persistent" if str(variable.get("scope") or "").strip().lower() == "persistent" else "save"
         if "defaultValue" not in variable:
             variable["defaultValue"] = 0 if variable_type == "number" else False if variable_type == "boolean" else ""
         normalized_variables.append(variable)
@@ -9026,6 +9031,8 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
         "runtimeStorageModulePath": str(build_dir / NATIVE_RUNTIME_STORAGE_NAME),
         "runtimeVariablesModuleName": NATIVE_RUNTIME_VARIABLES_NAME,
         "runtimeVariablesModulePath": str(build_dir / NATIVE_RUNTIME_VARIABLES_NAME),
+        "runtimePersistentVariablesModuleName": NATIVE_RUNTIME_PERSISTENT_VARIABLES_NAME,
+        "runtimePersistentVariablesModulePath": str(build_dir / NATIVE_RUNTIME_PERSISTENT_VARIABLES_NAME),
         "runtimeVnQualityModuleName": NATIVE_RUNTIME_VN_QUALITY_NAME,
         "runtimeVnQualityModulePath": str(build_dir / NATIVE_RUNTIME_VN_QUALITY_NAME),
         "readmeName": NATIVE_RUNTIME_README_NAME,
@@ -9539,6 +9546,7 @@ def export_native_runtime_build() -> dict:
             "runtimeTextEffectsModule": runtime_files["runtimeTextEffectsModuleName"],
             "runtimeStorageModule": runtime_files["runtimeStorageModuleName"],
             "runtimeVariablesModule": runtime_files["runtimeVariablesModuleName"],
+            "runtimePersistentVariablesModule": runtime_files["runtimePersistentVariablesModuleName"],
             "runtimeVnQualityModule": runtime_files["runtimeVnQualityModuleName"],
             "readme": runtime_files["readmeName"],
             "requirements": runtime_files["requirementsName"],
@@ -9619,6 +9627,7 @@ def export_native_runtime_build() -> dict:
             "runtimeTextEffectsModule": runtime_files["runtimeTextEffectsModuleName"],
             "runtimeStorageModule": runtime_files["runtimeStorageModuleName"],
             "runtimeVariablesModule": runtime_files["runtimeVariablesModuleName"],
+            "runtimePersistentVariablesModule": runtime_files["runtimePersistentVariablesModuleName"],
             "runtimeVnQualityModule": runtime_files["runtimeVnQualityModuleName"],
             "releaseCheck": runtime_files["releaseCheckName"],
             "doctorReport": runtime_files["doctorReportName"],
@@ -9851,6 +9860,7 @@ def export_native_runtime_build() -> dict:
         {"name": runtime_files["runtimeTextEffectsModuleName"], "description": "原生 Runtime 打字机和文本效果模块。"},
         {"name": runtime_files["runtimeStorageModuleName"], "description": "原生 Runtime 存档、自动恢复和崩溃日志模块。"},
         {"name": runtime_files["runtimeVariablesModuleName"], "description": "原生 Runtime 变量和条件判断模块。"},
+        {"name": runtime_files["runtimePersistentVariablesModuleName"], "description": "原生 Runtime 跨周目记忆合并、校验和持久化规则模块。"},
         {"name": runtime_files["runtimeVnQualityModuleName"], "description": "原生 Runtime 视觉小说基础质感分析模块。"},
         {"name": runtime_files["releaseCheckName"], "description": "发布前自检 JSON。"},
         {"name": runtime_files["releaseCandidateReportName"], "description": "原生 Runtime 发布候选总报告。"},
@@ -10146,6 +10156,9 @@ def export_native_runtime_build() -> dict:
         "runtimeVariablesModuleName": runtime_files["runtimeVariablesModuleName"],
         "runtimeVariablesModulePath": runtime_files["runtimeVariablesModulePath"],
         "runtimeVariablesModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimeVariablesModuleName']}",
+        "runtimePersistentVariablesModuleName": runtime_files["runtimePersistentVariablesModuleName"],
+        "runtimePersistentVariablesModulePath": runtime_files["runtimePersistentVariablesModulePath"],
+        "runtimePersistentVariablesModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimePersistentVariablesModuleName']}",
         "runtimeVnQualityModuleName": runtime_files["runtimeVnQualityModuleName"],
         "runtimeVnQualityModulePath": runtime_files["runtimeVnQualityModulePath"],
         "runtimeVnQualityModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimeVnQualityModuleName']}",
@@ -10328,6 +10341,7 @@ def export_web_build() -> dict:
             "playerJs": "player.js",
             "playerRuntimeData": "runtime_data.js",
             "playerRuntimeStorage": "runtime_storage.js",
+            "playerRuntimePersistentVariables": "runtime_persistent_variables.js",
             "playerRuntimeCharacterMotion": "runtime_character_motion.js",
             "playerRuntimeStageImages": "runtime_stage_images.js",
             "playerRuntimeVisualConstants": "runtime_visual_constants.js",
@@ -11466,6 +11480,7 @@ def export_windows_nwjs_build() -> dict:
             "appPlayerJs": "app/player.js",
             "appRuntimeData": "app/runtime_data.js",
             "appRuntimeStorage": "app/runtime_storage.js",
+            "appRuntimePersistentVariables": "app/runtime_persistent_variables.js",
             "appRuntimeCharacterMotion": "app/runtime_character_motion.js",
             "appRuntimeStageImages": "app/runtime_stage_images.js",
             "appRuntimeVisualConstants": "app/runtime_visual_constants.js",
@@ -11938,6 +11953,7 @@ def export_macos_nwjs_build() -> dict:
             "appPlayerJs": "app/player.js",
             "appRuntimeData": "app/runtime_data.js",
             "appRuntimeStorage": "app/runtime_storage.js",
+            "appRuntimePersistentVariables": "app/runtime_persistent_variables.js",
             "appRuntimeCharacterMotion": "app/runtime_character_motion.js",
             "appRuntimeStageImages": "app/runtime_stage_images.js",
             "appRuntimeVisualConstants": "app/runtime_visual_constants.js",
@@ -12417,6 +12433,7 @@ def export_linux_nwjs_build() -> dict:
             "appPlayerJs": "app/player.js",
             "appRuntimeData": "app/runtime_data.js",
             "appRuntimeStorage": "app/runtime_storage.js",
+            "appRuntimePersistentVariables": "app/runtime_persistent_variables.js",
             "appRuntimeCharacterMotion": "app/runtime_character_motion.js",
             "appRuntimeStageImages": "app/runtime_stage_images.js",
             "appRuntimeVisualConstants": "app/runtime_visual_constants.js",

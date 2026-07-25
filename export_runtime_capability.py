@@ -102,6 +102,19 @@ def get_asset_list(bundle: dict) -> list[dict]:
     return [asset for asset in as_list(assets) if isinstance(asset, dict)]
 
 
+def get_variable_definitions(bundle: dict) -> list[dict]:
+    variables_doc = bundle.get("variables") if isinstance(bundle, dict) else {}
+    if isinstance(variables_doc, dict):
+        variables = variables_doc.get("variables")
+    else:
+        variables = variables_doc
+    return [variable for variable in as_list(variables) if isinstance(variable, dict) and clean_text(variable.get("id"))]
+
+
+def is_persistent_variable(variable: dict) -> bool:
+    return clean_text(variable.get("scope")).lower() == "persistent"
+
+
 def build_asset_map(bundle: dict) -> dict[str, dict]:
     return {clean_text(asset.get("id")): asset for asset in get_asset_list(bundle) if clean_text(asset.get("id"))}
 
@@ -201,7 +214,7 @@ def build_runtime_usage(bundle: dict) -> dict[str, dict]:
     return usage
 
 
-def build_runtime_acceptance_checklist(rows: list[dict], summary: dict) -> dict:
+def build_runtime_acceptance_checklist(rows: list[dict], summary: dict, bundle: dict | None = None) -> dict:
     used_rows = [row for row in rows if as_int(row.get("usedCount")) > 0]
     items: list[dict] = []
     seen_ids: set[str] = set()
@@ -345,6 +358,25 @@ def build_runtime_acceptance_checklist(rows: list[dict], summary: dict) -> dict:
                 "relatedBlockTypes": sorted(used_types & VISUAL_EFFECT_TYPES),
             }
         )
+    persistent_variables = [
+        variable for variable in get_variable_definitions(bundle or {}) if is_persistent_variable(variable)
+    ]
+    if persistent_variables:
+        add_item(
+            {
+                "id": "runtime-persistent-variables",
+                "target": "cross",
+                "targetLabel": "Web / 原生",
+                "severity": "check",
+                "severityLabel": "点测",
+                "title": "跨周目记忆要验新游戏、旧存档和重置",
+                "detail": (
+                    f"项目定义了 {len(persistent_variables)} 个跨周目变量。先改变其中一个值，再开始新游戏、读取更早存档、剧情回退，"
+                    "确认最新记忆不会倒退；最后从系统菜单重置并确认正式存档仍保留。"
+                ),
+                "relatedBlockTypes": ["variable_set", "variable_add", "text_input", "choice"],
+            }
+        )
     return {"items": items, "summary": summarize_acceptance_items(items)}
 
 
@@ -368,6 +400,8 @@ def build_vn_essentials_audit(bundle: dict) -> dict:
     scenes_with_background: set[str] = set()
     scenes_with_music: set[str] = set()
     character_positions: set[str] = set()
+    variables = get_variable_definitions(bundle)
+    persistent_variables = [variable for variable in variables if is_persistent_variable(variable)]
     metrics = {
         "sceneCount": scene_count,
         "blockCount": len(block_records),
@@ -389,6 +423,9 @@ def build_vn_essentials_audit(bundle: dict) -> dict:
         "musicFadeOutCount": 0,
         "sfxPlayCount": 0,
         "videoPlayCount": 0,
+        "variableCount": len(variables),
+        "saveVariableCount": len(variables) - len(persistent_variables),
+        "persistentVariableCount": len(persistent_variables),
     }
     for record in block_records:
         block = record["block"]
@@ -478,7 +515,12 @@ def build_vn_essentials_audit(bundle: dict) -> dict:
         ("visual", "画面背景", ["background_coverage"], f"{metrics['scenesWithBackground']}/{scene_count} 个场景有背景"),
         ("character", "人物舞台", ["character_stage_missing"], f"{metrics['characterShowCount']} 次登场 / {metrics['characterMoveCount']} 次动作"),
         ("audio", "音频调度", ["bgm_plan_missing", "bgm_scope_missing", "bgm_fade_in_missing", "sfx_plan_missing"], f"{metrics['musicPlayCount']} 个 BGM / {metrics['sfxPlayCount']} 个音效"),
-        ("branch", "分支变量", ["choice_node_missing"], f"{metrics['choiceCount']} 个选项 / {metrics['conditionCount']} 个条件 / {metrics['sceneCallCount']} 次子场景调用"),
+        (
+            "branch",
+            "分支变量",
+            ["choice_node_missing"],
+            f"{metrics['choiceCount']} 个选项 / {metrics['conditionCount']} 个条件 / {metrics['persistentVariableCount']} 个跨周目变量",
+        ),
     ]
     areas: list[dict] = []
     for area_id, label, codes, summary in area_specs:
@@ -597,7 +639,7 @@ def build_export_runtime_capability_matrix(bundle: dict) -> dict:
         "scene3dBackgroundCount": sum(as_int(row.get("scene3dCount")) for row in used_rows),
         "issueCount": len(issues),
     }
-    acceptance = build_runtime_acceptance_checklist(rows, summary)
+    acceptance = build_runtime_acceptance_checklist(rows, summary, bundle)
     essentials = build_vn_essentials_audit(bundle)
     return {
         "formatVersion": 1,

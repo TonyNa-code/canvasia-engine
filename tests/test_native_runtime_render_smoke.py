@@ -33,6 +33,7 @@ from native_runtime.runtime_player import (
     build_native_runtime_control_guide,
     build_native_runtime_preload_report,
     build_acceptance_automated_checks,
+    build_release_check_report,
     build_native_runtime_vn_baseline_quality_report,
     build_project_default_runtime_player_settings,
     build_runtime_preload_doctor_check,
@@ -98,6 +99,44 @@ UI_ASSET_IDS = [
 
 
 class NativeRuntimeTextHelperTests(unittest.TestCase):
+    def test_release_check_flags_invalid_variable_scope(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_dir = Path(temp_dir)
+            payload = {
+                "project": {"projectId": "scope_check", "title": "Scope Check", "entrySceneId": "scene_start"},
+                "assets": {"assets": []},
+                "characters": {"characters": []},
+                "variables": {
+                    "variables": [
+                        {
+                            "id": "ending_memory",
+                            "name": "结局记忆",
+                            "type": "string",
+                            "scope": "global_forever",
+                            "defaultValue": "none",
+                        }
+                    ]
+                },
+                "chapters": [
+                    {
+                        "id": "chapter_1",
+                        "scenes": [
+                            {
+                                "id": "scene_start",
+                                "name": "开场",
+                                "blocks": [{"id": "line_1", "type": "narration", "text": "开始。"}],
+                            }
+                        ],
+                    }
+                ],
+            }
+            (bundle_dir / "game_data.json").write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+            report = build_release_check_report(bundle_dir)
+
+            self.assertIn("logic_variable_scope_invalid", {issue["code"] for issue in report["issues"]})
+            self.assertGreaterEqual(report["summary"]["logicIssueCount"], 1)
+
     def test_native_runtime_control_guide_is_data_driven_and_cli_exportable(self) -> None:
         guide = build_native_runtime_control_guide()
 
@@ -3252,6 +3291,58 @@ class NativeRuntimeRenderSmokeTests(unittest.TestCase):
         self.assertEqual(player.current_line["type"], "narration")
         self.assertEqual(player.current_line["text"], "欢迎，小夏。")
         self.assertEqual(player.build_save_snapshot("quick")["variableState"]["player_name"], "小夏")
+
+    def test_persistent_variables_survive_new_game_old_saves_and_rollback_restore(self) -> None:
+        data_path = self.write_game_data()
+        payload = json.loads(data_path.read_text(encoding="utf-8"))
+        payload["variables"] = {
+            "variables": [
+                {
+                    "id": "loop_count",
+                    "name": "周目计数",
+                    "type": "number",
+                    "scope": "persistent",
+                    "defaultValue": 0,
+                    "min": 0,
+                    "max": 9,
+                },
+                {
+                    "id": "scene_score",
+                    "name": "本周目分数",
+                    "type": "number",
+                    "scope": "save",
+                    "defaultValue": 0,
+                },
+            ]
+        }
+        payload["chapters"][0]["scenes"][0]["blocks"] = [
+            {"id": "block_start", "type": "narration", "text": "新的周目开始了。"},
+        ]
+        data_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="The system font .*", category=UserWarning)
+            player = NativeRuntimePlayer(pygame, data_path)
+        player.start_story_from_title()
+        player.apply_variable_set({"variableId": "loop_count", "value": 2})
+        player.apply_variable_set({"variableId": "scene_score", "value": 5})
+        old_snapshot = player.build_save_snapshot("formal")
+
+        player.apply_variable_set({"variableId": "loop_count", "value": 3})
+        player.apply_variable_set({"variableId": "scene_score", "value": 8})
+        player.restore_from_snapshot(old_snapshot)
+
+        self.assertEqual(player.variable_state["loop_count"], 3)
+        self.assertEqual(player.variable_state["scene_score"], 5)
+        self.assertTrue(player.persistent_variables_file_path.is_file())
+
+        player.start_story_from_title()
+        self.assertEqual(player.variable_state["loop_count"], 3)
+        self.assertEqual(player.variable_state["scene_score"], 0)
+
+        self.assertTrue(player.reset_persistent_variable_state())
+        self.assertEqual(player.variable_state["loop_count"], 0)
+        self.assertEqual(player.variable_state["scene_score"], 0)
 
     def test_visual_save_slots_capture_persist_and_render_scene_thumbnails(self) -> None:
         data_path = self.write_game_data()

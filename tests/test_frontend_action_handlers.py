@@ -24,6 +24,7 @@ RUNTIME_AUDIO_PATH = ROOT_DIR / "export_player_template" / "runtime_audio.js"
 RUNTIME_CHARACTER_MOTION_PATH = ROOT_DIR / "export_player_template" / "runtime_character_motion.js"
 RUNTIME_DATA_PATH = ROOT_DIR / "export_player_template" / "runtime_data.js"
 RUNTIME_STORAGE_PATH = ROOT_DIR / "export_player_template" / "runtime_storage.js"
+RUNTIME_PERSISTENT_VARIABLES_PATH = ROOT_DIR / "export_player_template" / "runtime_persistent_variables.js"
 RUNTIME_I18N_PATH = ROOT_DIR / "export_player_template" / "runtime_i18n.js"
 RUNTIME_TEXT_EFFECTS_PATH = ROOT_DIR / "export_player_template" / "runtime_text_effects.js"
 NATIVE_RUNTIME_PATH = ROOT_DIR / "native_runtime" / "runtime_player.py"
@@ -277,6 +278,7 @@ class FrontendActionHandlerTests(unittest.TestCase):
         route_analyzer_source = (EDITOR_DIR / "modules" / "route_analyzer.js").read_text(encoding="utf-8")
         player_source = PLAYER_PATH.read_text(encoding="utf-8")
         runtime_storage_source = RUNTIME_STORAGE_PATH.read_text(encoding="utf-8")
+        runtime_persistent_variables_source = RUNTIME_PERSISTENT_VARIABLES_PATH.read_text(encoding="utf-8")
         runtime_data_source = RUNTIME_DATA_PATH.read_text(encoding="utf-8")
         native_runtime_source = NATIVE_RUNTIME_PATH.read_text(encoding="utf-8")
         native_runtime_choice_availability_source = NATIVE_RUNTIME_CHOICE_AVAILABILITY_PATH.read_text(encoding="utf-8")
@@ -560,14 +562,20 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("认真回应她", story_templates_source)
         self.assertIn('from "./runtime_data.js"', player_source)
         self.assertIn('from "./runtime_storage.js"', player_source)
+        self.assertIn('from "./runtime_persistent_variables.js"', player_source)
         self.assertIn("buildRuntimeStorageKeys(data.project)", player_source)
         self.assertIn("readRuntimeStorageJson(storageKeys.quickSave", player_source)
         self.assertIn("writeRuntimeStorageJson(storageKeys.saveSlots", player_source)
         self.assertIn("removeRuntimeStorageItem(storageKeys.autoResume", player_source)
+        self.assertIn("persistPersistentVariables(nextSnapshot.variables)", player_source)
+        self.assertIn("applyPersistentVariablesToSession", player_source)
+        self.assertIn("resetPersistentVariables", player_source)
         self.assertIn("export function buildRuntimeStorageKeys", runtime_storage_source)
         self.assertIn("export function readRuntimeStorageJson", runtime_storage_source)
         self.assertIn("export function writeRuntimeStorageJson", runtime_storage_source)
         self.assertIn("export function removeRuntimeStorageItem", runtime_storage_source)
+        self.assertIn("export function mergePersistentRuntimeVariableState", runtime_persistent_variables_source)
+        self.assertIn("export function buildPersistentRuntimeVariableStore", runtime_persistent_variables_source)
         self.assertIn('export const CHOICE_CONTINUE_TARGET = "__continue__";', runtime_data_source)
         self.assertIn("export function isChoiceContinueTarget", runtime_data_source)
         self.assertIn("export function normalizeGameData", runtime_data_source)

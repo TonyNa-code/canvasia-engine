@@ -62,6 +62,7 @@ jobs:
             native_runtime/runtime_save_thumbnails.py \
             native_runtime/runtime_i18n.py \
             native_runtime/runtime_text_input.py \
+            native_runtime/runtime_persistent_variables.py \
             native_runtime/runtime_vn_quality.py \
             native_runtime/build_native_runtime_app.py \
             tools/release/check_editor_signing_readiness.py \
@@ -83,6 +84,7 @@ jobs:
             tests/test_native_runtime_choice_availability.py \
             tests/test_native_runtime_story_flow.py \
             tests/test_story_flow_contract.py \
+            tests/test_persistent_variables_contract.py \
             tests/test_native_runtime_rollback.py \
             tests/test_native_runtime_input.py \
             tests/test_native_runtime_text_input.py \
@@ -325,6 +327,7 @@ jobs:
           node --check export_player_template/player.js
           node --check export_player_template/runtime_data.js
           node --check export_player_template/runtime_storage.js
+          node --check export_player_template/runtime_persistent_variables.js
           node --check export_player_template/runtime_visual_constants.js
           node --check export_player_template/runtime_controls.js
           node --check export_player_template/runtime_gamepad.js
@@ -354,6 +357,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_native_runtime_choice_availability.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_story_flow.py' -v
           python -m unittest discover -s tests -p 'test_story_flow_contract.py' -v
+          python -m unittest discover -s tests -p 'test_persistent_variables_contract.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_rollback.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_input.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_text_input.py' -v

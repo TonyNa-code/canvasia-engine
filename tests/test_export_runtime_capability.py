@@ -24,6 +24,18 @@ def make_runtime_bundle() -> dict:
             {"id": "scene_3d", "type": "scene3d", "name": "3D 教室"},
             {"id": "op", "type": "video", "name": "OP"},
         ],
+        "variables": {
+            "variables": [
+                {"id": "affection", "name": "好感度", "type": "number", "scope": "save", "defaultValue": 0},
+                {
+                    "id": "ending_memory",
+                    "name": "结局记忆",
+                    "type": "string",
+                    "scope": "persistent",
+                    "defaultValue": "none",
+                },
+            ]
+        },
         "chapters": [
             {
                 "id": "chapter_1",
@@ -91,6 +103,9 @@ class ExportRuntimeCapabilityTests(unittest.TestCase):
         acceptance_ids = {item["id"] for item in matrix["acceptance"]["items"]}
         self.assertIn("runtime-video-sync", acceptance_ids)
         self.assertIn("runtime-input-navigation", acceptance_ids)
+        self.assertIn("runtime-persistent-variables", acceptance_ids)
+        self.assertEqual(matrix["essentials"]["metrics"]["variableCount"], 2)
+        self.assertEqual(matrix["essentials"]["metrics"]["persistentVariableCount"], 1)
         self.assertIn("character_stage_missing", {issue["code"] for issue in matrix["essentials"]["issues"]})
         self.assertIn("bgm_scope_missing", {issue["code"] for issue in matrix["essentials"]["issues"]})
         self.assertIn("# Runtime Export Demo Runtime 覆盖矩阵", markdown)
