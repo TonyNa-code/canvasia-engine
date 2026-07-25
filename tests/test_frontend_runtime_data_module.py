@@ -59,6 +59,8 @@ class FrontendRuntimeDataModuleTests(unittest.TestCase):
                     }},
                     {{ id: "scene_c", blocks: [] }},
                     {{ id: "scene_d", blocks: [] }},
+                    {{ id: "scene_call_host", blocks: [{{ type: "scene_call", targetSceneId: "scene_common" }}] }},
+                    {{ id: "scene_common", blocks: [{{ type: "scene_return" }}] }},
                   ],
                 }},
               ],
@@ -72,6 +74,9 @@ class FrontendRuntimeDataModuleTests(unittest.TestCase):
               sceneAChapterName: data.scenesById.get("scene_a").chapterName,
               outgoingA: tools.collectSceneOutgoingTargets(data.scenesById.get("scene_a")),
               outgoingB: tools.collectSceneOutgoingTargets(data.scenesById.get("scene_b")),
+              outgoingCallHost: tools.collectSceneOutgoingTargets(data.scenesById.get("scene_call_host")),
+              callHostIsEnding: tools.isSceneEndingCandidate(data.scenesById.get("scene_call_host")),
+              commonIsEnding: tools.isSceneEndingCandidate(data.scenesById.get("scene_common")),
               endings: data.endingScenes.map((scene) => scene.id),
               supportedLanguages: data.i18n.supportedLanguages,
               fallbackLanguage: data.i18n.fallbackLanguage,
@@ -97,11 +102,14 @@ class FrontendRuntimeDataModuleTests(unittest.TestCase):
         self.assertIn("normalizeGameData", payload["keys"])
         self.assertIn("collectSceneOutgoingTargets", payload["keys"])
         self.assertEqual(payload["chapterIds"], ["chapter_b", "chapter_a"])
-        self.assertEqual(payload["sceneIds"], ["scene_b", "scene_c", "scene_d", "scene_a"])
+        self.assertEqual(payload["sceneIds"], ["scene_b", "scene_c", "scene_d", "scene_call_host", "scene_common", "scene_a"])
         self.assertEqual(payload["sceneAChapterName"], "A")
         self.assertEqual(payload["outgoingA"], ["scene_b"])
         self.assertEqual(payload["outgoingB"], ["scene_c", "scene_d"])
-        self.assertEqual(payload["endings"], ["scene_c", "scene_d"])
+        self.assertEqual(payload["outgoingCallHost"], ["scene_common"])
+        self.assertTrue(payload["callHostIsEnding"])
+        self.assertFalse(payload["commonIsEnding"])
+        self.assertEqual(payload["endings"], ["scene_c", "scene_d", "scene_call_host"])
         self.assertEqual(payload["supportedLanguages"], ["zh-CN", "en-US"])
         self.assertEqual(payload["fallbackLanguage"], "ja-JP")
         self.assertTrue(payload["assetsByIdHasBg"])

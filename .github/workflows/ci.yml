@@ -51,6 +51,7 @@ jobs:
             native_runtime/runtime_character_motion.py \
             native_runtime/runtime_stage_images.py \
             native_runtime/runtime_choice_availability.py \
+            native_runtime/runtime_story_flow.py \
             native_runtime/runtime_rollback.py \
             native_runtime/runtime_input.py \
             native_runtime/runtime_key_bindings.py \
@@ -80,6 +81,8 @@ jobs:
             tests/test_character_motion_contract.py \
             tests/test_native_runtime_stage_images.py \
             tests/test_native_runtime_choice_availability.py \
+            tests/test_native_runtime_story_flow.py \
+            tests/test_story_flow_contract.py \
             tests/test_native_runtime_rollback.py \
             tests/test_native_runtime_input.py \
             tests/test_native_runtime_text_input.py \
@@ -178,6 +181,7 @@ jobs:
             tests/test_native_runtime_visual_comfort.py \
             tests/test_frontend_runtime_preload_module.py \
             tests/test_frontend_runtime_scene_prefetch_module.py \
+            tests/test_frontend_runtime_story_flow_module.py \
             tests/test_frontend_runtime_character_motion_module.py \
             tests/test_frontend_runtime_stage_images_module.py \
             tests/test_frontend_runtime_visual_constants_module.py \
@@ -330,6 +334,7 @@ jobs:
           node --check export_player_template/runtime_audio.js
           node --check export_player_template/runtime_preload.js
           node --check export_player_template/runtime_scene_prefetch.js
+          node --check export_player_template/runtime_story_flow.js
           node --check export_player_template/runtime_character_motion.js
           node --check export_player_template/runtime_stage_images.js
           node --check export_player_template/runtime_text_effects.js
@@ -347,6 +352,8 @@ jobs:
           python -m unittest discover -s tests -p 'test_character_motion_contract.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_stage_images.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_choice_availability.py' -v
+          python -m unittest discover -s tests -p 'test_native_runtime_story_flow.py' -v
+          python -m unittest discover -s tests -p 'test_story_flow_contract.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_rollback.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_input.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_text_input.py' -v
@@ -453,6 +460,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_native_runtime_visual_comfort.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_preload_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_scene_prefetch_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_runtime_story_flow_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_character_motion_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_stage_images_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_visual_constants_module.py' -v

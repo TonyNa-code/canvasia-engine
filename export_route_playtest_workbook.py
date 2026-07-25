@@ -35,6 +35,8 @@ def get_route_kind_label(route_kind: str) -> str:
         return "否则分支"
     if route_kind == "jump":
         return "直接跳转"
+    if route_kind == "call":
+        return "子场景调用"
     if route_kind == "ending":
         return "结局路径"
     return "路线"
@@ -71,6 +73,8 @@ def get_route_testing_variable_preset_hint(item: dict) -> str:
         return "自动回归会尝试让上方条件都不满足；人工试玩时确认失败线、普通线或保底线不会卡死。"
     if item.get("routeKind") == "choice":
         return "按玩家视角选择对应选项即可；若该选项会改变量，后续需要确认变量真的影响分支或回想。"
+    if item.get("routeKind") == "call":
+        return "进入子场景后走到末尾，确认会自动回到调用卡的下一步；提前返回、存档读取和嵌套调用也要覆盖。"
     if item.get("kind") == "ending":
         return "按路径完整跑到结局，顺手确认结局回想、CG/BGM/语音解锁和返回标题。"
     return "不需要额外变量预设，按路径进入并确认跳转结果。"
@@ -82,6 +86,12 @@ def build_manual_steps(item: dict) -> list[str]:
             f"打开「{item.get('sceneName') or '分支场景'}」并定位到 {get_route_kind_label(item.get('routeKind') or '')}。",
             f"重新选择或创建目标场景「{item.get('targetLabel') or '未设置目标'}」。",
             "重新生成路线试玩工作簿，确认这条用例不再显示坏链。",
+        ]
+    if item.get("kind") == "subscene":
+        return [
+            f"从入口进入「{item.get('sceneName') or '调用场景'}」，执行子场景调用「{item.get('targetLabel') or '目标子场景'}」。",
+            "走到子场景末尾或提前返回卡，确认回到调用卡的下一张。",
+            "在子场景内保存并读档一次；若有嵌套调用，再确认逐层返回顺序正确。",
         ]
     if item.get("severity") == "warn":
         return [
@@ -109,6 +119,8 @@ def get_lane_detail(lane_id: str, items: list[dict]) -> str:
         return "每条可达分支都应该至少人工点一次，避免默认路线掩盖问题。" if items else "当前没有可单独执行的分支用例。"
     if lane_id == "ending":
         return "每个可打到结局都需要完整跑一遍，确认收束和解锁。" if items else "还没有可打到的结局路径。"
+    if lane_id == "subscene":
+        return "逐条确认子场景能进入、返回、存档恢复，并覆盖一次嵌套调用。" if items else "当前没有需要单独验证的子场景调用。"
     return "这些用例适合交给自动回归优先执行。" if items else "暂无自动回归优先种子。"
 
 
@@ -190,11 +202,35 @@ def build_route_playtest_plan(route_map: dict) -> dict:
     path_labels, route_label_paths = build_path_maps(route_map)
     scenes = [scene for scene in as_list(route_map.get("scenes")) if isinstance(scene, dict)]
     decision_points: list[dict] = []
+    subscene_cases: list[dict] = []
 
     for scene in scenes:
         routes = [route for route in as_list(scene.get("routes")) if isinstance(route, dict)]
-        explicit_routes = [route for route in routes if not route.get("implicit")]
-        is_decision_point = bool(scene.get("choiceCount") or scene.get("conditionCount") or len(explicit_routes) > 1)
+        call_routes = [route for route in routes if clean_route_text(route.get("routeKind")) == "call"]
+        decision_routes = [route for route in routes if clean_route_text(route.get("routeKind")) != "call"]
+        explicit_decision_routes = [route for route in decision_routes if not route.get("implicit")]
+        point_context = {
+            "sceneId": clean_route_text(scene.get("sceneId")),
+            "sceneName": clean_route_text(scene.get("sceneName")),
+            "chapterName": clean_route_text(scene.get("chapterName")),
+            "routeDepth": scene.get("routeDepth"),
+            "entryPathLabel": path_labels.get(clean_route_text(scene.get("sceneId")), ""),
+            "isReachableFromEntry": bool(scene.get("isReachableFromEntry")),
+        }
+        for call_index, route in enumerate(call_routes):
+            route_case = build_route_case(route, point_context, path_labels, call_index + 1)
+            subscene_cases.append(
+                {
+                    **route_case,
+                    "sourceSceneId": point_context["sceneId"],
+                    "sourceSceneName": point_context["sceneName"],
+                    "chapterName": point_context["chapterName"],
+                    "routeDepth": point_context["routeDepth"],
+                    "entryPathLabel": point_context["entryPathLabel"],
+                    "testingHint": "进入子场景后确认会回到调用卡的下一张；再覆盖一次存档读取与嵌套调用。",
+                }
+            )
+        is_decision_point = bool(scene.get("choiceCount") or scene.get("conditionCount") or len(explicit_decision_routes) > 1)
         if not is_decision_point:
             continue
         point = {
@@ -211,7 +247,7 @@ def build_route_playtest_plan(route_map: dict) -> dict:
             for route_index, route in enumerate(
                 [
                     route
-                    for route in routes
+                    for route in decision_routes
                     if clean_route_text(route.get("routeKind")) in {"choice", "condition", "fallback", "jump"}
                     or not route.get("implicit")
                 ]
@@ -248,22 +284,38 @@ def build_route_playtest_plan(route_map: dict) -> dict:
     route_case_count = sum(len(point["routeCases"]) for point in decision_points)
     broken_count = sum(to_count(point.get("brokenRouteCount")) for point in decision_points)
     unreachable_count = sum(to_count(point.get("unreachableTargetCount")) for point in decision_points)
+    blocked_subscene_count = sum(1 for item in subscene_cases if item.get("status") != "ready")
     summary = {
         "decisionPointCount": len(decision_points),
         "reachableDecisionPointCount": sum(1 for point in decision_points if point.get("isReachable")),
         "routeCaseCount": route_case_count,
         "brokenRouteCaseCount": broken_count,
         "unreachableRouteCaseCount": unreachable_count,
+        "subsceneCaseCount": len(subscene_cases),
+        "blockedSubsceneCaseCount": blocked_subscene_count,
         "endingTestCaseCount": len(ending_test_cases),
         "reachableEndingTestCaseCount": sum(1 for item in ending_test_cases if item.get("status") == "ready"),
     }
-    return {"summary": summary, "decisionPoints": decision_points, "endingTestCases": ending_test_cases}
+    return {
+        "summary": summary,
+        "decisionPoints": decision_points,
+        "subsceneCases": subscene_cases,
+        "endingTestCases": ending_test_cases,
+    }
 
 
 def get_route_testing_status_digest(plan: dict) -> dict:
     summary = plan.get("summary") or {}
-    blocked_count = to_count(summary.get("brokenRouteCaseCount")) + to_count(summary.get("unreachableRouteCaseCount"))
-    total_case_count = to_count(summary.get("routeCaseCount")) + to_count(summary.get("endingTestCaseCount"))
+    blocked_count = (
+        to_count(summary.get("brokenRouteCaseCount"))
+        + to_count(summary.get("unreachableRouteCaseCount"))
+        + to_count(summary.get("blockedSubsceneCaseCount"))
+    )
+    total_case_count = (
+        to_count(summary.get("routeCaseCount"))
+        + to_count(summary.get("subsceneCaseCount"))
+        + to_count(summary.get("endingTestCaseCount"))
+    )
     if total_case_count == 0:
         return {"status": "empty", "title": "还没有路线试玩用例", "detail": "项目里暂时没有可独立覆盖的分支或结局路径。"}
     if blocked_count > 0:
@@ -273,10 +325,18 @@ def get_route_testing_status_digest(plan: dict) -> dict:
 
 def get_route_testing_readiness_percent(plan: dict) -> int:
     summary = plan.get("summary") or {}
-    total = to_count(summary.get("routeCaseCount")) + to_count(summary.get("endingTestCaseCount"))
+    total = (
+        to_count(summary.get("routeCaseCount"))
+        + to_count(summary.get("subsceneCaseCount"))
+        + to_count(summary.get("endingTestCaseCount"))
+    )
     if total <= 0:
         return 0
-    blocked = to_count(summary.get("brokenRouteCaseCount")) + to_count(summary.get("unreachableRouteCaseCount"))
+    blocked = (
+        to_count(summary.get("brokenRouteCaseCount"))
+        + to_count(summary.get("unreachableRouteCaseCount"))
+        + to_count(summary.get("blockedSubsceneCaseCount"))
+    )
     unreachable_endings = max(0, to_count(summary.get("endingTestCaseCount")) - to_count(summary.get("reachableEndingTestCaseCount")))
     ready = max(0, total - blocked - unreachable_endings)
     return max(0, min(100, round((ready / total) * 100)))
@@ -284,7 +344,7 @@ def get_route_testing_readiness_percent(plan: dict) -> int:
 
 def get_execution_weight(item: dict) -> float:
     severity_weight = 1000 if item.get("severity") == "blocker" else 700 if item.get("severity") == "warn" else 260
-    kind_weight = 60 if item.get("kind") == "ending" else 90
+    kind_weight = 110 if item.get("kind") == "subscene" else 60 if item.get("kind") == "ending" else 90
     try:
         depth = float(item.get("routeDepth"))
     except (TypeError, ValueError):
@@ -324,6 +384,35 @@ def build_execution_queue(plan: dict) -> list[dict]:
                     "acceptanceCriteria": "能按入口路径抵达分支点，选择该分支后进入目标场景，文本、演出、存档和回收状态正常。" if route_case.get("status") == "ready" else "修复后重新生成路线试玩工作簿，确认状态变为可试玩。",
                 }
             )
+    for index, test_case in enumerate(as_list(plan.get("subsceneCases"))):
+        severity = get_execution_severity(clean_route_text(test_case.get("status")))
+        queue.append(
+            {
+                "id": f"subscene_{clean_route_text(test_case.get('routeId'), str(index))}",
+                "kind": "subscene",
+                "severity": severity,
+                "phase": get_execution_phase(clean_route_text(test_case.get("status"))),
+                "title": "验证子场景调用与返回" if test_case.get("status") == "ready" else "修复子场景调用目标",
+                "chapterName": test_case.get("chapterName"),
+                "sceneName": test_case.get("sourceSceneName"),
+                "sourceSceneId": test_case.get("sourceSceneId"),
+                "sourceSceneName": test_case.get("sourceSceneName"),
+                "targetSceneId": test_case.get("targetSceneId"),
+                "routeDepth": test_case.get("routeDepth"),
+                "entryPathLabel": test_case.get("entryPathLabel") or "入口未接通",
+                "routeLabel": "调用后返回",
+                "routeKind": "call",
+                "routeCaseId": test_case.get("routeId"),
+                "blockIndex": test_case.get("blockIndex"),
+                "optionIndex": None,
+                "branchIndex": None,
+                "targetLabel": test_case.get("targetSceneName"),
+                "status": test_case.get("status"),
+                "statusLabel": test_case.get("statusLabel"),
+                "actionLabel": test_case.get("testingHint"),
+                "acceptanceCriteria": "进入目标子场景并回到调用卡的下一张；保存后读档仍回到同一位置，嵌套调用不会串栈。" if test_case.get("status") == "ready" else "修复目标后重新生成路线试玩工作簿，确认子场景用例变为可试玩。",
+            }
+        )
     for index, test_case in enumerate(as_list(plan.get("endingTestCases"))):
         severity = get_execution_severity(clean_route_text(test_case.get("status")))
         queue.append(
@@ -365,12 +454,15 @@ def build_acceptance_checklist(plan: dict, queue: list[dict]) -> list[dict]:
     summary = plan.get("summary") or {}
     blocked_count = sum(1 for item in queue if item.get("severity") != "test")
     ready_branch_count = sum(1 for item in queue if item.get("kind") == "branch" and item.get("status") == "ready")
+    ready_subscene_count = sum(1 for item in queue if item.get("kind") == "subscene" and item.get("status") == "ready")
     ready_ending_count = sum(1 for item in queue if item.get("kind") == "ending" and item.get("status") == "ready")
     route_case_count = to_count(summary.get("routeCaseCount"))
+    subscene_case_count = to_count(summary.get("subsceneCaseCount"))
     ending_case_count = to_count(summary.get("endingTestCaseCount"))
     return [
         {"id": "route_blockers_clear", "label": "路线阻塞清零", "done": blocked_count == 0, "detail": "坏链和入口不可达用例已经清掉。" if blocked_count == 0 else f"还有 {blocked_count} 条路线用例需要先接通。"},
         {"id": "branch_cases_played", "label": "分支用例逐条试玩", "done": route_case_count > 0 and ready_branch_count == route_case_count, "detail": f"可试玩分支 {ready_branch_count}/{route_case_count} 条。" if route_case_count > 0 else "当前没有分支用例；如果游戏有选择肢，建议先补分支点。"},
+        {"id": "subscene_cases_played", "label": "子场景调用与返回确认", "done": subscene_case_count == 0 or ready_subscene_count == subscene_case_count, "detail": f"可试玩子场景 {ready_subscene_count}/{subscene_case_count} 条。" if subscene_case_count > 0 else "当前没有子场景调用，本项无需处理。"},
         {"id": "ending_cases_played", "label": "结局路径完整跑通", "done": ending_case_count > 0 and ready_ending_count == ending_case_count, "detail": f"可打到结局 {ready_ending_count}/{ending_case_count} 个。" if ending_case_count > 0 else "当前没有结局候选；建议至少做一个明确收束场景。"},
         {"id": "save_and_archive_checked", "label": "存档与回想联动确认", "done": blocked_count == 0 and ready_ending_count > 0, "detail": "跑结局时顺手确认保存、读档、文本历史、CG/BGM/语音回想和返回标题。"},
     ]
@@ -380,7 +472,7 @@ def build_workbook(plan: dict, execution_queue: list[dict]) -> dict:
     cards = [
         {
             **item,
-            "kindLabel": "结局" if item.get("kind") == "ending" else "分支",
+            "kindLabel": "结局" if item.get("kind") == "ending" else "子场景" if item.get("kind") == "subscene" else "分支",
             "routeKindLabel": get_route_kind_label(clean_route_text(item.get("routeKind"))),
             "variablePresetHint": get_route_testing_variable_preset_hint(item),
             "manualSteps": build_manual_steps(item),
@@ -391,10 +483,12 @@ def build_workbook(plan: dict, execution_queue: list[dict]) -> dict:
     repair_items = [item for item in cards if item.get("severity") != "test"]
     branch_items = [item for item in cards if item.get("kind") == "branch" and item.get("status") == "ready"]
     ending_items = [item for item in cards if item.get("kind") == "ending" and item.get("status") == "ready"]
+    subscene_items = [item for item in cards if item.get("kind") == "subscene" and item.get("status") == "ready"]
     auto_smoke_items = [item for item in cards if item.get("canAutoSmoke")][:8]
     lanes = [
         {"id": "repair", "label": "先修路线断点", "tone": "warn" if repair_items else "good", "itemCount": len(repair_items), "detail": get_lane_detail("repair", repair_items), "items": repair_items},
         {"id": "branch", "label": "逐条覆盖分支", "tone": "test" if branch_items else "soft", "itemCount": len(branch_items), "detail": get_lane_detail("branch", branch_items), "items": branch_items},
+        {"id": "subscene", "label": "验证子场景返回", "tone": "test" if subscene_items else "soft", "itemCount": len(subscene_items), "detail": get_lane_detail("subscene", subscene_items), "items": subscene_items},
         {"id": "ending", "label": "完整跑通结局", "tone": "test" if ending_items else "soft", "itemCount": len(ending_items), "detail": get_lane_detail("ending", ending_items), "items": ending_items},
         {"id": "auto_smoke", "label": "自动回归优先种子", "tone": "good" if auto_smoke_items else "soft", "itemCount": len(auto_smoke_items), "detail": get_lane_detail("auto_smoke", auto_smoke_items), "items": auto_smoke_items},
     ]
@@ -452,6 +546,7 @@ def build_route_playtest_report(sheet: dict) -> str:
     checklist = as_list(sheet.get("acceptanceChecklist"))
     workbook_cards = as_list((sheet.get("workbook") or {}).get("topCards"))
     decision_points = as_list((sheet.get("plan") or {}).get("decisionPoints"))
+    subscene_cases = as_list((sheet.get("plan") or {}).get("subsceneCases"))
     ending_test_cases = as_list((sheet.get("plan") or {}).get("endingTestCases"))
     return "\ufeff" + "\n".join(
         [
@@ -470,6 +565,8 @@ def build_route_playtest_report(sheet: dict) -> str:
                     ["从入口可到的分支点", summary.get("reachableDecisionPointCount", 0)],
                     ["路线用例", summary.get("routeCaseCount", 0)],
                     ["阻塞路线用例", to_count(summary.get("brokenRouteCaseCount")) + to_count(summary.get("unreachableRouteCaseCount"))],
+                    ["子场景调用用例", summary.get("subsceneCaseCount", 0)],
+                    ["阻塞子场景用例", summary.get("blockedSubsceneCaseCount", 0)],
                     ["结局用例", summary.get("endingTestCaseCount", 0)],
                     ["可打到结局用例", summary.get("reachableEndingTestCaseCount", 0)],
                     ["执行队列", len(queue)],
@@ -482,7 +579,7 @@ def build_route_playtest_report(sheet: dict) -> str:
             markdown_table(
                 ["序号", "阶段", "类型", "任务", "位置", "路线/目标", "动作", "通过标准"],
                 [
-                    [item.get("rank"), item.get("phase"), "结局" if item.get("kind") == "ending" else "分支", item.get("title"), f"{item.get('chapterName')} · {item.get('sceneName')}", f"{item.get('routeLabel')} -> {item.get('targetLabel')}", item.get("actionLabel"), item.get("acceptanceCriteria")]
+                    [item.get("rank"), item.get("phase"), "结局" if item.get("kind") == "ending" else "子场景" if item.get("kind") == "subscene" else "分支", item.get("title"), f"{item.get('chapterName')} · {item.get('sceneName')}", f"{item.get('routeLabel')} -> {item.get('targetLabel')}", item.get("actionLabel"), item.get("acceptanceCriteria")]
                     for item in queue[:80]
                 ],
             )
@@ -519,6 +616,14 @@ def build_route_playtest_report(sheet: dict) -> str:
             )
             or "当前没有需要单独覆盖的分支点。",
             "",
+            "## 子场景调用与返回",
+            "",
+            markdown_table(
+                ["调用位置", "目标子场景", "状态", "测试提示"],
+                [[f"{case.get('chapterName') or '未分章'} · {case.get('sourceSceneName')}", case.get("targetSceneName") or case.get("targetSceneId"), case.get("statusLabel"), case.get("testingHint")] for case in subscene_cases[:40]],
+            )
+            or "当前没有需要单独覆盖的子场景调用。",
+            "",
             "## 结局试玩路径",
             "",
             markdown_table(["结局", "状态", "路径", "测试提示"], [[f"{case.get('chapterName')} · {case.get('sceneName')}", case.get("statusLabel"), case.get("pathLabel") or "暂未接通", case.get("testingHint")] for case in ending_test_cases[:40]]) or "当前没有可列出的结局试玩路径。",
@@ -527,7 +632,8 @@ def build_route_playtest_report(sheet: dict) -> str:
             "",
             "1. 先处理状态为坏链或未接通的路线用例。",
             "2. 每个分支检查点至少试玩一次所有选项或条件结果。",
-            "3. 每个可打到结局都完整跑一遍，确认文本、演出、存档和回想解锁正常。",
+            "3. 子场景需要验证进入、返回、存档读取与嵌套调用。",
+            "4. 每个可打到结局都完整跑一遍，确认文本、演出、存档和回想解锁正常。",
             "",
         ]
     )
@@ -545,6 +651,8 @@ def build_route_playtest_csv(sheet: dict) -> str:
     for point_index, point in enumerate(as_list((sheet.get("plan") or {}).get("decisionPoints"))):
         for route_index, route_case in enumerate(as_list(point.get("routeCases"))):
             writer.writerow(["分支路线", f"{point_index + 1}.{route_index + 1}", point.get("chapterName"), point.get("sceneName"), point.get("entryPathLabel") or "入口未接通", f"{route_case.get('label')} -> {route_case.get('targetSceneName')}", route_case.get("statusLabel"), "按此分支进入目标场景并确认演出正常。" if route_case.get("targetExists") else "先修复目标场景缺失或名称变更。"])
+    for index, test_case in enumerate(as_list((sheet.get("plan") or {}).get("subsceneCases"))):
+        writer.writerow(["子场景调用", index + 1, test_case.get("chapterName"), test_case.get("sourceSceneName"), test_case.get("entryPathLabel") or "入口未接通", f"调用 -> {test_case.get('targetSceneName') or test_case.get('targetSceneId')}", test_case.get("statusLabel"), test_case.get("testingHint")])
     for index, test_case in enumerate(as_list((sheet.get("plan") or {}).get("endingTestCases"))):
         writer.writerow(["结局路径", index + 1, test_case.get("chapterName"), test_case.get("sceneName"), test_case.get("pathLabel") or "暂未接通", test_case.get("sceneName"), test_case.get("statusLabel"), test_case.get("testingHint")])
     return "\ufeff" + output.getvalue()
@@ -569,8 +677,9 @@ def write_export_route_playtest_workbook_files(target_dir: Path, *, bundle: dict
         "routePlaytestWorkbookCsvPath": str(csv_path),
         "routePlaytestReadinessPercent": summary["readinessPercent"],
         "routePlaytestRouteCaseCount": summary["routeCaseCount"],
+        "routePlaytestSubsceneCaseCount": summary["subsceneCaseCount"],
         "routePlaytestEndingCaseCount": summary["endingTestCaseCount"],
-        "routePlaytestBlockedCaseCount": summary["brokenRouteCaseCount"] + summary["unreachableRouteCaseCount"],
+        "routePlaytestBlockedCaseCount": summary["brokenRouteCaseCount"] + summary["unreachableRouteCaseCount"] + summary["blockedSubsceneCaseCount"],
     }
 
 

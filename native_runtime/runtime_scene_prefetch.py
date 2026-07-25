@@ -224,7 +224,7 @@ def collect_block_target_scene_ids(block: dict | None, continue_target: str = CH
         return []
     targets: list[str] = []
     block_type = clean_text(block.get("type"))
-    if block_type == "jump":
+    if block_type in {"jump", "scene_call"}:
         targets.append(clean_text(block.get("targetSceneId")))
     if block_type == "condition":
         for branch in to_list(block.get("branches")):

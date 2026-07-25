@@ -42,6 +42,54 @@ def load_frontend_payload(script_body: str) -> dict:
 
 
 class RenpyExportContractTests(unittest.TestCase):
+    def test_reusable_scene_calls_match_on_both_exporters(self) -> None:
+        blocks = [
+            {"type": "scene_call", "targetSceneId": "scene_common"},
+            {"type": "scene_return"},
+        ]
+        frontend = load_frontend_payload(
+            f"""
+            const warnings = [];
+            const lines = {json.dumps(blocks)}.flatMap((block, blockIndex) =>
+              tools.renderBlock(block, {{
+                warnings,
+                blockIndex,
+                sceneId: "scene_open",
+                sceneMap: new Map(),
+                assetMap: new Map(),
+                characterMap: new Map(),
+              }})
+            );
+            process.stdout.write(JSON.stringify({{ lines, warnings }}));
+            """
+        )
+        backend_warnings: list[dict] = []
+        backend_lines: list[str] = []
+        for block_index, block in enumerate(blocks):
+            backend_lines.extend(
+                renpy_export.render_story_block(
+                    block,
+                    {
+                        "warnings": backend_warnings,
+                        "blockIndex": block_index,
+                        "sceneId": "scene_open",
+                        "sceneLabelMap": {},
+                        "assetMap": {},
+                        "characterMap": {},
+                        "variableMap": {},
+                    },
+                )
+            )
+
+        self.assertEqual(frontend["lines"], ["    call scene_common", "    return"])
+        self.assertEqual(frontend["lines"], backend_lines)
+        self.assertEqual(frontend["warnings"], [])
+        self.assertEqual(backend_warnings, [])
+        references = renpy_export.collect_renpy_script_references(
+            "label scene_open:\n    call scene_common\n    return\n\nlabel scene_common:\n    return\n"
+        )
+        self.assertEqual(references["calls"], ["scene_common"])
+
     def test_player_input_and_text_variables_match_on_both_exporters(self) -> None:
         variables = {
             "player_name": {"id": "player_name", "name": "玩家姓名", "type": "string", "defaultValue": "旅人"},

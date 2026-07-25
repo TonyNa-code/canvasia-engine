@@ -92,7 +92,9 @@ class FrontendStoryBlockActionsModuleTests(unittest.TestCase):
         self.assertEqual(action_to_block["add-variable-add"], "variable_add")
         self.assertEqual(action_to_block["add-text-input"], "text_input")
         self.assertEqual(action_to_block["add-condition"], "condition")
-        self.assertEqual(len(entries), 27)
+        self.assertEqual(action_to_block["add-scene-call"], "scene_call")
+        self.assertEqual(action_to_block["add-scene-return"], "scene_return")
+        self.assertEqual(len(entries), 29)
         self.assertEqual(
             payload["beginnerActions"],
             [

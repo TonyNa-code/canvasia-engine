@@ -158,6 +158,18 @@
       beginnerVisible: true,
       description: "跳转到另一个场景，用于路线推进、分支合流或章节切换。",
     }),
+    "add-scene-call": Object.freeze({
+      blockType: "scene_call",
+      label: "调用子场景",
+      group: "flow",
+      description: "播放一段可复用剧情，走完后自动回到当前场景继续，适合公共事件、电话和重复演出。",
+    }),
+    "add-scene-return": Object.freeze({
+      blockType: "scene_return",
+      label: "提前返回",
+      group: "flow",
+      description: "提前结束被调用的子场景并回到调用处；不放这张卡时，走到场景末尾也会自动返回。",
+    }),
     "add-variable-set": Object.freeze({
       blockType: "variable_set",
       label: "设置变量",

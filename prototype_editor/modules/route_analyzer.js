@@ -200,6 +200,19 @@
         );
       }
 
+      if (block.type === "scene_call") {
+        routes.push(
+          createSceneRoute(scene, {
+            blockIndex,
+            routeKind: "call",
+            targetSceneId: block.targetSceneId,
+            label: "调用后返回",
+            shortLabel: "子场景",
+            meta: `第 ${blockIndex + 1} 张卡片 / 结束后回到下一张卡`,
+          }, options)
+        );
+      }
+
       if (block.type === "choice") {
         (block.options ?? []).forEach((option, optionIndex) => {
           if (isChoiceContinueTarget(option.gotoSceneId)) {
@@ -328,9 +341,12 @@
   function buildRouteTestingPlan(nodes = [], endingPaths = []) {
     const nodeById = new Map(nodes.map((node) => [node.id, node]));
     const decisionPoints = nodes
-      .filter((node) => (node.routes?.length ?? 0) > 1 || node.choiceCount > 0 || node.conditionCount > 0)
+      .filter((node) => {
+        const decisionRoutes = (node.routes ?? []).filter((route) => route.routeKind !== "call");
+        return decisionRoutes.length > 1 || node.choiceCount > 0 || node.conditionCount > 0;
+      })
       .map((node) => {
-        const routeCases = (node.routes ?? []).map((route, routeIndex) => {
+        const routeCases = (node.routes ?? []).filter((route) => route.routeKind !== "call").map((route, routeIndex) => {
           const targetNode = route.targetExists ? nodeById.get(route.targetSceneId) ?? null : null;
           const status = getRouteCaseStatus(route, targetNode);
           return {
@@ -343,6 +359,10 @@
             label: getRoutePathStepLabel(route),
             sourceSceneId: node.id,
             sourceSceneName: node.name,
+            chapterId: node.chapterId,
+            chapterName: node.chapterName,
+            routeDepth: node.routeDepth,
+            entryPathLabel: node.entryPathLabel,
             targetSceneId: route.targetSceneId,
             targetSceneName: route.targetSceneName,
             targetExists: route.targetExists,
@@ -375,6 +395,26 @@
         return (left.routeDepth ?? Number.POSITIVE_INFINITY) - (right.routeDepth ?? Number.POSITIVE_INFINITY);
       });
 
+    const subsceneCases = nodes.flatMap((node) =>
+      (node.routes ?? [])
+        .filter((route) => route.routeKind === "call")
+        .map((route) => {
+          const targetNode = route.targetExists ? nodeById.get(route.targetSceneId) ?? null : null;
+          const status = getRouteCaseStatus(route, targetNode);
+          return {
+            routeId: route.id,
+            sourceSceneId: node.id,
+            sourceSceneName: node.name,
+            targetSceneId: route.targetSceneId,
+            targetSceneName: route.targetSceneName,
+            blockIndex: route.blockIndex,
+            status,
+            statusLabel: getRouteCaseStatusLabel(status),
+            testingHint: "进入子场景后确认会回到调用卡的下一张；再覆盖一次存档读取与嵌套调用。",
+          };
+        })
+    );
+
     const endingTestCases = endingPaths.map((path, index) => ({
       order: index + 1,
       sceneId: path.sceneId,
@@ -393,6 +433,7 @@
 
     return {
       decisionPoints,
+      subsceneCases,
       endingTestCases,
       summary: {
         decisionPointCount: decisionPoints.length,
@@ -402,6 +443,8 @@
         unreachableRouteCaseCount: decisionPoints.reduce((sum, point) => sum + point.unreachableTargetCount, 0),
         endingTestCaseCount: endingTestCases.length,
         reachableEndingTestCaseCount: endingTestCases.filter((item) => item.status === "ready").length,
+        subsceneCaseCount: subsceneCases.length,
+        blockedSubsceneCaseCount: subsceneCases.filter((item) => item.status !== "ready").length,
       },
     };
   }
@@ -453,6 +496,8 @@
   function buildSceneRouteOverview(data = {}, validation = {}, options = {}) {
     const entrySceneId = data.project?.entrySceneId;
     const incomingCounts = new Map();
+    const incomingCallCounts = new Map();
+    const incomingControlCounts = new Map();
     const brokenRoutes = [];
     const validationSceneIndex = buildRouteValidationSceneIndex(validation);
     const getSafeSceneStatus = typeof options.getSafeSceneStatus === "function" ? options.getSafeSceneStatus : (value) => value ?? "drafting";
@@ -483,6 +528,8 @@
             narrationCount: (scene.blocks ?? []).filter((block) => block.type === "narration").length,
             choiceCount: (scene.blocks ?? []).filter((block) => block.type === "choice").length,
             conditionCount: (scene.blocks ?? []).filter((block) => block.type === "condition").length,
+            sceneCallCount: (scene.blocks ?? []).filter((block) => block.type === "scene_call").length,
+            sceneReturnCount: (scene.blocks ?? []).filter((block) => block.type === "scene_return").length,
             routes,
             isEntry: scene.id === entrySceneId,
             ...buildRouteSceneProduction(scene, validationSceneIndex.get(scene.id), options),
@@ -504,6 +551,8 @@
       node.routes.forEach((route) => {
         if (route.targetExists) {
           incomingCounts.set(route.targetSceneId, (incomingCounts.get(route.targetSceneId) ?? 0) + 1);
+          const routeCounts = route.routeKind === "call" ? incomingCallCounts : incomingControlCounts;
+          routeCounts.set(route.targetSceneId, (routeCounts.get(route.targetSceneId) ?? 0) + 1);
         } else {
           brokenRoutes.push(route);
         }
@@ -514,14 +563,20 @@
 
     nodes.forEach((node) => {
       const validRoutes = node.routes.filter((route) => route.targetExists);
+      const validControlRoutes = validRoutes.filter((route) => route.routeKind !== "call");
       const entryPath = reachability.reachableSceneIds.has(node.id)
         ? buildRoutePathFromPredecessors(reachability.nodeById, reachability.predecessorBySceneId, node.id)
         : buildRoutePathFromPredecessors(reachability.nodeById, new Map(), "");
       node.incomingCount = incomingCounts.get(node.id) ?? 0;
-      node.branchTargetCount = new Set(validRoutes.map((route) => route.targetSceneId)).size;
+      node.incomingCallCount = incomingCallCounts.get(node.id) ?? 0;
+      node.incomingControlCount = incomingControlCounts.get(node.id) ?? 0;
+      node.branchTargetCount = new Set(validControlRoutes.map((route) => route.targetSceneId)).size;
       node.brokenRouteCount = node.routes.length - validRoutes.length;
       node.isOrphan = !node.isEntry && node.incomingCount === 0;
-      node.isEnding = validRoutes.length === 0;
+      node.isReusableSubscene =
+        node.sceneReturnCount > 0 ||
+        (!node.isEntry && node.incomingCallCount > 0 && node.incomingControlCount === 0);
+      node.isEnding = validControlRoutes.length === 0 && !node.isReusableSubscene;
       node.isReachableFromEntry = reachability.reachableSceneIds.has(node.id);
       node.isUnreachable = !node.isReachableFromEntry;
       node.routeDepth = reachability.routeDepthBySceneId.has(node.id)
@@ -607,6 +662,9 @@
       metrics: {
         entrySceneName: getSceneById(data, entrySceneId, options)?.name ?? "未设置",
         branchingScenes: nodes.filter((node) => node.branchTargetCount > 1).length,
+        sceneCalls: nodes.reduce((total, node) => total + node.sceneCallCount, 0),
+        sceneReturns: nodes.reduce((total, node) => total + node.sceneReturnCount, 0),
+        reusableSubscenes: nodes.filter((node) => node.isReusableSubscene).length,
         endingScenes: nodes.filter((node) => node.isEnding).length,
         reachableEndingScenes: endingPaths.filter((path) => path.isReachable).length,
         unreachableEndingScenes: endingPaths.filter((path) => !path.isReachable).length,
@@ -617,6 +675,8 @@
         brokenRoutes: brokenRoutes.length,
         decisionPointScenes: routeTestingPlan.summary.decisionPointCount,
         routeTestCases: routeTestingPlan.summary.routeCaseCount,
+        subsceneTestCases: routeTestingPlan.summary.subsceneCaseCount,
+        blockedSubsceneTestCases: routeTestingPlan.summary.blockedSubsceneCaseCount,
         blockedRouteTestCases:
           routeTestingPlan.summary.brokenRouteCaseCount + routeTestingPlan.summary.unreachableRouteCaseCount,
       },

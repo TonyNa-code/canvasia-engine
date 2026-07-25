@@ -56,6 +56,48 @@ def make_route_bundle() -> dict:
 
 
 class ExportStoryRouteMapTests(unittest.TestCase):
+    def test_route_map_distinguishes_subscene_calls_from_fallthrough(self) -> None:
+        bundle = {
+            "project": {"title": "Reusable Scene Demo", "entrySceneId": "scene_start"},
+            "chapters": [
+                {
+                    "id": "chapter_1",
+                    "name": "第一章",
+                    "scenes": [
+                        {
+                            "id": "scene_start",
+                            "name": "开始",
+                            "blocks": [{"id": "call_1", "type": "scene_call", "targetSceneId": "scene_common"}],
+                        },
+                        {"id": "scene_end", "name": "结尾", "blocks": [{"id": "end", "type": "credits_roll"}]},
+                        {
+                            "id": "scene_common",
+                            "name": "共用演出",
+                            "blocks": [
+                                {"id": "line", "type": "narration", "text": "一次共用演出。"},
+                                {"id": "return", "type": "scene_return"},
+                            ],
+                        },
+                    ],
+                }
+            ],
+        }
+
+        route_map = build_export_story_route_map(bundle)
+        start_routes = [route for route in route_map["routes"] if route["sourceSceneId"] == "scene_start"]
+        common_node = next(node for node in route_map["scenes"] if node["sceneId"] == "scene_common")
+
+        self.assertEqual([(route["routeKind"], route["targetSceneId"]) for route in start_routes], [
+            ("call", "scene_common"),
+            ("auto_next", "scene_end"),
+        ])
+        self.assertEqual(route_map["summary"]["sceneCallCount"], 1)
+        self.assertEqual(route_map["summary"]["sceneReturnCount"], 1)
+        self.assertEqual(route_map["summary"]["reusableSubsceneCount"], 1)
+        self.assertTrue(common_node["isReusableSubscene"])
+        self.assertFalse(common_node["isEndingCandidate"])
+        self.assertEqual(common_node["outgoingCount"], 0)
+
     def test_build_route_map_detects_broken_and_unreachable_routes(self) -> None:
         route_map = build_export_story_route_map(make_route_bundle())
 

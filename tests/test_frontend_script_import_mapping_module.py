@@ -299,6 +299,16 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
                 {{ id: "scene_start" }},
                 resolvers
               ),
+              normalizedSceneCall: tools.normalizeImportedDraftBlockForScene(
+                {{ type: "scene_call", targetHint: "rooftop" }},
+                {{ id: "scene_start" }},
+                resolvers
+              ),
+              normalizedSceneReturn: tools.normalizeImportedDraftBlockForScene(
+                {{ type: "scene_return" }},
+                {{ id: "scene_start" }},
+                resolvers
+              ),
               normalizedCondition: tools.normalizeImportedDraftBlockForScene(
                 {{ type: "condition", branches: [
                   {{ when: [
@@ -507,6 +517,8 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
             "normalized": True,
         })
         self.assertEqual(payload["normalizedJumpFallback"], {"type": "jump", "targetSceneId": "scene_end"})
+        self.assertEqual(payload["normalizedSceneCall"], {"type": "scene_call", "targetSceneId": "scene_roof"})
+        self.assertEqual(payload["normalizedSceneReturn"], {"type": "scene_return"})
         self.assertEqual(payload["normalizedCondition"], {
             "type": "condition",
             "branches": [

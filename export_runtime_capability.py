@@ -22,6 +22,8 @@ CAPABILITY_ROWS = [
     ("choice", "分支", "full", "full", "支持玩家选项、变量效果和目标场景跳转。"),
     ("condition", "分支", "full", "full", "支持条件分支、否则分支和变量判断。"),
     ("jump", "分支", "full", "full", "支持显式场景跳转。"),
+    ("scene_call", "流程", "full", "full", "支持可复用子场景调用、嵌套调用，并在结束后返回调用位置。"),
+    ("scene_return", "流程", "full", "full", "支持从子场景提前返回；调用栈会随存档、读档和回滚恢复。"),
     ("variable_set", "变量", "full", "full", "支持变量赋值。"),
     ("variable_add", "变量", "full", "full", "支持数值变量增减。"),
     ("text_input", "变量", "full", "full", "支持玩家命名、问答输入、数字输入与正文变量占位符。"),
@@ -374,6 +376,8 @@ def build_vn_essentials_audit(bundle: dict) -> dict:
         "choiceCount": 0,
         "conditionCount": 0,
         "jumpCount": 0,
+        "sceneCallCount": 0,
+        "sceneReturnCount": 0,
         "backgroundBlockCount": 0,
         "characterShowCount": 0,
         "characterMoveCount": 0,
@@ -399,6 +403,10 @@ def build_vn_essentials_audit(bundle: dict) -> dict:
             metrics["conditionCount"] += 1
         elif block_type == "jump":
             metrics["jumpCount"] += 1
+        elif block_type == "scene_call":
+            metrics["sceneCallCount"] += 1
+        elif block_type == "scene_return":
+            metrics["sceneReturnCount"] += 1
         elif block_type == "background":
             metrics["backgroundBlockCount"] += 1
             scenes_with_background.add(record["sceneId"])
@@ -430,6 +438,7 @@ def build_vn_essentials_audit(bundle: dict) -> dict:
 
     metrics["textBlockCount"] = metrics["dialogueCount"] + metrics["narrationCount"] + metrics["choiceCount"]
     metrics["branchBlockCount"] = metrics["choiceCount"] + metrics["conditionCount"] + metrics["jumpCount"]
+    metrics["flowControlBlockCount"] = metrics["branchBlockCount"] + metrics["sceneCallCount"] + metrics["sceneReturnCount"]
     metrics["scenesWithBackground"] = len(scenes_with_background)
     metrics["scenesWithMusic"] = len(scenes_with_music)
     metrics["characterPositionVariantCount"] = len(character_positions)
@@ -469,7 +478,7 @@ def build_vn_essentials_audit(bundle: dict) -> dict:
         ("visual", "画面背景", ["background_coverage"], f"{metrics['scenesWithBackground']}/{scene_count} 个场景有背景"),
         ("character", "人物舞台", ["character_stage_missing"], f"{metrics['characterShowCount']} 次登场 / {metrics['characterMoveCount']} 次动作"),
         ("audio", "音频调度", ["bgm_plan_missing", "bgm_scope_missing", "bgm_fade_in_missing", "sfx_plan_missing"], f"{metrics['musicPlayCount']} 个 BGM / {metrics['sfxPlayCount']} 个音效"),
-        ("branch", "分支变量", ["choice_node_missing"], f"{metrics['choiceCount']} 个选项 / {metrics['conditionCount']} 个条件"),
+        ("branch", "分支变量", ["choice_node_missing"], f"{metrics['choiceCount']} 个选项 / {metrics['conditionCount']} 个条件 / {metrics['sceneCallCount']} 次子场景调用"),
     ]
     areas: list[dict] = []
     for area_id, label, codes, summary in area_specs:

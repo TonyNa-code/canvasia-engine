@@ -413,7 +413,7 @@ def build_music_scope_stop_plan(blocks: list[dict], context: dict) -> dict:
             stop_index = target_index
         else:
             last_type = clean_text(normalized_blocks[stop_index].get("type")) if normalized_blocks else ""
-            if last_type in {"jump", "return"}:
+            if last_type in {"jump", "return", "scene_return"}:
                 timing = "before"
             elif last_type == "choice":
                 add_music_scope_warning(block, scoped_context, "renpy_music_scope_terminal_choice_review", "BGM 设置为场景结束，但场景以选项结束；Ren'Py 菜单分支需要按路线决定是否停止音乐。")
@@ -1648,6 +1648,20 @@ def render_story_block(block: dict, context: dict) -> list[str]:
         return render_dialogue_presentation(block, context)
     if block_type == "choice":
         return render_choice_block(block, context)
+    if block_type == "scene_call":
+        target_scene_id = clean_text(block.get("targetSceneId") or block.get("target"))
+        if not target_scene_id:
+            add_warning(
+                warnings,
+                "renpy_missing_call_target",
+                "子场景调用卡没有目标，已导出 pass。",
+                sceneId=scene_id,
+                blockIndex=block_index,
+            )
+            return ["    pass"]
+        return [f"    call {get_scene_label(context['sceneLabelMap'], target_scene_id)}"]
+    if block_type == "scene_return":
+        return ["    return"]
     if block_type == "jump":
         target_scene_id = clean_text(block.get("targetSceneId") or block.get("target"))
         if not target_scene_id:
@@ -1738,7 +1752,7 @@ def build_renpy_draft_export(bundle: dict, assets_doc: dict | None = None) -> di
             if block_index in music_scope_stop_plan["after"]:
                 lines.extend(music_scope_stop_plan["after"][block_index])
         last_type = clean_text((blocks[-1] if blocks else {}).get("type"))
-        if last_type not in {"jump", "choice", "return", "credits_roll"}:
+        if last_type not in {"jump", "choice", "return", "scene_return", "credits_roll"}:
             lines.append("    return")
         lines.append("")
 
@@ -2088,9 +2102,11 @@ def is_renpy_asset_reference(value: str) -> bool:
 def collect_renpy_script_references(script: str) -> dict:
     label_counts: dict[str, int] = {}
     jumps: list[str] = []
+    calls: list[str] = []
     asset_references: list[str] = []
     label_pattern = re.compile(r"^\s*label\s+([A-Za-z_][A-Za-z0-9_]*)\s*:", re.MULTILINE)
     jump_pattern = re.compile(r"^\s*jump\s+([A-Za-z_][A-Za-z0-9_]*)\b", re.MULTILINE)
+    call_pattern = re.compile(r"^\s*call\s+([A-Za-z_][A-Za-z0-9_]*)\b", re.MULTILINE)
     quoted_pattern = re.compile(r'"((?:\\"|[^"])*)"')
 
     for match in label_pattern.finditer(script):
@@ -2098,6 +2114,8 @@ def collect_renpy_script_references(script: str) -> dict:
         label_counts[label] = label_counts.get(label, 0) + 1
     for match in jump_pattern.finditer(script):
         jumps.append(match.group(1))
+    for match in call_pattern.finditer(script):
+        calls.append(match.group(1))
     for match in quoted_pattern.finditer(script):
         value = match.group(1).replace('\\"', '"').replace("\\\\", "\\")
         if is_renpy_asset_reference(value):
@@ -2107,6 +2125,7 @@ def collect_renpy_script_references(script: str) -> dict:
         "labels": sorted(label_counts),
         "duplicateLabels": sorted(label for label, count in label_counts.items() if count > 1),
         "jumps": sorted(dict.fromkeys(jumps)),
+        "calls": sorted(dict.fromkeys(calls)),
         "assetReferences": sorted(dict.fromkeys(asset_references)),
     }
 
@@ -2118,6 +2137,7 @@ def merge_renpy_reference_sets(primary: dict, secondary: dict) -> dict:
             dict.fromkeys([*as_list(primary.get("duplicateLabels")), *as_list(secondary.get("duplicateLabels"))])
         ),
         "jumps": sorted(dict.fromkeys([*as_list(primary.get("jumps")), *as_list(secondary.get("jumps"))])),
+        "calls": sorted(dict.fromkeys([*as_list(primary.get("calls")), *as_list(secondary.get("calls"))])),
         "assetReferences": sorted(
             dict.fromkeys([*as_list(primary.get("assetReferences")), *as_list(secondary.get("assetReferences"))])
         ),
@@ -2142,7 +2162,7 @@ def build_renpy_quality_report(build_dir: Path, export_result: dict) -> dict:
     options_path = game_dir / RENPY_OPTIONS_FILE_NAME
     screens_path = game_dir / RENPY_SCREENS_FILE_NAME
     issues: list[dict] = []
-    references = {"labels": [], "duplicateLabels": [], "jumps": [], "assetReferences": []}
+    references = {"labels": [], "duplicateLabels": [], "jumps": [], "calls": [], "assetReferences": []}
     runtime_preference_markers = build_renpy_runtime_preference_markers(export_result.get("runtimeSettings"))
     missing_runtime_preference_markers: list[str] = []
 
@@ -2194,6 +2214,10 @@ def build_renpy_quality_report(build_dir: Path, export_result: dict) -> dict:
         if jump not in labels:
             add_quality_issue(issues, "error", "renpy_undefined_jump", f"Jump target is not defined: {jump}", label=jump)
 
+    for call in references["calls"]:
+        if call not in labels:
+            add_quality_issue(issues, "error", "renpy_undefined_call", f"Call target is not defined: {call}", label=call)
+
     missing_asset_references: list[str] = []
     for asset_reference in references["assetReferences"]:
         if not (game_dir / asset_reference).is_file():
@@ -2236,6 +2260,7 @@ def build_renpy_quality_report(build_dir: Path, export_result: dict) -> dict:
         "summary": {
             "labelCount": len(references["labels"]),
             "jumpCount": len(references["jumps"]),
+            "callCount": len(references["calls"]),
             "assetReferenceCount": len(references["assetReferences"]),
             "missingAssetReferenceCount": len(missing_asset_references),
             "runtimePreferenceCount": len(runtime_preference_markers),
@@ -2268,6 +2293,7 @@ def build_renpy_quality_markdown(report: dict) -> str:
         f"- Status: {clean_text(report.get('status'), 'unknown')}",
         f"- Labels: {summary.get('labelCount', 0)}",
         f"- Jumps: {summary.get('jumpCount', 0)}",
+        f"- Calls: {summary.get('callCount', 0)}",
         f"- Asset references: {summary.get('assetReferenceCount', 0)}",
         f"- Missing asset references: {summary.get('missingAssetReferenceCount', 0)}",
         f"- Runtime preferences: {summary.get('runtimePreferenceCount', 0) - summary.get('missingRuntimePreferenceCount', 0)} / {summary.get('runtimePreferenceCount', 0)}",
@@ -2373,6 +2399,9 @@ def main() -> int:
     for jump in sorted(set(re.findall(r"^\\s*jump\\s+([A-Za-z_][A-Za-z0-9_]*)\\b", script, flags=re.MULTILINE))):
         if jump not in label_set:
             issues.append(f"undefined jump target: {{jump}}")
+    for call in sorted(set(re.findall(r"^\\s*call\\s+([A-Za-z_][A-Za-z0-9_]*)\\b", script, flags=re.MULTILINE))):
+        if call not in label_set:
+            issues.append(f"undefined call target: {{call}}")
     for quoted in re.findall(r'"((?:\\\\"|[^"])*)"', script + "\\n" + screens):
         path = quoted.replace('\\\\"', '"').replace("\\\\\\\\", "\\\\").replace("\\\\", "/")
         normalized_path = normalize_asset_reference(path)

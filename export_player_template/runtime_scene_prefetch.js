@@ -196,7 +196,7 @@ function collectChoiceTargetSceneIds(snapshot, continueTarget) {
 
 function collectBlockTargetSceneIds(block, continueTarget = "__continue__") {
   const targets = [];
-  if (block?.type === "jump") {
+  if (block?.type === "jump" || block?.type === "scene_call") {
     targets.push(cleanText(block.targetSceneId));
   }
   if (block?.type === "condition") {

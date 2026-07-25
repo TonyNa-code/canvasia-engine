@@ -66,6 +66,9 @@
     const cloneVariables = typeof options.cloneVariables === "function"
       ? options.cloneVariables
       : deepClonePreviewData;
+    const sanitizeCallStack = typeof options.sanitizeCallStack === "function"
+      ? options.sanitizeCallStack
+      : (value) => (Array.isArray(value) ? deepClonePreviewData(value) : []);
     const choiceOptions = Array.isArray(source.choiceOptions)
       ? source.choiceOptions.map((option) => deepClonePreviewData(option)).filter(Boolean)
       : [];
@@ -80,6 +83,7 @@
       visualState: cloneVisualState(source.visualState),
       variables: cloneVariables(source.variables),
       choiceOptions,
+      callStack: sanitizeCallStack(source.callStack),
       transitionTargetSceneId:
         source.transitionTargetSceneId == null ? null : String(source.transitionTargetSceneId),
       selectedOptionId: source.selectedOptionId == null ? null : String(source.selectedOptionId),

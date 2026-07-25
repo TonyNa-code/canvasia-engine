@@ -50,6 +50,34 @@ def make_runtime_bundle() -> dict:
 
 
 class ExportRuntimeCapabilityTests(unittest.TestCase):
+    def test_runtime_capability_tracks_reusable_scene_flow(self) -> None:
+        bundle = {
+            "project": {"title": "Subscene Demo"},
+            "chapters": [
+                {
+                    "id": "chapter_1",
+                    "scenes": [
+                        {
+                            "id": "scene_start",
+                            "blocks": [
+                                {"id": "call", "type": "scene_call", "targetSceneId": "scene_common"},
+                                {"id": "return", "type": "scene_return"},
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+
+        matrix = build_export_runtime_capability_matrix(bundle)
+        used_rows = {row["type"]: row for row in matrix["rows"] if row["usedCount"] > 0}
+
+        self.assertEqual(matrix["essentials"]["metrics"]["sceneCallCount"], 1)
+        self.assertEqual(matrix["essentials"]["metrics"]["sceneReturnCount"], 1)
+        self.assertEqual(matrix["essentials"]["metrics"]["flowControlBlockCount"], 2)
+        self.assertEqual(used_rows["scene_call"]["overallStatus"], "full")
+        self.assertEqual(used_rows["scene_return"]["overallStatus"], "full")
+
     def test_runtime_capability_matrix_flags_export_runtime_and_vn_gaps(self) -> None:
         matrix = build_export_runtime_capability_matrix(make_runtime_bundle())
         markdown = build_export_runtime_capability_markdown(matrix)

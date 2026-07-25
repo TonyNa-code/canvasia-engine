@@ -461,7 +461,7 @@
         stopIndex = targetIndex;
       } else {
         const lastType = cleanText(normalizedBlocks[stopIndex]?.type);
-        if (["jump", "return"].includes(lastType)) {
+        if (["jump", "return", "scene_return"].includes(lastType)) {
           timing = "before";
         } else if (lastType === "choice") {
           pushMusicScopeWarning(block, scopedContext, "renpy_music_scope_terminal_choice_review", "BGM 设置为场景结束，但场景以选项结束；Ren'Py 菜单分支需要按路线决定是否停止音乐。");
@@ -1559,6 +1559,17 @@
     if (type === "choice") {
       return renderChoiceBlock(block, context);
     }
+    if (type === "scene_call") {
+      const targetSceneId = cleanText(block.targetSceneId ?? block.target);
+      if (!targetSceneId) {
+        pushWarning(warnings, "renpy_missing_call_target", "子场景调用卡没有目标，已导出 pass。", getWarningContext(context));
+        return ["    pass"];
+      }
+      return [`    call ${getSceneLabel(targetSceneId, context.sceneMap)}`];
+    }
+    if (type === "scene_return") {
+      return ["    return"];
+    }
     if (type === "jump") {
       const targetSceneId = cleanText(block.targetSceneId ?? block.target);
       if (!targetSceneId) {
@@ -1632,7 +1643,7 @@
         });
       }
       const lastBlock = blocks[blocks.length - 1];
-      if (!lastBlock || !["jump", "choice", "return", "credits_roll"].includes(cleanText(lastBlock.type))) {
+      if (!lastBlock || !["jump", "choice", "return", "scene_return", "credits_roll"].includes(cleanText(lastBlock.type))) {
         lines.push("    return");
       }
       lines.push("");

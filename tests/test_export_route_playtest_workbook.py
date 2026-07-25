@@ -54,6 +54,40 @@ def make_route_bundle() -> dict:
 
 
 class ExportRoutePlaytestWorkbookTests(unittest.TestCase):
+    def test_route_playtest_workbook_tracks_subscene_return_cases(self) -> None:
+        bundle = {
+            "project": {"title": "子场景试玩", "entrySceneId": "scene_start"},
+            "chapters": [
+                {
+                    "id": "chapter_1",
+                    "name": "第一章",
+                    "scenes": [
+                        {
+                            "id": "scene_start",
+                            "name": "开始",
+                            "blocks": [
+                                {"id": "call", "type": "scene_call", "targetSceneId": "scene_common"},
+                                {"id": "jump", "type": "jump", "targetSceneId": "scene_end"},
+                            ],
+                        },
+                        {"id": "scene_end", "name": "结尾", "blocks": [{"type": "credits_roll"}]},
+                        {"id": "scene_common", "name": "共用演出", "blocks": [{"type": "scene_return"}]},
+                    ],
+                }
+            ],
+        }
+
+        sheet = build_route_playtest_workbook(bundle)
+
+        self.assertEqual(sheet["summary"]["subsceneCaseCount"], 1)
+        self.assertEqual(sheet["summary"]["blockedSubsceneCaseCount"], 0)
+        self.assertEqual(sheet["plan"]["decisionPoints"], [])
+        self.assertEqual(sheet["plan"]["subsceneCases"][0]["targetSceneId"], "scene_common")
+        self.assertTrue(any(item["kind"] == "subscene" for item in sheet["executionQueue"]))
+        self.assertTrue(any(lane["id"] == "subscene" for lane in sheet["workbook"]["lanes"]))
+        self.assertIn("子场景调用与返回", build_route_playtest_report(sheet))
+        self.assertIn("子场景调用", build_route_playtest_csv(sheet))
+
     def test_route_playtest_workbook_builds_executable_queue(self) -> None:
         sheet = build_route_playtest_workbook(make_route_bundle())
 

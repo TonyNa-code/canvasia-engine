@@ -581,10 +581,10 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path, deps: dict
                     missing_character_ref_names.append(str(block.get("id") or character_id))
                 if get_safe_character_transition(block.get("transition")) != "none" and get_safe_transition_duration_ms(block.get("transitionDurationMs"), 600) > 0:
                     character_transition_count += 1
-            elif block_type == "jump":
+            elif block_type in {"jump", "scene_call"}:
                 if not str(block.get("targetSceneId") or "").strip():
                     missing_navigation_target_count += 1
-                    missing_navigation_target_names.append(str(block.get("id") or "jump"))
+                    missing_navigation_target_names.append(str(block.get("id") or block_type))
             elif block_type == "background":
                 scene_has_background = True
                 background_block_count += 1
@@ -879,7 +879,7 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path, deps: dict
             "warn",
             "navigation_target_empty",
             "路线控制卡片缺少跳转目标",
-            f"检测到 {missing_navigation_target_count} 个跳转或条件分支没有目标场景：{', '.join(missing_navigation_target_names[:3])}",
+            f"检测到 {missing_navigation_target_count} 个跳转、条件分支或子场景调用没有目标场景：{', '.join(missing_navigation_target_names[:3])}",
             "补齐目标场景，或改成明确的结局/片尾卡片；否则原生 Runtime 会把空目标视为剧情结束，玩家可能以为流程断了。",
         )
     if implicit_condition_fallback_end_count:

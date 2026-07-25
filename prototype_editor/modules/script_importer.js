@@ -23,7 +23,7 @@
     "depth_blur",
     "particle_effect",
   ]);
-  const ROUTE_DRAFT_TYPES = Object.freeze(["jump", "condition"]);
+  const ROUTE_DRAFT_TYPES = Object.freeze(["jump", "scene_call", "scene_return", "condition"]);
   const VARIABLE_DRAFT_TYPES = Object.freeze(["variable_set", "variable_add"]);
   const TEXT_SPEED_ALIASES = Object.freeze({
     slow: "slow",
@@ -524,7 +524,7 @@
   }
 
   function isIgnoredScriptLine(line) {
-    return /^(?:#|\/\/|label\s+\S+\s*:|menu\s*:|return\b|call\s+\S+)/i.test(String(line ?? "").trim());
+    return /^(?:#|\/\/|label\s+\S+\s*:|menu\s*:)/i.test(String(line ?? "").trim());
   }
 
   function parseChoiceLine(line) {
@@ -1079,6 +1079,17 @@
     return targetHint ? { type: "jump", targetHint } : null;
   }
 
+  function parseSceneFlowLine(line) {
+    const text = String(line ?? "").trim();
+    if (/^(?:return|提前返回)$/iu.test(text)) {
+      return { type: "scene_return" };
+    }
+
+    const callMatch = text.match(/^(?:call|调用(?:子场景)?|呼叫(?:子場景)?)\s+(.+)$/iu);
+    const targetHint = trimImportedText(callMatch?.[1] ?? "", 120);
+    return targetHint ? { type: "scene_call", targetHint } : null;
+  }
+
   function flushChoiceOptions(blocks, choiceOptions) {
     if (!choiceOptions.length) {
       return;
@@ -1164,6 +1175,13 @@
 
         flushChoiceOptions(blocks, choiceOptions);
         blocks.push(jump);
+        return;
+      }
+
+      const sceneFlow = parseSceneFlowLine(line);
+      if (sceneFlow) {
+        flushChoiceOptions(blocks, choiceOptions);
+        blocks.push(sceneFlow);
         return;
       }
 
@@ -1336,6 +1354,12 @@
     if (block?.type === "jump") {
       return `跳转：${block.targetHint || "待选择场景"}`;
     }
+    if (block?.type === "scene_call") {
+      return `调用子场景：${block.targetHint || "待选择场景"}`;
+    }
+    if (block?.type === "scene_return") {
+      return "提前返回调用处";
+    }
     if (block?.type === "condition") {
       const firstBranch = block.branches?.[0] ?? {};
       const whenText = (firstBranch.when ?? [])
@@ -1425,6 +1449,7 @@
     parseConditionRuleClause,
     parseConditionLine,
     parseJumpLine,
+    parseSceneFlowLine,
     parseScriptDraftToBlocks,
     summarizeScriptDraftBlocks,
     buildScriptDraftPreviewLines,

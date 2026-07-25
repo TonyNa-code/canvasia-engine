@@ -50,6 +50,7 @@ const {
 const storyBlockCatalogTools = window.CanvasiaEditorStoryBlockCatalog;
 const { BLOCK_LABELS, MUSIC_END_MODE_LABELS, CHOICE_CONTINUE_TARGET } = storyBlockCatalogTools;
 const runtimeChoiceAvailabilityTools = window.CanvasiaRuntimeChoiceAvailability;
+const runtimeStoryFlowTools = window.CanvasiaRuntimeStoryFlow;
 const choiceAvailabilityEditorTools = window.CanvasiaEditorChoiceAvailability;
 const storyBlockActionTools = window.CanvasiaEditorStoryBlockActions;
 const storyBlockEditorTools = window.CanvasiaEditorStoryBlockEditors;
@@ -12466,6 +12467,15 @@ function buildStoryBlockSearchText(block, scene) {
     parts.push(state.data.scenesById.get(block.targetSceneId)?.name ?? block.targetSceneId);
   }
 
+  if (block.type === "scene_call") {
+    parts.push(state.data.scenesById.get(block.targetSceneId)?.name ?? block.targetSceneId);
+    parts.push("调用子场景 可复用剧情 返回调用处");
+  }
+
+  if (block.type === "scene_return") {
+    parts.push("提前返回 返回调用处 子场景结束");
+  }
+
   if (block.type === "variable_set" || block.type === "variable_add") {
     parts.push(state.data.variablesById.get(block.variableId)?.name ?? block.variableId);
   }
@@ -18746,6 +18756,9 @@ function sanitizeStoredPreviewSnapshot(source) {
       getSceneById: (sceneId) => state.data?.scenesById.get(sceneId) ?? null,
       cloneVisualState: clonePreviewVisualState,
       cloneVariables: clonePreviewVariables,
+      sanitizeCallStack: (value) => runtimeStoryFlowTools.sanitizeStoryCallStack(value, {
+        hasScene: (sceneId) => state.data?.scenesById.has(sceneId),
+      }),
     });
   }
 
@@ -18771,6 +18784,9 @@ function sanitizeStoredPreviewSnapshot(source) {
     visualState: clonePreviewVisualState(source.visualState),
     variables: clonePreviewVariables(source.variables),
     choiceOptions,
+    callStack: runtimeStoryFlowTools.sanitizeStoryCallStack(source.callStack, {
+      hasScene: (targetSceneId) => state.data?.scenesById.has(targetSceneId),
+    }),
     transitionTargetSceneId:
       source.transitionTargetSceneId == null ? null : String(source.transitionTargetSceneId),
     selectedOptionId: source.selectedOptionId == null ? null : String(source.selectedOptionId),
@@ -19412,7 +19428,7 @@ function getPreviewAutoAdvanceDelay(snapshot) {
     return Math.min(6800, Math.max(1100, 520 + text.length * multiplier));
   }
 
-  if (snapshot.blockType === "jump" || snapshot.blockType === "condition") {
+  if (["jump", "condition", "scene_call", "scene_return"].includes(snapshot.blockType)) {
     return 520;
   }
 
@@ -20029,10 +20045,13 @@ function clonePreviewVariables(variables) {
   return JSON.parse(JSON.stringify(variables ?? {}));
 }
 
-function buildPreviewSnapshot(sceneId, blockIndex, previousVisualState, previousVariables) {
+function buildPreviewSnapshot(sceneId, blockIndex, previousVisualState, previousVariables, callStack = []) {
   const scene = state.data.scenesById.get(sceneId);
   const baseVisualState = clonePreviewVisualState(previousVisualState);
   const baseVariables = clonePreviewVariables(previousVariables);
+  const safeCallStack = runtimeStoryFlowTools.sanitizeStoryCallStack(callStack, {
+    hasScene: (targetSceneId) => state.data.scenesById.has(targetSceneId),
+  });
 
   if (!scene) {
     return createPreviewTerminalSnapshot(
@@ -20042,7 +20061,8 @@ function buildPreviewSnapshot(sceneId, blockIndex, previousVisualState, previous
       },
       baseVisualState,
       baseVariables,
-      "目标场景不存在，试玩在这里停下来了。"
+      "目标场景不存在，试玩在这里停下来了。",
+      safeCallStack
     );
   }
 
@@ -20056,7 +20076,8 @@ function buildPreviewSnapshot(sceneId, blockIndex, previousVisualState, previous
       },
       baseVisualState,
       baseVariables,
-      "这个场景还没有卡片，试玩在这里停下来了。"
+      "这个场景还没有卡片，试玩在这里停下来了。",
+      safeCallStack
     );
   }
 
@@ -20077,6 +20098,7 @@ function buildPreviewSnapshot(sceneId, blockIndex, previousVisualState, previous
     block,
     visualState: nextVisualState,
     variables: nextVariables,
+    callStack: safeCallStack,
     choiceOptions:
       block.type === "choice"
         ? runtimeChoiceAvailabilityTools.resolveChoiceOptions(block.options, nextVariables, {
@@ -20091,7 +20113,7 @@ function buildPreviewSnapshot(sceneId, blockIndex, previousVisualState, previous
   };
 }
 
-function createPreviewTerminalSnapshot(scene, visualState, variables, message) {
+function createPreviewTerminalSnapshot(scene, visualState, variables, message, callStack = []) {
   const nextVisualState = clonePreviewVisualState(visualState);
   clearTransientStageEffects(nextVisualState);
   applyMusicScopeForTerminal(nextVisualState);
@@ -20107,6 +20129,9 @@ function createPreviewTerminalSnapshot(scene, visualState, variables, message) {
     block: null,
     visualState: nextVisualState,
     variables: clonePreviewVariables(variables),
+    callStack: runtimeStoryFlowTools.sanitizeStoryCallStack(callStack, {
+      hasScene: (targetSceneId) => state.data.scenesById.has(targetSceneId),
+    }),
     choiceOptions: [],
     transitionTargetSceneId: null,
     selectedOptionId: null,
@@ -20117,32 +20142,34 @@ function createPreviewTerminalSnapshot(scene, visualState, variables, message) {
 }
 
 function createNextPreviewSnapshot(currentSnapshot) {
-  if (currentSnapshot.transitionTargetSceneId) {
-    return buildPreviewSnapshot(
-      currentSnapshot.transitionTargetSceneId,
-      0,
+  const hasScene = (sceneId) => state.data.scenesById.has(sceneId);
+  const nextLocation = runtimeStoryFlowTools.resolveNextStoryLocation(currentSnapshot, {
+    hasScene,
+    hasNextBlock: (sceneId, blockIndex) => Boolean(state.data.scenesById.get(sceneId)?.blocks?.[blockIndex]),
+  });
+  if (nextLocation.kind === "error" || nextLocation.kind === "complete") {
+    const message = nextLocation.kind === "error"
+      ? runtimeStoryFlowTools.getStoryFlowErrorMessage(nextLocation.errorCode)
+      : "这段试玩已经走完了。点“重新开始”可以再走一遍。";
+    return createPreviewTerminalSnapshot(
+      currentSnapshot,
       currentSnapshot.visualState,
-      currentSnapshot.variables
+      currentSnapshot.variables,
+      message,
+      nextLocation.callStack
     );
   }
 
-  const scene = state.data.scenesById.get(currentSnapshot.sceneId);
-  const nextBlockIndex = currentSnapshot.blockIndex + 1;
-
-  if (scene?.blocks?.[nextBlockIndex]) {
-    return buildPreviewSnapshot(
-      currentSnapshot.sceneId,
-      nextBlockIndex,
-      currentSnapshot.visualState,
-      currentSnapshot.variables
-    );
+  const nextVisualState = clonePreviewVisualState(currentSnapshot.visualState);
+  if (nextLocation.applyTerminalScope) {
+    applyMusicScopeForTerminal(nextVisualState);
   }
-
-  return createPreviewTerminalSnapshot(
-    currentSnapshot,
-    currentSnapshot.visualState,
+  return buildPreviewSnapshot(
+    nextLocation.targetSceneId,
+    nextLocation.targetBlockIndex,
+    nextVisualState,
     currentSnapshot.variables,
-    "这段试玩已经走完了。点“重新开始”可以再走一遍。"
+    nextLocation.callStack
   );
 }
 
@@ -20207,10 +20234,11 @@ function buildChoiceOptionNextSnapshot(current, option, nextVariables) {
       current.sceneId,
       current.blockIndex + 1,
       current.visualState,
-      nextVariables
+      nextVariables,
+      current.callStack
     );
   }
-  return buildPreviewSnapshot(targetSceneId, 0, current.visualState, nextVariables);
+  return buildPreviewSnapshot(targetSceneId, 0, current.visualState, nextVariables, current.callStack);
 }
 
 function choosePreviewRegressionOption(session, optionId) {
@@ -20544,6 +20572,16 @@ function applyBlockToPreviewState(block, visualState, variables, sceneId = "") {
       }`;
       return branchResult.targetSceneId;
     }
+    case "scene_call":
+      visualState.speakerName = "子场景调用";
+      visualState.dialogueText = `暂时进入：${
+        state.data.scenesById.get(block.targetSceneId)?.name ?? block.targetSceneId
+      }；结束后会回到这里继续。`;
+      return getSafeSceneId(block.targetSceneId, block.targetSceneId);
+    case "scene_return":
+      visualState.speakerName = "子场景返回";
+      visualState.dialogueText = "当前子场景会在这里结束，并回到最近一次调用位置。";
+      return null;
     case "jump":
       visualState.speakerName = "场景跳转";
       visualState.dialogueText = `下一步会跳到：${
@@ -32788,6 +32826,10 @@ function renderBlockPanel(block, scene, selectedIndex) {
     editorMarkup = renderDepthBlurEditor(block);
   } else if (block.type === "jump") {
     editorMarkup = renderJumpEditor(block);
+  } else if (block.type === "scene_call") {
+    editorMarkup = renderSceneCallEditor(block);
+  } else if (block.type === "scene_return") {
+    editorMarkup = renderSceneReturnEditor(block);
   } else if (block.type === "variable_set") {
     editorMarkup = renderVariableSetEditor(block);
   } else if (block.type === "text_input") {
@@ -33664,6 +33706,17 @@ function renderJumpEditor(block) {
     getSafeSceneId,
     renderSceneOptions,
   });
+}
+
+function renderSceneCallEditor(block) {
+  return storyBlockEditorTools.renderSceneCallEditor(block, {
+    getSafeSceneId,
+    renderSceneOptions,
+  });
+}
+
+function renderSceneReturnEditor(block) {
+  return storyBlockEditorTools.renderSceneReturnEditor(block);
 }
 
 function renderVariableStarterPrompt(title, description) {
@@ -34747,6 +34800,12 @@ function normalizeAssistantDraftBlockForScene(sceneDraft, draftBlock) {
     delete block.elseTargetHint;
   } else if (blockType === "jump") {
     block.targetSceneId = getSafeSceneId(block.targetSceneId, getDefaultJumpTargetSceneId(sceneDraft.id));
+    delete block.targetHint;
+  } else if (blockType === "scene_call") {
+    block.targetSceneId = getSafeSceneId(block.targetSceneId, getDefaultJumpTargetSceneId(sceneDraft.id));
+    delete block.targetHint;
+  } else if (blockType === "scene_return") {
+    delete block.targetSceneId;
     delete block.targetHint;
   } else {
     block.text = String(block.text ?? "新旁白").trim() || "新旁白";
@@ -39839,6 +39898,20 @@ function collectEditedBlock(block) {
     };
   }
 
+  if (block.type === "scene_call") {
+    return {
+      ...block,
+      targetSceneId: getSafeSceneId(
+        document.getElementById("editorSceneCallTargetSceneId")?.value,
+        getDefaultJumpTargetSceneId(state.selectedSceneId)
+      ),
+    };
+  }
+
+  if (block.type === "scene_return") {
+    return { ...block };
+  }
+
   if (block.type === "variable_set") {
     const variableId = getSafeVariableId(document.getElementById("editorVariableId")?.value);
     return {
@@ -41307,6 +41380,21 @@ function createDefaultBlock(scene, blockType) {
       id: blockId,
       type: "jump",
       targetSceneId: getDefaultJumpTargetSceneId(scene.id),
+    };
+  }
+
+  if (blockType === "scene_call") {
+    return {
+      id: blockId,
+      type: "scene_call",
+      targetSceneId: getDefaultJumpTargetSceneId(scene.id),
+    };
+  }
+
+  if (blockType === "scene_return") {
+    return {
+      id: blockId,
+      type: "scene_return",
     };
   }
 
@@ -42934,6 +43022,13 @@ function buildBlockDetails(block) {
     case "jump":
       rows.push(["跳转到", state.data.scenesById.get(block.targetSceneId)?.name ?? block.targetSceneId]);
       break;
+    case "scene_call":
+      rows.push(["调用场景", state.data.scenesById.get(block.targetSceneId)?.name ?? block.targetSceneId]);
+      rows.push(["返回方式", "目标场景结束后回到下一张卡"]);
+      break;
+    case "scene_return":
+      rows.push(["返回方式", "立即回到最近一次调用位置"]);
+      break;
     case "variable_set":
     case "variable_add":
       rows.push([
@@ -43150,6 +43245,16 @@ function getBlockSummary(block, scene) {
       return {
         title: `跳到 ${state.data.scenesById.get(block.targetSceneId)?.name ?? block.targetSceneId}`,
         meta: "直接切到另一个场景",
+      };
+    case "scene_call":
+      return {
+        title: `调用 ${state.data.scenesById.get(block.targetSceneId)?.name ?? block.targetSceneId}`,
+        meta: "播放完子场景后自动回来继续",
+      };
+    case "scene_return":
+      return {
+        title: "提前返回调用位置",
+        meta: "结束当前子场景并回到调用处",
       };
     case "variable_set":
       return {
@@ -44197,6 +44302,17 @@ function validateBlock(block, scene, data, pushIssue) {
         break;
       case "jump":
         requireScene(block.targetSceneId, "跳转目标场景");
+        break;
+      case "scene_call":
+        requireScene(block.targetSceneId, "调用目标场景");
+        if (block.targetSceneId === scene.id) {
+          pushIssue("warning", "子场景正在调用自身，运行时会用最大调用深度阻止无限循环。", location, blockContext);
+        }
+        break;
+      case "scene_return":
+        if (blockIndex === 0) {
+          pushIssue("warning", "返回卡位于场景开头；只有通过调用进入本场景时才会继续到调用处。", location, blockContext);
+        }
         break;
       case "variable_set":
         requireVariable(block.variableId);

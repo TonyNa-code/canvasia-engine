@@ -174,6 +174,65 @@ class FrontendRouteAnalyzerModuleTests(unittest.TestCase):
         self.assertEqual(payload["endNode"]["warningCount"], 1)
         self.assertGreater(payload["chapterProduction"]["averageCompletion"], 0)
 
+    def test_subscene_calls_are_reachable_without_becoming_false_branches_or_endings(self) -> None:
+        script = textwrap.dedent(
+            f"""
+            const fs = require("fs");
+            const vm = require("vm");
+            const context = {{ window: {{}} }};
+            context.globalThis = context;
+            vm.createContext(context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(CATALOG_MODULE_PATH))}, "utf8"), context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
+            const tools = context.window.CanvasiaEditorRouteAnalyzer;
+            const caller = {{
+              id: "scene_start",
+              name: "Start",
+              blocks: [{{ id: "call", type: "scene_call", targetSceneId: "scene_common" }}],
+            }};
+            const common = {{
+              id: "scene_common",
+              name: "Common",
+              blocks: [
+                {{ id: "line", type: "narration", text: "Shared." }},
+                {{ id: "return", type: "scene_return" }},
+              ],
+            }};
+            const data = {{
+              project: {{ entrySceneId: "scene_start" }},
+              chapters: [{{ chapterId: "ch1", name: "Chapter", sceneOrder: ["scene_start", "scene_common"] }}],
+              scenesById: new Map([["scene_start", caller], ["scene_common", common]]),
+            }};
+            const overview = tools.buildSceneRouteOverview(data, {{ errors: [], warnings: [] }});
+            process.stdout.write(JSON.stringify({{
+              metrics: overview.metrics,
+              caller: overview.nodes.find((node) => node.id === "scene_start"),
+              common: overview.nodes.find((node) => node.id === "scene_common"),
+              plan: overview.routeTestingPlan,
+            }}));
+            """
+        )
+        completed = subprocess.run(
+            ["node", "-e", script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        self.assertEqual(payload["metrics"]["sceneCalls"], 1)
+        self.assertEqual(payload["metrics"]["sceneReturns"], 1)
+        self.assertEqual(payload["metrics"]["reusableSubscenes"], 1)
+        self.assertEqual(payload["metrics"]["branchingScenes"], 0)
+        self.assertTrue(payload["caller"]["isEnding"])
+        self.assertTrue(payload["common"]["isReusableSubscene"])
+        self.assertFalse(payload["common"]["isEnding"])
+        self.assertEqual(payload["plan"]["summary"]["decisionPointCount"], 0)
+        self.assertEqual(payload["plan"]["summary"]["subsceneCaseCount"], 1)
+        self.assertEqual(payload["plan"]["subsceneCases"][0]["targetSceneId"], "scene_common")
+
     def test_route_testing_plan_export_actions_are_wired_in_app(self) -> None:
         source = (ROOT_DIR / "prototype_editor" / "app.js").read_text(encoding="utf-8")
 

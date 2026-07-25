@@ -353,6 +353,23 @@ except ImportError:  # pragma: no cover - exported native packages import from t
     )
 
 try:
+    from .runtime_story_flow import (
+        create_story_call_transition,
+        create_story_return_transition,
+        get_story_flow_error_message,
+        is_story_scene_ending_candidate as is_scene_ending_candidate,
+        sanitize_story_call_stack,
+    )
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_story_flow import (
+        create_story_call_transition,
+        create_story_return_transition,
+        get_story_flow_error_message,
+        is_story_scene_ending_candidate as is_scene_ending_candidate,
+        sanitize_story_call_stack,
+    )
+
+try:
     from .runtime_rollback import (
         DEFAULT_ROLLBACK_LIMIT,
         append_rollback_checkpoint,
@@ -7497,7 +7514,7 @@ def collect_scene_outgoing_targets(scene: dict | None) -> list[str]:
     targets = []
     for block in scene.get("blocks", []) or []:
         block_type = str(block.get("type") or "").strip()
-        if block_type == "jump":
+        if block_type in {"jump", "scene_call"}:
             target = str(block.get("targetSceneId") or "").strip()
             if target:
                 targets.append(target)
@@ -7525,7 +7542,7 @@ def build_ending_scene_ids(chapters: list[dict]) -> list[str]:
     scene_ids = []
     for scene in iter_export_scenes(chapters):
         scene_id = str(scene.get("id") or "").strip()
-        if scene_id and not collect_scene_outgoing_targets(scene):
+        if scene_id and is_scene_ending_candidate(scene):
             scene_ids.append(scene_id)
     return scene_ids
 
@@ -8212,6 +8229,7 @@ class NativeRuntimePlayer:
             self.current_scene_id = self.scene_order[0]
         self.unlock_current_chapter_replay()
         self.current_block_index = 0
+        self.story_call_stack: list[dict] = []
         self.current_line: dict | None = None
         self.current_choices: list[dict] | None = None
         self.current_choice_index = 0
@@ -9090,7 +9108,7 @@ class NativeRuntimePlayer:
             chapter_name = self.localize_value(chapter, "name", "未命名章节")
             for scene in chapter.get("scenes") or []:
                 scene_id = str(scene.get("id") or "").strip()
-                if not scene_id or collect_scene_outgoing_targets(scene):
+                if not scene_id or not is_scene_ending_candidate(scene):
                     continue
                 preview = self.build_scene_preview(scene)
                 entries.append(
@@ -9252,7 +9270,7 @@ class NativeRuntimePlayer:
         if not safe_scene_id:
             return False
         scene = self.scenes_by_id.get(safe_scene_id)
-        return bool(scene) and not collect_scene_outgoing_targets(scene)
+        return bool(scene) and is_scene_ending_candidate(scene)
 
     def record_ending_completion(self, scene_id: str | None) -> None:
         safe_scene_id = str(scene_id or "").strip()
@@ -9497,14 +9515,17 @@ class NativeRuntimePlayer:
                 self.advance_current_line_if_allowed()
                 self.auto_play_deadline_ms = 0
 
-    def handle_scene_finished(self, scene: dict | None) -> None:
+    def handle_scene_finished(self, scene: dict | None) -> bool:
         self.apply_bgm_scope_for_scene_finished(scene)
         self.unlock_relation_entries_for_scene(scene)
+        if self.story_call_stack:
+            return self.return_from_story_call()
         scene_id = str((scene or {}).get("id") or "").strip()
         if self.is_ending_scene(scene_id):
             self.record_ending_completion(scene_id)
         self.finished = True
         self.finished_message = "剧情已经结束。"
+        return False
 
     def unlock_relation_entries_for_scene(self, scene: dict | None, max_block_index: int | None = None) -> None:
         scene_character_ids = self.collect_scene_encounter_character_ids(scene, max_block_index=max_block_index)
@@ -9944,6 +9965,7 @@ class NativeRuntimePlayer:
         self.current_bgm_volume_percent = 100
         self.current_bgm_scope = None
         self.variable_state = self.build_initial_variable_state()
+        self.story_call_stack = []
         self.reset_rollback_timeline()
         self.current_scene_id = self.project.get("entrySceneId") or self.scene_order[0]
         if self.current_scene_id not in self.scenes_by_id:
@@ -10426,6 +10448,7 @@ class NativeRuntimePlayer:
             self.current_line = None
             self.finished = False
             self.finished_message = ""
+            self.story_call_stack = []
             self.title_screen_active = False
             self.set_scene(first_scene_id)
             self.close_overlay(preserve_status=True)
@@ -10475,6 +10498,7 @@ class NativeRuntimePlayer:
             self.current_line = None
             self.finished = False
             self.finished_message = ""
+            self.story_call_stack = []
             self.title_screen_active = False
             self.set_scene(scene_id)
             self.close_overlay(preserve_status=True)
@@ -10613,6 +10637,10 @@ class NativeRuntimePlayer:
             "sceneId": self.current_scene_id,
             "sceneName": self.get_current_scene_name(),
             "blockIndex": self.current_block_index,
+            "storyCallStack": sanitize_story_call_stack(
+                self.story_call_stack,
+                has_scene=self.scenes_by_id.__contains__,
+            ),
             "variableState": dict(self.variable_state),
             "stageBackgroundAssetId": self.stage_background_asset_id,
             "scene3dPreview": {
@@ -10745,6 +10773,10 @@ class NativeRuntimePlayer:
         self.current_scene_id = scene_id if scene_id in self.scenes_by_id else self.scene_order[0]
         self.unlock_current_chapter_replay()
         self.current_block_index = int(snapshot.get("blockIndex") or 0)
+        self.story_call_stack = sanitize_story_call_stack(
+            snapshot.get("storyCallStack"),
+            has_scene=self.scenes_by_id.__contains__,
+        )
         self.variable_state = self.merge_variable_state(snapshot.get("variableState") or {})
         self.stage_background_asset_id = snapshot.get("stageBackgroundAssetId")
         self.apply_scene3d_preview_config(snapshot.get("scene3dPreview") if isinstance(snapshot.get("scene3dPreview"), dict) else None)
@@ -10796,6 +10828,42 @@ class NativeRuntimePlayer:
             return
         self.finished = True
         self.finished_message = "剧情已经结束。"
+
+    def call_story_scene(self, block: dict) -> bool:
+        transition = create_story_call_transition(
+            call_stack=self.story_call_stack,
+            source_scene_id=self.current_scene_id,
+            source_block_index=self.current_block_index,
+            source_block_id=block.get("id"),
+            target_scene_id=block.get("targetSceneId"),
+            has_scene=self.scenes_by_id.__contains__,
+        )
+        if not transition.get("ok"):
+            self.finished = True
+            self.finished_message = get_story_flow_error_message(transition.get("errorCode"))
+            return False
+        self.story_call_stack = transition["callStack"]
+        self.current_scene_id = transition["targetSceneId"]
+        self.current_block_index = int(transition["targetBlockIndex"])
+        self.unlock_current_chapter_replay()
+        self.status_message = f"已进入子场景：{self.get_current_scene_name()}"
+        return True
+
+    def return_from_story_call(self) -> bool:
+        transition = create_story_return_transition(
+            self.story_call_stack,
+            has_scene=self.scenes_by_id.__contains__,
+        )
+        if not transition.get("ok"):
+            self.finished = True
+            self.finished_message = get_story_flow_error_message(transition.get("errorCode"))
+            return False
+        self.story_call_stack = transition["callStack"]
+        self.current_scene_id = transition["targetSceneId"]
+        self.current_block_index = int(transition["targetBlockIndex"])
+        self.unlock_current_chapter_replay()
+        self.status_message = f"已返回：{self.get_current_scene_name()}"
+        return True
 
     def clear_particle_effect(self) -> None:
         self.active_particle_effect = None
@@ -11142,7 +11210,8 @@ class NativeRuntimePlayer:
         scene = self.get_current_scene()
         blocks = (scene or {}).get("blocks", []) or []
         if self.current_block_index >= len(blocks):
-            self.handle_scene_finished(scene)
+            if self.handle_scene_finished(scene):
+                self._advance_until_pause()
             return
 
         block = blocks[self.current_block_index]
@@ -11202,7 +11271,8 @@ class NativeRuntimePlayer:
 
             blocks = scene.get("blocks", []) or []
             if self.current_block_index >= len(blocks):
-                self.handle_scene_finished(scene)
+                if self.handle_scene_finished(scene):
+                    continue
                 return
 
             self.apply_bgm_scope_before_block(scene, self.current_block_index)
@@ -11434,6 +11504,16 @@ class NativeRuntimePlayer:
 
             if block_type == "jump":
                 self.set_scene(block.get("targetSceneId"))
+                continue
+
+            if block_type == "scene_call":
+                self.call_story_scene(block)
+                continue
+
+            if block_type == "scene_return":
+                self.apply_bgm_scope_for_scene_finished(scene)
+                self.unlock_relation_entries_for_scene(scene, max_block_index=self.current_block_index)
+                self.return_from_story_call()
                 continue
 
             if block_type == "condition":

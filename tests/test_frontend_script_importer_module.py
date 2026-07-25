@@ -169,6 +169,9 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
               chineseWaitLine: tools.parseWaitLine("等待 1.5秒"),
               voiceLine: tools.parseVoiceLine("voice yuina_001"),
               jumpLine: tools.parseJumpLine("jump scene_end"),
+              sceneCallLine: tools.parseSceneFlowLine("call shared_phone"),
+              sceneReturnLine: tools.parseSceneFlowLine("return"),
+              sceneFlowBlocks: tools.parseScriptDraftToBlocks("call shared_phone\\n旁白：电话接通。\\nreturn"),
               blocks,
               summary: tools.summarizeScriptDraftBlocks(blocks),
               preview: tools.buildScriptDraftPreviewLines(blocks, 4),
@@ -416,6 +419,13 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
         self.assertEqual(payload["chineseWaitLine"], {"type": "wait", "durationSeconds": 1.5})
         self.assertEqual(payload["voiceLine"], {"voiceHint": "yuina_001"})
         self.assertEqual(payload["jumpLine"], {"type": "jump", "targetHint": "scene_end"})
+        self.assertEqual(payload["sceneCallLine"], {"type": "scene_call", "targetHint": "shared_phone"})
+        self.assertEqual(payload["sceneReturnLine"], {"type": "scene_return"})
+        self.assertEqual([block["type"] for block in payload["sceneFlowBlocks"]], [
+            "scene_call",
+            "narration",
+            "scene_return",
+        ])
         self.assertEqual([block["type"] for block in payload["blocks"]], [
             "narration",
             "dialogue",

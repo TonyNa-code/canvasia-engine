@@ -102,6 +102,18 @@ def collect_explicit_route_edges(source_record: dict, scene_ids: set[str]) -> li
             if edge:
                 edges.append(edge)
 
+        if block_type == "scene_call":
+            edge = make_route_edge(
+                source_record=source_record,
+                target_scene_id=block.get("targetSceneId") or block.get("gotoSceneId") or block.get("sceneId"),
+                route_kind="call",
+                label="调用后返回",
+                block_index=block_index,
+                scene_ids=scene_ids,
+            )
+            if edge:
+                edges.append(edge)
+
         if block_type == "choice":
             for option_index, option in enumerate(block.get("options") or []):
                 if not isinstance(option, dict):
@@ -152,6 +164,8 @@ def collect_explicit_route_edges(source_record: dict, scene_ids: set[str]) -> li
             ("trueTargetSceneId", "条件为真"),
             ("falseTargetSceneId", "条件为假"),
         ):
+            if block_type == "scene_call" and key in {"targetSceneId", "gotoSceneId"}:
+                continue
             edge = make_route_edge(
                 source_record=source_record,
                 target_scene_id=block.get(key),
@@ -179,6 +193,11 @@ def scene_has_ending_marker(scene: dict) -> bool:
     return any(clean_route_text(block.get("type")) in {"credits_roll", "ending"} for block in blocks)
 
 
+def scene_has_return_marker(scene: dict) -> bool:
+    blocks = [block for block in scene.get("blocks") or [] if isinstance(block, dict)]
+    return any(clean_route_text(block.get("type")) == "scene_return" for block in blocks)
+
+
 def build_export_story_route_map(bundle: dict) -> dict:
     records = iter_export_route_scene_records(bundle)
     scene_ids = {record["sceneId"] for record in records}
@@ -189,10 +208,15 @@ def build_export_story_route_map(bundle: dict) -> dict:
 
     edges: list[dict] = []
     ending_scene_ids: set[str] = set()
+    returning_scene_ids: set[str] = set()
     for record in records:
         explicit_edges = collect_explicit_route_edges(record, scene_ids)
         if explicit_edges:
             edges.extend(explicit_edges)
+        if scene_has_return_marker(record["scene"]):
+            returning_scene_ids.add(record["sceneId"])
+            continue
+        if any(edge["routeKind"] != "call" for edge in explicit_edges):
             continue
         if scene_has_ending_marker(record["scene"]):
             ending_scene_ids.add(record["sceneId"])
@@ -223,6 +247,12 @@ def build_export_story_route_map(bundle: dict) -> dict:
         adjacency.setdefault(edge["sourceSceneId"], []).append(edge)
         if edge["targetExists"]:
             incoming_counts[edge["targetSceneId"]] = incoming_counts.get(edge["targetSceneId"], 0) + 1
+
+    called_scene_ids = {
+        edge["targetSceneId"]
+        for edge in edges
+        if edge["routeKind"] == "call" and edge["targetExists"]
+    }
 
     project = bundle.get("project") if isinstance(bundle.get("project"), dict) else {}
     entry_scene_id = clean_route_text(project.get("entrySceneId"), records[0]["sceneId"] if records else "")
@@ -269,6 +299,9 @@ def build_export_story_route_map(bundle: dict) -> dict:
                 "narrationCount": sum(1 for block in blocks if clean_route_text(block.get("type")) == "narration"),
                 "choiceCount": sum(1 for block in blocks if clean_route_text(block.get("type")) == "choice"),
                 "conditionCount": sum(1 for block in blocks if clean_route_text(block.get("type")) == "condition"),
+                "sceneCallCount": sum(1 for block in blocks if clean_route_text(block.get("type")) == "scene_call"),
+                "sceneReturnCount": sum(1 for block in blocks if clean_route_text(block.get("type")) == "scene_return"),
+                "isReusableSubscene": record["sceneId"] in called_scene_ids or record["sceneId"] in returning_scene_ids,
                 "isEndingCandidate": record["sceneId"] in ending_scene_ids,
                 "routes": outgoing_edges,
             }
@@ -300,6 +333,9 @@ def build_export_story_route_map(bundle: dict) -> dict:
         "endingCandidateCount": len(ending_scene_ids),
         "reachableEndingCount": len(reachable_endings),
         "decisionPointCount": route_case_count,
+        "sceneCallCount": sum(1 for edge in edges if edge["routeKind"] == "call"),
+        "sceneReturnCount": sum(node["sceneReturnCount"] for node in scene_nodes),
+        "reusableSubsceneCount": sum(1 for node in scene_nodes if node["isReusableSubscene"]),
         "maxRouteDepth": max(route_depth_by_scene_id.values()) if route_depth_by_scene_id else 0,
         "entrySceneExists": entry_exists,
     }
@@ -348,6 +384,7 @@ def build_export_story_route_map_markdown(route_map: dict) -> str:
         f"- 状态：{markdown_cell(status_labels.get(str(summary.get('status')), summary.get('status')))}",
         f"- 场景：{markdown_cell(summary.get('sceneCount'))} 个",
         f"- 路线：{markdown_cell(summary.get('routeCount'))} 条（显式 {markdown_cell(summary.get('explicitRouteCount'))} / 自动顺接 {markdown_cell(summary.get('implicitRouteCount'))}）",
+        f"- 子场景调用：{markdown_cell(summary.get('sceneCallCount'))} 次；可复用子场景 {markdown_cell(summary.get('reusableSubsceneCount'))} 个",
         f"- 坏跳转：{markdown_cell(summary.get('brokenRouteCount'))} 条",
         f"- 入口不可达场景：{markdown_cell(summary.get('unreachableSceneCount'))} 个",
         f"- 结局候选：{markdown_cell(summary.get('reachableEndingCount'))}/{markdown_cell(summary.get('endingCandidateCount'))} 可达",

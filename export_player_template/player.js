@@ -145,6 +145,7 @@ import {
 const rawData = window.LIGHTWHISPER_GAME_DATA ?? {};
 const runtimeConditionTools = window.CanvasiaRuntimeConditions;
 const runtimeChoiceAvailabilityTools = window.CanvasiaRuntimeChoiceAvailability;
+const runtimeStoryFlowTools = window.CanvasiaRuntimeStoryFlow;
 const data = normalizeGameData(rawData);
 const storageKeys = buildRuntimeStorageKeys(data.project);
 
@@ -3740,9 +3741,15 @@ function movePreviewForward() {
 function buildChoiceOptionNextSnapshot(current, option, nextVariables) {
   const targetSceneId = option?.gotoSceneId ?? option?.targetSceneId ?? "";
   if (isChoiceContinueTarget(targetSceneId)) {
-    return buildPreviewSnapshot(current.sceneId, current.blockIndex + 1, current.visualState, nextVariables);
+    return buildPreviewSnapshot(
+      current.sceneId,
+      current.blockIndex + 1,
+      current.visualState,
+      nextVariables,
+      current.callStack
+    );
   }
-  return buildPreviewSnapshot(targetSceneId, 0, current.visualState, nextVariables);
+  return buildPreviewSnapshot(targetSceneId, 0, current.visualState, nextVariables, current.callStack);
 }
 
 function choosePreviewOption(optionId) {
@@ -4906,6 +4913,9 @@ function sanitizeStoredSnapshot(source) {
     visualState: clonePreviewVisualState(source.visualState),
     variables: clonePreviewVariables(source.variables),
     choiceOptions,
+    callStack: runtimeStoryFlowTools.sanitizeStoryCallStack(source.callStack, {
+      hasScene: (targetSceneId) => data.scenesById.has(targetSceneId),
+    }),
     transitionTargetSceneId:
       source.transitionTargetSceneId == null ? null : String(source.transitionTargetSceneId),
     completed: Boolean(source.completed),
@@ -5201,7 +5211,7 @@ function getAutoAdvanceDelay(snapshot) {
     return Math.min(6800, Math.max(1100, 520 + text.length * multiplier));
   }
 
-  if (snapshot.blockType === "jump" || snapshot.blockType === "condition") {
+  if (["jump", "condition", "scene_call", "scene_return"].includes(snapshot.blockType)) {
     return 520;
   }
 
@@ -7609,10 +7619,13 @@ function clonePreviewVariables(variables) {
   return JSON.parse(JSON.stringify(variables ?? {}));
 }
 
-function buildPreviewSnapshot(sceneId, blockIndex, previousVisualState, previousVariables) {
+function buildPreviewSnapshot(sceneId, blockIndex, previousVisualState, previousVariables, callStack = []) {
   const scene = data.scenesById.get(getSafeSceneId(sceneId));
   const baseVisualState = clonePreviewVisualState(previousVisualState);
   const baseVariables = clonePreviewVariables(previousVariables);
+  const safeCallStack = runtimeStoryFlowTools.sanitizeStoryCallStack(callStack, {
+    hasScene: (targetSceneId) => data.scenesById.has(targetSceneId),
+  });
 
   if (!scene) {
     return createPreviewTerminalSnapshot(
@@ -7622,7 +7635,8 @@ function buildPreviewSnapshot(sceneId, blockIndex, previousVisualState, previous
       },
       baseVisualState,
       baseVariables,
-      "目标场景不存在，试玩在这里停下来了。"
+      "目标场景不存在，试玩在这里停下来了。",
+      safeCallStack
     );
   }
 
@@ -7635,7 +7649,8 @@ function buildPreviewSnapshot(sceneId, blockIndex, previousVisualState, previous
       },
       baseVisualState,
       baseVariables,
-      "这段剧情已经结束了。"
+      "这段剧情已经结束了。",
+      safeCallStack
     );
   }
 
@@ -7654,6 +7669,7 @@ function buildPreviewSnapshot(sceneId, blockIndex, previousVisualState, previous
     block,
     visualState: nextVisualState,
     variables: nextVariables,
+    callStack: safeCallStack,
     choiceOptions:
       block.type === "choice"
         ? runtimeChoiceAvailabilityTools.resolveChoiceOptions(block.options, nextVariables, {
@@ -7665,7 +7681,7 @@ function buildPreviewSnapshot(sceneId, blockIndex, previousVisualState, previous
   };
 }
 
-function createPreviewTerminalSnapshot(scene, visualState, variables, message) {
+function createPreviewTerminalSnapshot(scene, visualState, variables, message, callStack = []) {
   const nextVisualState = clonePreviewVisualState(visualState);
   clearTransientStageEffects(nextVisualState);
   applyMusicScopeForTerminal(nextVisualState);
@@ -7681,6 +7697,9 @@ function createPreviewTerminalSnapshot(scene, visualState, variables, message) {
     block: null,
     visualState: nextVisualState,
     variables: clonePreviewVariables(variables),
+    callStack: runtimeStoryFlowTools.sanitizeStoryCallStack(callStack, {
+      hasScene: (targetSceneId) => data.scenesById.has(targetSceneId),
+    }),
     choiceOptions: [],
     transitionTargetSceneId: null,
     completed: true,
@@ -7688,32 +7707,34 @@ function createPreviewTerminalSnapshot(scene, visualState, variables, message) {
 }
 
 function createNextPreviewSnapshot(currentSnapshot) {
-  if (currentSnapshot.transitionTargetSceneId) {
-    return buildPreviewSnapshot(
-      currentSnapshot.transitionTargetSceneId,
-      0,
+  const hasScene = (sceneId) => data.scenesById.has(sceneId);
+  const nextLocation = runtimeStoryFlowTools.resolveNextStoryLocation(currentSnapshot, {
+    hasScene,
+    hasNextBlock: (sceneId, blockIndex) => Boolean(data.scenesById.get(sceneId)?.blocks?.[blockIndex]),
+  });
+  if (nextLocation.kind === "error" || nextLocation.kind === "complete") {
+    const message = nextLocation.kind === "error"
+      ? runtimeStoryFlowTools.getStoryFlowErrorMessage(nextLocation.errorCode)
+      : "这条试玩路线已经结束了。";
+    return createPreviewTerminalSnapshot(
+      currentSnapshot,
       currentSnapshot.visualState,
-      currentSnapshot.variables
+      currentSnapshot.variables,
+      message,
+      nextLocation.callStack
     );
   }
 
-  const scene = data.scenesById.get(currentSnapshot.sceneId);
-  const nextBlockIndex = currentSnapshot.blockIndex + 1;
-
-  if (scene?.blocks?.[nextBlockIndex]) {
-    return buildPreviewSnapshot(
-      currentSnapshot.sceneId,
-      nextBlockIndex,
-      currentSnapshot.visualState,
-      currentSnapshot.variables
-    );
+  const nextVisualState = clonePreviewVisualState(currentSnapshot.visualState);
+  if (nextLocation.applyTerminalScope) {
+    applyMusicScopeForTerminal(nextVisualState);
   }
-
-  return createPreviewTerminalSnapshot(
-    currentSnapshot,
-    currentSnapshot.visualState,
+  return buildPreviewSnapshot(
+    nextLocation.targetSceneId,
+    nextLocation.targetBlockIndex,
+    nextVisualState,
     currentSnapshot.variables,
-    "这条试玩路线已经结束了。"
+    nextLocation.callStack
   );
 }
 
@@ -8035,6 +8056,17 @@ function applyBlockToPreviewState(block, visualState, variables, sceneId = "") {
       )}`;
       return targetSceneId;
     }
+    case "scene_call":
+      visualState.speakerName = "子场景调用";
+      visualState.dialogueText = `暂时进入：${getSceneName(
+        data.scenesById.get(block.targetSceneId),
+        block.targetSceneId
+      )}；结束后会回到这里继续。`;
+      return getSafeSceneId(block.targetSceneId, block.targetSceneId);
+    case "scene_return":
+      visualState.speakerName = "子场景返回";
+      visualState.dialogueText = "当前子场景会在这里结束，并回到最近一次调用位置。";
+      return null;
     case "jump":
       visualState.speakerName = "场景跳转";
       visualState.dialogueText = `下一步会跳到：${getSceneName(
@@ -8796,6 +8828,14 @@ function getPreviewHint(snapshot) {
 
   if (snapshot.blockType === "jump") {
     return "下一步会进入目标场景。";
+  }
+
+  if (snapshot.blockType === "scene_call") {
+    return "下一步会进入可复用子场景，走完后自动回到这里继续。";
+  }
+
+  if (snapshot.blockType === "scene_return") {
+    return "下一步会结束当前子场景并回到最近一次调用位置。";
   }
 
   return "可点画面或按空格 / 回车继续，按 R 重新开始，按 S 切换跳过已读，按 H 隐藏对话框。";

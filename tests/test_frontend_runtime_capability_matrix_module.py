@@ -95,6 +95,8 @@ class FrontendRuntimeCapabilityMatrixModuleTests(unittest.TestCase):
         self.assertIn("buildRuntimeCapabilityCsv", payload["keys"])
         self.assertEqual(len(payload["capabilityRows"]), len(payload["catalogRuntimeRows"]))
         self.assertTrue(any(row["type"] == "wait" for row in payload["capabilityRows"]))
+        self.assertTrue(any(row["type"] == "scene_call" for row in payload["capabilityRows"]))
+        self.assertTrue(any(row["type"] == "scene_return" for row in payload["capabilityRows"]))
         summary = payload["matrix"]["summary"]
         self.assertEqual(summary["totalBlockCount"], 6)
         self.assertEqual(summary["usedTypeCount"], 5)

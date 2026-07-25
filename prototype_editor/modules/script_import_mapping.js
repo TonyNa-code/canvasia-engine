@@ -593,6 +593,17 @@
       });
     }
 
+    if (draftBlock.type === "scene_call") {
+      return {
+        type: "scene_call",
+        targetSceneId: getSceneId(draftBlock.targetHint),
+      };
+    }
+
+    if (draftBlock.type === "scene_return") {
+      return { type: "scene_return" };
+    }
+
     if (draftBlock.type === "jump") {
       return {
         type: "jump",

@@ -1205,6 +1205,47 @@
   `;
   }
 
+  function renderSceneCallEditor(block, options = {}) {
+    const getSafeSceneId = getRenderer(options, "getSafeSceneId", (sceneId) => sceneId ?? "");
+    const renderSceneOptions = getRenderer(options, "renderSceneOptions");
+    const targetSceneId = getSafeSceneId(block?.targetSceneId);
+
+    return `
+    <article class="editor-card">
+      <h3>调用一段可复用剧情</h3>
+      <p>运行到这里会暂时进入目标场景；目标场景走到末尾后，会自动回到这张卡片的下一步继续。</p>
+    </article>
+    <div class="field-grid">
+      <div class="detail-row">
+        <label for="editorSceneCallTargetSceneId">调用哪个场景</label>
+        <select id="editorSceneCallTargetSceneId">
+          ${renderSceneOptions(targetSceneId)}
+        </select>
+        <p class="helper-text">适合复用电话、公共事件、教学段落、反复出现的过场；可以嵌套调用，但不要让场景互相无限调用。</p>
+      </div>
+    </div>
+    <div class="detail-actions">
+      <button class="toolbar-button toolbar-button-primary" data-action="save-block">保存这张卡片</button>
+    </div>
+  `;
+  }
+
+  function renderSceneReturnEditor() {
+    return `
+    <article class="editor-card">
+      <h3>提前返回调用位置</h3>
+      <p>运行到这里会立即结束当前子场景，并回到调用它的场景继续。若子场景总是自然走到末尾，可以不放这张卡。</p>
+    </article>
+    <article class="editor-card">
+      <h3>安全行为</h3>
+      <p>如果玩家不是通过“调用子场景”来到这里，运行时会把它当作当前路线结束，不会卡死或跳到未知位置。</p>
+    </article>
+    <div class="detail-actions">
+      <button class="toolbar-button toolbar-button-primary" data-action="save-block">保存这张卡片</button>
+    </div>
+  `;
+  }
+
   function renderVariableStarterPrompt(title, description, options = {}) {
     const escape = getEscapeHtml(options);
 
@@ -1678,6 +1719,8 @@
     renderVideoPlayEditor,
     renderCreditsRollEditor,
     renderJumpEditor,
+    renderSceneCallEditor,
+    renderSceneReturnEditor,
     renderVariableStarterPrompt,
     renderVariableSetEditor,
     renderTextInputEditor,

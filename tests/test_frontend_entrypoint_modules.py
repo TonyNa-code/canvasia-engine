@@ -19,6 +19,7 @@ class FrontendEntrypointModuleTests(unittest.TestCase):
         required_scripts = [
             "../export_player_template/runtime_conditions.js",
             "../export_player_template/runtime_choice_availability.js",
+            "../export_player_template/runtime_story_flow.js",
             "./modules/story_block_catalog.js",
             "./modules/choice_availability_editor.js",
             "./modules/story_block_editors.js",

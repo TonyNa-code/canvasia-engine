@@ -27,7 +27,7 @@ export function collectSceneOutgoingTargets(scene) {
   const targets = [];
 
   (scene?.blocks ?? []).forEach((block) => {
-    if (block.type === "jump" && block.targetSceneId) {
+    if (["jump", "scene_call"].includes(block.type) && block.targetSceneId) {
       targets.push(block.targetSceneId);
       return;
     }
@@ -54,6 +54,27 @@ export function collectSceneOutgoingTargets(scene) {
   });
 
   return Array.from(new Set(targets.filter((target) => typeof target === "string" && target.trim())));
+}
+
+export function isSceneEndingCandidate(scene) {
+  const blocks = Array.isArray(scene?.blocks) ? scene.blocks : [];
+  if (blocks.some((block) => block?.type === "scene_return")) {
+    return false;
+  }
+  return !blocks.some((block) => {
+    if (block?.type === "jump") {
+      return Boolean(String(block.targetSceneId ?? "").trim());
+    }
+    if (block?.type === "choice") {
+      return (block.options ?? []).some(
+        (option) => option?.gotoSceneId && !isChoiceContinueTarget(option.gotoSceneId)
+      );
+    }
+    if (block?.type === "condition") {
+      return (block.branches ?? []).some((branch) => branch?.gotoSceneId) || Boolean(block.elseGotoSceneId);
+    }
+    return false;
+  });
 }
 
 export function normalizeGameData(source = {}) {
@@ -94,7 +115,7 @@ export function normalizeGameData(source = {}) {
     });
   });
 
-  const endingScenes = scenes.filter((scene) => collectSceneOutgoingTargets(scene).length === 0);
+  const endingScenes = scenes.filter(isSceneEndingCandidate);
 
   return {
     project,

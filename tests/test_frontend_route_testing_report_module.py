@@ -29,6 +29,8 @@ class FrontendRouteTestingReportModuleTests(unittest.TestCase):
                 routeCaseCount: 3,
                 brokenRouteCaseCount: 1,
                 unreachableRouteCaseCount: 1,
+                subsceneCaseCount: 1,
+                blockedSubsceneCaseCount: 0,
                 endingTestCaseCount: 2,
                 reachableEndingTestCaseCount: 1,
               }},
@@ -73,6 +75,22 @@ class FrontendRouteTestingReportModuleTests(unittest.TestCase):
                       branchIndex: 0,
                     }},
                   ],
+                }},
+              ],
+              subsceneCases: [
+                {{
+                  routeId: "call_common",
+                  sourceSceneId: "scene_start",
+                  sourceSceneName: "Start | Branch",
+                  chapterName: "Chapter 1",
+                  routeDepth: 0,
+                  entryPathLabel: "Start",
+                  targetSceneId: "scene_common",
+                  targetSceneName: "Common Scene",
+                  blockIndex: 5,
+                  status: "ready",
+                  statusLabel: "可试玩",
+                  testingHint: "确认调用后返回。",
                 }},
               ],
               endingTestCases: [
@@ -143,11 +161,15 @@ class FrontendRouteTestingReportModuleTests(unittest.TestCase):
         self.assertEqual(payload["summary"]["routeCaseCount"], 3)
         self.assertEqual(payload["summary"]["brokenRouteCaseCount"], 1)
         self.assertEqual(payload["summary"]["unreachableRouteCaseCount"], 1)
+        self.assertEqual(payload["summary"]["subsceneCaseCount"], 1)
+        self.assertEqual(payload["serialized"]["subsceneCases"][0]["targetSceneId"], "scene_common")
         self.assertEqual(payload["digest"]["status"], "blocked")
         self.assertEqual(payload["executionQueue"][0]["severity"], "blocker")
         self.assertEqual(payload["executionQueue"][0]["title"], "修复分支坏链")
         self.assertEqual(payload["executionQueue"][0]["routeKind"], "condition")
         self.assertTrue(any(item["id"] == "route_blockers_clear" for item in payload["acceptanceChecklist"]))
+        self.assertTrue(any(item["id"] == "subscene_cases_played" for item in payload["acceptanceChecklist"]))
+        self.assertTrue(any(item["kind"] == "subscene" for item in payload["executionQueue"]))
         self.assertEqual(payload["workbook"]["lanes"][0]["id"], "repair")
         self.assertEqual(payload["workbook"]["nextBestAction"]["routeKindLabel"], "条件分支")
         self.assertIn("自动回归会尝试把条件变量", payload["workbook"]["nextBestAction"]["variablePresetHint"])
@@ -162,8 +184,10 @@ class FrontendRouteTestingReportModuleTests(unittest.TestCase):
         self.assertIn("## 执行优先队列", payload["markdown"])
         self.assertIn("## 验收标准", payload["markdown"])
         self.assertIn("## 分支检查点", payload["markdown"])
+        self.assertIn("## 子场景调用与返回", payload["markdown"])
         self.assertIn('"执行队列"', payload["csv"])
         self.assertIn('"分支路线"', payload["csv"])
+        self.assertIn('"子场景调用"', payload["csv"])
         self.assertIn('"结局路径"', payload["csv"])
         self.assertEqual(payload["escaped"], "a\\|b<br />c")
 

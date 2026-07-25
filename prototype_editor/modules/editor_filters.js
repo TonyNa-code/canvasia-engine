@@ -360,6 +360,10 @@
       pushIssue("broken_target", "跳转待修", "danger-text");
     }
 
+    if (block.type === "scene_call" && !hasCollectionEntry(scenesById, block.targetSceneId)) {
+      pushIssue("broken_target", "调用待修", "danger-text");
+    }
+
     if (
       block.type === "choice" &&
       (block.options ?? []).some((option) => option.gotoSceneId && !hasCollectionEntry(scenesById, option.gotoSceneId))

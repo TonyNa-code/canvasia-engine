@@ -82,6 +82,23 @@
             : null,
         })),
       })),
+      subsceneCases: toArray(plan.subsceneCases).map((testCase) => ({
+        routeId: testCase.routeId,
+        sourceSceneId: testCase.sourceSceneId,
+        sourceSceneName: testCase.sourceSceneName,
+        chapterId: testCase.chapterId,
+        chapterName: testCase.chapterName,
+        routeDepth: testCase.routeDepth,
+        entryPathLabel: testCase.entryPathLabel,
+        targetSceneId: testCase.targetSceneId,
+        targetSceneName: testCase.targetSceneName,
+        blockIndex: Number.isInteger(testCase.blockIndex)
+          ? testCase.blockIndex
+          : null,
+        status: testCase.status,
+        statusLabel: testCase.statusLabel,
+        testingHint: testCase.testingHint,
+      })),
       endingTestCases: toArray(plan.endingTestCases).map((testCase) => ({
         order: testCase.order,
         sceneId: testCase.sceneId,
@@ -101,6 +118,7 @@
   function getRouteTestingSummary(plan = {}) {
     const serialized = serializeRouteTestingPlan(plan);
     const decisionPoints = serialized.decisionPoints;
+    const subsceneCases = serialized.subsceneCases;
     const endingTestCases = serialized.endingTestCases;
     const summary = serialized.summary ?? {};
     const routeCaseCount = decisionPoints.reduce(
@@ -134,6 +152,14 @@
         summary.unreachableRouteCaseCount,
         unreachableRouteCaseCount,
       ),
+      subsceneCaseCount: toCount(
+        summary.subsceneCaseCount,
+        subsceneCases.length,
+      ),
+      blockedSubsceneCaseCount: toCount(
+        summary.blockedSubsceneCaseCount,
+        subsceneCases.filter((testCase) => testCase.status !== "ready").length,
+      ),
       endingTestCaseCount: toCount(
         summary.endingTestCaseCount,
         endingTestCases.length,
@@ -149,8 +175,13 @@
   function getRouteTestingStatusDigest(plan = {}) {
     const summary = getRouteTestingSummary(plan);
     const blockedCount =
-      summary.brokenRouteCaseCount + summary.unreachableRouteCaseCount;
-    const totalCaseCount = summary.routeCaseCount + summary.endingTestCaseCount;
+      summary.brokenRouteCaseCount +
+      summary.unreachableRouteCaseCount +
+      summary.blockedSubsceneCaseCount;
+    const totalCaseCount =
+      summary.routeCaseCount +
+      summary.subsceneCaseCount +
+      summary.endingTestCaseCount;
 
     if (totalCaseCount === 0) {
       return {
@@ -201,7 +232,7 @@
   function getExecutionWeight(item = {}) {
     const severityWeight =
       item.severity === "blocker" ? 1000 : item.severity === "warn" ? 700 : 260;
-    const kindWeight = item.kind === "ending" ? 60 : 90;
+    const kindWeight = item.kind === "subscene" ? 110 : item.kind === "ending" ? 60 : 90;
     const depth = Number.isFinite(Number(item.routeDepth))
       ? Number(item.routeDepth)
       : 999;
@@ -259,6 +290,41 @@
               ? "能按入口路径抵达分支点，选择该分支后进入目标场景，文本、演出、存档和回收状态正常。"
               : "修复后重新生成路线试玩手册，确认状态变为可试玩。",
         });
+      });
+    });
+
+    serialized.subsceneCases.forEach((testCase, index) => {
+      const severity = getExecutionSeverity(testCase.status);
+      queue.push({
+        id: `subscene_${testCase.routeId || index}`,
+        kind: "subscene",
+        severity,
+        phase: getExecutionPhase(testCase.status),
+        title:
+          testCase.status === "ready"
+            ? "验证子场景调用与返回"
+            : "修复子场景调用目标",
+        chapterName: testCase.chapterName,
+        sceneName: testCase.sourceSceneName,
+        sourceSceneId: testCase.sourceSceneId,
+        sourceSceneName: testCase.sourceSceneName,
+        targetSceneId: testCase.targetSceneId,
+        routeDepth: testCase.routeDepth,
+        entryPathLabel: testCase.entryPathLabel || "入口未接通",
+        routeLabel: "调用后返回",
+        routeKind: "call",
+        routeCaseId: testCase.routeId ?? "",
+        blockIndex: testCase.blockIndex,
+        optionIndex: null,
+        branchIndex: null,
+        targetLabel: testCase.targetSceneName,
+        status: testCase.status,
+        statusLabel: testCase.statusLabel,
+        actionLabel: testCase.testingHint,
+        acceptanceCriteria:
+          testCase.status === "ready"
+            ? "进入目标子场景并回到调用卡的下一张；保存后读档仍回到同一位置，嵌套调用不会串栈。"
+            : "修复目标后重新生成路线试玩手册，确认子场景用例变为可试玩。",
       });
     });
 
@@ -321,6 +387,9 @@
     const readyBranchCount = queue.filter(
       (item) => item.kind === "branch" && item.status === "ready",
     ).length;
+    const readySubsceneCount = queue.filter(
+      (item) => item.kind === "subscene" && item.status === "ready",
+    ).length;
     const readyEndingCount = queue.filter(
       (item) => item.kind === "ending" && item.status === "ready",
     ).length;
@@ -358,6 +427,17 @@
             : "当前没有结局候选；建议至少做一个明确收束场景。",
       },
       {
+        id: "subscene_cases_played",
+        label: "子场景调用与返回确认",
+        done:
+          summary.subsceneCaseCount === 0 ||
+          readySubsceneCount === summary.subsceneCaseCount,
+        detail:
+          summary.subsceneCaseCount > 0
+            ? `可试玩子场景 ${readySubsceneCount}/${summary.subsceneCaseCount} 条。`
+            : "当前没有子场景调用，本项无需处理。",
+      },
+      {
         id: "save_and_archive_checked",
         label: "存档与回想联动确认",
         done: blockedCount === 0 && readyEndingCount > 0,
@@ -380,6 +460,9 @@
     if (routeKind === "jump") {
       return "直接跳转";
     }
+    if (routeKind === "call") {
+      return "子场景调用";
+    }
     if (routeKind === "ending") {
       return "结局路径";
     }
@@ -396,6 +479,9 @@
     if (item.routeKind === "choice") {
       return "按玩家视角选择对应选项即可；若该选项会改变量，后续需要确认变量真的影响分支或回想。";
     }
+    if (item.routeKind === "call") {
+      return "进入子场景后走到末尾，确认会自动回到调用卡的下一步；有提前返回卡时也要单独验证。";
+    }
     if (item.kind === "ending") {
       return "按路径完整跑到结局，顺手确认结局回想、CG/BGM/语音解锁和返回标题。";
     }
@@ -408,6 +494,13 @@
         `打开「${item.sceneName || "分支场景"}」并定位到 ${getRouteKindLabel(item.routeKind)}。`,
         `重新选择或创建目标场景「${item.targetLabel || "未设置目标"}」。`,
         "重新生成路线试玩手册，确认这条用例不再显示坏链。",
+      ];
+    }
+    if (item.kind === "subscene") {
+      return [
+        `从入口进入「${item.sceneName || "调用场景"}」，执行子场景调用「${item.targetLabel || "目标子场景"}」。`,
+        "走到子场景末尾或提前返回卡，确认回到调用卡的下一张，而不是重新开始或跳到别处。",
+        "在子场景内保存并读档一次；如果项目有嵌套调用，再确认逐层返回顺序正确。",
       ];
     }
     if (item.severity === "warn") {
@@ -447,6 +540,11 @@
         ? "每个可打到结局都需要完整跑一遍，确认收束和解锁。"
         : "还没有可打到的结局路径。";
     }
+    if (laneId === "subscene") {
+      return items.length > 0
+        ? "逐条确认子场景能进入、返回、存档恢复，并覆盖一次嵌套调用。"
+        : "当前没有需要单独验证的子场景调用。";
+    }
     return items.length > 0
       ? "这些用例适合交给自动回归优先执行。"
       : "暂无自动回归优先种子。";
@@ -457,7 +555,7 @@
     const executionQueue = buildRouteTestingExecutionQueue(serialized);
     const cards = executionQueue.map((item) => ({
       ...item,
-      kindLabel: item.kind === "ending" ? "结局" : "分支",
+      kindLabel: item.kind === "ending" ? "结局" : item.kind === "subscene" ? "子场景" : "分支",
       routeKindLabel: getRouteKindLabel(item.routeKind),
       variablePresetHint: getRouteTestingVariablePresetHint(item),
       manualSteps: buildRouteTestingManualSteps(item),
@@ -469,6 +567,9 @@
     );
     const endingItems = cards.filter(
       (item) => item.kind === "ending" && item.status === "ready",
+    );
+    const subsceneItems = cards.filter(
+      (item) => item.kind === "subscene" && item.status === "ready",
     );
     const autoSmokeItems = cards
       .filter((item) => item.canAutoSmoke)
@@ -489,6 +590,14 @@
         itemCount: branchItems.length,
         detail: getRouteTestingLaneDetail("branch", branchItems),
         items: branchItems,
+      },
+      {
+        id: "subscene",
+        label: "验证子场景返回",
+        tone: subsceneItems.length > 0 ? "test" : "soft",
+        itemCount: subsceneItems.length,
+        detail: getRouteTestingLaneDetail("subscene", subsceneItems),
+        items: subsceneItems,
       },
       {
         id: "ending",
@@ -545,12 +654,17 @@
 
   function getRouteTestingReadinessPercent(plan = {}) {
     const summary = getRouteTestingSummary(plan);
-    const total = summary.routeCaseCount + summary.endingTestCaseCount;
+    const total =
+      summary.routeCaseCount +
+      summary.subsceneCaseCount +
+      summary.endingTestCaseCount;
     if (total <= 0) {
       return 0;
     }
     const blocked =
-      summary.brokenRouteCaseCount + summary.unreachableRouteCaseCount;
+      summary.brokenRouteCaseCount +
+      summary.unreachableRouteCaseCount +
+      summary.blockedSubsceneCaseCount;
     const unreachableEndings = Math.max(
       0,
       summary.endingTestCaseCount - summary.reachableEndingTestCaseCount,
@@ -572,6 +686,8 @@
         ["分支检查点", `${summary.decisionPointCount}`],
         ["从入口可到的分支点", `${summary.reachableDecisionPointCount}`],
         ["路线用例", `${summary.routeCaseCount}`],
+        ["子场景调用用例", `${summary.subsceneCaseCount}`],
+        ["阻塞子场景用例", `${summary.blockedSubsceneCaseCount}`],
         [
           "阻塞路线用例",
           `${summary.brokenRouteCaseCount + summary.unreachableRouteCaseCount}`,
@@ -589,7 +705,7 @@
         .map((item) => [
           `${item.rank}`,
           item.phase,
-          item.kind === "ending" ? "结局" : "分支",
+          item.kind === "ending" ? "结局" : item.kind === "subscene" ? "子场景" : "分支",
           item.title,
           `${item.chapterName} · ${item.sceneName}`,
           `${item.routeLabel} -> ${item.targetLabel}`,
@@ -631,6 +747,15 @@
           testCase.testingHint,
         ]),
     );
+    const subsceneTable = buildMarkdownTable(
+      ["调用位置", "目标子场景", "状态", "测试提示"],
+      serialized.subsceneCases.slice(0, 40).map((testCase) => [
+        `${testCase.chapterName || "未分章"} · ${testCase.sourceSceneName}`,
+        testCase.targetSceneName || testCase.targetSceneId,
+        testCase.statusLabel,
+        testCase.testingHint,
+      ]),
+    );
 
     return {
       summaryTable,
@@ -638,6 +763,7 @@
       acceptanceTable,
       workbookTable,
       decisionTable,
+      subsceneTable,
       endingTable,
     };
   }
@@ -675,6 +801,10 @@
       "",
       tables.decisionTable || "当前没有需要单独覆盖的分支点。",
       "",
+      "## 子场景调用与返回",
+      "",
+      tables.subsceneTable || "当前没有需要单独覆盖的子场景调用。",
+      "",
       "## 结局试玩路径",
       "",
       tables.endingTable || "当前没有可列出的结局试玩路径。",
@@ -683,7 +813,8 @@
       "",
       "1. 先处理状态为坏链或未接通的路线用例。",
       "2. 每个分支检查点至少试玩一次所有选项或条件结果。",
-      "3. 每个可打到结局都完整跑一遍，确认文本、演出、存档和回想解锁正常。",
+      "3. 子场景需要验证进入、返回、存档读取与嵌套调用。",
+      "4. 每个可打到结局都完整跑一遍，确认文本、演出、存档和回想解锁正常。",
       "",
     ].join("\n")}`;
   }
@@ -735,6 +866,19 @@
             : "先修复目标场景缺失或名称变更。",
         ]);
       });
+    });
+
+    serialized.subsceneCases.forEach((testCase, index) => {
+      rows.push([
+        "子场景调用",
+        `${index + 1}`,
+        testCase.chapterName,
+        testCase.sourceSceneName,
+        testCase.entryPathLabel || "入口未接通",
+        `调用 -> ${testCase.targetSceneName || testCase.targetSceneId}`,
+        testCase.statusLabel,
+        testCase.testingHint,
+      ]);
     });
 
     serialized.endingTestCases.forEach((testCase, index) => {

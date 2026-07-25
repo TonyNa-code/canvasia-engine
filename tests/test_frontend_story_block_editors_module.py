@@ -547,6 +547,8 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
             "renderNarrationEditor",
             "renderReadableTextQualityTools",
             "renderReadonlyBlockPanel",
+            "renderSceneCallEditor",
+            "renderSceneReturnEditor",
             "renderScreenFadeEditor",
             "renderScreenFilterEditor",
             "renderScreenFlashEditor",

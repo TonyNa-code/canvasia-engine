@@ -178,6 +178,7 @@ EXPORT_TEMPLATE_DIR = ROOT_DIR / "export_player_template"
 EXPORT_PLAYER_SCRIPT_FILES = (
     "runtime_conditions.js",
     "runtime_choice_availability.js",
+    "runtime_story_flow.js",
     "player.js",
     "runtime_data.js",
     "runtime_storage.js",
@@ -489,6 +490,7 @@ EDITOR_SIGNING_CHECK_COMMAND_SOURCE = ROOT_DIR / "tools" / "release" / "run_sign
 NATIVE_RUNTIME_PLAYER_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_player.py"
 NATIVE_RUNTIME_PRELOAD_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_preload.py"
 NATIVE_RUNTIME_SCENE_PREFETCH_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_scene_prefetch.py"
+NATIVE_RUNTIME_STORY_FLOW_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_story_flow.py"
 NATIVE_RUNTIME_DIAGNOSTICS_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_diagnostics.py"
 NATIVE_RUNTIME_PERFORMANCE_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_performance.py"
 NATIVE_RUNTIME_INPUT_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_input.py"
@@ -519,6 +521,7 @@ NATIVE_RUNTIME_BRAND_LOGO_SOURCE = ROOT_DIR / "prototype_editor" / "assets" / "c
 NATIVE_RUNTIME_PLAYER_NAME = "runtime_player.py"
 NATIVE_RUNTIME_PRELOAD_NAME = "runtime_preload.py"
 NATIVE_RUNTIME_SCENE_PREFETCH_NAME = "runtime_scene_prefetch.py"
+NATIVE_RUNTIME_STORY_FLOW_NAME = "runtime_story_flow.py"
 NATIVE_RUNTIME_DIAGNOSTICS_NAME = "runtime_diagnostics.py"
 NATIVE_RUNTIME_PERFORMANCE_NAME = "runtime_performance.py"
 NATIVE_RUNTIME_INPUT_NAME = "runtime_input.py"
@@ -589,6 +592,7 @@ NATIVE_RUNTIME_REQUIRED_MODULE_FILES = (
     (NATIVE_RUNTIME_PLAYER_SOURCE, NATIVE_RUNTIME_PLAYER_NAME),
     (NATIVE_RUNTIME_PRELOAD_SOURCE, NATIVE_RUNTIME_PRELOAD_NAME),
     (NATIVE_RUNTIME_SCENE_PREFETCH_SOURCE, NATIVE_RUNTIME_SCENE_PREFETCH_NAME),
+    (NATIVE_RUNTIME_STORY_FLOW_SOURCE, NATIVE_RUNTIME_STORY_FLOW_NAME),
     (NATIVE_RUNTIME_DIAGNOSTICS_SOURCE, NATIVE_RUNTIME_DIAGNOSTICS_NAME),
     (NATIVE_RUNTIME_PERFORMANCE_SOURCE, NATIVE_RUNTIME_PERFORMANCE_NAME),
     (NATIVE_RUNTIME_INPUT_SOURCE, NATIVE_RUNTIME_INPUT_NAME),
@@ -8976,6 +8980,8 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
         "runtimePreloadModulePath": str(build_dir / NATIVE_RUNTIME_PRELOAD_NAME),
         "runtimeScenePrefetchModuleName": NATIVE_RUNTIME_SCENE_PREFETCH_NAME,
         "runtimeScenePrefetchModulePath": str(build_dir / NATIVE_RUNTIME_SCENE_PREFETCH_NAME),
+        "runtimeStoryFlowModuleName": NATIVE_RUNTIME_STORY_FLOW_NAME,
+        "runtimeStoryFlowModulePath": str(build_dir / NATIVE_RUNTIME_STORY_FLOW_NAME),
         "runtimeDiagnosticsModuleName": NATIVE_RUNTIME_DIAGNOSTICS_NAME,
         "runtimeDiagnosticsModulePath": str(build_dir / NATIVE_RUNTIME_DIAGNOSTICS_NAME),
         "runtimeDiagnosticsReportName": runtime_diagnostics_files["runtimeDiagnosticsReportName"],
@@ -9518,6 +9524,7 @@ def export_native_runtime_build() -> dict:
             "playerScript": runtime_files["playerName"],
             "runtimePreloadModule": runtime_files["runtimePreloadModuleName"],
             "runtimeScenePrefetchModule": runtime_files["runtimeScenePrefetchModuleName"],
+            "runtimeStoryFlowModule": runtime_files["runtimeStoryFlowModuleName"],
             "runtimeDiagnosticsModule": runtime_files["runtimeDiagnosticsModuleName"],
             "runtimeDiagnosticsReport": runtime_files["runtimeDiagnosticsReportName"],
             "runtimeDiagnosticsMarkdown": runtime_files["runtimeDiagnosticsMarkdownName"],
@@ -9595,6 +9602,7 @@ def export_native_runtime_build() -> dict:
             "runtimePreloadSummary": runtime_files["runtimePreloadSummary"],
             "runtimePreloadModule": runtime_files["runtimePreloadModuleName"],
             "runtimeScenePrefetchModule": runtime_files["runtimeScenePrefetchModuleName"],
+            "runtimeStoryFlowModule": runtime_files["runtimeStoryFlowModuleName"],
             "runtimeDiagnosticsModule": runtime_files["runtimeDiagnosticsModuleName"],
             "runtimeDiagnosticsReport": runtime_files["runtimeDiagnosticsReportName"],
             "runtimeDiagnosticsMarkdown": runtime_files["runtimeDiagnosticsMarkdownName"],
@@ -10337,6 +10345,7 @@ def export_web_build() -> dict:
             "playerRuntimeAudio": "runtime_audio.js",
             "playerRuntimePreload": "runtime_preload.js",
             "playerRuntimeScenePrefetch": "runtime_scene_prefetch.js",
+            "playerRuntimeStoryFlow": "runtime_story_flow.js",
             "playerRuntimeTextEffects": "runtime_text_effects.js",
             "playerRuntimeTextVariables": "runtime_text_variables.js",
             "runtimePreloadManifest": RUNTIME_PRELOAD_MANIFEST_FILE_NAME,
@@ -11474,6 +11483,7 @@ def export_windows_nwjs_build() -> dict:
             "appRuntimeAudio": "app/runtime_audio.js",
             "appRuntimePreload": "app/runtime_preload.js",
             "appRuntimeScenePrefetch": "app/runtime_scene_prefetch.js",
+            "appRuntimeStoryFlow": "app/runtime_story_flow.js",
             "appRuntimeTextEffects": "app/runtime_text_effects.js",
             "appRuntimeTextVariables": "app/runtime_text_variables.js",
             "appRuntimePreloadManifest": f"app/{RUNTIME_PRELOAD_MANIFEST_FILE_NAME}",
@@ -11945,6 +11955,7 @@ def export_macos_nwjs_build() -> dict:
             "appRuntimeAudio": "app/runtime_audio.js",
             "appRuntimePreload": "app/runtime_preload.js",
             "appRuntimeScenePrefetch": "app/runtime_scene_prefetch.js",
+            "appRuntimeStoryFlow": "app/runtime_story_flow.js",
             "appRuntimeTextEffects": "app/runtime_text_effects.js",
             "appRuntimeTextVariables": "app/runtime_text_variables.js",
             "appRuntimePreloadManifest": f"app/{RUNTIME_PRELOAD_MANIFEST_FILE_NAME}",
@@ -12423,6 +12434,7 @@ def export_linux_nwjs_build() -> dict:
             "appRuntimeAudio": "app/runtime_audio.js",
             "appRuntimePreload": "app/runtime_preload.js",
             "appRuntimeScenePrefetch": "app/runtime_scene_prefetch.js",
+            "appRuntimeStoryFlow": "app/runtime_story_flow.js",
             "appRuntimeTextEffects": "app/runtime_text_effects.js",
             "appRuntimeTextVariables": "app/runtime_text_variables.js",
             "appRuntimePreloadManifest": f"app/{RUNTIME_PRELOAD_MANIFEST_FILE_NAME}",

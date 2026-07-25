@@ -13,6 +13,8 @@
     ["choice", "分支", "full", "full", "支持玩家选项、变量效果、目标场景跳转，以及按变量条件隐藏或锁定选项。"],
     ["condition", "分支", "full", "full", "支持条件分支、否则分支和变量判断。"],
     ["jump", "分支", "full", "full", "支持显式场景跳转。"],
+    ["scene_call", "流程", "full", "full", "支持可复用子场景调用、嵌套调用，并在结束后返回调用位置。"],
+    ["scene_return", "流程", "full", "full", "支持从子场景提前返回；调用栈会随存档、读档和回滚恢复。"],
     ["variable_set", "变量", "full", "full", "支持变量赋值。"],
     ["variable_add", "变量", "full", "full", "支持数值变量增减。"],
     ["music_play", "音频", "full", "full", "支持 BGM 播放、循环、音量、淡入和范围调度。"],
@@ -432,14 +434,14 @@
       });
     }
 
-    if (["choice", "condition", "jump", "variable_set", "variable_add", "text_input"].some((type) => hasUsedType(usedTypeMap, type))) {
+    if (["choice", "condition", "jump", "scene_call", "scene_return", "variable_set", "variable_add", "text_input"].some((type) => hasUsedType(usedTypeMap, type))) {
       addItem({
         id: "runtime-branch-variables",
         target: "cross",
         severity: "check",
-        title: "分支变量要验每条可达路线和坏链兜底",
-        detail: "至少跑一条主线、一条分支和一个返回路径，确认变量条件、否则分支、跳转目标和结局候选不会卡死。",
-        relatedBlockTypes: ["choice", "condition", "jump", "variable_set", "variable_add", "text_input"],
+        title: "分支、变量与子场景返回要逐条验收",
+        detail: "至少跑一条主线、一条分支和一个子场景返回路径，确认变量条件、否则分支、跳转目标、嵌套调用和读档恢复不会卡死。",
+        relatedBlockTypes: ["choice", "condition", "jump", "scene_call", "scene_return", "variable_set", "variable_add", "text_input"],
         source: "分支链路",
       });
     }
@@ -648,6 +650,8 @@
       choiceCount: 0,
       conditionCount: 0,
       jumpCount: 0,
+      sceneCallCount: 0,
+      sceneReturnCount: 0,
       variableMutationCount: 0,
       choiceEffectCount: 0,
       backgroundBlockCount: 0,
@@ -699,6 +703,10 @@
         metrics.conditionCount += 1;
       } else if (type === "jump") {
         metrics.jumpCount += 1;
+      } else if (type === "scene_call") {
+        metrics.sceneCallCount += 1;
+      } else if (type === "scene_return") {
+        metrics.sceneReturnCount += 1;
       } else if (type === "variable_set" || type === "variable_add" || type === "text_input") {
         metrics.variableMutationCount += 1;
       } else if (type === "background") {
@@ -766,6 +774,7 @@
     metrics.referencedMusicAssetCount = [...referencedMusicAssetIds].filter((id) => assetMap.has(id)).length;
     metrics.textBlockCount = metrics.dialogueCount + metrics.narrationCount + metrics.choiceCount;
     metrics.branchBlockCount = metrics.choiceCount + metrics.conditionCount + metrics.jumpCount;
+    metrics.flowControlBlockCount = metrics.branchBlockCount + metrics.sceneCallCount + metrics.sceneReturnCount;
 
     if (sceneCount > 0 && metrics.textBlockCount === 0) {
       issues.push(buildVnEssentialIssue("warn", "story_text_missing", "缺少可读剧情文本", "当前项目已有场景，但没有台词、旁白或选项卡片。", "先补一段可从入口读到的文本，再做导出试玩。", "story"));
@@ -877,7 +886,7 @@
         `${metrics.musicPlayCount} 个 BGM / ${metrics.sfxPlayCount} 个音效`,
         "BGM 应按文本范围、场景或停止卡控制，而不是机械连播。"
       ),
-      buildVnEssentialArea("branch", "分支变量", ["choice_node_missing", "choice_consequence_missing"], issues, `${metrics.choiceCount} 个选项 / ${metrics.conditionCount} 个条件`, "至少让关键选项有可解释后果。"),
+      buildVnEssentialArea("branch", "分支变量", ["choice_node_missing", "choice_consequence_missing"], issues, `${metrics.choiceCount} 个选项 / ${metrics.conditionCount} 个条件 / ${metrics.sceneCallCount} 次子场景调用`, "至少让关键选项有可解释后果，并确认子场景会返回正确位置。"),
       buildVnEssentialArea("textbox", "文本框可读性", ["dialog_box_readability"], issues, `${metrics.textBoxIssueCount} 个可读性提示`, "长文本、浅色背景和复杂 CG 下要能看清。"),
       buildVnEssentialArea("system", "存档与系统项", ["save_slot_count_low"], issues, `${metrics.formalSaveSlotCount} 个正式存档位`, "中长篇作品需要足够手动存档空间。"),
       buildVnEssentialArea("ui", "游戏 UI 皮肤", ["game_ui_skin_default", "font_asset_unbound"], issues, hasCustomUiAsset || hasCustomUiPalette ? "已检测到自定义 UI 线索" : "接近默认皮肤", "作品自己的 Logo、字体、按钮和面板会显著提升完成感。"),

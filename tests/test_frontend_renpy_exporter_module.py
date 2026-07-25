@@ -101,7 +101,16 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
                         {{ type: "depth_blur", action: "apply", focus: "full", strength: "strong" }},
                         {{ type: "particle_effect", action: "stop" }},
                         {{ type: "character_hide", characterId: "yuna", transition: "rise", transitionDurationMs: 850 }},
+                        {{ type: "scene_call", targetSceneId: "scene_common" }},
                         {{ type: "jump", targetSceneId: "scene_end" }},
+                      ],
+                    }},
+                    {{
+                      id: "scene_common",
+                      name: "共用提示",
+                      blocks: [
+                        {{ type: "narration", text: "这一段会回到调用它的位置。" }},
+                        {{ type: "scene_return" }},
                       ],
                     }},
                     {{
@@ -142,7 +151,7 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
         self.assertIn("buildRenpyDraftManifest", payload["keys"])
         self.assertIn("renderBlock", payload["keys"])
         self.assertEqual(payload["draft"]["projectTitle"], "Renpy Demo")
-        self.assertEqual(payload["draft"]["sceneCount"], 2)
+        self.assertEqual(payload["draft"]["sceneCount"], 3)
         self.assertEqual(payload["draft"]["characterCount"], 1)
         self.assertEqual(payload["draft"]["variableDefinitionCount"], 3)
         self.assertGreaterEqual(payload["draft"]["assetDefinitionCount"], 1)
@@ -184,6 +193,8 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
         self.assertIn("if affection >= 2:", payload["draft"]["script"])
         self.assertIn('$ renpy.movie_cutscene("<from 1.5 to 12 volume 0.8>video/op.webm", delay=10.5)', payload["draft"]["script"])
         self.assertIn("jump scene_end", payload["draft"]["script"])
+        self.assertIn("call scene_common", payload["draft"]["script"])
+        self.assertIn("label scene_common:", payload["draft"]["script"])
         self.assertIn("$ renpy.pause(1.2)", payload["draft"]["script"])
         self.assertIn("with hpunch", payload["draft"]["script"])
         self.assertIn('with Fade(0.24, 0.14, 0.82, color="#ffeccc")', payload["draft"]["script"])
