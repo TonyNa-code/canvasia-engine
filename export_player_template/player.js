@@ -105,6 +105,10 @@ import {
   getSafeReadingTextScalePercent,
 } from "./runtime_reading_profiles.js";
 import {
+  buildDialogueLayoutPresentation,
+  getSafeDialogueLayout,
+} from "./runtime_dialogue_layouts.js";
+import {
   collectVoiceMixerEntries,
   createVoiceMixerController,
   getVoiceMixVolumeRatio,
@@ -166,6 +170,7 @@ const refs = {
   speakerName: document.getElementById("speakerName"),
   lineTypeTag: document.getElementById("lineTypeTag"),
   messageText: document.getElementById("messageText"),
+  dialogNvlPage: document.getElementById("dialogNvlPage"),
   choiceList: document.getElementById("choiceList"),
   hintText: document.getElementById("hintText"),
   continueButton: document.getElementById("continueButton"),
@@ -3740,6 +3745,66 @@ function syncRuntimeDialoguePresentation(snapshot) {
   }
 }
 
+function buildRuntimeDialogueLayoutPresentation(snapshot) {
+  const scene = data.scenesById.get(snapshot?.sceneId);
+  return buildDialogueLayoutPresentation(snapshot?.block, {
+    blocks: scene?.blocks,
+    currentIndex: snapshot?.blockIndex,
+    resolveEntry: (block, blockIndex) => ({
+      id: block.id,
+      blockIndex,
+      type: block.type,
+      speakerName: block.type === "dialogue" ? getCharacterName(block.speakerId) : "旁白",
+      text:
+        blockIndex === snapshot?.blockIndex && state.typingActive
+          ? state.typingVisibleText
+          : getBlockText(block),
+    }),
+  });
+}
+
+function renderRuntimeDialogueLayout(snapshot) {
+  const presentation = buildRuntimeDialogueLayoutPresentation(snapshot);
+  const layout = getSafeDialogueLayout(presentation.layout);
+  if (refs.dialogPanel) {
+    refs.dialogPanel.dataset.dialogLayout = layout;
+  }
+  if (!refs.dialogNvlPage) {
+    return;
+  }
+  refs.dialogNvlPage.hidden = layout !== "nvl";
+  refs.dialogNvlPage.innerHTML =
+    layout === "nvl"
+      ? presentation.entries
+          .map(
+            (entry, index, entries) => `
+              <article class="dialog-nvl-entry ${
+                index === entries.length - 1 ? "is-current" : ""
+              }" data-dialogue-type="${escapeHtml(entry.type)}">
+                ${
+                  entry.speakerName
+                    ? `<strong class="dialog-nvl-speaker">${escapeHtml(entry.speakerName)}</strong>`
+                    : ""
+                }
+                <p class="dialog-nvl-text ${
+                  index === entries.length - 1 && state.typingActive ? "is-typing" : ""
+                }">${escapeHtml(entry.text)}</p>
+              </article>
+            `
+          )
+          .join("")
+      : "";
+}
+
+function syncRuntimeNvlTypewriterText(text, isTyping) {
+  const activeText = refs.dialogNvlPage?.querySelector?.(".dialog-nvl-entry.is-current .dialog-nvl-text");
+  if (!activeText) {
+    return;
+  }
+  activeText.textContent = String(text ?? "");
+  activeText.classList.toggle("is-typing", Boolean(isTyping));
+}
+
 function scheduleRuntimeTypewriterTick(expectedKey) {
   if (state.typingTimer) {
     window.clearTimeout(state.typingTimer);
@@ -3754,6 +3819,7 @@ function scheduleRuntimeTypewriterTick(expectedKey) {
     state.typingVisibleText = state.typingFullText.slice(0, nextIndex);
     refs.messageText.textContent = state.typingVisibleText;
     refs.messageText.classList.toggle("is-typing", nextIndex < state.typingFullText.length);
+    syncRuntimeNvlTypewriterText(state.typingVisibleText, nextIndex < state.typingFullText.length);
 
     if (nextIndex >= state.typingFullText.length) {
       state.typingTimer = null;
@@ -7939,6 +8005,7 @@ function renderRuntime() {
   refs.variablesPanel.innerHTML = renderVariables(snapshot.variables);
   refs.historyPanel.innerHTML = renderHistory(session);
   syncRuntimeDialoguePresentation(snapshot);
+  renderRuntimeDialogueLayout(snapshot);
   refs.hintText.textContent = getPreviewHint(snapshot);
   const isBlockingMedia = isBlockingMediaSnapshot(snapshot);
   refs.continueButton.textContent = snapshot.completed

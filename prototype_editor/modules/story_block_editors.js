@@ -119,6 +119,46 @@
     `;
   }
 
+  function renderDialogueLayoutEditor(block, options = {}) {
+    const escape = getEscapeHtml(options);
+    const layoutLabels = options.dialogueLayoutLabels ?? {
+      adv: "经典 ADV 对话框",
+      nvl: "NVL 满页叙事",
+      cinematic: "电影字幕",
+    };
+    const layoutDescriptions = options.dialogueLayoutDescriptions ?? {
+      adv: "角色名与正文显示在常规对话框中，适合大多数对白。",
+      nvl: "同页保留前文并逐句累积，适合书信、回忆、长旁白和密集叙事。",
+      cinematic: "把当前一句压成画面下方的电影字幕，适合短句、转场和演出高光。",
+    };
+    const getSafeDialogueLayout = getRenderer(
+      options,
+      "getSafeDialogueLayout",
+      (value) => (["adv", "nvl", "cinematic"].includes(value) ? value : "adv")
+    );
+    const layout = getSafeDialogueLayout(block?.dialogueLayout);
+    const description = layoutDescriptions[layout] ?? "选择这句文字在成品中的排版方式。";
+
+    return `
+      <div class="detail-row dialogue-layout-editor" data-dialogue-layout-editor>
+        <label for="editorDialogueLayout">对话呈现方式</label>
+        <select id="editorDialogueLayout">
+          ${renderLabelOptions(layoutLabels, layout, options)}
+        </select>
+        <p class="helper-text" data-dialogue-layout-description>${escape(description)}</p>
+      </div>
+      <label class="detail-check dialogue-layout-page-break" data-nvl-page-break-row ${
+        layout === "nvl" ? "" : "hidden"
+      }>
+        <input id="editorNvlPageBreak" type="checkbox" ${block?.nvlPageBreak === true ? "checked" : ""} />
+        <span>
+          <strong>从这句开始新的一页</strong>
+          <small>NVL 模式会保留前文；勾选后先清空上一页，再显示当前句。</small>
+        </span>
+      </label>
+    `;
+  }
+
   function renderSaveBlockActions() {
     return `
     <div class="detail-actions">
@@ -541,6 +581,7 @@
         <textarea id="editorDialogueText">${escape(block?.text ?? "")}</textarea>
         ${renderReadableTextTools(block?.text, "台词")}
       </div>
+      ${renderDialogueLayoutEditor(block, options)}
       ${renderTextSpeedOverrideRow(block, options)}
     </div>
     ${renderSaveBlockActions()}
@@ -622,6 +663,7 @@
         )}" />
         <p class="helper-text">用于单独控制这段旁白语音的强弱，会和玩家自己的语音音量设置叠加。</p>
       </div>
+      ${renderDialogueLayoutEditor(block, options)}
       ${renderTextSpeedOverrideRow(block, options)}
     </div>
     ${renderSaveBlockActions()}

@@ -221,6 +221,13 @@ const {
   getSafeDialogBoxOpacityPercent,
   getSafeReadingTextScalePercent,
 } = runtimeReadingProfileTools;
+const runtimeDialogueLayoutTools = window.CanvasiaRuntimeDialogueLayouts;
+const {
+  DIALOGUE_LAYOUT_DESCRIPTIONS,
+  DIALOGUE_LAYOUT_LABELS,
+  buildDialogueLayoutPresentation,
+  getSafeDialogueLayout,
+} = runtimeDialogueLayoutTools;
 const runtimeVisualComfortTools = window.CanvasiaRuntimeVisualComfort;
 const {
   getSafeVisualComfortMode,
@@ -5456,6 +5463,21 @@ function handleInput(event) {
 
   if (event.target.id === "editorDialogueText" || event.target.id === "editorNarrationText") {
     updateReadableTextQualityToolsFromInput(event.target);
+    scheduleAutoSave();
+    return;
+  }
+
+  if (event.target.id === "editorDialogueLayout") {
+    const layout = getSafeDialogueLayout(event.target.value);
+    const editor = event.target.closest("[data-dialogue-layout-editor]")?.parentElement;
+    const pageBreakRow = editor?.querySelector?.("[data-nvl-page-break-row]");
+    const description = editor?.querySelector?.("[data-dialogue-layout-description]");
+    if (pageBreakRow) {
+      pageBreakRow.hidden = layout !== "nvl";
+    }
+    if (description) {
+      description.textContent = DIALOGUE_LAYOUT_DESCRIPTIONS[layout];
+    }
     scheduleAutoSave();
     return;
   }
@@ -17938,6 +17960,10 @@ function renderPreviewScreen() {
   syncPreviewDebugDraft(snapshot);
   const resolution = getProjectResolution();
   const typingPresentation = preparePreviewTypewriter(snapshot);
+  const dialogueLayoutPresentation = buildPreviewDialogueLayoutPresentation(
+    snapshot,
+    typingPresentation.text
+  );
   const routeOverview = buildSceneRouteOverview();
   const previewSceneOverview = buildPreviewScenePickerOverview(routeOverview);
 
@@ -17998,6 +18024,7 @@ function renderPreviewScreen() {
         isTyping: typingPresentation.active,
         dialogTheme: state.previewPlayback.dialogTheme,
         dialogHidden: state.previewDialogHidden,
+        dialogueLayoutPresentation,
       })
     : renderEmpty("没有场景可预览。");
   refs.previewLog.innerHTML = session ? renderPreviewTimeline(session) : "";
@@ -18008,6 +18035,24 @@ function renderPreviewScreen() {
   syncPreviewVoice(snapshot);
   syncPreviewOneShotAudio(snapshot);
   schedulePreviewAutoAdvance(snapshot);
+}
+
+function buildPreviewDialogueLayoutPresentation(snapshot, currentText = "") {
+  const scene = state.data?.scenesById?.get(snapshot?.sceneId);
+  return buildDialogueLayoutPresentation(snapshot?.block, {
+    blocks: scene?.blocks,
+    currentIndex: snapshot?.blockIndex,
+    resolveEntry: (block, blockIndex) => ({
+      id: block.id,
+      blockIndex,
+      type: block.type,
+      speakerName:
+        block.type === "dialogue"
+          ? state.data?.charactersById?.get(block.speakerId)?.displayName ?? block.speakerId
+          : "旁白",
+      text: blockIndex === snapshot?.blockIndex ? currentText : block.text,
+    }),
+  });
 }
 
 function ensurePreviewSession() {
@@ -22208,6 +22253,36 @@ function renderStage(visualState, large, options = {}) {
     visualComfortMode
   );
   const dialogueText = options.dialogueTextOverride ?? visualState.dialogueText;
+  const dialogueLayoutPresentation = options.dialogueLayoutPresentation ?? {
+    layout: "adv",
+    entries: [],
+  };
+  const dialogueLayout = getSafeDialogueLayout(dialogueLayoutPresentation.layout);
+  const nvlPageMarkup =
+    dialogueLayout === "nvl"
+      ? `
+        <div class="dialog-nvl-page">
+          ${(dialogueLayoutPresentation.entries ?? [])
+            .map(
+              (entry, index, entries) => `
+                <article class="dialog-nvl-entry ${
+                  index === entries.length - 1 ? "is-current" : ""
+                }" data-dialogue-type="${escapeHtml(entry.type)}">
+                  ${
+                    entry.speakerName
+                      ? `<strong class="dialog-nvl-speaker">${escapeHtml(entry.speakerName)}</strong>`
+                      : ""
+                  }
+                  <p class="dialog-nvl-text ${
+                    index === entries.length - 1 && options.isTyping ? "is-typing" : ""
+                  }">${escapeHtml(entry.text)}</p>
+                </article>
+              `
+            )
+            .join("")}
+        </div>
+      `
+      : "";
   const choiceMarkup =
     large && (options.choiceOptions?.length ?? 0) > 0
       ? `
@@ -22301,11 +22376,13 @@ function renderStage(visualState, large, options = {}) {
         <div
           class="dialog-box ${options.dialogHidden ? "is-hidden" : ""}"
           data-dialog-theme="${dialogPresentation.theme}"
+          data-dialog-layout="${dialogueLayout}"
           style="${dialogPresentation.style}"
         >
           <div class="dialog-box-art ${dialogPresentation.assetUrl ? "has-image" : ""}"></div>
           <div class="dialog-speaker">${escapeHtml(visualState.speakerName)}</div>
           <div class="dialog-text ${options.isTyping ? "is-typing" : ""}">${escapeHtml(dialogueText)}</div>
+          ${nvlPageMarkup}
           ${choiceMarkup}
           ${hintMarkup}
         </div>
@@ -33158,6 +33235,9 @@ function renderDialogueEditor(block) {
     voiceAssets: state.data.assetList.filter((asset) => asset.type === "voice"),
     assetsById: state.data.assetsById,
     textSpeedLabels: TEXT_SPEED_LABELS,
+    dialogueLayoutLabels: DIALOGUE_LAYOUT_LABELS,
+    dialogueLayoutDescriptions: DIALOGUE_LAYOUT_DESCRIPTIONS,
+    getSafeDialogueLayout,
     getSafeCharacterId,
     getSafeExpressionId,
     renderExpressionOptions,
@@ -33181,6 +33261,9 @@ function renderNarrationEditor(block) {
     voiceAssets: state.data.assetList.filter((asset) => asset.type === "voice"),
     assetsById: state.data.assetsById,
     textSpeedLabels: TEXT_SPEED_LABELS,
+    dialogueLayoutLabels: DIALOGUE_LAYOUT_LABELS,
+    dialogueLayoutDescriptions: DIALOGUE_LAYOUT_DESCRIPTIONS,
+    getSafeDialogueLayout,
     renderReadableTextQualityTools,
   });
 }
@@ -39161,6 +39244,18 @@ function collectEditedBlock(block) {
     }
     return nextBlock;
   };
+  const applyDialogueLayout = (nextBlock) => {
+    const layout = getSafeDialogueLayout(
+      document.getElementById("editorDialogueLayout")?.value
+    );
+    nextBlock.dialogueLayout = layout;
+    if (layout === "nvl" && document.getElementById("editorNvlPageBreak")?.checked) {
+      nextBlock.nvlPageBreak = true;
+    } else {
+      delete nextBlock.nvlPageBreak;
+    }
+    return nextBlock;
+  };
 
   if (block.type === "dialogue") {
     const speakerId = getSafeCharacterId(document.getElementById("editorSpeakerId")?.value);
@@ -39185,7 +39280,7 @@ function collectEditedBlock(block) {
       delete nextBlock.voiceVolume;
     }
 
-    return applyTextSpeedOverride(nextBlock);
+    return applyTextSpeedOverride(applyDialogueLayout(nextBlock));
   }
 
   if (block.type === "narration") {
@@ -39203,7 +39298,7 @@ function collectEditedBlock(block) {
       delete nextBlock.voiceVolume;
     }
 
-    return applyTextSpeedOverride(nextBlock);
+    return applyTextSpeedOverride(applyDialogueLayout(nextBlock));
   }
 
   if (block.type === "choice") {

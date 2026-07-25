@@ -55,6 +55,7 @@ jobs:
             native_runtime/runtime_key_bindings.py \
             native_runtime/runtime_settings_overlay.py \
             native_runtime/runtime_reading_profiles.py \
+            native_runtime/runtime_dialogue_layouts.py \
             native_runtime/runtime_visual_comfort.py \
             native_runtime/runtime_save_thumbnails.py \
             native_runtime/runtime_i18n.py \
@@ -162,12 +163,14 @@ jobs:
             tests/test_frontend_runtime_storage_module.py \
             tests/test_frontend_runtime_voice_mixer_module.py \
             tests/test_frontend_runtime_reading_profiles_module.py \
+            tests/test_frontend_runtime_dialogue_layouts_module.py \
             tests/test_frontend_runtime_visual_comfort_module.py \
             tests/test_frontend_runtime_ui_skin_module.py \
             tests/test_frontend_runtime_i18n_module.py \
             tests/test_native_runtime_i18n.py \
             tests/test_native_runtime_voice_mixer.py \
             tests/test_native_runtime_reading_profiles.py \
+            tests/test_native_runtime_dialogue_layouts.py \
             tests/test_native_runtime_visual_comfort.py \
             tests/test_frontend_runtime_preload_module.py \
             tests/test_frontend_runtime_scene_prefetch_module.py \
@@ -318,6 +321,7 @@ jobs:
           node --check export_player_template/runtime_controls.js
           node --check export_player_template/runtime_gamepad.js
           node --check export_player_template/runtime_settings.js
+          node --check export_player_template/runtime_dialogue_layouts.js
           node --check export_player_template/runtime_i18n.js
           node --check export_player_template/runtime_audio.js
           node --check export_player_template/runtime_preload.js
@@ -430,12 +434,14 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_runtime_storage_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_voice_mixer_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_reading_profiles_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_runtime_dialogue_layouts_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_visual_comfort_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_ui_skin_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_i18n_module.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_i18n.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_voice_mixer.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_reading_profiles.py' -v
+          python -m unittest discover -s tests -p 'test_native_runtime_dialogue_layouts.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_visual_comfort.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_preload_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_scene_prefetch_module.py' -v

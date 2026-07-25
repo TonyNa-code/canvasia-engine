@@ -42,6 +42,64 @@ def load_frontend_payload(script_body: str) -> dict:
 
 
 class RenpyExportContractTests(unittest.TestCase):
+    def test_dialogue_layouts_preserve_nvl_and_cinematic_semantics(self) -> None:
+        blocks = [
+            {
+                "type": "narration",
+                "text": "第一页从这里开始。",
+                "dialogueLayout": "nvl",
+                "nvlPageBreak": True,
+            },
+            {
+                "type": "dialogue",
+                "speakerId": "hero",
+                "text": "天亮了。",
+                "dialogueLayout": "cinematic",
+            },
+        ]
+        frontend = load_frontend_payload(
+            f"""
+            const warnings = [];
+            const renderContext = {{
+              warnings,
+              sceneId: "scene_open",
+              assetMap: new Map(),
+              characterMap: new Map([["hero", {{ displayName: "主人公" }}]]),
+            }};
+            const lines = {json.dumps(blocks)}.flatMap((block, blockIndex) =>
+              tools.renderBlock(block, {{ ...renderContext, blockIndex }})
+            );
+            process.stdout.write(JSON.stringify({{ lines, warnings }}));
+            """
+        )
+        backend_warnings: list[dict] = []
+        backend_context = {
+            "warnings": backend_warnings,
+            "sceneId": "scene_open",
+            "assetMap": {},
+            "characterMap": {"hero": {"displayName": "主人公"}},
+        }
+        backend_lines: list[str] = []
+        for block_index, block in enumerate(blocks):
+            backend_lines.extend(
+                renpy_export.render_dialogue_presentation(
+                    block,
+                    {**backend_context, "blockIndex": block_index},
+                )
+            )
+
+        self.assertEqual(frontend["lines"], backend_lines)
+        self.assertEqual(
+            backend_lines,
+            [
+                "    nvl clear",
+                '    canvasia_nvl "第一页从这里开始。"',
+                '    centered "主人公\\n天亮了。"',
+            ],
+        )
+        self.assertEqual(frontend["warnings"], [])
+        self.assertEqual(backend_warnings, [])
+
     def test_stage_images_export_as_native_renpy_layers_on_both_exporters(self) -> None:
         blocks = [
             {

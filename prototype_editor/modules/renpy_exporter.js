@@ -54,6 +54,7 @@
     fast: 72,
     instant: 10000,
   });
+  const DIALOGUE_LAYOUTS = Object.freeze(["adv", "nvl", "cinematic"]);
   const BACKGROUND_TRANSITION_DEFAULT_MS = 360;
   const EFFECT_DURATION_SECONDS = Object.freeze({
     short: 0.42,
@@ -1210,6 +1211,34 @@
     return [`${indent}voice ${quoteRenpy(path)}`];
   }
 
+  function renderDialoguePresentation(block = {}, context = {}) {
+    const type = cleanText(block.type);
+    const layout = DIALOGUE_LAYOUTS.includes(block.dialogueLayout) ? block.dialogueLayout : "adv";
+    const line = renderRenpyText(block, context);
+    const voiceLines = renderVoicePrefix(block, context);
+    const characterId = cleanText(block.speakerId);
+    const speakerName = type === "dialogue" && characterId
+      ? getCharacterName(context.characterMap ?? new Map(), characterId)
+      : "";
+
+    if (layout === "nvl") {
+      const pageLines = block.nvlPageBreak === true ? ["    nvl clear"] : [];
+      const text = speakerName ? `${speakerName}：${line}` : line;
+      return [...pageLines, ...voiceLines, `    canvasia_nvl ${quoteRenpy(text)}`];
+    }
+    if (layout === "cinematic") {
+      const text = speakerName ? `${speakerName}\n${line}` : line;
+      return [...voiceLines, `    centered ${quoteRenpy(text)}`];
+    }
+    if (type === "dialogue" && characterId) {
+      return [...voiceLines, `    ${normalizeIdentifier(characterId, "character")} ${quoteRenpy(line)}`];
+    }
+    if (type === "dialogue") {
+      pushWarning(context.warnings ?? [], "renpy_missing_speaker", "台词缺少说话人，已作为旁白导出。", getWarningContext(context));
+    }
+    return [...voiceLines, `    ${quoteRenpy(line)}`];
+  }
+
   function getEffectVariableId(effect = {}) {
     return cleanText(effect.variableId ?? effect.variableHint);
   }
@@ -1466,18 +1495,8 @@
     if (type === "particle_effect") {
       return renderParticleBlock(block, context);
     }
-    if (type === "dialogue") {
-      const characterId = cleanText(block.speakerId);
-      const line = renderRenpyText(block, context);
-      const voiceLines = renderVoicePrefix(block, context);
-      if (!characterId) {
-        pushWarning(warnings, "renpy_missing_speaker", "台词缺少说话人，已作为旁白导出。", getWarningContext(context));
-        return [...voiceLines, `    ${quoteRenpy(line)}`];
-      }
-      return [...voiceLines, `    ${normalizeIdentifier(characterId, "character")} ${quoteRenpy(line)}`];
-    }
-    if (type === "narration") {
-      return [...renderVoicePrefix(block, context), `    ${quoteRenpy(renderRenpyText(block, context))}`];
+    if (type === "dialogue" || type === "narration") {
+      return renderDialoguePresentation(block, context);
     }
     if (type === "choice") {
       return renderChoiceBlock(block, context);
@@ -1513,6 +1532,8 @@
     const lines = [
       `# ${getProjectTitle(data, options)} - Canvasia Ren'Py draft`,
       "# Generated as a migration-friendly draft. Review labels, assets, and custom effects before shipping.",
+      "",
+      "define canvasia_nvl = Character(None, kind=nvl)",
       "",
       ...buildImageDefinitions(assetMap),
       "",
@@ -1620,6 +1641,7 @@
       stageImageActions: [...STAGE_IMAGE_ACTIONS].sort(),
       stageImageEasings: [...STAGE_IMAGE_EASINGS].sort(),
       textSpeedCps: { ...TEXT_SPEED_CPS },
+      dialogueLayouts: [...DIALOGUE_LAYOUTS],
       runtimeDefaults: sanitizeProjectRuntimeSettings({}),
       effectDurationSeconds: { ...EFFECT_DURATION_SECONDS },
       cameraFocusKeys: Object.keys(CAMERA_FOCUS_XALIGN).sort(),

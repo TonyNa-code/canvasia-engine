@@ -67,6 +67,7 @@ CHARACTER_POP_TRANSITIONS = {
     "hide": "zoomout",
 }
 TEXT_SPEED_CPS = dict(PROJECT_RUNTIME_TEXT_SPEED_CPS)
+DIALOGUE_LAYOUTS = ("adv", "nvl", "cinematic")
 BACKGROUND_TRANSITION_DEFAULT_MS = 360
 EFFECT_DURATION_SECONDS = {
     "short": 0.42,
@@ -171,6 +172,7 @@ def get_renpy_export_contract() -> dict:
         "stageImageActions": sorted(STAGE_IMAGE_ACTIONS),
         "stageImageEasings": sorted(STAGE_IMAGE_EASINGS),
         "textSpeedCps": dict(TEXT_SPEED_CPS),
+        "dialogueLayouts": list(DIALOGUE_LAYOUTS),
         "runtimeDefaults": sanitize_project_runtime_settings({}),
         "effectDurationSeconds": dict(EFFECT_DURATION_SECONDS),
         "cameraFocusKeys": sorted(CAMERA_FOCUS_XALIGN),
@@ -465,6 +467,44 @@ def render_renpy_text(block: dict, context: dict | None = None) -> str:
     line = clean_text(block.get("text") or (block.get("fields") or {}).get("text"), " ")
     cps = get_effective_text_cps(block, (context or {}).get("runtimeSettings"))
     return f"{{cps={cps}}}{line}{{/cps}}" if cps else line
+
+
+def render_dialogue_presentation(block: dict, context: dict) -> list[str]:
+    block_type = clean_text(block.get("type"))
+    layout = clean_text(block.get("dialogueLayout"), "adv")
+    if layout not in DIALOGUE_LAYOUTS:
+        layout = "adv"
+    line = render_renpy_text(block, context)
+    voice_path = get_asset_path(context["assetMap"], block.get("voiceAssetId"))
+    voice_lines = [f"    voice {quote_renpy(voice_path)}"] if voice_path else []
+    speaker_id = clean_text(block.get("speakerId"))
+    speaker_name = (
+        get_character_name(context["characterMap"], speaker_id)
+        if block_type == "dialogue" and speaker_id
+        else ""
+    )
+
+    if layout == "nvl":
+        page_lines = ["    nvl clear"] if block.get("nvlPageBreak") is True else []
+        text = f"{speaker_name}：{line}" if speaker_name else line
+        return [*page_lines, *voice_lines, f"    canvasia_nvl {quote_renpy(text)}"]
+    if layout == "cinematic":
+        text = f"{speaker_name}\n{line}" if speaker_name else line
+        return [*voice_lines, f"    centered {quote_renpy(text)}"]
+    if block_type == "dialogue" and speaker_id:
+        return [
+            *voice_lines,
+            f"    {normalize_identifier(speaker_id, 'character')} {quote_renpy(line)}",
+        ]
+    if block_type == "dialogue":
+        add_warning(
+            context["warnings"],
+            "renpy_missing_speaker",
+            "台词缺少说话人，已作为旁白导出。",
+            sceneId=context.get("sceneId"),
+            blockIndex=context.get("blockIndex"),
+        )
+    return [*voice_lines, f"    {quote_renpy(line)}"]
 
 
 def get_safe_character_stage(source: Any) -> dict:
@@ -1539,18 +1579,7 @@ def render_story_block(block: dict, context: dict) -> list[str]:
     if block_type == "particle_effect":
         return render_particle_block(block, context)
     if block_type in {"dialogue", "narration"}:
-        line = render_renpy_text(block, context)
-        output: list[str] = []
-        voice_path = get_asset_path(asset_map, block.get("voiceAssetId"))
-        if voice_path:
-            output.append(f"    voice {quote_renpy(voice_path)}")
-        if block_type == "dialogue" and clean_text(block.get("speakerId")):
-            output.append(f"    {normalize_identifier(block.get('speakerId'), 'character')} {quote_renpy(line)}")
-        else:
-            if block_type == "dialogue":
-                add_warning(warnings, "renpy_missing_speaker", "台词缺少说话人，已作为旁白导出。", sceneId=scene_id, blockIndex=block_index)
-            output.append(f"    {quote_renpy(line)}")
-        return output
+        return render_dialogue_presentation(block, context)
     if block_type == "choice":
         return render_choice_block(block, context)
     if block_type == "jump":
@@ -1586,6 +1615,8 @@ def build_renpy_draft_export(bundle: dict, assets_doc: dict | None = None) -> di
     lines = [
         f"# {clean_text(project.get('title'), 'Canvasia Project')} - Canvasia Ren'Py Starter",
         "# Generated for migration and collaboration. Review custom effects before release.",
+        "",
+        "define canvasia_nvl = Character(None, kind=nvl)",
         "",
         *build_variable_definitions(variable_map),
         "",

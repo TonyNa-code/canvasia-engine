@@ -63,7 +63,8 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
                         }},
                         {{ id: "line", type: "dialogue", speakerId: "yuna", text: "欢迎回来。", voiceAssetId: "voice_yuna_001", textSpeed: "fast" }},
                         {{ type: "sfx_play", assetId: "sfx_bell", volume: 65 }},
-                        {{ type: "narration", text: "风吹过屋顶。", textSpeed: "instant" }},
+                        {{ type: "narration", text: "风吹过屋顶。", textSpeed: "instant", dialogueLayout: "nvl", nvlPageBreak: true }},
+                        {{ type: "dialogue", speakerId: "yuna", text: "天空正在变暗。", dialogueLayout: "cinematic" }},
                         {{ type: "particle_effect", action: "start", preset: "snow", intensity: "medium", speed: "medium", wind: "still", area: "full", assetId: "particle_snow" }},
                         {{
                           type: "choice",
@@ -145,6 +146,7 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
         self.assertGreaterEqual(payload["draft"]["assetDefinitionCount"], 1)
         self.assertEqual(payload["digest"]["status"], "ready")
         self.assertIn('define yuna = Character("悠奈")', payload["draft"]["script"])
+        self.assertIn("define canvasia_nvl = Character(None, kind=nvl)", payload["draft"]["script"])
         self.assertIn("default affection = 0", payload["draft"]["script"])
         self.assertIn('default route = "common"', payload["draft"]["script"])
         self.assertIn('image bg_rooftop = "bg/rooftop.png"', payload["draft"]["script"])
@@ -163,7 +165,8 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
         self.assertIn('voice "voice/yuna_001.ogg"', payload["draft"]["script"])
         self.assertIn('yuna "{cps=72}欢迎回来。{/cps}"', payload["draft"]["script"])
         self.assertIn('play sound "sfx/bell.ogg" volume 0.65', payload["draft"]["script"])
-        self.assertIn('"{cps=10000}风吹过屋顶。{/cps}"', payload["draft"]["script"])
+        self.assertIn('nvl clear\n    canvasia_nvl "{cps=10000}风吹过屋顶。{/cps}"', payload["draft"]["script"])
+        self.assertIn('centered "悠奈\\n天空正在变暗。"', payload["draft"]["script"])
         self.assertIn('"{cps=24}风把答案吹散了。{/cps}"', payload["draft"]["script"])
         self.assertIn('show expression SnowBlossom(Image("ui/snowflake.png"), count=40', payload["draft"]["script"])
         self.assertIn("as canvasia_particles onlayer overlay", payload["draft"]["script"])

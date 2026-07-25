@@ -565,6 +565,17 @@ except ImportError:  # pragma: no cover - exported native packages import from t
     )
 
 try:
+    from .runtime_dialogue_layouts import (
+        get_safe_dialogue_layout,
+        render_native_dialogue,
+    )
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_dialogue_layouts import (
+        get_safe_dialogue_layout,
+        render_native_dialogue,
+    )
+
+try:
     from .runtime_stage_images import (
         apply_native_stage_image_block,
         clone_stage_image_state,
@@ -10409,6 +10420,8 @@ class NativeRuntimePlayer:
             "speakerId": block.get("speakerId"),
             "text": line_text,
             "textSpeed": block.get("textSpeed"),
+            "dialogueLayout": get_safe_dialogue_layout(block.get("dialogueLayout")),
+            "nvlPageBreak": block.get("nvlPageBreak") is True,
             "voiceAssetId": block.get("voiceAssetId"),
             "voiceVolume": block.get("voiceVolume"),
             "blockLabel": get_block_label(block_type),
@@ -10955,6 +10968,8 @@ class NativeRuntimePlayer:
                 "speakerId": block.get("speakerId"),
                 "text": line_text,
                 "textSpeed": block.get("textSpeed"),
+                "dialogueLayout": get_safe_dialogue_layout(block.get("dialogueLayout")),
+                "nvlPageBreak": block.get("nvlPageBreak") is True,
                 "voiceAssetId": block.get("voiceAssetId"),
                 "voiceVolume": block.get("voiceVolume"),
                 "blockLabel": get_block_label(block_type),
@@ -11237,6 +11252,8 @@ class NativeRuntimePlayer:
                     "speakerId": block.get("speakerId"),
                     "text": line_text,
                     "textSpeed": block.get("textSpeed"),
+                    "dialogueLayout": get_safe_dialogue_layout(block.get("dialogueLayout")),
+                    "nvlPageBreak": block.get("nvlPageBreak") is True,
                     "voiceAssetId": block.get("voiceAssetId"),
                     "voiceVolume": block.get("voiceVolume"),
                     "blockLabel": get_block_label(block_type),
@@ -12656,57 +12673,7 @@ class NativeRuntimePlayer:
             self.screen.blit(mode_surface, (self.width - mode_surface.get_width() - 36, 52))
 
     def render_dialogue(self) -> None:
-        line = self.current_line or {}
-        layout = self.build_dialogue_layout(line)
-        panel = self.get_dialog_panel_rect(layout["minHeight"])
-        self.draw_dialog_panel(panel)
-        padding_x = int(self.dialog_box_config.get("paddingX", 18))
-        padding_y = int(self.dialog_box_config.get("paddingY", 14))
-        text_left = panel.left + padding_x
-        text_width = panel.width - padding_x * 2
-
-        if text_width != layout["textWidth"]:
-            layout = self.build_dialogue_layout(line, text_width)
-        speaker_name = layout["speakerName"]
-
-        current_top = panel.top + padding_y
-        if speaker_name:
-            self.blit_dialogue_text(
-                self.font_title,
-                speaker_name,
-                (text_left, current_top),
-                self.dialog_box_config.get("speakerColor", COLOR_TEXT),
-            )
-            current_top += self.font_title.get_height() + 12
-
-        text = self.get_current_line_render_text()
-        full_lines = layout["fullLines"]
-        line_height = layout["lineHeight"]
-        meta_text = self.build_save_summary_line()
-        meta_height = self.font_ui.get_height()
-        meta_top = panel.bottom - padding_y - meta_height
-        max_text_height = max(36, meta_top - current_top - 10)
-        max_lines = max(1, max_text_height // line_height)
-        has_overflow = len(full_lines) > max_lines
-        if has_overflow:
-            meta_text += " · 长文本：H 查看历史"
-        meta_surface = self.font_ui.render(meta_text, True, self.dialog_box_config.get("hintColor", COLOR_TEXT_MUTED))
-        meta_top = panel.bottom - padding_y - meta_surface.get_height()
-        max_text_height = max(36, meta_top - current_top - 10)
-        max_lines = max(1, max_text_height // line_height)
-        lines = wrap_text(self.font_body, text, text_width)
-        visible_lines = list(lines[:max_lines])
-        if has_overflow and self.is_current_line_fully_visible() and visible_lines:
-            visible_lines[-1] = ellipsize_text(self.font_body, visible_lines[-1], text_width, " …")
-        for index, text_line in enumerate(visible_lines):
-            self.blit_dialogue_text(
-                self.font_body,
-                text_line,
-                (text_left, current_top + index * line_height),
-                self.dialog_box_config.get("textColor", COLOR_TEXT),
-            )
-
-        self.screen.blit(meta_surface, (text_left, meta_top))
+        render_native_dialogue(self)
 
     def render_video_card(self) -> None:
         line = self.current_line or {}

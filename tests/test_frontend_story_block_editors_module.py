@@ -268,7 +268,15 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
               }}
             );
             const dialogueMarkup = tools.renderDialogueEditor(
-              {{ id: "block_1", speakerId: "char_a", expressionId: "smile", text: "你好 <世界>", textSpeed: "fast" }},
+              {{
+                id: "block_1",
+                speakerId: "char_a",
+                expressionId: "smile",
+                text: "你好 <世界>",
+                textSpeed: "fast",
+                dialogueLayout: "nvl",
+                nvlPageBreak: true,
+              }},
               {{
                 selectedSceneId: "scene_a",
                 characters: [
@@ -319,7 +327,13 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
               }}
             );
             const narrationMarkup = tools.renderNarrationEditor(
-              {{ text: "旁白 <内容>", textSpeed: "instant", voiceAssetId: "voice_narration", voiceVolume: 58 }},
+              {{
+                text: "旁白 <内容>",
+                textSpeed: "instant",
+                voiceAssetId: "voice_narration",
+                voiceVolume: 58,
+                dialogueLayout: "cinematic",
+              }},
               {{
                 voiceAssets: [{{ id: "voice_narration", name: "旁白朗读" }}],
                 assetsById: new Map([["voice_narration", {{ name: "旁白朗读" }}]]),
@@ -579,6 +593,10 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
         self.assertIn("这句文字速度", payload["dialogueMarkup"])
         self.assertIn("editorVoiceVolume", payload["dialogueMarkup"])
         self.assertIn('value="fast" selected', payload["dialogueMarkup"])
+        self.assertIn('id="editorDialogueLayout"', payload["dialogueMarkup"])
+        self.assertIn('value="nvl" selected', payload["dialogueMarkup"])
+        self.assertIn('id="editorNvlPageBreak" type="checkbox" checked', payload["dialogueMarkup"])
+        self.assertIn("同页保留前文并逐句累积", payload["dialogueMarkup"])
         self.assertIn("这句已经绑好语音", payload["boundDialogueMarkup"])
         self.assertIn("第一句语音", payload["boundDialogueMarkup"])
         self.assertIn('value="66"', payload["boundDialogueMarkup"])
@@ -596,6 +614,8 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
         self.assertIn("旁白朗读", payload["narrationMarkup"])
         self.assertIn('value="58"', payload["narrationMarkup"])
         self.assertIn('value="instant" selected', payload["narrationMarkup"])
+        self.assertIn('value="cinematic" selected', payload["narrationMarkup"])
+        self.assertIn("画面下方的电影字幕", payload["narrationMarkup"])
         self.assertIn("编辑背景切换", payload["backgroundMarkup"])
         self.assertIn("教室 &lt;黄昏&gt;", payload["backgroundMarkup"])
         self.assertIn("天台 3D · 3D 场景", payload["backgroundMarkup"])

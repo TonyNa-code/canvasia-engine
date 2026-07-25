@@ -11233,6 +11233,109 @@ html[data-ui-theme="light"] select {
   opacity: 0;
 }
 
+.preview-stage .dialog-box[data-dialog-layout="nvl"] {
+  top: 50%;
+  bottom: auto;
+  width: min(88%, 980px);
+  min-height: min(72%, 620px);
+  max-height: 82%;
+  padding: clamp(22px, 3.2vw, 44px);
+  overflow-y: auto;
+  transform: translate(-50%, -50%);
+}
+
+.preview-stage .dialog-box[data-dialog-layout="nvl"] > .dialog-speaker,
+.preview-stage .dialog-box[data-dialog-layout="nvl"] > .dialog-text {
+  display: none;
+}
+
+.dialog-nvl-page {
+  display: grid;
+  gap: clamp(12px, 1.8vh, 22px);
+  align-content: end;
+  min-height: 100%;
+}
+
+.dialog-nvl-entry {
+  display: grid;
+  grid-template-columns: minmax(72px, 0.22fr) minmax(0, 1fr);
+  gap: 16px;
+  padding: 0 0 14px;
+  border-bottom: 1px solid color-mix(in srgb, var(--dialog-box-border, rgba(255, 255, 255, 0.18)) 58%, transparent);
+  opacity: 0.68;
+}
+
+.dialog-nvl-entry.is-current {
+  opacity: 1;
+}
+
+.dialog-nvl-speaker {
+  color: var(--dialog-box-speaker, inherit);
+  font-size: var(--runtime-speaker-font-size, 18px);
+  letter-spacing: 0.04em;
+}
+
+.dialog-nvl-text {
+  margin: 0;
+  color: var(--dialog-box-text, inherit);
+  font-size: var(--runtime-message-font-size, 16px);
+  line-height: 1.9;
+  white-space: pre-wrap;
+}
+
+.preview-stage .dialog-box[data-dialog-layout="cinematic"] {
+  bottom: clamp(28px, 6%, 72px);
+  width: min(86%, 1040px);
+  min-height: 0;
+  padding: 24px clamp(28px, 5vw, 70px);
+  border: 0;
+  border-radius: 10px;
+  background: linear-gradient(90deg, transparent, rgba(3, 8, 18, 0.82) 14%, rgba(3, 8, 18, 0.82) 86%, transparent);
+  box-shadow: none;
+  backdrop-filter: blur(3px);
+}
+
+.preview-stage .dialog-box[data-dialog-layout="cinematic"] .dialog-speaker,
+.preview-stage .dialog-box[data-dialog-layout="cinematic"] .dialog-text {
+  text-align: center;
+}
+
+.preview-stage .dialog-box[data-dialog-layout="cinematic"] .dialog-speaker {
+  margin-bottom: 7px;
+  font-size: var(--runtime-meta-font-size, 13px);
+  letter-spacing: 0.14em;
+  opacity: 0.82;
+}
+
+.preview-stage .dialog-box[data-dialog-layout="cinematic"] .dialog-text {
+  font-size: calc(var(--runtime-message-font-size, 16px) * 1.12);
+  line-height: 1.75;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.9);
+}
+
+.dialogue-layout-page-break[hidden] {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .preview-stage .dialog-box[data-dialog-layout="nvl"] {
+    width: calc(100% - 24px);
+    min-height: 76%;
+    max-height: 86%;
+    padding: 20px;
+  }
+
+  .dialog-nvl-entry {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .preview-stage .dialog-box[data-dialog-layout="cinematic"] {
+    width: calc(100% - 18px);
+    padding: 18px 20px;
+  }
+}
+
 /* === Character Stage Direction Controls === */
 .sprite-card {
   --sprite-base-y: 0px;
