@@ -24,6 +24,7 @@ CAPABILITY_ROWS = [
     ("jump", "分支", "full", "full", "支持显式场景跳转。"),
     ("variable_set", "变量", "full", "full", "支持变量赋值。"),
     ("variable_add", "变量", "full", "full", "支持数值变量增减。"),
+    ("text_input", "变量", "full", "full", "支持玩家命名、问答输入、数字输入与正文变量占位符。"),
     ("music_play", "音频", "full", "full", "支持 BGM 播放、循环、音量、淡入和范围调度。"),
     ("music_stop", "音频", "full", "full", "支持 BGM 淡出停止。"),
     ("sfx_play", "音频", "full", "full", "支持音效播放与音量控制。"),

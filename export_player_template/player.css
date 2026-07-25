@@ -1585,6 +1585,53 @@ html[data-visual-comfort="static"] .sprite-card.is-speaking .sprite-card-inner {
   gap: 10px;
 }
 
+.text-input-dialog {
+  gap: 14px;
+}
+
+.text-input-field {
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.text-input-field input {
+  width: 100%;
+  min-height: 54px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  outline: none;
+  background: var(--panel-strong);
+  color: var(--ink);
+  font: inherit;
+  font-size: 18px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.42);
+}
+
+.text-input-field input:focus {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand) 18%, transparent);
+}
+
+.text-input-error {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: color-mix(in srgb, #b84b45 12%, var(--panel-strong));
+  color: #a83f3b;
+}
+
+.text-input-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .save-dialog-tabs {
   display: inline-flex;
   flex-wrap: wrap;

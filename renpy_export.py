@@ -227,6 +227,14 @@ def quote_renpy(value: Any) -> str:
     return f'"{text}"'
 
 
+def convert_runtime_text_variables(value: Any) -> str:
+    return re.sub(
+        r"\{\{\s*([0-9A-Za-z_\-\u3400-\u9fff]{1,64})\s*\}\}",
+        lambda match: f"[{normalize_identifier(match.group(1), 'var')}]",
+        str(value or ""),
+    )
+
+
 def value_to_renpy(value: Any) -> str:
     if isinstance(value, bool):
         return "True" if value else "False"
@@ -464,7 +472,9 @@ def get_safe_position(value: Any) -> str:
 
 
 def render_renpy_text(block: dict, context: dict | None = None) -> str:
-    line = clean_text(block.get("text") or (block.get("fields") or {}).get("text"), " ")
+    line = convert_runtime_text_variables(
+        clean_text(block.get("text") or (block.get("fields") or {}).get("text"), " ")
+    )
     cps = get_effective_text_cps(block, (context or {}).get("runtimeSettings"))
     return f"{{cps={cps}}}{line}{{/cps}}" if cps else line
 
@@ -1243,7 +1253,9 @@ def render_choice_block(block: dict, context: dict) -> list[str]:
     gated_expressions: list[str] = []
     has_always_option = False
     for option_index, option in enumerate(options):
-        option_text = clean_text(option.get("text") or option.get("label"), f"Option {option_index + 1}")
+        option_text = convert_runtime_text_variables(
+            clean_text(option.get("text") or option.get("label"), f"Option {option_index + 1}")
+        )
         target_scene_id = clean_text(option.get("gotoSceneId") or option.get("targetSceneId") or option.get("target"))
         mode = clean_text(option.get("choiceAvailabilityMode") or option.get("availabilityMode"), "always")
         if mode not in {"hide_when_false", "disable_when_false"}:
@@ -1285,6 +1297,60 @@ def render_choice_block(block: dict, context: dict) -> list[str]:
             sceneId=scene_id,
             blockIndex=block_index,
         )
+    return lines
+
+
+def render_text_input_block(block: dict, context: dict) -> list[str]:
+    warnings = context["warnings"]
+    variable_id = clean_text(block.get("variableId"))
+    variable = context["variableMap"].get(variable_id)
+    if not variable:
+        add_warning(
+            warnings,
+            "renpy_text_input_variable_missing",
+            "玩家输入卡没有有效变量，已导出 pass。",
+            sceneId=context.get("sceneId"),
+            blockIndex=context.get("blockIndex"),
+        )
+        return ["    pass"]
+    variable_type = clean_text(variable.get("type"), "string").lower()
+    if variable_type not in {"string", "number"}:
+        add_warning(
+            warnings,
+            "renpy_text_input_variable_type",
+            "玩家输入卡只支持文本或数字变量，已导出 pass。",
+            sceneId=context.get("sceneId"),
+            blockIndex=context.get("blockIndex"),
+        )
+        return ["    pass"]
+    prompt = convert_runtime_text_variables(clean_text(block.get("prompt"), "Please enter a value"))
+    try:
+        max_length = round(float(block.get("maxLength") or 32))
+    except (TypeError, ValueError):
+        max_length = 32
+    max_length = max(1, min(200, max_length))
+    default_value = block.get("defaultValue")
+    if default_value is None:
+        default_value = variable.get("defaultValue", "")
+    default_text = "" if default_value is None else str(default_value)
+    target = normalize_identifier(variable_id, "var")
+    lines = [
+        "    while True:",
+        f"        $ _canvasia_input = renpy.input({quote_renpy(prompt)}, default={quote_renpy(default_text)}, length={max_length}).strip()",
+    ]
+    if variable_type == "number":
+        lines.extend(
+            [
+                "        $ _canvasia_value = canvasia_parse_number_input(_canvasia_input)",
+                "        if _canvasia_value is not None:",
+                f"            $ {target} = _canvasia_value",
+                "            break",
+            ]
+        )
+    elif block.get("allowEmpty") is True:
+        lines.extend([f"        $ {target} = _canvasia_input", "        break"])
+    else:
+        lines.extend(["        if _canvasia_input:", f"            $ {target} = _canvasia_input", "            break"])
     return lines
 
 
@@ -1593,6 +1659,8 @@ def render_story_block(block: dict, context: dict) -> list[str]:
         return [f"    $ renpy.pause({float(seconds):g})"]
     if block_type in {"variable_set", "variable_add"}:
         return render_variable_effect(block, variable_map, warnings, "    ")
+    if block_type == "text_input":
+        return render_text_input_block(block, context)
     if block_type in COMMENT_ONLY_BLOCK_TYPES:
         return render_review_comment(block, warnings, scene_id, block_index)
     add_warning(warnings, "renpy_unknown_block", f"{block_type} 暂未映射，已作为复核注释导出。", sceneId=scene_id, blockIndex=block_index)
@@ -1617,6 +1685,14 @@ def build_renpy_draft_export(bundle: dict, assets_doc: dict | None = None) -> di
         "# Generated for migration and collaboration. Review custom effects before release.",
         "",
         "define canvasia_nvl = Character(None, kind=nvl)",
+        "",
+        "init python:",
+        "    def canvasia_parse_number_input(value):",
+        "        try:",
+        "            number = float(value)",
+        "        except (TypeError, ValueError):",
+        "            return None",
+        "        return int(number) if number.is_integer() else number",
         "",
         *build_variable_definitions(variable_map),
         "",

@@ -146,7 +146,15 @@
   }
 
   function getFilteredVariables(typeFilter = null, options = {}) {
-    return getVariableList(options).filter((variable) => !typeFilter || variable.type === typeFilter);
+    const allowedTypes = Array.isArray(typeFilter)
+      ? new Set(typeFilter.map((type) => String(type ?? "").trim()).filter(Boolean))
+      : null;
+    return getVariableList(options).filter((variable) => {
+      if (allowedTypes) {
+        return allowedTypes.has(variable.type);
+      }
+      return !typeFilter || variable.type === typeFilter;
+    });
   }
 
   function hasUsableVariable(typeFilter = null, options = {}) {

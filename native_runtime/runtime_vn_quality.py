@@ -18,6 +18,7 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path, deps: dict
     add_vn_baseline_issue = deps['add_vn_baseline_issue']
     build_ending_scene_ids = deps['build_ending_scene_ids']
     collect_scene_outgoing_targets = deps['collect_scene_outgoing_targets']
+    collect_runtime_text_variable_ids = deps['collect_runtime_text_variable_ids']
     condition_operator_matches_variable_type = deps['condition_operator_matches_variable_type']
     count_i18n_translations = deps['count_i18n_translations']
     get_asset_runtime_path = deps['get_asset_runtime_path']
@@ -198,10 +199,13 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path, deps: dict
     choice_effect_count = 0
     variable_set_count = 0
     variable_add_count = 0
+    text_input_count = 0
     variable_written_ids: set[str] = set()
     condition_read_variable_ids: set[str] = set()
+    text_read_variable_ids: set[str] = set()
     logic_missing_variable_count = 0
     logic_non_number_add_count = 0
+    logic_text_input_type_count = 0
     logic_operator_mismatch_count = 0
     character_show_count = 0
     character_move_count = 0
@@ -322,6 +326,27 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path, deps: dict
             if not isinstance(block, dict):
                 continue
             block_type = str(block.get("type") or "").strip()
+            text_values = [str(block.get("text") or ""), str(block.get("prompt") or "")]
+            for translation_key in ("textTranslations", "promptTranslations"):
+                translations = block.get(translation_key)
+                if isinstance(translations, dict):
+                    text_values.extend(str(value or "") for value in translations.values())
+            options_for_text = block.get("options") if isinstance(block.get("options"), list) else []
+            for option in options_for_text:
+                if not isinstance(option, dict):
+                    continue
+                text_values.extend(
+                    [str(option.get("text") or ""), str(option.get("choiceLockedReason") or "")]
+                )
+                for translation_key in ("textTranslations", "choiceLockedReasonTranslations"):
+                    translations = option.get(translation_key)
+                    if isinstance(translations, dict):
+                        text_values.extend(str(value or "") for value in translations.values())
+            for variable_id in collect_runtime_text_variable_ids(text_values):
+                if variable_id in variables_by_id:
+                    text_read_variable_ids.add(variable_id)
+                else:
+                    logic_missing_variable_count += 1
             if block_type == "dialogue":
                 dialogue_count += 1
                 expected, present = count_i18n_translations(block, "text", target_i18n_languages)
@@ -453,6 +478,16 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path, deps: dict
                     variable_written_ids.add(variable_id)
                     if normalize_variable_type(variable.get("type")) != "number":
                         logic_non_number_add_count += 1
+            elif block_type == "text_input":
+                text_input_count += 1
+                variable_id = str(block.get("variableId") or "").strip()
+                variable = variables_by_id.get(variable_id)
+                if not variable:
+                    logic_missing_variable_count += 1
+                else:
+                    variable_written_ids.add(variable_id)
+                    if normalize_variable_type(variable.get("type")) not in {"string", "number"}:
+                        logic_text_input_type_count += 1
             elif block_type == "condition":
                 condition_count += 1
                 branches = block.get("branches") if isinstance(block.get("branches"), list) else []
@@ -684,7 +719,8 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path, deps: dict
         for asset_id in unused_voice_asset_ids
     ]
     route_influencing_variable_ids = sorted(variable_written_ids & condition_read_variable_ids)
-    unconsumed_variable_write_ids = sorted(variable_written_ids - condition_read_variable_ids)
+    consumed_variable_ids = condition_read_variable_ids | text_read_variable_ids
+    unconsumed_variable_write_ids = sorted(variable_written_ids - consumed_variable_ids)
     unconsumed_variable_write_names = [
         str((variables_by_id.get(variable_id) or {}).get("name") or variable_id)
         for variable_id in unconsumed_variable_write_ids
@@ -1161,6 +1197,15 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path, deps: dict
             f"检测到 {logic_non_number_add_count} 处变量加减或选项加减效果没有绑定数字变量。",
             "把变量加减改绑到 number 类型变量，或改用变量设置效果；否则 Runtime 会忽略这类变化。",
         )
+    if logic_text_input_type_count:
+        add_vn_baseline_issue(
+            issues,
+            "warn",
+            "logic_text_input_type",
+            "玩家输入绑定了不支持的变量类型",
+            f"检测到 {logic_text_input_type_count} 张玩家输入卡没有绑定文本或数字变量。",
+            "把玩家输入改绑到 string 或 number 类型变量；开关变量应使用选项或变量设置卡。",
+        )
     if logic_operator_mismatch_count:
         add_vn_baseline_issue(
             issues,
@@ -1170,14 +1215,16 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path, deps: dict
             f"检测到 {logic_operator_mismatch_count} 条条件规则使用了不适合当前变量类型的比较符。",
             "文本和开关变量只用等于/不等于；大于、小于这类比较请改用数字变量。",
         )
-    if unconsumed_variable_write_ids and (condition_count or choice_effect_count or variable_set_count or variable_add_count):
+    if unconsumed_variable_write_ids and (
+        condition_count or choice_effect_count or variable_set_count or variable_add_count or text_input_count
+    ):
         add_vn_baseline_issue(
             issues,
             "soft",
             "logic_variable_unconsumed_write",
-            "部分变量变化没有进入路线判断",
-            f"检测到 {len(unconsumed_variable_write_ids)} 个被写入但没有被条件分支读取的变量：{', '.join(unconsumed_variable_write_names[:3])}",
-            "如果这些变量代表好感度、路线旗标或状态差分，建议补条件分支读取它们；如果只是成就、统计或存档展示变量，可以在发布说明里明确用途。",
+            "部分变量变化没有被剧情读取",
+            f"检测到 {len(unconsumed_variable_write_ids)} 个被写入但没有被条件或正文读取的变量：{', '.join(unconsumed_variable_write_names[:3])}",
+            "如果这些变量代表玩家姓名、好感度或路线旗标，请在正文用 {{变量ID}} 显示，或补条件分支读取；纯统计变量可以保留。",
         )
     if characters and characters_with_sprite < len(characters):
         add_vn_baseline_issue(
@@ -1545,8 +1592,10 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path, deps: dict
             "duplicateVariableIdCount": len(duplicate_variable_ids),
             "variableSetCount": variable_set_count,
             "variableAddCount": variable_add_count,
+            "textInputCount": text_input_count,
             "variableWrittenCount": len(variable_written_ids),
             "conditionReadVariableCount": len(condition_read_variable_ids),
+            "textReadVariableCount": len(text_read_variable_ids),
             "routeInfluencingVariableCount": len(route_influencing_variable_ids),
             "unconsumedVariableWriteCount": len(unconsumed_variable_write_ids),
             "conditionCount": condition_count,
@@ -1558,6 +1607,7 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path, deps: dict
             "choiceEffectCount": choice_effect_count,
             "logicMissingVariableCount": logic_missing_variable_count,
             "logicNonNumberAddCount": logic_non_number_add_count,
+            "logicTextInputTypeCount": logic_text_input_type_count,
             "logicOperatorMismatchCount": logic_operator_mismatch_count,
             "characterCount": len(characters),
             "charactersWithSpriteCount": characters_with_sprite,

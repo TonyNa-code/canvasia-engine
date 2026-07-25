@@ -2146,7 +2146,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                     "options": [
                         {
                             "id": "choice_01",
-                            "text": "继续",
+                            "text": "{{var_score}} 分，继续",
                             "gotoSceneId": chapter_result["sceneId"],
                             "effects": [
                                 {"type": "variable_set", "variableId": "var_score", "value": 5},
@@ -2165,6 +2165,18 @@ class RunEditorSmokeTests(unittest.TestCase):
                         }
                     ],
                 },
+                {
+                    "id": "block_004",
+                    "type": "text_input",
+                    "variableId": "var_score",
+                    "prompt": "把 {{var_score}} 改成多少？",
+                    "maxLength": 4,
+                },
+                {
+                    "id": "block_005",
+                    "type": "narration",
+                    "text": "当前积分：{{var_score}}",
+                },
             ],
         )
 
@@ -2182,12 +2194,16 @@ class RunEditorSmokeTests(unittest.TestCase):
         bundle = run_editor.load_project_bundle()
         saved_scene = bundle["chapters"][0]["scenes"][0]
 
-        self.assertEqual(result["migration"]["referenceCount"], 3)
+        self.assertEqual(result["migration"]["referenceCount"], 7)
         self.assertEqual(bundle["variables"]["variables"][0]["id"], "var_points")
         self.assertEqual(bundle["variables"]["variables"][0]["name"], "积分")
         self.assertEqual(saved_scene["blocks"][0]["variableId"], "var_points")
         self.assertEqual(saved_scene["blocks"][1]["options"][0]["effects"][0]["variableId"], "var_points")
+        self.assertEqual(saved_scene["blocks"][1]["options"][0]["text"], "{{var_points}} 分，继续")
         self.assertEqual(saved_scene["blocks"][2]["branches"][0]["when"][0]["variableId"], "var_points")
+        self.assertEqual(saved_scene["blocks"][3]["variableId"], "var_points")
+        self.assertEqual(saved_scene["blocks"][3]["prompt"], "把 {{var_points}} 改成多少？")
+        self.assertEqual(saved_scene["blocks"][4]["text"], "当前积分：{{var_points}}")
 
     def test_native_runtime_release_check_flags_gltf_material_texture_slot_issues(self) -> None:
         self.create_blank_project_with_chapter()
@@ -3293,6 +3309,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / "runtime_scene_prefetch.js").is_file())
         self.assertTrue((build_dir / "runtime_character_motion.js").is_file())
         self.assertTrue((build_dir / "runtime_text_effects.js").is_file())
+        self.assertTrue((build_dir / "runtime_text_variables.js").is_file())
         self.assertTrue((build_dir / run_editor.RUNTIME_PRELOAD_MANIFEST_FILE_NAME).is_file())
         self.assertTrue((build_dir / run_editor.RUNTIME_PRELOAD_REPORT_FILE_NAME).is_file())
         self.assertTrue((build_dir / "player.css").is_file())
@@ -3398,6 +3415,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["playerRuntimeScenePrefetch"], "runtime_scene_prefetch.js")
         self.assertEqual(manifest["files"]["playerRuntimeCharacterMotion"], "runtime_character_motion.js")
         self.assertEqual(manifest["files"]["playerRuntimeTextEffects"], "runtime_text_effects.js")
+        self.assertEqual(manifest["files"]["playerRuntimeTextVariables"], "runtime_text_variables.js")
         self.assertEqual(manifest["files"]["runtimePreloadManifest"], run_editor.RUNTIME_PRELOAD_MANIFEST_FILE_NAME)
         self.assertEqual(manifest["files"]["runtimePreloadReport"], run_editor.RUNTIME_PRELOAD_REPORT_FILE_NAME)
         self.assertEqual(manifest["files"]["playtestGuide"], run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME)
@@ -3483,6 +3501,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 "runtime_scene_prefetch.js",
                 "runtime_character_motion.js",
                 "runtime_text_effects.js",
+                "runtime_text_variables.js",
                 run_editor.RUNTIME_PRELOAD_MANIFEST_FILE_NAME,
                 run_editor.RUNTIME_PRELOAD_REPORT_FILE_NAME,
                 "player.css",
@@ -4900,6 +4919,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / "app" / "runtime_scene_prefetch.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_character_motion.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_text_effects.js").is_file())
+        self.assertTrue((build_dir / "app" / "runtime_text_variables.js").is_file())
         self.assert_export_playtest_guide_file(build_dir / run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME)
         self.assert_export_release_evidence_pack_file(build_dir / run_editor.EXPORT_RELEASE_EVIDENCE_PACK_NAME)
         self.assertEqual(export_result["releaseEvidencePackName"], run_editor.EXPORT_RELEASE_EVIDENCE_PACK_NAME)
@@ -4977,6 +4997,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["appRuntimeUiSkin"], "app/runtime_ui_skin.js")
         self.assertEqual(manifest["files"]["appRuntimeCharacterMotion"], "app/runtime_character_motion.js")
         self.assertEqual(manifest["files"]["appRuntimeTextEffects"], "app/runtime_text_effects.js")
+        self.assertEqual(manifest["files"]["appRuntimeTextVariables"], "app/runtime_text_variables.js")
         self.assertEqual(manifest["files"]["storyRouteMap"], run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME)
         self.assertEqual(manifest["files"]["storyRouteMapReport"], run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME)
         self.assertEqual(manifest["files"]["localizationAudit"], run_editor.EXPORT_LOCALIZATION_AUDIT_JSON_NAME)
@@ -5029,6 +5050,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 "app/runtime_scene_prefetch.js",
                 "app/runtime_character_motion.js",
                 "app/runtime_text_effects.js",
+                "app/runtime_text_variables.js",
                 "app/player.css",
             },
         )
@@ -5146,6 +5168,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["appRuntimeUiSkin"], "app/runtime_ui_skin.js")
         self.assertEqual(manifest["files"]["appRuntimeCharacterMotion"], "app/runtime_character_motion.js")
         self.assertEqual(manifest["files"]["appRuntimeTextEffects"], "app/runtime_text_effects.js")
+        self.assertEqual(manifest["files"]["appRuntimeTextVariables"], "app/runtime_text_variables.js")
         self.assertEqual(manifest["files"]["storyRouteMap"], run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME)
         self.assertEqual(manifest["files"]["storyRouteMapReport"], run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME)
         self.assertEqual(manifest["files"]["localizationAudit"], run_editor.EXPORT_LOCALIZATION_AUDIT_JSON_NAME)
@@ -5198,6 +5221,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 "app/runtime_scene_prefetch.js",
                 "app/runtime_character_motion.js",
                 "app/runtime_text_effects.js",
+                "app/runtime_text_variables.js",
                 "app/player.css",
             },
         )
@@ -5317,6 +5341,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / "app" / "runtime_scene_prefetch.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_character_motion.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_text_effects.js").is_file())
+        self.assertTrue((build_dir / "app" / "runtime_text_variables.js").is_file())
         self.assert_export_playtest_guide_file(build_dir / run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME)
         self.assert_export_release_evidence_pack_file(build_dir / run_editor.EXPORT_RELEASE_EVIDENCE_PACK_NAME)
         self.assertEqual(export_result["releaseEvidencePackName"], run_editor.EXPORT_RELEASE_EVIDENCE_PACK_NAME)
@@ -5393,6 +5418,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["appRuntimeUiSkin"], "app/runtime_ui_skin.js")
         self.assertEqual(manifest["files"]["appRuntimeCharacterMotion"], "app/runtime_character_motion.js")
         self.assertEqual(manifest["files"]["appRuntimeTextEffects"], "app/runtime_text_effects.js")
+        self.assertEqual(manifest["files"]["appRuntimeTextVariables"], "app/runtime_text_variables.js")
         self.assertEqual(manifest["files"]["storyRouteMap"], run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME)
         self.assertEqual(manifest["files"]["storyRouteMapReport"], run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME)
         self.assertEqual(manifest["files"]["localizationAudit"], run_editor.EXPORT_LOCALIZATION_AUDIT_JSON_NAME)
@@ -5445,6 +5471,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 "app/runtime_scene_prefetch.js",
                 "app/runtime_character_motion.js",
                 "app/runtime_text_effects.js",
+                "app/runtime_text_variables.js",
                 "app/player.css",
                 "package.nw",
             },
@@ -5482,6 +5509,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_scene_prefetch.js").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_character_motion.js").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_text_effects.js").is_file())
+        self.assertTrue((bundle_dir / "export_player_template" / "runtime_text_variables.js").is_file())
         self.assertTrue((bundle_dir / "native_runtime" / run_editor.NATIVE_RUNTIME_PLAYER_NAME).is_file())
         self.assertTrue((bundle_dir / "native_runtime" / run_editor.NATIVE_RUNTIME_SCENE_PREFETCH_NAME).is_file())
         self.assertTrue((bundle_dir / "native_runtime" / run_editor.NATIVE_RUNTIME_CHARACTER_MOTION_NAME).is_file())

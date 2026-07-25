@@ -44,6 +44,12 @@ import {
   getTypewriterStepDelay,
 } from "./runtime_text_effects.js";
 import {
+  getSafeTextInputMaxLength,
+  interpolateRuntimeText,
+  normalizeTextInputBlock,
+  sanitizeTextInputValue,
+} from "./runtime_text_variables.js";
+import {
   buildRuntimeStorageKeys,
   readRuntimeStorageJson,
   removeRuntimeStorageItem,
@@ -335,6 +341,16 @@ const refs = {
   saveConfirmDialogSummary: document.getElementById("saveConfirmDialogSummary"),
   cancelSaveConfirmButton: document.getElementById("cancelSaveConfirmButton"),
   confirmSaveConfirmButton: document.getElementById("confirmSaveConfirmButton"),
+  textInputDialog: document.getElementById("textInputDialog"),
+  textInputForm: document.getElementById("textInputForm"),
+  textInputDialogTitle: document.getElementById("textInputDialogTitle"),
+  textInputDialogSummary: document.getElementById("textInputDialogSummary"),
+  runtimeTextInputLabel: document.getElementById("runtimeTextInputLabel"),
+  runtimeTextInput: document.getElementById("runtimeTextInput"),
+  runtimeTextInputError: document.getElementById("runtimeTextInputError"),
+  runtimeTextInputVariable: document.getElementById("runtimeTextInputVariable"),
+  runtimeTextInputCounter: document.getElementById("runtimeTextInputCounter"),
+  submitTextInputButton: document.getElementById("submitTextInputButton"),
 };
 
 function resolveUiTheme(mode = state.playback?.uiThemeMode ?? PLAYBACK_DEFAULTS.uiThemeMode, now = new Date()) {
@@ -461,6 +477,8 @@ const state = {
   localizationFallbacks: new Map(),
   runtimeGamepad: null,
   runtimeGamepadStatus: buildRuntimeGamepadStatus(),
+  textInputOpen: false,
+  textInputSnapshotKey: "",
 };
 
 const activeSfxAudios = new Set();
@@ -591,6 +609,8 @@ function init() {
   refs.confirmReturnTitleButton?.addEventListener("click", confirmReturnToTitle);
   refs.cancelSaveConfirmButton?.addEventListener("click", closeSaveConfirmDialog);
   refs.confirmSaveConfirmButton?.addEventListener("click", confirmSaveIntent);
+  refs.textInputForm?.addEventListener("submit", submitRuntimeTextInput);
+  refs.runtimeTextInput?.addEventListener("input", renderRuntimeTextInputCounter);
   refs.menuReadingProfileSelect?.addEventListener("change", handleReadingProfileChange);
   refs.menuTextSpeedSelect?.addEventListener("change", handleTextSpeedChange);
   refs.menuLanguageSelect?.addEventListener("change", handleLanguageChange);
@@ -1102,6 +1122,7 @@ function renderMissingAssets() {
 }
 
 function renderBeforeStart() {
+  closeRuntimeTextInput();
   stopRuntimeTypewriter();
   stopRuntimeAutoAdvance();
   stopOneShotAudio();
@@ -1173,6 +1194,7 @@ function renderBeforeStart() {
 }
 
 function startGameFromScene(sceneId = getEntrySceneId()) {
+  closeRuntimeTextInput();
   stopMusic();
   stopRuntimeTypewriter();
   stopRuntimeAutoAdvance();
@@ -1235,6 +1257,8 @@ function continueLastSession() {
     startGame();
     return false;
   }
+
+  closeRuntimeTextInput();
 
   stopMusic();
   stopRuntimeTypewriter();
@@ -1318,6 +1342,12 @@ function handleContinue() {
     return;
   }
 
+  if (snapshot.blockType === "text_input") {
+    syncRuntimeTextInput(snapshot);
+    refs.runtimeTextInput?.focus();
+    return;
+  }
+
   if (completeRuntimeTypewriter()) {
     stopRuntimeAutoAdvance();
     renderRuntime();
@@ -1331,6 +1361,112 @@ function handleContinue() {
   stopRuntimeAutoAdvance();
   movePreviewForward();
   renderRuntime();
+}
+
+function closeRuntimeTextInput() {
+  state.textInputOpen = false;
+  state.textInputSnapshotKey = "";
+  if (refs.textInputDialog) {
+    refs.textInputDialog.hidden = true;
+  }
+}
+
+function renderRuntimeTextInputCounter() {
+  const snapshot = getCurrentSnapshot();
+  const maxLength = getSafeTextInputMaxLength(snapshot?.block?.maxLength);
+  const length = Array.from(refs.runtimeTextInput?.value ?? "").length;
+  if (refs.runtimeTextInputCounter) {
+    refs.runtimeTextInputCounter.textContent = `${length} / ${maxLength}`;
+  }
+}
+
+function showRuntimeTextInputError(message = "") {
+  if (!refs.runtimeTextInputError) {
+    return;
+  }
+  refs.runtimeTextInputError.textContent = message;
+  refs.runtimeTextInputError.hidden = !message;
+}
+
+function syncRuntimeTextInput(snapshot = getCurrentSnapshot()) {
+  if (!snapshot || snapshot.blockType !== "text_input" || !snapshot.block) {
+    closeRuntimeTextInput();
+    return;
+  }
+  const snapshotKey = getRuntimeSnapshotKey(snapshot);
+  const config = normalizeTextInputBlock(snapshot.block);
+  const variable = data.variablesById.get(config.variableId) ?? {};
+  const prompt = interpolateLocalizedRuntimeText(
+    getLocalizedValue(snapshot.block, "prompt", config.prompt),
+    snapshot.variables
+  );
+  const placeholder = getLocalizedValue(snapshot.block, "placeholder", config.placeholder);
+
+  if (refs.textInputDialogTitle) {
+    refs.textInputDialogTitle.textContent = prompt;
+  }
+  if (refs.textInputDialogSummary) {
+    refs.textInputDialogSummary.textContent = config.allowEmpty
+      ? "可以留空；确认后答案会写入剧情变量并随存档保存。"
+      : "填写后确认；答案会写入剧情变量并随存档保存。";
+  }
+  if (refs.runtimeTextInputLabel) {
+    refs.runtimeTextInputLabel.textContent = variable.name || config.variableId || "你的答案";
+  }
+  if (refs.runtimeTextInputVariable) {
+    refs.runtimeTextInputVariable.textContent = `保存到：${variable.name || config.variableId || "未选择变量"}`;
+  }
+  if (refs.runtimeTextInput) {
+    refs.runtimeTextInput.type = variable.type === "number" ? "number" : "text";
+    if (variable.type === "number") {
+      refs.runtimeTextInput.removeAttribute("maxlength");
+    } else {
+      refs.runtimeTextInput.maxLength = config.maxLength;
+    }
+    refs.runtimeTextInput.placeholder = placeholder;
+    if (state.textInputSnapshotKey !== snapshotKey) {
+      const currentValue = Object.hasOwn(snapshot.variables ?? {}, config.variableId)
+        ? snapshot.variables[config.variableId]
+        : variable.defaultValue ?? "";
+      refs.runtimeTextInput.value = config.defaultValue || String(currentValue ?? "");
+      showRuntimeTextInputError();
+    }
+  }
+  state.textInputOpen = true;
+  state.textInputSnapshotKey = snapshotKey;
+  if (refs.textInputDialog) {
+    refs.textInputDialog.hidden = false;
+  }
+  renderRuntimeTextInputCounter();
+  window.requestAnimationFrame(() => refs.runtimeTextInput?.focus());
+}
+
+function submitRuntimeTextInput(event) {
+  event?.preventDefault?.();
+  const snapshot = getCurrentSnapshot();
+  if (!snapshot || snapshot.blockType !== "text_input" || !snapshot.block) {
+    closeRuntimeTextInput();
+    return false;
+  }
+  const config = normalizeTextInputBlock(snapshot.block);
+  const variable = data.variablesById.get(config.variableId);
+  const result = sanitizeTextInputValue(refs.runtimeTextInput?.value, config, variable, {
+    normalizeValue: (value) => normalizeVariableValue(config.variableId, value),
+  });
+  if (!result.ok) {
+    showRuntimeTextInputError(result.error);
+    refs.runtimeTextInput?.focus();
+    return false;
+  }
+
+  snapshot.variables[config.variableId] = result.value;
+  snapshot.visualState.speakerName = "玩家输入";
+  snapshot.visualState.dialogueText = `${data.variablesById.get(config.variableId)?.name ?? config.variableId} 已保存。`;
+  closeRuntimeTextInput();
+  stopRuntimeAutoAdvance();
+  movePreviewForward();
+  renderRuntime();
+  return true;
 }
 
 function getSafeEndingSceneId(sceneId = null) {
@@ -3950,16 +4086,31 @@ function getLocalizedValue(source, key, fallback = "") {
   return result.value;
 }
 
-function getBlockText(block) {
-  return getLocalizedValue(block, "text");
+function getRuntimeTextVariables(variables = null) {
+  return variables && typeof variables === "object"
+    ? variables
+    : getCurrentSnapshot()?.variables ?? createInitialVariableState();
 }
 
-function getChoiceText(option) {
-  return getLocalizedValue(option, "text", "未命名选项");
+function interpolateLocalizedRuntimeText(value, variables = null) {
+  return interpolateRuntimeText(value, getRuntimeTextVariables(variables), {
+    variablesById: data.variablesById,
+  });
 }
 
-function getChoiceLockedReasonText(option) {
-  return getLocalizedValue(option, "choiceLockedReason", option?.choiceLockedReason || "条件尚未满足");
+function getBlockText(block, variables = null) {
+  return interpolateLocalizedRuntimeText(getLocalizedValue(block, "text"), variables);
+}
+
+function getChoiceText(option, variables = null) {
+  return interpolateLocalizedRuntimeText(getLocalizedValue(option, "text", "未命名选项"), variables);
+}
+
+function getChoiceLockedReasonText(option, variables = null) {
+  return interpolateLocalizedRuntimeText(
+    getLocalizedValue(option, "choiceLockedReason", option?.choiceLockedReason || "条件尚未满足"),
+    variables
+  );
 }
 
 function getSceneName(scene, fallback = "") {
@@ -4769,13 +4920,20 @@ function relocalizeRuntimeSnapshot(snapshot) {
   snapshot.sceneName = getSceneName(scene, snapshot.sceneName);
   if (snapshot.blockType === "dialogue") {
     snapshot.visualState.speakerName = getCharacterName(snapshot.block.speakerId);
-    snapshot.visualState.dialogueText = getBlockText(snapshot.block);
+    snapshot.visualState.dialogueText = getBlockText(snapshot.block, snapshot.variables);
   } else if (snapshot.blockType === "narration") {
     snapshot.visualState.speakerName = "旁白";
-    snapshot.visualState.dialogueText = getBlockText(snapshot.block);
+    snapshot.visualState.dialogueText = getBlockText(snapshot.block, snapshot.variables);
   } else if (snapshot.blockType === "choice") {
     snapshot.visualState.speakerName = "选择分支";
     snapshot.visualState.dialogueText = "请选择一个选项继续试玩。";
+  } else if (snapshot.blockType === "text_input") {
+    const config = normalizeTextInputBlock(snapshot.block);
+    snapshot.visualState.speakerName = "玩家输入";
+    snapshot.visualState.dialogueText = interpolateLocalizedRuntimeText(
+      getLocalizedValue(snapshot.block, "prompt", config.prompt),
+      snapshot.variables
+    );
   }
   return snapshot;
 }
@@ -5149,6 +5307,7 @@ function scheduleRuntimeAutoAdvance(snapshot, options = {}) {
     !snapshot ||
     snapshot.completed ||
     isBlockingMediaSnapshot(snapshot) ||
+    snapshot.blockType === "text_input" ||
     snapshot.choiceOptions.length > 0
   ) {
     return;
@@ -6716,6 +6875,7 @@ function closeReturnTitleDialog() {
 }
 
 function confirmReturnToTitle() {
+  closeRuntimeTextInput();
   finalizePlayerSession({ silent: true });
   const profile = state.playerProfile ?? sanitizePlayerProfile(null);
   profile.returnToTitleCount += 1;
@@ -7818,7 +7978,7 @@ function applyBlockToPreviewState(block, visualState, variables, sceneId = "") {
         characterId: block.speakerId,
       };
       visualState.speakerName = getCharacterName(block.speakerId);
-      visualState.dialogueText = getBlockText(block);
+      visualState.dialogueText = getBlockText(block, variables);
       upsertPreviewCharacter(visualState, {
         characterId: block.speakerId,
         position:
@@ -7833,12 +7993,21 @@ function applyBlockToPreviewState(block, visualState, variables, sceneId = "") {
       return null;
     case "narration":
       visualState.speakerName = "旁白";
-      visualState.dialogueText = getBlockText(block);
+      visualState.dialogueText = getBlockText(block, variables);
       return null;
     case "choice":
       visualState.speakerName = "选择分支";
       visualState.dialogueText = "请选择一个选项继续试玩。";
       return null;
+    case "text_input": {
+      const config = normalizeTextInputBlock(block);
+      visualState.speakerName = "玩家输入";
+      visualState.dialogueText = interpolateLocalizedRuntimeText(
+        getLocalizedValue(block, "prompt", config.prompt),
+        variables
+      );
+      return null;
+    }
     case "variable_set": {
       const value = setPreviewVariableValue(variables, block.variableId, block.value);
       visualState.speakerName = "系统变量";
@@ -8016,11 +8185,14 @@ function renderRuntime() {
           ? "跳过片尾"
           : "跳过视频"
         : "播放中"
+    : snapshot.blockType === "text_input"
+      ? "等待输入"
     : isRuntimeTypewriterActive()
       ? "显示整句"
       : "继续";
   refs.continueButton.disabled =
     (isBlockingMedia && !isMediaSnapshotSkippable(snapshot)) ||
+    snapshot.blockType === "text_input" ||
     (!isRuntimeTypewriterActive() && snapshot.choiceOptions.length > 0);
   renderPlaybackControls(snapshot);
   renderStageVisual(snapshot);
@@ -8029,6 +8201,7 @@ function renderRuntime() {
   syncOneShotAudio(snapshot);
   syncVideoPlayback(snapshot);
   syncCreditsPlayback(snapshot);
+  syncRuntimeTextInput(snapshot);
   startRuntimeScenePrefetch(snapshot);
   scheduleRuntimeAutoAdvance(snapshot);
 }
@@ -8110,10 +8283,10 @@ function renderChoiceButtons(snapshot) {
           data-option-id="${escapeHtml(option.id)}"
           ${option.choiceEnabled === false ? "disabled aria-disabled=\"true\"" : ""}
         >
-          <strong>${escapeHtml(getChoiceText(option))}</strong>
+          <strong>${escapeHtml(getChoiceText(option, snapshot.variables))}</strong>
           <span>${escapeHtml(
             option.choiceEnabled === false
-              ? getChoiceLockedReasonText(option)
+              ? getChoiceLockedReasonText(option, snapshot.variables)
               : isChoiceContinueTarget(option.gotoSceneId)
                 ? "继续下一张卡"
                 : `进入 ${getSceneName(data.scenesById.get(option.gotoSceneId), option.gotoSceneId)}`
@@ -8597,6 +8770,10 @@ function getPreviewHint(snapshot) {
     return "需要先选择一个选项，剧情才会继续。";
   }
 
+  if (snapshot.blockType === "text_input") {
+    return "请在弹出的输入框里填写答案并确认；答案会跟随存档保存。";
+  }
+
   if (snapshot.blockType === "video_play") {
     return snapshot.block?.skippable === false ? "视频播放完后会自动继续。" : "视频播放完会自动继续，也可以跳过视频。";
   }
@@ -8752,6 +8929,7 @@ function getBlockLabel(type) {
     jump: "跳转",
     variable_set: "设置变量",
     variable_add: "修改变量",
+    text_input: "询问玩家",
     choice: "选项",
     condition: "条件判断",
     complete: "结束",

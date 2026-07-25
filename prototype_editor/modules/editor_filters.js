@@ -283,7 +283,7 @@
       return "story";
     }
 
-    if (type === "jump" || type === "variable_set" || type === "variable_add" || type === "condition") {
+    if (type === "jump" || type === "variable_set" || type === "variable_add" || type === "text_input" || type === "condition") {
       return "logic";
     }
 

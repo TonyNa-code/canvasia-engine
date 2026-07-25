@@ -228,6 +228,13 @@ const {
   buildDialogueLayoutPresentation,
   getSafeDialogueLayout,
 } = runtimeDialogueLayoutTools;
+const runtimeTextVariableTools = window.CanvasiaRuntimeTextVariables;
+const {
+  collectRuntimeTextVariableIds,
+  getSafeTextInputMaxLength,
+  interpolateRuntimeText,
+  normalizeTextInputBlock,
+} = runtimeTextVariableTools;
 const runtimeVisualComfortTools = window.CanvasiaRuntimeVisualComfort;
 const {
   getSafeVisualComfortMode,
@@ -5228,6 +5235,12 @@ function handleChange(event) {
 
   if (target.id === "editorVariableId") {
     updateVariableSetEditor(target.value);
+    scheduleAutoSave();
+    return;
+  }
+
+  if (target.id === "editorTextInputVariableId") {
+    updateTextInputVariableEditor(target.value);
     scheduleAutoSave();
     return;
   }
@@ -32777,6 +32790,8 @@ function renderBlockPanel(block, scene, selectedIndex) {
     editorMarkup = renderJumpEditor(block);
   } else if (block.type === "variable_set") {
     editorMarkup = renderVariableSetEditor(block);
+  } else if (block.type === "text_input") {
+    editorMarkup = renderTextInputEditor(block);
   } else if (block.type === "variable_add") {
     editorMarkup = renderVariableAddEditor(block);
   } else if (block.type === "condition") {
@@ -33675,6 +33690,26 @@ function renderVariableSetEditor(block) {
   });
 }
 
+function renderTextInputEditor(block) {
+  const supportedTypes = ["string", "number"];
+  if (!hasUsableVariable(supportedTypes)) {
+    return renderVariableStarterPrompt(
+      "还没有文本或数字变量",
+      "玩家输入需要一个文本或数字变量来保存答案。可以先创建基础变量库，再把路线标记改成姓名、口令或调查答案。"
+    );
+  }
+
+  const variableId = getSafeVariableId(block.variableId, supportedTypes);
+  return storyBlockEditorTools.renderTextInputEditor({ ...block, variableId }, {
+    escapeHtml,
+    getSafeVariableId,
+    getVariableType,
+    getVariableTypeLabel,
+    renderVariableOptions,
+    getSafeTextInputMaxLength,
+  });
+}
+
 function renderVariableAddEditor(block) {
   if (!hasUsableVariable("number")) {
     return renderVariableStarterPrompt(
@@ -34478,6 +34513,7 @@ function normalizeAssistantDraftBlockForScene(sceneDraft, draftBlock) {
     "particle_effect",
     "variable_set",
     "variable_add",
+    "text_input",
     "condition",
     "jump",
   ].includes(draftBlock.type)
@@ -34670,6 +34706,12 @@ function normalizeAssistantDraftBlockForScene(sceneDraft, draftBlock) {
     }
     block.variableId = variableId;
     block.value = getSafeNumber(block.value, 1);
+  } else if (blockType === "text_input") {
+    const variableId = getSafeVariableId(block.variableId, ["string", "number"]);
+    if (!variableId) {
+      return null;
+    }
+    Object.assign(block, normalizeTextInputBlock({ ...block, variableId }));
   } else if (blockType === "condition") {
     const rawBranches = Array.isArray(block.branches) ? block.branches : [];
     block.branches = rawBranches
@@ -36258,6 +36300,8 @@ function buildProjectVariableUsageMap(data = state.data) {
         total: 0,
         setCount: 0,
         addCount: 0,
+        inputCount: 0,
+        textReferenceCount: 0,
         conditionCount: 0,
         choiceEffectCount: 0,
         locations: [],
@@ -36275,6 +36319,8 @@ function buildProjectVariableUsageMap(data = state.data) {
     usage.total += 1;
     if (kind === "set") usage.setCount += 1;
     if (kind === "add") usage.addCount += 1;
+    if (kind === "input") usage.inputCount += 1;
+    if (kind === "text") usage.textReferenceCount += 1;
     if (kind === "condition") usage.conditionCount += 1;
     if (kind === "choice") usage.choiceEffectCount += 1;
     if (usage.locations.length < 4) {
@@ -36309,8 +36355,44 @@ function buildProjectVariableUsageMap(data = state.data) {
             blockIndex,
           });
         }
+        if (block.type === "text_input") {
+          addUsage(block.variableId, "input", `${blockLabel}：保存玩家输入`, {
+            chapterId: chapter.chapterId,
+            sceneId: scene.id,
+            blockId: block.id,
+            blockIndex,
+          });
+        }
+        const blockTextValues = [
+          block.text,
+          ...Object.values(block.textTranslations ?? {}),
+          block.prompt,
+          ...Object.values(block.promptTranslations ?? {}),
+        ];
+        collectRuntimeTextVariableIds(blockTextValues).forEach((variableId) => {
+          addUsage(variableId, "text", `${blockLabel}：正文显示`, {
+            chapterId: chapter.chapterId,
+            sceneId: scene.id,
+            blockId: block.id,
+            blockIndex,
+          });
+        });
         if (block.type === "choice") {
           (block.options ?? []).forEach((option) => {
+            collectRuntimeTextVariableIds([
+              option.text,
+              ...Object.values(option.textTranslations ?? {}),
+              option.choiceLockedReason,
+              ...Object.values(option.choiceLockedReasonTranslations ?? {}),
+            ]).forEach((variableId) => {
+              addUsage(variableId, "text", `${blockLabel}：选项「${option.text || option.id}」显示`, {
+                chapterId: chapter.chapterId,
+                sceneId: scene.id,
+                blockId: block.id,
+                blockIndex,
+                optionId: option.id,
+              });
+            });
             (option.effects ?? []).forEach((effect, effectIndex) => {
               addUsage(effect.variableId, "choice", `${blockLabel}：选项「${option.text || option.id}」效果`, {
                 chapterId: chapter.chapterId,
@@ -36916,6 +36998,8 @@ function renderProjectVariableLibraryPanel() {
                       total: 0,
                       setCount: 0,
                       addCount: 0,
+                      inputCount: 0,
+                      textReferenceCount: 0,
                       conditionCount: 0,
                       choiceEffectCount: 0,
                       locations: [],
@@ -39772,6 +39856,23 @@ function collectEditedBlock(block) {
     };
   }
 
+  if (block.type === "text_input") {
+    return {
+      ...block,
+      ...normalizeTextInputBlock({
+        variableId: getSafeVariableId(
+          document.getElementById("editorTextInputVariableId")?.value,
+          ["string", "number"]
+        ),
+        prompt: document.getElementById("editorTextInputPrompt")?.value,
+        placeholder: document.getElementById("editorTextInputPlaceholder")?.value,
+        defaultValue: document.getElementById("editorTextInputDefaultValue")?.value,
+        maxLength: document.getElementById("editorTextInputMaxLength")?.value,
+        allowEmpty: Boolean(document.getElementById("editorTextInputAllowEmpty")?.checked),
+      }),
+    };
+  }
+
   if (block.type === "condition") {
     const branchEditors = Array.from(document.querySelectorAll("[data-condition-branch]"));
     const branches = branchEditors.map((branchEditor, branchIndex) => {
@@ -41228,6 +41329,19 @@ function createDefaultBlock(scene, blockType) {
     };
   }
 
+  if (blockType === "text_input") {
+    return {
+      id: blockId,
+      type: "text_input",
+      variableId: getSafeVariableId(null, ["string", "number"]),
+      prompt: "请告诉我该怎样称呼你？",
+      placeholder: "请输入姓名",
+      defaultValue: "",
+      maxLength: 32,
+      allowEmpty: false,
+    };
+  }
+
   if (blockType === "condition") {
     return {
       id: blockId,
@@ -41870,6 +41984,20 @@ function updateVariableSetEditor(variableId) {
       safeVariableId,
       getVariableDefaultValue(safeVariableId)
     );
+  }
+}
+
+function updateTextInputVariableEditor(variableId) {
+  const safeVariableId = getSafeVariableId(variableId, ["string", "number"]);
+  const type = getVariableType(safeVariableId);
+  const typeValue = document.getElementById("editorTextInputVariableTypeValue");
+  const defaultInput = document.getElementById("editorTextInputDefaultValue");
+  if (typeValue) {
+    typeValue.textContent = getVariableTypeLabel(type);
+  }
+  if (defaultInput) {
+    defaultInput.type = type === "number" ? "number" : "text";
+    defaultInput.placeholder = type === "number" ? "例如：0" : "玩家没填时可采用这个答案";
   }
 }
 
@@ -42814,6 +42942,13 @@ function buildBlockDetails(block) {
       ]);
       rows.push(["变化值", formatVariableValue(block.variableId, block.value)]);
       break;
+    case "text_input":
+      rows.push(["保存到变量", state.data.variablesById.get(block.variableId)?.name ?? block.variableId]);
+      rows.push(["询问内容", block.prompt || "未填写"]);
+      rows.push(["输入上限", `${getSafeTextInputMaxLength(block.maxLength)} 字`]);
+      rows.push(["允许留空", block.allowEmpty === true ? "是" : "否"]);
+      rows.push(["正文用法", `{{${block.variableId || "变量ID"}}}`]);
+      break;
     case "choice":
       rows.push(["选项数量", block.options.length]);
       block.options.forEach((option, index) => {
@@ -43030,6 +43165,11 @@ function getBlockSummary(block, scene) {
         } ${block.value >= 0 ? "+" : ""}${block.value}`,
         meta: "给数字变量加减数值",
       };
+    case "text_input":
+      return {
+        title: block.prompt || "询问玩家",
+        meta: `答案保存到 ${state.data.variablesById.get(block.variableId)?.name ?? block.variableId}`,
+      };
     case "choice":
       return {
         title: block.options.map((option) => option.text).join(" / "),
@@ -43077,6 +43217,9 @@ function computeVisualState(scene, blockIndex) {
   }
 
   const visibleMap = new Map();
+  const previewVariables = Object.fromEntries(
+    (state.data.variables ?? []).map((variable) => [variable.id, getVariableDefaultValue(variable.id)])
+  );
   const blocks = scene.blocks ?? [];
 
   blocks.slice(0, blockIndex + 1).forEach((block, index) => {
@@ -43320,7 +43463,9 @@ function computeVisualState(scene, blockIndex) {
           characterId: block.speakerId,
         };
         visual.speakerName = characterName;
-        visual.dialogueText = block.text;
+        visual.dialogueText = interpolateRuntimeText(block.text, previewVariables, {
+          variablesById: state.data.variablesById,
+        });
 
         const existing = visibleMap.get(block.speakerId);
         visibleMap.set(block.speakerId, {
@@ -43334,14 +43479,19 @@ function computeVisualState(scene, blockIndex) {
       }
       case "narration":
         visual.speakerName = "旁白";
-        visual.dialogueText = block.text;
+        visual.dialogueText = interpolateRuntimeText(block.text, previewVariables, {
+          variablesById: state.data.variablesById,
+        });
         break;
       case "choice":
         visual.speakerName = "选择分支";
-        visual.dialogueText = block.options.map((option) => option.text).join(" / ");
+        visual.dialogueText = block.options
+          .map((option) => interpolateRuntimeText(option.text, previewVariables, { variablesById: state.data.variablesById }))
+          .join(" / ");
         break;
       case "variable_set": {
         const variable = state.data.variablesById.get(block.variableId);
+        previewVariables[block.variableId] = normalizeVariableValue(block.variableId, block.value);
         visual.speakerName = "系统变量";
         visual.dialogueText = `${variable?.name ?? block.variableId} 设为 ${formatVariableValue(
           block.variableId,
@@ -43352,9 +43502,24 @@ function computeVisualState(scene, blockIndex) {
       case "variable_add": {
         const variable = state.data.variablesById.get(block.variableId);
         const delta = normalizeVariableValue(block.variableId, block.value);
+        previewVariables[block.variableId] = normalizeVariableValue(
+          block.variableId,
+          getSafeNumber(previewVariables[block.variableId], 0) + getSafeNumber(delta, 0)
+        );
         const deltaText = typeof delta === "number" && delta > 0 ? `+${delta}` : `${delta}`;
         visual.speakerName = "系统变量";
         visual.dialogueText = `${variable?.name ?? block.variableId} ${deltaText}`;
+        break;
+      }
+      case "text_input": {
+        const config = normalizeTextInputBlock(block);
+        const variable = state.data.variablesById.get(config.variableId);
+        const fallbackValue = config.defaultValue || getVariableDefaultValue(config.variableId);
+        previewVariables[config.variableId] = normalizeVariableValue(config.variableId, fallbackValue);
+        visual.speakerName = "玩家输入";
+        visual.dialogueText = `${interpolateRuntimeText(config.prompt, previewVariables, {
+          variablesById: state.data.variablesById,
+        })}（答案保存到 ${variable?.name ?? config.variableId}）`;
         break;
       }
       case "condition":
@@ -43704,6 +43869,24 @@ function validateBlock(block, scene, data, pushIssue) {
     }
   };
 
+  const validateTextVariableTokens = (values, label) => {
+    collectRuntimeTextVariableIds(values).forEach((variableId) => {
+      if (!data.variablesById.has(variableId)) {
+        pushIssue(
+          "error",
+          `${label}引用了不存在的文本变量。`,
+          `${location} -> {{${variableId}}}`,
+          blockContext
+        );
+      }
+    });
+  };
+
+  validateTextVariableTokens(
+    [block.text, ...Object.values(block.textTranslations ?? {}), block.prompt, ...Object.values(block.promptTranslations ?? {})],
+    "卡片文字"
+  );
+
   const matchesVariableType = (variableId, value) => {
     const variable = data.variablesById.get(variableId);
 
@@ -44029,6 +44212,27 @@ function validateBlock(block, scene, data, pushIssue) {
         }
         break;
       }
+      case "text_input": {
+        requireVariable(block.variableId);
+        const variable = data.variablesById.get(block.variableId);
+        if (variable && !["string", "number"].includes(variable.type)) {
+          pushIssue("error", "玩家输入卡片只能保存到文本或数字变量。", location, blockContext);
+        }
+        if (!String(block.prompt ?? "").trim()) {
+          pushIssue("error", "玩家输入卡片还没有填写问题。", location, blockContext);
+        }
+        if (getSafeTextInputMaxLength(block.maxLength) !== Number(block.maxLength ?? 32)) {
+          pushIssue("warning", "玩家输入长度超出 1-200 的范围，运行时会自动限制。", location, blockContext);
+        }
+        if (
+          variable?.type === "number" &&
+          String(block.defaultValue ?? "").trim() &&
+          !Number.isFinite(Number(block.defaultValue))
+        ) {
+          pushIssue("error", "数字答案卡片的默认答案不是有效数字。", location, blockContext);
+        }
+        break;
+      }
       case "choice":
       if ((block.options ?? []).length > VN_CHOICE_MANY_OPTIONS) {
         pushIssue(
@@ -44039,6 +44243,15 @@ function validateBlock(block, scene, data, pushIssue) {
         );
       }
       (block.options ?? []).forEach((option) => {
+        validateTextVariableTokens(
+          [
+            option.text,
+            ...Object.values(option.textTranslations ?? {}),
+            option.choiceLockedReason,
+            ...Object.values(option.choiceLockedReasonTranslations ?? {}),
+          ],
+          "选项文字"
+        );
         if (!option.text?.trim()) {
           pushIssue("error", "有空白选项文案。", `${location} -> ${option.id}`, blockContext);
         } else if (String(option.text).trim().length > VN_CHOICE_LONG_WARNING_LENGTH) {

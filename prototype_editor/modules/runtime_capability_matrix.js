@@ -432,14 +432,14 @@
       });
     }
 
-    if (["choice", "condition", "jump", "variable_set", "variable_add"].some((type) => hasUsedType(usedTypeMap, type))) {
+    if (["choice", "condition", "jump", "variable_set", "variable_add", "text_input"].some((type) => hasUsedType(usedTypeMap, type))) {
       addItem({
         id: "runtime-branch-variables",
         target: "cross",
         severity: "check",
         title: "分支变量要验每条可达路线和坏链兜底",
         detail: "至少跑一条主线、一条分支和一个返回路径，确认变量条件、否则分支、跳转目标和结局候选不会卡死。",
-        relatedBlockTypes: ["choice", "condition", "jump", "variable_set", "variable_add"],
+        relatedBlockTypes: ["choice", "condition", "jump", "variable_set", "variable_add", "text_input"],
         source: "分支链路",
       });
     }
@@ -699,7 +699,7 @@
         metrics.conditionCount += 1;
       } else if (type === "jump") {
         metrics.jumpCount += 1;
-      } else if (type === "variable_set" || type === "variable_add") {
+      } else if (type === "variable_set" || type === "variable_add" || type === "text_input") {
         metrics.variableMutationCount += 1;
       } else if (type === "background") {
         metrics.backgroundBlockCount += 1;

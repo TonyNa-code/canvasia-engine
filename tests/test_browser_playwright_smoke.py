@@ -154,7 +154,13 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
 
         try:
             cls.playwright = sync_playwright().start()
-            cls.browser = cls.playwright.chromium.launch(headless=True)
+            try:
+                cls.browser = cls.playwright.chromium.launch(headless=True)
+            except PlaywrightError as chromium_error:
+                message = str(chromium_error)
+                if "Executable doesn't exist" not in message and "playwright install" not in message:
+                    raise
+                cls.browser = cls.playwright.chromium.launch(channel="chrome", headless=True)
         except PlaywrightError as error:
             try:
                 if cls.playwright:
@@ -1695,6 +1701,83 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
             player_page.locator("#saveDialog [data-load-slot='1']").wait_for(timeout=10000)
             player_page.locator("#saveDialog [data-load-slot='1']").click()
             player_page.locator("#startOverlay").wait_for(state="hidden", timeout=15000)
+        finally:
+            player_page.close()
+
+    def test_exported_player_text_input_writes_variable_and_interpolates_story(self) -> None:
+        project_title = "浏览器烟测项目_PlayerInput"
+        self.create_blank_project(project_title)
+        self.create_first_chapter()
+        self.page.evaluate(
+            """async () => {
+                const bundleResponse = await fetch('/api/project-data');
+                const bundle = await bundleResponse.json();
+                const chapter = bundle.chapters[0];
+                const scene = chapter.scenes[0];
+                await fetch('/api/save-project-settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        variables: {
+                            variables: [
+                                {
+                                    id: 'player_name',
+                                    name: '玩家姓名',
+                                    type: 'string',
+                                    defaultValue: '',
+                                },
+                            ],
+                        },
+                    }),
+                });
+                await fetch('/api/save-scene', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chapterId: chapter.chapterId,
+                        sceneId: scene.id,
+                        scene: {
+                            ...scene,
+                            blocks: [
+                                {
+                                    id: 'block_player_name',
+                                    type: 'text_input',
+                                    variableId: 'player_name',
+                                    prompt: '请告诉我你的名字',
+                                    placeholder: '例如：小夏',
+                                    defaultValue: '',
+                                    allowEmpty: false,
+                                    maxLength: 12,
+                                },
+                                {
+                                    id: 'block_player_greeting',
+                                    type: 'narration',
+                                    text: '欢迎，{{player_name}}。',
+                                },
+                            ],
+                        },
+                    }),
+                });
+            }"""
+        )
+        self.open_project_by_title(project_title)
+        player_url = self.export_web_build()
+
+        player_page = self.context.new_page()
+        try:
+            player_page.goto(player_url, wait_until="domcontentloaded")
+            player_page.locator("#startButton").wait_for(timeout=20000)
+            player_page.locator("#startButton").click()
+            player_page.locator("#startOverlay").wait_for(state="hidden", timeout=15000)
+            player_page.locator("#textInputDialog").wait_for(state="visible", timeout=10000)
+            self.assertEqual(player_page.locator("#textInputDialogTitle").inner_text(), "请告诉我你的名字")
+            player_page.locator("#runtimeTextInput").fill("小夏")
+            player_page.locator("#submitTextInputButton").click()
+            player_page.locator("#textInputDialog").wait_for(state="hidden", timeout=10000)
+            player_page.wait_for_function(
+                """() => (document.querySelector('#messageText')?.textContent || '').includes('欢迎，小夏。')""",
+                timeout=10000,
+            )
         finally:
             player_page.close()
 

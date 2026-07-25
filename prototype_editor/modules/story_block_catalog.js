@@ -129,6 +129,16 @@
         tags: ["variable"],
       },
       {
+        type: "text_input",
+        label: "询问玩家",
+        compactLabel: "玩家输入",
+        group: "变量",
+        webStatus: "full",
+        nativeStatus: "full",
+        note: "询问姓名、答案或数字并写入变量；后续文本可用 {{变量ID}} 显示答案。",
+        tags: ["timelineText", "storyContent", "variable", "localizable"],
+      },
+      {
         type: "music_play",
         label: "播放音乐",
         compactLabel: "播放 BGM",

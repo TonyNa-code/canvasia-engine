@@ -4,10 +4,13 @@
     boolean: "开关",
     string: "文本",
   });
+  const TEXT_INPUT_VARIABLE_TYPES = new Set(["string", "number"]);
 
   const USAGE_LABELS = Object.freeze({
     set: "直接设置",
     add: "数值增减",
+    input: "玩家输入",
+    text: "正文显示",
     choice: "选项后果",
     condition: "条件读取",
     choice_gate: "选项门控",
@@ -20,6 +23,20 @@
   function cleanText(value, fallback = "") {
     const text = String(value ?? "").replace(/\s+/g, " ").trim();
     return text || fallback;
+  }
+
+  function collectTextVariableIds(values) {
+    const sharedCollector = global.CanvasiaRuntimeTextVariables?.collectRuntimeTextVariableIds;
+    if (typeof sharedCollector === "function") {
+      return sharedCollector(values);
+    }
+    const ids = new Set();
+    toArray(values).forEach((value) => {
+      for (const match of String(value ?? "").matchAll(/\{\{\s*([0-9A-Za-z_\-\u3400-\u9fff]{1,64})\s*\}\}/g)) {
+        ids.add(match[1]);
+      }
+    });
+    return [...ids];
   }
 
   function getVariableTypeLabel(type = "") {
@@ -211,6 +228,8 @@
       writeCount: 0,
       setCount: 0,
       addCount: 0,
+      inputCount: 0,
+      textReadCount: 0,
       choiceEffectCount: 0,
       conditionCount: 0,
       locations: [],
@@ -303,6 +322,11 @@
       record.locations.push(base.label);
     }
 
+    if (reference.kind === "text") {
+      record.readCount += 1;
+      record.textReadCount += 1;
+      return;
+    }
     if (reference.kind === "condition" || reference.kind === "choice_gate") {
       record.readCount += 1;
       record.conditionCount += 1;
@@ -329,6 +353,19 @@
           "variable_set_type_mismatch",
           "变量设置值类型不对",
           `${record.variableName} 是 ${record.typeLabel}，但设置值是 ${formatValue(reference.value) || "空"}`,
+          nextReference
+        );
+      }
+    } else if (reference.kind === "input") {
+      record.inputCount += 1;
+      record.setCount += 1;
+      if (!TEXT_INPUT_VARIABLE_TYPES.has(variable.type)) {
+        pushIssue(
+          record.issues,
+          "blocker",
+          "text_input_type_mismatch",
+          "玩家输入变量类型不支持",
+          `${record.variableName} 必须是文本或数字变量。`,
           nextReference
         );
       }
@@ -465,6 +502,18 @@
           blockIndex,
           label: `${chapterName} / ${sceneName} / 第 ${blockIndex + 1} 张`,
         };
+        collectTextVariableIds([
+          block?.text,
+          ...Object.values(block?.textTranslations ?? {}),
+          block?.prompt,
+          ...Object.values(block?.promptTranslations ?? {}),
+        ]).forEach((variableId) => {
+          recordReference(records, unknownReferences, variableMap, {
+            ...base,
+            kind: "text",
+            variableId,
+          });
+        });
         if (block?.type === "variable_set") {
           recordReference(records, unknownReferences, variableMap, {
             ...base,
@@ -481,8 +530,30 @@
             value: block.value,
           });
         }
+        if (block?.type === "text_input") {
+          recordReference(records, unknownReferences, variableMap, {
+            ...base,
+            kind: "input",
+            variableId: block.variableId,
+            value: block.defaultValue,
+          });
+        }
         if (block?.type === "choice") {
           toArray(block.options).forEach((option, optionIndex) => {
+            collectTextVariableIds([
+              option?.text,
+              ...Object.values(option?.textTranslations ?? {}),
+              option?.choiceLockedReason,
+              ...Object.values(option?.choiceLockedReasonTranslations ?? {}),
+            ]).forEach((variableId) => {
+              recordReference(records, unknownReferences, variableMap, {
+                ...base,
+                kind: "text",
+                variableId,
+                optionText: cleanText(option.text, `选项 ${optionIndex + 1}`),
+                optionIndex,
+              });
+            });
             toArray(option.choiceAvailabilityWhen).forEach((rule, ruleIndex) => {
               recordReference(records, unknownReferences, variableMap, {
                 ...base,
@@ -561,6 +632,8 @@
       unusedVariableCount: variableRecords.filter((record) => record.references.length === 0).length,
       readCount: variableRecords.reduce((total, record) => total + record.readCount, 0),
       writeCount: variableRecords.reduce((total, record) => total + record.writeCount, 0),
+      inputCount: variableRecords.reduce((total, record) => total + record.inputCount, 0),
+      textReadCount: variableRecords.reduce((total, record) => total + record.textReadCount, 0),
       choiceEffectCount: variableRecords.reduce((total, record) => total + record.choiceEffectCount, 0),
       conditionCount: variableRecords.reduce((total, record) => total + record.conditionCount, 0),
       unknownReferenceCount: unknownReferences.length,

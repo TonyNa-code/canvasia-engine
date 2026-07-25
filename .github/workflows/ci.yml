@@ -43,6 +43,7 @@ jobs:
             export_provenance_verifier.py \
             export_release_artifacts.py \
             run_editor.py \
+            project_variable_migration.py \
             native_runtime_export_commands.py \
             native_runtime_export_digest.py \
             native_runtime/runtime_player.py \
@@ -59,6 +60,7 @@ jobs:
             native_runtime/runtime_visual_comfort.py \
             native_runtime/runtime_save_thumbnails.py \
             native_runtime/runtime_i18n.py \
+            native_runtime/runtime_text_input.py \
             native_runtime/runtime_vn_quality.py \
             native_runtime/build_native_runtime_app.py \
             tools/release/check_editor_signing_readiness.py \
@@ -80,7 +82,9 @@ jobs:
             tests/test_native_runtime_choice_availability.py \
             tests/test_native_runtime_rollback.py \
             tests/test_native_runtime_input.py \
+            tests/test_native_runtime_text_input.py \
             tests/test_native_runtime_save_thumbnails.py \
+            tests/test_project_variable_migration.py \
             tests/test_stage_image_contract.py \
             tests/test_maintainability_check_tool.py \
             tests/test_project_health_tool.py \
@@ -329,6 +333,7 @@ jobs:
           node --check export_player_template/runtime_character_motion.js
           node --check export_player_template/runtime_stage_images.js
           node --check export_player_template/runtime_text_effects.js
+          node --check export_player_template/runtime_text_variables.js
 
       - name: Release tooling tests
         run: |
@@ -344,7 +349,9 @@ jobs:
           python -m unittest discover -s tests -p 'test_native_runtime_choice_availability.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_rollback.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_input.py' -v
+          python -m unittest discover -s tests -p 'test_native_runtime_text_input.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_save_thumbnails.py' -v
+          python -m unittest discover -s tests -p 'test_project_variable_migration.py' -v
           python -m unittest discover -s tests -p 'test_stage_image_contract.py' -v
           python -m unittest discover -s tests -p 'test_editor_asset_usage.py' -v
           python -m unittest discover -s tests -p 'test_maintainability_check_tool.py' -v
@@ -438,6 +445,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_runtime_visual_comfort_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_ui_skin_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_i18n_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_runtime_text_variables_module.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_i18n.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_voice_mixer.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_reading_profiles.py' -v

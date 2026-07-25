@@ -1874,7 +1874,7 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
 
             markdown = render_native_runtime_vn_baseline_quality_markdown(report)
             self.assertIn("变量 / 条件 / 选项效果", markdown)
-            self.assertIn("逻辑缺失变量 / 非数字加减 / 条件符号不匹配", markdown)
+            self.assertIn("逻辑缺失变量 / 非数字加减 / 输入类型 / 条件符号", markdown)
 
     def test_vn_baseline_quality_report_flags_same_target_condition_branches(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -2011,8 +2011,8 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
 
             markdown = render_native_runtime_vn_baseline_quality_markdown(report)
             self.assertIn("写入变量 / 条件读取 / 影响路线", markdown)
-            self.assertIn("未被条件读取的变量写入", markdown)
-            self.assertIn("部分变量变化没有进入路线判断", markdown)
+            self.assertIn("未被剧情读取的变量写入", markdown)
+            self.assertIn("部分变量变化没有被剧情读取", markdown)
 
     def test_vn_baseline_quality_report_flags_text_readability_gaps(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -3215,6 +3215,43 @@ class NativeRuntimeRenderSmokeTests(unittest.TestCase):
         self.assertIn("panel_frame", player.image_cache)
         self.assertIn("资源预热：3/3", player.get_runtime_preload_status_line())
         self.assertIn("资源预热：3/3", player.status_message)
+
+    def test_player_text_input_writes_variable_and_interpolates_next_line(self) -> None:
+        data_path = self.write_game_data()
+        payload = json.loads(data_path.read_text(encoding="utf-8"))
+        payload["variables"] = {
+            "variables": [
+                {"id": "player_name", "name": "玩家姓名", "type": "string", "defaultValue": ""}
+            ]
+        }
+        payload["chapters"][0]["scenes"][0]["blocks"] = [
+            {"id": "block_bg", "type": "background", "assetId": "title_background"},
+            {
+                "id": "block_name",
+                "type": "text_input",
+                "variableId": "player_name",
+                "prompt": "请告诉我你的名字",
+                "maxLength": 24,
+            },
+            {"id": "block_welcome", "type": "narration", "text": "欢迎，{{player_name}}。"},
+        ]
+        data_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="The system font .*", category=UserWarning)
+            player = NativeRuntimePlayer(pygame, data_path)
+        player.start_story_from_title()
+
+        self.assertEqual(player.overlay_mode, "text-input")
+        self.assertEqual(player.current_line["type"], "text_input")
+        player.handle_event(pygame.event.Event(pygame.TEXTINPUT, text="小夏"))
+        player.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN, unicode="\r", mod=0))
+
+        self.assertIsNone(player.overlay_mode)
+        self.assertEqual(player.variable_state["player_name"], "小夏")
+        self.assertEqual(player.current_line["type"], "narration")
+        self.assertEqual(player.current_line["text"], "欢迎，小夏。")
+        self.assertEqual(player.build_save_snapshot("quick")["variableState"]["player_name"], "小夏")
 
     def test_visual_save_slots_capture_persist_and_render_scene_thumbnails(self) -> None:
         data_path = self.write_game_data()

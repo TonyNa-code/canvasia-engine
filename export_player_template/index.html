@@ -659,6 +659,30 @@
       </section>
     </div>
 
+    <div id="textInputDialog" class="save-dialog-backdrop" hidden>
+      <form id="textInputForm" class="save-dialog save-dialog-confirm text-input-dialog" aria-labelledby="textInputDialogTitle">
+        <div class="save-dialog-head">
+          <div>
+            <div class="eyebrow">Canvasia Engine · 玩家输入</div>
+            <h2 id="textInputDialogTitle">请输入内容</h2>
+            <p id="textInputDialogSummary" class="save-dialog-summary">答案会写入剧情变量，并随存档一起保存。</p>
+          </div>
+        </div>
+        <label class="text-input-field" for="runtimeTextInput">
+          <span id="runtimeTextInputLabel">你的答案</span>
+          <input id="runtimeTextInput" type="text" autocomplete="off" />
+        </label>
+        <p id="runtimeTextInputError" class="text-input-error" role="alert" hidden></p>
+        <div class="text-input-meta">
+          <span id="runtimeTextInputVariable">保存到项目变量</span>
+          <span id="runtimeTextInputCounter">0 / 32</span>
+        </div>
+        <div class="save-dialog-confirm-actions">
+          <button id="submitTextInputButton" class="pill-button" type="submit">确认并继续</button>
+        </div>
+      </form>
+    </div>
+
     <script>
       window.LIGHTWHISPER_GAME_DATA = __LIGHTWHISPER_GAME_DATA__;
     </script>

@@ -42,6 +42,66 @@ def load_frontend_payload(script_body: str) -> dict:
 
 
 class RenpyExportContractTests(unittest.TestCase):
+    def test_player_input_and_text_variables_match_on_both_exporters(self) -> None:
+        variables = {
+            "player_name": {"id": "player_name", "name": "玩家姓名", "type": "string", "defaultValue": "旅人"},
+        }
+        blocks = [
+            {
+                "type": "text_input",
+                "variableId": "player_name",
+                "prompt": "请告诉我你的名字",
+                "maxLength": 24,
+            },
+            {"type": "narration", "text": "欢迎，{{player_name}}。"},
+            {"type": "choice", "options": [{"text": "{{player_name}}，继续", "gotoSceneId": "__continue__"}]},
+        ]
+        frontend = load_frontend_payload(
+            f"""
+            const warnings = [];
+            const variableMap = new Map(Object.entries({json.dumps(variables, ensure_ascii=False)}));
+            const lines = {json.dumps(blocks, ensure_ascii=False)}.flatMap((block, blockIndex) =>
+              tools.renderBlock(block, {{
+                warnings,
+                blockIndex,
+                sceneId: "scene_open",
+                variableMap,
+                assetMap: new Map(),
+                characterMap: new Map(),
+                sceneMap: new Map(),
+              }})
+            );
+            process.stdout.write(JSON.stringify({{ lines, warnings }}));
+            """
+        )
+        backend_warnings: list[dict] = []
+        backend_lines: list[str] = []
+        for block_index, block in enumerate(blocks):
+            backend_lines.extend(
+                renpy_export.render_story_block(
+                    block,
+                    {
+                        "warnings": backend_warnings,
+                        "blockIndex": block_index,
+                        "sceneId": "scene_open",
+                        "variableMap": variables,
+                        "assetMap": {},
+                        "characterMap": {},
+                        "sceneLabelMap": {},
+                    },
+                )
+            )
+
+        self.assertEqual(frontend["lines"], backend_lines)
+        self.assertIn(
+            '        $ _canvasia_input = renpy.input("请告诉我你的名字", default="旅人", length=24).strip()',
+            backend_lines,
+        )
+        self.assertIn('    "欢迎，[player_name]。"', backend_lines)
+        self.assertIn('        "[player_name]，继续":', backend_lines)
+        self.assertEqual(frontend["warnings"], [])
+        self.assertEqual(backend_warnings, [])
+
     def test_dialogue_layouts_preserve_nvl_and_cinematic_semantics(self) -> None:
         blocks = [
             {

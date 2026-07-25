@@ -49,6 +49,7 @@ PYTHON_SYNTAX_FILES = [
     "export_story_route_map.py",
     "export_unlockable_manifest.py",
     "renpy_export.py",
+    "project_variable_migration.py",
     "run_editor.py",
     "native_runtime/runtime_player.py",
     "native_runtime/runtime_i18n.py",
@@ -67,6 +68,7 @@ PYTHON_SYNTAX_FILES = [
     "native_runtime/runtime_key_bindings.py",
     "native_runtime/runtime_save_thumbnails.py",
     "native_runtime/runtime_text_effects.py",
+    "native_runtime/runtime_text_input.py",
     "native_runtime/runtime_storage.py",
     "native_runtime/runtime_variables.py",
     "native_runtime/runtime_vn_quality.py",
@@ -202,6 +204,7 @@ def build_node_check_steps() -> list[VerifyStep]:
             "export_player_template/runtime_character_motion.js",
             "export_player_template/runtime_stage_images.js",
             "export_player_template/runtime_text_effects.js",
+            "export_player_template/runtime_text_variables.js",
         ]
     )
     return [
@@ -239,7 +242,9 @@ def build_release_tooling_steps(python_executable: str) -> list[VerifyStep]:
         build_unittest_step("Native runtime player view helpers", "test_native_runtime_player_view.py", "release-tests", python_executable),
         build_unittest_step("Native runtime rollback helpers", "test_native_runtime_rollback.py", "release-tests", python_executable),
         build_unittest_step("Native runtime controller input helpers", "test_native_runtime_input.py", "release-tests", python_executable),
+        build_unittest_step("Native runtime player text input helpers", "test_native_runtime_text_input.py", "release-tests", python_executable),
         build_unittest_step("Native runtime save thumbnail helpers", "test_native_runtime_save_thumbnails.py", "release-tests", python_executable),
+        build_unittest_step("Project variable reference migration", "test_project_variable_migration.py", "release-tests", python_executable),
         build_unittest_step("Native runtime reading profiles", "test_native_runtime_reading_profiles.py", "release-tests", python_executable),
         build_unittest_step("Native runtime dialogue layouts", "test_native_runtime_dialogue_layouts.py", "release-tests", python_executable),
         build_unittest_step("Native runtime visual comfort helpers", "test_native_runtime_visual_comfort.py", "release-tests", python_executable),

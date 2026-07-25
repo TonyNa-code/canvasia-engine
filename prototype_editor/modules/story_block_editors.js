@@ -1262,6 +1262,91 @@
   `;
   }
 
+  function renderTextInputEditor(block, options = {}) {
+    const escape = getEscapeHtml(options);
+    const getSafeVariableId = getRenderer(options, "getSafeVariableId", (variableId) => variableId ?? "");
+    const getVariableType = getRenderer(options, "getVariableType", () => "string");
+    const getVariableTypeLabel = getRenderer(options, "getVariableTypeLabel", (type) => type ?? "");
+    const renderVariableOptions = getRenderer(options, "renderVariableOptions");
+    const getSafeTextInputMaxLength = getRenderer(options, "getSafeTextInputMaxLength", (value) => Number(value) || 32);
+    const variableId = getSafeVariableId(block?.variableId, ["string", "number"]);
+
+    return `
+    <article class="editor-card">
+      <h3>编辑玩家输入</h3>
+      <p>游戏运行到这里会停下来询问玩家，并把答案保存到变量。后续台词、旁白或选项里写 <code>{{${escape(variableId || "变量ID")}}}</code> 就能显示答案。</p>
+    </article>
+    <div class="field-grid">
+      <div class="detail-row">
+        <label for="editorTextInputVariableId">答案保存到哪个变量</label>
+        <select id="editorTextInputVariableId">
+          ${renderVariableOptions(variableId, ["string", "number"])}
+        </select>
+      </div>
+      <div class="detail-row">
+        <label>答案类型</label>
+        <div id="editorTextInputVariableTypeValue" class="value">${escape(
+          getVariableTypeLabel(getVariableType(variableId))
+        )}</div>
+      </div>
+      <div class="detail-row">
+        <label for="editorTextInputPrompt">向玩家提出的问题</label>
+        <input
+          id="editorTextInputPrompt"
+          type="text"
+          maxlength="160"
+          value="${escape(block?.prompt || "请告诉我该怎样称呼你？") }"
+          placeholder="例如：请告诉我该怎样称呼你？"
+        />
+      </div>
+      <div class="detail-row">
+        <label for="editorTextInputPlaceholder">输入框提示</label>
+        <input
+          id="editorTextInputPlaceholder"
+          type="text"
+          maxlength="80"
+          value="${escape(block?.placeholder || "请输入内容") }"
+          placeholder="例如：请输入姓名"
+        />
+      </div>
+      <div class="detail-row">
+        <label for="editorTextInputDefaultValue">默认答案（可不填）</label>
+        <input
+          id="editorTextInputDefaultValue"
+          type="text"
+          value="${escape(block?.defaultValue ?? "") }"
+          placeholder="玩家没填时可采用这个答案"
+        />
+      </div>
+      <div class="detail-row">
+        <label for="editorTextInputMaxLength">最多输入多少字符</label>
+        <input
+          id="editorTextInputMaxLength"
+          type="number"
+          min="1"
+          max="200"
+          step="1"
+          value="${escape(String(getSafeTextInputMaxLength(block?.maxLength)))}"
+        />
+      </div>
+      <div class="detail-row compact-toggle-row">
+        <label>
+          <input id="editorTextInputAllowEmpty" type="checkbox" ${block?.allowEmpty === true ? "checked" : ""} />
+          <span>允许留空</span>
+        </label>
+        <div class="helper-text">适合可跳过的昵称或调查答案；姓名等关键值建议不要开启。</div>
+      </div>
+    </div>
+    <article class="editor-card">
+      <h3>在正文里使用答案</h3>
+      <p>示例：<code>欢迎回来，{{${escape(variableId || "player_name")}}}。</code> 未填写或拼错的变量会在项目巡检里提示，不会静默吞掉文字。</p>
+    </article>
+    <div class="detail-actions">
+      <button class="toolbar-button toolbar-button-primary" data-action="save-block">保存这张卡片</button>
+    </div>
+  `;
+  }
+
   function renderVariableAddEditor(block, options = {}) {
     const escape = getEscapeHtml(options);
     const getSafeVariableId = getRenderer(options, "getSafeVariableId", (variableId) => variableId ?? "");
@@ -1595,6 +1680,7 @@
     renderJumpEditor,
     renderVariableStarterPrompt,
     renderVariableSetEditor,
+    renderTextInputEditor,
     renderVariableAddEditor,
     renderConditionEditor,
     renderConditionBranchEditorRow,

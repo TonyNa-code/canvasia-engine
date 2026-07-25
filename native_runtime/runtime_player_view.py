@@ -806,6 +806,7 @@ def get_block_label(block_type: str) -> str:
         "dialogue": "台词",
         "narration": "旁白",
         "choice": "选项",
+        "text_input": "询问玩家",
         "jump": "跳转",
         "condition": "条件判断",
         "background": "背景",

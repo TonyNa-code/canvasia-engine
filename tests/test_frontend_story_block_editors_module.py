@@ -171,6 +171,16 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
                 renderVariableOptions: (selected, filter) => `<option value="${{selected}}" data-filter="${{filter}}" selected>${{selected}}</option>`,
               }}
             );
+            const textInputMarkup = tools.renderTextInputEditor(
+              {{ variableId: "player_name", prompt: "怎么称呼你？", placeholder: "请输入昵称", maxLength: 24 }},
+              {{
+                getSafeVariableId: (variableId) => variableId || "player_name",
+                getVariableType: () => "string",
+                getVariableTypeLabel: () => "文本",
+                renderVariableOptions: (selected, filter) => `<option value="${{selected}}" data-filter="${{filter.join(",")}}" selected>${{selected}}</option>`,
+                getSafeTextInputMaxLength: (value) => Number(value) || 32,
+              }}
+            );
             const shakeMarkup = tools.renderScreenShakeEditor(
               {{ intensity: "heavy", duration: "long" }},
               {{
@@ -474,6 +484,7 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
               starterMarkup,
               variableSetMarkup,
               variableAddMarkup,
+              textInputMarkup,
               shakeMarkup,
               flashMarkup,
               fadeMarkup,
@@ -541,6 +552,7 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
             "renderScreenFlashEditor",
             "renderScreenShakeEditor",
             "renderSfxPlayEditor",
+            "renderTextInputEditor",
             "renderVariableAddEditor",
             "renderVariableSetEditor",
             "renderVariableStarterPrompt",
@@ -686,6 +698,10 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
         self.assertIn("编辑数字变量变化", payload["variableAddMarkup"])
         self.assertIn('data-filter="number"', payload["variableAddMarkup"])
         self.assertIn('value="3.5"', payload["variableAddMarkup"])
+        self.assertIn("编辑玩家输入", payload["textInputMarkup"])
+        self.assertIn('data-filter="string,number"', payload["textInputMarkup"])
+        self.assertIn('value="怎么称呼你？"', payload["textInputMarkup"])
+        self.assertIn('value="24"', payload["textInputMarkup"])
         self.assertIn("判断 2", payload["ruleMarkup"])
         self.assertIn('value="score:5"', payload["ruleMarkup"])
         self.assertIn("条件分支 1", payload["branchMarkup"])

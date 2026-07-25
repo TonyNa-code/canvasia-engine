@@ -31,6 +31,7 @@ from urllib.request import Request, urlopen
 from editor_local_security import is_local_editor_host, is_local_editor_origin
 from editor_asset_usage import collect_asset_usages_from_bundle
 from editor_snapshot_cache import SnapshotCache, build_file_cache_signature
+from project_variable_migration import replace_variable_reference_in_block
 from editor_static_cache import (
     build_editor_static_cache_headers,
     is_editor_static_cache_candidate,
@@ -196,6 +197,7 @@ EXPORT_PLAYER_SCRIPT_FILES = (
     "runtime_preload.js",
     "runtime_scene_prefetch.js",
     "runtime_text_effects.js",
+    "runtime_text_variables.js",
 )
 NATIVE_RUNTIME_TEMPLATE_DIR = ROOT_DIR / "native_runtime"
 EXPORT_RUNTIME_CACHE_DIR = ROOT_DIR / ".export_runtime_cache"
@@ -505,6 +507,7 @@ NATIVE_RUNTIME_CHOICE_AVAILABILITY_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runti
 NATIVE_RUNTIME_ROLLBACK_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_rollback.py"
 NATIVE_RUNTIME_SAVE_THUMBNAILS_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_save_thumbnails.py"
 NATIVE_RUNTIME_TEXT_EFFECTS_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_text_effects.py"
+NATIVE_RUNTIME_TEXT_INPUT_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_text_input.py"
 NATIVE_RUNTIME_STORAGE_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_storage.py"
 NATIVE_RUNTIME_VARIABLES_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_variables.py"
 NATIVE_RUNTIME_VN_QUALITY_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_vn_quality.py"
@@ -534,6 +537,7 @@ NATIVE_RUNTIME_CHOICE_AVAILABILITY_NAME = "runtime_choice_availability.py"
 NATIVE_RUNTIME_ROLLBACK_NAME = "runtime_rollback.py"
 NATIVE_RUNTIME_SAVE_THUMBNAILS_NAME = "runtime_save_thumbnails.py"
 NATIVE_RUNTIME_TEXT_EFFECTS_NAME = "runtime_text_effects.py"
+NATIVE_RUNTIME_TEXT_INPUT_NAME = "runtime_text_input.py"
 NATIVE_RUNTIME_STORAGE_NAME = "runtime_storage.py"
 NATIVE_RUNTIME_VARIABLES_NAME = "runtime_variables.py"
 NATIVE_RUNTIME_VN_QUALITY_NAME = "runtime_vn_quality.py"
@@ -603,6 +607,7 @@ NATIVE_RUNTIME_REQUIRED_MODULE_FILES = (
     (NATIVE_RUNTIME_ROLLBACK_SOURCE, NATIVE_RUNTIME_ROLLBACK_NAME),
     (NATIVE_RUNTIME_SAVE_THUMBNAILS_SOURCE, NATIVE_RUNTIME_SAVE_THUMBNAILS_NAME),
     (NATIVE_RUNTIME_TEXT_EFFECTS_SOURCE, NATIVE_RUNTIME_TEXT_EFFECTS_NAME),
+    (NATIVE_RUNTIME_TEXT_INPUT_SOURCE, NATIVE_RUNTIME_TEXT_INPUT_NAME),
     (NATIVE_RUNTIME_STORAGE_SOURCE, NATIVE_RUNTIME_STORAGE_NAME),
     (NATIVE_RUNTIME_VARIABLES_SOURCE, NATIVE_RUNTIME_VARIABLES_NAME),
     (NATIVE_RUNTIME_VN_QUALITY_SOURCE, NATIVE_RUNTIME_VN_QUALITY_NAME),
@@ -3302,35 +3307,6 @@ def validate_variable_id(value: object) -> str:
     if not VARIABLE_ID_PATTERN.fullmatch(variable_id):
         raise ValueError("变量 ID 只能使用字母、数字、下划线、短横线或中文，并且不能超过 64 个字符。")
     return variable_id
-
-
-def replace_variable_reference_in_block(block: dict, old_variable_id: str, new_variable_id: str) -> int:
-    changed = 0
-    block_type = block.get("type")
-
-    if block_type in {"variable_set", "variable_add"} and block.get("variableId") == old_variable_id:
-        block["variableId"] = new_variable_id
-        changed += 1
-
-    if block_type == "choice":
-        for option in block.get("options") or []:
-            if not isinstance(option, dict):
-                continue
-            for effect in option.get("effects") or []:
-                if isinstance(effect, dict) and effect.get("variableId") == old_variable_id:
-                    effect["variableId"] = new_variable_id
-                    changed += 1
-
-    if block_type == "condition":
-        for branch in block.get("branches") or []:
-            if not isinstance(branch, dict):
-                continue
-            for rule in branch.get("when") or []:
-                if isinstance(rule, dict) and rule.get("variableId") == old_variable_id:
-                    rule["variableId"] = new_variable_id
-                    changed += 1
-
-    return changed
 
 
 def rename_project_variable(*, old_variable_id: object, variable: object) -> dict:
@@ -10362,6 +10338,7 @@ def export_web_build() -> dict:
             "playerRuntimePreload": "runtime_preload.js",
             "playerRuntimeScenePrefetch": "runtime_scene_prefetch.js",
             "playerRuntimeTextEffects": "runtime_text_effects.js",
+            "playerRuntimeTextVariables": "runtime_text_variables.js",
             "runtimePreloadManifest": RUNTIME_PRELOAD_MANIFEST_FILE_NAME,
             "runtimePreloadReport": RUNTIME_PRELOAD_REPORT_FILE_NAME,
             "playtestGuide": EXPORT_PLAYTEST_GUIDE_FILE_NAME,
@@ -11498,6 +11475,7 @@ def export_windows_nwjs_build() -> dict:
             "appRuntimePreload": "app/runtime_preload.js",
             "appRuntimeScenePrefetch": "app/runtime_scene_prefetch.js",
             "appRuntimeTextEffects": "app/runtime_text_effects.js",
+            "appRuntimeTextVariables": "app/runtime_text_variables.js",
             "appRuntimePreloadManifest": f"app/{RUNTIME_PRELOAD_MANIFEST_FILE_NAME}",
             "appRuntimePreloadReport": f"app/{RUNTIME_PRELOAD_REPORT_FILE_NAME}",
             "playtestGuide": EXPORT_PLAYTEST_GUIDE_FILE_NAME,
@@ -11968,6 +11946,7 @@ def export_macos_nwjs_build() -> dict:
             "appRuntimePreload": "app/runtime_preload.js",
             "appRuntimeScenePrefetch": "app/runtime_scene_prefetch.js",
             "appRuntimeTextEffects": "app/runtime_text_effects.js",
+            "appRuntimeTextVariables": "app/runtime_text_variables.js",
             "appRuntimePreloadManifest": f"app/{RUNTIME_PRELOAD_MANIFEST_FILE_NAME}",
             "appRuntimePreloadReport": f"app/{RUNTIME_PRELOAD_REPORT_FILE_NAME}",
             "playtestGuide": EXPORT_PLAYTEST_GUIDE_FILE_NAME,
@@ -12445,6 +12424,7 @@ def export_linux_nwjs_build() -> dict:
             "appRuntimePreload": "app/runtime_preload.js",
             "appRuntimeScenePrefetch": "app/runtime_scene_prefetch.js",
             "appRuntimeTextEffects": "app/runtime_text_effects.js",
+            "appRuntimeTextVariables": "app/runtime_text_variables.js",
             "appRuntimePreloadManifest": f"app/{RUNTIME_PRELOAD_MANIFEST_FILE_NAME}",
             "appRuntimePreloadReport": f"app/{RUNTIME_PRELOAD_REPORT_FILE_NAME}",
             "playtestGuide": EXPORT_PLAYTEST_GUIDE_FILE_NAME,

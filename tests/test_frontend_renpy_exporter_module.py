@@ -40,6 +40,7 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
               variables: [
                 {{ id: "affection", name: "好感度", type: "number", defaultValue: 0 }},
                 {{ id: "route", name: "路线", type: "string", defaultValue: "common" }},
+                {{ id: "player_name", name: "玩家姓名", type: "string", defaultValue: "旅人" }},
               ],
               chapters: [
                 {{
@@ -61,7 +62,8 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
                           transitionDurationMs: 720,
                           stage: {{ offsetX: -8, offsetY: -5, scale: 118, opacity: 90, layer: 2, flipX: true }},
                         }},
-                        {{ id: "line", type: "dialogue", speakerId: "yuna", text: "欢迎回来。", voiceAssetId: "voice_yuna_001", textSpeed: "fast" }},
+                        {{ type: "text_input", variableId: "player_name", prompt: "请告诉我你的名字", maxLength: 24 }},
+                        {{ id: "line", type: "dialogue", speakerId: "yuna", text: "欢迎回来，{{{{player_name}}}}。", voiceAssetId: "voice_yuna_001", textSpeed: "fast" }},
                         {{ type: "sfx_play", assetId: "sfx_bell", volume: 65 }},
                         {{ type: "narration", text: "风吹过屋顶。", textSpeed: "instant", dialogueLayout: "nvl", nvlPageBreak: true }},
                         {{ type: "dialogue", speakerId: "yuna", text: "天空正在变暗。", dialogueLayout: "cinematic" }},
@@ -69,7 +71,7 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
                         {{
                           type: "choice",
                           options: [
-                            {{ text: "追上去", gotoSceneId: "scene_end", effects: [{{ type: "variable_add", variableId: "affection", value: 1 }}] }},
+                            {{ text: "{{{{player_name}}}}，追上去", gotoSceneId: "scene_end", effects: [{{ type: "variable_add", variableId: "affection", value: 1 }}] }},
                             {{ text: "留在原地", gotoSceneId: "__continue__" }},
                           ],
                         }},
@@ -142,7 +144,7 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
         self.assertEqual(payload["draft"]["projectTitle"], "Renpy Demo")
         self.assertEqual(payload["draft"]["sceneCount"], 2)
         self.assertEqual(payload["draft"]["characterCount"], 1)
-        self.assertEqual(payload["draft"]["variableDefinitionCount"], 2)
+        self.assertEqual(payload["draft"]["variableDefinitionCount"], 3)
         self.assertGreaterEqual(payload["draft"]["assetDefinitionCount"], 1)
         self.assertEqual(payload["digest"]["status"], "ready")
         self.assertIn('define yuna = Character("悠奈")', payload["draft"]["script"])
@@ -163,7 +165,11 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
         self.assertIn("    alpha 0.9", payload["draft"]["script"])
         self.assertIn("show yuna smile at canvasia_stage_scene_open_3 zorder 22 with MoveTransition(0.72, enter=offscreenleft, enter_time_warp=_warper.easeout)", payload["draft"]["script"])
         self.assertIn('voice "voice/yuna_001.ogg"', payload["draft"]["script"])
-        self.assertIn('yuna "{cps=72}欢迎回来。{/cps}"', payload["draft"]["script"])
+        self.assertIn("def canvasia_parse_number_input(value):", payload["draft"]["script"])
+        self.assertIn('$ _canvasia_input = renpy.input("请告诉我你的名字", default="旅人", length=24).strip()', payload["draft"]["script"])
+        self.assertIn('$ player_name = _canvasia_input', payload["draft"]["script"])
+        self.assertIn('yuna "{cps=72}欢迎回来，[player_name]。{/cps}"', payload["draft"]["script"])
+        self.assertIn('"[player_name]，追上去":', payload["draft"]["script"])
         self.assertIn('play sound "sfx/bell.ogg" volume 0.65', payload["draft"]["script"])
         self.assertIn('nvl clear\n    canvasia_nvl "{cps=10000}风吹过屋顶。{/cps}"', payload["draft"]["script"])
         self.assertIn('centered "悠奈\\n天空正在变暗。"', payload["draft"]["script"])
@@ -192,7 +198,7 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
         self.assertNotIn("renpy_comment_only_block", payload["manifest"])
         self.assertNotIn("renpy_video_timing_review", payload["manifest"])
         self.assertNotIn("renpy_music_scope_review", payload["manifest"])
-        self.assertIn("变量默认值：2", payload["manifest"])
+        self.assertIn("变量默认值：3", payload["manifest"])
         self.assertIn("暂无需要人工复核的迁移提示。", payload["manifest"])
 
 

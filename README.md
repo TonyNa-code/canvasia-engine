@@ -51,6 +51,7 @@ The project already includes a visual editor, export pipeline, native runtime pr
 ## Core Features
 
 - Visual story editor with scenes, cards, dialogue, narration, choices, variables, and conditional branches; each choice can stay available, hide, or remain visibly locked until affection, inventory, route flags, or other variable rules are satisfied
+- Player input cards for names, passwords, investigation answers, and numeric values, with `{{variable_id}}` interpolation in dialogue, narration, choices, and locked-choice hints across Web Runtime, native Runtime, saves, and Ren'Py draft export
 - Project center with playable Demo projects, blank projects, beginner mode, advanced mode, and a six-stage creator workflow guide from project setup to Release Candidate export
 - Context-aware Command Palette with Cmd/Ctrl+K quick actions for project setup, navigation, recommended next steps, recent commands, story card insertion, a previewed first-playable-scene template, themes, tutorial access, and export flow
 - Production-ready scene recipes for OP hooks, daily dialogue rhythm, affection choices, mystery clues, relationship reveals, branch merges, climax direction, ED / credits, BGM range scoping, and variable-backed branch consequences

@@ -175,6 +175,14 @@
         reason: "数字变量变化卡片需要先有数字变量。",
       }),
     }),
+    "add-text-input": Object.freeze({
+      blockType: "text_input",
+      label: "询问玩家",
+      group: "flow",
+      beginnerVisible: true,
+      description: "询问姓名、密码或调查答案并保存到变量，之后可直接写进台词和选项。",
+      variableRequirement: Object.freeze({ reason: "玩家输入卡片需要先有文本或数字变量。" }),
+    }),
     "add-condition": Object.freeze({
       blockType: "condition",
       label: "条件判断",

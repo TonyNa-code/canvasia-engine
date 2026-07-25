@@ -22,10 +22,13 @@ VARIABLE_TYPE_LABELS = {
 USAGE_LABELS = {
     "set": "直接设置",
     "add": "数值增减",
+    "input": "玩家输入",
+    "text": "正文显示",
     "choice": "选项后果",
     "condition": "条件读取",
 }
 ISSUE_WEIGHT = {"blocker": 100, "warn": 60, "tip": 20}
+TEXT_VARIABLE_TOKEN_PATTERN = re.compile(r"\{\{\s*([0-9A-Za-z_\-\u3400-\u9fff]{1,64})\s*\}\}")
 
 
 def as_list(value: object) -> list:
@@ -35,6 +38,16 @@ def as_list(value: object) -> list:
 def clean_text(value: object, fallback: str = "") -> str:
     text = re.sub(r"\s+", " ", str(value or "")).strip()
     return text or fallback
+
+
+def collect_text_variable_ids(values: object) -> list[str]:
+    source = values if isinstance(values, list) else [values]
+    return list(dict.fromkeys(match.group(1) for value in source for match in TEXT_VARIABLE_TOKEN_PATTERN.finditer(str(value or ""))))
+
+
+def get_translation_values(source: dict, key: str) -> list[object]:
+    translations = source.get(f"{key}Translations")
+    return list(translations.values()) if isinstance(translations, dict) else []
 
 
 def get_project_title(bundle: dict) -> str:
@@ -206,6 +219,8 @@ def create_variable_record(variable: dict) -> dict:
         "writeCount": 0,
         "setCount": 0,
         "addCount": 0,
+        "inputCount": 0,
+        "textReadCount": 0,
         "choiceEffectCount": 0,
         "conditionCount": 0,
         "locations": [],
@@ -285,6 +300,10 @@ def record_reference(records: dict[str, dict], unknown_references: list[dict], v
     add_record_location(record, clean_text(reference.get("label")))
 
     kind = clean_text(reference.get("kind"))
+    if kind == "text":
+        record["readCount"] += 1
+        record["textReadCount"] += 1
+        return
     if kind == "condition":
         record["readCount"] += 1
         record["conditionCount"] += 1
@@ -297,6 +316,11 @@ def record_reference(records: dict[str, dict], unknown_references: list[dict], v
         record["setCount"] += 1
         if not is_value_matching_type(variable, reference.get("value")):
             push_issue(record["issues"], "blocker", "variable_set_type_mismatch", "变量设置值类型不对", f"{record['variableName']} 是 {record['typeLabel']}，但设置值是 {format_value(reference.get('value')) or '空'}", context)
+    elif kind == "input":
+        record["inputCount"] += 1
+        record["setCount"] += 1
+        if variable.get("type") not in {"string", "number"}:
+            push_issue(record["issues"], "blocker", "text_input_type_mismatch", "玩家输入变量类型不支持", f"{record['variableName']} 必须是文本或数字变量。", context)
     elif kind == "add":
         record["addCount"] += 1
         if variable.get("type") != "number" or not is_number_value(reference.get("value")):
@@ -341,12 +365,24 @@ def collect_references(bundle: dict, variables_by_id: dict[str, dict]) -> tuple[
                 "label": f"{scene_record['chapterName']} / {scene_name} / 第 {block_index + 1} 张",
             }
             block_type = clean_text(block.get("type"))
+            block_text_values = [block.get("text"), block.get("prompt")]
+            block_text_values.extend(get_translation_values(block, "text"))
+            block_text_values.extend(get_translation_values(block, "prompt"))
+            for variable_id in collect_text_variable_ids(block_text_values):
+                record_reference(records, unknown_references, variables_by_id, {**base, "kind": "text", "variableId": variable_id})
             if block_type == "variable_set":
                 record_reference(records, unknown_references, variables_by_id, {**base, "kind": "set", "variableId": block.get("variableId"), "value": block.get("value")})
             if block_type == "variable_add":
                 record_reference(records, unknown_references, variables_by_id, {**base, "kind": "add", "variableId": block.get("variableId"), "value": block.get("value")})
+            if block_type == "text_input":
+                record_reference(records, unknown_references, variables_by_id, {**base, "kind": "input", "variableId": block.get("variableId"), "value": block.get("defaultValue")})
             if block_type == "choice":
                 for option_index, option in enumerate([option for option in as_list(block.get("options")) if isinstance(option, dict)]):
+                    option_text_values = [option.get("text"), option.get("choiceLockedReason")]
+                    option_text_values.extend(get_translation_values(option, "text"))
+                    option_text_values.extend(get_translation_values(option, "choiceLockedReason"))
+                    for variable_id in collect_text_variable_ids(option_text_values):
+                        record_reference(records, unknown_references, variables_by_id, {**base, "kind": "text", "variableId": variable_id, "optionText": clean_text(option.get("text"), f"选项 {option_index + 1}"), "optionIndex": option_index})
                     for effect_index, effect in enumerate([effect for effect in as_list(option.get("effects")) if isinstance(effect, dict)]):
                         record_reference(
                             records,
@@ -423,6 +459,8 @@ def build_variable_influence_sheet(bundle: dict) -> dict:
         "unusedVariableCount": sum(1 for record in variable_records if not record["references"]),
         "readCount": sum(int(record["readCount"]) for record in variable_records),
         "writeCount": sum(int(record["writeCount"]) for record in variable_records),
+        "inputCount": sum(int(record["inputCount"]) for record in variable_records),
+        "textReadCount": sum(int(record["textReadCount"]) for record in variable_records),
         "choiceEffectCount": sum(int(record["choiceEffectCount"]) for record in variable_records),
         "conditionCount": sum(int(record["conditionCount"]) for record in variable_records),
         "unknownReferenceCount": len(unknown_references),

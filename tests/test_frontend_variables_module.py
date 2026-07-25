@@ -61,6 +61,7 @@ class FrontendVariablesModuleTests(unittest.TestCase):
               ],
               variableLookup: [
                 tools.getFilteredVariables("number", options).map((variable) => variable.id),
+                tools.getFilteredVariables(["string", "number"], options).map((variable) => variable.id),
                 tools.hasUsableVariable("boolean", options),
                 tools.hasUsableVariable("missing", options),
                 tools.getSafeVariableId("missing", "number", options),
@@ -163,7 +164,8 @@ class FrontendVariablesModuleTests(unittest.TestCase):
         self.assertEqual(payload["starter"]["copiedId"], "var_affection_03")
         self.assertEqual(payload["bounds"], [0, 0, None, [0, 10], 0, 10])
         self.assertEqual(payload["variableLookup"][0], ["score"])
-        self.assertEqual(payload["variableLookup"][1:], [True, False, "score", "flag", "boolean", "开关"])
+        self.assertEqual(payload["variableLookup"][1], ["score", "route"])
+        self.assertEqual(payload["variableLookup"][2:], [True, False, "score", "flag", "boolean", "开关"])
         self.assertEqual(payload["values"], [7.5, 12, 10, False, "是", "common", "branch-a"])
         self.assertEqual(
             payload["conditions"],

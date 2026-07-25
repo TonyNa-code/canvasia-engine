@@ -145,6 +145,13 @@
     return `"${String(value ?? "").replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\r?\n/g, "\\n")}"`;
   }
 
+  function convertRuntimeTextVariables(value) {
+    return String(value ?? "").replace(
+      /\{\{\s*([0-9A-Za-z_\-\u3400-\u9fff]{1,64})\s*\}\}/g,
+      (_match, variableId) => `[${getVariableIdentifier(variableId)}]`
+    );
+  }
+
   function getProjectTitle(data = {}, options = {}) {
     return cleanText(options.projectTitle ?? data.project?.title ?? data.title, "Canvasia Project");
   }
@@ -1112,7 +1119,7 @@
   }
 
   function renderRenpyText(block = {}, context = {}) {
-    const line = getBlockText(block) || " ";
+    const line = convertRuntimeTextVariables(getBlockText(block) || " ");
     const textSpeed = getEffectiveTextSpeed(block, context.runtimeSettings);
     if (!textSpeed) {
       return line;
@@ -1178,6 +1185,54 @@
       .filter((variable) => cleanText(variable?.id))
       .map((variable) => `default ${getVariableIdentifier(variable.id)} = ${renderRenpyLiteral(variable.defaultValue)}`)
       .sort();
+  }
+
+  function buildVariableMap(data = {}) {
+    return new Map(
+      getVariableList(data)
+        .filter((variable) => cleanText(variable?.id))
+        .map((variable) => [cleanText(variable.id), variable])
+    );
+  }
+
+  function renderTextInputBlock(block = {}, context = {}) {
+    const warnings = context.warnings ?? [];
+    const variableId = cleanText(block.variableId);
+    const variable = (context.variableMap ?? new Map()).get(variableId);
+    if (!variable) {
+      pushWarning(warnings, "renpy_text_input_variable_missing", "玩家输入卡没有有效变量，已导出 pass。", getWarningContext(context));
+      return ["    pass"];
+    }
+    const variableType = cleanText(variable.type, "string").toLowerCase();
+    if (!["string", "number"].includes(variableType)) {
+      pushWarning(warnings, "renpy_text_input_variable_type", "玩家输入卡只支持文本或数字变量，已导出 pass。", getWarningContext(context));
+      return ["    pass"];
+    }
+    const prompt = convertRuntimeTextVariables(cleanText(block.prompt, "Please enter a value"));
+    const maxLength = Math.max(1, Math.min(200, Math.round(Number(block.maxLength) || 32)));
+    const rawDefault = block.defaultValue ?? variable.defaultValue ?? "";
+    const defaultValue = String(rawDefault ?? "");
+    const target = getVariableIdentifier(variableId);
+    const lines = [
+      "    while True:",
+      `        $ _canvasia_input = renpy.input(${quoteRenpy(prompt)}, default=${quoteRenpy(defaultValue)}, length=${maxLength}).strip()`,
+    ];
+    if (variableType === "number") {
+      lines.push("        $ _canvasia_value = canvasia_parse_number_input(_canvasia_input)");
+      lines.push("        if _canvasia_value is not None:");
+      lines.push(`            $ ${target} = _canvasia_value`);
+      lines.push("            break");
+      return lines;
+    }
+    if (block.allowEmpty === true) {
+      lines.push(`        $ ${target} = _canvasia_input`);
+      lines.push("        break");
+      return lines;
+    }
+    lines.push("        if _canvasia_input:");
+    lines.push(`            $ ${target} = _canvasia_input`);
+    lines.push("            break");
+    return lines;
   }
 
   function pushWarning(warnings, code, message, context = {}) {
@@ -1375,7 +1430,7 @@
     const gatedExpressions = [];
     let hasAlwaysOption = false;
     options.forEach((option, optionIndex) => {
-      const optionText = cleanText(option?.text ?? option?.label, `Option ${optionIndex + 1}`);
+      const optionText = convertRuntimeTextVariables(cleanText(option?.text ?? option?.label, `Option ${optionIndex + 1}`));
       const targetSceneId = getChoiceTarget(option);
       const effectCount = toArray(option.effects).length;
       const rawMode = cleanText(option.choiceAvailabilityMode ?? option.availabilityMode, "always");
@@ -1468,6 +1523,9 @@
     if (type === "variable_set" || type === "variable_add") {
       return renderVariableEffect(block, context);
     }
+    if (type === "text_input") {
+      return renderTextInputBlock(block, context);
+    }
     if (type === "condition") {
       return renderConditionBlock(block, context);
     }
@@ -1523,6 +1581,7 @@
   function buildRenpyDraftExport(data = {}, options = {}) {
     const assetMap = buildAssetMap(data);
     const characterMap = buildCharacterMap(data);
+    const variableMap = buildVariableMap(data);
     const sceneMap = buildSceneMap(data);
     const sceneRecords = getSceneRecords(data);
     const projectResolution = getProjectResolution(data);
@@ -1534,6 +1593,14 @@
       "# Generated as a migration-friendly draft. Review labels, assets, and custom effects before shipping.",
       "",
       "define canvasia_nvl = Character(None, kind=nvl)",
+      "",
+      "init python:",
+      "    def canvasia_parse_number_input(value):",
+      "        try:",
+      "            number = float(value)",
+      "        except (TypeError, ValueError):",
+      "            return None",
+      "        return int(number) if number.is_integer() else number",
       "",
       ...buildImageDefinitions(assetMap),
       "",
@@ -1560,7 +1627,7 @@
         const musicScopeStopPlan = buildMusicScopeStopPlan(blocks, { warnings, sceneId });
         blocks.forEach((block, blockIndex) => {
           (musicScopeStopPlan.before.get(blockIndex) ?? []).forEach((line) => lines.push(line));
-          renderBlock(block, { assetMap, characterMap, sceneMap, warnings, sceneId, blockIndex, cameraState, stageImageAssets, projectResolution, runtimeSettings }).forEach((line) => lines.push(line));
+          renderBlock(block, { assetMap, characterMap, variableMap, sceneMap, warnings, sceneId, blockIndex, cameraState, stageImageAssets, projectResolution, runtimeSettings }).forEach((line) => lines.push(line));
           (musicScopeStopPlan.after.get(blockIndex) ?? []).forEach((line) => lines.push(line));
         });
       }
@@ -1655,6 +1722,7 @@
     CHOICE_CONTINUE_TARGET,
     normalizeIdentifier,
     quoteRenpy,
+    convertRuntimeTextVariables,
     buildRenpyDraftExport,
     getRenpyDraftStatusDigest,
     buildRenpyDraftManifest,

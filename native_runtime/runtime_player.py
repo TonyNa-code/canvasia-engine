@@ -231,6 +231,25 @@ except ImportError:  # pragma: no cover - exported native packages import from t
     )
 
 try:
+    from .runtime_text_input import (
+        collect_runtime_text_variable_ids,
+        interpolate_runtime_text,
+        normalize_text_input_block,
+        render_runtime_text_input_overlay as render_runtime_text_input_overlay_panel,
+        sanitize_text_input_value,
+        handle_runtime_text_input_event,
+    )
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_text_input import (
+        collect_runtime_text_variable_ids,
+        interpolate_runtime_text,
+        normalize_text_input_block,
+        render_runtime_text_input_overlay as render_runtime_text_input_overlay_panel,
+        sanitize_text_input_value,
+        handle_runtime_text_input_event,
+    )
+
+try:
     from .runtime_storage import (
         READ_TEXT_KEY_LIMIT,
         clear_project_auto_resume,
@@ -3430,6 +3449,29 @@ def build_release_check_report(bundle_dir: Path) -> dict:
                 path,
             )
 
+    def collect_source_text_values(source: dict, key: str) -> list[str]:
+        values = [str(source.get(key) or "")]
+        translations = source.get(f"{key}Translations")
+        if isinstance(translations, dict):
+            values.extend(str(value or "") for value in translations.values())
+        return values
+
+    def check_runtime_text_references(source: dict, keys: tuple[str, ...], path: str) -> None:
+        values = []
+        for key in keys:
+            values.extend(collect_source_text_values(source, key))
+        for variable_id in collect_runtime_text_variable_ids(values):
+            if variable_id in variables_by_id:
+                continue
+            add_release_check_issue(
+                issues,
+                "error",
+                "runtime_text_variable_missing",
+                f"正文变量占位符引用不存在：{{{{{variable_id}}}}}",
+                "在变量库创建同名变量，或把正文里的双花括号改成现有变量 ID。",
+                path,
+            )
+
     for scene in scenes:
         scene_name = str(scene.get("name") or scene.get("id") or "未命名场景")
         for block_index, block in enumerate(scene.get("blocks", []) or []):
@@ -3437,6 +3479,15 @@ def build_release_check_report(bundle_dir: Path) -> dict:
                 continue
             block_type = str(block.get("type") or "")
             block_path = f"{scene_name}#{block_index + 1}"
+            check_runtime_text_references(block, ("text", "prompt"), block_path)
+            if block_type == "choice":
+                for option_index, option in enumerate(block.get("options", []) or []):
+                    if isinstance(option, dict):
+                        check_runtime_text_references(
+                            option,
+                            ("text", "choiceLockedReason"),
+                            f"{block_path}/option-{option_index + 1}",
+                        )
             if block_type == "jump":
                 check_scene_target(block.get("targetSceneId"), "跳转目标场景", block_path)
             elif block_type == "variable_set":
@@ -3456,6 +3507,61 @@ def build_release_check_report(bundle_dir: Path) -> dict:
                     value=block.get("value"),
                     validate_value=True,
                 )
+            elif block_type == "text_input":
+                variable_id = str(block.get("variableId") or "").strip()
+                check_variable_reference(
+                    variable_id,
+                    path=block_path,
+                    usage_label="玩家输入卡片",
+                )
+                variable = variables_by_id.get(variable_id)
+                variable_type = normalize_variable_type((variable or {}).get("type"))
+                if variable and variable_type not in {"string", "number"}:
+                    add_release_check_issue(
+                        issues,
+                        "error",
+                        "text_input_variable_type_mismatch",
+                        f"玩家输入卡片只能写入文本或数字变量：{variable_name(variable_id)}",
+                        "把输入卡改绑到文本/数字变量；开关变量应使用选项或变量设置卡片。",
+                        block_path,
+                    )
+                if not str(block.get("prompt") or "").strip():
+                    add_release_check_issue(
+                        issues,
+                        "error",
+                        "text_input_prompt_missing",
+                        "玩家输入卡片没有提问文案。",
+                        "填写玩家能看懂的问题，例如“请告诉我你的名字”。",
+                        block_path,
+                    )
+                config = normalize_text_input_block(block)
+                try:
+                    raw_max_length = int(round(float(block.get("maxLength"))))
+                except (TypeError, ValueError):
+                    raw_max_length = None
+                if raw_max_length != config.get("maxLength"):
+                    add_release_check_issue(
+                        issues,
+                        "error",
+                        "text_input_length_invalid",
+                        "玩家输入卡片的最大长度不在 1 到 200 之间。",
+                        "回到输入卡重新设置最大字数。",
+                        block_path,
+                    )
+                if variable_type == "number" and str(block.get("defaultValue") or "").strip():
+                    try:
+                        default_number = float(block.get("defaultValue"))
+                    except (TypeError, ValueError):
+                        default_number = math.nan
+                    if not math.isfinite(default_number):
+                        add_release_check_issue(
+                            issues,
+                            "error",
+                            "text_input_default_invalid",
+                            "数字输入卡片的预填答案不是有效数字。",
+                            "清空预填答案，或改成有效数字。",
+                            block_path,
+                        )
             elif block_type == "choice":
                 options = block.get("options") if isinstance(block.get("options"), list) else []
                 for option_index, option in enumerate(options):
@@ -6292,9 +6398,10 @@ def render_native_runtime_vn_baseline_quality_markdown(report: dict) -> str:
         ("重复素材 / 角色 / 表情 ID", f"{int(metrics.get('duplicateAssetIdCount') or 0)} / {int(metrics.get('duplicateCharacterIdCount') or 0)} / {int(metrics.get('duplicateExpressionIdCount') or 0)}"),
         ("台词 / 旁白 / 选项", f"{int(metrics.get('dialogueCount') or 0)} / {int(metrics.get('narrationCount') or 0)} / {int(metrics.get('choiceCount') or 0)}"),
         ("变量 / 条件 / 选项效果", f"{int(metrics.get('variableCount') or 0)} / {int(metrics.get('conditionCount') or 0)} / {int(metrics.get('choiceEffectCount') or 0)}"),
+        ("玩家输入 / 正文变量读取", f"{int(metrics.get('textInputCount') or 0)} / {int(metrics.get('textReadVariableCount') or 0)}"),
         ("写入变量 / 条件读取 / 影响路线", f"{int(metrics.get('variableWrittenCount') or 0)} / {int(metrics.get('conditionReadVariableCount') or 0)} / {int(metrics.get('routeInfluencingVariableCount') or 0)}"),
-        ("未被条件读取的变量写入", metrics.get("unconsumedVariableWriteCount")),
-        ("逻辑缺失变量 / 非数字加减 / 条件符号不匹配", f"{int(metrics.get('logicMissingVariableCount') or 0)} / {int(metrics.get('logicNonNumberAddCount') or 0)} / {int(metrics.get('logicOperatorMismatchCount') or 0)}"),
+        ("未被剧情读取的变量写入", metrics.get("unconsumedVariableWriteCount")),
+        ("逻辑缺失变量 / 非数字加减 / 输入类型 / 条件符号", f"{int(metrics.get('logicMissingVariableCount') or 0)} / {int(metrics.get('logicNonNumberAddCount') or 0)} / {int(metrics.get('logicTextInputTypeCount') or 0)} / {int(metrics.get('logicOperatorMismatchCount') or 0)}"),
         ("空路线目标 / 条件隐式结束", f"{int(metrics.get('missingNavigationTargetCount') or 0)} / {int(metrics.get('implicitConditionFallbackEndCount') or 0)}"),
         ("选项按钮总数", metrics.get("choiceOptionCount")),
         ("条件门控选项 / 判断规则", f"{int(metrics.get('choiceGatedOptionCount') or 0)} / {int(metrics.get('choiceAvailabilityRuleCount') or 0)}"),
@@ -6691,8 +6798,9 @@ def render_native_runtime_release_control_markdown(payload: dict) -> str:
             ("重复素材 / 角色 / 表情 ID", f"{int(vn_metrics.get('duplicateAssetIdCount') or 0)} / {int(vn_metrics.get('duplicateCharacterIdCount') or 0)} / {int(vn_metrics.get('duplicateExpressionIdCount') or 0)}"),
             ("台词 / 旁白 / 选项", f"{int(vn_metrics.get('dialogueCount') or 0)} / {int(vn_metrics.get('narrationCount') or 0)} / {int(vn_metrics.get('choiceCount') or 0)}"),
             ("变量 / 条件 / 选项效果", f"{int(vn_metrics.get('variableCount') or 0)} / {int(vn_metrics.get('conditionCount') or 0)} / {int(vn_metrics.get('choiceEffectCount') or 0)}"),
+            ("玩家输入 / 正文变量读取", f"{int(vn_metrics.get('textInputCount') or 0)} / {int(vn_metrics.get('textReadVariableCount') or 0)}"),
             ("写入变量 / 条件读取 / 影响路线", f"{int(vn_metrics.get('variableWrittenCount') or 0)} / {int(vn_metrics.get('conditionReadVariableCount') or 0)} / {int(vn_metrics.get('routeInfluencingVariableCount') or 0)}"),
-            ("未被条件读取的变量写入", vn_metrics.get("unconsumedVariableWriteCount")),
+            ("未被剧情读取的变量写入", vn_metrics.get("unconsumedVariableWriteCount")),
             ("逻辑缺失变量 / 非数字加减 / 条件符号不匹配", f"{int(vn_metrics.get('logicMissingVariableCount') or 0)} / {int(vn_metrics.get('logicNonNumberAddCount') or 0)} / {int(vn_metrics.get('logicOperatorMismatchCount') or 0)}"),
             ("空路线目标 / 条件隐式结束", f"{int(vn_metrics.get('missingNavigationTargetCount') or 0)} / {int(vn_metrics.get('implicitConditionFallbackEndCount') or 0)}"),
             ("选项按钮总数", vn_metrics.get("choiceOptionCount")),
@@ -8040,6 +8148,7 @@ class NativeRuntimePlayer:
         self.auto_resume_write_enabled = self.auto_resume_snapshot is None
         self.profile_session_started_at_ms = 0
         self.overlay_mode: str | None = None
+        self.text_input_state: dict | None = None
         self.overlay_page = 0
         self.overlay_focus_index = 0
         self.overlay_hotspots: list[dict] = []
@@ -8467,6 +8576,13 @@ class NativeRuntimePlayer:
         )
         self.record_runtime_localization_fallback(result, source, key)
         return str(result.get("value") or "")
+
+    def localize_runtime_text(self, source: dict | None, key: str, fallback: str = "") -> str:
+        return interpolate_runtime_text(
+            self.localize_value(source, key, fallback),
+            self.variable_state,
+            self.variables_by_id,
+        )
 
     def is_voice_playing(self) -> bool:
         if not self.current_voice_channel:
@@ -9775,6 +9891,7 @@ class NativeRuntimePlayer:
         return ""
 
     def open_title_screen(self) -> None:
+        self.close_runtime_text_input()
         self.stop_embedded_video_playback()
         self.last_gameplay_frame = None
         self.ui_hidden = False
@@ -9799,6 +9916,7 @@ class NativeRuntimePlayer:
         )
 
     def start_story_from_title(self) -> None:
+        self.close_runtime_text_input()
         self.stop_embedded_video_playback()
         self.last_gameplay_frame = None
         self.ui_hidden = False
@@ -10414,7 +10532,7 @@ class NativeRuntimePlayer:
         if block_type not in {"dialogue", "narration"}:
             return
         was_fully_visible = self.is_current_line_fully_visible()
-        line_text = self.localize_value(block, "text")
+        line_text = self.localize_runtime_text(block, "text")
         self.current_line = {
             "type": block_type,
             "speakerId": block.get("speakerId"),
@@ -10609,6 +10727,7 @@ class NativeRuntimePlayer:
     def restore_from_snapshot(self, snapshot: dict, *, reset_rollback: bool = True) -> None:
         if reset_rollback:
             self.reset_rollback_timeline()
+        self.close_runtime_text_input()
         self.stop_embedded_video_playback()
         self.last_gameplay_frame = None
         self.ui_hidden = False
@@ -10928,6 +11047,79 @@ class NativeRuntimePlayer:
             rect = image.get_rect(center=(int(item.get("x") or 0), int(item.get("y") or 0)))
             target.blit(image, rect)
 
+    def close_runtime_text_input(self) -> None:
+        try:
+            self.pygame.key.stop_text_input()
+        except (AttributeError, self.pygame.error):
+            pass
+        self.text_input_state = None
+        if self.overlay_mode == "text-input":
+            self.overlay_mode = None
+
+    def open_runtime_text_input(self, block: dict, scene: dict | None) -> None:
+        config = normalize_text_input_block(block)
+        variable_id = str(config.get("variableId") or "")
+        variable = self.variables_by_id.get(variable_id) or {}
+        prompt = interpolate_runtime_text(
+            self.localize_value(block, "prompt", str(config.get("prompt") or "请输入内容")),
+            self.variable_state,
+            self.variables_by_id,
+        )
+        current_value = self.get_runtime_variable_value(variable_id)
+        initial_value = str(config.get("defaultValue") or current_value or "")
+        self.text_input_state = {
+            **config,
+            "prompt": prompt,
+            "value": initial_value[: int(config.get("maxLength") or 32)],
+            "variableName": str(variable.get("name") or variable_id or "未绑定变量"),
+            "error": "" if variable else "这张输入卡没有绑定有效变量，请让作者修复项目。",
+        }
+        self.current_line = {
+            "type": "text_input",
+            "speakerId": None,
+            "speakerName": "玩家输入",
+            "text": prompt,
+            "voiceAssetId": None,
+            "blockLabel": get_block_label("text_input"),
+        }
+        self.stop_flow_assist()
+        self.stop_voice()
+        self.record_text_history(self.current_line, scene, self.current_block_index)
+        self.start_current_line_display(prompt)
+        self.reveal_current_line_immediately()
+        self.overlay_mode = "text-input"
+        try:
+            self.pygame.key.start_text_input()
+        except (AttributeError, self.pygame.error):
+            pass
+        self.status_message = f"等待玩家输入：{self.text_input_state['variableName']}"
+
+    def submit_text_input(self) -> None:
+        state = self.text_input_state if isinstance(self.text_input_state, dict) else {}
+        variable_id = str(state.get("variableId") or "")
+        variable = self.variables_by_id.get(variable_id)
+        if not variable:
+            state["error"] = "输入卡绑定的变量不存在，请让作者返回编辑器修复。"
+            return
+        result = sanitize_text_input_value(
+            state.get("value"),
+            state,
+            variable,
+            normalize_value=lambda value: self.normalize_runtime_variable_value(variable_id, value),
+        )
+        if not result.get("ok"):
+            state["error"] = str(result.get("error") or "输入内容无效。")
+            return
+        self.variable_state[variable_id] = result.get("value")
+        variable_name = str(variable.get("name") or variable_id)
+        self.close_runtime_text_input()
+        self.current_line = None
+        self.current_block_index += 1
+        self.auto_resume_write_enabled = True
+        self.advance_until_pause()
+        self.persist_auto_resume_snapshot()
+        self.status_message = f"已保存玩家输入：{variable_name}"
+
     def pause_on_wait_block(self, block: dict, scene: dict | None) -> None:
         duration_seconds = get_safe_wait_duration_seconds(block.get("durationSeconds"))
         duration_label = f"{duration_seconds:g}"
@@ -10961,8 +11153,11 @@ class NativeRuntimePlayer:
         if block_type == "wait":
             self.pause_on_wait_block(block, scene)
             return
+        if block_type == "text_input":
+            self.open_runtime_text_input(block, scene)
+            return
         if block_type in {"dialogue", "narration"}:
-            line_text = self.localize_value(block, "text")
+            line_text = self.localize_runtime_text(block, "text")
             self.current_line = {
                 "type": block_type,
                 "speakerId": block.get("speakerId"),
@@ -11161,6 +11356,10 @@ class NativeRuntimePlayer:
                 self.pause_on_wait_block(block, scene)
                 return
 
+            if block_type == "text_input":
+                self.open_runtime_text_input(block, scene)
+                return
+
             if block_type == "video_play":
                 self.stop_embedded_video_playback()
                 asset_id = str(block.get("assetId") or "")
@@ -11246,7 +11445,7 @@ class NativeRuntimePlayer:
                 return
 
             if block_type in {"dialogue", "narration"}:
-                line_text = self.localize_value(block, "text")
+                line_text = self.localize_runtime_text(block, "text")
                 self.current_line = {
                     "type": block_type,
                     "speakerId": block.get("speakerId"),
@@ -11729,7 +11928,11 @@ class NativeRuntimePlayer:
             return
         option = self.current_choices[option_index]
         if not is_choice_option_selectable(option):
-            self.status_message = str(option.get("choiceLockedReason") or "这个选项的条件尚未满足。")
+            self.status_message = self.localize_runtime_text(
+                option,
+                "choiceLockedReason",
+                str(option.get("choiceLockedReason") or "这个选项的条件尚未满足。"),
+            )
             return
         for effect in option.get("effects", []) or []:
             self.apply_choice_effect(effect)
@@ -12919,9 +13122,9 @@ class NativeRuntimePlayer:
             self.pygame.draw.rect(self.screen, border, row_rect, 2, border_radius=16)
             self.draw_game_ui_button_frame(row_rect, self.get_game_ui_button_state(row_rect, active=is_active))
             label = str(option.get("text") or f"选项 {index + 1}")
-            label = self.localize_value(option, "text", label)
+            label = self.localize_runtime_text(option, "text", label)
             if not is_enabled:
-                locked_reason = self.localize_value(
+                locked_reason = self.localize_runtime_text(
                     option,
                     "choiceLockedReason",
                     str(option.get("choiceLockedReason") or "条件尚未满足"),
@@ -12979,6 +13182,8 @@ class NativeRuntimePlayer:
             self.render_archive_overlay()
         elif self.overlay_mode == "archive-detail":
             self.render_archive_detail_overlay()
+        elif self.overlay_mode == "text-input":
+            render_runtime_text_input_overlay_panel(self)
 
     def render_title_overlay(self) -> None:
         palette = self.get_active_palette()
@@ -14344,6 +14549,8 @@ class NativeRuntimePlayer:
         controller_result = self.handle_controller_event(event)
         if controller_result is not None:
             return controller_result
+        if self.overlay_mode == "text-input":
+            return self.handle_overlay_event(event)
         if event.type == self.pygame.KEYDOWN and event.key == self.pygame.K_ESCAPE:
             if self.overlay_mode:
                 if self.overlay_mode == "title":
@@ -14509,6 +14716,8 @@ class NativeRuntimePlayer:
             return self.handle_archive_overlay_event(event)
         if self.overlay_mode == "archive-detail":
             return self.handle_archive_detail_overlay_event(event)
+        if self.overlay_mode == "text-input":
+            return handle_runtime_text_input_event(self, event)
         return True
 
     def handle_title_overlay_event(self, event) -> bool:
@@ -14939,8 +15148,13 @@ class NativeRuntimePlayer:
                         self.current_choice_index = index
                         self.choose_current_option(index)
                     else:
-                        self.status_message = str(
-                            self.current_choices[index].get("choiceLockedReason") or "这个选项的条件尚未满足。"
+                        self.status_message = self.localize_runtime_text(
+                            self.current_choices[index],
+                            "choiceLockedReason",
+                            str(
+                                self.current_choices[index].get("choiceLockedReason")
+                                or "这个选项的条件尚未满足。"
+                            ),
                         )
                     break
         return True

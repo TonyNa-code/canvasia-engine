@@ -90,8 +90,9 @@ class FrontendStoryBlockActionsModuleTests(unittest.TestCase):
         self.assertEqual(action_to_block["add-camera-zoom"], "camera_zoom")
         self.assertEqual(action_to_block["add-variable-set"], "variable_set")
         self.assertEqual(action_to_block["add-variable-add"], "variable_add")
+        self.assertEqual(action_to_block["add-text-input"], "text_input")
         self.assertEqual(action_to_block["add-condition"], "condition")
-        self.assertEqual(len(entries), 26)
+        self.assertEqual(len(entries), 27)
         self.assertEqual(
             payload["beginnerActions"],
             [
@@ -106,6 +107,7 @@ class FrontendStoryBlockActionsModuleTests(unittest.TestCase):
                 "add-video-play",
                 "add-wait",
                 "add-jump",
+                "add-text-input",
             ],
         )
         self.assertEqual(len(payload["beginnerEntries"]), len(payload["beginnerActions"]))
