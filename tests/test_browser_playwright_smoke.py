@@ -320,6 +320,11 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
         self.page.get_by_role("button", name="一键创建第一章").first.click()
         self.page.locator("#screen-story").get_by_role("button", name="加台词").first.wait_for(timeout=15000)
 
+    def preview_navigation_button(self):
+        return self.page.locator(
+            'button[data-action="switch-screen"][data-screen="preview"][data-requires-project="true"]'
+        ).first
+
     def test_editor_system_dialog_replaces_native_alert(self) -> None:
         self.open_editor()
         self.page.evaluate("window.alert('系统弹窗测试：统一提示层')")
@@ -362,8 +367,8 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
         self.page.wait_for_function(
             """() => {
                 const appMain = document.querySelector("#appMain");
-                const previewButton = Array.from(document.querySelectorAll("button")).find(
-                    (button) => button.textContent?.trim() === "试玩收尾"
+                const previewButton = document.querySelector(
+                    'button[data-action="switch-screen"][data-screen="preview"][data-requires-project="true"]'
                 );
                 return Boolean(appMain)
                     && !appMain.classList.contains("is-hidden")
@@ -394,7 +399,7 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
         self.page.get_by_role("heading", name="一键巡检中心").wait_for(timeout=15000)
 
     def open_preview_screen(self) -> None:
-        self.page.get_by_role("button", name="试玩收尾").click()
+        self.preview_navigation_button().click()
         self.page.get_by_text("新手收尾顺序").wait_for(timeout=15000)
 
     def test_dashboard_scene_preview_button_opens_preview_without_runtime_error(self) -> None:
@@ -431,6 +436,45 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
             if "ReferenceError" in message or "getBlockLabel" in message
         ]
         self.assertFalse(runtime_errors, "\n".join(runtime_errors))
+
+    def test_preview_flight_recorder_tracks_and_exports_active_playtest(self) -> None:
+        page_errors: list[str] = []
+        self.page.on("pageerror", lambda error: page_errors.append(str(error)))
+        self.open_project_by_title("心跳时差")
+
+        advanced_button = self.page.get_by_role("button", name="打开高级工具").first
+        advanced_button.wait_for(timeout=10000)
+        advanced_button.click()
+        self.preview_navigation_button().click()
+
+        recorder = self.page.locator(".preview-flight-card")
+        recorder.wait_for(timeout=15000)
+        recorder.get_by_text("试玩飞行记录器").wait_for(timeout=10000)
+        self.assertIn("当前落点", recorder.inner_text())
+
+        next_button = self.page.locator("#previewNextButton")
+        for _ in range(8):
+            if next_button.is_disabled():
+                break
+            next_button.click()
+            self.page.wait_for_timeout(120)
+
+        self.assertGreaterEqual(recorder.locator(".preview-flight-entry").count(), 1)
+        self.assertGreaterEqual(recorder.locator("[data-action='jump-preview-history']").count(), 1)
+        self.assertGreaterEqual(recorder.locator("[data-action='open-character-line']").count(), 1)
+        self.assertIn("音画调度", recorder.inner_text())
+
+        with self.page.expect_download(timeout=10000) as markdown_download:
+            recorder.locator("[data-action='export-preview-flight-recorder-markdown']").click()
+        self.assertTrue(markdown_download.value.suggested_filename.endswith(".md"))
+
+        with self.page.expect_download(timeout=10000) as json_download:
+            recorder.locator("[data-action='export-preview-flight-recorder-json']").click()
+        self.assertTrue(json_download.value.suggested_filename.endswith(".json"))
+
+        recorder.locator("[data-action='open-character-line']").first.click()
+        self.page.locator("#screen-story.is-active").wait_for(timeout=10000)
+        self.assertFalse(page_errors, "\n".join(page_errors))
 
     def test_editor_preview_reading_profile_updates_typography_and_custom_state(self) -> None:
         self.open_project_by_title("心跳时差")
@@ -680,7 +724,7 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
             timeout=15000,
         )
 
-        self.page.get_by_role("button", name="试玩收尾").click()
+        self.preview_navigation_button().click()
         stage_image = self.page.locator('#previewStage [data-layer-id="smoke_note"]')
         self.page.locator("#previewStage").wait_for(state="visible", timeout=15000)
         for _ in range(12):

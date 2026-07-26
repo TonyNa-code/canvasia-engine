@@ -7005,6 +7005,251 @@ html[data-ui-theme="light"] .music-range-health.is-danger .issue-tag {
   line-height: 1.7;
 }
 
+.preview-flight-card {
+  position: relative;
+  display: grid;
+  gap: 14px;
+  border-color: color-mix(in srgb, var(--brand) 22%, var(--line));
+  background:
+    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--brand) 12%, transparent), transparent 34%),
+    linear-gradient(150deg, color-mix(in srgb, var(--panel-strong) 94%, white), var(--panel));
+}
+
+.preview-flight-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: linear-gradient(180deg, var(--brand), color-mix(in srgb, var(--brand) 18%, transparent));
+}
+
+.preview-flight-head,
+.preview-flight-entry-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.preview-flight-head > div,
+.preview-flight-entry-head > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.preview-flight-head p,
+.preview-flight-entry p {
+  margin: 0;
+}
+
+.preview-flight-signal {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 3px;
+  min-width: 38px;
+  height: 30px;
+  padding: 7px 9px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--good) 28%, transparent);
+  background: color-mix(in srgb, var(--good) 10%, var(--panel));
+}
+
+.preview-flight-signal i {
+  width: 3px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--good);
+  animation: previewFlightSignal 1.5s ease-in-out infinite;
+}
+
+.preview-flight-signal i:nth-child(2) {
+  height: 14px;
+  animation-delay: 0.18s;
+}
+
+.preview-flight-signal i:nth-child(3) {
+  height: 10px;
+  animation-delay: 0.36s;
+}
+
+@keyframes previewFlightSignal {
+  0%,
+  100% {
+    transform: scaleY(0.62);
+    opacity: 0.55;
+  }
+
+  50% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+.preview-flight-current {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--brand) 18%, var(--line));
+  background: color-mix(in srgb, var(--brand) 7%, var(--panel-strong));
+}
+
+.preview-flight-current span,
+.preview-flight-current small,
+.preview-flight-entry-head span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.preview-flight-current strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preview-flight-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.preview-flight-metrics > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel-strong) 88%, transparent);
+}
+
+.preview-flight-metrics span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.preview-flight-metrics strong {
+  color: var(--ink);
+  font-family: "Georgia", "Times New Roman", serif;
+  font-size: 22px;
+}
+
+.preview-flight-export-actions {
+  justify-content: flex-start;
+}
+
+.preview-flight-list {
+  display: grid;
+  gap: 10px;
+}
+
+.preview-flight-entry {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 12px;
+  padding: 13px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel-strong) 86%, transparent);
+}
+
+.preview-flight-entry.is-current {
+  border-color: color-mix(in srgb, var(--brand) 34%, var(--line));
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--brand) 10%, transparent);
+}
+
+.preview-flight-step {
+  display: grid;
+  align-content: start;
+  justify-items: center;
+  gap: 2px;
+  padding: 7px 4px;
+  border-radius: 13px;
+  color: var(--brand-deep);
+  background: color-mix(in srgb, var(--brand) 10%, transparent);
+}
+
+.preview-flight-step span {
+  font-family: "Georgia", "Times New Roman", serif;
+  font-size: 18px;
+}
+
+.preview-flight-step small {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.preview-flight-entry-body {
+  display: grid;
+  min-width: 0;
+  gap: 9px;
+}
+
+.preview-flight-entry-body > p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.preview-flight-route {
+  display: grid;
+  gap: 2px;
+  padding: 9px 11px;
+  border-radius: 13px;
+  border: 1px solid color-mix(in srgb, var(--good) 22%, var(--line));
+  background: color-mix(in srgb, var(--good) 8%, transparent);
+}
+
+.preview-flight-route.is-pending {
+  border-color: color-mix(in srgb, var(--warn) 26%, var(--line));
+  background: color-mix(in srgb, var(--warn) 8%, transparent);
+}
+
+.preview-flight-route span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.preview-flight-change-list,
+.preview-flight-cue-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.preview-flight-change,
+.preview-flight-cue {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 6px 9px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--brand) 18%, var(--line));
+  background: color-mix(in srgb, var(--brand) 6%, var(--panel-strong));
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.preview-flight-change strong,
+.preview-flight-cue strong {
+  color: var(--ink);
+}
+
+.preview-flight-change del {
+  color: var(--muted);
+  text-decoration-color: color-mix(in srgb, var(--danger) 46%, transparent);
+}
+
+.preview-flight-change ins {
+  color: var(--good);
+  font-weight: 700;
+  text-decoration: none;
+}
+
 .preview-coverage-card {
   display: grid;
   gap: 14px;
@@ -7559,6 +7804,8 @@ html[data-ui-theme="light"] .music-range-health.is-danger .issue-tag {
   .preview-coverage-head,
   .preview-coverage-item-head,
   .preview-coverage-section-head,
+  .preview-flight-head,
+  .preview-flight-entry-head,
   .preview-route-head,
   .preview-route-step {
     flex-direction: column;
@@ -7566,8 +7813,19 @@ html[data-ui-theme="light"] .music-range-health.is-danger .issue-tag {
   }
 
   .preview-route-metrics,
+  .preview-flight-metrics,
   .preview-coverage-metrics {
     grid-template-columns: 1fr;
+  }
+
+  .preview-flight-current,
+  .preview-flight-entry {
+    grid-template-columns: 1fr;
+  }
+
+  .preview-flight-step {
+    grid-template-columns: auto auto;
+    justify-content: start;
   }
 
   .stage-cast {
@@ -7905,6 +8163,7 @@ select:focus {
     .preview-auto-resume-card,
     .preview-debug-card,
     .preview-route-card,
+    .preview-flight-card,
     .preview-coverage-card,
     .preview-sprint-card,
     .formal-save-dialog,
@@ -7944,6 +8203,7 @@ select:focus {
     .history-card,
     .formal-save-dialog,
     .preview-route-card,
+    .preview-flight-card,
     .preview-coverage-card,
     .preview-sprint-card
   )::before {
@@ -8358,6 +8618,7 @@ html:not([data-ui-theme="light"]) .script-importer-preview-lines code {
     .character-card,
     .script-entry-card,
     .preview-route-card,
+    .preview-flight-card,
     .preview-coverage-card,
     .preview-sprint-card,
     .scene-status-column,
@@ -8693,6 +8954,7 @@ body::-webkit-scrollbar-thumb {
 .character-card,
 .script-entry-card,
 .preview-route-card,
+.preview-flight-card,
 .preview-coverage-card,
 .preview-sprint-card,
 .scene-status-column {
@@ -8708,6 +8970,7 @@ body::-webkit-scrollbar-thumb {
 .character-card > *,
 .script-entry-card > *,
 .preview-route-card > *,
+.preview-flight-card > *,
 .preview-coverage-card > *,
 .preview-sprint-card > *,
 .scene-status-column > * {
@@ -8766,6 +9029,7 @@ body::-webkit-scrollbar-thumb {
 .history-card,
 .project-card,
 .preview-route-card,
+.preview-flight-card,
 .preview-coverage-card,
 .preview-sprint-card {
   isolation: isolate;

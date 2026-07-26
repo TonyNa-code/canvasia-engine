@@ -142,6 +142,8 @@ jobs:
             tests/test_frontend_presentation_timeline_module.py \
             tests/test_frontend_presentation_timeline_panel_module.py \
             tests/test_frontend_preview_regression_module.py \
+            tests/test_frontend_preview_story_debugger_module.py \
+            tests/test_frontend_preview_story_debugger_panel_module.py \
             tests/test_frontend_preview_save_module.py \
             tests/test_frontend_production_backlog_module.py \
             tests/test_frontend_project_center_module.py \
@@ -266,6 +268,8 @@ jobs:
           node --check prototype_editor/modules/presentation_timeline.js
           node --check prototype_editor/modules/presentation_timeline_panel.js
           node --check prototype_editor/modules/preview_regression.js
+          node --check prototype_editor/modules/preview_story_debugger.js
+          node --check prototype_editor/modules/preview_story_debugger_panel.js
           node --check prototype_editor/modules/regression_diagnostics.js
           node --check prototype_editor/modules/project_center.js
           node --check prototype_editor/modules/project_doctor.js
@@ -418,6 +422,8 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_presentation_timeline_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_presentation_timeline_panel_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_preview_regression_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_preview_story_debugger_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_preview_story_debugger_panel_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_preview_save_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_production_backlog_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_project_center_module.py' -v

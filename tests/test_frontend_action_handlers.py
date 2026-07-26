@@ -2992,7 +2992,12 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("scheduleCreativeAssistantHistoryRefresh();", handle_input)
         self.assertIn("creativeAssistantHistoryRefreshFrame", schedule_refresh)
         self.assertIn("requestAnimationFrame", schedule_refresh)
-        self.assertIn("refreshCreativeAssistantPanel({ focusHistorySearch: true });", schedule_refresh)
+        self.assertIn("creativeAssistantHistoryRefreshTimeout", schedule_refresh)
+        self.assertIn("setTimeout(flushCreativeAssistantHistoryRefresh, 120)", schedule_refresh)
+        flush_refresh = _extract_function_source(source, "flushCreativeAssistantHistoryRefresh")
+        self.assertIn("refreshCreativeAssistantPanel({ focusHistorySearch: true });", flush_refresh)
+        self.assertIn("cancelAnimationFrame", flush_refresh)
+        self.assertIn("clearTimeout", flush_refresh)
         self.assertIn("refs.creativeAssistantPanel.innerHTML", refresh_panel)
         self.assertIn('querySelector("#creativeAssistantHistorySearchInput")', refresh_panel)
         self.assertIn("searchInput.value !== focusQuery", refresh_panel)
@@ -6573,6 +6578,20 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn('if block.get("voiceAssetId"):', native_source)
         self.assertIn("voice_profile_id=get_voice_profile_id_from_block(block)", native_source)
         self.assertIn("voice_profile_id: object | None = None", native_source)
+
+    def test_preview_flight_recorder_is_delegated_to_tested_modules(self) -> None:
+        app_source = APP_PATH.read_text(encoding="utf-8")
+        click_handler = _extract_function_source(app_source, "handleClick")
+        build_recorder = _extract_function_source(app_source, "buildPreviewFlightRecorder")
+        render_sidebar = _extract_function_source(app_source, "renderPreviewSidebar")
+
+        self.assertIn("window.CanvasiaEditorPreviewStoryDebugger", app_source)
+        self.assertIn("window.CanvasiaEditorPreviewStoryDebuggerPanel", app_source)
+        self.assertIn("previewStoryDebuggerTools.buildPreviewFlightRecorder", build_recorder)
+        self.assertIn("previewStoryDebuggerPanelTools.renderPreviewFlightRecorderPanel", render_sidebar)
+        self.assertIn('action === "export-preview-flight-recorder-markdown"', click_handler)
+        self.assertIn('action === "export-preview-flight-recorder-json"', click_handler)
+        self.assertIn("buildDatedProjectFileName(\"playtest_flight_record\"", app_source)
 
 
 if __name__ == "__main__":

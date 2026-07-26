@@ -71,6 +71,8 @@ const screenplayExporterTools = window.CanvasiaEditorScreenplayExporter;
 const renpyExporterTools = window.CanvasiaEditorRenpyExporter;
 const directorCueSheetTools = window.CanvasiaEditorDirectorCueSheet;
 const previewRegressionTools = window.CanvasiaEditorPreviewRegression;
+const previewStoryDebuggerTools = window.CanvasiaEditorPreviewStoryDebugger;
+const previewStoryDebuggerPanelTools = window.CanvasiaEditorPreviewStoryDebuggerPanel;
 const playtestHandoffReportTools = window.CanvasiaEditorPlaytestHandoffReport;
 const choiceConsequenceSheetTools = window.CanvasiaEditorChoiceConsequenceSheet;
 const variableInfluenceSheetTools = window.CanvasiaEditorVariableInfluenceSheet;
@@ -2566,6 +2568,16 @@ async function handleClick(event) {
 
   if (action === "export-regression-diagnostic-bundle") {
     exportPreviewRegressionDiagnosticBundle();
+    return;
+  }
+
+  if (action === "export-preview-flight-recorder-markdown") {
+    exportPreviewFlightRecorderMarkdown();
+    return;
+  }
+
+  if (action === "export-preview-flight-recorder-json") {
+    exportPreviewFlightRecorderJson();
     return;
   }
 
@@ -19875,8 +19887,6 @@ function createInitialPreviewVisualState() {
     visibleCharacters: [],
     visibleStageImages: [],
     stageImageEvent: null,
-    visibleStageImages: [],
-    stageImageEvent: null,
     speakerName: "预览面板",
     dialogueText: "点“下一句”以后，这里会按真实分支逻辑推进。",
   };
@@ -22999,54 +23009,9 @@ function getPreviewRouteDecisionSummary(snapshot) {
 }
 
 function buildPreviewRouteSummary(session) {
-  const timeline = session?.timeline ?? [];
-  const sceneIds = new Set();
-  const items = [];
-  let choiceCount = 0;
-  let conditionCount = 0;
-  let pendingChoiceCount = 0;
-
-  timeline.forEach((snapshot, index) => {
-    if (snapshot?.sceneId) {
-      sceneIds.add(snapshot.sceneId);
-    }
-
-    const decision = getPreviewRouteDecisionSummary(snapshot);
-
-    if (!decision) {
-      return;
-    }
-
-    if (snapshot.blockType === "choice") {
-      if (decision.pending) {
-        pendingChoiceCount += 1;
-      } else {
-        choiceCount += 1;
-      }
-    } else if (snapshot.blockType === "condition") {
-      conditionCount += 1;
-    }
-
-    items.push({
-      index,
-      sceneId: snapshot.sceneId,
-      blockId: snapshot.blockId,
-      blockType: snapshot.blockType,
-      sceneName: snapshot.sceneName,
-      title: decision.title,
-      meta: decision.meta,
-      pending: decision.pending,
-      isCurrent: index === session.position,
-    });
+  return previewStoryDebuggerTools.buildPreviewRouteSummary(session, {
+    getRouteDecisionSummary: getPreviewRouteDecisionSummary,
   });
-
-  return {
-    visitedSceneCount: sceneIds.size,
-    choiceCount,
-    conditionCount,
-    pendingChoiceCount,
-    items,
-  };
 }
 
 function renderPreviewTimeline(session) {
@@ -23406,90 +23371,9 @@ function renderPreviewDebugPanel(snapshot) {
 }
 
 function renderPreviewRouteSummaryPanel(session) {
-  if (!session) {
-    return `
-      <article class="detail-card preview-route-card">
-        <strong>路线摘要</strong>
-        <p class="helper-text">开始一段试玩后，这里会记录已选选项和命中过的条件。</p>
-      </article>
-    `;
-  }
-
-  const routeSummary = buildPreviewRouteSummary(session);
-  const recentItems = routeSummary.items.slice(-6).reverse();
-
-  return `
-    <article class="detail-card preview-route-card">
-      <div class="preview-route-head">
-        <div>
-          <strong>路线摘要</strong>
-          <p class="helper-text">这里会把这次试玩里真正生效过的选项和条件结果按顺序记下来，回头查路线会轻松很多。</p>
-        </div>
-        ${
-          routeSummary.pendingChoiceCount > 0
-            ? `<span class="issue-tag warn-text">当前还有 ${routeSummary.pendingChoiceCount} 个分支口在等你选择</span>`
-            : ""
-        }
-      </div>
-      <div class="preview-route-metrics">
-        <div class="preview-route-metric">
-          <span>走过场景</span>
-          <strong>${routeSummary.visitedSceneCount}</strong>
-        </div>
-        <div class="preview-route-metric">
-          <span>已选选项</span>
-          <strong>${routeSummary.choiceCount}</strong>
-        </div>
-        <div class="preview-route-metric">
-          <span>命中条件</span>
-          <strong>${routeSummary.conditionCount}</strong>
-        </div>
-      </div>
-      ${
-        recentItems.length === 0
-          ? '<div class="preview-route-note">这轮试玩暂时还没有经过选项或条件判断。继续往后走，路线记录会自动出现。</div>'
-          : `
-            <div class="detail-stack preview-route-list">
-              ${recentItems
-                .map(
-                  (item) => `
-                    <article class="preview-route-item ${item.isCurrent ? "is-current" : ""}">
-                      <div class="preview-route-step">
-                        <span>第 ${item.index + 1} 步</span>
-                        <strong>${escapeHtml(item.blockType === "choice" ? "选项结果" : "条件结果")}</strong>
-                      </div>
-                      <div class="preview-route-copy">
-                        <strong>${escapeHtml(item.title)}</strong>
-                        <p>${escapeHtml(`${item.sceneName} · ${item.meta}`)}</p>
-                      </div>
-                      <div class="detail-actions">
-                        <button
-                          type="button"
-                          class="toolbar-button toolbar-button-primary"
-                          data-action="jump-preview-history"
-                          data-preview-index="${item.index}"
-                        >
-                          跳回这一步
-                        </button>
-                        <button
-                          type="button"
-                          class="toolbar-button"
-                          data-action="open-character-line"
-                          data-scene-id="${item.sceneId}"
-                          data-block-id="${item.blockId}"
-                        >
-                          打开卡片
-                        </button>
-                      </div>
-                    </article>
-                  `
-                )
-                .join("")}
-            </div>
-          `
-      }
-    </article>
-  `;
+  return previewStoryDebuggerPanelTools.renderPreviewRouteSummaryPanel(
+    session ? buildPreviewRouteSummary(session) : null
+  );
 }
 
 function formatPreviewConditionRule(rule) {
@@ -23499,308 +23383,66 @@ function formatPreviewConditionRule(rule) {
 }
 
 function buildPreviewBranchCoverage(session) {
-  const timeline = session?.timeline ?? [];
-  const visitedPointKeys = new Set();
-  const coveredOutcomeKeys = new Set();
-
-  timeline.forEach((snapshot) => {
-    if (!snapshot || snapshot.completed || !snapshot.blockId) {
-      return;
-    }
-
-    if (snapshot.blockType === "choice") {
-      const pointKey = `choice:${snapshot.sceneId}:${snapshot.blockId}`;
-      visitedPointKeys.add(pointKey);
-      const selectedOptionId = String(snapshot.selectedOptionId ?? "").trim();
-
-      if (selectedOptionId) {
-        coveredOutcomeKeys.add(`${pointKey}:${selectedOptionId}`);
-      }
-      return;
-    }
-
-    if (snapshot.blockType === "condition") {
-      const pointKey = `condition:${snapshot.sceneId}:${snapshot.blockId}`;
-      visitedPointKeys.add(pointKey);
-      const resolvedBranchId = String(snapshot.resolvedBranchId ?? "").trim();
-
-      if (resolvedBranchId) {
-        coveredOutcomeKeys.add(`${pointKey}:${resolvedBranchId}`);
-      }
-    }
+  return previewStoryDebuggerTools.buildPreviewBranchCoverage(session, state.data, {
+    getConditionBranchKey,
+    formatConditionRule: formatPreviewConditionRule,
+    getChoiceTargetLabel,
   });
-
-  const points = [];
-
-  state.data.chapters.forEach((chapter) => {
-    (chapter.scenes ?? []).forEach((scene) => {
-      (scene.blocks ?? []).forEach((block, blockIndex) => {
-        if (block.type === "choice") {
-          const pointKey = `choice:${scene.id}:${block.id}`;
-          const outcomes = (block.options ?? []).map((option, index) => {
-            const optionKey = String(option?.id ?? "").trim() || `option-${index + 1}`;
-            const outcomeKey = `${pointKey}:${optionKey}`;
-            const effectsCount = option.effects?.length ?? 0;
-            const targetSceneName =
-              getChoiceTargetLabel(option.gotoSceneId) || "未设置目标";
-
-            return {
-              key: outcomeKey,
-              label: option.text?.trim() || `选项 ${index + 1}`,
-              meta: `${targetSceneName}${effectsCount > 0 ? ` · ${effectsCount} 条效果` : ""}`,
-              covered: coveredOutcomeKeys.has(outcomeKey),
-            };
-          });
-
-          points.push({
-            key: pointKey,
-            sceneId: scene.id,
-            blockId: block.id,
-            blockType: block.type,
-            title: `${scene.name} / 选项分支`,
-            meta: `${scene.chapterName ?? chapter.name} · 第 ${blockIndex + 1} 张卡片`,
-            visited: visitedPointKeys.has(pointKey),
-            outcomes,
-          });
-          return;
-        }
-
-        if (block.type === "condition") {
-          const pointKey = `condition:${scene.id}:${block.id}`;
-          const branchOutcomes = (block.branches ?? []).map((branch, index) => {
-            const branchKey = getConditionBranchKey(branch, index);
-            const outcomeKey = `${pointKey}:${branchKey}`;
-            const targetSceneName =
-              state.data.scenesById.get(branch.gotoSceneId)?.name ?? branch.gotoSceneId ?? "未设置目标";
-            const rules = (branch.when ?? []).map((rule) => formatPreviewConditionRule(rule)).filter(Boolean);
-
-            return {
-              key: outcomeKey,
-              label: rules.join(" 且 ") || `条件分支 ${index + 1}`,
-              meta: `命中后去：${targetSceneName}`,
-              covered: coveredOutcomeKeys.has(outcomeKey),
-            };
-          });
-
-          const elseOutcomeKey = `${pointKey}:else`;
-          const elseTargetSceneName =
-            state.data.scenesById.get(block.elseGotoSceneId)?.name ?? block.elseGotoSceneId ?? "未设置目标";
-
-          points.push({
-            key: pointKey,
-            sceneId: scene.id,
-            blockId: block.id,
-            blockType: block.type,
-            title: `${scene.name} / 条件判断`,
-            meta: `${scene.chapterName ?? chapter.name} · 第 ${blockIndex + 1} 张卡片`,
-            visited: visitedPointKeys.has(pointKey),
-            outcomes: [
-              ...branchOutcomes,
-              {
-                key: elseOutcomeKey,
-                label: "否则",
-                meta: `都不满足时去：${elseTargetSceneName}`,
-                covered: coveredOutcomeKeys.has(elseOutcomeKey),
-              },
-            ],
-          });
-        }
-      });
-    });
-  });
-
-  const currentSnapshot = getCurrentPreviewSnapshot();
-  const pointsWithCoverage = points.map((point) => {
-    const coveredCount = point.outcomes.filter((outcome) => outcome.covered).length;
-    return {
-      ...point,
-      coveredCount,
-      remainingCount: Math.max(point.outcomes.length - coveredCount, 0),
-      isCurrent:
-        currentSnapshot?.sceneId === point.sceneId &&
-        currentSnapshot?.blockId === point.blockId &&
-        (currentSnapshot?.blockType === "choice" || currentSnapshot?.blockType === "condition"),
-    };
-  });
-
-  const unvisitedPoints = pointsWithCoverage.filter((point) => !point.visited);
-  const partialPoints = pointsWithCoverage.filter((point) => point.remainingCount > 0 && point.visited);
-  const fullyCoveredPoints = pointsWithCoverage.filter((point) => point.remainingCount === 0);
-  const totalOutcomeCount = pointsWithCoverage.reduce((total, point) => total + point.outcomes.length, 0);
-  const coveredOutcomeCount = pointsWithCoverage.reduce((total, point) => total + point.coveredCount, 0);
-
-  return {
-    totalPoints: pointsWithCoverage.length,
-    visitedPointCount: pointsWithCoverage.length - unvisitedPoints.length,
-    fullyCoveredPointCount: fullyCoveredPoints.length,
-    totalOutcomeCount,
-    coveredOutcomeCount,
-    remainingOutcomeCount: Math.max(totalOutcomeCount - coveredOutcomeCount, 0),
-    unvisitedPoints,
-    partialPoints,
-    points: pointsWithCoverage,
-    currentPendingChoice:
-      currentSnapshot?.blockType === "choice" && currentSnapshot?.choiceOptions?.length > 0 ? currentSnapshot : null,
-  };
-}
-
-function renderPreviewCoveragePoint(point, tone = "pending") {
-  const badgeClass = tone === "pending" ? "warn-text" : point.remainingCount > 1 ? "warn-text" : "good-text";
-  const badgeText =
-    tone === "pending"
-      ? "还没走到"
-      : point.remainingCount > 0
-        ? `还差 ${point.remainingCount} 条`
-        : "这处已测完";
-
-  return `
-    <article class="preview-coverage-item ${point.isCurrent ? "is-current" : ""}">
-      <div class="preview-coverage-item-head">
-        <div class="preview-coverage-copy">
-          <strong>${escapeHtml(point.title)}</strong>
-          <p>${escapeHtml(point.meta)}</p>
-        </div>
-        <span class="issue-tag ${badgeClass}">${escapeHtml(badgeText)}</span>
-      </div>
-      <div class="preview-coverage-progress">
-        <span>已试 ${point.coveredCount}/${point.outcomes.length} 条</span>
-        <span>${point.blockType === "choice" ? "选项结果" : "判断结果"}</span>
-      </div>
-      <div class="preview-coverage-branch-list">
-        ${point.outcomes
-          .map(
-            (outcome) => `
-              <span
-                class="preview-coverage-branch ${outcome.covered ? "is-covered" : "is-missing"}"
-                title="${escapeHtml(`${outcome.label} · ${outcome.meta}`)}"
-              >
-                ${escapeHtml(truncateText(outcome.label, 22))}
-              </span>
-            `
-          )
-          .join("")}
-      </div>
-      <div class="detail-actions">
-        <button
-          type="button"
-          class="toolbar-button toolbar-button-primary"
-          data-action="preview-story-location"
-          data-scene-id="${point.sceneId}"
-          data-block-id="${point.blockId}"
-        >
-          试玩这里
-        </button>
-        <button
-          type="button"
-          class="toolbar-button"
-          data-action="open-character-line"
-          data-scene-id="${point.sceneId}"
-          data-block-id="${point.blockId}"
-        >
-          打开卡片
-        </button>
-      </div>
-    </article>
-  `;
 }
 
 function renderPreviewBranchCoveragePanel(session) {
-  const coverage = buildPreviewBranchCoverage(session);
+  return previewStoryDebuggerPanelTools.renderPreviewBranchCoveragePanel(
+    buildPreviewBranchCoverage(session)
+  );
+}
 
-  if (coverage.totalPoints === 0) {
-    return `
-      <article class="detail-card preview-coverage-card">
-        <strong>分支覆盖</strong>
-        <p class="helper-text">这个项目目前还没有选项或条件判断，所以这里暂时不用查覆盖率。</p>
-      </article>
-    `;
+function buildPreviewFlightRecorder(session = state.previewSession, options = {}) {
+  return previewStoryDebuggerTools.buildPreviewFlightRecorder(session, {
+    projectTitle: state.data?.project?.title,
+    generatedAt: options.generatedAt,
+    variableDefinitions: state.data?.variables,
+    blockLabels: BLOCK_LABELS,
+    getVariableDefaultValue,
+    formatVariableValue,
+    getRouteDecisionSummary: getPreviewRouteDecisionSummary,
+    getBlockSummary: (snapshot) =>
+      snapshot?.completed
+        ? { title: snapshot.visualState?.dialogueText, meta: "路线结束" }
+        : getBlockSummary(snapshot?.block, state.data?.scenesById?.get(snapshot?.sceneId)),
+    getCharacterName: (characterId) =>
+      state.data?.charactersById?.get(characterId)?.displayName ?? characterId,
+    getAssetName: (assetId) => state.data?.assetsById?.get(assetId)?.name ?? assetId,
+  });
+}
+
+function exportPreviewFlightRecorderMarkdown() {
+  if (!state.previewSession) {
+    setSaveStatus("先开始试玩再导出飞行记录", true);
+    showToast("先开始试玩再导出飞行记录", "error");
+    return;
   }
 
-  const unvisitedMarkup = coverage.unvisitedPoints
-    .slice(0, 3)
-    .map((point) => renderPreviewCoveragePoint(point, "pending"))
-    .join("");
-  const partialMarkup = coverage.partialPoints
-    .slice(0, 3)
-    .map((point) => renderPreviewCoveragePoint(point, "partial"))
-    .join("");
-  const remainingUnvisitedCount = Math.max(coverage.unvisitedPoints.length - 3, 0);
-  const remainingPartialCount = Math.max(coverage.partialPoints.length - 3, 0);
+  const report = buildPreviewFlightRecorder(state.previewSession);
+  downloadTextFile(
+    buildDatedProjectFileName("playtest_flight_record", "md"),
+    `\uFEFF${previewStoryDebuggerTools.buildPreviewFlightRecorderMarkdown(report)}`,
+    "text/markdown;charset=utf-8"
+  );
+  setSaveStatus(`已导出 ${report.summary.stepCount} 步试玩飞行记录`);
+  showToast("试玩飞行记录已导出");
+}
 
-  return `
-    <article class="detail-card preview-coverage-card">
-      <div class="preview-coverage-head">
-        <div>
-          <strong>分支覆盖</strong>
-          <p class="helper-text">这里会看这次试玩已经踩过哪些分支口、还有哪些路线结果没测到。</p>
-        </div>
-        <div class="route-badge-row">
-          <span class="issue-tag ${coverage.remainingOutcomeCount > 0 ? "warn-text" : "good-text"}">
-            ${coverage.remainingOutcomeCount > 0 ? `还差 ${coverage.remainingOutcomeCount} 条路线` : "这轮试玩已测完"}
-          </span>
-        </div>
-      </div>
-      <div class="preview-coverage-metrics">
-        <div class="preview-coverage-metric">
-          <span>已遇到分支口</span>
-          <strong>${coverage.visitedPointCount} / ${coverage.totalPoints}</strong>
-        </div>
-        <div class="preview-coverage-metric">
-          <span>已试路线结果</span>
-          <strong>${coverage.coveredOutcomeCount} / ${coverage.totalOutcomeCount}</strong>
-        </div>
-        <div class="preview-coverage-metric">
-          <span>整处测完</span>
-          <strong>${coverage.fullyCoveredPointCount} / ${coverage.totalPoints}</strong>
-        </div>
-      </div>
-      ${
-        coverage.currentPendingChoice
-          ? `
-            <div class="preview-coverage-note">
-              当前正停在一个选项口。你一旦选完，下面的覆盖结果会立刻更新。
-            </div>
-          `
-          : coverage.remainingOutcomeCount === 0
-            ? `
-              <div class="preview-coverage-note is-complete">
-                这次试玩已经把所有分支结果都测到了，可以放心去试别的起点了。
-              </div>
-            `
-            : ""
-      }
-      <div class="preview-coverage-section">
-        <div class="preview-coverage-section-head">
-          <strong>还没走到的分支口</strong>
-          <span>${coverage.unvisitedPoints.length} 处</span>
-        </div>
-        ${
-          unvisitedMarkup ||
-          '<div class="preview-coverage-note is-complete">所有分支口这轮都已经走到过了。</div>'
-        }
-        ${
-          remainingUnvisitedCount > 0
-            ? `<div class="preview-coverage-note">后面还有 ${remainingUnvisitedCount} 处分支口没展示出来，等你继续试玩时会自动补上。</div>`
-            : ""
-        }
-      </div>
-      <div class="preview-coverage-section">
-        <div class="preview-coverage-section-head">
-          <strong>已经走到但还没试全</strong>
-          <span>${coverage.partialPoints.length} 处</span>
-        </div>
-        ${
-          partialMarkup ||
-          '<div class="preview-coverage-note is-complete">目前这轮已经没有“走到但没试全”的分支口了。</div>'
-        }
-        ${
-          remainingPartialCount > 0
-            ? `<div class="preview-coverage-note">后面还有 ${remainingPartialCount} 处未试全的分支口，可以继续往下翻起点树慢慢补。</div>`
-            : ""
-        }
-      </div>
-    </article>
-  `;
+function exportPreviewFlightRecorderJson() {
+  if (!state.previewSession) {
+    setSaveStatus("先开始试玩再导出完整轨迹", true);
+    showToast("先开始试玩再导出完整轨迹", "error");
+    return;
+  }
+
+  const report = buildPreviewFlightRecorder(state.previewSession);
+  downloadJsonFile(buildDatedProjectFileName("playtest_flight_record", "json"), report);
+  setSaveStatus(`已导出 ${report.summary.stepCount} 步完整试玩轨迹`);
+  showToast("完整试玩轨迹已导出");
 }
 
 function renderPreviewSidebar(session) {
@@ -23842,6 +23484,13 @@ function renderPreviewSidebar(session) {
       ["已走步数", session ? `${session.position + 1} / ${session.timeline.length}` : "0 / 0"],
     ])}
     ${isAdvancedMode ? renderPreviewDebugPanel(snapshot) : ""}
+    ${
+      isAdvancedMode
+        ? previewStoryDebuggerPanelTools.renderPreviewFlightRecorderPanel(
+            buildPreviewFlightRecorder(session)
+          )
+        : ""
+    }
     ${isAdvancedMode ? renderPreviewBranchCoveragePanel(session) : ""}
     ${isAdvancedMode ? renderPreviewRouteSummaryPanel(session) : ""}
     ${
@@ -34099,15 +33748,29 @@ function renderCreativeAssistantPanel(scene, selectedBlock) {
 }
 
 let creativeAssistantHistoryRefreshFrame = 0;
+let creativeAssistantHistoryRefreshTimeout = 0;
+
+function flushCreativeAssistantHistoryRefresh() {
+  const scheduledFrame = creativeAssistantHistoryRefreshFrame;
+  const scheduledTimeout = creativeAssistantHistoryRefreshTimeout;
+  creativeAssistantHistoryRefreshFrame = 0;
+  creativeAssistantHistoryRefreshTimeout = 0;
+  if (scheduledFrame) {
+    cancelAnimationFrame(scheduledFrame);
+  }
+  if (scheduledTimeout) {
+    clearTimeout(scheduledTimeout);
+  }
+  refreshCreativeAssistantPanel({ focusHistorySearch: true });
+}
 
 function scheduleCreativeAssistantHistoryRefresh() {
-  if (creativeAssistantHistoryRefreshFrame) {
+  if (creativeAssistantHistoryRefreshFrame || creativeAssistantHistoryRefreshTimeout) {
     return;
   }
-  creativeAssistantHistoryRefreshFrame = requestAnimationFrame(() => {
-    creativeAssistantHistoryRefreshFrame = 0;
-    refreshCreativeAssistantPanel({ focusHistorySearch: true });
-  });
+  creativeAssistantHistoryRefreshFrame = requestAnimationFrame(flushCreativeAssistantHistoryRefresh);
+  // Background tabs may throttle animation frames; keep search feedback deterministic.
+  creativeAssistantHistoryRefreshTimeout = setTimeout(flushCreativeAssistantHistoryRefresh, 120);
 }
 
 function refreshCreativeAssistantPanel(options = {}) {

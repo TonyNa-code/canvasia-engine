@@ -7,19 +7,22 @@
       "type": "number",
       "defaultValue": 0,
       "min": 0,
-      "max": 100
+      "max": 100,
+      "scope": "save"
     },
     {
       "id": "flag_walk_home",
       "name": "是否一起回家",
       "type": "boolean",
-      "defaultValue": false
+      "defaultValue": false,
+      "scope": "save"
     },
     {
       "id": "player_route",
       "name": "当前路线",
       "type": "string",
-      "defaultValue": "common"
+      "defaultValue": "common",
+      "scope": "save"
     }
   ]
 }

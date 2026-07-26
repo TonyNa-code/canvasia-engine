@@ -20,7 +20,17 @@
   "createdAt": "2026-04-13T18:15:00+08:00",
   "updatedAt": "2026-04-21T00:49:55+08:00",
   "runtimeSettings": {
-    "formalSaveSlotCount": 24
+    "formalSaveSlotCount": 24,
+    "defaultTextSpeed": "normal",
+    "defaultDialogTheme": "project",
+    "defaultUiThemeMode": "auto",
+    "performanceProfile": "standard",
+    "defaultBgmVolume": 72,
+    "defaultSfxVolume": 85,
+    "defaultVoiceVolume": 92,
+    "defaultVoiceDuckingRatio": 45,
+    "defaultVoiceEnabled": true,
+    "defaultVoiceDuckingEnabled": true
   },
   "dialogBoxConfig": {
     "preset": "moonlight",

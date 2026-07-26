@@ -68,6 +68,7 @@ Canvasia Engine は、ビジュアルノベル / Galgame 制作者のための s
 - シーンのサムネイルを表示できる通常セーブ / ロードとクイックセーブ / ロード、システムメニュー、テキスト履歴、自動再生、既読スキップ、ボイス回想、Web / ネイティブ Runtime のタイトル・選択肢・セーブ・設定・履歴・図鑑を操作できるゲームパッドナビゲーション
 - 変数ごとに「セーブ単位」または「周回記憶」を選択可能。周回変数は New Game、古いセーブのロード、ロールバック後も最新値を維持し、Web / native Runtime と Ren'Py 書き出しで同じ意味になります。システムメニューから通常セーブを消さずに周回記憶だけをリセットできます
 - 入口からの到達可能性にもとづくルート分析。壊れたリンク、孤立シーン、入口から到達できないシーン、分岐深度、エンディング候補、到達可能なエンディング経路プレビュー、エクスポート可能なルート QA チェックリスト、公開前ルート試遊ワークブックを確認可能
+- エディタ内の試遊フライトレコーダー。現在有効なタイムラインだけを追跡し、変数差分、選択肢 / 条件結果、背景 / BGM / キャラクター / stage-image / エフェクトの変化を記録します。記録ステップや元カードへ戻り、Markdown または完全な JSON 診断として書き出せます
 - Scene pacing advisor により、試遊シーンのリズム、長文、平坦な演出、実質的な結果を持たない選択肢、収束不足を確認し、scene production board で次の作業を提示
 - Ren'Py draft export により、シーン、台詞、ナレーション、ADV / NVL / 映画字幕レイアウト、選択肢、基本的な背景 / 立ち絵 / BGM、名前付き小道具 / 前景 / Cut-in レイヤー、待機、ジャンプ、サブシーンの `call` / `return` を `.rpy` の下書きへ変換し、手作業で確認すべきカスタム演出を migration notes として出力
 - ゲーム UI スキン、UI Kit 素材バインド、9-slice テクスチャ、ボタン状態、レイアウト調整、ビジュアルノベル用テキストボックス設計
@@ -131,7 +132,7 @@ Canvasia Engine は、ビジュアルノベル / Galgame 制作者のための s
 - [`export_runtime_preload.py`](export_runtime_preload.py): 書き出し Runtime 向け preload manifest / performance report 生成器
 - [`renpy_export.py`](renpy_export.py): Ren'Py Starter Bundle / `.rpy` migration export 生成器
 - [`prototype_editor`](prototype_editor): エディタ frontend
-- [`prototype_editor/modules`](prototype_editor/modules): ルート分析、ストーリーテンプレート、エディタ補助、Assistant、公開前チェックなどを扱う単体テスト可能な frontend 純ロジックモジュール
+- [`prototype_editor/modules`](prototype_editor/modules): ルート分析、試遊フライト記録、ストーリーテンプレート、エディタ補助、Assistant、公開前チェックなどを扱う単体テスト可能な frontend 純ロジックモジュール
 - [`export_player_template`](export_player_template): 書き出し後の Web Runtime テンプレート
 - [`native_runtime`](native_runtime): ネイティブ Runtime player と desktop runtime 関連ロジック
 - [`template_project`](template_project): 空白プロジェクトテンプレート

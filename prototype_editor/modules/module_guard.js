@@ -52,6 +52,8 @@ const REQUIRED_EDITOR_MODULES = Object.freeze([
     { globalName: "CanvasiaEditorRouteTestingReport", script: "./modules/route_testing_report.js", label: "路线测试报告" },
     { globalName: "CanvasiaEditorSceneProductionBoard", script: "./modules/scene_production_board.js", label: "场景制作看板" },
     { globalName: "CanvasiaEditorPreviewRegression", script: "./modules/preview_regression.js", label: "预览回归测试" },
+    { globalName: "CanvasiaEditorPreviewStoryDebugger", script: "./modules/preview_story_debugger.js", label: "试玩轨迹分析" },
+    { globalName: "CanvasiaEditorPreviewStoryDebuggerPanel", script: "./modules/preview_story_debugger_panel.js", label: "试玩轨迹面板" },
     { globalName: "CanvasiaEditorRegressionDiagnostics", script: "./modules/regression_diagnostics.js", label: "回归诊断" },
     { globalName: "CanvasiaEditorPlaytestHandoffReport", script: "./modules/playtest_handoff_report.js", label: "试玩交接报告" },
     { globalName: "CanvasiaEditorChoiceConsequenceSheet", script: "./modules/choice_consequence_sheet.js", label: "选项后果表" },
