@@ -3798,6 +3798,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / run_editor.RUNTIME_PRELOAD_REPORT_FILE_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_PLAYER_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_PRELOAD_NAME).is_file())
+        self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_CREDITS_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_INPUT_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_KEY_BINDINGS_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_I18N_NAME).is_file())
@@ -4121,6 +4122,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["runtimeScenePrefetchModule"], run_editor.NATIVE_RUNTIME_SCENE_PREFETCH_NAME)
         self.assertEqual(manifest["files"]["runtimeStoryFlowModule"], run_editor.NATIVE_RUNTIME_STORY_FLOW_NAME)
         self.assertEqual(manifest["files"]["runtimeAchievementsModule"], run_editor.NATIVE_RUNTIME_ACHIEVEMENTS_NAME)
+        self.assertEqual(manifest["files"]["runtimeCreditsModule"], run_editor.NATIVE_RUNTIME_CREDITS_NAME)
         self.assertEqual(manifest["files"]["runtimeCharacterMotionModule"], run_editor.NATIVE_RUNTIME_CHARACTER_MOTION_NAME)
         self.assertEqual(manifest["files"]["runtimeStageImagesModule"], run_editor.NATIVE_RUNTIME_STAGE_IMAGES_NAME)
         self.assertEqual(manifest["files"]["runtimeChoiceAvailabilityModule"], run_editor.NATIVE_RUNTIME_CHOICE_AVAILABILITY_NAME)
@@ -4140,6 +4142,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 run_editor.NATIVE_RUNTIME_SCENE_PREFETCH_NAME,
                 run_editor.NATIVE_RUNTIME_STORY_FLOW_NAME,
                 run_editor.NATIVE_RUNTIME_ACHIEVEMENTS_NAME,
+                run_editor.NATIVE_RUNTIME_CREDITS_NAME,
                 run_editor.NATIVE_RUNTIME_CHARACTER_MOTION_NAME,
                 run_editor.NATIVE_RUNTIME_STAGE_IMAGES_NAME,
                 run_editor.NATIVE_RUNTIME_CHOICE_AVAILABILITY_NAME,
@@ -4204,6 +4207,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["runtimeScenePrefetchModule"], run_editor.NATIVE_RUNTIME_SCENE_PREFETCH_NAME)
         self.assertEqual(manifest["files"]["runtimeStoryFlowModule"], run_editor.NATIVE_RUNTIME_STORY_FLOW_NAME)
         self.assertEqual(manifest["files"]["runtimeAchievementsModule"], run_editor.NATIVE_RUNTIME_ACHIEVEMENTS_NAME)
+        self.assertEqual(manifest["files"]["runtimeCreditsModule"], run_editor.NATIVE_RUNTIME_CREDITS_NAME)
         self.assertEqual(manifest["files"]["runtimeCharacterMotionModule"], run_editor.NATIVE_RUNTIME_CHARACTER_MOTION_NAME)
         self.assertEqual(manifest["files"]["runtimeStageImagesModule"], run_editor.NATIVE_RUNTIME_STAGE_IMAGES_NAME)
         self.assertEqual(manifest["files"]["runtimeChoiceAvailabilityModule"], run_editor.NATIVE_RUNTIME_CHOICE_AVAILABILITY_NAME)
@@ -4234,6 +4238,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["runtime"]["runtimeScenePrefetchModule"], run_editor.NATIVE_RUNTIME_SCENE_PREFETCH_NAME)
         self.assertEqual(manifest["runtime"]["runtimeStoryFlowModule"], run_editor.NATIVE_RUNTIME_STORY_FLOW_NAME)
         self.assertEqual(manifest["runtime"]["runtimeAchievementsModule"], run_editor.NATIVE_RUNTIME_ACHIEVEMENTS_NAME)
+        self.assertEqual(manifest["runtime"]["runtimeCreditsModule"], run_editor.NATIVE_RUNTIME_CREDITS_NAME)
         self.assertEqual(manifest["runtime"]["runtimeCharacterMotionModule"], run_editor.NATIVE_RUNTIME_CHARACTER_MOTION_NAME)
         self.assertEqual(manifest["runtime"]["runtimeStageImagesModule"], run_editor.NATIVE_RUNTIME_STAGE_IMAGES_NAME)
         self.assertEqual(manifest["runtime"]["runtimeChoiceAvailabilityModule"], run_editor.NATIVE_RUNTIME_CHOICE_AVAILABILITY_NAME)
@@ -5581,6 +5586,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((bundle_dir / "native_runtime" / run_editor.NATIVE_RUNTIME_PLAYER_NAME).is_file())
         self.assertTrue((bundle_dir / "native_runtime" / run_editor.NATIVE_RUNTIME_SCENE_PREFETCH_NAME).is_file())
         self.assertTrue((bundle_dir / "native_runtime" / run_editor.NATIVE_RUNTIME_ACHIEVEMENTS_NAME).is_file())
+        self.assertTrue((bundle_dir / "native_runtime" / run_editor.NATIVE_RUNTIME_CREDITS_NAME).is_file())
         self.assertTrue((bundle_dir / "native_runtime" / run_editor.NATIVE_RUNTIME_CHARACTER_MOTION_NAME).is_file())
         self.assertTrue((bundle_dir / "native_runtime" / run_editor.NATIVE_RUNTIME_DIAGNOSTICS_NAME).is_file())
         self.assertTrue((bundle_dir / "native_runtime" / run_editor.NATIVE_RUNTIME_INPUT_NAME).is_file())

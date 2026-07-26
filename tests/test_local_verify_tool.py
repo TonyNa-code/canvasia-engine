@@ -182,6 +182,8 @@ class LocalVerifyToolTests(unittest.TestCase):
         self.assertTrue(any("test_native_runtime_story_flow.py" in command for command in commands))
         self.assertTrue(any("test_story_flow_contract.py" in command for command in commands))
         self.assertTrue(any("test_native_runtime_achievements.py" in command for command in commands))
+        self.assertTrue(any("test_native_runtime_credits.py" in command for command in commands))
+        self.assertTrue(any("test_native_runtime_bundle.py" in command for command in commands))
         self.assertTrue(any("test_achievement_cross_runtime_contract.py" in command for command in commands))
         self.assertTrue(any("test_export_unlockable_manifest.py" in command for command in commands))
         self.assertTrue(any("test_persistent_variables_contract.py" in command for command in commands))

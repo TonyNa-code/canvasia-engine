@@ -126,6 +126,7 @@ from export_provenance_verifier import (
     write_export_provenance_verifier_files as write_export_provenance_verifier_files_impl,
 )
 from native_runtime_export_digest import build_native_3d_asset_export_digest
+from native_runtime_bundle import build_native_runtime_required_module_files
 from native_runtime.runtime_performance import (
     PERFORMANCE_BUDGET_MARKDOWN_NAME as NATIVE_RUNTIME_PERFORMANCE_BUDGET_MARKDOWN_NAME,
     PERFORMANCE_BUDGET_REPORT_NAME as NATIVE_RUNTIME_PERFORMANCE_BUDGET_REPORT_NAME,
@@ -489,34 +490,6 @@ EDITOR_SIGNING_GUIDE_SOURCE = ROOT_DIR / "docs" / "maintainers" / "release" / "e
 EDITOR_SIGNING_ENV_EXAMPLE_SOURCE = ROOT_DIR / "docs" / "maintainers" / "release" / "editor_signing.env.example"
 EDITOR_SIGNING_CHECK_SCRIPT_SOURCE = ROOT_DIR / "tools" / "release" / "check_editor_signing_readiness.py"
 EDITOR_SIGNING_CHECK_COMMAND_SOURCE = ROOT_DIR / "tools" / "release" / "run_signing_readiness.command"
-NATIVE_RUNTIME_PLAYER_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_player.py"
-NATIVE_RUNTIME_PRELOAD_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_preload.py"
-NATIVE_RUNTIME_SCENE_PREFETCH_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_scene_prefetch.py"
-NATIVE_RUNTIME_STORY_FLOW_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_story_flow.py"
-NATIVE_RUNTIME_ACHIEVEMENTS_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_achievements.py"
-NATIVE_RUNTIME_DIAGNOSTICS_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_diagnostics.py"
-NATIVE_RUNTIME_PERFORMANCE_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_performance.py"
-NATIVE_RUNTIME_INPUT_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_input.py"
-NATIVE_RUNTIME_KEY_BINDINGS_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_key_bindings.py"
-NATIVE_RUNTIME_I18N_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_i18n.py"
-NATIVE_RUNTIME_SETTINGS_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_player_settings.py"
-NATIVE_RUNTIME_SETTINGS_OVERLAY_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_settings_overlay.py"
-NATIVE_RUNTIME_READING_PROFILES_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_reading_profiles.py"
-NATIVE_RUNTIME_DIALOGUE_LAYOUTS_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_dialogue_layouts.py"
-NATIVE_RUNTIME_VISUAL_COMFORT_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_visual_comfort.py"
-NATIVE_RUNTIME_VOICE_MIXER_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_voice_mixer.py"
-NATIVE_RUNTIME_VIEW_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_player_view.py"
-NATIVE_RUNTIME_CHARACTER_MOTION_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_character_motion.py"
-NATIVE_RUNTIME_STAGE_IMAGES_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_stage_images.py"
-NATIVE_RUNTIME_CHOICE_AVAILABILITY_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_choice_availability.py"
-NATIVE_RUNTIME_ROLLBACK_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_rollback.py"
-NATIVE_RUNTIME_SAVE_THUMBNAILS_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_save_thumbnails.py"
-NATIVE_RUNTIME_TEXT_EFFECTS_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_text_effects.py"
-NATIVE_RUNTIME_TEXT_INPUT_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_text_input.py"
-NATIVE_RUNTIME_STORAGE_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_storage.py"
-NATIVE_RUNTIME_VARIABLES_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_variables.py"
-NATIVE_RUNTIME_PERSISTENT_VARIABLES_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_persistent_variables.py"
-NATIVE_RUNTIME_VN_QUALITY_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "runtime_vn_quality.py"
 NATIVE_RUNTIME_README_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "README.md"
 NATIVE_RUNTIME_REQUIREMENTS_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "requirements.txt"
 NATIVE_RUNTIME_BUILD_REQUIREMENTS_SOURCE = NATIVE_RUNTIME_TEMPLATE_DIR / "requirements-build.txt"
@@ -527,6 +500,7 @@ NATIVE_RUNTIME_PRELOAD_NAME = "runtime_preload.py"
 NATIVE_RUNTIME_SCENE_PREFETCH_NAME = "runtime_scene_prefetch.py"
 NATIVE_RUNTIME_STORY_FLOW_NAME = "runtime_story_flow.py"
 NATIVE_RUNTIME_ACHIEVEMENTS_NAME = "runtime_achievements.py"
+NATIVE_RUNTIME_CREDITS_NAME = "runtime_credits.py"
 NATIVE_RUNTIME_DIAGNOSTICS_NAME = "runtime_diagnostics.py"
 NATIVE_RUNTIME_PERFORMANCE_NAME = "runtime_performance.py"
 NATIVE_RUNTIME_INPUT_NAME = "runtime_input.py"
@@ -594,35 +568,39 @@ NATIVE_RUNTIME_WINDOWS_FILE_INTEGRITY_COMMAND_NAME = "verify_native_runtime_file
 NATIVE_RUNTIME_MAC_APP_BUILDER_COMMAND_NAME = "打包原生Runtime应用.command"
 NATIVE_RUNTIME_LINUX_APP_BUILDER_COMMAND_NAME = "build_native_runtime_app.sh"
 NATIVE_RUNTIME_WINDOWS_APP_BUILDER_COMMAND_NAME = "build_native_runtime_app.bat"
-NATIVE_RUNTIME_REQUIRED_MODULE_FILES = (
-    (NATIVE_RUNTIME_PLAYER_SOURCE, NATIVE_RUNTIME_PLAYER_NAME),
-    (NATIVE_RUNTIME_PRELOAD_SOURCE, NATIVE_RUNTIME_PRELOAD_NAME),
-    (NATIVE_RUNTIME_SCENE_PREFETCH_SOURCE, NATIVE_RUNTIME_SCENE_PREFETCH_NAME),
-    (NATIVE_RUNTIME_STORY_FLOW_SOURCE, NATIVE_RUNTIME_STORY_FLOW_NAME),
-    (NATIVE_RUNTIME_ACHIEVEMENTS_SOURCE, NATIVE_RUNTIME_ACHIEVEMENTS_NAME),
-    (NATIVE_RUNTIME_DIAGNOSTICS_SOURCE, NATIVE_RUNTIME_DIAGNOSTICS_NAME),
-    (NATIVE_RUNTIME_PERFORMANCE_SOURCE, NATIVE_RUNTIME_PERFORMANCE_NAME),
-    (NATIVE_RUNTIME_INPUT_SOURCE, NATIVE_RUNTIME_INPUT_NAME),
-    (NATIVE_RUNTIME_KEY_BINDINGS_SOURCE, NATIVE_RUNTIME_KEY_BINDINGS_NAME),
-    (NATIVE_RUNTIME_I18N_SOURCE, NATIVE_RUNTIME_I18N_NAME),
-    (NATIVE_RUNTIME_SETTINGS_SOURCE, NATIVE_RUNTIME_SETTINGS_NAME),
-    (NATIVE_RUNTIME_SETTINGS_OVERLAY_SOURCE, NATIVE_RUNTIME_SETTINGS_OVERLAY_NAME),
-    (NATIVE_RUNTIME_READING_PROFILES_SOURCE, NATIVE_RUNTIME_READING_PROFILES_NAME),
-    (NATIVE_RUNTIME_DIALOGUE_LAYOUTS_SOURCE, NATIVE_RUNTIME_DIALOGUE_LAYOUTS_NAME),
-    (NATIVE_RUNTIME_VISUAL_COMFORT_SOURCE, NATIVE_RUNTIME_VISUAL_COMFORT_NAME),
-    (NATIVE_RUNTIME_VOICE_MIXER_SOURCE, NATIVE_RUNTIME_VOICE_MIXER_NAME),
-    (NATIVE_RUNTIME_VIEW_SOURCE, NATIVE_RUNTIME_VIEW_NAME),
-    (NATIVE_RUNTIME_CHARACTER_MOTION_SOURCE, NATIVE_RUNTIME_CHARACTER_MOTION_NAME),
-    (NATIVE_RUNTIME_STAGE_IMAGES_SOURCE, NATIVE_RUNTIME_STAGE_IMAGES_NAME),
-    (NATIVE_RUNTIME_CHOICE_AVAILABILITY_SOURCE, NATIVE_RUNTIME_CHOICE_AVAILABILITY_NAME),
-    (NATIVE_RUNTIME_ROLLBACK_SOURCE, NATIVE_RUNTIME_ROLLBACK_NAME),
-    (NATIVE_RUNTIME_SAVE_THUMBNAILS_SOURCE, NATIVE_RUNTIME_SAVE_THUMBNAILS_NAME),
-    (NATIVE_RUNTIME_TEXT_EFFECTS_SOURCE, NATIVE_RUNTIME_TEXT_EFFECTS_NAME),
-    (NATIVE_RUNTIME_TEXT_INPUT_SOURCE, NATIVE_RUNTIME_TEXT_INPUT_NAME),
-    (NATIVE_RUNTIME_STORAGE_SOURCE, NATIVE_RUNTIME_STORAGE_NAME),
-    (NATIVE_RUNTIME_VARIABLES_SOURCE, NATIVE_RUNTIME_VARIABLES_NAME),
-    (NATIVE_RUNTIME_PERSISTENT_VARIABLES_SOURCE, NATIVE_RUNTIME_PERSISTENT_VARIABLES_NAME),
-    (NATIVE_RUNTIME_VN_QUALITY_SOURCE, NATIVE_RUNTIME_VN_QUALITY_NAME),
+NATIVE_RUNTIME_REQUIRED_MODULE_FILES = build_native_runtime_required_module_files(
+    NATIVE_RUNTIME_TEMPLATE_DIR,
+    (
+        NATIVE_RUNTIME_PLAYER_NAME,
+        NATIVE_RUNTIME_PRELOAD_NAME,
+        NATIVE_RUNTIME_SCENE_PREFETCH_NAME,
+        NATIVE_RUNTIME_STORY_FLOW_NAME,
+        NATIVE_RUNTIME_ACHIEVEMENTS_NAME,
+        NATIVE_RUNTIME_CREDITS_NAME,
+        NATIVE_RUNTIME_DIAGNOSTICS_NAME,
+        NATIVE_RUNTIME_PERFORMANCE_NAME,
+        NATIVE_RUNTIME_INPUT_NAME,
+        NATIVE_RUNTIME_KEY_BINDINGS_NAME,
+        NATIVE_RUNTIME_I18N_NAME,
+        NATIVE_RUNTIME_SETTINGS_NAME,
+        NATIVE_RUNTIME_SETTINGS_OVERLAY_NAME,
+        NATIVE_RUNTIME_READING_PROFILES_NAME,
+        NATIVE_RUNTIME_DIALOGUE_LAYOUTS_NAME,
+        NATIVE_RUNTIME_VISUAL_COMFORT_NAME,
+        NATIVE_RUNTIME_VOICE_MIXER_NAME,
+        NATIVE_RUNTIME_VIEW_NAME,
+        NATIVE_RUNTIME_CHARACTER_MOTION_NAME,
+        NATIVE_RUNTIME_STAGE_IMAGES_NAME,
+        NATIVE_RUNTIME_CHOICE_AVAILABILITY_NAME,
+        NATIVE_RUNTIME_ROLLBACK_NAME,
+        NATIVE_RUNTIME_SAVE_THUMBNAILS_NAME,
+        NATIVE_RUNTIME_TEXT_EFFECTS_NAME,
+        NATIVE_RUNTIME_TEXT_INPUT_NAME,
+        NATIVE_RUNTIME_STORAGE_NAME,
+        NATIVE_RUNTIME_VARIABLES_NAME,
+        NATIVE_RUNTIME_PERSISTENT_VARIABLES_NAME,
+        NATIVE_RUNTIME_VN_QUALITY_NAME,
+    ),
 )
 EDITOR_DISTRIBUTION_CONFIG_NAME = "editor_distribution.json"
 EDITOR_DISTRIBUTION_SNAPSHOT_NAME = "editor_distribution.snapshot.json"
@@ -663,6 +641,7 @@ EDITOR_PORTABLE_RUNTIME_TARGETS = {
 }
 EDITOR_EXPORT_FILES = [
     "run_editor.py",
+    "native_runtime_bundle.py",
     "editor_asset_usage.py",
     "editor_local_security.py",
     "editor_snapshot_cache.py",
@@ -8993,6 +8972,8 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
         "runtimeStoryFlowModulePath": str(build_dir / NATIVE_RUNTIME_STORY_FLOW_NAME),
         "runtimeAchievementsModuleName": NATIVE_RUNTIME_ACHIEVEMENTS_NAME,
         "runtimeAchievementsModulePath": str(build_dir / NATIVE_RUNTIME_ACHIEVEMENTS_NAME),
+        "runtimeCreditsModuleName": NATIVE_RUNTIME_CREDITS_NAME,
+        "runtimeCreditsModulePath": str(build_dir / NATIVE_RUNTIME_CREDITS_NAME),
         "runtimeDiagnosticsModuleName": NATIVE_RUNTIME_DIAGNOSTICS_NAME,
         "runtimeDiagnosticsModulePath": str(build_dir / NATIVE_RUNTIME_DIAGNOSTICS_NAME),
         "runtimeDiagnosticsReportName": runtime_diagnostics_files["runtimeDiagnosticsReportName"],
@@ -9539,6 +9520,7 @@ def export_native_runtime_build() -> dict:
             "runtimeScenePrefetchModule": runtime_files["runtimeScenePrefetchModuleName"],
             "runtimeStoryFlowModule": runtime_files["runtimeStoryFlowModuleName"],
             "runtimeAchievementsModule": runtime_files["runtimeAchievementsModuleName"],
+            "runtimeCreditsModule": runtime_files["runtimeCreditsModuleName"],
             "runtimeDiagnosticsModule": runtime_files["runtimeDiagnosticsModuleName"],
             "runtimeDiagnosticsReport": runtime_files["runtimeDiagnosticsReportName"],
             "runtimeDiagnosticsMarkdown": runtime_files["runtimeDiagnosticsMarkdownName"],
@@ -9619,6 +9601,7 @@ def export_native_runtime_build() -> dict:
             "runtimeScenePrefetchModule": runtime_files["runtimeScenePrefetchModuleName"],
             "runtimeStoryFlowModule": runtime_files["runtimeStoryFlowModuleName"],
             "runtimeAchievementsModule": runtime_files["runtimeAchievementsModuleName"],
+            "runtimeCreditsModule": runtime_files["runtimeCreditsModuleName"],
             "runtimeDiagnosticsModule": runtime_files["runtimeDiagnosticsModuleName"],
             "runtimeDiagnosticsReport": runtime_files["runtimeDiagnosticsReportName"],
             "runtimeDiagnosticsMarkdown": runtime_files["runtimeDiagnosticsMarkdownName"],

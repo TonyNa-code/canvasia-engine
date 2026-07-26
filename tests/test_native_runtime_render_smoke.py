@@ -4046,6 +4046,44 @@ class NativeRuntimeRenderSmokeTests(unittest.TestCase):
         persisted = load_project_archive_progress("native_render_smoke")
         self.assertIn("custom:first-meet", persisted["achievementUnlocked"])
 
+    def test_native_credits_render_scroll_respects_skip_rule_and_auto_continues(self) -> None:
+        data_path = self.write_game_data()
+        payload = json.loads(data_path.read_text(encoding="utf-8"))
+        payload["chapters"][0]["scenes"][0]["blocks"] = [
+            {
+                "id": "credits_true_end",
+                "type": "credits_roll",
+                "title": "TRUE END",
+                "subtitle": "The summer continues",
+                "lines": ["企划：Creator", "剧本：Writer", "音乐：Composer"],
+                "durationSeconds": 4,
+                "background": "light",
+                "skippable": False,
+            },
+            {"id": "line_after_credits", "type": "narration", "text": "片尾之后。"},
+        ]
+        data_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="The system font .*", category=UserWarning)
+            player = NativeRuntimePlayer(pygame, data_path)
+
+        player.runtime_settings["visualComfort"] = "static"
+        player.start_story_from_title()
+
+        self.assertEqual(player.current_line["type"], "credits_roll")
+        self.assertEqual(player.current_line["creditsPlayback"]["background"], "light")
+        self.assertFalse(player.current_line["creditsPlayback"]["skippable"])
+        self.assertFalse(player.can_advance_current_line())
+        self.assertIn("不可跳过", player.status_message)
+        player.render()
+
+        player.current_line["creditsPlayback"]["startedAtMs"] = pygame.time.get_ticks() - 5_000
+        self.assertTrue(player.can_advance_current_line())
+        player.update_flow_assist()
+        self.assertEqual(player.current_line["type"], "narration")
+        self.assertEqual(player.current_line["text"], "片尾之后。")
+
     def test_choice_availability_hides_locks_and_keeps_runtime_recoverable(self) -> None:
         data_path = self.write_game_data()
         payload = json.loads(data_path.read_text(encoding="utf-8"))

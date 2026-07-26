@@ -30,11 +30,21 @@ NATIVE_RUNTIME_SOURCE_PATTERN = re.compile(
     r'^(NATIVE_RUNTIME_[A-Z0-9_]+_SOURCE)\s*=\s*NATIVE_RUNTIME_TEMPLATE_DIR\s*/\s*"(runtime_[^"]+\.py)"',
     re.MULTILINE,
 )
+NATIVE_RUNTIME_NAME_PATTERN = re.compile(
+    r'^(NATIVE_RUNTIME_[A-Z0-9_]+_NAME)\s*=\s*"(runtime_[^"]+\.py)"',
+    re.MULTILINE,
+)
 NATIVE_RUNTIME_REQUIRED_TUPLE_PATTERN = re.compile(
     r"NATIVE_RUNTIME_REQUIRED_MODULE_FILES\s*=\s*\((.*?)\n\)",
     re.DOTALL,
 )
 NATIVE_RUNTIME_REQUIRED_SOURCE_PATTERN = re.compile(r"\((NATIVE_RUNTIME_[A-Z0-9_]+_SOURCE)\s*,")
+NATIVE_RUNTIME_REQUIRED_REGISTRY_PATTERN = re.compile(
+    r"NATIVE_RUNTIME_REQUIRED_MODULE_FILES\s*=\s*build_native_runtime_required_module_files\(\s*"
+    r"NATIVE_RUNTIME_TEMPLATE_DIR\s*,\s*\((.*?)\)\s*,?\s*\)",
+    re.DOTALL,
+)
+NATIVE_RUNTIME_REQUIRED_NAME_PATTERN = re.compile(r"(NATIVE_RUNTIME_[A-Z0-9_]+_NAME)\s*,")
 NATIVE_RUNTIME_IMPORT_PATTERN = re.compile(r"from\s+\.?(runtime_[A-Za-z0-9_]+)\s+import")
 MODULE_GUARD_SCRIPT = "./modules/module_guard.js"
 EDITOR_APP_SCRIPT = "./app.js"
@@ -313,22 +323,36 @@ def evaluate_native_runtime_bundle() -> dict[str, object]:
         constant_name: file_name
         for constant_name, file_name in NATIVE_RUNTIME_SOURCE_PATTERN.findall(run_editor_source)
     }
-    required_match = NATIVE_RUNTIME_REQUIRED_TUPLE_PATTERN.search(run_editor_source)
-    required_constants = (
-        NATIVE_RUNTIME_REQUIRED_SOURCE_PATTERN.findall(required_match.group(1))
-        if required_match
-        else []
-    )
-    bundled_files = sorted(
-        source_constants[constant_name]
-        for constant_name in required_constants
-        if constant_name in source_constants
-    )
+    name_constants = {
+        constant_name: file_name
+        for constant_name, file_name in NATIVE_RUNTIME_NAME_PATTERN.findall(run_editor_source)
+    }
+    tuple_match = NATIVE_RUNTIME_REQUIRED_TUPLE_PATTERN.search(run_editor_source)
+    registry_match = NATIVE_RUNTIME_REQUIRED_REGISTRY_PATTERN.search(run_editor_source)
+    required_constants = []
+    declared_files = source_constants.values()
+    if tuple_match:
+        required_constants = NATIVE_RUNTIME_REQUIRED_SOURCE_PATTERN.findall(tuple_match.group(1))
+        bundled_files = sorted(
+            source_constants[constant_name]
+            for constant_name in required_constants
+            if constant_name in source_constants
+        )
+    elif registry_match:
+        required_constants = NATIVE_RUNTIME_REQUIRED_NAME_PATTERN.findall(registry_match.group(1))
+        bundled_files = sorted(
+            name_constants[constant_name]
+            for constant_name in required_constants
+            if constant_name in name_constants
+        )
+        declared_files = name_constants.values()
+    else:
+        bundled_files = []
     imported_modules = sorted(set(NATIVE_RUNTIME_IMPORT_PATTERN.findall(player_source)))
     imported_files = [f"{module_name}.py" for module_name in imported_modules]
     module_file_set = set(module_files)
     bundled_file_set = set(bundled_files)
-    declared_file_set = set(source_constants.values())
+    declared_file_set = set(declared_files)
     missing_source_constants = sorted(module_file_set - declared_file_set)
     stale_source_constants = sorted(declared_file_set - module_file_set)
     missing_from_bundle = sorted(module_file_set - bundled_file_set)
@@ -340,7 +364,7 @@ def evaluate_native_runtime_bundle() -> dict[str, object]:
     if (
         not NATIVE_RUNTIME_PLAYER_PATH.exists()
         or not RUN_EDITOR_PATH.exists()
-        or not required_match
+        or not (tuple_match or registry_match)
         or missing_source_constants
         or stale_source_constants
         or missing_from_bundle
@@ -353,7 +377,7 @@ def evaluate_native_runtime_bundle() -> dict[str, object]:
     return {
         "status": status,
         "moduleCount": len(module_files),
-        "sourceConstantCount": len(source_constants),
+        "sourceConstantCount": len(declared_file_set),
         "bundledModuleCount": len(bundled_files),
         "importedHelperCount": len(imported_modules),
         "moduleFiles": module_files,
@@ -451,7 +475,7 @@ def build_maintenance_plan(
                     f"missing={len(native_runtime_bundle.get('missingFromBundle') or [])}; "
                     f"importedNotBundled={len(native_runtime_bundle.get('importedNotBundled') or [])}"
                 ),
-                "Update run_editor.py source constants and NATIVE_RUNTIME_REQUIRED_MODULE_FILES together.",
+                "Update the validated NATIVE_RUNTIME_REQUIRED_MODULE_FILES registry with the module filename.",
             )
         )
 

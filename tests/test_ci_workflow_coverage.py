@@ -158,6 +158,26 @@ class CiWorkflowCoverageTests(unittest.TestCase):
             workflow,
         )
 
+    def test_native_runtime_credits_module_is_checked_in_ci(self) -> None:
+        workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("native_runtime/runtime_credits.py", workflow)
+        self.assertIn("tests/test_native_runtime_credits.py", workflow)
+        self.assertIn(
+            "python -m unittest discover -s tests -p 'test_native_runtime_credits.py' -v",
+            workflow,
+        )
+
+    def test_native_runtime_bundle_registry_is_checked_in_ci(self) -> None:
+        workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("native_runtime_bundle.py", workflow)
+        self.assertIn("tests/test_native_runtime_bundle.py", workflow)
+        self.assertIn(
+            "python -m unittest discover -s tests -p 'test_native_runtime_bundle.py' -v",
+            workflow,
+        )
+
     def test_native_runtime_controller_input_module_is_checked_in_ci(self) -> None:
         workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
 

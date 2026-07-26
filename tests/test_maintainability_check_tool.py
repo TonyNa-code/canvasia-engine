@@ -171,6 +171,44 @@ class MaintainabilityCheckToolTests(unittest.TestCase):
             self.assertEqual(result["missingFromBundle"], ["runtime_helper.py"])
             self.assertEqual(result["importedNotBundled"], ["runtime_helper.py"])
 
+    def test_native_runtime_bundle_guard_supports_validated_name_registry(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            native_dir = root / "native_runtime"
+            native_dir.mkdir()
+            player_path = native_dir / "runtime_player.py"
+            helper_path = native_dir / "runtime_helper.py"
+            run_editor_path = root / "run_editor.py"
+            player_path.write_text("from .runtime_helper import helper\n", encoding="utf-8")
+            helper_path.write_text("def helper():\n    return True\n", encoding="utf-8")
+            run_editor_path.write_text(
+                "\n".join(
+                    [
+                        'NATIVE_RUNTIME_PLAYER_NAME = "runtime_player.py"',
+                        'NATIVE_RUNTIME_HELPER_NAME = "runtime_helper.py"',
+                        "NATIVE_RUNTIME_REQUIRED_MODULE_FILES = build_native_runtime_required_module_files(",
+                        "    NATIVE_RUNTIME_TEMPLATE_DIR,",
+                        "    (",
+                        "        NATIVE_RUNTIME_PLAYER_NAME,",
+                        "        NATIVE_RUNTIME_HELPER_NAME,",
+                        "    ),",
+                        ")",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            with (
+                mock.patch.object(self.maintainability, "NATIVE_RUNTIME_DIR", native_dir),
+                mock.patch.object(self.maintainability, "NATIVE_RUNTIME_PLAYER_PATH", player_path),
+                mock.patch.object(self.maintainability, "RUN_EDITOR_PATH", run_editor_path),
+            ):
+                result = self.maintainability.evaluate_native_runtime_bundle()
+
+            self.assertEqual(result["status"], "passed")
+            self.assertEqual(result["bundledFiles"], ["runtime_helper.py", "runtime_player.py"])
+
 
 if __name__ == "__main__":
     unittest.main()

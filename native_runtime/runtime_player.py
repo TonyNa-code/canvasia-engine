@@ -408,6 +408,11 @@ except ImportError:  # pragma: no cover - exported native packages import from t
     )
 
 try:
+    from . import runtime_credits as native_credits
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    import runtime_credits as native_credits
+
+try:
     from .runtime_rollback import (
         DEFAULT_ROLLBACK_LIMIT,
         append_rollback_checkpoint,
@@ -9463,9 +9468,17 @@ class NativeRuntimePlayer:
     def update_flow_assist(self) -> None:
         if self.overlay_mode or self.current_choices or self.finished or not self.current_line:
             return
-        if self.current_line.get("type") == "video_play":
+        line_type = self.current_line.get("type")
+        if line_type == "video_play":
             return
         now_ms = self.pygame.time.get_ticks()
+        if line_type == "credits_roll":
+            playback = self.current_line.get("creditsPlayback")
+            if native_credits.is_native_credits_complete(playback, now_ms) or (
+                self.skip_read_enabled and bool((playback or {}).get("skippable", True))
+            ):
+                self.advance_current_line_if_allowed()
+            return
         if self.skip_read_enabled:
             if self.current_line.get("type") == "wait":
                 if not self.is_current_line_fully_visible():
@@ -11480,26 +11493,17 @@ class NativeRuntimePlayer:
                 return
 
             if block_type == "credits_roll":
-                lines = block.get("lines") if isinstance(block.get("lines"), list) else []
-                credits_text = "\n".join(str(line) for line in lines[:12] if str(line).strip())
-                text = (
-                    f"{str(block.get('title') or 'STAFF')}\n"
-                    f"{str(block.get('subtitle') or '').strip()}\n\n"
-                    f"{credits_text or '感谢游玩。'}"
-                ).strip()
-                self.current_line = {
-                    "type": block_type,
-                    "speakerId": None,
-                    "speakerName": "片尾字幕",
-                    "text": text,
-                    "voiceAssetId": None,
-                    "blockLabel": get_block_label(block_type),
-                }
+                self.current_line = native_credits.build_native_credits_line(
+                    block,
+                    started_at_ms=self.pygame.time.get_ticks(),
+                    block_label=get_block_label(block_type),
+                    localize_value=lambda source, key, fallback: self.localize_value(source, key, fallback),
+                )
                 self.stop_voice()
                 self.record_text_history(self.current_line, scene, self.current_block_index)
-                self.start_current_line_display(text)
+                self.start_current_line_display(self.current_line["text"])
                 self.reveal_current_line_immediately()
-                self.status_message = "片尾字幕：按继续推进"
+                self.status_message = native_credits.get_native_credits_status(self.current_line["creditsPlayback"])
                 return
 
             if block_type == "achievement_unlock":
@@ -11880,7 +11884,15 @@ class NativeRuntimePlayer:
             self.open_current_video_external()
 
     def can_advance_current_line(self) -> bool:
-        if not self.current_line or self.current_line.get("type") != "video_play":
+        if not self.current_line:
+            return True
+        if self.current_line.get("type") == "credits_roll":
+            playback = self.current_line.get("creditsPlayback")
+            if native_credits.can_advance_native_credits(playback, self.pygame.time.get_ticks()):
+                return True
+            self.status_message = "这段片尾标记为不可跳过，请等待滚动结束。"
+            return False
+        if self.current_line.get("type") != "video_play":
             return True
         if (
             self.embedded_video_playback
@@ -12673,17 +12685,20 @@ class NativeRuntimePlayer:
         self.render_particle_effect(stage_surface)
         self.render_stage_surface(stage_surface)
         self.render_stage_effect_overlays()
-        if not self.ui_hidden or self.overlay_mode:
-            self.render_status_bar()
-        if not self.ui_hidden:
-            if self.current_choices:
-                self.render_choices()
-            elif self.current_line and self.current_line.get("type") == "video_play":
-                self.render_video_card()
-            elif self.current_line:
-                self.render_dialogue()
-            elif self.finished:
-                self.render_finished()
+        if self.current_line and self.current_line.get("type") == "credits_roll":
+            native_credits.render_native_credits_for_player(self)
+        else:
+            if not self.ui_hidden or self.overlay_mode:
+                self.render_status_bar()
+            if not self.ui_hidden:
+                if self.current_choices:
+                    self.render_choices()
+                elif self.current_line and self.current_line.get("type") == "video_play":
+                    self.render_video_card()
+                elif self.current_line:
+                    self.render_dialogue()
+                elif self.finished:
+                    self.render_finished()
         self.render_screen_effect_overlays()
         if self.overlay_mode != "title":
             self.last_gameplay_frame = self.screen.copy()
@@ -13991,6 +14006,7 @@ class NativeRuntimePlayer:
                 "dialogue": "台词播放",
                 "narration": "旁白播放",
                 "video_play": "视频段落",
+                "credits_roll": "滚动片尾",
             }.get(line_type, line_type)
         elif self.finished:
             reading_state = "路线结束"
