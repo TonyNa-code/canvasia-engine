@@ -49,6 +49,7 @@
     missing_asset: "待补素材",
     broken_target: "跳转待修",
     variable_logic: "变量待修",
+    achievement_setup: "成就待补",
     too_long: "偏长文本",
   });
 
@@ -283,7 +284,16 @@
       return "story";
     }
 
-    if (type === "jump" || type === "variable_set" || type === "variable_add" || type === "text_input" || type === "condition") {
+    if (
+      type === "jump" ||
+      type === "scene_call" ||
+      type === "scene_return" ||
+      type === "variable_set" ||
+      type === "variable_add" ||
+      type === "text_input" ||
+      type === "condition" ||
+      type === "achievement_unlock"
+    ) {
       return "logic";
     }
 
@@ -339,6 +349,9 @@
     if (block.type === "particle_effect" && getSafeParticleAction(block.action) !== "stop" && block.assetId) {
       assetIdsToCheck.push(block.assetId);
     }
+    if (block.type === "achievement_unlock" && block.iconAssetId) {
+      assetIdsToCheck.push(block.iconAssetId);
+    }
     const expressionAssetId = getExpressionAssetId(block);
     if (expressionAssetId) {
       assetIdsToCheck.push(expressionAssetId);
@@ -383,6 +396,13 @@
 
     if (hasVariableLogicIssue(block)) {
       pushIssue("variable_logic", "变量待修", "danger-text");
+    }
+
+    if (
+      block.type === "achievement_unlock" &&
+      (!String(block.achievementId ?? "").trim() || !String(block.title ?? "").trim())
+    ) {
+      pushIssue("achievement_setup", "成就待补", "danger-text");
     }
 
     return items;

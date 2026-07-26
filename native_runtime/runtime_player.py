@@ -397,6 +397,17 @@ except ImportError:  # pragma: no cover - exported native packages import from t
     )
 
 try:
+    from .runtime_achievements import (
+        build_native_achievement_archive_entries,
+        sanitize_achievement_unlock_block,
+    )
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_achievements import (
+        build_native_achievement_archive_entries,
+        sanitize_achievement_unlock_block,
+    )
+
+try:
     from .runtime_rollback import (
         DEFAULT_ROLLBACK_LIMIT,
         append_rollback_checkpoint,
@@ -544,6 +555,7 @@ try:
         get_safe_volume_percent,
         normalize_video_time_seconds,
         parse_hex_color,
+        render_achievement_notification_panel,
         split_wrap_tokens,
         with_alpha,
         wrap_plain_text,
@@ -608,6 +620,7 @@ except ImportError:  # pragma: no cover - exported native packages import from t
         get_safe_volume_percent,
         normalize_video_time_seconds,
         parse_hex_color,
+        render_achievement_notification_panel,
         split_wrap_tokens,
         with_alpha,
         wrap_plain_text,
@@ -8282,6 +8295,7 @@ class NativeRuntimePlayer:
         self.finished = False
         self.finished_message = ""
         self.status_message = "正在初始化原生 Runtime…"
+        self.achievement_notification: dict | None = None
 
         self._initialize_audio()
         self.refresh_connected_controllers()
@@ -9177,87 +9191,22 @@ class NativeRuntimePlayer:
         gallery_entries = self.get_gallery_archive_entries()
         music_entries = self.get_music_archive_entries()
         ending_entries = self.get_ending_archive_entries()
-
-        unlocked_characters = sum(1 for entry in character_entries if entry.get("unlocked"))
-        unlocked_cg = sum(1 for entry in gallery_entries if entry.get("unlocked"))
-        unlocked_bgm = sum(1 for entry in music_entries if entry.get("unlocked"))
-        unlocked_endings = sum(1 for entry in ending_entries if entry.get("unlocked"))
-
-        definitions = [
-            {
-                "id": "first_start",
-                "name": "初次启动",
-                "subtitle": "第一次进入原生 Runtime",
-                "notes": "启动一次原生 Runtime 即可点亮。",
-                "unlocked": bool(self.scene_order),
+        return build_native_achievement_archive_entries(
+            self.chapters,
+            metrics={
+                "hasScenes": bool(self.scene_order),
+                "characterCount": len(character_entries),
+                "unlockedCharacterCount": sum(1 for entry in character_entries if entry.get("unlocked")),
+                "galleryCount": len(gallery_entries),
+                "unlockedCgCount": sum(1 for entry in gallery_entries if entry.get("unlocked")),
+                "musicCount": len(music_entries),
+                "unlockedBgmCount": sum(1 for entry in music_entries if entry.get("unlocked")),
+                "endingCount": len(ending_entries),
+                "unlockedEndingCount": sum(1 for entry in ending_entries if entry.get("unlocked")),
             },
-            {
-                "id": "first_character",
-                "name": "角色初见",
-                "subtitle": f"已收录角色 {unlocked_characters} / {len(character_entries)}",
-                "notes": "任意角色完成收录后点亮。",
-                "unlocked": unlocked_characters > 0,
-            },
-            {
-                "id": "all_characters",
-                "name": "角色全收录",
-                "subtitle": f"已收录角色 {unlocked_characters} / {len(character_entries)}",
-                "notes": "收录全部角色图鉴后点亮。",
-                "unlocked": bool(character_entries) and unlocked_characters >= len(character_entries),
-            },
-            {
-                "id": "first_cg",
-                "name": "CG 初见",
-                "subtitle": f"已回收 CG {unlocked_cg} / {len(gallery_entries)}",
-                "notes": "任意 CG 完成回收后点亮。",
-                "unlocked": unlocked_cg > 0,
-            },
-            {
-                "id": "all_cg",
-                "name": "CG 全回收",
-                "subtitle": f"已回收 CG {unlocked_cg} / {len(gallery_entries)}",
-                "notes": "回收全部 CG 后点亮。",
-                "unlocked": bool(gallery_entries) and unlocked_cg >= len(gallery_entries),
-            },
-            {
-                "id": "first_bgm",
-                "name": "乐曲初见",
-                "subtitle": f"已解锁曲目 {unlocked_bgm} / {len(music_entries)}",
-                "notes": "任意 BGM 完成解锁后点亮。",
-                "unlocked": unlocked_bgm > 0,
-            },
-            {
-                "id": "all_bgm",
-                "name": "乐曲全解锁",
-                "subtitle": f"已解锁曲目 {unlocked_bgm} / {len(music_entries)}",
-                "notes": "解锁全部 BGM 后点亮。",
-                "unlocked": bool(music_entries) and unlocked_bgm >= len(music_entries),
-            },
-            {
-                "id": "first_ending",
-                "name": "初次通关",
-                "subtitle": f"已回收结局 {unlocked_endings} / {len(ending_entries)}",
-                "notes": "任意结局完成回收后点亮。",
-                "unlocked": unlocked_endings > 0,
-            },
-            {
-                "id": "all_endings",
-                "name": "结局全回收",
-                "subtitle": f"已回收结局 {unlocked_endings} / {len(ending_entries)}",
-                "notes": "回收全部结局后点亮。",
-                "unlocked": bool(ending_entries) and unlocked_endings >= len(ending_entries),
-            },
-        ]
-
-        return [
-            {
-                **entry,
-                "actionLabel": "查看成就",
-                "actionEnabled": bool(entry.get("unlocked")),
-                "previewText": entry["notes"],
-            }
-            for entry in definitions
-        ]
+            unlocked_custom_ids=self.archive_progress.get("achievementUnlocked") or [],
+            localize_value=lambda source, key, fallback: self.localize_value(source, key, fallback),
+        )
 
     def get_archive_entries(self, archive_key: str) -> list[dict]:
         if archive_key == "achievements":
@@ -11553,6 +11502,22 @@ class NativeRuntimePlayer:
                 self.status_message = "片尾字幕：按继续推进"
                 return
 
+            if block_type == "achievement_unlock":
+                achievement = sanitize_achievement_unlock_block(
+                    block,
+                    localize_value=lambda source, key, fallback: self.localize_value(source, key, fallback),
+                )
+                was_unlocked = achievement["id"] in set(self.archive_progress.get("achievementUnlocked") or [])
+                self.unlock_archive_entry("achievementUnlocked", achievement["id"])
+                if not was_unlocked:
+                    self.status_message = f"成就已解锁：{achievement['name']}"
+                    self.achievement_notification = {
+                        **achievement,
+                        "expiresAtMs": self.pygame.time.get_ticks() + 4200,
+                    }
+                self.current_block_index += 1
+                continue
+
             if block_type == "variable_set":
                 self.apply_variable_set(block)
                 self.current_block_index += 1
@@ -12723,7 +12688,24 @@ class NativeRuntimePlayer:
         if self.overlay_mode != "title":
             self.last_gameplay_frame = self.screen.copy()
         self.render_overlay()
+        self.render_achievement_notification()
         pygame.display.flip()
+
+    def render_achievement_notification(self) -> None:
+        notification = self.achievement_notification
+        if not isinstance(notification, dict) or self.overlay_mode == "title":
+            return
+        if not render_achievement_notification_panel(
+            pygame_module=self.pygame,
+            screen=self.screen,
+            width=self.width,
+            notification=notification,
+            palette=self.get_active_palette(),
+            font_ui=self.font_ui,
+            font_body=self.font_body,
+            now_ms=self.pygame.time.get_ticks(),
+        ):
+            self.achievement_notification = None
 
     def render_background_asset(self, target, asset_id: str | None, alpha: int = 255) -> None:
         target = target or self.screen

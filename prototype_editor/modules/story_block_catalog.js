@@ -209,6 +209,16 @@
         tags: ["timelineVisualBeat", "storyContent", "localizable"],
       },
       {
+        type: "achievement_unlock",
+        label: "解锁成就",
+        compactLabel: "成就",
+        group: "收集",
+        webStatus: "full",
+        nativeStatus: "full",
+        note: "在指定剧情位置解锁作者自定义成就，支持隐藏条件、图标、多语言、存档和跨 Runtime 成就馆。",
+        tags: ["timelineText", "storyContent", "localizable"],
+      },
+      {
         type: "wait",
         label: "等待停顿",
         compactLabel: "等待停顿",

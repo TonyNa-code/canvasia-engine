@@ -2,6 +2,7 @@
   "use strict";
 
   const runtimeSettingsTools = global.CanvasiaEditorProjectRuntimeSettings;
+  const runtimeAchievementTools = global.CanvasiaRuntimeAchievements;
   const CHOICE_CONTINUE_TARGET = "__continue__";
   const BLOCK_TYPES_REQUIRING_COMMENT = Object.freeze([]);
   const CONDITION_OPERATORS = Object.freeze([
@@ -1440,6 +1441,11 @@
     ];
   }
 
+  function renderAchievementUnlockBlock(block = {}) {
+    const achievement = runtimeAchievementTools.sanitizeAchievementUnlockBlock(block);
+    return [`    $ achievement.grant(${quoteRenpy(achievement.id)})`];
+  }
+
   function renderChoiceBlock(block = {}, context = {}) {
     const lines = ["    menu:"];
     const options = toArray(block.options);
@@ -1545,6 +1551,9 @@
     if (type === "credits_roll") {
       return renderCreditsBlock(block);
     }
+    if (type === "achievement_unlock") {
+      return renderAchievementUnlockBlock(block);
+    }
     if (type === "variable_set" || type === "variable_add") {
       return renderVariableEffect(block, context);
     }
@@ -1624,6 +1633,9 @@
     const runtimeSettings = sanitizeProjectRuntimeSettings(data.project?.runtimeSettings);
     const warnings = [];
     const characterStageTransforms = buildCharacterStageTransformDefinitions(sceneRecords, sceneMap);
+    const customAchievements = runtimeAchievementTools.collectCustomAchievementDefinitions(
+      sceneRecords.map((record) => record.scene)
+    );
     const lines = [
       `# ${getProjectTitle(data, options)} - Canvasia Ren'Py draft`,
       "# Generated as a migration-friendly draft. Review labels, assets, and custom effects before shipping.",
@@ -1637,6 +1649,7 @@
       "        except (TypeError, ValueError):",
       "            return None",
       "        return int(number) if number.is_integer() else number",
+      ...customAchievements.map((definition) => `    achievement.register(${quoteRenpy(definition.id)})`),
       "",
       ...buildImageDefinitions(assetMap),
       "",
@@ -1681,6 +1694,7 @@
       characterCount: characterMap.size,
       assetDefinitionCount: buildImageDefinitions(assetMap).length,
       variableDefinitionCount: buildVariableDefinitions(data).length,
+      achievementDefinitionCount: customAchievements.length,
       warningCount: warnings.length,
       warnings,
       runtimeSettings,

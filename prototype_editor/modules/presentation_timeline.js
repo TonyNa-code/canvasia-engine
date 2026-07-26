@@ -14,6 +14,7 @@
     sfx_play: "音效",
     video_play: "视频",
     credits_roll: "片尾字幕",
+    achievement_unlock: "解锁成就",
     wait: "等待停顿",
     particle_effect: "粒子",
     screen_shake: "震动",
@@ -195,6 +196,9 @@
     if (block.type === "credits_roll") {
       return toArray(block.lines).map(cleanText).filter(Boolean).join(" / ");
     }
+    if (block.type === "achievement_unlock") {
+      return cleanText(block.title, "未命名成就");
+    }
     return cleanText(block.text ?? block.title ?? block.name ?? block.assetId ?? block.characterId ?? block.speakerId);
   }
 
@@ -249,6 +253,9 @@
     }
     if (block.type === "credits_roll") {
       return Math.round(clampNumber(block.durationSeconds, 4, 180, 18) * 1000);
+    }
+    if (block.type === "achievement_unlock") {
+      return 900;
     }
     if (block.type === "wait") {
       return Math.round(clampNumber(block.durationSeconds, 0.1, 30, 1) * 1000);

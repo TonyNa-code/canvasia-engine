@@ -24,7 +24,15 @@
       : FALLBACK_EFFECT_BLOCK_TYPES
   );
   const STORY_TEXT_TYPES = Object.freeze(["dialogue", "narration"]);
-  const STORY_CONTENT_TYPES = Object.freeze(["dialogue", "narration", "choice", "condition", "video_play", "credits_roll"]);
+  const STORY_CONTENT_TYPES = Object.freeze([
+    "dialogue",
+    "narration",
+    "choice",
+    "condition",
+    "video_play",
+    "credits_roll",
+    "achievement_unlock",
+  ]);
   const OUTRO_BLOCK_TYPES = Object.freeze(["jump", "credits_roll", "music_stop", "screen_fade"]);
   const SCRIPT_QUALITY_PACING_CODES = Object.freeze([
     "script_empty_text",

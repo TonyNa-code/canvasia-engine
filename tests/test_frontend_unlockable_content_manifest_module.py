@@ -9,6 +9,7 @@ from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "unlockable_content_manifest.js"
+ACHIEVEMENT_MODULE_PATH = ROOT_DIR / "export_player_template" / "runtime_achievements.js"
 
 
 class FrontendUnlockableContentManifestModuleTests(unittest.TestCase):
@@ -20,6 +21,7 @@ class FrontendUnlockableContentManifestModuleTests(unittest.TestCase):
             const context = {{ window: {{}} }};
             context.globalThis = context;
             vm.createContext(context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(ACHIEVEMENT_MODULE_PATH))}, "utf8"), context);
             vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
             const tools = context.window.CanvasiaEditorUnlockableContentManifest;
             const data = {{
@@ -60,6 +62,16 @@ class FrontendUnlockableContentManifestModuleTests(unittest.TestCase):
                         {{ id: "line_1", type: "dialogue", characterId: "hero", text: "欢迎回来。", voiceAssetId: "voice_ready" }},
                         {{ id: "line_2", type: "dialogue", characterId: "side", text: "你也太慢了吧。", voiceAssetId: "voice_missing" }},
                         {{ id: "choice_1", type: "choice", choices: [{{ text: "去天台", targetSceneId: "scene_roof" }}] }},
+                        {{
+                          id: "achievement_1",
+                          type: "achievement_unlock",
+                          achievementId: "First Meet",
+                          title: "第一次相遇",
+                          description: "在放学后的教室与她重逢。",
+                          category: "剧情里程碑",
+                          requirement: "读完教室黄昏",
+                          hiddenBeforeUnlock: true,
+                        }},
                       ],
                     }},
                     {{
@@ -143,6 +155,15 @@ class FrontendUnlockableContentManifestModuleTests(unittest.TestCase):
         self.assertIn("unlockable_character_visual_missing", issue_codes)
         self.assertIn("unlockable_location_asset_missing", issue_codes)
         self.assertIn("unlockable_ending_unreachable", issue_codes)
+        custom_achievement = next(
+            entry
+            for group in manifest["groups"]
+            if group["id"] == "achievements"
+            for entry in group["entries"]
+            if entry["id"] == "custom:first-meet"
+        )
+        self.assertEqual(custom_achievement["meta"]["kind"], "custom")
+        self.assertTrue(custom_achievement["meta"]["hiddenBeforeUnlock"])
         self.assertEqual(payload["digest"]["status"], "warn")
         self.assertIn("# Unlock Demo 可解锁内容清单", payload["markdown"])
         self.assertIn("CG 图鉴", payload["markdown"])

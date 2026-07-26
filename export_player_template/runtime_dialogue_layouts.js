@@ -19,6 +19,7 @@ const NVL_BOUNDARY_BLOCK_TYPES = new Set([
   "jump",
   "video_play",
   "credits_roll",
+  "achievement_unlock",
 ]);
 const DEFAULT_NVL_ENTRY_LIMIT = 8;
 const MAX_NVL_ENTRY_LIMIT = 20;

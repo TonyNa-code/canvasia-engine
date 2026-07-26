@@ -468,6 +468,29 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
                 getSafeCreditsBackground: (value) => value || "dark",
               }}
             );
+            const achievementMarkup = tools.renderAchievementUnlockEditor(
+              {{
+                achievementId: "secret_route",
+                title: "秘密 & 相遇",
+                description: "找到 <隐藏房间>",
+                category: "隐藏路线",
+                requirement: "完成第二章",
+                hiddenBeforeUnlock: true,
+                iconAssetId: "icon_secret",
+              }},
+              {{
+                imageAssets: [{{ id: "icon_secret", name: "秘密徽章" }}],
+                sanitizeAchievementUnlockBlock: (block) => ({{
+                  authorId: block.achievementId,
+                  name: block.title,
+                  description: block.description,
+                  category: block.category,
+                  requirement: block.requirement,
+                  hiddenBeforeUnlock: block.hiddenBeforeUnlock,
+                  iconAssetId: block.iconAssetId,
+                }}),
+              }}
+            );
             process.stdout.write(JSON.stringify({{
               keys: Object.keys(tools).sort(),
               blockManagementMarkup,
@@ -508,6 +531,7 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
               sfxMarkup,
               videoMarkup,
               creditsMarkup,
+              achievementMarkup,
             }}));
             """
         )
@@ -522,6 +546,7 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 0, completed.stderr)
         payload = json.loads(completed.stdout)
         self.assertEqual(payload["keys"], [
+            "renderAchievementUnlockEditor",
             "renderBackgroundEditor",
             "renderBlockManagementCard",
             "renderCameraPanEditor",
@@ -690,6 +715,11 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
         self.assertIn("Thanks &amp; Love", payload["creditsMarkup"])
         self.assertIn("企划：A", payload["creditsMarkup"])
         self.assertIn('value="light" selected', payload["creditsMarkup"])
+        self.assertIn("编辑自定义成就", payload["achievementMarkup"])
+        self.assertIn("秘密 &amp; 相遇", payload["achievementMarkup"])
+        self.assertIn("找到 &lt;隐藏房间&gt;", payload["achievementMarkup"])
+        self.assertIn('value="true" selected', payload["achievementMarkup"])
+        self.assertIn('value="icon_secret" selected', payload["achievementMarkup"])
         self.assertIn("编辑场景跳转", payload["jumpMarkup"])
         self.assertIn('value="scene_b" selected', payload["jumpMarkup"])
         self.assertIn("还没有 &lt;变量&gt;", payload["starterMarkup"])

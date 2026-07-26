@@ -153,6 +153,7 @@ const rawData = window.LIGHTWHISPER_GAME_DATA ?? {};
 const runtimeConditionTools = window.CanvasiaRuntimeConditions;
 const runtimeChoiceAvailabilityTools = window.CanvasiaRuntimeChoiceAvailability;
 const runtimeStoryFlowTools = window.CanvasiaRuntimeStoryFlow;
+const runtimeAchievementTools = window.CanvasiaRuntimeAchievements;
 const data = normalizeGameData(rawData);
 const storageKeys = buildRuntimeStorageKeys(data.project);
 
@@ -298,6 +299,7 @@ const refs = {
   achievementDialogHero: document.getElementById("achievementDialogHero"),
   achievementDialogList: document.getElementById("achievementDialogList"),
   closeAchievementDialogButton: document.getElementById("closeAchievementDialogButton"),
+  achievementToast: document.getElementById("achievementToast"),
   locationDialog: document.getElementById("locationDialog"),
   locationDialogSummary: document.getElementById("locationDialogSummary"),
   locationDialogHero: document.getElementById("locationDialogHero"),
@@ -496,6 +498,7 @@ const activeSfxAudios = new Set();
 let musicRoomAudio = null;
 let voiceReplayAudio = null;
 let runtimeUiThemeAutoRefreshTimer = null;
+let achievementToastTimer = null;
 let voiceMixerController = null;
 let keyBindingController = null;
 
@@ -3323,6 +3326,7 @@ function buildAchievementEntries() {
       ...achievement,
       unlocked: Boolean(unlockedAt),
       unlockedAt,
+      presentation: runtimeAchievementTools.getAchievementPresentation(achievement, Boolean(unlockedAt)),
       progressCurrent,
       progressTarget,
       progressLabel:
@@ -3346,7 +3350,7 @@ function renderAchievementDialog() {
   refs.achievementDialog.classList.toggle("is-visible", state.achievementDialogOpen);
   refs.achievementDialogSummary.textContent =
     entries.length > 0
-      ? `当前已达成 ${unlockedCount} / ${entries.length} 个自动成就。它们会根据试玩推进、图鉴收录、结局回收和 EXTRA 解锁自动点亮。`
+      ? `当前已达成 ${unlockedCount} / ${entries.length} 个成就。作者成就会在指定剧情点解锁，系统成就会根据图鉴、路线和 EXTRA 进度自动点亮。`
       : "这个项目当前还没有可收录的成就。";
 
   if (!selectedEntry) {
@@ -3356,15 +3360,23 @@ function renderAchievementDialog() {
   }
 
   refs.achievementDialogHero.innerHTML = `
+    <div class="achievement-hero-mark ${selectedEntry.presentation.hidden ? "is-hidden" : ""}">
+      ${
+        selectedEntry.presentation.iconUrl
+          ? `<img src="${escapeHtml(selectedEntry.presentation.iconUrl)}" alt="${escapeHtml(selectedEntry.presentation.name)}" />`
+          : `<span aria-hidden="true">${selectedEntry.presentation.hidden ? "?" : "◆"}</span>`
+      }
+    </div>
     <div class="extra-hero-copy">
-      <strong>${escapeHtml(selectedEntry.unlocked ? selectedEntry.name : `？？？ · ${selectedEntry.name}`)}</strong>
-      <span>${escapeHtml(selectedEntry.description)}</span>
+      <strong>${escapeHtml(selectedEntry.presentation.name)}</strong>
+      <span>${escapeHtml(selectedEntry.presentation.description)}</span>
       <div class="achievement-badge-strip">
-        <span class="achievement-badge">${escapeHtml(selectedEntry.category)}</span>
+        <span class="achievement-badge">${escapeHtml(selectedEntry.presentation.category)}</span>
+        <span class="achievement-badge">${escapeHtml(selectedEntry.kind === "custom" ? "作者成就" : "系统成就")}</span>
         <span class="achievement-badge">${escapeHtml(`进度：${selectedEntry.progressLabel}`)}</span>
-        <span class="achievement-badge">${escapeHtml(selectedEntry.unlocked ? `达成于 ${formatDate(selectedEntry.unlockedAt)}` : "推进剧情后自动达成")}</span>
+        <span class="achievement-badge">${escapeHtml(selectedEntry.unlocked ? `达成于 ${formatDate(selectedEntry.unlockedAt)}` : "尚未达成")}</span>
       </div>
-      <span>${escapeHtml(`目标：${selectedEntry.requirement}`)}</span>
+      <span>${escapeHtml(`目标：${selectedEntry.presentation.requirement}`)}</span>
     </div>
   `;
 
@@ -3378,11 +3390,11 @@ function renderAchievementDialog() {
                 type="button"
                 data-achievement-id="${escapeHtml(entry.id)}"
               >
-                <strong>${escapeHtml(entry.unlocked ? entry.name : `？？？ · ${entry.name}`)}</strong>
+                <strong>${escapeHtml(entry.presentation.name)}</strong>
                 <div class="ending-room-meta">
-                  ${escapeHtml(entry.category)} · ${escapeHtml(entry.progressLabel)}
+                  ${escapeHtml(entry.presentation.category)} · ${escapeHtml(entry.progressLabel)}
                 </div>
-                <p>${escapeHtml(entry.unlocked ? entry.description : `目标：${entry.requirement}`)}</p>
+                <p>${escapeHtml(entry.unlocked ? entry.presentation.description : `目标：${entry.presentation.requirement}`)}</p>
               </button>
             </article>
           `
@@ -4263,7 +4275,6 @@ function sanitizeVoiceReplayProgressMap(source) {
 }
 
 function getAchievementDefinitions() {
-  const achievements = [];
   const choiceBlockCount = data.scenes.reduce(
     (count, scene) => count + ((scene.blocks ?? []).filter((block) => block.type === "choice").length || 0),
     0
@@ -4272,124 +4283,24 @@ function getAchievementDefinitions() {
   const galleryAssets = getGalleryAssets();
   const musicAssets = getMusicRoomAssets();
   const endingScenes = getEndingScenes();
-
-  if (data.scenes.length > 0) {
-    achievements.push({
-      id: "first_start",
-      name: "初次启程",
-      category: "剧情里程碑",
-      description: "第一次正式开始试玩这个项目。",
-      requirement: "点击开始试玩 1 次",
-      progressCurrent: state.achievementProgress.has("first_start") ? 1 : 0,
-      progressTarget: 1,
-    });
-  }
-
-  if (choiceBlockCount > 0) {
-    achievements.push({
-      id: "first_choice",
-      name: "分岔路口",
-      category: "剧情里程碑",
-      description: "第一次在剧情里做出一个选项分支。",
-      requirement: "做出 1 次选项选择",
-      progressCurrent: state.achievementProgress.has("first_choice") ? 1 : 0,
-      progressTarget: 1,
-    });
-  }
-
-  if (characters.length > 0) {
-    achievements.push(
-      {
-        id: "first_character",
-        name: "初次相遇",
-        category: "人物收集",
-        description: "第一次在剧情里见到角色，人物档案馆开始亮起。",
-        requirement: "解锁 1 位角色",
-        progressCurrent: Math.min(state.characterArchive.size, 1),
-        progressTarget: 1,
-      },
-      {
-        id: "all_characters",
-        name: "全员到齐",
-        category: "人物收集",
-        description: "把这个项目里的所有角色都收录进图鉴里。",
-        requirement: `收录全部 ${characters.length} 位角色`,
-        progressCurrent: Math.min(state.characterArchive.size, characters.length),
-        progressTarget: characters.length,
-      }
-    );
-  }
-
-  if (galleryAssets.length > 0) {
-    achievements.push(
-      {
-        id: "first_cg",
-        name: "回想开幕",
-        category: "EXTRA 收集",
-        description: "第一次在剧情里解锁一张 CG。",
-        requirement: "解锁 1 张 CG",
-        progressCurrent: Math.min(state.extraUnlocks.cg.size, 1),
-        progressTarget: 1,
-      },
-      {
-        id: "all_cg",
-        name: "回想收藏家",
-        category: "EXTRA 收集",
-        description: "把这个项目里的所有 CG 都解锁进回想馆。",
-        requirement: `解锁全部 ${galleryAssets.length} 张 CG`,
-        progressCurrent: Math.min(state.extraUnlocks.cg.size, galleryAssets.length),
-        progressTarget: galleryAssets.length,
-      }
-    );
-  }
-
-  if (musicAssets.length > 0) {
-    achievements.push(
-      {
-        id: "first_bgm",
-        name: "旋律初响",
-        category: "EXTRA 收集",
-        description: "第一次在剧情里听到并解锁一首 BGM。",
-        requirement: "解锁 1 首 BGM",
-        progressCurrent: Math.min(state.extraUnlocks.bgm.size, 1),
-        progressTarget: 1,
-      },
-      {
-        id: "all_bgm",
-        name: "全曲收藏",
-        category: "EXTRA 收集",
-        description: "把这个项目里的所有 BGM 都收录进音乐鉴赏。",
-        requirement: `解锁全部 ${musicAssets.length} 首 BGM`,
-        progressCurrent: Math.min(state.extraUnlocks.bgm.size, musicAssets.length),
-        progressTarget: musicAssets.length,
-      }
-    );
-  }
-
-  if (endingScenes.length > 0) {
-    achievements.push(
-      {
-        id: "first_ending",
-        name: "终幕初见",
-        category: "路线回收",
-        description: "第一次真正抵达某条路线的结局。",
-        requirement: "回收 1 个结局",
-        progressCurrent: Math.min(state.endingProgress.unlocked.size, 1),
-        progressTarget: 1,
-      },
-      {
-        id: "all_endings",
-        name: "全结局制霸",
-        category: "路线回收",
-        description: "把所有可回收结局都点亮进结局回收馆。",
-        requirement: `回收全部 ${endingScenes.length} 个结局`,
-        progressCurrent: Math.min(state.endingProgress.unlocked.size, endingScenes.length),
-        progressTarget: endingScenes.length,
-      }
-    );
-  }
-
-  return achievements;
+  return runtimeAchievementTools.buildAchievementDefinitions({
+    scenes: data.scenes,
+    unlockedAchievementIds: state.achievementProgress,
+    getLocalizedValue,
+    getAssetUrl,
+    metrics: {
+      sceneCount: data.scenes.length,
+      choiceBlockCount,
+      characterCount: characters.length,
+      unlockedCharacterCount: state.characterArchive.size,
+      galleryCount: galleryAssets.length,
+      unlockedCgCount: state.extraUnlocks.cg.size,
+      musicCount: musicAssets.length,
+      unlockedBgmCount: state.extraUnlocks.bgm.size,
+      endingCount: endingScenes.length,
+      unlockedEndingCount: state.endingProgress.unlocked.size,
+    },
+  });
 }
 
 function getChapterReplayEntries() {
@@ -4620,13 +4531,8 @@ function sanitizePlayerProfile(source) {
 }
 
 function sanitizeAchievementProgressMap(source) {
-  const validIds = new Set(getAchievementDefinitions().map((achievement) => achievement.id));
-  const entries = source && typeof source === "object" ? Object.entries(source) : [];
-
   return new Map(
-    entries
-      .filter(([achievementId, unlockedAt]) => validIds.has(achievementId) && typeof unlockedAt === "string" && unlockedAt.trim())
-      .map(([achievementId, unlockedAt]) => [achievementId, unlockedAt])
+    runtimeAchievementTools.sanitizeAchievementProgressEntries(source, getAchievementDefinitions())
   );
 }
 
@@ -4695,6 +4601,39 @@ function persistVoiceReplayProgress() {
   writeRuntimeStorageJson(storageKeys.voiceReplay, Object.fromEntries(state.voiceReplayProgress));
 }
 
+function showAchievementToast(definition) {
+  if (!refs.achievementToast || !definition) {
+    return;
+  }
+  const presentation = runtimeAchievementTools.getAchievementPresentation(definition, true);
+  refs.achievementToast.innerHTML = `
+    ${
+      presentation.iconUrl
+        ? `<img src="${escapeHtml(presentation.iconUrl)}" alt="" />`
+        : `<span class="achievement-toast-mark" aria-hidden="true">◆</span>`
+    }
+    <span class="achievement-toast-copy">
+      <small>Achievement Unlocked</small>
+      <strong>${escapeHtml(presentation.name)}</strong>
+      <em>${escapeHtml(presentation.description)}</em>
+    </span>
+  `;
+  refs.achievementToast.hidden = false;
+  refs.achievementToast.classList.remove("is-visible");
+  window.requestAnimationFrame(() => refs.achievementToast?.classList.add("is-visible"));
+  if (achievementToastTimer) {
+    window.clearTimeout(achievementToastTimer);
+  }
+  achievementToastTimer = window.setTimeout(() => {
+    refs.achievementToast?.classList.remove("is-visible");
+    window.setTimeout(() => {
+      if (refs.achievementToast && !refs.achievementToast.classList.contains("is-visible")) {
+        refs.achievementToast.hidden = true;
+      }
+    }, 320);
+  }, 4200);
+}
+
 function unlockAchievement(achievementId, { silent = false } = {}) {
   if (!achievementId) {
     return false;
@@ -4709,6 +4648,7 @@ function unlockAchievement(achievementId, { silent = false } = {}) {
   persistAchievementProgress();
 
   if (!silent) {
+    showAchievementToast(definition);
     refs.gameMeta.textContent = buildMetaSummary();
     renderStartSummary();
     renderBuildInfo();
@@ -8128,6 +8068,14 @@ function applyBlockToPreviewState(block, visualState, variables, sceneId = "") {
       visualState.speakerName = "选择分支";
       visualState.dialogueText = "请选择一个选项继续试玩。";
       return null;
+    case "achievement_unlock": {
+      const achievement = runtimeAchievementTools.sanitizeAchievementUnlockBlock(block, {
+        getLocalizedValue,
+      });
+      visualState.speakerName = "成就解锁";
+      visualState.dialogueText = `${achievement.name}：${achievement.description}`;
+      return null;
+    }
     case "text_input": {
       const config = normalizeTextInputBlock(block);
       visualState.speakerName = "玩家输入";
@@ -8304,6 +8252,12 @@ function renderRuntime() {
   unlockNarrationArchiveEntry(snapshot);
   unlockRelationArchiveEntries(snapshot);
   unlockVoiceReplayEntry(snapshot);
+  if (snapshot.blockType === "achievement_unlock") {
+    const achievement = runtimeAchievementTools.sanitizeAchievementUnlockBlock(snapshot.block, {
+      getLocalizedValue,
+    });
+    unlockAchievement(achievement.id);
+  }
   syncAchievementProgressFromState();
   refs.sceneChip.textContent = `${snapshot.sceneName} · 第 ${Math.max(snapshot.blockIndex + 1, 0)} 步`;
   refs.musicChip.textContent = `BGM：${snapshot.visualState.musicName ?? "未播放"}`;

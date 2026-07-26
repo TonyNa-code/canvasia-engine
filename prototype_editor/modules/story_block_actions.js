@@ -96,6 +96,13 @@
       group: "media",
       description: "插入滚动演职员表，适合 Demo 结尾、ED 或发布版本署名。",
     }),
+    "add-achievement-unlock": Object.freeze({
+      blockType: "achievement_unlock",
+      label: "解锁成就",
+      group: "flow",
+      beginnerVisible: true,
+      description: "在剧情走到这里时解锁一个自定义成就，可隐藏标题和条件并设置专属图标。",
+    }),
     "add-wait": Object.freeze({
       blockType: "wait",
       label: "等待停顿",

@@ -51,6 +51,7 @@ const storyBlockCatalogTools = window.CanvasiaEditorStoryBlockCatalog;
 const { BLOCK_LABELS, MUSIC_END_MODE_LABELS, CHOICE_CONTINUE_TARGET } = storyBlockCatalogTools;
 const runtimeChoiceAvailabilityTools = window.CanvasiaRuntimeChoiceAvailability;
 const runtimeStoryFlowTools = window.CanvasiaRuntimeStoryFlow;
+const runtimeAchievementTools = window.CanvasiaRuntimeAchievements;
 const choiceAvailabilityEditorTools = window.CanvasiaEditorChoiceAvailability;
 const storyBlockActionTools = window.CanvasiaEditorStoryBlockActions;
 const storyBlockEditorTools = window.CanvasiaEditorStoryBlockEditors;
@@ -20562,6 +20563,12 @@ function applyBlockToPreviewState(block, visualState, variables, sceneId = "") {
       visualState.speakerName = "选择分支";
       visualState.dialogueText = "请选择一个选项继续试玩。";
       return null;
+    case "achievement_unlock": {
+      const achievement = runtimeAchievementTools.sanitizeAchievementUnlockBlock(block);
+      visualState.speakerName = "成就解锁";
+      visualState.dialogueText = `${achievement.name}：${achievement.description}`;
+      return null;
+    }
     case "variable_set": {
       const value = setPreviewVariableValue(variables, block.variableId, block.value);
       visualState.speakerName = "系统变量";
@@ -26776,32 +26783,34 @@ function renderAchievementOverviewPanel() {
   );
   const cgCount = assetList.filter((asset) => asset.type === "cg").length;
   const bgmCount = assetList.filter((asset) => asset.type === "bgm").length;
-  const achievementTotal =
+  const customAchievements = runtimeAchievementTools.collectCustomAchievementDefinitions(scenes);
+  const automaticAchievementTotal =
     (scenes.length > 0 ? 1 : 0) +
     (choiceBlockCount > 0 ? 1 : 0) +
     (characters.length > 0 ? 2 : 0) +
     (cgCount > 0 ? 2 : 0) +
     (bgmCount > 0 ? 2 : 0) +
     (endingCount > 0 ? 2 : 0);
+  const achievementTotal = automaticAchievementTotal + customAchievements.length;
 
   return `
     <article class="detail-card">
       <strong>成就系统 / 收集成就馆</strong>
-      <p class="helper-text">导出后的标题页会根据项目内容自动出现“成就馆”。这一版不需要你手配规则，系统会按开始试玩、第一次做选项、角色图鉴收录、CG/BGM 解锁、结局回收和全收集这些里程碑自动点亮成就。</p>
+      <p class="helper-text">在故事页插入“解锁成就”卡，就能把自定义标题、说明、分类、条件、隐藏状态和图标放进指定剧情点。系统仍会自动补充首次试玩、选项、图鉴、CG/BGM 与结局收集里程碑。</p>
       <div class="preview-sprint-metrics">
         ${renderRouteMetricCard(
-          "自动成就总数",
+          "成就总数",
           achievementTotal > 0 ? `${achievementTotal} 个` : "暂时没有",
           achievementTotal > 0
-            ? "会按剧情、图鉴、EXTRA 和结局进度自动生成"
-            : "至少先有场景、角色、CG、BGM 或结局，标题页才会出现成就馆"
+            ? `${customAchievements.length} 个作者成就 / ${automaticAchievementTotal} 个系统成就`
+            : "添加“解锁成就”卡，或先补场景、角色、CG、BGM 与结局"
         )}
         ${renderRouteMetricCard(
           "标题页入口",
           achievementTotal > 0 ? "会显示" : "暂不显示",
           achievementTotal > 0
-            ? "只要项目里存在可自动生成的里程碑，标题页就会出现“成就馆”按钮"
-            : "当前项目内容还不足以生成自动成就，所以标题页不会显示入口"
+            ? "存在作者成就或系统里程碑时，标题页会出现“成就馆”按钮"
+            : "当前项目还没有可展示的成就，所以标题页不会显示入口"
         )}
         ${renderRouteMetricCard(
           "剧情里程碑",
@@ -26819,8 +26828,8 @@ function renderAchievementOverviewPanel() {
         )}
       </div>
       <div class="detail-actions">
-        <button class="toolbar-button" data-action="switch-screen" data-screen="dashboard">
-          去首页继续补剧情
+        <button class="toolbar-button toolbar-button-primary" data-action="switch-screen" data-screen="story">
+          去故事页添加成就
         </button>
         <button class="toolbar-button" data-action="switch-screen" data-screen="characters">
           去角色页补图鉴来源
@@ -26833,6 +26842,7 @@ function renderAchievementOverviewPanel() {
         achievementTotal > 0
           ? `当前来源：${escapeHtml(
               [
+                customAchievements.length > 0 ? `作者成就 ${customAchievements.length} 个` : "",
                 scenes.length > 0 ? "开始试玩" : "",
                 choiceBlockCount > 0 ? "首次选项" : "",
                 characters.length > 0 ? `角色图鉴 ${characters.length} 位` : "",
@@ -26843,7 +26853,7 @@ function renderAchievementOverviewPanel() {
                 .filter(Boolean)
                 .join(" / ")
             )}`
-          : "现在还没有足够的剧情和收集内容，所以标题页暂时不会出现成就馆入口。"
+          : "现在还没有作者成就或系统里程碑，所以标题页暂时不会出现成就馆入口。"
       }</div>
     </article>
   `;
@@ -32459,6 +32469,8 @@ function renderBlockPanel(block, scene, selectedIndex) {
     editorMarkup = renderVideoPlayEditor(block);
   } else if (block.type === "credits_roll") {
     editorMarkup = renderCreditsRollEditor(block);
+  } else if (block.type === "achievement_unlock") {
+    editorMarkup = renderAchievementUnlockEditor(block);
   } else if (block.type === "particle_effect") {
     editorMarkup = renderParticleEffectEditor(block);
   } else if (block.type === "screen_shake") {
@@ -32582,6 +32594,8 @@ function getStorySceneHighlightCandidate(block, scene, index, blocks) {
     pushReason("这里会播放 OP、ED 或过场视频", 18);
   } else if (block.type === "credits_roll") {
     pushReason("这里会进入片尾演职人员表", 16);
+  } else if (block.type === "achievement_unlock") {
+    pushReason("这里会给玩家一个明确的收集与完成反馈", 18);
   } else if (block.type === "wait") {
     pushReason("这里会控制试玩节奏和情绪留白", 12);
   } else if (block.type === "background") {
@@ -33232,6 +33246,15 @@ function renderCreditsRollEditor(block) {
     getCreditsLinesText,
     getSafeCreditsDuration,
     getSafeCreditsBackground,
+  });
+}
+
+function renderAchievementUnlockEditor(block) {
+  return storyBlockEditorTools.renderAchievementUnlockEditor(block, {
+    escapeHtml,
+    imageAssets: getStageImageAssets(),
+    sanitizeAchievementUnlockBlock: (value) =>
+      runtimeAchievementTools.sanitizeAchievementUnlockBlock(value),
   });
 }
 
@@ -39342,6 +39365,29 @@ function collectEditedBlock(block) {
     };
   }
 
+  if (block.type === "achievement_unlock") {
+    const nextBlock = runtimeAchievementTools.sanitizeAchievementUnlockBlock({
+      ...block,
+      achievementId: document.getElementById("editorAchievementId")?.value,
+      title: document.getElementById("editorAchievementTitle")?.value,
+      description: document.getElementById("editorAchievementDescription")?.value,
+      category: document.getElementById("editorAchievementCategory")?.value,
+      requirement: document.getElementById("editorAchievementRequirement")?.value,
+      hiddenBeforeUnlock: document.getElementById("editorAchievementHidden")?.value === "true",
+      iconAssetId: document.getElementById("editorAchievementIconAssetId")?.value ?? "",
+    });
+    return {
+      ...block,
+      achievementId: nextBlock.authorId,
+      title: nextBlock.name,
+      description: nextBlock.description,
+      category: nextBlock.category,
+      requirement: nextBlock.requirement,
+      hiddenBeforeUnlock: nextBlock.hiddenBeforeUnlock,
+      iconAssetId: nextBlock.iconAssetId,
+    };
+  }
+
   if (block.type === "particle_effect") {
     const preset = getSafeParticlePreset(document.getElementById("editorParticlePreset")?.value);
     const defaults = getParticlePresetDefaults(preset);
@@ -41011,6 +41057,21 @@ function createDefaultBlock(scene, blockType) {
       durationSeconds: 18,
       background: "dark",
       skippable: true,
+    };
+  }
+
+  if (blockType === "achievement_unlock") {
+    const achievementCount = (scene.blocks ?? []).filter((block) => block.type === "achievement_unlock").length;
+    return {
+      id: blockId,
+      type: "achievement_unlock",
+      achievementId: `story_achievement_${achievementCount + 1}`,
+      title: "新的成就",
+      description: "完成这段剧情时解锁。",
+      category: "剧情里程碑",
+      requirement: "推进到这段剧情",
+      hiddenBeforeUnlock: false,
+      iconAssetId: "",
     };
   }
 
@@ -42689,6 +42750,21 @@ function buildBlockDetails(block) {
       rows.push(["允许跳过", block.skippable === false ? "否" : "是"]);
       break;
     }
+    case "achievement_unlock": {
+      const achievement = runtimeAchievementTools.sanitizeAchievementUnlockBlock(block);
+      rows.push(["成就 ID", achievement.authorId]);
+      rows.push(["显示标题", achievement.name]);
+      rows.push(["成就分类", achievement.category]);
+      rows.push(["达成条件", achievement.requirement]);
+      rows.push(["解锁前隐藏", achievement.hiddenBeforeUnlock ? "是" : "否"]);
+      rows.push([
+        "成就图标",
+        achievement.iconAssetId
+          ? state.data.assetsById.get(achievement.iconAssetId)?.name ?? achievement.iconAssetId
+          : "默认徽记",
+      ]);
+      break;
+    }
     case "wait":
       rows.push(["等待时长", `${getSafeWaitDurationSeconds(block.durationSeconds)} 秒`]);
       rows.push(["用途", "控制转场、登场或关键台词前后的节奏留白"]);
@@ -42878,6 +42954,13 @@ function getBlockSummary(block, scene) {
           block.durationSeconds
         )} 秒 / ${getCreditsBackgroundLabel(block.background)}`,
       };
+    case "achievement_unlock": {
+      const achievement = runtimeAchievementTools.sanitizeAchievementUnlockBlock(block);
+      return {
+        title: achievement.name,
+        meta: `${achievement.category} / ${achievement.hiddenBeforeUnlock ? "隐藏成就" : "公开成就"} / ID ${achievement.authorId}`,
+      };
+    }
     case "wait":
       return {
         title: `等待 ${getSafeWaitDurationSeconds(block.durationSeconds)} 秒`,
@@ -43110,6 +43193,12 @@ function computeVisualState(scene, blockIndex) {
           block.durationSeconds
         )} 秒。`;
         break;
+      case "achievement_unlock": {
+        const achievement = runtimeAchievementTools.sanitizeAchievementUnlockBlock(block);
+        visual.speakerName = "成就解锁";
+        visual.dialogueText = `${achievement.name}：${achievement.description}`;
+        break;
+      }
       case "wait":
         visual.speakerName = "节奏停顿";
         visual.dialogueText = `等待 ${getSafeWaitDurationSeconds(block.durationSeconds)} 秒。`;

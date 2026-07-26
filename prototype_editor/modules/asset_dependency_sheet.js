@@ -61,6 +61,7 @@
     sfx_play: Object.freeze(["sfx"]),
     video_play: Object.freeze(["video"]),
     particle_effect: Object.freeze(["background", "sprite", "cg", "ui"]),
+    achievement_unlock: Object.freeze(["background", "sprite", "cg", "ui"]),
   });
 
   const GAME_UI_ASSET_FIELDS = Object.freeze([
@@ -548,6 +549,13 @@
           expectedTypes: ["voice"],
           label: `${sceneName} / ${blockLabel}语音`,
           field: "block.voiceAssetId",
+        });
+
+        addAssetReference(records, unknownReferences, assetMap, block?.iconAssetId, {
+          ...base,
+          expectedTypes: STORY_BLOCK_ASSET_TYPES.achievement_unlock,
+          label: `${sceneName} / ${blockLabel}图标`,
+          field: "block.iconAssetId",
         });
 
         if (["dialogue", "character_show", "character_move"].includes(block?.type)) {

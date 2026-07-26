@@ -1181,6 +1181,67 @@
   `;
   }
 
+  function renderAchievementUnlockEditor(block, options = {}) {
+    const escape = getEscapeHtml(options);
+    const imageAssets = Array.isArray(options.imageAssets) ? options.imageAssets : [];
+    const safeBlock = typeof options.sanitizeAchievementUnlockBlock === "function"
+      ? options.sanitizeAchievementUnlockBlock(block)
+      : block ?? {};
+    const selectedIconAssetId = String(safeBlock.iconAssetId ?? "");
+
+    return `
+    <article class="editor-card">
+      <h3>编辑自定义成就</h3>
+      <p>剧情走到这张卡片时，玩家会收到解锁提示，成就也会永久收录到成就馆。相同成就 ID 会被视为同一个成就。</p>
+    </article>
+    <div class="field-grid">
+      <div class="detail-row">
+        <label for="editorAchievementId">成就 ID</label>
+        <input id="editorAchievementId" type="text" maxlength="64" value="${escape(safeBlock.authorId ?? "achievement")}" placeholder="例如：first_meeting" />
+        <div class="helper-text">用于存档识别。发布后尽量不要再修改，建议使用英文、数字、短横线或下划线。</div>
+      </div>
+      <div class="detail-row">
+        <label for="editorAchievementTitle">显示标题</label>
+        <input id="editorAchievementTitle" type="text" maxlength="80" value="${escape(safeBlock.name ?? "新的成就")}" />
+      </div>
+      <div class="detail-row">
+        <label for="editorAchievementDescription">成就说明</label>
+        <textarea id="editorAchievementDescription" maxlength="240" placeholder="玩家解锁后看到的说明。">${escape(safeBlock.description ?? "")}</textarea>
+      </div>
+      <div class="detail-row">
+        <label for="editorAchievementCategory">分类</label>
+        <input id="editorAchievementCategory" type="text" maxlength="48" value="${escape(safeBlock.category ?? "剧情里程碑")}" placeholder="例如：剧情里程碑 / 隐藏路线" />
+      </div>
+      <div class="detail-row">
+        <label for="editorAchievementRequirement">达成条件说明</label>
+        <input id="editorAchievementRequirement" type="text" maxlength="120" value="${escape(safeBlock.requirement ?? "推进到指定剧情")}" />
+      </div>
+      <div class="detail-row">
+        <label for="editorAchievementHidden">解锁前是否隐藏</label>
+        <select id="editorAchievementHidden">
+          <option value="false" ${safeBlock.hiddenBeforeUnlock ? "" : "selected"}>显示标题与达成条件</option>
+          <option value="true" ${safeBlock.hiddenBeforeUnlock ? "selected" : ""}>隐藏标题、说明与条件</option>
+        </select>
+      </div>
+      <div class="detail-row">
+        <label for="editorAchievementIconAssetId">成就图标（可选）</label>
+        <select id="editorAchievementIconAssetId">
+          <option value="">使用默认成就徽记</option>
+          ${imageAssets
+            .map(
+              (asset) => `<option value="${escape(asset.id)}" ${asset.id === selectedIconAssetId ? "selected" : ""}>${escape(
+                asset.name ?? asset.id
+              )}</option>`
+            )
+            .join("")}
+        </select>
+        <div class="helper-text">可使用 UI、CG、背景或立绘图片；推荐准备方形透明 PNG。</div>
+      </div>
+    </div>
+    ${renderSaveBlockActions()}
+  `;
+  }
+
   function renderJumpEditor(block, options = {}) {
     const getSafeSceneId = getRenderer(options, "getSafeSceneId", (sceneId) => sceneId ?? "");
     const renderSceneOptions = getRenderer(options, "renderSceneOptions");
@@ -1718,6 +1779,7 @@
     renderSfxPlayEditor,
     renderVideoPlayEditor,
     renderCreditsRollEditor,
+    renderAchievementUnlockEditor,
     renderJumpEditor,
     renderSceneCallEditor,
     renderSceneReturnEditor,

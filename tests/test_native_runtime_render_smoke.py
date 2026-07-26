@@ -4002,6 +4002,50 @@ class NativeRuntimeRenderSmokeTests(unittest.TestCase):
         self.assertEqual(player.variable_state["var_score"], 2)
         self.assertEqual(player.current_line["text"], "选择后的下一句。")
 
+    def test_custom_achievement_unlocks_persists_and_renders_notification(self) -> None:
+        data_path = self.write_game_data()
+        payload = json.loads(data_path.read_text(encoding="utf-8"))
+        payload["chapters"][0]["scenes"][0]["blocks"] = [
+            {
+                "id": "achievement_first_meet",
+                "type": "achievement_unlock",
+                "achievementId": "First Meet",
+                "title": "第一次相遇",
+                "description": "在教室与她重逢。",
+                "category": "剧情里程碑",
+                "requirement": "读完开场",
+                "hiddenBeforeUnlock": True,
+            },
+            {"id": "line_after_unlock", "type": "narration", "text": "成就之后的下一句。"},
+        ]
+        data_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="The system font .*", category=UserWarning)
+            player = NativeRuntimePlayer(pygame, data_path)
+
+        locked_entry = next(
+            entry for entry in player.get_achievement_archive_entries() if entry["id"] == "custom:first-meet"
+        )
+        self.assertEqual(locked_entry["name"], "隐藏成就")
+        self.assertFalse(locked_entry["unlocked"])
+
+        player.start_story_from_title()
+
+        self.assertIn("custom:first-meet", player.archive_progress["achievementUnlocked"])
+        self.assertEqual(player.current_line["text"], "成就之后的下一句。")
+        self.assertEqual(player.achievement_notification["name"], "第一次相遇")
+        unlocked_entry = next(
+            entry for entry in player.get_achievement_archive_entries() if entry["id"] == "custom:first-meet"
+        )
+        self.assertTrue(unlocked_entry["unlocked"])
+        self.assertEqual(unlocked_entry["name"], "第一次相遇")
+        player.render()
+        self.assertIsNotNone(player.achievement_notification)
+
+        persisted = load_project_archive_progress("native_render_smoke")
+        self.assertIn("custom:first-meet", persisted["achievementUnlocked"])
+
     def test_choice_availability_hides_locks_and_keeps_runtime_recoverable(self) -> None:
         data_path = self.write_game_data()
         payload = json.loads(data_path.read_text(encoding="utf-8"))

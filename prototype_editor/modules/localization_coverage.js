@@ -17,6 +17,7 @@
     choice: "选项",
     video_play: "视频标题",
     credits_roll: "片尾字幕",
+    achievement_unlock: "成就",
   });
 
   const BLOCK_LABEL_OVERRIDES = Object.freeze({
@@ -34,7 +35,9 @@
   );
 
   const LOCALIZABLE_TITLE_BLOCK_TYPES = Object.freeze(
-    LOCALIZABLE_BLOCK_TYPES.filter((type) => type === "video_play" || type === "credits_roll")
+    LOCALIZABLE_BLOCK_TYPES.filter(
+      (type) => type === "video_play" || type === "credits_roll" || type === "achievement_unlock"
+    )
   );
 
   const BLOCK_LABELS = Object.freeze({
@@ -159,6 +162,9 @@
       toArray(scene?.blocks).forEach((block) => {
         addLanguagesFromTranslationMap(languages, block, "text");
         addLanguagesFromTranslationMap(languages, block, "title");
+        addLanguagesFromTranslationMap(languages, block, "description");
+        addLanguagesFromTranslationMap(languages, block, "category");
+        addLanguagesFromTranslationMap(languages, block, "requirement");
         toArray(block?.options).forEach((option) => addLanguagesFromTranslationMap(languages, option, "text"));
       });
     });
@@ -211,6 +217,15 @@
     }
     if (key === "title") {
       return "标题";
+    }
+    if (key === "description") {
+      return "说明";
+    }
+    if (key === "category") {
+      return "分类";
+    }
+    if (key === "requirement") {
+      return "达成条件";
     }
     return "正文";
   }
@@ -286,6 +301,11 @@
       if (cleanText(block.text) || Object.keys(getTranslationMap(block, "text")).length) {
         addCoverageEntries(entries, block, { ...baseDescriptor, key: "text" }, context);
       }
+    }
+    if (block.type === "achievement_unlock") {
+      ["description", "category", "requirement"].forEach((key) => {
+        addCoverageEntries(entries, block, { ...baseDescriptor, key }, context);
+      });
     }
     if (block.type === "choice") {
       toArray(block.options).forEach((option, optionIndex) => {
@@ -865,8 +885,8 @@
       }
 
       if (kind === "block") {
-        if (!["text", "title"].includes(key)) {
-          pushImportSkip(skipped, row, "卡片翻译只支持 text 或 title 字段。");
+        if (!["text", "title", "description", "category", "requirement"].includes(key)) {
+          pushImportSkip(skipped, row, "卡片翻译只支持正文、标题、说明、分类或达成条件字段。");
           return;
         }
         if (getCurrentTranslation(match.block, key, language) === text) {

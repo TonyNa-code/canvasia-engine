@@ -10,6 +10,7 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "renpy_exporter.js"
 RUNTIME_SETTINGS_MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "project_runtime_settings.js"
+RUNTIME_ACHIEVEMENTS_MODULE_PATH = ROOT_DIR / "export_player_template" / "runtime_achievements.js"
 
 
 class FrontendRenpyExporterModuleTests(unittest.TestCase):
@@ -22,6 +23,7 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
             context.globalThis = context;
             vm.createContext(context);
             vm.runInContext(fs.readFileSync({json.dumps(str(RUNTIME_SETTINGS_MODULE_PATH))}, "utf8"), context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(RUNTIME_ACHIEVEMENTS_MODULE_PATH))}, "utf8"), context);
             vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
             const tools = context.window.CanvasiaEditorRenpyExporter;
             const data = {{
@@ -101,6 +103,13 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
                         {{ type: "depth_blur", action: "apply", focus: "full", strength: "strong" }},
                         {{ type: "particle_effect", action: "stop" }},
                         {{ type: "character_hide", characterId: "yuna", transition: "rise", transitionDurationMs: 850 }},
+                        {{
+                          type: "achievement_unlock",
+                          achievementId: "First Promise",
+                          title: "最初的约定",
+                          description: "完成第一次约定。",
+                          hiddenBeforeUnlock: true,
+                        }},
                         {{ type: "scene_call", targetSceneId: "scene_common" }},
                         {{ type: "jump", targetSceneId: "scene_end" }},
                       ],
@@ -204,6 +213,9 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
         self.assertIn('matrixcolor TintMatrix("#ffffff") * SaturationMatrix(0) * BrightnessMatrix(0.12) * ContrastMatrix(1.2) * SaturationMatrix(0.85) * HueMatrix(10)', payload["draft"]["script"])
         self.assertIn("        blur 6", payload["draft"]["script"])
         self.assertIn("hide yuna with MoveTransition(0.85, leave=offscreenbottom, leave_time_warp=_warper.easein)", payload["draft"]["script"])
+        self.assertIn('achievement.register("custom:first-promise")', payload["draft"]["script"])
+        self.assertIn('$ achievement.grant("custom:first-promise")', payload["draft"]["script"])
+        self.assertEqual(payload["draft"]["achievementDefinitionCount"], 1)
         self.assertIn('show text "STAFF\\nThank you\\n企划：Canvasia\\n剧本：Tester" at truecenter with dissolve', payload["draft"]["script"])
         self.assertNotIn("renpy_choice_effects_review", payload["manifest"])
         self.assertNotIn("renpy_comment_only_block", payload["manifest"])

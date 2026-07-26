@@ -13,6 +13,10 @@ from project_runtime_settings import (
     get_runtime_volume_ratio,
     sanitize_project_runtime_settings,
 )
+from native_runtime.runtime_achievements import (
+    collect_custom_achievement_definitions,
+    sanitize_achievement_unlock_block,
+)
 
 
 RENPY_GAME_DIR_NAME = "game"
@@ -1642,6 +1646,9 @@ def render_story_block(block: dict, context: dict) -> list[str]:
         return render_video_block(block, context)
     if block_type == "credits_roll":
         return render_credits_block(block)
+    if block_type == "achievement_unlock":
+        achievement = sanitize_achievement_unlock_block(block)
+        return [f"    $ achievement.grant({quote_renpy(achievement['id'])})"]
     if block_type == "condition":
         return render_condition_block(block, context)
     if block_type == "screen_shake":
@@ -1709,6 +1716,7 @@ def build_renpy_draft_export(bundle: dict, assets_doc: dict | None = None) -> di
     warnings: list[dict] = []
     sprite_definitions, _defined_sprites = build_sprite_definitions(character_map, asset_map, warnings)
     character_stage_transforms = build_character_stage_transform_definitions(scene_records, scene_label_map)
+    custom_achievements = collect_custom_achievement_definitions(bundle.get("chapters"))
 
     lines = [
         f"# {clean_text(project.get('title'), 'Canvasia Project')} - Canvasia Ren'Py Starter",
@@ -1723,6 +1731,7 @@ def build_renpy_draft_export(bundle: dict, assets_doc: dict | None = None) -> di
         "        except (TypeError, ValueError):",
         "            return None",
         "        return int(number) if number.is_integer() else number",
+        *(f"    achievement.register({quote_renpy(definition['id'])})" for definition in custom_achievements),
         "",
         *build_variable_definitions(variable_map),
         "",
@@ -1779,6 +1788,7 @@ def build_renpy_draft_export(bundle: dict, assets_doc: dict | None = None) -> di
         "sceneCount": len(scene_records),
         "characterCount": len(character_map),
         "variableCount": len(variable_map),
+        "achievementDefinitionCount": len(custom_achievements),
         "assetDefinitionCount": len(build_asset_image_definitions(asset_map)) + len(sprite_definitions),
         "warningCount": len(warnings),
         "warnings": warnings,

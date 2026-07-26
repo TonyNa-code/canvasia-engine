@@ -469,6 +469,7 @@ def sanitize_archive_progress(value: dict | None) -> dict:
         "relationUnlocked": clean_id_list(source.get("relationUnlocked")),
         "voiceReplayUnlocked": clean_id_list(source.get("voiceReplayUnlocked")),
         "endingUnlocked": clean_id_list(source.get("endingUnlocked")),
+        "achievementUnlocked": clean_id_list(source.get("achievementUnlocked")),
         "readTextKeys": clean_id_list(source.get("readTextKeys"), READ_TEXT_KEY_LIMIT),
         "endingCompletionCount": clean_count(source.get("endingCompletionCount")),
         "endingLastCompletedAt": str(source.get("endingLastCompletedAt") or "").strip() or None,

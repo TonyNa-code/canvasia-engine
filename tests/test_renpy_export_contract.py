@@ -12,6 +12,7 @@ import renpy_export
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 FRONTEND_RUNTIME_SETTINGS_MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "project_runtime_settings.js"
+FRONTEND_ACHIEVEMENT_MODULE_PATH = ROOT_DIR / "export_player_template" / "runtime_achievements.js"
 FRONTEND_MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "renpy_exporter.js"
 
 
@@ -24,6 +25,7 @@ def load_frontend_payload(script_body: str) -> dict:
         context.globalThis = context;
         vm.createContext(context);
         vm.runInContext(fs.readFileSync({json.dumps(str(FRONTEND_RUNTIME_SETTINGS_MODULE_PATH))}, "utf8"), context);
+        vm.runInContext(fs.readFileSync({json.dumps(str(FRONTEND_ACHIEVEMENT_MODULE_PATH))}, "utf8"), context);
         vm.runInContext(fs.readFileSync({json.dumps(str(FRONTEND_MODULE_PATH))}, "utf8"), context);
         const tools = context.window.CanvasiaEditorRenpyExporter;
         {script_body}
@@ -42,6 +44,51 @@ def load_frontend_payload(script_body: str) -> dict:
 
 
 class RenpyExportContractTests(unittest.TestCase):
+    def test_custom_achievements_register_and_grant_on_both_exporters(self) -> None:
+        block = {
+            "id": "achievement_first_meet",
+            "type": "achievement_unlock",
+            "achievementId": "First Meet",
+            "title": "第一次相遇",
+        }
+        frontend = load_frontend_payload(
+            f"""
+            const block = {json.dumps(block, ensure_ascii=False)};
+            const lines = tools.renderBlock(block, {{ warnings: [], assetMap: new Map(), characterMap: new Map() }});
+            const draft = tools.buildRenpyDraftExport({{
+              project: {{ title: "Achievement Demo" }},
+              chapters: [{{ id: "chapter_1", scenes: [{{ id: "scene_1", blocks: [block] }}] }}],
+            }});
+            process.stdout.write(JSON.stringify({{ lines, script: draft.script, count: draft.achievementDefinitionCount }}));
+            """
+        )
+        backend_lines = renpy_export.render_story_block(
+            block,
+            {
+                "warnings": [],
+                "blockIndex": 0,
+                "sceneId": "scene_1",
+                "sceneLabelMap": {},
+                "assetMap": {},
+                "characterMap": {},
+                "variableMap": {},
+            },
+        )
+        backend = renpy_export.build_renpy_draft_export(
+            {
+                "project": {"title": "Achievement Demo"},
+                "chapters": [{"id": "chapter_1", "scenes": [{"id": "scene_1", "blocks": [block]}]}],
+            },
+            {"assets": []},
+        )
+
+        self.assertEqual(frontend["lines"], ['    $ achievement.grant("custom:first-meet")'])
+        self.assertEqual(frontend["lines"], backend_lines)
+        self.assertIn('achievement.register("custom:first-meet")', frontend["script"])
+        self.assertIn('achievement.register("custom:first-meet")', backend["script"])
+        self.assertEqual(frontend["count"], 1)
+        self.assertEqual(backend["achievementDefinitionCount"], 1)
+
     def test_reusable_scene_calls_match_on_both_exporters(self) -> None:
         blocks = [
             {"type": "scene_call", "targetSceneId": "scene_common"},

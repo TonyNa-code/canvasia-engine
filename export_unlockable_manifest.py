@@ -5,6 +5,8 @@ import re
 from datetime import datetime
 from pathlib import Path
 
+from native_runtime.runtime_achievements import collect_custom_achievement_definitions
+
 
 UNLOCKABLE_CONTENT_MANIFEST_FILE_NAME = "unlockable_content_manifest.json"
 UNLOCKABLE_CONTENT_REPORT_FILE_NAME = "unlockable_content_report.md"
@@ -519,7 +521,40 @@ def collect_export_ending_collection_group(bundle: dict) -> dict:
 def collect_export_achievement_group(groups: list[dict], bundle: dict) -> dict:
     has_choice = any(str(record["block"].get("type") or "") == "choice" for record in iter_export_block_records(bundle))
     scene_count = len(iter_export_scene_records(bundle))
-    entries = [
+    custom_entries = []
+    for definition in collect_custom_achievement_definitions(bundle.get("chapters")):
+        duplicate_count = int(definition.get("duplicateCount") or 0)
+        entry_issues = []
+        if duplicate_count:
+            entry_issues.append(
+                make_unlockable_issue(
+                    "warn",
+                    "achievement_id_duplicate",
+                    "自定义成就 ID 重复",
+                    f"{definition['name']} 还有 {duplicate_count} 个同 ID 剧情卡；运行时只保留第一份展示定义。",
+                    groupId="achievements",
+                    achievementId=definition["id"],
+                    sceneId=definition.get("sceneId"),
+                )
+            )
+        custom_entries.append(
+            make_unlockable_entry(
+                definition["id"],
+                definition["name"],
+                status="warn" if duplicate_count else "ready",
+                detail=f"{definition['category']} · {definition['requirement']}",
+                source=definition.get("sceneId") or "",
+                meta={
+                    "kind": "custom",
+                    "authorId": definition["authorId"],
+                    "hiddenBeforeUnlock": definition["hiddenBeforeUnlock"],
+                    "iconAssetId": definition["iconAssetId"],
+                },
+                issues=entry_issues,
+            )
+        )
+
+    entries = custom_entries + [
         make_unlockable_entry(
             "story_start",
             "首次进入剧情",
@@ -544,7 +579,12 @@ def collect_export_achievement_group(groups: list[dict], bundle: dict) -> dict:
                     meta={"groupId": group["id"]},
                 )
             )
-    return build_unlockable_group("achievements", "成就集合", entries, "导出包内可推导的成就覆盖。")
+    return build_unlockable_group(
+        "achievements",
+        "成就集合",
+        entries,
+        "作者在剧情中配置的成就，以及运行时自动推导的收集里程碑。",
+    )
 
 
 def build_export_unlockable_content_manifest(bundle: dict, assets_doc: dict) -> dict:

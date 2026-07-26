@@ -675,6 +675,61 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
 
         self.assertGreater(block_cards.count(), initial_count)
 
+    def test_story_editor_custom_achievement_persists_and_reaches_preview(self) -> None:
+        self.create_blank_project("浏览器烟测项目_Achievement")
+        self.create_first_chapter()
+
+        self.page.get_by_role("button", name="解锁成就").first.click()
+        self.page.locator("#editorAchievementId").wait_for(timeout=15000)
+        self.page.locator("#editorAchievementId").fill("First Promise")
+        self.page.locator("#editorAchievementTitle").fill("最初的约定")
+        self.page.locator("#editorAchievementDescription").fill("完成第一次约定。")
+        self.page.locator("#editorAchievementCategory").fill("剧情里程碑")
+        self.page.locator("#editorAchievementRequirement").fill("读完序章")
+        self.page.locator("#editorAchievementHidden").select_option("true")
+        self.page.get_by_role("button", name="保存这张卡片").click()
+
+        self.page.wait_for_function(
+            """async () => {
+                const response = await fetch('/api/project-data');
+                const bundle = await response.json();
+                return (bundle.chapters || []).some((chapter) =>
+                    (chapter.scenes || []).some((scene) =>
+                        (scene.blocks || []).some((block) =>
+                            block.type === 'achievement_unlock'
+                            && block.achievementId === 'first-promise'
+                            && block.title === '最初的约定'
+                            && block.description === '完成第一次约定。'
+                            && block.category === '剧情里程碑'
+                            && block.requirement === '读完序章'
+                            && block.hiddenBeforeUnlock === true
+                        )
+                    )
+                );
+            }""",
+            timeout=15000,
+        )
+
+        self.preview_navigation_button().click()
+        self.page.locator("#previewStage").wait_for(state="visible", timeout=15000)
+        for _ in range(12):
+            preview_text = self.page.locator("#previewStage .dialog-text").text_content() or ""
+            if "最初的约定" in preview_text:
+                break
+            visible_choice = self.page.locator("#previewChoices button:visible").first
+            if visible_choice.count():
+                visible_choice.click()
+            else:
+                next_button = self.page.locator("#previewNextButton")
+                if next_button.is_disabled():
+                    break
+                next_button.click()
+            self.page.wait_for_timeout(120)
+
+        self.page.locator("#previewStage .dialog-text").filter(
+            has_text="最初的约定：完成第一次约定。"
+        ).wait_for(timeout=15000)
+
     def test_story_editor_stage_image_card_persists_and_reaches_preview(self) -> None:
         self.open_project_by_title("心跳时差")
         self.page.get_by_role("button", name="写剧情", exact=True).click()

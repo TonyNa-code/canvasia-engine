@@ -50,6 +50,16 @@ class ExportUnlockableManifestTests(unittest.TestCase):
                                     "type": "choice",
                                     "options": [{"id": "go", "text": "Go ending", "gotoSceneId": "scene_good"}],
                                 },
+                                {
+                                    "id": "achievement_first_meet",
+                                    "type": "achievement_unlock",
+                                    "achievementId": "First Meet",
+                                    "title": "First Meet",
+                                    "description": "Reach the first branch.",
+                                    "category": "Story",
+                                    "requirement": "Read the opening scene",
+                                    "hiddenBeforeUnlock": True,
+                                },
                             ],
                         },
                         {
@@ -96,6 +106,11 @@ class ExportUnlockableManifestTests(unittest.TestCase):
         self.assertTrue(
             any(entry["id"] == "first_choice" and entry["status"] == "ready" for entry in groups["achievements"]["entries"])
         )
+        custom_achievement = next(
+            entry for entry in groups["achievements"]["entries"] if entry["id"] == "custom:first-meet"
+        )
+        self.assertEqual(custom_achievement["meta"]["kind"], "custom")
+        self.assertTrue(custom_achievement["meta"]["hiddenBeforeUnlock"])
 
     def test_report_markdown_and_file_writers_are_release_friendly(self) -> None:
         bundle, assets_doc = self.build_sample_bundle()

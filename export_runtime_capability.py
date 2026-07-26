@@ -32,6 +32,7 @@ CAPABILITY_ROWS = [
     ("sfx_play", "音频", "full", "full", "支持音效播放与音量控制。"),
     ("video_play", "视频", "full", "partial", "视频播放依赖目标平台能力；发布前需要验音画同步、跳过和失败兜底。"),
     ("credits_roll", "结尾", "full", "full", "支持片尾字幕与回想 / 发布检查。"),
+    ("achievement_unlock", "收集", "full", "full", "支持自定义成就、隐藏规则、图标、持久化和成就馆。"),
     ("wait", "演出", "full", "full", "支持等待 / 停顿节奏卡。"),
     ("particle_effect", "演出", "full", "full", "支持项目粒子预设、图片粒子、密度、速度、重力和颜色等参数。"),
     ("screen_shake", "演出", "full", "full", "支持屏幕震动。"),

@@ -21,7 +21,7 @@ DIALOGUE_LAYOUT_DESCRIPTIONS = {
 }
 
 _DIALOGUE_BLOCK_TYPES = {"dialogue", "narration"}
-_NVL_BOUNDARY_BLOCK_TYPES = {"choice", "condition", "jump", "video_play", "credits_roll"}
+_NVL_BOUNDARY_BLOCK_TYPES = {"choice", "condition", "jump", "video_play", "credits_roll", "achievement_unlock"}
 _DEFAULT_NVL_ENTRY_LIMIT = 8
 _MAX_NVL_ENTRY_LIMIT = 20
 

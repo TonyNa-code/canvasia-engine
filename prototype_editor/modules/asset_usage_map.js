@@ -217,6 +217,13 @@
             label: `场景：${sceneName} / ${blockLabel}语音`,
             meta,
           });
+          addUsage(usageMap, block?.iconAssetId, {
+            kind: "story",
+            sceneId: scene?.id,
+            blockId: block?.id,
+            label: `场景：${sceneName} / ${blockLabel}图标`,
+            meta,
+          });
 
           if (["dialogue", "character_show", "character_move"].includes(block?.type)) {
             const characterId = cleanText(block.speakerId ?? block.characterId);

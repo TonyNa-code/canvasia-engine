@@ -5664,3 +5664,133 @@ html[data-runtime-input="gamepad"] :is(button, [href], input, select, textarea, 
     0 0 0 6px color-mix(in srgb, var(--runtime-accent, #67a4ff) 20%, transparent),
     0 10px 28px color-mix(in srgb, var(--runtime-accent, #67a4ff) 22%, transparent);
 }
+
+.achievement-toast {
+  position: absolute;
+  top: clamp(58px, 8%, 92px);
+  right: clamp(16px, 3.5%, 48px);
+  z-index: 34;
+  width: min(390px, calc(100% - 32px));
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+  padding: 14px 17px;
+  border: 1px solid color-mix(in srgb, var(--runtime-accent, #67a4ff) 42%, transparent);
+  border-radius: 18px;
+  color: var(--runtime-ink, #edf4ff);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--runtime-panel, #0e1728) 94%, transparent), color-mix(in srgb, var(--runtime-accent, #67a4ff) 18%, #0e1728)),
+    rgba(8, 15, 28, 0.94);
+  box-shadow:
+    0 24px 60px rgba(1, 7, 18, 0.44),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(18px);
+  opacity: 0;
+  transform: translate3d(24px, 0, 0) scale(0.98);
+  pointer-events: none;
+  transition:
+    opacity 260ms ease,
+    transform 360ms cubic-bezier(0.2, 0.9, 0.25, 1);
+}
+
+.achievement-toast.is-visible {
+  opacity: 1;
+  transform: translate3d(0, 0, 0) scale(1);
+}
+
+.achievement-toast > img,
+.achievement-toast-mark {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  object-fit: cover;
+}
+
+.achievement-toast-mark {
+  display: grid;
+  place-items: center;
+  font-size: 24px;
+  color: white;
+  background:
+    radial-gradient(circle at 30% 28%, rgba(255, 255, 255, 0.5), transparent 26%),
+    linear-gradient(135deg, var(--runtime-accent, #67a4ff), var(--runtime-accent-strong, #8f76ff));
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--runtime-accent, #67a4ff) 32%, transparent);
+}
+
+.achievement-toast-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.achievement-toast-copy small {
+  color: color-mix(in srgb, var(--runtime-accent, #67a4ff) 72%, white);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.achievement-toast-copy strong {
+  overflow: hidden;
+  color: inherit;
+  font-size: 17px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.achievement-toast-copy em {
+  overflow: hidden;
+  color: color-mix(in srgb, currentColor 70%, transparent);
+  font-size: 12px;
+  font-style: normal;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.achievement-hero-mark {
+  min-height: 224px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--runtime-accent, #67a4ff) 28%, transparent);
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--runtime-accent, #67a4ff) 26%, transparent), transparent 54%),
+    color-mix(in srgb, var(--runtime-panel, #0e1728) 86%, transparent);
+}
+
+.achievement-hero-mark img {
+  width: 100%;
+  height: 100%;
+  min-height: 224px;
+  object-fit: cover;
+}
+
+.achievement-hero-mark span {
+  font-size: clamp(48px, 7vw, 84px);
+  color: color-mix(in srgb, var(--runtime-accent, #67a4ff) 78%, white);
+  text-shadow: 0 16px 44px color-mix(in srgb, var(--runtime-accent, #67a4ff) 36%, transparent);
+}
+
+.achievement-hero-mark.is-hidden {
+  filter: saturate(0.36);
+}
+
+@media (max-width: 720px) {
+  .achievement-toast {
+    top: 54px;
+    right: 12px;
+    width: calc(100% - 24px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .achievement-toast {
+    transition: opacity 120ms linear;
+    transform: none;
+  }
+}

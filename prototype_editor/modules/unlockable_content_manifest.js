@@ -57,8 +57,8 @@
     {
       id: "achievements",
       label: "成就集合",
-      unlockRule: "由路线、图鉴、音频、角色和结局里程碑解锁。",
-      detail: "根据当前项目自动生成的成就覆盖。",
+      unlockRule: "由作者剧情卡或路线、图鉴、音频、角色和结局里程碑解锁。",
+      detail: "作者自定义成就与系统自动成就的完整覆盖。",
     },
   ]);
 
@@ -625,10 +625,43 @@
     return buildGroup("ending_collection", entries, entries.flatMap((entry) => entry.issues));
   }
 
-  function buildAchievementEntries(data = {}, routeOverview = {}, groups = []) {
+  function buildAchievementEntries(data = {}, routeOverview = {}, groups = [], issues = []) {
     const metrics = routeOverview?.metrics ?? {};
     const activeGroups = groups.filter((group) => group.id !== "achievements" && group.totalCount > 0);
+    const achievementTools = global.CanvasiaRuntimeAchievements;
+    const customDefinitions = achievementTools?.collectCustomAchievementDefinitions?.(
+      getSceneRecords(data).map((record) => record.scene)
+    ) ?? [];
+    const customEntries = customDefinitions.map((definition) => {
+      const entryIssues = [];
+      if (definition.duplicateCount > 0) {
+        const issue = makeIssue(
+          "warn",
+          "achievement_id_duplicate",
+          "自定义成就 ID 重复",
+          `${definition.name} 还有 ${definition.duplicateCount} 个同 ID 剧情卡；运行时只保留第一份展示定义。`,
+          { groupId: "achievements", achievementId: definition.id, sceneId: definition.sceneId }
+        );
+        entryIssues.push(issue);
+        issues.push(issue);
+      }
+      return makeEntry({
+        id: definition.id,
+        title: definition.name,
+        status: entryIssues.length ? "warn" : "ready",
+        detail: `${definition.category} · ${definition.requirement}`,
+        source: definition.sceneId,
+        meta: {
+          kind: "custom",
+          authorId: definition.authorId,
+          hiddenBeforeUnlock: definition.hiddenBeforeUnlock,
+          iconAssetId: definition.iconAssetId,
+        },
+        issues: entryIssues,
+      });
+    });
     const entries = [
+      ...customEntries,
       makeEntry({
         id: "story_start",
         title: "首次进入剧情",
@@ -668,7 +701,7 @@
       collectChapterReplayEntries(data),
       collectEndingEntries(routeOverview, issues),
     ];
-    groups.push(buildAchievementEntries(data, routeOverview, groups));
+    groups.push(buildAchievementEntries(data, routeOverview, groups, issues));
 
     if (!groups.some((group) => group.totalCount > 0)) {
       issues.push(

@@ -32,6 +32,71 @@ MIN_FORMAL_SAVE_SLOT_COUNT = 3
 MAX_FORMAL_SAVE_SLOT_COUNT = 120
 
 
+def render_achievement_notification_panel(
+    *,
+    pygame_module,
+    screen,
+    width: int,
+    notification: dict,
+    palette: dict,
+    font_ui,
+    font_body,
+    now_ms: int,
+) -> bool:
+    """Render a transient achievement card and report whether it is still active."""
+    if not isinstance(notification, dict):
+        return False
+    remaining_ms = int(notification.get("expiresAtMs") or 0) - int(now_ms or 0)
+    if remaining_ms <= 0:
+        return False
+
+    panel_width = min(460, max(280, int(width) - 56))
+    panel_height = 112
+    panel = pygame_module.Rect(int(width) - panel_width - 28, 96, panel_width, panel_height)
+    surface = pygame_module.Surface((panel_width, panel_height), pygame_module.SRCALPHA)
+    alpha = 255 if remaining_ms >= 360 else max(0, min(255, int(remaining_ms / 360 * 255)))
+    pygame_module.draw.rect(surface, (*palette["panel"], min(alpha, 244)), surface.get_rect(), border_radius=20)
+    pygame_module.draw.rect(
+        surface,
+        (*palette["accent"], min(alpha, 196)),
+        surface.get_rect(),
+        2,
+        border_radius=20,
+    )
+    mark_center = (34, panel_height // 2)
+    pygame_module.draw.polygon(
+        surface,
+        (*palette["accent"], alpha),
+        [
+            (mark_center[0], mark_center[1] - 13),
+            (mark_center[0] + 13, mark_center[1]),
+            (mark_center[0], mark_center[1] + 13),
+            (mark_center[0] - 13, mark_center[1]),
+        ],
+    )
+    label = font_ui.render("ACHIEVEMENT UNLOCKED", True, palette["accent"])
+    title = font_body.render(
+        ellipsize_text(font_body, str(notification.get("name") or "新的成就"), panel_width - 92),
+        True,
+        palette["text"],
+    )
+    description = font_ui.render(
+        ellipsize_text(
+            font_ui,
+            str(notification.get("description") or "完成了一项新的剧情里程碑。"),
+            panel_width - 92,
+        ),
+        True,
+        palette["muted"],
+    )
+    surface.blit(label, (62, 16))
+    surface.blit(title, (62, 42))
+    surface.blit(description, (62, 78))
+    surface.set_alpha(alpha)
+    screen.blit(surface, panel.topleft)
+    return True
+
+
 def build_save_dialog_layout(width: int, height: int, visible_slot_count: int) -> dict:
     """Return responsive save-dialog geometry without depending on Pygame."""
     safe_width = max(1, int(width or 0))
@@ -818,6 +883,7 @@ def get_block_label(block_type: str) -> str:
         "sfx_play": "播放音效",
         "video_play": "播放视频",
         "credits_roll": "片尾字幕",
+        "achievement_unlock": "解锁成就",
         "wait": "等待停顿",
         "particle_effect": "粒子特效",
         "screen_shake": "屏幕震动",
