@@ -4,6 +4,7 @@ import unittest
 
 from native_runtime.runtime_stage_images import (
     apply_native_stage_image_block,
+    build_native_renderable_stage_image_items,
     get_native_stage_image_render_pose,
     get_safe_stage_image_transform,
     is_native_stage_image_motion_complete,
@@ -11,6 +12,20 @@ from native_runtime.runtime_stage_images import (
 
 
 class NativeRuntimeStageImagesTests(unittest.TestCase):
+    def test_renderable_items_filter_plane_interpolate_and_sort(self) -> None:
+        items = build_native_renderable_stage_image_items(
+            {
+                "front_high": {"plane": "front", "transform": {"layer": 5}},
+                "back": {"plane": "back", "transform": {"layer": 0}},
+            },
+            {"front_low": {"plane": "front", "transform": {"layer": -2}}},
+            {},
+            "front",
+            100,
+        )
+
+        self.assertEqual([layer_id for layer_id, _state in items], ["front_low", "front_high"])
+
     def test_show_move_hide_preserve_asset_and_interpolate_pose(self) -> None:
         shown = apply_native_stage_image_block(
             {},

@@ -175,6 +175,17 @@ except ImportError:  # pragma: no cover - exported native packages import from t
     )
 
 try:
+    from .runtime_speaker_focus import (
+        NativeSpeakerFocusController,
+        scale_rgb_color,
+    )
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_speaker_focus import (
+        NativeSpeakerFocusController,
+        scale_rgb_color,
+    )
+
+try:
     from .runtime_reading_profiles import (
         READING_PROFILE_IDS,
         apply_reading_profile,
@@ -634,14 +645,16 @@ except ImportError:  # pragma: no cover - exported native packages import from t
 
 try:
     from .runtime_character_motion import (
+        build_native_renderable_character_items,
         build_native_character_motion_state,
-        get_native_character_render_pose,
+        get_native_character_transition_adjustment,
         is_native_character_motion_complete,
     )
 except ImportError:  # pragma: no cover - exported native packages import from the same directory.
     from runtime_character_motion import (
+        build_native_renderable_character_items,
         build_native_character_motion_state,
-        get_native_character_render_pose,
+        get_native_character_transition_adjustment,
         is_native_character_motion_complete,
     )
 
@@ -659,9 +672,8 @@ except ImportError:  # pragma: no cover - exported native packages import from t
 try:
     from .runtime_stage_images import (
         apply_native_stage_image_block,
+        build_native_renderable_stage_image_items,
         clone_stage_image_state,
-        get_native_stage_image_render_pose,
-        get_safe_stage_image_plane,
         get_safe_stage_image_transform,
         is_native_stage_image_motion_complete,
         normalize_stage_image_state,
@@ -669,9 +681,8 @@ try:
 except ImportError:  # pragma: no cover - exported native packages import from the same directory.
     from runtime_stage_images import (
         apply_native_stage_image_block,
+        build_native_renderable_stage_image_items,
         clone_stage_image_state,
-        get_native_stage_image_render_pose,
-        get_safe_stage_image_plane,
         get_safe_stage_image_transform,
         is_native_stage_image_motion_complete,
         normalize_stage_image_state,
@@ -8294,6 +8305,7 @@ class NativeRuntimePlayer:
         self.current_block_index = 0
         self.story_call_stack: list[dict] = []
         self.current_line: dict | None = None
+        self.speaker_focus_controller = NativeSpeakerFocusController()
         self.current_choices: list[dict] | None = None
         self.current_choice_index = 0
         self.title_screen_active = False
@@ -12822,79 +12834,16 @@ class NativeRuntimePlayer:
             target.blit(self.font_ui.render(clipped, True, palette["muted"]), (card_rect.left + 16, y))
             y += 20
 
-    def get_character_render_transition_adjustment(
-        self,
-        state: dict,
-        width: int,
-        height: int,
-        is_leaving: bool,
-    ) -> dict:
-        transition = state.get("transition") if isinstance(state, dict) else None
-        if not transition:
-            return {"opacityMultiplier": 1.0, "offsetX": 0, "offsetY": 0, "scaleMultiplier": 1.0}
-
-        progress = get_native_transition_progress(transition, self.get_runtime_ticks_ms())
-        eased = ease_out_cubic(progress)
-        transition_name = get_safe_character_transition(transition.get("transition"))
-        visible_ratio = 1.0 - eased if is_leaving else eased
-        offset_ratio = eased if is_leaving else (1.0 - eased)
-        offset_x = 0
-        offset_y = 0
-        scale_multiplier = 1.0
-
-        if transition_name == "slide_left":
-            offset_x = -int(width * 0.18 * offset_ratio)
-        elif transition_name == "slide_right":
-            offset_x = int(width * 0.18 * offset_ratio)
-        elif transition_name == "rise":
-            offset_y = int(height * 0.10 * offset_ratio)
-        elif transition_name == "pop":
-            scale_multiplier = (1.0 - 0.06 * eased) if is_leaving else (0.92 + 0.08 * eased)
-
-        return {
-            "opacityMultiplier": clamp(visible_ratio, 0.0, 1.0),
-            "offsetX": offset_x,
-            "offsetY": offset_y,
-            "scaleMultiplier": clamp(scale_multiplier, 0.25, 2.0),
-        }
-
-    def get_renderable_character_items(self) -> list[tuple[str, dict]]:
-        items: list[tuple[str, dict]] = []
-        now_ms = self.get_runtime_ticks_ms()
-        for character_id, state in self.visible_characters.items():
-            items.append(
-                (
-                    character_id,
-                    get_native_character_render_pose(
-                        dict(state or {}),
-                        self.character_motions.get(character_id),
-                        now_ms,
-                    ),
-                )
-            )
-        for character_id, state in self.leaving_characters.items():
-            leaving_state = dict(state or {})
-            leaving_state["__leaving"] = True
-            items.append((character_id, leaving_state))
-        return items
-
-    def get_renderable_stage_image_items(self, plane: str) -> list[tuple[str, dict]]:
-        safe_plane = get_safe_stage_image_plane(plane)
-        now_ms = self.get_runtime_ticks_ms()
-        items: list[tuple[str, dict]] = []
-        for layer_id, state in self.visible_stage_images.items():
-            if get_safe_stage_image_plane(state.get("plane")) != safe_plane:
-                continue
-            items.append((layer_id, get_native_stage_image_render_pose(state, self.stage_image_motions.get(layer_id), now_ms)))
-        for layer_id, state in self.leaving_stage_images.items():
-            if get_safe_stage_image_plane(state.get("plane")) != safe_plane:
-                continue
-            items.append((layer_id, get_native_stage_image_render_pose(state, self.stage_image_motions.get(layer_id), now_ms)))
-        return sorted(items, key=lambda item: (get_safe_stage_image_transform(item[1].get("transform"))["layer"], item[0]))
-
     def render_stage_images(self, target, plane: str) -> None:
         palette = self.get_active_palette()
-        for layer_id, state in self.get_renderable_stage_image_items(plane):
+        renderable_items = build_native_renderable_stage_image_items(
+            self.visible_stage_images,
+            self.leaving_stage_images,
+            self.stage_image_motions,
+            plane,
+            self.get_runtime_ticks_ms(),
+        )
+        for layer_id, state in renderable_items:
             transform = get_safe_stage_image_transform(state.get("transform"))
             image = self._load_image(state.get("assetId"))
             position_ratio = float(state.get("positionRatio") or 0.5)
@@ -12934,16 +12883,33 @@ class NativeRuntimePlayer:
             "center": int(self.width * 0.50),
             "right": int(self.width * 0.76),
         }
+        character_items = build_native_renderable_character_items(
+            self.visible_characters,
+            self.leaving_characters,
+            self.character_motions,
+            self.get_runtime_ticks_ms(),
+        )
+        speaker_focus_poses = self.speaker_focus_controller.build_render_poses(
+            items=character_items,
+            current_line=self.current_line,
+            game_ui_config=self.game_ui_config,
+            visual_comfort_mode=str(self.runtime_settings.get("visualComfort") or "standard"),
+            now_ms=self.get_runtime_ticks_ms(),
+        )
+
         def character_sort_key(item):
             character_state = item[1] if isinstance(item[1], dict) else {}
             stage = get_safe_character_stage(character_state.get("stage"))
+            focus_pose = self.speaker_focus_controller.get_render_pose(speaker_focus_poses, item[0], character_state)
             return (
                 stage["layer"],
+                int(focus_pose.get("layerBoost") or 0),
                 float(character_state.get("positionRatio") or 0),
             )
 
-        for character_id, state in sorted(self.get_renderable_character_items(), key=character_sort_key):
+        for character_id, state in sorted(character_items, key=character_sort_key):
             stage = get_safe_character_stage(state.get("stage"))
+            focus_pose = self.speaker_focus_controller.get_render_pose(speaker_focus_poses, character_id, state)
             sprite_asset_id = self.get_character_sprite_asset_id(character_id, state.get("expressionId"))
             sprite = self._load_image(sprite_asset_id)
             position_ratio = state.get("positionRatio")
@@ -12958,20 +12924,31 @@ class NativeRuntimePlayer:
                 sprite_width, sprite_height = sprite.get_size()
                 max_height = int(self.height * 0.74)
                 scale = min(max_height / max(sprite_height, 1), 1.6) * (stage["scale"] / 100)
-                transition_adjustment = self.get_character_render_transition_adjustment(
+                transition_adjustment = get_native_character_transition_adjustment(
                     state,
                     max(1, int(sprite_width * scale)),
                     max(1, int(sprite_height * scale)),
                     is_leaving,
+                    self.get_runtime_ticks_ms(),
                 )
-                scale *= transition_adjustment["scaleMultiplier"]
+                scale *= transition_adjustment["scaleMultiplier"] * float(focus_pose["scaleMultiplier"])
                 scaled = self.pygame.transform.smoothscale(
                     sprite,
                     (max(1, int(sprite_width * scale)), max(1, int(sprite_height * scale))),
                 )
                 if stage["flipX"]:
                     scaled = self.pygame.transform.flip(scaled, True, False)
-                effective_opacity = clamp(stage["opacity"] * transition_adjustment["opacityMultiplier"], 0, 100)
+                brightness_multiplier = float(focus_pose["brightnessMultiplier"])
+                if brightness_multiplier < 0.999:
+                    shade = max(0, min(255, round(255 * brightness_multiplier)))
+                    scaled.fill((shade, shade, shade, 255), special_flags=self.pygame.BLEND_RGBA_MULT)
+                effective_opacity = clamp(
+                    stage["opacity"]
+                    * transition_adjustment["opacityMultiplier"]
+                    * float(focus_pose["opacityMultiplier"]),
+                    0,
+                    100,
+                )
                 if effective_opacity < 100:
                     scaled = scaled.copy()
                     scaled.set_alpha(int(255 * effective_opacity / 100))
@@ -12986,26 +12963,47 @@ class NativeRuntimePlayer:
                 if effective_opacity > 15 and not is_leaving:
                     self.render_character_model_preview_card(target, rect, character, state.get("expressionId"))
             else:
-                transition_adjustment = self.get_character_render_transition_adjustment(state, 220, 420, is_leaving)
+                transition_adjustment = get_native_character_transition_adjustment(
+                    state,
+                    220,
+                    420,
+                    is_leaving,
+                    self.get_runtime_ticks_ms(),
+                )
                 placeholder_rect = self.pygame.Rect(0, 0, 220, 420)
-                placeholder_scale = stage["scale"] / 100 * transition_adjustment["scaleMultiplier"]
+                placeholder_scale = (
+                    stage["scale"]
+                    / 100
+                    * transition_adjustment["scaleMultiplier"]
+                    * float(focus_pose["scaleMultiplier"])
+                )
                 placeholder_rect.width = max(1, int(placeholder_rect.width * placeholder_scale))
                 placeholder_rect.height = max(1, int(placeholder_rect.height * placeholder_scale))
                 placeholder_rect.midbottom = (
                     x + int(transition_adjustment["offsetX"]),
                     bottom_y + int(transition_adjustment["offsetY"]),
                 )
-                effective_opacity = clamp(stage["opacity"] * transition_adjustment["opacityMultiplier"], 0, 100)
+                effective_opacity = clamp(
+                    stage["opacity"]
+                    * transition_adjustment["opacityMultiplier"]
+                    * float(focus_pose["opacityMultiplier"]),
+                    0,
+                    100,
+                )
+                brightness_multiplier = float(focus_pose["brightnessMultiplier"])
                 placeholder_surface = self.pygame.Surface(placeholder_rect.size, self.pygame.SRCALPHA)
                 self.pygame.draw.rect(
                     placeholder_surface,
-                    with_alpha(palette["placeholder"], effective_opacity),
+                    with_alpha(scale_rgb_color(palette["placeholder"], brightness_multiplier), effective_opacity),
                     placeholder_surface.get_rect(),
                     border_radius=28,
                 )
                 self.pygame.draw.rect(
                     placeholder_surface,
-                    with_alpha(palette["panelBorder"], effective_opacity),
+                    with_alpha(
+                        palette["accent"] if focus_pose.get("active") else scale_rgb_color(palette["panelBorder"], brightness_multiplier),
+                        effective_opacity,
+                    ),
                     placeholder_surface.get_rect(),
                     2,
                     border_radius=28,
@@ -13022,7 +13020,7 @@ class NativeRuntimePlayer:
                         character_name,
                         placeholder_rect.centerx,
                         placeholder_rect.centery - 16,
-                        palette["text"],
+                        scale_rgb_color(palette["text"], brightness_multiplier),
                         target=target,
                     )
                     self.blit_text_center(
@@ -13030,7 +13028,7 @@ class NativeRuntimePlayer:
                         presentation_label,
                         placeholder_rect.centerx,
                         placeholder_rect.centery + 22,
-                        palette["accent"],
+                        scale_rgb_color(palette["accent"], brightness_multiplier),
                         target=target,
                     )
                     self.blit_text_center(
@@ -13038,7 +13036,7 @@ class NativeRuntimePlayer:
                         model_asset_label,
                         placeholder_rect.centerx,
                         placeholder_rect.centery + 52,
-                        palette["muted"],
+                        scale_rgb_color(palette["muted"], brightness_multiplier),
                         target=target,
                     )
                     self.blit_text_center(
@@ -13046,7 +13044,7 @@ class NativeRuntimePlayer:
                         binding_label[:32],
                         placeholder_rect.centerx,
                         placeholder_rect.centery + 80,
-                        palette["muted"],
+                        scale_rgb_color(palette["muted"], brightness_multiplier),
                         target=target,
                     )
                 if not is_leaving:

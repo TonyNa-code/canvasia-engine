@@ -168,6 +168,22 @@ class CiWorkflowCoverageTests(unittest.TestCase):
             workflow,
         )
 
+    def test_speaker_focus_contract_is_checked_in_ci(self) -> None:
+        workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("native_runtime/runtime_speaker_focus.py", workflow)
+        self.assertIn("export_player_template/runtime_speaker_focus.js", workflow)
+        self.assertIn("tests/test_native_runtime_speaker_focus.py", workflow)
+        self.assertIn("tests/test_speaker_focus_contract.py", workflow)
+        self.assertIn(
+            "python -m unittest discover -s tests -p 'test_native_runtime_speaker_focus.py' -v",
+            workflow,
+        )
+        self.assertIn(
+            "python -m unittest discover -s tests -p 'test_speaker_focus_contract.py' -v",
+            workflow,
+        )
+
     def test_native_runtime_bundle_registry_is_checked_in_ci(self) -> None:
         workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
 

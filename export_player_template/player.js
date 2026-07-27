@@ -110,6 +110,7 @@ import {
   scaleVisualMotion,
   scaleVisualTransitionMs,
 } from "./runtime_visual_comfort.js";
+import { buildSpeakerFocusPresentation } from "./runtime_speaker_focus.js";
 import {
   applyReadingProfile,
   detectReadingProfile,
@@ -8451,6 +8452,7 @@ function renderStageImageCards(visualState, plane) {
 
 function renderSpriteCards(visualState) {
   const cards = [...(visualState.visibleCharacters ?? [])];
+  const visibleCharacterIds = cards.map((item) => item.characterId).filter(Boolean);
 
   if (visualState.characterTransitionEvent?.mode === "hide" && visualState.characterTransitionEvent.characterState) {
     cards.push({
@@ -8467,7 +8469,8 @@ function renderSpriteCards(visualState) {
         visualState.depthBlur,
         visualState.characterTransitionEvent,
         visualState.activeCharacterId,
-        visualState.characterEmphasisEvent
+        visualState.characterEmphasisEvent,
+        visibleCharacterIds
       )
     )
     .join("");
@@ -8478,13 +8481,22 @@ function renderSpriteCard(
   depthBlur = null,
   characterTransitionEvent = null,
   activeCharacterId = null,
-  characterEmphasisEvent = null
+  characterEmphasisEvent = null,
+  visibleCharacterIds = []
 ) {
   const spriteAssetId = getSpriteAssetId(characterState.characterId, characterState.expressionId);
   const spriteUrl = getAssetUrl(spriteAssetId);
   const localizedName = getCharacterName(characterState.characterId);
   const classes = ["sprite-card"];
   const isGhostHide = characterState.__ghostMode === "hide";
+  const speakerFocusPresentation = buildSpeakerFocusPresentation({
+    characterId: characterState.characterId,
+    activeCharacterId,
+    visibleCharacterIds,
+    gameUiConfig: data.project?.gameUiConfig,
+    visualComfortMode: state.playback.visualComfort,
+    isLeaving: isGhostHide,
+  });
   const transition = characterTransitionEvent ? getSafeTransition(characterTransitionEvent.transition) : "none";
   const transitionDurationMs = characterTransitionEvent
     ? scaleVisualTransitionMs(
@@ -8497,7 +8509,9 @@ function renderSpriteCard(
     characterTransitionEvent.characterId === characterState.characterId;
   const stageStyle = `${getCharacterStageStyle(characterState.stage, characterState.position)}${
     isMoving ? getCharacterMotionStyle(characterTransitionEvent) : ""
-  }--sprite-transition-ms:${transitionDurationMs}ms;`;
+  }--sprite-transition-ms:${transitionDurationMs}ms;${speakerFocusPresentation.style}`;
+
+  classes.push(...speakerFocusPresentation.classNames);
 
   if (shouldBlurPlayerCharacter(characterState.position, depthBlur)) {
     classes.push("is-depth-muted");
@@ -8533,7 +8547,7 @@ function renderSpriteCard(
     : `<div class="sprite-fallback">${escapeHtml((localizedName || "?").slice(0, 1))}</div>`;
 
   return `
-    <article class="${classes.join(" ")}" data-position="${escapeHtml(characterState.position)}" data-transition="${escapeHtml(transition)}" style="${stageStyle}">
+    <article class="${classes.join(" ")}" data-position="${escapeHtml(characterState.position)}" data-transition="${escapeHtml(transition)}" data-speaker-focus="${speakerFocusPresentation.role}" style="${stageStyle}">
       <div class="sprite-card-inner">
         <div class="sprite-visual-frame">${visual}</div>
         <div class="sprite-name">${escapeHtml(localizedName)}</div>

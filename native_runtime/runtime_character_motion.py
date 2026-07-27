@@ -4,9 +4,21 @@ import math
 from typing import Any
 
 try:
-    from .runtime_player_view import clamp, get_safe_character_stage
+    from .runtime_player_view import (
+        clamp,
+        ease_out_cubic,
+        get_native_transition_progress,
+        get_safe_character_stage,
+        get_safe_character_transition,
+    )
 except ImportError:  # pragma: no cover - exported native packages import siblings directly.
-    from runtime_player_view import clamp, get_safe_character_stage
+    from runtime_player_view import (
+        clamp,
+        ease_out_cubic,
+        get_native_transition_progress,
+        get_safe_character_stage,
+        get_safe_character_transition,
+    )
 
 
 CHARACTER_POSITION_RATIOS = {
@@ -171,3 +183,61 @@ def get_native_character_render_pose(
         "stage": stage,
         "motionProgress": raw_progress,
     }
+
+
+def get_native_character_transition_adjustment(
+    state: dict | None,
+    width: int,
+    height: int,
+    is_leaving: bool,
+    now_ms: int,
+) -> dict:
+    source = state if isinstance(state, dict) else {}
+    transition = source.get("transition")
+    if not transition:
+        return {"opacityMultiplier": 1.0, "offsetX": 0, "offsetY": 0, "scaleMultiplier": 1.0}
+
+    progress = get_native_transition_progress(transition, now_ms)
+    eased = ease_out_cubic(progress)
+    transition_name = get_safe_character_transition(transition.get("transition"))
+    visible_ratio = 1.0 - eased if is_leaving else eased
+    offset_ratio = eased if is_leaving else (1.0 - eased)
+    offset_x = 0
+    offset_y = 0
+    scale_multiplier = 1.0
+    if transition_name == "slide_left":
+        offset_x = -int(width * 0.18 * offset_ratio)
+    elif transition_name == "slide_right":
+        offset_x = int(width * 0.18 * offset_ratio)
+    elif transition_name == "rise":
+        offset_y = int(height * 0.10 * offset_ratio)
+    elif transition_name == "pop":
+        scale_multiplier = (1.0 - 0.06 * eased) if is_leaving else (0.92 + 0.08 * eased)
+    return {
+        "opacityMultiplier": clamp(visible_ratio, 0.0, 1.0),
+        "offsetX": offset_x,
+        "offsetY": offset_y,
+        "scaleMultiplier": clamp(scale_multiplier, 0.25, 2.0),
+    }
+
+
+def build_native_renderable_character_items(
+    visible_characters: dict | None,
+    leaving_characters: dict | None,
+    character_motions: dict | None,
+    now_ms: int,
+) -> list[tuple[str, dict]]:
+    items: list[tuple[str, dict]] = []
+    motions = character_motions if isinstance(character_motions, dict) else {}
+    for character_id, state in (visible_characters or {}).items():
+        items.append(
+            (
+                character_id,
+                get_native_character_render_pose(dict(state or {}), motions.get(character_id), now_ms),
+            )
+        )
+    for character_id, state in (leaving_characters or {}).items():
+        leaving_state = dict(state or {})
+        leaving_state["__leaving"] = True
+        items.append((character_id, leaving_state))
+    return items

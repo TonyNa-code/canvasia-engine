@@ -68,7 +68,9 @@ from native_runtime.runtime_player_settings import (
     DEFAULT_RUNTIME_PLAYER_SETTINGS,
     sanitize_runtime_player_settings,
 )
+from native_runtime.runtime_character_motion import build_native_renderable_character_items
 from native_runtime.runtime_key_bindings import RUNTIME_KEY_BINDING_ACTIONS
+from native_runtime.runtime_stage_images import build_native_renderable_stage_image_items
 from native_runtime.runtime_save_thumbnails import (
     build_save_thumbnail_status,
     get_save_thumbnail_path,
@@ -3530,8 +3532,23 @@ class NativeRuntimeRenderSmokeTests(unittest.TestCase):
             }
         }
 
-        self.assertEqual(player.get_renderable_stage_image_items("back"), [])
-        front_items = player.get_renderable_stage_image_items("front")
+        self.assertEqual(
+            build_native_renderable_stage_image_items(
+                player.visible_stage_images,
+                player.leaving_stage_images,
+                player.stage_image_motions,
+                "back",
+                player.get_runtime_ticks_ms(),
+            ),
+            [],
+        )
+        front_items = build_native_renderable_stage_image_items(
+            player.visible_stage_images,
+            player.leaving_stage_images,
+            player.stage_image_motions,
+            "front",
+            player.get_runtime_ticks_ms(),
+        )
         self.assertEqual([item[0] for item in front_items], ["smoke_note"])
         player.render_stage_images(canvas, "front")
 
@@ -4432,7 +4449,13 @@ class NativeRuntimeRenderSmokeTests(unittest.TestCase):
             "stage": {"scale": 100, "opacity": 100},
             "transition": hide_transition,
         }
-        self.assertGreaterEqual(len(player.get_renderable_character_items()), 2)
+        renderable_characters = build_native_renderable_character_items(
+            player.visible_characters,
+            player.leaving_characters,
+            player.character_motions,
+            player.get_runtime_ticks_ms(),
+        )
+        self.assertGreaterEqual(len(renderable_characters), 2)
         player.render_characters()
         self.assert_screen_has_pixels(player)
 

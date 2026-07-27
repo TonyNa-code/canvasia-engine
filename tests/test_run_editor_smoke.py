@@ -3320,6 +3320,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / "runtime_story_flow.js").is_file())
         self.assertTrue((build_dir / "runtime_achievements.js").is_file())
         self.assertTrue((build_dir / "runtime_character_motion.js").is_file())
+        self.assertTrue((build_dir / "runtime_speaker_focus.js").is_file())
         self.assertTrue((build_dir / "runtime_text_effects.js").is_file())
         self.assertTrue((build_dir / "runtime_text_variables.js").is_file())
         self.assertTrue((build_dir / run_editor.RUNTIME_PRELOAD_MANIFEST_FILE_NAME).is_file())
@@ -3432,6 +3433,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["playerRuntimeStoryFlow"], "runtime_story_flow.js")
         self.assertEqual(manifest["files"]["playerRuntimeAchievements"], "runtime_achievements.js")
         self.assertEqual(manifest["files"]["playerRuntimeCharacterMotion"], "runtime_character_motion.js")
+        self.assertEqual(manifest["files"]["playerRuntimeSpeakerFocus"], "runtime_speaker_focus.js")
         self.assertEqual(manifest["files"]["playerRuntimeTextEffects"], "runtime_text_effects.js")
         self.assertEqual(manifest["files"]["playerRuntimeTextVariables"], "runtime_text_variables.js")
         self.assertEqual(manifest["files"]["runtimePreloadManifest"], run_editor.RUNTIME_PRELOAD_MANIFEST_FILE_NAME)
@@ -3521,6 +3523,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 "runtime_story_flow.js",
                 "runtime_achievements.js",
                 "runtime_character_motion.js",
+                "runtime_speaker_focus.js",
                 "runtime_text_effects.js",
                 "runtime_text_variables.js",
                 run_editor.RUNTIME_PRELOAD_MANIFEST_FILE_NAME,
@@ -4961,6 +4964,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / "app" / "runtime_story_flow.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_achievements.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_character_motion.js").is_file())
+        self.assertTrue((build_dir / "app" / "runtime_speaker_focus.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_text_effects.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_text_variables.js").is_file())
         self.assert_export_playtest_guide_file(build_dir / run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME)
@@ -5045,6 +5049,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["appRuntimeVoiceMixer"], "app/runtime_voice_mixer.js")
         self.assertEqual(manifest["files"]["appRuntimeUiSkin"], "app/runtime_ui_skin.js")
         self.assertEqual(manifest["files"]["appRuntimeCharacterMotion"], "app/runtime_character_motion.js")
+        self.assertEqual(manifest["files"]["appRuntimeSpeakerFocus"], "app/runtime_speaker_focus.js")
         self.assertEqual(manifest["files"]["appRuntimeTextEffects"], "app/runtime_text_effects.js")
         self.assertEqual(manifest["files"]["appRuntimeTextVariables"], "app/runtime_text_variables.js")
         self.assertEqual(manifest["files"]["storyRouteMap"], run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME)
@@ -5101,6 +5106,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 "app/runtime_story_flow.js",
                 "app/runtime_achievements.js",
                 "app/runtime_character_motion.js",
+                "app/runtime_speaker_focus.js",
                 "app/runtime_text_effects.js",
                 "app/runtime_text_variables.js",
                 "app/player.css",
@@ -5224,6 +5230,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["appRuntimeVoiceMixer"], "app/runtime_voice_mixer.js")
         self.assertEqual(manifest["files"]["appRuntimeUiSkin"], "app/runtime_ui_skin.js")
         self.assertEqual(manifest["files"]["appRuntimeCharacterMotion"], "app/runtime_character_motion.js")
+        self.assertEqual(manifest["files"]["appRuntimeSpeakerFocus"], "app/runtime_speaker_focus.js")
         self.assertEqual(manifest["files"]["appRuntimeTextEffects"], "app/runtime_text_effects.js")
         self.assertEqual(manifest["files"]["appRuntimeTextVariables"], "app/runtime_text_variables.js")
         self.assertEqual(manifest["files"]["storyRouteMap"], run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME)
@@ -5280,6 +5287,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 "app/runtime_story_flow.js",
                 "app/runtime_achievements.js",
                 "app/runtime_character_motion.js",
+                "app/runtime_speaker_focus.js",
                 "app/runtime_text_effects.js",
                 "app/runtime_text_variables.js",
                 "app/player.css",
@@ -5403,6 +5411,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / "app" / "runtime_story_flow.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_achievements.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_character_motion.js").is_file())
+        self.assertTrue((build_dir / "app" / "runtime_speaker_focus.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_text_effects.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_text_variables.js").is_file())
         self.assert_export_playtest_guide_file(build_dir / run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME)
@@ -5484,6 +5493,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["appRuntimeVoiceMixer"], "app/runtime_voice_mixer.js")
         self.assertEqual(manifest["files"]["appRuntimeUiSkin"], "app/runtime_ui_skin.js")
         self.assertEqual(manifest["files"]["appRuntimeCharacterMotion"], "app/runtime_character_motion.js")
+        self.assertEqual(manifest["files"]["appRuntimeSpeakerFocus"], "app/runtime_speaker_focus.js")
         self.assertEqual(manifest["files"]["appRuntimeTextEffects"], "app/runtime_text_effects.js")
         self.assertEqual(manifest["files"]["appRuntimeTextVariables"], "app/runtime_text_variables.js")
         self.assertEqual(manifest["files"]["storyRouteMap"], run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME)
@@ -5540,6 +5550,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 "app/runtime_story_flow.js",
                 "app/runtime_achievements.js",
                 "app/runtime_character_motion.js",
+                "app/runtime_speaker_focus.js",
                 "app/runtime_text_effects.js",
                 "app/runtime_text_variables.js",
                 "app/player.css",
@@ -5581,6 +5592,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_story_flow.js").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_achievements.js").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_character_motion.js").is_file())
+        self.assertTrue((bundle_dir / "export_player_template" / "runtime_speaker_focus.js").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_text_effects.js").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_text_variables.js").is_file())
         self.assertTrue((bundle_dir / "native_runtime" / run_editor.NATIVE_RUNTIME_PLAYER_NAME).is_file())

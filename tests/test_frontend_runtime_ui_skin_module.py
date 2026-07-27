@@ -53,6 +53,9 @@ class FrontendRuntimeUiSkinModuleTests(unittest.TestCase):
                 fontAssetId: "font-main",
                 sidePanelWidth: 999,
                 panelOpacity: -1,
+                speakerFocusMode: "broken",
+                speakerFocusIntensity: 999,
+                speakerFocusTransitionMs: -10,
                 panelFrameSlice: { top: -9, right: 120, bottom: 12, left: 18 },
               },
             };
@@ -100,6 +103,9 @@ class FrontendRuntimeUiSkinModuleTests(unittest.TestCase):
         self.assertNotIn("(", payload["gameUi"]["fontFamily"])
         self.assertEqual(payload["gameUi"]["sidePanelWidth"], 460)
         self.assertEqual(payload["gameUi"]["panelOpacity"], 35)
+        self.assertEqual(payload["gameUi"]["speakerFocusMode"], "soft")
+        self.assertEqual(payload["gameUi"]["speakerFocusIntensity"], 100)
+        self.assertEqual(payload["gameUi"]["speakerFocusTransitionMs"], 0)
         self.assertEqual(payload["gameUi"]["panelFrameSlice"], {"top": 0, "right": 96, "bottom": 12, "left": 18})
         self.assertEqual(payload["rgba"], "rgba(16, 32, 48, 0.25)")
         self.assertNotIn("\n", payload["presentation"]["style"])

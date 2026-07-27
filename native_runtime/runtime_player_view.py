@@ -10,6 +10,11 @@ try:
 except ImportError:  # pragma: no cover - exported native packages import from the same directory.
     from runtime_variables import coerce_runtime_variable_value
 
+try:
+    from .runtime_speaker_focus import sanitize_speaker_focus_config
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_speaker_focus import sanitize_speaker_focus_config
+
 
 TRANSITION_DURATION_DEFAULT_MS = 360
 TRANSITION_DURATION_MIN_MS = 0
@@ -240,6 +245,9 @@ DEFAULT_GAME_UI_CONFIG = {
     "backdropBlur": 14,
     "stageVignette": 42,
     "motionIntensity": 70,
+    "speakerFocusMode": "soft",
+    "speakerFocusIntensity": 65,
+    "speakerFocusTransitionMs": 240,
     "titleBackgroundAssetId": "",
     "titleBackgroundFit": "cover",
     "titleBackgroundOpacity": 42,
@@ -574,6 +582,7 @@ def get_project_dialog_box_config(project: dict | None) -> dict:
 def get_project_game_ui_config(project: dict | None) -> dict:
     source = (project or {}).get("gameUiConfig") or {}
     base = {**DEFAULT_GAME_UI_CONFIG}
+    speaker_focus_config = sanitize_speaker_focus_config(source)
     return {
         **base,
         "preset": get_safe_option(
@@ -663,6 +672,7 @@ def get_project_game_ui_config(project: dict | None) -> dict:
         "backdropBlur": clamp_int(source.get("backdropBlur"), 0, 28, base["backdropBlur"]),
         "stageVignette": clamp_int(source.get("stageVignette"), 0, 80, base["stageVignette"]),
         "motionIntensity": clamp_int(source.get("motionIntensity"), 0, 100, base["motionIntensity"]),
+        **speaker_focus_config,
         "titleBackgroundAssetId": str(source.get("titleBackgroundAssetId") or "").strip(),
         "titleBackgroundFit": "contain" if source.get("titleBackgroundFit") == "contain" else "cover",
         "titleBackgroundOpacity": clamp_int(source.get("titleBackgroundOpacity"), 0, 100, base["titleBackgroundOpacity"]),

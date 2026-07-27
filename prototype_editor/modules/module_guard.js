@@ -4,6 +4,7 @@ const REQUIRED_EDITOR_MODULES = Object.freeze([
   { globalName: "CanvasiaRuntimeDialogueLayouts", script: "../export_player_template/runtime_dialogue_layouts.js", label: "对话布局系统" },
   { globalName: "CanvasiaRuntimeTextVariables", script: "../export_player_template/runtime_text_variables.js", label: "玩家输入与文本变量系统" },
   { globalName: "CanvasiaRuntimeVisualComfort", script: "../export_player_template/runtime_visual_comfort.js", label: "视觉舒适度系统" },
+  { globalName: "CanvasiaRuntimeSpeakerFocus", script: "../export_player_template/runtime_speaker_focus.js", label: "说话者聚焦系统" },
     { globalName: "CanvasiaRuntimeConditions", script: "../export_player_template/runtime_conditions.js", label: "运行条件系统" },
     { globalName: "CanvasiaRuntimeChoiceAvailability", script: "../export_player_template/runtime_choice_availability.js", label: "选项门控系统" },
     { globalName: "CanvasiaRuntimeStoryFlow", script: "../export_player_template/runtime_story_flow.js", label: "子场景调用系统" },

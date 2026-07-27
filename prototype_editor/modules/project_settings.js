@@ -257,6 +257,11 @@
     bottom: "标题靠下",
     free: "自由偏移",
   });
+  const PROJECT_GAME_UI_SPEAKER_FOCUS_LABELS = Object.freeze({
+    off: "关闭聚焦",
+    soft: "柔和聚焦",
+    cinematic: "电影感聚焦",
+  });
   const DEFAULT_PROJECT_GAME_UI_CONFIG = Object.freeze({
     preset: "stellar",
     layoutPreset: "balanced",
@@ -290,6 +295,9 @@
     backdropBlur: 14,
     stageVignette: 42,
     motionIntensity: 70,
+    speakerFocusMode: "soft",
+    speakerFocusIntensity: 65,
+    speakerFocusTransitionMs: 240,
     titleBackgroundAssetId: "",
     titleBackgroundFit: "cover",
     titleBackgroundOpacity: 42,
@@ -807,6 +815,15 @@
     );
   }
 
+  function getSafeProjectGameUiSpeakerFocusMode(value, options = {}) {
+    const defaults = options.defaultGameUiConfig || DEFAULT_PROJECT_GAME_UI_CONFIG;
+    return getSafeLabelKey(
+      options.gameUiSpeakerFocusLabels || PROJECT_GAME_UI_SPEAKER_FOCUS_LABELS,
+      value,
+      defaults.speakerFocusMode ?? DEFAULT_PROJECT_GAME_UI_CONFIG.speakerFocusMode
+    );
+  }
+
   function getSafeGameUiFrameSlice(value, fallback = DEFAULT_FRAME_SLICE, options = {}) {
     const source = value && typeof value === "object" ? value : {};
     return {
@@ -875,6 +892,30 @@
       backdropBlur: clamp(getSafeNumber(source.backdropBlur, base.backdropBlur, options), 0, 28, options),
       stageVignette: clamp(getSafeNumber(source.stageVignette, base.stageVignette, options), 0, 80, options),
       motionIntensity: clamp(getSafeNumber(source.motionIntensity, base.motionIntensity, options), 0, 100, options),
+      speakerFocusMode: getSafeProjectGameUiSpeakerFocusMode(
+        source.speakerFocusMode ?? base.speakerFocusMode ?? DEFAULT_PROJECT_GAME_UI_CONFIG.speakerFocusMode,
+        options
+      ),
+      speakerFocusIntensity: clamp(
+        getSafeNumber(
+          source.speakerFocusIntensity,
+          base.speakerFocusIntensity ?? DEFAULT_PROJECT_GAME_UI_CONFIG.speakerFocusIntensity,
+          options
+        ),
+        0,
+        100,
+        options
+      ),
+      speakerFocusTransitionMs: clamp(
+        getSafeNumber(
+          source.speakerFocusTransitionMs,
+          base.speakerFocusTransitionMs ?? DEFAULT_PROJECT_GAME_UI_CONFIG.speakerFocusTransitionMs,
+          options
+        ),
+        0,
+        1200,
+        options
+      ),
       titleBackgroundAssetId: String(source.titleBackgroundAssetId ?? "").trim(),
       titleBackgroundFit: source.titleBackgroundFit === "contain" ? "contain" : "cover",
       titleBackgroundOpacity: clamp(
@@ -940,6 +981,7 @@
     PROJECT_GAME_UI_TOPBAR_POSITION_LABELS,
     PROJECT_GAME_UI_HUD_POSITION_LABELS,
     PROJECT_GAME_UI_TITLE_CARD_ANCHOR_LABELS,
+    PROJECT_GAME_UI_SPEAKER_FOCUS_LABELS,
     DEFAULT_PROJECT_GAME_UI_CONFIG,
     PROJECT_GAME_UI_PRESETS,
     getProjectResolution,
@@ -972,6 +1014,7 @@
     getSafeProjectGameUiTopbarPosition,
     getSafeProjectGameUiHudPosition,
     getSafeProjectGameUiTitleCardAnchor,
+    getSafeProjectGameUiSpeakerFocusMode,
     getSafeGameUiFrameSlice,
     getProjectGameUiPresetConfig,
     getProjectGameUiConfig,

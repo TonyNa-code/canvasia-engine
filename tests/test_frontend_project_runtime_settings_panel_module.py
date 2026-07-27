@@ -42,6 +42,7 @@ class FrontendProjectRuntimeSettingsPanelModuleTests(unittest.TestCase):
               gameUiTopbarPositionLabels: {{ top: "顶部" }},
               gameUiHudPositionLabels: {{ bottom: "底部" }},
               gameUiTitleCardAnchorLabels: {{ center: "中央" }},
+              gameUiSpeakerFocusLabels: {{ off: "关闭", soft: "柔和", cinematic: "电影感" }},
             }};
             const baseSlice = {{ top: 12, right: 12, bottom: 12, left: 12 }};
             const model = {{
@@ -129,6 +130,9 @@ class FrontendProjectRuntimeSettingsPanelModuleTests(unittest.TestCase):
                 backdropBlur: 10,
                 stageVignette: 25,
                 motionIntensity: 30,
+                speakerFocusMode: "soft",
+                speakerFocusIntensity: 65,
+                speakerFocusTransitionMs: 240,
               }},
               projectLanguage: "zh-CN",
               projectSupportedLanguages: ["zh-CN", "en-US"],
@@ -164,6 +168,7 @@ class FrontendProjectRuntimeSettingsPanelModuleTests(unittest.TestCase):
               hasVariableHost: html.includes("projectVariableLibraryPanelHost"),
               hasFrameSlice: html.includes("projectGameUiPanelFrameSliceTopInput"),
               hasExportAction: html.includes('data-export-target="web"'),
+              hasSpeakerFocus: html.includes('id="projectGameUiSpeakerFocusModeSelect"') && html.includes('id="projectGameUiSpeakerFocusIntensityInput"'),
             }}));
             """
         )
@@ -185,6 +190,7 @@ class FrontendProjectRuntimeSettingsPanelModuleTests(unittest.TestCase):
         self.assertTrue(payload["hasVariableHost"])
         self.assertTrue(payload["hasFrameSlice"])
         self.assertTrue(payload["hasExportAction"])
+        self.assertTrue(payload["hasSpeakerFocus"])
 
     def test_input_readers_delegate_dom_fields_to_normalizers(self) -> None:
         script = textwrap.dedent(

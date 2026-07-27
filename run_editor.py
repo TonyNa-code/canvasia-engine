@@ -186,6 +186,7 @@ EXPORT_PLAYER_SCRIPT_FILES = (
     "runtime_storage.js",
     "runtime_persistent_variables.js",
     "runtime_character_motion.js",
+    "runtime_speaker_focus.js",
     "runtime_stage_images.js",
     "runtime_visual_constants.js",
     "runtime_controls.js",
@@ -514,6 +515,7 @@ NATIVE_RUNTIME_VISUAL_COMFORT_NAME = "runtime_visual_comfort.py"
 NATIVE_RUNTIME_VOICE_MIXER_NAME = "runtime_voice_mixer.py"
 NATIVE_RUNTIME_VIEW_NAME = "runtime_player_view.py"
 NATIVE_RUNTIME_CHARACTER_MOTION_NAME = "runtime_character_motion.py"
+NATIVE_RUNTIME_SPEAKER_FOCUS_NAME = "runtime_speaker_focus.py"
 NATIVE_RUNTIME_STAGE_IMAGES_NAME = "runtime_stage_images.py"
 NATIVE_RUNTIME_CHOICE_AVAILABILITY_NAME = "runtime_choice_availability.py"
 NATIVE_RUNTIME_ROLLBACK_NAME = "runtime_rollback.py"
@@ -590,6 +592,7 @@ NATIVE_RUNTIME_REQUIRED_MODULE_FILES = build_native_runtime_required_module_file
         NATIVE_RUNTIME_VOICE_MIXER_NAME,
         NATIVE_RUNTIME_VIEW_NAME,
         NATIVE_RUNTIME_CHARACTER_MOTION_NAME,
+        NATIVE_RUNTIME_SPEAKER_FOCUS_NAME,
         NATIVE_RUNTIME_STAGE_IMAGES_NAME,
         NATIVE_RUNTIME_CHOICE_AVAILABILITY_NAME,
         NATIVE_RUNTIME_ROLLBACK_NAME,
@@ -10334,6 +10337,7 @@ def export_web_build() -> dict:
             "playerRuntimeStorage": "runtime_storage.js",
             "playerRuntimePersistentVariables": "runtime_persistent_variables.js",
             "playerRuntimeCharacterMotion": "runtime_character_motion.js",
+            "playerRuntimeSpeakerFocus": "runtime_speaker_focus.js",
             "playerRuntimeStageImages": "runtime_stage_images.js",
             "playerRuntimeVisualConstants": "runtime_visual_constants.js",
             "playerRuntimeConditions": "runtime_conditions.js",
@@ -11474,6 +11478,7 @@ def export_windows_nwjs_build() -> dict:
             "appRuntimeStorage": "app/runtime_storage.js",
             "appRuntimePersistentVariables": "app/runtime_persistent_variables.js",
             "appRuntimeCharacterMotion": "app/runtime_character_motion.js",
+            "appRuntimeSpeakerFocus": "app/runtime_speaker_focus.js",
             "appRuntimeStageImages": "app/runtime_stage_images.js",
             "appRuntimeVisualConstants": "app/runtime_visual_constants.js",
             "appRuntimeConditions": "app/runtime_conditions.js",
@@ -11948,6 +11953,7 @@ def export_macos_nwjs_build() -> dict:
             "appRuntimeStorage": "app/runtime_storage.js",
             "appRuntimePersistentVariables": "app/runtime_persistent_variables.js",
             "appRuntimeCharacterMotion": "app/runtime_character_motion.js",
+            "appRuntimeSpeakerFocus": "app/runtime_speaker_focus.js",
             "appRuntimeStageImages": "app/runtime_stage_images.js",
             "appRuntimeVisualConstants": "app/runtime_visual_constants.js",
             "appRuntimeConditions": "app/runtime_conditions.js",
@@ -12429,6 +12435,7 @@ def export_linux_nwjs_build() -> dict:
             "appRuntimeStorage": "app/runtime_storage.js",
             "appRuntimePersistentVariables": "app/runtime_persistent_variables.js",
             "appRuntimeCharacterMotion": "app/runtime_character_motion.js",
+            "appRuntimeSpeakerFocus": "app/runtime_speaker_focus.js",
             "appRuntimeStageImages": "app/runtime_stage_images.js",
             "appRuntimeVisualConstants": "app/runtime_visual_constants.js",
             "appRuntimeConditions": "app/runtime_conditions.js",

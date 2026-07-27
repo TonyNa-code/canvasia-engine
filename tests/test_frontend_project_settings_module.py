@@ -203,6 +203,9 @@ class FrontendProjectSettingsModuleTests(unittest.TestCase):
                 backdropBlur: -5,
                 stageVignette: 120,
                 motionIntensity: -20,
+                speakerFocusMode: "broken",
+                speakerFocusIntensity: 999,
+                speakerFocusTransitionMs: -20,
                 titleBackgroundFit: "contain",
                 titleBackgroundOpacity: 101,
                 titleLogoAssetId: " logo ",
@@ -361,6 +364,9 @@ class FrontendProjectSettingsModuleTests(unittest.TestCase):
         self.assertEqual(payload["gameConfig"]["backdropBlur"], 0)
         self.assertEqual(payload["gameConfig"]["stageVignette"], 80)
         self.assertEqual(payload["gameConfig"]["motionIntensity"], 0)
+        self.assertEqual(payload["gameConfig"]["speakerFocusMode"], "soft")
+        self.assertEqual(payload["gameConfig"]["speakerFocusIntensity"], 100)
+        self.assertEqual(payload["gameConfig"]["speakerFocusTransitionMs"], 0)
         self.assertEqual(payload["gameConfig"]["titleBackgroundFit"], "contain")
         self.assertEqual(payload["gameConfig"]["titleBackgroundOpacity"], 100)
         self.assertEqual(payload["gameConfig"]["titleLogoAssetId"], "logo")

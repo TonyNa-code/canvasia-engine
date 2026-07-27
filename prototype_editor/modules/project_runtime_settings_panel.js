@@ -542,6 +542,7 @@
           ${renderSelectField({ id: "projectGameUiTopbarPositionSelect", label: "顶部栏位置", optionsHtml: renderOptionList(labels.gameUiTopbarPositionLabels, gameUiConfig.topbarPosition, helpers) }, helpers)}
           ${renderSelectField({ id: "projectGameUiHudPositionSelect", label: "舞台 HUD", optionsHtml: renderOptionList(labels.gameUiHudPositionLabels, gameUiConfig.hudPosition, helpers) }, helpers)}
           ${renderSelectField({ id: "projectGameUiTitleCardAnchorSelect", label: "标题卡片位置", optionsHtml: renderOptionList(labels.gameUiTitleCardAnchorLabels, gameUiConfig.titleCardAnchor, helpers) }, helpers)}
+          ${renderSelectField({ id: "projectGameUiSpeakerFocusModeSelect", label: "说话者聚焦", optionsHtml: renderOptionList(labels.gameUiSpeakerFocusLabels, gameUiConfig.speakerFocusMode, helpers) }, helpers)}
           ${renderSelectField(
             {
               id: "projectGameUiTitleBackgroundFitSelect",
@@ -586,6 +587,8 @@
           ${renderRangeField({ id: "projectGameUiBackdropBlurInput", label: "背景模糊", min: 0, max: 28, value: gameUiConfig.backdropBlur, suffix: "px" }, helpers)}
           ${renderRangeField({ id: "projectGameUiStageVignetteInput", label: "舞台暗角", min: 0, max: 80, value: gameUiConfig.stageVignette, suffix: "%" }, helpers)}
           ${renderRangeField({ id: "projectGameUiMotionIntensityInput", label: "动态强度", min: 0, max: 100, value: gameUiConfig.motionIntensity, suffix: "%" }, helpers)}
+          ${renderRangeField({ id: "projectGameUiSpeakerFocusIntensityInput", label: "说话者聚焦强度", min: 0, max: 100, value: gameUiConfig.speakerFocusIntensity, suffix: "%" }, helpers)}
+          ${renderRangeField({ id: "projectGameUiSpeakerFocusTransitionInput", label: "说话者切换过渡", min: 0, max: 1200, step: 20, value: gameUiConfig.speakerFocusTransitionMs, suffix: "ms" }, helpers)}
           ${renderRangeField({ id: "projectGameUiTitleBackgroundOpacityInput", label: "标题背景透明度", min: 0, max: 100, value: gameUiConfig.titleBackgroundOpacity, suffix: "%" }, helpers)}
           ${renderRangeField({ id: "projectGameUiPanelFrameOpacityInput", label: "面板贴图透明度", min: 0, max: 100, value: gameUiConfig.panelFrameOpacity, suffix: "%" }, helpers)}
           ${renderRangeField({ id: "projectGameUiButtonFrameOpacityInput", label: "按钮贴图透明度", min: 0, max: 100, value: gameUiConfig.buttonFrameOpacity, suffix: "%" }, helpers)}
@@ -603,7 +606,7 @@
             导出网页包检查外观
           </button>
         </div>
-        <div class="detail-meta">当前覆盖标题页、系统菜单、存档/读档、EXTRA/图鉴弹窗、侧栏、按钮、HUD、布局位置、UI 贴图绑定、九宫格拉伸和按钮多状态贴图。</div>
+        <div class="detail-meta">当前覆盖标题页、系统菜单、存档/读档、EXTRA/图鉴弹窗、侧栏、按钮、HUD、说话者聚焦、布局位置、UI 贴图绑定、九宫格拉伸和按钮多状态贴图。</div>
       </section>
     `;
   }
@@ -741,6 +744,9 @@
         backdropBlur: readInputValue(doc, "projectGameUiBackdropBlurInput"),
         stageVignette: readInputValue(doc, "projectGameUiStageVignetteInput"),
         motionIntensity: readInputValue(doc, "projectGameUiMotionIntensityInput"),
+        speakerFocusMode: readInputValue(doc, "projectGameUiSpeakerFocusModeSelect"),
+        speakerFocusIntensity: readInputValue(doc, "projectGameUiSpeakerFocusIntensityInput"),
+        speakerFocusTransitionMs: readInputValue(doc, "projectGameUiSpeakerFocusTransitionInput"),
       },
     });
   }

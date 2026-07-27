@@ -219,3 +219,25 @@ def get_native_stage_image_render_pose(target_state: Any, motion: Any, now_ms: i
         "transform": transform,
         "motionProgress": raw_progress,
     }
+
+
+def build_native_renderable_stage_image_items(
+    visible_images: dict | None,
+    leaving_images: dict | None,
+    stage_image_motions: dict | None,
+    plane: str,
+    now_ms: int,
+) -> list[tuple[str, dict]]:
+    safe_plane = get_safe_stage_image_plane(plane)
+    motions = stage_image_motions if isinstance(stage_image_motions, dict) else {}
+    items = [
+        (layer_id, get_native_stage_image_render_pose(state, motions.get(layer_id), now_ms))
+        for layer_id, state in (visible_images or {}).items()
+        if get_safe_stage_image_plane((state or {}).get("plane")) == safe_plane
+    ]
+    items.extend(
+        (layer_id, get_native_stage_image_render_pose(state, motions.get(layer_id), now_ms))
+        for layer_id, state in (leaving_images or {}).items()
+        if get_safe_stage_image_plane((state or {}).get("plane")) == safe_plane
+    )
+    return sorted(items, key=lambda item: (get_safe_stage_image_transform(item[1].get("transform"))["layer"], item[0]))

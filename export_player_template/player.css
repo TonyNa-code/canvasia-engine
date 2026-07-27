@@ -5794,3 +5794,27 @@ html[data-runtime-input="gamepad"] :is(button, [href], input, select, textarea, 
     transform: none;
   }
 }
+
+/* Speaker focus composes with authored stage transforms and transition animations. */
+.sprite-card .sprite-card-inner {
+  opacity: var(--speaker-focus-opacity, 1);
+  filter:
+    brightness(var(--speaker-focus-brightness, 1))
+    saturate(var(--speaker-focus-saturation, 1));
+  scale: var(--speaker-focus-scale, 1);
+  transition:
+    opacity var(--speaker-focus-transition-ms, 240ms) ease,
+    filter var(--speaker-focus-transition-ms, 240ms) ease,
+    scale var(--speaker-focus-transition-ms, 240ms) cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.sprite-card.is-speaker-focus-active {
+  z-index: calc(120 + var(--sprite-layer, 0)) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sprite-card .sprite-card-inner {
+    scale: 1;
+    transition-duration: 0ms;
+  }
+}
