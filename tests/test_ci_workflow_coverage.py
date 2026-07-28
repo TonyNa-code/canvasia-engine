@@ -257,6 +257,27 @@ class CiWorkflowCoverageTests(unittest.TestCase):
             workflow,
         )
 
+    def test_rich_story_text_contract_is_checked_in_ci(self) -> None:
+        workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+
+        for path in (
+            "native_runtime/runtime_rich_text.py",
+            "native_runtime/runtime_story_text.py",
+            "native_runtime/runtime_rich_text_renderer.py",
+            "export_player_template/runtime_rich_text.js",
+            "export_player_template/runtime_story_text.js",
+            "prototype_editor/modules/rich_text_editor.js",
+            "tests/test_native_runtime_story_text.py",
+            "tests/test_story_text_contract.py",
+            "tests/test_frontend_runtime_story_text_module.py",
+            "tests/test_frontend_rich_text_editor_module.py",
+        ):
+            self.assertIn(path, workflow)
+        self.assertIn(
+            "python -m unittest discover -s tests -p 'test_story_text_contract.py' -v",
+            workflow,
+        )
+
     def test_editor_project_presentation_settings_are_checked_in_ci(self) -> None:
         workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
 

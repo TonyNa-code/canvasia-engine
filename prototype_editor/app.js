@@ -56,6 +56,7 @@ const runtimeAchievementTools = window.CanvasiaRuntimeAchievements;
 const choiceAvailabilityEditorTools = window.CanvasiaEditorChoiceAvailability;
 const timedChoiceEditorTools = window.CanvasiaEditorTimedChoice;
 const textPacingEditorTools = window.CanvasiaEditorTextPacing;
+const richTextEditorTools = window.CanvasiaEditorRichText;
 const storyBlockActionTools = window.CanvasiaEditorStoryBlockActions;
 const storyBlockEditorTools = window.CanvasiaEditorStoryBlockEditors;
 const musicRangeScopeTools = window.CanvasiaEditorMusicRangeScope;
@@ -378,9 +379,14 @@ const {
   getInitialTextPacingIndex,
   getNextTextPacingIndex,
   getTextPacingStepDelay,
-  parseRuntimeTextPacing,
-  stripRuntimeTextPacing,
 } = runtimeTextPacingTools;
+const runtimeRichTextTools = window.CanvasiaRuntimeRichText;
+const runtimeStoryTextTools = window.CanvasiaRuntimeStoryText;
+const {
+  parseRuntimeStoryText,
+  renderRuntimeStoryText,
+  stripRuntimeStoryText,
+} = runtimeStoryTextTools;
 
 const getSafePosition = visualEffectTools.getSafePosition;
 const getSafeTransition = visualEffectTools.getSafeTransition;
@@ -4314,6 +4320,16 @@ async function handleClick(event) {
     return;
   }
 
+  if (action === "insert-rich-text") {
+    const result = richTextEditorTools.applyRichTextAction(actionTarget, {
+      document,
+      runtimeTools: runtimeRichTextTools,
+    });
+    setSaveStatus(result.label);
+    showToast(result.label, result.ok ? undefined : "error");
+    return;
+  }
+
   if (action === "apply-character-stage-preset") {
     applyCharacterStagePresetToEditor(actionTarget.dataset.characterStagePreset);
     return;
@@ -6177,7 +6193,7 @@ function getPreviewSaveSlotSummary(slot) {
   const stepLabel = snapshot.completed ? "路线已结束" : `第 ${Math.max(snapshot.blockIndex + 1, 0)} 步`;
   const speakerName = snapshot.visualState?.speakerName ? `${snapshot.visualState.speakerName}：` : "";
   const dialogueText = truncateText(
-    stripRuntimeTextPacing(snapshot.visualState?.dialogueText ?? "这个节点没有正文。"),
+    stripRuntimeStoryText(snapshot.visualState?.dialogueText ?? "这个节点没有正文。"),
     34
   );
   return `${sceneName} · ${stepLabel} · ${speakerName}${dialogueText}`;
@@ -6305,7 +6321,7 @@ function buildPreviewThumbnailDataUrl(snapshot) {
 
   const speaker = escapeHtml(snapshot.visualState?.speakerName ?? snapshot.sceneName ?? "Canvasia Engine");
   const dialogue = escapeHtml(
-    truncateText(stripRuntimeTextPacing(snapshot.visualState?.dialogueText ?? "这个节点没有正文。"), 34)
+    truncateText(stripRuntimeStoryText(snapshot.visualState?.dialogueText ?? "这个节点没有正文。"), 34)
   );
   const scene = escapeHtml(snapshot.visualState?.backgroundName ?? snapshot.sceneName ?? "未设置背景");
   const block = escapeHtml(snapshot.completed ? "路线结束" : getBlockLabel(snapshot.blockType));
@@ -6390,7 +6406,7 @@ function renderPreviewSaveVisualSummary(slot) {
   const blockLabel = snapshot.completed ? "路线结束" : getBlockLabel(snapshot.blockType);
   const stageTitle = snapshot.visualState?.speakerName || snapshot.sceneName || "Canvasia Engine";
   const stageText = truncateText(
-    stripRuntimeTextPacing(snapshot.visualState?.dialogueText ?? "这个节点没有正文。"),
+    stripRuntimeStoryText(snapshot.visualState?.dialogueText ?? "这个节点没有正文。"),
     38
   );
   const thumbnailUrl = slot?.thumbnailDataUrl || buildPreviewThumbnailDataUrl(snapshot);
@@ -8879,6 +8895,7 @@ function shouldFlushPendingStoryChanges(action) {
   return ![
     "save-block",
     "insert-text-pacing",
+    "insert-rich-text",
     "apply-character-stage-preset",
     "adjust-character-stage",
     "apply-stage-image-preset",
@@ -18128,7 +18145,8 @@ function renderPreviewScreen() {
         timedChoicePresentation,
         hint: getPreviewHint(snapshot),
         isComplete: snapshot.completed,
-        dialogueTextOverride: typingPresentation.text,
+        dialogueSourceText: snapshot.visualState?.dialogueText ?? "",
+        dialogueVisibleEnd: typingPresentation.text.length,
         isTyping: typingPresentation.active,
         dialogTheme: state.previewPlayback.dialogTheme,
         dialogHidden: state.previewDialogHidden,
@@ -18161,7 +18179,12 @@ function buildPreviewDialogueLayoutPresentation(snapshot, currentText = "") {
       text:
         blockIndex === snapshot?.blockIndex
           ? currentText
-          : stripRuntimeTextPacing(block.text),
+          : stripRuntimeStoryText(block.text),
+      sourceText: block.text ?? "",
+      visibleEnd:
+        blockIndex === snapshot?.blockIndex
+          ? currentText.length
+          : stripRuntimeStoryText(block.text).length,
     }),
   });
 }
@@ -18567,7 +18590,7 @@ function shouldUsePreviewTypewriter(snapshot) {
     return false;
   }
 
-  return stripRuntimeTextPacing(snapshot.visualState?.dialogueText ?? "").trim().length > 0;
+  return stripRuntimeStoryText(snapshot.visualState?.dialogueText ?? "").trim().length > 0;
 }
 
 function getPreviewSnapshotTextSpeed(snapshot) {
@@ -18612,7 +18635,7 @@ function completePreviewTypewriter() {
 
 function preparePreviewTypewriter(snapshot) {
   const sourceText = snapshot?.visualState?.dialogueText ?? "";
-  const pacingPlan = parseRuntimeTextPacing(sourceText);
+  const pacingPlan = parseRuntimeStoryText(sourceText);
   const plainText = pacingPlan.plainText;
   if (!snapshot || !shouldUsePreviewTypewriter(snapshot)) {
     stopPreviewTypewriter();
@@ -19645,7 +19668,7 @@ function getPreviewAutoAdvanceDelay(snapshot) {
   }
 
   if (snapshot.blockType === "dialogue" || snapshot.blockType === "narration") {
-    const text = stripRuntimeTextPacing(snapshot.visualState?.dialogueText ?? "");
+    const text = stripRuntimeStoryText(snapshot.visualState?.dialogueText ?? "");
     const multiplier = {
       slow: 92,
       normal: 72,
@@ -22546,9 +22569,12 @@ function renderStage(visualState, large, options = {}) {
     visualState.characterEmphasisEvent,
     visualComfortMode
   );
-  const dialogueText = stripRuntimeTextPacing(
-    options.dialogueTextOverride ?? visualState.dialogueText
-  );
+  const dialogueSourceText = options.dialogueSourceText ?? visualState.dialogueText ?? "";
+  const dialoguePlan = parseRuntimeStoryText(dialogueSourceText);
+  const dialogueVisibleEnd = options.dialogueVisibleEnd == null
+    ? dialoguePlan.plainText.length
+    : Math.max(0, Math.min(dialoguePlan.plainText.length, Number(options.dialogueVisibleEnd) || 0));
+  const dialogueMarkup = renderRuntimeStoryText(dialoguePlan, { visibleEnd: dialogueVisibleEnd });
   const dialogueLayoutPresentation = options.dialogueLayoutPresentation ?? {
     layout: "adv",
     entries: [],
@@ -22569,9 +22595,11 @@ function renderStage(visualState, large, options = {}) {
                       ? `<strong class="dialog-nvl-speaker">${escapeHtml(entry.speakerName)}</strong>`
                       : ""
                   }
-                  <p class="dialog-nvl-text ${
+                  <p class="dialog-nvl-text runtime-rich-text-container ${
                     index === entries.length - 1 && options.isTyping ? "is-typing" : ""
-                  }">${escapeHtml(entry.text)}</p>
+                  }">${renderRuntimeStoryText(entry.sourceText ?? entry.text, {
+                    visibleEnd: entry.visibleEnd ?? String(entry.text ?? "").length,
+                  })}</p>
                 </article>
               `
             )
@@ -22696,7 +22724,7 @@ function renderStage(visualState, large, options = {}) {
         >
           <div class="dialog-box-art ${dialogPresentation.assetUrl ? "has-image" : ""}"></div>
           <div class="dialog-speaker">${escapeHtml(visualState.speakerName)}</div>
-          <div class="dialog-text ${options.isTyping ? "is-typing" : ""}">${escapeHtml(dialogueText)}</div>
+          <div class="dialog-text runtime-rich-text-container ${options.isTyping ? "is-typing" : ""}">${dialogueMarkup}</div>
           ${nvlPageMarkup}
           ${choiceMarkup}
           ${hintMarkup}
@@ -23223,7 +23251,7 @@ function renderPreviewTimeline(session) {
   return session.timeline
     .map((snapshot, index) => {
       const summary = snapshot.completed
-        ? { title: stripRuntimeTextPacing(snapshot.visualState.dialogueText), meta: "试玩结束" }
+        ? { title: stripRuntimeStoryText(snapshot.visualState.dialogueText), meta: "试玩结束" }
         : getBlockSummary(snapshot.block, state.data.scenesById.get(snapshot.sceneId));
       const hasVoice = Boolean(getPreviewVoiceAssetId(snapshot));
       const routeDecision = getPreviewRouteDecisionSummary(snapshot);
@@ -33168,6 +33196,10 @@ function renderDialogueEditor(block) {
       textPacingEditorTools.renderTextPacingEditor(textareaId, text, {
         runtimeTools: runtimeTextPacingTools,
       }),
+    renderRichTextEditor: (textareaId, text) =>
+      richTextEditorTools.renderRichTextEditor(textareaId, text, {
+        runtimeTools: runtimeRichTextTools,
+      }),
   });
 }
 
@@ -33202,6 +33234,10 @@ function renderNarrationEditor(block) {
     renderTextPacingEditor: (textareaId, text) =>
       textPacingEditorTools.renderTextPacingEditor(textareaId, text, {
         runtimeTools: runtimeTextPacingTools,
+      }),
+    renderRichTextEditor: (textareaId, text) =>
+      richTextEditorTools.renderRichTextEditor(textareaId, text, {
+        runtimeTools: runtimeRichTextTools,
       }),
   });
 }
@@ -43119,13 +43155,13 @@ function getBlockSummary(block, scene) {
     case "dialogue":
       return {
         title: `${state.data.charactersById.get(block.speakerId)?.displayName ?? block.speakerId}：${
-          stripRuntimeTextPacing(block.text)
+          stripRuntimeStoryText(block.text)
         }`,
         meta: block.voiceAssetId ? "这句台词已绑定语音" : "这句台词暂时没有语音",
       };
     case "narration":
       return {
-        title: stripRuntimeTextPacing(block.text),
+        title: stripRuntimeStoryText(block.text),
         meta: block.voiceAssetId ? "这段旁白已绑定语音" : "这是旁白卡片，不会显示角色名",
       };
     case "character_show":

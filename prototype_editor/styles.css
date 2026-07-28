@@ -5968,6 +5968,125 @@ html[data-visual-comfort="static"] .sprite-voice-reactive-layer {
   line-height: 1.7;
 }
 
+.runtime-rich-text-container {
+  white-space: pre-wrap;
+}
+
+.runtime-rich-text-emphasis {
+  font-weight: 800;
+  text-decoration: underline;
+  text-decoration-thickness: 0.12em;
+  text-decoration-color: color-mix(in srgb, var(--dialog-box-speaker, var(--accent)) 64%, transparent);
+  text-underline-offset: 0.2em;
+}
+
+.runtime-rich-text-whisper {
+  opacity: 0.82;
+  font-size: 0.94em;
+  font-style: italic;
+  letter-spacing: 0.025em;
+}
+
+.runtime-rich-text-color {
+  color: var(--runtime-rich-color, currentColor);
+}
+
+.runtime-rich-text-ruby {
+  ruby-align: center;
+  ruby-position: over;
+}
+
+.runtime-rich-text-ruby rt {
+  color: color-mix(in srgb, currentColor 78%, var(--dialog-box-speaker, var(--accent)));
+  font-size: 0.5em;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+}
+
+.rich-text-editor {
+  padding: 0;
+  overflow: hidden;
+}
+
+.rich-text-editor > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 16px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.rich-text-editor > summary::-webkit-details-marker {
+  display: none;
+}
+
+.rich-text-editor > summary span:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.rich-text-editor > summary small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.rich-text-editor > summary::after {
+  content: "+";
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  color: var(--muted);
+  font-size: 20px;
+  line-height: 22px;
+  text-align: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+}
+
+.rich-text-editor[open] > summary::after {
+  content: "−";
+}
+
+.rich-text-editor-body {
+  display: grid;
+  gap: 12px;
+  padding: 0 16px 16px;
+  border-top: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
+}
+
+.rich-text-editor-body > p:first-child {
+  margin-top: 14px;
+}
+
+.rich-text-inline-fields {
+  display: grid;
+  grid-template-columns: minmax(130px, 0.65fr) minmax(190px, 1.35fr);
+  gap: 10px;
+}
+
+.rich-text-inline-fields label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.rich-text-inline-fields input[type="color"] {
+  width: 100%;
+  min-height: 42px;
+  padding: 4px;
+}
+
+@media (max-width: 720px) {
+  .rich-text-inline-fields {
+    grid-template-columns: 1fr;
+  }
+}
+
 .dialog-text.is-typing::after {
   content: "▋";
   display: inline-block;

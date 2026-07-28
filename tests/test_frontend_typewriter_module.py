@@ -9,15 +9,18 @@ from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "typewriter.js"
+RUNTIME_TEXT_EFFECTS_PATH = ROOT_DIR / "export_player_template" / "runtime_text_effects.js"
 
 
 class FrontendTypewriterModuleTests(unittest.TestCase):
     def test_typewriter_handles_graphemes_quotes_abbreviations_and_punctuation_without_dom(self) -> None:
         script = textwrap.dedent(
             f"""
-            const fs = require("fs");
-            const vm = require("vm");
-            const context = {{ window: {{}}, Intl }};
+            import fs from "node:fs";
+            import vm from "node:vm";
+            import * as runtimeTools from {json.dumps(RUNTIME_TEXT_EFFECTS_PATH.as_uri())};
+
+            const context = {{ window: {{ CanvasiaRuntimeTextEffects: runtimeTools }}, Intl }};
             context.globalThis = context;
             vm.createContext(context);
             vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
@@ -52,7 +55,7 @@ class FrontendTypewriterModuleTests(unittest.TestCase):
             """
         )
         completed = subprocess.run(
-            ["node", "-e", script],
+            ["node", "--input-type=module", "-e", script],
             cwd=ROOT_DIR,
             capture_output=True,
             text=True,

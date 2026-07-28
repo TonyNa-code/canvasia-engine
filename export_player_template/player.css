@@ -962,6 +962,41 @@ html[data-visual-comfort="static"] .sprite-voice-reactive-layer {
   white-space: pre-wrap;
 }
 
+.runtime-rich-text-container {
+  white-space: pre-wrap;
+}
+
+.runtime-rich-text-emphasis {
+  font-weight: 800;
+  text-decoration: underline;
+  text-decoration-thickness: 0.12em;
+  text-decoration-color: color-mix(in srgb, var(--dialog-box-speaker, var(--accent)) 64%, transparent);
+  text-underline-offset: 0.2em;
+}
+
+.runtime-rich-text-whisper {
+  opacity: 0.82;
+  font-size: 0.94em;
+  font-style: italic;
+  letter-spacing: 0.025em;
+}
+
+.runtime-rich-text-color {
+  color: var(--runtime-rich-color, currentColor);
+}
+
+.runtime-rich-text-ruby {
+  ruby-align: center;
+  ruby-position: over;
+}
+
+.runtime-rich-text-ruby rt {
+  color: color-mix(in srgb, currentColor 78%, var(--dialog-box-speaker, var(--accent)));
+  font-size: 0.5em;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+}
+
 .message-text.is-typing::after {
   content: "▋";
   display: inline-block;

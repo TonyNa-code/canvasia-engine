@@ -244,3 +244,25 @@ export function getTypewriterStepDelay(speed, visibleText = "", fullText = "") {
   }
   return TYPEWRITER_STEP_DELAYS[safeSpeed] + getTypewriterPunctuationPause(visibleText, fullText);
 }
+
+const runtimeTextEffectsApi = Object.freeze({
+  getCodePointAtIndex,
+  getNextCodePointIndex,
+  getNextTypewriterClusterIndex,
+  getNextTypewriterIndex,
+  getNextUnicodeScalarIndex,
+  getSafeRuntimeTextSpeed,
+  getTypewriterCodePointAtIndex,
+  getTypewriterPauseAnchorChar,
+  getTypewriterPauseAnchorText,
+  getTypewriterPunctuationPause,
+  getTypewriterStepDelay,
+  includeTypewriterLeadingFollower,
+  includeTypewriterTrailingClosers,
+  isRegionalIndicatorSymbol,
+  isTypewriterAbbreviationPeriod,
+  isTypewriterGraphemeExtension,
+  isTypewriterInlinePeriod,
+});
+
+globalThis.CanvasiaRuntimeTextEffects = runtimeTextEffectsApi;

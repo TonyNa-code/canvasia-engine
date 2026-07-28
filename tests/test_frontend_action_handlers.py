@@ -6184,8 +6184,8 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("getPreviewSnapshotTextSpeed(snapshot)", preview_delay)
         self.assertIn("window.CanvasiaEditorTypewriter", app_source)
         self.assertIn("const getTypewriterStepDelay = typewriterTools.getTypewriterStepDelay", app_source)
-        self.assertIn("function getTypewriterPunctuationPause", typewriter_source)
-        self.assertIn("getTypewriterPunctuationPause(visibleText, fullText)", typewriter_source)
+        self.assertIn("global.CanvasiaRuntimeTextEffects", typewriter_source)
+        self.assertIn('getTypewriterPunctuationPause: delegate("getTypewriterPunctuationPause")', typewriter_source)
         self.assertIn("state.previewTyping.visibleText", preview_schedule_typewriter)
 
         story_editor_source = (EDITOR_DIR / "modules" / "story_block_editors.js").read_text(encoding="utf-8")
@@ -6249,11 +6249,11 @@ class FrontendActionHandlerTests(unittest.TestCase):
 
         self.assertIn('"insert-text-pacing"', should_flush)
         self.assertIn('action === "insert-text-pacing"', click_handler)
-        self.assertIn("parseRuntimeTextPacing(sourceText)", app_source)
-        self.assertIn('from "./runtime_text_pacing.js"', player_source)
-        self.assertIn("parseRuntimeTextPacing(sourceText)", player_source)
+        self.assertIn("parseRuntimeStoryText(sourceText)", app_source)
+        self.assertIn('from "./runtime_story_text.js"', player_source)
+        self.assertIn("parseRuntimeStoryText(sourceText)", player_source)
         self.assertIn("export function parseRuntimeTextPacing", runtime_pacing_source)
-        self.assertIn("runtime_text_pacing import", native_source)
+        self.assertIn("runtime_story_text import", native_source)
         self.assertIn("def parse_runtime_text_pacing", native_pacing_source)
 
     def test_web_runtime_exposes_explicit_history_step_controls(self) -> None:
@@ -6428,19 +6428,17 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("updateRuntimeAudioVolumes()", toggle_voice_ducking)
 
     def test_typewriter_index_helpers_keep_unicode_characters_intact(self) -> None:
-        for path in (TYPEWRITER_MODULE_PATH, RUNTIME_TEXT_EFFECTS_PATH):
+        adapter_source = TYPEWRITER_MODULE_PATH.read_text(encoding="utf-8")
+        self.assertIn("global.CanvasiaRuntimeTextEffects", adapter_source)
+        self.assertIn('getNextTypewriterIndex: delegate("getNextTypewriterIndex")', adapter_source)
+        self.assertIn('getSafeTypewriterTextSpeed: delegate("getSafeRuntimeTextSpeed")', adapter_source)
+
+        for path in (RUNTIME_TEXT_EFFECTS_PATH,):
             source = path.read_text(encoding="utf-8")
-            speed_helper_lines = (
-                [
-                    "const TYPEWRITER_STEP_DELAYS = Object.freeze({ slow: 42, normal: 28, fast: 18, instant: 0 });",
-                    f"function getSafeTypewriterTextSpeed(speed) {_extract_function_source(source, 'getSafeTypewriterTextSpeed')}",
-                ]
-                if path == TYPEWRITER_MODULE_PATH
-                else [
-                    "const TYPEWRITER_STEP_DELAYS = Object.freeze({ slow: 42, normal: 28, fast: 18, instant: 0 });",
-                    f"function getSafeRuntimeTextSpeed(speed) {_extract_function_source(source, 'getSafeRuntimeTextSpeed')}",
-                ]
-            )
+            speed_helper_lines = [
+                "const TYPEWRITER_STEP_DELAYS = Object.freeze({ slow: 42, normal: 28, fast: 18, instant: 0 });",
+                f"function getSafeRuntimeTextSpeed(speed) {_extract_function_source(source, 'getSafeRuntimeTextSpeed')}",
+            ]
             script = "\n".join(
                 [
                     "const typewriterGraphemeSegmenter = null;",

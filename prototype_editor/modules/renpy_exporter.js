@@ -1121,8 +1121,78 @@
 
   function renderRenpyText(block = {}, context = {}) {
     const sourceLine = convertRuntimeTextVariables(getBlockText(block) || " ", context.variableMap ?? new Map());
-    const plan = global.CanvasiaRuntimeTextPacing.parseRuntimeTextPacing(sourceLine);
-    return renderRenpyTextPacing(plan, getEffectiveTextSpeed(block, context.runtimeSettings));
+    const plan = global.CanvasiaRuntimeStoryText?.parseRuntimeStoryText
+      ? global.CanvasiaRuntimeStoryText.parseRuntimeStoryText(sourceLine)
+      : global.CanvasiaRuntimeTextPacing.parseRuntimeTextPacing(sourceLine);
+    return renderRenpyStoryText(plan, getEffectiveTextSpeed(block, context.runtimeSettings));
+  }
+
+  function getRenpyRichTextTags(segment = {}) {
+    if (segment.type === "emphasis") return { open: "{b}", close: "{/b}" };
+    if (segment.type === "whisper") return { open: "{i}{size=-3}{alpha=0.82}", close: "{/alpha}{/size}{/i}" };
+    if (segment.type === "color") return { open: `{color=${segment.color}}`, close: "{/color}" };
+    return { open: "", close: "" };
+  }
+
+  function renderRenpyStoryText(plan = {}, baseSpeed = "") {
+    const plainText = String(plan.plainText ?? "");
+    const cues = Array.isArray(plan.cues) ? plan.cues : [];
+    const segments = Array.isArray(plan.segments) ? plan.segments : [];
+    const cuesByIndex = new Map();
+    const startsByIndex = new Map();
+    const endsByIndex = new Map();
+    cues.forEach((cue) => {
+      const index = Math.max(0, Math.min(plainText.length, Number(cue.index) || 0));
+      cuesByIndex.set(index, [...(cuesByIndex.get(index) ?? []), cue]);
+    });
+    segments.forEach((segment) => {
+      const start = Math.max(0, Math.min(plainText.length, Number(segment.start) || 0));
+      const end = Math.max(start, Math.min(plainText.length, Number(segment.end) || start));
+      startsByIndex.set(start, [...(startsByIndex.get(start) ?? []), { ...segment, start, end }]);
+      endsByIndex.set(end, [...(endsByIndex.get(end) ?? []), { ...segment, start, end }]);
+    });
+
+    let activeSpeed = Object.hasOwn(TEXT_SPEED_CPS, baseSpeed) ? baseSpeed : "";
+    const parts = [activeSpeed ? `{cps=${TEXT_SPEED_CPS[activeSpeed]}}` : ""];
+    let cursor = 0;
+    while (cursor <= plainText.length) {
+      [...(endsByIndex.get(cursor) ?? [])].reverse().forEach((segment) => {
+        if (segment.type !== "ruby") parts.push(getRenpyRichTextTags(segment).close);
+      });
+      (cuesByIndex.get(cursor) ?? []).forEach((cue) => {
+        if (cue.type === "pause") {
+          const pauseSeconds = Math.round((Number(cue.pauseMs) || 0) / 10) / 100;
+          if (pauseSeconds > 0) parts.push(`{w=${pauseSeconds}}`);
+          return;
+        }
+        if (cue.type !== "speed") return;
+        const requestedSpeed = cue.speed === "inherit" ? baseSpeed : cue.speed;
+        const targetSpeed = Object.hasOwn(TEXT_SPEED_CPS, requestedSpeed) ? requestedSpeed : "";
+        if (targetSpeed === activeSpeed) return;
+        if (activeSpeed) parts.push("{/cps}");
+        if (targetSpeed) parts.push(`{cps=${TEXT_SPEED_CPS[targetSpeed]}}`);
+        activeSpeed = targetSpeed;
+      });
+
+      const startingSegments = startsByIndex.get(cursor) ?? [];
+      const rubySegment = startingSegments.find((segment) => segment.type === "ruby");
+      if (rubySegment && rubySegment.end > cursor) {
+        const annotation = String(rubySegment.annotation ?? "").replace(/[{}]/g, "");
+        parts.push(`{rb}${plainText.slice(cursor, rubySegment.end)}{/rb}{rt}${annotation}{/rt}`);
+        cursor = rubySegment.end;
+        continue;
+      }
+      startingSegments.forEach((segment) => {
+        if (segment.type !== "ruby") parts.push(getRenpyRichTextTags(segment).open);
+      });
+      if (cursor >= plainText.length) break;
+      const codePoint = plainText.codePointAt(cursor) ?? 0;
+      const charLength = codePoint > 0xffff ? 2 : 1;
+      parts.push(plainText.slice(cursor, cursor + charLength));
+      cursor += charLength;
+    }
+    if (activeSpeed) parts.push("{/cps}");
+    return parts.join("");
   }
 
   function renderRenpyTextPacing(plan = {}, baseSpeed = "") {
@@ -1932,6 +2002,7 @@
     getRenpyExportContract,
     renderConditionRuleExpression,
     renderRenpyTextPacing,
+    renderRenpyStoryText,
     renderBlock,
     sanitizeProjectRuntimeSettings,
   });

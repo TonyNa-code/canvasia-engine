@@ -3,9 +3,19 @@ from __future__ import annotations
 from collections.abc import Callable
 
 try:
-    from .runtime_player_view import ellipsize_text, wrap_text
+    from .runtime_rich_text_renderer import (
+        draw_runtime_rich_text,
+        layout_runtime_rich_text,
+        limit_runtime_rich_text_layout,
+    )
+    from .runtime_story_text import parse_runtime_story_text
 except ImportError:  # pragma: no cover - exported native packages import from the same directory.
-    from runtime_player_view import ellipsize_text, wrap_text
+    from runtime_rich_text_renderer import (
+        draw_runtime_rich_text,
+        layout_runtime_rich_text,
+        limit_runtime_rich_text_layout,
+    )
+    from runtime_story_text import parse_runtime_story_text
 
 
 DIALOGUE_LAYOUT_IDS = ("adv", "nvl", "cinematic")
@@ -91,6 +101,9 @@ def _sanitize_dialogue_page_entry(entry: object, block: dict, index: int) -> dic
         "type": entry_type if entry_type in _DIALOGUE_BLOCK_TYPES else "narration",
         "speakerName": str(source.get("speakerName") or ""),
         "text": str(source.get("text") or block.get("text") or ""),
+        "sourceText": str(source.get("sourceText") or block.get("text") or ""),
+        "storyText": source.get("storyText") if isinstance(source.get("storyText"), dict) else None,
+        "visibleEnd": source.get("visibleEnd"),
     }
 
 
@@ -174,15 +187,23 @@ def _collect_player_nvl_entries(player: object) -> list[dict]:
             )
         else:
             speaker_name = "旁白"
-        text = player.localize_value(block, "text")
+        source_text = player.localize_value(block, "text")
+        story_text = parse_runtime_story_text(source_text)
+        text = story_text["plainText"]
+        visible_end = len(text)
         if index == player.current_block_index:
+            story_text = (player.current_line or {}).get("textPacing") or story_text
             text = player.get_current_line_render_text()
+            visible_end = len(text)
         return {
             "id": block.get("id"),
             "blockIndex": index,
             "type": block.get("type"),
             "speakerName": speaker_name,
             "text": text,
+            "sourceText": source_text,
+            "storyText": story_text,
+            "visibleEnd": visible_end,
         }
 
     return collect_nvl_page_entries(
@@ -192,19 +213,83 @@ def _collect_player_nvl_entries(player: object) -> list[dict]:
     )
 
 
+def _get_player_story_text_plan(player: object, line: dict | None = None) -> dict:
+    safe_line = line or player.current_line or {}
+    plan = safe_line.get("textPacing")
+    if isinstance(plan, dict) and "plainText" in plan:
+        return plan
+    return parse_runtime_story_text(safe_line.get("text") or "")
+
+
+def _layout_player_story_text(
+    player: object,
+    plan: dict,
+    max_width: int,
+    color: tuple[int, int, int],
+    *,
+    visible_end: int | None = None,
+) -> dict:
+    body_font = player.font_body
+    bold_font = getattr(player, "font_body_bold", body_font)
+    ruby_font = getattr(player, "font_ruby", getattr(player, "font_ui", body_font))
+    return layout_runtime_rich_text(
+        plan,
+        body_font,
+        bold_font,
+        ruby_font,
+        max_width,
+        color,
+        visible_end=visible_end,
+    )
+
+
+def _draw_player_story_text(
+    player: object,
+    layout: dict,
+    position: tuple[int, int],
+    *,
+    center: bool = False,
+) -> None:
+    body_font = player.font_body
+    bold_font = getattr(player, "font_body_bold", body_font)
+    ruby_font = getattr(player, "font_ruby", getattr(player, "font_ui", body_font))
+    draw_runtime_rich_text(
+        player.pygame,
+        player.screen,
+        layout,
+        body_font,
+        bold_font,
+        ruby_font,
+        position,
+        center=center,
+        shadow_strength=int(player.dialog_box_config.get("shadowStrength", 0)),
+    )
+
+
 def _render_adv_dialogue(player: object) -> None:
     line = player.current_line or {}
-    layout = player.build_dialogue_layout(line)
-    panel = player.get_dialog_panel_rect(layout["minHeight"])
-    player.draw_dialog_panel(panel)
     padding_x = int(player.dialog_box_config.get("paddingX", 18))
     padding_y = int(player.dialog_box_config.get("paddingY", 14))
+    layout = player.build_dialogue_layout(line)
+    panel = player.get_dialog_panel_rect(layout["minHeight"])
     text_left = panel.left + padding_x
     text_width = panel.width - padding_x * 2
-
     if text_width != layout["textWidth"]:
         layout = player.build_dialogue_layout(line, text_width)
     speaker_name = layout["speakerName"]
+    speaker_height = player.font_title.get_height() + 12 if speaker_name else 0
+    meta_height = player.font_ui.get_height()
+    text_color = player.dialog_box_config.get("textColor", (238, 245, 255))
+    story_plan = _get_player_story_text_plan(player, line)
+    full_rich_layout = _layout_player_story_text(player, story_plan, text_width, text_color)
+    max_panel_height = max(176, player.height - 48)
+    desired_height = padding_y * 2 + speaker_height + meta_height + 10 + full_rich_layout["totalHeight"]
+    panel = player.get_dialog_panel_rect(min(max_panel_height, max(layout["minHeight"], desired_height)))
+    text_left = panel.left + padding_x
+    text_width = panel.width - padding_x * 2
+    if text_width != full_rich_layout["maxWidth"]:
+        full_rich_layout = _layout_player_story_text(player, story_plan, text_width, text_color)
+    player.draw_dialog_panel(panel)
 
     current_top = panel.top + padding_y
     if speaker_name:
@@ -216,15 +301,19 @@ def _render_adv_dialogue(player: object) -> None:
         )
         current_top += player.font_title.get_height() + 12
 
-    text = player.get_current_line_render_text()
-    full_lines = layout["fullLines"]
-    line_height = layout["lineHeight"]
     meta_text = player.build_save_summary_line()
-    meta_height = player.font_ui.get_height()
     meta_top = panel.bottom - padding_y - meta_height
     max_text_height = max(36, meta_top - current_top - 10)
-    max_lines = max(1, max_text_height // line_height)
-    has_overflow = len(full_lines) > max_lines
+    max_lines = 0
+    occupied_height = 0
+    for rich_line in full_rich_layout["lines"]:
+        line_height = int(rich_line.get("height") or player.font_body.get_height())
+        if max_lines and occupied_height + line_height > max_text_height:
+            break
+        occupied_height += line_height
+        max_lines += 1
+    max_lines = max(1, max_lines)
+    has_overflow = full_rich_layout["lineCount"] > max_lines
     if has_overflow:
         meta_text += " · 长文本：H 查看历史"
     meta_surface = player.font_ui.render(
@@ -234,18 +323,20 @@ def _render_adv_dialogue(player: object) -> None:
     )
     meta_top = panel.bottom - padding_y - meta_surface.get_height()
     max_text_height = max(36, meta_top - current_top - 10)
-    max_lines = max(1, max_text_height // line_height)
-    lines = wrap_text(player.font_body, text, text_width)
-    visible_lines = list(lines[:max_lines])
-    if has_overflow and player.is_current_line_fully_visible() and visible_lines:
-        visible_lines[-1] = ellipsize_text(player.font_body, visible_lines[-1], text_width, " …")
-    for index, text_line in enumerate(visible_lines):
-        player.blit_dialogue_text(
-            player.font_body,
-            text_line,
-            (text_left, current_top + index * line_height),
-            player.dialog_box_config.get("textColor", (238, 245, 255)),
-        )
+    visible_layout = _layout_player_story_text(
+        player,
+        story_plan,
+        text_width,
+        text_color,
+        visible_end=player.current_line_revealed_chars,
+    )
+    visible_layout = limit_runtime_rich_text_layout(
+        visible_layout,
+        max_lines,
+        player.font_body,
+        append_ellipsis=has_overflow and player.is_current_line_fully_visible(),
+    )
+    _draw_player_story_text(player, visible_layout, (text_left, current_top))
 
     player.screen.blit(meta_surface, (text_left, meta_top))
 
@@ -254,13 +345,27 @@ def _render_cinematic_dialogue(player: object) -> None:
     pygame = player.pygame
     line = player.current_line or {}
     speaker_name = player.get_dialogue_speaker_name(line)
-    text = player.get_current_line_render_text()
     panel_width = min(player.width - 36, max(460, int(player.width * 0.86)))
     text_width = panel_width - 72
-    lines = wrap_text(player.font_body, text, text_width)
-    line_height = player.font_body.get_height() + 10
+    text_color = player.dialog_box_config.get("textColor", (248, 250, 255))
+    story_plan = _get_player_story_text_plan(player, line)
+    full_layout = _layout_player_story_text(player, story_plan, text_width, text_color)
+    full_layout = limit_runtime_rich_text_layout(
+        full_layout,
+        4,
+        player.font_body,
+        append_ellipsis=full_layout["lineCount"] > 4 and player.is_current_line_fully_visible(),
+    )
+    visible_layout = _layout_player_story_text(
+        player,
+        story_plan,
+        text_width,
+        text_color,
+        visible_end=player.current_line_revealed_chars,
+    )
+    visible_layout = limit_runtime_rich_text_layout(visible_layout, 4, player.font_body)
     speaker_height = player.font_ui.get_height() + 10 if speaker_name else 0
-    panel_height = max(112, 54 + speaker_height + min(len(lines), 4) * line_height)
+    panel_height = max(112, 54 + speaker_height + full_layout["totalHeight"])
     panel = pygame.Rect(0, 0, panel_width, panel_height)
     panel.midbottom = (player.width // 2, player.height - 42)
     surface = pygame.Surface(panel.size, pygame.SRCALPHA)
@@ -277,14 +382,7 @@ def _render_cinematic_dialogue(player: object) -> None:
         )
         player.screen.blit(speaker_surface, (panel.centerx - speaker_surface.get_width() // 2, current_y))
         current_y += speaker_height
-    for text_line in lines[:4]:
-        line_surface = player.font_body.render(
-            text_line,
-            True,
-            player.dialog_box_config.get("textColor", (248, 250, 255)),
-        )
-        player.screen.blit(line_surface, (panel.centerx - line_surface.get_width() // 2, current_y))
-        current_y += line_height
+    _draw_player_story_text(player, visible_layout, (panel.centerx, current_y), center=True)
 
     meta_surface = player.font_ui.render(
         player.build_save_summary_line(),
@@ -310,7 +408,6 @@ def _render_nvl_dialogue(player: object) -> None:
     speaker_width = min(160, max(92, panel.width // 5))
     text_left = panel.left + padding_x + speaker_width
     text_width = panel.width - padding_x * 2 - speaker_width
-    line_height = player.font_body.get_height() + 8
     entry_gap = 14
     meta_surface = player.font_ui.render(
         f"NVL 满页叙事 · {player.build_save_summary_line()}",
@@ -320,28 +417,39 @@ def _render_nvl_dialogue(player: object) -> None:
     content_bottom = panel.bottom - padding_y - meta_surface.get_height() - 12
     rows = []
     for entry in entries:
-        lines = wrap_text(player.font_body, str(entry.get("text") or ""), text_width)
-        row_height = max(player.font_title.get_height(), len(lines) * line_height)
-        rows.append((entry, lines, row_height))
+        is_current = int(entry.get("blockIndex") or -1) == int(player.current_block_index)
+        text_color = player.dialog_box_config.get("textColor", (238, 245, 255))
+        if not is_current:
+            text_color = tuple(max(0, int(channel * 0.72)) for channel in text_color)
+        story_plan = (
+            entry.get("storyText")
+            if isinstance(entry.get("storyText"), dict)
+            else parse_runtime_story_text(entry.get("sourceText") or entry.get("text") or "")
+        )
+        visible_end = entry.get("visibleEnd")
+        rich_layout = _layout_player_story_text(
+            player,
+            story_plan,
+            text_width,
+            text_color,
+            visible_end=len(str(entry.get("text") or "")) if visible_end is None else int(visible_end),
+        )
+        row_height = max(player.font_title.get_height(), rich_layout["totalHeight"])
+        rows.append((entry, rich_layout, row_height, text_color))
 
     available_height = max(80, content_bottom - (panel.top + padding_y))
     while len(rows) > 1 and sum(row[2] + entry_gap for row in rows) > available_height:
         rows.pop(0)
 
     current_y = panel.top + padding_y
-    for row_index, (entry, lines, row_height) in enumerate(rows):
+    for row_index, (entry, rich_layout, row_height, _text_color) in enumerate(rows):
         is_current = row_index == len(rows) - 1
         speaker_color = player.dialog_box_config.get(
             "speakerColor",
             (238, 245, 255),
         )
-        text_color = player.dialog_box_config.get(
-            "textColor",
-            (238, 245, 255),
-        )
         if not is_current:
             speaker_color = tuple(max(0, int(channel * 0.72)) for channel in speaker_color)
-            text_color = tuple(max(0, int(channel * 0.72)) for channel in text_color)
         speaker_name = str(entry.get("speakerName") or "")
         if speaker_name:
             player.blit_dialogue_text(
@@ -350,13 +458,7 @@ def _render_nvl_dialogue(player: object) -> None:
                 (panel.left + padding_x, current_y),
                 speaker_color,
             )
-        for line_index, text_line in enumerate(lines):
-            player.blit_dialogue_text(
-                player.font_body,
-                text_line,
-                (text_left, current_y + line_index * line_height),
-                text_color,
-            )
+        _draw_player_story_text(player, rich_layout, (text_left, current_y))
         current_y += row_height + entry_gap
         if current_y >= content_bottom:
             break

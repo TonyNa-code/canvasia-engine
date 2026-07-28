@@ -20,7 +20,7 @@ class FrontendTypewriterParityTests(unittest.TestCase):
             import vm from "node:vm";
             import * as runtimeTools from {json.dumps(RUNTIME_TEXT_EFFECTS_PATH.as_uri())};
 
-            const editorSandbox = {{}};
+            const editorSandbox = {{ CanvasiaRuntimeTextEffects: runtimeTools }};
             vm.createContext(editorSandbox);
             vm.runInContext(fs.readFileSync({json.dumps(str(EDITOR_TYPEWRITER_PATH))}, "utf8"), editorSandbox);
             const editorTools = editorSandbox.CanvasiaEditorTypewriter;

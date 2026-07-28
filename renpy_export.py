@@ -18,7 +18,7 @@ from native_runtime.runtime_achievements import (
     sanitize_achievement_unlock_block,
 )
 from native_runtime.runtime_timed_choices import sanitize_timed_choice_config
-from native_runtime.runtime_text_pacing import parse_runtime_text_pacing
+from native_runtime.runtime_story_text import parse_runtime_story_text
 
 
 RENPY_GAME_DIR_NAME = "game"
@@ -482,9 +482,81 @@ def render_renpy_text(block: dict, context: dict | None = None) -> str:
         clean_text(block.get("text") or (block.get("fields") or {}).get("text"), " "),
         (context or {}).get("variableMap") or {},
     )
-    plan = parse_runtime_text_pacing(source_line)
+    plan = parse_runtime_story_text(source_line)
     base_speed = get_effective_text_speed(block, (context or {}).get("runtimeSettings"))
-    return render_renpy_text_pacing(plan, base_speed)
+    return render_renpy_story_text(plan, base_speed)
+
+
+def get_renpy_rich_text_tags(segment: dict) -> tuple[str, str]:
+    segment_type = str((segment or {}).get("type") or "")
+    if segment_type == "emphasis":
+        return "{b}", "{/b}"
+    if segment_type == "whisper":
+        return "{i}{size=-3}{alpha=0.82}", "{/alpha}{/size}{/i}"
+    if segment_type == "color":
+        return f"{{color={segment.get('color')}}}", "{/color}"
+    return "", ""
+
+
+def render_renpy_story_text(plan: dict, base_speed: str = "") -> str:
+    plain_text = str((plan or {}).get("plainText") or "")
+    cues_by_index: dict[int, list[dict]] = {}
+    starts_by_index: dict[int, list[dict]] = {}
+    ends_by_index: dict[int, list[dict]] = {}
+    for cue in (plan or {}).get("cues") or []:
+        cue_index = max(0, min(len(plain_text), int(cue.get("index") or 0)))
+        cues_by_index.setdefault(cue_index, []).append(cue)
+    for segment in (plan or {}).get("segments") or []:
+        start = max(0, min(len(plain_text), int(segment.get("start") or 0)))
+        end = max(start, min(len(plain_text), int(segment.get("end") or start)))
+        normalized = {**segment, "start": start, "end": end}
+        starts_by_index.setdefault(start, []).append(normalized)
+        ends_by_index.setdefault(end, []).append(normalized)
+
+    active_speed = base_speed if base_speed in TEXT_SPEED_CPS else ""
+    parts = [f"{{cps={TEXT_SPEED_CPS[active_speed]}}}" if active_speed else ""]
+    cursor = 0
+    while cursor <= len(plain_text):
+        for segment in reversed(ends_by_index.get(cursor, [])):
+            if segment.get("type") != "ruby":
+                parts.append(get_renpy_rich_text_tags(segment)[1])
+        for cue in cues_by_index.get(cursor, []):
+            if cue.get("type") == "pause":
+                pause_seconds = round(int(cue.get("pauseMs") or 0) / 1000, 3)
+                if pause_seconds > 0:
+                    parts.append(f"{{w={pause_seconds:g}}}")
+                continue
+            if cue.get("type") != "speed":
+                continue
+            target_speed = base_speed if cue.get("speed") == "inherit" else str(cue.get("speed") or "")
+            target_speed = target_speed if target_speed in TEXT_SPEED_CPS else ""
+            if target_speed == active_speed:
+                continue
+            if active_speed:
+                parts.append("{/cps}")
+            if target_speed:
+                parts.append(f"{{cps={TEXT_SPEED_CPS[target_speed]}}}")
+            active_speed = target_speed
+
+        starting_segments = starts_by_index.get(cursor, [])
+        ruby_segment = next((segment for segment in starting_segments if segment.get("type") == "ruby"), None)
+        if ruby_segment and int(ruby_segment["end"]) > cursor:
+            annotation = re.sub(r"[{}]", "", str(ruby_segment.get("annotation") or ""))
+            end = int(ruby_segment["end"])
+            parts.append(f"{{rb}}{plain_text[cursor:end]}{{/rb}}{{rt}}{annotation}{{/rt}}")
+            cursor = end
+            continue
+        for segment in starting_segments:
+            if segment.get("type") != "ruby":
+                parts.append(get_renpy_rich_text_tags(segment)[0])
+        if cursor >= len(plain_text):
+            break
+        parts.append(plain_text[cursor])
+        cursor += 1
+
+    if active_speed:
+        parts.append("{/cps}")
+    return "".join(parts)
 
 
 def render_renpy_text_pacing(plan: dict, base_speed: str = "") -> str:

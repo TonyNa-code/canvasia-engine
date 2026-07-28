@@ -53,6 +53,7 @@ The project already includes a visual editor, export pipeline, native runtime pr
 - Visual story editor with scenes, cards, dialogue, narration, choices, variables, and conditional branches; each choice can stay available, hide, or remain visibly locked until affection, inventory, route flags, or other variable rules are satisfied
 - Optional timed choices with 5 / 10 / 15 / 30-second presets or a custom 1-300 second limit, an author-selected timeout branch, safe fallback when that branch is locked, pause-aware menus and background tabs, and remaining-time restoration across editor preview, Web Runtime, native Runtime, saves, and Ren'Py export
 - Inline dialogue pacing with beginner-friendly buttons for short / long pauses and selected-text slow, fast, or instant reveal; editor preview, Web Runtime, native Runtime, saves, history, archives, and Ren'Py drafts share the same marker-safe behavior, while a player's Instant text-speed preference always takes priority
+- Rich story text with no-code selected-text buttons for emphasis, whisper, safe custom colors, and ruby / furigana; rich styling composes with inline pacing and stays aligned across editor preview, Web Runtime, native Runtime, clean save/history/archive text, and Ren'Py draft export without accepting raw HTML
 - Player input cards for names, passwords, investigation answers, and numeric values, with `{{variable_id}}` interpolation in dialogue, narration, choices, and locked-choice hints across Web Runtime, native Runtime, saves, and Ren'Py draft export
 - Reusable sub-scenes with nested `call` / automatic or early return flow for shared events, phone calls, tutorials, and recurring sequences; the call stack survives preview, Web, and native Runtime saves, and exports as native Ren'Py `call` / `return`
 - Project center with playable Demo projects, blank projects, beginner mode, advanced mode, and a six-stage creator workflow guide from project setup to Release Candidate export
@@ -155,6 +156,7 @@ The project already includes a visual editor, export pipeline, native runtime pr
 - [`template_project`](template_project): blank starter project template
 - [`tests`](tests): automated smoke and regression tests
 - [`docs/text-pacing.md`](docs/text-pacing.md): inline pause and local text-speed authoring contract
+- [`docs/rich-story-text.md`](docs/rich-story-text.md): no-code emphasis, whisper, color, ruby / furigana, and cross-runtime maintenance contract
 - [`docs/maintainer-guide.md`](docs/maintainer-guide.md): maintenance boundaries, safe extension pattern, and recommended checks
 
 ## Quick Start

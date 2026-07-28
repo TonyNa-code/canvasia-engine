@@ -47,9 +47,12 @@ import {
   getInitialTextPacingIndex,
   getNextTextPacingIndex,
   getTextPacingStepDelay,
-  parseRuntimeTextPacing,
-  stripRuntimeTextPacing,
 } from "./runtime_text_pacing.js";
+import {
+  parseRuntimeStoryText,
+  renderRuntimeStoryText,
+  stripRuntimeStoryText,
+} from "./runtime_story_text.js";
 import {
   getSafeTextInputMaxLength,
   interpolateRuntimeText,
@@ -858,7 +861,7 @@ function buildEndingScenePreview(scene) {
   (scene?.blocks ?? []).forEach((block) => {
     applyBlockToPreviewState(block, visualState, variables);
     if (block.type === "dialogue" || block.type === "narration") {
-      lastStoryText = stripRuntimeTextPacing(getBlockText(block)).trim();
+      lastStoryText = stripRuntimeStoryText(getBlockText(block)).trim();
       lastStorySpeaker = visualState.speakerName ?? "";
     }
   });
@@ -4013,7 +4016,7 @@ function shouldUseRuntimeTypewriter(snapshot) {
     return false;
   }
 
-  return stripRuntimeTextPacing(snapshot.visualState?.dialogueText ?? "").trim().length > 0;
+  return stripRuntimeStoryText(snapshot.visualState?.dialogueText ?? "").trim().length > 0;
 }
 
 function getSnapshotTextSpeed(snapshot) {
@@ -4056,12 +4059,12 @@ function completeRuntimeTypewriter() {
 
 function syncRuntimeDialoguePresentation(snapshot) {
   const sourceText = snapshot?.visualState?.dialogueText ?? "";
-  const pacingPlan = parseRuntimeTextPacing(sourceText);
+  const pacingPlan = parseRuntimeStoryText(sourceText);
   const plainText = pacingPlan.plainText;
   if (!snapshot || !shouldUseRuntimeTypewriter(snapshot)) {
     stopRuntimeTypewriter();
     markSnapshotAsRead(snapshot);
-    refs.messageText.textContent = plainText;
+    refs.messageText.innerHTML = renderRuntimeStoryText(pacingPlan);
     refs.messageText.classList.remove("is-typing");
     refs.choiceList.innerHTML = snapshot ? renderChoiceButtons(snapshot) : "";
     return;
@@ -4070,7 +4073,7 @@ function syncRuntimeDialoguePresentation(snapshot) {
   if (state.playback.skipRead && isSnapshotRead(snapshot)) {
     stopRuntimeTypewriter();
     markSnapshotAsRead(snapshot);
-    refs.messageText.textContent = plainText;
+    refs.messageText.innerHTML = renderRuntimeStoryText(pacingPlan);
     refs.messageText.classList.remove("is-typing");
     refs.choiceList.innerHTML = renderChoiceButtons(snapshot);
     return;
@@ -4096,7 +4099,9 @@ function syncRuntimeDialoguePresentation(snapshot) {
     }
   }
 
-  refs.messageText.textContent = state.typingActive ? state.typingVisibleText : fullText;
+  refs.messageText.innerHTML = renderRuntimeStoryText(pacingPlan, {
+    visibleEnd: state.typingActive ? state.typingVisibleText.length : fullText.length,
+  });
   refs.messageText.classList.toggle("is-typing", state.typingActive);
   refs.choiceList.innerHTML = state.typingActive ? "" : renderChoiceButtons(snapshot);
 
@@ -4118,7 +4123,12 @@ function buildRuntimeDialogueLayoutPresentation(snapshot) {
       text:
         blockIndex === snapshot?.blockIndex && state.typingActive
           ? state.typingVisibleText
-          : stripRuntimeTextPacing(getBlockText(block)),
+          : stripRuntimeStoryText(getBlockText(block)),
+      sourceText: getBlockText(block),
+      visibleEnd:
+        blockIndex === snapshot?.blockIndex && state.typingActive
+          ? state.typingVisibleText.length
+          : stripRuntimeStoryText(getBlockText(block)).length,
     }),
   });
 }
@@ -4146,9 +4156,11 @@ function renderRuntimeDialogueLayout(snapshot) {
                     ? `<strong class="dialog-nvl-speaker">${escapeHtml(entry.speakerName)}</strong>`
                     : ""
                 }
-                <p class="dialog-nvl-text ${
+                <p class="dialog-nvl-text runtime-rich-text-container ${
                   index === entries.length - 1 && state.typingActive ? "is-typing" : ""
-                }">${escapeHtml(entry.text)}</p>
+                }">${renderRuntimeStoryText(entry.sourceText ?? entry.text, {
+                  visibleEnd: entry.visibleEnd ?? String(entry.text ?? "").length,
+                })}</p>
               </article>
             `
           )
@@ -4156,12 +4168,12 @@ function renderRuntimeDialogueLayout(snapshot) {
       : "";
 }
 
-function syncRuntimeNvlTypewriterText(text, isTyping) {
+function syncRuntimeNvlTypewriterText(plan, visibleEnd, isTyping) {
   const activeText = refs.dialogNvlPage?.querySelector?.(".dialog-nvl-entry.is-current .dialog-nvl-text");
   if (!activeText) {
     return;
   }
-  activeText.textContent = String(text ?? "");
+  activeText.innerHTML = renderRuntimeStoryText(plan, { visibleEnd });
   activeText.classList.toggle("is-typing", Boolean(isTyping));
 }
 
@@ -4181,9 +4193,15 @@ function scheduleRuntimeTypewriterTick(expectedKey) {
       getNextTypewriterIndex
     );
     state.typingVisibleText = state.typingFullText.slice(0, nextIndex);
-    refs.messageText.textContent = state.typingVisibleText;
+    refs.messageText.innerHTML = renderRuntimeStoryText(state.typingPacingPlan, {
+      visibleEnd: state.typingVisibleText.length,
+    });
     refs.messageText.classList.toggle("is-typing", nextIndex < state.typingFullText.length);
-    syncRuntimeNvlTypewriterText(state.typingVisibleText, nextIndex < state.typingFullText.length);
+    syncRuntimeNvlTypewriterText(
+      state.typingPacingPlan,
+      state.typingVisibleText.length,
+      nextIndex < state.typingFullText.length
+    );
 
     if (nextIndex >= state.typingFullText.length) {
       state.typingTimer = null;
@@ -5417,7 +5435,7 @@ function getAutoAdvanceDelay(snapshot) {
   }
 
   if (snapshot.blockType === "dialogue" || snapshot.blockType === "narration") {
-    const text = stripRuntimeTextPacing(snapshot.visualState?.dialogueText ?? "");
+    const text = stripRuntimeStoryText(snapshot.visualState?.dialogueText ?? "");
     const multiplier = {
       slow: 92,
       normal: 72,
@@ -6601,7 +6619,7 @@ function getSaveSlotSummary(slot) {
   const stepLabel = snapshot.completed ? "路线已结束" : `第 ${Math.max(snapshot.blockIndex + 1, 0)} 步`;
   const speakerName = snapshot.visualState?.speakerName ? `${snapshot.visualState.speakerName}：` : "";
   const dialogueText = truncateText(
-    stripRuntimeTextPacing(snapshot.visualState?.dialogueText ?? "这个节点没有正文。"),
+    stripRuntimeStoryText(snapshot.visualState?.dialogueText ?? "这个节点没有正文。"),
     34
   );
   return `${sceneName} · ${stepLabel} · ${speakerName}${dialogueText}`;
@@ -6699,7 +6717,7 @@ function buildSaveThumbnailDataUrl(snapshot) {
 
   const speaker = escapeHtml(snapshot.visualState?.speakerName ?? snapshot.sceneName ?? "Canvasia Engine");
   const dialogue = escapeHtml(
-    truncateText(stripRuntimeTextPacing(snapshot.visualState?.dialogueText ?? "这个节点没有正文。"), 34)
+    truncateText(stripRuntimeStoryText(snapshot.visualState?.dialogueText ?? "这个节点没有正文。"), 34)
   );
   const scene = escapeHtml(snapshot.visualState?.backgroundName ?? snapshot.sceneName ?? "未设置背景");
   const block = escapeHtml(snapshot.completed ? "路线结束" : getBlockLabel(snapshot.blockType));
@@ -6795,7 +6813,7 @@ function renderSaveVisualSummary(slot) {
   const blockLabel = snapshot.completed ? "路线结束" : getBlockLabel(snapshot.blockType);
   const stageTitle = snapshot.visualState?.speakerName || snapshot.sceneName || "Canvasia Engine";
   const stageText = truncateText(
-    stripRuntimeTextPacing(snapshot.visualState?.dialogueText ?? "这个节点没有正文。"),
+    stripRuntimeStoryText(snapshot.visualState?.dialogueText ?? "这个节点没有正文。"),
     38
   );
   const thumbnailUrl = slot?.thumbnailDataUrl || buildSaveThumbnailDataUrl(snapshot);
@@ -8572,7 +8590,7 @@ function renderHistory(session) {
         <article class="history-row ${absoluteIndex === session.position ? "is-selected" : ""}">
           <button class="history-main-button" type="button" data-history-index="${absoluteIndex}">
             <strong>${number}. ${escapeHtml(title)}</strong>
-            <p>${escapeHtml(stripRuntimeTextPacing(snapshot.visualState.dialogueText ?? ""))}</p>
+            <p>${escapeHtml(stripRuntimeStoryText(snapshot.visualState.dialogueText ?? ""))}</p>
             <div class="meta">${escapeHtml(snapshot.visualState.speakerName ?? "系统")}</div>
           </button>
           <div class="history-actions">

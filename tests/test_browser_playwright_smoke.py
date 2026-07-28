@@ -766,6 +766,90 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
         self.assertNotIn("[[", preview_text)
         self.assertNotIn("[[", self.page.locator("#previewLog").inner_text())
 
+    def test_story_editor_rich_text_persists_and_renders_in_preview(self) -> None:
+        self.create_blank_project("浏览器烟测项目_RichText")
+        self.create_first_chapter()
+        self.page.locator("#screen-story").get_by_role("button", name="加台词").first.click()
+
+        textarea = self.page.locator("#editorDialogueText")
+        textarea.wait_for(timeout=15000)
+        textarea.fill("漢字很重要")
+        rich_editor = self.page.locator(
+            '[data-rich-text-editor][data-textarea-id="editorDialogueText"]'
+        )
+        rich_editor.locator("summary").click()
+        textarea.evaluate(
+            """(element) => {
+                const start = element.value.indexOf('重要');
+                element.setSelectionRange(start, start + 2);
+            }"""
+        )
+        rich_editor.get_by_role("button", name="强调这段").click()
+        rich_editor.locator("[data-rich-text-reading]").fill("かんじ")
+        textarea.evaluate(
+            """(element) => {
+                const start = element.value.indexOf('漢字');
+                element.setSelectionRange(start, start + 2);
+            }"""
+        )
+        rich_editor.get_by_role("button", name="加入注音").click()
+
+        edited_text = textarea.input_value()
+        self.assertIn("[[em=重要]]", edited_text)
+        self.assertIn("[[ruby=漢字|かんじ]]", edited_text)
+        self.page.get_by_role("button", name="保存这张卡片").click()
+        self.page.wait_for_function(
+            """async () => {
+                const response = await fetch('/api/project-data');
+                const bundle = await response.json();
+                return (bundle.chapters || []).some((chapter) =>
+                    (chapter.scenes || []).some((scene) =>
+                        (scene.blocks || []).some((block) =>
+                            block.type === 'dialogue'
+                            && String(block.text || '').includes('[[em=重要]]')
+                            && String(block.text || '').includes('[[ruby=漢字|かんじ]]')
+                        )
+                    )
+                );
+            }""",
+            timeout=15000,
+        )
+
+        self.preview_navigation_button().click()
+        self.page.locator("#previewStage").wait_for(state="visible", timeout=15000)
+        dialogue = self.page.locator("#previewStage .dialog-text")
+        preview_states = []
+        for _ in range(16):
+            current_text = dialogue.text_content() or ""
+            next_button = self.page.locator("#previewNextButton")
+            preview_states.append({"text": current_text, "nextDisabled": next_button.is_disabled()})
+            if (
+                dialogue.locator("strong.runtime-rich-text-emphasis").count()
+                and dialogue.locator("ruby.runtime-rich-text-ruby rt").count()
+            ):
+                break
+            visible_choice = self.page.locator("#previewChoices button:visible").first
+            if visible_choice.count():
+                visible_choice.click()
+            else:
+                if next_button.is_disabled():
+                    break
+                next_button.click()
+            self.page.wait_for_timeout(180)
+        dialogue_html = dialogue.inner_html()
+        diagnostic = (
+            f"dialogue_html={dialogue_html!r} "
+            f"preview_states={preview_states!r} preview_log={self.page.locator('#previewLog').inner_text()!r} "
+            f"page_errors={self.page_errors[-5:]} console_errors={self.console_errors[-5:]}"
+        )
+        self.assertIn('strong class="runtime-rich-text runtime-rich-text-emphasis"', dialogue_html, diagnostic)
+        self.assertIn('ruby class="runtime-rich-text runtime-rich-text-ruby"', dialogue_html, diagnostic)
+        self.assertIn("<rt>かんじ</rt>", dialogue_html, diagnostic)
+        self.assertEqual(dialogue.locator("ruby rb").inner_text(), "漢字", diagnostic)
+        self.assertEqual(dialogue.locator("strong").inner_text(), "重要", diagnostic)
+        self.assertNotIn("[[", dialogue.inner_text())
+        self.assertNotIn("[[", self.page.locator("#previewLog").inner_text())
+
     def test_story_editor_custom_achievement_persists_and_reaches_preview(self) -> None:
         self.create_blank_project("浏览器烟测项目_Achievement")
         self.create_first_chapter()

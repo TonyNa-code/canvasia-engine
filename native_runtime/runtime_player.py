@@ -248,15 +248,18 @@ try:
         get_initial_text_pacing_index,
         get_native_text_pacing_step_delay_ms,
         get_next_text_pacing_index,
-        parse_runtime_text_pacing,
     )
 except ImportError:  # pragma: no cover - exported native packages import from the same directory.
     from runtime_text_pacing import (
         get_initial_text_pacing_index,
         get_native_text_pacing_step_delay_ms,
         get_next_text_pacing_index,
-        parse_runtime_text_pacing,
     )
+
+try:
+    from .runtime_story_text import parse_runtime_story_text
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_story_text import parse_runtime_story_text
 
 try:
     from .runtime_text_input import (
@@ -8229,6 +8232,8 @@ class NativeRuntimePlayer:
         self.font_source_status = "系统字体"
         self.font_small = self._create_font(22)
         self.font_body = self._create_font(30)
+        self.font_body_bold = self._create_font(30, bold=True)
+        self.font_ruby = self._create_font(15, bold=True)
         self.font_title = self._create_font(36, bold=True)
         self.font_ui = self._create_font(18)
         self.active_text_scale_percent = 100
@@ -8308,7 +8313,7 @@ class NativeRuntimePlayer:
         self.current_line_started_at_ms = 0
         self.current_line_next_reveal_at_ms = 0
         self.current_line_full_text = ""
-        self.current_line_text_pacing: dict = parse_runtime_text_pacing("")
+        self.current_line_text_pacing: dict = parse_runtime_story_text("")
         self.current_line_revealed_chars = 0
         self.runtime_elapsed_seconds = 0.0
         self.scene3d_preview_yaw = float(DEFAULT_SCENE3D_PREVIEW["yaw"])
@@ -8431,6 +8436,8 @@ class NativeRuntimePlayer:
         scale = scale_percent / 100
         self.font_small = self._create_font(max(18, int(round(22 * scale))))
         self.font_body = self._create_font(max(24, int(round(30 * scale))))
+        self.font_body_bold = self._create_font(max(24, int(round(30 * scale))), bold=True)
+        self.font_ruby = self._create_font(max(12, int(round(15 * scale))), bold=True)
         self.font_title = self._create_font(max(28, int(round(36 * scale))), bold=True)
         ui_scale = min(1.16, max(0.94, scale))
         self.font_ui = self._create_font(max(16, int(round(18 * ui_scale))))
@@ -10659,7 +10666,7 @@ class NativeRuntimePlayer:
         return self.localize_value(self.get_current_scene(), "name", self.current_scene_id or "未命名场景")
 
     def build_current_story_line(self, block: dict, block_type: str) -> dict:
-        pacing_plan = parse_runtime_text_pacing(self.localize_runtime_text(block, "text"))
+        pacing_plan = parse_runtime_story_text(self.localize_runtime_text(block, "text"))
         return {
             "type": block_type,
             "speakerId": block.get("speakerId"),
