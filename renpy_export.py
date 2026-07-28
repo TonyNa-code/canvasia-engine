@@ -7,7 +7,7 @@ from typing import Any
 
 from project_runtime_settings import (
     PROJECT_RUNTIME_TEXT_SPEED_CPS,
-    get_effective_text_cps,
+    get_effective_text_speed,
     get_renpy_runtime_summary,
     get_runtime_settings_from_bundle,
     get_runtime_volume_ratio,
@@ -18,6 +18,7 @@ from native_runtime.runtime_achievements import (
     sanitize_achievement_unlock_block,
 )
 from native_runtime.runtime_timed_choices import sanitize_timed_choice_config
+from native_runtime.runtime_text_pacing import parse_runtime_text_pacing
 
 
 RENPY_GAME_DIR_NAME = "game"
@@ -477,12 +478,44 @@ def get_safe_position(value: Any) -> str:
 
 
 def render_renpy_text(block: dict, context: dict | None = None) -> str:
-    line = convert_runtime_text_variables(
+    source_line = convert_runtime_text_variables(
         clean_text(block.get("text") or (block.get("fields") or {}).get("text"), " "),
         (context or {}).get("variableMap") or {},
     )
-    cps = get_effective_text_cps(block, (context or {}).get("runtimeSettings"))
-    return f"{{cps={cps}}}{line}{{/cps}}" if cps else line
+    plan = parse_runtime_text_pacing(source_line)
+    base_speed = get_effective_text_speed(block, (context or {}).get("runtimeSettings"))
+    return render_renpy_text_pacing(plan, base_speed)
+
+
+def render_renpy_text_pacing(plan: dict, base_speed: str = "") -> str:
+    plain_text = str((plan or {}).get("plainText") or "")
+    cues = list((plan or {}).get("cues") or [])
+    active_speed = base_speed if base_speed in TEXT_SPEED_CPS else ""
+    parts = [f"{{cps={TEXT_SPEED_CPS[active_speed]}}}" if active_speed else ""]
+    cursor = 0
+
+    for cue in cues:
+        cue_index = max(cursor, min(len(plain_text), int(cue.get("index") or 0)))
+        parts.append(plain_text[cursor:cue_index])
+        if cue.get("type") == "pause":
+            pause_seconds = round(int(cue.get("pauseMs") or 0) / 1000, 3)
+            if pause_seconds > 0:
+                parts.append(f"{{w={pause_seconds:g}}}")
+        elif cue.get("type") == "speed":
+            target_speed = base_speed if cue.get("speed") == "inherit" else str(cue.get("speed") or "")
+            target_speed = target_speed if target_speed in TEXT_SPEED_CPS else ""
+            if target_speed != active_speed:
+                if active_speed:
+                    parts.append("{/cps}")
+                if target_speed:
+                    parts.append(f"{{cps={TEXT_SPEED_CPS[target_speed]}}}")
+                active_speed = target_speed
+        cursor = cue_index
+
+    parts.append(plain_text[cursor:])
+    if active_speed:
+        parts.append("{/cps}")
+    return "".join(parts)
 
 
 def render_dialogue_presentation(block: dict, context: dict) -> list[str]:

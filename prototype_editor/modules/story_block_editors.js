@@ -496,6 +496,7 @@
     const getSafeExpressionId = getRenderer(options, "getSafeExpressionId", (_characterId, expressionId) => expressionId ?? "");
     const renderExpressionOptions = getRenderer(options, "renderExpressionOptions");
     const renderReadableTextTools = getRenderer(options, "renderReadableTextQualityTools", renderReadableTextQualityTools);
+    const renderTextPacingEditor = getRenderer(options, "renderTextPacingEditor");
     const characters = Array.isArray(options.characters) ? options.characters : [];
     const voiceAssets = Array.isArray(options.voiceAssets) ? options.voiceAssets : [];
     const speakerId = getSafeCharacterId(block?.speakerId);
@@ -580,6 +581,7 @@
         <label for="editorDialogueText">台词内容</label>
         <textarea id="editorDialogueText">${escape(block?.text ?? "")}</textarea>
         ${renderReadableTextTools(block?.text, "台词")}
+        ${renderTextPacingEditor("editorDialogueText", block?.text ?? "")}
       </div>
       ${renderDialogueLayoutEditor(block, options)}
       ${renderTextSpeedOverrideRow(block, options)}
@@ -625,6 +627,7 @@
   function renderNarrationEditor(block, options = {}) {
     const escape = getEscapeHtml(options);
     const renderReadableTextTools = getRenderer(options, "renderReadableTextQualityTools", renderReadableTextQualityTools);
+    const renderTextPacingEditor = getRenderer(options, "renderTextPacingEditor");
     const voiceAssets = Array.isArray(options.voiceAssets) ? options.voiceAssets : [];
     const voiceAssetId = String(block?.voiceAssetId ?? "");
     const boundVoiceAsset = voiceAssetId ? getCollectionEntry(options.assetsById, voiceAssetId) : null;
@@ -639,6 +642,7 @@
         <label for="editorNarrationText">旁白内容</label>
         <textarea id="editorNarrationText">${escape(block?.text ?? "")}</textarea>
         ${renderReadableTextTools(block?.text, "旁白")}
+        ${renderTextPacingEditor("editorNarrationText", block?.text ?? "")}
       </div>
       <div class="detail-row">
         <label for="editorNarrationVoiceAssetId">旁白语音</label>

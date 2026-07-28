@@ -19,7 +19,12 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
             f"""
             const fs = require("fs");
             const vm = require("vm");
-            const context = {{ window: {{}} }};
+            const textPacingTools = {{
+              parseRuntimeTextPacing(value) {{
+                return {{ sourceText: String(value ?? ""), plainText: String(value ?? ""), cues: [], hasCues: false }};
+              }},
+            }};
+            const context = {{ window: {{ CanvasiaRuntimeTextPacing: textPacingTools }} }};
             context.globalThis = context;
             vm.createContext(context);
             vm.runInContext(fs.readFileSync({json.dumps(str(RUNTIME_SETTINGS_MODULE_PATH))}, "utf8"), context);
@@ -138,11 +143,20 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
             const draft = tools.buildRenpyDraftExport(data);
             const digest = tools.getRenpyDraftStatusDigest(draft);
             const manifest = tools.buildRenpyDraftManifest(draft);
+            const pacedLine = tools.renderRenpyTextPacing({{
+              plainText: "她说等等慢一点。",
+              cues: [
+                {{ index: 2, type: "pause", pauseMs: 350 }},
+                {{ index: 4, type: "speed", speed: "slow" }},
+                {{ index: 7, type: "speed", speed: "inherit" }},
+              ],
+            }}, "fast");
             process.stdout.write(JSON.stringify({{
               keys: Object.keys(tools).sort(),
               draft,
               digest,
               manifest,
+              pacedLine,
             }}));
             """
         )
@@ -159,6 +173,11 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
         self.assertIn("buildRenpyDraftExport", payload["keys"])
         self.assertIn("buildRenpyDraftManifest", payload["keys"])
         self.assertIn("renderBlock", payload["keys"])
+        self.assertIn("renderRenpyTextPacing", payload["keys"])
+        self.assertEqual(
+            payload["pacedLine"],
+            "{cps=72}她说{w=0.35}等等{/cps}{cps=24}慢一点{/cps}{cps=72}。{/cps}",
+        )
         self.assertEqual(payload["draft"]["projectTitle"], "Renpy Demo")
         self.assertEqual(payload["draft"]["sceneCount"], 3)
         self.assertEqual(payload["draft"]["characterCount"], 1)

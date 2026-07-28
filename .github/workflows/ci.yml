@@ -73,6 +73,7 @@ jobs:
             native_runtime/runtime_stage_renderer.py \
             native_runtime/runtime_save_thumbnails.py \
             native_runtime/runtime_i18n.py \
+            native_runtime/runtime_text_pacing.py \
             native_runtime/runtime_text_input.py \
             native_runtime/runtime_persistent_variables.py \
             native_runtime/runtime_vn_quality.py \
@@ -105,6 +106,8 @@ jobs:
             tests/test_native_runtime_choice_availability.py \
             tests/test_native_runtime_timed_choices.py \
             tests/test_timed_choice_contract.py \
+            tests/test_native_runtime_text_pacing.py \
+            tests/test_text_pacing_contract.py \
             tests/test_native_runtime_story_flow.py \
             tests/test_story_flow_contract.py \
             tests/test_native_runtime_achievements.py \
@@ -147,6 +150,7 @@ jobs:
             tests/test_frontend_beginner_tutorial_module.py \
             tests/test_frontend_choice_consequence_sheet_module.py \
             tests/test_frontend_timed_choice_editor_module.py \
+            tests/test_frontend_text_pacing_editor_module.py \
             tests/test_frontend_command_palette_module.py \
             tests/test_frontend_module_guard_module.py \
             tests/test_frontend_creative_assistant_module.py \
@@ -196,6 +200,7 @@ jobs:
             tests/test_frontend_route_testing_report_module.py \
             tests/test_frontend_runtime_conditions_module.py \
             tests/test_frontend_runtime_timed_choices_module.py \
+            tests/test_frontend_runtime_text_pacing_module.py \
             tests/test_frontend_runtime_controls_module.py \
             tests/test_frontend_runtime_gamepad_module.py \
             tests/test_frontend_runtime_audio_module.py \
@@ -279,6 +284,7 @@ jobs:
           node --check prototype_editor/modules/choice_consequence_sheet.js
           node --check prototype_editor/modules/choice_availability_editor.js
           node --check prototype_editor/modules/timed_choice_editor.js
+          node --check prototype_editor/modules/text_pacing_editor.js
           node --check prototype_editor/modules/command_palette.js
           node --check prototype_editor/modules/module_guard.js
           node --check prototype_editor/modules/dashboard_primary_actions.js
@@ -383,6 +389,7 @@ jobs:
           node --check export_player_template/runtime_timed_choices.js
           node --check export_player_template/runtime_stage_images.js
           node --check export_player_template/runtime_text_effects.js
+          node --check export_player_template/runtime_text_pacing.js
           node --check export_player_template/runtime_text_variables.js
 
       - name: Release tooling tests
@@ -407,6 +414,8 @@ jobs:
           python -m unittest discover -s tests -p 'test_native_runtime_choice_availability.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_timed_choices.py' -v
           python -m unittest discover -s tests -p 'test_timed_choice_contract.py' -v
+          python -m unittest discover -s tests -p 'test_native_runtime_text_pacing.py' -v
+          python -m unittest discover -s tests -p 'test_text_pacing_contract.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_story_flow.py' -v
           python -m unittest discover -s tests -p 'test_story_flow_contract.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_achievements.py' -v
@@ -508,6 +517,8 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_choice_availability_editor_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_timed_choices_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_timed_choice_editor_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_runtime_text_pacing_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_text_pacing_editor_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_audio_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_data_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_storage_module.py' -v

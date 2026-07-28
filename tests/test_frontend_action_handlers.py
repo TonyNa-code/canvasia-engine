@@ -27,12 +27,14 @@ RUNTIME_STORAGE_PATH = ROOT_DIR / "export_player_template" / "runtime_storage.js
 RUNTIME_PERSISTENT_VARIABLES_PATH = ROOT_DIR / "export_player_template" / "runtime_persistent_variables.js"
 RUNTIME_I18N_PATH = ROOT_DIR / "export_player_template" / "runtime_i18n.js"
 RUNTIME_TEXT_EFFECTS_PATH = ROOT_DIR / "export_player_template" / "runtime_text_effects.js"
+RUNTIME_TEXT_PACING_PATH = ROOT_DIR / "export_player_template" / "runtime_text_pacing.js"
 NATIVE_RUNTIME_PATH = ROOT_DIR / "native_runtime" / "runtime_player.py"
 NATIVE_RUNTIME_CHOICE_AVAILABILITY_PATH = ROOT_DIR / "native_runtime" / "runtime_choice_availability.py"
 NATIVE_RUNTIME_I18N_PATH = ROOT_DIR / "native_runtime" / "runtime_i18n.py"
 NATIVE_RUNTIME_SETTINGS_PATH = ROOT_DIR / "native_runtime" / "runtime_player_settings.py"
 NATIVE_RUNTIME_VIEW_PATH = ROOT_DIR / "native_runtime" / "runtime_player_view.py"
 NATIVE_RUNTIME_TEXT_EFFECTS_PATH = ROOT_DIR / "native_runtime" / "runtime_text_effects.py"
+NATIVE_RUNTIME_TEXT_PACING_PATH = ROOT_DIR / "native_runtime" / "runtime_text_pacing.py"
 PROJECT_POLISH_RECEIPT_PANEL_PATH = EDITOR_DIR / "modules" / "project_polish_receipt_panel.js"
 DASHBOARD_PRIMARY_ACTIONS_PATH = EDITOR_DIR / "modules" / "dashboard_primary_actions.js"
 STORY_BLOCK_ACTIONS_PATH = EDITOR_DIR / "modules" / "story_block_actions.js"
@@ -6235,6 +6237,24 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn('"textSpeed": block.get("textSpeed")', native_source)
         self.assertIn("self.get_current_line_text_speed() == \"instant\"", native_source)
         self.assertIn("self.current_line_next_reveal_at_ms", native_source)
+
+    def test_inline_text_pacing_mutates_before_autosave_and_reaches_all_runtimes(self) -> None:
+        app_source = APP_PATH.read_text(encoding="utf-8")
+        player_source = PLAYER_PATH.read_text(encoding="utf-8")
+        runtime_pacing_source = RUNTIME_TEXT_PACING_PATH.read_text(encoding="utf-8")
+        native_source = NATIVE_RUNTIME_PATH.read_text(encoding="utf-8")
+        native_pacing_source = NATIVE_RUNTIME_TEXT_PACING_PATH.read_text(encoding="utf-8")
+        should_flush = _extract_function_source(app_source, "shouldFlushPendingStoryChanges")
+        click_handler = _extract_function_source(app_source, "handleClick")
+
+        self.assertIn('"insert-text-pacing"', should_flush)
+        self.assertIn('action === "insert-text-pacing"', click_handler)
+        self.assertIn("parseRuntimeTextPacing(sourceText)", app_source)
+        self.assertIn('from "./runtime_text_pacing.js"', player_source)
+        self.assertIn("parseRuntimeTextPacing(sourceText)", player_source)
+        self.assertIn("export function parseRuntimeTextPacing", runtime_pacing_source)
+        self.assertIn("runtime_text_pacing import", native_source)
+        self.assertIn("def parse_runtime_text_pacing", native_pacing_source)
 
     def test_web_runtime_exposes_explicit_history_step_controls(self) -> None:
         player_html = (ROOT_DIR / "export_player_template" / "index.html").read_text(encoding="utf-8")

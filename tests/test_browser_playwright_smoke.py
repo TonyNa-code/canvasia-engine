@@ -264,6 +264,15 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
     def setUp(self) -> None:
         self.context = self.browser.new_context(viewport={"width": 1600, "height": 1000}, accept_downloads=True)
         self.page = self.context.new_page()
+        self.page_errors: list[str] = []
+        self.console_errors: list[str] = []
+        self.page.on("pageerror", lambda error: self.page_errors.append(str(error)))
+        self.page.on(
+            "console",
+            lambda message: self.console_errors.append(message.text)
+            if message.type == "error"
+            else None,
+        )
 
     def tearDown(self) -> None:
         self.context.close()
@@ -318,7 +327,16 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
 
     def create_first_chapter(self) -> None:
         self.page.get_by_role("button", name="一键创建第一章").first.click()
-        self.page.locator("#screen-story").get_by_role("button", name="加台词").first.wait_for(timeout=15000)
+        try:
+            self.page.locator("#screen-story").get_by_role("button", name="加台词").first.wait_for(timeout=15000)
+        except Exception as error:
+            diagnostics = [
+                f"url={self.page.url}",
+                f"page_errors={self.page_errors[-5:]}",
+                f"console_errors={self.console_errors[-5:]}",
+                f"body={self.page.locator('body').inner_text()[-2000:]}",
+            ]
+            raise AssertionError("创建第一章后剧情编辑器未就绪：\n" + "\n".join(diagnostics)) from error
 
     def preview_navigation_button(self):
         return self.page.locator(
@@ -674,6 +692,79 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
         )
 
         self.assertGreater(block_cards.count(), initial_count)
+
+    def test_story_editor_inline_pacing_persists_and_stays_hidden_in_preview(self) -> None:
+        self.create_blank_project("浏览器烟测项目_TextPacing")
+        self.create_first_chapter()
+        self.page.locator("#screen-story").get_by_role("button", name="加台词").first.click()
+
+        textarea = self.page.locator("#editorDialogueText")
+        textarea.wait_for(timeout=15000)
+        textarea.fill("她说，然后慢慢停下。")
+        textarea.evaluate("(element) => element.setSelectionRange(3, 3)")
+        pacing_editor = self.page.locator(
+            '[data-text-pacing-editor][data-textarea-id="editorDialogueText"]'
+        )
+        pacing_editor.get_by_role("button", name="稍停一下").click()
+        self.assertIn(
+            "[[pause=0.35]]",
+            textarea.input_value(),
+            (
+                f"save_status={self.page.locator('#saveStatusBadge').inner_text()} "
+                f"page_errors={self.page_errors[-5:]} console_errors={self.console_errors[-5:]}"
+            ),
+        )
+
+        textarea.evaluate(
+            """(element) => {
+                const start = element.value.indexOf('慢慢');
+                element.setSelectionRange(start, start + 2);
+            }"""
+        )
+        pacing_editor.get_by_role("button", name="这段慢慢说").click()
+        edited_text = textarea.input_value()
+        self.assertIn("[[speed=slow]]", edited_text)
+        self.assertIn("[[speed=inherit]]", edited_text)
+        self.page.get_by_role("button", name="保存这张卡片").click()
+
+        self.page.wait_for_function(
+            """async () => {
+                const response = await fetch('/api/project-data');
+                const bundle = await response.json();
+                return (bundle.chapters || []).some((chapter) =>
+                    (chapter.scenes || []).some((scene) =>
+                        (scene.blocks || []).some((block) =>
+                            block.type === 'dialogue'
+                            && String(block.text || '').includes('[[pause=0.35]]')
+                            && String(block.text || '').includes('[[speed=slow]]')
+                        )
+                    )
+                );
+            }""",
+            timeout=15000,
+        )
+
+        self.preview_navigation_button().click()
+        self.page.locator("#previewStage").wait_for(state="visible", timeout=15000)
+        for _ in range(16):
+            preview_text = self.page.locator("#previewStage .dialog-text").text_content() or ""
+            if "她说" in preview_text and "停下" in preview_text:
+                break
+            visible_choice = self.page.locator("#previewChoices button:visible").first
+            if visible_choice.count():
+                visible_choice.click()
+            else:
+                next_button = self.page.locator("#previewNextButton")
+                if next_button.is_disabled():
+                    break
+                next_button.click()
+            self.page.wait_for_timeout(180)
+
+        preview_text = self.page.locator("#previewStage .dialog-text").text_content() or ""
+        self.assertIn("她说", preview_text)
+        self.assertIn("停下", preview_text)
+        self.assertNotIn("[[", preview_text)
+        self.assertNotIn("[[", self.page.locator("#previewLog").inner_text())
 
     def test_story_editor_custom_achievement_persists_and_reaches_preview(self) -> None:
         self.create_blank_project("浏览器烟测项目_Achievement")

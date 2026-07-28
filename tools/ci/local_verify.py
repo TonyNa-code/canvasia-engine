@@ -76,6 +76,7 @@ PYTHON_SYNTAX_FILES = [
     "native_runtime/runtime_key_bindings.py",
     "native_runtime/runtime_save_thumbnails.py",
     "native_runtime/runtime_text_effects.py",
+    "native_runtime/runtime_text_pacing.py",
     "native_runtime/runtime_text_input.py",
     "native_runtime/runtime_storage.py",
     "native_runtime/runtime_variables.py",
@@ -225,6 +226,7 @@ def build_node_check_steps() -> list[VerifyStep]:
             "export_player_template/runtime_timed_choices.js",
             "export_player_template/runtime_stage_images.js",
             "export_player_template/runtime_text_effects.js",
+            "export_player_template/runtime_text_pacing.js",
             "export_player_template/runtime_text_variables.js",
         ]
     )
@@ -284,6 +286,8 @@ def build_release_tooling_steps(python_executable: str) -> list[VerifyStep]:
         build_unittest_step("Native choice availability helpers", "test_native_runtime_choice_availability.py", "release-tests", python_executable),
         build_unittest_step("Native timed choice helpers", "test_native_runtime_timed_choices.py", "release-tests", python_executable),
         build_unittest_step("Timed choice cross-runtime contract", "test_timed_choice_contract.py", "release-tests", python_executable),
+        build_unittest_step("Native text pacing helpers", "test_native_runtime_text_pacing.py", "release-tests", python_executable),
+        build_unittest_step("Text pacing cross-runtime contract", "test_text_pacing_contract.py", "release-tests", python_executable),
         build_unittest_step("Native story flow helpers", "test_native_runtime_story_flow.py", "release-tests", python_executable),
         build_unittest_step("Story flow cross-runtime contract", "test_story_flow_contract.py", "release-tests", python_executable),
         build_unittest_step("Native achievement helpers", "test_native_runtime_achievements.py", "release-tests", python_executable),

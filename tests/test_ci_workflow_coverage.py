@@ -238,6 +238,25 @@ class CiWorkflowCoverageTests(unittest.TestCase):
             workflow,
         )
 
+    def test_text_pacing_contract_is_checked_in_ci(self) -> None:
+        workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("native_runtime/runtime_text_pacing.py", workflow)
+        self.assertIn("export_player_template/runtime_text_pacing.js", workflow)
+        self.assertIn("prototype_editor/modules/text_pacing_editor.js", workflow)
+        self.assertIn("tests/test_native_runtime_text_pacing.py", workflow)
+        self.assertIn("tests/test_text_pacing_contract.py", workflow)
+        self.assertIn("tests/test_frontend_runtime_text_pacing_module.py", workflow)
+        self.assertIn("tests/test_frontend_text_pacing_editor_module.py", workflow)
+        self.assertIn(
+            "python -m unittest discover -s tests -p 'test_native_runtime_text_pacing.py' -v",
+            workflow,
+        )
+        self.assertIn(
+            "python -m unittest discover -s tests -p 'test_text_pacing_contract.py' -v",
+            workflow,
+        )
+
     def test_editor_project_presentation_settings_are_checked_in_ci(self) -> None:
         workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
 

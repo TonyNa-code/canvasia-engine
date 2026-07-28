@@ -1120,12 +1120,39 @@
   }
 
   function renderRenpyText(block = {}, context = {}) {
-    const line = convertRuntimeTextVariables(getBlockText(block) || " ", context.variableMap ?? new Map());
-    const textSpeed = getEffectiveTextSpeed(block, context.runtimeSettings);
-    if (!textSpeed) {
-      return line;
-    }
-    return `{cps=${TEXT_SPEED_CPS[textSpeed]}}${line}{/cps}`;
+    const sourceLine = convertRuntimeTextVariables(getBlockText(block) || " ", context.variableMap ?? new Map());
+    const plan = global.CanvasiaRuntimeTextPacing.parseRuntimeTextPacing(sourceLine);
+    return renderRenpyTextPacing(plan, getEffectiveTextSpeed(block, context.runtimeSettings));
+  }
+
+  function renderRenpyTextPacing(plan = {}, baseSpeed = "") {
+    const plainText = String(plan.plainText ?? "");
+    const cues = Array.isArray(plan.cues) ? plan.cues : [];
+    let activeSpeed = Object.hasOwn(TEXT_SPEED_CPS, baseSpeed) ? baseSpeed : "";
+    const parts = [activeSpeed ? `{cps=${TEXT_SPEED_CPS[activeSpeed]}}` : ""];
+    let cursor = 0;
+
+    cues.forEach((cue) => {
+      const cueIndex = Math.max(cursor, Math.min(plainText.length, Number(cue.index) || 0));
+      parts.push(plainText.slice(cursor, cueIndex));
+      if (cue.type === "pause") {
+        const pauseSeconds = Math.round((Number(cue.pauseMs) || 0) / 10) / 100;
+        if (pauseSeconds > 0) parts.push(`{w=${pauseSeconds}}`);
+      } else if (cue.type === "speed") {
+        const requestedSpeed = cue.speed === "inherit" ? baseSpeed : cue.speed;
+        const targetSpeed = Object.hasOwn(TEXT_SPEED_CPS, requestedSpeed) ? requestedSpeed : "";
+        if (targetSpeed !== activeSpeed) {
+          if (activeSpeed) parts.push("{/cps}");
+          if (targetSpeed) parts.push(`{cps=${TEXT_SPEED_CPS[targetSpeed]}}`);
+          activeSpeed = targetSpeed;
+        }
+      }
+      cursor = cueIndex;
+    });
+
+    parts.push(plainText.slice(cursor));
+    if (activeSpeed) parts.push("{/cps}");
+    return parts.join("");
   }
 
   function getVoiceAssetId(block = {}) {
@@ -1904,6 +1931,7 @@
     buildRenpyDraftManifest,
     getRenpyExportContract,
     renderConditionRuleExpression,
+    renderRenpyTextPacing,
     renderBlock,
     sanitizeProjectRuntimeSettings,
   });

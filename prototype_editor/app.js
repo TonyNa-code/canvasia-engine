@@ -55,6 +55,7 @@ const runtimeStoryFlowTools = window.CanvasiaRuntimeStoryFlow;
 const runtimeAchievementTools = window.CanvasiaRuntimeAchievements;
 const choiceAvailabilityEditorTools = window.CanvasiaEditorChoiceAvailability;
 const timedChoiceEditorTools = window.CanvasiaEditorTimedChoice;
+const textPacingEditorTools = window.CanvasiaEditorTextPacing;
 const storyBlockActionTools = window.CanvasiaEditorStoryBlockActions;
 const storyBlockEditorTools = window.CanvasiaEditorStoryBlockEditors;
 const musicRangeScopeTools = window.CanvasiaEditorMusicRangeScope;
@@ -372,6 +373,14 @@ const {
 const typewriterTools = window.CanvasiaEditorTypewriter;
 const getNextTypewriterIndex = typewriterTools.getNextTypewriterIndex;
 const getTypewriterStepDelay = typewriterTools.getTypewriterStepDelay;
+const runtimeTextPacingTools = window.CanvasiaRuntimeTextPacing;
+const {
+  getInitialTextPacingIndex,
+  getNextTextPacingIndex,
+  getTextPacingStepDelay,
+  parseRuntimeTextPacing,
+  stripRuntimeTextPacing,
+} = runtimeTextPacingTools;
 
 const getSafePosition = visualEffectTools.getSafePosition;
 const getSafeTransition = visualEffectTools.getSafeTransition;
@@ -689,8 +698,10 @@ const state = {
   previewTyping: {
     timer: null,
     snapshotKey: null,
+    sourceText: "",
     fullText: "",
     visibleText: "",
+    pacingPlan: null,
     active: false,
   },
   previewPlayback: { ...PREVIEW_PLAYBACK_DEFAULTS },
@@ -4293,6 +4304,16 @@ async function handleClick(event) {
     return;
   }
 
+  if (action === "insert-text-pacing") {
+    const result = textPacingEditorTools.applyTextPacingAction(actionTarget, {
+      document,
+      runtimeTools: runtimeTextPacingTools,
+    });
+    setSaveStatus(result.label);
+    showToast(result.label, result.ok ? undefined : "error");
+    return;
+  }
+
   if (action === "apply-character-stage-preset") {
     applyCharacterStagePresetToEditor(actionTarget.dataset.characterStagePreset);
     return;
@@ -6155,7 +6176,10 @@ function getPreviewSaveSlotSummary(slot) {
   const sceneName = snapshot.sceneName ?? snapshot.sceneId ?? "未知场景";
   const stepLabel = snapshot.completed ? "路线已结束" : `第 ${Math.max(snapshot.blockIndex + 1, 0)} 步`;
   const speakerName = snapshot.visualState?.speakerName ? `${snapshot.visualState.speakerName}：` : "";
-  const dialogueText = truncateText(snapshot.visualState?.dialogueText ?? "这个节点没有正文。", 34);
+  const dialogueText = truncateText(
+    stripRuntimeTextPacing(snapshot.visualState?.dialogueText ?? "这个节点没有正文。"),
+    34
+  );
   return `${sceneName} · ${stepLabel} · ${speakerName}${dialogueText}`;
 }
 
@@ -6280,7 +6304,9 @@ function buildPreviewThumbnailDataUrl(snapshot) {
     .join("");
 
   const speaker = escapeHtml(snapshot.visualState?.speakerName ?? snapshot.sceneName ?? "Canvasia Engine");
-  const dialogue = escapeHtml(truncateText(snapshot.visualState?.dialogueText ?? "这个节点没有正文。", 34));
+  const dialogue = escapeHtml(
+    truncateText(stripRuntimeTextPacing(snapshot.visualState?.dialogueText ?? "这个节点没有正文。"), 34)
+  );
   const scene = escapeHtml(snapshot.visualState?.backgroundName ?? snapshot.sceneName ?? "未设置背景");
   const block = escapeHtml(snapshot.completed ? "路线结束" : getBlockLabel(snapshot.blockType));
   const svg = `
@@ -6363,7 +6389,10 @@ function renderPreviewSaveVisualSummary(slot) {
 
   const blockLabel = snapshot.completed ? "路线结束" : getBlockLabel(snapshot.blockType);
   const stageTitle = snapshot.visualState?.speakerName || snapshot.sceneName || "Canvasia Engine";
-  const stageText = truncateText(snapshot.visualState?.dialogueText ?? "这个节点没有正文。", 38);
+  const stageText = truncateText(
+    stripRuntimeTextPacing(snapshot.visualState?.dialogueText ?? "这个节点没有正文。"),
+    38
+  );
   const thumbnailUrl = slot?.thumbnailDataUrl || buildPreviewThumbnailDataUrl(snapshot);
 
   return `
@@ -8849,6 +8878,7 @@ function closeActiveEngineDialog(result = false) {
 function shouldFlushPendingStoryChanges(action) {
   return ![
     "save-block",
+    "insert-text-pacing",
     "apply-character-stage-preset",
     "adjust-character-stage",
     "apply-stage-image-preset",
@@ -18128,7 +18158,10 @@ function buildPreviewDialogueLayoutPresentation(snapshot, currentText = "") {
         block.type === "dialogue"
           ? state.data?.charactersById?.get(block.speakerId)?.displayName ?? block.speakerId
           : "旁白",
-      text: blockIndex === snapshot?.blockIndex ? currentText : block.text,
+      text:
+        blockIndex === snapshot?.blockIndex
+          ? currentText
+          : stripRuntimeTextPacing(block.text),
     }),
   });
 }
@@ -18534,7 +18567,7 @@ function shouldUsePreviewTypewriter(snapshot) {
     return false;
   }
 
-  return (snapshot.visualState?.dialogueText ?? "").trim().length > 0;
+  return stripRuntimeTextPacing(snapshot.visualState?.dialogueText ?? "").trim().length > 0;
 }
 
 function getPreviewSnapshotTextSpeed(snapshot) {
@@ -18553,8 +18586,10 @@ function stopPreviewTypewriter() {
   state.previewTyping = {
     timer: null,
     snapshotKey: null,
+    sourceText: "",
     fullText: "",
     visibleText: "",
+    pacingPlan: null,
     active: false,
   };
 }
@@ -18576,11 +18611,14 @@ function completePreviewTypewriter() {
 }
 
 function preparePreviewTypewriter(snapshot) {
+  const sourceText = snapshot?.visualState?.dialogueText ?? "";
+  const pacingPlan = parseRuntimeTextPacing(sourceText);
+  const plainText = pacingPlan.plainText;
   if (!snapshot || !shouldUsePreviewTypewriter(snapshot)) {
     stopPreviewTypewriter();
     markPreviewSnapshotAsRead(snapshot);
     return {
-      text: snapshot?.visualState?.dialogueText ?? "",
+      text: plainText,
       active: false,
     };
   }
@@ -18589,19 +18627,24 @@ function preparePreviewTypewriter(snapshot) {
     stopPreviewTypewriter();
     markPreviewSnapshotAsRead(snapshot);
     return {
-      text: snapshot.visualState?.dialogueText ?? "",
+      text: plainText,
       active: false,
     };
   }
 
   const snapshotKey = getPreviewSnapshotKey(snapshot);
-  const fullText = snapshot.visualState?.dialogueText ?? "";
+  const fullText = plainText;
 
-  if (state.previewTyping.snapshotKey !== snapshotKey || state.previewTyping.fullText !== fullText) {
+  if (state.previewTyping.snapshotKey !== snapshotKey || state.previewTyping.sourceText !== sourceText) {
     stopPreviewTypewriter();
     state.previewTyping.snapshotKey = snapshotKey;
+    state.previewTyping.sourceText = sourceText;
     state.previewTyping.fullText = fullText;
-    state.previewTyping.visibleText = fullText.slice(0, getNextTypewriterIndex(fullText, 0));
+    state.previewTyping.pacingPlan = pacingPlan;
+    state.previewTyping.visibleText = fullText.slice(
+      0,
+      getInitialTextPacingIndex(pacingPlan, getNextTypewriterIndex)
+    );
     state.previewTyping.active = state.previewTyping.visibleText.length < fullText.length;
 
     if (state.previewTyping.active) {
@@ -18625,9 +18668,10 @@ function schedulePreviewTypewriterTick(expectedKey) {
       return;
     }
 
-    const nextIndex = getNextTypewriterIndex(
-      state.previewTyping.fullText,
-      state.previewTyping.visibleText.length
+    const nextIndex = getNextTextPacingIndex(
+      state.previewTyping.pacingPlan,
+      state.previewTyping.visibleText.length,
+      getNextTypewriterIndex
     );
     state.previewTyping.visibleText = state.previewTyping.fullText.slice(0, nextIndex);
 
@@ -18645,10 +18689,13 @@ function schedulePreviewTypewriterTick(expectedKey) {
     }
 
     schedulePreviewTypewriterTick(expectedKey);
-  }, getTypewriterStepDelay(
+  }, getTextPacingStepDelay(
+    state.previewTyping.pacingPlan,
+    state.previewTyping.visibleText.length,
     getPreviewSnapshotTextSpeed(getCurrentPreviewSnapshot()),
     state.previewTyping.visibleText,
-    state.previewTyping.fullText
+    state.previewTyping.fullText,
+    getTypewriterStepDelay
   ));
 }
 
@@ -19598,7 +19645,7 @@ function getPreviewAutoAdvanceDelay(snapshot) {
   }
 
   if (snapshot.blockType === "dialogue" || snapshot.blockType === "narration") {
-    const text = snapshot.visualState?.dialogueText ?? "";
+    const text = stripRuntimeTextPacing(snapshot.visualState?.dialogueText ?? "");
     const multiplier = {
       slow: 92,
       normal: 72,
@@ -22499,7 +22546,9 @@ function renderStage(visualState, large, options = {}) {
     visualState.characterEmphasisEvent,
     visualComfortMode
   );
-  const dialogueText = options.dialogueTextOverride ?? visualState.dialogueText;
+  const dialogueText = stripRuntimeTextPacing(
+    options.dialogueTextOverride ?? visualState.dialogueText
+  );
   const dialogueLayoutPresentation = options.dialogueLayoutPresentation ?? {
     layout: "adv",
     entries: [],
@@ -23174,7 +23223,7 @@ function renderPreviewTimeline(session) {
   return session.timeline
     .map((snapshot, index) => {
       const summary = snapshot.completed
-        ? { title: snapshot.visualState.dialogueText, meta: "试玩结束" }
+        ? { title: stripRuntimeTextPacing(snapshot.visualState.dialogueText), meta: "试玩结束" }
         : getBlockSummary(snapshot.block, state.data.scenesById.get(snapshot.sceneId));
       const hasVoice = Boolean(getPreviewVoiceAssetId(snapshot));
       const routeDecision = getPreviewRouteDecisionSummary(snapshot);
@@ -33115,6 +33164,10 @@ function renderDialogueEditor(block) {
     getSafeExpressionId,
     renderExpressionOptions,
     renderReadableTextQualityTools,
+    renderTextPacingEditor: (textareaId, text) =>
+      textPacingEditorTools.renderTextPacingEditor(textareaId, text, {
+        runtimeTools: runtimeTextPacingTools,
+      }),
   });
 }
 
@@ -33146,6 +33199,10 @@ function renderNarrationEditor(block) {
     dialogueLayoutDescriptions: DIALOGUE_LAYOUT_DESCRIPTIONS,
     getSafeDialogueLayout,
     renderReadableTextQualityTools,
+    renderTextPacingEditor: (textareaId, text) =>
+      textPacingEditorTools.renderTextPacingEditor(textareaId, text, {
+        runtimeTools: runtimeTextPacingTools,
+      }),
   });
 }
 
@@ -43062,13 +43119,13 @@ function getBlockSummary(block, scene) {
     case "dialogue":
       return {
         title: `${state.data.charactersById.get(block.speakerId)?.displayName ?? block.speakerId}：${
-          block.text
+          stripRuntimeTextPacing(block.text)
         }`,
         meta: block.voiceAssetId ? "这句台词已绑定语音" : "这句台词暂时没有语音",
       };
     case "narration":
       return {
-        title: block.text,
+        title: stripRuntimeTextPacing(block.text),
         meta: block.voiceAssetId ? "这段旁白已绑定语音" : "这是旁白卡片，不会显示角色名",
       };
     case "character_show":

@@ -214,6 +214,7 @@ EXPORT_PLAYER_SCRIPT_FILES = (
     "runtime_preload.js",
     "runtime_scene_prefetch.js",
     "runtime_text_effects.js",
+    "runtime_text_pacing.js",
     "runtime_text_variables.js",
 )
 NATIVE_RUNTIME_TEMPLATE_DIR = ROOT_DIR / "native_runtime"
@@ -463,6 +464,7 @@ NATIVE_RUNTIME_TIMED_CHOICES_NAME = "runtime_timed_choices.py"
 NATIVE_RUNTIME_ROLLBACK_NAME = "runtime_rollback.py"
 NATIVE_RUNTIME_SAVE_THUMBNAILS_NAME = "runtime_save_thumbnails.py"
 NATIVE_RUNTIME_TEXT_EFFECTS_NAME = "runtime_text_effects.py"
+NATIVE_RUNTIME_TEXT_PACING_NAME = "runtime_text_pacing.py"
 NATIVE_RUNTIME_TEXT_INPUT_NAME = "runtime_text_input.py"
 NATIVE_RUNTIME_STORAGE_NAME = "runtime_storage.py"
 NATIVE_RUNTIME_VARIABLES_NAME = "runtime_variables.py"
@@ -545,6 +547,7 @@ NATIVE_RUNTIME_REQUIRED_MODULE_FILES = build_native_runtime_required_module_file
         NATIVE_RUNTIME_ROLLBACK_NAME,
         NATIVE_RUNTIME_SAVE_THUMBNAILS_NAME,
         NATIVE_RUNTIME_TEXT_EFFECTS_NAME,
+        NATIVE_RUNTIME_TEXT_PACING_NAME,
         NATIVE_RUNTIME_TEXT_INPUT_NAME,
         NATIVE_RUNTIME_STORAGE_NAME,
         NATIVE_RUNTIME_VARIABLES_NAME,
@@ -8766,6 +8769,8 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
         "runtimeTimedChoicesModulePath": str(build_dir / NATIVE_RUNTIME_TIMED_CHOICES_NAME),
         "runtimeTextEffectsModuleName": NATIVE_RUNTIME_TEXT_EFFECTS_NAME,
         "runtimeTextEffectsModulePath": str(build_dir / NATIVE_RUNTIME_TEXT_EFFECTS_NAME),
+        "runtimeTextPacingModuleName": NATIVE_RUNTIME_TEXT_PACING_NAME,
+        "runtimeTextPacingModulePath": str(build_dir / NATIVE_RUNTIME_TEXT_PACING_NAME),
         "runtimeStorageModuleName": NATIVE_RUNTIME_STORAGE_NAME,
         "runtimeStorageModulePath": str(build_dir / NATIVE_RUNTIME_STORAGE_NAME),
         "runtimeVariablesModuleName": NATIVE_RUNTIME_VARIABLES_NAME,
@@ -9286,6 +9291,7 @@ def export_native_runtime_build() -> dict:
             "runtimeChoiceAvailabilityModule": runtime_files["runtimeChoiceAvailabilityModuleName"],
             "runtimeTimedChoicesModule": runtime_files["runtimeTimedChoicesModuleName"],
             "runtimeTextEffectsModule": runtime_files["runtimeTextEffectsModuleName"],
+            "runtimeTextPacingModule": runtime_files["runtimeTextPacingModuleName"],
             "runtimeStorageModule": runtime_files["runtimeStorageModuleName"],
             "runtimeVariablesModule": runtime_files["runtimeVariablesModuleName"],
             "runtimePersistentVariablesModule": runtime_files["runtimePersistentVariablesModuleName"],
@@ -9370,6 +9376,7 @@ def export_native_runtime_build() -> dict:
             "runtimeChoiceAvailabilityModule": runtime_files["runtimeChoiceAvailabilityModuleName"],
             "runtimeTimedChoicesModule": runtime_files["runtimeTimedChoicesModuleName"],
             "runtimeTextEffectsModule": runtime_files["runtimeTextEffectsModuleName"],
+            "runtimeTextPacingModule": runtime_files["runtimeTextPacingModuleName"],
             "runtimeStorageModule": runtime_files["runtimeStorageModuleName"],
             "runtimeVariablesModule": runtime_files["runtimeVariablesModuleName"],
             "runtimePersistentVariablesModule": runtime_files["runtimePersistentVariablesModuleName"],
@@ -9604,6 +9611,7 @@ def export_native_runtime_build() -> dict:
         {"name": runtime_files["runtimeChoiceAvailabilityModuleName"], "description": "原生 Runtime 条件选项隐藏、锁定提示和死路安全保护模块。"},
         {"name": runtime_files["runtimeTimedChoicesModuleName"], "description": "原生 Runtime 限时选项、暂停恢复和超时安全分支模块。"},
         {"name": runtime_files["runtimeTextEffectsModuleName"], "description": "原生 Runtime 打字机和文本效果模块。"},
+        {"name": runtime_files["runtimeTextPacingModuleName"], "description": "原生 Runtime 句中停顿和局部语速模块。"},
         {"name": runtime_files["runtimeStorageModuleName"], "description": "原生 Runtime 存档、自动恢复和崩溃日志模块。"},
         {"name": runtime_files["runtimeVariablesModuleName"], "description": "原生 Runtime 变量和条件判断模块。"},
         {"name": runtime_files["runtimePersistentVariablesModuleName"], "description": "原生 Runtime 跨周目记忆合并、校验和持久化规则模块。"},
@@ -9899,6 +9907,9 @@ def export_native_runtime_build() -> dict:
         "runtimeTextEffectsModuleName": runtime_files["runtimeTextEffectsModuleName"],
         "runtimeTextEffectsModulePath": runtime_files["runtimeTextEffectsModulePath"],
         "runtimeTextEffectsModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimeTextEffectsModuleName']}",
+        "runtimeTextPacingModuleName": runtime_files["runtimeTextPacingModuleName"],
+        "runtimeTextPacingModulePath": runtime_files["runtimeTextPacingModulePath"],
+        "runtimeTextPacingModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimeTextPacingModuleName']}",
         "runtimeStorageModuleName": runtime_files["runtimeStorageModuleName"],
         "runtimeStorageModulePath": runtime_files["runtimeStorageModulePath"],
         "runtimeStorageModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimeStorageModuleName']}",
@@ -10116,6 +10127,7 @@ def export_web_build() -> dict:
             "playerRuntimeStoryFlow": "runtime_story_flow.js",
             "playerRuntimeAchievements": "runtime_achievements.js",
             "playerRuntimeTextEffects": "runtime_text_effects.js",
+            "playerRuntimeTextPacing": "runtime_text_pacing.js",
             "playerRuntimeTextVariables": "runtime_text_variables.js",
             "runtimePreloadManifest": RUNTIME_PRELOAD_MANIFEST_FILE_NAME,
             "runtimePreloadReport": RUNTIME_PRELOAD_REPORT_FILE_NAME,
@@ -11261,6 +11273,7 @@ def export_windows_nwjs_build() -> dict:
             "appRuntimeStoryFlow": "app/runtime_story_flow.js",
             "appRuntimeAchievements": "app/runtime_achievements.js",
             "appRuntimeTextEffects": "app/runtime_text_effects.js",
+            "appRuntimeTextPacing": "app/runtime_text_pacing.js",
             "appRuntimeTextVariables": "app/runtime_text_variables.js",
             "appRuntimePreloadManifest": f"app/{RUNTIME_PRELOAD_MANIFEST_FILE_NAME}",
             "appRuntimePreloadReport": f"app/{RUNTIME_PRELOAD_REPORT_FILE_NAME}",
@@ -11740,6 +11753,7 @@ def export_macos_nwjs_build() -> dict:
             "appRuntimeStoryFlow": "app/runtime_story_flow.js",
             "appRuntimeAchievements": "app/runtime_achievements.js",
             "appRuntimeTextEffects": "app/runtime_text_effects.js",
+            "appRuntimeTextPacing": "app/runtime_text_pacing.js",
             "appRuntimeTextVariables": "app/runtime_text_variables.js",
             "appRuntimePreloadManifest": f"app/{RUNTIME_PRELOAD_MANIFEST_FILE_NAME}",
             "appRuntimePreloadReport": f"app/{RUNTIME_PRELOAD_REPORT_FILE_NAME}",
@@ -12226,6 +12240,7 @@ def export_linux_nwjs_build() -> dict:
             "appRuntimeStoryFlow": "app/runtime_story_flow.js",
             "appRuntimeAchievements": "app/runtime_achievements.js",
             "appRuntimeTextEffects": "app/runtime_text_effects.js",
+            "appRuntimeTextPacing": "app/runtime_text_pacing.js",
             "appRuntimeTextVariables": "app/runtime_text_variables.js",
             "appRuntimePreloadManifest": f"app/{RUNTIME_PRELOAD_MANIFEST_FILE_NAME}",
             "appRuntimePreloadReport": f"app/{RUNTIME_PRELOAD_REPORT_FILE_NAME}",

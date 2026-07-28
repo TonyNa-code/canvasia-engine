@@ -44,6 +44,13 @@ import {
   getTypewriterStepDelay,
 } from "./runtime_text_effects.js";
 import {
+  getInitialTextPacingIndex,
+  getNextTextPacingIndex,
+  getTextPacingStepDelay,
+  parseRuntimeTextPacing,
+  stripRuntimeTextPacing,
+} from "./runtime_text_pacing.js";
+import {
   getSafeTextInputMaxLength,
   interpolateRuntimeText,
   normalizeTextInputBlock,
@@ -431,8 +438,10 @@ const state = {
   lastRenderedStepKey: null,
   typingTimer: null,
   typingSnapshotKey: null,
+  typingSourceText: "",
   typingFullText: "",
   typingVisibleText: "",
+  typingPacingPlan: null,
   typingActive: false,
   voiceAudio: null,
   currentVoiceStepKey: null,
@@ -849,7 +858,7 @@ function buildEndingScenePreview(scene) {
   (scene?.blocks ?? []).forEach((block) => {
     applyBlockToPreviewState(block, visualState, variables);
     if (block.type === "dialogue" || block.type === "narration") {
-      lastStoryText = getBlockText(block).trim();
+      lastStoryText = stripRuntimeTextPacing(getBlockText(block)).trim();
       lastStorySpeaker = visualState.speakerName ?? "";
     }
   });
@@ -4004,7 +4013,7 @@ function shouldUseRuntimeTypewriter(snapshot) {
     return false;
   }
 
-  return (snapshot.visualState?.dialogueText ?? "").trim().length > 0;
+  return stripRuntimeTextPacing(snapshot.visualState?.dialogueText ?? "").trim().length > 0;
 }
 
 function getSnapshotTextSpeed(snapshot) {
@@ -4022,8 +4031,10 @@ function stopRuntimeTypewriter() {
 
   state.typingTimer = null;
   state.typingSnapshotKey = null;
+  state.typingSourceText = "";
   state.typingFullText = "";
   state.typingVisibleText = "";
+  state.typingPacingPlan = null;
   state.typingActive = false;
 }
 
@@ -4044,10 +4055,13 @@ function completeRuntimeTypewriter() {
 }
 
 function syncRuntimeDialoguePresentation(snapshot) {
+  const sourceText = snapshot?.visualState?.dialogueText ?? "";
+  const pacingPlan = parseRuntimeTextPacing(sourceText);
+  const plainText = pacingPlan.plainText;
   if (!snapshot || !shouldUseRuntimeTypewriter(snapshot)) {
     stopRuntimeTypewriter();
     markSnapshotAsRead(snapshot);
-    refs.messageText.textContent = snapshot?.visualState?.dialogueText ?? "";
+    refs.messageText.textContent = plainText;
     refs.messageText.classList.remove("is-typing");
     refs.choiceList.innerHTML = snapshot ? renderChoiceButtons(snapshot) : "";
     return;
@@ -4056,20 +4070,25 @@ function syncRuntimeDialoguePresentation(snapshot) {
   if (state.playback.skipRead && isSnapshotRead(snapshot)) {
     stopRuntimeTypewriter();
     markSnapshotAsRead(snapshot);
-    refs.messageText.textContent = snapshot.visualState?.dialogueText ?? "";
+    refs.messageText.textContent = plainText;
     refs.messageText.classList.remove("is-typing");
     refs.choiceList.innerHTML = renderChoiceButtons(snapshot);
     return;
   }
 
   const snapshotKey = getRuntimeSnapshotKey(snapshot);
-  const fullText = snapshot.visualState?.dialogueText ?? "";
+  const fullText = plainText;
 
-  if (state.typingSnapshotKey !== snapshotKey) {
+  if (state.typingSnapshotKey !== snapshotKey || state.typingSourceText !== sourceText) {
     stopRuntimeTypewriter();
     state.typingSnapshotKey = snapshotKey;
+    state.typingSourceText = sourceText;
     state.typingFullText = fullText;
-    state.typingVisibleText = fullText.slice(0, getNextTypewriterIndex(fullText, 0));
+    state.typingPacingPlan = pacingPlan;
+    state.typingVisibleText = fullText.slice(
+      0,
+      getInitialTextPacingIndex(pacingPlan, getNextTypewriterIndex)
+    );
     state.typingActive = state.typingVisibleText.length < fullText.length;
 
     if (state.typingActive) {
@@ -4099,7 +4118,7 @@ function buildRuntimeDialogueLayoutPresentation(snapshot) {
       text:
         blockIndex === snapshot?.blockIndex && state.typingActive
           ? state.typingVisibleText
-          : getBlockText(block),
+          : stripRuntimeTextPacing(getBlockText(block)),
     }),
   });
 }
@@ -4156,7 +4175,11 @@ function scheduleRuntimeTypewriterTick(expectedKey) {
       return;
     }
 
-    const nextIndex = getNextTypewriterIndex(state.typingFullText, state.typingVisibleText.length);
+    const nextIndex = getNextTextPacingIndex(
+      state.typingPacingPlan,
+      state.typingVisibleText.length,
+      getNextTypewriterIndex
+    );
     state.typingVisibleText = state.typingFullText.slice(0, nextIndex);
     refs.messageText.textContent = state.typingVisibleText;
     refs.messageText.classList.toggle("is-typing", nextIndex < state.typingFullText.length);
@@ -4170,10 +4193,13 @@ function scheduleRuntimeTypewriterTick(expectedKey) {
     }
 
     scheduleRuntimeTypewriterTick(expectedKey);
-  }, getTypewriterStepDelay(
+  }, getTextPacingStepDelay(
+    state.typingPacingPlan,
+    state.typingVisibleText.length,
     getSnapshotTextSpeed(getCurrentSnapshot()),
     state.typingVisibleText,
-    state.typingFullText
+    state.typingFullText,
+    getTypewriterStepDelay
   ));
 }
 
@@ -5391,7 +5417,7 @@ function getAutoAdvanceDelay(snapshot) {
   }
 
   if (snapshot.blockType === "dialogue" || snapshot.blockType === "narration") {
-    const text = snapshot.visualState?.dialogueText ?? "";
+    const text = stripRuntimeTextPacing(snapshot.visualState?.dialogueText ?? "");
     const multiplier = {
       slow: 92,
       normal: 72,
@@ -6574,7 +6600,10 @@ function getSaveSlotSummary(slot) {
   const sceneName = snapshot.sceneName ?? snapshot.sceneId ?? "未知场景";
   const stepLabel = snapshot.completed ? "路线已结束" : `第 ${Math.max(snapshot.blockIndex + 1, 0)} 步`;
   const speakerName = snapshot.visualState?.speakerName ? `${snapshot.visualState.speakerName}：` : "";
-  const dialogueText = truncateText(snapshot.visualState?.dialogueText ?? "这个节点没有正文。", 34);
+  const dialogueText = truncateText(
+    stripRuntimeTextPacing(snapshot.visualState?.dialogueText ?? "这个节点没有正文。"),
+    34
+  );
   return `${sceneName} · ${stepLabel} · ${speakerName}${dialogueText}`;
 }
 
@@ -6669,7 +6698,9 @@ function buildSaveThumbnailDataUrl(snapshot) {
     .join("");
 
   const speaker = escapeHtml(snapshot.visualState?.speakerName ?? snapshot.sceneName ?? "Canvasia Engine");
-  const dialogue = escapeHtml(truncateText(snapshot.visualState?.dialogueText ?? "这个节点没有正文。", 34));
+  const dialogue = escapeHtml(
+    truncateText(stripRuntimeTextPacing(snapshot.visualState?.dialogueText ?? "这个节点没有正文。"), 34)
+  );
   const scene = escapeHtml(snapshot.visualState?.backgroundName ?? snapshot.sceneName ?? "未设置背景");
   const block = escapeHtml(snapshot.completed ? "路线结束" : getBlockLabel(snapshot.blockType));
   const svg = `
@@ -6763,7 +6794,10 @@ function renderSaveVisualSummary(slot) {
 
   const blockLabel = snapshot.completed ? "路线结束" : getBlockLabel(snapshot.blockType);
   const stageTitle = snapshot.visualState?.speakerName || snapshot.sceneName || "Canvasia Engine";
-  const stageText = truncateText(snapshot.visualState?.dialogueText ?? "这个节点没有正文。", 38);
+  const stageText = truncateText(
+    stripRuntimeTextPacing(snapshot.visualState?.dialogueText ?? "这个节点没有正文。"),
+    38
+  );
   const thumbnailUrl = slot?.thumbnailDataUrl || buildSaveThumbnailDataUrl(snapshot);
 
   return `
@@ -8538,7 +8572,7 @@ function renderHistory(session) {
         <article class="history-row ${absoluteIndex === session.position ? "is-selected" : ""}">
           <button class="history-main-button" type="button" data-history-index="${absoluteIndex}">
             <strong>${number}. ${escapeHtml(title)}</strong>
-            <p>${escapeHtml(snapshot.visualState.dialogueText ?? "")}</p>
+            <p>${escapeHtml(stripRuntimeTextPacing(snapshot.visualState.dialogueText ?? ""))}</p>
             <div class="meta">${escapeHtml(snapshot.visualState.speakerName ?? "系统")}</div>
           </button>
           <div class="history-actions">

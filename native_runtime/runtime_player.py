@@ -244,6 +244,21 @@ except ImportError:  # pragma: no cover - exported native packages import from t
     )
 
 try:
+    from .runtime_text_pacing import (
+        get_initial_text_pacing_index,
+        get_native_text_pacing_step_delay_ms,
+        get_next_text_pacing_index,
+        parse_runtime_text_pacing,
+    )
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_text_pacing import (
+        get_initial_text_pacing_index,
+        get_native_text_pacing_step_delay_ms,
+        get_next_text_pacing_index,
+        parse_runtime_text_pacing,
+    )
+
+try:
     from .runtime_text_input import (
         collect_runtime_text_variable_ids,
         interpolate_runtime_text,
@@ -8293,6 +8308,7 @@ class NativeRuntimePlayer:
         self.current_line_started_at_ms = 0
         self.current_line_next_reveal_at_ms = 0
         self.current_line_full_text = ""
+        self.current_line_text_pacing: dict = parse_runtime_text_pacing("")
         self.current_line_revealed_chars = 0
         self.runtime_elapsed_seconds = 0.0
         self.scene3d_preview_yaw = float(DEFAULT_SCENE3D_PREVIEW["yaw"])
@@ -9331,15 +9347,40 @@ class NativeRuntimePlayer:
         if safe_scene_id not in before_unlocked:
             self.status_message = "结局已回收。"
 
-    def start_current_line_display(self, text: str) -> None:
-        self.current_line_full_text = str(text or "")
-        self.current_line_revealed_chars = 0
+    def start_current_line_display(self, text: str, pacing_plan: dict | None = None) -> None:
+        source_text = str(text or "")
+        line_plan = (self.current_line or {}).get("textPacing")
+        if pacing_plan is None and isinstance(line_plan, dict) and line_plan.get("plainText") == source_text:
+            pacing_plan = line_plan
+        self.current_line_text_pacing = (
+            pacing_plan
+            if isinstance(pacing_plan, dict)
+            else {
+                "sourceText": source_text,
+                "plainText": source_text,
+                "cues": [],
+                "hasCues": False,
+            }
+        )
+        self.current_line_full_text = str(self.current_line_text_pacing.get("plainText") or "")
+        self.current_line_revealed_chars = get_initial_text_pacing_index(
+            self.current_line_text_pacing,
+            get_next_typewriter_index,
+        )
         self.current_line_started_at_ms = self.pygame.time.get_ticks()
         self.current_line_next_reveal_at_ms = self.current_line_started_at_ms
         self.auto_play_deadline_ms = 0
         self.skip_deadline_ms = 0
         if self.get_current_line_text_speed() == "instant":
             self.reveal_current_line_immediately()
+        elif not self.is_current_line_fully_visible():
+            self.current_line_next_reveal_at_ms += get_native_text_pacing_step_delay_ms(
+                self.current_line_text_pacing,
+                self.current_line_revealed_chars,
+                self.get_current_line_text_speed(),
+                self.current_line_full_text[: self.current_line_revealed_chars],
+                self.current_line_full_text,
+            )
 
     def reveal_current_line_immediately(self) -> None:
         self.current_line_revealed_chars = len(self.current_line_full_text)
@@ -9351,8 +9392,8 @@ class NativeRuntimePlayer:
     def update_current_line_reveal(self) -> None:
         if not self.current_line or self.is_current_line_fully_visible():
             return
-        speed = self.get_current_line_text_speed()
-        if speed == "instant":
+        fallback_speed = self.get_current_line_text_speed()
+        if fallback_speed == "instant":
             self.reveal_current_line_immediately()
             return
 
@@ -9361,7 +9402,11 @@ class NativeRuntimePlayer:
             self.current_line_next_reveal_at_ms = now_ms
 
         while not self.is_current_line_fully_visible() and now_ms >= self.current_line_next_reveal_at_ms:
-            next_index = get_next_typewriter_index(self.current_line_full_text, self.current_line_revealed_chars)
+            next_index = get_next_text_pacing_index(
+                self.current_line_text_pacing,
+                self.current_line_revealed_chars,
+                get_next_typewriter_index,
+            )
             if next_index <= self.current_line_revealed_chars:
                 self.reveal_current_line_immediately()
                 return
@@ -9370,8 +9415,10 @@ class NativeRuntimePlayer:
                 self.current_line_next_reveal_at_ms = 0
                 return
             visible_text = self.current_line_full_text[: self.current_line_revealed_chars]
-            self.current_line_next_reveal_at_ms += get_native_typewriter_step_delay_ms(
-                speed,
+            self.current_line_next_reveal_at_ms += get_native_text_pacing_step_delay_ms(
+                self.current_line_text_pacing,
+                self.current_line_revealed_chars,
+                fallback_speed,
                 visible_text,
                 self.current_line_full_text,
             )
@@ -10611,6 +10658,21 @@ class NativeRuntimePlayer:
     def get_current_scene_name(self) -> str:
         return self.localize_value(self.get_current_scene(), "name", self.current_scene_id or "未命名场景")
 
+    def build_current_story_line(self, block: dict, block_type: str) -> dict:
+        pacing_plan = parse_runtime_text_pacing(self.localize_runtime_text(block, "text"))
+        return {
+            "type": block_type,
+            "speakerId": block.get("speakerId"),
+            "text": pacing_plan["plainText"],
+            "textPacing": pacing_plan,
+            "textSpeed": block.get("textSpeed"),
+            "dialogueLayout": get_safe_dialogue_layout(block.get("dialogueLayout")),
+            "nvlPageBreak": block.get("nvlPageBreak") is True,
+            "voiceAssetId": block.get("voiceAssetId"),
+            "voiceVolume": block.get("voiceVolume"),
+            "blockLabel": get_block_label(block_type),
+        }
+
     def refresh_current_localized_pause(self) -> None:
         scene = self.get_current_scene()
         blocks = (scene or {}).get("blocks", []) or []
@@ -10621,19 +10683,8 @@ class NativeRuntimePlayer:
         if block_type not in {"dialogue", "narration"}:
             return
         was_fully_visible = self.is_current_line_fully_visible()
-        line_text = self.localize_runtime_text(block, "text")
-        self.current_line = {
-            "type": block_type,
-            "speakerId": block.get("speakerId"),
-            "text": line_text,
-            "textSpeed": block.get("textSpeed"),
-            "dialogueLayout": get_safe_dialogue_layout(block.get("dialogueLayout")),
-            "nvlPageBreak": block.get("nvlPageBreak") is True,
-            "voiceAssetId": block.get("voiceAssetId"),
-            "voiceVolume": block.get("voiceVolume"),
-            "blockLabel": get_block_label(block_type),
-        }
-        self.start_current_line_display(line_text)
+        self.current_line = self.build_current_story_line(block, block_type)
+        self.start_current_line_display(self.current_line["text"], self.current_line["textPacing"])
         if was_fully_visible:
             self.reveal_current_line_immediately()
 
@@ -11297,21 +11348,10 @@ class NativeRuntimePlayer:
             self.open_runtime_text_input(block, scene)
             return
         if block_type in {"dialogue", "narration"}:
-            line_text = self.localize_runtime_text(block, "text")
-            self.current_line = {
-                "type": block_type,
-                "speakerId": block.get("speakerId"),
-                "text": line_text,
-                "textSpeed": block.get("textSpeed"),
-                "dialogueLayout": get_safe_dialogue_layout(block.get("dialogueLayout")),
-                "nvlPageBreak": block.get("nvlPageBreak") is True,
-                "voiceAssetId": block.get("voiceAssetId"),
-                "voiceVolume": block.get("voiceVolume"),
-                "blockLabel": get_block_label(block_type),
-            }
+            self.current_line = self.build_current_story_line(block, block_type)
             self.sync_archive_progress_for_pause(scene, block, self.current_block_index)
             self.record_text_history(self.current_line, scene, self.current_block_index)
-            self.start_current_line_display(line_text)
+            self.start_current_line_display(self.current_line["text"], self.current_line["textPacing"])
             if block_type == "dialogue":
                 self.sync_expression_for_dialogue(block)
             if block.get("voiceAssetId"):
@@ -11605,21 +11645,10 @@ class NativeRuntimePlayer:
                 return
 
             if block_type in {"dialogue", "narration"}:
-                line_text = self.localize_runtime_text(block, "text")
-                self.current_line = {
-                    "type": block_type,
-                    "speakerId": block.get("speakerId"),
-                    "text": line_text,
-                    "textSpeed": block.get("textSpeed"),
-                    "dialogueLayout": get_safe_dialogue_layout(block.get("dialogueLayout")),
-                    "nvlPageBreak": block.get("nvlPageBreak") is True,
-                    "voiceAssetId": block.get("voiceAssetId"),
-                    "voiceVolume": block.get("voiceVolume"),
-                    "blockLabel": get_block_label(block_type),
-                }
+                self.current_line = self.build_current_story_line(block, block_type)
                 self.sync_archive_progress_for_pause(scene, block, self.current_block_index)
                 self.record_text_history(self.current_line, scene, self.current_block_index)
-                self.start_current_line_display(line_text)
+                self.start_current_line_display(self.current_line["text"], self.current_line["textPacing"])
                 if block_type == "dialogue":
                     self.sync_expression_for_dialogue(block)
                 if block.get("voiceAssetId"):

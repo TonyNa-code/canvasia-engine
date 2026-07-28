@@ -3335,6 +3335,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / "runtime_speaker_focus.js").is_file())
         self.assertTrue((build_dir / "runtime_dialogue_camera.js").is_file())
         self.assertTrue((build_dir / "runtime_text_effects.js").is_file())
+        self.assertTrue((build_dir / "runtime_text_pacing.js").is_file())
         self.assertTrue((build_dir / "runtime_text_variables.js").is_file())
         self.assertTrue((build_dir / run_editor.RUNTIME_PRELOAD_MANIFEST_FILE_NAME).is_file())
         self.assertTrue((build_dir / run_editor.RUNTIME_PRELOAD_REPORT_FILE_NAME).is_file())
@@ -3449,6 +3450,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["playerRuntimeSpeakerFocus"], "runtime_speaker_focus.js")
         self.assertEqual(manifest["files"]["playerRuntimeDialogueCamera"], "runtime_dialogue_camera.js")
         self.assertEqual(manifest["files"]["playerRuntimeTextEffects"], "runtime_text_effects.js")
+        self.assertEqual(manifest["files"]["playerRuntimeTextPacing"], "runtime_text_pacing.js")
         self.assertEqual(manifest["files"]["playerRuntimeTextVariables"], "runtime_text_variables.js")
         self.assertEqual(manifest["files"]["runtimePreloadManifest"], run_editor.RUNTIME_PRELOAD_MANIFEST_FILE_NAME)
         self.assertEqual(manifest["files"]["runtimePreloadReport"], run_editor.RUNTIME_PRELOAD_REPORT_FILE_NAME)
@@ -3540,6 +3542,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 "runtime_speaker_focus.js",
                 "runtime_dialogue_camera.js",
                 "runtime_text_effects.js",
+                "runtime_text_pacing.js",
                 "runtime_text_variables.js",
                 run_editor.RUNTIME_PRELOAD_MANIFEST_FILE_NAME,
                 run_editor.RUNTIME_PRELOAD_REPORT_FILE_NAME,
@@ -3826,6 +3829,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_ROLLBACK_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_SAVE_THUMBNAILS_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_TEXT_EFFECTS_NAME).is_file())
+        self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_TEXT_PACING_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_STORAGE_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_VARIABLES_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_PERSISTENT_VARIABLES_NAME).is_file())
@@ -4130,6 +4134,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["runtimeVoiceMixerModule"], run_editor.NATIVE_RUNTIME_VOICE_MIXER_NAME)
         self.assertEqual(manifest["files"]["runtimeViewModule"], run_editor.NATIVE_RUNTIME_VIEW_NAME)
         self.assertEqual(manifest["files"]["runtimeTextEffectsModule"], run_editor.NATIVE_RUNTIME_TEXT_EFFECTS_NAME)
+        self.assertEqual(manifest["files"]["runtimeTextPacingModule"], run_editor.NATIVE_RUNTIME_TEXT_PACING_NAME)
         self.assertEqual(manifest["files"]["runtimeStorageModule"], run_editor.NATIVE_RUNTIME_STORAGE_NAME)
         self.assertEqual(manifest["files"]["runtimeVariablesModule"], run_editor.NATIVE_RUNTIME_VARIABLES_NAME)
         self.assertEqual(
@@ -4170,6 +4175,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 run_editor.NATIVE_RUNTIME_SETTINGS_NAME,
                 run_editor.NATIVE_RUNTIME_VOICE_MIXER_NAME,
                 run_editor.NATIVE_RUNTIME_TEXT_EFFECTS_NAME,
+                run_editor.NATIVE_RUNTIME_TEXT_PACING_NAME,
                 run_editor.NATIVE_RUNTIME_STORAGE_NAME,
                 run_editor.NATIVE_RUNTIME_VARIABLES_NAME,
                 run_editor.NATIVE_RUNTIME_PERSISTENT_VARIABLES_NAME,
@@ -4808,16 +4814,30 @@ class RunEditorSmokeTests(unittest.TestCase):
             any(entry["source"] == run_editor.NATIVE_RUNTIME_BRAND_LOGO_NAME for entry in app_builder_payload["dataEntries"])
         )
 
-        title_screen_description = subprocess.run(
-            [
-                sys.executable,
-                str(build_dir / run_editor.NATIVE_RUNTIME_PLAYER_NAME),
-                "--describe-title-screen",
-                str(build_dir),
-            ],
-            capture_output=True,
-            text=True,
-            check=False,
+        native_runtime_home = self.test_root / "native-runtime-home"
+        native_runtime_home.mkdir(parents=True, exist_ok=True)
+        native_runtime_env = os.environ.copy()
+        native_runtime_env.update({
+            "HOME": str(native_runtime_home),
+            "USERPROFILE": str(native_runtime_home),
+        })
+
+        def run_native_runtime_command(*arguments: str) -> subprocess.CompletedProcess[str]:
+            return subprocess.run(
+                [
+                    sys.executable,
+                    str(build_dir / run_editor.NATIVE_RUNTIME_PLAYER_NAME),
+                    *arguments,
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+                env=native_runtime_env,
+            )
+
+        title_screen_description = run_native_runtime_command(
+            "--describe-title-screen",
+            str(build_dir),
         )
         self.assertEqual(title_screen_description.returncode, 0, title_screen_description.stdout + title_screen_description.stderr)
         title_screen_payload = json.loads(title_screen_description.stdout)
@@ -4826,109 +4846,53 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertIn("start", {item["key"] for item in title_screen_payload["menuItems"]})
         self.assertIn("settings", {item["key"] for item in title_screen_payload["menuItems"]})
 
-        validation = subprocess.run(
-            [
-                sys.executable,
-                str(build_dir / run_editor.NATIVE_RUNTIME_PLAYER_NAME),
-                "--validate-bundle",
-                str(build_dir),
-            ],
-            capture_output=True,
-            text=True,
-            check=False,
+        validation = run_native_runtime_command(
+            "--validate-bundle",
+            str(build_dir),
         )
         self.assertEqual(validation.returncode, 0, validation.stdout + validation.stderr)
 
-        save_load_validation = subprocess.run(
-            [
-                sys.executable,
-                str(build_dir / run_editor.NATIVE_RUNTIME_PLAYER_NAME),
-                "--exercise-save-load",
-                str(build_dir),
-            ],
-            capture_output=True,
-            text=True,
-            check=False,
+        save_load_validation = run_native_runtime_command(
+            "--exercise-save-load",
+            str(build_dir),
         )
         self.assertEqual(save_load_validation.returncode, 0, save_load_validation.stdout + save_load_validation.stderr)
 
-        settings_validation = subprocess.run(
-            [
-                sys.executable,
-                str(build_dir / run_editor.NATIVE_RUNTIME_PLAYER_NAME),
-                "--exercise-settings",
-                str(build_dir),
-            ],
-            capture_output=True,
-            text=True,
-            check=False,
+        settings_validation = run_native_runtime_command(
+            "--exercise-settings",
+            str(build_dir),
         )
         self.assertEqual(settings_validation.returncode, 0, settings_validation.stdout + settings_validation.stderr)
 
-        archive_validation = subprocess.run(
-            [
-                sys.executable,
-                str(build_dir / run_editor.NATIVE_RUNTIME_PLAYER_NAME),
-                "--exercise-archives",
-                str(build_dir),
-            ],
-            capture_output=True,
-            text=True,
-            check=False,
+        archive_validation = run_native_runtime_command(
+            "--exercise-archives",
+            str(build_dir),
         )
         self.assertEqual(archive_validation.returncode, 0, archive_validation.stdout + archive_validation.stderr)
 
-        particle_validation = subprocess.run(
-            [
-                sys.executable,
-                str(build_dir / run_editor.NATIVE_RUNTIME_PLAYER_NAME),
-                "--exercise-particles",
-                str(build_dir),
-            ],
-            capture_output=True,
-            text=True,
-            check=False,
+        particle_validation = run_native_runtime_command(
+            "--exercise-particles",
+            str(build_dir),
         )
         self.assertEqual(particle_validation.returncode, 0, particle_validation.stdout + particle_validation.stderr)
 
-        visual_effect_validation = subprocess.run(
-            [
-                sys.executable,
-                str(build_dir / run_editor.NATIVE_RUNTIME_PLAYER_NAME),
-                "--exercise-visual-effects",
-                str(build_dir),
-            ],
-            capture_output=True,
-            text=True,
-            check=False,
+        visual_effect_validation = run_native_runtime_command(
+            "--exercise-visual-effects",
+            str(build_dir),
         )
         self.assertEqual(visual_effect_validation.returncode, 0, visual_effect_validation.stdout + visual_effect_validation.stderr)
 
-        profile_validation = subprocess.run(
-            [
-                sys.executable,
-                str(build_dir / run_editor.NATIVE_RUNTIME_PLAYER_NAME),
-                "--exercise-profile",
-                str(build_dir),
-            ],
-            capture_output=True,
-            text=True,
-            check=False,
+        profile_validation = run_native_runtime_command(
+            "--exercise-profile",
+            str(build_dir),
         )
         self.assertEqual(profile_validation.returncode, 0, profile_validation.stdout + profile_validation.stderr)
 
-        save_dialog_description = subprocess.run(
-            [
-                sys.executable,
-                str(build_dir / run_editor.NATIVE_RUNTIME_PLAYER_NAME),
-                "--describe-save-dialog",
-                str(build_dir),
-                "--page",
-                "1",
-            ],
-            capture_output=True,
-            text=True,
-            check=False,
+        save_dialog_description = run_native_runtime_command(
+            "--describe-save-dialog",
+            str(build_dir),
+            "--page",
+            "1",
         )
         self.assertEqual(save_dialog_description.returncode, 0, save_dialog_description.stdout + save_dialog_description.stderr)
         dialog_payload = json.loads(save_dialog_description.stdout)
@@ -4982,6 +4946,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / "app" / "runtime_speaker_focus.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_dialogue_camera.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_text_effects.js").is_file())
+        self.assertTrue((build_dir / "app" / "runtime_text_pacing.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_text_variables.js").is_file())
         self.assert_export_playtest_guide_file(build_dir / run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME)
         self.assert_export_release_evidence_pack_file(build_dir / run_editor.EXPORT_RELEASE_EVIDENCE_PACK_NAME)
@@ -5068,6 +5033,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["appRuntimeSpeakerFocus"], "app/runtime_speaker_focus.js")
         self.assertEqual(manifest["files"]["appRuntimeDialogueCamera"], "app/runtime_dialogue_camera.js")
         self.assertEqual(manifest["files"]["appRuntimeTextEffects"], "app/runtime_text_effects.js")
+        self.assertEqual(manifest["files"]["appRuntimeTextPacing"], "app/runtime_text_pacing.js")
         self.assertEqual(manifest["files"]["appRuntimeTextVariables"], "app/runtime_text_variables.js")
         self.assertEqual(manifest["files"]["storyRouteMap"], run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME)
         self.assertEqual(manifest["files"]["storyRouteMapReport"], run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME)
@@ -5126,6 +5092,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 "app/runtime_speaker_focus.js",
                 "app/runtime_dialogue_camera.js",
                 "app/runtime_text_effects.js",
+                "app/runtime_text_pacing.js",
                 "app/runtime_text_variables.js",
                 "app/player.css",
             },
@@ -5250,6 +5217,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["appRuntimeCharacterMotion"], "app/runtime_character_motion.js")
         self.assertEqual(manifest["files"]["appRuntimeSpeakerFocus"], "app/runtime_speaker_focus.js")
         self.assertEqual(manifest["files"]["appRuntimeTextEffects"], "app/runtime_text_effects.js")
+        self.assertEqual(manifest["files"]["appRuntimeTextPacing"], "app/runtime_text_pacing.js")
         self.assertEqual(manifest["files"]["appRuntimeTextVariables"], "app/runtime_text_variables.js")
         self.assertEqual(manifest["files"]["storyRouteMap"], run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME)
         self.assertEqual(manifest["files"]["storyRouteMapReport"], run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME)
@@ -5308,6 +5276,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 "app/runtime_speaker_focus.js",
                 "app/runtime_dialogue_camera.js",
                 "app/runtime_text_effects.js",
+                "app/runtime_text_pacing.js",
                 "app/runtime_text_variables.js",
                 "app/player.css",
             },
@@ -5432,6 +5401,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / "app" / "runtime_character_motion.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_speaker_focus.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_text_effects.js").is_file())
+        self.assertTrue((build_dir / "app" / "runtime_text_pacing.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_text_variables.js").is_file())
         self.assert_export_playtest_guide_file(build_dir / run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME)
         self.assert_export_release_evidence_pack_file(build_dir / run_editor.EXPORT_RELEASE_EVIDENCE_PACK_NAME)
@@ -5514,6 +5484,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["appRuntimeCharacterMotion"], "app/runtime_character_motion.js")
         self.assertEqual(manifest["files"]["appRuntimeSpeakerFocus"], "app/runtime_speaker_focus.js")
         self.assertEqual(manifest["files"]["appRuntimeTextEffects"], "app/runtime_text_effects.js")
+        self.assertEqual(manifest["files"]["appRuntimeTextPacing"], "app/runtime_text_pacing.js")
         self.assertEqual(manifest["files"]["appRuntimeTextVariables"], "app/runtime_text_variables.js")
         self.assertEqual(manifest["files"]["storyRouteMap"], run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME)
         self.assertEqual(manifest["files"]["storyRouteMapReport"], run_editor.EXPORT_STORY_ROUTE_MAP_REPORT_NAME)
@@ -5572,6 +5543,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 "app/runtime_speaker_focus.js",
                 "app/runtime_dialogue_camera.js",
                 "app/runtime_text_effects.js",
+                "app/runtime_text_pacing.js",
                 "app/runtime_text_variables.js",
                 "app/player.css",
                 "package.nw",
@@ -5615,6 +5587,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_speaker_focus.js").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_dialogue_camera.js").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_text_effects.js").is_file())
+        self.assertTrue((bundle_dir / "export_player_template" / "runtime_text_pacing.js").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_text_variables.js").is_file())
         self.assertTrue((bundle_dir / "native_runtime" / run_editor.NATIVE_RUNTIME_PLAYER_NAME).is_file())
         self.assertTrue((bundle_dir / "native_runtime" / run_editor.NATIVE_RUNTIME_SCENE_PREFETCH_NAME).is_file())
