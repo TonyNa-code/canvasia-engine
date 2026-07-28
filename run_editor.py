@@ -187,6 +187,7 @@ EXPORT_TEMPLATE_DIR = ROOT_DIR / "export_player_template"
 EXPORT_PLAYER_SCRIPT_FILES = (
     "runtime_conditions.js",
     "runtime_choice_availability.js",
+    "runtime_timed_choices.js",
     "runtime_story_flow.js",
     "runtime_achievements.js",
     "player.js",
@@ -458,6 +459,7 @@ NATIVE_RUNTIME_CHARACTER_RENDERER_NAME = "runtime_character_renderer.py"
 NATIVE_RUNTIME_STAGE_RENDERER_NAME = "runtime_stage_renderer.py"
 NATIVE_RUNTIME_STAGE_IMAGES_NAME = "runtime_stage_images.py"
 NATIVE_RUNTIME_CHOICE_AVAILABILITY_NAME = "runtime_choice_availability.py"
+NATIVE_RUNTIME_TIMED_CHOICES_NAME = "runtime_timed_choices.py"
 NATIVE_RUNTIME_ROLLBACK_NAME = "runtime_rollback.py"
 NATIVE_RUNTIME_SAVE_THUMBNAILS_NAME = "runtime_save_thumbnails.py"
 NATIVE_RUNTIME_TEXT_EFFECTS_NAME = "runtime_text_effects.py"
@@ -539,6 +541,7 @@ NATIVE_RUNTIME_REQUIRED_MODULE_FILES = build_native_runtime_required_module_file
         NATIVE_RUNTIME_STAGE_RENDERER_NAME,
         NATIVE_RUNTIME_STAGE_IMAGES_NAME,
         NATIVE_RUNTIME_CHOICE_AVAILABILITY_NAME,
+        NATIVE_RUNTIME_TIMED_CHOICES_NAME,
         NATIVE_RUNTIME_ROLLBACK_NAME,
         NATIVE_RUNTIME_SAVE_THUMBNAILS_NAME,
         NATIVE_RUNTIME_TEXT_EFFECTS_NAME,
@@ -8759,6 +8762,8 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
         "runtimeStageImagesModulePath": str(build_dir / NATIVE_RUNTIME_STAGE_IMAGES_NAME),
         "runtimeChoiceAvailabilityModuleName": NATIVE_RUNTIME_CHOICE_AVAILABILITY_NAME,
         "runtimeChoiceAvailabilityModulePath": str(build_dir / NATIVE_RUNTIME_CHOICE_AVAILABILITY_NAME),
+        "runtimeTimedChoicesModuleName": NATIVE_RUNTIME_TIMED_CHOICES_NAME,
+        "runtimeTimedChoicesModulePath": str(build_dir / NATIVE_RUNTIME_TIMED_CHOICES_NAME),
         "runtimeTextEffectsModuleName": NATIVE_RUNTIME_TEXT_EFFECTS_NAME,
         "runtimeTextEffectsModulePath": str(build_dir / NATIVE_RUNTIME_TEXT_EFFECTS_NAME),
         "runtimeStorageModuleName": NATIVE_RUNTIME_STORAGE_NAME,
@@ -9279,6 +9284,7 @@ def export_native_runtime_build() -> dict:
             "runtimeCharacterMotionModule": runtime_files["runtimeCharacterMotionModuleName"],
             "runtimeStageImagesModule": runtime_files["runtimeStageImagesModuleName"],
             "runtimeChoiceAvailabilityModule": runtime_files["runtimeChoiceAvailabilityModuleName"],
+            "runtimeTimedChoicesModule": runtime_files["runtimeTimedChoicesModuleName"],
             "runtimeTextEffectsModule": runtime_files["runtimeTextEffectsModuleName"],
             "runtimeStorageModule": runtime_files["runtimeStorageModuleName"],
             "runtimeVariablesModule": runtime_files["runtimeVariablesModuleName"],
@@ -9362,6 +9368,7 @@ def export_native_runtime_build() -> dict:
             "runtimeCharacterMotionModule": runtime_files["runtimeCharacterMotionModuleName"],
             "runtimeStageImagesModule": runtime_files["runtimeStageImagesModuleName"],
             "runtimeChoiceAvailabilityModule": runtime_files["runtimeChoiceAvailabilityModuleName"],
+            "runtimeTimedChoicesModule": runtime_files["runtimeTimedChoicesModuleName"],
             "runtimeTextEffectsModule": runtime_files["runtimeTextEffectsModuleName"],
             "runtimeStorageModule": runtime_files["runtimeStorageModuleName"],
             "runtimeVariablesModule": runtime_files["runtimeVariablesModuleName"],
@@ -9595,6 +9602,7 @@ def export_native_runtime_build() -> dict:
         {"name": runtime_files["runtimeCharacterMotionModuleName"], "description": "原生 Runtime 角色走位、缩放、透明度、翻转和缓动插值模块。"},
         {"name": runtime_files["runtimeStageImagesModuleName"], "description": "原生 Runtime 道具、Cut-in、前景装饰和氛围叠图模块。"},
         {"name": runtime_files["runtimeChoiceAvailabilityModuleName"], "description": "原生 Runtime 条件选项隐藏、锁定提示和死路安全保护模块。"},
+        {"name": runtime_files["runtimeTimedChoicesModuleName"], "description": "原生 Runtime 限时选项、暂停恢复和超时安全分支模块。"},
         {"name": runtime_files["runtimeTextEffectsModuleName"], "description": "原生 Runtime 打字机和文本效果模块。"},
         {"name": runtime_files["runtimeStorageModuleName"], "description": "原生 Runtime 存档、自动恢复和崩溃日志模块。"},
         {"name": runtime_files["runtimeVariablesModuleName"], "description": "原生 Runtime 变量和条件判断模块。"},
@@ -9885,6 +9893,9 @@ def export_native_runtime_build() -> dict:
         "runtimeChoiceAvailabilityModuleName": runtime_files["runtimeChoiceAvailabilityModuleName"],
         "runtimeChoiceAvailabilityModulePath": runtime_files["runtimeChoiceAvailabilityModulePath"],
         "runtimeChoiceAvailabilityModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimeChoiceAvailabilityModuleName']}",
+        "runtimeTimedChoicesModuleName": runtime_files["runtimeTimedChoicesModuleName"],
+        "runtimeTimedChoicesModulePath": runtime_files["runtimeTimedChoicesModulePath"],
+        "runtimeTimedChoicesModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimeTimedChoicesModuleName']}",
         "runtimeTextEffectsModuleName": runtime_files["runtimeTextEffectsModuleName"],
         "runtimeTextEffectsModulePath": runtime_files["runtimeTextEffectsModulePath"],
         "runtimeTextEffectsModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimeTextEffectsModuleName']}",
@@ -10089,6 +10100,7 @@ def export_web_build() -> dict:
             "playerRuntimeVisualConstants": "runtime_visual_constants.js",
             "playerRuntimeConditions": "runtime_conditions.js",
             "playerRuntimeChoiceAvailability": "runtime_choice_availability.js",
+            "playerRuntimeTimedChoices": "runtime_timed_choices.js",
             "playerRuntimeControls": "runtime_controls.js",
             "playerRuntimeGamepad": "runtime_gamepad.js",
             "playerRuntimeSettings": "runtime_settings.js",
@@ -11233,6 +11245,7 @@ def export_windows_nwjs_build() -> dict:
             "appRuntimeVisualConstants": "app/runtime_visual_constants.js",
             "appRuntimeConditions": "app/runtime_conditions.js",
             "appRuntimeChoiceAvailability": "app/runtime_choice_availability.js",
+            "appRuntimeTimedChoices": "app/runtime_timed_choices.js",
             "appRuntimeControls": "app/runtime_controls.js",
             "appRuntimeGamepad": "app/runtime_gamepad.js",
             "appRuntimeSettings": "app/runtime_settings.js",
@@ -11711,6 +11724,7 @@ def export_macos_nwjs_build() -> dict:
             "appRuntimeVisualConstants": "app/runtime_visual_constants.js",
             "appRuntimeConditions": "app/runtime_conditions.js",
             "appRuntimeChoiceAvailability": "app/runtime_choice_availability.js",
+            "appRuntimeTimedChoices": "app/runtime_timed_choices.js",
             "appRuntimeControls": "app/runtime_controls.js",
             "appRuntimeGamepad": "app/runtime_gamepad.js",
             "appRuntimeSettings": "app/runtime_settings.js",
@@ -12196,6 +12210,7 @@ def export_linux_nwjs_build() -> dict:
             "appRuntimeVisualConstants": "app/runtime_visual_constants.js",
             "appRuntimeConditions": "app/runtime_conditions.js",
             "appRuntimeChoiceAvailability": "app/runtime_choice_availability.js",
+            "appRuntimeTimedChoices": "app/runtime_timed_choices.js",
             "appRuntimeControls": "app/runtime_controls.js",
             "appRuntimeGamepad": "app/runtime_gamepad.js",
             "appRuntimeSettings": "app/runtime_settings.js",

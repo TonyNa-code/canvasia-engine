@@ -51,6 +51,7 @@ The project already includes a visual editor, export pipeline, native runtime pr
 ## Core Features
 
 - Visual story editor with scenes, cards, dialogue, narration, choices, variables, and conditional branches; each choice can stay available, hide, or remain visibly locked until affection, inventory, route flags, or other variable rules are satisfied
+- Optional timed choices with 5 / 10 / 15 / 30-second presets or a custom 1-300 second limit, an author-selected timeout branch, safe fallback when that branch is locked, pause-aware menus and background tabs, and remaining-time restoration across editor preview, Web Runtime, native Runtime, saves, and Ren'Py export
 - Player input cards for names, passwords, investigation answers, and numeric values, with `{{variable_id}}` interpolation in dialogue, narration, choices, and locked-choice hints across Web Runtime, native Runtime, saves, and Ren'Py draft export
 - Reusable sub-scenes with nested `call` / automatic or early return flow for shared events, phone calls, tutorials, and recurring sequences; the call stack survives preview, Web, and native Runtime saves, and exports as native Ren'Py `call` / `return`
 - Project center with playable Demo projects, blank projects, beginner mode, advanced mode, and a six-stage creator workflow guide from project setup to Release Candidate export

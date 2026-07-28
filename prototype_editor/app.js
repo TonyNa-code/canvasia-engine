@@ -50,9 +50,11 @@ const {
 const storyBlockCatalogTools = window.CanvasiaEditorStoryBlockCatalog;
 const { BLOCK_LABELS, MUSIC_END_MODE_LABELS, CHOICE_CONTINUE_TARGET } = storyBlockCatalogTools;
 const runtimeChoiceAvailabilityTools = window.CanvasiaRuntimeChoiceAvailability;
+const runtimeTimedChoiceTools = window.CanvasiaRuntimeTimedChoices;
 const runtimeStoryFlowTools = window.CanvasiaRuntimeStoryFlow;
 const runtimeAchievementTools = window.CanvasiaRuntimeAchievements;
 const choiceAvailabilityEditorTools = window.CanvasiaEditorChoiceAvailability;
+const timedChoiceEditorTools = window.CanvasiaEditorTimedChoice;
 const storyBlockActionTools = window.CanvasiaEditorStoryBlockActions;
 const storyBlockEditorTools = window.CanvasiaEditorStoryBlockEditors;
 const musicRangeScopeTools = window.CanvasiaEditorMusicRangeScope;
@@ -704,6 +706,7 @@ const state = {
   previewSaveDialogMode: "save",
   previewSaveDialogPage: 0,
   previewSaveConfirmIntent: null,
+  previewTimedChoicePersistBucket: null,
   voiceMatchReview: null,
   previewVoiceStepKey: null,
   previewLastSfxStepKey: null,
@@ -806,6 +809,10 @@ previewVoiceAudio.addEventListener("ended", handlePreviewVoiceEnded);
 previewVoiceAudio.addEventListener("error", handlePreviewVoiceError);
 const previewVoiceReactiveMotionController = voiceReactiveMotionTools.createVoiceReactiveMotionController({
   root: document,
+});
+const previewTimedChoiceController = runtimeTimedChoiceTools.createTimedChoiceController({
+  onTick: handlePreviewTimedChoiceTick,
+  onTimeout: handlePreviewTimedChoiceTimeout,
 });
 
 const refs = {
@@ -982,6 +989,9 @@ document.addEventListener("click", (event) => {
 document.addEventListener("change", handleChange);
 document.addEventListener("input", handleInput);
 document.addEventListener("keydown", handleGlobalKeydown);
+document.addEventListener("visibilitychange", syncPreviewTimedChoicePauseState);
+document.addEventListener("click", schedulePreviewTimedChoicePauseSync);
+document.addEventListener("keydown", schedulePreviewTimedChoicePauseSync);
 document.addEventListener("dragstart", handleGlobalDragStart);
 document.addEventListener("dragover", handleGlobalDragOver);
 document.addEventListener("drop", (event) => {
@@ -1547,6 +1557,8 @@ function resetProjectScopedUiState() {
   stopPreviewMusicPlayback();
   stopPreviewOneShotAudios();
   stopPreviewVoicePlayback();
+  previewTimedChoiceController.stop();
+  state.previewTimedChoicePersistBucket = null;
   assetPreviewAudio.pause();
   assetPreviewAudio.currentTime = 0;
 }
@@ -6390,6 +6402,7 @@ function quickSavePreview() {
     return false;
   }
 
+  captureCurrentPreviewTimedChoiceState();
   state.previewQuickSave = {
     savedAt: new Date().toISOString(),
     session: deepClonePreviewData(session),
@@ -6426,6 +6439,7 @@ function openPreviewSystemMenu() {
   renderPreviewReturnConfirmDialog();
   renderPreviewSaveConfirmDialog();
   renderPreviewSystemMenu();
+  syncPreviewTimedChoicePauseState();
   setSaveStatus("已打开试玩系统菜单");
   return true;
 }
@@ -6437,6 +6451,7 @@ function closePreviewSystemMenu() {
 
   state.previewSystemMenuOpen = false;
   renderPreviewSystemMenu();
+  syncPreviewTimedChoicePauseState();
   setSaveStatus("已关闭试玩系统菜单");
   return true;
 }
@@ -6449,6 +6464,7 @@ function openPreviewReturnConfirm() {
   renderPreviewSaveDialog();
   renderPreviewReturnConfirmDialog();
   renderPreviewSaveConfirmDialog();
+  syncPreviewTimedChoicePauseState();
   setSaveStatus("已打开回到起点确认");
   return true;
 }
@@ -6460,6 +6476,7 @@ function closePreviewReturnConfirm() {
 
   state.previewReturnConfirmOpen = false;
   renderPreviewReturnConfirmDialog();
+  syncPreviewTimedChoicePauseState();
   setSaveStatus("已取消回到起点");
   return true;
 }
@@ -6494,6 +6511,7 @@ function quickLoadPreview() {
   stopPreviewMusicPlayback();
   stopPreviewOneShotAudios();
   stopPreviewVoicePlayback();
+  previewTimedChoiceController.stop();
   state.previewSession = session;
   state.previewStartSceneId = session.startSceneId;
   state.previewSceneId = getCurrentPreviewSnapshot()?.sceneId ?? session.startSceneId;
@@ -6623,6 +6641,7 @@ function openPreviewSaveConfirm(intent) {
   state.previewSaveConfirmOpen = true;
   renderPreviewReturnConfirmDialog();
   renderPreviewSaveConfirmDialog();
+  syncPreviewTimedChoicePauseState();
   setSaveStatus(getPreviewSaveConfirmContent(intent).title);
   return true;
 }
@@ -6635,6 +6654,7 @@ function closePreviewSaveConfirm() {
   state.previewSaveConfirmOpen = false;
   state.previewSaveConfirmIntent = null;
   renderPreviewSaveConfirmDialog();
+  syncPreviewTimedChoicePauseState();
   setSaveStatus("已取消这次存档操作");
   return true;
 }
@@ -6809,6 +6829,7 @@ function openPreviewSaveDialog(rawMode = "save") {
   renderPreviewReturnConfirmDialog();
   renderPreviewSaveConfirmDialog();
   renderPreviewSaveDialog();
+  syncPreviewTimedChoicePauseState();
   setSaveStatus(state.previewSaveDialogMode === "save" ? "已打开正式存档界面" : "已打开正式读档界面");
   return true;
 }
@@ -6820,6 +6841,7 @@ function closePreviewSaveDialog() {
 
   state.previewSaveDialogOpen = false;
   renderPreviewSaveDialog();
+  syncPreviewTimedChoicePauseState();
   setSaveStatus("已关闭正式存档界面");
   return true;
 }
@@ -7195,6 +7217,7 @@ function loadPreviewAutoResume() {
   stopPreviewMusicPlayback();
   stopPreviewOneShotAudios();
   stopPreviewVoicePlayback();
+  previewTimedChoiceController.stop();
   state.previewSession = session;
   state.previewStartSceneId = session.startSceneId;
   state.previewSceneId = getCurrentPreviewSnapshot()?.sceneId ?? session.startSceneId;
@@ -7229,6 +7252,7 @@ function saveCurrentPreviewSlot(rawIndex) {
     return false;
   }
 
+  captureCurrentPreviewTimedChoiceState();
   state.previewSaveSlots[slotIndex] = {
     savedAt: new Date().toISOString(),
     session: deepClonePreviewData(session),
@@ -7257,6 +7281,7 @@ function loadPreviewSaveSlot(rawIndex) {
   stopPreviewMusicPlayback();
   stopPreviewOneShotAudios();
   stopPreviewVoicePlayback();
+  previewTimedChoiceController.stop();
   state.previewSession = session;
   state.previewStartSceneId = session.startSceneId;
   state.previewSceneId = getCurrentPreviewSnapshot()?.sceneId ?? session.startSceneId;
@@ -18011,6 +18036,7 @@ function renderPreviewScreen() {
   syncPreviewDebugDraft(snapshot);
   const resolution = getProjectResolution();
   const typingPresentation = preparePreviewTypewriter(snapshot);
+  const timedChoicePresentation = syncPreviewTimedChoice(snapshot, typingPresentation.active);
   const dialogueLayoutPresentation = buildPreviewDialogueLayoutPresentation(
     snapshot,
     typingPresentation.text
@@ -18069,6 +18095,7 @@ function renderPreviewScreen() {
     : snapshot
     ? renderStage(snapshot.visualState, true, {
         choiceOptions: typingPresentation.active ? [] : snapshot.choiceOptions,
+        timedChoicePresentation,
         hint: getPreviewHint(snapshot),
         isComplete: snapshot.completed,
         dialogueTextOverride: typingPresentation.text,
@@ -18124,6 +18151,8 @@ function resetPreviewSession(sceneId = null) {
   stopPreviewMusicPlayback();
   stopPreviewOneShotAudios();
   stopPreviewVoicePlayback();
+  previewTimedChoiceController.stop();
+  state.previewTimedChoicePersistBucket = null;
   state.previewStartSceneId = safeSceneId;
   state.previewSceneId = safeSceneId;
   state.previewDialogHidden = false;
@@ -18159,6 +18188,7 @@ function movePreviewBackward() {
   }
 
   stopPreviewAutoAdvance();
+  previewTimedChoiceController.stop();
   session.position -= 1;
   state.previewSceneId = getCurrentPreviewSnapshot()?.sceneId ?? state.previewStartSceneId;
   persistPreviewAutoResume();
@@ -18204,6 +18234,9 @@ function choosePreviewOption(optionId) {
   if (!option || !runtimeChoiceAvailabilityTools.isChoiceOptionSelectable(option)) {
     return;
   }
+
+  previewTimedChoiceController.stop();
+  delete current.timedChoiceState;
 
   const nextVariables = clonePreviewVariables(current.variables);
   applyChoiceEffectsToPreviewVariables(nextVariables, option.effects ?? []);
@@ -18373,6 +18406,119 @@ function getPreviewSnapshotKey(snapshot) {
   return `${snapshot.sceneId ?? "none"}:${snapshot.blockId ?? "complete"}:${snapshot.blockIndex}:${
     state.previewSession?.position ?? 0
   }`;
+}
+
+function isPreviewTimedChoicePaused() {
+  return Boolean(
+    document.hidden ||
+      state.currentScreen !== "preview" ||
+      state.previewSystemMenuOpen ||
+      state.previewSaveDialogOpen ||
+      state.previewReturnConfirmOpen ||
+      state.previewSaveConfirmOpen ||
+      state.previewDialogHidden ||
+      state.beginnerTutorialOpen ||
+      state.commandPaletteOpen
+  );
+}
+
+function buildPreviewTimedChoicePresentation(snapshot, timerSnapshot) {
+  if (!snapshot || !timerSnapshot?.choiceKey) return null;
+  const target = snapshot.choiceOptions.find((option) => option.id === timerSnapshot.targetOptionId);
+  return {
+    ...timerSnapshot,
+    remainingLabel: runtimeTimedChoiceTools.formatTimedChoiceRemaining(timerSnapshot.remainingMs),
+    targetLabel: target?.text || "第一个可选分支",
+  };
+}
+
+function updatePreviewTimedChoicePresentation(timerSnapshot) {
+  const status = refs.previewStage?.querySelector?.("[data-preview-timed-choice]");
+  if (!status || !timerSnapshot) return;
+  const snapshot = getCurrentPreviewSnapshot();
+  const presentation = buildPreviewTimedChoicePresentation(snapshot, timerSnapshot);
+  if (!presentation) return;
+  const remaining = status.querySelector("[data-preview-timed-choice-remaining]");
+  const progress = status.querySelector("[data-preview-timed-choice-progress]");
+  const paused = status.querySelector("[data-preview-timed-choice-paused]");
+  if (remaining) remaining.textContent = presentation.remainingLabel;
+  if (progress) progress.style.transform = `scaleX(${Math.max(0, Math.min(1, 1 - presentation.progress))})`;
+  if (paused) paused.hidden = !presentation.paused;
+  status.classList.toggle("is-paused", Boolean(presentation.paused));
+}
+
+function captureCurrentPreviewTimedChoiceState() {
+  const snapshot = getCurrentPreviewSnapshot();
+  if (!snapshot || snapshot.choiceOptions.length === 0) return null;
+  const timerState = previewTimedChoiceController.serialize();
+  if (timerState?.choiceKey === getPreviewSnapshotKey(snapshot)) {
+    snapshot.timedChoiceState = timerState;
+    return timerState;
+  }
+  return runtimeTimedChoiceTools.sanitizeTimedChoiceState(snapshot.timedChoiceState, snapshot.block);
+}
+
+function handlePreviewTimedChoiceTick(timerSnapshot) {
+  const snapshot = getCurrentPreviewSnapshot();
+  if (!snapshot || timerSnapshot.choiceKey !== getPreviewSnapshotKey(snapshot)) return;
+  snapshot.timedChoiceState = previewTimedChoiceController.serialize();
+  updatePreviewTimedChoicePresentation(timerSnapshot);
+  const bucket = Math.ceil(timerSnapshot.remainingMs / 1000);
+  if (state.previewTimedChoicePersistBucket !== bucket) {
+    state.previewTimedChoicePersistBucket = bucket;
+    persistPreviewAutoResume();
+  }
+}
+
+function handlePreviewTimedChoiceTimeout(optionId, timerSnapshot) {
+  const snapshot = getCurrentPreviewSnapshot();
+  if (!snapshot || timerSnapshot.choiceKey !== getPreviewSnapshotKey(snapshot)) return;
+  choosePreviewOption(optionId);
+  renderPreviewScreen();
+  setSaveStatus("限时选择结束，试玩已自动进入预设分支");
+}
+
+function syncPreviewTimedChoice(snapshot = getCurrentPreviewSnapshot(), typingActive = false) {
+  if (!snapshot || snapshot.choiceOptions.length === 0 || typingActive) {
+    previewTimedChoiceController.stop();
+    state.previewTimedChoicePersistBucket = null;
+    return null;
+  }
+  const config = runtimeTimedChoiceTools.sanitizeTimedChoiceConfig(snapshot.block);
+  if (!config.enabled) {
+    previewTimedChoiceController.stop();
+    delete snapshot.timedChoiceState;
+    state.previewTimedChoicePersistBucket = null;
+    return null;
+  }
+  const storedState = runtimeTimedChoiceTools.sanitizeTimedChoiceState(
+    snapshot.timedChoiceState,
+    snapshot.block
+  );
+  const timerSnapshot = previewTimedChoiceController.start({
+    choiceKey: getPreviewSnapshotKey(snapshot),
+    block: snapshot.block,
+    choiceOptions: snapshot.choiceOptions,
+    remainingMs: storedState?.remainingMs,
+    paused: isPreviewTimedChoicePaused(),
+  });
+  snapshot.timedChoiceState = previewTimedChoiceController.serialize();
+  state.previewTimedChoicePersistBucket = Math.ceil(timerSnapshot.remainingMs / 1000);
+  return buildPreviewTimedChoicePresentation(snapshot, timerSnapshot);
+}
+
+function syncPreviewTimedChoicePauseState() {
+  const snapshot = getCurrentPreviewSnapshot();
+  if (!snapshot || snapshot.choiceOptions.length === 0) return;
+  const timerSnapshot = previewTimedChoiceController.setPaused(isPreviewTimedChoicePaused());
+  if (timerSnapshot.choiceKey === getPreviewSnapshotKey(snapshot)) {
+    snapshot.timedChoiceState = previewTimedChoiceController.serialize();
+    updatePreviewTimedChoicePresentation(timerSnapshot);
+  }
+}
+
+function schedulePreviewTimedChoicePauseSync() {
+  window.setTimeout(syncPreviewTimedChoicePauseState, 0);
 }
 
 function shouldUsePreviewTypewriter(snapshot) {
@@ -18787,6 +18933,8 @@ function sanitizeStoredPreviewSnapshot(source) {
       sanitizeCallStack: (value) => runtimeStoryFlowTools.sanitizeStoryCallStack(value, {
         hasScene: (sceneId) => state.data?.scenesById.has(sceneId),
       }),
+      sanitizeTimedChoiceState: (value, block) =>
+        runtimeTimedChoiceTools.sanitizeTimedChoiceState(value, block),
     });
   }
 
@@ -18802,16 +18950,19 @@ function sanitizeStoredPreviewSnapshot(source) {
         .filter(Boolean)
     : [];
 
+  const block = source.block && typeof source.block === "object" ? deepClonePreviewData(source.block) : null;
+  const timedChoiceState = runtimeTimedChoiceTools.sanitizeTimedChoiceState(source.timedChoiceState, block);
   return {
     sceneId,
     sceneName: String(source.sceneName ?? scene?.name ?? sceneId ?? "试玩记录"),
     blockIndex: Number.isFinite(Number(source.blockIndex)) ? Number(source.blockIndex) : -1,
     blockId: source.blockId == null ? null : String(source.blockId),
     blockType: source.completed ? "complete" : String(source.blockType ?? "dialogue"),
-    block: source.block && typeof source.block === "object" ? deepClonePreviewData(source.block) : null,
+    block,
     visualState: clonePreviewVisualState(source.visualState),
     variables: clonePreviewVariables(source.variables),
     choiceOptions,
+    ...(timedChoiceState ? { timedChoiceState } : {}),
     callStack: runtimeStoryFlowTools.sanitizeStoryCallStack(source.callStack, {
       hasScene: (targetSceneId) => state.data?.scenesById.has(targetSceneId),
     }),
@@ -18954,6 +19105,7 @@ function persistPreviewAutoResume() {
     return;
   }
 
+  captureCurrentPreviewTimedChoiceState();
   const session = sanitizeStoredPreviewSession(state.previewSession);
 
   if (!session) {
@@ -22382,6 +22534,22 @@ function renderStage(visualState, large, options = {}) {
     large && (options.choiceOptions?.length ?? 0) > 0
       ? `
         <div class="preview-choice-list">
+          ${
+            options.timedChoicePresentation
+              ? `
+                <div class="preview-timed-choice ${options.timedChoicePresentation.paused ? "is-paused" : ""}" data-preview-timed-choice role="timer" aria-live="off">
+                  <div class="preview-timed-choice-copy">
+                    <strong>限时选择</strong>
+                    <span><b data-preview-timed-choice-remaining>${escapeHtml(options.timedChoicePresentation.remainingLabel)}</b> 后自动选择“${escapeHtml(options.timedChoicePresentation.targetLabel)}”</span>
+                    <em data-preview-timed-choice-paused ${options.timedChoicePresentation.paused ? "" : "hidden"}>已暂停</em>
+                  </div>
+                  <div class="preview-timed-choice-track" aria-hidden="true">
+                    <i data-preview-timed-choice-progress style="transform:scaleX(${Math.max(0, Math.min(1, 1 - options.timedChoicePresentation.progress))})"></i>
+                  </div>
+                </div>
+              `
+              : ""
+          }
           ${options.choiceOptions
             .map(
               (option) => `
@@ -32956,7 +33124,15 @@ function renderChoiceEditor(block) {
     createDefaultChoiceOptions,
     renderDetailRows,
     renderChoiceCountQualityTools,
+    renderTimedChoiceEditor,
     renderChoiceOptionEditorRow,
+  });
+}
+
+function renderTimedChoiceEditor(block, choiceOptions) {
+  return timedChoiceEditorTools.renderTimedChoiceEditor(block, {
+    choiceOptions,
+    runtimeTools: runtimeTimedChoiceTools,
   });
 }
 
@@ -39225,10 +39401,13 @@ function collectEditedBlock(block) {
       };
     });
 
-    return {
+    return timedChoiceEditorTools.readTimedChoiceEditor({
       ...block,
       options,
-    };
+    }, {
+      document,
+      runtimeTools: runtimeTimedChoiceTools,
+    });
   }
 
   if (block.type === "background") {

@@ -126,6 +126,13 @@ import {
 } from "./runtime_dialogue_camera.js";
 import { createVoiceReactiveMotionController } from "./runtime_voice_reactive_motion.js";
 import {
+  createTimedChoiceController,
+  formatTimedChoiceRemaining,
+  resolveTimedChoiceTarget,
+  sanitizeTimedChoiceConfig,
+  sanitizeTimedChoiceState,
+} from "./runtime_timed_choices.js";
+import {
   applyReadingProfile,
   detectReadingProfile,
   getReadingProfileLabel,
@@ -505,10 +512,15 @@ const state = {
   runtimeGamepadStatus: buildRuntimeGamepadStatus(),
   textInputOpen: false,
   textInputSnapshotKey: "",
+  timedChoicePersistBucket: null,
 };
 
 const activeSfxAudios = new Set();
 const voiceReactiveMotionController = createVoiceReactiveMotionController({ root: document });
+const timedChoiceController = createTimedChoiceController({
+  onTick: handleTimedChoiceTick,
+  onTimeout: handleTimedChoiceTimeout,
+});
 
 let musicRoomAudio = null;
 let voiceReplayAudio = null;
@@ -687,6 +699,9 @@ function init() {
   });
   keyBindingController.attach();
   document.addEventListener("keydown", handleGlobalKeydown);
+  document.addEventListener("visibilitychange", syncRuntimeTimedChoicePauseState);
+  document.addEventListener("click", scheduleRuntimeTimedChoicePauseSync);
+  document.addEventListener("keydown", scheduleRuntimeTimedChoicePauseSync);
   document.addEventListener("pointerdown", () => setRuntimeInputMode("pointer"), { passive: true });
   startRuntimeGamepadInput();
   window.addEventListener("beforeunload", finalizePlayerSession);
@@ -696,6 +711,7 @@ function init() {
   window.addEventListener("beforeunload", stopOneShotAudio);
   window.addEventListener("beforeunload", stopVoicePlayback);
   window.addEventListener("beforeunload", stopRuntimeGamepadInput);
+  window.addEventListener("beforeunload", captureCurrentTimedChoiceState);
   startRuntimeAssetPreload();
   renderPlaybackControls();
   scheduleRuntimeUiThemeAutoRefresh();
@@ -1161,6 +1177,7 @@ function renderBeforeStart() {
   stopVoiceReplayPreview({ rerender: false });
   stopVideoPlayback();
   stopCreditsPlayback();
+  timedChoiceController.stop();
   resetRuntimeScenePrefetchState();
   state.dialogHidden = false;
   state.saveDialogPage = 0;
@@ -1234,6 +1251,7 @@ function startGameFromScene(sceneId = getEntrySceneId()) {
   stopVoiceReplayPreview({ rerender: false });
   stopVideoPlayback();
   stopCreditsPlayback();
+  timedChoiceController.stop();
   resetRuntimeScenePrefetchState();
   state.dialogHidden = false;
   state.saveDialogOpen = false;
@@ -1299,6 +1317,7 @@ function continueLastSession() {
   stopVoiceReplayPreview({ rerender: false });
   stopVideoPlayback();
   stopCreditsPlayback();
+  timedChoiceController.stop();
   state.dialogHidden = false;
   state.saveDialogOpen = false;
   state.saveDialogPage = 0;
@@ -3806,6 +3825,9 @@ function choosePreviewOption(optionId) {
     return;
   }
 
+  timedChoiceController.stop();
+  delete current.timedChoiceState;
+
   if (!option.isChoiceSafetyFallback) {
     unlockAchievement("first_choice");
   }
@@ -3833,6 +3855,140 @@ function getRuntimeSnapshotKey(snapshot) {
   return `${snapshot.sceneId ?? "none"}:${snapshot.blockId ?? "complete"}:${snapshot.blockIndex}:${
     state.session?.position ?? 0
   }`;
+}
+
+function isRuntimeTimedChoicePaused() {
+  return Boolean(
+    document.hidden ||
+      !state.started ||
+      !refs.startOverlay?.hidden ||
+      state.textInputOpen ||
+      getRuntimeGamepadOverlayRoot()
+  );
+}
+
+function getCurrentTimedChoiceSnapshot(snapshot = getCurrentSnapshot()) {
+  if (!snapshot || snapshot.choiceOptions.length === 0) return null;
+  const controllerSnapshot = timedChoiceController.snapshot();
+  if (controllerSnapshot.choiceKey === getRuntimeSnapshotKey(snapshot)) return controllerSnapshot;
+  const stored = sanitizeTimedChoiceState(snapshot.timedChoiceState, snapshot.block);
+  if (stored?.choiceKey === getRuntimeSnapshotKey(snapshot)) {
+    return {
+      active: stored.remainingMs > 0,
+      paused: false,
+      expired: stored.remainingMs <= 0,
+      ...stored,
+      progress: stored.durationMs > 0 ? 1 - stored.remainingMs / stored.durationMs : 0,
+    };
+  }
+  const config = sanitizeTimedChoiceConfig(snapshot.block);
+  return config.enabled
+    ? {
+        active: true,
+        paused: false,
+        expired: false,
+        choiceKey: getRuntimeSnapshotKey(snapshot),
+        targetOptionId: resolveTimedChoiceTarget(snapshot.choiceOptions, config.timeoutOptionId),
+        durationMs: config.timeoutMs,
+        remainingMs: config.timeoutMs,
+        progress: 0,
+      }
+    : null;
+}
+
+function updateTimedChoicePresentation(timerSnapshot = getCurrentTimedChoiceSnapshot()) {
+  const status = refs.choiceList?.querySelector?.("[data-timed-choice-status]");
+  if (!status || !timerSnapshot) return;
+  const remaining = status.querySelector("[data-timed-choice-remaining]");
+  const progress = status.querySelector("[data-timed-choice-progress]");
+  const pauseLabel = status.querySelector("[data-timed-choice-pause-label]");
+  const targetLabel = status.querySelector("[data-timed-choice-target]");
+  const snapshot = getCurrentSnapshot();
+  const targetOption = snapshot?.choiceOptions?.find?.(
+    (option) => option.id === timerSnapshot.targetOptionId
+  );
+  if (remaining) remaining.textContent = formatTimedChoiceRemaining(timerSnapshot.remainingMs);
+  if (targetLabel) {
+    targetLabel.textContent = targetOption
+      ? getChoiceText(targetOption, snapshot?.variables)
+      : "第一个可选分支";
+  }
+  if (progress) progress.style.transform = `scaleX(${Math.max(0, Math.min(1, 1 - timerSnapshot.progress))})`;
+  if (pauseLabel) {
+    pauseLabel.textContent = timerSnapshot.paused ? "已暂停" : "倒计时中";
+    pauseLabel.hidden = !timerSnapshot.paused;
+  }
+  status.classList.toggle("is-paused", Boolean(timerSnapshot.paused));
+}
+
+function captureCurrentTimedChoiceState() {
+  const snapshot = getCurrentSnapshot();
+  if (!snapshot || snapshot.choiceOptions.length === 0) return null;
+  const timerState = timedChoiceController.serialize();
+  if (timerState?.choiceKey === getRuntimeSnapshotKey(snapshot)) {
+    snapshot.timedChoiceState = timerState;
+    return timerState;
+  }
+  return sanitizeTimedChoiceState(snapshot.timedChoiceState, snapshot.block);
+}
+
+function handleTimedChoiceTick(timerSnapshot) {
+  const snapshot = getCurrentSnapshot();
+  if (!snapshot || timerSnapshot.choiceKey !== getRuntimeSnapshotKey(snapshot)) return;
+  snapshot.timedChoiceState = timedChoiceController.serialize();
+  updateTimedChoicePresentation(timerSnapshot);
+  const bucket = Math.ceil(timerSnapshot.remainingMs / 1000);
+  if (state.timedChoicePersistBucket !== bucket) {
+    state.timedChoicePersistBucket = bucket;
+    persistAutoResume();
+  }
+}
+
+function handleTimedChoiceTimeout(optionId, timerSnapshot) {
+  const snapshot = getCurrentSnapshot();
+  if (!snapshot || timerSnapshot.choiceKey !== getRuntimeSnapshotKey(snapshot)) return;
+  choosePreviewOption(optionId);
+}
+
+function syncRuntimeTimedChoice(snapshot = getCurrentSnapshot()) {
+  if (!snapshot || snapshot.choiceOptions.length === 0 || isRuntimeTypewriterActive()) {
+    timedChoiceController.stop();
+    state.timedChoicePersistBucket = null;
+    return null;
+  }
+  const config = sanitizeTimedChoiceConfig(snapshot.block);
+  if (!config.enabled) {
+    timedChoiceController.stop();
+    delete snapshot.timedChoiceState;
+    state.timedChoicePersistBucket = null;
+    return null;
+  }
+  const storedState = sanitizeTimedChoiceState(snapshot.timedChoiceState, snapshot.block);
+  const timerSnapshot = timedChoiceController.start({
+    choiceKey: getRuntimeSnapshotKey(snapshot),
+    block: snapshot.block,
+    choiceOptions: snapshot.choiceOptions,
+    remainingMs: storedState?.remainingMs,
+    paused: isRuntimeTimedChoicePaused(),
+  });
+  snapshot.timedChoiceState = timedChoiceController.serialize();
+  state.timedChoicePersistBucket = Math.ceil(timerSnapshot.remainingMs / 1000);
+  updateTimedChoicePresentation(timerSnapshot);
+  return timerSnapshot;
+}
+
+function syncRuntimeTimedChoicePauseState() {
+  const snapshot = getCurrentSnapshot();
+  if (!snapshot || snapshot.choiceOptions.length === 0) return;
+  const timerSnapshot = timedChoiceController.setPaused(isRuntimeTimedChoicePaused());
+  if (timerSnapshot.choiceKey === getRuntimeSnapshotKey(snapshot)) {
+    snapshot.timedChoiceState = timedChoiceController.serialize();
+    updateTimedChoicePresentation(timerSnapshot);
+  }
+}
+
+function scheduleRuntimeTimedChoicePauseSync() {
+  window.setTimeout(syncRuntimeTimedChoicePauseState, 0);
 }
 
 function shouldUseRuntimeTypewriter(snapshot) {
@@ -4873,16 +5029,18 @@ function sanitizeStoredSnapshot(source) {
         .filter(Boolean)
     : [];
 
+  const block = source.block && typeof source.block === "object" ? deepCloneRuntimeData(source.block) : null;
   return {
     sceneId,
     sceneName: String(source.sceneName ?? scene?.name ?? sceneId ?? "试玩记录"),
     blockIndex: Number.isFinite(Number(source.blockIndex)) ? Number(source.blockIndex) : -1,
     blockId: source.blockId == null ? null : String(source.blockId),
     blockType: source.completed ? "complete" : String(source.blockType ?? "dialogue"),
-    block: source.block && typeof source.block === "object" ? deepCloneRuntimeData(source.block) : null,
+    block,
     visualState: clonePreviewVisualState(source.visualState),
     variables: clonePreviewVariables(source.variables),
     choiceOptions,
+    timedChoiceState: sanitizeTimedChoiceState(source.timedChoiceState, block),
     callStack: runtimeStoryFlowTools.sanitizeStoryCallStack(source.callStack, {
       hasScene: (targetSceneId) => data.scenesById.has(targetSceneId),
     }),
@@ -5052,6 +5210,7 @@ function loadStoredPlayerProfile() {
 }
 
 function persistAutoResume() {
+  captureCurrentTimedChoiceState();
   const session = sanitizeStoredSession(state.session);
 
   if (!session) {
@@ -6337,6 +6496,7 @@ function jumpToHistory(rawIndex) {
   stopRuntimeAutoAdvance();
   stopOneShotAudio();
   stopVoicePlayback();
+  timedChoiceController.stop();
   session.position = nextIndex;
   persistAutoResume();
   renderRuntime();
@@ -6637,6 +6797,7 @@ function quickSaveCurrent() {
     return false;
   }
 
+  captureCurrentTimedChoiceState();
   state.quickSave = {
     savedAt: new Date().toISOString(),
     session: deepCloneRuntimeData(state.session),
@@ -6660,6 +6821,7 @@ function quickLoadCurrent() {
   stopRuntimeAutoAdvance();
   stopOneShotAudio();
   stopVoicePlayback();
+  timedChoiceController.stop();
   state.started = true;
   state.session = session;
   state.lastRenderedStepKey = null;
@@ -7335,6 +7497,7 @@ function saveCurrentSlot(rawIndex) {
     return false;
   }
 
+  captureCurrentTimedChoiceState();
   state.saveSlots[slotIndex] = {
     savedAt: new Date().toISOString(),
     session: deepCloneRuntimeData(state.session),
@@ -7360,6 +7523,7 @@ function loadSaveSlot(rawIndex) {
   stopRuntimeAutoAdvance();
   stopOneShotAudio();
   stopVoicePlayback();
+  timedChoiceController.stop();
   stopMusicRoomPreview();
   stopVoiceReplayPreview({ rerender: false });
   state.started = true;
@@ -8299,6 +8463,7 @@ function renderRuntime() {
   refs.variablesPanel.innerHTML = renderVariables(snapshot.variables);
   refs.historyPanel.innerHTML = renderHistory(session);
   syncRuntimeDialoguePresentation(snapshot);
+  syncRuntimeTimedChoice(snapshot);
   renderRuntimeDialogueLayout(snapshot);
   refs.hintText.textContent = getPreviewHint(snapshot);
   const isBlockingMedia = isBlockingMediaSnapshot(snapshot);
@@ -8399,7 +8564,26 @@ function renderChoiceButtons(snapshot) {
     return "";
   }
 
-  return snapshot.choiceOptions
+  const config = sanitizeTimedChoiceConfig(snapshot.block);
+  const timerSnapshot = getCurrentTimedChoiceSnapshot(snapshot);
+  const targetOption = snapshot.choiceOptions.find(
+    (option) => option.id === timerSnapshot?.targetOptionId
+  );
+  const timerMarkup = config.enabled && timerSnapshot
+    ? `
+        <div class="timed-choice-status ${timerSnapshot.paused ? "is-paused" : ""}" data-timed-choice-status role="timer" aria-live="off">
+          <div class="timed-choice-copy">
+            <strong>限时选择</strong>
+            <span><b data-timed-choice-remaining>${escapeHtml(formatTimedChoiceRemaining(timerSnapshot.remainingMs))}</b> 后自动选择“<span data-timed-choice-target>${escapeHtml(targetOption ? getChoiceText(targetOption, snapshot.variables) : "第一个可选分支")}</span>”</span>
+            <em data-timed-choice-pause-label ${timerSnapshot.paused ? "" : "hidden"}>已暂停</em>
+          </div>
+          <div class="timed-choice-track" aria-hidden="true">
+            <i data-timed-choice-progress style="transform:scaleX(${Math.max(0, Math.min(1, 1 - timerSnapshot.progress))})"></i>
+          </div>
+        </div>
+      `
+    : "";
+  const buttons = snapshot.choiceOptions
     .map(
       (option) => `
         <button
@@ -8420,6 +8604,7 @@ function renderChoiceButtons(snapshot) {
       `
     )
     .join("");
+  return timerMarkup + buttons;
 }
 
 function renderStageVisual(snapshot) {
@@ -8845,7 +9030,10 @@ function getPreviewHint(snapshot) {
   }
 
   if (snapshot.choiceOptions.length > 0) {
-    return "需要先选择一个选项，剧情才会继续。";
+    const config = sanitizeTimedChoiceConfig(snapshot.block);
+    return config.enabled
+      ? `这是限时选择，${config.timeoutSeconds} 秒后会自动走预设分支；打开菜单时倒计时会暂停。`
+      : "需要先选择一个选项，剧情才会继续。";
   }
 
   if (snapshot.blockType === "text_input") {

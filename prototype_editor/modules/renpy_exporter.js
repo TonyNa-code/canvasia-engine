@@ -1446,6 +1446,115 @@
     return [`    $ achievement.grant(${quoteRenpy(achievement.id)})`];
   }
 
+  function sanitizeTimedChoiceExportConfig(block = {}) {
+    const runtimeTools = global.CanvasiaRuntimeTimedChoices;
+    if (typeof runtimeTools?.sanitizeTimedChoiceConfig === "function") {
+      return runtimeTools.sanitizeTimedChoiceConfig(block);
+    }
+    const rawSeconds = Number.parseFloat(block.timeoutSeconds ?? block.choiceTimeoutSeconds ?? 0);
+    const timeoutSeconds = Number.isFinite(rawSeconds) && rawSeconds > 0
+      ? Math.round(Math.min(Math.max(rawSeconds, 1), 300) * 10) / 10
+      : 0;
+    return {
+      enabled: timeoutSeconds > 0,
+      timeoutSeconds,
+      timeoutOptionId: cleanText(block.timeoutOptionId ?? block.choiceTimeoutOptionId),
+    };
+  }
+
+  function getChoiceAvailability(option = {}, context = {}) {
+    const rawMode = cleanText(option.choiceAvailabilityMode ?? option.availabilityMode, "always");
+    const mode = ["hide_when_false", "disable_when_false"].includes(rawMode) ? rawMode : "always";
+    const rules = toArray(option.choiceAvailabilityWhen ?? option.availabilityWhen);
+    return {
+      mode,
+      expression: rules.length
+        ? rules.map((rule) => renderConditionRuleExpression(rule, context)).join(" and ")
+        : "False",
+    };
+  }
+
+  function renderChoiceOutcomeLines(option = {}, context = {}, indent = "            ") {
+    const lines = [];
+    toArray(option.effects).forEach((effect) => {
+      renderVariableEffect(effect, context, indent).forEach((line) => lines.push(line));
+    });
+    const targetSceneId = getChoiceTarget(option);
+    if (targetSceneId && targetSceneId !== CHOICE_CONTINUE_TARGET) {
+      lines.push(`${indent}jump ${getSceneLabel(targetSceneId, context.sceneMap)}`);
+    } else {
+      lines.push(`${indent}pass`);
+    }
+    return lines;
+  }
+
+  function getTimedChoiceResultKey(context = {}, optionIndex = 0) {
+    const blockNumber = Math.max(0, Number.parseInt(context.blockIndex ?? 0, 10) || 0) + 1;
+    return `canvasia_choice_${blockNumber}_${optionIndex + 1}`;
+  }
+
+  function renderTimedChoiceBlock(block = {}, context = {}, config = sanitizeTimedChoiceExportConfig(block)) {
+    const options = toArray(block.options);
+    const warnings = context.warnings ?? [];
+    const lines = ["    $ _canvasia_choices = []"];
+    const gatedExpressions = [];
+    let hasAlwaysOption = false;
+
+    options.forEach((option, optionIndex) => {
+      const optionText = convertRuntimeTextVariables(
+        cleanText(option?.text ?? option?.label, `Option ${optionIndex + 1}`),
+        context.variableMap ?? new Map()
+      );
+      const resultKey = getTimedChoiceResultKey(context, optionIndex);
+      const availability = getChoiceAvailability(option, context);
+      const itemExpression = `(${quoteRenpy(optionText)}, ${quoteRenpy(resultKey)}, True)`;
+      if (availability.mode === "always") {
+        hasAlwaysOption = true;
+        lines.push(`    $ _canvasia_choices.append(${itemExpression})`);
+      } else if (availability.mode === "hide_when_false") {
+        gatedExpressions.push(availability.expression);
+        lines.push(`    if ${availability.expression}:`);
+        lines.push(`        $ _canvasia_choices.append(${itemExpression})`);
+      } else {
+        gatedExpressions.push(availability.expression);
+        lines.push(`    $ _canvasia_choices.append((${quoteRenpy(optionText)}, ${quoteRenpy(resultKey)}, bool(${availability.expression})))`);
+      }
+    });
+
+    lines.push("    $ _canvasia_selectable_choices = [item for item in _canvasia_choices if item[2]]");
+    lines.push("    if not _canvasia_selectable_choices:");
+    lines.push(`        $ _canvasia_choices.append((${quoteRenpy("Continue (safety fallback)")}, ${quoteRenpy("__canvasia_safety__")}, True))`);
+    lines.push("        $ _canvasia_selectable_choices = [_canvasia_choices[-1]]");
+    lines.push("    $ _canvasia_timeout_choice = _canvasia_selectable_choices[0][1]");
+
+    const configuredOptionIndex = options.findIndex((option) => (
+      cleanText(option?.id) && cleanText(option.id) === config.timeoutOptionId
+    ));
+    if (configuredOptionIndex >= 0) {
+      const configuredResultKey = getTimedChoiceResultKey(context, configuredOptionIndex);
+      lines.push(`    if any(item[1] == ${quoteRenpy(configuredResultKey)} and item[2] for item in _canvasia_choices):`);
+      lines.push(`        $ _canvasia_timeout_choice = ${quoteRenpy(configuredResultKey)}`);
+    }
+    lines.push(`    $ _canvasia_choice = renpy.call_screen("canvasia_timed_choice", items=_canvasia_choices, timeout_seconds=${config.timeoutSeconds}, timeout_value=_canvasia_timeout_choice)`);
+
+    options.forEach((option, optionIndex) => {
+      lines.push(`    ${optionIndex === 0 ? "if" : "elif"} _canvasia_choice == ${quoteRenpy(getTimedChoiceResultKey(context, optionIndex))}:`);
+      renderChoiceOutcomeLines(option, { ...context, optionIndex }, "        ").forEach((line) => lines.push(line));
+    });
+    lines.push("    else:");
+    lines.push("        pass");
+
+    if (!hasAlwaysOption && gatedExpressions.length) {
+      pushWarning(
+        warnings,
+        "renpy_choice_safety_fallback",
+        "这组选项没有始终可选的保底项；Ren'Py 草稿已加入只在全部条件不满足时出现的安全继续。",
+        getWarningContext(context)
+      );
+    }
+    return lines;
+  }
+
   function renderChoiceBlock(block = {}, context = {}) {
     const lines = ["    menu:"];
     const options = toArray(block.options);
@@ -1455,6 +1564,10 @@
       lines.push("        pass");
       return lines;
     }
+    const timedChoiceConfig = sanitizeTimedChoiceExportConfig(block);
+    if (timedChoiceConfig.enabled) {
+      return renderTimedChoiceBlock(block, context, timedChoiceConfig);
+    }
     const gatedExpressions = [];
     let hasAlwaysOption = false;
     options.forEach((option, optionIndex) => {
@@ -1462,21 +1575,14 @@
         cleanText(option?.text ?? option?.label, `Option ${optionIndex + 1}`),
         context.variableMap ?? new Map()
       );
-      const targetSceneId = getChoiceTarget(option);
-      const effectCount = toArray(option.effects).length;
-      const rawMode = cleanText(option.choiceAvailabilityMode ?? option.availabilityMode, "always");
-      const mode = ["hide_when_false", "disable_when_false"].includes(rawMode) ? rawMode : "always";
-      const rules = toArray(option.choiceAvailabilityWhen ?? option.availabilityWhen);
-      const expression = rules.length
-        ? rules.map((rule) => renderConditionRuleExpression(rule, context)).join(" and ")
-        : "False";
+      const availability = getChoiceAvailability(option, context);
       let conditionClause = "";
-      if (mode === "always") {
+      if (availability.mode === "always") {
         hasAlwaysOption = true;
       } else {
-        gatedExpressions.push(expression);
-        conditionClause = ` if ${expression}`;
-        if (mode === "disable_when_false") {
+        gatedExpressions.push(availability.expression);
+        conditionClause = ` if ${availability.expression}`;
+        if (availability.mode === "disable_when_false") {
           pushWarning(
             warnings,
             "renpy_choice_lock_degraded",
@@ -1486,16 +1592,7 @@
         }
       }
       lines.push(`        ${quoteRenpy(optionText)}${conditionClause}:`);
-      if (effectCount > 0) {
-        toArray(option.effects).forEach((effect) => {
-          renderVariableEffect(effect, { ...context, optionIndex }, "            ").forEach((line) => lines.push(line));
-        });
-      }
-      if (targetSceneId && targetSceneId !== CHOICE_CONTINUE_TARGET) {
-        lines.push(`            jump ${getSceneLabel(targetSceneId, context.sceneMap)}`);
-      } else {
-        lines.push("            pass");
-      }
+      renderChoiceOutcomeLines(option, { ...context, optionIndex }).forEach((line) => lines.push(line));
     });
     if (!hasAlwaysOption && gatedExpressions.length) {
       const allUnavailableExpression = `not (${gatedExpressions.map((expression) => `(${expression})`).join(" or ")})`;
@@ -1649,7 +1746,35 @@
       "        except (TypeError, ValueError):",
       "            return None",
       "        return int(number) if number.is_integer() else number",
+      "",
+      "    def canvasia_timed_choice_countdown(st, at, duration):",
+      "        remaining = max(0, int(max(0.0, duration - st) + 0.999))",
+      "        return Text(\"Auto-select in {}s\".format(remaining), style=\"canvasia_choice_timer_text\"), 0.1",
       ...customAchievements.map((definition) => `    achievement.register(${quoteRenpy(definition.id)})`),
+      "",
+      "screen canvasia_timed_choice(items, timeout_seconds=0.0, timeout_value=None):",
+      "    modal True",
+      "    style_prefix \"choice\"",
+      "",
+      "    vbox:",
+      "        for caption, value, enabled in items:",
+      "            textbutton caption action Return(value) sensitive enabled",
+      "",
+      "    if timeout_seconds > 0 and timeout_value is not None:",
+      "        timer timeout_seconds action Return(timeout_value)",
+      "        frame:",
+      "            style \"canvasia_choice_timer_frame\"",
+      "            add DynamicDisplayable(canvasia_timed_choice_countdown, timeout_seconds)",
+      "",
+      "style canvasia_choice_timer_frame is default:",
+      "    xalign 0.5",
+      "    yalign 0.94",
+      "    padding (18, 10)",
+      "    background \"#101a2cdd\"",
+      "",
+      "style canvasia_choice_timer_text is default:",
+      "    color \"#dff7ff\"",
+      "    size 24",
       "",
       ...buildImageDefinitions(assetMap),
       "",

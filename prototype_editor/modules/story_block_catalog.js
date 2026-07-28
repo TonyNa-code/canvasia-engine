@@ -85,7 +85,7 @@
         group: "分支",
         webStatus: "full",
         nativeStatus: "full",
-        note: "支持玩家选项、变量效果、目标场景跳转，以及按变量条件隐藏或锁定选项。",
+        note: "支持玩家选项、变量效果、目标场景跳转、按变量条件隐藏或锁定，以及可暂停并随存档恢复的限时自动选择。",
         tags: ["timelineText", "storyContent", "branch", "localizable"],
       },
       {

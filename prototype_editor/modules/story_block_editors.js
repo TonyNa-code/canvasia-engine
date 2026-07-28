@@ -593,6 +593,7 @@
     const renderDetailRows = getRenderer(options, "renderDetailRows");
     const renderChoiceCountQualityTools = getRenderer(options, "renderChoiceCountQualityTools");
     const renderChoiceOptionEditorRow = getRenderer(options, "renderChoiceOptionEditorRow");
+    const renderTimedChoiceEditor = getRenderer(options, "renderTimedChoiceEditor");
     const choiceOptions = Array.isArray(block?.options) && block.options.length
       ? block.options
       : createDefaultChoiceOptions(block?.id);
@@ -610,6 +611,7 @@
       ["当前选项数", choiceOptions.length],
     ])}
     ${renderChoiceCountQualityTools(choiceOptions.length)}
+    ${renderTimedChoiceEditor(block, choiceOptions)}
     <div id="choiceOptionsEditor" class="option-editor-list">
       ${optionMarkup.join("")}
     </div>

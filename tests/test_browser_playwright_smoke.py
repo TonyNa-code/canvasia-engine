@@ -962,6 +962,69 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
 
         self.assertEqual(option_editors.count(), initial_count)
 
+    def test_timed_choice_pauses_in_menu_and_selects_authored_target(self) -> None:
+        self.create_blank_project("浏览器烟测项目_TimedChoice")
+        self.create_first_chapter()
+
+        self.page.locator("#screen-story").get_by_role("button", name="加选项").first.click()
+        option_editors = self.page.locator("[data-choice-option]")
+        option_editors.first.wait_for(timeout=15000)
+        self.assertGreaterEqual(option_editors.count(), 2)
+        option_editors.nth(0).locator('[data-field="choice-text"]').fill("普通路线 A")
+        option_editors.nth(1).locator('[data-field="choice-text"]').fill("超时路线 B")
+
+        timeout_select = self.page.locator("#editorChoiceTimeoutSeconds")
+        timeout_select.wait_for(timeout=10000)
+        timeout_select.select_option("5")
+        timeout_target = self.page.locator("#editorChoiceTimeoutOptionId")
+        timeout_target.locator("option").nth(2).wait_for(state="attached", timeout=10000)
+        timeout_target.select_option(index=2)
+        authored_target_id = timeout_target.input_value()
+        self.assertTrue(authored_target_id)
+        self.page.get_by_role("button", name="保存这张卡片").click()
+
+        self.page.wait_for_function(
+            """(targetId) => fetch('/api/project-data')
+                .then((response) => response.json())
+                .then((bundle) => (bundle.chapters || []).some((chapter) =>
+                    (chapter.scenes || []).some((scene) =>
+                        (scene.blocks || []).some((block) =>
+                            block.type === 'choice'
+                            && block.timeoutSeconds === 5
+                            && block.timeoutOptionId === targetId
+                            && block.options?.some((option) => option.id === targetId && option.text === '超时路线 B')
+                        )
+                    )
+                ))""",
+            arg=authored_target_id,
+            timeout=15000,
+        )
+
+        self.preview_navigation_button().click()
+        timer = self.page.locator("[data-preview-timed-choice]")
+        for _ in range(24):
+            if timer.count() and timer.is_visible():
+                break
+            next_button = self.page.locator("#previewNextButton")
+            if next_button.is_enabled():
+                next_button.click()
+            self.page.wait_for_timeout(120)
+        timer.wait_for(state="visible", timeout=15000)
+        timer.get_by_text("超时路线 B", exact=False).wait_for(timeout=10000)
+
+        remaining = timer.locator("[data-preview-timed-choice-remaining]")
+        self.page.locator("#previewSystemMenuButton").click()
+        self.page.locator("#previewSystemMenu").wait_for(state="visible", timeout=10000)
+        timer.locator("[data-preview-timed-choice-paused]").wait_for(state="visible", timeout=10000)
+        paused_value = remaining.text_content()
+        self.page.wait_for_timeout(1200)
+        self.assertEqual(remaining.text_content(), paused_value)
+
+        self.page.locator("#previewSystemMenu").get_by_role("button", name="继续试玩").click()
+        self.page.locator("#previewSystemMenu").wait_for(state="hidden", timeout=10000)
+        self.page.locator("#previewLog").get_by_text("已选：超时路线 B", exact=False).wait_for(timeout=8000)
+        self.assertEqual(self.page.locator("#previewChoices button:visible").count(), 0)
+
     def test_story_editor_condition_branch_and_rule_controls(self) -> None:
         self.create_blank_project("浏览器烟测项目_Condition")
         self.create_first_chapter()

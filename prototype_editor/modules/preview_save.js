@@ -73,16 +73,22 @@
       ? source.choiceOptions.map((option) => deepClonePreviewData(option)).filter(Boolean)
       : [];
 
+    const block = source.block && typeof source.block === "object" ? deepClonePreviewData(source.block) : null;
+    const timedChoiceState = typeof options.sanitizeTimedChoiceState === "function"
+      ? options.sanitizeTimedChoiceState(source.timedChoiceState, block)
+      : null;
+
     return {
       sceneId,
       sceneName: String(source.sceneName ?? scene?.name ?? sceneId ?? "试玩记录"),
       blockIndex: Number.isFinite(Number(source.blockIndex)) ? Number(source.blockIndex) : -1,
       blockId: source.blockId == null ? null : String(source.blockId),
       blockType: source.completed ? "complete" : String(source.blockType ?? "dialogue"),
-      block: source.block && typeof source.block === "object" ? deepClonePreviewData(source.block) : null,
+      block,
       visualState: cloneVisualState(source.visualState),
       variables: cloneVariables(source.variables),
       choiceOptions,
+      ...(timedChoiceState ? { timedChoiceState } : {}),
       callStack: sanitizeCallStack(source.callStack),
       transitionTargetSceneId:
         source.transitionTargetSceneId == null ? null : String(source.transitionTargetSceneId),

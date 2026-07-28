@@ -4148,6 +4148,72 @@ class NativeRuntimeRenderSmokeTests(unittest.TestCase):
         self.assertEqual(player.current_block_index, 1)
         self.assertEqual(player.current_line["text"], "安全继续后的下一句。")
 
+    def test_timed_choice_renders_and_selects_authored_target(self) -> None:
+        data_path = self.write_game_data()
+        payload = json.loads(data_path.read_text(encoding="utf-8"))
+        payload["variables"] = {
+            "variables": [
+                {"id": "route", "name": "Route", "type": "number", "defaultValue": 0},
+            ]
+        }
+        payload["chapters"][0]["scenes"][0]["blocks"] = [
+            {
+                "id": "choice_timed",
+                "type": "choice",
+                "timeoutSeconds": 5,
+                "timeoutOptionId": "wait",
+                "options": [
+                    {
+                        "id": "act_now",
+                        "text": "马上行动",
+                        "gotoSceneId": "__continue__",
+                        "effects": [{"type": "variable_set", "variableId": "route", "value": 1}],
+                    },
+                    {
+                        "id": "wait",
+                        "text": "再等等",
+                        "gotoSceneId": "__continue__",
+                        "effects": [{"type": "variable_set", "variableId": "route", "value": 2}],
+                    },
+                ],
+            },
+            {"id": "after_timed_choice", "type": "narration", "text": "限时选择结束。"},
+        ]
+        data_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="The system font .*", category=UserWarning)
+            player = NativeRuntimePlayer(pygame, data_path)
+
+        player.start_story_from_title()
+        timer = player.get_timed_choice_presentation()
+        self.assertTrue(timer["visible"])
+        self.assertFalse(timer["paused"])
+        self.assertEqual(timer["targetLabel"], "再等等")
+        self.assertEqual(timer["remainingLabel"], "5.0 秒")
+        self.assertGreaterEqual(player.get_choice_panel_height(), 260)
+        player.render()
+        self.assert_screen_has_pixels(player)
+
+        player.timed_choice_controller.deadline_ms = player.get_runtime_ticks_ms() + 2400
+        save_snapshot = player.build_save_snapshot("quick")
+        self.assertGreater(save_snapshot["timedChoiceState"]["remainingMs"], 1500)
+        self.assertLessEqual(save_snapshot["timedChoiceState"]["remainingMs"], 2400)
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="The system font .*", category=UserWarning)
+            restored_player = NativeRuntimePlayer(pygame, data_path)
+        restored_player.restore_from_snapshot(save_snapshot)
+        restored_timer = restored_player.get_timed_choice_presentation()
+        self.assertTrue(restored_timer["visible"])
+        self.assertEqual(restored_timer["targetLabel"], "再等等")
+        restored_player.timed_choice_controller.deadline_ms = restored_player.get_runtime_ticks_ms() - 1
+        restored_player.update_timed_choice()
+
+        self.assertIsNone(restored_player.current_choices)
+        self.assertEqual(restored_player.variable_state["route"], 2)
+        self.assertEqual(restored_player.current_line["text"], "限时选择结束。")
+
     def test_native_runtime_renders_ui_skin_overlays_headlessly(self) -> None:
         data_path = self.write_game_data()
         with warnings.catch_warnings():

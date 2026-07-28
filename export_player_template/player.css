@@ -976,6 +976,64 @@ html[data-visual-comfort="static"] .sprite-voice-reactive-layer {
   margin-top: 14px;
 }
 
+.timed-choice-status {
+  display: grid;
+  gap: 8px;
+  padding: 11px 14px;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--brand) 8%, rgba(255, 250, 245, 0.96));
+  border: 1px solid color-mix(in srgb, var(--brand) 28%, transparent);
+  border-radius: 16px;
+}
+
+.timed-choice-copy {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  min-width: 0;
+  font-size: 12px;
+}
+
+.timed-choice-copy > span {
+  overflow: hidden;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.timed-choice-copy b {
+  color: var(--brand-deep);
+  font-variant-numeric: tabular-nums;
+}
+
+.timed-choice-copy em {
+  margin-left: auto;
+  color: var(--brand-deep);
+  font-style: normal;
+  font-weight: 700;
+}
+
+.timed-choice-track {
+  height: 3px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--brand) 12%, transparent);
+  border-radius: 999px;
+}
+
+.timed-choice-track i {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, var(--brand), var(--brand-deep));
+  border-radius: inherit;
+  transform-origin: left center;
+  transition: transform 100ms linear;
+}
+
+.timed-choice-status.is-paused .timed-choice-track i {
+  opacity: 0.5;
+}
+
 .choice-button {
   display: grid;
   gap: 4px;

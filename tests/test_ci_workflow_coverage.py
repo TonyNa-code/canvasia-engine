@@ -219,6 +219,25 @@ class CiWorkflowCoverageTests(unittest.TestCase):
             workflow,
         )
 
+    def test_timed_choice_contract_is_checked_in_ci(self) -> None:
+        workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("native_runtime/runtime_timed_choices.py", workflow)
+        self.assertIn("export_player_template/runtime_timed_choices.js", workflow)
+        self.assertIn("prototype_editor/modules/timed_choice_editor.js", workflow)
+        self.assertIn("tests/test_native_runtime_timed_choices.py", workflow)
+        self.assertIn("tests/test_timed_choice_contract.py", workflow)
+        self.assertIn("tests/test_frontend_runtime_timed_choices_module.py", workflow)
+        self.assertIn("tests/test_frontend_timed_choice_editor_module.py", workflow)
+        self.assertIn(
+            "python -m unittest discover -s tests -p 'test_native_runtime_timed_choices.py' -v",
+            workflow,
+        )
+        self.assertIn(
+            "python -m unittest discover -s tests -p 'test_timed_choice_contract.py' -v",
+            workflow,
+        )
+
     def test_editor_project_presentation_settings_are_checked_in_ci(self) -> None:
         workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
 

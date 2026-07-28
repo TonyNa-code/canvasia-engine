@@ -462,6 +462,83 @@ class RenpyExportContractTests(unittest.TestCase):
         self.assertEqual([warning["code"] for warning in frontend["warnings"]], ["renpy_choice_lock_degraded", "renpy_choice_safety_fallback"])
         self.assertEqual(frontend["warnings"], backend_warnings)
 
+    def test_timed_choice_exports_custom_screen_with_safe_target_parity(self) -> None:
+        block = {
+            "id": "choice_deadline",
+            "type": "choice",
+            "timeoutSeconds": 8.5,
+            "timeoutOptionId": "secret",
+            "options": [
+                {
+                    "id": "locked",
+                    "text": "钥匙门",
+                    "gotoSceneId": "__continue__",
+                    "choiceAvailabilityMode": "disable_when_false",
+                    "choiceAvailabilityWhen": [{"variableId": "has_key", "operator": "==", "value": True}],
+                },
+                {
+                    "id": "secret",
+                    "text": "秘密路线",
+                    "gotoSceneId": "scene_secret",
+                    "choiceAvailabilityMode": "hide_when_false",
+                    "choiceAvailabilityWhen": [{"variableId": "affection", "operator": ">=", "value": 5}],
+                    "effects": [{"type": "variable_add", "variableId": "affection", "value": 1}],
+                },
+                {
+                    "id": "safe",
+                    "text": "再想一想",
+                    "gotoSceneId": "__continue__",
+                },
+            ],
+        }
+        frontend = load_frontend_payload(
+            f"""
+            const block = {json.dumps(block, ensure_ascii=False)};
+            const warnings = [];
+            const lines = tools.renderBlock(block, {{
+              warnings,
+              sceneId: "scene_open",
+              blockIndex: 3,
+              variableMap: new Map([["has_key", {{}}], ["affection", {{ scope: "persistent" }}]]),
+              sceneMap: new Map([["scene_secret", {{ id: "scene_secret" }}]]),
+            }});
+            const draft = tools.buildRenpyDraftExport({{
+              project: {{ title: "Timed Choice Demo" }},
+              variables: [
+                {{ id: "has_key", type: "boolean", defaultValue: false }},
+                {{ id: "affection", type: "number", scope: "persistent", defaultValue: 0 }},
+              ],
+              chapters: [{{ id: "chapter_1", scenes: [{{ id: "scene_open", blocks: [block] }}] }}],
+            }});
+            process.stdout.write(JSON.stringify({{ lines, warnings, script: draft.script }}));
+            """
+        )
+        backend_warnings: list[dict] = []
+        backend_lines = renpy_export.render_choice_block(
+            block,
+            {
+                "warnings": backend_warnings,
+                "variableMap": {"has_key": {}, "affection": {"scope": "persistent"}},
+                "sceneLabelMap": {"scene_secret": "scene_secret"},
+                "sceneId": "scene_open",
+                "blockIndex": 3,
+            },
+        )
+
+        self.assertEqual(frontend["lines"], backend_lines)
+        self.assertEqual(frontend["warnings"], backend_warnings)
+        self.assertIn('    $ _canvasia_choices.append(("钥匙门", "canvasia_choice_4_1", bool(has_key == True)))', backend_lines)
+        self.assertIn("    if persistent.affection >= 5:", backend_lines)
+        self.assertIn('    if any(item[1] == "canvasia_choice_4_2" and item[2] for item in _canvasia_choices):', backend_lines)
+        self.assertIn('    $ _canvasia_choice = renpy.call_screen("canvasia_timed_choice", items=_canvasia_choices, timeout_seconds=8.5, timeout_value=_canvasia_timeout_choice)', backend_lines)
+        self.assertIn("        $ persistent.affection += 1", backend_lines)
+        self.assertIn("screen canvasia_timed_choice(items, timeout_seconds=0.0, timeout_value=None):", frontend["script"])
+        self.assertIn("def canvasia_timed_choice_countdown(st, at, duration):", frontend["script"])
+        self.assertIn("        timer timeout_seconds action Return(timeout_value)", frontend["script"])
+        backend_screens = renpy_export.build_renpy_screens_file({})
+        self.assertIn("screen canvasia_timed_choice(items, timeout_seconds=0.0, timeout_value=None):", backend_screens)
+        self.assertIn("        timer timeout_seconds action Return(timeout_value)", backend_screens)
+
     def test_pop_character_transition_uses_native_renpy_zoom_transitions(self) -> None:
         frontend = load_frontend_payload(
             """

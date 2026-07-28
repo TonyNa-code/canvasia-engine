@@ -17,6 +17,7 @@ from native_runtime.runtime_achievements import (
     collect_custom_achievement_definitions,
     sanitize_achievement_unlock_block,
 )
+from native_runtime.runtime_timed_choices import sanitize_timed_choice_config
 
 
 RENPY_GAME_DIR_NAME = "game"
@@ -1255,10 +1256,117 @@ def render_variable_effect(effect: dict, variable_map: dict[str, dict], warnings
     return [f"{indent}# Canvasia review choice effect: {clean_text(effect_type, 'unknown')}"]
 
 
+def get_choice_availability(option: dict, context: dict) -> dict:
+    mode = clean_text(option.get("choiceAvailabilityMode") or option.get("availabilityMode"), "always")
+    if mode not in {"hide_when_false", "disable_when_false"}:
+        mode = "always"
+    rules = as_list(option.get("choiceAvailabilityWhen") or option.get("availabilityWhen"))
+    expression = " and ".join(
+        render_condition_rule_expression(rule, context) for rule in rules
+    ) if rules else "False"
+    return {"mode": mode, "expression": expression}
+
+
+def render_choice_outcome_lines(option: dict, context: dict, indent: str = "            ") -> list[str]:
+    lines: list[str] = []
+    for effect in as_list(option.get("effects")):
+        lines.extend(render_variable_effect(effect, context["variableMap"], context["warnings"], indent))
+    target_scene_id = clean_text(option.get("gotoSceneId") or option.get("targetSceneId") or option.get("target"))
+    if target_scene_id and target_scene_id != CHOICE_CONTINUE_TARGET:
+        lines.append(f"{indent}jump {get_scene_label(context['sceneLabelMap'], target_scene_id)}")
+    else:
+        lines.append(f"{indent}pass")
+    return lines
+
+
+def get_timed_choice_result_key(context: dict, option_index: int) -> str:
+    block_number = max(0, int(context.get("blockIndex") or 0)) + 1
+    return f"canvasia_choice_{block_number}_{option_index + 1}"
+
+
+def render_timed_choice_block(block: dict, context: dict, config: dict | None = None) -> list[str]:
+    warnings = context["warnings"]
+    variable_map = context["variableMap"]
+    scene_id = context.get("sceneId")
+    block_index = context.get("blockIndex")
+    options = as_list(block.get("options"))
+    config = config or sanitize_timed_choice_config(block)
+    lines = ["    $ _canvasia_choices = []"]
+    gated_expressions: list[str] = []
+    has_always_option = False
+
+    for option_index, option in enumerate(options):
+        option_text = convert_runtime_text_variables(
+            clean_text(option.get("text") or option.get("label"), f"Option {option_index + 1}"),
+            variable_map,
+        )
+        result_key = get_timed_choice_result_key(context, option_index)
+        availability = get_choice_availability(option, context)
+        item_expression = f"({quote_renpy(option_text)}, {quote_renpy(result_key)}, True)"
+        if availability["mode"] == "always":
+            has_always_option = True
+            lines.append(f"    $ _canvasia_choices.append({item_expression})")
+        elif availability["mode"] == "hide_when_false":
+            gated_expressions.append(availability["expression"])
+            lines.append(f"    if {availability['expression']}:")
+            lines.append(f"        $ _canvasia_choices.append({item_expression})")
+        else:
+            gated_expressions.append(availability["expression"])
+            lines.append(
+                f"    $ _canvasia_choices.append(({quote_renpy(option_text)}, {quote_renpy(result_key)}, bool({availability['expression']})))"
+            )
+
+    lines.extend(
+        [
+            "    $ _canvasia_selectable_choices = [item for item in _canvasia_choices if item[2]]",
+            "    if not _canvasia_selectable_choices:",
+            f"        $ _canvasia_choices.append(({quote_renpy('Continue (safety fallback)')}, {quote_renpy('__canvasia_safety__')}, True))",
+            "        $ _canvasia_selectable_choices = [_canvasia_choices[-1]]",
+            "    $ _canvasia_timeout_choice = _canvasia_selectable_choices[0][1]",
+        ]
+    )
+
+    configured_option_id = clean_text(config.get("timeoutOptionId"))
+    configured_option_index = next(
+        (
+            option_index
+            for option_index, option in enumerate(options)
+            if clean_text(option.get("id")) and clean_text(option.get("id")) == configured_option_id
+        ),
+        -1,
+    )
+    if configured_option_index >= 0:
+        configured_result_key = get_timed_choice_result_key(context, configured_option_index)
+        lines.extend(
+            [
+                f"    if any(item[1] == {quote_renpy(configured_result_key)} and item[2] for item in _canvasia_choices):",
+                f"        $ _canvasia_timeout_choice = {quote_renpy(configured_result_key)}",
+            ]
+        )
+    lines.append(
+        f"    $ _canvasia_choice = renpy.call_screen(\"canvasia_timed_choice\", items=_canvasia_choices, timeout_seconds={float(config['timeoutSeconds']):g}, timeout_value=_canvasia_timeout_choice)"
+    )
+
+    for option_index, option in enumerate(options):
+        keyword = "if" if option_index == 0 else "elif"
+        lines.append(f"    {keyword} _canvasia_choice == {quote_renpy(get_timed_choice_result_key(context, option_index))}:")
+        lines.extend(render_choice_outcome_lines(option, context, "        "))
+    lines.extend(["    else:", "        pass"])
+
+    if not has_always_option and gated_expressions:
+        add_warning(
+            warnings,
+            "renpy_choice_safety_fallback",
+            "这组选项没有始终可选的保底项；Ren'Py 草稿已加入只在全部条件不满足时出现的安全继续。",
+            sceneId=scene_id,
+            blockIndex=block_index,
+        )
+    return lines
+
+
 def render_choice_block(block: dict, context: dict) -> list[str]:
     warnings = context["warnings"]
     variable_map = context["variableMap"]
-    scene_label_map = context["sceneLabelMap"]
     scene_id = context.get("sceneId")
     block_index = context.get("blockIndex")
     lines = ["    menu:"]
@@ -1266,6 +1374,9 @@ def render_choice_block(block: dict, context: dict) -> list[str]:
     if not options:
         add_warning(warnings, "renpy_empty_choice", "选项卡没有选项，已导出 pass。", sceneId=scene_id, blockIndex=block_index)
         return [*lines, "        pass"]
+    timed_choice_config = sanitize_timed_choice_config(block)
+    if timed_choice_config["enabled"]:
+        return render_timed_choice_block(block, context, timed_choice_config)
     gated_expressions: list[str] = []
     has_always_option = False
     for option_index, option in enumerate(options):
@@ -1273,21 +1384,14 @@ def render_choice_block(block: dict, context: dict) -> list[str]:
             clean_text(option.get("text") or option.get("label"), f"Option {option_index + 1}"),
             variable_map,
         )
-        target_scene_id = clean_text(option.get("gotoSceneId") or option.get("targetSceneId") or option.get("target"))
-        mode = clean_text(option.get("choiceAvailabilityMode") or option.get("availabilityMode"), "always")
-        if mode not in {"hide_when_false", "disable_when_false"}:
-            mode = "always"
-        rules = as_list(option.get("choiceAvailabilityWhen") or option.get("availabilityWhen"))
-        expression = " and ".join(
-            render_condition_rule_expression(rule, context) for rule in rules
-        ) if rules else "False"
+        availability = get_choice_availability(option, context)
         condition_clause = ""
-        if mode == "always":
+        if availability["mode"] == "always":
             has_always_option = True
         else:
-            gated_expressions.append(expression)
-            condition_clause = f" if {expression}"
-            if mode == "disable_when_false":
+            gated_expressions.append(availability["expression"])
+            condition_clause = f" if {availability['expression']}"
+            if availability["mode"] == "disable_when_false":
                 add_warning(
                     warnings,
                     "renpy_choice_lock_degraded",
@@ -1297,12 +1401,7 @@ def render_choice_block(block: dict, context: dict) -> list[str]:
                     optionIndex=option_index,
                 )
         lines.append(f"        {quote_renpy(option_text)}{condition_clause}:")
-        for effect in as_list(option.get("effects")):
-            lines.extend(render_variable_effect(effect, variable_map, warnings, "            "))
-        if target_scene_id and target_scene_id != CHOICE_CONTINUE_TARGET:
-            lines.append(f"            jump {get_scene_label(scene_label_map, target_scene_id)}")
-        else:
-            lines.append("            pass")
+        lines.extend(render_choice_outcome_lines(option, context))
     if not has_always_option and gated_expressions:
         all_unavailable_expression = " not (" + " or ".join(f"({expression})" for expression in gated_expressions) + ")"
         lines.append(f"        {quote_renpy('Continue (safety fallback)')} if{all_unavailable_expression}:")
@@ -1731,6 +1830,10 @@ def build_renpy_draft_export(bundle: dict, assets_doc: dict | None = None) -> di
         "        except (TypeError, ValueError):",
         "            return None",
         "        return int(number) if number.is_integer() else number",
+        "",
+        "    def canvasia_timed_choice_countdown(st, at, duration):",
+        "        remaining = max(0, int(max(0.0, duration - st) + 0.999))",
+        "        return Text(\"Auto-select in {}s\".format(remaining), style=\"canvasia_choice_timer_text\"), 0.1",
         *(f"    achievement.register({quote_renpy(definition['id'])})" for definition in custom_achievements),
         "",
         *build_variable_definitions(variable_map),
@@ -2004,8 +2107,8 @@ def build_renpy_screens_file(bundle: dict, assets_doc: dict | None = None) -> st
     font_style_lines = build_dialog_font_style_lines(summary)
     return "\n".join(
         [
-            "# Canvasia Ren'Py dialogue screen",
-            "# Generated from the project textbox settings. You can keep editing it in Ren'Py.",
+            "# Canvasia Ren'Py dialogue and timed-choice screens",
+            "# Generated from project presentation settings. You can keep editing them in Ren'Py.",
             "",
             "screen say(who, what):",
             "    window:",
@@ -2040,6 +2143,30 @@ def build_renpy_screens_file(bundle: dict, assets_doc: dict | None = None) -> st
             "    size 32",
             "    line_spacing 8",
             "    outlines [(1, \"#00000066\", 0, 0)]",
+            "",
+            "screen canvasia_timed_choice(items, timeout_seconds=0.0, timeout_value=None):",
+            "    modal True",
+            "    style_prefix \"choice\"",
+            "",
+            "    vbox:",
+            "        for caption, value, enabled in items:",
+            "            textbutton caption action Return(value) sensitive enabled",
+            "",
+            "    if timeout_seconds > 0 and timeout_value is not None:",
+            "        timer timeout_seconds action Return(timeout_value)",
+            "        frame:",
+            "            style \"canvasia_choice_timer_frame\"",
+            "            add DynamicDisplayable(canvasia_timed_choice_countdown, timeout_seconds)",
+            "",
+            "style canvasia_choice_timer_frame is default:",
+            "    xalign 0.5",
+            "    yalign 0.94",
+            "    padding (18, 10)",
+            "    background \"#101a2cdd\"",
+            "",
+            "style canvasia_choice_timer_text is default:",
+            "    color \"#dff7ff\"",
+            "    size 24",
             "",
             "# Canvasia textbox reference:",
             f"# anchor={summary['anchor']} widthPercent={summary['widthPercent']} panel={summary['panelAssetPath'] or 'color'} font={summary['fontAssetPath'] or summary['fontFamily'] or summary['fontStyle']} border={summary['borderColor']} borderWidth={summary['borderWidth']} shadow={summary['shadowStrength']}",
@@ -2089,7 +2216,7 @@ def build_renpy_readme(export_result: dict) -> str:
             "",
             f"- `{RENPY_GAME_DIR_NAME}/{RENPY_SCRIPT_FILE_NAME}`: converted labels, dialogue, choices, audio cues, variables, and basic presentation commands.",
             f"- `{RENPY_GAME_DIR_NAME}/{RENPY_OPTIONS_FILE_NAME}`: project title, resolution, and default text/audio preferences.",
-            f"- `{RENPY_GAME_DIR_NAME}/{RENPY_SCREENS_FILE_NAME}`: generated dialogue screen and textbox style based on the project textbox settings.",
+            f"- `{RENPY_GAME_DIR_NAME}/{RENPY_SCREENS_FILE_NAME}`: generated dialogue, timed-choice, and textbox styles based on project settings.",
             f"- `{RENPY_GAME_DIR_NAME}/assets/`: copied assets referenced by the generated script.",
             f"- `{RENPY_REVIEW_FILE_NAME}`: review notes for custom effects and migration gaps.",
             f"- `{RENPY_MANIFEST_FILE_NAME}`: machine-readable export summary.",

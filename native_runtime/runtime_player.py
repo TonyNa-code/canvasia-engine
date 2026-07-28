@@ -393,6 +393,21 @@ except ImportError:  # pragma: no cover - exported native packages import from t
     )
 
 try:
+    from .runtime_timed_choices import (
+        NativeTimedChoiceController,
+        build_native_timed_choice_presentation,
+        sanitize_timed_choice_config,
+        sanitize_timed_choice_state,
+    )
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_timed_choices import (
+        NativeTimedChoiceController,
+        build_native_timed_choice_presentation,
+        sanitize_timed_choice_config,
+        sanitize_timed_choice_state,
+    )
+
+try:
     from .runtime_story_flow import (
         create_story_call_transition,
         create_story_return_transition,
@@ -8317,6 +8332,9 @@ class NativeRuntimePlayer:
         self.speaker_focus_controller = NativeSpeakerFocusController()
         self.dialogue_camera_controller = NativeDialogueCameraController()
         self.voice_reactive_motion_controller = NativeVoiceReactiveMotionController()
+        self.timed_choice_controller = NativeTimedChoiceController()
+        self.pending_timed_choice_state: dict | None = None
+        self.timed_choice_last_persist_bucket: int | None = None
         self.current_choices: list[dict] | None = None
         self.current_choice_index = 0
         self.title_screen_active = False
@@ -10678,6 +10696,7 @@ class NativeRuntimePlayer:
         return True
 
     def build_save_snapshot(self, kind: str) -> dict:
+        timed_choice_state = self.timed_choice_controller.serialize(self.get_runtime_ticks_ms())
         return {
             "kind": kind,
             "savedAt": now_iso(),
@@ -10701,6 +10720,7 @@ class NativeRuntimePlayer:
             "currentBgmAssetId": self.current_bgm_asset_id,
             "currentBgmVolume": self.current_bgm_volume_percent,
             "currentBgmScope": dict(self.current_bgm_scope) if isinstance(self.current_bgm_scope, dict) else None,
+            "timedChoiceState": timed_choice_state,
             "finished": self.finished,
             "finishedMessage": self.finished_message,
             "summaryText": self.get_current_line_preview()[:96],
@@ -10813,6 +10833,8 @@ class NativeRuntimePlayer:
         self.current_line = None
         self.current_choices = None
         self.current_choice_index = 0
+        self.timed_choice_controller.reset()
+        self.pending_timed_choice_state = snapshot.get("timedChoiceState") if isinstance(snapshot.get("timedChoiceState"), dict) else None
         self.restore_text_history_from_snapshot(snapshot)
         self.finished = bool(snapshot.get("finished"))
         self.finished_message = str(snapshot.get("finishedMessage") or "")
@@ -11310,6 +11332,8 @@ class NativeRuntimePlayer:
     def _advance_until_pause(self) -> None:
         self.current_line = None
         self.current_choices = None
+        self.timed_choice_controller.reset()
+        self.pending_timed_choice_state = None
 
         while not self.finished:
             scene = self.get_current_scene()
@@ -12106,6 +12130,24 @@ class NativeRuntimePlayer:
                 return False
         return True
 
+    def get_current_choice_key(self, block: dict | None = None) -> str:
+        block = block if isinstance(block, dict) else {}
+        block_id = str(block.get("id") or f"choice_{self.current_block_index}").strip()
+        return f"{self.current_scene_id}:{self.current_block_index}:{block_id}"
+
+    def get_timed_choice_presentation(self) -> dict:
+        timer_state = self.timed_choice_controller.snapshot(self.get_runtime_ticks_ms())
+        return build_native_timed_choice_presentation(timer_state, self.current_choices)
+
+    def get_choice_panel_height(self) -> int:
+        timer = self.get_timed_choice_presentation()
+        extra_height = timer["extraHeight"] if timer["visible"] else 0
+        return max(212 + extra_height, 86 + len(self.current_choices or []) * 54 + extra_height)
+
+    def get_choice_button_top(self, panel, padding_y: int) -> int:
+        timer = self.get_timed_choice_presentation()
+        return panel.top + padding_y + self.font_title.get_height() + 18 + (timer["extraHeight"] if timer["visible"] else 0)
+
     def pause_on_choice_block(self, block: dict) -> None:
         resolution = resolve_runtime_choice_options(
             block.get("options", []) or [],
@@ -12115,6 +12157,22 @@ class NativeRuntimePlayer:
         self.current_choice_index = find_selectable_choice_index(self.current_choices, 0)
         if self.current_choice_index < 0:
             self.current_choice_index = 0
+        choice_key = self.get_current_choice_key(block)
+        stored_state = sanitize_timed_choice_state(self.pending_timed_choice_state, block)
+        remaining_ms = (
+            stored_state.get("remainingMs")
+            if stored_state and stored_state.get("choiceKey") == choice_key
+            else None
+        )
+        timer_state = self.timed_choice_controller.start(
+            choice_key=choice_key,
+            block=block,
+            choice_options=self.current_choices,
+            now_ms=self.get_runtime_ticks_ms(),
+            remaining_ms=remaining_ms,
+            paused=bool(self.overlay_mode),
+        )
+        self.pending_timed_choice_state = None
         self.stop_flow_assist()
         if resolution["safetyOption"]:
             self.status_message = "选项条件没有留下可选路线，已启用安全继续；请让作者修复门控规则。"
@@ -12123,6 +12181,49 @@ class NativeRuntimePlayer:
                 f"当前为选项卡：{len(self.current_choices)} 个可见分支"
                 f"（隐藏 {resolution['hiddenCount']}，锁定 {resolution['lockedCount']}）"
             )
+        if timer_state["active"]:
+            config = sanitize_timed_choice_config(block)
+            self.timed_choice_last_persist_bucket = math.ceil(timer_state["remainingMs"] / 1000)
+            self.status_message += f" · 限时 {config['timeoutSeconds']:g} 秒，菜单打开时暂停"
+        else:
+            self.timed_choice_last_persist_bucket = None
+
+    def update_timed_choice(self) -> None:
+        if not self.current_choices:
+            self.timed_choice_controller.reset()
+            self.timed_choice_last_persist_bucket = None
+            return
+        try:
+            window_active = bool(self.pygame.display.get_active())
+        except Exception:
+            window_active = True
+        now_ms = self.get_runtime_ticks_ms()
+        target_option_id = self.timed_choice_controller.update(
+            now_ms,
+            paused=bool(self.overlay_mode or self.ui_hidden or not window_active),
+        )
+        timer_state = self.timed_choice_controller.snapshot(now_ms)
+        if timer_state["active"]:
+            persist_bucket = math.ceil(timer_state["remainingMs"] / 1000)
+            if self.timed_choice_last_persist_bucket != persist_bucket:
+                self.timed_choice_last_persist_bucket = persist_bucket
+                if self.auto_resume_write_enabled:
+                    self.persist_auto_resume_snapshot()
+        if not target_option_id:
+            return
+        option_index = next(
+            (
+                index
+                for index, option in enumerate(self.current_choices)
+                if str(option.get("id") or "") == target_option_id and is_choice_option_selectable(option)
+            ),
+            find_selectable_choice_index(self.current_choices, 0),
+        )
+        if option_index < 0:
+            self.status_message = "限时选择结束，但当前没有可安全进入的分支。"
+            return
+        self.status_message = "限时选择结束，已自动进入预设分支。"
+        self.choose_current_option(option_index)
 
     def resolve_condition(self, block: dict) -> None:
         for branch in block.get("branches", []) or []:
@@ -12163,6 +12264,9 @@ class NativeRuntimePlayer:
         self.current_block_index += 1
         target_scene_id = option.get("gotoSceneId") or option.get("targetSceneId")
         self.current_choices = None
+        self.timed_choice_controller.reset()
+        self.pending_timed_choice_state = None
+        self.timed_choice_last_persist_bucket = None
         if target_scene_id and str(target_scene_id).strip() != CHOICE_CONTINUE_TARGET:
             self.set_scene(target_scene_id)
         self.advance_until_pause()
@@ -12861,13 +12965,14 @@ class NativeRuntimePlayer:
 
     def render_choices(self) -> None:
         option_count = len(self.current_choices or [])
-        panel = self.get_dialog_panel_rect(max(212, 86 + option_count * 54))
+        panel = self.get_dialog_panel_rect(self.get_choice_panel_height())
         self.draw_dialog_panel(panel)
         padding_x = int(self.dialog_box_config.get("paddingX", 18))
         padding_y = int(self.dialog_box_config.get("paddingY", 14))
         title = self.font_title.render("请选择下一步", True, self.dialog_box_config.get("speakerColor", COLOR_TEXT))
         self.screen.blit(title, (panel.left + padding_x, panel.top + padding_y))
-        button_top = panel.top + padding_y + title.get_height() + 18
+        timer = self.get_timed_choice_presentation()
+        button_top = self.get_choice_button_top(panel, padding_y)
         button_left = panel.left + padding_x
         button_width = panel.width - padding_x * 2
         active_fill = with_alpha(self.dialog_box_config.get("borderColor", COLOR_ACCENT), 88)
@@ -12876,6 +12981,28 @@ class NativeRuntimePlayer:
             max(0, self.scale_dialog_opacity(self.dialog_box_config.get("backgroundOpacity", 0))),
         )
         border_color = with_alpha(self.dialog_box_config.get("borderColor", COLOR_PANEL_BORDER), max(24, self.dialog_box_config.get("borderOpacity", 0)))
+
+        if timer["visible"]:
+            timer_top = panel.top + padding_y + title.get_height() + 7
+            timer_label = f"限时选择 · {timer['remainingLabel']} 后自动选择「{timer['targetLabel']}」"
+            if timer["paused"]:
+                timer_label += " · 已暂停"
+            timer_label = ellipsize_text(self.font_ui, timer_label, button_width)
+            self.screen.blit(
+                self.font_ui.render(timer_label, True, self.dialog_box_config.get("hintColor", COLOR_TEXT_MUTED)),
+                (button_left, timer_top),
+            )
+            track_rect = self.pygame.Rect(button_left, timer_top + 25, button_width, 4)
+            self.pygame.draw.rect(self.screen, border_color, track_rect, border_radius=2)
+            remaining_ratio = max(0.0, min(1.0, 1.0 - float(timer["progress"])))
+            fill_rect = self.pygame.Rect(track_rect.left, track_rect.top, round(track_rect.width * remaining_ratio), track_rect.height)
+            if fill_rect.width > 0:
+                self.pygame.draw.rect(
+                    self.screen,
+                    self.dialog_box_config.get("speakerColor", COLOR_ACCENT),
+                    fill_rect,
+                    border_radius=2,
+                )
 
         for index, option in enumerate(self.current_choices or []):
             row_rect = self.pygame.Rect(button_left, button_top + index * 52, button_width, 40)
@@ -14910,10 +15037,10 @@ class NativeRuntimePlayer:
             elif event.key in (self.pygame.K_RETURN, self.pygame.K_SPACE):
                 self.choose_current_option(self.current_choice_index)
         elif event.type == self.pygame.MOUSEBUTTONDOWN and event.button == 1:
-            panel = self.get_dialog_panel_rect(max(212, 86 + len(self.current_choices) * 54))
+            panel = self.get_dialog_panel_rect(self.get_choice_panel_height())
             padding_x = int(self.dialog_box_config.get("paddingX", 18))
             padding_y = int(self.dialog_box_config.get("paddingY", 14))
-            button_top = panel.top + padding_y + self.font_title.get_height() + 18
+            button_top = self.get_choice_button_top(panel, padding_y)
             button_width = panel.width - padding_x * 2
             for index, _option in enumerate(self.current_choices):
                 row_rect = self.pygame.Rect(panel.left + padding_x, button_top + index * 52, button_width, 40)
@@ -14944,6 +15071,9 @@ class NativeRuntimePlayer:
                     break
             if running:
                 running = self.handle_controller_repeat()
+            if not running:
+                break
+            self.update_timed_choice()
             self.update_stage_visual_effects(dt_seconds)
             self.update_particle_effect(dt_seconds)
             self.update_voice_playback_state()

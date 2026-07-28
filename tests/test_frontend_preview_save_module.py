@@ -28,7 +28,7 @@ class FrontendPreviewSaveModuleTests(unittest.TestCase):
               blockIndex: "2",
               blockId: 42,
               blockType: "choice",
-              block: {{ text: "继续调查", nested: {{ ok: true }} }},
+              block: {{ text: "继续调查", timeoutSeconds: 10, nested: {{ ok: true }} }},
               visualState: {{ backgroundId: "bg_1" }},
               variables: {{ affection: 3 }},
               choiceOptions: [
@@ -36,6 +36,7 @@ class FrontendPreviewSaveModuleTests(unittest.TestCase):
                 null,
                 () => "ignored",
               ],
+              timedChoiceState: {{ choiceKey: "scene_a:2:42", remainingMs: 4200 }},
               transitionTargetSceneId: 99,
               selectedOptionId: "choice_a",
               resolvedBranchId: 77,
@@ -44,6 +45,9 @@ class FrontendPreviewSaveModuleTests(unittest.TestCase):
               getSceneById: (sceneId) => sceneNames.get(sceneId),
               cloneVisualState: (value) => ({{ clonedVisual: value?.backgroundId ?? "" }}),
               cloneVariables: (value) => ({{ clonedVariables: value?.affection ?? 0 }}),
+              sanitizeTimedChoiceState: (value, block) => block?.timeoutSeconds
+                ? {{ choiceKey: String(value?.choiceKey ?? ""), remainingMs: Number(value?.remainingMs ?? 0) }}
+                : null,
             }});
             const sanitizedSession = tools.sanitizeStoredPreviewSession({{
               startSceneId: null,
@@ -131,6 +135,10 @@ class FrontendPreviewSaveModuleTests(unittest.TestCase):
         self.assertEqual(payload["sanitizedSnapshot"]["visualState"], {"clonedVisual": "bg_1"})
         self.assertEqual(payload["sanitizedSnapshot"]["variables"], {"clonedVariables": 3})
         self.assertEqual(len(payload["sanitizedSnapshot"]["choiceOptions"]), 1)
+        self.assertEqual(
+            payload["sanitizedSnapshot"]["timedChoiceState"],
+            {"choiceKey": "scene_a:2:42", "remainingMs": 4200},
+        )
         self.assertEqual(payload["sanitizedSnapshot"]["transitionTargetSceneId"], "99")
         self.assertEqual(payload["sanitizedSnapshot"]["resolvedBranchId"], "77")
         self.assertEqual(payload["sanitizedSession"]["startSceneId"], "safe:scene_a")
