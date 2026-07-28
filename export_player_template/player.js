@@ -112,6 +112,19 @@ import {
 } from "./runtime_visual_comfort.js";
 import { buildSpeakerFocusPresentation } from "./runtime_speaker_focus.js";
 import {
+  buildStageCameraPresentation,
+  getCameraPanStrengthLabel,
+  getCameraPanTargetLabel,
+  getCameraZoomActionLabel,
+  getCameraZoomFocusLabel,
+  getCameraZoomStrengthLabel,
+  getSafeCameraPanStrength,
+  getSafeCameraPanTarget,
+  getSafeCameraZoomAction,
+  getSafeCameraZoomFocus,
+  getSafeCameraZoomStrength,
+} from "./runtime_dialogue_camera.js";
+import {
   applyReadingProfile,
   detectReadingProfile,
   getReadingProfileLabel,
@@ -140,8 +153,7 @@ import {
   PARTICLE_IMAGE_ASSET_TYPES, PARTICLE_INTENSITY_LABELS, PARTICLE_OPACITY_CURVE_LABELS, PARTICLE_PRESET_ADVANCED_DEFAULTS,
   PARTICLE_PRESET_DEFAULTS, PARTICLE_PRESET_LABELS, PARTICLE_SIZE_CURVE_LABELS, PARTICLE_SPEED_LABELS,
   PARTICLE_WIND_LABELS,
-  CAMERA_PAN_STRENGTH_LABELS, CAMERA_PAN_TARGET_LABELS, CAMERA_ZOOM_ACTION_LABELS, CAMERA_ZOOM_FOCUS_LABELS,
-  CAMERA_ZOOM_STRENGTH_LABELS, CREDITS_BACKGROUND_LABELS,
+  CREDITS_BACKGROUND_LABELS,
   DEPTH_BLUR_ACTION_LABELS, DEPTH_BLUR_FOCUS_LABELS, DEPTH_BLUR_STRENGTH_LABELS,
   EFFECT_DURATION_LABELS, FADE_ACTION_LABELS, FADE_COLOR_LABELS, FLASH_COLOR_LABELS, FLASH_INTENSITY_LABELS,
   MUSIC_END_MODE_LABELS, SAVE_DIALOG_PAGE_SIZE,
@@ -9903,92 +9915,6 @@ function getFadeColorRgb(color) {
   }[getSafeFadeColor(color)];
 }
 
-function getSafeCameraZoomAction(action) {
-  return Object.hasOwn(CAMERA_ZOOM_ACTION_LABELS, action) ? action : "zoom_in";
-}
-
-function getCameraZoomActionLabel(action) {
-  return CAMERA_ZOOM_ACTION_LABELS[getSafeCameraZoomAction(action)];
-}
-
-function getSafeCameraZoomStrength(strength) {
-  return Object.hasOwn(CAMERA_ZOOM_STRENGTH_LABELS, strength) ? strength : "medium";
-}
-
-function getCameraZoomStrengthLabel(strength) {
-  return CAMERA_ZOOM_STRENGTH_LABELS[getSafeCameraZoomStrength(strength)];
-}
-
-function getSafeCameraZoomFocus(focus) {
-  return Object.hasOwn(CAMERA_ZOOM_FOCUS_LABELS, focus) ? focus : "center";
-}
-
-function getCameraZoomFocusLabel(focus) {
-  return CAMERA_ZOOM_FOCUS_LABELS[getSafeCameraZoomFocus(focus)];
-}
-
-function getCameraZoomScale(action, strength) {
-  const safeAction = getSafeCameraZoomAction(action);
-  const safeStrength = getSafeCameraZoomStrength(strength);
-
-  if (safeAction === "reset") {
-    return 1;
-  }
-
-  const zoomInScale = {
-    light: 1.08,
-    medium: 1.16,
-    heavy: 1.26,
-  };
-
-  const zoomOutScale = {
-    light: 0.96,
-    medium: 0.92,
-    heavy: 0.88,
-  };
-
-  return safeAction === "zoom_out" ? zoomOutScale[safeStrength] : zoomInScale[safeStrength];
-}
-
-function getCameraZoomOrigin(focus) {
-  return {
-    left: "28% 52%",
-    center: "50% 52%",
-    right: "72% 52%",
-  }[getSafeCameraZoomFocus(focus)];
-}
-
-function getSafeCameraPanTarget(target) {
-  return Object.hasOwn(CAMERA_PAN_TARGET_LABELS, target) ? target : "center";
-}
-
-function getCameraPanTargetLabel(target) {
-  return CAMERA_PAN_TARGET_LABELS[getSafeCameraPanTarget(target)];
-}
-
-function getSafeCameraPanStrength(strength) {
-  return Object.hasOwn(CAMERA_PAN_STRENGTH_LABELS, strength) ? strength : "medium";
-}
-
-function getCameraPanStrengthLabel(strength) {
-  return CAMERA_PAN_STRENGTH_LABELS[getSafeCameraPanStrength(strength)];
-}
-
-function getCameraPanOffset(target, strength) {
-  const safeTarget = getSafeCameraPanTarget(target);
-  if (safeTarget === "center") {
-    return 0;
-  }
-
-  const amount = {
-    light: 4,
-    medium: 8,
-    heavy: 12,
-  }[getSafeCameraPanStrength(strength)];
-
-  return safeTarget === "left" ? amount : -amount;
-}
-
 function getSafeScreenFilterAction(action) {
   return Object.hasOwn(SCREEN_FILTER_ACTION_LABELS, action) ? action : "apply";
 }
@@ -10403,13 +10329,17 @@ function getParticleImageUrl(assetId) {
 }
 
 function applyStageWorldPresentation(visualState) {
-  const zoomScale = visualState.cameraZoom
-    ? getCameraZoomScale(visualState.cameraZoom.action, visualState.cameraZoom.strength)
-    : 1;
-  const panOffset = visualState.cameraPan
-    ? getCameraPanOffset(visualState.cameraPan.target, visualState.cameraPan.strength)
-    : 0;
-  const zoomOrigin = getCameraZoomOrigin(visualState.cameraZoom?.focus);
+  const cameraPresentation = buildStageCameraPresentation({
+    cameraZoom: visualState.cameraZoom,
+    cameraPan: visualState.cameraPan,
+    activeCharacterId: visualState.activeCharacterId,
+    visibleCharacters: visualState.visibleCharacters,
+    gameUiConfig: data.project?.gameUiConfig,
+    visualComfortMode: state.playback.visualComfort,
+  });
+  const zoomScale = cameraPresentation.zoomScale;
+  const panOffset = cameraPresentation.panPercent;
+  const zoomOrigin = cameraPresentation.transformOrigin;
   const filterCss = getScreenFilterCss(visualState.screenFilter);
   const wash = getScreenFilterWash(visualState.screenFilter);
   const depthBackdropFilter = visualState.depthBlur
@@ -10418,6 +10348,14 @@ function applyStageWorldPresentation(visualState) {
   const depthParticleFilter = visualState.depthBlur
     ? `blur(${getDepthBlurParticlePx(visualState.depthBlur.strength)}px)`
     : "";
+
+  refs.stageFrame.style.setProperty(
+    "--dialogue-camera-transition-ms",
+    `${cameraPresentation.transitionMs}ms`
+  );
+  refs.stageFrame.dataset.dialogueCamera = cameraPresentation.autoActive
+    ? cameraPresentation.mode
+    : "off";
 
   refs.backgroundLayer.style.transform = `translate3d(${panOffset.toFixed(2)}%, 0, 0) scale(${(zoomScale * 1.02).toFixed(3)})`;
   refs.stageImageBackLayer.style.transform = `translate3d(${panOffset.toFixed(2)}%, 0, 0) scale(${zoomScale.toFixed(3)})`;

@@ -56,6 +56,9 @@ class FrontendRuntimeUiSkinModuleTests(unittest.TestCase):
                 speakerFocusMode: "broken",
                 speakerFocusIntensity: 999,
                 speakerFocusTransitionMs: -10,
+                dialogueCameraMode: "broken",
+                dialogueCameraIntensity: 999,
+                dialogueCameraTransitionMs: -10,
                 panelFrameSlice: { top: -9, right: 120, bottom: 12, left: 18 },
               },
             };
@@ -106,6 +109,9 @@ class FrontendRuntimeUiSkinModuleTests(unittest.TestCase):
         self.assertEqual(payload["gameUi"]["speakerFocusMode"], "soft")
         self.assertEqual(payload["gameUi"]["speakerFocusIntensity"], 100)
         self.assertEqual(payload["gameUi"]["speakerFocusTransitionMs"], 0)
+        self.assertEqual(payload["gameUi"]["dialogueCameraMode"], "soft")
+        self.assertEqual(payload["gameUi"]["dialogueCameraIntensity"], 100)
+        self.assertEqual(payload["gameUi"]["dialogueCameraTransitionMs"], 0)
         self.assertEqual(payload["gameUi"]["panelFrameSlice"], {"top": 0, "right": 96, "bottom": 12, "left": 18})
         self.assertEqual(payload["rgba"], "rgba(16, 32, 48, 0.25)")
         self.assertNotIn("\n", payload["presentation"]["style"])
@@ -145,6 +151,11 @@ class FrontendRuntimeUiSkinModuleTests(unittest.TestCase):
               dialogRuntime: runtime.getProjectDialogBoxConfig(project),
               gameUiEditor: editor.getProjectGameUiConfig(project),
               gameUiRuntime: runtime.getProjectGameUiConfig(project),
+              presets: ["stellar", "warm", "paper", "minimal"].map((preset) => ({{
+                preset,
+                editor: editor.getProjectGameUiConfig({{ gameUiConfig: {{ preset }} }}),
+                runtime: runtime.getProjectGameUiConfig({{ gameUiConfig: {{ preset }} }}),
+              }})),
             }}));
             """
         )
@@ -160,6 +171,8 @@ class FrontendRuntimeUiSkinModuleTests(unittest.TestCase):
         payload = json.loads(completed.stdout)
         self.assertEqual(payload["dialogEditor"], payload["dialogRuntime"])
         self.assertEqual(payload["gameUiEditor"], payload["gameUiRuntime"])
+        for preset in payload["presets"]:
+            self.assertEqual(preset["editor"], preset["runtime"], preset["preset"])
 
     def test_skin_applies_css_branding_and_custom_font_with_safe_fallback(self) -> None:
         payload = run_node_module(

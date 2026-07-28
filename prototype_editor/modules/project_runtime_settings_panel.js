@@ -543,6 +543,7 @@
           ${renderSelectField({ id: "projectGameUiHudPositionSelect", label: "舞台 HUD", optionsHtml: renderOptionList(labels.gameUiHudPositionLabels, gameUiConfig.hudPosition, helpers) }, helpers)}
           ${renderSelectField({ id: "projectGameUiTitleCardAnchorSelect", label: "标题卡片位置", optionsHtml: renderOptionList(labels.gameUiTitleCardAnchorLabels, gameUiConfig.titleCardAnchor, helpers) }, helpers)}
           ${renderSelectField({ id: "projectGameUiSpeakerFocusModeSelect", label: "说话者聚焦", optionsHtml: renderOptionList(labels.gameUiSpeakerFocusLabels, gameUiConfig.speakerFocusMode, helpers) }, helpers)}
+          ${renderSelectField({ id: "projectGameUiDialogueCameraModeSelect", label: "自动对话镜头", optionsHtml: renderOptionList(labels.gameUiDialogueCameraLabels, gameUiConfig.dialogueCameraMode, helpers) }, helpers)}
           ${renderSelectField(
             {
               id: "projectGameUiTitleBackgroundFitSelect",
@@ -589,6 +590,8 @@
           ${renderRangeField({ id: "projectGameUiMotionIntensityInput", label: "动态强度", min: 0, max: 100, value: gameUiConfig.motionIntensity, suffix: "%" }, helpers)}
           ${renderRangeField({ id: "projectGameUiSpeakerFocusIntensityInput", label: "说话者聚焦强度", min: 0, max: 100, value: gameUiConfig.speakerFocusIntensity, suffix: "%" }, helpers)}
           ${renderRangeField({ id: "projectGameUiSpeakerFocusTransitionInput", label: "说话者切换过渡", min: 0, max: 1200, step: 20, value: gameUiConfig.speakerFocusTransitionMs, suffix: "ms" }, helpers)}
+          ${renderRangeField({ id: "projectGameUiDialogueCameraIntensityInput", label: "自动镜头强度", min: 0, max: 100, value: gameUiConfig.dialogueCameraIntensity, suffix: "%" }, helpers)}
+          ${renderRangeField({ id: "projectGameUiDialogueCameraTransitionInput", label: "镜头跟随过渡", min: 0, max: 1600, step: 20, value: gameUiConfig.dialogueCameraTransitionMs, suffix: "ms" }, helpers)}
           ${renderRangeField({ id: "projectGameUiTitleBackgroundOpacityInput", label: "标题背景透明度", min: 0, max: 100, value: gameUiConfig.titleBackgroundOpacity, suffix: "%" }, helpers)}
           ${renderRangeField({ id: "projectGameUiPanelFrameOpacityInput", label: "面板贴图透明度", min: 0, max: 100, value: gameUiConfig.panelFrameOpacity, suffix: "%" }, helpers)}
           ${renderRangeField({ id: "projectGameUiButtonFrameOpacityInput", label: "按钮贴图透明度", min: 0, max: 100, value: gameUiConfig.buttonFrameOpacity, suffix: "%" }, helpers)}
@@ -598,6 +601,10 @@
           ${renderRangeField({ id: "projectGameUiLayoutGapInput", label: "主布局间距", min: 8, max: 48, value: gameUiConfig.layoutGap, suffix: "px" }, helpers)}
           ${renderRangeField({ id: "projectGameUiSidePanelWidthInput", label: "侧栏宽度", min: 240, max: 460, step: 4, value: gameUiConfig.sidePanelWidth, suffix: "px" }, helpers)}
         </div>
+        <div class="detail-card dialogue-camera-guidance-card">
+          <strong>自动镜头不会抢导演权</strong>
+          <p class="helper-text">它只在台词能对应到舞台角色时轻推镜头。你插入的“镜头平移 / 推近拉远”卡片会优先覆盖对应方向，旁白和静态舒适模式会自动回到稳定构图。</p>
+        </div>
         <div class="detail-actions">
           <button class="toolbar-button toolbar-button-primary" data-action="save-project-game-ui-config">
             保存成品 UI 皮肤
@@ -606,7 +613,7 @@
             导出网页包检查外观
           </button>
         </div>
-        <div class="detail-meta">当前覆盖标题页、系统菜单、存档/读档、EXTRA/图鉴弹窗、侧栏、按钮、HUD、说话者聚焦、布局位置、UI 贴图绑定、九宫格拉伸和按钮多状态贴图。</div>
+        <div class="detail-meta">当前覆盖标题页、系统菜单、存档/读档、EXTRA/图鉴弹窗、侧栏、按钮、HUD、说话者聚焦、自动对话镜头、布局位置、UI 贴图绑定、九宫格拉伸和按钮多状态贴图。</div>
       </section>
     `;
   }
@@ -747,6 +754,9 @@
         speakerFocusMode: readInputValue(doc, "projectGameUiSpeakerFocusModeSelect"),
         speakerFocusIntensity: readInputValue(doc, "projectGameUiSpeakerFocusIntensityInput"),
         speakerFocusTransitionMs: readInputValue(doc, "projectGameUiSpeakerFocusTransitionInput"),
+        dialogueCameraMode: readInputValue(doc, "projectGameUiDialogueCameraModeSelect"),
+        dialogueCameraIntensity: readInputValue(doc, "projectGameUiDialogueCameraIntensityInput"),
+        dialogueCameraTransitionMs: readInputValue(doc, "projectGameUiDialogueCameraTransitionInput"),
       },
     });
   }

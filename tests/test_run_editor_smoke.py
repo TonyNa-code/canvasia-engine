@@ -1325,6 +1325,12 @@ class RunEditorSmokeTests(unittest.TestCase):
                 "backdropBlur": 2,
                 "stageVignette": 20,
                 "motionIntensity": 10,
+                "speakerFocusMode": "cinematic",
+                "speakerFocusIntensity": 74,
+                "speakerFocusTransitionMs": 360,
+                "dialogueCameraMode": "cinematic",
+                "dialogueCameraIntensity": 68,
+                "dialogueCameraTransitionMs": 640,
                 "titleBackgroundAssetId": "asset_title_bg",
                 "titleBackgroundFit": "contain",
                 "titleBackgroundOpacity": 55,
@@ -1415,6 +1421,12 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(saved_project["gameUiConfig"]["layoutGap"], 26)
         self.assertEqual(saved_project["gameUiConfig"]["sidePanelWidth"], 356)
         self.assertEqual(saved_project["gameUiConfig"]["panelOpacity"], 48)
+        self.assertEqual(saved_project["gameUiConfig"]["speakerFocusMode"], "cinematic")
+        self.assertEqual(saved_project["gameUiConfig"]["speakerFocusIntensity"], 74)
+        self.assertEqual(saved_project["gameUiConfig"]["speakerFocusTransitionMs"], 360)
+        self.assertEqual(saved_project["gameUiConfig"]["dialogueCameraMode"], "cinematic")
+        self.assertEqual(saved_project["gameUiConfig"]["dialogueCameraIntensity"], 68)
+        self.assertEqual(saved_project["gameUiConfig"]["dialogueCameraTransitionMs"], 640)
         self.assertEqual(saved_project["gameUiConfig"]["titleBackgroundAssetId"], "asset_title_bg")
         self.assertEqual(saved_project["gameUiConfig"]["titleBackgroundFit"], "contain")
         self.assertEqual(saved_project["gameUiConfig"]["titleBackgroundOpacity"], 55)
@@ -3321,6 +3333,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / "runtime_achievements.js").is_file())
         self.assertTrue((build_dir / "runtime_character_motion.js").is_file())
         self.assertTrue((build_dir / "runtime_speaker_focus.js").is_file())
+        self.assertTrue((build_dir / "runtime_dialogue_camera.js").is_file())
         self.assertTrue((build_dir / "runtime_text_effects.js").is_file())
         self.assertTrue((build_dir / "runtime_text_variables.js").is_file())
         self.assertTrue((build_dir / run_editor.RUNTIME_PRELOAD_MANIFEST_FILE_NAME).is_file())
@@ -3434,6 +3447,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["playerRuntimeAchievements"], "runtime_achievements.js")
         self.assertEqual(manifest["files"]["playerRuntimeCharacterMotion"], "runtime_character_motion.js")
         self.assertEqual(manifest["files"]["playerRuntimeSpeakerFocus"], "runtime_speaker_focus.js")
+        self.assertEqual(manifest["files"]["playerRuntimeDialogueCamera"], "runtime_dialogue_camera.js")
         self.assertEqual(manifest["files"]["playerRuntimeTextEffects"], "runtime_text_effects.js")
         self.assertEqual(manifest["files"]["playerRuntimeTextVariables"], "runtime_text_variables.js")
         self.assertEqual(manifest["files"]["runtimePreloadManifest"], run_editor.RUNTIME_PRELOAD_MANIFEST_FILE_NAME)
@@ -3524,6 +3538,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 "runtime_achievements.js",
                 "runtime_character_motion.js",
                 "runtime_speaker_focus.js",
+                "runtime_dialogue_camera.js",
                 "runtime_text_effects.js",
                 "runtime_text_variables.js",
                 run_editor.RUNTIME_PRELOAD_MANIFEST_FILE_NAME,
@@ -4965,6 +4980,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / "app" / "runtime_achievements.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_character_motion.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_speaker_focus.js").is_file())
+        self.assertTrue((build_dir / "app" / "runtime_dialogue_camera.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_text_effects.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_text_variables.js").is_file())
         self.assert_export_playtest_guide_file(build_dir / run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME)
@@ -5050,6 +5066,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["appRuntimeUiSkin"], "app/runtime_ui_skin.js")
         self.assertEqual(manifest["files"]["appRuntimeCharacterMotion"], "app/runtime_character_motion.js")
         self.assertEqual(manifest["files"]["appRuntimeSpeakerFocus"], "app/runtime_speaker_focus.js")
+        self.assertEqual(manifest["files"]["appRuntimeDialogueCamera"], "app/runtime_dialogue_camera.js")
         self.assertEqual(manifest["files"]["appRuntimeTextEffects"], "app/runtime_text_effects.js")
         self.assertEqual(manifest["files"]["appRuntimeTextVariables"], "app/runtime_text_variables.js")
         self.assertEqual(manifest["files"]["storyRouteMap"], run_editor.EXPORT_STORY_ROUTE_MAP_JSON_NAME)
@@ -5107,6 +5124,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 "app/runtime_achievements.js",
                 "app/runtime_character_motion.js",
                 "app/runtime_speaker_focus.js",
+                "app/runtime_dialogue_camera.js",
                 "app/runtime_text_effects.js",
                 "app/runtime_text_variables.js",
                 "app/player.css",
@@ -5288,6 +5306,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 "app/runtime_achievements.js",
                 "app/runtime_character_motion.js",
                 "app/runtime_speaker_focus.js",
+                "app/runtime_dialogue_camera.js",
                 "app/runtime_text_effects.js",
                 "app/runtime_text_variables.js",
                 "app/player.css",
@@ -5551,6 +5570,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 "app/runtime_achievements.js",
                 "app/runtime_character_motion.js",
                 "app/runtime_speaker_focus.js",
+                "app/runtime_dialogue_camera.js",
                 "app/runtime_text_effects.js",
                 "app/runtime_text_variables.js",
                 "app/player.css",
@@ -5593,6 +5613,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_achievements.js").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_character_motion.js").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_speaker_focus.js").is_file())
+        self.assertTrue((bundle_dir / "export_player_template" / "runtime_dialogue_camera.js").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_text_effects.js").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_text_variables.js").is_file())
         self.assertTrue((bundle_dir / "native_runtime" / run_editor.NATIVE_RUNTIME_PLAYER_NAME).is_file())
@@ -5600,6 +5621,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((bundle_dir / "native_runtime" / run_editor.NATIVE_RUNTIME_ACHIEVEMENTS_NAME).is_file())
         self.assertTrue((bundle_dir / "native_runtime" / run_editor.NATIVE_RUNTIME_CREDITS_NAME).is_file())
         self.assertTrue((bundle_dir / "native_runtime" / run_editor.NATIVE_RUNTIME_CHARACTER_MOTION_NAME).is_file())
+        self.assertTrue((bundle_dir / "native_runtime" / run_editor.NATIVE_RUNTIME_DIALOGUE_CAMERA_NAME).is_file())
         self.assertTrue((bundle_dir / "native_runtime" / run_editor.NATIVE_RUNTIME_DIAGNOSTICS_NAME).is_file())
         self.assertTrue((bundle_dir / "native_runtime" / run_editor.NATIVE_RUNTIME_INPUT_NAME).is_file())
         self.assertTrue((bundle_dir / "native_runtime" / run_editor.NATIVE_RUNTIME_KEY_BINDINGS_NAME).is_file())

@@ -186,6 +186,11 @@ except ImportError:  # pragma: no cover - exported native packages import from t
     )
 
 try:
+    from .runtime_dialogue_camera import NativeDialogueCameraController
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_dialogue_camera import NativeDialogueCameraController
+
+try:
     from .runtime_reading_profiles import (
         READING_PROFILE_IDS,
         apply_reading_profile,
@@ -1102,16 +1107,6 @@ SHAKE_DISTANCE = {"light": 4, "medium": 9, "heavy": 16}
 FLASH_COLORS = {"white": (255, 255, 255), "warm": (255, 206, 138), "red": (255, 94, 94), "black": (0, 0, 0)}
 FLASH_ALPHA = {"soft": 86, "medium": 146, "strong": 210}
 FADE_COLORS = {"black": (0, 0, 0), "white": (255, 255, 255)}
-CAMERA_ZOOM_SCALE = {
-    ("zoom_in", "light"): 1.045,
-    ("zoom_in", "medium"): 1.085,
-    ("zoom_in", "heavy"): 1.13,
-    ("zoom_out", "light"): 0.985,
-    ("zoom_out", "medium"): 0.96,
-    ("zoom_out", "heavy"): 0.925,
-}
-CAMERA_PAN_OFFSET = {"left": 0.055, "right": -0.055}
-CAMERA_PAN_STRENGTH_MULTIPLIER = {"light": 0.62, "medium": 1.0, "heavy": 1.44}
 SCREEN_FILTER_WASH = {
     "memory": ((255, 207, 150), 38),
     "mono": ((180, 190, 205), 42),
@@ -8306,6 +8301,7 @@ class NativeRuntimePlayer:
         self.story_call_stack: list[dict] = []
         self.current_line: dict | None = None
         self.speaker_focus_controller = NativeSpeakerFocusController()
+        self.dialogue_camera_controller = NativeDialogueCameraController()
         self.current_choices: list[dict] | None = None
         self.current_choice_index = 0
         self.title_screen_active = False
@@ -12487,22 +12483,6 @@ class NativeRuntimePlayer:
             return True
         return False
 
-    def get_stage_zoom_scale(self) -> float:
-        if not self.camera_zoom_effect:
-            return 1.0
-        action = str(self.camera_zoom_effect.get("action") or "zoom_in")
-        strength = str(self.camera_zoom_effect.get("strength") or "medium")
-        return CAMERA_ZOOM_SCALE.get((action, strength), 1.0)
-
-    def get_stage_pan_offset(self) -> int:
-        if not self.camera_pan_effect:
-            return 0
-        target = str(self.camera_pan_effect.get("target") or "center")
-        strength = str(self.camera_pan_effect.get("strength") or "medium")
-        base = CAMERA_PAN_OFFSET.get(target, 0.0)
-        multiplier = CAMERA_PAN_STRENGTH_MULTIPLIER.get(strength, 1.0)
-        return int(round(self.width * base * multiplier))
-
     def get_stage_shake_offset(self) -> tuple[int, int]:
         if not self.screen_shake_effect:
             return (0, 0)
@@ -12515,13 +12495,29 @@ class NativeRuntimePlayer:
         return (int(math.sin(phase) * distance), int(math.cos(phase * 1.31) * distance * 0.55))
 
     def render_stage_surface(self, stage_surface) -> None:
-        scale = self.get_stage_zoom_scale()
-        offset_x = self.get_stage_pan_offset()
+        camera_pose = self.dialogue_camera_controller.build_render_pose(
+            camera_zoom=self.camera_zoom_effect,
+            camera_pan=self.camera_pan_effect,
+            current_line=self.current_line,
+            visible_characters=self.visible_characters,
+            game_ui_config=self.game_ui_config,
+            visual_comfort_mode=str(self.runtime_settings.get("visualComfort") or "standard"),
+            now_ms=self.get_runtime_ticks_ms(),
+        )
+        scale = float(camera_pose.get("zoomScale") or 1.0)
+        offset_x = int(round(self.width * float(camera_pose.get("panPercent") or 0) / 100))
+        focus_ratio = float(camera_pose.get("focusPercent") or 50) / 100
+        zoom_anchor_offset_x = int(round(self.width * (focus_ratio - 0.5) * (1 - scale)))
         shake_x, shake_y = self.get_stage_shake_offset()
         if abs(scale - 1.0) > 0.01:
             scaled_size = (max(1, int(self.width * scale)), max(1, int(self.height * scale)))
             stage_surface = self.pygame.transform.smoothscale(stage_surface, scaled_size)
-        rect = stage_surface.get_rect(center=(self.width // 2 + offset_x + shake_x, self.height // 2 + shake_y))
+        rect = stage_surface.get_rect(
+            center=(
+                self.width // 2 + offset_x + zoom_anchor_offset_x + shake_x,
+                self.height // 2 + shake_y,
+            )
+        )
         self.screen.blit(stage_surface, rect)
 
     def render_stage_effect_overlays(self) -> None:

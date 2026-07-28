@@ -22,6 +22,7 @@ class FrontendEntrypointModuleTests(unittest.TestCase):
             "../export_player_template/runtime_story_flow.js",
             "../export_player_template/runtime_achievements.js",
             "../export_player_template/runtime_speaker_focus.js",
+            "../export_player_template/runtime_dialogue_camera.js",
             "./modules/story_block_catalog.js",
             "./modules/choice_availability_editor.js",
             "./modules/story_block_editors.js",

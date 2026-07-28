@@ -86,6 +86,7 @@ class FrontendProjectSettingsModuleTests(unittest.TestCase):
               gameUiTopbarPositionLabels: {{ top: "上", bottom: "下", hidden: "隐藏" }},
               gameUiHudPositionLabels: {{ top: "顶部", "bottom-left": "左下", hidden: "隐藏" }},
               gameUiTitleCardAnchorLabels: {{ center: "中", left: "左", bottom: "下", free: "自由" }},
+              gameUiDialogueCameraLabels: {{ off: "关闭", soft: "柔和", cinematic: "电影感" }},
               defaultGameUiConfig: {{
                 preset: "stellar",
                 layoutPreset: "balanced",
@@ -119,6 +120,9 @@ class FrontendProjectSettingsModuleTests(unittest.TestCase):
                 backdropBlur: 14,
                 stageVignette: 42,
                 motionIntensity: 70,
+                dialogueCameraMode: "soft",
+                dialogueCameraIntensity: 58,
+                dialogueCameraTransitionMs: 520,
                 titleBackgroundOpacity: 42,
                 titleBackgroundFit: "cover",
                 panelFrameOpacity: 18,
@@ -206,6 +210,9 @@ class FrontendProjectSettingsModuleTests(unittest.TestCase):
                 speakerFocusMode: "broken",
                 speakerFocusIntensity: 999,
                 speakerFocusTransitionMs: -20,
+                dialogueCameraMode: "broken",
+                dialogueCameraIntensity: 999,
+                dialogueCameraTransitionMs: -20,
                 titleBackgroundFit: "contain",
                 titleBackgroundOpacity: 101,
                 titleLogoAssetId: " logo ",
@@ -258,6 +265,7 @@ class FrontendProjectSettingsModuleTests(unittest.TestCase):
                 tools.getSafeProjectGameUiLayoutPreset("bad", options),
                 tools.getSafeProjectGameUiHudPosition("bottom-left", options),
                 tools.getSafeProjectGameUiTitleCardAnchor("bad", options),
+                tools.getSafeProjectGameUiDialogueCameraMode("bad", options),
               ],
               gameConfig: tools.getProjectGameUiConfig(project, options),
               rgba: [
@@ -353,7 +361,7 @@ class FrontendProjectSettingsModuleTests(unittest.TestCase):
         self.assertEqual(payload["dialogConfig"]["anchor"], "bottom")
         self.assertEqual(payload["dialogConfig"]["offsetXPercent"], 35)
         self.assertEqual(payload["dialogConfig"]["offsetYPercent"], -35)
-        self.assertEqual(payload["safeGameValues"], ["stellar", "balanced", "bottom-left", "center"])
+        self.assertEqual(payload["safeGameValues"], ["stellar", "balanced", "bottom-left", "center", "soft"])
         self.assertEqual(payload["gameConfig"]["preset"], "minimal")
         self.assertEqual(payload["gameConfig"]["layoutPreset"], "balanced")
         self.assertEqual(payload["gameConfig"]["titleLayout"], "left")
@@ -367,6 +375,9 @@ class FrontendProjectSettingsModuleTests(unittest.TestCase):
         self.assertEqual(payload["gameConfig"]["speakerFocusMode"], "soft")
         self.assertEqual(payload["gameConfig"]["speakerFocusIntensity"], 100)
         self.assertEqual(payload["gameConfig"]["speakerFocusTransitionMs"], 0)
+        self.assertEqual(payload["gameConfig"]["dialogueCameraMode"], "soft")
+        self.assertEqual(payload["gameConfig"]["dialogueCameraIntensity"], 100)
+        self.assertEqual(payload["gameConfig"]["dialogueCameraTransitionMs"], 0)
         self.assertEqual(payload["gameConfig"]["titleBackgroundFit"], "contain")
         self.assertEqual(payload["gameConfig"]["titleBackgroundOpacity"], 100)
         self.assertEqual(payload["gameConfig"]["titleLogoAssetId"], "logo")

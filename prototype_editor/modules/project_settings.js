@@ -262,6 +262,11 @@
     soft: "柔和聚焦",
     cinematic: "电影感聚焦",
   });
+  const PROJECT_GAME_UI_DIALOGUE_CAMERA_LABELS = Object.freeze({
+    off: "关闭自动镜头",
+    soft: "柔和跟拍",
+    cinematic: "电影切镜",
+  });
   const DEFAULT_PROJECT_GAME_UI_CONFIG = Object.freeze({
     preset: "stellar",
     layoutPreset: "balanced",
@@ -298,6 +303,9 @@
     speakerFocusMode: "soft",
     speakerFocusIntensity: 65,
     speakerFocusTransitionMs: 240,
+    dialogueCameraMode: "soft",
+    dialogueCameraIntensity: 58,
+    dialogueCameraTransitionMs: 520,
     titleBackgroundAssetId: "",
     titleBackgroundFit: "cover",
     titleBackgroundOpacity: 42,
@@ -348,6 +356,9 @@
       backdropBlur: 14,
       stageVignette: 42,
       motionIntensity: 70,
+      dialogueCameraMode: "soft",
+      dialogueCameraIntensity: 58,
+      dialogueCameraTransitionMs: 520,
       titleBackgroundOpacity: 42,
       titleBackgroundFit: "cover",
       panelFrameOpacity: 18,
@@ -385,6 +396,9 @@
       backdropBlur: 10,
       stageVignette: 28,
       motionIntensity: 45,
+      dialogueCameraMode: "soft",
+      dialogueCameraIntensity: 42,
+      dialogueCameraTransitionMs: 620,
       titleBackgroundOpacity: 36,
       titleBackgroundFit: "cover",
       panelFrameOpacity: 14,
@@ -422,6 +436,9 @@
       backdropBlur: 4,
       stageVignette: 35,
       motionIntensity: 25,
+      dialogueCameraMode: "off",
+      dialogueCameraIntensity: 0,
+      dialogueCameraTransitionMs: 0,
       titleBackgroundOpacity: 28,
       titleBackgroundFit: "cover",
       panelFrameOpacity: 22,
@@ -459,6 +476,9 @@
       backdropBlur: 2,
       stageVignette: 20,
       motionIntensity: 10,
+      dialogueCameraMode: "cinematic",
+      dialogueCameraIntensity: 48,
+      dialogueCameraTransitionMs: 720,
       titleBackgroundOpacity: 24,
       titleBackgroundFit: "cover",
       panelFrameOpacity: 0,
@@ -824,6 +844,15 @@
     );
   }
 
+  function getSafeProjectGameUiDialogueCameraMode(value, options = {}) {
+    const defaults = options.defaultGameUiConfig || DEFAULT_PROJECT_GAME_UI_CONFIG;
+    return getSafeLabelKey(
+      options.gameUiDialogueCameraLabels || PROJECT_GAME_UI_DIALOGUE_CAMERA_LABELS,
+      value,
+      defaults.dialogueCameraMode ?? DEFAULT_PROJECT_GAME_UI_CONFIG.dialogueCameraMode
+    );
+  }
+
   function getSafeGameUiFrameSlice(value, fallback = DEFAULT_FRAME_SLICE, options = {}) {
     const source = value && typeof value === "object" ? value : {};
     return {
@@ -916,6 +945,30 @@
         1200,
         options
       ),
+      dialogueCameraMode: getSafeProjectGameUiDialogueCameraMode(
+        source.dialogueCameraMode ?? base.dialogueCameraMode ?? DEFAULT_PROJECT_GAME_UI_CONFIG.dialogueCameraMode,
+        options
+      ),
+      dialogueCameraIntensity: clamp(
+        getSafeNumber(
+          source.dialogueCameraIntensity,
+          base.dialogueCameraIntensity ?? DEFAULT_PROJECT_GAME_UI_CONFIG.dialogueCameraIntensity,
+          options
+        ),
+        0,
+        100,
+        options
+      ),
+      dialogueCameraTransitionMs: clamp(
+        getSafeNumber(
+          source.dialogueCameraTransitionMs,
+          base.dialogueCameraTransitionMs ?? DEFAULT_PROJECT_GAME_UI_CONFIG.dialogueCameraTransitionMs,
+          options
+        ),
+        0,
+        1600,
+        options
+      ),
       titleBackgroundAssetId: String(source.titleBackgroundAssetId ?? "").trim(),
       titleBackgroundFit: source.titleBackgroundFit === "contain" ? "contain" : "cover",
       titleBackgroundOpacity: clamp(
@@ -982,6 +1035,7 @@
     PROJECT_GAME_UI_HUD_POSITION_LABELS,
     PROJECT_GAME_UI_TITLE_CARD_ANCHOR_LABELS,
     PROJECT_GAME_UI_SPEAKER_FOCUS_LABELS,
+    PROJECT_GAME_UI_DIALOGUE_CAMERA_LABELS,
     DEFAULT_PROJECT_GAME_UI_CONFIG,
     PROJECT_GAME_UI_PRESETS,
     getProjectResolution,
@@ -1015,6 +1069,7 @@
     getSafeProjectGameUiHudPosition,
     getSafeProjectGameUiTitleCardAnchor,
     getSafeProjectGameUiSpeakerFocusMode,
+    getSafeProjectGameUiDialogueCameraMode,
     getSafeGameUiFrameSlice,
     getProjectGameUiPresetConfig,
     getProjectGameUiConfig,

@@ -43,6 +43,7 @@ class FrontendProjectRuntimeSettingsPanelModuleTests(unittest.TestCase):
               gameUiHudPositionLabels: {{ bottom: "底部" }},
               gameUiTitleCardAnchorLabels: {{ center: "中央" }},
               gameUiSpeakerFocusLabels: {{ off: "关闭", soft: "柔和", cinematic: "电影感" }},
+              gameUiDialogueCameraLabels: {{ off: "关闭", soft: "柔和", cinematic: "电影感" }},
             }};
             const baseSlice = {{ top: 12, right: 12, bottom: 12, left: 12 }};
             const model = {{
@@ -133,6 +134,9 @@ class FrontendProjectRuntimeSettingsPanelModuleTests(unittest.TestCase):
                 speakerFocusMode: "soft",
                 speakerFocusIntensity: 65,
                 speakerFocusTransitionMs: 240,
+                dialogueCameraMode: "cinematic",
+                dialogueCameraIntensity: 58,
+                dialogueCameraTransitionMs: 520,
               }},
               projectLanguage: "zh-CN",
               projectSupportedLanguages: ["zh-CN", "en-US"],
@@ -169,6 +173,7 @@ class FrontendProjectRuntimeSettingsPanelModuleTests(unittest.TestCase):
               hasFrameSlice: html.includes("projectGameUiPanelFrameSliceTopInput"),
               hasExportAction: html.includes('data-export-target="web"'),
               hasSpeakerFocus: html.includes('id="projectGameUiSpeakerFocusModeSelect"') && html.includes('id="projectGameUiSpeakerFocusIntensityInput"'),
+              hasDialogueCamera: html.includes('id="projectGameUiDialogueCameraModeSelect"') && html.includes('id="projectGameUiDialogueCameraTransitionInput"'),
             }}));
             """
         )
@@ -191,6 +196,7 @@ class FrontendProjectRuntimeSettingsPanelModuleTests(unittest.TestCase):
         self.assertTrue(payload["hasFrameSlice"])
         self.assertTrue(payload["hasExportAction"])
         self.assertTrue(payload["hasSpeakerFocus"])
+        self.assertTrue(payload["hasDialogueCamera"])
 
     def test_input_readers_delegate_dom_fields_to_normalizers(self) -> None:
         script = textwrap.dedent(
@@ -220,6 +226,9 @@ class FrontendProjectRuntimeSettingsPanelModuleTests(unittest.TestCase):
               projectGameUiPanelFrameSliceRightInput: {{ value: "12" }},
               projectGameUiPanelFrameSliceBottomInput: {{ value: "13" }},
               projectGameUiPanelFrameSliceLeftInput: {{ value: "14" }},
+              projectGameUiDialogueCameraModeSelect: {{ value: "cinematic" }},
+              projectGameUiDialogueCameraIntensityInput: {{ value: "72" }},
+              projectGameUiDialogueCameraTransitionInput: {{ value: "680" }},
             }};
             const doc = {{ getElementById(id) {{ return values[id] || {{ value: undefined, checked: true }}; }} }};
             const runtime = tools.readProjectRuntimePlaybackDefaultsFromDocument(
@@ -255,6 +264,9 @@ class FrontendProjectRuntimeSettingsPanelModuleTests(unittest.TestCase):
         self.assertEqual(payload["dialog"]["widthPercent"], "88")
         self.assertEqual(payload["gameUi"]["preset"], "aurora")
         self.assertEqual(payload["gameUi"]["panelFrameSlice"], {"top": "11", "right": "12", "bottom": "13", "left": "14"})
+        self.assertEqual(payload["gameUi"]["dialogueCameraMode"], "cinematic")
+        self.assertEqual(payload["gameUi"]["dialogueCameraIntensity"], "72")
+        self.assertEqual(payload["gameUi"]["dialogueCameraTransitionMs"], "680")
 
 
 if __name__ == "__main__":

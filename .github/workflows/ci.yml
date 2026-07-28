@@ -37,6 +37,7 @@ jobs:
         run: |
           python -m py_compile \
             editor_asset_usage.py \
+            editor_project_presentation.py \
             export_report_descriptions.py \
             export_release_control.py \
             export_icon.py \
@@ -65,6 +66,7 @@ jobs:
             native_runtime/runtime_dialogue_layouts.py \
             native_runtime/runtime_visual_comfort.py \
             native_runtime/runtime_speaker_focus.py \
+            native_runtime/runtime_dialogue_camera.py \
             native_runtime/runtime_save_thumbnails.py \
             native_runtime/runtime_i18n.py \
             native_runtime/runtime_text_input.py \
@@ -79,6 +81,7 @@ jobs:
             tools/ci/project_health.py \
             tools/runtime/run_native_runtime_smoke.py \
             tests/test_ci_workflow_coverage.py \
+            tests/test_editor_project_presentation.py \
             tests/test_github_status_tool.py \
             tests/test_local_verify_tool.py \
             tests/test_native_runtime_export_commands.py \
@@ -89,6 +92,8 @@ jobs:
             tests/test_character_motion_contract.py \
             tests/test_native_runtime_speaker_focus.py \
             tests/test_speaker_focus_contract.py \
+            tests/test_native_runtime_dialogue_camera.py \
+            tests/test_dialogue_camera_contract.py \
             tests/test_native_runtime_stage_images.py \
             tests/test_native_runtime_choice_availability.py \
             tests/test_native_runtime_story_flow.py \
@@ -360,6 +365,7 @@ jobs:
           node --check export_player_template/runtime_achievements.js
           node --check export_player_template/runtime_character_motion.js
           node --check export_player_template/runtime_speaker_focus.js
+          node --check export_player_template/runtime_dialogue_camera.js
           node --check export_player_template/runtime_stage_images.js
           node --check export_player_template/runtime_text_effects.js
           node --check export_player_template/runtime_text_variables.js
@@ -377,6 +383,8 @@ jobs:
           python -m unittest discover -s tests -p 'test_character_motion_contract.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_speaker_focus.py' -v
           python -m unittest discover -s tests -p 'test_speaker_focus_contract.py' -v
+          python -m unittest discover -s tests -p 'test_native_runtime_dialogue_camera.py' -v
+          python -m unittest discover -s tests -p 'test_dialogue_camera_contract.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_stage_images.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_choice_availability.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_story_flow.py' -v
@@ -393,6 +401,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_project_variable_migration.py' -v
           python -m unittest discover -s tests -p 'test_stage_image_contract.py' -v
           python -m unittest discover -s tests -p 'test_editor_asset_usage.py' -v
+          python -m unittest discover -s tests -p 'test_editor_project_presentation.py' -v
           python -m unittest discover -s tests -p 'test_maintainability_check_tool.py' -v
           python tools/ci/maintainability_check.py --json-report verification_reports/maintainability.json --markdown-report verification_reports/maintainability.md
           python -m unittest discover -s tests -p 'test_project_health_tool.py' -v
@@ -485,6 +494,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_runtime_dialogue_layouts_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_visual_comfort_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_speaker_focus_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_runtime_dialogue_camera_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_ui_skin_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_i18n_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_text_variables_module.py' -v

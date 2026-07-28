@@ -63,6 +63,9 @@ class NativeRuntimePlayerViewTests(unittest.TestCase):
                 "speakerFocusMode": "broken",
                 "speakerFocusIntensity": 999,
                 "speakerFocusTransitionMs": -10,
+                "dialogueCameraMode": "broken",
+                "dialogueCameraIntensity": 999,
+                "dialogueCameraTransitionMs": -10,
                 "buttonFrameSlice": {"top": 240, "right": -1, "bottom": 20, "left": 18},
             },
         }
@@ -84,6 +87,9 @@ class NativeRuntimePlayerViewTests(unittest.TestCase):
         self.assertEqual(game_ui_config["speakerFocusMode"], "soft")
         self.assertEqual(game_ui_config["speakerFocusIntensity"], 100)
         self.assertEqual(game_ui_config["speakerFocusTransitionMs"], 0)
+        self.assertEqual(game_ui_config["dialogueCameraMode"], "soft")
+        self.assertEqual(game_ui_config["dialogueCameraIntensity"], 100)
+        self.assertEqual(game_ui_config["dialogueCameraTransitionMs"], 0)
         self.assertEqual(game_ui_config["buttonFrameSlice"], {"top": 96, "right": 0, "bottom": 20, "left": 18})
 
     def test_save_dialog_summary_formats_variable_values(self) -> None:

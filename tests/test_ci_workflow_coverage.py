@@ -184,6 +184,32 @@ class CiWorkflowCoverageTests(unittest.TestCase):
             workflow,
         )
 
+    def test_dialogue_camera_contract_is_checked_in_ci(self) -> None:
+        workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("native_runtime/runtime_dialogue_camera.py", workflow)
+        self.assertIn("export_player_template/runtime_dialogue_camera.js", workflow)
+        self.assertIn("tests/test_native_runtime_dialogue_camera.py", workflow)
+        self.assertIn("tests/test_dialogue_camera_contract.py", workflow)
+        self.assertIn(
+            "python -m unittest discover -s tests -p 'test_native_runtime_dialogue_camera.py' -v",
+            workflow,
+        )
+        self.assertIn(
+            "python -m unittest discover -s tests -p 'test_dialogue_camera_contract.py' -v",
+            workflow,
+        )
+
+    def test_editor_project_presentation_settings_are_checked_in_ci(self) -> None:
+        workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("editor_project_presentation.py", workflow)
+        self.assertIn("tests/test_editor_project_presentation.py", workflow)
+        self.assertIn(
+            "python -m unittest discover -s tests -p 'test_editor_project_presentation.py' -v",
+            workflow,
+        )
+
     def test_native_runtime_bundle_registry_is_checked_in_ci(self) -> None:
         workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
 

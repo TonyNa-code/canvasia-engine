@@ -196,6 +196,7 @@ const {
   PROJECT_GAME_UI_HUD_POSITION_LABELS,
   PROJECT_GAME_UI_TITLE_CARD_ANCHOR_LABELS,
   PROJECT_GAME_UI_SPEAKER_FOCUS_LABELS,
+  PROJECT_GAME_UI_DIALOGUE_CAMERA_LABELS,
   DEFAULT_PROJECT_GAME_UI_CONFIG,
   PROJECT_GAME_UI_PRESETS,
 } = projectSettingsTools;
@@ -249,6 +250,7 @@ const {
   scaleVisualTransitionMs,
 } = runtimeVisualComfortTools;
 const speakerFocusTools = window.CanvasiaRuntimeSpeakerFocus;
+const dialogueCameraTools = window.CanvasiaRuntimeDialogueCamera;
 const particleEffectTools = window.CanvasiaEditorParticleEffects;
 const {
   PARTICLE_PRESET_LABELS,
@@ -506,6 +508,7 @@ const PROJECT_SETTINGS_OPTIONS = Object.freeze({
   gameUiHudPositionLabels: PROJECT_GAME_UI_HUD_POSITION_LABELS,
   gameUiTitleCardAnchorLabels: PROJECT_GAME_UI_TITLE_CARD_ANCHOR_LABELS,
   gameUiSpeakerFocusLabels: PROJECT_GAME_UI_SPEAKER_FOCUS_LABELS,
+  gameUiDialogueCameraLabels: PROJECT_GAME_UI_DIALOGUE_CAMERA_LABELS,
   defaultGameUiConfig: DEFAULT_PROJECT_GAME_UI_CONFIG,
   gameUiPresets: PROJECT_GAME_UI_PRESETS,
   clamp,
@@ -22314,11 +22317,7 @@ function renderStage(visualState, large, options = {}) {
   ]
     .filter(Boolean)
     .join(" ");
-  const worldPresentation = getStageWorldPresentation(
-    visualState.cameraZoom,
-    visualState.cameraPan,
-    visualState.screenFilter
-  );
+  const worldPresentation = getStageWorldPresentation(visualState, visualComfortMode);
   const castMarkup = renderStageCastMarkup(
     visualState.visibleCharacters,
     visualState.depthBlur,
@@ -22408,6 +22407,9 @@ function renderStage(visualState, large, options = {}) {
       : "",
     visualState.cameraPan
       ? `<span class="stage-token">平移：${escapeHtml(getCameraPanTargetLabel(visualState.cameraPan.target))}</span>`
+      : "",
+    worldPresentation.autoActive
+      ? `<span class="stage-token">自动镜头：${escapeHtml(PROJECT_GAME_UI_DIALOGUE_CAMERA_LABELS[worldPresentation.mode] ?? "跟随说话者")}</span>`
       : "",
     visualState.screenFilter
       ? `<span class="stage-token">滤镜：${escapeHtml(getScreenFilterPresetLabel(visualState.screenFilter.preset))}</span>`
@@ -22882,21 +22884,25 @@ function renderStageFadeLayer(screenFade) {
   `;
 }
 
-function getStageWorldPresentation(cameraZoom, cameraPan, screenFilter) {
-  const styles = [];
-  const filterCss = getScreenFilterCss(screenFilter);
-  const scale = cameraZoom ? getCameraZoomScale(cameraZoom.action, cameraZoom.strength) : 1;
-  const panOffset = cameraPan ? getCameraPanOffset(cameraPan.target, cameraPan.strength) : 0;
-
-  styles.push(`transform:translate3d(${panOffset.toFixed(2)}%, 0, 0) scale(${scale.toFixed(3)})`);
-  styles.push(`transform-origin:${getCameraZoomOrigin(cameraZoom?.focus ?? "center")}`);
+function getStageWorldPresentation(visualState, visualComfortMode = "standard") {
+  const cameraPresentation = dialogueCameraTools.buildStageCameraPresentation({
+    cameraZoom: visualState?.cameraZoom,
+    cameraPan: visualState?.cameraPan,
+    activeCharacterId: visualState?.activeCharacterId,
+    visibleCharacters: visualState?.visibleCharacters,
+    gameUiConfig: state.data?.project?.gameUiConfig,
+    visualComfortMode,
+  });
+  const styles = [cameraPresentation.style];
+  const filterCss = getScreenFilterCss(visualState?.screenFilter);
 
   if (filterCss) {
     styles.push(`filter:${filterCss}`);
   }
 
   return {
-    style: styles.join(";"),
+    ...cameraPresentation,
+    style: styles.filter(Boolean).join(";"),
   };
 }
 
@@ -36947,6 +36953,7 @@ function buildProjectRuntimeSettingsPanelLabels() {
     gameUiHudPositionLabels: PROJECT_GAME_UI_HUD_POSITION_LABELS,
     gameUiTitleCardAnchorLabels: PROJECT_GAME_UI_TITLE_CARD_ANCHOR_LABELS,
     gameUiSpeakerFocusLabels: PROJECT_GAME_UI_SPEAKER_FOCUS_LABELS,
+    gameUiDialogueCameraLabels: PROJECT_GAME_UI_DIALOGUE_CAMERA_LABELS,
   };
 }
 
@@ -37691,6 +37698,7 @@ function applyProjectGameUiPreset(preset) {
     projectGameUiHudPositionSelect: nextConfig.hudPosition,
     projectGameUiTitleCardAnchorSelect: nextConfig.titleCardAnchor,
     projectGameUiSpeakerFocusModeSelect: nextConfig.speakerFocusMode,
+    projectGameUiDialogueCameraModeSelect: nextConfig.dialogueCameraMode,
     projectGameUiTitleCardOffsetXInput: nextConfig.titleCardOffsetXPercent,
     projectGameUiTitleCardOffsetYInput: nextConfig.titleCardOffsetYPercent,
     projectGameUiLayoutGapInput: nextConfig.layoutGap,
@@ -37725,6 +37733,8 @@ function applyProjectGameUiPreset(preset) {
     projectGameUiMotionIntensityInput: nextConfig.motionIntensity,
     projectGameUiSpeakerFocusIntensityInput: nextConfig.speakerFocusIntensity,
     projectGameUiSpeakerFocusTransitionInput: nextConfig.speakerFocusTransitionMs,
+    projectGameUiDialogueCameraIntensityInput: nextConfig.dialogueCameraIntensity,
+    projectGameUiDialogueCameraTransitionInput: nextConfig.dialogueCameraTransitionMs,
   };
 
   Object.entries(fieldMap).forEach(([id, value]) => {
