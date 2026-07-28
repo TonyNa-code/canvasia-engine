@@ -191,7 +191,7 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
         self.assertIn('image bg_rooftop = "bg/rooftop.png"', payload["draft"]["script"])
         self.assertIn("label scene_open:", payload["draft"]["script"])
         self.assertIn("scene bg_rooftop with Dissolve(0.9)", payload["draft"]["script"])
-        self.assertIn('play music "bgm/piano.ogg" fadein 0.8 noloop volume 0.82', payload["draft"]["script"])
+        self.assertIn('play music "bgm/piano.ogg" fadein 0.8 noloop if_changed volume 0.82', payload["draft"]["script"])
         self.assertIn("# Canvasia music scope end: after_block after line", payload["draft"]["script"])
         self.assertIn("stop music fadeout 0.9", payload["draft"]["script"])
         self.assertIn("transform canvasia_stage_scene_open_3:", payload["draft"]["script"])

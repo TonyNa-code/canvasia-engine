@@ -69,6 +69,7 @@ jobs:
             native_runtime/runtime_speaker_focus.py \
             native_runtime/runtime_dialogue_camera.py \
             native_runtime/runtime_voice_reactive_motion.py \
+            native_runtime/runtime_music_transport.py \
             native_runtime/runtime_character_renderer.py \
             native_runtime/runtime_stage_renderer.py \
             native_runtime/runtime_save_thumbnails.py \
@@ -104,6 +105,8 @@ jobs:
             tests/test_dialogue_camera_contract.py \
             tests/test_native_runtime_voice_reactive_motion.py \
             tests/test_voice_reactive_motion_contract.py \
+            tests/test_native_runtime_music_transport.py \
+            tests/test_music_transport_contract.py \
             tests/test_native_runtime_stage_renderer.py \
             tests/test_native_runtime_stage_images.py \
             tests/test_native_runtime_choice_availability.py \
@@ -152,6 +155,7 @@ jobs:
             tests/test_frontend_beginner_character_guide_module.py \
             tests/test_frontend_character_presentation_panel_module.py \
             tests/test_frontend_music_range_scope_module.py \
+            tests/test_frontend_music_transport_editor_module.py \
             tests/test_frontend_beginner_tutorial_module.py \
             tests/test_frontend_choice_consequence_sheet_module.py \
             tests/test_frontend_timed_choice_editor_module.py \
@@ -211,6 +215,7 @@ jobs:
             tests/test_frontend_runtime_controls_module.py \
             tests/test_frontend_runtime_gamepad_module.py \
             tests/test_frontend_runtime_audio_module.py \
+            tests/test_frontend_runtime_music_transport_module.py \
             tests/test_frontend_runtime_data_module.py \
             tests/test_frontend_runtime_storage_module.py \
             tests/test_frontend_runtime_voice_mixer_module.py \
@@ -287,6 +292,7 @@ jobs:
           node --check prototype_editor/modules/beginner_character_guide.js
           node --check prototype_editor/modules/character_presentation_panel.js
           node --check prototype_editor/modules/music_range_scope.js
+          node --check prototype_editor/modules/music_transport_editor.js
           node --check prototype_editor/modules/beginner_tutorial.js
           node --check prototype_editor/modules/choice_consequence_sheet.js
           node --check prototype_editor/modules/choice_availability_editor.js
@@ -385,6 +391,7 @@ jobs:
           node --check export_player_template/runtime_dialogue_layouts.js
           node --check export_player_template/runtime_i18n.js
           node --check export_player_template/runtime_audio.js
+          node --check export_player_template/runtime_music_transport.js
           node --check export_player_template/runtime_preload.js
           node --check export_player_template/runtime_scene_prefetch.js
           node --check export_player_template/runtime_story_flow.js
@@ -470,6 +477,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_beginner_character_guide_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_character_presentation_panel_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_music_range_scope_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_music_transport_editor_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_beginner_tutorial_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_choice_consequence_sheet_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_command_palette_module.py' -v
@@ -534,6 +542,9 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_runtime_story_text_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_rich_text_editor_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_audio_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_runtime_music_transport_module.py' -v
+          python -m unittest discover -s tests -p 'test_native_runtime_music_transport.py' -v
+          python -m unittest discover -s tests -p 'test_music_transport_contract.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_data_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_storage_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_voice_mixer_module.py' -v

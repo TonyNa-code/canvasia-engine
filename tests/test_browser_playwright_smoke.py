@@ -984,6 +984,56 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
         self.assertEqual(style_values["opacity"], "0.91")
         self.assertEqual(style_values["rotation"], "8deg")
 
+    def test_story_editor_music_transport_presets_persist_to_project(self) -> None:
+        project_title = "浏览器烟测项目_MusicTransport"
+        self.create_blank_project(project_title)
+        self.create_first_chapter()
+
+        self.page.locator('button[data-action="add-music-play"]').first.click()
+        self.page.locator("#editorMusicStartTime").wait_for(timeout=15000)
+
+        self.page.locator('[data-music-transport-preset="play_once"]').click()
+        self.page.wait_for_function(
+            "() => document.querySelector('#editorMusicLoop')?.value === 'false'",
+            timeout=10000,
+        )
+        self.assertTrue(self.page.locator("#editorMusicLoopStart").is_disabled())
+
+        self.page.locator('[data-music-transport-preset="intro_loop"]').click()
+        self.page.wait_for_function(
+            """() => document.querySelector('#editorMusicLoop')?.value === 'true'
+                && document.querySelector('#editorMusicLoopStart')?.value === '8'""",
+            timeout=10000,
+        )
+        self.assertEqual(self.page.locator("#editorMusicLoopStart").input_value(), "8")
+        self.assertFalse(self.page.locator("#editorMusicLoopStart").is_disabled())
+
+        self.page.locator("#editorMusicStartTime").fill("1.5")
+        self.page.locator("#editorMusicLoopStart").fill("6.25")
+        self.page.locator("#editorMusicLoopEnd").fill("24.5")
+        self.page.locator("#editorMusicRestartMode").select_option("restart")
+        self.page.locator("[data-music-transport-summary]").filter(has_text="循环 6.25 秒").wait_for(
+            timeout=10000
+        )
+        self.page.get_by_role("button", name="保存这张卡片").click()
+
+        self.page.wait_for_function(
+            """async () => {
+                const response = await fetch('/api/project-data');
+                const bundle = await response.json();
+                const music = bundle.chapters
+                    .flatMap((chapter) => chapter.scenes || [])
+                    .flatMap((scene) => scene.blocks || [])
+                    .find((block) => block.type === 'music_play');
+                return music?.loop === true
+                    && music.startTimeSeconds === 1.5
+                    && music.loopStartSeconds === 6.25
+                    && music.loopEndSeconds === 24.5
+                    && music.restartMode === 'restart';
+            }""",
+            timeout=15000,
+        )
+
     def test_story_editor_can_split_long_dialogue_into_multiple_cards(self) -> None:
         self.create_blank_project("浏览器烟测项目_Split")
         self.create_first_chapter()
@@ -1702,6 +1752,10 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
         )
         self.page.locator(f'input[data-action="toggle-asset-bulk"][data-asset-id="{asset_payload["usedId"]}"]').wait_for(
             timeout=15000
+        )
+        self.page.wait_for_function(
+            """() => document.querySelector('#assetBulkDeleteButton')?.textContent?.includes('无可删未使用')""",
+            timeout=15000,
         )
         self.assertIn("无可删未使用", bulk_delete_button.inner_text())
 

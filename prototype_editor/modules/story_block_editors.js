@@ -927,6 +927,7 @@
     }));
     const getMusicRangeDiagnostics = getRenderer(options, "getMusicRangeDiagnostics", () => null);
     const renderMusicRangeHealthChips = getRenderer(options, "renderMusicRangeHealthChips", () => "");
+    const renderMusicTransportEditor = getRenderer(options, "renderMusicTransportEditor", () => "");
     const renderMusicEndModeOptions = getRenderer(options, "renderMusicEndModeOptions");
     const renderMusicRangeEndBlockOptions = getRenderer(options, "renderMusicRangeEndBlockOptions");
     const assetId = getSafeAssetIdByType("bgm", block?.assetId);
@@ -955,6 +956,7 @@
           <option value="false" ${block?.loop === false ? "selected" : ""}>只播放一次</option>
         </select>
       </div>
+      ${renderMusicTransportEditor(block)}
       <div class="detail-row">
         <label for="editorMusicVolume">本段音量（%）</label>
         <input id="editorMusicVolume" type="number" min="0" max="100" step="1" value="${escape(

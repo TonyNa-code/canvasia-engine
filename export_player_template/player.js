@@ -27,6 +27,15 @@ import {
   stopTrackedAudios,
 } from "./runtime_audio.js";
 import {
+  bindMusicTransportToAudio,
+  buildMusicPlaybackKey,
+  getMusicInitialPosition,
+  getMusicPlaybackPosition,
+  getMusicTransportSummary,
+  keepExistingMusicPlaybackAlive,
+  sanitizeMusicTransport,
+} from "./runtime_music_transport.js";
+import {
   buildRuntimePreloadMetaText,
   buildRuntimePreloadStatusText,
   startRuntimePreload,
@@ -438,6 +447,9 @@ const state = {
   session: null,
   bgmAudio: null,
   currentMusicAssetId: null,
+  currentMusicPlaybackKey: "",
+  currentMusicCueId: "",
+  musicTransportCleanup: null,
   lastRenderedStepKey: null,
   typingTimer: null,
   typingSnapshotKey: null,
@@ -5255,6 +5267,7 @@ function loadStoredPlayerProfile() {
 
 function persistAutoResume() {
   captureCurrentTimedChoiceState();
+  captureCurrentMusicPlaybackPosition();
   const session = sanitizeStoredSession(state.session);
 
   if (!session) {
@@ -6850,6 +6863,7 @@ function quickSaveCurrent() {
   }
 
   captureCurrentTimedChoiceState();
+  captureCurrentMusicPlaybackPosition();
   state.quickSave = {
     savedAt: new Date().toISOString(),
     session: deepCloneRuntimeData(state.session),
@@ -7550,6 +7564,7 @@ function saveCurrentSlot(rawIndex) {
   }
 
   captureCurrentTimedChoiceState();
+  captureCurrentMusicPlaybackPosition();
   state.saveSlots[slotIndex] = {
     savedAt: new Date().toISOString(),
     session: deepCloneRuntimeData(state.session),
@@ -7721,6 +7736,10 @@ function createInitialPreviewVisualState() {
     musicName: "未播放",
     musicAssetId: null,
     musicVolume: 100,
+    musicTransport: sanitizeMusicTransport(),
+    musicCueId: "",
+    musicCueSequence: 0,
+    musicPlaybackPositionSeconds: 0,
     musicScope: null,
     musicFadeOutMs: 0,
     musicPreviousFadeOutMs: 0,
@@ -7759,6 +7778,13 @@ function clonePreviewVisualState(visualState) {
         }
       : null,
     musicVolume: getSafeVolumePercent(visualState?.musicVolume, 100),
+    musicTransport: sanitizeMusicTransport(visualState?.musicTransport),
+    musicCueId: String(visualState?.musicCueId ?? ""),
+    musicCueSequence: Math.max(0, Math.round(Number(visualState?.musicCueSequence) || 0)),
+    musicPlaybackPositionSeconds: getMusicInitialPosition(
+      visualState?.musicTransport,
+      visualState?.musicPlaybackPositionSeconds
+    ),
     musicFadeOutMs: getSafeAudioFadeMs(visualState?.musicFadeOutMs, 0),
     musicPreviousFadeOutMs: getSafeAudioFadeMs(visualState?.musicPreviousFadeOutMs, 0),
     backgroundTransitionEvent: visualState?.backgroundTransitionEvent
@@ -7866,6 +7892,10 @@ function clearPreviewMusicForScopeEnd(visualState, fadeOutMs = 0) {
   visualState.musicAssetId = null;
   visualState.musicName = "未播放";
   visualState.musicVolume = 100;
+  visualState.musicTransport = sanitizeMusicTransport();
+  visualState.musicCueId = "";
+  visualState.musicCueSequence = 0;
+  visualState.musicPlaybackPositionSeconds = 0;
   visualState.musicScope = null;
   visualState.musicFadeOutMs = getSafeAudioFadeMs(fadeOutMs, 0);
 }
@@ -8072,10 +8102,14 @@ function applyBlockToPreviewState(block, visualState, variables, sceneId = "") {
       visualState.musicAssetId = block.assetId;
       visualState.musicName = asset?.name ?? block.assetId;
       visualState.musicVolume = getSafeVolumePercent(block.volume, 100);
+      visualState.musicTransport = sanitizeMusicTransport(block);
+      visualState.musicCueSequence = Math.max(0, Math.round(Number(visualState.musicCueSequence) || 0)) + 1;
+      visualState.musicCueId = `${sceneId}:${block.id ?? "music"}:${visualState.musicCueSequence}`;
+      visualState.musicPlaybackPositionSeconds = visualState.musicTransport.startTimeSeconds;
       visualState.musicScope = getMusicScopeFromBlock(block, sceneId);
       visualState.musicFadeOutMs = 0;
       visualState.speakerName = "音乐";
-      visualState.dialogueText = `开始播放：${asset?.name ?? block.assetId}`;
+      visualState.dialogueText = `开始播放：${asset?.name ?? block.assetId}。${getMusicTransportSummary(visualState.musicTransport)}`;
       return null;
     }
     case "music_stop":
@@ -8083,6 +8117,10 @@ function applyBlockToPreviewState(block, visualState, variables, sceneId = "") {
       visualState.musicAssetId = null;
       visualState.musicName = "未播放";
       visualState.musicVolume = 100;
+      visualState.musicTransport = sanitizeMusicTransport();
+      visualState.musicCueId = "";
+      visualState.musicCueSequence = 0;
+      visualState.musicPlaybackPositionSeconds = 0;
       visualState.musicScope = null;
       visualState.speakerName = "音乐";
       visualState.dialogueText = "背景音乐停止了。";
@@ -8775,8 +8813,22 @@ function syncAudio(snapshot) {
     return;
   }
 
-  if (state.currentMusicAssetId === nextMusicAssetId && state.bgmAudio) {
+  const transport = sanitizeMusicTransport(snapshot.visualState?.musicTransport ?? snapshot.block);
+  const playbackKey = buildMusicPlaybackKey(
+    nextMusicAssetId,
+    transport,
+    snapshot.visualState?.musicCueId ?? snapshot.blockId
+  );
+  const cueId = String(snapshot.visualState?.musicCueId ?? snapshot.blockId ?? "");
+
+  const isNewCue = state.currentMusicCueId !== cueId;
+  if (
+    state.currentMusicPlaybackKey === playbackKey
+    && state.bgmAudio
+    && (!state.bgmAudio.ended || !isNewCue)
+  ) {
     state.bgmAudio.volume = targetVolume;
+    keepExistingMusicPlaybackAlive(state.bgmAudio);
     return;
   }
 
@@ -8791,11 +8843,15 @@ function syncAudio(snapshot) {
   }
 
   const audio = new Audio(encodeURI(musicUrl));
-  audio.loop = true;
   audio.volume = fadeInMs > 0 ? 0 : targetVolume;
+  state.musicTransportCleanup = bindMusicTransportToAudio(audio, transport, {
+    initialPositionSeconds: snapshot.visualState?.musicPlaybackPositionSeconds,
+  });
   audio.play().catch(() => {});
   state.bgmAudio = audio;
   state.currentMusicAssetId = nextMusicAssetId;
+  state.currentMusicPlaybackKey = playbackKey;
+  state.currentMusicCueId = cueId;
 
   if (fadeInMs > 0) {
     fadeAudioVolume(audio, {
@@ -9038,8 +9094,12 @@ function finishCreditsPlayback({ skipped = false } = {}) {
 
 function fadeOutPreviousMusic(fadeOutMs = 0) {
   const previousAudio = state.bgmAudio;
+  state.musicTransportCleanup?.();
+  state.musicTransportCleanup = null;
   state.bgmAudio = null;
   state.currentMusicAssetId = null;
+  state.currentMusicPlaybackKey = "";
+  state.currentMusicCueId = "";
 
   if (!previousAudio) {
     return;
@@ -9062,6 +9122,19 @@ function fadeOutPreviousMusic(fadeOutMs = 0) {
 function stopMusic({ fadeOutMs = 0 } = {}) {
   fadeOutPreviousMusic(fadeOutMs);
   state.currentMusicAssetId = null;
+}
+
+function captureCurrentMusicPlaybackPosition() {
+  const snapshot = getCurrentSnapshot();
+  if (!snapshot?.visualState || !state.bgmAudio || snapshot.visualState.musicAssetId !== state.currentMusicAssetId) {
+    return 0;
+  }
+  const position = getMusicPlaybackPosition(
+    state.bgmAudio,
+    snapshot.visualState.musicPlaybackPositionSeconds
+  );
+  snapshot.visualState.musicPlaybackPositionSeconds = position;
+  return position;
 }
 
 function getPreviewHint(snapshot) {

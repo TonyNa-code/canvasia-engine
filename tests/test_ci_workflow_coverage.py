@@ -278,6 +278,30 @@ class CiWorkflowCoverageTests(unittest.TestCase):
             workflow,
         )
 
+    def test_music_transport_contract_is_checked_in_ci(self) -> None:
+        workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+
+        for path in (
+            "native_runtime/runtime_music_transport.py",
+            "export_player_template/runtime_music_transport.js",
+            "prototype_editor/modules/music_transport_editor.js",
+            "tests/test_native_runtime_music_transport.py",
+            "tests/test_music_transport_contract.py",
+            "tests/test_frontend_runtime_music_transport_module.py",
+            "tests/test_frontend_music_transport_editor_module.py",
+        ):
+            self.assertIn(path, workflow)
+        for test_name in (
+            "test_native_runtime_music_transport.py",
+            "test_music_transport_contract.py",
+            "test_frontend_runtime_music_transport_module.py",
+            "test_frontend_music_transport_editor_module.py",
+        ):
+            self.assertIn(
+                f"python -m unittest discover -s tests -p '{test_name}' -v",
+                workflow,
+            )
+
     def test_editor_project_presentation_settings_are_checked_in_ci(self) -> None:
         workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
 

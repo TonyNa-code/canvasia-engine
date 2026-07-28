@@ -185,6 +185,8 @@ def get_renpy_export_contract() -> dict:
         "particleImageAssetTypes": list(PARTICLE_IMAGE_ASSET_TYPES),
         "particlePresetKeys": sorted(PARTICLE_PRESET_DEFAULTS),
         "screenFilterPresetKeys": sorted(SCREEN_FILTER_PRESETS),
+        "musicRestartModes": ["continue", "restart"],
+        "musicTransportMaxSeconds": 21600,
     }
 
 
@@ -352,6 +354,41 @@ def render_music_loop_clause(block: dict) -> str:
     if block.get("loop") is False:
         return " noloop"
     return ""
+
+
+def get_music_cue_seconds(value: object, fallback: float = 0.0) -> float:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        number = float(fallback)
+    if number != number:
+        number = float(fallback)
+    return round(max(0.0, min(21600.0, number)), 3)
+
+
+def build_music_playback_spec(path: str, block: dict) -> dict:
+    loop = block.get("loop") is not False
+    start = get_music_cue_seconds(block.get("startTimeSeconds"))
+    has_loop_start = block.get("loopStartSeconds") not in {None, ""}
+    loop_start = get_music_cue_seconds(
+        block.get("loopStartSeconds") if has_loop_start else start,
+        start,
+    )
+    raw_loop_end = get_music_cue_seconds(block.get("loopEndSeconds"))
+    loop_end = raw_loop_end if raw_loop_end > loop_start else 0.0
+    clauses: list[str] = []
+    if start > 0:
+        clauses.extend(["from", format_renpy_seconds(start)])
+    if loop_end > 0:
+        clauses.extend(["to", format_renpy_seconds(loop_end)])
+    if loop and loop_start != start:
+        clauses.extend(["loop", format_renpy_seconds(loop_start)])
+    playback_path = f"<{' '.join(clauses)}>{path}" if clauses else path
+    return {
+        "path": playback_path,
+        "loopClause": " loop" if loop else " noloop",
+        "restartClause": "" if block.get("restartMode") == "restart" else " if_changed",
+    }
 
 
 def is_music_control_block(block: dict) -> bool:
@@ -1839,7 +1876,11 @@ def render_story_block(block: dict, context: dict) -> list[str]:
         fade_in = seconds_from_ms(block.get("fadeInMs"))
         fade_suffix = f" fadein {fade_in:g}" if fade_in else ""
         volume_suffix = render_runtime_volume_clause(block, context, "defaultBgmVolume")
-        return [f"    play music {quote_renpy(get_asset_path(asset_map, block.get('assetId')) or 'audio/bgm.ogg')}{fade_suffix}{render_music_loop_clause(block)}{volume_suffix}"]
+        playback = build_music_playback_spec(
+            get_asset_path(asset_map, block.get("assetId")) or "audio/bgm.ogg",
+            block,
+        )
+        return [f"    play music {quote_renpy(playback['path'])}{fade_suffix}{playback['loopClause']}{playback['restartClause']}{volume_suffix}"]
     if block_type == "music_stop":
         fade_out = seconds_from_ms(block.get("fadeOutMs"))
         return [f"    stop music{f' fadeout {fade_out:g}' if fade_out else ''}"]

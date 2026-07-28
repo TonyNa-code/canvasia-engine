@@ -17,7 +17,7 @@
     ["scene_return", "流程", "full", "full", "支持从子场景提前返回；调用栈会随存档、读档和回滚恢复。"],
     ["variable_set", "变量", "full", "full", "支持变量赋值。"],
     ["variable_add", "变量", "full", "full", "支持数值变量增减。"],
-    ["music_play", "音频", "full", "full", "支持 BGM 播放、循环、音量、淡入和范围调度。"],
+    ["music_play", "音频", "full", "full", "支持 BGM 起播点、片头后循环、循环终点、同曲续播 / 重播、音量、淡入和范围调度。"],
     ["music_stop", "音频", "full", "full", "支持 BGM 淡出停止。"],
     ["sfx_play", "音频", "full", "full", "支持音效播放与音量控制。"],
     ["video_play", "视频", "full", "partial", "Web Runtime 支持内嵌播放；原生 Runtime 支持 PyAV / OpenCV / 系统播放器兜底，需按目标平台验收。"],

@@ -882,7 +882,7 @@ class RenpyExportContractTests(unittest.TestCase):
         options = renpy_export.build_renpy_options_file(bundle)
 
         for script in (frontend["script"], backend["script"]):
-            self.assertIn('play music "audio/theme.ogg" loop volume 0.64', script)
+            self.assertIn('play music "audio/theme.ogg" loop if_changed volume 0.64', script)
             self.assertIn('hero "{cps=72}The project default speed is active.{/cps}"', script)
             self.assertIn('play sound "audio/bell.ogg" volume 0.77', script)
 

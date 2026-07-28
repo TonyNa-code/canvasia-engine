@@ -399,6 +399,37 @@
     return "";
   }
 
+  function getMusicCueSeconds(value, fallback = 0) {
+    const number = Number(value);
+    const fallbackNumber = Number(fallback) || 0;
+    return Number(Math.min(21600, Math.max(0, Number.isFinite(number) ? number : fallbackNumber)).toFixed(3));
+  }
+
+  function buildMusicPlaybackSpec(path, block = {}) {
+    const loop = block.loop !== false;
+    const start = getMusicCueSeconds(block.startTimeSeconds);
+    const hasLoopStart = block.loopStartSeconds !== undefined && block.loopStartSeconds !== null && block.loopStartSeconds !== "";
+    const loopStart = getMusicCueSeconds(hasLoopStart ? block.loopStartSeconds : start, start);
+    const rawLoopEnd = getMusicCueSeconds(block.loopEndSeconds);
+    const loopEnd = rawLoopEnd > loopStart ? rawLoopEnd : 0;
+    const clauses = [];
+    if (start > 0) {
+      clauses.push("from", formatRenpySeconds(start));
+    }
+    if (loopEnd > 0) {
+      clauses.push("to", formatRenpySeconds(loopEnd));
+    }
+    if (loop && loopStart !== start) {
+      clauses.push("loop", formatRenpySeconds(loopStart));
+    }
+    const playbackPath = clauses.length ? `<${clauses.join(" ")}>${path}` : path;
+    return {
+      path: playbackPath,
+      loopClause: loop ? " loop" : " noloop",
+      restartClause: block.restartMode === "restart" ? "" : " if_changed",
+    };
+  }
+
   function isMusicControlBlock(block = {}) {
     return ["music_play", "music_stop"].includes(cleanText(block.type));
   }
@@ -1728,8 +1759,9 @@
     if (type === "music_play") {
       const path = getAssetPath(assetMap, block.assetId);
       const fadeIn = secondsFromMs(block.fadeInMs);
+      const playback = buildMusicPlaybackSpec(path || "audio/bgm.ogg", block);
       return [
-        `    play music ${quoteRenpy(path || "audio/bgm.ogg")}${fadeIn ? ` fadein ${fadeIn}` : ""}${renderMusicLoopClause(block)}${renderRuntimeVolumeClause(block, context, "defaultBgmVolume")}`,
+        `    play music ${quoteRenpy(playback.path)}${fadeIn ? ` fadein ${fadeIn}` : ""}${playback.loopClause}${playback.restartClause}${renderRuntimeVolumeClause(block, context, "defaultBgmVolume")}`,
       ];
     }
     if (type === "music_stop") {
@@ -1987,6 +2019,8 @@
       particleImageAssetTypes: [...PARTICLE_IMAGE_ASSET_TYPES],
       particlePresetKeys: Object.keys(PARTICLE_PRESET_DEFAULTS).sort(),
       screenFilterPresetKeys: Object.keys(SCREEN_FILTER_PRESETS).sort(),
+      musicRestartModes: ["continue", "restart"],
+      musicTransportMaxSeconds: 21600,
     };
   }
 
@@ -2003,6 +2037,7 @@
     renderConditionRuleExpression,
     renderRenpyTextPacing,
     renderRenpyStoryText,
+    buildMusicPlaybackSpec,
     renderBlock,
     sanitizeProjectRuntimeSettings,
   });

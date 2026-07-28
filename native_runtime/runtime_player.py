@@ -188,6 +188,19 @@ except ImportError:  # pragma: no cover - exported native packages import from t
     from runtime_voice_reactive_motion import NativeVoiceReactiveMotionController
 
 try:
+    from .runtime_music_transport import (
+        NativeMusicTransportController,
+        build_music_playback_key,
+        sanitize_music_transport,
+    )
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_music_transport import (
+        NativeMusicTransportController,
+        build_music_playback_key,
+        sanitize_music_transport,
+    )
+
+try:
     from .runtime_reading_profiles import (
         READING_PROFILE_IDS,
         apply_reading_profile,
@@ -8256,6 +8269,11 @@ class NativeRuntimePlayer:
         self.current_bgm_asset_id: str | None = None
         self.current_bgm_volume_percent = 100
         self.current_bgm_scope: dict | None = None
+        self.current_bgm_transport = sanitize_music_transport()
+        self.current_bgm_playback_key = ""
+        self.current_bgm_cue_id = ""
+        self.current_bgm_cue_sequence = 0
+        self.music_transport_controller = NativeMusicTransportController()
         self.current_voice_channel = None
         self.current_voice_volume_percent = 100
         self.current_voice_profile_id = ""
@@ -10069,6 +10087,7 @@ class NativeRuntimePlayer:
         self.current_bgm_asset_id = None
         self.current_bgm_volume_percent = 100
         self.current_bgm_scope = None
+        self.current_bgm_cue_sequence = 0
         self.variable_state = self.build_initial_variable_state()
         self.story_call_stack = []
         self.reset_rollback_timeline()
@@ -10778,6 +10797,10 @@ class NativeRuntimePlayer:
             "currentBgmAssetId": self.current_bgm_asset_id,
             "currentBgmVolume": self.current_bgm_volume_percent,
             "currentBgmScope": dict(self.current_bgm_scope) if isinstance(self.current_bgm_scope, dict) else None,
+            "currentBgmTransport": dict(self.current_bgm_transport),
+            "currentBgmCueId": self.current_bgm_cue_id,
+            "currentBgmCueSequence": self.current_bgm_cue_sequence,
+            "currentBgmPlaybackPositionSeconds": self.get_current_bgm_playback_position(),
             "timedChoiceState": timed_choice_state,
             "finished": self.finished,
             "finishedMessage": self.finished_message,
@@ -10917,12 +10940,24 @@ class NativeRuntimePlayer:
         self.current_bgm_asset_id = None
         self.current_bgm_volume_percent = get_safe_volume_percent(snapshot.get("currentBgmVolume"), 100)
         self.current_bgm_scope = snapshot.get("currentBgmScope") if isinstance(snapshot.get("currentBgmScope"), dict) else None
+        self.current_bgm_transport = sanitize_music_transport(snapshot.get("currentBgmTransport"))
+        self.current_bgm_playback_key = ""
+        self.current_bgm_cue_id = str(snapshot.get("currentBgmCueId") or "")
+        self.current_bgm_cue_sequence = max(0, int(snapshot.get("currentBgmCueSequence") or 0))
+        self.music_transport_controller.reset()
         self.clear_particle_effect()
         self.clear_stage_visual_effects(include_persistent=True)
 
         bgm_asset_id = snapshot.get("currentBgmAssetId")
         if bgm_asset_id:
-            self.play_bgm(bgm_asset_id, loop=True, volume_percent=self.current_bgm_volume_percent)
+            self.play_bgm(
+                bgm_asset_id,
+                loop=bool(self.current_bgm_transport.get("loop", True)),
+                volume_percent=self.current_bgm_volume_percent,
+                transport=self.current_bgm_transport,
+                cue_id=self.current_bgm_cue_id,
+                resume_time_seconds=snapshot.get("currentBgmPlaybackPositionSeconds"),
+            )
         else:
             self.stop_bgm()
 
@@ -11507,11 +11542,15 @@ class NativeRuntimePlayer:
 
             if block_type == "music_play":
                 self.current_bgm_scope = get_music_scope_from_block(block, self.current_scene_id)
+                self.current_bgm_cue_sequence += 1
+                cue_id = f"{self.current_scene_id}:{block.get('id') or 'music'}:{self.current_bgm_cue_sequence}"
                 self.play_bgm(
                     block.get("assetId"),
                     loop=bool(block.get("loop", True)),
                     fade_in_ms=get_safe_audio_fade_ms(block.get("fadeInMs"), 600),
                     volume_percent=block.get("volume"),
+                    transport=block,
+                    cue_id=cue_id,
                 )
                 self.current_block_index += 1
                 continue
@@ -11696,20 +11735,37 @@ class NativeRuntimePlayer:
         loop: bool = True,
         fade_in_ms: int = 0,
         volume_percent: object | None = None,
+        transport: dict | None = None,
+        cue_id: str = "",
+        resume_time_seconds: object | None = None,
     ) -> None:
         if not self.pygame.mixer.get_init():
             return
         safe_volume_percent = get_safe_volume_percent(volume_percent, 100)
-        if asset_id == self.current_bgm_asset_id:
-            self.current_bgm_volume_percent = safe_volume_percent
-            self.pygame.mixer.music.set_volume(self.get_effective_bgm_volume())
-            return
+        transport_source = dict(transport) if isinstance(transport, dict) else {}
+        transport_source.setdefault("loop", bool(loop))
+        safe_transport = sanitize_music_transport(transport_source)
+        playback_key = build_music_playback_key(asset_id, safe_transport, cue_id)
+        if playback_key == self.current_bgm_playback_key and self.current_bgm_asset_id:
+            try:
+                playback_active = bool(self.pygame.mixer.music.get_busy())
+            except (AttributeError, TypeError, ValueError):
+                playback_active = True
+            is_new_cue = str(cue_id or "") != self.current_bgm_cue_id
+            if playback_active or not is_new_cue:
+                self.current_bgm_volume_percent = safe_volume_percent
+                self.pygame.mixer.music.set_volume(self.get_effective_bgm_volume())
+                return
         asset = self.assets_by_id.get(asset_id)
         asset_path = get_asset_runtime_path(self.bundle_dir, asset)
         if not asset_path:
             self.current_bgm_asset_id = None
             self.current_bgm_volume_percent = 100
             self.current_bgm_scope = None
+            self.current_bgm_transport = sanitize_music_transport()
+            self.current_bgm_playback_key = ""
+            self.current_bgm_cue_id = ""
+            self.music_transport_controller.reset()
             return
         if asset and asset.get("type") == "bgm":
             self.unlock_archive_entry("bgmUnlocked", asset_id)
@@ -11718,15 +11774,71 @@ class NativeRuntimePlayer:
             self.current_bgm_volume_percent = safe_volume_percent
             self.pygame.mixer.music.set_volume(self.get_effective_bgm_volume())
             safe_fade_in_ms = get_safe_audio_fade_ms(fade_in_ms)
-            try:
-                self.pygame.mixer.music.play(-1 if loop else 0, fade_ms=safe_fade_in_ms)
-            except TypeError:
-                self.pygame.mixer.music.play(-1 if loop else 0)
+            self.current_bgm_transport = self.music_transport_controller.configure(
+                safe_transport,
+                resume_time_seconds,
+            )
+            self._start_loaded_bgm(
+                self.music_transport_controller.get_start_position(),
+                self.music_transport_controller.get_pygame_loop_count(),
+                safe_fade_in_ms,
+            )
             self.current_bgm_asset_id = asset_id
+            self.current_bgm_playback_key = playback_key
+            self.current_bgm_cue_id = str(cue_id or "")
         except Exception:
             self.current_bgm_asset_id = None
             self.current_bgm_volume_percent = 100
             self.current_bgm_scope = None
+            self.current_bgm_transport = sanitize_music_transport()
+            self.current_bgm_playback_key = ""
+            self.current_bgm_cue_id = ""
+            self.music_transport_controller.reset()
+
+    def _start_loaded_bgm(self, start_seconds: float, loops: int = 0, fade_in_ms: int = 0) -> None:
+        safe_start = max(0.0, float(start_seconds or 0))
+        safe_fade = get_safe_audio_fade_ms(fade_in_ms)
+        try:
+            self.pygame.mixer.music.play(loops, start=safe_start, fade_ms=safe_fade)
+            return
+        except Exception:
+            pass
+        try:
+            self.pygame.mixer.music.play(loops, start=safe_start)
+            return
+        except Exception:
+            pass
+        self.pygame.mixer.music.play(loops)
+        if safe_start > 0:
+            try:
+                self.pygame.mixer.music.set_pos(safe_start)
+            except (AttributeError, TypeError, ValueError):
+                pass
+
+    def get_current_bgm_playback_position(self) -> float:
+        if not self.current_bgm_asset_id:
+            return 0.0
+        try:
+            return self.music_transport_controller.get_absolute_position(self.pygame.mixer.music.get_pos())
+        except (AttributeError, TypeError, ValueError):
+            return self.music_transport_controller.get_start_position()
+
+    def update_bgm_transport(self) -> None:
+        if not self.current_bgm_asset_id or not self.pygame.mixer.get_init():
+            return
+        try:
+            restart_position = self.music_transport_controller.get_restart_position(
+                self.pygame.mixer.music.get_pos(),
+                bool(self.pygame.mixer.music.get_busy()),
+            )
+        except (AttributeError, TypeError, ValueError):
+            return
+        if restart_position is None:
+            return
+        self.music_transport_controller.restart_segment(
+            restart_position,
+            lambda position: self._start_loaded_bgm(position, 0, 0),
+        )
 
     def stop_bgm(self, fade_out_ms: int = 0) -> None:
         if self.pygame.mixer.get_init():
@@ -11738,6 +11850,10 @@ class NativeRuntimePlayer:
         self.current_bgm_asset_id = None
         self.current_bgm_volume_percent = 100
         self.current_bgm_scope = None
+        self.current_bgm_transport = sanitize_music_transport()
+        self.current_bgm_playback_key = ""
+        self.current_bgm_cue_id = ""
+        self.music_transport_controller.reset()
 
     def play_sfx(self, asset_id: str | None, volume_percent: object | None = None) -> None:
         sound = self._load_sound(asset_id)
@@ -15110,6 +15226,7 @@ class NativeRuntimePlayer:
             if not running:
                 break
             self.update_timed_choice()
+            self.update_bgm_transport()
             self.update_stage_visual_effects(dt_seconds)
             self.update_particle_effect(dt_seconds)
             self.update_voice_playback_state()

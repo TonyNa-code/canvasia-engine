@@ -165,7 +165,7 @@
         group: "音频",
         webStatus: "full",
         nativeStatus: "full",
-        note: "支持 BGM 播放、循环、音量、淡入和范围调度。",
+        note: "支持 BGM 起播点、片头后循环、循环终点、同曲续播 / 重播、音量、淡入和范围调度。",
         tags: ["timelineAudioBeat", "audioCue"],
       },
       {

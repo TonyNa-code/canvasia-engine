@@ -69,7 +69,7 @@
       label: "播放音乐",
       group: "audio",
       beginnerVisible: true,
-      description: "播放 BGM，可配合淡入、音量和范围卡控制场景氛围。",
+      description: "播放 BGM，可设置淡入、音量、片头循环点、同曲续播方式和覆盖范围。",
     }),
     "add-music-stop": Object.freeze({
       blockType: "music_stop",

@@ -67,6 +67,7 @@ Canvasia Engine 当前更适合这样理解：
 - 手写剧本转剧情卡片：可把文档 / 备忘录里的 `角色：台词`、`角色 "台词"`、旁白、连续选项、`- 选项 -> 场景 [好感 +1; 已见面=true]` 变量后果、`设置 好感 为 2` / `add affection +1` 独立变量卡、`if 好感 >= 2 -> 好结局 else -> 普通结局` 条件分支，以及 `scene / show / move / hide / show 或 move ... scale / x / y / opacity / layer / flip / duration / easing / stage image show / update / hide / speed slow / normal / fast / instant / play music / stop music / play sound / play video / wait / pause / 等待 / 停顿 / shake / flash / zoom / pan / filter / blur / particle / credits / voice / jump / call / return` 等轻量演出、文字速度、音频、视频、节奏停顿、镜头、角色舞台、氛围和路线指令预览后插入当前场景
 - 角色、素材、台词台本、配音工作流
 - 网页与原生 Runtime 角色语音混音：总语音音量、角色 / 旁白独立音量和逐句音量三级叠加，可单独静音并持久保存；正常播放、历史回听和语音回想使用同一套混音结果
+- 跨 Runtime 精确 BGM 调度：提供整首循环、片头后循环、只播一次、同曲也重播四个小白预设，也可自定义起播点、循环起点 / 终点、同曲续播规则、淡入淡出、音量和剧情覆盖范围；编辑器试玩、网页 Runtime、原生 Runtime、存读档与 Ren'Py 草稿保持同一语义
 - 项目默认语言 / 可切换语言配置，网页 Runtime 与原生 Runtime 可按中日英等语言读取翻译文本并自动回退
 - 台词和旁白可逐句选择经典 ADV 对话框、会保留前文并支持手动换页的 NVL 满页叙事，或电影字幕；编辑器试玩、网页 Runtime、原生 Runtime 与 Ren'Py 草稿使用同一套字段和默认回退
 - 作者可启用自动说话者聚焦：当前发言角色会自然提亮并轻微前移，其他可见立绘柔和退后；编辑器试玩、网页 Runtime 与原生 Runtime 共用关闭 / 柔和 / 电影感三档，可调强度和过渡速度，静态阅读方案会自动取消缩放动画

@@ -53,6 +53,7 @@ const runtimeChoiceAvailabilityTools = window.CanvasiaRuntimeChoiceAvailability;
 const runtimeTimedChoiceTools = window.CanvasiaRuntimeTimedChoices;
 const runtimeStoryFlowTools = window.CanvasiaRuntimeStoryFlow;
 const runtimeAchievementTools = window.CanvasiaRuntimeAchievements;
+const runtimeMusicTransportTools = window.CanvasiaRuntimeMusicTransport;
 const choiceAvailabilityEditorTools = window.CanvasiaEditorChoiceAvailability;
 const timedChoiceEditorTools = window.CanvasiaEditorTimedChoice;
 const textPacingEditorTools = window.CanvasiaEditorTextPacing;
@@ -60,6 +61,7 @@ const richTextEditorTools = window.CanvasiaEditorRichText;
 const storyBlockActionTools = window.CanvasiaEditorStoryBlockActions;
 const storyBlockEditorTools = window.CanvasiaEditorStoryBlockEditors;
 const musicRangeScopeTools = window.CanvasiaEditorMusicRangeScope;
+const musicTransportEditorTools = window.CanvasiaEditorMusicTransport;
 const storyTemplateTools = window.CanvasiaEditorStoryTemplates;
 const storyTemplateApplicationTools = window.CanvasiaEditorStoryTemplateApplication;
 const storyTemplatePanelTools = window.CanvasiaEditorStoryTemplatePanel;
@@ -812,6 +814,9 @@ let previewAutoAdvanceTimer = null;
 let previewAutoAdvanceKey = null;
 let previewMusicAudio = null;
 let previewCurrentMusicAssetId = null;
+let previewCurrentMusicPlaybackKey = "";
+let previewCurrentMusicCueId = "";
+let previewMusicTransportCleanup = null;
 let editorUiThemeAutoRefreshTimer = null;
 let lastEditorRuntimeErrorKey = "";
 let lastEditorRuntimeErrorAt = 0;
@@ -4330,6 +4335,20 @@ async function handleClick(event) {
     return;
   }
 
+  if (action === "apply-music-transport-preset") {
+    const result = musicTransportEditorTools.applyMusicTransportPreset(
+      actionTarget.dataset.musicTransportPreset,
+      document,
+      { runtimeTools: runtimeMusicTransportTools }
+    );
+    setSaveStatus(result.label);
+    showToast(result.label, result.ok ? undefined : "error");
+    if (result.ok) {
+      scheduleAutoSave();
+    }
+    return;
+  }
+
   if (action === "apply-character-stage-preset") {
     applyCharacterStagePresetToEditor(actionTarget.dataset.characterStagePreset);
     return;
@@ -5311,6 +5330,14 @@ function handleChange(event) {
     return;
   }
 
+  if (["editorMusicLoop", "editorMusicRestartMode"].includes(target.id)) {
+    musicTransportEditorTools.updateMusicTransportPreview(document, {
+      runtimeTools: runtimeMusicTransportTools,
+    });
+    scheduleAutoSave();
+    return;
+  }
+
   if (target.id === "editorVariableId") {
     updateVariableSetEditor(target.value);
     scheduleAutoSave();
@@ -5569,6 +5596,14 @@ function handleInput(event) {
     if (description) {
       description.textContent = DIALOGUE_LAYOUT_DESCRIPTIONS[layout];
     }
+    scheduleAutoSave();
+    return;
+  }
+
+  if (["editorMusicStartTime", "editorMusicLoopStart", "editorMusicLoopEnd"].includes(event.target.id)) {
+    musicTransportEditorTools.updateMusicTransportPreview(document, {
+      runtimeTools: runtimeMusicTransportTools,
+    });
     scheduleAutoSave();
     return;
   }
@@ -6448,6 +6483,7 @@ function quickSavePreview() {
   }
 
   captureCurrentPreviewTimedChoiceState();
+  capturePreviewCurrentMusicPlaybackPosition();
   state.previewQuickSave = {
     savedAt: new Date().toISOString(),
     session: deepClonePreviewData(session),
@@ -7298,6 +7334,7 @@ function saveCurrentPreviewSlot(rawIndex) {
   }
 
   captureCurrentPreviewTimedChoiceState();
+  capturePreviewCurrentMusicPlaybackPosition();
   state.previewSaveSlots[slotIndex] = {
     savedAt: new Date().toISOString(),
     session: deepClonePreviewData(session),
@@ -19176,6 +19213,7 @@ function persistPreviewAutoResume() {
   }
 
   captureCurrentPreviewTimedChoiceState();
+  capturePreviewCurrentMusicPlaybackPosition();
   const session = sanitizeStoredPreviewSession(state.previewSession);
 
   if (!session) {
@@ -19695,6 +19733,8 @@ function stopPreviewAutoAdvance() {
 }
 
 function stopPreviewMusicPlayback() {
+  previewMusicTransportCleanup?.();
+  previewMusicTransportCleanup = null;
   if (previewMusicAudio) {
     previewMusicAudio.pause();
     previewMusicAudio.src = "";
@@ -19702,6 +19742,21 @@ function stopPreviewMusicPlayback() {
   }
 
   previewCurrentMusicAssetId = null;
+  previewCurrentMusicPlaybackKey = "";
+  previewCurrentMusicCueId = "";
+}
+
+function capturePreviewCurrentMusicPlaybackPosition() {
+  const snapshot = getCurrentPreviewSnapshot();
+  if (!snapshot?.visualState || !previewMusicAudio || snapshot.visualState.musicAssetId !== previewCurrentMusicAssetId) {
+    return 0;
+  }
+  const position = runtimeMusicTransportTools.getMusicPlaybackPosition(
+    previewMusicAudio,
+    snapshot.visualState.musicPlaybackPositionSeconds
+  );
+  snapshot.visualState.musicPlaybackPositionSeconds = position;
+  return position;
 }
 
 function stopPreviewOneShotAudios() {
@@ -19776,8 +19831,24 @@ function syncPreviewMusic(snapshot) {
     return;
   }
 
-  if (previewCurrentMusicAssetId === nextMusicAssetId && previewMusicAudio) {
+  const transport = runtimeMusicTransportTools.sanitizeMusicTransport(
+    snapshot?.visualState?.musicTransport ?? snapshot?.block
+  );
+  const playbackKey = runtimeMusicTransportTools.buildMusicPlaybackKey(
+    nextMusicAssetId,
+    transport,
+    snapshot?.visualState?.musicCueId ?? snapshot?.blockId
+  );
+  const cueId = String(snapshot?.visualState?.musicCueId ?? snapshot?.blockId ?? "");
+
+  const isNewCue = previewCurrentMusicCueId !== cueId;
+  if (
+    previewCurrentMusicPlaybackKey === playbackKey
+    && previewMusicAudio
+    && (!previewMusicAudio.ended || !isNewCue)
+  ) {
     previewMusicAudio.volume = targetVolume;
+    runtimeMusicTransportTools.keepExistingMusicPlaybackAlive(previewMusicAudio);
     return;
   }
 
@@ -19792,10 +19863,14 @@ function syncPreviewMusic(snapshot) {
   }
 
   const audio = new Audio(encodeURI(previewUrl));
-  audio.loop = true;
   audio.volume = targetVolume;
+  previewMusicTransportCleanup = runtimeMusicTransportTools.bindMusicTransportToAudio(audio, transport, {
+    initialPositionSeconds: snapshot?.visualState?.musicPlaybackPositionSeconds,
+  });
   audio.play().catch(() => {});
   previewMusicAudio = audio;
+  previewCurrentMusicPlaybackKey = playbackKey;
+  previewCurrentMusicCueId = cueId;
 }
 
 function getPreviewMusicTargetVolume(snapshot) {
@@ -20120,6 +20195,10 @@ function createInitialPreviewVisualState() {
     musicName: "未播放",
     musicAssetId: null,
     musicVolume: 100,
+    musicTransport: runtimeMusicTransportTools.sanitizeMusicTransport(),
+    musicCueId: "",
+    musicCueSequence: 0,
+    musicPlaybackPositionSeconds: 0,
     musicScope: null,
     musicFadeOutMs: 0,
     musicPreviousFadeOutMs: 0,
@@ -20158,6 +20237,13 @@ function clonePreviewVisualState(visualState) {
         }
       : null,
     musicVolume: getSafeVolumePercent(visualState?.musicVolume, 100),
+    musicTransport: runtimeMusicTransportTools.sanitizeMusicTransport(visualState?.musicTransport),
+    musicCueId: String(visualState?.musicCueId ?? ""),
+    musicCueSequence: Math.max(0, Math.round(Number(visualState?.musicCueSequence) || 0)),
+    musicPlaybackPositionSeconds: runtimeMusicTransportTools.getMusicInitialPosition(
+      visualState?.musicTransport,
+      visualState?.musicPlaybackPositionSeconds
+    ),
     musicFadeOutMs: getSafeNonNegativeNumber(visualState?.musicFadeOutMs, 0),
     musicPreviousFadeOutMs: getSafeNonNegativeNumber(visualState?.musicPreviousFadeOutMs, 0),
     backgroundTransitionEvent: visualState?.backgroundTransitionEvent
@@ -20262,6 +20348,10 @@ function clearPreviewMusicForScopeEnd(visualState, fadeOutMs = 0) {
   visualState.musicAssetId = null;
   visualState.musicName = "未播放";
   visualState.musicVolume = 100;
+  visualState.musicTransport = runtimeMusicTransportTools.sanitizeMusicTransport();
+  visualState.musicCueId = "";
+  visualState.musicCueSequence = 0;
+  visualState.musicPlaybackPositionSeconds = 0;
   visualState.musicScope = null;
   visualState.musicFadeOutMs = getSafeNonNegativeNumber(fadeOutMs, 0);
 }
@@ -20572,12 +20662,16 @@ function applyBlockToPreviewState(block, visualState, variables, sceneId = "") {
       visualState.musicAssetId = block.assetId;
       visualState.musicName = asset?.name ?? block.assetId;
       visualState.musicVolume = getSafeVolumePercent(block.volume, 100);
+      visualState.musicTransport = runtimeMusicTransportTools.sanitizeMusicTransport(block);
+      visualState.musicCueSequence = Math.max(0, Math.round(Number(visualState.musicCueSequence) || 0)) + 1;
+      visualState.musicCueId = `${sceneId}:${block.id ?? "music"}:${visualState.musicCueSequence}`;
+      visualState.musicPlaybackPositionSeconds = visualState.musicTransport.startTimeSeconds;
       visualState.musicScope = getMusicScopeFromBlock(block, sceneId);
       visualState.musicFadeOutMs = 0;
       visualState.speakerName = "音乐";
       visualState.dialogueText = `开始播放：${asset?.name ?? block.assetId}。范围：${getMusicEndModeLabel(
         visualState.musicScope.endMode
-      )} / 音量：${formatVolumePercent(visualState.musicVolume)}`;
+      )} / ${runtimeMusicTransportTools.getMusicTransportSummary(visualState.musicTransport)} / 音量：${formatVolumePercent(visualState.musicVolume)}`;
       return null;
     }
     case "music_stop":
@@ -20585,6 +20679,10 @@ function applyBlockToPreviewState(block, visualState, variables, sceneId = "") {
       visualState.musicAssetId = null;
       visualState.musicName = "未播放";
       visualState.musicVolume = 100;
+      visualState.musicTransport = runtimeMusicTransportTools.sanitizeMusicTransport();
+      visualState.musicCueId = "";
+      visualState.musicCueSequence = 0;
+      visualState.musicPlaybackPositionSeconds = 0;
       visualState.musicScope = null;
       visualState.speakerName = "音乐";
       visualState.dialogueText = "背景音乐停止了。";
@@ -33461,6 +33559,9 @@ function renderMusicPlayEditor(block) {
     renderMusicRangeHealthChips,
     renderMusicEndModeOptions,
     renderMusicRangeEndBlockOptions,
+    renderMusicTransportEditor: (musicBlock) => musicTransportEditorTools.renderMusicTransportEditor(musicBlock, {
+      runtimeTools: runtimeMusicTransportTools,
+    }),
   });
 }
 
@@ -39572,10 +39673,13 @@ function collectEditedBlock(block) {
 
   if (block.type === "music_play") {
     const endMode = getSafeMusicEndMode(document.getElementById("editorMusicEndMode")?.value);
+    const transport = musicTransportEditorTools.readMusicTransportEditor(block, document, {
+      runtimeTools: runtimeMusicTransportTools,
+    });
     return {
       ...block,
+      ...transport,
       assetId: getSafeAssetIdByType("bgm", document.getElementById("editorMusicAssetId")?.value),
-      loop: document.getElementById("editorMusicLoop")?.value !== "false",
       volume: getSafeVolumePercent(document.getElementById("editorMusicVolume")?.value, 100),
       fadeInMs: getSafeNonNegativeNumber(document.getElementById("editorFadeInMs")?.value, 600),
       fadeOutMs: getSafeNonNegativeNumber(document.getElementById("editorMusicRangeFadeOutMs")?.value, 600),
@@ -41269,7 +41373,7 @@ function createDefaultBlock(scene, blockType) {
       id: blockId,
       type: "music_play",
       assetId: getSafeAssetIdByType("bgm"),
-      loop: true,
+      ...runtimeMusicTransportTools.sanitizeMusicTransport(),
       volume: 100,
       fadeInMs: 600,
       fadeOutMs: 600,
