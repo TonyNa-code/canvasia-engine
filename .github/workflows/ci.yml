@@ -67,6 +67,9 @@ jobs:
             native_runtime/runtime_visual_comfort.py \
             native_runtime/runtime_speaker_focus.py \
             native_runtime/runtime_dialogue_camera.py \
+            native_runtime/runtime_voice_reactive_motion.py \
+            native_runtime/runtime_character_renderer.py \
+            native_runtime/runtime_stage_renderer.py \
             native_runtime/runtime_save_thumbnails.py \
             native_runtime/runtime_i18n.py \
             native_runtime/runtime_text_input.py \
@@ -94,6 +97,9 @@ jobs:
             tests/test_speaker_focus_contract.py \
             tests/test_native_runtime_dialogue_camera.py \
             tests/test_dialogue_camera_contract.py \
+            tests/test_native_runtime_voice_reactive_motion.py \
+            tests/test_voice_reactive_motion_contract.py \
+            tests/test_native_runtime_stage_renderer.py \
             tests/test_native_runtime_stage_images.py \
             tests/test_native_runtime_choice_availability.py \
             tests/test_native_runtime_story_flow.py \
@@ -365,7 +371,9 @@ jobs:
           node --check export_player_template/runtime_achievements.js
           node --check export_player_template/runtime_character_motion.js
           node --check export_player_template/runtime_speaker_focus.js
+          node --check export_player_template/runtime_character_cards.js
           node --check export_player_template/runtime_dialogue_camera.js
+          node --check export_player_template/runtime_voice_reactive_motion.js
           node --check export_player_template/runtime_stage_images.js
           node --check export_player_template/runtime_text_effects.js
           node --check export_player_template/runtime_text_variables.js
@@ -385,6 +393,9 @@ jobs:
           python -m unittest discover -s tests -p 'test_speaker_focus_contract.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_dialogue_camera.py' -v
           python -m unittest discover -s tests -p 'test_dialogue_camera_contract.py' -v
+          python -m unittest discover -s tests -p 'test_native_runtime_voice_reactive_motion.py' -v
+          python -m unittest discover -s tests -p 'test_voice_reactive_motion_contract.py' -v
+          python -m unittest discover -s tests -p 'test_native_runtime_stage_renderer.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_stage_images.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_choice_availability.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_story_flow.py' -v
@@ -494,7 +505,9 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_runtime_dialogue_layouts_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_visual_comfort_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_speaker_focus_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_runtime_character_cards_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_dialogue_camera_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_runtime_voice_reactive_motion_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_ui_skin_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_i18n_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_text_variables_module.py' -v

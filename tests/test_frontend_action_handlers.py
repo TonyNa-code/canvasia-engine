@@ -4095,11 +4095,14 @@ class FrontendActionHandlerTests(unittest.TestCase):
 
         native_source = NATIVE_RUNTIME_PATH.read_text(encoding="utf-8")
         native_view_source = NATIVE_RUNTIME_VIEW_PATH.read_text(encoding="utf-8")
+        native_stage_renderer_source = (
+            ROOT_DIR / "native_runtime" / "runtime_stage_renderer.py"
+        ).read_text(encoding="utf-8")
         self.assertIn("SCREEN_COLOR_GRADE_DEFAULTS", native_view_source)
         self.assertIn("def get_safe_screen_color_grade", native_view_source)
         self.assertIn('"grade": get_safe_screen_color_grade(block.get("grade"))', native_source)
-        self.assertIn("temperature = int(grade.get(\"temperature\") or 0)", native_source)
-        self.assertIn("vignette = int(grade.get(\"vignette\") or 0)", native_source)
+        self.assertIn("temperature = int(grade.get(\"temperature\") or 0)", native_stage_renderer_source)
+        self.assertIn("vignette = int(grade.get(\"vignette\") or 0)", native_stage_renderer_source)
 
     def test_project_doctor_report_labels_distinguish_preview_from_repair(self) -> None:
         source = APP_PATH.read_text(encoding="utf-8")
@@ -6107,9 +6110,12 @@ class FrontendActionHandlerTests(unittest.TestCase):
 
         native_source = NATIVE_RUNTIME_PATH.read_text(encoding="utf-8")
         native_view_source = NATIVE_RUNTIME_VIEW_PATH.read_text(encoding="utf-8")
+        native_character_renderer_source = (
+            ROOT_DIR / "native_runtime" / "runtime_character_renderer.py"
+        ).read_text(encoding="utf-8")
         self.assertIn('"flipX": read_bool("flipX")', native_view_source)
         self.assertIn("get_safe_character_stage", native_source)
-        self.assertIn("self.pygame.transform.flip(scaled, True, False)", native_source)
+        self.assertIn("runtime.pygame.transform.flip(scaled, True, False)", native_character_renderer_source)
 
     def test_transition_duration_reaches_editor_preview_and_export_runtime(self) -> None:
         app_source = APP_PATH.read_text(encoding="utf-8")
@@ -6121,11 +6127,14 @@ class FrontendActionHandlerTests(unittest.TestCase):
         collect_edited_block = _extract_function_source(app_source, "collectEditedBlock")
         apply_preview_block = _extract_function_source(app_source, "applyBlockToPreviewState")
         render_stage = _extract_function_source(app_source, "renderStage")
+        render_stage_cast = _extract_function_source(app_source, "renderStageCastMarkup")
         render_sprite = _extract_function_source(app_source, "renderStageSpriteCard")
         block_summary = _extract_function_source(app_source, "getBlockSummary")
         runtime_apply_block = _extract_function_source(player_source, "applyBlockToPreviewState")
         runtime_stage_visual = _extract_function_source(player_source, "renderStageVisual")
+        runtime_sprite_cards = _extract_function_source(player_source, "renderSpriteCards")
         runtime_sprite = _extract_function_source(player_source, "renderSpriteCard")
+        character_cards_source = (ROOT_DIR / "export_player_template" / "runtime_character_cards.js").read_text(encoding="utf-8")
         native_source = NATIVE_RUNTIME_PATH.read_text(encoding="utf-8")
 
         self.assertIn("editorTransitionDurationMs", story_editor_source)
@@ -6134,13 +6143,16 @@ class FrontendActionHandlerTests(unittest.TestCase):
         self.assertIn("backgroundTransitionEvent", apply_preview_block)
         self.assertIn("durationMs: getSafeTransitionDurationMs(block.transitionDurationMs)", apply_preview_block)
         self.assertIn("--background-transition-ms", render_stage)
-        self.assertIn("--sprite-transition-ms", render_sprite)
+        self.assertIn("renderCharacterCards", render_stage_cast)
+        self.assertIn("presentation.stageStyle", render_sprite)
         self.assertIn("getTransitionDurationSummary(block)", block_summary)
         self.assertIn("getSafeTransitionDurationMs(block.transitionDurationMs)", app_source)
         self.assertIn("backgroundTransitionEvent", runtime_apply_block)
         self.assertIn("getSafeTransitionDurationMs(block.transitionDurationMs)", runtime_apply_block)
         self.assertIn("--background-transition-ms", runtime_stage_visual)
-        self.assertIn("--sprite-transition-ms", runtime_sprite)
+        self.assertIn("renderCharacterCards", runtime_sprite_cards)
+        self.assertIn("presentation.stageStyle", runtime_sprite)
+        self.assertIn("--sprite-transition-ms", character_cards_source)
         self.assertIn("stage-backdrop-fade-in var(--background-transition-ms", editor_css)
         self.assertIn("player-background-fade-in var(--background-transition-ms", player_css)
         self.assertIn("var(--sprite-transition-ms", editor_css)

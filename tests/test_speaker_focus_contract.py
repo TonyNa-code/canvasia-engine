@@ -71,14 +71,23 @@ class SpeakerFocusContractTests(unittest.TestCase):
         player_source = (ROOT_DIR / "export_player_template" / "player.js").read_text(encoding="utf-8")
         editor_source = (ROOT_DIR / "prototype_editor" / "app.js").read_text(encoding="utf-8")
         native_source = (ROOT_DIR / "native_runtime" / "runtime_player.py").read_text(encoding="utf-8")
+        character_cards_source = (
+            ROOT_DIR / "export_player_template" / "runtime_character_cards.js"
+        ).read_text(encoding="utf-8")
+        native_character_renderer_source = (
+            ROOT_DIR / "native_runtime" / "runtime_character_renderer.py"
+        ).read_text(encoding="utf-8")
         player_css = (ROOT_DIR / "export_player_template" / "player.css").read_text(encoding="utf-8")
         editor_css = (ROOT_DIR / "prototype_editor" / "styles.css").read_text(encoding="utf-8")
 
         self.assertIn('"runtime_speaker_focus.js"', run_editor_source)
         self.assertIn('NATIVE_RUNTIME_SPEAKER_FOCUS_NAME = "runtime_speaker_focus.py"', run_editor_source)
-        self.assertIn('from "./runtime_speaker_focus.js"', player_source)
-        self.assertIn("buildSpeakerFocusPresentation", editor_source)
-        self.assertIn("speaker_focus_controller.build_render_poses", native_source)
+        self.assertIn('from "./runtime_character_cards.js"', player_source)
+        self.assertIn('from "./runtime_speaker_focus.js"', character_cards_source)
+        self.assertIn("buildSpeakerFocusPresentation", character_cards_source)
+        self.assertIn("renderCharacterCards", editor_source)
+        self.assertIn("render_native_characters(self, target)", native_source)
+        self.assertIn("speaker_focus_controller.build_render_poses", native_character_renderer_source)
         self.assertIn("--speaker-focus-brightness", player_css)
         self.assertIn("--speaker-focus-brightness", editor_css)
 

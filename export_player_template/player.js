@@ -110,7 +110,7 @@ import {
   scaleVisualMotion,
   scaleVisualTransitionMs,
 } from "./runtime_visual_comfort.js";
-import { buildSpeakerFocusPresentation } from "./runtime_speaker_focus.js";
+import { renderCharacterCards } from "./runtime_character_cards.js";
 import {
   buildStageCameraPresentation,
   getCameraPanStrengthLabel,
@@ -124,6 +124,7 @@ import {
   getSafeCameraZoomFocus,
   getSafeCameraZoomStrength,
 } from "./runtime_dialogue_camera.js";
+import { createVoiceReactiveMotionController } from "./runtime_voice_reactive_motion.js";
 import {
   applyReadingProfile,
   detectReadingProfile,
@@ -507,6 +508,7 @@ const state = {
 };
 
 const activeSfxAudios = new Set();
+const voiceReactiveMotionController = createVoiceReactiveMotionController({ root: document });
 
 let musicRoomAudio = null;
 let voiceReplayAudio = null;
@@ -5265,6 +5267,7 @@ function stopOneShotAudio() {
 }
 
 function stopVoicePlayback({ resetStepKey = true } = {}) {
+  voiceReactiveMotionController.stop();
   if (state.voiceAudio) {
     disposeAudio(state.voiceAudio);
     state.voiceAudio = null;
@@ -5399,6 +5402,7 @@ function scheduleRuntimeAutoAdvance(snapshot, options = {}) {
 }
 
 function handleVoiceEnded() {
+  voiceReactiveMotionController.stop();
   const snapshot = getCurrentSnapshot();
   const stepKey = getCurrentStepKey(snapshot);
 
@@ -5410,6 +5414,7 @@ function handleVoiceEnded() {
 }
 
 function handleVoiceError() {
+  voiceReactiveMotionController.stop();
   const snapshot = getCurrentSnapshot();
   updateRuntimeAudioVolumes();
   scheduleRuntimeAutoAdvance(snapshot);
@@ -5427,6 +5432,12 @@ function syncVoice(snapshot) {
 
   if (state.currentVoiceStepKey === stepKey && state.voiceAudio) {
     state.voiceAudio.volume = targetVolume;
+    voiceReactiveMotionController.start({
+      audio: state.voiceAudio,
+      characterId: snapshot.blockType === "dialogue" ? snapshot.block?.speakerId : "",
+      gameUiConfig: data.project?.gameUiConfig,
+      visualComfortMode: state.playback.visualComfort,
+    });
     updateRuntimeAudioVolumes();
     return;
   }
@@ -5446,11 +5457,18 @@ function syncVoice(snapshot) {
   audio.addEventListener("pause", updateRuntimeAudioVolumes);
   audio.addEventListener("ended", handleVoiceEnded);
   audio.addEventListener("error", handleVoiceError);
+  state.voiceAudio = audio;
+  voiceReactiveMotionController.start({
+    audio,
+    characterId: snapshot.blockType === "dialogue" ? snapshot.block?.speakerId : "",
+    gameUiConfig: data.project?.gameUiConfig,
+    visualComfortMode: state.playback.visualComfort,
+  });
   audio.play().catch(() => {
+    voiceReactiveMotionController.stop();
     scheduleRuntimeAutoAdvance(snapshot);
     updateRuntimeAudioVolumes();
   });
-  state.voiceAudio = audio;
   updateRuntimeAudioVolumes();
 }
 
@@ -8435,6 +8453,7 @@ function renderStageVisual(snapshot) {
   applyStageScreenEffects(visualState, snapshot.block);
 
   refs.spriteLayer.innerHTML = renderSpriteCards(visualState);
+  voiceReactiveMotionController.applyCurrentPose();
 
   refs.choiceList.querySelectorAll("[data-option-id]").forEach((button) => {
     button.addEventListener("click", () => choosePreviewOption(button.dataset.optionId));
@@ -8463,107 +8482,46 @@ function renderStageImageCards(visualState, plane) {
 }
 
 function renderSpriteCards(visualState) {
-  const cards = [...(visualState.visibleCharacters ?? [])];
-  const visibleCharacterIds = cards.map((item) => item.characterId).filter(Boolean);
-
-  if (visualState.characterTransitionEvent?.mode === "hide" && visualState.characterTransitionEvent.characterState) {
-    cards.push({
-      ...visualState.characterTransitionEvent.characterState,
-      __ghostMode: "hide",
-    });
-  }
-
-  return cards
-    .sort((left, right) => getPositionOrder(left.position) - getPositionOrder(right.position))
-    .map((characterState) =>
-      renderSpriteCard(
-        characterState,
-        visualState.depthBlur,
-        visualState.characterTransitionEvent,
-        visualState.activeCharacterId,
-        visualState.characterEmphasisEvent,
-        visibleCharacterIds
-      )
-    )
-    .join("");
+  return renderCharacterCards(
+    {
+      visibleCharacters: visualState.visibleCharacters,
+      depthBlur: visualState.depthBlur,
+      characterTransitionEvent: visualState.characterTransitionEvent,
+      activeCharacterId: visualState.activeCharacterId,
+      characterEmphasisEvent: visualState.characterEmphasisEvent,
+      visualComfortMode: state.playback.visualComfort,
+      gameUiConfig: data.project?.gameUiConfig,
+    },
+    {
+      getPositionOrder,
+      getSafeTransition,
+      getSafeTransitionDurationMs,
+      scaleVisualTransitionMs,
+      getCharacterStageStyle,
+      getCharacterMotionStyle,
+      shouldBlurCharacter: shouldBlurPlayerCharacter,
+      getSafeDepthBlurStrength,
+      renderCard: renderSpriteCard,
+    }
+  );
 }
 
-function renderSpriteCard(
-  characterState,
-  depthBlur = null,
-  characterTransitionEvent = null,
-  activeCharacterId = null,
-  characterEmphasisEvent = null,
-  visibleCharacterIds = []
-) {
+function renderSpriteCard(characterState, presentation) {
   const spriteAssetId = getSpriteAssetId(characterState.characterId, characterState.expressionId);
   const spriteUrl = getAssetUrl(spriteAssetId);
   const localizedName = getCharacterName(characterState.characterId);
-  const classes = ["sprite-card"];
-  const isGhostHide = characterState.__ghostMode === "hide";
-  const speakerFocusPresentation = buildSpeakerFocusPresentation({
-    characterId: characterState.characterId,
-    activeCharacterId,
-    visibleCharacterIds,
-    gameUiConfig: data.project?.gameUiConfig,
-    visualComfortMode: state.playback.visualComfort,
-    isLeaving: isGhostHide,
-  });
-  const transition = characterTransitionEvent ? getSafeTransition(characterTransitionEvent.transition) : "none";
-  const transitionDurationMs = characterTransitionEvent
-    ? scaleVisualTransitionMs(
-        getSafeTransitionDurationMs(characterTransitionEvent.durationMs),
-        state.playback.visualComfort
-      )
-    : scaleVisualTransitionMs(getSafeTransitionDurationMs(), state.playback.visualComfort);
-  const isMoving =
-    characterTransitionEvent?.mode === "move" &&
-    characterTransitionEvent.characterId === characterState.characterId;
-  const stageStyle = `${getCharacterStageStyle(characterState.stage, characterState.position)}${
-    isMoving ? getCharacterMotionStyle(characterTransitionEvent) : ""
-  }--sprite-transition-ms:${transitionDurationMs}ms;${speakerFocusPresentation.style}`;
-
-  classes.push(...speakerFocusPresentation.classNames);
-
-  if (shouldBlurPlayerCharacter(characterState.position, depthBlur)) {
-    classes.push("is-depth-muted");
-    classes.push(`depth-strength-${getSafeDepthBlurStrength(depthBlur?.strength)}`);
-  } else if (depthBlur) {
-    classes.push("is-depth-focus");
-  }
-
-  if (characterTransitionEvent?.mode === "show" && characterTransitionEvent.characterId === characterState.characterId) {
-    classes.push("is-entering");
-  }
-
-  if (isMoving) {
-    classes.push("is-moving");
-  }
-
-  if (isGhostHide) {
-    classes.push("is-leaving");
-  }
-
-  classes.push("is-breathing");
-
-  if (activeCharacterId === characterState.characterId) {
-    classes.push("is-speaking");
-  }
-
-  if (characterEmphasisEvent?.characterId === characterState.characterId) {
-    classes.push("is-emphasis");
-  }
-
   const visual = spriteUrl
     ? `<img class="sprite-image" src="${escapeHtml(encodeURI(spriteUrl))}" alt="${escapeHtml(localizedName)}" />`
     : `<div class="sprite-fallback">${escapeHtml((localizedName || "?").slice(0, 1))}</div>`;
 
   return `
-    <article class="${classes.join(" ")}" data-position="${escapeHtml(characterState.position)}" data-transition="${escapeHtml(transition)}" data-speaker-focus="${speakerFocusPresentation.role}" style="${stageStyle}">
-      <div class="sprite-card-inner">
-        <div class="sprite-visual-frame">${visual}</div>
-        <div class="sprite-name">${escapeHtml(localizedName)}</div>
-        <div class="sprite-expression">${escapeHtml(characterState.expressionName ?? "默认")}</div>
+    <article class="${presentation.classes.join(" ")}" data-character-id="${escapeHtml(characterState.characterId)}" data-position="${escapeHtml(characterState.position)}" data-transition="${escapeHtml(presentation.transition)}" data-speaker-focus="${presentation.speakerFocusPresentation.role}" style="${presentation.stageStyle}">
+      <div class="sprite-voice-reactive-layer">
+        <div class="sprite-card-inner">
+          <div class="sprite-visual-frame">${visual}</div>
+          <div class="sprite-name">${escapeHtml(localizedName)}</div>
+          <div class="sprite-expression">${escapeHtml(characterState.expressionName ?? "默认")}</div>
+        </div>
       </div>
     </article>
   `;

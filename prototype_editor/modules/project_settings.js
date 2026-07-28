@@ -267,6 +267,11 @@
     soft: "柔和跟拍",
     cinematic: "电影切镜",
   });
+  const PROJECT_GAME_UI_VOICE_REACTIVE_MOTION_LABELS = Object.freeze({
+    off: "关闭语音演技",
+    soft: "自然语音起伏",
+    cinematic: "鲜明舞台演技",
+  });
   const DEFAULT_PROJECT_GAME_UI_CONFIG = Object.freeze({
     preset: "stellar",
     layoutPreset: "balanced",
@@ -306,6 +311,9 @@
     dialogueCameraMode: "soft",
     dialogueCameraIntensity: 58,
     dialogueCameraTransitionMs: 520,
+    voiceReactiveMotionMode: "soft",
+    voiceReactiveMotionIntensity: 58,
+    voiceReactiveMotionSensitivity: 62,
     titleBackgroundAssetId: "",
     titleBackgroundFit: "cover",
     titleBackgroundOpacity: 42,
@@ -359,6 +367,9 @@
       dialogueCameraMode: "soft",
       dialogueCameraIntensity: 58,
       dialogueCameraTransitionMs: 520,
+      voiceReactiveMotionMode: "soft",
+      voiceReactiveMotionIntensity: 58,
+      voiceReactiveMotionSensitivity: 62,
       titleBackgroundOpacity: 42,
       titleBackgroundFit: "cover",
       panelFrameOpacity: 18,
@@ -399,6 +410,9 @@
       dialogueCameraMode: "soft",
       dialogueCameraIntensity: 42,
       dialogueCameraTransitionMs: 620,
+      voiceReactiveMotionMode: "soft",
+      voiceReactiveMotionIntensity: 42,
+      voiceReactiveMotionSensitivity: 58,
       titleBackgroundOpacity: 36,
       titleBackgroundFit: "cover",
       panelFrameOpacity: 14,
@@ -439,6 +453,9 @@
       dialogueCameraMode: "off",
       dialogueCameraIntensity: 0,
       dialogueCameraTransitionMs: 0,
+      voiceReactiveMotionMode: "off",
+      voiceReactiveMotionIntensity: 0,
+      voiceReactiveMotionSensitivity: 50,
       titleBackgroundOpacity: 28,
       titleBackgroundFit: "cover",
       panelFrameOpacity: 22,
@@ -479,6 +496,9 @@
       dialogueCameraMode: "cinematic",
       dialogueCameraIntensity: 48,
       dialogueCameraTransitionMs: 720,
+      voiceReactiveMotionMode: "cinematic",
+      voiceReactiveMotionIntensity: 46,
+      voiceReactiveMotionSensitivity: 65,
       titleBackgroundOpacity: 24,
       titleBackgroundFit: "cover",
       panelFrameOpacity: 0,
@@ -853,6 +873,15 @@
     );
   }
 
+  function getSafeProjectGameUiVoiceReactiveMotionMode(value, options = {}) {
+    const defaults = options.defaultGameUiConfig || DEFAULT_PROJECT_GAME_UI_CONFIG;
+    return getSafeLabelKey(
+      options.gameUiVoiceReactiveMotionLabels || PROJECT_GAME_UI_VOICE_REACTIVE_MOTION_LABELS,
+      value,
+      defaults.voiceReactiveMotionMode ?? DEFAULT_PROJECT_GAME_UI_CONFIG.voiceReactiveMotionMode
+    );
+  }
+
   function getSafeGameUiFrameSlice(value, fallback = DEFAULT_FRAME_SLICE, options = {}) {
     const source = value && typeof value === "object" ? value : {};
     return {
@@ -969,6 +998,32 @@
         1600,
         options
       ),
+      voiceReactiveMotionMode: getSafeProjectGameUiVoiceReactiveMotionMode(
+        source.voiceReactiveMotionMode ??
+          base.voiceReactiveMotionMode ??
+          DEFAULT_PROJECT_GAME_UI_CONFIG.voiceReactiveMotionMode,
+        options
+      ),
+      voiceReactiveMotionIntensity: clamp(
+        getSafeNumber(
+          source.voiceReactiveMotionIntensity,
+          base.voiceReactiveMotionIntensity ?? DEFAULT_PROJECT_GAME_UI_CONFIG.voiceReactiveMotionIntensity,
+          options
+        ),
+        0,
+        100,
+        options
+      ),
+      voiceReactiveMotionSensitivity: clamp(
+        getSafeNumber(
+          source.voiceReactiveMotionSensitivity,
+          base.voiceReactiveMotionSensitivity ?? DEFAULT_PROJECT_GAME_UI_CONFIG.voiceReactiveMotionSensitivity,
+          options
+        ),
+        0,
+        100,
+        options
+      ),
       titleBackgroundAssetId: String(source.titleBackgroundAssetId ?? "").trim(),
       titleBackgroundFit: source.titleBackgroundFit === "contain" ? "contain" : "cover",
       titleBackgroundOpacity: clamp(
@@ -1036,6 +1091,7 @@
     PROJECT_GAME_UI_TITLE_CARD_ANCHOR_LABELS,
     PROJECT_GAME_UI_SPEAKER_FOCUS_LABELS,
     PROJECT_GAME_UI_DIALOGUE_CAMERA_LABELS,
+    PROJECT_GAME_UI_VOICE_REACTIVE_MOTION_LABELS,
     DEFAULT_PROJECT_GAME_UI_CONFIG,
     PROJECT_GAME_UI_PRESETS,
     getProjectResolution,

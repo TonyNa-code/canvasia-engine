@@ -20,6 +20,11 @@ try:
 except ImportError:  # pragma: no cover - exported native packages import from the same directory.
     from runtime_dialogue_camera import sanitize_dialogue_camera_config
 
+try:
+    from .runtime_voice_reactive_motion import sanitize_voice_reactive_motion_config
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_voice_reactive_motion import sanitize_voice_reactive_motion_config
+
 
 TRANSITION_DURATION_DEFAULT_MS = 360
 TRANSITION_DURATION_MIN_MS = 0
@@ -256,6 +261,9 @@ DEFAULT_GAME_UI_CONFIG = {
     "dialogueCameraMode": "soft",
     "dialogueCameraIntensity": 58,
     "dialogueCameraTransitionMs": 520,
+    "voiceReactiveMotionMode": "soft",
+    "voiceReactiveMotionIntensity": 58,
+    "voiceReactiveMotionSensitivity": 62,
     "titleBackgroundAssetId": "",
     "titleBackgroundFit": "cover",
     "titleBackgroundOpacity": 42,
@@ -592,6 +600,7 @@ def get_project_game_ui_config(project: dict | None) -> dict:
     base = {**DEFAULT_GAME_UI_CONFIG}
     speaker_focus_config = sanitize_speaker_focus_config(source)
     dialogue_camera_config = sanitize_dialogue_camera_config(source)
+    voice_reactive_motion_config = sanitize_voice_reactive_motion_config(source)
     return {
         **base,
         "preset": get_safe_option(
@@ -683,6 +692,7 @@ def get_project_game_ui_config(project: dict | None) -> dict:
         "motionIntensity": clamp_int(source.get("motionIntensity"), 0, 100, base["motionIntensity"]),
         **speaker_focus_config,
         **dialogue_camera_config,
+        **voice_reactive_motion_config,
         "titleBackgroundAssetId": str(source.get("titleBackgroundAssetId") or "").strip(),
         "titleBackgroundFit": "contain" if source.get("titleBackgroundFit") == "contain" else "cover",
         "titleBackgroundOpacity": clamp_int(source.get("titleBackgroundOpacity"), 0, 100, base["titleBackgroundOpacity"]),

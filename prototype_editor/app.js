@@ -197,6 +197,7 @@ const {
   PROJECT_GAME_UI_TITLE_CARD_ANCHOR_LABELS,
   PROJECT_GAME_UI_SPEAKER_FOCUS_LABELS,
   PROJECT_GAME_UI_DIALOGUE_CAMERA_LABELS,
+  PROJECT_GAME_UI_VOICE_REACTIVE_MOTION_LABELS,
   DEFAULT_PROJECT_GAME_UI_CONFIG,
   PROJECT_GAME_UI_PRESETS,
 } = projectSettingsTools;
@@ -249,8 +250,9 @@ const {
   scaleVisualMotion,
   scaleVisualTransitionMs,
 } = runtimeVisualComfortTools;
-const speakerFocusTools = window.CanvasiaRuntimeSpeakerFocus;
 const dialogueCameraTools = window.CanvasiaRuntimeDialogueCamera;
+const voiceReactiveMotionTools = window.CanvasiaRuntimeVoiceReactiveMotion;
+const characterCardTools = window.CanvasiaRuntimeCharacterCards;
 const particleEffectTools = window.CanvasiaEditorParticleEffects;
 const {
   PARTICLE_PRESET_LABELS,
@@ -802,6 +804,9 @@ const previewVoiceAudio = new Audio();
 previewVoiceAudio.preload = "none";
 previewVoiceAudio.addEventListener("ended", handlePreviewVoiceEnded);
 previewVoiceAudio.addEventListener("error", handlePreviewVoiceError);
+const previewVoiceReactiveMotionController = voiceReactiveMotionTools.createVoiceReactiveMotionController({
+  root: document,
+});
 
 const refs = {
   loadingState: document.getElementById("loadingState"),
@@ -19486,6 +19491,7 @@ function stopPreviewOneShotAudios() {
 }
 
 function stopPreviewVoicePlayback({ resetStepKey = true } = {}) {
+  previewVoiceReactiveMotionController.stop();
   previewVoiceAudio.pause();
   previewVoiceAudio.currentTime = 0;
   previewVoiceAudio.src = "";
@@ -19622,6 +19628,7 @@ function syncPreviewOneShotAudio(snapshot) {
 }
 
 function handlePreviewVoiceEnded() {
+  previewVoiceReactiveMotionController.stop();
   const snapshot = getCurrentPreviewSnapshot();
   const snapshotKey = getPreviewSnapshotStepKey(snapshot);
 
@@ -19631,6 +19638,7 @@ function handlePreviewVoiceEnded() {
 }
 
 function handlePreviewVoiceError() {
+  previewVoiceReactiveMotionController.stop();
   const snapshot = getCurrentPreviewSnapshot();
   schedulePreviewAutoAdvance(snapshot);
 }
@@ -19647,6 +19655,12 @@ function syncPreviewVoice(snapshot) {
 
   if (state.previewVoiceStepKey === snapshotKey && (previewVoiceAudio.currentSrc || previewVoiceAudio.src)) {
     previewVoiceAudio.volume = targetVolume;
+    previewVoiceReactiveMotionController.start({
+      audio: previewVoiceAudio,
+      characterId: snapshot.blockType === "dialogue" ? snapshot.block?.speakerId : "",
+      gameUiConfig: getProjectGameUiConfig(),
+      visualComfortMode: state.previewPlayback.visualComfort,
+    });
     return;
   }
 
@@ -19663,7 +19677,14 @@ function syncPreviewVoice(snapshot) {
   previewVoiceAudio.src = encodeURI(previewUrl);
   previewVoiceAudio.currentTime = 0;
   previewVoiceAudio.volume = targetVolume;
+  previewVoiceReactiveMotionController.start({
+    audio: previewVoiceAudio,
+    characterId: snapshot.blockType === "dialogue" ? snapshot.block?.speakerId : "",
+    gameUiConfig: getProjectGameUiConfig(),
+    visualComfortMode: state.previewPlayback.visualComfort,
+  });
   previewVoiceAudio.play().catch(() => {
+    previewVoiceReactiveMotionController.stop();
     schedulePreviewAutoAdvance(snapshot);
   });
 }
@@ -22485,107 +22506,45 @@ function renderStageCastMarkup(
   characterEmphasisEvent,
   visualComfortMode = "standard"
 ) {
-  const cards = [...(visibleCharacters ?? [])];
-  const visibleCharacterIds = cards.map((item) => item.characterId).filter(Boolean);
-
-  if (characterTransitionEvent?.mode === "hide" && characterTransitionEvent.characterState) {
-    cards.push({
-      ...characterTransitionEvent.characterState,
-      __ghostMode: "hide",
-    });
-  }
-
-  if (cards.length === 0) {
-    return `<div class="empty-note">当前画面还没有角色站在画面里。</div>`;
-  }
-
-  return cards
-    .sort((left, right) => getPositionOrder(left.position) - getPositionOrder(right.position))
-    .map((characterState) =>
-      renderStageSpriteCard(
-        characterState,
-        depthBlur,
-        characterTransitionEvent,
-        activeCharacterId,
-        characterEmphasisEvent,
-        visualComfortMode,
-        visibleCharacterIds
-      )
-    )
-    .join("");
+  return characterCardTools.renderCharacterCards(
+    {
+      visibleCharacters,
+      depthBlur,
+      characterTransitionEvent,
+      activeCharacterId,
+      characterEmphasisEvent,
+      visualComfortMode,
+      gameUiConfig: getProjectGameUiConfig(),
+    },
+    {
+      emptyMarkup: `<div class="empty-note">当前画面还没有角色站在画面里。</div>`,
+      getPositionOrder,
+      getSafeTransition,
+      getSafeTransitionDurationMs,
+      scaleVisualTransitionMs,
+      getCharacterStageStyle,
+      getCharacterMotionStyle,
+      shouldBlurCharacter: shouldBlurStageCharacter,
+      getSafeDepthBlurStrength,
+      renderCard: renderStageSpriteCard,
+    }
+  );
 }
 
-function renderStageSpriteCard(
-  characterState,
-  depthBlur,
-  characterTransitionEvent,
-  activeCharacterId,
-  characterEmphasisEvent,
-  visualComfortMode = "standard",
-  visibleCharacterIds = []
-) {
+function renderStageSpriteCard(characterState, presentation) {
   const character = state.data.charactersById.get(characterState.characterId);
-  const classes = ["sprite-card"];
-  const isGhostHide = characterState.__ghostMode === "hide";
-  const speakerFocusPresentation = speakerFocusTools.buildSpeakerFocusPresentation({
-    characterId: characterState.characterId,
-    activeCharacterId,
-    visibleCharacterIds,
-    gameUiConfig: getProjectGameUiConfig(),
-    visualComfortMode,
-    isLeaving: isGhostHide,
-  });
   const presentationLabel = character ? getCharacterPresentationModeLabel(character) : "普通立绘";
   const expression = (character?.expressions ?? []).find((item) => item.id === characterState.expressionId);
   const expressionBindingStatus = getCharacterExpressionBindingStatus(expression);
-  const transition = characterTransitionEvent ? getSafeTransition(characterTransitionEvent.transition) : "none";
-  const transitionDurationMs = characterTransitionEvent
-    ? scaleVisualTransitionMs(getSafeTransitionDurationMs(characterTransitionEvent.durationMs), visualComfortMode)
-    : scaleVisualTransitionMs(getSafeTransitionDurationMs(), visualComfortMode);
-  const isMoving =
-    characterTransitionEvent?.mode === "move" &&
-    characterTransitionEvent.characterId === characterState.characterId;
-  const stageStyle = `${getCharacterStageStyle(characterState.stage, characterState.position)}${
-    isMoving ? getCharacterMotionStyle(characterTransitionEvent) : ""
-  }--sprite-transition-ms:${transitionDurationMs}ms;${speakerFocusPresentation.style}`;
-
-  classes.push(...speakerFocusPresentation.classNames);
-
-  if (shouldBlurStageCharacter(characterState.position, depthBlur)) {
-    classes.push("is-depth-muted");
-    classes.push(`depth-strength-${getSafeDepthBlurStrength(depthBlur?.strength)}`);
-  } else if (depthBlur) {
-    classes.push("is-depth-focus");
-  }
-
-  if (characterTransitionEvent?.mode === "show" && characterTransitionEvent.characterId === characterState.characterId) {
-    classes.push("is-entering");
-  }
-
-  if (isMoving) {
-    classes.push("is-moving");
-  }
-
-  if (isGhostHide) {
-    classes.push("is-leaving");
-  }
-
-  classes.push("is-breathing");
-
-  if (activeCharacterId === characterState.characterId) {
-    classes.push("is-speaking");
-  }
-
-  if (characterEmphasisEvent?.characterId === characterState.characterId) {
-    classes.push("is-emphasis");
-  }
 
   return `
-    <div class="${classes.join(" ")}" data-position="${characterState.position}" data-transition="${transition}" data-speaker-focus="${speakerFocusPresentation.role}" data-presentation="${escapeHtml(getCharacterPresentation(character).mode)}" style="${stageStyle}">
-      <div class="sprite-card-inner">
-        <div class="sprite-name">${escapeHtml(character?.displayName ?? characterState.characterId)}</div>
-        <div class="sprite-expression">${escapeHtml(characterState.expressionName)}</div>
-        <div class="sprite-presentation">${escapeHtml(presentationLabel)} · ${escapeHtml(expressionBindingStatus.label)}</div>
+    <div class="${presentation.classes.join(" ")}" data-character-id="${escapeHtml(characterState.characterId)}" data-position="${characterState.position}" data-transition="${presentation.transition}" data-speaker-focus="${presentation.speakerFocusPresentation.role}" data-presentation="${escapeHtml(getCharacterPresentation(character).mode)}" style="${presentation.stageStyle}">
+      <div class="sprite-voice-reactive-layer">
+        <div class="sprite-card-inner">
+          <div class="sprite-name">${escapeHtml(character?.displayName ?? characterState.characterId)}</div>
+          <div class="sprite-expression">${escapeHtml(characterState.expressionName)}</div>
+          <div class="sprite-presentation">${escapeHtml(presentationLabel)} · ${escapeHtml(expressionBindingStatus.label)}</div>
+        </div>
       </div>
     </div>
   `;
@@ -36954,6 +36913,7 @@ function buildProjectRuntimeSettingsPanelLabels() {
     gameUiTitleCardAnchorLabels: PROJECT_GAME_UI_TITLE_CARD_ANCHOR_LABELS,
     gameUiSpeakerFocusLabels: PROJECT_GAME_UI_SPEAKER_FOCUS_LABELS,
     gameUiDialogueCameraLabels: PROJECT_GAME_UI_DIALOGUE_CAMERA_LABELS,
+    gameUiVoiceReactiveMotionLabels: PROJECT_GAME_UI_VOICE_REACTIVE_MOTION_LABELS,
   };
 }
 

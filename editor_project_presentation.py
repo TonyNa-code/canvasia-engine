@@ -68,6 +68,9 @@ DEFAULT_GAME_UI_CONFIG = {
     "dialogueCameraMode": "soft",
     "dialogueCameraIntensity": 58,
     "dialogueCameraTransitionMs": 520,
+    "voiceReactiveMotionMode": "soft",
+    "voiceReactiveMotionIntensity": 58,
+    "voiceReactiveMotionSensitivity": 62,
     "titleBackgroundAssetId": "",
     "titleBackgroundFit": "cover",
     "titleBackgroundOpacity": 42,
@@ -178,6 +181,7 @@ def sanitize_game_ui_config(value: object) -> dict:
         "titleCardAnchor": {"center", "left", "right", "top", "bottom", "free"},
         "speakerFocusMode": {"off", "soft", "cinematic"},
         "dialogueCameraMode": {"off", "soft", "cinematic"},
+        "voiceReactiveMotionMode": {"off", "soft", "cinematic"},
         "titleBackgroundFit": {"cover", "contain"},
     }
     result = {key: sanitize_choice(source.get(key), allowed, defaults[key]) for key, allowed in choice_specs.items()}
@@ -221,6 +225,12 @@ def sanitize_game_ui_config(value: object) -> dict:
             ),
             "dialogueCameraTransitionMs": clamp_int(
                 source.get("dialogueCameraTransitionMs"), defaults["dialogueCameraTransitionMs"], 0, 1600
+            ),
+            "voiceReactiveMotionIntensity": clamp_int(
+                source.get("voiceReactiveMotionIntensity"), defaults["voiceReactiveMotionIntensity"], 0, 100
+            ),
+            "voiceReactiveMotionSensitivity": clamp_int(
+                source.get("voiceReactiveMotionSensitivity"), defaults["voiceReactiveMotionSensitivity"], 0, 100
             ),
             "titleBackgroundAssetId": str(source.get("titleBackgroundAssetId") or "").strip(),
             "titleBackgroundOpacity": clamp_int(

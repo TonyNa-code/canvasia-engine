@@ -2,6 +2,7 @@ import { getSafeDialogTheme } from "./runtime_settings.js";
 import { getSafeDialogBoxOpacityPercent } from "./runtime_reading_profiles.js";
 import { getSpeakerFocusConfig } from "./runtime_speaker_focus.js";
 import { getDialogueCameraConfig } from "./runtime_dialogue_camera.js";
+import { getVoiceReactiveMotionConfig } from "./runtime_voice_reactive_motion.js";
 import {
   DEFAULT_PROJECT_DIALOG_BOX_CONFIG,
   DEFAULT_PROJECT_GAME_UI_CONFIG,
@@ -189,6 +190,7 @@ export function getProjectGameUiConfig(project = {}) {
   const base = getProjectGameUiPresetConfig(source.preset);
   const speakerFocusConfig = getSpeakerFocusConfig(source);
   const dialogueCameraConfig = getDialogueCameraConfig({ ...base, ...source });
+  const voiceReactiveMotionConfig = getVoiceReactiveMotionConfig({ ...base, ...source });
   return {
     ...base,
     preset: getSafeProjectGameUiPreset(source.preset ?? base.preset),
@@ -225,6 +227,7 @@ export function getProjectGameUiConfig(project = {}) {
     motionIntensity: clamp(getSafeNumber(source.motionIntensity, base.motionIntensity), 0, 100),
     ...speakerFocusConfig,
     ...dialogueCameraConfig,
+    ...voiceReactiveMotionConfig,
     titleBackgroundAssetId: String(source.titleBackgroundAssetId ?? "").trim(),
     titleBackgroundFit: source.titleBackgroundFit === "contain" ? "contain" : "cover",
     titleBackgroundOpacity: clamp(getSafeNumber(source.titleBackgroundOpacity, base.titleBackgroundOpacity), 0, 100),

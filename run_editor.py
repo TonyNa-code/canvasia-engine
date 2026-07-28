@@ -195,7 +195,9 @@ EXPORT_PLAYER_SCRIPT_FILES = (
     "runtime_persistent_variables.js",
     "runtime_character_motion.js",
     "runtime_speaker_focus.js",
+    "runtime_character_cards.js",
     "runtime_dialogue_camera.js",
+    "runtime_voice_reactive_motion.js",
     "runtime_stage_images.js",
     "runtime_visual_constants.js",
     "runtime_controls.js",
@@ -451,6 +453,9 @@ NATIVE_RUNTIME_VIEW_NAME = "runtime_player_view.py"
 NATIVE_RUNTIME_CHARACTER_MOTION_NAME = "runtime_character_motion.py"
 NATIVE_RUNTIME_SPEAKER_FOCUS_NAME = "runtime_speaker_focus.py"
 NATIVE_RUNTIME_DIALOGUE_CAMERA_NAME = "runtime_dialogue_camera.py"
+NATIVE_RUNTIME_VOICE_REACTIVE_MOTION_NAME = "runtime_voice_reactive_motion.py"
+NATIVE_RUNTIME_CHARACTER_RENDERER_NAME = "runtime_character_renderer.py"
+NATIVE_RUNTIME_STAGE_RENDERER_NAME = "runtime_stage_renderer.py"
 NATIVE_RUNTIME_STAGE_IMAGES_NAME = "runtime_stage_images.py"
 NATIVE_RUNTIME_CHOICE_AVAILABILITY_NAME = "runtime_choice_availability.py"
 NATIVE_RUNTIME_ROLLBACK_NAME = "runtime_rollback.py"
@@ -529,6 +534,9 @@ NATIVE_RUNTIME_REQUIRED_MODULE_FILES = build_native_runtime_required_module_file
         NATIVE_RUNTIME_CHARACTER_MOTION_NAME,
         NATIVE_RUNTIME_SPEAKER_FOCUS_NAME,
         NATIVE_RUNTIME_DIALOGUE_CAMERA_NAME,
+        NATIVE_RUNTIME_VOICE_REACTIVE_MOTION_NAME,
+        NATIVE_RUNTIME_CHARACTER_RENDERER_NAME,
+        NATIVE_RUNTIME_STAGE_RENDERER_NAME,
         NATIVE_RUNTIME_STAGE_IMAGES_NAME,
         NATIVE_RUNTIME_CHOICE_AVAILABILITY_NAME,
         NATIVE_RUNTIME_ROLLBACK_NAME,
@@ -8741,6 +8749,12 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
         "runtimeViewModulePath": str(build_dir / NATIVE_RUNTIME_VIEW_NAME),
         "runtimeCharacterMotionModuleName": NATIVE_RUNTIME_CHARACTER_MOTION_NAME,
         "runtimeCharacterMotionModulePath": str(build_dir / NATIVE_RUNTIME_CHARACTER_MOTION_NAME),
+        "runtimeVoiceReactiveMotionModuleName": NATIVE_RUNTIME_VOICE_REACTIVE_MOTION_NAME,
+        "runtimeVoiceReactiveMotionModulePath": str(build_dir / NATIVE_RUNTIME_VOICE_REACTIVE_MOTION_NAME),
+        "runtimeCharacterRendererModuleName": NATIVE_RUNTIME_CHARACTER_RENDERER_NAME,
+        "runtimeCharacterRendererModulePath": str(build_dir / NATIVE_RUNTIME_CHARACTER_RENDERER_NAME),
+        "runtimeStageRendererModuleName": NATIVE_RUNTIME_STAGE_RENDERER_NAME,
+        "runtimeStageRendererModulePath": str(build_dir / NATIVE_RUNTIME_STAGE_RENDERER_NAME),
         "runtimeStageImagesModuleName": NATIVE_RUNTIME_STAGE_IMAGES_NAME,
         "runtimeStageImagesModulePath": str(build_dir / NATIVE_RUNTIME_STAGE_IMAGES_NAME),
         "runtimeChoiceAvailabilityModuleName": NATIVE_RUNTIME_CHOICE_AVAILABILITY_NAME,
@@ -10068,7 +10082,9 @@ def export_web_build() -> dict:
             "playerRuntimePersistentVariables": "runtime_persistent_variables.js",
             "playerRuntimeCharacterMotion": "runtime_character_motion.js",
             "playerRuntimeSpeakerFocus": "runtime_speaker_focus.js",
+            "playerRuntimeCharacterCards": "runtime_character_cards.js",
             "playerRuntimeDialogueCamera": "runtime_dialogue_camera.js",
+            "playerRuntimeVoiceReactiveMotion": "runtime_voice_reactive_motion.js",
             "playerRuntimeStageImages": "runtime_stage_images.js",
             "playerRuntimeVisualConstants": "runtime_visual_constants.js",
             "playerRuntimeConditions": "runtime_conditions.js",
@@ -11210,7 +11226,9 @@ def export_windows_nwjs_build() -> dict:
             "appRuntimePersistentVariables": "app/runtime_persistent_variables.js",
             "appRuntimeCharacterMotion": "app/runtime_character_motion.js",
             "appRuntimeSpeakerFocus": "app/runtime_speaker_focus.js",
+            "appRuntimeCharacterCards": "app/runtime_character_cards.js",
             "appRuntimeDialogueCamera": "app/runtime_dialogue_camera.js",
+            "appRuntimeVoiceReactiveMotion": "app/runtime_voice_reactive_motion.js",
             "appRuntimeStageImages": "app/runtime_stage_images.js",
             "appRuntimeVisualConstants": "app/runtime_visual_constants.js",
             "appRuntimeConditions": "app/runtime_conditions.js",
@@ -11686,7 +11704,9 @@ def export_macos_nwjs_build() -> dict:
             "appRuntimePersistentVariables": "app/runtime_persistent_variables.js",
             "appRuntimeCharacterMotion": "app/runtime_character_motion.js",
             "appRuntimeSpeakerFocus": "app/runtime_speaker_focus.js",
+            "appRuntimeCharacterCards": "app/runtime_character_cards.js",
             "appRuntimeDialogueCamera": "app/runtime_dialogue_camera.js",
+            "appRuntimeVoiceReactiveMotion": "app/runtime_voice_reactive_motion.js",
             "appRuntimeStageImages": "app/runtime_stage_images.js",
             "appRuntimeVisualConstants": "app/runtime_visual_constants.js",
             "appRuntimeConditions": "app/runtime_conditions.js",
@@ -12169,7 +12189,9 @@ def export_linux_nwjs_build() -> dict:
             "appRuntimePersistentVariables": "app/runtime_persistent_variables.js",
             "appRuntimeCharacterMotion": "app/runtime_character_motion.js",
             "appRuntimeSpeakerFocus": "app/runtime_speaker_focus.js",
+            "appRuntimeCharacterCards": "app/runtime_character_cards.js",
             "appRuntimeDialogueCamera": "app/runtime_dialogue_camera.js",
+            "appRuntimeVoiceReactiveMotion": "app/runtime_voice_reactive_motion.js",
             "appRuntimeStageImages": "app/runtime_stage_images.js",
             "appRuntimeVisualConstants": "app/runtime_visual_constants.js",
             "appRuntimeConditions": "app/runtime_conditions.js",

@@ -32,6 +32,9 @@ class EditorProjectPresentationTests(unittest.TestCase):
                 "dialogueCameraMode": "cinematic",
                 "dialogueCameraIntensity": 72,
                 "dialogueCameraTransitionMs": 680,
+                "voiceReactiveMotionMode": "cinematic",
+                "voiceReactiveMotionIntensity": 140,
+                "voiceReactiveMotionSensitivity": -1,
                 "panelFrameSlice": {"top": -1, "right": 140, "bottom": 20, "left": 18},
                 "unknownField": "drop me",
             }
@@ -44,10 +47,13 @@ class EditorProjectPresentationTests(unittest.TestCase):
         self.assertEqual(sanitized["dialogueCameraMode"], "cinematic")
         self.assertEqual(sanitized["dialogueCameraIntensity"], 72)
         self.assertEqual(sanitized["dialogueCameraTransitionMs"], 680)
+        self.assertEqual(sanitized["voiceReactiveMotionMode"], "cinematic")
+        self.assertEqual(sanitized["voiceReactiveMotionIntensity"], 100)
+        self.assertEqual(sanitized["voiceReactiveMotionSensitivity"], 0)
         self.assertEqual(sanitized["panelFrameSlice"], {"top": 0, "right": 96, "bottom": 20, "left": 18})
         self.assertNotIn("unknownField", sanitized)
 
-    def test_editor_and_native_runtime_share_focus_and_camera_defaults(self) -> None:
+    def test_editor_and_native_runtime_share_presentation_defaults(self) -> None:
         keys = (
             "speakerFocusMode",
             "speakerFocusIntensity",
@@ -55,6 +61,9 @@ class EditorProjectPresentationTests(unittest.TestCase):
             "dialogueCameraMode",
             "dialogueCameraIntensity",
             "dialogueCameraTransitionMs",
+            "voiceReactiveMotionMode",
+            "voiceReactiveMotionIntensity",
+            "voiceReactiveMotionSensitivity",
         )
 
         self.assertEqual(

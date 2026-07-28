@@ -162,7 +162,6 @@ try:
         VISUAL_COMFORT_MODES,
         get_visual_comfort_label,
         scale_visual_flash,
-        scale_visual_motion,
         scale_visual_transition_ms,
     )
 except ImportError:  # pragma: no cover - exported native packages import from the same directory.
@@ -170,25 +169,23 @@ except ImportError:  # pragma: no cover - exported native packages import from t
         VISUAL_COMFORT_MODES,
         get_visual_comfort_label,
         scale_visual_flash,
-        scale_visual_motion,
         scale_visual_transition_ms,
     )
 
 try:
-    from .runtime_speaker_focus import (
-        NativeSpeakerFocusController,
-        scale_rgb_color,
-    )
+    from .runtime_speaker_focus import NativeSpeakerFocusController
 except ImportError:  # pragma: no cover - exported native packages import from the same directory.
-    from runtime_speaker_focus import (
-        NativeSpeakerFocusController,
-        scale_rgb_color,
-    )
+    from runtime_speaker_focus import NativeSpeakerFocusController
 
 try:
     from .runtime_dialogue_camera import NativeDialogueCameraController
 except ImportError:  # pragma: no cover - exported native packages import from the same directory.
     from runtime_dialogue_camera import NativeDialogueCameraController
+
+try:
+    from .runtime_voice_reactive_motion import NativeVoiceReactiveMotionController
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_voice_reactive_motion import NativeVoiceReactiveMotionController
 
 try:
     from .runtime_reading_profiles import (
@@ -548,7 +545,6 @@ try:
         build_video_clip_label,
         clamp,
         clamp_int,
-        ease_out_cubic,
         ellipsize_text,
         format_play_duration,
         format_runtime_variable_value,
@@ -613,7 +609,6 @@ except ImportError:  # pragma: no cover - exported native packages import from t
         build_video_clip_label,
         clamp,
         clamp_int,
-        ease_out_cubic,
         ellipsize_text,
         format_play_duration,
         format_runtime_variable_value,
@@ -650,17 +645,49 @@ except ImportError:  # pragma: no cover - exported native packages import from t
 
 try:
     from .runtime_character_motion import (
-        build_native_renderable_character_items,
         build_native_character_motion_state,
-        get_native_character_transition_adjustment,
         is_native_character_motion_complete,
     )
 except ImportError:  # pragma: no cover - exported native packages import from the same directory.
     from runtime_character_motion import (
-        build_native_renderable_character_items,
         build_native_character_motion_state,
-        get_native_character_transition_adjustment,
         is_native_character_motion_complete,
+    )
+
+try:
+    from .runtime_character_renderer import render_native_characters
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_character_renderer import render_native_characters
+
+try:
+    from .runtime_stage_renderer import (
+        DEPTH_BLUR_ALPHA,
+        SCREEN_FILTER_WASH,
+        SHAKE_DISTANCE,
+        get_native_stage_shake_offset,
+        project_native_scene3d_grid_point,
+        render_native_background,
+        render_native_background_asset,
+        render_native_character_model_preview_card,
+        render_native_scene3d_background_preview,
+        render_native_stage_effect_overlays,
+        render_native_stage_images,
+        render_native_stage_surface,
+    )
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_stage_renderer import (
+        DEPTH_BLUR_ALPHA,
+        SCREEN_FILTER_WASH,
+        SHAKE_DISTANCE,
+        get_native_stage_shake_offset,
+        project_native_scene3d_grid_point,
+        render_native_background,
+        render_native_background_asset,
+        render_native_character_model_preview_card,
+        render_native_scene3d_background_preview,
+        render_native_stage_effect_overlays,
+        render_native_stage_images,
+        render_native_stage_surface,
     )
 
 try:
@@ -677,18 +704,14 @@ except ImportError:  # pragma: no cover - exported native packages import from t
 try:
     from .runtime_stage_images import (
         apply_native_stage_image_block,
-        build_native_renderable_stage_image_items,
         clone_stage_image_state,
-        get_safe_stage_image_transform,
         is_native_stage_image_motion_complete,
         normalize_stage_image_state,
     )
 except ImportError:  # pragma: no cover - exported native packages import from the same directory.
     from runtime_stage_images import (
         apply_native_stage_image_block,
-        build_native_renderable_stage_image_items,
         clone_stage_image_state,
-        get_safe_stage_image_transform,
         is_native_stage_image_motion_complete,
         normalize_stage_image_state,
     )
@@ -1103,18 +1126,9 @@ NATIVE_PARTICLE_AREA_RANGES = {
     "right": (0.54, 0.96),
 }
 EFFECT_DURATION_SECONDS = {"short": 0.42, "medium": 0.72, "long": 1.2}
-SHAKE_DISTANCE = {"light": 4, "medium": 9, "heavy": 16}
 FLASH_COLORS = {"white": (255, 255, 255), "warm": (255, 206, 138), "red": (255, 94, 94), "black": (0, 0, 0)}
 FLASH_ALPHA = {"soft": 86, "medium": 146, "strong": 210}
 FADE_COLORS = {"black": (0, 0, 0), "white": (255, 255, 255)}
-SCREEN_FILTER_WASH = {
-    "memory": ((255, 207, 150), 38),
-    "mono": ((180, 190, 205), 42),
-    "dream": ((172, 145, 255), 44),
-    "cold": ((122, 184, 255), 42),
-}
-SCREEN_FILTER_STRENGTH_MULTIPLIER = {"soft": 0.62, "medium": 1.0, "strong": 1.38}
-DEPTH_BLUR_ALPHA = {"soft": 24, "medium": 42, "strong": 64}
 SUPPORTED_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp", ".webp"}
 SUPPORTED_AUDIO_EXTENSIONS = {".ogg", ".wav", ".mp3"}
 SUPPORTED_VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov", ".m4v"}
@@ -8302,6 +8316,7 @@ class NativeRuntimePlayer:
         self.current_line: dict | None = None
         self.speaker_focus_controller = NativeSpeakerFocusController()
         self.dialogue_camera_controller = NativeDialogueCameraController()
+        self.voice_reactive_motion_controller = NativeVoiceReactiveMotionController()
         self.current_choices: list[dict] | None = None
         self.current_choice_index = 0
         self.title_screen_active = False
@@ -8691,6 +8706,9 @@ class NativeRuntimePlayer:
             self.current_voice_channel = None
             self.current_voice_volume_percent = 100
             self.current_voice_profile_id = ""
+            voice_motion_controller = getattr(self, "voice_reactive_motion_controller", None)
+            if voice_motion_controller:
+                voice_motion_controller.stop()
         self.apply_bgm_runtime_volume()
 
     def apply_runtime_settings(self) -> None:
@@ -11694,6 +11712,17 @@ class NativeRuntimePlayer:
                 return False
             self.current_voice_channel = channel
             self.update_voice_playback_state(force=True)
+            active_character_id = str((self.current_line or {}).get("speakerId") or self.current_voice_profile_id or "")
+            voice_motion_controller = getattr(self, "voice_reactive_motion_controller", None)
+            if voice_motion_controller is None:
+                voice_motion_controller = NativeVoiceReactiveMotionController()
+                self.voice_reactive_motion_controller = voice_motion_controller
+            voice_motion_controller.start(
+                sound,
+                active_character_id,
+                self.get_runtime_ticks_ms(),
+                self.pygame.mixer.get_init(),
+            )
             return True
         except Exception:
             self.current_voice_channel = None
@@ -11703,6 +11732,9 @@ class NativeRuntimePlayer:
             return False
 
     def stop_voice(self) -> None:
+        voice_motion_controller = getattr(self, "voice_reactive_motion_controller", None)
+        if voice_motion_controller:
+            voice_motion_controller.stop()
         if self.current_voice_channel:
             try:
                 self.current_voice_channel.stop()
@@ -12484,180 +12516,19 @@ class NativeRuntimePlayer:
         return False
 
     def get_stage_shake_offset(self) -> tuple[int, int]:
-        if not self.screen_shake_effect:
-            return (0, 0)
-        intensity = str(self.screen_shake_effect.get("intensity") or "medium")
-        distance = scale_visual_motion(
-            SHAKE_DISTANCE.get(intensity, SHAKE_DISTANCE["medium"]),
-            self.runtime_settings.get("visualComfort"),
-        )
-        phase = self.runtime_elapsed_seconds * 74.0
-        return (int(math.sin(phase) * distance), int(math.cos(phase * 1.31) * distance * 0.55))
+        return get_native_stage_shake_offset(self)
 
     def render_stage_surface(self, stage_surface) -> None:
-        camera_pose = self.dialogue_camera_controller.build_render_pose(
-            camera_zoom=self.camera_zoom_effect,
-            camera_pan=self.camera_pan_effect,
-            current_line=self.current_line,
-            visible_characters=self.visible_characters,
-            game_ui_config=self.game_ui_config,
-            visual_comfort_mode=str(self.runtime_settings.get("visualComfort") or "standard"),
-            now_ms=self.get_runtime_ticks_ms(),
-        )
-        scale = float(camera_pose.get("zoomScale") or 1.0)
-        offset_x = int(round(self.width * float(camera_pose.get("panPercent") or 0) / 100))
-        focus_ratio = float(camera_pose.get("focusPercent") or 50) / 100
-        zoom_anchor_offset_x = int(round(self.width * (focus_ratio - 0.5) * (1 - scale)))
-        shake_x, shake_y = self.get_stage_shake_offset()
-        if abs(scale - 1.0) > 0.01:
-            scaled_size = (max(1, int(self.width * scale)), max(1, int(self.height * scale)))
-            stage_surface = self.pygame.transform.smoothscale(stage_surface, scaled_size)
-        rect = stage_surface.get_rect(
-            center=(
-                self.width // 2 + offset_x + zoom_anchor_offset_x + shake_x,
-                self.height // 2 + shake_y,
-            )
-        )
-        self.screen.blit(stage_surface, rect)
+        render_native_stage_surface(self, stage_surface)
 
     def render_stage_effect_overlays(self) -> None:
-        if self.screen_filter_effect:
-            preset = str(self.screen_filter_effect.get("preset") or "memory")
-            strength = str(self.screen_filter_effect.get("strength") or "medium")
-            grade = get_safe_screen_color_grade(self.screen_filter_effect.get("grade"))
-            wash_color, base_alpha = SCREEN_FILTER_WASH.get(preset, SCREEN_FILTER_WASH["memory"])
-            alpha = int(base_alpha * SCREEN_FILTER_STRENGTH_MULTIPLIER.get(strength, 1.0))
-            wash = self.pygame.Surface((self.width, self.height), self.pygame.SRCALPHA)
-            wash.fill((*wash_color, max(0, min(160, alpha))))
-            self.screen.blit(wash, (0, 0))
-
-            temperature = int(grade.get("temperature") or 0)
-            if temperature:
-                temp_color = (255, 184, 102) if temperature > 0 else (108, 172, 255)
-                temp_alpha = int(min(54, abs(temperature) / 100 * 54))
-                temp_wash = self.pygame.Surface((self.width, self.height), self.pygame.SRCALPHA)
-                temp_wash.fill((*temp_color, temp_alpha))
-                self.screen.blit(temp_wash, (0, 0))
-
-            brightness_delta = int(grade.get("brightness") or 100) - 100
-            if brightness_delta:
-                tone = 255 if brightness_delta > 0 else 0
-                tone_alpha = int(min(72, abs(brightness_delta) / 80 * 72))
-                tone_wash = self.pygame.Surface((self.width, self.height), self.pygame.SRCALPHA)
-                tone_wash.fill((tone, tone, tone, tone_alpha))
-                self.screen.blit(tone_wash, (0, 0))
-
-            contrast_delta = int(grade.get("contrast") or 100) - 100
-            if contrast_delta > 0:
-                multiplier = 255 - int(min(42, contrast_delta / 80 * 42))
-                contrast_wash = self.pygame.Surface((self.width, self.height), self.pygame.SRCALPHA)
-                contrast_wash.fill((multiplier, multiplier, multiplier, 255))
-                self.screen.blit(contrast_wash, (0, 0), special_flags=self.pygame.BLEND_RGBA_MULT)
-            elif contrast_delta < 0:
-                flat_alpha = int(min(42, abs(contrast_delta) / 80 * 42))
-                flat_wash = self.pygame.Surface((self.width, self.height), self.pygame.SRCALPHA)
-                flat_wash.fill((140, 148, 160, flat_alpha))
-                self.screen.blit(flat_wash, (0, 0))
-
-            saturation_delta = int(grade.get("saturation") or 100) - 100
-            if saturation_delta < 0:
-                gray_alpha = int(min(58, abs(saturation_delta) / 100 * 58))
-                gray_wash = self.pygame.Surface((self.width, self.height), self.pygame.SRCALPHA)
-                gray_wash.fill((184, 192, 206, gray_alpha))
-                self.screen.blit(gray_wash, (0, 0))
-
-            hue_shift = int(grade.get("hue") or 0)
-            if hue_shift:
-                hue_color = (142, 106, 255) if hue_shift > 0 else (94, 222, 184)
-                hue_alpha = int(min(34, abs(hue_shift) / 180 * 34))
-                hue_wash = self.pygame.Surface((self.width, self.height), self.pygame.SRCALPHA)
-                hue_wash.fill((*hue_color, hue_alpha))
-                self.screen.blit(hue_wash, (0, 0))
-
-            vignette = int(grade.get("vignette") or 0)
-            if vignette > 0:
-                vignette_surface = self.pygame.Surface((self.width, self.height), self.pygame.SRCALPHA)
-                max_alpha = int(min(122, vignette / 100 * 122))
-                band = max(1, int(min(self.width, self.height) * 0.16))
-                for index in range(6):
-                    ratio = (index + 1) / 6
-                    alpha_step = int(max_alpha * ratio)
-                    inset = int(band * (1 - ratio))
-                    self.pygame.draw.rect(vignette_surface, (2, 6, 12, alpha_step), self.pygame.Rect(0, 0, self.width, max(1, band - inset)))
-                    self.pygame.draw.rect(vignette_surface, (2, 6, 12, alpha_step), self.pygame.Rect(0, self.height - max(1, band - inset), self.width, max(1, band - inset)))
-                    self.pygame.draw.rect(vignette_surface, (2, 6, 12, alpha_step), self.pygame.Rect(0, 0, max(1, band - inset), self.height))
-                    self.pygame.draw.rect(vignette_surface, (2, 6, 12, alpha_step), self.pygame.Rect(self.width - max(1, band - inset), 0, max(1, band - inset), self.height))
-                self.screen.blit(vignette_surface, (0, 0))
-
-        if self.depth_blur_effect:
-            strength = str(self.depth_blur_effect.get("strength") or "medium")
-            focus = str(self.depth_blur_effect.get("focus") or "full")
-            alpha = DEPTH_BLUR_ALPHA.get(strength, DEPTH_BLUR_ALPHA["medium"])
-            shade = self.pygame.Surface((self.width, self.height), self.pygame.SRCALPHA)
-            if focus == "left":
-                shade.fill((0, 0, 0, 0))
-                self.pygame.draw.rect(shade, (0, 0, 0, alpha), self.pygame.Rect(int(self.width * 0.42), 0, int(self.width * 0.58), self.height))
-            elif focus == "right":
-                shade.fill((0, 0, 0, 0))
-                self.pygame.draw.rect(shade, (0, 0, 0, alpha), self.pygame.Rect(0, 0, int(self.width * 0.58), self.height))
-            elif focus == "center":
-                shade.fill((0, 0, 0, 0))
-                self.pygame.draw.rect(shade, (0, 0, 0, alpha), self.pygame.Rect(0, 0, int(self.width * 0.26), self.height))
-                self.pygame.draw.rect(shade, (0, 0, 0, alpha), self.pygame.Rect(int(self.width * 0.74), 0, int(self.width * 0.26), self.height))
-            else:
-                shade.fill((0, 0, 0, alpha))
-            self.screen.blit(shade, (0, 0))
+        render_native_stage_effect_overlays(self)
 
     def project_scene3d_grid_point(self, x: float, z: float, center_x: int, center_y: int, scale: float) -> tuple[int, int]:
-        yaw = math.radians(float(self.scene3d_preview_yaw))
-        pitch_ratio = math.sin(math.radians(float(self.scene3d_preview_pitch)))
-        rotated_x = x * math.cos(yaw) - z * math.sin(yaw)
-        rotated_z = x * math.sin(yaw) + z * math.cos(yaw)
-        screen_x = center_x + rotated_x * scale
-        screen_y = center_y + rotated_z * scale * (0.20 + 0.48 * pitch_ratio)
-        return int(round(screen_x)), int(round(screen_y))
+        return project_native_scene3d_grid_point(self, x, z, center_x, center_y, scale)
 
     def render_scene3d_background_preview(self, target, asset: dict) -> None:
-        palette = self.get_active_palette()
-        target.fill(mix_rgb(palette["bgTop"], (0, 0, 0), 0.16))
-        glow = self.pygame.Surface((self.width, self.height), self.pygame.SRCALPHA)
-        for index, radius in enumerate([520, 360, 220]):
-            alpha = max(18, 58 - index * 16)
-            self.pygame.draw.circle(
-                glow,
-                (*palette["accent"], alpha),
-                (self.width // 2, int(self.height * 0.38)),
-                radius,
-            )
-        target.blit(glow, (0, 0))
-
-        center_x = self.width // 2
-        center_y = int(self.height * 0.58)
-        scale = 42 * float(self.scene3d_preview_zoom)
-        grid_range = range(-9, 10)
-        line_color = with_alpha(palette["accent"], 34)
-        axis_color = with_alpha(palette["accentAlt"], 70)
-        for value in grid_range:
-            start = self.project_scene3d_grid_point(value, -9, center_x, center_y, scale)
-            end = self.project_scene3d_grid_point(value, 9, center_x, center_y, scale)
-            self.pygame.draw.line(target, axis_color if value == 0 else line_color, start, end, 2 if value == 0 else 1)
-            start = self.project_scene3d_grid_point(-9, value, center_x, center_y, scale)
-            end = self.project_scene3d_grid_point(9, value, center_x, center_y, scale)
-            self.pygame.draw.line(target, axis_color if value == 0 else line_color, start, end, 2 if value == 0 else 1)
-
-        report = self.get_scene3d_preview_report(str(asset.get("id") or ""))
-        panel_rect = self.pygame.Rect(0, 0, min(520, self.width - 96), 178)
-        panel_rect.center = (self.width // 2, int(self.height * 0.28))
-        self.pygame.draw.rect(target, (*palette["panel"], 224), panel_rect, border_radius=24)
-        self.pygame.draw.rect(target, with_alpha(palette["accent"], 62), panel_rect, 2, border_radius=24)
-        target.blit(self.font_title.render("3D 场景交互预览桥", True, palette["text"]), (panel_rect.left + 24, panel_rect.top + 18))
-        status_surface = self.font_ui.render(str(report.get("statusLabel") or "待检查"), True, palette["accent"] if report.get("status") == "ready" else palette["warning"])
-        target.blit(status_surface, (panel_rect.right - status_surface.get_width() - 24, panel_rect.top + 26))
-        y = panel_rect.top + 66
-        for line in self.get_scene3d_preview_lines(str(asset.get("id") or ""))[1:]:
-            clipped = ellipsize_text(self.font_ui, line, panel_rect.width - 48)
-            target.blit(self.font_ui.render(clipped, True, palette["muted"]), (panel_rect.left + 24, y))
-            y += 24
+        render_native_scene3d_background_preview(self, target, asset)
 
     def render_screen_effect_overlays(self) -> None:
         if self.screen_fade_effect:
@@ -12730,321 +12601,17 @@ class NativeRuntimePlayer:
         ):
             self.achievement_notification = None
 
-    def render_background_asset(self, target, asset_id: str | None, alpha: int = 255) -> None:
-        target = target or self.screen
-        palette = self.get_active_palette()
-        safe_asset_id = str(asset_id or "").strip()
-        safe_alpha = clamp_int(alpha, 0, 255, 255)
-        render_target = target
-        if safe_alpha < 255:
-            render_target = self.pygame.Surface((self.width, self.height), self.pygame.SRCALPHA)
-
-        background_asset = self.assets_by_id.get(safe_asset_id) or {}
-        if background_asset.get("type") == "scene3d":
-            self.render_scene3d_background_preview(render_target, background_asset)
-            if safe_alpha < 255:
-                render_target.set_alpha(safe_alpha)
-                target.blit(render_target, (0, 0))
-            return
-        background = self._load_image(safe_asset_id)
-        if background:
-            bg_width, bg_height = background.get_size()
-            scale = max(self.width / bg_width, self.height / bg_height)
-            scaled = self.pygame.transform.smoothscale(
-                background,
-                (max(1, int(bg_width * scale)), max(1, int(bg_height * scale))),
-            )
-            rect = scaled.get_rect(center=(self.width // 2, self.height // 2))
-            render_target.blit(scaled, rect)
-        else:
-            top = self.pygame.Surface((self.width, self.height // 2))
-            bottom = self.pygame.Surface((self.width, self.height - self.height // 2))
-            top.fill(palette["bgTop"])
-            bottom.fill(palette["bgBottom"])
-            render_target.blit(top, (0, 0))
-            render_target.blit(bottom, (0, self.height // 2))
-            label = "背景未加载" if safe_asset_id else "当前场景没有背景"
-            self.blit_text_center(self.font_title, label, self.width // 2, self.height // 2 - 20, palette["muted"], target=render_target)
-
-        if safe_alpha < 255 and background_asset.get("type") != "scene3d":
-            render_target.set_alpha(safe_alpha)
-            target.blit(render_target, (0, 0))
-
     def render_background(self, target=None) -> None:
-        target = target or self.screen
-        self.render_background_asset(target, self.stage_background_asset_id)
-        transition = self.background_transition
-        if not transition:
-            return
-        now_ms = self.get_runtime_ticks_ms()
-        progress = get_native_transition_progress(transition, now_ms)
-        if progress >= 1.0:
-            self.background_transition = None
-            return
-        previous_alpha = int(round(255 * (1.0 - ease_out_cubic(progress))))
-        if previous_alpha > 0:
-            self.render_background_asset(target, transition.get("previousAssetId"), previous_alpha)
+        render_native_background(self, target)
 
     def render_character_model_preview_card(self, target, anchor_rect, character: dict, expression_id: str | None) -> None:
-        report = self.get_character_model_preview_report(character, expression_id)
-        if not report.get("isAdvanced"):
-            return
-
-        palette = self.get_active_palette()
-        status = str(report.get("status") or "")
-        accent = palette["accent"] if status == "ready" else palette["warning"]
-        if status in {"missing_asset", "missing_file", "invalid", "unbound"}:
-            accent = mix_rgb(palette["warning"], (255, 64, 64), 0.34)
-
-        card_width = min(300, max(238, int(self.width * 0.22)))
-        card_height = 128
-        card_x = int(anchor_rect.centerx - card_width / 2)
-        card_x = max(18, min(self.width - card_width - 18, card_x))
-        if anchor_rect.top > 156:
-            card_y = anchor_rect.top - card_height - 14
-        else:
-            card_y = anchor_rect.bottom - card_height - 18
-        card_y = max(92, min(self.height - card_height - 150, card_y))
-        card_rect = self.pygame.Rect(card_x, card_y, card_width, card_height)
-
-        self.pygame.draw.rect(target, (*palette["panel"], 226), card_rect, border_radius=18)
-        self.pygame.draw.rect(target, with_alpha(accent, 68), card_rect, 2, border_radius=18)
-        self.pygame.draw.line(
-            target,
-            (*accent, 190),
-            (card_rect.left + 18, card_rect.top + 34),
-            (card_rect.right - 18, card_rect.top + 34),
-            2,
-        )
-
-        title = f"{report['modeLabel']} 预览桥"
-        status_label = str(report.get("statusLabel") or "待检查")
-        target.blit(self.font_ui.render(title, True, palette["text"]), (card_rect.left + 16, card_rect.top + 10))
-        status_surface = self.font_ui.render(status_label, True, accent)
-        target.blit(status_surface, (card_rect.right - status_surface.get_width() - 16, card_rect.top + 10))
-
-        lines = self.get_character_model_preview_lines(character, expression_id)[1:5]
-        y = card_rect.top + 44
-        for line in lines:
-            clipped = ellipsize_text(self.font_ui, line, card_rect.width - 30)
-            target.blit(self.font_ui.render(clipped, True, palette["muted"]), (card_rect.left + 16, y))
-            y += 20
+        render_native_character_model_preview_card(self, target, anchor_rect, character, expression_id)
 
     def render_stage_images(self, target, plane: str) -> None:
-        palette = self.get_active_palette()
-        renderable_items = build_native_renderable_stage_image_items(
-            self.visible_stage_images,
-            self.leaving_stage_images,
-            self.stage_image_motions,
-            plane,
-            self.get_runtime_ticks_ms(),
-        )
-        for layer_id, state in renderable_items:
-            transform = get_safe_stage_image_transform(state.get("transform"))
-            image = self._load_image(state.get("assetId"))
-            position_ratio = float(state.get("positionRatio") or 0.5)
-            center_x = int(self.width * position_ratio + self.width * transform["offsetX"] / 100)
-            center_y = int(self.height * 0.5 + self.height * transform["offsetY"] / 100)
-            target_width = max(1, int(self.width * transform["width"] / 100))
-            if image:
-                source_width, source_height = image.get_size()
-                target_height = max(1, int(source_height * target_width / max(source_width, 1)))
-                scaled = self.pygame.transform.smoothscale(image, (target_width, target_height))
-                if transform["flipX"]:
-                    scaled = self.pygame.transform.flip(scaled, True, False)
-                if transform["rotation"]:
-                    scaled = self.pygame.transform.rotate(scaled, -float(transform["rotation"]))
-                if transform["opacity"] < 100:
-                    scaled = scaled.copy()
-                    scaled.set_alpha(int(255 * transform["opacity"] / 100))
-                target.blit(scaled, scaled.get_rect(center=(center_x, center_y)))
-                continue
-
-            placeholder_width = min(target_width, max(120, int(self.width * 0.34)))
-            placeholder_height = max(72, int(placeholder_width * 0.38))
-            placeholder = self.pygame.Surface((placeholder_width, placeholder_height), self.pygame.SRCALPHA)
-            alpha = int(180 * transform["opacity"] / 100)
-            self.pygame.draw.rect(placeholder, (*palette["panel"], alpha), placeholder.get_rect(), border_radius=18)
-            self.pygame.draw.rect(placeholder, (*palette["panelBorder"], alpha), placeholder.get_rect(), 2, border_radius=18)
-            label = ellipsize_text(self.font_ui, str(layer_id or "舞台贴图"), placeholder_width - 24)
-            label_surface = self.font_ui.render(label, True, palette["muted"])
-            placeholder.blit(label_surface, label_surface.get_rect(center=placeholder.get_rect().center))
-            target.blit(placeholder, placeholder.get_rect(center=(center_x, center_y)))
+        render_native_stage_images(self, target, plane)
 
     def render_characters(self, target=None) -> None:
-        target = target or self.screen
-        palette = self.get_active_palette()
-        position_x = {
-            "left": int(self.width * 0.24),
-            "center": int(self.width * 0.50),
-            "right": int(self.width * 0.76),
-        }
-        character_items = build_native_renderable_character_items(
-            self.visible_characters,
-            self.leaving_characters,
-            self.character_motions,
-            self.get_runtime_ticks_ms(),
-        )
-        speaker_focus_poses = self.speaker_focus_controller.build_render_poses(
-            items=character_items,
-            current_line=self.current_line,
-            game_ui_config=self.game_ui_config,
-            visual_comfort_mode=str(self.runtime_settings.get("visualComfort") or "standard"),
-            now_ms=self.get_runtime_ticks_ms(),
-        )
-
-        def character_sort_key(item):
-            character_state = item[1] if isinstance(item[1], dict) else {}
-            stage = get_safe_character_stage(character_state.get("stage"))
-            focus_pose = self.speaker_focus_controller.get_render_pose(speaker_focus_poses, item[0], character_state)
-            return (
-                stage["layer"],
-                int(focus_pose.get("layerBoost") or 0),
-                float(character_state.get("positionRatio") or 0),
-            )
-
-        for character_id, state in sorted(character_items, key=character_sort_key):
-            stage = get_safe_character_stage(state.get("stage"))
-            focus_pose = self.speaker_focus_controller.get_render_pose(speaker_focus_poses, character_id, state)
-            sprite_asset_id = self.get_character_sprite_asset_id(character_id, state.get("expressionId"))
-            sprite = self._load_image(sprite_asset_id)
-            position_ratio = state.get("positionRatio")
-            x = (
-                int(self.width * float(position_ratio))
-                if isinstance(position_ratio, (int, float))
-                else position_x.get(state.get("position") or "center", self.width // 2)
-            ) + int(self.width * stage["offsetX"] / 100)
-            bottom_y = int(self.height * 0.88) + int(self.height * stage["offsetY"] / 100)
-            is_leaving = bool(state.get("__leaving"))
-            if sprite:
-                sprite_width, sprite_height = sprite.get_size()
-                max_height = int(self.height * 0.74)
-                scale = min(max_height / max(sprite_height, 1), 1.6) * (stage["scale"] / 100)
-                transition_adjustment = get_native_character_transition_adjustment(
-                    state,
-                    max(1, int(sprite_width * scale)),
-                    max(1, int(sprite_height * scale)),
-                    is_leaving,
-                    self.get_runtime_ticks_ms(),
-                )
-                scale *= transition_adjustment["scaleMultiplier"] * float(focus_pose["scaleMultiplier"])
-                scaled = self.pygame.transform.smoothscale(
-                    sprite,
-                    (max(1, int(sprite_width * scale)), max(1, int(sprite_height * scale))),
-                )
-                if stage["flipX"]:
-                    scaled = self.pygame.transform.flip(scaled, True, False)
-                brightness_multiplier = float(focus_pose["brightnessMultiplier"])
-                if brightness_multiplier < 0.999:
-                    shade = max(0, min(255, round(255 * brightness_multiplier)))
-                    scaled.fill((shade, shade, shade, 255), special_flags=self.pygame.BLEND_RGBA_MULT)
-                effective_opacity = clamp(
-                    stage["opacity"]
-                    * transition_adjustment["opacityMultiplier"]
-                    * float(focus_pose["opacityMultiplier"]),
-                    0,
-                    100,
-                )
-                if effective_opacity < 100:
-                    scaled = scaled.copy()
-                    scaled.set_alpha(int(255 * effective_opacity / 100))
-                rect = scaled.get_rect(
-                    midbottom=(
-                        x + int(transition_adjustment["offsetX"]),
-                        bottom_y + int(transition_adjustment["offsetY"]),
-                    )
-                )
-                target.blit(scaled, rect)
-                character = self.characters_by_id.get(character_id) or {}
-                if effective_opacity > 15 and not is_leaving:
-                    self.render_character_model_preview_card(target, rect, character, state.get("expressionId"))
-            else:
-                transition_adjustment = get_native_character_transition_adjustment(
-                    state,
-                    220,
-                    420,
-                    is_leaving,
-                    self.get_runtime_ticks_ms(),
-                )
-                placeholder_rect = self.pygame.Rect(0, 0, 220, 420)
-                placeholder_scale = (
-                    stage["scale"]
-                    / 100
-                    * transition_adjustment["scaleMultiplier"]
-                    * float(focus_pose["scaleMultiplier"])
-                )
-                placeholder_rect.width = max(1, int(placeholder_rect.width * placeholder_scale))
-                placeholder_rect.height = max(1, int(placeholder_rect.height * placeholder_scale))
-                placeholder_rect.midbottom = (
-                    x + int(transition_adjustment["offsetX"]),
-                    bottom_y + int(transition_adjustment["offsetY"]),
-                )
-                effective_opacity = clamp(
-                    stage["opacity"]
-                    * transition_adjustment["opacityMultiplier"]
-                    * float(focus_pose["opacityMultiplier"]),
-                    0,
-                    100,
-                )
-                brightness_multiplier = float(focus_pose["brightnessMultiplier"])
-                placeholder_surface = self.pygame.Surface(placeholder_rect.size, self.pygame.SRCALPHA)
-                self.pygame.draw.rect(
-                    placeholder_surface,
-                    with_alpha(scale_rgb_color(palette["placeholder"], brightness_multiplier), effective_opacity),
-                    placeholder_surface.get_rect(),
-                    border_radius=28,
-                )
-                self.pygame.draw.rect(
-                    placeholder_surface,
-                    with_alpha(
-                        palette["accent"] if focus_pose.get("active") else scale_rgb_color(palette["panelBorder"], brightness_multiplier),
-                        effective_opacity,
-                    ),
-                    placeholder_surface.get_rect(),
-                    2,
-                    border_radius=28,
-                )
-                target.blit(placeholder_surface, placeholder_rect)
-                character = self.characters_by_id.get(character_id) or {}
-                character_name = self.localize_value(character, "displayName", character_id)
-                presentation_label = self.get_character_presentation_mode_label(character)
-                model_asset_label = self.get_character_model_asset_label(character)
-                binding_label = self.get_character_expression_binding_label(character, state.get("expressionId"))
-                if effective_opacity > 15:
-                    self.blit_text_center(
-                        self.font_body,
-                        character_name,
-                        placeholder_rect.centerx,
-                        placeholder_rect.centery - 16,
-                        scale_rgb_color(palette["text"], brightness_multiplier),
-                        target=target,
-                    )
-                    self.blit_text_center(
-                        self.font_ui,
-                        presentation_label,
-                        placeholder_rect.centerx,
-                        placeholder_rect.centery + 22,
-                        scale_rgb_color(palette["accent"], brightness_multiplier),
-                        target=target,
-                    )
-                    self.blit_text_center(
-                        self.font_ui,
-                        model_asset_label,
-                        placeholder_rect.centerx,
-                        placeholder_rect.centery + 52,
-                        scale_rgb_color(palette["muted"], brightness_multiplier),
-                        target=target,
-                    )
-                    self.blit_text_center(
-                        self.font_ui,
-                        binding_label[:32],
-                        placeholder_rect.centerx,
-                        placeholder_rect.centery + 80,
-                        scale_rgb_color(palette["muted"], brightness_multiplier),
-                        target=target,
-                    )
-                if not is_leaving:
-                    self.render_character_model_preview_card(target, placeholder_rect, character, state.get("expressionId"))
+        render_native_characters(self, target)
 
     def render_status_bar(self) -> None:
         palette = self.get_active_palette()

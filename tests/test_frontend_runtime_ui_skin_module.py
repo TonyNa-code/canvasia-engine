@@ -59,6 +59,9 @@ class FrontendRuntimeUiSkinModuleTests(unittest.TestCase):
                 dialogueCameraMode: "broken",
                 dialogueCameraIntensity: 999,
                 dialogueCameraTransitionMs: -10,
+                voiceReactiveMotionMode: "broken",
+                voiceReactiveMotionIntensity: 999,
+                voiceReactiveMotionSensitivity: -10,
                 panelFrameSlice: { top: -9, right: 120, bottom: 12, left: 18 },
               },
             };
@@ -112,6 +115,9 @@ class FrontendRuntimeUiSkinModuleTests(unittest.TestCase):
         self.assertEqual(payload["gameUi"]["dialogueCameraMode"], "soft")
         self.assertEqual(payload["gameUi"]["dialogueCameraIntensity"], 100)
         self.assertEqual(payload["gameUi"]["dialogueCameraTransitionMs"], 0)
+        self.assertEqual(payload["gameUi"]["voiceReactiveMotionMode"], "soft")
+        self.assertEqual(payload["gameUi"]["voiceReactiveMotionIntensity"], 100)
+        self.assertEqual(payload["gameUi"]["voiceReactiveMotionSensitivity"], 0)
         self.assertEqual(payload["gameUi"]["panelFrameSlice"], {"top": 0, "right": 96, "bottom": 12, "left": 18})
         self.assertEqual(payload["rgba"], "rgba(16, 32, 48, 0.25)")
         self.assertNotIn("\n", payload["presentation"]["style"])

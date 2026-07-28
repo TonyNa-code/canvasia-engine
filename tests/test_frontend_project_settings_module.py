@@ -87,6 +87,7 @@ class FrontendProjectSettingsModuleTests(unittest.TestCase):
               gameUiHudPositionLabels: {{ top: "顶部", "bottom-left": "左下", hidden: "隐藏" }},
               gameUiTitleCardAnchorLabels: {{ center: "中", left: "左", bottom: "下", free: "自由" }},
               gameUiDialogueCameraLabels: {{ off: "关闭", soft: "柔和", cinematic: "电影感" }},
+              gameUiVoiceReactiveMotionLabels: {{ off: "关闭", soft: "自然", cinematic: "舞台感" }},
               defaultGameUiConfig: {{
                 preset: "stellar",
                 layoutPreset: "balanced",
@@ -123,6 +124,9 @@ class FrontendProjectSettingsModuleTests(unittest.TestCase):
                 dialogueCameraMode: "soft",
                 dialogueCameraIntensity: 58,
                 dialogueCameraTransitionMs: 520,
+                voiceReactiveMotionMode: "soft",
+                voiceReactiveMotionIntensity: 58,
+                voiceReactiveMotionSensitivity: 62,
                 titleBackgroundOpacity: 42,
                 titleBackgroundFit: "cover",
                 panelFrameOpacity: 18,
@@ -213,6 +217,9 @@ class FrontendProjectSettingsModuleTests(unittest.TestCase):
                 dialogueCameraMode: "broken",
                 dialogueCameraIntensity: 999,
                 dialogueCameraTransitionMs: -20,
+                voiceReactiveMotionMode: "broken",
+                voiceReactiveMotionIntensity: 999,
+                voiceReactiveMotionSensitivity: -20,
                 titleBackgroundFit: "contain",
                 titleBackgroundOpacity: 101,
                 titleLogoAssetId: " logo ",
@@ -378,6 +385,9 @@ class FrontendProjectSettingsModuleTests(unittest.TestCase):
         self.assertEqual(payload["gameConfig"]["dialogueCameraMode"], "soft")
         self.assertEqual(payload["gameConfig"]["dialogueCameraIntensity"], 100)
         self.assertEqual(payload["gameConfig"]["dialogueCameraTransitionMs"], 0)
+        self.assertEqual(payload["gameConfig"]["voiceReactiveMotionMode"], "soft")
+        self.assertEqual(payload["gameConfig"]["voiceReactiveMotionIntensity"], 100)
+        self.assertEqual(payload["gameConfig"]["voiceReactiveMotionSensitivity"], 0)
         self.assertEqual(payload["gameConfig"]["titleBackgroundFit"], "contain")
         self.assertEqual(payload["gameConfig"]["titleBackgroundOpacity"], 100)
         self.assertEqual(payload["gameConfig"]["titleLogoAssetId"], "logo")

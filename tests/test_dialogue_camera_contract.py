@@ -73,6 +73,9 @@ class DialogueCameraContractTests(unittest.TestCase):
         player_source = (ROOT_DIR / "export_player_template" / "player.js").read_text(encoding="utf-8")
         editor_source = (ROOT_DIR / "prototype_editor" / "app.js").read_text(encoding="utf-8")
         native_source = (ROOT_DIR / "native_runtime" / "runtime_player.py").read_text(encoding="utf-8")
+        native_stage_renderer_source = (
+            ROOT_DIR / "native_runtime" / "runtime_stage_renderer.py"
+        ).read_text(encoding="utf-8")
         player_css = (ROOT_DIR / "export_player_template" / "player.css").read_text(encoding="utf-8")
         editor_css = (ROOT_DIR / "prototype_editor" / "styles.css").read_text(encoding="utf-8")
 
@@ -80,7 +83,8 @@ class DialogueCameraContractTests(unittest.TestCase):
         self.assertIn('NATIVE_RUNTIME_DIALOGUE_CAMERA_NAME = "runtime_dialogue_camera.py"', run_editor_source)
         self.assertIn('from "./runtime_dialogue_camera.js"', player_source)
         self.assertIn("dialogueCameraTools.buildStageCameraPresentation", editor_source)
-        self.assertIn("dialogue_camera_controller.build_render_pose", native_source)
+        self.assertIn("render_native_stage_surface(self, stage_surface)", native_source)
+        self.assertIn("dialogue_camera_controller.build_render_pose", native_stage_renderer_source)
         self.assertIn("--dialogue-camera-transition-ms", player_css)
         self.assertIn("--dialogue-camera-transition-ms", editor_css)
 

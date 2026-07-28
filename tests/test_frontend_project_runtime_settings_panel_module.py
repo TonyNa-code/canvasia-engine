@@ -44,6 +44,7 @@ class FrontendProjectRuntimeSettingsPanelModuleTests(unittest.TestCase):
               gameUiTitleCardAnchorLabels: {{ center: "中央" }},
               gameUiSpeakerFocusLabels: {{ off: "关闭", soft: "柔和", cinematic: "电影感" }},
               gameUiDialogueCameraLabels: {{ off: "关闭", soft: "柔和", cinematic: "电影感" }},
+              gameUiVoiceReactiveMotionLabels: {{ off: "关闭", soft: "自然", cinematic: "舞台感" }},
             }};
             const baseSlice = {{ top: 12, right: 12, bottom: 12, left: 12 }};
             const model = {{
@@ -137,6 +138,9 @@ class FrontendProjectRuntimeSettingsPanelModuleTests(unittest.TestCase):
                 dialogueCameraMode: "cinematic",
                 dialogueCameraIntensity: 58,
                 dialogueCameraTransitionMs: 520,
+                voiceReactiveMotionMode: "soft",
+                voiceReactiveMotionIntensity: 58,
+                voiceReactiveMotionSensitivity: 62,
               }},
               projectLanguage: "zh-CN",
               projectSupportedLanguages: ["zh-CN", "en-US"],
@@ -174,6 +178,7 @@ class FrontendProjectRuntimeSettingsPanelModuleTests(unittest.TestCase):
               hasExportAction: html.includes('data-export-target="web"'),
               hasSpeakerFocus: html.includes('id="projectGameUiSpeakerFocusModeSelect"') && html.includes('id="projectGameUiSpeakerFocusIntensityInput"'),
               hasDialogueCamera: html.includes('id="projectGameUiDialogueCameraModeSelect"') && html.includes('id="projectGameUiDialogueCameraTransitionInput"'),
+              hasVoiceReactiveMotion: html.includes('id="projectGameUiVoiceReactiveMotionModeSelect"') && html.includes('id="projectGameUiVoiceReactiveMotionSensitivityInput"'),
             }}));
             """
         )
@@ -197,6 +202,7 @@ class FrontendProjectRuntimeSettingsPanelModuleTests(unittest.TestCase):
         self.assertTrue(payload["hasExportAction"])
         self.assertTrue(payload["hasSpeakerFocus"])
         self.assertTrue(payload["hasDialogueCamera"])
+        self.assertTrue(payload["hasVoiceReactiveMotion"])
 
     def test_input_readers_delegate_dom_fields_to_normalizers(self) -> None:
         script = textwrap.dedent(
@@ -229,6 +235,9 @@ class FrontendProjectRuntimeSettingsPanelModuleTests(unittest.TestCase):
               projectGameUiDialogueCameraModeSelect: {{ value: "cinematic" }},
               projectGameUiDialogueCameraIntensityInput: {{ value: "72" }},
               projectGameUiDialogueCameraTransitionInput: {{ value: "680" }},
+              projectGameUiVoiceReactiveMotionModeSelect: {{ value: "cinematic" }},
+              projectGameUiVoiceReactiveMotionIntensityInput: {{ value: "76" }},
+              projectGameUiVoiceReactiveMotionSensitivityInput: {{ value: "81" }},
             }};
             const doc = {{ getElementById(id) {{ return values[id] || {{ value: undefined, checked: true }}; }} }};
             const runtime = tools.readProjectRuntimePlaybackDefaultsFromDocument(
@@ -267,6 +276,9 @@ class FrontendProjectRuntimeSettingsPanelModuleTests(unittest.TestCase):
         self.assertEqual(payload["gameUi"]["dialogueCameraMode"], "cinematic")
         self.assertEqual(payload["gameUi"]["dialogueCameraIntensity"], "72")
         self.assertEqual(payload["gameUi"]["dialogueCameraTransitionMs"], "680")
+        self.assertEqual(payload["gameUi"]["voiceReactiveMotionMode"], "cinematic")
+        self.assertEqual(payload["gameUi"]["voiceReactiveMotionIntensity"], "76")
+        self.assertEqual(payload["gameUi"]["voiceReactiveMotionSensitivity"], "81")
 
 
 if __name__ == "__main__":
