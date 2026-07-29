@@ -19,7 +19,8 @@
     ["variable_add", "变量", "full", "full", "支持数值变量增减。"],
     ["music_play", "音频", "full", "full", "支持 BGM 起播点、片头后循环、循环终点、同曲续播 / 重播、音量、淡入和范围调度。"],
     ["music_stop", "音频", "full", "full", "支持 BGM 淡出停止。"],
-    ["sfx_play", "音频", "full", "full", "支持音效播放与音量控制。"],
+    ["sfx_play", "音频", "full", "full", "支持效果 / 环境 / UI 声道、叠加短音效、循环环境声、淡入淡出和存档恢复。"],
+    ["sfx_stop", "音频", "full", "full", "支持按逻辑声道淡出停止循环环境声或清空全部音效。"],
     ["video_play", "视频", "full", "partial", "编辑器试玩与 Web Runtime 支持自动 / 手动起播、精确裁段、单次 / 循环、读档续播、适配、音量和安全跳过；原生 Runtime 同步这些规则并提供 PyAV / OpenCV / 系统播放器兜底，编码兼容性仍需按目标平台验收。"],
     ["credits_roll", "结尾", "full", "full", "支持片尾字幕与回想 / 发布检查。"],
     ["achievement_unlock", "收集", "full", "full", "支持自定义成就、隐藏规则、图标、持久化和成就馆。"],
@@ -399,14 +400,14 @@
       });
     }
 
-    if (["music_play", "music_stop", "sfx_play"].some((type) => hasUsedType(usedTypeMap, type))) {
+    if (["music_play", "music_stop", "sfx_play", "sfx_stop"].some((type) => hasUsedType(usedTypeMap, type))) {
       addItem({
         id: "runtime-audio-cues",
         target: "cross",
         severity: "check",
         title: "音频调度要验淡入淡出、循环、音量和范围",
         detail: "确认 BGM 不只是机械连播，而是能按指定剧情范围切换；音效不抢占 BGM，停止和淡出不会残留。",
-        relatedBlockTypes: ["music_play", "music_stop", "sfx_play"],
+        relatedBlockTypes: ["music_play", "music_stop", "sfx_play", "sfx_stop"],
         source: "音频链路",
       });
     }
@@ -670,6 +671,7 @@
       musicFadeInCount: 0,
       musicFadeOutCount: 0,
       sfxPlayCount: 0,
+      sfxStopCount: 0,
       videoPlayCount: 0,
       scenesWithMusic: 0,
       scenesWithEffects: 0,
@@ -762,6 +764,8 @@
         }
       } else if (type === "sfx_play") {
         metrics.sfxPlayCount += 1;
+      } else if (type === "sfx_stop") {
+        metrics.sfxStopCount += 1;
       } else if (type === "video_play") {
         metrics.videoPlayCount += 1;
       }

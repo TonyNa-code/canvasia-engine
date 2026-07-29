@@ -29,7 +29,8 @@ CAPABILITY_ROWS = [
     ("text_input", "变量", "full", "full", "支持玩家命名、问答输入、数字输入与正文变量占位符。"),
     ("music_play", "音频", "full", "full", "支持 BGM 播放、循环、音量、淡入和范围调度。"),
     ("music_stop", "音频", "full", "full", "支持 BGM 淡出停止。"),
-    ("sfx_play", "音频", "full", "full", "支持音效播放与音量控制。"),
+    ("sfx_play", "音频", "full", "full", "支持效果 / 环境 / UI 声道、叠加短音效、循环环境声、淡入淡出和存档恢复。"),
+    ("sfx_stop", "音频", "full", "full", "支持按逻辑声道淡出停止循环环境声或清空全部音效。"),
     ("video_play", "视频", "full", "partial", "视频播放依赖目标平台能力；发布前需要验音画同步、跳过和失败兜底。"),
     ("credits_roll", "结尾", "full", "full", "支持片尾字幕与回想 / 发布检查。"),
     ("achievement_unlock", "收集", "full", "full", "支持自定义成就、隐藏规则、图标、持久化和成就馆。"),
@@ -320,7 +321,7 @@ def build_runtime_acceptance_checklist(rows: list[dict], summary: dict, bundle: 
                 "relatedBlockTypes": ["video_play"],
             }
         )
-    if {"music_play", "music_stop", "sfx_play"} & used_types:
+    if {"music_play", "music_stop", "sfx_play", "sfx_stop"} & used_types:
         add_item(
             {
                 "id": "runtime-audio-cues",
@@ -330,7 +331,7 @@ def build_runtime_acceptance_checklist(rows: list[dict], summary: dict, bundle: 
                 "severityLabel": "点测",
                 "title": "音频调度要验淡入淡出、循环、音量和范围",
                 "detail": "确认 BGM 能按指定剧情范围切换，音效不抢占 BGM，停止和淡出不会残留。",
-                "relatedBlockTypes": ["music_play", "music_stop", "sfx_play"],
+                "relatedBlockTypes": ["music_play", "music_stop", "sfx_play", "sfx_stop"],
             }
         )
     if {"character_show", "character_move", "character_hide"} & used_types:
@@ -423,6 +424,7 @@ def build_vn_essentials_audit(bundle: dict) -> dict:
         "musicFadeInCount": 0,
         "musicFadeOutCount": 0,
         "sfxPlayCount": 0,
+        "sfxStopCount": 0,
         "videoPlayCount": 0,
         "variableCount": len(variables),
         "saveVariableCount": len(variables) - len(persistent_variables),
@@ -471,6 +473,8 @@ def build_vn_essentials_audit(bundle: dict) -> dict:
                 metrics["musicFadeOutCount"] += 1
         elif block_type == "sfx_play":
             metrics["sfxPlayCount"] += 1
+        elif block_type == "sfx_stop":
+            metrics["sfxStopCount"] += 1
         elif block_type == "video_play":
             metrics["videoPlayCount"] += 1
 

@@ -15,6 +15,7 @@ class StageImageContractTests(unittest.TestCase):
     def test_editor_web_runtime_and_export_packaging_share_stage_image_contract(self) -> None:
         run_editor = read_source("run_editor.py")
         editor_app = read_source("prototype_editor/app.js")
+        editor_factory = read_source("prototype_editor/modules/story_block_factory.js")
         editor_module = read_source("prototype_editor/modules/stage_images.js")
         player = read_source("export_player_template/player.js")
         web_module = read_source("export_player_template/runtime_stage_images.js")
@@ -22,7 +23,7 @@ class StageImageContractTests(unittest.TestCase):
         native_player = read_source("native_runtime/runtime_player.py")
         native_module = read_source("native_runtime/runtime_stage_images.py")
 
-        self.assertIn('type: "stage_image"', editor_app)
+        self.assertIn('type: "stage_image"', editor_factory)
         self.assertIn('case "stage_image"', editor_app)
         self.assertIn("applyStageImageBlock", editor_module)
         self.assertIn('from "./runtime_stage_images.js"', player)

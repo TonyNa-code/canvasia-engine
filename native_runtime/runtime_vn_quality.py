@@ -245,6 +245,8 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path, deps: dict
     same_target_condition_count = 0
     same_target_condition_names: list[str] = []
     sfx_play_count = 0
+    sfx_loop_count = 0
+    sfx_stop_count = 0
     missing_sfx_asset_count = 0
     missing_sfx_asset_names: list[str] = []
     video_play_count = 0
@@ -632,6 +634,8 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path, deps: dict
                     music_fade_out_count += 1
             elif block_type == "sfx_play":
                 sfx_play_count += 1
+                if block.get("loop") is True:
+                    sfx_loop_count += 1
                 sfx_asset_id = str(block.get("assetId") or "").strip()
                 if sfx_asset_id:
                     sfx_used_asset_ids.add(sfx_asset_id)
@@ -639,6 +643,8 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path, deps: dict
                 if not sfx_asset or not get_asset_runtime_path(bundle_dir, sfx_asset):
                     missing_sfx_asset_count += 1
                     missing_sfx_asset_names.append(str(block.get("id") or sfx_asset_id or "未命名音效卡"))
+            elif block_type == "sfx_stop":
+                sfx_stop_count += 1
             elif block_type == "video_play":
                 video_play_count += 1
                 video_asset_id = str(block.get("assetId") or "").strip()
@@ -1389,6 +1395,15 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path, deps: dict
             "多场景项目没有检测到播放音效卡片。",
             "为门铃、脚步、点击、心跳、短信提示或关键演出补少量音效点，能显著提升试玩完成度。",
         )
+    if sfx_loop_count > 0 and sfx_stop_count == 0:
+        add_vn_baseline_issue(
+            issues,
+            "soft",
+            "sfx_loop_without_stop",
+            "循环环境声没有明确停止点",
+            f"检测到 {sfx_loop_count} 个循环音效，但没有停止环境声卡片。",
+            "如果环境声不需要覆盖到游戏结尾，请在转场、室内外切换或情绪结束处加入停止环境声卡片。",
+        )
     if video_asset_count and video_play_count == 0:
         add_vn_baseline_issue(
             issues,
@@ -1645,6 +1660,8 @@ def build_native_runtime_vn_baseline_quality_report(bundle_dir: Path, deps: dict
             "sameTargetChoiceCount": same_target_choice_count,
             "sameTargetConditionCount": same_target_condition_count,
             "sfxPlayCount": sfx_play_count,
+            "sfxLoopCount": sfx_loop_count,
+            "sfxStopCount": sfx_stop_count,
             "missingSfxAssetCount": missing_sfx_asset_count,
             "videoAssetCount": video_asset_count,
             "videoPlayCount": video_play_count,

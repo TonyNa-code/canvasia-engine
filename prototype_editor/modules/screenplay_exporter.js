@@ -10,6 +10,7 @@
     "music_play",
     "music_stop",
     "sfx_play",
+    "sfx_stop",
     "video_play",
     "particle_effect",
     "wait",
@@ -301,8 +302,15 @@
     }
     if (type === "sfx_play") {
       return joinParts([
-        `播放音效：${getAssetName(assetMap, block.assetId, "未选择音效")}`,
+        `${block.loop === true ? "循环" : "播放"}${{ effect: "效果声", ambience: "环境声", ui: "界面声" }[block.channelId] ?? "效果声"}：${getAssetName(assetMap, block.assetId, "未选择音效")}`,
         block.volume ? `音量 ${block.volume}` : "",
+        block.fadeInMs ? `淡入 ${formatMs(block.fadeInMs)}` : "",
+      ]);
+    }
+    if (type === "sfx_stop") {
+      return joinParts([
+        `停止${{ all: "全部音效", effect: "效果声", ambience: "环境声", ui: "界面声" }[block.channelId] ?? "全部音效"}`,
+        block.fadeOutMs ? `淡出 ${formatMs(block.fadeOutMs)}` : "",
       ]);
     }
     if (type === "video_play") {

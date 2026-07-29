@@ -454,7 +454,20 @@
       return {
         type: "sfx_play",
         assetId: getAssetId(draftBlock.assetHint, ["sfx"]),
+        channelId: ["effect", "ambience", "ui"].includes(draftBlock.channelId) ? draftBlock.channelId : "effect",
+        loop: draftBlock.loop === true,
+        restartMode: draftBlock.restartMode === "restart" ? "restart" : draftBlock.loop === true ? "continue" : "restart",
         volume: getVolumePercent(draftBlock.volume, 100),
+        fadeInMs: getNonNegativeNumber(draftBlock.fadeInMs, 0),
+        replaceFadeOutMs: getNonNegativeNumber(draftBlock.replaceFadeOutMs, 0),
+      };
+    }
+
+    if (draftBlock.type === "sfx_stop") {
+      return {
+        type: "sfx_stop",
+        channelId: ["all", "effect", "ambience", "ui"].includes(draftBlock.channelId) ? draftBlock.channelId : "all",
+        fadeOutMs: getNonNegativeNumber(draftBlock.fadeOutMs, 600),
       };
     }
 

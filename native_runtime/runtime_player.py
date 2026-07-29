@@ -197,6 +197,11 @@ except ImportError:  # pragma: no cover - exported native packages import from t
     )
 
 try:
+    from .runtime_sfx_transport import NativeSfxTransportController
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_sfx_transport import NativeSfxTransportController
+
+try:
     from .runtime_video_transport import (
         NATIVE_VIDEO_BACKEND_OPTIONS,
         NATIVE_VIDEO_EMBEDDED_BACKEND_ID,
@@ -8149,6 +8154,10 @@ class NativeRuntimePlayer:
         self.current_bgm_cue_id = ""
         self.current_bgm_cue_sequence = 0
         self.music_transport_controller = NativeMusicTransportController()
+        self.sfx_transport_controller = NativeSfxTransportController(
+            self._load_sound,
+            lambda: self.get_effective_volume("sfxVolume"),
+        )
         self.current_voice_channel = None
         self.current_voice_volume_percent = 100
         self.current_voice_profile_id = ""
@@ -8650,6 +8659,7 @@ class NativeRuntimePlayer:
         self.apply_text_scale()
         self.apply_display_mode()
         self.update_voice_playback_state(force=True)
+        self.sfx_transport_controller.update_volumes()
         if self.current_voice_channel:
             try:
                 self.current_voice_channel.set_volume(self.get_effective_voice_volume())
@@ -9956,6 +9966,7 @@ class NativeRuntimePlayer:
         self.overlay_hotspots = []
         self.stop_voice()
         self.stop_bgm()
+        self.stop_sfx({"channelId": "all", "fadeOutMs": 0})
         self.clear_particle_effect()
         self.clear_stage_visual_effects(include_persistent=True)
         self.current_line = None
@@ -10688,6 +10699,7 @@ class NativeRuntimePlayer:
             "currentBgmCueId": self.current_bgm_cue_id,
             "currentBgmCueSequence": self.current_bgm_cue_sequence,
             "currentBgmPlaybackPositionSeconds": self.get_current_bgm_playback_position(),
+            "sfxTransportState": self.sfx_transport_controller.serialize_persistent_channels(),
             "currentVideoPlaybackPositionSeconds": self.get_current_video_playback_position(),
             "currentVideoActive": bool(self.current_line and self.current_line.get("type") == "video_play"),
             "currentVideoResumeMode": (
@@ -10844,6 +10856,7 @@ class NativeRuntimePlayer:
         self.current_bgm_cue_id = str(snapshot.get("currentBgmCueId") or "")
         self.current_bgm_cue_sequence = max(0, int(snapshot.get("currentBgmCueSequence") or 0))
         self.music_transport_controller.reset()
+        self.sfx_transport_controller.restore_persistent_channels(snapshot.get("sfxTransportState"))
         self.clear_particle_effect()
         self.clear_stage_visual_effects(include_persistent=True)
 
@@ -11476,7 +11489,15 @@ class NativeRuntimePlayer:
                 continue
 
             if block_type == "sfx_play":
-                self.play_sfx(block.get("assetId"), volume_percent=block.get("volume"))
+                self.play_sfx(
+                    block,
+                    cue_id=f"{self.current_scene_id}:{block.get('id') or self.current_block_index}",
+                )
+                self.current_block_index += 1
+                continue
+
+            if block_type == "sfx_stop":
+                self.stop_sfx(block)
                 self.current_block_index += 1
                 continue
 
@@ -11742,15 +11763,22 @@ class NativeRuntimePlayer:
         self.current_bgm_cue_id = ""
         self.music_transport_controller.reset()
 
-    def play_sfx(self, asset_id: str | None, volume_percent: object | None = None) -> None:
-        sound = self._load_sound(asset_id)
-        if sound:
-            try:
-                sound_volume = get_safe_volume_percent(volume_percent, 100) / 100
-                sound.set_volume(self.get_effective_volume("sfxVolume") * sound_volume)
-                sound.play()
-            except Exception:
-                return
+    def play_sfx(
+        self,
+        source: dict | str | None,
+        volume_percent: object | None = None,
+        *,
+        cue_id: object = "",
+    ) -> bool:
+        block = (
+            dict(source)
+            if isinstance(source, dict)
+            else {"assetId": source, "volume": volume_percent}
+        )
+        return self.sfx_transport_controller.play(block, cue_id=cue_id)
+
+    def stop_sfx(self, source: dict | None = None) -> None:
+        self.sfx_transport_controller.stop(source)
 
     def play_voice(
         self,
@@ -15126,6 +15154,7 @@ class NativeRuntimePlayer:
         self.record_player_session_end()
         self.persist_auto_resume_snapshot()
         self.stop_bgm()
+        self.stop_sfx({"channelId": "all", "fadeOutMs": 0})
         self.stop_voice()
         return 0
 

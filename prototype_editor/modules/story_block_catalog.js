@@ -185,7 +185,17 @@
         group: "音频",
         webStatus: "full",
         nativeStatus: "full",
-        note: "支持音效播放与音量控制。",
+        note: "支持效果 / 环境 / UI 逻辑声道、叠加短音效、循环环境声、淡入淡出与同声道续播。",
+        tags: ["timelineAudioBeat", "audioCue"],
+      },
+      {
+        type: "sfx_stop",
+        label: "停止环境声",
+        compactLabel: "停止音效",
+        group: "音频",
+        webStatus: "full",
+        nativeStatus: "full",
+        note: "按逻辑声道停止循环环境声或清空全部音效，支持淡出。",
         tags: ["timelineAudioBeat", "audioCue"],
       },
       {

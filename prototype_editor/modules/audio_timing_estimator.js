@@ -161,7 +161,7 @@
       estimatedSeconds += clampNumber(block.durationMs, 0, 10000, 600) / 1000;
     } else if (["background", "character_show", "character_hide", "screen_shake", "screen_flash", "screen_fade"].includes(type)) {
       estimatedSeconds += type.startsWith("screen_") ? getEffectSeconds(block) : timingOptions.visualBlockSeconds;
-    } else if (["music_play", "music_stop", "sfx_play"].includes(type)) {
+    } else if (["music_play", "music_stop", "sfx_play", "sfx_stop"].includes(type)) {
       estimatedSeconds += timingOptions.audioControlSeconds;
     }
 

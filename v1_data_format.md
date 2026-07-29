@@ -354,11 +354,30 @@ V1 建议支持三种变量类型：
 
 作用：
 
-- 播放音效
+- 叠加播放短音效，或跨剧情卡循环播放环境声
 
 核心字段：
 
 - `assetId`
+- `channelId`：`effect` / `ambience` / `ui`
+- `loop`
+- `restartMode`：`continue` / `restart`
+- `volume`
+- `fadeInMs`
+- `replaceFadeOutMs`
+
+旧项目只填写 `assetId` 时，会按效果声道、单次播放、100% 音量处理。
+
+### `sfx_stop`
+
+作用：
+
+- 停止指定逻辑声道的循环环境声，或清空全部音效声道
+
+核心字段：
+
+- `channelId`：`all` / `effect` / `ambience` / `ui`
+- `fadeOutMs`
 
 ### `jump`
 

@@ -75,6 +75,7 @@
     music_play: "BGM",
     music_stop: "BGM stop",
     sfx_play: "SFX",
+    sfx_stop: "SFX Stop",
     video_play: "Video",
     particle_effect: "Particle",
     wait: "Wait",
@@ -341,7 +342,7 @@
       defaultLanguage: getDefaultLanguage(data),
       supportedLanguages: languages,
       topBlockTypes,
-      hasAudio: ["music_play", "sfx_play"].some((type) => blockCounts.has(type)),
+      hasAudio: ["music_play", "music_stop", "sfx_play", "sfx_stop"].some((type) => blockCounts.has(type)),
       hasVideo: blockCounts.has("video_play"),
       hasCharacterStaging: ["character_show", "character_move", "character_hide"].some((type) => blockCounts.has(type)),
       hasParticlesOrEffects: ["particle_effect", "screen_shake", "screen_flash", "screen_fade", "camera_zoom", "camera_pan"].some((type) =>

@@ -14,6 +14,7 @@ APP_PATH = EDITOR_DIR / "app.js"
 INDEX_PATH = EDITOR_DIR / "index.html"
 CATALOG_MODULE_PATH = EDITOR_DIR / "modules" / "story_block_catalog.js"
 ACTION_MODULE_PATH = EDITOR_DIR / "modules" / "story_block_actions.js"
+FACTORY_MODULE_PATH = EDITOR_DIR / "modules" / "story_block_factory.js"
 COMMAND_PALETTE_MODULE_PATH = EDITOR_DIR / "modules" / "command_palette.js"
 
 
@@ -91,16 +92,18 @@ class FrontendStoryBlockRegistryIntegrationTests(unittest.TestCase):
     def test_registered_story_blocks_have_editor_entrypoints_and_runtime_rows(self) -> None:
         payload = _load_story_block_registry_payload()
         source = APP_PATH.read_text(encoding="utf-8")
+        factory_source = FACTORY_MODULE_PATH.read_text(encoding="utf-8")
         index_source = INDEX_PATH.read_text(encoding="utf-8")
         handle_click = _extract_function_source(source, "handleClick")
         queue_add = _extract_function_source(source, "queueAddBlockFromAction")
         add_block = _extract_function_source(source, "addBlock")
         create_default_block = _extract_function_source(source, "createDefaultBlock")
+        create_default_story_block = _extract_function_source(factory_source, "createDefaultStoryBlock")
 
         known_types = set(payload["knownTypes"])
         label_types = set(payload["labelTypes"])
         runtime_types = set(payload["runtimeTypes"])
-        created_types = set(re.findall(r'\bif\s*\(\s*blockType\s*===\s*"([^"]+)"\s*\)', create_default_block))
+        created_types = set(re.findall(r'\bsafeType\s*===\s*"([^"]+)"', create_default_story_block))
         add_action_types = set(payload["addActionTypes"])
         toolbar_actions = set(re.findall(r'data-action="([^"]+)"', index_source))
         command_types = set(payload["commandTypes"])
@@ -116,6 +119,7 @@ class FrontendStoryBlockRegistryIntegrationTests(unittest.TestCase):
         self.assertIn("storyBlockActionTools.getAddBlockActionConfig(action)", handle_click)
         self.assertIn("addBlock(blockType, getSceneChecklistAddBlockOptions(actionTarget))", queue_add)
         self.assertIn("isKnownStoryBlockType(safeBlockType)", add_block)
+        self.assertIn("storyBlockFactoryTools.createDefaultStoryBlock", create_default_block)
         self.assertIn("未知剧情卡片类型", add_block)
 
 

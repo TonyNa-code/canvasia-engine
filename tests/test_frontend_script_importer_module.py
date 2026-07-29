@@ -12,6 +12,45 @@ MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "script_importer.js"
 
 
 class FrontendScriptImporterModuleTests(unittest.TestCase):
+    def test_script_importer_parses_sfx_channels_loops_and_chinese_stop_commands(self) -> None:
+        script = textwrap.dedent(
+            f"""
+            const fs = require("fs");
+            const vm = require("vm");
+            const context = {{ window: {{}} }};
+            context.globalThis = context;
+            vm.createContext(context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
+            const tools = context.window.CanvasiaEditorScriptImporter;
+            process.stdout.write(JSON.stringify(tools.parseScriptDraftToBlocks(`
+              播放环境音 rain ambience loop continue volume 65 fadein 1.2 replace-fadeout 0.8
+              音效 click
+              停止环境音 ambience fadeout 0.6
+              环境音停止 fadeout 0.2
+            `)));
+            """
+        )
+        result = subprocess.run(["node", "-e", script], cwd=ROOT_DIR, capture_output=True, text=True, check=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        blocks = json.loads(result.stdout)
+        self.assertEqual(
+            blocks[0],
+            {
+                "type": "sfx_play",
+                "assetHint": "rain",
+                "channelId": "ambience",
+                "loop": True,
+                "restartMode": "continue",
+                "volume": 65,
+                "fadeInMs": 1200,
+                "replaceFadeOutMs": 800,
+            },
+        )
+        self.assertEqual(blocks[1]["restartMode"], "restart")
+        self.assertFalse(blocks[1]["loop"])
+        self.assertEqual(blocks[2], {"type": "sfx_stop", "channelId": "ambience", "fadeOutMs": 600})
+        self.assertEqual(blocks[3], {"type": "sfx_stop", "channelId": "all", "fadeOutMs": 200})
+
     def test_script_importer_parses_stage_image_commands(self) -> None:
         script = textwrap.dedent(
             f"""
@@ -344,7 +383,16 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
                 "flipX": True,
             },
         })
-        self.assertEqual(payload["sfxLine"], {"type": "sfx_play", "assetHint": "door_knock", "volume": 100})
+        self.assertEqual(payload["sfxLine"], {
+            "type": "sfx_play",
+            "assetHint": "door_knock",
+            "channelId": "effect",
+            "loop": False,
+            "restartMode": "restart",
+            "volume": 100,
+            "fadeInMs": 0,
+            "replaceFadeOutMs": 0,
+        })
         self.assertEqual(payload["videoLine"], {
             "type": "video_play",
             "assetHint": "opening_movie",
@@ -496,7 +544,16 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
         self.assertEqual(payload["vnBlocks"][3]["position"], "right")
         self.assertEqual(payload["vnBlocks"][3]["transition"], "fade")
         self.assertEqual(payload["vnBlocks"][3]["transitionDurationMs"], 700)
-        self.assertEqual(payload["vnBlocks"][4], {"type": "sfx_play", "assetHint": "door_knock", "volume": 100})
+        self.assertEqual(payload["vnBlocks"][4], {
+            "type": "sfx_play",
+            "assetHint": "door_knock",
+            "channelId": "effect",
+            "loop": False,
+            "restartMode": "restart",
+            "volume": 100,
+            "fadeInMs": 0,
+            "replaceFadeOutMs": 0,
+        })
         self.assertEqual(payload["vnBlocks"][5]["voiceHint"], "yuina_001")
         self.assertEqual(payload["vnBlocks"][7]["options"], [
             {"text": "问她原因", "targetHint": "scene_roof"},

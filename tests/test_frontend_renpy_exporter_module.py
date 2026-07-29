@@ -207,7 +207,7 @@ class FrontendRenpyExporterModuleTests(unittest.TestCase):
         self.assertIn('$ persistent.player_name = _canvasia_input', payload["draft"]["script"])
         self.assertIn('yuna "{cps=72}欢迎回来，[persistent.player_name]。{/cps}"', payload["draft"]["script"])
         self.assertIn('"[persistent.player_name]，追上去":', payload["draft"]["script"])
-        self.assertIn('play sound "sfx/bell.ogg" volume 0.65', payload["draft"]["script"])
+        self.assertIn('play canvasia_effect_2 "sfx/bell.ogg" noloop volume 0.65', payload["draft"]["script"])
         self.assertIn('nvl clear\n    canvasia_nvl "{cps=10000}风吹过屋顶。{/cps}"', payload["draft"]["script"])
         self.assertIn('centered "悠奈\\n天空正在变暗。"', payload["draft"]["script"])
         self.assertIn('"{cps=24}风把答案吹散了。{/cps}"', payload["draft"]["script"])

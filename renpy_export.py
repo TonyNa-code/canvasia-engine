@@ -187,6 +187,13 @@ def get_renpy_export_contract() -> dict:
         "screenFilterPresetKeys": sorted(SCREEN_FILTER_PRESETS),
         "musicRestartModes": ["continue", "restart"],
         "musicTransportMaxSeconds": 21600,
+        "sfxChannels": {
+            channel_id: {
+                "persistent": config["persistent"],
+                "oneShots": list(config["oneShots"]),
+            }
+            for channel_id, config in RENPY_SFX_CHANNELS.items()
+        },
         "videoResumeModes": ["restart", "resume"],
         "videoFitModes": ["contain", "cover", "fill"],
         "videoTransportMaxSeconds": 21600,
@@ -404,6 +411,60 @@ def build_music_playback_spec(path: str, block: dict) -> dict:
 
 def is_music_control_block(block: dict) -> bool:
     return clean_text(block.get("type")) in {"music_play", "music_stop"}
+
+
+RENPY_SFX_CHANNELS = {
+    "effect": {
+        "persistent": "canvasia_effect_loop",
+        "oneShots": ["canvasia_effect_1", "canvasia_effect_2", "canvasia_effect_3", "canvasia_effect_4"],
+    },
+    "ambience": {
+        "persistent": "canvasia_ambience",
+        "oneShots": ["canvasia_ambience_1", "canvasia_ambience_2"],
+    },
+    "ui": {
+        "persistent": "canvasia_ui_loop",
+        "oneShots": ["canvasia_ui_1", "canvasia_ui_2"],
+    },
+}
+
+
+def get_renpy_sfx_channel_config(channel_id: object) -> dict:
+    return RENPY_SFX_CHANNELS.get(clean_text(channel_id), RENPY_SFX_CHANNELS["effect"])
+
+
+def get_renpy_sfx_playback_channel(block: dict, context: dict) -> str:
+    config = get_renpy_sfx_channel_config(block.get("channelId"))
+    if block.get("loop") is True:
+        return config["persistent"]
+    block_index = max(0, int(context.get("blockIndex") or 0))
+    pool = config["oneShots"]
+    return pool[block_index % len(pool)]
+
+
+def get_renpy_sfx_stop_channels(channel_id: object) -> list[str]:
+    safe_channel_id = clean_text(channel_id)
+    configs = list(RENPY_SFX_CHANNELS.values()) if safe_channel_id == "all" else [get_renpy_sfx_channel_config(safe_channel_id)]
+    return [channel for config in configs for channel in [config["persistent"], *config["oneShots"]]]
+
+
+def render_renpy_sfx_block(block: dict, context: dict, asset_map: dict) -> list[str]:
+    channel = get_renpy_sfx_playback_channel(block, context)
+    path = get_asset_path(asset_map, block.get("assetId")) or "audio/sfx.ogg"
+    fade_in = seconds_from_ms(block.get("fadeInMs"))
+    fade_out = seconds_from_ms(block.get("replaceFadeOutMs"))
+    loop_clause = " loop" if block.get("loop") is True else " noloop"
+    restart_clause = " if_changed" if block.get("loop") is True and block.get("restartMode") != "restart" else ""
+    volume_suffix = render_runtime_volume_clause(block, context, "defaultSfxVolume")
+    fade_out_suffix = f" fadeout {fade_out:g}" if fade_out else ""
+    fade_in_suffix = f" fadein {fade_in:g}" if fade_in else ""
+    return [f"    play {channel} {quote_renpy(path)}{fade_out_suffix}{fade_in_suffix}{loop_clause}{restart_clause}{volume_suffix}"]
+
+
+def render_renpy_sfx_stop_block(block: dict) -> list[str]:
+    fade_out = seconds_from_ms(block.get("fadeOutMs"))
+    suffix = f" fadeout {fade_out:g}" if fade_out else ""
+    return [f"    stop {channel}{suffix}" for channel in get_renpy_sfx_stop_channels(block.get("channelId") or "all")]
 
 
 def add_music_scope_warning(block: dict, context: dict, code: str, message: str) -> None:
@@ -1896,8 +1957,9 @@ def render_story_block(block: dict, context: dict) -> list[str]:
         fade_out = seconds_from_ms(block.get("fadeOutMs"))
         return [f"    stop music{f' fadeout {fade_out:g}' if fade_out else ''}"]
     if block_type == "sfx_play":
-        volume_suffix = render_runtime_volume_clause(block, context, "defaultSfxVolume")
-        return [f"    play sound {quote_renpy(get_asset_path(asset_map, block.get('assetId')) or 'audio/sfx.ogg')}{volume_suffix}"]
+        return render_renpy_sfx_block(block, context, asset_map)
+    if block_type == "sfx_stop":
+        return render_renpy_sfx_stop_block(block)
     if block_type == "video_play":
         return render_video_block(block, context)
     if block_type == "credits_roll":
@@ -1981,6 +2043,12 @@ def build_renpy_draft_export(bundle: dict, assets_doc: dict | None = None) -> di
         "define canvasia_nvl = Character(None, kind=nvl)",
         "",
         "init python:",
+        *(
+            f"    renpy.music.register_channel({quote_renpy(channel)}, mixer=\"sfx\", loop=False)"
+            for config in RENPY_SFX_CHANNELS.values()
+            for channel in [config["persistent"], *config["oneShots"]]
+        ),
+        "",
         "    def canvasia_parse_number_input(value):",
         "        try:",
         "            number = float(value)",

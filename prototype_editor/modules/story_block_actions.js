@@ -81,7 +81,15 @@
       blockType: "sfx_play",
       label: "播放音效",
       group: "audio",
-      description: "播放一次性音效，适合门铃、脚步、点击、闪回等瞬间反馈。",
+      beginnerVisible: true,
+      description: "播放可叠加的短音效，或让雨声、风声等环境声持续循环。",
+    }),
+    "add-sfx-stop": Object.freeze({
+      blockType: "sfx_stop",
+      label: "停止环境声",
+      group: "audio",
+      beginnerVisible: true,
+      description: "淡出并停止指定环境声、效果声或全部音效声道。",
     }),
     "add-video-play": Object.freeze({
       blockType: "video_play",

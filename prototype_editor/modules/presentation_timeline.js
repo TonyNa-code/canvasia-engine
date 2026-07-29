@@ -12,6 +12,7 @@
     music_play: "播放 BGM",
     music_stop: "停止 BGM",
     sfx_play: "音效",
+    sfx_stop: "停止环境声",
     video_play: "视频",
     credits_roll: "片尾字幕",
     achievement_unlock: "解锁成就",
@@ -71,7 +72,7 @@
   const AUDIO_BEAT_TYPES = new Set(
     typeof storyBlockCatalogTools.getTimelineAudioBeatBlockTypes === "function"
       ? storyBlockCatalogTools.getTimelineAudioBeatBlockTypes()
-      : ["music_play", "music_stop", "sfx_play", "video_play"]
+      : ["music_play", "music_stop", "sfx_play", "sfx_stop", "video_play"]
   );
   const TIMELINE_TYPES = new Set([...STORY_TEXT_TYPES, ...VISUAL_BEAT_TYPES, ...AUDIO_BEAT_TYPES, "condition", "jump"]);
 
@@ -394,12 +395,18 @@
 
     if (type === "sfx_play") {
       const asset = getAssetStatus(block.assetId, context.assetMap);
-      detail = asset.name || asset.label;
+      const channelLabel = { effect: "效果", ambience: "环境", ui: "界面" }[block.channelId] ?? "效果";
+      detail = `${asset.name || asset.label} · ${channelLabel}${block.loop === true ? "循环" : "单次"}`;
       if (!cleanText(block.assetId)) {
         pushIssue(issues, "blocker", "sfx_missing_asset", "音效卡未选择素材", "这张音效卡没有绑定音效素材。", baseContext);
       } else if (!asset.ready) {
         pushIssue(issues, "blocker", "sfx_asset_not_ready", "音效素材不可用", asset.label, baseContext);
       }
+    }
+
+    if (type === "sfx_stop") {
+      const channelLabel = { all: "全部", effect: "效果", ambience: "环境", ui: "界面" }[block.channelId] ?? "全部";
+      detail = `停止${channelLabel}声道 · ${Math.round(clampNumber(block.fadeOutMs, 0, 60000, 600))}ms 淡出`;
     }
 
     if (type === "video_play") {

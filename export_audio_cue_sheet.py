@@ -27,6 +27,7 @@ BLOCK_LABELS = {
     "music_play": "播放 BGM",
     "music_stop": "停止 BGM",
     "sfx_play": "音效",
+    "sfx_stop": "停止环境声",
     "video_play": "视频",
     "credits_roll": "片尾字幕",
     "wait": "等待停顿",
@@ -539,6 +540,11 @@ def build_audio_cue_sheet(bundle: dict, assets_doc: dict) -> dict:
                         "assetName": get_asset_name(asset, asset_id or "未绑定音效"),
                         "assetPath": get_asset_path(asset),
                         "volume": clamp_int(block.get("volume"), 0, 100, 80),
+                        "channelId": clean_text(block.get("channelId"), "effect") if clean_text(block.get("channelId"), "effect") in {"effect", "ambience", "ui"} else "effect",
+                        "loop": block.get("loop") is True,
+                        "restartMode": "restart" if block.get("restartMode") == "restart" else ("continue" if block.get("loop") is True else "restart"),
+                        "fadeInMs": clamp_int(block.get("fadeInMs"), 0, 60000, 0),
+                        "replaceFadeOutMs": clamp_int(block.get("replaceFadeOutMs"), 0, 60000, 0),
                     }
                 )
 

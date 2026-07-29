@@ -28,6 +28,7 @@ BLOCK_LABELS = {
     "music_play": "播放 BGM",
     "music_stop": "停止 BGM",
     "sfx_play": "音效",
+    "sfx_stop": "停止环境声",
     "video_play": "视频",
     "credits_roll": "片尾字幕",
     "wait": "等待停顿",

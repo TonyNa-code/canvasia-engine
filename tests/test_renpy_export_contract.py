@@ -884,7 +884,7 @@ class RenpyExportContractTests(unittest.TestCase):
         for script in (frontend["script"], backend["script"]):
             self.assertIn('play music "audio/theme.ogg" loop if_changed volume 0.64', script)
             self.assertIn('hero "{cps=72}The project default speed is active.{/cps}"', script)
-            self.assertIn('play sound "audio/bell.ogg" volume 0.77', script)
+            self.assertIn('play canvasia_effect_3 "audio/bell.ogg" noloop volume 0.77', script)
 
         self.assertEqual(frontend["runtimeSettings"]["defaultTextSpeed"], "fast")
         self.assertEqual(backend["runtimeSettings"]["defaultBgmVolume"], 64)

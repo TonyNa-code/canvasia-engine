@@ -442,6 +442,49 @@
     return ["music_play", "music_stop"].includes(cleanText(block.type));
   }
 
+  const RENPY_SFX_CHANNELS = Object.freeze({
+    effect: Object.freeze({ persistent: "canvasia_effect_loop", oneShots: Object.freeze(["canvasia_effect_1", "canvasia_effect_2", "canvasia_effect_3", "canvasia_effect_4"]) }),
+    ambience: Object.freeze({ persistent: "canvasia_ambience", oneShots: Object.freeze(["canvasia_ambience_1", "canvasia_ambience_2"]) }),
+    ui: Object.freeze({ persistent: "canvasia_ui_loop", oneShots: Object.freeze(["canvasia_ui_1", "canvasia_ui_2"]) }),
+  });
+
+  function getRenpySfxChannelConfig(channelId) {
+    return RENPY_SFX_CHANNELS[cleanText(channelId)] ?? RENPY_SFX_CHANNELS.effect;
+  }
+
+  function getRenpySfxPlaybackChannel(block = {}, context = {}) {
+    const config = getRenpySfxChannelConfig(block.channelId);
+    if (block.loop === true) {
+      return config.persistent;
+    }
+    const blockIndex = Math.max(0, Number(context.blockIndex) || 0);
+    return config.oneShots[blockIndex % config.oneShots.length];
+  }
+
+  function getRenpySfxStopChannels(channelId) {
+    const safeChannelId = cleanText(channelId);
+    const configs = safeChannelId === "all"
+      ? Object.values(RENPY_SFX_CHANNELS)
+      : [getRenpySfxChannelConfig(safeChannelId)];
+    return configs.flatMap((config) => [config.persistent, ...config.oneShots]);
+  }
+
+  function renderRenpySfxBlock(block = {}, context = {}) {
+    const channel = getRenpySfxPlaybackChannel(block, context);
+    const path = getAssetPath(context.assetMap, block.assetId) || "audio/sfx.ogg";
+    const fadeIn = secondsFromMs(block.fadeInMs);
+    const fadeOut = secondsFromMs(block.replaceFadeOutMs);
+    const loopClause = block.loop === true ? " loop" : " noloop";
+    const restartClause = block.loop === true && block.restartMode !== "restart" ? " if_changed" : "";
+    return [`    play ${channel} ${quoteRenpy(path)}${fadeOut ? ` fadeout ${fadeOut}` : ""}${fadeIn ? ` fadein ${fadeIn}` : ""}${loopClause}${restartClause}${renderRuntimeVolumeClause(block, context, "defaultSfxVolume")}`];
+  }
+
+  function renderRenpySfxStopBlock(block = {}) {
+    const fadeOut = secondsFromMs(block.fadeOutMs);
+    return getRenpySfxStopChannels(block.channelId || "all")
+      .map((channel) => `    stop ${channel}${fadeOut ? ` fadeout ${fadeOut}` : ""}`);
+  }
+
   function pushMusicScopeWarning(block = {}, context = {}, code, message) {
     pushWarning(context.warnings ?? [], code, message, {
       ...getWarningContext(context),
@@ -1777,7 +1820,10 @@
       return [`    stop music${fadeOut ? ` fadeout ${fadeOut}` : ""}`];
     }
     if (type === "sfx_play") {
-      return [`    play sound ${quoteRenpy(getAssetPath(assetMap, block.assetId) || "audio/sfx.ogg")}${renderRuntimeVolumeClause(block, context, "defaultSfxVolume")}`];
+      return renderRenpySfxBlock(block, { ...context, assetMap });
+    }
+    if (type === "sfx_stop") {
+      return renderRenpySfxStopBlock(block);
     }
     if (type === "video_play") {
       return renderVideoBlock(block, context);
@@ -1877,6 +1923,9 @@
       "define canvasia_nvl = Character(None, kind=nvl)",
       "",
       "init python:",
+      ...Object.values(RENPY_SFX_CHANNELS).flatMap((config) => [config.persistent, ...config.oneShots])
+        .map((channel) => `    renpy.music.register_channel(${quoteRenpy(channel)}, mixer="sfx", loop=False)`),
+      "",
       "    def canvasia_parse_number_input(value):",
       "        try:",
       "            number = float(value)",
@@ -2029,6 +2078,10 @@
       screenFilterPresetKeys: Object.keys(SCREEN_FILTER_PRESETS).sort(),
       musicRestartModes: ["continue", "restart"],
       musicTransportMaxSeconds: 21600,
+      sfxChannels: Object.fromEntries(Object.entries(RENPY_SFX_CHANNELS).map(([channelId, config]) => [channelId, {
+        persistent: config.persistent,
+        oneShots: [...config.oneShots],
+      }])),
       videoResumeModes: ["restart", "resume"],
       videoFitModes: ["contain", "cover", "fill"],
       videoTransportMaxSeconds: 21600,

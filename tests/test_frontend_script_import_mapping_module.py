@@ -440,7 +440,16 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
                 "flipX": True,
             },
         })
-        self.assertEqual(payload["normalizedSfx"], {"type": "sfx_play", "assetId": "sfx_door", "volume": 80})
+        self.assertEqual(payload["normalizedSfx"], {
+            "type": "sfx_play",
+            "assetId": "sfx_door",
+            "channelId": "effect",
+            "loop": False,
+            "restartMode": "restart",
+            "volume": 80,
+            "fadeInMs": 0,
+            "replaceFadeOutMs": 0,
+        })
         self.assertEqual(
             payload["normalizedVideo"],
             {

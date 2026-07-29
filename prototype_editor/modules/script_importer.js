@@ -11,6 +11,7 @@
     "music_play",
     "music_stop",
     "sfx_play",
+    "sfx_stop",
     "video_play",
     "credits_roll",
     "wait",
@@ -275,6 +276,31 @@
     }
     if (/(?:读档续播|接着播放|续播)|\b(?:resume|continue-playback)\b/i.test(source)) {
       return "resume";
+    }
+    return fallback;
+  }
+
+  function parseInlineSfxChannel(text, fallback = "effect") {
+    const source = String(text ?? "");
+    if (/(?:环境声道|环境音)|\b(?:ambience|ambient|environment)\b/i.test(source)) {
+      return "ambience";
+    }
+    if (/(?:界面声道|界面音)|\b(?:ui|interface)\b/i.test(source)) {
+      return "ui";
+    }
+    if (/(?:效果声道|效果音)|\b(?:effect|effects)\b/i.test(source)) {
+      return "effect";
+    }
+    return fallback;
+  }
+
+  function parseInlineSfxRestartMode(text, fallback = "continue") {
+    const source = String(text ?? "");
+    if (/(?:重新播放|从头播放)|\b(?:restart|replay|from-start)\b/i.test(source)) {
+      return "restart";
+    }
+    if (/(?:自然续播|保持播放)|\b(?:continue|keep-playing)\b/i.test(source)) {
+      return "continue";
     }
     return fallback;
   }
@@ -884,15 +910,23 @@
         : null;
     }
 
-    const playSfxMatch = text.match(/^(?:play\s+)?(?:sound|sfx|se)\s+(.+)$/i);
+    const playSfxMatch =
+      text.match(/^(?:play\s+)?(?:sound|sfx|se)\s+(?!stop\b)(.+)$/iu) ??
+      text.match(/^(?:播放\s*)?(?:音效|环境音)\s*(?!停止(?:\s|$))(.+)$/u);
     if (playSfxMatch) {
       const sfxText = playSfxMatch[1];
       const leading = readLeadingArgument(sfxText);
+      const loop = parseInlineVideoLoop(sfxText, false);
       return leading.argument
         ? {
             type: "sfx_play",
             assetHint: leading.argument,
-            volume: 100,
+            channelId: parseInlineSfxChannel(sfxText),
+            loop,
+            restartMode: parseInlineSfxRestartMode(sfxText, loop ? "continue" : "restart"),
+            volume: parseInlineVolumePercent(sfxText, 100),
+            fadeInMs: parseInlineTimeMs(sfxText, "fadein", 0),
+            replaceFadeOutMs: parseInlineTimeMs(sfxText, "replace-fadeout", 0),
           }
         : null;
     }
@@ -1076,6 +1110,19 @@
       return {
         type: "music_stop",
         fadeOutMs: parseInlineTimeMs(stopMusicMatch[1], "fadeout", 600),
+      };
+    }
+
+    const stopSfxMatch =
+      text.match(/^stop\s+(?:sound|sfx|se)\b(.*)$/iu) ??
+      text.match(/^(?:sound|sfx|se)\s+stop\b(.*)$/iu) ??
+      text.match(/^停止\s*(?:音效|环境音)(.*)$/u) ??
+      text.match(/^(?:音效|环境音)\s*停止(.*)$/u);
+    if (stopSfxMatch) {
+      return {
+        type: "sfx_stop",
+        channelId: parseInlineSfxChannel(stopSfxMatch[1], "all"),
+        fadeOutMs: parseInlineTimeMs(stopSfxMatch[1], "fadeout", 600),
       };
     }
 
@@ -1380,6 +1427,9 @@
     }
     if (block?.type === "music_stop") {
       return "停止 BGM";
+    }
+    if (block?.type === "sfx_stop") {
+      return `停止音效：${block.channelId || "all"}`;
     }
     if (block?.type === "screen_fade") {
       return block.action === "fade_in" ? "画面淡入" : "画面淡出";

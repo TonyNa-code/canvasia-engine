@@ -95,7 +95,8 @@ class FrontendStoryBlockActionsModuleTests(unittest.TestCase):
         self.assertEqual(action_to_block["add-scene-call"], "scene_call")
         self.assertEqual(action_to_block["add-scene-return"], "scene_return")
         self.assertEqual(action_to_block["add-achievement-unlock"], "achievement_unlock")
-        self.assertEqual(len(entries), 30)
+        self.assertEqual(action_to_block["add-sfx-stop"], "sfx_stop")
+        self.assertEqual(len(entries), 31)
         self.assertEqual(
             payload["beginnerActions"],
             [
@@ -107,6 +108,8 @@ class FrontendStoryBlockActionsModuleTests(unittest.TestCase):
                 "add-character-show",
                 "add-character-move",
                 "add-music-play",
+                "add-sfx-play",
+                "add-sfx-stop",
                 "add-video-play",
                 "add-achievement-unlock",
                 "add-wait",

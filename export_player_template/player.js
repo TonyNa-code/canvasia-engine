@@ -24,7 +24,6 @@ import {
   getRuntimeSfxTargetVolume as getRuntimeSfxTargetVolumeBase,
   getRuntimeVoiceTargetVolume as getRuntimeVoiceTargetVolumeBase,
   getSafeAudioFadeMs,
-  stopTrackedAudios,
 } from "./runtime_audio.js";
 import {
   bindMusicTransportToAudio,
@@ -42,6 +41,13 @@ import {
   getVideoTransportSummary,
   sanitizeVideoTransport,
 } from "./runtime_video_transport.js";
+import {
+  applySfxBlockToChannelState,
+  createSfxTransportController,
+  getSfxStopSummary,
+  getSfxTransportSummary,
+  sanitizeSfxChannelStateMap,
+} from "./runtime_sfx_transport.js";
 import {
   buildRuntimePreloadMetaText,
   buildRuntimePreloadStatusText,
@@ -457,7 +463,6 @@ const state = {
   currentMusicPlaybackKey: "",
   currentMusicCueId: "",
   musicTransportCleanup: null,
-  lastRenderedStepKey: null,
   typingTimer: null,
   typingSnapshotKey: null,
   typingSourceText: "",
@@ -546,7 +551,10 @@ const state = {
   timedChoicePersistBucket: null,
 };
 
-const activeSfxAudios = new Set();
+const sfxTransportController = createSfxTransportController({
+  resolveAssetUrl: (assetId) => getAssetUrl(assetId),
+  getMasterVolume: () => getRuntimeSfxTargetVolume(100),
+});
 const voiceReactiveMotionController = createVoiceReactiveMotionController({ root: document });
 const timedChoiceController = createTimedChoiceController({
   onTick: handleTimedChoiceTick,
@@ -739,7 +747,7 @@ function init() {
   window.addEventListener("beforeunload", stopMusic);
   window.addEventListener("beforeunload", stopMusicRoomPreview);
   window.addEventListener("beforeunload", stopVoiceReplayPreview);
-  window.addEventListener("beforeunload", stopOneShotAudio);
+  window.addEventListener("beforeunload", stopSfxPlayback);
   window.addEventListener("beforeunload", stopVoicePlayback);
   window.addEventListener("beforeunload", stopRuntimeGamepadInput);
   window.addEventListener("beforeunload", captureCurrentTimedChoiceState);
@@ -1202,7 +1210,7 @@ function renderBeforeStart() {
   closeRuntimeTextInput();
   stopRuntimeTypewriter();
   stopRuntimeAutoAdvance();
-  stopOneShotAudio();
+  stopSfxPlayback();
   stopVoicePlayback();
   stopMusicRoomPreview();
   stopVoiceReplayPreview({ rerender: false });
@@ -1276,7 +1284,7 @@ function startGameFromScene(sceneId = getEntrySceneId()) {
   stopMusic();
   stopRuntimeTypewriter();
   stopRuntimeAutoAdvance();
-  stopOneShotAudio();
+  stopSfxPlayback();
   stopVoicePlayback();
   stopMusicRoomPreview();
   stopVoiceReplayPreview({ rerender: false });
@@ -1304,7 +1312,6 @@ function startGameFromScene(sceneId = getEntrySceneId()) {
   state.saveConfirmIntent = null;
   state.started = true;
   state.session = createPreviewSession(sceneId);
-  state.lastRenderedStepKey = null;
   state.lastLocationArchiveStepKey = null;
   state.lastVoiceReplayStepKey = null;
   recordPlayerSessionStart("start");
@@ -1342,7 +1349,7 @@ function continueLastSession() {
   stopMusic();
   stopRuntimeTypewriter();
   stopRuntimeAutoAdvance();
-  stopOneShotAudio();
+  stopSfxPlayback();
   stopVoicePlayback();
   stopMusicRoomPreview();
   stopVoiceReplayPreview({ rerender: false });
@@ -1369,7 +1376,6 @@ function continueLastSession() {
   state.saveConfirmIntent = null;
   state.started = true;
   state.session = session;
-  state.lastRenderedStepKey = null;
   state.lastLocationArchiveStepKey = null;
   state.lastVoiceReplayStepKey = null;
   recordPlayerSessionStart("resume");
@@ -5489,8 +5495,9 @@ function stopRuntimeAutoAdvance() {
   state.autoAdvanceStepKey = null;
 }
 
-function stopOneShotAudio() {
-  stopTrackedAudios(activeSfxAudios);
+function stopSfxPlayback() {
+  sfxTransportController.stop("all", 0);
+  sfxTransportController.resetOneShotStepKey();
 }
 
 function stopVoicePlayback({ resetStepKey = true } = {}) {
@@ -5521,9 +5528,7 @@ function updateRuntimeAudioVolumes() {
     state.voiceAudio.volume = getRuntimeVoiceTargetVolume(getCurrentSnapshot());
   }
 
-  activeSfxAudios.forEach((audio) => {
-    audio.volume = getRuntimeSfxTargetVolume(audio._canvasiaSfxVolumePercent);
-  });
+  sfxTransportController.updateVolumes();
 }
 
 function isRuntimeVoiceDuckingActive() {
@@ -6562,7 +6567,7 @@ function jumpToHistory(rawIndex) {
 
   stopRuntimeTypewriter();
   stopRuntimeAutoAdvance();
-  stopOneShotAudio();
+  stopSfxPlayback();
   stopVoicePlayback();
   timedChoiceController.stop();
   session.position = nextIndex;
@@ -6897,12 +6902,11 @@ function quickLoadCurrent() {
   stopMusic();
   stopRuntimeTypewriter();
   stopRuntimeAutoAdvance();
-  stopOneShotAudio();
+  stopSfxPlayback();
   stopVoicePlayback();
   timedChoiceController.stop();
   state.started = true;
   state.session = session;
-  state.lastRenderedStepKey = null;
   state.systemMenuOpen = false;
   state.returnTitleConfirmOpen = false;
   state.locationDialogOpen = false;
@@ -7219,7 +7223,6 @@ function confirmReturnToTitle() {
   state.saveConfirmIntent = null;
   state.started = false;
   state.session = null;
-  state.lastRenderedStepKey = null;
   state.currentVoiceStepKey = null;
   renderSaveDialog();
   renderSystemMenu();
@@ -7601,14 +7604,13 @@ function loadSaveSlot(rawIndex) {
   stopMusic();
   stopRuntimeTypewriter();
   stopRuntimeAutoAdvance();
-  stopOneShotAudio();
+  stopSfxPlayback();
   stopVoicePlayback();
   timedChoiceController.stop();
   stopMusicRoomPreview();
   stopVoiceReplayPreview({ rerender: false });
   state.started = true;
   state.session = session;
-  state.lastRenderedStepKey = null;
   state.lastLocationArchiveStepKey = null;
   state.lastVoiceReplayStepKey = null;
   state.systemMenuOpen = false;
@@ -7756,6 +7758,7 @@ function createInitialPreviewVisualState() {
     musicScope: null,
     musicFadeOutMs: 0,
     musicPreviousFadeOutMs: 0,
+    sfxChannels: {},
     particleEffect: null,
     screenShake: null,
     screenFlash: null,
@@ -7800,6 +7803,7 @@ function clonePreviewVisualState(visualState) {
     ),
     musicFadeOutMs: getSafeAudioFadeMs(visualState?.musicFadeOutMs, 0),
     musicPreviousFadeOutMs: getSafeAudioFadeMs(visualState?.musicPreviousFadeOutMs, 0),
+    sfxChannels: sanitizeSfxChannelStateMap(visualState?.sfxChannels),
     backgroundTransitionEvent: visualState?.backgroundTransitionEvent
       ? {
           transition: getSafeTransition(visualState.backgroundTransitionEvent.transition),
@@ -8138,6 +8142,20 @@ function applyBlockToPreviewState(block, visualState, variables, sceneId = "") {
       visualState.speakerName = "音乐";
       visualState.dialogueText = "背景音乐停止了。";
       return null;
+    case "sfx_play": {
+      const asset = data.assetsById.get(block.assetId);
+      visualState.sfxChannels = applySfxBlockToChannelState(visualState.sfxChannels, block, {
+        cueId: `${sceneId}:${block.id ?? "sfx"}`,
+      });
+      visualState.speakerName = "声音演出";
+      visualState.dialogueText = `${asset?.name ?? block.assetId ?? "未选择音效"}：${getSfxTransportSummary(block)}`;
+      return null;
+    }
+    case "sfx_stop":
+      visualState.sfxChannels = applySfxBlockToChannelState(visualState.sfxChannels, block);
+      visualState.speakerName = "声音演出";
+      visualState.dialogueText = getSfxStopSummary(block);
+      return null;
     case "video_play": {
       const asset = data.assetsById.get(block.assetId);
       visualState.speakerName = "视频播放";
@@ -8426,10 +8444,6 @@ function applyBlockToPreviewState(block, visualState, variables, sceneId = "") {
         block.targetSceneId
       )}`;
       return getSafeSceneId(block.targetSceneId, block.targetSceneId);
-    case "sfx_play":
-      visualState.speakerName = "音效";
-      visualState.dialogueText = `播放音效：${data.assetsById.get(block.assetId)?.name ?? block.assetId}`;
-      return null;
     default:
       visualState.speakerName = getBlockLabel(block.type);
       visualState.dialogueText = "这张卡片会参与试玩流程。";
@@ -8589,7 +8603,7 @@ function renderRuntime() {
   renderStageVisual(snapshot);
   syncAudio(snapshot);
   syncVoice(snapshot);
-  syncOneShotAudio(snapshot);
+  syncSfxPlayback(snapshot);
   syncVideoPlayback(snapshot);
   syncCreditsPlayback(snapshot);
   syncRuntimeTextInput(snapshot);
@@ -8883,34 +8897,9 @@ function getRuntimeSfxTargetVolume(volumePercent = 100) {
   return getRuntimeSfxTargetVolumeBase(state.playback, volumePercent);
 }
 
-function syncOneShotAudio(snapshot) {
+function syncSfxPlayback(snapshot) {
   const stepKey = `${snapshot.sceneId}:${snapshot.blockId ?? "complete"}:${snapshot.blockIndex}`;
-
-  if (state.lastRenderedStepKey === stepKey) {
-    return;
-  }
-
-  state.lastRenderedStepKey = stepKey;
-
-  if (snapshot.blockType !== "sfx_play") {
-    return;
-  }
-
-  const soundUrl = getAssetUrl(snapshot.block?.assetId);
-  if (!soundUrl) {
-    return;
-  }
-
-  const audio = new Audio(encodeURI(soundUrl));
-  audio._canvasiaSfxVolumePercent = getSafeVolumePercent(snapshot.block?.volume, 100);
-  audio.volume = getRuntimeSfxTargetVolume(audio._canvasiaSfxVolumePercent);
-  activeSfxAudios.add(audio);
-  const cleanup = () => {
-    activeSfxAudios.delete(audio);
-  };
-  audio.addEventListener("ended", cleanup, { once: true });
-  audio.addEventListener("error", cleanup, { once: true });
-  audio.play().catch(cleanup);
+  sfxTransportController.sync(snapshot, { stepKey });
 }
 
 function syncVideoPlayback(snapshot) {
@@ -9331,6 +9320,7 @@ function getBlockLabel(type) {
     music_play: "播放音乐",
     music_stop: "停止音乐",
     sfx_play: "播放音效",
+    sfx_stop: "停止环境声",
     video_play: "播放视频",
     credits_roll: "片尾字幕",
     wait: "等待停顿",

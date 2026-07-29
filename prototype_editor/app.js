@@ -55,15 +55,18 @@ const runtimeStoryFlowTools = window.CanvasiaRuntimeStoryFlow;
 const runtimeAchievementTools = window.CanvasiaRuntimeAchievements;
 const runtimeMusicTransportTools = window.CanvasiaRuntimeMusicTransport;
 const runtimeVideoTransportTools = window.CanvasiaRuntimeVideoTransport;
+const runtimeSfxTransportTools = window.CanvasiaRuntimeSfxTransport;
 const choiceAvailabilityEditorTools = window.CanvasiaEditorChoiceAvailability;
 const timedChoiceEditorTools = window.CanvasiaEditorTimedChoice;
 const textPacingEditorTools = window.CanvasiaEditorTextPacing;
 const richTextEditorTools = window.CanvasiaEditorRichText;
 const storyBlockActionTools = window.CanvasiaEditorStoryBlockActions;
+const storyBlockFactoryTools = window.CanvasiaEditorStoryBlockFactory;
 const storyBlockEditorTools = window.CanvasiaEditorStoryBlockEditors;
 const musicRangeScopeTools = window.CanvasiaEditorMusicRangeScope;
 const musicTransportEditorTools = window.CanvasiaEditorMusicTransport;
 const videoTransportEditorTools = window.CanvasiaEditorVideoTransport;
+const sfxTransportEditorTools = window.CanvasiaEditorSfxTransport;
 const storyTemplateTools = window.CanvasiaEditorStoryTemplates;
 const storyTemplateApplicationTools = window.CanvasiaEditorStoryTemplateApplication;
 const storyTemplatePanelTools = window.CanvasiaEditorStoryTemplatePanel;
@@ -729,7 +732,6 @@ const state = {
   previewTimedChoicePersistBucket: null,
   voiceMatchReview: null,
   previewVoiceStepKey: null,
-  previewLastSfxStepKey: null,
   previewDebugDraft: null,
   previewDebugSnapshotKey: "",
   recentWorkspaceItems: [],
@@ -824,7 +826,10 @@ const previewVideoController = videoTransportEditorTools.createPreviewVideoContr
 let editorUiThemeAutoRefreshTimer = null;
 let lastEditorRuntimeErrorKey = "";
 let lastEditorRuntimeErrorAt = 0;
-const previewActiveSfxAudios = new Set();
+const previewSfxTransportController = runtimeSfxTransportTools.createSfxTransportController({
+  resolveAssetUrl: (assetId) => getAssetPublicUrl(state.data?.assetsById?.get(assetId)),
+  getMasterVolume: () => getVolumeRatio(state.previewPlayback?.sfxVolume, 85),
+});
 const assetPreviewAudio = new Audio();
 assetPreviewAudio.preload = "none";
 assetPreviewAudio.addEventListener("ended", handleAssetAudioEnded);
@@ -1563,7 +1568,6 @@ function resetProjectScopedUiState() {
   state.previewSystemMenuOpen = false;
   state.previewSaveDialogOpen = false;
   state.previewVoiceStepKey = null;
-  state.previewLastSfxStepKey = null;
   state.previewReturnConfirmOpen = false;
   state.previewSaveConfirmOpen = false;
   state.previewSaveDialogPage = 0;
@@ -1582,7 +1586,7 @@ function resetProjectScopedUiState() {
   stopPreviewAutoAdvance();
   stopPreviewMusicPlayback();
   stopPreviewVideoPlayback();
-  stopPreviewOneShotAudios();
+  stopPreviewSfxPlayback();
   stopPreviewVoicePlayback();
   previewTimedChoiceController.stop();
   state.previewTimedChoicePersistBucket = null;
@@ -4368,6 +4372,20 @@ async function handleClick(event) {
     return;
   }
 
+  if (action === "apply-sfx-transport-preset") {
+    const result = sfxTransportEditorTools.applySfxTransportPreset(
+      actionTarget.dataset.sfxTransportPreset,
+      document,
+      { runtimeTools: runtimeSfxTransportTools }
+    );
+    setSaveStatus(result.label);
+    showToast(result.label, result.ok ? undefined : "error");
+    if (result.ok) {
+      scheduleAutoSave();
+    }
+    return;
+  }
+
   if (action === "apply-character-stage-preset") {
     applyCharacterStagePresetToEditor(actionTarget.dataset.characterStagePreset);
     return;
@@ -5372,6 +5390,14 @@ function handleChange(event) {
     return;
   }
 
+  if (["editorSfxChannelId", "editorSfxLoop", "editorSfxRestartMode"].includes(target.id)) {
+    sfxTransportEditorTools.updateSfxTransportPreview(document, {
+      runtimeTools: runtimeSfxTransportTools,
+    });
+    scheduleAutoSave();
+    return;
+  }
+
   if (target.id === "editorVariableId") {
     updateVariableSetEditor(target.value);
     scheduleAutoSave();
@@ -5645,6 +5671,14 @@ function handleInput(event) {
   if (["editorVideoStartTime", "editorVideoEndTime", "editorVideoVolume"].includes(event.target.id)) {
     videoTransportEditorTools.updateVideoTransportPreview(document, {
       runtimeTools: runtimeVideoTransportTools,
+    });
+    scheduleAutoSave();
+    return;
+  }
+
+  if (["editorSfxVolume", "editorSfxFadeInMs", "editorSfxReplaceFadeOutMs"].includes(event.target.id)) {
+    sfxTransportEditorTools.updateSfxTransportPreview(document, {
+      runtimeTools: runtimeSfxTransportTools,
     });
     scheduleAutoSave();
     return;
@@ -6163,7 +6197,7 @@ function jumpToPreviewHistory(rawIndex) {
 
   stopPreviewTypewriter();
   stopPreviewAutoAdvance();
-  stopPreviewOneShotAudios();
+  stopPreviewSfxPlayback();
   stopPreviewVoicePlayback();
   session.position = nextIndex;
   state.previewSceneId = getCurrentPreviewSnapshot()?.sceneId ?? state.previewStartSceneId;
@@ -6634,14 +6668,13 @@ function quickLoadPreview() {
   stopPreviewAutoAdvance();
   stopPreviewMusicPlayback();
   stopPreviewVideoPlayback();
-  stopPreviewOneShotAudios();
+  stopPreviewSfxPlayback();
   stopPreviewVoicePlayback();
   previewTimedChoiceController.stop();
   state.previewSession = session;
   state.previewStartSceneId = session.startSceneId;
   state.previewSceneId = getCurrentPreviewSnapshot()?.sceneId ?? session.startSceneId;
   state.previewBlockIndex = Math.max(getCurrentPreviewSnapshot()?.blockIndex ?? 0, 0);
-  state.previewLastSfxStepKey = null;
   state.previewVoiceStepKey = null;
   persistPreviewAutoResume();
   state.previewSaveDialogOpen = false;
@@ -7341,14 +7374,13 @@ function loadPreviewAutoResume() {
   stopPreviewAutoAdvance();
   stopPreviewMusicPlayback();
   stopPreviewVideoPlayback();
-  stopPreviewOneShotAudios();
+  stopPreviewSfxPlayback();
   stopPreviewVoicePlayback();
   previewTimedChoiceController.stop();
   state.previewSession = session;
   state.previewStartSceneId = session.startSceneId;
   state.previewSceneId = getCurrentPreviewSnapshot()?.sceneId ?? session.startSceneId;
   state.previewBlockIndex = Math.max(getCurrentPreviewSnapshot()?.blockIndex ?? 0, 0);
-  state.previewLastSfxStepKey = null;
   state.previewVoiceStepKey = null;
   persistPreviewAutoResume();
   state.previewSaveDialogOpen = false;
@@ -7408,14 +7440,13 @@ function loadPreviewSaveSlot(rawIndex) {
   stopPreviewAutoAdvance();
   stopPreviewMusicPlayback();
   stopPreviewVideoPlayback();
-  stopPreviewOneShotAudios();
+  stopPreviewSfxPlayback();
   stopPreviewVoicePlayback();
   previewTimedChoiceController.stop();
   state.previewSession = session;
   state.previewStartSceneId = session.startSceneId;
   state.previewSceneId = getCurrentPreviewSnapshot()?.sceneId ?? session.startSceneId;
   state.previewBlockIndex = Math.max(getCurrentPreviewSnapshot()?.blockIndex ?? 0, 0);
-  state.previewLastSfxStepKey = null;
   state.previewVoiceStepKey = null;
   persistPreviewAutoResume();
   state.previewSaveDialogOpen = false;
@@ -7475,7 +7506,7 @@ function switchScreen(screenName) {
     stopPreviewVoicePlayback();
     stopPreviewMusicPlayback();
     stopPreviewVideoPlayback();
-    stopPreviewOneShotAudios();
+    stopPreviewSfxPlayback();
   }
 
   scrollEditorViewportToTop();
@@ -7852,7 +7883,7 @@ function openPreviewAtStoryLocation(sceneId, blockId = null) {
   stopPreviewAutoAdvance();
   stopPreviewMusicPlayback();
   stopPreviewVideoPlayback();
-  stopPreviewOneShotAudios();
+  stopPreviewSfxPlayback();
   stopPreviewVoicePlayback();
   persistPreviewAutoResume();
   switchScreen("preview");
@@ -18245,7 +18276,7 @@ function renderPreviewScreen() {
   renderPreviewPlaybackControls(snapshot);
   syncPreviewMusic(snapshot);
   syncPreviewVoice(snapshot);
-  syncPreviewOneShotAudio(snapshot);
+  syncPreviewSfxPlayback(snapshot);
   syncPreviewVideo(snapshot);
   schedulePreviewAutoAdvance(snapshot);
 }
@@ -18293,7 +18324,7 @@ function resetPreviewSession(sceneId = null) {
   stopPreviewAutoAdvance();
   stopPreviewMusicPlayback();
   stopPreviewVideoPlayback();
-  stopPreviewOneShotAudios();
+  stopPreviewSfxPlayback();
   stopPreviewVoicePlayback();
   previewTimedChoiceController.stop();
   state.previewTimedChoicePersistBucket = null;
@@ -18302,7 +18333,6 @@ function resetPreviewSession(sceneId = null) {
   state.previewDialogHidden = false;
   state.previewSession = createPreviewSession(safeSceneId);
   state.previewBlockIndex = 0;
-  state.previewLastSfxStepKey = null;
   persistPreviewAutoResume();
 }
 
@@ -19824,12 +19854,9 @@ function capturePreviewCurrentMusicPlaybackPosition() {
   return position;
 }
 
-function stopPreviewOneShotAudios() {
-  previewActiveSfxAudios.forEach((audio) => {
-    audio.pause();
-    audio.src = "";
-  });
-  previewActiveSfxAudios.clear();
+function stopPreviewSfxPlayback() {
+  previewSfxTransportController.stop("all", 0);
+  previewSfxTransportController.resetOneShotStepKey();
 }
 
 function stopPreviewVoicePlayback({ resetStepKey = true } = {}) {
@@ -19849,9 +19876,7 @@ function updatePreviewAudioVolumes() {
     previewMusicAudio.volume = getPreviewMusicTargetVolume(getCurrentPreviewSnapshot());
   }
 
-  previewActiveSfxAudios.forEach((audio) => {
-    audio.volume = getPreviewSfxTargetVolume(audio._canvasiaSfxVolumePercent);
-  });
+  previewSfxTransportController.updateVolumes();
 
   if (previewVoiceAudio.currentSrc || previewVoiceAudio.src) {
     previewVoiceAudio.volume = getPreviewVoiceTargetVolume(getCurrentPreviewSnapshot());
@@ -19969,48 +19994,13 @@ function getPreviewMusicTargetVolume(snapshot) {
   );
 }
 
-function getPreviewSfxTargetVolume(volumePercent = 100) {
-  return getVolumeRatio(state.previewPlayback.sfxVolume, 85) * getVolumeRatio(volumePercent, 100);
-}
-
-function playPreviewOneShotAudio(previewUrl, volumePercent = 100) {
-  const audio = new Audio(encodeURI(previewUrl));
-  audio._canvasiaSfxVolumePercent = getSafeVolumePercent(volumePercent, 100);
-  audio.volume = getPreviewSfxTargetVolume(audio._canvasiaSfxVolumePercent);
-  previewActiveSfxAudios.add(audio);
-  const cleanup = () => {
-    previewActiveSfxAudios.delete(audio);
-  };
-  audio.addEventListener("ended", cleanup, { once: true });
-  audio.addEventListener("error", cleanup, { once: true });
-  audio.play().catch(cleanup);
-}
-
-function syncPreviewOneShotAudio(snapshot) {
+function syncPreviewSfxPlayback(snapshot) {
   if (!snapshot) {
     return;
   }
-
-  const snapshotKey = getPreviewSnapshotKey(snapshot);
-
-  if (state.previewLastSfxStepKey === snapshotKey) {
-    return;
-  }
-
-  state.previewLastSfxStepKey = snapshotKey;
-
-  if (snapshot.blockType !== "sfx_play") {
-    return;
-  }
-
-  const asset = state.data.assetsById.get(snapshot.block?.assetId);
-  const previewUrl = getAssetPublicUrl(asset);
-
-  if (!previewUrl) {
-    return;
-  }
-
-  playPreviewOneShotAudio(previewUrl, snapshot.block?.volume);
+  previewSfxTransportController.sync(snapshot, {
+    stepKey: getPreviewSnapshotKey(snapshot),
+  });
 }
 
 function handlePreviewVoiceEnded() {
@@ -20292,6 +20282,7 @@ function createInitialPreviewVisualState() {
     musicScope: null,
     musicFadeOutMs: 0,
     musicPreviousFadeOutMs: 0,
+    sfxChannels: {},
     particleEffect: null,
     screenShake: null,
     screenFlash: null,
@@ -20336,6 +20327,7 @@ function clonePreviewVisualState(visualState) {
     ),
     musicFadeOutMs: getSafeNonNegativeNumber(visualState?.musicFadeOutMs, 0),
     musicPreviousFadeOutMs: getSafeNonNegativeNumber(visualState?.musicPreviousFadeOutMs, 0),
+    sfxChannels: runtimeSfxTransportTools.sanitizeSfxChannelStateMap(visualState?.sfxChannels),
     backgroundTransitionEvent: visualState?.backgroundTransitionEvent
       ? {
           transition: getSafeTransition(visualState.backgroundTransitionEvent.transition),
@@ -20776,6 +20768,22 @@ function applyBlockToPreviewState(block, visualState, variables, sceneId = "") {
       visualState.musicScope = null;
       visualState.speakerName = "音乐";
       visualState.dialogueText = "背景音乐停止了。";
+      return null;
+    case "sfx_play": {
+      const asset = state.data.assetsById.get(block.assetId);
+      visualState.sfxChannels = runtimeSfxTransportTools.applySfxBlockToChannelState(
+        visualState.sfxChannels,
+        block,
+        { cueId: `${sceneId}:${block.id ?? "sfx"}` }
+      );
+      visualState.speakerName = "声音演出";
+      visualState.dialogueText = `${asset?.name ?? block.assetId ?? "未选择音效"}：${runtimeSfxTransportTools.getSfxTransportSummary(block)}`;
+      return null;
+    }
+    case "sfx_stop":
+      visualState.sfxChannels = runtimeSfxTransportTools.applySfxBlockToChannelState(visualState.sfxChannels, block);
+      visualState.speakerName = "声音演出";
+      visualState.dialogueText = runtimeSfxTransportTools.getSfxStopSummary(block);
       return null;
     case "particle_effect": {
       const action = getSafeParticleAction(block.action);
@@ -32879,6 +32887,8 @@ function renderBlockPanel(block, scene, selectedIndex) {
     editorMarkup = renderMusicStopEditor(block);
   } else if (block.type === "sfx_play") {
     editorMarkup = renderSfxPlayEditor(block);
+  } else if (block.type === "sfx_stop") {
+    editorMarkup = renderSfxStopEditor(block);
   } else if (block.type === "video_play") {
     editorMarkup = renderVideoPlayEditor(block);
   } else if (block.type === "credits_roll") {
@@ -33019,7 +33029,7 @@ function getStorySceneHighlightCandidate(block, scene, index, blocks) {
       getSafeStageImageAction(block.action) === "hide" ? "这里会收掉一层舞台贴图" : "这里会增加道具、前景或 Cut-in 构图",
       getSafeStageImageAction(block.action) === "hide" ? 10 : 15
     );
-  } else if (["music_play", "music_stop", "sfx_play"].includes(block.type)) {
+  } else if (["music_play", "music_stop", "sfx_play", "sfx_stop"].includes(block.type)) {
     pushReason("这里会明显影响听觉节奏", 12);
   } else if (["character_show", "character_move", "character_hide"].includes(block.type)) {
     pushReason("这里会改变画面上的人物关系", 10);
@@ -33664,6 +33674,17 @@ function renderSfxPlayEditor(block) {
     escapeHtml,
     sfxAssets: state.data.assetList.filter((asset) => asset.type === "sfx"),
     getSafeAssetIdByType,
+    renderSfxTransportEditor: (sfxBlock) => sfxTransportEditorTools.renderSfxTransportEditor(sfxBlock, {
+      runtimeTools: runtimeSfxTransportTools,
+    }),
+  });
+}
+
+function renderSfxStopEditor(block) {
+  return storyBlockEditorTools.renderSfxStopEditor(block, {
+    renderSfxStopEditor: (sfxBlock) => sfxTransportEditorTools.renderSfxStopEditor(sfxBlock, {
+      runtimeTools: runtimeSfxTransportTools,
+    }),
   });
 }
 
@@ -34683,6 +34704,7 @@ function normalizeAssistantDraftBlockForScene(sceneDraft, draftBlock) {
     "music_play",
     "music_stop",
     "sfx_play",
+    "sfx_stop",
     "video_play",
     "credits_roll",
     "wait",
@@ -34809,8 +34831,10 @@ function normalizeAssistantDraftBlockForScene(sceneDraft, draftBlock) {
     block.fadeOutMs = getSafeNonNegativeNumber(block.fadeOutMs, 600);
   } else if (blockType === "sfx_play") {
     block.assetId = getSafeAssetIdByType("sfx", block.assetId);
-    block.volume = getSafeVolumePercent(block.volume, 100);
+    Object.assign(block, runtimeSfxTransportTools.sanitizeSfxTransport(block));
     delete block.assetHint;
+  } else if (blockType === "sfx_stop") {
+    Object.assign(block, runtimeSfxTransportTools.sanitizeSfxStop(block));
   } else if (blockType === "video_play") {
     const startTimeSeconds = getSafeNonNegativeNumber(block.startTimeSeconds, 0);
     const endTimeSeconds = getSafeNonNegativeNumber(block.endTimeSeconds, 0);
@@ -39785,10 +39809,22 @@ function collectEditedBlock(block) {
   }
 
   if (block.type === "sfx_play") {
+    const transport = sfxTransportEditorTools.readSfxTransportEditor(block, document, {
+      runtimeTools: runtimeSfxTransportTools,
+    });
     return {
       ...block,
+      ...transport,
       assetId: getSafeAssetIdByType("sfx", document.getElementById("editorSfxAssetId")?.value),
-      volume: getSafeVolumePercent(document.getElementById("editorSfxVolume")?.value, 100),
+    };
+  }
+
+  if (block.type === "sfx_stop") {
+    return {
+      ...block,
+      ...sfxTransportEditorTools.readSfxStopEditor(block, document, {
+        runtimeTools: runtimeSfxTransportTools,
+      }),
     };
   }
 
@@ -41363,319 +41399,31 @@ function moveConditionRuleEditor(actionTarget, direction) {
 }
 
 function createDefaultBlock(scene, blockType) {
-  const blockId = createBlockId(scene);
-
-  if (blockType === "dialogue") {
-    const speakerId = state.selectedCharacterId ?? state.data.characters[0]?.id ?? "";
-    return {
-      id: blockId,
-      type: "dialogue",
-      speakerId,
-      expressionId: getSafeExpressionId(speakerId, null),
-      text: "新台词",
-    };
-  }
-
-  if (blockType === "choice") {
-    return {
-      id: blockId,
-      type: "choice",
-      options: createDefaultChoiceOptions(blockId, state.selectedSceneId),
-    };
-  }
-
-  if (blockType === "narration") {
-    return {
-      id: blockId,
-      type: "narration",
-      text: "新旁白",
-    };
-  }
-
-  if (blockType === "background") {
-    return {
-      id: blockId,
-      type: "background",
-      assetId: state.data.assetList.find((asset) => asset.type === "background")?.id ?? "",
-      transition: "fade",
-    };
-  }
-
-  if (blockType === "stage_image") {
-    const existingCount = (scene.blocks ?? []).filter((block) => block.type === "stage_image").length;
-    return {
-      id: blockId,
-      type: "stage_image",
-      action: "show",
-      layerId: `layer_${existingCount + 1}`,
-      assetId: getSafeStageImageAssetId(""),
-      plane: "front",
-      position: "center",
-      transform: { ...DEFAULT_STAGE_IMAGE_TRANSFORM },
-      durationMs: 520,
-      easing: "ease_out",
-    };
-  }
-
-  if (blockType === "character_show") {
-    const characterId = state.selectedCharacterId ?? state.data.characters[0]?.id ?? "";
-    return {
-      id: blockId,
-      type: "character_show",
-      characterId,
-      expressionId: getSafeExpressionId(characterId, null),
-      position: getDefaultCharacterPosition(characterId),
-      transition: "fade",
-      stage: { ...DEFAULT_CHARACTER_STAGE },
-    };
-  }
-
-  if (blockType === "character_move") {
-    const characterId = state.selectedCharacterId ?? state.data.characters[0]?.id ?? "";
-    return {
-      id: blockId,
-      type: "character_move",
-      characterId,
-      expressionId: getSafeExpressionId(characterId, null),
-      position: getDefaultCharacterPosition(characterId),
-      durationMs: 600,
-      easing: "ease_out",
-      stage: { ...DEFAULT_CHARACTER_STAGE },
-    };
-  }
-
-  if (blockType === "character_hide") {
-    const characterId = state.selectedCharacterId ?? state.data.characters[0]?.id ?? "";
-    return {
-      id: blockId,
-      type: "character_hide",
-      characterId,
-      transition: "fade",
-    };
-  }
-
-  if (blockType === "music_play") {
-    return {
-      id: blockId,
-      type: "music_play",
-      assetId: getSafeAssetIdByType("bgm"),
-      ...runtimeMusicTransportTools.sanitizeMusicTransport(),
-      volume: 100,
-      fadeInMs: 600,
-      fadeOutMs: 600,
-      endMode: "until_next_music",
-      endBlockId: "",
-    };
-  }
-
-  if (blockType === "music_stop") {
-    return {
-      id: blockId,
-      type: "music_stop",
-      fadeOutMs: 600,
-    };
-  }
-
-  if (blockType === "sfx_play") {
-    return {
-      id: blockId,
-      type: "sfx_play",
-      assetId: getSafeAssetIdByType("sfx"),
-      volume: 100,
-    };
-  }
-
-  if (blockType === "video_play") {
-    return {
-      id: blockId,
-      type: "video_play",
-      assetId: getSafeAssetIdByType("video"),
-      title: "Opening Movie",
-      ...runtimeVideoTransportTools.sanitizeVideoTransport(),
-    };
-  }
-
-  if (blockType === "credits_roll") {
-    return {
-      id: blockId,
-      type: "credits_roll",
-      title: "STAFF",
-      subtitle: "Thank you for playing",
-      lines: ["企划：Creator", "剧本：Writer", "美术：", "音乐：", "特别感谢：所有玩家"],
-      durationSeconds: 18,
-      background: "dark",
-      skippable: true,
-    };
-  }
-
-  if (blockType === "achievement_unlock") {
-    const achievementCount = (scene.blocks ?? []).filter((block) => block.type === "achievement_unlock").length;
-    return {
-      id: blockId,
-      type: "achievement_unlock",
-      achievementId: `story_achievement_${achievementCount + 1}`,
-      title: "新的成就",
-      description: "完成这段剧情时解锁。",
-      category: "剧情里程碑",
-      requirement: "推进到这段剧情",
-      hiddenBeforeUnlock: false,
-      iconAssetId: "",
-    };
-  }
-
-  if (blockType === "wait") {
-    return {
-      id: blockId,
-      type: "wait",
-      durationSeconds: 1,
-    };
-  }
-
-  if (blockType === "particle_effect") {
-    return {
-      id: blockId,
-      type: "particle_effect",
-      ...buildDefaultParticleEffectConfig("snow"),
-    };
-  }
-
-  if (blockType === "screen_shake") {
-    return {
-      id: blockId,
-      type: "screen_shake",
-      intensity: "medium",
-      duration: "short",
-    };
-  }
-
-  if (blockType === "screen_flash") {
-    return {
-      id: blockId,
-      type: "screen_flash",
-      color: "white",
-      intensity: "medium",
-      duration: "short",
-    };
-  }
-
-  if (blockType === "screen_fade") {
-    return {
-      id: blockId,
-      type: "screen_fade",
-      action: "fade_out",
-      color: "black",
-      duration: "medium",
-    };
-  }
-
-  if (blockType === "camera_zoom") {
-    return {
-      id: blockId,
-      type: "camera_zoom",
-      action: "zoom_in",
-      strength: "medium",
-      focus: "center",
-    };
-  }
-
-  if (blockType === "camera_pan") {
-    return {
-      id: blockId,
-      type: "camera_pan",
-      target: "center",
-      strength: "medium",
-    };
-  }
-
-  if (blockType === "screen_filter") {
-    return {
-      id: blockId,
-      type: "screen_filter",
-      action: "apply",
-      preset: "memory",
-      strength: "medium",
-      grade: getSafeScreenColorGrade(),
-    };
-  }
-
-  if (blockType === "depth_blur") {
-    return {
-      id: blockId,
-      type: "depth_blur",
-      action: "apply",
-      focus: "center",
-      strength: "medium",
-    };
-  }
-
-  if (blockType === "jump") {
-    return {
-      id: blockId,
-      type: "jump",
-      targetSceneId: getDefaultJumpTargetSceneId(scene.id),
-    };
-  }
-
-  if (blockType === "scene_call") {
-    return {
-      id: blockId,
-      type: "scene_call",
-      targetSceneId: getDefaultJumpTargetSceneId(scene.id),
-    };
-  }
-
-  if (blockType === "scene_return") {
-    return {
-      id: blockId,
-      type: "scene_return",
-    };
-  }
-
-  if (blockType === "variable_set") {
-    const variableId = getSafeVariableId(state.data.variables[0]?.id);
-    return {
-      id: blockId,
-      type: "variable_set",
-      variableId,
-      value: getVariableDefaultValue(variableId),
-    };
-  }
-
-  if (blockType === "variable_add") {
-    return {
-      id: blockId,
-      type: "variable_add",
-      variableId: getSafeVariableId(null, "number"),
-      value: 1,
-    };
-  }
-
-  if (blockType === "text_input") {
-    return {
-      id: blockId,
-      type: "text_input",
-      variableId: getSafeVariableId(null, ["string", "number"]),
-      prompt: "请告诉我该怎样称呼你？",
-      placeholder: "请输入姓名",
-      defaultValue: "",
-      maxLength: 32,
-      allowEmpty: false,
-    };
-  }
-
-  if (blockType === "condition") {
-    return {
-      id: blockId,
-      type: "condition",
-      branches: createDefaultConditionBranches(blockId, scene.id),
-      elseGotoSceneId: getDefaultJumpTargetSceneId(scene.id),
-    };
-  }
-
-  return {
-    id: blockId,
-    type: blockType,
-  };
+  return storyBlockFactoryTools.createDefaultStoryBlock(scene, blockType, {
+    blockId: createBlockId(scene),
+    selectedSceneId: state.selectedSceneId,
+    selectedCharacterId: state.selectedCharacterId,
+    characters: state.data.characters,
+    variables: state.data.variables,
+    assetList: state.data.assetList,
+    defaultStageImageTransform: DEFAULT_STAGE_IMAGE_TRANSFORM,
+    defaultCharacterStage: DEFAULT_CHARACTER_STAGE,
+    getSafeExpressionId,
+    createDefaultChoiceOptions,
+    getSafeStageImageAssetId,
+    getDefaultCharacterPosition,
+    getSafeAssetIdByType,
+    sanitizeMusicTransport: runtimeMusicTransportTools.sanitizeMusicTransport,
+    sanitizeSfxTransport: runtimeSfxTransportTools.sanitizeSfxTransport,
+    sanitizeSfxStop: runtimeSfxTransportTools.sanitizeSfxStop,
+    sanitizeVideoTransport: runtimeVideoTransportTools.sanitizeVideoTransport,
+    buildDefaultParticleEffectConfig,
+    getSafeScreenColorGrade,
+    getDefaultJumpTargetSceneId,
+    getSafeVariableId,
+    getVariableDefaultValue,
+    createDefaultConditionBranches,
+  });
 }
 
 function duplicateBlockForScene(scene, sourceBlock) {
@@ -43165,12 +42913,18 @@ function buildBlockDetails(block) {
     case "music_stop":
       rows.push(["淡出时间", `${block.fadeOutMs ?? 0} ms`]);
       break;
-    case "sfx_play":
+    case "sfx_play": {
+      const transport = runtimeSfxTransportTools.sanitizeSfxTransport(block);
       rows.push([
         "音效素材",
         state.data.assetsById.get(block.assetId)?.name ?? block.assetId,
       ]);
-      rows.push(["本次音量", formatVolumePercent(block.volume, 100)]);
+      rows.push(["声音规则", runtimeSfxTransportTools.getSfxTransportSummary(transport)]);
+      rows.push(["淡入 / 替换淡出", `${transport.fadeInMs} / ${transport.replaceFadeOutMs} ms`]);
+      break;
+    }
+    case "sfx_stop":
+      rows.push(["停止规则", runtimeSfxTransportTools.getSfxStopSummary(block)]);
       break;
     case "video_play": {
       const transport = runtimeVideoTransportTools.sanitizeVideoTransport(block);
@@ -43381,7 +43135,12 @@ function getBlockSummary(block, scene) {
     case "sfx_play":
       return {
         title: state.data.assetsById.get(block.assetId)?.name ?? block.assetId,
-        meta: "播放一次音效",
+        meta: runtimeSfxTransportTools.getSfxTransportSummary(block),
+      };
+    case "sfx_stop":
+      return {
+        title: runtimeSfxTransportTools.getSfxStopSummary(block),
+        meta: "声音控制卡",
       };
     case "video_play": {
       const transport = runtimeVideoTransportTools.sanitizeVideoTransport(block);

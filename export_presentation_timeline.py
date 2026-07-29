@@ -23,6 +23,7 @@ BLOCK_LABELS = {
     "music_play": "播放 BGM",
     "music_stop": "停止 BGM",
     "sfx_play": "音效",
+    "sfx_stop": "停止环境声",
     "video_play": "视频",
     "credits_roll": "片尾字幕",
     "wait": "等待停顿",
@@ -57,7 +58,7 @@ VISUAL_BEAT_TYPES = {
     "video_play",
     "credits_roll",
 }
-AUDIO_BEAT_TYPES = {"music_play", "music_stop", "sfx_play", "video_play"}
+AUDIO_BEAT_TYPES = {"music_play", "music_stop", "sfx_play", "sfx_stop", "video_play"}
 TIMELINE_TYPES = {*STORY_TEXT_TYPES, *VISUAL_BEAT_TYPES, *AUDIO_BEAT_TYPES, "condition", "jump"}
 ISSUE_WEIGHT = {"blocker": 100, "warn": 60, "tip": 20}
 
@@ -355,11 +356,16 @@ def inspect_block(block: dict, context: dict) -> dict:
 
     if block_type == "sfx_play":
         asset = get_asset_status(block.get("assetId"), assets_by_id)
-        detail = asset["name"] or asset["label"]
+        channel_label = {"effect": "效果", "ambience": "环境", "ui": "界面"}.get(clean_text(block.get("channelId")), "效果")
+        detail = f"{asset['name'] or asset['label']} · {channel_label}{'循环' if block.get('loop') is True else '单次'}"
         if not clean_text(block.get("assetId")):
             push_issue(issues, "blocker", "sfx_missing_asset", "音效卡未选择素材", "这张音效卡没有绑定音效素材。", base_context)
         elif not asset["ready"]:
             push_issue(issues, "blocker", "sfx_asset_not_ready", "音效素材不可用", asset["label"], base_context)
+
+    if block_type == "sfx_stop":
+        channel_label = {"all": "全部", "effect": "效果", "ambience": "环境", "ui": "界面"}.get(clean_text(block.get("channelId")), "全部")
+        detail = f"停止{channel_label}声道 · {clamp_int(block.get('fadeOutMs'), 0, 60000, 600)}ms 淡出"
 
     if block_type == "video_play":
         asset = get_asset_status(block.get("assetId"), assets_by_id)

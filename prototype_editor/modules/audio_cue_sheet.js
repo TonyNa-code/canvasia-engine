@@ -12,6 +12,7 @@
     music_play: "播放 BGM",
     music_stop: "停止 BGM",
     sfx_play: "音效",
+    sfx_stop: "停止环境声",
     video_play: "视频",
     credits_roll: "片尾字幕",
     wait: "等待停顿",
@@ -956,6 +957,11 @@
       assetName: cleanText(asset?.name ?? asset?.fileName, assetId || assetHint || "未选择音效"),
       assetReady: Boolean(asset && asset.fileExists !== false),
       volume,
+      channelId: ["effect", "ambience", "ui"].includes(block.channelId) ? block.channelId : "effect",
+      loop: block.loop === true,
+      restartMode: block.restartMode === "restart" ? "restart" : block.loop === true ? "continue" : "restart",
+      fadeInMs: Math.round(clampNumber(block.fadeInMs, 0, 60000, 0)),
+      replaceFadeOutMs: Math.round(clampNumber(block.replaceFadeOutMs, 0, 60000, 0)),
       issues,
     };
     return finalizeSfxCueStatus(cue);
@@ -985,6 +991,8 @@
       assetId: cue.assetId,
       cueLabel: cue.cueLabel,
       volumeLabel: `${cue.volume}%`,
+      channelLabel: { effect: "效果", ambience: "环境", ui: "界面" }[cue.channelId] ?? "效果",
+      playbackLabel: cue.loop ? "循环" : "单次叠加",
       reviewHint: cue.reviewHint,
       status: cue.status,
       statusLabel: cue.statusLabel,
@@ -1453,6 +1461,20 @@
             blockId: cleanText(block.id),
             fadeOutMs: Math.round(clampNumber(block.fadeOutMs, 0, 30000, 600)),
             label: summarizeBlock(block, blockIndex),
+            stopType: "music",
+          });
+        }
+        if (block?.type === "sfx_stop") {
+          stops.push({
+            id: cleanText(block.id, `sfx_stop_${blockIndex + 1}`),
+            chapterName: chapter.name,
+            sceneName: cleanText(scene?.name ?? scene?.title, `场景 ${sceneIndex + 1}`),
+            blockIndex,
+            blockId: cleanText(block.id),
+            fadeOutMs: Math.round(clampNumber(block.fadeOutMs, 0, 60000, 600)),
+            channelId: ["all", "effect", "ambience", "ui"].includes(block.channelId) ? block.channelId : "all",
+            label: summarizeBlock(block, blockIndex),
+            stopType: "sfx",
           });
         }
       });

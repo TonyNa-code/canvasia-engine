@@ -911,6 +911,7 @@ def get_block_label(block_type: str) -> str:
         "music_play": "播放音乐",
         "music_stop": "停止音乐",
         "sfx_play": "播放音效",
+        "sfx_stop": "停止环境声",
         "video_play": "播放视频",
         "credits_roll": "片尾字幕",
         "achievement_unlock": "解锁成就",

@@ -1031,8 +1031,8 @@
   }
 
   function renderSfxPlayEditor(block, options = {}) {
-    const escape = getEscapeHtml(options);
     const getSafeAssetIdByType = getRenderer(options, "getSafeAssetIdByType", (_type, assetId) => assetId ?? "");
+    const renderSfxTransportEditor = getRenderer(options, "renderSfxTransportEditor", () => "");
     const assetId = getSafeAssetIdByType("sfx", block?.assetId);
 
     return `
@@ -1047,16 +1047,15 @@
           ${renderAssetOptions(options.sfxAssets, assetId, options)}
         </select>
       </div>
-      <div class="detail-row">
-        <label for="editorSfxVolume">本次音效音量（%）</label>
-        <input id="editorSfxVolume" type="number" min="0" max="100" step="1" value="${escape(
-          String(block?.volume ?? 100)
-        )}" />
-        <p class="helper-text">用于调整这一声门铃、脚步、心跳或爆发音效的存在感，会和玩家音效音量叠加。</p>
-      </div>
     </div>
+    ${renderSfxTransportEditor(block)}
     ${renderSaveBlockActions()}
   `;
+  }
+
+  function renderSfxStopEditor(block, options = {}) {
+    const renderer = getRenderer(options, "renderSfxStopEditor", () => "");
+    return renderer(block);
   }
 
   function renderVideoPlayEditor(block, options = {}) {
@@ -1754,6 +1753,7 @@
     renderMusicPlayEditor,
     renderMusicStopEditor,
     renderSfxPlayEditor,
+    renderSfxStopEditor,
     renderVideoPlayEditor,
     renderCreditsRollEditor,
     renderAchievementUnlockEditor,

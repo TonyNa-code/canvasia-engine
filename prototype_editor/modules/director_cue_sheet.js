@@ -24,6 +24,7 @@
     music_play: "播放 BGM",
     music_stop: "停止 BGM",
     sfx_play: "音效",
+    sfx_stop: "停止环境声",
     video_play: "视频",
     particle_effect: "粒子",
     wait: "等待",
@@ -520,7 +521,14 @@
 
     if (type === "sfx_play") {
       const assetName = addRequiredAsset(sceneCue, sheetIssues, assetMap, block.assetId, "音效", { blockIndex });
-      addCue(sceneCue, "audio", block, blockIndex, `播放音效：${assetName || "未选择音效"}`, { assetNames: assetName ? [assetName] : [] });
+      const channelLabel = { effect: "效果", ambience: "环境", ui: "界面" }[block.channelId] ?? "效果";
+      addCue(sceneCue, "audio", block, blockIndex, `${block.loop === true ? "循环" : "播放"}${channelLabel}声：${assetName || "未选择音效"}`, { assetNames: assetName ? [assetName] : [] });
+      return;
+    }
+
+    if (type === "sfx_stop") {
+      const channelLabel = { all: "全部音效", effect: "效果声", ambience: "环境声", ui: "界面声" }[block.channelId] ?? "全部音效";
+      addCue(sceneCue, "audio", block, blockIndex, `停止${channelLabel}${block.fadeOutMs ? ` / 淡出 ${block.fadeOutMs}ms` : ""}`);
       return;
     }
 

@@ -10,21 +10,27 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "story_block_editors.js"
 VIDEO_TRANSPORT_MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "video_transport_editor.js"
+SFX_RUNTIME_MODULE_PATH = ROOT_DIR / "export_player_template" / "runtime_sfx_transport.js"
+SFX_TRANSPORT_MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "sfx_transport_editor.js"
 
 
 class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
     def test_choice_editor_renderers_work_without_browser_dom(self) -> None:
         script = textwrap.dedent(
             f"""
-            const fs = require("fs");
-            const vm = require("vm");
-            const context = {{ window: {{}} }};
+            import fs from "fs";
+            import vm from "vm";
+            import * as sfxRuntimeTools from {json.dumps(SFX_RUNTIME_MODULE_PATH.as_uri())};
+
+            const context = {{ window: {{ CanvasiaRuntimeSfxTransport: sfxRuntimeTools }} }};
             context.globalThis = context;
             vm.createContext(context);
             vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
             vm.runInContext(fs.readFileSync({json.dumps(str(VIDEO_TRANSPORT_MODULE_PATH))}, "utf8"), context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(SFX_TRANSPORT_MODULE_PATH))}, "utf8"), context);
             const tools = context.window.CanvasiaEditorStoryBlockEditors;
             const videoTransportTools = context.window.CanvasiaEditorVideoTransport;
+            const sfxTransportTools = context.window.CanvasiaEditorSfxTransport;
             const blockManagementMarkup = tools.renderBlockManagementCard(
               {{ name: "第一场 <黄昏>", blocks: [{{ id: "b1" }}, {{ id: "b2" }}, {{ id: "b3" }}] }},
               1,
@@ -448,6 +454,7 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
               {{
                 sfxAssets: [{{ id: "sfx_1", name: "门铃" }}],
                 getSafeAssetIdByType: (_type, assetId) => assetId || "sfx_1",
+                renderSfxTransportEditor: (sfxBlock) => sfxTransportTools.renderSfxTransportEditor(sfxBlock),
               }}
             );
             const videoMarkup = tools.renderVideoPlayEditor(
@@ -551,7 +558,7 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
             """
         )
         completed = subprocess.run(
-            ["node", "-e", script],
+            ["node", "--input-type=module", "-e", script],
             cwd=ROOT_DIR,
             capture_output=True,
             text=True,
@@ -594,6 +601,7 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
             "renderScreenFlashEditor",
             "renderScreenShakeEditor",
             "renderSfxPlayEditor",
+            "renderSfxStopEditor",
             "renderTextInputEditor",
             "renderVariableAddEditor",
             "renderVariableSetEditor",

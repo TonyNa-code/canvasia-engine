@@ -4849,7 +4849,8 @@ button.asset-gap-stat-card:hover {
 }
 
 .music-transport-editor,
-.video-transport-editor {
+.video-transport-editor,
+.sfx-transport-editor {
   display: grid;
   gap: 12px;
   padding: 14px;
@@ -4861,7 +4862,8 @@ button.asset-gap-stat-card:hover {
 }
 
 .music-transport-heading,
-.video-transport-heading {
+.video-transport-heading,
+.sfx-transport-heading {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -4869,13 +4871,15 @@ button.asset-gap-stat-card:hover {
 }
 
 .music-transport-heading > div,
-.video-transport-heading > div {
+.video-transport-heading > div,
+.sfx-transport-heading > div {
   display: grid;
   gap: 3px;
 }
 
 .music-transport-heading strong,
-.video-transport-heading strong {
+.video-transport-heading strong,
+.sfx-transport-heading strong {
   color: var(--ink);
   font-size: 14px;
 }
@@ -4883,14 +4887,17 @@ button.asset-gap-stat-card:hover {
 .music-transport-heading span,
 .music-transport-summary,
 .video-transport-heading span,
-.video-transport-summary {
+.video-transport-summary,
+.sfx-transport-heading span,
+.sfx-transport-summary {
   color: var(--muted);
   font-size: 12px;
   line-height: 1.55;
 }
 
 .music-transport-status,
-.video-transport-status {
+.video-transport-status,
+.sfx-transport-status {
   max-width: 300px;
   padding: 6px 9px;
   border: 1px solid rgba(74, 222, 128, 0.26);
@@ -4901,24 +4908,28 @@ button.asset-gap-stat-card:hover {
 }
 
 .music-transport-status.is-warning,
-.video-transport-status.is-warning {
+.video-transport-status.is-warning,
+.sfx-transport-status.is-warning {
   border-color: rgba(251, 191, 36, 0.3);
   background: rgba(251, 191, 36, 0.1);
   color: var(--warning) !important;
 }
 
 .music-transport-presets,
-.video-transport-presets {
+.video-transport-presets,
+.sfx-transport-presets {
   margin: 0;
 }
 
 .music-transport-fields,
-.video-transport-fields {
+.video-transport-fields,
+.sfx-transport-fields {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
 .music-transport-summary,
-.video-transport-summary {
+.video-transport-summary,
+.sfx-transport-summary {
   padding: 9px 11px;
   border-left: 3px solid var(--accent-deep);
   border-radius: 4px 12px 12px 4px;
@@ -4927,7 +4938,8 @@ button.asset-gap-stat-card:hover {
 }
 
 html[data-ui-theme="light"] .music-transport-editor,
-html[data-ui-theme="light"] .video-transport-editor {
+html[data-ui-theme="light"] .video-transport-editor,
+html[data-ui-theme="light"] .sfx-transport-editor {
   border-color: rgba(83, 144, 255, 0.18);
   background:
     radial-gradient(circle at 92% 8%, rgba(59, 130, 246, 0.1), transparent 35%),
@@ -4936,12 +4948,14 @@ html[data-ui-theme="light"] .video-transport-editor {
 
 @media (max-width: 720px) {
   .music-transport-heading,
-  .video-transport-heading {
+  .video-transport-heading,
+  .sfx-transport-heading {
     flex-direction: column;
   }
 
   .music-transport-status,
-  .video-transport-status {
+  .video-transport-status,
+  .sfx-transport-status {
     max-width: none;
     text-align: left;
   }
