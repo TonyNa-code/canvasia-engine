@@ -343,7 +343,7 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
             'button[data-action="switch-screen"][data-screen="preview"][data-requires-project="true"]'
         ).first
 
-    def finish_active_preview_typewriter(self, timeout: int = 10000) -> bool:
+    def wait_for_preview_typewriter_to_finish(self, timeout: int = 10000) -> bool:
         dialogue = self.page.locator("#previewStage .dialog-text")
         if not dialogue.count() or not dialogue.is_visible():
             return False
@@ -352,9 +352,6 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
         if "is-typing" not in classes:
             return False
 
-        next_button = self.page.locator("#previewNextButton")
-        if next_button.is_enabled():
-            next_button.click()
         self.page.wait_for_function(
             """() => !document.querySelector('#previewStage .dialog-text')
                 ?.classList.contains('is-typing')""",
@@ -766,7 +763,7 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
         self.preview_navigation_button().click()
         self.page.locator("#previewStage").wait_for(state="visible", timeout=15000)
         for _ in range(16):
-            self.finish_active_preview_typewriter()
+            self.wait_for_preview_typewriter_to_finish()
             preview_text = self.page.locator("#previewStage .dialog-text").text_content() or ""
             if "她说" in preview_text and "停下" in preview_text:
                 break
@@ -840,7 +837,7 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
         dialogue = self.page.locator("#previewStage .dialog-text")
         preview_states = []
         for _ in range(16):
-            self.finish_active_preview_typewriter()
+            self.wait_for_preview_typewriter_to_finish()
             current_text = dialogue.text_content() or ""
             next_button = self.page.locator("#previewNextButton")
             preview_states.append({"text": current_text, "nextDisabled": next_button.is_disabled()})
@@ -909,7 +906,7 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
         self.preview_navigation_button().click()
         self.page.locator("#previewStage").wait_for(state="visible", timeout=15000)
         for _ in range(12):
-            self.finish_active_preview_typewriter()
+            self.wait_for_preview_typewriter_to_finish()
             preview_text = self.page.locator("#previewStage .dialog-text").text_content() or ""
             if "最初的约定" in preview_text:
                 break
@@ -980,7 +977,7 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
         stage_image = self.page.locator('#previewStage [data-layer-id="smoke_note"]')
         self.page.locator("#previewStage").wait_for(state="visible", timeout=15000)
         for _ in range(12):
-            self.finish_active_preview_typewriter()
+            self.wait_for_preview_typewriter_to_finish()
             if stage_image.count() and stage_image.is_visible():
                 break
             visible_choice = self.page.locator("#previewChoices button:visible").first
@@ -1306,7 +1303,7 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
         self.preview_navigation_button().click()
         timer = self.page.locator("[data-preview-timed-choice]")
         for _ in range(24):
-            self.finish_active_preview_typewriter()
+            self.wait_for_preview_typewriter_to_finish()
             if timer.count() and timer.is_visible():
                 break
             next_button = self.page.locator("#previewNextButton")
