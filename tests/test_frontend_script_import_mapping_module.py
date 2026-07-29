@@ -235,7 +235,7 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
                 resolvers
               ),
               normalizedVideo: tools.normalizeImportedDraftBlockForScene(
-                {{ type: "video_play", assetHint: "opening_movie", title: "Opening Movie", fit: "cover", volume: "75", startTimeSeconds: "2", endTimeSeconds: "12", skippable: false }},
+                {{ type: "video_play", assetHint: "opening_movie", title: "Opening Movie", autoplay: false, loop: true, resumeMode: "resume", fit: "cover", volume: "75", startTimeSeconds: "2", endTimeSeconds: "12", skippable: false }},
                 null,
                 resolvers
               ),
@@ -447,11 +447,14 @@ class FrontendScriptImportMappingModuleTests(unittest.TestCase):
                 "type": "video_play",
                 "assetId": "video_opening",
                 "title": "Opening Movie",
+                "autoplay": False,
+                "loop": True,
+                "resumeMode": "resume",
                 "fit": "cover",
                 "volume": 75,
                 "startTimeSeconds": 2,
                 "endTimeSeconds": 12,
-                "skippable": False,
+                "skippable": True,
             },
         )
         self.assertEqual(payload["normalizedCredits"], {

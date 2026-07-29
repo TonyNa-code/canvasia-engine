@@ -4214,6 +4214,88 @@ class NativeRuntimeRenderSmokeTests(unittest.TestCase):
         self.assertEqual(restored_player.variable_state["route"], 2)
         self.assertEqual(restored_player.current_line["text"], "限时选择结束。")
 
+    def test_native_video_transport_save_restores_position_and_autoplay(self) -> None:
+        data_path = self.write_game_data()
+        payload = json.loads(data_path.read_text(encoding="utf-8"))
+        payload["chapters"][0]["scenes"][0]["blocks"] = [
+            {
+                "id": "video_opening",
+                "type": "video_play",
+                "assetId": "opening_video",
+                "title": "Opening Video",
+                "autoplay": True,
+                "loop": False,
+                "resumeMode": "resume",
+                "startTimeSeconds": 1.5,
+                "endTimeSeconds": 12,
+                "fit": "cover",
+                "volume": 75,
+                "skippable": True,
+            },
+            {"id": "after_video", "type": "narration", "text": "After video."},
+        ]
+        data_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+        starts: list[tuple[float, float, str, int]] = []
+
+        class FakeVideoPlayback:
+            backend_id = NATIVE_VIDEO_EMBEDDED_BACKEND_ID
+            status_message = "Fake video playing"
+            current_surface = None
+            audio_channel = None
+
+            def __init__(self, start_time_seconds: float) -> None:
+                self.elapsed_ms = int(round(start_time_seconds * 1000))
+                self.status = "ready"
+                self.finished = False
+
+            def play(self, _now_ms: int) -> None:
+                self.status = "playing"
+
+            def update(self, _now_ms: int) -> None:
+                return None
+
+            def release(self) -> None:
+                self.status = "stopped"
+
+            def toggle_pause(self, _now_ms: int) -> None:
+                self.status = "paused" if self.status == "playing" else "playing"
+
+        def create_playback(
+            _video_path: Path,
+            start_time_seconds: float,
+            end_time_seconds: float,
+            fit_mode: str,
+            volume: int,
+        ) -> tuple[FakeVideoPlayback, str]:
+            starts.append((start_time_seconds, end_time_seconds, fit_mode, volume))
+            return FakeVideoPlayback(start_time_seconds), "Fake backend"
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="The system font .*", category=UserWarning)
+            player = NativeRuntimePlayer(pygame, data_path)
+        player.create_embedded_video_playback = create_playback
+        player.start_story_from_title()
+
+        self.assertEqual(starts[-1], (1.5, 12.0, "cover", 75))
+        self.assertEqual(player.current_line["type"], "video_play")
+        self.assertEqual(player.current_line["videoPlaybackPositionSeconds"], 1.5)
+        player.embedded_video_playback.elapsed_ms = 6250
+        snapshot = player.build_save_snapshot("quick")
+        self.assertTrue(snapshot["currentVideoActive"])
+        self.assertEqual(snapshot["currentVideoResumeMode"], "resume")
+        self.assertEqual(snapshot["currentVideoPlaybackPositionSeconds"], 6.25)
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="The system font .*", category=UserWarning)
+            restored_player = NativeRuntimePlayer(pygame, data_path)
+        restored_player.create_embedded_video_playback = create_playback
+        restored_player.restore_from_snapshot(snapshot)
+
+        self.assertEqual(starts[-1], (6.25, 12.0, "cover", 75))
+        self.assertEqual(restored_player.current_line["videoPlaybackPositionSeconds"], 6.25)
+        self.assertIsNotNone(restored_player.embedded_video_playback)
+
     def test_native_runtime_renders_ui_skin_overlays_headlessly(self) -> None:
         data_path = self.write_game_data()
         with warnings.catch_warnings():

@@ -461,15 +461,19 @@
     if (draftBlock.type === "video_play") {
       const startTimeSeconds = getNonNegativeNumber(draftBlock.startTimeSeconds, 0);
       const endTimeSeconds = getNonNegativeNumber(draftBlock.endTimeSeconds, 0);
+      const loop = draftBlock.loop === true;
       return {
         type: "video_play",
         assetId: getAssetId(draftBlock.assetHint, ["video"]),
         title: String(draftBlock.title || draftBlock.assetHint || "").trim().slice(0, 80),
+        autoplay: draftBlock.autoplay !== false,
+        loop,
+        resumeMode: draftBlock.resumeMode === "resume" ? "resume" : "restart",
         fit: getVideoFit(draftBlock.fit),
         volume: getVideoVolume(draftBlock.volume),
         startTimeSeconds,
         endTimeSeconds: endTimeSeconds > startTimeSeconds ? endTimeSeconds : 0,
-        skippable: draftBlock.skippable !== false,
+        skippable: loop ? true : draftBlock.skippable !== false,
       };
     }
 

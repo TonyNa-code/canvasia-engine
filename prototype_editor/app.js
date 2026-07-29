@@ -54,6 +54,7 @@ const runtimeTimedChoiceTools = window.CanvasiaRuntimeTimedChoices;
 const runtimeStoryFlowTools = window.CanvasiaRuntimeStoryFlow;
 const runtimeAchievementTools = window.CanvasiaRuntimeAchievements;
 const runtimeMusicTransportTools = window.CanvasiaRuntimeMusicTransport;
+const runtimeVideoTransportTools = window.CanvasiaRuntimeVideoTransport;
 const choiceAvailabilityEditorTools = window.CanvasiaEditorChoiceAvailability;
 const timedChoiceEditorTools = window.CanvasiaEditorTimedChoice;
 const textPacingEditorTools = window.CanvasiaEditorTextPacing;
@@ -62,6 +63,7 @@ const storyBlockActionTools = window.CanvasiaEditorStoryBlockActions;
 const storyBlockEditorTools = window.CanvasiaEditorStoryBlockEditors;
 const musicRangeScopeTools = window.CanvasiaEditorMusicRangeScope;
 const musicTransportEditorTools = window.CanvasiaEditorMusicTransport;
+const videoTransportEditorTools = window.CanvasiaEditorVideoTransport;
 const storyTemplateTools = window.CanvasiaEditorStoryTemplates;
 const storyTemplateApplicationTools = window.CanvasiaEditorStoryTemplateApplication;
 const storyTemplatePanelTools = window.CanvasiaEditorStoryTemplatePanel;
@@ -362,7 +364,6 @@ const {
   DEPTH_BLUR_FOCUS_LABELS,
   DEPTH_BLUR_STRENGTH_LABELS,
   VIDEO_FIT_LABELS,
-  VIDEO_VOLUME_LABELS,
   CREDITS_BACKGROUND_LABELS,
   POSITION_LABELS,
   CHARACTER_TRANSITION_LABELS,
@@ -817,6 +818,9 @@ let previewCurrentMusicAssetId = null;
 let previewCurrentMusicPlaybackKey = "";
 let previewCurrentMusicCueId = "";
 let previewMusicTransportCleanup = null;
+const previewVideoController = videoTransportEditorTools.createPreviewVideoController({
+  runtimeTools: runtimeVideoTransportTools,
+});
 let editorUiThemeAutoRefreshTimer = null;
 let lastEditorRuntimeErrorKey = "";
 let lastEditorRuntimeErrorAt = 0;
@@ -1577,6 +1581,7 @@ function resetProjectScopedUiState() {
   stopPreviewTypewriter();
   stopPreviewAutoAdvance();
   stopPreviewMusicPlayback();
+  stopPreviewVideoPlayback();
   stopPreviewOneShotAudios();
   stopPreviewVoicePlayback();
   previewTimedChoiceController.stop();
@@ -4349,6 +4354,20 @@ async function handleClick(event) {
     return;
   }
 
+  if (action === "apply-video-transport-preset") {
+    const result = videoTransportEditorTools.applyVideoTransportPreset(
+      actionTarget.dataset.videoTransportPreset,
+      document,
+      { runtimeTools: runtimeVideoTransportTools }
+    );
+    setSaveStatus(result.label);
+    showToast(result.label, result.ok ? undefined : "error");
+    if (result.ok) {
+      scheduleAutoSave();
+    }
+    return;
+  }
+
   if (action === "apply-character-stage-preset") {
     applyCharacterStagePresetToEditor(actionTarget.dataset.characterStagePreset);
     return;
@@ -5338,6 +5357,21 @@ function handleChange(event) {
     return;
   }
 
+  if ([
+    "editorVideoAutoplay",
+    "editorVideoLoop",
+    "editorVideoResumeMode",
+    "editorVideoFit",
+    "editorVideoVolume",
+    "editorVideoSkippable",
+  ].includes(target.id)) {
+    videoTransportEditorTools.updateVideoTransportPreview(document, {
+      runtimeTools: runtimeVideoTransportTools,
+    });
+    scheduleAutoSave();
+    return;
+  }
+
   if (target.id === "editorVariableId") {
     updateVariableSetEditor(target.value);
     scheduleAutoSave();
@@ -5603,6 +5637,14 @@ function handleInput(event) {
   if (["editorMusicStartTime", "editorMusicLoopStart", "editorMusicLoopEnd"].includes(event.target.id)) {
     musicTransportEditorTools.updateMusicTransportPreview(document, {
       runtimeTools: runtimeMusicTransportTools,
+    });
+    scheduleAutoSave();
+    return;
+  }
+
+  if (["editorVideoStartTime", "editorVideoEndTime", "editorVideoVolume"].includes(event.target.id)) {
+    videoTransportEditorTools.updateVideoTransportPreview(document, {
+      runtimeTools: runtimeVideoTransportTools,
     });
     scheduleAutoSave();
     return;
@@ -6484,6 +6526,7 @@ function quickSavePreview() {
 
   captureCurrentPreviewTimedChoiceState();
   capturePreviewCurrentMusicPlaybackPosition();
+  capturePreviewCurrentVideoPlaybackPosition();
   state.previewQuickSave = {
     savedAt: new Date().toISOString(),
     session: deepClonePreviewData(session),
@@ -6590,6 +6633,7 @@ function quickLoadPreview() {
   stopPreviewTypewriter();
   stopPreviewAutoAdvance();
   stopPreviewMusicPlayback();
+  stopPreviewVideoPlayback();
   stopPreviewOneShotAudios();
   stopPreviewVoicePlayback();
   previewTimedChoiceController.stop();
@@ -7296,6 +7340,7 @@ function loadPreviewAutoResume() {
   stopPreviewTypewriter();
   stopPreviewAutoAdvance();
   stopPreviewMusicPlayback();
+  stopPreviewVideoPlayback();
   stopPreviewOneShotAudios();
   stopPreviewVoicePlayback();
   previewTimedChoiceController.stop();
@@ -7335,6 +7380,7 @@ function saveCurrentPreviewSlot(rawIndex) {
 
   captureCurrentPreviewTimedChoiceState();
   capturePreviewCurrentMusicPlaybackPosition();
+  capturePreviewCurrentVideoPlaybackPosition();
   state.previewSaveSlots[slotIndex] = {
     savedAt: new Date().toISOString(),
     session: deepClonePreviewData(session),
@@ -7361,6 +7407,7 @@ function loadPreviewSaveSlot(rawIndex) {
   stopPreviewTypewriter();
   stopPreviewAutoAdvance();
   stopPreviewMusicPlayback();
+  stopPreviewVideoPlayback();
   stopPreviewOneShotAudios();
   stopPreviewVoicePlayback();
   previewTimedChoiceController.stop();
@@ -7427,6 +7474,7 @@ function switchScreen(screenName) {
     stopPreviewAutoAdvance();
     stopPreviewVoicePlayback();
     stopPreviewMusicPlayback();
+    stopPreviewVideoPlayback();
     stopPreviewOneShotAudios();
   }
 
@@ -7803,6 +7851,7 @@ function openPreviewAtStoryLocation(sceneId, blockId = null) {
   stopPreviewTypewriter();
   stopPreviewAutoAdvance();
   stopPreviewMusicPlayback();
+  stopPreviewVideoPlayback();
   stopPreviewOneShotAudios();
   stopPreviewVoicePlayback();
   persistPreviewAutoResume();
@@ -18197,6 +18246,7 @@ function renderPreviewScreen() {
   syncPreviewMusic(snapshot);
   syncPreviewVoice(snapshot);
   syncPreviewOneShotAudio(snapshot);
+  syncPreviewVideo(snapshot);
   schedulePreviewAutoAdvance(snapshot);
 }
 
@@ -18242,6 +18292,7 @@ function resetPreviewSession(sceneId = null) {
   const safeSceneId = getSafeSceneId(sceneId ?? state.selectedSceneId);
   stopPreviewAutoAdvance();
   stopPreviewMusicPlayback();
+  stopPreviewVideoPlayback();
   stopPreviewOneShotAudios();
   stopPreviewVoicePlayback();
   previewTimedChoiceController.stop();
@@ -19042,6 +19093,8 @@ function sanitizeStoredPreviewSnapshot(source) {
       }),
       sanitizeTimedChoiceState: (value, block) =>
         runtimeTimedChoiceTools.sanitizeTimedChoiceState(value, block),
+      sanitizeVideoPlaybackPosition: (value, block) =>
+        runtimeVideoTransportTools.getVideoInitialPosition(block, value),
     });
   }
 
@@ -19070,6 +19123,9 @@ function sanitizeStoredPreviewSnapshot(source) {
     variables: clonePreviewVariables(source.variables),
     choiceOptions,
     ...(timedChoiceState ? { timedChoiceState } : {}),
+    ...(String(source.blockType ?? "") === "video_play"
+      ? { videoPlaybackPositionSeconds: runtimeVideoTransportTools.getVideoInitialPosition(block, source.videoPlaybackPositionSeconds) }
+      : {}),
     callStack: runtimeStoryFlowTools.sanitizeStoryCallStack(source.callStack, {
       hasScene: (targetSceneId) => state.data?.scenesById.has(targetSceneId),
     }),
@@ -19214,6 +19270,7 @@ function persistPreviewAutoResume() {
 
   captureCurrentPreviewTimedChoiceState();
   capturePreviewCurrentMusicPlaybackPosition();
+  capturePreviewCurrentVideoPlaybackPosition();
   const session = sanitizeStoredPreviewSession(state.previewSession);
 
   if (!session) {
@@ -19746,6 +19803,14 @@ function stopPreviewMusicPlayback() {
   previewCurrentMusicCueId = "";
 }
 
+function stopPreviewVideoPlayback() {
+  previewVideoController.stop();
+}
+
+function capturePreviewCurrentVideoPlaybackPosition() {
+  return previewVideoController.capture(getCurrentPreviewSnapshot());
+}
+
 function capturePreviewCurrentMusicPlaybackPosition() {
   const snapshot = getCurrentPreviewSnapshot();
   if (!snapshot?.visualState || !previewMusicAudio || snapshot.visualState.musicAssetId !== previewCurrentMusicAssetId) {
@@ -19871,6 +19936,30 @@ function syncPreviewMusic(snapshot) {
   previewMusicAudio = audio;
   previewCurrentMusicPlaybackKey = playbackKey;
   previewCurrentMusicCueId = cueId;
+}
+
+function syncPreviewVideo(snapshot) {
+  if (snapshot?.blockType !== "video_play") {
+    stopPreviewVideoPlayback();
+    return;
+  }
+
+  const asset = state.data.assetsById.get(snapshot.block?.assetId);
+  const stepKey = getPreviewSnapshotStepKey(snapshot);
+  previewVideoController.sync(snapshot, {
+    root: refs.previewStage,
+    stepKey,
+    videoUrl: getAssetPublicUrl(asset),
+    title: snapshot.block?.title || asset?.name || "视频播放",
+    onFinished: (completedSnapshot) => {
+      const current = getCurrentPreviewSnapshot();
+      if (!current || current !== completedSnapshot || getPreviewSnapshotStepKey(current) !== stepKey) {
+        return;
+      }
+      movePreviewForward();
+      renderPreviewScreen();
+    },
+  });
 }
 
 function getPreviewMusicTargetVolume(snapshot) {
@@ -20003,6 +20092,7 @@ function schedulePreviewAutoAdvance(snapshot, options = {}) {
     (!autoPlayActive && !skipActive) ||
     !snapshot ||
     snapshot.completed ||
+    ["video_play", "credits_roll"].includes(snapshot.blockType) ||
     snapshot.choiceOptions.length > 0
   ) {
     return;
@@ -33581,12 +33671,11 @@ function renderVideoPlayEditor(block) {
   return storyBlockEditorTools.renderVideoPlayEditor(block, {
     escapeHtml,
     videoAssets: state.data.assetList.filter((asset) => asset.type === "video"),
-    videoFitLabels: VIDEO_FIT_LABELS,
-    videoVolumeLabels: VIDEO_VOLUME_LABELS,
     getSafeAssetIdByType,
-    getSafeNonNegativeNumber,
-    getSafeVideoVolume,
-    getSafeVideoFit,
+    renderVideoTransportEditor: (videoBlock) => videoTransportEditorTools.renderVideoTransportEditor(videoBlock, {
+      runtimeTools: runtimeVideoTransportTools,
+      videoFitLabels: VIDEO_FIT_LABELS,
+    }),
   });
 }
 
@@ -39704,18 +39793,15 @@ function collectEditedBlock(block) {
   }
 
   if (block.type === "video_play") {
-    const startTimeSeconds = getSafeNonNegativeNumber(document.getElementById("editorVideoStartTime")?.value, 0);
-    const endTimeSeconds = getSafeNonNegativeNumber(document.getElementById("editorVideoEndTime")?.value, 0);
+    const transport = videoTransportEditorTools.readVideoTransportEditor(block, document, {
+      runtimeTools: runtimeVideoTransportTools,
+    });
 
     return {
       ...block,
+      ...transport,
       assetId: getSafeAssetIdByType("video", document.getElementById("editorVideoAssetId")?.value),
       title: String(document.getElementById("editorVideoTitle")?.value ?? "").trim(),
-      fit: getSafeVideoFit(document.getElementById("editorVideoFit")?.value),
-      volume: getSafeVideoVolume(document.getElementById("editorVideoVolume")?.value),
-      startTimeSeconds,
-      endTimeSeconds: endTimeSeconds > startTimeSeconds ? endTimeSeconds : 0,
-      skippable: document.getElementById("editorVideoSkippable")?.value !== "false",
     };
   }
 
@@ -41405,11 +41491,7 @@ function createDefaultBlock(scene, blockType) {
       type: "video_play",
       assetId: getSafeAssetIdByType("video"),
       title: "Opening Movie",
-      fit: "contain",
-      volume: 100,
-      startTimeSeconds: 0,
-      endTimeSeconds: 0,
-      skippable: true,
+      ...runtimeVideoTransportTools.sanitizeVideoTransport(),
     };
   }
 
@@ -43090,22 +43172,17 @@ function buildBlockDetails(block) {
       ]);
       rows.push(["本次音量", formatVolumePercent(block.volume, 100)]);
       break;
-    case "video_play":
+    case "video_play": {
+      const transport = runtimeVideoTransportTools.sanitizeVideoTransport(block);
       rows.push([
         "视频素材",
         state.data.assetsById.get(block.assetId)?.name ?? block.assetId,
       ]);
       rows.push(["播放标题", block.title || "未填写"]);
-      rows.push(["画面适配", getVideoFitLabel(block.fit)]);
-      rows.push(["视频音量", `${getSafeVideoVolume(block.volume)}%`]);
-      rows.push([
-        "播放片段",
-        `${getSafeNonNegativeNumber(block.startTimeSeconds, 0)}s -> ${
-          getSafeNonNegativeNumber(block.endTimeSeconds, 0) || "自然结束"
-        }`,
-      ]);
-      rows.push(["允许跳过", block.skippable === false ? "否" : "是"]);
+      rows.push(["播放规则", runtimeVideoTransportTools.getVideoTransportSummary(transport)]);
+      rows.push(["画面与音量", `${getVideoFitLabel(transport.fit)} / ${transport.volume}%`]);
       break;
+    }
     case "credits_roll": {
       const creditsLines = getCreditsLines(block.lines);
       rows.push(["片尾标题", block.title || "STAFF"]);
@@ -43306,13 +43383,13 @@ function getBlockSummary(block, scene) {
         title: state.data.assetsById.get(block.assetId)?.name ?? block.assetId,
         meta: "播放一次音效",
       };
-    case "video_play":
+    case "video_play": {
+      const transport = runtimeVideoTransportTools.sanitizeVideoTransport(block);
       return {
         title: block.title || state.data.assetsById.get(block.assetId)?.name || block.assetId || "未选择视频",
-        meta: `${getVideoFitLabel(block.fit)} / ${getSafeVideoVolume(block.volume)}% / ${
-          block.skippable === false ? "不可跳过" : "可跳过"
-        }`,
+        meta: `${transport.autoplay ? "自动播放" : "手动播放"} / ${transport.loop ? "循环" : "单次"} / ${getVideoFitLabel(transport.fit)} / ${transport.volume}%`,
       };
+    }
     case "credits_roll":
       return {
         title: block.title || "STAFF",
@@ -43548,9 +43625,7 @@ function computeVisualState(scene, blockIndex) {
       case "video_play": {
         const asset = state.data.assetsById.get(block.assetId);
         visual.speakerName = "视频播放";
-        visual.dialogueText = `${block.title || asset?.name || block.assetId || "未选择视频"} 会以 ${getVideoFitLabel(
-          block.fit
-        )} 方式播放。`;
+        visual.dialogueText = `${block.title || asset?.name || block.assetId || "未选择视频"}：${runtimeVideoTransportTools.getVideoTransportSummary(block)}`;
         break;
       }
       case "credits_roll":

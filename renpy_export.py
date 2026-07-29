@@ -187,6 +187,9 @@ def get_renpy_export_contract() -> dict:
         "screenFilterPresetKeys": sorted(SCREEN_FILTER_PRESETS),
         "musicRestartModes": ["continue", "restart"],
         "musicTransportMaxSeconds": 21600,
+        "videoResumeModes": ["restart", "resume"],
+        "videoFitModes": ["contain", "cover", "fill"],
+        "videoTransportMaxSeconds": 21600,
     }
 
 
@@ -333,6 +336,14 @@ def build_video_playback_spec(path: str, block: dict, context: dict) -> dict:
             blockIndex=context.get("blockIndex"),
         )
         end = 0
+    if block.get("autoplay") is False or block.get("loop") is True or block.get("resumeMode") == "resume":
+        add_warning(
+            context["warnings"],
+            "renpy_video_transport_review",
+            "视频的手动起播、循环或读档续播规则已保留在项目中，但 Ren'Py cutscene 草稿需要人工复核交互与存档行为。",
+            sceneId=context.get("sceneId"),
+            blockIndex=context.get("blockIndex"),
+        )
 
     clauses: list[str] = []
     if start > 0:

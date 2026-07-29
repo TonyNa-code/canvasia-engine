@@ -1062,22 +1062,13 @@
   function renderVideoPlayEditor(block, options = {}) {
     const escape = getEscapeHtml(options);
     const getSafeAssetIdByType = getRenderer(options, "getSafeAssetIdByType", (_type, assetId) => assetId ?? "");
-    const getSafeNonNegativeNumber = getRenderer(options, "getSafeNonNegativeNumber", (value, fallback = 0) => {
-      const parsed = Number.parseFloat(value ?? "");
-      return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
-    });
-    const getSafeVideoVolume = getRenderer(options, "getSafeVideoVolume", (value) => Number(value ?? 100));
-    const getSafeVideoFit = getRenderer(options, "getSafeVideoFit", (value) => value ?? "contain");
+    const renderVideoTransportEditor = getRenderer(options, "renderVideoTransportEditor", () => "");
     const assetId = getSafeAssetIdByType("video", block?.assetId);
-    const startTimeSeconds = getSafeNonNegativeNumber(block?.startTimeSeconds, 0);
-    const endTimeSeconds = getSafeNonNegativeNumber(block?.endTimeSeconds, 0);
-    const volume = getSafeVideoVolume(block?.volume);
-    const fit = getSafeVideoFit(block?.fit);
 
     return `
     <article class="editor-card">
       <h3>编辑视频播放</h3>
-      <p>适合 OP、ED、PV、过场动画。这里也提供最基础的裁段能力：设置开始秒数和结束秒数，就能只播放素材中的一小段。</p>
+      <p>适合 OP、ED、PV、短过场和循环氛围。先选素材，再用下方预设决定它如何进入、循环与结束。</p>
     </article>
     <div class="field-grid">
       <div class="detail-row">
@@ -1097,35 +1088,9 @@
           placeholder="例如：Opening Movie / Ending Movie"
         />
       </div>
-      <div class="detail-row">
-        <label for="editorVideoFit">画面适配</label>
-        <select id="editorVideoFit">
-          ${renderLabelOptions(options.videoFitLabels, fit, options)}
-        </select>
-      </div>
-      <div class="detail-row">
-        <label for="editorVideoVolume">视频音量</label>
-        <select id="editorVideoVolume">
-          ${renderVideoVolumeOptions(options.videoVolumeLabels, volume, options)}
-        </select>
-      </div>
-      <div class="detail-row">
-        <label for="editorVideoStartTime">从第几秒开始</label>
-        <input id="editorVideoStartTime" type="number" min="0" step="0.1" value="${escape(String(startTimeSeconds))}" />
-      </div>
-      <div class="detail-row">
-        <label for="editorVideoEndTime">到第几秒结束</label>
-        <input id="editorVideoEndTime" type="number" min="0" step="0.1" value="${escape(String(endTimeSeconds))}" />
-      </div>
-      <div class="detail-row">
-        <label for="editorVideoSkippable">是否允许跳过</label>
-        <select id="editorVideoSkippable">
-          <option value="true" ${block?.skippable !== false ? "selected" : ""}>允许玩家跳过</option>
-          <option value="false" ${block?.skippable === false ? "selected" : ""}>必须播放完</option>
-        </select>
-      </div>
-      <div class="helper-text">结束秒数填 0 表示播放到视频文件自然结束。网页包和 NW.js 桌面包会直接播放视频；原生 Runtime Preview 会优先尝试窗口内 PyAV/FFmpeg 音画同步播放，失败时再回落到 OpenCV 画面兜底或系统播放器桥接。</div>
     </div>
+    ${renderVideoTransportEditor(block)}
+    <p class="helper-text">编辑器试玩、网页 / 桌面成品和原生 Runtime 会读取同一组播放参数；原生端仍会在编码不兼容时提供 OpenCV 或系统播放器兜底。</p>
     <div class="detail-actions">
       <button class="toolbar-button toolbar-button-primary" data-action="save-block">保存这张卡片</button>
       <button class="toolbar-button" data-action="focus-asset-gap" data-asset-filter-mode="all" data-asset-type="video">去视频素材库</button>

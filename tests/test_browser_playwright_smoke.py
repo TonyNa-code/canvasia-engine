@@ -1034,6 +1034,61 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
             timeout=15000,
         )
 
+    def test_story_editor_video_transport_presets_persist_to_project(self) -> None:
+        project_title = "浏览器烟测项目_VideoTransport"
+        self.create_blank_project(project_title)
+        self.create_first_chapter()
+
+        self.page.locator('button[data-action="add-video-play"]').first.click()
+        self.page.locator("#editorVideoStartTime").wait_for(timeout=15000)
+
+        self.page.locator('[data-video-transport-preset="atmosphere_loop"]').click()
+        self.page.wait_for_function(
+            """() => document.querySelector('#editorVideoLoop')?.value === 'true'
+                && document.querySelector('#editorVideoVolume')?.value === '0'""",
+            timeout=10000,
+        )
+        self.assertTrue(self.page.locator("#editorVideoSkippable").is_disabled())
+
+        self.page.locator('[data-video-transport-preset="manual_clip"]').click()
+        self.page.wait_for_function(
+            """() => document.querySelector('#editorVideoAutoplay')?.value === 'false'
+                && document.querySelector('#editorVideoLoop')?.value === 'false'
+                && document.querySelector('#editorVideoResumeMode')?.value === 'resume'""",
+            timeout=10000,
+        )
+        self.assertFalse(self.page.locator("#editorVideoSkippable").is_disabled())
+
+        self.page.locator("#editorVideoStartTime").fill("2.5")
+        self.page.locator("#editorVideoEndTime").fill("12.75")
+        self.page.locator("#editorVideoVolume").fill("63")
+        self.page.locator("#editorVideoFit").select_option("cover")
+        self.page.locator("#editorVideoSkippable").select_option("false")
+        self.page.locator("[data-video-transport-summary]").filter(has_text="等待玩家手动播放").wait_for(
+            timeout=10000
+        )
+        self.page.get_by_role("button", name="保存这张卡片").click()
+
+        self.page.wait_for_function(
+            """async () => {
+                const response = await fetch('/api/project-data');
+                const bundle = await response.json();
+                const video = bundle.chapters
+                    .flatMap((chapter) => chapter.scenes || [])
+                    .flatMap((scene) => scene.blocks || [])
+                    .find((block) => block.type === 'video_play');
+                return video?.autoplay === false
+                    && video.loop === false
+                    && video.resumeMode === 'resume'
+                    && video.startTimeSeconds === 2.5
+                    && video.endTimeSeconds === 12.75
+                    && video.fit === 'cover'
+                    && video.volume === 63
+                    && video.skippable === false;
+            }""",
+            timeout=15000,
+        )
+
     def test_story_editor_can_split_long_dialogue_into_multiple_cards(self) -> None:
         self.create_blank_project("浏览器烟测项目_Split")
         self.create_first_chapter()

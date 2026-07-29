@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import importlib
-import importlib.util
 import io
 import json
 import math
@@ -11,8 +9,6 @@ import os
 import platform
 import random
 import re
-import shutil
-import subprocess
 import sys
 import tempfile
 from contextlib import redirect_stdout
@@ -198,6 +194,47 @@ except ImportError:  # pragma: no cover - exported native packages import from t
         NativeMusicTransportController,
         build_music_playback_key,
         sanitize_music_transport,
+    )
+
+try:
+    from .runtime_video_transport import (
+        NATIVE_VIDEO_BACKEND_OPTIONS,
+        NATIVE_VIDEO_EMBEDDED_BACKEND_ID,
+        NATIVE_VIDEO_OPTIONAL_REQUIREMENTS_CANDIDATES,
+        NATIVE_VIDEO_OPTIONAL_REQUIREMENTS_NAME,
+        NATIVE_VIDEO_SYNC_BACKEND_ID,
+        build_native_video_line,
+        can_open_external_video,
+        get_external_video_opener_label,
+        get_native_video_backend_options,
+        get_video_initial_position,
+        get_video_playback_position,
+        get_video_preview_cache_key,
+        import_optional_python_module,
+        is_optional_python_module_available,
+        normalize_video_time_seconds,
+        open_external_video,
+        sanitize_video_transport,
+    )
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_video_transport import (
+        NATIVE_VIDEO_BACKEND_OPTIONS,
+        NATIVE_VIDEO_EMBEDDED_BACKEND_ID,
+        NATIVE_VIDEO_OPTIONAL_REQUIREMENTS_CANDIDATES,
+        NATIVE_VIDEO_OPTIONAL_REQUIREMENTS_NAME,
+        NATIVE_VIDEO_SYNC_BACKEND_ID,
+        build_native_video_line,
+        can_open_external_video,
+        get_external_video_opener_label,
+        get_native_video_backend_options,
+        get_video_initial_position,
+        get_video_playback_position,
+        get_video_preview_cache_key,
+        import_optional_python_module,
+        is_optional_python_module_available,
+        normalize_video_time_seconds,
+        open_external_video,
+        sanitize_video_transport,
     )
 
 try:
@@ -588,7 +625,6 @@ try:
         build_save_dialog_layout,
         build_save_dialog_page_data,
         build_variable_summary_text,
-        build_video_clip_label,
         clamp,
         clamp_int,
         ellipsize_text,
@@ -616,7 +652,6 @@ try:
         get_safe_screen_color_grade,
         get_safe_transition_duration_ms,
         get_safe_volume_percent,
-        normalize_video_time_seconds,
         parse_hex_color,
         render_achievement_notification_panel,
         split_wrap_tokens,
@@ -652,7 +687,6 @@ except ImportError:  # pragma: no cover - exported native packages import from t
         build_save_dialog_layout,
         build_save_dialog_page_data,
         build_variable_summary_text,
-        build_video_clip_label,
         clamp,
         clamp_int,
         ellipsize_text,
@@ -680,7 +714,6 @@ except ImportError:  # pragma: no cover - exported native packages import from t
         get_safe_screen_color_grade,
         get_safe_transition_duration_ms,
         get_safe_volume_percent,
-        normalize_video_time_seconds,
         parse_hex_color,
         render_achievement_notification_panel,
         split_wrap_tokens,
@@ -767,10 +800,6 @@ ASSET_TYPE_IMAGE = {"background", "sprite", "cg", "ui"}
 ASSET_TYPE_FONT = {"font"}
 DEFAULT_GAME_DATA_NAME = "game_data.json"
 ENGINE_BRAND_LOGO_RELATIVE_PATH = "assets/canvasia-brand-logo.png"
-NATIVE_VIDEO_OPTIONAL_REQUIREMENTS_NAME = "requirements-native-runtime-video.txt"
-NATIVE_VIDEO_OPTIONAL_REQUIREMENTS_CANDIDATES = (NATIVE_VIDEO_OPTIONAL_REQUIREMENTS_NAME, "requirements-video.txt")
-NATIVE_VIDEO_SYNC_BACKEND_ID = "pyav_audio_video_sync"
-NATIVE_VIDEO_EMBEDDED_BACKEND_ID = "opencv_embedded_playback"
 FILE_INTEGRITY_REPORT_NAME = "native-runtime-file-integrity.json"
 FILE_INTEGRITY_MARKDOWN_NAME = "native-runtime-file-integrity.md"
 DOCTOR_REPORT_NAME = "native-runtime-doctor-report.json"
@@ -821,52 +850,6 @@ GAME_UI_ASSET_REFERENCE_LABELS = {
     "systemPanelFrameAssetId": "系统面板九宫格",
     "uiOverlayAssetId": "UI 氛围叠层",
 }
-NATIVE_VIDEO_BACKEND_OPTIONS = [
-    {
-        "id": "system_player_bridge",
-        "label": "系统播放器桥接",
-        "kind": "external",
-        "pythonPackage": "",
-        "moduleName": "",
-        "embeddedVideo": False,
-        "audio": True,
-        "productionReady": True,
-        "notes": "默认方案。包体轻、三平台风险低，但无法在 Pygame 窗口内检测真实播放进度。",
-    },
-    {
-        "id": NATIVE_VIDEO_SYNC_BACKEND_ID,
-        "label": "PyAV/FFmpeg 音画同步内嵌播放",
-        "kind": "embedded_audio_video_sync",
-        "pythonPackage": "av>=12",
-        "moduleName": "av",
-        "embeddedVideo": True,
-        "audio": True,
-        "productionReady": False,
-        "notes": "推荐的商业化路线候选：按音频播放时钟驱动画面帧，支持剪辑区间和播放结束检测；仍需在目标系统实机验证编码兼容性。",
-    },
-    {
-        "id": "opencv_frame_preview",
-        "label": "OpenCV 内嵌画面帧预览",
-        "kind": "embedded_visual_preview",
-        "pythonPackage": "opencv-python>=4.9,<5",
-        "moduleName": "cv2",
-        "embeddedVideo": True,
-        "audio": False,
-        "productionReady": False,
-        "notes": "用于快速抽帧和发布前画面探针；OpenCV 不负责音频，音画同步优先交给 PyAV/FFmpeg 后端。",
-    },
-    {
-        "id": NATIVE_VIDEO_EMBEDDED_BACKEND_ID,
-        "label": "OpenCV 窗口内嵌逐帧播放",
-        "kind": "embedded_visual_playback",
-        "pythonPackage": "opencv-python>=4.9,<5",
-        "moduleName": "cv2",
-        "embeddedVideo": True,
-        "audio": False,
-        "productionReady": False,
-        "notes": "PyAV 不可用时的画面播放兜底：可在 Pygame 窗口内播放视频画面并识别结束，但不解音频。",
-    },
-]
 FPS = 60
 VN_TEXT_LONG_WARNING_LENGTH = 260
 VN_TEXT_LONG_WARNING_LINES = 5
@@ -2268,114 +2251,6 @@ def resolve_game_data_argument(game_data_value: str) -> Path:
     return candidate.resolve()
 
 
-def get_external_video_opener_command(video_path: Path) -> list[str] | None:
-    if sys.platform.startswith("win"):
-        return None
-    if sys.platform == "darwin":
-        opener = shutil.which("open")
-        return [opener or "open", str(video_path)]
-    if sys.platform.startswith("linux"):
-        opener = shutil.which("xdg-open")
-        if opener:
-            return [opener, str(video_path)]
-        gio = shutil.which("gio")
-        if gio:
-            return [gio, "open", str(video_path)]
-    return None
-
-
-def get_external_video_opener_label() -> str:
-    if sys.platform.startswith("win"):
-        return "Windows 默认视频播放器"
-    if sys.platform == "darwin":
-        return "macOS 默认视频播放器"
-    if sys.platform.startswith("linux"):
-        if shutil.which("xdg-open"):
-            return "Linux xdg-open 默认视频播放器"
-        if shutil.which("gio"):
-            return "Linux gio 默认视频播放器"
-    return "系统默认视频播放器"
-
-
-def can_open_external_video() -> bool:
-    if sys.platform.startswith("win"):
-        return hasattr(os, "startfile")
-    return get_external_video_opener_command(Path("preview.mp4")) is not None
-
-
-def is_optional_python_module_available(module_name: str) -> bool:
-    if not module_name:
-        return True
-    try:
-        return importlib.util.find_spec(module_name) is not None
-    except (ImportError, ValueError):
-        return False
-
-
-def import_optional_python_module(module_name: str):
-    if not module_name:
-        return None
-    try:
-        return importlib.import_module(module_name)
-    except Exception:
-        return None
-
-
-def get_native_video_backend_options(bundle_dir: Path | None = None) -> list[dict]:
-    candidate_root = bundle_dir or Path(".")
-    optional_requirements_name = next(
-        (
-            file_name
-            for file_name in NATIVE_VIDEO_OPTIONAL_REQUIREMENTS_CANDIDATES
-            if (candidate_root / file_name).is_file()
-        ),
-        NATIVE_VIDEO_OPTIONAL_REQUIREMENTS_NAME,
-    )
-    options = []
-    for option in NATIVE_VIDEO_BACKEND_OPTIONS:
-        option_copy = dict(option)
-        if option_copy["id"] == "system_player_bridge":
-            available = can_open_external_video()
-            option_copy.update(
-                {
-                    "available": available,
-                    "status": "ready" if available else "needs_system_opener",
-                    "openerLabel": get_external_video_opener_label() if available else "",
-                    "installCommand": "",
-                }
-            )
-        else:
-            available = is_optional_python_module_available(str(option_copy.get("moduleName") or ""))
-            option_copy.update(
-                {
-                    "available": available,
-                    "status": "available" if available else "optional_dependency_missing",
-                    "optionalRequirements": optional_requirements_name,
-                    "installCommand": f"python -m pip install -r {optional_requirements_name}",
-                }
-            )
-        options.append(option_copy)
-    return options
-
-
-def open_external_video(video_path: Path) -> tuple[bool, str]:
-    if not video_path.is_file():
-        return False, f"视频文件不存在：{video_path.name}"
-    try:
-        if sys.platform.startswith("win"):
-            if not hasattr(os, "startfile"):
-                return False, "当前 Windows Python 环境没有 os.startfile，无法唤起默认播放器。"
-            os.startfile(str(video_path))  # type: ignore[attr-defined]
-        else:
-            command = get_external_video_opener_command(video_path)
-            if not command:
-                return False, "当前系统没有找到可用的默认视频打开器。"
-            subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except Exception as error:
-        return False, f"打开视频失败：{error}"
-    return True, f"已交给{get_external_video_opener_label()}播放。"
-
-
 def opencv_frame_to_pygame_surface(pygame, frame, cv2_module=None) -> tuple[object | None, str]:
     cv2 = cv2_module if cv2_module is not None else import_optional_python_module("cv2")
     try:
@@ -2468,7 +2343,7 @@ class OpenCvEmbeddedVideoPlayback:
         self.video_path = video_path
         self.start_time_seconds = max(0.0, float(start_time_seconds or 0.0))
         self.end_time_seconds = max(0.0, float(end_time_seconds or 0.0))
-        self.fit_mode = fit_mode if fit_mode in {"contain", "cover"} else "contain"
+        self.fit_mode = fit_mode if fit_mode in {"contain", "cover", "fill"} else "contain"
         self.cv2 = cv2_module if cv2_module is not None else import_optional_python_module("cv2")
         self.capture = None
         self.current_surface = None
@@ -2641,7 +2516,7 @@ class PyAvSynchronizedVideoPlayback:
         self.video_path = video_path
         self.start_time_seconds = max(0.0, float(start_time_seconds or 0.0))
         self.end_time_seconds = max(0.0, float(end_time_seconds or 0.0))
-        self.fit_mode = fit_mode if fit_mode in {"contain", "cover"} else "contain"
+        self.fit_mode = fit_mode if fit_mode in {"contain", "cover", "fill"} else "contain"
         self.volume = clamp_int(volume, 0, 100, 100) / 100
         self.av = av_module if av_module is not None else import_optional_python_module("av")
         self.video_container = None
@@ -8307,6 +8182,7 @@ class NativeRuntimePlayer:
         self.video_hotspots: list[dict] = []
         self.video_preview_frame_cache: dict[str, dict] = {}
         self.embedded_video_playback: PyAvSynchronizedVideoPlayback | OpenCvEmbeddedVideoPlayback | None = None
+        self.pending_video_playback_position_seconds: float | None = None
         self.text_history: list[dict] = []
         self.text_history_seen_keys: set[str] = set()
         self.read_text_key_order: list[str] = loaded_read_text_keys[-READ_TEXT_KEY_LIMIT:]
@@ -9586,6 +9462,17 @@ class NativeRuntimePlayer:
             return
         line_type = self.current_line.get("type")
         if line_type == "video_play":
+            if (
+                self.current_line.get("videoPlaybackFinished")
+                and self.current_line.get("videoPlaybackMode") != "system_player_bridge"
+            ):
+                if self.current_line.get("videoLoop") and not self.current_line.get("videoLoopRestartFailed"):
+                    self.current_line["videoPlaybackFinished"] = False
+                    if not self.start_or_toggle_embedded_video(restart=True):
+                        self.current_line["videoLoopRestartFailed"] = True
+                        self.status_message = "循环重启失败；可按 Space 重试，或按 Enter 结束循环。"
+                else:
+                    self.advance_current_line_if_allowed()
             return
         now_ms = self.pygame.time.get_ticks()
         if line_type == "credits_roll":
@@ -10801,6 +10688,13 @@ class NativeRuntimePlayer:
             "currentBgmCueId": self.current_bgm_cue_id,
             "currentBgmCueSequence": self.current_bgm_cue_sequence,
             "currentBgmPlaybackPositionSeconds": self.get_current_bgm_playback_position(),
+            "currentVideoPlaybackPositionSeconds": self.get_current_video_playback_position(),
+            "currentVideoActive": bool(self.current_line and self.current_line.get("type") == "video_play"),
+            "currentVideoResumeMode": (
+                str(self.current_line.get("videoResumeMode") or "restart")
+                if self.current_line and self.current_line.get("type") == "video_play"
+                else "restart"
+            ),
             "timedChoiceState": timed_choice_state,
             "finished": self.finished,
             "finishedMessage": self.finished_message,
@@ -10916,6 +10810,11 @@ class NativeRuntimePlayer:
         self.current_choice_index = 0
         self.timed_choice_controller.reset()
         self.pending_timed_choice_state = snapshot.get("timedChoiceState") if isinstance(snapshot.get("timedChoiceState"), dict) else None
+        self.pending_video_playback_position_seconds = (
+            normalize_video_time_seconds(snapshot.get("currentVideoPlaybackPositionSeconds"))
+            if snapshot.get("currentVideoActive") is True
+            else None
+        )
         self.restore_text_history_from_snapshot(snapshot)
         self.finished = bool(snapshot.get("finished"))
         self.finished_message = str(snapshot.get("finishedMessage") or "")
@@ -11594,38 +11493,26 @@ class NativeRuntimePlayer:
                 asset_id = str(block.get("assetId") or "")
                 asset = self.assets_by_id.get(asset_id) or {}
                 asset_path = get_asset_runtime_path(self.bundle_dir, asset)
-                start_time = normalize_video_time_seconds(block.get("startTimeSeconds"))
-                end_time = normalize_video_time_seconds(block.get("endTimeSeconds"))
-                if end_time <= start_time:
-                    end_time = 0.0
-                text = self.build_native_video_prompt(block, asset, asset_path)
-                self.current_line = {
-                    "type": block_type,
-                    "speakerId": None,
-                    "speakerName": "视频",
-                    "text": text,
-                    "voiceAssetId": None,
-                    "videoAssetId": asset_id,
-                    "videoAssetPath": str(asset_path) if asset_path else "",
-                    "videoTitle": str(block.get("title") or asset.get("name") or "视频播放"),
-                    "videoFileName": asset_path.name if asset_path else "",
-                    "videoStartTimeSeconds": start_time,
-                    "videoEndTimeSeconds": end_time,
-                    "videoClipLabel": build_video_clip_label(start_time, end_time),
-                    "videoFit": str(block.get("fit") or "contain"),
-                    "videoVolume": clamp_int(block.get("volume"), 0, 100, 100),
-                    "videoSkippable": bool(block.get("skippable", True)),
-                    "videoPreviewMode": NATIVE_VIDEO_PREVIEW_MODE,
-                    "videoOpened": False,
-                    "videoPlaybackFinished": False,
-                    "videoPlaybackMode": "",
-                    "blockLabel": get_block_label(block_type),
-                }
+                self.current_line = build_native_video_line(
+                    block,
+                    asset,
+                    asset_path,
+                    preview_mode=NATIVE_VIDEO_PREVIEW_MODE,
+                    block_label=get_block_label(block_type),
+                    resume_time_seconds=self.pending_video_playback_position_seconds,
+                )
+                self.pending_video_playback_position_seconds = None
+                text = str(self.current_line.get("text") or "")
                 self.stop_voice()
                 self.record_text_history(self.current_line, scene, self.current_block_index)
                 self.start_current_line_display(text)
                 self.reveal_current_line_immediately()
-                self.status_message = "视频卡片：按 V 内嵌播放，按 O 使用系统播放器，Enter 继续"
+                if self.current_line.get("videoAutoplay") and asset_path:
+                    started = self.start_or_toggle_embedded_video()
+                    if not started:
+                        self.status_message = "自动播放暂不可用；按 Space 重试内嵌播放，或按 O 使用系统播放器。"
+                else:
+                    self.status_message = "视频已就绪：按 Space 播放，按 O 使用系统播放器，Enter 跳过。"
                 return
 
             if block_type == "credits_roll":
@@ -11926,57 +11813,13 @@ class NativeRuntimePlayer:
             self.embedded_video_playback.release()
         self.embedded_video_playback = None
 
-    def build_native_video_prompt(self, block: dict, asset: dict, asset_path: Path | None) -> str:
-        title = str(block.get("title") or asset.get("name") or "视频播放")
-        start_time = normalize_video_time_seconds(block.get("startTimeSeconds"))
-        end_time = normalize_video_time_seconds(block.get("endTimeSeconds"))
-        if end_time <= start_time:
-            end_time = 0.0
-        lines = [
-            title,
-            "",
-            "原生 Runtime Preview 会优先尝试 PyAV/FFmpeg 音画同步内嵌播放；依赖或编码不匹配时，会自动回落到 OpenCV 画面播放或系统播放器桥接。",
-        ]
-        if asset_path:
-            lines.extend(
-                [
-                    f"文件：{asset_path.name}",
-                    "操作：按 V 播放/暂停内嵌视频；按 O 调用系统播放器；播放结束后按 Enter 继续。",
-                ]
-            )
-        else:
-            lines.extend(
-                [
-                    "视频文件没有被找到，可能是素材缺失或导出包不完整。",
-                    "建议回到编辑器重新导出，或改用网页包 / NW.js 桌面包验证视频。",
-                ]
-            )
-
-        has_clip_range = start_time > 0 or end_time > 0
-        if has_clip_range:
-            lines.append(
-                f"剪辑提示：编辑器设置了 {build_video_clip_label(start_time, end_time)}；"
-                "内嵌播放会按该区间停下；系统播放器桥接不会强制裁切。"
-            )
-        if not bool(block.get("skippable", True)):
-            lines.append("不可跳过提示：需要先播放视频；如果使用内嵌播放，需要播放结束后才能继续。")
-        lines.append("音画提示：安装可选视频依赖后会走 PyAV 同步播放；若当前机器不支持该编码，仍可按 O 使用系统播放器兜底。")
-        return "\n".join(lines)
-
-    def get_video_preview_cache_key(self, line: dict) -> str:
-        video_path_value = str(line.get("videoAssetPath") or "").strip()
-        if not video_path_value:
-            return ""
-        start_time = normalize_video_time_seconds(line.get("videoStartTimeSeconds"))
-        return f"{Path(video_path_value).resolve()}::{start_time:.3f}"
-
     def get_video_preview_frame_result(self, line: dict) -> dict:
-        cache_key = self.get_video_preview_cache_key(line)
+        cache_key = get_video_preview_cache_key(line)
         if not cache_key:
             return {"surface": None, "status": "视频文件缺失"}
         if cache_key not in self.video_preview_frame_cache:
             video_path_value = str(line.get("videoAssetPath") or "").strip()
-            start_time = normalize_video_time_seconds(line.get("videoStartTimeSeconds"))
+            start_time = normalize_video_time_seconds(line.get("videoPlaybackPositionSeconds"))
             surface, status = load_opencv_video_frame_surface(self.pygame, Path(video_path_value), start_time)
             self.video_preview_frame_cache[cache_key] = {"surface": surface, "status": status}
         return self.video_preview_frame_cache[cache_key]
@@ -11984,6 +11827,11 @@ class NativeRuntimePlayer:
     def get_current_embedded_video_surface(self):
         if self.embedded_video_playback:
             self.embedded_video_playback.update(self.pygame.time.get_ticks())
+            if self.current_line and self.current_line.get("type") == "video_play":
+                self.current_line["videoPlaybackPositionSeconds"] = get_video_playback_position(
+                    self.embedded_video_playback,
+                    self.current_line.get("videoPlaybackPositionSeconds"),
+                )
             if self.embedded_video_playback.finished and self.current_line and self.current_line.get("type") == "video_play":
                 self.current_line["videoOpened"] = True
                 self.current_line["videoPlaybackFinished"] = True
@@ -12000,6 +11848,16 @@ class NativeRuntimePlayer:
         if not self.embedded_video_playback:
             return ""
         return str(self.embedded_video_playback.status or "")
+
+    def get_current_video_playback_position(self) -> float:
+        if not self.current_line or self.current_line.get("type") != "video_play":
+            return 0.0
+        position = get_video_playback_position(
+            self.embedded_video_playback,
+            self.current_line.get("videoPlaybackPositionSeconds"),
+        )
+        self.current_line["videoPlaybackPositionSeconds"] = position
+        return position
 
     def create_embedded_video_playback(
         self,
@@ -12037,7 +11895,7 @@ class NativeRuntimePlayer:
             playback.release()
         return None, "；".join(failure_messages) or "没有可用的内嵌视频后端"
 
-    def start_or_toggle_embedded_video(self) -> bool:
+    def start_or_toggle_embedded_video(self, *, restart: bool = False) -> bool:
         if not self.current_line or self.current_line.get("type") != "video_play":
             return False
         video_path_value = str(self.current_line.get("videoAssetPath") or "").strip()
@@ -12045,15 +11903,31 @@ class NativeRuntimePlayer:
             self.status_message = "当前视频文件不存在，无法打开。"
             return False
         now_ms = self.pygame.time.get_ticks()
-        if self.embedded_video_playback and self.embedded_video_playback.status in {"playing", "paused"}:
+        if not restart and self.embedded_video_playback and self.embedded_video_playback.status in {"playing", "paused"}:
             self.embedded_video_playback.toggle_pause(now_ms)
             self.status_message = self.embedded_video_playback.status_message
             return True
         self.stop_embedded_video_playback()
-        start_time_seconds = normalize_video_time_seconds(self.current_line.get("videoStartTimeSeconds"))
-        end_time_seconds = normalize_video_time_seconds(self.current_line.get("videoEndTimeSeconds"))
+        transport = sanitize_video_transport(
+            {
+                "autoplay": self.current_line.get("videoAutoplay"),
+                "loop": self.current_line.get("videoLoop"),
+                "resumeMode": self.current_line.get("videoResumeMode"),
+                "startTimeSeconds": self.current_line.get("videoStartTimeSeconds"),
+                "endTimeSeconds": self.current_line.get("videoEndTimeSeconds"),
+                "fit": self.current_line.get("videoFit"),
+                "volume": self.current_line.get("videoVolume"),
+                "skippable": self.current_line.get("videoSkippable"),
+            }
+        )
+        start_time_seconds = (
+            transport["startTimeSeconds"]
+            if restart or self.current_line.get("videoOpened")
+            else get_video_initial_position(transport, self.current_line.get("videoPlaybackPositionSeconds"))
+        )
+        end_time_seconds = transport["endTimeSeconds"]
         fit_mode = str(self.current_line.get("videoFit") or "contain")
-        volume = clamp_int(self.current_line.get("videoVolume"), 0, 100, 100)
+        volume = int(transport["volume"])
         playback, message = self.create_embedded_video_playback(
             Path(video_path_value),
             start_time_seconds,
@@ -12062,6 +11936,7 @@ class NativeRuntimePlayer:
             volume,
         )
         if playback is None:
+            self.current_line["videoLoopRestartFailed"] = bool(restart)
             self.status_message = f"{message}；已回落到系统播放器桥接。"
             return False
         playback.play(now_ms)
@@ -12070,6 +11945,8 @@ class NativeRuntimePlayer:
         self.current_line["videoOpened"] = True
         self.current_line["videoPlaybackFinished"] = bool(playback.finished)
         self.current_line["videoPlaybackMode"] = playback.backend_id
+        self.current_line["videoPlaybackPositionSeconds"] = start_time_seconds
+        self.current_line["videoLoopRestartFailed"] = False
         if playback.backend_id == NATIVE_VIDEO_SYNC_BACKEND_ID and getattr(playback, "audio_channel", None):
             self.status_message = "PyAV 音画同步播放中；按 Space 暂停，O 可用系统播放器兜底。"
         elif playback.backend_id == NATIVE_VIDEO_SYNC_BACKEND_ID:
@@ -12936,6 +12813,7 @@ class NativeRuntimePlayer:
                     else ("已播放" if line.get("videoOpened") else "等待播放")
                 )
             ),
+            f"{'自动' if line.get('videoAutoplay') is not False else '手动'} · {'循环' if line.get('videoLoop') is True else '单次'}",
             "不可跳过" if line.get("videoSkippable") is False else "可跳过",
             backend_label if playback_mode else ("窗口内画面" if display_frame else "桥接卡预览"),
         ]
@@ -12959,13 +12837,17 @@ class NativeRuntimePlayer:
             image_width, image_height = display_frame.get_size()
             image_area = preview_rect.inflate(-6, -6)
             fit_mode = str(line.get("videoFit") or "contain")
-            if fit_mode == "cover":
+            if fit_mode == "fill":
+                scaled_size = image_area.size
+            elif fit_mode == "cover":
                 scale = max(image_area.width / max(1, image_width), image_area.height / max(1, image_height))
+                scaled_size = (max(1, int(image_width * scale)), max(1, int(image_height * scale)))
             else:
                 scale = min(image_area.width / max(1, image_width), image_area.height / max(1, image_height))
+                scaled_size = (max(1, int(image_width * scale)), max(1, int(image_height * scale)))
             scaled = self.pygame.transform.smoothscale(
                 display_frame,
-                (max(1, int(image_width * scale)), max(1, int(image_height * scale))),
+                scaled_size,
             )
             previous_clip = self.screen.get_clip()
             self.screen.set_clip(preview_rect)
@@ -13035,11 +12917,17 @@ class NativeRuntimePlayer:
 
         meta_top = preview_rect.bottom + 18
         clip_label = str(line.get("videoClipLabel") or "整段播放")
+        fit_label = {
+            "contain": "完整显示",
+            "cover": "裁切铺满",
+            "fill": "拉伸铺满",
+        }.get(str(line.get("videoFit") or "contain"), "完整显示")
+        video_volume = sanitize_video_transport({"volume": line.get("videoVolume")})["volume"]
         meta_rows = [
             ("剪辑范围", clip_label),
-            ("画面适配", str(line.get("videoFit") or "contain")),
+            ("画面适配", fit_label),
             ("播放后端", backend_label),
-            ("音量", f"{int(line.get('videoVolume') or 100)}%"),
+            ("音量", f"{video_volume}%"),
         ]
         meta_left = panel.left + 34
         meta_width = max(130, (panel.width - 68) // len(meta_rows))

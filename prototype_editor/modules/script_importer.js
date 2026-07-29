@@ -208,7 +208,7 @@
     }
 
     const titleStopWords =
-      "volume|vol|from|start|to|end|duration|subtitle|sub|lines|staff|dark|light|transparent|contain|cover|fill|skip|skippable|no-?skip|unskippable";
+      "volume|vol|from|start|to|end|duration|subtitle|sub|lines|staff|dark|light|transparent|contain|cover|fill|skip|skippable|no-?skip|unskippable|auto(?:play)?|manual|loop|once|resume|restart";
     const plain = String(text ?? "").match(
       new RegExp(`\\b(?:title|name|as)\\s+([^,;]+?)(?=\\s+\\b(?:${titleStopWords})\\b|$)`, "iu")
     );
@@ -242,6 +242,39 @@
     }
     if (/(?:可跳过)|\b(?:skip|skippable|can\s+skip)\b/i.test(source)) {
       return true;
+    }
+    return fallback;
+  }
+
+  function parseInlineVideoAutoplay(text, fallback = true) {
+    const source = String(text ?? "");
+    if (/(?:手动播放|等待播放)|\b(?:manual(?:-start)?|wait-for-play)\b/i.test(source)) {
+      return false;
+    }
+    if (/(?:自动播放)|\b(?:auto(?:play)?|auto-start)\b/i.test(source)) {
+      return true;
+    }
+    return fallback;
+  }
+
+  function parseInlineVideoLoop(text, fallback = false) {
+    const source = String(text ?? "");
+    if (/(?:单次播放|播放一次|不循环)|\b(?:no-?loop|once|play-once)\b/i.test(source)) {
+      return false;
+    }
+    if (/(?:循环播放|循环)|\b(?:loop|repeat)\b/i.test(source)) {
+      return true;
+    }
+    return fallback;
+  }
+
+  function parseInlineVideoResumeMode(text, fallback = "restart") {
+    const source = String(text ?? "");
+    if (/(?:重新播放|从头重播|重播)|\b(?:restart|from-start|replay)\b/i.test(source)) {
+      return "restart";
+    }
+    if (/(?:读档续播|接着播放|续播)|\b(?:resume|continue-playback)\b/i.test(source)) {
+      return "resume";
     }
     return fallback;
   }
@@ -871,6 +904,7 @@
       const startTimeSeconds = parseInlineTimeSeconds(videoText, ["from", "start"], 0);
       const rawEndTimeSeconds = parseInlineTimeSeconds(videoText, ["to", "end"], 0);
       const endTimeSeconds = rawEndTimeSeconds > startTimeSeconds ? rawEndTimeSeconds : 0;
+      const loop = parseInlineVideoLoop(videoText, false);
       return leading.argument
         ? {
             type: "video_play",
@@ -878,9 +912,12 @@
             title: parseInlineTitle(leading.rest),
             fit: parseInlineVideoFit(videoText),
             volume: parseInlineVolumePercent(videoText, 100),
+            autoplay: parseInlineVideoAutoplay(videoText, true),
+            loop,
+            resumeMode: parseInlineVideoResumeMode(videoText, "restart"),
             startTimeSeconds,
             endTimeSeconds,
-            skippable: parseInlineVideoSkippable(videoText, true),
+            skippable: loop ? true : parseInlineVideoSkippable(videoText, true),
           }
         : null;
     }

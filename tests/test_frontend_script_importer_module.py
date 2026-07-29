@@ -154,6 +154,7 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
               characterMoveLine: tools.parseStageDirectionLine("move yuina smile at left duration 900ms easing spring scale 112 x -4 y 2 opacity 88 layer 3 flip"),
               sfxLine: tools.parseStageDirectionLine("play sound door_knock"),
               videoLine: tools.parseStageDirectionLine('play video opening_movie title "Opening Movie" volume 80 from 2 to 12 cover no-skip'),
+              videoTransportLine: tools.parseStageDirectionLine('play video rain_loop title "Rain" manual loop resume volume 0 cover'),
               shakeLine: tools.parseStageDirectionLine("shake heavy short"),
               flashLine: tools.parseStageDirectionLine("flash red strong long"),
               zoomLine: tools.parseStageDirectionLine("zoom out heavy right"),
@@ -350,9 +351,25 @@ class FrontendScriptImporterModuleTests(unittest.TestCase):
             "title": "Opening Movie",
             "fit": "cover",
             "volume": 80,
+            "autoplay": True,
+            "loop": False,
+            "resumeMode": "restart",
             "startTimeSeconds": 2,
             "endTimeSeconds": 12,
             "skippable": False,
+        })
+        self.assertEqual(payload["videoTransportLine"], {
+            "type": "video_play",
+            "assetHint": "rain_loop",
+            "title": "Rain",
+            "fit": "cover",
+            "volume": 0,
+            "autoplay": False,
+            "loop": True,
+            "resumeMode": "resume",
+            "startTimeSeconds": 0,
+            "endTimeSeconds": 0,
+            "skippable": True,
         })
         self.assertEqual(payload["shakeLine"], {"type": "screen_shake", "intensity": "heavy", "duration": "short"})
         self.assertEqual(payload["flashLine"], {

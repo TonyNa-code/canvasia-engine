@@ -212,6 +212,7 @@ EXPORT_PLAYER_SCRIPT_FILES = (
     "runtime_i18n.js",
     "runtime_audio.js",
     "runtime_music_transport.js",
+    "runtime_video_transport.js",
     "runtime_preload.js",
     "runtime_scene_prefetch.js",
     "runtime_text_effects.js",
@@ -460,6 +461,7 @@ NATIVE_RUNTIME_SPEAKER_FOCUS_NAME = "runtime_speaker_focus.py"
 NATIVE_RUNTIME_DIALOGUE_CAMERA_NAME = "runtime_dialogue_camera.py"
 NATIVE_RUNTIME_VOICE_REACTIVE_MOTION_NAME = "runtime_voice_reactive_motion.py"
 NATIVE_RUNTIME_MUSIC_TRANSPORT_NAME = "runtime_music_transport.py"
+NATIVE_RUNTIME_VIDEO_TRANSPORT_NAME = "runtime_video_transport.py"
 NATIVE_RUNTIME_CHARACTER_RENDERER_NAME = "runtime_character_renderer.py"
 NATIVE_RUNTIME_STAGE_RENDERER_NAME = "runtime_stage_renderer.py"
 NATIVE_RUNTIME_STAGE_IMAGES_NAME = "runtime_stage_images.py"
@@ -547,6 +549,7 @@ NATIVE_RUNTIME_REQUIRED_MODULE_FILES = build_native_runtime_required_module_file
         NATIVE_RUNTIME_DIALOGUE_CAMERA_NAME,
         NATIVE_RUNTIME_VOICE_REACTIVE_MOTION_NAME,
         NATIVE_RUNTIME_MUSIC_TRANSPORT_NAME,
+        NATIVE_RUNTIME_VIDEO_TRANSPORT_NAME,
         NATIVE_RUNTIME_CHARACTER_RENDERER_NAME,
         NATIVE_RUNTIME_STAGE_RENDERER_NAME,
         NATIVE_RUNTIME_STAGE_IMAGES_NAME,
@@ -10158,6 +10161,7 @@ def export_web_build() -> dict:
             "playerRuntimeI18n": "runtime_i18n.js",
             "playerRuntimeAudio": "runtime_audio.js",
             "playerRuntimeMusicTransport": "runtime_music_transport.js",
+            "playerRuntimeVideoTransport": "runtime_video_transport.js",
             "playerRuntimePreload": "runtime_preload.js",
             "playerRuntimeScenePrefetch": "runtime_scene_prefetch.js",
             "playerRuntimeStoryFlow": "runtime_story_flow.js",
@@ -11307,6 +11311,7 @@ def export_windows_nwjs_build() -> dict:
             "appRuntimeI18n": "app/runtime_i18n.js",
             "appRuntimeAudio": "app/runtime_audio.js",
             "appRuntimeMusicTransport": "app/runtime_music_transport.js",
+            "appRuntimeVideoTransport": "app/runtime_video_transport.js",
             "appRuntimePreload": "app/runtime_preload.js",
             "appRuntimeScenePrefetch": "app/runtime_scene_prefetch.js",
             "appRuntimeStoryFlow": "app/runtime_story_flow.js",
@@ -11790,6 +11795,7 @@ def export_macos_nwjs_build() -> dict:
             "appRuntimeI18n": "app/runtime_i18n.js",
             "appRuntimeAudio": "app/runtime_audio.js",
             "appRuntimeMusicTransport": "app/runtime_music_transport.js",
+            "appRuntimeVideoTransport": "app/runtime_video_transport.js",
             "appRuntimePreload": "app/runtime_preload.js",
             "appRuntimeScenePrefetch": "app/runtime_scene_prefetch.js",
             "appRuntimeStoryFlow": "app/runtime_story_flow.js",
@@ -12280,6 +12286,7 @@ def export_linux_nwjs_build() -> dict:
             "appRuntimeI18n": "app/runtime_i18n.js",
             "appRuntimeAudio": "app/runtime_audio.js",
             "appRuntimeMusicTransport": "app/runtime_music_transport.js",
+            "appRuntimeVideoTransport": "app/runtime_video_transport.js",
             "appRuntimePreload": "app/runtime_preload.js",
             "appRuntimeScenePrefetch": "app/runtime_scene_prefetch.js",
             "appRuntimeStoryFlow": "app/runtime_story_flow.js",

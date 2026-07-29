@@ -36,6 +36,13 @@ import {
   sanitizeMusicTransport,
 } from "./runtime_music_transport.js";
 import {
+  bindVideoTransportToVideo,
+  getVideoInitialPosition,
+  getVideoPlaybackPosition,
+  getVideoTransportSummary,
+  sanitizeVideoTransport,
+} from "./runtime_video_transport.js";
+import {
   buildRuntimePreloadMetaText,
   buildRuntimePreloadStatusText,
   startRuntimePreload,
@@ -186,7 +193,7 @@ import {
   MUSIC_END_MODE_LABELS, SAVE_DIALOG_PAGE_SIZE,
   SAVE_SHORTCUT_COUNT, SCREEN_COLOR_GRADE_DEFAULTS, SCREEN_COLOR_GRADE_LIMITS, SCREEN_FILTER_ACTION_LABELS,
   SCREEN_FILTER_PRESET_LABELS, SCREEN_FILTER_STRENGTH_LABELS, SHAKE_INTENSITY_LABELS, TRANSITION_DURATION_DEFAULT_MS,
-  TRANSITION_DURATION_MAX_MS, TRANSITION_DURATION_MIN_MS, VIDEO_FIT_LABELS,
+  TRANSITION_DURATION_MAX_MS, TRANSITION_DURATION_MIN_MS,
 } from "./runtime_visual_constants.js";
 
 const rawData = window.LIGHTWHISPER_GAME_DATA ?? {};
@@ -5097,6 +5104,9 @@ function sanitizeStoredSnapshot(source) {
     variables: clonePreviewVariables(source.variables),
     choiceOptions,
     timedChoiceState: sanitizeTimedChoiceState(source.timedChoiceState, block),
+    ...(String(source.blockType ?? "") === "video_play"
+      ? { videoPlaybackPositionSeconds: getVideoInitialPosition(block, source.videoPlaybackPositionSeconds) }
+      : {}),
     callStack: runtimeStoryFlowTools.sanitizeStoryCallStack(source.callStack, {
       hasScene: (targetSceneId) => data.scenesById.has(targetSceneId),
     }),
@@ -5268,6 +5278,7 @@ function loadStoredPlayerProfile() {
 function persistAutoResume() {
   captureCurrentTimedChoiceState();
   captureCurrentMusicPlaybackPosition();
+  captureCurrentVideoPlaybackPosition();
   const session = sanitizeStoredSession(state.session);
 
   if (!session) {
@@ -6864,6 +6875,7 @@ function quickSaveCurrent() {
 
   captureCurrentTimedChoiceState();
   captureCurrentMusicPlaybackPosition();
+  captureCurrentVideoPlaybackPosition();
   state.quickSave = {
     savedAt: new Date().toISOString(),
     session: deepCloneRuntimeData(state.session),
@@ -7565,6 +7577,7 @@ function saveCurrentSlot(rawIndex) {
 
   captureCurrentTimedChoiceState();
   captureCurrentMusicPlaybackPosition();
+  captureCurrentVideoPlaybackPosition();
   state.saveSlots[slotIndex] = {
     savedAt: new Date().toISOString(),
     session: deepCloneRuntimeData(state.session),
@@ -8128,9 +8141,7 @@ function applyBlockToPreviewState(block, visualState, variables, sceneId = "") {
     case "video_play": {
       const asset = data.assetsById.get(block.assetId);
       visualState.speakerName = "视频播放";
-      visualState.dialogueText = `${block.title || asset?.name || block.assetId || "未选择视频"} 会以 ${getVideoFitLabel(
-        block.fit
-      )} 方式播放。`;
+      visualState.dialogueText = `${block.title || asset?.name || block.assetId || "未选择视频"}：${getVideoTransportSummary(block)}`;
       return null;
     }
     case "credits_roll":
@@ -8920,43 +8931,32 @@ function syncVideoPlayback(snapshot) {
   const asset = data.assetsById.get(block.assetId);
   const videoUrl = getAssetUrl(block.assetId);
   const title = block.title || asset?.name || "视频播放";
-  const startTimeSeconds = getSafeVideoTime(block.startTimeSeconds, 0);
-  const endTimeSeconds = getSafeVideoTime(block.endTimeSeconds, 0);
+  const transport = sanitizeVideoTransport(block);
 
   state.videoPlaybackStepKey = stepKey;
   refs.videoOverlay.hidden = false;
-  refs.videoOverlay.dataset.fit = getSafeVideoFit(block.fit);
+  refs.videoOverlay.dataset.fit = transport.fit;
+  refs.videoOverlay.dataset.loop = String(transport.loop);
   refs.videoOverlayTitle.textContent = title;
-  refs.videoSkipButton.hidden = block.skippable === false;
+  refs.videoSkipButton.hidden = !transport.skippable;
+  refs.videoSkipButton.textContent = transport.loop ? "结束循环" : "跳过视频";
   refs.runtimeVideo.controls = true;
-  refs.runtimeVideo.volume = getSafeVideoVolume(block.volume) / 100;
 
   const finish = () => {
     if (state.videoPlaybackStepKey === stepKey) {
       finishVideoPlayback();
     }
   };
-  const handleTimeUpdate = () => {
-    if (endTimeSeconds > 0 && refs.runtimeVideo.currentTime >= endTimeSeconds) {
-      finish();
-    }
-  };
-  const handleLoadedMetadata = () => {
-    if (startTimeSeconds > 0 && Number.isFinite(refs.runtimeVideo.duration)) {
-      refs.runtimeVideo.currentTime = Math.min(startTimeSeconds, Math.max(refs.runtimeVideo.duration - 0.08, 0));
-    }
-  };
-
-  refs.runtimeVideo.addEventListener("ended", finish);
-  refs.runtimeVideo.addEventListener("error", finish);
-  refs.runtimeVideo.addEventListener("loadedmetadata", handleLoadedMetadata);
-  refs.runtimeVideo.addEventListener("timeupdate", handleTimeUpdate);
-  state.videoPlaybackCleanup = () => {
-    refs.runtimeVideo.removeEventListener("ended", finish);
-    refs.runtimeVideo.removeEventListener("error", finish);
-    refs.runtimeVideo.removeEventListener("loadedmetadata", handleLoadedMetadata);
-    refs.runtimeVideo.removeEventListener("timeupdate", handleTimeUpdate);
-  };
+  state.videoPlaybackCleanup = bindVideoTransportToVideo(refs.runtimeVideo, transport, {
+    initialPositionSeconds: snapshot.videoPlaybackPositionSeconds,
+    onFinished: finish,
+    onLoop: () => {
+      if (state.videoPlaybackStepKey === stepKey) {
+        refs.videoOverlayTitle.textContent = `${title} · 循环中`;
+      }
+    },
+    onError: finish,
+  });
 
   if (!videoUrl) {
     refs.videoOverlayTitle.textContent = `${title}（视频文件缺失）`;
@@ -8976,9 +8976,13 @@ function syncVideoPlayback(snapshot) {
 
   refs.runtimeVideo.src = encodeURI(videoUrl);
   refs.runtimeVideo.load();
-  refs.runtimeVideo.play().catch(() => {
-    refs.videoOverlayTitle.textContent = `${title} · 点击视频画面播放`;
-  });
+  if (transport.autoplay) {
+    refs.runtimeVideo.play().catch(() => {
+      refs.videoOverlayTitle.textContent = `${title} · 点击视频画面播放`;
+    });
+  } else {
+    refs.videoOverlayTitle.textContent = `${title} · 等待手动播放`;
+  }
 }
 
 function stopVideoPlayback() {
@@ -9014,6 +9018,19 @@ function finishVideoPlayback({ skipped = false } = {}) {
   stopVideoPlayback();
   movePreviewForward();
   renderRuntime();
+}
+
+function captureCurrentVideoPlaybackPosition() {
+  const snapshot = getCurrentSnapshot();
+  if (snapshot?.blockType !== "video_play" || !refs.runtimeVideo || state.videoPlaybackStepKey !== getCurrentStepKey(snapshot)) {
+    return 0;
+  }
+  const position = getVideoPlaybackPosition(
+    refs.runtimeVideo,
+    snapshot.videoPlaybackPositionSeconds ?? snapshot.block?.startTimeSeconds
+  );
+  snapshot.videoPlaybackPositionSeconds = position;
+  return position;
 }
 
 function syncCreditsPlayback(snapshot) {
@@ -9337,30 +9354,6 @@ function getBlockLabel(type) {
   return labels[type] ?? type ?? "步骤";
 }
 
-function getSafeVideoFit(value) {
-  return Object.hasOwn(VIDEO_FIT_LABELS, value) ? value : "contain";
-}
-
-function getVideoFitLabel(value) {
-  return VIDEO_FIT_LABELS[getSafeVideoFit(value)] ?? VIDEO_FIT_LABELS.contain;
-}
-
-function getSafeVideoVolume(value) {
-  const number = Number(value);
-  if (!Number.isFinite(number)) {
-    return 100;
-  }
-  return Math.round(clamp(number, 0, 100));
-}
-
-function getSafeVideoTime(value, fallback = 0) {
-  const number = Number(value);
-  if (!Number.isFinite(number) || number < 0) {
-    return fallback;
-  }
-  return number;
-}
-
 function getSafeCreditsDuration(value) {
   const number = Number(value);
   if (!Number.isFinite(number)) {
@@ -9404,6 +9397,9 @@ function isBlockingMediaSnapshot(snapshot) {
 }
 
 function isMediaSnapshotSkippable(snapshot) {
+  if (snapshot?.blockType === "video_play") {
+    return sanitizeVideoTransport(snapshot.block).skippable;
+  }
   return snapshot?.block?.skippable !== false;
 }
 

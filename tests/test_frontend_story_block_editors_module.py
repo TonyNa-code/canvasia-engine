@@ -9,6 +9,7 @@ from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "story_block_editors.js"
+VIDEO_TRANSPORT_MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "video_transport_editor.js"
 
 
 class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
@@ -21,7 +22,9 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
             context.globalThis = context;
             vm.createContext(context);
             vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(VIDEO_TRANSPORT_MODULE_PATH))}, "utf8"), context);
             const tools = context.window.CanvasiaEditorStoryBlockEditors;
+            const videoTransportTools = context.window.CanvasiaEditorVideoTransport;
             const blockManagementMarkup = tools.renderBlockManagementCard(
               {{ name: "第一场 <黄昏>", blocks: [{{ id: "b1" }}, {{ id: "b2" }}, {{ id: "b3" }}] }},
               1,
@@ -451,12 +454,24 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
               {{ assetId: "video_1", title: "OP <Movie>", fit: "cover", volume: 75, startTimeSeconds: 1.5, endTimeSeconds: 12, skippable: false }},
               {{
                 videoAssets: [{{ id: "video_1", name: "开场动画" }}],
-                videoFitLabels: {{ contain: "完整显示", cover: "铺满裁切" }},
-                videoVolumeLabels: {{ 50: "50%", 75: "75%" }},
                 getSafeAssetIdByType: (_type, assetId) => assetId || "video_1",
-                getSafeNonNegativeNumber: (value, fallback) => Number.parseFloat(value ?? fallback),
-                getSafeVideoVolume: (value) => Number(value ?? 100),
-                getSafeVideoFit: (value) => value || "contain",
+                renderVideoTransportEditor: (videoBlock) => videoTransportTools.renderVideoTransportEditor(videoBlock, {{
+                  videoFitLabels: {{ contain: "完整显示", cover: "铺满裁切", fill: "拉伸铺满" }},
+                  runtimeTools: {{
+                    sanitizeVideoTransport: (source = {{}}) => ({{
+                      autoplay: source.autoplay !== false,
+                      loop: source.loop === true,
+                      resumeMode: source.resumeMode === "resume" ? "resume" : "restart",
+                      startTimeSeconds: Number(source.startTimeSeconds || 0),
+                      endTimeSeconds: Number(source.endTimeSeconds || 0),
+                      fit: ["contain", "cover", "fill"].includes(source.fit) ? source.fit : "contain",
+                      volume: Number(source.volume ?? 100),
+                      skippable: source.loop === true ? true : source.skippable !== false,
+                    }}),
+                    getVideoTransportDiagnostics: () => ({{ level: "good", label: "配置完整" }}),
+                    getVideoTransportSummary: (transport) => `视频音量 ${{transport.volume}}%`,
+                  }},
+                }}),
               }}
             );
             const creditsMarkup = tools.renderCreditsRollEditor(
@@ -708,7 +723,8 @@ class FrontendStoryBlockEditorsModuleTests(unittest.TestCase):
         self.assertIn("编辑视频播放", payload["videoMarkup"])
         self.assertIn("OP &lt;Movie&gt;", payload["videoMarkup"])
         self.assertIn('value="cover" selected', payload["videoMarkup"])
-        self.assertIn('value="75" selected', payload["videoMarkup"])
+        self.assertIn('id="editorVideoVolume"', payload["videoMarkup"])
+        self.assertIn('value="75"', payload["videoMarkup"])
         self.assertIn("必须播放完", payload["videoMarkup"])
         self.assertIn("编辑片尾演职人员表", payload["creditsMarkup"])
         self.assertIn("STAFF &lt;END&gt;", payload["creditsMarkup"])

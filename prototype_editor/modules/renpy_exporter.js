@@ -371,6 +371,14 @@
       pushWarning(context.warnings ?? [], "renpy_video_timing_review", "视频结束时间早于或等于开始时间，已忽略结束时间。", getWarningContext(context));
       end = 0;
     }
+    if (block.autoplay === false || block.loop === true || block.resumeMode === "resume") {
+      pushWarning(
+        context.warnings ?? [],
+        "renpy_video_transport_review",
+        "视频的手动起播、循环或读档续播规则已保留在项目中，但 Ren'Py cutscene 草稿需要人工复核交互与存档行为。",
+        getWarningContext(context)
+      );
+    }
 
     const clauses = [];
     if (start > 0) {
@@ -2021,6 +2029,9 @@
       screenFilterPresetKeys: Object.keys(SCREEN_FILTER_PRESETS).sort(),
       musicRestartModes: ["continue", "restart"],
       musicTransportMaxSeconds: 21600,
+      videoResumeModes: ["restart", "resume"],
+      videoFitModes: ["contain", "cover", "fill"],
+      videoTransportMaxSeconds: 21600,
     };
   }
 
@@ -2037,6 +2048,7 @@
     renderConditionRuleExpression,
     renderRenpyTextPacing,
     renderRenpyStoryText,
+    buildVideoPlaybackSpec,
     buildMusicPlaybackSpec,
     renderBlock,
     sanitizeProjectRuntimeSettings,

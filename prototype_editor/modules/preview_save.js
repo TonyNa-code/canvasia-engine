@@ -77,6 +77,9 @@
     const timedChoiceState = typeof options.sanitizeTimedChoiceState === "function"
       ? options.sanitizeTimedChoiceState(source.timedChoiceState, block)
       : null;
+    const videoPlaybackPositionSeconds = typeof options.sanitizeVideoPlaybackPosition === "function"
+      ? options.sanitizeVideoPlaybackPosition(source.videoPlaybackPositionSeconds, block)
+      : Math.max(0, Number(source.videoPlaybackPositionSeconds) || 0);
 
     return {
       sceneId,
@@ -89,6 +92,7 @@
       variables: cloneVariables(source.variables),
       choiceOptions,
       ...(timedChoiceState ? { timedChoiceState } : {}),
+      ...(String(source.blockType ?? "") === "video_play" ? { videoPlaybackPositionSeconds } : {}),
       callStack: sanitizeCallStack(source.callStack),
       transitionTargetSceneId:
         source.transitionTargetSceneId == null ? null : String(source.transitionTargetSceneId),
