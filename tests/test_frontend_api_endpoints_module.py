@@ -34,6 +34,8 @@ class FrontendApiEndpointsModuleTests(unittest.TestCase):
               endpointKeys: Object.keys(tools.API_ENDPOINTS).sort(),
               projectData: tools.API_PROJECT_DATA,
               saveScene: tools.API_SAVE_SCENE,
+              previewTextRefactor: tools.API_PREVIEW_PROJECT_TEXT_REFACTOR,
+              applyTextRefactor: tools.API_APPLY_PROJECT_TEXT_REFACTOR,
               generateOpenAiAsset: tools.API_GENERATE_OPENAI_ASSET,
               defaultGenerateOpenAiAsset: tools.DEFAULT_API_ENDPOINTS.generateOpenAiAsset,
               fallback: tools.getApiEndpoint("missing", "/fallback"),
@@ -63,6 +65,8 @@ class FrontendApiEndpointsModuleTests(unittest.TestCase):
         self.assertIn("importLocalizationPatches", payload["endpointKeys"])
         self.assertEqual(payload["projectData"], "/api/project-data")
         self.assertEqual(payload["saveScene"], "/api/save-scene")
+        self.assertEqual(payload["previewTextRefactor"], "/api/preview-project-text-refactor")
+        self.assertEqual(payload["applyTextRefactor"], "/api/apply-project-text-refactor")
         self.assertEqual(payload["generateOpenAiAsset"], "/api/custom-openai-asset")
         self.assertEqual(payload["defaultGenerateOpenAiAsset"], "/api/generate-openai-asset")
         self.assertEqual(payload["fallback"], "/fallback")

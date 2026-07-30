@@ -16,6 +16,8 @@ const {
   API_RENAME_PROJECT,
   API_DUPLICATE_PROJECT,
   API_DELETE_PROJECT,
+  API_PREVIEW_PROJECT_TEXT_REFACTOR,
+  API_APPLY_PROJECT_TEXT_REFACTOR,
   API_SAVE_SCENE,
   API_CREATE_SCENE,
   API_EXPORT_BUILD,
@@ -217,6 +219,7 @@ const uiThemeTools = window.CanvasiaEditorUiTheme;
 const previewSaveTools = window.CanvasiaEditorPreviewSave;
 const recentWorkspaceTools = window.CanvasiaEditorRecentWorkspace;
 const editorFilterTools = window.CanvasiaEditorFilters;
+const projectTextRefactorTools = window.CanvasiaEditorProjectTextRefactor;
 const dashboardSearchPanelTools = window.CanvasiaEditorDashboardSearchPanel;
 const dashboardPrimaryActionTools = window.CanvasiaEditorDashboardPrimaryActions;
 const scriptReadabilityTools = window.CanvasiaEditorScriptReadability;
@@ -647,6 +650,7 @@ const state = {
   ...initialOpenAiAssetState,
   dashboardSearchQuery: "",
   dashboardSearchMode: "all",
+  projectTextRefactor: projectTextRefactorTools.createProjectTextRefactorState(),
   dashboardRouteFilter: "all",
   historySearchQuery: "",
   historyFilterMode: "all",
@@ -1522,6 +1526,7 @@ function resetProjectScopedUiState() {
   Object.assign(state, openAiAssetTools?.getDefaultOpenAiAssetGenerationState?.() ?? initialOpenAiAssetState);
   state.dashboardSearchQuery = "";
   state.dashboardSearchMode = "all";
+  state.projectTextRefactor = projectTextRefactorTools.createProjectTextRefactorState();
   state.dashboardRouteFilter = "all";
   state.historySearchQuery = "";
   state.historyFilterMode = "all";
@@ -3158,6 +3163,24 @@ async function handleClick(event) {
     state.dashboardSearchMode = getSafeDashboardSearchMode(actionTarget.dataset.searchMode);
     renderDashboardSearchPanel();
     setSaveStatus(`全局搜索已切到：${getDashboardSearchModeLabel(state.dashboardSearchMode)}`);
+    return;
+  }
+
+  if (action === "preview-project-text-refactor") {
+    await previewProjectTextRefactor();
+    return;
+  }
+
+  if (action === "apply-project-text-refactor") {
+    await applyProjectTextRefactor();
+    return;
+  }
+
+  if (action === "reset-project-text-refactor") {
+    state.projectTextRefactor = projectTextRefactorTools.createProjectTextRefactorState();
+    renderDashboard();
+    document.getElementById("projectTextRefactorFindInput")?.focus({ preventScroll: true });
+    setSaveStatus("剧情重构台已清空");
     return;
   }
 
@@ -5017,6 +5040,32 @@ function handleChange(event) {
 
   const target = event.target;
 
+  if (target.matches("[data-text-refactor-scope]")) {
+    const scope = target.getAttribute("data-text-refactor-scope") ?? "";
+    const scopes = new Set(state.projectTextRefactor.scopes ?? []);
+    if (target.checked) {
+      scopes.add(scope);
+    } else {
+      scopes.delete(scope);
+    }
+    state.projectTextRefactor.scopes = projectTextRefactorTools.normalizeProjectTextRefactorScopes([...scopes]);
+    target.closest(".text-refactor-scope-option")?.classList.toggle("is-active", target.checked);
+    invalidateProjectTextRefactorPreview();
+    return;
+  }
+
+  if (target.id === "projectTextRefactorCaseSensitiveInput") {
+    state.projectTextRefactor.caseSensitive = Boolean(target.checked);
+    invalidateProjectTextRefactorPreview();
+    return;
+  }
+
+  if (target.id === "projectTextRefactorTranslationsInput") {
+    state.projectTextRefactor.includeTranslations = Boolean(target.checked);
+    invalidateProjectTextRefactorPreview();
+    return;
+  }
+
   if (state.openAiAssetLoading && isOpenAiAssetGenerationFieldId(target.id)) {
     setSaveStatus("AI 素材正在生成，请稍等...");
     return;
@@ -5477,6 +5526,18 @@ function handleInput(event) {
   if (event.target.id === "assetSearchInput") {
     state.assetSearchQuery = event.target.value ?? "";
     renderAssetsScreen();
+    return;
+  }
+
+  if (event.target.id === "projectTextRefactorFindInput") {
+    state.projectTextRefactor.findText = event.target.value ?? "";
+    invalidateProjectTextRefactorPreview();
+    return;
+  }
+
+  if (event.target.id === "projectTextRefactorReplaceInput") {
+    state.projectTextRefactor.replaceText = event.target.value ?? "";
+    invalidateProjectTextRefactorPreview();
     return;
   }
 
@@ -10656,6 +10717,12 @@ function renderDashboard() {
             <div id="dashboardSearchFilterBar" class="asset-tag-chip-row"></div>
             <div id="dashboardSearchSummary" class="route-summary-strip"></div>
             <div id="dashboardSearchResults" class="list-stack"></div>
+            <div id="projectTextRefactorPanelHost">
+              ${projectTextRefactorTools.renderProjectTextRefactorPanel(state.projectTextRefactor, {
+                escapeHtml,
+                truncateText,
+              })}
+            </div>
           </section>
         `
         : ""
@@ -13104,6 +13171,129 @@ function renderDashboardSearchPanel() {
   filterBar.innerHTML = dashboardSearchPanelTools.renderDashboardSearchFilterBar(overview, helpers);
   summary.innerHTML = dashboardSearchPanelTools.renderDashboardSearchSummary(overview, stats, helpers);
   results.innerHTML = dashboardSearchPanelTools.renderDashboardSearchResults(overview, helpers);
+}
+
+function getProjectTextRefactorRenderHelpers() {
+  return {
+    escapeHtml,
+    truncateText,
+  };
+}
+
+function syncProjectTextRefactorFeedback() {
+  const feedback = document.getElementById("projectTextRefactorFeedback");
+  const applyButton = document.getElementById("projectTextRefactorApplyButton");
+  const previewButton = document.querySelector('[data-action="preview-project-text-refactor"]');
+  const resetButton = document.querySelector('[data-action="reset-project-text-refactor"]');
+  const refactorState = state.projectTextRefactor;
+
+  if (feedback) {
+    feedback.innerHTML = projectTextRefactorTools.renderProjectTextRefactorFeedback(
+      refactorState,
+      getProjectTextRefactorRenderHelpers()
+    );
+  }
+  if (previewButton) {
+    previewButton.disabled = Boolean(refactorState.loading);
+    previewButton.textContent = refactorState.loading ? "正在检查..." : "预览全部命中";
+  }
+  if (applyButton) {
+    const replacementCount = Number(refactorState.report?.totalReplacements ?? 0);
+    applyButton.disabled = Boolean(refactorState.loading) || replacementCount <= 0;
+    applyButton.textContent = replacementCount > 0 ? `确认替换 ${replacementCount} 处` : "确认后再替换";
+  }
+  if (resetButton) {
+    resetButton.disabled = Boolean(refactorState.loading);
+  }
+}
+
+function invalidateProjectTextRefactorPreview() {
+  state.projectTextRefactor.report = null;
+  state.projectTextRefactor.error = "";
+  syncProjectTextRefactorFeedback();
+}
+
+async function previewProjectTextRefactor() {
+  const refactorState = state.projectTextRefactor;
+  const validationError = projectTextRefactorTools.getProjectTextRefactorValidationError(refactorState);
+  if (validationError) {
+    refactorState.error = validationError;
+    refactorState.report = null;
+    syncProjectTextRefactorFeedback();
+    setSaveStatus(validationError, true);
+    return;
+  }
+
+  refactorState.loading = true;
+  refactorState.error = "";
+  refactorState.report = null;
+  syncProjectTextRefactorFeedback();
+  setSaveStatus("正在逐章预览文字替换...");
+  try {
+    const result = await postJson(
+      API_PREVIEW_PROJECT_TEXT_REFACTOR,
+      projectTextRefactorTools.buildProjectTextRefactorPayload(refactorState)
+    );
+    refactorState.report = result.report ?? null;
+    refactorState.lastAppliedReport = null;
+    const replacementCount = Number(result.report?.totalReplacements ?? 0);
+    const message = replacementCount > 0 ? `预览完成：找到 ${replacementCount} 处可替换文字` : "预览完成：当前范围没有命中";
+    setSaveStatus(message);
+    showToast(message);
+  } catch (error) {
+    refactorState.error = getErrorDetailMessage(error, "没有成功生成替换预览。");
+    setSaveStatus("剧情重构预览失败", true);
+  } finally {
+    refactorState.loading = false;
+    syncProjectTextRefactorFeedback();
+  }
+}
+
+async function applyProjectTextRefactor() {
+  const refactorState = state.projectTextRefactor;
+  const report = refactorState.report;
+  if (!report?.totalReplacements || !report.projectRevision) {
+    refactorState.error = "先预览全部命中，再确认执行。";
+    syncProjectTextRefactorFeedback();
+    return;
+  }
+
+  const replacementLabel = refactorState.replaceText || "（删除匹配文字）";
+  const confirmed = await showEngineConfirm({
+    title: "执行这次剧情重构？",
+    message: `将“${refactorState.findText}”替换为“${replacementLabel}”。\n\n共 ${report.totalReplacements} 处，涉及 ${report.changedChapterCount} 个章节、${report.changedSceneCount} 个场景。执行后可用顶部“撤销”整体恢复。`,
+    tone: "warning",
+    confirmLabel: `替换 ${report.totalReplacements} 处`,
+    cancelLabel: "返回检查",
+  });
+  if (!confirmed) {
+    return;
+  }
+
+  refactorState.loading = true;
+  refactorState.error = "";
+  syncProjectTextRefactorFeedback();
+  setSaveStatus("正在安全写入剧情重构...");
+  try {
+    const result = await postJson(API_APPLY_PROJECT_TEXT_REFACTOR, {
+      ...projectTextRefactorTools.buildProjectTextRefactorPayload(refactorState),
+      expectedRevision: report.projectRevision,
+    });
+    refactorState.lastAppliedReport = result.report ?? report;
+    refactorState.report = null;
+    await reloadProjectData({ ...getCurrentUiState() });
+    const message = `剧情重构完成：已替换 ${Number(result.report?.totalReplacements ?? report.totalReplacements)} 处文字`;
+    setSaveStatus(message);
+    showToast(message);
+  } catch (error) {
+    refactorState.report = null;
+    refactorState.error = getErrorDetailMessage(error, "批量替换没有成功，项目文件保持原样。");
+    setSaveStatus("剧情重构没有写入", true);
+    await showEditorOperationFailure(error, "剧情重构失败", "批量替换没有写入项目");
+  } finally {
+    refactorState.loading = false;
+    syncProjectTextRefactorFeedback();
+  }
 }
 
 function countSearchableStoryBlocks() {

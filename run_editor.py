@@ -31,6 +31,10 @@ from urllib.request import Request, urlopen
 from editor_local_security import is_local_editor_host, is_local_editor_origin
 from editor_asset_usage import collect_asset_usages_from_bundle
 from editor_snapshot_cache import SnapshotCache, build_file_cache_signature
+from editor_project_text_refactor import (
+    apply_project_text_refactor,
+    build_project_text_refactor_preview,
+)
 from project_variable_migration import replace_variable_reference_in_block
 from editor_static_cache import (
     build_editor_static_cache_headers,
@@ -614,6 +618,7 @@ EDITOR_EXPORT_FILES = [
     "native_runtime_bundle.py",
     "editor_asset_usage.py",
     "editor_local_security.py",
+    "editor_project_text_refactor.py",
     "editor_snapshot_cache.py",
     "editor_static_cache.py",
     "export_route_playtest_workbook.py",
@@ -1602,6 +1607,75 @@ def get_project_center_payload() -> dict:
 
 def list_chapter_files() -> list[Path]:
     return sorted(CHAPTERS_DIR.glob("chapter_*.json"))
+
+
+def load_project_text_refactor_documents() -> tuple[list[Path], list[dict]]:
+    chapter_paths = list_chapter_files()
+    return chapter_paths, [read_json(path) for path in chapter_paths]
+
+
+def build_public_project_text_refactor_report(report: dict) -> dict:
+    return {
+        key: value
+        for key, value in report.items()
+        if key != "changedChapterIndexes"
+    }
+
+
+def build_project_text_refactor_history_label(report: dict) -> str:
+    request = report.get("request") if isinstance(report.get("request"), dict) else {}
+
+    def summarize(value: object, *, empty_label: str) -> str:
+        text = " ".join(str(value or "").split())
+        if not text:
+            return empty_label
+        return text if len(text) <= 42 else f"{text[:41]}…"
+
+    find_label = summarize(request.get("findText"), empty_label="（空）")
+    replace_label = summarize(request.get("replaceText"), empty_label="（删除）")
+    return f"剧情重构：{find_label} → {replace_label}"
+
+
+def preview_project_text_refactor(payload: object) -> dict:
+    _chapter_paths, chapter_documents = load_project_text_refactor_documents()
+    report = build_project_text_refactor_preview(chapter_documents, payload)
+    return build_public_project_text_refactor_report(report)
+
+
+def apply_project_text_refactor_to_project(payload: object) -> dict:
+    chapter_paths, chapter_documents = load_project_text_refactor_documents()
+    source = payload if isinstance(payload, dict) else {}
+    updated_documents, report = apply_project_text_refactor(
+        chapter_documents,
+        source,
+        expected_revision=str(source.get("expectedRevision") or ""),
+    )
+    changed_indexes = [
+        int(index)
+        for index in report.get("changedChapterIndexes", [])
+        if isinstance(index, int) and 0 <= index < len(chapter_paths)
+    ]
+    changed_paths = [chapter_paths[index] for index in changed_indexes]
+    file_snapshots = capture_file_snapshots([*changed_paths, PROJECT_PATH])
+
+    ensure_project_history_initialized()
+    try:
+        for index in changed_indexes:
+            write_json(chapter_paths[index], updated_documents[index])
+        touch_project()
+        history = record_project_history(build_project_text_refactor_history_label(report))
+    except Exception:
+        restore_file_snapshots(file_snapshots)
+        clear_project_bundle_cache()
+        raise
+
+    clear_project_bundle_cache()
+    public_report = build_public_project_text_refactor_report(report)
+    public_report["changedFiles"] = [path.name for path in changed_paths]
+    return {
+        "report": public_report,
+        "history": history,
+    }
 
 
 def clear_project_bundle_cache() -> None:
@@ -13523,6 +13597,14 @@ class EditorRequestHandler(SimpleHTTPRequestHandler):
             self.handle_delete_project()
             return
 
+        if parsed.path == "/api/preview-project-text-refactor":
+            self.handle_preview_project_text_refactor()
+            return
+
+        if parsed.path == "/api/apply-project-text-refactor":
+            self.handle_apply_project_text_refactor()
+            return
+
         if parsed.path == "/api/save-scene":
             self.handle_save_scene()
             return
@@ -13652,6 +13734,52 @@ class EditorRequestHandler(SimpleHTTPRequestHandler):
                 {
                     "ok": False,
                     "error": f"读取项目数据时出了意外问题：{error}",
+                    "recovery": build_history_payload(),
+                },
+                status=HTTPStatus.INTERNAL_SERVER_ERROR,
+            )
+
+    def handle_preview_project_text_refactor(self) -> None:
+        try:
+            payload = self.read_json_body()
+            report = preview_project_text_refactor(payload)
+            self.send_json(
+                {
+                    "ok": True,
+                    "savedAt": now_iso(),
+                    "report": report,
+                }
+            )
+        except json.JSONDecodeError:
+            self.send_json({"ok": False, "error": "请求体不是有效 JSON。"}, status=HTTPStatus.BAD_REQUEST)
+        except ValueError as error:
+            self.send_json({"ok": False, "error": str(error)}, status=HTTPStatus.BAD_REQUEST)
+        except Exception as error:  # pragma: no cover - defensive fallback
+            self.send_json(
+                {"ok": False, "error": f"预览剧情文字替换时出了意外问题：{error}"},
+                status=HTTPStatus.INTERNAL_SERVER_ERROR,
+            )
+
+    def handle_apply_project_text_refactor(self) -> None:
+        try:
+            payload = self.read_json_body()
+            result = apply_project_text_refactor_to_project(payload)
+            self.send_json(
+                {
+                    "ok": True,
+                    "savedAt": now_iso(),
+                    **result,
+                }
+            )
+        except json.JSONDecodeError:
+            self.send_json({"ok": False, "error": "请求体不是有效 JSON。"}, status=HTTPStatus.BAD_REQUEST)
+        except ValueError as error:
+            self.send_json({"ok": False, "error": str(error)}, status=HTTPStatus.BAD_REQUEST)
+        except Exception as error:  # pragma: no cover - defensive fallback
+            self.send_json(
+                {
+                    "ok": False,
+                    "error": f"批量替换剧情文字时出了意外问题：{error}",
                     "recovery": build_history_payload(),
                 },
                 status=HTTPStatus.INTERNAL_SERVER_ERROR,

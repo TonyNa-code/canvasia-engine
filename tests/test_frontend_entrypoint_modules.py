@@ -56,6 +56,7 @@ class FrontendEntrypointModuleTests(unittest.TestCase):
             "./modules/preview_save.js",
             "./modules/recent_workspace.js",
             "./modules/editor_filters.js",
+            "./modules/project_text_refactor.js",
             "./modules/dashboard_search_panel.js",
             "./modules/dashboard_primary_actions.js",
             "./modules/dashboard_production.js",

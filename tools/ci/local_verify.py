@@ -24,6 +24,7 @@ PYTHON_SYNTAX_FILES = [
     "editor_asset_usage.py",
     "editor_local_security.py",
     "editor_project_presentation.py",
+    "editor_project_text_refactor.py",
     "editor_snapshot_cache.py",
     "editor_static_cache.py",
     "export_route_playtest_workbook.py",

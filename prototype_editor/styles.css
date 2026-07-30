@@ -2124,6 +2124,380 @@ textarea {
   margin-top: 12px;
 }
 
+.text-refactor-workbench {
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+}
+
+.text-refactor-heading,
+.text-refactor-match-meta,
+.text-refactor-options {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.text-refactor-heading {
+  align-items: flex-start;
+  margin-bottom: 18px;
+}
+
+.text-refactor-heading h3 {
+  margin: 7px 0 5px;
+  font-size: clamp(22px, 2.2vw, 30px);
+  letter-spacing: -0.02em;
+}
+
+.text-refactor-heading p {
+  max-width: 68ch;
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.text-refactor-safety-mark {
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  border: 1px solid color-mix(in srgb, var(--good) 28%, transparent);
+  border-radius: 999px;
+  color: var(--good);
+  background: color-mix(in srgb, var(--good) 9%, transparent);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.text-refactor-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.86fr) minmax(360px, 1.14fr);
+  gap: 16px;
+  align-items: stretch;
+}
+
+.text-refactor-form,
+.text-refactor-feedback {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--panel-strong) 90%, transparent);
+}
+
+.text-refactor-form {
+  padding: 18px;
+}
+
+.text-refactor-feedback {
+  min-height: 360px;
+  padding: 16px;
+  overflow: hidden;
+}
+
+.text-refactor-input-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.text-refactor-input-grid label,
+.text-refactor-input-grid label > span {
+  display: block;
+}
+
+.text-refactor-input-grid label > span,
+.text-refactor-scope-fieldset legend {
+  margin-bottom: 7px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.text-refactor-scope-fieldset {
+  min-width: 0;
+  margin: 18px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.text-refactor-scope-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.text-refactor-scope-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  min-width: 0;
+  padding: 10px 11px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--panel) 82%, transparent);
+  cursor: pointer;
+  transition: 150ms ease;
+}
+
+.text-refactor-scope-option:hover,
+.text-refactor-scope-option.is-active {
+  border-color: color-mix(in srgb, var(--accent-deep) 42%, transparent);
+  background: color-mix(in srgb, var(--accent) 32%, var(--panel));
+}
+
+.text-refactor-scope-option input,
+.text-refactor-options input {
+  width: auto;
+  margin: 2px 0 0;
+  accent-color: var(--brand);
+}
+
+.text-refactor-scope-option span,
+.text-refactor-scope-option strong,
+.text-refactor-scope-option small {
+  display: block;
+  min-width: 0;
+}
+
+.text-refactor-scope-option strong {
+  font-size: 13px;
+}
+
+.text-refactor-scope-option small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.text-refactor-options {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
+.text-refactor-options label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.text-refactor-actions {
+  margin-top: 18px;
+}
+
+.text-refactor-empty,
+.text-refactor-receipt {
+  display: grid;
+  place-content: center;
+  min-height: 326px;
+  padding: 28px;
+  text-align: center;
+}
+
+.text-refactor-empty strong,
+.text-refactor-receipt strong {
+  font-size: 18px;
+}
+
+.text-refactor-empty p,
+.text-refactor-receipt p {
+  max-width: 44ch;
+  margin: 8px auto 0;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.text-refactor-empty.is-error {
+  color: var(--danger);
+}
+
+.text-refactor-pulse {
+  width: 26px;
+  height: 3px;
+  margin: 0 auto 14px;
+  border-radius: 999px;
+  background: var(--brand);
+  animation: text-refactor-pulse 1.1s ease-in-out infinite alternate;
+}
+
+@keyframes text-refactor-pulse {
+  from { transform: scaleX(0.45); opacity: 0.45; }
+  to { transform: scaleX(1); opacity: 1; }
+}
+
+.text-refactor-receipt .issue-tag {
+  justify-self: center;
+  margin-bottom: 14px;
+}
+
+.text-refactor-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.text-refactor-metrics span {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--panel) 78%, transparent);
+}
+
+.text-refactor-metrics strong {
+  font-size: 19px;
+}
+
+.text-refactor-metrics small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.text-refactor-match-list {
+  display: grid;
+  gap: 8px;
+  max-height: 470px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.text-refactor-match-card {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: color-mix(in srgb, var(--panel) 80%, transparent);
+}
+
+.text-refactor-match-meta span {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.text-refactor-match-meta small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.text-refactor-diff {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 9px;
+}
+
+.text-refactor-diff del,
+.text-refactor-diff ins {
+  min-width: 0;
+  padding: 9px 10px;
+  border-radius: 11px;
+  font-size: 12px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  text-decoration: none;
+  white-space: pre-wrap;
+}
+
+.text-refactor-diff del {
+  color: color-mix(in srgb, var(--danger) 82%, var(--ink));
+  background: color-mix(in srgb, var(--danger) 9%, transparent);
+}
+
+.text-refactor-diff ins {
+  color: color-mix(in srgb, var(--good) 82%, var(--ink));
+  background: color-mix(in srgb, var(--good) 10%, transparent);
+}
+
+.text-refactor-match-card .text-link {
+  appearance: none;
+  padding: 0;
+  border: 0;
+  margin-top: 8px;
+  color: var(--accent-deep);
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 750;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 35%, transparent);
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+
+.text-refactor-match-card .text-link:hover {
+  text-decoration-color: currentColor;
+}
+
+.text-refactor-match-card .text-link:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent-deep) 58%, transparent);
+  outline-offset: 4px;
+}
+
+html:not([data-ui-theme="light"]) .text-refactor-match-card .text-link {
+  color: var(--accent);
+}
+
+html:not([data-ui-theme="light"]) .text-refactor-form,
+html:not([data-ui-theme="light"]) .text-refactor-feedback,
+html:not([data-ui-theme="light"]) .text-refactor-match-card,
+html:not([data-ui-theme="light"]) .text-refactor-metrics span,
+html:not([data-ui-theme="light"]) .text-refactor-scope-option {
+  background: rgba(7, 14, 26, 0.64);
+  border-color: rgba(121, 220, 255, 0.13);
+}
+
+html[data-ui-theme="light"] .text-refactor-heading h3,
+html[data-ui-theme="light"] .text-refactor-empty strong,
+html[data-ui-theme="light"] .text-refactor-receipt strong,
+html[data-ui-theme="light"] .text-refactor-match-meta span,
+html[data-ui-theme="light"] .text-refactor-metrics strong {
+  color: #173352;
+}
+
+@media (max-width: 980px) {
+  .text-refactor-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .text-refactor-feedback {
+    min-height: 280px;
+  }
+
+  .text-refactor-empty,
+  .text-refactor-receipt {
+    min-height: 246px;
+  }
+}
+
+@media (max-width: 640px) {
+  .text-refactor-heading,
+  .text-refactor-match-meta {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .text-refactor-input-grid,
+  .text-refactor-scope-grid,
+  .text-refactor-diff {
+    grid-template-columns: 1fr;
+  }
+
+  .text-refactor-match-meta small {
+    text-align: left;
+    white-space: normal;
+  }
+}
+
 .script-entry-card {
   padding: 14px 16px;
   border-radius: 18px;

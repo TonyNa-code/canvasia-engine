@@ -49,6 +49,7 @@ const REQUIRED_EDITOR_MODULES = Object.freeze([
     { globalName: "CanvasiaEditorPreviewSave", script: "./modules/preview_save.js", label: "预览存档" },
     { globalName: "CanvasiaEditorRecentWorkspace", script: "./modules/recent_workspace.js", label: "最近工作区" },
     { globalName: "CanvasiaEditorFilters", script: "./modules/editor_filters.js", label: "筛选器" },
+    { globalName: "CanvasiaEditorProjectTextRefactor", script: "./modules/project_text_refactor.js", label: "剧情重构台" },
     { globalName: "CanvasiaEditorDashboardSearchPanel", script: "./modules/dashboard_search_panel.js", label: "首页搜索面板" },
     { globalName: "CanvasiaEditorDashboardPrimaryActions", script: "./modules/dashboard_primary_actions.js", label: "首页主操作" },
     { globalName: "CanvasiaEditorDashboardProduction", script: "./modules/dashboard_production.js", label: "制作看板" },

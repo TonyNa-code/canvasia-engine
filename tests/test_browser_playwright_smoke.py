@@ -709,6 +709,65 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
 
         self.assertGreater(block_cards.count(), initial_count)
 
+    def test_project_text_refactor_previews_and_applies_from_dashboard(self) -> None:
+        self.create_blank_project("浏览器烟测项目_TextRefactor")
+        self.create_first_chapter()
+        self.page.locator("#screen-story").get_by_role("button", name="加台词").first.click()
+
+        dialogue_input = self.page.locator("#editorDialogueText")
+        dialogue_input.wait_for(timeout=15000)
+        dialogue_input.fill("旧校舍里还留着旧校舍的钥匙。")
+        self.page.get_by_role("button", name="保存这张卡片").click()
+        self.page.wait_for_function(
+            """async () => {
+                const response = await fetch('/api/project-data');
+                const bundle = await response.json();
+                return (bundle.chapters || []).some((chapter) =>
+                    (chapter.scenes || []).some((scene) =>
+                        (scene.blocks || []).some((block) =>
+                            block.type === 'dialogue' && String(block.text || '').includes('旧校舍')
+                        )
+                    )
+                );
+            }""",
+            timeout=15000,
+        )
+
+        advanced_button = self.page.get_by_role("button", name="打开高级工具").first
+        if advanced_button.is_visible():
+            advanced_button.click()
+        self.page.locator('button[data-screen="dashboard"]').first.click()
+
+        workbench = self.page.locator(".text-refactor-workbench")
+        workbench.wait_for(timeout=15000)
+        workbench.locator("#projectTextRefactorFindInput").fill("旧校舍")
+        workbench.locator("#projectTextRefactorReplaceInput").fill("北馆")
+        workbench.get_by_role("button", name="预览全部命中").click()
+        workbench.get_by_text("替换处数").wait_for(timeout=15000)
+        self.assertIn("旧校舍里还留着旧校舍的钥匙。", workbench.inner_text())
+        self.assertIn("北馆里还留着北馆的钥匙。", workbench.inner_text())
+
+        apply_button = workbench.get_by_role("button", name=re.compile(r"^确认替换 2 处$"))
+        self.assertFalse(apply_button.is_disabled())
+        apply_button.click()
+        dialog = self.page.locator(".system-dialog").filter(has_text="执行这次剧情重构").first
+        dialog.wait_for(timeout=15000)
+        dialog.get_by_role("button", name="替换 2 处").click()
+        workbench.get_by_text("已替换 2 处文字").wait_for(timeout=15000)
+
+        self.page.wait_for_function(
+            """async () => {
+                const response = await fetch('/api/project-data');
+                const bundle = await response.json();
+                const serialized = JSON.stringify(bundle.chapters || []);
+                return serialized.includes('北馆里还留着北馆的钥匙。') && !serialized.includes('旧校舍');
+            }""",
+            timeout=15000,
+        )
+        undo_button = self.page.get_by_role("button", name="撤销").first
+        self.assertFalse(undo_button.is_disabled())
+        self.assertFalse(self.page_errors, "\n".join(self.page_errors))
+
     def test_story_editor_inline_pacing_persists_and_stays_hidden_in_preview(self) -> None:
         self.create_blank_project("浏览器烟测项目_TextPacing")
         self.create_first_chapter()

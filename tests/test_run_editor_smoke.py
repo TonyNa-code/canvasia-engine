@@ -289,6 +289,80 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(target_path.read_text(encoding="utf-8"), '{"ok": true}\n')
         self.assertFalse(list(self.test_root.glob(".atomic_write.json.*.tmp")))
 
+    def test_project_text_refactor_previews_applies_and_rolls_back_transactionally(self) -> None:
+        long_history_label = run_editor.build_project_text_refactor_history_label(
+            {
+                "request": {
+                    "findText": "旧" * 120,
+                    "replaceText": "新" * 120,
+                }
+            }
+        )
+        self.assertLessEqual(len(long_history_label), 96)
+        self.assertIn("…", long_history_label)
+
+        _summary, first_result = self.create_blank_project_with_chapter()
+        second_result = run_editor.create_chapter("第二章", "旧称重逢")
+        chapter_paths = run_editor.list_chapter_files()
+        for path in chapter_paths:
+            chapter = run_editor.read_json(path)
+            for scene in chapter.get("scenes", []):
+                scene["blocks"] = [
+                    {
+                        "id": f"line_{scene['id']}",
+                        "type": "dialogue",
+                        "speakerId": "char_heroine",
+                        "text": f"旧称出现在{scene['name']}。",
+                    }
+                ]
+            run_editor.write_json(path, chapter)
+
+        request = {
+            "findText": "旧称",
+            "replaceText": "新称",
+            "scopes": ["dialogue", "scene_name"],
+            "caseSensitive": True,
+        }
+        preview = run_editor.preview_project_text_refactor(request)
+        self.assertEqual(preview["changedChapterCount"], 2)
+        self.assertEqual(preview["totalReplacements"], 4)
+        self.assertNotIn("changedChapterIndexes", preview)
+
+        result = run_editor.apply_project_text_refactor_to_project(
+            {**request, "expectedRevision": preview["projectRevision"]}
+        )
+        self.assertEqual(result["report"]["changedChapterCount"], 2)
+        self.assertTrue(result["history"]["canUndo"])
+        self.assertEqual(len(result["report"]["changedFiles"]), 2)
+        self.assertLessEqual(len(result["history"]["currentSnapshot"]["label"]), 100)
+        refreshed = [run_editor.read_json(path) for path in chapter_paths]
+        self.assertTrue(all("旧称" not in json.dumps(chapter, ensure_ascii=False) for chapter in refreshed))
+
+        rollback_request = {
+            "findText": "新称",
+            "replaceText": "回滚后不应存在",
+            "scopes": ["dialogue", "scene_name"],
+            "caseSensitive": True,
+        }
+        rollback_preview = run_editor.preview_project_text_refactor(rollback_request)
+        before_failure = {path: path.read_bytes() for path in chapter_paths}
+        original_write_json = run_editor.write_json
+
+        def fail_second_chapter(path: Path, payload: dict) -> None:
+            if path == chapter_paths[1]:
+                raise OSError("simulated batch write failure")
+            original_write_json(path, payload)
+
+        with mock.patch.object(run_editor, "write_json", side_effect=fail_second_chapter):
+            with self.assertRaisesRegex(OSError, "simulated batch write failure"):
+                run_editor.apply_project_text_refactor_to_project(
+                    {**rollback_request, "expectedRevision": rollback_preview["projectRevision"]}
+                )
+
+        self.assertEqual({path: path.read_bytes() for path in chapter_paths}, before_failure)
+        self.assertEqual(first_result["chapterId"], refreshed[0]["chapterId"])
+        self.assertEqual(second_result["chapterId"], refreshed[1]["chapterId"])
+
     def test_local_editor_api_origin_guard_accepts_only_local_hosts(self) -> None:
         accepted_hosts = [
             "127.0.0.1",

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import unittest
+from pathlib import Path
 
 from editor_project_presentation import (
     DEFAULT_DIALOG_BOX_CONFIG,
@@ -70,6 +72,12 @@ class EditorProjectPresentationTests(unittest.TestCase):
             {key: DEFAULT_GAME_UI_CONFIG[key] for key in keys},
             {key: NATIVE_DEFAULT_GAME_UI_CONFIG[key] for key in keys},
         )
+
+    def test_template_project_tracks_every_presentation_default(self) -> None:
+        template_path = Path(__file__).resolve().parents[1] / "template_project" / "project.json"
+        template_project = json.loads(template_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(template_project["gameUiConfig"], DEFAULT_GAME_UI_CONFIG)
 
     def test_dialog_box_sanitizer_clamps_values_without_mutating_defaults(self) -> None:
         sanitized = sanitize_dialog_box_config(
