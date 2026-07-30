@@ -340,6 +340,7 @@ class FrontendProjectSettingsModuleTests(unittest.TestCase):
                 "defaultTextSpeed": "instant",
                 "defaultDialogTheme": "paper",
                 "defaultUiThemeMode": "dark",
+                "defaultMobileReaderMode": "auto",
                 "defaultBgmVolume": 100,
                 "defaultSfxVolume": 85,
                 "defaultVoiceVolume": 0,

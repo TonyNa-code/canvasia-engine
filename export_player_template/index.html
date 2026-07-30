@@ -2,7 +2,7 @@
 <html lang="zh-CN">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Canvasia Engine 网页试玩包</title>
     <link rel="stylesheet" href="./player.css" />
   </head>
@@ -287,6 +287,39 @@
       </main>
     </div>
 
+    <nav id="mobileReaderDock" class="mobile-reader-dock" aria-label="手机阅读快捷栏" data-mobile-gesture-ignore hidden>
+      <button id="mobileHistoryButton" class="mobile-reader-action" type="button">
+        <span aria-hidden="true">↥</span>
+        <strong>回看</strong>
+      </button>
+      <button id="mobileAutoButton" class="mobile-reader-action" type="button" aria-pressed="false">
+        <span aria-hidden="true">▷</span>
+        <strong>自动</strong>
+      </button>
+      <button id="mobileDialogButton" class="mobile-reader-action" type="button" aria-pressed="false">
+        <span aria-hidden="true">▱</span>
+        <strong>隐框</strong>
+      </button>
+      <button id="mobileSystemButton" class="mobile-reader-action" type="button">
+        <span aria-hidden="true">⌁</span>
+        <strong>菜单</strong>
+      </button>
+    </nav>
+
+    <div id="mobileHistorySheet" class="mobile-history-sheet" data-mobile-gesture-ignore hidden>
+      <section class="mobile-history-panel" role="dialog" aria-modal="true" aria-labelledby="mobileHistoryTitle">
+        <header class="mobile-history-head">
+          <div>
+            <span>BACKLOG / 最近经过</span>
+            <h2 id="mobileHistoryTitle">剧情回看</h2>
+          </div>
+          <button id="mobileHistoryCloseButton" class="mobile-history-close" type="button">回到画面</button>
+        </header>
+        <p class="mobile-history-gesture-hint">画面上滑打开回看，下滑隐藏或恢复对话框。选中记录可安全回到对应剧情位置。</p>
+        <div id="mobileHistoryList" class="history-list mobile-history-list"></div>
+      </section>
+    </div>
+
     <div id="saveDialog" class="save-dialog-backdrop" hidden>
       <section class="save-dialog" role="dialog" aria-modal="true" aria-labelledby="saveDialogTitle">
         <div class="save-dialog-head">
@@ -509,6 +542,14 @@
                   <option value="standard">原始演出</option>
                   <option value="gentle">柔和模式</option>
                   <option value="static">静态模式</option>
+                </select>
+              </label>
+              <label class="playback-setting">
+                <span>手机触控阅读</span>
+                <select id="menuMobileReaderModeSelect">
+                  <option value="auto">自动识别设备</option>
+                  <option value="on">始终开启</option>
+                  <option value="off">关闭触控栏</option>
                 </select>
               </label>
               <label class="playback-setting">

@@ -217,6 +217,8 @@ def build_node_check_steps() -> list[VerifyStep]:
             "export_player_template/runtime_particle_renderer.js",
             "export_player_template/runtime_controls.js",
             "export_player_template/runtime_gamepad.js",
+            "export_player_template/runtime_mobile_reader.js",
+            "export_player_template/runtime_mobile_reader_ui.js",
             "export_player_template/runtime_settings.js",
             "export_player_template/runtime_dialogue_layouts.js",
             "export_player_template/runtime_voice_mixer.js",

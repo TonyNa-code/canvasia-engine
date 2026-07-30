@@ -206,6 +206,10 @@ import {
   createAdaptiveParticleQualityController,
 } from "./runtime_particle_quality.js";
 import { renderRuntimeParticleLayer } from "./runtime_particle_renderer.js";
+import {
+  buildMobileReaderControlGroup,
+} from "./runtime_mobile_reader.js";
+import { createMobileReaderUiController } from "./runtime_mobile_reader_ui.js";
 
 const rawData = window.LIGHTWHISPER_GAME_DATA ?? {};
 const runtimeConditionTools = window.CanvasiaRuntimeConditions;
@@ -296,6 +300,14 @@ const refs = {
   resetPlaybackButton: document.getElementById("resetPlaybackButton"),
   systemMenuButton: document.getElementById("systemMenuButton"),
   operationGuideButton: document.getElementById("operationGuideButton"),
+  mobileReaderDock: document.getElementById("mobileReaderDock"),
+  mobileHistoryButton: document.getElementById("mobileHistoryButton"),
+  mobileAutoButton: document.getElementById("mobileAutoButton"),
+  mobileDialogButton: document.getElementById("mobileDialogButton"),
+  mobileSystemButton: document.getElementById("mobileSystemButton"),
+  mobileHistorySheet: document.getElementById("mobileHistorySheet"),
+  mobileHistoryList: document.getElementById("mobileHistoryList"),
+  mobileHistoryCloseButton: document.getElementById("mobileHistoryCloseButton"),
   buildInfoPanel: document.getElementById("buildInfoPanel"),
   variablesPanel: document.getElementById("variablesPanel"),
   missingAssetsPanel: document.getElementById("missingAssetsPanel"),
@@ -334,6 +346,7 @@ const refs = {
   menuDialogThemeSelect: document.getElementById("menuDialogThemeSelect"),
   menuUiThemeSelect: document.getElementById("menuUiThemeSelect"),
   menuVisualComfortSelect: document.getElementById("menuVisualComfortSelect"),
+  menuMobileReaderModeSelect: document.getElementById("menuMobileReaderModeSelect"),
   menuTextScaleSelect: document.getElementById("menuTextScaleSelect"),
   menuDialogOpacitySelect: document.getElementById("menuDialogOpacitySelect"),
   menuBgmVolumeRange: document.getElementById("menuBgmVolumeRange"),
@@ -556,6 +569,8 @@ const state = {
   timedChoicePersistBucket: null,
   storageRecoveryEvents: [],
   particleQualityStatus: null,
+  mobileReaderStatus: null,
+  mobileHistoryOpen: false,
 };
 
 const sfxTransportController = createSfxTransportController({
@@ -576,6 +591,23 @@ const particleQualityController = createAdaptiveParticleQualityController({
       scheduleParticleQualityRerender();
     }
   },
+});
+const mobileReaderUi = createMobileReaderUiController({
+  refs,
+  state,
+  globalObject: window,
+  documentRef: document,
+  getSnapshot: getCurrentSnapshot,
+  getOverlayRoot: getRuntimeGamepadOverlayRoot,
+  isBlockingMediaSnapshot,
+  renderHistory,
+  renderEmpty,
+  handleHistoryPanelClick,
+  stopAutoAdvance: stopRuntimeAutoAdvance,
+  toggleDialogVisibility,
+  persistPlaybackSettings,
+  renderPlaybackControls,
+  setInputMode: setRuntimeInputMode,
 });
 
 let musicRoomAudio = null;
@@ -664,6 +696,12 @@ function init() {
   refs.operationGuideButton?.addEventListener("click", openOperationGuideDialog);
   refs.stageFrame?.addEventListener("click", handleStageFrameClick);
   refs.stageFrame?.addEventListener("contextmenu", handleStageFrameContextMenu);
+  refs.mobileHistoryButton?.addEventListener("click", openMobileHistorySheet);
+  refs.mobileAutoButton?.addEventListener("click", toggleAutoPlay);
+  refs.mobileDialogButton?.addEventListener("click", toggleDialogVisibility);
+  refs.mobileSystemButton?.addEventListener("click", openSystemMenu);
+  refs.mobileHistoryCloseButton?.addEventListener("click", closeMobileHistorySheet);
+  refs.mobileHistorySheet?.addEventListener("click", handleMobileHistorySheetClick);
   refs.historyPanel?.addEventListener("click", handleHistoryPanelClick);
   refs.saveSlotPanel?.addEventListener("click", handleSaveSlotPanelClick);
   refs.saveDialogSlotList?.addEventListener("click", handleSaveSlotPanelClick);
@@ -718,6 +756,7 @@ function init() {
   refs.menuDialogThemeSelect?.addEventListener("change", handleDialogThemeChange);
   refs.menuUiThemeSelect?.addEventListener("change", handleUiThemeModeChange);
   refs.menuVisualComfortSelect?.addEventListener("change", handleVisualComfortChange);
+  refs.menuMobileReaderModeSelect?.addEventListener("change", handleMobileReaderModeChange);
   refs.menuTextScaleSelect?.addEventListener("change", handleTextScaleChange);
   refs.menuDialogOpacitySelect?.addEventListener("change", handleDialogOpacityChange);
   refs.menuBgmVolumeRange?.addEventListener("input", handleBgmVolumeChange);
@@ -761,8 +800,11 @@ function init() {
   document.addEventListener("visibilitychange", syncRuntimeTimedChoicePauseState);
   document.addEventListener("click", scheduleRuntimeTimedChoicePauseSync);
   document.addEventListener("keydown", scheduleRuntimeTimedChoicePauseSync);
-  document.addEventListener("pointerdown", () => setRuntimeInputMode("pointer"), { passive: true });
+  document.addEventListener("pointerdown", (event) => {
+    setRuntimeInputMode(event.pointerType === "touch" || event.pointerType === "pen" ? "touch" : "pointer");
+  }, { passive: true });
   startRuntimeGamepadInput();
+  mobileReaderUi.start();
   particleQualityController.start(window);
   window.addEventListener("beforeunload", finalizePlayerSession);
   window.addEventListener("beforeunload", stopMusic);
@@ -771,6 +813,7 @@ function init() {
   window.addEventListener("beforeunload", stopSfxPlayback);
   window.addEventListener("beforeunload", stopVoicePlayback);
   window.addEventListener("beforeunload", stopRuntimeGamepadInput);
+  window.addEventListener("beforeunload", mobileReaderUi.stop);
   window.addEventListener("beforeunload", captureCurrentTimedChoiceState);
   window.addEventListener("beforeunload", () => particleQualityController.stop(window));
   startRuntimeAssetPreload();
@@ -1266,6 +1309,7 @@ function renderBeforeStart() {
   state.galleryDialogOpen = false;
   state.musicRoomDialogOpen = false;
   state.operationGuideOpen = false;
+  state.mobileHistoryOpen = false;
   state.returnTitleConfirmOpen = false;
   state.saveConfirmOpen = false;
   state.saveConfirmIntent = null;
@@ -1341,6 +1385,7 @@ function startGameFromScene(sceneId = getEntrySceneId()) {
   state.galleryDialogOpen = false;
   state.musicRoomDialogOpen = false;
   state.operationGuideOpen = false;
+  state.mobileHistoryOpen = false;
   state.returnTitleConfirmOpen = false;
   state.saveConfirmOpen = false;
   state.saveConfirmIntent = null;
@@ -1405,6 +1450,7 @@ function continueLastSession() {
   state.galleryDialogOpen = false;
   state.musicRoomDialogOpen = false;
   state.operationGuideOpen = false;
+  state.mobileHistoryOpen = false;
   state.returnTitleConfirmOpen = false;
   state.saveConfirmOpen = false;
   state.saveConfirmIntent = null;
@@ -2313,11 +2359,12 @@ function renderOperationGuideDialog() {
     ? ` 手柄已连接：${state.runtimeGamepadStatus.label}。`
     : " 也可连接标准布局手柄操作。";
   refs.operationGuideDialogSummary.textContent = state.started
-    ? `这些操作会直接作用于当前试玩进度；打开本页时自动播放会先暂停，避免错过剧情。${gamepadSummary}`
-    : `开始试玩前可以先看一眼操作方式。导出包支持鼠标、键盘和标准布局手柄。${gamepadSummary}`;
+    ? `这些操作会直接作用于当前试玩进度；打开本页时自动播放会先暂停，避免错过剧情。手机触控模式会自动避开按钮与输入框。${gamepadSummary}`
+    : `开始试玩前可以先看一眼操作方式。导出包支持鼠标、触控、键盘和标准布局手柄。${gamepadSummary}`;
   refs.operationGuideList.innerHTML = renderOperationGuideGroups([
     ...buildRuntimeShortcutGroups(state.playback.keyBindings),
     buildRuntimeGamepadControlGroup(state.runtimeGamepadStatus),
+    buildMobileReaderControlGroup(state.mobileReaderStatus),
   ]);
 }
 
@@ -5963,6 +6010,7 @@ function renderPlaybackControls(snapshot = getCurrentSnapshot()) {
   renderSaveConfirmDialog();
   renderSaveDialog();
   renderOperationGuideDialog();
+  renderMobileReaderControls(snapshot);
 }
 
 function applyRuntimeReadingPresentation() {
@@ -6138,6 +6186,7 @@ function showDialogPanel() {
 
   state.dialogHidden = false;
   renderDialogVisibility();
+  renderMobileReaderControls();
   return true;
 }
 
@@ -6148,6 +6197,7 @@ function toggleDialogVisibility() {
 
   state.dialogHidden = !state.dialogHidden;
   renderDialogVisibility();
+  renderMobileReaderControls();
   return true;
 }
 
@@ -6208,8 +6258,29 @@ function setRuntimeInputMode(mode) {
   document.documentElement.dataset.runtimeInput = String(mode || "pointer");
 }
 
+function handleMobileReaderModeChange(event) {
+  mobileReaderUi.handleModeChange(event);
+}
+
+function renderMobileReaderControls(snapshot = getCurrentSnapshot()) {
+  mobileReaderUi.render(snapshot);
+}
+
+function openMobileHistorySheet() {
+  return mobileReaderUi.openHistory();
+}
+
+function closeMobileHistorySheet() {
+  return mobileReaderUi.closeHistory();
+}
+
+function handleMobileHistorySheetClick(event) {
+  mobileReaderUi.handleHistorySheetClick(event);
+}
+
 function getRuntimeGamepadOverlayRoot() {
   const overlayEntries = [
+    [state.mobileHistoryOpen, refs.mobileHistorySheet],
     [state.saveConfirmOpen, refs.saveConfirmDialog],
     [state.returnTitleConfirmOpen, refs.returnTitleDialog],
     [state.operationGuideOpen, refs.operationGuideDialog],
@@ -6355,6 +6426,7 @@ function handleGlobalKeydown(event) {
   }
 
   if (handleRuntimeModalKeydown(event, [
+    { isOpen: state.mobileHistoryOpen, close: closeMobileHistorySheet },
     { isOpen: state.operationGuideOpen, close: closeOperationGuideDialog },
     { isOpen: state.profileDialogOpen, close: closeProfileDialog },
     { isOpen: state.voiceReplayDialogOpen, close: closeVoiceReplayDialog },
@@ -7183,6 +7255,7 @@ function getSystemMenuSummary() {
 }
 
 function openSystemMenu() {
+  state.mobileHistoryOpen = false;
   state.saveDialogOpen = false;
   state.returnTitleConfirmOpen = false;
   state.saveConfirmOpen = false;
@@ -7215,6 +7288,7 @@ function openSystemMenu() {
   renderReturnTitleDialog();
   renderSaveConfirmDialog();
   renderSystemMenu();
+  renderMobileReaderControls();
   return true;
 }
 
@@ -7225,6 +7299,7 @@ function closeSystemMenu() {
 
   state.systemMenuOpen = false;
   renderSystemMenu();
+  renderMobileReaderControls();
   return true;
 }
 

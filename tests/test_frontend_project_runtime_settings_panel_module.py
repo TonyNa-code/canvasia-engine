@@ -27,6 +27,7 @@ class FrontendProjectRuntimeSettingsPanelModuleTests(unittest.TestCase):
               textSpeedLabels: {{ normal: "普通", fast: "快速" }},
               dialogThemeLabels: {{ project: "项目样式", paper: "纸张" }},
               uiThemeModeLabels: {{ auto: "自动", dark: "深色" }},
+              mobileReaderModeLabels: {{ auto: "自动识别设备", on: "始终开启", off: "关闭" }},
               performanceProfileLabels: {{ standard: "标准 PC / 网页", web: "网页轻量" }},
               dialogBoxPresetLabels: {{ glass: "玻璃", custom: "自定义" }},
               dialogBoxShapeLabels: {{ rounded: "圆角" }},
@@ -54,6 +55,7 @@ class FrontendProjectRuntimeSettingsPanelModuleTests(unittest.TestCase):
                 defaultTextSpeed: "fast",
                 defaultDialogTheme: "project",
                 defaultUiThemeMode: "dark",
+                defaultMobileReaderMode: "on",
                 performanceProfile: "web",
                 defaultBgmVolume: 64,
                 defaultSfxVolume: 70,
@@ -170,6 +172,7 @@ class FrontendProjectRuntimeSettingsPanelModuleTests(unittest.TestCase):
             process.stdout.write(JSON.stringify({{
               hasPerformanceSelect: html.includes('id="projectRuntimePerformanceProfileSelect"'),
               hasPerformanceLabel: html.includes("性能目标"),
+              hasMobileReaderMode: html.includes('id="projectRuntimeDefaultMobileReaderModeSelect"') && html.includes("手机触控阅读"),
               hasDialogAction: html.includes('data-action="apply-dialog-box-readability-fix"'),
               hasGameUiSave: html.includes('data-action="save-project-game-ui-config"'),
               hasAssetName: html.includes("文本框 · box.png"),
@@ -194,6 +197,7 @@ class FrontendProjectRuntimeSettingsPanelModuleTests(unittest.TestCase):
         payload = json.loads(completed.stdout)
         self.assertTrue(payload["hasPerformanceSelect"])
         self.assertTrue(payload["hasPerformanceLabel"])
+        self.assertTrue(payload["hasMobileReaderMode"])
         self.assertTrue(payload["hasDialogAction"])
         self.assertTrue(payload["hasGameUiSave"])
         self.assertTrue(payload["hasAssetName"])
@@ -219,6 +223,7 @@ class FrontendProjectRuntimeSettingsPanelModuleTests(unittest.TestCase):
               projectRuntimeDefaultTextSpeedSelect: {{ value: "fast" }},
               projectRuntimeDefaultDialogThemeSelect: {{ value: "project" }},
               projectRuntimeDefaultUiThemeModeSelect: {{ value: "dark" }},
+              projectRuntimeDefaultMobileReaderModeSelect: {{ value: "off" }},
               projectRuntimeDefaultBgmVolumeInput: {{ value: "64" }},
               projectRuntimeDefaultSfxVolumeInput: {{ value: "70" }},
               projectRuntimeDefaultVoiceVolumeInput: {{ value: "80" }},
@@ -267,6 +272,7 @@ class FrontendProjectRuntimeSettingsPanelModuleTests(unittest.TestCase):
         payload = json.loads(completed.stdout)
         self.assertEqual(payload["runtime"]["performanceProfile"], "web")
         self.assertEqual(payload["runtime"]["defaultTextSpeed"], "fast")
+        self.assertEqual(payload["runtime"]["defaultMobileReaderMode"], "off")
         self.assertFalse(payload["runtime"]["defaultVoiceEnabled"])
         self.assertTrue(payload["runtime"]["defaultVoiceDuckingEnabled"])
         self.assertEqual(payload["dialog"]["preset"], "glass")

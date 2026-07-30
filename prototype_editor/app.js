@@ -291,6 +291,7 @@ const {
   PARTICLE_IMAGE_ASSET_TYPES,
 } = particleEffectTools;
 const variableTools = window.CanvasiaEditorVariables;
+const projectVariableGovernanceTools = window.CanvasiaEditorProjectVariableGovernance;
 const {
   PROJECT_VARIABLE_FILTER_LABELS,
   PROJECT_VARIABLE_SCOPE_DESCRIPTIONS,
@@ -554,6 +555,11 @@ const UI_THEME_MODE_LABELS = uiThemeTools?.UI_THEME_MODE_LABELS ?? {
   light: "浅色模式",
   dark: "深色模式",
 };
+const RUNTIME_MOBILE_READER_MODE_LABELS = Object.freeze({
+  auto: "自动识别设备",
+  on: "始终显示触控栏",
+  off: "关闭触控栏",
+});
 
 const PROJECT_SETTINGS_OPTIONS = Object.freeze({
   defaultResolution: projectSettingsTools.DEFAULT_RESOLUTION,
@@ -564,6 +570,7 @@ const PROJECT_SETTINGS_OPTIONS = Object.freeze({
   runtimeTextSpeedLabels: TEXT_SPEED_LABELS,
   runtimeDialogThemeLabels: DIALOG_THEME_LABELS,
   runtimeUiThemeModeLabels: UI_THEME_MODE_LABELS,
+  runtimeMobileReaderModeLabels: RUNTIME_MOBILE_READER_MODE_LABELS,
   runtimePerformanceProfileLabels: RUNTIME_PERFORMANCE_PROFILE_LABELS,
   dialogBoxPresetLabels: PROJECT_DIALOG_BOX_PRESET_LABELS,
   dialogBoxShapeLabels: PROJECT_DIALOG_BOX_SHAPE_LABELS,
@@ -37233,289 +37240,50 @@ function renderProjectVariableEditorRow(variable, usage) {
   `;
 }
 
-function getProjectVariableGovernanceItems(variables, usageMap) {
-  return variables.map((variable) => {
-    const draft = getProjectVariableDraft(variable.id);
-    const renderVariable = buildProjectVariableDraftModel(variable);
-  const usage = usageMap.get(variable.id) ?? { total: 0, references: [] };
-  const rangeIssues = getProjectVariableRangeIssues(renderVariable);
-  const idIssue = getProjectVariableIdIssue(renderVariable.id, variable.id);
-  const status = getSafeProjectVariableStatus(renderVariable.status);
-  const issues = [...rangeIssues];
-  if (idIssue) {
-    issues.push(idIssue);
-  }
-  if (status === "deprecated" && usage.total > 0) {
-    issues.push("废弃变量仍被引用");
-  }
+function getProjectVariableGovernanceOptions() {
   return {
-    variable,
-    renderVariable,
-    usage,
-    issues,
-    status,
-    hasDraft: Boolean(draft),
+    getDraft: getProjectVariableDraft,
+    buildDraftModel: buildProjectVariableDraftModel,
+    getRangeIssues: getProjectVariableRangeIssues,
+    getIdIssue: getProjectVariableIdIssue,
+    getSafeStatus: getSafeProjectVariableStatus,
+    getSafeScope: getSafeProjectVariableScope,
+    getVariableTypeLabel,
+    getDefaultInputValue: getProjectVariableDefaultInputValue,
+    isPersistentVariable: isPersistentProjectVariable,
+    escapeHtml,
+    renderMetricCard: renderRouteMetricCard,
+    renderEmpty,
+    renderEditorRow: renderProjectVariableEditorRow,
+    filterLabels: PROJECT_VARIABLE_FILTER_LABELS,
+    scopeLabels: PROJECT_VARIABLE_SCOPE_LABELS,
+    statusLabels: PROJECT_VARIABLE_STATUS_LABELS,
   };
-});
 }
 
-function isProjectVariableMatchingFilter(item, filterMode) {
-  if (filterMode === "referenced") {
-    return item.usage.total > 0;
-  }
-  if (filterMode === "unused") {
-    return item.usage.total === 0;
-  }
-  if (filterMode === "risky") {
-    return item.issues.length > 0;
-  }
-  if (filterMode === "draft") {
-    return item.hasDraft;
-  }
-  if (["active", "reserved", "deprecated"].includes(filterMode)) {
-    return item.status === filterMode;
-  }
-  if (["number", "boolean", "string"].includes(filterMode)) {
-    return item.renderVariable.type === filterMode;
-  }
-  if (["save", "persistent"].includes(filterMode)) {
-    return getSafeProjectVariableScope(item.renderVariable.scope) === filterMode;
-  }
-  return true;
-}
-
-function getProjectVariableGovernanceScore(items) {
-  if (items.length === 0) {
-    return 100;
-  }
-  const riskCount = items.filter((item) => item.issues.length > 0).length;
-  const unusedCount = items.filter((item) => item.usage.total === 0 && item.status !== "reserved").length;
-  const draftCount = items.filter((item) => item.hasDraft).length;
-  const penalty = riskCount * 18 + unusedCount * 4 + draftCount * 2;
-  return clamp(100 - penalty, 0, 100);
-}
-
-function renderProjectVariableGovernancePanel(items) {
-  const totalCount = items.length;
-  const referencedCount = items.filter((item) => item.usage.total > 0).length;
-  const unusedCount = items.filter((item) => item.usage.total === 0).length;
-  const riskItems = items.filter((item) => item.issues.length > 0);
-  const draftCount = items.filter((item) => item.hasDraft).length;
-  const reservedCount = items.filter((item) => item.status === "reserved").length;
-  const deprecatedCount = items.filter((item) => item.status === "deprecated").length;
-  const persistentCount = items.filter((item) => isPersistentProjectVariable(item.renderVariable)).length;
-  const score = getProjectVariableGovernanceScore(items);
-  const hotItems = items
-    .filter((item) => item.usage.total > 0)
-    .sort((a, b) => b.usage.total - a.usage.total)
-    .slice(0, 3);
-  const unusedPreview = items
-    .filter((item) => item.usage.total === 0)
-    .slice(0, 4);
-
-  return `
-    <section class="detail-card">
-      <div class="panel-heading">
-        <div>
-          <strong>变量治理雷达</strong>
-          <p class="helper-text">用项目级视角看变量健康度：风险越少、废弃变量越少，后期做分支和导出就越稳。</p>
-        </div>
-        <span class="badge badge-soft">Health ${score}</span>
-      </div>
-      <div class="route-summary-strip beginner-guide-metrics">
-        ${renderRouteMetricCard("健康分", score, "范围风险、草稿和未引用变量越少越高")}
-        ${renderRouteMetricCard("引用覆盖", `${referencedCount} / ${totalCount}`, "至少被一张剧情卡片使用")}
-        ${renderRouteMetricCard("未引用", unusedCount, "可清理，也可能是预留变量")}
-        ${renderRouteMetricCard("风险变量", riskItems.length, "ID、范围或默认值需要处理")}
-        ${renderRouteMetricCard("草稿中", draftCount, "已修改但还没保存")}
-        ${renderRouteMetricCard("跨周目", persistentCount, "新游戏、旧存档和回退都不会让它倒退")}
-        ${renderRouteMetricCard("预留 / 废弃", `${reservedCount} / ${deprecatedCount}`, "预留不会被自动清理；废弃仍引用会报风险")}
-      </div>
-      <div class="playback-setting-grid dialog-config-grid">
-        <article class="detail-card">
-          <strong>热点变量</strong>
-          <div class="detail-stack">
-            ${
-              hotItems.length > 0
-                ? hotItems
-                    .map(
-                      (item) => `
-                        <div class="detail-row">
-                          <label>${escapeHtml(item.renderVariable.name || item.variable.id)}</label>
-                          <div class="value">${item.usage.total} 处引用</div>
-                        </div>
-                      `
-                    )
-                    .join("")
-                : renderEmpty("还没有变量被剧情卡片引用。")
-            }
-          </div>
-        </article>
-        <article class="detail-card">
-          <strong>优先处理</strong>
-          <div class="detail-stack">
-            ${
-              riskItems.length > 0
-                ? riskItems
-                    .slice(0, 4)
-                    .map(
-                      (item) => `
-                        <div class="detail-row">
-                          <label>${escapeHtml(item.renderVariable.name || item.variable.id)}</label>
-                          <div class="value">${escapeHtml(item.issues.join("、"))}</div>
-                        </div>
-                      `
-                    )
-                    .join("")
-                : renderEmpty("变量 ID、默认值和范围目前没有明显风险。")
-            }
-          </div>
-        </article>
-        <article class="detail-card">
-          <strong>未引用预览</strong>
-          <div class="detail-stack">
-            ${
-              unusedPreview.length > 0
-                ? unusedPreview
-                    .map(
-                      (item) => `
-                        <div class="detail-row">
-                          <label>${escapeHtml(item.renderVariable.name || item.variable.id)}</label>
-                          <div class="value">${escapeHtml(getVariableTypeLabel(item.renderVariable.type))}</div>
-                        </div>
-                      `
-                    )
-                    .join("")
-                : renderEmpty("没有未引用变量，逻辑库很干净。")
-            }
-          </div>
-        </article>
-      </div>
-    </section>
-  `;
-}
-
-function renderProjectVariableFilterButtons(items) {
-  const filterMode = getSafeProjectVariableFilterMode(state.projectVariableFilterMode);
-  return Object.entries(PROJECT_VARIABLE_FILTER_LABELS)
-    .map(([mode, label]) => {
-      const count = items.filter((item) => isProjectVariableMatchingFilter(item, mode)).length;
-      return `
-        <button
-          type="button"
-          class="toolbar-button ${filterMode === mode ? "toolbar-button-primary" : ""}"
-          data-action="set-project-variable-filter"
-          data-variable-filter-mode="${mode}"
-        >
-          ${escapeHtml(label)} · ${count}
-        </button>
-      `;
-    })
-    .join("");
+function getProjectVariableGovernanceItems(variables, usageMap) {
+  return projectVariableGovernanceTools.buildGovernanceItems(
+    variables,
+    usageMap,
+    getProjectVariableGovernanceOptions()
+  );
 }
 
 function renderProjectVariableLibraryPanel() {
   const variables = state.data.variables ?? [];
-  const query = String(state.projectVariableSearchQuery ?? "").trim().toLowerCase();
   const filterMode = getSafeProjectVariableFilterMode(state.projectVariableFilterMode);
   const usageMap = buildProjectVariableUsageMap();
   const governanceItems = getProjectVariableGovernanceItems(variables, usageMap);
-  const filteredItems = governanceItems.filter((item) => {
-    const { variable, renderVariable } = item;
-    if (!isProjectVariableMatchingFilter(item, filterMode)) {
-      return false;
-    }
-    if (!query) {
-      return true;
-    }
-    return [
-      renderVariable.id,
-      renderVariable.name,
-      renderVariable.group,
-      renderVariable.description,
-      variable.id,
-      variable.name,
-      getVariableTypeLabel(renderVariable.type),
-      PROJECT_VARIABLE_SCOPE_LABELS[getSafeProjectVariableScope(renderVariable.scope)],
-      PROJECT_VARIABLE_STATUS_LABELS[getSafeProjectVariableStatus(renderVariable.status)],
-    ]
-      .some((value) => String(value ?? "").toLowerCase().includes(query));
-  });
-  const referencedCount = variables.filter((variable) => (usageMap.get(variable.id)?.total ?? 0) > 0).length;
-  const unusedCount = Math.max(variables.length - referencedCount, 0);
-  const riskCount = variables.filter((variable) => getProjectVariableRangeIssues(variable).length > 0).length;
-  const persistentCount = variables.filter((variable) => isPersistentProjectVariable(variable)).length;
-  const typeCount = (type) => variables.filter((variable) => variable.type === type).length;
-
-  return `
-    <section class="detail-card dialog-config-card" id="projectVariableLibraryPanel">
-      <div class="panel-heading">
-        <div>
-          <strong>变量库管理台</strong>
-          <p class="helper-text">集中管理好感度、路线标记、开关和计数器。这里保存后，剧情条件、选项效果、网页包和原生 Runtime 会一起使用同一套变量定义。</p>
-        </div>
-        <span class="badge badge-soft">Logic Core</span>
-      </div>
-      <div class="route-summary-strip beginner-guide-metrics">
-        ${renderRouteMetricCard("变量总数", variables.length, "项目可用的逻辑状态")}
-        ${renderRouteMetricCard("数字变量", typeCount("number"), "好感度、分数和进度")}
-        ${renderRouteMetricCard("跨周目记忆", persistentCount, "通关标记、周目继承和隐藏路线")}
-        ${renderRouteMetricCard("已引用", referencedCount, "被剧情卡片实际使用")}
-        ${renderRouteMetricCard("未引用", unusedCount, "可能是废弃变量或预留变量")}
-        ${renderRouteMetricCard("待整理", riskCount, "范围或默认值需要注意")}
-      </div>
-      ${renderProjectVariableGovernancePanel(governanceItems)}
-      <div class="asset-search-row story-tree-filter-row">
-        <label class="asset-search-field">
-          <span class="sr-only">搜索变量</span>
-          <input
-            id="projectVariableSearchInput"
-            type="search"
-            value="${escapeHtml(state.projectVariableSearchQuery)}"
-            placeholder="搜变量名、ID 或类型"
-          />
-        </label>
-        <button class="toolbar-button" data-action="add-project-variable" data-variable-type="number">新增数字</button>
-        <button class="toolbar-button" data-action="add-project-variable" data-variable-type="boolean">新增开关</button>
-        <button class="toolbar-button" data-action="add-project-variable" data-variable-type="string">新增文本</button>
-        <button class="toolbar-button" data-action="repair-project-variable-ranges">一键整理范围</button>
-        <button class="toolbar-button" data-action="delete-unused-project-variables">清理未引用</button>
-        <button class="toolbar-button" data-action="export-project-variable-report">导出治理报告</button>
-        <button class="toolbar-button" data-action="create-starter-variables">补齐基础变量包</button>
-      </div>
-      <div class="story-filter-chip-row">
-        ${renderProjectVariableFilterButtons(governanceItems)}
-      </div>
-      <div class="detail-stack">
-        ${
-          filteredItems.length > 0
-            ? filteredItems
-                .map(({ variable }) =>
-                  renderProjectVariableEditorRow(
-                    variable,
-                    usageMap.get(variable.id) ?? {
-                      total: 0,
-                      setCount: 0,
-                      addCount: 0,
-                      inputCount: 0,
-                      textReferenceCount: 0,
-                      conditionCount: 0,
-                      choiceEffectCount: 0,
-                      locations: [],
-                      references: [],
-                    }
-                  )
-                )
-                .join("")
-            : renderEmpty(
-                variables.length > 0
-                  ? `当前「${PROJECT_VARIABLE_FILTER_LABELS[filterMode]}」视图没有命中变量。`
-                  : "这个项目还没有变量，可以先新增一个数字变量或补齐基础变量包。"
-              )
-        }
-      </div>
-    </section>
-  `;
+  return projectVariableGovernanceTools.renderLibraryPanel(
+    {
+      variables,
+      searchQuery: state.projectVariableSearchQuery,
+      filterMode,
+      usageMap,
+      governanceItems,
+    },
+    getProjectVariableGovernanceOptions()
+  );
 }
 
 function rerenderProjectVariableLibraryPanel() {
@@ -37532,90 +37300,14 @@ function setProjectVariableFilterMode(mode) {
 }
 
 function buildProjectVariableAuditReportContent(items) {
-  const projectTitle = state.data?.project?.title ?? "未命名项目";
-  const score = getProjectVariableGovernanceScore(items);
-  const referencedCount = items.filter((item) => item.usage.total > 0).length;
-  const unusedItems = items.filter((item) => item.usage.total === 0);
-  const riskItems = items.filter((item) => item.issues.length > 0);
-  const draftItems = items.filter((item) => item.hasDraft);
-  const persistentItems = items.filter((item) => isPersistentProjectVariable(item.renderVariable));
-  const hotItems = [...items]
-    .filter((item) => item.usage.total > 0)
-    .sort((a, b) => b.usage.total - a.usage.total);
-  const lines = [
-    "Canvasia Engine 变量治理报告",
-    `项目：${projectTitle}`,
-    `生成时间：${new Date().toLocaleString()}`,
-    "",
-    "一、总体概览",
-    `- 健康分：${score}`,
-    `- 变量总数：${items.length}`,
-    `- 已引用变量：${referencedCount}`,
-    `- 未引用变量：${unusedItems.length}`,
-    `- 风险变量：${riskItems.length}`,
-    `- 草稿变量：${draftItems.length}`,
-    `- 跨周目记忆：${persistentItems.length}`,
-    "",
-    "二、热点变量",
-  ];
-
-  if (hotItems.length > 0) {
-    hotItems.slice(0, 12).forEach((item, index) => {
-      lines.push(
-        `${index + 1}. ${item.renderVariable.name || item.variable.id} (${item.variable.id})：${item.usage.total} 处引用`
-      );
-    });
-  } else {
-    lines.push("暂无变量被剧情卡片引用。");
-  }
-
-  lines.push("", "三、优先处理风险");
-  if (riskItems.length > 0) {
-    riskItems.forEach((item, index) => {
-      lines.push(
-        `${index + 1}. ${item.renderVariable.name || item.variable.id} (${item.variable.id})：${item.issues.join("、")}`
-      );
-    });
-  } else {
-    lines.push("未发现变量 ID、默认值或范围风险。");
-  }
-
-  lines.push("", "四、未引用变量");
-  if (unusedItems.length > 0) {
-    unusedItems.forEach((item, index) => {
-      lines.push(
-        `${index + 1}. ${item.renderVariable.name || item.variable.id} (${item.variable.id}) · ${getVariableTypeLabel(item.renderVariable.type)}`
-      );
-    });
-  } else {
-    lines.push("没有未引用变量。");
-  }
-
-  lines.push("", "五、变量明细");
-  items.forEach((item, index) => {
-    lines.push(
-      `${index + 1}. ${item.renderVariable.name || item.variable.id}`,
-      `   ID：${item.variable.id}`,
-      `   类型：${getVariableTypeLabel(item.renderVariable.type)}`,
-      `   保存范围：${PROJECT_VARIABLE_SCOPE_LABELS[getSafeProjectVariableScope(item.renderVariable.scope)]}`,
-      `   分组：${item.renderVariable.group || "未分组"}`,
-      `   状态：${PROJECT_VARIABLE_STATUS_LABELS[item.status]}`,
-      `   说明：${item.renderVariable.description || "未填写"}`,
-      `   默认值：${getProjectVariableDefaultInputValue(item.renderVariable)}`,
-      `   引用数：${item.usage.total}`,
-      `   风险：${item.issues.length > 0 ? item.issues.join("、") : "无"}`
-    );
-    if (item.usage.references.length > 0) {
-      item.usage.references.slice(0, 8).forEach((reference) => {
-        lines.push(`   - ${reference.label}`);
-      });
-      if (item.usage.references.length > 8) {
-        lines.push(`   - 另有 ${item.usage.references.length - 8} 处引用`);
-      }
-    }
-  });
-
-  return `\uFEFF${lines.join("\n")}`;
+  return projectVariableGovernanceTools.buildAuditReport(
+    items,
+    {
+      projectTitle: state.data?.project?.title ?? "未命名项目",
+      generatedAt: new Date().toLocaleString(),
+    },
+    getProjectVariableGovernanceOptions()
+  );
 }
 
 function exportProjectVariableAuditReport() {
@@ -37634,6 +37326,7 @@ function buildProjectRuntimeSettingsPanelLabels() {
     textSpeedLabels: TEXT_SPEED_LABELS,
     dialogThemeLabels: DIALOG_THEME_LABELS,
     uiThemeModeLabels: UI_THEME_MODE_LABELS,
+    mobileReaderModeLabels: RUNTIME_MOBILE_READER_MODE_LABELS,
     performanceProfileLabels: RUNTIME_PERFORMANCE_PROFILE_LABELS,
     dialogBoxPresetLabels: PROJECT_DIALOG_BOX_PRESET_LABELS,
     dialogBoxShapeLabels: PROJECT_DIALOG_BOX_SHAPE_LABELS,

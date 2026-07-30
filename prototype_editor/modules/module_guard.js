@@ -39,6 +39,7 @@ const REQUIRED_EDITOR_MODULES = Object.freeze([
     { globalName: "CanvasiaEditorExportFileNames", script: "./modules/export_file_names.js", label: "导出文件命名" },
     { globalName: "CanvasiaEditorExportReportDescriptions", script: "./modules/export_report_descriptions.js", label: "导出报告说明" },
     { globalName: "CanvasiaEditorVariables", script: "./modules/variables.js", label: "变量系统" },
+    { globalName: "CanvasiaEditorProjectVariableGovernance", script: "./modules/project_variable_governance.js", label: "变量治理" },
     { globalName: "CanvasiaEditorProjectRuntimeSettings", script: "./modules/project_runtime_settings.js", label: "运行设置" },
     { globalName: "CanvasiaEditorProjectRuntimeSettingsPanel", script: "./modules/project_runtime_settings_panel.js", label: "运行设置面板" },
     { globalName: "CanvasiaEditorProjectSettings", script: "./modules/project_settings.js", label: "项目设置" },

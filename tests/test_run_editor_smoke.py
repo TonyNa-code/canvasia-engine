@@ -1343,6 +1343,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 "defaultTextSpeed": "fast",
                 "defaultDialogTheme": "paper",
                 "defaultUiThemeMode": "dark",
+                "defaultMobileReaderMode": "on",
                 "defaultBgmVolume": 64,
                 "defaultSfxVolume": 77,
                 "defaultVoiceVolume": 88,
@@ -1465,6 +1466,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(saved_project["runtimeSettings"]["defaultTextSpeed"], "fast")
         self.assertEqual(saved_project["runtimeSettings"]["defaultDialogTheme"], "paper")
         self.assertEqual(saved_project["runtimeSettings"]["defaultUiThemeMode"], "dark")
+        self.assertEqual(saved_project["runtimeSettings"]["defaultMobileReaderMode"], "on")
         self.assertEqual(saved_project["runtimeSettings"]["defaultBgmVolume"], 64)
         self.assertEqual(saved_project["runtimeSettings"]["defaultSfxVolume"], 77)
         self.assertEqual(saved_project["runtimeSettings"]["defaultVoiceVolume"], 88)
@@ -1530,6 +1532,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(merged_runtime_settings["defaultTextSpeed"], "fast")
         self.assertEqual(merged_runtime_settings["defaultDialogTheme"], "paper")
         self.assertEqual(merged_runtime_settings["defaultUiThemeMode"], "dark")
+        self.assertEqual(merged_runtime_settings["defaultMobileReaderMode"], "on")
         self.assertEqual(merged_runtime_settings["defaultBgmVolume"], 64)
         self.assertEqual(merged_runtime_settings["defaultSfxVolume"], 77)
         self.assertEqual(merged_runtime_settings["defaultVoiceVolume"], 88)
@@ -3393,6 +3396,8 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / "runtime_choice_availability.js").is_file())
         self.assertTrue((build_dir / "runtime_controls.js").is_file())
         self.assertTrue((build_dir / "runtime_gamepad.js").is_file())
+        self.assertTrue((build_dir / "runtime_mobile_reader.js").is_file())
+        self.assertTrue((build_dir / "runtime_mobile_reader_ui.js").is_file())
         self.assertTrue((build_dir / "runtime_settings.js").is_file())
         self.assertTrue((build_dir / "runtime_reading_profiles.js").is_file())
         self.assertTrue((build_dir / "runtime_dialogue_layouts.js").is_file())
@@ -3511,6 +3516,8 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["playerRuntimeVisualConstants"], "runtime_visual_constants.js")
         self.assertEqual(manifest["files"]["playerRuntimeControls"], "runtime_controls.js")
         self.assertEqual(manifest["files"]["playerRuntimeGamepad"], "runtime_gamepad.js")
+        self.assertEqual(manifest["files"]["playerRuntimeMobileReader"], "runtime_mobile_reader.js")
+        self.assertEqual(manifest["files"]["playerRuntimeMobileReaderUi"], "runtime_mobile_reader_ui.js")
         self.assertEqual(manifest["files"]["playerRuntimeConditions"], "runtime_conditions.js")
         self.assertEqual(manifest["files"]["playerRuntimeChoiceAvailability"], "runtime_choice_availability.js")
         self.assertEqual(manifest["files"]["playerRuntimeSettings"], "runtime_settings.js")
@@ -3613,6 +3620,8 @@ class RunEditorSmokeTests(unittest.TestCase):
                 "runtime_conditions.js",
                 "runtime_controls.js",
                 "runtime_gamepad.js",
+                "runtime_mobile_reader.js",
+                "runtime_mobile_reader_ui.js",
                 "runtime_settings.js",
                 "runtime_voice_mixer.js",
                 "runtime_ui_skin.js",
@@ -5030,6 +5039,8 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / "app" / "runtime_choice_availability.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_controls.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_gamepad.js").is_file())
+        self.assertTrue((build_dir / "app" / "runtime_mobile_reader.js").is_file())
+        self.assertTrue((build_dir / "app" / "runtime_mobile_reader_ui.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_settings.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_voice_mixer.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_ui_skin.js").is_file())
@@ -5186,6 +5197,8 @@ class RunEditorSmokeTests(unittest.TestCase):
                 "app/runtime_conditions.js",
                 "app/runtime_controls.js",
                 "app/runtime_gamepad.js",
+                "app/runtime_mobile_reader.js",
+                "app/runtime_mobile_reader_ui.js",
                 "app/runtime_settings.js",
                 "app/runtime_voice_mixer.js",
                 "app/runtime_ui_skin.js",
@@ -5240,6 +5253,8 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / "app" / "runtime_conditions.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_controls.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_gamepad.js").is_file())
+        self.assertTrue((build_dir / "app" / "runtime_mobile_reader.js").is_file())
+        self.assertTrue((build_dir / "app" / "runtime_mobile_reader_ui.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_settings.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_voice_mixer.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_ui_skin.js").is_file())
@@ -5381,6 +5396,8 @@ class RunEditorSmokeTests(unittest.TestCase):
                 "app/runtime_conditions.js",
                 "app/runtime_controls.js",
                 "app/runtime_gamepad.js",
+                "app/runtime_mobile_reader.js",
+                "app/runtime_mobile_reader_ui.js",
                 "app/runtime_settings.js",
                 "app/runtime_voice_mixer.js",
                 "app/runtime_ui_skin.js",
@@ -5510,6 +5527,8 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / "app" / "runtime_conditions.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_controls.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_gamepad.js").is_file())
+        self.assertTrue((build_dir / "app" / "runtime_mobile_reader.js").is_file())
+        self.assertTrue((build_dir / "app" / "runtime_mobile_reader_ui.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_settings.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_voice_mixer.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_ui_skin.js").is_file())
@@ -5661,6 +5680,8 @@ class RunEditorSmokeTests(unittest.TestCase):
                 "app/runtime_conditions.js",
                 "app/runtime_controls.js",
                 "app/runtime_gamepad.js",
+                "app/runtime_mobile_reader.js",
+                "app/runtime_mobile_reader_ui.js",
                 "app/runtime_settings.js",
                 "app/runtime_voice_mixer.js",
                 "app/runtime_ui_skin.js",

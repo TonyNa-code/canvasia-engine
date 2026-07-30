@@ -178,6 +178,32 @@ class CiWorkflowCoverageTests(unittest.TestCase):
             workflow,
         )
 
+    def test_mobile_reader_runtime_is_checked_in_ci(self) -> None:
+        workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("export_player_template/runtime_mobile_reader.js", workflow)
+        self.assertIn("export_player_template/runtime_mobile_reader_ui.js", workflow)
+        self.assertIn("tests/test_frontend_runtime_mobile_reader_module.py", workflow)
+        self.assertIn("tests/test_frontend_runtime_mobile_reader_ui_module.py", workflow)
+        self.assertIn(
+            "python -m unittest discover -s tests -p 'test_frontend_runtime_mobile_reader_module.py' -v",
+            workflow,
+        )
+        self.assertIn(
+            "python -m unittest discover -s tests -p 'test_frontend_runtime_mobile_reader_ui_module.py' -v",
+            workflow,
+        )
+
+    def test_project_variable_governance_module_is_checked_in_ci(self) -> None:
+        workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("prototype_editor/modules/project_variable_governance.js", workflow)
+        self.assertIn("tests/test_frontend_project_variable_governance_module.py", workflow)
+        self.assertIn(
+            "python -m unittest discover -s tests -p 'test_frontend_project_variable_governance_module.py' -v",
+            workflow,
+        )
+
     def test_native_runtime_credits_module_is_checked_in_ci(self) -> None:
         workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
 

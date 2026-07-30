@@ -18,6 +18,7 @@ PROJECT_RUNTIME_TEXT_SPEED_CPS = {
 PROJECT_RUNTIME_TEXT_SPEEDS = frozenset(PROJECT_RUNTIME_TEXT_SPEED_CPS)
 PROJECT_RUNTIME_DIALOG_THEMES = frozenset({"project", "warm", "moonlight", "paper", "transparent"})
 PROJECT_RUNTIME_UI_THEME_MODES = frozenset({"auto", "light", "dark"})
+PROJECT_RUNTIME_MOBILE_READER_MODES = frozenset({"auto", "on", "off"})
 PROJECT_RUNTIME_PERFORMANCE_PROFILES = frozenset({"standard", "web", "mobile_low", "high_quality_pc"})
 
 
@@ -41,6 +42,7 @@ def build_default_project_runtime_settings() -> dict:
         "defaultTextSpeed": "normal",
         "defaultDialogTheme": "project",
         "defaultUiThemeMode": "auto",
+        "defaultMobileReaderMode": "auto",
         "defaultBgmVolume": 72,
         "defaultSfxVolume": 85,
         "defaultVoiceVolume": 92,
@@ -56,6 +58,7 @@ def sanitize_project_runtime_settings(value: Any) -> dict:
     text_speed = _clean_key(source.get("defaultTextSpeed"), defaults["defaultTextSpeed"])
     dialog_theme = _clean_key(source.get("defaultDialogTheme"), defaults["defaultDialogTheme"])
     ui_theme_mode = _clean_key(source.get("defaultUiThemeMode"), defaults["defaultUiThemeMode"])
+    mobile_reader_mode = _clean_key(source.get("defaultMobileReaderMode"), defaults["defaultMobileReaderMode"])
     performance_profile = _clean_key(source.get("performanceProfile"), defaults["performanceProfile"])
     return {
         "formalSaveSlotCount": clamp_int(
@@ -67,6 +70,11 @@ def sanitize_project_runtime_settings(value: Any) -> dict:
         "defaultTextSpeed": text_speed if text_speed in PROJECT_RUNTIME_TEXT_SPEEDS else defaults["defaultTextSpeed"],
         "defaultDialogTheme": dialog_theme if dialog_theme in PROJECT_RUNTIME_DIALOG_THEMES else defaults["defaultDialogTheme"],
         "defaultUiThemeMode": ui_theme_mode if ui_theme_mode in PROJECT_RUNTIME_UI_THEME_MODES else defaults["defaultUiThemeMode"],
+        "defaultMobileReaderMode": (
+            mobile_reader_mode
+            if mobile_reader_mode in PROJECT_RUNTIME_MOBILE_READER_MODES
+            else defaults["defaultMobileReaderMode"]
+        ),
         "performanceProfile": (
             performance_profile
             if performance_profile in PROJECT_RUNTIME_PERFORMANCE_PROFILES

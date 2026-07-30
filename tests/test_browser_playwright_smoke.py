@@ -2242,6 +2242,114 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
         finally:
             player_page.close()
 
+    def test_exported_player_mobile_reader_mode_supports_safe_touch_workflow(self) -> None:
+        self.create_blank_project("浏览器烟测项目_MobileReader")
+        self.create_first_chapter()
+        player_url = self.export_web_build()
+        mobile_context = self.browser.new_context(
+            viewport={"width": 390, "height": 844},
+            device_scale_factor=2,
+            is_mobile=True,
+            has_touch=True,
+        )
+        player_page = mobile_context.new_page()
+        mobile_errors: list[str] = []
+        player_page.on("pageerror", lambda error: mobile_errors.append(str(error)))
+        try:
+            player_page.goto(player_url, wait_until="domcontentloaded")
+            player_page.locator("#startButton").wait_for(timeout=20000)
+            player_page.wait_for_function(
+                "() => document.documentElement.dataset.runtimeMobileReader === 'active'"
+            )
+            self.assertTrue(player_page.locator("#mobileReaderDock").is_hidden())
+            player_page.locator("#startButton").click()
+            player_page.locator("#startOverlay").wait_for(state="hidden", timeout=15000)
+            player_page.locator("#mobileReaderDock").wait_for(state="visible", timeout=10000)
+            layout = player_page.evaluate(
+                """() => ({
+                    topbar: getComputedStyle(document.querySelector('.player-topbar')).display,
+                    stageHeight: document.querySelector('#stageFrame').getBoundingClientRect().height,
+                    viewportHeight: window.visualViewport?.height || window.innerHeight,
+                    cssViewport: document.documentElement.style.getPropertyValue('--runtime-mobile-viewport-height'),
+                })"""
+            )
+            self.assertEqual(layout["topbar"], "none")
+            self.assertLess(abs(layout["stageHeight"] - layout["viewportHeight"]), 3)
+            self.assertTrue(layout["cssViewport"].endswith("px"))
+
+            player_page.dispatch_event(
+                "#stageFrame",
+                "pointerdown",
+                {
+                    "pointerId": 7,
+                    "pointerType": "touch",
+                    "isPrimary": True,
+                    "clientX": 190,
+                    "clientY": 610,
+                },
+            )
+            player_page.dispatch_event(
+                "#stageFrame",
+                "pointerup",
+                {
+                    "pointerId": 7,
+                    "pointerType": "touch",
+                    "isPrimary": True,
+                    "clientX": 192,
+                    "clientY": 470,
+                },
+            )
+            player_page.locator("#mobileHistorySheet").wait_for(state="visible", timeout=10000)
+            player_page.locator("#mobileHistoryCloseButton").click()
+            player_page.locator("#mobileHistorySheet").wait_for(state="hidden", timeout=10000)
+
+            player_page.dispatch_event(
+                "#stageFrame",
+                "pointerdown",
+                {
+                    "pointerId": 8,
+                    "pointerType": "touch",
+                    "isPrimary": True,
+                    "clientX": 190,
+                    "clientY": 470,
+                },
+            )
+            player_page.dispatch_event(
+                "#stageFrame",
+                "pointerup",
+                {
+                    "pointerId": 8,
+                    "pointerType": "touch",
+                    "isPrimary": True,
+                    "clientX": 192,
+                    "clientY": 620,
+                },
+            )
+            player_page.wait_for_function(
+                "() => document.querySelector('#mobileDialogButton')?.getAttribute('aria-pressed') === 'true'"
+            )
+
+            player_page.locator("#mobileSystemButton").click()
+            player_page.locator("#systemMenu").wait_for(state="visible", timeout=10000)
+            player_page.locator("#menuMobileReaderModeSelect").select_option("off")
+            player_page.wait_for_function(
+                "() => document.documentElement.dataset.runtimeMobileReader === 'inactive'"
+            )
+            player_page.locator("#menuMobileReaderModeSelect").select_option("on")
+            player_page.wait_for_function(
+                "() => document.documentElement.dataset.runtimeMobileReader === 'active'"
+            )
+            player_page.locator("#closeSystemMenuButton").click()
+            player_page.locator("#mobileReaderDock").wait_for(state="visible", timeout=10000)
+            player_page.reload(wait_until="domcontentloaded")
+            player_page.wait_for_function(
+                "() => document.documentElement.dataset.runtimeMobileReader === 'active'"
+            )
+            self.assertEqual(player_page.locator("#menuMobileReaderModeSelect").input_value(), "on")
+            self.assertEqual(mobile_errors, [])
+        finally:
+            mobile_context.close()
+
     def test_exported_player_text_input_writes_variable_and_interpolates_story(self) -> None:
         project_title = "浏览器烟测项目_PlayerInput"
         self.create_blank_project(project_title)

@@ -8,6 +8,7 @@
     defaultTextSpeed: "normal",
     defaultDialogTheme: "project",
     defaultUiThemeMode: "auto",
+    defaultMobileReaderMode: "auto",
     defaultBgmVolume: 72,
     defaultSfxVolume: 85,
     defaultVoiceVolume: 92,
@@ -30,6 +31,7 @@
   });
   const RUNTIME_DIALOG_THEMES = Object.freeze(["project", "warm", "moonlight", "paper", "transparent"]);
   const RUNTIME_UI_THEME_MODES = Object.freeze(["auto", "light", "dark"]);
+  const RUNTIME_MOBILE_READER_MODES = Object.freeze(["auto", "on", "off"]);
 
   function hasOwn(source, key) {
     return Object.prototype.hasOwnProperty.call(source ?? {}, key);
@@ -86,6 +88,15 @@
     return getSafeKey(options.runtimeUiThemeModeLabels || RUNTIME_UI_THEME_MODES, value, defaults.defaultUiThemeMode);
   }
 
+  function getSafeProjectRuntimeMobileReaderMode(value, options = {}) {
+    const defaults = getRuntimeDefaults(options);
+    return getSafeKey(
+      options.runtimeMobileReaderModeLabels || RUNTIME_MOBILE_READER_MODES,
+      value,
+      defaults.defaultMobileReaderMode
+    );
+  }
+
   function getSafeProjectRuntimePerformanceProfile(value, options = {}) {
     const defaults = getRuntimeDefaults(options);
     return getSafeKey(
@@ -116,6 +127,7 @@
       defaultTextSpeed: getSafeProjectRuntimeTextSpeed(runtimeSettings.defaultTextSpeed, options),
       defaultDialogTheme: getSafeProjectRuntimeDialogTheme(runtimeSettings.defaultDialogTheme, options),
       defaultUiThemeMode: getSafeProjectRuntimeUiThemeMode(runtimeSettings.defaultUiThemeMode, options),
+      defaultMobileReaderMode: getSafeProjectRuntimeMobileReaderMode(runtimeSettings.defaultMobileReaderMode, options),
       defaultBgmVolume: getSafeProjectRuntimeVolume(runtimeSettings.defaultBgmVolume, defaults.defaultBgmVolume),
       defaultSfxVolume: getSafeProjectRuntimeVolume(runtimeSettings.defaultSfxVolume, defaults.defaultSfxVolume),
       defaultVoiceVolume: getSafeProjectRuntimeVolume(runtimeSettings.defaultVoiceVolume, defaults.defaultVoiceVolume),
@@ -183,11 +195,13 @@
     TEXT_SPEED_CPS,
     RUNTIME_DIALOG_THEMES,
     RUNTIME_UI_THEME_MODES,
+    RUNTIME_MOBILE_READER_MODES,
     DEFAULT_VOICE_DUCKING_RATIO_LIMITS,
     getSafeProjectFormalSaveSlotCount,
     getSafeProjectRuntimeTextSpeed,
     getSafeProjectRuntimeDialogTheme,
     getSafeProjectRuntimeUiThemeMode,
+    getSafeProjectRuntimeMobileReaderMode,
     getSafeProjectRuntimePerformanceProfile,
     getSafeProjectRuntimeVolume,
     getSafeProjectRuntimeVoiceDuckingRatio,

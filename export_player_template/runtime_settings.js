@@ -8,6 +8,7 @@ import {
   getSafeDialogBoxOpacityPercent,
   getSafeReadingTextScalePercent,
 } from "./runtime_reading_profiles.js";
+import { getSafeMobileReaderMode } from "./runtime_mobile_reader.js";
 
 export const TEXT_SPEED_LABELS = Object.freeze({
   slow: "慢一点",
@@ -35,6 +36,7 @@ export const PLAYBACK_DEFAULTS = Object.freeze({
   language: "",
   dialogTheme: "project",
   uiThemeMode: "auto",
+  mobileReaderMode: "auto",
   visualComfort: "standard",
   textScalePercent: 100,
   dialogBoxOpacityPercent: 100,
@@ -153,6 +155,9 @@ export function getProjectRuntimeSettings(project = {}) {
     defaultTextSpeed: getSafeTextSpeed(runtimeSettings.defaultTextSpeed ?? PLAYBACK_DEFAULTS.textSpeed),
     defaultDialogTheme: getSafeDialogTheme(runtimeSettings.defaultDialogTheme ?? PLAYBACK_DEFAULTS.dialogTheme),
     defaultUiThemeMode: getSafeUiThemeMode(runtimeSettings.defaultUiThemeMode ?? PLAYBACK_DEFAULTS.uiThemeMode),
+    defaultMobileReaderMode: getSafeMobileReaderMode(
+      runtimeSettings.defaultMobileReaderMode ?? PLAYBACK_DEFAULTS.mobileReaderMode
+    ),
     defaultBgmVolume: getSafeVolumePercent(runtimeSettings.defaultBgmVolume, PLAYBACK_DEFAULTS.bgmVolume),
     defaultSfxVolume: getSafeVolumePercent(runtimeSettings.defaultSfxVolume, PLAYBACK_DEFAULTS.sfxVolume),
     defaultVoiceVolume: getSafeVolumePercent(runtimeSettings.defaultVoiceVolume, PLAYBACK_DEFAULTS.voiceVolume),
@@ -175,6 +180,7 @@ export function sanitizePlaybackSettings(source = {}, options = {}) {
     language: normalizePlaybackLanguage(source.language, PLAYBACK_DEFAULTS.language, options),
     dialogTheme: getSafeDialogTheme(source.dialogTheme ?? PLAYBACK_DEFAULTS.dialogTheme),
     uiThemeMode: getSafeUiThemeMode(source.uiThemeMode ?? PLAYBACK_DEFAULTS.uiThemeMode),
+    mobileReaderMode: getSafeMobileReaderMode(source.mobileReaderMode ?? PLAYBACK_DEFAULTS.mobileReaderMode),
     visualComfort: getSafeVisualComfortMode(source.visualComfort ?? PLAYBACK_DEFAULTS.visualComfort),
     textScalePercent: getSafeReadingTextScalePercent(
       source.textScalePercent,
@@ -206,6 +212,7 @@ export function buildProjectPlaybackDefaults(project = {}, defaultLanguage = "",
       language: defaultLanguage,
       dialogTheme: runtimeSettings.defaultDialogTheme,
       uiThemeMode: runtimeSettings.defaultUiThemeMode,
+      mobileReaderMode: runtimeSettings.defaultMobileReaderMode,
       voiceEnabled: runtimeSettings.defaultVoiceEnabled,
       voiceDuckingEnabled: runtimeSettings.defaultVoiceDuckingEnabled,
       bgmVolume: runtimeSettings.defaultBgmVolume,

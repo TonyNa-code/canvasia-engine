@@ -401,6 +401,14 @@
             },
             helpers
           )}
+          ${renderSelectField(
+            {
+              id: "projectRuntimeDefaultMobileReaderModeSelect",
+              label: "手机触控阅读",
+              optionsHtml: renderOptionList(labels.mobileReaderModeLabels, runtimeSettings.defaultMobileReaderMode, helpers),
+            },
+            helpers
+          )}
           ${renderCheckboxButton(
             {
               id: "projectRuntimeDefaultVoiceEnabledInput",
@@ -433,7 +441,7 @@
           labels.dialogThemeLabels?.[runtimeSettings.defaultDialogTheme] ?? runtimeSettings.defaultDialogTheme
         )} · ${escapeHtml(labels.uiThemeModeLabels?.[runtimeSettings.defaultUiThemeMode] ?? runtimeSettings.defaultUiThemeMode)} · ${escapeHtml(
           labels.performanceProfileLabels?.[runtimeSettings.performanceProfile] ?? runtimeSettings.performanceProfile
-        )} · BGM ${runtimeSettings.defaultBgmVolume}% / 音效 ${runtimeSettings.defaultSfxVolume}% / 语音 ${runtimeSettings.defaultVoiceVolume}% · 语音焦点${runtimeSettings.defaultVoiceDuckingEnabled ? "开" : "关"} / BGM 保留 ${runtimeSettings.defaultVoiceDuckingRatio}%</div>
+        )} · 手机触控${escapeHtml(labels.mobileReaderModeLabels?.[runtimeSettings.defaultMobileReaderMode] ?? runtimeSettings.defaultMobileReaderMode)} · BGM ${runtimeSettings.defaultBgmVolume}% / 音效 ${runtimeSettings.defaultSfxVolume}% / 语音 ${runtimeSettings.defaultVoiceVolume}% · 语音焦点${runtimeSettings.defaultVoiceDuckingEnabled ? "开" : "关"} / BGM 保留 ${runtimeSettings.defaultVoiceDuckingRatio}%</div>
       </section>
     `;
   }
@@ -774,6 +782,7 @@
         defaultTextSpeed: readInputValue(doc, "projectRuntimeDefaultTextSpeedSelect"),
         defaultDialogTheme: readInputValue(doc, "projectRuntimeDefaultDialogThemeSelect"),
         defaultUiThemeMode: readInputValue(doc, "projectRuntimeDefaultUiThemeModeSelect"),
+        defaultMobileReaderMode: readInputValue(doc, "projectRuntimeDefaultMobileReaderModeSelect"),
         performanceProfile: readInputValue(doc, "projectRuntimePerformanceProfileSelect"),
         defaultBgmVolume: readInputValue(doc, "projectRuntimeDefaultBgmVolumeInput"),
         defaultSfxVolume: readInputValue(doc, "projectRuntimeDefaultSfxVolumeInput"),

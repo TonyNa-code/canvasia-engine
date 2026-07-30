@@ -46,6 +46,7 @@ class FrontendEntrypointModuleTests(unittest.TestCase):
             "./modules/editor_common.js",
             "./modules/export_file_names.js",
             "./modules/variables.js",
+            "./modules/project_variable_governance.js",
             "./modules/project_runtime_settings.js",
             "./modules/project_runtime_settings_panel.js",
             "./modules/project_settings.js",
