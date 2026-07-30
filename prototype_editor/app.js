@@ -267,6 +267,7 @@ const {
 const dialogueCameraTools = window.CanvasiaRuntimeDialogueCamera;
 const voiceReactiveMotionTools = window.CanvasiaRuntimeVoiceReactiveMotion;
 const characterCardTools = window.CanvasiaRuntimeCharacterCards;
+const particlePerformanceTools = window.CanvasiaEditorParticlePerformance;
 const particleEffectTools = window.CanvasiaEditorParticleEffects;
 const {
   PARTICLE_PRESET_LABELS,
@@ -474,12 +475,51 @@ const {
   getDepthBlurSpriteOpacity,
 } = visualEffectTools;
 const {
+  getSafeParticleAction,
+  getParticleActionLabel,
+  getSafeParticlePreset,
+  getParticlePresetLabel,
+  getParticlePresetDefaults,
+  getParticleAdvancedDefaults,
+  getSafeParticleIntensity,
+  getParticleIntensityLabel,
   getSafeParticleSpeed,
   getParticleSpeedLabel,
   getSafeParticleWind,
   getParticleWindLabel,
   getSafeParticleArea,
   getParticleAreaLabel,
+  getSafeParticleBlendMode,
+  getParticleBlendModeLabel,
+  getParticleBlendCssValue,
+  getSafeParticleEmissionMode,
+  getParticleEmissionModeLabel,
+  getSafeParticleEmitterShape,
+  getParticleEmitterShapeLabel,
+  getSafeParticleFollowTarget,
+  getParticleFollowTargetLabel,
+  getSafeParticleFollowAnchor,
+  getParticleFollowAnchorLabel,
+  getSafeParticleSizeCurve,
+  getParticleSizeCurveLabel,
+  getSafeParticleOpacityCurve,
+  getParticleOpacityCurveLabel,
+  getSafeParticleColorCurve,
+  getParticleColorCurveLabel,
+  getSafeParticleForceField,
+  getParticleForceFieldLabel,
+  getSafeParticleComboPreset,
+  getParticleComboPresetLabel,
+  getParticleScenePresetConfig,
+  buildDefaultParticleCustomComboLayer,
+  normalizeParticleCustomComboLayer,
+  normalizeParticleCustomComboLayers,
+  getEnabledParticleCustomComboLayers,
+  getParticleCustomComboLayerSummary,
+  getParticleDefaultColorCurve,
+  getSafeParticleLayerCount,
+  getSafeParticleClampedNumber,
+  buildDefaultParticleEffectConfig,
   getParticleSpeedMultiplier,
   getParticleWindBias,
   getParticleAreaLayout,
@@ -490,6 +530,12 @@ const {
   formatParticleNumber,
   getParticleAnchorPercent,
   getParticleCameraAnchorPercent,
+  isValidParticleColor,
+  getSafeParticleColor,
+  makeParticleCustomPresetId,
+  getParticleCustomPresetPrimaryPreset,
+  getParticleCustomPresetSearchTokens,
+  groupParticleCustomPresets,
 } = particleEffectTools;
 
 const PROJECT_SAVE_SLOT_COUNT_LIMITS = projectRuntimeSettingsTools.DEFAULT_SAVE_SLOT_COUNT_LIMITS;
@@ -23197,6 +23243,18 @@ function renderParticleEffectLayer(particleEffect, large = false, depthBlur = nu
 
   const config = normalizeParticleEffectConfig(particleEffect);
   const combos = buildParticleComboVariants(config);
+  const layerConfigs = combos.flatMap((comboConfig) =>
+    buildParticleLayerVariants(comboConfig).map((layerConfig) => ({
+      ...layerConfig,
+      __comboIndex: comboConfig.__comboIndex ?? 0,
+    }))
+  );
+  const renderPlan = particlePerformanceTools.buildParticleRenderPlan(layerConfigs, {
+    performanceProfile: getProjectRuntimeSettings().performanceProfile,
+    getPresetDensityMultiplier: getParticlePresetDensityMultiplier,
+    editorPreview: true,
+    large,
+  });
 
   return `
     <div
@@ -23213,25 +23271,23 @@ function renderParticleEffectLayer(particleEffect, large = false, depthBlur = nu
       data-particle-blend="${config.blend}"
       data-particle-layers="${config.layerCount}"
       data-has-custom-image="${config.assetId ? "true" : "false"}"
+      data-particle-performance-profile="${renderPlan.performanceProfile}"
+      data-particle-requested="${renderPlan.requestedTotal}"
+      data-particle-rendered="${renderPlan.renderedTotal}"
+      data-particle-limited="${renderPlan.wasLimited ? "true" : "false"}"
       style="${getDepthBlurParticleStyle(depthBlur)}"
       aria-hidden="true"
     >
-      ${combos
-        .map((comboConfig) => {
-          const layers = buildParticleLayerVariants(comboConfig);
-          return layers
-            .map((layerConfig) => {
-              const particleCount = getParticleItemCount(layerConfig, large);
-              return Array.from({ length: particleCount }, (_, index) =>
-                renderParticleItem(
-                  layerConfig,
-                  comboConfig.__comboIndex * 10000 + layerConfig.__layerIndex * 1000 + index,
-                  stageContext
-                )
-              ).join("");
-            })
-            .join("");
-        })
+      ${renderPlan.entries
+        .map(({ config: layerConfig, count }) =>
+          Array.from({ length: count }, (_, index) =>
+            renderParticleItem(
+              layerConfig,
+              layerConfig.__comboIndex * 10000 + layerConfig.__layerIndex * 1000 + index,
+              stageContext
+            )
+          ).join("")
+        )
         .join("")}
     </div>
   `;
@@ -23403,15 +23459,12 @@ function renderParticleItem(particleEffect, index, stageContext = null) {
 
 function getParticleItemCount(particleEffect, large = false) {
   const config = normalizeParticleEffectConfig(particleEffect);
-  const intensityMultiplier = {
-    light: 0.72,
-    medium: 1,
-    heavy: 1.28,
-  }[config.intensity];
-  const areaMultiplier = config.area === "full" ? 1 : 0.64;
-  const presetMultiplier = getParticlePresetDensityMultiplier(config.preset);
-  const count = Math.round(config.density * intensityMultiplier * areaMultiplier * presetMultiplier);
-  return clamp(large ? count + 8 : Math.max(count - 4, 6), 6, large ? 220 : 180);
+  return particlePerformanceTools.buildParticleRenderPlan([config], {
+    performanceProfile: getProjectRuntimeSettings().performanceProfile,
+    getPresetDensityMultiplier: getParticlePresetDensityMultiplier,
+    editorPreview: true,
+    large,
+  }).renderedTotal;
 }
 
 function renderScreenFlashLayer(screenFlash, visualComfortMode = "standard") {
@@ -33914,6 +33967,15 @@ function renderParticleCustomLayerEditor(index, layer) {
 }
 
 function renderParticleEffectEditor(block) {
+  const performanceReport = particlePerformanceTools.buildParticlePerformanceReport(block, {
+    performanceProfile: getProjectRuntimeSettings().performanceProfile,
+    normalizeParticleEffectConfig,
+    buildParticleComboVariants,
+    buildParticleLayerVariants,
+    getPresetDensityMultiplier: getParticlePresetDensityMultiplier,
+    editorPreview: true,
+  });
+
   return particleEffectTools.renderParticleEffectEditor(block, {
     escapeHtml,
     normalizeParticleEffectConfig,
@@ -33926,6 +33988,9 @@ function renderParticleEffectEditor(block) {
     getAssetTypeLabel,
     renderParticleCustomPresetQuickList,
     renderParticleCustomLayerEditor,
+    particlePerformanceMarkup: particlePerformanceTools.renderParticlePerformanceCard(performanceReport, {
+      escapeHtml,
+    }),
   });
 }
 
@@ -42608,146 +42673,6 @@ function renderCharacterStageControls(stageSource = {}, options = {}) {
   `;
 }
 
-function getSafeParticleAction(action) {
-  return particleEffectTools.getSafeParticleAction(action);
-}
-
-function getParticleActionLabel(action) {
-  return particleEffectTools.getParticleActionLabel(action);
-}
-
-function getSafeParticlePreset(preset) {
-  return particleEffectTools.getSafeParticlePreset(preset);
-}
-
-function getParticlePresetLabel(preset) {
-  return particleEffectTools.getParticlePresetLabel(preset);
-}
-
-function getParticlePresetDefaults(preset) {
-  return particleEffectTools.getParticlePresetDefaults(preset);
-}
-
-function getParticleAdvancedDefaults(preset) {
-  return particleEffectTools.getParticleAdvancedDefaults(preset);
-}
-
-function getSafeParticleIntensity(intensity) {
-  return particleEffectTools.getSafeParticleIntensity(intensity);
-}
-
-function getParticleIntensityLabel(intensity) {
-  return particleEffectTools.getParticleIntensityLabel(intensity);
-}
-
-function getSafeParticleBlendMode(blend) {
-  return particleEffectTools.getSafeParticleBlendMode(blend);
-}
-
-function getParticleBlendModeLabel(blend) {
-  return particleEffectTools.getParticleBlendModeLabel(blend);
-}
-
-function getParticleBlendCssValue(blend) {
-  return particleEffectTools.getParticleBlendCssValue(blend);
-}
-
-function getSafeParticleEmissionMode(mode) {
-  return particleEffectTools.getSafeParticleEmissionMode(mode);
-}
-
-function getParticleEmissionModeLabel(mode) {
-  return particleEffectTools.getParticleEmissionModeLabel(mode);
-}
-
-function getSafeParticleEmitterShape(shape) {
-  return particleEffectTools.getSafeParticleEmitterShape(shape);
-}
-
-function getParticleEmitterShapeLabel(shape) {
-  return particleEffectTools.getParticleEmitterShapeLabel(shape);
-}
-
-function getSafeParticleFollowTarget(follow) {
-  return particleEffectTools.getSafeParticleFollowTarget(follow);
-}
-
-function getParticleFollowTargetLabel(follow) {
-  return particleEffectTools.getParticleFollowTargetLabel(follow);
-}
-
-function getSafeParticleFollowAnchor(anchor) {
-  return particleEffectTools.getSafeParticleFollowAnchor(anchor);
-}
-
-function getParticleFollowAnchorLabel(anchor) {
-  return particleEffectTools.getParticleFollowAnchorLabel(anchor);
-}
-
-function getSafeParticleSizeCurve(curve) {
-  return particleEffectTools.getSafeParticleSizeCurve(curve);
-}
-
-function getParticleSizeCurveLabel(curve) {
-  return particleEffectTools.getParticleSizeCurveLabel(curve);
-}
-
-function getSafeParticleOpacityCurve(curve) {
-  return particleEffectTools.getSafeParticleOpacityCurve(curve);
-}
-
-function getParticleOpacityCurveLabel(curve) {
-  return particleEffectTools.getParticleOpacityCurveLabel(curve);
-}
-
-function getSafeParticleForceField(mode) {
-  return particleEffectTools.getSafeParticleForceField(mode);
-}
-
-function getParticleForceFieldLabel(mode) {
-  return particleEffectTools.getParticleForceFieldLabel(mode);
-}
-
-function getParticleScenePresetConfig(presetId) {
-  return particleEffectTools.getParticleScenePresetConfig(presetId);
-}
-
-function getParticleDefaultColorCurve(preset) {
-  return particleEffectTools.getParticleDefaultColorCurve(preset);
-}
-
-function getSafeParticleLayerCount(layerCount) {
-  return particleEffectTools.getSafeParticleLayerCount(layerCount);
-}
-
-function getSafeParticleComboPreset(comboPreset) {
-  return particleEffectTools.getSafeParticleComboPreset(comboPreset);
-}
-
-function getParticleComboPresetLabel(comboPreset) {
-  return particleEffectTools.getParticleComboPresetLabel(comboPreset);
-}
-
-function buildDefaultParticleCustomComboLayer(preset = "stardust") {
-  return particleEffectTools.buildDefaultParticleCustomComboLayer(preset);
-}
-
-function normalizeParticleCustomComboLayer(layer, fallbackPreset = "stardust") {
-  return particleEffectTools.normalizeParticleCustomComboLayer(layer, fallbackPreset);
-}
-
-function normalizeParticleCustomComboLayers(layers) {
-  return particleEffectTools.normalizeParticleCustomComboLayers(layers);
-}
-
-function getEnabledParticleCustomComboLayers(layers) {
-  return particleEffectTools.getEnabledParticleCustomComboLayers(layers);
-}
-
-function getParticleCustomComboLayerSummary(layers) {
-  return particleEffectTools.getParticleCustomComboLayerSummary(layers);
-}
-
 function getProjectParticleCustomPresets(project = state.data?.project) {
   return Array.isArray(project?.particleCustomPresets) ? project.particleCustomPresets : [];
 }
@@ -42756,24 +42681,8 @@ function getParticleCustomPresetById(presetId, project = state.data?.project) {
   return particleEffectTools.getParticleCustomPresetById(getProjectParticleCustomPresets(project), presetId);
 }
 
-function makeParticleCustomPresetId(name, existingIds = []) {
-  return particleEffectTools.makeParticleCustomPresetId(name, existingIds);
-}
-
-function getParticleCustomPresetPrimaryPreset(config) {
-  return particleEffectTools.getParticleCustomPresetPrimaryPreset(config);
-}
-
-function getParticleCustomPresetSearchTokens(preset) {
-  return particleEffectTools.getParticleCustomPresetSearchTokens(preset);
-}
-
 function getFilteredParticleCustomPresets(query = state.particlePresetSearchQuery, project = state.data?.project) {
   return particleEffectTools.getFilteredParticleCustomPresets(getProjectParticleCustomPresets(project), query);
-}
-
-function groupParticleCustomPresets(presets) {
-  return particleEffectTools.groupParticleCustomPresets(presets);
 }
 
 function renderParticleCustomPresetQuickList() {
@@ -42785,34 +42694,10 @@ function renderParticleCustomPresetQuickList() {
   });
 }
 
-function getSafeParticleColorCurve(curve) {
-  return particleEffectTools.getSafeParticleColorCurve(curve);
-}
-
-function getParticleColorCurveLabel(curve) {
-  return particleEffectTools.getParticleColorCurveLabel(curve);
-}
-
-function isValidParticleColor(color) {
-  return particleEffectTools.isValidParticleColor(color);
-}
-
-function getSafeParticleColor(color, fallback = "#ffffff") {
-  return particleEffectTools.getSafeParticleColor(color, fallback);
-}
-
-function getSafeParticleClampedNumber(value, fallback, min, max) {
-  return particleEffectTools.getSafeParticleClampedNumber(value, fallback, min, max);
-}
-
 function normalizeParticleRange(minValue, maxValue, fallbackMin, fallbackMax, clampMin, clampMax) {
   const safeMin = getSafeParticleClampedNumber(minValue, fallbackMin, clampMin, clampMax);
   const safeMax = getSafeParticleClampedNumber(maxValue, fallbackMax, clampMin, clampMax);
   return [Math.min(safeMin, safeMax), Math.max(safeMin, safeMax)];
-}
-
-function buildDefaultParticleEffectConfig(preset = "snow") {
-  return particleEffectTools.buildDefaultParticleEffectConfig(preset);
 }
 
 function normalizeParticleEffectConfig(particleEffect) {

@@ -99,6 +99,7 @@ class FrontendEntrypointModuleTests(unittest.TestCase):
             "./modules/release_evidence_pack.js",
             "./modules/unlockable_content_manifest.js",
             "./modules/visual_effects.js",
+            "./modules/particle_performance.js",
             "./modules/particle_effects.js",
             "./modules/project_history.js",
             "./modules/project_history_panel.js",

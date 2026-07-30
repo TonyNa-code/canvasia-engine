@@ -7,7 +7,6 @@ import json
 import math
 import os
 import platform
-import random
 import re
 import sys
 import tempfile
@@ -177,6 +176,25 @@ try:
     from .runtime_dialogue_camera import NativeDialogueCameraController
 except ImportError:  # pragma: no cover - exported native packages import from the same directory.
     from runtime_dialogue_camera import NativeDialogueCameraController
+
+try:
+    from .runtime_particles import (
+        NativeParticleQualityController,
+        build_native_particle_budget,
+        build_native_particle_items,
+        normalize_native_particle_effect_config,
+        resize_native_particle_items,
+        update_native_particle_items,
+    )
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_particles import (
+        NativeParticleQualityController,
+        build_native_particle_budget,
+        build_native_particle_items,
+        normalize_native_particle_effect_config,
+        resize_native_particle_items,
+        update_native_particle_items,
+    )
 
 try:
     from .runtime_voice_reactive_motion import NativeVoiceReactiveMotionController
@@ -1138,29 +1156,6 @@ ARCHIVE_MENU_ITEMS = {
     "achievements": "成就馆",
 }
 ARCHIVE_MENU_SEQUENCE = tuple(ARCHIVE_MENU_ITEMS.keys())
-NATIVE_PARTICLE_PRESET_DEFAULTS = {
-    "snow": {"density": 40, "sizeMin": 5, "sizeMax": 14, "speed": 90, "drift": 18, "color": (255, 255, 255), "accent": (214, 238, 255), "shape": "flake"},
-    "rain": {"density": 54, "sizeMin": 2, "sizeMax": 4, "speed": 300, "drift": 32, "color": (164, 208, 255), "accent": (219, 239, 255), "shape": "rain"},
-    "petals": {"density": 30, "sizeMin": 10, "sizeMax": 18, "speed": 84, "drift": 30, "color": (255, 191, 221), "accent": (255, 226, 238), "shape": "petal"},
-    "dust": {"density": 24, "sizeMin": 3, "sizeMax": 8, "speed": 26, "drift": 10, "color": (244, 230, 191), "accent": (255, 245, 221), "shape": "glow"},
-    "embers": {"density": 34, "sizeMin": 4, "sizeMax": 10, "speed": 72, "drift": 18, "color": (255, 142, 82), "accent": (255, 217, 148), "shape": "ember"},
-    "sparkles": {"density": 22, "sizeMin": 6, "sizeMax": 12, "speed": 34, "drift": 12, "color": (175, 213, 255), "accent": (235, 243, 255), "shape": "spark"},
-    "bubbles": {"density": 18, "sizeMin": 10, "sizeMax": 20, "speed": -42, "drift": 12, "color": (150, 220, 255), "accent": (239, 250, 255), "shape": "bubble"},
-    "confetti": {"density": 28, "sizeMin": 6, "sizeMax": 12, "speed": 110, "drift": 42, "color": (118, 159, 255), "accent": (185, 115, 255), "shape": "confetti"},
-    "smoke": {"density": 20, "sizeMin": 18, "sizeMax": 42, "speed": -24, "drift": 16, "color": (149, 164, 196), "accent": (214, 222, 242), "shape": "smoke"},
-    "flame": {"density": 24, "sizeMin": 10, "sizeMax": 22, "speed": -110, "drift": 12, "color": (255, 132, 63), "accent": (255, 214, 104), "shape": "flame"},
-    "stardust": {"density": 28, "sizeMin": 4, "sizeMax": 10, "speed": 20, "drift": 8, "color": (126, 173, 255), "accent": (201, 140, 255), "shape": "star"},
-    "glyphs": {"density": 16, "sizeMin": 12, "sizeMax": 22, "speed": 12, "drift": 6, "color": (124, 167, 255), "accent": (196, 126, 255), "shape": "glyph"},
-}
-NATIVE_PARTICLE_INTENSITY_MULTIPLIER = {"light": 0.65, "medium": 1.0, "heavy": 1.45}
-NATIVE_PARTICLE_SPEED_MULTIPLIER = {"slow": 0.72, "medium": 1.0, "fast": 1.35}
-NATIVE_PARTICLE_WIND_VALUE = {"left": -26, "still": 0, "right": 26}
-NATIVE_PARTICLE_AREA_RANGES = {
-    "full": (0.04, 0.96),
-    "left": (0.04, 0.46),
-    "center": (0.28, 0.72),
-    "right": (0.54, 0.96),
-}
 EFFECT_DURATION_SECONDS = {"short": 0.42, "medium": 0.72, "long": 1.2}
 FLASH_COLORS = {"white": (255, 255, 255), "warm": (255, 206, 138), "red": (255, 94, 94), "black": (0, 0, 0)}
 FLASH_ALPHA = {"soft": 86, "medium": 146, "strong": 210}
@@ -7580,26 +7575,6 @@ def mix_rgb(color_a: tuple[int, int, int], color_b: tuple[int, int, int], amount
     )
 
 
-def hex_to_rgb(value: str | None, fallback: tuple[int, int, int]) -> tuple[int, int, int]:
-    if isinstance(value, (list, tuple)) and len(value) >= 3:
-        try:
-            return tuple(clamp_int(channel, 0, 255, fallback[index]) for index, channel in enumerate(value[:3]))
-        except Exception:
-            return fallback
-    safe_value = str(value or "").strip().lstrip("#")
-    if len(safe_value) != 6:
-        return fallback
-    try:
-        return tuple(int(safe_value[index : index + 2], 16) for index in range(0, 6, 2))
-    except Exception:
-        return fallback
-
-
-def get_safe_native_particle_preset(preset: str | None) -> str:
-    safe_preset = str(preset or "").strip()
-    return safe_preset if safe_preset in NATIVE_PARTICLE_PRESET_DEFAULTS else "snow"
-
-
 def get_safe_option(value, allowed: set[str], fallback: str) -> str:
     safe_value = str(value or "").strip()
     return safe_value if safe_value in allowed else fallback
@@ -7675,87 +7650,6 @@ def normalize_native_visual_effect_block(block: dict | None) -> dict:
             "strength": get_safe_option(block.get("strength"), set(DEPTH_BLUR_ALPHA), "medium"),
         }
     return {"type": block_type}
-
-
-def normalize_native_particle_effect_config(effect: dict | None) -> dict:
-    effect = effect or {}
-    preset = get_safe_native_particle_preset(effect.get("preset"))
-    defaults = NATIVE_PARTICLE_PRESET_DEFAULTS[preset]
-    intensity = str(effect.get("intensity") or "medium").strip()
-    if intensity not in NATIVE_PARTICLE_INTENSITY_MULTIPLIER:
-        intensity = "medium"
-    speed = str(effect.get("speed") or "medium").strip()
-    if speed not in NATIVE_PARTICLE_SPEED_MULTIPLIER:
-        speed = "medium"
-    wind = str(effect.get("wind") or "still").strip()
-    if wind not in NATIVE_PARTICLE_WIND_VALUE:
-        wind = "still"
-    area = str(effect.get("area") or "full").strip()
-    if area not in NATIVE_PARTICLE_AREA_RANGES:
-        area = "full"
-    density = int(round(float(effect.get("density") or defaults["density"])))
-    density = max(4, min(240, density))
-    size_min = float(effect.get("sizeMin") or defaults["sizeMin"])
-    size_max = float(effect.get("sizeMax") or defaults["sizeMax"])
-    speed_value = float(effect.get("gravityY") or defaults["speed"])
-    drift_value = float(effect.get("spreadX") or defaults["drift"])
-    return {
-        "action": str(effect.get("action") or "start").strip(),
-        "preset": preset,
-        "assetId": str(effect.get("assetId") or "").strip(),
-        "intensity": intensity,
-        "speed": speed,
-        "wind": wind,
-        "area": area,
-        "density": density,
-        "sizeMin": max(1.0, min(size_min, size_max)),
-        "sizeMax": max(1.0, max(size_min, size_max)),
-        "speedValue": speed_value,
-        "driftValue": drift_value,
-        "color": hex_to_rgb(effect.get("color"), defaults["color"]),
-        "accentColor": hex_to_rgb(effect.get("colorAccent"), defaults["accent"]),
-        "shape": defaults["shape"],
-    }
-
-
-def build_native_particle_item(config: dict, width: int, height: int) -> dict:
-    size = random.uniform(float(config.get("sizeMin") or 4), float(config.get("sizeMax") or 10))
-    area_start, area_end = NATIVE_PARTICLE_AREA_RANGES.get(config.get("area"), NATIVE_PARTICLE_AREA_RANGES["full"])
-    start_x = random.uniform(width * area_start, width * area_end)
-    start_y = random.uniform(-height * 0.2, height * 0.1)
-    wind_bias = NATIVE_PARTICLE_WIND_VALUE.get(config.get("wind"), 0)
-    speed_multiplier = NATIVE_PARTICLE_SPEED_MULTIPLIER.get(config.get("speed"), 1.0)
-    velocity_x = (random.uniform(-1.0, 1.0) * float(config.get("driftValue") or 12) * 0.25) + wind_bias
-    base_speed = float(config.get("speedValue") or 90) * speed_multiplier
-    velocity_y = base_speed + random.uniform(-0.25, 0.25) * base_speed
-    preset = str(config.get("preset") or "snow")
-    if preset in {"bubbles", "smoke", "flame", "stardust", "glyphs"}:
-        start_y = random.uniform(height * 0.4, height * 0.95)
-        velocity_y *= -0.55 if preset != "flame" else -0.82
-    lifetime = random.uniform(3.0, 8.0)
-    return {
-        "x": start_x,
-        "y": start_y,
-        "vx": velocity_x,
-        "vy": velocity_y,
-        "size": size,
-        "life": lifetime,
-        "maxLife": lifetime,
-        "spin": random.uniform(-120, 120),
-        "rotation": random.uniform(0, 360),
-        "colorMix": random.random(),
-        "wobble": random.uniform(4.0, 20.0),
-        "wobblePhase": random.uniform(0, math.pi * 2),
-    }
-
-
-def build_native_particle_items(config: dict, width: int, height: int) -> list[dict]:
-    if str(config.get("action") or "start") == "stop":
-        return []
-    density = int(config.get("density") or 0)
-    density = int(density * NATIVE_PARTICLE_INTENSITY_MULTIPLIER.get(config.get("intensity"), 1.0))
-    density = max(4, min(180, density))
-    return [build_native_particle_item(config, width, height) for _ in range(density)]
 
 
 def exercise_particle_effect(bundle_dir: Path) -> None:
@@ -8229,6 +8123,11 @@ class NativeRuntimePlayer:
         self.scene3d_preview_interaction_enabled = bool(DEFAULT_SCENE3D_PREVIEW["interactionEnabled"])
         self.active_particle_effect: dict | None = None
         self.particle_items: list[dict] = []
+        self.particle_quality_controller = NativeParticleQualityController(
+            self.get_runtime_preload_performance_profile()
+        )
+        self.particle_quality_status = self.particle_quality_controller.snapshot()
+        self.particle_budget: dict | None = None
         self.screen_shake_effect: dict | None = None
         self.screen_flash_effect: dict | None = None
         self.screen_fade_effect: dict | None = None
@@ -10958,6 +10857,7 @@ class NativeRuntimePlayer:
     def clear_particle_effect(self) -> None:
         self.active_particle_effect = None
         self.particle_items = []
+        self.particle_budget = None
 
     def stop_bgm_for_scope_end(self, fade_out_ms: int = 0) -> None:
         self.stop_bgm(fade_out_ms=fade_out_ms)
@@ -11100,34 +11000,45 @@ class NativeRuntimePlayer:
             self.clear_particle_effect()
             return
         self.active_particle_effect = config
-        self.particle_items = build_native_particle_items(config, self.width, self.height)
+        self.particle_quality_status = self.particle_quality_controller.snapshot()
+        self.particle_budget = build_native_particle_budget(
+            config,
+            self.get_runtime_preload_performance_profile(),
+            self.particle_quality_status["adaptiveScale"],
+        )
+        self.particle_items = build_native_particle_items(
+            config,
+            self.width,
+            self.height,
+            self.get_runtime_preload_performance_profile(),
+            self.particle_quality_status["adaptiveScale"],
+        )
 
     def update_particle_effect(self, dt_seconds: float) -> None:
-        if not self.active_particle_effect or not self.particle_items:
+        if not self.active_particle_effect:
             return
-        config = self.active_particle_effect
-        preset = str(config.get("preset") or "snow")
-        upward = preset in {"bubbles", "smoke", "flame", "stardust", "glyphs"}
-        padding = max(32.0, float(config.get("sizeMax") or 20) * 2.0)
-        for index, item in enumerate(self.particle_items):
-            item["life"] = max(0.0, float(item.get("life") or 0.0) - dt_seconds)
-            item["rotation"] = float(item.get("rotation") or 0.0) + float(item.get("spin") or 0.0) * dt_seconds
-            wobble = math.sin(self.runtime_elapsed_seconds * 1.8 + float(item.get("wobblePhase") or 0.0)) * float(item.get("wobble") or 0.0)
-            item["x"] = float(item.get("x") or 0.0) + float(item.get("vx") or 0.0) * dt_seconds + wobble * dt_seconds
-            item["y"] = float(item.get("y") or 0.0) + float(item.get("vy") or 0.0) * dt_seconds
-            out_of_bounds = (
-                item["x"] < -padding
-                or item["x"] > self.width + padding
-                or item["y"] < -padding
-                or item["y"] > self.height + padding
+        if self.particle_quality_controller.observe_frame(dt_seconds):
+            self.particle_quality_status = self.particle_quality_controller.snapshot()
+            self.particle_budget = build_native_particle_budget(
+                self.active_particle_effect,
+                self.get_runtime_preload_performance_profile(),
+                self.particle_quality_status["adaptiveScale"],
             )
-            if item["life"] <= 0 or out_of_bounds:
-                replacement = build_native_particle_item(config, self.width, self.height)
-                if upward:
-                    replacement["y"] = random.uniform(self.height * 0.5, self.height + padding * 0.5)
-                else:
-                    replacement["y"] = random.uniform(-self.height * 0.2, 0.0)
-                self.particle_items[index] = replacement
+            self.particle_items = resize_native_particle_items(
+                self.particle_items,
+                self.active_particle_effect,
+                self.width,
+                self.height,
+                self.particle_budget["renderedCount"],
+            )
+        self.particle_items = update_native_particle_items(
+            self.particle_items,
+            self.active_particle_effect,
+            self.width,
+            self.height,
+            dt_seconds,
+            self.runtime_elapsed_seconds,
+        )
 
     def update_stage_visual_effects(self, dt_seconds: float) -> None:
         for attr_name in ("screen_shake_effect", "screen_flash_effect"):

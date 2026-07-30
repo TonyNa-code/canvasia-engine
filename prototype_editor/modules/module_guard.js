@@ -96,6 +96,7 @@ const REQUIRED_EDITOR_MODULES = Object.freeze([
     { globalName: "CanvasiaEditorUnlockableContentManifest", script: "./modules/unlockable_content_manifest.js", label: "解锁内容清单" },
     { globalName: "CanvasiaEditorStageImages", script: "./modules/stage_images.js", label: "舞台贴图图层" },
     { globalName: "CanvasiaEditorVisualEffects", script: "./modules/visual_effects.js", label: "视觉演出" },
+    { globalName: "CanvasiaEditorParticlePerformance", script: "./modules/particle_performance.js", label: "粒子性能预算" },
     { globalName: "CanvasiaEditorParticleEffects", script: "./modules/particle_effects.js", label: "粒子系统" },
     { globalName: "CanvasiaEditorProjectHistory", script: "./modules/project_history.js", label: "项目历史" },
     { globalName: "CanvasiaEditorProjectHistoryPanel", script: "./modules/project_history_panel.js", label: "项目历史面板" },

@@ -202,6 +202,10 @@ import {
   SCREEN_FILTER_PRESET_LABELS, SCREEN_FILTER_STRENGTH_LABELS, SHAKE_INTENSITY_LABELS, TRANSITION_DURATION_DEFAULT_MS,
   TRANSITION_DURATION_MAX_MS, TRANSITION_DURATION_MIN_MS,
 } from "./runtime_visual_constants.js";
+import {
+  createAdaptiveParticleQualityController,
+} from "./runtime_particle_quality.js";
+import { renderRuntimeParticleLayer } from "./runtime_particle_renderer.js";
 
 const rawData = window.LIGHTWHISPER_GAME_DATA ?? {};
 const runtimeConditionTools = window.CanvasiaRuntimeConditions;
@@ -551,6 +555,7 @@ const state = {
   textInputSnapshotKey: "",
   timedChoicePersistBucket: null,
   storageRecoveryEvents: [],
+  particleQualityStatus: null,
 };
 
 const sfxTransportController = createSfxTransportController({
@@ -562,6 +567,16 @@ const timedChoiceController = createTimedChoiceController({
   onTick: handleTimedChoiceTick,
   onTimeout: handleTimedChoiceTimeout,
 });
+const particleQualityController = createAdaptiveParticleQualityController({
+  performanceProfile: getProjectRuntimeSettings(data.project).performanceProfile,
+  globalObject: window,
+  onChange: (snapshot, reason) => {
+    state.particleQualityStatus = snapshot;
+    if (reason !== "started") {
+      scheduleParticleQualityRerender();
+    }
+  },
+});
 
 let musicRoomAudio = null;
 let voiceReplayAudio = null;
@@ -569,6 +584,7 @@ let runtimeUiThemeAutoRefreshTimer = null;
 let achievementToastTimer = null;
 let voiceMixerController = null;
 let keyBindingController = null;
+let particleQualityRerenderFrame = null;
 
 init();
 
@@ -747,6 +763,7 @@ function init() {
   document.addEventListener("keydown", scheduleRuntimeTimedChoicePauseSync);
   document.addEventListener("pointerdown", () => setRuntimeInputMode("pointer"), { passive: true });
   startRuntimeGamepadInput();
+  particleQualityController.start(window);
   window.addEventListener("beforeunload", finalizePlayerSession);
   window.addEventListener("beforeunload", stopMusic);
   window.addEventListener("beforeunload", stopMusicRoomPreview);
@@ -755,6 +772,7 @@ function init() {
   window.addEventListener("beforeunload", stopVoicePlayback);
   window.addEventListener("beforeunload", stopRuntimeGamepadInput);
   window.addEventListener("beforeunload", captureCurrentTimedChoiceState);
+  window.addEventListener("beforeunload", () => particleQualityController.stop(window));
   startRuntimeAssetPreload();
   renderPlaybackControls();
   scheduleRuntimeUiThemeAutoRefresh();
@@ -3898,6 +3916,24 @@ function choosePreviewOption(optionId) {
 
 function getCurrentSnapshot() {
   return state.session?.timeline?.[state.session.position] ?? null;
+}
+
+function scheduleParticleQualityRerender() {
+  if (!state.started || particleQualityRerenderFrame !== null) {
+    return;
+  }
+
+  particleQualityRerenderFrame = window.requestAnimationFrame(() => {
+    particleQualityRerenderFrame = null;
+    const snapshot = getCurrentSnapshot();
+    if (!snapshot?.visualState || !refs.particleLayer) {
+      return;
+    }
+    refs.particleLayer.innerHTML = renderParticleEffectLayer(
+      snapshot.visualState.particleEffect,
+      snapshot.visualState
+    );
+  });
 }
 
 function getRuntimeSnapshotKey(snapshot) {
@@ -10370,235 +10406,32 @@ function shouldBlurPlayerCharacter(position, depthBlur) {
 }
 
 function renderParticleEffectLayer(particleEffect, stageContext = null) {
-  if (!particleEffect) {
-    return "";
-  }
-
-  const config = normalizeParticleEffectConfig(particleEffect);
-  const combos = buildParticleComboVariants(config);
-
-  return `
-    <div
-      class="particle-layer"
-      data-particle-preset="${config.preset}"
-      data-particle-intensity="${config.intensity}"
-      data-particle-speed="${config.speed}"
-      data-particle-wind="${config.wind}"
-      data-particle-area="${config.area}"
-      data-particle-combo="${config.comboPreset}"
-      data-particle-emission="${config.emissionMode}"
-      data-particle-emitter-shape="${config.emitterShape}"
-      data-particle-follow="${config.follow}"
-      data-particle-blend="${config.blend}"
-      data-particle-layers="${config.layerCount}"
-      data-has-custom-image="${config.assetId ? "true" : "false"}"
-      aria-hidden="true"
-    >
-      ${combos
-        .map((comboConfig) => {
-          const layers = buildParticleLayerVariants(comboConfig);
-          return layers
-            .map((layerConfig) => {
-              const particleCount = getParticleItemCount(layerConfig);
-              return Array.from({ length: particleCount }, (_, index) =>
-                renderParticleItem(
-                  layerConfig,
-                  comboConfig.__comboIndex * 10000 + layerConfig.__layerIndex * 1000 + index,
-                  stageContext
-                )
-              ).join("");
-            })
-            .join("");
-        })
-        .join("")}
-    </div>
-  `;
-}
-
-function renderParticleItem(particleEffect, index, stageContext = null) {
-  const config = normalizeParticleEffectConfig(particleEffect);
-  const motion = getParticleMotionProfile(config.preset);
-  const areaLayout = getParticleAreaLayout(config.area, 100);
-  const anchor = getParticleEmitterAnchor(config, stageContext);
-  const emitterShape = getSafeParticleEmitterShape(config.emitterShape);
-  const curves = getParticleCurveProfile(config);
-  const colorCurve = getParticleColorCurveProfile(config);
-  const speedMultiplier = getParticleSpeedMultiplier(config.speed);
-  const duration = (config.lifeMin + (config.lifeMax - config.lifeMin) * getParticleRandom(index, 2)) * speedMultiplier;
-  const baseSize = config.sizeMin + (config.sizeMax - config.sizeMin) * getParticleRandom(index, 3);
-  const depthShift = (getParticleRandom(index, 4) - 0.5) * 2 * (config.spreadZ / 100) + anchor.z / 100;
-  const profileAspect = motion.aspect;
-  const width =
-    profileAspect === "rain"
-      ? Math.max(1.5, baseSize * 0.28)
-      : profileAspect === "petal"
-        ? baseSize * 1.08
-        : profileAspect === "confetti"
-          ? baseSize * 0.76
-          : baseSize;
-  const height =
-    profileAspect === "rain"
-      ? Math.max(18, baseSize * 8.6)
-      : profileAspect === "petal"
-        ? Math.max(6, baseSize * 0.82)
-        : profileAspect === "confetti"
-          ? Math.max(6, baseSize * 1.34)
-          : width;
-  const seedX = getParticleRandom(index, 5);
-  const seedY = getParticleRandom(index, 6);
-  const seedAngle = getParticleRandom(index, 13) * Math.PI * 2;
-  const seedRadius = Math.sqrt(getParticleRandom(index, 14));
-  let left = anchor.x;
-  let startY = anchor.y;
-
-  if (emitterShape === "point") {
-    left += (seedX - 0.5) * Math.max(4, config.spreadX * 0.12);
-    startY += (seedY - 0.5) * Math.max(4, config.spreadY * 0.12);
-  } else if (emitterShape === "line") {
-    left += (seedX - 0.5) * config.spreadX;
-    startY += (seedY - 0.5) * Math.max(4, config.spreadY * 0.12);
-  } else if (emitterShape === "box") {
-    left += (seedX - 0.5) * config.spreadX;
-    startY += (seedY - 0.5) * config.spreadY;
-  } else if (emitterShape === "circle") {
-    left += Math.cos(seedAngle) * (config.spreadX * 0.5) * seedRadius;
-    startY += Math.sin(seedAngle) * (config.spreadY * 0.5) * seedRadius;
-  }
-
-  left = clamp(left, areaLayout.start, areaLayout.start + areaLayout.width);
-  startY = clamp(startY, -24, 124);
-
-  const travelY = motion.endBase - motion.startBase;
-  const fieldX = clamp(config.fieldX, 0, 100);
-  const fieldY = clamp(config.fieldY, -20, 120);
-  const fieldDeltaX = fieldX - left;
-  const fieldDeltaY = fieldY - startY;
-  const endY =
-    startY +
-    travelY +
-    config.gravityY * 0.18 +
-    config.attractionY * 0.34 +
-    fieldDeltaY * curves.force.y * 0.22 +
-    (getParticleRandom(index, 15) - 0.5) * config.spreadY * 0.35;
-  const windBias = getParticleWindBias(config.wind, config.preset);
-  const driftX =
-    windBias +
-    config.gravityX * 0.88 +
-    config.attractionX * 0.58 +
-    fieldDeltaX * curves.force.x * 0.24 +
-    (getParticleRandom(index, 7) - 0.5) * config.turbulence * 1.9 +
-    (getParticleRandom(index, 16) - 0.5) * config.vortex * (0.42 + curves.force.orbit) +
-    fieldDeltaY * curves.force.orbit * 0.18 +
-    depthShift * config.spreadZ * 0.35;
-  const opacityStart =
-    config.opacityMin + (config.opacityMax - config.opacityMin) * getParticleRandom(index, 8);
-  const opacityMid = clamp(opacityStart * curves.opacity.mid, 0, 1);
-  const opacityEnd = clamp(
-    opacityStart * curves.opacity.end * (config.preset === "bubbles" ? 1.16 : config.preset === "embers" ? 0.92 : 1),
-    0,
-    1
-  );
-  const rotationStart =
-    config.rotationMin + (config.rotationMax - config.rotationMin) * getParticleRandom(index, 9);
-  const rotationEnd =
-    rotationStart +
-    config.spin * (0.45 + getParticleRandom(index, 10) * 0.75) +
-    config.vortex * (0.4 + getParticleRandom(index, 17) * 0.35);
-  const midY = startY + (endY - startY) * (0.5 + getParticleRandom(index, 19) * 0.12);
-  const rotationMid = rotationStart + (rotationEnd - rotationStart) * (0.48 + getParticleRandom(index, 20) * 0.14);
-  const blur = Math.max(
-    0,
-    Math.abs(depthShift) * (config.spreadZ / 100) * 4.2 +
-      (config.preset === "dust" ? 1.1 : 0) +
-      (config.preset === "bubbles" ? 0.8 : 0)
-  );
-  const scaleBase = 0.68 + depthShift * 0.28 + config.gravityZ * 0.002 + anchor.z * 0.002;
-  const scaleStart = clamp(scaleBase * curves.size.start, 0.22, 2.8);
-  const scaleMid = clamp(scaleBase * curves.size.mid, 0.18, 3.2);
-  const scaleEnd = clamp(
-    scaleBase * curves.size.end + config.gravityZ * 0.004 + (motion.endBase < motion.startBase ? 0.16 : 0.05),
-    0.16,
-    3.4
-  );
-  const particleColor = mixParticleColors(config.color, config.colorAccent, getParticleRandom(index, 11));
-  const particleAccent = mixParticleColors(
-    config.colorAccent,
-    config.colorEnd,
-    getParticleRandom(index, 12) * 0.32
-  );
-  const particleEnd = mixParticleColors(config.colorEnd, config.colorAccent, getParticleRandom(index, 21) * 0.24);
-  const filterStart = `blur(calc(var(--particle-blur, 0px) + var(--particle-blur-extra, 0px))) hue-rotate(${colorCurve.hue.start}deg) saturate(${colorCurve.saturation.start.toFixed(
-    3
-  )}) brightness(${colorCurve.brightness.start.toFixed(3)})`;
-  const filterMid = `blur(calc(var(--particle-blur, 0px) + var(--particle-blur-extra, 0px))) hue-rotate(${colorCurve.hue.mid}deg) saturate(${colorCurve.saturation.mid.toFixed(
-    3
-  )}) brightness(${colorCurve.brightness.mid.toFixed(3)})`;
-  const filterEnd = `blur(calc(var(--particle-blur, 0px) + var(--particle-blur-extra, 0px))) hue-rotate(${colorCurve.hue.end}deg) saturate(${colorCurve.saturation.end.toFixed(
-    3
-  )}) brightness(${colorCurve.brightness.end.toFixed(3)})`;
-  const imageStyle = getParticleImageStyle(config.assetId);
-  const emissionDelay =
-    config.emissionMode === "burst"
-      ? -(getParticleRandom(index, 18) * Math.min(0.9, Math.max(0.18, duration * 0.18)))
-      : -((index * 0.35) % Math.max(duration * 0.72, 1.2));
-
-  return `
-    <span
-      class="particle-item ${imageStyle ? "has-custom-image" : ""}"
-      style="
-        --particle-left:${left.toFixed(2)}%;
-        --particle-start-y:${startY.toFixed(2)}%;
-        --particle-mid-y:${midY.toFixed(2)}%;
-        --particle-end-y:${endY.toFixed(2)}%;
-        --particle-duration:${duration.toFixed(2)}s;
-        --particle-delay:${emissionDelay.toFixed(2)}s;
-        --particle-width:${width.toFixed(2)}px;
-        --particle-height:${height.toFixed(2)}px;
-        --particle-drift-x:${driftX.toFixed(2)}px;
-        --particle-opacity-start:${opacityStart.toFixed(3)};
-        --particle-opacity-mid:${opacityMid.toFixed(3)};
-        --particle-opacity-end:${opacityEnd.toFixed(3)};
-        --particle-scale-start:${scaleStart.toFixed(3)};
-        --particle-scale-mid:${scaleMid.toFixed(3)};
-        --particle-scale-end:${scaleEnd.toFixed(3)};
-        --particle-rotate-start:${rotationStart.toFixed(2)}deg;
-        --particle-rotate-mid:${rotationMid.toFixed(2)}deg;
-        --particle-rotate-end:${rotationEnd.toFixed(2)}deg;
-        --particle-blur:${blur.toFixed(2)}px;
-        --particle-color:${particleColor};
-        --particle-color-accent:${particleAccent};
-        --particle-color-end:${particleEnd};
-        --particle-filter-start:${filterStart};
-        --particle-filter-mid:${filterMid};
-        --particle-filter-end:${filterEnd};
-        --particle-blend:${getParticleBlendCssValue(config.blend)};
-        ${imageStyle}
-      "
-    ></span>
-  `;
-}
-
-function getParticleItemCount(particleEffect) {
-  const config = normalizeParticleEffectConfig(particleEffect);
-  const intensityMultiplier = {
-    light: 0.72,
-    medium: 1,
-    heavy: 1.28,
-  }[config.intensity];
-  const areaMultiplier = config.area === "full" ? 1 : 0.64;
-  const presetMultiplier = getParticlePresetDensityMultiplier(config.preset);
-  const count = Math.round(config.density * intensityMultiplier * areaMultiplier * presetMultiplier);
-  return clamp(Math.max(count, 6), 6, 180);
-}
-
-function getParticleImageStyle(assetId) {
-  const imageUrl = getParticleImageUrl(assetId);
-  return imageUrl ? `--particle-image:url("${escapeHtml(encodeURI(imageUrl))}");` : "";
-}
-
-function getParticleImageUrl(assetId) {
-  const safeAssetId = getSafeParticleImageAssetId(assetId);
-  return safeAssetId ? getAssetUrl(safeAssetId) : null;
+  const qualityStatus = state.particleQualityStatus ?? particleQualityController.getSnapshot();
+  return renderRuntimeParticleLayer(particleEffect, stageContext, {
+    normalizeParticleEffectConfig,
+    buildParticleComboVariants,
+    buildParticleLayerVariants,
+    performanceProfile: getProjectRuntimeSettings(data.project).performanceProfile,
+    qualityStatus,
+    getPresetDensityMultiplier: getParticlePresetDensityMultiplier,
+    getParticleMotionProfile,
+    getParticleAreaLayout,
+    getParticleEmitterAnchor,
+    getSafeParticleEmitterShape,
+    getParticleCurveProfile,
+    getParticleColorCurveProfile,
+    getParticleSpeedMultiplier,
+    getParticleRandom,
+    getParticleWindBias,
+    mixParticleColors,
+    getParticleBlendCssValue,
+    resolveParticleImageUrl: (assetId) => {
+      const safeAssetId = getSafeParticleImageAssetId(assetId);
+      return safeAssetId ? getAssetUrl(safeAssetId) : null;
+    },
+    clamp,
+    escapeHtml,
+  });
 }
 
 function applyStageWorldPresentation(visualState) {

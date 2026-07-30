@@ -82,7 +82,7 @@ Canvasia Engine は、ビジュアルノベル / Galgame 制作者のための s
 - エディタ試遊、Web Runtime、ネイティブ Runtime 共通の視覚コンフォート設定。制作者の演出を維持する標準、揺れ・フラッシュ・トランジションを弱めるソフト、短時間の点滅・パーティクル・呼吸・トランジション動作を止める静止モードをプレイヤーが選択でき、プロジェクトデータは変更しません
 - エディタ試遊、Web Runtime、ネイティブ Runtime 共通のワンクリック読書プロファイル。原作、快適、大文字、静止の各プリセットが文字速度、文字サイズ、ダイアログ表示、視覚コンフォートをまとめて調整し、個別に変更した設定は自動的にカスタムとして保存されます
 - CG 回想、音楽鑑賞、キャラクター図鑑、場所図鑑、ナレーション図鑑、関係図鑑、実績、章回想、エンディング回想、ボイス回想。CG、BGM、ボイス、図鑑、章、エンディング、実績の抜けを確認できる Unlockable Content manifest / CSV も出力可能
-- 高度なパーティクルプリセット、プロジェクト単位のパーティクルライブラリ、カメラ演出、フィルター、フラッシュ、画面揺れ、フェード
+- 高度なパーティクルプリセット、プロジェクト単位のライブラリ、性能プロファイル別の複合レイヤー総量予算。Web 再生は継続的なフレーム負荷に応じて、ストーリー・音声・音楽を止めずに密度を自動調整します
 - Live2D / 3D キャラクターと 3D シーン素材のインポート、ネイティブ Runtime での glTF / GLB / VRM 構造レポート
 - Web 試遊パッケージ、デスクトップ書き出し、エディタデスクトップビルド、ネイティブ Runtime preview パッケージ。Web / desktop / native Runtime は preload manifest により、最初のシーンと序盤ルートの素材を優先的に準備し、エディタ側でも事前に startup-pressure report を確認できます。
 - ローカル CI precheck、backend smoke、Playwright browser smoke、ボタン配線チェック、Ren'Py draft export test、条件 / fallback 変数プリセット付き分岐対応 preview regression、route playtest workbook、first-screen loading risks と route blockers も修正順に含める release-control report、startup-loading tasks も含む production backlog queue、Runtime capability matrix と export acceptance checklist、Runtime preload budget audit、台詞の空欄 / 重複 / 長文 / 選択肢文面を確認する script-quality audit、pacing-aware one-click recipe suggestion 付き scene production board、voice production sheet、choice consequence audit、variable influence audit、asset dependency audit、asset footprint audit、unlockable-content audit、BGM cue sheet audit、character stage-direction audit、presentation timeline audit、テスター引き継ぎワークオーダー、プレイテストフィードバックテンプレートと取り込みサマリー、VN baseline quality audit、ファイル整合性検証
@@ -98,7 +98,7 @@ Canvasia Engine は、ビジュアルノベル / Galgame 制作者のための s
 | プロジェクト安全網 | Available | スナップショット、復元、クラッシュ復旧、プロジェクト Doctor、修復キュー、公開前チェック、release-control report、プレースホルダー、立ち絵、背景、BGM、選択肢、テキスト密度、演出の基礎品質チェック。 |
 | ゲーム UI カスタマイズ | Available | UI スキン、ボタン状態、9-slice 画像、レイアウト調整、テキストボックス設計。 |
 | EXTRA / 回想システム | Available | CG、音楽、キャラクター、場所、ナレーション、関係、実績、章、エンディング、ボイス回想。Unlockable Content manifest でギャラリー素材不足、ボイス回想不足、キャラクター図鑑素材不足、到達不能エンディングも確認可能。 |
-| パーティクル / 演出 | Available | パーティクル、カメラ、フィルター、フラッシュ、画面揺れ、フェード、キャラクター演出、独立した小道具 / 前景 / Cut-in stage-image レイヤー。 |
+| パーティクル / 演出 | Available | パーティクル、複合レイヤー総量予算、Web / native Runtime の適応品質、カメラ、フィルター、フラッシュ、画面揺れ、フェード、キャラクター演出、独立した小道具 / 前景 / Cut-in stage-image レイヤー。 |
 | Live2D / 3D 素材 | Preview | Live2D、3D キャラクター、3D シーン素材をインポート可能。ネイティブ Runtime は 3D 構造とリスクレポートを出力。 |
 | Web / Desktop 書き出し | Preview | Web 試遊パッケージとデスクトップパッケージは、低負荷の適応型ゲームパッド監視、方向フォーカス移動、キーボード / マウス操作に対応。署名と公証は Release notes に従います。 |
 | ネイティブ Runtime | Preview | コア再生、設定、ローカル保存のシーンサムネイル付きビジュアルセーブ、ゲームパッドナビゲーションと読書ショートカット、履歴、自動再生、変数・舞台・音楽・画面効果を復元する段階的ロールバック、動画フォールバック、3D レポート、初期図鑑システム、Web / native Runtime coverage checks をカバー。画像のない旧セーブもそのまま読み込めます。 |

@@ -52,6 +52,7 @@ jobs:
             native_runtime_export_digest.py \
             native_runtime_bundle.py \
             native_runtime/runtime_player.py \
+            native_runtime/runtime_particles.py \
             native_runtime/runtime_player_view.py \
             native_runtime/runtime_character_motion.py \
             native_runtime/runtime_stage_images.py \
@@ -109,6 +110,8 @@ jobs:
             tests/test_dialogue_camera_contract.py \
             tests/test_native_runtime_voice_reactive_motion.py \
             tests/test_voice_reactive_motion_contract.py \
+            tests/test_native_runtime_particles.py \
+            tests/test_particle_quality_contract.py \
             tests/test_native_runtime_music_transport.py \
             tests/test_music_transport_contract.py \
             tests/test_native_runtime_video_transport.py \
@@ -185,6 +188,7 @@ jobs:
             tests/test_frontend_export_file_names_module.py \
             tests/test_frontend_export_report_descriptions_module.py \
             tests/test_frontend_openai_asset_generator_module.py \
+            tests/test_frontend_particle_performance_module.py \
             tests/test_frontend_particle_effects_module.py \
             tests/test_frontend_editor_filters_module.py \
             tests/test_frontend_entrypoint_modules.py \
@@ -250,6 +254,8 @@ jobs:
             tests/test_frontend_runtime_character_motion_module.py \
             tests/test_frontend_runtime_stage_images_module.py \
             tests/test_frontend_runtime_visual_constants_module.py \
+            tests/test_frontend_runtime_particle_quality_module.py \
+            tests/test_frontend_runtime_particle_renderer_module.py \
             tests/test_frontend_runtime_capability_matrix_module.py \
             tests/test_frontend_scene_mood_recipes_module.py \
             tests/test_frontend_scene_pacing_advisor_module.py \
@@ -352,6 +358,7 @@ jobs:
           node --check prototype_editor/modules/project_settings.js
           node --check prototype_editor/modules/dialog_box_readability.js
           node --check prototype_editor/modules/openai_asset_generator.js
+          node --check prototype_editor/modules/particle_performance.js
           node --check prototype_editor/modules/particle_effects.js
           node --check prototype_editor/modules/production_backlog.js
           node --check prototype_editor/modules/recent_workspace.js
@@ -403,6 +410,8 @@ jobs:
           node --check export_player_template/runtime_storage.js
           node --check export_player_template/runtime_persistent_variables.js
           node --check export_player_template/runtime_visual_constants.js
+          node --check export_player_template/runtime_particle_quality.js
+          node --check export_player_template/runtime_particle_renderer.js
           node --check export_player_template/runtime_controls.js
           node --check export_player_template/runtime_gamepad.js
           node --check export_player_template/runtime_settings.js
@@ -446,6 +455,8 @@ jobs:
           python -m unittest discover -s tests -p 'test_dialogue_camera_contract.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_voice_reactive_motion.py' -v
           python -m unittest discover -s tests -p 'test_voice_reactive_motion_contract.py' -v
+          python -m unittest discover -s tests -p 'test_native_runtime_particles.py' -v
+          python -m unittest discover -s tests -p 'test_particle_quality_contract.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_stage_renderer.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_stage_images.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_choice_availability.py' -v
@@ -517,6 +528,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_export_file_names_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_export_report_descriptions_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_openai_asset_generator_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_particle_performance_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_particle_effects_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_editor_filters_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_entrypoint_modules.py' -v
@@ -600,6 +612,8 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_runtime_character_motion_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_stage_images_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_visual_constants_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_runtime_particle_quality_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_runtime_particle_renderer_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_typewriter_parity.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_capability_matrix_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_scene_mood_recipes_module.py' -v

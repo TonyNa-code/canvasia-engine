@@ -158,6 +158,26 @@ class CiWorkflowCoverageTests(unittest.TestCase):
             workflow,
         )
 
+    def test_particle_quality_contract_is_checked_in_ci(self) -> None:
+        workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+
+        for path in (
+            "prototype_editor/modules/particle_performance.js",
+            "export_player_template/runtime_particle_quality.js",
+            "export_player_template/runtime_particle_renderer.js",
+            "native_runtime/runtime_particles.py",
+            "tests/test_frontend_particle_performance_module.py",
+            "tests/test_frontend_runtime_particle_quality_module.py",
+            "tests/test_frontend_runtime_particle_renderer_module.py",
+            "tests/test_native_runtime_particles.py",
+            "tests/test_particle_quality_contract.py",
+        ):
+            self.assertIn(path, workflow)
+        self.assertIn(
+            "python -m unittest discover -s tests -p 'test_particle_quality_contract.py' -v",
+            workflow,
+        )
+
     def test_native_runtime_credits_module_is_checked_in_ci(self) -> None:
         workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
 

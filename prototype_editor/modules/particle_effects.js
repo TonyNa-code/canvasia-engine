@@ -2195,12 +2195,14 @@ const PARTICLE_COMBO_PRESET_CONFIGS = {
             selectedPresetId: selectedParticleCustomPresetId,
             normalizeParticleEffectConfig: normalizeConfig,
           });
+    const particlePerformanceMarkup = String(options.particlePerformanceMarkup ?? "");
 
     return `
     <article class="editor-card">
       <h3>编辑粒子特效</h3>
       <p>这里已经升级成高级粒子模块了。除了雪、雨、樱花和光尘，现在还能做火星、闪光、气泡、纸片，并且把数量、尺寸、寿命、重力、XYZ 疏散、旋转、颜色、混合方式都像 AE 一样细调。</p>
     </article>
+    ${particlePerformanceMarkup}
     <div class="field-grid">
       <div class="detail-row">
         <label for="editorParticleAction">这张卡片要做什么</label>
