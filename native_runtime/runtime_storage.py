@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import os
 import platform
 import sys
+import tempfile
 import traceback
 from datetime import datetime
 from pathlib import Path
@@ -37,6 +39,9 @@ READ_TEXT_KEY_LIMIT = 20000
 SNAPSHOT_TEXT_HISTORY_LIMIT = 120
 CRASH_LOG_FILE_PREFIX = "runtime-crash-"
 CRASH_FEEDBACK_LOG_LIMIT = 8
+RUNTIME_JSON_BACKUP_SUFFIX = ".bak"
+RUNTIME_STORAGE_RECOVERY_EVENT_LIMIT = 32
+_runtime_storage_recovery_events: list[dict] = []
 DEFAULT_PLAYER_PROFILE = {
     "firstPlayedAt": None,
     "lastPlayedAt": None,
@@ -82,6 +87,134 @@ def get_runtime_log_dir() -> Path:
 
 def get_runtime_screenshot_dir() -> Path:
     return Path.home() / SAVE_ROOT_DIR_NAME / SCREENSHOT_SUBDIR_NAME
+
+
+def get_runtime_json_backup_path(path: Path) -> Path:
+    return path.with_name(f"{path.name}{RUNTIME_JSON_BACKUP_SUFFIX}")
+
+
+def _sync_runtime_storage_dir(path: Path) -> None:
+    try:
+        directory_fd = os.open(path, os.O_RDONLY)
+    except OSError:
+        return
+    try:
+        os.fsync(directory_fd)
+    except OSError:
+        pass
+    finally:
+        os.close(directory_fd)
+
+
+def _write_runtime_text_atomically(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as handle:
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
+            temporary_path = Path(handle.name)
+        os.replace(temporary_path, path)
+        temporary_path = None
+        _sync_runtime_storage_dir(path.parent)
+    finally:
+        if temporary_path is not None:
+            try:
+                temporary_path.unlink()
+            except FileNotFoundError:
+                pass
+
+
+def _read_runtime_json_candidate(path: Path, expected_type=None) -> tuple[bool, object | None]:
+    if not path.is_file():
+        return False, None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return False, None
+    if expected_type is not None and not isinstance(payload, expected_type):
+        return False, None
+    return True, payload
+
+
+def _record_runtime_storage_recovery(path: Path, label: str) -> None:
+    _runtime_storage_recovery_events.append(
+        {
+            "label": str(label or "运行数据"),
+            "filename": path.name,
+            "recoveredAt": now_iso(),
+        }
+    )
+    del _runtime_storage_recovery_events[:-RUNTIME_STORAGE_RECOVERY_EVENT_LIMIT]
+
+
+def consume_runtime_storage_recovery_events() -> list[dict]:
+    events = [dict(event) for event in _runtime_storage_recovery_events]
+    _runtime_storage_recovery_events.clear()
+    return events
+
+
+def write_runtime_json_file(path: Path, payload: object) -> Path:
+    serialized = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+    expected_type = type(payload)
+    previous_is_valid, previous_payload = _read_runtime_json_candidate(path, expected_type)
+    backup_path = get_runtime_json_backup_path(path)
+    backup_is_valid, _backup_payload = _read_runtime_json_candidate(backup_path, expected_type)
+
+    _write_runtime_text_atomically(path, serialized)
+
+    backup_payload = previous_payload if previous_is_valid else payload
+    if previous_is_valid or not backup_is_valid:
+        try:
+            backup_text = json.dumps(backup_payload, ensure_ascii=False, indent=2) + "\n"
+            _write_runtime_text_atomically(backup_path, backup_text)
+        except (OSError, TypeError, ValueError):
+            # The primary replacement already completed atomically. A backup failure
+            # must not turn a successful save into an apparent data-loss failure.
+            pass
+    return path
+
+
+def read_runtime_json_file(
+    path: Path,
+    fallback: object = None,
+    *,
+    expected_type=None,
+    recovery_label: str = "运行数据",
+):
+    primary_is_valid, primary_payload = _read_runtime_json_candidate(path, expected_type)
+    if primary_is_valid:
+        return primary_payload
+
+    backup_path = get_runtime_json_backup_path(path)
+    backup_is_valid, backup_payload = _read_runtime_json_candidate(backup_path, expected_type)
+    if not backup_is_valid:
+        return fallback
+
+    try:
+        write_runtime_json_file(path, backup_payload)
+    except (OSError, TypeError, ValueError):
+        pass
+    _record_runtime_storage_recovery(path, recovery_label)
+    return backup_payload
+
+
+def remove_runtime_json_file(path: Path) -> Path:
+    # Remove the backup first so a partially failed clear cannot resurrect data.
+    for target_path in (get_runtime_json_backup_path(path), path):
+        try:
+            target_path.unlink()
+        except FileNotFoundError:
+            pass
+    return path
 
 
 def write_runtime_crash_log(game_data_path: Path, error: BaseException, context: str) -> Path:
@@ -253,12 +386,13 @@ def get_project_auto_resume_file_path(project_id: str) -> Path:
 
 def load_project_save_store(project_id: str, slot_count: int) -> dict:
     save_path = get_project_save_file_path(project_id)
-    if not save_path.is_file():
-        return {"quickSave": None, "formalSlots": [None] * slot_count}
-    try:
-        payload = json.loads(save_path.read_text(encoding="utf-8"))
-    except Exception:
-        return {"quickSave": None, "formalSlots": [None] * slot_count}
+    empty_store = {"quickSave": None, "formalSlots": [None] * slot_count}
+    payload = read_runtime_json_file(
+        save_path,
+        empty_store,
+        expected_type=dict,
+        recovery_label="正式存档",
+    )
 
     formal_slots = payload.get("formalSlots")
     if not isinstance(formal_slots, list):
@@ -273,11 +407,8 @@ def load_project_save_store(project_id: str, slot_count: int) -> dict:
 
 
 def write_project_save_store(project_id: str, save_store: dict) -> Path:
-    save_dir = get_runtime_save_dir()
-    save_dir.mkdir(parents=True, exist_ok=True)
     save_path = get_project_save_file_path(project_id)
-    save_path.write_text(json.dumps(save_store, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    return save_path
+    return write_runtime_json_file(save_path, save_store)
 
 
 def sanitize_player_profile(value: dict | None) -> dict:
@@ -306,42 +437,35 @@ def sanitize_player_profile(value: dict | None) -> dict:
 
 def load_project_player_profile(project_id: str) -> dict:
     profile_path = get_project_profile_file_path(project_id)
-    if not profile_path.is_file():
-        return sanitize_player_profile(DEFAULT_PLAYER_PROFILE)
-    try:
-        payload = json.loads(profile_path.read_text(encoding="utf-8"))
-    except Exception:
-        return sanitize_player_profile(DEFAULT_PLAYER_PROFILE)
+    payload = read_runtime_json_file(
+        profile_path,
+        DEFAULT_PLAYER_PROFILE,
+        expected_type=dict,
+        recovery_label="玩家档案",
+    )
     return sanitize_player_profile(payload)
 
 
 def write_project_player_profile(project_id: str, profile: dict) -> Path:
-    profile_dir = get_runtime_profile_dir()
-    profile_dir.mkdir(parents=True, exist_ok=True)
     profile_path = get_project_profile_file_path(project_id)
     safe_profile = sanitize_player_profile(profile)
-    profile_path.write_text(json.dumps(safe_profile, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    return profile_path
+    return write_runtime_json_file(profile_path, safe_profile)
 
 
 def load_project_persistent_variables(project_id: str) -> dict:
     persistent_path = get_project_persistent_variables_file_path(project_id)
-    if not persistent_path.is_file():
-        return {}
-    try:
-        payload = json.loads(persistent_path.read_text(encoding="utf-8"))
-    except Exception:
-        return {}
-    return payload if isinstance(payload, dict) else {}
+    return read_runtime_json_file(
+        persistent_path,
+        {},
+        expected_type=dict,
+        recovery_label="跨周目记忆",
+    )
 
 
 def write_project_persistent_variables(project_id: str, payload: dict) -> Path:
-    persistent_dir = get_runtime_persistent_variables_dir()
-    persistent_dir.mkdir(parents=True, exist_ok=True)
     persistent_path = get_project_persistent_variables_file_path(project_id)
     safe_payload = payload if isinstance(payload, dict) else {}
-    persistent_path.write_text(json.dumps(safe_payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    return persistent_path
+    return write_runtime_json_file(persistent_path, safe_payload)
 
 
 def sanitize_text_history_entries(value: object, limit: int = SNAPSHOT_TEXT_HISTORY_LIMIT) -> list[dict]:
@@ -403,18 +527,16 @@ def sanitize_auto_resume_snapshot(value: dict | None) -> dict | None:
 
 def load_project_auto_resume(project_id: str) -> dict | None:
     auto_resume_path = get_project_auto_resume_file_path(project_id)
-    if not auto_resume_path.is_file():
-        return None
-    try:
-        payload = json.loads(auto_resume_path.read_text(encoding="utf-8"))
-    except Exception:
-        return None
+    payload = read_runtime_json_file(
+        auto_resume_path,
+        None,
+        expected_type=dict,
+        recovery_label="续玩记录",
+    )
     return sanitize_auto_resume_snapshot(payload)
 
 
 def write_project_auto_resume(project_id: str, snapshot: dict) -> Path:
-    auto_resume_dir = get_runtime_auto_resume_dir()
-    auto_resume_dir.mkdir(parents=True, exist_ok=True)
     auto_resume_path = get_project_auto_resume_file_path(project_id)
     safe_snapshot = sanitize_auto_resume_snapshot(snapshot)
     if safe_snapshot is None:
@@ -425,17 +547,12 @@ def write_project_auto_resume(project_id: str, snapshot: dict) -> Path:
             "sceneName": "未命名场景",
             "blockIndex": 0,
         }
-    auto_resume_path.write_text(json.dumps(safe_snapshot, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    return auto_resume_path
+    return write_runtime_json_file(auto_resume_path, safe_snapshot)
 
 
 def clear_project_auto_resume(project_id: str) -> Path:
     auto_resume_path = get_project_auto_resume_file_path(project_id)
-    try:
-        auto_resume_path.unlink()
-    except FileNotFoundError:
-        pass
-    return auto_resume_path
+    return remove_runtime_json_file(auto_resume_path)
 
 
 def sanitize_archive_progress(value: dict | None) -> dict:
@@ -478,40 +595,34 @@ def sanitize_archive_progress(value: dict | None) -> dict:
 
 def load_project_archive_progress(project_id: str) -> dict:
     progress_path = get_project_progress_file_path(project_id)
-    if not progress_path.is_file():
-        return sanitize_archive_progress(None)
-    try:
-        payload = json.loads(progress_path.read_text(encoding="utf-8"))
-    except Exception:
-        return sanitize_archive_progress(None)
+    payload = read_runtime_json_file(
+        progress_path,
+        {},
+        expected_type=dict,
+        recovery_label="收藏与已读进度",
+    )
     return sanitize_archive_progress(payload)
 
 
 def write_project_archive_progress(project_id: str, progress: dict) -> Path:
-    progress_dir = get_runtime_progress_dir()
-    progress_dir.mkdir(parents=True, exist_ok=True)
     progress_path = get_project_progress_file_path(project_id)
     safe_payload = sanitize_archive_progress(progress)
-    progress_path.write_text(json.dumps(safe_payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    return progress_path
+    return write_runtime_json_file(progress_path, safe_payload)
 
 
 def load_project_runtime_settings(project_id: str, project: dict | None = None) -> dict:
     project_defaults = build_project_default_runtime_player_settings(project)
     settings_path = get_project_settings_file_path(project_id)
-    if not settings_path.is_file():
-        return project_defaults
-    try:
-        payload = json.loads(settings_path.read_text(encoding="utf-8"))
-    except Exception:
-        return project_defaults
+    payload = read_runtime_json_file(
+        settings_path,
+        {},
+        expected_type=dict,
+        recovery_label="体验设置",
+    )
     return sanitize_runtime_player_settings({**project_defaults, **payload})
 
 
 def write_project_runtime_settings(project_id: str, settings: dict) -> Path:
-    settings_dir = get_runtime_settings_dir()
-    settings_dir.mkdir(parents=True, exist_ok=True)
     settings_path = get_project_settings_file_path(project_id)
     safe_settings = sanitize_runtime_player_settings(settings)
-    settings_path.write_text(json.dumps(safe_settings, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    return settings_path
+    return write_runtime_json_file(settings_path, safe_settings)

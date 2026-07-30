@@ -83,6 +83,7 @@ import {
 } from "./runtime_text_variables.js";
 import {
   buildRuntimeStorageKeys,
+  consumeRuntimeStorageRecoveryEvents,
   readRuntimeStorageJson,
   removeRuntimeStorageItem,
   writeRuntimeStorageJson,
@@ -549,6 +550,7 @@ const state = {
   textInputOpen: false,
   textInputSnapshotKey: "",
   timedChoicePersistBucket: null,
+  storageRecoveryEvents: [],
 };
 
 const sfxTransportController = createSfxTransportController({
@@ -572,6 +574,7 @@ init();
 
 function init() {
   applyProjectResolutionStyles();
+  consumeRuntimeStorageRecoveryEvents();
   state.playback = loadStoredPlaybackSettings();
   applyRuntimeUiTheme(state.playback.uiThemeMode);
   applyProjectGameUiSkin();
@@ -590,6 +593,7 @@ function init() {
   state.characterArchive = loadStoredCharacterArchive();
   state.endingProgress = loadStoredEndingProgress();
   state.extraUnlocks = loadStoredExtraUnlocks();
+  state.storageRecoveryEvents = consumeRuntimeStorageRecoveryEvents();
   syncAchievementProgressFromState();
   document.title = `${data.project.title ?? "Canvasia Engine"} · 网页试玩包`;
   refs.gameTitle.textContent = data.project.title ?? "未命名项目";
@@ -1061,23 +1065,35 @@ function renderStartResumeSummary() {
   const snapshot = getSaveSlotSnapshot(slot);
   const hasResume = Boolean(slot && snapshot);
   const hasLoadSource = Boolean(hasResume || state.saveSlots.some(Boolean) || state.quickSave);
+  const recoveryCount = state.storageRecoveryEvents.length;
+  const hasRecoveryNotice = recoveryCount > 0;
 
   refs.startContinueButton.hidden = !hasResume;
   refs.startLoadButton.hidden = !hasLoadSource;
   refs.startLoadButton.disabled = !hasLoadSource;
-  refs.startResumeSummary.hidden = !hasResume;
+  refs.startResumeSummary.hidden = !hasResume && !hasRecoveryNotice;
 
-  if (!hasResume) {
+  if (!hasResume && !hasRecoveryNotice) {
     refs.startResumeSummary.innerHTML = "";
     return;
   }
 
-  refs.startResumeSummary.innerHTML = `
-    <strong>上次试玩停在这里</strong>
-    <div>${escapeHtml(getSaveSlotSummary(slot))}</div>
-    <div>${escapeHtml(`变量：${getVariableSummary(snapshot.variables)}`)}</div>
-    <div>${escapeHtml(`记录时间：${formatDate(slot.savedAt)}`)}</div>
-  `;
+  const sections = [];
+  if (hasRecoveryNotice) {
+    sections.push(`
+      <strong>存档安全修复完成</strong>
+      <div>${escapeHtml(`已从上一份有效备份恢复 ${recoveryCount} 项本地数据。建议进入游戏后重新保存一次。`)}</div>
+    `);
+  }
+  if (hasResume) {
+    sections.push(`
+      <strong>上次试玩停在这里</strong>
+      <div>${escapeHtml(getSaveSlotSummary(slot))}</div>
+      <div>${escapeHtml(`变量：${getVariableSummary(snapshot.variables)}`)}</div>
+      <div>${escapeHtml(`记录时间：${formatDate(slot.savedAt)}`)}</div>
+    `);
+  }
+  refs.startResumeSummary.innerHTML = sections.join("");
 }
 
 function renderBuildInfo() {

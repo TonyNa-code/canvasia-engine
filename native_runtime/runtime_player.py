@@ -339,6 +339,7 @@ try:
     from .runtime_storage import (
         READ_TEXT_KEY_LIMIT,
         clear_project_auto_resume,
+        consume_runtime_storage_recovery_events,
         get_project_auto_resume_file_path,
         get_project_progress_file_path,
         get_project_profile_file_path,
@@ -371,6 +372,7 @@ except ImportError:  # pragma: no cover - exported native packages import from t
     from runtime_storage import (
         READ_TEXT_KEY_LIMIT,
         clear_project_auto_resume,
+        consume_runtime_storage_recovery_events,
         get_project_auto_resume_file_path,
         get_project_progress_file_path,
         get_project_profile_file_path,
@@ -8163,6 +8165,7 @@ class NativeRuntimePlayer:
         self.current_voice_profile_id = ""
         self.voice_playback_active = False
         self.project_id = str(self.project.get("projectId") or "untitled_project")
+        consume_runtime_storage_recovery_events()
         self.persistent_variable_state = sanitize_persistent_runtime_variable_state(
             load_project_persistent_variables(self.project_id),
             self.variables,
@@ -8181,6 +8184,7 @@ class NativeRuntimePlayer:
         self.profile_file_path = get_project_profile_file_path(self.project_id)
         self.auto_resume_snapshot = load_project_auto_resume(self.project_id)
         self.auto_resume_file_path = get_project_auto_resume_file_path(self.project_id)
+        self.runtime_storage_recovery_events = consume_runtime_storage_recovery_events()
         self.auto_resume_write_enabled = self.auto_resume_snapshot is None
         self.profile_session_started_at_ms = 0
         self.overlay_mode: str | None = None
@@ -8273,6 +8277,18 @@ class NativeRuntimePlayer:
         self.runtime_preload_status = self.preload_runtime_assets()
         self.record_player_session_start()
         self.open_title_screen()
+        if self.runtime_storage_recovery_events:
+            labels = list(
+                dict.fromkeys(
+                    str(event.get("label") or "运行数据")
+                    for event in self.runtime_storage_recovery_events
+                    if isinstance(event, dict)
+                )
+            )
+            label_summary = "、".join(labels[:3]) or "运行数据"
+            extra_count = max(0, len(labels) - 3)
+            extra_summary = f"等 {len(labels)} 类数据" if extra_count else ""
+            self.status_message = f"已从安全备份恢复{label_summary}{extra_summary}；建议确认进度后重新保存一次。"
 
     def get_project_font_asset_path(self) -> Path | None:
         font_asset_id = str(self.game_ui_config.get("fontAssetId") or "").strip()

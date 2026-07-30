@@ -50,10 +50,31 @@ class FrontendRuntimeStorageModuleTests(unittest.TestCase):
             const keys = tools.buildRuntimeStorageKeys({{ title: "My VN: 夏 / Demo!!" }});
             const saved = tools.writeRuntimeStorageJson(keys.quickSave, {{ sceneId: "scene_a", step: 3 }}, {{ storage }});
             const loaded = tools.readRuntimeStorageJson(keys.quickSave, null, {{ storage }});
+            const backupKey = tools.buildRuntimeStorageBackupKey(keys.quickSave);
+            const seededBackup = JSON.parse(storage.getItem(backupKey));
+            const savedAgain = tools.writeRuntimeStorageJson(keys.quickSave, {{ sceneId: "scene_b", step: 8 }}, {{ storage }});
+            const previousGeneration = JSON.parse(storage.getItem(backupKey));
+            storage.setItem(keys.quickSave, "{{broken");
+            const recovered = tools.readRuntimeStorageJson(keys.quickSave, null, {{ storage }});
+            const healedPrimary = JSON.parse(storage.getItem(keys.quickSave));
+            const recoveryEvents = tools.consumeRuntimeStorageRecoveryEvents();
+
+            const compactValue = {{
+              savedAt: "2026-07-30T00:00:00Z",
+              thumbnailDataUrl: "x".repeat(400),
+              session: {{ sceneId: "scene_compact" }},
+            }};
+            const compactSaved = tools.writeRuntimeStorageJson(
+              keys.autoResume,
+              compactValue,
+              {{ storage, backupCharacterLimit: 120 }}
+            );
+            const compactBackup = JSON.parse(storage.getItem(tools.buildRuntimeStorageBackupKey(keys.autoResume)));
             storage.setItem(keys.readHistory, "{{bad json");
             const badJsonFallback = tools.readRuntimeStorageJson(keys.readHistory, ["fallback"], {{ storage }});
             const removed = tools.removeRuntimeStorageItem(keys.quickSave, {{ storage }});
             const removedValue = storage.getItem(keys.quickSave);
+            const removedBackupValue = storage.getItem(backupKey);
 
             process.stdout.write(JSON.stringify({{
               exportedKeys: Object.keys(tools).sort(),
@@ -63,9 +84,18 @@ class FrontendRuntimeStorageModuleTests(unittest.TestCase):
               playbackKey: keys.playback,
               saved,
               loaded,
+              seededBackup,
+              savedAgain,
+              previousGeneration,
+              recovered,
+              healedPrimary,
+              recoveryEvents,
+              compactSaved,
+              compactBackup,
               badJsonFallback,
               removed,
               removedValue,
+              removedBackupValue,
               emptyScope: tools.getProjectStorageScope({{ title: "   " }}),
               fallbackRead: tools.readRuntimeStorageJson(keys.playback, "fallback", {{ storage: failingStorage }}),
               fallbackWrite: tools.writeRuntimeStorageJson(keys.playback, {{}}, {{ storage: failingStorage }}),
@@ -85,6 +115,8 @@ class FrontendRuntimeStorageModuleTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 0, completed.stderr)
         payload = json.loads(completed.stdout)
         self.assertIn("buildRuntimeStorageKeys", payload["exportedKeys"])
+        self.assertIn("buildRuntimeStorageBackupKey", payload["exportedKeys"])
+        self.assertIn("consumeRuntimeStorageRecoveryEvents", payload["exportedKeys"])
         self.assertIn("readRuntimeStorageJson", payload["exportedKeys"])
         self.assertIn("writeRuntimeStorageJson", payload["exportedKeys"])
         self.assertIn("removeRuntimeStorageItem", payload["exportedKeys"])
@@ -99,9 +131,20 @@ class FrontendRuntimeStorageModuleTests(unittest.TestCase):
         self.assertTrue(payload["playbackKey"].startswith("canvasia-engine:player-preview:"))
         self.assertTrue(payload["saved"])
         self.assertEqual(payload["loaded"], {"sceneId": "scene_a", "step": 3})
+        self.assertEqual(payload["seededBackup"], {"sceneId": "scene_a", "step": 3})
+        self.assertTrue(payload["savedAgain"])
+        self.assertEqual(payload["previousGeneration"], {"sceneId": "scene_a", "step": 3})
+        self.assertEqual(payload["recovered"], {"sceneId": "scene_a", "step": 3})
+        self.assertEqual(payload["healedPrimary"], {"sceneId": "scene_a", "step": 3})
+        self.assertEqual(len(payload["recoveryEvents"]), 1)
+        self.assertEqual(payload["recoveryEvents"][0]["key"], payload["storageKey"])
+        self.assertTrue(payload["compactSaved"])
+        self.assertEqual(payload["compactBackup"]["thumbnailDataUrl"], "")
+        self.assertEqual(payload["compactBackup"]["session"]["sceneId"], "scene_compact")
         self.assertEqual(payload["badJsonFallback"], ["fallback"])
         self.assertTrue(payload["removed"])
         self.assertIsNone(payload["removedValue"])
+        self.assertIsNone(payload["removedBackupValue"])
         self.assertEqual(payload["emptyScope"], "project")
         self.assertEqual(payload["fallbackRead"], "fallback")
         self.assertFalse(payload["fallbackWrite"])
