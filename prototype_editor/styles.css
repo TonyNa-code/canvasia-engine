@@ -9528,6 +9528,242 @@ body::after {
   }
 }
 
+/* Story card batch editing stays compact so it reads like an editing tool, not another dashboard. */
+.story-block-batch-host {
+  margin-bottom: 12px;
+}
+
+.story-batch-toolbar {
+  position: relative;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--line) 84%, rgba(121, 220, 255, 0.18));
+  border-radius: 16px;
+  background:
+    linear-gradient(90deg, rgba(121, 220, 255, 0.035) 1px, transparent 1px),
+    color-mix(in srgb, var(--panel-strong) 96%, transparent);
+  background-size: 18px 100%, auto;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+.story-batch-toolbar::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  content: "";
+  background: color-mix(in srgb, var(--muted) 48%, transparent);
+}
+
+.story-batch-toolbar.has-selection::before {
+  background: linear-gradient(180deg, #7bdcff, #3f78ff);
+  box-shadow: 0 0 18px rgba(88, 176, 255, 0.42);
+}
+
+.story-batch-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.story-batch-copy strong {
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.story-batch-copy small,
+.story-batch-safety {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.story-batch-kicker {
+  color: #7bdcff;
+  font-family: "SFMono-Regular", "Cascadia Mono", monospace;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+}
+
+.story-batch-select-actions,
+.story-batch-operation-rail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.story-batch-select-actions .toolbar-button {
+  min-height: 32px;
+  padding: 7px 10px;
+  font-size: 11px;
+}
+
+.story-batch-operation-rail {
+  padding-top: 11px;
+  border-top: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
+}
+
+.story-batch-operation {
+  min-height: 32px;
+  padding: 7px 10px;
+  border: 1px solid color-mix(in srgb, var(--line) 88%, rgba(121, 220, 255, 0.12));
+  border-radius: 10px;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--panel) 90%, transparent);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease, color 140ms ease;
+}
+
+.story-batch-operation:hover:not(:disabled) {
+  border-color: rgba(121, 220, 255, 0.38);
+  background: rgba(69, 132, 255, 0.12);
+}
+
+.story-batch-operation.is-copy {
+  color: #aeeaff;
+}
+
+.story-batch-operation.is-danger {
+  color: #ff9fb0;
+}
+
+.story-batch-operation:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+.story-batch-operation:focus-visible,
+.block-card-selection-toggle:focus-visible {
+  outline: 2px solid #7bdcff;
+  outline-offset: 2px;
+}
+
+.story-batch-safety {
+  padding-left: 10px;
+  border-left: 1px solid rgba(121, 220, 255, 0.2);
+}
+
+.block-card-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.block-card-selection-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 4px 8px 4px 5px;
+  border: 1px solid color-mix(in srgb, var(--line) 84%, transparent);
+  border-radius: 999px;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.block-card-selection-mark {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--line) 56%, transparent);
+  font-family: "SFMono-Regular", "Cascadia Mono", monospace;
+  font-size: 11px;
+}
+
+.block-card-selection-toggle[aria-pressed="true"] {
+  border-color: rgba(121, 220, 255, 0.34);
+  color: #aeeaff;
+  background: rgba(64, 131, 255, 0.12);
+}
+
+.block-card-selection-toggle[aria-pressed="true"] .block-card-selection-mark {
+  color: #06111e;
+  background: #7bdcff;
+}
+
+.block-card.is-batch-selected {
+  border-color: rgba(121, 220, 255, 0.38);
+  box-shadow:
+    inset 3px 0 0 #61cfff,
+    0 14px 28px rgba(30, 105, 188, 0.12);
+}
+
+.block-card.is-selected.is-batch-selected {
+  border-color: rgba(121, 220, 255, 0.58);
+  box-shadow:
+    inset 3px 0 0 #61cfff,
+    0 16px 34px rgba(30, 105, 188, 0.2);
+}
+
+html[data-ui-theme="light"] .story-batch-toolbar {
+  border-color: rgba(61, 96, 139, 0.18);
+  background:
+    linear-gradient(90deg, rgba(59, 112, 180, 0.045) 1px, transparent 1px),
+    rgba(249, 252, 255, 0.96);
+  background-size: 18px 100%, auto;
+  box-shadow: 0 10px 24px rgba(54, 78, 110, 0.08), inset 0 1px 0 #fff;
+}
+
+html[data-ui-theme="light"] .story-batch-kicker,
+html[data-ui-theme="light"] .story-batch-operation.is-copy {
+  color: #176da7;
+}
+
+html[data-ui-theme="light"] .story-batch-operation,
+html[data-ui-theme="light"] .block-card-selection-toggle {
+  border-color: rgba(61, 96, 139, 0.18);
+  color: #425974;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+html[data-ui-theme="light"] .story-batch-operation.is-danger {
+  color: #ad334c;
+}
+
+html[data-ui-theme="light"] .block-card-selection-toggle[aria-pressed="true"] {
+  border-color: rgba(35, 118, 180, 0.34);
+  color: #155f93;
+  background: rgba(62, 149, 214, 0.1);
+}
+
+html[data-ui-theme="light"] .block-card-selection-toggle[aria-pressed="true"] .block-card-selection-mark {
+  color: #fff;
+  background: #247eb8;
+}
+
+html[data-ui-theme="light"] .block-card.is-batch-selected {
+  border-color: rgba(36, 126, 184, 0.42);
+  box-shadow: inset 3px 0 0 #247eb8, 0 12px 24px rgba(54, 78, 110, 0.1);
+}
+
+@media (max-width: 720px) {
+  .story-batch-select-actions,
+  .story-batch-operation-rail {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .story-batch-select-actions .toolbar-button,
+  .story-batch-operation {
+    width: 100%;
+  }
+}
+
 /* === Brand Finish Pass === */
 html {
   scrollbar-color: rgba(121, 220, 255, 0.32) rgba(7, 12, 22, 0.72);

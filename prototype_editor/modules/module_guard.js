@@ -28,6 +28,7 @@ const REQUIRED_EDITOR_MODULES = Object.freeze([
     { globalName: "CanvasiaEditorTextPacing", script: "./modules/text_pacing_editor.js", label: "句内节奏编辑器" },
     { globalName: "CanvasiaEditorRichText", script: "./modules/rich_text_editor.js", label: "富文本表现编辑器" },
     { globalName: "CanvasiaEditorStoryBlockEditors", script: "./modules/story_block_editors.js", label: "剧情卡片编辑器" },
+    { globalName: "CanvasiaEditorStoryBlockBatch", script: "./modules/story_block_batch.js", label: "剧情卡片批量编排" },
     { globalName: "CanvasiaEditorMusicRangeScope", script: "./modules/music_range_scope.js", label: "音乐范围系统" },
     { globalName: "CanvasiaEditorMusicTransport", script: "./modules/music_transport_editor.js", label: "音乐精确播放编辑器" },
     { globalName: "CanvasiaEditorVideoTransport", script: "./modules/video_transport_editor.js", label: "视频播放编辑器" },

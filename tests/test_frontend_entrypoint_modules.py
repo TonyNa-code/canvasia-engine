@@ -36,6 +36,7 @@ class FrontendEntrypointModuleTests(unittest.TestCase):
             "./modules/timed_choice_editor.js",
             "./modules/text_pacing_editor.js",
             "./modules/story_block_editors.js",
+            "./modules/story_block_batch.js",
             "./modules/music_range_scope.js",
             "./modules/music_transport_editor.js",
             "./modules/video_transport_editor.js",

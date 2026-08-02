@@ -37,6 +37,7 @@ jobs:
         run: |
           python -m py_compile \
             editor_asset_usage.py \
+            editor_port_selection.py \
             editor_project_presentation.py \
             editor_project_text_refactor.py \
             export_report_descriptions.py \
@@ -94,6 +95,7 @@ jobs:
             tools/ci/project_health.py \
             tools/runtime/run_native_runtime_smoke.py \
             tests/test_ci_workflow_coverage.py \
+            tests/test_editor_infrastructure.py \
             tests/test_editor_project_presentation.py \
             tests/test_editor_project_text_refactor.py \
             tests/test_github_status_tool.py \
@@ -200,6 +202,7 @@ jobs:
             tests/test_frontend_presentation_timeline_module.py \
             tests/test_frontend_presentation_timeline_panel_module.py \
             tests/test_frontend_scene_rehearsal_board_module.py \
+            tests/test_frontend_story_block_batch_module.py \
             tests/test_frontend_preview_regression_module.py \
             tests/test_frontend_preview_story_debugger_module.py \
             tests/test_frontend_preview_story_debugger_panel_module.py \
@@ -347,6 +350,7 @@ jobs:
           node --check prototype_editor/modules/presentation_timeline.js
           node --check prototype_editor/modules/presentation_timeline_panel.js
           node --check prototype_editor/modules/scene_rehearsal_board.js
+          node --check prototype_editor/modules/story_block_batch.js
           node --check prototype_editor/modules/preview_regression.js
           node --check prototype_editor/modules/preview_story_debugger.js
           node --check prototype_editor/modules/preview_story_debugger_panel.js
@@ -451,6 +455,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_ci_workflow_coverage.py' -v
           python -m unittest discover -s tests -p 'test_github_status_tool.py' -v
           python -m unittest discover -s tests -p 'test_local_verify_tool.py' -v
+          python -m unittest discover -s tests -p 'test_editor_infrastructure.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_export_commands.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_export_digest.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_bundle.py' -v
@@ -547,6 +552,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_presentation_timeline_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_presentation_timeline_panel_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_scene_rehearsal_board_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_story_block_batch_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_preview_regression_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_preview_story_debugger_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_preview_story_debugger_panel_module.py' -v

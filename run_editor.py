@@ -9,7 +9,6 @@ import os
 import platform
 import plistlib
 import re
-import socket
 import struct
 import subprocess
 import shutil
@@ -28,8 +27,9 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlparse
 from urllib.request import Request, urlopen
 
-from editor_local_security import is_local_editor_host, is_local_editor_origin
 from editor_asset_usage import collect_asset_usages_from_bundle
+from editor_local_security import is_local_editor_host, is_local_editor_origin
+from editor_port_selection import find_available_port
 from editor_snapshot_cache import SnapshotCache, build_file_cache_signature
 from editor_project_text_refactor import (
     apply_project_text_refactor,
@@ -877,19 +877,6 @@ CURRENT_PROJECT_INFO = {
 HAS_SELECTED_PROJECT = False
 CURRENT_SERVER_SESSION_ID = f"server_session_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{os.getpid()}"
 PROJECT_BUNDLE_CACHE = SnapshotCache()
-
-
-def find_available_port(start_port: int) -> int:
-    port = start_port
-
-    while True:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            try:
-                sock.bind(("127.0.0.1", port))
-                return port
-            except OSError:
-                port += 1
 
 
 def build_url(port: int) -> str:
@@ -14965,7 +14952,10 @@ def main() -> None:
     ensure_project_roots()
     set_active_project_paths(SAMPLE_PROJECT_ID, SAMPLE_PROJECT_DIR, "sample")
     HAS_SELECTED_PROJECT = False
-    port = find_available_port(args.port)
+    try:
+        port = find_available_port(args.port)
+    except (ValueError, RuntimeError) as error:
+        parser.error(str(error))
     os.chdir(ROOT_DIR)
 
     server = ThreadingHTTPServer(("127.0.0.1", port), EditorRequestHandler)

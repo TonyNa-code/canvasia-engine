@@ -4,8 +4,11 @@ import tempfile
 import unittest
 from email.utils import formatdate
 from pathlib import Path
+from unittest import mock
 
+import editor_port_selection
 from editor_local_security import extract_host_from_header, is_local_editor_host, is_local_editor_origin
+from editor_port_selection import find_available_port
 from editor_snapshot_cache import SnapshotCache, build_file_cache_signature
 from editor_static_cache import (
     build_editor_static_cache_headers,
@@ -17,6 +20,54 @@ from editor_static_cache import (
 
 
 class EditorInfrastructureTests(unittest.TestCase):
+    def test_available_port_selection_uses_a_bounded_search(self) -> None:
+        attempted_ports = []
+
+        class FakeSocket:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return False
+
+            def setsockopt(self, *_args):
+                return None
+
+            def bind(self, address):
+                attempted_ports.append(address[1])
+                if address[1] < 8767:
+                    raise OSError("address already in use")
+
+        with mock.patch.object(
+            editor_port_selection.socket,
+            "socket",
+            side_effect=lambda *_args, **_kwargs: FakeSocket(),
+        ):
+            port = find_available_port(8765, max_attempts=3)
+
+        self.assertEqual(port, 8767)
+        self.assertEqual(attempted_ports, [8765, 8766, 8767])
+
+    def test_available_port_selection_reports_exhausted_range(self) -> None:
+        fake_socket = mock.MagicMock()
+        fake_socket.__enter__.return_value = fake_socket
+        fake_socket.bind.side_effect = PermissionError("operation not permitted")
+
+        with mock.patch.object(editor_port_selection.socket, "socket", return_value=fake_socket):
+            with self.assertRaisesRegex(RuntimeError, "8765-8766"):
+                find_available_port(8765, max_attempts=2)
+
+        self.assertEqual(fake_socket.bind.call_count, 2)
+
+    def test_available_port_selection_rejects_invalid_arguments(self) -> None:
+        for start_port in (0, 65536, True):
+            with self.subTest(start_port=start_port):
+                with self.assertRaisesRegex(ValueError, "1 到 65535"):
+                    find_available_port(start_port)
+
+        with self.assertRaisesRegex(ValueError, "正整数"):
+            find_available_port(8765, max_attempts=0)
+
     def test_local_editor_security_accepts_only_loopback_hosts(self) -> None:
         self.assertEqual(extract_host_from_header("[::1]:8765"), "::1")
         self.assertTrue(is_local_editor_host("127.0.0.1:8765"))

@@ -23,6 +23,7 @@ SCRIPT_SRC_PATTERN = re.compile(r"<script\b[^>]*\bsrc=[\"']([^\"']+)[\"'][^>]*>"
 PYTHON_SYNTAX_FILES = [
     "editor_asset_usage.py",
     "editor_local_security.py",
+    "editor_port_selection.py",
     "editor_project_presentation.py",
     "editor_project_text_refactor.py",
     "editor_snapshot_cache.py",
@@ -276,6 +277,7 @@ def build_release_tooling_steps(python_executable: str) -> list[VerifyStep]:
         build_unittest_step("CI workflow coverage", "test_ci_workflow_coverage.py", "release-tests", python_executable),
         build_unittest_step("GitHub status tooling", "test_github_status_tool.py", "release-tests", python_executable),
         build_unittest_step("Local verify tooling", "test_local_verify_tool.py", "release-tests", python_executable),
+        build_unittest_step("Editor infrastructure helpers", "test_editor_infrastructure.py", "release-tests", python_executable),
         build_unittest_step("Native runtime export command writer", "test_native_runtime_export_commands.py", "release-tests", python_executable),
         build_unittest_step("Native runtime export digest", "test_native_runtime_export_digest.py", "release-tests", python_executable),
         build_unittest_step("Native runtime bundle registry", "test_native_runtime_bundle.py", "release-tests", python_executable),

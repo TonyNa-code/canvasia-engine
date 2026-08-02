@@ -51,6 +51,7 @@ The project already includes a visual editor, export pipeline, native runtime pr
 ## Core Features
 
 - Visual story editor with scenes, cards, dialogue, narration, choices, variables, and conditional branches; each choice can stay available, hide, or remain visibly locked until affection, inventory, route flags, or other variable rules are satisfied
+- Story-card clip selection for larger scenes: select individual cards or Shift-select a range, then move, duplicate, or delete the selection as one undoable project-history operation; invalid BGM end ranges are repaired safely after structural edits
 - Safe project-wide text refactoring for names, terminology, dialogue, narration, choices, input prompts, scenes, and chapters, with selectable scopes, optional translation updates, a before/after preview, stale-preview protection, transactional rollback, and one-step project-history undo
 - Optional timed choices with 5 / 10 / 15 / 30-second presets or a custom 1-300 second limit, an author-selected timeout branch, safe fallback when that branch is locked, pause-aware menus and background tabs, and remaining-time restoration across editor preview, Web Runtime, native Runtime, saves, and Ren'Py export
 - Inline dialogue pacing with beginner-friendly buttons for short / long pauses and selected-text slow, fast, or instant reveal; editor preview, Web Runtime, native Runtime, saves, history, archives, and Ren'Py drafts share the same marker-safe behavior, while a player's Instant text-speed preference always takes priority

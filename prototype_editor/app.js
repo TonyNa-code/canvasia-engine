@@ -65,6 +65,7 @@ const richTextEditorTools = window.CanvasiaEditorRichText;
 const storyBlockActionTools = window.CanvasiaEditorStoryBlockActions;
 const storyBlockFactoryTools = window.CanvasiaEditorStoryBlockFactory;
 const storyBlockEditorTools = window.CanvasiaEditorStoryBlockEditors;
+const storyBlockBatchTools = window.CanvasiaEditorStoryBlockBatch;
 const musicRangeScopeTools = window.CanvasiaEditorMusicRangeScope;
 const musicTransportEditorTools = window.CanvasiaEditorMusicTransport;
 const videoTransportEditorTools = window.CanvasiaEditorVideoTransport;
@@ -711,6 +712,9 @@ const state = {
   storyBlockSearchQuery: "",
   storyBlockTypeFilter: "all",
   storyBlockIssueFilter: "all",
+  storyBlockCheckedIds: [],
+  storyBlockSelectionAnchorId: "",
+  storyBlockBatchInFlight: false,
   storySceneTreeSearchQuery: "",
   storySceneTreeFilter: "all",
   sceneRehearsalExpanded: false,
@@ -929,6 +933,7 @@ const refs = {
   dashboardContent: document.getElementById("dashboardContent"),
   storySceneTree: document.getElementById("storySceneTree"),
   storyBlockList: document.getElementById("storyBlockList"),
+  storyBlockBatchToolbar: document.getElementById("storyBlockBatchToolbar"),
   storyBlockDetails: document.getElementById("storyBlockDetails"),
   storySceneMeta: document.getElementById("storySceneMeta"),
   storyScenePlanner: document.getElementById("storyScenePlanner"),
@@ -1069,6 +1074,32 @@ const systemDialogController = systemDialogTools?.createSystemDialogController?.
   copyTextToClipboard: (text) => copyTextToClipboard(text),
   fallbackAlert: nativeWindowAlert,
 }) ?? null;
+
+const storyBlockBatchController = storyBlockBatchTools.createStoryBlockBatchController({
+  getScene: () => getSelectedScene(),
+  getVisibleBlocks: (scene) => getFilteredStoryBlocks(scene),
+  getSelectedIds: () => state.storyBlockCheckedIds,
+  getAnchorId: () => state.storyBlockSelectionAnchorId,
+  getFocusedBlockId: () => state.selectedBlockId,
+  setSelection: (selectedIds, anchorId) => {
+    state.storyBlockCheckedIds = selectedIds;
+    state.storyBlockSelectionAnchorId = anchorId;
+  },
+  getBusy: () => state.storyBlockBatchInFlight,
+  setBusy: (busy) => {
+    state.storyBlockBatchInFlight = busy;
+  },
+  onUiChange: () => refreshStoryBlockSelectionUi(),
+  onToolbarChange: () => refreshStoryBlockBatchToolbar(),
+  setStatus: (message) => setSaveStatus(message),
+  showToast: (message) => showToast(message),
+  flushPendingChanges: () => flushPendingStoryChanges(),
+  cloneScene: (scene) => cloneScene(scene),
+  persistScene: (scene, options) => persistScene(scene, options),
+  duplicateBlockForScene: (scene, block) => duplicateBlockForScene(scene, block),
+  showConfirm: (options) => showEngineConfirm(options),
+  getBlockSummary: (block, scene) => getBlockSummary(block, scene),
+});
 
 installEditorRuntimeErrorBoundary();
 
@@ -1589,6 +1620,9 @@ function resetProjectScopedUiState() {
   state.storyBlockSearchQuery = "";
   state.storyBlockTypeFilter = "all";
   state.storyBlockIssueFilter = "all";
+  state.storyBlockCheckedIds = [];
+  state.storyBlockSelectionAnchorId = "";
+  state.storyBlockBatchInFlight = false;
   state.storySceneTreeSearchQuery = "";
   state.storySceneTreeFilter = "all";
   state.sceneRehearsalExpanded = false;
@@ -2583,6 +2617,9 @@ function initializeSelection(data) {
   const firstScene = data.scenesById.get(data.project.entrySceneId) ?? data.scenes[0];
   state.selectedSceneId = firstScene?.id ?? null;
   state.selectedBlockId = firstScene?.blocks?.[0]?.id ?? null;
+  state.storyBlockCheckedIds = [];
+  state.storyBlockSelectionAnchorId = "";
+  state.storyBlockBatchInFlight = false;
   state.previewStartSceneId = firstScene?.id ?? null;
   state.previewSceneId = firstScene?.id ?? null;
   state.previewBlockIndex = Math.max((firstScene?.blocks?.length ?? 1) - 1, 0);
@@ -4393,6 +4430,12 @@ async function handleClick(event) {
   }
 
   if (action === "select-block") {
+    if (
+      actionTarget.dataset.blockId !== state.selectedBlockId &&
+      !(await flushPendingStoryChanges())
+    ) {
+      return;
+    }
     state.selectedBlockId = actionTarget.dataset.blockId;
     const scene = getSelectedScene();
     const blockIndex = scene?.blocks?.findIndex((block) => block.id === state.selectedBlockId) ?? 0;
@@ -4403,6 +4446,53 @@ async function handleClick(event) {
     const block = scene?.blocks?.find((item) => item.id === state.selectedBlockId);
     setSaveStatus(`已选中第 ${Math.max(blockIndex, 0) + 1} 张卡片`);
     showToast(`正在编辑：${getBlockSummary(block, scene).title}`);
+    return;
+  }
+
+  if (action === "toggle-story-block-selection") {
+    storyBlockBatchController.toggle(actionTarget.dataset.blockId, {
+      range: event.shiftKey === true,
+    });
+    return;
+  }
+
+  if (action === "select-all-visible-story-blocks") {
+    storyBlockBatchController.selectVisible();
+    return;
+  }
+
+  if (action === "clear-story-block-selection") {
+    storyBlockBatchController.clear();
+    return;
+  }
+
+  if (action === "move-story-block-selection-up") {
+    void storyBlockBatchController.reorder("up");
+    return;
+  }
+
+  if (action === "move-story-block-selection-down") {
+    void storyBlockBatchController.reorder("down");
+    return;
+  }
+
+  if (action === "move-story-block-selection-start") {
+    void storyBlockBatchController.reorder("start");
+    return;
+  }
+
+  if (action === "move-story-block-selection-end") {
+    void storyBlockBatchController.reorder("end");
+    return;
+  }
+
+  if (action === "duplicate-story-block-selection") {
+    void storyBlockBatchController.duplicate();
+    return;
+  }
+
+  if (action === "delete-story-block-selection") {
+    void storyBlockBatchController.remove();
     return;
   }
 
@@ -4619,22 +4709,22 @@ async function handleClick(event) {
   }
 
   if (action === "move-block-up") {
-    void moveSelectedBlock(-1);
+    void storyBlockBatchController.moveFocused(-1);
     return;
   }
 
   if (action === "duplicate-block") {
-    void duplicateSelectedBlock();
+    void storyBlockBatchController.duplicateFocused();
     return;
   }
 
   if (action === "move-block-down") {
-    void moveSelectedBlock(1);
+    void storyBlockBatchController.moveFocused(1);
     return;
   }
 
   if (action === "delete-block") {
-    void deleteSelectedBlock();
+    void storyBlockBatchController.deleteFocused();
     return;
   }
 
@@ -7671,6 +7761,8 @@ function selectScene(sceneId, options = {}) {
   const scene = state.data.scenesById.get(sceneId);
   state.selectedSceneId = sceneId;
   state.selectedBlockId = scene?.blocks?.[0]?.id ?? null;
+  state.storyBlockCheckedIds = [];
+  state.storyBlockSelectionAnchorId = "";
   if (!options.keepChecklistFocus) {
     state.sceneChecklistFocus = null;
   }
@@ -7787,6 +7879,8 @@ function openStoryLocation(sceneId, blockId = null) {
 
   state.selectedSceneId = safeSceneId;
   state.selectedBlockId = block?.id ?? null;
+  state.storyBlockCheckedIds = [];
+  state.storyBlockSelectionAnchorId = "";
   state.previewStartSceneId = safeSceneId;
   state.previewSceneId = safeSceneId;
   state.previewBlockIndex = blockIndex;
@@ -9301,6 +9395,11 @@ function handleStoryBlockDragStart(event) {
     return;
   }
 
+  if (event.target instanceof Element && event.target.closest('[data-action="toggle-story-block-selection"]')) {
+    event.preventDefault();
+    return;
+  }
+
   const scene = getSelectedScene();
   if (!canDragStoryBlocks(scene)) {
     return;
@@ -9374,7 +9473,11 @@ async function handleStoryBlockDrop(event) {
   }
 
   event.preventDefault();
-  await reorderStoryBlock(scene, dragState.blockId, instruction.card.dataset.blockId, instruction.position);
+  await storyBlockBatchController.reorderFocused(
+    dragState.blockId,
+    instruction.card.dataset.blockId,
+    instruction.position
+  );
 }
 
 function handleStoryBlockDragEnd() {
@@ -12789,13 +12892,88 @@ function hasActiveStoryBlockFilter() {
     getSafeStoryBlockIssueFilter(state.storyBlockIssueFilter) !== "all";
 }
 
+function getCheckedStoryBlockIds(scene = getSelectedScene()) {
+  return storyBlockBatchTools.normalizeStoryBlockSelection(
+    scene?.blocks ?? [],
+    state.storyBlockCheckedIds
+  );
+}
+
+function normalizeCurrentStoryBlockSelection(scene = getSelectedScene()) {
+  state.storyBlockCheckedIds = getCheckedStoryBlockIds(scene);
+  state.storyBlockSelectionAnchorId = storyBlockBatchTools.normalizeStoryBlockSelectionAnchor(
+    scene?.blocks ?? [],
+    state.storyBlockSelectionAnchorId,
+    state.storyBlockCheckedIds
+  );
+  return state.storyBlockCheckedIds;
+}
+
 function canDragStoryBlocks(scene = getSelectedScene()) {
-  return Boolean(scene) && (scene.blocks?.length ?? 0) > 1 && !hasActiveStoryBlockFilter();
+  return Boolean(scene) &&
+    (scene.blocks?.length ?? 0) > 1 &&
+    !hasActiveStoryBlockFilter() &&
+    getCheckedStoryBlockIds(scene).length === 0;
+}
+
+function renderStoryBlockBatchToolbar(scene, visibleBlocks = getFilteredStoryBlocks(scene)) {
+  if (!scene) {
+    return "";
+  }
+  return storyBlockBatchTools.renderStoryBlockBatchToolbar(
+    scene,
+    visibleBlocks,
+    getCheckedStoryBlockIds(scene),
+    { busy: state.storyBlockBatchInFlight }
+  );
+}
+
+function renderStoryBlockList(scene, visibleBlocks = getFilteredStoryBlocks(scene)) {
+  if (!refs.storyBlockList) {
+    return;
+  }
+  const isBlankProject = isCurrentProjectBlank();
+  const blocks = scene?.blocks ?? [];
+  const checkedIds = new Set(getCheckedStoryBlockIds(scene));
+  const canDragBlocks = canDragStoryBlocks(scene);
+  const blockIndexMap = new Map(blocks.map((block, index) => [block.id, index]));
+
+  refs.storyBlockList.innerHTML = isBlankProject
+    ? renderBlankProjectStarterPanel("story")
+    : blocks.length === 0
+      ? renderEmpty("这个场景还没有卡片。")
+      : visibleBlocks.length === 0
+        ? renderEmpty("这个筛选下没有命中的卡片。可换一个关键词，或点击上面的“清空筛选”。")
+        : visibleBlocks
+          .map((block) =>
+            renderBlockCard(
+              block,
+              scene,
+              blockIndexMap.get(block.id) ?? 0,
+              block.id === state.selectedBlockId,
+              canDragBlocks,
+              checkedIds.has(block.id)
+            )
+          )
+          .join("");
+}
+
+function refreshStoryBlockSelectionUi(scene = getSelectedScene()) {
+  if (!scene || state.currentScreen !== "story") {
+    return;
+  }
+  normalizeCurrentStoryBlockSelection(scene);
+  const visibleBlocks = getFilteredStoryBlocks(scene);
+  if (refs.storyBlockBatchToolbar) {
+    refs.storyBlockBatchToolbar.innerHTML = renderStoryBlockBatchToolbar(scene, visibleBlocks);
+  }
+  renderStoryBlockList(scene, visibleBlocks);
 }
 
 function renderStoryBlockFilterSummary(scene, visibleBlocks, allBlocks, selectedBlock) {
   const activeLabels = [];
   const dragEnabled = canDragStoryBlocks(scene);
+  const checkedCount = getCheckedStoryBlockIds(scene).length;
 
   if ((state.storyBlockSearchQuery ?? "").trim()) {
     activeLabels.push(`关键词：${state.storyBlockSearchQuery.trim()}`);
@@ -12833,7 +13011,11 @@ function renderStoryBlockFilterSummary(scene, visibleBlocks, allBlocks, selected
       ${
         allBlocks.length > 1
           ? `<span class="issue-tag ${dragEnabled ? "good-text" : "warn-text"}">${
-              dragEnabled ? "现在可以直接拖拽卡片改顺序。" : "当前有筛选，先清空筛选后再拖拽排序。"
+              dragEnabled
+                ? "现在可以直接拖拽卡片改顺序。"
+                : checkedCount > 0
+                  ? "剪辑选区已启用，请用批量工具条移动；清空选区后可恢复单卡拖拽。"
+                  : "当前有筛选，先清空筛选后再拖拽排序。"
             }</span>`
           : ""
       }
@@ -13297,8 +13479,7 @@ function renderStoryScreen() {
   const sceneTreeOverview = buildStorySceneTreeOverview(routeOverview);
   const blocks = scene?.blocks ?? [];
   const visibleBlocks = getFilteredStoryBlocks(scene);
-  const canDragBlocks = canDragStoryBlocks(scene);
-  const blockIndexMap = new Map(blocks.map((block, index) => [block.id, index]));
+  normalizeCurrentStoryBlockSelection(scene);
   const selectedBlock = getSelectedBlock();
   const selectedIndex = Math.max(
     blocks.findIndex((block) => block.id === state.selectedBlockId),
@@ -13376,6 +13557,13 @@ function renderStoryScreen() {
       : renderEmpty("先从左边选一个场景，再开始筛剧情卡片。");
   }
 
+  if (refs.storyBlockBatchToolbar) {
+    refs.storyBlockBatchToolbar.innerHTML = isBlankProject || !scene
+      ? ""
+      : renderStoryBlockBatchToolbar(scene, visibleBlocks);
+    refs.storyBlockBatchToolbar.classList.toggle("is-hidden", isBlankProject || !scene || blocks.length === 0);
+  }
+
   if (refs.sceneRehearsalBoard) {
     refs.sceneRehearsalBoard.innerHTML = isBlankProject || !scene ? "" : renderCurrentSceneRehearsalBoard(scene);
     refs.sceneRehearsalBoard.classList.toggle("is-hidden", isBlankProject || !scene);
@@ -13396,23 +13584,7 @@ function renderStoryScreen() {
         useStoryFilters: true,
         sceneTreeOverview,
       });
-  refs.storyBlockList.innerHTML = isBlankProject
-    ? renderBlankProjectStarterPanel("story")
-    : blocks.length === 0
-      ? renderEmpty("这个场景还没有卡片。")
-      : visibleBlocks.length === 0
-        ? renderEmpty("这个筛选下没有命中的卡片。可换一个关键词，或点击上面的“清空筛选”。")
-        : visibleBlocks
-          .map((block) =>
-            renderBlockCard(
-              block,
-              scene,
-              blockIndexMap.get(block.id) ?? 0,
-              block.id === state.selectedBlockId,
-              canDragBlocks
-            )
-          )
-          .join("");
+  renderStoryBlockList(scene, visibleBlocks);
 
   refs.storyBlockDetails.innerHTML = isBlankProject
     ? renderBlankStoryWorkspacePanel()
@@ -21847,16 +22019,29 @@ function renderAssetGapStatCard(label, count, note, tone = "soft", action = null
   `;
 }
 
-function renderBlockCard(block, scene, index, isSelected, canDragBlocks = false) {
+function renderBlockCard(block, scene, index, isSelected, canDragBlocks = false, isBatchSelected = false) {
   const summary = getBlockSummary(block, scene);
   return `
     <article
-      class="block-card ${isSelected ? "is-selected" : ""}"
+      class="block-card ${isSelected ? "is-selected" : ""} ${isBatchSelected ? "is-batch-selected" : ""}"
       data-action="select-block"
-      data-block-id="${block.id}"
+      data-block-id="${escapeHtml(block.id)}"
       draggable="${canDragBlocks ? "true" : "false"}"
     >
-      <span class="block-tag">${BLOCK_LABELS[block.type] ?? block.type}</span>
+      <div class="block-card-topline">
+        <button
+          type="button"
+          class="block-card-selection-toggle"
+          data-action="toggle-story-block-selection"
+          data-block-id="${escapeHtml(block.id)}"
+          aria-pressed="${isBatchSelected ? "true" : "false"}"
+          title="${isBatchSelected ? "从剪辑选区移除" : "加入剪辑选区；按住 Shift 可连续选择"}"
+        >
+          <span class="block-card-selection-mark" aria-hidden="true">${isBatchSelected ? "✓" : "+"}</span>
+          <span>${isBatchSelected ? "已选" : "多选"}</span>
+        </button>
+        <span class="block-tag">${BLOCK_LABELS[block.type] ?? block.type}</span>
+      </div>
       <strong>${escapeHtml(summary.title)}</strong>
       <div class="block-meta">第 ${index + 1} 张 · ${escapeHtml(summary.meta)}</div>
       ${canDragBlocks ? '<div class="block-card-drag-hint">拖住这张卡片，就能改顺序</div>' : ""}
@@ -35562,149 +35747,14 @@ async function applyStoryTemplateToScene(sceneId, templateId) {
   await applyStoryTemplate(templateId);
 }
 
-async function duplicateSelectedBlock() {
-  const scene = getSelectedScene();
-  const block = getSelectedBlock();
-
-  if (!scene || !block) {
+function refreshStoryBlockBatchToolbar(scene = getSelectedScene()) {
+  if (!refs.storyBlockBatchToolbar || !scene || state.currentScreen !== "story") {
     return;
   }
-
-  const updatedScene = cloneScene(scene);
-  const currentIndex = updatedScene.blocks.findIndex((item) => item.id === block.id);
-
-  if (currentIndex < 0) {
-    return;
-  }
-
-  const duplicatedBlock = duplicateBlockForScene(updatedScene, updatedScene.blocks[currentIndex]);
-  const insertIndex = currentIndex + 1;
-  updatedScene.blocks.splice(insertIndex, 0, duplicatedBlock);
-
-  await persistScene(updatedScene, {
-    selectedSceneId: updatedScene.id,
-    selectedBlockId: duplicatedBlock.id,
-    previewSceneId: updatedScene.id,
-    previewBlockIndex: insertIndex,
-    successMessage: "这张卡片已经复制",
-  });
-}
-
-async function reorderStoryBlock(scene, blockId, targetBlockId, position = "before") {
-  if (!scene) {
-    return;
-  }
-
-  const updatedScene = cloneScene(scene);
-  const originalOrder = updatedScene.blocks.map((block) => block.id).join("|");
-  const currentIndex = updatedScene.blocks.findIndex((block) => block.id === blockId);
-
-  if (currentIndex < 0) {
-    return;
-  }
-
-  const [movedBlock] = updatedScene.blocks.splice(currentIndex, 1);
-  const targetIndex = updatedScene.blocks.findIndex((block) => block.id === targetBlockId);
-
-  if (targetIndex < 0) {
-    updatedScene.blocks.splice(currentIndex, 0, movedBlock);
-    return;
-  }
-
-  const insertIndex = position === "after" ? targetIndex + 1 : targetIndex;
-  const safeInsertIndex = clamp(insertIndex, 0, updatedScene.blocks.length);
-  updatedScene.blocks.splice(safeInsertIndex, 0, movedBlock);
-
-  if (updatedScene.blocks.map((block) => block.id).join("|") === originalOrder) {
-    setSaveStatus("卡片顺序没有变化");
-    return;
-  }
-
-  const success = await persistScene(updatedScene, {
-    selectedSceneId: updatedScene.id,
-    selectedBlockId: movedBlock.id,
-    previewSceneId: updatedScene.id,
-    previewBlockIndex: safeInsertIndex,
-    successMessage: "卡片顺序已更新",
-  });
-
-  if (success) {
-    showToast("卡片顺序已更新");
-  }
-}
-
-async function moveSelectedBlock(direction) {
-  const scene = getSelectedScene();
-  const block = getSelectedBlock();
-
-  if (!scene || !block) {
-    return;
-  }
-
-  const updatedScene = cloneScene(scene);
-  const currentIndex = updatedScene.blocks.findIndex((item) => item.id === block.id);
-  const targetIndex = currentIndex + direction;
-
-  if (currentIndex < 0) {
-    return;
-  }
-
-  if (targetIndex < 0 || targetIndex >= updatedScene.blocks.length) {
-    setSaveStatus(direction < 0 ? "这张卡片已经在最上面了" : "这张卡片已经在最下面了");
-    return;
-  }
-
-  const [movedBlock] = updatedScene.blocks.splice(currentIndex, 1);
-  updatedScene.blocks.splice(targetIndex, 0, movedBlock);
-
-  await persistScene(updatedScene, {
-    selectedSceneId: updatedScene.id,
-    selectedBlockId: block.id,
-    previewSceneId: updatedScene.id,
-    previewBlockIndex: targetIndex,
-    successMessage: direction < 0 ? "卡片已上移一格" : "卡片已下移一格",
-  });
-}
-
-async function deleteSelectedBlock() {
-  const scene = getSelectedScene();
-  const block = getSelectedBlock();
-
-  if (!scene || !block) {
-    return;
-  }
-
-  const summary = getBlockSummary(block, scene);
-  const shouldDelete = await showEngineConfirm({
-    title: "删除这张剧情卡片？",
-    message: `要删除这张“${summary.title}”卡片吗？删除后会立刻写回项目文件。`,
-    tone: "danger",
-    confirmLabel: "删除卡片",
-    cancelLabel: "保留卡片",
-  });
-
-  if (!shouldDelete) {
-    return;
-  }
-
-  const updatedScene = cloneScene(scene);
-  updatedScene.blocks = Array.isArray(updatedScene.blocks) ? updatedScene.blocks : [];
-  const blockIndex = updatedScene.blocks.findIndex((item) => item.id === block.id);
-
-  if (blockIndex < 0) {
-    return;
-  }
-
-  updatedScene.blocks.splice(blockIndex, 1);
-  const nextSelectedBlock = updatedScene.blocks[Math.min(blockIndex, updatedScene.blocks.length - 1)] ?? null;
-
-  await persistScene(updatedScene, {
-    selectedSceneId: updatedScene.id,
-    selectedBlockId: nextSelectedBlock?.id ?? null,
-    previewSceneId: updatedScene.id,
-    previewBlockIndex: Math.max(Math.min(blockIndex, updatedScene.blocks.length - 1), 0),
-    successMessage: "这张卡片已经删除",
-  });
+  refs.storyBlockBatchToolbar.innerHTML = renderStoryBlockBatchToolbar(
+    scene,
+    getFilteredStoryBlocks(scene)
+  );
 }
 
 async function createScene() {
@@ -40157,6 +40207,8 @@ function getCurrentUiState() {
   return {
     selectedSceneId: state.selectedSceneId,
     selectedBlockId: state.selectedBlockId,
+    storyBlockCheckedIds: [...state.storyBlockCheckedIds],
+    storyBlockSelectionAnchorId: state.storyBlockSelectionAnchorId,
     previewSceneId: state.previewSceneId,
     previewStartSceneId: state.previewStartSceneId,
     previewBlockIndex: state.previewBlockIndex,
@@ -40265,6 +40317,9 @@ async function persistScene(updatedScene, options = {}) {
         ...getCurrentUiState(),
         selectedSceneId: options.selectedSceneId ?? updatedScene.id,
         selectedBlockId: options.selectedBlockId ?? null,
+        storyBlockCheckedIds: options.storyBlockCheckedIds ?? state.storyBlockCheckedIds,
+        storyBlockSelectionAnchorId:
+          options.storyBlockSelectionAnchorId ?? state.storyBlockSelectionAnchorId,
         previewSceneId: options.previewSceneId ?? updatedScene.id,
         previewStartSceneId: options.previewStartSceneId ?? state.previewStartSceneId,
         previewBlockIndex: options.previewBlockIndex ?? 0,
@@ -40312,6 +40367,15 @@ async function reloadProjectData(preserved = {}) {
     selectedScene?.blocks?.some((block) => block.id === preserved.selectedBlockId)
       ? preserved.selectedBlockId
       : selectedScene?.blocks?.[0]?.id ?? null;
+  state.storyBlockCheckedIds = storyBlockBatchTools.normalizeStoryBlockSelection(
+    selectedScene?.blocks ?? [],
+    preserved.storyBlockCheckedIds ?? []
+  );
+  state.storyBlockSelectionAnchorId = storyBlockBatchTools.normalizeStoryBlockSelectionAnchor(
+    selectedScene?.blocks ?? [],
+    preserved.storyBlockSelectionAnchorId,
+    state.storyBlockCheckedIds
+  );
 
   const previewScene =
     data.scenesById.get(preserved.previewSceneId) ??
