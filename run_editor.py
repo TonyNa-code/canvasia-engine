@@ -35,6 +35,7 @@ from editor_project_text_refactor import (
     apply_project_text_refactor,
     build_project_text_refactor_preview,
 )
+from editor_character_stage_presets import normalize_character_stage_presets_for_migration, sanitize_character_stage_presets
 from project_variable_migration import replace_variable_reference_in_block
 from editor_static_cache import (
     build_editor_static_cache_headers,
@@ -1343,6 +1344,9 @@ def normalize_project_document(
     )
     if not normalized["particleCustomPresets"]:
         normalized.pop("particleCustomPresets", None)
+    normalized["characterStagePresets"] = normalize_character_stage_presets_for_migration(normalized.get("characterStagePresets"))
+    if not normalized["characterStagePresets"]:
+        normalized.pop("characterStagePresets", None)
 
     created_at = str(normalized.get("createdAt") or "").strip()
     updated_at = str(normalized.get("updatedAt") or "").strip()
@@ -2841,6 +2845,7 @@ def save_project_settings(
     dialog_box_config: dict | None = None,
     game_ui_config: dict | None = None,
     particle_custom_presets: list | None = None,
+    character_stage_presets: list | None = None,
     variables: object | None = None,
 ) -> dict:
     project = read_json(PROJECT_PATH)
@@ -2906,6 +2911,13 @@ def save_project_settings(
             project["particleCustomPresets"] = cleaned_particle_presets
         else:
             project.pop("particleCustomPresets", None)
+
+    if character_stage_presets is not None:
+        cleaned_character_stage_presets = sanitize_character_stage_presets(character_stage_presets)
+        if cleaned_character_stage_presets:
+            project["characterStagePresets"] = cleaned_character_stage_presets
+        else:
+            project.pop("characterStagePresets", None)
 
     if variables is not None:
         write_json(DATA_DIR / "variables.json", normalize_variables_document(variables))
@@ -14505,6 +14517,7 @@ class EditorRequestHandler(SimpleHTTPRequestHandler):
                     dialog_box_config=payload.get("dialogBoxConfig"),
                     game_ui_config=payload.get("gameUiConfig"),
                     particle_custom_presets=payload.get("particleCustomPresets"),
+                    character_stage_presets=payload.get("characterStagePresets"),
                     variables=payload.get("variables"),
                 ),
                 "修改项目设置",

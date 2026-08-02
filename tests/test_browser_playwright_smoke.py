@@ -1063,6 +1063,104 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
         self.assertEqual(style_values["opacity"], "0.91")
         self.assertEqual(style_values["rotation"], "8deg")
 
+    def test_character_stage_composer_drag_zoom_theme_and_project_preset(self) -> None:
+        self.open_project_by_title("心跳时差")
+        self.page.get_by_role("button", name="写剧情", exact=True).click()
+        character_card = self.page.locator('.block-card[data-block-id="block_003"]')
+        character_card.wait_for(timeout=15000)
+        character_card.click()
+
+        composer = self.page.locator("[data-character-stage-composer]")
+        monitor = composer.locator("[data-character-stage-preview]")
+        sprite = composer.locator("[data-character-stage-preview-sprite]")
+        composer.wait_for(timeout=15000)
+        monitor.wait_for(state="visible", timeout=15000)
+        sprite.wait_for(state="visible", timeout=15000)
+        sprite.scroll_into_view_if_needed()
+
+        offset_input = composer.locator("#editorCharacterOffsetX")
+        scale_input = composer.locator("#editorCharacterScale")
+        initial_offset = int(offset_input.input_value())
+        initial_scale = int(scale_input.input_value())
+        sprite_box = sprite.bounding_box()
+        self.assertIsNotNone(sprite_box)
+        start_x = sprite_box["x"] + sprite_box["width"] / 2
+        start_y = sprite_box["y"] + sprite_box["height"] / 2
+        hit_target = self.page.evaluate(
+            """({ x, y }) => {
+                const target = document.elementFromPoint(x, y);
+                return {
+                    tag: target?.tagName || "",
+                    className: String(target?.className || ""),
+                    hitsSprite: Boolean(target?.closest?.('[data-character-stage-preview-sprite]')),
+                };
+            }""",
+            {"x": start_x, "y": start_y},
+        )
+        self.page.mouse.move(start_x, start_y)
+        self.page.mouse.down()
+        self.page.mouse.move(start_x + 28, start_y - 16, steps=4)
+        self.page.mouse.up()
+        self.page.wait_for_timeout(300)
+        dragged_offset = int(offset_input.input_value())
+        self.assertNotEqual(
+            dragged_offset,
+            initial_offset,
+            f"drag did not update offset; hit={hit_target}; page_errors={self.page_errors}; "
+            f"console_errors={self.console_errors}",
+        )
+
+        monitor.hover()
+        self.page.mouse.wheel(0, -120)
+        self.page.wait_for_function(
+            """(initial) => Number(document.querySelector('#editorCharacterScale')?.value) > initial""",
+            arg=initial_scale,
+            timeout=10000,
+        )
+
+        composer.locator("#editorCharacterStagePresetName").fill("Smoke composition")
+        composer.locator('[data-action="save-character-stage-preset"]').click()
+        self.page.locator('[data-custom-character-stage-preset="stage_smoke_composition"]').wait_for(
+            timeout=15000
+        )
+        self.page.wait_for_function(
+            """async () => {
+                const response = await fetch('/api/project-data');
+                const bundle = await response.json();
+                return (bundle.project?.characterStagePresets || []).some((preset) =>
+                    preset.id === 'stage_smoke_composition' && preset.stage?.scale > 100
+                );
+            }""",
+            timeout=15000,
+        )
+
+        self.page.locator('#globalUiThemeSwitch [data-ui-theme-mode="light"]').click()
+        self.page.wait_for_function("() => document.documentElement.dataset.uiTheme === 'light'", timeout=10000)
+        light_colors = composer.evaluate(
+            """(element) => ({
+                ink: getComputedStyle(element).getPropertyValue('--stage-composer-ink').trim(),
+                surface: getComputedStyle(element).getPropertyValue('--stage-composer-surface').trim(),
+            })"""
+        )
+        light_screenshot_path = os.environ.get("CANVASIA_STAGE_COMPOSER_QA_LIGHT_SCREENSHOT", "").strip()
+        if light_screenshot_path:
+            composer.screenshot(path=light_screenshot_path)
+        self.page.locator('#globalUiThemeSwitch [data-ui-theme-mode="dark"]').click()
+        self.page.wait_for_function("() => document.documentElement.dataset.uiTheme === 'dark'", timeout=10000)
+        dark_colors = composer.evaluate(
+            """(element) => ({
+                ink: getComputedStyle(element).getPropertyValue('--stage-composer-ink').trim(),
+                surface: getComputedStyle(element).getPropertyValue('--stage-composer-surface').trim(),
+            })"""
+        )
+        qa_screenshot_path = os.environ.get("CANVASIA_STAGE_COMPOSER_QA_SCREENSHOT", "").strip()
+        if qa_screenshot_path:
+            composer.screenshot(path=qa_screenshot_path)
+
+        self.assertNotEqual(light_colors, dark_colors)
+        self.assertFalse(self.page_errors, "\n".join(self.page_errors))
+        self.assertFalse(self.console_errors, "\n".join(self.console_errors))
+
     def test_story_editor_music_transport_presets_persist_to_project(self) -> None:
         project_title = "浏览器烟测项目_MusicTransport"
         self.create_blank_project(project_title)

@@ -236,6 +236,7 @@ const scriptVoiceTools = window.CanvasiaEditorScriptVoice;
 const voiceMatchReviewPanelTools = window.CanvasiaEditorVoiceMatchReviewPanel;
 const characterPresentationPanelTools = window.CanvasiaEditorCharacterPresentationPanel;
 const visualEffectTools = window.CanvasiaEditorVisualEffects;
+const characterStageComposerTools = window.CanvasiaEditorCharacterStageComposer;
 const runtimeReadingProfileTools = window.CanvasiaRuntimeReadingProfiles;
 const {
   applyReadingProfile,
@@ -1101,6 +1102,25 @@ const storyBlockBatchController = storyBlockBatchTools.createStoryBlockBatchCont
   getBlockSummary: (block, scene) => getBlockSummary(block, scene),
 });
 
+const characterStageComposerController = characterStageComposerTools.createCharacterStageComposerController({
+  document,
+  getSafeCharacterStage,
+  getSafePosition,
+  getPositionLabel,
+  getCharacterStageSummary,
+  getCharacterStageStyle,
+  getMatchingBuiltInPresetId: getMatchingCharacterStagePresetId,
+  getBuiltInPreset: (presetId) => getCharacterStagePreset(presetId),
+  getCustomPresets: () => state.data?.project?.characterStagePresets ?? [],
+  applyCharacterStageDelta,
+  applyCharacterStageAdjustment,
+  onLiveChanged: ({ delay = 120 } = {}) => scheduleAutoSave(delay),
+  onChanged: ({ message, delay = 220 } = {}) => {
+    scheduleAutoSave(delay);
+    setSaveStatus(message || "舞台构图已更新");
+  },
+});
+
 installEditorRuntimeErrorBoundary();
 
 document.addEventListener("click", (event) => {
@@ -1111,6 +1131,11 @@ document.addEventListener("click", (event) => {
 document.addEventListener("change", handleChange);
 document.addEventListener("input", handleInput);
 document.addEventListener("keydown", handleGlobalKeydown);
+document.addEventListener("pointerdown", (event) => characterStageComposerController.handlePointerDown(event));
+document.addEventListener("pointermove", (event) => characterStageComposerController.handlePointerMove(event));
+document.addEventListener("pointerup", (event) => characterStageComposerController.handlePointerUp(event));
+document.addEventListener("pointercancel", (event) => characterStageComposerController.handlePointerCancel(event));
+document.addEventListener("wheel", (event) => characterStageComposerController.handleWheel(event), { passive: false });
 document.addEventListener("visibilitychange", syncPreviewTimedChoicePauseState);
 document.addEventListener("click", schedulePreviewTimedChoicePauseSync);
 document.addEventListener("keydown", schedulePreviewTimedChoicePauseSync);
@@ -4568,6 +4593,21 @@ async function handleClick(event) {
     return;
   }
 
+  if (action === "apply-custom-character-stage-preset") {
+    applyCustomCharacterStagePresetToEditor(actionTarget.dataset.customCharacterStagePreset);
+    return;
+  }
+
+  if (action === "save-character-stage-preset") {
+    void saveCharacterStagePreset();
+    return;
+  }
+
+  if (action === "delete-character-stage-preset") {
+    void deleteCharacterStagePreset();
+    return;
+  }
+
   if (action === "apply-stage-image-preset") {
     applyStageImagePresetToEditor();
     return;
@@ -6078,62 +6118,8 @@ function handleGlobalKeydown(event) {
   }
 }
 
-function getCharacterStageKeyboardDelta(event) {
-  const moveStep = event.shiftKey ? 10 : 2;
-  const scaleStep = event.shiftKey ? 12 : 3;
-  const layerStep = event.shiftKey ? 2 : 1;
-
-  if (event.code === "ArrowLeft") {
-    return { offsetX: -moveStep };
-  }
-  if (event.code === "ArrowRight") {
-    return { offsetX: moveStep };
-  }
-  if (event.code === "ArrowUp") {
-    return { offsetY: -moveStep };
-  }
-  if (event.code === "ArrowDown") {
-    return { offsetY: moveStep };
-  }
-  if (event.code === "Equal" || event.code === "NumpadAdd") {
-    return { scale: scaleStep };
-  }
-  if (event.code === "Minus" || event.code === "NumpadSubtract") {
-    return { scale: -scaleStep };
-  }
-  if (event.code === "BracketRight") {
-    return { layer: layerStep };
-  }
-  if (event.code === "BracketLeft") {
-    return { layer: -layerStep };
-  }
-  return null;
-}
-
 function handleCharacterStageKeyboardNudge(event) {
-  if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) {
-    return false;
-  }
-  if (!(event.target instanceof HTMLElement)) {
-    return false;
-  }
-  const controls = event.target.closest(".character-stage-controls");
-  if (!controls || event.target.closest("input, textarea, select")) {
-    return false;
-  }
-
-  const delta = getCharacterStageKeyboardDelta(event);
-  if (!delta) {
-    return false;
-  }
-
-  event.preventDefault();
-  const nextStage = applyCharacterStageDelta(readCharacterStageControls(), delta);
-  setCharacterStageEditorValues(nextStage);
-  updateCharacterStagePreview(nextStage);
-  scheduleAutoSave(180);
-  setSaveStatus(`键盘微调：${getCharacterStagePreviewSummary(nextStage, getCharacterStageEditorPosition())}`);
-  return true;
+  return characterStageComposerController.handleKeyboard(event);
 }
 
 function getSceneStatusDragCard(target) {
@@ -42137,230 +42123,208 @@ function getCharacterStageFromBlock(block = {}) {
 }
 
 function readCharacterStageControls() {
-  return getSafeCharacterStage({
-    offsetX: document.getElementById("editorCharacterOffsetX")?.value,
-    offsetY: document.getElementById("editorCharacterOffsetY")?.value,
-    scale: document.getElementById("editorCharacterScale")?.value,
-    opacity: document.getElementById("editorCharacterOpacity")?.value,
-    layer: document.getElementById("editorCharacterLayer")?.value,
-    flipX: document.getElementById("editorCharacterFlipX")?.checked,
-  });
+  return characterStageComposerController.readStage();
 }
 
 function setCharacterStageEditorValues(stageSource = {}) {
-  const stage = getSafeCharacterStage(stageSource);
-  const fieldMap = [
-    ["editorCharacterOffsetX", stage.offsetX],
-    ["editorCharacterOffsetY", stage.offsetY],
-    ["editorCharacterScale", stage.scale],
-    ["editorCharacterOpacity", stage.opacity],
-    ["editorCharacterLayer", stage.layer],
-  ];
-
-  fieldMap.forEach(([fieldId, value]) => {
-    const input = document.getElementById(fieldId);
-    if (input) {
-      input.value = String(value);
-    }
-  });
-
-  const flipInput = document.getElementById("editorCharacterFlipX");
-  if (flipInput) {
-    flipInput.checked = stage.flipX;
-  }
+  return characterStageComposerController.setStage(stageSource);
 }
 
 function getCharacterStageEditorPosition() {
-  return getSafePosition(document.getElementById("editorCharacterPosition")?.value);
+  return characterStageComposerController.readPosition();
 }
 
 function setCharacterStageEditorPosition(position) {
-  if (!position) {
-    return getCharacterStageEditorPosition();
-  }
-
-  const safePosition = getSafePosition(position);
-  const positionSelect = document.getElementById("editorCharacterPosition");
-  if (positionSelect) {
-    positionSelect.value = safePosition;
-  }
-  return safePosition;
+  return position ? characterStageComposerController.setPosition(position) : getCharacterStageEditorPosition();
 }
 
 function applyCharacterStagePresetToEditor(presetId) {
   const preset = getCharacterStagePreset(presetId);
-  setCharacterStageEditorValues(preset.stage);
-  const position = preset.position
-    ? setCharacterStageEditorPosition(preset.position)
-    : getCharacterStageEditorPosition();
-  updateCharacterStagePreview(preset.stage, position);
-  scheduleAutoSave(300);
-  setSaveStatus(`已套用立绘预设：${preset.label}`);
-  showToast(`立绘预设：${preset.label}`);
+  if (characterStageComposerController.applyBuiltInPreset(presetId)) {
+    showToast(`已套用构图：${preset.label}`);
+  }
+}
+
+function applyCustomCharacterStagePresetToEditor(presetId) {
+  const preset = characterStageComposerTools.getCharacterStagePresetById(
+    getProjectCharacterStagePresets(),
+    presetId,
+    getCharacterStageComposerToolOptions()
+  );
+  if (preset && characterStageComposerController.applyCustomPreset(presetId)) {
+    showToast(`已套用我的构图：${preset.name}`);
+  }
 }
 
 function adjustCharacterStageInEditor(adjustmentId) {
-  const nextStage = applyCharacterStageAdjustment(readCharacterStageControls(), adjustmentId);
-  setCharacterStageEditorValues(nextStage);
-  updateCharacterStagePreview(nextStage);
-  scheduleAutoSave(240);
-  setSaveStatus(`立绘微调：${getCharacterStagePreviewSummary(nextStage, getCharacterStageEditorPosition())}`);
+  characterStageComposerController.applyAdjustment(adjustmentId);
 }
 
 function getCharacterStagePreviewSummary(stageSource = {}, positionSource = "center") {
-  return `${getPositionLabel(positionSource)} · ${getCharacterStageSummary(stageSource)}`;
+  return characterStageComposerTools.buildCharacterStagePreviewSummary(
+    stageSource,
+    positionSource,
+    getCharacterStageComposerToolOptions()
+  );
+}
+
+function getProjectCharacterStagePresets(project = state.data?.project) {
+  return Array.isArray(project?.characterStagePresets) ? project.characterStagePresets : [];
+}
+
+function getCharacterStageComposerPreviewContext() {
+  const scene = getSelectedScene();
+  const selectedBlock = getSelectedBlock();
+  const selectedIndex = Math.max(0, scene?.blocks?.findIndex((block) => block.id === selectedBlock?.id) ?? 0);
+  const blocks = scene?.blocks?.slice(0, selectedIndex + 1) ?? [];
+  let backgroundAssetId = "";
+  let scene3dPreview = null;
+  blocks.forEach((block) => {
+    if (block.type === "background") {
+      backgroundAssetId = block.assetId ?? "";
+      scene3dPreview = block.scene3dPreview ?? null;
+    }
+  });
+
+  const characterId = selectedBlock?.characterId ?? "";
+  let expressionId = selectedBlock?.expressionId ?? "";
+  if (!expressionId && characterId) {
+    for (let index = blocks.length - 1; index >= 0; index -= 1) {
+      const block = blocks[index];
+      if (["character_show", "character_move"].includes(block.type) && block.characterId === characterId && block.expressionId) {
+        expressionId = block.expressionId;
+        break;
+      }
+    }
+  }
+  const character = state.data?.charactersById?.get(characterId);
+  const spriteAsset = state.data?.assetsById?.get(getCharacterSpriteAssetId(characterId, expressionId));
+  const spriteUrl =
+    spriteAsset?.fileExists && isImageAssetType(spriteAsset.type) ? encodeURI(getAssetPublicUrl(spriteAsset)) : "";
+  return {
+    backdropStyle: getBackdropStyle(backgroundAssetId, scene3dPreview),
+    spriteUrl,
+    spriteLabel: character?.displayName ?? selectedBlock?.characterId ?? "当前立绘",
+  };
+}
+
+function getCharacterStageComposerToolOptions() {
+  return {
+    getSafeCharacterStage,
+    getSafePosition,
+    getPositionLabel,
+    getCharacterStageSummary,
+    getCharacterStageStyle,
+    getMatchingBuiltInPresetId: getMatchingCharacterStagePresetId,
+  };
 }
 
 function renderCharacterStageLivePreview(stageSource = {}, positionSource = "center") {
-  const stage = getSafeCharacterStage(stageSource);
-  const position = getSafePosition(positionSource);
-  const summary = getCharacterStagePreviewSummary(stage, position);
-  return `
-    <div class="stage-control-preview" data-character-stage-preview tabindex="0" aria-label="立绘构图实时预览。聚焦后可用方向键微调位置，Shift 加速。">
-      <div class="stage-control-preview-grid" aria-hidden="true"></div>
-      <div class="stage-control-preview-floor" aria-hidden="true"></div>
-      <div class="stage-control-preview-sprite" data-character-stage-preview-sprite data-position="${escapeHtml(position)}" style="${getCharacterStageStyle(stage)}">
-        <span class="stage-control-preview-head"></span>
-        <span class="stage-control-preview-body"></span>
-      </div>
-      <div class="stage-control-preview-summary">
-        <strong>实时构图预览</strong>
-        <span data-character-stage-preview-summary>${escapeHtml(summary)}</span>
-      </div>
-    </div>
-  `;
-}
-
-function updateCharacterStagePresetState(stageSource = readCharacterStageControls(), positionSource = getCharacterStageEditorPosition()) {
-  const activePresetId = getMatchingCharacterStagePresetId(stageSource, positionSource);
-  document.querySelectorAll("[data-character-stage-preset]").forEach((button) => {
-    const isActive = button.getAttribute("data-character-stage-preset") === activePresetId;
-    button.classList.toggle("is-active", isActive);
-    button.setAttribute("aria-pressed", isActive ? "true" : "false");
+  return characterStageComposerTools.renderCharacterStageLivePreview(stageSource, positionSource, {
+    ...getCharacterStageComposerToolOptions(),
+    ...getCharacterStageComposerPreviewContext(),
   });
 }
 
-function updateCharacterStagePreview(stageSource = readCharacterStageControls(), positionSource = getCharacterStageEditorPosition()) {
-  const stage = getSafeCharacterStage(stageSource);
-  const position = getSafePosition(positionSource);
-  const previewSprite = document.querySelector("[data-character-stage-preview-sprite]");
-  const previewSummary = document.querySelector("[data-character-stage-preview-summary]");
+function updateCharacterStagePresetState(
+  stageSource = readCharacterStageControls(),
+  positionSource = getCharacterStageEditorPosition()
+) {
+  return characterStageComposerController.update(stageSource, positionSource);
+}
 
-  if (previewSprite) {
-    previewSprite.dataset.position = position;
-    previewSprite.setAttribute("style", getCharacterStageStyle(stage));
-  }
-  if (previewSummary) {
-    previewSummary.textContent = getCharacterStagePreviewSummary(stage, position);
-  }
-  updateCharacterStagePresetState(stage, position);
+function updateCharacterStagePreview(
+  stageSource = readCharacterStageControls(),
+  positionSource = getCharacterStageEditorPosition()
+) {
+  return characterStageComposerController.update(stageSource, positionSource);
 }
 
 function renderCharacterStageControls(stageSource = {}, options = {}) {
-  const stage = getSafeCharacterStage(stageSource);
-  const position = getSafePosition(options.position);
-  const activePresetId = getMatchingCharacterStagePresetId(stage, position);
-  const presetCards = getCharacterStagePresetEntries()
-    .map((preset) => {
-      const summary = preset.position
-        ? `${getPositionLabel(preset.position)} · ${getCharacterStageSummary(preset.stage)}`
-        : getCharacterStageSummary(preset.stage);
-      const isActive = preset.id === activePresetId;
-      return `
-        <button
-          type="button"
-          class="stage-preset-chip ${isActive ? "is-active" : ""}"
-          data-action="apply-character-stage-preset"
-          data-character-stage-preset="${escapeHtml(preset.id)}"
-          aria-pressed="${isActive ? "true" : "false"}"
-          title="${escapeHtml(preset.description)}"
-        >
-          <strong>${escapeHtml(preset.label)}<em class="stage-preset-current">当前</em></strong>
-          <span>${escapeHtml(summary)}</span>
-        </button>
-      `;
-    })
-    .join("");
-  const adjustmentButtons = getCharacterStageAdjustmentEntries()
-    .map(
-      (adjustment) => `
-        <button
-          type="button"
-          class="stage-adjust-button"
-          data-action="adjust-character-stage"
-          data-character-stage-adjustment="${escapeHtml(adjustment.id)}"
-          title="${escapeHtml(adjustment.description)}"
-        >
-          <strong>${escapeHtml(adjustment.label)}</strong>
-          <span>${escapeHtml(adjustment.description)}</span>
-        </button>
-      `
-    )
-    .join("");
-  const shortcutHints = [
-    ["方向键", "移动"],
-    ["Shift", "加速"],
-    ["+ / -", "缩放"],
-    ["[ / ]", "层级"],
-  ]
-    .map(
-      ([key, label]) => `
-        <span class="stage-shortcut-chip">
-          <kbd>${escapeHtml(key)}</kbd>
-          <span>${escapeHtml(label)}</span>
-        </span>
-      `
-    )
-    .join("");
+  return characterStageComposerTools.renderCharacterStageControls(stageSource, {
+    ...getCharacterStageComposerToolOptions(),
+    ...getCharacterStageComposerPreviewContext(),
+    position: options.position,
+    builtInPresets: getCharacterStagePresetEntries(),
+    customPresets: getProjectCharacterStagePresets(),
+    adjustments: getCharacterStageAdjustmentEntries(),
+  });
+}
 
-  return `
-    <div class="detail-row character-stage-controls">
-      <label>立绘位置 / 大小 / 层级</label>
-      <div class="stage-preset-grid" aria-label="立绘舞台预设">
-        ${presetCards}
-      </div>
-      ${renderCharacterStageLivePreview(stage, position)}
-      <div class="stage-adjust-panel" tabindex="0" aria-label="立绘微调。方向键移动，加减缩放，中括号调整层级。">
-        <div class="stage-adjust-head">
-          <strong>快速微调</strong>
-          <span>小步移动、缩放、透明度和层级</span>
-        </div>
-        <div class="stage-adjust-grid">
-          ${adjustmentButtons}
-        </div>
-      </div>
-      <div class="stage-shortcut-strip" aria-label="立绘键盘快捷键">
-        ${shortcutHints}
-      </div>
-      <div class="field-grid compact-grid">
-        <label>
-          <span>X 偏移 %</span>
-          <input id="editorCharacterOffsetX" type="number" min="-60" max="60" step="1" value="${stage.offsetX}" />
-        </label>
-        <label>
-          <span>Y 偏移 %</span>
-          <input id="editorCharacterOffsetY" type="number" min="-45" max="45" step="1" value="${stage.offsetY}" />
-        </label>
-        <label>
-          <span>缩放 %</span>
-          <input id="editorCharacterScale" type="number" min="45" max="220" step="1" value="${stage.scale}" />
-        </label>
-        <label>
-          <span>透明度 %</span>
-          <input id="editorCharacterOpacity" type="number" min="0" max="100" step="1" value="${stage.opacity}" />
-        </label>
-        <label>
-          <span>层级</span>
-          <input id="editorCharacterLayer" type="number" min="-10" max="10" step="1" value="${stage.layer}" />
-        </label>
-      </div>
-      <label class="toggle-row compact-toggle">
-        <input id="editorCharacterFlipX" type="checkbox" ${stage.flipX ? "checked" : ""} />
-        <span>水平镜像这张立绘，用同一张素材做左右朝向调度</span>
-      </label>
-      <p class="helper-text">先点预设快速得到可用构图，再用数字或键盘微调：方向键移动，+ / - 缩放，[ / ] 调层级，按住 Shift 加速。默认值不会影响旧项目。</p>
-    </div>
-  `;
+async function saveCharacterStagePreset() {
+  const block = getSelectedBlock();
+  if (!block || !["character_show", "character_move"].includes(block.type)) {
+    showToast("先选中角色登场或角色动作卡片", "error");
+    return;
+  }
+  const name = String(document.getElementById("editorCharacterStagePresetName")?.value ?? "").trim();
+  const selectedPresetId = String(
+    document.querySelector("[data-character-stage-preset-library]")?.dataset.selectedCharacterStagePresetId ?? ""
+  ).trim();
+  const plan = characterStageComposerTools.buildCharacterStagePresetSavePlan(
+    {
+      name,
+      selectedPresetId,
+      stage: readCharacterStageControls(),
+      position: getCharacterStageEditorPosition(),
+      currentPresets: getProjectCharacterStagePresets(),
+    },
+    getCharacterStageComposerToolOptions()
+  );
+  if (!plan.ok) {
+    const message =
+      plan.reason === "limit_reached"
+        ? `每个项目最多保存 ${characterStageComposerTools.CUSTOM_CHARACTER_STAGE_PRESET_LIMIT} 组构图，请先删掉不用的预设。`
+        : "先给当前构图起一个名字。";
+    setSaveStatus(message, true);
+    showToast(message, "error");
+    return;
+  }
+
+  try {
+    await flushPendingStoryChanges();
+    setSaveStatus(plan.isUpdate ? "正在更新项目构图..." : "正在保存项目构图...");
+    await postJson(API_SAVE_PROJECT_SETTINGS, { characterStagePresets: plan.nextPresets });
+    await reloadProjectData({ ...getCurrentUiState() });
+    const message = plan.isUpdate ? `项目构图已更新：${plan.name}` : `项目构图已保存：${plan.name}`;
+    setSaveStatus(message);
+    showToast(message);
+  } catch (error) {
+    await showEditorOperationFailure(error, "保存项目构图失败", `构图「${plan.name}」没有保存成功`);
+  }
+}
+
+async function deleteCharacterStagePreset() {
+  const selectedPresetId = String(
+    document.querySelector("[data-character-stage-preset-library]")?.dataset.selectedCharacterStagePresetId ?? ""
+  ).trim();
+  const plan = characterStageComposerTools.buildCharacterStagePresetDeletePlan(
+    getProjectCharacterStagePresets(),
+    selectedPresetId,
+    getCharacterStageComposerToolOptions()
+  );
+  if (!plan.ok) {
+    showToast("先套用一个要删除的项目构图", "error");
+    return;
+  }
+  const shouldDelete = await showEngineConfirm({
+    title: "删除这个项目构图？",
+    message: `确定删除「${plan.preset.name}」吗？已经写入剧情卡片的数值不会改变。`,
+    tone: "danger",
+    confirmLabel: "删除构图",
+    cancelLabel: "保留构图",
+  });
+  if (!shouldDelete) return;
+
+  try {
+    setSaveStatus("正在删除项目构图...");
+    await postJson(API_SAVE_PROJECT_SETTINGS, { characterStagePresets: plan.nextPresets });
+    await reloadProjectData({ ...getCurrentUiState() });
+    setSaveStatus(`项目构图已删除：${plan.preset.name}`);
+    showToast(`项目构图已删除：${plan.preset.name}`);
+  } catch (error) {
+    await showEditorOperationFailure(error, "删除项目构图失败", `构图「${plan.preset.name}」没有删除成功`);
+  }
 }
 
 function getProjectParticleCustomPresets(project = state.data?.project) {

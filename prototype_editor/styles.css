@@ -5736,6 +5736,430 @@ html[data-ui-theme="light"] .music-range-health.is-danger .issue-tag {
   width: auto;
 }
 
+/* Character composition stays self-contained so the editor can evolve without app.js styling debt. */
+.character-stage-controls {
+  --stage-composer-surface: rgba(7, 13, 23, 0.9);
+  --stage-composer-panel: rgba(15, 25, 40, 0.82);
+  --stage-composer-line: rgba(133, 198, 232, 0.2);
+  --stage-composer-ink: #edf7ff;
+  --stage-composer-muted: #9ab2c9;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--stage-composer-line);
+  border-radius: 20px;
+  background:
+    linear-gradient(140deg, rgba(121, 220, 255, 0.055), transparent 38%),
+    var(--stage-composer-surface);
+  container-type: inline-size;
+}
+
+.stage-composer-heading,
+.stage-preset-section-head,
+.stage-adjust-head {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.stage-composer-heading > div {
+  display: grid;
+  flex: 0 0 94px;
+  gap: 2px;
+}
+
+.stage-composer-heading span,
+.stage-control-preview-summary strong {
+  color: #82ddff;
+  font: 700 9px / 1.2 "SFMono-Regular", "Cascadia Mono", monospace;
+  letter-spacing: 0.16em;
+}
+
+.stage-composer-heading strong {
+  color: var(--stage-composer-ink);
+  font-size: 17px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.stage-composer-heading p {
+  flex: 1 1 auto;
+  max-width: 360px;
+  margin: 0;
+  color: var(--stage-composer-muted);
+  font-size: 11px;
+  line-height: 1.55;
+  text-align: left;
+}
+
+.stage-composer-monitor.stage-control-preview {
+  min-height: 292px;
+  margin: 0;
+  isolation: isolate;
+  border: 1px solid rgba(144, 211, 239, 0.28);
+  border-radius: 16px;
+  background-color: #111a28;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.035),
+    inset 0 -52px 90px rgba(0, 0, 0, 0.28),
+    0 18px 34px rgba(0, 0, 0, 0.22);
+  touch-action: none;
+}
+
+.stage-composer-monitor::before {
+  content: "LIVE COMPOSITION";
+  position: absolute;
+  z-index: 6;
+  top: 12px;
+  left: 14px;
+  padding: 5px 7px;
+  border: 1px solid rgba(174, 225, 245, 0.22);
+  border-radius: 6px;
+  background: rgba(5, 11, 20, 0.66);
+  color: rgba(222, 245, 255, 0.78);
+  font: 700 8px / 1 "SFMono-Regular", "Cascadia Mono", monospace;
+  letter-spacing: 0.14em;
+  backdrop-filter: blur(10px);
+}
+
+.stage-composer-monitor .stage-control-preview-grid {
+  inset: 0;
+  z-index: 1;
+  opacity: 0.2;
+  background-size: 32px 32px;
+  mask-image: linear-gradient(180deg, black, black 74%, transparent 96%);
+  pointer-events: none;
+}
+
+.stage-composer-safe-frame {
+  position: absolute;
+  z-index: 2;
+  inset: 9% 7% 18%;
+  border: 1px solid rgba(223, 246, 255, 0.2);
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+.stage-composer-safe-frame::before,
+.stage-composer-safe-frame::after {
+  content: "";
+  position: absolute;
+  inset: 8%;
+  border: solid rgba(223, 246, 255, 0.13);
+  border-width: 1px 0;
+}
+
+.stage-composer-safe-frame::after {
+  inset: 0 33.333%;
+  border-width: 0 1px;
+}
+
+.stage-composer-safe-frame span {
+  position: absolute;
+  right: 5px;
+  top: 5px;
+  color: rgba(228, 247, 255, 0.48);
+  font: 700 7px / 1 "SFMono-Regular", "Cascadia Mono", monospace;
+  letter-spacing: 0.12em;
+}
+
+.stage-composer-axis {
+  position: absolute;
+  z-index: 3;
+  top: 44px;
+  color: rgba(230, 249, 255, 0.54);
+  font: 700 8px / 1 "SFMono-Regular", "Cascadia Mono", monospace;
+  pointer-events: none;
+}
+
+.stage-composer-axis.is-left { left: 26.5%; }
+.stage-composer-axis.is-center { left: 49.5%; }
+.stage-composer-axis.is-right { left: 72.5%; }
+
+.stage-composer-monitor .stage-control-preview-floor {
+  z-index: 2;
+  bottom: 44px;
+  background: linear-gradient(90deg, transparent, rgba(197, 237, 255, 0.4), transparent);
+  pointer-events: none;
+}
+
+.stage-composer-monitor .stage-control-preview-sprite {
+  z-index: calc(4 + var(--sprite-layer));
+  bottom: 45px;
+  width: clamp(106px, 28%, 210px);
+  max-height: 228px;
+  display: flex;
+  align-items: end;
+  justify-content: center;
+  cursor: grab;
+  user-select: none;
+  will-change: transform;
+}
+
+.stage-composer-monitor .stage-control-preview-sprite:active,
+.stage-composer-monitor.is-dragging .stage-control-preview-sprite {
+  cursor: grabbing;
+  transition: opacity 0.18s ease;
+}
+
+.stage-composer-monitor .stage-control-preview-sprite.has-image img {
+  display: block;
+  max-width: 100%;
+  max-height: 228px;
+  object-fit: contain;
+  object-position: 50% 100%;
+  filter: drop-shadow(0 14px 14px rgba(0, 0, 0, 0.26));
+  transform: scaleX(var(--sprite-flip-x));
+  transform-origin: 50% 100%;
+  pointer-events: none;
+}
+
+.stage-composer-monitor.is-fallback-sprite .stage-control-preview-sprite {
+  width: 92px;
+}
+
+.stage-composer-drag-handle {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  translate: -50% 0;
+  padding: 4px 7px;
+  border: 1px solid rgba(220, 245, 255, 0.28);
+  border-radius: 999px;
+  background: rgba(6, 13, 23, 0.7);
+  color: rgba(235, 249, 255, 0.84);
+  font: 700 7px / 1 "SFMono-Regular", "Cascadia Mono", monospace;
+  letter-spacing: 0.12em;
+  opacity: 0;
+  transition: opacity 0.16s ease;
+  pointer-events: none;
+}
+
+.stage-composer-monitor .stage-control-preview-sprite:hover .stage-composer-drag-handle,
+.stage-composer-monitor.is-dragging .stage-composer-drag-handle {
+  opacity: 1;
+}
+
+.stage-composer-monitor .stage-control-preview-summary {
+  z-index: 7;
+  left: 10px;
+  right: 10px;
+  bottom: 9px;
+  min-width: 0;
+  padding: 7px 9px;
+  border: 1px solid rgba(188, 229, 246, 0.14);
+  border-radius: 8px;
+  background: rgba(5, 11, 20, 0.78);
+  color: rgba(217, 237, 247, 0.78);
+  backdrop-filter: blur(12px);
+}
+
+.stage-composer-monitor .stage-control-preview-summary span {
+  color: rgba(222, 242, 252, 0.8);
+}
+
+.stage-preset-section,
+.stage-custom-preset-library,
+.character-stage-controls .stage-adjust-panel {
+  display: grid;
+  gap: 9px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--stage-composer-line);
+  border-radius: 14px;
+  background: var(--stage-composer-panel);
+  box-shadow: none;
+}
+
+.stage-preset-section-head {
+  align-items: center;
+}
+
+.stage-preset-section-head strong,
+.character-stage-controls .stage-adjust-head strong {
+  color: var(--stage-composer-ink);
+  font-size: 12px;
+}
+
+.stage-preset-section-head span,
+.character-stage-controls .stage-adjust-head span {
+  color: var(--stage-composer-muted);
+  font-size: 10px;
+}
+
+.character-stage-controls .stage-preset-grid {
+  grid-template-columns: repeat(auto-fit, minmax(108px, 1fr));
+  gap: 7px;
+  margin: 0;
+}
+
+.character-stage-controls .stage-preset-chip,
+.character-stage-controls .stage-adjust-button {
+  min-height: 62px;
+  border-color: rgba(139, 197, 226, 0.16);
+  border-radius: 10px;
+  background: rgba(6, 13, 23, 0.54);
+  color: var(--stage-composer-ink);
+  box-shadow: none;
+}
+
+.character-stage-controls .stage-preset-chip:hover,
+.character-stage-controls .stage-preset-chip:focus-visible,
+.character-stage-controls .stage-adjust-button:hover,
+.character-stage-controls .stage-adjust-button:focus-visible {
+  border-color: rgba(121, 220, 255, 0.55);
+  background: rgba(18, 36, 55, 0.82);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.16);
+}
+
+.character-stage-controls .stage-preset-chip.is-active {
+  border-color: rgba(121, 220, 255, 0.76);
+  background:
+    linear-gradient(135deg, rgba(121, 220, 255, 0.16), rgba(73, 113, 255, 0.08)),
+    rgba(10, 24, 39, 0.9);
+  box-shadow: inset 3px 0 0 #79dcff;
+}
+
+.character-stage-controls .stage-preset-chip span,
+.character-stage-controls .stage-adjust-button span {
+  color: var(--stage-composer-muted);
+}
+
+.character-stage-controls .stage-preset-current {
+  background: rgba(121, 220, 255, 0.14);
+  color: #99e6ff;
+}
+
+.stage-custom-preset-empty {
+  padding: 10px 12px;
+  border: 1px dashed rgba(151, 203, 230, 0.2);
+  border-radius: 10px;
+  color: var(--stage-composer-muted);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.stage-custom-preset-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  align-items: end;
+}
+
+.stage-custom-preset-actions label {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 5px;
+  color: var(--stage-composer-muted);
+  font-size: 10px;
+}
+
+.stage-custom-preset-actions .toolbar-button {
+  min-width: 0;
+  width: 100%;
+  padding-inline: 9px;
+  white-space: nowrap;
+}
+
+.stage-custom-preset-actions input,
+.stage-composer-number-grid input {
+  border-color: rgba(145, 201, 229, 0.18);
+  background: rgba(4, 10, 18, 0.58);
+  color: var(--stage-composer-ink);
+}
+
+.stage-composer-number-grid {
+  margin: 0;
+}
+
+.character-stage-controls .compact-toggle {
+  margin: 0;
+  color: var(--stage-composer-ink);
+}
+
+html[data-ui-theme="light"] .character-stage-controls {
+  --stage-composer-surface: rgba(244, 249, 253, 0.96);
+  --stage-composer-panel: rgba(255, 255, 255, 0.82);
+  --stage-composer-line: rgba(54, 103, 139, 0.17);
+  --stage-composer-ink: #1b3448;
+  --stage-composer-muted: #5b7488;
+  box-shadow: 0 16px 34px rgba(41, 78, 108, 0.1);
+}
+
+html[data-ui-theme="light"] .character-stage-controls .stage-preset-chip,
+html[data-ui-theme="light"] .character-stage-controls .stage-adjust-button {
+  border-color: rgba(54, 103, 139, 0.16);
+  background: rgba(250, 253, 255, 0.94);
+  color: #1b3448;
+}
+
+html[data-ui-theme="light"] .character-stage-controls .stage-preset-chip.is-active {
+  border-color: rgba(39, 122, 177, 0.48);
+  background: #eaf7fc;
+  box-shadow: inset 3px 0 0 #2389c8;
+}
+
+html[data-ui-theme="light"] .character-stage-controls .stage-preset-current {
+  color: #176c9f;
+}
+
+html[data-ui-theme="light"] .stage-custom-preset-actions input,
+html[data-ui-theme="light"] .stage-composer-number-grid input {
+  border-color: rgba(54, 103, 139, 0.2);
+  background: #fff;
+  color: #1b3448;
+}
+
+@media (max-width: 720px) {
+  .stage-composer-heading,
+  .stage-preset-section-head,
+  .character-stage-controls .stage-adjust-head {
+    align-items: start;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .stage-composer-heading p {
+    max-width: none;
+    text-align: left;
+  }
+
+  .stage-composer-monitor.stage-control-preview {
+    min-height: 248px;
+  }
+
+  .stage-composer-monitor .stage-control-preview-sprite,
+  .stage-composer-monitor .stage-control-preview-sprite.has-image img {
+    max-height: 190px;
+  }
+
+  .stage-custom-preset-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .stage-custom-preset-actions .toolbar-button {
+    width: 100%;
+  }
+}
+
+@container (max-width: 360px) {
+  .stage-composer-heading {
+    align-items: start;
+  }
+
+  .stage-composer-heading p {
+    font-size: 10px;
+  }
+
+  .stage-preset-section-head,
+  .character-stage-controls .stage-adjust-head {
+    align-items: start;
+    flex-direction: column;
+    gap: 3px;
+  }
+}
+
 .option-editor-list {
   display: flex;
   flex-direction: column;

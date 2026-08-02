@@ -22,6 +22,7 @@ SCRIPT_SRC_PATTERN = re.compile(r"<script\b[^>]*\bsrc=[\"']([^\"']+)[\"'][^>]*>"
 
 PYTHON_SYNTAX_FILES = [
     "editor_asset_usage.py",
+    "editor_character_stage_presets.py",
     "editor_local_security.py",
     "editor_port_selection.py",
     "editor_project_presentation.py",
@@ -105,6 +106,7 @@ PYTHON_SYNTAX_FILES = [
     "tools/release/prepare_preview_release.py",
     "tools/runtime/run_native_runtime_smoke.py",
     "tests/test_ci_workflow_coverage.py",
+    "tests/test_editor_character_stage_presets.py",
     "tests/test_editor_infrastructure.py",
     "tests/test_export_icon.py",
     "tests/test_export_provenance_verifier.py",
@@ -277,6 +279,7 @@ def build_release_tooling_steps(python_executable: str) -> list[VerifyStep]:
         build_unittest_step("CI workflow coverage", "test_ci_workflow_coverage.py", "release-tests", python_executable),
         build_unittest_step("GitHub status tooling", "test_github_status_tool.py", "release-tests", python_executable),
         build_unittest_step("Local verify tooling", "test_local_verify_tool.py", "release-tests", python_executable),
+        build_unittest_step("Editor character stage presets", "test_editor_character_stage_presets.py", "release-tests", python_executable),
         build_unittest_step("Editor infrastructure helpers", "test_editor_infrastructure.py", "release-tests", python_executable),
         build_unittest_step("Native runtime export command writer", "test_native_runtime_export_commands.py", "release-tests", python_executable),
         build_unittest_step("Native runtime export digest", "test_native_runtime_export_digest.py", "release-tests", python_executable),
