@@ -296,6 +296,7 @@ jobs:
             tests/test_frontend_validation_cache_module.py \
             tests/test_frontend_variable_influence_sheet_module.py \
             tests/test_frontend_variables_module.py \
+            tests/test_frontend_character_blocking_workspace_module.py \
             tests/test_frontend_character_stage_composer_module.py \
             tests/test_frontend_visual_effects_module.py \
             tests/test_frontend_voice_production_sheet_module.py \
@@ -414,6 +415,7 @@ jobs:
           node --check prototype_editor/modules/variable_influence_sheet.js
           node --check prototype_editor/modules/variables.js
           node --check prototype_editor/modules/visual_effects.js
+          node --check prototype_editor/modules/character_blocking_workspace.js
           node --check prototype_editor/modules/character_stage_composer.js
           node --check prototype_editor/modules/voice_production_sheet.js
           node --check prototype_editor/app.js
@@ -669,6 +671,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_validation_cache_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_variable_influence_sheet_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_variables_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_character_blocking_workspace_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_character_stage_composer_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_visual_effects_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_voice_production_sheet_module.py' -v

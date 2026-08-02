@@ -236,6 +236,7 @@ const scriptVoiceTools = window.CanvasiaEditorScriptVoice;
 const voiceMatchReviewPanelTools = window.CanvasiaEditorVoiceMatchReviewPanel;
 const characterPresentationPanelTools = window.CanvasiaEditorCharacterPresentationPanel;
 const visualEffectTools = window.CanvasiaEditorVisualEffects;
+const characterBlockingTools = window.CanvasiaEditorCharacterBlockingWorkspace;
 const characterStageComposerTools = window.CanvasiaEditorCharacterStageComposer;
 const runtimeReadingProfileTools = window.CanvasiaRuntimeReadingProfiles;
 const {
@@ -1100,6 +1101,19 @@ const storyBlockBatchController = storyBlockBatchTools.createStoryBlockBatchCont
   duplicateBlockForScene: (scene, block) => duplicateBlockForScene(scene, block),
   showConfirm: (options) => showEngineConfirm(options),
   getBlockSummary: (block, scene) => getBlockSummary(block, scene),
+});
+
+const characterBlockingController = characterBlockingTools.createCharacterBlockingController({
+  getScene: () => getSelectedScene(),
+  getSelectedBlockId: () => getSelectedBlock()?.id ?? "",
+  getSafeCharacterStage,
+  getSafePosition,
+  getCharacterVisual: (characterId, expressionId) => getCharacterBlockingVisual(characterId, expressionId),
+  flushPendingChanges: () => flushPendingStoryChanges(),
+  confirm: (dialogOptions) => showEngineConfirm({ ...dialogOptions, tone: "default" }),
+  persistScene: (scene, saveOptions) => persistScene(scene, saveOptions),
+  setStatus: (message) => setSaveStatus(message),
+  showToast: (message, tone) => showToast(message, tone),
 });
 
 const characterStageComposerController = characterStageComposerTools.createCharacterStageComposerController({
@@ -4595,6 +4609,11 @@ async function handleClick(event) {
 
   if (action === "apply-custom-character-stage-preset") {
     applyCustomCharacterStagePresetToEditor(actionTarget.dataset.customCharacterStagePreset);
+    return;
+  }
+
+  if (action === "apply-character-blocking-formation") {
+    void characterBlockingController.applyFormation(actionTarget.dataset.characterBlockingFormation);
     return;
   }
 
@@ -42172,6 +42191,23 @@ function getProjectCharacterStagePresets(project = state.data?.project) {
   return Array.isArray(project?.characterStagePresets) ? project.characterStagePresets : [];
 }
 
+function getCharacterBlockingVisual(characterId = "", expressionId = "") {
+  const character = state.data?.charactersById?.get(characterId);
+  const expression = character?.expressions?.find((item) => item.id === expressionId);
+  const spriteAsset = state.data?.assetsById?.get(getCharacterSpriteAssetId(characterId, expressionId));
+  return {
+    characterId,
+    characterName: character?.displayName ?? character?.name ?? characterId ?? "未选择角色",
+    expressionId,
+    expressionName: expression?.name ?? expressionId ?? "默认表情",
+    defaultPosition: character?.defaultPosition ?? "center",
+    spriteUrl:
+      spriteAsset?.fileExists && isImageAssetType(spriteAsset.type)
+        ? encodeURI(getAssetPublicUrl(spriteAsset))
+        : "",
+  };
+}
+
 function getCharacterStageComposerPreviewContext() {
   const scene = getSelectedScene();
   const selectedBlock = getSelectedBlock();
@@ -42197,14 +42233,16 @@ function getCharacterStageComposerPreviewContext() {
       }
     }
   }
-  const character = state.data?.charactersById?.get(characterId);
-  const spriteAsset = state.data?.assetsById?.get(getCharacterSpriteAssetId(characterId, expressionId));
-  const spriteUrl =
-    spriteAsset?.fileExists && isImageAssetType(spriteAsset.type) ? encodeURI(getAssetPublicUrl(spriteAsset)) : "";
+  const selectedVisual = getCharacterBlockingVisual(characterId, expressionId);
+  const blockingModel = characterBlockingController.getModel();
   return {
     backdropStyle: getBackdropStyle(backgroundAssetId, scene3dPreview),
-    spriteUrl,
-    spriteLabel: character?.displayName ?? selectedBlock?.characterId ?? "当前立绘",
+    spriteUrl: selectedVisual.spriteUrl,
+    spriteLabel: selectedVisual.characterName || "当前立绘",
+    ensembleMarkup: characterBlockingTools.renderCharacterBlockingSprites(blockingModel, {
+      getCharacterStageStyle,
+    }),
+    blockingWorkspaceMarkup: characterBlockingTools.renderCharacterBlockingWorkspace(blockingModel),
   };
 }
 

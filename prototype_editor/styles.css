@@ -5885,7 +5885,7 @@ html[data-ui-theme="light"] .music-range-health.is-danger .issue-tag {
 }
 
 .stage-composer-monitor .stage-control-preview-sprite {
-  z-index: calc(4 + var(--sprite-layer));
+  z-index: 60 !important;
   bottom: 45px;
   width: clamp(106px, 28%, 210px);
   max-height: 228px;
@@ -5957,6 +5957,300 @@ html[data-ui-theme="light"] .music-range-health.is-danger .issue-tag {
 
 .stage-composer-monitor .stage-control-preview-summary span {
   color: rgba(222, 242, 252, 0.8);
+}
+
+.stage-composer-monitor .stage-blocking-sprite {
+  --sprite-offset-x: 0%;
+  --sprite-offset-y: 0%;
+  --sprite-scale: 1;
+  --sprite-opacity: 1;
+  --sprite-flip-x: 1;
+  position: absolute;
+  left: 50%;
+  bottom: 45px;
+  z-index: calc(8 + var(--sprite-layer));
+  display: flex;
+  align-items: end;
+  justify-content: center;
+  width: clamp(106px, 28%, 210px);
+  max-height: 228px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  opacity: var(--sprite-opacity);
+  transform:
+    translate(calc(-50% + var(--sprite-offset-x)), var(--sprite-offset-y))
+    scale(var(--sprite-scale));
+  transform-origin: 50% 100%;
+  filter: saturate(0.78) brightness(0.82);
+  cursor: pointer;
+  transition: opacity 0.16s ease, filter 0.16s ease;
+}
+
+.stage-composer-monitor .stage-blocking-sprite[data-position="left"] { left: 27%; }
+.stage-composer-monitor .stage-blocking-sprite[data-position="center"] { left: 50%; }
+.stage-composer-monitor .stage-blocking-sprite[data-position="right"] { left: 73%; }
+
+.stage-composer-monitor .stage-blocking-sprite:hover,
+.stage-composer-monitor .stage-blocking-sprite:focus-visible {
+  opacity: var(--sprite-opacity);
+  filter: saturate(1) brightness(1);
+  outline: none;
+}
+
+.stage-composer-monitor .stage-blocking-sprite.has-image img {
+  display: block;
+  max-width: 100%;
+  max-height: 228px;
+  object-fit: contain;
+  object-position: 50% 100%;
+  filter: drop-shadow(0 12px 14px rgba(0, 0, 0, 0.24));
+  transform: scaleX(var(--sprite-flip-x));
+  transform-origin: 50% 100%;
+  pointer-events: none;
+}
+
+.stage-composer-monitor .stage-blocking-sprite.is-fallback {
+  width: 88px;
+  min-height: 154px;
+}
+
+.stage-blocking-fallback-head,
+.stage-blocking-fallback-body {
+  position: absolute;
+  left: 50%;
+  border: 1px solid rgba(190, 231, 248, 0.34);
+  background: rgba(85, 145, 180, 0.25);
+  translate: -50% 0;
+}
+
+.stage-blocking-fallback-head {
+  top: 8px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+}
+
+.stage-blocking-fallback-body {
+  top: 40px;
+  width: 72px;
+  height: 112px;
+  border-radius: 38px 38px 12px 12px;
+}
+
+.stage-blocking-sprite-label {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  max-width: 112px;
+  padding: 4px 7px;
+  overflow: hidden;
+  border: 1px solid rgba(211, 241, 252, 0.22);
+  border-radius: 999px;
+  background: rgba(5, 12, 21, 0.78);
+  color: rgba(230, 246, 252, 0.9);
+  font-size: 8px;
+  font-weight: 750;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  translate: -50% 0;
+  backdrop-filter: blur(8px);
+  pointer-events: none;
+}
+
+.stage-blocking-sprite.is-implicit {
+  pointer-events: none;
+}
+
+.stage-blocking-sprite.is-implicit .stage-blocking-sprite-label::after {
+  content: " · 待补登场";
+  color: #ffc986;
+}
+
+.stage-blocking-workspace {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--stage-composer-line);
+  border-radius: 14px;
+  background:
+    linear-gradient(135deg, rgba(121, 220, 255, 0.055), transparent 42%),
+    var(--stage-composer-panel);
+}
+
+.stage-blocking-head {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.stage-blocking-head > div {
+  display: grid;
+  gap: 2px;
+}
+
+.stage-blocking-head span {
+  color: #82ddff;
+  font: 700 8px / 1.2 "SFMono-Regular", "Cascadia Mono", monospace;
+  letter-spacing: 0.16em;
+}
+
+.stage-blocking-head strong {
+  color: var(--stage-composer-ink);
+  font-size: 14px;
+}
+
+.stage-blocking-head p {
+  margin: 0;
+  color: var(--stage-composer-muted);
+  font-size: 10px;
+}
+
+.stage-blocking-head p b {
+  color: var(--stage-composer-ink);
+}
+
+.stage-blocking-cast {
+  display: flex;
+  gap: 7px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
+}
+
+.stage-blocking-cast-chip {
+  display: grid;
+  flex: 0 0 112px;
+  gap: 3px;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid rgba(139, 197, 226, 0.16);
+  border-radius: 10px;
+  background: rgba(6, 13, 23, 0.5);
+  color: var(--stage-composer-ink);
+  text-align: left;
+}
+
+button.stage-blocking-cast-chip {
+  cursor: pointer;
+}
+
+button.stage-blocking-cast-chip:hover,
+button.stage-blocking-cast-chip:focus-visible,
+.stage-blocking-cast-chip.is-selected {
+  border-color: rgba(121, 220, 255, 0.5);
+  background: rgba(18, 40, 59, 0.78);
+  outline: none;
+}
+
+.stage-blocking-cast-chip.is-selected {
+  box-shadow: inset 3px 0 0 #79dcff;
+}
+
+.stage-blocking-cast-chip > span {
+  color: #82ddff;
+  font-size: 8px;
+  font-weight: 750;
+}
+
+.stage-blocking-cast-chip strong {
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stage-blocking-cast-chip small {
+  color: var(--stage-composer-muted);
+  font-size: 9px;
+}
+
+.stage-blocking-cast-chip.is-implicit {
+  border-style: dashed;
+}
+
+.stage-blocking-formations {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.stage-blocking-formation {
+  display: grid;
+  gap: 3px;
+  min-height: 58px;
+  padding: 9px 10px;
+  border: 1px solid rgba(139, 197, 226, 0.16);
+  border-radius: 10px;
+  background: rgba(6, 13, 23, 0.5);
+  color: var(--stage-composer-ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.stage-blocking-formation:hover,
+.stage-blocking-formation:focus-visible {
+  border-color: rgba(121, 220, 255, 0.5);
+  background: rgba(18, 40, 59, 0.78);
+  outline: none;
+}
+
+.stage-blocking-formation:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.stage-blocking-formation strong {
+  font-size: 11px;
+}
+
+.stage-blocking-formation span {
+  color: var(--stage-composer-muted);
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.stage-blocking-status {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 8px;
+  padding: 9px 10px;
+  border-left: 3px solid rgba(91, 210, 166, 0.72);
+  border-radius: 7px;
+  background: rgba(91, 210, 166, 0.08);
+}
+
+.stage-blocking-status.is-warn {
+  border-left-color: rgba(255, 183, 93, 0.8);
+  background: rgba(255, 183, 93, 0.08);
+}
+
+.stage-blocking-status.is-tip {
+  border-left-color: rgba(121, 220, 255, 0.72);
+  background: rgba(121, 220, 255, 0.07);
+}
+
+.stage-blocking-status span {
+  grid-row: 1 / span 2;
+  align-self: center;
+  color: var(--stage-composer-muted);
+  font-size: 8px;
+  font-weight: 750;
+  writing-mode: vertical-rl;
+}
+
+.stage-blocking-status strong {
+  color: var(--stage-composer-ink);
+  font-size: 10px;
+}
+
+.stage-blocking-status small {
+  color: var(--stage-composer-muted);
+  font-size: 9px;
+  line-height: 1.4;
 }
 
 .stage-preset-section,
@@ -6088,7 +6382,9 @@ html[data-ui-theme="light"] .character-stage-controls {
 }
 
 html[data-ui-theme="light"] .character-stage-controls .stage-preset-chip,
-html[data-ui-theme="light"] .character-stage-controls .stage-adjust-button {
+html[data-ui-theme="light"] .character-stage-controls .stage-adjust-button,
+html[data-ui-theme="light"] .stage-blocking-cast-chip,
+html[data-ui-theme="light"] .stage-blocking-formation {
   border-color: rgba(54, 103, 139, 0.16);
   background: rgba(250, 253, 255, 0.94);
   color: #1b3448;
@@ -6098,6 +6394,15 @@ html[data-ui-theme="light"] .character-stage-controls .stage-preset-chip.is-acti
   border-color: rgba(39, 122, 177, 0.48);
   background: #eaf7fc;
   box-shadow: inset 3px 0 0 #2389c8;
+}
+
+html[data-ui-theme="light"] button.stage-blocking-cast-chip:hover,
+html[data-ui-theme="light"] button.stage-blocking-cast-chip:focus-visible,
+html[data-ui-theme="light"] .stage-blocking-cast-chip.is-selected,
+html[data-ui-theme="light"] .stage-blocking-formation:hover,
+html[data-ui-theme="light"] .stage-blocking-formation:focus-visible {
+  border-color: rgba(39, 122, 177, 0.4);
+  background: #edf8fc;
 }
 
 html[data-ui-theme="light"] .character-stage-controls .stage-preset-current {
@@ -6138,6 +6443,12 @@ html[data-ui-theme="light"] .stage-composer-number-grid input {
     grid-template-columns: 1fr;
   }
 
+  .stage-blocking-head {
+    align-items: start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
   .stage-custom-preset-actions .toolbar-button {
     width: 100%;
   }
@@ -6157,6 +6468,10 @@ html[data-ui-theme="light"] .stage-composer-number-grid input {
     align-items: start;
     flex-direction: column;
     gap: 3px;
+  }
+
+  .stage-blocking-formations {
+    grid-template-columns: 1fr;
   }
 }
 

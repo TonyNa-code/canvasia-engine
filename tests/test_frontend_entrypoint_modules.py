@@ -102,6 +102,7 @@ class FrontendEntrypointModuleTests(unittest.TestCase):
             "./modules/release_evidence_pack.js",
             "./modules/unlockable_content_manifest.js",
             "./modules/visual_effects.js",
+            "./modules/character_blocking_workspace.js",
             "./modules/character_stage_composer.js",
             "./modules/particle_performance.js",
             "./modules/particle_effects.js",

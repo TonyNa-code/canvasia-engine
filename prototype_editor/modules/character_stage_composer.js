@@ -338,6 +338,7 @@
         <div class="stage-composer-axis is-center" aria-hidden="true">C</div>
         <div class="stage-composer-axis is-right" aria-hidden="true">R</div>
         <div class="stage-control-preview-floor" aria-hidden="true"></div>
+        ${options.ensembleMarkup ?? ""}
         <div
           class="stage-control-preview-sprite${spriteUrl ? " has-image" : ""}"
           data-character-stage-preview-sprite
@@ -419,6 +420,7 @@
           <p>拖动立绘定位置，滚轮调大小；满意后可存成这个项目自己的构图。</p>
         </div>
         ${renderCharacterStageLivePreview(stage, position, options)}
+        ${options.blockingWorkspaceMarkup ?? ""}
         <div class="stage-preset-section">
           <div class="stage-preset-section-head">
             <strong>基础构图</strong>

@@ -1161,6 +1161,73 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
         self.assertFalse(self.page_errors, "\n".join(self.page_errors))
         self.assertFalse(self.console_errors, "\n".join(self.console_errors))
 
+    def test_character_stage_ensemble_blocking_applies_two_card_formation(self) -> None:
+        self.open_project_by_title("心跳时差")
+        self.page.get_by_role("button", name="写剧情", exact=True).click()
+        second_character_card = self.page.locator('.block-card[data-block-id="block_004"]')
+        second_character_card.wait_for(timeout=15000)
+        second_character_card.click()
+
+        composer = self.page.locator("[data-character-stage-composer]")
+        workspace = composer.locator("[data-character-blocking-workspace]")
+        workspace.wait_for(timeout=15000)
+        self.assertIn("2 人在场", workspace.inner_text())
+        self.assertEqual(composer.locator(".stage-blocking-sprite").count(), 1)
+        self.assertEqual(workspace.locator(".stage-blocking-cast-chip").count(), 2)
+
+        workspace.get_by_role("button", name=re.compile(r"^双人对谈")).click()
+        dialog = self.page.locator(".system-dialog").filter(has_text="套用“双人对谈”").first
+        dialog.wait_for(timeout=15000)
+        self.assertIn("同时调整 2 张角色登场/动作卡", dialog.inner_text())
+        dialog.get_by_role("button", name="套用编队").click()
+
+        self.page.wait_for_function(
+            """async () => {
+                const response = await fetch('/api/project-data');
+                const bundle = await response.json();
+                const scene = (bundle.chapters || [])
+                    .flatMap((chapter) => chapter.scenes || [])
+                    .find((item) => item.id === 'scene_classroom_sunset');
+                const first = (scene?.blocks || []).find((block) => block.id === 'block_003');
+                const second = (scene?.blocks || []).find((block) => block.id === 'block_004');
+                return first?.position === 'left'
+                    && first?.stage?.scale === 112
+                    && second?.position === 'right'
+                    && second?.stage?.scale === 112;
+            }""",
+            timeout=15000,
+        )
+        composer.wait_for(timeout=15000)
+        workspace = composer.locator("[data-character-blocking-workspace]")
+        workspace.wait_for(timeout=15000)
+        screenshot_path = os.environ.get("CANVASIA_CHARACTER_BLOCKING_QA_SCREENSHOT", "").strip()
+        if screenshot_path:
+            composer.screenshot(path=screenshot_path)
+
+        dark_colors = workspace.evaluate(
+            """(element) => ({
+                color: getComputedStyle(element).color,
+                panel: getComputedStyle(element).backgroundColor,
+            })"""
+        )
+        self.page.locator('#globalUiThemeSwitch [data-ui-theme-mode="light"]').click()
+        self.page.wait_for_function("() => document.documentElement.dataset.uiTheme === 'light'", timeout=10000)
+        light_colors = workspace.evaluate(
+            """(element) => ({
+                color: getComputedStyle(element).color,
+                panel: getComputedStyle(element).backgroundColor,
+            })"""
+        )
+        light_screenshot_path = os.environ.get("CANVASIA_CHARACTER_BLOCKING_LIGHT_QA_SCREENSHOT", "").strip()
+        if light_screenshot_path:
+            composer.screenshot(path=light_screenshot_path)
+
+        self.assertEqual(self.page.locator("#editorCharacterPosition").input_value(), "right")
+        self.assertEqual(composer.locator("#editorCharacterScale").input_value(), "112")
+        self.assertNotEqual(light_colors, dark_colors)
+        self.assertFalse(self.page_errors, "\n".join(self.page_errors))
+        self.assertFalse(self.console_errors, "\n".join(self.console_errors))
+
     def test_story_editor_music_transport_presets_persist_to_project(self) -> None:
         project_title = "浏览器烟测项目_MusicTransport"
         self.create_blank_project(project_title)
