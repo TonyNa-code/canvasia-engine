@@ -1200,6 +1200,8 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
         composer.wait_for(timeout=15000)
         workspace = composer.locator("[data-character-blocking-workspace]")
         workspace.wait_for(timeout=15000)
+        self.page.locator('#globalUiThemeSwitch [data-ui-theme-mode="dark"]').click()
+        self.page.wait_for_function("() => document.documentElement.dataset.uiTheme === 'dark'", timeout=10000)
         screenshot_path = os.environ.get("CANVASIA_CHARACTER_BLOCKING_QA_SCREENSHOT", "").strip()
         if screenshot_path:
             composer.screenshot(path=screenshot_path)
