@@ -89,6 +89,7 @@ const REQUIRED_EDITOR_MODULES = Object.freeze([
     { globalName: "CanvasiaEditorStageDirectionSheetPanel", script: "./modules/stage_direction_sheet_panel.js", label: "舞台调度面板" },
     { globalName: "CanvasiaEditorPresentationTimeline", script: "./modules/presentation_timeline.js", label: "演出时间轴" },
     { globalName: "CanvasiaEditorPresentationTimelinePanel", script: "./modules/presentation_timeline_panel.js", label: "演出时间轴面板" },
+    { globalName: "CanvasiaEditorSceneRehearsalBoard", script: "./modules/scene_rehearsal_board.js", label: "导演排练台" },
     { globalName: "CanvasiaEditorLocalizationCoverage", script: "./modules/localization_coverage.js", label: "多语言覆盖" },
     { globalName: "CanvasiaEditorLocalizationCoveragePanel", script: "./modules/localization_coverage_panel.js", label: "多语言覆盖面板" },
     { globalName: "CanvasiaEditorProductionBacklog", script: "./modules/production_backlog.js", label: "制作待办" },

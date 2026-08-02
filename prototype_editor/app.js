@@ -99,6 +99,7 @@ const stageDirectionSheetTools = window.CanvasiaEditorStageDirectionSheet;
 const stageDirectionSheetPanelTools = window.CanvasiaEditorStageDirectionSheetPanel;
 const presentationTimelineTools = window.CanvasiaEditorPresentationTimeline;
 const presentationTimelinePanelTools = window.CanvasiaEditorPresentationTimelinePanel;
+const sceneRehearsalBoardTools = window.CanvasiaEditorSceneRehearsalBoard;
 const scenePolishTools = window.CanvasiaEditorScenePolish;
 const sceneMoodRecipeTools = window.CanvasiaEditorSceneMoodRecipes;
 const dashboardProductionTools = window.CanvasiaEditorDashboardProduction;
@@ -712,6 +713,7 @@ const state = {
   storyBlockIssueFilter: "all",
   storySceneTreeSearchQuery: "",
   storySceneTreeFilter: "all",
+  sceneRehearsalExpanded: false,
   scriptImporterDraft: "",
   scriptImporterBlocks: [],
   scriptImporterError: "",
@@ -939,6 +941,7 @@ const refs = {
   storyBlockIssueSelect: document.getElementById("storyBlockIssueSelect"),
   storyBlockClearButton: document.getElementById("storyBlockClearButton"),
   storyBlockFilterSummary: document.getElementById("storyBlockFilterSummary"),
+  sceneRehearsalBoard: document.getElementById("sceneRehearsalBoard"),
   storyEditorModeHint: document.getElementById("storyEditorModeHint"),
   storyPrimaryToolbar: document.getElementById("storyPrimaryToolbar"),
   storyTemplatePanel: document.getElementById("storyTemplatePanel"),
@@ -1588,6 +1591,7 @@ function resetProjectScopedUiState() {
   state.storyBlockIssueFilter = "all";
   state.storySceneTreeSearchQuery = "";
   state.storySceneTreeFilter = "all";
+  state.sceneRehearsalExpanded = false;
   state.characterSearchQuery = "";
   state.characterFilterMode = "all";
   state.previewIssueSearchQuery = "";
@@ -3245,6 +3249,13 @@ async function handleClick(event) {
         ? "路线图已恢复显示全部场景"
         : `路线图已切到：${getRouteMapFilterLabel(state.dashboardRouteFilter)}`
     );
+    return;
+  }
+
+  if (action === "toggle-scene-rehearsal") {
+    state.sceneRehearsalExpanded = !state.sceneRehearsalExpanded;
+    renderStoryScreen();
+    setSaveStatus(state.sceneRehearsalExpanded ? "导演排练轨道已展开" : "导演排练轨道已收起");
     return;
   }
 
@@ -5856,6 +5867,10 @@ function handleGlobalKeydown(event) {
       return;
     }
     event.preventDefault();
+    return;
+  }
+
+  if (sceneRehearsalBoardTools?.handleSceneRehearsalKeyboardNavigation?.(event, refs.sceneRehearsalBoard)) {
     return;
   }
 
@@ -12420,124 +12435,7 @@ function getBlockExpressionAssetId(block) {
 }
 
 function isRawVariableValueMatchingType(variable, value) {
-  if (!variable) {
-    return false;
-  }
-
-  if (variable.type === "number") {
-    return typeof value === "number" && Number.isFinite(value);
-  }
-
-  if (variable.type === "boolean") {
-    return typeof value === "boolean";
-  }
-
-  return typeof value === "string";
-}
-
-function isConditionOperatorAllowedForVariable(variable, operator) {
-  const safeOperator = String(operator ?? "==").trim() || "==";
-  if (["==", "=", "!="].includes(safeOperator)) {
-    return true;
-  }
-  if ([">", ">=", "<", "<="].includes(safeOperator)) {
-    return variable?.type === "number";
-  }
-  if (["contains", "not_contains", "starts_with", "ends_with"].includes(safeOperator)) {
-    return variable?.type === "string";
-  }
-  return false;
-}
-
-function hasVariableReferenceIssue(
-  variableId,
-  { expectedType = null, value = null, validateValue = false, operator = null } = {}
-) {
-  const variable = state.data.variablesById.get(variableId);
-  if (!variable) {
-    return true;
-  }
-
-  if (expectedType && variable.type !== expectedType) {
-    return true;
-  }
-
-  if (validateValue && !isRawVariableValueMatchingType(variable, value)) {
-    return true;
-  }
-
-  if (operator !== null && !isConditionOperatorAllowedForVariable(variable, operator)) {
-    return true;
-  }
-
-  return false;
-}
-
-function blockHasVariableLogicIssue(block) {
-  if (block.type === "variable_set") {
-    return hasVariableReferenceIssue(block.variableId, {
-      value: block.value,
-      validateValue: true,
-    });
-  }
-
-  if (block.type === "variable_add") {
-    return hasVariableReferenceIssue(block.variableId, {
-      expectedType: "number",
-      value: block.value,
-      validateValue: true,
-    });
-  }
-
-  if (block.type === "choice") {
-    return (block.options ?? []).some((option) => {
-      const availabilityMode = runtimeChoiceAvailabilityTools.normalizeChoiceAvailabilityMode(
-        option.choiceAvailabilityMode
-      );
-      const availabilityRules = runtimeChoiceAvailabilityTools.getChoiceAvailabilityRules(option);
-      const hasAvailabilityIssue =
-        availabilityMode !== "always" &&
-        (availabilityRules.length === 0 ||
-          availabilityRules.some((rule) =>
-            hasVariableReferenceIssue(rule.variableId, {
-              value: rule.value,
-              validateValue: true,
-              operator: rule.operator,
-            })
-          ));
-      const hasEffectIssue = (option.effects ?? []).some((effect) => {
-        if (effect.type === "variable_add") {
-          return hasVariableReferenceIssue(effect.variableId, {
-            expectedType: "number",
-            value: effect.value,
-            validateValue: true,
-          });
-        }
-        if (effect.type === "variable_set") {
-          return hasVariableReferenceIssue(effect.variableId, {
-            value: effect.value,
-            validateValue: true,
-          });
-        }
-        return true;
-      });
-      return hasAvailabilityIssue || hasEffectIssue;
-    });
-  }
-
-  if (block.type === "condition") {
-    return (block.branches ?? []).some((branch) =>
-      (branch.when ?? []).some((rule) =>
-        hasVariableReferenceIssue(rule.variableId, {
-          value: rule.value,
-          validateValue: true,
-          operator: rule.operator,
-        })
-      )
-    );
-  }
-
-  return false;
+  return editorFilterTools.isRawVariableValueMatchingType(variable, value);
 }
 
 function getStoryBlockIssueItems(block) {
@@ -12549,7 +12447,8 @@ function getStoryBlockIssueItems(block) {
     isReadableTextLong,
     choiceManyOptions: VN_CHOICE_MANY_OPTIONS,
     choiceLongWarningLength: VN_CHOICE_LONG_WARNING_LENGTH,
-    hasVariableLogicIssue: blockHasVariableLogicIssue,
+    variablesById: state.data.variablesById,
+    choiceAvailabilityTools: runtimeChoiceAvailabilityTools,
   });
 }
 
@@ -13360,6 +13259,35 @@ function countSearchableStoryBlocks() {
   );
 }
 
+function buildCurrentScenePresentationReport(scene) {
+  if (!scene || typeof presentationTimelineTools?.buildPresentationTimeline !== "function") {
+    return {};
+  }
+
+  const timeline = presentationTimelineTools.buildPresentationTimeline({
+    project: state.data.project,
+    chapters: state.data.chapters,
+    scenes: [scene],
+    assetList: state.data.assetList,
+    characters: state.data.characters,
+  });
+  return timeline.sceneReports?.find((report) => report.sceneId === scene.id) ?? timeline.sceneReports?.[0] ?? {};
+}
+
+function renderCurrentSceneRehearsalBoard(scene) {
+  if (!scene || typeof sceneRehearsalBoardTools?.renderSceneRehearsalBoard !== "function") {
+    return "";
+  }
+  return sceneRehearsalBoardTools.renderSceneRehearsalBoard(scene, buildCurrentScenePresentationReport(scene), {
+    blockLabels: BLOCK_LABELS,
+    expanded: state.sceneRehearsalExpanded,
+    formatDuration: presentationTimelineTools?.formatDuration,
+    getBlockSummary,
+    maxVisibleBeats: 48,
+    selectedBlockId: state.selectedBlockId,
+  });
+}
+
 function renderStoryScreen() {
   const scene = getSelectedScene();
   const isBlankProject = isCurrentProjectBlank();
@@ -13446,6 +13374,11 @@ function renderStoryScreen() {
       : scene
       ? renderStoryBlockFilterSummary(scene, visibleBlocks, blocks, selectedBlock)
       : renderEmpty("先从左边选一个场景，再开始筛剧情卡片。");
+  }
+
+  if (refs.sceneRehearsalBoard) {
+    refs.sceneRehearsalBoard.innerHTML = isBlankProject || !scene ? "" : renderCurrentSceneRehearsalBoard(scene);
+    refs.sceneRehearsalBoard.classList.toggle("is-hidden", isBlankProject || !scene);
   }
 
   if (refs.storyScenePlanner) {

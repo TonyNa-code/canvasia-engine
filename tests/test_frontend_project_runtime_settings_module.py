@@ -9,9 +9,15 @@ from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "project_runtime_settings.js"
+TEMPLATE_PROJECT_PATH = ROOT_DIR / "template_project" / "project.json"
 
 
 class FrontendProjectRuntimeSettingsModuleTests(unittest.TestCase):
+    def test_template_project_persists_mobile_reader_default(self) -> None:
+        project = json.loads(TEMPLATE_PROJECT_PATH.read_text(encoding="utf-8"))
+
+        self.assertEqual(project["runtimeSettings"]["defaultMobileReaderMode"], "auto")
+
     def test_runtime_settings_helpers_sanitize_and_summarize_project_defaults(self) -> None:
         script = textwrap.dedent(
             f"""

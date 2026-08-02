@@ -369,6 +369,70 @@ class FrontendEditorFiltersModuleTests(unittest.TestCase):
         self.assertIn("return editorFilterTools.getSafeDashboardSearchMode(mode);", app_source)
         self.assertIn("return editorFilterTools.getStoryBlockGroup(type);", app_source)
         self.assertIn("return editorFilterTools.getScriptIssueFilterLabel(value);", app_source)
+        self.assertIn("return editorFilterTools.isRawVariableValueMatchingType(variable, value);", app_source)
+        self.assertNotIn("function blockHasVariableLogicIssue(block)", app_source)
+
+    def test_variable_logic_validation_is_owned_by_editor_filter_module(self) -> None:
+        script = textwrap.dedent(
+            f"""
+            const fs = require("fs");
+            const vm = require("vm");
+            const context = {{ window: {{}} }};
+            context.globalThis = context;
+            vm.createContext(context);
+            vm.runInContext(fs.readFileSync({json.dumps(str(MODULE_PATH))}, "utf8"), context);
+            const tools = context.window.CanvasiaEditorFilters;
+            const variablesById = new Map([
+              ["affection", {{ id: "affection", type: "number" }}],
+              ["route", {{ id: "route", type: "string" }}],
+              ["seen", {{ id: "seen", type: "boolean" }}],
+            ]);
+            const choiceAvailabilityTools = {{
+              normalizeChoiceAvailabilityMode: (value) => value || "always",
+              getChoiceAvailabilityRules: (option) => option.rules || [],
+            }};
+            const options = {{ variablesById, choiceAvailabilityTools }};
+            const blocks = [
+              {{ type: "variable_set", variableId: "route", value: "common" }},
+              {{ type: "variable_set", variableId: "affection", value: "high" }},
+              {{ type: "variable_add", variableId: "affection", value: 1 }},
+              {{ type: "variable_add", variableId: "route", value: 1 }},
+              {{ type: "choice", options: [{{ choiceAvailabilityMode: "disable_when_false", rules: [{{ variableId: "affection", operator: ">=", value: 2 }}], effects: [{{ type: "variable_set", variableId: "seen", value: true }}] }}] }},
+              {{ type: "choice", options: [{{ choiceAvailabilityMode: "disable_when_false", rules: [{{ variableId: "missing", operator: "==", value: true }}] }}] }},
+              {{ type: "condition", branches: [{{ when: [{{ variableId: "route", operator: "contains", value: "good" }}] }}] }},
+              {{ type: "condition", branches: [{{ when: [{{ variableId: "route", operator: ">", value: "good" }}] }}] }},
+            ];
+            process.stdout.write(JSON.stringify({{
+              rawTypes: [
+                tools.isRawVariableValueMatchingType(variablesById.get("affection"), 1),
+                tools.isRawVariableValueMatchingType(variablesById.get("affection"), "1"),
+                tools.isRawVariableValueMatchingType(variablesById.get("seen"), false),
+                tools.isRawVariableValueMatchingType(variablesById.get("route"), "common"),
+              ],
+              operators: [
+                tools.isConditionOperatorAllowedForVariable(variablesById.get("affection"), ">="),
+                tools.isConditionOperatorAllowedForVariable(variablesById.get("route"), "contains"),
+                tools.isConditionOperatorAllowedForVariable(variablesById.get("route"), ">"),
+              ],
+              issues: blocks.map((block) => tools.blockHasVariableLogicIssue(block, options)),
+              integratedIssue: tools.getStoryBlockIssueItems(blocks[5], options).map((item) => item.key),
+            }}));
+            """
+        )
+        completed = subprocess.run(
+            ["node", "-e", script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        self.assertEqual(payload["rawTypes"], [True, False, True, True])
+        self.assertEqual(payload["operators"], [True, True, False])
+        self.assertEqual(payload["issues"], [False, True, False, True, False, True, False, True])
+        self.assertEqual(payload["integratedIssue"], ["variable_logic"])
 
 
 if __name__ == "__main__":

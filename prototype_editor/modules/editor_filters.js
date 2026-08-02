@@ -311,6 +311,120 @@
     return "演出";
   }
 
+  function isRawVariableValueMatchingType(variable, value) {
+    if (!variable) {
+      return false;
+    }
+    if (variable.type === "number") {
+      return typeof value === "number" && Number.isFinite(value);
+    }
+    if (variable.type === "boolean") {
+      return typeof value === "boolean";
+    }
+    return typeof value === "string";
+  }
+
+  function isConditionOperatorAllowedForVariable(variable, operator) {
+    const safeOperator = String(operator ?? "==").trim() || "==";
+    if (["==", "=", "!="].includes(safeOperator)) {
+      return true;
+    }
+    if ([">", ">=", "<", "<="].includes(safeOperator)) {
+      return variable?.type === "number";
+    }
+    if (["contains", "not_contains", "starts_with", "ends_with"].includes(safeOperator)) {
+      return variable?.type === "string";
+    }
+    return false;
+  }
+
+  function hasVariableReferenceIssue(
+    variablesById,
+    variableId,
+    { expectedType = null, value = null, validateValue = false, operator = null } = {}
+  ) {
+    const variable = getCollectionEntry(variablesById, variableId);
+    if (!variable) {
+      return true;
+    }
+    if (expectedType && variable.type !== expectedType) {
+      return true;
+    }
+    if (validateValue && !isRawVariableValueMatchingType(variable, value)) {
+      return true;
+    }
+    if (operator !== null && !isConditionOperatorAllowedForVariable(variable, operator)) {
+      return true;
+    }
+    return false;
+  }
+
+  function blockHasVariableLogicIssue(block = {}, options = {}) {
+    const variablesById = options.variablesById ?? null;
+    const choiceAvailabilityTools = options.choiceAvailabilityTools ?? {};
+    const normalizeChoiceAvailabilityMode =
+      choiceAvailabilityTools.normalizeChoiceAvailabilityMode ||
+      ((value) => (["hide_when_false", "disable_when_false"].includes(value) ? value : "always"));
+    const getChoiceAvailabilityRules =
+      choiceAvailabilityTools.getChoiceAvailabilityRules ||
+      ((option) => (Array.isArray(option?.choiceAvailabilityRules) ? option.choiceAvailabilityRules : []));
+    const hasIssue = (variableId, issueOptions = {}) =>
+      hasVariableReferenceIssue(variablesById, variableId, issueOptions);
+
+    if (block.type === "variable_set") {
+      return hasIssue(block.variableId, { value: block.value, validateValue: true });
+    }
+    if (block.type === "variable_add") {
+      return hasIssue(block.variableId, {
+        expectedType: "number",
+        value: block.value,
+        validateValue: true,
+      });
+    }
+    if (block.type === "choice") {
+      return (block.options ?? []).some((option) => {
+        const availabilityMode = normalizeChoiceAvailabilityMode(option.choiceAvailabilityMode);
+        const availabilityRules = getChoiceAvailabilityRules(option);
+        const hasAvailabilityIssue =
+          availabilityMode !== "always" &&
+          (availabilityRules.length === 0 ||
+            availabilityRules.some((rule) =>
+              hasIssue(rule.variableId, {
+                value: rule.value,
+                validateValue: true,
+                operator: rule.operator,
+              })
+            ));
+        const hasEffectIssue = (option.effects ?? []).some((effect) => {
+          if (effect.type === "variable_add") {
+            return hasIssue(effect.variableId, {
+              expectedType: "number",
+              value: effect.value,
+              validateValue: true,
+            });
+          }
+          if (effect.type === "variable_set") {
+            return hasIssue(effect.variableId, { value: effect.value, validateValue: true });
+          }
+          return true;
+        });
+        return hasAvailabilityIssue || hasEffectIssue;
+      });
+    }
+    if (block.type === "condition") {
+      return (block.branches ?? []).some((branch) =>
+        (branch.when ?? []).some((rule) =>
+          hasIssue(rule.variableId, {
+            value: rule.value,
+            validateValue: true,
+            operator: rule.operator,
+          })
+        )
+      );
+    }
+    return false;
+  }
+
   function getStoryBlockIssueItems(block = {}, options = {}) {
     const items = [];
     const pushIssue = (key, label, toneClass = "warn-text") => {
@@ -326,7 +440,9 @@
       isReadableTextLong = () => false,
       choiceManyOptions = 6,
       choiceLongWarningLength = 42,
-      hasVariableLogicIssue = () => false,
+      hasVariableLogicIssue = null,
+      variablesById = null,
+      choiceAvailabilityTools = null,
     } = options;
 
     if (block.type === "dialogue" && !block.voiceAssetId) {
@@ -394,7 +510,11 @@
       pushIssue("broken_target", "跳转待修", "danger-text");
     }
 
-    if (hasVariableLogicIssue(block)) {
+    const variableLogicIssue =
+      typeof hasVariableLogicIssue === "function"
+        ? hasVariableLogicIssue(block)
+        : blockHasVariableLogicIssue(block, { variablesById, choiceAvailabilityTools });
+    if (variableLogicIssue) {
       pushIssue("variable_logic", "变量待修", "danger-text");
     }
 
@@ -570,6 +690,10 @@
     getStoryBlockIssueFilterLabel,
     getStoryBlockGroup,
     getStoryBlockGroupLabel,
+    isRawVariableValueMatchingType,
+    isConditionOperatorAllowedForVariable,
+    hasVariableReferenceIssue,
+    blockHasVariableLogicIssue,
     getStoryBlockIssueItems,
     getSafeStorySceneTreeFilter,
     getStorySceneTreeFilterLabel,

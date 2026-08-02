@@ -92,6 +92,7 @@ class FrontendEntrypointModuleTests(unittest.TestCase):
             "./modules/stage_direction_sheet_panel.js",
             "./modules/presentation_timeline.js",
             "./modules/presentation_timeline_panel.js",
+            "./modules/scene_rehearsal_board.js",
             "./modules/localization_coverage.js",
             "./modules/localization_coverage_panel.js",
             "./modules/runtime_capability_matrix.js",

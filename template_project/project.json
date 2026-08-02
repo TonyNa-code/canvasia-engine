@@ -24,6 +24,7 @@
     "defaultTextSpeed": "normal",
     "defaultDialogTheme": "project",
     "defaultUiThemeMode": "auto",
+    "defaultMobileReaderMode": "auto",
     "performanceProfile": "standard",
     "defaultBgmVolume": 72,
     "defaultSfxVolume": 85,
