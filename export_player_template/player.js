@@ -76,6 +76,10 @@ import {
   stripRuntimeStoryText,
 } from "./runtime_story_text.js";
 import {
+  createRuntimeHistoryController,
+  getRuntimeHistoryStepIndex,
+} from "./runtime_text_history.js";
+import {
   getSafeTextInputMaxLength,
   interpolateRuntimeText,
   normalizeTextInputBlock,
@@ -573,6 +577,14 @@ const state = {
   mobileHistoryOpen: false,
 };
 
+const runtimeHistoryController = createRuntimeHistoryController({
+  getBlockLabel,
+  getVoiceAssetId,
+  stripStoryText: stripRuntimeStoryText,
+  escapeHtml,
+  renderEmpty,
+});
+
 const sfxTransportController = createSfxTransportController({
   resolveAssetUrl: (assetId) => getAssetUrl(assetId),
   getMasterVolume: () => getRuntimeSfxTargetVolume(100),
@@ -703,6 +715,10 @@ function init() {
   refs.mobileHistoryCloseButton?.addEventListener("click", closeMobileHistorySheet);
   refs.mobileHistorySheet?.addEventListener("click", handleMobileHistorySheetClick);
   refs.historyPanel?.addEventListener("click", handleHistoryPanelClick);
+  refs.historyPanel?.addEventListener("input", handleHistoryFilterInput);
+  refs.historyPanel?.addEventListener("change", handleHistoryFilterInput);
+  refs.mobileHistoryList?.addEventListener("input", handleHistoryFilterInput);
+  refs.mobileHistoryList?.addEventListener("change", handleHistoryFilterInput);
   refs.saveSlotPanel?.addEventListener("click", handleSaveSlotPanelClick);
   refs.saveDialogSlotList?.addEventListener("click", handleSaveSlotPanelClick);
   refs.closeSaveDialogButton?.addEventListener("click", closeSaveDialog);
@@ -1310,6 +1326,7 @@ function renderBeforeStart() {
   state.musicRoomDialogOpen = false;
   state.operationGuideOpen = false;
   state.mobileHistoryOpen = false;
+  runtimeHistoryController.resetFilters();
   state.returnTitleConfirmOpen = false;
   state.saveConfirmOpen = false;
   state.saveConfirmIntent = null;
@@ -1386,6 +1403,7 @@ function startGameFromScene(sceneId = getEntrySceneId()) {
   state.musicRoomDialogOpen = false;
   state.operationGuideOpen = false;
   state.mobileHistoryOpen = false;
+  runtimeHistoryController.resetFilters();
   state.returnTitleConfirmOpen = false;
   state.saveConfirmOpen = false;
   state.saveConfirmIntent = null;
@@ -6574,6 +6592,12 @@ function handleHistoryPanelClick(event) {
     return;
   }
 
+  const filterButton = event.target.closest("[data-history-voiced], [data-history-clear]");
+  if (filterButton && runtimeHistoryController.updateFromTarget(filterButton)) {
+    renderRuntimeHistoryPanels();
+    return;
+  }
+
   const jumpButton = event.target.closest("[data-history-index]");
 
   if (jumpButton) {
@@ -6585,6 +6609,46 @@ function handleHistoryPanelClick(event) {
 
   if (voiceButton) {
     void replayHistoryVoice(voiceButton.dataset.historyVoiceIndex);
+  }
+}
+
+function handleHistoryFilterInput(event) {
+  if (!(event.target instanceof HTMLElement)) {
+    return;
+  }
+  const isSearch = event.target.matches("[data-history-search]");
+  const isSpeaker = event.target.matches("[data-history-speaker]");
+  if ((!isSearch && !isSpeaker) || !runtimeHistoryController.updateFromTarget(event.target)) {
+    return;
+  }
+  const selectionStart = isSearch && "selectionStart" in event.target
+    ? event.target.selectionStart
+    : null;
+  renderRuntimeHistoryPanels({
+    focusRoot: event.currentTarget,
+    focusSelector: isSearch ? "[data-history-search]" : "[data-history-speaker]",
+    selectionStart,
+  });
+}
+
+function renderRuntimeHistoryPanels({ focusRoot = null, focusSelector = "", selectionStart = null } = {}) {
+  const markup = state.session
+    ? runtimeHistoryController.render(state.session)
+    : renderEmpty("开始后，这里会显示已经走过的剧情步骤。");
+  if (refs.historyPanel) {
+    refs.historyPanel.innerHTML = markup;
+  }
+  if (refs.mobileHistoryList) {
+    refs.mobileHistoryList.innerHTML = markup;
+  }
+  const nextFocus = focusRoot && focusSelector
+    ? focusRoot.querySelector?.(focusSelector)
+    : null;
+  if (nextFocus) {
+    nextFocus.focus?.({ preventScroll: true });
+    if (Number.isInteger(selectionStart) && typeof nextFocus.setSelectionRange === "function") {
+      nextFocus.setSelectionRange(selectionStart, selectionStart);
+    }
   }
 }
 
@@ -6657,27 +6721,12 @@ function handleSaveSlotPanelClick(event) {
   }
 }
 
-function getRuntimeHistoryStepIndex(delta) {
-  const session = state.session;
-  const offset = Math.trunc(Number(delta) || 0);
-
-  if (!session || !Number.isInteger(session.position) || !offset) {
-    return null;
-  }
-
-  const nextIndex = session.position + offset;
-  if (nextIndex < 0 || nextIndex >= session.timeline.length) {
-    return null;
-  }
-  return nextIndex;
-}
-
 function canStepRuntimeHistory(delta) {
-  return getRuntimeHistoryStepIndex(delta) !== null;
+  return getRuntimeHistoryStepIndex(state.session, delta) !== null;
 }
 
 function stepRuntimeHistory(delta) {
-  const nextIndex = getRuntimeHistoryStepIndex(delta);
+  const nextIndex = getRuntimeHistoryStepIndex(state.session, delta);
   return nextIndex === null ? false : jumpToHistory(nextIndex);
 }
 
@@ -8703,7 +8752,7 @@ function renderRuntime() {
   refs.speakerName.style.color = getSpeakerColor(snapshot);
   refs.lineTypeTag.textContent = snapshot.completed ? "结束" : getBlockLabel(snapshot.blockType);
   refs.variablesPanel.innerHTML = renderVariables(snapshot.variables);
-  refs.historyPanel.innerHTML = renderHistory(session);
+  renderRuntimeHistoryPanels();
   syncRuntimeDialoguePresentation(snapshot);
   syncRuntimeTimedChoice(snapshot);
   renderRuntimeDialogueLayout(snapshot);
@@ -8765,40 +8814,7 @@ function renderVariables(variables) {
 }
 
 function renderHistory(session) {
-  const startIndex = Math.max(session.timeline.length - 12, 0);
-  const rows = session.timeline
-    .slice(startIndex)
-    .map((snapshot, index) => {
-      const absoluteIndex = startIndex + index;
-      const number = absoluteIndex + 1;
-      const title = snapshot.completed
-        ? "试玩结束"
-        : `${getBlockLabel(snapshot.blockType)} · ${snapshot.sceneName}`;
-      const hasVoice = Boolean(getVoiceAssetId(snapshot));
-
-      return `
-        <article class="history-row ${absoluteIndex === session.position ? "is-selected" : ""}">
-          <button class="history-main-button" type="button" data-history-index="${absoluteIndex}">
-            <strong>${number}. ${escapeHtml(title)}</strong>
-            <p>${escapeHtml(stripRuntimeStoryText(snapshot.visualState.dialogueText ?? ""))}</p>
-            <div class="meta">${escapeHtml(snapshot.visualState.speakerName ?? "系统")}</div>
-          </button>
-          <div class="history-actions">
-            <button
-              class="history-voice-button"
-              type="button"
-              data-history-voice-index="${absoluteIndex}"
-              ${hasVoice ? "" : "disabled"}
-            >
-              重播语音
-            </button>
-          </div>
-        </article>
-      `;
-    })
-    .join("");
-
-  return rows || renderEmpty("还没有历史记录。");
+  return runtimeHistoryController.render(session);
 }
 
 function renderChoiceButtons(snapshot) {

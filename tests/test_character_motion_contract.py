@@ -23,6 +23,7 @@ class CharacterMotionContractTests(unittest.TestCase):
             "renpy_py": read_source("renpy_export.py"),
             "web_player": read_source("export_player_template/player.js"),
             "native_player": read_source("native_runtime/runtime_player.py"),
+            "web_runtime_registry": read_source("export_runtime_module_registry.py"),
             "run_editor": read_source("run_editor.py"),
         }
 
@@ -35,7 +36,7 @@ class CharacterMotionContractTests(unittest.TestCase):
         self.assertIn('block_type == "character_move"', sources["renpy_py"])
         self.assertIn('case "character_move":', sources["web_player"])
         self.assertIn('block_type == "character_move"', sources["native_player"])
-        self.assertIn('"runtime_character_motion.js"', sources["run_editor"])
+        self.assertIn('"runtime_character_motion.js"', sources["web_runtime_registry"])
         self.assertIn('NATIVE_RUNTIME_CHARACTER_MOTION_NAME = "runtime_character_motion.py"', sources["run_editor"])
 
     def test_character_motion_has_pure_helpers_and_anchored_css(self) -> None:

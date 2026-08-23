@@ -549,6 +549,34 @@ except ImportError:  # pragma: no cover - exported native packages import from t
     )
 
 try:
+    from .runtime_text_history import (
+        append_text_history_entry,
+        build_text_history_entry,
+        collect_text_history_speakers,
+        filter_text_history_entries,
+        move_text_history_selection as move_filtered_text_history_selection,
+    )
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_text_history import (
+        append_text_history_entry,
+        build_text_history_entry,
+        collect_text_history_speakers,
+        filter_text_history_entries,
+        move_text_history_selection as move_filtered_text_history_selection,
+    )
+
+try:
+    from .runtime_text_history_overlay import (
+        handle_runtime_text_history_overlay_event,
+        render_runtime_text_history_overlay,
+    )
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_text_history_overlay import (
+        handle_runtime_text_history_overlay_event,
+        render_runtime_text_history_overlay,
+    )
+
+try:
     from .runtime_save_thumbnails import (
         build_save_thumbnail_status,
         capture_pygame_save_thumbnail,
@@ -958,7 +986,12 @@ NATIVE_RUNTIME_CONTROL_GROUPS = (
                 "detail": "打开已经显示过的文本记录；历史内可用 PageUp / PageDown 快速滚动。",
             },
             {
-                "keys": ("R", "V"),
+                "keys": ("/", "F", "V", "C"),
+                "label": "筛选文本历史",
+                "detail": "搜索台词 / 角色 / 场景，切换角色、只看有语音，或清除筛选。",
+            },
+            {
+                "keys": ("R",),
                 "label": "历史语音回听",
                 "detail": "在文本历史中选中有语音的条目后可重听。",
             },
@@ -8095,6 +8128,10 @@ class NativeRuntimePlayer:
         self.read_text_key_order: list[str] = loaded_read_text_keys[-READ_TEXT_KEY_LIMIT:]
         self.read_text_keys: set[str] = set(self.read_text_key_order)
         self.history_scroll_index = 0
+        self.history_search_query = ""
+        self.history_search_active = False
+        self.history_speaker_filter = ""
+        self.history_voiced_only = False
         self.auto_play_enabled = False
         self.auto_play_deadline_ms = 0
         self.skip_read_enabled = False
@@ -9259,11 +9296,6 @@ class NativeRuntimePlayer:
         self.update_current_line_reveal()
         return self.current_line_full_text[: self.current_line_revealed_chars]
 
-    def build_text_history_key(self, scene: dict | None, block_index: int, block_type: str, text: str) -> str:
-        scene_id = str((scene or {}).get("id") or self.current_scene_id or "")
-        text_digest = hashlib.sha1(str(text or "").encode("utf-8")).hexdigest()[:12]
-        return f"{scene_id}:{int(block_index)}:{block_type}:{text_digest}"
-
     def get_line_speaker_name(self, line: dict) -> str:
         speaker_id = line.get("speakerId")
         if line.get("type") == "dialogue":
@@ -9276,36 +9308,91 @@ class NativeRuntimePlayer:
         return "旁白"
 
     def record_text_history(self, line: dict, scene: dict | None, block_index: int) -> None:
-        text = str(line.get("text") or "").strip()
-        if not text:
+        entry = build_text_history_entry(
+            scene_id=str((scene or {}).get("id") or self.current_scene_id or ""),
+            block_index=block_index,
+            block_type=str(line.get("type") or ""),
+            scene_name=self.localize_value(scene, "name", self.get_current_scene_name()),
+            speaker_name=self.get_line_speaker_name(line),
+            text=line.get("text"),
+            voice_asset_id=line.get("voiceAssetId"),
+            voice_volume=get_safe_volume_percent(line.get("voiceVolume"), 100),
+            voice_profile_id=get_voice_profile_id_from_block(line),
+        )
+        if entry is None:
             return
-        block_type = str(line.get("type") or "")
-        history_key = self.build_text_history_key(scene, block_index, block_type, text)
+        history_key = str(entry.get("key") or "")
         line["historyKey"] = history_key
         if history_key in self.text_history_seen_keys:
             return
-        self.text_history_seen_keys.add(history_key)
-        self.text_history.append(
-            {
-                "key": history_key,
-                "sceneName": self.localize_value(scene, "name", self.get_current_scene_name()),
-                "speakerName": self.get_line_speaker_name(line),
-                "text": text,
-                "blockType": block_type,
-                "voiceAssetId": str(line.get("voiceAssetId") or "").strip(),
-                "voiceVolume": get_safe_volume_percent(line.get("voiceVolume"), 100),
-                "voiceProfileId": get_voice_profile_id_from_block(line),
-            }
-        )
-        self.text_history = self.text_history[-120:]
+        self.text_history = append_text_history_entry(self.text_history, entry)
+        self.text_history_seen_keys = {
+            str(item.get("key") or "")
+            for item in self.text_history
+            if str(item.get("key") or "")
+        }
         self.history_scroll_index = max(0, len(self.text_history) - 1)
 
+    def get_filtered_text_history_entries(self) -> list[tuple[int, dict]]:
+        speakers = collect_text_history_speakers(self.text_history)
+        if self.history_speaker_filter and self.history_speaker_filter not in speakers:
+            self.history_speaker_filter = ""
+        return filter_text_history_entries(
+            self.text_history,
+            query=self.history_search_query,
+            speaker=self.history_speaker_filter,
+            voiced_only=self.history_voiced_only,
+        )
+
+    def move_text_history_selection(self, delta: int) -> None:
+        self.history_scroll_index = move_filtered_text_history_selection(
+            self.get_filtered_text_history_entries(),
+            self.history_scroll_index,
+            delta,
+        )
+
+    def cycle_text_history_speaker(self) -> None:
+        speakers = [""] + collect_text_history_speakers(self.text_history)
+        try:
+            current_index = speakers.index(self.history_speaker_filter)
+        except ValueError:
+            current_index = 0
+        self.history_speaker_filter = speakers[(current_index + 1) % len(speakers)]
+        filtered = self.get_filtered_text_history_entries()
+        self.history_scroll_index = filtered[-1][0] if filtered else 0
+
+    def clear_text_history_filters(self) -> None:
+        self.history_search_query = ""
+        self.history_speaker_filter = ""
+        self.history_voiced_only = False
+        self.history_scroll_index = max(0, len(self.text_history) - 1)
+
+    def set_text_history_search_active(self, active: bool) -> None:
+        self.history_search_active = bool(active)
+        try:
+            if self.history_search_active:
+                self.pygame.key.start_text_input()
+            else:
+                self.pygame.key.stop_text_input()
+        except (AttributeError, self.pygame.error):
+            pass
+
+    def append_text_history_search(self, value: object) -> None:
+        addition = "".join(character for character in str(value or "") if character.isprintable())
+        if not addition:
+            return
+        self.history_search_query = (self.history_search_query + addition)[:80]
+        filtered = self.get_filtered_text_history_entries()
+        self.history_scroll_index = filtered[-1][0] if filtered else 0
+
     def get_selected_text_history_item(self) -> dict | None:
-        if not self.text_history:
+        filtered = self.get_filtered_text_history_entries()
+        if not filtered:
             return None
-        safe_index = max(0, min(len(self.text_history) - 1, self.history_scroll_index))
-        self.history_scroll_index = safe_index
-        return self.text_history[safe_index]
+        matching_indices = {index for index, _item in filtered}
+        if self.history_scroll_index not in matching_indices:
+            self.history_scroll_index = filtered[-1][0]
+        return next(item for index, item in filtered if index == self.history_scroll_index)
 
     def play_selected_history_voice(self) -> bool:
         item = self.get_selected_text_history_item()
@@ -9338,7 +9425,9 @@ class NativeRuntimePlayer:
     def open_text_history_overlay(self) -> None:
         self.ui_hidden = False
         self.overlay_mode = "history"
-        self.history_scroll_index = max(0, len(self.text_history) - 1)
+        self.set_text_history_search_active(False)
+        filtered = self.get_filtered_text_history_entries()
+        self.history_scroll_index = filtered[-1][0] if filtered else 0
         self.status_message = "文本历史已打开。"
 
     def toggle_ui_hidden(self) -> None:
@@ -9954,6 +10043,8 @@ class NativeRuntimePlayer:
 
     def close_overlay(self, preserve_status: bool = False) -> None:
         closing_mode = self.overlay_mode
+        if closing_mode == "history":
+            self.set_text_history_search_active(False)
         self.persistent_memory_reset_armed_until_ms = 0
         self.overlay_hotspots = []
         self.archive_detail_entry = None
@@ -13822,54 +13913,7 @@ class NativeRuntimePlayer:
         self.screen.blit(self.font_ui.render("点击上方入口或按 S/H/A/P 快速跳转 · Enter / Esc / 右键关闭", True, palette["muted"]), (panel.left + 26, panel.bottom - 38))
 
     def render_text_history_overlay(self) -> None:
-        palette = self.get_active_palette()
-        panel = self.pygame.Rect(0, 0, min(self.width - 88, 860), min(self.height - 96, 620))
-        panel.center = (self.width // 2, self.height // 2)
-        self.pygame.draw.rect(self.screen, (*palette["panel"], 246), panel, border_radius=28)
-        self.pygame.draw.rect(self.screen, with_alpha(palette["panelBorder"], 72), panel, 2, border_radius=28)
-        self.draw_game_ui_panel_frame(panel, "system")
-        self.screen.blit(self.font_title.render("文本历史", True, palette["text"]), (panel.left + 28, panel.top + 24))
-        subtitle = f"已记录 {len(self.text_history)} 条 · 字体：{self.font_source_status}"
-        self.screen.blit(self.font_ui.render(subtitle[:72], True, palette["muted"]), (panel.left + 28, panel.top + 60))
-
-        list_rect = self.pygame.Rect(panel.left + 28, panel.top + 98, panel.width - 56, panel.height - 164)
-        self.pygame.draw.rect(self.screen, with_alpha(palette["accent"], 16), list_rect, border_radius=20)
-        self.pygame.draw.rect(self.screen, with_alpha(palette["panelBorder"], 24), list_rect, 1, border_radius=20)
-        if not self.text_history:
-            self.blit_text_center(self.font_body, "还没有历史文本", list_rect.centerx, list_rect.centery - 18, palette["muted"])
-        else:
-            visible_count = max(1, list_rect.height // 104)
-            max_start = max(0, len(self.text_history) - visible_count)
-            start = max(0, min(max_start, self.history_scroll_index - visible_count + 1))
-            y = list_rect.top + 16
-            for offset, item in enumerate(self.text_history[start : start + visible_count]):
-                item_index = start + offset
-                item_rect = self.pygame.Rect(list_rect.left + 10, y - 8, list_rect.width - 20, 96)
-                is_active = item_index == self.history_scroll_index
-                if is_active:
-                    self.pygame.draw.rect(self.screen, with_alpha(palette["accent"], 28), item_rect, border_radius=16)
-                    self.pygame.draw.rect(self.screen, with_alpha(palette["accentAlt"], 64), item_rect, 1, border_radius=16)
-                speaker = str(item.get("speakerName") or "旁白")
-                scene_name = str(item.get("sceneName") or "")
-                has_voice = bool(str(item.get("voiceAssetId") or "").strip())
-                header = f"{speaker} · {scene_name}" if scene_name else speaker
-                self.screen.blit(self.font_ui.render(header[:56], True, palette["accent"]), (list_rect.left + 18, y))
-                if has_voice:
-                    voice_surface = self.font_ui.render("VOICE", True, palette["accentAlt"])
-                    self.screen.blit(voice_surface, (list_rect.right - voice_surface.get_width() - 18, y))
-                text_rect = self.pygame.Rect(list_rect.left + 18, y + 24, list_rect.width - 36, 62)
-                self.blit_wrapped_text(self.font_ui, str(item.get("text") or ""), text_rect, palette["text"], line_gap=4, max_lines=3)
-                self.overlay_hotspots.append({"kind": "history-item", "value": item_index, "rect": item_rect})
-                y += 104
-
-        close_rect = self.pygame.Rect(panel.right - 138, panel.bottom - 56, 108, 34)
-        self.pygame.draw.rect(self.screen, with_alpha(palette["panel"], 58), close_rect, border_radius=14)
-        self.pygame.draw.rect(self.screen, with_alpha(palette["panelBorder"], 42), close_rect, 1, border_radius=14)
-        self.draw_game_ui_button_frame(close_rect, self.get_game_ui_button_state(close_rect))
-        self.blit_text_center(self.font_ui, "关闭", close_rect.centerx, close_rect.top + 8, palette["text"])
-        self.overlay_hotspots.append({"kind": "close", "rect": close_rect})
-        hint = "↑↓ 选择 · R/V 重听语音 · PageUp/PageDown 快速滚动 · Esc 关闭"
-        self.screen.blit(self.font_ui.render(hint, True, palette["muted"]), (panel.left + 28, panel.bottom - 44))
+        render_runtime_text_history_overlay(self, with_alpha)
 
     def render_settings_overlay(self) -> None:
         render_runtime_settings_overlay_panel(self, SETTINGS_MENU_ITEMS, with_alpha)
@@ -14447,7 +14491,14 @@ class NativeRuntimePlayer:
             return controller_result
         if self.overlay_mode == "text-input":
             return self.handle_overlay_event(event)
+        text_input_event = getattr(self.pygame, "TEXTINPUT", None)
+        if self.overlay_mode == "history" and text_input_event is not None and event.type == text_input_event:
+            return self.handle_overlay_event(event)
         if event.type == self.pygame.KEYDOWN and event.key == self.pygame.K_ESCAPE:
+            if self.overlay_mode == "history" and self.history_search_active:
+                self.set_text_history_search_active(False)
+                self.status_message = "历史搜索输入已结束，筛选结果会继续保留。"
+                return True
             if self.overlay_mode:
                 if self.overlay_mode == "title":
                     return False
@@ -14737,49 +14788,7 @@ class NativeRuntimePlayer:
         return True
 
     def handle_text_history_overlay_event(self, event) -> bool:
-        pygame = self.pygame
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_UP:
-                self.history_scroll_index = max(0, self.history_scroll_index - 1)
-                return True
-            if event.key == pygame.K_DOWN:
-                self.history_scroll_index = min(max(0, len(self.text_history) - 1), self.history_scroll_index + 1)
-                return True
-            if event.key == pygame.K_PAGEUP:
-                self.history_scroll_index = max(0, self.history_scroll_index - 5)
-                return True
-            if event.key == pygame.K_PAGEDOWN:
-                self.history_scroll_index = min(max(0, len(self.text_history) - 1), self.history_scroll_index + 5)
-                return True
-            if event.key in (pygame.K_r, pygame.K_v):
-                return self.play_selected_history_voice()
-            if event.key in (pygame.K_RETURN, pygame.K_SPACE):
-                self.close_overlay()
-                return True
-        if event.type == pygame.MOUSEWHEEL:
-            if event.y > 0:
-                self.history_scroll_index = max(0, self.history_scroll_index - 1)
-                return True
-            if event.y < 0:
-                self.history_scroll_index = min(max(0, len(self.text_history) - 1), self.history_scroll_index + 1)
-                return True
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            for target in self.overlay_hotspots:
-                if target.get("kind") == "history-item" and target["rect"].collidepoint(event.pos):
-                    self.history_scroll_index = int(target.get("value") or 0)
-                    if getattr(event, "clicks", 1) >= 2:
-                        return self.play_selected_history_voice()
-                    return True
-                if target.get("kind") == "close" and target["rect"].collidepoint(event.pos):
-                    self.close_overlay()
-                    return True
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button in {4, 5}:
-            if event.button == 4:
-                self.history_scroll_index = max(0, self.history_scroll_index - 1)
-            else:
-                self.history_scroll_index = min(max(0, len(self.text_history) - 1), self.history_scroll_index + 1)
-            return True
-        return True
+        return handle_runtime_text_history_overlay_event(self, event)
 
     def handle_profile_overlay_event(self, event) -> bool:
         pygame = self.pygame

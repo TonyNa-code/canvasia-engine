@@ -147,6 +147,7 @@ class SfxTransportContractTests(unittest.TestCase):
         player = (ROOT_DIR / "export_player_template" / "player.js").read_text(encoding="utf-8")
         native = (ROOT_DIR / "native_runtime" / "runtime_player.py").read_text(encoding="utf-8")
         runner = (ROOT_DIR / "run_editor.py").read_text(encoding="utf-8")
+        runtime_registry = (ROOT_DIR / "export_runtime_module_registry.py").read_text(encoding="utf-8")
         catalog = (ROOT_DIR / "prototype_editor" / "modules" / "story_block_catalog.js").read_text(encoding="utf-8")
         python_exporter = (ROOT_DIR / "renpy_export.py").read_text(encoding="utf-8")
 
@@ -159,8 +160,9 @@ class SfxTransportContractTests(unittest.TestCase):
         self.assertIn("NativeSfxTransportController", native)
         self.assertIn('"sfxTransportState"', native)
         self.assertIn('NATIVE_RUNTIME_SFX_TRANSPORT_NAME = "runtime_sfx_transport.py"', runner)
-        self.assertIn('"playerRuntimeSfxTransport": "runtime_sfx_transport.js"', runner)
-        self.assertIn('"appRuntimeSfxTransport": "app/runtime_sfx_transport.js"', runner)
+        self.assertIn('("SfxTransport", "runtime_sfx_transport.js")', runtime_registry)
+        self.assertIn('build_export_runtime_module_manifest("playerRuntime")', runner)
+        self.assertIn('build_export_runtime_module_manifest("appRuntime", "app")', runner)
         self.assertIn('type: "sfx_stop"', catalog)
         self.assertIn("renpy.music.register_channel", python_exporter)
 

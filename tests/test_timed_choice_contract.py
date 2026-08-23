@@ -78,6 +78,7 @@ class TimedChoiceContractTests(unittest.TestCase):
 
     def test_editor_export_and_all_runtimes_are_wired(self) -> None:
         run_editor_source = (ROOT_DIR / "run_editor.py").read_text(encoding="utf-8")
+        runtime_registry_source = (ROOT_DIR / "export_runtime_module_registry.py").read_text(encoding="utf-8")
         editor_index = (ROOT_DIR / "prototype_editor" / "index.html").read_text(encoding="utf-8")
         editor_source = (ROOT_DIR / "prototype_editor" / "app.js").read_text(encoding="utf-8")
         editor_guard = (ROOT_DIR / "prototype_editor" / "modules" / "module_guard.js").read_text(encoding="utf-8")
@@ -86,10 +87,10 @@ class TimedChoiceContractTests(unittest.TestCase):
         native_source = (ROOT_DIR / "native_runtime" / "runtime_player.py").read_text(encoding="utf-8")
         renpy_source = (ROOT_DIR / "renpy_export.py").read_text(encoding="utf-8")
 
-        self.assertIn('"runtime_timed_choices.js"', run_editor_source)
+        self.assertIn('("TimedChoices", "runtime_timed_choices.js")', runtime_registry_source)
         self.assertIn('NATIVE_RUNTIME_TIMED_CHOICES_NAME = "runtime_timed_choices.py"', run_editor_source)
-        self.assertIn('"playerRuntimeTimedChoices":', run_editor_source)
-        self.assertIn('"appRuntimeTimedChoices":', run_editor_source)
+        self.assertIn('build_export_runtime_module_manifest("playerRuntime")', run_editor_source)
+        self.assertIn('build_export_runtime_module_manifest("appRuntime", "app")', run_editor_source)
         self.assertIn('"runtimeTimedChoicesModule":', run_editor_source)
         self.assertIn('../export_player_template/runtime_timed_choices.js', editor_index)
         self.assertIn('./modules/timed_choice_editor.js', editor_index)

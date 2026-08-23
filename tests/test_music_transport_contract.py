@@ -78,6 +78,7 @@ class MusicTransportContractTests(unittest.TestCase):
         player = (ROOT_DIR / "export_player_template" / "player.js").read_text(encoding="utf-8")
         native = (ROOT_DIR / "native_runtime" / "runtime_player.py").read_text(encoding="utf-8")
         runner = (ROOT_DIR / "run_editor.py").read_text(encoding="utf-8")
+        runtime_registry = (ROOT_DIR / "export_runtime_module_registry.py").read_text(encoding="utf-8")
 
         self.assertIn('from "./runtime_music_transport.js"', player)
         self.assertIn("const runtimeMusicTransportTools = window.CanvasiaRuntimeMusicTransport", editor)
@@ -94,7 +95,7 @@ class MusicTransportContractTests(unittest.TestCase):
         self.assertIn("NativeMusicTransportController", native)
         self.assertIn("is_new_cue", native)
         self.assertIn('NATIVE_RUNTIME_MUSIC_TRANSPORT_NAME = "runtime_music_transport.py"', runner)
-        self.assertIn('"runtime_music_transport.js"', runner)
+        self.assertIn('("MusicTransport", "runtime_music_transport.js")', runtime_registry)
 
 
 if __name__ == "__main__":

@@ -45,6 +45,7 @@ class StoryFlowContractTests(unittest.TestCase):
         renpy_js = read_source("prototype_editor/modules/renpy_exporter.js")
         renpy_py = read_source("renpy_export.py")
         run_editor = read_source("run_editor.py")
+        runtime_registry = read_source("export_runtime_module_registry.py")
         route_analyzer = read_source("prototype_editor/modules/route_analyzer.js")
         route_report = read_source("prototype_editor/modules/route_testing_report.js")
 
@@ -56,7 +57,7 @@ class StoryFlowContractTests(unittest.TestCase):
         self.assertIn('"storyCallStack": sanitize_story_call_stack', native)
         self.assertIn('type === "scene_call"', renpy_js)
         self.assertIn('block_type == "scene_call"', renpy_py)
-        self.assertIn('"runtime_story_flow.js"', run_editor)
+        self.assertIn('("StoryFlow", "runtime_story_flow.js")', runtime_registry)
         self.assertIn('NATIVE_RUNTIME_STORY_FLOW_NAME = "runtime_story_flow.py"', run_editor)
         self.assertIn("subsceneCases", route_analyzer)
         self.assertIn("serialized.subsceneCases", route_report)

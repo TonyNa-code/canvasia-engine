@@ -46,6 +46,7 @@ jobs:
             export_icon.py \
             export_provenance_verifier.py \
             export_release_artifacts.py \
+            export_runtime_module_registry.py \
             export_unlockable_manifest.py \
             renpy_export.py \
             run_editor.py \
@@ -64,6 +65,8 @@ jobs:
             native_runtime/runtime_achievements.py \
             native_runtime/runtime_credits.py \
             native_runtime/runtime_rollback.py \
+            native_runtime/runtime_text_history.py \
+            native_runtime/runtime_text_history_overlay.py \
             native_runtime/runtime_input.py \
             native_runtime/runtime_key_bindings.py \
             native_runtime/runtime_settings_overlay.py \
@@ -102,6 +105,7 @@ jobs:
             tests/test_editor_project_text_refactor.py \
             tests/test_github_status_tool.py \
             tests/test_local_verify_tool.py \
+            tests/test_export_runtime_module_registry.py \
             tests/test_native_runtime_export_commands.py \
             tests/test_native_runtime_export_digest.py \
             tests/test_native_runtime_bundle.py \
@@ -139,6 +143,8 @@ jobs:
             tests/test_export_unlockable_manifest.py \
             tests/test_persistent_variables_contract.py \
             tests/test_native_runtime_rollback.py \
+            tests/test_native_runtime_text_history.py \
+            tests/test_native_runtime_text_history_overlay.py \
             tests/test_native_runtime_input.py \
             tests/test_native_runtime_text_input.py \
             tests/test_native_runtime_save_thumbnails.py \
@@ -237,6 +243,7 @@ jobs:
             tests/test_frontend_runtime_gamepad_module.py \
             tests/test_frontend_runtime_mobile_reader_module.py \
             tests/test_frontend_runtime_mobile_reader_ui_module.py \
+            tests/test_frontend_runtime_text_history_module.py \
             tests/test_frontend_runtime_audio_module.py \
             tests/test_frontend_runtime_music_transport_module.py \
             tests/test_frontend_runtime_video_transport_module.py \
@@ -454,6 +461,7 @@ jobs:
           node --check export_player_template/runtime_text_pacing.js
           node --check export_player_template/runtime_rich_text.js
           node --check export_player_template/runtime_story_text.js
+          node --check export_player_template/runtime_text_history.js
           node --check export_player_template/runtime_text_variables.js
 
       - name: Release tooling tests
@@ -463,6 +471,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_local_verify_tool.py' -v
           python -m unittest discover -s tests -p 'test_editor_character_stage_presets.py' -v
           python -m unittest discover -s tests -p 'test_editor_infrastructure.py' -v
+          python -m unittest discover -s tests -p 'test_export_runtime_module_registry.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_export_commands.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_export_digest.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_bundle.py' -v
@@ -494,6 +503,8 @@ jobs:
           python -m unittest discover -s tests -p 'test_export_unlockable_manifest.py' -v
           python -m unittest discover -s tests -p 'test_persistent_variables_contract.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_rollback.py' -v
+          python -m unittest discover -s tests -p 'test_native_runtime_text_history.py' -v
+          python -m unittest discover -s tests -p 'test_native_runtime_text_history_overlay.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_input.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_text_input.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_save_thumbnails.py' -v
@@ -593,6 +604,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_runtime_gamepad_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_mobile_reader_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_mobile_reader_ui_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_runtime_text_history_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_choice_availability_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_choice_availability_editor_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_timed_choices_module.py' -v

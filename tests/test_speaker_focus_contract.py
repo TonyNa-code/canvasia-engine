@@ -68,6 +68,7 @@ class SpeakerFocusContractTests(unittest.TestCase):
 
     def test_editor_export_and_native_runtime_are_all_wired(self) -> None:
         run_editor_source = (ROOT_DIR / "run_editor.py").read_text(encoding="utf-8")
+        runtime_registry_source = (ROOT_DIR / "export_runtime_module_registry.py").read_text(encoding="utf-8")
         player_source = (ROOT_DIR / "export_player_template" / "player.js").read_text(encoding="utf-8")
         editor_source = (ROOT_DIR / "prototype_editor" / "app.js").read_text(encoding="utf-8")
         native_source = (ROOT_DIR / "native_runtime" / "runtime_player.py").read_text(encoding="utf-8")
@@ -80,7 +81,7 @@ class SpeakerFocusContractTests(unittest.TestCase):
         player_css = (ROOT_DIR / "export_player_template" / "player.css").read_text(encoding="utf-8")
         editor_css = (ROOT_DIR / "prototype_editor" / "styles.css").read_text(encoding="utf-8")
 
-        self.assertIn('"runtime_speaker_focus.js"', run_editor_source)
+        self.assertIn('("SpeakerFocus", "runtime_speaker_focus.js")', runtime_registry_source)
         self.assertIn('NATIVE_RUNTIME_SPEAKER_FOCUS_NAME = "runtime_speaker_focus.py"', run_editor_source)
         self.assertIn('from "./runtime_character_cards.js"', player_source)
         self.assertIn('from "./runtime_speaker_focus.js"', character_cards_source)

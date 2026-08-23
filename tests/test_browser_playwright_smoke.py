@@ -2467,6 +2467,17 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
                 },
             )
             player_page.locator("#mobileHistorySheet").wait_for(state="visible", timeout=10000)
+            history_search = player_page.locator("#mobileHistoryList [data-history-search]")
+            history_search.wait_for(state="visible", timeout=10000)
+            history_search.fill("绝不会命中的历史台词")
+            player_page.wait_for_function(
+                "() => document.querySelector('#mobileHistoryList .history-filter-summary')?.textContent.includes('找到 0 /')"
+            )
+            player_page.locator("#mobileHistoryList [data-history-clear]").click()
+            player_page.wait_for_function(
+                "() => document.querySelector('#mobileHistoryList [data-history-search]')?.value === ''"
+            )
+            self.assertTrue(player_page.locator("#mobileHistorySheet").is_visible())
             player_page.locator("#mobileHistoryCloseButton").click()
             player_page.locator("#mobileHistorySheet").wait_for(state="hidden", timeout=10000)
 

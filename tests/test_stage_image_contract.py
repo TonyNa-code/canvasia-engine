@@ -14,6 +14,7 @@ def read_source(relative_path: str) -> str:
 class StageImageContractTests(unittest.TestCase):
     def test_editor_web_runtime_and_export_packaging_share_stage_image_contract(self) -> None:
         run_editor = read_source("run_editor.py")
+        runtime_registry = read_source("export_runtime_module_registry.py")
         editor_app = read_source("prototype_editor/app.js")
         editor_factory = read_source("prototype_editor/modules/story_block_factory.js")
         editor_module = read_source("prototype_editor/modules/stage_images.js")
@@ -31,9 +32,9 @@ class StageImageContractTests(unittest.TestCase):
         self.assertIn("buildStageImageRenderItems", web_module)
         self.assertIn('id="stageImageBackLayer"', player_html)
         self.assertIn('id="stageImageFrontLayer"', player_html)
-        self.assertIn('"runtime_stage_images.js"', run_editor)
-        self.assertIn('"playerRuntimeStageImages": "runtime_stage_images.js"', run_editor)
-        self.assertEqual(run_editor.count('"appRuntimeStageImages": "app/runtime_stage_images.js"'), 3)
+        self.assertIn('("StageImages", "runtime_stage_images.js")', runtime_registry)
+        self.assertIn('build_export_runtime_module_manifest("playerRuntime")', run_editor)
+        self.assertEqual(run_editor.count('build_export_runtime_module_manifest("appRuntime", "app")'), 3)
         self.assertIn('NATIVE_RUNTIME_STAGE_IMAGES_NAME = "runtime_stage_images.py"', run_editor)
         self.assertIn("build_native_runtime_required_module_files", run_editor)
         self.assertIn("NATIVE_RUNTIME_STAGE_IMAGES_NAME,", run_editor)

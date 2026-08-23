@@ -97,6 +97,7 @@ class VideoTransportContractTests(unittest.TestCase):
         player = (ROOT_DIR / "export_player_template" / "player.js").read_text(encoding="utf-8")
         native = (ROOT_DIR / "native_runtime" / "runtime_player.py").read_text(encoding="utf-8")
         runner = (ROOT_DIR / "run_editor.py").read_text(encoding="utf-8")
+        runtime_registry = (ROOT_DIR / "export_runtime_module_registry.py").read_text(encoding="utf-8")
 
         self.assertIn('from "./runtime_video_transport.js"', player)
         self.assertIn("bindVideoTransportToVideo", player)
@@ -113,9 +114,9 @@ class VideoTransportContractTests(unittest.TestCase):
         self.assertIn("get_current_video_playback_position", native)
         self.assertIn("currentVideoPlaybackPositionSeconds", native)
         self.assertIn('NATIVE_RUNTIME_VIDEO_TRANSPORT_NAME = "runtime_video_transport.py"', runner)
-        self.assertIn('"runtime_video_transport.js"', runner)
-        self.assertIn('"playerRuntimeVideoTransport": "runtime_video_transport.js"', runner)
-        self.assertIn('"appRuntimeVideoTransport": "app/runtime_video_transport.js"', runner)
+        self.assertIn('("VideoTransport", "runtime_video_transport.js")', runtime_registry)
+        self.assertIn('build_export_runtime_module_manifest("playerRuntime")', runner)
+        self.assertIn('build_export_runtime_module_manifest("appRuntime", "app")', runner)
 
 
 if __name__ == "__main__":

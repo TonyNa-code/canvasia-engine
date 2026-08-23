@@ -91,13 +91,14 @@ class VoiceReactiveMotionContractTests(unittest.TestCase):
 
     def test_editor_web_export_and_native_runtime_are_all_wired(self) -> None:
         run_editor_source = (ROOT_DIR / "run_editor.py").read_text(encoding="utf-8")
+        runtime_registry_source = (ROOT_DIR / "export_runtime_module_registry.py").read_text(encoding="utf-8")
         player_source = (ROOT_DIR / "export_player_template" / "player.js").read_text(encoding="utf-8")
         editor_source = (ROOT_DIR / "prototype_editor" / "app.js").read_text(encoding="utf-8")
         native_source = (ROOT_DIR / "native_runtime" / "runtime_player.py").read_text(encoding="utf-8")
         player_css = (ROOT_DIR / "export_player_template" / "player.css").read_text(encoding="utf-8")
         editor_css = (ROOT_DIR / "prototype_editor" / "styles.css").read_text(encoding="utf-8")
 
-        self.assertIn('"runtime_voice_reactive_motion.js"', run_editor_source)
+        self.assertIn('("VoiceReactiveMotion", "runtime_voice_reactive_motion.js")', runtime_registry_source)
         self.assertIn('NATIVE_RUNTIME_VOICE_REACTIVE_MOTION_NAME = "runtime_voice_reactive_motion.py"', run_editor_source)
         self.assertIn('from "./runtime_voice_reactive_motion.js"', player_source)
         self.assertIn("previewVoiceReactiveMotionController.start", editor_source)
