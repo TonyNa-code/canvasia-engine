@@ -197,6 +197,8 @@ class LocalVerifyToolTests(unittest.TestCase):
         self.assertTrue(any("test_native_runtime_text_history.py" in command for command in commands))
         self.assertTrue(any("test_native_runtime_text_history_overlay.py" in command for command in commands))
         self.assertTrue(any("test_native_runtime_storage.py" in command for command in commands))
+        self.assertTrue(any("test_native_runtime_save_vault.py" in command for command in commands))
+        self.assertTrue(any("test_native_runtime_system_menu.py" in command for command in commands))
         self.assertTrue(any("test_native_runtime_save_slots.py" in command for command in commands))
         self.assertTrue(any("test_native_runtime_save_overlay.py" in command for command in commands))
         self.assertTrue(any("test_native_runtime_input.py" in command for command in commands))

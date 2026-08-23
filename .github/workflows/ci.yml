@@ -70,6 +70,8 @@ jobs:
             native_runtime/runtime_input.py \
             native_runtime/runtime_key_bindings.py \
             native_runtime/runtime_settings_overlay.py \
+            native_runtime/runtime_system_menu.py \
+            native_runtime/runtime_save_vault.py \
             native_runtime/runtime_reading_profiles.py \
             native_runtime/runtime_dialogue_layouts.py \
             native_runtime/runtime_dialog_panel.py \
@@ -156,6 +158,8 @@ jobs:
             tests/test_native_runtime_text_history.py \
             tests/test_native_runtime_text_history_overlay.py \
             tests/test_native_runtime_storage.py \
+            tests/test_native_runtime_save_vault.py \
+            tests/test_native_runtime_system_menu.py \
             tests/test_native_runtime_save_slots.py \
             tests/test_native_runtime_input.py \
             tests/test_native_runtime_text_input.py \
@@ -534,6 +538,8 @@ jobs:
           python -m unittest discover -s tests -p 'test_native_runtime_text_history.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_text_history_overlay.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_storage.py' -v
+          python -m unittest discover -s tests -p 'test_native_runtime_save_vault.py' -v
+          python -m unittest discover -s tests -p 'test_native_runtime_system_menu.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_save_slots.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_input.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_text_input.py' -v

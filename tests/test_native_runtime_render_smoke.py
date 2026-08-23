@@ -4351,6 +4351,7 @@ class NativeRuntimeRenderSmokeTests(unittest.TestCase):
         self.assertIn("主题", player.get_system_menu_item_description("settings"))
         self.assertIn("正式存档", player.get_system_menu_item_description("load"))
         self.assertIn("路线预取", player.get_system_menu_item_description("diagnostics"))
+        self.assertIn("完整性校验", player.get_system_menu_item_description("save-vault"))
         self.assertEqual(player.get_character_presentation_mode_label(player.characters_by_id["heroine"]), "3D 模型")
         self.assertEqual(player.get_character_model_asset_label(player.characters_by_id["heroine"]), "Heroine 3D Model")
         self.assertIn(
@@ -4367,6 +4368,7 @@ class NativeRuntimeRenderSmokeTests(unittest.TestCase):
             lambda: (player.open_save_dialog("save"), player.render()),
             lambda: (player.open_save_dialog("load"), player.render()),
             lambda: (player.open_system_menu(), player.render()),
+            lambda: (player.open_save_vault_overlay(), player.render()),
             lambda: (player.open_help_overlay(), player.render()),
             lambda: (player.open_settings_overlay(), player.render()),
             lambda: (player.open_profile_overlay(), player.render()),
@@ -4377,6 +4379,19 @@ class NativeRuntimeRenderSmokeTests(unittest.TestCase):
         for render_step in render_steps:
             render_step()
             self.assert_screen_has_pixels(player)
+
+        player.open_save_vault_overlay()
+        saved_theme = player.runtime_settings["themeMode"]
+        self.assertIsNotNone(player.create_save_vault_backup())
+        player.render()
+        self.assertTrue(player.save_vault_entries)
+        self.assertTrue(any(target.get("kind") == "save-vault-restore" for target in player.overlay_hotspots))
+        player.runtime_settings["themeMode"] = "light" if saved_theme != "light" else "dark"
+        self.assertFalse(player.restore_selected_save_vault())
+        self.assertIn("5 秒内", player.status_message)
+        self.assertTrue(player.restore_selected_save_vault())
+        self.assertEqual(player.runtime_settings["themeMode"], saved_theme)
+        self.assertTrue(any("before-restore" in entry["filename"] for entry in player.save_vault_entries))
 
         player.start_story_from_title()
         player.render()

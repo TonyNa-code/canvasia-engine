@@ -310,6 +310,40 @@ except ImportError:  # pragma: no cover - exported native packages import from t
     from runtime_settings_overlay import render_runtime_settings_overlay as render_runtime_settings_overlay_panel
 
 try:
+    from .runtime_system_menu import (
+        get_system_menu_item_description as get_runtime_system_menu_item_description,
+        handle_system_menu_event as handle_runtime_system_menu_event,
+        render_system_menu_overlay as render_runtime_system_menu_overlay,
+    )
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_system_menu import (
+        get_system_menu_item_description as get_runtime_system_menu_item_description,
+        handle_system_menu_event as handle_runtime_system_menu_event,
+        render_system_menu_overlay as render_runtime_system_menu_overlay,
+    )
+
+try:
+    from .runtime_save_vault import (
+        cancel_runtime_save_vault_restore_confirmation,
+        create_runtime_save_vault_backup,
+        handle_save_vault_event as handle_runtime_save_vault_event,
+        open_runtime_save_vault_overlay,
+        refresh_runtime_save_vault_entries,
+        render_save_vault_overlay as render_runtime_save_vault_overlay,
+        restore_selected_runtime_save_vault,
+    )
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_save_vault import (
+        cancel_runtime_save_vault_restore_confirmation,
+        create_runtime_save_vault_backup,
+        handle_save_vault_event as handle_runtime_save_vault_event,
+        open_runtime_save_vault_overlay,
+        refresh_runtime_save_vault_entries,
+        render_save_vault_overlay as render_runtime_save_vault_overlay,
+        restore_selected_runtime_save_vault,
+    )
+
+try:
     from .runtime_voice_mixer import (
         collect_voice_mixer_entries,
         get_safe_voice_profile_id,
@@ -975,6 +1009,7 @@ SYSTEM_MENU_ITEMS = [
     ("diagnostics", "性能诊断"),
     ("save", "正式存档"),
     ("load", "读取存档"),
+    ("save-vault", "数据保险箱"),
     ("settings", "体验设置"),
     ("quick-save", "快速存档"),
     ("quick-load", "快速读档"),
@@ -8197,6 +8232,10 @@ class NativeRuntimePlayer:
         self.skip_deadline_ms = 0
         self.ui_hidden = False
         self.system_menu_index = 0
+        self.save_vault_entries: list[dict] = []
+        self.save_vault_index = 0
+        self.save_vault_restore_armed_path = ""
+        self.save_vault_restore_armed_until_ms = 0
         self.persistent_memory_reset_armed_until_ms = 0
         self.title_menu_index = 0
         self.settings_menu_index = 0
@@ -10156,6 +10195,21 @@ class NativeRuntimePlayer:
         self.overlay_mode = "auto-resume"
         self.status_message = "续玩记录已打开。"
 
+    def refresh_save_vault_entries(self) -> None:
+        refresh_runtime_save_vault_entries(self)
+
+    def open_save_vault_overlay(self) -> None:
+        open_runtime_save_vault_overlay(self)
+
+    def create_save_vault_backup(self, *, kind: str = "manual") -> Path | None:
+        return create_runtime_save_vault_backup(self, kind=kind)
+
+    def cancel_save_vault_restore_confirmation(self) -> None:
+        cancel_runtime_save_vault_restore_confirmation(self)
+
+    def restore_selected_save_vault(self) -> bool:
+        return restore_selected_runtime_save_vault(self)
+
     def open_diagnostics_overlay(self) -> None:
         self.overlay_mode = "diagnostics"
         self.status_message = "性能诊断已打开。"
@@ -10164,6 +10218,8 @@ class NativeRuntimePlayer:
         closing_mode = self.overlay_mode
         if closing_mode == "history":
             self.set_text_history_search_active(False)
+        if closing_mode == "save-vault":
+            self.cancel_save_vault_restore_confirmation()
         self.persistent_memory_reset_armed_until_ms = 0
         self.overlay_hotspots = []
         self.archive_detail_entry = None
@@ -10244,6 +10300,9 @@ class NativeRuntimePlayer:
             return True
         if item_key == "load":
             self.open_save_dialog("load")
+            return True
+        if item_key == "save-vault":
+            self.open_save_vault_overlay()
             return True
         if item_key == "settings":
             self.open_settings_overlay()
@@ -13300,6 +13359,8 @@ class NativeRuntimePlayer:
             self.render_save_dialog_overlay()
         elif self.overlay_mode == "system":
             self.render_system_menu_overlay()
+        elif self.overlay_mode == "save-vault":
+            render_runtime_save_vault_overlay(self)
         elif self.overlay_mode == "help":
             self.render_help_overlay()
         elif self.overlay_mode == "history":
@@ -13532,42 +13593,7 @@ class NativeRuntimePlayer:
         self.screen.blit(self.font_ui.render(hint, True, palette["muted"]), (panel.left + 30, panel.bottom - 50))
 
     def get_system_menu_item_description(self, item_key: str) -> str:
-        if item_key == "continue":
-            return "关闭菜单，返回当前剧情画面。"
-        if item_key == "help":
-            return "打开原生操作中心，查看当前状态、快捷键和常用入口。"
-        if item_key == "history":
-            return f"查看最近文本和语音回听；当前记录 {len(self.text_history)} 条。"
-        if item_key == "archives":
-            return "进入章节、CG、音乐、角色、结局和成就等资料馆。"
-        if item_key == "profile":
-            return "查看本地玩家档案、游玩时长和续玩统计。"
-        if item_key == "auto-resume":
-            state = "已有续玩记录" if self.auto_resume_snapshot else "暂无续玩记录"
-            return f"管理自动续玩快照；当前：{state}。"
-        if item_key == "diagnostics":
-            return "查看当前位置、资源预热、路线预取和运行缓存，方便定位卡顿或缺素材。"
-        if item_key == "save":
-            return f"打开正式存档面板；{self.build_save_summary_line()}。"
-        if item_key == "load":
-            return f"读取正式存档槽位；{self.build_save_summary_line()}。"
-        if item_key == "settings":
-            return "调整主题、全屏、语言、文字速度、文本框透明度和各类音量。"
-        if item_key == "quick-save":
-            return "立即覆盖快速存档，适合临时保留当前进度。"
-        if item_key == "quick-load":
-            return "立即读入快速存档；若没有快存会给出提示。"
-        if item_key == "persistent-memory":
-            summary = get_persistent_runtime_variable_summary(self.persistent_variable_state, self.variables)
-            return (
-                f"管理作者定义的跨周目变量；当前 {summary.get('changedCount', 0)} / "
-                f"{summary.get('count', 0)} 项已偏离默认值。连续确认两次才会重置，正式存档不会删除。"
-            )
-        if item_key == "restart":
-            return "回到入口场景重新开始，并记录一次返回开头。"
-        if item_key == "exit":
-            return "关闭原生 Runtime 预览窗口。"
-        return "执行当前系统操作。"
+        return get_runtime_system_menu_item_description(self, item_key)
 
     def get_runtime_diagnostics_context(self) -> dict:
         current_scene = self.get_current_scene() or {}
@@ -13658,96 +13684,7 @@ class NativeRuntimePlayer:
         self.screen.blit(self.font_ui.render(hint, True, palette["muted"]), (panel.left + 28, panel.bottom - 42))
 
     def render_system_menu_overlay(self) -> None:
-        palette = self.get_active_palette()
-        panel_height = min(self.height - 72, max(548, 150 + len(SYSTEM_MENU_ITEMS) * 38))
-        panel = self.pygame.Rect(0, 0, min(self.width - 96, 760), panel_height)
-        panel.center = (self.width // 2, self.height // 2)
-        self.pygame.draw.rect(self.screen, (*palette["panel"], 244), panel, border_radius=28)
-        self.pygame.draw.rect(
-            self.screen,
-            with_alpha(palette["panelBorder"], 72),
-            panel,
-            2,
-            border_radius=28,
-        )
-        self.draw_game_ui_panel_frame(panel, "system")
-        title_surface = self.font_title.render("系统菜单", True, palette["text"])
-        self.screen.blit(title_surface, (panel.left + 26, panel.top + 24))
-        self.screen.blit(
-            self.font_ui.render("原生 Runtime 控制台", True, palette["muted"]),
-            (panel.left + 26, panel.top + 58),
-        )
-
-        button_top = panel.top + 96
-        list_width = min(310, max(260, panel.width // 2 - 52))
-        row_step = max(30, min(38, (panel.height - 174) // max(1, len(SYSTEM_MENU_ITEMS))))
-        row_height = max(26, min(32, row_step - 4))
-        for index, (item_key, item_label) in enumerate(SYSTEM_MENU_ITEMS):
-            row_rect = self.pygame.Rect(panel.left + 26, button_top + index * row_step, list_width, row_height)
-            is_active = index == self.system_menu_index
-            self.pygame.draw.rect(
-                self.screen,
-                with_alpha(
-                    palette["accent"] if is_active else palette["panel"],
-                    72 if is_active else 36,
-                ),
-                row_rect,
-                border_radius=16,
-            )
-            self.pygame.draw.rect(
-                self.screen,
-                with_alpha(
-                    palette["accentAlt"] if is_active else palette["panelBorder"],
-                    84 if is_active else 22,
-                ),
-                row_rect,
-                1,
-                border_radius=16,
-            )
-            self.draw_game_ui_button_frame(row_rect, self.get_game_ui_button_state(row_rect, active=is_active))
-            self.screen.blit(
-                self.font_ui.render(item_label, True, palette["text"]),
-                (row_rect.left + 14, row_rect.top + 6),
-            )
-            self.overlay_hotspots.append({"kind": "system-item", "value": item_key, "rect": row_rect})
-
-        selected_key, selected_label = SYSTEM_MENU_ITEMS[self.system_menu_index]
-        detail_rect = self.pygame.Rect(
-            panel.left + 26 + list_width + 18,
-            button_top,
-            panel.right - (panel.left + 26 + list_width + 18) - 26,
-            panel.bottom - button_top - 78,
-        )
-        self.pygame.draw.rect(self.screen, with_alpha(palette["accent"], 16), detail_rect, border_radius=22)
-        self.pygame.draw.rect(self.screen, with_alpha(palette["panelBorder"], 32), detail_rect, 1, border_radius=22)
-        self.screen.blit(self.font_body.render(selected_label, True, palette["accent"]), (detail_rect.left + 18, detail_rect.top + 18))
-        description_rect = self.pygame.Rect(detail_rect.left + 18, detail_rect.top + 62, detail_rect.width - 36, 96)
-        self.blit_wrapped_text(
-            self.font_ui,
-            self.get_system_menu_item_description(selected_key),
-            description_rect,
-            palette["text"],
-            line_gap=6,
-            max_lines=4,
-        )
-        status_lines = [
-            f"主题：{self.get_setting_value_label('themeMode')}",
-            f"显示：{self.get_setting_value_label('displayMode')}",
-            f"阅读方案：{self.get_setting_value_label('readingProfile')}",
-            f"文本：{self.get_setting_value_label('textSpeed')} / {self.get_setting_value_label('textScalePercent')}",
-        ]
-        status_top = detail_rect.bottom - 94
-        for offset, line in enumerate(status_lines):
-            self.screen.blit(
-                self.font_ui.render(line, True, palette["muted"]),
-                (detail_rect.left + 18, status_top + offset * (self.font_ui.get_height() + 6)),
-            )
-
-        hint = "↑↓ 切换 · Enter 执行 · Esc 关闭"
-        self.screen.blit(
-            self.font_ui.render(hint, True, palette["muted"]),
-            (panel.left + 26, panel.bottom - 44),
-        )
+        render_runtime_system_menu_overlay(self, SYSTEM_MENU_ITEMS)
 
     def get_help_overlay_sections(self) -> list[dict]:
         scene = self.scenes_by_id.get(str(self.current_scene_id or "")) or {}
@@ -14623,6 +14560,8 @@ class NativeRuntimePlayer:
             return self.handle_save_dialog_event(event)
         if self.overlay_mode == "system":
             return self.handle_system_menu_event(event)
+        if self.overlay_mode == "save-vault":
+            return handle_runtime_save_vault_event(self, event)
         if self.overlay_mode == "help":
             return self.handle_help_overlay_event(event)
         if self.overlay_mode == "history":
@@ -14682,21 +14621,7 @@ class NativeRuntimePlayer:
         return handle_runtime_save_dialog_event(self, event)
 
     def handle_system_menu_event(self, event) -> bool:
-        pygame = self.pygame
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_UP:
-                self.system_menu_index = (self.system_menu_index - 1) % len(SYSTEM_MENU_ITEMS)
-                return True
-            if event.key == pygame.K_DOWN:
-                self.system_menu_index = (self.system_menu_index + 1) % len(SYSTEM_MENU_ITEMS)
-                return True
-            if event.key in (pygame.K_RETURN, pygame.K_SPACE):
-                return self.activate_system_menu_item(SYSTEM_MENU_ITEMS[self.system_menu_index][0])
-        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            for target in self.overlay_hotspots:
-                if target["kind"] == "system-item" and target["rect"].collidepoint(event.pos):
-                    return self.activate_system_menu_item(str(target["value"]))
-        return True
+        return handle_runtime_system_menu_event(self, event, SYSTEM_MENU_ITEMS)
 
     def handle_help_overlay_event(self, event) -> bool:
         pygame = self.pygame

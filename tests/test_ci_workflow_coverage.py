@@ -162,6 +162,25 @@ class CiWorkflowCoverageTests(unittest.TestCase):
             workflow,
         )
 
+    def test_native_runtime_save_vault_and_system_menu_are_checked_in_ci(self) -> None:
+        workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+
+        for path in (
+            "native_runtime/runtime_save_vault.py",
+            "native_runtime/runtime_system_menu.py",
+            "tests/test_native_runtime_save_vault.py",
+            "tests/test_native_runtime_system_menu.py",
+        ):
+            self.assertIn(path, workflow)
+        self.assertIn(
+            "python -m unittest discover -s tests -p 'test_native_runtime_save_vault.py' -v",
+            workflow,
+        )
+        self.assertIn(
+            "python -m unittest discover -s tests -p 'test_native_runtime_system_menu.py' -v",
+            workflow,
+        )
+
     def test_cross_runtime_text_history_modules_are_checked_in_ci(self) -> None:
         workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
 
