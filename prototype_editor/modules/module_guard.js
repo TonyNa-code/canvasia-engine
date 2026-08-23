@@ -1,6 +1,7 @@
 (function attachEditorModuleGuard(global) {
 const REQUIRED_EDITOR_MODULES = Object.freeze([
   { globalName: "CanvasiaRuntimeReadingProfiles", script: "../export_player_template/runtime_reading_profiles.js", label: "阅读方案系统" },
+  { globalName: "CanvasiaRuntimePlaybackLifecycle", script: "../export_player_template/runtime_playback_lifecycle.js", label: "后台暂停与恢复系统" },
   { globalName: "CanvasiaRuntimeDialogueLayouts", script: "../export_player_template/runtime_dialogue_layouts.js", label: "对话布局系统" },
   { globalName: "CanvasiaRuntimeTextVariables", script: "../export_player_template/runtime_text_variables.js", label: "玩家输入与文本变量系统" },
   { globalName: "CanvasiaRuntimeTextEffects", script: "../export_player_template/runtime_text_effects.js", label: "共享打字机系统" },

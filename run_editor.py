@@ -440,6 +440,7 @@ NATIVE_RUNTIME_DIALOGUE_CAMERA_NAME = "runtime_dialogue_camera.py"
 NATIVE_RUNTIME_VOICE_REACTIVE_MOTION_NAME = "runtime_voice_reactive_motion.py"
 NATIVE_RUNTIME_MUSIC_TRANSPORT_NAME = "runtime_music_transport.py"
 NATIVE_RUNTIME_VIDEO_TRANSPORT_NAME = "runtime_video_transport.py"
+NATIVE_RUNTIME_PLAYBACK_LIFECYCLE_NAME = "runtime_playback_lifecycle.py"
 NATIVE_RUNTIME_SFX_TRANSPORT_NAME = "runtime_sfx_transport.py"
 NATIVE_RUNTIME_CHARACTER_RENDERER_NAME = "runtime_character_renderer.py"
 NATIVE_RUNTIME_STAGE_RENDERER_NAME = "runtime_stage_renderer.py"
@@ -536,6 +537,7 @@ NATIVE_RUNTIME_REQUIRED_MODULE_FILES = build_native_runtime_required_module_file
         NATIVE_RUNTIME_VOICE_REACTIVE_MOTION_NAME,
         NATIVE_RUNTIME_MUSIC_TRANSPORT_NAME,
         NATIVE_RUNTIME_VIDEO_TRANSPORT_NAME,
+        NATIVE_RUNTIME_PLAYBACK_LIFECYCLE_NAME,
         NATIVE_RUNTIME_SFX_TRANSPORT_NAME,
         NATIVE_RUNTIME_CHARACTER_RENDERER_NAME,
         NATIVE_RUNTIME_STAGE_RENDERER_NAME,
@@ -8849,6 +8851,8 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
         "runtimeChoiceAvailabilityModulePath": str(build_dir / NATIVE_RUNTIME_CHOICE_AVAILABILITY_NAME),
         "runtimeTimedChoicesModuleName": NATIVE_RUNTIME_TIMED_CHOICES_NAME,
         "runtimeTimedChoicesModulePath": str(build_dir / NATIVE_RUNTIME_TIMED_CHOICES_NAME),
+        "runtimePlaybackLifecycleModuleName": NATIVE_RUNTIME_PLAYBACK_LIFECYCLE_NAME,
+        "runtimePlaybackLifecycleModulePath": str(build_dir / NATIVE_RUNTIME_PLAYBACK_LIFECYCLE_NAME),
         "runtimeTextEffectsModuleName": NATIVE_RUNTIME_TEXT_EFFECTS_NAME,
         "runtimeTextEffectsModulePath": str(build_dir / NATIVE_RUNTIME_TEXT_EFFECTS_NAME),
         "runtimeTextPacingModuleName": NATIVE_RUNTIME_TEXT_PACING_NAME,
@@ -9386,6 +9390,7 @@ def export_native_runtime_build() -> dict:
             "runtimeStageImagesModule": runtime_files["runtimeStageImagesModuleName"],
             "runtimeChoiceAvailabilityModule": runtime_files["runtimeChoiceAvailabilityModuleName"],
             "runtimeTimedChoicesModule": runtime_files["runtimeTimedChoicesModuleName"],
+            "runtimePlaybackLifecycleModule": runtime_files["runtimePlaybackLifecycleModuleName"],
             "runtimeTextEffectsModule": runtime_files["runtimeTextEffectsModuleName"],
             "runtimeTextPacingModule": runtime_files["runtimeTextPacingModuleName"],
             "runtimeRichTextModule": runtime_files["runtimeRichTextModuleName"],
@@ -9478,6 +9483,7 @@ def export_native_runtime_build() -> dict:
             "runtimeStageImagesModule": runtime_files["runtimeStageImagesModuleName"],
             "runtimeChoiceAvailabilityModule": runtime_files["runtimeChoiceAvailabilityModuleName"],
             "runtimeTimedChoicesModule": runtime_files["runtimeTimedChoicesModuleName"],
+            "runtimePlaybackLifecycleModule": runtime_files["runtimePlaybackLifecycleModuleName"],
             "runtimeTextEffectsModule": runtime_files["runtimeTextEffectsModuleName"],
             "runtimeTextPacingModule": runtime_files["runtimeTextPacingModuleName"],
             "runtimeRichTextModule": runtime_files["runtimeRichTextModuleName"],
@@ -9719,6 +9725,7 @@ def export_native_runtime_build() -> dict:
         {"name": runtime_files["runtimeStageImagesModuleName"], "description": "原生 Runtime 道具、Cut-in、前景装饰和氛围叠图模块。"},
         {"name": runtime_files["runtimeChoiceAvailabilityModuleName"], "description": "原生 Runtime 条件选项隐藏、锁定提示和死路安全保护模块。"},
         {"name": runtime_files["runtimeTimedChoicesModuleName"], "description": "原生 Runtime 限时选项、暂停恢复和超时安全分支模块。"},
+        {"name": runtime_files["runtimePlaybackLifecycleModuleName"], "description": "原生 Runtime 后台暂停、恢复校时和低频待机模块。"},
         {"name": runtime_files["runtimeTextEffectsModuleName"], "description": "原生 Runtime 打字机和文本效果模块。"},
         {"name": runtime_files["runtimeTextPacingModuleName"], "description": "原生 Runtime 句中停顿和局部语速模块。"},
         {"name": runtime_files["runtimeRichTextModuleName"], "description": "原生 Runtime 安全富文本解析模块。"},
@@ -10028,6 +10035,9 @@ def export_native_runtime_build() -> dict:
         "runtimeTimedChoicesModuleName": runtime_files["runtimeTimedChoicesModuleName"],
         "runtimeTimedChoicesModulePath": runtime_files["runtimeTimedChoicesModulePath"],
         "runtimeTimedChoicesModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimeTimedChoicesModuleName']}",
+        "runtimePlaybackLifecycleModuleName": runtime_files["runtimePlaybackLifecycleModuleName"],
+        "runtimePlaybackLifecycleModulePath": runtime_files["runtimePlaybackLifecycleModulePath"],
+        "runtimePlaybackLifecycleModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimePlaybackLifecycleModuleName']}",
         "runtimeTextEffectsModuleName": runtime_files["runtimeTextEffectsModuleName"],
         "runtimeTextEffectsModulePath": runtime_files["runtimeTextEffectsModulePath"],
         "runtimeTextEffectsModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimeTextEffectsModuleName']}",

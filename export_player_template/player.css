@@ -499,6 +499,11 @@ button {
   animation: player-credits-roll var(--credits-duration, 18s) linear forwards;
 }
 
+.credits-overlay[data-playback-paused="true"] .credits-roll-inner,
+.credits-overlay[data-playback-paused="true"] .credits-overlay-atmosphere {
+  animation-play-state: paused;
+}
+
 .credits-roll-kicker {
   text-transform: uppercase;
   letter-spacing: 0.32em;

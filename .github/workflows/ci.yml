@@ -79,6 +79,7 @@ jobs:
             native_runtime/runtime_voice_reactive_motion.py \
             native_runtime/runtime_music_transport.py \
             native_runtime/runtime_video_transport.py \
+            native_runtime/runtime_playback_lifecycle.py \
             native_runtime/runtime_sfx_transport.py \
             native_runtime/runtime_character_renderer.py \
             native_runtime/runtime_stage_renderer.py \
@@ -92,6 +93,7 @@ jobs:
             native_runtime/runtime_story_text.py \
             native_runtime/runtime_rich_text_renderer.py \
             native_runtime/runtime_text_input.py \
+            native_runtime/runtime_storage.py \
             native_runtime/runtime_persistent_variables.py \
             native_runtime/runtime_vn_quality.py \
             native_runtime/build_native_runtime_app.py \
@@ -128,6 +130,8 @@ jobs:
             tests/test_music_transport_contract.py \
             tests/test_native_runtime_video_transport.py \
             tests/test_video_transport_contract.py \
+            tests/test_native_runtime_playback_lifecycle.py \
+            tests/test_playback_lifecycle_contract.py \
             tests/test_native_runtime_sfx_transport.py \
             tests/test_sfx_transport_contract.py \
             tests/test_native_runtime_stage_renderer.py \
@@ -151,6 +155,7 @@ jobs:
             tests/test_native_runtime_rollback.py \
             tests/test_native_runtime_text_history.py \
             tests/test_native_runtime_text_history_overlay.py \
+            tests/test_native_runtime_storage.py \
             tests/test_native_runtime_save_slots.py \
             tests/test_native_runtime_input.py \
             tests/test_native_runtime_text_input.py \
@@ -256,6 +261,7 @@ jobs:
             tests/test_frontend_runtime_music_transport_module.py \
             tests/test_frontend_runtime_video_transport_module.py \
             tests/test_frontend_video_transport_editor_module.py \
+            tests/test_frontend_runtime_playback_lifecycle_module.py \
             tests/test_frontend_runtime_sfx_transport_module.py \
             tests/test_frontend_runtime_data_module.py \
             tests/test_frontend_runtime_storage_module.py \
@@ -456,6 +462,7 @@ jobs:
           node --check export_player_template/runtime_audio.js
           node --check export_player_template/runtime_music_transport.js
           node --check export_player_template/runtime_video_transport.js
+          node --check export_player_template/runtime_playback_lifecycle.js
           node --check export_player_template/runtime_sfx_transport.js
           node --check export_player_template/runtime_preload.js
           node --check export_player_template/runtime_scene_prefetch.js
@@ -520,6 +527,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_native_runtime_rollback.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_text_history.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_text_history_overlay.py' -v
+          python -m unittest discover -s tests -p 'test_native_runtime_storage.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_save_slots.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_input.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_text_input.py' -v
@@ -638,6 +646,9 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_video_transport_editor_module.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_video_transport.py' -v
           python -m unittest discover -s tests -p 'test_video_transport_contract.py' -v
+          python -m unittest discover -s tests -p 'test_native_runtime_playback_lifecycle.py' -v
+          python -m unittest discover -s tests -p 'test_playback_lifecycle_contract.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_runtime_playback_lifecycle_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_sfx_transport_module.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_sfx_transport.py' -v
           python -m unittest discover -s tests -p 'test_sfx_transport_contract.py' -v

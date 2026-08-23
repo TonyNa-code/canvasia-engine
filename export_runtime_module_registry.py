@@ -28,6 +28,7 @@ EXPORT_RUNTIME_MODULE_SPECS = (
     ("MobileReaderUi", "runtime_mobile_reader_ui.js"),
     ("Settings", "runtime_settings.js"),
     ("ReadingProfiles", "runtime_reading_profiles.js"),
+    ("PlaybackLifecycle", "runtime_playback_lifecycle.js"),
     ("DialogueLayouts", "runtime_dialogue_layouts.js"),
     ("VisualComfort", "runtime_visual_comfort.js"),
     ("VoiceMixer", "runtime_voice_mixer.js"),

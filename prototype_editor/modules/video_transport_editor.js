@@ -28,6 +28,10 @@
     return options.runtimeTools ?? global.CanvasiaRuntimeVideoTransport;
   }
 
+  function getDelayTools(options = {}) {
+    return options.delayTools ?? global.CanvasiaRuntimePlaybackLifecycle;
+  }
+
   function escapeHtml(value) {
     return String(value ?? "")
       .replaceAll("&", "&amp;")
@@ -193,21 +197,68 @@
 
   function createPreviewVideoController(options = {}) {
     const runtimeTools = getRuntimeTools(options);
+    const delayTools = getDelayTools(options);
+    if (typeof delayTools?.createPauseAwareDelayController !== "function") {
+      throw new TypeError("Preview video playback requires the shared playback lifecycle module.");
+    }
+    const fallbackDelayController = delayTools.createPauseAwareDelayController();
     let active = null;
+    let suspended = false;
 
     function stop() {
+      fallbackDelayController.cancel();
       if (!active) {
         return;
       }
       active.cleanup?.();
-      if (active.timer) {
-        global.clearTimeout?.(active.timer);
-      }
       active.video?.pause?.();
       active.video?.removeAttribute?.("src");
       active.video?.load?.();
       active.overlay?.remove?.();
       active = null;
+    }
+
+    function scheduleFallback(stepKey, reason, finish) {
+      fallbackDelayController.schedule({
+        key: `${stepKey}:${reason}`,
+        delayMs: 1600,
+        callback: () => finish({ reason }),
+      });
+    }
+
+    function suspend() {
+      suspended = true;
+      fallbackDelayController.pause();
+      if (active?.video) {
+        active.resumeAfterLifecycle = !active.video.paused && !active.video.ended;
+        if (active.resumeAfterLifecycle) {
+          active.video.pause?.();
+        }
+      }
+      return getStatus();
+    }
+
+    function resume() {
+      suspended = false;
+      fallbackDelayController.resume();
+      if (active?.resumeAfterLifecycle && active.video && !active.video.ended) {
+        active.resumeAfterLifecycle = false;
+        try {
+          active.video.play?.()?.catch?.(() => {});
+        } catch (_error) {
+          // The preview keeps its manual controls when browser autoplay is unavailable.
+        }
+      }
+      return getStatus();
+    }
+
+    function getStatus() {
+      return Object.freeze({
+        active: Boolean(active),
+        stepKey: active?.stepKey ?? "",
+        suspended,
+        fallback: fallbackDelayController.getSnapshot(),
+      });
     }
 
     function capture(snapshot) {
@@ -277,11 +328,11 @@
         onError: () => {
           title.textContent = `${String(syncOptions.title || "视频播放")} · 文件无法播放`;
           if (active) {
-            active.timer = global.setTimeout?.(() => finish({ reason: "error" }), 1600);
+            scheduleFallback(stepKey, "error", finish);
           }
         },
       });
-      active = { stepKey, snapshot, overlay, video, transport, cleanup, timer: null };
+      active = { stepKey, snapshot, overlay, video, transport, cleanup, resumeAfterLifecycle: false };
       skipButton.addEventListener("click", (event) => {
         event.stopPropagation();
         finish({ reason: transport.loop ? "loop-exit" : "skipped", skipped: true });
@@ -290,22 +341,28 @@
       const videoUrl = String(syncOptions.videoUrl || "").trim();
       if (!videoUrl) {
         title.textContent = `${String(syncOptions.title || "视频播放")} · 素材缺失`;
-        active.timer = global.setTimeout?.(() => finish({ reason: "missing" }), 1600);
+        scheduleFallback(stepKey, "missing", finish);
         return true;
       }
       video.src = encodeURI(videoUrl);
       video.load?.();
       if (transport.autoplay) {
-        video.play?.().catch?.(() => {
-          title.textContent = `${String(syncOptions.title || "视频播放")} · 点击画面开始`;
-        });
+        if (suspended) {
+          active.resumeAfterLifecycle = true;
+          title.textContent = `${String(syncOptions.title || "视频播放")} · 切回窗口后继续`;
+        } else {
+          const playResult = video.play?.();
+          playResult?.catch?.(() => {
+            title.textContent = `${String(syncOptions.title || "视频播放")} · 点击画面开始`;
+          });
+        }
       } else {
         title.textContent = `${String(syncOptions.title || "视频播放")} · 等待手动播放`;
       }
       return true;
     }
 
-    return Object.freeze({ sync, capture, stop });
+    return Object.freeze({ sync, capture, stop, suspend, resume, getStatus });
   }
 
   global.CanvasiaEditorVideoTransport = Object.freeze({

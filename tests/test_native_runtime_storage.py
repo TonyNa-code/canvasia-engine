@@ -46,7 +46,11 @@ class NativeRuntimeStorageTests(unittest.TestCase):
         save_path.write_text('{"quickSave":', encoding="utf-8")
         recovered = runtime_storage.load_project_save_store("storage_safety", 2)
 
-        self.assertEqual(recovered, first_store)
+        self.assertEqual(recovered["quickSave"], first_store["quickSave"])
+        self.assertEqual(
+            recovered["formalSlots"],
+            [None, {"sceneName": "旧存档", "protected": False}],
+        )
         self.assertEqual(json.loads(save_path.read_text(encoding="utf-8")), first_store)
         events = runtime_storage.consume_runtime_storage_recovery_events()
         self.assertEqual(len(events), 1)

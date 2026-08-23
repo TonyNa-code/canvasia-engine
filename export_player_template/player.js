@@ -50,6 +50,10 @@ import {
 } from "./runtime_sfx_transport.js";
 import { createRuntimeAssetPipeline } from "./runtime_asset_pipeline.js";
 import {
+  createDocumentPlaybackLifecycle,
+  createPauseAwareDelayController,
+} from "./runtime_playback_lifecycle.js";
+import {
   CHOICE_CONTINUE_TARGET,
   isChoiceContinueTarget,
   normalizeGameData,
@@ -496,10 +500,8 @@ const state = {
   currentVoiceStepKey: null,
   videoPlaybackStepKey: null,
   videoPlaybackCleanup: null,
+  lifecyclePausedVideoStepKey: null,
   creditsPlaybackStepKey: null,
-  creditsPlaybackTimer: null,
-  autoAdvanceTimer: null,
-  autoAdvanceStepKey: null,
   dialogHidden: false,
   playback: {},
   persistentVariables: {},
@@ -587,6 +589,15 @@ const voiceReactiveMotionController = createVoiceReactiveMotionController({ root
 const timedChoiceController = createTimedChoiceController({
   onTick: handleTimedChoiceTick,
   onTimeout: handleTimedChoiceTimeout,
+});
+const runtimeAutoAdvanceDelayController = createPauseAwareDelayController();
+const runtimeVideoFallbackDelayController = createPauseAwareDelayController();
+const runtimeCreditsDelayController = createPauseAwareDelayController();
+const runtimePlaybackLifecycle = createDocumentPlaybackLifecycle({
+  documentRef: document,
+  windowRef: window,
+  onSuspend: handleRuntimePlaybackSuspended,
+  onResume: handleRuntimePlaybackResumed,
 });
 const particleQualityController = createAdaptiveParticleQualityController({
   performanceProfile: getProjectRuntimeSettings(data.project).performanceProfile,
@@ -807,7 +818,6 @@ function init() {
   });
   keyBindingController.attach();
   document.addEventListener("keydown", handleGlobalKeydown);
-  document.addEventListener("visibilitychange", syncRuntimeTimedChoicePauseState);
   document.addEventListener("click", scheduleRuntimeTimedChoicePauseSync);
   document.addEventListener("keydown", scheduleRuntimeTimedChoicePauseSync);
   document.addEventListener("pointerdown", (event) => {
@@ -816,6 +826,7 @@ function init() {
   startRuntimeGamepadInput();
   mobileReaderUi.start();
   particleQualityController.start(window);
+  runtimePlaybackLifecycle.attach();
   window.addEventListener("beforeunload", finalizePlayerSession);
   window.addEventListener("beforeunload", stopMusic);
   window.addEventListener("beforeunload", stopMusicRoomPreview);
@@ -826,6 +837,7 @@ function init() {
   window.addEventListener("beforeunload", mobileReaderUi.stop);
   window.addEventListener("beforeunload", captureCurrentTimedChoiceState);
   window.addEventListener("beforeunload", stopRuntimeAssetPipeline);
+  window.addEventListener("beforeunload", stopRuntimePlaybackLifecycle);
   window.addEventListener("beforeunload", () => particleQualityController.stop(window));
   startRuntimeAssetPreload();
   renderPlaybackControls();
@@ -3930,7 +3942,7 @@ function getRuntimeSnapshotKey(snapshot) {
 
 function isRuntimeTimedChoicePaused() {
   return Boolean(
-    document.hidden ||
+    runtimePlaybackLifecycle.getSnapshot().suspended ||
       !state.started ||
       !refs.startOverlay?.hidden ||
       state.textInputOpen ||
@@ -5516,12 +5528,65 @@ function getAutoAdvanceDelay(snapshot) {
 }
 
 function stopRuntimeAutoAdvance() {
-  if (state.autoAdvanceTimer) {
-    window.clearTimeout(state.autoAdvanceTimer);
-    state.autoAdvanceTimer = null;
+  runtimeAutoAdvanceDelayController.cancel();
+}
+
+function handleRuntimePlaybackSuspended() {
+  runtimeAutoAdvanceDelayController.pause();
+  runtimeVideoFallbackDelayController.pause();
+  runtimeCreditsDelayController.pause();
+  syncRuntimeTimedChoicePauseState();
+
+  if (refs.creditsOverlay) {
+    refs.creditsOverlay.dataset.playbackPaused = "true";
   }
 
-  state.autoAdvanceStepKey = null;
+  const snapshot = getCurrentSnapshot();
+  const stepKey = getCurrentStepKey(snapshot);
+  if (
+    snapshot?.blockType === "video_play" &&
+    state.videoPlaybackStepKey === stepKey &&
+    refs.runtimeVideo &&
+    !refs.runtimeVideo.paused &&
+    !refs.runtimeVideo.ended
+  ) {
+    captureCurrentVideoPlaybackPosition();
+    state.lifecyclePausedVideoStepKey = stepKey;
+    refs.runtimeVideo.pause();
+  }
+}
+
+function handleRuntimePlaybackResumed() {
+  runtimeAutoAdvanceDelayController.resume();
+  runtimeVideoFallbackDelayController.resume();
+  runtimeCreditsDelayController.resume();
+  syncRuntimeTimedChoicePauseState();
+
+  if (refs.creditsOverlay) {
+    refs.creditsOverlay.dataset.playbackPaused = "false";
+  }
+
+  const resumeStepKey = state.lifecyclePausedVideoStepKey;
+  state.lifecyclePausedVideoStepKey = null;
+  const snapshot = getCurrentSnapshot();
+  if (
+    resumeStepKey &&
+    snapshot?.blockType === "video_play" &&
+    getCurrentStepKey(snapshot) === resumeStepKey &&
+    state.videoPlaybackStepKey === resumeStepKey &&
+    refs.runtimeVideo?.paused &&
+    !refs.runtimeVideo.ended
+  ) {
+    refs.runtimeVideo.play().catch(() => {});
+  }
+}
+
+function stopRuntimePlaybackLifecycle() {
+  runtimePlaybackLifecycle.detach();
+  runtimeAutoAdvanceDelayController.cancel();
+  runtimeVideoFallbackDelayController.cancel();
+  runtimeCreditsDelayController.cancel();
+  state.lifecyclePausedVideoStepKey = null;
 }
 
 function stopSfxPlayback() {
@@ -5639,27 +5704,30 @@ function scheduleRuntimeAutoAdvance(snapshot, options = {}) {
     !state.voiceAudio.paused;
 
   if (shouldWaitVoice) {
-    state.autoAdvanceStepKey = stepKey;
     return;
   }
 
-  state.autoAdvanceStepKey = stepKey;
-  state.autoAdvanceTimer = window.setTimeout(() => {
-    const current = getCurrentSnapshot();
-    if (
-      (!state.playback.autoPlay && !state.playback.skipRead && current?.blockType !== "wait") ||
-      state.autoAdvanceStepKey !== stepKey
-    ) {
-      return;
-    }
+  runtimeAutoAdvanceDelayController.schedule({
+    key: stepKey,
+    delayMs: skipActive ? 70 : options.preferVoiceEnding ? 180 : getAutoAdvanceDelay(snapshot),
+    callback: () => {
+      const current = getCurrentSnapshot();
+      if (
+        !state.playback.autoPlay &&
+        !state.playback.skipRead &&
+        current?.blockType !== "wait"
+      ) {
+        return;
+      }
 
-    if (!current || getCurrentStepKey(current) !== stepKey) {
-      return;
-    }
+      if (!current || getCurrentStepKey(current) !== stepKey) {
+        return;
+      }
 
-    movePreviewForward();
-    renderRuntime();
-  }, skipActive ? 70 : options.preferVoiceEnding ? 180 : getAutoAdvanceDelay(snapshot));
+      movePreviewForward();
+      renderRuntime();
+    },
+  });
 }
 
 function handleVoiceEnded() {
@@ -9092,13 +9160,17 @@ function syncVideoPlayback(snapshot) {
     refs.videoSkipButton.hidden = false;
     refs.runtimeVideo.removeAttribute("src");
     refs.runtimeVideo.load();
-    const missingVideoTimer = window.setTimeout(finish, 1600);
+    runtimeVideoFallbackDelayController.schedule({
+      key: stepKey,
+      delayMs: 1600,
+      callback: finish,
+    });
     const cleanup = state.videoPlaybackCleanup;
     state.videoPlaybackCleanup = () => {
       if (typeof cleanup === "function") {
         cleanup();
       }
-      window.clearTimeout(missingVideoTimer);
+      runtimeVideoFallbackDelayController.cancel();
     };
     return;
   }
@@ -9121,6 +9193,8 @@ function stopVideoPlayback() {
 
   state.videoPlaybackCleanup = null;
   state.videoPlaybackStepKey = null;
+  state.lifecyclePausedVideoStepKey = null;
+  runtimeVideoFallbackDelayController.cancel();
 
   if (refs.runtimeVideo) {
     refs.runtimeVideo.pause();
@@ -9181,6 +9255,9 @@ function syncCreditsPlayback(snapshot) {
   const lines = getCreditsLines(block.lines);
   state.creditsPlaybackStepKey = stepKey;
   refs.creditsOverlay.hidden = false;
+  refs.creditsOverlay.dataset.playbackPaused = String(
+    runtimePlaybackLifecycle.getSnapshot().suspended
+  );
   refs.creditsOverlay.dataset.background = getSafeCreditsBackground(block.background);
   refs.creditsOverlay.style.setProperty("--credits-duration", `${durationSeconds}s`);
   refs.creditsSkipButton.hidden = block.skippable === false;
@@ -9198,19 +9275,19 @@ function syncCreditsPlayback(snapshot) {
       </div>
     </div>
   `;
-  state.creditsPlaybackTimer = window.setTimeout(() => {
-    if (state.creditsPlaybackStepKey === stepKey) {
-      finishCreditsPlayback();
-    }
-  }, durationSeconds * 1000);
+  runtimeCreditsDelayController.schedule({
+    key: stepKey,
+    delayMs: durationSeconds * 1000,
+    callback: () => {
+      if (state.creditsPlaybackStepKey === stepKey) {
+        finishCreditsPlayback();
+      }
+    },
+  });
 }
 
 function stopCreditsPlayback() {
-  if (state.creditsPlaybackTimer) {
-    window.clearTimeout(state.creditsPlaybackTimer);
-  }
-
-  state.creditsPlaybackTimer = null;
+  runtimeCreditsDelayController.cancel();
   state.creditsPlaybackStepKey = null;
 
   if (refs.creditsOverlay) {

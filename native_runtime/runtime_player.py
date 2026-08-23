@@ -275,6 +275,21 @@ except ImportError:  # pragma: no cover - exported native packages import from t
     )
 
 try:
+    from .runtime_playback_lifecycle import (
+        NativePlaybackLifecycleController,
+        shift_deadline_ms,
+        shift_record_timestamp,
+        shift_timestamp_ms,
+    )
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_playback_lifecycle import (
+        NativePlaybackLifecycleController,
+        shift_deadline_ms,
+        shift_record_timestamp,
+        shift_timestamp_ms,
+    )
+
+try:
     from .runtime_reading_profiles import (
         READING_PROFILE_IDS,
         apply_reading_profile,
@@ -8241,6 +8256,8 @@ class NativeRuntimePlayer:
         self.dialogue_camera_controller = NativeDialogueCameraController()
         self.voice_reactive_motion_controller = NativeVoiceReactiveMotionController()
         self.timed_choice_controller = NativeTimedChoiceController()
+        self.playback_lifecycle = NativePlaybackLifecycleController()
+        self.lifecycle_paused_video_playback = None
         self.pending_timed_choice_state: dict | None = None
         self.timed_choice_last_persist_bucket: int | None = None
         self.current_choices: list[dict] | None = None
@@ -9546,6 +9563,78 @@ class NativeRuntimePlayer:
         self.skip_read_enabled = False
         self.auto_play_deadline_ms = 0
         self.skip_deadline_ms = 0
+
+    def is_runtime_display_active(self) -> bool:
+        try:
+            return bool(self.pygame.display.get_active())
+        except (AttributeError, self.pygame.error):
+            return True
+
+    def shift_runtime_playback_timestamps(self, suspended_duration_ms: int) -> None:
+        if suspended_duration_ms <= 0:
+            return
+        self.auto_play_deadline_ms = shift_deadline_ms(
+            self.auto_play_deadline_ms,
+            suspended_duration_ms,
+        )
+        self.skip_deadline_ms = shift_deadline_ms(
+            self.skip_deadline_ms,
+            suspended_duration_ms,
+        )
+        self.current_line_started_at_ms = shift_timestamp_ms(
+            self.current_line_started_at_ms,
+            suspended_duration_ms,
+        )
+        self.current_line_next_reveal_at_ms = shift_deadline_ms(
+            self.current_line_next_reveal_at_ms,
+            suspended_duration_ms,
+        )
+        self.profile_session_started_at_ms = shift_timestamp_ms(
+            self.profile_session_started_at_ms,
+            suspended_duration_ms,
+        )
+        shift_record_timestamp(self.background_transition, suspended_duration_ms)
+        for motion_map in (self.character_motions, self.stage_image_motions):
+            for motion in motion_map.values():
+                shift_record_timestamp(motion, suspended_duration_ms)
+        for state_map in (self.visible_characters, self.leaving_characters):
+            for character_state in state_map.values():
+                if isinstance(character_state, dict):
+                    shift_record_timestamp(character_state.get("transition"), suspended_duration_ms)
+        if self.current_line and self.current_line.get("type") == "credits_roll":
+            shift_record_timestamp(
+                self.current_line.get("creditsPlayback"),
+                suspended_duration_ms,
+            )
+        if self.achievement_notification:
+            self.achievement_notification["expiresAtMs"] = shift_deadline_ms(
+                self.achievement_notification.get("expiresAtMs"),
+                suspended_duration_ms,
+            )
+        for controller in (self.speaker_focus_controller, self.dialogue_camera_controller):
+            controller.transition_started_at_ms = shift_timestamp_ms(
+                getattr(controller, "transition_started_at_ms", 0),
+                suspended_duration_ms,
+            )
+
+    def sync_runtime_playback_lifecycle(self, now_ms: int) -> dict:
+        transition = self.playback_lifecycle.update(
+            self.is_runtime_display_active(),
+            now_ms,
+        )
+        if transition["event"] == "suspend":
+            playback = self.embedded_video_playback
+            if playback and playback.status == "playing":
+                playback.pause()
+                self.lifecycle_paused_video_playback = playback
+        elif transition["event"] == "resume":
+            suspended_duration_ms = int(transition.get("lastSuspendedDurationMs") or 0)
+            self.shift_runtime_playback_timestamps(suspended_duration_ms)
+            playback = self.lifecycle_paused_video_playback
+            self.lifecycle_paused_video_playback = None
+            if playback is self.embedded_video_playback and playback and playback.status == "paused":
+                playback.resume(now_ms)
+        return transition
 
     def update_flow_assist(self) -> None:
         if self.overlay_mode or self.current_choices or self.finished or not self.current_line:
@@ -11928,6 +12017,7 @@ class NativeRuntimePlayer:
         if self.embedded_video_playback:
             self.embedded_video_playback.release()
         self.embedded_video_playback = None
+        self.lifecycle_paused_video_playback = None
 
     def get_video_preview_frame_result(self, line: dict) -> dict:
         cache_key = get_video_preview_cache_key(line)
@@ -14906,8 +14996,8 @@ class NativeRuntimePlayer:
     def run(self) -> int:
         running = True
         while running:
-            dt_seconds = self.clock.tick(FPS) / 1000
-            self.runtime_elapsed_seconds += dt_seconds
+            target_fps = self.playback_lifecycle.get_target_fps(FPS)
+            dt_seconds = self.clock.tick(target_fps) / 1000
             for event in self.pygame.event.get():
                 running = self.handle_event(event)
                 if not running:
@@ -14916,11 +15006,15 @@ class NativeRuntimePlayer:
                 running = self.handle_controller_repeat()
             if not running:
                 break
+            lifecycle = self.sync_runtime_playback_lifecycle(self.pygame.time.get_ticks())
             self.update_timed_choice()
             self.update_bgm_transport()
+            self.update_voice_playback_state()
+            if lifecycle["suspended"]:
+                continue
+            self.runtime_elapsed_seconds += dt_seconds
             self.update_stage_visual_effects(dt_seconds)
             self.update_particle_effect(dt_seconds)
-            self.update_voice_playback_state()
             self.update_flow_assist()
             self.update_runtime_preload_queue()
             self.update_runtime_scene_prefetch_queue()

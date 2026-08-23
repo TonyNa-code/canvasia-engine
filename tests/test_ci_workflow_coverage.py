@@ -152,6 +152,16 @@ class CiWorkflowCoverageTests(unittest.TestCase):
             workflow,
         )
 
+    def test_native_runtime_storage_recovery_is_checked_in_ci(self) -> None:
+        workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("native_runtime/runtime_storage.py", workflow)
+        self.assertIn("tests/test_native_runtime_storage.py", workflow)
+        self.assertIn(
+            "python -m unittest discover -s tests -p 'test_native_runtime_storage.py' -v",
+            workflow,
+        )
+
     def test_cross_runtime_text_history_modules_are_checked_in_ci(self) -> None:
         workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
 
@@ -451,6 +461,27 @@ class CiWorkflowCoverageTests(unittest.TestCase):
             "test_video_transport_contract.py",
             "test_frontend_runtime_video_transport_module.py",
             "test_frontend_video_transport_editor_module.py",
+        ):
+            self.assertIn(
+                f"python -m unittest discover -s tests -p '{test_name}' -v",
+                workflow,
+            )
+
+    def test_playback_lifecycle_contract_is_checked_in_ci(self) -> None:
+        workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+
+        for path in (
+            "native_runtime/runtime_playback_lifecycle.py",
+            "export_player_template/runtime_playback_lifecycle.js",
+            "tests/test_native_runtime_playback_lifecycle.py",
+            "tests/test_playback_lifecycle_contract.py",
+            "tests/test_frontend_runtime_playback_lifecycle_module.py",
+        ):
+            self.assertIn(path, workflow)
+        for test_name in (
+            "test_native_runtime_playback_lifecycle.py",
+            "test_playback_lifecycle_contract.py",
+            "test_frontend_runtime_playback_lifecycle_module.py",
         ):
             self.assertIn(
                 f"python -m unittest discover -s tests -p '{test_name}' -v",

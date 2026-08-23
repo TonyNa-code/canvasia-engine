@@ -3412,6 +3412,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / "runtime_preload.js").is_file())
         self.assertTrue((build_dir / "runtime_scene_prefetch.js").is_file())
         self.assertTrue((build_dir / "runtime_asset_pipeline.js").is_file())
+        self.assertTrue((build_dir / "runtime_playback_lifecycle.js").is_file())
         self.assertTrue((build_dir / "runtime_story_flow.js").is_file())
         self.assertTrue((build_dir / "runtime_achievements.js").is_file())
         self.assertTrue((build_dir / "runtime_character_motion.js").is_file())
@@ -3537,6 +3538,10 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["playerRuntimePreload"], "runtime_preload.js")
         self.assertEqual(manifest["files"]["playerRuntimeScenePrefetch"], "runtime_scene_prefetch.js")
         self.assertEqual(manifest["files"]["playerRuntimeAssetPipeline"], "runtime_asset_pipeline.js")
+        self.assertEqual(
+            manifest["files"]["playerRuntimePlaybackLifecycle"],
+            "runtime_playback_lifecycle.js",
+        )
         self.assertEqual(manifest["files"]["playerRuntimeStoryFlow"], "runtime_story_flow.js")
         self.assertEqual(manifest["files"]["playerRuntimeAchievements"], "runtime_achievements.js")
         self.assertEqual(manifest["files"]["playerRuntimeCharacterMotion"], "runtime_character_motion.js")
@@ -3921,6 +3926,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / run_editor.RUNTIME_PRELOAD_MANIFEST_FILE_NAME).is_file())
         self.assertTrue((build_dir / run_editor.RUNTIME_PRELOAD_REPORT_FILE_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_PLAYER_NAME).is_file())
+        self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_PLAYBACK_LIFECYCLE_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_PRELOAD_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_CREDITS_NAME).is_file())
         self.assertTrue((build_dir / run_editor.NATIVE_RUNTIME_INPUT_NAME).is_file())
@@ -4270,6 +4276,10 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["runtimeSaveOverlayModule"], run_editor.NATIVE_RUNTIME_SAVE_OVERLAY_NAME)
         self.assertEqual(manifest["files"]["runtimeStageImagesModule"], run_editor.NATIVE_RUNTIME_STAGE_IMAGES_NAME)
         self.assertEqual(manifest["files"]["runtimeChoiceAvailabilityModule"], run_editor.NATIVE_RUNTIME_CHOICE_AVAILABILITY_NAME)
+        self.assertEqual(
+            manifest["files"]["runtimePlaybackLifecycleModule"],
+            run_editor.NATIVE_RUNTIME_PLAYBACK_LIFECYCLE_NAME,
+        )
         self.assertEqual(manifest["files"]["runtimeDiagnosticsModule"], run_editor.NATIVE_RUNTIME_DIAGNOSTICS_NAME)
         self.assertEqual(manifest["files"]["runtimeDiagnosticsReport"], run_editor.NATIVE_RUNTIME_DIAGNOSTICS_REPORT_NAME)
         self.assertEqual(manifest["files"]["runtimeDiagnosticsMarkdown"], run_editor.NATIVE_RUNTIME_DIAGNOSTICS_MARKDOWN_NAME)
@@ -4290,6 +4300,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 run_editor.NATIVE_RUNTIME_CHARACTER_MOTION_NAME,
                 run_editor.NATIVE_RUNTIME_STAGE_IMAGES_NAME,
                 run_editor.NATIVE_RUNTIME_CHOICE_AVAILABILITY_NAME,
+                run_editor.NATIVE_RUNTIME_PLAYBACK_LIFECYCLE_NAME,
                 run_editor.NATIVE_RUNTIME_DIAGNOSTICS_NAME,
                 run_editor.NATIVE_RUNTIME_INPUT_NAME,
                 run_editor.NATIVE_RUNTIME_I18N_NAME,
@@ -4356,6 +4367,10 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["runtimeCharacterMotionModule"], run_editor.NATIVE_RUNTIME_CHARACTER_MOTION_NAME)
         self.assertEqual(manifest["files"]["runtimeStageImagesModule"], run_editor.NATIVE_RUNTIME_STAGE_IMAGES_NAME)
         self.assertEqual(manifest["files"]["runtimeChoiceAvailabilityModule"], run_editor.NATIVE_RUNTIME_CHOICE_AVAILABILITY_NAME)
+        self.assertEqual(
+            manifest["files"]["runtimePlaybackLifecycleModule"],
+            run_editor.NATIVE_RUNTIME_PLAYBACK_LIFECYCLE_NAME,
+        )
         self.assertEqual(manifest["files"]["runtimeDiagnosticsModule"], run_editor.NATIVE_RUNTIME_DIAGNOSTICS_NAME)
         self.assertEqual(manifest["files"]["runtimeDiagnosticsReport"], run_editor.NATIVE_RUNTIME_DIAGNOSTICS_REPORT_NAME)
         self.assertEqual(manifest["files"]["runtimeDiagnosticsMarkdown"], run_editor.NATIVE_RUNTIME_DIAGNOSTICS_MARKDOWN_NAME)
@@ -4390,6 +4405,10 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["runtime"]["runtimeSaveOverlayModule"], run_editor.NATIVE_RUNTIME_SAVE_OVERLAY_NAME)
         self.assertEqual(manifest["runtime"]["runtimeStageImagesModule"], run_editor.NATIVE_RUNTIME_STAGE_IMAGES_NAME)
         self.assertEqual(manifest["runtime"]["runtimeChoiceAvailabilityModule"], run_editor.NATIVE_RUNTIME_CHOICE_AVAILABILITY_NAME)
+        self.assertEqual(
+            manifest["runtime"]["runtimePlaybackLifecycleModule"],
+            run_editor.NATIVE_RUNTIME_PLAYBACK_LIFECYCLE_NAME,
+        )
         self.assertEqual(manifest["runtime"]["runtimeDiagnosticsModule"], run_editor.NATIVE_RUNTIME_DIAGNOSTICS_NAME)
         self.assertEqual(manifest["runtime"]["runtimeViewModule"], run_editor.NATIVE_RUNTIME_VIEW_NAME)
         self.assertEqual(manifest["runtime"]["runtimeVnQualityModule"], run_editor.NATIVE_RUNTIME_VN_QUALITY_NAME)

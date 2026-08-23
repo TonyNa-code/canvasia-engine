@@ -57,6 +57,7 @@ const runtimeStoryFlowTools = window.CanvasiaRuntimeStoryFlow;
 const runtimeAchievementTools = window.CanvasiaRuntimeAchievements;
 const runtimeMusicTransportTools = window.CanvasiaRuntimeMusicTransport;
 const runtimeVideoTransportTools = window.CanvasiaRuntimeVideoTransport;
+const runtimePlaybackLifecycleTools = window.CanvasiaRuntimePlaybackLifecycle;
 const runtimeSfxTransportTools = window.CanvasiaRuntimeSfxTransport;
 const choiceAvailabilityEditorTools = window.CanvasiaEditorChoiceAvailability;
 const timedChoiceEditorTools = window.CanvasiaEditorTimedChoice;
@@ -878,8 +879,7 @@ const projectValidationCache = validationCacheTools.createValidationCache();
 let autoSaveTimer = null;
 let autoSavePromise = null;
 let storyChangeVersion = 0;
-let previewAutoAdvanceTimer = null;
-let previewAutoAdvanceKey = null;
+const previewAutoAdvanceDelayController = runtimePlaybackLifecycleTools.createPauseAwareDelayController();
 let previewMusicAudio = null;
 let previewCurrentMusicAssetId = null;
 let previewCurrentMusicPlaybackKey = "";
@@ -887,6 +887,13 @@ let previewCurrentMusicCueId = "";
 let previewMusicTransportCleanup = null;
 const previewVideoController = videoTransportEditorTools.createPreviewVideoController({
   runtimeTools: runtimeVideoTransportTools,
+  delayTools: runtimePlaybackLifecycleTools,
+});
+const previewPlaybackLifecycle = runtimePlaybackLifecycleTools.createDocumentPlaybackLifecycle({
+  documentRef: document,
+  windowRef: window,
+  onSuspend: handlePreviewPlaybackSuspended,
+  onResume: handlePreviewPlaybackResumed,
 });
 let editorUiThemeAutoRefreshTimer = null;
 let lastEditorRuntimeErrorKey = "";
@@ -1150,7 +1157,6 @@ document.addEventListener("pointermove", (event) => characterStageComposerContro
 document.addEventListener("pointerup", (event) => characterStageComposerController.handlePointerUp(event));
 document.addEventListener("pointercancel", (event) => characterStageComposerController.handlePointerCancel(event));
 document.addEventListener("wheel", (event) => characterStageComposerController.handleWheel(event), { passive: false });
-document.addEventListener("visibilitychange", syncPreviewTimedChoicePauseState);
 document.addEventListener("click", schedulePreviewTimedChoicePauseSync);
 document.addEventListener("keydown", schedulePreviewTimedChoicePauseSync);
 document.addEventListener("dragstart", handleGlobalDragStart);
@@ -1184,6 +1190,9 @@ if (refs.previewStage) {
   refs.previewStage.addEventListener("click", handlePreviewStageClick);
   refs.previewStage.addEventListener("contextmenu", handlePreviewStageContextMenu);
 }
+
+previewPlaybackLifecycle.attach();
+window.addEventListener("beforeunload", stopPreviewPlaybackLifecycle);
 
 installEngineDialogBridge();
 init();
@@ -18937,7 +18946,7 @@ function getPreviewSnapshotKey(snapshot) {
 
 function isPreviewTimedChoicePaused() {
   return Boolean(
-    document.hidden ||
+    previewPlaybackLifecycle.getSnapshot().suspended ||
       state.currentScreen !== "preview" ||
       state.previewSystemMenuOpen ||
       state.previewSaveDialogOpen ||
@@ -20164,12 +20173,25 @@ function getPreviewAutoAdvanceDelay(snapshot) {
 }
 
 function stopPreviewAutoAdvance() {
-  if (previewAutoAdvanceTimer) {
-    window.clearTimeout(previewAutoAdvanceTimer);
-    previewAutoAdvanceTimer = null;
-  }
+  previewAutoAdvanceDelayController.cancel();
+}
 
-  previewAutoAdvanceKey = null;
+function handlePreviewPlaybackSuspended() {
+  previewAutoAdvanceDelayController.pause();
+  previewVideoController.suspend();
+  syncPreviewTimedChoicePauseState();
+}
+
+function handlePreviewPlaybackResumed() {
+  previewAutoAdvanceDelayController.resume();
+  previewVideoController.resume();
+  syncPreviewTimedChoicePauseState();
+}
+
+function stopPreviewPlaybackLifecycle() {
+  previewPlaybackLifecycle.detach();
+  previewAutoAdvanceDelayController.cancel();
+  previewVideoController.stop();
 }
 
 function stopPreviewMusicPlayback() {
@@ -20466,24 +20488,26 @@ function schedulePreviewAutoAdvance(snapshot, options = {}) {
     !previewVoiceAudio.paused;
 
   if (hasVoicePlaying) {
-    previewAutoAdvanceKey = snapshotKey;
     return;
   }
 
-  previewAutoAdvanceKey = snapshotKey;
-  previewAutoAdvanceTimer = window.setTimeout(() => {
-    if ((!state.previewPlayback.autoPlay && !state.previewPlayback.skipRead) || previewAutoAdvanceKey !== snapshotKey) {
-      return;
-    }
+  previewAutoAdvanceDelayController.schedule({
+    key: snapshotKey,
+    delayMs: skipActive ? 70 : options.preferVoiceEnding ? 180 : getPreviewAutoAdvanceDelay(snapshot),
+    callback: () => {
+      if (!state.previewPlayback.autoPlay && !state.previewPlayback.skipRead) {
+        return;
+      }
 
-    const current = getCurrentPreviewSnapshot();
-    if (!current || getPreviewSnapshotStepKey(current) !== snapshotKey) {
-      return;
-    }
+      const current = getCurrentPreviewSnapshot();
+      if (!current || getPreviewSnapshotStepKey(current) !== snapshotKey) {
+        return;
+      }
 
-    movePreviewForward();
-    renderPreviewScreen();
-  }, skipActive ? 70 : options.preferVoiceEnding ? 180 : getPreviewAutoAdvanceDelay(snapshot));
+      movePreviewForward();
+      renderPreviewScreen();
+    },
+  });
 }
 
 function togglePreviewAutoPlay() {

@@ -10,6 +10,7 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parents[1]
 EDITOR_MODULE_PATH = ROOT_DIR / "prototype_editor" / "modules" / "video_transport_editor.js"
 RUNTIME_MODULE_PATH = ROOT_DIR / "export_player_template" / "runtime_video_transport.js"
+LIFECYCLE_MODULE_PATH = ROOT_DIR / "export_player_template" / "runtime_playback_lifecycle.js"
 
 
 class FrontendVideoTransportEditorModuleTests(unittest.TestCase):
@@ -19,6 +20,7 @@ class FrontendVideoTransportEditorModuleTests(unittest.TestCase):
             import fs from "fs";
             import vm from "vm";
             import * as runtimeTools from {json.dumps(RUNTIME_MODULE_PATH.as_uri())};
+            import * as delayTools from {json.dumps(LIFECYCLE_MODULE_PATH.as_uri())};
 
             const controls = new Map([
               ["editorVideoAutoplay", {{ value: "true" }}],
@@ -91,6 +93,7 @@ class FrontendVideoTransportEditorModuleTests(unittest.TestCase):
             import fs from "fs";
             import vm from "vm";
             import * as runtimeTools from {json.dumps(RUNTIME_MODULE_PATH.as_uri())};
+            import * as delayTools from {json.dumps(LIFECYCLE_MODULE_PATH.as_uri())};
 
             class FakeElement {{
               constructor(tagName, ownerDocument) {{
@@ -104,6 +107,9 @@ class FrontendVideoTransportEditorModuleTests(unittest.TestCase):
                 this.readyState = 1;
                 this.parentNode = null;
                 this.playCount = 0;
+                this.pauseCount = 0;
+                this.paused = true;
+                this.ended = false;
                 this.removed = false;
               }}
               append(...items) {{
@@ -114,8 +120,8 @@ class FrontendVideoTransportEditorModuleTests(unittest.TestCase):
               setAttribute() {{}}
               removeAttribute() {{}}
               load() {{}}
-              pause() {{}}
-              play() {{ this.playCount += 1; return Promise.resolve(); }}
+              pause() {{ this.pauseCount += 1; this.paused = true; }}
+              play() {{ this.playCount += 1; this.paused = false; return Promise.resolve(); }}
               emit(name, event = {{ stopPropagation() {{}} }}) {{ this.listeners.get(name)?.(event); }}
               contains(target) {{ return this === target || this.children.some((child) => child.contains?.(target)); }}
               remove() {{
@@ -137,7 +143,7 @@ class FrontendVideoTransportEditorModuleTests(unittest.TestCase):
             vm.createContext(context);
             vm.runInContext(fs.readFileSync({json.dumps(str(EDITOR_MODULE_PATH))}, "utf8"), context);
             const tools = context.window.CanvasiaEditorVideoTransport;
-            const controller = tools.createPreviewVideoController({{ runtimeTools }});
+            const controller = tools.createPreviewVideoController({{ runtimeTools, delayTools }});
             const snapshot = {{
               blockType: "video_play",
               videoPlaybackPositionSeconds: 2,
@@ -154,6 +160,8 @@ class FrontendVideoTransportEditorModuleTests(unittest.TestCase):
             const overlay = root.children[0];
             const video = overlay.children[0];
             const initialTime = video.currentTime;
+            const suspended = controller.suspend();
+            const resumed = controller.resume();
             video.currentTime = 3.25;
             const captured = controller.capture(snapshot);
             video.currentTime = 4;
@@ -164,6 +172,9 @@ class FrontendVideoTransportEditorModuleTests(unittest.TestCase):
               captured,
               snapshotPosition: snapshot.videoPlaybackPositionSeconds,
               playCount: video.playCount,
+              pauseCount: video.pauseCount,
+              suspended,
+              resumed,
               finishReason,
               overlayRemoved: overlay.removed,
               remainingChildren: root.children.length,
@@ -183,7 +194,10 @@ class FrontendVideoTransportEditorModuleTests(unittest.TestCase):
         self.assertEqual(payload["initialTime"], 2)
         self.assertEqual(payload["captured"], 3.25)
         self.assertEqual(payload["snapshotPosition"], 3.25)
-        self.assertEqual(payload["playCount"], 1)
+        self.assertEqual(payload["playCount"], 2)
+        self.assertGreaterEqual(payload["pauseCount"], 1)
+        self.assertTrue(payload["suspended"]["suspended"])
+        self.assertFalse(payload["resumed"]["suspended"])
         self.assertEqual(payload["finishReason"], "segment-end")
         self.assertTrue(payload["overlayRemoved"])
         self.assertEqual(payload["remainingChildren"], 0)
