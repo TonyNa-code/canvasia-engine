@@ -80,6 +80,13 @@ import {
   getRuntimeHistoryStepIndex,
 } from "./runtime_text_history.js";
 import {
+  canMutateFormalSaveSlot,
+  isFormalSaveSlotProtected,
+  sanitizeFormalSaveSlotMetadata,
+  serializeFormalSaveSlot,
+  toggleFormalSaveSlotProtection,
+} from "./runtime_save_slots.js";
+import {
   getSafeTextInputMaxLength,
   interpolateRuntimeText,
   normalizeTextInputBlock,
@@ -5371,6 +5378,7 @@ function sanitizeStoredSaveSlot(source) {
     savedAt: source.savedAt ? String(source.savedAt) : new Date().toISOString(),
     session,
     thumbnailDataUrl: typeof source.thumbnailDataUrl === "string" ? source.thumbnailDataUrl : "",
+    ...sanitizeFormalSaveSlotMetadata(source),
   };
 }
 
@@ -5485,16 +5493,10 @@ function finalizePlayerSession({ silent = false } = {}) {
 
 function persistSaveSlots() {
   const payload = state.saveSlots.map((slot) =>
-    slot
-      ? {
-          savedAt: slot.savedAt,
-          session: deepCloneRuntimeData(slot.session),
-          thumbnailDataUrl: slot.thumbnailDataUrl ?? "",
-        }
-      : null
+    serializeFormalSaveSlot(slot, deepCloneRuntimeData)
   );
 
-  writeRuntimeStorageJson(storageKeys.saveSlots, payload);
+  return writeRuntimeStorageJson(storageKeys.saveSlots, payload);
 }
 
 function persistQuickSave() {
@@ -6718,6 +6720,13 @@ function handleSaveSlotPanelClick(event) {
 
   if (clearButton) {
     requestSaveSlotClear(clearButton.dataset.clearSlot);
+    return;
+  }
+
+  const protectionButton = event.target.closest("[data-toggle-save-protection]");
+
+  if (protectionButton) {
+    toggleSaveSlotProtection(protectionButton.dataset.toggleSaveProtection);
   }
 }
 
@@ -7105,6 +7114,10 @@ function requestSaveSlot(rawIndex) {
     return saveCurrentSlot(rawIndex);
   }
 
+  if (!canMutateFormalSaveSlot(state.saveSlots[slotIndex])) {
+    return false;
+  }
+
   return openSaveConfirmDialog({
     type: "overwrite-slot",
     slotIndex,
@@ -7114,7 +7127,11 @@ function requestSaveSlot(rawIndex) {
 function requestSaveSlotClear(rawIndex) {
   const slotIndex = getSafeSaveSlotIndex(rawIndex);
 
-  if (slotIndex == null || !state.saveSlots[slotIndex]) {
+  if (
+    slotIndex == null ||
+    !state.saveSlots[slotIndex] ||
+    !canMutateFormalSaveSlot(state.saveSlots[slotIndex])
+  ) {
     return false;
   }
 
@@ -7538,19 +7555,30 @@ function getSaveDialogSummary() {
 
 function renderFormalSaveSlotCard(slotNumber, slot, mode, options = {}) {
   const hasSave = Boolean(slot);
+  const isProtected = isFormalSaveSlotProtected(slot);
   const canSave = Boolean(options.canSave);
-  const actionLabel = mode === "save" ? (hasSave ? "覆盖这个存档" : "存到这里") : "读这个点";
+  const actionLabel = mode === "save"
+    ? isProtected
+      ? "已保护"
+      : hasSave
+        ? "覆盖这个存档"
+        : "存到这里"
+    : "读这个点";
   const actionName = mode === "save" ? "save" : "load";
-  const actionDisabled = mode === "save" ? !canSave : !hasSave;
+  const actionDisabled = mode === "save" ? !canSave || isProtected : !hasSave;
 
   return `
-    <article class="save-slot-card save-dialog-slot-card ${hasSave ? "" : "is-empty"}">
+    <article class="save-slot-card save-dialog-slot-card ${hasSave ? "" : "is-empty"} ${isProtected ? "is-protected" : ""}">
       ${renderSaveVisualSummary(slot)}
       <div class="save-slot-meta">
-        <strong>存档 ${slotNumber}</strong>
+        <div class="save-slot-title-row">
+          <strong>存档 ${slotNumber}</strong>
+          ${isProtected ? '<span class="save-slot-protection-badge">重要存档 · 已保护</span>' : ""}
+        </div>
         <span class="save-slot-time">${hasSave ? `保存时间：${escapeHtml(formatDate(slot.savedAt))}` : "还没有存档"}</span>
         <p>${escapeHtml(getSaveSlotSummary(slot))}</p>
         <p>${escapeHtml(hasSave ? `变量：${getVariableSummary(getSaveSlotSnapshot(slot)?.variables)}` : "变量还是初始状态。")}</p>
+        ${isProtected ? '<p class="save-slot-protection-note">读取不受影响；覆盖和清空已被拦截。</p>' : ""}
       </div>
       <div class="save-slot-actions">
         <button
@@ -7565,9 +7593,18 @@ function renderFormalSaveSlotCard(slotNumber, slot, mode, options = {}) {
           class="pill-button"
           type="button"
           data-clear-slot="${slotNumber}"
-          ${hasSave ? "" : "disabled"}
+          ${hasSave && !isProtected ? "" : "disabled"}
         >
           清空
+        </button>
+        <button
+          class="pill-button ${isProtected ? "" : "is-secondary"}"
+          type="button"
+          data-toggle-save-protection="${slotNumber}"
+          aria-pressed="${isProtected}"
+          ${hasSave ? "" : "disabled"}
+        >
+          ${isProtected ? "取消保护" : "保护这个存档"}
         </button>
       </div>
     </article>
@@ -7721,25 +7758,39 @@ function renderSaveSlots() {
     const slotNumber = index + 1;
     const slot = state.saveSlots[index] ?? null;
     const hasSave = Boolean(slot);
+    const isProtected = isFormalSaveSlotProtected(slot);
 
     return `
-      <article class="save-slot-card">
+      <article class="save-slot-card ${isProtected ? "is-protected" : ""}">
         ${renderSaveVisualSummary(slot)}
         <div class="save-slot-meta">
-          <strong>存档 ${slotNumber}</strong>
+          <div class="save-slot-title-row">
+            <strong>存档 ${slotNumber}</strong>
+            ${isProtected ? '<span class="save-slot-protection-badge">重要存档 · 已保护</span>' : ""}
+          </div>
           <span class="save-slot-time">${hasSave ? `保存时间：${escapeHtml(formatDate(slot.savedAt))}` : "还没有存档"}</span>
           <p>${escapeHtml(getSaveSlotSummary(slot))}</p>
           <p>${escapeHtml(hasSave ? `变量：${getVariableSummary(getSaveSlotSnapshot(slot)?.variables)}` : "变量还是初始状态。")}</p>
+          ${isProtected ? '<p class="save-slot-protection-note">读取不受影响；覆盖和清空已被拦截。</p>' : ""}
         </div>
         <div class="save-slot-actions">
-          <button class="pill-button" type="button" data-save-slot="${slotNumber}" ${canSave ? "" : "disabled"}>
-            存到这里
+          <button class="pill-button" type="button" data-save-slot="${slotNumber}" ${canSave && !isProtected ? "" : "disabled"}>
+            ${isProtected ? "已保护" : "存到这里"}
           </button>
           <button class="pill-button" type="button" data-load-slot="${slotNumber}" ${hasSave ? "" : "disabled"}>
             读这个点
           </button>
-          <button class="pill-button" type="button" data-clear-slot="${slotNumber}" ${hasSave ? "" : "disabled"}>
+          <button class="pill-button" type="button" data-clear-slot="${slotNumber}" ${hasSave && !isProtected ? "" : "disabled"}>
             清空
+          </button>
+          <button
+            class="pill-button ${isProtected ? "" : "is-secondary"}"
+            type="button"
+            data-toggle-save-protection="${slotNumber}"
+            aria-pressed="${isProtected}"
+            ${hasSave ? "" : "disabled"}
+          >
+            ${isProtected ? "取消保护" : "保护"}
           </button>
         </div>
       </article>
@@ -7747,22 +7798,50 @@ function renderSaveSlots() {
   }).join("");
 }
 
+function toggleSaveSlotProtection(rawIndex) {
+  const slotIndex = getSafeSaveSlotIndex(rawIndex);
+  if (slotIndex == null || !state.saveSlots[slotIndex]) {
+    return false;
+  }
+  const wasProtected = isFormalSaveSlotProtected(state.saveSlots[slotIndex]);
+  if (toggleFormalSaveSlotProtection(state.saveSlots, slotIndex) === null) {
+    return false;
+  }
+  if (!persistSaveSlots()) {
+    state.saveSlots[slotIndex].protected = wasProtected;
+    return false;
+  }
+  renderSaveSlots();
+  renderSaveDialog();
+  return true;
+}
+
 function saveCurrentSlot(rawIndex) {
   const slotIndex = getSafeSaveSlotIndex(rawIndex);
 
-  if (slotIndex == null || !state.started || !state.session) {
+  if (
+    slotIndex == null ||
+    !state.started ||
+    !state.session ||
+    !canMutateFormalSaveSlot(state.saveSlots[slotIndex])
+  ) {
     return false;
   }
 
   captureCurrentTimedChoiceState();
   captureCurrentMusicPlaybackPosition();
   captureCurrentVideoPlaybackPosition();
+  const previousSlot = state.saveSlots[slotIndex];
   state.saveSlots[slotIndex] = {
     savedAt: new Date().toISOString(),
     session: deepCloneRuntimeData(state.session),
     thumbnailDataUrl: buildSaveThumbnailDataUrl(getCurrentSnapshot()),
+    protected: false,
   };
-  persistSaveSlots();
+  if (!persistSaveSlots()) {
+    state.saveSlots[slotIndex] = previousSlot;
+    return false;
+  }
   renderStartResumeSummary();
   renderPlaybackControls(getCurrentSnapshot());
   return true;
@@ -7908,12 +7987,20 @@ function renderSaveConfirmDialog() {
 function clearSaveSlot(rawIndex) {
   const slotIndex = getSafeSaveSlotIndex(rawIndex);
 
-  if (slotIndex == null || !state.saveSlots[slotIndex]) {
+  if (
+    slotIndex == null ||
+    !state.saveSlots[slotIndex] ||
+    !canMutateFormalSaveSlot(state.saveSlots[slotIndex])
+  ) {
     return false;
   }
 
+  const previousSlot = state.saveSlots[slotIndex];
   state.saveSlots[slotIndex] = null;
-  persistSaveSlots();
+  if (!persistSaveSlots()) {
+    state.saveSlots[slotIndex] = previousSlot;
+    return false;
+  }
   renderStartResumeSummary();
   renderPlaybackControls(getCurrentSnapshot());
   return true;

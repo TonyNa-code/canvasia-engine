@@ -3257,6 +3257,21 @@ class NativeRuntimeRenderSmokeTests(unittest.TestCase):
         self.assertIn("资源预热：3/3", player.get_runtime_preload_status_line())
         self.assertIn("资源预热：3/3", player.status_message)
 
+    def test_native_background_render_reuses_scaled_surface_cache(self) -> None:
+        data_path = self.write_game_data()
+        player = NativeRuntimePlayer(pygame, data_path)
+        player.stage_background_asset_id = "title_background"
+        target = pygame.Surface((player.width, player.height), pygame.SRCALPHA)
+
+        player.render_background(target)
+        first = player.surface_cache.snapshot()
+        player.render_background(target)
+        second = player.surface_cache.snapshot()
+
+        self.assertGreaterEqual(first["entryCount"], 1)
+        self.assertGreater(second["hits"], first["hits"])
+        self.assertGreater(second["hitRatePercent"], 0)
+
     def test_player_text_input_writes_variable_and_interpolates_next_line(self) -> None:
         data_path = self.write_game_data()
         payload = json.loads(data_path.read_text(encoding="utf-8"))

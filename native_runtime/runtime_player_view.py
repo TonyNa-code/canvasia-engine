@@ -829,6 +829,7 @@ def build_save_dialog_page_data(
                 "variableSummaryText": variable_summary_text,
                 "savedAt": saved_at,
                 "finished": bool(snapshot.get("finished")) if snapshot else False,
+                "protected": bool(snapshot.get("protected") is True) if snapshot else False,
                 "thumbnailKey": str(snapshot.get("thumbnailKey") or "") if snapshot else "",
                 "thumbnailWidth": clamp_int(snapshot.get("thumbnailWidth"), 0, 10000, 0) if snapshot else 0,
                 "thumbnailHeight": clamp_int(snapshot.get("thumbnailHeight"), 0, 10000, 0) if snapshot else 0,

@@ -2390,6 +2390,20 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
                 }""",
                 timeout=15000,
             )
+            player_page.locator("#saveDialog [data-toggle-save-protection='1']").click()
+            player_page.wait_for_function(
+                """() => {
+                    const card = document.querySelector("#saveDialog [data-toggle-save-protection='1']")?.closest(".save-slot-card");
+                    const protectButton = document.querySelector("#saveDialog [data-toggle-save-protection='1']");
+                    const saveButton = document.querySelector("#saveDialog [data-save-slot='1']");
+                    const clearButton = document.querySelector("#saveDialog [data-clear-slot='1']");
+                    return Boolean(card?.classList.contains("is-protected"))
+                      && protectButton?.getAttribute("aria-pressed") === "true"
+                      && Boolean(saveButton?.disabled)
+                      && Boolean(clearButton?.disabled);
+                }""",
+                timeout=15000,
+            )
 
             player_page.locator("#closeSaveDialogButton").click()
             player_page.locator("#saveDialog").wait_for(state="hidden", timeout=10000)

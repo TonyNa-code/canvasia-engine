@@ -7,6 +7,7 @@ try:
     )
     from .runtime_player_view import clamp, get_safe_character_stage, with_alpha
     from .runtime_speaker_focus import scale_rgb_color
+    from .runtime_surface_cache import get_cached_transformed_surface, get_runtime_surface_cache
     from .runtime_voice_reactive_motion import NativeVoiceReactiveMotionController
 except ImportError:  # pragma: no cover - exported native packages import from the same directory.
     from runtime_character_motion import (
@@ -15,6 +16,7 @@ except ImportError:  # pragma: no cover - exported native packages import from t
     )
     from runtime_player_view import clamp, get_safe_character_stage, with_alpha
     from runtime_speaker_focus import scale_rgb_color
+    from runtime_surface_cache import get_cached_transformed_surface, get_runtime_surface_cache
     from runtime_voice_reactive_motion import NativeVoiceReactiveMotionController
 
 
@@ -101,16 +103,15 @@ def render_native_characters(runtime, target=None) -> None:
                 * float(focus_pose["scaleMultiplier"])
                 * float(voice_pose["scaleMultiplier"])
             )
-            scaled = runtime.pygame.transform.smoothscale(
+            scaled = get_cached_transformed_surface(
+                get_runtime_surface_cache(runtime),
+                runtime.pygame,
                 sprite,
                 (max(1, int(sprite_width * scale)), max(1, int(sprite_height * scale))),
+                namespace="character-sprite",
+                flip_x=stage["flipX"],
             )
-            if stage["flipX"]:
-                scaled = runtime.pygame.transform.flip(scaled, True, False)
             brightness_multiplier = float(focus_pose["brightnessMultiplier"])
-            if brightness_multiplier < 0.999:
-                shade = max(0, min(255, round(255 * brightness_multiplier)))
-                scaled.fill((shade, shade, shade, 255), special_flags=runtime.pygame.BLEND_RGBA_MULT)
             effective_opacity = clamp(
                 stage["opacity"]
                 * transition_adjustment["opacityMultiplier"]
@@ -118,8 +119,12 @@ def render_native_characters(runtime, target=None) -> None:
                 0,
                 100,
             )
-            if effective_opacity < 100:
+            if brightness_multiplier < 0.999 or effective_opacity < 100:
                 scaled = scaled.copy()
+            if brightness_multiplier < 0.999:
+                shade = max(0, min(255, round(255 * brightness_multiplier)))
+                scaled.fill((shade, shade, shade, 255), special_flags=runtime.pygame.BLEND_RGBA_MULT)
+            if effective_opacity < 100:
                 scaled.set_alpha(int(255 * effective_opacity / 100))
             rect = scaled.get_rect(
                 midbottom=(

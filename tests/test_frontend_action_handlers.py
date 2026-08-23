@@ -6103,9 +6103,14 @@ class FrontendActionHandlerTests(unittest.TestCase):
         native_character_renderer_source = (
             ROOT_DIR / "native_runtime" / "runtime_character_renderer.py"
         ).read_text(encoding="utf-8")
+        native_surface_cache_source = (
+            ROOT_DIR / "native_runtime" / "runtime_surface_cache.py"
+        ).read_text(encoding="utf-8")
         self.assertIn('"flipX": read_bool("flipX")', native_view_source)
         self.assertIn("get_safe_character_stage", native_source)
-        self.assertIn("runtime.pygame.transform.flip(scaled, True, False)", native_character_renderer_source)
+        self.assertIn("get_cached_transformed_surface(", native_character_renderer_source)
+        self.assertIn('flip_x=stage["flipX"]', native_character_renderer_source)
+        self.assertIn("pygame_module.transform.flip(transformed, True, False)", native_surface_cache_source)
 
     def test_transition_duration_reaches_editor_preview_and_export_runtime(self) -> None:
         app_source = APP_PATH.read_text(encoding="utf-8")

@@ -11,6 +11,7 @@ EXPORT_RUNTIME_MODULE_SPECS = (
     ("Achievements", "runtime_achievements.js"),
     ("Data", "runtime_data.js"),
     ("Storage", "runtime_storage.js"),
+    ("SaveSlots", "runtime_save_slots.js"),
     ("PersistentVariables", "runtime_persistent_variables.js"),
     ("CharacterMotion", "runtime_character_motion.js"),
     ("SpeakerFocus", "runtime_speaker_focus.js"),

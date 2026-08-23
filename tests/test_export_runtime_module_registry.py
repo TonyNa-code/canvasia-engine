@@ -10,20 +10,23 @@ from export_runtime_module_registry import (
 
 
 class ExportRuntimeModuleRegistryTests(unittest.TestCase):
-    def test_registry_has_unique_keys_files_and_text_history_module(self) -> None:
+    def test_registry_has_unique_keys_and_cross_runtime_player_modules(self) -> None:
         suffixes = [suffix for suffix, _file_name in EXPORT_RUNTIME_MODULE_SPECS]
         files = list(get_export_runtime_module_files())
 
         self.assertEqual(len(suffixes), len(set(suffixes)))
         self.assertEqual(len(files), len(set(files)))
         self.assertIn("runtime_text_history.js", files)
+        self.assertIn("runtime_save_slots.js", files)
 
     def test_manifest_builder_shapes_web_and_desktop_paths(self) -> None:
         web = build_export_runtime_module_manifest("playerRuntime")
         desktop = build_export_runtime_module_manifest("appRuntime", "app")
 
         self.assertEqual(web["playerRuntimeTextHistory"], "runtime_text_history.js")
+        self.assertEqual(web["playerRuntimeSaveSlots"], "runtime_save_slots.js")
         self.assertEqual(desktop["appRuntimeTextHistory"], "app/runtime_text_history.js")
+        self.assertEqual(desktop["appRuntimeSaveSlots"], "app/runtime_save_slots.js")
         self.assertEqual(set(web.values()), set(get_export_runtime_module_files()))
         self.assertEqual(
             {value.removeprefix("app/") for value in desktop.values()},

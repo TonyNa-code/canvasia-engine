@@ -159,6 +159,28 @@ class CiWorkflowCoverageTests(unittest.TestCase):
             workflow,
         )
 
+    def test_cross_runtime_save_slot_protection_is_checked_in_ci(self) -> None:
+        workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("native_runtime/runtime_save_slots.py", workflow)
+        self.assertIn("native_runtime/runtime_save_overlay.py", workflow)
+        self.assertIn("export_player_template/runtime_save_slots.js", workflow)
+        self.assertIn("tests/test_native_runtime_save_slots.py", workflow)
+        self.assertIn("tests/test_native_runtime_save_overlay.py", workflow)
+        self.assertIn("tests/test_frontend_runtime_save_slots_module.py", workflow)
+        self.assertIn(
+            "python -m unittest discover -s tests -p 'test_native_runtime_save_slots.py' -v",
+            workflow,
+        )
+        self.assertIn(
+            "python -m unittest discover -s tests -p 'test_native_runtime_save_overlay.py' -v",
+            workflow,
+        )
+        self.assertIn(
+            "python -m unittest discover -s tests -p 'test_frontend_runtime_save_slots_module.py' -v",
+            workflow,
+        )
+
     def test_export_runtime_module_registry_is_checked_in_ci(self) -> None:
         workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
 
@@ -294,6 +316,16 @@ class CiWorkflowCoverageTests(unittest.TestCase):
         )
         self.assertIn(
             "python -m unittest discover -s tests -p 'test_voice_reactive_motion_contract.py' -v",
+            workflow,
+        )
+
+    def test_native_surface_cache_is_checked_in_ci(self) -> None:
+        workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("native_runtime/runtime_surface_cache.py", workflow)
+        self.assertIn("tests/test_native_runtime_surface_cache.py", workflow)
+        self.assertIn(
+            "python -m unittest discover -s tests -p 'test_native_runtime_surface_cache.py' -v",
             workflow,
         )
 

@@ -473,7 +473,7 @@ def build_runtime_cache_diagnostic_rows(context: dict | None) -> list[dict]:
     efficiency_tone = "empty"
     if total_entries > 0:
         efficiency_tone = "ready" if ready_percent >= 100 else "warming"
-    return [
+    rows = [
         build_status_row("图片缓存", f"{image_count} 项", "已解码到内存的背景、CG、立绘和 UI 图片。", "ready" if image_count else "empty"),
         build_status_row("音频缓存", f"{sound_count} 项", f"BGM：{active_bgm} / 语音：{active_voice}", "ready" if sound_count else "empty"),
         build_status_row("视频预览缓存", f"{video_preview_count} 项", "内嵌视频卡片的预览帧缓存。", "ready" if video_preview_count else "empty"),
@@ -485,6 +485,22 @@ def build_runtime_cache_diagnostic_rows(context: dict | None) -> list[dict]:
             efficiency_tone,
         ),
     ]
+    surface_cache = safe_context.get("surfaceCache") if isinstance(safe_context.get("surfaceCache"), dict) else {}
+    if surface_cache:
+        estimated_megabytes = float(surface_cache.get("estimatedBytes") or 0) / (1024 * 1024)
+        rows.insert(
+            1,
+            build_status_row(
+                "绘制变换缓存",
+                f"{int(surface_cache.get('entryCount') or 0)} 项",
+                (
+                    f"命中率 {int(surface_cache.get('hitRatePercent') or 0)}% / "
+                    f"约 {estimated_megabytes:.1f} MiB / 淘汰 {int(surface_cache.get('evictions') or 0)} 项。"
+                ),
+                "ready" if int(surface_cache.get("hits") or 0) else "empty",
+            ),
+        )
+    return rows
 
 
 def build_runtime_position_diagnostic_rows(context: dict | None) -> list[dict]:

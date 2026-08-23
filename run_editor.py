@@ -442,12 +442,15 @@ NATIVE_RUNTIME_VIDEO_TRANSPORT_NAME = "runtime_video_transport.py"
 NATIVE_RUNTIME_SFX_TRANSPORT_NAME = "runtime_sfx_transport.py"
 NATIVE_RUNTIME_CHARACTER_RENDERER_NAME = "runtime_character_renderer.py"
 NATIVE_RUNTIME_STAGE_RENDERER_NAME = "runtime_stage_renderer.py"
+NATIVE_RUNTIME_SURFACE_CACHE_NAME = "runtime_surface_cache.py"
 NATIVE_RUNTIME_STAGE_IMAGES_NAME = "runtime_stage_images.py"
 NATIVE_RUNTIME_CHOICE_AVAILABILITY_NAME = "runtime_choice_availability.py"
 NATIVE_RUNTIME_TIMED_CHOICES_NAME = "runtime_timed_choices.py"
 NATIVE_RUNTIME_ROLLBACK_NAME = "runtime_rollback.py"
 NATIVE_RUNTIME_TEXT_HISTORY_NAME = "runtime_text_history.py"
 NATIVE_RUNTIME_TEXT_HISTORY_OVERLAY_NAME = "runtime_text_history_overlay.py"
+NATIVE_RUNTIME_SAVE_SLOTS_NAME = "runtime_save_slots.py"
+NATIVE_RUNTIME_SAVE_OVERLAY_NAME = "runtime_save_overlay.py"
 NATIVE_RUNTIME_SAVE_THUMBNAILS_NAME = "runtime_save_thumbnails.py"
 NATIVE_RUNTIME_TEXT_EFFECTS_NAME = "runtime_text_effects.py"
 NATIVE_RUNTIME_TEXT_PACING_NAME = "runtime_text_pacing.py"
@@ -534,12 +537,15 @@ NATIVE_RUNTIME_REQUIRED_MODULE_FILES = build_native_runtime_required_module_file
         NATIVE_RUNTIME_SFX_TRANSPORT_NAME,
         NATIVE_RUNTIME_CHARACTER_RENDERER_NAME,
         NATIVE_RUNTIME_STAGE_RENDERER_NAME,
+        NATIVE_RUNTIME_SURFACE_CACHE_NAME,
         NATIVE_RUNTIME_STAGE_IMAGES_NAME,
         NATIVE_RUNTIME_CHOICE_AVAILABILITY_NAME,
         NATIVE_RUNTIME_TIMED_CHOICES_NAME,
         NATIVE_RUNTIME_ROLLBACK_NAME,
         NATIVE_RUNTIME_TEXT_HISTORY_NAME,
         NATIVE_RUNTIME_TEXT_HISTORY_OVERLAY_NAME,
+        NATIVE_RUNTIME_SAVE_SLOTS_NAME,
+        NATIVE_RUNTIME_SAVE_OVERLAY_NAME,
         NATIVE_RUNTIME_SAVE_THUMBNAILS_NAME,
         NATIVE_RUNTIME_TEXT_EFFECTS_NAME,
         NATIVE_RUNTIME_TEXT_PACING_NAME,
@@ -8829,6 +8835,10 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
         "runtimeCharacterRendererModulePath": str(build_dir / NATIVE_RUNTIME_CHARACTER_RENDERER_NAME),
         "runtimeStageRendererModuleName": NATIVE_RUNTIME_STAGE_RENDERER_NAME,
         "runtimeStageRendererModulePath": str(build_dir / NATIVE_RUNTIME_STAGE_RENDERER_NAME),
+        "runtimeSurfaceCacheModuleName": NATIVE_RUNTIME_SURFACE_CACHE_NAME,
+        "runtimeSurfaceCacheModulePath": str(build_dir / NATIVE_RUNTIME_SURFACE_CACHE_NAME),
+        "runtimeSaveOverlayModuleName": NATIVE_RUNTIME_SAVE_OVERLAY_NAME,
+        "runtimeSaveOverlayModulePath": str(build_dir / NATIVE_RUNTIME_SAVE_OVERLAY_NAME),
         "runtimeStageImagesModuleName": NATIVE_RUNTIME_STAGE_IMAGES_NAME,
         "runtimeStageImagesModulePath": str(build_dir / NATIVE_RUNTIME_STAGE_IMAGES_NAME),
         "runtimeChoiceAvailabilityModuleName": NATIVE_RUNTIME_CHOICE_AVAILABILITY_NAME,
@@ -9366,6 +9376,8 @@ def export_native_runtime_build() -> dict:
             "runtimeVoiceMixerModule": runtime_files["runtimeVoiceMixerModuleName"],
             "runtimeViewModule": runtime_files["runtimeViewModuleName"],
             "runtimeCharacterMotionModule": runtime_files["runtimeCharacterMotionModuleName"],
+            "runtimeSurfaceCacheModule": runtime_files["runtimeSurfaceCacheModuleName"],
+            "runtimeSaveOverlayModule": runtime_files["runtimeSaveOverlayModuleName"],
             "runtimeStageImagesModule": runtime_files["runtimeStageImagesModuleName"],
             "runtimeChoiceAvailabilityModule": runtime_files["runtimeChoiceAvailabilityModuleName"],
             "runtimeTimedChoicesModule": runtime_files["runtimeTimedChoicesModuleName"],
@@ -9455,6 +9467,8 @@ def export_native_runtime_build() -> dict:
             "runtimeVoiceMixerModule": runtime_files["runtimeVoiceMixerModuleName"],
             "runtimeViewModule": runtime_files["runtimeViewModuleName"],
             "runtimeCharacterMotionModule": runtime_files["runtimeCharacterMotionModuleName"],
+            "runtimeSurfaceCacheModule": runtime_files["runtimeSurfaceCacheModuleName"],
+            "runtimeSaveOverlayModule": runtime_files["runtimeSaveOverlayModuleName"],
             "runtimeStageImagesModule": runtime_files["runtimeStageImagesModuleName"],
             "runtimeChoiceAvailabilityModule": runtime_files["runtimeChoiceAvailabilityModuleName"],
             "runtimeTimedChoicesModule": runtime_files["runtimeTimedChoicesModuleName"],
@@ -9693,6 +9707,8 @@ def export_native_runtime_build() -> dict:
         {"name": runtime_files["runtimeVoiceMixerModuleName"], "description": "原生 Runtime 角色语音混音与持久化规则模块。"},
         {"name": runtime_files["runtimeViewModuleName"], "description": "原生 Runtime 可见层配置、转场安全值和文本排版模块。"},
         {"name": runtime_files["runtimeCharacterMotionModuleName"], "description": "原生 Runtime 角色走位、缩放、透明度、翻转和缓动插值模块。"},
+        {"name": runtime_files["runtimeSurfaceCacheModuleName"], "description": "原生 Runtime 图片变换和静态特效表面的有界 LRU 缓存。"},
+        {"name": runtime_files["runtimeSaveOverlayModuleName"], "description": "原生 Runtime 正式存读档面板绘制、键鼠交互与重要档位保护入口。"},
         {"name": runtime_files["runtimeStageImagesModuleName"], "description": "原生 Runtime 道具、Cut-in、前景装饰和氛围叠图模块。"},
         {"name": runtime_files["runtimeChoiceAvailabilityModuleName"], "description": "原生 Runtime 条件选项隐藏、锁定提示和死路安全保护模块。"},
         {"name": runtime_files["runtimeTimedChoicesModuleName"], "description": "原生 Runtime 限时选项、暂停恢复和超时安全分支模块。"},
@@ -9987,6 +10003,12 @@ def export_native_runtime_build() -> dict:
         "runtimeCharacterMotionModuleName": runtime_files["runtimeCharacterMotionModuleName"],
         "runtimeCharacterMotionModulePath": runtime_files["runtimeCharacterMotionModulePath"],
         "runtimeCharacterMotionModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimeCharacterMotionModuleName']}",
+        "runtimeSurfaceCacheModuleName": runtime_files["runtimeSurfaceCacheModuleName"],
+        "runtimeSurfaceCacheModulePath": runtime_files["runtimeSurfaceCacheModulePath"],
+        "runtimeSurfaceCacheModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimeSurfaceCacheModuleName']}",
+        "runtimeSaveOverlayModuleName": runtime_files["runtimeSaveOverlayModuleName"],
+        "runtimeSaveOverlayModulePath": runtime_files["runtimeSaveOverlayModulePath"],
+        "runtimeSaveOverlayModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimeSaveOverlayModuleName']}",
         "runtimeStageImagesModuleName": runtime_files["runtimeStageImagesModuleName"],
         "runtimeStageImagesModulePath": runtime_files["runtimeStageImagesModulePath"],
         "runtimeStageImagesModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimeStageImagesModuleName']}",

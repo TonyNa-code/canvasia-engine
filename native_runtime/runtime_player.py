@@ -120,6 +120,19 @@ except ImportError:  # pragma: no cover - exported native packages import from t
     )
 
 try:
+    from .runtime_surface_cache import (
+        NativeSurfaceCache,
+        get_cached_transformed_surface,
+        get_native_surface_cache_limits,
+    )
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_surface_cache import (
+        NativeSurfaceCache,
+        get_cached_transformed_surface,
+        get_native_surface_cache_limits,
+    )
+
+try:
     from .runtime_player_settings import (
         AUTO_PLAY_DELAY_PRESETS,
         DEFAULT_RUNTIME_PLAYER_SETTINGS,
@@ -596,6 +609,30 @@ except ImportError:  # pragma: no cover - exported native packages import from t
     )
 
 try:
+    from .runtime_save_slots import (
+        can_mutate_formal_save_slot,
+        is_formal_save_slot_protected,
+        toggle_formal_save_slot_protection,
+    )
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_save_slots import (
+        can_mutate_formal_save_slot,
+        is_formal_save_slot_protected,
+        toggle_formal_save_slot_protection,
+    )
+
+try:
+    from .runtime_save_overlay import (
+        handle_runtime_save_dialog_event,
+        render_runtime_save_dialog_overlay,
+    )
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_save_overlay import (
+        handle_runtime_save_dialog_event,
+        render_runtime_save_dialog_overlay,
+    )
+
+try:
     from .runtime_input import (
         build_controller_control_group,
         build_controller_input_state,
@@ -675,7 +712,6 @@ try:
         TRANSITION_DURATION_MAX_MS,
         TRANSITION_DURATION_MIN_MS,
         build_native_transition_state,
-        build_save_dialog_layout,
         build_save_dialog_page_data,
         build_variable_summary_text,
         clamp,
@@ -737,7 +773,6 @@ except ImportError:  # pragma: no cover - exported native packages import from t
         TRANSITION_DURATION_MAX_MS,
         TRANSITION_DURATION_MIN_MS,
         build_native_transition_state,
-        build_save_dialog_layout,
         build_save_dialog_page_data,
         build_variable_summary_text,
         clamp,
@@ -8061,6 +8096,9 @@ class NativeRuntimePlayer:
         self.active_text_scale_percent = 100
         self.image_cache: dict[str, object] = {}
         self.image_file_cache: dict[str, object] = {}
+        self.surface_cache = NativeSurfaceCache(
+            **get_native_surface_cache_limits(self.get_runtime_preload_performance_profile())
+        )
         self.last_gameplay_frame = None
         self.sound_cache: dict[str, object] = {}
         self.runtime_preload_manifest = self.get_runtime_preload_manifest()
@@ -9657,6 +9695,21 @@ class NativeRuntimePlayer:
             (target_top, rect.height - target_bottom),
             (rect.height - target_bottom, rect.height),
         ]
+        cache_key = (
+            "nine-slice",
+            id(source),
+            rect.width,
+            rect.height,
+            left,
+            right,
+            top,
+            bottom,
+            opacity,
+        )
+        cached_frame = self.surface_cache.get(cache_key)
+        if cached_frame is not None:
+            self.screen.blit(cached_frame, rect.topleft)
+            return
         frame_surface = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
 
         for row_index, (source_y1, source_y2) in enumerate(source_rows):
@@ -9678,6 +9731,7 @@ class NativeRuntimePlayer:
                 frame_surface.blit(segment, target_rect)
 
         frame_surface.set_alpha(int(round(opacity * 2.55)))
+        self.surface_cache.put(cache_key, frame_surface)
         self.screen.blit(frame_surface, rect.topleft)
 
     def get_game_ui_panel_frame_image(self, frame_kind: str = "panel"):
@@ -9828,10 +9882,14 @@ class NativeRuntimePlayer:
                     scale = min(rect.width / art_width, rect.height / art_height)
                 else:
                     scale = max(rect.width / art_width, rect.height / art_height)
-                scaled = pygame.transform.smoothscale(
+                scaled = get_cached_transformed_surface(
+                    self.surface_cache,
+                    pygame,
                     panel_art,
                     (max(1, int(art_width * scale)), max(1, int(art_height * scale))),
+                    namespace="dialog-panel-art",
                 )
+                scaled = scaled.copy()
                 scaled.set_alpha(int(round(panel_art_opacity * 2.55)))
                 art_rect = scaled.get_rect(center=panel_rect.center)
                 panel_surface.blit(scaled, art_rect)
@@ -10077,15 +10135,21 @@ class NativeRuntimePlayer:
             return
         slot_index = int(visible_slots[visible_slot_index]["slotIndex"])
         if self.overlay_mode == "save":
-            self.save_formal_slot(slot_index)
-            self.close_overlay(preserve_status=True)
+            if self.save_formal_slot(slot_index):
+                self.close_overlay(preserve_status=True)
         elif self.overlay_mode == "load":
             snapshot = (self.save_store.get("formalSlots") or [None] * self.formal_save_slot_count)[slot_index]
             if not snapshot:
                 self.status_message = f"正式存档 {slot_index + 1} 还是空的。"
                 return
-            self.load_formal_slot(slot_index)
-            self.close_overlay(preserve_status=True)
+            if self.load_formal_slot(slot_index):
+                self.close_overlay(preserve_status=True)
+
+    def toggle_visible_save_slot_protection(self, visible_slot_index: int) -> bool:
+        visible_slots = self.get_save_dialog_data().get("visibleSlots") or []
+        if visible_slot_index < 0 or visible_slot_index >= len(visible_slots):
+            return False
+        return self.toggle_formal_slot_protection(int(visible_slots[visible_slot_index]["slotIndex"]))
 
     def restart_story(self) -> None:
         self.record_player_return_to_start()
@@ -10738,6 +10802,10 @@ class NativeRuntimePlayer:
             self.save_store["quickSave"] = snapshot
         elif kind == "formal" and slot_index is not None:
             previous_snapshot = self.save_store["formalSlots"][slot_index]
+            if not can_mutate_formal_save_slot(previous_snapshot):
+                return False
+            snapshot = dict(snapshot)
+            snapshot["protected"] = False
             self.save_store["formalSlots"][slot_index] = snapshot
         else:
             return False
@@ -10789,28 +10857,58 @@ class NativeRuntimePlayer:
         self.persist_auto_resume_snapshot()
         self.status_message = f"已读入快速存档：{snapshot.get('sceneName') or '未命名场景'}"
 
-    def save_formal_slot(self, slot_index: int) -> None:
+    def save_formal_slot(self, slot_index: int) -> bool:
         if slot_index < 0 or slot_index >= self.formal_save_slot_count:
-            return
+            return False
+        previous_snapshot = (self.save_store.get("formalSlots") or [None] * self.formal_save_slot_count)[slot_index]
+        if is_formal_save_slot_protected(previous_snapshot):
+            self.status_message = f"正式存档 {slot_index + 1} 已保护；取消保护后才能覆盖。"
+            return False
         snapshot = self.build_save_snapshot("formal")
         thumbnail_metadata = self.capture_save_thumbnail("formal", slot_index)
         snapshot.update(thumbnail_metadata)
         if not self.commit_save_snapshot("formal", snapshot, slot_index):
             self.status_message = f"正式存档 {slot_index + 1} 写入失败，原存档仍然保留；请检查磁盘空间或目录权限。"
-            return
+            return False
         suffix = "（含画面缩略图）" if thumbnail_metadata else "（缩略图捕获失败，进度已安全保存）"
         self.status_message = f"正式存档 {slot_index + 1} 已写入：{self.save_file_path.name}{suffix}"
+        return True
 
-    def load_formal_slot(self, slot_index: int) -> None:
+    def load_formal_slot(self, slot_index: int) -> bool:
         if slot_index < 0 or slot_index >= self.formal_save_slot_count:
-            return
+            return False
         snapshot = (self.save_store.get("formalSlots") or [None] * self.formal_save_slot_count)[slot_index]
         if not snapshot:
             self.status_message = f"正式存档 {slot_index + 1} 还是空的。"
-            return
+            return False
         self.restore_from_snapshot(snapshot)
         self.persist_auto_resume_snapshot()
         self.status_message = f"已读入正式存档 {slot_index + 1}：{snapshot.get('sceneName') or '未命名场景'}"
+        return True
+
+    def toggle_formal_slot_protection(self, slot_index: int) -> bool:
+        if slot_index < 0 or slot_index >= self.formal_save_slot_count:
+            return False
+        formal_slots = self.save_store.get("formalSlots") or []
+        snapshot = formal_slots[slot_index] if slot_index < len(formal_slots) else None
+        updated_snapshot = toggle_formal_save_slot_protection(snapshot)
+        if updated_snapshot is None:
+            self.status_message = f"正式存档 {slot_index + 1} 还是空的，无法保护。"
+            return False
+        formal_slots[slot_index] = updated_snapshot
+        try:
+            self.persist_save_store()
+        except (OSError, TypeError, ValueError):
+            formal_slots[slot_index] = snapshot
+            self.status_message = f"正式存档 {slot_index + 1} 的保护状态写入失败，原存档未改变。"
+            return False
+        protected = is_formal_save_slot_protected(updated_snapshot)
+        self.status_message = (
+            f"正式存档 {slot_index + 1} 已保护，不会被误覆盖。"
+            if protected
+            else f"正式存档 {slot_index + 1} 已取消保护。"
+        )
+        return True
 
     def restore_from_snapshot(self, snapshot: dict, *, reset_rollback: bool = True) -> None:
         if reset_rollback:
@@ -13250,188 +13348,7 @@ class NativeRuntimePlayer:
         )
 
     def render_save_dialog_overlay(self) -> None:
-        dialog_data = self.get_save_dialog_data()
-        slots = dialog_data.get("visibleSlots") or []
-        layout = build_save_dialog_layout(self.width, self.height, len(slots))
-        panel_layout = layout["panel"]
-        panel = self.pygame.Rect(
-            panel_layout["x"],
-            panel_layout["y"],
-            panel_layout["width"],
-            panel_layout["height"],
-        )
-        compact = bool(layout["compact"])
-        self.pygame.draw.rect(self.screen, with_alpha(self.dialog_box_config.get("backgroundColor", COLOR_PANEL), 96), panel, border_radius=28)
-        self.pygame.draw.rect(
-            self.screen,
-            with_alpha(self.dialog_box_config.get("borderColor", COLOR_PANEL_BORDER), 72),
-            panel,
-            2,
-            border_radius=28,
-        )
-        self.draw_game_ui_panel_frame(panel, "system")
-
-        title = "正式存档" if self.overlay_mode == "save" else "读取存档"
-        title_surface = self.font_title.render(title, True, self.dialog_box_config.get("speakerColor", COLOR_TEXT))
-        subtitle = f"第 {dialog_data['page'] + 1} / {dialog_data['pageCount']} 页 · 共 {dialog_data['slotCount']} 格"
-        subtitle_surface = self.font_ui.render(subtitle, True, self.dialog_box_config.get("hintColor", COLOR_TEXT_MUTED))
-        self.screen.blit(title_surface, layout["titlePosition"])
-        self.screen.blit(subtitle_surface, layout["subtitlePosition"])
-
-        quick_save = dialog_data.get("quickSave") or {}
-        quick_layout = layout["quick"]
-        quick_rect = self.pygame.Rect(
-            quick_layout["x"],
-            quick_layout["y"],
-            quick_layout["width"],
-            quick_layout["height"],
-        )
-        self.pygame.draw.rect(self.screen, with_alpha(self.dialog_box_config.get("backgroundColor", COLOR_PANEL), 42), quick_rect, border_radius=18)
-        self.pygame.draw.rect(
-            self.screen,
-            with_alpha(self.dialog_box_config.get("borderColor", COLOR_PANEL_BORDER), 26),
-            quick_rect,
-            1,
-            border_radius=18,
-        )
-        self.draw_game_ui_panel_frame(quick_rect, "save")
-        quick_thumbnail_height = max(36, quick_rect.height - 20)
-        quick_thumbnail_width = min(104, round(quick_thumbnail_height * 16 / 9))
-        quick_thumbnail_rect = self.pygame.Rect(
-            quick_rect.left + 10,
-            quick_rect.top + 10,
-            quick_thumbnail_width,
-            quick_thumbnail_height,
-        )
-        self.draw_save_thumbnail(
-            quick_save,
-            quick_thumbnail_rect,
-            "空" if quick_save.get("isEmpty") else "旧存档",
-        )
-        quick_text_left = quick_thumbnail_rect.right + 12
-        quick_title = "快速存档" if not quick_save.get("isEmpty") else "快速存档（空）"
-        self.screen.blit(
-            self.font_ui.render(quick_title, True, self.dialog_box_config.get("speakerColor", COLOR_TEXT)),
-            (quick_text_left, quick_rect.top + (7 if compact else 10)),
-        )
-        quick_variable_summary = str(quick_save.get("variableSummaryText") or "")
-        quick_meta = f"{quick_save.get('savedAt')} · {quick_save.get('sceneName') or '尚未创建'}"
-        if quick_variable_summary:
-            quick_meta = f"{quick_meta} · {quick_variable_summary}"
-        self.screen.blit(
-            self.font_ui.render(quick_meta[:92], True, self.dialog_box_config.get("hintColor", COLOR_TEXT_MUTED)),
-            (quick_text_left, quick_rect.top + (28 if compact else 34)),
-        )
-        quick_summary = str(quick_save.get("summaryText") or "空")
-        self.screen.blit(
-            self.font_ui.render(quick_summary[:78], True, self.dialog_box_config.get("textColor", COLOR_TEXT)),
-            (quick_text_left, quick_rect.top + (48 if compact else 52)),
-        )
-
-        for visible_index, (slot, card_layout) in enumerate(zip(slots, layout["cards"])):
-            card_rect = self.pygame.Rect(
-                card_layout["x"],
-                card_layout["y"],
-                card_layout["width"],
-                card_layout["height"],
-            )
-            is_active = visible_index == self.overlay_focus_index
-            fill_opacity = 78 if is_active else 34
-            border_opacity = 92 if is_active else 24
-            self.pygame.draw.rect(
-                self.screen,
-                with_alpha(
-                    self.dialog_box_config.get("borderColor", COLOR_ACCENT) if is_active else self.dialog_box_config.get("backgroundColor", COLOR_PANEL),
-                    fill_opacity,
-                ),
-                card_rect,
-                border_radius=22,
-            )
-            self.pygame.draw.rect(
-                self.screen,
-                with_alpha(
-                    self.dialog_box_config.get("speakerColor", COLOR_ACCENT_ALT) if is_active else self.dialog_box_config.get("borderColor", COLOR_PANEL_BORDER),
-                    border_opacity,
-                ),
-                card_rect,
-                2,
-                border_radius=22,
-            )
-            self.draw_game_ui_panel_frame(card_rect, "save")
-            label = str(slot.get("label") or "")
-            scene_name = str(slot.get("sceneName") or ("空位" if slot.get("isEmpty") else "未命名场景"))
-            summary_text = str(slot.get("summaryText") or "")
-            if slot.get("finished"):
-                summary_text = "路线结束 · " + summary_text
-            saved_at = str(slot.get("savedAt") or "尚未保存")
-            variable_summary = str(slot.get("variableSummaryText") or "")
-            meta_text = f"{saved_at} · {variable_summary}" if variable_summary else saved_at
-            thumbnail_height = max(28, min(70, card_rect.height - 46))
-            thumbnail_width = min(126, round(thumbnail_height * 16 / 9))
-            thumbnail_rect = self.pygame.Rect(
-                card_rect.left + 12,
-                card_rect.top + 34,
-                thumbnail_width,
-                thumbnail_height,
-            )
-            self.draw_save_thumbnail(
-                slot,
-                thumbnail_rect,
-                "空位" if slot.get("isEmpty") else "旧存档",
-            )
-            text_left = thumbnail_rect.right + 12
-            self.screen.blit(
-                self.font_ui.render(label, True, self.dialog_box_config.get("speakerColor", COLOR_TEXT)),
-                (card_rect.left + 16, card_rect.top + 12),
-            )
-            self.screen.blit(
-                self.font_body.render(scene_name[:16], True, self.dialog_box_config.get("textColor", COLOR_TEXT)),
-                (text_left, card_rect.top + 34),
-            )
-            if card_rect.height >= 92:
-                self.screen.blit(
-                    self.font_ui.render(meta_text[:30], True, self.dialog_box_config.get("hintColor", COLOR_TEXT_MUTED)),
-                    (text_left, card_rect.top + 70),
-                )
-            if card_rect.height >= 112:
-                self.screen.blit(
-                    self.font_ui.render(summary_text[:26], True, self.dialog_box_config.get("textColor", COLOR_TEXT)),
-                    (text_left, card_rect.top + 92),
-                )
-            self.overlay_hotspots.append({"kind": "slot", "value": visible_index, "rect": card_rect})
-
-        controls = [("prev", "上一页"), ("next", "下一页"), ("switch", "切换存/读"), ("close", "关闭")]
-        for (action, label), control_layout in zip(controls, layout["controls"]):
-            button_rect = self.pygame.Rect(
-                control_layout["x"],
-                control_layout["y"],
-                control_layout["width"],
-                control_layout["height"],
-            )
-            self.pygame.draw.rect(self.screen, with_alpha(self.dialog_box_config.get("backgroundColor", COLOR_PANEL), 58), button_rect, border_radius=14)
-            self.pygame.draw.rect(
-                self.screen,
-                with_alpha(self.dialog_box_config.get("borderColor", COLOR_PANEL_BORDER), 42),
-                button_rect,
-                1,
-                border_radius=14,
-            )
-            self.draw_game_ui_button_frame(button_rect, self.get_game_ui_button_state(button_rect))
-            self.blit_text_center(
-                self.font_ui,
-                label,
-                button_rect.centerx,
-                button_rect.top + (5 if compact else 8),
-                self.dialog_box_config.get("textColor", COLOR_TEXT),
-            )
-            self.overlay_hotspots.append({"kind": action, "rect": button_rect})
-
-        slot_key_end = max(1, min(9, len(slots)))
-        hint = f"数字键 1-{slot_key_end} 选槽位 · ←→ 切页 · Enter 执行 · Esc 关闭"
-        self.screen.blit(
-            self.font_ui.render(hint, True, self.dialog_box_config.get("hintColor", COLOR_TEXT_MUTED)),
-            layout["hintPosition"],
-        )
+        render_runtime_save_dialog_overlay(self)
 
     def get_profile_total_play_ms(self) -> int:
         profile = sanitize_player_profile(self.player_profile)
@@ -13606,6 +13523,7 @@ class NativeRuntimePlayer:
             "imageCache": getattr(self, "image_cache", {}),
             "soundCache": getattr(self, "sound_cache", {}),
             "videoPreviewFrameCache": getattr(self, "video_preview_frame_cache", {}),
+            "surfaceCache": self.surface_cache.snapshot() if hasattr(self, "surface_cache") else {},
             "runtimeScenePrefetchedAssetIds": getattr(self, "runtime_scene_prefetched_asset_ids", set()),
             "currentBgmAssetId": getattr(self, "current_bgm_asset_id", None),
             "voicePlaybackActive": bool(getattr(self, "voice_playback_active", False)),
@@ -14699,58 +14617,7 @@ class NativeRuntimePlayer:
         return True
 
     def handle_save_dialog_event(self, event) -> bool:
-        pygame = self.pygame
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_LEFT:
-                self.change_save_dialog_page(-1)
-                return True
-            if event.key == pygame.K_RIGHT:
-                self.change_save_dialog_page(1)
-                return True
-            if event.key == pygame.K_UP:
-                self.overlay_focus_index = (self.overlay_focus_index - 2) % max(1, self.get_save_dialog_slot_count())
-                self.normalize_overlay_focus()
-                return True
-            if event.key == pygame.K_DOWN:
-                self.overlay_focus_index = (self.overlay_focus_index + 2) % max(1, self.get_save_dialog_slot_count())
-                self.normalize_overlay_focus()
-                return True
-            if event.key == pygame.K_a:
-                self.overlay_focus_index = max(0, self.overlay_focus_index - 1)
-                return True
-            if event.key == pygame.K_d:
-                self.overlay_focus_index = min(max(0, self.get_save_dialog_slot_count() - 1), self.overlay_focus_index + 1)
-                return True
-            if event.key in (pygame.K_RETURN, pygame.K_SPACE):
-                self.activate_overlay_slot(self.overlay_focus_index)
-                return True
-            digit_map = {
-                pygame.K_1: 0,
-                pygame.K_2: 1,
-                pygame.K_3: 2,
-                pygame.K_4: 3,
-                pygame.K_5: 4,
-                pygame.K_6: 5,
-            }
-            if event.key in digit_map:
-                self.activate_overlay_slot(digit_map[event.key])
-                return True
-        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            for target in self.overlay_hotspots:
-                if target["rect"].collidepoint(event.pos):
-                    kind = target.get("kind")
-                    if kind == "slot":
-                        self.activate_overlay_slot(int(target.get("value", 0)))
-                    elif kind == "prev":
-                        self.change_save_dialog_page(-1)
-                    elif kind == "next":
-                        self.change_save_dialog_page(1)
-                    elif kind == "switch":
-                        self.open_save_dialog("load" if self.overlay_mode == "save" else "save")
-                    elif kind == "close":
-                        self.close_overlay()
-                    return True
-        return True
+        return handle_runtime_save_dialog_event(self, event)
 
     def handle_system_menu_event(self, event) -> bool:
         pygame = self.pygame

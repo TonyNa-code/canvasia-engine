@@ -116,6 +116,7 @@ class NativeRuntimePlayerViewTests(unittest.TestCase):
                     "sceneName": "屋顶",
                     "savedAt": "2026-07-15T10:20:30",
                     "summaryText": "",
+                    "protected": True,
                     "variableState": {"affection": 3.0, "flag": False},
                     "thumbnailKey": "formal-0002",
                     "thumbnailWidth": "bad",
@@ -137,7 +138,9 @@ class NativeRuntimePlayerViewTests(unittest.TestCase):
         self.assertEqual(page_data["quickSave"]["thumbnailKey"], "quick")
         self.assertEqual(page_data["quickSave"]["thumbnailWidth"], 320)
         self.assertTrue(page_data["visibleSlots"][0]["isEmpty"])
+        self.assertFalse(page_data["visibleSlots"][0]["protected"])
         self.assertEqual(page_data["visibleSlots"][1]["sceneName"], "屋顶")
+        self.assertTrue(page_data["visibleSlots"][1]["protected"])
         self.assertEqual(page_data["visibleSlots"][1]["summaryText"], "当前没有摘要。")
         self.assertEqual(page_data["visibleSlots"][1]["variableSummaryText"], "好感:3 / 约定:关")
         self.assertEqual(page_data["visibleSlots"][1]["thumbnailKey"], "formal-0002")

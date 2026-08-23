@@ -57,6 +57,14 @@ class NativeRuntimeDiagnosticsTests(unittest.TestCase):
                 "imageCache": {"bg": object(), "missing": None},
                 "soundCache": {"voice": object()},
                 "videoPreviewFrameCache": {"op": object()},
+                "surfaceCache": {
+                    "entryCount": 9,
+                    "estimatedBytes": 8 * 1024 * 1024,
+                    "hits": 18,
+                    "misses": 2,
+                    "evictions": 1,
+                    "hitRatePercent": 90,
+                },
                 "runtimeScenePrefetchedAssetIds": {"bg_branch", "voice_branch"},
                 "currentBgmAssetId": "bgm_theme",
                 "voicePlaybackActive": True,
@@ -91,6 +99,9 @@ class NativeRuntimeDiagnosticsTests(unittest.TestCase):
         self.assertIn("图片 1 / 音频 1 / 视频 0", by_label["路线预取"]["detail"])
         self.assertEqual(by_label["分支预判"]["value"], "1 个场景")
         self.assertEqual(by_label["图片缓存"]["value"], "1 项")
+        self.assertEqual(by_label["绘制变换缓存"]["value"], "9 项")
+        self.assertIn("命中率 90%", by_label["绘制变换缓存"]["detail"])
+        self.assertIn("8.0 MiB", by_label["绘制变换缓存"]["detail"])
         self.assertEqual(by_label["音频缓存"]["value"], "1 项")
         self.assertIn("BGM：bgm_theme", by_label["音频缓存"]["detail"])
         self.assertEqual(by_label["缓存复用效率"]["value"], "2/7")

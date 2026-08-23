@@ -12,6 +12,7 @@ try:
         with_alpha,
     )
     from .runtime_stage_images import build_native_renderable_stage_image_items, get_safe_stage_image_transform
+    from .runtime_surface_cache import get_cached_transformed_surface, get_runtime_surface_cache
     from .runtime_visual_comfort import scale_visual_motion
 except ImportError:  # pragma: no cover - exported native packages import from the same directory.
     from runtime_player_view import (
@@ -23,6 +24,7 @@ except ImportError:  # pragma: no cover - exported native packages import from t
         with_alpha,
     )
     from runtime_stage_images import build_native_renderable_stage_image_items, get_safe_stage_image_transform
+    from runtime_surface_cache import get_cached_transformed_surface, get_runtime_surface_cache
     from runtime_visual_comfort import scale_visual_motion
 
 
@@ -35,6 +37,26 @@ SCREEN_FILTER_WASH = {
 }
 SCREEN_FILTER_STRENGTH_MULTIPLIER = {"soft": 0.62, "medium": 1.0, "strong": 1.38}
 DEPTH_BLUR_ALPHA = {"soft": 24, "medium": 42, "strong": 64}
+
+
+def _get_cached_stage_effect_surface(runtime, key: tuple, factory):
+    cache_key = ("stage-effect", runtime.width, runtime.height, *key)
+    return get_runtime_surface_cache(runtime).get_or_create(cache_key, factory)
+
+
+def _get_cached_solid_overlay(runtime, namespace: str, color: tuple[int, int, int], alpha: int):
+    safe_alpha = max(0, min(255, int(alpha)))
+
+    def build_surface():
+        surface = runtime.pygame.Surface((runtime.width, runtime.height), runtime.pygame.SRCALPHA)
+        surface.fill((*color[:3], safe_alpha))
+        return surface
+
+    return _get_cached_stage_effect_surface(
+        runtime,
+        ("solid", namespace, tuple(color[:3]), safe_alpha),
+        build_surface,
+    )
 
 
 def _mix_rgb(color_a: tuple[int, int, int], color_b: tuple[int, int, int], amount: float) -> tuple[int, int, int]:
@@ -88,82 +110,90 @@ def render_native_stage_effect_overlays(runtime) -> None:
         grade = get_safe_screen_color_grade(runtime.screen_filter_effect.get("grade"))
         wash_color, base_alpha = SCREEN_FILTER_WASH.get(preset, SCREEN_FILTER_WASH["memory"])
         alpha = int(base_alpha * SCREEN_FILTER_STRENGTH_MULTIPLIER.get(strength, 1.0))
-        wash = runtime.pygame.Surface((runtime.width, runtime.height), runtime.pygame.SRCALPHA)
-        wash.fill((*wash_color, max(0, min(160, alpha))))
+        wash = _get_cached_solid_overlay(runtime, "filter", wash_color, max(0, min(160, alpha)))
         runtime.screen.blit(wash, (0, 0))
 
         temperature = int(grade.get("temperature") or 0)
         if temperature:
             temp_color = (255, 184, 102) if temperature > 0 else (108, 172, 255)
             temp_alpha = int(min(54, abs(temperature) / 100 * 54))
-            temp_wash = runtime.pygame.Surface((runtime.width, runtime.height), runtime.pygame.SRCALPHA)
-            temp_wash.fill((*temp_color, temp_alpha))
+            temp_wash = _get_cached_solid_overlay(runtime, "temperature", temp_color, temp_alpha)
             runtime.screen.blit(temp_wash, (0, 0))
 
         brightness_delta = int(grade.get("brightness") or 100) - 100
         if brightness_delta:
             tone = 255 if brightness_delta > 0 else 0
             tone_alpha = int(min(72, abs(brightness_delta) / 80 * 72))
-            tone_wash = runtime.pygame.Surface((runtime.width, runtime.height), runtime.pygame.SRCALPHA)
-            tone_wash.fill((tone, tone, tone, tone_alpha))
+            tone_wash = _get_cached_solid_overlay(runtime, "brightness", (tone, tone, tone), tone_alpha)
             runtime.screen.blit(tone_wash, (0, 0))
 
         contrast_delta = int(grade.get("contrast") or 100) - 100
         if contrast_delta > 0:
             multiplier = 255 - int(min(42, contrast_delta / 80 * 42))
-            contrast_wash = runtime.pygame.Surface((runtime.width, runtime.height), runtime.pygame.SRCALPHA)
-            contrast_wash.fill((multiplier, multiplier, multiplier, 255))
+            contrast_wash = _get_cached_solid_overlay(
+                runtime,
+                "contrast",
+                (multiplier, multiplier, multiplier),
+                255,
+            )
             runtime.screen.blit(contrast_wash, (0, 0), special_flags=runtime.pygame.BLEND_RGBA_MULT)
         elif contrast_delta < 0:
             flat_alpha = int(min(42, abs(contrast_delta) / 80 * 42))
-            flat_wash = runtime.pygame.Surface((runtime.width, runtime.height), runtime.pygame.SRCALPHA)
-            flat_wash.fill((140, 148, 160, flat_alpha))
+            flat_wash = _get_cached_solid_overlay(runtime, "contrast-flat", (140, 148, 160), flat_alpha)
             runtime.screen.blit(flat_wash, (0, 0))
 
         saturation_delta = int(grade.get("saturation") or 100) - 100
         if saturation_delta < 0:
             gray_alpha = int(min(58, abs(saturation_delta) / 100 * 58))
-            gray_wash = runtime.pygame.Surface((runtime.width, runtime.height), runtime.pygame.SRCALPHA)
-            gray_wash.fill((184, 192, 206, gray_alpha))
+            gray_wash = _get_cached_solid_overlay(runtime, "saturation", (184, 192, 206), gray_alpha)
             runtime.screen.blit(gray_wash, (0, 0))
 
         hue_shift = int(grade.get("hue") or 0)
         if hue_shift:
             hue_color = (142, 106, 255) if hue_shift > 0 else (94, 222, 184)
             hue_alpha = int(min(34, abs(hue_shift) / 180 * 34))
-            hue_wash = runtime.pygame.Surface((runtime.width, runtime.height), runtime.pygame.SRCALPHA)
-            hue_wash.fill((*hue_color, hue_alpha))
+            hue_wash = _get_cached_solid_overlay(runtime, "hue", hue_color, hue_alpha)
             runtime.screen.blit(hue_wash, (0, 0))
 
         vignette = int(grade.get("vignette") or 0)
         if vignette > 0:
-            vignette_surface = runtime.pygame.Surface((runtime.width, runtime.height), runtime.pygame.SRCALPHA)
             max_alpha = int(min(122, vignette / 100 * 122))
-            band = max(1, int(min(runtime.width, runtime.height) * 0.16))
-            for index in range(6):
-                ratio = (index + 1) / 6
-                alpha_step = int(max_alpha * ratio)
-                inset = int(band * (1 - ratio))
-                edge = max(1, band - inset)
-                runtime.pygame.draw.rect(vignette_surface, (2, 6, 12, alpha_step), runtime.pygame.Rect(0, 0, runtime.width, edge))
-                runtime.pygame.draw.rect(vignette_surface, (2, 6, 12, alpha_step), runtime.pygame.Rect(0, runtime.height - edge, runtime.width, edge))
-                runtime.pygame.draw.rect(vignette_surface, (2, 6, 12, alpha_step), runtime.pygame.Rect(0, 0, edge, runtime.height))
-                runtime.pygame.draw.rect(vignette_surface, (2, 6, 12, alpha_step), runtime.pygame.Rect(runtime.width - edge, 0, edge, runtime.height))
+
+            def build_vignette():
+                surface = runtime.pygame.Surface((runtime.width, runtime.height), runtime.pygame.SRCALPHA)
+                band = max(1, int(min(runtime.width, runtime.height) * 0.16))
+                for index in range(6):
+                    ratio = (index + 1) / 6
+                    alpha_step = int(max_alpha * ratio)
+                    inset = int(band * (1 - ratio))
+                    edge = max(1, band - inset)
+                    runtime.pygame.draw.rect(surface, (2, 6, 12, alpha_step), runtime.pygame.Rect(0, 0, runtime.width, edge))
+                    runtime.pygame.draw.rect(surface, (2, 6, 12, alpha_step), runtime.pygame.Rect(0, runtime.height - edge, runtime.width, edge))
+                    runtime.pygame.draw.rect(surface, (2, 6, 12, alpha_step), runtime.pygame.Rect(0, 0, edge, runtime.height))
+                    runtime.pygame.draw.rect(surface, (2, 6, 12, alpha_step), runtime.pygame.Rect(runtime.width - edge, 0, edge, runtime.height))
+                return surface
+
+            vignette_surface = _get_cached_stage_effect_surface(runtime, ("vignette", max_alpha), build_vignette)
             runtime.screen.blit(vignette_surface, (0, 0))
 
     if runtime.depth_blur_effect:
         strength = str(runtime.depth_blur_effect.get("strength") or "medium")
         focus = str(runtime.depth_blur_effect.get("focus") or "full")
         alpha = DEPTH_BLUR_ALPHA.get(strength, DEPTH_BLUR_ALPHA["medium"])
-        shade = runtime.pygame.Surface((runtime.width, runtime.height), runtime.pygame.SRCALPHA)
-        shade.fill((0, 0, 0, 0 if focus in {"left", "right", "center"} else alpha))
-        if focus == "left":
-            runtime.pygame.draw.rect(shade, (0, 0, 0, alpha), runtime.pygame.Rect(int(runtime.width * 0.42), 0, int(runtime.width * 0.58), runtime.height))
-        elif focus == "right":
-            runtime.pygame.draw.rect(shade, (0, 0, 0, alpha), runtime.pygame.Rect(0, 0, int(runtime.width * 0.58), runtime.height))
-        elif focus == "center":
-            runtime.pygame.draw.rect(shade, (0, 0, 0, alpha), runtime.pygame.Rect(0, 0, int(runtime.width * 0.26), runtime.height))
-            runtime.pygame.draw.rect(shade, (0, 0, 0, alpha), runtime.pygame.Rect(int(runtime.width * 0.74), 0, int(runtime.width * 0.26), runtime.height))
+
+        def build_depth_shade():
+            surface = runtime.pygame.Surface((runtime.width, runtime.height), runtime.pygame.SRCALPHA)
+            surface.fill((0, 0, 0, 0 if focus in {"left", "right", "center"} else alpha))
+            if focus == "left":
+                runtime.pygame.draw.rect(surface, (0, 0, 0, alpha), runtime.pygame.Rect(int(runtime.width * 0.42), 0, int(runtime.width * 0.58), runtime.height))
+            elif focus == "right":
+                runtime.pygame.draw.rect(surface, (0, 0, 0, alpha), runtime.pygame.Rect(0, 0, int(runtime.width * 0.58), runtime.height))
+            elif focus == "center":
+                runtime.pygame.draw.rect(surface, (0, 0, 0, alpha), runtime.pygame.Rect(0, 0, int(runtime.width * 0.26), runtime.height))
+                runtime.pygame.draw.rect(surface, (0, 0, 0, alpha), runtime.pygame.Rect(int(runtime.width * 0.74), 0, int(runtime.width * 0.26), runtime.height))
+            return surface
+
+        shade = _get_cached_stage_effect_surface(runtime, ("depth", focus, alpha), build_depth_shade)
         runtime.screen.blit(shade, (0, 0))
 
 
@@ -233,15 +263,20 @@ def render_native_background_asset(runtime, target, asset_id: str | None, alpha:
     if background:
         bg_width, bg_height = background.get_size()
         scale = max(runtime.width / bg_width, runtime.height / bg_height)
-        scaled = runtime.pygame.transform.smoothscale(background, (max(1, int(bg_width * scale)), max(1, int(bg_height * scale))))
+        scaled = get_cached_transformed_surface(
+            get_runtime_surface_cache(runtime),
+            runtime.pygame,
+            background,
+            (max(1, int(bg_width * scale)), max(1, int(bg_height * scale))),
+            namespace="stage-background",
+        )
         render_target.blit(scaled, scaled.get_rect(center=(runtime.width // 2, runtime.height // 2)))
     else:
-        top = runtime.pygame.Surface((runtime.width, runtime.height // 2))
-        bottom = runtime.pygame.Surface((runtime.width, runtime.height - runtime.height // 2))
-        top.fill(palette["bgTop"])
-        bottom.fill(palette["bgBottom"])
-        render_target.blit(top, (0, 0))
-        render_target.blit(bottom, (0, runtime.height // 2))
+        render_target.fill(palette["bgTop"], runtime.pygame.Rect(0, 0, runtime.width, runtime.height // 2))
+        render_target.fill(
+            palette["bgBottom"],
+            runtime.pygame.Rect(0, runtime.height // 2, runtime.width, runtime.height - runtime.height // 2),
+        )
         label = "背景未加载" if safe_asset_id else "当前场景没有背景"
         runtime.blit_text_center(runtime.font_title, label, runtime.width // 2, runtime.height // 2 - 20, palette["muted"], target=render_target)
     if safe_alpha < 255:
@@ -312,11 +347,15 @@ def render_native_stage_images(runtime, target, plane: str) -> None:
         if image:
             source_width, source_height = image.get_size()
             target_height = max(1, int(source_height * target_width / max(source_width, 1)))
-            scaled = runtime.pygame.transform.smoothscale(image, (target_width, target_height))
-            if transform["flipX"]:
-                scaled = runtime.pygame.transform.flip(scaled, True, False)
-            if transform["rotation"]:
-                scaled = runtime.pygame.transform.rotate(scaled, -float(transform["rotation"]))
+            scaled = get_cached_transformed_surface(
+                get_runtime_surface_cache(runtime),
+                runtime.pygame,
+                image,
+                (target_width, target_height),
+                namespace="stage-image",
+                flip_x=transform["flipX"],
+                rotation_degrees=-float(transform["rotation"] or 0),
+            )
             if transform["opacity"] < 100:
                 scaled = scaled.copy()
                 scaled.set_alpha(int(255 * transform["opacity"] / 100))

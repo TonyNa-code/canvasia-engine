@@ -1500,13 +1500,41 @@ html[data-visual-comfort="static"] .sprite-voice-reactive-layer {
   border: 1px solid rgba(112, 84, 64, 0.12);
 }
 
+.save-slot-card.is-protected {
+  border-color: color-mix(in srgb, var(--accent) 46%, var(--border));
+  box-shadow:
+    inset 3px 0 0 color-mix(in srgb, var(--accent) 72%, transparent),
+    0 14px 34px color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
 .save-slot-meta {
   display: grid;
   gap: 4px;
 }
 
+.save-slot-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
 .save-slot-meta strong {
   display: block;
+}
+
+.save-slot-protection-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 14%, var(--panel));
+  border: 1px solid color-mix(in srgb, var(--accent) 36%, var(--border));
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
 }
 
 .save-slot-preview {
@@ -1666,6 +1694,11 @@ html[data-visual-comfort="static"] .sprite-voice-reactive-layer {
 
 .save-slot-meta p + p {
   margin-top: 4px;
+}
+
+.save-slot-meta .save-slot-protection-note {
+  color: color-mix(in srgb, var(--accent) 72%, var(--text));
+  font-weight: 650;
 }
 
 .save-slot-time {

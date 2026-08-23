@@ -25,6 +25,11 @@ try:
 except ImportError:  # pragma: no cover - exported native packages import from the same directory.
     from runtime_voice_mixer import get_safe_voice_profile_id
 
+try:
+    from .runtime_save_slots import normalize_formal_save_slots
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_save_slots import normalize_formal_save_slots
+
 
 SAVE_ROOT_DIR_NAME = ".canvasia-engine"
 SAVE_SUBDIR_NAME = "native-runtime-saves"
@@ -394,12 +399,7 @@ def load_project_save_store(project_id: str, slot_count: int) -> dict:
         recovery_label="正式存档",
     )
 
-    formal_slots = payload.get("formalSlots")
-    if not isinstance(formal_slots, list):
-        formal_slots = [None] * slot_count
-    formal_slots = list(formal_slots[:slot_count])
-    while len(formal_slots) < slot_count:
-        formal_slots.append(None)
+    formal_slots = normalize_formal_save_slots(payload.get("formalSlots"), slot_count)
     return {
         "quickSave": payload.get("quickSave"),
         "formalSlots": formal_slots,
