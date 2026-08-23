@@ -2428,6 +2428,68 @@ class BrowserPlaywrightSmokeTests(unittest.TestCase):
         finally:
             player_page.close()
 
+    def test_exported_player_can_backup_validate_and_restore_player_data(self) -> None:
+        self.create_blank_project("浏览器烟测项目_SavePortability")
+        self.create_first_chapter()
+        player_url = self.export_web_build()
+
+        player_page = self.context.new_page()
+        page_errors: list[str] = []
+        player_page.on("pageerror", lambda error: page_errors.append(str(error)))
+        try:
+            player_page.goto(player_url, wait_until="domcontentloaded")
+            player_page.locator("#startButton").wait_for(timeout=20000)
+            player_page.locator("#startButton").click()
+            player_page.locator("#startOverlay").wait_for(state="hidden", timeout=15000)
+            player_page.locator("#systemMenuButton").click()
+            player_page.locator("#systemMenu").wait_for(state="visible", timeout=10000)
+            player_page.locator("#systemMenuQuickSaveButton").click()
+
+            with player_page.expect_download(timeout=15000) as download_info:
+                player_page.locator("#saveBackupExportButton").click()
+            download = download_info.value
+            backup_path = self.repo_copy / download.suggested_filename
+            download.save_as(str(backup_path))
+            self.assertTrue(backup_path.name.endswith(".canvasia-save.json"))
+            backup_payload = json.loads(backup_path.read_text(encoding="utf-8"))
+            self.assertEqual(backup_payload["format"], "canvasia-runtime-save-backup")
+            self.assertTrue(backup_payload["records"]["quickSave"]["present"])
+
+            quick_save_key = f"canvasia-engine:player-quicksave:{backup_payload['project']['scope']}"
+            player_page.evaluate(
+                """(key) => localStorage.setItem(key, JSON.stringify({ session: { sceneId: 'temporary_current' } }))""",
+                quick_save_key,
+            )
+            player_page.locator("#saveBackupFileInput").set_input_files(str(backup_path))
+            player_page.wait_for_function(
+                "() => document.querySelector('#saveBackupStatus')?.textContent.includes('再次确认')",
+                timeout=10000,
+            )
+            self.assertEqual(
+                player_page.evaluate(
+                    "(key) => JSON.parse(localStorage.getItem(key) || '{}').session?.sceneId",
+                    quick_save_key,
+                ),
+                "temporary_current",
+            )
+            player_page.locator("#saveBackupRestoreButton").wait_for(state="visible", timeout=10000)
+            player_page.locator("#saveBackupRestoreButton").click(no_wait_after=True)
+            player_page.locator("#startOverlay").wait_for(state="visible", timeout=20000)
+            player_page.wait_for_function(
+                """({ key, expected }) => {
+                    const current = JSON.parse(localStorage.getItem(key) || "null");
+                    return JSON.stringify(current) === JSON.stringify(expected);
+                }""",
+                arg={
+                    "key": quick_save_key,
+                    "expected": backup_payload["records"]["quickSave"]["value"],
+                },
+                timeout=10000,
+            )
+            self.assertEqual(page_errors, [])
+        finally:
+            player_page.close()
+
     def test_exported_player_mobile_reader_mode_supports_safe_touch_workflow(self) -> None:
         self.create_blank_project("浏览器烟测项目_MobileReader")
         self.create_first_chapter()

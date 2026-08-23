@@ -58,6 +58,7 @@ import {
   isChoiceContinueTarget,
   normalizeGameData,
 } from "./runtime_data.js";
+import { createRuntimeDomRefs } from "./runtime_dom_refs.js";
 import {
   getNextTypewriterIndex,
   getTypewriterStepDelay,
@@ -84,11 +85,10 @@ import {
   toggleFormalSaveSlotProtection,
 } from "./runtime_save_slots.js";
 import {
-  getSafeTextInputMaxLength,
   interpolateRuntimeText,
   normalizeTextInputBlock,
-  sanitizeTextInputValue,
 } from "./runtime_text_variables.js";
+import { createRuntimeTextInputController } from "./runtime_text_input.js";
 import {
   buildRuntimeStorageKeys,
   consumeRuntimeStorageRecoveryEvents,
@@ -96,6 +96,7 @@ import {
   removeRuntimeStorageItem,
   writeRuntimeStorageJson,
 } from "./runtime_storage.js";
+import { createRuntimeSavePortabilityController } from "./runtime_save_portability.js";
 import {
   buildPersistentRuntimeVariableStore,
   collectPersistentRuntimeVariableState,
@@ -227,221 +228,7 @@ const runtimeAchievementTools = window.CanvasiaRuntimeAchievements;
 const data = normalizeGameData(rawData);
 const storageKeys = buildRuntimeStorageKeys(data.project);
 
-const refs = {
-  stageFrame: document.getElementById("stageFrame"),
-  dialogPanel: document.querySelector(".dialog-panel"),
-  gameTitle: document.getElementById("gameTitle"),
-  gameMeta: document.getElementById("gameMeta"),
-  backgroundLayer: document.getElementById("backgroundLayer"),
-  stageImageBackLayer: document.getElementById("stageImageBackLayer"),
-  stageImageFrontLayer: document.getElementById("stageImageFrontLayer"),
-  particleLayer: document.getElementById("particleLayer"),
-  filterLayer: document.getElementById("filterLayer"),
-  fadeLayer: document.getElementById("fadeLayer"),
-  flashLayer: document.getElementById("flashLayer"),
-  spriteLayer: document.getElementById("spriteLayer"),
-  videoOverlay: document.getElementById("videoOverlay"),
-  runtimeVideo: document.getElementById("runtimeVideo"),
-  videoOverlayTitle: document.getElementById("videoOverlayTitle"),
-  videoSkipButton: document.getElementById("videoSkipButton"),
-  creditsOverlay: document.getElementById("creditsOverlay"),
-  creditsRoll: document.getElementById("creditsRoll"),
-  creditsSkipButton: document.getElementById("creditsSkipButton"),
-  sceneChip: document.getElementById("sceneChip"),
-  musicChip: document.getElementById("musicChip"),
-  gamepadChip: document.getElementById("gamepadChip"),
-  backgroundLabel: document.getElementById("backgroundLabel"),
-  dialogHiddenHint: document.getElementById("dialogHiddenHint"),
-  speakerName: document.getElementById("speakerName"),
-  lineTypeTag: document.getElementById("lineTypeTag"),
-  messageText: document.getElementById("messageText"),
-  dialogNvlPage: document.getElementById("dialogNvlPage"),
-  choiceList: document.getElementById("choiceList"),
-  hintText: document.getElementById("hintText"),
-  continueButton: document.getElementById("continueButton"),
-  restartButton: document.getElementById("restartButton"),
-  startOverlay: document.getElementById("startOverlay"),
-  startArtworkWrap: document.getElementById("startArtworkWrap"),
-  startArtwork: document.getElementById("startArtwork"),
-  startButton: document.getElementById("startButton"),
-  startContinueButton: document.getElementById("startContinueButton"),
-  startLoadButton: document.getElementById("startLoadButton"),
-  startOperationGuideButton: document.getElementById("startOperationGuideButton"),
-  startProfileButton: document.getElementById("startProfileButton"),
-  startVoiceReplayButton: document.getElementById("startVoiceReplayButton"),
-  startAchievementButton: document.getElementById("startAchievementButton"),
-  startChapterButton: document.getElementById("startChapterButton"),
-  startLocationButton: document.getElementById("startLocationButton"),
-  startNarrationButton: document.getElementById("startNarrationButton"),
-  startRelationButton: document.getElementById("startRelationButton"),
-  startCharacterButton: document.getElementById("startCharacterButton"),
-  startEndingButton: document.getElementById("startEndingButton"),
-  startGalleryButton: document.getElementById("startGalleryButton"),
-  startMusicRoomButton: document.getElementById("startMusicRoomButton"),
-  runtimeThemeButtons: Array.from(document.querySelectorAll(".player-theme-button")),
-  startSummary: document.getElementById("startSummary"),
-  startResumeSummary: document.getElementById("startResumeSummary"),
-  readingProfileSelect: document.getElementById("readingProfileSelect"),
-  textSpeedSelect: document.getElementById("textSpeedSelect"),
-  languageSelect: document.getElementById("languageSelect"),
-  dialogThemeSelect: document.getElementById("dialogThemeSelect"),
-  uiThemeSelect: document.getElementById("uiThemeSelect"),
-  visualComfortSelect: document.getElementById("visualComfortSelect"),
-  textScaleSelect: document.getElementById("textScaleSelect"),
-  dialogOpacitySelect: document.getElementById("dialogOpacitySelect"),
-  bgmVolumeRange: document.getElementById("bgmVolumeRange"),
-  bgmVolumeValue: document.getElementById("bgmVolumeValue"),
-  sfxVolumeRange: document.getElementById("sfxVolumeRange"),
-  sfxVolumeValue: document.getElementById("sfxVolumeValue"),
-  voiceVolumeRange: document.getElementById("voiceVolumeRange"),
-  voiceVolumeValue: document.getElementById("voiceVolumeValue"),
-  voiceDuckingRatioRange: document.getElementById("voiceDuckingRatioRange"),
-  voiceDuckingRatioValue: document.getElementById("voiceDuckingRatioValue"),
-  previousHistoryButton: document.getElementById("previousHistoryButton"),
-  nextHistoryButton: document.getElementById("nextHistoryButton"),
-  autoPlayToggleButton: document.getElementById("autoPlayToggleButton"),
-  voiceToggleButton: document.getElementById("voiceToggleButton"),
-  voiceDuckingToggleButton: document.getElementById("voiceDuckingToggleButton"),
-  skipReadToggleButton: document.getElementById("skipReadToggleButton"),
-  dialogToggleButton: document.getElementById("dialogToggleButton"),
-  replayVoiceButton: document.getElementById("replayVoiceButton"),
-  resetPlaybackButton: document.getElementById("resetPlaybackButton"),
-  systemMenuButton: document.getElementById("systemMenuButton"),
-  operationGuideButton: document.getElementById("operationGuideButton"),
-  mobileReaderDock: document.getElementById("mobileReaderDock"),
-  mobileHistoryButton: document.getElementById("mobileHistoryButton"),
-  mobileAutoButton: document.getElementById("mobileAutoButton"),
-  mobileDialogButton: document.getElementById("mobileDialogButton"),
-  mobileSystemButton: document.getElementById("mobileSystemButton"),
-  mobileHistorySheet: document.getElementById("mobileHistorySheet"),
-  mobileHistoryList: document.getElementById("mobileHistoryList"),
-  mobileHistoryCloseButton: document.getElementById("mobileHistoryCloseButton"),
-  buildInfoPanel: document.getElementById("buildInfoPanel"),
-  variablesPanel: document.getElementById("variablesPanel"),
-  missingAssetsPanel: document.getElementById("missingAssetsPanel"),
-  historyPanel: document.getElementById("historyPanel"),
-  saveSlotPanel: document.getElementById("saveSlotPanel"),
-  saveDialog: document.getElementById("saveDialog"),
-  saveDialogTitle: document.getElementById("saveDialogTitle"),
-  saveDialogSummary: document.getElementById("saveDialogSummary"),
-  closeSaveDialogButton: document.getElementById("closeSaveDialogButton"),
-  saveDialogSaveModeButton: document.getElementById("saveDialogSaveModeButton"),
-  saveDialogLoadModeButton: document.getElementById("saveDialogLoadModeButton"),
-  saveDialogSlotList: document.getElementById("saveDialogSlotList"),
-  profileDialog: document.getElementById("profileDialog"),
-  profileDialogSummary: document.getElementById("profileDialogSummary"),
-  profileDialogHero: document.getElementById("profileDialogHero"),
-  profileDialogList: document.getElementById("profileDialogList"),
-  closeProfileDialogButton: document.getElementById("closeProfileDialogButton"),
-  voiceReplayDialog: document.getElementById("voiceReplayDialog"),
-  voiceReplayDialogSummary: document.getElementById("voiceReplayDialogSummary"),
-  voiceReplayDialogHero: document.getElementById("voiceReplayDialogHero"),
-  voiceReplayDialogList: document.getElementById("voiceReplayDialogList"),
-  closeVoiceReplayDialogButton: document.getElementById("closeVoiceReplayDialogButton"),
-  systemMenu: document.getElementById("systemMenu"),
-  systemMenuSummary: document.getElementById("systemMenuSummary"),
-  closeSystemMenuButton: document.getElementById("closeSystemMenuButton"),
-  systemMenuOpenSaveButton: document.getElementById("systemMenuOpenSaveButton"),
-  systemMenuOpenLoadButton: document.getElementById("systemMenuOpenLoadButton"),
-  systemMenuQuickSaveButton: document.getElementById("systemMenuQuickSaveButton"),
-  systemMenuQuickLoadButton: document.getElementById("systemMenuQuickLoadButton"),
-  systemMenuOperationGuideButton: document.getElementById("systemMenuOperationGuideButton"),
-  systemMenuPersistentResetButton: document.getElementById("systemMenuPersistentResetButton"),
-  systemMenuReturnTitleButton: document.getElementById("systemMenuReturnTitleButton"),
-  menuReadingProfileSelect: document.getElementById("menuReadingProfileSelect"),
-  menuTextSpeedSelect: document.getElementById("menuTextSpeedSelect"),
-  menuLanguageSelect: document.getElementById("menuLanguageSelect"),
-  menuDialogThemeSelect: document.getElementById("menuDialogThemeSelect"),
-  menuUiThemeSelect: document.getElementById("menuUiThemeSelect"),
-  menuVisualComfortSelect: document.getElementById("menuVisualComfortSelect"),
-  menuMobileReaderModeSelect: document.getElementById("menuMobileReaderModeSelect"),
-  menuTextScaleSelect: document.getElementById("menuTextScaleSelect"),
-  menuDialogOpacitySelect: document.getElementById("menuDialogOpacitySelect"),
-  menuBgmVolumeRange: document.getElementById("menuBgmVolumeRange"),
-  menuBgmVolumeValue: document.getElementById("menuBgmVolumeValue"),
-  menuSfxVolumeRange: document.getElementById("menuSfxVolumeRange"),
-  menuSfxVolumeValue: document.getElementById("menuSfxVolumeValue"),
-  menuVoiceVolumeRange: document.getElementById("menuVoiceVolumeRange"),
-  menuVoiceVolumeValue: document.getElementById("menuVoiceVolumeValue"),
-  menuVoiceDuckingRatioRange: document.getElementById("menuVoiceDuckingRatioRange"),
-  menuVoiceDuckingRatioValue: document.getElementById("menuVoiceDuckingRatioValue"),
-  menuVoiceDuckingToggleButton: document.getElementById("menuVoiceDuckingToggleButton"),
-  voiceMixerSummary: document.getElementById("voiceMixerSummary"),
-  voiceMixerList: document.getElementById("voiceMixerList"),
-  resetVoiceMixerButton: document.getElementById("resetVoiceMixerButton"),
-  keyBindingSummary: document.getElementById("keyBindingSummary"),
-  keyBindingStatus: document.getElementById("keyBindingStatus"),
-  keyBindingList: document.getElementById("keyBindingList"),
-  resetKeyBindingsButton: document.getElementById("resetKeyBindingsButton"),
-  achievementDialog: document.getElementById("achievementDialog"),
-  achievementDialogSummary: document.getElementById("achievementDialogSummary"),
-  achievementDialogHero: document.getElementById("achievementDialogHero"),
-  achievementDialogList: document.getElementById("achievementDialogList"),
-  closeAchievementDialogButton: document.getElementById("closeAchievementDialogButton"),
-  achievementToast: document.getElementById("achievementToast"),
-  locationDialog: document.getElementById("locationDialog"),
-  locationDialogSummary: document.getElementById("locationDialogSummary"),
-  locationDialogHero: document.getElementById("locationDialogHero"),
-  locationDialogList: document.getElementById("locationDialogList"),
-  closeLocationDialogButton: document.getElementById("closeLocationDialogButton"),
-  narrationDialog: document.getElementById("narrationDialog"),
-  narrationDialogSummary: document.getElementById("narrationDialogSummary"),
-  narrationDialogHero: document.getElementById("narrationDialogHero"),
-  narrationDialogList: document.getElementById("narrationDialogList"),
-  closeNarrationDialogButton: document.getElementById("closeNarrationDialogButton"),
-  relationDialog: document.getElementById("relationDialog"),
-  relationDialogSummary: document.getElementById("relationDialogSummary"),
-  relationDialogHero: document.getElementById("relationDialogHero"),
-  relationDialogList: document.getElementById("relationDialogList"),
-  closeRelationDialogButton: document.getElementById("closeRelationDialogButton"),
-  chapterDialog: document.getElementById("chapterDialog"),
-  chapterDialogSummary: document.getElementById("chapterDialogSummary"),
-  chapterDialogHero: document.getElementById("chapterDialogHero"),
-  chapterDialogList: document.getElementById("chapterDialogList"),
-  closeChapterDialogButton: document.getElementById("closeChapterDialogButton"),
-  galleryDialog: document.getElementById("galleryDialog"),
-  galleryDialogSummary: document.getElementById("galleryDialogSummary"),
-  galleryDialogHero: document.getElementById("galleryDialogHero"),
-  galleryDialogList: document.getElementById("galleryDialogList"),
-  closeGalleryDialogButton: document.getElementById("closeGalleryDialogButton"),
-  characterDialog: document.getElementById("characterDialog"),
-  characterDialogSummary: document.getElementById("characterDialogSummary"),
-  characterDialogHero: document.getElementById("characterDialogHero"),
-  characterDialogList: document.getElementById("characterDialogList"),
-  closeCharacterDialogButton: document.getElementById("closeCharacterDialogButton"),
-  endingDialog: document.getElementById("endingDialog"),
-  endingDialogSummary: document.getElementById("endingDialogSummary"),
-  endingDialogHero: document.getElementById("endingDialogHero"),
-  endingDialogList: document.getElementById("endingDialogList"),
-  closeEndingDialogButton: document.getElementById("closeEndingDialogButton"),
-  musicRoomDialog: document.getElementById("musicRoomDialog"),
-  musicRoomDialogSummary: document.getElementById("musicRoomDialogSummary"),
-  musicRoomNowPlaying: document.getElementById("musicRoomNowPlaying"),
-  musicRoomList: document.getElementById("musicRoomList"),
-  closeMusicRoomDialogButton: document.getElementById("closeMusicRoomDialogButton"),
-  operationGuideDialog: document.getElementById("operationGuideDialog"),
-  operationGuideDialogSummary: document.getElementById("operationGuideDialogSummary"),
-  operationGuideList: document.getElementById("operationGuideList"),
-  closeOperationGuideButton: document.getElementById("closeOperationGuideButton"),
-  returnTitleDialog: document.getElementById("returnTitleDialog"),
-  cancelReturnTitleButton: document.getElementById("cancelReturnTitleButton"),
-  confirmReturnTitleButton: document.getElementById("confirmReturnTitleButton"),
-  saveConfirmDialog: document.getElementById("saveConfirmDialog"),
-  saveConfirmDialogTitle: document.getElementById("saveConfirmDialogTitle"),
-  saveConfirmDialogSummary: document.getElementById("saveConfirmDialogSummary"),
-  cancelSaveConfirmButton: document.getElementById("cancelSaveConfirmButton"),
-  confirmSaveConfirmButton: document.getElementById("confirmSaveConfirmButton"),
-  textInputDialog: document.getElementById("textInputDialog"),
-  textInputForm: document.getElementById("textInputForm"),
-  textInputDialogTitle: document.getElementById("textInputDialogTitle"),
-  textInputDialogSummary: document.getElementById("textInputDialogSummary"),
-  runtimeTextInputLabel: document.getElementById("runtimeTextInputLabel"),
-  runtimeTextInput: document.getElementById("runtimeTextInput"),
-  runtimeTextInputError: document.getElementById("runtimeTextInputError"),
-  runtimeTextInputVariable: document.getElementById("runtimeTextInputVariable"),
-  runtimeTextInputCounter: document.getElementById("runtimeTextInputCounter"),
-  submitTextInputButton: document.getElementById("submitTextInputButton"),
-};
+const refs = createRuntimeDomRefs(document);
 
 function resolveUiTheme(mode = state.playback?.uiThemeMode ?? PLAYBACK_DEFAULTS.uiThemeMode, now = new Date()) {
   const safeMode = getSafeUiThemeMode(mode);
@@ -564,10 +351,9 @@ const state = {
   localizationFallbacks: new Map(),
   runtimeGamepad: null,
   runtimeGamepadStatus: buildRuntimeGamepadStatus(),
-  textInputOpen: false,
-  textInputSnapshotKey: "",
   timedChoicePersistBucket: null,
   storageRecoveryEvents: [],
+  storageRestoreInProgress: false,
   particleQualityStatus: null,
   mobileReaderStatus: null,
   mobileHistoryOpen: false,
@@ -625,6 +411,54 @@ const mobileReaderUi = createMobileReaderUiController({
   persistPlaybackSettings,
   renderPlaybackControls,
   setInputMode: setRuntimeInputMode,
+});
+const runtimeTextInputController = createRuntimeTextInputController({
+  windowRef: window,
+  refs: {
+    dialog: refs.textInputDialog,
+    form: refs.textInputForm,
+    title: refs.textInputDialogTitle,
+    summary: refs.textInputDialogSummary,
+    label: refs.runtimeTextInputLabel,
+    input: refs.runtimeTextInput,
+    error: refs.runtimeTextInputError,
+    variable: refs.runtimeTextInputVariable,
+    counter: refs.runtimeTextInputCounter,
+  },
+  variablesById: data.variablesById,
+  getSnapshot: getCurrentSnapshot,
+  getSnapshotKey: getRuntimeSnapshotKey,
+  getLocalizedValue,
+  interpolateLocalizedText: interpolateLocalizedRuntimeText,
+  normalizeValue: normalizeVariableValue,
+  persistVariables: persistPersistentVariables,
+  stopAutoAdvance: stopRuntimeAutoAdvance,
+  moveForward: movePreviewForward,
+  render: renderRuntime,
+});
+const runtimeSavePortabilityController = createRuntimeSavePortabilityController({
+  project: data.project,
+  storageKeys,
+  windowRef: window,
+  documentRef: document,
+  refs: {
+    root: refs.savePortabilityPanel,
+    exportButton: refs.saveBackupExportButton,
+    importButton: refs.saveBackupImportButton,
+    restoreButton: refs.saveBackupRestoreButton,
+    fileInput: refs.saveBackupFileInput,
+    status: refs.saveBackupStatus,
+  },
+  onBeforeRestore: () => {
+    state.storageRestoreInProgress = true;
+    stopRuntimeAutoAdvance();
+    stopRuntimeTypewriter();
+    timedChoiceController.stop();
+  },
+  onRestoreFailed: () => {
+    state.storageRestoreInProgress = false;
+  },
+  onRestored: () => window.location.reload(),
 });
 
 let musicRoomAudio = null;
@@ -769,8 +603,7 @@ function init() {
   refs.confirmReturnTitleButton?.addEventListener("click", confirmReturnToTitle);
   refs.cancelSaveConfirmButton?.addEventListener("click", closeSaveConfirmDialog);
   refs.confirmSaveConfirmButton?.addEventListener("click", confirmSaveIntent);
-  refs.textInputForm?.addEventListener("submit", submitRuntimeTextInput);
-  refs.runtimeTextInput?.addEventListener("input", renderRuntimeTextInputCounter);
+  runtimeTextInputController.attach();
   refs.menuReadingProfileSelect?.addEventListener("change", handleReadingProfileChange);
   refs.menuTextSpeedSelect?.addEventListener("change", handleTextSpeedChange);
   refs.menuLanguageSelect?.addEventListener("change", handleLanguageChange);
@@ -817,6 +650,7 @@ function init() {
     escapeHtml,
   });
   keyBindingController.attach();
+  runtimeSavePortabilityController.attach();
   document.addEventListener("keydown", handleGlobalKeydown);
   document.addEventListener("click", scheduleRuntimeTimedChoicePauseSync);
   document.addEventListener("keydown", scheduleRuntimeTimedChoicePauseSync);
@@ -838,6 +672,8 @@ function init() {
   window.addEventListener("beforeunload", captureCurrentTimedChoiceState);
   window.addEventListener("beforeunload", stopRuntimeAssetPipeline);
   window.addEventListener("beforeunload", stopRuntimePlaybackLifecycle);
+  window.addEventListener("beforeunload", runtimeTextInputController.detach);
+  window.addEventListener("beforeunload", runtimeSavePortabilityController.detach);
   window.addEventListener("beforeunload", () => particleQualityController.stop(window));
   startRuntimeAssetPreload();
   renderPlaybackControls();
@@ -1229,7 +1065,7 @@ function renderMissingAssets() {
 }
 
 function renderBeforeStart() {
-  closeRuntimeTextInput();
+  runtimeTextInputController.close();
   stopRuntimeTypewriter();
   stopRuntimeAutoAdvance();
   stopSfxPlayback();
@@ -1304,7 +1140,7 @@ function renderBeforeStart() {
 }
 
 function startGameFromScene(sceneId = getEntrySceneId()) {
-  closeRuntimeTextInput();
+  runtimeTextInputController.close();
   stopMusic();
   stopRuntimeTypewriter();
   stopRuntimeAutoAdvance();
@@ -1370,7 +1206,7 @@ function continueLastSession() {
     return false;
   }
 
-  closeRuntimeTextInput();
+  runtimeTextInputController.close();
 
   stopMusic();
   stopRuntimeTypewriter();
@@ -1456,8 +1292,8 @@ function handleContinue() {
   }
 
   if (snapshot.blockType === "text_input") {
-    syncRuntimeTextInput(snapshot);
-    refs.runtimeTextInput?.focus();
+    runtimeTextInputController.sync(snapshot);
+    runtimeTextInputController.focus();
     return;
   }
 
@@ -1474,113 +1310,6 @@ function handleContinue() {
   stopRuntimeAutoAdvance();
   movePreviewForward();
   renderRuntime();
-}
-
-function closeRuntimeTextInput() {
-  state.textInputOpen = false;
-  state.textInputSnapshotKey = "";
-  if (refs.textInputDialog) {
-    refs.textInputDialog.hidden = true;
-  }
-}
-
-function renderRuntimeTextInputCounter() {
-  const snapshot = getCurrentSnapshot();
-  const maxLength = getSafeTextInputMaxLength(snapshot?.block?.maxLength);
-  const length = Array.from(refs.runtimeTextInput?.value ?? "").length;
-  if (refs.runtimeTextInputCounter) {
-    refs.runtimeTextInputCounter.textContent = `${length} / ${maxLength}`;
-  }
-}
-
-function showRuntimeTextInputError(message = "") {
-  if (!refs.runtimeTextInputError) {
-    return;
-  }
-  refs.runtimeTextInputError.textContent = message;
-  refs.runtimeTextInputError.hidden = !message;
-}
-
-function syncRuntimeTextInput(snapshot = getCurrentSnapshot()) {
-  if (!snapshot || snapshot.blockType !== "text_input" || !snapshot.block) {
-    closeRuntimeTextInput();
-    return;
-  }
-  const snapshotKey = getRuntimeSnapshotKey(snapshot);
-  const config = normalizeTextInputBlock(snapshot.block);
-  const variable = data.variablesById.get(config.variableId) ?? {};
-  const prompt = interpolateLocalizedRuntimeText(
-    getLocalizedValue(snapshot.block, "prompt", config.prompt),
-    snapshot.variables
-  );
-  const placeholder = getLocalizedValue(snapshot.block, "placeholder", config.placeholder);
-
-  if (refs.textInputDialogTitle) {
-    refs.textInputDialogTitle.textContent = prompt;
-  }
-  if (refs.textInputDialogSummary) {
-    refs.textInputDialogSummary.textContent = config.allowEmpty
-      ? "可以留空；确认后答案会写入剧情变量并随存档保存。"
-      : "填写后确认；答案会写入剧情变量并随存档保存。";
-  }
-  if (refs.runtimeTextInputLabel) {
-    refs.runtimeTextInputLabel.textContent = variable.name || config.variableId || "你的答案";
-  }
-  if (refs.runtimeTextInputVariable) {
-    refs.runtimeTextInputVariable.textContent = `保存到：${variable.name || config.variableId || "未选择变量"}`;
-  }
-  if (refs.runtimeTextInput) {
-    refs.runtimeTextInput.type = variable.type === "number" ? "number" : "text";
-    if (variable.type === "number") {
-      refs.runtimeTextInput.removeAttribute("maxlength");
-    } else {
-      refs.runtimeTextInput.maxLength = config.maxLength;
-    }
-    refs.runtimeTextInput.placeholder = placeholder;
-    if (state.textInputSnapshotKey !== snapshotKey) {
-      const currentValue = Object.hasOwn(snapshot.variables ?? {}, config.variableId)
-        ? snapshot.variables[config.variableId]
-        : variable.defaultValue ?? "";
-      refs.runtimeTextInput.value = config.defaultValue || String(currentValue ?? "");
-      showRuntimeTextInputError();
-    }
-  }
-  state.textInputOpen = true;
-  state.textInputSnapshotKey = snapshotKey;
-  if (refs.textInputDialog) {
-    refs.textInputDialog.hidden = false;
-  }
-  renderRuntimeTextInputCounter();
-  window.requestAnimationFrame(() => refs.runtimeTextInput?.focus());
-}
-
-function submitRuntimeTextInput(event) {
-  event?.preventDefault?.();
-  const snapshot = getCurrentSnapshot();
-  if (!snapshot || snapshot.blockType !== "text_input" || !snapshot.block) {
-    closeRuntimeTextInput();
-    return false;
-  }
-  const config = normalizeTextInputBlock(snapshot.block);
-  const variable = data.variablesById.get(config.variableId);
-  const result = sanitizeTextInputValue(refs.runtimeTextInput?.value, config, variable, {
-    normalizeValue: (value) => normalizeVariableValue(config.variableId, value),
-  });
-  if (!result.ok) {
-    showRuntimeTextInputError(result.error);
-    refs.runtimeTextInput?.focus();
-    return false;
-  }
-
-  snapshot.variables[config.variableId] = result.value;
-  persistPersistentVariables(snapshot.variables);
-  snapshot.visualState.speakerName = "玩家输入";
-  snapshot.visualState.dialogueText = `${data.variablesById.get(config.variableId)?.name ?? config.variableId} 已保存。`;
-  closeRuntimeTextInput();
-  stopRuntimeAutoAdvance();
-  movePreviewForward();
-  renderRuntime();
-  return true;
 }
 
 function getSafeEndingSceneId(sceneId = null) {
@@ -3945,7 +3674,7 @@ function isRuntimeTimedChoicePaused() {
     runtimePlaybackLifecycle.getSnapshot().suspended ||
       !state.started ||
       !refs.startOverlay?.hidden ||
-      state.textInputOpen ||
+      runtimeTextInputController.isOpen() ||
       getRuntimeGamepadOverlayRoot()
   );
 }
@@ -5396,6 +5125,9 @@ function recordPlayerSessionStart(mode = "start") {
 }
 
 function finalizePlayerSession({ silent = false } = {}) {
+  if (state.storageRestoreInProgress) {
+    return false;
+  }
   if (!state.profileSessionStartedAt || !state.playerProfile) {
     return false;
   }
@@ -7369,7 +7101,7 @@ function closeReturnTitleDialog() {
 }
 
 function confirmReturnToTitle() {
-  closeRuntimeTextInput();
+  runtimeTextInputController.close();
   finalizePlayerSession({ silent: true });
   const profile = state.playerProfile ?? sanitizePlayerProfile(null);
   profile.returnToTitleCount += 1;
@@ -7873,6 +7605,7 @@ function renderSystemMenu() {
   refs.systemMenu.hidden = !state.systemMenuOpen;
   refs.systemMenu.classList.toggle("is-visible", state.systemMenuOpen);
   refs.systemMenuSummary.textContent = getSystemMenuSummary();
+  runtimeSavePortabilityController.render();
 
   if (refs.systemMenuOpenSaveButton) {
     refs.systemMenuOpenSaveButton.disabled = !state.started || !snapshot;
@@ -8847,7 +8580,7 @@ function renderRuntime() {
   syncSfxPlayback(snapshot);
   syncVideoPlayback(snapshot);
   syncCreditsPlayback(snapshot);
-  syncRuntimeTextInput(snapshot);
+  runtimeTextInputController.sync(snapshot);
   startRuntimeScenePrefetch(snapshot);
   scheduleRuntimeAutoAdvance(snapshot);
 }

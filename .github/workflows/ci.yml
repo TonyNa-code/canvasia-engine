@@ -264,7 +264,9 @@ jobs:
             tests/test_frontend_runtime_playback_lifecycle_module.py \
             tests/test_frontend_runtime_sfx_transport_module.py \
             tests/test_frontend_runtime_data_module.py \
+            tests/test_frontend_runtime_dom_refs_module.py \
             tests/test_frontend_runtime_storage_module.py \
+            tests/test_frontend_runtime_save_portability_module.py \
             tests/test_frontend_runtime_voice_mixer_module.py \
             tests/test_frontend_runtime_reading_profiles_module.py \
             tests/test_frontend_runtime_dialogue_layouts_module.py \
@@ -313,6 +315,7 @@ jobs:
             tests/test_frontend_story_template_panel_module.py \
             tests/test_frontend_story_templates_module.py \
             tests/test_frontend_system_dialog_module.py \
+            tests/test_frontend_runtime_text_input_module.py \
             tests/test_frontend_typewriter_module.py \
             tests/test_frontend_ui_theme_module.py \
             tests/test_frontend_unlockable_content_manifest_module.py \
@@ -447,7 +450,9 @@ jobs:
           node --check export_player_template/runtime_choice_availability.js
           node --check export_player_template/player.js
           node --check export_player_template/runtime_data.js
+          node --check export_player_template/runtime_dom_refs.js
           node --check export_player_template/runtime_storage.js
+          node --check export_player_template/runtime_save_portability.js
           node --check export_player_template/runtime_persistent_variables.js
           node --check export_player_template/runtime_visual_constants.js
           node --check export_player_template/runtime_particle_quality.js
@@ -483,6 +488,7 @@ jobs:
           node --check export_player_template/runtime_text_history.js
           node --check export_player_template/runtime_save_slots.js
           node --check export_player_template/runtime_text_variables.js
+          node --check export_player_template/runtime_text_input.js
 
       - name: Release tooling tests
         run: |
@@ -653,7 +659,9 @@ jobs:
           python -m unittest discover -s tests -p 'test_native_runtime_sfx_transport.py' -v
           python -m unittest discover -s tests -p 'test_sfx_transport_contract.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_data_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_runtime_dom_refs_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_storage_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_runtime_save_portability_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_voice_mixer_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_reading_profiles_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_dialogue_layouts_module.py' -v
@@ -665,6 +673,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_frontend_runtime_ui_skin_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_i18n_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_text_variables_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_runtime_text_input_module.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_i18n.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_voice_mixer.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_reading_profiles.py' -v

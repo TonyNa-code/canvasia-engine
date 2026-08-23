@@ -488,6 +488,28 @@ class CiWorkflowCoverageTests(unittest.TestCase):
                 workflow,
             )
 
+    def test_runtime_maintenance_modules_are_checked_in_ci(self) -> None:
+        workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+
+        for path in (
+            "export_player_template/runtime_dom_refs.js",
+            "export_player_template/runtime_save_portability.js",
+            "export_player_template/runtime_text_input.js",
+            "tests/test_frontend_runtime_dom_refs_module.py",
+            "tests/test_frontend_runtime_save_portability_module.py",
+            "tests/test_frontend_runtime_text_input_module.py",
+        ):
+            self.assertIn(path, workflow)
+        for test_name in (
+            "test_frontend_runtime_dom_refs_module.py",
+            "test_frontend_runtime_save_portability_module.py",
+            "test_frontend_runtime_text_input_module.py",
+        ):
+            self.assertIn(
+                f"python -m unittest discover -s tests -p '{test_name}' -v",
+                workflow,
+            )
+
     def test_sfx_transport_contract_is_checked_in_ci(self) -> None:
         workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
 

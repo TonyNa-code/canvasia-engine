@@ -222,7 +222,9 @@ def build_node_check_steps() -> list[VerifyStep]:
             "export_player_template/runtime_choice_availability.js",
             "export_player_template/player.js",
             "export_player_template/runtime_data.js",
+            "export_player_template/runtime_dom_refs.js",
             "export_player_template/runtime_storage.js",
+            "export_player_template/runtime_save_portability.js",
             "export_player_template/runtime_persistent_variables.js",
             "export_player_template/runtime_visual_constants.js",
             "export_player_template/runtime_particle_quality.js",
@@ -260,6 +262,7 @@ def build_node_check_steps() -> list[VerifyStep]:
             "export_player_template/runtime_text_history.js",
             "export_player_template/runtime_save_slots.js",
             "export_player_template/runtime_text_variables.js",
+            "export_player_template/runtime_text_input.js",
         ]
     )
     return [

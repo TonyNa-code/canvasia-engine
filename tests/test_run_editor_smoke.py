@@ -3389,7 +3389,10 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / "index.html").is_file())
         self.assertTrue((build_dir / "player.js").is_file())
         self.assertTrue((build_dir / "runtime_data.js").is_file())
+        self.assertTrue((build_dir / "runtime_dom_refs.js").is_file())
         self.assertTrue((build_dir / "runtime_storage.js").is_file())
+        self.assertTrue((build_dir / "runtime_save_portability.js").is_file())
+        self.assertTrue((build_dir / "runtime_text_input.js").is_file())
         self.assertTrue((build_dir / "runtime_persistent_variables.js").is_file())
         self.assertTrue((build_dir / "runtime_visual_constants.js").is_file())
         self.assertTrue((build_dir / "runtime_conditions.js").is_file())
@@ -3428,6 +3431,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / run_editor.RUNTIME_PRELOAD_MANIFEST_FILE_NAME).is_file())
         self.assertTrue((build_dir / run_editor.RUNTIME_PRELOAD_REPORT_FILE_NAME).is_file())
         self.assertTrue((build_dir / "player.css").is_file())
+        self.assertTrue((build_dir / "assets" / "canvasia-brand-logo.png").is_file())
         self.assertTrue((build_dir / "launch_splash.svg").is_file())
         self.assertTrue((build_dir / "app_icon.png").is_file())
         self.assertTrue((build_dir / "app_icon.ico").is_file())
@@ -3513,6 +3517,9 @@ class RunEditorSmokeTests(unittest.TestCase):
         )
         self.assertEqual(manifest["files"]["playerRuntimeData"], "runtime_data.js")
         self.assertEqual(manifest["files"]["playerRuntimeStorage"], "runtime_storage.js")
+        self.assertEqual(manifest["files"]["playerRuntimeDomRefs"], "runtime_dom_refs.js")
+        self.assertEqual(manifest["files"]["playerRuntimeSavePortability"], "runtime_save_portability.js")
+        self.assertEqual(manifest["files"]["playerRuntimeTextInput"], "runtime_text_input.js")
         self.assertEqual(
             manifest["files"]["playerRuntimePersistentVariables"],
             "runtime_persistent_variables.js",
@@ -5070,7 +5077,10 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue(Path(export_result["startHelperPath"]).is_file())
         self.assertTrue(Path(export_result["archivePath"]).is_file())
         self.assertTrue((build_dir / "app" / "runtime_data.js").is_file())
+        self.assertTrue((build_dir / "app" / "runtime_dom_refs.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_storage.js").is_file())
+        self.assertTrue((build_dir / "app" / "runtime_save_portability.js").is_file())
+        self.assertTrue((build_dir / "app" / "runtime_text_input.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_persistent_variables.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_visual_constants.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_conditions.js").is_file())
@@ -5101,6 +5111,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / "app" / "runtime_text_history.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_save_slots.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_text_variables.js").is_file())
+        self.assertTrue((build_dir / "app" / "assets" / "canvasia-brand-logo.png").is_file())
         self.assert_export_playtest_guide_file(build_dir / run_editor.EXPORT_PLAYTEST_GUIDE_FILE_NAME)
         self.assert_export_release_evidence_pack_file(build_dir / run_editor.EXPORT_RELEASE_EVIDENCE_PACK_NAME)
         self.assertEqual(export_result["releaseEvidencePackName"], run_editor.EXPORT_RELEASE_EVIDENCE_PACK_NAME)
@@ -5170,6 +5181,9 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["voiceProductionCsv"], run_editor.EXPORT_VOICE_PRODUCTION_CSV_NAME)
         self.assertEqual(manifest["files"]["appRuntimeData"], "app/runtime_data.js")
         self.assertEqual(manifest["files"]["appRuntimeStorage"], "app/runtime_storage.js")
+        self.assertEqual(manifest["files"]["appRuntimeDomRefs"], "app/runtime_dom_refs.js")
+        self.assertEqual(manifest["files"]["appRuntimeSavePortability"], "app/runtime_save_portability.js")
+        self.assertEqual(manifest["files"]["appRuntimeTextInput"], "app/runtime_text_input.js")
         self.assertEqual(
             manifest["files"]["appRuntimePersistentVariables"],
             "app/runtime_persistent_variables.js",

@@ -10,7 +10,9 @@ EXPORT_RUNTIME_MODULE_SPECS = (
     ("StoryFlow", "runtime_story_flow.js"),
     ("Achievements", "runtime_achievements.js"),
     ("Data", "runtime_data.js"),
+    ("DomRefs", "runtime_dom_refs.js"),
     ("Storage", "runtime_storage.js"),
+    ("SavePortability", "runtime_save_portability.js"),
     ("SaveSlots", "runtime_save_slots.js"),
     ("PersistentVariables", "runtime_persistent_variables.js"),
     ("CharacterMotion", "runtime_character_motion.js"),
@@ -47,6 +49,7 @@ EXPORT_RUNTIME_MODULE_SPECS = (
     ("StoryText", "runtime_story_text.js"),
     ("TextHistory", "runtime_text_history.js"),
     ("TextVariables", "runtime_text_variables.js"),
+    ("TextInput", "runtime_text_input.js"),
 )
 
 

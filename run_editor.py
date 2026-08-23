@@ -197,6 +197,9 @@ EXPORT_PLAYER_SCRIPT_FILES = (
     "player.js",
     *get_export_runtime_module_files(),
 )
+EXPORT_PLAYER_STATIC_FILES = (
+    "assets/canvasia-brand-logo.png",
+)
 NATIVE_RUNTIME_TEMPLATE_DIR = ROOT_DIR / "native_runtime"
 EXPORT_RUNTIME_CACHE_DIR = ROOT_DIR / ".export_runtime_cache"
 SUPPORTED_RESOLUTIONS = {(1280, 720), (1920, 1080)}
@@ -8029,6 +8032,11 @@ def write_export_app_files(build_dir: Path, export_payload: dict) -> None:
     shutil.copy2(EXPORT_TEMPLATE_DIR / "player.css", build_dir / "player.css")
     for script_name in EXPORT_PLAYER_SCRIPT_FILES:
         shutil.copy2(EXPORT_TEMPLATE_DIR / script_name, build_dir / script_name)
+    for relative_name in EXPORT_PLAYER_STATIC_FILES:
+        source_path = EXPORT_TEMPLATE_DIR / relative_name
+        target_path = build_dir / relative_name
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source_path, target_path)
     runtime_preload_manifest = (export_payload.get("buildInfo") or {}).get("runtimePreloadManifest")
     if isinstance(runtime_preload_manifest, dict):
         write_runtime_preload_files(build_dir, runtime_preload_manifest)

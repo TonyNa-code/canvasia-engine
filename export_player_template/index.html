@@ -492,6 +492,27 @@
             <button id="systemMenuOperationGuideButton" class="pill-button" type="button">操作指南</button>
             <button id="systemMenuPersistentResetButton" class="pill-button is-secondary" type="button">重置跨周目记忆</button>
             <button id="systemMenuReturnTitleButton" class="pill-button" type="button">返回标题页</button>
+            <section id="savePortabilityPanel" class="save-portability-panel" aria-labelledby="savePortabilityTitle">
+              <div class="save-portability-head">
+                <span class="eyebrow">PLAYER DATA</span>
+                <h3 id="savePortabilityTitle">存档备份与迁移</h3>
+              </div>
+              <p>把正式存档、快速存档、设置和解锁记录保存成一个文件，换浏览器或换电脑后可以继续。</p>
+              <div class="save-portability-actions">
+                <button id="saveBackupExportButton" class="pill-button is-secondary" type="button">导出当前存档</button>
+                <button id="saveBackupImportButton" class="pill-button is-secondary" type="button">选择备份文件</button>
+                <button id="saveBackupRestoreButton" class="pill-button save-portability-restore" type="button" hidden>确认恢复此备份</button>
+              </div>
+              <input
+                id="saveBackupFileInput"
+                class="sr-only"
+                type="file"
+                accept="application/json,.json,.canvasia-save"
+              />
+              <p id="saveBackupStatus" class="save-portability-status" aria-live="polite">
+                备份只包含这个游戏的玩家数据，不会打包游戏素材。
+              </p>
+            </section>
           </div>
           <div class="save-dialog-system-settings">
             <div class="playback-setting-grid">
