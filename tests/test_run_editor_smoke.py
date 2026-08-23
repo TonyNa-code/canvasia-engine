@@ -3411,6 +3411,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / "runtime_sfx_transport.js").is_file())
         self.assertTrue((build_dir / "runtime_preload.js").is_file())
         self.assertTrue((build_dir / "runtime_scene_prefetch.js").is_file())
+        self.assertTrue((build_dir / "runtime_asset_pipeline.js").is_file())
         self.assertTrue((build_dir / "runtime_story_flow.js").is_file())
         self.assertTrue((build_dir / "runtime_achievements.js").is_file())
         self.assertTrue((build_dir / "runtime_character_motion.js").is_file())
@@ -3535,6 +3536,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertEqual(manifest["files"]["playerRuntimeSfxTransport"], "runtime_sfx_transport.js")
         self.assertEqual(manifest["files"]["playerRuntimePreload"], "runtime_preload.js")
         self.assertEqual(manifest["files"]["playerRuntimeScenePrefetch"], "runtime_scene_prefetch.js")
+        self.assertEqual(manifest["files"]["playerRuntimeAssetPipeline"], "runtime_asset_pipeline.js")
         self.assertEqual(manifest["files"]["playerRuntimeStoryFlow"], "runtime_story_flow.js")
         self.assertEqual(manifest["files"]["playerRuntimeAchievements"], "runtime_achievements.js")
         self.assertEqual(manifest["files"]["playerRuntimeCharacterMotion"], "runtime_character_motion.js")
@@ -3636,6 +3638,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 "runtime_sfx_transport.js",
                 "runtime_preload.js",
                 "runtime_scene_prefetch.js",
+                "runtime_asset_pipeline.js",
                 "runtime_story_flow.js",
                 "runtime_achievements.js",
                 "runtime_character_motion.js",
@@ -5066,6 +5069,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / "app" / "runtime_video_transport.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_sfx_transport.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_scene_prefetch.js").is_file())
+        self.assertTrue((build_dir / "app" / "runtime_asset_pipeline.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_story_flow.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_achievements.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_character_motion.js").is_file())
@@ -5228,6 +5232,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 "app/runtime_video_transport.js",
                 "app/runtime_sfx_transport.js",
                 "app/runtime_scene_prefetch.js",
+                "app/runtime_asset_pipeline.js",
                 "app/runtime_story_flow.js",
                 "app/runtime_achievements.js",
                 "app/runtime_character_motion.js",
@@ -5429,6 +5434,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 "app/runtime_video_transport.js",
                 "app/runtime_sfx_transport.js",
                 "app/runtime_scene_prefetch.js",
+                "app/runtime_asset_pipeline.js",
                 "app/runtime_story_flow.js",
                 "app/runtime_achievements.js",
                 "app/runtime_character_motion.js",
@@ -5560,6 +5566,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((build_dir / "app" / "runtime_video_transport.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_sfx_transport.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_scene_prefetch.js").is_file())
+        self.assertTrue((build_dir / "app" / "runtime_asset_pipeline.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_story_flow.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_achievements.js").is_file())
         self.assertTrue((build_dir / "app" / "runtime_character_motion.js").is_file())
@@ -5717,6 +5724,7 @@ class RunEditorSmokeTests(unittest.TestCase):
                 "app/runtime_video_transport.js",
                 "app/runtime_sfx_transport.js",
                 "app/runtime_scene_prefetch.js",
+                "app/runtime_asset_pipeline.js",
                 "app/runtime_story_flow.js",
                 "app/runtime_achievements.js",
                 "app/runtime_character_motion.js",
@@ -5764,6 +5772,7 @@ class RunEditorSmokeTests(unittest.TestCase):
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_video_transport.js").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_sfx_transport.js").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_scene_prefetch.js").is_file())
+        self.assertTrue((bundle_dir / "export_player_template" / "runtime_asset_pipeline.js").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_story_flow.js").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_achievements.js").is_file())
         self.assertTrue((bundle_dir / "export_player_template" / "runtime_character_motion.js").is_file())

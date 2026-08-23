@@ -403,6 +403,19 @@ def build_runtime_preload_diagnostic_rows(preload_status: dict | None) -> list[d
         + int(status.get("failedEntries") or 0)
         + int(status.get("audioUnavailableEntries") or 0)
     )
+    configured_budget = max(1, int(status.get("frameBudget") or 1))
+    adaptive_budget = max(1, int(status.get("adaptiveFrameBudget") or 1))
+    timed_entries = max(0, int(status.get("timedEntries") or 0))
+    average_entry_ms = max(0.0, float(status.get("averageEntryMs") or 0.0))
+    maximum_entry_ms = max(0.0, float(status.get("maxEntryMs") or 0.0))
+    slow_entry_count = max(0, int(status.get("slowEntryCount") or 0))
+    timing_detail = (
+        f"已采样 {timed_entries} 项，平均 {average_entry_ms:.1f} ms，峰值 {maximum_entry_ms:.1f} ms"
+        if timed_entries
+        else "尚无加载耗时样本；运行后会逐项采样并自动调整每帧工作量。"
+    )
+    if slow_entry_count:
+        timing_detail = f"{timing_detail}；检测到慢项 {slow_entry_count} 个。"
     return [
         build_status_row(
             "全局资源预热",
@@ -415,6 +428,12 @@ def build_runtime_preload_diagnostic_rows(preload_status: dict | None) -> list[d
             f"{pending_entries} 项",
             "启动后会按性能档位分帧继续预热，避免首屏一次性卡顿。",
             "warming" if pending_entries else "ready",
+        ),
+        build_status_row(
+            "自适应帧预算",
+            f"{adaptive_budget}/{configured_budget} 项/帧",
+            timing_detail,
+            "warming" if adaptive_budget < configured_budget or slow_entry_count else "ready",
         ),
         build_status_row(
             "预热异常",

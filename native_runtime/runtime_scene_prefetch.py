@@ -266,6 +266,25 @@ def get_prefetch_signature(snapshot: dict | None, scene_ids: list[str], entries:
     return "|".join([current, target_key, asset_key])
 
 
+def build_runtime_scene_prefetch_request_key(
+    snapshot: dict | None,
+    continue_target: str = CHOICE_CONTINUE_TARGET,
+) -> str:
+    if not isinstance(snapshot, dict) or snapshot.get("completed"):
+        return ""
+    current = ":".join(
+        [
+            clean_text(snapshot.get("sceneId")),
+            clean_text(snapshot.get("blockId")),
+            clean_text(snapshot.get("blockIndex")),
+        ]
+    )
+    target_scene_ids = [clean_text(snapshot.get("transitionTargetSceneId"))]
+    target_scene_ids.extend(collect_choice_target_scene_ids(snapshot, continue_target))
+    target_key = ",".join(sorted(get_unique_scene_ids(target_scene_ids)))
+    return f"{current}|{target_key}"
+
+
 def build_runtime_scene_prefetch_snapshot(
     scene: dict | None,
     block_index: int,
@@ -305,6 +324,7 @@ def build_runtime_scene_prefetch_manifest(snapshot: dict | None, context: dict |
             "formatVersion": 1,
             "entrySceneId": clean_text((snapshot or {}).get("sceneId") if isinstance(snapshot, dict) else ""),
             "generatedBy": "runtime_scene_prefetch",
+            "requestKey": build_runtime_scene_prefetch_request_key(snapshot, continue_target),
             "prefetchKey": get_prefetch_signature(snapshot, [], []),
             "targetSceneIds": [],
             "entries": [],
@@ -360,6 +380,7 @@ def build_runtime_scene_prefetch_manifest(snapshot: dict | None, context: dict |
         "formatVersion": 1,
         "entrySceneId": clean_text(snapshot.get("sceneId")),
         "generatedBy": "runtime_scene_prefetch",
+        "requestKey": build_runtime_scene_prefetch_request_key(snapshot, continue_target),
         "prefetchKey": get_prefetch_signature(snapshot, target_scene_ids, entries),
         "targetSceneIds": get_unique_scene_ids(target_scene_ids),
         "entries": entries,

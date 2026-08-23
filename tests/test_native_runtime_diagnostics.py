@@ -99,6 +99,8 @@ class NativeRuntimeDiagnosticsTests(unittest.TestCase):
         self.assertEqual(by_label["手柄输入"]["tone"], "ready")
         self.assertEqual(by_label["全局资源预热"]["value"], "3/5")
         self.assertEqual(by_label["后台剩余"]["value"], "2 项")
+        self.assertEqual(by_label["自适应帧预算"]["value"], "1/1 项/帧")
+        self.assertIn("尚无加载耗时样本", by_label["自适应帧预算"]["detail"])
         self.assertEqual(by_label["路线预取"]["value"], "2/2")
         self.assertIn("图片 1 / 音频 1 / 视频 0", by_label["路线预取"]["detail"])
         self.assertEqual(by_label["分支预判"]["value"], "1 个场景")

@@ -639,6 +639,77 @@ class FrontendRuntimePreloadModuleTests(unittest.TestCase):
         self.assertEqual(payload["startedCount"], 2)
         self.assertEqual(payload["safeProfiles"], ["web", "standard"])
 
+    def test_runtime_preload_measures_assets_and_adapts_to_constrained_networks(self) -> None:
+        script = textwrap.dedent(
+            f"""
+            import * as tools from {json.dumps(MODULE_PATH.as_uri())};
+
+            let nowMs = 0;
+            const pending = [];
+            class TimedImage {{
+              set src(value) {{
+                this._src = value;
+                pending.push(() => this.onload?.());
+              }}
+            }}
+            const manifest = {{
+              formatVersion: 1,
+              entries: [
+                {{ assetId: "large-a", name: "Large A", type: "background", url: "a.png", phase: "critical", sizeBytes: 1000 }},
+                {{ assetId: "large-b", name: "Large B", type: "background", url: "b.png", phase: "critical", sizeBytes: 3000 }},
+              ],
+            }};
+            const controller = tools.startRuntimePreload(manifest, {{
+              ImageCtor: TimedImage,
+              connection: {{ effectiveType: "3g", downlink: 1.2 }},
+              now: () => nowMs,
+              maxConcurrent: 4,
+              backgroundBatchSize: 4,
+              backgroundBatchDelayMs: 10,
+              slowAssetThresholdMs: 1000,
+              timeoutMs: 5000,
+            }});
+            const initial = controller.getStatus();
+            nowMs = 1300;
+            pending.shift()?.();
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            nowMs = 1700;
+            pending.shift()?.();
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            const finalStatus = controller.getStatus();
+            const digest = tools.buildRuntimePreloadStatusText({{ manifest, preloadStatus: finalStatus }});
+            const saveData = tools.getRuntimePreloadNetworkHint({{ saveData: true, effectiveType: "4g" }});
+            process.stdout.write(JSON.stringify({{ initial, finalStatus, digest, saveData }}));
+            """
+        )
+        completed = subprocess.run(
+            ["node", "--input-type=module", "-e", script],
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        self.assertEqual(payload["initial"]["networkMode"], "slow")
+        self.assertEqual(payload["initial"]["maxConcurrent"], 2)
+        self.assertEqual(payload["initial"]["configuredMaxConcurrent"], 4)
+        self.assertEqual(payload["initial"]["backgroundBatchSize"], 1)
+        self.assertGreaterEqual(payload["initial"]["backgroundBatchDelayMs"], 320)
+        self.assertEqual(payload["finalStatus"]["timedEntryCount"], 2)
+        self.assertEqual(payload["finalStatus"]["averageAssetMs"], 1500)
+        self.assertEqual(payload["finalStatus"]["maxAssetMs"], 1700)
+        self.assertEqual(payload["finalStatus"]["loadedBytes"], 4000)
+        self.assertGreater(payload["finalStatus"]["throughputBytesPerSecond"], 0)
+        self.assertEqual(payload["finalStatus"]["slowAssetCount"], 2)
+        self.assertEqual(payload["finalStatus"]["slowAssets"][0]["assetId"], "large-b")
+        self.assertIn("网络策略 受限网络", payload["digest"])
+        self.assertIn("实测均值 1.5s", payload["digest"])
+        self.assertIn("慢素材 2 个", payload["digest"])
+        self.assertEqual(payload["saveData"]["mode"], "save_data")
+        self.assertEqual(payload["saveData"]["maxConcurrent"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()

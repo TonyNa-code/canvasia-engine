@@ -33,6 +33,21 @@ def _get_workflow_top_level_blocks() -> dict[str, str]:
 
 
 class CiWorkflowCoverageTests(unittest.TestCase):
+    def test_runtime_asset_pipeline_is_syntax_checked_and_tested(self) -> None:
+        workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("export_player_template/runtime_asset_pipeline.js", workflow)
+        self.assertIn("tests/test_frontend_runtime_asset_pipeline_module.py", workflow)
+        self.assertIn(
+            "python -m unittest discover -s tests -p 'test_frontend_runtime_asset_pipeline_module.py' -v",
+            workflow,
+        )
+        self.assertIn("tests/test_native_runtime_preload.py", workflow)
+        self.assertIn(
+            "python -m unittest discover -s tests -p 'test_native_runtime_preload.py' -v",
+            workflow,
+        )
+
     def test_ci_hardening_keys_are_top_level(self) -> None:
         blocks = _get_workflow_top_level_blocks()
 

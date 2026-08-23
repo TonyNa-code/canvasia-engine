@@ -274,6 +274,7 @@ jobs:
             tests/test_native_runtime_visual_comfort.py \
             tests/test_frontend_runtime_preload_module.py \
             tests/test_frontend_runtime_scene_prefetch_module.py \
+            tests/test_frontend_runtime_asset_pipeline_module.py \
             tests/test_frontend_runtime_story_flow_module.py \
             tests/test_frontend_runtime_achievements_module.py \
             tests/test_frontend_runtime_character_motion_module.py \
@@ -318,6 +319,7 @@ jobs:
             tests/test_frontend_voice_production_sheet_module.py \
             tests/test_run_editor_smoke.py \
             tests/test_native_runtime_render_smoke.py \
+            tests/test_native_runtime_preload.py \
             tests/test_browser_playwright_smoke.py
 
       - name: Frontend syntax check
@@ -457,6 +459,7 @@ jobs:
           node --check export_player_template/runtime_sfx_transport.js
           node --check export_player_template/runtime_preload.js
           node --check export_player_template/runtime_scene_prefetch.js
+          node --check export_player_template/runtime_asset_pipeline.js
           node --check export_player_template/runtime_story_flow.js
           node --check export_player_template/runtime_achievements.js
           node --check export_player_template/runtime_character_motion.js
@@ -659,6 +662,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_native_runtime_visual_comfort.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_preload_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_scene_prefetch_module.py' -v
+          python -m unittest discover -s tests -p 'test_frontend_runtime_asset_pipeline_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_story_flow_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_achievements_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_character_motion_module.py' -v
@@ -718,6 +722,7 @@ jobs:
           SDL_VIDEODRIVER: dummy
         run: |
           python -m unittest discover -s tests -p 'test_native_runtime_render_smoke.py' -v
+          python -m unittest discover -s tests -p 'test_native_runtime_preload.py' -v
 
       - name: Install browser smoke dependencies
         timeout-minutes: 15

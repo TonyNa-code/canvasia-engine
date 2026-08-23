@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 
 RUNTIME_PRELOAD_IMAGE_TYPES = {"background", "sprite", "cg", "ui"}
 RUNTIME_PRELOAD_SOUND_TYPES = {"sfx", "voice"}
@@ -24,6 +26,7 @@ RUNTIME_PRELOAD_PERFORMANCE_PROFILES = {
         "key": "standard",
         "label": "标准 PC / 网页",
         "frameBudget": 1,
+        "slowEntryThresholdMs": 8,
         "startupPhases": {"critical"},
         "criticalBudgetBytes": 96 * 1024 * 1024,
         "totalBudgetBytes": 512 * 1024 * 1024,
@@ -32,6 +35,7 @@ RUNTIME_PRELOAD_PERFORMANCE_PROFILES = {
         "key": "web",
         "label": "网页轻量",
         "frameBudget": 1,
+        "slowEntryThresholdMs": 12,
         "startupPhases": {"critical"},
         "criticalBudgetBytes": 72 * 1024 * 1024,
         "totalBudgetBytes": 384 * 1024 * 1024,
@@ -40,6 +44,7 @@ RUNTIME_PRELOAD_PERFORMANCE_PROFILES = {
         "key": "mobile_low",
         "label": "低配 / 移动端",
         "frameBudget": 1,
+        "slowEntryThresholdMs": 16,
         "startupPhases": {"critical"},
         "criticalBudgetBytes": 48 * 1024 * 1024,
         "totalBudgetBytes": 256 * 1024 * 1024,
@@ -48,6 +53,7 @@ RUNTIME_PRELOAD_PERFORMANCE_PROFILES = {
         "key": "high_quality_pc",
         "label": "高画质 PC",
         "frameBudget": 3,
+        "slowEntryThresholdMs": 6,
         "startupPhases": {"critical", "early"},
         "criticalBudgetBytes": 160 * 1024 * 1024,
         "totalBudgetBytes": 768 * 1024 * 1024,
@@ -114,6 +120,38 @@ def get_runtime_preload_profile_config(performance_profile: object = None) -> di
 def get_runtime_preload_frame_budget(performance_profile: object = None) -> int:
     profile = get_runtime_preload_profile_config(performance_profile)
     return clamp_int(profile.get("frameBudget"), 1, 8, RUNTIME_PRELOAD_DEFAULT_FRAME_BUDGET)
+
+
+def get_runtime_preload_slow_entry_threshold_ms(performance_profile: object = None) -> float:
+    profile = get_runtime_preload_profile_config(performance_profile)
+    try:
+        threshold = float(profile.get("slowEntryThresholdMs") or 8)
+    except (TypeError, ValueError):
+        threshold = 8.0
+    return max(1.0, min(1000.0, threshold))
+
+
+def get_runtime_preload_adaptive_frame_budget(
+    status: dict | None = None,
+    performance_profile: object = None,
+) -> int:
+    source = status if isinstance(status, dict) else {}
+    profile_key = performance_profile or source.get("performanceProfile")
+    configured_budget = get_runtime_preload_frame_budget(profile_key)
+    if configured_budget <= 1:
+        return 1
+    timed_entries = max(0, int(source.get("timedEntries") or 0))
+    if timed_entries <= 0:
+        return 1
+    threshold_ms = get_runtime_preload_slow_entry_threshold_ms(profile_key)
+    average_ms = max(0.0, float(source.get("averageEntryMs") or 0.0))
+    maximum_ms = max(0.0, float(source.get("maxEntryMs") or 0.0))
+    issue_count = int(source.get("failedEntries") or 0) + int(source.get("missingEntries") or 0)
+    if issue_count > 0 or average_ms >= threshold_ms or maximum_ms >= threshold_ms * 2:
+        return 1
+    if timed_entries < 2 or average_ms >= threshold_ms * 0.5:
+        return min(configured_budget, 2)
+    return configured_budget
 
 
 def get_runtime_preload_startup_phases(performance_profile: object = None) -> set[str]:
@@ -360,6 +398,8 @@ def build_empty_runtime_preload_status(performance_profile: object = None) -> di
         "performanceProfile": profile.get("key") or "standard",
         "performanceProfileLabel": profile.get("label") or "标准 PC / 网页",
         "frameBudget": get_runtime_preload_frame_budget(profile.get("key")),
+        "adaptiveFrameBudget": 1,
+        "slowEntryThresholdMs": get_runtime_preload_slow_entry_threshold_ms(profile.get("key")),
         "totalEntries": 0,
         "loadedEntries": 0,
         "pendingEntries": 0,
@@ -377,6 +417,12 @@ def build_empty_runtime_preload_status(performance_profile: object = None) -> di
         "criticalBytes": 0,
         "loadedBytes": 0,
         "readyEntries": 0,
+        "timedEntries": 0,
+        "totalLoadTimeMs": 0.0,
+        "averageEntryMs": 0.0,
+        "maxEntryMs": 0.0,
+        "slowEntryCount": 0,
+        "slowestEntries": [],
         "loadedAssetIds": [],
         "cachedAssetIds": [],
         "missingAssetIds": [],
@@ -406,7 +452,13 @@ def build_runtime_preload_status(entries: list[dict], performance_profile: objec
     return finalize_runtime_preload_status(status)
 
 
-def mark_runtime_preload_entry(status: dict, entry: dict, outcome: str) -> dict:
+def mark_runtime_preload_entry(
+    status: dict,
+    entry: dict,
+    outcome: str,
+    *,
+    elapsed_ms: object = None,
+) -> dict:
     asset_id = str(entry.get("assetId") or "")
     asset_type = str(entry.get("type") or "")
     status.setdefault("loadedAssetIds", [])
@@ -414,7 +466,40 @@ def mark_runtime_preload_entry(status: dict, entry: dict, outcome: str) -> dict:
     status.setdefault("missingAssetIds", [])
     status.setdefault("failedAssetIds", [])
     status.setdefault("skippedAssetIds", [])
+    status.setdefault("slowestEntries", [])
     status.setdefault("cachedEntries", 0)
+    try:
+        measured_ms = float(elapsed_ms)
+    except (TypeError, ValueError):
+        measured_ms = -1.0
+    if math.isfinite(measured_ms) and measured_ms >= 0:
+        status["timedEntries"] = max(0, int(status.get("timedEntries") or 0)) + 1
+        status["totalLoadTimeMs"] = max(0.0, float(status.get("totalLoadTimeMs") or 0.0)) + measured_ms
+        status["maxEntryMs"] = max(max(0.0, float(status.get("maxEntryMs") or 0.0)), measured_ms)
+        threshold_ms = max(
+            1.0,
+            float(
+                status.get("slowEntryThresholdMs")
+                or get_runtime_preload_slow_entry_threshold_ms(status.get("performanceProfile"))
+            ),
+        )
+        if measured_ms >= threshold_ms:
+            status["slowEntryCount"] = max(0, int(status.get("slowEntryCount") or 0)) + 1
+            status["slowestEntries"].append(
+                {
+                    "assetId": asset_id,
+                    "name": str(entry.get("name") or asset_id),
+                    "type": asset_type,
+                    "phase": str(entry.get("phase") or "deferred"),
+                    "elapsedMs": round(measured_ms, 2),
+                    "outcome": outcome,
+                }
+            )
+            status["slowestEntries"] = sorted(
+                status["slowestEntries"],
+                key=lambda item: float(item.get("elapsedMs") or 0.0),
+                reverse=True,
+            )[:5]
     if status.get("pendingEntries"):
         status["pendingEntries"] = max(0, int(status.get("pendingEntries") or 0) - 1)
     if outcome in {"loaded_image", "loaded_sound", "ready_stream", "cached"}:
@@ -457,6 +542,11 @@ def finalize_runtime_preload_status(status: dict) -> dict:
         + int(status.get("readyStreamEntries") or 0)
     )
     status["readyEntries"] = status["loadedEntries"]
+    timed_entries = max(0, int(status.get("timedEntries") or 0))
+    total_load_time_ms = max(0.0, float(status.get("totalLoadTimeMs") or 0.0))
+    status["averageEntryMs"] = round(total_load_time_ms / timed_entries, 2) if timed_entries else 0.0
+    status["maxEntryMs"] = round(max(0.0, float(status.get("maxEntryMs") or 0.0)), 2)
+    status["adaptiveFrameBudget"] = get_runtime_preload_adaptive_frame_budget(status)
     issue_count = (
         int(status.get("missingEntries") or 0)
         + int(status.get("failedEntries") or 0)
@@ -512,6 +602,19 @@ def format_runtime_preload_status_line(status: dict | None = None) -> str:
     cached_entries = int(source.get("cachedEntries") or 0)
     if cached_entries > 0:
         detail = f"{detail} · 复用 {cached_entries}"
+    timed_entries = int(source.get("timedEntries") or 0)
+    if timed_entries > 0:
+        detail = (
+            f"{detail} · 实测 {float(source.get('averageEntryMs') or 0.0):.1f} ms/项"
+            f" · 峰值 {float(source.get('maxEntryMs') or 0.0):.1f} ms"
+        )
+    configured_budget = max(1, int(source.get("frameBudget") or 1))
+    adaptive_budget = max(1, int(source.get("adaptiveFrameBudget") or 1))
+    if configured_budget > 1 or adaptive_budget != configured_budget:
+        detail = f"{detail} · 每帧预算 {adaptive_budget}/{configured_budget}"
+    slow_entry_count = int(source.get("slowEntryCount") or 0)
+    if slow_entry_count > 0:
+        detail = f"{detail} · 慢项 {slow_entry_count}"
     if pending_entries > 0:
         return f"资源预热：{ready_entries}/{total_entries} 已准备，后台继续 {pending_entries} 项（{detail}）"
     if issue_count > 0:

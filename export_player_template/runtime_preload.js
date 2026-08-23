@@ -13,6 +13,7 @@ export const RUNTIME_PRELOAD_PERFORMANCE_PROFILES = Object.freeze({
     deferredDelayMs: 0,
     backgroundBatchSize: 3,
     backgroundBatchDelayMs: 120,
+    slowAssetThresholdMs: 900,
     phaseDelayMs: Object.freeze({
       early: 0,
       deferred: 900,
@@ -29,6 +30,7 @@ export const RUNTIME_PRELOAD_PERFORMANCE_PROFILES = Object.freeze({
     deferredDelayMs: 120,
     backgroundBatchSize: 2,
     backgroundBatchDelayMs: 220,
+    slowAssetThresholdMs: 1200,
     phaseDelayMs: Object.freeze({
       early: 120,
       deferred: 1600,
@@ -45,6 +47,7 @@ export const RUNTIME_PRELOAD_PERFORMANCE_PROFILES = Object.freeze({
     deferredDelayMs: 360,
     backgroundBatchSize: 1,
     backgroundBatchDelayMs: 420,
+    slowAssetThresholdMs: 1800,
     phaseDelayMs: Object.freeze({
       early: 360,
       deferred: 3200,
@@ -61,6 +64,7 @@ export const RUNTIME_PRELOAD_PERFORMANCE_PROFILES = Object.freeze({
     deferredDelayMs: 0,
     backgroundBatchSize: 5,
     backgroundBatchDelayMs: 80,
+    slowAssetThresholdMs: 650,
     phaseDelayMs: Object.freeze({
       early: 0,
       deferred: 420,
@@ -137,6 +141,94 @@ function clampPercent(numerator, denominator) {
     return 0;
   }
   return Math.max(0, Math.min(100, Math.round((safeNumerator / safeDenominator) * 100)));
+}
+
+function getDefaultNow() {
+  if (typeof globalThis.performance?.now === "function") {
+    return globalThis.performance.now();
+  }
+  return Date.now();
+}
+
+function normalizeRuntimePreloadConnection(connection) {
+  const effectiveType = safeText(connection?.effectiveType).toLowerCase();
+  const downlink = Number(connection?.downlink);
+  return {
+    effectiveType,
+    saveData: Boolean(connection?.saveData),
+    downlinkMbps: Number.isFinite(downlink) && downlink >= 0 ? downlink : null,
+  };
+}
+
+export function getRuntimePreloadNetworkHint(connection = globalThis.navigator?.connection) {
+  const normalized = normalizeRuntimePreloadConnection(connection);
+  if (normalized.saveData) {
+    return Object.freeze({
+      ...normalized,
+      mode: "save_data",
+      label: "省流量",
+      maxConcurrent: 1,
+      backgroundBatchSize: 1,
+      minimumBatchDelayMs: 600,
+    });
+  }
+  if (["slow-2g", "2g"].includes(normalized.effectiveType)) {
+    return Object.freeze({
+      ...normalized,
+      mode: "very_slow",
+      label: "较慢网络",
+      maxConcurrent: 1,
+      backgroundBatchSize: 1,
+      minimumBatchDelayMs: 600,
+    });
+  }
+  if (normalized.effectiveType === "3g") {
+    return Object.freeze({
+      ...normalized,
+      mode: "slow",
+      label: "受限网络",
+      maxConcurrent: 2,
+      backgroundBatchSize: 1,
+      minimumBatchDelayMs: 320,
+    });
+  }
+  return Object.freeze({
+    ...normalized,
+    mode: normalized.effectiveType || normalized.downlinkMbps !== null ? "normal" : "unknown",
+    label: normalized.effectiveType || normalized.downlinkMbps !== null ? "常规网络" : "网络未知",
+    maxConcurrent: 8,
+    backgroundBatchSize: 16,
+    minimumBatchDelayMs: 0,
+  });
+}
+
+function formatRuntimePreloadDuration(value) {
+  const milliseconds = Number(value);
+  if (!Number.isFinite(milliseconds) || milliseconds <= 0) {
+    return "";
+  }
+  return milliseconds >= 1000 ? `${(milliseconds / 1000).toFixed(1)}s` : `${Math.round(milliseconds)}ms`;
+}
+
+function getAdaptiveBackgroundBatchSize(status, options) {
+  const configured = Math.max(1, Number(options.configuredBackgroundBatchSize) || 1);
+  if (["save_data", "very_slow", "slow"].includes(options.networkMode)) {
+    return Math.min(configured, Math.max(1, Number(options.networkBackgroundBatchSize) || 1));
+  }
+  if (status.timedEntryCount < 2) {
+    return configured;
+  }
+  if (
+    status.failedCount > 0 ||
+    status.averageAssetMs >= options.slowAssetThresholdMs ||
+    status.maxAssetMs >= options.slowAssetThresholdMs * 2
+  ) {
+    return 1;
+  }
+  if (status.averageAssetMs >= options.slowAssetThresholdMs * 0.6) {
+    return Math.max(1, Math.ceil(configured / 2));
+  }
+  return configured;
 }
 
 function getStatusReadyCount(status) {
@@ -287,6 +379,22 @@ export function buildRuntimePreloadStatusDigest(options = {}) {
     cacheEfficiency.totalCount > 0
       ? `准备率 ${cacheEfficiency.readyPercent}% · 复用率 ${cacheEfficiency.reusePercent}%`
       : "";
+  const networkText =
+    preloadStatus?.networkMode && !["unknown", "normal"].includes(preloadStatus.networkMode)
+      ? `网络策略 ${preloadStatus.networkLabel}`
+      : "";
+  const averageAssetText = formatRuntimePreloadDuration(preloadStatus?.averageAssetMs);
+  const maxAssetText = formatRuntimePreloadDuration(preloadStatus?.maxAssetMs);
+  const timingText = averageAssetText
+    ? `实测均值 ${averageAssetText}${maxAssetText ? ` · 峰值 ${maxAssetText}` : ""}`
+    : "";
+  const throughputBytesPerSecond = Number(preloadStatus?.throughputBytesPerSecond);
+  const throughputText =
+    Number.isFinite(throughputBytesPerSecond) && throughputBytesPerSecond > 0
+      ? `吞吐 ${formatRuntimePreloadBytes(throughputBytesPerSecond)}/s`
+      : "";
+  const slowAssetCount = Math.max(0, Number(preloadStatus?.slowAssetCount) || 0);
+  const slowAssetText = slowAssetCount > 0 ? `慢素材 ${slowAssetCount} 个` : "";
   const lines = [
     `首屏 ${summary.criticalCount} 个`,
     `全局 ${summary.totalCount} 个`,
@@ -298,6 +406,10 @@ export function buildRuntimePreloadStatusDigest(options = {}) {
     `视频 ${summary.videoCount}`,
     `已准备 ${readyCount}/${summary.totalCount}${pendingText}${skippedText}${failureText}`,
     efficiencyText,
+    networkText,
+    timingText,
+    throughputText,
+    slowAssetText,
     prefetchText,
   ].filter(Boolean);
   const statusLabel = failedCount > 0 ? "retrying" : pendingCount > 0 || readyCount < summary.totalCount ? "warming" : "ready";
@@ -354,18 +466,45 @@ export function resolveRuntimePreloadOptions(options = {}) {
   const profileKey = pickRuntimePreloadPerformanceProfile(options);
   const profile = getRuntimePreloadPerformanceProfileDefinition(profileKey);
   const phaseDelayMs = resolvePhaseDelayOptions(options, profile);
+  const networkAdaptive = options.networkAdaptive !== false;
+  const networkHint = getRuntimePreloadNetworkHint(options.connection ?? options.navigatorRef?.connection);
+  const configuredMaxConcurrent = clampOption(options.maxConcurrent, profile.maxConcurrent, 1, 8);
+  const configuredBackgroundBatchSize = clampOption(options.backgroundBatchSize, profile.backgroundBatchSize, 1, 16);
+  const configuredBackgroundBatchDelayMs = clampOption(
+    options.backgroundBatchDelayMs,
+    profile.backgroundBatchDelayMs,
+    0,
+    10000
+  );
   return {
     ...options,
     performanceProfile: profile.key,
     performanceProfileLabel: profile.label,
-    maxConcurrent: clampOption(options.maxConcurrent, profile.maxConcurrent, 1, 8),
+    networkAdaptive,
+    networkMode: networkAdaptive ? networkHint.mode : "disabled",
+    networkLabel: networkAdaptive ? networkHint.label : "已关闭",
+    networkEffectiveType: networkHint.effectiveType,
+    networkDownlinkMbps: networkHint.downlinkMbps,
+    configuredMaxConcurrent,
+    maxConcurrent: networkAdaptive
+      ? Math.min(configuredMaxConcurrent, networkHint.maxConcurrent)
+      : configuredMaxConcurrent,
     timeoutMs: clampOption(options.timeoutMs, profile.timeoutMs, 2500, 60000),
     idleTimeoutMs: clampOption(options.idleTimeoutMs, profile.idleTimeoutMs, 250, 10000),
     fallbackDelayMs: clampOption(options.fallbackDelayMs, profile.fallbackDelayMs, 0, 5000),
     deferredDelayMs: phaseDelayMs.early,
     phaseDelayMs,
-    backgroundBatchSize: clampOption(options.backgroundBatchSize, profile.backgroundBatchSize, 1, 16),
-    backgroundBatchDelayMs: clampOption(options.backgroundBatchDelayMs, profile.backgroundBatchDelayMs, 0, 10000),
+    configuredBackgroundBatchSize,
+    networkBackgroundBatchSize: networkHint.backgroundBatchSize,
+    backgroundBatchSize: networkAdaptive
+      ? Math.min(configuredBackgroundBatchSize, networkHint.backgroundBatchSize)
+      : configuredBackgroundBatchSize,
+    configuredBackgroundBatchDelayMs,
+    backgroundBatchDelayMs: networkAdaptive
+      ? Math.max(configuredBackgroundBatchDelayMs, networkHint.minimumBatchDelayMs)
+      : configuredBackgroundBatchDelayMs,
+    slowAssetThresholdMs: clampOption(options.slowAssetThresholdMs, profile.slowAssetThresholdMs, 100, 60000),
+    now: typeof options.now === "function" ? options.now : getDefaultNow,
   };
 }
 
@@ -589,6 +728,7 @@ export function startRuntimePreload(manifest, options = {}) {
   const normalized = normalizeRuntimePreloadManifest(manifest);
   const resolvedOptions = resolveRuntimePreloadOptions(options);
   const maxConcurrent = resolvedOptions.maxConcurrent;
+  const startedAtMs = Number(resolvedOptions.now()) || 0;
   const skipAssetIds = normalizeAssetIdSet(resolvedOptions.skipAssetIds ?? resolvedOptions.cachedAssetIds);
   const skippedEntries = normalized.entries.filter((entry) => skipAssetIds.has(entry.assetId));
   const entriesToLoad = normalized.entries.filter((entry) => !skipAssetIds.has(entry.assetId));
@@ -611,10 +751,28 @@ export function startRuntimePreload(manifest, options = {}) {
     waitingCount: entriesToLoad.length,
     pendingCount: entriesToLoad.length,
     maxConcurrent,
+    configuredMaxConcurrent: resolvedOptions.configuredMaxConcurrent,
     backgroundBatchSize: resolvedOptions.backgroundBatchSize,
+    configuredBackgroundBatchSize: resolvedOptions.configuredBackgroundBatchSize,
     backgroundBatchDelayMs: resolvedOptions.backgroundBatchDelayMs,
     performanceProfile: resolvedOptions.performanceProfile,
     performanceProfileLabel: resolvedOptions.performanceProfileLabel,
+    networkAdaptive: resolvedOptions.networkAdaptive,
+    networkMode: resolvedOptions.networkMode,
+    networkLabel: resolvedOptions.networkLabel,
+    networkEffectiveType: resolvedOptions.networkEffectiveType,
+    networkDownlinkMbps: resolvedOptions.networkDownlinkMbps,
+    slowAssetThresholdMs: resolvedOptions.slowAssetThresholdMs,
+    startedAtMs,
+    elapsedMs: 0,
+    timedEntryCount: 0,
+    totalLoadTimeMs: 0,
+    averageAssetMs: 0,
+    maxAssetMs: 0,
+    loadedBytes: 0,
+    throughputBytesPerSecond: 0,
+    slowAssetCount: 0,
+    slowAssets: [],
     readyPhases: ["critical"],
     started: normalized.entries.length > 0,
     finished: entriesToLoad.length === 0,
@@ -632,12 +790,26 @@ export function startRuntimePreload(manifest, options = {}) {
   const onProgress = typeof resolvedOptions.onProgress === "function" ? resolvedOptions.onProgress : null;
   let stopped = false;
   let backgroundPumpScheduled = false;
-  const getStatusSnapshot = () => ({
-    ...status,
-    loadedAssetIds: [...status.loadedAssetIds],
-    failedAssetIds: [...status.failedAssetIds],
-    skippedAssetIds: [...status.skippedAssetIds],
-  });
+  const updateRuntimeMetrics = () => {
+    status.elapsedMs = Math.max(0, (Number(resolvedOptions.now()) || startedAtMs) - startedAtMs);
+    status.averageAssetMs =
+      status.timedEntryCount > 0 ? Math.round(status.totalLoadTimeMs / status.timedEntryCount) : 0;
+    status.throughputBytesPerSecond =
+      status.loadedBytes > 0 && status.elapsedMs > 0
+        ? Math.round(status.loadedBytes / (status.elapsedMs / 1000))
+        : 0;
+    status.backgroundBatchSize = getAdaptiveBackgroundBatchSize(status, resolvedOptions);
+  };
+  const getStatusSnapshot = () => {
+    updateRuntimeMetrics();
+    return {
+      ...status,
+      loadedAssetIds: [...status.loadedAssetIds],
+      failedAssetIds: [...status.failedAssetIds],
+      skippedAssetIds: [...status.skippedAssetIds],
+      slowAssets: status.slowAssets.map((entry) => ({ ...entry })),
+    };
+  };
   const updateWaitingCount = () => {
     status.waitingCount = PRELOAD_PHASE_ORDER.reduce(
       (total, phase) => total + (readyPhases.has(phase) ? phaseQueues[phase].length : 0),
@@ -649,13 +821,19 @@ export function startRuntimePreload(manifest, options = {}) {
   };
   const emitProgress = () => onProgress?.(getStatusSnapshot());
 
-  const mark = (ok, phase = "deferred", entry = null) => {
+  const mark = (ok, phase = "deferred", entry = null, entryStartedAtMs = startedAtMs) => {
     if (stopped) {
       return;
     }
+    const finishedAtMs = Number(resolvedOptions.now()) || entryStartedAtMs;
+    const elapsedMs = Math.max(0, finishedAtMs - entryStartedAtMs);
     status.activeCount = Math.max(0, status.activeCount - 1);
+    status.timedEntryCount += 1;
+    status.totalLoadTimeMs += elapsedMs;
+    status.maxAssetMs = Math.max(status.maxAssetMs, elapsedMs);
     if (ok) {
       status.loadedCount += 1;
+      status.loadedBytes += Math.max(0, Number(entry?.sizeBytes) || 0);
       if (entry?.assetId) {
         status.loadedAssetIds.push(entry.assetId);
       }
@@ -665,6 +843,20 @@ export function startRuntimePreload(manifest, options = {}) {
         status.failedAssetIds.push(entry.assetId);
       }
     }
+    if (elapsedMs >= resolvedOptions.slowAssetThresholdMs) {
+      status.slowAssets.push({
+        assetId: safeText(entry?.assetId),
+        name: safeText(entry?.name || entry?.assetId),
+        type: safeText(entry?.type),
+        phase: normalizePreloadPhase(entry?.phase),
+        elapsedMs: Math.round(elapsedMs),
+        outcome: ok ? "loaded" : "failed",
+      });
+      status.slowAssets.sort((left, right) => right.elapsedMs - left.elapsedMs);
+      status.slowAssets = status.slowAssets.slice(0, 5);
+      status.slowAssetCount += 1;
+    }
+    updateRuntimeMetrics();
     status.readyCount = status.loadedCount + status.skippedCount;
     status.finished = status.readyCount + status.failedCount >= status.totalCount;
     updateWaitingCount();
@@ -731,13 +923,14 @@ export function startRuntimePreload(manifest, options = {}) {
       return;
     }
     updateWaitingCount();
+    updateRuntimeMetrics();
     let backgroundStarted = 0;
     while (status.activeCount < maxConcurrent) {
       const entry = takeNextEntry();
       if (!entry) {
         break;
       }
-      if (entry.phase !== "critical" && backgroundStarted >= resolvedOptions.backgroundBatchSize) {
+      if (entry.phase !== "critical" && backgroundStarted >= status.backgroundBatchSize) {
         phaseQueues[entry.phase].unshift(entry);
         scheduleBackgroundPump();
         break;
@@ -747,7 +940,10 @@ export function startRuntimePreload(manifest, options = {}) {
         backgroundStarted += 1;
       }
       updateWaitingCount();
-      preloadEntry(entry, safeOptions).then((ok) => mark(ok, entry.phase, entry)).catch(() => mark(false, entry.phase, entry));
+      const entryStartedAtMs = Number(resolvedOptions.now()) || startedAtMs;
+      preloadEntry(entry, safeOptions)
+        .then((ok) => mark(ok, entry.phase, entry, entryStartedAtMs))
+        .catch(() => mark(false, entry.phase, entry, entryStartedAtMs));
     }
   }
 

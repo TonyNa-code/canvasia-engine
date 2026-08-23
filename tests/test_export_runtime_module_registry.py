@@ -18,6 +18,7 @@ class ExportRuntimeModuleRegistryTests(unittest.TestCase):
         self.assertEqual(len(files), len(set(files)))
         self.assertIn("runtime_text_history.js", files)
         self.assertIn("runtime_save_slots.js", files)
+        self.assertIn("runtime_asset_pipeline.js", files)
 
     def test_manifest_builder_shapes_web_and_desktop_paths(self) -> None:
         web = build_export_runtime_module_manifest("playerRuntime")
@@ -25,8 +26,10 @@ class ExportRuntimeModuleRegistryTests(unittest.TestCase):
 
         self.assertEqual(web["playerRuntimeTextHistory"], "runtime_text_history.js")
         self.assertEqual(web["playerRuntimeSaveSlots"], "runtime_save_slots.js")
+        self.assertEqual(web["playerRuntimeAssetPipeline"], "runtime_asset_pipeline.js")
         self.assertEqual(desktop["appRuntimeTextHistory"], "app/runtime_text_history.js")
         self.assertEqual(desktop["appRuntimeSaveSlots"], "app/runtime_save_slots.js")
+        self.assertEqual(desktop["appRuntimeAssetPipeline"], "app/runtime_asset_pipeline.js")
         self.assertEqual(set(web.values()), set(get_export_runtime_module_files()))
         self.assertEqual(
             {value.removeprefix("app/") for value in desktop.values()},

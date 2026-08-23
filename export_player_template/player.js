@@ -48,14 +48,7 @@ import {
   getSfxTransportSummary,
   sanitizeSfxChannelStateMap,
 } from "./runtime_sfx_transport.js";
-import {
-  buildRuntimePreloadMetaText,
-  buildRuntimePreloadStatusText,
-  startRuntimePreload,
-} from "./runtime_preload.js";
-import {
-  buildRuntimeScenePrefetchManifest,
-} from "./runtime_scene_prefetch.js";
+import { createRuntimeAssetPipeline } from "./runtime_asset_pipeline.js";
 import {
   CHOICE_CONTINUE_TARGET,
   isChoiceContinueTarget,
@@ -565,13 +558,7 @@ const state = {
   lastLocationArchiveStepKey: null,
   lastNarrationArchiveStepKey: null,
   lastVoiceReplayStepKey: null,
-  runtimePreload: null,
-  runtimePreloadStatus: null,
-  runtimePreloadedAssetIds: new Set(),
-  runtimeScenePrefetch: null,
-  runtimeScenePrefetchKey: "",
-  runtimeScenePrefetchStatus: null,
-  runtimeScenePrefetchedAssetIds: new Set(),
+  runtimeAssetPipeline: null,
   localizationFallbacks: new Map(),
   runtimeGamepad: null,
   runtimeGamepadStatus: buildRuntimeGamepadStatus(),
@@ -838,6 +825,7 @@ function init() {
   window.addEventListener("beforeunload", stopRuntimeGamepadInput);
   window.addEventListener("beforeunload", mobileReaderUi.stop);
   window.addEventListener("beforeunload", captureCurrentTimedChoiceState);
+  window.addEventListener("beforeunload", stopRuntimeAssetPipeline);
   window.addEventListener("beforeunload", () => particleQualityController.stop(window));
   startRuntimeAssetPreload();
   renderPlaybackControls();
@@ -849,122 +837,44 @@ function init() {
 }
 
 function startRuntimeAssetPreload() {
-  state.runtimePreload?.stop?.();
-  state.runtimePreloadStatus = null;
-  state.runtimePreloadedAssetIds = new Set();
-  const runtimeSettings = getProjectRuntimeSettings(data.project);
-  state.runtimePreload = startRuntimePreload(data.buildInfo.runtimePreloadManifest, {
-    runtimeSettings,
-    onProgress: (status) => {
-      state.runtimePreloadStatus = status;
-      rememberRuntimePreloadAssets(status, state.runtimePreloadedAssetIds);
-      renderStartSummary();
-      renderBuildInfo();
-    },
-  });
-  state.runtimePreloadStatus = state.runtimePreload?.getStatus?.() ?? null;
-  rememberRuntimePreloadAssets(state.runtimePreloadStatus, state.runtimePreloadedAssetIds);
-}
-
-function resetRuntimeScenePrefetchState() {
-  state.runtimeScenePrefetch?.stop?.();
-  state.runtimeScenePrefetch = null;
-  state.runtimeScenePrefetchKey = "";
-  state.runtimeScenePrefetchStatus = null;
-  state.runtimeScenePrefetchedAssetIds = new Set();
-}
-
-function rememberRuntimePreloadAssets(status, targetSet) {
-  if (!status || !(targetSet instanceof Set)) {
-    return;
-  }
-  [...(status.loadedAssetIds ?? []), ...(status.skippedAssetIds ?? [])].forEach((assetId) => {
-    const normalizedAssetId = String(assetId ?? "").trim();
-    if (normalizedAssetId) {
-      targetSet.add(normalizedAssetId);
-    }
-  });
-}
-
-function getRuntimeCachedAssetIds() {
-  return new Set([
-    ...state.runtimePreloadedAssetIds,
-    ...state.runtimeScenePrefetchedAssetIds,
-  ]);
-}
-
-function startRuntimeScenePrefetch(snapshot) {
-  if (!snapshot || snapshot.completed) {
-    return;
-  }
-
-  const runtimeSettings = getProjectRuntimeSettings(data.project);
-  const cachedAssetIds = getRuntimeCachedAssetIds();
-  const manifest = buildRuntimeScenePrefetchManifest(
-    snapshot,
-    {
+  state.runtimeAssetPipeline?.stop?.();
+  state.runtimeAssetPipeline = createRuntimeAssetPipeline({
+    preloadManifest: data.buildInfo.runtimePreloadManifest,
+    runtimeSettings: getProjectRuntimeSettings(data.project),
+    context: {
       scenesById: data.scenesById,
       assetsById: data.assetsById,
       charactersById: data.charactersById,
-      excludeAssetIds: cachedAssetIds,
     },
-    {
-      choiceContinueTarget: CHOICE_CONTINUE_TARGET,
-      blockLookahead: 8,
-      targetBlockLookahead: 10,
-      maxEntries: 24,
-    }
-  );
-
-  const prefetchKey = manifest.prefetchKey ?? "";
-  if (prefetchKey && prefetchKey === state.runtimeScenePrefetchKey) {
-    return;
-  }
-
-  state.runtimeScenePrefetch?.stop?.();
-  state.runtimeScenePrefetchKey = prefetchKey;
-  state.runtimeScenePrefetchStatus = null;
-
-  if (!manifest.entries.length) {
-    state.runtimeScenePrefetch = null;
-    return;
-  }
-
-  const prefetchAssetIds = manifest.entries.map((entry) => entry.assetId);
-
-  state.runtimeScenePrefetch = startRuntimePreload(manifest, {
-    runtimeSettings,
-    skipAssetIds: cachedAssetIds,
-    maxConcurrent: 1,
-    backgroundBatchSize: 1,
-    backgroundBatchDelayMs: 240,
-    phaseDelayMs: {
-      early: 120,
-      deferred: 900,
-      library: 1800,
-    },
-    onProgress: (status) => {
-      state.runtimeScenePrefetchStatus = status;
-      rememberRuntimePreloadAssets(status, state.runtimeScenePrefetchedAssetIds);
-      if (status.finished) {
-        prefetchAssetIds.forEach((assetId) => state.runtimeScenePrefetchedAssetIds.add(assetId));
+    choiceContinueTarget: CHOICE_CONTINUE_TARGET,
+    onStatusChange(kind) {
+      if (kind === "preload") {
+        renderStartSummary();
       }
       renderBuildInfo();
     },
   });
-  state.runtimeScenePrefetchStatus = state.runtimeScenePrefetch?.getStatus?.() ?? null;
+  state.runtimeAssetPipeline.start();
+}
+
+function resetRuntimeScenePrefetchState() {
+  state.runtimeAssetPipeline?.resetPrefetch?.();
+}
+
+function startRuntimeScenePrefetch(snapshot) {
+  state.runtimeAssetPipeline?.prefetch?.(snapshot);
+}
+
+function stopRuntimeAssetPipeline() {
+  state.runtimeAssetPipeline?.stop?.();
 }
 
 function getRuntimePreloadStatusText() {
-  return buildRuntimePreloadStatusText({
-    manifest: data.buildInfo.runtimePreloadManifest,
-    preloadStatus: state.runtimePreloadStatus ?? state.runtimePreload?.getStatus?.() ?? null,
-    prefetchStatus: state.runtimeScenePrefetchStatus ?? state.runtimeScenePrefetch?.getStatus?.() ?? null,
-  });
+  return state.runtimeAssetPipeline?.getStatusText?.() ?? "没有需要预热的素材";
 }
 
 function getRuntimePreloadMetaText() {
-  return buildRuntimePreloadMetaText(data.buildInfo.runtimePreloadManifest);
+  return state.runtimeAssetPipeline?.getMetaText?.() ?? "";
 }
 
 function buildEndingScenePreview(scene) {

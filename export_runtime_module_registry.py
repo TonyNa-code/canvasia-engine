@@ -39,6 +39,7 @@ EXPORT_RUNTIME_MODULE_SPECS = (
     ("SfxTransport", "runtime_sfx_transport.js"),
     ("Preload", "runtime_preload.js"),
     ("ScenePrefetch", "runtime_scene_prefetch.js"),
+    ("AssetPipeline", "runtime_asset_pipeline.js"),
     ("TextEffects", "runtime_text_effects.js"),
     ("TextPacing", "runtime_text_pacing.js"),
     ("RichText", "runtime_rich_text.js"),

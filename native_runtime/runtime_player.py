@@ -13,6 +13,7 @@ import tempfile
 from contextlib import redirect_stdout
 from datetime import datetime
 from pathlib import Path
+from time import perf_counter
 
 try:
     from .runtime_i18n import (
@@ -46,7 +47,7 @@ try:
         build_runtime_preload_profile_advice,
         build_runtime_preload_size_budget,
         get_project_runtime_preload_performance_profile,
-        get_runtime_preload_frame_budget,
+        get_runtime_preload_adaptive_frame_budget,
         get_runtime_preload_manifest,
         is_runtime_preload_startup_entry,
         mark_runtime_preload_entry,
@@ -63,7 +64,7 @@ except ImportError:  # pragma: no cover - exported native packages import from t
         build_runtime_preload_profile_advice,
         build_runtime_preload_size_budget,
         get_project_runtime_preload_performance_profile,
-        get_runtime_preload_frame_budget,
+        get_runtime_preload_adaptive_frame_budget,
         get_runtime_preload_manifest,
         is_runtime_preload_startup_entry,
         mark_runtime_preload_entry,
@@ -74,6 +75,7 @@ try:
     from .runtime_scene_prefetch import (
         CHOICE_CONTINUE_TARGET as RUNTIME_SCENE_PREFETCH_CONTINUE_TARGET,
         build_runtime_scene_prefetch_manifest,
+        build_runtime_scene_prefetch_request_key,
         build_runtime_scene_prefetch_snapshot,
         get_runtime_scene_prefetch_summary,
     )
@@ -81,6 +83,7 @@ except ImportError:  # pragma: no cover - exported native packages import from t
     from runtime_scene_prefetch import (
         CHOICE_CONTINUE_TARGET as RUNTIME_SCENE_PREFETCH_CONTINUE_TARGET,
         build_runtime_scene_prefetch_manifest,
+        build_runtime_scene_prefetch_request_key,
         build_runtime_scene_prefetch_snapshot,
         get_runtime_scene_prefetch_summary,
     )
@@ -8360,7 +8363,10 @@ class NativeRuntimePlayer:
             if not isinstance(cache, dict):
                 continue
             cached_ids.update(str(asset_id) for asset_id, value in cache.items() if asset_id and value is not None)
-        cached_ids.update(getattr(self, "runtime_preload_finished_asset_ids", set()) or set())
+        preload_status = getattr(self, "runtime_preload_status", {})
+        if isinstance(preload_status, dict):
+            cached_ids.update(str(asset_id) for asset_id in preload_status.get("loadedAssetIds") or [])
+            cached_ids.update(str(asset_id) for asset_id in preload_status.get("cachedAssetIds") or [])
         cached_ids.update(getattr(self, "runtime_scene_prefetched_asset_ids", set()) or set())
         if getattr(self, "current_bgm_asset_id", None):
             cached_ids.add(str(self.current_bgm_asset_id))
@@ -8387,11 +8393,13 @@ class NativeRuntimePlayer:
         *,
         status_attr: str = "runtime_preload_status",
         finished_asset_ids: set[str] | None = None,
-    ) -> None:
+    ) -> str | None:
         asset_id = str(entry.get("assetId") or "")
         finished_ids = finished_asset_ids if finished_asset_ids is not None else self.runtime_preload_finished_asset_ids
         if not asset_id or asset_id in finished_ids:
-            return
+            return None
+        preload_clock = getattr(self, "_runtime_preload_clock", perf_counter)
+        started_at = float(preload_clock())
         asset_type = str(entry.get("type") or "")
         asset = self.assets_by_id.get(asset_id)
         if asset_id in self.get_runtime_cached_asset_ids():
@@ -8412,16 +8420,25 @@ class NativeRuntimePlayer:
             else:
                 outcome = "failed"
 
+        elapsed_ms = max(0.0, (float(preload_clock()) - started_at) * 1000.0)
         current_status = getattr(self, status_attr, build_runtime_preload_status([]))
-        setattr(self, status_attr, mark_runtime_preload_entry(current_status, entry, outcome))
+        setattr(
+            self,
+            status_attr,
+            mark_runtime_preload_entry(current_status, entry, outcome, elapsed_ms=elapsed_ms),
+        )
         finished_ids.add(asset_id)
+        return outcome
 
     def update_runtime_preload_queue(self, max_entries: int | None = None) -> None:
         if not self.runtime_preload_pending_entries:
             return
         budget_source = max_entries
         if budget_source is None:
-            budget_source = get_runtime_preload_frame_budget(self.get_runtime_preload_performance_profile())
+            budget_source = get_runtime_preload_adaptive_frame_budget(
+                self.runtime_preload_status,
+                self.get_runtime_preload_performance_profile(),
+            )
         budget = max(0, int(budget_source or 0))
         if budget <= 0:
             return
@@ -8477,10 +8494,22 @@ class NativeRuntimePlayer:
     def update_runtime_scene_prefetch_queue(self, max_entries: int | None = None) -> None:
         if getattr(self, "title_screen_active", False):
             return
-        manifest = self.get_runtime_scene_prefetch_manifest()
-        prefetch_key = str(manifest.get("prefetchKey") or "")
+        snapshot = self.build_runtime_scene_prefetch_snapshot()
+        prefetch_key = str(
+            build_runtime_scene_prefetch_request_key(
+                snapshot,
+                RUNTIME_SCENE_PREFETCH_CONTINUE_TARGET,
+            )
+            or ""
+        )
         if prefetch_key != self.runtime_scene_prefetch_key:
-            self.runtime_scene_prefetch_key = prefetch_key
+            manifest = self.get_runtime_scene_prefetch_manifest()
+            self.runtime_scene_prefetch_key = str(
+                manifest.get("requestKey")
+                or prefetch_key
+                or manifest.get("prefetchKey")
+                or ""
+            )
             self.reset_runtime_scene_prefetch_queue(manifest)
 
         if not self.runtime_scene_prefetch_pending_entries:
@@ -8488,19 +8517,25 @@ class NativeRuntimePlayer:
 
         budget_source = max_entries
         if budget_source is None:
-            budget_source = min(2, get_runtime_preload_frame_budget(self.get_runtime_preload_performance_profile()))
+            budget_source = min(
+                2,
+                get_runtime_preload_adaptive_frame_budget(
+                    self.runtime_scene_prefetch_status,
+                    self.get_runtime_preload_performance_profile(),
+                ),
+            )
         budget = max(0, int(budget_source or 0))
         if budget <= 0:
             return
 
         for _index in range(min(budget, len(self.runtime_scene_prefetch_pending_entries))):
             entry = self.runtime_scene_prefetch_pending_entries.pop(0)
-            self.warm_runtime_preload_entry(
+            outcome = self.warm_runtime_preload_entry(
                 entry,
                 status_attr="runtime_scene_prefetch_status",
                 finished_asset_ids=self.runtime_scene_prefetch_finished_asset_ids,
             )
-            if entry.get("assetId"):
+            if outcome in {"loaded_image", "loaded_sound", "ready_stream", "cached"} and entry.get("assetId"):
                 self.runtime_scene_prefetched_asset_ids.add(str(entry.get("assetId")))
         self.runtime_scene_prefetch_status = finalize_runtime_preload_status(self.runtime_scene_prefetch_status)
 

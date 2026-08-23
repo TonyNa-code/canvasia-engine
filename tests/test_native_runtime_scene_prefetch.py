@@ -7,6 +7,7 @@ from pathlib import Path
 from native_runtime.runtime_player import NativeRuntimePlayer
 from native_runtime.runtime_scene_prefetch import (
     build_runtime_scene_prefetch_manifest,
+    build_runtime_scene_prefetch_request_key,
     build_runtime_scene_prefetch_snapshot,
     get_runtime_scene_prefetch_summary,
 )
@@ -79,6 +80,7 @@ class NativeRuntimeScenePrefetchTests(unittest.TestCase):
         self.assertEqual(manifest["entrySceneId"], "intro")
         self.assertEqual(manifest["targetSceneIds"], ["branch"])
         self.assertIn("intro:b1:1", manifest["prefetchKey"])
+        self.assertEqual(manifest["requestKey"], build_runtime_scene_prefetch_request_key(snapshot))
         self.assertEqual(asset_ids[:2], ["bg_next", "sfx_click"])
         self.assertIn("branch_bg", asset_ids)
         self.assertIn("branch_voice", asset_ids)
@@ -89,6 +91,24 @@ class NativeRuntimeScenePrefetchTests(unittest.TestCase):
         self.assertEqual(summary["imageCount"], 3)
         self.assertEqual(summary["audioCount"], 2)
         self.assertEqual(summary["videoCount"], 1)
+
+    def test_scene_step_request_key_stays_stable_as_cache_fills(self) -> None:
+        fixture = build_prefetch_fixture()
+        snapshot = build_runtime_scene_prefetch_snapshot(
+            fixture["scenesById"]["intro"],
+            1,
+            scene_id="intro",
+            choice_options=[{"text": "Branch", "gotoSceneId": "branch"}],
+        )
+        first = build_runtime_scene_prefetch_manifest(snapshot, fixture)
+        second = build_runtime_scene_prefetch_manifest(
+            snapshot,
+            {**fixture, "excludeAssetIds": {"bg_next"}},
+        )
+
+        self.assertEqual(first["requestKey"], second["requestKey"])
+        self.assertNotEqual(first["prefetchKey"], second["prefetchKey"])
+        self.assertNotIn("bg_next", [entry["assetId"] for entry in second["entries"]])
 
     def test_native_player_scene_prefetch_warms_assets_without_window(self) -> None:
         fixture = build_prefetch_fixture()
@@ -144,9 +164,21 @@ class NativeRuntimeScenePrefetchTests(unittest.TestCase):
             player._load_image = fake_load_image
             player._load_sound = fake_load_sound
 
+            build_count = 0
+            original_manifest_builder = player.get_runtime_scene_prefetch_manifest
+
+            def counted_manifest_builder():
+                nonlocal build_count
+                build_count += 1
+                return original_manifest_builder()
+
+            player.get_runtime_scene_prefetch_manifest = counted_manifest_builder
+
+            player.update_runtime_scene_prefetch_queue(max_entries=24)
             player.update_runtime_scene_prefetch_queue(max_entries=24)
 
         status = player.runtime_scene_prefetch_status
+        self.assertEqual(build_count, 1)
         self.assertEqual(status["status"], "ready")
         self.assertEqual(status["totalEntries"], 6)
         self.assertEqual(status["loadedEntries"], 6)
@@ -158,6 +190,82 @@ class NativeRuntimeScenePrefetchTests(unittest.TestCase):
         self.assertIn("branch_voice", player.sound_cache)
         self.assertIn("branch_video", player.runtime_scene_prefetched_asset_ids)
         self.assertIn("已准备 6/6 项", player.get_runtime_scene_prefetch_status_line())
+
+    def test_failed_prefetch_asset_is_not_reported_as_cached(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_dir = Path(temp_dir)
+            asset_path = bundle_dir / "assets" / "failed.png"
+            asset_path.parent.mkdir(parents=True, exist_ok=True)
+            asset_path.write_bytes(b"asset")
+            entry = {
+                "assetId": "failed-image",
+                "name": "Failed image",
+                "type": "background",
+                "url": "assets/failed.png",
+                "phase": "early",
+                "priority": 10,
+            }
+
+            player = NativeRuntimePlayer.__new__(NativeRuntimePlayer)
+            player.bundle_dir = bundle_dir
+            player.project = {"runtimeSettings": {"performanceProfile": "high_quality_pc"}}
+            player.assets_by_id = {
+                "failed-image": {
+                    "id": "failed-image",
+                    "type": "background",
+                    "exportUrl": "assets/failed.png",
+                }
+            }
+            player.image_cache = {}
+            player.sound_cache = {}
+            player.runtime_preload_finished_asset_ids = set()
+            player.runtime_scene_prefetched_asset_ids = set()
+            player.runtime_scene_prefetch_key = ""
+            player.runtime_scene_prefetch_pending_entries = []
+            player.runtime_scene_prefetch_finished_asset_ids = set()
+            player.runtime_scene_prefetch_status = {}
+            player.current_bgm_asset_id = None
+            player.title_screen_active = False
+            player.build_runtime_scene_prefetch_snapshot = lambda: {
+                "sceneId": "scene",
+                "blockId": "block",
+                "blockIndex": 0,
+                "choiceOptions": [],
+                "transitionTargetSceneId": "",
+                "completed": False,
+            }
+            player.get_runtime_scene_prefetch_manifest = lambda: {
+                "formatVersion": 1,
+                "requestKey": "scene:block:0|",
+                "prefetchKey": "scene:block:0|failed-image",
+                "entries": [entry],
+            }
+            player._load_image = lambda _asset_id: None
+            player._load_sound = lambda _asset_id: None
+
+            player.update_runtime_scene_prefetch_queue(max_entries=1)
+
+        self.assertEqual(player.runtime_scene_prefetch_status["failedEntries"], 1)
+        self.assertIn("failed-image", player.runtime_scene_prefetch_status["failedAssetIds"])
+        self.assertNotIn("failed-image", player.runtime_scene_prefetched_asset_ids)
+
+    def test_failed_global_preload_attempt_is_not_reported_as_cached(self) -> None:
+        player = NativeRuntimePlayer.__new__(NativeRuntimePlayer)
+        player.image_cache = {}
+        player.sound_cache = {}
+        player.runtime_preload_finished_asset_ids = {"failed-image", "ready-stream"}
+        player.runtime_preload_status = {
+            "loadedAssetIds": ["ready-stream"],
+            "cachedAssetIds": [],
+            "failedAssetIds": ["failed-image"],
+        }
+        player.runtime_scene_prefetched_asset_ids = set()
+        player.current_bgm_asset_id = None
+
+        cached_asset_ids = player.get_runtime_cached_asset_ids()
+
+        self.assertIn("ready-stream", cached_asset_ids)
+        self.assertNotIn("failed-image", cached_asset_ids)
 
 
 if __name__ == "__main__":

@@ -470,6 +470,8 @@ class NativeRuntimeTextHelperTests(unittest.TestCase):
         self.assertEqual(status["totalBytes"], 7168)
         self.assertEqual(status["criticalBytes"], 7168)
         self.assertEqual(status["loadedBytes"], 7168)
+        self.assertEqual(status["timedEntries"], 3)
+        self.assertGreaterEqual(status["averageEntryMs"], 0)
         self.assertIn("首屏 7.0 KB", status["summaryText"])
         self.assertIn("合计 7.0 KB", player.get_runtime_preload_status_line())
         self.assertEqual(player.image_cache["title_ui"], "image:title_ui")

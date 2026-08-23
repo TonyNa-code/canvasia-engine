@@ -229,7 +229,7 @@ Canvasia は初期 i18n フローに対応しています。
 - Linux desktop パッケージ
 - standalone app ビルド用 scaffold を含むネイティブ Runtime preview パッケージ
 
-気軽に共有するなら Web 試遊パッケージが最も簡単です。Web / desktop / native Runtime には `runtime_preload_manifest.json` と `RUNTIME_PRELOAD_REPORT.md` も含まれ、最初のシーンや序盤ルートの背景、立ち絵、音声を優先的に準備します。エディタの inspection page では、書き出し前に Runtime preload budget report を出力し、入口シーンの重い素材、欠落ファイル、シーン単位のロード hotspots を確認できます。ネイティブ Runtime は同じ manifest を読み込み、起動時は critical な画像と短い音声を優先キャッシュし、その後は小さな background queue で非 critical 素材を段階的に準備します。よりアプリに近いデスクトップ再生フローを検証する場合は、ネイティブ Runtime パッケージを使います。
+気軽に共有するなら Web 試遊パッケージが最も簡単です。Web / desktop / native Runtime には `runtime_preload_manifest.json` と `RUNTIME_PRELOAD_REPORT.md` も含まれ、最初のシーンや序盤ルートの背景、立ち絵、音声を優先的に準備します。Web Runtime は省データ / 低速回線で同時ロード数を抑え、実測時間・スループット・遅い素材を記録し、ルート prefetch の重複起動と失敗素材の誤キャッシュを防ぎます。エディタの inspection page では、書き出し前に Runtime preload budget report を出力し、入口シーンの重い素材、欠落ファイル、シーン単位のロード hotspots を確認できます。ネイティブ Runtime は同じ manifest を読み込み、critical な画像と短い音声を優先キャッシュした後、実測コストに応じて 1 フレーム当たりの background preload 数を調整します。よりアプリに近いデスクトップ再生フローを検証する場合は、ネイティブ Runtime パッケージを使います。
 
 Ren'Py Starter Bundle は `game/script.rpy`、`game/options.rpy`、`game/assets/` にコピーされた素材、migration manifest、カスタム Canvasia 演出の review notes、bundle quality report、label / jump / 参照ファイルを確認する local verifier script を含む zip を生成します。
 
