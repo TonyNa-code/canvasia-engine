@@ -122,13 +122,11 @@ except ImportError:  # pragma: no cover - exported native packages import from t
 try:
     from .runtime_surface_cache import (
         NativeSurfaceCache,
-        get_cached_transformed_surface,
         get_native_surface_cache_limits,
     )
 except ImportError:  # pragma: no cover - exported native packages import from the same directory.
     from runtime_surface_cache import (
         NativeSurfaceCache,
-        get_cached_transformed_surface,
         get_native_surface_cache_limits,
     )
 
@@ -867,6 +865,11 @@ except ImportError:  # pragma: no cover - exported native packages import from t
         get_safe_dialogue_layout,
         render_native_dialogue,
     )
+
+try:
+    from .runtime_dialog_panel import render_runtime_dialog_panel
+except ImportError:  # pragma: no cover - exported native packages import from the same directory.
+    from runtime_dialog_panel import render_runtime_dialog_panel
 
 try:
     from .runtime_stage_images import (
@@ -9845,73 +9848,7 @@ class NativeRuntimePlayer:
         return rect
 
     def draw_dialog_panel(self, rect) -> None:
-        pygame = self.pygame
-        config = self.dialog_box_config
-        radius = self.get_dialog_border_radius(rect.height)
-        shadow_strength = int(config.get("shadowStrength", 0))
-        if shadow_strength > 0:
-            shadow_alpha = int(70 + shadow_strength * 2.2)
-            shadow_surface = pygame.Surface((rect.width + 32, rect.height + 32), pygame.SRCALPHA)
-            pygame.draw.rect(
-                shadow_surface,
-                (0, 0, 0, min(190, shadow_alpha)),
-                pygame.Rect(16, 16, rect.width, rect.height),
-                border_radius=min(radius + 6, (rect.height + 12) // 2),
-            )
-            self.screen.blit(shadow_surface, (rect.left - 16, rect.top - 8))
-
-        panel_surface = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
-        panel_rect = panel_surface.get_rect()
-
-        background_opacity = self.scale_dialog_opacity(int(config.get("backgroundOpacity", 0)))
-        if background_opacity > 0:
-            pygame.draw.rect(
-                panel_surface,
-                with_alpha(config.get("backgroundColor", COLOR_PANEL), background_opacity),
-                panel_rect,
-                border_radius=radius,
-            )
-
-        panel_art_id = config.get("panelAssetId")
-        panel_art_opacity = self.scale_dialog_opacity(int(config.get("panelAssetOpacity", 0)))
-        panel_art = self._load_image(panel_art_id) if panel_art_id and panel_art_opacity > 0 else None
-        if panel_art:
-            art_width, art_height = panel_art.get_size()
-            if art_width > 0 and art_height > 0:
-                if config.get("panelAssetFit") == "contain":
-                    scale = min(rect.width / art_width, rect.height / art_height)
-                else:
-                    scale = max(rect.width / art_width, rect.height / art_height)
-                scaled = get_cached_transformed_surface(
-                    self.surface_cache,
-                    pygame,
-                    panel_art,
-                    (max(1, int(art_width * scale)), max(1, int(art_height * scale))),
-                    namespace="dialog-panel-art",
-                )
-                scaled = scaled.copy()
-                scaled.set_alpha(int(round(panel_art_opacity * 2.55)))
-                art_rect = scaled.get_rect(center=panel_rect.center)
-                panel_surface.blit(scaled, art_rect)
-
-        mask_surface = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
-        pygame.draw.rect(mask_surface, (255, 255, 255, 255), mask_surface.get_rect(), border_radius=radius)
-        panel_surface.blit(mask_surface, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
-
-        self.screen.blit(panel_surface, rect)
-
-        border_width = int(config.get("borderWidth", 0))
-        border_opacity = int(config.get("borderOpacity", 0))
-        if border_width > 0 and border_opacity > 0:
-            border_surface = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
-            pygame.draw.rect(
-                border_surface,
-                with_alpha(config.get("borderColor", COLOR_PANEL_BORDER), border_opacity),
-                border_surface.get_rect(),
-                width=border_width,
-                border_radius=radius,
-            )
-            self.screen.blit(border_surface, rect)
+        render_runtime_dialog_panel(self, rect)
 
     def get_dialogue_speaker_name(self, line: dict) -> str:
         if line.get("type") == "dialogue":

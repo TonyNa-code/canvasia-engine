@@ -78,6 +78,26 @@ class NativeRuntimeSurfaceCacheTests(unittest.TestCase):
 
         self.assertIs(cache.put("large", surface), surface)
         self.assertEqual(cache.snapshot()["entryCount"], 0)
+        self.assertEqual(cache.snapshot()["oversizedBypasses"], 1)
+
+    def test_cache_measures_successful_surface_builds_without_recounting_hits(self) -> None:
+        times = iter((1.0, 1.004))
+        cache = NativeSurfaceCache(
+            max_entries=4,
+            max_pixels=1_000,
+            timer=lambda: next(times),
+        )
+
+        first = cache.get_or_create("panel", lambda: FakeSurface((10, 10)))
+        second = cache.get_or_create("panel", lambda: FakeSurface((20, 20)))
+        snapshot = cache.snapshot()
+
+        self.assertIs(first, second)
+        self.assertEqual(snapshot["buildCount"], 1)
+        self.assertEqual(snapshot["buildTimeMs"], 4.0)
+        self.assertEqual(snapshot["averageBuildTimeMs"], 4.0)
+        self.assertEqual(snapshot["maxBuildTimeMs"], 4.0)
+        self.assertEqual(snapshot["hits"], 1)
 
     def test_transform_cache_skips_duplicate_scale_flip_and_rotation(self) -> None:
         transform = FakeTransform()

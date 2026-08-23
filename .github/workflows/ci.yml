@@ -72,6 +72,7 @@ jobs:
             native_runtime/runtime_settings_overlay.py \
             native_runtime/runtime_reading_profiles.py \
             native_runtime/runtime_dialogue_layouts.py \
+            native_runtime/runtime_dialog_panel.py \
             native_runtime/runtime_visual_comfort.py \
             native_runtime/runtime_speaker_focus.py \
             native_runtime/runtime_dialogue_camera.py \
@@ -269,6 +270,7 @@ jobs:
             tests/test_native_runtime_voice_mixer.py \
             tests/test_native_runtime_reading_profiles.py \
             tests/test_native_runtime_dialogue_layouts.py \
+            tests/test_native_runtime_dialog_panel.py \
             tests/test_native_runtime_visual_comfort.py \
             tests/test_frontend_runtime_preload_module.py \
             tests/test_frontend_runtime_scene_prefetch_module.py \
@@ -653,6 +655,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_native_runtime_voice_mixer.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_reading_profiles.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_dialogue_layouts.py' -v
+          python -m unittest discover -s tests -p 'test_native_runtime_dialog_panel.py' -v
           python -m unittest discover -s tests -p 'test_native_runtime_visual_comfort.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_preload_module.py' -v
           python -m unittest discover -s tests -p 'test_frontend_runtime_scene_prefetch_module.py' -v

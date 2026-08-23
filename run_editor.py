@@ -430,6 +430,7 @@ NATIVE_RUNTIME_SETTINGS_NAME = "runtime_player_settings.py"
 NATIVE_RUNTIME_SETTINGS_OVERLAY_NAME = "runtime_settings_overlay.py"
 NATIVE_RUNTIME_READING_PROFILES_NAME = "runtime_reading_profiles.py"
 NATIVE_RUNTIME_DIALOGUE_LAYOUTS_NAME = "runtime_dialogue_layouts.py"
+NATIVE_RUNTIME_DIALOG_PANEL_NAME = "runtime_dialog_panel.py"
 NATIVE_RUNTIME_VISUAL_COMFORT_NAME = "runtime_visual_comfort.py"
 NATIVE_RUNTIME_VOICE_MIXER_NAME = "runtime_voice_mixer.py"
 NATIVE_RUNTIME_VIEW_NAME = "runtime_player_view.py"
@@ -525,6 +526,7 @@ NATIVE_RUNTIME_REQUIRED_MODULE_FILES = build_native_runtime_required_module_file
         NATIVE_RUNTIME_SETTINGS_OVERLAY_NAME,
         NATIVE_RUNTIME_READING_PROFILES_NAME,
         NATIVE_RUNTIME_DIALOGUE_LAYOUTS_NAME,
+        NATIVE_RUNTIME_DIALOG_PANEL_NAME,
         NATIVE_RUNTIME_VISUAL_COMFORT_NAME,
         NATIVE_RUNTIME_VOICE_MIXER_NAME,
         NATIVE_RUNTIME_VIEW_NAME,
@@ -8823,6 +8825,8 @@ def write_native_runtime_files(build_dir: Path, export_payload: dict) -> dict:
         "runtimeSettingsModulePath": str(build_dir / NATIVE_RUNTIME_SETTINGS_NAME),
         "runtimeDialogueLayoutsModuleName": NATIVE_RUNTIME_DIALOGUE_LAYOUTS_NAME,
         "runtimeDialogueLayoutsModulePath": str(build_dir / NATIVE_RUNTIME_DIALOGUE_LAYOUTS_NAME),
+        "runtimeDialogPanelModuleName": NATIVE_RUNTIME_DIALOG_PANEL_NAME,
+        "runtimeDialogPanelModulePath": str(build_dir / NATIVE_RUNTIME_DIALOG_PANEL_NAME),
         "runtimeVoiceMixerModuleName": NATIVE_RUNTIME_VOICE_MIXER_NAME,
         "runtimeVoiceMixerModulePath": str(build_dir / NATIVE_RUNTIME_VOICE_MIXER_NAME),
         "runtimeViewModuleName": NATIVE_RUNTIME_VIEW_NAME,
@@ -9373,6 +9377,7 @@ def export_native_runtime_build() -> dict:
             "runtimeParticlesModule": runtime_files["runtimeParticlesModuleName"],
             "runtimeI18nModule": runtime_files["runtimeI18nModuleName"],
             "runtimeSettingsModule": runtime_files["runtimeSettingsModuleName"],
+            "runtimeDialogPanelModule": runtime_files["runtimeDialogPanelModuleName"],
             "runtimeVoiceMixerModule": runtime_files["runtimeVoiceMixerModuleName"],
             "runtimeViewModule": runtime_files["runtimeViewModuleName"],
             "runtimeCharacterMotionModule": runtime_files["runtimeCharacterMotionModuleName"],
@@ -9464,6 +9469,7 @@ def export_native_runtime_build() -> dict:
             "runtimeParticlesModule": runtime_files["runtimeParticlesModuleName"],
             "runtimeI18nModule": runtime_files["runtimeI18nModuleName"],
             "runtimeSettingsModule": runtime_files["runtimeSettingsModuleName"],
+            "runtimeDialogPanelModule": runtime_files["runtimeDialogPanelModuleName"],
             "runtimeVoiceMixerModule": runtime_files["runtimeVoiceMixerModuleName"],
             "runtimeViewModule": runtime_files["runtimeViewModuleName"],
             "runtimeCharacterMotionModule": runtime_files["runtimeCharacterMotionModuleName"],
@@ -9704,6 +9710,7 @@ def export_native_runtime_build() -> dict:
         {"name": runtime_files["crashFeedbackJsonName"], "description": "机器可读原生 Runtime 崩溃反馈 JSON 模板。"},
         {"name": runtime_files["runtimeI18nModuleName"], "description": "原生 Runtime 多语言和文本回退模块。"},
         {"name": runtime_files["runtimeSettingsModuleName"], "description": "原生 Runtime 系统设置模块。"},
+        {"name": runtime_files["runtimeDialogPanelModuleName"], "description": "原生 Runtime 对话框底板、素材、圆角、边框与阴影的一次合成缓存。"},
         {"name": runtime_files["runtimeVoiceMixerModuleName"], "description": "原生 Runtime 角色语音混音与持久化规则模块。"},
         {"name": runtime_files["runtimeViewModuleName"], "description": "原生 Runtime 可见层配置、转场安全值和文本排版模块。"},
         {"name": runtime_files["runtimeCharacterMotionModuleName"], "description": "原生 Runtime 角色走位、缩放、透明度、翻转和缓动插值模块。"},
@@ -9994,6 +10001,9 @@ def export_native_runtime_build() -> dict:
         "runtimeSettingsModuleName": runtime_files["runtimeSettingsModuleName"],
         "runtimeSettingsModulePath": runtime_files["runtimeSettingsModulePath"],
         "runtimeSettingsModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimeSettingsModuleName']}",
+        "runtimeDialogPanelModuleName": runtime_files["runtimeDialogPanelModuleName"],
+        "runtimeDialogPanelModulePath": runtime_files["runtimeDialogPanelModulePath"],
+        "runtimeDialogPanelModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimeDialogPanelModuleName']}",
         "runtimeVoiceMixerModuleName": runtime_files["runtimeVoiceMixerModuleName"],
         "runtimeVoiceMixerModulePath": runtime_files["runtimeVoiceMixerModulePath"],
         "runtimeVoiceMixerModulePublicUrl": f"/exports/{build_dir.name}/{runtime_files['runtimeVoiceMixerModuleName']}",

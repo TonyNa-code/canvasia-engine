@@ -64,6 +64,10 @@ class NativeRuntimeDiagnosticsTests(unittest.TestCase):
                     "misses": 2,
                     "evictions": 1,
                     "hitRatePercent": 90,
+                    "buildCount": 2,
+                    "buildTimeMs": 7.5,
+                    "maxBuildTimeMs": 5.25,
+                    "oversizedBypasses": 1,
                 },
                 "runtimeScenePrefetchedAssetIds": {"bg_branch", "voice_branch"},
                 "currentBgmAssetId": "bgm_theme",
@@ -102,6 +106,10 @@ class NativeRuntimeDiagnosticsTests(unittest.TestCase):
         self.assertEqual(by_label["绘制变换缓存"]["value"], "9 项")
         self.assertIn("命中率 90%", by_label["绘制变换缓存"]["detail"])
         self.assertIn("8.0 MiB", by_label["绘制变换缓存"]["detail"])
+        self.assertIn("合成 2 次", by_label["绘制变换缓存"]["detail"])
+        self.assertIn("累计 7.5 ms", by_label["绘制变换缓存"]["detail"])
+        self.assertIn("峰值 5.2 ms", by_label["绘制变换缓存"]["detail"])
+        self.assertIn("超预算绕过 1 次", by_label["绘制变换缓存"]["detail"])
         self.assertEqual(by_label["音频缓存"]["value"], "1 项")
         self.assertIn("BGM：bgm_theme", by_label["音频缓存"]["detail"])
         self.assertEqual(by_label["缓存复用效率"]["value"], "2/7")

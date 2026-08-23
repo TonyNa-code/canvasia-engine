@@ -323,9 +323,15 @@ class CiWorkflowCoverageTests(unittest.TestCase):
         workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
 
         self.assertIn("native_runtime/runtime_surface_cache.py", workflow)
+        self.assertIn("native_runtime/runtime_dialog_panel.py", workflow)
         self.assertIn("tests/test_native_runtime_surface_cache.py", workflow)
+        self.assertIn("tests/test_native_runtime_dialog_panel.py", workflow)
         self.assertIn(
             "python -m unittest discover -s tests -p 'test_native_runtime_surface_cache.py' -v",
+            workflow,
+        )
+        self.assertIn(
+            "python -m unittest discover -s tests -p 'test_native_runtime_dialog_panel.py' -v",
             workflow,
         )
 

@@ -495,7 +495,11 @@ def build_runtime_cache_diagnostic_rows(context: dict | None) -> list[dict]:
                 f"{int(surface_cache.get('entryCount') or 0)} 项",
                 (
                     f"命中率 {int(surface_cache.get('hitRatePercent') or 0)}% / "
-                    f"约 {estimated_megabytes:.1f} MiB / 淘汰 {int(surface_cache.get('evictions') or 0)} 项。"
+                    f"约 {estimated_megabytes:.1f} MiB / 淘汰 {int(surface_cache.get('evictions') or 0)} 项 / "
+                    f"合成 {int(surface_cache.get('buildCount') or 0)} 次，累计 "
+                    f"{float(surface_cache.get('buildTimeMs') or 0):.1f} ms，峰值 "
+                    f"{float(surface_cache.get('maxBuildTimeMs') or 0):.1f} ms / "
+                    f"超预算绕过 {int(surface_cache.get('oversizedBypasses') or 0)} 次。"
                 ),
                 "ready" if int(surface_cache.get("hits") or 0) else "empty",
             ),

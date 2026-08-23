@@ -3272,6 +3272,35 @@ class NativeRuntimeRenderSmokeTests(unittest.TestCase):
         self.assertGreater(second["hits"], first["hits"])
         self.assertGreater(second["hitRatePercent"], 0)
 
+    def test_dialog_panel_chrome_reuses_composed_surface_until_style_changes(self) -> None:
+        data_path = self.write_game_data()
+        player = NativeRuntimePlayer(pygame, data_path)
+        player.dialog_box_config.update(
+            {
+                "panelAssetId": "panel_frame",
+                "panelAssetOpacity": 52,
+                "panelAssetFit": "cover",
+                "shadowStrength": 16,
+            }
+        )
+        panel = player.get_dialog_panel_rect(188)
+
+        player.draw_dialog_panel(panel)
+        first = player.surface_cache.snapshot()
+        player.draw_dialog_panel(panel)
+        second = player.surface_cache.snapshot()
+
+        self.assertGreaterEqual(first["buildCount"], 2)
+        self.assertEqual(second["buildCount"], first["buildCount"])
+        self.assertGreater(second["hits"], first["hits"])
+        self.assertGreater(second["hitRatePercent"], 0)
+        self.assert_screen_has_pixels(player)
+
+        player.dialog_box_config["backgroundOpacity"] = 54
+        player.draw_dialog_panel(panel)
+        changed = player.surface_cache.snapshot()
+        self.assertGreater(changed["buildCount"], second["buildCount"])
+
     def test_player_text_input_writes_variable_and_interpolates_next_line(self) -> None:
         data_path = self.write_game_data()
         payload = json.loads(data_path.read_text(encoding="utf-8"))

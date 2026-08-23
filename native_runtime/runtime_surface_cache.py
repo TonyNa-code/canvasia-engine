@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from collections.abc import Callable, Hashable
+from time import perf_counter
 
 
 DEFAULT_SURFACE_CACHE_MAX_ENTRIES = 128
@@ -30,6 +31,7 @@ class NativeSurfaceCache:
         *,
         max_entries: int = DEFAULT_SURFACE_CACHE_MAX_ENTRIES,
         max_pixels: int = DEFAULT_SURFACE_CACHE_MAX_PIXELS,
+        timer: Callable[[], float] = perf_counter,
     ) -> None:
         self.max_entries = max(1, int(max_entries))
         self.max_pixels = max(1, int(max_pixels))
@@ -38,6 +40,11 @@ class NativeSurfaceCache:
         self._hits = 0
         self._misses = 0
         self._evictions = 0
+        self._build_count = 0
+        self._build_time_ms = 0.0
+        self._max_build_time_ms = 0.0
+        self._oversized_bypasses = 0
+        self._timer = timer
 
     def get(self, key: Hashable):
         entry = self._entries.get(key)
@@ -50,7 +57,10 @@ class NativeSurfaceCache:
 
     def put(self, key: Hashable, surface):
         pixel_count = _surface_pixel_count(surface)
-        if pixel_count <= 0 or pixel_count > self.max_pixels:
+        if pixel_count <= 0:
+            return surface
+        if pixel_count > self.max_pixels:
+            self._oversized_bypasses += 1
             return surface
 
         previous = self._entries.pop(key, None)
@@ -66,7 +76,13 @@ class NativeSurfaceCache:
         cached = self.get(key)
         if cached is not None:
             return cached
-        return self.put(key, factory())
+        started_at = self._timer()
+        surface = factory()
+        elapsed_ms = max(0.0, (self._timer() - started_at) * 1000)
+        self._build_count += 1
+        self._build_time_ms += elapsed_ms
+        self._max_build_time_ms = max(self._max_build_time_ms, elapsed_ms)
+        return self.put(key, surface)
 
     def clear(self) -> None:
         self._entries.clear()
@@ -83,6 +99,11 @@ class NativeSurfaceCache:
             "hits": self._hits,
             "misses": self._misses,
             "evictions": self._evictions,
+            "buildCount": self._build_count,
+            "buildTimeMs": round(self._build_time_ms, 2),
+            "averageBuildTimeMs": round(self._build_time_ms / self._build_count, 2) if self._build_count else 0.0,
+            "maxBuildTimeMs": round(self._max_build_time_ms, 2),
+            "oversizedBypasses": self._oversized_bypasses,
             "hitRatePercent": round(self._hits / requests * 100) if requests else 0,
         }
 
