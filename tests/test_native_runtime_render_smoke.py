@@ -4231,6 +4231,8 @@ class NativeRuntimeRenderSmokeTests(unittest.TestCase):
             warnings.filterwarnings("ignore", message="The system font .*", category=UserWarning)
             player = NativeRuntimePlayer(pygame, data_path)
 
+        fixed_now_ms = player.get_runtime_ticks_ms()
+        player.get_runtime_ticks_ms = lambda: fixed_now_ms
         player.start_story_from_title()
         timer = player.get_timed_choice_presentation()
         self.assertTrue(timer["visible"])
@@ -4249,6 +4251,8 @@ class NativeRuntimeRenderSmokeTests(unittest.TestCase):
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", message="The system font .*", category=UserWarning)
             restored_player = NativeRuntimePlayer(pygame, data_path)
+        restored_now_ms = restored_player.get_runtime_ticks_ms()
+        restored_player.get_runtime_ticks_ms = lambda: restored_now_ms
         restored_player.restore_from_snapshot(save_snapshot)
         restored_timer = restored_player.get_timed_choice_presentation()
         self.assertTrue(restored_timer["visible"])
