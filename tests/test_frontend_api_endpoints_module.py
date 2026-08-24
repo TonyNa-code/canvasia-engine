@@ -36,6 +36,7 @@ class FrontendApiEndpointsModuleTests(unittest.TestCase):
               saveScene: tools.API_SAVE_SCENE,
               previewTextRefactor: tools.API_PREVIEW_PROJECT_TEXT_REFACTOR,
               applyTextRefactor: tools.API_APPLY_PROJECT_TEXT_REFACTOR,
+              importUiKit: tools.API_IMPORT_UI_KIT,
               generateOpenAiAsset: tools.API_GENERATE_OPENAI_ASSET,
               defaultGenerateOpenAiAsset: tools.DEFAULT_API_ENDPOINTS.generateOpenAiAsset,
               fallback: tools.getApiEndpoint("missing", "/fallback"),
@@ -63,10 +64,12 @@ class FrontendApiEndpointsModuleTests(unittest.TestCase):
         self.assertIn("API_CREATIVE_ASSISTANT", payload["keys"])
         self.assertIn("createProjectHistorySnapshot", payload["endpointKeys"])
         self.assertIn("importLocalizationPatches", payload["endpointKeys"])
+        self.assertIn("importUiKit", payload["endpointKeys"])
         self.assertEqual(payload["projectData"], "/api/project-data")
         self.assertEqual(payload["saveScene"], "/api/save-scene")
         self.assertEqual(payload["previewTextRefactor"], "/api/preview-project-text-refactor")
         self.assertEqual(payload["applyTextRefactor"], "/api/apply-project-text-refactor")
+        self.assertEqual(payload["importUiKit"], "/api/import-ui-kit")
         self.assertEqual(payload["generateOpenAiAsset"], "/api/custom-openai-asset")
         self.assertEqual(payload["defaultGenerateOpenAiAsset"], "/api/generate-openai-asset")
         self.assertEqual(payload["fallback"], "/fallback")

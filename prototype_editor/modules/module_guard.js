@@ -44,6 +44,7 @@ const REQUIRED_EDITOR_MODULES = Object.freeze([
     { globalName: "CanvasiaEditorProjectVariableGovernance", script: "./modules/project_variable_governance.js", label: "变量治理" },
     { globalName: "CanvasiaEditorProjectRuntimeSettings", script: "./modules/project_runtime_settings.js", label: "运行设置" },
     { globalName: "CanvasiaEditorProjectRuntimeSettingsPanel", script: "./modules/project_runtime_settings_panel.js", label: "运行设置面板" },
+    { globalName: "CanvasiaEditorUiKitPackage", script: "./modules/ui_kit_package.js", label: "UI Kit 便携包" },
     { globalName: "CanvasiaEditorProjectSettings", script: "./modules/project_settings.js", label: "项目设置" },
     { globalName: "CanvasiaEditorDialogBoxReadability", script: "./modules/dialog_box_readability.js", label: "文本框可读性检查" },
     { globalName: "CanvasiaEditorValidationCache", script: "./modules/validation_cache.js", label: "项目巡检缓存" },

@@ -29,6 +29,7 @@ PYTHON_SYNTAX_FILES = [
     "editor_project_text_refactor.py",
     "editor_snapshot_cache.py",
     "editor_static_cache.py",
+    "editor_ui_kit.py",
     "export_route_playtest_workbook.py",
     "export_choice_consequence_sheet.py",
     "export_variable_influence_sheet.py",
@@ -359,6 +360,7 @@ def build_release_tooling_steps(python_executable: str) -> list[VerifyStep]:
         build_unittest_step("Stage image cross-runtime contract", "test_stage_image_contract.py", "release-tests", python_executable),
         build_unittest_step("Editor asset usage helpers", "test_editor_asset_usage.py", "release-tests", python_executable),
         build_unittest_step("Editor project presentation settings", "test_editor_project_presentation.py", "release-tests", python_executable),
+        build_unittest_step("Editor UI Kit import planning", "test_editor_ui_kit.py", "release-tests", python_executable),
         build_unittest_step("Maintainability tooling", "test_maintainability_check_tool.py", "release-tests", python_executable),
         VerifyStep(
             name="Maintainability guardrails",

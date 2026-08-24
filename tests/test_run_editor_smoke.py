@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import copy
 import hashlib
+import io
 import json
 import os
 import plistlib
@@ -5954,6 +5955,114 @@ class RunEditorSmokeTests(unittest.TestCase):
         if run_editor.should_build_editor_macos_app():
             self.assertTrue(Path(platform_map[run_editor.EDITOR_PLATFORM_MACOS]["appPath"]).is_dir())
             self.assertTrue(Path(platform_map[run_editor.EDITOR_PLATFORM_MACOS]["installerPath"]).is_file())
+
+    def test_ui_kit_import_rebinds_assets_and_preserves_metadata(self) -> None:
+        panel_file = build_upload_payload("portable_rain_panel.png", build_fake_png_bytes())
+        panel_file.update(
+            {
+                "displayName": "雨幕九宫格面板",
+                "assetType": "ui",
+                "tags": ["界面", "雨幕", "Canvasia UI Kit"],
+                "rights": {
+                    "license": "CC-BY-4.0",
+                    "author": "Test Studio",
+                    "commercialUse": "可商用",
+                    "attributionRequired": True,
+                },
+            }
+        )
+        payload = {
+            "name": "雨幕 UI Kit",
+            "gameUiConfig": {
+                "panelFrameAssetId": "source_panel",
+                "buttonFrameAssetId": "source_panel",
+                "accentColor": "#55aaff",
+            },
+            "dialogBoxConfig": {
+                "panelAssetId": "source_panel",
+                "preset": "custom",
+                "textColor": "#ffffff",
+            },
+            "bindings": {
+                "gameUiConfig.panelFrameAssetId": 0,
+                "gameUiConfig.buttonFrameAssetId": 0,
+                "dialogBoxConfig.panelAssetId": 0,
+            },
+            "files": [panel_file],
+        }
+
+        result = run_editor.import_project_ui_kit(payload)
+        imported_asset = result["assets"][0]
+        project = run_editor.read_json(run_editor.PROJECT_PATH)
+        assets = run_editor.read_json(run_editor.DATA_DIR / "assets.json").get("assets", [])
+        persisted_asset = next(asset for asset in assets if asset.get("id") == imported_asset["id"])
+
+        self.assertEqual(result["importedCount"], 1)
+        self.assertEqual(result["bindingCount"], 3)
+        self.assertEqual(project["gameUiConfig"]["panelFrameAssetId"], imported_asset["id"])
+        self.assertEqual(project["gameUiConfig"]["buttonFrameAssetId"], imported_asset["id"])
+        self.assertEqual(project["dialogBoxConfig"]["panelAssetId"], imported_asset["id"])
+        self.assertEqual(persisted_asset["name"], "雨幕九宫格面板")
+        self.assertIn("Canvasia UI Kit", persisted_asset["tags"])
+        self.assertEqual(persisted_asset["license"], "CC-BY-4.0")
+        self.assertEqual(persisted_asset["author"], "Test Studio")
+        self.assertEqual(persisted_asset["commercialUse"], "可商用")
+        self.assertTrue(persisted_asset["attributionRequired"])
+        self.assertTrue((run_editor.TEMPLATE_DIR / persisted_asset["path"]).is_file())
+
+    def test_ui_kit_import_rolls_back_files_and_documents_on_save_failure(self) -> None:
+        assets_path = run_editor.DATA_DIR / "assets.json"
+        project_before = run_editor.PROJECT_PATH.read_bytes()
+        assets_before = assets_path.read_bytes()
+        ui_dir = run_editor.TEMPLATE_DIR / run_editor.ASSET_DIRECTORIES["ui"]
+        files_before = {path.name for path in ui_dir.glob("*") if path.is_file()}
+        panel_file = build_upload_payload("rollback_ui_kit_panel.png", build_fake_png_bytes())
+        panel_file["assetType"] = "ui"
+        payload = {
+            "name": "Rollback UI Kit",
+            "gameUiConfig": {"panelFrameAssetId": "source_panel"},
+            "dialogBoxConfig": {},
+            "bindings": {"gameUiConfig.panelFrameAssetId": 0},
+            "files": [panel_file],
+        }
+
+        with mock.patch.object(run_editor, "save_project_settings", side_effect=OSError("simulated UI Kit save failure")):
+            with self.assertRaisesRegex(OSError, "simulated UI Kit save failure"):
+                run_editor.import_project_ui_kit(payload)
+
+        self.assertEqual(run_editor.PROJECT_PATH.read_bytes(), project_before)
+        self.assertEqual(assets_path.read_bytes(), assets_before)
+        self.assertEqual({path.name for path in ui_dir.glob("*") if path.is_file()}, files_before)
+
+    def test_smart_import_rejects_declared_type_extension_mismatch(self) -> None:
+        file_payload = build_upload_payload("disguised_music.mp3", b"not-an-image")
+        file_payload["assetType"] = "ui"
+
+        with self.assertRaisesRegex(ValueError, "disguised_music.mp3"):
+            run_editor.import_assets("auto", [file_payload], "ui")
+
+        self.assertFalse((run_editor.TEMPLATE_DIR / "assets/ui/disguised_music.mp3").exists())
+
+    def test_json_body_reader_rejects_oversized_ui_kit_before_reading(self) -> None:
+        handler = object.__new__(run_editor.EditorRequestHandler)
+        handler.headers = {"Content-Length": str(run_editor.MAX_UI_KIT_REQUEST_BYTES + 1)}
+        handler.rfile = io.BytesIO(b"{}")
+
+        with self.assertRaisesRegex(ValueError, "超过安全上限"):
+            handler.read_json_body(max_bytes=run_editor.MAX_UI_KIT_REQUEST_BYTES)
+
+        self.assertEqual(handler.rfile.tell(), 0)
+
+    def test_json_body_reader_accepts_ui_kit_within_limit(self) -> None:
+        raw = json.dumps({"format": "canvasia-ui-kit"}).encode("utf-8")
+        handler = object.__new__(run_editor.EditorRequestHandler)
+        handler.headers = {"Content-Length": str(len(raw))}
+        handler.rfile = io.BytesIO(raw)
+
+        self.assertEqual(
+            handler.read_json_body(max_bytes=run_editor.MAX_UI_KIT_REQUEST_BYTES),
+            {"format": "canvasia-ui-kit"},
+        )
 
 
 if __name__ == "__main__":

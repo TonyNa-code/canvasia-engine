@@ -10,6 +10,8 @@ This guide explains the current maintenance boundaries for contributors who want
 - `editor_local_security.py` owns loopback-only editor API checks. Keep Host, Origin, and Referer policy changes there instead of spreading request-safety rules through handlers.
 - `editor_port_selection.py` owns bounded loopback port discovery and readable exhaustion errors. Keep socket probing and port-range validation there; `run_editor.py` should only choose the preferred port and turn failures into command-line guidance.
 - `editor_project_presentation.py` owns backend defaults and sanitization for project dialog boxes and game UI, including speaker focus, automatic dialogue-camera controls, and voice-reactive character acting. Keep project-file persistence rules there, keep editor/native/Web defaults aligned through focused contract tests, and leave `run_editor.py` responsible only for reading, saving, and exporting the normalized result.
+- `prototype_editor/modules/ui_kit_package.js` owns the portable UI Kit browser format and its injected product workflow: dependency discovery, de-duplication, bounded sequential binary embedding, canonical SHA-256 calculation, structural validation, import-request shaping, confirmation, status, and download/upload orchestration. Keep package schema, role/type rules, file-count limits, browser-side size limits, and UI Kit workflow wording there instead of rebuilding them in `app.js`; the module stays DOM-free by accepting editor callbacks.
+- `editor_ui_kit.py` owns the pure backend UI Kit import plan: package name, file descriptors, binding-path allowlist, role/type compatibility, and project-local asset-ID rebinding. `run_editor.py` owns only the guarded endpoint, common asset import, final project writes, history entry, and transaction rollback. Any format change must keep both modules, `tests/test_editor_ui_kit.py`, `tests/test_frontend_ui_kit_package_module.py`, `tests/test_run_editor_smoke.py`, CI syntax coverage, and [the UI Kit format contract](ui-kit-packages.md) aligned.
 - `editor_snapshot_cache.py` owns small immutable-snapshot cache behavior. Reuse `SnapshotCache` for expensive read-mostly payloads that can be invalidated by a file signature.
 - `openai_asset_generation.py` owns image-generation API calls and returned-file validation.
 - `prototype_editor/modules/` owns browser-side editor logic that can be tested without a browser DOM.
@@ -161,6 +163,7 @@ When adding a new `/api/*` route:
 - Keep it behind the shared `EditorRequestHandler` request guard.
 - Return JSON errors for user-facing failures.
 - Avoid writing outside the active project or approved export/cache directories.
+- Apply a route-specific `Content-Length` ceiling before reading requests that embed base64 files. The UI Kit endpoint intentionally uses a 64 MB request ceiling around its 48 MB package and 32 MB decoded-asset limits; do not replace this with a global ceiling that could silently break supported video imports.
 
 ## Recommended Checks
 

@@ -22,6 +22,7 @@ const {
   API_CREATE_SCENE,
   API_EXPORT_BUILD,
   API_IMPORT_ASSETS,
+  API_IMPORT_UI_KIT,
   API_GENERATE_OPENAI_ASSET,
   API_CREATE_VOICE_PLACEHOLDER,
   API_CREATE_VOICE_PLACEHOLDERS,
@@ -191,6 +192,7 @@ const buildTemplateAssetUrl = (relativePath) =>
   editorCommonTools.buildTemplateAssetUrl(relativePath, state.data?.currentProject?.publicRoot ?? "");
 const projectRuntimeSettingsTools = window.CanvasiaEditorProjectRuntimeSettings;
 const projectRuntimeSettingsPanelTools = window.CanvasiaEditorProjectRuntimeSettingsPanel;
+const uiKitPackageTools = window.CanvasiaEditorUiKitPackage;
 const projectSettingsTools = window.CanvasiaEditorProjectSettings;
 const dialogBoxReadabilityTools = window.CanvasiaEditorDialogBoxReadability;
 const validationCacheTools = window.CanvasiaEditorValidationCache;
@@ -828,6 +830,32 @@ const state = {
   commandPaletteSelectedIndex: 0,
   commandPaletteRecentIds: loadStoredCommandPaletteRecentIds(null),
 };
+
+const uiKitWorkflow = uiKitPackageTools.createUiKitWorkflow({
+  getProjectModel: () => {
+    const projectTitle = String(state.data?.project?.title || "Canvasia UI").trim() || "Canvasia UI";
+    return {
+      name: `${projectTitle} UI Kit`,
+      projectTitle,
+      gameUiConfig: readProjectGameUiConfigFromInputs(),
+      dialogBoxConfig: readProjectDialogBoxConfigFromInputs(),
+      assetList: state.data?.assetList ?? [],
+    };
+  },
+  getAssetUrl: getAssetPublicUrl,
+  sanitizeFileName,
+  downloadJsonFile,
+  readFileAsText,
+  parseJsonImportText,
+  formatFileSize,
+  confirmImport: showEngineConfirm,
+  postImport: (payload) => postJson(API_IMPORT_UI_KIT, payload),
+  reloadProjectData: () => reloadProjectData({ ...getCurrentUiState() }),
+  renderAll,
+  setSaveStatus,
+  showToast,
+  showFailure: showEditorOperationFailure,
+});
 
 function getSafeUiThemeMode(mode) {
   const safeMode = String(mode ?? "").trim();
@@ -4177,6 +4205,16 @@ async function handleClick(event) {
     return;
   }
 
+  if (action === "export-project-ui-kit") {
+    void uiKitWorkflow.exportPackage();
+    return;
+  }
+
+  if (action === "import-project-ui-kit") {
+    document.getElementById("projectUiKitImportInput")?.click();
+    return;
+  }
+
   if (action === "set-preview-dialog-theme-project") {
     state.previewPlayback.dialogTheme = "project";
     persistPreviewPlaybackSettings();
@@ -5295,6 +5333,12 @@ function handleChange(event) {
 
   if (target.id === "assetImportInput") {
     void importAssets(Array.from(target.files ?? []));
+    target.value = "";
+    return;
+  }
+
+  if (target.id === "projectUiKitImportInput") {
+    void uiKitWorkflow.importPackage(target.files?.[0] ?? null);
     target.value = "";
     return;
   }

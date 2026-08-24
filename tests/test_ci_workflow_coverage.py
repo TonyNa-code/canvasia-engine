@@ -573,6 +573,25 @@ class CiWorkflowCoverageTests(unittest.TestCase):
             workflow,
         )
 
+    def test_editor_ui_kit_modules_are_checked_in_ci(self) -> None:
+        workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+
+        for path in (
+            "editor_ui_kit.py",
+            "prototype_editor/modules/ui_kit_package.js",
+            "tests/test_editor_ui_kit.py",
+            "tests/test_frontend_ui_kit_package_module.py",
+        ):
+            self.assertIn(path, workflow)
+        self.assertIn(
+            "python -m unittest discover -s tests -p 'test_editor_ui_kit.py' -v",
+            workflow,
+        )
+        self.assertIn(
+            "python -m unittest discover -s tests -p 'test_frontend_ui_kit_package_module.py' -v",
+            workflow,
+        )
+
     def test_native_runtime_controller_input_module_is_checked_in_ci(self) -> None:
         workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
 

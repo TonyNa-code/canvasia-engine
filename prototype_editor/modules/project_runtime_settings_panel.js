@@ -620,11 +620,23 @@
           <button class="toolbar-button toolbar-button-primary" data-action="save-project-game-ui-config">
             保存成品 UI 皮肤
           </button>
+          <button class="toolbar-button" data-action="export-project-ui-kit">
+            导出完整 UI Kit
+          </button>
+          <button class="toolbar-button" data-action="import-project-ui-kit">
+            导入 UI Kit
+          </button>
           <button class="toolbar-button" data-action="export-build" data-export-target="web">
             导出网页包检查外观
           </button>
+          <input
+            id="projectUiKitImportInput"
+            class="sr-only"
+            type="file"
+            accept="application/json,.json,.canvasia-ui-kit.json"
+          />
         </div>
-        <div class="detail-meta">当前覆盖标题页、系统菜单、存档/读档、EXTRA/图鉴弹窗、侧栏、按钮、HUD、说话者聚焦、自动对话镜头、语音驱动角色演技、布局位置、UI 贴图绑定、九宫格拉伸和按钮多状态贴图。</div>
+        <div class="detail-meta">UI Kit 会把文本框、成品皮肤、字体与所引用的 UI 图片一起打包，适合跨项目复用。当前还覆盖标题页、系统菜单、存档/读档、EXTRA/图鉴弹窗、侧栏、按钮、HUD、说话者聚焦、自动对话镜头、语音驱动角色演技、布局位置、九宫格拉伸和按钮多状态贴图。</div>
       </section>
     `;
   }

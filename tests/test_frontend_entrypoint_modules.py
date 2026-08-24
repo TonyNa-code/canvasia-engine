@@ -50,6 +50,7 @@ class FrontendEntrypointModuleTests(unittest.TestCase):
             "./modules/project_variable_governance.js",
             "./modules/project_runtime_settings.js",
             "./modules/project_runtime_settings_panel.js",
+            "./modules/ui_kit_package.js",
             "./modules/project_settings.js",
             "./modules/dialog_box_readability.js",
             "./modules/validation_cache.js",

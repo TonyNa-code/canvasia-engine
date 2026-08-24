@@ -36,6 +36,10 @@ from editor_project_text_refactor import (
     build_project_text_refactor_preview,
 )
 from editor_character_stage_presets import normalize_character_stage_presets_for_migration, sanitize_character_stage_presets
+from editor_ui_kit import (
+    build_ui_kit_import_plan,
+    prepare_ui_kit_import,
+)
 from project_variable_migration import replace_variable_reference_in_block
 from editor_static_cache import (
     build_editor_static_cache_headers,
@@ -191,6 +195,7 @@ PROJECTS_DIR = ROOT_DIR / "projects"
 SAMPLE_PROJECT_DIR = ROOT_DIR / "template_project"
 SAMPLE_PROJECT_ID = "sample_heartbeat"
 DEFAULT_PORT = 8765
+MAX_UI_KIT_REQUEST_BYTES = 64 * 1024 * 1024
 EXPORTS_DIR = ROOT_DIR / "exports"
 EXPORT_TEMPLATE_DIR = ROOT_DIR / "export_player_template"
 EXPORT_PLAYER_SCRIPT_FILES = (
@@ -4653,23 +4658,30 @@ def import_assets(asset_type: str, files: list[dict], fallback_asset_type: str |
     existing_names_by_type: dict[str, set[str]] = {}
     imported_assets = []
     grouped_counts: dict[str, int] = {}
-    pending_files: list[tuple[str, bytes, str]] = []
+    pending_files: list[tuple[str, bytes, str, dict]] = []
     invalid_files: list[tuple[str, str, str]] = []
     written_paths: list[Path] = []
+    transaction_snapshots = capture_file_snapshots([assets_path, PROJECT_PATH])
 
     for file_item in files:
         file_name, raw = decode_uploaded_file(file_item)
-        resolved_asset_type = (
-            choose_smart_asset_type(file_name, fallback_asset_type)
-            if asset_type == "auto"
-            else asset_type
-        )
-        if asset_type != "auto" and not is_replace_file_allowed_for_asset_type(resolved_asset_type, file_name):
+        descriptor_asset_type = str(file_item.get("assetType") or "").strip()
+        if asset_type == "auto" and descriptor_asset_type:
+            if descriptor_asset_type not in ASSET_DIRECTORIES:
+                raise ValueError(f"文件“{file_name}”声明了不受支持的素材类型。")
+            resolved_asset_type = descriptor_asset_type
+        else:
+            resolved_asset_type = (
+                choose_smart_asset_type(file_name, fallback_asset_type)
+                if asset_type == "auto"
+                else asset_type
+            )
+        if not is_replace_file_allowed_for_asset_type(resolved_asset_type, file_name):
             type_label = ASSET_TYPE_LABELS.get(str(resolved_asset_type or ""), str(resolved_asset_type or "素材"))
             extension_hint = get_asset_replace_extension_hint(resolved_asset_type)
             invalid_files.append((file_name, type_label, extension_hint))
             continue
-        pending_files.append((file_name, raw, resolved_asset_type))
+        pending_files.append((file_name, raw, resolved_asset_type, file_item))
 
     if invalid_files:
         _, type_label, extension_hint = invalid_files[0]
@@ -4683,7 +4695,7 @@ def import_assets(asset_type: str, files: list[dict], fallback_asset_type: str |
         )
 
     try:
-        for file_name, raw, resolved_asset_type in pending_files:
+        for file_name, raw, resolved_asset_type, file_item in pending_files:
             target_relative_dir = ASSET_DIRECTORIES[resolved_asset_type]
             target_dir = TEMPLATE_DIR / target_relative_dir
             target_dir.mkdir(parents=True, exist_ok=True)
@@ -4699,30 +4711,86 @@ def import_assets(asset_type: str, files: list[dict], fallback_asset_type: str |
             asset_record = {
                 "id": asset_id,
                 "type": resolved_asset_type,
-                "name": display_asset_name(file_name),
+                "name": str(file_item.get("displayName") or "").strip()[:160] or display_asset_name(file_name),
                 "path": (target_relative_dir / output_name).as_posix(),
-                "tags": [],
+                "tags": normalize_asset_tags(file_item.get("tags")),
                 "favorite": False,
             }
+            apply_asset_rights_metadata(asset_record, file_item.get("rights"))
             assets.append(asset_record)
             imported_assets.append(enrich_asset_record(asset_record))
             grouped_counts[resolved_asset_type] = grouped_counts.get(resolved_asset_type, 0) + 1
 
         write_json(assets_path, assets_doc)
+        touch_project()
     except Exception:
         for written_path in reversed(written_paths):
             try:
                 written_path.unlink(missing_ok=True)
             except OSError:
                 pass
+        restore_file_snapshots(transaction_snapshots)
+        clear_project_bundle_cache()
         raise
 
-    touch_project()
+    clear_project_bundle_cache()
     return {
         "assetType": imported_assets[0]["type"] if imported_assets else fallback_asset_type or asset_type,
         "importedCount": len(imported_assets),
         "assets": imported_assets,
         "groupedCounts": grouped_counts,
+    }
+
+
+def import_project_ui_kit(payload: object) -> dict:
+    prepared = prepare_ui_kit_import(
+        payload,
+        decode_file=decode_uploaded_file,
+        is_file_allowed=is_replace_file_allowed_for_asset_type,
+        asset_type_labels=ASSET_TYPE_LABELS,
+    )
+    name = prepared["name"]
+    files = prepared["files"]
+    bindings = prepared["bindings"]
+
+    assets_path = DATA_DIR / "assets.json"
+    snapshots = capture_file_snapshots([assets_path, PROJECT_PATH])
+    imported_assets: list[dict] = []
+    try:
+        if files:
+            import_result = import_assets("auto", files, "ui")
+            imported_assets = import_result.get("assets") or []
+        plan = build_ui_kit_import_plan(
+            game_ui_config=prepared["gameUiConfig"],
+            dialog_box_config=prepared["dialogBoxConfig"],
+            bindings=bindings,
+            imported_assets=imported_assets,
+        )
+        settings_result = save_project_settings(
+            game_ui_config=plan["gameUiConfig"],
+            dialog_box_config=plan["dialogBoxConfig"],
+        )
+    except Exception:
+        for asset in imported_assets:
+            relative_path = str(asset.get("path") or "").strip()
+            if not relative_path:
+                continue
+            try:
+                (TEMPLATE_DIR / relative_path).unlink(missing_ok=True)
+            except OSError:
+                pass
+        restore_file_snapshots(snapshots)
+        clear_project_bundle_cache()
+        raise
+
+    clear_project_bundle_cache()
+    return {
+        **settings_result,
+        "name": name,
+        "assets": imported_assets,
+        "importedCount": len(imported_assets),
+        "bindingCount": plan["bindingCount"],
+        "totalAssetBytes": prepared["totalAssetBytes"],
     }
 
 
@@ -13521,6 +13589,10 @@ class EditorRequestHandler(SimpleHTTPRequestHandler):
             self.handle_import_assets()
             return
 
+        if parsed.path == "/api/import-ui-kit":
+            self.handle_import_ui_kit()
+            return
+
         if parsed.path == "/api/generate-openai-asset":
             self.handle_generate_openai_asset()
             return
@@ -14106,6 +14178,28 @@ class EditorRequestHandler(SimpleHTTPRequestHandler):
         except Exception as error:  # pragma: no cover - defensive fallback
             self.send_json(
                 {"ok": False, "error": f"导入素材时出了意外问题：{error}"},
+                status=HTTPStatus.INTERNAL_SERVER_ERROR,
+            )
+
+    def handle_import_ui_kit(self) -> None:
+        try:
+            payload = self.read_json_body(max_bytes=MAX_UI_KIT_REQUEST_BYTES)
+            result = import_project_ui_kit(payload)
+            result = attach_history_to_result(result, f"导入 UI Kit：{result.get('name') or '未命名'}")
+            self.send_json(
+                {
+                    "ok": True,
+                    "savedAt": now_iso(),
+                    **result,
+                }
+            )
+        except json.JSONDecodeError:
+            self.send_json({"ok": False, "error": "请求体不是有效 JSON。"}, status=HTTPStatus.BAD_REQUEST)
+        except ValueError as error:
+            self.send_json({"ok": False, "error": str(error)}, status=HTTPStatus.BAD_REQUEST)
+        except Exception as error:  # pragma: no cover - defensive fallback
+            self.send_json(
+                {"ok": False, "error": f"导入 UI Kit 时出了意外问题：{error}"},
                 status=HTTPStatus.INTERNAL_SERVER_ERROR,
             )
 
@@ -14806,8 +14900,15 @@ class EditorRequestHandler(SimpleHTTPRequestHandler):
                 status=HTTPStatus.INTERNAL_SERVER_ERROR,
             )
 
-    def read_json_body(self) -> dict:
-        content_length = int(self.headers.get("Content-Length", "0"))
+    def read_json_body(self, *, max_bytes: int | None = None) -> dict:
+        try:
+            content_length = int(self.headers.get("Content-Length", "0"))
+        except (TypeError, ValueError) as error:
+            raise ValueError("请求体大小无效。") from error
+        if content_length < 0:
+            raise ValueError("请求体大小无效。")
+        if max_bytes is not None and content_length > max_bytes:
+            raise ValueError("UI Kit 请求体超过安全上限。")
         raw = self.rfile.read(content_length)
         return json.loads(raw.decode("utf-8"))
 

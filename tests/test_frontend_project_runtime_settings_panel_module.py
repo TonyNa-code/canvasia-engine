@@ -175,6 +175,8 @@ class FrontendProjectRuntimeSettingsPanelModuleTests(unittest.TestCase):
               hasMobileReaderMode: html.includes('id="projectRuntimeDefaultMobileReaderModeSelect"') && html.includes("手机触控阅读"),
               hasDialogAction: html.includes('data-action="apply-dialog-box-readability-fix"'),
               hasGameUiSave: html.includes('data-action="save-project-game-ui-config"'),
+              hasUiKitActions: html.includes('data-action="export-project-ui-kit"') && html.includes('data-action="import-project-ui-kit"'),
+              hasUiKitInput: html.includes('id="projectUiKitImportInput"') && html.includes(".canvasia-ui-kit.json"),
               hasAssetName: html.includes("文本框 · box.png"),
               hasVariableHost: html.includes("projectVariableLibraryPanelHost"),
               hasFrameSlice: html.includes("projectGameUiPanelFrameSliceTopInput"),
@@ -200,6 +202,8 @@ class FrontendProjectRuntimeSettingsPanelModuleTests(unittest.TestCase):
         self.assertTrue(payload["hasMobileReaderMode"])
         self.assertTrue(payload["hasDialogAction"])
         self.assertTrue(payload["hasGameUiSave"])
+        self.assertTrue(payload["hasUiKitActions"])
+        self.assertTrue(payload["hasUiKitInput"])
         self.assertTrue(payload["hasAssetName"])
         self.assertTrue(payload["hasVariableHost"])
         self.assertTrue(payload["hasFrameSlice"])
